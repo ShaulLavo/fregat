@@ -6,6 +6,7 @@ import { Elysia } from 'elysia'
 import { attachmentRoutes } from './attachments/routes'
 import { authGuard, createAuthConfig, isCorsOriginAllowed, type AuthOptions } from './auth'
 import { getDefaultPlatformDatabase } from './db/client'
+import { migratePlatformDatabase } from './db/migrations'
 import { readEnvironmentIdentity } from './db/environment-identity'
 import { fontRoutes } from './fonts/routes'
 import { NerdFontService, type FontService } from './fonts/service'
@@ -107,6 +108,10 @@ export function createApp(options: AppOptions) {
   })
   const fonts = options.fonts ?? new NerdFontService()
   const database = options.orchestration?.database ?? getDefaultPlatformDatabase()
+  // The schema has to exist before anything below reads this handle: the
+  // identity row, the settings store, and the engine all query it while
+  // `createApp` is still running. Idempotent — applied versions are skipped.
+  migratePlatformDatabase(database)
   // Before the registry, because the registry is built *from* it. One SQLite
   // file backs the whole platform, so settings ride on whichever handle this
   // app was given — in tests that is the in-memory database, which is what

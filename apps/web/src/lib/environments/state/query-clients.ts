@@ -53,9 +53,11 @@ export function registerEnvironmentQueryClient(
     owners.set(queryClient, { client, origin })
     return
   }
-  if (owner.origin === origin && owner.client === client) return
-
-  throw createQueryClientOwnerConflictError(owner.origin, origin)
+  if (owner.origin !== origin) throw createQueryClientOwnerConflictError(owner.origin, origin)
+  // Same origin, different transport: that is a client swap against the same
+  // server, so the cache stays coherent. It is how `setClient` reaches queries
+  // that resolve through this registry rather than through `getClient()`.
+  if (owner.client !== client) owners.set(queryClient, { client, origin })
 }
 
 export function clientForQueryClient(queryClient: QueryClient): Client {
