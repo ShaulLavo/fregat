@@ -9,9 +9,14 @@ import {
   type FileTreeResult,
 } from '@workspace/contracts'
 import { FsError, mapNodeError } from './errors'
-import { isIgnoredPath, treeIgnoredNames, toPosix, type WorkspacePaths } from './path'
-import { assertDirectory, readEntryStats } from './stat'
-import { fileVersion } from './version'
+import {
+  isIgnoredPath,
+  resolveExistingPath,
+  treeIgnoredNames,
+  toPosix,
+  type WorkspacePaths,
+} from './path'
+import { assertDirectory, statPath } from './stat'
 
 export type TreeReadOptions = {
   concurrency?: number
@@ -26,11 +31,11 @@ export async function readTree(
   entryType?: EntryTypeFilter,
   options: TreeReadOptions = {},
 ): Promise<FileTreeResult> {
-  const target = paths.resolve(input)
-  if (paths.isInternalPath(target.relativePath)) throw new FsError('NOT_FOUND')
+  if (paths.isInternalPath(input)) throw new FsError('NOT_FOUND')
   const limit = createTaskLimiter(options.concurrency ?? 32)
 
   try {
+    const target = await resolveExistingPath(paths, input)
     const stats = await stat(target.absolutePath)
     assertDirectory(stats)
 
@@ -78,9 +83,7 @@ async function readEntry(
   entryType: EntryTypeFilter | undefined,
   limit: TaskLimiter,
 ) {
-  const entry = await limit(() =>
-    readEntryMetadata(paths, absoluteDirectory, relativeDirectory, name),
-  )
+  const entry = await limit(() => readEntryMetadata(paths, relativeDirectory, name))
   if (!entry) return null
 
   if (!isDirectoryEntry(entry)) return matchingEntry(entry, entryType)
@@ -99,7 +102,6 @@ async function readEntry(
 
 async function readEntryMetadata(
   paths: WorkspacePaths,
-  absoluteDirectory: string,
   relativeDirectory: string,
   name: string,
 ): Promise<FileTreeEntry | null> {
@@ -107,8 +109,7 @@ async function readEntryMetadata(
   if (paths.isInternalPath(relativePath)) return null
   if (isIgnoredPath(relativePath, treeIgnoredNames)) return null
 
-  const absolutePath = path.join(absoluteDirectory, name)
-  const entryStats = await safeEntryStats(absolutePath)
+  const entryStats = await safeEntryStats(paths, relativePath)
   if (!entryStats) return null
 
   return {
@@ -116,16 +117,16 @@ async function readEntryMetadata(
     path: relativePath,
     type: entryStats.type,
     targetType: entryStats.targetType,
-    size: entryStats.targetStats.size,
-    mtimeMs: entryStats.targetStats.mtimeMs,
-    birthtimeMs: entryStats.targetStats.birthtimeMs,
-    version: fileVersion(entryStats.targetStats),
+    size: entryStats.size,
+    mtimeMs: entryStats.mtimeMs,
+    birthtimeMs: entryStats.birthtimeMs,
+    version: entryStats.version,
   } satisfies FileTreeEntry
 }
 
-async function safeEntryStats(absolutePath: string) {
+async function safeEntryStats(paths: WorkspacePaths, relativePath: string) {
   try {
-    return await readEntryStats(absolutePath)
+    return await statPath(paths, relativePath)
   } catch {
     return null
   }

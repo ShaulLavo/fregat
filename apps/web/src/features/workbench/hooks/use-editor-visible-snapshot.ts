@@ -88,6 +88,7 @@ type CaptureRuntime = {
   coreDocumentGeneration: number | null
   disposed: boolean
   generation: number
+  livePaintSnapshot: EditorViewSnapshot | null
   latestSnapshot: {
     readonly generation: number
     readonly kind: EditorViewContributionUpdateKind
@@ -96,6 +97,7 @@ type CaptureRuntime = {
   paintFrame: number | null
   paintIdentity: string | null
   pendingPaintEvents: PendingPaintEvent[]
+  terminalPaint: PendingPaintEvent | null
   presentationTimer: ReturnType<typeof setTimeout> | null
   renderedDocument: RenderedSnapshotDocument | null
   selectedTarget: SnapshotTarget
@@ -157,6 +159,12 @@ export function useEditorVisibleSnapshot({
         presented.attemptedIdentities,
       ),
     )
+  } else if (
+    presented.record &&
+    selectedTarget.contentVersion !== null &&
+    presented.record.contentVersion !== selectedTarget.contentVersion
+  ) {
+    setPresented({ ...presented, record: null })
   }
 
   const overlayRef = useRef<HTMLDivElement>(null)
@@ -167,7 +175,9 @@ export function useEditorVisibleSnapshot({
     () => (removeTarget?: SnapshotPath) => {
       const overlay = overlayRef.current
       if (overlay) overlay.hidden = true
-      cancelOverlayPresentation(currentCaptureRuntime(runtimeRef))
+      const runtime = currentCaptureRuntime(runtimeRef)
+      cancelOverlayPresentation(runtime)
+      runtime.terminalPaint = null
       if (removeTarget) removeEditorVisibleSnapshotCacheForPath(storage, removeTarget)
       setPresented((current) => {
         if (current.record === null) return current
@@ -314,6 +324,7 @@ export function useEditorVisibleSnapshot({
     const startedAt = now()
     const detail = {
       ...editorVisibleSnapshotCounts(record.snapshot),
+      contentVersionKnown: runtime.selectedTarget.contentVersion !== null,
       path: record.path,
       rootPath: record.rootPath,
       themeId: record.themeId,
@@ -387,10 +398,12 @@ function createCaptureRuntime(
     coreDocumentGeneration: null,
     disposed: false,
     generation: 0,
+    livePaintSnapshot: null,
     latestSnapshot: null,
     paintFrame: null,
     paintIdentity: null,
     pendingPaintEvents: [],
+    terminalPaint: null,
     presentationTimer: null,
     renderedDocument,
     selectedTarget,
@@ -423,6 +436,7 @@ function installCaptureIdentity(
   runtime.committedThemeId = theme.committedThemeId
   runtime.cachedPaintFrameTime = null
   runtime.latestSnapshot = null
+  runtime.livePaintSnapshot = null
   runtime.renderedDocument = renderedDocument
   runtime.selectedTarget = selectedTarget
   runtime.selectedThemeId = theme.selectedThemeId
@@ -466,6 +480,7 @@ function acceptSnapshot(
   if (!captureIdentityMatches(runtime, snapshot)) return
 
   cancelPendingCapture(runtime)
+  runtime.livePaintSnapshot = snapshot
   runtime.latestSnapshot = { generation: runtime.generation, kind, snapshot }
   if (snapshot.initialHighlightStatus === 'loading') return
 
@@ -486,6 +501,10 @@ function flushCapture(runtime: CaptureRuntime, expectedGeneration = runtime.gene
   if (pending.snapshot.visibleRows.length === 0) return
 
   const startedAt = now()
+  const captureDetail = {
+    syntaxStatus: pending.snapshot.syntaxStatus,
+    updateKind: pending.kind,
+  }
   const visible = pending.snapshot.toVisibleSnapshot()
   const materializeDurationMs = now() - startedAt
   if (!visible || visible.rows.length === 0) {
@@ -493,11 +512,11 @@ function flushCapture(runtime: CaptureRuntime, expectedGeneration = runtime.gene
     recordEditorVisibleSnapshotPerformance(
       'editor.visible_snapshot.materialize',
       materializeDurationMs,
-      { outcome, updateKind: pending.kind },
+      { ...captureDetail, outcome },
     )
     recordEditorVisibleSnapshotPerformance('editor.visible_snapshot.capture', now() - startedAt, {
+      ...captureDetail,
       outcome,
-      updateKind: pending.kind,
     })
     return
   }
@@ -513,12 +532,12 @@ function flushCapture(runtime: CaptureRuntime, expectedGeneration = runtime.gene
     materializeDurationMs,
     {
       ...editorVisibleSnapshotCounts(snapshot),
+      ...captureDetail,
       outcome: 'ready',
-      updateKind: pending.kind,
     },
   )
   const result = writeEditorVisibleSnapshotCache(runtime.storage, {
-    cacheVersion: 2,
+    cacheVersion: 4,
     contentVersion,
     path: rendered.path,
     rootPath: rendered.rootPath,
@@ -527,9 +546,9 @@ function flushCapture(runtime: CaptureRuntime, expectedGeneration = runtime.gene
   })
   recordEditorVisibleSnapshotPerformance('editor.visible_snapshot.capture', now() - startedAt, {
     ...editorVisibleSnapshotCounts(snapshot),
+    ...captureDetail,
     outcome: result.status,
     serializedBytes: result.serializedBytes,
-    updateKind: pending.kind,
   })
 }
 
@@ -569,6 +588,7 @@ function acceptInitialPaint(
   if (paintIdentity !== currentPaintIdentity) return
 
   if (event.phase === 'text') {
+    runtime.terminalPaint = null
     runtime.coreDocumentGeneration = event.documentGeneration
     runtime.paintIdentity = paintIdentity
   } else if (
@@ -583,7 +603,7 @@ function acceptInitialPaint(
 }
 
 function scheduleAuthoritativePaint(runtime: CaptureRuntime, dismiss: () => void): void {
-  if (runtime.pendingPaintEvents.length === 0) return
+  if (runtime.pendingPaintEvents.length === 0 && runtime.terminalPaint === null) return
   const currentPaintIdentity = authoritativePaintIdentity(
     runtime.active,
     runtime.renderedDocument,
@@ -626,8 +646,6 @@ function flushInitialPaint(runtime: CaptureRuntime, dismiss: () => void, frameTi
       selectedThemeId: runtime.selectedThemeId,
     },
   )
-  let terminal = false
-
   for (const item of pending) {
     if (item.paintIdentity !== currentPaintIdentity) continue
     if (item.paintIdentity !== runtime.paintIdentity) continue
@@ -641,7 +659,7 @@ function flushInitialPaint(runtime: CaptureRuntime, dismiss: () => void, frameTi
       continue
     }
 
-    if (item.event.status !== 'plain') terminal = true
+    if (item.event.status !== 'plain') runtime.terminalPaint = item
     if (item.event.status === 'painted' || item.event.status === 'degraded') {
       markEditorVisibleSnapshotPerformance(
         'editor.authoritative_highlight_paint',
@@ -656,7 +674,36 @@ function flushInitialPaint(runtime: CaptureRuntime, dismiss: () => void, frameTi
     })
   }
 
-  if (terminal) dismiss()
+  const terminal = runtime.terminalPaint
+  if (!terminal || terminal.paintIdentity !== currentPaintIdentity) return
+  if (terminal.event.documentGeneration !== runtime.coreDocumentGeneration) return
+  if (terminal.event.phase !== 'highlight-settled') return
+  if (terminal.event.status === 'error' || runtime.presentationTimer === null) {
+    dismiss()
+    return
+  }
+
+  const snapshot = runtime.livePaintSnapshot
+  if (
+    snapshot?.documentId === terminal.event.documentId &&
+    snapshot.textVersion === terminal.event.textVersion &&
+    snapshot.paintLayers !== null
+  ) {
+    markEditorVisibleSnapshotPerformance('editor.authoritative_visible_paint', {
+      ...paintEventDetail(terminal.event),
+      foldMarkers: snapshot.foldMarkers.length,
+      paintLayers: snapshot.paintLayers.length,
+      paintRectangles: snapshot.paintLayers.reduce(
+        (count, layer) => count + layer.rectangles.length,
+        0,
+      ),
+      syntaxStatus: snapshot.syntaxStatus,
+    })
+    dismiss()
+    return
+  }
+
+  scheduleAuthoritativePaint(runtime, dismiss)
 }
 
 function paintEventDetail(event: EditorInitialPaintEvent): Readonly<Record<string, unknown>> {
@@ -711,6 +758,7 @@ function cancelAuthoritativePaint(runtime: CaptureRuntime): void {
   runtime.coreDocumentGeneration = null
   runtime.paintIdentity = null
   runtime.pendingPaintEvents = []
+  runtime.terminalPaint = null
   cancelAuthoritativePaintFrame(runtime)
 }
 
@@ -739,14 +787,12 @@ function initialPresentedSnapshot(
     active &&
     !fileReadError &&
     cachePresentationMatchesRenderedDocument(renderedDocument, selectedTarget) &&
-    selectedTarget.contentVersion !== null &&
     theme.selectedThemeId === theme.committedThemeId
   const attempted =
     renderedDocument === null ||
     cachePresentationMatchesRenderedDocument(renderedDocument, selectedTarget)
   const attemptedIdentities = attempted ? new Set([...priorAttempts, identity]) : priorAttempts
-  const contentVersion = selectedTarget.contentVersion
-  if (!eligible || contentVersion === null) {
+  if (!eligible) {
     return { attempted, attemptedIdentities, identity, record: null }
   }
 
@@ -755,7 +801,6 @@ function initialPresentedSnapshot(
     attemptedIdentities,
     identity,
     record: readEditorVisibleSnapshotCache(storage, {
-      contentVersion,
       path: selectedTarget.path,
       rootPath: selectedTarget.rootPath,
       themeId: theme.committedThemeId,
@@ -782,7 +827,11 @@ function presentableRecord(
   theme: EditorSnapshotThemeIdentity,
 ): CachedEditorVisibleSnapshot | null {
   if (!record || !active || fileReadError) return null
-  if (record.contentVersion !== selectedTarget.contentVersion) return null
+  if (
+    selectedTarget.contentVersion !== null &&
+    record.contentVersion !== selectedTarget.contentVersion
+  )
+    return null
   if (record.rootPath !== selectedTarget.rootPath) return null
   if (record.path !== selectedTarget.path) return null
   if (theme.selectedThemeId !== theme.committedThemeId) return null
@@ -800,7 +849,6 @@ function cachePresentationIdentity(
 ): string {
   return [
     active ? 'active' : 'inactive',
-    target.contentVersion ?? 'unknown-content',
     target.rootPath,
     target.path,
     theme.committedThemeId,
@@ -844,7 +892,9 @@ function initialPaintCandidateIdentity(
 
 function visibleSnapshotUnsupportedOutcome(
   snapshot: EditorViewSnapshot,
-): 'unreplayable-plugin-css' | 'unreplayable-widget' {
+): 'pending-paint' | 'unreplayable-plugin-css' | 'unreplayable-widget' {
+  if (snapshot.paintLayers === null) return 'pending-paint'
+
   for (const row of snapshot.visibleRows) {
     if (row.mountedPaintSupport === 'unreplayable-plugin-css') {
       return 'unreplayable-plugin-css'

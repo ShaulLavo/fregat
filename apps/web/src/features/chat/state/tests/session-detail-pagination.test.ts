@@ -1,25 +1,31 @@
 import {
   ORCHESTRATION_SESSION_DETAIL_PAGE_SIZE,
+  eventIdSchema,
   orchestrationEventSchema,
   sessionIdSchema,
   type OrchestrationMessage,
   type OrchestrationSessionDetailPage,
   type OrchestrationSessionDetailSnapshot,
+  type OrchestrationSessionActivity,
 } from '@workspace/contracts'
 import * as v from 'valibot'
 
-import { CHAT_MESSAGE_CACHE_LIMIT } from '../chat-cache-constants'
-import { createInitialChatProjectionSlice } from '../chat-projection-store'
+import { CHAT_MESSAGE_CACHE_LIMIT } from '@workspace/client-core/chat/cache-constants'
+import { createInitialChatProjectionSlice } from '@workspace/client-core/chat/types'
 import {
   chatSessionEarlierPageInput,
   selectChatSessionHasEarlier,
-} from '../chat-projection-selectors'
+} from '@workspace/client-core/chat/selectors'
 import {
   applyChatProjectionEvent,
   prependChatProjectionSessionDetailPage,
   syncChatProjectionSessionDetailSnapshot,
-} from '../chat-projection-writers'
-import { chatMessage, session as sessionFactory } from '../../../../../test/factories/chat'
+} from '@workspace/client-core/chat/writers'
+import {
+  chatMessage,
+  session as sessionFactory,
+  sessionActivity,
+} from '../../../../../test/factories/chat'
 import { expect, test } from '../../../../../test/fixtures'
 
 const SESSION_ID = v.parse(sessionIdSchema, 'ad686244-5b2e-59be-805f-ef86eac80feb')
@@ -127,6 +133,87 @@ test('a live append that trims the front re-arms the page so trimmed rows stay r
   })
 })
 
+test('a latest snapshot preserves loaded message and activity pages beyond the live cache limit', () => {
+  const messages = windowMessages(CHAT_MESSAGE_CACHE_LIMIT + 4)
+  const activities = messages.map((message, index) =>
+    sessionActivity({
+      id: v.parse(eventIdSchema, `activity-${index}`),
+      sessionId: SESSION_ID,
+      createdAt: message.createdAt,
+    }),
+  )
+  const snapshot = detailSnapshot(
+    messages.slice(-ORCHESTRATION_SESSION_DETAIL_PAGE_SIZE),
+    activities.slice(-ORCHESTRATION_SESSION_DETAIL_PAGE_SIZE),
+  )
+  let state = syncChatProjectionSessionDetailSnapshot(createInitialChatProjectionSlice(), snapshot)
+  state = prependChatProjectionSessionDetailPage(state, {
+    ...page(messages, false),
+    activities,
+  })
+  const before = state
+  state = syncChatProjectionSessionDetailSnapshot(
+    state,
+    { ...snapshot, snapshotSequence: 2 },
+    'reconcile',
+  )
+  expect(state.messageIdsBySessionId[SESSION_ID]).toEqual(before.messageIdsBySessionId[SESSION_ID])
+  expect(state.activityIdsBySessionId[SESSION_ID]).toEqual(
+    before.activityIdsBySessionId[SESSION_ID],
+  )
+  expect(selectChatSessionHasEarlier(state, SESSION_ID)).toBe(false)
+})
+
+test('a shortened snapshot removes rows that are no longer in the history', () => {
+  let state = syncChatProjectionSessionDetailSnapshot(
+    createInitialChatProjectionSlice(),
+    detailSnapshot(windowMessages(ORCHESTRATION_SESSION_DETAIL_PAGE_SIZE)),
+  )
+  state = syncChatProjectionSessionDetailSnapshot(
+    state,
+    {
+      ...detailSnapshot(windowMessages(3)),
+      snapshotSequence: 2,
+    },
+    'reconcile',
+  )
+  expect(state.messageIdsBySessionId[SESSION_ID]).toEqual(['message-0', 'message-1', 'message-2'])
+  expect(selectChatSessionHasEarlier(state, SESSION_ID)).toBe(false)
+})
+
+test('a snapshot without overlap discards disconnected pages and offers earlier history again', () => {
+  let state = syncChatProjectionSessionDetailSnapshot(
+    createInitialChatProjectionSlice(),
+    detailSnapshot(windowMessages(ORCHESTRATION_SESSION_DETAIL_PAGE_SIZE)),
+  )
+  state = prependChatProjectionSessionDetailPage(state, page([], false))
+  const incoming = Array.from({ length: ORCHESTRATION_SESSION_DETAIL_PAGE_SIZE }, (_, index) =>
+    message(1000 + index),
+  )
+  state = syncChatProjectionSessionDetailSnapshot(
+    state,
+    {
+      ...detailSnapshot(incoming),
+      snapshotSequence: 2,
+    },
+    'reconcile',
+  )
+  expect(state.messageIdsBySessionId[SESSION_ID]).toEqual(incoming.map((row) => row.id))
+  expect(selectChatSessionHasEarlier(state, SESSION_ID)).toBe(true)
+})
+
+test('an authoritative snapshot invalidates older pages even when its boundary still overlaps', () => {
+  const messages = windowMessages(ORCHESTRATION_SESSION_DETAIL_PAGE_SIZE + 3)
+  const snapshot = detailSnapshot(messages.slice(3))
+  let state = syncChatProjectionSessionDetailSnapshot(createInitialChatProjectionSlice(), snapshot)
+  state = prependChatProjectionSessionDetailPage(state, page(messages.slice(0, 3), false))
+  state = syncChatProjectionSessionDetailSnapshot(state, { ...snapshot, snapshotSequence: 2 })
+  expect(state.messageIdsBySessionId[SESSION_ID]).toEqual(
+    snapshot.session.messages.map((row) => row.id),
+  )
+  expect(selectChatSessionHasEarlier(state, SESSION_ID)).toBe(true)
+})
+
 function windowMessages(count: number) {
   return Array.from({ length: count }, (_, index) => message(index))
 }
@@ -144,12 +231,19 @@ function createdAt(index: number) {
   return new Date(Date.UTC(2026, 4, 24) + index * 1_000).toISOString()
 }
 
-function detailSnapshot(messages: OrchestrationMessage[]): OrchestrationSessionDetailSnapshot {
+function detailSnapshot(
+  messages: OrchestrationMessage[],
+  activities: OrchestrationSessionActivity[] = [],
+): OrchestrationSessionDetailSnapshot {
   return {
     checkpoints: [],
     proposedPlans: [],
     snapshotSequence: 1,
-    session: { deletion: null, ...sessionFactory({ id: SESSION_ID, messages }), deletedAt: null },
+    session: {
+      deletion: null,
+      ...sessionFactory({ id: SESSION_ID, messages, activities }),
+      deletedAt: null,
+    },
   }
 }
 

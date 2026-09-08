@@ -37,6 +37,7 @@ async function main() {
     client,
     storageDirectory: path.join(homedir(), '.platform', 'tui'),
     createSocket: (url) => createSocket(url, instanceId),
+    createServiceSocket: (url) => createSocket(url, instanceId),
     observation: createRpcObservation(instanceId),
     record: (event) =>
       recordObservabilityInfo('tui.connection', { ...event, instanceId, source: 'tui' }),

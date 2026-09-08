@@ -24,12 +24,29 @@ a bare root `bun run verify`.
 | [078 — federated environments](078-federated-environments.md)                           | **IMPLEMENTED — AUTOMATED CHECKS PASS; LIVE GATES OPEN** |
 | [071 — syntax highlight retry](071-syntax-highlight-retry.md)                           | **PROPOSED — ROOT GO/NO-GO SCHEDULING**                  |
 | [056 — multi-step chord keymap](056-multi-step-chord-keymap.md)                         | **IMPLEMENTED — BROWSER VERIFIED**                       |
-| [057 — standalone Editor chords and shared keymap](057-editor-native-vscode-keymap.md)  | **NEXT — STANDALONE EXECUTION FIRST**                    |
+| [057 — standalone Editor chords and shared keymap](057-editor-native-vscode-keymap.md)  | **COMPLETE — DELIVERY RECORD RETAINED**                  |
+| [080 — Platform and VS Code keybinding modes](080-platform-keybinding-modes.md)         | **PROPOSED — INTERACTION RULES CONFIRMED**               |
+| [085 — instant workspace reload](085-instant-workspace-reload.md)                       | **PROPOSED — IMPLEMENTATION NOT STARTED**                |
 | [073 — Electrobun 2.x migration](073-electrobun-v2-migration.md)                        | **PROPOSED — ROOT GO/NO-GO SCHEDULING**                  |
 | [075 — terminal renderer fallbacks](075-terminal-renderer-fallbacks.md)                 | **PROPOSED — BLOCKED ON TIER DECISION**                  |
 | [076 — watch-reload child reaping](076-watch-reload-child-reaping.md)                   | **PROPOSED — ROOT GO/NO-GO SCHEDULING**                  |
 
 ## Dependency notes
+
+- Plan 085 restores the visible workspace before live responses, starting with bootstrap, file tree,
+  and settings. It reuses feature renderers and keeps native paint separate from current-state
+  authority. Diff/search native paint and terminal replay may require package contracts; those
+  dependencies remain open until verified. Execution order is recorded in root `PLAN.md`.
+
+- Plans 081 and 082 are complete and their executable plans are deleted. The
+  [workbench record](../docs/tui-workbench.md) and [Agent view record](../docs/tui-agent.md) preserve
+  implementation and native verification. Worktree parity (083) is next in the
+  [TUI strategy](../docs/tui-plan.md). Plan 080 belongs to platform keybinding modes.
+
+- Plan 080 extends the existing preset selector to workspace commands and adds whole-sidebar Cmd+B.
+  Editor tabs and chats share navigation keys; panel shortcuts use a separate combination. Held
+  modifiers reveal the matching targets. Interaction rules are confirmed and exact keys remain a
+  proposal. Implementation follows the completed shared runtime and preserves Plan 057's parity records.
 
 - The sole command/focus runtime is landed in `keymap/table.ts`, `keymap/state/command-bus.ts`,
   `keymap/providers/command-provider.tsx`, and `lib/focus/`. Settings commands use the semantic
@@ -60,11 +77,9 @@ a bare root `bun run verify`.
   Platform owns Shiki registration resolution, Editor's Oniguruma worker is self-contained, and
   built-dist highlighting is covered by a real-browser and shared-log proof. Root `PLAN.md` has not
   scheduled the retry work yet.
-- Plan 056 is implemented and browser verified. Plan 057 first gives standalone Editor consumers
-  automatic chord execution through the normal binding API. Platform then adopts the same public
-  runtime with its combined app and editor table and disables embedded Editor matching. Preserve
-  the existing target registry, enablement evaluator, and terminal handoff. Standalone browser
-  execution must pass before the takeover; folding and the remaining VS Code defaults stay in 057.
+- Plans 056 and 057 are implemented and browser verified. Plan 057 delivered standalone Editor
+  chord execution and Platform's adoption of the same public runtime. Preserve its target registry,
+  enablement evaluator, terminal handoff, and parity records when extending presets in Plan 080.
 - The config-resolver feasibility proof is complete with four native `PASS` rows and accepted
   package ceilings. Its stable records are
   `ghostty-webgpu/docs/config-resolver-feasibility.md` and

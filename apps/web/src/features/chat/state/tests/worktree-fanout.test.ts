@@ -1,13 +1,13 @@
 import { orchestrationEventSchema } from '@workspace/contracts'
 import * as v from 'valibot'
-import { createInitialChatProjectionSlice } from '@/features/chat/state/chat-projection-store'
-import { selectChatSessionById } from '@/features/chat/state/chat-projection-selectors'
-import { isChatSessionBusy } from '@/features/chat/utils/session-busy'
+import { createInitialChatProjectionSlice } from '@workspace/client-core/chat/types'
+import { selectChatSessionById } from '@workspace/client-core/chat/selectors'
+import { isChatSessionBusy } from '@workspace/client-core/chat/session-busy'
 import {
   applyChatProjectionEvent,
   applyChatProjectionShellStreamItem,
   syncChatProjectionShellSnapshot,
-} from '@/features/chat/state/chat-projection-writers'
+} from '@workspace/client-core/chat/writers'
 import {
   chatWorktree,
   fixtureSessionId,

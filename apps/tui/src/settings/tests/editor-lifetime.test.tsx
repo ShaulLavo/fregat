@@ -19,12 +19,20 @@ test('a canceled editor save leaves the next editor and its draft intact', async
   const state = session.getSnapshot()
   expect(state.kind).toBe('ready')
   if (state.kind !== 'ready') return
-  const frame = await renderTui(<Application session={session} onExit={() => {}} noColor />, {
-    width: 110,
-    height: 32,
-    useThread: false,
-    kittyKeyboard: true,
-  })
+  const frame = await renderTui(
+    <Application
+      initialLocation={{ kind: 'settings', query: '' }}
+      session={session}
+      onExit={() => {}}
+      noColor
+    />,
+    {
+      width: 110,
+      height: 32,
+      useThread: false,
+      kittyKeyboard: true,
+    },
+  )
   const gate = transport.pauseNextRequest('/settings/write')
   try {
     await act(async () => {

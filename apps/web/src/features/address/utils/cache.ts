@@ -1,9 +1,15 @@
 import { pathForDocumentToken } from '@/features/address/utils/document-token'
-import { applicableTabs, type Address } from '@workspace/client-core/address/grammar'
-import { NO_WORKSPACE_SLUG, resolveWorkspaceSlug } from '@workspace/client-core/address/slug'
+import {
+  applicableTabs,
+  editorDocumentToken,
+  type Address,
+} from '@workspace/client-core/address/grammar'
+import { NO_WORKSPACE_TOKEN, parseWorkspaceToken } from '@workspace/client-core/address/workspace'
 import { isChatModeToolTab, showChatModeToolTab } from '@/features/chat-mode/utils/panels'
 import {
+  activeEditorTabForWorkbenchPanels,
   openEditorPathInWorkbenchPanels,
+  selectEditorTabInWorkbenchPanels,
   setWorkbenchBottomTab,
   setWorkbenchSidebarTab,
   type WorkbenchPanels,
@@ -34,6 +40,9 @@ export function addressedWorkspaceCache(
   address: Address,
 ): CachedWorkspaceState {
   if (address.environmentId || address.rejectedEnvironment !== null) return cached
+  if (address.workspace === NO_WORKSPACE_TOKEN) {
+    return { ...cached, rootFolder: null, uiMode: address.mode ?? cached.uiMode }
+  }
   const rootPath = seedableRootPath(cached, address)
   if (rootPath === null) return cached
 
@@ -69,34 +78,34 @@ export function addressedWorkspaceCache(
 function seedableRootPath(cached: CachedWorkspaceState, address: Address) {
   const openRootPath = cached.rootFolder?.path
   if (openRootPath === undefined) return null
-  if (!address.workspace || address.workspace === NO_WORKSPACE_SLUG) return null
+  if (!address.workspace) return null
 
-  const resolution = resolveWorkspaceSlug(address.workspace, { indexed: cached.workspaceOrder })
-  if (resolution.kind !== 'resolved') return null
-  if (resolution.rootPath !== openRootPath) return null
+  const resolution = parseWorkspaceToken(address.workspace)
+  if (resolution.kind !== 'workspace') return null
+  if (resolution.id !== cached.rootFolder?.workspaceAddress?.id) return null
 
   return openRootPath
 }
 
-function panelsForAddress(panels: WorkbenchPanels, rootPath: string, address: Address) {
+export function panelsForAddress(
+  panels: WorkbenchPanels,
+  rootPath: string | null,
+  address: Address,
+) {
+  const active = activeEditorTabForWorkbenchPanels(panels)
   const withPanes = withBottomTab(withSidebarTab(panels, address), address)
-  // Bounded by the same rule the post-mount applier uses. This runs inside
-  // `EditorStateProvider`'s `useState` initializer, so an unbounded `?tabs=` blocks
-  // first paint on a quadratic open loop — and the result is real store state, which
-  // the cache persistence then writes to disk.
   const withTabs = (applicableTabs(address.tabs) ?? []).reduce(
     (next, token) => withDocumentToken(next, rootPath, token),
     withPanes,
   )
+  const selected = editorDocumentToken(address)
+  if (selected) return withDocumentToken(withTabs, rootPath, selected)
+  if (active) return selectEditorTabInWorkbenchPanels(withTabs, active.id)
 
-  // In chat mode the document slot holds a `t/` session token, which is not a workspace
-  // document — feeding it to the file codec would open a bogus tab.
-  if (address.mode === 'chat' || !address.document) return withTabs
-
-  return withDocumentToken(withTabs, rootPath, address.document)
+  return withTabs
 }
 
-function withDocumentToken(panels: WorkbenchPanels, rootPath: string, token: string) {
+function withDocumentToken(panels: WorkbenchPanels, rootPath: string | null, token: string) {
   const parsed = pathForDocumentToken(rootPath, token)
   if (parsed.kind !== 'path') return panels
 

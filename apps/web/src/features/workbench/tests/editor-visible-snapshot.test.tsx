@@ -135,7 +135,6 @@ test('a held document flushes under its own path before a newly selected path ta
   expect(readMatching()).not.toBeNull()
   expect(
     readEditorVisibleSnapshotCache(testScopedStorage, {
-      contentVersion: CONTENT_VERSION,
       path: '/repo/src/next.ts',
       rootPath: ROOT_PATH,
       themeId: THEME_ID,
@@ -182,6 +181,126 @@ test('a cached selected file never paints above a different held document', () =
 
   rerender({ ...options, documentId: 'document-1' })
   expect(result.current.record).not.toBeNull()
+})
+
+test('the first render presents cached text before the content version is known', () => {
+  const snapshot = cachedSnapshot()
+  writeEditorVisibleSnapshotCache(testScopedStorage, snapshot)
+  const buffer = controlledBuffer()
+  const options = { ...hookOptions({ buffer, documentId: null }), contentVersion: null }
+  const renderedRecords: Array<CachedEditorVisibleSnapshot | null> = []
+
+  renderHook(
+    (props: HookProps) => {
+      const binding = useEditorVisibleSnapshot(toHookOptions(props, buffer))
+      renderedRecords.push(binding.record)
+      return binding
+    },
+    { initialProps: options },
+  )
+
+  expect(renderedRecords[0]).toEqual(snapshot)
+  expect(renderedRecords[0]?.snapshot.rows[0]?.chunks[0]?.parts).toEqual([
+    { kind: 'text', text: 'const value = 1' },
+  ])
+})
+
+test('a matching content version preserves the unverified frame and its presentation deadline', () => {
+  const mark = vi.spyOn(performance, 'mark')
+  writeEditorVisibleSnapshotCache(testScopedStorage, cachedSnapshot())
+  const buffer = controlledBuffer()
+  const options: HookProps = {
+    ...hookOptions({ buffer, documentId: null }),
+    contentVersion: null,
+  }
+  const { result, rerender } = renderHook(
+    (props: HookProps) => useEditorVisibleSnapshot(toHookOptions(props, buffer)),
+    { initialProps: options },
+  )
+  const initialRecord = result.current.record
+  expect(initialRecord).not.toBeNull()
+
+  act(() => vi.advanceTimersByTime(1_000))
+  rerender({ ...options, contentVersion: CONTENT_VERSION })
+
+  expect(result.current.record).toBe(initialRecord)
+  act(() => vi.advanceTimersByTime(499))
+  expect(result.current.record).toBe(initialRecord)
+  expect(mark.mock.calls.filter(([name]) => name === 'editor.cached_visible_paint')).toHaveLength(1)
+
+  act(() => vi.advanceTimersByTime(1))
+  expect(result.current.record).toBeNull()
+})
+
+test('a mismatched content version dismisses an unverified cached frame', () => {
+  writeEditorVisibleSnapshotCache(testScopedStorage, cachedSnapshot())
+  const buffer = controlledBuffer()
+  const options: HookProps = {
+    ...hookOptions({ buffer, documentId: null }),
+    contentVersion: null,
+  }
+  const { result, rerender } = renderHook(
+    (props: HookProps) => useEditorVisibleSnapshot(toHookOptions(props, buffer)),
+    { initialProps: options },
+  )
+  expect(result.current.record).not.toBeNull()
+
+  rerender({ ...options, contentVersion: 'stat:2:15' })
+
+  expect(result.current.record).toBeNull()
+  rerender(options)
+  expect(result.current.record).toBeNull()
+})
+
+test('content version arrival never restores an unverified frame dismissed by interaction', () => {
+  writeEditorVisibleSnapshotCache(testScopedStorage, cachedSnapshot())
+  const buffer = controlledBuffer()
+  const options: HookProps = {
+    ...hookOptions({ buffer, documentId: null }),
+    contentVersion: null,
+  }
+  const { result, rerender } = renderHook(
+    (props: HookProps) => useEditorVisibleSnapshot(toHookOptions(props, buffer)),
+    { initialProps: options },
+  )
+  expect(result.current.record).not.toBeNull()
+
+  act(() => result.current.dismissOverlay())
+  expect(result.current.record).toBeNull()
+  rerender({ ...options, contentVersion: CONTENT_VERSION })
+
+  expect(result.current.record).toBeNull()
+  expect(readMatching()).not.toBeNull()
+})
+
+test('a file-read error dismisses and removes an unverified cached frame', () => {
+  writeEditorVisibleSnapshotCache(testScopedStorage, cachedSnapshot())
+  const buffer = controlledBuffer()
+  const options = { ...hookOptions({ buffer, documentId: null }), contentVersion: null }
+  const { result, rerender } = renderHook(
+    (props: HookProps) => useEditorVisibleSnapshot(toHookOptions(props, buffer)),
+    { initialProps: options },
+  )
+  expect(result.current.record).not.toBeNull()
+
+  rerender({ ...options, fileReadError: true })
+
+  expect(result.current.record).toBeNull()
+  expect(readMatching()).toBeNull()
+})
+
+test('an unverified cached frame never covers an already dirty live document', () => {
+  writeEditorVisibleSnapshotCache(testScopedStorage, cachedSnapshot())
+  const buffer = controlledBuffer()
+  buffer.setDirty(true)
+  const options = { ...hookOptions({ buffer, documentId: 'document-1' }), contentVersion: null }
+  const { result } = renderHook(
+    (props: HookProps) => useEditorVisibleSnapshot(toHookOptions(props, buffer)),
+    { initialProps: options },
+  )
+
+  expect(result.current.record).toBeNull()
+  expect(readMatching()).toBeNull()
 })
 
 test('a cached frame with a different content version is never presented', () => {
@@ -273,8 +392,10 @@ test('terminal paint dismisses only on the matching next frame', () => {
   )
   expect(result.current.record).not.toBeNull()
   rerender({ ...options, documentId: 'document-1' })
+  const contribution = activateCaptureContribution(result.current.additionalPlugins[0]!)
 
   act(() => {
+    contribution.update(runtimeSnapshot('document-1').snapshot, 'document')
     const textPaint = {
       documentGeneration: 7,
       documentId: 'document-1',
@@ -310,6 +431,44 @@ test('terminal paint dismisses only on the matching next frame', () => {
   expect(highlight?.[1]).toMatchObject({ detail: { status: 'painted' } })
 })
 
+test('highlighted text keeps the cached frame until matching paint layers are ready', () => {
+  writeEditorVisibleSnapshotCache(testScopedStorage, cachedSnapshot())
+  const buffer = controlledBuffer()
+  const options = hookOptions({ buffer, documentId: null })
+  const { result, rerender } = renderHook(
+    (props: HookProps) => useEditorVisibleSnapshot(toHookOptions(props, buffer)),
+    { initialProps: options },
+  )
+  rerender({ ...options, documentId: 'document-1' })
+  const contribution = activateCaptureContribution(result.current.additionalPlugins[0]!)
+  const ready = runtimeSnapshot('document-1').snapshot
+
+  act(() => {
+    contribution.update({ ...ready, paintLayers: null }, 'document')
+    emitSuccessfulPaint(result.current.onInitialPaint, 7)
+    vi.advanceTimersByTime(64)
+  })
+  expect(result.current.record).not.toBeNull()
+
+  act(() => {
+    contribution.update(runtimeSnapshot('another-document').snapshot, 'layout')
+    vi.advanceTimersByTime(32)
+  })
+  expect(result.current.record).not.toBeNull()
+
+  act(() => {
+    contribution.update(runtimeSnapshot('document-1', 2).snapshot, 'layout')
+    vi.advanceTimersByTime(32)
+  })
+  expect(result.current.record).not.toBeNull()
+
+  act(() => {
+    contribution.update(ready, 'layout')
+    vi.advanceTimersByTime(32)
+  })
+  expect(result.current.record).toBeNull()
+})
+
 test('interaction dismissal preserves the authoritative paint pipeline', () => {
   const mark = vi.spyOn(performance, 'mark')
   writeEditorVisibleSnapshotCache(testScopedStorage, cachedSnapshot())
@@ -320,8 +479,10 @@ test('interaction dismissal preserves the authoritative paint pipeline', () => {
     { initialProps: options },
   )
   rerender({ ...options, documentId: 'document-1' })
+  const contribution = activateCaptureContribution(result.current.additionalPlugins[0]!)
 
   act(() => {
+    contribution.update(runtimeSnapshot('document-1').snapshot, 'document')
     result.current.onInitialPaint({
       documentGeneration: 12,
       documentId: 'document-1',
@@ -345,6 +506,41 @@ test('interaction dismissal preserves the authoritative paint pipeline', () => {
   ).toHaveLength(1)
 })
 
+test('a terminal paint error dismisses the cache while paint layers remain pending', () => {
+  writeEditorVisibleSnapshotCache(testScopedStorage, cachedSnapshot())
+  const buffer = controlledBuffer()
+  const options = hookOptions({ buffer, documentId: null })
+  const { result, rerender } = renderHook(
+    (props: HookProps) => useEditorVisibleSnapshot(toHookOptions(props, buffer)),
+    { initialProps: options },
+  )
+  rerender({ ...options, documentId: 'document-1' })
+  const contribution = activateCaptureContribution(result.current.additionalPlugins[0]!)
+
+  act(() => {
+    contribution.update(
+      { ...runtimeSnapshot('document-1').snapshot, paintLayers: null },
+      'document',
+    )
+    result.current.onInitialPaint({
+      documentGeneration: 7,
+      documentId: 'document-1',
+      phase: 'text',
+      textVersion: 1,
+    })
+    result.current.onInitialPaint({
+      documentGeneration: 7,
+      documentId: 'document-1',
+      phase: 'highlight-settled',
+      status: 'error',
+      textVersion: 1,
+    })
+    vi.advanceTimersByTime(64)
+  })
+
+  expect(result.current.record).toBeNull()
+})
+
 test('plain paint survives provider loading and a later painted event remains authoritative', () => {
   const mark = vi.spyOn(performance, 'mark')
   writeEditorVisibleSnapshotCache(testScopedStorage, cachedSnapshot())
@@ -359,6 +555,7 @@ test('plain paint survives provider loading and a later painted event remains au
   const replacement = runtimeSnapshot('document-1', 2)
 
   act(() => {
+    contribution.update(runtimeSnapshot('document-1').snapshot, 'document')
     result.current.onInitialPaint({
       documentGeneration: 8,
       documentId: 'document-1',
@@ -422,6 +619,7 @@ test('pending-theme paint survives an interrupted handoff and marks once', () =>
     { initialProps: options },
   )
   rerender({ ...renderedOptions, appliedThemeId: 'old-theme' })
+  const contribution = activateCaptureContribution(result.current.additionalPlugins[0]!)
 
   act(() => emitSuccessfulPaint(result.current.onInitialPaint, 9))
   act(() => vi.advanceTimersByTime(16))
@@ -435,6 +633,7 @@ test('pending-theme paint survives an interrupted handoff and marks once', () =>
   ).toHaveLength(0)
 
   rerender(renderedOptions)
+  act(() => contribution.update(runtimeSnapshot('document-1').snapshot, 'document'))
   rerender({ ...renderedOptions, appliedThemeId: 'old-theme' })
   act(() => vi.advanceTimersByTime(16))
   expect(result.current.record).not.toBeNull()
@@ -447,6 +646,7 @@ test('pending-theme paint survives an interrupted handoff and marks once', () =>
   ).toHaveLength(0)
 
   rerender(renderedOptions)
+  act(() => contribution.update(runtimeSnapshot('document-1').snapshot, 'layout'))
   act(() => vi.advanceTimersByTime(15))
   expect(result.current.record).not.toBeNull()
 
@@ -481,7 +681,9 @@ test('dirty state cancels matching paint before the authoritative frame', () => 
   )
 
   rerender({ ...options, documentId: 'document-1' })
+  const contribution = activateCaptureContribution(result.current.additionalPlugins[0]!)
   act(() => {
+    contribution.update(runtimeSnapshot('document-1').snapshot, 'document')
     emitSuccessfulPaint(result.current.onInitialPaint, 10)
     buffer.setDirty(true)
     vi.advanceTimersByTime(16)
@@ -512,6 +714,53 @@ test('the presentation fail-safe bounds a hung cold load', () => {
 
   act(() => vi.advanceTimersByTime(1))
   expect(result.current.record).toBeNull()
+})
+
+test('cached paint rectangles preserve scroll offsets and current guide visibility', () => {
+  const record = cachedSnapshot()
+  record.snapshot.viewport.scrollLeft = 8
+  record.snapshot.viewport.scrollTop = 12
+  record.snapshot.paintLayers = [
+    {
+      id: 'scope-lines',
+      rectangles: [{ left: 80, top: 20, width: 1, height: 40, backgroundColor: 'rgb(90, 90, 90)' }],
+    },
+    {
+      id: 'selection-decoration',
+      rectangles: [
+        { left: 100, top: 30, width: 20, height: 2, backgroundColor: 'rgb(30, 40, 50)' },
+      ],
+    },
+  ]
+  const overlayRef = { current: null }
+  const view = render(
+    <EditorVisibleSnapshot indentationGuidesEnabled overlayRef={overlayRef} record={record} />,
+  )
+  const guide = view.container.querySelector(
+    '[data-editor-visible-paint-layer="scope-lines"] [data-editor-visible-paint-rectangle]',
+  )
+
+  expect(guide).toHaveStyle({
+    left: '72px',
+    top: '8px',
+    width: '1px',
+    height: '40px',
+    backgroundColor: 'rgb(90, 90, 90)',
+  })
+
+  view.rerender(
+    <EditorVisibleSnapshot
+      indentationGuidesEnabled={false}
+      overlayRef={overlayRef}
+      record={record}
+    />,
+  )
+
+  expect(view.container.querySelector('[data-editor-visible-paint-layer="scope-lines"]')).toBeNull()
+  expect(
+    view.container.querySelector('[data-editor-visible-paint-layer="selection-decoration"]'),
+  ).not.toBeNull()
+  expect(view.container.textContent).toContain('const value = 1')
 })
 
 test('the inert renderer preserves bounded parts, syntax runs, and captured geometry', () => {
@@ -554,7 +803,9 @@ test('the inert renderer preserves bounded parts, syntax runs, and captured geom
   ]
   const overlayRef = { current: null }
 
-  const view = render(<EditorVisibleSnapshot overlayRef={overlayRef} record={record} />)
+  const view = render(
+    <EditorVisibleSnapshot indentationGuidesEnabled overlayRef={overlayRef} record={record} />,
+  )
 
   const overlay = view
     .getByText('Bidirectional text omitted')
@@ -599,6 +850,9 @@ test('the inert renderer preserves bounded parts, syntax runs, and captured geom
   ])
   expect(editorVisibleSnapshotCounts(record.snapshot)).toEqual({
     chunks: 2,
+    foldMarkers: 1,
+    paintLayers: 0,
+    paintRectangles: 0,
     parts: 4,
     rows: 1,
     runs: 1,
@@ -748,7 +1002,11 @@ function runtimeSnapshot(documentId: string, textVersion = 1) {
   }))
   const snapshot = {
     documentId,
+    foldMarkers: [],
     initialHighlightStatus: 'painted',
+    paintLayers: [],
+    syntaxStatus: 'ready',
+    textVersion,
     toVisibleSnapshot: materialize,
     visibleRows: [{}],
   } as unknown as EditorViewSnapshot
@@ -767,6 +1025,9 @@ function unsupportedRuntimeSnapshot(
   return {
     documentId: 'document-1',
     initialHighlightStatus: 'painted',
+    paintLayers: [],
+    syntaxStatus: 'ready',
+    textVersion: 1,
     toVisibleSnapshot: () => null,
     visibleRows: [{ chunks, mountedPaintSupport }],
   } as unknown as EditorViewSnapshot
@@ -816,7 +1077,6 @@ function controlledBuffer(): ControlledBuffer {
 
 function readMatching() {
   return readEditorVisibleSnapshotCache(testScopedStorage, {
-    contentVersion: CONTENT_VERSION,
     path: PATH,
     rootPath: ROOT_PATH,
     themeId: THEME_ID,
@@ -825,7 +1085,7 @@ function readMatching() {
 
 function cachedSnapshot(): Mutable<CachedEditorVisibleSnapshot> {
   return {
-    cacheVersion: 2,
+    cacheVersion: 4,
     contentVersion: CONTENT_VERSION,
     path: PATH,
     rootPath: ROOT_PATH,
@@ -836,6 +1096,7 @@ function cachedSnapshot(): Mutable<CachedEditorVisibleSnapshot> {
 
 function visibleSnapshot(): Mutable<EditorVisibleSnapshotJSON> {
   return {
+    paintLayers: [],
     contentWidth: 160,
     documentId: 'document-1',
     gutterLayout: {

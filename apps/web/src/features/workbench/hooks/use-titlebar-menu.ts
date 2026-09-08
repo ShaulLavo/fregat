@@ -2,10 +2,7 @@ import { useActiveChatProjection } from '@/features/chat/hooks/use-active-projec
 import { useQuery } from '@tanstack/react-query'
 
 import { useTheme } from '@/features/settings/hooks/use-theme'
-import {
-  selectChatProjects,
-  selectCurrentWorktree,
-} from '@/features/chat/state/chat-projection-selectors'
+import { selectChatProjects, selectCurrentWorktree } from '@workspace/client-core/chat/selectors'
 import { useEditorWorkspaceState } from '@/features/editor/state/workspace-state'
 import { projectMenuModel } from '@/features/workbench/utils/project-menu-model'
 import { titlebarMenu } from '@/features/workbench/utils/titlebar-menu'

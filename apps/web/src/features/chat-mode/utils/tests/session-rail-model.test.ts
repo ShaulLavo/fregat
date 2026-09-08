@@ -9,9 +9,9 @@ import {
   scopedProjectKey,
 } from '@workspace/contracts'
 import * as v from 'valibot'
-import { createInitialChatProjectionSlice } from '@/features/chat/state/chat-projection-store'
-import { syncChatProjectionShellSnapshot } from '@/features/chat/state/chat-projection-writers'
-import { sessionRailModel } from '@/features/chat-mode/utils/session-rail-model'
+import { createInitialChatProjectionSlice } from '@workspace/client-core/chat/types'
+import { syncChatProjectionShellSnapshot } from '@workspace/client-core/chat/writers'
+import { sessionRailModel } from '@workspace/client-core/chat/rail/model'
 import {
   chatProject,
   chatWorktree,

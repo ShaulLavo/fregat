@@ -1,4 +1,4 @@
-import type { ChatTurnDiffSummary } from '@/features/chat/state/chat-projection-store'
+import type { ChatTurnDiffSummary } from '@workspace/client-core/chat/types'
 
 export type ChatTurnDiffFile = ChatTurnDiffSummary['files'][number]
 

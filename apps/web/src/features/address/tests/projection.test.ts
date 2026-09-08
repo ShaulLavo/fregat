@@ -1,3 +1,4 @@
+import { testWorkspaceToken } from '../../../../test/factories/workspace-address'
 import { describe } from 'vitest'
 
 import { expect, test } from '../../../../test/fixtures'
@@ -42,10 +43,48 @@ function harness() {
 }
 
 function addressFor(workspace: string, document: string | null = null): Address {
-  return { ...emptyAddress(), document, mode: 'workbench', workspace }
+  return {
+    ...emptyAddress(),
+    document,
+    mode: 'workbench',
+    workspace: testWorkspaceToken(workspace),
+  }
 }
 
 describe('the address projection', () => {
+  test('selecting an editor tab in chat pushes navigation history', () => {
+    const { frame, projection, pushed } = harness()
+    const chat: Address = {
+      ...emptyAddress(),
+      workspace: testWorkspaceToken('/repo'),
+      mode: 'chat',
+      document: 't/session-1',
+      editor: 'f/a.ts',
+    }
+    projection.project(chat)
+    frame()
+
+    projection.project({ ...chat, editor: 'settings' })
+    frame()
+
+    expect(pushed).toEqual([`/~${testWorkspaceToken('/repo')}/chat/t/session-1?editor=settings`])
+  })
+
+  test('changing settings category replaces the current history entry', () => {
+    const { frame, projection, pushed, written } = harness()
+    const settings = addressFor('/repo', 'settings')
+    projection.project(settings)
+    frame()
+
+    projection.project({ ...settings, settings: 'providers' })
+    frame()
+
+    expect(pushed).toEqual([])
+    expect(written.at(-1)).toBe(
+      `/~${testWorkspaceToken('/repo')}/workbench/settings?settings=providers`,
+    )
+  })
+
   test('coalesces a burst into one write per frame', () => {
     const { frame, projection, written } = harness()
 
@@ -55,7 +94,7 @@ describe('the address projection', () => {
     expect(written).toEqual([])
 
     frame()
-    expect(written).toEqual(['/~c/workbench'])
+    expect(written).toEqual([`/~${testWorkspaceToken('c')}/workbench`])
   })
 
   test('writes nothing when the address has not changed', () => {
@@ -66,7 +105,7 @@ describe('the address projection', () => {
     projection.project(addressFor('a'))
     frame()
 
-    expect(written).toEqual(['/~a/workbench'])
+    expect(written).toEqual([`/~${testWorkspaceToken('a')}/workbench`])
   })
 
   // Safari throttles `replaceState` at ~100 calls / 30s and then THROWS. A budget
@@ -78,7 +117,7 @@ describe('the address projection', () => {
     for (let index = 0; index < 200; index += 1) projection.project(addressFor(`w${index}`))
     frame()
 
-    expect(written).toEqual(['/~w199/workbench'])
+    expect(written).toEqual([`/~${testWorkspaceToken('w199')}/workbench`])
   })
 
   // The failure the budget had: once tripped it stayed tripped, so the last address of
@@ -92,7 +131,7 @@ describe('the address projection', () => {
       frame()
     }
 
-    expect(written.at(-1)).toBe('/~r4i99/workbench')
+    expect(written.at(-1)).toBe(`/~${testWorkspaceToken('r4i99')}/workbench`)
   })
 
   // Closing the tab does not wait out the quiet period.
@@ -104,7 +143,7 @@ describe('the address projection', () => {
 
     projection.flushNow()
 
-    expect(written).toEqual(['/~unloading/workbench'])
+    expect(written).toEqual([`/~${testWorkspaceToken('unloading')}/workbench`])
   })
 
   test('serializes the document token into the path', () => {
@@ -113,7 +152,9 @@ describe('the address projection', () => {
     projection.project(addressFor('platform', 'f/apps/web/src/main.tsx'))
     frame()
 
-    expect(written).toEqual(['/~platform/workbench/f/apps/web/src/main.tsx'])
+    expect(written).toEqual([
+      `/~${testWorkspaceToken('platform')}/workbench/f/apps/web/src/main.tsx`,
+    ])
   })
 })
 
@@ -136,7 +177,7 @@ describe('push versus replace, decided by slot', () => {
     projection.project(addressFor('a', 'f/y.ts'))
     frame()
 
-    expect(pushed).toEqual(['/~a/workbench/f/y.ts'])
+    expect(pushed).toEqual([`/~${testWorkspaceToken('a')}/workbench/f/y.ts`])
   })
 
   test('pushes on a workspace change', () => {
@@ -147,7 +188,7 @@ describe('push versus replace, decided by slot', () => {
     projection.project(addressFor('b', 'f/x.ts'))
     frame()
 
-    expect(pushed).toEqual(['/~b/workbench/f/x.ts'])
+    expect(pushed).toEqual([`/~${testWorkspaceToken('b')}/workbench/f/x.ts`])
   })
 
   // Six characters typed into search must not leave six history entries.
@@ -176,14 +217,14 @@ describe('push versus replace, decided by slot', () => {
     frame()
     projection.project(addressFor('a', 'f/y.ts'))
     frame()
-    expect(pushed).toEqual(['/~a/workbench/f/y.ts'])
+    expect(pushed).toEqual([`/~${testWorkspaceToken('a')}/workbench/f/y.ts`])
 
     // The browser is now showing x.ts again; the applier is about to restore it.
-    projection.adopt('/~a/workbench/f/x.ts')
+    projection.adopt(`/~${testWorkspaceToken('a')}/workbench/f/x.ts`)
     projection.project(addressFor('a', 'f/x.ts'))
     frame()
 
-    expect(pushed).toEqual(['/~a/workbench/f/y.ts'])
+    expect(pushed).toEqual([`/~${testWorkspaceToken('a')}/workbench/f/y.ts`])
   })
 
   // An adopted address the projection itself wrote is already canonical, so restoring
@@ -195,7 +236,7 @@ describe('push versus replace, decided by slot', () => {
     frame()
     const writesBeforeBack = written.length
 
-    projection.adopt('/~a/workbench/f/x.ts')
+    projection.adopt(`/~${testWorkspaceToken('a')}/workbench/f/x.ts`)
     projection.project(addressFor('a', 'f/x.ts'))
     frame()
 
@@ -218,6 +259,6 @@ describe('push versus replace, decided by slot', () => {
     projection.project(addressFor('a', 'f/navigated.ts'))
     frame()
 
-    expect(pushed).toEqual(['/~a/workbench/f/navigated.ts'])
+    expect(pushed).toEqual([`/~${testWorkspaceToken('a')}/workbench/f/navigated.ts`])
   })
 })

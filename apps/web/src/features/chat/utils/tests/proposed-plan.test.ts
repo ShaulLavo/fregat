@@ -6,7 +6,7 @@ import {
 } from '@workspace/contracts'
 import * as v from 'valibot'
 
-import { createDraftSessionSubmission } from '@/features/chat/utils/command-builders'
+import { createDraftSessionSubmission } from '@workspace/client-core/chat/commands'
 import {
   actionableProposedPlan,
   planImplementationPrompt,
@@ -14,7 +14,7 @@ import {
   proposedPlanExportFilename,
   proposedPlanExportMarkdown,
   resolvePlanFollowUpSubmission,
-} from '@/features/chat/utils/proposed-plan'
+} from '@workspace/client-core/chat/proposed-plan'
 import { expect, test } from '../../../../../test/fixtures'
 
 const PLAN_MARKDOWN = '# Ship the retry queue\n\n1. Add the queue\n2. Drain it on boot\n'

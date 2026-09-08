@@ -180,7 +180,7 @@ function activeWorkspaceState(slice: CachedWorkspaceSlice) {
 }
 
 function sliceForRootPath(state: CachedWorkspaceState, rootPath: string | null) {
-  if (!rootPath) return emptyWorkspaceSlice()
+  if (rootPath === null) return emptyWorkspaceSlice()
 
   return state.workspaces[rootPath] ?? emptyWorkspaceSlice()
 }

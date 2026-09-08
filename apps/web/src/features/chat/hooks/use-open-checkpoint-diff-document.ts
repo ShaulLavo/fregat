@@ -18,7 +18,7 @@ import {
   fetchCheckpointDiff,
   matchingCheckpointDiff,
 } from '@/features/chat/utils/checkpoint-diff-query'
-import type { ChatTurnDiffSummary } from '../state/chat-projection-store'
+import type { ChatTurnDiffSummary } from '@workspace/client-core/chat/types'
 import { useSessionDiffScopeStore } from '../state/session-diff-scope-store'
 
 export function useOpenCheckpointDiffDocument() {

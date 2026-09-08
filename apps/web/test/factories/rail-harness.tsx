@@ -26,7 +26,7 @@ import { SessionDeleteDialog } from '@/features/chat-mode/components/session-del
 import { ProjectDeleteDialog } from '@/features/chat-mode/components/project-delete-dialog'
 import { ProjectRenameDialog } from '@/features/chat-mode/components/project-rename-dialog'
 import { StageHeader } from '@/features/chat-mode/components/stage-header'
-import { sessionRailModel } from '@/features/chat-mode/utils/session-rail-model'
+import { sessionRailModel } from '@workspace/client-core/chat/rail/model'
 import { currentRailEnvironments } from '@/features/chat-mode/state/rail-environments'
 import { setSessionProjectOpener } from '@/features/chat-mode/state/session-commands'
 import { resetSessionSelectionStore } from '@/features/chat-mode/state/session-selection-store'
@@ -36,7 +36,7 @@ import { useSessionMultiSelectStore } from '@/features/chat-mode/state/session-m
 import { useChatProjectionStore } from '@/features/chat/state/chat-projection-store'
 import { createChatTransport } from '@/features/chat/transport/create-chat-transport'
 import { fetchOrchestrationShellSnapshotHttp } from '@/features/chat/transport/orchestration-http-snapshots'
-import { createProjectRegistrationCommand } from '@/lib/environments/utils/registration'
+import { createProjectRegistrationCommand } from '@workspace/client-core/chat/registration'
 import { useEnvironmentsStore } from '@/lib/environments/state/store'
 import {
   activeServerOrigin,

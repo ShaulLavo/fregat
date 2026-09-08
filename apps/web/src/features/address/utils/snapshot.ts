@@ -8,7 +8,8 @@ import {
   MAX_APPLIED_TABS,
   TAB_SEPARATOR,
 } from '@workspace/client-core/address/grammar'
-import { NO_WORKSPACE_SLUG, workspaceSlug } from '@workspace/client-core/address/slug'
+import { NO_WORKSPACE_TOKEN, workspaceToken } from '@workspace/client-core/address/workspace'
+import type { WorkspaceAddress } from '@workspace/contracts'
 import { isSettingsDocumentId } from '@/features/settings/utils/document'
 
 /**
@@ -29,8 +30,7 @@ export type AddressSnapshot = {
   readonly bottomTab: Address['bottom']
   readonly editorTabPaths: readonly string[]
   readonly focus: Address['focus']
-  /** Every remembered root, so a slug can be made distinct from its neighbours. */
-  readonly knownRootPaths: readonly string[]
+  readonly workspaceAddress: WorkspaceAddress | null
   readonly mode: Address['mode']
   /** Unowned search keys observed at boot, carried so a rewrite cannot drop them. */
   readonly passthrough: Readonly<Record<string, string>>
@@ -60,7 +60,7 @@ export function emptyAddressSnapshot(): AddressSnapshot {
     bottomTab: null,
     editorTabPaths: [],
     focus: null,
-    knownRootPaths: [],
+    workspaceAddress: null,
     mode: null,
     passthrough: {},
     railView: null,
@@ -75,24 +75,7 @@ export function emptyAddressSnapshot(): AddressSnapshot {
   }
 }
 
-/**
- * Snapshot to `Address`. Documents that cannot be encoded — a conflict diff, anything
- * outside the workspace — simply produce no token, so the encoder cannot leak them
- * even by accident. A settings tab becomes the overlay slot rather than a tab token,
- * because settings is addressed as `?settings=` and never as a route.
- */
 export function addressFromSnapshot(snapshot: AddressSnapshot): Address {
-  // Passthrough survives even here: with no folder open there is nothing else to
-  // name, but the dev params still have to reach the code that reads them.
-  if (snapshot.rootPath === null) {
-    return {
-      ...emptyAddress(),
-      environmentId: snapshot.environmentId,
-      passthrough: { ...snapshot.passthrough },
-      workspace: NO_WORKSPACE_SLUG,
-    }
-  }
-
   const rootPath = snapshot.rootPath
   const active = snapshot.activeDocumentPath
     ? documentTokenForPath(rootPath, snapshot.activeDocumentPath)
@@ -104,17 +87,20 @@ export function addressFromSnapshot(snapshot: AddressSnapshot): Address {
     bottom: snapshot.bottomTab,
     diff: snapshot.sessionDiffScope,
     document: snapshot.mode === 'chat' ? snapshot.sessionToken : documentToken(active),
+    editor: snapshot.mode === 'chat' ? documentToken(active) : null,
     focus: snapshot.focus,
     mode: snapshot.mode,
     passthrough: { ...snapshot.passthrough },
     logs: snapshot.logs ? { ...snapshot.logs } : null,
     rail: snapshot.railView,
     search: snapshot.search ? { ...snapshot.search } : null,
-    settings: settingsCategory(snapshot, active),
+    settings: settingsCategory(snapshot),
     side: snapshot.sidebarTab,
     tabs: tabTokens(rootPath, snapshot.editorTabPaths),
     tool: snapshot.toolTab,
-    workspace: workspaceSlug(rootPath, [...snapshot.knownRootPaths, rootPath]),
+    workspace: snapshot.workspaceAddress
+      ? workspaceToken(snapshot.workspaceAddress)
+      : NO_WORKSPACE_TOKEN,
   })
 }
 
@@ -169,24 +155,11 @@ function withinUrlBudget(address: Address): Address {
   return trimmed
 }
 
-/**
- * Driven by whether a settings tab is actually OPEN, not by the category store.
- * That store keeps its pick after the tab closes, so reading it directly left
- * `?settings=` in the URL forever and reopened the page on every reload — the exact
- * "an open menu is never a place" failure the classification table warns about.
- *
- * The tab set is checked too, not just the active document: settings can sit in a
- * background tab, and that is still open.
- */
-function settingsCategory(
-  snapshot: AddressSnapshot,
-  active: ReturnType<typeof documentTokenForPath> | null,
-) {
-  const open =
-    active?.kind === 'overlay' || snapshot.editorTabPaths.some((path) => isSettingsDocumentId(path))
+function settingsCategory(snapshot: AddressSnapshot) {
+  const open = snapshot.editorTabPaths.some(isSettingsDocumentId)
   if (!open) return null
 
-  return snapshot.settingsCategory ?? ''
+  return snapshot.settingsCategory
 }
 
 /**
@@ -196,7 +169,7 @@ function settingsCategory(
  */
 const TABS_BUDGET_BYTES = 1500
 
-function tabTokens(rootPath: string, paths: readonly string[]) {
+function tabTokens(rootPath: string | null, paths: readonly string[]) {
   const tokens = paths
     .map((path) => documentTokenForPath(rootPath, path))
     .flatMap((result) => (result.kind === 'token' ? [result.token] : []))

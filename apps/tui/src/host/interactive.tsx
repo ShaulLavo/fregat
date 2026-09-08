@@ -7,6 +7,8 @@ import { createTuiError } from '@/host/utils/structured-errors'
 import { runExternalEditor } from '@/host/external-editor'
 import { foregroundJobGroup } from '@/host/job-control'
 import type { EditTextRequest } from '@/host/providers/actions-context'
+import { runTerminalAttach, type AttachTerminalRequest } from '@/host/attach'
+import { readClipboardImage } from '@/host/clipboard-image'
 
 export async function runInteractive(session: SettingsSession, noColor: boolean) {
   if (!process.stdin.isTTY || !process.stdout.isTTY || process.env.TERM === 'dumb') {
@@ -51,6 +53,18 @@ export async function runInteractive(session: SettingsSession, noColor: boolean)
       if (!exitRequested) renderer?.resume()
     }
   }
+  const attachTerminal = async (request: AttachTerminalRequest) => {
+    lifetime.signal.throwIfAborted()
+    renderer?.suspend()
+    try {
+      await runTerminalAttach({
+        ...request,
+        signal: AbortSignal.any([request.signal, lifetime.signal]),
+      })
+    } finally {
+      if (!exitRequested) renderer?.resume()
+    }
+  }
   process.once('SIGINT', close)
   process.once('SIGTERM', close)
   process.on('SIGCONT', resume)
@@ -73,6 +87,10 @@ export async function runInteractive(session: SettingsSession, noColor: boolean)
         onExit={close}
         onSuspend={suspend}
         onEditText={editText}
+        onAttachTerminal={attachTerminal}
+        onReadClipboardImage={(signal) =>
+          readClipboardImage(AbortSignal.any([signal, lifetime.signal]))
+        }
       />,
     )
     void session.refresh()

@@ -11,7 +11,7 @@ import {
   createProjectDefaultModelCommand,
   createProjectMetaCommand,
   createWorkspaceProjectCommand,
-} from '@/features/chat/utils/command-builders'
+} from '@workspace/client-core/chat/commands'
 import { expect, test } from '../../../../../test/fixtures'
 
 const claudeSelection: ModelSelection = {

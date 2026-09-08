@@ -174,7 +174,10 @@ function createContribution(context: EditorViewContributionContext, options: Dif
     if (offset === null) return
 
     context.focusEditor()
-    context.setSelection(offset, offset, 'diff-definition', offset)
+    context.setSelection(offset, offset, 'diff-definition', {
+      revealBlock: 'center',
+      revealOffset: offset,
+    })
   }
 
   const handleLeave = (): void => {

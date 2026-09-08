@@ -1,7 +1,7 @@
 import { XIcon } from '@phosphor-icons/react'
 import { Button } from '@workspace/ui/components/button'
 
-import { formatTerminalContextLabel } from '@/features/chat/utils/terminal-context'
+import { formatTerminalContextLabel } from '@workspace/client-core/chat/terminal-context'
 import type { ChatInputTerminalContext } from '../state/chat-input-draft-store'
 import { TerminalContextChip } from './terminal-context-chip'
 

@@ -17,6 +17,7 @@ const TAB_STRIP_GUTTER = 8
 export function useActiveTabStripScroll(activeTabId: string | null) {
   const stripRef = useRef<HTMLDivElement>(null)
   const metricsRef = useRef<TabStripMetrics | null>(null)
+  const hasRevealedRef = useRef(false)
 
   // A layout effect, and declared above the reveal so it runs first: metrics built in a passive
   // effect do not exist yet on the mount that has to reveal an already-clipped active tab.
@@ -27,6 +28,7 @@ export function useActiveTabStripScroll(activeTabId: string | null) {
     const metrics = createTabStripMetrics(strip)
     metricsRef.current = metrics
     return () => {
+      hasRevealedRef.current = false
       metricsRef.current = null
       metrics.dispose()
     }
@@ -41,11 +43,13 @@ export function useActiveTabStripScroll(activeTabId: string | null) {
     const bounds = metrics.boundsFor(activeTabId) ?? metrics.measure(activeTabId)
     if (!bounds) return
 
+    const behavior = hasRevealedRef.current ? revealBehavior() : 'instant'
+    hasRevealedRef.current = true
     const left = tabStripScrollLeft({ gutter: TAB_STRIP_GUTTER, ...bounds })
     if (left === null) return
 
     metrics.noteScrollTarget(left)
-    strip.scrollTo({ behavior: revealBehavior(), left })
+    strip.scrollTo({ behavior, left })
   }, [activeTabId])
 
   return stripRef

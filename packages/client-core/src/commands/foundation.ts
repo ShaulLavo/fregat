@@ -35,7 +35,10 @@ export const foundationCommandMetadata = {
     'workspace.quit',
     'Quit',
     'Close Platform and restore the terminal.',
-    [{ chord: ['Control+C'], platforms: ['tui'] }],
+    [
+      { chord: ['Control+C'], platforms: ['tui'] },
+      { chord: ['Control+K', 'Q'], platforms: ['tui'] },
+    ],
   ),
   'workspace.suspend': foundation(
     'workspace.suspend',

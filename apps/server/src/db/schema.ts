@@ -1,4 +1,4 @@
-import { sessionRuntimeStatusSchema } from '@workspace/contracts'
+import { sessionRuntimeStatusSchema, type WorkspaceAddressId } from '@workspace/contracts'
 import { sql } from 'drizzle-orm'
 import {
   check,
@@ -44,6 +44,18 @@ export const fsMetadata = sqliteTable('fs_metadata', {
 })
 
 export type FsMetadataRow = typeof fsMetadata.$inferSelect
+
+export const workspaceAddresses = sqliteTable(
+  'workspace_addresses',
+  {
+    id: text('id').$type<WorkspaceAddressId>().primaryKey(),
+    filesystemRoot: text('filesystem_root').notNull(),
+    canonicalPath: text('canonical_path').notNull(),
+  },
+  (table) => [
+    uniqueIndex('workspace_addresses_directory_idx').on(table.filesystemRoot, table.canonicalPath),
+  ],
+)
 
 export const orchestrationEvents = sqliteTable(
   'orchestration_events',
@@ -230,6 +242,18 @@ export const projectionTerminalLeases = sqliteTable(
   },
   (table) => [index('projection_terminal_leases_worktree_idx').on(table.worktreeId)],
 )
+
+export const agentTerminalHandoffs = sqliteTable('agent_terminal_handoffs', {
+  sessionId: text('session_id').primaryKey(),
+  providerInstanceId: text('provider_instance_id').notNull(),
+  worktreeId: text('worktree_id').notNull(),
+  terminalLeaseId: text('terminal_lease_id').notNull(),
+  runtimeEpoch: text('runtime_epoch').notNull(),
+  cwd: text('cwd').notNull(),
+  startedAt: text('started_at').notNull(),
+  baselineJson: text('baseline_json').notNull(),
+  phase: text('phase', { enum: ['active', 'history'] }).notNull(),
+})
 
 export const projectionSessions = sqliteTable(
   'projection_sessions',

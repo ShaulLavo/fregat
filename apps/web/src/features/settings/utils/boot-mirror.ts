@@ -1,4 +1,9 @@
-import { descriptorFor, DEFAULT_SETTING_VALUES, type SettingsValues } from '@workspace/contracts'
+import {
+  descriptorFor,
+  DEFAULT_SETTING_VALUES,
+  type SettingId,
+  type SettingsValues,
+} from '@workspace/contracts'
 import * as v from 'valibot'
 
 /**
@@ -82,6 +87,13 @@ export function readSettingsMirror(): MirroredValues {
   return values as MirroredValues
 }
 
+/** One cached startup value until the confirmed settings document arrives. */
+export function readSettingBootValue<K extends SettingId>(key: K): SettingsValues[K] {
+  if (!MIRRORED_KEYS.some((mirrored) => mirrored === key)) return DEFAULT_SETTING_VALUES[key]
+
+  return validValue(key, parseStored()[key])
+}
+
 /** Called only with a snapshot the server sent. */
 export function writeBootMirror(values: SettingsValues) {
   const mirrored: Record<string, unknown> = {}
@@ -95,12 +107,13 @@ export function writeBootMirror(values: SettingsValues) {
   }
 }
 
-function validValue(key: MirroredKey, stored: unknown): unknown {
+function validValue<K extends SettingId>(key: K, stored: unknown): SettingsValues[K] {
   if (stored === undefined) return DEFAULT_SETTING_VALUES[key]
 
   const parsed = v.safeParse(descriptorFor(key).schema, stored)
+  if (!parsed.success) return DEFAULT_SETTING_VALUES[key]
 
-  return parsed.success ? parsed.output : DEFAULT_SETTING_VALUES[key]
+  return parsed.output as SettingsValues[K]
 }
 
 function parseStored(): Record<string, unknown> {

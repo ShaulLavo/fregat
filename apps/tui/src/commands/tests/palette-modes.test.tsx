@@ -10,12 +10,20 @@ import { openPaletteSearch, submitPaletteSearch } from '../../../test/palette'
 test('batched command filtering and Enter use the submitted native query', async ({ server }) => {
   const session = createTestSettingsSession(server)
   await session.refresh()
-  const frame = await renderTui(<Application session={session} noColor onExit={() => {}} />, {
-    width: 110,
-    height: 32,
-    useThread: false,
-    kittyKeyboard: true,
-  })
+  const frame = await renderTui(
+    <Application
+      initialLocation={{ kind: 'settings', query: '' }}
+      session={session}
+      noColor
+      onExit={() => {}}
+    />,
+    {
+      width: 110,
+      height: 32,
+      useThread: false,
+      kittyKeyboard: true,
+    },
+  )
   try {
     await act(async () => {
       frame.mockInput.pressKey('F1')
@@ -34,19 +42,26 @@ test('batched command filtering and Enter use the submitted native query', async
 
 test.for([
   ['edt editor', 'Open editors'],
-  ['sess thread', 'Sessions'],
   ['run test', 'Scripts'],
   ['@symbol', 'Symbols'],
   [':42', 'Go to line'],
 ])('deferred prefix %s stays unavailable', async ([query, title], { server }) => {
   const session = createTestSettingsSession(server)
   await session.refresh()
-  const frame = await renderTui(<Application session={session} onExit={() => {}} noColor />, {
-    width: 110,
-    height: 32,
-    useThread: false,
-    kittyKeyboard: true,
-  })
+  const frame = await renderTui(
+    <Application
+      initialLocation={{ kind: 'settings', query: '' }}
+      session={session}
+      onExit={() => {}}
+      noColor
+    />,
+    {
+      width: 110,
+      height: 32,
+      useThread: false,
+      kittyKeyboard: true,
+    },
+  )
   try {
     await openPaletteSearch(frame, query)
     expect(frame.captureCharFrame()).toContain(`${title} is not available in the TUI yet.`)
@@ -75,12 +90,20 @@ test('color and theme prefixes commit the existing settings and restore their in
     { kind: 'set', key: 'workbench.palette', value: 'graphite' },
   ])
   if (initial.kind === 'submitted') await initial.settled
-  const frame = await renderTui(<Application session={session} onExit={() => {}} noColor />, {
-    width: 110,
-    height: 32,
-    useThread: false,
-    kittyKeyboard: true,
-  })
+  const frame = await renderTui(
+    <Application
+      initialLocation={{ kind: 'settings', query: '' }}
+      session={session}
+      onExit={() => {}}
+      noColor
+    />,
+    {
+      width: 110,
+      height: 32,
+      useThread: false,
+      kittyKeyboard: true,
+    },
+  )
   try {
     await act(async () => {
       frame.mockInput.pressKey('TAB')
@@ -111,12 +134,20 @@ test('view prefix invokes an available view and unprefixed text carries into fil
   await writeFile(`${server.root}/unrelated.txt`, 'another file')
   const session = createTestSettingsSession(server)
   await session.refresh()
-  const frame = await renderTui(<Application session={session} onExit={() => {}} noColor />, {
-    width: 110,
-    height: 32,
-    useThread: false,
-    kittyKeyboard: true,
-  })
+  const frame = await renderTui(
+    <Application
+      initialLocation={{ kind: 'settings', query: '' }}
+      session={session}
+      onExit={() => {}}
+      noColor
+    />,
+    {
+      width: 110,
+      height: 32,
+      useThread: false,
+      kittyKeyboard: true,
+    },
+  )
   try {
     await openPaletteSearch(frame, 'view settings')
     expect(frame.captureCharFrame()).toContain('Open providers, models, and keybindings.')

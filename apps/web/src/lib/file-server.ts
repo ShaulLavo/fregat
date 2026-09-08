@@ -16,7 +16,7 @@ import { log, observeClientOperation } from '@/lib/client-logging'
 import { createCoalescedLogQueue } from '@/features/workspace/utils/coalesced-log'
 import { omitNullish } from '@/lib/objects'
 import { createRpcError } from '@/lib/structured-errors'
-import { collectWorkspaceSearch } from '@/lib/workspace-search-client'
+import { collectWorkspaceSearch } from '@workspace/client-core/files/search-client'
 import type {
   WorkspaceEditPrepareRequest,
   WorkspaceEditRecoverRequest,
@@ -26,6 +26,7 @@ import type {
   WorkspaceEditStatusResult,
   WorkspaceEditTransitionRequest,
   WorkspaceSearchMeasurement,
+  WorkspaceRootEntry,
 } from '@workspace/contracts'
 
 const TREE_LOG_DELAY_MS = 250
@@ -46,7 +47,7 @@ type DeleteResult = {
 }
 
 type OpenWorkspaceRootResult = {
-  entry?: StatResult
+  entry?: WorkspaceRootEntry
   status: 'opened' | 'superseded'
   workspaceIndex: NonNullable<ServerInfo['workspaceIndex']>
 }

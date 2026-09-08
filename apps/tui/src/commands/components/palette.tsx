@@ -1,4 +1,7 @@
-import { useEffect, useRef, useState } from 'react'
+import { useEffect, useRef, useState, useSyncExternalStore } from 'react'
+import type { SessionId } from '@workspace/contracts'
+import type { ChatOwner } from '@workspace/client-core/chat/owner'
+import { quickAccessMode } from '@workspace/client-core/commands/palette'
 import { useTerminalDimensions } from '@opentui/react'
 import type { KeyValueStorage } from '@workspace/client-core/storage'
 import type { CommandId } from '@workspace/client-core/commands/catalog'
@@ -17,6 +20,7 @@ import type { Theme } from '@/theme/utils/theme'
 import { useSettingValue } from '@/settings/hooks/use-setting-value'
 import { connectionFailure } from '@/connection/utils/failure'
 import { Spinner } from '@/components/spinner'
+import { LoadingState } from '@/components/loading-state'
 
 export function CommandPalette({
   origin,
@@ -25,6 +29,8 @@ export function CommandPalette({
   onClose,
   onRun,
   onFiles,
+  chat,
+  onSession,
   owner,
   writable,
   initialQuery = '>',
@@ -35,11 +41,14 @@ export function CommandPalette({
   onClose: () => void
   onRun: (id: CommandId) => void
   onFiles: (query: string) => void
+  chat: ChatOwner
+  onSession: (id: SessionId) => void
   owner: SettingsOwner
   writable: boolean
   initialQuery?: string
 }) {
   const commands = useCommands()
+  const snapshot = useSyncExternalStore(chat.subscribe, chat.getSnapshot)
   const captured = commands.bus.capture('palette', origin)
   const [query, setQuery] = useState(initialQuery)
   const [selected, setSelected] = useState(0)
@@ -63,6 +72,7 @@ export function CommandPalette({
     colorMode,
     palette,
     writable,
+    chat: snapshot,
   }
   const { title, empty, options } = paletteModeRows({ ...paletteInput, search: query })
   useCommandFocus(
@@ -93,6 +103,10 @@ export function CommandPalette({
       onFiles(action.query)
       return
     }
+    if (action.kind === 'session') {
+      onSession(action.sessionId)
+      return
+    }
     setPending(true)
     try {
       const saved = await setThemePreference(owner, {
@@ -112,7 +126,7 @@ export function CommandPalette({
       title={title}
       theme={theme}
       onClose={onClose}
-      footer='> commands · view · color · theme · ↑↓ select · Enter open'
+      footer='> commands · sess sessions · view · color · theme · Enter open'
       dismissLabel='close'
       width={90}
     >
@@ -129,9 +143,15 @@ export function CommandPalette({
           void run(selection.current, value)
         }}
         theme={theme}
-        placeholder='Search files, or use >, view, color, theme…'
+        placeholder='Search files, or use >, sess, view, color, theme…'
       />
-      {options.length === 0 && <text fg={theme.mutedForeground}>{empty}</text>}
+      {options.length === 0 &&
+        quickAccessMode(query) === 'sessions' &&
+        snapshot.status === 'loading' && <LoadingState theme={theme} label='Reading sessions…' />}
+      {options.length === 0 &&
+        (quickAccessMode(query) !== 'sessions' || snapshot.status !== 'loading') && (
+          <text fg={theme.mutedForeground}>{empty}</text>
+        )}
       <Select
         options={options}
         selectedIndex={selected}

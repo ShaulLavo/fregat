@@ -5,7 +5,7 @@ import type { MenuAnchor } from '@/features/menus/utils/virtual-anchor'
 
 import { useMessageMenu } from '../hooks/use-message-menu'
 import type { OptimisticChatMessage } from '../state/chat-optimistic-store'
-import type { ChatTurnDiffSummary } from '../state/chat-projection-store'
+import type { ChatTurnDiffSummary } from '@workspace/client-core/chat/types'
 
 /**
  * Mounted by the bubble only while its menu is open, so the timeline action

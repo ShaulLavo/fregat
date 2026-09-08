@@ -15,7 +15,7 @@ import {
   hydrateChatChangedFilesExpansionStoreFromStorage,
   resetChatChangedFilesExpansionStore,
 } from '@/features/chat/state/chat-changed-files-expansion-store'
-import type { ChatTurnDiffSummary } from '@/features/chat/state/chat-projection-store'
+import type { ChatTurnDiffSummary } from '@workspace/client-core/chat/types'
 import { turnDiffSummary } from '../../../../../test/factories/chat'
 import { expect, test } from '../../../../../test/fixtures'
 import { renderWithProviders } from '../../../../../test/render'

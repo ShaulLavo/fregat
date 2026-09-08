@@ -4,7 +4,8 @@ import { mkdir, mkdtemp, readFile, rm } from 'node:fs/promises'
 import { platform, release, tmpdir } from 'node:os'
 import path from 'node:path'
 import { createError } from 'evlog'
-import { parseTerminalServerMessage } from '@workspace/contracts'
+import { parseTerminalServerMessage, terminalLeaseIdSchema } from '@workspace/contracts'
+import * as v from 'valibot'
 import { createAuthConfig } from '../src/auth'
 import { createWorkspacePaths } from '../src/fs/path'
 import { TerminalService } from '../src/terminal/service'
@@ -197,6 +198,8 @@ async function main() {
     env: { HOME: root, PATH: process.env.PATH, SHELL: '/bin/sh', TERM: 'xterm-256color' },
     lifecycle: {
       begin: async () => ({
+        terminalLeaseId: v.parse(terminalLeaseIdSchema, crypto.randomUUID()),
+        runtimeEpoch: 'smoke-test',
         activate: async () => {},
         terminate: async () => {},
         end: async () => {

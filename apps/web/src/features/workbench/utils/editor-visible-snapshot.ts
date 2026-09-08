@@ -20,7 +20,10 @@ export type EditorVisibleSnapshotSegment =
 
 export type EditorVisibleSnapshotCounts = {
   readonly chunks: number
+  readonly foldMarkers: number
   readonly parts: number
+  readonly paintLayers: number
+  readonly paintRectangles: number
   readonly rows: number
   readonly runs: number
 }
@@ -98,18 +101,31 @@ export function editorVisibleSnapshotCounts(
   snapshot: EditorVisibleSnapshotJSON,
 ): EditorVisibleSnapshotCounts {
   let chunks = 0
+  let foldMarkers = 0
   let parts = 0
   let runs = 0
 
   for (const row of snapshot.rows) {
     chunks += row.chunks.length
+    if (row.foldMarker) foldMarkers += 1
     for (const chunk of row.chunks) {
       parts += chunk.parts.length
       runs += chunk.runs.length
     }
   }
 
-  return { chunks, parts, rows: snapshot.rows.length, runs }
+  return {
+    chunks,
+    foldMarkers,
+    parts,
+    paintLayers: snapshot.paintLayers.length,
+    paintRectangles: snapshot.paintLayers.reduce(
+      (count, layer) => count + layer.rectangles.length,
+      0,
+    ),
+    rows: snapshot.rows.length,
+    runs,
+  }
 }
 
 function segmentWithoutSyntax(part: EditorMountedChunkPaintPartJSON): EditorVisibleSnapshotSegment {

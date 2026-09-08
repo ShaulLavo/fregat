@@ -2,7 +2,7 @@ import { DotsThreeIcon } from '@phosphor-icons/react'
 import { useState } from 'react'
 
 import { useSessionMenu } from '@/features/chat-mode/hooks/use-session-menu'
-import type { SessionRailItem } from '@/features/chat-mode/utils/session-rail-model'
+import type { SessionRailItem } from '@workspace/client-core/chat/rail/model'
 import { MenuSurface } from '@/features/menus/components/surface'
 import { rectAnchor, type MenuAnchor } from '@/features/menus/utils/virtual-anchor'
 import { Button } from '@workspace/ui/components/button'

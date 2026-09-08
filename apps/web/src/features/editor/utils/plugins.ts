@@ -14,6 +14,7 @@ import { createEditorFindPlugin } from '@singapor/find'
 import { createFoldGutterPlugin, createLineGutterPlugin } from '@singapor/gutters'
 import type { FoldGutterIconContext } from '@singapor/gutters'
 import { createMarkdownPreviewPlugin } from '@singapor/markdown'
+import { createScopeLinesPlugin } from '@singapor/scope-lines'
 import { createTreeSitterSyntaxPlugin } from '@singapor/tree-sitter'
 import { subscribeActiveShikiTheme } from '@/features/editor/state/color-theme-store'
 import { requestedDecodeMode } from '@/features/editor/utils/decode-mode'
@@ -43,11 +44,7 @@ const PLATFORM_SEARCH_RESULT_EDITOR_LOGGING_PLUGIN = createEditorLoggingPlugin(
     name: 'platform.search-result-editor-logging',
   },
 )
-const nonCriticalEditorPluginsByGuideEligibility = new Map<boolean, readonly EditorPlugin[]>()
-const nonCriticalEditorPluginPromisesByGuideEligibility = new Map<
-  boolean,
-  Promise<readonly EditorPlugin[]>
->()
+let nonCriticalEditorPluginPromise: Promise<readonly EditorPlugin[]> | null = null
 
 /**
  * `languageId` gates the language-specific plugins. Markdown preview is registered only for markdown
@@ -56,7 +53,12 @@ const nonCriticalEditorPluginPromisesByGuideEligibility = new Map<
  */
 export function createCriticalEditorCorePlugins(
   languageId: EditorSyntaxLanguageId | null,
+  indentationGuidesEnabled: boolean,
 ): readonly EditorPlugin[] {
+  const includeGuides =
+    indentationGuidesEnabled &&
+    editorIndentationGuidesSupported(languageId) &&
+    !editorPerformanceFeatureDisabled('scope-lines')
   return [
     ...createEditorSyntaxHighlightingPlugins(),
     createLineGutterPlugin(),
@@ -74,6 +76,7 @@ export function createCriticalEditorCorePlugins(
       style: { backgroundColor: 'var(--editor-occurrence-highlight-background)' },
     }),
     createDocumentLinkPlugin(),
+    ...(includeGuides ? [createScopeLinesPlugin()] : []),
     // Critical rather than lazy: loading it after first paint would flash raw markdown first. It
     // derives its replacements from tree-sitter's markdown captures, so a file renders as source
     // while syntax highlighting is off.
@@ -82,9 +85,7 @@ export function createCriticalEditorCorePlugins(
   ]
 }
 
-export function createNonCriticalEditorPluginsLoaderPlugin(
-  languageId: EditorSyntaxLanguageId | null,
-): EditorPlugin {
+export function createNonCriticalEditorPluginsLoaderPlugin(): EditorPlugin {
   return {
     name: 'platform.non-critical-editor-plugins',
     activate: (context) => {
@@ -92,7 +93,7 @@ export function createNonCriticalEditorPluginsLoaderPlugin(
       const disposables: EditorDisposable[] = []
 
       scheduleNonCriticalPluginLoad(async () => {
-        const plugins = await loadNonCriticalEditorPlugins(languageId)
+        const plugins = await loadNonCriticalEditorPlugins()
         if (disposed) return
 
         for (const plugin of plugins) {
@@ -111,46 +112,16 @@ export function createNonCriticalEditorPluginsLoaderPlugin(
   }
 }
 
-function loadNonCriticalEditorPlugins(
-  languageId: EditorSyntaxLanguageId | null,
-): Promise<readonly EditorPlugin[]> {
-  const guidesEligible = editorIndentationGuidesSupported(languageId)
-  const plugins = nonCriticalEditorPluginsByGuideEligibility.get(guidesEligible)
-  if (plugins) return Promise.resolve(plugins)
-
-  const pending = nonCriticalEditorPluginPromisesByGuideEligibility.get(guidesEligible)
-  if (pending) return pending
-
-  const promise = Promise.all(nonCriticalEditorPluginLoaders(guidesEligible)).then(
-    (loadedPlugins) => {
-      const availablePlugins = loadedPlugins.filter(
-        (plugin): plugin is EditorPlugin => plugin !== null,
-      )
-      nonCriticalEditorPluginsByGuideEligibility.set(guidesEligible, availablePlugins)
-      return availablePlugins
-    },
+function loadNonCriticalEditorPlugins(): Promise<readonly EditorPlugin[]> {
+  nonCriticalEditorPluginPromise ??= Promise.all(nonCriticalEditorPluginLoaders()).then((plugins) =>
+    plugins.filter((plugin): plugin is EditorPlugin => plugin !== null),
   )
-  nonCriticalEditorPluginPromisesByGuideEligibility.set(guidesEligible, promise)
-
-  return promise
+  return nonCriticalEditorPluginPromise
 }
 
-function nonCriticalEditorPluginLoaders(
-  guidesEligible: boolean,
-): readonly Promise<EditorPlugin | null>[] {
+function nonCriticalEditorPluginLoaders(): readonly Promise<EditorPlugin | null>[] {
   const loaders: Promise<EditorPlugin | null>[] = []
   const settings = readSettingsMirror()
-  if (
-    guidesEligible &&
-    settings['editor.guides.indentation'] &&
-    !editorPerformanceFeatureDisabled('scope-lines')
-  ) {
-    loaders.push(
-      loadPlugin('@singapor/scope-lines', () =>
-        import('@singapor/scope-lines').then((module) => module.createScopeLinesPlugin()),
-      ),
-    )
-  }
   if (settings['editor.minimap.enabled'] && !editorPerformanceFeatureDisabled('minimap')) {
     loaders.push(
       loadPlugin('@singapor/minimap', () =>

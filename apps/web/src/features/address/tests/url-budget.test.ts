@@ -1,3 +1,7 @@
+import {
+  testWorkspaceAddress,
+  testWorkspaceToken,
+} from '../../../../test/factories/workspace-address'
 import { afterEach, describe, vi } from 'vitest'
 
 import { expect, test } from '../../../../test/fixtures'
@@ -24,7 +28,7 @@ function snapshotWith(extra: Partial<ReturnType<typeof emptyAddressSnapshot>>) {
   return addressFromSnapshot({
     ...emptyAddressSnapshot(),
     activeDocumentPath: `${ROOT}/src/main.ts`,
-    knownRootPaths: [ROOT],
+    workspaceAddress: testWorkspaceAddress(ROOT),
     mode: 'workbench' as const,
     rootPath: ROOT,
     sidebarTab: 'git' as const,
@@ -52,7 +56,7 @@ describe('the URL budget', () => {
   test('keeps the workspace, mode and document when it trims', () => {
     const address = snapshotWith({ search: { q: 'x'.repeat(8000) } })
 
-    expect(address.workspace).toBe('repo')
+    expect(address.workspace).toBe(testWorkspaceToken('/repo'))
     expect(address.mode).toBe('workbench')
     expect(address.document).toBe('f/src/main.ts')
     expect(address.side).toBe('git')
@@ -111,7 +115,7 @@ describe('the URL budget', () => {
     const deep = Array.from({ length: 400 }, () => 'ünïcödé').join('/')
     const address = snapshotWith({ activeDocumentPath: `${ROOT}/${deep}.ts` })
 
-    expect(address.workspace).toBe('repo')
+    expect(address.workspace).toBe(testWorkspaceToken('/repo'))
     expect(address.document).toContain('f/')
     expect(address.search).toBeNull()
     expect(address.tabs).toBeNull()

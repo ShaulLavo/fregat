@@ -1,3 +1,4 @@
+import { LoadingState } from '@workspace/ui/components/loading-state'
 import { useActiveChatProjection } from '@/features/chat/hooks/use-active-projection'
 import type { ModelSelection, SessionId } from '@workspace/contracts'
 import { useCallback, useEffect, useMemo, useState } from 'react'
@@ -9,17 +10,17 @@ import {
   createProjectDefaultModelCommand,
   createSessionInterruptCommand,
   createTurnSubmission,
-} from '@/features/chat/utils/command-builders'
+} from '@workspace/client-core/chat/commands'
 import { dispatchChatCommand, replayAfterDispatch } from '@/features/chat/utils/command-dispatch'
 import { scheduleSessionProjectionSyncAfterDispatch } from '@/features/chat/utils/command-sync'
 import { optimisticMessageSummary } from '@/features/chat/utils/pipeline-logging'
-import { isChatSessionBusy } from '@/features/chat/utils/session-busy'
-import { createChatSessionSelector } from '../state/chat-projection-selectors'
+import { isChatSessionBusy } from '@workspace/client-core/chat/session-busy'
+import { createChatSessionSelector } from '@workspace/client-core/chat/selectors'
 import {
   createOptimisticMessagesForSessionSelector,
   useChatOptimisticStore,
 } from '../state/chat-optimistic-store'
-import { type ChatSession } from '../state/chat-projection-store'
+import { type ChatSession } from '@workspace/client-core/chat/types'
 import { ChatTransportContext } from '@/features/chat/providers/transport-context'
 import { ChatInput, type ChatInputSubmitPayload } from './chat-input'
 import { ImportedChatNotice } from '@/features/chat/components/imported-chat-notice'
@@ -133,18 +134,15 @@ export function ChatView({
       )
   }, [session, transport.environmentId])
 
-  if (!activeSessionId) {
+  if (!activeSessionId || !session) {
     return (
-      <div className='text-muted-foreground flex min-h-0 flex-1 items-center justify-center px-4 text-center text-xs'>
-        Preparing workspace chat
-      </div>
-    )
-  }
-  if (!session) {
-    return (
-      <div className='text-muted-foreground flex min-h-0 flex-1 items-center justify-center px-4 text-center text-xs'>
-        Loading session
-      </div>
+      <LoadingState
+        className='flex min-h-0 flex-1 flex-col gap-4 p-4'
+        label={activeSessionId ? 'Loading session' : 'Preparing workspace chat'}
+      >
+        <div className='skeleton-sweep ml-auto h-12 w-2/3 rounded-lg' />
+        <div className='skeleton-sweep h-24 w-3/4 rounded-lg' />
+      </LoadingState>
     )
   }
 
@@ -162,13 +160,7 @@ export function ChatView({
 
   return (
     <section className='flex min-h-0 flex-1 flex-col'>
-      <ChatRuntimeStatus
-        commandFailure={sendError}
-        interruptPending={interrupting}
-        sendPending={sending}
-        stopPending={false}
-        session={session}
-      />
+      <ChatRuntimeStatus commandFailure={sendError} session={session} />
       <ChatTransportContext value={transport}>
         <ChatTimelineActionsProvider revertToCheckpoint={handleRevertToCheckpoint}>
           <MessagesTimeline
@@ -206,12 +198,14 @@ export function ChatView({
           <ChatInput
             busy={busy}
             commandStatusLabel={interrupting ? 'Interrupting' : null}
-            disabled={interrupting || (!busy && session.worktree.lifecycle.state !== 'ready')}
+            disabled={
+              sending || interrupting || (!busy && session.worktree.lifecycle.state !== 'ready')
+            }
             draftKey={session.id}
             error={null}
             interactionMode={session.interactionMode}
             modelSelection={session.modelSelection}
-            modelSelectionLocked={session.messages.length > 0 || session.latestTurn !== null}
+            sessionProviderInstanceId={session.modelSelection.providerInstanceId}
             rootPath={rootPath}
             runtimeMode={session.runtimeMode}
             onPersistModelSelection={handlePersistModelSelection}

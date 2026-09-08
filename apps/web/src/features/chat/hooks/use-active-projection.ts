@@ -1,8 +1,8 @@
 import { useEnvironmentId } from '@/lib/environments/hooks/use-environment-id'
+import { type ChatProjectionSlice } from '@workspace/client-core/chat/types'
 import {
   selectChatProjectionSlice,
   useChatProjectionStore,
-  type ChatProjectionSlice,
 } from '@/features/chat/state/chat-projection-store'
 
 export function useActiveChatProjection<T>(selector: (slice: ChatProjectionSlice) => T): T {

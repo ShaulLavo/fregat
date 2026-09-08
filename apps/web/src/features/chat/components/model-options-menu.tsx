@@ -1,6 +1,5 @@
 import { BrainIcon, CaretUpDownIcon } from '@phosphor-icons/react'
-import { useQuery } from '@tanstack/react-query'
-import type { ModelSelection, ProviderModel, ProviderSnapshot } from '@workspace/contracts'
+import type { ModelSelection } from '@workspace/contracts'
 import { Button } from '@workspace/ui/components/button'
 import {
   DropdownMenu,
@@ -18,8 +17,7 @@ import {
   modelSelectionOptionValue,
   withModelOption,
   type ModelOptionDescriptor,
-} from '@/features/chat/utils/model-effort'
-import { providerListQueryOptions } from '@/features/chat/utils/provider-query'
+} from '@workspace/client-core/chat/providers/effort'
 import {
   useChatInputDraftStore,
   type ChatInputDraftTarget,
@@ -49,10 +47,9 @@ export function ModelOptionsMenu({
   readonly disabled: boolean
   readonly draftTarget: ChatInputDraftTarget
 }) {
-  const { locked, modelSelection } = useModelPicker()
-  const providersQuery = useQuery(providerListQueryOptions())
+  const { modelSelection, display } = useModelPicker()
   const setModelSelection = useChatInputDraftStore((state) => state.setModelSelection)
-  const model = selectedModel(providersQuery.data?.providers, modelSelection)
+  const model = display?.models.find((candidate) => candidate.slug === modelSelection?.model)
   const descriptors = model ? modelOptionDescriptors(model) : []
   if (!modelSelection || descriptors.length === 0) return null
 
@@ -60,8 +57,6 @@ export function ModelOptionsMenu({
   const summary = descriptorSummary(descriptors, selection)
 
   function selectOption(descriptor: ModelOptionDescriptor, value: string) {
-    if (locked) return
-
     const next = value === PROVIDER_DEFAULT_VALUE ? null : value
     setModelSelection(draftTarget, withModelOption(selection, descriptor, next))
   }
@@ -73,7 +68,7 @@ export function ModelOptionsMenu({
           <Button
             aria-label='Model options'
             className='text-muted-foreground hover:text-foreground compact:h-6 compact:px-1.5 h-7 min-w-0 gap-1 rounded-md px-2 text-xs font-normal'
-            disabled={disabled || locked}
+            disabled={disabled}
             size='sm'
             title={`Model options: ${summary}`}
             type='button'
@@ -141,17 +136,4 @@ function defaultChoiceLabel(descriptor: ModelOptionDescriptor) {
   if (!fallback) return 'Provider default'
 
   return `Provider default (${fallback.label})`
-}
-
-function selectedModel(
-  providers: readonly ProviderSnapshot[] | undefined,
-  selection: ModelSelection | null,
-): ProviderModel | null {
-  if (!providers || !selection) return null
-
-  const provider = providers.find(
-    (candidate) => candidate.providerInstanceId === selection.providerInstanceId,
-  )
-
-  return provider?.models.find((model) => model.slug === selection.model) ?? null
 }

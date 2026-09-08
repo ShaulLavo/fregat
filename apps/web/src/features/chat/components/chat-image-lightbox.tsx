@@ -39,7 +39,7 @@ export function ChatImageLightbox({
   return (
     <Dialog open onOpenChange={(open) => onOpenIndexChange(open ? index : null)}>
       <DialogContent
-        className='surface-vibrancy compact:gap-1.5 compact:p-2 max-w-[min(92vw,72rem)] gap-2 rounded-lg bg-transparent p-3 sm:max-w-[min(92vw,72rem)]'
+        className='bg-popover-solid compact:gap-1.5 compact:p-2 max-w-[min(92vw,72rem)] gap-2 rounded-lg p-3 sm:max-w-[min(92vw,72rem)]'
         onKeyDown={handleKeyDown}
       >
         <DialogTitle className='truncate pr-8 text-xs'>{image.name}</DialogTitle>

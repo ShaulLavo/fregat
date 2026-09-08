@@ -7,29 +7,20 @@ import { useState } from 'react'
 
 import {
   chatRuntimeAlerts,
-  type ChatCommandState,
   type ChatRuntimeAlert,
   type ChatRuntimeAlertTone,
 } from '@/features/chat/utils/runtime-state'
 import { errorMessage } from '@/lib/error-message'
 import { useProviderSignInDialog } from '../hooks/use-provider-sign-in-dialog'
 import { providerListQueryOptions } from '@/features/chat/utils/provider-query'
-import type { ChatSession } from '../state/chat-projection-store'
-import { Spinner } from '@workspace/ui/components/spinner'
+import type { ChatSession } from '@workspace/client-core/chat/types'
 
-/**
- * The runtime notice stack above the composer. Only the most urgent notice is
- * expanded; the rest fold behind a disclosure so a session with a provider
- * warning, a pending approval and a live spinner cannot walk the composer off
- * the bottom of the viewport.
- */
+// Keep the most urgent error visible; additional provider notices remain expandable.
 export function ChatRuntimeStatus({
   commandFailure,
-  interruptPending,
-  sendPending,
-  stopPending,
   session,
-}: ChatCommandState & {
+}: {
+  commandFailure: string | null
   session: ChatSession
 }) {
   const { openSignIn } = useProviderSignInDialog()
@@ -40,7 +31,7 @@ export function ChatRuntimeStatus({
     (candidate) => candidate.providerInstanceId === session.modelSelection.providerInstanceId,
   )
   const alerts = chatRuntimeAlerts({
-    commandState: { commandFailure, interruptPending, sendPending, stopPending },
+    commandFailure,
     provider,
     providerError: providersQuery.error
       ? errorMessage(providersQuery.error, 'Provider request failed.')
@@ -104,7 +95,6 @@ function RuntimeAlert({
   readonly onDismiss: (alert: ChatRuntimeAlert) => void
   readonly onSignIn: (target: NonNullable<ChatRuntimeAlert['signIn']>) => void
 }) {
-  const Icon = alert.tone === 'busy' ? Spinner : WarningCircleIcon
   const signIn = alert.signIn
 
   return (
@@ -112,7 +102,7 @@ function RuntimeAlert({
       className={cn(runtimeAlertClass(alert.tone), 'rounded-md')}
       variant={alert.tone === 'error' ? 'destructive' : 'default'}
     >
-      <Icon className='size-4' />
+      <WarningCircleIcon className='size-4' />
       <AlertTitle>{alert.title}</AlertTitle>
       {alert.detail ? (
         <AlertDescription className='line-clamp-3 tabular-nums' title={alert.detail}>
@@ -148,7 +138,6 @@ function runtimeAlertClass(tone: ChatRuntimeAlertTone) {
   if (tone === 'warning') {
     return 'border-warning/30 bg-warning/10 text-warning'
   }
-  if (tone === 'busy') return 'border-border/70 bg-card text-muted-foreground'
 
   return null
 }

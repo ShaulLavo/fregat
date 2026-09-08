@@ -3,6 +3,30 @@ import { effectiveTerminalBindings } from '@/commands/utils/bindings'
 import { createCommandHarness } from '../../../test/commands'
 import { expect, test } from '../../../test/fixtures'
 
+test('embedded terminal owns shell controls while Platform chords remain available', () => {
+  const harness = createCommandHarness({
+    area: 'terminal',
+    textEntry: true,
+    handlers: {
+      'workspace.quit': { run: () => {} },
+      'workspace.suspend': { run: () => {} },
+      'workspace.focusNextPane': { run: () => {} },
+      'workspace.dismiss': { run: () => {} },
+      'workspace.reconnect': { run: () => {} },
+      'workspace.showCommandPalette': { run: () => {} },
+    },
+  })
+  try {
+    for (const sequence of ['\x03', '\x1a', '\t', '\x1b', '\x12'])
+      expect(harness.key(sequence)).toBe(false)
+    expect(harness.key('\x0b')).toBe(true)
+    expect(harness.key('q')).toBe(true)
+    expect(harness.executed).toEqual(['workspace.quit'])
+  } finally {
+    harness.dispose()
+  }
+})
+
 test('Control chords work in text entry and Escape cancels before dismissing', () => {
   const actions: string[] = []
   const harness = createCommandHarness({
@@ -157,6 +181,7 @@ test('overrides resolve Mod as Control, retain scope, unbind, and reject ambiguo
     'workspace.copyAddress',
     'workspace.openAddress',
     'missing',
+    'workspace.focusFileTree',
   ])
 })
 

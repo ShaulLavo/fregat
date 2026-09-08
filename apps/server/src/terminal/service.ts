@@ -1,4 +1,7 @@
+import { terminalAgentLease, type AgentTerminalResolver } from './agent-launch'
+import { sessionIdentityErrors } from '../provider/structured-errors'
 import type { TerminalExecutionLease, TerminalLeaseBoundary } from './lease'
+import { TerminalModes } from './modes'
 import * as v from 'valibot'
 import {
   terminalOpenInputSchema,
@@ -28,6 +31,7 @@ export type TerminalServiceOptions = {
   resolveWorktree: (worktreeId: WorktreeId) => Promise<string>
   lifecycle: TerminalLeaseBoundary
   ptyFactory?: TerminalPtyFactory
+  resolveAgentSession?: AgentTerminalResolver
 }
 
 type TerminalConnection = {
@@ -46,6 +50,7 @@ export class TerminalService {
   private readonly env: NodeJS.ProcessEnv
   private readonly paths: WorkspacePaths
   private readonly resolveWorktree: TerminalServiceOptions['resolveWorktree']
+  private readonly resolveAgentSession: AgentTerminalResolver | undefined
   private readonly lifecycle: TerminalLeaseBoundary
   private readonly opening = new WeakSet<object>()
   private readonly starts = new Map<string, Promise<void>>()
@@ -59,6 +64,7 @@ export class TerminalService {
     paths,
     resolveWorktree,
     lifecycle,
+    resolveAgentSession,
     ptyFactory = spawnPty,
   }: TerminalServiceOptions) {
     this.detachTtlMs = detachTtlMs
@@ -66,6 +72,7 @@ export class TerminalService {
     this.paths = paths
     this.resolveWorktree = resolveWorktree
     this.lifecycle = lifecycle
+    this.resolveAgentSession = resolveAgentSession
     this.ptyFactory = ptyFactory
   }
 
@@ -79,6 +86,7 @@ export class TerminalService {
 
   async dispose() {
     this.disposed = true
+    await Promise.allSettled(this.starts.values())
     await Promise.all([...this.persistentSessions.values()].map((session) => session.dispose()))
   }
 
@@ -140,9 +148,9 @@ export class TerminalService {
       close: socket.close,
       send: socket.send,
     }
-    const sessionId = socket.input.terminalId
+    const sessionId = socket.input.agentSessionId ?? socket.input.terminalId
     const worktreeId = socket.input.worktreeId
-    const sessionKey = terminalSessionKey(worktreeId, sessionId)
+    const sessionKey = terminalSessionKey(worktreeId, sessionId, socket.input.agentSessionId)
     const previous = this.starts.get(sessionKey)
     const start = Promise.resolve(previous)
       .catch(() => {})
@@ -165,6 +173,7 @@ export class TerminalService {
         operation: 'open',
         error,
       })
+      socket.send(JSON.stringify({ type: 'error', message: terminalSpawnErrorMessage(error) }))
       socket.close(1008, 'worktree-unavailable')
     } finally {
       this.opening.delete(socket.key)
@@ -196,7 +205,8 @@ export class TerminalService {
     }
 
     if (this.disposed) return
-    const lease = await this.lifecycle.begin(worktreeId)
+    const execution = await this.sessionExecution(worktreeId, socket.input?.agentSessionId)
+    const lease = execution.lease
     if (this.disposed || !this.opening.has(socket.key)) {
       await lease.end()
       return
@@ -208,7 +218,8 @@ export class TerminalService {
       rows: socket.input?.rows ?? DEFAULT_ROWS,
       worktreeId,
       detachTtlMs: this.detachTtlMs,
-      env: this.env,
+      env: execution.env,
+      command: execution.command,
       onDispose: () => this.persistentSessions.delete(sessionKey),
       ptyFactory: this.ptyFactory,
       rootPath: root.relativePath,
@@ -224,6 +235,31 @@ export class TerminalService {
     await session.dispose({ kill: false })
     socketSessions.delete(socket.key)
     socket.close()
+  }
+
+  private async sessionExecution(
+    worktreeId: WorktreeId,
+    sessionId: TerminalOpenInput['agentSessionId'],
+  ): Promise<{
+    lease: TerminalExecutionLease
+    env: NodeJS.ProcessEnv
+    command?: readonly [string, ...string[]]
+  }> {
+    const lease = await this.lifecycle.begin(worktreeId)
+    if (!sessionId) return { lease, env: this.env }
+    try {
+      if (!this.resolveAgentSession) throw sessionIdentityErrors.TERMINAL_UNSUPPORTED()
+      const launch = await this.resolveAgentSession({
+        sessionId,
+        worktreeId,
+        terminalLeaseId: lease.terminalLeaseId,
+        runtimeEpoch: lease.runtimeEpoch,
+      })
+      return { lease: terminalAgentLease(lease, launch), env: launch.env, command: launch.command }
+    } catch (error) {
+      await lease.end()
+      throw error
+    }
   }
 
   private async activateSession(session: TerminalSession, lease: TerminalExecutionLease) {
@@ -276,20 +312,25 @@ export class TerminalSession {
   private readonly lease: TerminalExecutionLease
   private terminating = false
   private disposal = Promise.resolve()
-  private readonly cols: number
-  private readonly rows: number
+  private cols: number
+  private rows: number
   private readonly cwd: string
   private readonly detachTtlMs: number
   private readonly env: NodeJS.ProcessEnv
+  private readonly command: readonly [string, ...string[]] | undefined
   private readonly onDispose: (session: TerminalSession) => void
   private readonly ptyFactory: TerminalPtyFactory
   private readonly rootPath: string
   private readonly sessionId: string
   private readonly outputBufferChunks: Uint8Array[] = []
-  private connection: TerminalConnection | null = null
+  private readonly modes = new TerminalModes()
+  private readonly connections = new Map<object, TerminalConnection>()
+  private viewerCount = 0
   private completion = Promise.resolve()
   private detachTimer: ReturnType<typeof setTimeout> | null = null
+  private repaintTimer: ReturnType<typeof setTimeout> | null = null
   private disposed = false
+  private finalizationFailed = false
   private errorMessage: string | null = null
   private exitCode: number | null = null
   private exitSignal: NodeJS.Signals | null = null
@@ -312,6 +353,7 @@ export class TerminalSession {
     worktreeId,
     detachTtlMs,
     env,
+    command,
     onDispose,
     ptyFactory,
     rootPath,
@@ -324,6 +366,7 @@ export class TerminalSession {
     worktreeId: WorktreeId
     detachTtlMs: number
     env: NodeJS.ProcessEnv
+    command?: readonly [string, ...string[]]
     onDispose: (session: TerminalSession) => void
     ptyFactory: TerminalPtyFactory
     rootPath: string
@@ -336,6 +379,7 @@ export class TerminalSession {
     this.worktreeId = worktreeId
     this.detachTtlMs = detachTtlMs
     this.env = env
+    this.command = command
     this.onDispose = onDispose
     this.ptyFactory = ptyFactory
     this.rootPath = rootPath
@@ -363,20 +407,26 @@ export class TerminalSession {
   }
 
   attach(connection: TerminalConnection) {
+    if (this.finalizationFailed) {
+      this.disposed = false
+      this.setConnection(connection)
+      void this.dispose({ kill: false })
+      return
+    }
     if (this.disposed || this.terminating) {
       connection.close()
       return
     }
 
     this.setConnection(connection)
-    this.emitReady()
-    for (const data of this.outputBufferChunks) this.emit({ type: 'output', data })
+    if (this.shell !== null)
+      this.send(connection, { type: 'ready', cwd: this.cwd, shell: this.shell })
+    for (const data of this.outputBufferChunks) this.send(connection, { type: 'output', data })
+    this.repaint()
   }
 
   detach(key: object) {
-    if (!this.connection || this.connection.key !== key) return
-
-    this.connection = null
+    if (!this.connections.delete(key) || this.connections.size > 0) return
     this.startDetachTimer()
   }
 
@@ -393,7 +443,13 @@ export class TerminalSession {
     if (!this.pty) return
 
     try {
+      if (parsed.type === 'resize') {
+        this.cols = parsed.cols
+        this.rows = parsed.rows
+        this.cancelRepaint()
+      }
       handleTerminalClientMessage(this.pty, parsed)
+      if (parsed.type === 'resize') this.reportResize(parsed.cols, parsed.rows)
     } catch (error) {
       recordProcessWarning('terminal.session.input_failed', {
         area: 'terminal',
@@ -409,20 +465,27 @@ export class TerminalSession {
   dispose(options: { kill?: boolean } = {}): Promise<void> {
     if (this.disposed) return this.disposal
     this.cancelDetachTimer()
+    this.cancelRepaint()
     if ((options.kill ?? true) && this.pty && this.exitCode === null)
       return this.requestTermination()
 
     this.disposed = true
-    const connection = this.connection
-    this.connection = null
-    connection?.close()
+    this.terminating = true
+    const retrying = this.finalizationFailed
+    this.finalizationFailed = false
     this.disposal = this.lease
       .end()
       .then(() => {
+        if (retrying) this.emit({ type: 'exit', exitCode: this.exitCode })
+        this.closeConnections()
         this.recordSession()
         this.onDispose(this)
       })
       .catch((error: unknown) => {
+        this.finalizationFailed = true
+        this.errorMessage = `${terminalSpawnErrorMessage(error)} Reconnect this terminal to retry synchronization.`
+        this.emit({ type: 'error', message: this.errorMessage })
+        this.closeConnections()
         recordProcessWarning('terminal.session.end_failed', {
           area: 'terminal',
           worktreeId: this.worktreeId,
@@ -462,8 +525,7 @@ export class TerminalSession {
       error,
     })
     this.emit({ type: 'error', message: 'Terminal cleanup could not be confirmed.' })
-    this.connection?.close()
-    this.connection = null
+    this.closeConnections()
   }
 
   private emitReady() {
@@ -474,10 +536,8 @@ export class TerminalSession {
 
   private setConnection(connection: TerminalConnection) {
     this.cancelDetachTimer()
-    if (this.connection && this.connection.key !== connection.key) {
-      this.connection.close()
-    }
-    this.connection = connection
+    this.connections.set(connection.key, connection)
+    this.viewerCount = Math.max(this.viewerCount, this.connections.size)
   }
 
   private startDetachTimer() {
@@ -497,8 +557,10 @@ export class TerminalSession {
   }
 
   private handleOutput(data: Uint8Array) {
+    this.modes.write(data)
     this.appendOutput(data)
     this.emit({ type: 'output', data })
+    this.finishRepaint()
   }
 
   private appendOutput(data: Uint8Array) {
@@ -508,10 +570,12 @@ export class TerminalSession {
       // Copy at the retention boundary so an oversized chunk cannot pin its whole allocation.
       this.outputBufferChunks.push(new Uint8Array(data.subarray(-TERMINAL_REPLAY_BUFFER_BYTES)))
       this.outputBufferBytes = TERMINAL_REPLAY_BUFFER_BYTES
+      this.trimPartialCharacter()
       return
     }
     this.outputBufferChunks.push(data)
     this.outputBufferBytes += data.byteLength
+    const truncated = this.outputBufferBytes > TERMINAL_REPLAY_BUFFER_BYTES
     while (this.outputBufferBytes > TERMINAL_REPLAY_BUFFER_BYTES) {
       const first = this.outputBufferChunks[0]
       const removed = Math.min(
@@ -525,14 +589,78 @@ export class TerminalSession {
       }
       this.outputBufferChunks[0] = first.subarray(removed)
     }
+    if (truncated) this.trimPartialCharacter()
+  }
+
+  private trimPartialCharacter() {
+    let remaining = 3
+    while (remaining > 0 && this.outputBufferChunks.length > 0) {
+      const first = this.outputBufferChunks[0]
+      const removed = partialCharacterBytes(first, remaining)
+      if (removed === 0) return
+      this.outputBufferBytes -= removed
+      remaining -= removed
+      if (removed === first.byteLength) {
+        this.outputBufferChunks.shift()
+        continue
+      }
+      this.outputBufferChunks[0] = first.subarray(removed)
+      return
+    }
+  }
+
+  private closeConnections() {
+    const connections = [...this.connections.values()]
+    this.connections.clear()
+    for (const connection of connections) connection.close()
+  }
+
+  private repaint() {
+    if (!this.pty) return
+    this.cancelRepaint()
+    // Restore after output so a fullscreen program observes both sizes instead of coalescing SIGWINCH.
+    this.repaintTimer = setTimeout(() => this.finishRepaint(), 50)
+    this.repaintTimer.unref?.()
+    this.resizeForRepaint(this.cols === 500 ? this.cols - 1 : this.cols + 1, this.rows)
+  }
+
+  private finishRepaint() {
+    if (!this.repaintTimer || !this.pty) return
+    this.cancelRepaint()
+    this.resizeForRepaint(this.cols, this.rows)
+  }
+
+  private reportResize(cols: number, rows: number) {
+    if (this.modes.inBandResize) this.pty?.write(`\x1b[48;${rows};${cols};0;0t`)
+  }
+
+  private resizeForRepaint(cols: number, rows: number) {
+    try {
+      this.pty?.resize(cols, rows)
+      this.reportResize(cols, rows)
+    } catch (error) {
+      recordProcessWarning('terminal.session.repaint_failed', {
+        area: 'terminal',
+        worktreeId: this.worktreeId,
+        sessionId: this.sessionId,
+        error,
+      })
+    }
+  }
+
+  private cancelRepaint() {
+    if (this.repaintTimer) clearTimeout(this.repaintTimer)
+    this.repaintTimer = null
   }
 
   private spawnPty() {
-    const candidates = terminalShellCandidates(this.env)
+    const candidates: readonly (readonly [string, ...string[]])[] = this.command
+      ? [this.command]
+      : terminalShellCandidates(this.env).map((shell) => [shell])
     let lastError: unknown = null
 
-    for (const shell of candidates) {
-      const result = this.trySpawnPty(shell)
+    for (const command of candidates) {
+      const result = this.trySpawnPty(command)
       if (result.pty) return result
 
       lastError = result.error
@@ -545,7 +673,8 @@ export class TerminalSession {
     return null
   }
 
-  private trySpawnPty(shell: string) {
+  private trySpawnPty(command: readonly [string, ...string[]]) {
+    const shell = command[0]
     try {
       return {
         pty: this.ptyFactory({
@@ -553,7 +682,7 @@ export class TerminalSession {
           cwd: this.cwd,
           env: terminalEnv(this.env),
           rows: this.rows,
-          command: [shell],
+          command,
           onData: (data) => this.handleOutput(data),
         }),
         shell,
@@ -565,8 +694,10 @@ export class TerminalSession {
 
   private emit(message: TerminalServerMessage) {
     this.recordServerMessage(message)
-    const connection = this.connection
-    if (!connection) return
+    for (const connection of this.connections.values()) this.send(connection, message)
+  }
+
+  private send(connection: TerminalConnection, message: TerminalServerMessage) {
     try {
       // Elysia passes Buffer through; a plain Uint8Array would become JSON.
       const frame =
@@ -628,6 +759,7 @@ export class TerminalSession {
       outputBytes: this.outputBytes,
       outputMessageCount: this.outputMessageCount,
       resizeCount: this.resizeCount,
+      peakViewerCount: this.viewerCount,
       rootPath: this.rootPath,
       serverMessageCount: this.serverMessageCount,
       sessionId: this.sessionId,
@@ -677,6 +809,7 @@ function openInputFromWebSocketData(data: unknown): TerminalOpenInput | null {
   const result = v.safeParse(terminalOpenInputSchema, {
     worktreeId: queryValueFromWebSocketData(data, 'worktreeId'),
     terminalId: queryValueFromWebSocketData(data, 'terminalId'),
+    agentSessionId: queryValueFromWebSocketData(data, 'agentSessionId') ?? undefined,
     cols: optionalQueryNumber(data, 'cols'),
     rows: optionalQueryNumber(data, 'rows'),
   })
@@ -702,8 +835,12 @@ function queryValueFromWebSocketData(data: unknown, key: string) {
   }
 }
 
-function terminalSessionKey(rootPath: string, sessionId: string) {
-  return JSON.stringify([rootPath, sessionId])
+function terminalSessionKey(
+  rootPath: string,
+  sessionId: string,
+  agentSessionId?: TerminalOpenInput['agentSessionId'],
+) {
+  return JSON.stringify([rootPath, agentSessionId ? 'agent' : 'shell', agentSessionId ?? sessionId])
 }
 
 function handleTerminalClientMessage(ptyProcess: Pty, message: TerminalClientMessage) {
@@ -753,4 +890,10 @@ function terminalOutcome(exitCode: number | null, errorMessage: string | null) {
 
 function isString(value: string | undefined): value is string {
   return typeof value === 'string' && value.length > 0
+}
+
+function partialCharacterBytes(bytes: Uint8Array, limit: number) {
+  let offset = 0
+  while (offset < bytes.length && offset < limit && (bytes[offset] & 0xc0) === 0x80) offset += 1
+  return offset
 }

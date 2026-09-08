@@ -7,10 +7,7 @@ import {
   readPersistedRailCollapse,
   writePersistedRailCollapse,
 } from '@/features/chat-mode/utils/rail-collapse-storage'
-import type {
-  SessionRailScope,
-  SessionRailView,
-} from '@/features/chat-mode/utils/session-rail-model'
+import type { SessionRailScope, SessionRailView } from '@workspace/client-core/chat/rail/model'
 
 /** Rename happens in two places, and only the one that was asked may swap for a field. */
 export type SessionRenameSurface = 'header' | 'rail'

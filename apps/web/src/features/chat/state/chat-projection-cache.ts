@@ -24,17 +24,17 @@ import {
   CHAT_PROJECTION_CACHE_MESSAGE_LIMIT,
   CHAT_PROJECTION_CACHE_SESSION_LIMIT,
   CHAT_PROJECTION_CACHE_TRANSCRIPT_LIMIT,
-} from '@/features/chat/state/chat-cache-constants'
+} from '@workspace/client-core/chat/cache-constants'
 import {
   createInitialChatProjectionSlice,
   type ChatProjectionSlice,
-  type ChatProjectionState,
   type ProjectionSession,
-} from '@/features/chat/state/chat-projection-store'
+} from '@workspace/client-core/chat/types'
+import { type ChatProjectionState } from '@/features/chat/state/chat-projection-store'
 import {
   syncChatProjectionShellSnapshot,
   syncChatProjectionSessionDetailSnapshot,
-} from '@/features/chat/state/chat-projection-writers'
+} from '@workspace/client-core/chat/writers'
 
 export const CHAT_PROJECTION_CACHE_STORAGE_KEY = 'platform.chat-projection'
 const CHAT_PROJECTION_CACHE_VERSION = 3

@@ -26,14 +26,17 @@ import {
 } from '@workspace/contracts'
 import * as v from 'valibot'
 
-import { CHAT_ACTIVITY_CACHE_LIMIT, CHAT_MESSAGE_CACHE_LIMIT } from '../chat-cache-constants'
-import { createInitialChatProjectionSlice } from '../chat-projection-store'
+import {
+  CHAT_ACTIVITY_CACHE_LIMIT,
+  CHAT_MESSAGE_CACHE_LIMIT,
+} from '@workspace/client-core/chat/cache-constants'
+import { createInitialChatProjectionSlice } from '@workspace/client-core/chat/types'
 import {
   applyChatProjectionEvent,
   applyChatProjectionShellStreamItem,
   syncChatProjectionShellSnapshot,
   syncChatProjectionSessionDetailSnapshot,
-} from '../chat-projection-writers'
+} from '@workspace/client-core/chat/writers'
 import { expect, test } from '../../../../../test/fixtures'
 
 test('preserves existing detail for sessions still present in a shell snapshot', () => {

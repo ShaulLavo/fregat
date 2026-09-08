@@ -228,6 +228,21 @@ export function decideOrchestrationCommand(
         turnId: command.turnId ?? null,
         updatedAt: command.createdAt,
       })
+    case 'session.terminal-history.append':
+      requireSessionNotDeleted(model, command.sessionId)
+      return command.messages.map((message) =>
+        event(command, at, 'session.message-sent', {
+          sessionId: command.sessionId,
+          messageId: message.id,
+          role: message.role,
+          text: message.text,
+          attachments: [],
+          turnId: null,
+          streaming: false,
+          createdAt: message.createdAt,
+          updatedAt: message.createdAt,
+        }),
+      )
     case 'session.history.import': {
       const session = requireSessionNotDeleted(model, command.sessionId)
       if (session.origin !== 'discovered' || session.latestTurn || session.runtime) return []

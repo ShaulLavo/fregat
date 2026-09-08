@@ -1,4 +1,4 @@
-import type { ProjectionSession } from '@/features/chat/state/chat-projection-store'
+import type { ProjectionSession } from '@workspace/client-core/chat/types'
 
 // Attention can require input while a provider still owns an active turn.
 export function hasRunningTurn(session: ProjectionSession | undefined | null) {

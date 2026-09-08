@@ -12,12 +12,20 @@ test('records a real two-stroke shortcut without firing commands, saves semantic
 }) => {
   const session = createTestSettingsSession(server)
   await session.refresh()
-  const frame = await renderTui(<Application session={session} onExit={() => {}} noColor />, {
-    width: 110,
-    height: 36,
-    useThread: false,
-    kittyKeyboard: true,
-  })
+  const frame = await renderTui(
+    <Application
+      initialLocation={{ kind: 'settings', query: '' }}
+      session={session}
+      onExit={() => {}}
+      noColor
+    />,
+    {
+      width: 110,
+      height: 36,
+      useThread: false,
+      kittyKeyboard: true,
+    },
+  )
   try {
     await act(async () => {
       await frame.mockInput.typeText('keybindings.overrides')
@@ -120,12 +128,20 @@ test('recorder reports unsupported keys and shortcut conflicts before saving', a
 }) => {
   const session = createTestSettingsSession(server)
   await session.refresh()
-  const frame = await renderTui(<Application session={session} onExit={() => {}} noColor />, {
-    width: 110,
-    height: 36,
-    useThread: false,
-    kittyKeyboard: true,
-  })
+  const frame = await renderTui(
+    <Application
+      initialLocation={{ kind: 'settings', query: '' }}
+      session={session}
+      onExit={() => {}}
+      noColor
+    />,
+    {
+      width: 110,
+      height: 36,
+      useThread: false,
+      kittyKeyboard: true,
+    },
+  )
   try {
     await act(async () => {
       await frame.mockInput.typeText('keybindings.overrides')
@@ -172,12 +188,20 @@ test('shortcut picker and recording controls remain visible at the minimum termi
 }) => {
   const session = createTestSettingsSession(server)
   await session.refresh()
-  const frame = await renderTui(<Application session={session} onExit={() => {}} noColor />, {
-    width: 40,
-    height: 12,
-    useThread: false,
-    kittyKeyboard: true,
-  })
+  const frame = await renderTui(
+    <Application
+      initialLocation={{ kind: 'settings', query: '' }}
+      session={session}
+      onExit={() => {}}
+      noColor
+    />,
+    {
+      width: 40,
+      height: 12,
+      useThread: false,
+      kittyKeyboard: true,
+    },
+  )
   try {
     await act(async () => {
       await frame.mockInput.typeText('keybindings.overrides')

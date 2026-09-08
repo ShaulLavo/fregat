@@ -12,7 +12,7 @@ import {
   withModelEffort,
   withModelOption,
   type ModelEffortCapability,
-} from '@/features/chat/utils/model-effort'
+} from '@workspace/client-core/chat/providers/effort'
 import { providerModel } from '../../../../../test/factories/chat'
 import { expect, test } from '../../../../../test/fixtures'
 

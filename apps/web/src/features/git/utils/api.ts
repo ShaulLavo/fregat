@@ -9,7 +9,8 @@ import type {
 
 import { getClient, type Client } from '@/lib/client'
 import { observeClientOperation } from '@/lib/client-logging'
-import { parseEdenSseStream, unwrapEdenResponse } from '@/lib/eden-events'
+import { parseEdenSseStream } from '@workspace/client-core/transport/eden'
+import { unwrapEdenResponse } from '@/lib/eden-events'
 import { createClientError } from '@workspace/client-core/errors'
 import type { StatusResult } from '@/features/git/utils/types'
 

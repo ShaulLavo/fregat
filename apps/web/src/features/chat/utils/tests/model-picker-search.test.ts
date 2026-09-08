@@ -9,7 +9,7 @@ import * as v from 'valibot'
 import { expect, test } from '../../../../../test/fixtures'
 
 import { rankModelPickerOptions } from '@/features/chat/utils/model-picker-search'
-import { providerModelOptions } from '@/features/chat/utils/provider-model-options'
+import { providerModelOptions } from '@workspace/client-core/chat/providers/models'
 import { providerSnapshot } from '../../../../../test/factories/chat'
 
 function model(name: string, slug: string, shortName?: string): ProviderModel {

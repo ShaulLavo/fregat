@@ -1,6 +1,7 @@
 import type { OrchestrationLatestTurn, OrchestrationSessionActivity } from '@workspace/contracts'
 
 import {
+  chatActivityHasFailure,
   chatActivityPlanSteps,
   chatActivityPresentation,
   chatActivityToolCallId,
@@ -8,6 +9,7 @@ import {
   type ChatActivityOutcome,
   type ChatActivityPlanStep,
 } from '@/features/chat/utils/activity-presentation'
+import { isVisibleChatActivity } from '@/features/chat/utils/activity-visibility'
 
 export type ChatWorkLogTone = 'error' | 'info' | 'thinking' | 'tool'
 
@@ -24,6 +26,7 @@ export type ChatWorkLogEntry = {
   detail: string | null
   icon: ChatActivityIconKey
   id: string
+  input: string | null
   itemType: string | null
   outcome: ChatActivityOutcome | null
   output: string | null
@@ -38,6 +41,7 @@ type DerivedChatWorkLogEntry = ChatWorkLogEntry & {
   activityKind: string
   collapseKey: string | null
   toolCallKey: string | null
+  reasoningDelta: boolean
 }
 
 type TurnPlanRow = {
@@ -53,6 +57,7 @@ const WORK_LOG_SCALAR_FIELDS = [
   'detail',
   'icon',
   'id',
+  'input',
   'itemType',
   'outcome',
   'output',
@@ -94,6 +99,7 @@ export function chatWorkLogEntries({
       activityKind: _activityKind,
       collapseKey: _collapseKey,
       toolCallKey: _toolCallKey,
+      reasoningDelta: _reasoningDelta,
       ...entry
     }) => entry,
   )
@@ -148,9 +154,7 @@ function stringListsEqual(left: readonly string[], right: readonly string[]) {
 }
 
 function isActivityForWorkLog(activity: OrchestrationSessionActivity) {
-  if (activity.kind === 'task.started') return false
-  if (activity.kind === 'context-window.updated') return false
-  if (activity.summary === 'Checkpoint captured') return false
+  if (!isVisibleChatActivity(activity)) return false
   if (isPlanBoundaryToolActivity(activity)) return false
   // A start with no tool-call id cannot fold into its completion, so it would
   // duplicate the row it belongs to.
@@ -246,6 +250,7 @@ function planWorkLogEntry(
     detail: null,
     icon: 'task',
     id: `turn-plan:${key}`,
+    input: null,
     itemType: null,
     outcome: null,
     output: null,
@@ -253,6 +258,7 @@ function planWorkLogEntry(
     status: null,
     title: activity.summary || 'Plan updated',
     toolCallKey: null,
+    reasoningDelta: false,
     tone: 'info',
     turnId: activity.turnId,
   }
@@ -269,13 +275,16 @@ function derivedWorkLogEntry(activity: OrchestrationSessionActivity): DerivedCha
     detail: presentation.detail,
     icon: presentation.icon,
     id: activity.id,
+    input: presentation.input,
     itemType: stringPayloadValue(activity.payload, 'itemType'),
     outcome: presentation.outcome,
     output: presentation.output,
     plan: null,
     status: presentation.status,
     title: presentation.title,
-    toolCallKey: toolCallKey(activity, presentation.toolCallId),
+    toolCallKey: workLogIdentity(activity, presentation.toolCallId),
+    reasoningDelta:
+      stringPayloadValue(activity.payload, 'streamKind')?.startsWith('reasoning') ?? false,
     tone: workLogTone(activity),
     turnId: activity.turnId,
   }
@@ -286,17 +295,31 @@ function derivedWorkLogEntry(activity: OrchestrationSessionActivity): DerivedCha
   }
 }
 
-function toolCallKey(activity: OrchestrationSessionActivity, toolCallId: string | null) {
+function workLogIdentity(activity: OrchestrationSessionActivity, toolCallId: string | null) {
+  const taskId = stringPayloadValue(activity.payload, 'taskId')
+  if (taskId && (activity.kind === 'task.progress' || activity.kind === 'task.completed')) {
+    return ['task', activity.turnId ?? 'no-turn', taskId, reasoningSection(activity.payload)].join(
+      '\u001f',
+    )
+  }
   if (!toolCallId) return null
   if (!activity.kind.startsWith('tool.')) return null
 
-  return [activity.turnId ?? 'no-turn', toolCallId].join('')
+  return ['tool', activity.turnId ?? 'no-turn', toolCallId].join('')
+}
+
+function reasoningSection(payload: unknown) {
+  if (!payload || typeof payload !== 'object') return ''
+  if (!('streamKind' in payload)) return ''
+  const contentIndex = 'contentIndex' in payload ? payload.contentIndex : ''
+  const summaryIndex = 'summaryIndex' in payload ? payload.summaryIndex : ''
+  return `${payload.streamKind}:${contentIndex ?? ''}:${summaryIndex ?? ''}`
 }
 
 function workLogTone(activity: OrchestrationSessionActivity): ChatWorkLogTone {
+  if (chatActivityHasFailure(activity)) return 'error'
   if (activity.kind === 'task.progress') return 'thinking'
   if (activity.tone === 'approval') return 'info'
-  if (activity.tone === 'error') return 'error'
   if (activity.tone === 'thinking') return 'thinking'
   if (activity.tone === 'tool') return 'tool'
 
@@ -362,11 +385,15 @@ function mergeWorkLogEntries(
     createdAt: previous.createdAt,
     detail: next.detail ?? previous.detail,
     id: previous.id,
+    input: next.input ?? previous.input,
     itemType: next.itemType ?? previous.itemType,
     outcome: mergedOutcome(previous.outcome, next.outcome),
     output: next.output ?? previous.output,
     status: next.status ?? previous.status,
-    title: next.title || previous.title,
+    title:
+      previous.reasoningDelta && next.reasoningDelta
+        ? previous.title + next.title
+        : next.title || previous.title,
   }
 }
 

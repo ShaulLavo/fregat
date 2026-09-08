@@ -2,6 +2,7 @@ import type {
   FileTreeBatchOperation,
   FileTreeDirectoryHandle,
   FileTreeItemHandle,
+  FileTreeScrollToPathOptions,
 } from '@workspace/tree'
 import type { FileTreePreparedInput } from '@workspace/tree'
 import type { FileTreeModel } from '@workspace/tree'
@@ -22,6 +23,7 @@ export function syncTreePaneState({
   previousPaths,
   prepareInputForPaths,
   rootPath,
+  scrollBehavior = 'smooth',
   syncSelection = true,
   selectedFilePath,
   tree,
@@ -31,6 +33,7 @@ export function syncTreePaneState({
   previousPaths: readonly string[]
   prepareInputForPaths?: (paths: readonly string[]) => FileTreePreparedInput
   rootPath: string
+  scrollBehavior?: FileTreeScrollToPathOptions['behavior']
   syncSelection?: boolean
   selectedFilePath: string | null
   tree: FileTreeModel
@@ -42,7 +45,7 @@ export function syncTreePaneState({
   loadExpandedDirectoriesForCurrentModel(tree)
   if (selectedTreePath) {
     tree.scrollToPath(selectedTreePath, {
-      behavior: 'smooth',
+      behavior: scrollBehavior,
       focus: false,
       offset: 'nearest',
     })

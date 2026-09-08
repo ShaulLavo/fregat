@@ -25,6 +25,7 @@ export type FocusTarget = FocusScope & {
   readonly token: FocusToken
 }
 export type FocusRegistration = FocusScope & {
+  readonly available?: boolean
   readonly id: string
   readonly area: FocusArea
   readonly textEntry: boolean
@@ -71,6 +72,7 @@ export class FocusRegistry {
   private readonly listeners = new Set<() => void>()
   private snapshot: Snapshot
   private lastActivated: FocusToken | null = null
+  private overlayOwner: FocusToken | null = null
   private pending: Pending | null = null
   private disposed = false
 
@@ -88,7 +90,8 @@ export class FocusRegistry {
 
   resolve(token: FocusToken | null): FocusTarget | null {
     const entry = token ? this.entries.get(token) : null
-    if (!entry || !token || !sameScope(entry, this.snapshot.scope)) return null
+    if (!entry || entry.available === false || !token || !sameScope(entry, this.snapshot.scope))
+      return null
     return targetSnapshot(entry, token)
   }
 
@@ -99,7 +102,9 @@ export class FocusRegistry {
     readonly eventPath?: readonly FocusToken[]
   }) {
     const targets = [...this.entries].flatMap(([token, entry]) =>
-      sameScope(entry, this.snapshot.scope) ? [targetSnapshot(entry, token)] : [],
+      entry.available !== false && sameScope(entry, this.snapshot.scope)
+        ? [targetSnapshot(entry, token)]
+        : [],
     )
     const event = options.eventPath
       ?.map((token) => this.resolve(token))
@@ -118,9 +123,21 @@ export class FocusRegistry {
   activate(token: FocusToken) {
     const entry = this.entries.get(token)
     if (!entry?.isFocused()) return false
-    this.lastActivated = token
     const target = this.resolve(token)
-    if (!target) return false
+    if (!target) {
+      this.lastActivated = token
+      return false
+    }
+    const overlay = this.activeOverlay()
+    if (overlay && !target.capabilities.overlay) {
+      this.invoke(overlay.token, 'focus')
+      return false
+    }
+    this.lastActivated = token
+    if (target.capabilities.overlay) {
+      this.overlayOwner = token
+      this.deferBackgroundRequest()
+    }
     const lastCommandTarget = target.capabilities.overlay ? this.snapshot.lastCommandTarget : target
     if (this.snapshot.current?.token !== token)
       this.publish({ ...this.snapshot, current: target, lastCommandTarget })
@@ -158,7 +175,8 @@ export class FocusRegistry {
 
   cycle(direction: 1 | -1) {
     const targets = [...this.entries].filter(
-      ([, entry]) => !entry.overlay && sameScope(entry, this.snapshot.scope),
+      ([, entry]) =>
+        entry.available !== false && !entry.overlay && sameScope(entry, this.snapshot.scope),
     )
     if (!targets.length) return false
     const index = targets.findIndex(([token]) => token === this.snapshot.current?.token)
@@ -176,6 +194,7 @@ export class FocusRegistry {
         ? targetSnapshot(entry, this.lastActivated)
         : null
     const lastCommandTarget = current?.capabilities.overlay ? null : current
+    this.overlayOwner = current?.capabilities.overlay ? current.token : null
     this.publish({ ...this.snapshot, scope, current, lastCommandTarget })
   }
 
@@ -184,6 +203,12 @@ export class FocusRegistry {
     this.entries.set(token, input)
     this.tryPending()
     return { token, unregister: () => this.unregister(token) }
+  }
+
+  refreshAvailability(token: FocusToken) {
+    if (this.snapshot.current?.token === token && !this.resolve(token))
+      this.publish({ ...this.snapshot, current: null })
+    this.tryPending()
   }
 
   dispose() {
@@ -227,6 +252,7 @@ export class FocusRegistry {
         this.settle({ status: 'rejected', reason: 'unregistered' })
       return
     }
+    if (this.activeOverlay() && !target.capabilities.overlay) return
     pending.attempted = target.token
     this.publish({
       ...this.snapshot,
@@ -259,6 +285,22 @@ export class FocusRegistry {
     } catch {
       return false
     }
+  }
+
+  private activeOverlay() {
+    const target = this.resolve(this.overlayOwner)
+    if (!target) this.overlayOwner = null
+    return target
+  }
+
+  private deferBackgroundRequest() {
+    const pending = this.pending
+    if (!pending?.attempted || this.resolve(pending.attempted)?.capabilities.overlay) return
+    pending.attempted = null
+    this.publish({
+      ...this.snapshot,
+      requested: { token: pending.token, target: null, intent: pending.intent },
+    })
   }
 
   private acknowledge(token: FocusToken, target: FocusTarget) {

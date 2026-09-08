@@ -9,7 +9,7 @@ import type { ChatTransport } from '@/features/chat/transport/chat-transport'
 import {
   createInteractionModeSetCommand,
   createRuntimeModeSetCommand,
-} from '@/features/chat/utils/command-builders'
+} from '@workspace/client-core/chat/commands'
 import { dispatchChatCommand } from '@/features/chat/utils/command-dispatch'
 import {
   ChatComposerModesContext,

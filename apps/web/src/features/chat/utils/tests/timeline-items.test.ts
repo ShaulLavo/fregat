@@ -1,4 +1,5 @@
-import { describe, expect, it } from 'vitest'
+import { describe } from 'vitest'
+import { expect, test as it } from '../../../../../test/fixtures'
 import {
   commandIdSchema,
   eventIdSchema,
@@ -14,10 +15,44 @@ import {
 import * as v from 'valibot'
 
 import type { OptimisticChatMessage } from '@/features/chat/state/chat-optimistic-store'
-import type { ChatTurnDiffSummary } from '@/features/chat/state/chat-projection-store'
+import type { ChatTurnDiffSummary } from '@workspace/client-core/chat/types'
 import { chatTimelineItems, type ChatTimelineItem } from '@/features/chat/utils/timeline-items'
 
 describe('chat timeline items', () => {
+  it.each(['completed', 'interrupted', 'error'] as const)(
+    'clears activity running identity when a turn is %s',
+    (state) => {
+      const sessionId = v.parse(sessionIdSchema, 'ad686244-5b2e-59be-805f-ef86eac80feb')
+      const turnId = v.parse(turnIdSchema, 'unfinished-tool-turn')
+      const latestTurn = runningTurn(turnId, timestamp(1))
+      const input = {
+        activities: [
+          activity('unfinished-tool', sessionId, timestamp(2), turnId, 'tool.started', 'tool', {
+            toolCallId: 'call-1',
+            status: 'inProgress',
+          }),
+        ],
+        latestTurn,
+        messages: [],
+        optimisticMessages: [],
+        proposedPlans: [],
+      }
+      const before = flattenTimelineItems(chatTimelineItems(input)).find(
+        (item) => item.type === 'activity-group',
+      )
+      const after = flattenTimelineItems(
+        chatTimelineItems({
+          ...input,
+          latestTurn: { ...latestTurn, state, completedAt: timestamp(3) },
+        }),
+      ).find((item) => item.type === 'activity-group')
+
+      expect(before).toMatchObject({ activeTurnId: turnId })
+      expect(after).toMatchObject({ activeTurnId: null })
+      expect(after).not.toBe(before)
+    },
+  )
+
   it('orders messages, optimistic messages, activities, and working state by timestamp', () => {
     const sessionId = v.parse(sessionIdSchema, 'ad686244-5b2e-59be-805f-ef86eac80feb')
     const turnId = v.parse(turnIdSchema, 'turn-1')

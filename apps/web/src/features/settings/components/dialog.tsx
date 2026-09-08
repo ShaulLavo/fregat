@@ -56,12 +56,12 @@ export function SettingsDialog({
   return (
     <Dialog open={open} onOpenChange={onOpenChange}>
       <DialogContent
-        className='flex h-[min(720px,calc(100svh-4rem))] w-[min(880px,calc(100vw-3rem))] max-w-none flex-col gap-0 overflow-hidden p-0 sm:max-w-none'
+        className='flex h-dvh w-full max-w-none flex-col gap-0 overflow-hidden p-0 pt-[env(safe-area-inset-top)] pb-[env(safe-area-inset-bottom)] sm:h-[min(720px,calc(100svh-4rem))] sm:w-[min(880px,calc(100vw-3rem))] sm:max-w-none sm:py-0 max-sm:[&>[data-slot=dialog-close]]:top-[max(0.5rem,env(safe-area-inset-top))] max-sm:[&>[data-slot=dialog-close]]:size-10'
         finalFocus={false}
         ref={setRootRef}
         tabIndex={-1}
       >
-        <DialogHeader className='border-border/60 compact:px-3 compact:py-2 gap-1 border-b px-4 py-3'>
+        <DialogHeader className='border-border/60 compact:px-3 compact:py-2 gap-1 border-b px-4 py-3 max-sm:shrink-0 max-sm:pr-14'>
           <DialogTitle className='compact:gap-1.5 flex items-center gap-2 text-sm'>
             <span className='border-info/20 bg-info/10 text-info compact:size-6 flex size-7 items-center justify-center rounded-md border'>
               <GearSixIcon weight='duotone' />

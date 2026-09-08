@@ -1,3 +1,4 @@
+import { getClient } from '@/lib/client'
 import {
   createWorkspaceSearchMatcher,
   errorNumberField,
@@ -13,7 +14,7 @@ import {
 } from '@workspace/contracts'
 
 import { log } from '@/lib/client-logging'
-import { streamWorkspaceSearch } from '@/lib/workspace-search-client'
+import { streamWorkspaceSearch } from '@workspace/client-core/files/search-client'
 import { compareSearchPaths } from '@/features/search/utils/sort'
 
 const MAX_DISK_SEARCH_LIMIT = 200
@@ -32,7 +33,11 @@ export class DiskSearchProvider implements SearchProvider {
     query: WorkspaceSearchQuery,
     signal?: AbortSignal,
   ): AsyncGenerator<WorkspaceSearchEvent> {
-    yield* streamWorkspaceSearch({ ...query, entryType: query.entryType ?? 'file' }, signal)
+    yield* streamWorkspaceSearch(
+      { ...query, entryType: query.entryType ?? 'file' },
+      signal,
+      getClient(),
+    )
   }
 }
 

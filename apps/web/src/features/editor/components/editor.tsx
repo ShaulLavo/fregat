@@ -83,6 +83,7 @@ export function Editor({
   const { appliedThemeContentHash, appliedThemeId, editorTheme, selectedThemeId } =
     useEditorColorTheme()
   const syntaxHighlightingEnabled = useSettingValue('editor.syntaxHighlighting.enabled')
+  const indentationGuidesEnabled = useSettingValue('editor.guides.indentation')
   const mountedEditors = useMountedEditorRegistry()
   const diagnosticPeek = useDiagnosticPeek({ active, filePath: liveDocument.path })
   const { languageServer, languageServerStatusSource } = useLanguageServerPlugin({
@@ -117,13 +118,10 @@ export function Editor({
     ],
   )
   const criticalEditorCorePlugins = useMemo(
-    () => createCriticalEditorCorePlugins(documentLanguageId),
-    [documentLanguageId],
+    () => createCriticalEditorCorePlugins(documentLanguageId, indentationGuidesEnabled),
+    [documentLanguageId, indentationGuidesEnabled],
   )
-  const nonCriticalEditorPlugins = useMemo(
-    () => createNonCriticalEditorPluginsLoaderPlugin(documentLanguageId),
-    [documentLanguageId],
-  )
+  const nonCriticalEditorPlugins = useMemo(() => createNonCriticalEditorPluginsLoaderPlugin(), [])
   const plugins = useMemo(
     () => [
       ...criticalEditorCorePlugins,
@@ -252,7 +250,10 @@ export function Editor({
 
   useEffect(() => {
     if (!selection) return
-    controller.commands.setSelection(selection.anchor, selection.head, selection.anchor)
+    controller.commands.setSelection(selection.anchor, selection.head, {
+      revealBlock: 'center',
+      revealOffset: selection.anchor,
+    })
   }, [controller, selection])
 
   useCommitMessageEditorFocus({

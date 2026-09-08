@@ -6,7 +6,7 @@ import { PassThrough } from 'node:stream'
 import { afterEach, describe, expect, it, vi } from 'vitest'
 import type { ChildProcessWithoutNullStreams } from 'node:child_process'
 
-import type { LspServerMatch } from '../registry'
+import type { LspServerHandle, LspServerMatch } from '../registry'
 import { encodeLspStdioMessage, LspStdioMessageReader } from '../stdio-rpc'
 import { LspSessionPool } from '../proxy-session'
 import { closeApp, createApp } from '../../app'
@@ -26,6 +26,39 @@ afterEach(async () => {
 })
 
 describe('LspSessionPool pooling', () => {
+  it('initializes the spawned runtime with machine settings taking precedence', async () => {
+    const fixture = await lspFixture(
+      { initializationOptions: async () => ({ preference: 'machine' }) },
+      {
+        tsserver: { path: '/workspace/node_modules/typescript/lib/tsserver.js' },
+        preference: 'runtime',
+      },
+    )
+    const session = await fixture.pool.acquire(fixture.firstSocket, fixture.match, '')
+    expect(session).not.toBeNull()
+    if (!session) return
+
+    const initializing = session.handleClientMessage(
+      json(initializeRequest(1, { initializationOptions: { preference: 'client', locale: 'en' } })),
+    )
+    await fixture.waitForServerMessageCount(1)
+    expect(fixture.initializeMessages()[0]).toMatchObject({
+      params: {
+        initializationOptions: {
+          locale: 'en',
+          preference: 'machine',
+          tsserver: { path: '/workspace/node_modules/typescript/lib/tsserver.js' },
+        },
+      },
+    })
+    fixture.respond({
+      id: fixture.serverMessages[0].id,
+      jsonrpc: '2.0',
+      result: initializeResult(),
+    })
+    await initializing
+  })
+
   it('reuses one backend process and synthesizes later initialize responses', async () => {
     const fixture = await lspFixture()
     const first = await fixture.pool.acquire(fixture.firstSocket, fixture.match, '')
@@ -1726,7 +1759,10 @@ async function initializedFixture(server: Partial<LspServerMatch['server']> = {}
   return { ...fixture, first, second }
 }
 
-async function lspFixture(server: Partial<LspServerMatch['server']> = {}) {
+async function lspFixture(
+  server: Partial<LspServerMatch['server']> = {},
+  initializationOptions?: LspServerHandle['initializationOptions'],
+) {
   const root = await fixtureRoot('platform-lsp-pool-')
   // A flag the test flips rather than a setter on the pool: `deltaEnabled` is a
   // getter in production precisely so a settings write takes effect without a
@@ -1748,7 +1784,7 @@ async function lspFixture(server: Partial<LspServerMatch['server']> = {}) {
   let openSpawnGate: (() => void) | null = null
   const spawn = vi.fn(async () => {
     if (spawnGate) await spawnGate
-    return { process: process.process }
+    return { process: process.process, initializationOptions }
   })
   const match = {
     root,

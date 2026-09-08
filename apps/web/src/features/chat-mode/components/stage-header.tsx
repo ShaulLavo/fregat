@@ -4,7 +4,7 @@ import { scopedSessionKey } from '@workspace/contracts'
 import { CaretRightIcon } from '@phosphor-icons/react'
 
 import { ContextUsageRing } from '@/features/chat/components/context-usage-ring'
-import type { ContextUsage } from '@/features/chat/utils/context-usage'
+import type { ContextUsage } from '@workspace/client-core/chat/context-usage'
 import {
   sessionStatusLabel,
   sessionStatusTextClass,
@@ -14,7 +14,7 @@ import { SessionRename } from '@/features/chat-mode/components/session-rename'
 import { StageSessionMenu } from '@/features/chat-mode/components/stage-session-menu'
 import { useChatModeSession } from '@/features/chat-mode/providers/session-context'
 import { useSessionRailStore } from '@/features/chat-mode/state/session-rail-store'
-import type { SessionRailItem } from '@/features/chat-mode/utils/session-rail-model'
+import type { SessionRailItem } from '@workspace/client-core/chat/rail/model'
 import { cn } from '@workspace/ui/lib/utils'
 
 export function StageHeader({

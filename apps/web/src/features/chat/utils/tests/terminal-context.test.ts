@@ -7,7 +7,7 @@ import {
   parseTerminalContextBlock,
   terminalContextPreview,
   type TerminalContextSelection,
-} from '@/features/chat/utils/terminal-context'
+} from '@workspace/client-core/chat/terminal-context'
 import { expect, test } from '../../../../../test/fixtures'
 
 const failure: TerminalContextSelection = {

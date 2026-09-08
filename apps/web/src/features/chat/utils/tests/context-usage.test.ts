@@ -10,7 +10,7 @@ import {
   contextUsageForActivities,
   contextUsageForPayload,
   formatContextTokens,
-} from '@/features/chat/utils/context-usage'
+} from '@workspace/client-core/chat/context-usage'
 import { expect, test } from '../../../../../test/fixtures'
 
 test('reads the used and maximum token counts a provider reports', () => {

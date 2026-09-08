@@ -26,7 +26,7 @@ import type {
   ChatSession,
   ChatTurnDiffSummary,
   ProjectionSession,
-} from '@/features/chat/state/chat-projection-store'
+} from '@workspace/client-core/chat/types'
 
 export const TEST_ENVIRONMENT_ID = orchestrationServerConfig().environmentId
 export const TEST_PROJECT_ID = v.parse(projectIdSchema, '609d2bd3-7993-5564-9918-c603beaa32c6')

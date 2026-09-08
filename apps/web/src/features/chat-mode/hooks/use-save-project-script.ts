@@ -1,6 +1,6 @@
 import type { OrchestrationProjectScript } from '@workspace/contracts'
 
-import { createProjectScriptsCommand } from '@/features/chat/utils/command-builders'
+import { createProjectScriptsCommand } from '@workspace/client-core/chat/commands'
 import { dispatchChatCommand } from '@/features/chat/utils/command-dispatch'
 import { notifyChatCommandError } from '@/features/chat/notify-command-error'
 import { useOptionalChatModeSession } from '@/features/chat-mode/providers/session-context'

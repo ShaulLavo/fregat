@@ -117,7 +117,7 @@ export type ResolvedFileIcon = {
   src: string
 }
 
-const ICON_BASE_PATH = '/vscode-icons'
+const ICON_BASE_PATH = `${import.meta.env.BASE_URL}vscode-icons`
 const TREE_ICON_SYMBOL_PREFIX = 'app-vscode-icon-'
 const DEFAULT_FILE_ICON_TOKEN = 'default'
 

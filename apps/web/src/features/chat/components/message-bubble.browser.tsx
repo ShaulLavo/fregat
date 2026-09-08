@@ -12,7 +12,7 @@ import {
   ChatTimelineActionsContext,
   type ChatTimelineActions,
 } from '../providers/timeline-actions-context'
-import type { ChatTurnDiffSummary } from '../state/chat-projection-store'
+import type { ChatTurnDiffSummary } from '@workspace/client-core/chat/types'
 import { MessageBubble } from './message-bubble'
 
 // Token colours from Dark Plus, the default dark editor theme, which the app

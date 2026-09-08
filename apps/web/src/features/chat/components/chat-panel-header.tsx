@@ -10,7 +10,7 @@ import {
 import { ChatCircleIcon, ClockCounterClockwiseIcon, PlusIcon } from '@phosphor-icons/react'
 
 import { chatSessionPreview, formatChatDateLabel } from '@/features/chat/utils/formatters'
-import type { ChatSessionListProjection } from '../state/chat-projection-selectors'
+import type { ChatSessionListProjection } from '@workspace/client-core/chat/selectors'
 
 export function ChatPanelHeader({
   activeSessionId,

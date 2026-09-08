@@ -13,7 +13,7 @@ import {
   createCheckpointRevertCommand,
   createDraftSessionSubmission,
   createTurnSubmission,
-} from '@/features/chat/utils/command-builders'
+} from '@workspace/client-core/chat/commands'
 import { dispatchChatCommand, replayAfterDispatch } from '@/features/chat/utils/command-dispatch'
 
 const MODEL_SELECTION = {

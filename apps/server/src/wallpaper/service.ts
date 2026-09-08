@@ -1,6 +1,8 @@
-import { tmpdir } from 'node:os'
+import { realpath } from 'node:fs/promises'
+import { homedir, tmpdir } from 'node:os'
 import path from 'node:path'
 
+import { recordRequestContext } from '../observability'
 import { createWallpaperSourceUnavailableError } from './structured-errors'
 
 // The wallpaper is a backdrop behind translucent panes, so a downscaled JPEG is
@@ -40,14 +42,8 @@ type WallpaperMediaSource = DesktopWallpaperInfo & {
   readonly path: string
 }
 
-// Reads the host machine's current macOS desktop wallpaper as browser-renderable
-// media. Animated sources are preserved when discoverable; otherwise macOS
-// wallpapers are converted to JPEG because they are often browser-incompatible
-// HEIC files. Returns null off macOS or on failure (e.g. Automation permission
-// denied); the route 404s and the client falls back to the shipped image.
+// Preserve browser-readable media; macOS HEIC sources need JPEG conversion.
 export async function readDesktopWallpaperMedia(): Promise<DesktopWallpaperMedia | null> {
-  if (process.platform !== 'darwin') return null
-
   const sourcePath = await currentWallpaperPath()
   if (!sourcePath) return null
 
@@ -55,8 +51,6 @@ export async function readDesktopWallpaperMedia(): Promise<DesktopWallpaperMedia
 }
 
 export async function readDesktopWallpaperInfo(): Promise<DesktopWallpaperInfo | null> {
-  if (process.platform !== 'darwin') return null
-
   const sourcePath = await currentWallpaperPath()
   if (!sourcePath) return null
 
@@ -64,8 +58,6 @@ export async function readDesktopWallpaperInfo(): Promise<DesktopWallpaperInfo |
 }
 
 export async function readDesktopWallpaperStillMedia(): Promise<DesktopWallpaperMedia | null> {
-  if (process.platform !== 'darwin') return null
-
   const sourcePath = await currentWallpaperPath()
   if (!sourcePath) return null
 
@@ -74,9 +66,13 @@ export async function readDesktopWallpaperStillMedia(): Promise<DesktopWallpaper
 
 export async function readDesktopWallpaperInfoFromPath(
   sourcePath: string,
-): Promise<DesktopWallpaperInfo> {
+): Promise<DesktopWallpaperInfo | null> {
   const animatedSource = await animatedMediaSource(sourcePath)
   if (animatedSource) return mediaInfo(animatedSource)
+
+  const stillSource = await stillImageSource(sourcePath)
+  if (stillSource) return mediaInfo(stillSource)
+  if (process.platform !== 'darwin') return null
 
   return jpegInfo()
 }
@@ -87,7 +83,7 @@ export async function readDesktopWallpaperMediaFromPath(
   const animatedSource = await animatedMediaSource(sourcePath)
   if (animatedSource) return readExistingMedia(animatedSource)
 
-  return convertToJpeg(sourcePath)
+  return readDesktopWallpaperStillMediaFromPath(sourcePath)
 }
 
 export async function readDesktopWallpaperStillMediaFromPath(
@@ -100,6 +96,17 @@ export async function readDesktopWallpaperStillMediaFromPath(
 }
 
 async function currentWallpaperPath(): Promise<string | null> {
+  const sourcePath = await discoverWallpaperPath()
+  recordRequestContext({
+    wallpaperDiscovery: { platform: process.platform, sourceFound: sourcePath !== null },
+  })
+  return sourcePath
+}
+
+async function discoverWallpaperPath(): Promise<string | null> {
+  if (process.platform === 'linux') return omarchyWallpaperPath()
+  if (process.platform !== 'darwin') return null
+
   const result = await runCommand([
     'osascript',
     '-e',
@@ -109,6 +116,20 @@ async function currentWallpaperPath(): Promise<string | null> {
 
   const trimmed = result.stdout.trim()
   return trimmed.length > 0 ? trimmed : null
+}
+
+async function omarchyWallpaperPath(): Promise<string | null> {
+  const stateHome = process.env.XDG_STATE_HOME || path.join(homedir(), '.local', 'state')
+  const linkPath = path.join(stateHome, 'omarchy', 'current', 'background')
+  recordRequestContext({ wallpaperDiscovery: { provider: 'omarchy' } })
+  try {
+    // The selection symlink has no extension. Resolve it before detecting media type.
+    return await realpath(linkPath)
+  } catch (error) {
+    if (error instanceof Error && 'code' in error && error.code === 'ENOENT') return null
+
+    throw error
+  }
 }
 
 async function animatedMediaSource(sourcePath: string): Promise<WallpaperMediaSource | null> {
@@ -316,6 +337,8 @@ function isInterruptedSystemCall(error: unknown): error is Error & { readonly co
 }
 
 async function convertToJpeg(sourcePath: string): Promise<DesktopWallpaperMedia | null> {
+  if (process.platform !== 'darwin') return null
+
   const outputPath = path.join(tmpdir(), 'platform-desktop-wallpaper.jpg')
   const result = await runCommand([
     'sips',

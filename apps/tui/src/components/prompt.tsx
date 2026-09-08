@@ -1,5 +1,5 @@
 import type { InputRenderable } from '@opentui/core'
-import { useRef } from 'react'
+import { useLayoutEffect, useRef } from 'react'
 
 import type { Theme } from '@/theme/utils/theme'
 
@@ -23,12 +23,21 @@ export function Prompt({
   disabled?: boolean
 }) {
   const input = useRef<InputRenderable>(null)
+  const synchronizing = useRef(false)
+  useLayoutEffect(() => {
+    if (!input.current) return
+    // Native value assignments emit input events, just like typing.
+    synchronizing.current = true
+    input.current.value = value
+    synchronizing.current = false
+  }, [value])
   return (
     <input
       id={id}
       ref={input}
-      value={value}
-      onInput={onChange}
+      onInput={(next) => {
+        if (!synchronizing.current) onChange(next)
+      }}
       onSubmit={disabled ? undefined : () => onSubmit(input.current?.value ?? value)}
       focused={focused && !disabled}
       placeholder={placeholder}

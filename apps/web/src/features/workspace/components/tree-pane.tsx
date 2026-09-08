@@ -308,6 +308,7 @@ function ReadyTreePane({
       previousPaths: pathsRef.current,
       prepareInputForPaths: preparedTreeInputForPaths,
       rootPath,
+      scrollBehavior: selectionSync.reason === 'root-changed' ? 'auto' : 'smooth',
       syncSelection: selectionSync.shouldSync,
       selectedFilePath,
       tree,

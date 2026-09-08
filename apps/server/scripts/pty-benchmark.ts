@@ -3,7 +3,8 @@ import { chmod, mkdir, mkdtemp, readFile, rm, writeFile } from 'node:fs/promises
 import { arch, cpus, platform, release, tmpdir, totalmem } from 'node:os'
 import path from 'node:path'
 import { createError } from 'evlog'
-import { parseTerminalServerMessage } from '@workspace/contracts'
+import { parseTerminalServerMessage, terminalLeaseIdSchema } from '@workspace/contracts'
+import * as v from 'valibot'
 
 import { createAuthConfig } from '../src/auth'
 import { createWorkspacePaths } from '../src/fs/path'
@@ -33,6 +34,8 @@ const SAMPLE_TIMEOUT_MS = 5_000
 // The temporary worktree has one benchmark owner and no persisted execution leases.
 const lifecycle = {
   begin: async () => ({
+    terminalLeaseId: v.parse(terminalLeaseIdSchema, crypto.randomUUID()),
+    runtimeEpoch: 'benchmark',
     activate: () => Promise.resolve(),
     terminate: () => Promise.resolve(),
     end: () => Promise.resolve(),

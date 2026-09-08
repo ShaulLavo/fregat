@@ -14,8 +14,8 @@ import { SessionRowSnippet } from '@/features/chat-mode/components/session-row-s
 import { activateSessionRow } from '@/features/chat-mode/state/session-commands'
 import { useSessionMultiSelectStore } from '@/features/chat-mode/state/session-multi-select-store'
 import { useSessionRailStore } from '@/features/chat-mode/state/session-rail-store'
-import { sessionClickIntent } from '@/features/chat-mode/utils/session-multi-select'
-import type { SessionRailItem } from '@/features/chat-mode/utils/session-rail-model'
+import { sessionClickIntent } from '@workspace/client-core/chat/rail/multi-select'
+import type { SessionRailItem } from '@workspace/client-core/chat/rail/model'
 import { cn } from '@workspace/ui/lib/utils'
 
 export function SessionRow({

@@ -1,7 +1,12 @@
+import { initializePromptStashStore } from '@/features/chat/state/prompt-stash-store'
+import { environmentScopedStorage } from '@/lib/environments/state/scoped-storage'
 import { TEST_ENVIRONMENT_ID as FIXTURE_ENVIRONMENT_ID } from '../../../../../test/factories/chat'
 import { LexicalComposer } from '@lexical/react/LexicalComposer'
 import { sessionIdSchema, type ClientOrchestrationCommand } from '@workspace/contracts'
 import { screen } from '@testing-library/react'
+import userEvent from '@testing-library/user-event'
+import { DEFAULT_PROVIDER_INSTANCE_ID, providerInstanceIdSchema } from '@workspace/contracts'
+import { providerModel, providerSnapshot } from '../../../../../test/factories/chat'
 import { createRef } from 'react'
 import * as v from 'valibot'
 import { afterEach, beforeEach } from 'vitest'
@@ -13,6 +18,7 @@ import { ChatModelPickerProvider } from '@/features/chat/providers/model-picker-
 import { ChatProviderSignInProvider } from '@/features/chat/providers/provider-sign-in-provider'
 import {
   resetChatInputDraftStore,
+  useChatInputDraftStore,
   type ChatInputDraftTarget,
 } from '@/features/chat/state/chat-input-draft-store'
 import { expect, test } from '../../../../../test/fixtures'
@@ -68,15 +74,63 @@ test('a narrow composer compacts rather than squeezing the controls', () => {
   expect(row?.lastElementChild).toHaveTextContent('Working')
 })
 
+test('an existing chat can open the picker and change its model', async () => {
+  renderActions({ existingSession: true })
+
+  await userEvent.click(screen.getByRole('button', { name: 'Provider and model' }))
+  expect(await screen.findByPlaceholderText('Search models')).toBeVisible()
+  expect(screen.queryByRole('button', { name: /Other provider/ })).toBeNull()
+  await userEvent.click(await screen.findByRole('option', { name: /Alternate model/ }))
+
+  expect(useChatInputDraftStore.getState().getDraft(draftTarget).modelSelection).toMatchObject({
+    model: 'alternate',
+    providerInstanceId: DEFAULT_PROVIDER_INSTANCE_ID,
+  })
+})
+
+test('a new chat can still choose a different provider', async () => {
+  renderActions()
+
+  await userEvent.click(screen.getByRole('button', { name: 'Provider and model' }))
+  await userEvent.click(await screen.findByRole('button', { name: /Other provider/ }))
+  await userEvent.click(await screen.findByRole('option', { name: /Other model/ }))
+
+  expect(useChatInputDraftStore.getState().getDraft(draftTarget).modelSelection).toMatchObject({
+    model: 'other-model',
+    providerInstanceId: 'other-provider',
+  })
+})
+
 function actionsRow(container: HTMLElement) {
   return container.querySelector('[data-composer-actions]')
 }
 
-function renderActions() {
+function renderActions({ existingSession = false } = {}) {
   resetChatInputDraftStore()
+  initializePromptStashStore(environmentScopedStorage(FIXTURE_ENVIRONMENT_ID))
 
   const queryClient = createTestQueryClient()
-  queryClient.setQueryData(providerListQueryOptions().queryKey, { providers: [] })
+  queryClient.setQueryData(providerListQueryOptions().queryKey, {
+    providers: [
+      providerSnapshot({
+        displayLabel: 'Other provider',
+        providerInstanceId: v.parse(providerInstanceIdSchema, 'other-provider'),
+        models: [
+          providerModel({ slug: 'other-model', name: 'Other model', shortName: 'Other model' }),
+        ],
+      }),
+      providerSnapshot({
+        models: [
+          providerModel(),
+          providerModel({
+            slug: 'alternate',
+            name: 'Alternate model',
+            shortName: 'Alternate model',
+          }),
+        ],
+      }),
+    ],
+  })
 
   async function dispatchCommand(_command: ClientOrchestrationCommand) {
     return { result: null, deduped: false, sequence: 1 }
@@ -91,8 +145,11 @@ function renderActions() {
       >
         <ChatModelPickerProvider
           draftTarget={draftTarget}
-          locked={false}
-          modelSelection={null}
+          sessionProviderInstanceId={existingSession ? DEFAULT_PROVIDER_INSTANCE_ID : null}
+          modelSelection={{
+            model: 'gpt-5.5',
+            providerInstanceId: DEFAULT_PROVIDER_INSTANCE_ID,
+          }}
           persistModelSelection={() => {}}
         >
           <LexicalComposer

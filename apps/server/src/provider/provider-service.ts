@@ -1,3 +1,4 @@
+import type { AgentTerminalProcess } from '../terminal/agent-launch'
 import { mkdir, mkdtemp, rm } from 'node:fs/promises'
 import { createInternalError } from '../observability/structured-errors'
 import { sessionIdentityErrors } from './structured-errors'
@@ -105,6 +106,7 @@ type PendingProviderLaunch = {
 export class ProviderService {
   private readonly adapterSubscriptions = new Map<ProviderInstanceId, AdapterSubscription>()
   private readonly adapterRegistry: ProviderAdapterRegistry
+  private readonly externalSessions = new Map<SessionId, 'terminal' | 'history' | 'unknown'>()
   private readonly pendingLaunches = new Map<SessionId, PendingProviderLaunch>()
   private readonly reaper: ProviderSessionReaper
   private readonly runtimeEventListeners = new Set<ProviderRuntimeEventListener>()
@@ -196,6 +198,7 @@ export class ProviderService {
   }
 
   async ensureRuntime(input: ProviderEnsureRuntimeInput): Promise<ProviderEnsureRuntimeResult> {
+    this.requireSdkOwnership(input.sessionId)
     return this.trackLaunch(input, () => this.ensureRuntimeOperation(input))
   }
 
@@ -245,6 +248,7 @@ export class ProviderService {
     const continuation = continuableBinding(existing, adapter, input.providerInstanceId, {
       modelChanged: bindingModelChanged(existing, input.runtimePayload.modelSelection),
     })
+    this.requireSdkOwnership(input.sessionId)
     this.recordLaunch(input, adapter)
     const session = await adapter.startRuntime(
       providerRuntimeStartInput(input, input.runtimePayload, continuation),
@@ -273,6 +277,7 @@ export class ProviderService {
   }
 
   async sendTurn(input: ProviderTurnInput) {
+    this.requireSdkOwnership(input.sessionId)
     this.requireRunning()
     const startedAt = performance.now()
     recordChatPipelineInfo(
@@ -553,7 +558,7 @@ export class ProviderService {
   ) {
     const adapter = this.adapterRegistry.getByInstance(input.providerInstanceId)
     if (!adapter.readSessionHistory) throw sessionIdentityErrors.HISTORY_UNSUPPORTED()
-    return adapter.readSessionHistory(input)
+    return boundedProviderOperation(adapter, adapter.readSessionHistory(input))
   }
 
   discoverSessions(
@@ -618,6 +623,60 @@ export class ProviderService {
     return this.runtimeEvents.isIdle()
   }
 
+  requireSdkOwnership(sessionId: SessionId) {
+    if (this.externalSessions.get(sessionId) === 'unknown')
+      throw sessionIdentityErrors.TERMINAL_OWNERSHIP_UNKNOWN()
+    if (this.externalSessions.get(sessionId) === 'history')
+      throw sessionIdentityErrors.TERMINAL_HISTORY_PENDING()
+    if (this.externalSessions.has(sessionId)) throw sessionIdentityErrors.SESSION_IN_TERMINAL()
+  }
+
+  restoreTerminalOwnership(sessionId: SessionId, state: 'history' | 'unknown') {
+    this.externalSessions.set(sessionId, state)
+  }
+
+  releaseTerminalOwnership(sessionId: SessionId) {
+    this.externalSessions.delete(sessionId)
+  }
+
+  markTerminalHistoryPending(sessionId: SessionId) {
+    this.requireTerminalOwnership(sessionId)
+    this.externalSessions.set(sessionId, 'history')
+  }
+
+  requireTerminalOwnership(sessionId: SessionId) {
+    if (!this.externalSessions.has(sessionId))
+      throw sessionIdentityErrors.TERMINAL_SESSION_INVALID()
+  }
+
+  async reserveTerminalRuntime(input: {
+    sessionId: SessionId
+    providerInstanceId: ProviderInstanceId
+  }): Promise<AgentTerminalProcess> {
+    this.requireRunning()
+    this.requireSdkOwnership(input.sessionId)
+    const launch = this.adapterRegistry.acquireTerminalLaunch(
+      input.providerInstanceId,
+      input.sessionId,
+    )
+    this.externalSessions.set(input.sessionId, 'terminal')
+    let released = false
+    const release = () => {
+      if (released) return
+      released = true
+      this.externalSessions.delete(input.sessionId)
+      launch.release()
+    }
+    try {
+      await this.stopRuntime({ sessionId: input.sessionId })
+      this.requireRunning()
+      return { ...launch, release }
+    } catch (error) {
+      release()
+      throw error
+    }
+  }
+
   bindingForSession(sessionId: SessionId) {
     return this.sessionDirectory.getBinding(sessionId)
   }
@@ -654,6 +713,7 @@ export class ProviderService {
     const previous = this.pendingLaunches.get(input.sessionId)
     const result = Promise.resolve(previous?.completion).then(async () => {
       this.requireRunning()
+      this.requireSdkOwnership(input.sessionId)
       try {
         return await operation()
       } finally {

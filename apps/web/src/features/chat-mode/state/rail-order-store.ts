@@ -10,7 +10,7 @@ import {
   selectChatProjectionSlice,
   type ChatProjectionState,
 } from '@/features/chat/state/chat-projection-store'
-import type { RailOrderOverrides } from '@/features/chat-mode/utils/session-rail-model'
+import type { RailOrderOverrides } from '@workspace/client-core/chat/rail/model'
 type RailOrderStore = RailOrderOverrides & {
   readonly placeProject: (ref: ScopedProjectRef, key: string) => void
   readonly placeSession: (ref: ScopedSessionRef, key: string) => void

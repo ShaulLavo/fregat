@@ -5,6 +5,7 @@ import type {
   ChatAttachmentUpload,
   InteractionMode,
   ModelSelection,
+  ProviderInstanceId,
   RuntimeMode,
 } from '@workspace/contracts'
 import type { LexicalEditor } from 'lexical'
@@ -36,7 +37,7 @@ import { useProjectEntrySearch } from '../hooks/use-project-entry-search'
 import { providerCommandCatalogQueryOptions } from '@/features/chat/utils/composer-skills'
 import { useComposerInbox } from '../hooks/use-composer-inbox'
 import { ChatModelPickerProvider } from '../providers/model-picker-provider'
-import type { TerminalContextSelection } from '@/features/chat/utils/terminal-context'
+import type { TerminalContextSelection } from '@workspace/client-core/chat/terminal-context'
 import {
   readChatInputDraftPrompt,
   selectChatInputDraftImages,
@@ -71,7 +72,7 @@ export function ChatInput({
   error,
   interactionMode,
   modelSelection,
-  modelSelectionLocked = false,
+  sessionProviderInstanceId = null,
   onPersistModelSelection,
   onStop,
   onSubmit,
@@ -85,7 +86,7 @@ export function ChatInput({
   error: string | null
   interactionMode: InteractionMode
   modelSelection: ModelSelection | null
-  modelSelectionLocked?: boolean
+  sessionProviderInstanceId?: ProviderInstanceId | null
   onPersistModelSelection: (modelSelection: ModelSelection) => void
   onStop: () => void
   onSubmit: (payload: ChatInputSubmitPayload) => Promise<boolean>
@@ -384,7 +385,7 @@ export function ChatInput({
     <div className='border-border/60 compact:px-2 compact:py-2 shrink-0 border-t px-3 pt-2.5 pb-3'>
       <ChatModelPickerProvider
         draftTarget={draftTarget}
-        locked={modelSelectionLocked}
+        sessionProviderInstanceId={sessionProviderInstanceId}
         modelSelection={modelSelection}
         persistModelSelection={onPersistModelSelection}
       >

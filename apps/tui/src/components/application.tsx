@@ -1,3 +1,4 @@
+import type { Location } from '@/navigation/state/history'
 import { useKeyboard, useTerminalDimensions } from '@opentui/react'
 import { useSyncExternalStore } from 'react'
 
@@ -10,19 +11,25 @@ import { useSettingValue } from '@/settings/hooks/use-setting-value'
 import { HostActionsContext, type HostActions } from '@/host/providers/actions-context'
 
 type ApplicationProps = {
+  initialLocation?: Location
   session: SettingsSession
   noColor?: boolean
   onExit: () => void
   onSuspend?: () => void
   onEditText?: HostActions['editText']
+  onAttachTerminal?: HostActions['attachTerminal']
+  onReadClipboardImage?: HostActions['readClipboardImage']
 }
 
 export function Application({
   session,
+  initialLocation,
   noColor = false,
   onExit,
   onSuspend,
   onEditText,
+  onAttachTerminal,
+  onReadClipboardImage,
 }: ApplicationProps) {
   const { height } = useTerminalDimensions()
   const short = height < 20
@@ -46,32 +53,44 @@ export function Application({
   return (
     <box width='100%' height='100%' backgroundColor={theme.background} flexDirection='column'>
       <box
-        height={short ? 1 : 3}
+        height={short ? 1 : 2}
         flexShrink={0}
         paddingX={2}
         alignItems='center'
         gap={2}
-        backgroundColor={theme.card}
+        backgroundColor={theme.background}
         flexDirection='row'
       >
         <text fg={theme.primary}>
           <strong>PLATFORM</strong>
         </text>
-        <text fg={theme.foreground}>Settings</text>
-        <text fg={theme.mutedForeground}>TUI</text>
+        <text fg={theme.mutedForeground}>workspace</text>
       </box>
       {state.kind === 'loading' && <LoadingState theme={theme} />}
       {state.kind === 'failed' && <Failure failure={state.failure} theme={theme} />}
       {state.kind === 'ready' && state.connection.kind === 'offline' && (
         <text fg={theme.warning} paddingX={2} flexShrink={0}>
           {short
-            ? 'Offline · cached settings'
-            : 'Connection lost. Showing the last loaded settings.'}
+            ? 'Offline · cached view'
+            : 'Connection lost. Your draft is retained. Reconnect to continue.'}
         </text>
       )}
       {state.kind === 'ready' && (
-        <HostActionsContext value={{ quit: onExit, suspend: onSuspend, editText: onEditText }}>
-          <Foundation session={session} state={state} theme={theme} />
+        <HostActionsContext
+          value={{
+            quit: onExit,
+            suspend: onSuspend,
+            editText: onEditText,
+            attachTerminal: onAttachTerminal,
+            readClipboardImage: onReadClipboardImage,
+          }}
+        >
+          <Foundation
+            session={session}
+            state={state}
+            theme={theme}
+            initialLocation={initialLocation}
+          />
         </HostActionsContext>
       )}
       {state.kind !== 'ready' && (

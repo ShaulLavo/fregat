@@ -117,7 +117,7 @@ export const SETTINGS_REGISTRY = {
     // Clamped rather than open: at `window` scope a cloned repository can set
     // this, and an unbounded backdrop-filter blur is a real GPU cost.
     schema: v.pipe(v.number(), v.integer(), v.minValue(0), v.maxValue(40)),
-    default: 12,
+    default: 9,
     scope: 'window',
     widget: 'number',
     category: 'Appearance',

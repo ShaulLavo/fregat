@@ -1,4 +1,4 @@
-import { railReorderIntent } from '@/features/chat-mode/utils/rail-reorder'
+import { railReorderIntent } from '@workspace/client-core/chat/rail/reorder'
 import { expect, test } from '../../../../../test/fixtures'
 
 const arranged = [

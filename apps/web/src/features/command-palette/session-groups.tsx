@@ -2,10 +2,7 @@ import { CommandGroup } from '@workspace/ui/components/command'
 
 import { SessionPaletteRow } from '@/features/command-palette/session-palette-row'
 import { SessionProjectPaletteRow } from '@/features/command-palette/session-project-palette-row'
-import type {
-  SessionRailItem,
-  SessionRailProject,
-} from '@/features/chat-mode/utils/session-rail-model'
+import type { SessionRailItem, SessionRailProject } from '@workspace/client-core/chat/rail/model'
 
 type SessionGroupsProps = {
   readonly projects: readonly SessionRailProject[]

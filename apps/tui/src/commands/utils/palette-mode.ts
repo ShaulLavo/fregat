@@ -1,4 +1,5 @@
-import { SETTINGS_REGISTRY, type SettingsValues } from '@workspace/contracts'
+import { SETTINGS_REGISTRY, type SettingsValues, type SessionId } from '@workspace/contracts'
+import type { ChatOwnerSnapshot } from '@workspace/client-core/chat/owner'
 import type { CommandId } from '@workspace/client-core/commands/catalog'
 import {
   quickAccessMode,
@@ -9,11 +10,13 @@ import {
 import type { CommandBus } from '@/commands/state/bus'
 import type { TerminalBinding } from '@/commands/utils/bindings'
 import { paletteOptions } from '@/commands/utils/palette'
+import { sessionAccessRows } from '@/commands/utils/session-access'
 
 export type PaletteAction =
   | { readonly kind: 'command'; readonly id: CommandId }
   | { readonly kind: 'files'; readonly query: string }
   | { readonly kind: 'theme'; readonly id: SettingsValues['workbench.palette'] }
+  | { readonly kind: 'session'; readonly sessionId: SessionId }
 
 type PaletteOption = {
   readonly name: string
@@ -22,8 +25,17 @@ type PaletteOption = {
 }
 
 const viewCommands = [
+  'workspace.revealChat',
   'workspace.showSettings',
   'workspace.showQuickAccess',
+  'workspace.openWorkbench',
+  'workspace.focusFileTree',
+  'workspace.focusEditor',
+  'workspace.focusGit',
+  'workspace.openSearchEditor',
+  'workspace.revealTerminal',
+  'workspace.showProblems',
+  'workspace.showLogs',
   'workspace.showShortcutHelp',
 ] as const satisfies readonly CommandId[]
 
@@ -41,6 +53,7 @@ export function paletteModeRows({
   colorMode,
   palette,
   writable,
+  chat,
 }: {
   readonly captured: ReturnType<CommandBus['capture']>
   readonly bindings: readonly TerminalBinding[]
@@ -49,6 +62,7 @@ export function paletteModeRows({
   readonly colorMode: keyof typeof colorCommands
   readonly palette: SettingsValues['workbench.palette']
   readonly writable: boolean
+  readonly chat: ChatOwnerSnapshot
 }): { readonly title: string; readonly empty: string; readonly options: PaletteOption[] } {
   const mode = quickAccessMode(search)
   const query = quickAccessQuery(search)
@@ -105,7 +119,11 @@ export function paletteModeRows({
     case 'scripts':
       return unavailable('Scripts')
     case 'sessions':
-      return unavailable('Sessions')
+      return {
+        title: 'Sessions',
+        empty: chat.error ?? 'No matching sessions.',
+        options: sessionAccessRows(chat.projection, query),
+      }
     case 'symbols':
       return unavailable('Symbols')
     case 'gotoLine':

@@ -1,6 +1,7 @@
 import {
   effectiveEntryType,
   type FileTreeEntry,
+  type WorkspaceAddress,
   type WorkspaceSearchMatch,
 } from '@workspace/contracts'
 
@@ -52,8 +53,7 @@ export type ServerInfo = {
   homePath: string
 }
 
-export type PickedFsEntry = FsEntry &
-  (
+export type PickedFsEntry = FsEntry & { workspaceAddress?: WorkspaceAddress } & (
     | {
         type: 'file' | 'directory'
       }

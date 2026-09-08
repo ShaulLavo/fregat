@@ -6,7 +6,7 @@ import { unwrapEdenResponse } from '@/lib/eden-events'
 import {
   createProjectRegistrationCommand,
   projectRegistrationResult,
-} from '@/lib/environments/utils/registration'
+} from '@workspace/client-core/chat/registration'
 
 export async function registerTerminalCheckout({
   client,

@@ -50,11 +50,15 @@ import { wallpaperRoutes } from './wallpaper/routes'
 import { ProviderSessionDirectory } from './provider/provider-session-directory'
 import { ProviderService } from './provider/provider-service'
 
+import type { LogReaderService } from './observability/log-reader'
+
 export type AppOptions = FileSystemServiceOptions & {
+  logs?: LogReaderService
   auth?: AuthOptions
   terminal?: {
     env?: NodeJS.ProcessEnv
     ptyFactory?: TerminalPtyFactory
+    detachTtlMs?: number
   }
   fonts?: FontService
   orchestration?: {
@@ -105,6 +109,7 @@ export function createApp(options: AppOptions) {
       return worktree.canonicalPath
     },
     lifecycle: { begin: (worktreeId) => orchestration.beginTerminalLease(worktreeId) },
+    resolveAgentSession: (input) => orchestration.beginAgentTerminal(input),
   })
   const fonts = options.fonts ?? new NerdFontService()
   const database = options.orchestration?.database ?? getDefaultPlatformDatabase()
@@ -222,7 +227,7 @@ export function createApp(options: AppOptions) {
     // Auth runs after the WS upgrade so the browser receives the explicit 1008 refusal.
     .use(orchestrationWsRoutes(orchestration, auth, identity))
     .onBeforeHandle(authGuard(auth))
-    .use(observabilityRoutes())
+    .use(observabilityRoutes({ logs: options.logs }))
     .get(
       '/health',
       () =>
@@ -309,7 +314,7 @@ function appCleanup(
     if (closed) return
 
     closed = true
-    terminal.dispose()
+    await terminal.dispose()
     // Language servers are child processes. Without this, jdtls, gopls and
     // rust-analyzer outlive the server and idle on the machine until someone
     // notices and kills them by hand.

@@ -15,6 +15,7 @@ test('raw JSON palette command invokes the host editor and restores its native s
   const requests: EditTextRequest[] = []
   const frame = await renderTui(
     <Application
+      initialLocation={{ kind: 'settings', query: '' }}
       session={session}
       onExit={() => {}}
       noColor
@@ -66,6 +67,7 @@ test('dismissing an external editor cancels its late result and preserves the ne
   const requests: EditTextRequest[] = []
   const frame = await renderTui(
     <Application
+      initialLocation={{ kind: 'settings', query: '' }}
       session={session}
       onExit={() => {}}
       noColor

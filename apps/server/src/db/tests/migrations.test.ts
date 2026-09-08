@@ -41,6 +41,7 @@ const expectedTables = [
   'projection_session_checkpoints',
   'projection_turns',
   'provider_session_runtime',
+  'agent_terminal_handoffs',
 ] as const
 
 /** Every real migration in the ledger, so the assertions below move with it. */
@@ -92,7 +93,9 @@ describe('platform migration ledger', () => {
       platformMigrations.filter((migration) => migration.version === 11),
     )
     seedVersion11Worktrees(handle.db)
-    expect(migratePlatformDatabase(handle.db).map((migration) => migration.version)).toEqual([12])
+    expect(migratePlatformDatabase(handle.db).map((migration) => migration.version)).toEqual([
+      12, 13, 14,
+    ])
     const query = new OrchestrationSnapshotQuery(handle.db)
     const migrated = query.shellSnapshot()
     const worktrees = [...query.fullReadModel().worktrees.values()]
@@ -158,8 +161,8 @@ describe('platform migration ledger', () => {
     seedLegacyDatabase(handle)
     const identity = readEnvironmentIdentity(handle.db)
     const applied = migratePlatformDatabase(handle.db)
-    expect(applied.map(({ version }) => version)).toEqual([11, 12])
-    expect(ledgerVersions(handle)).toEqual([11, 12])
+    expect(applied.map(({ version }) => version)).toEqual(ledgerVersionNumbers)
+    expect(ledgerVersions(handle)).toEqual(ledgerVersionNumbers)
     expect(handle.db.select().from(environmentIdentity).all()).toEqual([identity])
     expect(rows<{ value: string }>(handle, sql`SELECT value FROM operator_state`)).toEqual([
       { value: 'keep-settings-and-secrets' },

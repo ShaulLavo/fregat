@@ -79,6 +79,8 @@ class Terminal:
 
 
 def check_editor(terminal, group, shell_group, shell_modes):
+    terminal.send(b"\x0bs")
+    terminal.expect(b"Search settings")
     terminal.send(b"\x1bOP")
     terminal.expect(b"Commands")
     terminal.send(b"Edit settings JSON in external editor")

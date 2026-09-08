@@ -26,13 +26,13 @@ import {
   selectChatSidebarSessions,
   selectChatSidebarSessionsForProject,
   selectChatSessionById,
-} from '../chat-projection-selectors'
-import { createInitialChatProjectionSlice } from '../chat-projection-store'
+} from '@workspace/client-core/chat/selectors'
+import { createInitialChatProjectionSlice } from '@workspace/client-core/chat/types'
 import {
   applyChatProjectionEvent,
   syncChatProjectionShellSnapshot,
   syncChatProjectionSessionDetailSnapshot,
-} from '../chat-projection-writers'
+} from '@workspace/client-core/chat/writers'
 import { sessionShell } from '../../../../../test/factories/chat'
 import { expect, test } from '../../../../../test/fixtures'
 

@@ -1,3 +1,4 @@
+import { testWorkspaceToken } from '../../../../test/factories/workspace-address'
 import { describe } from 'vitest'
 
 import { expect, test } from '../../../../test/fixtures'
@@ -64,8 +65,7 @@ describe('search params', () => {
 
 describe('the prefixed groups in the grammar', () => {
   test('round-trips s.* and log.* to a fixed point', () => {
-    const href =
-      '/~platform/workbench/s?s.q=createStructuredError&s.m=regex&s.case=1&log.level=error&log.area=git'
+    const href = `/~${testWorkspaceToken('platform')}/workbench/s?s.q=createStructuredError&s.m=regex&s.case=1&log.level=error&log.area=git`
     const once = formatAddress(parseAddress(href))
 
     expect(formatAddress(parseAddress(once))).toBe(once)
@@ -75,7 +75,8 @@ describe('the prefixed groups in the grammar', () => {
 
   test('keeps the prefixed groups out of passthrough', () => {
     expect(
-      parseAddress('/~p/workbench?s.q=a&log.level=error&decode=diffusion').passthrough,
+      parseAddress(`/~${testWorkspaceToken('p')}/workbench?s.q=a&log.level=error&decode=diffusion`)
+        .passthrough,
     ).toEqual({ decode: 'diffusion' })
   })
 
@@ -85,7 +86,7 @@ describe('the prefixed groups in the grammar', () => {
       logs: { level: 'error' },
       mode: 'workbench',
       search: { q: 'x' },
-      workspace: 'p',
+      workspace: testWorkspaceToken('p'),
     })
 
     expect(href).toContain('s.q=x')

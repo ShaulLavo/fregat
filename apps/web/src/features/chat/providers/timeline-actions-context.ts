@@ -1,6 +1,6 @@
 import { createContext } from 'react'
 
-import type { ChatTurnDiffSummary } from '@/features/chat/state/chat-projection-store'
+import type { ChatTurnDiffSummary } from '@workspace/client-core/chat/types'
 
 export type ChatTimelineActions = {
   readonly openCheckpointDiff: (

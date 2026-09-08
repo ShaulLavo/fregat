@@ -1,10 +1,25 @@
-import { describe, expect, it } from 'vitest'
+import { describe } from 'vitest'
+import { expect, test as it } from '../../../../../test/fixtures'
 
 import { visibleActivityGroupRows } from '@/features/chat/utils/activity-visibility'
 import type { ChatWorkLogEntry, ChatWorkLogTone } from '@/features/chat/utils/work-log'
 
 describe('chat activity visibility', () => {
-  it('keeps thinking visible when the collapsed work log overflows', () => {
+  it('keeps failures and approval requests visible when newer work arrives', () => {
+    const activities = [
+      { ...activity('failed', 'tool'), outcome: 'failed' as const },
+      { ...activity('approval', 'info'), icon: 'approval' as const },
+      activity('latest', 'tool'),
+    ]
+
+    expect(visibleActivityGroupRows(activities, 1).map((item) => item.id)).toEqual([
+      'failed',
+      'approval',
+      'latest',
+    ])
+  })
+
+  it('keeps the latest rows when the collapsed work log overflows', () => {
     const activities = [
       activity('thinking-1', 'thinking'),
       activity('tool-1', 'tool'),
@@ -14,7 +29,7 @@ describe('chat activity visibility', () => {
     ]
 
     expect(visibleActivityGroupRows(activities, 3).map((item) => item.id)).toEqual([
-      'thinking-1',
+      'tool-2',
       'tool-3',
       'tool-4',
     ])
@@ -42,6 +57,7 @@ function activity(id: string, tone: ChatWorkLogTone): ChatWorkLogEntry {
     detail: null,
     icon: tone === 'thinking' ? 'thinking' : 'tool',
     id,
+    input: null,
     itemType: tone === 'tool' ? 'command_execution' : null,
     outcome: null,
     output: null,

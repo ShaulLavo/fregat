@@ -1,13 +1,16 @@
-import type { ModelSelection } from '@workspace/contracts'
+import type { ModelSelection, ProviderInstanceId, ProviderSnapshot } from '@workspace/contracts'
 import { createContext } from 'react'
 
-import type { ProviderModelOption } from '@/features/chat/utils/provider-model-options'
+import type { ProviderModelOption } from '@workspace/client-core/chat/providers/models'
+import type { ProviderDisplay } from '@/features/chat/state/provider-display-cache'
 
 export type ChatModelPicker = {
-  /** True while the session pins its provider and model, so the picker is read-only. */
-  readonly locked: boolean
+  /** Existing sessions can change models, but must keep their provider. */
+  readonly sessionProviderInstanceId: ProviderInstanceId | null
   /** The selection the composer will send with the next turn, or null when no provider offers one. */
   readonly modelSelection: ModelSelection | null
+  readonly provider: ProviderSnapshot | undefined
+  readonly display: ProviderDisplay | undefined
   /** Takes the picker row, not a bare selection, so the level can be reconciled against the new model. */
   readonly selectModel: (option: ProviderModelOption) => void
 }

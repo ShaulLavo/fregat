@@ -42,7 +42,7 @@ export function createAuthConfig(options: AuthOptions = {}): AuthConfig {
 
 export function authGuard(auth: AuthConfig) {
   return ({ request, set }: { request: Request; set: { status?: number | string } }) => {
-    const origin = request.headers.get('origin')
+    const origin = browserRequestOrigin(request)
     const error = localBrowserOriginError(auth, origin)
     if (!error) {
       recordRequestContext({ auth: { outcome: 'success' } })
@@ -54,6 +54,7 @@ export function authGuard(auth: AuthConfig) {
       area: 'auth',
       auth: {
         errorCode: error.code,
+        fetchSite: request.headers.get('sec-fetch-site'),
         origin,
         outcome: 'denied',
       },
@@ -83,6 +84,18 @@ function hasTrustedOrigin(auth: AuthConfig, origin: string | null) {
   if (!origin) return false
 
   return auth.allowedOrigins.includes(origin)
+}
+
+function browserRequestOrigin(request: Request): string | null {
+  const origin = request.headers.get('origin')
+  if (origin !== null) return origin
+
+  // Browsers omit Origin on same-origin GETs. The referrer must still
+  // resolve to an exact allowlisted origin, including behind a mesh proxy.
+  if (request.headers.get('sec-fetch-site') !== 'same-origin') return null
+
+  const referer = request.headers.get('referer')
+  return referer ? (URL.parse(referer)?.origin ?? null) : null
 }
 
 function originFromWebSocketData(data: unknown) {

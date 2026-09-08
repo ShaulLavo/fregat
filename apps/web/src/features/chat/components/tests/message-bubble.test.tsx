@@ -85,21 +85,37 @@ test('only the terminal assistant message shows its metadata row', () => {
   expect(hidden.container.querySelector('[data-assistant-message-meta]')).toBeNull()
 })
 
-test('the assistant copy button reveals on keyboard focus and never eats a click while hidden', () => {
+test('message metadata stays available to keyboard focus and touch while hiding hover-only chrome', async () => {
   const { container } = renderBubble(chatMessage({ text: 'Done.' }), {
     renderAssistantCopyButton: (text) => <button type='button'>{`Copy ${text}`}</button>,
     showAssistantCopyButton: true,
   })
 
   const actions = container.querySelector<HTMLElement>('[data-assistant-copy-actions]')
+  const metadata = container.querySelector<HTMLElement>('[data-assistant-message-meta]')
 
   expect(actions).not.toBeNull()
-  // The negative: hiding it must not have unmounted it.
   expect(actions?.querySelector('button')?.textContent).toBe('Copy Done.')
-  expect(actions).toHaveClass('pointer-events-none')
-  expect(actions).toHaveClass('group-focus-within/assistant:opacity-100')
-  expect(actions).toHaveClass('group-focus-within/assistant:pointer-events-auto')
-  expect(actions).toHaveClass('group-hover/assistant:pointer-events-auto')
+  expect(metadata).toHaveClass('[@media(hover:hover)]:pointer-events-none')
+  expect(metadata).toHaveClass('[@media(hover:hover)]:opacity-0')
+  expect(metadata).toHaveClass('group-focus-within/message:opacity-100')
+  expect(metadata).toHaveClass('group-focus-within/message:pointer-events-auto')
+  expect(metadata).toHaveClass('group-hover/message:pointer-events-auto')
+  expect(metadata).not.toHaveClass('opacity-0')
+
+  await userEvent.tab()
+
+  expect(screen.getByRole('button', { name: 'Copy Done.' })).toHaveFocus()
+})
+
+test('user timestamps use the same hover and focus disclosure as assistant metadata', () => {
+  const { container } = renderBubble(chatMessage({ role: 'user', text: 'ship it' }))
+  const metadata = container.querySelector<HTMLElement>('[data-user-message-meta]')
+
+  expect(metadata).toHaveClass('[@media(hover:hover)]:opacity-0')
+  expect(metadata).toHaveClass('group-focus-within/message:opacity-100')
+  expect(metadata).toHaveClass('group-hover/message:opacity-100')
+  expect(metadata).not.toHaveClass('opacity-0')
 })
 
 test('a sent image renders as a thumbnail and opens in a lightbox', async () => {

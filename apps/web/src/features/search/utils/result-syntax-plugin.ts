@@ -52,6 +52,7 @@ function searchResultSyntaxSessionOptions(
 }
 
 class SearchResultSyntaxSession implements EditorSyntaxSession {
+  public readonly foldingSupport = 'unsupported'
   private readonly syntaxProvider: EditorSyntaxProvider
   private readonly options: EditorSyntaxSessionOptions & {
     readonly languageId: EditorSyntaxLanguageId

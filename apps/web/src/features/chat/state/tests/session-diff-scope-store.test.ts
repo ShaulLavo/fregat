@@ -15,8 +15,8 @@ import {
 import { afterEach, beforeEach } from 'vitest'
 import * as v from 'valibot'
 
-import { createInitialChatProjectionSlice } from '@/features/chat/state/chat-projection-store'
-import { applyChatProjectionEvent } from '@/features/chat/state/chat-projection-writers'
+import { createInitialChatProjectionSlice } from '@workspace/client-core/chat/types'
+import { applyChatProjectionEvent } from '@workspace/client-core/chat/writers'
 import {
   hydrateSessionDiffScopeStoreFromStorage,
   useSessionDiffScopeStore,

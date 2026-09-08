@@ -1,3 +1,7 @@
+import type { SessionId } from '@workspace/contracts'
+import type { AgentTerminalProcess } from '../terminal/agent-launch'
+import { sessionIdentityErrors } from './structured-errors'
+import { claudeTerminalResumeArgv } from './utils/claude-terminal-resume'
 import { createInternalError } from '../observability/structured-errors'
 
 import {
@@ -57,6 +61,7 @@ export type ProviderAdapterRegistryOptions = {
 }
 
 type LiveProviderInstance = {
+  env: NodeJS.ProcessEnv
   adapter: ProviderAdapter
   config: ProviderInstanceConfig
   credentialPaths: readonly string[]
@@ -278,6 +283,22 @@ export class ProviderAdapterRegistry {
     }
   }
 
+  acquireTerminalLaunch(
+    providerInstanceId: ProviderInstanceId,
+    sessionId: SessionId,
+  ): AgentTerminalProcess {
+    const instance = this.instances.get(providerInstanceId)
+    if (!instance || instance.config.driverKind !== 'claude' || instance.config.enabled === false)
+      throw sessionIdentityErrors.TERMINAL_UNSUPPORTED()
+    const lease = this.acquireInstanceLease(providerInstanceId)
+    const [, ...args] = claudeTerminalResumeArgv(sessionId)
+    return {
+      command: [instance.config.binaryPath || 'claude', ...args],
+      env: instance.env,
+      release: lease.release,
+    }
+  }
+
   async getInstanceRoutingInfo(
     providerInstanceId: ProviderInstanceId,
   ): Promise<ProviderInstanceRoutingInfo> {
@@ -348,6 +369,7 @@ export class ProviderAdapterRegistry {
     this.instances.set(providerInstanceId, {
       adapter,
       config: { driverKind: adapter.driverKind, providerInstanceId },
+      env: process.env,
       credentialPaths: [],
       dispose: () => adapter.stopAll(),
     })
@@ -421,6 +443,7 @@ export class ProviderAdapterRegistry {
     this.instances.set(entry.providerInstanceId, {
       adapter: handle.adapter,
       config: entry,
+      env,
       credentialPaths: driver.credentialPaths({ config, env }),
       dispose: handle.dispose,
     })

@@ -1,4 +1,4 @@
-import type { ScopedStorage } from '@/lib/environments/state/scoped-storage'
+import { addressHrefFromBrowser } from '@/features/address/utils/browser-url'
 import { fetchOrchestrationShellSnapshotHttp } from '@/features/chat/transport/orchestration-http-snapshots'
 import { useEffect } from 'react'
 
@@ -7,9 +7,14 @@ import type { Client } from '@/lib/client'
 import { environmentActivitySignal } from '@/lib/environments/state/activity'
 import { clientForQueryClient } from '@/lib/environments/state/query-clients'
 
-import { applicableTabs, parseAddress } from '@workspace/client-core/address/grammar'
+import {
+  applicableTabs,
+  editorDocumentToken,
+  parseAddress,
+} from '@workspace/client-core/address/grammar'
 import { pathForDocumentToken } from '@/features/address/utils/document-token'
-import { resolveWorkspaceSlug, NO_WORKSPACE_SLUG } from '@workspace/client-core/address/slug'
+import { parseWorkspaceToken, NO_WORKSPACE_TOKEN } from '@workspace/client-core/address/workspace'
+import { readWorkspaceAddress } from '@workspace/client-core/files/workspace-address'
 import { parseSessionToken } from '@/features/address/utils/session-token'
 import { claimAddressRoot } from '@/features/address/state/root-claim'
 import { useSessionRailStore } from '@/features/chat-mode/state/session-rail-store'
@@ -21,10 +26,7 @@ import {
   selectChatProjectionSlice,
   useChatProjectionStore,
 } from '@/features/chat/state/chat-projection-store'
-import {
-  selectSessionOwnership,
-  selectWorktreeAtPath,
-} from '@/features/chat/state/chat-projection-selectors'
+import { selectSessionOwnership, selectWorktreeAtPath } from '@workspace/client-core/chat/selectors'
 import { useEnvironmentsStore } from '@/lib/environments/state/store'
 import { addressEnvironments } from '@/features/address/utils/environments'
 import { confirmedEnvironmentId, confirmedEnvironmentOrigin } from '@/lib/environments/state/domain'
@@ -33,7 +35,7 @@ import { useApplicationRuntime } from '@/hooks/use-application-runtime'
 import type { ApplicationRuntime } from '@/state/application-runtime'
 import { createEditorCommands } from '@/features/editor/state/commands'
 import { settingsCategoryForSlug } from '@/features/address/utils/settings-category'
-import { isSettingsDocumentId } from '@/features/settings/utils/document'
+import { isEditorTabDirty } from '@/features/workspace/utils/tab-dirty'
 import { selectSettingsCategory } from '@/features/settings/state/category-store'
 import { SETTING_IDS, descriptorFor, type EnvironmentId } from '@workspace/contracts'
 import { searchStateFor } from '@/features/address/utils/search-params'
@@ -46,6 +48,7 @@ import { useEditorDocumentStoreApi } from '@/features/editor/state/document-stat
 import { documentTokenForPath } from '@/features/address/utils/document-token'
 import { useEditorWorkspaceStoreApi } from '@/features/editor/state/workspace-state'
 import {
+  activeEditorTabForWorkbenchPanels,
   createDefaultWorkbenchPanels,
   setWorkbenchBottomTab,
   setWorkbenchSidebarTab,
@@ -53,8 +56,6 @@ import {
 import { toast } from 'sonner'
 
 import { log } from '@/lib/client-logging'
-import { fetchRecentEntries } from '@/lib/file-server'
-import { readWorkspaceOrder } from '@/features/workspace/state/cache'
 
 /**
  * The inbound edge for everything `addressedWorkspaceCache` could not decide.
@@ -100,13 +101,14 @@ type ApplyReason = 'boot' | 'popstate'
  * timestamp, and a boot that rejected three tokens looked like three unrelated faults.
  */
 type ApplyTrace = {
-  ambiguousSlugCandidates: number | null
+  workspaceSource: 'cache' | 'server' | 'session' | null
+  workspaceId: string | null
   rejectedTokens: string[]
   tabsRejected: number | null
 }
 
 function emptyApplyTrace(): ApplyTrace {
-  return { ambiguousSlugCandidates: null, rejectedTokens: [], tabsRejected: null }
+  return { workspaceSource: null, workspaceId: null, rejectedTokens: [], tabsRejected: null }
 }
 
 export type AddressRestoreResult =
@@ -148,9 +150,9 @@ let restoreGeneration = 0
 
 /** Whether the URL names a real workspace, decidable before any await. */
 function addressNamesWorkspace() {
-  const workspace = parseAddress(window.location.href).workspace
+  const workspace = parseAddress(addressHrefFromBrowser(window.location.href)).workspace
 
-  return Boolean(workspace) && workspace !== NO_WORKSPACE_SLUG
+  return Boolean(workspace) && workspace !== NO_WORKSPACE_TOKEN
 }
 
 async function applyAddress(
@@ -178,7 +180,7 @@ async function applyCurrentAddress(
   trace: ApplyTrace,
 ): Promise<AddressRestoreResult> {
   const environments = addressEnvironments(useEnvironmentsStore.getState().entries)
-  const address = parseAddress(window.location.href, environments)
+  const address = parseAddress(addressHrefFromBrowser(window.location.href), environments)
   if (address.rejectedEnvironment !== null) {
     trace.rejectedTokens.push('environment id')
     return report({ status: 'unavailable', reason: 'unknown environment' }, trace)
@@ -204,11 +206,12 @@ async function applyCurrentAddress(
   if (!address.workspace) {
     return report({ status: 'pending', reason: 'no address to apply' }, trace)
   }
-  // `/~-` names "no folder open", not "nothing to do": the settings overlay works
-  // without a workspace, and returning early made every documented folderless address
-  // a silent no-op.
-  if (address.workspace === NO_WORKSPACE_SLUG) {
-    applySettings(address, commands, storeApi)
+  if (address.workspace === NO_WORKSPACE_TOKEN) {
+    applyMode(address.mode, storeApi)
+    applyPanels(address, storeApi, reason)
+    applyTabs(address, null, commands, storeApi, documentStoreApi, reason, trace)
+    applyDocument(address, null, commands, trace)
+    applySettingsCategory(address)
     return report({ status: 'applied', reason }, trace)
   }
 
@@ -219,9 +222,9 @@ async function applyCurrentAddress(
     useChatProjectionStore.getState().syncShellSnapshot(environmentId, snapshot)
   }
   const selectedRoot = environmentId ? checkoutPathForAddress(address, environmentId) : null
-  const rootPath =
-    selectedRoot ??
-    (await resolveRoot(address.workspace, storeApi, trace, client, activity, editor.storage))
+  if (selectedRoot !== null) trace.workspaceSource = 'session'
+  let rootPath =
+    selectedRoot ?? (await resolveRoot(address.workspace, storeApi, trace, client, activity))
   // A newer press started while this one was resolving. Everything below writes store
   // state, so continuing would drag the older address over the newer one.
   if (superseded()) return report({ status: 'pending', reason: 'superseded' }, trace)
@@ -230,7 +233,8 @@ async function applyCurrentAddress(
     return report(
       {
         status: 'unavailable',
-        reason: `no workspace named ${address.workspace} on this machine`,
+        reason:
+          'The link does not contain a valid workspace ID. Open the folder and copy its new link.',
       },
       trace,
     )
@@ -256,6 +260,7 @@ async function applyCurrentAddress(
   }
 
   confirmedEnvironmentId(owner.origin)
+  rootPath = storeApi.getState().rootFolder?.path ?? rootPath
   if (!seeded) {
     applyMode(address.mode, storeApi)
     applyPanels(address, storeApi, reason)
@@ -263,15 +268,9 @@ async function applyCurrentAddress(
     applyTabs(address, rootPath, commands, storeApi, documentStoreApi, reason, trace)
   }
 
-  // Before the document, always. `openSettingsEditor` selects the tab it opens, so
-  // running it afterwards made which tab you land on depend on `?tabs=` byte order.
-  applySettings(address, commands, storeApi)
-
-  // Last, and NOT inside `applyTabs`: opening the tab set moves the selection, and an
-  // address without `?tabs=` skips that step entirely — so a document re-select that
-  // lived in there simply did not happen for short links, and back left the previous
-  // document selected. One call, one place, after everything that can steal focus.
-  if (address.mode !== 'chat') applyDocument(address, rootPath, commands, trace)
+  // Select after opening the tab collection, including links that omit the collection.
+  applyDocument(address, rootPath, commands, trace)
+  applySettingsCategory(address)
 
   // Always applied: none of these lives in a workspace slice, so the merge cannot
   // reach them however the address arrived.
@@ -294,77 +293,26 @@ function checkoutPathForAddress(
   return selectSessionOwnership(slice, parsed.sessionId)?.worktree.path ?? null
 }
 
-/** Enough to cover a link to a project opened a while ago, without a slow round trip. */
-const RECENT_DIRECTORY_LIMIT = 50
-
 async function resolveRoot(
-  slug: string,
+  token: string,
   storeApi: ReturnType<typeof useEditorWorkspaceStoreApi>,
   trace: ApplyTrace,
   client: Client,
   activity: AbortSignal,
-  storage: ScopedStorage,
 ) {
-  // The index only, never `readWorkspaceCache()`: that parses every slice and every
-  // search buffer — and a search buffer holds a materialized match list — and sweeps
-  // the whole localStorage keyspace, all to read one array, on every back press.
-  const indexed = readWorkspaceOrder(storage, storeApi.getState().rootFolder?.path ?? null)
-  const resolution = await resolvedSlug(slug, indexed, client, activity)
+  const parsed = parseWorkspaceToken(token)
+  if (parsed.kind !== 'workspace') return null
 
-  if (resolution.kind === 'resolved') return resolution.rootPath
-  // Ambiguity is not a guess to make: two checkouts named the same thing are two
-  // different workspaces, and picking one silently swaps the user's whole world.
-  if (resolution.kind === 'ambiguous') trace.ambiguousSlugCandidates = resolution.rootPaths.length
-
-  return null
-}
-
-/**
- * The index first, and the file server's recent directories only when the index has no
- * answer at all — so a warm boot never pays for the round trip.
- *
- * The recents pass is handed an EMPTY index deliberately: reaching it means the index
- * steps already returned `unknown`, and re-running them would rebuild the whole slug
- * map (grouping, qualifying and hashing every root) a second time to reach the same
- * dead end. Wiring the step at all is what lets a link reach a project this machine has
- * on disk but has not opened recently enough to still be in the eight-slot index.
- */
-async function resolvedSlug(
-  slug: string,
-  indexed: readonly string[],
-  client: Client,
-  activity: AbortSignal,
-) {
-  const local = resolveWorkspaceSlug(slug, { indexed })
-  if (local.kind !== 'unknown') return local
-
-  return resolveWorkspaceSlug(slug, {
-    indexed: [],
-    recent: await recentRootPaths(client, activity),
-  })
-}
-
-/**
- * A failure here is not a failed restore — it just means the resolver falls back to
- * what it already had.
- */
-async function recentRootPaths(client: Client, activity: AbortSignal) {
-  try {
-    const entries = await fetchRecentEntries(
-      {
-        limit: RECENT_DIRECTORY_LIMIT,
-        mode: 'folder',
-        showHidden: true,
-      },
-      activity,
-      client,
-    )
-
-    return entries.map((entry) => entry.path)
-  } catch {
-    // Swallowed, not silent: `fs.recents` carries the failure as its own wide event.
-    return []
+  trace.workspaceId = parsed.id
+  const root = storeApi.getState().rootFolder
+  if (root?.workspaceAddress?.id === parsed.id) {
+    trace.workspaceSource = 'cache'
+    return root.path
   }
+
+  trace.workspaceSource = 'server'
+  const workspace = await readWorkspaceAddress({ client, id: parsed.id, signal: activity })
+  return workspace.path
 }
 
 function applyMode(
@@ -378,18 +326,18 @@ function applyMode(
 
 function applyDocument(
   address: ReturnType<typeof parseAddress>,
-  rootPath: string,
+  rootPath: string | null,
   commands: ReturnType<typeof useEditorCommands>,
   trace: ApplyTrace,
 ) {
-  const token = address.document
+  const token = editorDocumentToken(address)
   if (!token) return
 
   const parsed = pathForDocumentToken(rootPath, token)
   if (parsed.kind !== 'path') {
     // Recorded rather than swallowed: a token that parses to nothing is otherwise a
     // blank tab with no error anywhere.
-    trace.rejectedTokens.push('reason' in parsed ? parsed.reason : parsed.kind)
+    trace.rejectedTokens.push(parsed.reason)
     return
   }
 
@@ -512,49 +460,11 @@ function applyPanels(
   state.setWorkbenchPanels(panels)
 }
 
-/**
- * A param rather than a route, deliberately: a real `/settings` route would unmount
- * the workspace behind it, killing live terminal sockets and editor DOM. The empty
- * string means "settings, no category" — the page opens showing everything.
- *
- * Symmetric, which it was not: with no `null` branch the slot was a one-way sink.
- * `selectSettingsCategory` has no other caller, so nothing in the UI could undo a
- * category a link had pinned, and backing out of settings left the tab open forever.
- */
-function applySettings(
-  address: ReturnType<typeof parseAddress>,
-  commands: ReturnType<typeof useEditorCommands>,
-  storeApi: ReturnType<typeof useEditorWorkspaceStoreApi>,
-) {
-  if (address.settings === null) {
-    closeSettingsTab(commands, storeApi)
-    return
-  }
-
+function applySettingsCategory(address: ReturnType<typeof parseAddress>) {
   const categories = SETTING_IDS.map((id) => descriptorFor(id).category)
   selectSettingsCategory(
     address.settings ? settingsCategoryForSlug(address.settings, categories) : null,
   )
-  commands.openSettingsEditor()
-}
-
-/**
- * The settings tab is addressed by the `?settings=` slot rather than a `?tabs=` token,
- * so `closeTabsOutsideAddress` cannot see it — which is why walking back out of
- * settings used to leave it open. Closing it here keeps the one slot that owns it
- * responsible for both directions.
- */
-function closeSettingsTab(
-  commands: ReturnType<typeof useEditorCommands>,
-  storeApi: ReturnType<typeof useEditorWorkspaceStoreApi>,
-) {
-  const open = storeApi
-    .getState()
-    .workbenchPanels.editorTabs.find((tab) => isSettingsDocumentId(tab.path))
-  if (!open) return
-
-  selectSettingsCategory(null)
-  commands.closeTab(open.id)
 }
 
 /**
@@ -628,7 +538,7 @@ function applyLogs(address: ReturnType<typeof parseAddress>, reason: ApplyReason
  */
 function applyTabs(
   address: ReturnType<typeof parseAddress>,
-  rootPath: string,
+  rootPath: string | null,
   commands: ReturnType<typeof useEditorCommands>,
   storeApi: ReturnType<typeof useEditorWorkspaceStoreApi>,
   documentStoreApi: ReturnType<typeof useEditorDocumentStoreApi>,
@@ -647,9 +557,9 @@ function applyTabs(
     return
   }
 
+  const active = activeEditorTabForWorkbenchPanels(storeApi.getState().workbenchPanels)
+  const selected = editorDocumentToken(address)
   for (const token of tabs) {
-    if (token === address.document) continue
-
     const parsed = pathForDocumentToken(rootPath, token)
     if (parsed.kind !== 'path') continue
 
@@ -662,8 +572,13 @@ function applyTabs(
   // later, surviving the restart. Walking history is the only case where the tab set
   // is one this app wrote, and therefore the only case where absence means "close".
   if (reason === 'popstate') {
-    closeTabsOutsideAddress(tabs, rootPath, commands, storeApi, documentStoreApi)
+    const wanted = selected ? [...tabs, selected] : tabs
+    closeTabsOutsideAddress(wanted, rootPath, commands, storeApi, documentStoreApi)
   }
+  if (selected || !active) return
+  if (!storeApi.getState().workbenchPanels.editorTabs.some((tab) => tab.id === active.id)) return
+
+  commands.openFileSurface(active.path)
 }
 
 /**
@@ -677,7 +592,7 @@ function applyTabs(
  */
 function closeTabsOutsideAddress(
   tokens: readonly string[],
-  rootPath: string,
+  rootPath: string | null,
   commands: ReturnType<typeof useEditorCommands>,
   storeApi: ReturnType<typeof useEditorWorkspaceStoreApi>,
   documentStoreApi: ReturnType<typeof useEditorDocumentStoreApi>,
@@ -689,7 +604,7 @@ function closeTabsOutsideAddress(
     const token = documentTokenForPath(rootPath, tab.path)
     if (token.kind !== 'token') continue
     if (wanted.has(token.token)) continue
-    if (dirty.has(tab.path)) continue
+    if (isEditorTabDirty(tab.path, dirty)) continue
 
     commands.closeTab(tab.id)
   }
@@ -706,7 +621,7 @@ function closeTabsOutsideAddress(
 function reportUnavailable(result: AddressRestoreResult) {
   if (result.status !== 'unavailable') return result
 
-  toast.error('That link points somewhere this machine does not have', {
+  toast.error('This workspace link could not be opened', {
     description: result.reason,
   })
 
@@ -716,7 +631,8 @@ function reportUnavailable(result: AddressRestoreResult) {
 function report(result: AddressRestoreResult, trace: ApplyTrace) {
   log.info({
     action: 'address.restored',
-    ambiguousSlugCandidates: trace.ambiguousSlugCandidates,
+    workspaceSource: trace.workspaceSource,
+    workspaceId: trace.workspaceId,
     area: 'address',
     reason: 'reason' in result ? result.reason : null,
     rejectedTokenCount: trace.rejectedTokens.length,

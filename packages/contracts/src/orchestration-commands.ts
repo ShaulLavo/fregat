@@ -485,6 +485,12 @@ export const preparedSessionTurnStartCommandSchema = v.object({
 export const internalOrchestrationCommandSchema = v.variant('type', [
   v.object({
     ...commandBaseSchema,
+    type: v.literal('session.terminal-history.append'),
+    sessionId: sessionIdSchema,
+    messages: v.array(importedSessionMessageSchema),
+  }),
+  v.object({
+    ...commandBaseSchema,
     type: v.literal('session.history.import'),
     sessionId: sessionIdSchema,
     revision: trimmedNonEmptyStringSchema,

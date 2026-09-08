@@ -1,7 +1,7 @@
 import { useQuery } from '@tanstack/react-query'
 
-import { modelPreferenceRows } from '@/features/chat/utils/model-preferences'
-import { providerModelOptions } from '@/features/chat/utils/provider-model-options'
+import { modelPreferenceRows } from '@workspace/client-core/chat/providers/preferences'
+import { providerModelOptions } from '@workspace/client-core/chat/providers/models'
 import { providerListQueryOptions } from '@/features/chat/utils/provider-query'
 
 import { useSettingValue } from '../hooks/use-setting-value'
@@ -37,7 +37,7 @@ export function ModelSection() {
   const displayed = rows.map((row) => row.ref)
 
   return (
-    <div className='border-border flex max-h-64 w-96 flex-col overflow-y-auto rounded-md border'>
+    <div className='border-border flex max-h-64 w-96 max-w-full min-w-0 flex-col overflow-y-auto rounded-md border @max-3xl/settings:w-full'>
       {rows.map((row, index) => (
         <ModelRow
           canMoveDown={index < rows.length - 1}

@@ -2,7 +2,7 @@ import {
   shellSnapshot,
   TEST_ENVIRONMENT_ID as FIXTURE_ENVIRONMENT_ID,
 } from '../../../../../test/factories/chat'
-import { screen } from '@testing-library/react'
+import { act, screen } from '@testing-library/react'
 import userEvent from '@testing-library/user-event'
 import {
   eventIdSchema,
@@ -56,6 +56,48 @@ test('a resolved approval leaves nothing to answer', () => {
   renderPanel([requestedActivity(), resolvedActivity()])
 
   expect(screen.queryByRole('alert', { name: 'Pending approvals' })).not.toBeInTheDocument()
+})
+
+test('only the oldest approval is shown and resolving it reveals the next request', () => {
+  const nextApproval = sessionActivity({
+    id: v.parse(eventIdSchema, 'event-activity-next'),
+    sequence: 3,
+    payload: {
+      detail: 'cat package.json',
+      requestId: 'approval-2',
+      requestKind: 'command',
+      requestType: 'exec_command_approval',
+    },
+  })
+  const { updateActivities } = renderPanel([requestedActivity(), nextApproval])
+
+  expect(screen.getByText('1/2')).toBeInTheDocument()
+  expect(screen.getByLabelText('Command')).toHaveTextContent('rm -rf build')
+  expect(screen.queryByText('cat package.json')).not.toBeInTheDocument()
+  expect(screen.getAllByRole('button', { name: 'Allow' })).toHaveLength(1)
+
+  act(() => updateActivities([requestedActivity(), resolvedActivity(), nextApproval]))
+
+  expect(screen.queryByText('1/2')).not.toBeInTheDocument()
+  expect(screen.getByLabelText('Command')).toHaveTextContent('cat package.json')
+  expect(screen.queryByText('rm -rf build')).not.toBeInTheDocument()
+})
+
+test('the complete approval detail is keyboard accessible without truncation', () => {
+  const detail = `bun run build\n${'echo checking workspace\n'.repeat(30)}bun run deploy`
+  renderPanel([
+    sessionActivity({
+      payload: {
+        detail,
+        requestId: REQUEST_ID,
+        requestKind: 'command',
+        requestType: 'exec_command_approval',
+      },
+    }),
+  ])
+
+  expect(screen.getByLabelText('Command').textContent).toBe(detail)
+  expect(screen.getByLabelText('Command')).toHaveAttribute('tabindex', '0')
 })
 
 test('the decisions stay disabled while a response is in flight', async () => {
@@ -133,7 +175,17 @@ function renderPanel(
     </Wrap>,
   )
 
-  return { dispatched }
+  return {
+    dispatched,
+    updateActivities: (nextActivities: ReturnType<typeof sessionActivity>[]) => {
+      useChatProjectionStore.getState().syncSessionDetailSnapshot(FIXTURE_ENVIRONMENT_ID, {
+        checkpoints: [],
+        proposedPlans: [],
+        snapshotSequence: 2,
+        session: { deletion: null, ...seeded, activities: nextActivities, deletedAt: null },
+      })
+    },
+  }
 }
 
 function Wrap({

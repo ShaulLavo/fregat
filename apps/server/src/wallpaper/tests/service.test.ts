@@ -1,8 +1,10 @@
-import { mkdir, mkdtemp, rm, writeFile } from 'node:fs/promises'
+import { mkdir, mkdtemp, rm, symlink, writeFile } from 'node:fs/promises'
 import { tmpdir } from 'node:os'
 import path from 'node:path'
-import { afterEach, describe, expect, it } from 'vitest'
+import { Elysia } from 'elysia'
+import { afterEach, describe, expect, it, vi } from 'vitest'
 
+import { wallpaperRoutes } from '../routes'
 import {
   readDesktopWallpaperMediaFromPath,
   readDesktopWallpaperStillMediaFromPath,
@@ -12,8 +14,54 @@ import {
 const roots: string[] = []
 
 afterEach(async () => {
+  vi.unstubAllEnvs()
   await Promise.all(roots.splice(0).map((root) => rm(root, { recursive: true, force: true })))
 })
+
+it.skipIf(process.platform !== 'linux')(
+  'serves the current Omarchy wallpaper through every route',
+  async () => {
+    const root = await fixtureRoot()
+    vi.stubEnv('XDG_STATE_HOME', root)
+    const imagePath = path.join(root, 'backgrounds', 'current image.jpg')
+    const linkPath = path.join(root, 'omarchy', 'current', 'background')
+    await writeFixture(imagePath, 'desktop-image')
+    await mkdir(path.dirname(linkPath), { recursive: true })
+    await symlink(imagePath, linkPath)
+    const app = new Elysia().use(wallpaperRoutes())
+
+    const info = await app.handle(new Request('http://local/wallpaper/info'))
+    expect(info.status).toBe(200)
+    expect(await info.json()).toEqual({
+      contentType: 'image/jpeg',
+      kind: 'image',
+      source: 'still-image',
+    })
+    for (const endpoint of ['/wallpaper', '/wallpaper/still']) {
+      const response = await app.handle(new Request(`http://local${endpoint}`))
+      expect(response.status).toBe(200)
+      expect(response.headers.get('content-type')).toBe('image/jpeg')
+      expect(await response.text()).toBe('desktop-image')
+    }
+  },
+)
+
+it.skipIf(process.platform !== 'linux')(
+  'falls back when the Omarchy wallpaper target is missing',
+  async () => {
+    const root = await fixtureRoot()
+    vi.stubEnv('XDG_STATE_HOME', root)
+    const linkPath = path.join(root, 'omarchy', 'current', 'background')
+    await mkdir(path.dirname(linkPath), { recursive: true })
+    await symlink(path.join(root, 'missing.jpg'), linkPath)
+    const app = new Elysia().use(wallpaperRoutes())
+
+    for (const endpoint of ['/wallpaper/info', '/wallpaper', '/wallpaper/still']) {
+      const response = await app.handle(new Request(`http://local${endpoint}`))
+      expect(response.status).toBe(404)
+    }
+  },
+)
 
 describe('readDesktopWallpaperMediaFromPath', () => {
   it('serves the matching Dynamic Wallpaper video before the tiny GIF preview', async () => {

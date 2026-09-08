@@ -24,9 +24,11 @@ const MAX_ROWS = 400
 const MAX_CHUNKS = 4_096
 const MAX_PAINT_PARTS = 16_384
 const MAX_PAINT_RUNS = 2_048
+const MAX_PAINT_LAYERS = 32
+const MAX_PAINT_RECTANGLES = 8_192
 
 export type CachedEditorVisibleSnapshot = {
-  readonly cacheVersion: 2
+  readonly cacheVersion: 4
   readonly contentVersion: string
   readonly rootPath: string
   readonly path: string
@@ -36,7 +38,7 @@ export type CachedEditorVisibleSnapshot = {
 
 export type EditorVisibleSnapshotCacheKey = Pick<
   CachedEditorVisibleSnapshot,
-  'contentVersion' | 'rootPath' | 'path' | 'themeId'
+  'rootPath' | 'path' | 'themeId'
 >
 
 export type EditorVisibleSnapshotCacheWriteResult =
@@ -97,6 +99,17 @@ const gutterLaneSchema = v.strictObject({
 const gutterLayoutSchema = v.strictObject({
   fixedWidth: nonNegativeNumberSchema,
   lanes: v.array(gutterLaneSchema),
+})
+const paintRectangleSchema = v.strictObject({
+  left: finiteNumberSchema,
+  top: finiteNumberSchema,
+  width: positiveNumberSchema,
+  height: positiveNumberSchema,
+  backgroundColor: v.string(),
+})
+const paintLayerSchema = v.strictObject({
+  id: v.pipe(v.string(), v.minLength(1)),
+  rectangles: v.pipe(v.array(paintRectangleSchema), v.maxLength(MAX_PAINT_RECTANGLES)),
 })
 const visibleRangeSchema = v.pipe(
   v.strictObject({
@@ -204,11 +217,12 @@ const editorVisibleSnapshotSchema = v.pipe(
     tabSize: positiveIntegerSchema,
     viewport: viewportSchema,
     rows: v.pipe(v.array(paintRowSchema), v.maxLength(MAX_ROWS)),
+    paintLayers: v.pipe(v.array(paintLayerSchema), v.maxLength(MAX_PAINT_LAYERS)),
   }),
   v.check((snapshot) => editorVisibleSnapshotIsValid(snapshot)),
 )
 const cachedEditorVisibleSnapshotSchema = v.strictObject({
-  cacheVersion: v.literal(2),
+  cacheVersion: v.literal(4),
   contentVersion: v.string(),
   rootPath: v.string(),
   path: v.string(),
@@ -225,8 +239,6 @@ export function readEditorVisibleSnapshotCache(
   if (cached.rootPath !== key.rootPath) return null
   if (cached.path !== key.path) return null
   if (cached.themeId !== key.themeId) return null
-  if (cached.contentVersion !== key.contentVersion) return null
-
   return cached
 }
 
@@ -335,6 +347,15 @@ function paintRunsAreValid(runs: readonly EditorVisiblePaintRunJSON[], paintLeng
 }
 
 function editorVisibleSnapshotIsValid(snapshot: EditorVisibleSnapshotJSON) {
+  const paintLayerIds = new Set<string>()
+  let rectangles = 0
+  for (const layer of snapshot.paintLayers) {
+    if (paintLayerIds.has(layer.id)) return false
+    paintLayerIds.add(layer.id)
+    rectangles += layer.rectangles.length
+  }
+  if (rectangles > MAX_PAINT_RECTANGLES) return false
+
   const laneIds = new Set<string>()
   let gutterWidth = snapshot.gutterLayout.fixedWidth
   for (const lane of snapshot.gutterLayout.lanes) {

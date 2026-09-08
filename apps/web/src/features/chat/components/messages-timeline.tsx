@@ -8,7 +8,7 @@ import { useEffect, useLayoutEffect, useMemo, useReducer, useState, type Dispatc
 
 import { chatTimelineItemEstimate, chatTimelineItems } from '@/features/chat/utils/timeline-items'
 import type { ChatTimelineItem } from '@/features/chat/utils/timeline-items'
-import type { ChatSession } from '../state/chat-projection-store'
+import type { ChatSession } from '@workspace/client-core/chat/types'
 import type { OptimisticChatMessage } from '../state/chat-optimistic-store'
 import {
   initialTimelineScrollState,

@@ -11,13 +11,22 @@ export function externalEditorExecutable(
   return configured.trim() || environmentEditor?.trim() || 'vi'
 }
 
-export async function runExternalEditor({ text, executable, signal }: EditTextRequest) {
+export async function runExternalEditor({
+  text,
+  executable,
+  signal,
+  filename: requestedName,
+}: EditTextRequest) {
   signal.throwIfAborted()
   await mkdir('/work/tmp', { recursive: true })
-  const directory = await mkdtemp('/work/tmp/platform-settings-editor-')
+  const directory = await mkdtemp('/work/tmp/platform-editor-')
   try {
     await chmod(directory, 0o700)
-    const filename = path.join(directory, 'settings.json')
+    const basename = path.basename(requestedName ?? 'settings.json')
+    const filename = path.join(
+      directory,
+      basename === '.' || basename === '..' ? 'document.txt' : basename,
+    )
     await writeFile(filename, text, { mode: 0o600 })
     signal.throwIfAborted()
     await runEditorProcess(executable, filename, signal)
@@ -52,7 +61,7 @@ async function runEditorProcess(executable: string, filename: string, signal: Ab
     if (code === 0) return
     throw createTuiError(
       `External editor exited with status ${code}.`,
-      'Retry editing, or cancel to keep the current settings.',
+      'Retry editing, or cancel to keep the current content.',
     )
   } finally {
     signal.removeEventListener('abort', cancel)

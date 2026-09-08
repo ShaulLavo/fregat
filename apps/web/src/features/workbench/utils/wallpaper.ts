@@ -1,7 +1,4 @@
-// Changing the wallpaper also requires regenerating
-// /workbench/wallpaper-vibrancy.png, referenced by --surface-wallpaper in
-// packages/ui/src/styles/globals.css.
-export const WALLPAPER_URL = '/workbench/wallpaper.png'
+export const WALLPAPER_URL = `${import.meta.env.BASE_URL}workbench/wallpaper.jpg`
 
 export type WallpaperMediaKind = 'image' | 'video'
 

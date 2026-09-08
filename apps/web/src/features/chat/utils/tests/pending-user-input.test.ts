@@ -8,7 +8,7 @@ import {
   resolveUserInputAnswer,
   setUserInputCustomAnswer,
   toggleUserInputOption,
-} from '@/features/chat/utils/pending-user-input'
+} from '@workspace/client-core/chat/pending-user-input'
 import { expect, test } from '../../../../../test/fixtures'
 
 const scope: UserInputQuestion = {

@@ -1,6 +1,6 @@
 import { act } from 'react'
 import { writeFile } from 'node:fs/promises'
-import { InputRenderable, SelectRenderable } from '@opentui/core'
+import { InputRenderable } from '@opentui/core'
 
 import { Application } from '@/components/application'
 import { settingsAddress } from '@/navigation/utils/address'
@@ -9,26 +9,20 @@ import { test, expect } from '../../../test/fixtures'
 import { renderTui } from '../../../test/render'
 import { runPaletteCommand } from '../../../test/actions'
 
-test('a settings editor opened from the file palette owns arrows and dismissal', async ({
-  server,
-}) => {
+test('Files is a full view and closing a palette restores its path draft', async ({ server }) => {
   await writeFile(`${server.root}/visible.txt`, 'visible')
   const session = createTestSettingsSession(server)
   await session.refresh()
-  const frame = await renderTui(<Application session={session} noColor onExit={() => {}} />, {
-    width: 110,
-    height: 32,
-    useThread: false,
-    kittyKeyboard: true,
-  })
+  const frame = await renderTui(
+    <Application
+      initialLocation={{ kind: 'settings', query: 'workbench.colorTheme' }}
+      session={session}
+      noColor
+      onExit={() => {}}
+    />,
+    { width: 110, height: 32, useThread: false, kittyKeyboard: true },
+  )
   try {
-    await act(async () => {
-      await frame.mockInput.typeText('workbench.colorTheme')
-    })
-    await act(async () => {
-      frame.mockInput.pressKey('TAB')
-    })
-    expect(frame.renderer.currentFocusedRenderable?.id).toBe('settings-list')
     await act(async () => {
       frame.mockInput.pressKey('p', { ctrl: true })
     })
@@ -40,24 +34,32 @@ test('a settings editor opened from the file palette owns arrows and dismissal',
         return frame.captureCharFrame()
       })
       .toContain('visible.txt')
-    await runPaletteCommand(frame, 'Edit selected setting')
+    expect(frame.renderer.root.findDescendantById('settings-search')).toBeUndefined()
+    expect(frame.renderer.root.findDescendantById('file-view')?.width).toBe(110)
     await act(async () => {
-      await frame.renderOnce()
+      frame.mockInput.pressKey('TAB')
     })
-    expect(frame.renderer.currentFocusedRenderable?.id).toBe('settings-editor')
-    expect(frame.renderer.root.findDescendantById('file-picker-filter')).toBeUndefined()
-    const editor = frame.renderer.currentFocusedRenderable
-    if (!(editor instanceof SelectRenderable)) return expect.unreachable('Expected editor choices')
-    const selected = editor.getSelectedIndex()
+    expect(frame.renderer.currentFocusedRenderable?.id).toBe('file-picker-path')
+    const path = frame.renderer.currentFocusedRenderable
+    if (!(path instanceof InputRenderable)) return expect.unreachable('Expected path input')
     await act(async () => {
-      frame.mockInput.pressArrow('down')
+      await frame.mockInput.typeText('/unfinished')
     })
-    expect(editor.getSelectedIndex()).toBe((selected + 1) % 3)
+    const draft = path.value
+    await act(async () => {
+      frame.mockInput.pressKey('F1')
+    })
+    expect(frame.renderer.currentFocusedRenderable?.id).toBe('command-palette')
     await act(async () => {
       frame.mockInput.pressEscape()
     })
-    expect(frame.renderer.root.findDescendantById('settings-editor')).toBeUndefined()
-    expect(frame.renderer.currentFocusedRenderable?.id).toBe('settings-list')
+    expect(frame.renderer.currentFocusedRenderable?.id).toBe('file-picker-path')
+    expect(path.value).toBe(draft)
+    await runPaletteCommand(frame, 'Open settings')
+    expect(frame.renderer.currentFocusedRenderable?.id).toBe('settings-search')
+    const search = frame.renderer.currentFocusedRenderable
+    if (!(search instanceof InputRenderable)) return expect.unreachable('Expected settings search')
+    expect(search.value).toBe('workbench.colorTheme')
   } finally {
     await frame.cleanup()
     session.dispose()
@@ -77,12 +79,20 @@ test('direct address commands replace drafts and retain a usable request lifetim
     { kind: 'keybinding.set', command: 'workspace.copyAddress', keys: 'F9' },
   ])
   if (submission.kind === 'submitted') await submission.settled
-  const frame = await renderTui(<Application session={session} noColor onExit={() => {}} />, {
-    width: 110,
-    height: 32,
-    useThread: false,
-    kittyKeyboard: true,
-  })
+  const frame = await renderTui(
+    <Application
+      initialLocation={{ kind: 'settings', query: '' }}
+      session={session}
+      noColor
+      onExit={() => {}}
+    />,
+    {
+      width: 110,
+      height: 32,
+      useThread: false,
+      kittyKeyboard: true,
+    },
+  )
   try {
     await act(async () => {
       frame.mockInput.pressKey('F8')

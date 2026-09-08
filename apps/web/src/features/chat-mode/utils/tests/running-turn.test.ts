@@ -1,7 +1,7 @@
 import { sessionIdSchema, turnIdSchema, type SessionRuntimeStatus } from '@workspace/contracts'
 import * as v from 'valibot'
 
-import type { ProjectionSession } from '@/features/chat/state/chat-projection-store'
+import type { ProjectionSession } from '@workspace/client-core/chat/types'
 import { hasRunningTurn } from '@/features/chat-mode/utils/running-turn'
 import { projectionSession } from '../../../../../test/factories/chat'
 import { expect, test } from '../../../../../test/fixtures'

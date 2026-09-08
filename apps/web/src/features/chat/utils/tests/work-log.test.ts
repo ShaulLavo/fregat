@@ -1,4 +1,5 @@
-import { describe, expect, it } from 'vitest'
+import { describe } from 'vitest'
+import { expect, test as it } from '../../../../../test/fixtures'
 import {
   eventIdSchema,
   sessionIdSchema,
@@ -10,6 +11,197 @@ import * as v from 'valibot'
 import { chatActiveWorkLogPlan, chatWorkLogEntries } from '@/features/chat/utils/work-log'
 
 describe('chat work log entries', () => {
+  it('hides persisted Rust stderr diagnostics while preserving protocol retries and failures', () => {
+    const diagnostic =
+      '2026-09-07T05:01:30.819533Z ERROR codex_models_manager::manager: failed to refresh available models: timeout waiting for child process to exit'
+    const fatal =
+      '2026-09-07T05:01:30.819533Z ERROR codex_core::client: failed to connect to websocket'
+    const entries = chatWorkLogEntries({
+      activities: [
+        activity('diagnostic', {
+          kind: 'runtime.warning',
+          tone: 'info',
+          summary: 'Runtime warning',
+          payload: { message: diagnostic, detail: { message: diagnostic } },
+        }),
+        activity('retry', {
+          kind: 'runtime.warning',
+          tone: 'info',
+          payload: { message: diagnostic, detail: { message: diagnostic, willRetry: true } },
+        }),
+        activity('runtime-failure', {
+          kind: 'runtime.error',
+          tone: 'error',
+          payload: { message: diagnostic, detail: { message: diagnostic } },
+        }),
+        activity('websocket-failure', {
+          kind: 'runtime.warning',
+          tone: 'info',
+          payload: { message: fatal, detail: { message: fatal } },
+        }),
+        activity('explicit-warning', {
+          kind: 'runtime.warning',
+          tone: 'info',
+          payload: { message: diagnostic, detail: { error: { message: diagnostic } } },
+        }),
+        activity('unstructured-warning', {
+          kind: 'runtime.warning',
+          tone: 'info',
+          payload: {
+            message: 'Authentication required',
+            detail: { message: 'Authentication required' },
+          },
+        }),
+      ],
+    })
+
+    expect(entries.map((entry) => entry.id)).toEqual([
+      'retry',
+      'runtime-failure',
+      'websocket-failure',
+      'explicit-warning',
+      'unstructured-warning',
+    ])
+  })
+
+  it('hides persisted protocol notices but retains actionable failures and approvals', () => {
+    const quietKinds = [
+      'mcp.status.updated',
+      'account.updated',
+      'account.rate-limits.updated',
+      'auth.status',
+      'mcp.oauth.completed',
+      'model.rerouted',
+      'files.persisted',
+      'conversation.realtime.started',
+      'conversation.realtime.closed',
+      'tool.progress',
+      'tool.summary',
+      'turn.diff.updated',
+      'deprecation.notice',
+    ]
+    const entries = chatWorkLogEntries({
+      activities: [
+        ...quietKinds.map((kind) => activity(kind, { kind, tone: 'info' })),
+        activity('mcp-ready', {
+          kind: 'mcp.status.updated',
+          tone: 'info',
+          payload: {
+            status: { name: 'codex_apps', status: 'ready', error: null, failureReason: null },
+          },
+        }),
+        activity('mcp-failed', {
+          kind: 'mcp.status.updated',
+          tone: 'info',
+          payload: {
+            status: {
+              name: 'GitHub',
+              status: 'failed',
+              error: null,
+              failureReason: 'Authentication required',
+            },
+          },
+        }),
+        activity('approval', { kind: 'approval.requested', tone: 'approval' }),
+        activity('runtime', {
+          kind: 'runtime.error',
+          tone: 'error',
+          payload: { message: 'Provider exited' },
+        }),
+        activity('empty-warning', {
+          kind: 'runtime.warning',
+          tone: 'info',
+          summary: 'Unknown SDK message (no displayable text content)',
+        }),
+      ],
+    })
+
+    expect(entries.map((entry) => entry.id)).toEqual(['mcp-failed', 'approval', 'runtime'])
+    expect(entries[0]).toMatchObject({
+      title: 'GitHub connection failed',
+      detail: 'Authentication required',
+    })
+  })
+
+  it('combines reasoning chunks into one readable row per section', () => {
+    const entries = chatWorkLogEntries({
+      activities: [
+        activity('reason-1', {
+          kind: 'task.progress',
+          tone: 'thinking',
+          payload: {
+            taskId: 'reasoning',
+            streamKind: 'reasoning_summary_text',
+            summaryIndex: 0,
+            summary: 'Reading ',
+          },
+        }),
+        activity('reason-2', {
+          kind: 'task.progress',
+          tone: 'thinking',
+          payload: {
+            taskId: 'reasoning',
+            streamKind: 'reasoning_summary_text',
+            summaryIndex: 0,
+            summary: 'the code',
+          },
+        }),
+        activity('reason-3', {
+          kind: 'task.progress',
+          tone: 'thinking',
+          payload: {
+            taskId: 'reasoning',
+            streamKind: 'reasoning_summary_text',
+            summaryIndex: 1,
+            summary: 'Planning changes',
+          },
+        }),
+      ],
+    })
+
+    expect(entries.map((entry) => entry.title)).toEqual(['Reading the code', 'Planning changes'])
+    expect(entries[0]?.id).toBe('reason-1')
+  })
+
+  it('uses one row per task and provider tool identity across interleaved updates', () => {
+    const entries = chatWorkLogEntries({
+      activities: [
+        activity('task-1', {
+          kind: 'task.progress',
+          payload: { taskId: 'review', summary: 'Reading' },
+        }),
+        activity('tool-1', {
+          kind: 'tool.updated',
+          payload: {
+            toolCallId: 'call-1',
+            data: { item: { command: 'bun test' } },
+            status: 'inProgress',
+          },
+        }),
+        activity('task-2', {
+          kind: 'task.progress',
+          payload: { taskId: 'review', summary: 'Testing' },
+        }),
+        activity('tool-2', {
+          kind: 'tool.completed',
+          payload: {
+            toolCallId: 'call-1',
+            data: { item: { aggregatedOutput: 'Passed' } },
+            status: 'completed',
+          },
+        }),
+      ],
+    })
+
+    expect(entries.map((entry) => entry.id)).toEqual(['task-1', 'tool-1'])
+    expect(entries[0]?.title).toBe('Testing')
+    expect(entries[1]).toMatchObject({
+      command: 'bun test',
+      output: 'Passed',
+      outcome: 'succeeded',
+    })
+  })
+
   it('keeps the work of every turn, not only the running one', () => {
     const entries = chatWorkLogEntries({
       activities: [

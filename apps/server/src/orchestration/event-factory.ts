@@ -88,6 +88,7 @@ function commandActor(command: OrchestrationCommand) {
     type === 'session.discover' ||
     type === 'session.discovery-metadata.update' ||
     type === 'session.history.import' ||
+    type === 'session.terminal-history.append' ||
     type === 'session.runtime.recover' ||
     type === 'session.deletion.update' ||
     type === 'session.turn.diff.complete' ||

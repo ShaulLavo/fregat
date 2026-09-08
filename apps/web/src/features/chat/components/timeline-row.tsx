@@ -90,7 +90,8 @@ function timelineRowContent({
       </>
     )
   }
-  if (item.type === 'activity-group') return <ActivityGroupRow activities={item.activities} />
+  if (item.type === 'activity-group')
+    return <ActivityGroupRow activities={item.activities} activeTurnId={item.activeTurnId} />
   if (item.type === 'proposed-plan') return <ProposedPlanCard plan={item.plan} />
 
   return <WorkingRow latestTurn={item.latestTurn} />

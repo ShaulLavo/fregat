@@ -11,12 +11,20 @@ test('palette settings actions show exact scope and host requirements and remain
 }) => {
   const session = createTestSettingsSession(server)
   await session.refresh()
-  const frame = await renderTui(<Application session={session} onExit={() => {}} noColor />, {
-    width: 110,
-    height: 32,
-    useThread: false,
-    kittyKeyboard: true,
-  })
+  const frame = await renderTui(
+    <Application
+      initialLocation={{ kind: 'settings', query: '' }}
+      session={session}
+      onExit={() => {}}
+      noColor
+    />,
+    {
+      width: 110,
+      height: 32,
+      useThread: false,
+      kittyKeyboard: true,
+    },
+  )
   try {
     await act(async () => {
       await frame.mockInput.typeText('keybindings.overrides')
@@ -56,6 +64,7 @@ test('palette opens the recorder, its action list wraps, and Ctrl+C cancels reco
   let exits = 0
   const frame = await renderTui(
     <Application
+      initialLocation={{ kind: 'settings', query: '' }}
       session={session}
       onExit={() => {
         exits += 1

@@ -1,8 +1,8 @@
 import type { ScopedProjectRef } from '@workspace/contracts'
-import { createProjectDeleteCommand } from '@/features/chat/utils/command-builders'
+import { createProjectDeleteCommand } from '@workspace/client-core/chat/commands'
 import { dispatchChatCommand } from '@/features/chat/utils/command-dispatch'
 import { dispatchCommandForEnvironment } from '@/features/chat/state/active-transports'
-import { selectChatSessionsForProject } from '@/features/chat/state/chat-projection-selectors'
+import { selectChatSessionsForProject } from '@workspace/client-core/chat/selectors'
 import {
   useChatProjectionStore,
   selectChatProjectionSlice,
@@ -14,7 +14,7 @@ import {
 } from '@/features/chat-mode/state/project-delete-request-store'
 import { clearSessionMultiSelect } from '@/features/chat-mode/state/session-commands'
 import { useSessionSelectionStore } from '@/features/chat-mode/state/session-selection-store'
-import type { SessionRailProject } from '@/features/chat-mode/utils/session-rail-model'
+import type { SessionRailProject } from '@workspace/client-core/chat/rail/model'
 export function useProjectActions() {
   const sessionActions = useSessionActions()
   const releaseSession = useSessionSelectionStore((state) => state.releaseSession)

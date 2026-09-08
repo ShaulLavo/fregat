@@ -37,7 +37,6 @@ test('round-trips one matching record and leaves mismatches untouched', () => {
   expect(writeEditorVisibleSnapshotCache(testScopedStorage, record).status).toBe('written')
   expect(
     readEditorVisibleSnapshotCache(testScopedStorage, {
-      contentVersion: CONTENT_VERSION,
       rootPath: '/repo',
       path: '/repo/src/app.ts',
       themeId: 'dark-plus',
@@ -45,7 +44,6 @@ test('round-trips one matching record and leaves mismatches untouched', () => {
   ).toEqual(record)
   expect(
     readEditorVisibleSnapshotCache(testScopedStorage, {
-      contentVersion: CONTENT_VERSION,
       rootPath: '/other',
       path: '/repo/src/app.ts',
       themeId: 'dark-plus',
@@ -53,10 +51,9 @@ test('round-trips one matching record and leaves mismatches untouched', () => {
   ).toBeNull()
   expect(
     readEditorVisibleSnapshotCache(testScopedStorage, {
-      contentVersion: 'stat:2:5',
       rootPath: '/repo',
       path: '/repo/src/app.ts',
-      themeId: 'dark-plus',
+      themeId: 'light-plus',
     }),
   ).toBeNull()
   expect(Boolean(testScopedStorage.getItem(EDITOR_VISIBLE_SNAPSHOT_CACHE_STORAGE_KEY))).toBe(true)
@@ -73,7 +70,6 @@ test('a write overwrites the single prior record', () => {
 
   expect(
     readEditorVisibleSnapshotCache(testScopedStorage, {
-      contentVersion: CONTENT_VERSION,
       rootPath: '/first',
       path: '/first/a.ts',
       themeId: 'dark-plus',
@@ -81,7 +77,6 @@ test('a write overwrites the single prior record', () => {
   ).toBeNull()
   expect(
     readEditorVisibleSnapshotCache(testScopedStorage, {
-      contentVersion: CONTENT_VERSION,
       rootPath: '/second',
       path: '/second/b.ts',
       themeId: 'light-plus',
@@ -127,17 +122,105 @@ test('rejects invalid geometry, gutter lane ids, and run fidelity', () => {
   expect(writeUntyped(transformedRun).status).toBe('invalid')
 })
 
+test('round-trips bounded paint rectangles including positions before the viewport', () => {
+  const record = cachedSnapshot()
+  record.snapshot.paintLayers = [
+    {
+      id: 'scope-lines',
+      rectangles: [
+        { left: -1, top: -20, width: 1, height: 40, backgroundColor: 'rgb(90, 90, 90)' },
+      ],
+    },
+  ]
+
+  expect(writeEditorVisibleSnapshotCache(testScopedStorage, record).status).toBe('written')
+  expect(readMatchingSnapshot()?.snapshot.paintLayers).toEqual(record.snapshot.paintLayers)
+})
+
+test.each([
+  ['left', Number.NaN],
+  ['left', Number.POSITIVE_INFINITY],
+  ['top', Number.NEGATIVE_INFINITY],
+  ['width', 0],
+  ['width', -1],
+  ['height', 0],
+  ['height', Number.POSITIVE_INFINITY],
+])('rejects invalid paint rectangle %s = %s', (field, value) => {
+  const record = cachedSnapshot()
+  const rectangle = { left: 56, top: 0, width: 1, height: 20, backgroundColor: 'gray' }
+  record.snapshot.paintLayers = [
+    { id: 'scope-lines', rectangles: [{ ...rectangle, [field]: value }] },
+  ]
+
+  expect(writeEditorVisibleSnapshotCache(testScopedStorage, record).status).toBe('invalid')
+})
+
+test('rejects missing and pending paint layers in a persisted snapshot', () => {
+  const record = cachedSnapshot()
+  const { paintLayers: _paintLayers, ...withoutLayers } = record.snapshot
+
+  expect(writeUntyped({ ...record, snapshot: withoutLayers }).status).toBe('invalid')
+  expect(
+    writeUntyped({ ...record, snapshot: { ...record.snapshot, paintLayers: null } }).status,
+  ).toBe('invalid')
+})
+
+test('requires unique nonempty paint layer identities and bounds their count', () => {
+  const record = cachedSnapshot()
+  record.snapshot.paintLayers = [{ id: '', rectangles: [] }]
+  expect(writeEditorVisibleSnapshotCache(testScopedStorage, record).status).toBe('invalid')
+
+  record.snapshot.paintLayers = [
+    { id: 'scope-lines', rectangles: [] },
+    { id: 'scope-lines', rectangles: [] },
+  ]
+  expect(writeEditorVisibleSnapshotCache(testScopedStorage, record).status).toBe('invalid')
+
+  record.snapshot.paintLayers = Array.from({ length: 32 }, (_, index) => ({
+    id: `layer-${index}`,
+    rectangles: [],
+  }))
+  expect(writeEditorVisibleSnapshotCache(testScopedStorage, record).status).toBe('written')
+
+  record.snapshot.paintLayers.push({ id: 'layer-overflow', rectangles: [] })
+  expect(writeEditorVisibleSnapshotCache(testScopedStorage, record).status).toBe('invalid')
+})
+
+test('bounds the aggregate rectangle count across paint layers', () => {
+  const record = cachedSnapshot()
+  const rectangles = Array.from({ length: 4_096 }, () => ({
+    left: 0,
+    top: 0,
+    width: 1,
+    height: 1,
+    backgroundColor: '',
+  }))
+  record.snapshot.paintLayers = [
+    { id: 'first', rectangles },
+    { id: 'second', rectangles },
+  ]
+  // Geometry passes validation at the limit; serialization still enforces its smaller byte cap.
+  expect(writeEditorVisibleSnapshotCache(testScopedStorage, record).status).toBe('oversized')
+
+  record.snapshot.paintLayers.push({ id: 'overflow', rectangles: [rectangles[0]!] })
+  expect(writeEditorVisibleSnapshotCache(testScopedStorage, record).status).toBe('invalid')
+
+  record.snapshot.paintLayers = [
+    { id: 'one-layer', rectangles: [...rectangles, ...rectangles, rectangles[0]!] },
+  ]
+  expect(writeEditorVisibleSnapshotCache(testScopedStorage, record).status).toBe('invalid')
+})
+
 test('a rejected write preserves the prior record and emits a structured warning', () => {
   const prior = cachedSnapshot('/repo', '/repo/src/prior.ts')
   expect(writeEditorVisibleSnapshotCache(testScopedStorage, prior).status).toBe('written')
+  const storedPrior = testScopedStorage.getItem(EDITOR_VISIBLE_SNAPSHOT_CACHE_STORAGE_KEY)
   const warn = vi.spyOn(log, 'warn')
   const invalid = structuredClone(cachedSnapshot())
   invalid.snapshot.gutterWidth += 1
 
   expect(writeUntyped(invalid).status).toBe('invalid')
-  expect(testScopedStorage.getItem(EDITOR_VISIBLE_SNAPSHOT_CACHE_STORAGE_KEY)).toBe(
-    JSON.stringify(prior),
-  )
+  expect(testScopedStorage.getItem(EDITOR_VISIBLE_SNAPSHOT_CACHE_STORAGE_KEY)).toBe(storedPrior)
   expect(warn).toHaveBeenCalledWith(
     expect.objectContaining({
       action: 'editor.visible_snapshot.cache_write',
@@ -258,6 +341,7 @@ test('enforces aggregate chunk, part, and run caps across rows', () => {
 test('rejects an oversized write before storage and an oversized read before parsing', () => {
   const prior = cachedSnapshot('/repo', '/repo/src/prior.ts')
   expect(writeEditorVisibleSnapshotCache(testScopedStorage, prior).status).toBe('written')
+  const storedPrior = testScopedStorage.getItem(EDITOR_VISIBLE_SNAPSHOT_CACHE_STORAGE_KEY)
   const oversized = cachedSnapshot()
   const text = 'x'.repeat(EDITOR_VISIBLE_SNAPSHOT_CACHE_MAX_BYTES / 2)
   oversized.snapshot.rows[0]!.chunks = [exactPaintChunk(text)]
@@ -265,9 +349,7 @@ test('rejects an oversized write before storage and an oversized read before par
   const writeResult = writeEditorVisibleSnapshotCache(testScopedStorage, oversized)
   expect(writeResult.status).toBe('oversized')
   expect(writeResult.serializedBytes).toBeGreaterThan(EDITOR_VISIBLE_SNAPSHOT_CACHE_MAX_BYTES)
-  expect(testScopedStorage.getItem(EDITOR_VISIBLE_SNAPSHOT_CACHE_STORAGE_KEY)).toBe(
-    JSON.stringify(prior),
-  )
+  expect(testScopedStorage.getItem(EDITOR_VISIBLE_SNAPSHOT_CACHE_STORAGE_KEY)).toBe(storedPrior)
 
   const parse = vi.spyOn(JSON, 'parse')
   testScopedStorage.setItem(
@@ -348,7 +430,6 @@ test('accepts wrapped and injected display indices beyond document line count', 
 
 function readMatchingSnapshot() {
   return readEditorVisibleSnapshotCache(testScopedStorage, {
-    contentVersion: CONTENT_VERSION,
     rootPath: '/repo',
     path: '/repo/src/app.ts',
     themeId: 'dark-plus',
@@ -361,7 +442,7 @@ function cachedSnapshot(
   themeId = 'dark-plus',
 ): Mutable<CachedEditorVisibleSnapshot> {
   return {
-    cacheVersion: 2,
+    cacheVersion: 4,
     contentVersion: CONTENT_VERSION,
     rootPath,
     path,
@@ -372,6 +453,7 @@ function cachedSnapshot(
 
 function visibleSnapshot(): Mutable<EditorVisibleSnapshotJSON> {
   return {
+    paintLayers: [],
     kind: 'editor-visible',
     schemaVersion: 1,
     documentId: 'document-1',

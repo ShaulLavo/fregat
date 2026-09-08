@@ -1,5 +1,5 @@
 import { orchestrationDispatchResultSchema } from '@workspace/contracts'
-import { projectRegistrationResult } from '@/lib/environments/utils/registration'
+import { projectRegistrationResult } from '@workspace/client-core/chat/registration'
 import { unwrapEdenResponse } from '@/lib/eden-events'
 import type { Client } from '@/lib/client'
 import { providerInstanceIdSchema, type ModelSelection } from '@workspace/contracts'
@@ -9,7 +9,7 @@ import * as v from 'valibot'
 import {
   createDraftSessionSubmission,
   createWorkspaceProjectCommand,
-} from '@/features/chat/utils/command-builders'
+} from '@workspace/client-core/chat/commands'
 import {
   isSessionSearchQuery,
   sessionSearchQueryOptions,

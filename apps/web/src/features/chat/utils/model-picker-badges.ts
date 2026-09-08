@@ -1,4 +1,4 @@
-import type { ProviderModelOption } from '@/features/chat/utils/provider-model-options'
+import type { ProviderModelOption } from '@workspace/client-core/chat/providers/models'
 
 /** One chip on a picker row. `title` is the hover text; the label is the chip. */
 export type ModelPickerBadge = {

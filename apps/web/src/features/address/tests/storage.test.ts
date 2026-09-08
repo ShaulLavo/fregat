@@ -1,3 +1,4 @@
+import { testWorkspaceToken } from '../../../../test/factories/workspace-address'
 import { describe, afterEach, beforeEach } from 'vitest'
 
 import { expect, test } from '../../../../test/fixtures'
@@ -16,7 +17,7 @@ import {
  * the whole query, re-escaping the `/` and `~` that `?tabs=` leaves bare.
  */
 
-const TABS = '/~repo/workbench/f/src/a.ts?tabs=f/src/a.ts~f/src/b.ts&side=git'
+const TABS = `/~${testWorkspaceToken('/repo')}/workbench/f/src/a.ts?tabs=f/src/a.ts~f/src/b.ts&side=git`
 
 // The `node` project has no `localStorage`; this mirrors the shim `workspace-cache.test.ts`
 // already installs rather than growing a second way to do the same thing.
@@ -74,15 +75,17 @@ describe('writeAddressCache', () => {
   })
 
   test('leaves an address with no query alone', () => {
-    writeAddressCache('/~repo/workbench/f/src/a.ts')
+    writeAddressCache(`/~${testWorkspaceToken('/repo')}/workbench/f/src/a.ts`)
 
-    expect(readAddressCache()).toBe('/~repo/workbench/f/src/a.ts')
+    expect(readAddressCache()).toBe(`/~${testWorkspaceToken('/repo')}/workbench/f/src/a.ts`)
   })
 
   test('keeps the fragment, which names the position', () => {
-    writeAddressCache('/~repo/workbench/f/src/a.ts?decode=diffusion#L21,9')
+    writeAddressCache(
+      `/~${testWorkspaceToken('/repo')}/workbench/f/src/a.ts?decode=diffusion#L21,9`,
+    )
 
-    expect(readAddressCache()).toBe('/~repo/workbench/f/src/a.ts#L21,9')
+    expect(readAddressCache()).toBe(`/~${testWorkspaceToken('/repo')}/workbench/f/src/a.ts#L21,9`)
   })
 })
 
@@ -149,7 +152,7 @@ describe('restoreAddressFromStorage', () => {
   test('leaves a URL that already names a place alone', () => {
     writeAddressCache(TABS)
 
-    expect(restoreAt('/~other/workbench/f/z.ts', '')).toBeNull()
+    expect(restoreAt(`/~${testWorkspaceToken('other')}/workbench/f/z.ts`, '')).toBeNull()
   })
 })
 

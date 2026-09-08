@@ -6,6 +6,7 @@ import { selectServerConnection } from '../../environments/state/store'
 import { orchestrationServerConfig } from '../../../test/orchestration-server-config'
 import { rpcClientFixture } from '../../../test/rpc-client'
 import { FakeOrchestrationSocket } from '../../../test/orchestration-socket'
+import { isOrchestrationRpcServerError } from '../orchestration-rpc-client'
 
 test('ready verifies a handshake without subscriptions or a global WebSocket', async () => {
   vi.stubGlobal('WebSocket', undefined)
@@ -150,11 +151,40 @@ test('a dropped command is rejected without opening another socket or resending'
   socket.open()
   await vi.waitFor(() => expect(socket.sent).toHaveLength(1))
   socket.serverClose({ code: 1006, wasClean: false })
-  expect(await result).toMatchObject({ code: 'ORCHESTRATION_WS_CLOSED' })
+  const failure = await result
+  expect(failure).toMatchObject({ code: 'ORCHESTRATION_WS_CLOSED' })
+  expect(isOrchestrationRpcServerError(failure)).toBe(false)
   await new Promise((resolve) => setTimeout(resolve, 20))
   expect(createSocket).toHaveBeenCalledTimes(1)
   expect(socket.sent).toHaveLength(1)
   fixture.client.close()
+})
+
+test('dispatch errors identify an authoritative server response without relying on its code', async () => {
+  const fixture = rpcClientFixture()
+  const result = fixture.client
+    .dispatchCommand({
+      type: 'project.create',
+      commandId: v.parse(commandIdSchema, 'core-rejected-command'),
+      defaultModelSelection: null,
+      title: 'Project',
+      workspaceRoot: '/project',
+    })
+    .catch((error: unknown) => error)
+  fixture.socket.open()
+  await vi.waitFor(() => expect(fixture.socket.sent).toHaveLength(1))
+  const request = v.parse(orchestrationWsClientMessageSchema, JSON.parse(fixture.socket.sent[0]!))
+  if (request.kind !== 'request') return expect.unreachable('Expected an RPC request')
+  fixture.socket.deliver({
+    kind: 'response',
+    requestId: request.requestId,
+    ok: false,
+    error: { message: 'Command rejected' },
+  })
+  const failure = await result
+  expect(failure).toMatchObject({ message: 'Command rejected' })
+  expect(isOrchestrationRpcServerError(failure)).toBe(true)
+  expect(isOrchestrationRpcServerError({ message: 'Command rejected' })).toBe(false)
 })
 
 async function subscriptionMessage(socket: FakeOrchestrationSocket) {

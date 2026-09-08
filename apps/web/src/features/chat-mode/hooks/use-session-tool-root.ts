@@ -1,6 +1,6 @@
 import { createClientInvariantError } from '@/lib/structured-errors'
 import { useActiveChatProjection } from '@/features/chat/hooks/use-active-projection'
-import { selectSessionOwnership } from '@/features/chat/state/chat-projection-selectors'
+import { selectSessionOwnership } from '@workspace/client-core/chat/selectors'
 import { useChatModeSession } from '@/features/chat-mode/providers/session-context'
 
 export function useSessionToolRoot() {

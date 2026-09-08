@@ -1,8 +1,10 @@
 import { createDefaultWorkbenchLayout } from '@/features/workbench/utils/layout'
 import { createDefaultChatModePanels } from '@/features/chat-mode/utils/panels'
 import { waitFor } from '@testing-library/react'
+import { symlink } from 'node:fs/promises'
 import path from 'node:path'
 import { renderWithProviders } from '../../../../test/render'
+import { TestEditorStateProvider } from '../../../../test/factories/editor-state-provider'
 
 import { expect, test } from '../../../../test/fixtures'
 import {
@@ -48,6 +50,25 @@ test('keeps a cached root folder that still exists and makes it the index scope'
     expect(info.workspaceIndex?.scanRoot).toBe(path.join(server.root, 'repo'))
   })
   expect(store.getState().rootFolder?.path).toBe('repo')
+  await waitFor(() =>
+    expect(store.getState().rootFolder?.workspaceAddress).toMatchObject({ path: 'repo' }),
+  )
+})
+
+test('restores a cached alias through the canonical workspace switch', async ({
+  client,
+  server,
+}) => {
+  void client
+  await ensureFolderPath('actual')
+  await symlink('actual', path.join(server.root, 'alias'))
+  const store = storeWithRoot(pickedDirectory('alias'))
+
+  renderValidation(store)
+
+  await waitFor(() => expect(store.getState().rootFolder?.path).toBe('actual'))
+  expect(store.getState().rootFolder?.workspaceAddress?.path).toBe('actual')
+  expect(store.getState().parkedWorkspaces.has('alias')).toBe(true)
 })
 
 function pickedDirectory(path: string): PickedFsEntry {
@@ -77,9 +98,11 @@ function storeWithRoot(rootFolder: PickedFsEntry) {
 
 function renderValidation(store: ReturnType<typeof storeWithRoot>) {
   return renderWithProviders(
-    <EditorWorkspaceStateContext.Provider value={store}>
-      <RootValidation />
-    </EditorWorkspaceStateContext.Provider>,
+    <TestEditorStateProvider>
+      <EditorWorkspaceStateContext.Provider value={store}>
+        <RootValidation />
+      </EditorWorkspaceStateContext.Provider>
+    </TestEditorStateProvider>,
   )
 }
 

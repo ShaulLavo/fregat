@@ -20,6 +20,15 @@ export function unavailableEnvironment(entry: EnvironmentEntry | undefined) {
   return entry
 }
 
+export function hasConnectionNotice(
+  entry: Pick<EnvironmentEntry, 'phase' | 'lastErrorAt' | 'connectedAt'>,
+) {
+  if (entry.phase === 'live') return false
+  if (entry.phase === 'blocked' || entry.phase === 'identity-drift') return true
+  if (entry.phase === 'reconnecting') return true
+  return entry.lastErrorAt !== null || entry.connectedAt !== null
+}
+
 export function createMachineUnavailableError(entry: EnvironmentEntry) {
   const machine = entry.label ?? entry.name
   const definition = availabilityErrors.MACHINE_UNAVAILABLE

@@ -10,9 +10,10 @@ is the Platform executable-plan inventory. Strategy documents under `docs/` desc
 but do not authorize implementation. A completed executable plan is deleted after its checks pass;
 Git history is the archive.
 
-The [Editor backlog](../Editor/plans/README.md) contains 30 scoped proposals from its 22-topic
+The [Editor backlog](../Editor/plans/README.md) contains 30 stable entries from its 22-topic
 wishlist. Its suggested order is advisory; promote selected work into this execution roadmap
-when scheduled. The backlog also links the existing Plan 071 syntax-retry proposal.
+when scheduled. Completed entries link to permanent references. The backlog also links the
+existing Plan 071 syntax-retry proposal.
 
 ## Verified completed foundations
 
@@ -119,11 +120,41 @@ browser-visible host paths, or cold-start reads triggered by a disabled workbenc
 
 ## Ordered Platform editor lane
 
+Editor E002 is complete as of 2026-09-07. Correlated input diagnostics, bounded source-range
+indexing, and stale secondary-work guards are live. Three fresh controls calibrated the
+[local browser gate](../Editor/examples/stress/results/input-latency/README.md): the optimized candidate
+and independent unchanged run pass all 108 blocking limits, and a real 20 ms delay fails all 36
+synchronous input groups. Screenshot timing is advisory, with one excess retained. Mounted geometry
+buffers and chunk reuse reduce long-line multiple-view p95 from 4.1 to 2.7 ms for typing and 9.8 to
+6.9 ms for paste. The calibration uses observed control ranges and preserves previous failures.
+The [measurement reference](../Editor/docs/performance/input-latency.md) records the contracts
+and reference limits. The completed executable plan has been deleted.
+
 Plans 056 and 057 are complete. Standalone Editor executes default and custom chords, and
 Platform uses the shared runtime with its command-bus and terminal ownership policies intact.
 Default and VS Code presets, conditional bindings, and Settings resolution diagnostics are wired.
 
 See [Plan 057 delivery](plans/057-delivery.md) for the paired revision, verification, and boundaries.
+
+[Plan 080](plans/080-platform-keybinding-modes.md) is the proposed follow-up for Platform and VS Code
+keyboard modes across the app. Platform defaults start from VS Code bindings and document intentional
+differences. Whole-sidebar Cmd+B is the first milestone. Editor tabs and chats share navigation keys,
+while numbered panel shortcuts use a separate combination. Held-modifier hints follow the matching
+targets. Interaction rules are confirmed; the exact keys remain proposed. Implementation follows
+the delivered shared runtime and has not started.
+
+## Instant workspace reload
+
+[Plan 085](plans/085-instant-workspace-reload.md) is proposed and implementation has not started.
+It follows the existing environment, workspace-address, settings-admission, and Editor paint
+foundations. Its internal order is calibrated browser proof and budgets, synchronous bootstrap,
+tree/settings, Git/diff, search/chat, continuous native handoff, remaining visible tools, and
+complete reload verification. The first complete slice is bootstrap plus tree and settings.
+
+Editor/diff paint and Ghostty terminal viewport replay stay with their package owners. If a required
+native contract is absent, record that package dependency before implementing its host integration.
+The plan remains incomplete until the visible terminal and all other scoped panes pass. This
+proposal does not reorder Plan 080 or the existing TUI and Ghostty lanes.
 
 ## Environments lane (foundation completed 2026-09-05)
 
@@ -174,9 +205,23 @@ pass all 152 TUI tests, including native dialog regressions, concurrent-process 
 shutdown cleanup. Real PTY tests cover the launcher, external editing, suspend/resume, signals,
 and terminal restoration. The original completion also verified eight client-core tests and
 affected web checks. TUI build and affected typechecks pass.
-Agent view, workbench, and distribution follow [the TUI strategy](docs/tui-plan.md). The
-terminal/editor feasibility proofs remain prerequisites for workbench integration.
-This lane preserves concurrent environment and terminal changes.
+Plan 081 is complete (2026-09-07) and its executable plan is deleted. The
+[workbench record](docs/tui-workbench.md) covers files, syntax and LSP, external editing with
+durable conflict drafts, Git and diffs, search and replacement, logs, terminals, raw attach,
+and persisted navigation. Review fixes cover all eight reproduced findings, including wrong-file
+writes, rolled-back draft loss, and palette input reaching the shell during resize. The full
+234-test TUI suite, build, lint, and client-core typecheck pass.
+Native Neovim and host PTY checks prove resize, detach, and terminal restoration. The
+[terminal](docs/tui-research/terminal-feasibility.md) and
+[tokenizer](docs/tui-research/viewer-feasibility.md) records preserve the feasibility results.
+Plan 082 is complete (2026-09-07) and its executable plan is deleted. The
+[Agent view record](docs/tui-agent.md) covers the shared chat runtime, prompt and streamed timeline,
+rail and provider management, approvals, questions, plans, terminal context, and Claude terminal
+resume with safe history return. All 282 TUI tests pass, alongside 58 terminal/provider tests and
+168 migrated web logic tests. TUI and server builds, affected typechecks, lint, and formatting pass.
+The existing server was rebuilt and restarted; the desktop TUI connects live with a visible prompt.
+Worktree parity (083) and distribution (084) follow [the TUI strategy](docs/tui-plan.md).
+This lane preserves concurrent environment changes.
 
 Platform now uses `@workspace/pty` directly, with binary terminal input, output, and replay.
 The Node bridge and its dependency are removed. The [terminal reference](docs/terminal.md)

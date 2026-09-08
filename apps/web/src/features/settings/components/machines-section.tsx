@@ -10,7 +10,7 @@ export function MachinesSection({ disabled }: { readonly disabled: boolean }) {
   const [adding, setAdding] = useState(false)
 
   return (
-    <div className='flex w-full min-w-0 flex-col gap-3 sm:w-[min(32rem,45vw)]'>
+    <div className='flex w-full min-w-0 flex-col gap-3 @3xl/settings:w-[min(32rem,45vw)]'>
       <p className='text-muted-foreground text-xs'>
         Connecting a machine is equivalent to handing it a root shell as your user, in both
         directions.

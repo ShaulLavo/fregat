@@ -5,8 +5,8 @@ import type {
 } from '@workspace/contracts'
 import { createContext } from 'react'
 
-import type { PendingApproval } from '@/features/chat/utils/pending-approvals'
-import type { PendingUserInput } from '@/features/chat/utils/pending-user-input'
+import type { PendingApproval } from '@workspace/client-core/chat/pending-approvals'
+import type { PendingUserInput } from '@workspace/client-core/chat/pending-user-input'
 
 /**
  * The requests currently blocking the active session, plus the two actions that

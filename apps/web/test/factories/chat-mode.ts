@@ -1,12 +1,12 @@
-import { createInitialChatProjectionSlice } from '@/features/chat/state/chat-projection-store'
-import { syncChatProjectionShellSnapshot } from '@/features/chat/state/chat-projection-writers'
+import { createInitialChatProjectionSlice } from '@workspace/client-core/chat/types'
+import { syncChatProjectionShellSnapshot } from '@workspace/client-core/chat/writers'
 import {
   selectChatProjects,
   selectChatSessions,
   selectChatWorktrees,
-} from '@/features/chat/state/chat-projection-selectors'
-import type { ChatProjectionSlice } from '@/features/chat/state/chat-projection-store'
-import type { SessionRailEnvironment } from '@/features/chat-mode/utils/session-rail-model'
+} from '@workspace/client-core/chat/selectors'
+import type { ChatProjectionSlice } from '@workspace/client-core/chat/types'
+import type { SessionRailEnvironment } from '@workspace/client-core/chat/rail/model'
 import { sessionShell, shellSnapshot, TEST_ENVIRONMENT_ID } from './chat'
 
 export function railEnvironment(

@@ -5,7 +5,7 @@ import {
   contextUsageTone,
   formatContextTokens,
   type ContextUsage,
-} from '@/features/chat/utils/context-usage'
+} from '@workspace/client-core/chat/context-usage'
 
 const RADIUS = 7
 const CIRCUMFERENCE = 2 * Math.PI * RADIUS

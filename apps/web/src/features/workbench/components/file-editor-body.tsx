@@ -5,6 +5,7 @@ import { CompareSavedView } from '@/features/editor/components/compare-saved-vie
 import { parseCompareSavedDocumentId } from '@/features/editor/utils/compare-saved-document'
 import { Editor } from '@/features/editor/components/editor'
 import { useEditorColorTheme } from '@/features/editor/hooks/use-editor-color-theme'
+import { useSettingValue } from '@/features/settings/hooks/use-setting-value'
 import { LanguageServerReferencesPane } from '@/features/editor/components/language-server-references-pane'
 import type { EditorRenderDocument } from '@/features/editor/utils/render-document'
 import { DiffView } from '@/features/git/components/diff-view'
@@ -46,6 +47,7 @@ export function FileEditorBody({
   tabId: string
 }) {
   const { storage } = useEditorRuntime()
+  const indentationGuidesEnabled = useSettingValue('editor.guides.indentation')
   const actions = useEditorSurfaceActions()
   const { service: fileOpenIntent } = useFileOpenIntent()
   // Neither a diff nor a compare document is file-backed, so neither can own a live editor
@@ -119,7 +121,7 @@ export function FileEditorBody({
         }
       >
         <div
-          className='relative min-h-0 min-w-0 overflow-hidden'
+          className='relative min-h-0 min-w-0 overflow-hidden has-[>[data-editor-visible-snapshot]:not([hidden])]:[&>[data-editor-focus-active]]:opacity-0'
           onFocusCapture={dismissVisibleSnapshot}
           onKeyDownCapture={dismissVisibleSnapshot}
           onPointerDownCapture={dismissVisibleSnapshot}
@@ -150,6 +152,7 @@ export function FileEditorBody({
           />
           {visibleSnapshot.record ? (
             <EditorVisibleSnapshot
+              indentationGuidesEnabled={indentationGuidesEnabled}
               overlayRef={visibleSnapshot.overlayRef}
               record={visibleSnapshot.record}
             />
@@ -188,6 +191,7 @@ export function FileEditorBody({
         onWheelCapture={dismissVisibleSnapshot}
       >
         <EditorVisibleSnapshot
+          indentationGuidesEnabled={indentationGuidesEnabled}
           overlayRef={visibleSnapshot.overlayRef}
           record={visibleSnapshot.record}
         />

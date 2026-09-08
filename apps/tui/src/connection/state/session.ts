@@ -1,3 +1,4 @@
+import { createChatOwner, type ChatOwner } from '@workspace/client-core/chat/owner'
 import { readEnvironmentDescriptor } from '@workspace/client-core/environments/descriptor'
 import { createEnvironmentsStore } from '@workspace/client-core/environments/state/store'
 import { readSettings } from '@workspace/client-core/settings/read'
@@ -11,6 +12,9 @@ import type { HealthDescriptor, SettingsSnapshot } from '@workspace/contracts'
 
 import { connectionFailure, type ConnectionFailure } from '@/connection/utils/failure'
 import { openFileStorage, type FileStorage } from '@/storage/files'
+import type { ServiceSocket } from '@/connection/utils/service-socket'
+import { ensureWorktree } from '@/connection/state/worktree'
+import { createTuiError } from '@/host/utils/structured-errors'
 
 export type SessionState =
   | { readonly kind: 'loading' }
@@ -20,6 +24,7 @@ export type SessionState =
       readonly descriptor: HealthDescriptor
       readonly settings: SettingsSnapshot
       readonly owner: SettingsOwner
+      readonly chat: ChatOwner
       readonly storage: Awaited<ReturnType<typeof openFileStorage>>
       readonly connection:
         | { readonly kind: 'live' }
@@ -31,6 +36,7 @@ type SessionOptions = Pick<OrchestrationRpcClientOptions, 'createSocket' | 'obse
   readonly client: Client
   readonly storageDirectory: string
   readonly record?: (event: Record<string, unknown>) => void
+  readonly createServiceSocket?: (url: string) => ServiceSocket
 }
 
 export type SettingsSession = ReturnType<typeof createSettingsSession>
@@ -44,6 +50,7 @@ export function createSettingsSession(options: SessionOptions) {
   let current: AbortController | null = null
   let currentRpc: OrchestrationRpcClient | null = null
   let currentOwner: SettingsOwner | null = null
+  let currentChat: ChatOwner | null = null
   let storage: ReturnType<typeof openFileStorage> | null = null
   let savedStorage: FileStorage | null = null
 
@@ -56,6 +63,7 @@ export function createSettingsSession(options: SessionOptions) {
   async function refresh() {
     if (lifetime.signal.aborted) return
     current?.abort()
+    currentChat?.dispose()
     currentRpc?.close()
     currentOwner?.dispose()
     const controller = new AbortController()
@@ -108,6 +116,9 @@ export function createSettingsSession(options: SessionOptions) {
         record: options.record,
       })
       currentOwner = owner
+      const chat = createChatOwner({ client: options.client, rpc, record: options.record })
+      currentChat = chat
+      controller.signal.addEventListener('abort', () => chat.dispose(), { once: true })
       controller.signal.addEventListener('abort', () => owner.dispose(), { once: true })
       owner.subscribe(() => {
         if (controller.signal.aborted || state.kind !== 'ready') return
@@ -118,10 +129,12 @@ export function createSettingsSession(options: SessionOptions) {
         descriptor,
         settings,
         owner,
+        chat,
         storage: saved,
         connection: { kind: 'live' },
       })
       owner.start()
+      chat.start()
       options.record?.({
         origin,
         outcome: 'live',
@@ -131,6 +144,7 @@ export function createSettingsSession(options: SessionOptions) {
       })
     } catch (error) {
       if (controller.signal.aborted) return
+      currentChat?.dispose()
       currentRpc?.close()
       const failure = connectionFailure(error)
       publish({ kind: 'failed', failure })
@@ -146,6 +160,7 @@ export function createSettingsSession(options: SessionOptions) {
   function disconnected(controller: AbortController, error: unknown) {
     if (controller.signal.aborted || lifetime.signal.aborted || state.kind !== 'ready') return
     currentOwner?.pause()
+    currentChat?.dispose()
     publish({ ...state, connection: { kind: 'offline', failure: connectionFailure(error) } })
   }
 
@@ -153,6 +168,29 @@ export function createSettingsSession(options: SessionOptions) {
     origin,
     signal: lifetime.signal,
     client: options.client,
+    createServiceSocket(url: string) {
+      lifetime.signal.throwIfAborted()
+      if (!options.createServiceSocket)
+        throw createTuiError(
+          'Service sockets are unavailable.',
+          'Provide a service socket factory to this TUI host.',
+        )
+      return options.createServiceSocket(url)
+    },
+    async ensureWorktree(rootPath: string) {
+      lifetime.signal.throwIfAborted()
+      if (!currentRpc || state.kind !== 'ready' || state.connection.kind !== 'live')
+        throw createTuiError(
+          'The environment is disconnected.',
+          'Reconnect before opening a terminal.',
+        )
+      return ensureWorktree({
+        client: options.client,
+        rpc: currentRpc,
+        rootPath,
+        signal: lifetime.signal,
+      })
+    },
     record: (event: Record<string, unknown>) => options.record?.(event),
     refresh,
     getSnapshot: () => state,
@@ -166,6 +204,7 @@ export function createSettingsSession(options: SessionOptions) {
       if (lifetime.signal.aborted) return
       lifetime.abort()
       current?.abort()
+      currentChat?.dispose()
       currentRpc?.close()
       currentOwner?.dispose()
       listeners.clear()

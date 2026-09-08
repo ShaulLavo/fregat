@@ -1,7 +1,7 @@
 import { EmptyState } from '@workspace/ui/components/empty-state'
 import { LoadingState } from '@workspace/ui/components/loading-state'
 import { OrbitLoader } from '@workspace/ui/components/orbit-loader'
-import type { SessionRailView } from '@/features/chat-mode/utils/session-rail-model'
+import type { SessionRailView } from '@workspace/client-core/chat/rail/model'
 
 export function SessionRailEmpty({
   query,

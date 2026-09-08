@@ -1,5 +1,21 @@
 # VS Code keymap development status
 
+## Proposed keyboard modes
+
+[Plan 080](../plans/080-platform-keybinding-modes.md) preserves VS Code parity as a selectable mode
+and defines Platform defaults based on it. The existing preset selector currently changes editor
+packs; the proposal extends it to workspace commands. Proposed behavior is not shipped behavior.
+
+Its first milestone makes Cmd+B toggle the entire sidebar while preserving the selected panel.
+VS Code already toggles the whole primary sidebar; Platform's current Files-specific handler is a
+mismatch. Confirmed Platform rules keep Cmd+B on the current screen, toggle a visible panel when
+its shortcut repeats, and use the same navigation keys for editor tabs and chats. Panel shortcuts
+use a separate combination. Proposed keys are Cmd+1–9 for tabs or chats, Cmd+Option+[ and ] for
+previous and next, and Cmd+Option+1–9 for panels. Held-modifier hints identify the matching targets.
+The plan records host-conflict checks and the pinned T3 Code reference.
+
+## Existing implementation record
+
 Last reviewed: 2026-09-05. Plan 056 is implemented and verified through focused tests and trusted browser input.
 
 Platform supports a subset of VS Code defaults. The command table defines the available commands,

@@ -1,0 +1,7 @@
+Wallpaper: 1-eyes-wide.jpg, bundled with Omarchy's Last Horizon theme.
+Theme author: HANCORE.
+Omarchy source: https://github.com/omacom/omarchy/tree/quattro/themes/last-horizon/backgrounds
+Theme repository: https://github.com/HANCORE-linux/omarchy-lasthorizon-theme
+The original image artist is not identified in the sources checked.
+
+wallpaper.jpg is an unchanged copy of the desktop selection on 2026-09-07.

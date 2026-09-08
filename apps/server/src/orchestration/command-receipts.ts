@@ -174,6 +174,7 @@ export function commandAggregate(command: ReceiptCommand) {
     case 'session.deletion.update':
     case 'session.discover':
     case 'session.discovery-metadata.update':
+    case 'session.terminal-history.append':
     case 'session.history.import':
     case 'session.interaction-mode.set':
     case 'session.message.assistant.complete':

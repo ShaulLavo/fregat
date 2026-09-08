@@ -23,7 +23,7 @@ describe('DiagnosticPeek', () => {
     )
 
     expect(screen.getByRole('dialog', { name: 'Error diagnostic' })).toHaveClass(
-      'surface-vibrancy',
+      'bg-popover-solid',
       'max-h-[calc(100%-1rem)]',
       'overflow-y-auto',
     )

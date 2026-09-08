@@ -12,15 +12,15 @@ import type { ChatTransport } from '@/features/chat/transport/chat-transport'
 import {
   createApprovalRespondCommand,
   createUserInputRespondCommand,
-} from '@/features/chat/utils/command-builders'
+} from '@workspace/client-core/chat/commands'
 import { dispatchChatCommand } from '@/features/chat/utils/command-dispatch'
 import {
   ChatPendingRequestsContext,
   type ChatPendingRequests,
 } from '@/features/chat/providers/pending-requests-context'
-import { selectChatSessionById } from '@/features/chat/state/chat-projection-selectors'
-import { derivePendingApprovals } from '@/features/chat/utils/pending-approvals'
-import { derivePendingUserInputs } from '@/features/chat/utils/pending-user-input'
+import { selectChatSessionById } from '@workspace/client-core/chat/selectors'
+import { derivePendingApprovals } from '@workspace/client-core/chat/pending-approvals'
+import { derivePendingUserInputs } from '@workspace/client-core/chat/pending-user-input'
 
 type DispatchCommand = ChatTransport['dispatchCommand']
 type RespondingRequestIds = ReadonlySet<ApprovalRequestId>

@@ -20,7 +20,7 @@ import { transportFor, closeChatTransports } from '@/features/chat/state/active-
 import { writeBootMirror } from '@/features/settings/utils/boot-mirror'
 import { createBootRuntime } from '@/state/bootstrap-runtime'
 import { currentRailEnvironments } from '@/features/chat-mode/state/rail-environments'
-import { sessionRailModel } from '@/features/chat-mode/utils/session-rail-model'
+import { sessionRailModel } from '@workspace/client-core/chat/rail/model'
 import { createInProcessClient } from '../../../../test/client'
 import { registerFederatedProject } from '../../../../test/factories/federation'
 import { expect, test } from '../../../../test/fixtures'

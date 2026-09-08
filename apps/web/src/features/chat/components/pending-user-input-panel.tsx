@@ -16,7 +16,7 @@ import {
   type PendingUserInput,
   type UserInputAnswerDraft,
   type UserInputAnswerDrafts,
-} from '@/features/chat/utils/pending-user-input'
+} from '@workspace/client-core/chat/pending-user-input'
 
 /**
  * The prompt the agent is currently waiting on. Only the oldest is rendered:

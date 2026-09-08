@@ -30,7 +30,7 @@ export function EnumWidget({
       }}
       value={value}
     >
-      <SelectTrigger className='w-44' id={id}>
+      <SelectTrigger className='w-44 @max-3xl/settings:w-full' id={id}>
         <SelectValue />
       </SelectTrigger>
       <SelectContent>

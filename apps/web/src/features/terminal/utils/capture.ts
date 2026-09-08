@@ -2,7 +2,7 @@ import {
   normalizeTerminalContextSelection,
   normalizeTerminalContextText,
   type TerminalContextSelection,
-} from '@/features/chat/utils/terminal-context'
+} from '@workspace/client-core/chat/terminal-context'
 
 /**
  * The slice of ghostty's `Terminal` a capture needs. Structural rather than the

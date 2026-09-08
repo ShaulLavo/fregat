@@ -10,12 +10,20 @@ test('edits a setting through real keyboard input and restores settings search',
 }) => {
   const session = createTestSettingsSession(server)
   await session.refresh()
-  const frame = await testRender(<Application session={session} onExit={() => {}} noColor />, {
-    width: 110,
-    height: 32,
-    useThread: false,
-    kittyKeyboard: true,
-  })
+  const frame = await testRender(
+    <Application
+      initialLocation={{ kind: 'settings', query: '' }}
+      session={session}
+      onExit={() => {}}
+      noColor
+    />,
+    {
+      width: 110,
+      height: 32,
+      useThread: false,
+      kittyKeyboard: true,
+    },
+  )
   try {
     await act(async () => {
       await frame.mockInput.typeText('editor.fontSize')
@@ -54,12 +62,20 @@ test('edits a setting through real keyboard input and restores settings search',
 test('palette editing returns to the settings list that invoked it', async ({ server }) => {
   const session = createTestSettingsSession(server)
   await session.refresh()
-  const frame = await testRender(<Application session={session} onExit={() => {}} noColor />, {
-    width: 110,
-    height: 32,
-    useThread: false,
-    kittyKeyboard: true,
-  })
+  const frame = await testRender(
+    <Application
+      initialLocation={{ kind: 'settings', query: '' }}
+      session={session}
+      onExit={() => {}}
+      noColor
+    />,
+    {
+      width: 110,
+      height: 32,
+      useThread: false,
+      kittyKeyboard: true,
+    },
+  )
   try {
     await act(async () => {
       await frame.mockInput.typeText('editor.fontSize')

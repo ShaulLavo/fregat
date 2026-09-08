@@ -14,6 +14,7 @@ export const editorCommandMetadata = {
     vscodeCommandIds: ['redo'],
   }),
   find: defineEditorMetadata({
+    keys: [{ chord: ['Control+F'], platforms: ['tui'] }],
     id: 'find',
     undoCategory: 'view-only',
     title: 'Find',
@@ -26,18 +27,21 @@ export const editorCommandMetadata = {
     vscodeCommandIds: ['editor.action.startFindReplaceAction'],
   }),
   findNext: defineEditorMetadata({
+    keys: [{ chord: ['F3'], platforms: ['tui'] }],
     id: 'findNext',
     undoCategory: 'view-only',
     title: 'Find next',
     vscodeCommandIds: ['editor.action.nextMatchFindAction'],
   }),
   findPrevious: defineEditorMetadata({
+    keys: [{ chord: ['Shift+F3'], platforms: ['tui'] }],
     id: 'findPrevious',
     undoCategory: 'view-only',
     title: 'Find previous',
     vscodeCommandIds: ['editor.action.previousMatchFindAction'],
   }),
   goToDefinition: defineEditorMetadata({
+    keys: [{ chord: ['F12'], platforms: ['tui'] }],
     id: 'goToDefinition',
     undoCategory: 'view-only',
     title: 'Go to definition',
@@ -72,6 +76,7 @@ export const editorCommandMetadata = {
     vscodeCommandIds: ['editor.action.revealDefinitionAside'],
   }),
   'editor.action.showHover': defineEditorMetadata({
+    keys: [{ chord: ['Control+K', 'H'], platforms: ['tui'] }],
     id: 'editor.action.showHover',
     undoCategory: 'view-only',
     title: 'Show hover',

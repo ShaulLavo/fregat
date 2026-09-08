@@ -1,6 +1,7 @@
+import { getClient } from '@/lib/client'
 import type { WorkspaceSearchEvent, WorkspaceSearchQuery } from '@workspace/contracts'
 import type { FindMatch, FsEntry, SearchScope } from '@/lib/file-system-types'
-import { streamWorkspaceSearch } from '@/lib/workspace-search-client'
+import { streamWorkspaceSearch } from '@workspace/client-core/files/search-client'
 
 import {
   ROOT_PATH,
@@ -38,7 +39,8 @@ export async function streamPickerSearchEntries(
   onEntries: (entries: FsEntry[]) => void,
   options: StreamPickerSearchOptions = {},
 ): Promise<FsEntry[]> {
-  const search = options.search ?? streamWorkspaceSearch
+  const search =
+    options.search ?? ((query, signal) => streamWorkspaceSearch(query, signal, getClient()))
   const showHidden = options.showHidden ?? false
   const scopeTimeoutMs = options.scopeTimeoutMs ?? SEARCH_SCOPE_TIMEOUT_MS
   const matches: FindMatch[] = []

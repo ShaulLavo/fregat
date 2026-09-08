@@ -10,7 +10,7 @@ import {
   hasNonZeroChatTurnDiffStat,
   type ChatTurnDiffTreeNode,
 } from '@/features/chat/utils/turn-diff-tree'
-import type { ChatTurnDiffSummary } from '../state/chat-projection-store'
+import type { ChatTurnDiffSummary } from '@workspace/client-core/chat/types'
 import { ChatDiffStatLabel } from './chat-diff-stat-label'
 
 const EMPTY_DIRECTORY_OVERRIDES: Record<string, boolean> = {}

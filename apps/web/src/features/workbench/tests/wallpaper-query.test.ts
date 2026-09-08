@@ -1,11 +1,17 @@
 import { QueryClient } from '@tanstack/react-query'
 import { expect, test } from '../../../../test/fixtures'
 import { registerEnvironmentQueryClient } from '@/lib/environments/state/query-clients'
+import { primaryServerOrigin, serverEndpoint } from '@/lib/client'
 import {
   wallpaperInfoQueryOptions,
   wallpaperMediaQueryOptions,
-  wallpaperStillQueryOptions,
+  wallpaperStillUrl,
 } from '@/features/workbench/state/wallpaper-query'
+
+test('the first still image has a stable browser-cacheable primary endpoint', () => {
+  const primary = primaryServerOrigin()
+  expect(wallpaperStillUrl(primary)).toBe(`${serverEndpoint(primary)}/wallpaper/still`)
+})
 
 test('a remote workbench returns the bundled fallback without fetching remote wallpaper', async ({
   client,
@@ -16,7 +22,7 @@ test('a remote workbench returns the bundled fallback without fetching remote wa
     await expect(
       queryClient.fetchQuery(wallpaperInfoQueryOptions({ enabled: true })),
     ).resolves.toBe('image')
-    await expect(queryClient.fetchQuery(wallpaperStillQueryOptions())).resolves.toBeNull()
+    expect(wallpaperStillUrl('http://localhost:39078')).toBeNull()
     await expect(
       queryClient.fetchQuery(wallpaperMediaQueryOptions({ enabled: true })),
     ).resolves.toBeNull()

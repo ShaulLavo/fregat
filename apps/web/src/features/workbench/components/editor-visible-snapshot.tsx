@@ -1,4 +1,5 @@
 import { applyEditorTheme } from '@singapor/core'
+import { cn } from '@workspace/ui/lib/utils'
 import type { CSSProperties, RefObject } from 'react'
 import { useLayoutEffect, useRef } from 'react'
 
@@ -8,14 +9,20 @@ import {
   editorVisibleSnapshotSegments,
 } from '@/features/workbench/utils/editor-visible-snapshot'
 import type { CachedEditorVisibleSnapshot } from '@/lib/editor-visible-snapshot-cache'
+import { EditorVisiblePaintLayers } from '@/features/workbench/components/editor-visible-paint-layers'
 
 type EditorVisibleSnapshotProps = {
+  readonly indentationGuidesEnabled: boolean
   readonly overlayRef: RefObject<HTMLDivElement | null>
   readonly record: CachedEditorVisibleSnapshot
 }
 
 /** A bounded, inert copy of the last mounted editor paint. It never feeds the live editor. */
-export function EditorVisibleSnapshot({ overlayRef, record }: EditorVisibleSnapshotProps) {
+export function EditorVisibleSnapshot({
+  indentationGuidesEnabled,
+  overlayRef,
+  record,
+}: EditorVisibleSnapshotProps) {
   const themeRef = useRef<HTMLDivElement>(null)
   const { snapshot } = record
   const rowHeight = snapshot.metrics.rowHeight
@@ -69,28 +76,23 @@ export function EditorVisibleSnapshot({ overlayRef, record }: EditorVisibleSnaps
               ) : null}
               {snapshot.gutterLayout.lanes.map((lane) => {
                 const cursorLine = row.gutterCursorLineBackgroundLaneIds.includes(lane.id)
-                const laneClassName = cursorLine
-                  ? 'editor-virtualized-gutter-cell editor-virtualized-cursor-line-gutter'
-                  : 'editor-virtualized-gutter-cell'
+                const lineNumber = lane.id === 'line-gutter' && row.firstWrapSegment
 
                 return (
                   <span
-                    className={laneClassName}
+                    className={cn(
+                      'editor-virtualized-gutter-cell',
+                      cursorLine && 'editor-virtualized-cursor-line-gutter',
+                      lineNumber && 'editor-virtualized-gutter-label',
+                      lineNumber &&
+                        row.gutterNumberCursorLine &&
+                        'editor-virtualized-line-number-active',
+                    )}
                     data-editor-visible-gutter-lane={lane.id}
                     key={lane.id}
                     style={{ width: lane.width }}
                   >
-                    {lane.id === 'line-gutter' && row.firstWrapSegment ? (
-                      <span
-                        className={
-                          row.gutterNumberCursorLine
-                            ? 'editor-virtualized-gutter-label editor-virtualized-line-number-active w-full tabular-nums'
-                            : 'editor-virtualized-gutter-label w-full tabular-nums'
-                        }
-                      >
-                        {row.bufferRow + 1}
-                      </span>
-                    ) : null}
+                    {lineNumber ? row.bufferRow + 1 : null}
                     {lane.id === 'fold-gutter' && row.firstWrapSegment && row.foldMarker ? (
                       <span
                         className='editor-virtualized-fold-toggle app-fold-gutter-icon'
@@ -167,6 +169,10 @@ export function EditorVisibleSnapshot({ overlayRef, record }: EditorVisibleSnaps
             ) : null}
           </div>
         ))}
+        <EditorVisiblePaintLayers
+          indentationGuidesEnabled={indentationGuidesEnabled}
+          snapshot={snapshot}
+        />
       </div>
     </div>
   )

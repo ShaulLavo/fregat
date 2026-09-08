@@ -5,7 +5,11 @@ import '@singapor/gutters/style.css'
 import {
   createEditorTextBuffer,
   createEditorViewSession,
+  type EditorPlugin,
+  type EditorPluginContext,
   type EditorTextBuffer,
+  type EditorViewContributionProvider,
+  type EditorViewSnapshot,
 } from '@singapor/core'
 import { Editor as CoreEditor } from '@singapor/core/editor'
 import { createFoldGutterPlugin, createLineGutterPlugin } from '@singapor/gutters'
@@ -36,6 +40,7 @@ import {
 import { useSelectedFile } from '@/features/workspace/hooks/use-selected-file'
 import { statPath } from '@/lib/file-server'
 import type { FileResult } from '@/lib/file-system-types'
+import { fileSystemKeys } from '@/lib/query-keys'
 import {
   readEditorVisibleSnapshotCache,
   writeEditorVisibleSnapshotCache,
@@ -83,7 +88,10 @@ test('cached paint matches live editor geometry, glass, active gutter, and synta
     },
     defaultText: `${'const\tvalue '.repeat(80)}\nsecond`,
     lineHeight: 20,
-    plugins: [createLineGutterPlugin(), createFoldGutterPlugin()],
+    plugins: [
+      createLineGutterPlugin({ labelForRow: ({ bufferRow }) => bufferRow + 1 }),
+      createFoldGutterPlugin(),
+    ],
     tabSize: 2,
     theme: record.snapshot.theme ?? undefined,
   })
@@ -117,7 +125,11 @@ test('cached paint matches live editor geometry, glass, active gutter, and synta
   const replayHost = editorHost()
   workspace.append(replayHost)
   root = createRoot(replayHost)
-  flushSync(() => root?.render(<EditorVisibleSnapshot overlayRef={createRef()} record={record} />))
+  flushSync(() =>
+    root?.render(
+      <EditorVisibleSnapshot indentationGuidesEnabled overlayRef={createRef()} record={record} />,
+    ),
+  )
 
   const overlay = await elementWithin(replayHost, '[data-editor-visible-snapshot]')
   const replaySurface = await elementWithin(replayHost, '.editor-virtualized')
@@ -160,6 +172,34 @@ test('cached paint matches live editor geometry, glass, active gutter, and synta
   expect(getComputedStyle(replayInactiveNumber).color).toBe(
     getComputedStyle(liveInactiveNumber).color,
   )
+  for (const { live, replay, text } of [
+    { live: liveActiveNumber, replay: replayActiveNumber, text: '1' },
+    { live: liveInactiveNumber, replay: replayInactiveNumber, text: '2' },
+  ]) {
+    const liveStyle = getComputedStyle(live)
+    const replayStyle = getComputedStyle(replay)
+    expect(['flex', 'inline-flex']).toContain(liveStyle.display)
+    expect(liveStyle.justifyContent).toBe('flex-end')
+    expect(replayStyle.display).toBe(liveStyle.display)
+    expect(replayStyle.justifyContent).toBe(liveStyle.justifyContent)
+    expect(replayStyle.paddingLeft).toBe(liveStyle.paddingLeft)
+    expect(replayStyle.paddingRight).toBe(liveStyle.paddingRight)
+    expect(live.textContent).toBe(text)
+    expect(replay.textContent).toBe(text)
+
+    const liveTextRange = document.createRange()
+    liveTextRange.selectNodeContents(live)
+    const replayTextRange = document.createRange()
+    replayTextRange.selectNodeContents(replay)
+    const liveTextBounds = liveTextRange.getBoundingClientRect()
+    const replayTextBounds = replayTextRange.getBoundingClientRect()
+    expect(liveTextBounds.width).toBeGreaterThan(0)
+    expect(replayTextBounds.width).toBeCloseTo(liveTextBounds.width, 1)
+    expect(replayTextBounds.right - replayGutter.getBoundingClientRect().left).toBeCloseTo(
+      liveTextBounds.right - liveGutter.getBoundingClientRect().left,
+      1,
+    )
+  }
   expect(getComputedStyle(replaySyntax).color).toBe(getComputedStyle(syntaxProbe).color)
   expect(getComputedStyle(replayCursorLane).backgroundColor).toBe(
     getComputedStyle(liveCursorLane).backgroundColor,
@@ -187,29 +227,87 @@ test('cached paint matches live editor geometry, glass, active gutter, and synta
 })
 
 test(
-  'a real delayed file load replays cached paint until authoritative highlight or the fail-safe',
+  'the first render replays cached text and highlights before metadata or file content arrives',
   { timeout: 20_000 },
-  async () => {
+  async ({ onTestFinished }) => {
     const path = 'repo/src/editor-tab-a.ts'
     const rootPath = 'repo'
     const themeId = prepareRealFileTest()
-    const gate = installDelayedFileReadClient()
-    delayedFileRead = gate
     const record = await cachedSnapshotForExistingTarget(path, rootPath, themeId)
-    expect(writeEditorVisibleSnapshotCache(testScopedStorage, record).status).toBe('written')
+    const withGuides = structuredClone(record) as Mutable<CachedEditorVisibleSnapshot>
+    withGuides.snapshot.paintLayers = [
+      {
+        id: 'scope-lines',
+        rectangles: [
+          { left: 80, top: 10, width: 1, height: 30, backgroundColor: 'rgb(90, 90, 90)' },
+        ],
+      },
+    ]
+    expect(writeEditorVisibleSnapshotCache(testScopedStorage, withGuides).status).toBe('written')
+    const gate = installDelayedFileReadClient(undefined, { delayMetadata: true })
+    delayedFileRead = gate
+    const queryClient = createTestQueryClient()
 
-    const host = mountRealFileEditor(path, rootPath)
+    const host = mountRealFileEditor(path, rootPath, queryClient)
 
-    await expect.poll(gate.observedStatus).toBe(200)
-    const overlay = await element('[data-editor-visible-snapshot]')
-    const cachedText = overlay.textContent ?? ''
+    const overlay = host.querySelector<HTMLElement>('[data-editor-visible-snapshot]')
+    expect(overlay).not.toBeNull()
+    const cachedText = overlay?.textContent ?? ''
     expect(cachedText).toContain('const\tvalue')
     expect(cachedText).not.toContain('real browser fixture A')
+    const syntax = overlay?.querySelector<HTMLElement>(
+      '[data-editor-visible-row="0"] [data-editor-visible-chunk="0"] > span',
+    )
+    expect(syntax?.textContent).toBe('const')
+    expect(syntax?.style.color).toBe('var(--editor-syntax-keyword)')
+    const guide = overlay?.querySelector<HTMLElement>(
+      '[data-editor-visible-paint-layer="scope-lines"] [data-editor-visible-paint-rectangle]',
+    )
+    expect(guide).not.toBeNull()
+    const overlayBounds = overlay!.getBoundingClientRect()
+    const guideBounds = guide!.getBoundingClientRect()
+    expect(guideBounds.left - overlayBounds.left).toBeCloseTo(72, 1)
+    expect(guideBounds.top - overlayBounds.top).toBeCloseTo(10, 1)
+    expect(guideBounds.width).toBe(1)
+    expect(guideBounds.height).toBe(30)
     expect(host.querySelector('.app-editor-host:not([data-editor-visible-snapshot])')).toBeNull()
+    await expect.poll(gate.observedStatus).toBe(200)
+    await expect.poll(gate.observedMetadataStatus).toBe(200)
     await nextFrame()
     expect(performance.getEntriesByName('editor.cached_visible_paint')).toHaveLength(1)
     expect(performance.getEntriesByName('editor.authoritative_text_paint')).toHaveLength(0)
     expect(performance.getEntriesByName('editor.authoritative_highlight_paint')).toHaveLength(0)
+
+    gate.releaseMetadata()
+    await expect
+      .poll(() => queryClient.getQueryState(fileSystemKeys.fileMetadata(path))?.fetchStatus)
+      .toBe('idle')
+    expect(host.querySelector('[data-editor-visible-snapshot]')).toBe(overlay)
+    expect(host.querySelector('.app-editor-host:not([data-editor-visible-snapshot])')).toBeNull()
+
+    const overlapPaints: {
+      cacheOpacity: number
+      liveOpacity: number
+      width: number
+      height: number
+    }[] = []
+    const observer = new MutationObserver(() => {
+      const cache = host.querySelector<HTMLElement>('[data-editor-visible-snapshot]')
+      const live = host.querySelector<HTMLElement>(
+        '.app-editor-host:not([data-editor-visible-snapshot]) .editor-virtualized',
+      )
+      if (!cache || cache.hidden || !live?.querySelector('.editor-virtualized-row')) return
+
+      const { width, height } = live.getBoundingClientRect()
+      overlapPaints.push({
+        cacheOpacity: paintedOpacity(cache),
+        liveOpacity: paintedOpacity(live),
+        width,
+        height,
+      })
+    })
+    observer.observe(host, { attributes: true, childList: true, subtree: true })
+    onTestFinished(() => observer.disconnect())
 
     gate.release()
 
@@ -229,6 +327,19 @@ test(
       .toBe(1)
     await expect.poll(() => !hasVisibleSnapshot(host)).toBe(true)
     await expect.poll(appliedThemeIdentity).toBe(`${themeId}|${themeId}|${themeId}`)
+
+    expect(overlapPaints.length).toBeGreaterThan(0)
+    for (const paint of overlapPaints) {
+      expect(paint.cacheOpacity).toBe(1)
+      expect(paint.liveOpacity).toBe(0)
+      expect(paint.width).toBeGreaterThan(0)
+      expect(paint.height).toBeGreaterThan(0)
+    }
+    const live = await elementWithin(
+      host,
+      '.app-editor-host:not([data-editor-visible-snapshot]) .editor-virtualized',
+    )
+    expect(paintedOpacity(live)).toBe(1)
 
     const cachedPaint = performance.getEntriesByName('editor.cached_visible_paint')[0]!
     const textPaint = performance.getEntriesByName(
@@ -259,8 +370,9 @@ test('a real file-read error removes both the cold paint and its matching record
   expect(writeEditorVisibleSnapshotCache(testScopedStorage, record).status).toBe('written')
 
   const host = mountRealFileEditor(path, rootPath)
+  expect(host.querySelector('[data-editor-visible-snapshot]')).not.toBeNull()
   await expect.poll(gate.observedStatus).toBe(404)
-  expect(host.querySelector('[data-editor-visible-snapshot]')).toBeNull()
+  expect(host.querySelector('[data-editor-visible-snapshot]')).not.toBeNull()
 
   gate.release()
 
@@ -268,7 +380,6 @@ test('a real file-read error removes both the cold paint and its matching record
   await expect
     .poll(() =>
       readEditorVisibleSnapshotCache(testScopedStorage, {
-        contentVersion: record.contentVersion,
         path,
         rootPath,
         themeId,
@@ -310,7 +421,6 @@ test.each(['pointerdown', 'touchmove', 'wheel'] as const)(
     expect(overlay.hidden).toBe(true)
     expect(
       readEditorVisibleSnapshotCache(testScopedStorage, {
-        contentVersion: record.contentVersion,
         path,
         rootPath,
         themeId,
@@ -452,9 +562,15 @@ function PaintHarness({ live }: { live: boolean }) {
   })
   return (
     <>
-      {live ? <InitialPaintEmitter emit={binding.onInitialPaint} /> : null}
+      {live ? (
+        <InitialPaintEmitter emit={binding.onInitialPaint} plugin={binding.additionalPlugins[0]!} />
+      ) : null}
       {binding.record ? (
-        <EditorVisibleSnapshot overlayRef={binding.overlayRef} record={binding.record} />
+        <EditorVisibleSnapshot
+          indentationGuidesEnabled
+          overlayRef={binding.overlayRef}
+          record={binding.record}
+        />
       ) : null}
     </>
   )
@@ -462,14 +578,35 @@ function PaintHarness({ live }: { live: boolean }) {
 
 function InitialPaintEmitter({
   emit,
+  plugin,
 }: {
   emit: ReturnType<typeof useEditorVisibleSnapshot>['onInitialPaint']
+  plugin: EditorPlugin
 }) {
   const emittedRef = useRef(false)
   useEffect(() => {
     if (emittedRef.current) return
 
     emittedRef.current = true
+    let provider: EditorViewContributionProvider | null = null
+    plugin.activate({
+      registerViewContribution: (next: EditorViewContributionProvider) => {
+        provider = next
+        return { dispose: () => undefined }
+      },
+    } as unknown as EditorPluginContext)
+    const contribution = provider!.createContribution({} as never)
+    contribution?.update(
+      {
+        ...cachedSnapshot().snapshot,
+        foldMarkers: [],
+        paintLayers: [],
+        syntaxStatus: 'ready',
+        toVisibleSnapshot: () => null,
+        visibleRows: [],
+      } as unknown as EditorViewSnapshot,
+      'document',
+    )
     emit({
       documentGeneration: 4,
       documentId: 'document-1',
@@ -483,7 +620,8 @@ function InitialPaintEmitter({
       status: 'painted',
       textVersion: 1,
     })
-  }, [emit])
+    return () => contribution?.dispose()
+  }, [emit, plugin])
 
   return null
 }
@@ -536,7 +674,11 @@ function InteractionHarness({
         live target
       </button>
       {binding.record ? (
-        <EditorVisibleSnapshot overlayRef={binding.overlayRef} record={binding.record} />
+        <EditorVisibleSnapshot
+          indentationGuidesEnabled
+          overlayRef={binding.overlayRef}
+          record={binding.record}
+        />
       ) : null}
     </div>
   )
@@ -575,7 +717,11 @@ function prepareRealFileTest(): string {
   return TREE_SITTER_DARK_THEME.id
 }
 
-function mountRealFileEditor(path: string, rootPath: string): HTMLElement {
+function mountRealFileEditor(
+  path: string,
+  rootPath: string,
+  queryClient = createTestQueryClient(),
+): HTMLElement {
   const host = document.createElement('main')
   host.dataset.workbench = ''
   host.style.height = '180px'
@@ -585,7 +731,7 @@ function mountRealFileEditor(path: string, rootPath: string): HTMLElement {
   root = createRoot(host)
   flushSync(() => {
     root?.render(
-      <AppProviders command={false} queryClient={createTestQueryClient()}>
+      <AppProviders command={false} queryClient={queryClient}>
         <EditorStateProvider>
           <ThemeIdentityProbe />
           <RealFileEditorBody path={path} rootPath={rootPath} />
@@ -679,13 +825,24 @@ function hasVisibleSnapshot(host: HTMLElement): boolean {
   )
 }
 
+function paintedOpacity(element: HTMLElement): number {
+  let opacity = 1
+  let current: HTMLElement | null = element
+  while (current) {
+    opacity *= Number(getComputedStyle(current).opacity)
+    current = current.parentElement
+  }
+  return opacity
+}
+
 function cachedSnapshot(): CachedEditorVisibleSnapshot {
   return {
-    cacheVersion: 2,
+    cacheVersion: 4,
     contentVersion: CONTENT_VERSION,
     path: '/repo/src/app.ts',
     rootPath: '/repo',
     snapshot: {
+      paintLayers: [],
       contentWidth: 200,
       documentId: 'document-1',
       gutterLayout: {

@@ -9,7 +9,7 @@ import {
 import { Input } from '@workspace/ui/components/input'
 import { useState } from 'react'
 
-import { createProjectMetaCommand } from '@/features/chat/utils/command-builders'
+import { createProjectMetaCommand } from '@workspace/client-core/chat/commands'
 import { dispatchChatCommand } from '@/features/chat/utils/command-dispatch'
 import { notifyChatCommandError } from '@/features/chat/notify-command-error'
 import { dispatchCommandForEnvironment } from '@/features/chat/state/active-transports'

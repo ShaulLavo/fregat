@@ -4,7 +4,7 @@ import userEvent from '@testing-library/user-event'
 import { SessionMachineMenu } from '@/features/chat-mode/components/session-machine-menu'
 import { currentRailEnvironments } from '@/features/chat-mode/state/rail-environments'
 import { useSessionRailStore } from '@/features/chat-mode/state/session-rail-store'
-import { sessionRailModel } from '@/features/chat-mode/utils/session-rail-model'
+import { sessionRailModel } from '@workspace/client-core/chat/rail/model'
 import { queryClientFor } from '@/lib/environments/state/query-clients'
 import {
   createFederationHarness,

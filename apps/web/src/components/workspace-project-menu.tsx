@@ -7,12 +7,10 @@ import { MachinePhase } from '@/components/machine-phase'
 import { useEnvironmentsStore } from '@/lib/environments/state/store'
 import { originForQueryClient } from '@/lib/environments/state/query-clients'
 
-import {
-  selectChatProjects,
-  selectCurrentWorktree,
-} from '@/features/chat/state/chat-projection-selectors'
+import { selectChatProjects, selectCurrentWorktree } from '@workspace/client-core/chat/selectors'
 import { useEditorWorkspaceState } from '@/features/editor/state/workspace-state'
-import { projectMenuModel } from '@/features/workbench/utils/project-menu-model'
+import { useProjectMenuEntries } from '@/features/workbench/hooks/use-project-menu-entries'
+import { LoadingState } from '@workspace/ui/components/loading-state'
 import { useOpenWorkspaceRoot } from '@/features/workspace/hooks/use-open-root'
 import { NATIVE_WINDOW_NO_DRAG_CLASS } from '@/lib/platform/window-drag'
 import { recentFoldersQueryOptions } from '@/lib/recent-folders-query'
@@ -46,7 +44,8 @@ export function WorkspaceProjectMenu({ workspaceTitle }: { readonly workspaceTit
   const openWorkspaceRoot = useOpenWorkspaceRoot()
   // Only fetched while the menu is open: recents are a menu concern, not app state.
   const recentFolders = useQuery(recentFoldersQueryOptions({ enabled: open }))
-  const entries = projectMenuModel({
+  const { entries, isPending } = useProjectMenuEntries({
+    enabled: open,
     activeRootPath: rootPath,
     activeTitle: workspaceTitle,
     projects,
@@ -91,6 +90,11 @@ export function WorkspaceProjectMenu({ workspaceTitle }: { readonly workspaceTit
         <DropdownMenuRadioGroup value={rootPath ?? ''}>
           {/* Inside the group: base-ui resolves the label against its group context. */}
           <DropdownMenuLabel>Recent</DropdownMenuLabel>
+          {recentFolders.isPending || isPending ? (
+            <LoadingState label='Loading projects' className='px-2 py-1'>
+              <div aria-hidden='true' className='skeleton-sweep h-4 w-full rounded-sm' />
+            </LoadingState>
+          ) : null}
           {entries.map((entry) => (
             <DropdownMenuRadioItem
               key={entry.rootPath}

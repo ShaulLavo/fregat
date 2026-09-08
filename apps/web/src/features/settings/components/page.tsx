@@ -112,11 +112,15 @@ export function SettingsPage({
     : [...categories]
 
   return (
-    <div className='flex h-full min-h-0 flex-col' ref={setRootRef} tabIndex={-1}>
-      <header className='border-border compact:gap-1.5 compact:px-3 compact:pb-3 flex shrink-0 flex-col gap-2 border-b px-4 pt-2 pb-4'>
+    <div
+      className='@container/settings flex h-full min-h-0 min-w-0 flex-col'
+      ref={setRootRef}
+      tabIndex={-1}
+    >
+      <header className='border-border compact:gap-1.5 compact:px-3 compact:pb-3 flex shrink-0 flex-col gap-2 border-b px-4 pt-2 pb-4 @max-3xl/settings:grid @max-3xl/settings:grid-cols-[minmax(0,1fr)_auto] @max-3xl/settings:[&_[data-slot=button]]:min-h-10 @max-3xl/settings:[&_input]:h-10 @max-3xl/settings:[&_input]:text-base'>
         {/* The tab's own action strip, above the scope tabs: these act on the tab,
             the row below picks which file the tab is showing. */}
-        <div className='flex items-center justify-end gap-1'>
+        <div className='flex items-center justify-end gap-1 @max-3xl/settings:order-2'>
           {tabId ? <ViewToggle /> : null}
           <SettingsOwnerProvider
             key={showJson ? 'editor' : 'global'}
@@ -129,6 +133,7 @@ export function SettingsPage({
         {showJson ? null : (
           <Input
             aria-label='Search settings'
+            className='@max-3xl/settings:order-3 @max-3xl/settings:col-span-full'
             autoFocus
             ref={searchRef}
             onChange={(event) => setQuery(event.currentTarget.value)}
@@ -136,7 +141,13 @@ export function SettingsPage({
             value={query}
           />
         )}
-        <div className={showJson ? 'hidden' : 'flex flex-wrap items-center gap-2'}>
+        <div
+          className={
+            showJson
+              ? 'hidden'
+              : 'flex flex-wrap items-center gap-2 @max-3xl/settings:order-4 @max-3xl/settings:col-span-full'
+          }
+        >
           {/* `visible` is already query-filtered, so "of N" only says something while a
               category narrows the list further; otherwise it printed the same number twice. */}
           <p className='text-muted-foreground text-xs tabular-nums'>
@@ -189,7 +200,7 @@ export function SettingsPage({
         </div>
       ) : (
         <div
-          className='compact:p-3 min-h-0 flex-1 overflow-y-auto p-4'
+          className='compact:p-3 min-h-0 min-w-0 flex-1 overflow-y-auto p-4 @max-3xl/settings:[&_[data-slot=button]]:min-h-10 @max-3xl/settings:[&_[data-slot=select-trigger]]:min-h-10 @max-3xl/settings:[&_input]:h-10 @max-3xl/settings:[&_input]:text-base'
           onKeyDown={(event) => {
             if (event.key !== 'Escape') return
             // Not while a control is mid-interaction: a recorder is capturing, and

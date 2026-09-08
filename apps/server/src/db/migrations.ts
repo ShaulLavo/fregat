@@ -16,7 +16,39 @@ export type Migration = {
 export const platformMigrations: readonly Migration[] = [
   { version: 11, name: 'session_domain', up: applySessionDomain },
   { version: 12, name: 'worktree_lifecycle', up: applyWorktreeLifecycle },
+  { version: 13, name: 'workspace_addresses', up: applyWorkspaceAddresses },
+  { version: 14, name: 'agent_terminal_handoffs', up: applyAgentTerminalHandoffs },
 ]
+
+function applyAgentTerminalHandoffs(database: PlatformDatabase) {
+  database.run(sql`
+    CREATE TABLE agent_terminal_handoffs (
+      session_id TEXT PRIMARY KEY NOT NULL,
+      provider_instance_id TEXT NOT NULL,
+      worktree_id TEXT NOT NULL,
+      terminal_lease_id TEXT NOT NULL,
+      runtime_epoch TEXT NOT NULL,
+      cwd TEXT NOT NULL,
+      started_at TEXT NOT NULL,
+      baseline_json TEXT NOT NULL,
+      phase TEXT NOT NULL CHECK (phase IN ('active', 'history'))
+    )
+  `)
+}
+
+function applyWorkspaceAddresses(database: PlatformDatabase) {
+  database.run(sql`
+    CREATE TABLE workspace_addresses (
+      id TEXT PRIMARY KEY NOT NULL,
+      filesystem_root TEXT NOT NULL,
+      canonical_path TEXT NOT NULL
+    )
+  `)
+  database.run(sql`
+    CREATE UNIQUE INDEX workspace_addresses_directory_idx
+    ON workspace_addresses (filesystem_root, canonical_path)
+  `)
+}
 
 export function migratePlatformDatabase(
   database: PlatformDatabase = getDefaultPlatformDatabase(),

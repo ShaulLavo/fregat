@@ -3,7 +3,7 @@ import type { Client } from '@/lib/client'
 import { clientForQueryClient } from '@/lib/environments/state/query-clients'
 import { useQuery } from '@tanstack/react-query'
 
-import { selectWorktreeAtPath } from '@/features/chat/state/chat-projection-selectors'
+import { selectWorktreeAtPath } from '@workspace/client-core/chat/selectors'
 import {
   packageJsonScripts,
   packageScriptRunner,

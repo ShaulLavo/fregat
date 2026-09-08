@@ -25,8 +25,8 @@ export function KeybindingRow({
   const title = spec?.title ?? binding.command
 
   return (
-    <div className='border-border compact:px-2 compact:py-1.5 flex items-center gap-2 border-b px-3 py-2 last:border-b-0'>
-      <div className='flex min-w-0 flex-1 flex-col'>
+    <div className='border-border compact:px-2 compact:py-1.5 flex items-center gap-2 border-b px-3 py-2 last:border-b-0 @max-3xl/settings:grid @max-3xl/settings:grid-cols-[minmax(0,1fr)_auto_auto]'>
+      <div className='flex min-w-0 flex-1 flex-col @max-3xl/settings:col-span-full'>
         <span className='text-foreground truncate text-sm'>{title}</span>
         {spec ? (
           <span className='text-muted-foreground truncate text-xs'>{binding.command}</span>
@@ -40,7 +40,11 @@ export function KeybindingRow({
         ) : null}
       </div>
 
-      {binding.source === 'user' ? <Badge variant='secondary'>Custom</Badge> : null}
+      {binding.source === 'user' ? (
+        <Badge className='@max-3xl/settings:col-span-full' variant='secondary'>
+          Custom
+        </Badge>
+      ) : null}
 
       <ChordRecorder
         bindings={bindings}

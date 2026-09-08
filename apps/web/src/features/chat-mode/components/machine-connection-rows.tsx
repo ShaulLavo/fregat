@@ -6,14 +6,20 @@ import { useEnvironmentConnections } from '@/hooks/use-environment-connections'
 import { primaryServerOrigin } from '@/lib/client'
 import { useEnvironmentsStore } from '@/lib/environments/state/store'
 import { isDesktop } from '@/lib/platform/bridge'
+import { hasConnectionNotice } from '@/lib/environments/utils/availability'
 
 export function MachineConnectionRows() {
   const connections = useEnvironmentConnections()
-  const primary = useEnvironmentsStore((state) => state.entries[primaryServerOrigin()])
+  const entries = useEnvironmentsStore((state) => state.entries)
+  const primary = entries[primaryServerOrigin()]
   const machines = connections.machines
     .filter(
       (machine) =>
-        machine.phase !== 'live' && (machine.phase !== 'idle' || machine.environmentId !== null),
+        (machine.phase === 'idle' && machine.environmentId !== null) ||
+        hasConnectionNotice({
+          ...machine,
+          connectedAt: machine.origin ? (entries[machine.origin]?.connectedAt ?? null) : null,
+        }),
     )
     .map((machine) => ({
       name: `machine:${machine.name}`,
@@ -23,7 +29,7 @@ export function MachineConnectionRows() {
       disabled: machine.config.kind === 'ssh' && !isDesktop(),
       retry: () => connections.retryMachine(machine.name),
     }))
-  if (primary && primary.phase !== 'live')
+  if (primary && hasConnectionNotice(primary))
     machines.unshift({
       name: 'primary',
       label: primary.label ?? primary.name,

@@ -4,34 +4,12 @@ import {
   isProviderAuthError,
   providerSignInTarget,
   type ProviderSignInTarget,
-} from '@/features/chat/utils/provider-auth'
-import type { ChatSession } from '@/features/chat/state/chat-projection-store'
+} from '@workspace/client-core/chat/providers/auth'
+import type { ChatSession } from '@workspace/client-core/chat/types'
 
-export type ChatRuntimeAlertTone = 'busy' | 'error' | 'warning'
+export type ChatRuntimeAlertTone = 'error' | 'warning'
 
-export type ChatCommandState = {
-  commandFailure: string | null
-  interruptPending: boolean
-  sendPending: boolean
-  stopPending: boolean
-}
-
-/**
- * Where an alert sits in the stack. Broken beats blocked beats degraded beats
- * working, because only the first two are things the user can do something
- * about right now. A flat list let a "Sending message" spinner sit above a
- * failed sign-in and pushed the composer down the viewport behind both.
- */
-const ALERT_PRIORITY = {
-  /** Something is broken and the turn will not run. */
-  error: 0,
-  /** The turn is held open waiting on the user. */
-  action: 1,
-  /** Degraded, but nothing is blocked. */
-  warning: 2,
-  /** Transient, clears itself. */
-  busy: 3,
-} as const
+const ALERT_PRIORITY = { error: 0, warning: 1 } as const
 
 type ChatRuntimeAlertPriority = (typeof ALERT_PRIORITY)[keyof typeof ALERT_PRIORITY]
 
@@ -53,31 +31,30 @@ export type ChatRuntimeAlert = {
 
 /** Highest priority first; ties keep the order the producers emit them in. */
 export function chatRuntimeAlerts({
-  commandState,
+  commandFailure,
   provider,
   providerError,
   providerLoading = false,
   session,
 }: {
-  commandState: ChatCommandState
+  commandFailure: string | null
   provider: ProviderSnapshot | undefined
   providerError: string | null
   providerLoading?: boolean
   session: ChatSession
 }) {
   return [
-    ...commandAlerts(commandState),
+    ...commandAlerts(commandFailure),
     ...providerAlerts(provider, providerError, providerLoading, session),
-    ...sessionErrorAlerts(session, provider),
-    ...pendingActionAlerts(session),
+    ...(commandFailure ? [] : sessionErrorAlerts(session, provider)),
   ].sort((left, right) => left.priority - right.priority)
 }
 
-function commandAlerts(commandState: ChatCommandState): ChatRuntimeAlert[] {
-  if (commandState.commandFailure) {
+function commandAlerts(commandFailure: string | null): ChatRuntimeAlert[] {
+  if (commandFailure) {
     return [
       alert({
-        detail: commandState.commandFailure,
+        detail: commandFailure,
         // Dismissible: a send that failed minutes ago is history the moment the
         // user has read it, and nothing else ever clears it.
         dismissible: true,
@@ -86,15 +63,6 @@ function commandAlerts(commandState: ChatCommandState): ChatRuntimeAlert[] {
         tone: 'error',
       }),
     ]
-  }
-  if (commandState.interruptPending) {
-    return [alert({ id: 'command:interrupt', title: 'Interrupting current turn', tone: 'busy' })]
-  }
-  if (commandState.stopPending) {
-    return [alert({ id: 'command:stop', title: 'Stopping session', tone: 'busy' })]
-  }
-  if (commandState.sendPending) {
-    return [alert({ id: 'command:send', title: 'Sending message', tone: 'busy' })]
   }
 
   return []
@@ -230,37 +198,6 @@ function needsSignIn(message: string | null | undefined, provider: ProviderSnaps
   if (provider?.auth.status === 'authenticated') return false
 
   return true
-}
-
-function pendingActionAlerts(session: ChatSession): ChatRuntimeAlert[] {
-  const alerts: ChatRuntimeAlert[] = []
-
-  // Never dismissible: the turn is parked on the answer, so hiding the ask
-  // would leave the session stalled with nothing on screen to explain it.
-  if (session.pendingApprovalCount > 0) {
-    alerts.push(
-      alert({
-        detail: `${session.pendingApprovalCount} pending`,
-        id: 'approval',
-        priority: ALERT_PRIORITY.action,
-        title: 'Approval requested',
-        tone: 'warning',
-      }),
-    )
-  }
-  if (session.pendingUserInputCount > 0) {
-    alerts.push(
-      alert({
-        detail: `${session.pendingUserInputCount} pending`,
-        id: 'user-input',
-        priority: ALERT_PRIORITY.action,
-        title: 'User input requested',
-        tone: 'warning',
-      }),
-    )
-  }
-
-  return alerts
 }
 
 function alert({

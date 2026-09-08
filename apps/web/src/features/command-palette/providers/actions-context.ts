@@ -2,7 +2,7 @@ import { createContext } from 'react'
 import type { OrchestrationProjectScript, ScopedProjectRef } from '@workspace/contracts'
 
 import type { GotoLineTarget } from '@/features/command-palette/goto-line-target'
-import type { SessionRailItem } from '@/features/chat-mode/utils/session-rail-model'
+import type { SessionRailItem } from '@workspace/client-core/chat/rail/model'
 import type { FlatDocumentSymbol } from '@/features/command-palette/document-symbols'
 import type { PlatformCommandId } from '@/keymap/types'
 

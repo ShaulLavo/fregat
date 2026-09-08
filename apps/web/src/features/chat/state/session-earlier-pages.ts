@@ -6,7 +6,7 @@ import { createChatPipelineScope } from '@/features/chat/utils/pipeline-logging'
 import {
   chatSessionEarlierPageInput,
   selectChatSessionHasEarlier,
-} from './chat-projection-selectors'
+} from '@workspace/client-core/chat/selectors'
 import {
   selectChatProjectionSlice,
   useChatProjectionStore,

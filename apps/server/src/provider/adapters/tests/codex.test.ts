@@ -266,6 +266,9 @@ function handle(message) {
     threadStartCount += 1;
     lastSessionStartParams = message.params;
     if (mode !== 'echo-mode-params' && !assertStartParams(message)) return;
+    if (mode === 'stderr-diagnostics') {
+      process.stderr.write('2026-09-07T05:01:30.819533Z ERROR codex_models_manager::manager: failed to refresh available models: timeout waiting for child process to exit\\n');
+    }
     if (mode === 'malformed-thread-start') {
       send({ id: message.id, result: { thread: {} } });
       return;
@@ -293,6 +296,10 @@ function handle(message) {
     if (mode !== 'echo-mode-params' && !assertTurnParams(message)) return;
     if (mode === 'hold-turn-start') return;
     process.stderr.write('2026-05-28T00:00:00Z INFO codex: harmless diagnostic\\n');
+    if (mode === 'stderr-diagnostics') {
+      process.stderr.write('2026-09-07T05:01:31Z ERROR codex_api::transport: failed to connect to websocket\\n');
+      process.stderr.write('Authentication required: sign in again\\n');
+    }
     send({
       method: 'turn/started',
       params: { threadId: 'provider-thread-1', turn: fakeTurn('inProgress') },
@@ -339,6 +346,17 @@ function handle(message) {
     }
     if (mode === 'reasoning-events') {
       sendReasoningEvents();
+    }
+    if (mode === 'retryable-error') {
+      send({
+        method: 'error',
+        params: {
+          threadId: 'provider-thread-1',
+          turnId: 'provider-turn-1',
+          willRetry: true,
+          error: { message: 'Connection interrupted. Retrying the request.' },
+        },
+      });
     }
     if (mode === 'token-usage') {
       send({
@@ -1066,7 +1084,10 @@ describe('CodexProviderAdapter', () => {
 
         try {
           const catalog = await adapter.listCommands({ cwd: projectPath })
-          const event = await codexSkillWarningEvent(logDir)
+          const event = await codexPipelineWarningEvent(
+            logDir,
+            'chat.pipeline.provider_commands.codex_skills',
+          )
 
           // One broken file does not hide the 2 that parsed, and the failure is
           // still on the record with the path that caused it.
@@ -1137,6 +1158,89 @@ describe('CodexProviderAdapter', () => {
         ])
       },
       { mode: 'reasoning-events' },
+    )
+  })
+
+  it('shows retryable Codex errors as warnings while the turn continues to completion', async () => {
+    await withFakeCodex(
+      async () => {
+        const adapter = new CodexProviderAdapter()
+        const events: ProviderRuntimeEvent[] = []
+        const input = providerTurnInput()
+        collectAdapterEvents(adapter, events)
+
+        await adapter.sendTurn(input)
+        await settleRuntimeEvents()
+        await adapter.stopAll()
+
+        expect(events).toContainEqual(
+          expect.objectContaining({
+            payload: expect.objectContaining({
+              detail: expect.objectContaining({ willRetry: true }),
+              message: 'Connection interrupted. Retrying the request.',
+            }),
+            sessionId: input.sessionId,
+            turnId: input.turnId,
+            type: 'runtime.warning',
+          }),
+        )
+        expect(events.some((event) => event.type === 'runtime.error')).toBe(false)
+        expect(events).toContainEqual(
+          expect.objectContaining({
+            payload: { state: 'completed' },
+            turnId: input.turnId,
+            type: 'turn.completed',
+          }),
+        )
+      },
+      { mode: 'retryable-error' },
+    )
+  })
+
+  it('logs background Codex diagnostics without chat rows and preserves actionable stderr', async ({
+    onTestFinished,
+  }) => {
+    const logDir = await mkdtemp('/work/tmp/platform-codex-stderr-')
+    initializeObservability({
+      NODE_ENV: 'production',
+      OBSERVABILITY_CONSOLE: 'false',
+      OBSERVABILITY_DIR: logDir,
+      OBSERVABILITY_ENABLED: 'true',
+    })
+    onTestFinished(async () => {
+      await resetObservabilityForTests()
+      await rm(logDir, { force: true, recursive: true })
+    })
+
+    await withFakeCodex(
+      async () => {
+        const adapter = new CodexProviderAdapter()
+        onTestFinished(() => adapter.stopAll())
+        const events: ProviderRuntimeEvent[] = []
+        collectAdapterEvents(adapter, events)
+        await adapter.sendTurn(providerTurnInput())
+        await settleRuntimeEvents()
+        await adapter.stopAll()
+
+        const warnings = events.flatMap((event) =>
+          event.type === 'runtime.warning' ? [event.payload.message] : [],
+        )
+        expect(warnings).toEqual(
+          expect.arrayContaining([
+            '2026-09-07T05:01:31Z ERROR codex_api::transport: failed to connect to websocket',
+            'Authentication required: sign in again',
+          ]),
+        )
+        expect(warnings.some((warning) => warning.includes('codex_models_manager'))).toBe(false)
+        expect(
+          await codexPipelineWarningEvent(logDir, 'chat.pipeline.codex_process.stderr'),
+        ).toMatchObject({
+          diagnostic:
+            '2026-09-07T05:01:30.819533Z ERROR codex_models_manager::manager: failed to refresh available models: timeout waiting for child process to exit',
+          processId: expect.any(Number),
+        })
+      },
+      { mode: 'stderr-diagnostics' },
     )
   })
 
@@ -1311,14 +1415,14 @@ async function countFakeCodexSpawns(spawnLogPath: string) {
 }
 
 /** The one wide event the degraded skill read is allowed to produce. */
-async function codexSkillWarningEvent(logDir: string) {
+async function codexPipelineWarningEvent(logDir: string, action: string) {
   await flushObservability()
   const events: Record<string, unknown>[] = []
   for await (const event of readFsLogs({ dir: logDir })) {
     events.push(event as Record<string, unknown>)
   }
 
-  return events.find((event) => event.action === 'chat.pipeline.provider_commands.codex_skills')
+  return events.find((event) => event.action === action)
 }
 
 async function readFakeCodexLog(spawnLogPath: string) {

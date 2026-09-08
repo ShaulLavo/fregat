@@ -78,6 +78,8 @@ const ANSI_ESCAPE_CHAR = String.fromCharCode(27)
 const ANSI_ESCAPE_REGEX = new RegExp(`${ANSI_ESCAPE_CHAR}\\[[0-9;]*m`, 'g')
 const CODEX_STDERR_LOG_REGEX =
   /^\d{4}-\d{2}-\d{2}T\S+\s+(TRACE|DEBUG|INFO|WARN|ERROR)\s+\S+:\s+(.*)$/
+const CODEX_DIAGNOSTIC_STDERR_REGEX =
+  /^\d{4}-\d{2}-\d{2}T\S+\s+(TRACE|DEBUG|INFO|WARN|ERROR)\s+[a-zA-Z0-9_]+(?:::[a-zA-Z0-9_]+)*:\s+/
 const BENIGN_CODEX_STDERR_ERROR_SNIPPETS = [
   'state db missing rollout path for thread',
   'state db record_discrepancy: find_thread_path_by_id_str_in_subdir, falling_back',
@@ -1605,9 +1607,12 @@ class CodexAppServerSession {
   }
 
   private handleErrorNotification(params: CodexServerNotificationParamsByMethod['error']) {
-    if (params.willRetry === true) return
-
     const message = errorNotificationMessage(params.error)
+    if (params.willRetry) {
+      this.emitRuntimeNotification('runtime.warning', { detail: params, message }, 'error', params)
+      return
+    }
+
     this.emit({
       createdAt: new Date().toISOString(),
       eventId: runtimeEventId('codex-error-notification'),
@@ -2162,6 +2167,13 @@ class CodexAppServerRpcClient {
   private handleStderrLine(line: string) {
     const classified = classifyCodexStderrLine(line)
     if (!classified) return
+    if (isBackgroundCodexDiagnostic(classified.message)) {
+      recordChatPipelineWarning('chat.pipeline.codex_process.stderr', {
+        diagnostic: classified.message,
+        processId: this.process.pid,
+      })
+      return
+    }
 
     for (const handler of this.handlers) {
       handler({ method: 'process/stderr', params: { message: classified.message } })
@@ -3166,4 +3178,10 @@ function classifyCodexStderrLine(rawLine: string) {
   if (BENIGN_CODEX_STDERR_ERROR_SNIPPETS.some((snippet) => line.includes(snippet))) return null
 
   return { message: line }
+}
+
+function isBackgroundCodexDiagnostic(message: string) {
+  if (message.toLowerCase().includes('failed to connect to websocket')) return false
+
+  return CODEX_DIAGNOSTIC_STDERR_REGEX.test(message)
 }

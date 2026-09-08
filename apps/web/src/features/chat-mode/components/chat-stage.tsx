@@ -2,8 +2,8 @@ import { scopedSessionKey } from '@workspace/contracts'
 import { useActiveChatProjection } from '@/features/chat/hooks/use-active-projection'
 import type { SessionId } from '@workspace/contracts'
 
-import { contextUsageForActivities } from '@/features/chat/utils/context-usage'
-import { selectChatSessionById } from '@/features/chat/state/chat-projection-selectors'
+import { contextUsageForActivities } from '@workspace/client-core/chat/context-usage'
+import { selectChatSessionById } from '@workspace/client-core/chat/selectors'
 import { StageBody } from '@/features/chat-mode/components/stage-body'
 import { StageHeader } from '@/features/chat-mode/components/stage-header'
 import { useMarkSessionSeen } from '@/features/chat-mode/hooks/use-mark-session-seen'
@@ -11,8 +11,8 @@ import { useChatModeSession } from '@/features/chat-mode/providers/session-conte
 import { useSessionReadStore } from '@/features/chat-mode/state/session-read-store'
 import { useSessionSelectionStore } from '@/features/chat-mode/state/session-selection-store'
 import { isDraftFor } from '@/features/chat-mode/utils/active-session'
-import { sessionRailItem } from '@/features/chat-mode/utils/session-rail-model'
-import { sessionCompletedAt } from '@/features/chat-mode/utils/session-unread'
+import { sessionRailItem } from '@workspace/client-core/chat/rail/model'
+import { sessionCompletedAt } from '@workspace/client-core/chat/rail/unread'
 
 const EMPTY_ACTIVITIES: readonly [] = []
 

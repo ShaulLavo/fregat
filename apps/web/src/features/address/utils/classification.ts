@@ -38,8 +38,13 @@ const CACHE_KEYS = WORKSPACE_CACHE_STORAGE_KEYS
 export const STATE_CLASSIFICATIONS: Readonly<Record<string, ClassifiedState>> = {
   address: {
     classification: 'address',
-    storageKey: 'platform.address.v1',
+    storageKey: 'platform.address.v2',
     why: 'the address itself — the restore payload half of the dual serialization',
+  },
+  connectedMachines: {
+    classification: 'preference',
+    storageKey: 'platform.environments.connected.v1',
+    why: 'remembered machine connections are browser preferences, not link destinations',
   },
   chatInputDrafts: {
     classification: 'ephemeral',
@@ -60,6 +65,11 @@ export const STATE_CLASSIFICATIONS: Readonly<Record<string, ClassifiedState>> = 
     classification: 'ephemeral',
     storageKey: 'platform.chat-projection',
     why: 'projected server truth, replayed from the server on connect',
+  },
+  providerDisplay: {
+    classification: 'ephemeral',
+    storageKey: 'platform.provider-display.v1',
+    why: 'provider logos, model labels and options for reload; live status is never persisted',
   },
   chatRailCollapse: {
     classification: 'preference',
@@ -135,7 +145,7 @@ export const STATE_CLASSIFICATIONS: Readonly<Record<string, ClassifiedState>> = 
   rootFolder: {
     classification: 'address',
     storageKey: CACHE_KEYS.rootFolder,
-    why: '~slug; the absolute path stays local',
+    why: '~name.id; the server owns folder identity and keeps the absolute path private',
   },
   scrollPositions: {
     classification: 'preference',
@@ -204,7 +214,7 @@ export const STATE_CLASSIFICATIONS: Readonly<Record<string, ClassifiedState>> = 
   workspaceIndex: {
     classification: 'preference',
     storageKey: CACHE_KEYS.workspaceIndex,
-    why: 'the slug→root oracle, not an address',
+    why: 'recent workspace order; URL identity comes from the server',
   },
 }
 

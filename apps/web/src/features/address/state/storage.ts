@@ -1,3 +1,4 @@
+import { addressHrefFromBrowser, browserAddressHref } from '@/features/address/utils/browser-url'
 import { DEV_SEARCH_KEYS } from '@workspace/client-core/address/grammar'
 import { log } from '@/lib/client-logging'
 
@@ -10,7 +11,7 @@ import { log } from '@/lib/client-logging'
  * exercised every time the app starts.
  */
 
-const ADDRESS_STORAGE_KEY = 'platform.address.v1'
+const ADDRESS_STORAGE_KEY = 'platform.address.v2'
 
 export function writeAddressCache(href: string) {
   if (typeof localStorage === 'undefined') return
@@ -78,7 +79,7 @@ export function readAddressCache() {
  */
 export function restoreAddressFromStorage(historyApi: History = history) {
   if (typeof location === 'undefined') return null
-  if (location.pathname !== '/') return null
+  if (addressHrefFromBrowser(location.pathname) !== '/') return null
 
   const stored = readAddressCache()
   if (!stored || stored === '/') return null
@@ -86,7 +87,7 @@ export function restoreAddressFromStorage(historyApi: History = history) {
   // The dev params on a cold launch are the ones the user just typed, not the ones
   // the last session happened to carry, so the live search wins over the stored one.
   const href = mergeLiveSearch(stored, location.search)
-  historyApi.replaceState(null, '', href)
+  historyApi.replaceState(null, '', browserAddressHref(href))
   // Length, not content. An address carries the user's search query, their file paths
   // and their branch names, and this is `info` — it ships in production. The redaction
   // list in `client-logging` works by field name (`absolutePath`, `fileName`, `cwd`),

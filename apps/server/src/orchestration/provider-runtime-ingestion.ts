@@ -512,7 +512,10 @@ export class ProviderRuntimeIngestion {
   }
 
   private async dispatchActivityCommands(event: ProviderRuntimeEvent) {
-    for (const activity of activitiesForRuntimeEvent(event)) {
+    const activities = this.getReadModel?.().sessions.get(event.sessionId)?.activities ?? []
+    const taskTitle =
+      event.type === 'task.completed' ? taskTitleFromActivities(event, activities) : undefined
+    for (const activity of activitiesForRuntimeEvent(event, taskTitle)) {
       await this.dispatch(
         {
           activity,
@@ -690,7 +693,10 @@ function assistantDeltaCommand(
   }
 }
 
-function activitiesForRuntimeEvent(event: ProviderRuntimeEvent): OrchestrationSessionActivity[] {
+function activitiesForRuntimeEvent(
+  event: ProviderRuntimeEvent,
+  taskTitle?: string,
+): OrchestrationSessionActivity[] {
   switch (event.type) {
     case 'activity.append':
       return [activityFromLegacyEvent(event)]
@@ -718,55 +724,21 @@ function activitiesForRuntimeEvent(event: ProviderRuntimeEvent): OrchestrationSe
     case 'task.progress':
       return [taskProgressActivity(event)]
     case 'task.completed':
-      return [taskCompletedActivity(event)]
+      return [taskCompletedActivity(event, taskTitle)]
     case 'turn.plan.updated':
       return [turnPlanUpdatedActivity(event)]
-    case 'turn.diff.updated':
-      return [turnDiffUpdatedActivity(event)]
-    case 'hook.started':
-      return [hookStartedActivity(event)]
-    case 'hook.progress':
-      return [hookProgressActivity(event)]
-    case 'hook.completed':
-      return [hookCompletedActivity(event)]
-    case 'tool.progress':
-      return [toolProgressActivity(event)]
-    case 'tool.summary':
-      return [toolSummaryActivity(event)]
     case 'auth.status':
-      return [authStatusActivity(event)]
-    case 'account.updated':
-      return [baseActivity(event, 'info', 'account.updated', 'Account updated', event.payload)]
-    case 'account.rate-limits.updated':
-      return [
-        baseActivity(
-          event,
-          'info',
-          'account.rate-limits.updated',
-          'Account rate limits updated',
-          event.payload,
-        ),
-      ]
+      return authStatusActivity(event)
     case 'mcp.status.updated':
-      return [
-        baseActivity(event, 'info', 'mcp.status.updated', 'MCP status updated', event.payload),
-      ]
+      return mcpStatusActivity(event)
     case 'mcp.oauth.completed':
-      return [mcpOauthCompletedActivity(event)]
-    case 'model.rerouted':
-      return [modelReroutedActivity(event)]
+      return mcpOauthCompletedActivity(event)
     case 'config.warning':
-      return [configWarningActivity(event)]
-    case 'deprecation.notice':
-      return [deprecationNoticeActivity(event)]
+      return [providerWarningActivity(event, event.payload.summary, event.payload.details)]
     case 'files.persisted':
-      return [filesPersistedActivity(event)]
-    case 'conversation.realtime.started':
-    case 'conversation.realtime.item-added':
-    case 'conversation.realtime.audio.delta':
+      return filesPersistedActivity(event)
     case 'conversation.realtime.error':
-    case 'conversation.realtime.closed':
-      return realtimeActivity(event)
+      return [providerWarningActivity(event, event.payload.message)]
     case 'runtime.warning':
       return [runtimeWarningActivity(event)]
     case 'runtime.error':
@@ -808,6 +780,7 @@ function toolActivity(
       detail: truncateDetail(event.payload.detail),
       itemType: event.payload.itemType,
       status: event.payload.status,
+      toolCallId: event.itemId,
     }),
   ]
 }
@@ -816,9 +789,13 @@ function requestOpenedActivity(event: Extract<ProviderRuntimeEvent, { type: 'req
   if (event.payload.requestType === 'tool_user_input') return []
 
   const requestKind = requestKindFromRequestType(event.payload.requestType)
+  const summary =
+    event.payload.requestType === 'mcp_elicitation_approval'
+      ? 'App access approval requested'
+      : approvalRequestSummary(requestKind)
   return [
-    baseActivity(event, 'approval', 'approval.requested', approvalRequestSummary(requestKind), {
-      detail: truncateDetail(event.payload.detail),
+    baseActivity(event, 'approval', 'approval.requested', summary, {
+      detail: event.payload.detail,
       requestId: event.requestId,
       requestKind,
       requestType: event.payload.requestType,
@@ -952,22 +929,38 @@ function firstBoolean(...values: readonly unknown[]) {
 
 function taskStartedActivity(event: Extract<ProviderRuntimeEvent, { type: 'task.started' }>) {
   const taskType = event.payload.taskType
-  const summary = taskType === 'plan' ? 'Plan task started' : `${taskType ?? 'Task'} started`
-  return baseActivity(event, 'info', 'task.started', summary, {
-    detail: truncateDetail(event.payload.description),
-    taskId: event.payload.taskId,
-    taskType,
-  })
+  const summary = taskType ? `${taskType} task started` : 'Task started'
+  return baseActivity(
+    event,
+    'info',
+    'task.started',
+    taskType === 'plan' ? 'Plan task started' : summary,
+    {
+      detail: truncateDetail(event.payload.description),
+      taskId: event.payload.taskId,
+      taskType,
+      title: truncateDetail(event.payload.description, 120),
+    },
+  )
 }
 
 function taskProgressActivity(event: Extract<ProviderRuntimeEvent, { type: 'task.progress' }>) {
-  return baseActivity(event, 'thinking', 'task.progress', 'Thinking', {
+  const title = truncateDetail(firstText(event.payload.description), 120)
+  const activity = baseActivity(event, 'info', 'task.progress', title || 'Reasoning update', {
     detail: truncateDetail(event.payload.summary ?? event.payload.description),
     lastToolName: event.payload.lastToolName,
     summary: truncateDetail(event.payload.summary),
     taskId: event.payload.taskId,
+    title,
     usage: event.payload.usage,
   })
+  return {
+    ...activity,
+    id: v.parse(
+      eventIdSchema,
+      `task-progress:${event.sessionId}:${event.turnId ?? 'session'}:${event.payload.taskId}`,
+    ),
+  }
 }
 
 function reasoningContentDeltaActivity(
@@ -990,7 +983,10 @@ function reasoningContentDeltaActivity(
   ]
 }
 
-function taskCompletedActivity(event: Extract<ProviderRuntimeEvent, { type: 'task.completed' }>) {
+function taskCompletedActivity(
+  event: Extract<ProviderRuntimeEvent, { type: 'task.completed' }>,
+  title?: string,
+) {
   return baseActivity(
     event,
     event.payload.status === 'failed' ? 'error' : 'info',
@@ -999,7 +995,9 @@ function taskCompletedActivity(event: Extract<ProviderRuntimeEvent, { type: 'tas
     {
       detail: truncateDetail(event.payload.summary),
       status: event.payload.status,
+      summary: truncateDetail(event.payload.summary),
       taskId: event.payload.taskId,
+      title,
       usage: event.payload.usage,
     },
   )
@@ -1008,141 +1006,79 @@ function taskCompletedActivity(event: Extract<ProviderRuntimeEvent, { type: 'tas
 function turnPlanUpdatedActivity(
   event: Extract<ProviderRuntimeEvent, { type: 'turn.plan.updated' }>,
 ) {
-  return baseActivity(event, 'thinking', 'turn.plan.updated', 'Plan updated', {
+  return baseActivity(event, 'info', 'turn.plan.updated', 'Plan updated', {
     explanation: truncateDetail(event.payload.explanation ?? undefined),
     plan: event.payload.plan,
   })
 }
 
-function turnDiffUpdatedActivity(
-  event: Extract<ProviderRuntimeEvent, { type: 'turn.diff.updated' }>,
-) {
-  return baseActivity(event, 'tool', 'turn.diff.updated', 'Diff updated', {
-    unifiedDiff: truncateDetail(event.payload.unifiedDiff, 600),
-  })
-}
-
-function hookStartedActivity(event: Extract<ProviderRuntimeEvent, { type: 'hook.started' }>) {
-  return baseActivity(event, 'tool', 'hook.started', `${event.payload.hookName} started`, {
-    hookEvent: event.payload.hookEvent,
-    hookId: event.payload.hookId,
-    hookName: event.payload.hookName,
-  })
-}
-
-function hookProgressActivity(event: Extract<ProviderRuntimeEvent, { type: 'hook.progress' }>) {
-  return baseActivity(event, 'tool', 'hook.progress', 'Hook output', {
-    hookId: event.payload.hookId,
-    output: truncateDetail(event.payload.output),
-    stderr: truncateDetail(event.payload.stderr),
-    stdout: truncateDetail(event.payload.stdout),
-  })
-}
-
-function hookCompletedActivity(event: Extract<ProviderRuntimeEvent, { type: 'hook.completed' }>) {
-  return baseActivity(
-    event,
-    event.payload.outcome === 'error' ? 'error' : 'tool',
-    'hook.completed',
-    event.payload.outcome === 'error' ? 'Hook failed' : 'Hook completed',
-    {
-      exitCode: event.payload.exitCode,
-      hookId: event.payload.hookId,
-      outcome: event.payload.outcome,
-      output: truncateDetail(event.payload.output),
-      stderr: truncateDetail(event.payload.stderr),
-      stdout: truncateDetail(event.payload.stdout),
-    },
-  )
-}
-
-function toolProgressActivity(event: Extract<ProviderRuntimeEvent, { type: 'tool.progress' }>) {
-  return baseActivity(event, 'tool', 'tool.progress', event.payload.summary ?? 'Tool progress', {
-    elapsedSeconds: event.payload.elapsedSeconds,
-    summary: truncateDetail(event.payload.summary),
-    toolName: event.payload.toolName,
-    toolUseId: event.payload.toolUseId,
-  })
-}
-
-function toolSummaryActivity(event: Extract<ProviderRuntimeEvent, { type: 'tool.summary' }>) {
-  return baseActivity(event, 'tool', 'tool.summary', event.payload.summary, {
-    precedingToolUseIds: event.payload.precedingToolUseIds,
-    summary: truncateDetail(event.payload.summary),
-  })
-}
-
 function authStatusActivity(event: Extract<ProviderRuntimeEvent, { type: 'auth.status' }>) {
-  return baseActivity(
-    event,
-    event.payload.error ? 'error' : 'info',
-    'auth.status',
-    event.payload.error ? 'Authentication failed' : 'Authentication status updated',
-    event.payload,
-  )
+  if (!event.payload.error) return []
+
+  return [providerWarningActivity(event, `Authentication failed: ${event.payload.error}`)]
+}
+
+function mcpStatusActivity(event: Extract<ProviderRuntimeEvent, { type: 'mcp.status.updated' }>) {
+  const status = event.payload.status
+  if (!isPlainRecord(status)) return []
+
+  const error = firstText(status.error, status.failureReason)
+  if (!error && status.status !== 'failed') return []
+
+  const name = firstText(status.name) ?? 'MCP server'
+  const message = error ? `${name} connection failed: ${error}` : `${name} connection failed`
+  return [providerWarningActivity(event, message)]
 }
 
 function mcpOauthCompletedActivity(
   event: Extract<ProviderRuntimeEvent, { type: 'mcp.oauth.completed' }>,
 ) {
-  return baseActivity(
-    event,
-    event.payload.success ? 'info' : 'error',
-    'mcp.oauth.completed',
-    event.payload.success ? 'MCP OAuth completed' : 'MCP OAuth failed',
-    event.payload,
-  )
-}
+  if (event.payload.success) return []
 
-function modelReroutedActivity(event: Extract<ProviderRuntimeEvent, { type: 'model.rerouted' }>) {
-  return baseActivity(event, 'info', 'model.rerouted', 'Model rerouted', event.payload)
-}
-
-function configWarningActivity(event: Extract<ProviderRuntimeEvent, { type: 'config.warning' }>) {
-  return baseActivity(event, 'error', 'config.warning', event.payload.summary, event.payload)
-}
-
-function deprecationNoticeActivity(
-  event: Extract<ProviderRuntimeEvent, { type: 'deprecation.notice' }>,
-) {
-  return baseActivity(event, 'info', 'deprecation.notice', event.payload.summary, event.payload)
+  const name = event.payload.name ?? 'MCP server'
+  const message = event.payload.error
+    ? `${name} sign-in failed: ${event.payload.error}`
+    : `${name} sign-in failed`
+  return [providerWarningActivity(event, message)]
 }
 
 function filesPersistedActivity(event: Extract<ProviderRuntimeEvent, { type: 'files.persisted' }>) {
-  return baseActivity(event, 'info', 'files.persisted', 'Files persisted', event.payload)
+  const failures = event.payload.failed ?? []
+  if (failures.length === 0) return []
+
+  const detail = failures.map((failure) => `${failure.filename}: ${failure.error}`).join('\n')
+  return [providerWarningActivity(event, 'Could not save files', detail)]
 }
 
-function realtimeActivity(
-  event: Extract<
-    ProviderRuntimeEvent,
-    {
-      type:
-        | 'conversation.realtime.audio.delta'
-        | 'conversation.realtime.closed'
-        | 'conversation.realtime.error'
-        | 'conversation.realtime.item-added'
-        | 'conversation.realtime.started'
-    }
-  >,
+function providerWarningActivity(
+  event: Parameters<typeof baseActivity>[0],
+  message: string,
+  detail?: unknown,
 ) {
-  if (event.type === 'conversation.realtime.audio.delta') return []
-
-  return [
-    baseActivity(
-      event,
-      event.type === 'conversation.realtime.error' ? 'error' : 'info',
-      event.type,
-      realtimeSummary(event.type),
-      event.payload,
-    ),
-  ]
+  return baseActivity(
+    event,
+    'info',
+    'runtime.warning',
+    truncateDetail(message, 120) ?? 'Provider warning',
+    {
+      detail,
+      message: truncateDetail(message),
+      sourceEventType: event.type,
+    },
+  )
 }
 
 function runtimeWarningActivity(event: Extract<ProviderRuntimeEvent, { type: 'runtime.warning' }>) {
-  return baseActivity(event, 'info', 'runtime.warning', 'Runtime warning', {
-    detail: event.payload.detail,
-    message: truncateDetail(event.payload.message),
-  })
+  return baseActivity(
+    event,
+    'info',
+    'runtime.warning',
+    truncateDetail(event.payload.message, 120) ?? 'Runtime warning',
+    {
+      detail: event.payload.detail,
+      message: truncateDetail(event.payload.message),
+    },
+  )
 }
 
 function runtimeErrorActivity(event: Extract<ProviderRuntimeEvent, { type: 'runtime.error' }>) {
@@ -1180,21 +1116,6 @@ function tokenUsageActivity(
       event.payload.usage,
     ),
   ]
-}
-
-function realtimeSummary(type: string) {
-  switch (type) {
-    case 'conversation.realtime.started':
-      return 'Realtime session started'
-    case 'conversation.realtime.item-added':
-      return 'Realtime item added'
-    case 'conversation.realtime.closed':
-      return 'Realtime session closed'
-    case 'conversation.realtime.error':
-      return 'Realtime error'
-    default:
-      return 'Realtime event'
-  }
 }
 
 function isReasoningStreamKind(streamKind: string) {
@@ -1241,6 +1162,26 @@ function taskCompletedSummary(event: Extract<ProviderRuntimeEvent, { type: 'task
   if (event.payload.status === 'stopped') return 'Task stopped'
 
   return 'Task completed'
+}
+
+function taskTitleFromActivities(
+  event: Extract<ProviderRuntimeEvent, { type: 'task.completed' }>,
+  activities: readonly OrchestrationSessionActivity[],
+) {
+  for (let index = activities.length - 1; index >= 0; index -= 1) {
+    const activity = activities[index]
+    if (!activity || (activity.kind !== 'task.started' && activity.kind !== 'task.progress'))
+      continue
+    if (activity.turnId !== (event.turnId ?? null)) continue
+    if (!isPlainRecord(activity.payload) || activity.payload.taskId !== event.payload.taskId)
+      continue
+
+    const detail = activity.kind === 'task.started' ? activity.payload.detail : undefined
+    const title = firstText(activity.payload.title, detail)
+    if (title) return truncateDetail(title, 120)
+  }
+
+  return undefined
 }
 
 function approvalRequestSummary(requestKind: ApprovalRequestKind) {
@@ -1321,5 +1262,5 @@ function truncateDetail(value: string | undefined, limit = 180) {
   if (value === undefined) return undefined
   if (value.length <= limit) return value
 
-  return `${value.slice(0, limit - 3)}...`
+  return `${value.slice(0, limit - 1)}…`
 }

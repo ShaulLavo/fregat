@@ -3,13 +3,13 @@ import {
   useChatProjectionStore,
   selectChatProjectionSlice,
 } from '@/features/chat/state/chat-projection-store'
-import { selectChatSidebarSessionsForProject } from '@/features/chat/state/chat-projection-selectors'
+import { selectChatSidebarSessionsForProject } from '@workspace/client-core/chat/selectors'
 import { useProjectActions } from '@/features/chat-mode/hooks/use-project-actions'
 import { startSessionDraft } from '@/features/chat-mode/state/session-commands'
 import { useProjectRenameRequestStore } from '@/features/chat-mode/state/project-rename-request-store'
 import { useSessionRailStore } from '@/features/chat-mode/state/session-rail-store'
 import { projectMenu } from '@/features/chat-mode/utils/project-menu'
-import type { SessionRailGroup } from '@/features/chat-mode/utils/session-rail-model'
+import type { SessionRailGroup } from '@workspace/client-core/chat/rail/model'
 import { copyTextToClipboard } from '@/lib/clipboard'
 
 /**

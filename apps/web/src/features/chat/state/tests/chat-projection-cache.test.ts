@@ -25,7 +25,7 @@ import {
   CHAT_PROJECTION_CACHE_MESSAGE_LIMIT,
   CHAT_PROJECTION_CACHE_SESSION_LIMIT,
   CHAT_PROJECTION_CACHE_TRANSCRIPT_LIMIT,
-} from '@/features/chat/state/chat-cache-constants'
+} from '@workspace/client-core/chat/cache-constants'
 import {
   CHAT_PROJECTION_CACHE_STORAGE_KEY,
   chatProjectionCacheFromState,
@@ -34,13 +34,13 @@ import {
 import {
   selectChatSidebarSessions,
   selectChatSessionById,
-} from '@/features/chat/state/chat-projection-selectors'
+} from '@workspace/client-core/chat/selectors'
 import {
   flushChatProjectionCache,
   restoredChatProjectionState,
   useChatProjectionStore,
 } from '@/features/chat/state/chat-projection-store'
-import { syncChatProjectionShellSnapshot } from '@/features/chat/state/chat-projection-writers'
+import { syncChatProjectionShellSnapshot } from '@workspace/client-core/chat/writers'
 
 const STORE = new Map<string, string>()
 

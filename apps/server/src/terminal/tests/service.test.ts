@@ -295,6 +295,74 @@ describe('terminal service', () => {
     expect(terminalOutputBytes(second.messages)).toEqual(output)
   })
 
+  it('fans out live output without replaying history to existing viewers', async () => {
+    const root = await fixtureRoot()
+    const pty = createFakePtyFactory()
+    const service = testService(root, { ptyFactory: pty.factory, detachTtlMs: 0 })
+    const routes = service.routes(auth())
+    const first = fakeSocket(root, '')
+    await routes.open(first)
+    pty.ptys[0]?.emit(new TextEncoder().encode('history'))
+    const second = fakeSocket(root, '')
+    await routes.open(second)
+
+    expect(first.closed).toBe(false)
+    expect(terminalOutputText(first.messages)).toBe('history')
+    expect(terminalOutputText(second.messages)).toBe('history')
+    await expect
+      .poll(() => pty.ptys[0]?.resizes)
+      .toEqual([
+        [81, 24],
+        [80, 24],
+      ])
+    pty.ptys[0]?.emit(new TextEncoder().encode(' live'))
+    expect(terminalOutputText(first.messages)).toBe('history live')
+    expect(terminalOutputText(second.messages)).toBe('history live')
+    routes.close(first)
+    await Bun.sleep(10)
+    expect(pty.ptys[0]?.killed).toBe(false)
+    routes.message(second, new TextEncoder().encode('input'))
+    expect(pty.ptys[0]?.writes).toEqual([new TextEncoder().encode('input')])
+    routes.close(second)
+    await expect.poll(() => pty.ptys[0]?.killed).toBe(true)
+  })
+
+  it('reports shared dimensions in band only while mode 2048 is enabled', async () => {
+    const root = await fixtureRoot()
+    const pty = createFakePtyFactory()
+    const service = testService(root, { ptyFactory: pty.factory })
+    const routes = service.routes(auth())
+    const socket = fakeSocket(root, '')
+    await routes.open(socket)
+    pty.ptys[0]?.emit(new TextEncoder().encode('\x1b]0;title \x1b[?2048h\x07'))
+    routes.message(socket, { type: 'resize', cols: 90, rows: 30 })
+    expect(pty.ptys[0]?.writes).toEqual([])
+    pty.ptys[0]?.emit(new TextEncoder().encode('\x1b[?1004;20'))
+    pty.ptys[0]?.emit(new TextEncoder().encode('48h'))
+    routes.message(socket, { type: 'resize', cols: 100, rows: 35 })
+    expect(pty.ptys[0]?.writes).toEqual(['\x1b[48;35;100;0;0t'])
+    pty.ptys[0]?.emit(new TextEncoder().encode('\x1b[?2048l'))
+    routes.message(socket, { type: 'resize', cols: 110, rows: 40 })
+    expect(pty.ptys[0]?.writes).toHaveLength(1)
+  })
+
+  it('starts truncated UTF-8 replay at a complete character boundary', async () => {
+    const root = await fixtureRoot()
+    const pty = createFakePtyFactory()
+    const service = testService(root, { ptyFactory: pty.factory })
+    const routes = service.routes(auth())
+    const first = fakeSocket(root, '')
+    await routes.open(first)
+    const bytes = new TextEncoder().encode('😀' + 'x'.repeat(256 * 1024 - 2))
+    pty.ptys[0]?.emit(bytes.subarray(0, 3))
+    pty.ptys[0]?.emit(bytes.subarray(3))
+    const second = fakeSocket(root, '')
+    await routes.open(second)
+
+    expect(terminalOutputText(first.messages)).toBe('😀' + 'x'.repeat(256 * 1024 - 2))
+    expect(terminalOutputText(second.messages)).toBe('x'.repeat(256 * 1024 - 2))
+  })
+
   it('keeps terminal tab sessions isolated within the same workspace', async () => {
     const root = await fixtureRoot()
     const pty = createFakePtyFactory()

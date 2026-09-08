@@ -1,7 +1,8 @@
-import { useQuery } from '@tanstack/react-query'
+import { useQuery, useQueryClient } from '@tanstack/react-query'
 import { useRef, useState } from 'react'
 
 import { cn } from '@workspace/ui/lib/utils'
+import { originForQueryClient } from '@/lib/environments/state/query-clients'
 
 import { useMediaBlobUrl } from '@/features/workbench/hooks/use-media-blob-url'
 import { useWallpaperPlayback } from '@/features/workbench/hooks/use-wallpaper-playback'
@@ -9,7 +10,8 @@ import { prefersReducedMotion, WALLPAPER_URL } from '@/features/workbench/utils/
 import {
   wallpaperInfoQueryOptions,
   wallpaperMediaQueryOptions,
-  wallpaperStillQueryOptions,
+  wallpaperPreloadState,
+  wallpaperStillUrl,
 } from '@/features/workbench/state/wallpaper-query'
 
 const wallpaperClassName = 'pointer-events-none absolute inset-0 z-0 h-full w-full object-cover'
@@ -18,38 +20,53 @@ const wallpaperClassName = 'pointer-events-none absolute inset-0 z-0 h-full w-fu
 // has to be drawn here. The still image carries the look; the video is the
 // optional animated upgrade and is the expensive half, so it stays gated.
 export function WebWallpaper({ className }: { readonly className?: string }) {
+  const queryClient = useQueryClient()
+  const desktopSource = wallpaperStillUrl(originForQueryClient(queryClient))
   const motionAllowed = !prefersReducedMotion()
   const info = useQuery(wallpaperInfoQueryOptions({ enabled: motionAllowed }))
-  const stillMedia = useQuery(wallpaperStillQueryOptions())
   const videoMedia = useQuery(
     wallpaperMediaQueryOptions({ enabled: motionAllowed && info.data === 'video' }),
   )
-  const [stillFailed, setStillFailed] = useState(false)
+  const [failedStillSource, setFailedStillSource] = useState<string | null>(null)
+  const [loadedStillSource, setLoadedStillSource] = useState<string | null>(null)
   const [videoFailed, setVideoFailed] = useState(false)
   const [videoReady, setVideoReady] = useState(false)
-  const stillRef = useRef<HTMLImageElement | null>(null)
   const videoRef = useRef<HTMLVideoElement | null>(null)
   const showVideo = !videoFailed && Boolean(videoMedia.data)
+  const preload = desktopSource ? wallpaperPreloadState(desktopSource) : 'pending'
+  const desktopReady = loadedStillSource === desktopSource || preload === 'ready'
+  const desktopFailed = failedStillSource === desktopSource || preload === 'error'
+  const stillSources = desktopSource && desktopReady && !desktopFailed ? [] : [WALLPAPER_URL]
+  if (desktopSource && !desktopFailed) stillSources.push(desktopSource)
 
-  useMediaBlobUrl(stillFailed ? null : stillMedia.data, stillRef, WALLPAPER_URL)
   useMediaBlobUrl(videoFailed ? null : videoMedia.data, videoRef)
   useWallpaperPlayback(videoRef)
 
   return (
     <>
-      <img
-        alt=''
-        aria-hidden='true'
-        className={cn(wallpaperClassName, className)}
-        crossOrigin='anonymous'
-        data-workbench-wallpaper={showVideo ? undefined : ''}
-        data-workbench-wallpaper-layer='still'
-        decoding='async'
-        fetchPriority='high'
-        onError={() => setStillFailed(true)}
-        ref={stillRef}
-        src={WALLPAPER_URL}
-      />
+      {stillSources.map((source) => {
+        const visible = source === WALLPAPER_URL || desktopReady
+        return (
+          <img
+            alt=''
+            aria-hidden='true'
+            className={cn(wallpaperClassName, !visible && 'opacity-0', className)}
+            crossOrigin='anonymous'
+            data-workbench-wallpaper={!showVideo && visible ? '' : undefined}
+            data-workbench-wallpaper-layer={visible ? 'still' : 'pending-still'}
+            decoding='sync'
+            fetchPriority='high'
+            key={source}
+            onError={() => {
+              if (source === desktopSource) setFailedStillSource(source)
+            }}
+            onLoad={() => {
+              if (source === desktopSource) setLoadedStillSource(source)
+            }}
+            src={source}
+          />
+        )
+      })}
       {showVideo ? (
         <video
           aria-hidden='true'

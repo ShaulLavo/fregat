@@ -16,6 +16,9 @@ test('overlay close restores captured focus and an unmounted origin falls back t
     })
     harness.focus.activate(overlay.token)
     expect(harness.focus.restore(origin)).toBe(true)
+    expect(harness.focus.capture()).toBe(overlay.token)
+    expect(harness.focus.getSnapshot().requested?.target).toBeNull()
+    overlay.unregister()
     expect(harness.focus.capture()).toBe(origin)
     harness.target.unregister()
     const fallback = harness.focus.register({
@@ -28,6 +31,80 @@ test('overlay close restores captured focus and an unmounted origin falls back t
     })
     expect(harness.focus.restore(origin)).toBe(true)
     expect(harness.focus.capture()).toBe(fallback.token)
+  } finally {
+    harness.dispose()
+  }
+})
+
+test('an overlay holds background requests and native activation until it becomes unavailable', async () => {
+  const harness = createCommandHarness({ handlers: {} })
+  let available = true
+  let overlayFocuses = 0
+  try {
+    const overlay = harness.focus.register({
+      ...harness.scope,
+      id: 'dialog',
+      area: 'dialog',
+      overlay: true,
+      textEntry: true,
+      get available() {
+        return available
+      },
+      focus: () => {
+        overlayFocuses += 1
+        return true
+      },
+      isFocused: () => true,
+    })
+    harness.focus.activate(overlay.token)
+    const request = harness.focus.request({ kind: 'target', token: harness.target.token })
+    expect(harness.focus.getSnapshot().requested).toMatchObject({
+      token: request.token,
+      target: null,
+    })
+    expect(harness.focus.activate(harness.target.token)).toBe(false)
+    expect(overlayFocuses).toBe(1)
+    expect(harness.focus.capture()).toBe(overlay.token)
+    expect(harness.focus.getSnapshot().lastCommandTarget?.token).toBe(harness.target.token)
+    available = false
+    harness.focus.refreshAvailability(overlay.token)
+    expect(await request.completion).toMatchObject({ status: 'acknowledged' })
+    expect(harness.focus.capture()).toBe(harness.target.token)
+  } finally {
+    harness.dispose()
+  }
+})
+
+test('opening an overlay hides a background target that is still waiting for native focus', async () => {
+  const harness = createCommandHarness({ handlers: {} })
+  let focused = false
+  try {
+    const target = harness.focus.register({
+      ...harness.scope,
+      id: 'delayed-widget',
+      area: 'editor',
+      textEntry: false,
+      focus: () => true,
+      isFocused: () => focused,
+    })
+    const request = harness.focus.request({ kind: 'target', token: target.token })
+    expect(harness.focus.getSnapshot().requested?.target?.token).toBe(target.token)
+    const overlay = harness.focus.register({
+      ...harness.scope,
+      id: 'dialog',
+      area: 'dialog',
+      overlay: true,
+      textEntry: true,
+      focus: () => true,
+      isFocused: () => true,
+    })
+    harness.focus.activate(overlay.token)
+    expect(harness.focus.getSnapshot().requested?.target).toBeNull()
+    expect(harness.focus.capture()).toBe(overlay.token)
+    focused = true
+    overlay.unregister()
+    expect(await request.completion).toMatchObject({ status: 'acknowledged' })
+    expect(harness.focus.capture()).toBe(target.token)
   } finally {
     harness.dispose()
   }

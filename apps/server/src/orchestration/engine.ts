@@ -1,3 +1,7 @@
+import { terminalHistoryMessages } from './utils/terminal-history'
+import { TerminalHandoffs, type TerminalHandoff } from './terminal-handoffs'
+import type { AgentTerminalResolver, AgentTerminalProcess } from '../terminal/agent-launch'
+import { sessionIdentityErrors } from '../provider/structured-errors'
 import { realpath } from 'node:fs/promises'
 import { WorktreeExecutionGate } from './worktree-execution-gate'
 import { WorktreeLifecycleReactor } from './worktree-lifecycle-reactor'
@@ -35,6 +39,8 @@ import { verifyReceiptIntent } from './command-receipts'
 import { sessionDomainErrors } from './structured-errors'
 import {
   commandIdSchema,
+  eventIdSchema,
+  errorStringField,
   type ClientOrchestrationCommand,
   type OrchestrationCommandReceipt,
 } from '@workspace/contracts'
@@ -92,6 +98,8 @@ export class OrchestrationEngine {
   private worktreeReactor: WorktreeLifecycleReactor | null = null
   private worktreePreparation: WorktreeCommandPreparation | null = null
   private readonly terminalLeases: TerminalLeaseController
+  private readonly terminalHandoffs: TerminalHandoffs
+  private readonly terminalHistoryRecoveries = new Map<SessionId, Promise<void>>()
   private unsubscribeGitMutations: (() => void) | null = null
   private reactorsStarted = false
   private queue = Promise.resolve()
@@ -121,6 +129,7 @@ export class OrchestrationEngine {
     this.database = database
     this.registration = options.registration
     this.providerService = options.providerService ?? null
+    this.terminalHandoffs = new TerminalHandoffs(database)
     this.terminalLeases = new TerminalLeaseController({
       gate: this.worktreeExecutionGate,
       dispatch: (command) => this.enqueue(command),
@@ -404,6 +413,30 @@ export class OrchestrationEngine {
     }
   }
 
+  private requireCommandRuntimeOwnership(command: OrchestrationCommand) {
+    switch (command.type) {
+      case 'session.terminal-history.append':
+        if (!this.providerService) throw sessionIdentityErrors.TERMINAL_SESSION_INVALID()
+        this.providerService.requireTerminalOwnership(command.sessionId)
+        return
+      case 'session.turn.start':
+      case 'session.checkpoint.revert':
+      case 'session.delete':
+        this.providerService?.requireSdkOwnership(command.sessionId)
+        return
+      case 'project.delete':
+        this.requireProjectRuntimeOwnership(command.projectId)
+    }
+  }
+
+  private requireProjectRuntimeOwnership(projectId: string) {
+    for (const session of this.readModel.sessions.values()) {
+      const worktree = this.readModel.worktrees.get(session.worktreeId)
+      if (worktree?.projectId !== projectId) continue
+      this.providerService?.requireSdkOwnership(session.id)
+    }
+  }
+
   private commitNewCommand(
     command: OrchestrationCommand,
     summary: OrchestrationCommandSummary,
@@ -416,6 +449,7 @@ export class OrchestrationEngine {
       ) {
         throw sessionImportErrors.CONTINUED()
       }
+      this.requireCommandRuntimeOwnership(command)
       const pendingEvents = decideOrchestrationCommand(command, this.readModel)
       recordChatPipelineInfo('chat.pipeline.command.decided', {
         ...summary,
@@ -563,6 +597,7 @@ export class OrchestrationEngine {
   }
 
   private async recover() {
+    await this.recoverTerminalHistory()
     for (const session of this.readModel.sessions.values()) {
       if (session.deletedAt) continue
       await this.recoverRuntime(session)
@@ -693,9 +728,204 @@ export class OrchestrationEngine {
     })
   }
 
+  beginAgentTerminal: AgentTerminalResolver = async (input) => {
+    await this.ready
+    const { sessionId, worktreeId } = input
+    const session = this.readModel.sessions.get(sessionId)
+    if (!session || session.deletedAt || session.worktreeId !== worktreeId || !this.providerService)
+      throw sessionIdentityErrors.TERMINAL_SESSION_INVALID()
+    const status = session.runtime?.status
+    if (
+      session.latestTurn?.state === 'running' ||
+      status === 'running' ||
+      status === 'starting' ||
+      status === 'waiting'
+    )
+      throw sessionIdentityErrors.TERMINAL_SESSION_INVALID()
+    const provider = this.providerService
+    const pending = this.terminalHandoffs.get(sessionId)
+    if (pending) await this.retryTerminalHistory(pending, provider)
+    const launch = await provider.reserveTerminalRuntime({
+      sessionId,
+      providerInstanceId: session.modelSelection.providerInstanceId,
+    })
+    return this.prepareTerminalHistory({ session, provider, launch, lease: input })
+  }
+
+  private async prepareTerminalHistory({
+    session,
+    provider,
+    launch,
+    lease,
+  }: {
+    session: OrchestrationProjectedSession
+    provider: ProviderService
+    launch: AgentTerminalProcess
+    lease: Parameters<AgentTerminalResolver>[0]
+  }) {
+    const worktree = this.readModel.worktrees.get(session.worktreeId)
+    if (!worktree) {
+      launch.release()
+      throw sessionIdentityErrors.TERMINAL_SESSION_INVALID()
+    }
+    const startedAt = new Date().toISOString()
+    const input = {
+      sessionId: session.id,
+      providerInstanceId: session.modelSelection.providerInstanceId,
+      cwd: worktree.canonicalPath,
+    }
+    try {
+      const before = await provider.readSessionHistory(input)
+      const handoff: TerminalHandoff = {
+        ...input,
+        worktreeId: session.worktreeId,
+        terminalLeaseId: lease.terminalLeaseId,
+        runtimeEpoch: lease.runtimeEpoch,
+        startedAt,
+        baseline: before.map((message) => message.sourceId),
+        phase: 'active',
+      }
+      this.terminalHandoffs.begin(handoff)
+      return {
+        ...launch,
+        reconcile: () => {
+          this.terminalHandoffs.exited(session.id)
+          return this.appendTerminalHistory(provider, handoff)
+        },
+        release: () => {
+          this.terminalHandoffs.complete(session.id)
+          launch.release()
+        },
+      }
+    } catch (error) {
+      launch.release()
+      throw error
+    }
+  }
+
+  private async appendTerminalHistory(provider: ProviderService, handoff: TerminalHandoff) {
+    provider.markTerminalHistoryPending(handoff.sessionId)
+    try {
+      const after = await provider.readSessionHistory(handoff)
+      const messages = terminalHistoryMessages(
+        handoff.sessionId,
+        handoff.startedAt,
+        handoff.baseline,
+        after,
+      )
+      if (!messages.length) return
+      await this.enqueue({
+        type: 'session.terminal-history.append',
+        sessionId: handoff.sessionId,
+        messages,
+        commandId: v.parse(
+          commandIdSchema,
+          internalCommandKey(
+            'session.terminal-history.append',
+            handoff.sessionId,
+            historyRevision(JSON.stringify(messages)),
+          ),
+        ),
+      })
+      recordChatPipelineInfo('chat.pipeline.terminal_history.summary', {
+        sessionId: handoff.sessionId,
+        messageCount: messages.length,
+        outcome: 'synchronized',
+      })
+    } catch (error) {
+      await this.recordTerminalHistoryFailure(handoff.sessionId, handoff.startedAt, error).catch(
+        (failure: unknown) => {
+          recordChatPipelineWarning('chat.pipeline.terminal_history.failure_record_failed', {
+            sessionId: handoff.sessionId,
+            error: failure,
+          })
+        },
+      )
+      throw error
+    }
+  }
+
+  private async recordTerminalHistoryFailure(
+    sessionId: SessionId,
+    startedAt: string,
+    error: unknown,
+  ) {
+    const message = errorStringField(error, 'message') ?? 'The provider history could not be read.'
+    const unknownOwnership =
+      errorStringField(error, 'code') === 'provider.TERMINAL_OWNERSHIP_UNKNOWN'
+    const key = internalCommandKey(
+      'terminal-history-failed',
+      sessionId,
+      startedAt,
+      historyRevision(message),
+    )
+    recordChatPipelineWarning('chat.pipeline.terminal_history.summary', {
+      sessionId,
+      outcome: 'failed',
+      error,
+    })
+    await this.enqueue({
+      type: 'session.activity.append',
+      commandId: v.parse(commandIdSchema, key),
+      sessionId,
+      createdAt: startedAt,
+      activity: {
+        id: v.parse(eventIdSchema, key),
+        sessionId,
+        createdAt: startedAt,
+        turnId: null,
+        tone: 'error',
+        kind: unknownOwnership ? 'terminal.ownership.unknown' : 'terminal.history.failed',
+        summary: unknownOwnership
+          ? 'Previous terminal process ownership is unconfirmed'
+          : 'Terminal history could not be synchronized',
+        payload: {
+          message,
+          fix:
+            errorStringField(error, 'fix') ??
+            'Reconnect the session terminal to retry synchronization.',
+        },
+      },
+    })
+  }
+
   async beginTerminalLease(worktreeId: WorktreeId) {
     await this.ready
     return this.terminalLeases.begin(worktreeId)
+  }
+
+  private async recoverTerminalHistory() {
+    const provider = this.providerService
+    if (!provider) return
+    const pending = this.terminalHandoffs.pending()
+    for (const handoff of pending)
+      provider.restoreTerminalOwnership(
+        handoff.sessionId,
+        handoff.phase === 'history' ? 'history' : 'unknown',
+      )
+    for (const handoff of pending) {
+      await this.retryTerminalHistory(handoff, provider).catch((error: unknown) =>
+        this.recordTerminalHistoryFailure(handoff.sessionId, handoff.startedAt, error),
+      )
+    }
+  }
+
+  private retryTerminalHistory(handoff: TerminalHandoff, provider: ProviderService) {
+    const existing = this.terminalHistoryRecoveries.get(handoff.sessionId)
+    if (existing) return existing
+    const recovery = this.finishTerminalHistoryRecovery(handoff, provider).finally(() => {
+      this.terminalHistoryRecoveries.delete(handoff.sessionId)
+    })
+    this.terminalHistoryRecoveries.set(handoff.sessionId, recovery)
+    return recovery
+  }
+
+  private async finishTerminalHistoryRecovery(handoff: TerminalHandoff, provider: ProviderService) {
+    if (handoff.phase === 'active') throw sessionIdentityErrors.TERMINAL_OWNERSHIP_UNKNOWN()
+    await this.terminalLeases.endRecovered(handoff.terminalLeaseId)
+    await this.appendTerminalHistory(provider, handoff)
+    this.terminalHandoffs.complete(handoff.sessionId)
+    provider.releaseTerminalOwnership(handoff.sessionId)
   }
 
   async refreshWorktreeMetadata(checkoutPath: string) {

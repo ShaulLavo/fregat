@@ -8,11 +8,11 @@ import {
   createSessionRenameCommand,
   createSessionRuntimeStopCommand,
   createSessionUnarchiveCommand,
-} from '@/features/chat/utils/command-builders'
+} from '@workspace/client-core/chat/commands'
 import {
   selectChatSessionsForProject,
   selectSessionOwnership,
-} from '@/features/chat/state/chat-projection-selectors'
+} from '@workspace/client-core/chat/selectors'
 import {
   useChatProjectionStore,
   selectChatProjectionSlice,
@@ -23,7 +23,7 @@ import {
   type SessionDeleteRequest,
 } from '@/features/chat-mode/state/session-delete-request-store'
 import { useSessionSelectionStore } from '@/features/chat-mode/state/session-selection-store'
-import { compareSessionsForRail } from '@/features/chat-mode/utils/session-order'
+import { compareSessionsForRail } from '@workspace/client-core/chat/rail/session-order'
 import { hasRunningTurn } from '@/features/chat-mode/utils/running-turn'
 
 export function useSessionActions() {

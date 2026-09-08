@@ -7,21 +7,29 @@ import { registerEnvironmentQueryClient } from '@/lib/environments/state/query-c
 import { clientInstanceId, instanceHeaderName } from '@/lib/instance-id'
 
 export type DelayedFileReadClient = {
+  readonly observedMetadataStatus: () => number | null
   readonly observedStatus: () => number | null
   readonly release: () => void
+  readonly releaseMetadata: () => void
   readonly restore: () => void
 }
 
 // Queries that resolve through the environment registry snapshot their client,
 // so swapping the process-wide one is not enough: pass the query client whose
 // reads should pass through the gate.
-export function installDelayedFileReadClient(queryClient?: QueryClient): DelayedFileReadClient {
+export function installDelayedFileReadClient(
+  queryClient?: QueryClient,
+  { delayMetadata = false }: { readonly delayMetadata?: boolean } = {},
+): DelayedFileReadClient {
   const previousClient = getClient()
   const gate = createDelayedReadGate()
+  const metadataGate = createDelayedReadGate()
   const fetcher = Object.assign(
     async (...args: Parameters<typeof fetch>) => {
       const response = await fetch(...args)
-      if (new URL(requestUrl(args[0])).pathname !== '/fs/read') return response
+      const pathname = new URL(requestUrl(args[0])).pathname
+      if (pathname === '/fs/stat' && delayMetadata) await metadataGate.hold(response.status)
+      if (pathname !== '/fs/read') return response
 
       await gate.hold(response.status)
       return response
@@ -37,10 +45,16 @@ export function installDelayedFileReadClient(queryClient?: QueryClient): Delayed
 
   let restored = false
   return {
+    observedMetadataStatus: metadataGate.observedStatus,
     observedStatus: gate.observedStatus,
-    release: gate.release,
+    release: () => {
+      gate.release()
+      metadataGate.release()
+    },
+    releaseMetadata: metadataGate.release,
     restore: () => {
       gate.release()
+      metadataGate.release()
       if (restored) return
 
       restored = true
