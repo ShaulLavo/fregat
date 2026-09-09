@@ -12,6 +12,14 @@ export {
   type TreeEntry,
 } from './tree-entry'
 export type { FileResult } from './file-result'
+export {
+  WORKSPACE_ADDRESS_ID_LENGTH,
+  workspaceAddressIdSchema,
+  workspaceAddressSchema,
+  type WorkspaceAddressId,
+  type WorkspaceAddress,
+  type WorkspaceRootEntry,
+} from './workspace-address'
 export { TUI_CLIENT_ORIGIN } from './client-origins'
 export {
   generateSpreadOrderKeys,

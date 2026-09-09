@@ -8,6 +8,7 @@ export const CODEX_CLIENT_REQUEST_METHODS = {
   'thread/start': 'thread/start',
   'thread/resume': 'thread/resume',
   'thread/rollback': 'thread/rollback',
+  'thread/list': 'thread/list',
   'thread/read': 'thread/read',
   'skills/list': 'skills/list',
   'turn/start': 'turn/start',
@@ -82,6 +83,7 @@ export interface CodexClientRequestParamsByMethod {
   readonly 'thread/start': CodexSchema.V2ThreadStartParams
   readonly 'thread/resume': CodexSchema.V2ThreadResumeParams
   readonly 'thread/rollback': CodexSchema.V2ThreadRollbackParams
+  readonly 'thread/list': CodexSchema.V2ThreadListParams
   readonly 'thread/read': CodexSchema.V2ThreadReadParams
   readonly 'skills/list': CodexSchema.V2SkillsListParams
   readonly 'turn/start': CodexSchema.V2TurnStartParams
@@ -95,6 +97,7 @@ export interface CodexClientRequestResultByMethod {
   readonly 'thread/start': CodexSchema.V2ThreadStartResponse
   readonly 'thread/resume': CodexSchema.V2ThreadResumeResponse
   readonly 'thread/rollback': CodexSchema.V2ThreadRollbackResponse
+  readonly 'thread/list': CodexSchema.V2ThreadListResponse
   readonly 'thread/read': CodexSchema.V2ThreadReadResponse
   readonly 'skills/list': CodexSchema.V2SkillsListResponse
   readonly 'turn/start': CodexSchema.V2TurnStartResponse
@@ -166,6 +169,7 @@ export const CODEX_CLIENT_REQUEST_PARAMS = {
   'thread/start': CodexSchema.V2ThreadStartParamsSchema,
   'thread/resume': CodexSchema.V2ThreadResumeParamsSchema,
   'thread/rollback': CodexSchema.V2ThreadRollbackParamsSchema,
+  'thread/list': CodexSchema.V2ThreadListParamsSchema,
   'thread/read': CodexSchema.V2ThreadReadParamsSchema,
   'skills/list': CodexSchema.V2SkillsListParamsSchema,
   'turn/start': CodexSchema.V2TurnStartParamsSchema,
@@ -179,6 +183,7 @@ export const CODEX_CLIENT_REQUEST_RESULTS = {
   'thread/start': CodexSchema.V2ThreadStartResponseSchema,
   'thread/resume': CodexSchema.V2ThreadResumeResponseSchema,
   'thread/rollback': CodexSchema.V2ThreadRollbackResponseSchema,
+  'thread/list': CodexSchema.V2ThreadListResponseSchema,
   'thread/read': CodexSchema.V2ThreadReadResponseSchema,
   'skills/list': CodexSchema.V2SkillsListResponseSchema,
   'turn/start': CodexSchema.V2TurnStartResponseSchema,

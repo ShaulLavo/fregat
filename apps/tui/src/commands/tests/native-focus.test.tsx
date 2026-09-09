@@ -7,12 +7,20 @@ import { renderTui } from '../../../test/render'
 test('pane commands and overlay dismissal focus the actual native widget', async ({ server }) => {
   const session = createTestSettingsSession(server)
   await session.refresh()
-  const frame = await renderTui(<Application session={session} onExit={() => {}} noColor />, {
-    width: 110,
-    height: 32,
-    useThread: false,
-    kittyKeyboard: true,
-  })
+  const frame = await renderTui(
+    <Application
+      initialLocation={{ kind: 'settings', query: '' }}
+      session={session}
+      onExit={() => {}}
+      noColor
+    />,
+    {
+      width: 110,
+      height: 32,
+      useThread: false,
+      kittyKeyboard: true,
+    },
+  )
   try {
     expect(frame.renderer.currentFocusedRenderable?.id).toBe('settings-search')
     await act(async () => {
@@ -45,12 +53,20 @@ test('saved key overrides update real keyboard dispatch and palette labels immed
   const state = session.getSnapshot()
   expect(state.kind).toBe('ready')
   if (state.kind !== 'ready') return
-  const frame = await renderTui(<Application session={session} onExit={() => {}} noColor />, {
-    width: 110,
-    height: 32,
-    useThread: false,
-    kittyKeyboard: true,
-  })
+  const frame = await renderTui(
+    <Application
+      initialLocation={{ kind: 'settings', query: '' }}
+      session={session}
+      onExit={() => {}}
+      noColor
+    />,
+    {
+      width: 110,
+      height: 32,
+      useThread: false,
+      kittyKeyboard: true,
+    },
+  )
   try {
     await act(async () => {
       const submission = state.owner.submit('user', [

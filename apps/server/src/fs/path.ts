@@ -1,5 +1,6 @@
 import path from 'node:path'
 import { realpathSync } from 'node:fs'
+import { realpath } from 'node:fs/promises'
 import { FsError } from './errors'
 
 export const defaultIgnoredNames = [
@@ -28,6 +29,14 @@ export type WorkspacePaths = ReturnType<typeof createWorkspacePaths>
 
 export type WorkspacePathsOptions = {
   excludedAbsolutePaths?: readonly string[]
+}
+
+export async function resolveExistingPath(paths: WorkspacePaths, input: string) {
+  const target = paths.resolve(input)
+  const absolutePath = await realpath(target.absolutePath)
+  paths.assertRealInside(absolutePath)
+
+  return { absolutePath, relativePath: target.relativePath }
 }
 
 export function createWorkspacePaths(

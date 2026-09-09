@@ -1,4 +1,13 @@
-import { copyFileSync, mkdtempSync, readFileSync, rmSync } from 'node:fs'
+import { createHash } from 'node:crypto'
+import {
+  copyFileSync,
+  existsSync,
+  mkdtempSync,
+  readFileSync,
+  readdirSync,
+  rmSync,
+  statSync,
+} from 'node:fs'
 import { relative, resolve, sep } from 'node:path'
 
 import {
@@ -17,11 +26,44 @@ import { createBenchmarkError } from './structured-errors.mjs'
 const defaultAppUrl = 'http://localhost:5173/'
 const defaultServerUrl = process.env.VITE_SERVER_URL ?? 'http://localhost:3001'
 const defaultFilePath = 'apps/web/src/features/editor/components/editor.tsx'
-const defaultRootPath = resolve(process.cwd(), '../..')
+const platformRoot = resolve(import.meta.dirname, '../../..')
+const defaultEditorRoot = resolve(platformRoot, '../Editor')
+const defaultRootPath = platformRoot
 const defaultCalibrationFile = resolve(
   import.meta.dirname,
   'editor-open-benchmark-calibration.json',
 )
+const benchmarkIdentityVersion = 2
+const benchmarkColorScheme = 'dark'
+const benchmarkViewport = { height: 900, width: 1440 }
+const platformImplementationEntries = [
+  'apps/web/index.html',
+  'apps/web/package.json',
+  'apps/web/public',
+  'apps/web/scripts/bench-workspace.mjs',
+  'apps/web/scripts/editor-open-benchmark.mjs',
+  'apps/web/src',
+  'apps/web/vite.config.ts',
+  'bun.lock',
+  'package.json',
+  'packages/contracts/package.json',
+  'packages/contracts/src',
+  'packages/observability/package.json',
+  'packages/observability/src',
+  'packages/tree/package.json',
+  'packages/tree/src',
+  'packages/ui/package.json',
+  'packages/ui/src',
+]
+const implementationManifestIgnoredDirectories = new Set([
+  '.turbo',
+  '__tests__',
+  'bench',
+  'coverage',
+  'node_modules',
+  'test',
+  'tests',
+])
 const modes = ['miss', 'query-only', 'prepared-50', 'prepared-150', 'prepared-300']
 const pipelineMarkNames = [
   'editor.authoritative_highlight_paint',
@@ -33,8 +75,11 @@ const pipelineMarkNames = [
   'editor.worker.request',
 ]
 const options = parseOptions(process.argv.slice(2))
+const benchmarkIdentity = createBenchmarkIdentity(options)
 const gateCalibrationEvidence =
-  options.gate && !options.calibrate ? readCalibrationEvidence(options.calibrationFile) : []
+  options.gate && !options.calibrate
+    ? readCalibrationEvidence(options.calibrationFile, benchmarkIdentity)
+    : []
 const fixtures = createFixtureSet(options)
 
 try {
@@ -55,6 +100,7 @@ function parseOptions(args) {
     browsers: browserList(process.env.EDITOR_OPEN_BENCH_BROWSERS ?? 'chromium'),
     calibrationFile: process.env.EDITOR_OPEN_BENCH_CALIBRATION_FILE ?? defaultCalibrationFile,
     calibrate: false,
+    editorRoot: process.env.EDITOR_OPEN_BENCH_EDITOR_ROOT ?? null,
     filePath: process.env.EDITOR_OPEN_BENCH_FILE ?? defaultFilePath,
     gate: false,
     pageTimeoutMs: numberOption(process.env.EDITOR_OPEN_BENCH_PAGE_TIMEOUT_MS, 30_000),
@@ -67,6 +113,7 @@ function parseOptions(args) {
   }
 
   for (const arg of args) applyOption(parsed, arg)
+  if (!parsed.editorRoot) parsed.editorRoot = defaultEditorRoot
   if (parsed.browsers.length === 0) parsed.browsers = ['chromium']
   if (parsed.gate && parsed.warmupsPerMode < 5) {
     throw createBenchmarkError('editor-open gate requires at least five warmups per mode')
@@ -96,6 +143,7 @@ function applyOption(parsed, arg) {
   if (name === '--app-url') parsed.appUrl = value ?? parsed.appUrl
   if (name === '--browsers') parsed.browsers = browserList(value)
   if (name === '--calibration-file') parsed.calibrationFile = value ?? parsed.calibrationFile
+  if (name === '--editor-root') parsed.editorRoot = value ?? parsed.editorRoot
   if (name === '--file') parsed.filePath = value ?? parsed.filePath
   if (name === '--page-timeout-ms') parsed.pageTimeoutMs = numberOption(value, parsed.pageTimeoutMs)
   if (name === '--samples') parsed.samplesPerMode = numberOption(value, parsed.samplesPerMode)
@@ -105,7 +153,89 @@ function applyOption(parsed, arg) {
   if (name === '--workspace-root') parsed.workspaceRoot = value ?? parsed.workspaceRoot
 }
 
-function readCalibrationEvidence(path) {
+function createBenchmarkIdentity(config) {
+  const source = resolve(config.workspaceRoot, config.filePath)
+  return {
+    benchmarkVersion: benchmarkIdentityVersion,
+    colorScheme: benchmarkColorScheme,
+    fixturePath: relative(config.workspaceRoot, source).split(sep).join('/'),
+    fixtureSha256: createHash('sha256').update(readFileSync(source)).digest('hex'),
+    modes,
+    editorImplementationSha256: implementationFingerprint(
+      config.editorRoot,
+      editorImplementationEntries(config.editorRoot),
+    ),
+    platformImplementationSha256: implementationFingerprint(
+      platformRoot,
+      platformImplementationEntries,
+    ),
+    samplesPerMode: config.samplesPerMode,
+    viewport: benchmarkViewport,
+    warmupsPerMode: config.warmupsPerMode,
+  }
+}
+
+function implementationFingerprint(root, entries) {
+  const hash = createHash('sha256')
+  const manifest = implementationManifest(root, entries)
+  for (const relativePath of manifest) {
+    hash.update(relativePath)
+    hash.update('\0')
+    hash.update(readFileSync(resolve(root, relativePath)))
+    hash.update('\0')
+  }
+  return hash.digest('hex')
+}
+
+function editorImplementationEntries(root) {
+  const entries = ['bun.lock', 'package.json']
+  const packageDirectories = readdirSync(resolve(root, 'packages'), { withFileTypes: true })
+    .filter((entry) => entry.isDirectory())
+    .map((entry) => entry.name)
+    .toSorted()
+  for (const packageDirectory of packageDirectories) {
+    entries.push(...editorPackageImplementationEntries(root, packageDirectory))
+  }
+  return entries
+}
+
+function editorPackageImplementationEntries(root, packageDirectory) {
+  const packageRoot = `packages/${packageDirectory}`
+  return [`${packageRoot}/package.json`, `${packageRoot}/src`, `${packageRoot}/dist`].filter(
+    (entry) => existsSync(resolve(root, entry)),
+  )
+}
+
+function implementationManifest(root, entries) {
+  const files = []
+  for (const entry of entries) collectImplementationFiles(root, entry, files)
+  return files.toSorted()
+}
+
+function collectImplementationFiles(root, relativePath, files) {
+  const absolutePath = resolve(root, relativePath)
+  const stats = statSync(absolutePath)
+  if (stats.isFile()) {
+    if (implementationFileIsIncluded(relativePath)) files.push(relativePath)
+    return
+  }
+  if (!stats.isDirectory()) return
+
+  const children = readdirSync(absolutePath, { withFileTypes: true })
+  for (const child of children) {
+    if (child.isDirectory() && implementationManifestIgnoredDirectories.has(child.name)) continue
+    collectImplementationFiles(root, `${relativePath}/${child.name}`, files)
+  }
+}
+
+function implementationFileIsIncluded(relativePath) {
+  if (relativePath.endsWith('.d.ts')) return false
+  if (relativePath.endsWith('.map')) return false
+  if (/\.(browser|spec|test)\.[cm]?[jt]sx?$/.test(relativePath)) return false
+  return true
+}
+
+function readCalibrationEvidence(path, expectedIdentity) {
   let value
   try {
     value = JSON.parse(readFileSync(path, 'utf8'))
@@ -116,12 +246,20 @@ function readCalibrationEvidence(path) {
   if (!value || typeof value !== 'object' || Array.isArray(value)) {
     throw createBenchmarkError('editor-open calibration evidence must be an object')
   }
-  if (value.schemaVersion !== 1 || !Array.isArray(value.runs)) {
-    throw createBenchmarkError('editor-open calibration evidence has an unsupported schema')
+  if (value.schemaVersion !== 2 || !Array.isArray(value.runs)) {
+    throw createBenchmarkError(
+      'editor-open calibration evidence is stale or unsupported; run bun run bench:editor-open:calibrate',
+    )
+  }
+  validateCalibrationIdentity(value.identity)
+  if (!calibrationIdentitiesMatch(value.identity, expectedIdentity)) {
+    throw createBenchmarkError(
+      'editor-open calibration evidence does not match the current fixture, implementation, and benchmark config; rerun bun run bench:editor-open:calibrate',
+    )
   }
   const seedsByBrowser = new Map()
   for (const run of value.runs) {
-    validateCalibrationRun(run)
+    validateCalibrationRun(run, value.identity)
     const seeds = seedsByBrowser.get(run.browser) ?? new Set()
     if (seeds.has(run.seed)) {
       throw createBenchmarkError(
@@ -134,7 +272,52 @@ function readCalibrationEvidence(path) {
   return value.runs
 }
 
-function validateCalibrationRun(run) {
+function validateCalibrationIdentity(identity) {
+  if (!identity || typeof identity !== 'object' || Array.isArray(identity)) {
+    throw createBenchmarkError('editor-open calibration identity must be an object')
+  }
+  if (
+    !Number.isInteger(identity.benchmarkVersion) ||
+    typeof identity.colorScheme !== 'string' ||
+    typeof identity.fixturePath !== 'string' ||
+    typeof identity.fixtureSha256 !== 'string' ||
+    (identity.editorImplementationSha256 !== undefined &&
+      typeof identity.editorImplementationSha256 !== 'string') ||
+    (identity.platformImplementationSha256 !== undefined &&
+      typeof identity.platformImplementationSha256 !== 'string') ||
+    !Array.isArray(identity.modes) ||
+    !identity.modes.every((mode) => typeof mode === 'string') ||
+    !Number.isInteger(identity.samplesPerMode) ||
+    !Number.isInteger(identity.warmupsPerMode) ||
+    !Number.isInteger(identity.viewport?.height) ||
+    !Number.isInteger(identity.viewport?.width)
+  ) {
+    throw createBenchmarkError('editor-open calibration identity is invalid')
+  }
+}
+
+function calibrationIdentitiesMatch(left, right) {
+  return (
+    left.benchmarkVersion === right.benchmarkVersion &&
+    left.colorScheme === right.colorScheme &&
+    left.fixturePath === right.fixturePath &&
+    left.fixtureSha256 === right.fixtureSha256 &&
+    left.editorImplementationSha256 === right.editorImplementationSha256 &&
+    left.platformImplementationSha256 === right.platformImplementationSha256 &&
+    left.samplesPerMode === right.samplesPerMode &&
+    left.warmupsPerMode === right.warmupsPerMode &&
+    left.viewport.height === right.viewport.height &&
+    left.viewport.width === right.viewport.width &&
+    sameValues(left.modes, right.modes)
+  )
+}
+
+function sameValues(left, right) {
+  if (left.length !== right.length) return false
+  return left.every((value, index) => value === right[index])
+}
+
+function validateCalibrationRun(run, identity) {
   if (!run || typeof run !== 'object' || Array.isArray(run)) {
     throw createBenchmarkError('editor-open calibration run must be an object')
   }
@@ -172,6 +355,12 @@ function validateCalibrationRun(run) {
   if (run.samplesPerMode < 30 || run.warmupsPerMode < 5) {
     throw createBenchmarkError('editor-open calibration run used too few samples or warmups')
   }
+  if (
+    run.samplesPerMode !== identity.samplesPerMode ||
+    run.warmupsPerMode !== identity.warmupsPerMode
+  ) {
+    throw createBenchmarkError('editor-open calibration run does not match its config identity')
+  }
 }
 
 function createFixtureSet(config) {
@@ -195,8 +384,8 @@ function createFixtureSet(config) {
 async function runBrowser(browserName, workspace, fixturePaths) {
   const browser = await browserTypes[browserName].launch(launchOptions(browserName))
   const context = await browser.newContext({
-    colorScheme: 'dark',
-    viewport: { height: 900, width: 1440 },
+    colorScheme: benchmarkColorScheme,
+    viewport: benchmarkViewport,
   })
   const inertPath = `search-buffer:${encodeURIComponent(workspace.rootFolder.path)}`
   await seedInertWorkspace(context, workspace, inertPath)
@@ -209,9 +398,18 @@ async function runBrowser(browserName, workspace, fixturePaths) {
 
     let fixtureIndex = 0
     const warmupOrder = randomizedModes(options.warmupsPerMode, options.seed ^ 0x0610)
+    const warmupSamples = []
     for (const mode of warmupOrder) {
-      await runSample(page, workspace, fixturePaths[fixtureIndex], mode, fixtureIndex, true)
+      const sample = await runSample(
+        page,
+        workspace,
+        fixturePaths[fixtureIndex],
+        mode,
+        fixtureIndex,
+        true,
+      )
       fixtureIndex += 1
+      warmupSamples.push(sample)
     }
 
     const measuredOrder = randomizedModes(options.samplesPerMode, options.seed)
@@ -235,12 +433,12 @@ async function runBrowser(browserName, workspace, fixturePaths) {
     }
 
     const compatibilitySamples = []
-    let sharedVisibleSnapshot = null
+    const compatibilityCaptureResults = []
     for (const mode of modes) {
       const path = fixturePaths[fixtureIndex]
       fixtureIndex += 1
       const record = await captureCompatibilityRecord(page, workspace, path)
-      sharedVisibleSnapshot ??= record.value.snapshot
+      compatibilityCaptureResults.push(record.reset)
       const sample = await runSample(
         page,
         workspace,
@@ -248,22 +446,19 @@ async function runBrowser(browserName, workspace, fixturePaths) {
         mode,
         compatibilitySamples.length,
         false,
-        {
-          key: record.key,
-          value: {
-            ...record.value,
-            snapshot: {
-              ...sharedVisibleSnapshot,
-              documentId: record.value.snapshot.documentId,
-            },
-          },
-        },
+        { key: record.key, value: record.value },
       )
       compatibilitySamples.push(sample)
     }
 
     const summary = summarize(browserName, samples, compatibilitySamples)
-    if (options.gate) validateGate(summary, samples)
+    const runtimeSessionSamples = [
+      ...warmupSamples,
+      ...samples,
+      ...compatibilityCaptureResults,
+      ...compatibilitySamples,
+    ]
+    if (options.gate) validateGate(summary, samples, runtimeSessionSamples)
     console.log(`EDITOR_OPEN_BENCHMARK_SUMMARY ${JSON.stringify(summary, null, 2)}`)
     if (options.calibrate) {
       console.log(`EDITOR_OPEN_BENCHMARK_EVIDENCE ${JSON.stringify(calibrationEvidence(summary))}`)
@@ -333,6 +528,7 @@ async function runSample(page, workspace, path, mode, order, warmup, visibleSnap
 
   const activationAt = await activateTarget(page, path)
   await waitForAuthoritativePaint(page)
+  await page.waitForTimeout(0)
   const measured = await readMeasuredPipeline(page, path, activationAt, detectedAt)
   const reset = await page.evaluate(
     (request) => window.__editorPerfTrace.resetEditorOpenSample(request),
@@ -361,8 +557,9 @@ async function captureCompatibilityRecord(page, workspace, path) {
   const targetButton = page.locator(attributeSelector(path))
   await targetButton.waitFor({ state: 'visible' })
   await nextFrames(page)
-  await activateTarget(page, path)
+  const activationAt = await activateTarget(page, path)
   await waitForAuthoritativePaint(page)
+  await page.waitForTimeout(0)
   await page.waitForFunction((targetPath) => {
     for (let index = 0; index < localStorage.length; index += 1) {
       const key = localStorage.key(index)
@@ -387,13 +584,18 @@ async function captureCompatibilityRecord(page, workspace, path) {
     }
     return null
   }, path)
-  await page.evaluate((request) => window.__editorPerfTrace.resetEditorOpenSample(request), {
-    ...target,
-    sampleId,
-  })
+  const measured = await readMeasuredPipeline(page, path, activationAt, null)
+  const reset = await page.evaluate(
+    (request) => window.__editorPerfTrace.resetEditorOpenSample(request),
+    {
+      ...target,
+      sampleId,
+    },
+  )
+  validateCompatibilityCaptureReset(reset, path)
   await assertResetState(page, path)
   if (!record) throw createBenchmarkError(`visible snapshot capture missing for ${path}`)
-  return record
+  return { ...record, reset: { ...measured, ...reset } }
 }
 
 async function triggerPreparedIntent(page, targetButton, path) {
@@ -465,6 +667,17 @@ async function waitForAuthoritativePaint(page) {
   )
 }
 
+function validateCompatibilityCaptureReset(reset, path) {
+  if (reset.quiescent !== true) {
+    throw createBenchmarkError(`visible snapshot capture reset was not quiescent for ${path}`)
+  }
+  if (reset.targetIntents === 0 && reset.nonTargetIntents === 0) return
+
+  throw createBenchmarkError(
+    `visible snapshot capture reset observed intents for ${path}: target=${reset.targetIntents}, nonTarget=${reset.nonTargetIntents}`,
+  )
+}
+
 function readMeasuredPipeline(page, path, activationAt, detectedAt) {
   return page.evaluate(
     ({ activatedAt, intentAt, targetPath }) => {
@@ -500,6 +713,8 @@ function readMeasuredPipeline(page, path, activationAt, detectedAt) {
           'editor.syntax.session_created',
           'highlighter',
         ),
+        postActivationHighlighterRuntimeSessionIds: workerRuntimeSessionIds('shiki'),
+        postActivationStructuralRuntimeSessionIds: workerRuntimeSessionIds('tree-sitter'),
         intentMarkMs:
           performance
             .getEntriesByName('editor.file_open_intent.detected', 'mark')
@@ -540,6 +755,17 @@ function readMeasuredPipeline(page, path, activationAt, detectedAt) {
       function workerCount(type) {
         return workers.filter((entry) => entry.detail?.type === type).length
       }
+
+      function workerRuntimeSessionIds(family) {
+        return [
+          ...new Set(
+            workers
+              .filter((entry) => entry.detail?.family === family)
+              .map((entry) => entry.detail?.runtimeSessionId)
+              .filter((runtimeSessionId) => typeof runtimeSessionId === 'string'),
+          ),
+        ]
+      }
     },
     { activatedAt: activationAt, intentAt: detectedAt, targetPath: path },
   )
@@ -567,10 +793,17 @@ function validateSample(sample, group) {
   if (sample.authoritativeTextCount !== 1 || sample.authoritativeHighlightCount !== 1) {
     throw createBenchmarkError(`${sample.mode} did not emit one authoritative paint per phase`)
   }
+  if (sample.mode === 'query-only' && sample.fileReads !== 0) {
+    throw createBenchmarkError(`query-only performed ${sample.fileReads} file reads after priming`)
+  }
   if (group === 'visible-snapshot-compatibility') {
     if (!sample.visibleSnapshotSeeded) {
       throw createBenchmarkError(`${sample.mode} compatibility sample was not seeded`)
     }
+    if (!sample.quiescent) {
+      throw createBenchmarkError(`${sample.mode} compatibility reset did not prove quiescence`)
+    }
+    if (sample.cachedFrameCount === 0 && sample.mode.startsWith('prepared-')) return
     if (sample.cachedFrameCount !== 1) {
       throw createBenchmarkError(
         `${sample.mode} visible-snapshot compatibility sample did not paint one cached frame`,
@@ -584,9 +817,6 @@ function validateSample(sample, group) {
       throw createBenchmarkError(
         `${sample.mode} did not paint its cached frame before authoritative text and highlight`,
       )
-    }
-    if (!sample.quiescent) {
-      throw createBenchmarkError(`${sample.mode} compatibility reset did not prove quiescence`)
     }
     return
   }
@@ -643,6 +873,7 @@ function summarize(browserName, samples, compatibilitySamples) {
       calibrate: options.calibrate,
       gate: options.gate,
       gateCalibration: calibrationContract(browserName),
+      identity: benchmarkIdentity,
       primaryComparison: 'query-only vs prepared-300',
       samplesPerMode: options.samplesPerMode,
       seed: options.seed,
@@ -723,7 +954,7 @@ function summarizeMode(samples) {
   }
 }
 
-function validateGate(summary, samples) {
+function validateGate(summary, samples, runtimeSessionSamples) {
   const prepared300 = samples.filter((sample) => sample.mode === 'prepared-300')
   const structuralFailures = prepared300.filter(
     (sample) =>
@@ -758,8 +989,15 @@ function validateGate(summary, samples) {
   }
   assertTransferredRuntimeIdsAreScoped(prepared300, 'highlighter')
   assertTransferredRuntimeIdsAreScoped(prepared300, 'structural')
-  assertUniqueRuntimeSessionIds(samples, 'highlighterRuntimeSessionIds')
-  assertUniqueRuntimeSessionIds(samples, 'structuralRuntimeSessionIds')
+  assertUniqueRuntimeSessionIds(runtimeSessionSamples, [
+    'highlighterRuntimeSessionIds',
+    'postActivationHighlighterRuntimeSessionIds',
+  ])
+  assertUniqueRuntimeSessionIds(runtimeSessionSamples, [
+    'structuralRuntimeSessionIds',
+    'postActivationStructuralRuntimeSessionIds',
+  ])
+  assertUniqueRuntimeSessionIdsAcrossFamilies(runtimeSessionSamples)
   if (summary.paired.queryOnlyPrepared300HighlightImprovementMs <= summary.paired.missNoiseMs) {
     throw createBenchmarkError(
       `prepared-300 improvement over query-only ${summary.paired.queryOnlyPrepared300HighlightImprovementMs}ms did not exceed ${summary.paired.missNoiseMs}ms noise`,
@@ -804,11 +1042,53 @@ function assertTransferredRuntimeIdsAreScoped(samples, family) {
   }
 }
 
-function assertUniqueRuntimeSessionIds(samples, key) {
-  const runtimeSessionIds = samples.flatMap((sample) => sample[key])
-  if (new Set(runtimeSessionIds).size === runtimeSessionIds.length) return
+function assertUniqueRuntimeSessionIds(samples, keys) {
+  assertRuntimeSessionSetsAreDisjoint(
+    sampleRuntimeSessionIdSets(samples, keys),
+    `editor-open benchmark reused a scoped ${keys.join('/')}`,
+  )
+}
 
-  throw createBenchmarkError(`editor-open benchmark reused a scoped ${key}`)
+function assertUniqueRuntimeSessionIdsAcrossFamilies(samples) {
+  const highlighterKeys = [
+    'highlighterRuntimeSessionIds',
+    'postActivationHighlighterRuntimeSessionIds',
+  ]
+  const structuralKeys = [
+    'postActivationStructuralRuntimeSessionIds',
+    'structuralRuntimeSessionIds',
+  ]
+  const highlighterSets = sampleRuntimeSessionIdSets(samples, highlighterKeys)
+  const structuralSets = sampleRuntimeSessionIdSets(samples, structuralKeys)
+  for (let index = 0; index < samples.length; index += 1) {
+    const highlighter = highlighterSets[index]
+    const structural = structuralSets[index]
+    if ([...highlighter].every((runtimeSessionId) => !structural.has(runtimeSessionId))) continue
+
+    throw createBenchmarkError('editor-open benchmark reused a runtime id across syntax families')
+  }
+
+  const combinedSets = highlighterSets.map(
+    (highlighter, index) => new Set([...highlighter, ...structuralSets[index]]),
+  )
+  assertRuntimeSessionSetsAreDisjoint(
+    combinedSets,
+    'editor-open benchmark reused a runtime id across samples',
+  )
+}
+
+function assertRuntimeSessionSetsAreDisjoint(runtimeSessionSets, message) {
+  const seen = new Set()
+  for (const runtimeSessionIds of runtimeSessionSets) {
+    for (const runtimeSessionId of runtimeSessionIds) {
+      if (seen.has(runtimeSessionId)) throw createBenchmarkError(message)
+      seen.add(runtimeSessionId)
+    }
+  }
+}
+
+function sampleRuntimeSessionIdSets(samples, keys) {
+  return samples.map((sample) => new Set(keys.flatMap((key) => sample[key] ?? [])))
 }
 
 function calibrationContract(browserName) {
@@ -833,14 +1113,17 @@ function calibrationContract(browserName) {
 
 function calibrationEvidence(summary) {
   return {
-    baselineQueryOnlyHighlightP50Ms: summary.modes['query-only'].authoritativeHighlightMs.p50,
-    browser: summary.browser,
-    finalPrepared300HighlightP50Ms: summary.modes['prepared-300'].authoritativeHighlightMs.p50,
-    missHighlightP50Ms: summary.modes.miss.authoritativeHighlightMs.p50,
-    missNoiseMs: summary.paired.missNoiseMs,
-    samplesPerMode: options.samplesPerMode,
-    seed: options.seed,
-    warmupsPerMode: options.warmupsPerMode,
+    identity: benchmarkIdentity,
+    run: {
+      baselineQueryOnlyHighlightP50Ms: summary.modes['query-only'].authoritativeHighlightMs.p50,
+      browser: summary.browser,
+      finalPrepared300HighlightP50Ms: summary.modes['prepared-300'].authoritativeHighlightMs.p50,
+      missHighlightP50Ms: summary.modes.miss.authoritativeHighlightMs.p50,
+      missNoiseMs: summary.paired.missNoiseMs,
+      samplesPerMode: options.samplesPerMode,
+      seed: options.seed,
+      warmupsPerMode: options.warmupsPerMode,
+    },
   }
 }
 

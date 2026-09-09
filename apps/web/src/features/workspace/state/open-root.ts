@@ -58,12 +58,24 @@ export async function openWorkspaceRootForOwner(
     confirmedEnvironmentId(origin)
     const entry = result.entry
     if (!entry) return 'superseded'
-    if (workspaceStore.getState().rootFolder?.path === workspaceRoot) return 'already-open'
+    activateWorkspaceRoot(entry.path)
+    const alreadyOpen = workspaceStore.getState().rootFolder?.path === entry.path
+    if (alreadyOpen) {
+      workspaceStore.setState({
+        rootFolder: { ...entry, name: workspacePathLeaf(entry.path), type: 'directory' },
+      })
+      return 'already-open'
+    }
 
     queryClient.removeQueries({ queryKey: fileSystemKeys.trees() })
-    switchRootFolder({ ...entry, name: workspacePathLeaf(workspaceRoot), type: 'directory' })
-    log.info({ action: 'workspace.root_opened', area: 'workspace', path: workspaceRoot })
-    void recordRootAsRecent(queryClient, workspaceRoot)
+    switchRootFolder({ ...entry, name: workspacePathLeaf(entry.path), type: 'directory' })
+    log.info({
+      action: 'workspace.root_opened',
+      area: 'workspace',
+      path: entry.path,
+      workspaceId: entry.workspaceAddress.id,
+    })
+    void recordRootAsRecent(queryClient, entry.path)
     return 'opened'
   } catch (error) {
     if (activity.aborted) return 'superseded'

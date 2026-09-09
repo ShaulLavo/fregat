@@ -1,3 +1,4 @@
+import { addressHrefFromBrowser, browserAddressHref } from '@/features/address/utils/browser-url'
 import { addressRootClaimed, subscribeAddressRoot } from '@/features/address/state/root-claim'
 import { scopedSessionKey } from '@workspace/contracts'
 import { useEnvironmentsStore } from '@/lib/environments/state/store'
@@ -28,7 +29,6 @@ import {
   readSettingsCategory,
   subscribe as subscribeSettingsCategory,
 } from '@/features/settings/state/category-store'
-import { WORKSPACE_SLICE_LIMIT } from '@/features/workspace/state/cache'
 import { settingsCategorySlug } from '@/features/address/utils/settings-category'
 import { useEditorUiStoreApi } from '@/features/editor/state/ui-state'
 import { useEditorWorkspaceStoreApi } from '@/features/editor/state/workspace-state'
@@ -53,7 +53,9 @@ export function useAddressProjection() {
   // `editorPerfLayout` during every editor render and `decode` on the first editor's
   // idle callback — so a projection that dropped them would change behaviour
   // mid-session with no error and no log.
-  const [passthrough] = useState(() => parseAddress(window.location.href).passthrough)
+  const [passthrough] = useState(
+    () => parseAddress(addressHrefFromBrowser(window.location.href)).passthrough,
+  )
 
   useEffect(() => {
     const projection = createAddressProjection({
@@ -73,13 +75,13 @@ export function useAddressProjection() {
       // this write back into an inbound apply.
       writer: {
         push: (href) => {
-          history.pushState(null, '', href)
+          history.pushState(null, '', browserAddressHref(href))
           writeAddressCache(href)
         },
         // The other half of the dual serialization. Writing both from one place is
         // what guarantees the URL and the restore payload cannot disagree.
         replace: (href) => {
-          history.replaceState(null, '', href)
+          history.replaceState(null, '', browserAddressHref(href))
           writeAddressCache(href)
         },
       },
@@ -87,8 +89,14 @@ export function useAddressProjection() {
 
     const project = () => {
       if (addressRootClaimed()) return
+      const root = storeApi.getState().rootFolder
+      if (root && !root.workspaceAddress) return
       const catalog = addressEnvironments(useEnvironmentsStore.getState().entries)
-      if (parseAddress(window.location.href, catalog).rejectedEnvironment !== null) return
+      if (
+        parseAddress(addressHrefFromBrowser(window.location.href), catalog).rejectedEnvironment !==
+        null
+      )
+        return
       projection.project(
         addressFromSnapshot(snapshotFromStore(storeApi, uiStoreApi, searchStoreApi, passthrough)),
       )
@@ -101,7 +109,7 @@ export function useAddressProjection() {
     // applier makes only schedule a flush onto a later macrotask. By the time `flush`
     // compares identities, this has already run.
     const adopt = () => {
-      projection.adopt(`${location.pathname}${location.search}${location.hash}`)
+      projection.adopt(addressHrefFromBrowser(window.location.href))
     }
 
     // A debounced write has a quiet period to survive, and closing the tab does not
@@ -154,7 +162,6 @@ function snapshotFromStore(
 ) {
   const state = storeApi.getState()
   const rootPath = state.rootFolder?.path ?? null
-  if (rootPath === null) return { ...emptyAddressSnapshot(), passthrough }
 
   const environments = useEnvironmentsStore.getState()
   const entry = environments.entries[environments.activeOrigin]
@@ -169,17 +176,7 @@ function snapshotFromStore(
     focus: focusFor(uiStoreApi, activeEditorTabForWorkbenchPanels(panels)?.path ?? null),
     bottomTab: orAbsent(panels.activeBottomTab, defaults.activeBottomTab),
     editorTabPaths: panels.editorTabs.map((tab) => tab.path),
-    // From memory, never from storage. `readWorkspaceCache()` re-enumerates the whole
-    // localStorage keyspace and re-parses every slice AND every search buffer — and
-    // search buffers carry a materialized match list. Measured at 32 key enumerations
-    // and 14 parses per single file click, on a path that runs on every store change.
-    //
-    // Capped to match the persisted index the DECODER resolves against. A slug is a
-    // property of the whole set, and `parkedWorkspaces` only ever grows within a
-    // session while `writeWorkspaceIndexCache` trims to `WORKSPACE_SLICE_LIMIT` — so
-    // past that many project switches the encoder was qualifying against roots the
-    // resolver had never heard of, and emitting slugs nothing could resolve.
-    knownRootPaths: cappedKnownRoots(rootPath, state.parkedWorkspaces.keys()),
+    workspaceAddress: state.rootFolder?.workspaceAddress ?? null,
     passthrough,
     mode: state.uiMode === 'chat' ? ('chat' as const) : ('workbench' as const),
     rootPath,
@@ -195,14 +192,6 @@ function snapshotFromStore(
       createDefaultChatModePanels().activeToolTab,
     ),
   }
-}
-
-/**
- * The active root first, then the parked ones, trimmed to what the workspace index
- * actually persists. Mirrors `workspaceOrderFromCache`, which the decoder reads.
- */
-function cappedKnownRoots(rootPath: string, parked: Iterable<string>) {
-  return [rootPath, ...parked].slice(0, WORKSPACE_SLICE_LIMIT)
 }
 
 /**

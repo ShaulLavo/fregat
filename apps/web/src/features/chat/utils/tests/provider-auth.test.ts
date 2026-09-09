@@ -20,7 +20,7 @@ import {
   providerSignInTarget,
   providerSupportsSignIn,
   PROVIDER_AUTH_METHODS,
-} from '@/features/chat/utils/provider-auth'
+} from '@workspace/client-core/chat/providers/auth'
 import { providerSnapshot } from '../../../../../test/factories/chat'
 
 function attempt(state: ProviderLoginState, message?: string): ProviderLoginAttempt {

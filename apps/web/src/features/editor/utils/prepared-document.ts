@@ -19,9 +19,9 @@ import type {
   FileOpenIntentPreparationConfiguration,
   FileOpenIntentPreparationStage,
   FileOpenIntentPreparer,
+  FileOpenIntentStructuralRange,
 } from '@/lib/file-open-intent/state/service'
 
-const PREPARED_VISIBLE_RANGE_CHARS = 300_000
 const DEFAULT_EDITOR_TAB_SIZE = 4
 
 export type EditorPreparedEnvironment = {
@@ -51,29 +51,29 @@ export function createPlatformFileOpenPreparer(
       highlighterProvider,
       structuralProvider,
     },
-    prepare: (buffer, documentId, path, abortSignal) => {
+    prepare: (buffer, documentId, path, abortSignal, structuralRange) => {
       const preparedDocument = prepareEditorDocument(buffer, documentId, path, environment)
       return {
         buffer,
         preparedDocument,
         ...preparedDocumentConfiguration(
           preparedDocument,
-          buffer,
           path,
           environment,
           abortSignal,
+          structuralRange,
           highlighterProvider,
           structuralProvider,
         ),
       }
     },
-    reconfigure: (preparedDocument, buffer, _documentId, path, abortSignal) =>
+    reconfigure: (preparedDocument, _buffer, _documentId, path, abortSignal, structuralRange) =>
       preparedDocumentConfiguration(
         preparedDocument,
-        buffer,
         path,
         environment,
         abortSignal,
+        structuralRange,
         highlighterProvider,
         structuralProvider,
       ),
@@ -122,10 +122,10 @@ function prepareEditorDocument(
 
 function preparedDocumentConfiguration(
   prepared: EditorPreparedDocument,
-  buffer: EditorTextBuffer,
   path: string,
   environment: EditorPreparedEnvironment,
   abortSignal: AbortSignal,
+  structuralRange: FileOpenIntentStructuralRange,
   highlighterProvider: EditorHighlighterProvider | null,
   structuralProvider: EditorSyntaxProvider | null,
 ): FileOpenIntentPreparationConfiguration {
@@ -144,11 +144,11 @@ function preparedDocumentConfiguration(
   )
   const structural = structuralPreparationStage(
     prepared,
-    buffer,
     languageId,
     source,
     tags,
     abortSignal,
+    structuralRange,
     structuralProvider,
   )
   return {
@@ -161,20 +161,15 @@ function preparedDocumentConfiguration(
 
 function structuralPreparationStage(
   prepared: EditorPreparedDocument,
-  buffer: EditorTextBuffer,
   languageId: EditorSyntaxLanguageId | null,
   source: EditorSyntaxHighlightingSource,
   tags: EditorPreparedDocumentTags,
   abortSignal: AbortSignal,
+  range: FileOpenIntentStructuralRange,
   provider: EditorSyntaxProvider | null,
 ): FileOpenIntentPreparationStage | null {
   if (!languageId || source === 'disabled' || !provider) return null
 
-  const snapshot = buffer.getSnapshot()
-  const range = {
-    startIndex: 0,
-    endIndex: Math.min(snapshot.length, PREPARED_VISIBLE_RANGE_CHARS),
-  }
   return {
     configurationTag: tags.structuralConfigurationTag,
     family: 'structural',

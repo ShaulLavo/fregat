@@ -1,7 +1,7 @@
 import type { ReactElement } from 'react'
 
 import { useProjectMenu } from '@/features/chat-mode/hooks/use-project-menu'
-import type { SessionRailGroup } from '@/features/chat-mode/utils/session-rail-model'
+import type { SessionRailGroup } from '@workspace/client-core/chat/rail/model'
 import { MenuSurface } from '@/features/menus/components/surface'
 
 export function ProjectMenu({

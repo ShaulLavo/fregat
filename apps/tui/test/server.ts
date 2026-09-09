@@ -7,6 +7,7 @@ import {
   createMetadataDatabase,
   migratePlatformDatabase,
   MockProviderAdapter,
+  LogReaderService,
   NerdFontService,
   ProviderAdapterRegistry,
   testSettingsOptions,
@@ -19,7 +20,10 @@ export const TEST_CLIENT_ORIGIN = TUI_CLIENT_ORIGIN
 
 export type TestServer = Awaited<ReturnType<typeof makeTestServer>>
 
-type TestServerOptions = Pick<AppOptions, 'terminal' | 'lsp'>
+type TestServerOptions = Pick<AppOptions, 'terminal' | 'lsp' | 'workspaceEditDriver'> & {
+  providerAdapter?: MockProviderAdapter
+  providerRuntime?: boolean
+}
 
 export async function makeTestServer(options: TestServerOptions = {}) {
   await mkdir('/work/tmp', { recursive: true })
@@ -48,11 +52,16 @@ function createServerWithDatabase(
   options: TestServerOptions,
 ) {
   migratePlatformDatabase(database.db)
-  const providerAdapter = new MockProviderAdapter()
+  const {
+    providerAdapter = new MockProviderAdapter(),
+    providerRuntime = false,
+    ...appOptions
+  } = options
   const workspaceEditJournalRoot = path.join(root, '.platform-test', 'workspace-edit-journals')
   const buildApp = () =>
     createApp({
-      ...options,
+      ...appOptions,
+      logs: new LogReaderService({ dir: path.join(root, 'logs') }),
       auth: { allowedOrigins: [TEST_CLIENT_ORIGIN] },
       fonts: new NerdFontService({ cacheRoot: path.join(root, '.platform-test', 'fonts') }),
       metadataDatabase: database,
@@ -60,7 +69,7 @@ function createServerWithDatabase(
         attachmentsDir: path.join(root, '.platform-test', 'attachments'),
         database: database.db,
         providerAdapterRegistry: new ProviderAdapterRegistry([providerAdapter]),
-        providerRuntime: false,
+        providerRuntime,
       },
       settings: testSettingsOptions(root),
       watch: false,

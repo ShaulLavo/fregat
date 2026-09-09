@@ -17,10 +17,7 @@ import {
   type CommandPaletteActions,
 } from '@/features/command-palette/providers/actions-context'
 import { SessionGroups } from '@/features/command-palette/session-groups'
-import type {
-  SessionRailItem,
-  SessionRailProject,
-} from '@/features/chat-mode/utils/session-rail-model'
+import type { SessionRailItem, SessionRailProject } from '@workspace/client-core/chat/rail/model'
 import { Command, CommandInput, CommandList } from '@workspace/ui/components/command'
 import { expect, test } from '../../../../test/fixtures'
 

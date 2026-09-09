@@ -10,7 +10,8 @@ import {
 import * as v from 'valibot'
 
 import { getClient, type Client } from '@/lib/client'
-import { parseEdenSseStream, unwrapEdenResponse } from '@/lib/eden-events'
+import { parseEdenSseStream } from '@workspace/client-core/transport/eden'
+import { unwrapEdenResponse } from '@/lib/eden-events'
 import { clientErrors, createRpcError } from '@/lib/structured-errors'
 import { logFilterQuery } from '@/features/logs/utils/filter-params'
 

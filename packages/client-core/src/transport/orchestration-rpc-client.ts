@@ -32,6 +32,12 @@ import type {
   RpcObservation,
 } from './rpc-host'
 
+const serverError = Symbol('orchestration RPC server response')
+
+export function isOrchestrationRpcServerError(error: unknown) {
+  return error !== null && typeof error === 'object' && serverError in error
+}
+
 const ORCHESTRATION_RPC_CONNECT_TIMEOUT_MS = 10_000
 const ORCHESTRATION_RPC_REQUEST_TIMEOUT_MS = 60_000
 const ORCHESTRATION_RPC_HEARTBEAT_MS = 30_000
@@ -692,14 +698,17 @@ function streamGuardSequence(afterSequence: number | undefined) {
 }
 
 function createOrchestrationRpcServerError(error: OrchestrationWsError) {
-  return createClientError({
-    cause: error,
-    code: error.code ?? 'client.RPC_FAILED',
-    message: error.message,
-    status: error.status ?? 502,
-    why: 'The server returned an error response for a client RPC call.',
-    fix: 'Inspect the structured RPC payload and retry once the server issue is resolved.',
-  })
+  return Object.assign(
+    createClientError({
+      cause: error,
+      code: error.code ?? 'client.RPC_FAILED',
+      message: error.message,
+      status: error.status ?? 502,
+      why: 'The server returned an error response for a client RPC call.',
+      fix: 'Inspect the structured RPC payload and retry once the server issue is resolved.',
+    }),
+    { [serverError]: true },
+  )
 }
 
 function createOrchestrationRpcTimeoutError(method: string) {

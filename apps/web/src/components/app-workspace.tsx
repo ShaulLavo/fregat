@@ -1,4 +1,5 @@
 import { EmptyWorkspace } from '@/components/empty-workspace'
+import { LoadingState } from '@workspace/ui/components/loading-state'
 import { ProjectMachinePicker } from '@/components/project-machine-picker'
 import { useConnectedMachines } from '@/hooks/use-connected-machines'
 import { useQueryClient } from '@tanstack/react-query'
@@ -13,7 +14,7 @@ import { useWorkspaceEvents } from '@/features/workspace/hooks/use-events'
 import { log } from '@/lib/client-logging'
 import type { PickedFsEntry } from '@/lib/file-system-types'
 
-export function AppWorkspace() {
+export function AppWorkspace({ restoringWorkspace }: { readonly restoringWorkspace: boolean }) {
   const machines = useConnectedMachines()
   const origin = originForQueryClient(useQueryClient())
   const chooseMachine = machines.length > 1 || origin !== primaryServerOrigin()
@@ -36,6 +37,15 @@ export function AppWorkspace() {
     open: pickerOpen && !chooseMachine,
     value: rootFolder,
   })
+
+  if (!rootFolder && restoringWorkspace) {
+    return (
+      <LoadingState label='Restoring workspace' className='flex h-full flex-col gap-3 p-6'>
+        <div className='skeleton-sweep h-4 w-48 rounded' />
+        <div className='skeleton-sweep h-4 w-32 rounded' />
+      </LoadingState>
+    )
+  }
 
   return (
     <>

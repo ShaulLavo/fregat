@@ -1,6 +1,36 @@
 import { defineErrorCatalog } from 'evlog'
 
 export const sessionIdentityErrors = defineErrorCatalog('provider', {
+  TERMINAL_OWNERSHIP_UNKNOWN: {
+    status: 409,
+    message: 'The previous terminal process may still own this session',
+    why: 'The server restarted before the agent CLI exit was confirmed.',
+    fix: 'Inspect and stop the previous agent CLI. Keep this session closed until its process ownership is resolved.',
+  },
+  SESSION_IN_TERMINAL: {
+    status: 409,
+    message: 'This session is open in a terminal',
+    why: 'The terminal CLI exclusively owns this conversation until its process exits.',
+    fix: 'Exit the agent CLI before sending another chat prompt.',
+  },
+  TERMINAL_HISTORY_PENDING: {
+    status: 409,
+    message: 'Terminal history still needs to synchronize',
+    why: 'The CLI exited, but its conversation has not been saved into the chat projection.',
+    fix: 'Reconnect the session terminal to retry synchronization before sending another prompt.',
+  },
+  TERMINAL_UNSUPPORTED: {
+    status: 400,
+    message: 'Terminal resume requires an enabled Claude provider',
+    why: 'This provider instance cannot resume a canonical Claude conversation in its CLI.',
+    fix: 'Choose a Claude session or use the chat view.',
+  },
+  TERMINAL_SESSION_INVALID: {
+    status: 409,
+    message: 'The session cannot open in this terminal',
+    why: 'The session was deleted, belongs to another checkout, or has work in progress.',
+    fix: 'Wait for the active turn to finish and reopen the session in its own checkout.',
+  },
   SERVICE_CLOSED: {
     status: 503,
     message: 'The provider service is shutting down',
@@ -30,5 +60,17 @@ export const sessionIdentityErrors = defineErrorCatalog('provider', {
     message: 'Claude session discovery failed',
     why: 'The isolated provider metadata process could not return valid session metadata.',
     fix: 'Inspect the provider instance configuration and retry the scan.',
+  },
+  HISTORY_FAILED: {
+    status: 502,
+    message: 'Claude conversation history could not be read',
+    why: 'The isolated provider process could not return the local conversation transcript.',
+    fix: 'Check that this provider instance can access the session files and retry the import.',
+  },
+  HISTORY_UNSUPPORTED: {
+    status: 400,
+    message: 'This provider does not support conversation imports',
+    why: 'The configured provider has no local history reader.',
+    fix: 'Choose a provider listed in the conversation import settings.',
   },
 })

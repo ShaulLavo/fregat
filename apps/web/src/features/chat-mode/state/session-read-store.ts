@@ -8,7 +8,7 @@ import {
   readPersistedSessionReads,
   writePersistedSessionReads,
 } from '@/features/chat-mode/utils/session-read-storage'
-import type { SessionSeenStamps } from '@/features/chat-mode/utils/session-unread'
+import type { SessionSeenStamps } from '@workspace/client-core/chat/rail/unread'
 
 const SESSION_READ_PERSIST_DEBOUNCE_MS = 300
 

@@ -20,7 +20,7 @@ import {
   chatChangedFilesExpansionKey,
   useChatChangedFilesExpansionStore,
 } from '../state/chat-changed-files-expansion-store'
-import type { ChatTurnDiffSummary } from '../state/chat-projection-store'
+import type { ChatTurnDiffSummary } from '@workspace/client-core/chat/types'
 import { AssistantChangedFilesTree } from './assistant-changed-files-tree'
 import { ChatDiffStatLabel } from './chat-diff-stat-label'
 

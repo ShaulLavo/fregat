@@ -9,6 +9,7 @@ import {
   pathQuerySchema,
   recordRecentBodySchema,
   recentsQuerySchema,
+  registerWorkspaceAddressBodySchema,
   renameBodySchema,
   searchQuerySchema,
   treeQuerySchema,
@@ -19,6 +20,7 @@ import {
   workspaceEditReleaseBodySchema,
   workspaceEditStatusQuerySchema,
   workspaceEditTransitionBodySchema,
+  workspaceAddressParamsSchema,
 } from './contracts'
 import { errorPayload, FsError, isFsError } from './errors'
 import type { SearchStreamEvent } from './search'
@@ -77,6 +79,12 @@ export function fsRoutes(fs: FileSystemService) {
       })
       .post('/workspace-root', ({ body }) => fs.openWorkspaceRoot(body), {
         body: openWorkspaceRootBodySchema,
+      })
+      .post('/workspace-address', ({ body }) => fs.registerWorkspaceAddress(body.path), {
+        body: registerWorkspaceAddressBodySchema,
+      })
+      .get('/workspace-address/:id', ({ params }) => fs.resolveWorkspaceAddress(params.id), {
+        params: workspaceAddressParamsSchema,
       })
       .post('/write', ({ body }) => fs.write(body), {
         body: writeBodySchema,

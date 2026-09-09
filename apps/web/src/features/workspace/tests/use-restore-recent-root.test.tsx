@@ -24,7 +24,7 @@ test('restores the most recent backend folder when browser workspace state is em
   await recordRecentEntry('anubis')
   const workspaceStore = emptyWorkspaceStore()
 
-  renderWithProviders(
+  const view = renderWithProviders(
     <EditorStateProvider>
       <EditorWorkspaceStateContext.Provider value={workspaceStore}>
         <RecentWorkspaceRecovery />
@@ -32,15 +32,33 @@ test('restores the most recent backend folder when browser workspace state is em
     </EditorStateProvider>,
   )
 
+  expect(view.getByText('Restoring workspace')).toBeInTheDocument()
   await waitFor(() => expect(workspaceStore.getState().rootFolder?.path).toBe('anubis'))
+  expect(view.getByText('Ready')).toBeInTheDocument()
   await waitFor(() => expect(readWorkspaceCache(testScopedStorage).rootFolder?.path).toBe('anubis'))
+})
+
+test('finishes restoring when the server has no recent folders', async ({ client }) => {
+  void client
+  const workspaceStore = emptyWorkspaceStore()
+  const view = renderWithProviders(
+    <EditorStateProvider>
+      <EditorWorkspaceStateContext.Provider value={workspaceStore}>
+        <RecentWorkspaceRecovery />
+      </EditorWorkspaceStateContext.Provider>
+    </EditorStateProvider>,
+  )
+
+  expect(view.getByText('Restoring workspace')).toBeInTheDocument()
+  await waitFor(() => expect(view.getByText('Ready')).toBeInTheDocument())
+  expect(workspaceStore.getState().rootFolder).toBeNull()
 })
 
 function RecentWorkspaceRecovery() {
   useWorkspaceCachePersistence()
-  useRestoreRecentWorkspaceRoot()
+  const restoring = useRestoreRecentWorkspaceRoot()
 
-  return null
+  return <output>{restoring ? 'Restoring workspace' : 'Ready'}</output>
 }
 
 function emptyWorkspaceStore() {

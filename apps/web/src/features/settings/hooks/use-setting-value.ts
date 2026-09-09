@@ -1,9 +1,10 @@
-import { DEFAULT_SETTING_VALUES, type SettingId, type SettingsValues } from '@workspace/contracts'
+import type { SettingId, SettingsValues } from '@workspace/contracts'
 
 import { useSettingsProjection } from '@/features/settings/hooks/use-settings-projection'
+import { readSettingBootValue } from '@/features/settings/utils/boot-mirror'
 
 /**
- * One setting, typed, with the registry default until the snapshot lands.
+ * One setting, with its validated boot mirror or registry default until the snapshot lands.
  *
  * The read every consumer outside this feature uses, so no component has to
  * index the raw document or know the query key.
@@ -11,5 +12,5 @@ import { useSettingsProjection } from '@/features/settings/hooks/use-settings-pr
 export function useSettingValue<K extends SettingId>(key: K): SettingsValues[K] {
   const projection = useSettingsProjection()
 
-  return projection?.values[key] ?? DEFAULT_SETTING_VALUES[key]
+  return projection?.values[key] ?? readSettingBootValue(key)
 }

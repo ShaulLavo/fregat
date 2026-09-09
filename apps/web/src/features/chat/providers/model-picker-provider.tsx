@@ -1,7 +1,9 @@
-import type { ModelSelection } from '@workspace/contracts'
-import { useMemo, type ReactNode } from 'react'
+import type { ModelSelection, ProviderInstanceId } from '@workspace/contracts'
+import type { ReactNode } from 'react'
 
-import { reconcileModelEffort } from '@/features/chat/utils/model-effort'
+import { useProviderDisplay } from '@/features/chat/hooks/use-provider-display'
+import type { ProviderModelOption } from '@workspace/client-core/chat/providers/models'
+import { reconcileModelEffort } from '@workspace/client-core/chat/providers/effort'
 import {
   ChatModelPickerContext,
   type ChatModelPicker,
@@ -11,26 +13,17 @@ import {
   type ChatInputDraftTarget,
 } from '@/features/chat/state/chat-input-draft-store'
 
-/**
- * Owns model selection for one composer: the draft's override wins over the
- * session's committed selection, and a locked session refuses writes outright.
- * Consumers read it through `useModelPicker`, so the selection never has to be
- * passed down through the composer's layout components.
- *
- * The reasoning level is part of that selection rather than state of its own —
- * it lives in `ModelSelection.options`, which the draft and the session
- * projection already persist, so it is sticky per session for free.
- */
+// The draft selection applies to the next turn; existing sessions keep their provider.
 export function ChatModelPickerProvider({
   children,
   draftTarget,
-  locked,
+  sessionProviderInstanceId,
   modelSelection,
   persistModelSelection,
 }: {
   readonly children: ReactNode
   readonly draftTarget: ChatInputDraftTarget
-  readonly locked: boolean
+  readonly sessionProviderInstanceId: ProviderInstanceId | null
   readonly modelSelection: ModelSelection | null
   /** Durable home for the pick, so the next new session starts on it. */
   readonly persistModelSelection: (modelSelection: ModelSelection) => void
@@ -40,26 +33,26 @@ export function ChatModelPickerProvider({
   )
   const setModelSelection = useChatInputDraftStore((state) => state.setModelSelection)
   const activeModelSelection = draftModelSelection ?? modelSelection
-  // Context value identity: a fresh object every render would rerender every
-  // picker consumer, including the popover list while it is open.
-  const value = useMemo<ChatModelPicker>(() => {
-    function commit(nextModelSelection: ModelSelection) {
-      // Write the draft override first so the trigger never flickers while the
-      // project default round-trips through the projection.
-      setModelSelection(draftTarget, nextModelSelection)
-      persistModelSelection(nextModelSelection)
-    }
+  const { provider, display } = useProviderDisplay(activeModelSelection?.providerInstanceId)
+  function selectModel(option: ProviderModelOption) {
+    if (
+      sessionProviderInstanceId !== null &&
+      option.modelSelection.providerInstanceId !== sessionProviderInstanceId
+    )
+      return
 
-    return {
-      locked,
-      modelSelection: activeModelSelection,
-      selectModel: (option) => {
-        if (locked) return
+    const next = reconcileModelEffort(activeModelSelection, option.modelSelection, option)
+    setModelSelection(draftTarget, next)
+    persistModelSelection(next)
+  }
 
-        commit(reconcileModelEffort(activeModelSelection, option.modelSelection, option))
-      },
-    }
-  }, [activeModelSelection, draftTarget, locked, persistModelSelection, setModelSelection])
+  const value: ChatModelPicker = {
+    sessionProviderInstanceId,
+    modelSelection: activeModelSelection,
+    provider,
+    display,
+    selectModel,
+  }
 
   return <ChatModelPickerContext value={value}>{children}</ChatModelPickerContext>
 }

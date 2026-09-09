@@ -1,5 +1,5 @@
 import { transportFor } from '@/features/chat/state/active-transports'
-import { createWorkspaceProjectCommand } from '@/features/chat/utils/command-builders'
+import { createWorkspaceProjectCommand } from '@workspace/client-core/chat/commands'
 import { dispatchChatCommand } from '@/features/chat/utils/command-dispatch'
 import { reportError, toClientError } from '@/lib/client-error-taxonomy'
 import type { ConfirmedMachine } from '@/lib/environments/utils/machines'

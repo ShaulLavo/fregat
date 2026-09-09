@@ -32,9 +32,11 @@ import {
 } from './installers'
 import { fileExtension, fileUriForPath } from './language'
 import { recordProcessInfo } from '../observability'
+import { spawnTypeScript } from './typescript/runtime'
 
 export type LspServerHandle = {
   readonly process: ChildProcessWithoutNullStreams
+  readonly initializationOptions?: Readonly<Record<string, unknown>>
 }
 
 export type LspServerDefinition = {
@@ -101,11 +103,6 @@ const tsExtensions = ['.ts', '.tsx', '.js', '.jsx', '.mjs', '.cjs', '.mts', '.ct
 const eslintConfigMarkers = ['eslint.config.*', '.eslintrc*'] as const
 const biomeConfigMarkers = ['biome.json', 'biome.jsonc'] as const
 const oxlintConfigMarkers = ['.oxlintrc.json', '.oxlintrc.jsonc'] as const
-
-const compatibleTypeScriptServerPath = path.resolve(
-  import.meta.dirname,
-  '../../node_modules/typescript-language-service/lib/tsserver.js',
-)
 
 const LANGUAGE_SERVER_FEATURES = {
   completion: 0,
@@ -584,11 +581,7 @@ const lspServers: readonly LspServerDefinition[] = withBuiltInFeatures([
       nearestRoot(filePath, workspaceRoot, jsProjectMarkers, {
         exclude: ['deno.json', 'deno.jsonc'],
       }),
-    spawn: (root) =>
-      spawnNodePackageBin('typescript-language-server', 'typescript-language-server', ['--stdio'], {
-        cwd: root,
-      }),
-    initializationOptions: typescriptInitializationOptions,
+    spawn: spawnTypeScript,
   },
   {
     id: 'vue',
@@ -944,17 +937,6 @@ async function pythonInitializationOptions(root: string) {
   if (!pythonPath) return undefined
 
   return { pythonPath }
-}
-
-async function typescriptInitializationOptions(root: string) {
-  const workspaceTypeScriptServer = await findUp(path.resolve(root), root, [
-    'node_modules/typescript/lib/tsserver.js',
-  ])
-  const tsserver =
-    workspaceTypeScriptServer ?? (await firstExistingPath([compatibleTypeScriptServerPath]))
-  if (!tsserver) return undefined
-
-  return { tsserver: { path: tsserver } }
 }
 
 function serverMatches(server: LspServerDefinition, extension: string) {

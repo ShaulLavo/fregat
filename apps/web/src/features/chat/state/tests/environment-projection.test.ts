@@ -20,7 +20,7 @@ import {
   TEST_SESSION_ID,
 } from '../../../../../test/factories/chat'
 import { useChatProjectionStore, selectChatProjectionSlice } from '../chat-projection-store'
-import { selectChatSessionById } from '../chat-projection-selectors'
+import { selectChatSessionById } from '@workspace/client-core/chat/selectors'
 import { useChatOptimisticStore } from '../chat-optimistic-store'
 
 const OTHER_ENVIRONMENT_ID = v.parse(environmentIdSchema, 'ce20f2c3-d736-407e-90ad-659f702b3565')

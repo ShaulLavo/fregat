@@ -420,7 +420,7 @@ export class OrchestrationSnapshotQuery {
     }
     // A revert prunes messages, activities, turns, checkpoints and plans at
     // once, so the held streams are the one thing a point read cannot repair.
-    if (event.type !== 'session.reverted') return
+    if (event.type !== 'session.reverted' && event.type !== 'session.history-imported') return
 
     this.hydrateSession(model, event.payload.sessionId, undefined)
   }

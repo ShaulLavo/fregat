@@ -1,3 +1,4 @@
+import { testWorkspaceAddress } from '../../../../test/factories/workspace-address'
 import { readdirSync, readFileSync } from 'node:fs'
 import { join } from 'node:path'
 import { describe } from 'vitest'
@@ -98,7 +99,7 @@ describe('the encoder cannot emit what it cannot reach', () => {
       ...emptyAddressSnapshot(),
       activeDocumentPath: '/repo/src/a.ts',
       editorTabPaths: ['/repo/src/a.ts'],
-      knownRootPaths: ['/repo'],
+      workspaceAddress: testWorkspaceAddress('/repo'),
       mode: 'workbench',
       rootPath: '/repo',
     })
@@ -107,6 +108,7 @@ describe('the encoder cannot emit what it cannot reach', () => {
       'bottom',
       'diff',
       'document',
+      'editor',
       'environmentId',
       'focus',
       'logs',
@@ -137,7 +139,7 @@ describe('the encoder cannot emit what it cannot reach', () => {
     expect(
       addressFromSnapshot({
         ...emptyAddressSnapshot(),
-        knownRootPaths: ['/repo'],
+        workspaceAddress: testWorkspaceAddress('/repo'),
         passthrough,
         rootPath: '/repo',
       }).passthrough,
@@ -157,7 +159,7 @@ describe('the encoder cannot emit what it cannot reach', () => {
     const address = addressFromSnapshot({
       ...emptyAddressSnapshot(),
       editorTabPaths: ['/repo/src/a.ts', 'conflict-diff:abc'],
-      knownRootPaths: ['/repo'],
+      workspaceAddress: testWorkspaceAddress('/repo'),
       rootPath: '/repo',
     })
 
@@ -173,7 +175,7 @@ describe('the tab set budget', () => {
       ...emptyAddressSnapshot(),
       activeDocumentPath: many[0],
       editorTabPaths: many,
-      knownRootPaths: ['/repo'],
+      workspaceAddress: testWorkspaceAddress('/repo'),
       rootPath: '/repo',
     })
 
@@ -193,7 +195,7 @@ describe('the tab set budget', () => {
     const address = addressFromSnapshot({
       ...emptyAddressSnapshot(),
       editorTabPaths: many,
-      knownRootPaths: ['/repo'],
+      workspaceAddress: testWorkspaceAddress('/repo'),
       rootPath: '/repo',
     })
 
@@ -206,7 +208,7 @@ describe('the tab set budget', () => {
     const address = addressFromSnapshot({
       ...emptyAddressSnapshot(),
       editorTabPaths: many,
-      knownRootPaths: ['/repo'],
+      workspaceAddress: testWorkspaceAddress('/repo'),
       rootPath: '/repo',
     })
 
@@ -218,7 +220,7 @@ describe('the tab set budget', () => {
     const address = addressFromSnapshot({
       ...emptyAddressSnapshot(),
       editorTabPaths: ['/repo/src/a.ts', '/repo/src/b.ts'],
-      knownRootPaths: ['/repo'],
+      workspaceAddress: testWorkspaceAddress('/repo'),
       rootPath: '/repo',
     })
 
@@ -226,7 +228,7 @@ describe('the tab set budget', () => {
   })
 })
 
-describe('the settings slot is driven by the tab, not the remembered category', () => {
+describe('the settings category belongs to an open settings document', () => {
   // The category store keeps its pick after the tab closes. Reading it directly left
   // `?settings=` in the URL forever and reopened the page on every reload.
   test('emits nothing when no settings tab is open, even with a remembered category', () => {
@@ -234,7 +236,7 @@ describe('the settings slot is driven by the tab, not the remembered category', 
       addressFromSnapshot({
         ...emptyAddressSnapshot(),
         editorTabPaths: ['/repo/src/a.ts'],
-        knownRootPaths: ['/repo'],
+        workspaceAddress: testWorkspaceAddress('/repo'),
         rootPath: '/repo',
         settingsCategory: 'providers',
       }).settings,
@@ -246,22 +248,22 @@ describe('the settings slot is driven by the tab, not the remembered category', 
       addressFromSnapshot({
         ...emptyAddressSnapshot(),
         editorTabPaths: ['settings:'],
-        knownRootPaths: ['/repo'],
+        workspaceAddress: testWorkspaceAddress('/repo'),
         rootPath: '/repo',
         settingsCategory: 'providers',
       }).settings,
     ).toBe('providers')
   })
 
-  test('emits an empty category for a settings tab in the background', () => {
+  test('omits the category when no category is selected', () => {
     expect(
       addressFromSnapshot({
         ...emptyAddressSnapshot(),
         activeDocumentPath: '/repo/src/a.ts',
         editorTabPaths: ['/repo/src/a.ts', 'settings:'],
-        knownRootPaths: ['/repo'],
+        workspaceAddress: testWorkspaceAddress('/repo'),
         rootPath: '/repo',
       }).settings,
-    ).toBe('')
+    ).toBeNull()
   })
 })

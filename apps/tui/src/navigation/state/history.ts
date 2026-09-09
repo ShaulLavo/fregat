@@ -1,11 +1,46 @@
+import type { AgentLocation } from '@/agent/utils/target'
+import type { WorkbenchLocation } from '@/workbench/utils/location'
+
 export type Location =
+  | AgentLocation
   | { readonly kind: 'settings'; readonly query: string }
-  | { readonly kind: 'files'; readonly path: string; readonly rootPath: string }
+  | {
+      readonly kind: 'files'
+      readonly path: string
+      readonly rootPath: string
+      readonly query?: string
+      readonly workbenchRoot?: string
+    }
+  | WorkbenchLocation
 
 function equal(left: Location, right: Location) {
+  if (left.kind === 'agent')
+    return (
+      right.kind === 'agent' &&
+      left.sessionId === right.sessionId &&
+      left.projectId === right.projectId &&
+      (left.worktreeId ?? null) === (right.worktreeId ?? null)
+    )
   if (left.kind === 'settings') return right.kind === 'settings' && left.query === right.query
-  return right.kind === 'files' && left.path === right.path && left.rootPath === right.rootPath
+  if (left.kind === 'workbench')
+    return (
+      right.kind === 'workbench' &&
+      left.rootPath === right.rootPath &&
+      left.path === right.path &&
+      left.line === right.line &&
+      left.pane === right.pane &&
+      left.tree === right.tree
+    )
+  return (
+    right.kind === 'files' &&
+    left.path === right.path &&
+    left.rootPath === right.rootPath &&
+    left.query === right.query &&
+    left.workbenchRoot === right.workbenchRoot
+  )
 }
+
+export type NavigationHistory = ReturnType<typeof createHistory>
 
 export function createHistory(initial: Location) {
   let entries: readonly Location[] = [initial]

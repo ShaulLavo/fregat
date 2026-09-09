@@ -17,7 +17,7 @@ import { isBlockedStreamError, streamReconnectDelayMs } from '../utils/stream-re
 import {
   MAX_CACHED_SESSION_DETAIL_SUBSCRIPTIONS,
   SESSION_DETAIL_SUBSCRIPTION_IDLE_EVICTION_MS,
-} from './chat-cache-constants'
+} from '@workspace/client-core/chat/cache-constants'
 import {
   selectChatProjectionSlice,
   useChatProjectionStore,

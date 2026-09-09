@@ -12,10 +12,8 @@ import { ChatTransportContext } from '@/features/chat/providers/transport-contex
 import { unsupportedChatTransport } from '../../../../../test/factories/chat-transport'
 import { MessagesTimeline } from '@/features/chat/components/messages-timeline'
 import { ChatTimelineActionsProvider } from '@/features/chat/providers/timeline-actions-provider'
-import {
-  useChatProjectionStore,
-  type ChatSession,
-} from '@/features/chat/state/chat-projection-store'
+import { type ChatSession } from '@workspace/client-core/chat/types'
+import { useChatProjectionStore } from '@/features/chat/state/chat-projection-store'
 import { TestEditorStateProvider as EditorStateProvider } from '../../../../../test/factories/editor-state-provider'
 import { TIMELINE_ANCHOR_OFFSET_PX } from '@/features/chat/utils/timeline-scroll-anchoring'
 import { expect, test } from '../../../../../test/fixtures'

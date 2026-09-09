@@ -50,10 +50,10 @@ export function FontWidget({
   }
 
   return (
-    <div className='flex items-center gap-1'>
+    <div className='flex min-w-0 items-center gap-1 @max-3xl/settings:flex-1'>
       <Input
         aria-label='Font family'
-        className='w-52'
+        className='w-52 @max-3xl/settings:w-full'
         disabled={disabled}
         id={id}
         onBlur={() => {

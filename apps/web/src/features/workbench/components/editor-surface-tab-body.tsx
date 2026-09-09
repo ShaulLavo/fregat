@@ -125,9 +125,7 @@ export function EditorSurfaceTabBody({
   useLayoutEffect(() => {
     if (!selectedFile) return
 
-    const claim =
-      fileOpenIntent.claimLive(selectedFile.path) ??
-      fileOpenIntent.claimReadyClean(selectedFile.path)
+    const claim = fileOpenIntent.claimReadyClean(selectedFile.path)
     ensureEditorView(tabId, selectedFile, claim)
   }, [ensureEditorView, fileOpenIntent, selectedFile, tabId])
 

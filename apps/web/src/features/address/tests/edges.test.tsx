@@ -1,3 +1,4 @@
+import { testWorkspaceToken } from '../../../../test/factories/workspace-address'
 import { MAX_APPLIED_TABS } from '@workspace/client-core/address/grammar'
 import { readSettingsCategory } from '@/features/settings/state/category-store'
 import { settingsDocumentId } from '@/features/settings/utils/document'
@@ -32,7 +33,7 @@ test('a foreign link does not close the tabs the cache restored', async () => {
     (name) => `${ROOT}/${name}`,
   )
   seedWorkspaceCache({ rootPath: ROOT, tabPaths: remembered })
-  startAt('/~repo/workbench/f/a.ts?tabs=f/a.ts~f/b.ts')
+  startAt(`/~${testWorkspaceToken('/repo')}/workbench/f/a.ts?tabs=f/a.ts~f/b.ts`)
 
   const { harness } = await renderAddressHarness()
   await flushProjection()
@@ -49,7 +50,7 @@ test('a foreign link does not close the tabs the cache restored', async () => {
  */
 test('a link opens the tabs it names alongside the remembered ones', async () => {
   seedWorkspaceCache({ rootPath: ROOT, tabPaths: [`${ROOT}/a.ts`] })
-  startAt('/~repo/workbench/f/a.ts?tabs=f/a.ts~f/new.ts')
+  startAt(`/~${testWorkspaceToken('/repo')}/workbench/f/a.ts?tabs=f/a.ts~f/new.ts`)
 
   const { harness } = await renderAddressHarness()
   await flushProjection()
@@ -65,7 +66,7 @@ test('a link opens the tabs it names alongside the remembered ones', async () =>
 test('a link naming more tabs than a person could open is rejected whole', async () => {
   seedWorkspaceCache({ rootPath: ROOT, tabPaths: [`${ROOT}/a.ts`] })
   const tokens = Array.from({ length: MAX_APPLIED_TABS + 1 }, (_, index) => `f/many-${index}.ts`)
-  startAt(`/~repo/workbench/f/a.ts?tabs=${tokens.join('~')}`)
+  startAt(`/~${testWorkspaceToken('/repo')}/workbench/f/a.ts?tabs=${tokens.join('~')}`)
 
   const { harness } = await renderAddressHarness()
   await flushProjection()
@@ -75,7 +76,7 @@ test('a link naming more tabs than a person could open is rejected whole', async
 
 test('going back does not answer with a push', async () => {
   seedWorkspaceCache({ rootPath: ROOT, tabPaths: [`${ROOT}/a.ts`, `${ROOT}/b.ts`] })
-  const first = '/~repo/workbench/f/a.ts'
+  const first = `/~${testWorkspaceToken('/repo')}/workbench/f/a.ts`
   startAt(first)
 
   const { harness } = await renderAddressHarness()
@@ -102,20 +103,17 @@ test('going back does not answer with a push', async () => {
   }
 })
 
-/**
- * `?settings=` was a one-way sink: `selectSettingsCategory` had no caller but the
- * applier, so nothing could undo a category a link had pinned, and the settings tab
- * carries no `?tabs=` token for `closeTabsOutsideAddress` to close.
- */
 test('walking back out of settings closes it and clears the category', async () => {
   seedWorkspaceCache({ rootPath: ROOT, tabPaths: [`${ROOT}/a.ts`] })
-  const withoutSettings = '/~repo/workbench/f/a.ts'
+  const withoutSettings = `/~${testWorkspaceToken('/repo')}/workbench/f/a.ts?tabs=f/a.ts`
   startAt(withoutSettings)
 
   const { harness } = await renderAddressHarness()
   await flushProjection()
 
-  await pressBack('/~repo/workbench/f/a.ts?settings=Providers')
+  await pressBack(
+    `/~${testWorkspaceToken('/repo')}/workbench/settings?tabs=f/a.ts~settings&settings=Providers`,
+  )
   expect(readSettingsCategory()).toBe('Providers')
   expect(editorTabPaths(harness.workspace)).toContain(settingsDocumentId())
 
@@ -123,6 +121,43 @@ test('walking back out of settings closes it and clears the category', async () 
 
   expect(editorTabPaths(harness.workspace)).not.toContain(settingsDocumentId())
   expect(readSettingsCategory()).toBeNull()
+})
+
+test('a category parameter alone does not open settings', async () => {
+  seedWorkspaceCache({ rootPath: ROOT, tabPaths: [`${ROOT}/a.ts`] })
+  startAt(`/~${testWorkspaceToken('/repo')}/workbench/f/a.ts?settings=Providers`)
+
+  const { harness } = await renderAddressHarness()
+  await flushProjection()
+
+  expect(editorTabPaths(harness.workspace)).toEqual([`${ROOT}/a.ts`])
+})
+
+test('restoring settings in the background keeps the selected file', async () => {
+  seedWorkspaceCache({ rootPath: ROOT, tabPaths: [`${ROOT}/a.ts`] })
+  startAt(
+    `/~${testWorkspaceToken('/repo')}/workbench/f/a.ts?tabs=f/a.ts~settings&settings=Providers`,
+  )
+
+  const { harness } = await renderAddressHarness()
+  await flushProjection()
+
+  const panels = harness.workspace.getState().workbenchPanels
+  expect(editorTabPaths(harness.workspace)).toContain(settingsDocumentId())
+  expect(panels.editorTabs.find((tab) => tab.id === panels.activeEditorTabId)?.path).toBe(
+    `${ROOT}/a.ts`,
+  )
+})
+
+test('folderless settings opens through its document token', async () => {
+  startAt('/~-/workbench/settings?tabs=settings&settings=Providers')
+
+  const { harness } = await renderAddressHarness()
+  await flushProjection()
+
+  expect(editorTabPaths(harness.workspace)).toEqual([settingsDocumentId()])
+  expect(readSettingsCategory()).toBe('Providers')
+  expect(location.pathname).toBe('/~-/workbench/settings')
 })
 
 /**
@@ -133,13 +168,13 @@ test('walking back out of settings closes it and clears the category', async () 
  */
 test('honouring a short link keeps every slot it named, then settles', async () => {
   seedWorkspaceCache({ rootPath: ROOT, tabPaths: [`${ROOT}/a.ts`] })
-  startAt('/~repo/workbench/f/a.ts?side=git')
+  startAt(`/~${testWorkspaceToken('/repo')}/workbench/f/a.ts?side=git`)
 
   await renderAddressHarness()
   await flushProjection()
   const settled = `${location.pathname}${location.search}`
 
-  expect(settled).toContain('/~repo/workbench/f/a.ts')
+  expect(settled).toContain(`/~${testWorkspaceToken('/repo')}/workbench/f/a.ts`)
   expect(settled).toContain('side=git')
 
   await flushProjection()
@@ -153,7 +188,7 @@ test('honouring a short link keeps every slot it named, then settles', async () 
  */
 test('returning to an address this app wrote costs no write', async () => {
   seedWorkspaceCache({ rootPath: ROOT, tabPaths: [`${ROOT}/a.ts`, `${ROOT}/b.ts`] })
-  startAt('/~repo/workbench/f/a.ts')
+  startAt(`/~${testWorkspaceToken('/repo')}/workbench/f/a.ts`)
 
   const { harness } = await renderAddressHarness()
   await flushProjection()

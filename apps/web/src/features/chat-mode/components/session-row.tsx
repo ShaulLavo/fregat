@@ -14,8 +14,8 @@ import { SessionRowSnippet } from '@/features/chat-mode/components/session-row-s
 import { activateSessionRow } from '@/features/chat-mode/state/session-commands'
 import { useSessionMultiSelectStore } from '@/features/chat-mode/state/session-multi-select-store'
 import { useSessionRailStore } from '@/features/chat-mode/state/session-rail-store'
-import { sessionClickIntent } from '@/features/chat-mode/utils/session-multi-select'
-import type { SessionRailItem } from '@/features/chat-mode/utils/session-rail-model'
+import { sessionClickIntent } from '@workspace/client-core/chat/rail/multi-select'
+import type { SessionRailItem } from '@workspace/client-core/chat/rail/model'
 import { cn } from '@workspace/ui/lib/utils'
 
 export function SessionRow({
@@ -59,7 +59,7 @@ export function SessionRow({
           {...listeners}
           aria-current={active ? 'true' : undefined}
           className={cn(
-            'group/session focus-visible:ring-ring/50 flex w-full touch-none flex-col gap-1 rounded-md px-2 py-1.5 text-left outline-none focus-visible:ring-1 compact:gap-0.5 compact:px-1.5 compact:py-1',
+            'group/session focus-visible:ring-ring/50 flex h-auto w-full touch-none flex-col items-start justify-start gap-1 rounded-md px-2 py-1.5 text-left outline-none focus-visible:ring-1 compact:gap-0.5 compact:px-1.5 compact:py-1',
             // Hover material only when not selected: bg-accent already carries
             // --surface-opacity, so a /60 hover on top of it composites *lighter*.
             'text-muted-foreground',
@@ -102,7 +102,7 @@ export function SessionRow({
             </span>
           </span>
           {session.origin === 'discovered' ? (
-            <span className='text-muted-foreground pl-[14px] text-[11px]'>External session</span>
+            <span className='text-muted-foreground pl-[14px] text-[11px]'>Imported chat</span>
           ) : null}
           <span className='flex min-w-0 items-center gap-1.5 pl-[14px]'>
             {session.machineLabel ? <MachineChip label={session.machineLabel} /> : null}

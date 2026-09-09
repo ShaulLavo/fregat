@@ -24,11 +24,7 @@ const defaultWallpaperService: WallpaperService = {
   readDesktopWallpaperStillMedia,
 }
 
-// Serves the host machine's current desktop wallpaper as browser-renderable
-// media. Animated video sources stay animated. The web app chooses <video> or
-// <img> from /wallpaper/info and uses crossorigin media requests so an Origin
-// reaches the auth guard. 404s off macOS or on failure so the client falls back
-// to the shipped image.
+// Unavailable desktop media returns 404 so the client uses its bundled wallpaper.
 export function wallpaperRoutes(service: WallpaperService = defaultWallpaperService) {
   return new Elysia({ name: 'wallpaper-routes' })
     .get('/wallpaper/info', async ({ set }) => {

@@ -3,7 +3,7 @@ import { useCallback } from 'react'
 import { useCommand } from '@/keymap/hooks/use-command'
 import { log } from '@/lib/client-logging'
 
-import type { TerminalContextSelection } from '@/features/chat/utils/terminal-context'
+import type { TerminalContextSelection } from '@workspace/client-core/chat/terminal-context'
 import { useComposerInboxStore } from '../state/composer-inbox-store'
 
 /**

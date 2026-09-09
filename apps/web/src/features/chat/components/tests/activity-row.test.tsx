@@ -2,10 +2,88 @@ import { screen } from '@testing-library/react'
 import userEvent from '@testing-library/user-event'
 
 import { ActivityRow } from '@/features/chat/components/activity-row'
+import { ActivityGroupRow } from '@/features/chat/components/activity-group-row'
 import type { ChatWorkLogEntry } from '@/features/chat/utils/work-log'
 import { useChatWorkLogExpansionStore } from '@/features/chat/state/chat-work-log-expansion-store'
+import { sessionActivity } from '../../../../../test/factories/chat'
 import { expect, test } from '../../../../../test/fixtures'
 import { renderWithProviders } from '../../../../../test/render'
+
+test('the tool spinner stops when its turn settles or is no longer current', () => {
+  resetExpansion()
+  const turnId = sessionActivity().turnId
+  const activities = [entry({ outcome: 'neutral', status: 'Started', turnId })]
+  const { rerender } = renderWithProviders(
+    <ActivityGroupRow activities={activities} activeTurnId={turnId} />,
+  )
+
+  expect(screen.getByLabelText('Tool running')).toBeInTheDocument()
+  rerender(<ActivityGroupRow activities={activities} activeTurnId={null} />)
+  expect(screen.queryByLabelText('Tool running')).not.toBeInTheDocument()
+  expect(screen.getByRole('button', { name: 'Ran 1 command' })).toBeInTheDocument()
+
+  rerender(
+    <ActivityGroupRow
+      activities={[entry({ outcome: 'neutral', status: 'Started', turnId: null })]}
+      activeTurnId={turnId}
+    />,
+  )
+  expect(screen.queryByLabelText('Tool running')).not.toBeInTheDocument()
+})
+
+test('tool groups collapse to a useful summary and open on click', async () => {
+  resetExpansion()
+  renderWithProviders(
+    <ActivityGroupRow
+      activeTurnId={null}
+      activities={[
+        entry({ id: 'one', title: 'First command', outcome: 'succeeded' }),
+        entry({ id: 'two', title: 'Second command', outcome: 'succeeded' }),
+      ]}
+    />,
+  )
+
+  expect(screen.queryByText('First command')).not.toBeInTheDocument()
+  await userEvent.click(screen.getByRole('button', { name: 'Ran 2 commands' }))
+  expect(screen.getByText('First command')).toBeInTheDocument()
+  expect(screen.getByText('Second command')).toBeInTheDocument()
+})
+
+test('a collapsed group keeps failed calls visible after a later success', () => {
+  resetExpansion()
+  renderWithProviders(
+    <ActivityGroupRow
+      activeTurnId={null}
+      activities={[
+        entry({ id: 'failed', title: 'Failed command', outcome: 'failed' }),
+        entry({ id: 'ok', title: 'Successful command', outcome: 'succeeded' }),
+      ]}
+    />,
+  )
+
+  expect(screen.getByText('Failed command')).toBeInTheDocument()
+  expect(screen.getByLabelText('Failed')).toBeInTheDocument()
+  expect(screen.queryByText('Successful command')).not.toBeInTheDocument()
+})
+
+test('expanded MCP rows expose their arguments and full detail', async () => {
+  resetExpansion()
+  renderWithProviders(
+    <ActivityRow
+      activity={entry({
+        title: 'linear · get_issue',
+        detail: 'Retrieving ENG-12',
+        input: '{"id":"ENG-12"}',
+        output: 'Issue found',
+      })}
+    />,
+  )
+
+  await userEvent.click(screen.getByRole('button'))
+  expect(screen.getByLabelText('Input')).toHaveTextContent('{"id":"ENG-12"}')
+  expect(screen.getByLabelText('Details')).toHaveTextContent('Retrieving ENG-12')
+  expect(screen.getByLabelText('Output')).toHaveTextContent('Issue found')
+})
 
 test('a failed tool call is distinguishable from a successful one', () => {
   const { unmount } = renderWithProviders(
@@ -106,6 +184,7 @@ function entry(overrides: Partial<ChatWorkLogEntry> = {}): ChatWorkLogEntry {
     detail: null,
     icon: 'tool',
     id: 'activity-1',
+    input: null,
     itemType: 'command_execution',
     outcome: null,
     output: null,

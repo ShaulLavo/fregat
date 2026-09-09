@@ -1,4 +1,5 @@
 import { cn } from '@workspace/ui/lib/utils'
+import { Button } from '@workspace/ui/components/button'
 import {
   BrainIcon,
   CaretDownIcon,
@@ -71,14 +72,15 @@ export function ActivityRow({ activity }: { activity: ChatWorkLogEntry }) {
   return (
     <div className='rounded-md'>
       {expandable ? (
-        <button
+        <Button
           aria-expanded={expanded}
-          className='hover:bg-accent focus-visible:ring-ring/70 flex w-full min-w-0 items-center gap-2 rounded-md px-1 py-1 text-left transition-colors focus-visible:ring-2 focus-visible:outline-none'
+          className='h-auto w-full min-w-0 justify-start gap-2 px-1 py-1 text-left font-normal'
+          variant='ghost'
           type='button'
           onClick={() => toggleRowExpanded(activity.id)}
         >
           {summary}
-        </button>
+        </Button>
       ) : (
         <div className='flex min-w-0 items-center gap-2 px-1 py-1'>{summary}</div>
       )}
@@ -91,6 +93,8 @@ export function ActivityRow({ activity }: { activity: ChatWorkLogEntry }) {
 function activityRowBody(activity: ChatWorkLogEntry) {
   return (
     <div className='border-border/45 mt-1 ml-4 space-y-2 border-l pt-0.5 pl-3'>
+      {activityRowBodySection('Details', activity.detail)}
+      {activityRowBodySection('Input', activity.input)}
       {activityRowBodySection('Command', activity.command)}
       {activityRowBodySection('Output', activity.output)}
       {activity.changedFiles.length > 0
@@ -178,7 +182,13 @@ function isFailedActivity(activity: ChatWorkLogEntry) {
 }
 
 function isExpandableActivity(activity: ChatWorkLogEntry) {
-  return Boolean(activity.command || activity.output || activity.changedFiles.length > 0)
+  return Boolean(
+    activity.detail ||
+    activity.input ||
+    activity.command ||
+    activity.output ||
+    activity.changedFiles.length > 0,
+  )
 }
 
 function activityIcon(icon: ChatActivityIconKey) {

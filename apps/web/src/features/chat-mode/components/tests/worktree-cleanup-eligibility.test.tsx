@@ -5,7 +5,7 @@ import { WorktreeManagerRow } from '@/features/chat-mode/components/worktree-man
 import {
   cleanupEligibilityLabel,
   canReleaseWorktree,
-} from '@/features/chat-mode/utils/worktree-cleanup'
+} from '@workspace/client-core/chat/worktrees/cleanup'
 import { chatProject, chatWorktree, TEST_ENVIRONMENT_ID } from '../../../../../test/factories/chat'
 import { expect, test } from '../../../../../test/fixtures'
 import { renderWithProviders } from '../../../../../test/render'

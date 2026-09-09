@@ -1,9 +1,13 @@
 import { testScopedStorage } from '../../../../../test/factories/scoped-storage'
+import { testWorkspaceAddress } from '../../../../../test/factories/workspace-address'
 import { afterEach, beforeEach, describe } from 'vitest'
 import { expect, test as it } from '../../../../../test/fixtures'
 
 import type { PickedFsEntry } from '@/lib/file-system-types'
 import { conflictDiffDocumentId } from '@/features/editor/utils/conflict-diff-document'
+import { settingsDocumentId } from '@/features/settings/utils/document'
+import { refDocumentId } from '@/features/git/utils/ref-document'
+import { compareSavedDocumentId } from '@/features/editor/utils/compare-saved-document'
 import { snapshotDiffDocumentId } from '@/features/git/utils/diff-document'
 import type { FileDiff } from '@/features/git/utils/types'
 import { searchBufferDocumentId } from '@/features/search/utils/buffer-document'
@@ -55,6 +59,28 @@ describe('workspace cache', () => {
     delete (globalThis as { localStorage?: Storage }).localStorage
   })
 
+  it('persists every durable editor tab through the same ordered collection and selection', () => {
+    const paths = [
+      '/repo/main.ts',
+      settingsDocumentId(),
+      searchBufferDocumentId('/repo'),
+      refDocumentId({ path: '/repo/main.ts', ref: 'HEAD' }),
+      compareSavedDocumentId('/repo/main.ts'),
+    ]
+    writeRootFolderCache(testScopedStorage, pickedDirectory('/repo'))
+    for (const selected of paths) {
+      const panels = workbenchPanelsForPaths(paths, selected)
+      writeWorkspaceSliceCache(testScopedStorage, '/repo', {
+        ...emptyWorkspaceSlice(),
+        workbenchPanels: panels,
+        recentlyClosedEditorPaths: paths,
+      })
+      const restored = readWorkspaceCache(testScopedStorage).workspaces['/repo']!
+      expect(restored.workbenchPanels).toEqual(panels)
+      expect(restored.recentlyClosedEditorPaths).toEqual(paths)
+    }
+  })
+
   it('persists git diff tabs when their backing file is in the workspace', () => {
     const diffPath = snapshotDiffDocumentId(snapshotDiff('/repo/src/app.ts'))
 
@@ -94,6 +120,7 @@ describe('workspace cache', () => {
       'src/app.ts',
       diffPath,
       searchPath,
+      'settings:',
     ])
     expect(cachedSlice('').workbenchPanels.editorTabs.map((tab) => tab.path)).toEqual([
       './src/app.ts',
@@ -159,11 +186,15 @@ describe('workspace cache', () => {
       ),
     }
 
-    writeRootFolderCache(testScopedStorage, pickedDirectory('/repo'))
+    const workspaceAddress = testWorkspaceAddress('/repo')
+    writeRootFolderCache(testScopedStorage, { ...pickedDirectory('/repo'), workspaceAddress })
     writeWorkspaceSliceCache(testScopedStorage, '/repo', slice)
     writeWorkspaceIndexCache(testScopedStorage, ['/repo'])
 
     expect(readWorkspaceCache(testScopedStorage).workspaces['/repo']).toEqual(slice)
+    expect(readWorkspaceCache(testScopedStorage).rootFolder?.workspaceAddress).toEqual(
+      workspaceAddress,
+    )
   })
 
   it('sweeps superseded cache versions, which nothing else can reach', () => {
@@ -175,6 +206,15 @@ describe('workspace cache', () => {
 
     expect(testScopedStorage.getItem(stale)).toBeNull()
     expect(readWorkspaceCache(testScopedStorage).rootFolder?.path).toBe('/repo')
+  })
+
+  it('rejects a cached workspace ID paired with another folder path', () => {
+    writeRootFolderCache(testScopedStorage, {
+      ...pickedDirectory('/alias'),
+      workspaceAddress: testWorkspaceAddress('/actual'),
+    })
+
+    expect(readWorkspaceCache(testScopedStorage).rootFolder).toBeNull()
   })
 
   it('persists fixed panel tabs', () => {
@@ -436,39 +476,12 @@ function emptySearchBuffer(rootPath: string): CachedSearchBufferState {
 
 function cachedEditorVisibleSnapshot(rootPath: string): CachedEditorVisibleSnapshot {
   return {
-    cacheVersion: 2,
+    cacheVersion: 5,
     contentVersion: 'stat:1:1',
     rootPath,
     path: `${rootPath}/src/app.ts`,
     themeId: 'dark-plus',
-    snapshot: {
-      kind: 'editor-visible',
-      schemaVersion: 1,
-      documentId: 'document-1',
-      languageId: 'typescript',
-      theme: null,
-      textVersion: 1,
-      initialHighlightStatus: 'plain',
-      metrics: { rowHeight: 20, characterWidth: 8 },
-      lineCount: 1,
-      contentWidth: 0,
-      totalHeight: 20,
-      gutterWidth: 0,
-      gutterLayout: { fixedWidth: 0, lanes: [] },
-      tabSize: 2,
-      viewport: {
-        scrollTop: 0,
-        scrollLeft: 0,
-        scrollHeight: 0,
-        scrollWidth: 0,
-        clientHeight: 0,
-        clientWidth: 0,
-        borderBoxHeight: null,
-        borderBoxWidth: null,
-        visibleRange: { start: 0, end: 0 },
-      },
-      rows: [],
-    },
+    paint: 'opaque-native-paint',
   }
 }
 

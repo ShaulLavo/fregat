@@ -11,7 +11,7 @@ import {
   DEFAULT_PROVIDER_AUTH_METHOD,
   providerSignInPhase,
   type ProviderSignInPhase,
-} from '@/features/chat/utils/provider-auth'
+} from '@workspace/client-core/chat/providers/auth'
 import {
   cancelProviderLoginAttempt,
   providerAuthKeys,

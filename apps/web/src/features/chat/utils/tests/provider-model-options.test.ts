@@ -11,7 +11,7 @@ import {
   providerModelOptionGroups,
   providerModelOptions,
   providerModelSelectionKey,
-} from '@/features/chat/utils/provider-model-options'
+} from '@workspace/client-core/chat/providers/models'
 import { providerModel as model, providerSnapshot } from '../../../../../test/factories/chat'
 
 function codex(overrides: Partial<ProviderSnapshot> = {}): ProviderSnapshot {

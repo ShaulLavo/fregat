@@ -2,8 +2,8 @@ import type { ScopedStorage } from '@/lib/environments/state/scoped-storage'
 import type { Query, QueryClient } from '@tanstack/react-query'
 
 import {
-  createEditorActivation,
   createEditorCommands,
+  type EditorActivation,
   type EditorCommands,
 } from '@/features/editor/state/commands'
 import type { EditorDocumentStoreApi } from '@/features/editor/state/document-state'
@@ -22,16 +22,22 @@ import {
 import type { SearchBufferStoreApi } from '@/features/search/state/buffer-state'
 import { removeEditorVisibleSnapshotCacheForPath } from '@/lib/editor-visible-snapshot-cache'
 import { ensureFileSnapshotQuery, fileSnapshotQueryOptions } from '@/lib/file-snapshot-query-cache'
-import type { FileOpenIntentService } from '@/lib/file-open-intent/state/service'
-import type { MountedEditorRegistry } from '@/lib/file-open-intent/state/mounted-editor-registry'
+import type {
+  FileOpenIntentBenchmarkSample,
+  FileOpenIntentServiceOwner,
+} from '@/lib/file-open-intent/state/service'
+import type { MountedEditorRegistry } from '@/features/editor/state/mounted-editor-registry'
 import { createClientInvariantError } from '@/lib/structured-errors'
+import { fileBackedDocumentPath } from '@/features/editor/utils/file-backed-document'
+import { closeEditorTabInWorkbenchPanels } from '@/features/workbench/utils/panels'
 
 const BENCHMARK_TARGET_TAB_PREFIX = 'editor-open-benchmark-target:'
 
 export function createEditorOpenBenchmarkControl({
   storage,
+  activation,
   documentStore,
-  fileOpenIntent,
+  fileOpenIntentOwner,
   mountedEditors,
   queryClient,
   searchStore,
@@ -39,8 +45,9 @@ export function createEditorOpenBenchmarkControl({
   workspaceStore,
 }: {
   readonly storage: ScopedStorage
+  readonly activation: EditorActivation
   readonly documentStore: EditorDocumentStoreApi
-  readonly fileOpenIntent: FileOpenIntentService
+  readonly fileOpenIntentOwner: FileOpenIntentServiceOwner
   readonly mountedEditors: MountedEditorRegistry
   readonly queryClient: QueryClient
   readonly searchStore: SearchBufferStoreApi
@@ -48,23 +55,29 @@ export function createEditorOpenBenchmarkControl({
   readonly workspaceStore: EditorWorkspaceStoreApi
 }): EditorOpenBenchmarkControl {
   const commands = createEditorCommands({
-    activation: createEditorActivation(fileOpenIntent, documentStore),
+    activation,
     documentStore,
     searchStore,
     uiStore,
     workspaceStore,
   })
+  const samples = new Map<string, FileOpenIntentBenchmarkSample>()
   let resetRunning = false
 
   return {
     begin: (request) => {
       assertTargetRoot(request, workspaceStore)
       assertTargetStateCleared(request, documentStore, mountedEditors, queryClient, workspaceStore)
-      fileOpenIntent.beginBenchmarkSample(request.sampleId, request.path)
+      if (samples.has(request.sampleId)) {
+        throw createClientInvariantError('Editor-open benchmark sample id is already active')
+      }
+      const sample = fileOpenIntentOwner.beginBenchmarkSample(request)
+      samples.set(request.sampleId, sample)
       installInactiveTargetTab(request.path, workspaceStore)
     },
     prime: async (request) => {
       assertTargetRoot(request, workspaceStore)
+      assertActiveSampleTarget(request, samples)
       await ensureFileSnapshotQuery(queryClient, request.path)
       return { ready: true }
     },
@@ -75,16 +88,23 @@ export function createEditorOpenBenchmarkControl({
 
       resetRunning = true
       try {
-        return await resetEditorOpenSample({
+        const sample = samples.get(request.sampleId)
+        if (!sample) {
+          throw createClientInvariantError('Editor-open benchmark sample is not active')
+        }
+        assertSampleTarget(request, sample)
+        const result = await resetEditorOpenSample({
           storage,
           commands,
           documentStore,
-          fileOpenIntent,
           mountedEditors,
           queryClient,
           request,
+          sample,
           workspaceStore,
         })
+        samples.delete(request.sampleId)
+        return result
       } finally {
         resetRunning = false
       }
@@ -96,34 +116,34 @@ async function resetEditorOpenSample({
   storage,
   commands,
   documentStore,
-  fileOpenIntent,
   mountedEditors,
   queryClient,
   request,
+  sample,
   workspaceStore,
 }: {
   readonly commands: EditorCommands
   readonly storage: ScopedStorage
   readonly documentStore: EditorDocumentStoreApi
-  readonly fileOpenIntent: FileOpenIntentService
   readonly mountedEditors: MountedEditorRegistry
   readonly queryClient: QueryClient
   readonly request: EditorOpenSampleResetRequest
+  readonly sample: FileOpenIntentBenchmarkSample
   readonly workspaceStore: EditorWorkspaceStoreApi
 }) {
   assertTargetRoot(request, workspaceStore)
-  fileOpenIntent.quarantineBenchmarkSample(request.sampleId)
+  sample.quarantine()
   assertTargetIsClean(request.path, documentStore)
-  closeTargetTabs(request.path, commands, workspaceStore)
+  activateInertAndCloseTarget(request.path, commands, workspaceStore)
   await nextTaskAndFrame()
   if (mountedEditors.has(request.path)) {
     throw createClientInvariantError('Editor-open benchmark target remained mounted after close')
   }
 
   await clearTargetQueries(request, queryClient)
+  const result = await sample.quiesce()
   deleteCleanTargetDocument(request.path, documentStore)
   removeEditorVisibleSnapshotCacheForPath(storage, request)
-  const result = await fileOpenIntent.finishBenchmarkSample(request.sampleId)
   await Promise.all([
     ...result.highlighterRuntimeSessionIds.map((runtimeSessionId) =>
       awaitEditorShikiRuntimeSessionIdle(runtimeSessionId),
@@ -136,7 +156,7 @@ async function resetEditorOpenSample({
   await nextTaskAndFrame()
   removeEditorVisibleSnapshotCacheForPath(storage, request)
   assertTargetStateCleared(request, documentStore, mountedEditors, queryClient, workspaceStore)
-  fileOpenIntent.releaseBenchmarkSample(request.sampleId)
+  sample.release()
   return { ...result, quiescent: true as const }
 }
 
@@ -156,14 +176,13 @@ function assertTargetIsClean(path: string, documentStore: EditorDocumentStoreApi
   throw createClientInvariantError('Editor-open benchmark cannot reset a dirty target')
 }
 
-function closeTargetTabs(
+function activateInertAndCloseTarget(
   path: string,
   commands: EditorCommands,
   workspaceStore: EditorWorkspaceStoreApi,
 ): void {
-  const targetTabs = workspaceStore
-    .getState()
-    .workbenchPanels.editorTabs.filter((tab) => tab.path === path)
+  const workspace = workspaceStore.getState()
+  const targetTabs = workspace.workbenchPanels.editorTabs.filter((tab) => tab.path === path)
   if (targetTabs.length > 1) {
     throw createClientInvariantError('Editor-open benchmark target is shared by multiple tabs')
   }
@@ -172,12 +191,50 @@ function closeTargetTabs(
     throw createClientInvariantError('Editor-open benchmark target tab is missing')
   }
 
-  commands.closeTab(targetTab.id)
+  const inertTab = workspace.workbenchPanels.editorTabs.find(
+    (tab) => tab.id !== targetTab.id && !fileBackedDocumentPath(tab.path),
+  )
+  if (!inertTab) {
+    throw createClientInvariantError('Editor-open benchmark requires a dedicated inert surface')
+  }
+
+  commands.selectTab('', inertTab.id)
+  const selectedInert = workspaceStore.getState().workbenchPanels.activeEditorTabId
+  if (selectedInert !== inertTab.id) {
+    throw createClientInvariantError('Editor-open benchmark could not activate its inert surface')
+  }
+
+  workspaceStore
+    .getState()
+    .setWorkbenchPanels(
+      closeEditorTabInWorkbenchPanels(workspaceStore.getState().workbenchPanels, targetTab.id),
+    )
 
   const activeTabId = workspaceStore.getState().workbenchPanels.activeEditorTabId
-  if (activeTabId) return
+  if (activeTabId === inertTab.id) return
 
   throw createClientInvariantError('Editor-open benchmark requires an inert editor surface')
+}
+
+function assertSampleTarget(
+  request: EditorOpenSampleResetRequest,
+  sample: FileOpenIntentBenchmarkSample,
+): void {
+  if (sample.target.path !== request.path || sample.target.rootPath !== request.rootPath) {
+    throw createClientInvariantError('Editor-open benchmark reset target does not match its sample')
+  }
+}
+
+function assertActiveSampleTarget(
+  target: EditorOpenSampleTarget,
+  samples: ReadonlyMap<string, FileOpenIntentBenchmarkSample>,
+): void {
+  for (const sample of samples.values()) {
+    if (sample.target.path !== target.path) continue
+    if (sample.target.rootPath === target.rootPath) return
+  }
+
+  throw createClientInvariantError('Editor-open benchmark query primer requires an active sample')
 }
 
 function deleteCleanTargetDocument(path: string, documentStore: EditorDocumentStoreApi): void {
@@ -275,10 +332,10 @@ function installInactiveTargetTab(path: string, workspaceStore: EditorWorkspaceS
 }
 
 async function nextTaskAndFrame(): Promise<void> {
-  await Promise.resolve()
+  await new Promise<void>((resolve) => setTimeout(resolve, 0))
   if (typeof requestAnimationFrame !== 'function') return
 
   await new Promise<void>((resolve) => {
-    requestAnimationFrame(() => requestAnimationFrame(() => resolve()))
+    requestAnimationFrame(() => resolve())
   })
 }

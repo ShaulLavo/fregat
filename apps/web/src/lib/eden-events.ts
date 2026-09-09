@@ -1,12 +1,7 @@
 import { normalizeEdenDates } from '@workspace/client-core/transport/normalize-dates'
 import { createClientInvariantError } from '@/lib/structured-errors'
 
-import { clientErrors, createRpcError } from './structured-errors'
-
-export type EdenSseEvent = {
-  event: string
-  data: unknown
-}
+import { createRpcError } from './structured-errors'
 
 export type UnwrapEdenOptions = {
   /** Throw when `data` is null/undefined instead of returning it. */
@@ -32,29 +27,4 @@ export function unwrapEdenResponse<T>(
   const data = options.normalizeDates ? normalizeEdenDates(response.data) : response.data
 
   return data as T
-}
-
-export async function* parseEdenSseStream(stream: unknown): AsyncGenerator<EdenSseEvent> {
-  if (!isAsyncIterable(stream)) {
-    throw clientErrors.EDEN_STREAM_MISSING({ label: 'Eden' })
-  }
-
-  for await (const chunk of stream) {
-    const event = edenSseEvent(chunk)
-    if (event) yield event
-  }
-}
-
-function isAsyncIterable(value: unknown): value is AsyncIterable<unknown> {
-  return value !== null && typeof value === 'object' && Symbol.asyncIterator in value
-}
-
-function edenSseEvent(chunk: unknown): EdenSseEvent | null {
-  if (!chunk || typeof chunk !== 'object') return null
-  if (!('event' in chunk) || typeof chunk.event !== 'string') return null
-
-  return {
-    event: chunk.event,
-    data: 'data' in chunk ? normalizeEdenDates(chunk.data) : null,
-  }
 }

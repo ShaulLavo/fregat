@@ -1,7 +1,7 @@
 import { screen } from '@testing-library/react'
 
 import { TerminalContextChip } from '@/features/chat/components/terminal-context-chip'
-import type { TerminalContextSelection } from '@/features/chat/utils/terminal-context'
+import type { TerminalContextSelection } from '@workspace/client-core/chat/terminal-context'
 import { expect, test } from '../../../../../test/fixtures'
 import { renderWithProviders } from '../../../../../test/render'
 

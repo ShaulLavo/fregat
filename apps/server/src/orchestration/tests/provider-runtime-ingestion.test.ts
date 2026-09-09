@@ -10,6 +10,13 @@ import type { ProviderRuntimeEvent } from '../../provider/types'
 import { MAX_BUFFERED_ASSISTANT_CHARS } from '../provider-runtime-buffers'
 import { ProviderRuntimeIngestion } from '../provider-runtime-ingestion'
 import { sessionPlanProgress } from '../read-model'
+import {
+  applyIncrementally,
+  createProjectionFixture,
+  pendingEvent,
+  sessionBootstrapEvents,
+  sessionCreatedEvent,
+} from './factories/projection'
 
 const now = '2026-05-24T00:00:00.000Z'
 const later = '2026-05-24T00:01:00.000Z'
@@ -18,6 +25,210 @@ const turnId = v.parse(turnIdSchema, 'turn-1')
 const messageId = v.parse(messageIdSchema, 'assistant:turn-1')
 
 describe('provider runtime ingestion', () => {
+  it('keeps hook lifecycle events out of chat activities, matching T3 Code', async () => {
+    const { dispatched, ingestion } = fixture()
+    const base = { createdAt: now, runtimeEpoch: 'epoch-ingestion', sessionId, turnId }
+
+    for (const hookId of ['hook-1', 'hook-2', 'hook-3']) {
+      await ingestion.ingest({
+        ...base,
+        eventId: `${hookId}-start`,
+        type: 'hook.started',
+        payload: { hookEvent: 'SessionStart', hookId, hookName: 'SessionStart:startup' },
+      })
+      await ingestion.ingest({
+        ...base,
+        eventId: `${hookId}-progress`,
+        type: 'hook.progress',
+        payload: { hookId, stdout: 'Preparing session' },
+      })
+      await ingestion.ingest({
+        ...base,
+        eventId: `${hookId}-complete`,
+        type: 'hook.completed',
+        payload: { hookId, exitCode: 0, outcome: 'success' },
+      })
+    }
+    await ingestion.ingest({
+      ...base,
+      eventId: 'hook-failure',
+      type: 'hook.completed',
+      payload: { hookId: 'failed-hook', exitCode: 1, outcome: 'error' },
+    })
+
+    expect(dispatched).toEqual([])
+    await ingestion.ingest({
+      ...base,
+      eventId: 'runtime-warning',
+      type: 'runtime.warning',
+      payload: { message: 'A Stop hook blocked continuation.' },
+    })
+    expect(dispatched).toMatchObject([
+      { type: 'session.activity.append', activity: { kind: 'runtime.warning' } },
+    ])
+  })
+
+  it('keeps routine provider startup and bookkeeping out of the chat', async () => {
+    const { dispatched, ingestion } = fixture()
+    const base = { createdAt: now, runtimeEpoch: 'epoch-ingestion', sessionId, turnId }
+    const events: ProviderRuntimeEvent[] = [
+      {
+        ...base,
+        eventId: 'mcp-start',
+        type: 'mcp.status.updated',
+        payload: {
+          status: { name: 'codex_apps', status: 'starting', error: null, failureReason: null },
+        },
+      },
+      {
+        ...base,
+        eventId: 'mcp-ready',
+        type: 'mcp.status.updated',
+        payload: {
+          status: { name: 'codex_apps', status: 'ready', error: null, failureReason: null },
+        },
+      },
+      { ...base, eventId: 'account', type: 'account.updated', payload: { account: {} } },
+      {
+        ...base,
+        eventId: 'limits',
+        type: 'account.rate-limits.updated',
+        payload: { rateLimits: {} },
+      },
+      { ...base, eventId: 'auth', type: 'auth.status', payload: { isAuthenticating: false } },
+      {
+        ...base,
+        eventId: 'oauth',
+        type: 'mcp.oauth.completed',
+        payload: { name: 'GitHub', success: true },
+      },
+      {
+        ...base,
+        eventId: 'reroute',
+        type: 'model.rerouted',
+        payload: { fromModel: 'old', toModel: 'new', reason: 'availability' },
+      },
+      {
+        ...base,
+        eventId: 'deprecation',
+        type: 'deprecation.notice',
+        payload: { summary: 'Legacy endpoint' },
+      },
+      {
+        ...base,
+        eventId: 'persisted',
+        type: 'files.persisted',
+        payload: { files: [{ fileId: 'file-1', filename: 'output.txt' }] },
+      },
+      { ...base, eventId: 'realtime-start', type: 'conversation.realtime.started', payload: {} },
+      {
+        ...base,
+        eventId: 'realtime-item',
+        type: 'conversation.realtime.item-added',
+        payload: { item: {} },
+      },
+      {
+        ...base,
+        eventId: 'realtime-audio',
+        type: 'conversation.realtime.audio.delta',
+        payload: { audio: {} },
+      },
+      { ...base, eventId: 'realtime-close', type: 'conversation.realtime.closed', payload: {} },
+      {
+        ...base,
+        eventId: 'heartbeat',
+        type: 'tool.progress',
+        payload: { elapsedSeconds: 1, toolName: 'Bash' },
+      },
+      {
+        ...base,
+        eventId: 'tool-summary',
+        type: 'tool.summary',
+        payload: { summary: 'Read a file' },
+      },
+      { ...base, eventId: 'diff-update', type: 'turn.diff.updated', payload: { unifiedDiff: '' } },
+    ]
+
+    for (const event of events) await ingestion.ingest(event)
+
+    expect(dispatched).toEqual([])
+  })
+
+  it('keeps explicit provider failures readable without turning a connection warning into a failed turn', async () => {
+    const { dispatched, ingestion } = fixture()
+    const base = { createdAt: now, runtimeEpoch: 'epoch-ingestion', sessionId, turnId }
+    const events: ProviderRuntimeEvent[] = [
+      {
+        ...base,
+        eventId: 'mcp-failed',
+        type: 'mcp.status.updated',
+        payload: { status: { name: 'GitHub', status: 'failed', error: 'Authentication required' } },
+      },
+      { ...base, eventId: 'auth-failed', type: 'auth.status', payload: { error: 'Token expired' } },
+      {
+        ...base,
+        eventId: 'oauth-failed',
+        type: 'mcp.oauth.completed',
+        payload: { name: 'Linear', success: false, error: 'Access denied' },
+      },
+      {
+        ...base,
+        eventId: 'files-failed',
+        type: 'files.persisted',
+        payload: { files: [], failed: [{ filename: 'output.txt', error: 'Permission denied' }] },
+      },
+      {
+        ...base,
+        eventId: 'realtime-failed',
+        type: 'conversation.realtime.error',
+        payload: { message: 'Audio connection lost' },
+      },
+      {
+        ...base,
+        eventId: 'configuration',
+        type: 'config.warning',
+        payload: { summary: 'Invalid provider setting', details: 'Update the configured model' },
+      },
+      {
+        ...base,
+        eventId: 'retry',
+        type: 'runtime.warning',
+        payload: { message: 'Connection lost. Retrying…' },
+      },
+      {
+        ...base,
+        eventId: 'fatal',
+        type: 'runtime.error',
+        payload: { message: 'Rate limit exceeded', class: 'provider_error' },
+      },
+    ]
+
+    for (const event of events) await ingestion.ingest(event)
+
+    const activities = dispatched.flatMap((command) =>
+      command.type === 'session.activity.append' ? [command.activity] : [],
+    )
+    expect(activities.map((activity) => activity.summary)).toEqual([
+      'GitHub connection failed: Authentication required',
+      'Authentication failed: Token expired',
+      'Linear sign-in failed: Access denied',
+      'Could not save files',
+      'Audio connection lost',
+      'Invalid provider setting',
+      'Connection lost. Retrying…',
+      'Runtime error',
+    ])
+    expect(
+      activities
+        .slice(0, -1)
+        .every((activity) => activity.kind === 'runtime.warning' && activity.tone === 'info'),
+    ).toBe(true)
+    expect(activities.filter((activity) => activity.kind === 'runtime.error')).toMatchObject([
+      { payload: { message: 'Rate limit exceeded', class: 'provider_error' }, tone: 'error' },
+    ])
+    expect(activities[3]?.payload).toMatchObject({ detail: 'output.txt: Permission denied' })
+  })
+
   it('streams assistant deltas by default', async () => {
     const { dispatched, ingestion } = fixture()
 
@@ -228,6 +439,7 @@ describe('provider runtime ingestion', () => {
     await ingestion.ingest({
       createdAt: now,
       eventId: 'tool-1',
+      itemId: 'command-1',
       payload: {
         detail: 'ls -la',
         itemType: 'command_execution',
@@ -239,20 +451,49 @@ describe('provider runtime ingestion', () => {
       type: 'item.started',
     })
 
+    await ingestion.ingest({
+      createdAt: later,
+      eventId: 'tool-1-completed',
+      itemId: 'command-1',
+      payload: {
+        data: { id: 'command-1', exitCode: 1, aggregatedOutput: 'Permission denied' },
+        detail: 'ls -la',
+        itemType: 'command_execution',
+        status: 'failed',
+        title: 'List files',
+      },
+      sessionId,
+      runtimeEpoch: 'epoch-ingestion',
+      turnId,
+      type: 'item.completed',
+    })
+
     expect(dispatched).toMatchObject([
       {
         activity: {
           kind: 'tool.started',
-          payload: { detail: 'ls -la', itemType: 'command_execution' },
+          payload: { detail: 'ls -la', itemType: 'command_execution', toolCallId: 'command-1' },
           summary: 'List files started',
           tone: 'tool',
+        },
+        type: 'session.activity.append',
+      },
+      {
+        activity: {
+          kind: 'tool.completed',
+          payload: {
+            data: { exitCode: 1, aggregatedOutput: 'Permission denied' },
+            itemType: 'command_execution',
+            status: 'failed',
+            toolCallId: 'command-1',
+          },
         },
         type: 'session.activity.append',
       },
     ])
   })
 
-  it('normalizes task progress into thinking activities', async () => {
+  it('describes task progress with the task name and current work', async () => {
     const { dispatched, ingestion } = fixture()
 
     await ingestion.ingest({
@@ -276,12 +517,80 @@ describe('provider runtime ingestion', () => {
           payload: {
             detail: 'Searching for API endpoints',
             summary: 'Searching for API endpoints',
+            title: 'Looking through the repo',
           },
-          summary: 'Thinking',
-          tone: 'thinking',
+          summary: 'Looking through the repo',
+          tone: 'info',
         },
         type: 'session.activity.append',
       },
+    ])
+  })
+
+  it('replaces task progress in the real projection and retains completion titles within their turn', async ({
+    onTestFinished,
+  }) => {
+    const projection = createProjectionFixture()
+    onTestFinished(projection.close)
+    let model = applyIncrementally(projection, [
+      ...sessionBootstrapEvents(),
+      sessionCreatedEvent(sessionId),
+    ])
+    const ingestion = new ProviderRuntimeIngestion(
+      async (command) => {
+        if (command.type !== 'session.activity.append') return
+
+        const events = projection.append([
+          pendingEvent('session.activity-appended', {
+            activity: command.activity,
+            sessionId: command.sessionId,
+          }),
+        ])
+        projection.pipeline.applyEvents(events)
+        model = projection.snapshots.refreshReadModel(model, events)
+      },
+      { getReadModel: () => model },
+    )
+    const base = { createdAt: now, runtimeEpoch: 'epoch-ingestion', sessionId, turnId }
+
+    await ingestion.ingest({
+      ...base,
+      eventId: 'progress-1',
+      type: 'task.progress',
+      payload: { taskId: 'task-1', description: 'Review the API', summary: 'Reading routes' },
+    })
+    await ingestion.ingest({
+      ...base,
+      eventId: 'progress-2',
+      type: 'task.progress',
+      payload: {
+        taskId: 'task-1',
+        description: 'Review the API',
+        summary: 'Checking authentication',
+      },
+    })
+    await ingestion.ingest({
+      ...base,
+      eventId: 'complete-1',
+      type: 'task.completed',
+      payload: { taskId: 'task-1', status: 'completed', summary: 'Found two issues' },
+    })
+    await ingestion.ingest({
+      ...base,
+      turnId: v.parse(turnIdSchema, 'turn-2'),
+      eventId: 'progress-3',
+      type: 'task.progress',
+      payload: { taskId: 'task-1', description: 'Fix the API', summary: 'Updating routes' },
+    })
+
+    expect(model.sessions.get(sessionId)?.activities).toMatchObject([
+      { kind: 'task.progress', turnId, payload: { detail: 'Checking authentication' } },
+      {
+        kind: 'task.completed',
+        turnId,
+        payload: { title: 'Review the API', summary: 'Found two issues' },
+      },
+      { kind: 'task.progress', turnId: 'turn-2', payload: { title: 'Fix the API' } },
     ])
   })
 
@@ -352,6 +661,33 @@ describe('provider runtime ingestion', () => {
           tone: 'approval',
         },
         type: 'session.activity.append',
+      },
+    ])
+  })
+
+  it('preserves the full app access request the user must approve', async () => {
+    const { dispatched, ingestion } = fixture()
+    const detail = `Authorize access to ${'repository '.repeat(30)}and its issues`
+
+    await ingestion.ingest({
+      createdAt: now,
+      eventId: 'app-approval',
+      payload: { detail, requestType: 'mcp_elicitation_approval' },
+      requestId: 'app-request-1',
+      sessionId,
+      runtimeEpoch: 'epoch-ingestion',
+      turnId,
+      type: 'request.opened',
+    })
+
+    expect(dispatched).toMatchObject([
+      {
+        type: 'session.activity.append',
+        activity: {
+          kind: 'approval.requested',
+          summary: 'App access approval requested',
+          payload: { detail, requestKind: 'tool', requestId: 'app-request-1' },
+        },
       },
     ])
   })

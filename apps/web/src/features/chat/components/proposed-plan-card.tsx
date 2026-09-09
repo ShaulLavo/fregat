@@ -20,7 +20,7 @@ import {
   proposedPlanExportMarkdown,
   proposedPlanTitle,
   stripDisplayedPlanMarkdown,
-} from '@/features/chat/utils/proposed-plan'
+} from '@workspace/client-core/chat/proposed-plan'
 import { AssistantMarkdown } from './assistant-markdown'
 
 export function ProposedPlanCard({ plan }: { plan: OrchestrationProposedPlan }) {

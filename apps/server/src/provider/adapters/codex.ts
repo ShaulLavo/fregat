@@ -32,6 +32,8 @@ import type {
   ProviderRuntimeStartInput,
   ProviderTurnInput,
   ProviderUserInputResponseInput,
+  ProviderSessionDiscoveryInput,
+  ProviderSessionHistoryInput,
 } from '../types'
 import { ProviderRuntimeEventStream } from '../provider-runtime-event-stream'
 import {
@@ -60,6 +62,13 @@ import { isPresent, noop, runtimeEventId } from './utils/runtime-ids'
 import { sessionInputFromTurn } from './utils/session-input'
 import { normalizeWorkspaceCwd } from './utils/workspace-cwd'
 import { canonicalTurnId, parseOptionalTurnId } from './utils/turn-ids'
+import {
+  codexDiscoveredSession,
+  codexHistoryMessages,
+  codexHistoryResponseSchema,
+} from './utils/codex-history'
+import { discoveryInputSchema } from '../utils/discovery-metadata'
+import { sessionHistoryInputSchema } from '../utils/session-history'
 
 const DEFAULT_CODEX_BINARY = 'codex'
 const DEFAULT_CODEX_MODEL = 'gpt-5.5'
@@ -69,6 +78,8 @@ const ANSI_ESCAPE_CHAR = String.fromCharCode(27)
 const ANSI_ESCAPE_REGEX = new RegExp(`${ANSI_ESCAPE_CHAR}\\[[0-9;]*m`, 'g')
 const CODEX_STDERR_LOG_REGEX =
   /^\d{4}-\d{2}-\d{2}T\S+\s+(TRACE|DEBUG|INFO|WARN|ERROR)\s+\S+:\s+(.*)$/
+const CODEX_DIAGNOSTIC_STDERR_REGEX =
+  /^\d{4}-\d{2}-\d{2}T\S+\s+(TRACE|DEBUG|INFO|WARN|ERROR)\s+[a-zA-Z0-9_]+(?:::[a-zA-Z0-9_]+)*:\s+/
 const BENIGN_CODEX_STDERR_ERROR_SNIPPETS = [
   'state db missing rollout path for thread',
   'state db record_discrepancy: find_thread_path_by_id_str_in_subdir, falling_back',
@@ -185,6 +196,36 @@ export class CodexProviderAdapter implements ProviderAdapter {
       enabled: options.enabled ?? DEFAULT_CODEX_PROVIDER_SETTINGS.enabled,
       providerInstanceId: this.adapterKey,
     }
+  }
+
+  discoverSessions(input: ProviderSessionDiscoveryInput) {
+    const request = v.parse(discoveryInputSchema, input)
+    return inspectCodexHistory(this.env, async (client) => {
+      const rows = await listCodexSessions(client, request)
+      return rows.map(codexDiscoveredSession)
+    })
+  }
+
+  readSessionHistory(input: ProviderSessionHistoryInput) {
+    const request = v.parse(sessionHistoryInputSchema, input)
+    return inspectCodexHistory(this.env, async (client) => {
+      const { thread } = await client.requestRaw(
+        'thread/read',
+        {
+          threadId: request.sessionId,
+          includeTurns: true,
+        },
+        REQUEST_TIMEOUT_MS,
+        (response) => v.parse(codexHistoryResponseSchema, response),
+      )
+      if (thread.id !== request.sessionId)
+        throw createInternalError('Codex returned a different conversation identity.')
+      if (normalizeWorkspaceCwd(thread.cwd) !== normalizeWorkspaceCwd(request.cwd))
+        throw createInternalError(
+          'The Codex conversation belongs to a different working directory.',
+        )
+      return codexHistoryMessages(thread)
+    })
   }
 
   async snapshot(): Promise<ProviderSnapshot> {
@@ -1566,9 +1607,12 @@ class CodexAppServerSession {
   }
 
   private handleErrorNotification(params: CodexServerNotificationParamsByMethod['error']) {
-    if (params.willRetry === true) return
-
     const message = errorNotificationMessage(params.error)
+    if (params.willRetry) {
+      this.emitRuntimeNotification('runtime.warning', { detail: params, message }, 'error', params)
+      return
+    }
+
     this.emit({
       createdAt: new Date().toISOString(),
       eventId: runtimeEventId('codex-error-notification'),
@@ -1932,7 +1976,7 @@ class CodexAppServerRpcClient {
   private readonly pending = new Map<
     string,
     {
-      method: CodexClientRequestMethod
+      parseResult: (value: unknown) => unknown
       reject: (error: Error) => void
       resolve: (value: unknown) => void
       timer: ReturnType<typeof setTimeout>
@@ -1993,7 +2037,7 @@ class CodexAppServerRpcClient {
         reject(createInternalError(`Codex app-server request timed out: ${method}`))
       }, timeoutMs)
       this.pending.set(String(id), {
-        method,
+        parseResult: (value) => parseCodexClientRequestResult(method, value),
         reject,
         resolve: resolve as (value: unknown) => void,
         timer,
@@ -2012,6 +2056,7 @@ class CodexAppServerRpcClient {
     method: string,
     params: unknown,
     timeoutMs = REQUEST_TIMEOUT_MS,
+    parseResult?: (value: unknown) => Result,
   ): Promise<Result> {
     if (this.closed) return Promise.reject(createInternalError('Codex app-server is closed.'))
 
@@ -2023,7 +2068,7 @@ class CodexAppServerRpcClient {
         reject(createInternalError(`Codex app-server request timed out: ${method}`))
       }, timeoutMs)
       this.pending.set(String(id), {
-        method: method as CodexClientRequestMethod,
+        parseResult: parseResult ?? ((value) => parseRawCodexResult(method, value)),
         reject,
         resolve: resolve as (value: unknown) => void,
         timer,
@@ -2112,21 +2157,23 @@ class CodexAppServerRpcClient {
       return
     }
 
-    if (pending.method in CODEX_CLIENT_REQUEST_METHODS) {
-      try {
-        pending.resolve(parseCodexClientRequestResult(pending.method, message.result))
-      } catch (error) {
-        pending.reject(createInternalError(providerErrorMessage(error)))
-      }
-      return
+    try {
+      pending.resolve(pending.parseResult(message.result))
+    } catch (error) {
+      pending.reject(createInternalError(providerErrorMessage(error)))
     }
-
-    pending.resolve(message.result)
   }
 
   private handleStderrLine(line: string) {
     const classified = classifyCodexStderrLine(line)
     if (!classified) return
+    if (isBackgroundCodexDiagnostic(classified.message)) {
+      recordChatPipelineWarning('chat.pipeline.codex_process.stderr', {
+        diagnostic: classified.message,
+        processId: this.process.pid,
+      })
+      return
+    }
 
     for (const handler of this.handlers) {
       handler({ method: 'process/stderr', params: { message: classified.message } })
@@ -2171,17 +2218,64 @@ async function probeCodexProvider(env: NodeJS.ProcessEnv) {
   }
 }
 
-/**
- * A dedicated app-server process, deliberately not the snapshot probe: a skill
- * read that fails must not take the model list and auth state down with it.
- *
- * A failure is relayed rather than degraded to an empty list. Skills are the
- * whole catalog for Codex, so "could not list" and "this project has no skills"
- * are different answers and the caller has to be able to tell them apart. That
- * includes a response the pinned schema rejects: parsing it loosely and keeping
- * whatever survived would hand the composer a silently short catalog, and a
- * skill the user knows exists but cannot invoke is worse than a visible error.
- */
+async function inspectCodexHistory<T>(
+  env: NodeJS.ProcessEnv,
+  read: (client: CodexAppServerRpcClient) => Promise<T>,
+): Promise<T> {
+  const client = CodexAppServerRpcClient.start(env)
+  try {
+    await initializeCodexClient(client, PROVIDER_PROBE_TIMEOUT_MS)
+    return await read(client)
+  } finally {
+    await client.close()
+  }
+}
+
+function parseRawCodexResult(method: string, value: unknown) {
+  const knownMethod = Object.values(CODEX_CLIENT_REQUEST_METHODS).find(
+    (candidate) => candidate === method,
+  )
+  if (!knownMethod) return value
+  return parseCodexClientRequestResult(knownMethod, value)
+}
+
+async function listCodexSessions(
+  client: CodexAppServerRpcClient,
+  input: ProviderSessionDiscoveryInput,
+) {
+  const rows: CodexClientRequestResultByMethod['thread/list']['data'] = []
+  const cursors = new Set<string>()
+  let cursor: string | undefined
+  let skipped = 0
+  while (rows.length < input.limit) {
+    const page = await client.request(
+      'thread/list',
+      {
+        cwd: normalizeWorkspaceCwd(input.cwd),
+        cursor,
+        limit: input.limit,
+        archived: false,
+        modelProviders: [],
+        sourceKinds: ['cli', 'vscode', 'appServer'],
+        sortKey: 'updated_at',
+        sortDirection: 'desc',
+      },
+      REQUEST_TIMEOUT_MS,
+    )
+    rows.push(
+      ...page.data.slice(Math.max(0, input.offset - skipped), input.offset + input.limit - skipped),
+    )
+    skipped += page.data.length
+    if (!page.nextCursor) break
+    if (cursors.has(page.nextCursor))
+      throw createInternalError('Codex returned a repeated conversation page cursor.')
+    cursors.add(page.nextCursor)
+    cursor = page.nextCursor
+  }
+  return rows
+}
+
+// A dedicated process keeps a failed skill read from taking model and auth probes down.
 async function probeCodexCommandCatalog(
   env: NodeJS.ProcessEnv,
   cwd: string | undefined,
@@ -3084,4 +3178,10 @@ function classifyCodexStderrLine(rawLine: string) {
   if (BENIGN_CODEX_STDERR_ERROR_SNIPPETS.some((snippet) => line.includes(snippet))) return null
 
   return { message: line }
+}
+
+function isBackgroundCodexDiagnostic(message: string) {
+  if (message.toLowerCase().includes('failed to connect to websocket')) return false
+
+  return CODEX_DIAGNOSTIC_STDERR_REGEX.test(message)
 }

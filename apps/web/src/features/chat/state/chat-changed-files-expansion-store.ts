@@ -11,7 +11,7 @@ import {
   writePersistedChatChangedFilesExpansion,
   type PersistedChatChangedFilesExpansion,
 } from '@/features/chat/utils/changed-files-expansion-storage'
-import type { ChatTurnDiffSummary } from './chat-projection-store'
+import type { ChatTurnDiffSummary } from '@workspace/client-core/chat/types'
 
 export type ChatChangedFilesExpansion = PersistedChatChangedFilesExpansion
 

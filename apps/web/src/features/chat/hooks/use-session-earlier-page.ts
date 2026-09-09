@@ -2,7 +2,7 @@ import { useActiveChatProjection } from '@/features/chat/hooks/use-active-projec
 import type { SessionId } from '@workspace/contracts'
 import { useCallback } from 'react'
 
-import { selectChatSessionHasEarlier } from '../state/chat-projection-selectors'
+import { selectChatSessionHasEarlier } from '@workspace/client-core/chat/selectors'
 import { useChatTransport } from '@/features/chat/hooks/use-chat-transport'
 import {
   selectSessionEarlierPage,

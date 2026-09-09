@@ -4,13 +4,14 @@ import type {
   LanguageServerDefinitionTarget,
   LanguageServerReferencesResult,
 } from '@singapor/lsp-plugin'
-import { useEffect, useLayoutEffect, useMemo } from 'react'
+import { useEffect, useLayoutEffect, useMemo, useState } from 'react'
+import { OrbitLoader } from '@workspace/ui/components/orbit-loader'
 
 import { EditorFrame } from '@/features/editor/components/frame'
 import { DiagnosticPeek } from '@/features/editor/components/diagnostic-peek'
 import {
   createCriticalEditorCorePlugins,
-  createNonCriticalEditorPluginsLoaderPlugin,
+  createDecodePluginLoader,
 } from '@/features/editor/utils/plugins'
 import { selectionForDefinition } from '@/features/editor/utils/position'
 import { languageIdForFilePath } from '@/features/editor/utils/file-path'
@@ -40,14 +41,20 @@ import type {
   EditorScrollPosition,
 } from '@singapor/core'
 import { editorPreparedDocumentTags } from '@/features/editor/utils/prepared-document'
-import { useFileOpenIntent } from '@/lib/file-open-intent/providers/context'
+import { useMountedEditorRegistry } from '@/features/editor/hooks/use-mounted-editor-registry'
+import type { SnapshotCaptureSource } from '@/lib/editor-visible-snapshot-cache'
+import { effectiveDecodeMode } from '@/features/editor/utils/decode-mode'
 import { useUnavailableEnvironment } from '@/lib/environments/hooks/use-unavailable-environment'
 
 const NO_ADDITIONAL_PLUGINS: readonly EditorPlugin[] = []
 
 type EditorProps = {
   active: boolean
-  document: EditorRenderDocument
+  document: EditorRenderDocument | null
+  documentKey?: string | null
+  path?: string
+  snapshot?: string | null
+  onCaptureSourceChange?: (source: SnapshotCaptureSource | null) => void
 
   languageServerTarget?: LanguageServerDocumentTarget
   additionalPlugins?: readonly EditorPlugin[]
@@ -67,6 +74,10 @@ export function Editor({
   additionalPlugins = NO_ADDITIONAL_PLUGINS,
   definitionTarget,
   document: liveDocument,
+  documentKey,
+  path: requestedPath,
+  snapshot,
+  onCaptureSourceChange,
 
   languageServerTarget,
   rootPath,
@@ -78,16 +89,25 @@ export function Editor({
   onStatusSourceChange,
   onTextChange,
 }: EditorProps) {
+  const [provisional, setProvisional] = useState(false)
   const unavailable = useUnavailableEnvironment()
-  const editability = unavailable ? 'readonly' : liveDocument.editability
+  const filePath = liveDocument?.path ?? requestedPath ?? ''
+  const editability = unavailable || !liveDocument ? 'readonly' : liveDocument.editability
   const { appliedThemeContentHash, appliedThemeId, editorTheme, selectedThemeId } =
     useEditorColorTheme()
   const syntaxHighlightingEnabled = useSettingValue('editor.syntaxHighlighting.enabled')
-  const { mountedEditors } = useFileOpenIntent()
-  const diagnosticPeek = useDiagnosticPeek({ active, filePath: liveDocument.path })
+  const indentationGuidesEnabled = useSettingValue('editor.guides.indentation')
+  const minimapEnabled = useSettingValue('editor.minimap.enabled')
+  const decodeSetting = useSettingValue('editor.decode.mode')
+  const decodeMode = effectiveDecodeMode(
+    decodeSetting,
+    typeof window === 'undefined' ? '' : location.search,
+  )
+  const mountedEditors = useMountedEditorRegistry()
+  const diagnosticPeek = useDiagnosticPeek({ active, filePath })
   const { languageServer, languageServerStatusSource } = useLanguageServerPlugin({
-    enabled: active && unavailable === null,
-    filePath: liveDocument.path,
+    enabled: active && liveDocument !== null && unavailable === null,
+    filePath,
     languageServerTarget,
     rootPath,
     onOpenDefinition,
@@ -95,41 +115,34 @@ export function Editor({
     onDidNavigateDiagnostic: diagnosticPeek.onDidNavigateDiagnostic,
   })
   const scrollPersistencePlugin = useScrollPersistencePlugin({
-    document: liveDocument,
-    onScrollPositionChange,
+    document: { path: filePath },
+    onScrollPositionChange: liveDocument ? onScrollPositionChange : undefined,
   })
-  const documentLanguageId = languageIdForFilePath(liveDocument.path)
+  const documentLanguageId = languageIdForFilePath(filePath)
   // Stable tags keep an unrelated render from looking like a document reattachment.
   const preparedTags = useMemo(
     () =>
-      editorPreparedDocumentTags(liveDocument.path, {
+      editorPreparedDocumentTags(filePath, {
         appliedThemeContentHash,
         appliedThemeId,
         selectedThemeId,
         syntaxHighlightingEnabled,
       }),
-    [
-      appliedThemeContentHash,
-      appliedThemeId,
-      liveDocument.path,
-      selectedThemeId,
-      syntaxHighlightingEnabled,
-    ],
+    [appliedThemeContentHash, appliedThemeId, filePath, selectedThemeId, syntaxHighlightingEnabled],
   )
+  // Plugin identity controls native registration lifetime.
   const criticalEditorCorePlugins = useMemo(
-    () => createCriticalEditorCorePlugins(documentLanguageId),
-    [documentLanguageId],
+    () =>
+      createCriticalEditorCorePlugins(documentLanguageId, indentationGuidesEnabled, minimapEnabled),
+    [documentLanguageId, indentationGuidesEnabled, minimapEnabled],
   )
-  const nonCriticalEditorPlugins = useMemo(
-    () => createNonCriticalEditorPluginsLoaderPlugin(documentLanguageId),
-    [documentLanguageId],
-  )
+  const decodePlugin = useMemo(() => createDecodePluginLoader(decodeMode), [decodeMode])
   const plugins = useMemo(
     () => [
       ...criticalEditorCorePlugins,
       diagnosticPeek.plugin,
       languageServer,
-      nonCriticalEditorPlugins,
+      decodePlugin,
       scrollPersistencePlugin,
       ...additionalPlugins,
     ],
@@ -138,28 +151,24 @@ export function Editor({
       criticalEditorCorePlugins,
       diagnosticPeek.plugin,
       languageServer,
-      nonCriticalEditorPlugins,
+      decodePlugin,
       scrollPersistencePlugin,
     ],
   )
   const document = useMemo(
-    () => ({
-      documentId: liveDocument.id,
-      buffer: liveDocument.buffer,
-      ...preparedTags,
-      languageId: documentLanguageId,
-      preparedDocument: liveDocument.preparedDocument,
-      text: '',
-      view: liveDocument.view,
-    }),
-    [
-      documentLanguageId,
-      liveDocument.buffer,
-      liveDocument.id,
-      liveDocument.preparedDocument,
-      liveDocument.view,
-      preparedTags,
-    ],
+    () =>
+      liveDocument
+        ? {
+            documentId: liveDocument.id,
+            buffer: liveDocument.buffer,
+            ...preparedTags,
+            languageId: documentLanguageId,
+            preparedDocument: liveDocument.preparedDocument,
+            text: '',
+            view: liveDocument.view,
+          }
+        : null,
+    [documentLanguageId, liveDocument, preparedTags],
   )
   const rowPositioning = editorPerformanceLayoutVariant() === 'absolute-rows' ? 'top' : 'transform'
   const controller = useEditor({
@@ -169,25 +178,34 @@ export function Editor({
       rowBackground: true,
     },
     document,
+    documentKey,
+    snapshot: decodeMode ? null : snapshot,
     editability,
     keymap: HOSTED_EDITOR_KEYMAP,
     onChange: (_state, change) => {
-      if (!change || change.kind === 'selection' || change.kind === 'none') return
+      if (!liveDocument || !change || change.kind === 'selection' || change.kind === 'none') return
 
-      onTextChange?.(tabId, liveDocument.path, change)
+      onTextChange?.(tabId, filePath, change)
     },
     onInitialPaint,
+    onPresentationChange: (state) => setProvisional(state === 'provisional'),
     plugins,
     rowPositioning,
     theme: editorTheme,
   })
+  useLayoutEffect(() => {
+    // Decode changes visible text during its animation and has no replay contract.
+    onCaptureSourceChange?.(
+      decodeMode ? null : () => controller.getEditor()?.captureSnapshot() ?? null,
+    )
+    return () => onCaptureSourceChange?.(null)
+  }, [controller, decodeMode, onCaptureSourceChange])
   useLayoutEffect(
-    () => mountedEditors.register(liveDocument.path),
-    [liveDocument.path, mountedEditors],
+    () => (liveDocument ? mountedEditors.register(filePath) : undefined),
+    [filePath, liveDocument, mountedEditors],
   )
   const settingsSurface =
-    savableDocumentPath(liveDocument.path) !== null &&
-    fileBackedDocumentPath(liveDocument.path) === null
+    savableDocumentPath(filePath) !== null && fileBackedDocumentPath(filePath) === null
   const focusTarget = useFocusTarget<HTMLDivElement>({
     area: 'editor',
     capabilities: {
@@ -199,7 +217,7 @@ export function Editor({
       },
     },
     id: {
-      key: liveDocument.id,
+      key: liveDocument?.id ?? documentKey ?? filePath,
       kind: 'editor',
       surface: settingsSurface ? 'settings' : 'document',
       tabId,
@@ -213,34 +231,31 @@ export function Editor({
   })
   const selection = useMemo(
     () =>
-      definitionTarget
-        ? selectionForDefinition(
-            liveDocument.path,
-            liveDocument.buffer.getTextSnapshot(),
-            definitionTarget,
-          )
+      definitionTarget && liveDocument
+        ? selectionForDefinition(filePath, liveDocument.buffer.getTextSnapshot(), definitionTarget)
         : null,
-    [definitionTarget, liveDocument.buffer, liveDocument.path],
+    [definitionTarget, liveDocument, filePath],
   )
 
   useEffect(() => {
-    if (!active) return
+    if (!active || !liveDocument) return
 
     onStatusSourceChange?.({
       controller,
-      filePath: liveDocument.path,
+      filePath,
       languageServerStatusSource,
     })
-  }, [active, controller, languageServerStatusSource, liveDocument.path, onStatusSourceChange])
+  }, [active, controller, languageServerStatusSource, filePath, liveDocument, onStatusSourceChange])
 
   useLayoutEffect(() => {
+    if (!liveDocument) return
     return () => {
       const snapshot = controller.getSnapshot()
       const scrollPosition =
         controller.getEditor()?.getScrollPosition() ?? scrollPositionFromSnapshot(snapshot)
       if (!scrollPosition) return
 
-      onScrollPositionChange?.(liveDocument.path, {
+      onScrollPositionChange?.(filePath, {
         left: scrollPosition.left,
         top:
           scrollPosition.top === undefined
@@ -248,11 +263,14 @@ export function Editor({
             : capOverscrollTop(scrollPosition.top, snapshot),
       })
     }
-  }, [controller, liveDocument.path, onScrollPositionChange])
+  }, [controller, filePath, liveDocument, onScrollPositionChange])
 
   useEffect(() => {
     if (!selection) return
-    controller.commands.setSelection(selection.anchor, selection.head, selection.anchor)
+    controller.commands.setSelection(selection.anchor, selection.head, {
+      revealBlock: 'center',
+      revealOffset: selection.anchor,
+    })
   }, [controller, selection])
 
   useCommitMessageEditorFocus({
@@ -267,6 +285,12 @@ export function Editor({
       onRequestCloseOverlay={diagnosticPeek.snapshot ? diagnosticPeek.close : undefined}
       targetRef={active ? focusTarget.ref : undefined}
     >
+      {provisional && liveDocument ? (
+        <div className='bg-background text-muted-foreground absolute inset-x-0 bottom-0 flex items-center gap-2 px-3 py-2 text-xs'>
+          <OrbitLoader className='size-3' label='Preparing editor' />
+          Preparing editor…
+        </div>
+      ) : null}
       {diagnosticPeek.snapshot ? (
         <DiagnosticPeek
           model={diagnosticPeek.snapshot}

@@ -5,12 +5,31 @@ import { createBenchmarkError } from './structured-errors.mjs'
 
 const calibrationFile = resolve(import.meta.dirname, 'editor-open-benchmark-calibration.json')
 const seeds = [60_061, 60_062, 60_063]
-const runs = []
+const evidence = []
 
-for (const seed of seeds) runs.push(await runCalibration(seed))
+for (const seed of seeds) evidence.push(await runCalibration(seed))
 
-writeFileSync(calibrationFile, `${JSON.stringify({ schemaVersion: 1, runs }, null, 2)}\n`)
+writeFileSync(calibrationFile, `${JSON.stringify(calibrationBundle(evidence), null, 2)}\n`)
 console.log(`EDITOR_OPEN_BENCHMARK_CALIBRATION ${calibrationFile}`)
+
+function calibrationBundle(entries) {
+  const identity = entries[0]?.identity
+  if (!identity || typeof identity !== 'object' || Array.isArray(identity)) {
+    throw createBenchmarkError('calibration runs returned no benchmark identity')
+  }
+
+  const serializedIdentity = JSON.stringify(identity)
+  for (const entry of entries) {
+    if (JSON.stringify(entry?.identity) === serializedIdentity) continue
+    throw createBenchmarkError('calibration runs returned different benchmark identities')
+  }
+
+  const runs = entries.map((entry) => entry?.run)
+  if (runs.some((run) => !run || typeof run !== 'object' || Array.isArray(run))) {
+    throw createBenchmarkError('calibration run returned no measurements')
+  }
+  return { schemaVersion: 2, identity, runs }
+}
 
 async function runCalibration(seed) {
   const child = Bun.spawn({

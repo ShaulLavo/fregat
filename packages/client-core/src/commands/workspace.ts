@@ -106,6 +106,7 @@ export const workspaceCommandMetadata = {
     vscodeCommandIds: ['workbench.action.quickOpen'],
   }),
   'workspace.openSearchEditor': defineMetadata({
+    keys: [{ chord: ['Control+K', 'F'], platforms: ['tui'] }],
     category: 'Workspace',
     description: 'Open workspace search results in an editor tab.',
     id: 'workspace.openSearchEditor',
@@ -310,6 +311,7 @@ export const workspaceCommandMetadata = {
     vscodeCommandIds: ['workbench.action.focusThirdEditorGroup'],
   }),
   'workspace.focusEditor': defineMetadata({
+    keys: [{ chord: ['Control+K', 'I'], platforms: ['tui'] }],
     category: 'Workspace',
     description: 'Move keyboard focus to the editor.',
     id: 'workspace.focusEditor',
@@ -323,7 +325,10 @@ export const workspaceCommandMetadata = {
     category: 'Workspace',
     description: 'Move keyboard focus to the file tree.',
     id: 'workspace.focusFileTree',
-    keys: [{ chord: ['Mod+Shift+E'], preventDefault: true }],
+    keys: [
+      { chord: ['Mod+Shift+E'], preventDefault: true },
+      { chord: ['Control+K', 'E'], platforms: ['tui'] },
+    ],
     execution: 'async',
     target: 'workspace',
     undoCategory: 'view-only',
@@ -352,6 +357,7 @@ export const workspaceCommandMetadata = {
     title: 'Reveal active file in tree',
   }),
   'workspace.focusGit': defineMetadata({
+    keys: [{ chord: ['Control+K', 'G'], platforms: ['tui'] }],
     category: 'Workspace',
     description: 'Move keyboard focus to the Git panel.',
     id: 'workspace.focusGit',
@@ -398,6 +404,7 @@ export const workspaceCommandMetadata = {
     category: 'Workspace',
     description: 'Bring the chat composer on screen.',
     id: 'workspace.revealChat',
+    keys: [{ chord: ['Control+K', 'R'], platforms: ['tui'] }],
     execution: 'async',
     target: 'workspace',
     undoCategory: 'view-only',
@@ -405,6 +412,7 @@ export const workspaceCommandMetadata = {
     title: 'Show chat',
   }),
   'workspace.revealTerminal': defineMetadata({
+    keys: [{ chord: ['Control+K', 'T'], platforms: ['tui'] }],
     category: 'Workspace',
     description: 'Bring the workbench terminal on screen.',
     id: 'workspace.revealTerminal',
@@ -535,9 +543,11 @@ export const workspaceCommandMetadata = {
   'workspace.newSession': defineMetadata({
     category: 'Workspace',
     description: 'Start a new chat session in the active project.',
-    hiddenInPalette: true,
     id: 'workspace.newSession',
-    keys: [{ chord: ['Mod+Alt+N'], preventDefault: true }],
+    keys: [
+      { chord: ['Mod+Alt+N'], preventDefault: true },
+      { chord: ['Control+N'], platforms: ['tui'] },
+    ],
     execution: 'async',
     target: 'workspace',
     undoCategory: 'workspace-operation',
@@ -547,7 +557,6 @@ export const workspaceCommandMetadata = {
   'workspace.nextSession': defineMetadata({
     category: 'Workspace',
     description: 'Move to the next session in the rail.',
-    hiddenInPalette: true,
     id: 'workspace.nextSession',
     keys: [{ chord: ['Mod+Alt+]'], preventDefault: true }],
     execution: 'async',
@@ -559,7 +568,6 @@ export const workspaceCommandMetadata = {
   'workspace.previousSession': defineMetadata({
     category: 'Workspace',
     description: 'Move to the previous session in the rail.',
-    hiddenInPalette: true,
     id: 'workspace.previousSession',
     keys: [{ chord: ['Mod+Alt+['], preventDefault: true }],
     execution: 'async',
@@ -571,7 +579,6 @@ export const workspaceCommandMetadata = {
   'workspace.toggleSessionRail': defineMetadata({
     category: 'Workspace',
     description: 'Show or hide the list of sessions.',
-    hiddenInPalette: true,
     id: 'workspace.toggleSessionRail',
     keys: [{ chord: ['Mod+Alt+B'], preventDefault: true }],
     execution: 'sync',

@@ -1,4 +1,5 @@
 import '@workspace/ui/globals.css'
+import '@singapor/core/style.css'
 import type { QueryClient } from '@tanstack/react-query'
 import {
   DEFAULT_SETTING_VALUES,
@@ -10,11 +11,27 @@ import { useEffect, useState } from 'react'
 import { flushSync } from 'react-dom'
 import { createRoot, type Root } from 'react-dom/client'
 import { afterEach, expect, test } from 'vitest'
+import { ForesightManager } from 'js.foresight'
 
 import { TestEditorStateProvider as EditorStateProvider } from '../../../../test/factories/editor-state-provider'
-import { useEditorCommands } from '@/features/editor/state/commands'
-import { useEditorWorkspaceState } from '@/features/editor/state/workspace-state'
+import { useEditorCommands, type EditorCommands } from '@/features/editor/state/commands'
+import {
+  useEditorDocumentStoreApi,
+  type EditorDocumentStoreApi,
+} from '@/features/editor/state/document-state'
+import {
+  awaitEditorSyntaxWorkerIdleFences,
+  disposeEditorShikiWorkerOwner,
+  disposeEditorTreeSitterSyntaxProvider,
+} from '@/features/editor/state/syntax-highlighting'
+import {
+  useEditorWorkspaceState,
+  useEditorWorkspaceStoreApi,
+  type EditorWorkspaceStore,
+  type EditorWorkspaceStoreApi,
+} from '@/features/editor/state/workspace-state'
 import { settingsKeys } from '@workspace/client-core/settings/query-keys'
+import { EditorSurfaceTabBody } from '@/features/workbench/components/editor-surface-tab-body'
 import { TreePane } from '@/features/workspace/components/tree-pane'
 import {
   FileTreeActionsContext,
@@ -24,11 +41,13 @@ import { useCommand } from '@/keymap/hooks/use-command'
 import type { PlatformCommandBus } from '@/keymap/providers/command-context'
 import { FocusService } from '@/lib/focus/state/service'
 import type { TreeEntry, TreeResult } from '@/lib/file-system-types'
-import { treeModel } from '@/lib/tree-model'
+import { treeModel, type TreeModel } from '@/lib/tree-model'
 import { AppProviders, createTestQueryClient, seedBootMirrorTheme } from '../../../../test/render'
 
 const ROOT_PATH = '/repo'
+const PREPARED_ROOT_PATH = 'repo'
 const DEEP_FILE_PATH = `${ROOT_PATH}/src/file-79.ts`
+const PREPARED_FILE_PATH = `${PREPARED_ROOT_PATH}/src/editor-tab-a.ts`
 const SHALLOW_FILE_PATH = `${ROOT_PATH}/src/file-0.ts`
 const UNLOADED_FILE_PATH = `${ROOT_PATH}/src/unloaded/deep.ts`
 
@@ -40,15 +59,83 @@ const fileTreeActions: FileTreeActions = {
 
 let root: Root | null = null
 let treeCommandBus: PlatformCommandBus | null = null
+let treeDocumentStore: EditorDocumentStoreApi | null = null
+let treeEditorCommands: EditorCommands | null = null
+let treeWorkspaceStore: EditorWorkspaceStoreApi | null = null
 
-afterEach(() => {
+afterEach(async () => {
   flushSync(() => root?.unmount())
   root = null
   treeCommandBus = null
+  treeDocumentStore = null
+  treeEditorCommands = null
+  treeWorkspaceStore = null
+  await Promise.all([disposeEditorShikiWorkerOwner(), disposeEditorTreeSitterSyntaxProvider()])
   document.body.replaceChildren()
   delete document.documentElement.dataset.density
   localStorage.clear()
+  performance.clearMarks()
+  performance.clearMeasures()
+  editorDiagnosticGlobal.__editorPerfTrace = undefined
 })
+
+test(
+  'a real Shadow DOM file row predicts and activates a prepared editor tab',
+  { timeout: 30_000 },
+  async () => {
+    mountTreePane(new FocusService(), createTestQueryClient(), {
+      editorMounted: true,
+      model: preparedNavigatorModel(),
+      rootPath: PREPARED_ROOT_PATH,
+    })
+    editorDiagnosticGlobal.__editorPerfTrace = { mark: () => undefined }
+    const shadowRoot = await fileTreeShadowRoot()
+    await expect.poll(treeRuntimeIsReady).toBe(true)
+    flushSync(() => requiredTreeEditorCommands().switchRootFolder(preparedRootFolder()))
+
+    const directoryRow = rowButton(shadowRoot, 'src/')
+    expect(directoryRow).not.toBeNull()
+    directoryRow!.dispatchEvent(new KeyboardEvent('keydown', { bubbles: true, key: 'ArrowRight' }))
+    await expect.poll(() => rowButton(shadowRoot, 'src/editor-tab-a.ts')).not.toBeNull()
+    const row = rowButton(shadowRoot, 'src/editor-tab-a.ts')!
+    await expect
+      .poll(() => ForesightManager.instance.getManagerData.registeredElements.get(row))
+      .toMatchObject({
+        meta: { treePath: 'src/editor-tab-a.ts' },
+        name: 'file-tree:src/editor-tab-a.ts',
+      })
+
+    performance.clearMarks('editor.file_open.file_read')
+    performance.clearMarks('editor.worker.request')
+    await triggerForesightElement(row)
+    await expect
+      .poll(() => performance.getEntriesByName('editor.file_open.file_read').length)
+      .toBe(1)
+    await expect
+      .poll(preparationRequestTypes, { timeout: 20_000 })
+      .toEqual(expect.arrayContaining(['open', 'parse', 'queryRange']))
+    await awaitEditorSyntaxWorkerIdleFences()
+
+    const activationPublication = observePreparedSelectionPublication(PREPARED_FILE_PATH)
+    const workspaceBeforeActivation = requiredTreeWorkspaceStore().getState()
+    expect(
+      workspaceBeforeActivation.workbenchPanels.editorTabs.some(
+        (tab) => tab.path === PREPARED_FILE_PATH,
+      ),
+    ).toBe(false)
+    const firstFrame = await activateTreeRowAndCaptureFirstFrame(row)
+
+    expect(firstFrame.selectedPath).toBe(PREPARED_FILE_PATH)
+    expect(firstFrame.text).toContain("export const editorTabA = 'real browser fixture A'")
+    expect(firstFrame.rowCount).toBeGreaterThan(0)
+    expect(activationPublication.read()).toMatchObject({
+      documentId: PREPARED_FILE_PATH,
+      prepared: true,
+      selectedPath: PREPARED_FILE_PATH,
+    })
+    activationPublication.stop()
+  },
+)
 
 test('the live navigator retains search, consumes requested focus, reveals, and creates at root', async () => {
   const focusService = new FocusService()
@@ -241,13 +328,22 @@ test('live density changes preserve the compact and cozy tree geometry and typog
     })
 })
 
-function TreePaneHarness() {
+function TreePaneHarness({
+  editorMounted = false,
+  initialModel = navigatorModel(),
+  rootPath = ROOT_PATH,
+}: {
+  readonly editorMounted?: boolean
+  readonly initialModel?: TreeModel
+  readonly rootPath?: string
+}) {
   const { selectFile, selectTab } = useEditorCommands()
   const selectedFilePath = useEditorWorkspaceState((state) => state.selectedFilePath)
   const workbenchPanels = useEditorWorkspaceState((state) => state.workbenchPanels)
   const [gitStatus, setGitStatus] = useState<readonly GitStatusEntry[]>([])
-  const [model] = useState(navigatorModel)
+  const [model] = useState(initialModel)
   const deepTab = workbenchPanels.editorTabs.find((tab) => tab.path === DEEP_FILE_PATH)
+  const activeTab = activeEditorTab(workbenchPanels)
 
   return (
     <>
@@ -301,10 +397,20 @@ function TreePaneHarness() {
       <div className='h-[180px] w-[360px]'>
         <TreePane
           gitStatus={gitStatus}
-          rootPath={ROOT_PATH}
+          rootPath={rootPath}
           state={{ data: model, status: 'ready' }}
         />
       </div>
+      {editorMounted && activeTab ? (
+        <div className='h-[240px] w-[640px]'>
+          <EditorSurfaceTabBody
+            active
+            path={activeTab.path}
+            rootPath={rootPath}
+            tabId={activeTab.id}
+          />
+        </div>
+      ) : null}
     </>
   )
 }
@@ -322,11 +428,33 @@ function TreeCommandBusCapture() {
   return null
 }
 
+function TreeRuntimeCapture() {
+  const commands = useEditorCommands()
+  const documentStore = useEditorDocumentStoreApi()
+  const workspaceStore = useEditorWorkspaceStoreApi()
+
+  useEffect(() => {
+    treeDocumentStore = documentStore
+    treeEditorCommands = commands
+    treeWorkspaceStore = workspaceStore
+    return () => {
+      if (treeDocumentStore === documentStore) treeDocumentStore = null
+      if (treeEditorCommands === commands) treeEditorCommands = null
+      if (treeWorkspaceStore === workspaceStore) treeWorkspaceStore = null
+    }
+  }, [commands, documentStore, workspaceStore])
+
+  return null
+}
+
 function mountTreePane(
   focusService: FocusService = new FocusService(),
   queryClient: QueryClient = createTestQueryClient(),
   options: {
     readonly commandSnapshot?: { readonly activeFilePath: string | null }
+    readonly editorMounted?: boolean
+    readonly model?: TreeModel
+    readonly rootPath?: string
     readonly treeMounted?: boolean
   } = {},
 ) {
@@ -343,22 +471,31 @@ function renderTreePane(
   queryClient: QueryClient,
   options: {
     readonly commandSnapshot?: { readonly activeFilePath: string | null }
+    readonly editorMounted?: boolean
+    readonly model?: TreeModel
+    readonly rootPath?: string
     readonly treeMounted?: boolean
   } = {},
 ) {
+  const rootPath = options.rootPath ?? ROOT_PATH
   flushSync(() => {
     root?.render(
       <AppProviders
-        command={{ rootPath: ROOT_PATH, snapshot: options.commandSnapshot }}
+        command={{ rootPath, snapshot: options.commandSnapshot }}
         focusService={focusService}
         queryClient={queryClient}
       >
         <EditorStateProvider>
           <TreeCommandBusCapture />
+          <TreeRuntimeCapture />
           <FileTreeActionsContext value={fileTreeActions}>
             {options.treeMounted === false ? null : (
               <div data-workbench=''>
-                <TreePaneHarness />
+                <TreePaneHarness
+                  editorMounted={options.editorMounted}
+                  initialModel={options.model}
+                  rootPath={rootPath}
+                />
               </div>
             )}
           </FileTreeActionsContext>
@@ -380,6 +517,25 @@ function navigatorModel() {
   model.loadedDirectoryPaths.add('src')
 
   return model
+}
+
+function preparedNavigatorModel() {
+  const sourceDirectory = directory(`${PREPARED_ROOT_PATH}/src`, [file(PREPARED_FILE_PATH)])
+  const model = treeModel(tree(PREPARED_ROOT_PATH, [sourceDirectory]), PREPARED_ROOT_PATH)
+  model.loadedDirectoryPaths.add('src')
+  return model
+}
+
+function preparedRootFolder() {
+  return {
+    birthtimeMs: 0,
+    mtimeMs: 0,
+    name: PREPARED_ROOT_PATH,
+    path: PREPARED_ROOT_PATH,
+    size: 0,
+    type: 'directory' as const,
+    version: 'tree-pane-browser-fixture',
+  }
 }
 
 function tree(path: string, entries: TreeEntry[]): TreeResult {
@@ -438,6 +594,104 @@ function rowButton(shadowRoot: ShadowRoot, path: string) {
   return shadowRoot.querySelector<HTMLButtonElement>(
     `button[data-item-path="${path}"]:not([data-file-tree-sticky-row="true"])`,
   )
+}
+
+async function triggerForesightElement(target: HTMLElement): Promise<void> {
+  await expect
+    .poll(() => ForesightManager.instance.getManagerData.loadedModules.desktopHandler)
+    .toBe(true)
+  const bounds = target.getBoundingClientRect()
+  dispatchPointerMove(bounds.left + bounds.width / 2, bounds.bottom + 100)
+  await nextAnimationFrame()
+  dispatchPointerMove(bounds.left + bounds.width / 2, bounds.top + bounds.height / 2)
+  await nextAnimationFrame()
+}
+
+async function activateTreeRowAndCaptureFirstFrame(row: HTMLButtonElement) {
+  const firstFrame = new Promise<TreeActivationFirstFrame>((resolve) => {
+    requestAnimationFrame(() => {
+      const surface = document.querySelector<HTMLElement>('.editor-virtualized')
+      resolve({
+        rowCount: document.querySelectorAll('.editor-virtualized-row').length,
+        selectedPath: selectedFilePathText(),
+        text: surface?.textContent ?? '',
+      })
+    })
+  })
+  row.click()
+  return firstFrame
+}
+
+function preparationRequestTypes(): string[] {
+  return performance
+    .getEntriesByName('editor.worker.request', 'mark')
+    .map((entry) => (entry as PerformanceMark).detail?.type)
+    .filter((type): type is string => typeof type === 'string')
+}
+
+function observePreparedSelectionPublication(path: string) {
+  const documentStore = requiredTreeDocumentStore()
+  const workspaceStore = requiredTreeWorkspaceStore()
+  let publication: PreparedSelectionPublication | null = null
+  const stop = workspaceStore.subscribe(
+    (state) => state.selectedFilePath,
+    (selectedPath, previousPath) => {
+      if (selectedPath !== path || previousPath === path) return
+
+      const tab = activeTabForPath(workspaceStore.getState(), path)
+      if (!tab) return
+
+      const view = documentStore.getState().viewsByTabId[tab.id]
+      publication = {
+        documentId: view?.documentId ?? null,
+        prepared: view?.preparedDocument !== null && view?.preparedDocument !== undefined,
+        selectedPath,
+        tabId: tab.id,
+      }
+    },
+  )
+  return { read: () => publication, stop }
+}
+
+function activeTabForPath(state: EditorWorkspaceStore, path: string) {
+  const activeTab = activeEditorTab(state.workbenchPanels)
+  if (activeTab?.path !== path) return null
+  return activeTab
+}
+
+function activeEditorTab(panels: EditorWorkspaceStore['workbenchPanels']) {
+  const activeTabId = panels.activeEditorTabId
+  if (!activeTabId) return null
+  return panels.editorTabs.find((tab) => tab.id === activeTabId) ?? null
+}
+
+function dispatchPointerMove(clientX: number, clientY: number): void {
+  document.dispatchEvent(
+    new PointerEvent('pointermove', { bubbles: true, clientX, clientY, pointerType: 'mouse' }),
+  )
+}
+
+function nextAnimationFrame(): Promise<void> {
+  return new Promise((resolve) => requestAnimationFrame(() => resolve()))
+}
+
+function requiredTreeDocumentStore(): EditorDocumentStoreApi {
+  if (!treeDocumentStore) throw new RangeError('file-tree document store unavailable')
+  return treeDocumentStore
+}
+
+function requiredTreeEditorCommands(): EditorCommands {
+  if (!treeEditorCommands) throw new RangeError('file-tree editor commands unavailable')
+  return treeEditorCommands
+}
+
+function requiredTreeWorkspaceStore(): EditorWorkspaceStoreApi {
+  if (!treeWorkspaceStore) throw new RangeError('file-tree workspace store unavailable')
+  return treeWorkspaceStore
+}
+
+function treeRuntimeIsReady(): boolean {
+  return Boolean(treeDocumentStore && treeEditorCommands && treeWorkspaceStore)
 }
 
 function treeRow(shadowRoot: ShadowRoot, path: string) {
@@ -533,4 +787,21 @@ function activeTreePath(shadowRoot: ShadowRoot) {
   if (!(activeElement instanceof HTMLElement)) return null
 
   return activeElement.dataset.itemPath ?? null
+}
+
+type TreeActivationFirstFrame = {
+  readonly rowCount: number
+  readonly selectedPath: string | null
+  readonly text: string
+}
+
+type PreparedSelectionPublication = {
+  readonly documentId: string | null
+  readonly prepared: boolean
+  readonly selectedPath: string
+  readonly tabId: string
+}
+
+const editorDiagnosticGlobal = globalThis as typeof globalThis & {
+  __editorPerfTrace?: { readonly mark: () => void }
 }

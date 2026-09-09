@@ -6,7 +6,7 @@ import { expect, test } from '../../../../../test/fixtures'
 import { activeServerOrigin } from '@/lib/client'
 import { useEnvironmentsStore } from '@/lib/environments/state/store'
 import { createChatTransport } from '@/features/chat/transport/create-chat-transport'
-import { createWorkspaceProjectCommand } from '@/features/chat/utils/command-builders'
+import { createWorkspaceProjectCommand } from '@workspace/client-core/chat/commands'
 import { useChatProjectionStore } from '@/features/chat/state/chat-projection-store'
 import {
   subscribeChatShell,

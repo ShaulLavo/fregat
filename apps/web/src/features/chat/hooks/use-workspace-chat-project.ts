@@ -6,14 +6,14 @@ import type {
 import { useEffect, useRef, useState } from 'react'
 
 import { errorMessage } from '@/lib/error-message'
-import { projectRegistrationResult } from '@/lib/environments/utils/registration'
+import { projectRegistrationResult } from '@workspace/client-core/chat/registration'
 import type { ChatTransport } from '@/features/chat/transport/chat-transport'
-import { createWorkspaceProjectCommand } from '@/features/chat/utils/command-builders'
+import { createWorkspaceProjectCommand } from '@workspace/client-core/chat/commands'
 import {
   selectChatProjectionSlice,
   useChatProjectionStore,
 } from '@/features/chat/state/chat-projection-store'
-import { selectWorktreeAtPath } from '@/features/chat/state/chat-projection-selectors'
+import { selectWorktreeAtPath } from '@workspace/client-core/chat/selectors'
 
 type Registration = {
   rootPath: string

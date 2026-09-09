@@ -1,6 +1,6 @@
 import { createContext } from 'react'
 
-import type { ProviderSignInTarget } from '@/features/chat/utils/provider-auth'
+import type { ProviderSignInTarget } from '@workspace/client-core/chat/providers/auth'
 
 export type ProviderSignInDialogControl = {
   /** Opens the sign-in dialog for one provider. Re-opening switches providers. */

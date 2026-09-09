@@ -2,6 +2,10 @@ import { ApplicationBootstrap } from '@/components/application-bootstrap'
 import { StrictMode } from 'react'
 import { createRoot } from 'react-dom/client'
 
+// Production tree shaking can skip the editor barrels that import these styles.
+import '@singapor/core/style.css'
+import '@singapor/diff/style.css'
+import '@singapor/find/style.css'
 import '@workspace/ui/globals.css'
 import { App } from '@/App'
 import { restoreAddressFromStorage } from '@/features/address/state/storage.ts'

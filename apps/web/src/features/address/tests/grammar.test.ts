@@ -1,3 +1,4 @@
+import { testWorkspaceToken } from '../../../../test/factories/workspace-address'
 import { describe } from 'vitest'
 
 import { expect, test } from '../../../../test/fixtures'
@@ -19,9 +20,11 @@ describe('the path', () => {
   })
 
   test('names a workspace, a mode and a document', () => {
-    const address = parseAddress('/~platform/workbench/f/apps/web/src/main.tsx')
+    const address = parseAddress(
+      `/~${testWorkspaceToken('platform')}/workbench/f/apps/web/src/main.tsx`,
+    )
 
-    expect(address.workspace).toBe('platform')
+    expect(address.workspace).toBe(testWorkspaceToken('platform'))
     expect(address.mode).toBe('workbench')
     expect(address.document).toBe('f/apps/web/src/main.tsx')
   })
@@ -39,7 +42,7 @@ describe('the path', () => {
   })
 
   test('falls back to the remembered mode on an unknown one, keeping the rest', () => {
-    const address = parseAddress('/~platform/wrkbnch/f/x?side=git')
+    const address = parseAddress(`/~${testWorkspaceToken('platform')}/wrkbnch/f/x?side=git`)
 
     expect(address.mode).toBeNull()
     expect(address.side).toBe('git')
@@ -48,13 +51,17 @@ describe('the path', () => {
 
 describe('the fragment', () => {
   test('parses a line, a line and column, and a range', () => {
-    expect(parseAddress('/~p/workbench/f/a.ts#L484').focus).toEqual({
+    expect(parseAddress(`/~${testWorkspaceToken('p')}/workbench/f/a.ts#L484`).focus).toEqual({
       column: null,
       endLine: null,
       line: 484,
     })
-    expect(parseAddress('/~p/workbench/f/a.ts#L21,9').focus).toMatchObject({ column: 9, line: 21 })
-    expect(parseAddress('/~p/workbench/f/a.ts#L484-L520').focus).toMatchObject({
+    expect(parseAddress(`/~${testWorkspaceToken('p')}/workbench/f/a.ts#L21,9`).focus).toMatchObject(
+      { column: 9, line: 21 },
+    )
+    expect(
+      parseAddress(`/~${testWorkspaceToken('p')}/workbench/f/a.ts#L484-L520`).focus,
+    ).toMatchObject({
       endLine: 520,
       line: 484,
     })
@@ -62,13 +69,15 @@ describe('the fragment', () => {
 
   test('round-trips each form to a fixed point', () => {
     for (const hash of ['#L484', '#L21,9', '#L484-L520']) {
-      expect(fixedPoint(`/~p/workbench/f/a.ts${hash}`)).toBe(`/~p/workbench/f/a.ts${hash}`)
+      expect(fixedPoint(`/~${testWorkspaceToken('p')}/workbench/f/a.ts${hash}`)).toBe(
+        `/~${testWorkspaceToken('p')}/workbench/f/a.ts${hash}`,
+      )
     }
   })
 
   test('drops a fragment it cannot read rather than guessing', () => {
-    expect(parseAddress('/~p/workbench/f/a.ts#nonsense').focus).toBeNull()
-    expect(parseAddress('/~p/workbench/f/a.ts#L0').focus).toBeNull()
+    expect(parseAddress(`/~${testWorkspaceToken('p')}/workbench/f/a.ts#nonsense`).focus).toBeNull()
+    expect(parseAddress(`/~${testWorkspaceToken('p')}/workbench/f/a.ts#L0`).focus).toBeNull()
   })
 
   /**
@@ -78,10 +87,12 @@ describe('the fragment', () => {
    * backwards. Neither is emittable, so both are hand-edited input.
    */
   test('drops a column or a range the encoder could never emit', () => {
-    expect(parseAddress('/~p/workbench/f/a.ts#L10,0').focus).toBeNull()
-    expect(parseAddress('/~p/workbench/f/a.ts#L20-L10').focus).toBeNull()
+    expect(parseAddress(`/~${testWorkspaceToken('p')}/workbench/f/a.ts#L10,0`).focus).toBeNull()
+    expect(parseAddress(`/~${testWorkspaceToken('p')}/workbench/f/a.ts#L20-L10`).focus).toBeNull()
     // The boundary stays legal: a one-line range is how a single-line selection reads.
-    expect(parseAddress('/~p/workbench/f/a.ts#L20-L20').focus).toMatchObject({
+    expect(
+      parseAddress(`/~${testWorkspaceToken('p')}/workbench/f/a.ts#L20-L20`).focus,
+    ).toMatchObject({
       endLine: 20,
       line: 20,
     })
@@ -93,7 +104,7 @@ describe('reserved pass-through', () => {
   // the first editor's idle callback — so a rewrite that dropped them would change
   // behaviour mid-session with no error and no log.
   test('copies the four dev params through encode -> decode -> encode unchanged', () => {
-    const href = '/~platform/workbench?decode=diffusion&editorPerfTrace=1&editorPerfDisable=x'
+    const href = `/~${testWorkspaceToken('platform')}/workbench?decode=diffusion&editorPerfTrace=1&editorPerfDisable=x`
     const address = parseAddress(href)
 
     expect(address.passthrough).toEqual({
@@ -107,29 +118,37 @@ describe('reserved pass-through', () => {
   })
 
   test('keeps editorPerfLayout, which is read live during render', () => {
-    expect(parseAddress('/~p/workbench?editorPerfLayout=transform').passthrough).toEqual({
+    expect(
+      parseAddress(`/~${testWorkspaceToken('p')}/workbench?editorPerfLayout=transform`).passthrough,
+    ).toEqual({
       editorPerfLayout: 'transform',
     })
   })
 
   test('does not mistake an owned key for a passthrough one', () => {
-    expect(parseAddress('/~p/workbench?side=git&tabs=f/a.ts').passthrough).toEqual({})
+    expect(
+      parseAddress(`/~${testWorkspaceToken('p')}/workbench?side=git&tabs=f/a.ts`).passthrough,
+    ).toEqual({})
   })
 
   // An allow-list, not "everything unowned". Carrying unknown keys made any query param
   // permanent for the install: the projection copied it into every later address and
   // nothing could remove it, so a link could pin a stranger's flag on your machine.
   test('drops a param no one owns instead of adopting it forever', () => {
-    const address = parseAddress('/~p/workbench?q=unowned&utm_source=newsletter&decode=diffusion')
+    const address = parseAddress(
+      `/~${testWorkspaceToken('p')}/workbench?q=unowned&utm_source=newsletter&decode=diffusion`,
+    )
 
     expect(address.passthrough).toEqual({ decode: 'diffusion' })
-    expect(formatAddress(address)).toBe('/~p/workbench?decode=diffusion')
+    expect(formatAddress(address)).toBe(`/~${testWorkspaceToken('p')}/workbench?decode=diffusion`)
   })
 })
 
 describe('owned search params', () => {
   test('reads the panel slots', () => {
-    const address = parseAddress('/~p/workbench?side=git&bottom=terminal&tool=git&rail=archived')
+    const address = parseAddress(
+      `/~${testWorkspaceToken('p')}/workbench?side=git&bottom=terminal&tool=git&rail=archived`,
+    )
 
     expect(address).toMatchObject({
       bottom: 'terminal',
@@ -140,24 +159,36 @@ describe('owned search params', () => {
   })
 
   test('drops a panel value outside its union', () => {
-    expect(parseAddress('/~p/workbench?side=nope&bottom=nope')).toMatchObject({
+    expect(
+      parseAddress(`/~${testWorkspaceToken('p')}/workbench?side=nope&bottom=nope`),
+    ).toMatchObject({
       bottom: null,
       side: null,
     })
   })
 
   test('splits the tab set on `~`', () => {
-    expect(parseAddress('/~p/workbench/f/a.ts?tabs=f/a.ts~f/b.ts~s').tabs).toEqual([
-      'f/a.ts',
-      'f/b.ts',
-      's',
-    ])
+    expect(
+      parseAddress(`/~${testWorkspaceToken('p')}/workbench/f/a.ts?tabs=f/a.ts~f/b.ts~s`).tabs,
+    ).toEqual(['f/a.ts', 'f/b.ts', 's'])
+  })
+
+  test('keeps the active editor token encoded independently from the chat session', () => {
+    const href = `/~${testWorkspaceToken('p')}/chat/t/session-1?tabs=f/a%7Eb.ts~settings&editor=f/a%7Eb.ts`
+    const address = parseAddress(href)
+
+    expect(address.document).toBe('t/session-1')
+    expect(address.editor).toBe('f/a%7Eb.ts')
+    expect(address.tabs).toEqual(['f/a%7Eb.ts', 'settings'])
+    expect(fixedPoint(href)).toBe(href)
   })
 
   // The rail scope is a ProjectId — a one-way hash of an absolute path — so it is not
   // addressable, and `diff` carries the session diff scope alone.
   test('keeps the session diff scope on its own key', () => {
-    expect(parseAddress('/~p/chat/t/session-1?diff=turn-4a1b').diff).toBe('turn-4a1b')
+    expect(parseAddress(`/~${testWorkspaceToken('p')}/chat/t/session-1?diff=turn-4a1b`).diff).toBe(
+      'turn-4a1b',
+    )
   })
 })
 
@@ -168,13 +199,13 @@ describe('fixed point over hostile input', () => {
   test('returns every canonical shape unchanged', () => {
     const hrefs = [
       '/',
-      '/~platform',
-      '/~platform/chat',
-      '/~platform/chat/t/session-9f3a1c2e?tool=git&diff=wt',
-      '/~platform/workbench/f/apps/web/src/main.tsx?side=git&bottom=problems#L21,9',
-      '/~platform/workbench/s?decode=diffusion',
-      '/~platform/workbench/f/a%20b/%C3%BCn%C3%AF.ts#L1',
-      '/~platform/workbench/f/a%7Eb.ts',
+      `/~${testWorkspaceToken('platform')}`,
+      `/~${testWorkspaceToken('platform')}/chat`,
+      `/~${testWorkspaceToken('platform')}/chat/t/session-9f3a1c2e?tool=git&diff=wt`,
+      `/~${testWorkspaceToken('platform')}/workbench/f/apps/web/src/main.tsx?side=git&bottom=problems#L21,9`,
+      `/~${testWorkspaceToken('platform')}/workbench/s?decode=diffusion`,
+      `/~${testWorkspaceToken('platform')}/workbench/f/a%20b/%C3%BCn%C3%AF.ts#L1`,
+      `/~${testWorkspaceToken('platform')}/workbench/f/a%7Eb.ts`,
     ]
 
     for (const href of hrefs) expect(fixedPoint(href)).toBe(href)
@@ -184,7 +215,7 @@ describe('fixed point over hostile input', () => {
   // `params.get` (first), while the prefixed and passthrough groups overwrote (last).
   test('resolves a duplicated key the same way in every slot', () => {
     const address = parseAddress(
-      '/~p/workbench?side=git&side=files&s.q=one&s.q=two&decode=a&decode=b',
+      `/~${testWorkspaceToken('p')}/workbench?side=git&side=files&s.q=one&s.q=two&decode=a&decode=b`,
     )
 
     expect(address.side).toBe('git')
@@ -197,42 +228,48 @@ describe('fixed point over hostile input', () => {
     const href = formatAddress({
       ...emptyAddress(),
       focus: { column: null, endLine: null, line: 1e21 },
-      workspace: 'p',
+      workspace: testWorkspaceToken('p'),
     })
 
-    expect(href).toBe('/~p')
+    expect(href).toBe(`/~${testWorkspaceToken('p')}`)
   })
 
   // Degrading means losing the field that is malformed, not the whole address.
   test('keeps the readable fields when a percent-escape is malformed', () => {
-    const address = parseAddress('/~platform/workbench/f/a%.ts?side=git')
+    const address = parseAddress(`/~${testWorkspaceToken('platform')}/workbench/f/a%.ts?side=git`)
 
-    expect(address.workspace).toBe('platform')
+    expect(address.workspace).toBe(testWorkspaceToken('platform'))
     expect(address.mode).toBe('workbench')
     expect(address.side).toBe('git')
   })
 
   test('escapes `~` in a slug so it cannot be read as a second segment marker', () => {
-    expect(formatAddress({ ...emptyAddress(), workspace: 'a~b' })).toBe('/~a%7Eb')
-    expect(parseAddress('/~a%7Eb').workspace).toBe('a~b')
+    const token = testWorkspaceToken('a~b')
+    const href = formatAddress({ ...emptyAddress(), workspace: token })
+    expect(href).toBe(`/~${token.replace('~', '%7E')}`)
+    expect(parseAddress(href).workspace).toBe(token)
   })
 })
 
-describe('the settings slot', () => {
-  // An open settings page with no category selected is a real state, and `''` is how
-  // the grammar spells it. Treating it as falsy dropped the tab on every reload.
-  test('round-trips settings open with no category', () => {
-    const href = formatAddress({ ...emptyAddress(), settings: '', workspace: 'p' })
+describe('the settings category', () => {
+  test('round-trips an explicitly empty category', () => {
+    const href = formatAddress({
+      ...emptyAddress(),
+      settings: '',
+      workspace: testWorkspaceToken('p'),
+    })
 
-    expect(href).toBe('/~p?settings=')
+    expect(href).toBe(`/~${testWorkspaceToken('p')}?settings=`)
     expect(parseAddress(href).settings).toBe('')
     expect(fixedPoint(href)).toBe(href)
   })
 
-  test('distinguishes no-category from no-settings', () => {
-    expect(parseAddress('/~p').settings).toBeNull()
-    expect(parseAddress('/~p?settings=').settings).toBe('')
-    expect(parseAddress('/~p?settings=providers').settings).toBe('providers')
+  test('distinguishes an absent category from an explicitly empty category', () => {
+    expect(parseAddress(`/~${testWorkspaceToken('p')}`).settings).toBeNull()
+    expect(parseAddress(`/~${testWorkspaceToken('p')}?settings=`).settings).toBe('')
+    expect(parseAddress(`/~${testWorkspaceToken('p')}?settings=providers`).settings).toBe(
+      'providers',
+    )
   })
 })
 
@@ -255,7 +292,7 @@ describe('every owned field survives a round trip', () => {
     side: 'git' as const,
     tabs: ['f/a.ts', 'f/b.ts', 's'],
     tool: 'git',
-    workspace: 'platform',
+    workspace: testWorkspaceToken('platform'),
   }
 
   test('parses back to exactly what was serialized', () => {
@@ -266,7 +303,7 @@ describe('every owned field survives a round trip', () => {
     const href = formatAddress(FULL)
 
     for (const fragment of [
-      '/~platform/workbench/f/apps/web/src/main.tsx',
+      `/~${testWorkspaceToken('platform')}/workbench/f/apps/web/src/main.tsx`,
       // `/` unescaped: legal in a query per RFC 3986, and `~` still separates.
       'tabs=f/a.ts~f/b.ts~s',
       'side=git',
@@ -292,7 +329,7 @@ describe('every owned field survives a round trip', () => {
    */
   test('keeps a file named with the tab separator as one tab', () => {
     const tabs = ['f/a%7Eb.ts', 'f/d%C3%BCr/x.ts']
-    const href = formatAddress({ ...emptyAddress(), tabs, workspace: 'p' })
+    const href = formatAddress({ ...emptyAddress(), tabs, workspace: testWorkspaceToken('p') })
 
     expect(parseAddress(href).tabs).toEqual(tabs)
   })
@@ -301,10 +338,10 @@ describe('every owned field survives a round trip', () => {
     const href = formatAddress({
       ...emptyAddress(),
       tabs: ['f/apps/web/src/main.tsx'],
-      workspace: 'p',
+      workspace: testWorkspaceToken('p'),
     })
 
-    expect(href).toBe('/~p?tabs=f/apps/web/src/main.tsx')
+    expect(href).toBe(`/~${testWorkspaceToken('p')}?tabs=f/apps/web/src/main.tsx`)
     expect(parseAddress(href).tabs).toEqual(['f/apps/web/src/main.tsx'])
   })
 
@@ -312,6 +349,7 @@ describe('every owned field survives a round trip', () => {
   test('round-trips each field independently', () => {
     const cases: [string, Partial<Address>][] = [
       ['tabs', { tabs: ['f/a.ts', 's'] }],
+      ['editor', { editor: 'f/a%7Eb.ts' }],
       ['side', { side: 'git' }],
       ['bottom', { bottom: 'terminal' }],
       ['tool', { tool: 'files' }],
@@ -325,7 +363,12 @@ describe('every owned field survives a round trip', () => {
     ]
 
     for (const [name, patch] of cases) {
-      const address = { ...emptyAddress(), mode: 'workbench' as const, workspace: 'p', ...patch }
+      const address = {
+        ...emptyAddress(),
+        mode: 'workbench' as const,
+        workspace: testWorkspaceToken('p'),
+        ...patch,
+      }
       expect(parseAddress(formatAddress(address)), `${name} did not survive`).toEqual(address)
     }
   })
@@ -339,28 +382,33 @@ describe('environment segment', () => {
   const environments = { knownEnvironmentIds: [primary, remote], primaryEnvironmentId: primary }
 
   test('round-trips the confirmed remote identity before the workspace segment', () => {
-    const href = `/@${remote}/~repo/chat/t/7c9ac8fb-14ad-4a20-8e54-d1756e4f9f97`
+    const href = `/@${remote}/~${testWorkspaceToken('/repo')}/chat/t/7c9ac8fb-14ad-4a20-8e54-d1756e4f9f97`
     const parsed = parseAddress(href, environments)
     expect(parsed).toMatchObject({
       environmentId: remote,
       rejectedEnvironment: null,
-      workspace: 'repo',
+      workspace: testWorkspaceToken('/repo'),
       mode: 'chat',
     })
     expect(formatAddress(parsed, primary)).toBe(href)
   })
 
   test('omits primary identity and leaves unscoped addresses on primary', () => {
-    const parsed = parseAddress(`/@${primary}/~repo/chat/t/new`, environments)
+    const parsed = parseAddress(
+      `/@${primary}/~${testWorkspaceToken('/repo')}/chat/t/new`,
+      environments,
+    )
     expect(parsed.environmentId).toBeNull()
-    expect(formatAddress(parsed, primary)).toBe('/~repo/chat/t/new')
-    expect(parseAddress('/~repo/chat/t/new', environments).environmentId).toBeNull()
+    expect(formatAddress(parsed, primary)).toBe(`/~${testWorkspaceToken('/repo')}/chat/t/new`)
+    expect(
+      parseAddress(`/~${testWorkspaceToken('/repo')}/chat/t/new`, environments).environmentId,
+    ).toBeNull()
   })
 
   test('preserves an unknown or malformed environment as a rejected token', () => {
     const unknown = '881e6a1b-b230-4e14-acdc-082db3f36e8e'
     for (const id of [unknown, 'bad-id', '']) {
-      const href = `/@${id}/~repo/chat/t/7c9ac8fb-14ad-4a20-8e54-d1756e4f9f97`
+      const href = `/@${id}/~${testWorkspaceToken('/repo')}/chat/t/7c9ac8fb-14ad-4a20-8e54-d1756e4f9f97`
       const parsed = parseAddress(href, environments)
       expect(parsed).toMatchObject({ environmentId: null, rejectedEnvironment: id })
       expect(formatAddress(parsed)).toBe(href)

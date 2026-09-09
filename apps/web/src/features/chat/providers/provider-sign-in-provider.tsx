@@ -1,7 +1,7 @@
 import { useMemo, useState, type ReactNode } from 'react'
 
 import { ProviderSignInDialog } from '@/features/chat/components/provider-sign-in-dialog'
-import type { ProviderSignInTarget } from '@/features/chat/utils/provider-auth'
+import type { ProviderSignInTarget } from '@workspace/client-core/chat/providers/auth'
 import {
   ProviderSignInDialogContext,
   type ProviderSignInDialogControl,

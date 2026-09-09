@@ -29,3 +29,5 @@ export type { ProviderDiscoveredSession, ProviderSessionDiscoveryInput } from '.
 export { LspSessionPool } from './lsp/proxy-session'
 export type { LspProxyClientSession } from './lsp/proxy-session'
 export type { TerminalPtyFactory } from './terminal/service'
+
+export { LogReaderService } from './observability/log-reader'

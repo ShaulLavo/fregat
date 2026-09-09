@@ -1,4 +1,6 @@
-import { screen } from '@testing-library/react'
+import { symlink } from 'node:fs/promises'
+import path from 'node:path'
+import { screen, waitFor } from '@testing-library/react'
 import userEvent from '@testing-library/user-event'
 
 import { WorkspaceProjectMenu } from '@/components/workspace-project-menu'
@@ -12,6 +14,7 @@ import { createDefaultWorkbenchLayout } from '@/features/workbench/utils/layout'
 import { createDefaultWorkbenchPanels } from '@/features/workbench/utils/panels'
 import { expect, test } from '../../../test/fixtures'
 import { renderWithProviders } from '../../../test/render'
+import { ensureFolderPath, recordRecentEntry } from '@/lib/file-server'
 
 function storeWithRoot(path: string | null) {
   return createEditorWorkspaceStore({
@@ -49,7 +52,7 @@ function renderMenu(rootPath: string | null) {
   const store = storeWithRoot(rootPath)
   // Real editor stack with the workspace store swapped, so the menu gets the
   // document and ui stores it needs to open a root.
-  return renderWithProviders(
+  const rendered = renderWithProviders(
     <EditorStateProvider>
       <EditorWorkspaceStateContext.Provider value={store}>
         <WorkspaceProjectMenu workspaceTitle='platform' />
@@ -57,7 +60,48 @@ function renderMenu(rootPath: string | null) {
     </EditorStateProvider>,
     { command: { runtime: { workspace: store } } },
   )
+  return { ...rendered, store }
 }
+
+test('lists a folder only once when recents include a symlink through its parent', async ({
+  client,
+  server,
+}) => {
+  void client
+  await ensureFolderPath('projects/platform')
+  await symlink('projects', path.join(server.root, 'Projects'))
+  await recordRecentEntry('projects/platform')
+  await recordRecentEntry('Projects/platform')
+  const { queryClient } = renderMenu('projects/platform')
+
+  await userEvent.click(screen.getByRole('button', { name: 'Switch project' }))
+  await waitFor(() => {
+    expect(
+      queryClient.getQueryData(['project-menu', 'canonical-root', 'Projects/platform']),
+    ).toMatchObject({ path: 'projects/platform' })
+  })
+
+  await waitFor(() => expect(screen.queryByRole('status', { name: 'Loading projects' })).toBeNull())
+  const items = screen.getAllByRole('menuitemradio')
+  expect(items).toHaveLength(1)
+  expect(items[0]).toHaveAttribute('aria-checked', 'true')
+  expect(items[0]).toHaveTextContent('platform')
+})
+
+test('keeps distinct case-sensitive folders and opens the selected folder', async ({ client }) => {
+  void client
+  await ensureFolderPath('projects/platform')
+  await ensureFolderPath('Projects/platform')
+  await recordRecentEntry('Projects/platform')
+  const { store } = renderMenu('projects/platform')
+
+  await userEvent.click(screen.getByRole('button', { name: 'Switch project' }))
+  const other = await screen.findByRole('menuitemradio', { name: 'platform Projects' })
+  expect(screen.getAllByRole('menuitemradio')).toHaveLength(2)
+  await userEvent.click(other)
+
+  await waitFor(() => expect(store.getState().rootFolder?.path).toBe('Projects/platform'))
+})
 
 test('opens without a render failure and lists recents under a heading', async () => {
   renderMenu('/repo/platform')

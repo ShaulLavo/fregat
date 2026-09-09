@@ -1,7 +1,7 @@
 import type { EnvironmentId } from '@workspace/contracts'
 import { confirmedEnvironmentOrigin } from '@/lib/environments/state/domain'
 import { openWorkspaceRootForOwner } from '@/features/workspace/state/open-root'
-import { createEditorActivation, createEditorCommands } from '@/features/editor/state/commands'
+import { createEditorCommands } from '@/features/editor/state/commands'
 import { createEnvironmentConnections } from '@/state/environment-connections'
 import { confirmedEnvironmentId } from '@/lib/environments/state/domain'
 import { environmentScopedStorage } from '@/lib/environments/state/scoped-storage'
@@ -116,7 +116,7 @@ export function createApplicationRuntime({
       const owner = current
       const editor = owner.editor
       const commands = createEditorCommands({
-        activation: createEditorActivation(editor.fileOpenIntentService, editor.documentStore),
+        activation: editor.editorActivation,
         documentStore: editor.documentStore,
         searchStore: editor.searchBufferStore,
         uiStore: editor.uiStore,

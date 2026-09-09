@@ -11,7 +11,7 @@ import {
 import { createClientError } from '@workspace/client-core/errors'
 import { clientErrors } from '@/lib/structured-errors'
 import { getClient, type Client } from '@/lib/client'
-import { streamWorkspaceSearch } from '@/lib/workspace-search-client'
+import { streamWorkspaceSearch } from '@workspace/client-core/files/search-client'
 
 import {
   basename,

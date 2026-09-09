@@ -7,12 +7,13 @@ import {
   type OrchestrationProject,
   type OrchestrationWorktree,
   type ProviderInstanceId,
+  type SessionId,
 } from '@workspace/contracts'
 import * as v from 'valibot'
 import { GitWorktreeService } from '../git/worktrees'
 import { DEFAULT_CLAUDE_MODEL } from '../provider/adapters/utils/claude-models'
 import type { ProviderService } from '../provider/provider-service'
-import type { ProviderDiscoveredSession } from '../provider/types'
+import type { ProviderDiscoveredSession, ProviderHistoryMessage } from '../provider/types'
 import { errorSummary } from '../observability/logging'
 import { isEvlogError } from '../observability/structured-errors'
 import { recordChatPipelineInfo, recordChatPipelineWarning } from './orchestration-logging'
@@ -40,15 +41,27 @@ export type DiscoveryScanResult = {
   scanned: number
   imported: number
   refreshed: number
+  messages: number
   skipped: Record<string, number>
   failures: DiscoveryFailure[]
 }
 
 type DiscoveryOptions = {
-  providerService: Pick<ProviderService, 'discoveryInstances' | 'discoverSessions'>
+  providerService: Pick<
+    ProviderService,
+    'discoveryInstances' | 'discoverSessions' | 'readSessionHistory' | 'importSources'
+  >
   registration: RegistrationBoundary
   dispatch: (command: OrchestrationCommand) => Promise<unknown>
   getReadModel: () => OrchestrationReadModel
+  keepUpdated: () => boolean
+  canImportHistory: (sessionId: SessionId) => boolean
+  needsHistory: (sessionId: SessionId, sourceUpdatedAt: string) => boolean
+  importHistory: (
+    sessionId: SessionId,
+    history: readonly ProviderHistoryMessage[],
+    sourceUpdatedAt: string,
+  ) => Promise<boolean>
 }
 
 type CheckoutMatch = { project: OrchestrationProject; worktree: OrchestrationWorktree }
@@ -68,22 +81,40 @@ export class SessionDiscoveryReconciler {
   start() {
     if (this.closed || this.interval) return
     this.interval = setInterval(() => {
-      void this.requestScan()
+      this.refreshInBackground()
     }, DISCOVERY_INTERVAL_MS)
     this.interval.unref()
-    void this.requestScan()
+    this.refreshInBackground()
   }
 
-  requestScan() {
-    return this.scan()
+  private refreshInBackground() {
+    if (!this.options.keepUpdated() || this.pending) return
+    void this.refresh().catch((error) =>
+      recordChatPipelineWarning('chat.pipeline.discovery.failed', {
+        error: discoveryErrorDetails(error),
+      }),
+    )
   }
 
-  scan(): Promise<DiscoveryScanResult> {
-    if (this.pending) return this.pending
-    this.pending = this.runScan().finally(() => {
-      this.pending = null
-    })
-    return this.pending
+  refresh() {
+    return this.enqueueScan(undefined, true)
+  }
+
+  scan(providerInstanceId?: ProviderInstanceId): Promise<DiscoveryScanResult> {
+    return this.enqueueScan(providerInstanceId, false)
+  }
+
+  private enqueueScan(providerInstanceId: ProviderInstanceId | undefined, importedOnly: boolean) {
+    const pending = (this.pending ?? Promise.resolve()).then(() =>
+      this.runScan(providerInstanceId, importedOnly),
+    )
+    this.pending = pending
+    void pending
+      .finally(() => {
+        if (this.pending === pending) this.pending = null
+      })
+      .catch(() => {})
+    return pending
   }
 
   async close() {
@@ -93,12 +124,16 @@ export class SessionDiscoveryReconciler {
     await this.pending
   }
 
-  private async runScan(): Promise<DiscoveryScanResult> {
+  private async runScan(
+    selectedInstance: ProviderInstanceId | undefined,
+    importedOnly: boolean,
+  ): Promise<DiscoveryScanResult> {
     const started = performance.now()
     const result: DiscoveryScanResult = {
       scanned: 0,
       imported: 0,
       refreshed: 0,
+      messages: 0,
       skipped: {},
       failures: [],
     }
@@ -107,7 +142,9 @@ export class SessionDiscoveryReconciler {
     )
     const seen = new Set<string>()
     for (const providerInstanceId of this.options.providerService.discoveryInstances()) {
-      await this.scanInstance(providerInstanceId, roots, seen, result)
+      if (selectedInstance && selectedInstance !== providerInstanceId) continue
+      if (importedOnly && !this.hasImportedSessions(providerInstanceId)) continue
+      await this.scanInstance(providerInstanceId, roots, seen, result, importedOnly)
     }
     const record = Object.keys(result.skipped).length
       ? recordChatPipelineWarning
@@ -116,15 +153,27 @@ export class SessionDiscoveryReconciler {
     return result
   }
 
+  private hasImportedSessions(providerInstanceId: ProviderInstanceId) {
+    return [...this.options.getReadModel().sessions.values()].some(
+      (session) =>
+        session.origin === 'discovered' &&
+        !session.deletedAt &&
+        session.modelSelection.providerInstanceId === providerInstanceId &&
+        !session.latestTurn &&
+        !session.runtime,
+    )
+  }
+
   private async scanInstance(
     providerInstanceId: ProviderInstanceId,
     roots: readonly OrchestrationWorktree[],
     seen: Set<string>,
     result: DiscoveryScanResult,
+    importedOnly: boolean,
   ) {
     for (const root of roots) {
       if (this.closed) return
-      await this.scanDirectory(providerInstanceId, root.canonicalPath, seen, result)
+      await this.scanDirectory(providerInstanceId, root.canonicalPath, seen, result, importedOnly)
     }
   }
 
@@ -133,11 +182,12 @@ export class SessionDiscoveryReconciler {
     cwd: string,
     seen: Set<string>,
     result: DiscoveryScanResult,
+    importedOnly: boolean,
   ) {
     for (let offset = 0; !this.closed; offset += DISCOVERY_PAGE_SIZE) {
       const rows = await this.discoverPage(providerInstanceId, cwd, offset, result)
       if (!rows) return
-      await this.importPage(providerInstanceId, rows, seen, result)
+      await this.importPage(providerInstanceId, rows, seen, result, importedOnly)
       if (rows.length < DISCOVERY_PAGE_SIZE) return
     }
   }
@@ -166,9 +216,11 @@ export class SessionDiscoveryReconciler {
     rows: readonly ProviderDiscoveredSession[],
     seen: Set<string>,
     result: DiscoveryScanResult,
+    importedOnly: boolean,
   ) {
     for (const row of rows) {
       if (this.closed) return
+      if (importedOnly && !this.options.keepUpdated()) return
       const fingerprint = internalCommandKey(
         'metadata',
         providerInstanceId,
@@ -181,6 +233,7 @@ export class SessionDiscoveryReconciler {
       if (seen.has(fingerprint)) continue
       seen.add(fingerprint)
       result.scanned += 1
+      if (importedOnly && !this.options.getReadModel().sessions.has(row.sessionId)) continue
       await this.importOne(providerInstanceId, row, result)
     }
   }
@@ -215,8 +268,28 @@ export class SessionDiscoveryReconciler {
       return skipped(result, 'provider-instance-conflict')
     if (existing && existing.worktreeId !== match.worktree.id)
       return skipped(result, 'session-reparent-conflict')
+    if (
+      existing &&
+      (existing.origin !== 'discovered' || !this.options.canImportHistory(row.sessionId))
+    )
+      return skipped(result, 'continued-in-platform')
+    if (existing && !this.options.needsHistory(row.sessionId, row.sourceUpdatedAt)) return
+    const history = await this.options.providerService.readSessionHistory({
+      providerInstanceId,
+      sessionId: row.sessionId,
+      cwd: match.worktree.canonicalPath,
+    })
+    if (history.length === 0) return skipped(result, 'no-conversation-text')
     const modelSelection =
-      existing?.modelSelection ?? discoveryModel(match.project, providerInstanceId)
+      existing?.modelSelection ??
+      discoveryModel(
+        match.project,
+        providerInstanceId,
+        this.options.providerService
+          .importSources()
+          .find((source) => source.providerInstanceId === providerInstanceId)?.driverKind ??
+          'claude',
+      )
     if (!existing) {
       await this.options.dispatch({
         type: 'session.discover',
@@ -229,7 +302,6 @@ export class SessionDiscoveryReconciler {
         interactionMode: 'default',
         sourceUpdatedAt: row.sourceUpdatedAt,
       })
-      result.imported += 1
     }
     await this.options.dispatch({
       type: 'session.discovery-metadata.update',
@@ -247,7 +319,11 @@ export class SessionDiscoveryReconciler {
       title: row.title,
       sourceUpdatedAt: row.sourceUpdatedAt,
     })
-    result.refreshed += 1
+    const changed = await this.options.importHistory(row.sessionId, history, row.sourceUpdatedAt)
+    if (!changed) return
+    result.messages += history.length
+    if (existing) result.refreshed += 1
+    else result.imported += 1
   }
 
   private async resolveCheckout(
@@ -399,10 +475,11 @@ function containsPath(root: string, candidate: string) {
 function discoveryModel(
   project: OrchestrationProject,
   providerInstanceId: ProviderInstanceId,
+  driverKind: string,
 ): ModelSelection {
   if (project.defaultModelSelection?.providerInstanceId === providerInstanceId)
     return project.defaultModelSelection
-  return { providerInstanceId, model: DEFAULT_CLAUDE_MODEL }
+  return { providerInstanceId, model: driverKind === 'codex' ? 'gpt-5.5' : DEFAULT_CLAUDE_MODEL }
 }
 
 function externalCheckout(

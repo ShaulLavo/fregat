@@ -118,17 +118,28 @@ export function createKeymapSession(options: Options) {
 function makeTrie(bindings: readonly TerminalBinding[], focus: FocusRegistry) {
   const area = focus.getSnapshot().current?.area ?? 'global'
   return buildKeymapTrie(
-    activeTerminalBindings(bindings, area).map((binding) => {
-      const chord = parsedChord(binding.keys, 'linux')
-      const first = parseHotkey(binding.keys.split(' ')[0], 'linux')
-      return {
-        chord,
-        payload: {
-          ...binding,
-          firesWhileTyping: first.ctrl || /^F\d+$/u.test(first.key) || first.key === 'Escape',
-        },
-      }
-    }),
+    activeTerminalBindings(bindings, area)
+      .filter((binding) => {
+        if (area !== 'terminal' || binding.pane === 'terminal') return true
+        return (
+          binding.source === 'user' || binding.keys.startsWith('Ctrl+K ') || binding.keys === 'F1'
+        )
+      })
+      .map((binding) => {
+        const chord = parsedChord(binding.keys, 'linux')
+        const first = parseHotkey(binding.keys.split(' ')[0], 'linux')
+        return {
+          chord,
+          payload: {
+            ...binding,
+            firesWhileTyping:
+              first.ctrl ||
+              /^F\d+$/u.test(first.key) ||
+              first.key === 'Escape' ||
+              first.key === 'Tab',
+          },
+        }
+      }),
     'linux',
   )
 }

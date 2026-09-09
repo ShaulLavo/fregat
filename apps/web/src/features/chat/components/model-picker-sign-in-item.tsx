@@ -1,7 +1,7 @@
 import { SignInIcon } from '@phosphor-icons/react'
 import { CommandItem } from '@workspace/ui/components/command'
 
-import type { ProviderSignInTarget } from '@/features/chat/utils/provider-auth'
+import type { ProviderSignInTarget } from '@workspace/client-core/chat/providers/auth'
 
 /**
  * The one enabled row in a signed-out provider's group. Every model above it is

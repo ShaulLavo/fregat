@@ -4,7 +4,7 @@ import {
   type ScopedWorktreeRef,
 } from '@workspace/contracts'
 import * as v from 'valibot'
-import type { WorktreeConfirmation } from '@/features/chat-mode/utils/worktree-commands'
+import type { WorktreeConfirmation } from '@workspace/client-core/chat/worktrees/commands'
 import { environmentClientFor } from '@/lib/client'
 import { confirmedEnvironmentOrigin } from '@/lib/environments/state/domain'
 import { unwrapEdenResponse } from '@/lib/eden-events'

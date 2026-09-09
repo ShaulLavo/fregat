@@ -5,12 +5,12 @@ import {
   readFilePreview,
   readServerPaths,
 } from '@workspace/client-core/files/read'
-import { parsePickerPathInput } from '@workspace/client-core/files/path-input'
+import { absolutePickerPath, parsePickerPathInput } from '@workspace/client-core/files/path-input'
 import type { Client } from '@workspace/client-core/transport/client'
 import type { KeyValueStorage } from '@workspace/client-core/storage'
 
 import { connectionFailure } from '@/connection/utils/failure'
-import { parentDirectory, type FileLocation } from '@/files/utils/list'
+import { parentDirectory, parseBrowserPathInput, type FileLocation } from '@/files/utils/list'
 
 type ServerPaths = Awaited<ReturnType<typeof readServerPaths>>
 type Listing =
@@ -28,12 +28,14 @@ export function createFileBrowser(client: Client, storage: KeyValueStorage) {
   let state: {
     paths: ServerPaths | null
     path: string
+    parentPath: string | null
     listing: Listing
     preview: Preview
     location: FileLocation | null
   } = {
     paths: null,
     path: '',
+    parentPath: null,
     listing: { kind: 'loading' },
     preview: { kind: 'empty' },
     location: null,
@@ -44,7 +46,7 @@ export function createFileBrowser(client: Client, storage: KeyValueStorage) {
 
   function publish(next: typeof state) {
     if (disposed) return
-    state = next
+    state = { ...next, parentPath: next.path ? parentDirectory(next.path) : null }
     for (const listener of listeners) listener()
   }
 
@@ -76,7 +78,7 @@ export function createFileBrowser(client: Client, storage: KeyValueStorage) {
         state.paths && destination === 'directory'
           ? {
               path: result.path,
-              rootPath: state.paths.defaultPath,
+              rootPath: result.path,
               kind: 'directory',
             }
           : state.location
@@ -99,23 +101,33 @@ export function createFileBrowser(client: Client, storage: KeyValueStorage) {
       const paths = await readServerPaths({ client, signal: controller.signal })
       controller.signal.throwIfAborted()
       publish({ ...state, paths })
-      if (initialPath) {
-        const entry = await readEntry({ client, path: initialPath, signal: controller.signal })
-        if (!isDirectoryEntry(entry)) {
-          if (!(await loadDirectory(parentDirectory(initialPath), controller, 'file'))) return
-          controller.signal.throwIfAborted()
-          await select({ ...entry, name: initialPath.split('/').at(-1) ?? initialPath })
-          return
-        }
+      const input = initialPath ?? storage.getItem('file-picker-directory') ?? paths.defaultPath
+      const parsed = input ? parsePickerPathInput(input, paths) : { error: null, path: '' }
+      if (parsed.error !== null) {
+        publish({ ...state, listing: { kind: 'failed', message: parsed.error } })
+        return
       }
-      await loadDirectory(
-        initialPath ?? storage.getItem('file-picker-directory') ?? paths.defaultPath,
-        controller,
-      )
+      if (initialPath !== undefined && parsed.path) {
+        await openEntry(parsed.path, controller)
+        return
+      }
+      await loadDirectory(parsed.path, controller)
     } catch (error) {
       if (controller.signal.aborted) return
       publish({ ...state, listing: { kind: 'failed', message: connectionFailure(error).message } })
     }
+  }
+
+  async function openEntry(path: string, controller: AbortController) {
+    const entry = await readEntry({ client, path, signal: controller.signal })
+    controller.signal.throwIfAborted()
+    if (isDirectoryEntry(entry)) {
+      await loadDirectory(path, controller)
+      return
+    }
+    if (!(await loadDirectory(parentDirectory(path), controller, 'file'))) return
+    controller.signal.throwIfAborted()
+    await select({ ...entry, name: path.split('/').at(-1) ?? path })
   }
 
   async function select(entry: FileTreeEntry) {
@@ -131,7 +143,7 @@ export function createFileBrowser(client: Client, storage: KeyValueStorage) {
       const location: FileLocation | null = state.paths
         ? {
             path: file.path,
-            rootPath: state.paths.defaultPath,
+            rootPath: parentDirectory(file.path),
             kind: 'file',
           }
         : state.location
@@ -151,10 +163,11 @@ export function createFileBrowser(client: Client, storage: KeyValueStorage) {
 
   async function completePath(input: string) {
     if (!state.paths || disposed) return input
-    const parsed = parsePickerPathInput(input, state.paths)
+    const parsed = parseBrowserPathInput({ input, currentPath: state.path, paths: state.paths })
     if (parsed.error !== null) return input
-    const parent = input.endsWith('/') ? parsed.path : parentDirectory(parsed.path)
-    const prefix = input.endsWith('/') ? '' : (parsed.path.split('/').at(-1) ?? '')
+    const directoryInput = input.trim().endsWith('/')
+    const parent = directoryInput ? parsed.path : parentDirectory(parsed.path)
+    const prefix = directoryInput ? '' : (parsed.path.split('/').at(-1) ?? '')
     const signal = request.signal
     try {
       const result = await readDirectory({ client, path: parent, signal })
@@ -163,7 +176,7 @@ export function createFileBrowser(client: Client, storage: KeyValueStorage) {
         (entry) => isDirectoryEntry(entry) && entry.name.startsWith(prefix),
       )
       if (matches.length !== 1) return input
-      return `${state.paths.workspaceRoot.replace(/\/$/, '')}/${matches[0].path}/`
+      return `${absolutePickerPath(matches[0].path, state.paths.workspaceRoot)}/`
     } catch (error) {
       if (signal.aborted) return input
       throw error
@@ -173,6 +186,10 @@ export function createFileBrowser(client: Client, storage: KeyValueStorage) {
   return {
     open,
     navigate,
+    async goUp() {
+      if (state.parentPath === null) return
+      await navigate(state.parentPath)
+    },
     select,
     completePath,
     clearPreview() {
@@ -182,7 +199,7 @@ export function createFileBrowser(client: Client, storage: KeyValueStorage) {
         state.paths && state.listing.kind === 'ready'
           ? {
               path: state.path,
-              rootPath: state.paths.defaultPath,
+              rootPath: state.path,
               kind: 'directory',
             }
           : state.location
@@ -190,7 +207,7 @@ export function createFileBrowser(client: Client, storage: KeyValueStorage) {
     },
     enterPath(input: string) {
       if (!state.paths) return 'Server paths are not available yet.'
-      const parsed = parsePickerPathInput(input, state.paths)
+      const parsed = parseBrowserPathInput({ input, currentPath: state.path, paths: state.paths })
       if (parsed.error !== null) return parsed.error
       void navigate(parsed.path)
       return null

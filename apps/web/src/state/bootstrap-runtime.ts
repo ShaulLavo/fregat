@@ -1,5 +1,6 @@
+import { addressHrefFromBrowser } from '@/features/address/utils/browser-url'
 import type { HealthDescriptor } from '@workspace/contracts'
-import { addressedWorkspaceCache } from '@/features/address/utils/cache'
+import { addressedWorkspaceCache, panelsForAddress } from '@/features/address/utils/cache'
 import { parseAddress } from '@workspace/client-core/address/grammar'
 import { readWorkspaceCache } from '@/features/workspace/state/cache'
 import { getSelectedEditorThemeId } from '@/features/editor/state/color-theme-store'
@@ -23,10 +24,11 @@ export function createBootRuntime(descriptor: HealthDescriptor, cached = false) 
   if (!cached) useEnvironmentsStore.getState().recordDescriptor(primaryServerOrigin(), descriptor)
   if (cached) useEnvironmentsStore.getState().setPhase(primaryServerOrigin(), 'offline')
   primaryQueryClient().setQueryData(['environment-descriptor'], descriptor)
-  return createApplicationRuntime({
+  const address = parseAddress(addressHrefFromBrowser(window.location.href))
+  const application = createApplicationRuntime({
     workspaceCache: addressedWorkspaceCache(
       readWorkspaceCache(environmentScopedStorage(descriptor.environmentId)),
-      parseAddress(window.location.href),
+      address,
     ),
     preparation: {
       appliedThemeContentHash: null,
@@ -35,4 +37,11 @@ export function createBootRuntime(descriptor: HealthDescriptor, cached = false) 
       syntaxHighlightingEnabled: readSettingsMirror()['editor.syntaxHighlighting.enabled'],
     },
   })
+  const workspace = application.getSnapshot().editor.workspaceStore
+  if (workspace.getState().rootFolder === null && address.rejectedEnvironment === null) {
+    workspace
+      .getState()
+      .setWorkbenchPanels(panelsForAddress(workspace.getState().workbenchPanels, null, address))
+  }
+  return application
 }

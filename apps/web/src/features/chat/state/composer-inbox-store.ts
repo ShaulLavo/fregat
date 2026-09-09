@@ -3,7 +3,7 @@ import { create } from 'zustand'
 import {
   normalizeTerminalContextSelection,
   type TerminalContextSelection,
-} from '@/features/chat/utils/terminal-context'
+} from '@workspace/client-core/chat/terminal-context'
 import type { ChatInputTerminalContext } from './chat-input-draft-store'
 
 /**

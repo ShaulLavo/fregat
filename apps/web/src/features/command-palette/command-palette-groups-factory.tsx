@@ -18,10 +18,7 @@ import { SessionGroups } from '@/features/command-palette/session-groups'
 import { SymbolGroups } from '@/features/command-palette/symbol-groups'
 import { ViewGroups } from '@/features/command-palette/view-groups'
 import type { ProjectScriptSuggestion } from '@/features/chat-mode/utils/project-scripts'
-import type {
-  SessionRailItem,
-  SessionRailProject,
-} from '@/features/chat-mode/utils/session-rail-model'
+import type { SessionRailItem, SessionRailProject } from '@workspace/client-core/chat/rail/model'
 
 type CommandPaletteGroupsFactoryProps = {
   readonly commandGroups: readonly (readonly [string, readonly CommandPaletteItem[]])[]

@@ -3,7 +3,7 @@ import { queryOptions } from '@tanstack/react-query'
 
 import type { Client } from '@/lib/client'
 import { clientForQueryClient } from '@/lib/environments/state/query-clients'
-import { collectWorkspaceSearch } from '@/lib/workspace-search-client'
+import { collectWorkspaceSearch } from '@workspace/client-core/files/search-client'
 
 const PROJECT_ENTRY_QUERY_LIMIT = 40
 const PROJECT_ENTRY_QUERY_STALE_TIME_MS = 15_000

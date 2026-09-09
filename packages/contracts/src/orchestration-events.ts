@@ -13,6 +13,7 @@ import {
 } from './chat-ids'
 import {
   chatAttachmentsSchema,
+  importedSessionMessageSchema,
   isoDateTimeSchema,
   nonNegativeIntegerSchema,
   orchestrationCheckpointFileSchema,
@@ -313,6 +314,7 @@ export const sessionDiscoveryMetadataUpdatedPayloadSchema = v.object({
 })
 
 export const orchestrationEventMetadataSchema = v.object({
+  historyRevision: v.optional(trimmedNonEmptyStringSchema),
   providerTurnId: v.optional(trimmedNonEmptyStringSchema),
   providerItemId: v.optional(trimmedNonEmptyStringSchema),
   adapterKey: v.optional(trimmedNonEmptyStringSchema),
@@ -374,6 +376,11 @@ export const ORCHESTRATION_EVENT_PAYLOADS = {
   'session.runtime-mode-set': sessionRuntimeModeSetPayloadSchema,
   'session.interaction-mode-set': sessionInteractionModeSetPayloadSchema,
   'session.message-sent': sessionMessageSentPayloadSchema,
+  'session.history-imported': v.object({
+    sessionId: sessionIdSchema,
+    messages: v.array(importedSessionMessageSchema),
+    sourceUpdatedAt: isoDateTimeSchema,
+  }),
   'session.turn-start-requested': sessionTurnStartRequestedPayloadSchema,
   'session.turn-interrupt-requested': sessionTurnInterruptRequestedPayloadSchema,
   'session.runtime-stop-requested': sessionRuntimeStopRequestedPayloadSchema,

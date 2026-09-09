@@ -1,7 +1,7 @@
 import { useState } from 'react'
 
 import type { ChatTransport } from '@/features/chat/transport/chat-transport'
-import { createWorkspaceProjectCommand } from '@/features/chat/utils/command-builders'
+import { createWorkspaceProjectCommand } from '@workspace/client-core/chat/commands'
 import { log } from '@/lib/client-logging'
 import { errorMessage } from '@/lib/error-message'
 

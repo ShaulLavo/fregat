@@ -14,7 +14,7 @@ import { resetServerConnectionStore, useEnvironmentsStore } from '@/lib/environm
 import { FakeOrchestrationSocket } from '@workspace/client-core/test/orchestration-socket'
 import { expect, test } from '../../../../../test/fixtures'
 import { orchestrationServerConfig } from '@workspace/client-core/test/orchestration-server-config'
-import { createWorkspaceProjectCommand } from '@/features/chat/utils/command-builders'
+import { createWorkspaceProjectCommand } from '@workspace/client-core/chat/commands'
 
 const ORIGIN = 'http://orchestration.test'
 const HEARTBEAT_MS = 10

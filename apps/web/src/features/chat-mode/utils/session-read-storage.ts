@@ -1,7 +1,7 @@
 import type { ScopedStorage } from '@/lib/environments/state/scoped-storage'
 import * as v from 'valibot'
 
-import type { SessionSeenStamps } from '@/features/chat-mode/utils/session-unread'
+import type { SessionSeenStamps } from '@workspace/client-core/chat/rail/unread'
 
 const SESSION_READ_STORAGE_KEY = 'platform.chat-session-reads.v1'
 const SESSION_READ_STORAGE_VERSION = 1

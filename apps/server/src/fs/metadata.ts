@@ -1,12 +1,20 @@
-import { and, asc, desc, inArray, isNotNull, sql } from 'drizzle-orm'
-import { effectiveEntryType, type EntryTypeFilter } from '@workspace/contracts'
+import { and, asc, desc, eq, inArray, isNotNull, sql } from 'drizzle-orm'
+import { nanoid } from 'nanoid'
+import {
+  effectiveEntryType,
+  WORKSPACE_ADDRESS_ID_LENGTH,
+  workspaceAddressIdSchema,
+  type EntryTypeFilter,
+  type WorkspaceAddressId,
+} from '@workspace/contracts'
+import * as v from 'valibot'
 import {
   createMetadataDatabase,
   type MetadataDatabaseHandle,
   type PlatformDatabase,
 } from '../db/client'
 import { migrateMetadataDatabase } from '../db/migrations'
-import { fsMetadata } from '../db/schema'
+import { fsMetadata, workspaceAddresses } from '../db/schema'
 
 export type FsMetadataEntry = {
   path: string
@@ -19,6 +27,7 @@ export type FsMetadataEntry = {
 }
 
 export type FsMetadataStoreOptions = {
+  createWorkspaceAddressId?: () => WorkspaceAddressId
   /** Existing database handle to use. The store will not close handles it does not own. */
   database?: MetadataDatabaseHandle
   /** Path to open a dedicated, store-owned database when no handle is provided. */
@@ -29,8 +38,10 @@ export class FsMetadataStore {
   readonly databasePath: string
   private readonly db: PlatformDatabase
   private readonly ownedHandle: MetadataDatabaseHandle | null
+  private readonly createWorkspaceAddressId: () => WorkspaceAddressId
 
   constructor(options: FsMetadataStoreOptions = {}) {
+    this.createWorkspaceAddressId = options.createWorkspaceAddressId ?? createWorkspaceAddressId
     if (options.database) {
       this.ownedHandle = null
       this.db = options.database.db
@@ -42,6 +53,44 @@ export class FsMetadataStore {
     }
 
     migrateMetadataDatabase(this.db)
+  }
+
+  registerWorkspaceAddress(filesystemRoot: string, canonicalPath: string): WorkspaceAddressId {
+    for (;;) {
+      const existing = this.workspaceAddressForDirectory(filesystemRoot, canonicalPath)
+      if (existing) return existing.id
+
+      const inserted = this.db
+        .insert(workspaceAddresses)
+        .values({ id: this.createWorkspaceAddressId(), filesystemRoot, canonicalPath })
+        .onConflictDoNothing()
+        .returning({ id: workspaceAddresses.id })
+        .get()
+      if (inserted) return inserted.id
+    }
+  }
+
+  private workspaceAddressForDirectory(filesystemRoot: string, canonicalPath: string) {
+    return this.db
+      .select({ id: workspaceAddresses.id })
+      .from(workspaceAddresses)
+      .where(
+        and(
+          eq(workspaceAddresses.filesystemRoot, filesystemRoot),
+          eq(workspaceAddresses.canonicalPath, canonicalPath),
+        ),
+      )
+      .get()
+  }
+
+  findWorkspaceAddress(filesystemRoot: string, id: WorkspaceAddressId) {
+    return this.db
+      .select()
+      .from(workspaceAddresses)
+      .where(
+        and(eq(workspaceAddresses.filesystemRoot, filesystemRoot), eq(workspaceAddresses.id, id)),
+      )
+      .get()
   }
 
   recordPicked(entry: FsMetadataEntry) {
@@ -96,4 +145,8 @@ export class FsMetadataStore {
   close() {
     this.ownedHandle?.close()
   }
+}
+
+function createWorkspaceAddressId(): WorkspaceAddressId {
+  return v.parse(workspaceAddressIdSchema, nanoid(WORKSPACE_ADDRESS_ID_LENGTH))
 }

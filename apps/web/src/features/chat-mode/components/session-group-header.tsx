@@ -5,7 +5,7 @@ import { CaretDownIcon, CaretRightIcon } from '@phosphor-icons/react'
 
 import { ProjectMenu } from '@/features/chat-mode/components/project-menu'
 import { useSessionRailStore } from '@/features/chat-mode/state/session-rail-store'
-import type { SessionRailGroup } from '@/features/chat-mode/utils/session-rail-model'
+import type { SessionRailGroup } from '@workspace/client-core/chat/rail/model'
 
 export function SessionGroupHeader({
   dragAttributes,

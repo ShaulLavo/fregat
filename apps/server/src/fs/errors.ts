@@ -8,6 +8,7 @@ export type FsErrorCode =
   | 'GIT_COMMAND_FAILED'
   | 'GIT_REPOSITORY_NOT_FOUND'
   | 'NOT_FOUND'
+  | 'WORKSPACE_ADDRESS_NOT_FOUND'
   | 'ALREADY_EXISTS'
   | 'FILE_CHANGED'
   | 'INVALID_PATH'
@@ -42,6 +43,7 @@ const statusByCode: Record<FsErrorCode, number> = {
   GIT_COMMAND_FAILED: 500,
   GIT_REPOSITORY_NOT_FOUND: 404,
   NOT_FOUND: 404,
+  WORKSPACE_ADDRESS_NOT_FOUND: 404,
   ALREADY_EXISTS: 409,
   FILE_CHANGED: 409,
   INVALID_PATH: 400,
@@ -66,6 +68,7 @@ const messageByCode: Record<FsErrorCode, string> = {
   GIT_COMMAND_FAILED: 'git command failed',
   GIT_REPOSITORY_NOT_FOUND: 'git repository not found',
   NOT_FOUND: 'file not found',
+  WORKSPACE_ADDRESS_NOT_FOUND: 'workspace address was not found',
   ALREADY_EXISTS: 'target already exists',
   FILE_CHANGED: 'file changed on disk',
   INVALID_PATH: 'invalid path',

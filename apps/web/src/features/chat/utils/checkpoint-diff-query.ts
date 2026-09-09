@@ -7,7 +7,7 @@ import { unwrapEdenResponse } from '@/lib/eden-events'
 import { gitKeys } from '@/lib/query-keys'
 import type { CheckpointDiffDocumentInput } from '@/features/git/utils/diff-document'
 import type { FileDiff, FileStatus } from '@/features/git/utils/types'
-import type { ChatTurnDiffSummary } from '@/features/chat/state/chat-projection-store'
+import type { ChatTurnDiffSummary } from '@workspace/client-core/chat/types'
 
 export type CheckpointDiffQueryInput = {
   filePath?: string

@@ -11,7 +11,10 @@ export function ScopeTabs({ hasWorkspace }: { hasWorkspace: boolean }) {
   const scope = useSettingsScope()
 
   return (
-    <div className='compact:gap-0.5 flex items-center gap-1' role='tablist'>
+    <div
+      className='compact:gap-0.5 flex min-w-0 items-center gap-1 @max-3xl/settings:order-1'
+      role='tablist'
+    >
       <Button
         aria-selected={scope === 'user'}
         onClick={() => selectSettingsScope('user')}

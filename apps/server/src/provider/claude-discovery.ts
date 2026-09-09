@@ -1,8 +1,14 @@
 import path from 'node:path'
 import * as v from 'valibot'
-import type { ProviderDiscoveredSession, ProviderSessionDiscoveryInput } from './types'
+import type {
+  ProviderDiscoveredSession,
+  ProviderSessionDiscoveryInput,
+  ProviderSessionHistoryInput,
+  ProviderHistoryMessage,
+} from './types'
 import { sessionIdentityErrors } from './structured-errors'
 import { discoveredSessionsSchema, discoveryInputSchema } from './utils/discovery-metadata'
+import { historyMessagesSchema, sessionHistoryInputSchema } from './utils/session-history'
 
 const DISCOVERY_TIMEOUT_MS = 8_000
 const DISCOVERY_STDERR_LIMIT = 4_096
@@ -11,6 +17,21 @@ export type ClaudeDiscoveryRunner = (input: {
   request: ProviderSessionDiscoveryInput
   env: NodeJS.ProcessEnv
 }) => Promise<unknown>
+
+export type ClaudeHistoryRunner = (input: {
+  request: ProviderSessionHistoryInput
+  env: NodeJS.ProcessEnv
+}) => Promise<unknown>
+
+export async function readClaudeSessionHistory(input: {
+  request: ProviderSessionHistoryInput
+  env: NodeJS.ProcessEnv
+  runner?: ClaudeHistoryRunner
+}): Promise<ProviderHistoryMessage[]> {
+  const request = v.parse(sessionHistoryInputSchema, input.request)
+  const messages = await (input.runner ?? runClaudeSessionWorker)({ request, env: input.env })
+  return v.parse(historyMessagesSchema, messages)
+}
 
 export async function discoverClaudeSessions(input: {
   request: ProviderSessionDiscoveryInput
@@ -38,6 +59,16 @@ export async function runClaudeDiscovery(
   input: Parameters<ClaudeDiscoveryRunner>[0],
   spawn = spawnClaudeDiscovery,
 ) {
+  return runClaudeSessionWorker(input, spawn)
+}
+
+async function runClaudeSessionWorker(
+  input: {
+    request: ProviderSessionDiscoveryInput | ProviderSessionHistoryInput
+    env: NodeJS.ProcessEnv
+  },
+  spawn = spawnClaudeDiscovery,
+) {
   const child = spawn(input.env)
   await child.stdin.write(JSON.stringify(input.request))
   await child.stdin.end()
@@ -53,7 +84,11 @@ export async function runClaudeDiscovery(
       child.exited,
     ])
     if (timedOut || exitCode !== 0)
-      throw sessionIdentityErrors.DISCOVERY_FAILED({
+      throw (
+        'sessionId' in input.request
+          ? sessionIdentityErrors.HISTORY_FAILED
+          : sessionIdentityErrors.DISCOVERY_FAILED
+      )({
         internal: {
           exitCode,
           signalCode: child.signalCode,

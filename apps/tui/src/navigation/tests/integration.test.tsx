@@ -14,12 +14,20 @@ test('batched address submission, copied filters, and Back/Forward preserve actu
   await session.refresh()
   const state = session.getSnapshot()
   if (state.kind !== 'ready') return expect.unreachable('Expected ready session')
-  const frame = await renderTui(<Application session={session} noColor onExit={() => {}} />, {
-    width: 110,
-    height: 32,
-    useThread: false,
-    kittyKeyboard: true,
-  })
+  const frame = await renderTui(
+    <Application
+      initialLocation={{ kind: 'settings', query: '' }}
+      session={session}
+      noColor
+      onExit={() => {}}
+    />,
+    {
+      width: 110,
+      height: 32,
+      useThread: false,
+      kittyKeyboard: true,
+    },
+  )
   try {
     await runPaletteCommand(frame, 'Open address')
     expect(frame.renderer.currentFocusedRenderable?.id).toBe('address-input')

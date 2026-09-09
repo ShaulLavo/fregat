@@ -14,8 +14,8 @@ import {
   canRetainWorktree,
   canRetryWorktree,
   cleanupStatusLabel,
-} from '@/features/chat-mode/utils/worktree-cleanup'
-import { worktreeLabel } from '@/features/chat-mode/utils/worktree-label'
+} from '@workspace/client-core/chat/worktrees/cleanup'
+import { worktreeLabel } from '@workspace/client-core/chat/worktrees/label'
 
 export function WorktreeManagerRow({
   environmentId,

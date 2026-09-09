@@ -7,7 +7,7 @@ import { SessionGroupHeader } from '@/features/chat-mode/components/session-grou
 import { SessionRow } from '@/features/chat-mode/components/session-row'
 import { useRailDragSensors } from '@/features/chat-mode/hooks/use-rail-drag-sensors'
 import { useChatRailOrder } from '@/features/chat-mode/providers/rail-order-context'
-import type { SessionRailGroup } from '@/features/chat-mode/utils/session-rail-model'
+import type { SessionRailGroup } from '@workspace/client-core/chat/rail/model'
 import { cn } from '@workspace/ui/lib/utils'
 
 const SESSION_DND_MODIFIERS = [restrictToVerticalAxis]

@@ -194,6 +194,12 @@ export class OrchestrationStreamHub {
 
   private retain(events: OrchestrationEvent[]) {
     for (const event of events) {
+      if (event.type === 'session.history-imported') {
+        // Keep full transcripts in SQL; reconnects across a replacement use snapshots.
+        this.retained.length = 0
+        this.observeSequence(event.sequence)
+        continue
+      }
       appendBounded(this.retained, event, RETAINED_EVENT_LIMIT)
       this.observeSequence(event.sequence)
     }
@@ -319,7 +325,7 @@ export class OrchestrationStreams {
     yield { kind: 'synchronized', sequence }
 
     for await (const events of eventBatches) {
-      const result = detailItemsAfter(events, sessionId, sequence)
+      const result = this.sessionItemsAfter(events, sessionId, sequence)
       sequence = result.sequence
       recordChatPipelineInfo('chat.pipeline.session_stream.batch', {
         emittedItemCount: result.items.length,
@@ -368,10 +374,26 @@ export class OrchestrationStreams {
     }
   }
 
+  private sessionItemsAfter(events: OrchestrationEvent[], sessionId: string, sequence: number) {
+    const replaced = events.some(
+      (event) =>
+        event.sequence > sequence &&
+        event.type === 'session.history-imported' &&
+        event.payload.sessionId === sessionId,
+    )
+    if (!replaced) return detailItemsAfter(events, sessionId, sequence)
+    // An import can replace thousands of messages; send the normal bounded window.
+    const snapshot = this.snapshots.sessionDetailSnapshot(sessionId)
+    return {
+      items: [{ kind: 'snapshot', snapshot } satisfies OrchestrationSessionStreamItem],
+      sequence: snapshot.snapshotSequence,
+    }
+  }
+
   private startSessionDetail(sessionId: string, afterSequence: number) {
     const plan = this.hub.resumePlan(afterSequence)
     if (plan.kind === 'replay') {
-      const result = detailItemsAfter(plan.events, sessionId, afterSequence)
+      const result = this.sessionItemsAfter(plan.events, sessionId, afterSequence)
       recordChatPipelineInfo('chat.pipeline.session_stream.start', {
         afterSequence,
         emittedItemCount: result.items.length,

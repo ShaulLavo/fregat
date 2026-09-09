@@ -26,7 +26,7 @@ import {
   setActiveServerOrigin,
 } from '@/lib/client'
 import { useChatProjectionStore } from '@/features/chat/state/chat-projection-store'
-import { createProjectRegistrationCommand } from '@/lib/environments/utils/registration'
+import { createProjectRegistrationCommand } from '@workspace/client-core/chat/registration'
 import { queryClientFor } from '@/lib/environments/state/query-clients'
 import { createInProcessClient } from '../client'
 import { makeTestServer, type TestServer } from '../server'

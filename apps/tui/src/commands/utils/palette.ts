@@ -1,4 +1,4 @@
-import { groupedCommandItems } from '@workspace/client-core/commands/palette'
+import { groupedCommandItems, quickAccessQuery } from '@workspace/client-core/commands/palette'
 import type { CommandBus } from '@/commands/state/bus'
 import type { TerminalBinding } from '@/commands/utils/bindings'
 
@@ -22,11 +22,26 @@ export function paletteOptions(
     reason: row.status === 'disabled' ? row.reason : null,
     shortcut: bindings.find((binding) => binding.command === row.command.id)?.keys,
   }))
-  return groupedCommandItems(commands, query, recents).flatMap(([group, rows]) =>
+  const search = quickAccessQuery(query).trim().toLocaleLowerCase()
+  const groups = groupedCommandItems(commands, query, search ? [] : recents)
+  const options = groups.flatMap(([group, rows]) =>
     rows.map((row) => ({
       name: row.shortcut ? `${row.title}  ${row.shortcut}` : row.title,
       description: row.reason ?? group,
       value: row,
     })),
   )
+  if (!search) return options
+  return options.toSorted(
+    (left, right) =>
+      Number(exactCommandMatch(right.value, search)) -
+      Number(exactCommandMatch(left.value, search)),
+  )
+}
+
+function exactCommandMatch(
+  command: { readonly id: string; readonly title: string },
+  search: string,
+) {
+  return command.id.toLocaleLowerCase() === search || command.title.toLocaleLowerCase() === search
 }

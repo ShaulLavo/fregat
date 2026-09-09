@@ -17,12 +17,20 @@ test.for([{ keys: 'F8' }, { keys: null }])(
       { kind: 'keybinding.set', command: 'workspace.dismiss', keys },
     ])
     if (submission.kind === 'submitted') await submission.settled
-    const frame = await renderTui(<Application session={session} noColor onExit={() => {}} />, {
-      width: 110,
-      height: 32,
-      useThread: false,
-      kittyKeyboard: true,
-    })
+    const frame = await renderTui(
+      <Application
+        initialLocation={{ kind: 'settings', query: '' }}
+        session={session}
+        noColor
+        onExit={() => {}}
+      />,
+      {
+        width: 110,
+        height: 32,
+        useThread: false,
+        kittyKeyboard: true,
+      },
+    )
     try {
       await act(async () => {
         frame.mockInput.pressKey('F1')
@@ -67,12 +75,20 @@ test('a rebound Dismiss key cancels a settings editor', async ({ server }) => {
     { kind: 'keybinding.set', command: 'workspace.dismiss', keys: 'F8' },
   ])
   if (submission.kind === 'submitted') await submission.settled
-  const frame = await renderTui(<Application session={session} noColor onExit={() => {}} />, {
-    width: 110,
-    height: 32,
-    useThread: false,
-    kittyKeyboard: true,
-  })
+  const frame = await renderTui(
+    <Application
+      initialLocation={{ kind: 'settings', query: '' }}
+      session={session}
+      noColor
+      onExit={() => {}}
+    />,
+    {
+      width: 110,
+      height: 32,
+      useThread: false,
+      kittyKeyboard: true,
+    },
+  )
   try {
     await act(async () => {
       await frame.mockInput.typeText('workbench.colorTheme')
@@ -108,12 +124,20 @@ test('a rebound Dismiss key returns from a narrow file preview before closing Fi
     { kind: 'keybinding.set', command: 'workspace.dismiss', keys: 'F8' },
   ])
   if (submission.kind === 'submitted') await submission.settled
-  const frame = await renderTui(<Application session={session} noColor onExit={() => {}} />, {
-    width: 60,
-    height: 20,
-    useThread: false,
-    kittyKeyboard: true,
-  })
+  const frame = await renderTui(
+    <Application
+      initialLocation={{ kind: 'settings', query: '' }}
+      session={session}
+      noColor
+      onExit={() => {}}
+    />,
+    {
+      width: 60,
+      height: 20,
+      useThread: false,
+      kittyKeyboard: true,
+    },
+  )
   try {
     await act(async () => {
       frame.mockInput.pressKey('p', { ctrl: true })

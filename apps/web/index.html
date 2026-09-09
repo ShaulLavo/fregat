@@ -48,6 +48,7 @@
         let theme = 'system'
         let palette = 'graphite'
         let density = 'compact'
+        let wallpaperEnabled = true
         try {
           const raw = localStorage.getItem('platform.settings-boot-mirror.v1')
           const mirror = raw ? JSON.parse(raw) : {}
@@ -56,6 +57,7 @@
           if (storedTheme === 'dark' || storedTheme === 'light') theme = storedTheme
           if (mirror['workbench.palette'] === 'sage') palette = 'sage'
           if (storedDensity === 'compact' || storedDensity === 'cozy') density = storedDensity
+          if (mirror['workbench.wallpaper.enabled'] === false) wallpaperEnabled = false
         } catch {
           // An unreadable mirror costs a system-theme boot floor, nothing more.
         }
@@ -68,6 +70,7 @@
         // matches the palette instead of flashing the default one.
         root.setAttribute('data-palette', palette)
         root.setAttribute('data-density', density)
+        preloadWallpaper(wallpaperEnabled)
         if (palette !== 'sage') return
 
         root.style.setProperty(
@@ -75,6 +78,40 @@
           dark ? 'oklch(0.17 0.01 260)' : 'oklch(0.98 0.003 90)',
         )
       })()
+
+      function preloadWallpaper(enabled) {
+        if (!enabled) return
+        const backdrop = window.platformBridge?.backdrop
+        if (backdrop === 'transparent' || backdrop === 'compositor') return
+        const platform = navigator.userAgentData?.platform
+        const desktopLinux = platform
+          ? platform === 'Linux'
+          : !/android/i.test(navigator.userAgent) && /linux|bsd/i.test(navigator.userAgent)
+        if (desktopLinux) return
+
+        const configuredServer = '%VITE_SERVER_URL%'
+        const server = new URL(
+          configuredServer.startsWith('%') ? 'http://localhost:3001' : configuredServer,
+        )
+        const desktopStill = `${server.origin}${server.pathname.replace(/\/+$/, '')}/wallpaper/still`
+        const sources = [desktopStill, '%BASE_URL%workbench/wallpaper.jpg']
+        for (const source of sources) {
+          const preload = document.createElement('link')
+          preload.rel = 'preload'
+          preload.as = 'image'
+          preload.crossOrigin = 'anonymous'
+          preload.href = source
+          preload.fetchPriority = source === desktopStill ? 'high' : 'low'
+          preload.dataset.workbenchWallpaperPreload = 'pending'
+          preload.onload = () => {
+            preload.dataset.workbenchWallpaperPreload = 'ready'
+          }
+          preload.onerror = () => {
+            preload.dataset.workbenchWallpaperPreload = 'error'
+          }
+          document.head.append(preload)
+        }
+      }
     </script>
   </head>
   <body>

@@ -37,7 +37,7 @@ export function StringWidget({
 
   return (
     <Input
-      className='w-64'
+      className='w-64 @max-3xl/settings:w-full'
       disabled={disabled}
       id={id}
       onBlur={() => {

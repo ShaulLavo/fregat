@@ -1,3 +1,4 @@
+import { registerTestWorkspaceAddress } from '../../../../test/factories/workspace-address'
 import { createEnvironmentEntry } from '@workspace/client-core/environments/utils/connection'
 import { waitFor } from '@testing-library/react'
 import { mkdir } from 'node:fs/promises'
@@ -26,7 +27,7 @@ import {
 } from '@/lib/client'
 import { queryClientFor } from '@/lib/environments/state/query-clients'
 import { useEnvironmentsStore } from '@/lib/environments/state/store'
-import { workspaceSlug } from '@workspace/client-core/address/slug'
+import { workspaceToken } from '@workspace/client-core/address/workspace'
 import { addressRootClaimed } from '@/features/address/state/root-claim'
 import { createInProcessClient, createObservedInProcessClient } from '../../../../test/client'
 import { expect, test } from '../../../../test/fixtures'
@@ -47,7 +48,7 @@ test('identity drift during a pending shell read cannot publish address state', 
   server,
 }) => {
   await mkdir(path.join(server.root, 'target'))
-  await registerSession(client, 'target', 'Target')
+  const registration = await registerSession(client, 'target', 'Target')
   const previousProjection = useChatProjectionStore.getState()
   const started = Promise.withResolvers<void>()
   const release = Promise.withResolvers<void>()
@@ -61,8 +62,8 @@ test('identity drift during a pending shell read cannot publish address state', 
   const restoreEnvironment = scopeAddressEnvironment(origin, descriptor.environmentId, gated)
   useChatProjectionStore.getState().resetChatProjection()
   resetSessionSelectionStore()
-  seedWorkspaceCache({ rootPath: 'target' })
-  startAt(`/~target/chat/t/${sessionId}`)
+  seedWorkspaceCache({ rootPath: 'target', workspaceAddress: registration.workspaceAddress })
+  startAt(`/~${workspaceToken(registration.workspaceAddress)}/chat/t/${sessionId}`)
   const rendered = await renderAddressHarness()
   try {
     await started.promise
@@ -91,7 +92,7 @@ test.for(['d7b4079f-a895-42df-b472-ed1785c7cc54', ''])(
     const previousProjection = useChatProjectionStore.getState()
     useChatProjectionStore.getState().resetChatProjection()
     await mkdir(path.join(server.root, 'target'))
-    await registerSession(client, 'target', 'Target')
+    const registration = await registerSession(client, 'target', 'Target')
     const started = Promise.withResolvers<void>()
     const release = Promise.withResolvers<void>()
     const gated = createObservedInProcessClient(server, async (request) => {
@@ -107,9 +108,9 @@ test.for(['d7b4079f-a895-42df-b472-ed1785c7cc54', ''])(
     )
     resetSessionSelectionStore()
     seedWorkspaceCache({ rootPath: 'source' })
-    startAt(`/~target/chat/t/${sessionId}`)
+    startAt(`/~${workspaceToken(registration.workspaceAddress)}/chat/t/${sessionId}`)
     const rendered = await renderAddressHarness()
-    const rejectedAddress = `/@${rejectedEnvironment}/~target/chat/t/${sessionId}`
+    const rejectedAddress = `/@${rejectedEnvironment}/~${workspaceToken(registration.workspaceAddress)}/chat/t/${sessionId}`
     try {
       await started.promise
       await pressBack(rejectedAddress)
@@ -135,7 +136,7 @@ test('an older restore cannot release the root claim of a newer pending restore'
   server,
 }) => {
   await mkdir(path.join(server.root, 'target'))
-  await registerSession(client, 'target', 'Target')
+  const registration = await registerSession(client, 'target', 'Target')
   const firstStarted = Promise.withResolvers<void>()
   const secondStarted = Promise.withResolvers<void>()
   const firstRelease = Promise.withResolvers<void>()
@@ -160,7 +161,7 @@ test('an older restore cannot release the root claim of a newer pending restore'
   )
   resetSessionSelectionStore()
   seedWorkspaceCache({ rootPath: 'source' })
-  const target = `/~target/chat/t/${sessionId}`
+  const target = `/~${workspaceToken(registration.workspaceAddress)}/chat/t/${sessionId}`
   startAt(target)
   const rendered = await renderAddressHarness()
   try {
@@ -200,8 +201,8 @@ test('restores a shared UUID only inside the addressed environment and target ed
   const previousProjection = useChatProjectionStore.getState()
   const descriptorA = v.parse(healthDescriptorSchema, (await client.health.get()).data)
   const descriptorB = v.parse(healthDescriptorSchema, (await clientB.health.get()).data)
-  const registrationA = await registerSession(client, server.root, 'Session A')
-  const registrationB = await registerSession(clientB, second.root, 'Session B')
+  const registrationA = await registerSession(client, server.root, 'Session A', '')
+  const registrationB = await registerSession(clientB, second.root, 'Session B', '')
   useChatProjectionStore
     .getState()
     .syncShellSnapshot(descriptorA.environmentId, await fetchOrchestrationShellSnapshotHttp(client))
@@ -238,8 +239,9 @@ test('restores a shared UUID only inside the addressed environment and target ed
   useEnvironmentsStore.getState().activate(originA)
   resetSessionSelectionStore()
   seedWorkspaceCache({ rootPath: 'source' })
-  const slug = workspaceSlug('', [''])
-  startAt(`/@${descriptorB.environmentId}/~${slug}/chat/t/${sessionId}`)
+  startAt(
+    `/@${descriptorB.environmentId}/~${workspaceToken(registrationB.workspaceAddress)}/chat/t/${sessionId}`,
+  )
   const rendered = await renderAddressHarness()
 
   try {
@@ -279,7 +281,12 @@ test('restores a shared UUID only inside the addressed environment and target ed
   }
 })
 
-async function registerSession(client: Client, workspaceRoot: string, title: string) {
+async function registerSession(
+  client: Client,
+  workspaceRoot: string,
+  title: string,
+  filesystemPath = workspaceRoot,
+) {
   const registration = v.parse(
     orchestrationDispatchResultSchema,
     (
@@ -305,5 +312,6 @@ async function registerSession(client: Client, workspaceRoot: string, title: str
     modelSelection: { providerInstanceId: DEFAULT_PROVIDER_INSTANCE_ID, model: 'gpt-5.5' },
   })
   expect(created.error).toBeNull()
-  return result
+  const workspaceAddress = await registerTestWorkspaceAddress(client, filesystemPath)
+  return { ...result, workspaceAddress }
 }

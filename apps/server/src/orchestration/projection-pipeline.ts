@@ -197,6 +197,9 @@ export class OrchestrationProjectionPipeline {
           updatedAt: event.payload.updatedAt,
         })
         return
+      case 'session.history-imported':
+        this.replaceImportedHistory(event)
+        return
       case 'session.worktree-released':
         this.releaseWorktreeTurn(event)
         return
@@ -617,6 +620,37 @@ export class OrchestrationProjectionPipeline {
         },
       })
       .run()
+  }
+
+  private replaceImportedHistory(
+    event: Extract<OrchestrationEvent, { type: 'session.history-imported' }>,
+  ) {
+    const { sessionId, messages, sourceUpdatedAt } = event.payload
+    this.database
+      .delete(projectionSessionMessages)
+      .where(eq(projectionSessionMessages.sessionId, sessionId))
+      .run()
+    for (const message of messages) {
+      this.database
+        .insert(projectionSessionMessages)
+        .values({
+          messageId: message.id,
+          sessionId,
+          role: message.role,
+          text: message.text,
+          createdAt: message.createdAt,
+          updatedAt: message.createdAt,
+          attachmentsJson: '[]',
+          streaming: false,
+          turnId: null,
+        })
+        .run()
+    }
+    this.updateSession(sessionId, {
+      updatedAt: sourceUpdatedAt,
+      latestUserMessageAt:
+        messages.findLast((message) => message.role === 'user')?.createdAt ?? null,
+    })
   }
 
   private upsertMessage(event: Extract<OrchestrationEvent, { type: 'session.message-sent' }>) {

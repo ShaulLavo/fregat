@@ -8,7 +8,7 @@ import {
   diffRowsForAddress,
   selectedDiffRows,
 } from '@/features/git/utils/diff-line-selection'
-import { editorDiffFiles } from '@/features/git/utils/editor-diff-files'
+import { editorDiffFiles } from '@workspace/client-core/git/diff-files'
 import { gitFileDiff } from '../../../../../test/factories/git-diff'
 import { expect, test } from '../../../../../test/fixtures'
 

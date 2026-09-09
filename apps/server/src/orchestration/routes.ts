@@ -3,6 +3,7 @@ import * as v from 'valibot'
 import {
   ORCHESTRATION_SESSION_DETAIL_PAGE_SIZE,
   worktreeIdSchema,
+  providerInstanceIdSchema,
   orchestrationSearchSessionsInputSchema,
 } from '@workspace/contracts'
 import {
@@ -60,6 +61,29 @@ export function orchestrationRoutes(
 ) {
   return new Elysia({ name: 'orchestration-routes' }).group('/orchestration', (app) =>
     app
+      .get('/session-import', () => engine.sessionImportSources())
+      .post(
+        '/session-import',
+        ({ body, request, server }) => {
+          // A local history import can outlast Bun's idle HTTP timeout.
+          server?.timeout(request, 0)
+          return observeRequestOperation(
+            chatOperationContext('orchestration.session_import', {
+              providerInstanceId: body.providerInstanceId,
+            }),
+            () => engine.importSessions(body.providerInstanceId),
+            (result) => ({
+              scanned: result.scanned,
+              imported: result.imported,
+              refreshed: result.refreshed,
+              messageCount: result.messages,
+              failureCount: result.failures.length,
+              skipped: result.skipped,
+            }),
+          )
+        },
+        { body: v.object({ providerInstanceId: providerInstanceIdSchema }) },
+      )
       .post(
         '/commands',
         ({ body }) =>

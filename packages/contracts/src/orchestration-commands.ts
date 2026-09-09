@@ -21,6 +21,7 @@ import {
 } from './chat-ids'
 import {
   chatAttachmentUploadsSchema,
+  importedSessionMessageSchema,
   isoDateTimeSchema,
   nonNegativeIntegerSchema,
   orchestrationCheckpointFileSchema,
@@ -482,6 +483,20 @@ export const preparedSessionTurnStartCommandSchema = v.object({
 })
 
 export const internalOrchestrationCommandSchema = v.variant('type', [
+  v.object({
+    ...commandBaseSchema,
+    type: v.literal('session.terminal-history.append'),
+    sessionId: sessionIdSchema,
+    messages: v.array(importedSessionMessageSchema),
+  }),
+  v.object({
+    ...commandBaseSchema,
+    type: v.literal('session.history.import'),
+    sessionId: sessionIdSchema,
+    revision: trimmedNonEmptyStringSchema,
+    messages: v.array(importedSessionMessageSchema),
+    sourceUpdatedAt: isoDateTimeSchema,
+  }),
   preparedProjectCreateCommandSchema,
   preparedSessionCreateCommandSchema,
   preparedSessionTurnStartCommandSchema,

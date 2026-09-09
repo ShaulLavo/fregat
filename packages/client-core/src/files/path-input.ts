@@ -30,7 +30,7 @@ function expandHomePath(input: string, homePath: string) {
   return homePath ? `${homePath}/${input.slice(2)}` : input.slice(2)
 }
 
-function relativePickerPath(input: string, workspaceRoot: string) {
+export function relativePickerPath(input: string, workspaceRoot: string) {
   if (!input.startsWith('/')) return input
 
   const root = withoutTrailingSlash(workspaceRoot)

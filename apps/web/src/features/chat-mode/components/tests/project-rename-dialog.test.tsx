@@ -1,6 +1,6 @@
 import { screen, waitFor } from '@testing-library/react'
 import userEvent from '@testing-library/user-event'
-import { createProjectDeleteCommand } from '@/features/chat/utils/command-builders'
+import { createProjectDeleteCommand } from '@workspace/client-core/chat/commands'
 import { useProjectRenameRequestStore } from '@/features/chat-mode/state/project-rename-request-store'
 import { createRailHarness, renderRailHarness } from '../../../../../test/factories/rail-harness'
 import { expect, test } from '../../../../../test/fixtures'

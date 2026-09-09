@@ -1,5 +1,5 @@
 import * as v from 'valibot'
-import { worktreeIdSchema } from './chat-ids'
+import { worktreeIdSchema, sessionIdSchema } from './chat-ids'
 import { isRecord } from './is-record'
 
 export const TERMINAL_MIN_COLS = 2
@@ -9,6 +9,7 @@ export const TERMINAL_MAX_ROWS = 200
 
 export const terminalOpenInputSchema = v.object({
   worktreeId: worktreeIdSchema,
+  agentSessionId: v.optional(sessionIdSchema),
   terminalId: v.pipe(v.string(), v.trim(), v.minLength(1)),
   cols: v.optional(
     v.pipe(v.number(), v.integer(), v.minValue(TERMINAL_MIN_COLS), v.maxValue(TERMINAL_MAX_COLS)),

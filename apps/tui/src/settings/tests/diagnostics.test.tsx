@@ -19,7 +19,13 @@ test('raw edits report ignored settings with their key and scope until corrected
   const before = state.owner.readSettingsMirror()['editor.fontSize']
   let text = '{"editor.fontSize":"bad-size"}'
   const frame = await renderTui(
-    <Application session={session} onExit={() => {}} noColor onEditText={async () => text} />,
+    <Application
+      initialLocation={{ kind: 'settings', query: '' }}
+      session={session}
+      onExit={() => {}}
+      noColor
+      onEditText={async () => text}
+    />,
     { width: 110, height: 32, useThread: false, kittyKeyboard: true },
   )
   try {
@@ -73,6 +79,7 @@ test('malformed files report their scope and fallback values and can be repaired
   const drafts: string[] = []
   const frame = await renderTui(
     <Application
+      initialLocation={{ kind: 'settings', query: '' }}
       session={session}
       onExit={() => {}}
       noColor
@@ -109,6 +116,7 @@ test('settings issues can be focused and scrolled in a 40 by 12 terminal', async
   await state.owner.writeRaw('user', '{"editor.fontSize":"bad-size","unknown.preference":true}', '')
   const frame = await renderTui(
     <Application
+      initialLocation={{ kind: 'settings', query: '' }}
       session={session}
       onExit={() => {}}
       noColor

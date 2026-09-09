@@ -21,7 +21,7 @@ import {
   createWorkspaceProjectCommand,
   sessionTitleFromPrompt,
   workspaceProjectTitle,
-} from '@/features/chat/utils/command-builders'
+} from '@workspace/client-core/chat/commands'
 
 const testModelSelection: ModelSelection = {
   model: 'claude-opus-5',

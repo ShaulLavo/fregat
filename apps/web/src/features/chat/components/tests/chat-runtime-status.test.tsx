@@ -2,47 +2,22 @@ import { screen } from '@testing-library/react'
 import userEvent from '@testing-library/user-event'
 
 import { ChatRuntimeStatus } from '@/features/chat/components/chat-runtime-status'
-import type { ChatCommandState } from '@/features/chat/utils/runtime-state'
 import { providerListQueryOptions } from '@/features/chat/utils/provider-query'
 import { ChatProviderSignInProvider } from '@/features/chat/providers/provider-sign-in-provider'
-import type { ChatSession } from '@/features/chat/state/chat-projection-store'
+import type { ChatSession } from '@workspace/client-core/chat/types'
 import { providerSnapshot, session } from '../../../../../test/factories/chat'
 import { expect, test } from '../../../../../test/fixtures'
 import { createTestQueryClient, renderWithProviders } from '../../../../../test/render'
 
-const idleCommandState: ChatCommandState = {
-  commandFailure: null,
-  interruptPending: false,
-  sendPending: false,
-  stopPending: false,
-}
+test('pending requests do not produce duplicate runtime banners', () => {
+  renderStatus({ session: session({ pendingApprovalCount: 2, pendingUserInputCount: 1 }) })
 
-test('the notice that needs an answer fronts the stack, whatever order it was produced in', async () => {
-  // The spinner is produced first and matters least: a flat list put it on top
-  // and pushed the approval — and the composer — down the viewport.
-  renderStatus({ commandState: { ...idleCommandState, sendPending: true } })
-
-  const alerts = await screen.findAllByRole('alert')
-  expect(alerts).toHaveLength(1)
-  expect(alerts[0]).toHaveTextContent('Approval requested')
-  expect(screen.getByRole('button', { name: /Show 1 more notice/ })).toBeVisible()
-})
-
-test('the folded notices are still reachable', async () => {
-  renderStatus({ commandState: { ...idleCommandState, sendPending: true } })
-
-  await userEvent.click(screen.getByRole('button', { name: /Show 1 more notice/ }))
-
-  const alerts = await screen.findAllByRole('alert')
-  expect(alerts.map((alert) => alert.textContent)).toEqual([
-    expect.stringContaining('Approval requested'),
-    expect.stringContaining('Sending message'),
-  ])
+  expect(screen.queryByRole('status', { name: 'Runtime notices' })).toBeNull()
 })
 
 test('a dismissed failure stays dismissed while nothing about it has changed', async () => {
   const { rerender } = renderStatus({
-    commandState: { ...idleCommandState, commandFailure: 'Dispatch rejected' },
+    commandFailure: 'Dispatch rejected',
     session: session({ pendingApprovalCount: 0 }),
   })
 
@@ -59,18 +34,11 @@ test('a dismissed failure stays dismissed while nothing about it has changed', a
   expect(await screen.findByText('Worktree is locked')).toBeVisible()
 })
 
-test('a request the session is parked on cannot be dismissed', async () => {
-  renderStatus()
-
-  await screen.findByText('Approval requested')
-  expect(screen.queryByRole('button', { name: /Dismiss/ })).toBeNull()
-})
-
 function renderStatus({
-  commandState = idleCommandState,
+  commandFailure = null,
   session: chatSession = session({ pendingApprovalCount: 1 }),
 }: {
-  commandState?: ChatCommandState
+  commandFailure?: string | null
   session?: ChatSession
 } = {}) {
   const queryClient = createTestQueryClient()
@@ -81,16 +49,12 @@ function renderStatus({
   function statusTree(commandFailure: string | null) {
     return (
       <ChatProviderSignInProvider>
-        <ChatRuntimeStatus
-          {...commandState}
-          commandFailure={commandFailure}
-          session={chatSession}
-        />
+        <ChatRuntimeStatus commandFailure={commandFailure} session={chatSession} />
       </ChatProviderSignInProvider>
     )
   }
 
-  const view = renderWithProviders(statusTree(commandState.commandFailure), { queryClient })
+  const view = renderWithProviders(statusTree(commandFailure), { queryClient })
 
   return {
     rerender(commandFailure: string | null) {

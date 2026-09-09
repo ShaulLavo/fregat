@@ -1,7 +1,7 @@
 import type { ReactElement } from 'react'
 
 import { useSessionMenu } from '@/features/chat-mode/hooks/use-session-menu'
-import type { SessionRailItem } from '@/features/chat-mode/utils/session-rail-model'
+import type { SessionRailItem } from '@workspace/client-core/chat/rail/model'
 import { MenuSurface } from '@/features/menus/components/surface'
 
 export function SessionMenu({

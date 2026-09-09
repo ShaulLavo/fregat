@@ -1,6 +1,6 @@
 import { useRailEnvironments } from '@/features/chat-mode/hooks/use-rail-environments'
 import { useSessionReadStore } from '@/features/chat-mode/state/session-read-store'
-import { sessionRailModel } from '@/features/chat-mode/utils/session-rail-model'
+import { sessionRailModel } from '@workspace/client-core/chat/rail/model'
 
 /**
  * The palette's view of chat: every project's inbox in one list, built from the same

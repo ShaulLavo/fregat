@@ -471,6 +471,18 @@ export type ProviderDiscoveredSession = {
   gitBranch: string | null
 }
 
+export type ProviderSessionHistoryInput = {
+  sessionId: SessionId
+  cwd: string
+}
+
+export type ProviderHistoryMessage = {
+  sourceId: string
+  role: 'user' | 'assistant'
+  text: string
+  createdAt: string | null
+}
+
 export type ProviderAdapterRuntime = {
   runtimeEpoch: string
   cwd: string
@@ -496,6 +508,7 @@ export type ProviderAdapter = {
   capabilities: ProviderAdapterCapabilities
   driverKind: ProviderDriverKind
   discoverSessions?: (input: ProviderSessionDiscoveryInput) => Promise<ProviderDiscoveredSession[]>
+  readSessionHistory?: (input: ProviderSessionHistoryInput) => Promise<ProviderHistoryMessage[]>
   hasRuntime: (input: { sessionId: SessionId }) => Promise<boolean>
   interruptTurn: (input: ProviderTurnControlInput) => Promise<void>
   /**

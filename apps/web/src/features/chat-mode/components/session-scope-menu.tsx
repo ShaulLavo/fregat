@@ -1,9 +1,6 @@
 import { CaretUpDownIcon } from '@phosphor-icons/react'
 
-import type {
-  SessionRailProject,
-  SessionRailScope,
-} from '@/features/chat-mode/utils/session-rail-model'
+import type { SessionRailProject, SessionRailScope } from '@workspace/client-core/chat/rail/model'
 import { Button } from '@workspace/ui/components/button'
 import {
   DropdownMenu,

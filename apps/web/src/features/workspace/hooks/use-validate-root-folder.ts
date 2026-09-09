@@ -3,6 +3,8 @@ import { useQueryClient } from '@tanstack/react-query'
 import { clientForQueryClient, originForQueryClient } from '@/lib/environments/state/query-clients'
 import { environmentActivitySignal } from '@/lib/environments/state/activity'
 import type { Client } from '@/lib/client'
+import type { WorkspaceRootEntry } from '@workspace/contracts'
+import { useOpenWorkspaceRoot } from '@/features/workspace/hooks/use-open-root'
 
 import {
   useEditorWorkspaceState,
@@ -29,6 +31,7 @@ const invalidRootCategories: ReadonlySet<ErrorCategory> = new Set<ErrorCategory>
 export function useValidateRootFolder() {
   const queryClient = useQueryClient()
   const store = useEditorWorkspaceStoreApi()
+  const openRoot = useOpenWorkspaceRoot()
   const path = useEditorWorkspaceState((state) => state.rootFolder?.path ?? null)
 
   useEffect(() => {
@@ -47,16 +50,29 @@ export function useValidateRootFolder() {
       log.warn({ action: 'workspace.root_invalid', area: 'workspace', path, reason })
       store.getState().clearRootFolder()
     }
+    const confirmWhenStillCurrent = (entry: WorkspaceRootEntry) => {
+      if (signal.aborted) return
+      const rootFolder = store.getState().rootFolder
+      if (!rootFolder || rootFolder.path !== path) return
+      if (entry.path !== path) {
+        void openRoot(entry.path)
+        return
+      }
+      if (rootFolder.workspaceAddress?.id === entry.workspaceAddress.id) return
+
+      store.setState({ rootFolder: { ...rootFolder, workspaceAddress: entry.workspaceAddress } })
+    }
 
     void validateRootPath(
       path,
       generation,
       signal,
       clearWhenStillCurrent,
+      confirmWhenStillCurrent,
       clientForQueryClient(queryClient),
     )
     return () => controller.abort()
-  }, [path, queryClient, store])
+  }, [openRoot, path, queryClient, store])
 }
 
 async function validateRootPath(
@@ -64,10 +80,12 @@ async function validateRootPath(
   generation: number,
   signal: AbortSignal,
   clear: (reason: string) => void,
+  confirm: (entry: WorkspaceRootEntry) => void,
   client: Client,
 ) {
   try {
-    await openWorkspaceRootPath(path, generation, signal, client)
+    const result = await openWorkspaceRootPath(path, generation, signal, client)
+    if (result.status === 'opened' && result.entry) confirm(result.entry)
   } catch (error) {
     if (signal.aborted) return
 

@@ -55,6 +55,7 @@ function tokenBackend(): DiffSyntaxBackend {
     kind: 'tree-sitter',
     provider: {
       createSession: (options: EditorSyntaxSessionOptions) => ({
+        foldingSupport: 'supported',
         applyChange: async () => result(options),
         dispose: () => undefined,
         getResult: () => result(options),

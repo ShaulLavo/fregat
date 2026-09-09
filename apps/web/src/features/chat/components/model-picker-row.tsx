@@ -8,7 +8,7 @@ import { isNewProviderModel, modelPickerRowBadges } from '@/features/chat/utils/
 import type {
   ProviderModelDisabledKind,
   ProviderModelOption,
-} from '@/features/chat/utils/provider-model-options'
+} from '@workspace/client-core/chat/providers/models'
 
 /**
  * One model in the picker list: name over a provider line, with metadata chips

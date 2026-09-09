@@ -46,10 +46,8 @@ import {
   writeChatProjectionCache,
   hydrateChatProjectionState,
 } from '@/features/chat/state/chat-projection-cache'
-import {
-  createInitialChatProjectionState,
-  createInitialChatProjectionSlice,
-} from '@/features/chat/state/chat-projection-store'
+import { createInitialChatProjectionSlice } from '@workspace/client-core/chat/types'
+import { createInitialChatProjectionState } from '@/features/chat/state/chat-projection-store'
 
 const a = environmentScopedStorage(
   v.parse(environmentIdSchema, 'acb59787-a2a8-4a00-9aee-aa242be93d01'),

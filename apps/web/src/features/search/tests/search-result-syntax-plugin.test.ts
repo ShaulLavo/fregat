@@ -27,6 +27,7 @@ describe('search result syntax provider', () => {
     const snapshot = createPieceTableSnapshot(text)
     const session = searchResultSession(provider, snapshot, text)
 
+    expect(session.foldingSupport).toBe('unsupported')
     const result = await session.refresh(snapshot, text)
 
     expect(recording.sessionCount).toBe(2)
@@ -117,6 +118,7 @@ function recordingSyntaxSession(
   let result = createLineSyntaxResult(options.snapshot, options.fullText)
 
   return {
+    foldingSupport: 'supported',
     refresh: async (snapshot, fullText) => {
       const text = fullText ?? options.fullText
       recordingText(recording, text)
@@ -153,6 +155,7 @@ function tokenSyntaxSession(
   let result = createTokenSyntaxResult(options.snapshot, tokens)
 
   return {
+    foldingSupport: 'supported',
     refresh: async (snapshot) => {
       result = createTokenSyntaxResult(snapshot, tokens)
       return result

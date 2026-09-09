@@ -51,6 +51,7 @@ test.each([
       ...fixture,
       dispatch: (command) => fixture.engine.dispatch(command),
       providerService: {
+        ...fixture.providerHistory,
         discoveryInstances: () => [providerInstanceId],
         discoverSessions: (request) =>
           discoverClaudeSessions({

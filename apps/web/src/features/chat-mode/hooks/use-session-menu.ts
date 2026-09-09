@@ -9,7 +9,7 @@ import {
   type SessionRenameSurface,
 } from '@/features/chat-mode/state/session-rail-store'
 import { canStopAgentSession, sessionMenu } from '@/features/chat-mode/utils/session-menu'
-import type { SessionRailItem } from '@/features/chat-mode/utils/session-rail-model'
+import type { SessionRailItem } from '@workspace/client-core/chat/rail/model'
 
 /** `surface` decides which of the two places swaps for a rename field. */
 export function useSessionMenu(session: SessionRailItem, surface: SessionRenameSurface) {

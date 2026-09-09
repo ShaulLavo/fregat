@@ -14,12 +14,19 @@ test('arrows navigate immediately from search and wrap in both directions', asyn
 }) => {
   const session = createTestSettingsSession(server, { client })
   await session.refresh()
-  const frame = await testRender(<Application session={session} onExit={() => {}} />, {
-    width: 100,
-    height: 30,
-    useThread: false,
-    kittyKeyboard: true,
-  })
+  const frame = await testRender(
+    <Application
+      initialLocation={{ kind: 'settings', query: '' }}
+      session={session}
+      onExit={() => {}}
+    />,
+    {
+      width: 100,
+      height: 30,
+      useThread: false,
+      kittyKeyboard: true,
+    },
+  )
   try {
     await act(async () => {
       frame.mockInput.pressArrow('down')
@@ -65,6 +72,7 @@ test('renders verified server settings and searches with real keyboard input', a
   let exits = 0
   const frame = await testRender(
     <Application
+      initialLocation={{ kind: 'settings', query: '' }}
       session={session}
       onExit={() => {
         exits += 1
@@ -102,12 +110,19 @@ test('narrow terminals can open selected details and return to search', async ({
 }) => {
   const session = createTestSettingsSession(server, { client })
   await session.refresh()
-  const frame = await testRender(<Application session={session} onExit={() => {}} />, {
-    width: 60,
-    height: 20,
-    useThread: false,
-    kittyKeyboard: false,
-  })
+  const frame = await testRender(
+    <Application
+      initialLocation={{ kind: 'settings', query: '' }}
+      session={session}
+      onExit={() => {}}
+    />,
+    {
+      width: 60,
+      height: 20,
+      useThread: false,
+      kittyKeyboard: false,
+    },
+  )
   try {
     await act(async () => {
       await frame.mockInput.typeText('colorTheme')
@@ -142,18 +157,25 @@ test('shows cached settings while disconnected and Ctrl+R restores the live conn
   const transport = createControlledInProcessTransport(server)
   const session = createTestSettingsSession(server, { createSocket: transport.createSocket })
   await session.refresh()
-  const frame = await testRender(<Application session={session} onExit={() => {}} />, {
-    width: 100,
-    height: 30,
-    useThread: false,
-  })
+  const frame = await testRender(
+    <Application
+      initialLocation={{ kind: 'settings', query: '' }}
+      session={session}
+      onExit={() => {}}
+    />,
+    {
+      width: 100,
+      height: 30,
+      useThread: false,
+    },
+  )
   try {
     await act(async () => {
       transport.sockets[0].serverClose({ code: 1006, wasClean: false })
     })
     await frame.renderOnce()
     expect(frame.captureCharFrame()).toContain('Disconnected')
-    expect(frame.captureCharFrame()).toContain('Showing the last loaded settings')
+    expect(frame.captureCharFrame()).toContain('Your draft is retained. Reconnect to continue.')
     expect(frame.captureCharFrame()).toContain('Ctrl+R refresh')
     expect(frame.captureCharFrame()).toContain('Color theme')
     await act(async () => {

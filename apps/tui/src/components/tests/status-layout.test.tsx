@@ -14,11 +14,19 @@ test.for([
     const transport = createControlledInProcessTransport(server)
     const session = createTestSettingsSession(server, { createSocket: transport.createSocket })
     await session.refresh()
-    const frame = await renderTui(<Application session={session} noColor onExit={() => {}} />, {
-      width,
-      height,
-      useThread: false,
-    })
+    const frame = await renderTui(
+      <Application
+        initialLocation={{ kind: 'settings', query: '' }}
+        session={session}
+        noColor
+        onExit={() => {}}
+      />,
+      {
+        width,
+        height,
+        useThread: false,
+      },
+    )
     try {
       await frame.renderOnce()
       expect(frame.captureCharFrame()).toContain('Live · ')

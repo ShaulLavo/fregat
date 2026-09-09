@@ -8,7 +8,7 @@ import {
 } from '@workspace/contracts'
 import * as v from 'valibot'
 
-import { isBusyChatSession } from '@/features/chat/utils/session-busy'
+import { isBusyChatSession } from '@workspace/client-core/chat/session-busy'
 
 describe('chat session status', () => {
   it('treats starting, running and waiting sessions as busy', () => {

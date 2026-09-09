@@ -12,11 +12,11 @@ import {
 } from '@singapor/core'
 import { createEditorFindPlugin } from '@singapor/find'
 import { createFoldGutterPlugin, createLineGutterPlugin } from '@singapor/gutters'
-import type { FoldGutterIconContext } from '@singapor/gutters'
+import { createMinimapPlugin } from '@singapor/minimap'
 import { createMarkdownPreviewPlugin } from '@singapor/markdown'
+import { createScopeLinesPlugin } from '@singapor/scope-lines'
 import { createTreeSitterSyntaxPlugin } from '@singapor/tree-sitter'
 import { subscribeActiveShikiTheme } from '@/features/editor/state/color-theme-store'
-import { requestedDecodeMode } from '@/features/editor/utils/decode-mode'
 import {
   editorShikiHighlighterProvider,
   editorSyntaxHighlightingSource,
@@ -25,7 +25,6 @@ import {
 import { reportError, toClientError } from '@/lib/client-error-taxonomy'
 import { log } from '@/lib/client-logging'
 import { editorPerformanceFeatureDisabled } from '@/features/editor/state/performance-trace'
-import { readSettingsMirror } from '@/features/settings/utils/boot-mirror'
 import type { DecodeMode } from '@singapor/decode'
 import { editorIndentationGuidesSupported } from '@/features/editor/utils/indentation-guides'
 
@@ -43,11 +42,6 @@ const PLATFORM_SEARCH_RESULT_EDITOR_LOGGING_PLUGIN = createEditorLoggingPlugin(
     name: 'platform.search-result-editor-logging',
   },
 )
-const nonCriticalEditorPluginsByGuideEligibility = new Map<boolean, readonly EditorPlugin[]>()
-const nonCriticalEditorPluginPromisesByGuideEligibility = new Map<
-  boolean,
-  Promise<readonly EditorPlugin[]>
->()
 
 /**
  * `languageId` gates the language-specific plugins. Markdown preview is registered only for markdown
@@ -56,15 +50,23 @@ const nonCriticalEditorPluginPromisesByGuideEligibility = new Map<
  */
 export function createCriticalEditorCorePlugins(
   languageId: EditorSyntaxLanguageId | null,
+  indentationGuidesEnabled: boolean,
+  minimapEnabled: boolean,
 ): readonly EditorPlugin[] {
+  const includeGuides =
+    indentationGuidesEnabled &&
+    editorIndentationGuidesSupported(languageId) &&
+    !editorPerformanceFeatureDisabled('scope-lines')
   return [
     ...createEditorSyntaxHighlightingPlugins(),
     createLineGutterPlugin(),
     createFoldGutterPlugin({
       width: 16,
-      icon: createFoldChevronIcon,
       iconClassName: 'app-fold-gutter-icon',
     }),
+    ...(minimapEnabled && !editorPerformanceFeatureDisabled('minimap')
+      ? [createMinimapPlugin()]
+      : []),
     createEditorFindPlugin(),
     createMergeConflictPlugin(),
     createBracketMatchPlugin({
@@ -74,6 +76,7 @@ export function createCriticalEditorCorePlugins(
       style: { backgroundColor: 'var(--editor-occurrence-highlight-background)' },
     }),
     createDocumentLinkPlugin(),
+    ...(includeGuides ? [createScopeLinesPlugin()] : []),
     // Critical rather than lazy: loading it after first paint would flash raw markdown first. It
     // derives its replacements from tree-sitter's markdown captures, so a file renders as source
     // while syntax highlighting is off.
@@ -82,100 +85,36 @@ export function createCriticalEditorCorePlugins(
   ]
 }
 
-export function createNonCriticalEditorPluginsLoaderPlugin(
-  languageId: EditorSyntaxLanguageId | null,
-): EditorPlugin {
+export function createDecodePluginLoader(mode: DecodeMode | null): EditorPlugin {
   return {
-    name: 'platform.non-critical-editor-plugins',
-    activate: (context) => {
-      let disposed = false
-      const disposables: EditorDisposable[] = []
-
-      scheduleNonCriticalPluginLoad(async () => {
-        const plugins = await loadNonCriticalEditorPlugins(languageId)
-        if (disposed) return
-
-        for (const plugin of plugins) {
-          const disposable = activateLoadedEditorPlugin(plugin, context)
-          if (disposable) disposables.push(disposable)
-        }
-      })
-
-      return {
-        dispose: () => {
-          disposed = true
-          disposeAll(disposables)
-        },
-      }
-    },
+    name: 'platform.decode-loader',
+    activate: (context) => activateDecodePlugin(context, mode),
   }
 }
 
-function loadNonCriticalEditorPlugins(
-  languageId: EditorSyntaxLanguageId | null,
-): Promise<readonly EditorPlugin[]> {
-  const guidesEligible = editorIndentationGuidesSupported(languageId)
-  const plugins = nonCriticalEditorPluginsByGuideEligibility.get(guidesEligible)
-  if (plugins) return Promise.resolve(plugins)
-
-  const pending = nonCriticalEditorPluginPromisesByGuideEligibility.get(guidesEligible)
-  if (pending) return pending
-
-  const promise = Promise.all(nonCriticalEditorPluginLoaders(guidesEligible)).then(
-    (loadedPlugins) => {
-      const availablePlugins = loadedPlugins.filter(
-        (plugin): plugin is EditorPlugin => plugin !== null,
-      )
-      nonCriticalEditorPluginsByGuideEligibility.set(guidesEligible, availablePlugins)
-      return availablePlugins
+function activateDecodePlugin(
+  context: Parameters<EditorPlugin['activate']>[0],
+  mode: DecodeMode | null,
+) {
+  if (!mode) return
+  let disposed = false
+  let registration: EditorDisposable | null = null
+  const load = async () => {
+    const plugin = await loadPlugin('@singapor/decode', () =>
+      import('@singapor/decode').then((module) => module.createDecodePlugin({ mode })),
+    )
+    if (disposed || !plugin) return
+    registration = activateLoadedEditorPlugin(plugin, context)
+  }
+  scheduleNonCriticalPluginLoad(() => {
+    void load()
+  })
+  return {
+    dispose: () => {
+      disposed = true
+      registration?.dispose()
     },
-  )
-  nonCriticalEditorPluginPromisesByGuideEligibility.set(guidesEligible, promise)
-
-  return promise
-}
-
-function nonCriticalEditorPluginLoaders(
-  guidesEligible: boolean,
-): readonly Promise<EditorPlugin | null>[] {
-  const loaders: Promise<EditorPlugin | null>[] = []
-  const settings = readSettingsMirror()
-  if (
-    guidesEligible &&
-    settings['editor.guides.indentation'] &&
-    !editorPerformanceFeatureDisabled('scope-lines')
-  ) {
-    loaders.push(
-      loadPlugin('@singapor/scope-lines', () =>
-        import('@singapor/scope-lines').then((module) => module.createScopeLinesPlugin()),
-      ),
-    )
   }
-  if (settings['editor.minimap.enabled'] && !editorPerformanceFeatureDisabled('minimap')) {
-    loaders.push(
-      loadPlugin('@singapor/minimap', () =>
-        import('@singapor/minimap').then((module) => module.createMinimapPlugin()),
-      ),
-    )
-  }
-
-  // File-open "writes itself" animation. The setting is the source of truth; the
-  // `?decode=` query param survives as a debug override so a mode can be tried
-  // without changing the user's document.
-  const decodeMode =
-    requestedDecodeMode(typeof window === 'undefined' ? '' : location.search) ??
-    decodeModeFromSetting(settings['editor.decode.mode'])
-  if (decodeMode) {
-    loaders.push(
-      loadPlugin('@singapor/decode', () =>
-        import('@singapor/decode').then((module) =>
-          module.createDecodePlugin({ mode: decodeMode }),
-        ),
-      ),
-    )
-  }
-
-  return loaders
 }
 
 function scheduleNonCriticalPluginLoad(load: () => void) {
@@ -277,38 +216,6 @@ async function loadPlugin(
     reportError(toClientError({ code: 'OPERATION_FAILED', name, error }))
     return null
   }
-}
-
-/** Built once per document, not once per row: every fold icon is a clone of this prototype. */
-const foldChevronPrototypes = new WeakMap<Document, SVGSVGElement>()
-
-// CaretDown (bold, size 12) from @phosphor-icons/react 2.1.10, frozen as path
-// data: rendering the React icon to markup put react-dom/server and the full
-// icon barrel on the boot path for one constant glyph.
-const FOLD_CHEVRON_PATH =
-  'M216.49,104.49l-80,80a12,12,0,0,1-17,0l-80-80a12,12,0,0,1,17-17L128,159l71.51-71.52a12,12,0,0,1,17,17Z'
-
-const SVG_NAMESPACE = 'http://www.w3.org/2000/svg'
-
-function foldChevronPrototype(document: Document): SVGSVGElement {
-  const cached = foldChevronPrototypes.get(document)
-  if (cached) return cached
-
-  const prototype = document.createElementNS(SVG_NAMESPACE, 'svg')
-  prototype.setAttribute('width', '12')
-  prototype.setAttribute('height', '12')
-  prototype.setAttribute('fill', 'currentColor')
-  prototype.setAttribute('viewBox', '0 0 256 256')
-  prototype.setAttribute('class', 'app-fold-chevron')
-  const path = document.createElementNS(SVG_NAMESPACE, 'path')
-  path.setAttribute('d', FOLD_CHEVRON_PATH)
-  prototype.appendChild(path)
-  foldChevronPrototypes.set(document, prototype)
-  return prototype
-}
-
-function createFoldChevronIcon({ document }: FoldGutterIconContext): SVGSVGElement {
-  return foldChevronPrototype(document).cloneNode(true) as SVGSVGElement
 }
 
 export function createPlatformEditorLoggingPlugin(): EditorPlugin {
@@ -432,9 +339,4 @@ function editorLogViewportHasScrollPosition(
     typeof (viewport as Record<string, unknown>).scrollLeft === 'number' &&
     typeof (viewport as Record<string, unknown>).scrollTop === 'number'
   )
-}
-
-/** `off` is the registry's way of saying no plugin; the plugin has no such mode. */
-function decodeModeFromSetting(mode: string): DecodeMode | null {
-  return mode === 'off' ? null : (mode as DecodeMode)
 }

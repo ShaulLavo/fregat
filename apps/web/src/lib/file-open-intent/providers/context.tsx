@@ -2,10 +2,8 @@ import { createContext, use, type ReactNode } from 'react'
 
 import { clientErrors } from '@/lib/structured-errors'
 import type { FileOpenIntentService } from '@/lib/file-open-intent/state/service'
-import type { MountedEditorRegistry } from '@/lib/file-open-intent/state/mounted-editor-registry'
 
 export type FileOpenIntentContextValue = {
-  readonly mountedEditors: MountedEditorRegistry
   readonly service: FileOpenIntentService
 }
 

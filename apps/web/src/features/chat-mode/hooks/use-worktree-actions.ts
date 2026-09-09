@@ -9,7 +9,7 @@ import {
   confirmedWorktreeCommand,
   type WorktreeAction,
   type WorktreeConfirmation,
-} from '@/features/chat-mode/utils/worktree-commands'
+} from '@workspace/client-core/chat/worktrees/commands'
 import { environmentClientFor } from '@/lib/client'
 import { confirmedEnvironmentOrigin } from '@/lib/environments/state/domain'
 import { worktreeConfirmationPreview } from '@/features/chat-mode/transport/worktree-preview'

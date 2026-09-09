@@ -1,3 +1,4 @@
+import { testWorkspaceToken } from '../../../../test/factories/workspace-address'
 import { describe } from 'vitest'
 
 import { expect, test } from '../../../../test/fixtures'
@@ -184,17 +185,15 @@ describe('checkpoint diffs', () => {
   })
 })
 
+test('settings round-trips as an ordinary document token', () => {
+  expect(token(settingsDocumentId())).toBe('settings')
+  expect(roundTrip(settingsDocumentId())).toBe(settingsDocumentId())
+})
+
 describe('what has no token', () => {
   test('cannot encode a conflict document', () => {
     expect(documentTokenForPath(ROOT, conflictDiffDocumentId('conflict-1'))).toMatchObject({
       kind: 'unaddressable',
-    })
-  })
-
-  test('routes settings to the overlay slot rather than a tab token', () => {
-    expect(documentTokenForPath(ROOT, settingsDocumentId())).toMatchObject({
-      kind: 'overlay',
-      overlay: 'settings',
     })
   })
 
@@ -256,7 +255,7 @@ describe('tokens survive the whole URL, not just the codec', () => {
       ...emptyAddress(),
       document: result.token,
       mode: 'workbench',
-      workspace: 'repo',
+      workspace: testWorkspaceToken('/repo'),
     })
     const parsed = pathForDocumentToken(ROOT, parseAddress(href).document ?? '')
     if (parsed.kind !== 'path') return expect.unreachable(`expected a path, got ${parsed.kind}`)

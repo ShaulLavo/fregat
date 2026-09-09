@@ -1,5 +1,4 @@
-import { useSettingsProjection } from '@/features/settings/hooks/use-settings-projection'
-import { readSettingsMirror } from '@/features/settings/utils/boot-mirror'
+import { useSettingValue } from '@/features/settings/hooks/use-setting-value'
 import { WebWallpaper } from '@/features/workbench/components/web-wallpaper'
 import { documentBackdrop } from '@/lib/platform/backdrop'
 
@@ -14,10 +13,7 @@ export function Wallpaper({ className }: { readonly className?: string }) {
   // layer is written by `applyAppearance`, alongside the other appearance
   // settings — two writers for one attribute is how it would end up disagreeing
   // with itself. This component owns only whether the media is mounted.
-  const projection = useSettingsProjection()
-  const enabled =
-    projection?.values['workbench.wallpaper.enabled'] ??
-    readSettingsMirror()['workbench.wallpaper.enabled']
+  const enabled = useSettingValue('workbench.wallpaper.enabled')
 
   // Unmounting is the point: hiding it with CSS would leave the video decoding.
   if (!enabled) return null

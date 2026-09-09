@@ -22,7 +22,7 @@ import {
 } from '@/features/workspace/utils/directory-churn'
 import { fileSystemKeys, gitKeys } from '@/lib/query-keys'
 import { Throttler } from '@tanstack/react-pacer/throttler'
-import { parseEdenSseStream } from '@/lib/eden-events'
+import { parseEdenSseStream } from '@workspace/client-core/transport/eden'
 import { toTreePath } from '@/lib/path-formatters'
 import { clientErrors } from '@/lib/structured-errors'
 import { createWideEventScope } from '@/lib/wide-event-scope'

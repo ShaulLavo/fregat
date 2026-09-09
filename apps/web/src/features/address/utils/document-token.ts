@@ -19,32 +19,20 @@ import {
   parseSearchBufferDocumentId,
   searchBufferDocumentId,
 } from '@/features/search/utils/buffer-document'
-import { isSettingsDocumentId } from '@/features/settings/utils/document'
+import { SETTINGS_DOCUMENT_TOKEN } from '@workspace/client-core/address/grammar'
+import { isSettingsDocumentId, settingsDocumentId } from '@/features/settings/utils/document'
 import { toWorkspaceAbsolute, toWorkspaceRelative } from '@workspace/client-core/files/path'
 import { sessionIdSchema, type SessionId } from '@workspace/contracts'
 import * as v from 'valibot'
 
-/**
- * The one place document kinds are encoded. Every other field in an address is a plain
- * named field; this is the only polymorphism in the design, and it earns a table because
- * the tab set is a heterogeneous list whose kinds arrived one at a time.
- *
- * Eight kinds reach `EditorTabRecord.path` today. Two of them — `git-ref:` and
- * `settings:` — are invisible to the cache because `pathForWorkspace` drops them, which
- * is exactly why they are easy to forget and why they are named explicitly here.
- */
-
 export type DocumentTokenResult =
   /** An addressable document, as its token. */
   | { readonly kind: 'token'; readonly token: string }
-  /** Settings is addressed by the `settings` overlay slot, never as a tab token. */
-  | { readonly kind: 'overlay'; readonly overlay: 'settings' }
   /** No token can encode this document; the encoder cannot leak it by accident. */
   | { readonly kind: 'unaddressable'; readonly reason: string }
 
 export type ParsedDocumentToken =
   | { readonly kind: 'path'; readonly path: string }
-  | { readonly kind: 'overlay'; readonly overlay: 'settings' }
   | { readonly kind: 'unavailable'; readonly reason: string }
   | { readonly kind: 'rejected'; readonly reason: string }
 
@@ -54,14 +42,15 @@ const OBJECT_ID = /^[0-9a-f]{40,64}$/i
 const MISSING_OBJECT_ID = '_'
 const TURN_SCOPE_SUFFIX = '!turn'
 
-export function documentTokenForPath(rootPath: string, path: string): DocumentTokenResult {
+export function documentTokenForPath(rootPath: string | null, path: string): DocumentTokenResult {
   // Reuses the cache's own predicate rather than re-deriving it: a conflict record is
   // born from a watcher event and holds its text in memory, so it cannot survive a
   // reload, let alone a machine.
   if (parseConflictDiffDocumentId(path)) {
     return { kind: 'unaddressable', reason: 'conflict documents are not addressable' }
   }
-  if (isSettingsDocumentId(path)) return { kind: 'overlay', overlay: 'settings' }
+  if (isSettingsDocumentId(path)) return { kind: 'token', token: SETTINGS_DOCUMENT_TOKEN }
+  if (rootPath === null) return { kind: 'unaddressable', reason: 'document requires a workspace' }
 
   const search = parseSearchBufferDocumentId(path)
   if (search) return searchToken(rootPath, search.rootPath)
@@ -78,7 +67,10 @@ export function documentTokenForPath(rootPath: string, path: string): DocumentTo
   return relativeToken('f', rootPath, path)
 }
 
-export function pathForDocumentToken(rootPath: string, token: string): ParsedDocumentToken {
+export function pathForDocumentToken(rootPath: string | null, token: string): ParsedDocumentToken {
+  if (token === SETTINGS_DOCUMENT_TOKEN) return { kind: 'path', path: settingsDocumentId() }
+  if (rootPath === null) return { kind: 'rejected', reason: 'document requires a workspace' }
+
   const segments = token.split('/')
   const kind = segments[0]
 

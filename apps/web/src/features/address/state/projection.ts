@@ -34,13 +34,7 @@ export type AddressWriter = {
   readonly replace: (href: string) => void
 }
 
-/**
- * §1.1 decides history mode by slot, keyed so that two ways of reaching the same place
- * cannot disagree. Identity — which workspace, which mode, which document, and whether
- * the settings overlay is up — PUSHES, so back returns you to where you were. Panels,
- * filters and the focus line REPLACE: nobody wants six history entries because they
- * typed six characters into search.
- */
+// Selecting a document pushes history; changing its filters replaces the current entry.
 function identityOf(address: Address) {
   return JSON.stringify([
     address.environmentId,
@@ -48,7 +42,7 @@ function identityOf(address: Address) {
     address.workspace,
     address.mode,
     address.document,
-    address.settings,
+    address.editor,
   ])
 }
 

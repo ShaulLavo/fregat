@@ -20,7 +20,7 @@ import {
 } from '@/features/workbench/utils/panels'
 import type { PickedFsEntry } from '@/lib/file-system-types'
 import type { CachedWorkspaceSlice, CachedWorkspaceState } from '@/features/workspace/state/cache'
-import { FileOpenIntentService } from '@/lib/file-open-intent/state/service'
+import { createFileOpenIntentServiceOwner } from '@/lib/file-open-intent/state/service'
 import { fileSnapshotQueryOptions } from '@/lib/file-snapshot-query-cache'
 
 describe('editor workspace state', () => {
@@ -72,9 +72,9 @@ describe('editor workspace state', () => {
     const tabId = workspaceStore.getState().workbenchPanels.activeEditorTabId!
     const document = documentStore.getState().ensureEditorView(tabId, fileResult(path))
     createEditorBufferSession(document.buffer).applyText('dirty')
-    const { service } = fileOpenIntentService(documentStore)
+    const { owner } = fileOpenIntentService(documentStore)
     const commands = createEditorCommands({
-      activation: createEditorActivation(service, documentStore),
+      activation: createEditorActivation(owner.activation, documentStore, owner),
       documentStore,
       searchStore,
       uiStore,
@@ -107,9 +107,13 @@ describe('editor workspace state', () => {
     const queryClient = new QueryClient()
     queryClient.setQueryData(fileSnapshotQueryOptions(path).queryKey, file)
     const preparedDocument = preparedDocumentLease()
-    const { prepare, service } = fileOpenIntentService(documentStore, queryClient, preparedDocument)
+    const { owner, prepare, service } = fileOpenIntentService(
+      documentStore,
+      queryClient,
+      preparedDocument,
+    )
     const commands = createEditorCommands({
-      activation: createEditorActivation(service, documentStore),
+      activation: createEditorActivation(owner.activation, documentStore, owner),
       documentStore,
       searchStore,
       uiStore,
@@ -372,9 +376,15 @@ function fileOpenIntentService(
   preparedDocument = preparedDocumentLease(),
 ) {
   const prepare = vi.fn((buffer: EditorTextBuffer) => ({ buffer, preparedDocument }))
-  const service = new FileOpenIntentService(
-    queryClient,
-    {
+  const owner = createFileOpenIntentServiceOwner({
+    getLiveDocument: (path) => documentStore.getState().getLiveEditorDocument(path),
+    getRetainedScrollPosition: () => null,
+    isActive: () => false,
+    mountedEditors: {
+      has: () => false,
+      subscribe: () => () => undefined,
+    },
+    preparer: {
       environment: {
         configurationTag: ['test'],
         highlighterProvider: null,
@@ -387,13 +397,13 @@ function fileOpenIntentService(
       }),
       reconfigure: () => ({ documentConfigurationTag: [], stages: [] }),
     },
-    (path) => documentStore.getState().getLiveEditorDocument(path),
-    () => false,
-    () => false,
-    () => undefined,
-  )
-  service.setRoot('/repo')
-  return { prepare, service }
+    prefetchRelated: () => undefined,
+    queryClient,
+    subscribeLiveDocuments: (listener) => documentStore.subscribe(() => listener()),
+  })
+  owner.setRoot('/repo')
+  owner.connect()
+  return { owner, prepare, service: owner.service }
 }
 
 function preparedDocumentLease(): EditorPreparedDocument {

@@ -4,7 +4,7 @@ import { Switch } from '@workspace/ui/components/switch'
 
 import type { ModelRef } from '@workspace/contracts'
 
-import type { ModelPreferenceRow } from '@/features/chat/utils/model-preferences'
+import type { ModelPreferenceRow } from '@workspace/client-core/chat/providers/preferences'
 
 import { useSettingsActions } from '@/features/settings/hooks/use-settings-actions'
 

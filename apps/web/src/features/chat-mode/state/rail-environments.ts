@@ -4,12 +4,12 @@ import {
 } from '@/features/chat/state/chat-projection-store'
 import { type EnvironmentsState } from '@workspace/client-core/environments/state/store'
 import { useEnvironmentsStore } from '@/lib/environments/state/store'
-import type { SessionRailEnvironment } from '@/features/chat-mode/utils/session-rail-model'
+import type { SessionRailEnvironment } from '@workspace/client-core/chat/rail/model'
 import {
   selectChatProjects,
   selectChatSessions,
   selectChatWorktrees,
-} from '@/features/chat/state/chat-projection-selectors'
+} from '@workspace/client-core/chat/selectors'
 
 export function railEnvironments(
   projection: ChatProjectionState,

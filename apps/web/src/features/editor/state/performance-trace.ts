@@ -104,7 +104,6 @@ const LAYOUT_PARAM = 'editorPerfLayout'
 const SLOW_FRAME_MS = 16.7
 const LONG_FRAME_MS = 50
 const MAX_TRACE_EVENTS = 5000
-const EDITOR_VISIBLE_SNAPSHOT_SELECTOR = '[data-editor-visible-snapshot]'
 
 export type EditorPerformanceLayoutVariant = 'absolute-rows' | 'default'
 
@@ -162,9 +161,10 @@ function createEditorPerformanceTrace(): {
   let startedAt = performance.now()
   const eventCounts = new Map<string, number>()
   const targetCounts = new Map<string, number>()
-  const observer = createLongTaskObserver((event) => {
-    traceEvents = boundedAppend(traceEvents, event)
-  })
+  const recordLongTask = (entry: PerformanceEntry) => {
+    traceEvents = boundedAppend(traceEvents, longTaskTraceEvent(entry))
+  }
+  const observer = createLongTaskObserver(recordLongTask)
 
   const sink: EditorPerformanceDiagnosticSink = {
     enabled: true,
@@ -224,6 +224,7 @@ function createEditorPerformanceTrace(): {
     primeEditorOpenQuery: (request) => requireEditorOpenBenchmarkControl().prime(request),
     report: () => createReport(),
     reset: () => {
+      observer?.takeRecords()
       traceEvents = []
       frameDurations = []
       eventCounts.clear()
@@ -245,6 +246,11 @@ function createEditorPerformanceTrace(): {
   }
 
   function createReport(): EditorPerformanceTraceReport {
+    for (const entry of observer?.takeRecords() ?? []) recordLongTask(entry)
+
+    const currentTraceEvents = traceEvents.filter(
+      (event) => event.kind !== 'long-task' || event.at + event.durationMs >= startedAt,
+    )
     return {
       disabledFeatures: Array.from(editorPerformanceDisabledFeatures()),
       dom: editorPerformanceDomSnapshot(document),
@@ -252,9 +258,9 @@ function createEditorPerformanceTrace(): {
       events: Object.fromEntries(eventCounts),
       frameStats: frameStats(frameDurations),
       layoutVariant: editorPerformanceLayoutVariant(),
-      topDiagnostics: summarizeDiagnostics(traceEvents),
+      topDiagnostics: summarizeDiagnostics(currentTraceEvents),
       topTargets: summarizeTargets(targetCounts),
-      traceEvents,
+      traceEvents: currentTraceEvents,
       url: location.href,
       userAgent: navigator.userAgent,
     }
@@ -270,25 +276,27 @@ function requireEditorOpenBenchmarkControl(): EditorOpenBenchmarkControl {
 }
 
 function createLongTaskObserver(
-  record: (event: EditorPerformanceTraceEvent) => void,
+  record: (entry: PerformanceEntry) => void,
 ): PerformanceObserver | null {
   if (!('PerformanceObserver' in window)) return null
 
   try {
     const observer = new PerformanceObserver((list) => {
-      for (const entry of list.getEntries()) {
-        record({
-          at: entry.startTime,
-          durationMs: entry.duration,
-          kind: 'long-task',
-          name: entry.name,
-        })
-      }
+      for (const entry of list.getEntries()) record(entry)
     })
     observer.observe({ entryTypes: ['longtask'] })
     return observer
   } catch {
     return null
+  }
+}
+
+function longTaskTraceEvent(entry: PerformanceEntry): EditorPerformanceTraceEvent {
+  return {
+    at: entry.startTime,
+    durationMs: entry.duration,
+    kind: 'long-task',
+    name: entry.name,
   }
 }
 
@@ -402,9 +410,7 @@ function editorRowTextCharacters(rows: readonly Element[]): number {
 }
 
 function liveEditorElements(document: Document, selector: string): Element[] {
-  return Array.from(document.querySelectorAll(selector)).filter(
-    (element) => !element.closest(EDITOR_VISIBLE_SNAPSHOT_SELECTOR),
-  )
+  return Array.from(document.querySelectorAll(selector))
 }
 
 function targetLabel(target: EventTarget | null): string {

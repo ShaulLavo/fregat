@@ -1,6 +1,6 @@
 import type { OrchestrationSessionActivity } from '@workspace/contracts'
 
-import { derivePendingApprovals } from '@/features/chat/utils/pending-approvals'
+import { derivePendingApprovals } from '@workspace/client-core/chat/pending-approvals'
 import { expect, test } from '../../../../../test/fixtures'
 
 test('an unresolved request stays open and a resolved one drops out', () => {

@@ -3,7 +3,7 @@ import { Badge } from '@workspace/ui/components/badge'
 import { Button } from '@workspace/ui/components/button'
 
 import { usePlanFollowUp } from '@/features/chat/hooks/use-plan-follow-up'
-import { proposedPlanTitle } from '@/features/chat/utils/proposed-plan'
+import { proposedPlanTitle } from '@workspace/client-core/chat/proposed-plan'
 import {
   useChatInputDraftStore,
   type ChatInputDraftTarget,

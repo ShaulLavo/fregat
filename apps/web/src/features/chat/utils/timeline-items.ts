@@ -7,7 +7,7 @@ import type {
 } from '@workspace/contracts'
 
 import type { OptimisticChatMessage } from '@/features/chat/state/chat-optimistic-store'
-import type { ChatTurnDiffSummary } from '@/features/chat/state/chat-projection-store'
+import type { ChatTurnDiffSummary } from '@workspace/client-core/chat/types'
 import { formatChatElapsed } from '@/features/chat/utils/formatters'
 import {
   chatMessageTimelineMetadata,
@@ -25,6 +25,7 @@ import {
 
 export type ChatTimelineItem =
   | {
+      activeTurnId: TurnId | null
       activities: ChatWorkLogEntry[]
       id: string
       timestamp: string
@@ -210,6 +211,7 @@ export function chatTimelineItems({
   const timelineItems = arrangeTimelineItems(
     chronological,
     deriveTurnFolds(chronological, latestTurn),
+    latestTurn?.state === 'running' ? latestTurn.turnId : null,
   )
   if (latestTurn?.state === 'running') {
     timelineItems.push(
@@ -327,13 +329,14 @@ function compareTimelineEntries(left: ChronologicalTimelineItem, right: Chronolo
 function arrangeTimelineItems(
   entries: readonly ChronologicalTimelineItem[],
   folds: ReadonlyMap<string, TurnFold>,
+  activeTurnId: TurnId | null,
 ) {
   const hiddenEntryIds = foldedEntryIds(folds)
   const foldedTurnIds = new Set([...folds.values()].map((fold) => fold.turnId))
   const arranged: ChatTimelineItem[] = []
   let pendingActivities: ChatWorkLogEntry[] = []
   const flushActivities = () => {
-    appendActivityGroup(arranged, pendingActivities)
+    appendActivityGroup(arranged, pendingActivities, activeTurnId)
     pendingActivities = []
   }
 
@@ -373,7 +376,7 @@ function turnFoldTimelineItem(fold: TurnFold): ChatTimelineItem {
   return {
     hiddenCount: fold.entries.length,
     id: `turn-fold:${fold.turnId}`,
-    items: arrangeTimelineItems(fold.entries, NO_FOLDS),
+    items: arrangeTimelineItems(fold.entries, NO_FOLDS, null),
     label: fold.label,
     timestamp: anchor?.timestamp ?? '',
     turnId: fold.turnId,
@@ -636,11 +639,16 @@ function compareMessagesByCreatedAt(left: ChatTimelineMessage, right: ChatTimeli
   return left.createdAt.localeCompare(right.createdAt)
 }
 
-function appendActivityGroup(items: ChatTimelineItem[], activities: readonly ChatWorkLogEntry[]) {
+function appendActivityGroup(
+  items: ChatTimelineItem[],
+  activities: readonly ChatWorkLogEntry[],
+  activeTurnId: TurnId | null,
+) {
   const firstActivity = activities[0]
   if (!firstActivity) return
 
   items.push({
+    activeTurnId,
     activities: [...activities],
     id: `activity-group:${firstActivity.id}`,
     timestamp: firstActivity.createdAt,
@@ -724,7 +732,10 @@ function timelineItemsEqual(left: ChatTimelineItem, right: ChatTimelineItem): bo
   if (left.timestamp !== right.timestamp) return false
   if (left.type === 'message' && right.type === 'message') return messageItemsEqual(left, right)
   if (left.type === 'activity-group' && right.type === 'activity-group') {
-    return activityListsEqual(left.activities, right.activities)
+    return (
+      left.activeTurnId === right.activeTurnId &&
+      activityListsEqual(left.activities, right.activities)
+    )
   }
   if (left.type === 'turn-fold' && right.type === 'turn-fold')
     return turnFoldItemsEqual(left, right)

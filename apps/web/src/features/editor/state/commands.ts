@@ -49,9 +49,12 @@ import type { LanguageServerDefinitionTarget } from '@singapor/lsp-plugin'
 import { useMemo } from 'react'
 import { settingsDocumentId } from '@/features/settings/utils/document'
 import { editorTabDocumentIds } from '@/features/workspace/utils/tab-dirty'
-import { useFileOpenIntent } from '@/lib/file-open-intent/providers/context'
-import type { FileOpenIntentService } from '@/lib/file-open-intent/state/service'
+import type {
+  FileOpenIntentActivation,
+  FileOpenIntentServiceOwner,
+} from '@/lib/file-open-intent/state/service'
 import { fileBackedDocumentPath } from '@/features/editor/utils/file-backed-document'
+import { useEditorActivation } from '@/features/editor/hooks/use-editor-activation'
 
 export type EditorCommands = {
   closeTab: (tabId: string) => void
@@ -86,16 +89,11 @@ export type EditorActivation = {
 }
 
 export function useEditorCommands() {
+  const activation = useEditorActivation()
   const documentStore = useEditorDocumentStoreApi()
   const searchStore = useSearchBufferStoreApi()
   const uiStore = useEditorUiStoreApi()
   const workspaceStore = useEditorWorkspaceStoreApi()
-  const { service: fileOpenIntent } = useFileOpenIntent()
-  const activation = useMemo(
-    () => createEditorActivation(fileOpenIntent, documentStore),
-    [documentStore, fileOpenIntent],
-  )
-
   return useMemo(
     () => createEditorCommands({ activation, documentStore, searchStore, uiStore, workspaceStore }),
     [activation, documentStore, searchStore, uiStore, workspaceStore],
@@ -510,8 +508,9 @@ function editorTabForPath(panels: WorkbenchPanels, path: string) {
 }
 
 export function createEditorActivation(
-  fileOpenIntent: FileOpenIntentService,
+  fileOpenIntent: FileOpenIntentActivation,
   documentStore: EditorDocumentStoreApi,
+  rootOwner: Pick<FileOpenIntentServiceOwner, 'setRoot'>,
 ): EditorActivation {
   return {
     activate: (path, tabId) => {
@@ -534,7 +533,7 @@ export function createEditorActivation(
         documentStore.getState().ensureEditorViewForDocument(tabId, liveDocument.id)
       }
     },
-    setRoot: (rootPath) => fileOpenIntent.setRoot(rootPath),
+    setRoot: (rootPath) => rootOwner.setRoot(rootPath),
   }
 }
 

@@ -22,7 +22,7 @@ import { selectSessionDetailSync, useSessionDetailSyncStore } from '../session-d
 import { createSessionDetailSubscriptionCache } from '../session-detail-subscriptions'
 import { inProcessOrchestrationSocketFactory } from '@workspace/client-core/test/in-process-orchestration-socket'
 import { createOrchestrationRpcClient } from '@/features/chat/transport/orchestration-rpc-client'
-import { createWorkspaceProjectCommand } from '@/features/chat/utils/command-builders'
+import { createWorkspaceProjectCommand } from '@workspace/client-core/chat/commands'
 import {
   DEFAULT_PROVIDER_INSTANCE_ID,
   DEFAULT_INTERACTION_MODE,

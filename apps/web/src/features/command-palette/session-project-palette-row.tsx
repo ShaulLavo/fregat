@@ -3,7 +3,7 @@ import { CommandItem, CommandShortcut } from '@workspace/ui/components/command'
 
 import { useCommandPaletteActions } from '@/features/command-palette/hooks/use-command-palette-actions'
 import { sessionProjectItemValue } from '@/features/command-palette/command-palette-utils'
-import type { SessionRailProject } from '@/features/chat-mode/utils/session-rail-model'
+import type { SessionRailProject } from '@workspace/client-core/chat/rail/model'
 
 export function SessionProjectPaletteRow({ project }: { readonly project: SessionRailProject }) {
   const { startSessionDraft } = useCommandPaletteActions()

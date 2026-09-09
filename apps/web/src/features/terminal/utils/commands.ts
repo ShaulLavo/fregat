@@ -1,6 +1,6 @@
 import type { Terminal } from 'ghostty-webgpu'
 
-import type { TerminalContextSelection } from '@/features/chat/utils/terminal-context'
+import type { TerminalContextSelection } from '@workspace/client-core/chat/terminal-context'
 
 import { captureTerminalSelection } from './capture'
 import { readClipboardText } from './clipboard'

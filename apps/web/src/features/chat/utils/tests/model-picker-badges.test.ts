@@ -8,7 +8,7 @@ import * as v from 'valibot'
 import { expect, test } from '../../../../../test/fixtures'
 
 import { isNewProviderModel, modelPickerRowBadges } from '@/features/chat/utils/model-picker-badges'
-import { providerModelOptions } from '@/features/chat/utils/provider-model-options'
+import { providerModelOptions } from '@workspace/client-core/chat/providers/models'
 import { providerModel as model, providerSnapshot } from '../../../../../test/factories/chat'
 
 function optionFor(overrides: Partial<ProviderSnapshot> = {}) {

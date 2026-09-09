@@ -149,26 +149,13 @@
   --workbench-tree-font-size: 12px;
   --workbench-tree-level-gap: 6.4px;
 
-  /* Surface material knobs. Every surface token below is its -solid color at
-     --surface-opacity over transparent. In-flow glass blurs what's behind it
-     with the backdrop-material utility; floating surfaces (dialogs, menus)
-     paint the surface-vibrancy wallpaper layer instead, because the content
-     under a popup is usually a near-white pane that frosts to nothing.
-     A settings UI changes the whole app by setting these on <html>
-     (100% opacity / 0px blur turns the material off). */
+  /* Pane material follows the transparency setting; floating UI stays opaque. */
   --surface-opacity: 80%;
   /* Content wells (editor, terminal) get their own, much higher opacity:
      text needs a stable ground, but a 5% wallpaper ghost keeps the material. */
   --content-opacity: 95%;
-  --surface-blur: 12px;
+  --surface-blur: 9px;
   --surface-saturation: 160%;
-  /* Pre-blurred + pre-saturated copy of the workbench wallpaper with ~35%
-     baked-in alpha — a color cast, not an image; stronger alpha drowns the
-     backdrop ghosting. An asset, not a runtime filter, so it works as a plain
-     background layer inside scroll containers. Regenerate it when the
-     wallpaper changes. */
-  --surface-wallpaper: url('/workbench/wallpaper-vibrancy.png');
-
   --background-solid: oklch(1 0.006 70);
   --background: color-mix(in oklch, var(--background-solid) var(--surface-opacity), transparent);
   --foreground: oklch(0.145 0.006 70);
@@ -177,7 +164,7 @@
   --content-well: color-mix(in oklch, var(--card-solid) var(--content-opacity), transparent);
   --card-foreground: oklch(0.145 0.006 70);
   --popover-solid: oklch(1 0.006 70);
-  --popover: color-mix(in oklch, var(--popover-solid) var(--surface-opacity), transparent);
+  --popover: var(--popover-solid);
   --popover-foreground: oklch(0.145 0.006 70);
   --primary: oklch(0.24 0.014 70);
   --primary-foreground: oklch(0.985 0.006 70);
@@ -637,51 +624,6 @@ html[data-palette='sage'] {
   backdrop-filter: blur(var(--surface-blur)) saturate(var(--surface-saturation));
 }
 
-/* macOS-style vibrancy for floating surfaces. Three layers, bottom to top:
-   real backdrop blur (content behind ghosts through), the pre-blurred
-   wallpaper at baked-in low alpha (a color cast so glass never goes flat
-   white over a white pane), and a popover tint thinner than the pane
-   material (a full-opacity tint over the wallpaper layer would composite to
-   near-opaque and kill the ghosting; same precedent as the LSP popups'
-   half-strength material). The wallpaper layer is sized to the viewport, not
-   the element — cover would shrink the whole wallpaper into the popup and
-   visibly mismatch the real wallpaper behind the app. 160vh = 100vh times
-   the asset's 1.6 aspect ratio. Centered popups (dialogs) align with the
-   real wallpaper exactly; anchored popups show a center crop at the correct
-   scale, indistinguishable under the asset's 48px blur. Self-contained — do
-   not add bg-popover on top, it would stack a fourth layer. */
-/* With no wallpaper behind the app there is nothing for the vibrancy layer to
-   echo, so its baked-in wallpaper copy would tint every menu, dialog, and
-   popover with an image that is not on screen — one the user hid, or one that
-   was never ours to show because the compositor is drawing their real desktop
-   back there. Drop that layer and leave the popover tint plus real backdrop
-   ghosting. */
-html[data-wallpaper-hidden],
-html[data-backdrop='compositor'],
-html[data-backdrop='transparent'] {
-  --surface-wallpaper: none;
-}
-
-@utility surface-vibrancy {
-  /* --surface-vibrancy-blur lets a surface scale its ghosting blur relative
-     to the knob (a custom property cannot reference itself). */
-  -webkit-backdrop-filter: blur(var(--surface-vibrancy-blur, var(--surface-blur)))
-    saturate(var(--surface-saturation));
-  backdrop-filter: blur(var(--surface-vibrancy-blur, var(--surface-blur)))
-    saturate(var(--surface-saturation));
-  background-image:
-    linear-gradient(
-      color-mix(in oklch, var(--popover-solid) calc(var(--surface-opacity) * 0.55), transparent),
-      color-mix(in oklch, var(--popover-solid) calc(var(--surface-opacity) * 0.55), transparent)
-    ),
-    var(--surface-wallpaper);
-  background-position: center;
-  background-repeat: no-repeat;
-  background-size:
-    auto,
-    max(100vw, 160vh) auto;
-}
-
 /* A skeleton bar. The tint is the floor; the sweep is what says "incoming".
    An opacity pulse cannot do that job at these alphas — the row tint is 5-7%
    foreground, so fading it in and out is a change nobody sees. A travelling
@@ -913,28 +855,33 @@ html[data-backdrop='transparent'] {
 
 .app-scrollbar-thin {
   scrollbar-width: thin;
-  scrollbar-color: var(--border) transparent;
+  scrollbar-color: var(--muted-foreground) transparent;
 }
 
-.app-scrollbar-thin::-webkit-scrollbar {
+.app-scrollbar-thin::-webkit-scrollbar,
+.app-editor-host .editor-virtualized::-webkit-scrollbar {
   height: 6px;
   width: 6px;
 }
 
-.app-scrollbar-thin::-webkit-scrollbar-track {
+.app-scrollbar-thin::-webkit-scrollbar-track,
+.app-editor-host .editor-virtualized::-webkit-scrollbar-track {
   background: transparent;
 }
 
-.app-scrollbar-thin::-webkit-scrollbar-thumb {
-  background-color: var(--border);
+.app-scrollbar-thin::-webkit-scrollbar-thumb,
+.app-editor-host .editor-virtualized::-webkit-scrollbar-thumb {
+  background-color: var(--muted-foreground);
   border-radius: 3px;
 }
 
-.app-scrollbar-thin::-webkit-scrollbar-thumb:hover {
-  background-color: var(--muted-foreground);
+.app-scrollbar-thin::-webkit-scrollbar-thumb:hover,
+.app-editor-host .editor-virtualized::-webkit-scrollbar-thumb:hover {
+  background-color: var(--foreground);
 }
 
-.app-scrollbar-thin::-webkit-scrollbar-corner {
+.app-scrollbar-thin::-webkit-scrollbar-corner,
+.app-editor-host .editor-virtualized::-webkit-scrollbar-corner {
   background: transparent;
 }
 
@@ -951,6 +898,9 @@ html[data-backdrop='transparent'] {
   min-height: 0;
   min-width: 0;
   overflow-anchor: none;
+  /* Keep the pixel-sized track measurable for the minimap's scrollbar lane. */
+  scrollbar-color: auto;
+  scrollbar-width: auto;
 }
 
 [data-workbench] .app-editor-host .editor-virtualized,
@@ -1017,18 +967,10 @@ html[data-backdrop='transparent'] {
   background: var(--workbench-editor-minimap-background);
 }
 
-/* LSP hover/diagnostic and completion popups mount on document.body, outside
-   the workbench subtree, so the pane material is restated here. !important
-   beats the plugin's inline background. */
+/* The plugin paints an inline background, so the solid popup color needs priority. */
 .editor-lsp-plugin-hover,
 .editor-lsp-plugin-completion {
-  -webkit-backdrop-filter: blur(calc(var(--surface-blur) / 2)) saturate(var(--surface-saturation));
-  backdrop-filter: blur(calc(var(--surface-blur) / 2)) saturate(var(--surface-saturation));
-  background: color-mix(
-    in oklch,
-    var(--card-solid) calc(var(--surface-opacity)),
-    transparent
-  ) !important;
+  background: var(--popover-solid) !important;
 }
 
 .search-result-excerpt-editor-host {
@@ -1075,46 +1017,6 @@ html[data-backdrop='transparent'] {
 .app-fold-gutter-icon {
   height: 12px;
   width: 12px;
-}
-
-.app-fold-chevron {
-  fill: currentColor;
-  height: 12px;
-  transform: rotate(0deg);
-  transform-origin: center;
-  width: 12px;
-}
-
-.editor-virtualized-fold-toggle[data-editor-fold-state='collapsed'] .app-fold-chevron {
-  transform: rotate(-90deg);
-}
-
-.editor-virtualized-fold-toggle[data-editor-fold-transition='collapse'] .app-fold-chevron {
-  animation: app-fold-chevron-collapse 120ms ease-out;
-}
-
-.editor-virtualized-fold-toggle[data-editor-fold-transition='expand'] .app-fold-chevron {
-  animation: app-fold-chevron-expand 120ms ease-out;
-}
-
-@keyframes app-fold-chevron-collapse {
-  from {
-    transform: rotate(0deg);
-  }
-
-  to {
-    transform: rotate(-90deg);
-  }
-}
-
-@keyframes app-fold-chevron-expand {
-  from {
-    transform: rotate(-90deg);
-  }
-
-  to {
-    transform: rotate(0deg);
-  }
 }
 
 @keyframes app-accordion-down {

@@ -12,7 +12,7 @@ import {
   createDraftSessionSubmission,
   createTurnSubmission,
   type SourceProposedPlanReference,
-} from '@/features/chat/utils/command-builders'
+} from '@workspace/client-core/chat/commands'
 import { dispatchChatCommand, replayAfterDispatch } from '@/features/chat/utils/command-dispatch'
 import { scheduleSessionProjectionSyncAfterDispatch } from '@/features/chat/utils/command-sync'
 import { chatInputUploadAttachments } from '@/features/chat/utils/input-attachments'
@@ -21,8 +21,8 @@ import {
   planImplementationPrompt,
   planImplementationSessionTitle,
   resolvePlanFollowUpSubmission,
-} from '@/features/chat/utils/proposed-plan'
-import { isChatSessionBusy } from '@/features/chat/utils/session-busy'
+} from '@workspace/client-core/chat/proposed-plan'
+import { isChatSessionBusy } from '@workspace/client-core/chat/session-busy'
 import {
   ChatPlanFollowUpContext,
   type ChatPlanFollowUp,
@@ -32,11 +32,11 @@ import {
   type ChatInputDraftTarget,
 } from '@/features/chat/state/chat-input-draft-store'
 import { useChatOptimisticStore } from '@/features/chat/state/chat-optimistic-store'
-import { selectChatSessionById } from '@/features/chat/state/chat-projection-selectors'
+import { selectChatSessionById } from '@workspace/client-core/chat/selectors'
+import { type ChatSession } from '@workspace/client-core/chat/types'
 import {
   useChatProjectionStore,
   selectChatProjectionSlice,
-  type ChatSession,
 } from '@/features/chat/state/chat-projection-store'
 
 const NO_PLANS: ChatSession['proposedPlans'] = []

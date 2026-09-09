@@ -9,7 +9,7 @@ import {
   selectCurrentWorktree,
   selectChatSessionsForProject,
   selectWorktreeAtPath,
-} from '@/features/chat/state/chat-projection-selectors'
+} from '@workspace/client-core/chat/selectors'
 import { activeChatProjection } from '@/features/chat/state/active-projection'
 import {
   useChatProjectionStore,
@@ -22,14 +22,11 @@ import { useSessionReadStore } from '@/features/chat-mode/state/session-read-sto
 import { useSessionSearchStore } from '@/features/chat-mode/state/session-search-store'
 import { useSessionSelectionStore } from '@/features/chat-mode/state/session-selection-store'
 import { currentRailEnvironments } from '@/features/chat-mode/state/rail-environments'
-import type { SessionClickIntent } from '@/features/chat-mode/utils/session-multi-select'
+import type { SessionClickIntent } from '@workspace/client-core/chat/rail/multi-select'
 import { activeSession } from '@/features/chat-mode/utils/active-session'
 import { activeWorktree } from '@/features/chat-mode/utils/active-worktree'
-import { compareSessionsForRail } from '@/features/chat-mode/utils/session-order'
-import {
-  sessionRailModel,
-  type SessionRailItem,
-} from '@/features/chat-mode/utils/session-rail-model'
+import { compareSessionsForRail } from '@workspace/client-core/chat/rail/session-order'
+import { sessionRailModel, type SessionRailItem } from '@workspace/client-core/chat/rail/model'
 import { useActiveProjectStore } from '@/features/workspace/state/active-project'
 import { activeEnvironmentId } from '@/lib/environments/state/domain'
 import type { OpenWorkspaceRootResult } from '@/features/workspace/hooks/use-open-root'

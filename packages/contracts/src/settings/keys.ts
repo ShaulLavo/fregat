@@ -117,7 +117,7 @@ export const SETTINGS_REGISTRY = {
     // Clamped rather than open: at `window` scope a cloned repository can set
     // this, and an unbounded backdrop-filter blur is a real GPU cost.
     schema: v.pipe(v.number(), v.integer(), v.minValue(0), v.maxValue(40)),
-    default: 12,
+    default: 9,
     scope: 'window',
     widget: 'number',
     category: 'Appearance',
@@ -354,6 +354,17 @@ export const SETTINGS_REGISTRY = {
     description: 'How many files the file picker lists.',
     visibility: 'advanced',
     keywords: ['search', 'quick open', 'picker', 'files', 'limit'],
+  }),
+  'chat.keepImportedSessionsUpdated': defineSetting({
+    schema: v.boolean(),
+    default: true,
+    scope: 'machine',
+    widget: 'boolean',
+    category: 'Chat',
+    title: 'Keep imported chats updated',
+    description:
+      'Imported chats receive one-way updates from local history until you send their first message in Platform. New chats are only imported when you click Import.',
+    keywords: ['chat', 'import', 'sync', 'history', 'claude', 'codex', 'cli', 'app', 'local'],
   }),
   'chat.defaultRuntimeMode': defineSetting({
     schema: v.picklist(['full-access', 'approval-required', 'auto-accept-edits'] as const),

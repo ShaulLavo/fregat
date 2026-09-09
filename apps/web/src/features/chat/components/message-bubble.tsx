@@ -1,5 +1,6 @@
 import type { OrchestrationMessage } from '@workspace/contracts'
 import { ArrowCounterClockwiseIcon } from '@phosphor-icons/react'
+import { Button } from '@workspace/ui/components/button'
 import { cn } from '@workspace/ui/lib/utils'
 import type { MouseEvent, ReactNode } from 'react'
 
@@ -7,9 +8,9 @@ import { useContextMenu } from '@/features/menus/hooks/use-context-menu'
 
 import { formatChatTimestamp } from '@/features/chat/utils/formatters'
 import { resolveAssistantMessageChromeState } from '@/features/chat/utils/message-metadata'
-import { extractTerminalContexts } from '@/features/chat/utils/terminal-context'
+import { extractTerminalContexts } from '@workspace/client-core/chat/terminal-context'
 import type { OptimisticChatMessage } from '../state/chat-optimistic-store'
-import type { ChatTurnDiffSummary } from '../state/chat-projection-store'
+import type { ChatTurnDiffSummary } from '@workspace/client-core/chat/types'
 import { allowsMessageContextMenu } from '../utils/message-menu'
 import { useChatTimelineActions } from '../hooks/use-chat-timeline-actions'
 import { AssistantChangedFilesSection } from './assistant-changed-files-section'
@@ -98,8 +99,7 @@ export function MessageBubble({
       ) : null}
       <div
         className={cn(
-          'flex w-full min-w-0',
-          assistant && 'group/assistant',
+          'group/message flex w-full min-w-0',
           user ? 'justify-end' : 'justify-start',
           optimistic && 'opacity-70',
         )}
@@ -143,26 +143,36 @@ export function MessageBubble({
             </>
           )}
           {user ? (
-            <div className='text-muted-foreground/50 mt-1 flex items-center justify-end gap-1.5 text-[10px] tabular-nums'>
-              {canRevertCheckpoint ? (
-                <button
-                  aria-label='Revert to checkpoint before this turn'
-                  className='hover:bg-background/80 hover:text-foreground inline-flex size-5 items-center justify-center border border-transparent transition-colors disabled:cursor-not-allowed disabled:opacity-50'
-                  data-scroll-anchor-ignore
-                  disabled={checkpointRevertPending}
-                  title='Revert to checkpoint before this turn'
-                  type='button'
-                  onClick={handleRevertClick}
-                >
-                  <ArrowCounterClockwiseIcon aria-hidden='true' className='size-3.5' />
-                </button>
-              ) : null}
+            <div
+              className='text-muted-foreground mt-1 flex items-center justify-end gap-1.5 text-[10px] tabular-nums transition-opacity duration-150 group-focus-within/message:pointer-events-auto group-focus-within/message:opacity-100 group-hover/message:pointer-events-auto group-hover/message:opacity-100 [@media(hover:hover)]:pointer-events-none [@media(hover:hover)]:opacity-0'
+              data-user-message-meta='true'
+            >
+              <span className='size-5 shrink-0'>
+                {canRevertCheckpoint ? (
+                  <Button
+                    aria-label='Revert to checkpoint before this turn'
+                    className='size-5'
+                    data-scroll-anchor-ignore
+                    disabled={checkpointRevertPending}
+                    size='icon-sm'
+                    title='Revert to checkpoint before this turn'
+                    type='button'
+                    variant='ghost'
+                    onClick={handleRevertClick}
+                  >
+                    <ArrowCounterClockwiseIcon aria-hidden='true' className='size-3.5' />
+                  </Button>
+                ) : null}
+              </span>
               <span>{messageTimestampLabel(message, optimistic)}</span>
             </div>
           ) : null}
           {!user && assistantChrome.metaVisible ? (
-            <div className='mt-1.5 flex items-center gap-2' data-assistant-message-meta='true'>
-              <p className='text-muted-foreground/30 text-[10px] tabular-nums'>
+            <div
+              className='mt-1.5 flex items-center gap-2 transition-opacity duration-150 group-focus-within/message:pointer-events-auto group-focus-within/message:opacity-100 group-hover/message:pointer-events-auto group-hover/message:opacity-100 [@media(hover:hover)]:pointer-events-none [@media(hover:hover)]:opacity-0'
+              data-assistant-message-meta='true'
+            >
+              <p className='text-muted-foreground text-[10px] tabular-nums'>
                 <AssistantMessageMeta
                   createdAt={message.createdAt}
                   durationEnd={durationEnd ?? message.updatedAt}
@@ -171,10 +181,7 @@ export function MessageBubble({
                 />
               </p>
               {assistantChrome.copyVisible && renderAssistantCopyButton ? (
-                <div
-                  className='pointer-events-none flex items-center opacity-0 transition-opacity duration-150 group-focus-within/assistant:pointer-events-auto group-focus-within/assistant:opacity-100 group-hover/assistant:pointer-events-auto group-hover/assistant:opacity-100'
-                  data-assistant-copy-actions='true'
-                >
+                <div className='flex items-center' data-assistant-copy-actions='true'>
                   {renderAssistantCopyButton(assistantChrome.copyText ?? '')}
                 </div>
               ) : null}

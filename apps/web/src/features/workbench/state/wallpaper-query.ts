@@ -23,7 +23,6 @@ export const wallpaperQueryKeys = {
   all: ['wallpaper'] as const,
   info: () => [...wallpaperQueryKeys.all, 'info'] as const,
   media: () => [...wallpaperQueryKeys.all, 'media'] as const,
-  still: () => [...wallpaperQueryKeys.all, 'still'] as const,
 }
 
 export function wallpaperInfoQueryOptions({ enabled }: { enabled: boolean }) {
@@ -39,17 +38,27 @@ export function wallpaperMediaQueryOptions({ enabled }: { enabled: boolean }) {
   return queryOptions({
     ...wallpaperQueryDefaults,
     enabled,
-    queryFn: ({ client }) => fetchWallpaperBlob(originForQueryClient(client), ''),
+    queryFn: ({ client }) => fetchWallpaperBlob(originForQueryClient(client)),
     queryKey: wallpaperQueryKeys.media(),
   })
 }
 
-export function wallpaperStillQueryOptions() {
-  return queryOptions({
-    ...wallpaperQueryDefaults,
-    queryFn: ({ client }) => fetchWallpaperBlob(originForQueryClient(client), '/still'),
-    queryKey: wallpaperQueryKeys.still(),
-  })
+export function wallpaperStillUrl(origin: string): string | null {
+  const source = wallpaperSource(origin)
+  return source ? `${desktopWallpaperUrl(source)}/still` : null
+}
+
+export function wallpaperPreloadState(source: string): 'pending' | 'ready' | 'error' {
+  if (typeof document === 'undefined') return 'pending'
+  const href = new URL(source, document.baseURI).href
+  for (const link of document.head.querySelectorAll<HTMLLinkElement>(
+    'link[data-workbench-wallpaper-preload]',
+  )) {
+    if (link.href !== href) continue
+    const status = link.dataset.workbenchWallpaperPreload
+    if (status === 'ready' || status === 'error') return status
+  }
+  return 'pending'
 }
 
 async function fetchWallpaperKind(origin: string): Promise<WallpaperMediaKind> {
@@ -62,10 +71,10 @@ async function fetchWallpaperKind(origin: string): Promise<WallpaperMediaKind> {
   return wallpaperMediaKind(info.contentType ?? null)
 }
 
-async function fetchWallpaperBlob(origin: string, suffix: '' | '/still'): Promise<Blob | null> {
+async function fetchWallpaperBlob(origin: string): Promise<Blob | null> {
   const source = wallpaperSource(origin)
   if (!source) return null
-  const response = await fetchWallpaper(`${desktopWallpaperUrl(source)}${suffix}`)
+  const response = await fetchWallpaper(desktopWallpaperUrl(source))
   if (!response.ok) return null
 
   return response.blob()

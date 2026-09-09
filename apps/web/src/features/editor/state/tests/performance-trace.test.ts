@@ -22,6 +22,15 @@ type TraceHandle = {
     readonly rootPath: string
     readonly sampleId: string
   }): Promise<EditorOpenSampleResetResult>
+  report(): {
+    readonly traceEvents: readonly {
+      readonly at: number
+      readonly durationMs?: number
+      readonly kind: string
+      readonly name?: string
+    }[]
+  }
+  reset(): void
   stop(): void
 }
 
@@ -31,6 +40,40 @@ afterEach(() => {
   traceHandle()?.stop()
   delete (globalThis as typeof globalThis & { __editorPerfTrace?: TraceHandle }).__editorPerfTrace
   history.replaceState(null, '', originalUrl)
+  vi.unstubAllGlobals()
+})
+
+test('report drains long tasks that overlap the activation boundary', () => {
+  let records: PerformanceEntry[] = []
+  class TestPerformanceObserver {
+    constructor(_callback: PerformanceObserverCallback) {}
+
+    disconnect(): void {}
+    observe(): void {}
+    takeRecords(): PerformanceEntryList {
+      const current = records
+      records = []
+      return current
+    }
+  }
+  vi.stubGlobal('PerformanceObserver', TestPerformanceObserver)
+  history.replaceState(null, '', '/?editorPerfTrace=1')
+  installEditorPerformanceTraceFromUrl()
+  const handle = traceHandle()
+  handle?.reset()
+  const reportAt = performance.now()
+  records = [
+    performanceEntry(reportAt - 10, 20, 'activation-task'),
+    performanceEntry(reportAt - 20, 5, 'pre-activation-task'),
+  ]
+
+  expect(handle?.report().traceEvents).toEqual([
+    expect.objectContaining({
+      durationMs: 20,
+      kind: 'long-task',
+      name: 'activation-task',
+    }),
+  ])
 })
 
 test('trace-only bridge forwards opaque sample controls and unregisters ownership', async () => {
@@ -98,4 +141,14 @@ test('benchmark control registration rejects concurrent owners', () => {
 
 function traceHandle(): TraceHandle | undefined {
   return (globalThis as typeof globalThis & { __editorPerfTrace?: TraceHandle }).__editorPerfTrace
+}
+
+function performanceEntry(startTime: number, duration: number, name: string): PerformanceEntry {
+  return {
+    duration,
+    entryType: 'longtask',
+    name,
+    startTime,
+    toJSON: () => ({}),
+  }
 }

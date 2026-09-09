@@ -1,4 +1,5 @@
-import { describe, expect, it } from 'vitest'
+import { describe } from 'vitest'
+import { expect, test as it } from '../../../../../test/fixtures'
 import {
   eventIdSchema,
   sessionIdSchema,
@@ -10,6 +11,84 @@ import * as v from 'valibot'
 import { chatActivityPresentation } from '@/features/chat/utils/activity-presentation'
 
 describe('chat activity presentation', () => {
+  it('reads nested Codex commands and does not mistake command text for an error', () => {
+    expect(
+      chatActivityPresentation(
+        activity(
+          'tool.completed',
+          'tool',
+          {
+            toolCallId: 'call-1',
+            status: 'completed',
+            data: {
+              item: {
+                command: 'rg "permission denied" logs',
+                aggregatedOutput: '3 matches',
+                exitCode: 0,
+              },
+            },
+          },
+          'Command run',
+        ),
+      ),
+    ).toMatchObject({
+      command: 'rg "permission denied" logs',
+      output: '3 matches',
+      outcome: 'succeeded',
+      toolCallId: 'call-1',
+    })
+  })
+
+  it('preserves MCP tool names, arguments and results', () => {
+    expect(
+      chatActivityPresentation(
+        activity(
+          'tool.completed',
+          'tool',
+          {
+            itemType: 'mcp_tool_call',
+            data: {
+              item: {
+                server: 'linear',
+                tool: 'get_issue',
+                arguments: { id: 'ENG-12' },
+                result: { content: [{ type: 'text', text: 'Issue found' }] },
+              },
+            },
+          },
+          'Tool completed',
+        ),
+      ),
+    ).toMatchObject({
+      title: 'linear · get_issue',
+      input: '{\n  "id": "ENG-12"\n}',
+      output: 'Issue found',
+    })
+  })
+
+  it('shows MCP startup failures with the server and error', () => {
+    expect(
+      chatActivityPresentation(
+        activity(
+          'mcp.status.updated',
+          'info',
+          {
+            status: {
+              name: 'GitHub',
+              status: 'failed',
+              error: 'Authentication required',
+              failureReason: null,
+            },
+          },
+          'MCP status updated',
+        ),
+      ),
+    ).toMatchObject({
+      title: 'GitHub connection failed',
+      detail: 'Authentication required',
+    })
+  })
+
   it('maps tool lifecycle payload status and detail', () => {
     const presentation = chatActivityPresentation(
       activity(
@@ -42,9 +121,9 @@ describe('chat activity presentation', () => {
         }),
       ),
     ).toMatchObject({
-      detail: 'Provider crashed',
+      detail: null,
       icon: 'error',
-      title: 'Runtime error',
+      title: 'Provider crashed',
     })
   })
 

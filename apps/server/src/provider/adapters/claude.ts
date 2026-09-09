@@ -39,7 +39,12 @@ import {
 } from '../../orchestration/orchestration-logging'
 import { ProviderRuntimeEventStream } from '../provider-runtime-event-stream'
 import { sessionIdentityErrors } from '../structured-errors'
-import { discoverClaudeSessions, type ClaudeDiscoveryRunner } from '../claude-discovery'
+import {
+  discoverClaudeSessions,
+  readClaudeSessionHistory,
+  type ClaudeDiscoveryRunner,
+  type ClaudeHistoryRunner,
+} from '../claude-discovery'
 import type {
   ProviderAdapter,
   ProviderAdapterRuntime,
@@ -50,6 +55,7 @@ import type {
   ProviderRuntimeEventPayload,
   ProviderRuntimeStartInput,
   ProviderSessionDiscoveryInput,
+  ProviderSessionHistoryInput,
   ProviderSignInInput,
   ProviderTurnInput,
   ProviderUserInputResponseInput,
@@ -112,6 +118,7 @@ export type ClaudeCreateQuery = (input: {
 
 export type ClaudeAdapterOptions = {
   discoveryRunner?: ClaudeDiscoveryRunner
+  historyRunner?: ClaudeHistoryRunner
   attachmentsDir?: string
   auth?: ClaudeAuthRunner
   createQuery?: ClaudeCreateQuery
@@ -165,6 +172,7 @@ export class ClaudeProviderAdapter implements ProviderAdapter {
   private readonly auth: ClaudeAuthRunner
   private readonly createQuery: ClaudeCreateQuery
   private readonly discoveryRunner: ClaudeDiscoveryRunner | undefined
+  private readonly historyRunner: ClaudeHistoryRunner | undefined
   private readonly env: NodeJS.ProcessEnv
   private readonly events = new ProviderRuntimeEventStream()
   private readonly sessions = new Map<SessionId, ClaudeAgentSession>()
@@ -186,6 +194,7 @@ export class ClaudeProviderAdapter implements ProviderAdapter {
     this.auth = options.auth ?? new ClaudeAuthRunner({ env: this.env })
     this.createQuery = options.createQuery ?? defaultClaudeCreateQuery
     this.discoveryRunner = options.discoveryRunner
+    this.historyRunner = options.historyRunner
     this.settings = {
       ...DEFAULT_CLAUDE_PROVIDER_SETTINGS,
       displayLabel: options.displayLabel ?? DEFAULT_CLAUDE_PROVIDER_SETTINGS.displayLabel,
@@ -308,6 +317,10 @@ export class ClaudeProviderAdapter implements ProviderAdapter {
 
   discoverSessions(request: ProviderSessionDiscoveryInput) {
     return discoverClaudeSessions({ request, env: this.env, runner: this.discoveryRunner })
+  }
+
+  readSessionHistory(request: ProviderSessionHistoryInput) {
+    return readClaudeSessionHistory({ request, env: this.env, runner: this.historyRunner })
   }
 
   async hasRuntime({ sessionId }: { sessionId: SessionId }) {

@@ -1,4 +1,6 @@
 import { testScopedStorage } from './factories/scoped-storage'
+import { testWorkspaceAddress } from './factories/workspace-address'
+import type { WorkspaceAddress } from '@workspace/contracts'
 import { waitFor } from '@testing-library/react'
 import { useEffect } from 'react'
 import { expect, onTestFinished } from 'vitest'
@@ -58,14 +60,19 @@ export function seedWorkspaceCache({
   rootPath,
   tabPaths = [],
   knownRoots = [],
+  workspaceAddress = testWorkspaceAddress(rootPath),
 }: {
   readonly rootPath: string
   readonly tabPaths?: readonly string[]
   readonly knownRoots?: readonly string[]
+  readonly workspaceAddress?: WorkspaceAddress
 }) {
   const panels = tabPaths.reduce(openEditorPathInWorkbenchPanels, createDefaultWorkbenchPanels())
 
-  writeRootFolderCache(testScopedStorage, directoryEntry(rootPath))
+  writeRootFolderCache(testScopedStorage, {
+    ...directoryEntry(rootPath),
+    workspaceAddress,
+  })
   writeWorkspaceIndexCache(testScopedStorage, [rootPath, ...knownRoots])
   writeWorkspaceSliceCache(testScopedStorage, rootPath, {
     editorHistory: [],

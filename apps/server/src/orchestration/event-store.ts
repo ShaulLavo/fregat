@@ -1,6 +1,9 @@
-import { and, asc, eq, gt, sql } from 'drizzle-orm'
+import { and, asc, desc, eq, gt, sql } from 'drizzle-orm'
 import * as v from 'valibot'
-import { ORCHESTRATION_REPLAY_MAX_EVENTS } from '@workspace/contracts'
+import {
+  ORCHESTRATION_REPLAY_MAX_EVENTS,
+  orchestrationEventMetadataSchema,
+} from '@workspace/contracts'
 import {
   orchestrationEventSchema,
   type OrchestrationEvent,
@@ -81,6 +84,50 @@ export class OrchestrationEventStore {
       streamVersions,
     })
     return appended
+  }
+
+  hasPlatformTurn(sessionId: string) {
+    return Boolean(
+      this.database
+        .select({ sequence: orchestrationEvents.sequence })
+        .from(orchestrationEvents)
+        .where(
+          and(
+            eq(orchestrationEvents.aggregateKind, 'session'),
+            eq(orchestrationEvents.aggregateId, sessionId),
+            eq(orchestrationEvents.eventType, 'session.turn-start-requested'),
+          ),
+        )
+        .limit(1)
+        .get(),
+    )
+  }
+
+  historyImportState(sessionId: string) {
+    const row = this.database
+      .select({
+        sequence: orchestrationEvents.sequence,
+        metadata: orchestrationEvents.metadataJson,
+        sourceUpdatedAt: sql<string>`json_extract(${orchestrationEvents.payloadJson}, '$.sourceUpdatedAt')`,
+      })
+      .from(orchestrationEvents)
+      .where(
+        and(
+          eq(orchestrationEvents.aggregateKind, 'session'),
+          eq(orchestrationEvents.aggregateId, sessionId),
+          eq(orchestrationEvents.eventType, 'session.history-imported'),
+        ),
+      )
+      .orderBy(desc(orchestrationEvents.sequence))
+      .limit(1)
+      .get()
+    return {
+      sequence: row?.sequence ?? 0,
+      revision: row
+        ? v.parse(orchestrationEventMetadataSchema, JSON.parse(row.metadata)).historyRevision
+        : null,
+      sourceUpdatedAt: row?.sourceUpdatedAt ?? null,
+    }
   }
 
   currentSequence() {

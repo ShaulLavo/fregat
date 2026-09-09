@@ -1,32 +1,47 @@
 {
-  "schemaVersion": 1,
+  "schemaVersion": 2,
+  "identity": {
+    "benchmarkVersion": 2,
+    "colorScheme": "dark",
+    "fixturePath": "apps/web/src/features/editor/components/editor.tsx",
+    "fixtureSha256": "7756c16e9e6fc8241ccff3ba9a8d5afd72d1985c9a9c7c33c6d06c59838d6806",
+    "modes": ["miss", "query-only", "prepared-50", "prepared-150", "prepared-300"],
+    "editorImplementationSha256": "612e823c401e98c53ba3d81f46037cbde82db490818caf1aecdf2e3f2a1aace2",
+    "platformImplementationSha256": "99bde15cf44a84cf85bdbd5765688c3b7420cc7f9e3b67e831dbeb8c93345e74",
+    "samplesPerMode": 30,
+    "viewport": {
+      "height": 900,
+      "width": 1440
+    },
+    "warmupsPerMode": 5
+  },
   "runs": [
     {
-      "baselineQueryOnlyHighlightP50Ms": 67,
+      "baselineQueryOnlyHighlightP50Ms": 99.1,
       "browser": "chromium",
-      "finalPrepared300HighlightP50Ms": 40.3,
-      "missHighlightP50Ms": 91.6,
-      "missNoiseMs": 3.59,
+      "finalPrepared300HighlightP50Ms": 83.7,
+      "missHighlightP50Ms": 103,
+      "missNoiseMs": 2.66,
       "samplesPerMode": 30,
       "seed": 60061,
       "warmupsPerMode": 5
     },
     {
-      "baselineQueryOnlyHighlightP50Ms": 66.3,
+      "baselineQueryOnlyHighlightP50Ms": 97.5,
       "browser": "chromium",
-      "finalPrepared300HighlightP50Ms": 56.8,
-      "missHighlightP50Ms": 93.1,
-      "missNoiseMs": 4.59,
+      "finalPrepared300HighlightP50Ms": 76.6,
+      "missHighlightP50Ms": 109,
+      "missNoiseMs": 6.38,
       "samplesPerMode": 30,
       "seed": 60062,
       "warmupsPerMode": 5
     },
     {
-      "baselineQueryOnlyHighlightP50Ms": 70.6,
+      "baselineQueryOnlyHighlightP50Ms": 108,
       "browser": "chromium",
-      "finalPrepared300HighlightP50Ms": 57.9,
-      "missHighlightP50Ms": 92.5,
-      "missNoiseMs": 3.06,
+      "finalPrepared300HighlightP50Ms": 83.7,
+      "missHighlightP50Ms": 125.9,
+      "missNoiseMs": 8.71,
       "samplesPerMode": 30,
       "seed": 60063,
       "warmupsPerMode": 5

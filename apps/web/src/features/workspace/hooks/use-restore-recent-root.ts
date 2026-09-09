@@ -1,5 +1,5 @@
 import { useQuery } from '@tanstack/react-query'
-import { useEffect, useRef } from 'react'
+import { useEffect, useRef, useState } from 'react'
 
 import { useAddressRootClaimed } from '@/features/address/state/root-claim'
 import {
@@ -22,6 +22,7 @@ export function useRestoreRecentWorkspaceRoot() {
   const workspaceStore = useEditorWorkspaceStoreApi()
   const openWorkspaceRoot = useOpenWorkspaceRoot()
   const attemptedRootPath = useRef<string | null>(null)
+  const [settledRootPath, setSettledRootPath] = useState<string | null>(null)
   const recentFolders = useQuery(recentFoldersQueryOptions({ enabled: rootPath === null }))
   const recentRootPath = recentFolders.data?.[0]?.path ?? null
   // A link names a workspace explicitly; recents is a guess. While the address applier
@@ -42,8 +43,17 @@ export function useRestoreRecentWorkspaceRoot() {
     if (workspaceStore.getState().rootFolder) return
 
     attemptedRootPath.current = recentRootPath
-    void restoreRecentWorkspaceRoot(recentRootPath, openWorkspaceRoot)
+    void restoreRecentWorkspaceRoot(recentRootPath, openWorkspaceRoot).finally(() => {
+      setSettledRootPath(recentRootPath)
+    })
   }, [addressClaimsRoot, openWorkspaceRoot, recentRootPath, rootPath, workspaceStore])
+
+  return (
+    rootPath === null &&
+    (addressClaimsRoot ||
+      recentFolders.isPending ||
+      (recentRootPath !== null && recentRootPath !== settledRootPath))
+  )
 }
 
 async function restoreRecentWorkspaceRoot(

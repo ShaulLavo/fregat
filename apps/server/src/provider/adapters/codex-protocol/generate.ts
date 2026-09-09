@@ -38,6 +38,7 @@ const CLIENT_REQUEST_METHODS = [
   'turn/start',
   'turn/interrupt',
   'thread/read',
+  'thread/list',
   'thread/rollback',
   'skills/list',
 ] as const

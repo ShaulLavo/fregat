@@ -50,6 +50,8 @@ export class TerminalLeaseController {
       return queue
     }
     return {
+      terminalLeaseId,
+      runtimeEpoch: this.runtimeEpoch,
       activate: () => ended ?? enqueue('terminal.lease.activate'),
       terminate: () => ended ?? enqueue('terminal.lease.terminate'),
       end: () => {
@@ -83,6 +85,12 @@ export class TerminalLeaseController {
         lease.state === 'requested' ? 'terminal.lease.end' : 'terminal.lease.mark-unknown'
       await this.send(type, lease.worktreeId, lease.terminalLeaseId, lease.runtimeEpoch)
     }
+  }
+
+  async endRecovered(terminalLeaseId: TerminalLeaseId) {
+    const lease = this.options.getReadModel().terminalLeases.get(terminalLeaseId)
+    if (!lease || lease.state === 'ended') return
+    await this.send('terminal.lease.end', lease.worktreeId, terminalLeaseId, lease.runtimeEpoch)
   }
 
   private send(

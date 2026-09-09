@@ -32,9 +32,15 @@ The web client forwards Ghostty's byte input directly and feeds received bytes t
 sockets use `binaryType = 'arraybuffer'`. Binary input bypasses Eden's JSON encoder; server
 output uses a Buffer view because Elysia would JSON-encode a plain Uint8Array.
 
-Detached sessions stay alive for ten minutes. Reconnection sends `ready` and replays the final
-256 KiB as raw byte chunks. The cap also applies to an individual oversized output chunk. A
-failed client send detaches that client without terminating its PTY.
+Detached sessions stay alive for ten minutes. A session accepts multiple viewers and broadcasts
+live output to each. Input is accepted from any viewer, and the latest resize sets the shared
+dimensions. A failed send detaches that viewer without terminating the PTY.
+
+Reconnection sends `ready` and replays the final 256 KiB only to the joining viewer. The cap
+also applies to an oversized output chunk, and truncation removes partial leading UTF-8 bytes.
+A resize nudge requests a repaint from full-screen programs after replay. The server tracks
+negotiated mode 2048 and sends in-band dimension reports when enabled, since those applications
+may ignore SIGWINCH. The requested size is restored after repaint output or a quiet-shell timeout.
 
 ## Verification
 

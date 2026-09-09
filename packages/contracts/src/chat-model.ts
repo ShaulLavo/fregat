@@ -227,6 +227,13 @@ export const orchestrationProjectSchema = v.object({
 
 export const orchestrationMessageRoleSchema = v.picklist(['user', 'assistant', 'system'])
 
+export const importedSessionMessageSchema = v.object({
+  id: messageIdSchema,
+  role: v.picklist(['user', 'assistant']),
+  text: v.string(),
+  createdAt: isoDateTimeSchema,
+})
+
 export const orchestrationMessageSchema = v.object({
   id: messageIdSchema,
   sessionId: sessionIdSchema,

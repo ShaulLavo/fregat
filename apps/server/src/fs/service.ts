@@ -1,6 +1,6 @@
 import { homedir } from 'node:os'
 import path from 'node:path'
-import { effectiveEntryType } from '@workspace/contracts'
+import { effectiveEntryType, type WorkspaceAddressId } from '@workspace/contracts'
 import { platformHomePath } from '../home'
 import { createWorkspacePaths } from './path'
 import { FileChangeHub, type WatchBackend } from './watch'
@@ -29,6 +29,7 @@ import { findInWorkspaceStream, type FindOptions, type SearchStreamEvent } from 
 import { FsError } from './errors'
 import type { MetadataDatabaseHandle } from '../db/client'
 import { FsMetadataStore } from './metadata'
+import { registerWorkspaceAddress, resolveWorkspaceAddress } from './workspace-address'
 import {
   WorkspaceIndex,
   inactiveWorkspaceIndexStatus,
@@ -192,9 +193,11 @@ export class FileSystemService {
       },
       () => this.openWorkspaceRootObserved(body),
       (result) => ({
+        canonicalPath: result.entry?.path,
         entryType: result.entry?.type,
         openStatus: result.status,
         scanRoot: result.workspaceIndex.scanRoot,
+        workspaceAddressId: result.entry?.workspaceAddress.id,
       }),
     )
   }
@@ -203,8 +206,7 @@ export class FileSystemService {
     await this.workspaceEditReady
     if (!this.claimWorkspaceOpen(body.generation)) return this.supersededWorkspaceOpen()
 
-    const entry = await statPath(this.paths, body.path)
-    if (effectiveEntryType(entry) !== 'directory') throw new FsError('NOT_A_DIRECTORY')
+    const entry = await registerWorkspaceAddress(this.paths, this.metadata, body.path)
     if (!this.isCurrentWorkspaceOpen(body.generation)) return this.supersededWorkspaceOpen()
 
     this.installWorkspaceIndexScope(entry.path)
@@ -213,6 +215,23 @@ export class FileSystemService {
       status: 'opened' as const,
       workspaceIndex: this.info().workspaceIndex,
     }
+  }
+
+  registerWorkspaceAddress(input: string) {
+    return observeRequestOperation(
+      { area: 'fs', operation: 'register_workspace_address', path: input },
+      async () =>
+        (await registerWorkspaceAddress(this.paths, this.metadata, input)).workspaceAddress,
+      (result) => ({ canonicalPath: result.path, workspaceAddressId: result.id }),
+    )
+  }
+
+  resolveWorkspaceAddress(id: WorkspaceAddressId) {
+    return observeRequestOperation(
+      { area: 'fs', operation: 'resolve_workspace_address', workspaceAddressId: id },
+      () => resolveWorkspaceAddress(this.paths, this.metadata, id),
+      (result) => ({ canonicalPath: result.path, workspaceAddressId: result.id }),
+    )
   }
 
   async tree(path: string, depth: number, entryType?: EntryTypeFilter) {

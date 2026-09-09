@@ -1,7 +1,7 @@
 import { providerInstanceIdSchema } from '@workspace/contracts'
 import * as v from 'valibot'
 
-import { resolveChatModelSelection } from '@/features/chat/utils/resolve-model-selection'
+import { resolveChatModelSelection } from '@workspace/client-core/chat/providers/selection'
 import { providerModel, providerSnapshot } from '../../../../../test/factories/chat'
 import { expect, test } from '../../../../../test/fixtures'
 

@@ -1,7 +1,9 @@
+import { chatCommandMetadata } from './chat'
 import { settingsCommandMetadata } from './settings'
 import { editorCommandMetadata } from './editor'
 import { environmentCommandMetadata } from './environment'
 import { foundationCommandMetadata } from './foundation'
+import { workbenchCommandMetadata } from './workbench'
 import { SESSION_JUMP_POSITIONS } from './session-jump'
 import { sessionJumpMetadata, workspaceCommandMetadata } from './workspace'
 import type { CommandMetadata } from './metadata'
@@ -13,6 +15,8 @@ export const commandMetadata = [
   ...SESSION_JUMP_POSITIONS.map(sessionJumpMetadata),
   ...Object.values(foundationCommandMetadata),
   ...Object.values(settingsCommandMetadata),
+  ...Object.values(workbenchCommandMetadata),
+  ...Object.values(chatCommandMetadata),
 ]
 
 export type CommandId = (typeof commandMetadata)[number]['id']

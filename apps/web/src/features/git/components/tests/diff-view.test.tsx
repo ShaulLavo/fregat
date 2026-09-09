@@ -15,7 +15,7 @@ import type {
   SnapshotDiffDocumentInput,
 } from '@/features/git/utils/diff-document'
 import type { FileDiff } from '@/features/git/utils/types'
-import { editorDiffFiles } from '@/features/git/utils/editor-diff-files'
+import { editorDiffFiles } from '@workspace/client-core/git/diff-files'
 import { testDiffLanguageHost } from '../../../../../test/factories/diff-language-host'
 import { gitFileDiff } from '../../../../../test/factories/git-diff'
 import { expect, test } from '../../../../../test/fixtures'

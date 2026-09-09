@@ -2,7 +2,7 @@ import { screen } from '@testing-library/react'
 import userEvent from '@testing-library/user-event'
 
 import { ContextUsageRing } from '@/features/chat/components/context-usage-ring'
-import type { ContextUsage } from '@/features/chat/utils/context-usage'
+import type { ContextUsage } from '@workspace/client-core/chat/context-usage'
 import { expect, test } from '../../../../../test/fixtures'
 import { renderWithProviders } from '../../../../../test/render'
 

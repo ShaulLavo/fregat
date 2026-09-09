@@ -5,7 +5,7 @@ import {
   sessionClickIntent,
   sessionIdRange,
   toggledSessionIds,
-} from '@/features/chat-mode/utils/session-multi-select'
+} from '@workspace/client-core/chat/rail/multi-select'
 import { expect, test } from '../../../../../test/fixtures'
 
 const sessionA = v.parse(sessionIdSchema, '0cecbcf1-b3a4-5425-826e-9780b43b7832')

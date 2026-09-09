@@ -1,5 +1,6 @@
 import { screen, waitFor } from '@testing-library/react'
 import userEvent from '@testing-library/user-event'
+import { symlink } from 'node:fs/promises'
 import path from 'node:path'
 import { vi } from 'vitest'
 
@@ -42,6 +43,28 @@ test('records an opened root as recent, so the project menu can order by it', as
     )
     expect(recents.map((entry) => entry.path)).toEqual(['anubis'])
   })
+})
+
+test('opening a folder through an alias keeps its canonical root and workspace ID', async ({
+  client,
+  server,
+}) => {
+  void client
+  await ensureFolderPath('actual')
+  await symlink('actual', path.join(server.root, 'alias'))
+  const store = emptyWorkspaceStore()
+  const results: Array<{ path: string; result: OpenWorkspaceRootResult }> = []
+  renderOpeners(store, ['actual', 'alias'], results)
+
+  await userEvent.click(screen.getByRole('button', { name: 'Open actual' }))
+  await waitFor(() => expect(store.getState().rootFolder?.workspaceAddress).toBeDefined())
+  const address = store.getState().rootFolder?.workspaceAddress
+
+  await userEvent.click(screen.getByRole('button', { name: 'Open alias' }))
+  await waitFor(() => expect(results).toContainEqual({ path: 'alias', result: 'already-open' }))
+
+  expect(store.getState().rootFolder?.path).toBe('actual')
+  expect(store.getState().rootFolder?.workspaceAddress).toEqual(address)
 })
 
 test('makes the latest rapid valid open the editor and index root', async ({ client, server }) => {

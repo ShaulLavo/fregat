@@ -2448,6 +2448,585 @@ export type V2ThreadArchivedNotification = v.InferOutput<typeof V2ThreadArchived
 export const V2ThreadClosedNotificationSchema = v.looseObject({ threadId: v.string() })
 export type V2ThreadClosedNotification = v.InferOutput<typeof V2ThreadClosedNotificationSchema>
 
+export const V2ThreadListParams__SortDirectionSchema = openEnum(['asc', 'desc'])
+export type V2ThreadListParams__SortDirection = v.InferOutput<
+  typeof V2ThreadListParams__SortDirectionSchema
+>
+
+export const V2ThreadListParams__ThreadSortKeySchema = openEnum(['created_at', 'updated_at'])
+export type V2ThreadListParams__ThreadSortKey = v.InferOutput<
+  typeof V2ThreadListParams__ThreadSortKeySchema
+>
+
+export const V2ThreadListParams__ThreadSourceKindSchema = openEnum([
+  'cli',
+  'vscode',
+  'exec',
+  'appServer',
+  'subAgent',
+  'subAgentReview',
+  'subAgentCompact',
+  'subAgentThreadSpawn',
+  'subAgentOther',
+  'unknown',
+])
+export type V2ThreadListParams__ThreadSourceKind = v.InferOutput<
+  typeof V2ThreadListParams__ThreadSourceKindSchema
+>
+
+export const V2ThreadListParamsSchema = v.looseObject({
+  archived: v.optional(v.union([v.boolean(), v.null()])),
+  cursor: v.optional(v.union([v.string(), v.null()])),
+  cwd: v.optional(v.union([v.string(), v.null()])),
+  limit: v.optional(v.union([v.pipe(v.number(), v.integer(), v.minValue(0)), v.null()])),
+  modelProviders: v.optional(v.union([v.array(v.string()), v.null()])),
+  searchTerm: v.optional(v.union([v.string(), v.null()])),
+  sortDirection: v.optional(v.union([V2ThreadListParams__SortDirectionSchema, v.null()])),
+  sortKey: v.optional(v.union([V2ThreadListParams__ThreadSortKeySchema, v.null()])),
+  sourceKinds: v.optional(v.union([v.array(V2ThreadListParams__ThreadSourceKindSchema), v.null()])),
+})
+export type V2ThreadListParams = v.InferOutput<typeof V2ThreadListParamsSchema>
+
+export const V2ThreadListResponse__AbsolutePathBufSchema = v.string()
+export type V2ThreadListResponse__AbsolutePathBuf = v.InferOutput<
+  typeof V2ThreadListResponse__AbsolutePathBufSchema
+>
+
+export const V2ThreadListResponse__AgentPathSchema = v.string()
+export type V2ThreadListResponse__AgentPath = v.InferOutput<
+  typeof V2ThreadListResponse__AgentPathSchema
+>
+
+export const V2ThreadListResponse__ByteRangeSchema = v.looseObject({
+  end: v.pipe(v.number(), v.integer(), v.minValue(0)),
+  start: v.pipe(v.number(), v.integer(), v.minValue(0)),
+})
+export type V2ThreadListResponse__ByteRange = v.InferOutput<
+  typeof V2ThreadListResponse__ByteRangeSchema
+>
+
+export const V2ThreadListResponse__NonSteerableTurnKindSchema = openEnum(['review', 'compact'])
+export type V2ThreadListResponse__NonSteerableTurnKind = v.InferOutput<
+  typeof V2ThreadListResponse__NonSteerableTurnKindSchema
+>
+
+export const V2ThreadListResponse__CodexErrorInfoSchema = v.union([
+  openEnum([
+    'contextWindowExceeded',
+    'usageLimitExceeded',
+    'serverOverloaded',
+    'internalServerError',
+    'unauthorized',
+    'badRequest',
+    'threadRollbackFailed',
+    'sandboxError',
+    'other',
+  ]),
+  v.looseObject({
+    httpConnectionFailed: v.looseObject({
+      httpStatusCode: v.optional(
+        v.union([v.pipe(v.number(), v.integer(), v.minValue(0)), v.null()]),
+      ),
+    }),
+  }),
+  v.looseObject({
+    responseStreamConnectionFailed: v.looseObject({
+      httpStatusCode: v.optional(
+        v.union([v.pipe(v.number(), v.integer(), v.minValue(0)), v.null()]),
+      ),
+    }),
+  }),
+  v.looseObject({
+    responseStreamDisconnected: v.looseObject({
+      httpStatusCode: v.optional(
+        v.union([v.pipe(v.number(), v.integer(), v.minValue(0)), v.null()]),
+      ),
+    }),
+  }),
+  v.looseObject({
+    responseTooManyFailedAttempts: v.looseObject({
+      httpStatusCode: v.optional(
+        v.union([v.pipe(v.number(), v.integer(), v.minValue(0)), v.null()]),
+      ),
+    }),
+  }),
+  v.looseObject({
+    activeTurnNotSteerable: v.looseObject({
+      turnKind: V2ThreadListResponse__NonSteerableTurnKindSchema,
+    }),
+  }),
+])
+export type V2ThreadListResponse__CodexErrorInfo = v.InferOutput<
+  typeof V2ThreadListResponse__CodexErrorInfoSchema
+>
+
+export const V2ThreadListResponse__CollabAgentStatusSchema = openEnum([
+  'pendingInit',
+  'running',
+  'interrupted',
+  'completed',
+  'errored',
+  'shutdown',
+  'notFound',
+])
+export type V2ThreadListResponse__CollabAgentStatus = v.InferOutput<
+  typeof V2ThreadListResponse__CollabAgentStatusSchema
+>
+
+export const V2ThreadListResponse__CollabAgentStateSchema = v.looseObject({
+  message: v.optional(v.union([v.string(), v.null()])),
+  status: V2ThreadListResponse__CollabAgentStatusSchema,
+})
+export type V2ThreadListResponse__CollabAgentState = v.InferOutput<
+  typeof V2ThreadListResponse__CollabAgentStateSchema
+>
+
+export const V2ThreadListResponse__CollabAgentToolSchema = openEnum([
+  'spawnAgent',
+  'sendInput',
+  'resumeAgent',
+  'wait',
+  'closeAgent',
+])
+export type V2ThreadListResponse__CollabAgentTool = v.InferOutput<
+  typeof V2ThreadListResponse__CollabAgentToolSchema
+>
+
+export const V2ThreadListResponse__CollabAgentToolCallStatusSchema = openEnum([
+  'inProgress',
+  'completed',
+  'failed',
+])
+export type V2ThreadListResponse__CollabAgentToolCallStatus = v.InferOutput<
+  typeof V2ThreadListResponse__CollabAgentToolCallStatusSchema
+>
+
+export const V2ThreadListResponse__CommandActionSchema = v.union([
+  v.looseObject({
+    command: v.string(),
+    name: v.string(),
+    path: V2ThreadListResponse__AbsolutePathBufSchema,
+    type: v.literal('read'),
+  }),
+  v.looseObject({
+    command: v.string(),
+    path: v.optional(v.union([v.string(), v.null()])),
+    type: v.literal('listFiles'),
+  }),
+  v.looseObject({
+    command: v.string(),
+    path: v.optional(v.union([v.string(), v.null()])),
+    query: v.optional(v.union([v.string(), v.null()])),
+    type: v.literal('search'),
+  }),
+  v.looseObject({ command: v.string(), type: v.literal('unknown') }),
+])
+export type V2ThreadListResponse__CommandAction = v.InferOutput<
+  typeof V2ThreadListResponse__CommandActionSchema
+>
+
+export const V2ThreadListResponse__CommandExecutionSourceSchema = openEnum([
+  'agent',
+  'userShell',
+  'unifiedExecStartup',
+  'unifiedExecInteraction',
+])
+export type V2ThreadListResponse__CommandExecutionSource = v.InferOutput<
+  typeof V2ThreadListResponse__CommandExecutionSourceSchema
+>
+
+export const V2ThreadListResponse__CommandExecutionStatusSchema = openEnum([
+  'inProgress',
+  'completed',
+  'failed',
+  'declined',
+])
+export type V2ThreadListResponse__CommandExecutionStatus = v.InferOutput<
+  typeof V2ThreadListResponse__CommandExecutionStatusSchema
+>
+
+export const V2ThreadListResponse__DynamicToolCallOutputContentItemSchema = v.union([
+  v.looseObject({ text: v.string(), type: v.literal('inputText') }),
+  v.looseObject({ imageUrl: v.string(), type: v.literal('inputImage') }),
+])
+export type V2ThreadListResponse__DynamicToolCallOutputContentItem = v.InferOutput<
+  typeof V2ThreadListResponse__DynamicToolCallOutputContentItemSchema
+>
+
+export const V2ThreadListResponse__DynamicToolCallStatusSchema = openEnum([
+  'inProgress',
+  'completed',
+  'failed',
+])
+export type V2ThreadListResponse__DynamicToolCallStatus = v.InferOutput<
+  typeof V2ThreadListResponse__DynamicToolCallStatusSchema
+>
+
+export const V2ThreadListResponse__PatchChangeKindSchema = v.union([
+  v.looseObject({ type: v.literal('add') }),
+  v.looseObject({ type: v.literal('delete') }),
+  v.looseObject({
+    move_path: v.optional(v.union([v.string(), v.null()])),
+    type: v.literal('update'),
+  }),
+])
+export type V2ThreadListResponse__PatchChangeKind = v.InferOutput<
+  typeof V2ThreadListResponse__PatchChangeKindSchema
+>
+
+export const V2ThreadListResponse__FileUpdateChangeSchema = v.looseObject({
+  diff: v.string(),
+  kind: V2ThreadListResponse__PatchChangeKindSchema,
+  path: v.string(),
+})
+export type V2ThreadListResponse__FileUpdateChange = v.InferOutput<
+  typeof V2ThreadListResponse__FileUpdateChangeSchema
+>
+
+export const V2ThreadListResponse__GitInfoSchema = v.looseObject({
+  branch: v.optional(v.union([v.string(), v.null()])),
+  originUrl: v.optional(v.union([v.string(), v.null()])),
+  sha: v.optional(v.union([v.string(), v.null()])),
+})
+export type V2ThreadListResponse__GitInfo = v.InferOutput<
+  typeof V2ThreadListResponse__GitInfoSchema
+>
+
+export const V2ThreadListResponse__HookPromptFragmentSchema = v.looseObject({
+  hookRunId: v.string(),
+  text: v.string(),
+})
+export type V2ThreadListResponse__HookPromptFragment = v.InferOutput<
+  typeof V2ThreadListResponse__HookPromptFragmentSchema
+>
+
+export const V2ThreadListResponse__McpToolCallErrorSchema = v.looseObject({ message: v.string() })
+export type V2ThreadListResponse__McpToolCallError = v.InferOutput<
+  typeof V2ThreadListResponse__McpToolCallErrorSchema
+>
+
+export const V2ThreadListResponse__McpToolCallResultSchema = v.looseObject({
+  _meta: v.optional(v.unknown()),
+  content: v.array(v.unknown()),
+  structuredContent: v.optional(v.unknown()),
+})
+export type V2ThreadListResponse__McpToolCallResult = v.InferOutput<
+  typeof V2ThreadListResponse__McpToolCallResultSchema
+>
+
+export const V2ThreadListResponse__McpToolCallStatusSchema = openEnum([
+  'inProgress',
+  'completed',
+  'failed',
+])
+export type V2ThreadListResponse__McpToolCallStatus = v.InferOutput<
+  typeof V2ThreadListResponse__McpToolCallStatusSchema
+>
+
+export const V2ThreadListResponse__MemoryCitationEntrySchema = v.looseObject({
+  lineEnd: v.pipe(v.number(), v.integer(), v.minValue(0)),
+  lineStart: v.pipe(v.number(), v.integer(), v.minValue(0)),
+  note: v.string(),
+  path: v.string(),
+})
+export type V2ThreadListResponse__MemoryCitationEntry = v.InferOutput<
+  typeof V2ThreadListResponse__MemoryCitationEntrySchema
+>
+
+export const V2ThreadListResponse__MemoryCitationSchema = v.looseObject({
+  entries: v.array(V2ThreadListResponse__MemoryCitationEntrySchema),
+  threadIds: v.array(v.string()),
+})
+export type V2ThreadListResponse__MemoryCitation = v.InferOutput<
+  typeof V2ThreadListResponse__MemoryCitationSchema
+>
+
+export const V2ThreadListResponse__MessagePhaseSchema = openEnum(['commentary', 'final_answer'])
+export type V2ThreadListResponse__MessagePhase = v.InferOutput<
+  typeof V2ThreadListResponse__MessagePhaseSchema
+>
+
+export const V2ThreadListResponse__PatchApplyStatusSchema = openEnum([
+  'inProgress',
+  'completed',
+  'failed',
+  'declined',
+])
+export type V2ThreadListResponse__PatchApplyStatus = v.InferOutput<
+  typeof V2ThreadListResponse__PatchApplyStatusSchema
+>
+
+export const V2ThreadListResponse__ReasoningEffortSchema = openEnum([
+  'none',
+  'minimal',
+  'low',
+  'medium',
+  'high',
+  'xhigh',
+])
+export type V2ThreadListResponse__ReasoningEffort = v.InferOutput<
+  typeof V2ThreadListResponse__ReasoningEffortSchema
+>
+
+export const V2ThreadListResponse__ThreadIdSchema = v.string()
+export type V2ThreadListResponse__ThreadId = v.InferOutput<
+  typeof V2ThreadListResponse__ThreadIdSchema
+>
+
+export const V2ThreadListResponse__SubAgentSourceSchema = v.union([
+  openEnum(['review', 'compact', 'memory_consolidation']),
+  v.looseObject({
+    thread_spawn: v.looseObject({
+      agent_nickname: v.optional(v.union([v.string(), v.null()])),
+      agent_path: v.optional(v.union([V2ThreadListResponse__AgentPathSchema, v.null()])),
+      agent_role: v.optional(v.union([v.string(), v.null()])),
+      depth: v.pipe(v.number(), v.integer()),
+      parent_thread_id: V2ThreadListResponse__ThreadIdSchema,
+    }),
+  }),
+  v.looseObject({ other: v.string() }),
+])
+export type V2ThreadListResponse__SubAgentSource = v.InferOutput<
+  typeof V2ThreadListResponse__SubAgentSourceSchema
+>
+
+export const V2ThreadListResponse__SessionSourceSchema = v.union([
+  openEnum(['cli', 'vscode', 'exec', 'appServer', 'unknown']),
+  v.looseObject({ custom: v.string() }),
+  v.looseObject({ subAgent: V2ThreadListResponse__SubAgentSourceSchema }),
+])
+export type V2ThreadListResponse__SessionSource = v.InferOutput<
+  typeof V2ThreadListResponse__SessionSourceSchema
+>
+
+export const V2ThreadListResponse__TextElementSchema = v.looseObject({
+  byteRange: V2ThreadListResponse__ByteRangeSchema,
+  placeholder: v.optional(v.union([v.string(), v.null()])),
+})
+export type V2ThreadListResponse__TextElement = v.InferOutput<
+  typeof V2ThreadListResponse__TextElementSchema
+>
+
+export const V2ThreadListResponse__ThreadActiveFlagSchema = openEnum([
+  'waitingOnApproval',
+  'waitingOnUserInput',
+])
+export type V2ThreadListResponse__ThreadActiveFlag = v.InferOutput<
+  typeof V2ThreadListResponse__ThreadActiveFlagSchema
+>
+
+export const V2ThreadListResponse__ThreadStatusSchema = v.union([
+  v.looseObject({ type: v.literal('notLoaded') }),
+  v.looseObject({ type: v.literal('idle') }),
+  v.looseObject({ type: v.literal('systemError') }),
+  v.looseObject({
+    activeFlags: v.array(V2ThreadListResponse__ThreadActiveFlagSchema),
+    type: v.literal('active'),
+  }),
+])
+export type V2ThreadListResponse__ThreadStatus = v.InferOutput<
+  typeof V2ThreadListResponse__ThreadStatusSchema
+>
+
+export const V2ThreadListResponse__TurnErrorSchema = v.looseObject({
+  additionalDetails: v.optional(v.union([v.string(), v.null()])),
+  codexErrorInfo: v.optional(v.union([V2ThreadListResponse__CodexErrorInfoSchema, v.null()])),
+  message: v.string(),
+})
+export type V2ThreadListResponse__TurnError = v.InferOutput<
+  typeof V2ThreadListResponse__TurnErrorSchema
+>
+
+export const V2ThreadListResponse__UserInputSchema = v.union([
+  v.looseObject({
+    text: v.string(),
+    text_elements: v.optional(v.array(V2ThreadListResponse__TextElementSchema)),
+    type: v.literal('text'),
+  }),
+  v.looseObject({ type: v.literal('image'), url: v.string() }),
+  v.looseObject({ path: v.string(), type: v.literal('localImage') }),
+  v.looseObject({ name: v.string(), path: v.string(), type: v.literal('skill') }),
+  v.looseObject({ name: v.string(), path: v.string(), type: v.literal('mention') }),
+])
+export type V2ThreadListResponse__UserInput = v.InferOutput<
+  typeof V2ThreadListResponse__UserInputSchema
+>
+
+export const V2ThreadListResponse__WebSearchActionSchema = v.union([
+  v.looseObject({
+    queries: v.optional(v.union([v.array(v.string()), v.null()])),
+    query: v.optional(v.union([v.string(), v.null()])),
+    type: v.literal('search'),
+  }),
+  v.looseObject({ type: v.literal('openPage'), url: v.optional(v.union([v.string(), v.null()])) }),
+  v.looseObject({
+    pattern: v.optional(v.union([v.string(), v.null()])),
+    type: v.literal('findInPage'),
+    url: v.optional(v.union([v.string(), v.null()])),
+  }),
+  v.looseObject({ type: v.literal('other') }),
+])
+export type V2ThreadListResponse__WebSearchAction = v.InferOutput<
+  typeof V2ThreadListResponse__WebSearchActionSchema
+>
+
+export const V2ThreadListResponse__ThreadItemSchema = v.union([
+  v.looseObject({
+    content: v.array(V2ThreadListResponse__UserInputSchema),
+    id: v.string(),
+    type: v.literal('userMessage'),
+  }),
+  v.looseObject({
+    fragments: v.array(V2ThreadListResponse__HookPromptFragmentSchema),
+    id: v.string(),
+    type: v.literal('hookPrompt'),
+  }),
+  v.looseObject({
+    id: v.string(),
+    memoryCitation: v.optional(v.union([V2ThreadListResponse__MemoryCitationSchema, v.null()])),
+    phase: v.optional(v.union([V2ThreadListResponse__MessagePhaseSchema, v.null()])),
+    text: v.string(),
+    type: v.literal('agentMessage'),
+  }),
+  v.looseObject({ id: v.string(), text: v.string(), type: v.literal('plan') }),
+  v.looseObject({
+    content: v.optional(v.array(v.string())),
+    id: v.string(),
+    summary: v.optional(v.array(v.string())),
+    type: v.literal('reasoning'),
+  }),
+  v.looseObject({
+    aggregatedOutput: v.optional(v.union([v.string(), v.null()])),
+    command: v.string(),
+    commandActions: v.array(V2ThreadListResponse__CommandActionSchema),
+    cwd: V2ThreadListResponse__AbsolutePathBufSchema,
+    durationMs: v.optional(v.union([v.pipe(v.number(), v.integer()), v.null()])),
+    exitCode: v.optional(v.union([v.pipe(v.number(), v.integer()), v.null()])),
+    id: v.string(),
+    processId: v.optional(v.union([v.string(), v.null()])),
+    source: v.optional(V2ThreadListResponse__CommandExecutionSourceSchema),
+    status: V2ThreadListResponse__CommandExecutionStatusSchema,
+    type: v.literal('commandExecution'),
+  }),
+  v.looseObject({
+    changes: v.array(V2ThreadListResponse__FileUpdateChangeSchema),
+    id: v.string(),
+    status: V2ThreadListResponse__PatchApplyStatusSchema,
+    type: v.literal('fileChange'),
+  }),
+  v.looseObject({
+    arguments: v.unknown(),
+    durationMs: v.optional(v.union([v.pipe(v.number(), v.integer()), v.null()])),
+    error: v.optional(v.union([V2ThreadListResponse__McpToolCallErrorSchema, v.null()])),
+    id: v.string(),
+    mcpAppResourceUri: v.optional(v.union([v.string(), v.null()])),
+    result: v.optional(v.union([V2ThreadListResponse__McpToolCallResultSchema, v.null()])),
+    server: v.string(),
+    status: V2ThreadListResponse__McpToolCallStatusSchema,
+    tool: v.string(),
+    type: v.literal('mcpToolCall'),
+  }),
+  v.looseObject({
+    arguments: v.unknown(),
+    contentItems: v.optional(
+      v.union([v.array(V2ThreadListResponse__DynamicToolCallOutputContentItemSchema), v.null()]),
+    ),
+    durationMs: v.optional(v.union([v.pipe(v.number(), v.integer()), v.null()])),
+    id: v.string(),
+    namespace: v.optional(v.union([v.string(), v.null()])),
+    status: V2ThreadListResponse__DynamicToolCallStatusSchema,
+    success: v.optional(v.union([v.boolean(), v.null()])),
+    tool: v.string(),
+    type: v.literal('dynamicToolCall'),
+  }),
+  v.looseObject({
+    agentsStates: v.record(v.string(), V2ThreadListResponse__CollabAgentStateSchema),
+    id: v.string(),
+    model: v.optional(v.union([v.string(), v.null()])),
+    prompt: v.optional(v.union([v.string(), v.null()])),
+    reasoningEffort: v.optional(v.union([V2ThreadListResponse__ReasoningEffortSchema, v.null()])),
+    receiverThreadIds: v.array(v.string()),
+    senderThreadId: v.string(),
+    status: V2ThreadListResponse__CollabAgentToolCallStatusSchema,
+    tool: V2ThreadListResponse__CollabAgentToolSchema,
+    type: v.literal('collabAgentToolCall'),
+  }),
+  v.looseObject({
+    action: v.optional(v.union([V2ThreadListResponse__WebSearchActionSchema, v.null()])),
+    id: v.string(),
+    query: v.string(),
+    type: v.literal('webSearch'),
+  }),
+  v.looseObject({
+    id: v.string(),
+    path: V2ThreadListResponse__AbsolutePathBufSchema,
+    type: v.literal('imageView'),
+  }),
+  v.looseObject({
+    id: v.string(),
+    result: v.string(),
+    revisedPrompt: v.optional(v.union([v.string(), v.null()])),
+    savedPath: v.optional(v.union([V2ThreadListResponse__AbsolutePathBufSchema, v.null()])),
+    status: v.string(),
+    type: v.literal('imageGeneration'),
+  }),
+  v.looseObject({ id: v.string(), review: v.string(), type: v.literal('enteredReviewMode') }),
+  v.looseObject({ id: v.string(), review: v.string(), type: v.literal('exitedReviewMode') }),
+  v.looseObject({ id: v.string(), type: v.literal('contextCompaction') }),
+])
+export type V2ThreadListResponse__ThreadItem = v.InferOutput<
+  typeof V2ThreadListResponse__ThreadItemSchema
+>
+
+export const V2ThreadListResponse__TurnStatusSchema = openEnum([
+  'completed',
+  'interrupted',
+  'failed',
+  'inProgress',
+])
+export type V2ThreadListResponse__TurnStatus = v.InferOutput<
+  typeof V2ThreadListResponse__TurnStatusSchema
+>
+
+export const V2ThreadListResponse__TurnSchema = v.looseObject({
+  completedAt: v.optional(v.union([v.pipe(v.number(), v.integer()), v.null()])),
+  durationMs: v.optional(v.union([v.pipe(v.number(), v.integer()), v.null()])),
+  error: v.optional(v.union([V2ThreadListResponse__TurnErrorSchema, v.null()])),
+  id: v.string(),
+  items: v.array(V2ThreadListResponse__ThreadItemSchema),
+  startedAt: v.optional(v.union([v.pipe(v.number(), v.integer()), v.null()])),
+  status: V2ThreadListResponse__TurnStatusSchema,
+})
+export type V2ThreadListResponse__Turn = v.InferOutput<typeof V2ThreadListResponse__TurnSchema>
+
+export const V2ThreadListResponse__ThreadSchema = v.looseObject({
+  agentNickname: v.optional(v.union([v.string(), v.null()])),
+  agentRole: v.optional(v.union([v.string(), v.null()])),
+  cliVersion: v.string(),
+  createdAt: v.pipe(v.number(), v.integer()),
+  cwd: V2ThreadListResponse__AbsolutePathBufSchema,
+  ephemeral: v.boolean(),
+  forkedFromId: v.optional(v.union([v.string(), v.null()])),
+  gitInfo: v.optional(v.union([V2ThreadListResponse__GitInfoSchema, v.null()])),
+  id: v.string(),
+  modelProvider: v.string(),
+  name: v.optional(v.union([v.string(), v.null()])),
+  path: v.optional(v.union([v.string(), v.null()])),
+  preview: v.string(),
+  source: V2ThreadListResponse__SessionSourceSchema,
+  status: V2ThreadListResponse__ThreadStatusSchema,
+  turns: v.array(V2ThreadListResponse__TurnSchema),
+  updatedAt: v.pipe(v.number(), v.integer()),
+})
+export type V2ThreadListResponse__Thread = v.InferOutput<typeof V2ThreadListResponse__ThreadSchema>
+
+export const V2ThreadListResponseSchema = v.looseObject({
+  backwardsCursor: v.optional(v.union([v.string(), v.null()])),
+  data: v.array(V2ThreadListResponse__ThreadSchema),
+  nextCursor: v.optional(v.union([v.string(), v.null()])),
+})
+export type V2ThreadListResponse = v.InferOutput<typeof V2ThreadListResponseSchema>
+
 export const V2ThreadNameUpdatedNotificationSchema = v.looseObject({
   threadId: v.string(),
   threadName: v.optional(v.union([v.string(), v.null()])),

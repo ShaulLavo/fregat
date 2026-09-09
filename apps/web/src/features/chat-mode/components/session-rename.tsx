@@ -3,7 +3,7 @@ import { toast } from 'sonner'
 
 import { useSessionActions } from '@/features/chat-mode/hooks/use-session-actions'
 import { useSessionRailStore } from '@/features/chat-mode/state/session-rail-store'
-import type { SessionRailItem } from '@/features/chat-mode/utils/session-rail-model'
+import type { SessionRailItem } from '@workspace/client-core/chat/rail/model'
 import { sessionRenameOutcome } from '@/features/chat-mode/utils/session-rename'
 import { Input } from '@workspace/ui/components/input'
 

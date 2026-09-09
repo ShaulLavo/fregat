@@ -1,4 +1,5 @@
 import {
+  workspaceAddressIdSchema,
   workspaceSearchGlobPatterns,
   type WorkspaceEditPrepareRequest,
   type WorkspaceEditRecoverRequest,
@@ -192,6 +193,9 @@ export const openWorkspaceRootBodySchema = v.object({
   generation: v.pipe(v.number(), v.safeInteger(), v.minValue(1)),
   path: pathSchema,
 })
+
+export const registerWorkspaceAddressBodySchema = v.object({ path: pathSchema })
+export const workspaceAddressParamsSchema = v.object({ id: workspaceAddressIdSchema })
 
 export const writeBodySchema = v.object({
   path: pathSchema,

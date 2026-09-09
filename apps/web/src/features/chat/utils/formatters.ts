@@ -1,6 +1,6 @@
-import type { ModelSelection, ProviderSnapshot } from '@workspace/contracts'
+import type { ModelSelection, ProviderModel, ProviderSnapshot } from '@workspace/contracts'
 
-import type { ChatSessionListProjection } from '@/features/chat/state/chat-projection-selectors'
+import type { ChatSessionListProjection } from '@workspace/client-core/chat/selectors'
 
 // Building an `Intl.DateTimeFormat` costs orders of magnitude more than formatting with
 // one, and these run once per row inside virtualized lists. One formatter per option set,
@@ -39,7 +39,10 @@ export function chatSessionPreview(session: ChatSessionListProjection) {
 }
 
 export function providerModelDisplayLabel(
-  provider: ProviderSnapshot | null | undefined,
+  provider:
+    | { readonly models: readonly Pick<ProviderModel, 'slug' | 'name' | 'shortName'>[] }
+    | null
+    | undefined,
   modelSelection: Pick<ModelSelection, 'model'>,
 ) {
   const model = provider?.models.find((candidate) => candidate.slug === modelSelection.model)

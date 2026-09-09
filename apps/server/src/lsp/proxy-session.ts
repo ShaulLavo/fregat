@@ -10,7 +10,7 @@ import {
 } from '@workspace/contracts'
 import type { ChildProcessWithoutNullStreams } from 'node:child_process'
 
-import type { LspServerMatch } from './registry'
+import type { LspServerHandle, LspServerMatch } from './registry'
 import { fileUriForPath } from './language'
 import { LspStdioMessageReader, writeLspStdioMessage } from './stdio-rpc'
 import { elapsedMs, limitText, recordProcessInfo, recordProcessWarning } from '../observability'
@@ -331,11 +331,12 @@ class PooledLspProxySession {
   private stderrBytes = 0
   private stderrCount = 0
   private stderrTail = ''
+  private readonly handle: LspServerHandle
 
   private constructor(
     key: string,
     match: LspServerMatch,
-    process: ChildProcessWithoutNullStreams,
+    handle: LspServerHandle,
     rootPath: string,
     pool: LspSessionPool,
     idleTimeoutMs: () => number,
@@ -346,7 +347,8 @@ class PooledLspProxySession {
     this.key = key
     this.match = match
     this.pool = pool
-    this.process = process
+    this.handle = handle
+    this.process = handle.process
     this.rootPath = rootPath
     this.reader = new LspStdioMessageReader((message) => this.handleServerMessage(message))
     this.bindProcess()
@@ -366,7 +368,7 @@ class PooledLspProxySession {
     return new PooledLspProxySession(
       key,
       match,
-      handle.process,
+      handle,
       rootPath,
       pool,
       idleTimeoutMs,
@@ -817,10 +819,11 @@ class PooledLspProxySession {
 
   private async applyInitializationOptions(params: Record<string, unknown>): Promise<void> {
     const options = await this.match.server.initializationOptions?.(this.match.root)
-    if (!options) return
+    if (!options && !this.handle.initializationOptions) return
 
     params.initializationOptions = {
       ...(isRecord(params.initializationOptions) ? params.initializationOptions : {}),
+      ...this.handle.initializationOptions,
       ...options,
     }
   }
@@ -1438,6 +1441,7 @@ class PooledLspProxySession {
   }
 
   private recordSession(outcome: string): void {
+    const initialized = this.initializeResult?.result
     const context = {
       activeConnectionCount: this.connections.size,
       area: 'lsp',
@@ -1453,6 +1457,7 @@ class PooledLspProxySession {
       serverBytes: this.serverBytes,
       serverHandledRequestCount: this.serverHandledRequestCount,
       serverId: this.match.server.id,
+      serverInfo: isRecord(initialized) ? initialized.serverInfo : undefined,
       serverMessageCount: this.serverMessageCount,
       stderrBytes: this.stderrBytes,
       stderrCount: this.stderrCount,

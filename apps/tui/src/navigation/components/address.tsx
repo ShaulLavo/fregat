@@ -1,3 +1,4 @@
+import type { AgentLocation } from '@/agent/utils/target'
 import { useEffect, useState } from 'react'
 import { useRenderer } from '@opentui/react'
 
@@ -9,7 +10,9 @@ import { Spinner } from '@/components/spinner'
 import { Toast } from '@/components/toast'
 import type { SessionState, SettingsSession } from '@/connection/state/session'
 import { connectionFailure } from '@/connection/utils/failure'
-import { resolveAddress } from '@/navigation/utils/address'
+import { locationAddress, resolveAddress } from '@/navigation/utils/address'
+import type { Location } from '@/navigation/state/history'
+import { type WorkbenchLocation } from '@/workbench/utils/location'
 import type { Theme } from '@/theme/utils/theme'
 
 export function AddressDialog({
@@ -18,8 +21,9 @@ export function AddressDialog({
   theme,
   onClose,
   onSettings,
-  onFile,
-  address,
+  onWorkbench,
+  onAgent,
+  location,
   copy = false,
 }: {
   session: SettingsSession
@@ -27,12 +31,13 @@ export function AddressDialog({
   theme: Theme
   onClose: () => void
   onSettings: (query: string) => void
-  onFile: (path: string) => void
+  onWorkbench: (location: WorkbenchLocation) => void
+  onAgent: (location: AgentLocation) => void
   copy?: boolean
-  address: string
+  location: Location
 }) {
-  const [input, setInput] = useState(copy ? address : '')
-  const [pending, setPending] = useState(false)
+  const [input, setInput] = useState('')
+  const [pending, setPending] = useState(copy)
   const [failure, setFailure] = useState<string | null>(null)
   const [copied, setCopied] = useState(false)
   const [controller] = useState(() => new AbortController())
@@ -50,9 +55,37 @@ export function AddressDialog({
     true,
   )
   useEffect(() => {
-    // oxlint-disable-next-line oxc-react-compiler/set-state-in-effect -- Clipboard support is known only after the terminal write.
-    if (copy) setCopied(renderer.copyToClipboardOSC52(address))
-  }, [copy, renderer, address])
+    if (!copy) return
+    void locationAddress(
+      state.descriptor.environmentId,
+      location,
+      { client: session.client, signal: controller.signal },
+      state.chat.getSnapshot().projection,
+    )
+      .then((address) => {
+        if (controller.signal.aborted) return
+        if (address === null) {
+          setFailure('This location has no shareable address.')
+          return
+        }
+        setInput(address)
+        setCopied(renderer.copyToClipboardOSC52(address))
+      })
+      .catch((error) => {
+        if (!controller.signal.aborted) setFailure(connectionFailure(error).message)
+      })
+      .finally(() => {
+        if (!controller.signal.aborted) setPending(false)
+      })
+  }, [
+    copy,
+    renderer,
+    location,
+    session.client,
+    state.descriptor.environmentId,
+    state.chat,
+    controller,
+  ])
   useEffect(() => () => controller.abort(), [controller])
   const open = async (value: string) => {
     if (pending) return
@@ -78,7 +111,11 @@ export function AddressDialog({
         onSettings(result.query)
         return
       }
-      onFile(result.path)
+      if (result.kind === 'agent') {
+        onAgent(result)
+        return
+      }
+      onWorkbench(result)
     } catch (error) {
       if (!controller.signal.aborted) setFailure(connectionFailure(error).message)
     } finally {
@@ -103,7 +140,7 @@ export function AddressDialog({
         disabled={pending}
         placeholder='Paste a Platform address…'
       />
-      {copy && (
+      {copy && !pending && !failure && (
         <text fg={theme.mutedForeground}>
           {copied
             ? 'Copied through the terminal clipboard.'

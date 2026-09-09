@@ -31,6 +31,7 @@ describe('session discovery reconciliation', () => {
       ...fixture,
       dispatch: (command) => fixture.engine.dispatch(command),
       providerService: {
+        ...fixture.providerHistory,
         discoveryInstances: () => [instance],
         discoverSessions: async ({ limit, offset }) => {
           pages.push({ limit, offset })
@@ -63,6 +64,7 @@ describe('session discovery reconciliation', () => {
       ...fixture,
       dispatch: (command) => fixture.engine.dispatch(command),
       providerService: {
+        ...fixture.providerHistory,
         discoveryInstances: () => [instance],
         discoverSessions: async () => [metadata(linked)],
       },
@@ -120,6 +122,7 @@ describe('session discovery reconciliation', () => {
       ...fixture,
       dispatch: (command) => fixture.engine.dispatch(command),
       providerService: {
+        ...fixture.providerHistory,
         discoveryInstances: () => [providerInstanceId],
         discoverSessions: async () => [row],
       },
@@ -169,6 +172,7 @@ describe('session discovery reconciliation', () => {
       ...fixture,
       dispatch: (command) => fixture.engine.dispatch(command),
       providerService: {
+        ...fixture.providerHistory,
         discoveryInstances: () => [instance],
         discoverSessions: async () => [row],
       },
@@ -199,6 +203,7 @@ describe('session discovery reconciliation', () => {
       ...fixture,
       dispatch: (command) => fixture.engine.dispatch(command),
       providerService: {
+        ...fixture.providerHistory,
         discoveryInstances: () => [instance],
         discoverSessions: async () => [metadata(linked)],
       },

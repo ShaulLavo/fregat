@@ -11,7 +11,7 @@ export function KeybindingResolution({
   readonly omitted: readonly string[]
 }) {
   return (
-    <details className='text-muted-foreground text-xs'>
+    <details className='text-muted-foreground text-xs @max-3xl/settings:wrap-anywhere'>
       <summary className='cursor-pointer'>Shortcut resolution</summary>
       <ul
         aria-label='Shortcut resolution report'

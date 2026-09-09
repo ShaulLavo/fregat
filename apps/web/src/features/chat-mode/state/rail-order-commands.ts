@@ -4,7 +4,7 @@ import {
   createProjectReorderCommand,
   createSessionPlaceCommand,
   createSessionReorderCommand,
-} from '@/features/chat/utils/command-builders'
+} from '@workspace/client-core/chat/commands'
 import { dispatchChatCommand } from '@/features/chat/utils/command-dispatch'
 import {
   settleProjectOrder,
@@ -13,8 +13,8 @@ import {
 } from '@/features/chat-mode/state/rail-order-store'
 import { useSessionRailStore } from '@/features/chat-mode/state/session-rail-store'
 import { currentRailEnvironments } from '@/features/chat-mode/state/rail-environments'
-import { railReorderIntent } from '@/features/chat-mode/utils/rail-reorder'
-import { sessionRailModel } from '@/features/chat-mode/utils/session-rail-model'
+import { railReorderIntent } from '@workspace/client-core/chat/rail/reorder'
+import { sessionRailModel } from '@workspace/client-core/chat/rail/model'
 type Drop = { readonly activeId: string; readonly overId: string | null }
 export function reorderRailProject({ activeId, overId }: Drop) {
   const model = railOrderModel()

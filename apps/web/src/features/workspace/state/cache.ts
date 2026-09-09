@@ -11,6 +11,9 @@ import type { PickedFsEntry } from '@/lib/file-system-types'
 import { fileBackedDocumentPath } from '@/features/editor/utils/file-backed-document'
 import { parseConflictDiffDocumentId } from '@/features/editor/utils/conflict-diff-document'
 import { parseDiffDocumentId } from '@/features/git/utils/diff-document'
+import { parseRefDocumentId } from '@/features/git/utils/ref-document'
+import { parseCompareSavedDocumentId } from '@/features/editor/utils/compare-saved-document'
+import { isSettingsDocumentId } from '@/features/settings/utils/document'
 import { parseSearchBufferDocumentId } from '@/features/search/utils/buffer-document'
 import {
   createDefaultChatModePanels,
@@ -48,6 +51,7 @@ import {
 } from '@workspace/client-core/files/path'
 import {
   environmentIdSchema,
+  workspaceAddressSchema,
   projectIdSchema,
   sessionIdSchema,
   type WorktreeId,
@@ -115,6 +119,7 @@ export type CachedSearchBufferState = {
 }
 
 const pickedDirectorySchema = v.object({
+  workspaceAddress: v.optional(workspaceAddressSchema),
   birthtimeMs: v.number(),
   mtimeMs: v.number(),
   name: v.string(),
@@ -124,6 +129,7 @@ const pickedDirectorySchema = v.object({
   version: v.optional(v.string(), ''),
 })
 const pickedSymlinkDirectorySchema = v.object({
+  workspaceAddress: v.optional(workspaceAddressSchema),
   birthtimeMs: v.number(),
   mtimeMs: v.number(),
   name: v.string(),
@@ -133,7 +139,12 @@ const pickedSymlinkDirectorySchema = v.object({
   type: v.literal('symlink'),
   version: v.optional(v.string(), ''),
 })
-const rootFolderSchema = v.nullable(v.union([pickedDirectorySchema, pickedSymlinkDirectorySchema]))
+const rootFolderSchema = v.nullable(
+  v.pipe(
+    v.union([pickedDirectorySchema, pickedSymlinkDirectorySchema]),
+    v.check((folder) => !folder.workspaceAddress || folder.workspaceAddress.path === folder.path),
+  ),
+)
 const cachedRootSchema = v.pipe(
   v.object({ folder: rootFolderSchema, location: v.nullable(workspaceLocationSchema) }),
   v.check((value) =>
@@ -464,21 +475,6 @@ function workspaceStateFromCache(storage: ScopedStorage): CachedWorkspaceState {
   }
 }
 
-/**
- * Just the workspace order — the slug→root oracle — without touching a single slice.
- *
- * `readWorkspaceCache(storage)` parses every slice AND every search buffer, and a search
- * buffer carries a materialized match list; it also sweeps the whole localStorage
- * keyspace. A caller that only needs the order should not pay for any of that, least
- * of all on a path that runs per back/forward press.
- */
-export function readWorkspaceOrder(
-  storage: ScopedStorage,
-  activeRootPath: string | null,
-): readonly string[] {
-  return workspaceOrderFromCache(storage, activeRootPath)
-}
-
 /** The open root always leads, even when the index predates it or was dropped. */
 function workspaceOrderFromCache(storage: ScopedStorage, activePath: string | null) {
   const stored = readWorkspaceIndex(storage).map((location) => location.rootPath)
@@ -573,6 +569,7 @@ function scrollPositionsForWorkspace(
 }
 
 function pathForWorkspace(rootPath: string, path: string) {
+  if (isSettingsDocumentId(path)) return true
   if (parseConflictDiffDocumentId(path)) return false
 
   const searchBuffer = parseSearchBufferDocumentId(path)
@@ -583,12 +580,9 @@ function pathForWorkspace(rootPath: string, path: string) {
 }
 
 function backingPathForWorkspace(path: string) {
-  if (parseConflictDiffDocumentId(path)) return ''
-
   const diff = parseDiffDocumentId(path)
   if (diff) return diff.path
-
-  return path
+  return parseRefDocumentId(path)?.path ?? parseCompareSavedDocumentId(path) ?? path
 }
 
 // The marker distinguishes persisted workspace-relative paths from filesystem API paths.

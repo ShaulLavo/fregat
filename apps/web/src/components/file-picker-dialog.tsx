@@ -442,7 +442,7 @@ export function FilePickerDialog({
   return (
     <Dialog onOpenChange={onOpenChange} open={open}>
       <DialogContent
-        className='surface-vibrancy flex h-[min(760px,calc(100svh-2rem))] w-[min(1080px,calc(100vw-1.5rem))] max-w-none flex-col gap-0 overflow-hidden rounded-xl border p-0 text-sm shadow-2xl sm:max-w-none'
+        className='bg-popover-solid flex h-[min(760px,calc(100svh-2rem))] w-[min(1080px,calc(100vw-1.5rem))] max-w-none flex-col gap-0 overflow-hidden rounded-xl border p-0 text-sm shadow-2xl sm:max-w-none'
         onKeyDownCapture={handleDialogKeyDownCapture}
         showCloseButton={false}
       >

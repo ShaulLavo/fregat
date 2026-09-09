@@ -57,14 +57,40 @@ projection replay, and repeated application.
 
 ## Discovery and attention
 
-[Claude discovery](../apps/server/src/provider/claude-discovery.ts) runs SDK metadata enumeration in
-an isolated Bun child with the provider instance's environment. It pages terminal-visible sessions
-and verifies their checkout ownership. [The reconciler](../apps/server/src/orchestration/session-discovery.ts)
-imports and refreshes them through commands, events, projections, and receipts. Discovery does not
-read transcripts or infer liveness from filesystem timestamps. The scan event records bounded
-failure details, including child exit code, stderr, timeout status, provider, directory, and page
-offset. [Diagnostic tests](../apps/server/src/orchestration/tests/discovery-diagnostics.test.ts)
-exercise real crashing and timed-out children.
+Chat settings expose an explicit import action for each enabled Claude Code or Codex provider.
+Import includes conversation text for registered projects on the selected machine. It excludes
+tool activity and attachments. Claude reads local CLI transcripts through the SDK in an isolated
+Bun child with the provider instance's environment. Codex reads local CLI, IDE, and app-server
+sessions through `thread/list` and `thread/read`, without resuming them. App sessions must exist in
+that provider's local Codex home. Claude app chats and cloud-only conversations are outside this import.
+
+`chat.keepImportedSessionsUpdated` defaults to true. The
+[reconciler](../apps/server/src/orchestration/session-discovery.ts) checks previously imported chats
+on startup and every minute. It never adds new chats in the background. Unchanged source metadata
+skips transcript reads. Sending the first Platform message stops external updates, including after
+a checkpoint rollback. The composer notice explains this handoff. Continuing uses the original
+provider session; it does not create an independent provider-side copy.
+
+The internal `session.history.import` command stores a `session.history-imported` event that replaces
+the imported text snapshot. Source rewinds therefore remove stale replies. The previous import's
+sequence and content revision identify each replacement, so retries and A-to-B-to-A source changes
+both work. The serialized commit checks durable turn-start events before accepting an import.
+SQL remains the owner of message search and pagination. Detail streams send the normal bounded
+snapshot after replacement and keep full imported histories out of the replay cache.
+
+Claude's SDK omits message timestamps. Those messages use the session's import timestamp and an
+ordinal in their IDs to preserve conversation order. Codex messages use source turn timestamps when
+available. [Import tests](../apps/server/src/orchestration/tests/session-import.test.ts) cover
+pagination, search, source replacement, repeat imports, stream snapshots, and the first-message race.
+The scan event records counts and bounded failure details without transcript text.
+[Diagnostic tests](../apps/server/src/orchestration/tests/discovery-diagnostics.test.ts) exercise
+real crashing and timed-out children.
+
+The design keeps provider reads behind one import operation. A separate lazy transcript reader
+was considered, but it would require every UI, search, and pagination caller to merge two histories.
+Persisted replacement events reuse the existing projection and keep those callers unchanged. The
+accepted limit is a one-way handoff on the first Platform message; provider and Platform message
+identities are not reconciled for simultaneous editing.
 
 The [server attention reducer](../apps/server/src/orchestration/utils/session-attention.ts) publishes
 `needs-input`, `working`, or `settled`. Within `needs-input`, reasons have this priority: approval,

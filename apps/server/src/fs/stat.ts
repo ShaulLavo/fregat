@@ -1,12 +1,13 @@
 import type { Stats } from 'node:fs'
 import { lstat, realpath, stat } from 'node:fs/promises'
+import path from 'node:path'
 import type {
   EntryTypeCarrier,
   EntryTypeFilter,
   FileSystemEntryMetadata,
 } from '@workspace/contracts'
 import { FsError, mapNodeError } from './errors'
-import type { WorkspacePaths } from './path'
+import { resolveExistingPath, type WorkspacePaths } from './path'
 import { fileVersion } from './version'
 
 export type FsEntryStats = EntryTypeCarrier & {
@@ -21,7 +22,7 @@ export async function statPath(
   const target = paths.resolve(input)
 
   try {
-    const entryStats = await readEntryStats(target.absolutePath)
+    const entryStats = await containedEntryStats(paths, target.relativePath)
     const canonicalPath = await canonicalEntryPath(paths, target, entryStats)
 
     return {
@@ -37,6 +38,29 @@ export async function statPath(
   } catch (error) {
     if (error instanceof FsError) throw error
     throw mapNodeError(error)
+  }
+}
+
+async function containedEntryStats(paths: WorkspacePaths, relativePath: string) {
+  if (!relativePath) return readEntryStats(paths.workspaceRootReal)
+
+  const parent = await resolveExistingPath(paths, path.posix.dirname(relativePath))
+  const absolutePath = path.join(parent.absolutePath, path.posix.basename(relativePath))
+  const entryStats = await readEntryStats(absolutePath)
+  if (!entryStats.targetType) return entryStats
+
+  try {
+    paths.assertRealInside(await realpath(absolutePath))
+    return entryStats
+  } catch (error) {
+    if (!(error instanceof FsError)) throw error
+    if (error.code !== 'PATH_OUTSIDE_WORKSPACE') throw error
+
+    return {
+      displayStats: entryStats.displayStats,
+      targetStats: entryStats.displayStats,
+      type: entryStats.type,
+    } satisfies FsEntryStats
   }
 }
 

@@ -24,6 +24,7 @@ export type ChatActivityPresentation = {
   command: string | null
   detail: string | null
   icon: ChatActivityIconKey
+  input: string | null
   outcome: ChatActivityOutcome | null
   output: string | null
   status: string | null
@@ -59,7 +60,7 @@ export function chatActivityPresentation(
   activity: OrchestrationSessionActivity,
 ): ChatActivityPresentation {
   const payload = recordPayload(activity.payload)
-  const data = recordPayload(payload.data)
+  const data = activityData(payload)
   const title = activityTitle(activity, payload)
   const command = activityCommand(data)
   const output = activityOutput(data)
@@ -70,7 +71,8 @@ export function chatActivityPresentation(
     command,
     detail,
     icon: activityIcon(activity),
-    outcome: activityOutcome(activity, payload, data, [detail, command, output]),
+    input: activityInput(data, command),
+    outcome: activityOutcome(activity, payload, data, [detail === command ? null : detail, output]),
     output,
     status: activityStatus(activity, payload),
     title,
@@ -83,9 +85,21 @@ export function chatActivityPresentation(
  * `tool_use_id`); it is the only key that folds "started" and "completed" into one row.
  */
 export function chatActivityToolCallId(activity: OrchestrationSessionActivity) {
-  const data = recordPayload(recordPayload(activity.payload).data)
+  const payload = recordPayload(activity.payload)
+  const data = activityData(payload)
 
-  return stringValue(data.id) ?? stringValue(data.tool_use_id) ?? stringValue(data.toolUseId)
+  return (
+    stringValue(payload.toolCallId) ??
+    stringValue(data.toolCallId) ??
+    stringValue(data.id) ??
+    stringValue(data.tool_use_id) ??
+    stringValue(data.toolUseId)
+  )
+}
+
+function activityData(payload: Record<string, unknown>) {
+  const data = recordPayload(payload.data)
+  return { ...data, ...recordPayload(data.item) }
 }
 
 export function chatActivityPlanSteps(
@@ -128,14 +142,22 @@ function activityTitle(activity: OrchestrationSessionActivity, payload: Record<s
   if (activity.kind === 'approval.resolved') return 'Approval resolved'
   if (activity.kind === 'user-input.requested') return 'User input requested'
   if (activity.kind === 'user-input.resolved') return 'User input resolved'
-  if (activity.kind === 'runtime.warning') return 'Runtime warning'
-  if (activity.kind === 'runtime.error') return 'Runtime error'
+  if (activity.kind === 'runtime.warning' || activity.kind === 'runtime.error') {
+    return firstStringValue(payload, ['message', 'detail']) ?? activity.summary
+  }
+  if (activity.kind === 'mcp.status.updated' && chatActivityHasFailure(activity)) {
+    const name =
+      stringValue(recordPayload(payload.status).name) ??
+      stringValue(payload.serverName) ??
+      stringValue(payload.server)
+    return `${name ?? 'MCP'} connection failed`
+  }
   if (activity.kind === 'context-compaction') return 'Context compacted'
   if (activity.kind === 'context-window.updated') return 'Context window updated'
   if (activity.kind === 'task.started') return 'Task started'
   if (activity.kind === 'task.progress') return taskProgressTitle(activity, payload)
   if (activity.kind === 'task.completed') return taskCompletedTitle(activity, payload)
-  if (activity.kind.startsWith('tool.')) return toolTitle(activity)
+  if (activity.kind.startsWith('tool.')) return toolTitle(activity, payload)
 
   return activity.summary
 }
@@ -176,7 +198,14 @@ function taskProgressTitle(
   return 'Thinking'
 }
 
-function toolTitle(activity: OrchestrationSessionActivity) {
+function toolTitle(activity: OrchestrationSessionActivity, payload: Record<string, unknown>) {
+  const data = activityData(payload)
+  const explicitTitle = stringValue(payload.title)
+  if (explicitTitle) return explicitTitle
+  const server = stringValue(data.server)
+  const tool = stringValue(data.tool)
+  if (server && tool) return `${server} · ${tool}`
+
   const title = compactActivityLabel(activity.summary)
   if (title) return title
 
@@ -201,10 +230,21 @@ function activityDetail(
   payload: Record<string, unknown>,
   title: string,
 ) {
-  const detail = firstStringValue(payload, ['message', 'detail', 'summary', 'lastToolName'])
+  const detail =
+    firstStringValue(payload, [
+      'error',
+      'failureReason',
+      'message',
+      'detail',
+      'summary',
+      'lastToolName',
+    ]) ??
+    stringValue(recordPayload(payload.error).message) ??
+    firstStringValue(recordPayload(payload.status), ['error', 'failureReason'])
   if (activity.kind === 'task.progress') return detail && detail !== title ? detail : null
   if (activity.kind === 'task.completed') return detail && detail !== title ? detail : null
   if (detail && detail !== title) return detail
+  if (detail === title) return null
   if (activity.summary !== title) return activity.summary
 
   return null
@@ -232,12 +272,14 @@ function activityOutcome(
   if (!activity.kind.startsWith('tool.')) return null
   if (activity.tone === 'error') return 'failed'
   if (data.is_error === true) return 'failed'
+  if (recordPayload(data.result).isError === true || data.error) return 'failed'
   if (isFailedExitCode(data)) return 'failed'
 
   const status = stringValue(payload.status)
   if (status === 'failed' || status === 'declined') return 'failed'
   if (toolTextLooksLikeFailure(texts.filter(Boolean).join('\n'))) return 'failed'
   if (activity.kind === 'tool.started') return 'neutral'
+  if (activity.kind === 'tool.updated' && !status) return 'neutral'
   if (status === 'inProgress' || status === 'stopped') return 'neutral'
 
   return 'succeeded'
@@ -251,14 +293,27 @@ function isFailedExitCode(data: Record<string, unknown>) {
 
 function activityCommand(data: Record<string, unknown>) {
   const input = recordPayload(data.input)
+  const rawInput = recordPayload(data.rawInput)
   const command =
     stringValue(data.command) ??
     stringValue(input.command) ??
+    stringValue(rawInput.command) ??
     argvCommand(data.command) ??
     argvCommand(input.command)
   if (!command) return null
 
   return truncateText(command, MAX_COMMAND_LENGTH)
+}
+
+function activityInput(data: Record<string, unknown>, command: string | null) {
+  if (command) return null
+  const input = data.arguments ?? data.input ?? data.rawInput
+  if (input === undefined || input === null) return null
+
+  return truncateText(
+    typeof input === 'string' ? input : JSON.stringify(input, null, 2),
+    MAX_OUTPUT_LENGTH,
+  )
 }
 
 function argvCommand(value: unknown) {
@@ -270,15 +325,37 @@ function argvCommand(value: unknown) {
 }
 
 function activityOutput(data: Record<string, unknown>) {
+  const rawOutput = recordPayload(data.rawOutput)
+  const result = recordPayload(data.result)
   const output =
     stringValue(data.aggregatedOutput) ??
     stringValue(data.aggregated_output) ??
     stringValue(data.output) ??
     stringValue(data.stdout) ??
-    toolResultText(data.content)
+    toolResultText(data.content) ??
+    toolResultText(result.content) ??
+    stringValue(data.rawOutput) ??
+    stringValue(rawOutput.content) ??
+    stringValue(rawOutput.output) ??
+    [stringValue(rawOutput.stdout), stringValue(rawOutput.stderr)].filter(Boolean).join('\n')
   if (!output) return null
 
   return truncateText(output, MAX_OUTPUT_LENGTH)
+}
+
+export function chatActivityHasFailure(activity: OrchestrationSessionActivity) {
+  const payload = recordPayload(activity.payload)
+  const status = recordPayload(payload.status)
+  if (activity.tone === 'error') return true
+  if (payload.success === false || payload.status === 'failed' || status.status === 'failed')
+    return true
+
+  return Boolean(
+    stringValue(payload.error) ??
+    stringValue(payload.failureReason) ??
+    stringValue(recordPayload(payload.error).message) ??
+    firstStringValue(status, ['error', 'failureReason']),
+  )
 }
 
 function toolResultText(content: unknown) {

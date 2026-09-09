@@ -10,7 +10,7 @@ import {
 } from '@/features/command-palette/command-palette-utils'
 import { formatChatRelativeTime } from '@/features/chat/utils/formatters'
 import { useCoarseNow } from '@/features/chat/hooks/use-coarse-now'
-import type { SessionRailItem } from '@/features/chat-mode/utils/session-rail-model'
+import type { SessionRailItem } from '@workspace/client-core/chat/rail/model'
 
 export function SessionPaletteRow({ session }: { readonly session: SessionRailItem }) {
   const { selectSession } = useCommandPaletteActions()

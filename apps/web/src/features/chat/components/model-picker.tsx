@@ -8,16 +8,17 @@ import { TooltipProvider } from '@workspace/ui/components/tooltip'
 import { cn } from '@workspace/ui/lib/utils'
 import { useState } from 'react'
 
+import { log } from '@/lib/client-logging'
 import { useModelPicker } from '@/features/chat/hooks/use-model-picker'
 import { useProviderSignInDialog } from '@/features/chat/hooks/use-provider-sign-in-dialog'
 import { rankModelPickerOptions } from '@/features/chat/utils/model-picker-search'
-import type { ProviderSignInTarget } from '@/features/chat/utils/provider-auth'
+import type { ProviderSignInTarget } from '@workspace/client-core/chat/providers/auth'
 import {
   providerModelOptionGroups,
   providerModelSelectionKey,
   type ProviderModelOption,
   type ProviderModelOptionGroup,
-} from '@/features/chat/utils/provider-model-options'
+} from '@workspace/client-core/chat/providers/models'
 import { providerListQueryOptions } from '@/features/chat/utils/provider-query'
 import { ModelPickerRail } from '@/features/chat/components/model-picker-rail'
 import { ModelPickerRow } from '@/features/chat/components/model-picker-row'
@@ -73,7 +74,7 @@ export function ModelPicker({
   readonly busy: boolean
   readonly disabled: boolean
 }) {
-  const { locked, modelSelection, selectModel } = useModelPicker()
+  const { sessionProviderInstanceId, modelSelection, selectModel } = useModelPicker()
   const { openSignIn } = useProviderSignInDialog()
   const providersQuery = useQuery(providerListQueryOptions())
   const [open, setOpen] = useState(false)
@@ -84,10 +85,14 @@ export function ModelPicker({
 
   // The picker is where hiding and ordering a model has to mean something.
   // Until now both lists were written and never read.
-  const groups = providerModelOptionGroups(providersQuery.data?.providers, {
+  const availableGroups = providerModelOptionGroups(providersQuery.data?.providers, {
     hidden: useSettingValue('models.hidden'),
     order: useSettingValue('models.order'),
   })
+  const groups =
+    sessionProviderInstanceId === null
+      ? availableGroups
+      : availableGroups.filter((group) => group.providerInstanceId === sessionProviderInstanceId)
   // The rail scopes the list to one provider. It appears the moment a second
   // provider exists and always has a selection, so the list is never an
   // unscoped pile of every provider's models.
@@ -100,7 +105,17 @@ export function ModelPicker({
   const emptyLabel = pickerEmptyLabel(providersQuery.isPending, groups.length > 0)
 
   function handleOpenChange(nextOpen: boolean) {
-    if (locked || disabled) return
+    if (nextOpen) {
+      log.info({
+        action: 'chat.model_picker.open',
+        area: 'chat',
+        outcome: disabled ? 'disabled' : 'opened',
+        sessionProviderInstanceId,
+        providerCount: groups.length,
+        modelsStatus: providersQuery.status,
+      })
+    }
+    if (disabled) return
 
     setQuery('')
     setOpen(nextOpen)
@@ -121,8 +136,6 @@ export function ModelPicker({
   return (
     <Popover open={open} onOpenChange={handleOpenChange}>
       <ModelPickerTrigger busy={busy} disabled={disabled} />
-      {/* Layout-only override: the popup already carries surface-vibrancy, and a
-          second tint on top of it goes opaque. */}
       <PopoverContent align='start' className={PANEL_CLASS} side='top'>
         <TooltipProvider delay={0}>
           {activeGroup ? (

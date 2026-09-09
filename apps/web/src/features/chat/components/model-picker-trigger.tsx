@@ -1,5 +1,4 @@
 import { CaretDownIcon } from '@phosphor-icons/react'
-import { useQuery } from '@tanstack/react-query'
 import type { ProviderSnapshot } from '@workspace/contracts'
 import { PopoverTrigger } from '@workspace/ui/components/popover'
 import { Tooltip, TooltipContent, TooltipTrigger } from '@workspace/ui/components/tooltip'
@@ -8,8 +7,7 @@ import { cn } from '@workspace/ui/lib/utils'
 import { ProviderGlyph } from '@/features/chat/components/provider-glyph'
 import { useModelPicker } from '@/features/chat/hooks/use-model-picker'
 import { providerModelDisplayLabel, providerStatusLabel } from '@/features/chat/utils/formatters'
-import { providerRequiresSignIn } from '@/features/chat/utils/provider-auth'
-import { providerListQueryOptions } from '@/features/chat/utils/provider-query'
+import { providerRequiresSignIn } from '@workspace/client-core/chat/providers/auth'
 
 /**
  * Composer control that opens the model picker. Stays interactive while the
@@ -23,15 +21,11 @@ export function ModelPickerTrigger({
   readonly busy: boolean
   readonly disabled: boolean
 }) {
-  const { locked, modelSelection } = useModelPicker()
-  const providersQuery = useQuery(providerListQueryOptions())
-  const provider = providersQuery.data?.providers.find(
-    (candidate) => candidate.providerInstanceId === modelSelection?.providerInstanceId,
-  )
+  const { modelSelection, provider, display } = useModelPicker()
   // No ready provider offers a model yet. Stay openable — the rows carry the
   // sign-in and not-installed affordances the user needs to fix it.
   const modelLabel = modelSelection
-    ? providerModelDisplayLabel(provider, modelSelection)
+    ? providerModelDisplayLabel(display, modelSelection)
     : 'Select model'
   const statusLabel = triggerStatusLabel(provider)
 
@@ -42,22 +36,18 @@ export function ModelPickerTrigger({
           <PopoverTrigger
             render={
               <button
-                // A locked session reports itself with aria-disabled rather than the
-                // native attribute: a natively disabled button swallows pointer
-                // events, so the tooltip explaining the lock would never open.
-                aria-disabled={locked}
                 aria-label='Provider and model'
-                className='text-muted-foreground hover:text-foreground focus-visible:border-ring focus-visible:ring-ring/50 compact:h-6 compact:px-1.5 flex h-7 max-w-44 items-center gap-1 truncate rounded-md px-2 text-xs transition-colors focus-visible:ring-1 focus-visible:outline-none disabled:pointer-events-none disabled:opacity-50 aria-disabled:cursor-default aria-disabled:opacity-50'
+                className='text-muted-foreground hover:text-foreground focus-visible:border-ring focus-visible:ring-ring/50 compact:h-6 compact:px-1.5 flex h-7 max-w-44 items-center gap-1 truncate rounded-md px-2 text-xs transition-colors focus-visible:ring-1 focus-visible:outline-none disabled:pointer-events-none disabled:opacity-50'
                 disabled={disabled}
                 type='button'
               />
             }
           >
-            {provider ? (
+            {display ? (
               <ProviderGlyph
                 className='size-3.5 text-[7px]'
-                displayLabel={provider.displayLabel}
-                driverKind={provider.driverKind}
+                displayLabel={display.displayLabel}
+                driverKind={display.driverKind}
               />
             ) : null}
             <span className='min-w-0 truncate'>{modelLabel}</span>
@@ -72,7 +62,7 @@ export function ModelPickerTrigger({
           </PopoverTrigger>
         }
       />
-      <TooltipContent>{triggerTooltipLabel({ locked, modelLabel, statusLabel })}</TooltipContent>
+      <TooltipContent>{`${modelLabel} - ${statusLabel}`}</TooltipContent>
     </Tooltip>
   )
 }
@@ -95,18 +85,4 @@ function triggerStatusDotClass(provider: ProviderSnapshot | undefined, busy: boo
   if (provider.status === 'warning') return 'bg-warning'
 
   return 'bg-destructive'
-}
-
-function triggerTooltipLabel({
-  locked,
-  modelLabel,
-  statusLabel,
-}: {
-  locked: boolean
-  modelLabel: string
-  statusLabel: string
-}) {
-  if (locked) return `${modelLabel} - locked for this session`
-
-  return `${modelLabel} - ${statusLabel}`
 }

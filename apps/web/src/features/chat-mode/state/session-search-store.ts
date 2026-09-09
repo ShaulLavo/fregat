@@ -4,7 +4,7 @@ import {
   type OrchestrationSessionSearchMatch,
 } from '@workspace/contracts'
 import { create } from 'zustand'
-import type { SessionSearchMatches } from '@/features/chat-mode/utils/session-rail-model'
+import type { SessionSearchMatches } from '@workspace/client-core/chat/rail/model'
 type SessionSearchStore = {
   readonly matchBySessionKey: SessionSearchMatches
   readonly matchedQuery: string

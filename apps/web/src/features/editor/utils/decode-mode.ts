@@ -14,3 +14,10 @@ export function requestedDecodeMode(search: string): DecodeMode | null {
 
   return DECODE_MODES.find((mode) => mode === value) ?? null
 }
+
+export function effectiveDecodeMode(
+  setting: 'off' | DecodeMode,
+  search: string,
+): DecodeMode | null {
+  return requestedDecodeMode(search) ?? (setting === 'off' ? null : setting)
+}

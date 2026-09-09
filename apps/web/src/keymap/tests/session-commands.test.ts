@@ -15,8 +15,8 @@ import { createRailHarness } from '../../../test/factories/rail-harness'
 import { createWorktreeLifecycleHarness } from '../../../test/factories/worktree-lifecycle'
 import { executeDomainGit } from '../../../test/factories/session-domain'
 import { newWorktreeTarget } from '@/features/chat/utils/worktree-target'
-import { createDraftSessionSubmission } from '@/features/chat/utils/command-builders'
-import { createProjectRegistrationCommand } from '@/lib/environments/utils/registration'
+import { createDraftSessionSubmission } from '@workspace/client-core/chat/commands'
+import { createProjectRegistrationCommand } from '@workspace/client-core/chat/registration'
 import { expect, test } from '../../../test/fixtures'
 test('every session command is reachable from the keyboard', () => {
   const bound = boundCommands()

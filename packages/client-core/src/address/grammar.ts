@@ -1,9 +1,9 @@
 import { environmentIdSchema, type EnvironmentId } from '@workspace/contracts'
 import * as v from 'valibot'
-import { NO_WORKSPACE_SLUG } from '@workspace/client-core/address/slug'
+import { NO_WORKSPACE_TOKEN } from '@workspace/client-core/address/workspace'
 
 /**
- * `/~<workspace-slug>/<mode>/<document-token>?<view params>#<position>`
+ * `/~<workspace-token>/<mode>/<document-token>?<view params>#<position>`
  *
  * Path is identity, search is composition and filters, fragment is intra-document
  * position. The workspace segment always starts `~` so the flat top-level namespace
@@ -17,6 +17,8 @@ import { NO_WORKSPACE_SLUG } from '@workspace/client-core/address/slug'
  */
 
 const WORKSPACE_PREFIX = '~'
+
+export const SETTINGS_DOCUMENT_TOKEN = 'settings'
 
 export const ADDRESS_MODES = ['chat', 'workbench'] as const
 export type AddressMode = (typeof ADDRESS_MODES)[number]
@@ -41,6 +43,8 @@ export type Address = {
   /** Session diff scope. Deliberately NOT `scope`: the rail owns no addressable scope. */
   readonly diff: string | null
   readonly document: string | null
+  /** Selected editor document while the path identifies a chat session. */
+  readonly editor: string | null
   readonly focus: {
     readonly column: number | null
     readonly endLine: number | null
@@ -54,11 +58,16 @@ export type Address = {
   readonly rail: 'active' | 'archived' | null
   /** `s.*` — the search buffer's query and flags. Never its replacement text. */
   readonly search: Readonly<Record<string, string>> | null
+  /** Settings category filter; tab membership and selection live in tabs/document/editor. */
   readonly settings: string | null
   readonly side: 'chat' | 'files' | 'git' | 'logs' | 'search' | null
   readonly tabs: readonly string[] | null
   readonly tool: string | null
   readonly workspace: string | null
+}
+
+export function editorDocumentToken(address: Address): string | null {
+  return address.mode === 'chat' ? address.editor : address.document
 }
 
 const LOGS_PREFIX = 'log.'
@@ -71,6 +80,7 @@ export function emptyAddress(): Address {
     bottom: null,
     diff: null,
     document: null,
+    editor: null,
     focus: null,
     logs: null,
     mode: null,
@@ -98,7 +108,7 @@ export function parseAddress(href: string, environments?: AddressEnvironments): 
   const url = safeUrl(href)
   if (!url) return emptyAddress()
 
-  // Segments stay RAW here. Only the workspace slug is decoded, because only the slug
+  // Segments stay RAW here. Only the workspace token is decoded, because only the token
   // is a plain value; a document token owns its own encoding and decodes per segment
   // in `document-token.ts`. Decoding the whole path first turned
   // `r/refs%2Fheads%2Fmain/src/a.ts` into `r/refs/heads/main/src/a.ts`, which then
@@ -115,7 +125,7 @@ export function parseAddress(href: string, environments?: AddressEnvironments): 
     document: rest.slice(1).join('/') || null,
     focus: parseFocus(url.hash),
     mode: addressMode(rest[0]),
-    workspace: workspaceSlugFromSegment(decodeOrEmpty(workspaceSegment ?? '')),
+    workspace: workspaceTokenFromSegment(decodeOrEmpty(workspaceSegment ?? '')),
   }
 }
 
@@ -141,7 +151,7 @@ function serializePathname(address: Address, primaryEnvironmentId?: EnvironmentI
     segments.push(`@${address.environmentId}`)
   if (address.rejectedEnvironment !== null)
     segments.push(`@${encodeURIComponent(address.rejectedEnvironment)}`)
-  segments.push(`${WORKSPACE_PREFIX}${encodeSlug(address.workspace)}`)
+  segments.push(`${WORKSPACE_PREFIX}${encodeWorkspaceToken(address.workspace)}`)
   if (address.mode) segments.push(address.mode)
   if (address.mode && address.document) segments.push(address.document)
 
@@ -212,9 +222,6 @@ function serializeSearch(address: Address) {
   if (address.tool !== null) params.set('tool', address.tool)
   if (address.rail) params.set('rail', address.rail)
   if (address.diff !== null) params.set('diff', address.diff)
-  // `!== null`, not truthiness: `?settings=` with an empty value is a real state —
-  // the settings page open on no particular category — and dropping it as falsy lost
-  // the whole tab on reload.
   if (address.settings !== null) params.set('settings', address.settings)
   for (const [key, value] of Object.entries(address.logs ?? {}))
     params.set(`${LOGS_PREFIX}${key}`, value)
@@ -225,7 +232,8 @@ function serializeSearch(address: Address) {
   // Tabs lead, as they did when `URLSearchParams` owned them, so the URL shape a user
   // has seen before does not reorder underneath them.
   const tabs = address.tabs?.length ? `tabs=${address.tabs.join(TAB_SEPARATOR)}` : ''
-  const query = [tabs, params.toString()].filter(Boolean).join('&')
+  const editor = address.editor ? `editor=${address.editor}` : ''
+  const query = [tabs, editor, params.toString()].filter(Boolean).join('&')
 
   return query ? `?${query}` : ''
 }
@@ -256,6 +264,7 @@ function searchFields(params: URLSearchParams, rawSearch: string) {
 
   return {
     bottom: pick(params.get('bottom'), ['terminal', 'problems'] as const),
+    editor: rawSearchValue(rawSearch, 'editor') || null,
     diff: params.get('diff'),
     logs: prefixedGroup(params, LOGS_PREFIX),
     search: prefixedGroup(params, SEARCH_PREFIX),
@@ -326,7 +335,7 @@ function prefixedGroup(params: URLSearchParams, prefix: string) {
   return Object.keys(group).length > 0 ? group : null
 }
 
-function workspaceSlugFromSegment(segment: string | undefined) {
+function workspaceTokenFromSegment(segment: string | undefined) {
   if (!segment?.startsWith(WORKSPACE_PREFIX)) return null
 
   return segment.slice(WORKSPACE_PREFIX.length) || null
@@ -377,11 +386,10 @@ function pick<const T extends readonly string[]>(value: string | null, allowed: 
   return value && (allowed as readonly string[]).includes(value) ? (value as T[number]) : null
 }
 
-/** `-` is not a legal directory leaf, so `/~-` cannot collide with a real workspace. */
-function encodeSlug(slug: string) {
-  if (slug === NO_WORKSPACE_SLUG) return slug
+function encodeWorkspaceToken(token: string) {
+  if (token === NO_WORKSPACE_TOKEN) return token
 
-  return encodeURIComponent(slug).replaceAll('~', '%7E')
+  return encodeURIComponent(token).replaceAll('~', '%7E')
 }
 
 function decodeOrEmpty(segment: string) {

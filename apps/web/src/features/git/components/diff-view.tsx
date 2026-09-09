@@ -1,3 +1,4 @@
+import { languageIdForFilePath } from '@/features/editor/utils/file-path'
 import { createDiffRegionStore } from '@singapor/diff'
 import { useMemo, useRef, useState } from 'react'
 
@@ -11,7 +12,7 @@ import {
   unchangedFileNotice,
   unrenderableDiffNotice,
 } from '../utils/diff-presentation'
-import { editorDiffFiles, renderableDiffFile } from '../utils/editor-diff-files'
+import { editorDiffFiles, renderableDiffFile } from '@workspace/client-core/git/diff-files'
 import { DiffLineCommentAction } from './diff-line-comment-action'
 import { DiffNotice } from './diff-notice'
 import { UnchangedDiffBanner } from './unchanged-diff-banner'
@@ -44,7 +45,7 @@ export function DiffView({
   const [regions] = useState(createDiffRegionStore)
   // Stable identity is required: this is pushed into the plugin, and a fresh
   // array each render would re-project the diff and throw away scroll position.
-  const files = useMemo(() => editorDiffFiles(diffs), [diffs])
+  const files = useMemo(() => editorDiffFiles(diffs, languageIdForFilePath), [diffs])
   // A file with hunks wins; a hunkless one is drawn only when it carries whole-file text, which is
   // what a pure rename looks like once the server sends the blob. A binary entry has neither and
   // still falls through to a notice — "we got diffs" is not the same as "there is something to

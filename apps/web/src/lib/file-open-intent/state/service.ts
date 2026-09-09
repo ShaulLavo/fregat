@@ -4,6 +4,7 @@ import {
   type EditorInitialPaintEvent,
   type EditorPreparedDocument,
   type EditorPreparedTagValue,
+  type EditorScrollPosition,
   type EditorTextBuffer,
 } from '@singapor/core'
 
@@ -11,6 +12,7 @@ import type { FileResult } from '@/lib/file-system-types'
 import {
   ensureFileSnapshotQuery,
   FILE_SNAPSHOT_STALE_MS,
+  fileSnapshotPathFromQueryKey,
   fileSnapshotQueryOptions,
 } from '@/lib/file-snapshot-query-cache'
 import type {
@@ -36,6 +38,11 @@ export type FileOpenIntentLiveDocument = {
 }
 
 export type FileOpenIntentPreparationFamily = 'highlighter' | 'structural'
+
+export type FileOpenIntentStructuralRange = {
+  readonly endIndex: number
+  readonly startIndex: number
+}
 
 export type FileOpenIntent = {
   readonly knownSize?: number
@@ -76,6 +83,7 @@ export type FileOpenIntentPreparer = {
     documentId: string,
     path: string,
     abortSignal: AbortSignal,
+    structuralRange: FileOpenIntentStructuralRange,
   ): FileOpenIntentPreparation
   reconfigure(
     preparedDocument: EditorPreparedDocument,
@@ -83,6 +91,7 @@ export type FileOpenIntentPreparer = {
     documentId: string,
     path: string,
     abortSignal: AbortSignal,
+    structuralRange: FileOpenIntentStructuralRange,
   ): FileOpenIntentPreparationConfiguration
 }
 
@@ -109,6 +118,59 @@ export type FileOpenIntentBenchmarkResult = {
   readonly transferredStructuralRuntimeSessionIds: readonly string[]
   readonly targetIntents: number
   readonly wastedIntents: number
+}
+
+export type FileOpenIntentService = {
+  claimLive(path: string): PreparedLiveFileOpenClaim | null
+  claimReadyClean(path: string): PreparedCleanFileOpenClaim | null
+  prepare(intent: FileOpenIntent): void
+  recordInitialPaint(path: string, paint: EditorInitialPaintEvent): void
+}
+
+export type FileOpenIntentActivation = Pick<FileOpenIntentService, 'claimLive' | 'claimReadyClean'>
+
+export type FileOpenIntentBenchmarkSample = {
+  readonly id: string
+  readonly target: {
+    readonly path: string
+    readonly rootPath: string
+  }
+  quarantine(): void
+  quiesce(): Promise<FileOpenIntentBenchmarkResult>
+  release(): void
+}
+
+export type FileOpenIntentServiceOwner = {
+  readonly activation: FileOpenIntentActivation
+  readonly service: FileOpenIntentService
+  beginBenchmarkSample(input: {
+    readonly path: string
+    readonly rootPath: string
+  }): FileOpenIntentBenchmarkSample
+  connect(): void
+  disposeNow(): void
+  scheduleDisconnect(): void
+  setEnvironment(preparer: FileOpenIntentPreparer): void
+  setRelatedPrefetch(
+    prefetchRelated: (rootPath: string, path: string) => Promise<unknown> | void,
+  ): void
+  setRoot(rootPath: string | null): void
+}
+
+export type FileOpenIntentServiceOwnerDependencies = {
+  readonly createEvent?: FileOpenIntentEventFactory
+  readonly getLiveDocument: (path: string) => FileOpenIntentLiveDocument | null
+  readonly getRetainedScrollPosition: (path: string) => EditorScrollPosition | null
+  readonly isActive: (path: string) => boolean
+  readonly mountedEditors: {
+    has(path: string): boolean
+    subscribe(listener: (path: string, mounted: boolean) => void): () => void
+  }
+  readonly preparer: FileOpenIntentPreparer
+  readonly prefetchRelated: (rootPath: string, path: string) => Promise<unknown> | void
+  readonly queryClient: QueryClient
+  readonly runtime?: FileOpenIntentRuntime
+  readonly subscribeLiveDocuments: (listener: () => void) => () => void
 }
 
 type FileOpenIntentBenchmarkScope = {
@@ -141,7 +203,25 @@ type PreparedOpenRecord = {
   lastActivityAt: number
   readonly preparedDocument: EditorPreparedDocument
   stages: Map<FileOpenIntentPreparationFamily, PreparedStageRecord>
+  structuralRange: FileOpenIntentStructuralRange
 }
+
+type FileOpenIntentPromotion =
+  | { readonly phase: 'preparing' }
+  | {
+      readonly at: number
+      readonly cancelPaintTimeout: () => void
+      readonly documentId: string
+      readonly phase: 'awaiting-text'
+    }
+  | {
+      readonly at: number
+      readonly cancelPaintTimeout: () => void
+      readonly documentGeneration: number
+      readonly documentId: string
+      readonly phase: 'awaiting-highlight'
+      readonly textVersion: number
+    }
 
 type FileOpenIntentOperation = {
   readonly detectedAt: number
@@ -151,11 +231,12 @@ type FileOpenIntentOperation = {
   readonly path: string
   pendingEnd: Record<string, unknown> | null
   postActivationBaseline: PostActivationWorkSnapshot | null
-  promotionAt: number | null
-  promotionPaintTimeout: (() => void) | null
+  promotion: FileOpenIntentPromotion
   relatedSettled: boolean
   readonly rootPath: string
 }
+
+type FileResultIdentity = Pick<FileResult, 'path' | 'version'>
 
 type PostActivationWorkCounters = {
   readonly bufferBuilds: number
@@ -173,7 +254,200 @@ type PostActivationWorkSnapshot = PostActivationWorkCounters & {
   readonly diagnosticsObserved: boolean
 }
 
-export class FileOpenIntentService {
+export function createFileOpenIntentServiceOwner(
+  dependencies: FileOpenIntentServiceOwnerDependencies,
+): FileOpenIntentServiceOwner {
+  return new FileOpenIntentOwner(dependencies)
+}
+
+class FileOpenIntentOwner implements FileOpenIntentServiceOwner {
+  readonly activation: FileOpenIntentActivation
+  readonly service: FileOpenIntentService
+  private readonly state: FileOpenIntentServiceState
+  private connected = false
+  private connectionGeneration = 0
+  private disposed = false
+  private nextBenchmarkSampleId = 0
+  private unsubscribeLiveDocuments: (() => void) | null = null
+  private unsubscribeMountedEditors: (() => void) | null = null
+  private unsubscribeQueries: (() => void) | null = null
+
+  constructor(private readonly dependencies: FileOpenIntentServiceOwnerDependencies) {
+    this.state = new FileOpenIntentServiceState(
+      dependencies.queryClient,
+      dependencies.preparer,
+      dependencies.getLiveDocument,
+      dependencies.getRetainedScrollPosition,
+      dependencies.isActive,
+      (path) => dependencies.mountedEditors.has(path),
+      dependencies.prefetchRelated,
+      dependencies.runtime,
+      dependencies.createEvent,
+    )
+    this.service = {
+      claimLive: (path) => (this.canConsume() ? this.state.claimLive(path) : null),
+      claimReadyClean: (path) => (this.canConsume() ? this.state.claimReadyClean(path) : null),
+      prepare: (intent) => {
+        if (!this.canConsume()) return
+        this.state.prepare(intent)
+      },
+      recordInitialPaint: (path, paint) => {
+        if (!this.canConsume()) return
+        this.state.recordInitialPaint(path, paint)
+      },
+    }
+    this.activation = {
+      claimLive: this.service.claimLive,
+      claimReadyClean: this.service.claimReadyClean,
+    }
+  }
+
+  connect(): void {
+    this.assertUsable('connect')
+    this.connectionGeneration += 1
+    if (this.connected) return
+
+    this.connected = true
+    this.state.connect()
+    this.unsubscribeLiveDocuments = this.dependencies.subscribeLiveDocuments(() =>
+      this.state.reconcileLiveAuthority(),
+    )
+    this.unsubscribeMountedEditors = this.dependencies.mountedEditors.subscribe((path, mounted) => {
+      if (mounted) this.state.invalidatePath(path)
+    })
+    this.unsubscribeQueries = this.dependencies.queryClient.getQueryCache().subscribe((event) => {
+      if (event.type !== 'updated' && event.type !== 'removed') return
+
+      const path = fileSnapshotPathFromQueryKey(event.query.queryKey)
+      if (!path) return
+      if (event.type === 'removed') {
+        this.state.reconcileFileSnapshot(path, null, true)
+        return
+      }
+
+      this.state.reconcileFileSnapshot(path, fileResultIdentity(event.query.state.data), false)
+    })
+  }
+
+  scheduleDisconnect(): void {
+    this.assertUsable('scheduleDisconnect')
+    if (!this.connected) return
+
+    const generation = ++this.connectionGeneration
+    queueMicrotask(() => {
+      if (generation !== this.connectionGeneration || !this.connected) return
+      this.disconnect('owner-disconnected')
+    })
+  }
+
+  disposeNow(): void {
+    if (this.disposed) return
+
+    this.disposed = true
+    this.connectionGeneration += 1
+    this.disconnect('owner-disposed')
+  }
+
+  setRoot(rootPath: string | null): void {
+    this.assertUsable('setRoot')
+    this.state.setRoot(rootPath)
+  }
+
+  setEnvironment(preparer: FileOpenIntentPreparer): void {
+    this.assertUsable('setEnvironment')
+    this.state.setEnvironment(preparer)
+  }
+
+  setRelatedPrefetch(
+    prefetchRelated: (rootPath: string, path: string) => Promise<unknown> | void,
+  ): void {
+    this.assertUsable('setRelatedPrefetch')
+    this.state.setRelatedPrefetch(prefetchRelated)
+  }
+
+  beginBenchmarkSample(input: {
+    readonly path: string
+    readonly rootPath: string
+  }): FileOpenIntentBenchmarkSample {
+    this.assertUsable('beginBenchmarkSample')
+    const sampleId = `file-open-intent:${++this.nextBenchmarkSampleId}`
+    this.state.beginBenchmarkSample(sampleId, input)
+    return createBenchmarkSample(this.state, sampleId, input)
+  }
+
+  private canConsume(): boolean {
+    return this.connected && !this.disposed
+  }
+
+  private disconnect(reason: string): void {
+    this.connected = false
+    this.unsubscribeLiveDocuments?.()
+    this.unsubscribeLiveDocuments = null
+    this.unsubscribeMountedEditors?.()
+    this.unsubscribeMountedEditors = null
+    this.unsubscribeQueries?.()
+    this.unsubscribeQueries = null
+    this.state.disconnectNow(reason)
+  }
+
+  private assertUsable(operation: string): void {
+    if (!this.disposed) return
+    throw createClientInvariantError(`Cannot ${operation} a disposed file-open intent owner`)
+  }
+}
+
+function createBenchmarkSample(
+  state: FileOpenIntentServiceState,
+  sampleId: string,
+  target: { readonly path: string; readonly rootPath: string },
+): FileOpenIntentBenchmarkSample {
+  let phase: 'active' | 'failed' | 'quarantined' | 'quiescing' | 'quiesced' | 'released' = 'active'
+  let quiescence: Promise<FileOpenIntentBenchmarkResult> | null = null
+  return {
+    id: sampleId,
+    target,
+    quarantine: () => {
+      if (phase !== 'active') {
+        throw createClientInvariantError('Editor-open benchmark sample already quarantined')
+      }
+
+      state.quarantineBenchmarkSample(sampleId)
+      phase = 'quarantined'
+    },
+    quiesce: () => {
+      if (phase === 'released') {
+        throw createClientInvariantError('Editor-open benchmark sample already released')
+      }
+      if (quiescence) return quiescence
+      if (phase !== 'quarantined') {
+        throw createClientInvariantError('Editor-open benchmark sample must quarantine first')
+      }
+
+      phase = 'quiescing'
+      quiescence = state.finishBenchmarkSample(sampleId).then(
+        (result) => {
+          phase = 'quiesced'
+          return result
+        },
+        (error: unknown) => {
+          phase = 'failed'
+          throw error
+        },
+      )
+      return quiescence
+    },
+    release: () => {
+      if (phase !== 'quiesced') {
+        throw createClientInvariantError('Editor-open benchmark sample is not quiescent')
+      }
+
+      state.releaseBenchmarkSample(sampleId)
+      phase = 'released'
+    },
+  }
+}
+
+class FileOpenIntentServiceState {
   private readonly records = new Map<string, PreparedOpenRecord>()
   private readonly queuedPaths: string[] = []
   private readonly queuedPathSet = new Set<string>()
@@ -185,7 +459,6 @@ export class FileOpenIntentService {
   private environment: FileOpenIntentEnvironmentIdentity
   private environmentGeneration = 0
   private lifecycleGeneration = 0
-  private connectionGeneration = 0
   private connected = false
   private cancelExpiryTimer: (() => void) | null = null
   private benchmarkScope: FileOpenIntentBenchmarkScope | null = null
@@ -197,6 +470,7 @@ export class FileOpenIntentService {
     private readonly queryClient: QueryClient,
     private preparer: FileOpenIntentPreparer,
     private readonly getLiveDocument: (path: string) => FileOpenIntentLiveDocument | null,
+    private readonly getRetainedScrollPosition: (path: string) => EditorScrollPosition | null,
     private readonly isActive: (path: string) => boolean,
     private readonly isMounted: (path: string) => boolean,
     private prefetchRelated: (rootPath: string, path: string) => Promise<unknown> | void,
@@ -216,27 +490,14 @@ export class FileOpenIntentService {
 
   connect(): void {
     this.connected = true
-    this.connectionGeneration += 1
   }
 
-  scheduleDisconnect(): void {
-    if (!this.connected) return
-
+  disconnectNow(reason: string): void {
     this.connected = false
-    const generation = ++this.connectionGeneration
-    queueMicrotask(() => {
-      if (this.connected || generation !== this.connectionGeneration) return
-      this.clear('owner-disconnected')
-    })
+    this.clear(reason)
   }
 
-  disposeNow(): void {
-    this.connected = false
-    this.connectionGeneration += 1
-    this.clear('owner-disposed')
-  }
-
-  setPreparationEnvironment(preparer: FileOpenIntentPreparer): void {
+  setEnvironment(preparer: FileOpenIntentPreparer): void {
     if (sameEnvironment(preparer.environment, this.environment)) return
 
     this.preparer = preparer
@@ -244,7 +505,7 @@ export class FileOpenIntentService {
     this.environmentGeneration += 1
     for (const [path, record] of this.records) {
       if (this.records.get(path) !== record) continue
-      this.reconcileRecord(path, record, preparer)
+      this.reconcileRecord(path, record, preparer, record.structuralRange)
     }
     this.runNext()
   }
@@ -255,9 +516,18 @@ export class FileOpenIntentService {
     this.prefetchRelated = prefetchRelated
   }
 
-  beginBenchmarkSample(sampleId: string, path: string): void {
+  beginBenchmarkSample(
+    sampleId: string,
+    input: { readonly path: string; readonly rootPath: string },
+  ): void {
     if (!this.connected) {
       throw createClientInvariantError('Editor-open benchmark sample requires a connected owner')
+    }
+    if (canonicalPath(input.rootPath) !== this.rootPath) {
+      throw createClientInvariantError('Editor-open benchmark target root is not current')
+    }
+    if (!this.pathBelongsToRoot(canonicalPath(input.path))) {
+      throw createClientInvariantError('Editor-open benchmark target is outside the current root')
     }
     if (this.benchmarkScope) {
       throw createClientInvariantError('An editor-open benchmark sample is already active')
@@ -279,7 +549,7 @@ export class FileOpenIntentService {
     this.benchmarkScope = {
       evictions: 0,
       nonTargetIntents: 0,
-      path: canonicalPath(path),
+      path: canonicalPath(input.path),
       preparedClaims: 0,
       promotedBytes: 0,
       highlighterRuntimeSessionIds: new Set(),
@@ -385,7 +655,10 @@ export class FileOpenIntentService {
     }
 
     this.pruneExpired()
-    if (this.recordIsCurrent(canonical)) return
+    if (this.recordIsCurrent(canonical)) {
+      this.refreshQueuedStructuralRange(canonical)
+      return
+    }
     if (this.activePath === canonical) return
     if (this.queuedPathSet.has(canonical)) {
       this.raiseQueuedPriority(canonical)
@@ -437,17 +710,41 @@ export class FileOpenIntentService {
   recordInitialPaint(path: string, paint: EditorInitialPaintEvent): void {
     const canonical = canonicalPath(path)
     const operation = this.promotedIntentOperations.get(canonical)
-    if (!operation || operation.promotionAt === null) return
+    if (!operation) return
 
-    const timingField = paint.phase === 'text' ? 'textPaintMs' : 'highlightPaintMs'
+    const promotion = operation.promotion
+    if (promotion.phase === 'preparing') return
+    if (paint.phase === 'text') {
+      if (promotion.phase !== 'awaiting-text') return
+      if (paint.documentId !== promotion.documentId) return
+
+      operation.event.set({
+        postActivation: {
+          ...postActivationWorkSince(operation.postActivationBaseline, canonical),
+          textPaintMs: this.runtime.now() - promotion.at,
+        },
+      })
+      operation.promotion = {
+        at: promotion.at,
+        cancelPaintTimeout: promotion.cancelPaintTimeout,
+        documentGeneration: paint.documentGeneration,
+        documentId: promotion.documentId,
+        phase: 'awaiting-highlight',
+        textVersion: paint.textVersion,
+      }
+      return
+    }
+    if (promotion.phase !== 'awaiting-highlight') return
+    if (paint.documentId !== promotion.documentId) return
+    if (paint.documentGeneration !== promotion.documentGeneration) return
+    if (paint.textVersion !== promotion.textVersion) return
+
     operation.event.set({
       postActivation: {
         ...postActivationWorkSince(operation.postActivationBaseline, canonical),
-        [timingField]: this.runtime.now() - operation.promotionAt,
+        highlightPaintMs: this.runtime.now() - promotion.at,
       },
     })
-    if (paint.phase === 'text') return
-
     this.finishPromotion(canonical, paint.status)
   }
 
@@ -466,7 +763,7 @@ export class FileOpenIntentService {
     if (this.claimIsCurrent(record.claim)) {
       if (this.activePath === canonical) this.activeAbortController = null
       this.noteBenchmarkClaim(canonical, record.estimatedBytes, record.preparedDocument)
-      this.promoteIntent(canonical, {
+      this.promoteIntent(canonical, record.documentId, {
         promotion: {
           kind: record.claim.kind,
           stages: preparationStageProgress(record),
@@ -496,8 +793,30 @@ export class FileOpenIntentService {
     this.scheduleExpiry()
   }
 
-  invalidatePreparedPath(path: string): void {
-    this.removeStaleRecord(canonicalPath(path))
+  reconcileLiveAuthority(): void {
+    for (const [path, record] of this.records) {
+      if (this.liveAuthorityMatches(record.claim)) {
+        this.refreshQueuedStructuralRange(path)
+        continue
+      }
+
+      this.disposeRecord(path, record)
+      this.finishIntent(path, 'invalidated', { reason: 'document-changed' })
+    }
+    this.scheduleExpiry()
+  }
+
+  reconcileFileSnapshot(path: string, file: FileResultIdentity | null, removed: boolean): void {
+    const canonical = canonicalPath(path)
+    const record = this.records.get(canonical)
+    if (!record || record.claim.kind !== 'clean') return
+    if (!removed && file && cleanFileIdentityMatches(record.claim, file)) return
+
+    this.disposeRecord(canonical, record)
+    this.finishIntent(canonical, 'invalidated', {
+      reason: removed || !file ? 'query-removed' : 'query-version-changed',
+    })
+    this.scheduleExpiry()
   }
 
   clear(reason = 'service-cleared'): void {
@@ -644,7 +963,14 @@ export class FileOpenIntentService {
       const buffer = createCleanBuffer(file)
       event.set({ stages: { buffer: { durationMs: this.runtime.now() - bufferStartedAt } } })
       const documentStartedAt = this.runtime.now()
-      const preparation = this.preparer.prepare(buffer, file.path, file.path, abortSignal)
+      const structuralRange = this.structuralRange(file.path, buffer)
+      const preparation = this.preparer.prepare(
+        buffer,
+        file.path,
+        file.path,
+        abortSignal,
+        structuralRange,
+      )
       event.set({
         stages: {
           line: {
@@ -668,7 +994,25 @@ export class FileOpenIntentService {
         preparedDocument: preparation.preparedDocument,
         snapshot: preparation.buffer.getSnapshot(),
       }
-      const record = this.store(path, file.path, claim, preparation, abortController)
+      const preparedSourceRejection = this.cleanPreparedSourceRejection(
+        path,
+        file,
+        lifecycleGeneration,
+        abortSignal,
+      )
+      if (preparedSourceRejection) {
+        preparation.preparedDocument.dispose()
+        this.finishIntent(path, 'superseded', { reason: preparedSourceRejection })
+        return
+      }
+      const record = this.store(
+        path,
+        file.path,
+        claim,
+        preparation,
+        structuralRange,
+        abortController,
+      )
       await this.runPreparationStages(path, record, lifecycleGeneration)
       event.set({ preparation: { status: 'ready-clean' } })
     } catch (error) {
@@ -692,7 +1036,14 @@ export class FileOpenIntentService {
     if (document.buffer.getSnapshot().length * 2 > MAX_PREPARED_FILE_BYTES) return null
     const snapshot = document.buffer.getSnapshot()
     const startedAt = this.runtime.now()
-    const prepared = this.preparer.prepare(document.buffer, document.id, document.path, abortSignal)
+    const structuralRange = this.structuralRange(document.path, document.buffer)
+    const prepared = this.preparer.prepare(
+      document.buffer,
+      document.id,
+      document.path,
+      abortSignal,
+      structuralRange,
+    )
     this.intentOperations.get(document.path)?.event.set({
       stages: {
         line: { durationMs: this.runtime.now() - startedAt, scope: 'document-data' },
@@ -716,7 +1067,7 @@ export class FileOpenIntentService {
       preparedDocument: prepared.preparedDocument,
       snapshot,
     }
-    return this.store(document.path, document.id, claim, prepared, abortController)
+    return this.store(document.path, document.id, claim, prepared, structuralRange, abortController)
   }
 
   private async runPreparationStages(
@@ -754,6 +1105,7 @@ export class FileOpenIntentService {
 
       stageRecord.progress = 'settled'
       this.intentOperations.get(path)?.event.set({
+        preparation: { estimatedBytes: record.estimatedBytes },
         stages: {
           [stageRecord.stage.family]: {
             durationMs: this.runtime.now() - startedAt,
@@ -762,6 +1114,7 @@ export class FileOpenIntentService {
         },
       })
       this.touchRecord(path, record)
+      this.pruneBounds()
     }
   }
 
@@ -780,25 +1133,34 @@ export class FileOpenIntentService {
     documentId: string,
     claim: PreparedFileOpenClaim,
     preparation: FileOpenIntentPreparation,
+    structuralRange: FileOpenIntentStructuralRange,
     abortController: AbortController,
   ): PreparedOpenRecord {
     const previous = this.records.get(path)
     if (previous) this.disposeRecord(path, previous)
+    const preparedDocument = preparation.preparedDocument
     const record: PreparedOpenRecord = {
       abortController,
       claim,
       documentConfigurationTag: preparation.documentConfigurationTag,
       documentId,
-      estimatedBytes: preparation.preparedDocument.estimatedBytes,
+      get estimatedBytes() {
+        return preparedDocument.estimatedBytes
+      },
       lastActivityAt: this.runtime.now(),
-      preparedDocument: preparation.preparedDocument,
+      preparedDocument,
       stages: stageRecords(preparation.stages),
+      structuralRange,
     }
     this.records.set(path, record)
+    const structural = record.stages.get('structural')
     this.intentOperations.get(path)?.event.set({
       preparation: {
         documentConfigurationTag: preparation.documentConfigurationTag,
         estimatedBytes: record.estimatedBytes,
+        ...(structural
+          ? { ranges: { structural: structural.stage.range ?? structuralRange } }
+          : {}),
       },
     })
     this.noteBenchmarkRuntimeSessionIds(record.preparedDocument)
@@ -825,6 +1187,7 @@ export class FileOpenIntentService {
     path: string,
     record: PreparedOpenRecord,
     preparer: FileOpenIntentPreparer,
+    structuralRange: FileOpenIntentStructuralRange,
   ): void {
     const configuration = preparer.reconfigure(
       record.preparedDocument,
@@ -832,6 +1195,7 @@ export class FileOpenIntentService {
       record.documentId,
       path,
       record.abortController.signal,
+      structuralRange,
     )
     if (!sameTag(record.documentConfigurationTag, configuration.documentConfigurationTag)) {
       this.rebuildRecord(path, record)
@@ -858,10 +1222,42 @@ export class FileOpenIntentService {
     }
     record.documentConfigurationTag = configuration.documentConfigurationTag
     record.stages = nextStages
+    record.structuralRange = structuralRange
+    const structural = nextStages.get('structural')
+    if (structural) {
+      this.intentOperations.get(path)?.event.set({
+        preparation: { ranges: { structural: structural.stage.range ?? structuralRange } },
+      })
+    }
     if (!nextQueuedStage(record)) return
     if (this.activePath === path) return
 
     this.enqueuePath(path)
+  }
+
+  private refreshQueuedStructuralRange(path: string): void {
+    const record = this.records.get(path)
+    const structural = record?.stages.get('structural')
+    if (!record || structural?.progress !== 'queued') return
+
+    const range = this.structuralRange(path, record.claim.buffer)
+    if (sameStructuralRange(record.structuralRange, range)) return
+    this.reconcileRecord(path, record, this.preparer, range)
+  }
+
+  private structuralRange(path: string, buffer: EditorTextBuffer): FileOpenIntentStructuralRange {
+    return defaultStructuralRange(buffer.getSnapshot().length, this.getRetainedScrollPosition(path))
+  }
+
+  private liveAuthorityMatches(claim: PreparedFileOpenClaim): boolean {
+    const liveDocument = this.getLiveDocument(claim.path)
+    if (claim.kind === 'clean') return liveDocument === null
+    if (!liveDocument) return false
+    if (liveDocument.buffer !== claim.buffer) return false
+    if (liveDocument.id !== claim.documentId) return false
+    if (liveDocument.localRevision !== claim.localRevision) return false
+    if (liveDocument.path !== claim.path) return false
+    return liveDocument.buffer.getSnapshot() === claim.snapshot
   }
 
   private rebuildRecord(path: string, record: PreparedOpenRecord): void {
@@ -916,6 +1312,7 @@ export class FileOpenIntentService {
   private pathBelongsToRoot(path: string): boolean {
     const rootPath = this.rootPath
     if (!rootPath) return false
+    if (rootPath === '/') return path.startsWith('/')
     if (path === rootPath) return true
 
     return path.startsWith(`${rootPath}/`)
@@ -957,10 +1354,11 @@ export class FileOpenIntentService {
       const oldest = this.records.entries().next().value as [string, PreparedOpenRecord] | undefined
       if (!oldest) return
 
+      const evictedBytes = oldest[1].estimatedBytes
       this.disposeRecord(oldest[0], oldest[1])
       this.finishIntent(oldest[0], 'evicted', { reason: 'memory-budget' })
       this.noteBenchmarkEviction()
-      totalBytes -= oldest[1].estimatedBytes
+      totalBytes -= evictedBytes
     }
   }
 
@@ -978,13 +1376,30 @@ export class FileOpenIntentService {
     return null
   }
 
-  private cleanClaimMatchesFreshQuery(claim: PreparedCleanFileOpenClaim): boolean {
-    const queryKey = fileSnapshotQueryOptions(claim.path).queryKey
+  private cleanPreparedSourceRejection(
+    path: string,
+    file: FileResult,
+    lifecycleGeneration: number,
+    abortSignal: AbortSignal,
+  ): string | null {
+    const rejection = this.cleanPreparationRejection(path, file, lifecycleGeneration, abortSignal)
+    if (rejection) return rejection
+    if (this.getLiveDocument(path)) return 'live-document-changed'
+    if (!this.cleanFileMatchesFreshQuery(file)) return 'query-version-changed'
+    return null
+  }
+
+  private cleanFileMatchesFreshQuery(file: FileResultIdentity): boolean {
+    const queryKey = fileSnapshotQueryOptions(file.path).queryKey
     const state = this.queryClient.getQueryState<FileResult>(queryKey)
     if (state?.status !== 'success' || !state.data) return false
     if (this.runtime.now() - state.dataUpdatedAt > FILE_SNAPSHOT_STALE_MS) return false
 
-    return state.data.path === claim.path && state.data.version === claim.fileVersion
+    return state.data.path === file.path && state.data.version === file.version
+  }
+
+  private cleanClaimMatchesFreshQuery(claim: PreparedCleanFileOpenClaim): boolean {
+    return this.cleanFileMatchesFreshQuery({ path: claim.path, version: claim.fileVersion })
   }
 
   private generationIsCurrent(generation: number): boolean {
@@ -1070,8 +1485,7 @@ export class FileOpenIntentService {
       path,
       pendingEnd: null,
       postActivationBaseline: null,
-      promotionAt: null,
-      promotionPaintTimeout: null,
+      promotion: { phase: 'preparing' },
       relatedSettled: true,
       rootPath,
     }
@@ -1102,7 +1516,7 @@ export class FileOpenIntentService {
     this.noteBenchmarkIntent(path)
   }
 
-  private promoteIntent(path: string, context: Record<string, unknown>): void {
+  private promoteIntent(path: string, documentId: string, context: Record<string, unknown>): void {
     const operation = this.intentOperations.get(path)
     if (!operation) return
 
@@ -1110,16 +1524,22 @@ export class FileOpenIntentService {
     const previous = this.promotedIntentOperations.get(path)
     if (previous) this.finishPromotion(path, 'superseded')
     operation.postActivationBaseline = postActivationWorkSnapshot(path)
-    operation.promotionAt = this.runtime.now()
+    const promotionAt = this.runtime.now()
     operation.event.set({
       ...context,
-      leadMs: operation.promotionAt - operation.detectedAt,
+      leadMs: promotionAt - operation.detectedAt,
       outcome: 'promoted',
     })
-    operation.promotionPaintTimeout = this.runtime.scheduleTimer(
+    const cancelPaintTimeout = this.runtime.scheduleTimer(
       () => this.finishPromotion(path, 'timeout', { reason: 'initial-paint-timeout' }),
       PROMOTION_PAINT_TIMEOUT_MS,
     )
+    operation.promotion = {
+      at: promotionAt,
+      cancelPaintTimeout,
+      documentId,
+      phase: 'awaiting-text',
+    }
     this.promotedIntentOperations.set(path, operation)
   }
 
@@ -1131,9 +1551,11 @@ export class FileOpenIntentService {
     const operation = this.promotedIntentOperations.get(path)
     if (!operation) return
 
+    const promotion = operation.promotion
+    if (promotion.phase === 'preparing') return
+
     this.promotedIntentOperations.delete(path)
-    operation.promotionPaintTimeout?.()
-    operation.promotionPaintTimeout = null
+    promotion.cancelPaintTimeout()
     const counters = postActivationWorkSince(operation.postActivationBaseline, path)
     const outcome = paintOutcome === 'abandoned' ? 'aborted' : 'promoted'
     operation.event.set({
@@ -1305,7 +1727,24 @@ function sameStage(
   if (!left || !right) return left === right
   if (left.family !== right.family) return false
   if (left.provider !== right.provider) return false
+  if (!sameStageRange(left.range, right.range)) return false
   return sameTag(left.configurationTag, right.configurationTag)
+}
+
+function sameStageRange(
+  left: FileOpenIntentPreparationStage['range'],
+  right: FileOpenIntentPreparationStage['range'],
+): boolean {
+  if (left === 'full' || right === 'full') return left === right
+  if (!left || !right) return left === right
+  return sameStructuralRange(left, right)
+}
+
+function sameStructuralRange(
+  left: FileOpenIntentStructuralRange,
+  right: FileOpenIntentStructuralRange,
+): boolean {
+  return left.startIndex === right.startIndex && left.endIndex === right.endIndex
 }
 
 function sameTag(
@@ -1479,6 +1918,33 @@ function createCleanBuffer(file: FileResult): EditorTextBuffer {
   const buffer = createEditorTextBuffer(file.content)
   buffer.markClean()
   return buffer
+}
+
+function defaultStructuralRange(
+  snapshotLength: number,
+  scrollPosition: EditorScrollPosition | null,
+): FileOpenIntentStructuralRange {
+  const estimatedRow = Math.floor((scrollPosition?.top ?? 0) / 20)
+  const estimatedOffset = estimatedRow * 96
+  const startIndex = Math.min(snapshotLength, Math.max(0, estimatedOffset - 16 * 1024))
+  return {
+    endIndex: Math.min(snapshotLength, startIndex + 64 * 1024),
+    startIndex,
+  }
+}
+
+function cleanFileIdentityMatches(
+  claim: PreparedCleanFileOpenClaim,
+  file: FileResultIdentity,
+): boolean {
+  return claim.path === file.path && claim.fileVersion === file.version
+}
+
+function fileResultIdentity(value: unknown): FileResultIdentity | null {
+  if (!isRecord(value)) return null
+  if (typeof value.path !== 'string') return null
+  if (typeof value.version !== 'string') return null
+  return { path: value.path, version: value.version }
 }
 
 function markEditorOpenBenchmark(name: string, path: string): void {

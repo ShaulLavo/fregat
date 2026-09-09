@@ -3,8 +3,8 @@ import type { InteractionMode, RuntimeMode, SessionId } from '@workspace/contrac
 import { useRef, type RefObject } from 'react'
 
 import { useElementWidth } from '@/features/workspace/hooks/use-element-width'
-import { contextUsageForActivities } from '@/features/chat/utils/context-usage'
-import { selectChatSessionById } from '@/features/chat/state/chat-projection-selectors'
+import { contextUsageForActivities } from '@workspace/client-core/chat/context-usage'
+import { selectChatSessionById } from '@workspace/client-core/chat/selectors'
 import type { ChatInputDraftTarget } from '@/features/chat/state/chat-input-draft-store'
 import { ChatInputAttachButton } from './chat-input-attach-button'
 import { ChatInputSubmitButton } from './chat-input-submit-button'

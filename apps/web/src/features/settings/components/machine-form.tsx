@@ -58,7 +58,7 @@ export function MachineForm({
       className='border-border flex flex-col gap-3 rounded-md border p-3'
       onSubmit={(event) => void save(event)}
     >
-      <fieldset className='grid min-w-0 gap-3 sm:grid-cols-2' disabled={saving}>
+      <fieldset className='grid min-w-0 gap-3 @3xl/settings:grid-cols-2' disabled={saving}>
         <div className='flex flex-col gap-1'>
           <label className='text-xs font-medium' htmlFor={`${id}-name`}>
             Machine name
@@ -90,7 +90,7 @@ export function MachineForm({
             </SelectContent>
           </Select>
         </div>
-        <div className='flex flex-col gap-1 sm:col-span-2'>
+        <div className='flex flex-col gap-1 @3xl/settings:col-span-2'>
           <label className='text-xs font-medium' htmlFor={`${id}-label`}>
             Display label
           </label>
@@ -103,7 +103,7 @@ export function MachineForm({
         </div>
         {draft.kind === 'ssh' ? (
           <>
-            <div className='flex flex-col gap-1 sm:col-span-2'>
+            <div className='flex flex-col gap-1 @3xl/settings:col-span-2'>
               <label className='text-xs font-medium' htmlFor={`${id}-target`}>
                 SSH target
               </label>
@@ -114,7 +114,7 @@ export function MachineForm({
                 placeholder='user@host'
               />
             </div>
-            <div className='flex flex-col gap-1 sm:col-span-2'>
+            <div className='flex flex-col gap-1 @3xl/settings:col-span-2'>
               <label className='text-xs font-medium' htmlFor={`${id}-path`}>
                 Repository path
               </label>
@@ -142,7 +142,7 @@ export function MachineForm({
             </div>
           </>
         ) : (
-          <div className='flex flex-col gap-1 sm:col-span-2'>
+          <div className='flex flex-col gap-1 @3xl/settings:col-span-2'>
             <label className='text-xs font-medium' htmlFor={`${id}-url`}>
               Server URL
             </label>

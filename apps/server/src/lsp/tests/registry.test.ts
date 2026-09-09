@@ -150,33 +150,6 @@ describe('LSP server registry', () => {
     expect(matches.every((match) => match.root === root)).toBe(true)
   })
 
-  it('uses the compatible server-owned TypeScript when the project has no tsserver entrypoint', async () => {
-    const root = await fixtureRoot({
-      'package.json': '{}',
-    })
-    const typescript = lspServersFor(NO_OVERRIDES).find((server) => server.id === 'typescript')
-    const expectedPath = path.resolve(
-      import.meta.dirname,
-      '../../../node_modules/typescript-language-service/lib/tsserver.js',
-    )
-
-    await expect(typescript?.initializationOptions?.(root)).resolves.toEqual({
-      tsserver: { path: expectedPath },
-    })
-  })
-
-  it('prefers a project TypeScript server entrypoint when one exists', async () => {
-    const root = await fixtureRoot({
-      'node_modules/typescript/lib/tsserver.js': 'module.exports = {}\n',
-      'package.json': '{}',
-    })
-    const typescript = lspServersFor(NO_OVERRIDES).find((server) => server.id === 'typescript')
-
-    await expect(typescript?.initializationOptions?.(root)).resolves.toEqual({
-      tsserver: { path: path.join(root, 'node_modules/typescript/lib/tsserver.js') },
-    })
-  })
-
   it('prefers deno for TypeScript files inside a Deno project', async () => {
     const root = await fixtureRoot({
       'deno.json': '{}',

@@ -14,8 +14,8 @@ import {
   reorderRailSession,
 } from '@/features/chat-mode/state/rail-order-commands'
 import { useRailOrderStore } from '@/features/chat-mode/state/rail-order-store'
-import { createSessionArchiveCommand } from '@/features/chat/utils/command-builders'
-import { createProjectRegistrationCommand } from '@/lib/environments/utils/registration'
+import { createSessionArchiveCommand } from '@workspace/client-core/chat/commands'
+import { createProjectRegistrationCommand } from '@workspace/client-core/chat/registration'
 import { createRailHarness, renderRailHarness } from '../../../../../test/factories/rail-harness'
 import {
   installVerticalRailRects,

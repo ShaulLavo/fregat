@@ -16,9 +16,9 @@ import type { ChatTransport } from '@/features/chat/transport/chat-transport'
 import {
   createDraftSessionSubmission,
   createProjectDefaultModelCommand,
-} from '@/features/chat/utils/command-builders'
+} from '@workspace/client-core/chat/commands'
 import { providerListQueryOptions } from '@/features/chat/utils/provider-query'
-import { resolveChatModelSelection } from '@/features/chat/utils/resolve-model-selection'
+import { resolveChatModelSelection } from '@workspace/client-core/chat/providers/selection'
 import { dispatchChatCommand, replayAfterDispatch } from '@/features/chat/utils/command-dispatch'
 import { scheduleSessionProjectionSyncAfterDispatch } from '@/features/chat/utils/command-sync'
 import { optimisticMessageSummary } from '@/features/chat/utils/pipeline-logging'

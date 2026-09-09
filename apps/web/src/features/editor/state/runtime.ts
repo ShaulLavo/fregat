@@ -8,10 +8,12 @@ import type { QueryClient } from '@tanstack/react-query'
 
 import type { WorkspaceEditHost } from '@/features/editor/providers/workspace-edit-context'
 import { createEditorConflictStore } from '@/features/editor/state/conflict-state'
+import { createEditorActivation } from '@/features/editor/state/commands'
 import { createEditorDocumentStore } from '@/features/editor/state/document-state'
 import { createEditorOpenBenchmarkControl } from '@/features/editor/state/editor-open-benchmark-control'
 import { FileSyncService } from '@/features/editor/state/file-sync-service'
 import { EditorSaveService } from '@/features/editor/state/save-service'
+import { MountedEditorRegistry } from '@/features/editor/state/mounted-editor-registry'
 import { createEditorUiStore } from '@/features/editor/state/ui-state'
 import { createEditorWorkspaceStore } from '@/features/editor/state/workspace-state'
 import { WorkspaceEditService } from '@/features/editor/state/workspace-edit-service'
@@ -23,9 +25,7 @@ import { createSearchBufferStore } from '@/features/search/state/buffer-state'
 import { SettingsSyncService } from '@/features/settings/state/sync-service'
 import type { CachedWorkspaceState } from '@/features/workspace/state/cache'
 import { log } from '@/lib/client-logging'
-import { MountedEditorRegistry } from '@/lib/file-open-intent/state/mounted-editor-registry'
-import { FileOpenIntentService } from '@/lib/file-open-intent/state/service'
-import { fileSnapshotPathFromQueryKey } from '@/lib/file-snapshot-query-cache'
+import { createFileOpenIntentServiceOwner } from '@/lib/file-open-intent/state/service'
 
 export type EditorRuntime = ReturnType<typeof createEditorRuntime>
 
@@ -67,13 +67,20 @@ export function createEditorRuntime({
   })
   const uiStore = createEditorUiStore()
   const mountedEditors = new MountedEditorRegistry()
-  const fileOpenIntentService = new FileOpenIntentService(
+  const fileOpenIntentOwner = createFileOpenIntentServiceOwner({
+    getLiveDocument: (path) => documentStore.getState().getLiveEditorDocument(path),
+    getRetainedScrollPosition: (path) => retainedScrollPosition(path, documentStore, workspaceStore),
+    isActive: (path) => workspaceStore.getState().selectedFilePath === path,
+    mountedEditors,
+    preparer: createPlatformFileOpenPreparer(preparation),
+    prefetchRelated: () => undefined,
     queryClient,
-    createPlatformFileOpenPreparer(preparation),
-    (path) => documentStore.getState().getLiveEditorDocument(path),
-    (path) => workspaceStore.getState().selectedFilePath === path,
-    (path) => mountedEditors.has(path),
-    () => undefined,
+    subscribeLiveDocuments: (listener) => documentStore.subscribe(() => listener()),
+  })
+  const editorActivation = createEditorActivation(
+    fileOpenIntentOwner.activation,
+    documentStore,
+    fileOpenIntentOwner,
   )
   const documentSyncController = new LanguageServerDocumentSyncController()
   const fileSync = new FileSyncService(documentStore, queryClient)
@@ -101,8 +108,9 @@ export function createEditorRuntime({
   )
   const editorOpenBenchmarkControl = createEditorOpenBenchmarkControl({
     storage,
+    activation: editorActivation,
     documentStore,
-    fileOpenIntent: fileOpenIntentService,
+    fileOpenIntentOwner,
     mountedEditors,
     queryClient,
     searchStore: searchBufferStore,
@@ -133,7 +141,7 @@ export function createEditorRuntime({
       (state) => state.rootFolder?.path ?? null,
       (rootPath) => {
         rootGeneration += 1
-        fileOpenIntentService.setRoot(rootPath)
+        fileOpenIntentOwner.setRoot(rootPath)
         workspaceEditService.resetForRoot()
         if (active) discoverRecovery()
       },
@@ -142,25 +150,13 @@ export function createEditorRuntime({
       (state) => state.scrollPositionByPath,
       (positions) => documentStore.getState().seedEditorScrollPositions(positions),
     ),
-    documentStore.subscribe(
-      (state) => state.documentContentRevisions,
-      (current, previous) => invalidateChangedDocuments(fileOpenIntentService, current, previous),
-    ),
-    mountedEditors.subscribe((path, mounted) => {
-      if (mounted) fileOpenIntentService.invalidatePath(path)
-    }),
-    queryClient.getQueryCache().subscribe((event) => {
-      if (event.type !== 'updated' && event.type !== 'removed') return
-      const path = fileSnapshotPathFromQueryKey(event.query.queryKey)
-      if (path) fileOpenIntentService.invalidatePreparedPath(path)
-    }),
   ]
-  fileOpenIntentService.setRoot(workspaceStore.getState().rootFolder?.path ?? null)
+  fileOpenIntentOwner.setRoot(workspaceStore.getState().rootFolder?.path ?? null)
 
   const suspend = () => {
     if (!active) return
     active = false
-    fileOpenIntentService.disposeNow()
+    fileOpenIntentOwner.scheduleDisconnect()
   }
 
   return {
@@ -183,8 +179,9 @@ export function createEditorRuntime({
     searchBufferStore,
     uiStore,
     mountedEditors,
-    fileOpenIntentService,
-    fileOpenIntent: { mountedEditors, service: fileOpenIntentService },
+    fileOpenIntentOwner,
+    fileOpenIntent: { service: fileOpenIntentOwner.service },
+    editorActivation,
     editorOpenBenchmarkControl,
     documentSyncController,
     workspaceEditService,
@@ -193,7 +190,7 @@ export function createEditorRuntime({
     resume() {
       if (active || disposed) return
       active = true
-      fileOpenIntentService.connect()
+      fileOpenIntentOwner.connect()
       discoverRecovery()
     },
     suspend,
@@ -202,7 +199,7 @@ export function createEditorRuntime({
       suspend()
       disposed = true
       for (const unsubscribe of subscriptions) unsubscribe()
-      fileOpenIntentService.disposeNow()
+      fileOpenIntentOwner.disposeNow()
       workspaceEditService.dispose()
     },
     hasUnsavedDocuments() {
@@ -220,15 +217,23 @@ export function createEditorRuntime({
   }
 }
 
-function invalidateChangedDocuments(
-  service: FileOpenIntentService,
-  current: Readonly<Record<string, string>>,
-  previous: Readonly<Record<string, string>>,
-): void {
-  for (const path of new Set([...Object.keys(current), ...Object.keys(previous)])) {
-    if (current[path] === previous[path]) continue
-    service.invalidatePath(path)
+function retainedScrollPosition(
+  path: string,
+  documentStore: ReturnType<typeof createEditorDocumentStore>,
+  workspaceStore: ReturnType<typeof createEditorWorkspaceStore>,
+) {
+  const documents = documentStore.getState()
+  const document = Object.values(documents.liveDocumentsById).find(
+    (candidate) => candidate.path === path,
+  )
+  if (document) {
+    const view = Object.values(documents.viewsByTabId).find(
+      (candidate) => candidate.documentId === document.id && candidate.scrollPosition,
+    )
+    if (view?.scrollPosition) return view.scrollPosition
   }
+
+  return workspaceStore.getState().scrollPositionByPath[path] ?? null
 }
 
 function workspaceRoot(store: ReturnType<typeof createEditorWorkspaceStore>, generation: number) {

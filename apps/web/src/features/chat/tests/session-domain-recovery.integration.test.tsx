@@ -16,8 +16,8 @@ import {
   selectChatProjects,
   selectChatSessions,
   selectChatWorktrees,
-} from '@/features/chat/state/chat-projection-selectors'
-import { sessionRailModel } from '@/features/chat-mode/utils/session-rail-model'
+} from '@workspace/client-core/chat/selectors'
+import { sessionRailModel } from '@workspace/client-core/chat/rail/model'
 import { fetchOrchestrationShellSnapshotHttp } from '@/features/chat/transport/orchestration-http-snapshots'
 import { expect, test } from '../../../../test/fixtures'
 import { createInProcessClient } from '../../../../test/client'
