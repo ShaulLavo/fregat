@@ -1,5 +1,5 @@
 import * as v from 'valibot'
-import { projectIdSchema, sessionIdSchema } from '@workspace/contracts'
+import { projectIdSchema, sessionIdSchema, worktreeIdSchema } from '@workspace/contracts'
 import type { KeyValueStorage } from '@workspace/client-core/storage'
 import type { AgentLocation } from '@/agent/utils/target'
 
@@ -7,6 +7,7 @@ const locationSchema = v.object({
   kind: v.literal('agent'),
   projectId: v.nullable(projectIdSchema),
   sessionId: v.nullable(sessionIdSchema),
+  worktreeId: v.optional(v.nullable(worktreeIdSchema)),
 })
 
 export function rememberedAgent(storage: KeyValueStorage): AgentLocation | null {

@@ -49,6 +49,10 @@ test('a pending prompt retains its command identity across remounts and expires 
     const reopened = createDrafts(ready.storage)
     expect(reopened.pending(key, reopened.read(key), 'send')).toEqual(submission.command)
     expect(reopened.pending(key, reopened.read(key), 'new')).toBeNull()
+    reopened.update(key, { worktreeMode: 'new' })
+    expect(reopened.pending(key, reopened.read(key), 'send')).toBeNull()
+    reopened.update(key, { worktreeMode: 'current' })
+    expect(reopened.pending(key, reopened.read(key), 'send')).toEqual(submission.command)
     reopened.update(key, { text: 'A distinct prompt' })
     expect(reopened.pending(key, reopened.read(key), 'send')).toBeNull()
     const next = draftChatTurn(worktreeId, 'A distinct prompt')
@@ -61,10 +65,14 @@ test('a pending prompt retains its command identity across remounts and expires 
     drafts.remember(sent, submission.command)
     drafts.remember(sent, submission.command)
     expect(ready.storage.keys('agent.history:')).toHaveLength(1)
+    reopened.update(key, { worktreeMode: 'new' })
     reopened.history(key, -1)
     expect(reopened.read(key).text).toBe(sent.text)
+    expect(reopened.read(key).worktreeMode).toBe('new')
+    reopened.update(key, { worktreeMode: 'current' })
     reopened.history(key, 1)
     expect(reopened.read(key).text).toBe('A distinct prompt')
+    expect(reopened.read(key).worktreeMode).toBe('current')
     queuePrompt(ready.storage, worktreeId, {
       source: 'terminal (selected excerpt)',
       lineStart: 1,

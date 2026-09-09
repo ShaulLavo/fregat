@@ -855,28 +855,33 @@ html[data-palette='sage'] {
 
 .app-scrollbar-thin {
   scrollbar-width: thin;
-  scrollbar-color: var(--border) transparent;
+  scrollbar-color: var(--muted-foreground) transparent;
 }
 
-.app-scrollbar-thin::-webkit-scrollbar {
+.app-scrollbar-thin::-webkit-scrollbar,
+.app-editor-host .editor-virtualized::-webkit-scrollbar {
   height: 6px;
   width: 6px;
 }
 
-.app-scrollbar-thin::-webkit-scrollbar-track {
+.app-scrollbar-thin::-webkit-scrollbar-track,
+.app-editor-host .editor-virtualized::-webkit-scrollbar-track {
   background: transparent;
 }
 
-.app-scrollbar-thin::-webkit-scrollbar-thumb {
-  background-color: var(--border);
+.app-scrollbar-thin::-webkit-scrollbar-thumb,
+.app-editor-host .editor-virtualized::-webkit-scrollbar-thumb {
+  background-color: var(--muted-foreground);
   border-radius: 3px;
 }
 
-.app-scrollbar-thin::-webkit-scrollbar-thumb:hover {
-  background-color: var(--muted-foreground);
+.app-scrollbar-thin::-webkit-scrollbar-thumb:hover,
+.app-editor-host .editor-virtualized::-webkit-scrollbar-thumb:hover {
+  background-color: var(--foreground);
 }
 
-.app-scrollbar-thin::-webkit-scrollbar-corner {
+.app-scrollbar-thin::-webkit-scrollbar-corner,
+.app-editor-host .editor-virtualized::-webkit-scrollbar-corner {
   background: transparent;
 }
 
@@ -893,6 +898,9 @@ html[data-palette='sage'] {
   min-height: 0;
   min-width: 0;
   overflow-anchor: none;
+  /* Keep the pixel-sized track measurable for the minimap's scrollbar lane. */
+  scrollbar-color: auto;
+  scrollbar-width: auto;
 }
 
 [data-workbench] .app-editor-host .editor-virtualized,
@@ -1009,46 +1017,6 @@ html[data-palette='sage'] {
 .app-fold-gutter-icon {
   height: 12px;
   width: 12px;
-}
-
-.app-fold-chevron {
-  fill: currentColor;
-  height: 12px;
-  transform: rotate(0deg);
-  transform-origin: center;
-  width: 12px;
-}
-
-.editor-virtualized-fold-toggle[data-editor-fold-state='collapsed'] .app-fold-chevron {
-  transform: rotate(-90deg);
-}
-
-.editor-virtualized-fold-toggle[data-editor-fold-transition='collapse'] .app-fold-chevron {
-  animation: app-fold-chevron-collapse 120ms ease-out;
-}
-
-.editor-virtualized-fold-toggle[data-editor-fold-transition='expand'] .app-fold-chevron {
-  animation: app-fold-chevron-expand 120ms ease-out;
-}
-
-@keyframes app-fold-chevron-collapse {
-  from {
-    transform: rotate(0deg);
-  }
-
-  to {
-    transform: rotate(-90deg);
-  }
-}
-
-@keyframes app-fold-chevron-expand {
-  from {
-    transform: rotate(-90deg);
-  }
-
-  to {
-    transform: rotate(0deg);
-  }
 }
 
 @keyframes app-accordion-down {

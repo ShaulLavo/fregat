@@ -12,7 +12,7 @@ import { expect, test } from '../../../../../test/fixtures'
 import { stubHighlightApi } from '../../../../../test/env/highlight-api'
 import { renderWithProviders } from '../../../../../test/render'
 
-test('a held document cannot publish its scroll position into the incoming tab', () => {
+test('an outgoing document cannot publish its scroll position into the incoming tab', () => {
   stubHighlightApi()
   const outgoing = editorDocument('/repo/a.ts', 200, 1_962)
   const incoming = editorDocument('/repo/b.ts', 4, 0)

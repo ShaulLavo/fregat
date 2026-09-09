@@ -40,8 +40,9 @@ a bare root `bun run verify`.
 
 - Plans 081 and 082 are complete and their executable plans are deleted. The
   [workbench record](../docs/tui-workbench.md) and [Agent view record](../docs/tui-agent.md) preserve
-  implementation and native verification. Worktree parity (083) is next in the
-  [TUI strategy](../docs/tui-plan.md). Plan 080 belongs to platform keybinding modes.
+  implementation and native verification. The [worktree record](../docs/tui-worktrees.md)
+  covers Plan 083. Distribution (084) is next in the [TUI strategy](../docs/tui-plan.md).
+  Plan 080 belongs to platform keybinding modes.
 
 - Plan 080 extends the existing preset selector to workspace commands and adds whole-sidebar Cmd+B.
   Editor tabs and chats share navigation keys; panel shortcuts use a separate combination. Held

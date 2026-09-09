@@ -1,5 +1,5 @@
 import { useEffect, useRef, useState, useSyncExternalStore } from 'react'
-import type { ClientOrchestrationCommand } from '@workspace/contracts'
+import type { ClientOrchestrationCommand, SessionWorktreeTarget } from '@workspace/contracts'
 import { selectChatSessionById } from '@workspace/client-core/chat/selectors'
 import {
   createDraftSessionSubmission,
@@ -18,6 +18,7 @@ import { useSettingValue } from '@/settings/hooks/use-setting-value'
 import { connectionFailure } from '@/connection/utils/failure'
 import { expandedPrompt } from '@/agent-stage/utils/prompt'
 import { isOrchestrationRpcServerError } from '@workspace/client-core/transport/orchestration-rpc-client'
+import { draftWorktreeReason, draftWorktreeTarget } from '@/agent-stage/utils/worktree-target'
 
 export function useStage({
   ready,
@@ -70,6 +71,26 @@ export function useStage({
     if (worktreeId && target.kind !== 'terminal') drafts.takeInbox(key, worktreeId)
   }, [drafts, key, worktreeId, target.kind])
 
+  function worktreeModeReason(mode: SessionWorktreeTarget['kind']) {
+    if (target.kind !== 'draft') return 'A session keeps the worktree it was created in.'
+    if (inFlight.current) return 'Wait for the current submission to finish.'
+    return draftWorktreeReason(worktree, mode)
+  }
+  function setWorktreeMode(mode: SessionWorktreeTarget['kind']) {
+    const reason = worktreeModeReason(mode)
+    if (reason) {
+      setError(reason)
+      return false
+    }
+    drafts.update(key, { worktreeMode: mode })
+    setError(null)
+    return true
+  }
+  const sendDisabledReason = draftWorktreeReason(
+    worktree,
+    target.kind === 'draft' ? draft.worktreeMode : 'current',
+  )
+
   async function run(command: ClientOrchestrationCommand) {
     setError(null)
     if (ready.connection.kind !== 'live') {
@@ -87,9 +108,17 @@ export function useStage({
     }
   }
   async function send(text?: string, implement: 'current' | 'new' | null = null) {
-    if (inFlight.current || busy || !worktreeId) return false
+    if (inFlight.current || busy || !worktreeId || target.kind === 'terminal') return false
     if (text !== undefined && text !== drafts.read(key).text) drafts.update(key, { text })
     const sent = drafts.read(key)
+    const reason = draftWorktreeReason(
+      worktree,
+      target.kind === 'draft' ? sent.worktreeMode : 'current',
+    )
+    if (reason) {
+      setError(reason)
+      return false
+    }
     const modelSelection =
       sent.modelSelection ?? conversation?.modelSelection ?? project?.defaultModelSelection
     if (!modelSelection) {
@@ -118,17 +147,25 @@ export function useStage({
     }
     if (plan && !implementing) options.interactionMode = 'plan'
     if (implementing) options.interactionMode = 'default'
-    const submission =
-      conversation && implementing !== 'new'
-        ? createTurnSubmission({ ...options, sessionId: conversation.id })
-        : createDraftSessionSubmission({
-            ...options,
-            worktreeTarget: { kind: 'current', worktreeId },
-            title:
-              implementing && plan ? planImplementationSessionTitle(plan.planMarkdown) : undefined,
-          })
     const intent = implementing ?? 'send'
-    const command = drafts.pending(key, sent, intent) ?? submission.command
+    let command = drafts.pending(key, sent, intent)
+    if (!command) {
+      const submission =
+        conversation && implementing !== 'new'
+          ? createTurnSubmission({ ...options, sessionId: conversation.id })
+          : createDraftSessionSubmission({
+              ...options,
+              worktreeTarget: draftWorktreeTarget(
+                worktreeId,
+                target.kind === 'draft' ? sent.worktreeMode : 'current',
+              ),
+              title:
+                implementing && plan
+                  ? planImplementationSessionTitle(plan.planMarkdown)
+                  : undefined,
+            })
+      command = submission.command
+    }
     drafts.retain(key, sent, intent, command)
     inFlight.current = true
     setSubmitting(true)
@@ -161,6 +198,9 @@ export function useStage({
     plan,
     submitting,
     error,
+    sendDisabledReason,
+    worktreeModeReason,
+    setWorktreeMode,
     setError,
     run,
     send,

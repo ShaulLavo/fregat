@@ -109,6 +109,32 @@ Select terminal output and use **Ask agent about terminal selection** to attach 
 a prompt. Excerpt line numbers start at one within the captured text. A dropped terminal connection
 shows **F1 → Reconnect terminal**, which reattaches the existing PTY or retries pending history sync.
 
+## Choose and manage worktrees
+
+Before the first send, use **F1 → Choose session worktree** or click the choice above the prompt.
+**Send to current branch** uses the selected checkout. **New worktree** creates a separate Git
+checkout from its current commit when you send. Uncommitted changes stay in the original checkout.
+The choice and prompt survive navigation and reconnection. Existing sessions keep their checkout.
+
+**Choose existing checkout** filters the project's branches and paths. Each checkout retains its
+own draft. **New session in a new worktree** opens a draft based on the focused session's checkout
+or the selected project. It creates nothing until the first send.
+
+The session row and stage header show branch, shared use, and worktree lifecycle state. Open
+**Manage project worktrees** from F1 or the rail actions to retry failed creation, open a checkout,
+or start a session there. The manager remains available after the last session is deleted.
+
+**Clean up…** asks for confirmation and preserves working changes. If cleanup finds changes,
+**Discard changes…** shows a separate preview and confirmation. Changed files require a new
+confirmation. Running processes, remaining sessions, and protected checkouts prevent cleanup.
+Cleanup retains branches and commits. **Retain checkout** keeps a blocked checkout; **Release…**
+keeps its files and transfers cleanup responsibility outside Platform. Missing and unclaimed
+checkouts have explicit resolution and adoption actions.
+In worktree action and confirmation dialogs, **Page Up** and **Page Down** scroll the details.
+Arrow keys select actions; the selected action stays visible in small terminals.
+
+See the [TUI worktree record](../../docs/tui-worktrees.md) for ownership and verification.
+
 ## Open a workbench
 
 Press **Ctrl+K, then W** to open the selected project's checkout, or the server's start folder

@@ -8,7 +8,7 @@ import {
   DialogTitle,
 } from '@workspace/ui/components/dialog'
 import { Spinner } from '@workspace/ui/components/spinner'
-import type { WorktreeConfirmation } from '@/features/chat-mode/utils/worktree-commands'
+import type { WorktreeConfirmation } from '@workspace/client-core/chat/worktrees/commands'
 
 export function WorktreeCleanupDialog({
   confirmation,

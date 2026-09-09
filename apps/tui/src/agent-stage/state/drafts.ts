@@ -22,6 +22,7 @@ const draftSchema = v.object({
   modelSelection: v.nullable(modelSelectionSchema),
   runtimeMode: v.nullable(runtimeModeSchema),
   interactionMode: v.nullable(interactionModeSchema),
+  worktreeMode: v.optional(v.picklist(['current', 'new']), 'current'),
   elements: v.optional(v.array(promptElementSchema), []),
   terminalContexts: v.optional(v.array(terminalContextSchema), []),
 })
@@ -37,6 +38,7 @@ const emptyDraft: ComposerDraft = {
   modelSelection: null,
   runtimeMode: null,
   interactionMode: null,
+  worktreeMode: 'current',
   elements: [],
   terminalContexts: [],
 }
@@ -113,12 +115,14 @@ export function createDrafts(storage: FileStorage) {
     },
     history(key: string, direction: -1 | 1) {
       const entries = storage.keys('agent.history:')
-      const cursor = historyCursors.get(key) ?? { index: entries.length, draft: read(key) }
+      const current = read(key)
+      const cursor = historyCursors.get(key) ?? { index: entries.length, draft: current }
       const index = Math.max(0, Math.min(entries.length, cursor.index + direction))
       historyCursors.set(key, { ...cursor, index })
-      if (index === entries.length) return write(key, cursor.draft)
+      if (index === entries.length)
+        return write(key, { ...cursor.draft, worktreeMode: current.worktreeMode })
       const stored = storage.getItem(entries[index])
-      if (stored) write(key, parseDraft(stored))
+      if (stored) write(key, { ...parseDraft(stored), worktreeMode: current.worktreeMode })
     },
     takeInbox(key: string, worktreeId: WorktreeId) {
       const contexts = readInbox(storage, worktreeId)
@@ -143,7 +147,14 @@ export function createDrafts(storage: FileStorage) {
     clearContent(key: string, sent: ComposerDraft) {
       const current = read(key)
       if (current !== sent) return
-      const cleared = { ...current, text: '', attachments: [], elements: [], terminalContexts: [] }
+      const cleared: ComposerDraft = {
+        ...current,
+        text: '',
+        attachments: [],
+        elements: [],
+        terminalContexts: [],
+        worktreeMode: 'current',
+      }
       storage.updateItem(key, (value) =>
         value && isDeepStrictEqual(parseDraft(value), v.parse(draftSchema, sent))
           ? JSON.stringify(cleared)

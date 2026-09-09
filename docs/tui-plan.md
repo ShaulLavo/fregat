@@ -13,7 +13,10 @@ Plan 081 completed on 2026-09-07. Its [workbench record](tui-workbench.md) cover
 viewer and external editing, Git, search, problems, logs, terminal, and native feasibility checks.
 Plan 082 completed on 2026-09-07. Its [Agent view record](tui-agent.md) covers the prompt, streamed
 timeline, session rail, provider controls, blocking requests, plans, and terminal history return.
-The executable plans were deleted after their checks passed. Worktree parity (083) is next.
+Plan 083 completed on 2026-09-08 with checkout choice, first-send worktree creation,
+lifecycle status, and cleanup.
+Its [worktree record](tui-worktrees.md) covers the implementation and native verification.
+Distribution (084) is next.
 
 ## 0. What the TUI is
 
@@ -443,8 +446,8 @@ the published tree-sitter worker fails under both Bun and standalone compilation
 | **083 — Worktree and session creation parity** | "Send to current branch / New worktree" picker, worktree chips, cleanup                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                      | 082, 069                                                                                                                             |
 | **084 — Distribution and machines**            | Compiled binaries, launcher package, attach-or-launch, machine chips and filter, one transport per machine, SSH forward through the launcher module shared with desktop                                                                                                                                                                                                                                                                                                                                                                                                                      | 082, S2, 078 (shared launcher module)                                                                                                |
 
-Plans 079, 081, and 082 are complete. Plan 080 belongs to platform keybinding modes; TUI follow-ups
-start at 083. Numbers are never reused. Each slice follows the executable-plan skeleton
+Plans 079, 081, 082, and 083 are complete. Plan 080 belongs to platform keybinding modes; TUI follow-ups
+start at 084. Numbers are never reused. Each slice follows the executable-plan skeleton
 in `plans/077` (status block, drift-check preamble, locks, verified source, outcome, locked design,
 scope, git and state policy, phases with narrow verification, done-when, STOP conditions,
 maintenance) and registers a row in `plans/README.md`. Root `PLAN.md` schedules them.

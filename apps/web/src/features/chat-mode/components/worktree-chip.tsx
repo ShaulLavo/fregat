@@ -2,7 +2,7 @@ import type { OrchestrationProjectShell, OrchestrationWorktreeShell } from '@wor
 import { GitBranchIcon } from '@phosphor-icons/react'
 import { OrbitLoader } from '@workspace/ui/components/orbit-loader'
 import { cn } from '@workspace/ui/lib/utils'
-import { worktreeLabel, worktreeLifecycleLabel } from '@/features/chat-mode/utils/worktree-label'
+import { worktreeLabel, worktreeLifecycleLabel } from '@workspace/client-core/chat/worktrees/label'
 
 export function WorktreeChip({
   worktree,

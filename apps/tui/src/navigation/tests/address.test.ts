@@ -1,6 +1,8 @@
 import { emptyAddress, formatAddress, parseAddress } from '@workspace/client-core/address/grammar'
 import { workspaceToken } from '@workspace/client-core/address/workspace'
 import { registerWorkspaceAddress } from '@workspace/client-core/files/workspace-address'
+import { readChatShell } from '@workspace/client-core/chat/snapshots'
+import assert from 'node:assert/strict'
 import { mkdir, symlink } from 'node:fs/promises'
 import path from 'node:path'
 import { readServerPaths } from '@workspace/client-core/files/read'
@@ -8,14 +10,65 @@ import { environmentIdSchema } from '@workspace/contracts'
 import * as v from 'valibot'
 
 import {
+  agentAddress,
   fileAddress,
   resolveAddress,
   settingsAddress,
   workbenchAddress,
 } from '@/navigation/utils/address'
 import { test, expect } from '../../../test/fixtures'
+import { draftChatTurn } from '../../../test/factories/chat'
+import { gitCommand } from '../../../test/factories/git-workbench'
+import { openManagedTestChat } from '../../../test/factories/worktrees'
 
 const environmentId = v.parse(environmentIdSchema, '11111111-1111-4111-8111-111111111111')
+
+test('chat addresses select the live checkout when a removed checkout path is reused', async ({
+  client,
+  server,
+}) => {
+  const { session, chat, worktree, repository, cleanupRequest } = await openManagedTestChat(server)
+  try {
+    assert(worktree.branch)
+    const address = await agentAddress(
+      environmentId,
+      {
+        kind: 'agent',
+        projectId: worktree.projectId,
+        sessionId: null,
+        worktreeId: worktree.id,
+      },
+      { client, signal: session.signal },
+      chat.getSnapshot().projection,
+    )
+    await cleanupRequest()
+    expect(chat.getSnapshot().projection.worktreeById[worktree.id]?.lifecycle.state).toBe('removed')
+    await gitCommand(repository, 'worktree', 'add', worktree.canonicalPath, worktree.branch)
+    const removedAddress = await resolveAddress(address, client, environmentId, session.signal)
+    const liveId = await session.ensureWorktree(worktree.path)
+    expect(liveId).not.toBe(worktree.id)
+    const snapshot = await readChatShell(client, session.signal)
+    expect(snapshot.worktrees.filter((item) => item.path === worktree.path)).toHaveLength(2)
+    const location = await resolveAddress(address, client, environmentId, session.signal)
+    expect(location).toEqual({
+      kind: 'agent',
+      sessionId: null,
+      projectId: worktree.projectId,
+      worktreeId: liveId,
+    })
+    expect(removedAddress).toMatchObject({ kind: 'failed' })
+    assert(location.kind === 'agent' && location.worktreeId)
+    const submission = draftChatTurn(location.worktreeId)
+    await chat.dispatch(submission.command)
+    await chat.refresh()
+    expect(
+      chat.getSnapshot().projection.sessionById[submission.command.sessionId]?.worktreeId,
+    ).toBe(liveId)
+  } finally {
+    session.dispose()
+    await session.flush()
+  }
+})
 
 test('settings addresses round-trip filters and reject foreign environments', async ({
   client,

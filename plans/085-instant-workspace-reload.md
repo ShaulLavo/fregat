@@ -179,6 +179,8 @@ Distinguish unknown transcript detail from a confirmed empty conversation. Prese
 
 ## Milestone 5: make native preview handoff continuous
 
+The proposed [editor-owned first-paint design](../docs/editor-first-paint-design.md) specifies provisional native display state, opaque snapshots, and replacement by the first authoritative paint in one commit. It preserves synchronous Editor construction and does not add a separate preview owner. Reconcile that design before implementing the editor portion below.
+
 Work in `features/workbench/hooks/use-editor-visible-snapshot.ts`, its renderer/cache admission, and the native contracts used by milestones 2–4.
 
 Replace deadline-only dismissal with an explicit readiness/failure decision. The current 1500 ms fail-safe must not erase the only useful content while the live document is pending. A stalled or failed live view remains observable through the shared pending/retry presentation and diagnostic reason.

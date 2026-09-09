@@ -105,6 +105,8 @@ Native editing becomes available only when the live document can accept input. U
 
 ## Slow connections and paint handoff
 
+The proposed [editor-owned first-paint design](editor-first-paint-design.md) refines the editor boundary here. Saved paint is provisional state in the existing native view, replaced by authoritative paint in one commit. Editor owns decoding, layout admission, and rendering; Platform retains persistence, file identity/freshness checks, and loading/retry presentation.
+
 Preserve saved read-only content while its matching live view is still pending. Change the editor's current 1500 ms dismissal into an explicit waiting or failure state when there is no live content to reveal. This is a deliberate change to the original snapshot policy, which used the deadline to prevent a preview from hiding a stalled editor.
 
 That change must retain an observable live failure. A real missing-file response, identity mismatch, changed revision, incompatible paint format, or user navigation ends the old preview. A network timeout can retain saved content with a clear retry state. Never report the cached preview as live readiness.

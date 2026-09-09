@@ -18,7 +18,8 @@ function equal(left: Location, right: Location) {
     return (
       right.kind === 'agent' &&
       left.sessionId === right.sessionId &&
-      left.projectId === right.projectId
+      left.projectId === right.projectId &&
+      (left.worktreeId ?? null) === (right.worktreeId ?? null)
     )
   if (left.kind === 'settings') return right.kind === 'settings' && left.query === right.query
   if (left.kind === 'workbench')

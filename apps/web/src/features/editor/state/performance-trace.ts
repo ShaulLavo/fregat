@@ -104,7 +104,6 @@ const LAYOUT_PARAM = 'editorPerfLayout'
 const SLOW_FRAME_MS = 16.7
 const LONG_FRAME_MS = 50
 const MAX_TRACE_EVENTS = 5000
-const EDITOR_VISIBLE_SNAPSHOT_SELECTOR = '[data-editor-visible-snapshot]'
 
 export type EditorPerformanceLayoutVariant = 'absolute-rows' | 'default'
 
@@ -411,9 +410,7 @@ function editorRowTextCharacters(rows: readonly Element[]): number {
 }
 
 function liveEditorElements(document: Document, selector: string): Element[] {
-  return Array.from(document.querySelectorAll(selector)).filter(
-    (element) => !element.closest(EDITOR_VISIBLE_SNAPSHOT_SELECTOR),
-  )
+  return Array.from(document.querySelectorAll(selector))
 }
 
 function targetLabel(target: EventTarget | null): string {

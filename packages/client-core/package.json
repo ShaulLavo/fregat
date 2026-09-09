@@ -88,7 +88,10 @@
     "./chat/providers/selection": "./src/chat/providers/selection.ts",
     "./chat/snapshots": "./src/chat/snapshots.ts",
     "./chat/context-usage": "./src/chat/context-usage.ts",
-    "./files/workspace-address": "./src/files/workspace-address.ts"
+    "./files/workspace-address": "./src/files/workspace-address.ts",
+    "./chat/worktrees/label": "./src/chat/worktrees/label.ts",
+    "./chat/worktrees/cleanup": "./src/chat/worktrees/cleanup.ts",
+    "./chat/worktrees/commands": "./src/chat/worktrees/commands.ts"
   },
   "scripts": {
     "build": "tsgo --noEmit",

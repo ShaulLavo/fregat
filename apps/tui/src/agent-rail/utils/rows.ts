@@ -5,6 +5,7 @@ import type {
   SessionSearchMatches,
 } from '@workspace/client-core/chat/rail/model'
 import type { ProjectId, SessionId } from '@workspace/contracts'
+import { worktreeSummary } from '@/worktrees/utils/summary'
 
 export type RailRow =
   | { readonly kind: 'project'; readonly project: SessionRailProject }
@@ -33,9 +34,7 @@ export function railRows(
         rows.push({
           key: session.key,
           name: `${marked.includes(session.id) ? '☑' : ' '} ${session.unread ? '● ' : ''}${session.title}`,
-          description:
-            search[session.key]?.snippet.replaceAll(/\s+/g, ' ') ??
-            `${section.title}${session.archived ? ' · archived' : ''}${session.origin === 'discovered' ? ' · imported' : ''}${session.branch ? ` · ${session.branch}` : ''}`,
+          description: `${worktreeSummary(session.worktree, session.repositoryKind)} · ${search[session.key]?.snippet.replaceAll(/\s+/g, ' ') ?? section.title}${session.archived ? ' · archived' : ''}${session.origin === 'discovered' ? ' · imported' : ''}`,
           value: { kind: 'session', session },
         })
     }

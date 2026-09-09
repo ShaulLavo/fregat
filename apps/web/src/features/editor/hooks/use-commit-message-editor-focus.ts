@@ -6,7 +6,7 @@ import { rowStartOffset } from '@/features/editor/utils/position'
 
 type UseCommitMessageEditorFocusOptions = {
   controller: ReactEditorController
-  document: Pick<EditorRenderDocument, 'buffer' | 'path'>
+  document: Pick<EditorRenderDocument, 'buffer' | 'path'> | null
 }
 
 export function useCommitMessageEditorFocus({
@@ -17,7 +17,7 @@ export function useCommitMessageEditorFocus({
 
   useEffect(() => {
     const editor = controller.getEditor()
-    if (!editor) return
+    if (!editor || !document) return
     if (!isGitCommitMessagePath(document.path)) {
       preparedPathRef.current = null
       return
@@ -28,7 +28,7 @@ export function useCommitMessageEditorFocus({
     const offset = rowStartOffset(document.buffer.getTextSnapshot(), 1)
     editor.setSelection(offset, offset, offset)
     editor.focus()
-  }, [controller, document.buffer, document.path])
+  }, [controller, document])
 }
 
 function isGitCommitMessagePath(path: string) {

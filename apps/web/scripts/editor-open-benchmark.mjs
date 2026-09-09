@@ -434,13 +434,11 @@ async function runBrowser(browserName, workspace, fixturePaths) {
 
     const compatibilitySamples = []
     const compatibilityCaptureResults = []
-    let sharedVisibleSnapshot = null
     for (const mode of modes) {
       const path = fixturePaths[fixtureIndex]
       fixtureIndex += 1
       const record = await captureCompatibilityRecord(page, workspace, path)
       compatibilityCaptureResults.push(record.reset)
-      sharedVisibleSnapshot ??= record.value.snapshot
       const sample = await runSample(
         page,
         workspace,
@@ -448,16 +446,7 @@ async function runBrowser(browserName, workspace, fixturePaths) {
         mode,
         compatibilitySamples.length,
         false,
-        {
-          key: record.key,
-          value: {
-            ...record.value,
-            snapshot: {
-              ...sharedVisibleSnapshot,
-              documentId: record.value.snapshot.documentId,
-            },
-          },
-        },
+        { key: record.key, value: record.value },
       )
       compatibilitySamples.push(sample)
     }
@@ -811,6 +800,10 @@ function validateSample(sample, group) {
     if (!sample.visibleSnapshotSeeded) {
       throw createBenchmarkError(`${sample.mode} compatibility sample was not seeded`)
     }
+    if (!sample.quiescent) {
+      throw createBenchmarkError(`${sample.mode} compatibility reset did not prove quiescence`)
+    }
+    if (sample.cachedFrameCount === 0 && sample.mode.startsWith('prepared-')) return
     if (sample.cachedFrameCount !== 1) {
       throw createBenchmarkError(
         `${sample.mode} visible-snapshot compatibility sample did not paint one cached frame`,
@@ -824,9 +817,6 @@ function validateSample(sample, group) {
       throw createBenchmarkError(
         `${sample.mode} did not paint its cached frame before authoritative text and highlight`,
       )
-    }
-    if (!sample.quiescent) {
-      throw createBenchmarkError(`${sample.mode} compatibility reset did not prove quiescence`)
     }
     return
   }

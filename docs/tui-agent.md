@@ -99,5 +99,5 @@ terminal/provider checks pass 58 tests, and migrated web logic checks pass 168 t
 server builds, TUI lint and formatting, and client-core, server, and web typechecks pass.
 The live check rebuilt and restarted the existing server on port 3301, wrote a native Agent frame,
 and launched the desktop terminal. Structured TUI logs confirm the interactive connection is live.
-Advanced worktree creation (083) and distribution with machine selection (084) remain separate
-slices in the [strategy](tui-plan.md).
+Worktree creation and cleanup are covered by the [TUI worktree record](tui-worktrees.md).
+Distribution with machine selection (084) remains a separate slice in the [strategy](tui-plan.md).

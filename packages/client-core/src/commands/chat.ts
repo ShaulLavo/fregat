@@ -35,6 +35,13 @@ export const chatCommandMetadata = {
   'chat.popStash': chat('chat.popStash', 'Restore stashed prompt'),
   'chat.attachFiles': chat('chat.attachFiles', 'Attach files'),
   'chat.openModelPicker': chat('chat.openModelPicker', 'Choose model', 'M'),
+  'chat.chooseWorktreeMode': chat('chat.chooseWorktreeMode', 'Choose session worktree'),
+  'chat.chooseCheckout': chat('chat.chooseCheckout', 'Choose existing checkout'),
+  'chat.manageWorktrees': chat('chat.manageWorktrees', 'Manage project worktrees'),
+  'workspace.newIsolatedSession': chat(
+    'workspace.newIsolatedSession',
+    'New session in a new worktree',
+  ),
   'chat.toggleInteractionMode': chat('chat.toggleInteractionMode', 'Toggle plan mode'),
   'chat.toggleRuntimeMode': chat('chat.toggleRuntimeMode', 'Change access mode'),
   'chat.loadEarlier': chat('chat.loadEarlier', 'Load earlier messages'),

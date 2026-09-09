@@ -67,7 +67,7 @@ test('real registered project and session addresses round-trip without changing 
     expect(
       await resolveAddress(address, client, ready.descriptor.environmentId, session.signal),
     ).toEqual(location)
-    const draft = { ...location, sessionId: null }
+    const draft = { ...location, sessionId: null, worktreeId }
     expect(
       await resolveAddress(
         await agentAddress(

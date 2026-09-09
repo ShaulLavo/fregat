@@ -1,6 +1,11 @@
 import { useEffect, useLayoutEffect, useRef, useState, useSyncExternalStore } from 'react'
 import { useTerminalDimensions } from '@opentui/react'
-import { scopedSessionKey, type ProjectId, type SessionId } from '@workspace/contracts'
+import {
+  scopedSessionKey,
+  type ProjectId,
+  type SessionId,
+  type WorktreeId,
+} from '@workspace/contracts'
 import {
   selectChatProjects,
   selectChatSessions,
@@ -25,8 +30,12 @@ import { railRows, type RailRow } from '@/agent-rail/utils/rows'
 import { railKeyTarget } from '@/agent-rail/utils/command-target'
 import { RailPrompt } from '@/agent-rail/components/prompt'
 import { RailMenu } from '@/agent-rail/components/menu'
+import { currentWorktree } from '@/agent/utils/selection'
+import { draftsForStorage, draftKey } from '@/agent-stage/state/drafts'
+import { WorktreeManager } from '@/worktrees/components/manager'
 import { useCommands } from '@/commands/hooks/use-commands'
 import type { CommandContext } from '@/commands/state/bus'
+import type { FocusToken } from '@/commands/state/focus'
 import { usePaneFocus } from '@/commands/hooks/use-pane-focus'
 import { useCommandHandlers } from '@/commands/hooks/use-command-handlers'
 import { Prompt } from '@/components/prompt'
@@ -39,30 +48,37 @@ import type { Theme } from '@/theme/utils/theme'
 
 type Modal =
   | { kind: 'closed' }
-  | { kind: 'add' }
+  | { kind: 'add'; origin: FocusToken | null }
   | { kind: 'menu' | 'rename'; row: RailRow }
   | { kind: 'delete-project'; row: Extract<RailRow, { kind: 'project' }> }
   | { kind: 'delete-sessions'; sessions: readonly SessionRailItem[] }
+  | { kind: 'worktrees'; projectId: ProjectId; origin: FocusToken | null }
 
 export function AgentRail({
   session,
   ready,
   projectId,
   sessionId,
+  worktreeId,
   theme,
   enabled,
+  focusable,
   onSelectProject,
   onSelectSession,
+  onSelectWorktree,
   onOpenWorkbench,
 }: {
   readonly session: SettingsSession
   readonly ready: Extract<SessionState, { kind: 'ready' }>
   readonly projectId: ProjectId | null
   readonly sessionId: SessionId | null
+  readonly worktreeId: WorktreeId | null
   readonly theme: Theme
   readonly enabled: boolean
+  readonly focusable: boolean
   readonly onSelectProject: (id: ProjectId | null) => void
   readonly onSelectSession: (id: SessionId) => void
+  readonly onSelectWorktree: (id: WorktreeId) => void
   readonly onOpenWorkbench: (path: string) => void | Promise<void>
 }) {
   const commands = useCommands()
@@ -79,6 +95,13 @@ export function AgentRail({
   const [filtering, setFiltering] = useState(false)
   const [modal, setModal] = useState<Modal>({ kind: 'closed' })
   const projection = chat.projection
+  const managedProject = modal.kind === 'worktrees' ? projection.projectById[modal.projectId] : null
+  const paneEnabled = enabled && focusable
+  useLayoutEffect(() => {
+    if (modal.kind !== 'worktrees' || managedProject || chat.status !== 'ready') return
+    setModal({ kind: 'closed' })
+    commands.focus.request({ kind: 'match', matches: (target) => target.widgetId === 'agent-rail' })
+  }, [modal, managedProject, chat.status, commands.focus])
   const sessions = selectChatSessions(projection)
   const model = sessionRailModel({
     environments: [
@@ -117,13 +140,13 @@ export function AgentRail({
   const focused = usePaneFocus({
     id: 'agent-rail',
     area: 'chat',
-    enabled: enabled && !filtering && modal.kind === 'closed',
+    enabled: paneEnabled && !filtering && modal.kind === 'closed',
   })
   const filterFocused = usePaneFocus({
     id: 'agent-rail-filter',
     area: 'chat',
     textEntry: true,
-    enabled: enabled && filtering && modal.kind === 'closed',
+    enabled: paneEnabled && filtering && modal.kind === 'closed',
   })
   useEffect(() => () => store.dispose(), [store])
   const completedAt = sessionId
@@ -142,6 +165,10 @@ export function AgentRail({
   }
   function close() {
     setModal({ kind: 'closed' })
+    if (modal.kind === 'worktrees' || modal.kind === 'add') {
+      commands.focus.restore(modal.origin)
+      return
+    }
     restoreFocus()
   }
   function open(index = latestSelection.current) {
@@ -157,9 +184,40 @@ export function AgentRail({
   }
   function newSession(context: CommandContext) {
     const fromRail = context.target?.widgetId.startsWith('agent-rail') === true
-    const id = fromRail ? rowProject(rows[latestSelection.current]?.value) : projectId
-    if (id) onSelectProject(id)
-    else setModal({ kind: 'add' })
+    startSession(fromRail ? rows[latestSelection.current]?.value : undefined)
+  }
+  function checkout(row?: RailRow) {
+    if (row?.kind === 'session') return row.session.worktree
+    if (row?.kind === 'project') return currentWorktree(projection, row.project.id)
+    if (worktreeId) return projection.worktreeById[worktreeId] ?? null
+    return currentWorktree(projection, projectId)
+  }
+  function startSession(row?: RailRow, isolated = false) {
+    const worktree = checkout(row)
+    if (!worktree) {
+      setModal({ kind: 'add', origin: commands.focus.capture() })
+      return
+    }
+    const project = projection.projectById[worktree.projectId]
+    if (isolated && (project?.repositoryKind !== 'git' || worktree.lifecycle.state !== 'ready')) {
+      store.setError('A new worktree requires a ready Git checkout.')
+      return
+    }
+    const target = { kind: 'draft', worktreeId: worktree.id } as const
+    draftsForStorage(ready.storage).update(draftKey(target), {
+      worktreeMode: isolated ? 'new' : 'current',
+    })
+    setModal({ kind: 'closed' })
+    onSelectWorktree(worktree.id)
+    commands.focus.request({
+      kind: 'match',
+      matches: (target) => target.widgetId === 'agent-composer',
+    })
+  }
+  function manageWorktrees(row?: RailRow, origin = commands.focus.capture()) {
+    const worktree = checkout(row)
+    const id = row?.kind === 'project' ? row.project.id : (worktree?.projectId ?? projectId)
+    if (id) setModal({ kind: 'worktrees', projectId: id, origin })
   }
   function mark(range = false) {
     if (current?.kind !== 'session') return
@@ -273,6 +331,32 @@ export function AgentRail({
   useCommandHandlers(
     {
       'workspace.newSession': { run: newSession },
+      'workspace.newIsolatedSession': {
+        run: (context) =>
+          startSession(
+            context.target?.widgetId.startsWith('agent-rail')
+              ? rows[latestSelection.current]?.value
+              : undefined,
+            true,
+          ),
+      },
+      'chat.manageWorktrees': {
+        run: (context) =>
+          manageWorktrees(
+            context.target?.widgetId.startsWith('agent-rail')
+              ? rows[latestSelection.current]?.value
+              : undefined,
+            context.target?.token ?? null,
+          ),
+      },
+      'agent.addProject': {
+        run: (context) => setModal({ kind: 'add', origin: context.target?.token ?? null }),
+      },
+    },
+    enabled && modal.kind === 'closed' && !state.busy,
+  )
+  useCommandHandlers(
+    {
       'workspace.nextSession': { run: () => adjacent(1) },
       'workspace.previousSession': { run: () => adjacent(-1) },
       'workspace.jumpToSession1': {
@@ -339,7 +423,6 @@ export function AgentRail({
           if (current) setModal({ kind: 'menu', row: current })
         },
       },
-      'agent.addProject': { run: () => setModal({ kind: 'add' }) },
       'agent.rename': {
         run: () => {
           if (current) setModal({ kind: 'rename', row: current })
@@ -370,7 +453,7 @@ export function AgentRail({
           ),
       },
     },
-    enabled && modal.kind === 'closed' && !state.busy,
+    paneEnabled && modal.kind === 'closed' && !state.busy,
   )
 
   async function submit(text: string) {
@@ -529,6 +612,29 @@ export function AgentRail({
           onClose={close}
         />
       )}
+      {modal.kind === 'worktrees' && managedProject && (
+        <WorktreeManager
+          key={managedProject.id}
+          session={session}
+          chat={ready.chat}
+          project={managedProject}
+          currentWorktreeId={worktreeId}
+          theme={theme}
+          onClose={close}
+          onSelectWorktree={(id) => {
+            draftsForStorage(ready.storage).update(draftKey({ kind: 'draft', worktreeId: id }), {
+              worktreeMode: 'current',
+            })
+            setModal({ kind: 'closed' })
+            onSelectWorktree(id)
+            commands.focus.request({
+              kind: 'match',
+              matches: (target) => target.widgetId === 'agent-composer',
+            })
+          }}
+          onOpenWorkbench={onOpenWorkbench}
+        />
+      )}
       {menuRow && (
         <RailMenu
           title={menuRow.kind === 'project' ? menuRow.project.title : menuRow.session.title}
@@ -537,11 +643,10 @@ export function AgentRail({
           actions={[
             {
               label: 'New session',
-              run: () => {
-                setModal({ kind: 'closed' })
-                onSelectProject(rowProject(menuRow))
-              },
+              run: () => startSession(menuRow),
             },
+            { label: 'New session in a new worktree', run: () => startSession(menuRow, true) },
+            { label: 'Manage worktrees', run: () => manageWorktrees(menuRow) },
             { label: 'Rename', run: () => setModal({ kind: 'rename', row: menuRow }) },
             {
               label: 'Archive / unarchive',

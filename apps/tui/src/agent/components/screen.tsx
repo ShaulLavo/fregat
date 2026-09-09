@@ -9,7 +9,7 @@ import { Toast } from '@/components/toast'
 import { useCommands } from '@/commands/hooks/use-commands'
 import { useCommandHandlers } from '@/commands/hooks/use-command-handlers'
 import type { FocusTarget } from '@/commands/state/focus'
-import { stageTarget, selectedProject } from '@/agent/utils/selection'
+import { stageTarget, selectedProject, selectedWorktree } from '@/agent/utils/selection'
 import type { AgentLocation, StageTarget } from '@/agent/utils/target'
 import type { SessionState, SettingsSession } from '@/connection/state/session'
 import type { Theme } from '@/theme/utils/theme'
@@ -43,12 +43,18 @@ export function AgentScreen({
   const projectId = selectedProject(snapshot.projection, location)
   const sameTerminalLocation =
     terminal?.location.sessionId === location.sessionId &&
-    terminal?.location.projectId === location.projectId
+    terminal?.location.projectId === location.projectId &&
+    (terminal?.location.worktreeId ?? null) === (location.worktreeId ?? null)
   const target = sameTerminalLocation ? terminal.target : stageTarget(snapshot.projection, location)
   const missingSession =
     snapshot.status === 'ready' &&
     location.sessionId !== null &&
     !snapshot.projection.sessionById[location.sessionId]
+  const missingWorktree =
+    snapshot.status === 'ready' &&
+    location.sessionId === null &&
+    !!location.worktreeId &&
+    !snapshot.projection.worktreeById[location.worktreeId]
   const narrow = width < 100
   const focusedTarget = focus.current?.capabilities.overlay
     ? focus.lastCommandTarget
@@ -75,7 +81,7 @@ export function AgentScreen({
       return
     }
     const projectId = snapshot.projection.worktreeById[target.worktreeId]?.projectId ?? null
-    onNavigate({ kind: 'agent', projectId, sessionId: null })
+    onNavigate({ kind: 'agent', projectId, sessionId: null, worktreeId: target.worktreeId })
   }
   function focusStage(item: FocusTarget) {
     if (target?.kind === 'terminal') return item.widgetId === `terminal-${target.terminalId}`
@@ -125,13 +131,18 @@ export function AgentScreen({
             ready={ready}
             projectId={projectId}
             sessionId={location.sessionId}
+            worktreeId={
+              location.worktreeId ?? selectedWorktree(snapshot.projection, location)?.id ?? null
+            }
             theme={theme}
-            enabled={enabled && (showRail || narrow)}
+            enabled={enabled}
+            focusable={showRail || narrow}
             onSelectProject={(projectId) => {
               setTerminal(null)
               onNavigate({ kind: 'agent', projectId, sessionId: null })
             }}
             onSelectSession={selectSession}
+            onSelectWorktree={(worktreeId) => select({ kind: 'draft', worktreeId })}
             onOpenWorkbench={onOpenWorkbench}
           />
         </box>
@@ -144,7 +155,7 @@ export function AgentScreen({
           overflow='hidden'
         >
           {snapshot.status === 'loading' && <LoadingState theme={theme} />}
-          {snapshot.status !== 'loading' && !missingSession && target && (
+          {snapshot.status !== 'loading' && !missingSession && !missingWorktree && target && (
             <AgentStage
               session={session}
               ready={ready}
@@ -161,7 +172,14 @@ export function AgentScreen({
               description='Choose a session in the rail or start a new one.'
             />
           )}
-          {snapshot.status !== 'loading' && !missingSession && !target && (
+          {missingWorktree && (
+            <EmptyState
+              theme={theme}
+              title='Checkout unavailable'
+              description='Choose an available checkout or start a session from the rail.'
+            />
+          )}
+          {snapshot.status !== 'loading' && !missingSession && !missingWorktree && !target && (
             <EmptyState
               theme={theme}
               title='Start a conversation'

@@ -4,6 +4,7 @@ export type AgentLocation = {
   readonly kind: 'agent'
   readonly projectId: ProjectId | null
   readonly sessionId: SessionId | null
+  readonly worktreeId?: WorktreeId | null
 }
 
 export type StageTarget =

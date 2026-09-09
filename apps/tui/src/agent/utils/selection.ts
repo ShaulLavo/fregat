@@ -12,22 +12,29 @@ export function currentWorktree(projection: ChatProjectionSlice, projectId: Proj
 export function selectedProject(projection: ChatProjectionSlice, location: AgentLocation) {
   const session = location.sessionId ? projection.sessionById[location.sessionId] : null
   if (session) return projection.worktreeById[session.worktreeId]?.projectId ?? null
+  const worktree = location.worktreeId ? projection.worktreeById[location.worktreeId] : null
+  if (worktree) return worktree.projectId
   if (location.projectId && projection.projectById[location.projectId]) return location.projectId
   return projection.projectIds[0] ?? null
 }
 
 export function selectedWorktree(projection: ChatProjectionSlice, location: AgentLocation) {
-  if (!location.sessionId) return currentWorktree(projection, selectedProject(projection, location))
-  const session = projection.sessionById[location.sessionId]
-  return session ? (projection.worktreeById[session.worktreeId] ?? null) : null
+  if (location.sessionId) {
+    const session = projection.sessionById[location.sessionId]
+    return session ? (projection.worktreeById[session.worktreeId] ?? null) : null
+  }
+  if (location.worktreeId) return projection.worktreeById[location.worktreeId] ?? null
+  return currentWorktree(projection, selectedProject(projection, location))
 }
 
 export function stageTarget(
   projection: ChatProjectionSlice,
   location: AgentLocation,
 ): StageTarget | null {
-  if (location.sessionId && projection.sessionById[location.sessionId])
-    return { kind: 'conversation', sessionId: location.sessionId }
-  const worktree = currentWorktree(projection, selectedProject(projection, location))
+  if (location.sessionId)
+    return projection.sessionById[location.sessionId]
+      ? { kind: 'conversation', sessionId: location.sessionId }
+      : null
+  const worktree = selectedWorktree(projection, location)
   return worktree ? { kind: 'draft', worktreeId: worktree.id } : null
 }

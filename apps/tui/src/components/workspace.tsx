@@ -236,7 +236,7 @@ export function Workspace({
         'Select a registered project before attaching terminal context.',
       )
     queuePrompt(state.storage, worktreeId, context)
-    visitAgent({ kind: 'agent', projectId: worktree.projectId, sessionId: null })
+    visitAgent({ kind: 'agent', projectId: worktree.projectId, sessionId: null, worktreeId })
   }
   async function openWorkbench(path?: string) {
     const request = ++navigationRequest.current
@@ -244,6 +244,16 @@ export function Workspace({
     const paths = await readServerPaths({ client: session.client, signal: session.signal })
     const projection = state.chat.getSnapshot().projection
     const agentWorktree = current.kind === 'agent' ? selectedWorktree(projection, current) : null
+    if (
+      path === undefined &&
+      current.kind === 'agent' &&
+      (current.worktreeId || current.sessionId) &&
+      !agentWorktree
+    )
+      throw createTuiError(
+        'This checkout is unavailable.',
+        'Choose an available checkout before opening its workbench.',
+      )
     let initial = path ?? paths.defaultPath
     if (path === undefined && agentWorktree) initial = agentWorktree.path
     if (path === undefined && (current.kind === 'files' || current.kind === 'workbench'))
@@ -350,7 +360,9 @@ export function Workspace({
     ...(host.suspend ? { 'workspace.suspend': { run: host.suspend } } : {}),
   })
   return (
-    <AgentNavigationContext value={{ openFile: openAgentFile, queuePrompt: queueAgentPrompt }}>
+    <AgentNavigationContext
+      value={{ openFile: openAgentFile, queuePrompt: queueAgentPrompt, openWorkbench }}
+    >
       <box flexGrow={1} minHeight={0} flexDirection='column' overflow='hidden'>
         {location.kind === 'agent' && (
           <AgentScreen

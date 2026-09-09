@@ -3,7 +3,7 @@ import { sessionIdSchema } from '@workspace/contracts'
 import { readChatShell } from '@workspace/client-core/chat/snapshots'
 import type { ChatProjectionSlice } from '@workspace/client-core/chat/types'
 import type { AgentLocation } from '@/agent/utils/target'
-import { currentWorktree, selectedProject } from '@/agent/utils/selection'
+import { selectedWorktree } from '@/agent/utils/selection'
 import {
   emptyAddress,
   formatAddress,
@@ -51,8 +51,12 @@ export async function agentAddress(
   connection: AddressConnection,
   projection?: ChatProjectionSlice,
 ) {
-  const projectId = projection ? selectedProject(projection, location) : null
-  const worktree = projection ? currentWorktree(projection, projectId) : null
+  const worktree = projection ? selectedWorktree(projection, location) : null
+  if (!worktree && (location.worktreeId || location.sessionId))
+    throw createTuiError(
+      'This checkout is unavailable.',
+      'Select an available checkout before copying its address.',
+    )
   const workspace = worktree ? await registerRoot(connection, worktree.path) : null
   return formatAddress({
     ...emptyAddress(),
@@ -208,18 +212,25 @@ async function resolveAgentAddress(
     return { kind: 'failed', message: 'This address does not identify a workspace.' } as const
   const root = await readWorkspaceAddress({ client, signal, id: workspace.id })
   const paths = await readServerPaths({ client, signal })
-  const worktree = snapshot.worktrees.find((item) => {
+  const matches = snapshot.worktrees.filter((item) => {
+    if (item.lifecycle.state === 'removed' || item.lifecycle.state === 'retired') return false
     const path = item.path.startsWith('/')
       ? relativePickerPath(item.path, paths.workspaceRoot)
       : item.path
     return path === root.path
   })
-  if (!worktree)
+  const [worktree] = matches
+  if (!worktree || matches.length !== 1)
     return {
       kind: 'failed',
       message: 'The project in this address is unknown or ambiguous.',
     } as const
-  return { kind: 'agent', sessionId: null, projectId: worktree.projectId } satisfies AgentLocation
+  return {
+    kind: 'agent',
+    sessionId: null,
+    projectId: worktree.projectId,
+    worktreeId: worktree.id,
+  } satisfies AgentLocation
 }
 
 async function registerRoot(connection: AddressConnection, rootPath: string) {

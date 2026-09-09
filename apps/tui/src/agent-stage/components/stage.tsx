@@ -25,6 +25,10 @@ import { Approval } from '@/agent-stage/components/approval'
 import { Question } from '@/agent-stage/components/question'
 import { PathDialog } from '@/agent-stage/components/path-dialog'
 import { CompletionPicker } from '@/agent-stage/components/completion'
+import { WorktreeMode } from '@/agent-stage/components/worktree-mode'
+import { WorktreeChip } from '@/worktrees/components/chip'
+import { WorktreePicker } from '@/worktrees/components/picker'
+import { WorktreeManager } from '@/worktrees/components/manager'
 import { ModelPicker } from '@/agent-models/components/picker'
 import {
   appendAttachment,
@@ -34,6 +38,7 @@ import {
 import { transcriptMarkdown } from '@/agent-stage/utils/timeline'
 import { expandedPrompt } from '@/agent-stage/utils/prompt'
 import { queuePrompt } from '@/agent-stage/state/inbox'
+import { draftKey } from '@/agent-stage/state/drafts'
 import { LoadingState } from '@/components/loading-state'
 import { TerminalView } from '@/terminal/components/view'
 import { useCommandHandlers } from '@/commands/hooks/use-command-handlers'
@@ -43,6 +48,7 @@ import { useSettingValue } from '@/settings/hooks/use-setting-value'
 import { externalEditorExecutable } from '@/host/external-editor'
 import type { Theme } from '@/theme/utils/theme'
 import { connectionFailure } from '@/connection/utils/failure'
+import { useAgentNavigation } from '@/navigation/hooks/use-agent-navigation'
 
 type Modal = { readonly key: string } & (
   | { readonly kind: 'attachment' }
@@ -50,6 +56,7 @@ type Modal = { readonly key: string } & (
   | { readonly kind: 'inbox' }
   | { readonly kind: 'changes'; readonly revert: boolean }
   | { readonly kind: 'completion'; readonly text: string }
+  | { readonly kind: 'worktree-mode' | 'checkout' | 'worktrees' }
 )
 export function AgentStage({
   session,
@@ -67,6 +74,7 @@ export function AgentStage({
   readonly enabled: boolean
 }) {
   const state = useStage({ ready, target, onSelect })
+  const navigation = useAgentNavigation()
   const { focus } = useCommands()
   const focusSnapshot = useSyncExternalStore(focus.subscribe, focus.getSnapshot)
   const overlayFocused = focusSnapshot.current?.capabilities.overlay === true
@@ -158,6 +166,16 @@ export function AgentStage({
   }
   useCommandHandlers(
     {
+      'chat.chooseWorktreeMode': {
+        disabledReason: () =>
+          target.kind !== 'draft' ? 'A session keeps its original checkout.' : null,
+        run: () => setModal({ kind: 'worktree-mode', key: state.key }),
+      },
+      'chat.chooseCheckout': {
+        disabledReason: () =>
+          target.kind !== 'draft' ? 'Start a new session to choose another checkout.' : null,
+        run: () => setModal({ kind: 'checkout', key: state.key }),
+      },
       'chat.stop': {
         disabledReason: () => (state.busy ? null : 'No turn is running.'),
         run: async () => {
@@ -331,9 +349,22 @@ export function AgentStage({
         <text fg={theme.foreground} height={1}>
           <strong>{conversation?.title ?? 'New session'}</strong>
         </text>
-        <text fg={theme.mutedForeground} height={1}>
-          {`${state.project?.title ?? 'Project'} / ${state.worktree?.branch ?? 'checkout'}`}
-        </text>
+        <box flexDirection='row' gap={1} height={1}>
+          <text fg={theme.mutedForeground}>{state.project?.title ?? 'Project'}</text>
+          {state.worktree && state.project && (
+            <box
+              onMouseDown={() => {
+                if (active) setModal({ kind: 'worktrees', key: state.key })
+              }}
+            >
+              <WorktreeChip
+                worktree={state.worktree}
+                repositoryKind={state.project.repositoryKind}
+                theme={theme}
+              />
+            </box>
+          )}
+        </box>
       </box>
       {usage && (
         <text
@@ -381,6 +412,27 @@ export function AgentStage({
       {(state.error ?? state.snapshot.error) && (
         <text fg={theme.destructive}>{state.error ?? state.snapshot.error}</text>
       )}
+      {target.kind === 'draft' && (
+        <box flexDirection='row' gap={2} paddingX={1} flexShrink={0}>
+          <text
+            fg={theme.primary}
+            onMouseDown={() => {
+              if (active) setModal({ kind: 'worktree-mode', key: state.key })
+            }}
+          >
+            {state.draft.worktreeMode === 'new' ? 'New worktree' : 'Send to current branch'} ▾
+          </text>
+          <text
+            fg={theme.mutedForeground}
+            onMouseDown={() => {
+              if (active) setModal({ kind: 'checkout', key: state.key })
+            }}
+          >
+            Choose checkout
+          </text>
+        </box>
+      )}
+      {state.sendDisabledReason && <text fg={theme.warning}>{state.sendDisabledReason}</text>}
       {state.plan && (
         <text
           fg={theme.info}
@@ -444,6 +496,7 @@ export function AgentStage({
           submitting={state.submitting}
           busy={
             state.busy ||
+            !!state.sendDisabledReason ||
             state.snapshot.detailLoading ||
             !!pendingId ||
             ready.connection.kind !== 'live'
@@ -526,6 +579,49 @@ export function AgentStage({
           theme={theme}
           onClose={close}
           onSelect={(text) => state.drafts.update(activeModal.key, { text })}
+        />
+      )}
+      {activeModal?.kind === 'worktree-mode' && (
+        <WorktreeMode
+          value={state.draft.worktreeMode}
+          newWorktreeReason={state.worktreeModeReason('new')}
+          theme={theme}
+          onSelect={(mode) => {
+            if (state.setWorktreeMode(mode)) close()
+          }}
+          onClose={close}
+        />
+      )}
+      {activeModal?.kind === 'checkout' && state.worktree && state.project && (
+        <WorktreePicker
+          worktrees={Object.values(state.snapshot.projection.worktreeById)}
+          project={state.project}
+          value={state.worktree.id}
+          theme={theme}
+          onSelect={(worktreeId) => {
+            close()
+            onSelect({ kind: 'draft', worktreeId })
+          }}
+          onClose={close}
+        />
+      )}
+      {activeModal?.kind === 'worktrees' && state.worktree && state.project && (
+        <WorktreeManager
+          key={state.project.id}
+          session={session}
+          chat={ready.chat}
+          project={state.project}
+          currentWorktreeId={state.worktree.id}
+          theme={theme}
+          onOpenWorkbench={navigation.openWorkbench}
+          onSelectWorktree={(worktreeId) => {
+            state.drafts.update(draftKey({ kind: 'draft', worktreeId }), {
+              worktreeMode: 'current',
+            })
+            close()
+            onSelect({ kind: 'draft', worktreeId })
+          }}
+          onClose={close}
         />
       )}
       {activeModal?.kind === 'export' && conversation && (

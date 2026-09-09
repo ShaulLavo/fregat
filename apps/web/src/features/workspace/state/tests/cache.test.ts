@@ -476,40 +476,12 @@ function emptySearchBuffer(rootPath: string): CachedSearchBufferState {
 
 function cachedEditorVisibleSnapshot(rootPath: string): CachedEditorVisibleSnapshot {
   return {
-    cacheVersion: 4,
+    cacheVersion: 5,
     contentVersion: 'stat:1:1',
     rootPath,
     path: `${rootPath}/src/app.ts`,
     themeId: 'dark-plus',
-    snapshot: {
-      paintLayers: [],
-      kind: 'editor-visible',
-      schemaVersion: 1,
-      documentId: 'document-1',
-      languageId: 'typescript',
-      theme: null,
-      textVersion: 1,
-      initialHighlightStatus: 'plain',
-      metrics: { rowHeight: 20, characterWidth: 8 },
-      lineCount: 1,
-      contentWidth: 0,
-      totalHeight: 20,
-      gutterWidth: 0,
-      gutterLayout: { fixedWidth: 0, lanes: [] },
-      tabSize: 2,
-      viewport: {
-        scrollTop: 0,
-        scrollLeft: 0,
-        scrollHeight: 0,
-        scrollWidth: 0,
-        clientHeight: 0,
-        clientWidth: 0,
-        borderBoxHeight: null,
-        borderBoxWidth: null,
-        visibleRange: { start: 0, end: 0 },
-      },
-      rows: [],
-    },
+    paint: 'opaque-native-paint',
   }
 }
 

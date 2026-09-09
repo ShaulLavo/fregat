@@ -1,5 +1,7 @@
 import assert from 'node:assert/strict'
+import { readFile } from 'node:fs/promises'
 import { act } from 'react'
+import { orchestrationForApp } from 'server/testing'
 import { createEnvironmentClient } from '@workspace/client-core/transport/client'
 import {
   createSessionArchiveCommand,
@@ -13,6 +15,83 @@ import { makeTestServer } from '../../../test/server'
 import { loseNextDispatchAcknowledgement } from '../../../test/factories/chat'
 import { runPaletteCommand } from '../../../test/actions'
 import { createDrafts, draftsForStorage } from '@/agent-stage/state/drafts'
+import { gitCommand, prepareGitWorkbench } from '../../../test/factories/git-workbench'
+
+test('the first send creates the selected worktree and later turns keep that checkout', async () => {
+  const server = await makeTestServer({ providerRuntime: true })
+  await prepareGitWorkbench(server.root)
+  const baseCommit = (await gitCommand(server.root, 'rev-parse', 'HEAD')).trim()
+  const app = await renderAgentStage(server)
+  const { frame, session, chat, worktreeId } = app
+  try {
+    const ready = session.getSnapshot()
+    assert(ready.kind === 'ready')
+    const drafts = draftsForStorage(ready.storage)
+    const key = `agent.draft.worktree:${worktreeId}`
+    await act(async () => {
+      drafts.update(key, { worktreeMode: 'new' })
+      await expect.poll(() => frame.renderer.currentFocusedRenderable?.id).toBe('agent-composer')
+      await expect.poll(() => frame.captureCharFrame()).not.toContain('Choose model')
+    })
+    expect(createDrafts(ready.storage).read(key).worktreeMode).toBe('new')
+    expect(Object.keys(chat.getSnapshot().projection.worktreeById)).toHaveLength(1)
+    expect(server.providerAdapter.startedTurns).toHaveLength(0)
+    await act(async () => {
+      await frame.mockInput.typeText('Use an isolated checkout')
+      frame.mockInput.pressEnter()
+      frame.mockInput.pressEnter()
+    })
+    await act(async () => {
+      await expect.poll(() => server.providerAdapter.startedTurns.length).toBe(1)
+      await expect.poll(() => chat.getSnapshot().selectedSessionId).not.toBeNull()
+    })
+    const sessionId = chat.getSnapshot().selectedSessionId
+    assert(sessionId)
+    const conversation = selectChatSessionById(chat.getSnapshot().projection, sessionId)
+    assert(conversation)
+    const worktree = chat.getSnapshot().projection.worktreeById[conversation.worktreeId]
+    assert(worktree)
+    expect(worktree.id).not.toBe(worktreeId)
+    expect(worktree).toMatchObject({
+      baseWorktreeId: worktreeId,
+      baseCommit,
+      lifecycle: { state: 'ready' },
+      branch: `worktree/${worktree.id}`,
+    })
+    expect(server.providerAdapter.startedTurns[0]?.cwd).toBe(worktree.canonicalPath)
+    expect(await readFile(`${worktree.canonicalPath}/sample.txt`, 'utf8')).toContain('line 20')
+    expect(await readFile(`${server.root}/sample.txt`, 'utf8')).toContain('changed line')
+    expect(createDrafts(ready.storage).read(key)).toMatchObject({
+      text: '',
+      worktreeMode: 'current',
+    })
+    await act(async () => {
+      await expect
+        .poll(
+          () => selectChatSessionById(chat.getSnapshot().projection, sessionId)?.latestTurn?.state,
+        )
+        .toBe('completed')
+      drafts.update(`agent.draft.session:${sessionId}`, { worktreeMode: 'new' })
+    })
+    await runPaletteCommand(frame, 'Focus prompt')
+    await act(async () => {
+      await frame.mockInput.typeText('Continue in the same checkout')
+      frame.mockInput.pressEnter()
+    })
+    await act(async () => {
+      await expect.poll(() => server.providerAdapter.startedTurns.length).toBe(2)
+    })
+    expect(server.providerAdapter.startedTurns[1]).toMatchObject({
+      sessionId,
+      cwd: worktree.canonicalPath,
+      messageText: 'Continue in the same checkout',
+    })
+    expect(Object.keys(chat.getSnapshot().projection.worktreeById)).toHaveLength(2)
+  } finally {
+    await app.cleanup()
+    await server.cleanup()
+  }
+})
 
 test('late acceptance preserves edits after a Stage remount and does not navigate it', async ({
   server,
@@ -111,6 +190,7 @@ test('an unchanged prompt gets a fresh command after authoritative rejection', a
 
 test('retrying an unknown acknowledgement keeps the original command and sends once', async () => {
   const server = await makeTestServer({ providerRuntime: true })
+  await prepareGitWorkbench(server.root)
   const transport = createControlledInProcessTransport(server)
   const client = createEnvironmentClient({
     origin: server.origin,
@@ -122,7 +202,11 @@ test('retrying an unknown acknowledgement keeps the original command and sends o
   })
   const { frame, session, worktreeId } = app
   try {
+    const initial = session.getSnapshot()
+    assert(initial.kind === 'ready')
+    const key = `agent.draft.worktree:${worktreeId}`
     await act(async () => {
+      draftsForStorage(initial.storage).update(key, { worktreeMode: 'new' })
       await expect.poll(() => frame.renderer.currentFocusedRenderable?.id).toBe('agent-composer')
     })
     loseNextDispatchAcknowledgement(transport)
@@ -135,10 +219,13 @@ test('retrying an unknown acknowledgement keeps the original command and sends o
     })
     const ready = session.getSnapshot()
     assert(ready.kind === 'ready')
-    const key = `agent.draft.worktree:${worktreeId}`
     const drafts = createDrafts(ready.storage)
     const pending = drafts.pending(key, drafts.read(key), 'send')
     assert(pending)
+    expect(pending.bootstrap?.createSession?.worktreeTarget).toMatchObject({
+      kind: 'new',
+      baseWorktreeId: worktreeId,
+    })
     await act(async () => {
       await session.refresh()
     })
@@ -159,8 +246,13 @@ test('retrying an unknown acknowledgement keeps the original command and sends o
       await expect
         .poll(() => reconnected.chat.getSnapshot().selectedSessionId)
         .toBe(pending.sessionId)
+      const engine = orchestrationForApp(server.app)
+      assert(engine)
+      await engine.providerRuntimeIdle()
     })
     expect(server.providerAdapter.startedTurns).toHaveLength(1)
+    expect(Object.keys(reconnected.chat.getSnapshot().projection.worktreeById)).toHaveLength(2)
+    expect(server.providerAdapter.startedTurns[0]?.sessionId).toBe(pending.sessionId)
     expect(drafts.pending(key, drafts.read(key), 'send')).toBeNull()
   } finally {
     await app.cleanup()

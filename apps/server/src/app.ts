@@ -99,7 +99,7 @@ export function createApp(options: AppOptions) {
   const git = new GitService(fs.paths, {
     maxTextFileBytes: fs.info().maxTextFileBytes,
   })
-  const terminal = new TerminalService({
+  const terminal: TerminalService = new TerminalService({
     ...options.terminal,
     paths: fs.paths,
     resolveWorktree: async (worktreeId) => {
@@ -122,7 +122,7 @@ export function createApp(options: AppOptions) {
   // app was given — in tests that is the in-memory database, which is what
   // keeps a test run from writing into the developer's real settings.
   const settings = new SettingsStore({ ...options.settings, workspaceRoot: fs.paths.workspaceRoot })
-  const providerAdapterRegistry =
+  const providerAdapterRegistry: ProviderAdapterRegistry =
     options.orchestration?.providerAdapterRegistry ??
     createDefaultProviderAdapterRegistry(
       mergeProviderInstanceConfigs(

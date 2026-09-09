@@ -220,7 +220,10 @@ rail and provider management, approvals, questions, plans, terminal context, and
 resume with safe history return. All 282 TUI tests pass, alongside 58 terminal/provider tests and
 168 migrated web logic tests. TUI and server builds, affected typechecks, lint, and formatting pass.
 The existing server was rebuilt and restarted; the desktop TUI connects live with a visible prompt.
-Worktree parity (083) and distribution (084) follow [the TUI strategy](docs/tui-plan.md).
+Plan 083 is complete (2026-09-08). It adds current/new checkout selection, first-send worktree
+creation, exact checkout navigation, shared lifecycle labels, and project cleanup controls. The
+[worktree record](docs/tui-worktrees.md) links the native creation, recovery, navigation, and
+cleanup checks. Distribution (084) follows [the TUI strategy](docs/tui-plan.md).
 This lane preserves concurrent environment changes.
 
 Platform now uses `@workspace/pty` directly, with binary terminal input, output, and replay.
