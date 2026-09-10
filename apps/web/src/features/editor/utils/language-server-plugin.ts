@@ -52,6 +52,7 @@ type MatchedLanguageServerPluginOptions = {
   statusSource: EditorLanguageServerStatusSource
   target: LanguageServerDocumentTarget
   onApplyWorkspaceEdit: OnApplyWorkspaceEdit
+  onDefinitionLinkHover?: (target: LanguageServerDefinitionTarget) => void
   onOpenDefinition?: (target: LanguageServerDefinitionTarget) => void | boolean
   onOpenReferences?: (result: LanguageServerReferencesResult) => void | boolean
   onDidNavigateDiagnostic?: (
@@ -68,6 +69,7 @@ export function createMatchedLanguageServerPlugin({
   statusSource,
   target,
   onApplyWorkspaceEdit,
+  onDefinitionLinkHover,
   onOpenDefinition,
   onOpenReferences,
   onDidNavigateDiagnostic,
@@ -101,6 +103,7 @@ export function createMatchedLanguageServerPlugin({
       ? semanticTokenOwnerFactory(semanticControllers)
       : undefined,
     onApplyWorkspaceEdit,
+    onDefinitionLinkHover,
     onOpenDefinition,
     onOpenReferences,
     onDidNavigateDiagnostic,

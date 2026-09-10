@@ -1,11 +1,17 @@
 import { useActiveChatProjection } from '@/features/chat/hooks/use-active-projection'
-import { CaretDownIcon, FolderOpenIcon, FolderPlusIcon } from '@phosphor-icons/react'
+import {
+  CaretDownIcon,
+  FolderOpenIcon,
+  FolderPlusIcon,
+  PlugsConnectedIcon,
+} from '@phosphor-icons/react'
 import { useQuery, useQueryClient } from '@tanstack/react-query'
 import { useState } from 'react'
 import { Button } from '@workspace/ui/components/button'
 import { MachinePhase } from '@/components/machine-phase'
 import { useEnvironmentsStore } from '@/lib/environments/state/store'
 import { originForQueryClient } from '@/lib/environments/state/query-clients'
+import { useCommand } from '@/keymap/hooks/use-command'
 
 import { selectChatProjects, selectCurrentWorktree } from '@workspace/client-core/chat/selectors'
 import { useEditorWorkspaceState } from '@/features/editor/state/workspace-state'
@@ -29,6 +35,7 @@ import { cn } from '@workspace/ui/lib/utils'
 const EMPTY_FOLDERS: readonly { name: string; path: string }[] = []
 
 export function WorkspaceProjectMenu({ workspaceTitle }: { readonly workspaceTitle: string }) {
+  const { bus } = useCommand()
   const origin = originForQueryClient(useQueryClient())
   const machine = useEnvironmentsStore((state) => state.entries[origin])
   const [open, setOpen] = useState(false)
@@ -116,6 +123,16 @@ export function WorkspaceProjectMenu({ workspaceTitle }: { readonly workspaceTit
         <DropdownMenuItem onClick={openPicker}>
           <FolderPlusIcon className='size-4' />
           Open folder…
+        </DropdownMenuItem>
+        <DropdownMenuItem
+          onClick={() => {
+            bus.dispatch('environment.connect', {
+              source: { kind: 'menu', surface: 'workspace.project' },
+            })
+          }}
+        >
+          <PlugsConnectedIcon className='size-4' />
+          Connect machine…
         </DropdownMenuItem>
       </DropdownMenuContent>
     </DropdownMenu>

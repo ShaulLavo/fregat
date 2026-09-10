@@ -2,7 +2,6 @@ import { readFilePreview } from '@workspace/client-core/files/read'
 import type { SettingsSession } from '@/connection/state/session'
 import { connectionFailure } from '@/connection/utils/failure'
 import type { EditTextRequest } from '@/host/providers/actions-context'
-import { externalEditorExecutable } from '@/host/external-editor'
 import { createTuiError } from '@/host/utils/structured-errors'
 import { commitFileEdit } from '@/viewer/state/edit'
 import { createViewerDraftCache, type ViewerDraft } from '@/viewer/state/drafts'
@@ -28,7 +27,7 @@ export function createViewerDocument({
   readonly session: SettingsSession
   readonly rootPath: string
   readonly path: string
-  readonly editText?: (request: EditTextRequest) => Promise<string>
+  readonly editText?: (request: EditTextRequest) => Promise<string | null>
 }) {
   const sessionState = session.getSnapshot()
   if (sessionState.kind !== 'ready')
@@ -60,7 +59,7 @@ export function createViewerDocument({
         draft,
         editing: false,
         error: draft
-          ? 'An unsaved external-editor draft was restored. Its original file snapshot is still required. Edit to recover it, or discard and reload.'
+          ? 'An unsaved editor draft was restored. Its original file snapshot is still required. Edit to recover it, or discard and reload.'
           : null,
       })
     } catch (error) {
@@ -75,21 +74,19 @@ export function createViewerDocument({
     try {
       if (!editText)
         throw createTuiError(
-          'External editor is unavailable.',
+          'Editor is unavailable.',
           'Use an interactive terminal to edit this file.',
         )
-      const sessionState = session.getSnapshot()
-      const configured =
-        sessionState.kind === 'ready'
-          ? sessionState.owner.readSettingsMirror()['editor.externalEditor']
-          : ''
       const text = await editText({
         text: draft?.text ?? snapshot.file.content,
-        executable: externalEditorExecutable(configured),
         filename: path.split('/').at(-1),
         signal,
       })
       signal.throwIfAborted()
+      if (text === null) {
+        publish({ ...snapshot, editing: false })
+        return
+      }
       if (text === snapshot.file.content) {
         await drafts.remove(draft)
         publish({ ...snapshot, editing: false, draft: null })

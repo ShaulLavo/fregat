@@ -23,13 +23,6 @@ export class CodexProtocolError extends Error {
   }
 }
 
-export type CodexServerNotification = {
-  readonly [Method in CodexServerNotificationMethod]: {
-    readonly method: Method
-    readonly params: CodexServerNotificationParamsByMethod[Method]
-  }
-}[CodexServerNotificationMethod]
-
 export function parseCodexClientRequestParams<Method extends CodexClientRequestMethod>(
   method: Method,
   value: unknown,
@@ -61,21 +54,6 @@ export function parseCodexServerNotification<Method extends CodexServerNotificat
     value,
     `${method} notification`,
   ) as CodexServerNotificationParamsByMethod[Method]
-}
-
-export function codexServerNotification(method: string, params: unknown) {
-  if (!isCodexServerNotificationMethod(method)) return null
-
-  return {
-    method,
-    params: parseCodexServerNotification(method, params),
-  } as CodexServerNotification
-}
-
-export function isCodexServerNotificationMethod(
-  method: string,
-): method is CodexServerNotificationMethod {
-  return method in CODEX_SERVER_NOTIFICATION_PARAMS
 }
 
 function parseCodexProtocolValue(schema: v.GenericSchema, value: unknown, label: string) {

@@ -27,6 +27,7 @@
     "./commands/catalog": "./src/commands/catalog.ts",
     "./commands/metadata": "./src/commands/metadata.ts",
     "./commands/workspace": "./src/commands/workspace.ts",
+    "./commands/workbench": "./src/commands/workbench.ts",
     "./commands/editor": "./src/commands/editor.ts",
     "./commands/environment": "./src/commands/environment.ts",
     "./commands/foundation": "./src/commands/foundation.ts",

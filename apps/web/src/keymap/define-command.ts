@@ -73,6 +73,7 @@ export type WorkspaceCommandRuntime = {
     ) => import('@/lib/focus/state/service').FocusTransitionTicket
     readonly showSettings: (
       origin?: FocusTargetToken | null,
+      search?: string,
     ) => import('@/lib/focus/state/service').FocusTransitionTicket
   }
   readonly tabs: {
@@ -127,7 +128,7 @@ export type EditorCommand<Id extends string = string> = CommandBase<Id> & {
 export type PlatformCommand = EditorCommand | WorkspaceCommand
 
 export function defineCommand<
-  const Id extends `workspace.${string}` | `environment.${string}`,
+  const Id extends `workspace.${string}` | `environment.${string}` | `fileTree.${string}`,
   const Execution extends CommandExecution,
 >(command: WorkspaceCommand<Id, Execution>): WorkspaceCommand<Id, Execution> {
   return command

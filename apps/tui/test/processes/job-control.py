@@ -20,7 +20,6 @@ class Terminal:
             os.environ,
             TERM="xterm-256color",
             PS1="TUI_TEST> ",
-            EDITOR=str(directory / "test/processes/job-control-editor.py"),
         )
         self.pid, self.fd = pty.fork()
         if self.pid == 0:
@@ -78,27 +77,18 @@ class Terminal:
         os.waitpid(self.pid, 0)
 
 
-def check_editor(terminal, group, shell_group, shell_modes):
+def check_editor(terminal):
     terminal.send(b"\x0bs")
     terminal.expect(b"Search settings")
     terminal.send(b"\x1bOP")
     terminal.expect(b"Commands")
-    terminal.send(b"Edit settings JSON in external editor")
-    terminal.expect(b"Edit settings JSON in external editor")
+    terminal.send(b"Edit settings JSON")
+    terminal.expect(b"Edit settings JSON")
     terminal.send(b"\r")
-    terminal.expect(b"EDITOR_ACTIVE")
-    terminal.expect_modes((True, True))
-    terminal.send(b"\x1a")
-    terminal.expect(b"Stopped")
-    terminal.expect(b"TUI_TEST> ")
-    terminal.expect_modes(shell_modes)
-    terminal.expect_group(shell_group)
-    terminal.send(b"fg\n")
-    terminal.expect_group(group)
-    terminal.expect_modes((True, True))
-    terminal.send(b"\n")
+    terminal.expect(b"Edit settings.json")
     terminal.expect_modes((False, False))
-    terminal.expect(b"TUI_SETTINGS_SAVED")
+    terminal.send(b"\x1b")
+    terminal.expect(b"Search settings")
 
 
 def check_job_control(bun, directory, mode):
@@ -145,7 +135,7 @@ def check_job_control(bun, directory, mode):
         terminal.expect_group(group)
         terminal.expect_modes((False, False))
 
-        check_editor(terminal, group, shell_group, shell_modes)
+        check_editor(terminal)
 
         if mode == "launcher-term":
             os.kill(group, signal.SIGTERM)
@@ -153,7 +143,7 @@ def check_job_control(bun, directory, mode):
             terminal.send(b"\x03")
         terminal.expect(b"TUI_CLOSED ")
         settings = json.loads(terminal.expect(b"\r\n"))
-        assert settings["editor.fontSize"] == 24
+        assert settings["editor.fontSize"] == 13
         terminal.expect(b"TUI_TEST> ")
         terminal.expect_modes(shell_modes)
         assert os.tcgetpgrp(terminal.fd) == terminal.pid

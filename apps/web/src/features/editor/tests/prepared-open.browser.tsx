@@ -18,7 +18,7 @@ import {
 } from '@/features/editor/state/document-state'
 import {
   resetEditorColorThemeStore,
-  setSelectedEditorThemeId,
+  syncEditorThemeSelection,
 } from '@/features/editor/state/color-theme-store'
 import {
   installEditorPerformanceTraceFromUrl,
@@ -87,7 +87,7 @@ test(
   async () => {
     seedBootMirrorTheme('dark')
     resetEditorColorThemeStore()
-    setSelectedEditorThemeId('dark', 'dark-plus')
+    syncEditorThemeSelection('dark', 'dark-plus')
     installBenchmarkTrace()
     const queryClient = createTestQueryClient()
     mountHarness(queryClient)
@@ -151,7 +151,7 @@ test(
   async () => {
     seedBootMirrorTheme('dark')
     resetEditorColorThemeStore()
-    setSelectedEditorThemeId('dark', 'dark-plus')
+    syncEditorThemeSelection('dark', 'dark-plus')
     editorDiagnosticGlobal.__EDITOR_PERFORMANCE_DIAGNOSTICS__ = (diagnostic) => {
       diagnostics.push(diagnostic)
     }
@@ -187,7 +187,7 @@ test(
   async () => {
     seedBootMirrorTheme('dark')
     resetEditorColorThemeStore()
-    setSelectedEditorThemeId('dark', 'dark-plus')
+    syncEditorThemeSelection('dark', 'dark-plus')
     installBenchmarkTrace()
     const queryClient = createTestQueryClient()
     mountHarness(queryClient)
@@ -226,7 +226,7 @@ test(
   async () => {
     seedBootMirrorTheme('dark')
     resetEditorColorThemeStore()
-    setSelectedEditorThemeId('dark', 'dark-plus')
+    syncEditorThemeSelection('dark', 'dark-plus')
     editorDiagnosticGlobal.__editorPerfTrace = { mark: () => undefined }
     const queryClient = createTestQueryClient()
     mountHarness(queryClient)
@@ -280,7 +280,7 @@ test(
   async () => {
     seedBootMirrorTheme('dark')
     resetEditorColorThemeStore()
-    setSelectedEditorThemeId('dark', 'dark-plus')
+    syncEditorThemeSelection('dark', 'dark-plus')
     installBenchmarkTrace()
     const queryClient = createTestQueryClient()
     mountHarness(queryClient)
@@ -328,7 +328,7 @@ test(
   async () => {
     seedBootMirrorTheme('dark')
     resetEditorColorThemeStore()
-    setSelectedEditorThemeId('dark', 'dark-plus')
+    syncEditorThemeSelection('dark', 'dark-plus')
     editorDiagnosticGlobal.__EDITOR_PERFORMANCE_DIAGNOSTICS__ = (diagnostic) => {
       diagnostics.push(diagnostic)
     }

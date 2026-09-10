@@ -31,8 +31,7 @@ const RESERVED_HOTKEYS = [
 ]
 const MAC_ONLY_RESERVED_HOTKEY = 'Mod+Alt+Tab'
 
-const SESSION_COMMAND_PATTERN =
-  /^workspace\.(new|next|previous)Session$|^workspace\.toggleSessionRail$|^workspace\.jumpToSession\d$/
+const SESSION_COMMAND_PATTERN = /^workspace\.jumpToSession\d$/
 
 const TEXT_MENU_EDITOR_COMMANDS = [
   'editor.editor.action.goToImplementation',
@@ -42,6 +41,14 @@ const TEXT_MENU_EDITOR_COMMANDS = [
 ] as const
 
 const ASYNC_COMMAND_IDS = [
+  'workspace.selectAppColors',
+  'workspace.runProjectScript',
+  'workspace.switchSession',
+  'workspace.goToLine',
+  'workspace.showFontSettings',
+  'workspace.showTransparencySettings',
+  'fileTree.newFile',
+  'fileTree.newFolder',
   'workspace.undoWorkspaceEdit',
   'workspace.redoWorkspaceEdit',
   'workspace.showQuickAccess',
@@ -138,6 +145,8 @@ const TEXT_EDIT_COMMAND_IDS = [
 ] as const satisfies readonly PlatformCommandId[]
 
 const FILE_OPERATION_COMMAND_IDS = [
+  'fileTree.newFile',
+  'fileTree.newFolder',
   'workspace.saveFile',
   'workspace.saveAllFiles',
   'workspace.revertFile',
@@ -156,6 +165,7 @@ const WORKSPACE_OPERATION_COMMAND_IDS = [
 ] as const satisfies readonly PlatformCommandId[]
 
 const FILE_BACKED_COMMAND_IDS = [
+  'workspace.goToLine',
   'workspace.gotoSymbol',
   'workspace.compareWithSaved',
   'workspace.openFileAtHead',
@@ -290,7 +300,7 @@ describe('command table', () => {
     expect(reservedBindings('windows').map((binding) => binding.chord[0])).toEqual(withoutMacOnly)
   })
 
-  it('gives the session commands specs without giving them palette rows', () => {
+  it('offers session commands while hiding numbered session jumps', () => {
     expect(platformCommandSpecs.map((spec) => spec.id)).toEqual(
       expect.arrayContaining([
         'workspace.findInFileTree',

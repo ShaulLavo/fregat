@@ -71,16 +71,3 @@ test('invalid raw JSON remains editable and a disposed editor cannot submit its 
     owner.dispose()
   }
 })
-
-test('external editor executable cannot be selected by workspace settings', async ({ client }) => {
-  const owner = await makeSettingsOwner(client)
-  try {
-    const result = owner.submit('workspace', [
-      { kind: 'set', key: 'editor.externalEditor', value: '/workspace/execute-me' },
-    ])
-    if (result.kind === 'submitted') expect(await result.settled).toBe('failed')
-    expect(owner.readSettingsMirror()['editor.externalEditor']).toBe('')
-  } finally {
-    owner.dispose()
-  }
-})

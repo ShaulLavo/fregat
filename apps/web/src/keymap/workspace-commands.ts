@@ -1,3 +1,4 @@
+import { workbenchCommandMetadata } from '@workspace/client-core/commands/workbench'
 import {
   workspaceCommandMetadata,
   sessionJumpMetadata,
@@ -7,6 +8,10 @@ import {
   ArrowCounterClockwiseIcon,
   BracketsCurlyIcon,
   CardsIcon,
+  ChatCircleIcon,
+  FilePlusIcon,
+  FolderPlusIcon,
+  PlayIcon,
   ClockCounterClockwiseIcon,
   CommandIcon,
   CrosshairIcon,
@@ -344,6 +349,98 @@ export const workspaceCommands = [
   // Settings are machine-wide, so this is the one workspace command that stays
   // available with no folder open — it is where a provider gets configured in
   // the first place.
+  defineCommand({
+    ...workspaceCommandMetadata['workspace.selectAppColors'],
+    icon: PaletteIcon,
+    run: ({ invocation, runtime }) =>
+      transitionStart(
+        runtime.shell.showCommandPalette('colors ', invocation.origin as FocusTargetToken | null),
+      ),
+  }),
+  defineCommand({
+    ...workspaceCommandMetadata['workspace.runProjectScript'],
+    icon: PlayIcon,
+    run: ({ invocation, runtime }) =>
+      transitionStart(
+        runtime.shell.showCommandPalette('run ', invocation.origin as FocusTargetToken | null),
+      ),
+  }),
+  defineCommand({
+    ...workspaceCommandMetadata['workspace.switchSession'],
+    icon: ChatCircleIcon,
+    run: ({ invocation, runtime }) =>
+      transitionStart(
+        runtime.shell.showCommandPalette('sess ', invocation.origin as FocusTargetToken | null),
+      ),
+  }),
+  defineCommand({
+    ...workbenchCommandMetadata['workspace.goToLine'],
+    undoCategory: 'view-only',
+    keepsPaletteOpen: true,
+    when: ['fileBackedTab'],
+    icon: CrosshairIcon,
+    run: ({ invocation, runtime }) =>
+      transitionStart(
+        runtime.shell.showCommandPalette(':', invocation.origin as FocusTargetToken | null),
+      ),
+  }),
+  defineCommand({
+    ...workspaceCommandMetadata['workspace.showFontSettings'],
+    icon: GearSixIcon,
+    run: ({ invocation, runtime }) =>
+      transitionStart(
+        runtime.shell.showSettings(invocation.origin as FocusTargetToken | null, 'font'),
+      ),
+  }),
+  defineCommand({
+    ...workspaceCommandMetadata['workspace.showTransparencySettings'],
+    icon: GearSixIcon,
+    run: ({ invocation, runtime }) =>
+      transitionStart(
+        runtime.shell.showSettings(
+          invocation.origin as FocusTargetToken | null,
+          'workbench.surface',
+        ),
+      ),
+  }),
+  defineCommand({
+    ...workbenchCommandMetadata['fileTree.newFile'],
+    undoCategory: 'file-operation',
+    when: ['workspaceOpen', 'workspaceMutable'],
+    icon: FilePlusIcon,
+    run: ({ runtime, snapshot }) => {
+      if (!snapshot.rootPath) return declined
+
+      const workspace = runtime.workspace.getState()
+      workspace.setUiMode('workbench')
+      workspace.setWorkbenchPanels(showWorkbenchSidebarTab(snapshot.workbenchPanels, 'files'))
+      return focusIdInLayoutStart(
+        runtime,
+        { kind: 'file-tree', rootPath: snapshot.rootPath },
+        'workbench',
+        'create-file',
+      )
+    },
+  }),
+  defineCommand({
+    ...workbenchCommandMetadata['fileTree.newFolder'],
+    undoCategory: 'file-operation',
+    when: ['workspaceOpen', 'workspaceMutable'],
+    icon: FolderPlusIcon,
+    run: ({ runtime, snapshot }) => {
+      if (!snapshot.rootPath) return declined
+
+      const workspace = runtime.workspace.getState()
+      workspace.setUiMode('workbench')
+      workspace.setWorkbenchPanels(showWorkbenchSidebarTab(snapshot.workbenchPanels, 'files'))
+      return focusIdInLayoutStart(
+        runtime,
+        { kind: 'file-tree', rootPath: snapshot.rootPath },
+        'workbench',
+        'create-folder',
+      )
+    },
+  }),
   defineCommand({
     ...workspaceCommandMetadata['workspace.showSettings'],
     icon: GearSixIcon,

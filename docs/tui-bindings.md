@@ -79,7 +79,8 @@ The live table has **179 production rows: 56 workspace and 123 editor**. `enviro
 
 Bun smoke execution imported the public shared trie with `typeof document === 'undefined'`, matched Ctrl+P to quick access, armed Ctrl+K with one descendant, and completed plain s to settings. That proves the actual shared pure entry is usable. No application tests were run for this read-only audit.
 
-The current root `PLAN.md` says 056/057 are complete and links `plans/057-delivery.md`; `plans/README.md` still has stale NEXT text for 057. The delivery record, not the stale research paths, describes the matcher now in use.
+The [shared keymap delivery record](keymap/delivery.md) describes the matcher now in use.
+The completed executable plans have been deleted.
 
 ## Named actions missing from the current table
 

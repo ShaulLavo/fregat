@@ -322,6 +322,15 @@ export {
 } from './orchestration-ws'
 export { healthDescriptorSchema, type HealthDescriptor } from './health'
 export {
+  machineConnectionStateSchema,
+  machineAuthPromptSchema,
+  machineEventSchema,
+  machineAuthResponseSchema,
+  type MachineConnectionState,
+  type MachineAuthPrompt,
+  type MachineEvent,
+} from './machine-connections'
+export {
   logDashboardLevelSchema,
   logDashboardSummarySchema,
   logEventsResultSchema,

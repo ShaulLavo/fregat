@@ -1,0 +1,56 @@
+import { screen, waitFor } from '@testing-library/react'
+import userEvent from '@testing-library/user-event'
+
+import { expect, test } from '../../../../test/fixtures'
+import { createTestQueryClient, renderWithProviders } from '../../../../test/render'
+import { createTestApplicationRuntime } from '../../../../test/factories/application-runtime'
+import { TestEditorStateProvider } from '../../../../test/factories/editor-state-provider'
+import { CommandPalette } from '@/components/command-palette'
+import { fetchSettings } from '@/features/settings/utils/api'
+import { settingsKeys } from '@workspace/client-core/settings/query-keys'
+
+test('app colors preview cancels without saving and selection updates the shared settings value', async ({
+  controlledClient,
+}) => {
+  const before = await fetchSettings()
+  const queryClient = createTestQueryClient()
+  queryClient.setQueryData(settingsKeys.document(), before)
+  const application = createTestApplicationRuntime()
+  const options = {
+    application,
+    command: { paletteOpen: true, paletteSearch: 'colors ' },
+    queryClient,
+  }
+  const first = renderWithProviders(
+    <TestEditorStateProvider>
+      <CommandPalette />
+    </TestEditorStateProvider>,
+    options,
+  )
+  const user = userEvent.setup()
+  await screen.findByPlaceholderText(/Select app colors/)
+  await waitFor(() => expect(document.documentElement).toHaveAttribute('data-palette', 'sage'))
+  expect(controlledClient.controller.settingsWriteCount).toBe(0)
+
+  await user.keyboard('{Escape}')
+  await waitFor(() => expect(screen.queryByPlaceholderText(/Select app colors/)).toBeNull())
+  expect(document.documentElement).toHaveAttribute(
+    'data-palette',
+    before.values['workbench.palette'],
+  )
+  expect(controlledClient.controller.settingsWriteCount).toBe(0)
+  first.unmount()
+
+  renderWithProviders(
+    <TestEditorStateProvider>
+      <CommandPalette />
+    </TestEditorStateProvider>,
+    options,
+  )
+  await user.click(await screen.findByText('Sage'))
+  await waitFor(async () =>
+    expect((await fetchSettings()).values['workbench.palette']).toBe('sage'),
+  )
+  expect(controlledClient.controller.settingsWriteCount).toBe(1)
+  expect(document.documentElement).toHaveAttribute('data-palette', 'sage')
+})

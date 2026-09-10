@@ -69,6 +69,8 @@
   --color-background: var(--background);
   /* Opaque escape hatches — deliberately ignore --surface-opacity. */
   --color-background-solid: var(--background-solid);
+  --color-card-light-solid: var(--card-light-solid);
+  --color-card-dark-solid: var(--card-dark-solid);
   --color-card-solid: var(--card-solid);
   --color-popover-solid: var(--popover-solid);
   --color-muted-solid: var(--muted-solid);
@@ -159,7 +161,9 @@
   --background-solid: oklch(1 0.006 70);
   --background: color-mix(in oklch, var(--background-solid) var(--surface-opacity), transparent);
   --foreground: oklch(0.145 0.006 70);
-  --card-solid: oklch(1 0.006 70);
+  --card-light-solid: oklch(1 0.006 70);
+  --card-dark-solid: oklch(0.205 0.006 70);
+  --card-solid: var(--card-light-solid);
   --card: color-mix(in oklch, var(--card-solid) var(--surface-opacity), transparent);
   --content-well: color-mix(in oklch, var(--card-solid) var(--content-opacity), transparent);
   --card-foreground: oklch(0.145 0.006 70);
@@ -370,7 +374,7 @@
      and make dark mode ignore --surface-opacity. */
   --background-solid: oklch(0.145 0.006 70);
   --foreground: oklch(0.985 0.006 70);
-  --card-solid: oklch(0.205 0.006 70);
+  --card-solid: var(--card-dark-solid);
   --card-foreground: oklch(0.985 0.006 70);
   --popover-solid: oklch(0.205 0.006 70);
   --popover-foreground: oklch(0.985 0.006 70);
@@ -517,7 +521,9 @@
 html[data-palette='sage'] {
   --background-solid: oklch(0.98 0.003 90);
   --foreground: oklch(0.16 0.01 260);
-  --card-solid: oklch(1 0 0);
+  --card-light-solid: oklch(1 0 0);
+  --card-dark-solid: oklch(0.21 0.01 260);
+  --card-solid: var(--card-light-solid);
   --card-foreground: oklch(0.16 0.01 260);
   --popover-solid: oklch(1 0 0);
   --popover-foreground: oklch(0.16 0.01 260);
@@ -557,7 +563,7 @@ html[data-palette='sage'] {
 .dark[data-palette='sage'] {
   --background-solid: oklch(0.17 0.01 260);
   --foreground: oklch(0.92 0.008 90);
-  --card-solid: oklch(0.21 0.01 260);
+  --card-solid: var(--card-dark-solid);
   --card-foreground: oklch(0.92 0.008 90);
   --popover-solid: oklch(0.21 0.01 260);
   --popover-foreground: oklch(0.92 0.008 90);
@@ -1012,11 +1018,6 @@ html[data-palette='sage'] {
 
 [data-editor-focus-active='false'] .app-editor-host .editor-virtualized-selection-range {
   background-color: var(--editor-inactive-selection);
-}
-
-.app-fold-gutter-icon {
-  height: 12px;
-  width: 12px;
 }
 
 @keyframes app-accordion-down {

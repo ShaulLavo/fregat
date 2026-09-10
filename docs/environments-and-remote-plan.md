@@ -110,7 +110,7 @@ record of names to `MachineDefinition`, with these fields:
 
 ```ts
 type MachineDefinition =
-  | { kind: 'ssh'; target: string; repoPath: string; remotePort?: number; label?: string }
+  | { kind: 'ssh'; target: string; remotePort?: number; label?: string }
   | { kind: 'origin'; url: string; label?: string }
 ```
 
@@ -190,21 +190,24 @@ selection.
 
 Both connection types supply a validated endpoint to the same client and transport owners.
 
-1. **SSH port forward.** The desktop shell owns it, like t3code's `DesktopSshEnvironment`:
-   probe the target with `ssh -o BatchMode=yes`, start or reuse `bun apps/server/src/index.ts` in
-   the configured repo checkout bound to remote loopback with `SERVER_ALLOWED_ORIGINS` set to the
-   client's own page origin, forward the remote port to a local port with `ssh -N -L`, wait on
-   `/health`, record the `environmentId`. Both ends stay loopback, the server's loopback assertion
-   and origin allowlist are untouched, and the SSH key is the credential. `mesh`'s key-only SSH door
-   on port 2222 is just an SSH target; a stock `~/.ssh/config` `Host` entry makes it one line.
+1. **SSH port forward.** The primary backend owns it: probe the target, start or reuse
+   the installed server discovered through `platform-server --describe`, forward its remote loopback port,
+   wait on `/health`, and confirm the `environmentId`. Browser and desktop clients reach this
+   forward through the backend's `/machines/:name/proxy` HTTP/WebSocket relay. The backend uses
+   its user's SSH configuration and agent; interactive prompts travel to the browser through
+   the machine event stream and return through a private SSH_ASKPASS helper. Both ends of the
+   forward remain on loopback, and the backend's origin allowlist protects the relay.
 2. **Direct origin.** `{ kind: 'origin', url }` accepts HTTPS or loopback HTTP URLs. The remote
    server must allow the client's page origin. The mesh deployment remains unverified, including
    WebSocket upgrades through its reverse proxy and path-prefix handling for
    `mesh serve pc 3001 --at /platform`. Those deployment checks remain unscheduled.
    A plain `http://` non-loopback origin is refused with a real message, never upgraded silently.
 
-There is no install step. The remote machine has the repository and Bun already; the launcher only
-starts or reuses the server. A version skew surfaces as the existing WS protocol-version refusal.
+The remote user runs `bun run server:install` once from a prepared Platform checkout. It installs
+`~/.local/bin/platform-server`, recording that checkout and its Bun executable. SSH discovers the
+launcher on PATH or at that fixed location, without asking for a repository path. See
+[the installation contract](federated-environments.md#install-the-remote-server). A version skew
+surfaces as the existing WS protocol-version refusal.
 
 ### 3.4 Settings across machines
 
@@ -275,7 +278,7 @@ explicit retry.
 
 ### 5.5 Settings → Machines
 
-List, add (SSH target plus repo path, or origin URL), connect, disconnect, remove, relabel, status,
+List, add (SSH target, or origin URL), connect, disconnect, remove, relabel, status,
 last error, and the root-shell statement.
 
 ### 5.6 Git overview across checkouts, unscheduled
@@ -328,7 +331,7 @@ unscheduled. Mesh deployment checks and pairing follow only on demand.
 7. One global `wsConnectionState` fed by every transport; ours is keyed by environment from day one.
 8. Automatic recovery wired only to the primary connection; ours retries every environment.
 9. `envMode` as a name for worktree-vs-checkout; our worktree picker keeps the word worktree.
-10. Installing the server over SSH through a package manager; our launcher assumes the checkout.
+10. Downloading a standalone server over SSH; the current installer registers a prepared source checkout.
 11. Silently upgrading a bare typed host to `https://`; we error with the real reason.
 12. A client-side logical-project layer for grouping; our server-derived project id already groups.
 
@@ -363,7 +366,7 @@ unscheduled. Mesh deployment checks and pairing follow only on demand.
   `state/environment-persistence.ts` initializes its stores, and
   `features/chat/state/chat-projection-cache.ts` records projection and descriptor bindings for
   cold startup.
-- `apps/desktop/src/bun/ssh/launcher.ts` owns SSH forwards and remote process records.
+- `apps/server/src/machines/launcher.ts` owns SSH forwards and remote process records.
   `apps/web/src/features/settings/providers/owner-provider.tsx` keeps client settings on the
   primary environment above the keyed workbench.
 - `apps/server/src/orchestration/ws-rpc.ts` sends code `1008` for authentication refusal.

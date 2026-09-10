@@ -9,7 +9,7 @@ import {
 import { TooltipProvider } from '@workspace/ui/components/tooltip'
 import { StrictMode, useState, type ReactElement, type ReactNode } from 'react'
 
-import { EditorColorThemeProvider } from '@/features/editor/hooks/use-editor-color-theme'
+import { EditorColorThemeProvider } from '@/features/editor/providers/color-theme-provider'
 import { AppearanceProvider } from '@/features/settings/providers/appearance-provider'
 import { readSettingsMirror } from '@/features/settings/utils/boot-mirror'
 import { FocusProvider } from '@/lib/focus/providers/provider'

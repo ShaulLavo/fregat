@@ -1,6 +1,8 @@
+import { selectSettingsSearch } from '@/features/settings/state/search-store'
+import { selectSettingsView } from '@/features/settings/state/view-store'
 import { selectSettingsScope } from '@/features/settings/state/scope-store'
 import { useEditorRuntime } from '@/features/editor/hooks/use-runtime'
-import { MachinePickerDialog } from '@/features/environments/components/machine-picker-dialog'
+import { MachinePickerDialog } from '@/components/machine-picker-dialog'
 import { selectSettingsCategory } from '@/features/settings/state/category-store'
 import { useEffect, useLayoutEffect, useMemo, useRef, useState, type ReactNode } from 'react'
 import { useQueryClient } from '@tanstack/react-query'
@@ -245,7 +247,12 @@ export function CommandProvider({ children }: { readonly children: ReactNode }) 
         setPaletteOpenState(true)
         return focus.request(focusTargetById({ kind: 'command-palette' }))
       },
-      showSettings: (origin) => {
+      showSettings: (origin, search) => {
+        if (search !== undefined) {
+          selectSettingsCategory(null)
+          selectSettingsSearch(search)
+          selectSettingsView('form')
+        }
         const rootOpen = workspace.getState().rootFolder !== null
         if (rootOpen) {
           return openWorkspaceSettings(focus, workspace, adaptersRef.current.editor)

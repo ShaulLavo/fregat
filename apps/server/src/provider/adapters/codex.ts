@@ -44,7 +44,7 @@ import {
 import {
   CODEX_CLIENT_REQUEST_METHODS,
   V2ThreadTokenUsageUpdatedNotificationSchema,
-  codexServerNotification,
+  parseCodexServerNotification,
   parseCodexClientRequestParams,
   parseCodexClientRequestResult,
   type CodexClientRequestMethod,
@@ -891,24 +891,25 @@ class CodexAppServerSession {
 
     if (await this.handleManualNotification(message.method, message.params)) return
 
-    const notification = codexServerNotification(message.method, message.params)
-    if (!notification) return
-
-    switch (notification.method) {
+    switch (message.method) {
       case 'thread/started':
-        this.handleSessionStartedNotification(notification.params)
+        this.handleSessionStartedNotification(
+          parseCodexServerNotification(message.method, message.params),
+        )
         return
       case 'turn/started':
-        this.handleTurnStarted(notification.params)
+        this.handleTurnStarted(parseCodexServerNotification(message.method, message.params))
         return
       case 'item/agentMessage/delta':
-        await this.handleAgentMessageDelta(notification.params)
+        await this.handleAgentMessageDelta(
+          parseCodexServerNotification(message.method, message.params),
+        )
         return
       case 'turn/completed':
-        await this.handleTurnCompleted(notification.params)
+        await this.handleTurnCompleted(parseCodexServerNotification(message.method, message.params))
         return
       case 'error':
-        this.handleErrorNotification(notification.params)
+        this.handleErrorNotification(parseCodexServerNotification(message.method, message.params))
         return
     }
   }

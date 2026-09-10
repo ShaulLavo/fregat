@@ -21,7 +21,7 @@ export function RawSettingsEditor({
 }: {
   readonly owner: SettingsOwner
   readonly target: SettingsWriteTarget
-  readonly editText: (request: EditTextRequest) => Promise<string>
+  readonly editText: (request: EditTextRequest) => Promise<string | null>
   readonly theme: Theme
   readonly onClose: () => void
 }) {
@@ -60,7 +60,7 @@ export function RawSettingsEditor({
         <box flexDirection='row' gap={1}>
           <Spinner theme={theme} />
           <text fg={theme.foreground}>
-            {state.phase === 'saving' ? 'Saving settings…' : 'Waiting for external editor…'}
+            {state.phase === 'saving' ? 'Saving settings…' : 'Waiting for editor…'}
           </text>
         </box>
       )}

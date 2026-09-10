@@ -66,21 +66,21 @@ export const viewPaletteItems: readonly ViewPaletteItem[] = [
 export const colorModePaletteItems: readonly ColorModePaletteItem[] = [
   {
     command: 'workspace.setLightTheme',
-    description: 'Use light color mode.',
+    description: 'Use light mode.',
     mode: 'light',
     title: 'Light',
     value: 'color-mode:light',
   },
   {
     command: 'workspace.setDarkTheme',
-    description: 'Use dark color mode.',
+    description: 'Use dark mode.',
     mode: 'dark',
     title: 'Dark',
     value: 'color-mode:dark',
   },
   {
     command: 'workspace.setSystemTheme',
-    description: 'Follow the system color mode.',
+    description: 'Follow the system light or dark mode.',
     mode: 'system',
     title: 'System',
     value: 'color-mode:system',

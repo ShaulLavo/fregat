@@ -8,6 +8,7 @@ import type {
 } from '@singapor/lsp-plugin'
 import { useMemo } from 'react'
 
+import { useFileOpenIntent } from '@/lib/file-open-intent/providers/context'
 import {
   createMatchedLanguageServerPlugin,
   type LanguageServerDocumentTarget,
@@ -41,6 +42,7 @@ export function useLanguageServerPlugin({
   onDidNavigateDiagnostic,
 }: UseLanguageServerPluginOptions) {
   const origin = originForQueryClient(useQueryClient())
+  const { service: fileOpenIntent } = useFileOpenIntent()
   const languageServerStatusSource = useMemo(() => createEditorLanguageServerStatusSource(), [])
   const onApplyWorkspaceEdit = useWorkspaceEditHost()
   const documentSyncController = useWorkspaceDocumentSyncController()
@@ -60,6 +62,9 @@ export function useLanguageServerPlugin({
       statusSource: languageServerStatusSource,
       target,
       onApplyWorkspaceEdit,
+      onDefinitionLinkHover: (definition) => {
+        fileOpenIntent.prepare({ path: definition.path, rootPath, source: 'definition' })
+      },
       onOpenDefinition,
       onOpenReferences,
       onDidNavigateDiagnostic,
@@ -68,6 +73,7 @@ export function useLanguageServerPlugin({
     origin,
     enabled,
     documentSyncController,
+    fileOpenIntent,
     languageServerStatusSource,
     matches,
     onApplyWorkspaceEdit,

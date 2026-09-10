@@ -34,7 +34,7 @@ test('raw JSON palette command invokes the host editor and restores its native s
       frame.mockInput.pressKey('F1')
     })
     await act(async () => {
-      await frame.mockInput.typeText('Edit settings JSON in external editor')
+      await frame.mockInput.typeText('Edit settings JSON')
     })
     await act(async () => {
       frame.mockInput.pressKey('RETURN')
@@ -46,7 +46,7 @@ test('raw JSON palette command invokes the host editor and restores its native s
       })
       .toBe(26)
     expect(requests).toHaveLength(1)
-    expect(requests[0]?.executable).toBeTruthy()
+    expect(requests[0]?.text).toBeDefined()
     await expect.poll(() => frame.renderer.currentFocusedRenderable?.id).toBe('settings-list')
   } finally {
     await frame.cleanup()
@@ -54,7 +54,7 @@ test('raw JSON palette command invokes the host editor and restores its native s
   }
 })
 
-test('dismissing an external editor cancels its late result and preserves the next native draft', async ({
+test('dismissing the editor cancels its late result and preserves the next native draft', async ({
   server,
 }) => {
   const session = createTestSettingsSession(server)
@@ -82,7 +82,7 @@ test('dismissing an external editor cancels its late result and preserves the ne
     await act(async () => {
       await frame.mockInput.typeText('editor.fontSize')
     })
-    await runPaletteCommand(frame, 'Edit settings JSON in external editor')
+    await runPaletteCommand(frame, 'Edit settings JSON')
     expect(requests).toHaveLength(1)
     await act(async () => {
       frame.mockInput.pressKey('ESCAPE')
@@ -108,6 +108,48 @@ test('dismissing an external editor cancels its late result and preserves the ne
     expect(frame.renderer.currentFocusedRenderable?.id).toBe('settings-editor')
   } finally {
     edited.resolve('{}')
+    await frame.cleanup()
+    session.dispose()
+  }
+})
+
+test('built-in JSON editor saves typed content and Escape discards changes', async ({ server }) => {
+  const session = createTestSettingsSession(server)
+  await session.refresh()
+  const state = session.getSnapshot()
+  if (state.kind !== 'ready') return
+  const frame = await renderTui(
+    <Application
+      initialLocation={{ kind: 'settings', query: '' }}
+      session={session}
+      onExit={() => {}}
+      noColor
+    />,
+    { width: 110, height: 32, useThread: false, kittyKeyboard: true },
+  )
+  try {
+    await runPaletteCommand(frame, 'Edit settings JSON')
+    await expect.poll(() => frame.renderer.currentFocusedRenderable?.id).toBe('text-editor')
+    await act(async () => {
+      frame.mockInput.pressKey('HOME')
+      frame.mockInput.pressKey('END', { shift: true })
+      await frame.mockInput.typeText('{"editor.fontSize":26}')
+    })
+    await frame.renderOnce()
+    await act(async () => {
+      frame.mockInput.pressKey('F2')
+    })
+    await expect.poll(() => state.owner.readSettingsMirror()['editor.fontSize']).toBe(26)
+    await runPaletteCommand(frame, 'Edit settings JSON')
+    await expect.poll(() => frame.renderer.currentFocusedRenderable?.id).toBe('text-editor')
+    await act(async () => {
+      await frame.mockInput.typeText('discard this')
+      frame.mockInput.pressKey('ESCAPE')
+    })
+    await expect.poll(() => frame.renderer.currentFocusedRenderable?.id).not.toBe('text-editor')
+    expect(state.owner.readSettingsMirror()['editor.fontSize']).toBe(26)
+    expect(frame.captureCharFrame()).not.toContain('Draft kept')
+  } finally {
     await frame.cleanup()
     session.dispose()
   }

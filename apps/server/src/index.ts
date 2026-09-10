@@ -1,6 +1,6 @@
 import { homedir } from 'node:os'
 import path from 'node:path'
-import { createApp } from './app'
+import { closeApp, createApp } from './app'
 import { getDefaultPlatformDatabase } from './db/client'
 import { readEnvironmentIdentity } from './db/environment-identity'
 import {
@@ -25,6 +25,7 @@ const watch = Bun.env.FS_WATCH !== 'false'
 const allowedOrigins = allowedOriginsFromEnv(Bun.env.SERVER_ALLOWED_ORIGINS)
 const maxTextFileBytes = numberFromEnv(Bun.env.FS_DEV_MAX_TEXT_FILE_BYTES)
 const treeConcurrency = numberFromEnv(Bun.env.FS_TREE_CONCURRENCY)
+let serverShutdown: Promise<void> | null = null
 
 assertLoopbackHost(hostname)
 initializeObservability(Bun.env)
@@ -59,12 +60,7 @@ installShutdownHandlers()
 
 export type App = typeof app
 
-/**
- * Bun ends the process on an unhandled rejection, and until this existed the
- * only trace was on stderr — nothing in `logs/*.jsonl`, which is the file
- * AGENTS.md tells everyone to debug from. Registering a handler suppresses
- * Bun's own exit, so this deliberately re-creates it: record, flush, exit 1.
- */
+// Installing a rejection handler replaces Bun's automatic exit, so cleanup must end in exit 1.
 function installCrashHandlers() {
   let crashing = false
 
@@ -78,8 +74,24 @@ function installCrashHandlers() {
 }
 
 async function crash() {
+  try {
+    await shutdownServer()
+  } catch (error) {
+    recordProcessWarning('server.stop_failed', {
+      error: errorMessage(error),
+      reason: 'unhandledRejection',
+    })
+  }
   await flushObservability()
   process.exit(1)
+}
+
+function shutdownServer() {
+  if (serverShutdown) return serverShutdown
+  serverShutdown = closeApp(app).then(async () => {
+    await app.stop(true)
+  })
+  return serverShutdown
 }
 
 function installShutdownHandlers() {
@@ -100,7 +112,7 @@ async function stopServer(signal: NodeJS.Signals) {
   recordProcessInfo('server.stop', { signal })
 
   try {
-    await app.stop()
+    await shutdownServer()
   } catch (error) {
     recordProcessWarning('server.stop_failed', {
       error: errorMessage(error),

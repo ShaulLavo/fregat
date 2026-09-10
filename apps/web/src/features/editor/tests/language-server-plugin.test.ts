@@ -51,6 +51,7 @@ describe('createMatchedLanguageServerPlugin', () => {
 
   test('builds one composite with one distinct lane per descriptor', () => {
     const source = createEditorLanguageServerStatusSource()
+    const onDefinitionLinkHover = vi.fn()
     const onDidNavigateDiagnostic = vi.fn(() => ({ kind: 'ignored' as const }))
     const plugin = createMatchedLanguageServerPlugin({
       documentSyncController,
@@ -60,6 +61,7 @@ describe('createMatchedLanguageServerPlugin', () => {
       statusSource: source,
       target: { matchPath: 'src/a.ts' },
       onApplyWorkspaceEdit,
+      onDefinitionLinkHover,
       onDidNavigateDiagnostic,
     })
 
@@ -70,6 +72,7 @@ describe('createMatchedLanguageServerPlugin', () => {
     expect(createdServerSets).toHaveLength(1)
     expect(options?.lanes.map((lane) => lane.id)).toEqual(['typescript', 'eslint'])
     expect(options?.onApplyWorkspaceEdit).toBe(onApplyWorkspaceEdit)
+    expect(options?.onDefinitionLinkHover).toBe(onDefinitionLinkHover)
     expect(options?.onDidNavigateDiagnostic).toBe(onDidNavigateDiagnostic)
     expect(options?.lanes.every((lane) => lane.onApplyWorkspaceEdit === onApplyWorkspaceEdit)).toBe(
       true,

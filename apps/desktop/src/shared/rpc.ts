@@ -1,5 +1,5 @@
 import type { RPCSchema } from 'electrobun'
-import type { PlatformMachineState, PlatformPickOptions } from './bridge'
+import type { PlatformPickOptions } from './bridge'
 
 type PlatformPickResult = {
   paths: string[]
@@ -12,13 +12,11 @@ export type DesktopRPC = {
         params: PlatformPickOptions
         response: PlatformPickResult
       }
-      connectMachine: { params: { name: string }; response: PlatformMachineState }
-      disconnectMachine: { params: { name: string }; response: void }
     }
     messages: Record<string, never>
   }>
   webview: RPCSchema<{
     requests: Record<string, never>
-    messages: { machineState: PlatformMachineState }
+    messages: Record<string, never>
   }>
 }

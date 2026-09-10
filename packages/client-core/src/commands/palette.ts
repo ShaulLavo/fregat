@@ -6,6 +6,7 @@ export type PaletteRankItem = {
   readonly keywords: readonly string[]
 }
 export type QuickAccessMode =
+  | 'appColors'
   | 'colorMode'
   | 'colorTheme'
   | 'commands'
@@ -149,6 +150,7 @@ function compareRankedCommandItems<Item extends PaletteRankItem>(
 }
 
 export function quickAccessMode(search: string): QuickAccessMode {
+  if (search.startsWith('colors ')) return 'appColors'
   if (search.startsWith('view ')) return 'views'
   if (search.startsWith('color ')) return 'colorMode'
   if (search.startsWith('theme ')) return 'colorTheme'
@@ -161,6 +163,7 @@ export function quickAccessMode(search: string): QuickAccessMode {
 }
 
 export function quickAccessQuery(search: string) {
+  if (search.startsWith('colors ')) return search.slice(7).trimStart()
   if (search.startsWith('view ')) return search.slice(5).trimStart()
   if (search.startsWith('color ')) return search.slice(6).trimStart()
   if (search.startsWith('theme ')) return search.slice(6).trimStart()

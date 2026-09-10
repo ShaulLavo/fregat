@@ -12,7 +12,7 @@ import type { FileTreeModel } from '@workspace/tree'
 import { WarningCircleIcon } from '@phosphor-icons/react'
 import { EmptyState } from '@workspace/ui/components/empty-state'
 
-import { workspacePathForTreePath } from '@/features/workspace/utils/entry-paths'
+import { containerTreePath, workspacePathForTreePath } from '@/features/workspace/utils/entry-paths'
 import { fileTreeIndentGuideVariables } from '@/features/workspace/utils/indent-guide-style'
 import { invalidateTreeQueries } from '@/features/workspace/utils/invalidate-queries'
 import {
@@ -275,6 +275,17 @@ function ReadyTreePane({
     area: 'file-tree',
     id: { kind: 'file-tree', rootPath },
     onIntent: (intent) => {
+      if (intent === 'create-file' || intent === 'create-folder') {
+        if (!fsActions.actions.mutationsEnabled) return false
+
+        const path = tree.getFocusedPath() ?? tree.getSelectedPaths()[0] ?? ''
+        const entry = model.entriesByTreePath.get(canonicalTreePath(path))
+        const container = containerTreePath(path, entry ? isDirectoryEntry(entry) : false)
+        tree.closeSearch()
+        fsActions.actions.createEntry(container, intent === 'create-folder')
+        return true
+      }
+
       if (intent === 'open-search') {
         tree.openSearch()
         return true

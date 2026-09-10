@@ -15,6 +15,7 @@ import { MachinesSection } from '@/features/settings/components/machines-section
 import { ProviderSection } from '@/features/settings/components/provider-section'
 import { RowActions } from '@/features/settings/components/row-actions'
 import { BooleanWidget } from '@/features/settings/components/widgets/boolean-widget'
+import { CodeThemeWidget } from '@/features/settings/components/widgets/code-theme-widget'
 import { EnumWidget } from '@/features/settings/components/widgets/enum-widget'
 import { FontWidget } from '@/features/settings/components/widgets/font-widget'
 import { NumberWidget } from '@/features/settings/components/widgets/number-widget'
@@ -24,6 +25,7 @@ import { useSettingsActions } from '@/features/settings/hooks/use-settings-actio
 import type { SettingsProjection } from '@/features/settings/hooks/use-settings-projection'
 import { useSettingsScope } from '@/features/settings/state/scope-store'
 import { settingRowTitle } from '@workspace/client-core/settings/humanize'
+import { cn } from '@workspace/ui/lib/utils'
 
 export function SettingRow({ id, snapshot }: { id: SettingId; snapshot: SettingsProjection }) {
   const descriptor = descriptorFor(id)
@@ -36,6 +38,7 @@ export function SettingRow({ id, snapshot }: { id: SettingId; snapshot: Settings
   // no scope makes a read-only key writable.
   const disabledReason = descriptor.readOnlyReason ?? inspection.disabledReason
   const value = snapshot.values[id]
+  const hasCodePreview = descriptor.widget === 'code-theme'
 
   return (
     <div className='border-border compact:gap-1.5 compact:py-2 @3xl/settings:compact:gap-4 flex flex-col gap-2 border-b py-3 last:border-b-0 @3xl/settings:flex-row @3xl/settings:items-start @3xl/settings:justify-between @3xl/settings:gap-6'>
@@ -85,7 +88,12 @@ export function SettingRow({ id, snapshot }: { id: SettingId; snapshot: Settings
         {disabledReason ? <p className='text-warning text-xs'>{disabledReason}</p> : null}
       </div>
 
-      <div className='flex max-w-full min-w-0 shrink-0 items-center gap-1 @max-3xl/settings:w-full'>
+      <div
+        className={cn(
+          'flex max-w-full min-w-0 shrink-0 items-center gap-1 @max-3xl/settings:w-full',
+          hasCodePreview && 'items-start @3xl/settings:w-1/2 @3xl/settings:max-w-xl',
+        )}
+      >
         <SettingControl
           disabled={disabledReason !== null}
           id={id}
@@ -150,6 +158,10 @@ function SettingControl({
 
   if (control.widget === 'font') {
     return <FontWidget disabled={disabled} id={id} onChange={onChange} value={control.value} />
+  }
+
+  if (control.widget === 'code-theme') {
+    return <CodeThemeWidget disabled={disabled} id={id} onChange={onChange} value={control.value} />
   }
 
   if (control.widget === 'string' || control.widget === 'multiline') {

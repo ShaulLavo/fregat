@@ -26,7 +26,7 @@ test('a sub-picker opens on an empty input under its own scope chip', async () =
 
   await openColorThemePicker(user)
 
-  expect(await screen.findByText('Color Theme')).toBeInTheDocument()
+  expect(await screen.findByText('Code theme')).toBeInTheDocument()
   expect(await themeInput()).toHaveValue('')
 })
 
@@ -46,7 +46,7 @@ test('typing filters the sub-picker, and deleting it back to empty stays inside'
   await user.clear(input)
 
   expect(await screen.findByText('Dark Plus')).toBeInTheDocument()
-  expect(screen.getByText('Color Theme')).toBeInTheDocument()
+  expect(screen.getByText('Code theme')).toBeInTheDocument()
 })
 
 test('backspace on the empty input pops back to the command list', async () => {
@@ -56,17 +56,17 @@ test('backspace on the empty input pops back to the command list', async () => {
   await openColorThemePicker(user)
   await user.type(await themeInput(), '{Backspace}')
 
-  await waitFor(() => expect(screen.queryByText('Color Theme')).toBeNull())
+  await waitFor(() => expect(screen.queryByText('Code theme')).toBeNull())
   expect(await screen.findByPlaceholderText('Search commands…')).toHaveValue('>')
 })
 
 async function openColorThemePicker(user: ReturnType<typeof userEvent.setup>) {
   await user.click(screen.getByRole('button', { name: 'Open command palette' }))
-  await user.click(await screen.findByText('Choose color theme'))
+  await user.click(await screen.findByText('Choose code theme'))
 }
 
 function themeInput() {
-  return screen.findByPlaceholderText(/Select a color theme/)
+  return screen.findByPlaceholderText(/Select a code theme/)
 }
 
 function renderPalette() {

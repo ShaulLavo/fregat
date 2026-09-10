@@ -14,6 +14,8 @@ import type {
   EnvironmentId,
   HealthDescriptor,
   MachineDefinition,
+  MachineConnectionState,
+  MachineAuthPrompt,
   Machines,
 } from '@workspace/contracts'
 import type { EnvironmentPhase } from '@workspace/client-core/environments/utils/connection'
@@ -29,12 +31,13 @@ import { useEnvironmentsStore } from '@/lib/environments/state/store'
 import { queryClientFor } from '@/lib/environments/state/query-clients'
 import { environmentScopedStorage } from '@/lib/environments/state/scoped-storage'
 import { readEnvironmentDescriptor } from '@/lib/environments/utils/descriptor'
-import { getPlatformBridge, type PlatformMachineState } from '@/lib/platform/bridge'
 import { createClientInvariantError } from '@/lib/structured-errors'
 import { errorMessage } from '@/lib/error-message'
 import { createEnvironmentRecovery } from '@/state/environment-recovery'
 import { initializeEnvironmentPersistence } from '@/state/environment-persistence'
 import { readConnectedMachines, writeConnectedMachines } from '@/state/connected-machines'
+import { answerMachineAuth, connectSshMachine, disconnectSshMachine } from '@/utils/machine-client'
+import { startMachineEvents } from '@/state/machine-events'
 
 export type ConnectedMachine = {
   readonly name: string
@@ -46,6 +49,8 @@ export type ConnectedMachine = {
   readonly origin: string | null
   readonly endpoint: string | null
 }
+
+type ConnectionResult = 'connected' | 'failed' | 'cancelled'
 
 type LiveConnection = {
   readonly origin: string
@@ -61,13 +66,21 @@ export function createEnvironmentConnections({
   readonly createTransport?: (origin: string) => ChatTransport
 }) {
   const store = createStore<{ machines: readonly ConnectedMachine[] }>(() => ({ machines: [] }))
+  const authStore = createStore<{
+    prompt: MachineAuthPrompt | null
+    pending: boolean
+    error: string | null
+  }>(() => ({ prompt: null, pending: false, error: null }))
   const desired = new Set(readConnectedMachines())
   const cachedBindings = readCachedEnvironmentBindings(['local', ...desired])
   const connections = new Map<EnvironmentId, LiveConnection>()
   const owners = new Map<EnvironmentId, string>()
   const attempts = new Map<string, AbortController>()
+  const pendingConnections = new Map<string, Promise<ConnectionResult>>()
+  const cancelledAuthentication = new Set<string>()
+  let authResponse: AbortController | null = null
   let recovery: ReturnType<typeof createEnvironmentRecovery> | null = null
-  let unsubscribeBridge: (() => void) | null = null
+  let unsubscribeEvents: (() => void) | null = null
   let started = false
 
   function machineFor(name: string) {
@@ -165,21 +178,34 @@ export function createEnvironmentConnections({
       )
       return { origin, descriptor, localPort: null }
     }
-    const bridge = getPlatformBridge()
-    if (!bridge) throw createClientInvariantError('SSH machines require the desktop app.')
-    const state = await bridge.connectMachine(machine.name)
+    const state = await connectSshMachine(machine.name, signal)
     signal.throwIfAborted()
     if (state.phase !== 'live') throw sshConnectionError(state)
     return state
   }
-  async function connectMachine(name: string): Promise<void> {
-    if (!started || attempts.has(name)) return
+  function connectMachine(name: string): Promise<ConnectionResult> {
+    if (!started) return Promise.resolve('cancelled')
+    const pending = pendingConnections.get(name)
+    if (pending) return pending
+    cancelledAuthentication.delete(name)
+    return trackConnection(name, performConnection(name))
+  }
+
+  function trackConnection(name: string, work: Promise<ConnectionResult>) {
+    const pending = work.finally(() => {
+      if (pendingConnections.get(name) === pending) pendingConnections.delete(name)
+    })
+    pendingConnections.set(name, pending)
+    return pending
+  }
+
+  async function performConnection(name: string): Promise<ConnectionResult> {
     const machine = machineFor(name)
     desired.add(name)
     writeConnectedMachines(desired)
     restoreCachedConnections()
     if (machine.phase === 'live' && machine.environmentId && connections.has(machine.environmentId))
-      return
+      return 'connected'
     const abort = new AbortController()
     attempts.set(name, abort)
     phase(name, machine.config.kind === 'ssh' ? 'launching' : 'connecting')
@@ -227,15 +253,13 @@ export function createEnvironmentConnections({
         descriptor: result.descriptor,
       })
       recovery?.forget(name)
+      return 'connected'
     } catch (error) {
-      if (abort.signal.aborted) return
+      if (abort.signal.aborted) return 'cancelled'
       const code = error && typeof error === 'object' && 'code' in error ? error.code : null
       const drift = code === 'ENVIRONMENT_IDENTITY_DRIFT'
       const blocked =
-        drift ||
-        code === 'ENVIRONMENT_PROTOCOL_MISMATCH' ||
-        code === 'MACHINE_BLOCKED' ||
-        (!getPlatformBridge() && machine.config.kind === 'ssh')
+        drift || code === 'ENVIRONMENT_PROTOCOL_MISMATCH' || code === 'MACHINE_BLOCKED'
       let failurePhase: EnvironmentPhase = 'offline'
       if (blocked) failurePhase = 'blocked'
       if (drift) failurePhase = 'identity-drift'
@@ -243,6 +267,7 @@ export function createEnvironmentConnections({
       event.set({ outcome: failurePhase })
       phase(name, failurePhase, errorMessage(error, `Cannot connect to ${name}.`))
       recovery?.schedule(name, blocked)
+      return 'failed'
     } finally {
       event.end({ cancelled: abort.signal.aborted })
       if (attempts.get(name) === abort) attempts.delete(name)
@@ -270,46 +295,60 @@ export function createEnvironmentConnections({
     if (descriptor) retain(replacement.endpoint, descriptor, true)
   }
 
-  async function replaceMachineConfiguration(machine: ConnectedMachine) {
-    if (!started || !desired.has(machine.name)) return
+  function replaceMachineConfiguration(machine: ConnectedMachine): Promise<ConnectionResult> {
+    if (!started || !desired.has(machine.name)) return Promise.resolve('cancelled')
     attempts.get(machine.name)?.abort()
+    return trackConnection(machine.name, replaceConfiguration(machine))
+  }
+
+  async function replaceConfiguration(machine: ConnectedMachine): Promise<ConnectionResult> {
     const abort = new AbortController()
     attempts.set(machine.name, abort)
     recovery?.forget(machine.name)
     phase(machine.name, 'reconnecting')
     releaseConnection(machine)
     try {
-      if (machine.config.kind === 'ssh') await getPlatformBridge()?.disconnectMachine(machine.name)
-      if (abort.signal.aborted || !started || !desired.has(machine.name)) return
+      if (machine.config.kind === 'ssh') await disconnectSshMachine(machine.name)
+      if (abort.signal.aborted || !started || !desired.has(machine.name)) return 'cancelled'
       attempts.delete(machine.name)
-      await connectMachine(machine.name)
+      return await performConnection(machine.name)
     } catch (error) {
-      if (abort.signal.aborted) return
+      if (abort.signal.aborted) return 'cancelled'
       phase(machine.name, 'offline', errorMessage(error, `Cannot reconnect ${machine.name}.`))
       recovery?.schedule(machine.name)
+      return 'failed'
     } finally {
       if (attempts.get(machine.name) === abort) attempts.delete(machine.name)
     }
   }
 
   async function disconnectMachine(name: string) {
-    const machine = machineFor(name)
+    const machine = store.getState().machines.find((entry) => entry.name === name)
     desired.delete(name)
     writeConnectedMachines(desired)
     attempts.get(name)?.abort()
     attempts.delete(name)
     recovery?.forget(name)
+    pendingConnections.delete(name)
+    if (!machine) return
     releaseConnection(machine)
     if (machine.origin && !hasAnotherOwner(machine))
       useEnvironmentsStore.getState().setPhase(machine.origin, 'offline')
+    update(name, { phase: 'idle', lastError: null })
     try {
-      if (machine.config.kind === 'ssh') await getPlatformBridge()?.disconnectMachine(name)
+      if (machine.config.kind === 'ssh') await disconnectSshMachine(name)
     } catch (error) {
-      phase(name, 'offline', errorMessage(error, `Could not stop ${name}.`))
+      if (!desired.has(name)) phase(name, 'offline', errorMessage(error, `Could not stop ${name}.`))
       throw error
     }
-    update(name, { phase: 'idle', lastError: null })
   }
+  function cancelMachine(name: string) {
+    const prompt = authStore.getState().prompt
+    if (prompt?.name === name) return cancelAuthentication(prompt)
+    cancelledAuthentication.add(name)
+    return disconnectMachine(name)
+  }
+
   function hasAnotherOwner(machine: ConnectedMachine) {
     if (machine.environmentId && serverHasPrimaryIdentity(machine.environmentId)) return true
     return store
@@ -321,9 +360,13 @@ export function createEnvironmentConnections({
           other.environmentId === machine.environmentId,
       )
   }
-  function machineState(state: PlatformMachineState) {
+  function machineState(state: MachineConnectionState) {
     if (!desired.has(state.name)) return
     if (state.phase === 'live') return
+    if (state.phase === 'launching' || state.phase === 'connecting') {
+      if (attempts.has(state.name)) update(state.name, { phase: state.phase, lastError: null })
+      return
+    }
     phase(state.name, state.phase, 'lastError' in state ? state.lastError : null)
     if (state.phase !== 'offline' && state.phase !== 'blocked' && state.phase !== 'identity-drift')
       return
@@ -470,13 +513,74 @@ export function createEnvironmentConnections({
   }
   reconcileMachines(readSettingsMirror()['environments.machines'], 'mirror')
 
+  async function answerAuth(prompt: MachineAuthPrompt, response: string | null) {
+    if (authStore.getState().prompt?.id !== prompt.id) return
+    if (response === null) return cancelAuthentication(prompt)
+    if (authStore.getState().pending) return
+    const abort = new AbortController()
+    authResponse = abort
+    authStore.setState({ pending: true, error: null })
+    try {
+      await answerMachineAuth(prompt, response, abort.signal)
+      if (authStore.getState().prompt?.id !== prompt.id) return
+      authStore.setState({ prompt: null, pending: false, error: null })
+    } catch {
+      if (authStore.getState().prompt?.id !== prompt.id) return
+      authStore.setState({ pending: false, error: 'Could not submit the SSH response. Try again.' })
+    } finally {
+      if (authResponse === abort) authResponse = null
+    }
+  }
+
+  async function cancelAuthentication(prompt: MachineAuthPrompt) {
+    authResponse?.abort()
+    authStore.setState({ prompt: null, pending: false, error: null })
+    cancelledAuthentication.add(prompt.name)
+    const event = createWideEventScope({
+      action: 'machine.auth.cancel',
+      area: 'environments',
+      machine: prompt.name,
+    })
+    try {
+      await disconnectMachine(prompt.name)
+    } catch (error) {
+      event.error(error)
+    }
+    await answerMachineAuth(prompt, null).catch(() => undefined)
+    event.end()
+  }
+
+  async function rejectCancelledPrompt(prompt: MachineAuthPrompt) {
+    const event = createWideEventScope({
+      action: 'machine.auth.reject',
+      area: 'environments',
+      machine: prompt.name,
+    })
+    try {
+      await disconnectMachine(prompt.name)
+      await answerMachineAuth(prompt, null)
+    } catch (error) {
+      event.error(error)
+    } finally {
+      event.end()
+    }
+  }
+
   function start() {
     if (started) return
     started = true
-    recovery = createEnvironmentRecovery((name) =>
-      name === '@primary' ? retryPrimary() : connectMachine(name),
-    )
-    unsubscribeBridge = getPlatformBridge()?.onMachineState(machineState) ?? null
+    recovery = createEnvironmentRecovery(async (name) => {
+      if (name === '@primary') return retryPrimary()
+      if (desired.has(name)) await connectMachine(name)
+    })
+    unsubscribeEvents = startMachineEvents((event) => {
+      if (event.kind === 'state') return machineState(event.state)
+      if (event.prompt && cancelledAuthentication.has(event.prompt.name)) {
+        void rejectCancelledPrompt(event.prompt)
+        return
+      }
+      authStore.setState({ prompt: event.prompt, pending: false, error: null })
+    })
     const primary = useEnvironmentsStore.getState().entries[primaryServerOrigin()]
     if (primary?.descriptor && primary.phase !== 'offline') {
       retain(primary.origin, primary.descriptor)
@@ -493,20 +597,27 @@ export function createEnvironmentConnections({
   }
   function stop() {
     started = false
-    unsubscribeBridge?.()
+    unsubscribeEvents?.()
+    unsubscribeEvents = null
+    authResponse?.abort()
+    authStore.setState({ prompt: null, pending: false, error: null })
     recovery?.dispose()
     recovery = null
     for (const attempt of attempts.values()) attempt.abort()
     attempts.clear()
+    pendingConnections.clear()
     for (const environmentId of connections.keys()) stopConnection(environmentId)
   }
   return {
     store,
+    authStore,
+    answerAuth,
     start,
     stop,
     configureMachines,
     connectMachine,
     disconnectMachine,
+    cancelMachine,
     retryPrimary,
     retryMachine: async (name: string) => {
       const machine = machineFor(name)
@@ -525,14 +636,10 @@ function sameConnectionConfiguration(left: MachineDefinition, right: MachineDefi
     return canonicalServerOrigin(left.url) === canonicalServerOrigin(right.url)
   }
   if (left.kind !== 'ssh' || right.kind !== 'ssh') return false
-  return (
-    left.target === right.target &&
-    left.repoPath === right.repoPath &&
-    left.remotePort === right.remotePort
-  )
+  return left.target === right.target && left.remotePort === right.remotePort
 }
 
-function sshConnectionError(state: Exclude<PlatformMachineState, { phase: 'live' }>) {
+function sshConnectionError(state: Exclude<MachineConnectionState, { phase: 'live' }>) {
   let code = 'MACHINE_CONNECTION_FAILED'
   if (state.phase === 'blocked') code = 'MACHINE_BLOCKED'
   if (state.phase === 'identity-drift') code = 'ENVIRONMENT_IDENTITY_DRIFT'
@@ -540,7 +647,7 @@ function sshConnectionError(state: Exclude<PlatformMachineState, { phase: 'live'
     code,
     status: state.phase === 'blocked' ? 403 : 502,
     message: 'lastError' in state ? state.lastError : 'The SSH machine has not connected.',
-    why: 'The desktop launcher refused or could not establish this machine connection.',
+    why: 'The server refused or could not establish this SSH connection.',
     fix: 'Resolve the machine error in Settings before reconnecting.',
   })
 }

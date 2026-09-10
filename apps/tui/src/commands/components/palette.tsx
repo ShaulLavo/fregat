@@ -126,7 +126,7 @@ export function CommandPalette({
       title={title}
       theme={theme}
       onClose={onClose}
-      footer='> commands · sess sessions · view · color · theme · Enter open'
+      footer='> commands · sess sessions · view · color · colors · Enter open'
       dismissLabel='close'
       width={90}
     >
@@ -172,7 +172,7 @@ export function CommandPalette({
       {pending && (
         <box flexDirection='row' gap={1}>
           <Spinner theme={theme} />
-          <text fg={theme.mutedForeground}>Saving color theme…</text>
+          <text fg={theme.mutedForeground}>Saving app colors…</text>
         </box>
       )}
     </Dialog>

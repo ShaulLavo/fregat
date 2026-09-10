@@ -34,7 +34,7 @@ test('raw edits report ignored settings with their key and scope until corrected
     })
     await frame.renderOnce()
     expect(frame.captureCharFrame()).not.toContain('not applied')
-    await runPaletteCommand(frame, 'Edit settings JSON in external editor')
+    await runPaletteCommand(frame, 'Edit settings JSON')
     await act(async () => {
       await expect
         .poll(() => state.owner.getSnapshot().snapshot.diagnostics)
@@ -52,7 +52,7 @@ test('raw edits report ignored settings with their key and scope until corrected
     expect(frame.captureCharFrame()).toContain('Edit settings JSON')
     expect(frame.captureCharFrame()).not.toContain('Set in user')
     text = '{"editor.fontSize":26}'
-    await runPaletteCommand(frame, 'Edit settings JSON in external editor')
+    await runPaletteCommand(frame, 'Edit settings JSON')
     await act(async () => {
       await expect.poll(() => state.owner.readSettingsMirror()['editor.fontSize']).toBe(26)
     })
@@ -94,7 +94,7 @@ test('malformed files report their scope and fallback values and can be repaired
     await frame.renderOnce()
     expect(frame.captureCharFrame()).toContain('user settings.json: syntax error')
     expect(frame.captureCharFrame()).toContain('last valid settings or defaults')
-    await runPaletteCommand(frame, 'Edit settings JSON in external editor')
+    await runPaletteCommand(frame, 'Edit settings JSON')
     await act(async () => {
       await expect.poll(() => state.owner.readSettingsMirror()['editor.fontSize']).toBe(22)
     })

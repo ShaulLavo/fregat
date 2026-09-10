@@ -338,28 +338,28 @@ describe('command registry', () => {
   it('exposes appearance commands for the command palette', () => {
     expect(platformCommandSpec('workspace.selectColorMode')).toMatchObject({
       category: 'Appearance',
-      description: 'Pick light, dark, or system color mode.',
-      title: 'Choose color mode',
+      description: 'Choose light or dark mode, or follow the system.',
+      title: 'Choose light / dark mode',
     })
     expect(platformCommandSpec('workspace.selectColorTheme')).toMatchObject({
       category: 'Appearance',
-      description: 'Pick the editor color theme from the bundled VSCode themes.',
-      title: 'Choose color theme',
+      description: 'Choose colors for the editor and code blocks in chat.',
+      title: 'Choose code theme',
     })
     expect(platformCommandSpec('workspace.setLightTheme')).toMatchObject({
       category: 'Appearance',
-      description: 'Use light color mode.',
-      title: 'Light color mode',
+      description: 'Use light mode.',
+      title: 'Light mode',
     })
     expect(platformCommandSpec('workspace.setDarkTheme')).toMatchObject({
       category: 'Appearance',
-      description: 'Use dark color mode.',
-      title: 'Dark color mode',
+      description: 'Use dark mode.',
+      title: 'Dark mode',
     })
     expect(platformCommandSpec('workspace.setSystemTheme')).toMatchObject({
       category: 'Appearance',
-      description: 'Follow the system color mode.',
-      title: 'System color mode',
+      description: 'Follow the system light or dark mode.',
+      title: 'Follow system light / dark mode',
     })
     expect(platformCommandSpec('workspace.toggleWallpaper')).toMatchObject({
       category: 'Appearance',

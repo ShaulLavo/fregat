@@ -29,6 +29,8 @@ const BOOT_MIRROR_KEY = 'platform.settings-boot-mirror.v1'
  * read here is live rather than merely boot-time, and never authority.
  */
 const MIRRORED_KEYS = [
+  'editor.codeTheme.dark',
+  'editor.codeTheme.light',
   'environments.machines',
   'editor.decode.mode',
   'editor.fontFamily',

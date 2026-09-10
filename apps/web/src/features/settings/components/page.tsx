@@ -1,9 +1,10 @@
+import { useSettingsSearch, selectSettingsSearch } from '@/features/settings/state/search-store'
 import { descriptorFor, type SettingId } from '@workspace/contracts'
 import { Button } from '@workspace/ui/components/button'
 import { Input } from '@workspace/ui/components/input'
 import { OrbitLoader } from '@workspace/ui/components/orbit-loader'
 import { XIcon } from '@phosphor-icons/react'
-import { useCallback, useRef, useState } from 'react'
+import { useCallback, useRef } from 'react'
 import { useQueryClient } from '@tanstack/react-query'
 
 import { DiagnosticsBanner } from '@/features/settings/components/diagnostics-banner'
@@ -63,7 +64,8 @@ export function SettingsPage({
     showJson || editorOwner === settingsOwner
       ? editorHasWorkspace
       : Boolean(document.data?.layers.some((layer) => layer.id === 'workspace'))
-  const [query, setQuery] = useState('')
+  const query = useSettingsSearch()
+  const setQuery = selectSettingsSearch
   const searchRef = useRef<HTMLInputElement>(null)
   const rootRef = useRef<HTMLDivElement | null>(null)
   const selectedCategory = useSettingsCategory()

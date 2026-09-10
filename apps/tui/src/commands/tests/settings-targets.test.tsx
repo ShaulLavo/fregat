@@ -6,7 +6,7 @@ import { test, expect } from '../../../test/fixtures'
 import { renderTui } from '../../../test/render'
 import { openPaletteSearch, submitPaletteSearch } from '../../../test/palette'
 
-test('palette settings actions show exact scope and host requirements and remain disabled', async ({
+test('palette settings actions enforce scope and open the built-in JSON editor', async ({
   server,
 }) => {
   const session = createTestSettingsSession(server)
@@ -41,14 +41,11 @@ test('palette settings actions show exact scope and host requirements and remain
     await act(async () => {
       frame.mockInput.pressKey('ESCAPE')
     })
-    await openPaletteSearch(frame, '>Edit settings JSON in external editor')
-    expect(frame.captureCharFrame()).toContain(
-      'The interactive terminal host is required to open an external editor.',
-    )
+    await openPaletteSearch(frame, '>Edit settings JSON')
     await act(async () => {
       frame.mockInput.pressEnter()
     })
-    expect(frame.renderer.currentFocusedRenderable?.id).toBe('command-palette')
+    await expect.poll(() => frame.renderer.currentFocusedRenderable?.id).toBe('text-editor')
   } finally {
     await frame.cleanup()
     session.dispose()

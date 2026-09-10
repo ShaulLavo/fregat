@@ -42,6 +42,7 @@ test('batched command filtering and Enter use the submitted native query', async
 
 test.for([
   ['edt editor', 'Open editors'],
+  ['theme sage', 'Code themes'],
   ['run test', 'Scripts'],
   ['@symbol', 'Symbols'],
   [':42', 'Go to line'],
@@ -77,7 +78,7 @@ test.for([
   }
 })
 
-test('color and theme prefixes commit the existing settings and restore their invoking pane', async ({
+test('light / dark mode and app colors commit the existing settings and restore their invoking pane', async ({
   server,
 }) => {
   const session = createTestSettingsSession(server)
@@ -111,7 +112,14 @@ test('color and theme prefixes commit the existing settings and restore their in
     await submitPaletteSearch(frame, 'color light')
     await expect.poll(() => state.owner.readSettingsMirror()['workbench.colorTheme']).toBe('light')
     expect(frame.renderer.currentFocusedRenderable?.id).toBe('settings-list')
-    await submitPaletteSearch(frame, 'theme sage')
+    await openPaletteSearch(frame, '>workspace.selectColorTheme')
+    expect(frame.captureCharFrame()).not.toContain('Choose code theme')
+    await act(async () => frame.mockInput.pressKey('ESCAPE'))
+    await submitPaletteSearch(frame, '>Choose app colors')
+    await frame.renderOnce()
+    expect(frame.captureCharFrame()).toContain('App colors')
+    await act(async () => frame.mockInput.pressKey('ESCAPE'))
+    await submitPaletteSearch(frame, 'colors sage')
     await expect.poll(() => state.owner.readSettingsMirror()['workbench.palette']).toBe('sage')
     expect(
       state.owner.getSnapshot().snapshot.layers.find((layer) => layer.id === 'workspace')?.raw[
@@ -151,7 +159,7 @@ test('view prefix invokes an available view and unprefixed text carries into fil
   try {
     await openPaletteSearch(frame, 'view settings')
     expect(frame.captureCharFrame()).toContain('Open providers, models, and keybindings.')
-    expect(frame.captureCharFrame()).not.toContain('Choose color mode')
+    expect(frame.captureCharFrame()).not.toContain('Choose light / dark mode')
     await act(async () => {
       frame.mockInput.pressEnter()
     })

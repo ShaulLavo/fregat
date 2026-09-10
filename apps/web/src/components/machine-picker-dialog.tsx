@@ -1,0 +1,118 @@
+import { useState } from 'react'
+import { Button } from '@workspace/ui/components/button'
+import { Dialog, DialogContent, DialogHeader, DialogTitle } from '@workspace/ui/components/dialog'
+import { Spinner } from '@workspace/ui/components/spinner'
+import { MachineFormDialog } from '@/components/machine-form-dialog'
+import { useEnvironmentConnections } from '@/hooks/use-environment-connections'
+import { useEnvironmentsStore } from '@/lib/environments/state/store'
+import { errorMessage } from '@/lib/error-message'
+
+export function MachinePickerDialog({
+  mode,
+  onClose,
+}: {
+  readonly mode: 'switch' | 'connect' | 'disconnect'
+  readonly onClose: () => void
+}) {
+  const connections = useEnvironmentConnections()
+  const entries = useEnvironmentsStore((state) => state.entries)
+  const [error, setError] = useState<string | null>(null)
+  const [adding, setAdding] = useState(mode === 'connect' && connections.machines.length === 0)
+  const [working, setWorking] = useState<string | null>(null)
+  const title = {
+    switch: 'Switch machine',
+    connect: 'Connect machine',
+    disconnect: 'Disconnect machine',
+  }[mode]
+  const machines = connections.machines.filter((machine) =>
+    mode === 'connect' ? machine.phase !== 'live' : machine.environmentId !== null,
+  )
+  const primary = Object.values(entries).find((entry) => entry.kind === 'primary')
+  const connecting = mode === 'connect'
+  const showForm = connecting && (adding || connections.machines.length === 0)
+  async function choose(name: string) {
+    setError(null)
+    setWorking(name)
+    try {
+      if (connecting) {
+        const result = await connections.connectMachine(name)
+        if (result === 'cancelled') return
+        if (result === 'failed') {
+          const machine = connections.store.getState().machines.find((entry) => entry.name === name)
+          return setError(machine?.lastError || `Cannot connect to ${name}. Retry the connection.`)
+        }
+      }
+      if (mode === 'disconnect') await connections.disconnectMachine(name)
+      const machine = connections.store.getState().machines.find((entry) => entry.name === name)
+      if (mode === 'switch' && machine?.environmentId)
+        connections.activateEnvironment(machine.environmentId)
+      onClose()
+    } catch (cause) {
+      setError(errorMessage(cause, 'The machine action failed.'))
+    } finally {
+      setWorking(null)
+    }
+  }
+  if (showForm)
+    return (
+      <MachineFormDialog
+        intent='connect'
+        onCancel={() => {
+          if (connections.machines.length === 0) return onClose()
+          setAdding(false)
+        }}
+        onSaved={onClose}
+      />
+    )
+  return (
+    <Dialog
+      open
+      onOpenChange={(open) => {
+        if (!open) onClose()
+      }}
+    >
+      <DialogContent className='max-h-[calc(100dvh-2rem)] overflow-y-auto'>
+        <DialogHeader>
+          <DialogTitle>{title}</DialogTitle>
+        </DialogHeader>
+        {mode === 'switch' && primary?.environmentId ? (
+          <Button
+            variant='ghost'
+            onClick={() => {
+              connections.activateEnvironment(primary.environmentId!)
+              onClose()
+            }}
+          >
+            {primary.label ?? 'Local machine'}
+          </Button>
+        ) : null}
+        {machines.map((machine) => (
+          <Button
+            key={machine.name}
+            variant='ghost'
+            className='justify-between'
+            disabled={working !== null}
+            onClick={() => void choose(machine.name)}
+          >
+            <span>{machine.config.label ?? machine.name}</span>
+            {working === machine.name ? <Spinner /> : null}
+            <span className='text-muted-foreground'>{machine.phase}</span>
+          </Button>
+        ))}
+        {connecting ? (
+          <Button variant='secondary' disabled={working !== null} onClick={() => setAdding(true)}>
+            Add machine
+          </Button>
+        ) : null}
+        {mode === 'disconnect' && machines.length === 0 ? (
+          <p className='text-muted-foreground text-sm'>No connected machines to disconnect.</p>
+        ) : null}
+        {error ? (
+          <p role='alert' className='text-destructive text-sm'>
+            {error}
+          </p>
+        ) : null}
+      </DialogContent>
+    </Dialog>
+  )
+}

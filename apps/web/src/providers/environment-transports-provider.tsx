@@ -2,6 +2,7 @@ import { useEffect, type ReactNode } from 'react'
 import { useSettingsProjection } from '@/features/settings/hooks/use-settings-projection'
 import { EnvironmentConnectionsContext } from '@/providers/environment-connections-context'
 import type { EnvironmentConnections } from '@/state/environment-connections'
+import { MachineAuthDialog } from '@/components/machine-auth-dialog'
 
 export function EnvironmentTransportsProvider({
   connections,
@@ -19,6 +20,9 @@ export function EnvironmentTransportsProvider({
     if (machines) connections.configureMachines(machines)
   }, [connections, machines])
   return (
-    <EnvironmentConnectionsContext value={connections}>{children}</EnvironmentConnectionsContext>
+    <EnvironmentConnectionsContext value={connections}>
+      {children}
+      <MachineAuthDialog />
+    </EnvironmentConnectionsContext>
   )
 }

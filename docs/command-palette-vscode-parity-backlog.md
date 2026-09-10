@@ -1,7 +1,22 @@
 > [!IMPORTANT]
-> **STATUS: 🟡 NEEDS UPDATE (reviewed 2026-06-06).** Some backlog items shipped (quick-access modes exist); reconcile done vs open. (Reference paths repaired 2026-06-12.)
+> Historical parity backlog. The current selection policy below was implemented on 2026-09-09. The older baseline and proposals record the original comparison, not a list of remaining work.
 
 # Command Palette VS Code Parity Backlog
+
+## Current command and settings policy
+
+Settings own saved preferences. The command palette offers actions, navigation, and quick pickers for common choices. Both entry points write through the same settings actions.
+
+- **Light / dark mode**, **App colors**, and per-mode **Code theme** choices appear in Settings. Each has a command palette picker with preview and cancellation.
+- Code themes share one native and imported theme catalog. The picker offers themes for the current light or dark mode. The registry stores each mode's choice separately.
+- Basic cursor movement, single-character deletion, and transient input handlers remain configurable as shortcuts but do not appear in the palette.
+- Palette visibility follows the invocation's context. An editor action requires an editor target; a relevant but unavailable action can remain disabled with a reason.
+- The palette exposes one **Go to definition** and one **Focus editor** action. Numbered editor-group shortcuts do not imply additional groups in the palette.
+- **Run project script**, **Switch session**, and **Go to line** open the existing pickers. **New file** and **New folder** use the Files pane's creation flow.
+- **Open font settings** and **Open transparency settings** open Settings filtered to the relevant controls.
+- The TUI's App colors picker uses the same setting. Its unsupported code-theme command is absent.
+
+The focused checks live in `apps/web/src/features/command-palette/tests/`, `apps/web/src/keymap/tests/palette-visibility.test.tsx`, and `apps/web/src/features/settings/tests/code-theme.test.tsx`.
 
 This tracks the gap between the first command palette pass and VS Code's Quick Access / Command Palette model. The reference points are:
 
@@ -11,7 +26,7 @@ This tracks the gap between the first command palette pass and VS Code's Quick A
 - `references/vscode/src/vs/workbench/contrib/quickaccess/browser/commandsQuickAccess.ts`
 - `references/vscode/src/vs/workbench/browser/actions/quickAccessActions.ts`
 
-## Current Baseline
+## Original baseline
 
 - Opens default Quick Access with `Mod+P`.
 - Opens command mode with `Mod+Shift+P` and `F1`, prefilling `>`.

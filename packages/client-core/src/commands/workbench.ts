@@ -109,10 +109,10 @@ export const workbenchCommandMetadata = {
     'J',
     'editor',
   ),
-  'workspace.editFileExternally': workbench(
-    'workspace.editFileExternally',
-    'Edit file externally',
-    'Edit with the configured editor and commit against the loaded snapshot.',
+  'workspace.editFile': workbench(
+    'workspace.editFile',
+    'Edit file',
+    'Edit in the built-in editor and commit against the loaded snapshot.',
     'X',
     'editor',
   ),

@@ -18,15 +18,6 @@ const sshTargetSchema = v.pipe(
   ),
   v.maxLength(255),
 )
-const absolutePathSchema = v.pipe(
-  v.string(),
-  v.startsWith('/', 'Use an absolute repository path on the remote machine.'),
-  v.check(
-    (value) => !value.includes('\0') && !value.includes('\r') && !value.includes('\n'),
-    'Repository paths cannot contain line breaks or NUL bytes.',
-  ),
-)
-
 const originSchema = v.pipe(
   v.string(),
   v.url('Use a complete https:// or loopback http:// URL.'),
@@ -37,7 +28,6 @@ const originSchema = v.pipe(
 export const sshMachineSchema = v.object({
   kind: v.literal('ssh'),
   target: sshTargetSchema,
-  repoPath: absolutePathSchema,
   remotePort: v.optional(portSchema),
   label: v.optional(labelSchema),
 })

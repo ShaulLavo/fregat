@@ -16,15 +16,14 @@ import {
   resolveEditorShikiThemeRegistration,
   resetEditorColorThemeStore,
   setActiveEditorColorMode,
-  setSelectedEditorThemeId,
+  syncEditorThemeSelection,
   subscribeActiveShikiTheme,
   subscribeEditorColorTheme,
 } from '@/features/editor/state/color-theme-store'
 
-const EDITOR_COLOR_THEME_STORAGE_KEY = 'platform.editor-color-theme.v1'
+const BOOT_MIRROR_KEY = 'platform.settings-boot-mirror.v1'
 
-// The node project has no DOM, and the point of these tests is what crosses
-// localStorage, so stand up a real Map-backed Storage rather than skipping it.
+// The node project reads the settings boot mirror through the Storage boundary.
 const STORE = new Map<string, string>()
 
 function memoryLocalStorage(): Storage {
@@ -61,76 +60,77 @@ test('defaults to dark-plus and light-plus per color mode', () => {
 })
 
 test('keeps each color mode’s selection independent', () => {
-  setSelectedEditorThemeId('dark', 'monokai')
-  setSelectedEditorThemeId('light', 'github-light')
+  syncEditorThemeSelection('dark', 'monokai')
+  syncEditorThemeSelection('light', 'github-light')
 
   expect(getSelectedEditorThemeId('dark')).toBe('monokai')
   expect(getSelectedEditorThemeId('light')).toBe('github-light')
 })
 
 test('ignores theme ids that are in neither catalog', () => {
-  setSelectedEditorThemeId('dark', 'not-a-real-theme')
+  syncEditorThemeSelection('dark', 'not-a-real-theme')
 
   expect(getSelectedEditorThemeId('dark')).toBe('dark-plus')
 })
 
-test('persists a built-in selection across a reload', () => {
-  setSelectedEditorThemeId('dark', 'tree-sitter-dark')
+test('reads native and imported selections from the confirmed settings mirror', () => {
+  localStorage.setItem(
+    BOOT_MIRROR_KEY,
+    JSON.stringify({
+      'editor.codeTheme.dark': 'tree-sitter-dark',
+      'editor.codeTheme.light': 'github-light',
+    }),
+  )
   resetEditorColorThemeStore()
 
   expect(getSelectedEditorThemeId('dark')).toBe('tree-sitter-dark')
+  expect(getSelectedEditorThemeId('light')).toBe('github-light')
 })
 
-test('survives a reload through localStorage', () => {
-  setSelectedEditorThemeId('dark', 'tokyo-night')
-
-  // What a fresh page load does: drop the in-memory store, read storage back.
+test('falls back for unavailable or wrong-mode saved code themes', () => {
+  localStorage.setItem(
+    BOOT_MIRROR_KEY,
+    JSON.stringify({
+      'editor.codeTheme.dark': 'garbage',
+      'editor.codeTheme.light': 'monokai',
+    }),
+  )
   resetEditorColorThemeStore()
 
-  expect(getSelectedEditorThemeId('dark')).toBe('tokyo-night')
+  expect(getSelectedEditorThemeId('dark')).toBe('dark-plus')
   expect(getSelectedEditorThemeId('light')).toBe('light-plus')
 })
 
-test('falls back to the mode default on garbage persisted ids', () => {
-  localStorage.setItem(
-    EDITOR_COLOR_THEME_STORAGE_KEY,
-    JSON.stringify({ selection: { dark: 'garbage', light: 'min-light' }, version: 1 }),
-  )
-  resetEditorColorThemeStore()
+test('theme synchronization and previews never write the confirmed settings mirror', () => {
+  const before = localStorage.getItem(BOOT_MIRROR_KEY)
+  syncEditorThemeSelection('dark', 'monokai')
+  previewEditorTheme('dark', 'dracula')
+  clearEditorThemePreview()
 
-  expect(getSelectedEditorThemeId('dark')).toBe('dark-plus')
-  expect(getSelectedEditorThemeId('light')).toBe('min-light')
+  expect(localStorage.getItem(BOOT_MIRROR_KEY)).toBe(before)
 })
 
-test('drops storage written under a different version instead of trusting it', () => {
-  localStorage.setItem(
-    EDITOR_COLOR_THEME_STORAGE_KEY,
-    JSON.stringify({ selection: { dark: 'monokai' }, version: 2 }),
-  )
-  resetEditorColorThemeStore()
+test('unchanged settings and changes in another mode preserve the active preview', () => {
+  previewEditorTheme('dark', 'monokai')
+  syncEditorThemeSelection('dark', 'dark-plus')
+  syncEditorThemeSelection('light', 'github-light')
 
-  expect(getSelectedEditorThemeId('dark')).toBe('dark-plus')
-})
-
-test('drops malformed storage instead of trusting it', () => {
-  localStorage.setItem(EDITOR_COLOR_THEME_STORAGE_KEY, '{not json')
-  resetEditorColorThemeStore()
-
-  expect(getSelectedEditorThemeId('dark')).toBe('dark-plus')
+  expect(getSelectedEditorThemeId('dark')).toBe('monokai')
+  expect(getCommittedEditorThemeId('dark')).toBe('dark-plus')
 })
 
 test('notifies subscribers when a selection changes', () => {
   const listener = vi.fn()
   const unsubscribe = subscribeEditorColorTheme(listener)
 
-  setSelectedEditorThemeId('dark', 'monokai')
+  syncEditorThemeSelection('dark', 'monokai')
   expect(listener).toHaveBeenCalledTimes(1)
 
-  setSelectedEditorThemeId('dark', 'monokai')
+  syncEditorThemeSelection('dark', 'monokai')
   expect(listener).toHaveBeenCalledTimes(1)
 
   unsubscribe()
-  setSelectedEditorThemeId('dark', 'nord')
+  syncEditorThemeSelection('dark', 'nord')
   expect(listener).toHaveBeenCalledTimes(1)
 })
 
@@ -148,7 +148,7 @@ test('notifies subscribers when the active color mode changes', () => {
 })
 
 test('loads the selected theme registration and derived editor theme', async () => {
-  setSelectedEditorThemeId('dark', 'monokai')
+  syncEditorThemeSelection('dark', 'monokai')
 
   const loaded = await loadEditorThemeForSelection('dark')
 
@@ -160,7 +160,7 @@ test('loads the selected theme registration and derived editor theme', async () 
 })
 
 test('serves the built-in themes from their inline palette, with no shiki backing', async () => {
-  setSelectedEditorThemeId('dark', 'tree-sitter-dark')
+  syncEditorThemeSelection('dark', 'tree-sitter-dark')
 
   const loaded = await loadEditorThemeForSelection('dark')
 
@@ -175,7 +175,7 @@ test('serves the built-in themes from their inline palette, with no shiki backin
 test('a built-in selection takes the shiki highlighter off the active color mode', () => {
   expect(activeEditorThemeUsesShiki()).toBe(true)
 
-  setSelectedEditorThemeId('dark', 'tree-sitter-dark')
+  syncEditorThemeSelection('dark', 'tree-sitter-dark')
   expect(activeEditorThemeUsesShiki()).toBe(false)
   // The resolver still has to name a theme shiki can load, for the window
   // between the selection landing and the provider being deregistered.
@@ -206,7 +206,7 @@ test('memoizes loaded themes by id', async () => {
 })
 
 test('a hover-preview overlays the selection without persisting', () => {
-  setSelectedEditorThemeId('dark', 'monokai')
+  syncEditorThemeSelection('dark', 'monokai')
 
   previewEditorTheme('dark', 'dracula')
 
@@ -221,9 +221,9 @@ test('a hover-preview overlays the selection without persisting', () => {
 })
 
 test('a peak-sized theme scrub produces one active Shiki notification', async () => {
-  setSelectedEditorThemeId('dark', 'monokai')
+  syncEditorThemeSelection('dark', 'monokai')
   await loadEditorThemeForSelection('dark')
-  setSelectedEditorThemeId('dark', 'dracula')
+  syncEditorThemeSelection('dark', 'dracula')
   await loadEditorThemeForSelection('dark')
 
   const listener = vi.fn()
@@ -247,13 +247,13 @@ test('active Shiki subscribers ignore an inactive color-mode selection', () => {
   const listener = vi.fn()
   subscribeActiveShikiTheme(listener)
 
-  setSelectedEditorThemeId('light', 'github-light')
+  syncEditorThemeSelection('light', 'github-light')
 
   expect(listener).not.toHaveBeenCalled()
 })
 
 test('committing the effective preview theme does not reload Shiki', async () => {
-  setSelectedEditorThemeId('dark', 'monokai')
+  syncEditorThemeSelection('dark', 'monokai')
   await loadEditorThemeForSelection('dark')
   previewEditorTheme('dark', 'dracula')
   await loadEditorThemeForSelection('dark')
@@ -261,7 +261,7 @@ test('committing the effective preview theme does not reload Shiki', async () =>
   const listener = vi.fn()
   subscribeActiveShikiTheme(listener)
 
-  setSelectedEditorThemeId('dark', 'dracula')
+  syncEditorThemeSelection('dark', 'dracula')
 
   expect(listener).not.toHaveBeenCalled()
 })
@@ -280,7 +280,7 @@ test('resolved Shiki content hashes are stable and distinguish loaded content', 
 test('preview is ignored when it targets the already-selected theme', () => {
   const listener = vi.fn()
   subscribeEditorColorTheme(listener)
-  setSelectedEditorThemeId('dark', 'monokai')
+  syncEditorThemeSelection('dark', 'monokai')
   listener.mockClear()
 
   previewEditorTheme('dark', 'monokai')
@@ -299,18 +299,15 @@ test('preview is a no-op for repeated calls with the same theme', () => {
   expect(listener).not.toHaveBeenCalled()
 })
 
-test('commit drops the preview and persists the selection', () => {
-  setSelectedEditorThemeId('dark', 'monokai')
+test('synchronizing a committed selection drops the preview', () => {
+  syncEditorThemeSelection('dark', 'monokai')
   previewEditorTheme('dark', 'dracula')
 
-  setSelectedEditorThemeId('dark', 'dracula')
+  syncEditorThemeSelection('dark', 'dracula')
 
   expect(getCommittedEditorThemeId('dark')).toBe('dracula')
   // No preview overlay anymore: the selected and committed ids agree.
   expect(getSelectedEditorThemeId('dark')).toBe('dracula')
-  resetEditorColorThemeStore()
-
-  expect(getCommittedEditorThemeId('dark')).toBe('dracula')
 })
 
 test('preview starts the registration load so the worker can use it synchronously', async () => {
@@ -381,7 +378,7 @@ test('a failed requested theme reports the actual fallback id', async () => {
   try {
     const isolatedStore = await import('@/features/editor/state/color-theme-store')
     isolatedStore.resetEditorColorThemeStore()
-    isolatedStore.setSelectedEditorThemeId('dark', 'monokai')
+    isolatedStore.syncEditorThemeSelection('dark', 'monokai')
 
     const loaded = await isolatedStore.loadEditorThemeForSelection('dark')
 

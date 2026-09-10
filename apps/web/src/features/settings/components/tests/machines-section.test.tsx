@@ -8,7 +8,7 @@ import { useSettingsActions } from '@/features/settings/hooks/use-settings-actio
 import { fetchSettings, saveSettings } from '@/features/settings/utils/api'
 import { settingsKeys } from '@workspace/client-core/settings/query-keys'
 import { registerEnvironmentQueryClient } from '@/lib/environments/state/query-clients'
-import { createEnvironmentConnections } from '@/state/environment-connections'
+import { createFederationHarness } from '../../../../../test/factories/federation'
 import { createInProcessClient } from '../../../../../test/client'
 import { expect, test } from '../../../../../test/fixtures'
 import {
@@ -18,27 +18,38 @@ import {
 } from '../../../../../test/render'
 import { makeTestServer } from '../../../../../test/server'
 
-test('adds, relabels, and removes an SSH machine through the real settings file', async ({
-  client,
+test('adds, relabels, and removes a machine inline through the shared form and real settings file', async ({
+  server,
 }) => {
-  const connections = createEnvironmentConnections({ activateEnvironment: () => {} })
+  const h = await createFederationHarness(server)
+  const client = h.clientA
+  const connections = h.connections
+  await connections.disconnectMachine('remote')
+  connections.configureMachines({})
   renderWithProviders(<MachinesSection disabled={false} />, { connections })
   await userEvent.click(screen.getByRole('button', { name: 'Add machine' }))
+  await userEvent.click(screen.getByRole('button', { name: 'Options' }))
   await userEvent.type(screen.getByLabelText('Machine name'), 'build-machine')
-  await userEvent.type(screen.getByLabelText('SSH target'), 'builder@localhost')
-  await userEvent.type(screen.getByLabelText('Repository path'), '/work/projects/platform')
-  await userEvent.click(screen.getByRole('button', { name: 'Add machine' }))
+  expect(screen.queryByRole('dialog')).toBeNull()
+  expect(screen.getByRole('button', { name: /Remote URL/ })).toBeVisible()
+  expect(screen.getByRole('button', { name: /^SSH/ })).toBeVisible()
+  await userEvent.click(screen.getByRole('button', { name: /Remote URL/ }))
+  await userEvent.type(screen.getByLabelText('Server URL'), h.originB)
+  await userEvent.click(screen.getByRole('button', { name: 'Connect' }))
   await waitFor(async () => {
     const snapshot = await fetchSettings(undefined, client)
     expect(snapshot.values['environments.machines']['build-machine']).toMatchObject({
-      target: 'builder@localhost',
+      kind: 'origin',
+      url: h.originB,
     })
     connections.configureMachines(snapshot.values['environments.machines'])
   })
-  expect(await screen.findByText('Desktop only')).toBeVisible()
-  expect(screen.getByRole('button', { name: 'Connect' })).toBeDisabled()
+  await waitFor(() => expect(screen.queryByLabelText('Server URL')).toBeNull())
+  await userEvent.click(screen.getByRole('button', { name: 'Disconnect' }))
+  expect(screen.getByRole('button', { name: 'Connect' })).toBeEnabled()
   await userEvent.click(screen.getByRole('button', { name: 'Edit' }))
-  await userEvent.type(screen.getByLabelText('Display label'), 'Build host')
+  expect(screen.queryByRole('dialog')).toBeNull()
+  await userEvent.type(screen.getByLabelText(/Display label/), 'Build host')
   await userEvent.click(screen.getByRole('button', { name: 'Save machine' }))
   expect(await screen.findByText('Build host')).toBeVisible()
   await userEvent.click(screen.getByRole('button', { name: 'Remove' }))
@@ -51,11 +62,9 @@ test('adds, relabels, and removes an SSH machine through the real settings file'
 test('refuses an off-loopback plain HTTP URL before writing settings', async ({ client }) => {
   renderWithProviders(<MachinesSection disabled={false} />)
   await userEvent.click(screen.getByRole('button', { name: 'Add machine' }))
-  await userEvent.type(screen.getByLabelText('Machine name'), 'remote')
-  await userEvent.click(screen.getByRole('combobox', { name: 'Connection' }))
-  await userEvent.click(await screen.findByRole('option', { name: 'Direct origin' }))
+  await userEvent.click(screen.getByRole('button', { name: /Remote URL/ }))
   await userEvent.type(screen.getByLabelText('Server URL'), 'http://10.0.0.5:3001')
-  await userEvent.click(screen.getByRole('button', { name: 'Add machine' }))
+  await userEvent.click(screen.getByRole('button', { name: 'Connect' }))
   expect(await screen.findByRole('alert')).toHaveTextContent(
     'plain http off loopback is refused; use an SSH machine or https',
   )

@@ -83,7 +83,7 @@ test('narrow viewer discards a saved conflict draft through the Revert file pale
         return frame.renderer.currentFocusedRenderable?.id
       })
       .toBe('workbench-viewer')
-    await runPaletteCommand(frame, 'Edit file externally')
+    await runPaletteCommand(frame, 'Edit file')
     await expect
       .poll(async () => {
         await act(async () => {

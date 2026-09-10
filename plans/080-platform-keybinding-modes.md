@@ -5,9 +5,8 @@
 - State: Proposed implementation. Interaction rules confirmed; exact navigation keys proposed below.
 - Created: 2026-09-07.
 - Deliverable for this planning pass: this plan and links from the roadmap and keymap documentation.
-- Implementation depends on the delivered shared runtime from Plan 057. Reconcile the installed
-  Editor package and current working tree before editing. Plan 057's delivery record reports completion;
-  older references that call it the next implementation are stale.
+- Implementation uses the [delivered shared runtime](../docs/keymap/delivery.md). Reconcile the
+  installed Editor package and current working tree before editing.
 - Preserve the VS Code parity work, including its baseline, delivery records, and remaining gaps.
   This plan extends preset selection to workspace commands and introduces intentional Platform defaults.
 - First implementation milestone: Cmd+B toggles the entire current sidebar without selecting Files.

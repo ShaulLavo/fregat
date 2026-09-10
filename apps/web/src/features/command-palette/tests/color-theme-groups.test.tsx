@@ -13,7 +13,7 @@ import {
 } from '@/features/command-palette/providers/actions-context'
 import { Command } from '@workspace/ui/components/command'
 
-test('lists the bundled VSCode themes grouped by dark and light', () => {
+test('lists code themes for the current light or dark mode', () => {
   const actions = commandPaletteActions()
 
   renderWithProviders(
@@ -24,10 +24,10 @@ test('lists the bundled VSCode themes grouped by dark and light', () => {
     </CommandPaletteActionsProvider>,
   )
 
-  expect(screen.getByText('Color Theme — Dark')).toBeInTheDocument()
-  expect(screen.getByText('Color Theme — Light')).toBeInTheDocument()
+  expect(screen.getByText('Code theme for dark mode')).toBeInTheDocument()
+  expect(screen.queryByText('Code theme for light mode')).not.toBeInTheDocument()
   expect(screen.getByText('Monokai')).toBeInTheDocument()
-  expect(screen.getByText('GitHub Light')).toBeInTheDocument()
+  expect(screen.queryByText('GitHub Light')).not.toBeInTheDocument()
 })
 
 test('offers the built-in tree-sitter palettes ahead of the VSCode themes', () => {
@@ -41,12 +41,12 @@ test('offers the built-in tree-sitter palettes ahead of the VSCode themes', () =
     </CommandPaletteActionsProvider>,
   )
 
-  const darkGroup = screen.getByText('Color Theme — Dark').closest('[cmdk-group]')
+  const darkGroup = screen.getByText('Code theme for dark mode').closest('[cmdk-group]')
   const rows = darkGroup?.querySelectorAll('[cmdk-item]') ?? []
 
-  expect(screen.getByText('Tree-sitter Dark')).toBeInTheDocument()
-  expect(screen.getByText('Tree-sitter Light')).toBeInTheDocument()
-  expect(rows[0]?.textContent).toContain('Tree-sitter Dark')
+  expect(screen.getByText('Native Dark')).toBeInTheDocument()
+  expect(screen.queryByText('Native Light')).not.toBeInTheDocument()
+  expect(rows[0]?.textContent).toContain('Native Dark')
 })
 
 test('marks the selected theme of the active color mode as active', () => {

@@ -3,10 +3,9 @@ import { Button } from '@workspace/ui/components/button'
 import { MachinePhase } from '@/components/machine-phase'
 import { useState } from 'react'
 
-import { MachineForm } from '@/features/settings/components/machine-form'
+import { MachineForm } from '@/components/machine-form'
 import { useSettingsActions } from '@/features/settings/hooks/use-settings-actions'
 import { useEnvironmentConnections } from '@/hooks/use-environment-connections'
-import { isDesktop } from '@/lib/platform/bridge'
 
 export function MachineRow({
   name,
@@ -22,12 +21,11 @@ export function MachineRow({
   const phase = state?.phase ?? 'idle'
   const pending = phase === 'launching' || phase === 'connecting' || phase === 'reconnecting'
   const connected = phase === 'live' || pending
-  const desktopOnly = machine.kind === 'ssh' && !isDesktop()
   const [editing, setEditing] = useState(false)
   const [working, setWorking] = useState(false)
   const [actionError, setActionError] = useState<string | null>(null)
   const { removeMachine } = useSettingsActions()
-  const run = async (action: () => Promise<void>) => {
+  const run = async (action: () => Promise<unknown>) => {
     setWorking(true)
     setActionError(null)
     try {
@@ -47,23 +45,28 @@ export function MachineRow({
     if ((await submission.settled) === 'acknowledged') return
     setActionError('The machine could not be removed. Retry after resolving the settings error.')
   }
-  if (editing) return <MachineForm name={name} machine={machine} onDone={() => setEditing(false)} />
+  if (editing)
+    return (
+      <div className='border-border rounded-lg border p-4'>
+        <MachineForm
+          name={name}
+          machine={machine}
+          onCancel={() => setEditing(false)}
+          onSaved={() => setEditing(false)}
+        />
+      </div>
+    )
 
   return (
     <div className='border-border flex flex-col gap-2 rounded-md border p-3'>
       <div className='flex items-center gap-2'>
         <MachinePhase label={machine.label ?? name} phase={phase} />
         <span className='min-w-0 flex-1 truncate text-sm font-medium'>{machine.label ?? name}</span>
-        <span className='text-muted-foreground text-xs'>
-          {desktopOnly ? 'Desktop only' : phase}
-        </span>
+        <span className='text-muted-foreground text-xs'>{phase}</span>
       </div>
       <p className='text-muted-foreground truncate font-mono text-xs'>
         {name} · {machine.kind === 'ssh' ? machine.target : machine.url}
       </p>
-      {machine.kind === 'ssh' ? (
-        <p className='text-muted-foreground truncate font-mono text-xs'>{machine.repoPath}</p>
-      ) : null}
       {state?.lastError ? (
         <p role='status' className='text-warning text-xs'>
           {state.lastError}
@@ -88,13 +91,13 @@ export function MachineRow({
           <Button
             size='sm'
             variant='secondary'
-            disabled={working || desktopOnly}
+            disabled={working}
             onClick={() => void run(() => connections.connectMachine(name))}
           >
             Connect
           </Button>
         )}
-        {phase !== 'idle' && phase !== 'live' && !desktopOnly ? (
+        {phase !== 'idle' && phase !== 'live' ? (
           <Button
             size='sm'
             variant='ghost'

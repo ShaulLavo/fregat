@@ -14,7 +14,7 @@ export function ColorModeGroups({ currentTheme }: ColorModeGroupsProps) {
   const { disabledReasonForCommand, selectPlatformCommand } = useCommandPaletteActions()
 
   return (
-    <CommandGroup heading='Color Mode'>
+    <CommandGroup heading='Light / dark mode'>
       {colorModePaletteItems.map((item) => {
         const disabledReason = disabledReasonForCommand(item.command)
 

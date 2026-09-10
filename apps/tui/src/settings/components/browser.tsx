@@ -167,9 +167,7 @@ export function SettingsBrowser({
       disabledReason: (context) =>
         settingsDisabled(context) ??
         (!writable ? 'Reconnect before editing settings.' : null) ??
-        (!host.editText
-          ? 'The interactive terminal host is required to open an external editor.'
-          : null),
+        (!host.editText ? 'Editor is unavailable.' : null),
       run: ({ origin }) => {
         returnFocus.current = origin
         setEditing('raw')

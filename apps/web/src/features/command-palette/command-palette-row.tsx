@@ -25,7 +25,7 @@ export function CommandPaletteRow({ disabledReason, item }: CommandPaletteRowPro
       <CommandPaletteIcon category={item.category} command={item.command.command} />
       <RowLabel
         label={item.title}
-        description={disabledReason ?? item.description ?? item.id}
+        description={disabledReason ?? item.description}
         descriptionClassName={cn(disabled && 'text-muted-foreground/70')}
       />
       {item.shortcut && <CommandShortcut>{item.shortcut}</CommandShortcut>}

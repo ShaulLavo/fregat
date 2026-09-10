@@ -6,7 +6,7 @@ import { test, expect } from '../../../test/fixtures'
 import { renderTui } from '../../../test/render'
 import { createTestSettingsSession } from '../../../test/factories/session'
 
-test('external editor shortening the document clamps the viewer to remaining content', async ({
+test('built-in editor shortening the document clamps the viewer to remaining content', async ({
   server,
 }) => {
   await writeFile(
@@ -24,15 +24,12 @@ test('external editor shortening the document clamps the viewer to remaining con
     path: 'sample.txt',
     line: 95,
   })
-  const frame = await renderTui(
-    <Application
-      session={session}
-      onExit={() => {}}
-      onEditText={async () => 'shortened'}
-      noColor
-    />,
-    { width: 110, height: 30, useThread: false, kittyKeyboard: true },
-  )
+  const frame = await renderTui(<Application session={session} onExit={() => {}} noColor />, {
+    width: 110,
+    height: 30,
+    useThread: false,
+    kittyKeyboard: true,
+  })
   try {
     await act(async () => {
       await expect
@@ -47,6 +44,16 @@ test('external editor shortening the document clamps the viewer to remaining con
     })
     await act(async () => {
       frame.mockInput.pressKey('x')
+    })
+    await expect.poll(() => frame.renderer.currentFocusedRenderable?.id).toBe('text-editor')
+    await act(async () => {
+      frame.mockInput.pressKey('HOME')
+      frame.mockInput.pressKey('END', { shift: true })
+      await frame.mockInput.typeText('shortened')
+    })
+    await frame.renderOnce()
+    await act(async () => {
+      frame.mockInput.pressKey('F2')
     })
     await expect
       .poll(async () => {

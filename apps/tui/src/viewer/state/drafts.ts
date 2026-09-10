@@ -18,7 +18,7 @@ export function createViewerDraftCache(storage: FileStorage, rootPath: string, p
         return v.parse(draftSchema, JSON.parse(text))
       } catch (cause) {
         throw createTuiError(
-          'Saved external-editor draft could not be read.',
+          'Saved editor draft could not be read.',
           'Inspect the saved TUI draft before deleting it.',
           cause instanceof Error ? cause : undefined,
         )

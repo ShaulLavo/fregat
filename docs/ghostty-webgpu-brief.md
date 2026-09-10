@@ -394,6 +394,6 @@ The stable human-readable and strict machine-readable records are
 `c3132eb6cf210aa841713972225a39e45658154199572df6a237d65206c85d99`. Platform therefore remains
 on registry `ghostty-webgpu@0.1.0`.
 
-This result makes Plan 066 eligible only for a separate root go/no-go scheduling decision; it does
-not authorize packaging or publication. Plan 067 remains blocked on Plan 066's reviewed artifact,
-root scheduling, and dirty-file reconciliation.
+Plans 066 and 067 were dropped on 2026-09-09 despite the successful proof. `ghostty-webgpu` must
+never read disk. Any future file loading would belong to Platform, which would pass data to the
+package. No replacement is planned. See the [decision](../PLAN.md#ghostty-appearance-integration-dropped).

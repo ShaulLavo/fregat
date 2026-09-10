@@ -44,8 +44,6 @@ import { TerminalView } from '@/terminal/components/view'
 import { useCommandHandlers } from '@/commands/hooks/use-command-handlers'
 import { useCommands } from '@/commands/hooks/use-commands'
 import { useHostActions } from '@/host/hooks/use-host-actions'
-import { useSettingValue } from '@/settings/hooks/use-setting-value'
-import { externalEditorExecutable } from '@/host/external-editor'
 import type { Theme } from '@/theme/utils/theme'
 import { connectionFailure } from '@/connection/utils/failure'
 import { useAgentNavigation } from '@/navigation/hooks/use-agent-navigation'
@@ -81,7 +79,6 @@ export function AgentStage({
   const host = useHostActions()
   const renderer = useRenderer()
   const { width, height } = useTerminalDimensions()
-  const editor = useSettingValue(ready.owner, 'editor.externalEditor')
   const [providers, setProviders] = useState<readonly ProviderSnapshot[]>([])
   const [modal, setModal] = useState<Modal | null>(null)
   const [responding, setResponding] = useState<string | null>(null)
@@ -287,17 +284,15 @@ export function AgentStage({
         },
       },
       'chat.editPrompt': {
-        disabledReason: () =>
-          host.editText ? null : 'External editing needs an interactive terminal.',
+        disabledReason: () => (host.editText ? null : 'Editor is unavailable.'),
         run: async () => {
           if (!host.editText) return
           const text = await host.editText({
             text: expandedPrompt({ ...state.drafts.read(state.key), terminalContexts: [] }),
-            executable: externalEditorExecutable(editor),
             signal: session.signal,
             filename: 'prompt.md',
           })
-          state.drafts.update(state.key, { text, elements: [] })
+          if (text !== null) state.drafts.update(state.key, { text, elements: [] })
         },
       },
     },

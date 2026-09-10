@@ -5,6 +5,12 @@ export function settingRowTitle(id: SettingId): string {
   return descriptorFor(id).title ?? humanizeSettingId(id)
 }
 
+export function settingOptionTitle(id: SettingId, value: string): string {
+  if (id !== 'workbench.colorTheme' && id !== 'workbench.palette') return value
+
+  return value.charAt(0).toUpperCase() + value.slice(1)
+}
+
 // Keep qualifiers after the namespace: Wallpaper enabled distinguishes generic enabled leaves.
 export function humanizeSettingId(id: string): string {
   const segments = id.split('.')

@@ -75,6 +75,7 @@
     "react-animated-counter": "^1.9.0",
     "react-dom": "^19.2.7",
     "server": "workspace:*",
+    "shiki": "4.2.0",
     "sonner": "^2.0.7",
     "streamdown": "^2.5.0",
     "valibot": "^1.4.1",

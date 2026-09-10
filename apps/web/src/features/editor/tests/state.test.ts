@@ -6,7 +6,8 @@ import {
   type EditorPreparedDocument,
   type EditorTextBuffer,
 } from '@singapor/core'
-import { describe, expect, it, vi } from 'vitest'
+import { describe, it, vi } from 'vitest'
+import { expect, test } from '../../../../test/fixtures'
 
 import { createEditorActivation, createEditorCommands } from '@/features/editor/state/commands'
 import { createEditorDocumentStore } from '@/features/editor/state/document-state'
@@ -97,44 +98,56 @@ describe('editor workspace state', () => {
     expect(documentStore.getState().getLiveEditorDocument(path)?.buffer).toBe(document.buffer)
   })
 
-  it('installs a ready clean preparation before publishing a new tab', async () => {
-    const path = '/repo/src/prepared.ts'
-    const file = fileResult(path)
-    const documentStore = createEditorDocumentStore()
-    const searchStore = createSearchBufferStore()
-    const uiStore = createEditorUiStore()
-    const workspaceStore = createEditorWorkspaceStore(cachedWorkspace({}))
-    const queryClient = new QueryClient()
-    queryClient.setQueryData(fileSnapshotQueryOptions(path).queryKey, file)
-    const preparedDocument = preparedDocumentLease()
-    const { owner, prepare, service } = fileOpenIntentService(
-      documentStore,
-      queryClient,
-      preparedDocument,
-    )
-    const commands = createEditorCommands({
-      activation: createEditorActivation(owner.activation, documentStore, owner),
-      documentStore,
-      searchStore,
-      uiStore,
-      workspaceStore,
-    })
-    service.prepare({ path, rootPath: '/repo', source: 'tab', tabId: 'test-tab' })
-    await vi.waitFor(() => expect(prepare).toHaveBeenCalledOnce())
-    let preparedAtPublication: EditorPreparedDocument | null = null
-    const unsubscribe = workspaceStore.subscribe((state) => {
-      if (state.selectedFilePath !== path) return
-      const activeTabId = state.workbenchPanels.activeEditorTabId
-      preparedAtPublication = activeTabId
-        ? (documentStore.getState().getEditorView(activeTabId)?.preparedDocument ?? null)
-        : null
-    })
+  test.for(['tab', 'definition'] as const)(
+    'installs a %s preparation before publishing a new tab',
+    async (source) => {
+      const path = '/repo/src/prepared.ts'
+      const file = fileResult(path)
+      const documentStore = createEditorDocumentStore()
+      const searchStore = createSearchBufferStore()
+      const uiStore = createEditorUiStore()
+      const workspaceStore = createEditorWorkspaceStore(cachedWorkspace({}))
+      const queryClient = new QueryClient()
+      queryClient.setQueryData(fileSnapshotQueryOptions(path).queryKey, file)
+      const preparedDocument = preparedDocumentLease()
+      const { owner, prepare, service } = fileOpenIntentService(
+        documentStore,
+        queryClient,
+        preparedDocument,
+      )
+      const commands = createEditorCommands({
+        activation: createEditorActivation(owner.activation, documentStore, owner),
+        documentStore,
+        searchStore,
+        uiStore,
+        workspaceStore,
+      })
+      service.prepare({ path, rootPath: '/repo', source })
+      await vi.waitFor(() => expect(prepare).toHaveBeenCalledOnce())
+      let preparedAtPublication: EditorPreparedDocument | null = null
+      const unsubscribe = workspaceStore.subscribe((state) => {
+        if (state.selectedFilePath !== path) return
+        const activeTabId = state.workbenchPanels.activeEditorTabId
+        preparedAtPublication = activeTabId
+          ? (documentStore.getState().getEditorView(activeTabId)?.preparedDocument ?? null)
+          : null
+      })
 
-    commands.openFileSurface(path)
-    unsubscribe()
+      const definition = {
+        path,
+        uri: `file://${path}`,
+        range: { start: { line: 0, character: 6 }, end: { line: 0, character: 7 } },
+      }
+      if (source === 'definition') commands.openDefinition(definition)
+      if (source === 'tab') commands.openFileSurface(path)
+      unsubscribe()
 
-    expect(preparedAtPublication).toBe(preparedDocument)
-  })
+      expect(preparedAtPublication).toBe(preparedDocument)
+      if (source === 'definition') expect(uiStore.getState().definitionTarget).toEqual(definition)
+      owner.disposeNow()
+      queryClient.clear()
+    },
+  )
 
   it('opens search as an editor tab for the workspace root', () => {
     const { commands, workspaceStore } = editorHarness()

@@ -1,9 +1,11 @@
-import { QueryClientProvider } from '@tanstack/react-query'
 import { act, renderHook, waitFor } from '@testing-library/react'
 import { FileTreeModel } from '@workspace/tree'
 import type { ReactNode } from 'react'
 import { vi } from 'vitest'
+import { createEditorBufferSession } from '@singapor/core'
 
+import { useEditorCommands } from '@/features/editor/state/commands'
+import { useEditorRuntime } from '@/features/editor/hooks/use-runtime'
 import { WorkspaceEditServiceContext } from '@/features/editor/providers/workspace-edit-context'
 import type { WorkspaceEditService } from '@/features/editor/state/workspace-edit-service'
 import { useFsActions } from '@/features/workspace/hooks/use-fs-actions'
@@ -13,7 +15,96 @@ import { createClientError } from '@workspace/client-core/errors'
 import { treeModel } from '@/lib/tree-model'
 
 import { expect, test } from '../../../../test/fixtures'
-import { createTestQueryClient } from '../../../../test/render'
+import { AppProviders, createTestQueryClient } from '../../../../test/render'
+import { setFileSnapshotQueryData } from '@/lib/file-snapshot-query-cache'
+import { fileSystemKeys } from '@/lib/query-keys'
+import { TestEditorStateProvider } from '../../../../test/factories/editor-state-provider'
+
+for (const { isFolder, dirty } of [
+  { isFolder: false, dirty: false },
+  { isFolder: false, dirty: true },
+  { isFolder: true, dirty: true },
+]) {
+  test(`retargets open tabs after a tree rename, directory: ${isFolder}, dirty: ${dirty}`, async ({
+    client,
+  }) => {
+    void client
+    await ensureFolderPath('repo/src')
+    const from = 'repo/src/a.ts'
+    const to = isFolder ? 'repo/renamed/a.ts' : 'repo/src/b.ts'
+    await createFileContent(from, 'original\n')
+    const sibling = 'repo/src/c.ts'
+    const unrelated = 'repo/src-other.ts'
+    await createFileContent(sibling, 'sibling\n')
+    await createFileContent(unrelated, 'unrelated\n')
+    const file = await fetchFile(from, signal())
+    const modelRef = { current: treeModel(await fetchTree('repo', signal()), 'repo') }
+    const treeRef = {
+      current: new FileTreeModel({ paths: modelRef.current.paths, renaming: true }),
+    }
+    const queryClient = createTestQueryClient()
+    function Wrapper({ children }: { readonly children: ReactNode }) {
+      return (
+        <AppProviders queryClient={queryClient}>
+          <TestEditorStateProvider>{children}</TestEditorStateProvider>
+        </AppProviders>
+      )
+    }
+    const hook = renderHook(
+      () => ({
+        commands: useEditorCommands(),
+        fs: useFsActions({ modelRef, rootPath: 'repo', treeRef }),
+        runtime: useEditorRuntime(),
+      }),
+      { wrapper: Wrapper },
+    )
+    const { documentStore, workspaceStore } = hook.result.current.runtime
+    setFileSnapshotQueryData(queryClient, file)
+    act(() => {
+      hook.result.current.commands.openFileSurface(sibling)
+      hook.result.current.commands.openFileSurface(unrelated)
+      hook.result.current.commands.openFileSurface(from)
+    })
+    const tabId = workspaceStore.getState().workbenchPanels.activeEditorTabId!
+    const view = documentStore.getState().ensureEditorView(tabId, file)
+    if (dirty) act(() => createEditorBufferSession(view.buffer, view.view).applyText('unsaved\n'))
+    const text = view.buffer.materializeFullText()
+
+    act(() =>
+      hook.result.current.fs.completeRename({
+        sourcePath: isFolder ? 'src' : 'src/a.ts',
+        destinationPath: isFolder ? 'renamed' : 'src/b.ts',
+        isFolder,
+      }),
+    )
+
+    await waitFor(() => expect(workspaceStore.getState().selectedFilePath).toBe(to))
+    expect(workspaceStore.getState().openFilePaths).toEqual([
+      isFolder ? 'repo/renamed/c.ts' : sibling,
+      unrelated,
+      to,
+    ])
+    expect(workspaceStore.getState().editorHistory).toContain(to)
+    expect(workspaceStore.getState().editorHistory).not.toContain(from)
+    expect(workspaceStore.getState().workbenchPanels.activeEditorTabId).toBe(tabId)
+    expect(documentStore.getState().getLiveEditorDocument(from)).toBeNull()
+    expect(documentStore.getState().getLiveEditorDocument(to)?.buffer).toBe(view.buffer)
+    expect(view.buffer.materializeFullText()).toBe(text)
+    expect(documentStore.getState().dirtyFilePaths.has(to)).toBe(dirty)
+    expect(queryClient.getQueryData(fileSystemKeys.fileSnapshot(from))).toBeUndefined()
+    expect(queryClient.getQueryData(fileSystemKeys.fileSnapshot(to))).toMatchObject({ path: to })
+    await expect(readContent(to)).resolves.toBe('original\n')
+    await act(async () => {
+      expect(await hook.result.current.runtime.saveService.save(to)).toBe(true)
+    })
+    await expect(readContent(to)).resolves.toBe(text)
+    await expect(treePaths('repo')).resolves.not.toContain(from)
+
+    hook.unmount()
+    treeRef.current.cleanUp()
+    queryClient.clear()
+  })
+}
 
 test('gates file create, rename, copy, and delete with their exact mutated paths', async ({
   client,
@@ -121,6 +212,12 @@ test('keeps optimistic rollback when the authoritative mutation reservation reje
   await createFileContent('repo/old.ts', 'old\n')
   const service = new RecordingWorkspaceEditService({ reject: true })
   const harness = await renderFsActions('repo', service)
+  const file = await fetchFile('repo/old.ts', signal())
+  setFileSnapshotQueryData(harness.queryClient, file)
+  act(() => harness.result.current.commands.openFileSurface(file.path))
+  const { documentStore, workspaceStore } = harness.result.current.runtime
+  const tabId = workspaceStore.getState().workbenchPanels.activeEditorTabId!
+  const view = documentStore.getState().ensureEditorView(tabId, file)
   harness.tree.move('old.ts', 'new.ts')
   const move = vi.spyOn(harness.tree, 'move')
 
@@ -134,6 +231,9 @@ test('keeps optimistic rollback when the authoritative mutation reservation reje
 
   await waitFor(() => expect(move).toHaveBeenCalledWith('new.ts', 'old.ts'))
   expect(service.affectedPaths).toEqual([['repo/old.ts', 'repo/new.ts']])
+  expect(workspaceStore.getState().selectedFilePath).toBe('repo/old.ts')
+  expect(documentStore.getState().getLiveEditorDocument('repo/old.ts')?.buffer).toBe(view.buffer)
+  expect(documentStore.getState().getLiveEditorDocument('repo/new.ts')).toBeNull()
   await expect(readContent('repo/old.ts')).resolves.toBe('old\n')
   await expect(treePaths('repo')).resolves.not.toContain('repo/new.ts')
 
@@ -147,22 +247,30 @@ async function renderFsActions(rootPath: string, service = new RecordingWorkspac
 
   function Wrapper({ children }: { readonly children: ReactNode }) {
     return (
-      <QueryClientProvider client={queryClient}>
-        <WorkspaceEditServiceContext value={service.asService()}>
-          {children}
-        </WorkspaceEditServiceContext>
-      </QueryClientProvider>
+      <AppProviders queryClient={queryClient}>
+        <TestEditorStateProvider>
+          <WorkspaceEditServiceContext value={service.asService()}>
+            {children}
+          </WorkspaceEditServiceContext>
+        </TestEditorStateProvider>
+      </AppProviders>
     )
   }
 
   const modelRef = { current: model }
   const treeRef = { current: tree }
-  const hook = renderHook(() => useFsActions({ modelRef, rootPath, treeRef }), {
-    wrapper: Wrapper,
-  })
+  const hook = renderHook(
+    () => ({
+      ...useFsActions({ modelRef, rootPath, treeRef }),
+      commands: useEditorCommands(),
+      runtime: useEditorRuntime(),
+    }),
+    { wrapper: Wrapper },
+  )
 
   return {
     ...hook,
+    queryClient,
     cleanUp: () => {
       hook.unmount()
       queryClient.clear()

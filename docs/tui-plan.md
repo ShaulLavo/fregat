@@ -409,8 +409,8 @@ These changes build on the completed [session domain](session-domain.md) and its
 
 - **Plan 077** is complete and deleted (commit `c8e05123`); the transport and environment seams
   are stable and can be extracted into `client-core`.
-- **Plans 056 and 057** (chord keymap, VS Code keymap) own `keymap/**` until 057 closes; the TUI
-  consumes their pure modules and does not edit them while 057 is in delivery.
+- The [shared chord keymap](keymap/delivery.md) is complete. The TUI can consume its pure modules;
+  the former delivery restriction on `keymap/**` no longer applies.
 - The [native PTY and binary transport](terminal.md) are available for slice 081 (§7.5).
 - **Plan 068** is complete. New consumers use the [session domain](session-domain.md): raw
   session UUIDs, protocol v5, worktree ownership, and projected attention. Its plan-file deletion

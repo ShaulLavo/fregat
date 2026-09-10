@@ -36,9 +36,6 @@ describe('resolveBackdrop', () => {
     window.platformBridge = {
       backdrop: 'transparent',
       pickEntry: async () => [],
-      connectMachine: async (name) => ({ name, phase: 'idle' }),
-      disconnectMachine: async () => {},
-      onMachineState: () => () => {},
     }
 
     expect(resolveBackdrop()).toBe('transparent')

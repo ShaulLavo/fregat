@@ -5,7 +5,6 @@ import {
   type SettingsWriteTarget,
 } from '@workspace/contracts'
 
-import { externalEditorExecutable } from '@/host/external-editor'
 import type { EditTextRequest } from '@/host/providers/actions-context'
 
 type RawEditorState = {
@@ -23,7 +22,7 @@ export function createRawSettingsEditor({
 }: {
   readonly owner: SettingsOwner
   readonly target: SettingsWriteTarget
-  readonly editText: (request: EditTextRequest) => Promise<string>
+  readonly editText: (request: EditTextRequest) => Promise<string | null>
   readonly signal?: AbortSignal
 }) {
   const controller = new AbortController()
@@ -48,10 +47,13 @@ export function createRawSettingsEditor({
       if (reload) publish({ ...state, ...document(await owner.refresh(signal), target) })
       const text = await editText({
         text: state.text,
-        executable: externalEditorExecutable(owner.readSettingsMirror()['editor.externalEditor']),
         signal,
       })
       signal.throwIfAborted()
+      if (text === null) {
+        publish({ ...state, phase: 'done' })
+        return
+      }
       publish({ ...state, phase: 'saving', text })
       await owner.writeRaw(target, text, state.revision, signal)
       publish({ ...state, phase: 'done' })

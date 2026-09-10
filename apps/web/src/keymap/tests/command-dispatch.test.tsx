@@ -11,7 +11,7 @@ import type {
 } from '@/features/editor/state/workspace-edit-service'
 import { activeEditorTabForWorkbenchPanels } from '@/features/workbench/utils/panels'
 import type { FocusArea, FocusTargetId, FocusTargetRegistration } from '@/lib/focus/state/service'
-import { FocusService } from '@/lib/focus/state/service'
+import { FocusService, focusTargetById } from '@/lib/focus/state/service'
 import { createTestCommandRuntime } from '../../../test/factories/command-runtime'
 import { expect, test } from '../../../test/fixtures'
 import { createTestQueryClient } from '../../../test/render'
@@ -25,6 +25,71 @@ afterEach(() => {
     document.removeEventListener('focusin', service.handleFocusIn, true)
   }
   document.body.replaceChildren()
+})
+
+test.each([
+  ['workspace.selectAppColors', 'colors '],
+  ['workspace.runProjectScript', 'run '],
+  ['workspace.switchSession', 'sess '],
+  ['workspace.goToLine', ':'],
+] as const)('%s opens its picker', async (id, prefix) => {
+  const focus = trackedFocusService()
+  registerPassiveTarget(focus, 'global', { kind: 'command-palette' }, 'Palette')
+  const searches: string[] = []
+  const commandRuntime = createTestCommandRuntime({
+    focus,
+    options: {
+      rootPath: '/repo',
+      snapshot: { activeFilePath: '/repo/src/active.ts', activeTabId: 'tab-1' },
+      runtime: {
+        shell: {
+          showCommandPalette: (search = '') => {
+            searches.push(search)
+            return focus.request(focusTargetById({ kind: 'command-palette' }))
+          },
+        },
+      },
+    },
+    queryClient: createTestQueryClient(),
+  })
+
+  const ticket = commandRuntime.bus.dispatch(id, invocation())
+  await expect(ticket.completion).resolves.toEqual({ status: 'handled' })
+  expect(searches).toEqual([prefix])
+})
+
+test.each([
+  ['fileTree.newFile', 'create-file'],
+  ['fileTree.newFolder', 'create-folder'],
+] as const)('%s opens Files and delegates creation to its focus owner', async (id, intent) => {
+  const focus = trackedFocusService()
+  const layout = layoutElement('workbench')
+  const element = document.createElement('button')
+  layout.append(element)
+  const intents: string[] = []
+  registrations.push(
+    focus.register({
+      area: 'file-tree',
+      element,
+      id: { kind: 'file-tree', rootPath: '/repo' },
+      onIntent: (received) => {
+        intents.push(received)
+        element.focus()
+        return true
+      },
+    }),
+  )
+  const commandRuntime = createTestCommandRuntime({
+    focus,
+    options: { rootPath: '/repo' },
+    queryClient: createTestQueryClient(),
+  })
+  commandRuntime.runtime.workspace.getState().setUiMode('chat')
+
+  const ticket = commandRuntime.bus.dispatch(id, invocation())
+  await expect(ticket.completion).resolves.toEqual({ status: 'handled' })
+  expect(commandRuntime.runtime.workspace.getState().uiMode).toBe('workbench')
+  expect(intents).toEqual([intent])
 })
 
 test('workspace editor focus acknowledges the active new-side diff target', async () => {
@@ -413,7 +478,10 @@ function registerPassiveTarget(
       area,
       element,
       id,
-      onIntent: () => true,
+      onIntent: () => {
+        element.focus()
+        return true
+      },
     }),
   )
   return element

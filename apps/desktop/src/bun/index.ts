@@ -28,9 +28,6 @@ import {
   shouldInheritChildOutput,
 } from './observability'
 import { attachWindowVibrancy } from './vibrancy'
-import { readSshClientId } from './ssh/client-id'
-import { createSshLauncher } from './ssh/launcher'
-import { readPrimaryMachines } from './ssh/records'
 import { createQuitHandler } from './quit'
 
 type ChildProcess = ReturnType<typeof Bun.spawn>
@@ -57,7 +54,6 @@ const SERVER_ALLOWED_ORIGINS = allowedOriginsForWebPort(
 const childProcesses = new Set<ChildProcess>()
 
 let stopping: Promise<void> | null = null
-let sshLauncher: ReturnType<typeof createSshLauncher> | null = null
 
 Electrobun.events.on(
   'before-quit',
@@ -143,24 +139,14 @@ function spawnWeb() {
 }
 
 async function openMainWindow() {
-  const clientId = await readSshClientId(Utils.paths.userData)
   const rpc = BrowserView.defineRPC<DesktopRPC>({
     maxRequestTime: 120_000,
     handlers: {
       requests: {
         pickEntry,
-        connectMachine: ({ name }) => launcher.connectMachine(name),
-        disconnectMachine: ({ name }) => launcher.disconnectMachine(name),
       },
     },
   })
-  const launcher = createSshLauncher({
-    clientId,
-    webOrigin: WEB_URL,
-    readMachines: () => readPrimaryMachines(SERVER_URL, WEB_URL),
-    publish: (state) => rpc.send.machineState(state),
-  })
-  sshLauncher = launcher
   const backdrop = await resolveBackdrop()
 
   new BrowserWindow({
@@ -467,10 +453,7 @@ function stopProcesses(): Promise<void> {
     child.kill()
   }
 
-  stopping = Promise.allSettled([
-    sshLauncher?.close(),
-    ...children.map((child) => child.exited),
-  ]).then(() => undefined)
+  stopping = Promise.allSettled(children.map((child) => child.exited)).then(() => undefined)
   return stopping
 }
 

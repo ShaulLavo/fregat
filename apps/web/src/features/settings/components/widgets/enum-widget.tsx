@@ -5,6 +5,8 @@ import {
   SelectTrigger,
   SelectValue,
 } from '@workspace/ui/components/select'
+import type { SettingId } from '@workspace/contracts'
+import { settingOptionTitle } from '@workspace/client-core/settings/humanize'
 
 export function EnumWidget({
   disabled,
@@ -14,7 +16,7 @@ export function EnumWidget({
   value,
 }: {
   disabled?: boolean
-  id: string
+  id: SettingId
   onChange: (next: string) => void
   options: readonly string[]
   value: string
@@ -31,12 +33,12 @@ export function EnumWidget({
       value={value}
     >
       <SelectTrigger className='w-44 @max-3xl/settings:w-full' id={id}>
-        <SelectValue />
+        <SelectValue>{settingOptionTitle(id, value)}</SelectValue>
       </SelectTrigger>
       <SelectContent>
         {options.map((option) => (
           <SelectItem key={option} value={option}>
-            {option}
+            {settingOptionTitle(id, option)}
           </SelectItem>
         ))}
       </SelectContent>

@@ -75,7 +75,7 @@ export function titlebarMenu(context: TitlebarMenuContext): Menu {
       submenuItem({
         icon: PaletteIcon,
         id: 'colorMode',
-        label: 'Color Mode',
+        label: 'Light / dark mode',
         sections: [
           section('colorModeChoices', [
             commandRadio('colorMode', colorModeCommand(context.colorMode), colorModeChoices),

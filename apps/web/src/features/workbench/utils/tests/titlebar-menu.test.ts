@@ -27,11 +27,11 @@ test('the project section leads with Open Folder, then Switch Project', () => {
   expect(labels(menuContext(), 'project')).toEqual(['Open Folder…', 'Switch Project'])
 })
 
-test('the view section runs palette, mode radio, then Color Mode', () => {
+test('the view section runs palette, mode radio, then Light / dark mode', () => {
   expect(labels(menuContext(), 'view')).toEqual([
     'Command Palette…',
     'workspace.showWorkbenchMode',
-    'Color Mode',
+    'Light / dark mode',
   ])
 })
 

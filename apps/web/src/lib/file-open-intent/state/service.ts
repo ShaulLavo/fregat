@@ -48,7 +48,7 @@ export type FileOpenIntent = {
   readonly knownSize?: number
   readonly path: string
   readonly rootPath: string
-  readonly source: 'file-tree' | 'tab'
+  readonly source: 'file-tree' | 'tab' | 'definition'
   readonly tabId?: string
 }
 

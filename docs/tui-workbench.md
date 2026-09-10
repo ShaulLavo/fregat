@@ -12,7 +12,7 @@ subsequent work in [the strategy](tui-plan.md).
 | Navigation | Folder workbenches, file history, pane selection, address round trips, per-folder persistence, and narrow layouts.                                                               |
 | Files      | Shared tree controller, lazy directory reads, Git status decorations, filtering, creation, rename, and confirmed deletion.                                                       |
 | Viewer     | Read-only text, line numbers, bundled Shiki syntax tokens, find, go-to-line, hover, definitions, and active-file diagnostics.                                                    |
-| Editing    | External editor handoff with filename extension, snapshot-precondition commit, and durable conflict drafts that preserve the original precondition.                              |
+| Editing    | Built-in editor with filename, snapshot-precondition commit, and durable conflict drafts that preserve the original precondition.                                                |
 | Git        | Whole-file diff projections, split or stacked rows, expandable context, stage, unstage, discard, streamed commit progress, generated messages, remote operations, and draft PRs. |
 | Search     | Streamed results, include and exclude globs, regex and case controls, and previewed atomic replacement.                                                                          |
 | Logs       | Structured event history, histogram, filters, live tail, pause, and JSON details.                                                                                                |

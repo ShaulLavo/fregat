@@ -74,7 +74,7 @@ Type a request and press **Enter** to send it. **Shift+Enter** inserts a newline
 **Ctrl+K, then M** to choose a model and its reasoning effort.
 
 Use **Tab** after `@file`, `/command`, or `$skill` to open completion choices. The palette also
-provides image attachments from local files, external prompt editing, stash and restore,
+provides image attachments from local files, built-in prompt editing, stash and restore,
 interaction mode, access mode, stop, and transcript export. Drafts survive navigation and
 reconnection. A rejected submission retains its content for retry.
 
@@ -159,14 +159,14 @@ per environment and folder.
 | Go to line             | Ctrl+K, then J |
 | Go to definition       | F12            |
 | Hover information      | Ctrl+K, then H |
-| Edit file externally   | Ctrl+K, then X |
+| Edit file              | Ctrl+K, then X |
 
 The wide layout keeps the tree beside the active view. At narrow widths, the file tree and
 viewer share the available space. Use their commands to switch. Problems lists diagnostics
 for the active file. Hover and definition navigation use the server's configured language server.
-The viewer remains read-only; external editing uses the configured editor and a snapshot check
+The file edit action opens the built-in editor and uses a snapshot check
 before committing the result. Conflicts retain a durable draft with the original snapshot.
-Use **Edit file externally** to recover it or **Revert file** in the palette to discard it and reload.
+Use **Edit file** to recover it or **Revert file** in the palette to discard it and reload.
 Long lines scroll horizontally. Home, End, and find keep their target visible as the layout changes.
 
 The Git palette includes stage, unstage, discard, commit, generated commit messages, fetch,
@@ -205,11 +205,8 @@ errors identify the broken file and explain that the last valid settings or defa
 effect. Tab into the panel to scroll its repair instructions. Details distinguish ignored entries
 from the effective value. The warning clears when the server accepts a corrected value.
 
-Choose **Edit settings JSON in external editor** from the palette to edit the current scope.
-`editor.externalEditor` selects one executable path; a blank value uses this host's `EDITOR`,
-then `vi`. Arguments and shell expressions are not parsed. The TUI suspends while the editor
-runs and saves through a revision check. Conflicts retain the draft and require explicit reload.
-Temporary files have mode 0600 under `/work/tmp` and are removed when editing finishes.
+Choose **Edit settings JSON** from the palette to edit the current scope.
+The built-in editor saves through a revision check. Conflicts retain the draft and require explicit reload.
 Closing an editor ends its request lifetime. A late completion cannot close a newer editor or
 discard its draft. A semantic save already submitted to the server may still complete.
 
@@ -242,8 +239,8 @@ mode requires a TTY other than `TERM=dumb`. The supported minimum is 40 columns 
 Tests use real in-process Elysia routes, isolated settings/databases, and OpenTUI's native renderer.
 They never open a socket to the Platform server.
 
-Permanent PTY tests also exercise direct and repository-launcher startup, Ctrl+Z and `fg`, external
-editor handoff, Ctrl+C, SIGTERM, and protection of a shared shell process group. These checks use
+Permanent PTY tests also exercise direct and repository-launcher startup, Ctrl+Z and `fg`, built-in
+editor cancellation, Ctrl+C, SIGTERM, and protection of a shared shell process group. These checks use
 Python 3 and Bash on supported POSIX hosts.
 
 ```sh

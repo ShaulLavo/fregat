@@ -11,11 +11,7 @@ export function scrollPositionFromSnapshot(
   }
 }
 
-/**
- * The editor lets the user overscroll until the last row reaches the top of the viewport, but
- * restoring an overscrolled offset paints a nearly empty pane. Persisted positions are capped to
- * the offset that rests the bottom row on the viewport's bottom edge; live scrolling is untouched.
- */
+// Keep the last row at the viewport bottom when restoring, even if the user scrolled past it.
 export function capOverscrollTop(top: number, snapshot: EditorViewSnapshot | null): number {
   if (!snapshot) return top
 

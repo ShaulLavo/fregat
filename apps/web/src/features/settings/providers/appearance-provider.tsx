@@ -6,7 +6,11 @@ import { useSettingsActions } from '@/features/settings/hooks/use-settings-actio
 import { useSettingsDocument } from '@/features/settings/hooks/use-settings-document'
 import { useSettingsProjection } from '@/features/settings/hooks/use-settings-projection'
 import { WorkbenchDensityBootContext } from '@/features/settings/providers/density-context'
-import { ThemeContext, type Theme } from '@/features/settings/providers/theme-context'
+import {
+  ThemeContext,
+  type AppColors,
+  type Theme,
+} from '@/features/settings/providers/theme-context'
 import type { SettingsSubmission } from '@workspace/client-core/settings/intent-store'
 import {
   applyAppearance,
@@ -17,10 +21,12 @@ import { readSettingsMirror, writeBootMirror } from '@/features/settings/utils/b
 
 const COLOR_SCHEME_QUERY = '(prefers-color-scheme: dark)'
 
-type ThemePreview = {
+type AppearancePreview = {
   readonly handingOffTo: string | null
-  readonly mode: Theme
-}
+} & (
+  | { readonly kind: 'mode'; readonly value: Theme }
+  | { readonly kind: 'colors'; readonly value: AppColors }
+)
 
 /** Owns all projected appearance, confirmed boot state, and color-mode preview. */
 export function AppearanceProvider({
@@ -32,15 +38,19 @@ export function AppearanceProvider({
 }) {
   const confirmedQuery = useSettingsDocument()
   const projection = useSettingsProjection()
-  const { setColorTheme } = useSettingsActions()
+  const { setColorTheme, setSetting } = useSettingsActions()
   const [bootValues] = useState(bootAppearance)
   const [prefersDark, setPrefersDark] = useState(() => systemPrefersDark())
-  const [preview, setPreview] = useState<ThemePreview | null>(null)
+  const [preview, setPreview] = useState<AppearancePreview | null>(null)
   const projectedValues = projection?.values
   const appearanceValues = projectedValues ?? bootValues
   const committedTheme = appearanceValues['workbench.colorTheme']
+  const committedColors = appearanceValues['workbench.palette']
   const handoffObserved = projectionObservesHandoff(projection, preview?.handingOffTo)
-  const renderedTheme = preview && !handoffObserved ? preview.mode : committedTheme
+  const renderedTheme =
+    preview?.kind === 'mode' && !handoffObserved ? preview.value : committedTheme
+  const renderedColors =
+    preview?.kind === 'colors' && !handoffObserved ? preview.value : committedColors
 
   useEffect(() => {
     const query = window.matchMedia(COLOR_SCHEME_QUERY)
@@ -56,7 +66,11 @@ export function AppearanceProvider({
     clearMatchingHandoff(setPreview, preview.handingOffTo)
   }, [handoffObserved, preview?.handingOffTo])
 
-  const renderedValues = { ...appearanceValues, 'workbench.colorTheme': renderedTheme }
+  const renderedValues = {
+    ...appearanceValues,
+    'workbench.colorTheme': renderedTheme,
+    'workbench.palette': renderedColors,
+  }
   // Descendant layout effects measure density-dependent geometry, so the root
   // appearance must be current before those effects run.
   useInsertionEffect(() => {
@@ -79,16 +93,28 @@ export function AppearanceProvider({
 
   // Stable identity lets palette unmount cleanup clear hover exactly once.
   const clearThemePreview = useCallback(() => {
-    setPreview((current) => (current?.handingOffTo ? current : null))
+    setPreview((current) => (current?.kind === 'mode' && !current.handingOffTo ? null : current))
   }, [])
 
   const previewTheme = useCallback((theme: Theme) => {
-    setPreview((current) => (current?.handingOffTo ? current : { handingOffTo: null, mode: theme }))
+    setPreview((current) =>
+      current?.handingOffTo ? current : { handingOffTo: null, kind: 'mode', value: theme },
+    )
+  }, [])
+
+  const clearAppColorsPreview = useCallback(() => {
+    setPreview((current) => (current?.kind === 'colors' && !current.handingOffTo ? null : current))
+  }, [])
+
+  const previewAppColors = useCallback((colors: AppColors) => {
+    setPreview((current) =>
+      current?.handingOffTo ? current : { handingOffTo: null, kind: 'colors', value: colors },
+    )
   }, [])
 
   const setTheme = (theme: Theme, initiator?: string): SettingsSubmission => {
     const submission = setColorTheme(theme, committedTheme, initiator, (entry) => {
-      setPreview({ handingOffTo: entry.request.mutationId, mode: theme })
+      setPreview({ handingOffTo: entry.request.mutationId, kind: 'mode', value: theme })
     })
     if (submission.kind === 'noop') {
       clearThemePreview()
@@ -99,14 +125,32 @@ export function AppearanceProvider({
     return submission
   }
 
+  const setAppColors = (colors: AppColors, initiator?: string): SettingsSubmission => {
+    if (colors === committedColors) {
+      clearAppColorsPreview()
+      return { kind: 'noop' }
+    }
+
+    const submission = setSetting('workbench.palette', colors, undefined, initiator)
+    if (submission.kind === 'noop') return submission
+
+    setPreview({ handingOffTo: submission.mutationId, kind: 'colors', value: colors })
+    void submission.settled.then(() => clearMatchingHandoff(setPreview, submission.mutationId))
+    return submission
+  }
+
   return (
     <WorkbenchDensityBootContext value={bootDensity}>
       <ThemeContext
         value={{
+          appColors: committedColors,
+          clearAppColorsPreview,
           clearThemePreview,
+          previewAppColors,
           previewTheme,
           resolvedTheme: resolveColorTheme(renderedTheme, prefersDark),
           setTheme,
+          setAppColors,
           theme: committedTheme,
         }}
       >
@@ -117,7 +161,7 @@ export function AppearanceProvider({
 }
 
 function clearMatchingHandoff(
-  setPreview: (updater: (current: ThemePreview | null) => ThemePreview | null) => void,
+  setPreview: (updater: (current: AppearancePreview | null) => AppearancePreview | null) => void,
   mutationId: string,
 ) {
   setPreview((current) => (current?.handingOffTo === mutationId ? null : current))

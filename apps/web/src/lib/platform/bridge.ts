@@ -1,4 +1,4 @@
-export type { PlatformBridge, PlatformMachineState } from '../../../../desktop/src/shared/bridge'
+export type { PlatformBridge } from '../../../../desktop/src/shared/bridge'
 import type { PlatformBridge } from '../../../../desktop/src/shared/bridge'
 
 export function getPlatformBridge(): PlatformBridge | null {

@@ -4,7 +4,7 @@ import { useCommandHandlers } from '@/commands/hooks/use-command-handlers'
 import { setThemePreference } from '@/commands/utils/theme'
 
 export function useThemeCommands(owner: SettingsOwner, writable: boolean) {
-  const disabledReason = () => (writable ? null : 'Reconnect before changing the color mode.')
+  const disabledReason = () => (writable ? null : 'Reconnect before changing light / dark mode.')
   useCommandHandlers({
     'workspace.setDarkTheme': {
       disabledReason,

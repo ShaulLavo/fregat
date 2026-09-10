@@ -5,7 +5,7 @@ import type { SettingsValues } from '@workspace/contracts'
 
 import { ThemeAwareToaster } from '@/components/theme-aware-toaster'
 import { EnvironmentConnectionGate } from '@/components/environment-connection-gate'
-import { EditorColorThemeProvider } from '@/features/editor/hooks/use-editor-color-theme'
+import { EditorColorThemeProvider } from '@/features/editor/providers/color-theme-provider'
 import { LanguageServerMatchProvider } from '@/features/editor/providers/language-server-match-provider'
 import { EditorStateProvider } from '@/features/editor/providers/state-provider'
 import { AppearanceProvider } from '@/features/settings/providers/appearance-provider'

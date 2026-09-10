@@ -109,8 +109,7 @@ export const STATE_CLASSIFICATIONS: Readonly<Record<string, ClassifiedState>> = 
   },
   editorColorTheme: {
     classification: 'preference',
-    storageKey: 'platform.editor-color-theme.v1',
-    why: 'machine appearance',
+    why: 'code appearance saved in settings',
   },
   editorHistory: {
     classification: 'preference',

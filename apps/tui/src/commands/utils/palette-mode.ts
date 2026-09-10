@@ -15,7 +15,7 @@ import { sessionAccessRows } from '@/commands/utils/session-access'
 export type PaletteAction =
   | { readonly kind: 'command'; readonly id: CommandId }
   | { readonly kind: 'files'; readonly query: string }
-  | { readonly kind: 'theme'; readonly id: SettingsValues['workbench.palette'] }
+  | { readonly kind: 'app-colors'; readonly id: SettingsValues['workbench.palette'] }
   | { readonly kind: 'session'; readonly sessionId: SessionId }
 
 type PaletteOption = {
@@ -84,8 +84,8 @@ export function paletteModeRows({
       }
     case 'colorMode':
       return {
-        title: 'Color mode',
-        empty: 'No matching color modes.',
+        title: 'Light / dark mode',
+        empty: 'No matching appearance modes.',
         options: commandRows(
           captured,
           Object.values(colorCommands),
@@ -94,10 +94,12 @@ export function paletteModeRows({
         ),
       }
     case 'colorTheme':
+      return unavailable('Code themes')
+    case 'appColors':
       return {
-        title: 'Color theme',
-        empty: 'No matching color themes.',
-        options: themeRows(query, palette, writable),
+        title: 'App colors',
+        empty: 'No matching app colors.',
+        options: appColorRows(query, palette, writable),
       }
     case 'files':
       return {
@@ -155,15 +157,15 @@ function commandRows(
   })
 }
 
-function themeRows(query: string, active: string, writable: boolean): PaletteOption[] {
+function appColorRows(query: string, active: string, writable: boolean): PaletteOption[] {
   return SETTINGS_REGISTRY['workbench.palette'].schema.options
     .filter((id) => scopedPaletteFilter(id, query) > 0)
     .map((id) => ({
       name: `${id.charAt(0).toUpperCase()}${id.slice(1)}${id === active ? ' · active' : ''}`,
       description: 'Interface colors',
       value: {
-        action: { kind: 'theme', id },
-        reason: writable ? null : 'Reconnect before changing the color theme.',
+        action: { kind: 'app-colors', id },
+        reason: writable ? null : 'Reconnect before changing app colors.',
       },
     }))
 }

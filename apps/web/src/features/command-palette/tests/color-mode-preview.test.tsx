@@ -28,7 +28,7 @@ test('real palette preview and cancel write nothing while selection dispatches o
   queryClient.setQueryData(settingsKeys.document(), before)
   const firstPalette = renderPalette(queryClient)
   const user = userEvent.setup()
-  const input = await screen.findByPlaceholderText(/Select a color mode/)
+  const input = await screen.findByPlaceholderText(/Select light or dark mode/)
 
   expect(useSettingsIntentStore.getState().active).toEqual([])
   expect(controlledClient.controller.settingsWriteCount).toBe(0)
@@ -47,7 +47,7 @@ test('real palette preview and cancel write nothing while selection dispatches o
   expect(controlledClient.controller.settingsWriteCount).toBe(0)
 
   await user.keyboard('{Escape}')
-  await waitFor(() => expect(screen.queryByPlaceholderText(/Select a color mode/)).toBeNull())
+  await waitFor(() => expect(screen.queryByPlaceholderText(/Select light or dark mode/)).toBeNull())
   expect(document.documentElement).toHaveClass('dark')
   expect(useSettingsIntentStore.getState().active).toEqual([])
   expect(controlledClient.controller.settingsWriteCount).toBe(0)
@@ -55,7 +55,7 @@ test('real palette preview and cancel write nothing while selection dispatches o
   firstPalette.unmount()
 
   const secondPalette = renderPalette(queryClient)
-  await screen.findByPlaceholderText(/Select a color mode/)
+  await screen.findByPlaceholderText(/Select light or dark mode/)
   await user.click(screen.getByText('Dark'))
 
   await controlledClient.controller.waitForSettingsWriteRequest(1)

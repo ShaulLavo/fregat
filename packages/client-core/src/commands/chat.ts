@@ -48,7 +48,7 @@ export const chatCommandMetadata = {
   'chat.jumpToLatest': chat('chat.jumpToLatest', 'Jump to latest message'),
   'chat.resumeInTerminal': chat('chat.resumeInTerminal', 'Resume Claude in terminal'),
   'chat.openTerminal': chat('chat.openTerminal', 'Open session terminal'),
-  'chat.editPrompt': chat('chat.editPrompt', 'Edit prompt externally'),
+  'chat.editPrompt': chat('chat.editPrompt', 'Edit prompt'),
   'chat.completePrompt': chat('chat.completePrompt', 'Complete prompt token'),
   'chat.clearAttachments': chat('chat.clearAttachments', 'Clear prompt attachments'),
   'chat.implementPlan': chat('chat.implementPlan', 'Implement proposed plan'),

@@ -1,6 +1,9 @@
+import { selectSettingsSearch } from '@/features/settings/state/search-store'
+import { selectSettingsCategory } from '@/features/settings/state/category-store'
+import { selectSettingsView } from '@/features/settings/state/view-store'
 import { testScopedStorage } from '../../../test/factories/scoped-storage'
 import { useEffect } from 'react'
-import { act, waitFor } from '@testing-library/react'
+import { act, screen, waitFor } from '@testing-library/react'
 import type { SettingsMutationRequest, SettingsValues } from '@workspace/contracts'
 
 import { EditorTabActionsProvider } from '@/features/editor/providers/tab-actions-provider'
@@ -25,14 +28,44 @@ let capturedBus: PlatformCommandBus | null = null
 
 test.beforeEach(() => {
   capturedBus = null
+  selectSettingsSearch('')
+  selectSettingsCategory(null)
+  selectSettingsView('form')
   resetSettingsIntentStore()
   writeRootFolderCache(testScopedStorage, null)
 })
 
 test.afterEach(() => {
   capturedBus = null
+  selectSettingsSearch('')
+  selectSettingsCategory(null)
+  selectSettingsView('form')
   resetSettingsIntentStore()
   writeRootFolderCache(testScopedStorage, null)
+})
+
+test.each([
+  ['workspace.showFontSettings', 'font'],
+  ['workspace.showTransparencySettings', 'workbench.surface'],
+] as const)('%s opens the settings controls matching its search', async (command, query) => {
+  const queryClient = createTestQueryClient()
+  queryClient.setQueryData(settingsKeys.document(), await fetchSettings())
+  selectSettingsCategory('Machines')
+  selectSettingsView('json')
+  const view = renderCommandProvider(queryClient)
+  await waitFor(() => expect(capturedBus).not.toBeNull())
+
+  act(() => {
+    capturedBus!.dispatch(command, invocation())
+  })
+
+  await waitFor(() =>
+    expect(screen.getByRole('textbox', { name: 'Search settings' })).toHaveValue(query),
+  )
+  expect(screen.queryByText('Clear category filter')).toBeNull()
+  view.unmount()
+  resetSettingsSnapshotAdmission(queryClient)
+  queryClient.clear()
 })
 
 test('consecutive toggles project landed settings intents before React renders', async ({

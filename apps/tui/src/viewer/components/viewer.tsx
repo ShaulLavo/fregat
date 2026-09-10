@@ -225,12 +225,10 @@ export function FileViewer({
           setPrompt('line')
         },
       },
-      'workspace.editFileExternally': { run: () => document.edit() },
+      'workspace.editFile': { run: () => document.edit() },
       'workspace.revertFile': {
         disabledReason: () =>
-          state.kind === 'ready' && state.editing
-            ? 'Wait for the external editor to finish.'
-            : null,
+          state.kind === 'ready' && state.editing ? 'Finish editing first.' : null,
         run: revert,
       },
     },

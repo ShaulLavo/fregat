@@ -141,7 +141,7 @@ function commandKeywords(spec: CommandSpec) {
 }
 
 export function isColorPreviewMode(mode: QuickAccessMode): boolean {
-  return mode === 'colorMode' || mode === 'colorTheme'
+  return mode === 'colorMode' || mode === 'colorTheme' || mode === 'appColors'
 }
 
 /**
@@ -175,9 +175,10 @@ export function paletteScopeForPrefix(prefix: string): QuickAccessMode | null {
 }
 
 export function scopeLabelForMode(mode: QuickAccessMode) {
+  if (mode === 'appColors') return 'App colors'
   if (mode === 'views') return 'View'
-  if (mode === 'colorMode') return 'Color Mode'
-  if (mode === 'colorTheme') return 'Color Theme'
+  if (mode === 'colorMode') return 'Light / dark mode'
+  if (mode === 'colorTheme') return 'Code theme'
   if (mode === 'editors') return 'Open Editor'
   if (mode === 'scripts') return 'Script'
   if (mode === 'sessions') return 'Session'
@@ -188,10 +189,11 @@ export function scopeLabelForMode(mode: QuickAccessMode) {
 }
 
 export function emptyLabelForMode(mode: QuickAccessMode) {
+  if (mode === 'appColors') return 'No matching app colors'
   if (mode === 'commands') return 'No matching commands'
   if (mode === 'views') return 'No matching views'
-  if (mode === 'colorMode') return 'No matching color modes'
-  if (mode === 'colorTheme') return 'No matching color themes'
+  if (mode === 'colorMode') return 'No matching light / dark modes'
+  if (mode === 'colorTheme') return 'No matching code themes'
   if (mode === 'editors') return 'No open editors'
   if (mode === 'sessions') return 'No matching sessions'
   if (mode === 'symbols') return 'No matching symbols'
@@ -200,11 +202,12 @@ export function emptyLabelForMode(mode: QuickAccessMode) {
 }
 
 export function placeholderForMode(mode: QuickAccessMode) {
+  if (mode === 'appColors') return 'Select app colors (up/down keys to preview)…'
   if (mode === 'commands') return 'Search commands…'
   if (mode === 'views') return 'Search views…'
   // Both preview live on the highlighted row, so say what the arrow keys do.
-  if (mode === 'colorMode') return 'Select a color mode (up/down keys to preview)…'
-  if (mode === 'colorTheme') return 'Select a color theme (up/down keys to preview)…'
+  if (mode === 'colorMode') return 'Select light or dark mode (up/down keys to preview)…'
+  if (mode === 'colorTheme') return 'Select a code theme (up/down keys to preview)…'
   if (mode === 'editors') return 'Search open editors…'
   if (mode === 'scripts') return 'Search project scripts…'
   if (mode === 'sessions') return 'Search sessions, or start one in a project…'

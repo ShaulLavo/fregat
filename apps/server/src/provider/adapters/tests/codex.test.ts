@@ -384,6 +384,16 @@ function handle(message) {
         },
       });
     }
+    if (mode === 'unknown-raw-item') {
+      send({
+        method: 'rawResponseItem/completed',
+        params: {
+          threadId: 'provider-thread-1',
+          turnId: 'provider-turn-1',
+          item: { type: 'future_tool_call', id: 'raw-item-1' },
+        },
+      });
+    }
     if (mode === 'malformed-delta') {
       send({
         method: 'item/agentMessage/delta',
@@ -1347,6 +1357,29 @@ describe('CodexProviderAdapter', () => {
         )
       },
       { mode: 'malformed-thread-start' },
+    )
+  })
+
+  it('completes turns when unused raw notifications contain unfamiliar items', async () => {
+    await withFakeCodex(
+      async () => {
+        const adapter = new CodexProviderAdapter()
+        const events: ProviderRuntimeEvent[] = []
+        collectAdapterEvents(adapter, events)
+
+        try {
+          await adapter.sendTurn(providerTurnInput())
+          expect(events).toEqual(
+            expect.arrayContaining([
+              expect.objectContaining({ type: 'content.delta' }),
+              expect.objectContaining({ type: 'turn.completed' }),
+            ]),
+          )
+        } finally {
+          await adapter.stopAll()
+        }
+      },
+      { mode: 'unknown-raw-item' },
     )
   })
 

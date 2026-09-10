@@ -10,6 +10,10 @@
 
 ## Status
 
+The desktop SSH ownership described in this original plan was superseded on 2026-09-09.
+The primary backend now owns SSH launch, authentication, and HTTP/WebSocket forwarding for all
+clients. See [the current implementation](../docs/federated-environments.md#backend-ssh-lifecycle).
+
 - **State:** Implemented; automated checks pass, live SSH/browser gates open
 - **Priority:** P1
 - **Effort:** XL
@@ -148,7 +152,7 @@ RPC has `pickEntry`, no `environments.*` setting exists, and the storage prefixe
 
 After this plan:
 
-1. A user lists machines in Settings → Machines: an SSH target plus the repo checkout path, or a
+1. A user lists machines in Settings → Machines: an SSH target with automatic server discovery, or a
    direct `https://`/loopback origin. The local machine is implicit.
 2. Connecting an SSH machine from the desktop app starts or reuses the platform server on that
    machine, forwards its loopback port to a local loopback port, and records its `environmentId`.
@@ -177,7 +181,7 @@ web (non-desktop) SSH, cross-machine worktree creation (Plan 069 stays single-ma
 
   ```ts
   schema: v.record(machineNameSchema, v.variant('kind', [
-    v.object({ kind: v.literal('ssh'), target: sshTargetSchema, repoPath: absolutePathSchema,
+    v.object({ kind: v.literal('ssh'), target: sshTargetSchema,
                remotePort: v.optional(portSchema), label: v.optional(labelSchema) }),
     v.object({ kind: v.literal('origin'), url: originSchema, label: v.optional(labelSchema) }),
   ]))
@@ -233,16 +237,17 @@ web (non-desktop) SSH, cross-machine worktree creation (Plan 069 stays single-ma
   anything.
 - Steps, each logged as fields on one wide `desktop.ssh.connect` event with `machine`, `target`,
   `step`, `durationMs`, `outcome`:
-  1. **Probe** `ssh -o BatchMode=yes -o ConnectTimeout=10 <target> sh -c 'command -v bun && test -d
-<repoPath>/apps/server'`. A password prompt is a refusal with fix "add your key to the agent or
-     configure the host in ~/.ssh/config"; no askpass in this plan.
+  1. **Discover** `platform-server --describe` on the remote PATH, falling back to
+     `~/.local/bin/platform-server`. Install that launcher once with `bun run server:install`
+     from a prepared checkout. The validated descriptor supplies the directory and Bun executable.
+     Current authentication uses the backend's shared SSH control connection and askpass flow.
   2. **Reuse or launch.** `curl`-free readiness on the remote: run a small Bun script from
-     `remote-scripts.ts` that reads `<repoPath>/.platform-ssh-launch/<clientId>.json` (remote pid,
+     `remote-scripts.ts` that reads `<installation.directory>/.platform-ssh-launch/<clientId>.json` (remote pid,
      port, environmentId), checks `/health` on remote loopback, and prints it; else picks a free
      loopback port, writes the record, and starts
      `nohup bun --env-file=.env apps/server/src/index.ts` with `FS_HOST=127.0.0.1`, `PORT`,
      `SERVER_ALLOWED_ORIGINS=<the client's web origin>`, `FS_METADATA_DB` left default, stdout and
-     stderr appended to `<repoPath>/logs/ssh-launch.log`. The remote record is keyed by the
+     stderr appended to `<installation.directory>/logs/ssh-launch.log`. The remote record is keyed by the
      connecting client's instance so two laptops get two records.
   3. **Forward** `ssh -N -o ExitOnForwardFailure=yes -L 127.0.0.1:<local>:127.0.0.1:<remote>
 <target>`; the local port is picked from an ephemeral range and verified free with
@@ -444,8 +449,8 @@ cd apps/desktop && bun --bun vitest run src/bun/ssh/tests/remote-scripts.test.ts
 `launcher.test.ts` injects a fake `ssh` spawner (a script that answers the probe, prints a fixed
 record, and holds a forward open) and asserts step order, the managed/external decision, the
 forwarded origin, and that disconnect stops only a managed server. Then, by hand: add a machine
-with target `localhost` (this machine's own sshd, key in the agent) and `repoPath` set to this
-checkout, connect from the desktop app, and confirm that readiness answers through the forward.
+with target `localhost` after running `bun run server:install` in this checkout. Connect from
+the app and confirm that readiness answers through the forward without entering a checkout path.
 The same SQLite identity database must report the same `environmentId` through both endpoints.
 Use a separate fixture checkout and identity database to prove two distinct environments; a new
 port or server process alone does not create one. Verify that disconnect stops only a managed

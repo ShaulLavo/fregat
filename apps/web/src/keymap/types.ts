@@ -45,6 +45,7 @@ export type MenuSurfaceId =
   | 'sidebar.rail'
   | 'terminal'
   | 'titlebar'
+  | 'workspace.project'
 
 export type PlatformKeyBinding = {
   readonly editorWhen?: readonly EditorKeyCondition[]

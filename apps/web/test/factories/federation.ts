@@ -31,8 +31,9 @@ import { queryClientFor } from '@/lib/environments/state/query-clients'
 import { createInProcessClient } from '../client'
 import { makeTestServer, type TestServer } from '../server'
 
-export async function createFederationHarness(serverA: TestServer) {
-  const serverB = await makeTestServer({ filesystemWatch: false, persistentDatabase: true })
+export async function createFederationHarness(serverA: TestServer, remote?: TestServer) {
+  const serverB =
+    remote ?? (await makeTestServer({ filesystemWatch: false, persistentDatabase: true }))
   const previousState = useEnvironmentsStore.getState()
   const previousProjection = useChatProjectionStore.getState()
   const previousOrigin = activeServerOrigin()

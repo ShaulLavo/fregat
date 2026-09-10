@@ -27,6 +27,7 @@ import { log } from '@/lib/client-logging'
 import { editorPerformanceFeatureDisabled } from '@/features/editor/state/performance-trace'
 import type { DecodeMode } from '@singapor/decode'
 import { editorIndentationGuidesSupported } from '@/features/editor/utils/indentation-guides'
+import { FOLD_CHEVRON_ICON } from '@/features/editor/utils/fold-icon'
 
 const editorScrollPositionsByInstanceId = new Map<string, EditorScrollPosition>()
 const ignoredEditorInfoActions = new Set([
@@ -62,7 +63,8 @@ export function createCriticalEditorCorePlugins(
     createLineGutterPlugin(),
     createFoldGutterPlugin({
       width: 16,
-      iconClassName: 'app-fold-gutter-icon',
+      icon: FOLD_CHEVRON_ICON,
+      iconClassName: 'size-3 [[data-editor-fold-state=collapsed]_&]:-rotate-90',
     }),
     ...(minimapEnabled && !editorPerformanceFeatureDisabled('minimap')
       ? [createMinimapPlugin()]

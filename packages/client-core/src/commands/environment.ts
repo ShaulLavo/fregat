@@ -15,7 +15,7 @@ export const environmentCommandMetadata = {
     id: 'environment.connect',
     title: 'Connect machine',
     category: 'Machines',
-    description: 'Connect a machine configured in Settings.',
+    description: 'Add a new machine or connect a saved machine.',
     execution: 'sync',
     target: 'workspace',
     undoCategory: 'view-only',

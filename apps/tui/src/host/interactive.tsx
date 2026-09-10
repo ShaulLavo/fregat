@@ -4,9 +4,7 @@ import { createRoot } from '@opentui/react'
 import { Application } from '@/components/application'
 import type { SettingsSession } from '@/connection/state/session'
 import { createTuiError } from '@/host/utils/structured-errors'
-import { runExternalEditor } from '@/host/external-editor'
 import { foregroundJobGroup } from '@/host/job-control'
-import type { EditTextRequest } from '@/host/providers/actions-context'
 import { runTerminalAttach, type AttachTerminalRequest } from '@/host/attach'
 import { readClipboardImage } from '@/host/clipboard-image'
 
@@ -41,18 +39,6 @@ export async function runInteractive(session: SettingsSession, noColor: boolean)
     lifetime.abort()
     closed.resolve()
   }
-  const editText = async (request: EditTextRequest) => {
-    lifetime.signal.throwIfAborted()
-    renderer?.suspend()
-    try {
-      return await runExternalEditor({
-        ...request,
-        signal: AbortSignal.any([request.signal, lifetime.signal]),
-      })
-    } finally {
-      if (!exitRequested) renderer?.resume()
-    }
-  }
   const attachTerminal = async (request: AttachTerminalRequest) => {
     lifetime.signal.throwIfAborted()
     renderer?.suspend()
@@ -86,7 +72,6 @@ export async function runInteractive(session: SettingsSession, noColor: boolean)
         noColor={noColor}
         onExit={close}
         onSuspend={suspend}
-        onEditText={editText}
         onAttachTerminal={attachTerminal}
         onReadClipboardImage={(signal) =>
           readClipboardImage(AbortSignal.any([signal, lifetime.signal]))

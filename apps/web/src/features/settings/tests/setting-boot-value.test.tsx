@@ -47,12 +47,12 @@ test('single-key boot reads validate mirrored values and ignore unmirrored value
     'platform.settings-boot-mirror.v1',
     JSON.stringify({
       'editor.guides.indentation': 'invalid',
-      'editor.externalEditor': 'untrusted-executable',
+      'environments.machines': { untrusted: {} },
     }),
   )
 
   expect(readSettingBootValue('editor.guides.indentation')).toBe(true)
-  expect(readSettingBootValue('editor.externalEditor')).toBe(
-    DEFAULT_SETTING_VALUES['editor.externalEditor'],
+  expect(readSettingBootValue('environments.machines')).toBe(
+    DEFAULT_SETTING_VALUES['environments.machines'],
   )
 })

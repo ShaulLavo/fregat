@@ -22,7 +22,7 @@ The implementation is concentrated in these files:
 | Native contributions | `Editor/packages/gutters`, `packages/scope-lines`, and `packages/minimap`: replay contracts, contribution visibility, current layout reservation, and full-document minimap input. Package CSS side-effect metadata keeps the minimap stylesheet in the production bundle. |
 | Platform host        | `apps/web/src/features/editor/components/editor.tsx` and `features/workbench/components/file-editor-body.tsx`: mount while file data is pending and show truthful loading status.                                                                                          |
 | Platform persistence | `apps/web/src/features/workbench/hooks/use-editor-visible-snapshot.ts`, new `state/snapshot-capture.ts`, and `apps/web/src/lib/editor-visible-snapshot-cache.ts`: eligibility, explicit capture, identity checks, and bounded storage.                                     |
-| Platform plugins     | `apps/web/src/features/editor/utils/plugins.ts` and `decode-mode.ts`: current minimap configuration before admission, native fold glyphs, and decode eligibility.                                                                                                          |
+| Platform plugins     | `apps/web/src/features/editor/utils/plugins.ts` and `decode-mode.ts`: current minimap configuration before admission, replayable SVG fold icons, and decode eligibility.                                                                                                   |
 | Open benchmark       | `apps/web/scripts/editor-open-benchmark.mjs`: reseed opaque envelopes without rewriting native internals; accept prepared opens that reach live paint immediately.                                                                                                         |
 
 ## Verification method
@@ -98,6 +98,8 @@ Navigation failures that occurred before the app mounted were retained as diagno
 ## Supported scope
 
 Saved paint includes native text, resolved syntax styles, built-in line and fold gutters, and replayable scope guides and decorations. The minimap lane is reserved from current configuration; minimap imagery appears from the complete authoritative document after takeover.
+
+Fold icons support declarative SVG path data. Platform passes its chevron path to the gutter plugin, which renders the same SVG during live paint and snapshot restore. The snapshot key includes the icon description, so changing the path or view box invalidates incompatible paint. Restored fold buttons stay disabled until the authoritative row binds its current fold action.
 
 Custom gutter DOM requires an explicit native replay renderer. Custom visible contributions require a stable `snapshotKey` and synchronous capture and replacement support. Mounted custom widgets, unsupported row or gutter CSS decorations, and incomplete declared contributions decline capture. Arbitrary third-party DOM without a capture declaration is outside the supported scope. Platform also declines snapshots while a decode animation is enabled because that plugin has no replay contract.
 

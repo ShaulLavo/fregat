@@ -1,0 +1,268 @@
+import type { SshMachineDefinition } from '@workspace/contracts'
+import type { RemoteRecord } from './records'
+import type { ServerInstallation } from '../installation/descriptor'
+import { shellQuote } from '../utils/shell'
+
+type LaunchOptions = {
+  machine: SshMachineDefinition
+  clientId: string
+  webOrigin: string
+}
+
+export function probeCommand() {
+  return `if command -v platform-server >/dev/null 2>&1; then
+  exec platform-server --describe
+fi
+if test -x "$HOME/.local/bin/platform-server"; then
+  exec "$HOME/.local/bin/platform-server" --describe
+fi
+printf '%s\\n' 'Platform server is not installed for this SSH user. Run bun run server:install from a prepared Platform checkout on this machine, then connect again.' >&2
+exit 127`
+}
+
+function bunCommand(installation: ServerInstallation, script: string) {
+  return `cd ${shellQuote(installation.directory)} && ${shellQuote(installation.executable)} -e ${shellQuote(script)}`
+}
+
+export function launchCommand(options: LaunchOptions & { installation: ServerInstallation }) {
+  return bunCommand(options.installation, launchScript(options))
+}
+
+export function stopCommand(
+  options: { installation: ServerInstallation; clientId: string },
+  record: RemoteRecord | null,
+) {
+  return bunCommand(options.installation, stopScript(options.clientId, record))
+}
+
+const prelude = `
+import { mkdir, readFile, readdir, rename, unlink } from 'node:fs/promises';
+import { openSync, closeSync } from 'node:fs';
+import net from 'node:net';
+import { Database } from 'bun:sqlite';
+import { createError } from 'evlog';
+import { healthDescriptorSchema } from './packages/contracts/src/health.ts';
+const fail = (message, code = 'machines.SSH_REMOTE') => { throw createError({ code, status: 502, message, why: 'The remote launcher could not complete the requested lifecycle operation.', fix: 'Inspect logs/ssh-launch.log in this checkout.' }); };
+const alive = (pid) => { try { process.kill(pid, 0); return true; } catch { return false; } };
+function processStart(pid) {
+  const result = Bun.spawnSync({ cmd: ['ps', '-p', String(pid), '-o', 'lstart='], stdout: 'pipe', stderr: 'ignore' });
+  return result.exitCode === 0 ? result.stdout.toString().trim() : null;
+}
+async function readRecord(file) {
+  try { return JSON.parse(await readFile(file, 'utf8')); }
+  catch (error) { if (error.code === 'ENOENT') return null; throw error; }
+}
+async function writeRecord(file, record) {
+  const temporary = file + '.' + process.pid + '.tmp';
+  await Bun.write(temporary, JSON.stringify(record), { mode: 0o600 });
+  await rename(temporary, file);
+}
+async function removeRecord(file) {
+  try { await unlink(file); }
+  catch (error) { if (error.code !== 'ENOENT') throw error; }
+}
+async function withLeaseLock(action) {
+  await mkdir('.platform-ssh-launch', { recursive: true, mode: 0o700 });
+  const lock = new Database('.platform-ssh-launch/lock.sqlite', { create: true });
+  try {
+    lock.exec('PRAGMA busy_timeout = 10000');
+    lock.exec('BEGIN IMMEDIATE');
+    return await runLocked(lock, action);
+  } finally { lock.close(); }
+}
+async function runLocked(lock, action) {
+  try {
+    const result = await action();
+    lock.exec('COMMIT');
+    return result;
+  } catch (error) {
+    lock.exec('ROLLBACK');
+    throw error;
+  }
+}
+function managedProcess(record) {
+  return record.kind === 'managed' && typeof record.processId === 'string' && /^[a-f0-9-]{36}$/.test(record.processId) && Number.isInteger(record.pid) && record.pid > 0 && typeof record.startedAt === 'string' && record.startedAt.length > 0;
+}
+function sameManagedProcess(left, right) {
+  if (!managedProcess(left) || !managedProcess(right) || left.processId !== right.processId) return false;
+  if (left.environmentId && right.environmentId && left.environmentId !== right.environmentId) fail('Recorded environment identity changed.', 'machines.SSH_IDENTITY');
+  return true;
+}
+function processFile(record) {
+  if (!managedProcess(record)) fail('Invalid managed process record.');
+  return '.platform-ssh-launch/' + record.processId + '.process';
+}
+async function writeManagedProcess(record) {
+  const { leaseId, ...processRecord } = record;
+  await writeRecord(processFile(record), processRecord);
+}
+async function currentRecord(lease) {
+  if (lease.kind === 'external') return lease;
+  const current = await readRecord(processFile(lease));
+  if (!current || !managedProcess(current) || current.processId !== lease.processId) fail('The managed process record is missing or invalid.');
+  if (lease.environmentId && current.environmentId && lease.environmentId !== current.environmentId) fail('Recorded environment identity changed.', 'machines.SSH_IDENTITY');
+  return { ...current, leaseId: lease.leaseId };
+}
+async function recordFiles(extension) {
+  return (await readdir('.platform-ssh-launch')).filter((name) => name.endsWith(extension)).map((name) => '.platform-ssh-launch/' + name);
+}
+async function hasOtherLease(file, record) {
+  for (const otherFile of await recordFiles('.json')) {
+    if (otherFile === file) continue;
+    const other = await readRecord(otherFile);
+    if (other && sameManagedProcess(other, record)) return true;
+  }
+  return false;
+}
+async function health(port, webOrigin) {
+  try {
+    const response = await fetch('http://127.0.0.1:' + port + '/health', { headers: { Origin: webOrigin }, signal: AbortSignal.timeout(1000) });
+    if (!response.ok) return null;
+    const parsed = await healthDescriptorSchema['~standard'].validate(await response.json());
+    return parsed.issues ? null : parsed.value;
+  } catch { return null; }
+}
+`
+
+export function launchScript({ machine, clientId, webOrigin }: LaunchOptions) {
+  return `${prelude}
+const config = ${JSON.stringify({ clientId, webOrigin, remotePort: machine.remotePort ?? null })};
+const recordFile = '.platform-ssh-launch/' + config.clientId + '.json';
+let previousRecord = null;
+let managedGroup = null;
+await mkdir('.platform-ssh-launch', { recursive: true, mode: 0o700 });
+await mkdir('logs', { recursive: true });
+function availablePort(port) {
+  return new Promise((resolve, reject) => {
+    const probe = net.createServer();
+    probe.once('error', reject);
+    probe.listen({ host: '127.0.0.1', port, exclusive: true }, () => {
+      const address = probe.address();
+      const selected = address.port;
+      probe.close(() => resolve(selected));
+    });
+  });
+}
+async function emit(record, descriptor) {
+  const expectedIdentity = previousRecord?.environmentId ?? managedGroup?.environmentId;
+  if (expectedIdentity && descriptor.environmentId !== expectedIdentity) fail('Recorded environment identity changed.', 'machines.SSH_IDENTITY');
+  const confirmed = { ...record, environmentId: descriptor.environmentId };
+  if (confirmed.kind === 'managed') await writeManagedProcess(confirmed);
+  await writeRecord(recordFile, confirmed);
+  process.stdout.write(JSON.stringify({ ...confirmed, descriptor }) + '\\n');
+}
+async function reuse() {
+  const lease = await readRecord(recordFile);
+  if (!lease) return false;
+  const record = await currentRecord(lease);
+  previousRecord = record;
+  if (typeof record.leaseId !== 'string' || !/^[a-f0-9-]{36}$/.test(record.leaseId)) fail('Invalid remote lease identity.');
+  if (!Number.isInteger(record.port) || record.port < 1 || record.port > 65535 || !['managed', 'external'].includes(record.kind)) fail('Invalid launch record; inspect ' + recordFile);
+  if (record.kind === 'managed' && !managedProcess(record)) fail('Invalid managed process record.');
+  if (record.kind === 'managed' && (!alive(record.pid) || processStart(record.pid) !== record.startedAt)) {
+    await removeRecord(recordFile);
+    return false;
+  }
+  const descriptor = await health(record.port, config.webOrigin);
+  if (descriptor) {
+    await emit(record, descriptor);
+    return true;
+  }
+  if (record.kind === 'managed' && Number.isInteger(record.pid) && alive(record.pid)) fail('The recorded managed server is still running but its health endpoint is unavailable.');
+  await unlink(recordFile);
+  return false;
+}
+async function launch() {
+  if (await reuse()) return;
+  const shared = await sharedManagedServer();
+  if (shared) return emit({ ...shared.record, leaseId: previousRecord?.leaseId ?? crypto.randomUUID() }, shared.descriptor);
+  const descriptor = config.remotePort ? await health(config.remotePort, config.webOrigin) : null;
+  if (descriptor) {
+    const record = { kind: 'external', processId: null, pid: null, startedAt: null, port: config.remotePort };
+    return emit({ ...record, leaseId: previousRecord?.leaseId ?? crypto.randomUUID() }, descriptor);
+  }
+  const port = await availablePort(config.remotePort ?? 0);
+  managedGroup = previousRecord?.kind === 'managed' ? previousRecord : await dormantManagedRecord(port);
+  const log = openSync('logs/ssh-launch.log', 'a', 0o600);
+  const child = Bun.spawn({ cmd: ['nohup', process.execPath, '--env-file=.env', 'apps/server/src/index.ts'], env: { ...process.env, FS_HOST: '127.0.0.1', PORT: String(port), SERVER_ALLOWED_ORIGINS: config.webOrigin }, stdin: 'ignore', stdout: log, stderr: log });
+  closeSync(log);
+  child.unref();
+  const record = { leaseId: previousRecord?.leaseId ?? crypto.randomUUID(), processId: managedGroup?.processId ?? crypto.randomUUID(), kind: 'managed', pid: child.pid, startedAt: processStart(child.pid), port, environmentId: previousRecord?.environmentId ?? managedGroup?.environmentId ?? null };
+  try {
+    if (!record.startedAt) fail('The launched process could not be identified.');
+    await writeManagedProcess(record);
+    await writeRecord(recordFile, record);
+    return await emit(record, await managedHealth(child, port));
+  } catch (error) {
+    await stopFailedChild(child);
+    await removeRecord(recordFile);
+    throw error;
+  }
+}
+async function dormantManagedRecord(port) {
+  for (const file of await recordFiles('.process')) {
+    const record = await readRecord(file);
+    if (!record || !managedProcess(record) || record.port !== port) continue;
+    if (alive(record.pid) && processStart(record.pid) === record.startedAt) continue;
+    return record;
+  }
+  return null;
+}
+async function sharedManagedServer() {
+  for (const file of await recordFiles('.process')) {
+    const record = await readRecord(file);
+    if (!record || !managedProcess(record)) continue;
+    if (config.remotePort && record.port !== config.remotePort) continue;
+    if (!alive(record.pid) || processStart(record.pid) !== record.startedAt) continue;
+    const descriptor = await health(record.port, config.webOrigin);
+    if (!descriptor) continue;
+    if (record.environmentId && record.environmentId !== descriptor.environmentId) fail('Recorded environment identity changed.', 'machines.SSH_IDENTITY');
+    return { record, descriptor };
+  }
+  return null;
+}
+async function managedHealth(child, port) {
+  const deadline = Date.now() + 30000;
+  while (Date.now() < deadline) {
+    const descriptor = await health(port, config.webOrigin);
+    if (descriptor) return descriptor;
+    if (child.exitCode !== null || child.signalCode !== null) break;
+    await Bun.sleep(200);
+  }
+  fail('The remote server did not become ready within 30 seconds.');
+}
+async function stopFailedChild(child) {
+  if (child.exitCode !== null || child.signalCode !== null) return;
+  child.kill('SIGTERM');
+  const timeout = setTimeout(() => child.kill('SIGKILL'), 2000);
+  try { await child.exited; }
+  finally { clearTimeout(timeout); }
+}
+try { await withLeaseLock(launch); }
+catch (error) { process.stderr.write(JSON.stringify({ code: error.code, message: error.message }) + '\\n'); process.exit(1); }
+`
+}
+
+export function stopScript(clientId: string, expected: RemoteRecord | null) {
+  return `${prelude}
+const recordFile = '.platform-ssh-launch/' + ${JSON.stringify(clientId)} + '.json';
+const expected = ${JSON.stringify(expected)};
+async function stop() {
+  const lease = await readRecord(recordFile);
+  if (!lease) return;
+  if (expected && (lease.leaseId !== expected.leaseId || lease.environmentId !== expected.environmentId)) fail('The launch record changed; refusing to stop another process.');
+  if (lease.kind === 'external') { await unlink(recordFile); return; }
+  const record = await currentRecord(lease);
+  if (record.kind !== 'managed' || !Number.isInteger(record.pid) || record.pid < 1) fail('Invalid managed process record.');
+  if (alive(record.pid) && (!record.startedAt || processStart(record.pid) !== record.startedAt)) fail('The PID was reused; refusing to stop another process.');
+  if (await hasOtherLease(recordFile, record)) { await unlink(recordFile); return; }
+  if (alive(record.pid)) process.kill(record.pid, 'SIGTERM');
+  const deadline = Date.now() + 3000;
+  while (alive(record.pid) && processStart(record.pid) === record.startedAt && Date.now() < deadline) await Bun.sleep(50);
+  if (alive(record.pid) && processStart(record.pid) === record.startedAt) process.kill(record.pid, 'SIGKILL');
+  await unlink(recordFile);
+  await removeRecord(processFile(record));
+}
+await withLeaseLock(stop);
+`
+}

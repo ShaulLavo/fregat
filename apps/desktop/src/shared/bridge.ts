@@ -1,5 +1,3 @@
-import type { HealthDescriptor } from '@workspace/contracts'
-
 import type { ShellBackdrop } from './window'
 
 export type PlatformPickOptions = {
@@ -15,23 +13,4 @@ export type PlatformBridge = {
   // created, never what the setting currently says.
   backdrop: ShellBackdrop
   pickEntry(options: PlatformPickOptions): Promise<string[]>
-  connectMachine(name: string): Promise<PlatformMachineState>
-  disconnectMachine(name: string): Promise<void>
-  onMachineState(listener: (state: PlatformMachineState) => void): () => void
 }
-
-export type PlatformMachineState =
-  | { name: string; phase: 'idle' | 'launching' | 'connecting' }
-  | {
-      name: string
-      phase: 'live'
-      origin: string
-      localPort: number
-      descriptor: HealthDescriptor
-    }
-  | {
-      name: string
-      phase: 'offline' | 'blocked' | 'identity-drift'
-      lastError: string
-      lastErrorAt: number
-    }

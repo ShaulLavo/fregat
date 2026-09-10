@@ -15,6 +15,7 @@ import { createDefaultWorkbenchPanels } from '@/features/workbench/utils/panels'
 import { expect, test } from '../../../test/fixtures'
 import { renderWithProviders } from '../../../test/render'
 import { ensureFolderPath, recordRecentEntry } from '@/lib/file-server'
+import type { TestCommandRuntimeOverrides } from '../../../test/factories/command-runtime'
 
 function storeWithRoot(path: string | null) {
   return createEditorWorkspaceStore({
@@ -48,7 +49,7 @@ function storeWithRoot(path: string | null) {
   })
 }
 
-function renderMenu(rootPath: string | null) {
+function renderMenu(rootPath: string | null, shell: TestCommandRuntimeOverrides['shell'] = {}) {
   const store = storeWithRoot(rootPath)
   // Real editor stack with the workspace store swapped, so the menu gets the
   // document and ui stores it needs to open a root.
@@ -58,7 +59,7 @@ function renderMenu(rootPath: string | null) {
         <WorkspaceProjectMenu workspaceTitle='platform' />
       </EditorWorkspaceStateContext.Provider>
     </EditorStateProvider>,
-    { command: { runtime: { workspace: store } } },
+    { command: { runtime: { workspace: store, shell } } },
   )
   return { ...rendered, store }
 }
@@ -131,4 +132,17 @@ test('still offers a way out when no workspace is open', async () => {
 
   expect(screen.queryAllByRole('menuitemradio')).toHaveLength(0)
   expect(await screen.findByRole('menuitem', { name: /Open folder/ })).toBeVisible()
+})
+
+test('opens the connect machine flow from the project dropdown with no workspace open', async () => {
+  const dialogs: string[] = []
+  renderMenu(null, {
+    showEnvironmentDialog: (mode) => {
+      dialogs.push(mode)
+    },
+  })
+  await userEvent.click(screen.getByRole('button', { name: 'Switch project' }))
+  await userEvent.click(screen.getByRole('menuitem', { name: 'Connect machine…' }))
+  expect(dialogs).toEqual(['connect'])
+  await waitFor(() => expect(screen.queryByRole('menu')).toBeNull())
 })

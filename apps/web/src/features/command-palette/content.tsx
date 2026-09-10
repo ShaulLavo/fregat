@@ -1,3 +1,4 @@
+import { CodeThemePreviewPanel } from '@/features/command-palette/components/code-theme-preview-panel'
 import { useApplicationRuntime } from '@/hooks/use-application-runtime'
 import {
   CommandDialog,
@@ -33,6 +34,8 @@ import {
 import { ScopeChip } from '@/features/command-palette/scope-chip'
 import { useHighlightedPaletteValue } from '@/features/command-palette/hooks/use-highlighted-palette-value'
 import { useRecentCommandIds } from '@/features/command-palette/hooks/use-recent-command-ids'
+import { appColorsFromItemValue } from '@/features/command-palette/utils/app-colors'
+import { isCommandVisibleInPalette } from '@/keymap/utils/palette-visibility'
 import {
   CommandPaletteActionsContext,
   type CommandPaletteActions,
@@ -48,8 +51,8 @@ import { showChatModeToolTab } from '@/features/chat-mode/utils/panels'
 import {
   clearEditorThemePreview,
   previewEditorTheme,
-  setSelectedEditorThemeId,
 } from '@/features/editor/state/color-theme-store'
+import { useEditorColorTheme } from '@/features/editor/hooks/use-editor-color-theme'
 import { useEditorCommands } from '@/features/editor/state/commands'
 import {
   useEditorWorkspaceState,
@@ -79,7 +82,15 @@ export function CommandPaletteContent() {
   } = useCommand()
   const focus = useFocusService()
   const workspace = useEditorWorkspaceStoreApi()
-  const { clearThemePreview, previewTheme, resolvedTheme, theme } = useTheme()
+  const { selectTheme } = useEditorColorTheme()
+  const {
+    clearAppColorsPreview,
+    clearThemePreview,
+    previewAppColors,
+    previewTheme,
+    resolvedTheme,
+    theme,
+  } = useTheme()
   const hasWorkspace = useEditorWorkspaceState((state) => Boolean(state.rootFolder))
   const rootFolder = useEditorWorkspaceState((state) => state.rootFolder)
   const openFilePaths = useEditorWorkspaceState((state) => state.openFilePaths)
@@ -115,7 +126,15 @@ export function CommandPaletteContent() {
     enabled: open && mode === 'scripts',
     rootPath: rootFolder?.path ?? null,
   })
-  const commandItems = commandPaletteItems(platformCommandSpecs, bindings)
+  const commandContext = bus.capture(paletteCommandInvocation(paletteOrigin))
+  const commandOrigin = paletteOrigin ? focus.getTarget(paletteOrigin) : null
+  const commandItems = commandPaletteItems(platformCommandSpecs, bindings).filter((item) =>
+    isCommandVisibleInPalette(
+      item.command.command,
+      commandContext.inspect(item.command.command),
+      commandOrigin,
+    ),
+  )
   const recentCommandIds = useRecentCommandIds()
   const groups = groupedCommandItems(commandItems, search, recentCommandIds)
   const { ref: paletteTargetRef } = useFocusTarget<HTMLDivElement>({
@@ -136,14 +155,16 @@ export function CommandPaletteContent() {
   useEffect(() => {
     if (mode !== 'colorTheme') clearEditorThemePreview()
     if (mode !== 'colorMode') clearThemePreview()
-  }, [clearThemePreview, mode])
+    if (mode !== 'appColors') clearAppColorsPreview()
+  }, [clearAppColorsPreview, clearThemePreview, mode])
 
   useEffect(
     () => () => {
       clearEditorThemePreview()
       clearThemePreview()
+      clearAppColorsPreview()
     },
-    [clearThemePreview],
+    [clearAppColorsPreview, clearThemePreview],
   )
 
   function previewHighlightedColorTheme(value: string) {
@@ -160,6 +181,11 @@ export function CommandPaletteContent() {
   const highlightedListRef = useHighlightedPaletteValue({
     enabled: isColorPreviewMode(mode),
     onHighlight: (value) => {
+      if (mode === 'appColors') {
+        const colors = appColorsFromItemValue(value)
+        if (colors) previewAppColors(colors)
+        return
+      }
       if (mode === 'colorTheme') {
         previewHighlightedColorTheme(value)
         return
@@ -227,7 +253,7 @@ export function CommandPaletteContent() {
         previewEditorTheme(resolvedTheme, themeId)
       },
       selectColorTheme: (themeId) => {
-        setSelectedEditorThemeId(resolvedTheme, themeId)
+        selectTheme(themeId, 'workspace.selectColorTheme')
         closePalette(true)
       },
       selectFile: async (path) => {
@@ -306,13 +332,21 @@ export function CommandPaletteContent() {
     resolvedTheme,
     saveProjectScript,
     selectFile,
+    selectTheme,
     selectedFileBackedPath,
     workspace,
   ])
 
   return (
     <CommandDialog
+      title={mode === 'colorTheme' ? 'Choose code theme' : undefined}
+      description={
+        mode === 'colorTheme'
+          ? 'Preview code themes with the arrow keys. Enter saves; Escape cancels.'
+          : undefined
+      }
       commandProps={{
+        className: mode === 'colorTheme' ? 'max-h-[calc(100dvh-4rem)]' : undefined,
         filter: paletteScope ? scopedPaletteFilter : quickAccessFilter,
         loop: true,
         onValueChange: handleCommandValueChange,
@@ -334,7 +368,14 @@ export function CommandPaletteContent() {
         onKeyDown={handleSearchKeyDown}
         onValueChange={handleSearchChange}
       />
-      <CommandList className='max-h-[min(440px,calc(100vh-8rem))] py-1' ref={highlightedListRef}>
+      <CommandList
+        className={
+          mode === 'colorTheme'
+            ? 'max-h-60 min-h-0 shrink overflow-y-auto py-1'
+            : 'max-h-[min(440px,calc(100vh-8rem))] py-1'
+        }
+        ref={highlightedListRef}
+      >
         <CommandEmpty>{emptyLabelForMode(mode)}</CommandEmpty>
         <CommandPaletteActionsContext value={actions}>
           <CommandPaletteGroupsFactory
@@ -354,6 +395,7 @@ export function CommandPaletteContent() {
           />
         </CommandPaletteActionsContext>
       </CommandList>
+      {mode === 'colorTheme' && <CodeThemePreviewPanel query={query} />}
     </CommandDialog>
   )
 }

@@ -11,6 +11,10 @@ import {
 } from '../settings/mutations'
 
 describe('machines', () => {
+  it('accepts an SSH address without a repository or installation path', () => {
+    const machine = { kind: 'ssh', target: 'user@devbox' }
+    expect(v.parse(machinesSchema, { remote: machine })).toEqual({ remote: machine })
+  })
   it.each([
     'https://pc.mesh.example/platform',
     'http://127.0.0.1:3002',
@@ -34,11 +38,10 @@ describe('machines', () => {
 
   it.each([
     { remote: { kind: 'origin', url: 'https://user:secret@example.com' } },
-    { remote: { kind: 'ssh', target: '-oProxyCommand=sh', repoPath: '/work/platform' } },
-    { remote: { kind: 'ssh', target: 'host;command', repoPath: '/work/platform' } },
-    { remote: { kind: 'ssh', target: 'host', repoPath: '~/platform' } },
-    { remote: { kind: 'ssh', target: 'host', repoPath: '/work/platform', remotePort: 65_536 } },
-    { 'Upper Case': { kind: 'ssh', target: 'host', repoPath: '/work/platform' } },
+    { remote: { kind: 'ssh', target: '-oProxyCommand=sh' } },
+    { remote: { kind: 'ssh', target: 'host;command' } },
+    { remote: { kind: 'ssh', target: 'host', remotePort: 65_536 } },
+    { 'Upper Case': { kind: 'ssh', target: 'host' } },
   ])('rejects unsafe machine input', (input) => {
     expect(v.safeParse(machinesSchema, input).success).toBe(false)
   })
@@ -64,7 +67,7 @@ describe('machines', () => {
     const first = {
       kind: 'machine.set',
       name: 'first',
-      machine: { kind: 'ssh', target: 'first', repoPath: '/work/platform' },
+      machine: { kind: 'ssh', target: 'first' },
     } as const
     const second = {
       kind: 'machine.set',

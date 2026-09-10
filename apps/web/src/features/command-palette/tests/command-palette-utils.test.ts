@@ -33,8 +33,9 @@ test('command groups rank strong command matches above earlier weak fuzzy groups
   const groups = groupedCommandItems(items, '> color')
 
   expect(groups[0]?.[1].map((item) => item.id)).toEqual([
-    'workspace.selectColorMode',
+    'workspace.selectAppColors',
     'workspace.selectColorTheme',
+    'workspace.selectColorMode',
   ])
   expect(groups.flatMap(([, groupItems]) => groupItems.map((item) => item.id))).not.toContain(
     'workspace.toggleSidebarVisibility',
@@ -101,9 +102,14 @@ test('a matching recent leads the query results even when something else scores 
       groupItems.map((item) => item.id),
     )
 
-  expect(ids([])).toEqual(['workspace.selectColorMode', 'workspace.selectColorTheme'])
+  expect(ids([])).toEqual([
+    'workspace.selectAppColors',
+    'workspace.selectColorTheme',
+    'workspace.selectColorMode',
+  ])
   expect(ids(['workspace.selectColorTheme'])).toEqual([
     'workspace.selectColorTheme',
+    'workspace.selectAppColors',
     'workspace.selectColorMode',
   ])
 })

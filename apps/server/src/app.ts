@@ -1,7 +1,8 @@
 import { createInternalError } from './observability/structured-errors'
 import { cors } from '@elysiajs/cors'
 import type { HealthDescriptor } from '@workspace/contracts'
-import { hostname } from 'node:os'
+import { homedir, hostname } from 'node:os'
+import path from 'node:path'
 import { Elysia } from 'elysia'
 import { attachmentRoutes } from './attachments/routes'
 import { authGuard, createAuthConfig, isCorsOriginAllowed, type AuthOptions } from './auth'
@@ -49,10 +50,15 @@ import { TerminalService, type TerminalPtyFactory } from './terminal/service'
 import { wallpaperRoutes } from './wallpaper/routes'
 import { ProviderSessionDirectory } from './provider/provider-session-directory'
 import { ProviderService } from './provider/provider-service'
+import { MachineService, type MachineServiceOptions } from './machines/service'
+import { machineRoutes } from './machines/routes'
+import type { TailnetStatusCommand } from './machines/tailnet-hosts'
+import { createMachineProxyRoutes } from './machines/proxy'
 
 import type { LogReaderService } from './observability/log-reader'
 
 export type AppOptions = FileSystemServiceOptions & {
+  machines?: MachineServiceOptions & { tailnetStatusCommand?: TailnetStatusCommand }
   logs?: LogReaderService
   auth?: AuthOptions
   terminal?: {
@@ -85,6 +91,13 @@ export type AppOptions = FileSystemServiceOptions & {
 }
 
 const appOrchestration = new WeakMap<object, OrchestrationEngine>()
+const appMachines = new WeakMap<object, MachineService>()
+
+export function machinesForApp(app: object) {
+  const machines = appMachines.get(app)
+  if (!machines) throw createInternalError('App has no machine service')
+  return machines
+}
 
 export function orchestrationForApp(app: object) {
   const engine = appOrchestration.get(app)
@@ -176,6 +189,15 @@ export function createApp(options: AppOptions) {
   const checkpointDiff = new OrchestrationCheckpointDiffQuery(database, git)
   const sessionSearch = new OrchestrationSessionSearchQuery(database)
   const auth = createAuthConfig(options.auth)
+  const machines = new MachineService({
+    ...options.machines,
+    environmentId: identity.id,
+    webOrigin: auth.allowedOrigins[0] ?? 'http://localhost:3000',
+    readMachines: () => settings.snapshot().values['environments.machines'],
+  })
+  settings.onChange(() => {
+    runDetached(() => machines.reconcile(), { area: 'machines', operation: 'reconcile' })
+  })
   // Read through the store on every call rather than captured once: a language
   // server that only picked up a settings change on restart would be a knob the
   // page claims is live and is not.
@@ -200,7 +222,15 @@ export function createApp(options: AppOptions) {
       () => settings.snapshot().values['lsp.idleTimeoutMs'],
       () => settings.snapshot().values['lsp.semanticTokens.delta'],
     )
-  const cleanup = appCleanup(terminal, fs, settings, lspPool, providerService, orchestration)
+  const cleanup = appCleanup(
+    terminal,
+    fs,
+    settings,
+    lspPool,
+    providerService,
+    orchestration,
+    machines,
+  )
 
   const app = new Elysia({ name: 'platform' })
   applyObservability(app)
@@ -227,6 +257,17 @@ export function createApp(options: AppOptions) {
     // Auth runs after the WS upgrade so the browser receives the explicit 1008 refusal.
     .use(orchestrationWsRoutes(orchestration, auth, identity))
     .onBeforeHandle(authGuard(auth))
+    .use(
+      machineRoutes(
+        machines,
+        {
+          homeDirectory: options.homeDirectory ?? homedir(),
+          systemDirectory: path.join(options.systemRoot ?? '/', 'etc/ssh'),
+        },
+        options.machines?.tailnetStatusCommand,
+      ),
+    )
+    .use(createMachineProxyRoutes({ auth, resolve: (name) => machines.resolve(name) }))
     .use(observabilityRoutes({ logs: options.logs }))
     .get(
       '/health',
@@ -267,6 +308,7 @@ export function createApp(options: AppOptions) {
     .onStop(cleanup)
   appCleanups.set(configured, cleanup)
   appOrchestration.set(configured, orchestration)
+  appMachines.set(configured, machines)
   return configured
 }
 
@@ -307,6 +349,7 @@ function appCleanup(
   lspPool: LspSessionPool,
   providerService: ProviderService,
   orchestration: OrchestrationEngine,
+  machines: MachineService,
 ) {
   let closed = false
 
@@ -314,6 +357,7 @@ function appCleanup(
     if (closed) return
 
     closed = true
+    await machines.close()
     await terminal.dispose()
     // Language servers are child processes. Without this, jdtls, gopls and
     // rust-analyzer outlive the server and idle on the machine until someone

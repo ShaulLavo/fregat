@@ -10,12 +10,13 @@ import { Debouncer } from '@tanstack/react-pacer/debouncer'
 
 import {
   builtinEditorTheme,
-  editorThemeExists,
+  editorThemeColorMode,
   isBuiltinEditorThemeId,
   type BuiltinEditorThemeDefinition,
-} from '@/features/editor/utils/theme-catalog'
+} from '@/lib/code-theme/utils/catalog'
 import { shikiThemeContentHash } from '@/features/editor/utils/theme-content-hash'
 import { loadVscodeThemeRegistration } from '@workspace/client-core/themes/registration'
+import { readSettingsMirror } from '@/features/settings/utils/boot-mirror'
 import { log } from '@/lib/client-logging'
 import { clientErrors, createClientInvariantError } from '@/lib/structured-errors'
 
@@ -29,8 +30,6 @@ export type LoadedEditorColorTheme = {
   readonly resolvedThemeId: string
 }
 
-const EDITOR_COLOR_THEME_STORAGE_KEY = 'platform.editor-color-theme.v1'
-const EDITOR_COLOR_THEME_STORAGE_VERSION = 1
 /**
  * Running the pointer down the theme list is one decision, not sixty-five.
  * Applying a preview costs the shiki worker a re-tokenize of every open document
@@ -65,8 +64,7 @@ const previewSettle = new Debouncer(() => notifyEditorColorThemeListeners(), {
 let themeSwitchingPrepared = false
 let selectionByColorMode: Record<EditorColorMode, string> | null = null
 let activeEditorColorMode: EditorColorMode = 'dark'
-// A hover-preview that overlays the persisted selection without touching
-// localStorage. Cleared on commit (select) or cancel (palette close).
+// Preview overlays settings until selection or palette close.
 let previewTheme: { readonly colorMode: EditorColorMode; readonly themeId: string } | null = null
 
 /**
@@ -88,18 +86,18 @@ export function getCommittedEditorThemeId(colorMode: EditorColorMode): string {
   return readSelectionByColorMode()[colorMode]
 }
 
-export function setSelectedEditorThemeId(colorMode: EditorColorMode, themeId: string) {
+export function syncEditorThemeSelection(colorMode: EditorColorMode, themeId: string) {
   const selection = readSelectionByColorMode()
-  if (!editorThemeExists(themeId)) return
+  themeId = validThemeIdForColorMode(colorMode, themeId)
+  if (selection[colorMode] === themeId) return
 
-  // A commit outranks any preview still waiting to settle; letting that one fire
-  // afterwards would reload every editor a second time for the same theme.
-  previewSettle.cancel()
-  if (selection[colorMode] === themeId && previewTheme === null) return
+  // A commit supersedes the pending preview in its own mode.
+  if (previewTheme?.colorMode === colorMode) {
+    previewSettle.cancel()
+    previewTheme = null
+  }
 
-  previewTheme = null
   selectionByColorMode = { ...selection, [colorMode]: themeId }
-  persistSelectionByColorMode(selectionByColorMode)
   notifyEditorColorThemeListeners()
   // The plugin reloads synchronously off the notify above; make sure the worker
   // gets a real registration for the commit, not just the name fallback.
@@ -107,7 +105,7 @@ export function setSelectedEditorThemeId(colorMode: EditorColorMode, themeId: st
 }
 
 export function previewEditorTheme(colorMode: EditorColorMode, themeId: string) {
-  if (!editorThemeExists(themeId)) return
+  if (editorThemeColorMode(themeId) !== colorMode) return
   if (previewTheme?.colorMode === colorMode && previewTheme.themeId === themeId) return
   if (previewTheme === null && readSelectionByColorMode()[colorMode] === themeId) return
 
@@ -253,7 +251,7 @@ export function preloadVscodeThemeRegistrations(): Promise<void> {
   ).then(() => undefined)
 }
 
-/** Test hook: drops in-memory state so the next read hits localStorage again. */
+/** Test hook: drops in-memory state so the next read uses the settings mirror. */
 export function resetEditorColorThemeStore() {
   previewSettle.cancel()
   themeSwitchingPrepared = false
@@ -371,46 +369,13 @@ function readSelectionByColorMode(): Record<EditorColorMode, string> {
 }
 
 function persistedThemeIdForColorMode(colorMode: EditorColorMode): string {
-  const fallback = DEFAULT_DEFINITION_BY_COLOR_MODE[colorMode].id
-  const persisted = readPersistedSelection()
-  const themeId = persisted?.[colorMode]
-  if (!themeId || !editorThemeExists(themeId)) return fallback
-
-  return themeId
+  const settings = readSettingsMirror()
+  return validThemeIdForColorMode(colorMode, settings[`editor.codeTheme.${colorMode}`])
 }
 
-function readPersistedSelection(): Partial<Record<EditorColorMode, string>> | null {
-  if (!canUseLocalStorage()) return null
-
-  try {
-    const raw = localStorage.getItem(EDITOR_COLOR_THEME_STORAGE_KEY)
-    if (!raw) return null
-
-    const parsed: unknown = JSON.parse(raw)
-    if (!parsed || typeof parsed !== 'object') return null
-    if ((parsed as { version?: unknown }).version !== EDITOR_COLOR_THEME_STORAGE_VERSION)
-      return null
-
-    const selection = (parsed as { selection?: unknown }).selection
-    if (!selection || typeof selection !== 'object') return null
-
-    return selection as Partial<Record<EditorColorMode, string>>
-  } catch {
-    return null
-  }
-}
-
-function persistSelectionByColorMode(selection: Record<EditorColorMode, string>) {
-  if (!canUseLocalStorage()) return
-
-  try {
-    localStorage.setItem(
-      EDITOR_COLOR_THEME_STORAGE_KEY,
-      JSON.stringify({ selection, version: EDITOR_COLOR_THEME_STORAGE_VERSION }),
-    )
-  } catch {
-    // A full or unavailable store only costs the selection on next reload.
-  }
+function validThemeIdForColorMode(colorMode: EditorColorMode, themeId: string): string {
+  if (editorThemeColorMode(themeId) === colorMode) return themeId
+  return DEFAULT_DEFINITION_BY_COLOR_MODE[colorMode].id
 }
 
 function notifyEditorColorThemeListeners() {
@@ -447,8 +412,4 @@ function requireVscodeThemeDefinition(themeId: string): VscodeThemeDefinition {
   }
 
   return definition
-}
-
-function canUseLocalStorage() {
-  return typeof localStorage !== 'undefined'
 }

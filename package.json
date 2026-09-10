@@ -31,6 +31,7 @@
     "prod": "bun scripts/prod.ts",
     "bench:workspace-search": "bun apps/server/scripts/workspace-search-benchmark.ts",
     "start": "bun scripts/prod.ts start",
+    "server:install": "bun scripts/install-server.ts",
     "format": "bun run --filter '*' format",
     "format:check": "bun run --filter '*' format:check",
     "typecheck": "bun run --sequential --filter '*' typecheck",

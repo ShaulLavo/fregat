@@ -43,6 +43,22 @@ test('a deferred snapshot keeps the callback that owned its document', () => {
   expect(secondOwner).not.toHaveBeenCalled()
 })
 
+test('persists the bottom row at the viewport bottom instead of the trailing empty area', () => {
+  const onChange = vi.fn()
+  const hook = renderHook(() =>
+    useScrollPersistencePlugin({
+      document: { path: '/repo/a.ts' },
+      onScrollPositionChange: onChange,
+    }),
+  )
+  const contribution = activate(hook.result.current)
+
+  contribution.update(snapshot('/repo/a.ts', 3_980), 'viewport')
+  contribution.dispose?.()
+
+  expect(onChange).toHaveBeenCalledWith('/repo/a.ts', { left: 0, top: 3_400 })
+})
+
 function activate(plugin: EditorPlugin): EditorViewContribution {
   let provider: EditorViewContributionProvider | null = null
   plugin.activate({

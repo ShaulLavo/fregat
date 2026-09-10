@@ -8,13 +8,13 @@ import {
   prepareEditorThemeSwitching,
   preloadVscodeThemeRegistrations,
 } from '@/features/editor/state/color-theme-store'
-import { editorThemeOptions, type EditorThemeOption } from '@/features/editor/utils/theme-catalog'
+import { editorThemeOptions } from '@/lib/code-theme/utils/catalog'
 import { colorThemeItemValue } from '@/features/command-palette/command-palette-utils'
 import { RowLabel } from '@/features/command-palette/row-label'
 
 export function ColorThemeGroups() {
   const { selectColorTheme } = useCommandPaletteActions()
-  const { committedThemeId } = useEditorColorTheme()
+  const { committedThemeId, colorMode } = useEditorColorTheme()
 
   // Opening this list is the moment switching themes stops being hypothetical,
   // so both warmups start here rather than at document open: the registrations
@@ -26,46 +26,17 @@ export function ColorThemeGroups() {
   }, [])
 
   return (
-    <>
-      <ColorThemeGroup
-        heading='Color Theme — Dark'
-        activeThemeId={committedThemeId}
-        themes={editorThemeOptions('dark')}
-        onSelect={selectColorTheme}
-      />
-      <ColorThemeGroup
-        heading='Color Theme — Light'
-        activeThemeId={committedThemeId}
-        themes={editorThemeOptions('light')}
-        onSelect={selectColorTheme}
-      />
-    </>
-  )
-}
-
-function ColorThemeGroup({
-  heading,
-  activeThemeId,
-  themes,
-  onSelect,
-}: {
-  readonly heading: string
-  readonly activeThemeId: string
-  readonly themes: readonly EditorThemeOption[]
-  readonly onSelect: (themeId: string) => void
-}) {
-  return (
-    <CommandGroup heading={heading}>
-      {themes.map((theme) => (
+    <CommandGroup heading={`Code theme for ${colorMode} mode`}>
+      {editorThemeOptions(colorMode).map((theme) => (
         <CommandItem
           key={theme.id}
           keywords={[theme.label, theme.id, theme.type, theme.source]}
           value={colorThemeItemValue(theme.id)}
-          onSelect={() => onSelect(theme.id)}
+          onSelect={() => selectColorTheme(theme.id)}
         >
           <PaletteIcon className='text-muted-foreground' />
           <RowLabel label={theme.label} description={theme.subtitle} />
-          {theme.id === activeThemeId && <CommandShortcut>active</CommandShortcut>}
+          {theme.id === committedThemeId && <CommandShortcut>active</CommandShortcut>}
         </CommandItem>
       ))}
     </CommandGroup>

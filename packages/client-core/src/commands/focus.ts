@@ -43,7 +43,12 @@ export type FocusTargetId =
   | { readonly dialogTarget: object; readonly kind: 'unsaved-dialog' }
   | { readonly kind: 'tui-widget'; readonly key: string }
 
-export type FocusIntent = 'focus' | 'open-search' | 'reveal-active'
+export type FocusIntent =
+  | 'focus'
+  | 'open-search'
+  | 'reveal-active'
+  | 'create-file'
+  | 'create-folder'
 
 export type FocusTransitionOutcome =
   | { readonly status: 'acknowledged'; readonly targetId: FocusTargetId }

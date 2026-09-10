@@ -10,12 +10,17 @@ type PendingThemeLoad = {
   readonly resolve: (registration: VscodeThemeRegistration) => void
 }
 
+let restoreClient: (() => void) | undefined
+
 afterEach(() => {
+  restoreClient?.()
+  restoreClient = undefined
   vi.doUnmock('@workspace/client-core/themes/registration')
   vi.resetModules()
 })
 
-test('a late older theme load cannot overwrite the newer applied theme id', async () => {
+test('a late older theme load cannot overwrite the newer applied theme id', async ({ client }) => {
+  expect(client).toBeDefined()
   const pending = new Map<string, PendingThemeLoad>()
   vi.resetModules()
   vi.doMock('@workspace/client-core/themes/registration', async () => {
@@ -41,13 +46,27 @@ test('a late older theme load cannot overwrite the newer applied theme id', asyn
   })
 
   const store = await import('@/features/editor/state/color-theme-store')
+  const { getClient, setClient } = await import('@/lib/client')
+  const previousClient = getClient()
+  setClient(client)
+  restoreClient = () => setClient(previousClient)
   const { useEditorColorTheme } = await import('@/features/editor/hooks/use-editor-color-theme')
-  const { renderWithProviders } = await import('../../../../../test/render')
+  const { renderWithProviders, createTestQueryClient } = await import('../../../../../test/render')
+  const { settingsKeys } = await import('@workspace/client-core/settings/query-keys')
+  const { fetchSettings, saveSettings } = await import('@/features/settings/utils/api')
+  await saveSettings({
+    mutationId: 'theme-load-seed',
+    operations: [{ kind: 'set', key: 'editor.codeTheme.dark', value: 'monokai' }],
+    target: 'user',
+  })
+  const queryClient = createTestQueryClient()
+  queryClient.setQueryData(settingsKeys.document(), await fetchSettings())
   store.resetEditorColorThemeStore()
-  store.setSelectedEditorThemeId('dark', 'monokai')
+  let selectTheme: ReturnType<typeof useEditorColorTheme>['selectTheme'] | undefined
 
   function AppliedThemeProbe() {
     const theme = useEditorColorTheme()
+    selectTheme = theme.selectTheme
 
     return createElement('output', {
       'data-applied-theme-id': theme.appliedThemeId ?? '',
@@ -55,10 +74,13 @@ test('a late older theme load cannot overwrite the newer applied theme id', asyn
     })
   }
 
-  const view = renderWithProviders(createElement(AppliedThemeProbe), { command: false })
+  const view = renderWithProviders(createElement(AppliedThemeProbe), {
+    command: false,
+    queryClient,
+  })
   await waitFor(() => expect(pending.has('monokai')).toBe(true))
 
-  act(() => store.setSelectedEditorThemeId('dark', 'dracula'))
+  act(() => selectTheme?.('dracula'))
   await waitFor(() => expect(pending.has('dracula')).toBe(true))
   await resolvePendingTheme(pending, 'dracula')
   await waitFor(() => {

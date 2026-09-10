@@ -128,7 +128,7 @@ test('narrow layout returns from the viewer to its tree and back', async ({ serv
   }
 })
 
-test('hidden and offline viewers cannot launch an external editor', async ({ server }) => {
+test('hidden and offline viewers cannot launch the editor', async ({ server }) => {
   await writeFile(`${server.root}/sample.txt`, 'unchanged')
   let edits = 0
   const fixture = await createWorkbenchFrame(server, {
@@ -149,7 +149,7 @@ test('hidden and offline viewers cannot launch an external editor', async ({ ser
       })
       .toBe('workbench-viewer')
     await runPaletteCommand(frame, 'Open Search Editor')
-    await runPaletteCommand(frame, 'Edit file externally')
+    await runPaletteCommand(frame, 'Edit file')
     expect(edits).toBe(0)
     await act(async () => {
       frame.mockInput.pressKey('ESCAPE')
@@ -168,7 +168,7 @@ test('hidden and offline viewers cannot launch an external editor', async ({ ser
     await act(async () => {
       frame.mockInput.pressKey('x')
     })
-    await runPaletteCommand(frame, 'Edit file externally')
+    await runPaletteCommand(frame, 'Edit file')
     expect(edits).toBe(0)
     expect(
       (await fixture.session.client.fs.read.get({ query: { path: 'sample.txt' } })).data,

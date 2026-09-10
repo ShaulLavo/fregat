@@ -16,12 +16,9 @@ The plan records host-conflict checks and the pinned T3 Code reference.
 
 ## Existing implementation record
 
-Last reviewed: 2026-09-05. Plan 056 is implemented and verified through focused tests and trusted browser input.
-
-Platform supports a subset of VS Code defaults. The command table defines the available commands,
-bindings, VS Code aliases, and enablement conditions. Plan 056 adds Platform's chord runtime.
-[Plan 057](../plans/057-editor-native-vscode-keymap.md) first adds standalone Editor chord execution,
-then moves Platform onto the same reusable runtime and completes the remaining Editor defaults.
+Plans 056 and 057 are complete. Standalone Editor executes default and custom chords, and
+Platform uses the same public runtime. The [delivery record](keymap/delivery.md) contains the
+paired revisions, verification results, and host limitations. The completed plans are in git history.
 
 ## Implemented runtime
 
@@ -32,8 +29,9 @@ then moves Platform onto the same reusable runtime and completes the remaining E
 - `activePlatformKeyBindings()` applies pane priority before app filtering. A per-pane trie
   represents complete shortcuts and prefixes. A complete shortcut wins over a longer sequence
   with the same prefix.
-- `utils/chord-machine.ts` makes pure arm, complete, and cancel decisions. `state/chord-session.ts`
-  owns listeners, pending state, the five-second timer, and one wide log event per chord lifecycle.
+- `@singapor/core/keymap` owns matching, pending state, listeners, and the five-second timer.
+  Platform's `state/keymap-session.ts` connects that runtime to focus, command dispatch, and one
+  wide log event per chord lifecycle.
 - Unarmed app shortcuts run in document bubble. A prefix installs document capture synchronously
   for the continuation, so React rendering cannot leave a gap between strokes.
 - Consumed prefixes and continuations never replay into text inputs or a shell.
@@ -41,15 +39,15 @@ then moves Platform onto the same reusable runtime and completes the remaining E
   pending chords. IME events do not advance the sequence, and held keys do not reset the timer.
 - Commands dispatch through the existing `CommandBus`. A single shortcut suppresses its event
   only after a synchronous claim. A chord's continuation is consumed even if its command declines.
-- Single-stroke Editor bindings still use the Editor layer bridge with Editor defaults disabled.
-  Multi-stroke `editor.*` bindings bypass that bridge and dispatch through the same bus and deepest
-  registered focus target. The target's capability and writable state govern execution.
+- Single-stroke and multi-stroke Editor bindings use the shared runtime and dispatch through the
+  same bus and deepest registered focus target. Embedded Editors disable their separate matcher
+  with `keymap.enabled: false`. The target's capability and writable state govern execution.
 - Trusted browser tests cover keyboard claims and terminal input through the real Ghostty engine.
   The shared provider, editor targets, settings shortcut, and terminal encoder pass these checks.
 
-TanStack supplies hotkey grammar and normalization helpers. Platform owns dispatch, prefix
-resolution, and timers. Its `SequenceManager` does not consume prefixes or expire pending state
-without another key event. The proposed `matchesKeyboardEvent` adoption was also rejected during
+TanStack supplies hotkey grammar and normalization helpers. The shared runtime owns prefix
+resolution and timers. Platform owns command dispatch. TanStack's `SequenceManager` does not consume
+prefixes or expire pending state without another key event. The proposed `matchesKeyboardEvent` adoption was also rejected during
 implementation because it regressed Hebrew and Cyrillic physical-key fallback. The trie preserves
 that fallback and the existing guard against treating an AZERTY Latin letter as another key.
 
@@ -88,34 +86,19 @@ command.
 - Save and sidebar visibility: `Mod+S` and `Mod+B`.
 - Settings: `Mod+,` followed by the new secondary `Mod+K Mod+S` default. The primary menu hint
   remains `Mod+,`.
-- Editor navigation, selection, deletion, indentation, undo, redo, find, replace, comments, and
-  multiple-cursor commands are represented in `keymap/editor-commands.ts`.
+- Editor defaults come from the shared default and VS Code packs, including folding and
+  `editor.action.moveSelectionToNextFindMatch`. The command registry includes every Editor command.
 
-The authoritative defaults and their platform restrictions are in `keymap/workspace-commands.ts`
-and `keymap/editor-commands.ts`. Browser-hostile desktop shortcuts remain explicit reservations
-where Platform cannot perform the desktop action.
+Workspace defaults are in `keymap/workspace-commands.ts`. Editor defaults and platform restrictions
+come from `@singapor/core/keymap`, with Platform policy applied in `keymap/editor-keymap.ts`.
+Browser-hostile desktop shortcuts remain explicit reservations where Platform cannot perform the desktop action.
 
 ## Remaining parity work
 
-- Implement standalone Editor chord execution through its ordinary binding options in Plan 057.
-  Export the reusable runtime through `@singapor/core/keymap`; standalone consumers must not need
-  Platform or external keyboard wiring. Prove default and custom chords with real browser input.
-- Adopt that shared runtime in Platform and remove its duplicate engine. Disable embedded Editor
-  matching with the existing `enabled: false` option while preserving native input handling.
-- Add the `editor.action.moveSelectionToNextFindMatch` chord default and the Editor folding pack
-  through Plan 057. Both standalone Editor and Platform must execute the shipped defaults.
 - Review save-all, show-all-editors, and other VS Code `Mod+K` defaults against the shared command
   table. They no longer need a new runtime mechanism.
-- Remove the remaining single-stroke Editor layer bridge only through the companion plan's
-  target and enablement contract.
 - Expand the closed command context model when a concrete command needs find-widget, replace-input,
   or other local focus facts.
-- Report cross-pane prefix conflicts in the settings UI. The app trie resolves and logs conflicts
-  that survive app filtering. An Editor single-stroke binding can intercept a global override prefix
-  first, such as `Mod+F` in `Mod+F Mod+B`, without a warning. Same-pane override conflicts already
-  populate `shadowedBy`. The remaining Editor layer bridge limits this case.
-- Add a repeatable VS Code default export, a normalized manifest, and a parity report covering
-  supported commands, missing commands, aliases, and conflicts.
 - Add an inspector for VS Code aliases, platform restrictions, focus conditions, and unsupported
   commands beyond the existing searchable settings table.
 

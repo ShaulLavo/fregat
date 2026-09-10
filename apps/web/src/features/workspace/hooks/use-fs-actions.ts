@@ -6,6 +6,9 @@ import { useMutation, useQueryClient } from '@tanstack/react-query'
 import { useRef, useState, type RefObject } from 'react'
 
 import { useWorkspaceMutationAllowed } from '@/features/editor/hooks/use-workspace-mutation-allowed'
+import { useEditorCommands } from '@/features/editor/state/commands'
+import { useEditorDocumentStoreApi } from '@/features/editor/state/document-state'
+import { useEditorWorkspaceStoreApi } from '@/features/editor/state/workspace-state'
 import { useOptionalWorkspaceEditService } from '@/features/editor/providers/workspace-edit-context'
 import {
   containerContentsLoaded,
@@ -14,8 +17,13 @@ import {
   workspacePathForTreePath,
 } from '@/features/workspace/utils/entry-paths'
 import { invalidateTreeQueries } from '@/features/workspace/utils/invalidate-queries'
+import { editorPathRenames } from '@/features/workspace/utils/editor-path-renames'
 import { expandTreeDirectory } from '@/features/workspace/utils/tree-pane-state'
 import { reportError, toClientError } from '@/lib/client-error-taxonomy'
+import { log } from '@/lib/client-logging'
+import { setFileSnapshotQueryData } from '@/lib/file-snapshot-query-cache'
+import type { FileResult } from '@/lib/file-system-types'
+import { fileSystemKeys } from '@/lib/query-keys'
 import {
   copyPath,
   createFileContent,
@@ -67,6 +75,9 @@ export function useFsActions({
   const queryClient = useQueryClient()
   const mutationsEnabled = useWorkspaceMutationAllowed()
   const workspaceEdits = useOptionalWorkspaceEditService()
+  const documentStore = useEditorDocumentStoreApi()
+  const workspaceStore = useEditorWorkspaceStoreApi()
+  const { renameLiveEditorDocument } = useEditorCommands()
   const [deleteTarget, setDeleteTarget] = useState<DeleteTarget | null>(null)
   // Set while an inline edit is creating rather than renaming, so the commit
   // handler knows to write a new entry instead of moving an existing one.
@@ -100,6 +111,19 @@ export function useFsActions({
       return runWorkspaceMutation(affectedPaths, () =>
         renamePath(from, to, clientForQueryClient(client)),
       )
+    },
+    onSuccess: (_entry, request) => {
+      const from = workspacePathForTreePath(rootPath, request.from)
+      const to = workspacePathForTreePath(rootPath, request.to)
+      const renamedPaths = renameEditorPaths(from, to)
+      log.info({
+        action: 'file-tree.rename',
+        area: 'file-tree',
+        from,
+        path: to,
+        isFolder: request.isFolder,
+        renamedEditorPathCount: renamedPaths.length,
+      })
     },
     onError: (error, request) => {
       // The refetched tree is identical to the one we already hold, so the path
@@ -159,6 +183,28 @@ export function useFsActions({
   ) {
     if (!workspaceEdits) return operation()
     return workspaceEdits.runWorkspaceMutation(affectedPaths, operation)
+  }
+
+  function renameEditorPaths(from: string, to: string) {
+    const workspace = workspaceStore.getState()
+    const renames = editorPathRenames(
+      [
+        ...workspace.openFilePaths,
+        ...workspace.editorHistory,
+        ...workspace.recentlyClosedEditorPaths,
+        ...Object.keys(documentStore.getState().liveDocumentsById),
+      ],
+      from,
+      to,
+    )
+    for (const rename of renames) {
+      const queryKey = fileSystemKeys.fileSnapshot(rename.from)
+      const file = queryClient.getQueryData<FileResult>(queryKey)
+      if (file) setFileSnapshotQueryData(queryClient, { ...file, path: rename.to })
+      renameLiveEditorDocument(rename.from, rename.to)
+      queryClient.removeQueries({ exact: true, queryKey })
+    }
+    return renames
   }
 
   /** Called by the pane after each model sync, once per settled tree. */

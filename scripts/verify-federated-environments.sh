@@ -6,6 +6,10 @@ if rg -n 'devSwitchOrigin|dev-origin-dialog' apps/web/src packages/client-core/s
   exit 1
 fi
 
+if rg -n 'connectMachine|disconnectMachine|onMachineState' apps/desktop/src/shared apps/desktop/src/preload; then
+  exit 1
+fi
+
 (
   cd packages/contracts
   bun run test -- src/tests/machines.test.ts src/tests/settings-registry.test.ts src/tests/settings-mutations.test.ts src/tests/settings-schema.test.ts src/tests/settings-control.test.ts
@@ -13,10 +17,15 @@ fi
 )
 (
   cd apps/desktop
-  bun --bun vitest run src/bun/ssh/tests src/bun/tests/quit.test.ts
+  bun --bun vitest run src/bun/tests/quit.test.ts
   bun run typecheck
   bun run lint
   bun run format:check
+)
+(
+  cd apps/server
+  bun --bun vitest run src/machines/tests src/installation/tests
+  bun run typecheck
 )
 (
   cd apps/web

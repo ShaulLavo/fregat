@@ -38,7 +38,10 @@ export type TestServer = {
 
 // Boots a real server against a throwaway workspace. No network, no mocks: the
 // app routes, valibot contracts, and filesystem are the genuine article.
-type TestServerOptions = Pick<AppOptions, 'workspaceEditClock' | 'workspaceEditDriver'> & {
+type TestServerOptions = Pick<
+  AppOptions,
+  'workspaceEditClock' | 'workspaceEditDriver' | 'machines'
+> & {
   persistentDatabase?: boolean
   providerRuntime?: boolean
   environmentId?: EnvironmentId
@@ -56,6 +59,7 @@ export async function makeTestServer({
   settingsWatch = false,
   workspaceEditClock,
   workspaceEditDriver,
+  machines,
 }: TestServerOptions = {}): Promise<TestServer> {
   const root = await mkdtemp(path.join(tmpdir(), 'web-itest-'))
   const workspaceEditJournalRoot = path.join(root, '.platform-test', 'workspace-edit-journals')
@@ -70,6 +74,8 @@ export async function makeTestServer({
   const buildApp = () =>
     createApp({
       auth: { allowedOrigins: [TEST_ORIGIN] },
+      homeDirectory: root,
+      systemRoot: root,
       // Keep the real parser/cache/route path, but pin its cache inside this
       // fixture. MSW supplies the external downloads page.
       fonts: new NerdFontService({ cacheRoot: path.join(root, '.platform-test', 'fonts') }),
@@ -89,6 +95,7 @@ export async function makeTestServer({
       workspaceEditDriver,
       workspaceEditJournalRoot,
       workspaceRoot: root,
+      machines: { tailnetStatusCommand: async () => '{"BackendState":"Stopped"}', ...machines },
     })
 
   let app = buildApp()

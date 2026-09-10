@@ -315,9 +315,9 @@ export function Workspace({
       disabledReason,
       run: ({ origin }) => show('commands', origin, 'color '),
     },
-    'workspace.selectColorTheme': {
+    'workspace.selectAppColors': {
       disabledReason,
-      run: ({ origin }) => show('commands', origin, 'theme '),
+      run: ({ origin }) => show('commands', origin, 'colors '),
     },
     'workspace.openAddress': {
       disabledReason: networkDisabledReason,
