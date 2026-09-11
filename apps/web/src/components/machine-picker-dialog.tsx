@@ -1,3 +1,4 @@
+import { useNavigation } from '@/hooks/use-navigation'
 import { useState } from 'react'
 import { Button } from '@workspace/ui/components/button'
 import { Dialog, DialogContent, DialogHeader, DialogTitle } from '@workspace/ui/components/dialog'
@@ -14,6 +15,7 @@ export function MachinePickerDialog({
   readonly mode: 'switch' | 'connect' | 'disconnect'
   readonly onClose: () => void
 }) {
+  const navigation = useNavigation()
   const connections = useEnvironmentConnections()
   const entries = useEnvironmentsStore((state) => state.entries)
   const [error, setError] = useState<string | null>(null)
@@ -45,7 +47,7 @@ export function MachinePickerDialog({
       if (mode === 'disconnect') await connections.disconnectMachine(name)
       const machine = connections.store.getState().machines.find((entry) => entry.name === name)
       if (mode === 'switch' && machine?.environmentId)
-        connections.activateEnvironment(machine.environmentId)
+        void navigation.openEnvironment(machine.environmentId)
       onClose()
     } catch (cause) {
       setError(errorMessage(cause, 'The machine action failed.'))
@@ -79,7 +81,7 @@ export function MachinePickerDialog({
           <Button
             variant='ghost'
             onClick={() => {
-              connections.activateEnvironment(primary.environmentId!)
+              void navigation.openEnvironment(primary.environmentId!)
               onClose()
             }}
           >

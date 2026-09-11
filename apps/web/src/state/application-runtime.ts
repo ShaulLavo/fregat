@@ -1,7 +1,7 @@
 import type { EnvironmentId } from '@workspace/contracts'
 import { confirmedEnvironmentOrigin } from '@/lib/environments/state/domain'
 import { openWorkspaceRootForOwner } from '@/features/workspace/state/open-root'
-import { createEditorCommands } from '@/features/editor/state/commands'
+import { createEditorApplyActions } from '@/features/editor/state/apply-actions'
 import { createEnvironmentConnections } from '@/state/environment-connections'
 import { confirmedEnvironmentId } from '@/lib/environments/state/domain'
 import { environmentScopedStorage } from '@/lib/environments/state/scoped-storage'
@@ -9,6 +9,7 @@ import { initializeEnvironmentPersistence } from '@/state/environment-persistenc
 import { restoreEnvironmentSessionSelection } from '@/features/chat-mode/state/session-selection-store'
 import { resetLanguageServerConnectionPool } from '@/features/editor/state/language-server-connection-pool'
 import { createEditorRuntime, type EditorRuntime } from '@/features/editor/state/runtime'
+import type { EditorWorkspaceStoreApi } from '@/features/editor/state/workspace-state'
 import type { QueryClient } from '@tanstack/react-query'
 import type { EditorPreparedEnvironment } from '@/features/editor/utils/prepared-document'
 import { readWorkspaceCache, type CachedWorkspaceState } from '@/features/workspace/state/cache'
@@ -41,11 +42,7 @@ export function createApplicationRuntime({
   const environments = new Map<EnvironmentId, RetainedEnvironment>()
   let current: RetainedEnvironment
 
-  function createEnvironment(
-    origin: string,
-    seed: CachedWorkspaceState,
-    restoreAddress = true,
-  ): RetainedEnvironment {
+  function createEnvironment(origin: string, seed: CachedWorkspaceState): RetainedEnvironment {
     const storage = environmentScopedStorage(confirmedEnvironmentId(origin))
     initializeEnvironmentPersistence(storage)
     const queryClient = queryClientFor(origin)
@@ -54,7 +51,6 @@ export function createApplicationRuntime({
       storage,
       workspaceCache: seed,
       preparation,
-      restoreAddress,
     })
     queryClient.mount()
     return {
@@ -76,15 +72,19 @@ export function createApplicationRuntime({
   environments.set(confirmedEnvironmentId(current.origin), current)
   activateWorkspaceRoot(current.editor.workspaceStore.getState().rootFolder?.path ?? null)
 
-  const connections = createEnvironmentConnections({
-    activateEnvironment: (environmentId) =>
-      application.activateEnvironment(confirmedEnvironmentOrigin(environmentId)),
-  })
+  const connections = createEnvironmentConnections()
 
   const application = {
     connections,
     commandBinding,
     getSnapshot: () => current,
+    getEnvironment: (environmentId: EnvironmentId) => environments.get(environmentId),
+    getEditorForWorkspace(workspace: EditorWorkspaceStoreApi) {
+      for (const { editor } of environments.values()) {
+        if (editor.workspaceStore === workspace) return editor
+      }
+      return null
+    },
     subscribe: (listener: () => void) => useEnvironmentsStore.subscribe(listener),
     activateEnvironment(origin: string) {
       origin = canonicalServerOrigin(origin)
@@ -92,11 +92,7 @@ export function createApplicationRuntime({
       const environmentId = confirmedEnvironmentId(origin)
       const next =
         environments.get(environmentId) ??
-        createEnvironment(
-          origin,
-          readWorkspaceCache(environmentScopedStorage(environmentId)),
-          false,
-        )
+        createEnvironment(origin, readWorkspaceCache(environmentScopedStorage(environmentId)))
       environments.set(environmentId, next)
       if (current === next) return
       commandBinding.clear()
@@ -110,12 +106,17 @@ export function createApplicationRuntime({
       restoreEnvironmentSessionSelection(environmentId)
       useEnvironmentsStore.getState().activate(next.origin)
     },
-    async openEnvironmentWorkspaceRoot(environmentId: EnvironmentId, path: string) {
+    async openEnvironmentWorkspaceRoot(
+      environmentId: EnvironmentId,
+      path: string,
+      options: { readonly isCurrent?: () => boolean; readonly signal?: AbortSignal } = {},
+    ) {
+      if (options.isCurrent?.() === false || options.signal?.aborted) return 'superseded' as const
       const origin = confirmedEnvironmentOrigin(environmentId)
       application.activateEnvironment(origin)
       const owner = current
       const editor = owner.editor
-      const commands = createEditorCommands({
+      const commands = createEditorApplyActions({
         activation: editor.editorActivation,
         documentStore: editor.documentStore,
         searchStore: editor.searchBufferStore,
@@ -130,6 +131,7 @@ export function createApplicationRuntime({
           workspaceEdits: editor.workspaceEditService,
         },
         path,
+        options,
       )
     },
     hasUnsavedDocuments: () =>

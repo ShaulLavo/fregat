@@ -84,8 +84,16 @@ test('requests bulk close ids from the tab context menu', () => {
 function TestEditorTabs({
   loadingTabId,
   tabs,
-  onCloseTab = (tabId) => ({ status: 'closed', tabIds: [tabId] }),
-  onCloseTabs = (tabIds) => ({ status: 'closed', tabIds }),
+  onCloseTab = (tabId) => ({
+    status: 'closed',
+    completion: Promise.resolve({ status: 'applied' as const }),
+    tabIds: [tabId],
+  }),
+  onCloseTabs = (tabIds) => ({
+    status: 'closed',
+    tabIds,
+    completion: Promise.resolve({ status: 'applied' as const }),
+  }),
   onSelectTab = () => undefined,
 }: {
   readonly loadingTabId?: string | null
@@ -100,7 +108,7 @@ function TestEditorTabs({
         value={{
           requestCloseTab: onCloseTab,
           requestCloseTabs: onCloseTabs,
-          reorderTab: () => false,
+          reorderTab: async () => ({ status: 'superseded' }),
           selectTab: onSelectTab,
         }}
       >

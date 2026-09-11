@@ -1,3 +1,4 @@
+import { parseAddressIntent } from '@/features/address/utils/intent'
 import { healthDescriptorSchema, DEFAULT_SETTING_VALUES } from '@workspace/contracts'
 import * as v from 'valibot'
 import { createEnvironmentEntry } from '@workspace/client-core/environments/utils/connection'
@@ -77,7 +78,7 @@ test('cached primary and remote slices paint before sockets, and cached protocol
     connectionByOrigin: {},
   })
   setActiveServerOrigin(primary)
-  const application = createBootRuntime(oldDescriptor, true)
+  const application = createBootRuntime(oldDescriptor, parseAddressIntent('/'), true)
   try {
     const model = sessionRailModel({ environments: currentRailEnvironments() })
     expect(model.projects).toHaveLength(1)
@@ -88,7 +89,9 @@ test('cached primary and remote slices paint before sockets, and cached protocol
     expect(application.connections.store.getState().machines[0]?.environmentId).toBe(
       descriptorB.environmentId,
     )
-    expect(() => createBootRuntime(descriptorB, true)).toThrow('cached machine identity conflicts')
+    expect(() => createBootRuntime(descriptorB, parseAddressIntent('/'), true)).toThrow(
+      'cached machine identity conflicts',
+    )
     expect(primaryQueryClient().getQueryData(['environment-descriptor'])).toEqual(oldDescriptor)
     expect(useEnvironmentsStore.getState().entries[primary]?.environmentId).toBe(
       descriptorA.environmentId,

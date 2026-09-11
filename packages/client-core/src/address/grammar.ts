@@ -1,21 +1,9 @@
 import { environmentIdSchema, type EnvironmentId } from '@workspace/contracts'
 import * as v from 'valibot'
 import { NO_WORKSPACE_TOKEN } from '@workspace/client-core/address/workspace'
+import { chatReferenceForToken, editorReferenceForToken } from './references'
 
-/**
- * `/~<workspace-token>/<mode>/<document-token>?<view params>#<position>`
- *
- * Path is identity, search is composition and filters, fragment is intra-document
- * position. The workspace segment always starts `~` so the flat top-level namespace
- * stays free — and that is load-bearing at the HTTP layer, not just tidiness: Vite
- * serves real files before its SPA fallback, and `apps/web/public/workbench/` exists,
- * so a bare `/workbench` route would be shadowed by a directory and never reach React.
- *
- * Every field is optional. An absent field means "defer to the remembered slice",
- * never "reset to default" — that rule is what lets a short link land somewhere sane
- * without flattening everything the URL does not mention.
- */
-
+// Parse explicit input before serialization removes static defaults.
 const WORKSPACE_PREFIX = '~'
 
 export const SETTINGS_DOCUMENT_TOKEN = 'settings'
@@ -40,6 +28,7 @@ export type Address = {
   readonly environmentId: EnvironmentId | null
   readonly rejectedEnvironment: string | null
   readonly bottom: 'terminal' | 'problems' | null
+  readonly chat: string | null
   /** Session diff scope. Deliberately NOT `scope`: the rail owns no addressable scope. */
   readonly diff: string | null
   readonly document: string | null
@@ -78,6 +67,7 @@ export function emptyAddress(): Address {
     environmentId: null,
     rejectedEnvironment: null,
     bottom: null,
+    chat: null,
     diff: null,
     document: null,
     editor: null,
@@ -118,7 +108,7 @@ export function parseAddress(href: string, environments?: AddressEnvironments): 
   const environment = parseEnvironment(environmentSegment, environments)
   const [workspaceSegment, ...rest] = segments
 
-  return {
+  const address: Address = {
     ...emptyAddress(),
     ...searchFields(url.searchParams, url.search),
     ...environment,
@@ -126,6 +116,14 @@ export function parseAddress(href: string, environments?: AddressEnvironments): 
     focus: parseFocus(url.hash),
     mode: addressMode(rest[0]),
     workspace: workspaceTokenFromSegment(decodeOrEmpty(workspaceSegment ?? '')),
+  }
+  const chat = address.chat && chatReferenceForToken(address.chat) ? address.chat : null
+  const side = address.side ?? (chat ? 'chat' : null)
+  return {
+    ...address,
+    chat: side === 'chat' ? chat : null,
+    side,
+    tabs: expandTabs(address.tabs, editorDocumentToken(address)),
   }
 }
 
@@ -172,69 +170,59 @@ function parseEnvironment(
   return { environmentId, rejectedEnvironment: null }
 }
 
-/**
- * `?tabs=` is written OUTSIDE `URLSearchParams`, and read back raw.
- *
- * RFC 3986 puts `/` in the legal character set for a query (`query = *( pchar / "/" /
- * "?" )`); `URLSearchParams` escapes it anyway, out of conservatism rather than need.
- * Since every tab token is already a `/`-joined list of individually encoded segments,
- * that escaping cost three characters per separator and turned a readable token into
- * `f%2Fapps%2Fweb%2Fsrc%2Fmain.tsx` — measured at 25% of the whole param on a
- * twelve-tab workspace.
- *
- * Reading it back has a trap, and it is why this cannot simply drop the encoding and
- * keep using `params.get`. That getter percent-decodes once, and the decode is
- * currently absorbed by `set` having escaped `%` as `%25` on the way out. Remove the
- * outer layer and a file named `a~b.ts` — encoded `a%7Eb.ts` — decodes back to a
- * literal `~` BEFORE the split, silently becoming two tabs. So the value is split
- * first and decoded per segment afterwards, exactly as `parseAddress` already treats
- * the path, for exactly the same reason.
- */
+// Split raw delimiters before decoding so a filename containing ~ stays one tab.
 export const TAB_SEPARATOR = '~'
-
-/**
- * A link naming more tabs than a person could have opened is not a tab set.
- *
- * Here rather than beside either consumer, because BOTH paths that apply `?tabs=` have
- * to honour it: the boot merge in `utils/cache.ts` and the post-mount applier in
- * `hooks/use-restore.ts`. The encoder caps what it writes, which says nothing about a
- * hand-edited or hostile link — and the boot merge runs inside a `useState`
- * initializer, so an unbounded set there blocks first paint and is then persisted.
- */
+export const SELECTED_TAB_TOKEN = '@'
+export const EMPTY_TABS_TOKEN = '-'
 export const MAX_APPLIED_TABS = 64
+export const TABS_BUDGET_BYTES = 1500
 
-/** The tab tokens an address may apply, or `null` when the set is not a tab set. */
 export function applicableTabs(tabs: readonly string[] | null) {
-  if (!tabs?.length) return null
-  if (tabs.length > MAX_APPLIED_TABS) return null
-
+  if (tabs === null || tabs.length > MAX_APPLIED_TABS) return null
+  if (tabs.some((token) => editorReferenceForToken(token) === null)) return null
   return tabs
+}
+
+export function expandTabs(tabs: readonly string[] | null, selected: string | null) {
+  if (tabs === null) return null
+  if (tabs.length === 0) return selected ? null : tabs
+  if (tabs.join(TAB_SEPARATOR).length > TABS_BUDGET_BYTES) return null
+  if (tabs.filter((token) => token === SELECTED_TAB_TOKEN).length > 1) return null
+  if (tabs.includes(SELECTED_TAB_TOKEN) && !selected) return null
+  const expanded = tabs.map((token) => (token === SELECTED_TAB_TOKEN ? (selected ?? '') : token))
+  if (selected && !expanded.includes(selected)) expanded.push(selected)
+  if (new Set(expanded).size !== expanded.length) return null
+  return applicableTabs(expanded)
+}
+
+export function compressedTabs(tabs: readonly string[] | null, selected: string | null) {
+  if (tabs === null) return null
+  if (tabs.length === 0) return selected ? null : EMPTY_TABS_TOKEN
+  return tabs.map((token) => (token === selected ? SELECTED_TAB_TOKEN : token)).join(TAB_SEPARATOR)
 }
 
 function serializeSearch(address: Address) {
   const params = new URLSearchParams()
-
-  if (address.side) params.set('side', address.side)
-  if (address.bottom) params.set('bottom', address.bottom)
-  // `!== null` for the free-text slots, matching `settings` below: an empty `?tool=`
-  // or `?diff=` is a value the parser reads back, and dropping it as falsy made the
-  // encoder disagree with its own decoder.
-  if (address.tool !== null) params.set('tool', address.tool)
-  if (address.rail) params.set('rail', address.rail)
-  if (address.diff !== null) params.set('diff', address.diff)
-  if (address.settings !== null) params.set('settings', address.settings)
-  for (const [key, value] of Object.entries(address.logs ?? {}))
-    params.set(`${LOGS_PREFIX}${key}`, value)
-  for (const [key, value] of Object.entries(address.search ?? {}))
-    params.set(`${SEARCH_PREFIX}${key}`, value)
+  const side = address.side ?? (address.chat ? 'chat' : null)
+  if (side && side !== 'files') params.set('side', side)
+  if (address.bottom && address.bottom !== 'terminal') params.set('bottom', address.bottom)
+  if (address.tool && address.tool !== 'git') params.set('tool', address.tool)
+  if (address.rail && address.rail !== 'active') params.set('rail', address.rail)
+  if (address.diff) params.set('diff', address.diff)
+  if (address.settings) params.set('settings', address.settings)
+  for (const [key, value] of Object.entries(address.logs ?? {})) {
+    if (value) params.set(`${LOGS_PREFIX}${key}`, value)
+  }
+  for (const [key, value] of Object.entries(address.search ?? {})) {
+    if (value) params.set(`${SEARCH_PREFIX}${key}`, value)
+  }
   for (const [key, value] of Object.entries(address.passthrough)) params.set(key, value)
 
-  // Tabs lead, as they did when `URLSearchParams` owned them, so the URL shape a user
-  // has seen before does not reorder underneath them.
-  const tabs = address.tabs?.length ? `tabs=${address.tabs.join(TAB_SEPARATOR)}` : ''
+  const tabValue = compressedTabs(address.tabs, editorDocumentToken(address))
+  const tabs = tabValue === null ? '' : `tabs=${tabValue}`
   const editor = address.editor ? `editor=${address.editor}` : ''
-  const query = [tabs, editor, params.toString()].filter(Boolean).join('&')
-
+  const chat = side === 'chat' && address.chat ? `chat=${address.chat}` : ''
+  const query = [tabs, editor, chat, params.toString()].filter(Boolean).join('&')
   return query ? `?${query}` : ''
 }
 
@@ -257,6 +245,12 @@ function rawSearchValue(search: string, key: string) {
   return null
 }
 
+function parseTabsValue(raw: string | null) {
+  if (raw === EMPTY_TABS_TOKEN) return []
+  if (!raw) return null
+  return raw.split(TAB_SEPARATOR)
+}
+
 function searchFields(params: URLSearchParams, rawSearch: string) {
   // Raw, not `params.get`: see `TAB_SEPARATOR`. Decoding before the split would let a
   // file named `a~b.ts` break the token list into two.
@@ -264,16 +258,25 @@ function searchFields(params: URLSearchParams, rawSearch: string) {
 
   return {
     bottom: pick(params.get('bottom'), ['terminal', 'problems'] as const),
+    chat: rawSearchValue(rawSearch, 'chat') || null,
     editor: rawSearchValue(rawSearch, 'editor') || null,
-    diff: params.get('diff'),
+    diff: params.get('diff') || null,
     logs: prefixedGroup(params, LOGS_PREFIX),
     search: prefixedGroup(params, SEARCH_PREFIX),
     passthrough: passthroughFrom(params),
     rail: pick(params.get('rail'), ['active', 'archived'] as const),
-    settings: params.get('settings'),
+    settings: params.get('settings') || null,
     side: pick(params.get('side'), ['chat', 'files', 'git', 'logs', 'search'] as const),
-    tabs: tabs ? tabs.split(TAB_SEPARATOR).filter(Boolean) : null,
-    tool: params.get('tool'),
+    tabs: parseTabsValue(tabs),
+    tool: pick(params.get('tool'), [
+      'editor',
+      'files',
+      'git',
+      'logs',
+      'problems',
+      'search',
+      'terminal',
+    ]),
   }
 }
 
@@ -329,7 +332,7 @@ function prefixedGroup(params: URLSearchParams, prefix: string) {
     // First wins, as everywhere else in this parser.
     if (name in group) continue
 
-    group[name] = value
+    if (value) group[name] = value
   }
 
   return Object.keys(group).length > 0 ? group : null
@@ -351,7 +354,7 @@ function parseFocus(hash: string) {
   if (!match) return null
 
   const line = Number(match[1])
-  if (!Number.isInteger(line) || line < 1) return null
+  if (!Number.isSafeInteger(line) || line < 1) return null
 
   // Every part is validated, not just the line. `#L10,0` yields a column the 1-based
   // grammar cannot mean — and which `serializeFocus` then drops as falsy, so it does not
@@ -361,8 +364,8 @@ function parseFocus(hash: string) {
   // segment: the field it names is dropped, and nothing else.
   const column = match[2] ? Number(match[2]) : null
   const endLine = match[3] ? Number(match[3]) : null
-  if (column !== null && column < 1) return null
-  if (endLine !== null && endLine < line) return null
+  if (column !== null && (!Number.isSafeInteger(column) || column < 1)) return null
+  if (endLine !== null && (!Number.isSafeInteger(endLine) || endLine < line)) return null
 
   return { column, endLine, line }
 }
@@ -382,8 +385,8 @@ function serializeFocus(focus: Address['focus']) {
   return `#L${focus.line}${column}${end}`
 }
 
-function pick<const T extends readonly string[]>(value: string | null, allowed: T) {
-  return value && (allowed as readonly string[]).includes(value) ? (value as T[number]) : null
+function pick<const T extends string>(value: string | null, allowed: readonly T[]): T | null {
+  return allowed.find((candidate) => candidate === value) ?? null
 }
 
 function encodeWorkspaceToken(token: string) {

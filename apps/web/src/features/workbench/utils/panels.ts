@@ -33,7 +33,7 @@ export function activeEditorPathForWorkbenchPanels(panels: WorkbenchPanels) {
 }
 
 export function activeEditorTabForWorkbenchPanels(panels: WorkbenchPanels) {
-  if (!panels.activeEditorTabId) return panels.editorTabs[0] ?? null
+  if (!panels.activeEditorTabId) return null
 
   return editorTabById(panels, panels.activeEditorTabId) ?? panels.editorTabs[0] ?? null
 }
@@ -236,7 +236,7 @@ function normalizedActiveTabIdFor(
   tabs: readonly EditorTabRecord[],
   panels: Pick<WorkbenchPanels, 'activeEditorTabId'>,
 ) {
-  if (!panels.activeEditorTabId) return tabs[0]?.id ?? null
+  if (!panels.activeEditorTabId) return null
   if (tabs.some((tab) => tab.id === panels.activeEditorTabId)) return panels.activeEditorTabId
 
   return tabs[0]?.id ?? null

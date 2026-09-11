@@ -7,7 +7,7 @@ import {
 import { useConflictEditorResolution } from '@/features/workspace/hooks/use-conflict-editor-resolution'
 import { SearchPane } from '@/features/workspace/components/search-pane'
 import { parseConflictDiffDocumentId } from '@/features/editor/utils/conflict-diff-document'
-import { useEditorCommands } from '@/features/editor/state/commands'
+import { useEditorCommands } from '@/features/editor/hooks/use-editor-commands'
 import { useEditorDocumentState } from '@/features/editor/state/document-state'
 import { useWorkspaceEditHost } from '@/features/editor/providers/workspace-edit-context'
 import { useEditorUiState, useEditorUiStoreApi } from '@/features/editor/state/ui-state'
@@ -181,7 +181,9 @@ export function EditorSurfaceTabBody({
     () => ({
       applyWorkspaceEdit,
       closeReferences: handleCloseReferences,
-      openDefinition,
+      openDefinition: (target) => {
+        void openDefinition(target)
+      },
       openReferences: handleOpenReferences,
       previewReference: handlePreviewDefinition,
       handleTextChange: handleEditorTextChange,

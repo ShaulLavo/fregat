@@ -1,5 +1,4 @@
 import { CodeThemePreviewPanel } from '@/features/command-palette/components/code-theme-preview-panel'
-import { useApplicationRuntime } from '@/hooks/use-application-runtime'
 import {
   CommandDialog,
   CommandEmpty,
@@ -47,13 +46,12 @@ import { useCommandPaletteSessions } from '@/features/command-palette/use-comman
 import { useCommandPaletteSymbols } from '@/features/command-palette/use-command-palette-symbols'
 import { useSaveProjectScript } from '@/features/chat-mode/hooks/use-save-project-script'
 import { openSessionRow, startSessionDraft } from '@/features/chat-mode/state/session-commands'
-import { showChatModeToolTab } from '@/features/chat-mode/utils/panels'
 import {
   clearEditorThemePreview,
   previewEditorTheme,
 } from '@/features/editor/state/color-theme-store'
 import { useEditorColorTheme } from '@/features/editor/hooks/use-editor-color-theme'
-import { useEditorCommands } from '@/features/editor/state/commands'
+import { useEditorCommands } from '@/features/editor/hooks/use-editor-commands'
 import {
   useEditorWorkspaceState,
   useEditorWorkspaceStoreApi,
@@ -67,7 +65,6 @@ import { useFocusService } from '@/lib/focus/hooks/use-service'
 import { useFocusTarget } from '@/lib/focus/hooks/use-target'
 
 export function CommandPaletteContent() {
-  const application = useApplicationRuntime()
   const {
     bindings,
     bus,
@@ -219,13 +216,6 @@ export function CommandPaletteContent() {
   // Context identity must stay stable while cmdk updates its controlled input.
   const actions = useMemo<CommandPaletteActions>(() => {
     async function focusSelectedEditor() {
-      const workspaceState = workspace.getState()
-      if (workspaceState.uiMode === 'chat') {
-        workspaceState.setChatModePanels(
-          showChatModeToolTab(workspaceState.chatModePanels, 'editor'),
-        )
-      }
-
       const destination = activeEditorFocusDestination(workspace)
       if (!destination) return false
 
@@ -257,7 +247,7 @@ export function CommandPaletteContent() {
         closePalette(true)
       },
       selectFile: async (path) => {
-        selectFile(path)
+        if ((await selectFile(path)).status !== 'applied') return
         if (!(await focusSelectedEditor())) return
 
         closePalette(false)
@@ -266,12 +256,12 @@ export function CommandPaletteContent() {
         if (!selectedFileBackedPath) return
 
         const position = { character: target.column - 1, line: target.line - 1 }
-        const handled = openDefinition({
+        const handled = await openDefinition({
           path: selectedFileBackedPath,
           range: { end: position, start: position },
           uri: fileUriForPath(selectedFileBackedPath),
         })
-        if (!handled) return
+        if (handled.status !== 'applied') return
         if (!(await focusSelectedEditor())) return
 
         closePalette(false)
@@ -292,37 +282,28 @@ export function CommandPaletteContent() {
         await revealDestination('workspace.revealTerminal')
       },
       selectSession: async (session) => {
-        if (
-          !(await openSessionRow(session, {
-            openProject: application.openEnvironmentWorkspaceRoot,
-          }))
-        )
-          return
+        if (!(await openSessionRow(session))) return
         await revealDestination('workspace.showChatMode')
       },
       selectSymbol: async (symbol) => {
         if (!selectedFileBackedPath) return
 
-        const handled = openDefinition({
+        const handled = await openDefinition({
           path: selectedFileBackedPath,
           range: symbol.selectionRange,
           uri: fileUriForPath(selectedFileBackedPath),
         })
-        if (!handled) return
+        if (handled.status !== 'applied') return
         if (!(await focusSelectedEditor())) return
 
         closePalette(false)
       },
       startSessionDraft: async (ref) => {
-        if (
-          !(await startSessionDraft(ref, { openProject: application.openEnvironmentWorkspaceRoot }))
-        )
-          return
+        if (!(await startSessionDraft(ref))) return
         await revealDestination('workspace.showChatMode')
       },
     }
   }, [
-    application,
     bus,
     closePalette,
     focus,

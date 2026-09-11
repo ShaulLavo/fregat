@@ -123,7 +123,9 @@ describe('snapshot diffs', () => {
   })
 
   test('reports branch diffs as unavailable rather than rejecting them', () => {
-    expect(pathForDocumentToken(ROOT, 'd/branch/main...feature')).toMatchObject({
+    expect(
+      pathForDocumentToken(ROOT, `d/branch/${'a'.repeat(40)}..${'b'.repeat(40)}/src/a.ts`),
+    ).toMatchObject({
       kind: 'unavailable',
     })
   })

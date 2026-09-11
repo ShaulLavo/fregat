@@ -1,6 +1,6 @@
 import { confirmedEnvironmentId } from '@/lib/environments/state/domain'
 import type { QueryClient } from '@tanstack/react-query'
-import type { EditorCommands } from '@/features/editor/state/commands'
+import type { EditorApplyActions } from '@/features/editor/state/apply-actions'
 import type { EditorWorkspaceStoreApi } from '@/features/editor/state/workspace-state'
 import type { WorkspaceEditService } from '@/features/editor/state/workspace-edit-service'
 import { environmentActivitySignal } from '@/lib/environments/state/activity'
@@ -21,7 +21,7 @@ export type OpenWorkspaceRootResult = 'already-open' | 'failed' | 'opened' | 'su
 
 type WorkspaceRootOwner = {
   queryClient: QueryClient
-  switchRootFolder: EditorCommands['switchRootFolder']
+  switchRootFolder: EditorApplyActions['switchRootFolder']
   workspaceStore: EditorWorkspaceStoreApi
   workspaceEdits: WorkspaceEditService | null
 }
@@ -29,10 +29,14 @@ type WorkspaceRootOwner = {
 export async function openWorkspaceRootForOwner(
   { queryClient, switchRootFolder, workspaceStore, workspaceEdits }: WorkspaceRootOwner,
   workspaceRoot: string,
+  options: { readonly isCurrent?: () => boolean; readonly signal?: AbortSignal } = {},
 ): Promise<OpenWorkspaceRootResult> {
   const origin = originForQueryClient(queryClient)
-  const activity = environmentActivitySignal(origin)
-  if (activity.aborted) return 'superseded'
+  const activity = AbortSignal.any([
+    environmentActivitySignal(origin),
+    ...(options.signal ? [options.signal] : []),
+  ])
+  if (activity.aborted || options.isCurrent?.() === false) return 'superseded'
   const client = clientForQueryClient(queryClient)
   const reservation = workspaceEdits?.acquireRootSwitchReservation() ?? null
   if (workspaceEdits && !reservation) return 'failed'
@@ -45,6 +49,7 @@ export async function openWorkspaceRootForOwner(
     // A later request already claimed the app; landing now would drag it back.
     if (
       activity.aborted ||
+      options.isCurrent?.() === false ||
       result.status === 'superseded' ||
       !isActiveWorkspaceRoot(workspaceRoot)
     ) {
@@ -78,7 +83,7 @@ export async function openWorkspaceRootForOwner(
     void recordRootAsRecent(queryClient, entry.path)
     return 'opened'
   } catch (error) {
-    if (activity.aborted) return 'superseded'
+    if (activity.aborted || options.isCurrent?.() === false) return 'superseded'
     log.warn({ action: 'workspace.root_open_rejected', area: 'workspace', path: workspaceRoot })
     reportError(toClientError(error))
     return 'failed'

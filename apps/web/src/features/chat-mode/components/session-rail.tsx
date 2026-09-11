@@ -1,3 +1,4 @@
+import { useNavigation } from '@/hooks/use-navigation'
 import { useWorktreeManagerStore } from '@/features/chat-mode/state/worktree-manager-store'
 import { scopedSessionKey } from '@workspace/contracts'
 import { useRailEnvironments } from '@/features/chat-mode/hooks/use-rail-environments'
@@ -66,7 +67,7 @@ export function SessionRail() {
   const view = useSessionRailStore((state) => state.view)
   const setQuery = useSessionRailStore((state) => state.setQuery)
   const setScope = useSessionRailStore((state) => state.setScope)
-  const setView = useSessionRailStore((state) => state.setView)
+  const navigation = useNavigation()
   const markedSessionIds = useSessionMultiSelectStore((state) => state.refs)
   const [draggingProjectId, setDraggingProjectId] = useState<string | null>(null)
   useSessionSearch()
@@ -92,7 +93,7 @@ export function SessionRail() {
   })
 
   function toggleView() {
-    setView(view === 'archived' ? 'active' : 'archived')
+    void navigation.setRail(view === 'archived' ? 'active' : 'archived')
   }
 
   function handleProjectDragStart(event: DragStartEvent) {

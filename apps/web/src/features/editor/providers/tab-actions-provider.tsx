@@ -5,7 +5,7 @@ import {
   EditorTabActionsContext,
   type EditorTabActions,
 } from '@/features/editor/providers/tab-actions-context'
-import { useEditorCommands } from '@/features/editor/state/commands'
+import { useEditorCommands } from '@/features/editor/hooks/use-editor-commands'
 
 export function EditorTabActionsProvider({
   children,

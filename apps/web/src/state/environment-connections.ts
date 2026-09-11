@@ -59,12 +59,10 @@ type LiveConnection = {
 }
 
 export function createEnvironmentConnections({
-  activateEnvironment,
   createTransport = createChatTransport,
 }: {
-  readonly activateEnvironment: (environmentId: EnvironmentId) => void
   readonly createTransport?: (origin: string) => ChatTransport
-}) {
+} = {}) {
   const store = createStore<{ machines: readonly ConnectedMachine[] }>(() => ({ machines: [] }))
   const authStore = createStore<{
     prompt: MachineAuthPrompt | null
@@ -625,7 +623,6 @@ export function createEnvironmentConnections({
       phase(name, 'reconnecting')
       await connectMachine(name)
     },
-    activateEnvironment,
     originFor: (environmentId: EnvironmentId) => owners.get(environmentId) ?? null,
   }
 }

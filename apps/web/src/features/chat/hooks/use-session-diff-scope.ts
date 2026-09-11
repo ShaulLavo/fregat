@@ -1,6 +1,7 @@
+import { useNavigation } from '@/hooks/use-navigation'
 import { useActiveChatProjection } from '@/features/chat/hooks/use-active-projection'
 import { scopedSessionKey, type TurnId } from '@workspace/contracts'
-import { useEffect } from 'react'
+import { useEffect, useSyncExternalStore } from 'react'
 
 import { useOpenCheckpointDiffDocument } from '@/features/chat/hooks/use-open-checkpoint-diff-document'
 import { useSessionDiffScopeStore } from '@/features/chat/state/session-diff-scope-store'
@@ -35,8 +36,11 @@ export function useSessionDiffScope() {
           ]?.scope
         : undefined) ?? DEFAULT_SESSION_DIFF_SCOPE,
   )
-  const reconcileTurnScope = useSessionDiffScopeStore((state) => state.reconcileTurnScope)
-  const selectSessionDiffScope = useSessionDiffScopeStore((state) => state.selectSessionDiffScope)
+  const navigation = useNavigation()
+  const navigationPending = useSyncExternalStore(
+    navigation.subscribe,
+    () => navigation.getSnapshot().status === 'pending',
+  )
   const { openCheckpointDiff } = useOpenCheckpointDiffDocument()
 
   const scope = reconcileSessionDiffScope(storedScope, turnIds) ?? storedScope
@@ -44,15 +48,20 @@ export function useSessionDiffScope() {
   const latestTurnId = turnIds.at(-1) ?? null
 
   useEffect(() => {
+    if (!sessionId || navigationPending) return
+
+    const reconciled = reconcileSessionDiffScope(storedScope, turnIds)
+    if (reconciled)
+      void navigation.setDiffScope(reconciled, {
+        environmentId: transport.environmentId,
+        sessionId,
+      })
+  }, [navigation, navigationPending, sessionId, storedScope, turnIds, transport.environmentId])
+
+  function selectScope(next: Parameters<typeof navigation.setDiffScope>[0]) {
     if (!sessionId) return
 
-    reconcileTurnScope({ environmentId: transport.environmentId, sessionId }, turnIds)
-  }, [reconcileTurnScope, sessionId, turnIds, transport.environmentId])
-
-  function selectScope(next: Parameters<typeof selectSessionDiffScope>[1]) {
-    if (!sessionId) return
-
-    selectSessionDiffScope({ environmentId: transport.environmentId, sessionId }, next)
+    void navigation.setDiffScope(next, { environmentId: transport.environmentId, sessionId })
   }
 
   return {

@@ -11,7 +11,8 @@ import { ForesightManager } from 'js.foresight'
 
 import { TestEditorStateProvider as EditorStateProvider } from '../../../../test/factories/editor-state-provider'
 import { useEditorColorTheme } from '@/features/editor/hooks/use-editor-color-theme'
-import { useEditorCommands, type EditorCommands } from '@/features/editor/state/commands'
+import { useEditorCommands } from '@/features/editor/hooks/use-editor-commands'
+import { type EditorCommands } from '@/features/editor/state/commands'
 import {
   useEditorDocumentStoreApi,
   type EditorDocumentStoreApi,
@@ -96,7 +97,7 @@ test(
     const harness = requiredRuntime()
 
     flushSync(() => {
-      harness.commands.switchRootFolder(rootFolder())
+      harness.workspaceStore.getState().switchWorkspace(rootFolder())
       harness.commands.openSearchEditor(ROOT_PATH)
     })
     const sampleId = await beginBenchmarkSampleWhenReady()
@@ -162,7 +163,7 @@ test(
     await expect.poll(activeThemeIdentity, { timeout: 10_000 }).toBe('dark-plus|dark-plus')
     const harness = requiredRuntime()
 
-    flushSync(() => harness.commands.switchRootFolder(rootFolder()))
+    flushSync(() => harness.workspaceStore.getState().switchWorkspace(rootFolder()))
     await ensureFileSnapshotQuery(queryClient, PATH)
     diagnostics = []
     performance.clearMarks('editor.file_open.file_read')
@@ -194,7 +195,7 @@ test(
     await expect.poll(() => runtime).not.toBeNull()
     await expect.poll(activeThemeIdentity, { timeout: 10_000 }).toBe('dark-plus|dark-plus')
     const harness = requiredRuntime()
-    flushSync(() => harness.commands.switchRootFolder(rootFolder()))
+    flushSync(() => harness.workspaceStore.getState().switchWorkspace(rootFolder()))
     delayedFileRead = installDelayedFileReadClient(queryClient)
 
     const firstFrame = await activateAndCaptureFirstFrame()
@@ -233,7 +234,7 @@ test(
     await expect.poll(() => runtime).not.toBeNull()
     await expect.poll(activeThemeIdentity, { timeout: 10_000 }).toBe('dark-plus|dark-plus')
     const harness = requiredRuntime()
-    flushSync(() => harness.commands.switchRootFolder(rootFolder()))
+    flushSync(() => harness.workspaceStore.getState().switchWorkspace(rootFolder()))
     await ensureFileSnapshotQuery(queryClient, PATH)
     await activateAndCaptureFirstFrame()
     await expect
@@ -288,7 +289,7 @@ test(
     await expect.poll(activeThemeIdentity, { timeout: 10_000 }).toBe('dark-plus|dark-plus')
     const harness = requiredRuntime()
     flushSync(() => {
-      harness.commands.switchRootFolder(rootFolder())
+      harness.workspaceStore.getState().switchWorkspace(rootFolder())
       harness.commands.openSearchEditor(ROOT_PATH)
     })
     const sampleId = await beginBenchmarkSampleWhenReady()
@@ -338,7 +339,7 @@ test(
     await expect.poll(() => runtime).not.toBeNull()
     await expect.poll(activeThemeIdentity, { timeout: 10_000 }).toBe('dark-plus|dark-plus')
     const harness = requiredRuntime()
-    flushSync(() => harness.commands.switchRootFolder(rootFolder()))
+    flushSync(() => harness.workspaceStore.getState().switchWorkspace(rootFolder()))
     await triggerForesightIntent()
     await expect
       .poll(preparationRequestTypes, { timeout: 20_000 })

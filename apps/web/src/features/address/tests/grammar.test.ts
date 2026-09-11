@@ -174,7 +174,7 @@ describe('owned search params', () => {
   })
 
   test('keeps the active editor token encoded independently from the chat session', () => {
-    const href = `/~${testWorkspaceToken('p')}/chat/t/session-1?tabs=f/a%7Eb.ts~settings&editor=f/a%7Eb.ts`
+    const href = `/~${testWorkspaceToken('p')}/chat/t/session-1?tabs=@~settings&editor=f/a%7Eb.ts`
     const address = parseAddress(href)
 
     expect(address.document).toBe('t/session-1')
@@ -201,7 +201,7 @@ describe('fixed point over hostile input', () => {
       '/',
       `/~${testWorkspaceToken('platform')}`,
       `/~${testWorkspaceToken('platform')}/chat`,
-      `/~${testWorkspaceToken('platform')}/chat/t/session-9f3a1c2e?tool=git&diff=wt`,
+      `/~${testWorkspaceToken('platform')}/chat/t/session-9f3a1c2e?diff=wt`,
       `/~${testWorkspaceToken('platform')}/workbench/f/apps/web/src/main.tsx?side=git&bottom=problems#L21,9`,
       `/~${testWorkspaceToken('platform')}/workbench/s?decode=diffusion`,
       `/~${testWorkspaceToken('platform')}/workbench/f/a%20b/%C3%BCn%C3%AF.ts#L1`,
@@ -252,21 +252,21 @@ describe('fixed point over hostile input', () => {
 })
 
 describe('the settings category', () => {
-  test('round-trips an explicitly empty category', () => {
+  test('omits an empty category', () => {
     const href = formatAddress({
       ...emptyAddress(),
       settings: '',
       workspace: testWorkspaceToken('p'),
     })
 
-    expect(href).toBe(`/~${testWorkspaceToken('p')}?settings=`)
-    expect(parseAddress(href).settings).toBe('')
+    expect(href).toBe(`/~${testWorkspaceToken('p')}`)
+    expect(parseAddress(href).settings).toBeNull()
     expect(fixedPoint(href)).toBe(href)
   })
 
-  test('distinguishes an absent category from an explicitly empty category', () => {
+  test('normalizes an empty category to absence', () => {
     expect(parseAddress(`/~${testWorkspaceToken('p')}`).settings).toBeNull()
-    expect(parseAddress(`/~${testWorkspaceToken('p')}?settings=`).settings).toBe('')
+    expect(parseAddress(`/~${testWorkspaceToken('p')}?settings=`).settings).toBeNull()
     expect(parseAddress(`/~${testWorkspaceToken('p')}?settings=providers`).settings).toBe(
       'providers',
     )
@@ -290,8 +290,8 @@ describe('every owned field survives a round trip', () => {
     search: { case: '1', q: 'createError' },
     settings: 'providers',
     side: 'git' as const,
-    tabs: ['f/a.ts', 'f/b.ts', 's'],
-    tool: 'git',
+    tabs: ['f/a.ts', 'f/b.ts', 's', 'f/apps/web/src/main.tsx'],
+    tool: 'editor',
     workspace: testWorkspaceToken('platform'),
   }
 
@@ -305,10 +305,10 @@ describe('every owned field survives a round trip', () => {
     for (const fragment of [
       `/~${testWorkspaceToken('platform')}/workbench/f/apps/web/src/main.tsx`,
       // `/` unescaped: legal in a query per RFC 3986, and `~` still separates.
-      'tabs=f/a.ts~f/b.ts~s',
+      'tabs=f/a.ts~f/b.ts~s~@',
       'side=git',
       'bottom=problems',
-      'tool=git',
+      'tool=editor',
       'rail=archived',
       'diff=turn-4a1b0c22',
       'settings=providers',
@@ -351,7 +351,7 @@ describe('every owned field survives a round trip', () => {
       ['tabs', { tabs: ['f/a.ts', 's'] }],
       ['editor', { editor: 'f/a%7Eb.ts' }],
       ['side', { side: 'git' }],
-      ['bottom', { bottom: 'terminal' }],
+      ['bottom', { bottom: 'problems' }],
       ['tool', { tool: 'files' }],
       ['rail', { rail: 'archived' }],
       ['diff', { diff: 'wt' }],
@@ -413,5 +413,75 @@ describe('environment segment', () => {
       expect(parsed).toMatchObject({ environmentId: null, rejectedEnvironment: id })
       expect(formatAddress(parsed)).toBe(href)
     }
+  })
+})
+
+describe('ordered tabs and explicit defaults', () => {
+  const base = `/~${testWorkspaceToken('p')}/workbench`
+
+  test('expands and compresses the selected editor in its ordered position', () => {
+    const href = `${base}/f/b.ts?tabs=f/a.ts~@~f/c.ts`
+    expect(parseAddress(href).tabs).toEqual(['f/a.ts', 'f/b.ts', 'f/c.ts'])
+    expect(fixedPoint(href)).toBe(href)
+    expect(fixedPoint(`${base}/f/b.ts?tabs=@`)).toBe(`${base}/f/b.ts?tabs=@`)
+  })
+
+  test('distinguishes unspecified and explicitly empty tabs', () => {
+    expect(parseAddress(base).tabs).toBeNull()
+    expect(parseAddress(`${base}?tabs=`).tabs).toBeNull()
+    expect(parseAddress(`${base}?tabs=-`).tabs).toEqual([])
+    expect(fixedPoint(`${base}?tabs=-`)).toBe(`${base}?tabs=-`)
+  })
+
+  test('rejects a contradictory or malformed collection without losing selection', () => {
+    for (const tabs of ['-', '@~@', '-~f/a.ts', 'f/a.ts~~@', 'f/a.ts~nope', 'f/../a.ts']) {
+      const address = parseAddress(`${base}/f/b.ts?tabs=${tabs}`)
+      expect(address.tabs, tabs).toBeNull()
+      expect(address.document).toBe('f/b.ts')
+    }
+    expect(parseAddress(`${base}?tabs=@`).tabs).toBeNull()
+  })
+
+  test('appends an omitted selected editor before enforcing the count limit', () => {
+    expect(parseAddress(`${base}/f/b.ts?tabs=f/a.ts`).tabs).toEqual(['f/a.ts', 'f/b.ts'])
+    const tabs = Array.from({ length: 64 }, (_, index) => `f/${index}`)
+    expect(parseAddress(`${base}/f/b.ts?tabs=${tabs.join('~')}`).tabs).toBeNull()
+  })
+
+  test('keeps explicit defaults in incoming intent, then omits them on output', () => {
+    const address = parseAddress(`${base}?side=files&bottom=terminal&tool=git&rail=active`)
+    expect(address).toMatchObject({
+      side: 'files',
+      bottom: 'terminal',
+      tool: 'git',
+      rail: 'active',
+    })
+    expect(formatAddress(address)).toBe(base)
+  })
+
+  test('keeps percent signs, spaces, Unicode, at signs, tildes and encoded slashes intact', () => {
+    const tabs = [
+      'f/a%25.ts',
+      'f/a%20b.ts',
+      'f/%C3%BC.ts',
+      'f/%40',
+      'f/a%7Eb',
+      'r/refs%2Fheads%2Fx/a.ts',
+    ]
+    const href = `${base}/f/%40?tabs=${tabs.slice(0, 3).join('~')}~@~${tabs.slice(4).join('~')}`
+    expect(parseAddress(href).tabs).toEqual(tabs)
+    expect(fixedPoint(href)).toBe(href)
+  })
+
+  test('opens a sidebar conversation unless an explicit different panel wins', () => {
+    const session = 't/99dc0669-0262-4f92-a8d2-85ff6baea075'
+    expect(parseAddress(`${base}?chat=${session}`)).toMatchObject({ side: 'chat', chat: session })
+    expect(fixedPoint(`${base}?chat=${session}`)).toBe(`${base}?chat=${session}&side=chat`)
+    expect(parseAddress(`${base}?chat=${session}&side=git`)).toMatchObject({
+      side: 'git',
+      chat: null,
+    })
+    expect(fixedPoint(`${base}?side=chat&chat=t/new`)).toBe(`${base}?chat=t/new&side=chat`)
+    expect(parseAddress(`${base}?chat=t/bogus`).chat).toBeNull()
   })
 })

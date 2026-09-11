@@ -1,3 +1,4 @@
+import { useNavigation } from '@/hooks/use-navigation'
 import {
   ChatCircleIcon,
   FilesIcon,
@@ -12,25 +13,21 @@ import { ChatSidePanel } from '@/features/chat/components/chat-side-panel'
 import { LogsPanel } from '@/features/logs/components/panel'
 import { FileNavigatorPanel } from '@/features/workbench/components/file-navigator-panel'
 import { GitChangesPanel } from '@/features/workbench/components/git-changes-panel'
-import {
-  setWorkbenchSidebarTab,
-  type WorkbenchPanels,
-  type WorkbenchSidebarTab,
-} from '@/features/workbench/utils/panels'
+import { type WorkbenchPanels, type WorkbenchSidebarTab } from '@/features/workbench/utils/panels'
 import { Button } from '@workspace/ui/components/button'
 import { cn } from '@workspace/ui/lib/utils'
 
 export function SidebarPanel({
   panels,
   rootPath,
-  onPanelsChange,
 }: {
   readonly panels: WorkbenchPanels
   readonly rootPath: string
-  readonly onPanelsChange: (panels: WorkbenchPanels) => void
 }) {
+  const navigation = useNavigation()
+
   function selectTab(tab: WorkbenchSidebarTab) {
-    onPanelsChange(setWorkbenchSidebarTab(panels, tab))
+    void navigation.setSidePanel(tab)
   }
 
   return (

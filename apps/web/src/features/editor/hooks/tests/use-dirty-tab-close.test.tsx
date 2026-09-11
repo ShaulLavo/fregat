@@ -10,7 +10,7 @@ import {
 import { TestEditorStateProvider as EditorStateProvider } from '../../../../../test/factories/editor-state-provider'
 import { WorkspaceEditServiceContext } from '@/features/editor/providers/workspace-edit-context'
 import type { WorkspaceEditService } from '@/features/editor/state/workspace-edit-service'
-import { useEditorCommands } from '@/features/editor/state/commands'
+import { useEditorCommands } from '@/features/editor/hooks/use-editor-commands'
 import { useEditorDocumentStoreApi } from '@/features/editor/state/document-state'
 import {
   useEditorWorkspaceState,
@@ -27,7 +27,7 @@ import { settingsJsonDocumentId } from '@/features/settings/utils/json-document'
 import { expect, test } from '../../../../../test/fixtures'
 import { AppProviders, createTestQueryClient } from '../../../../../test/render'
 
-test('a clean close returns the exact open tab ids it closed', () => {
+test('a clean close returns the exact open tab ids it closed', async () => {
   const hook = renderDirtyTabClose()
   const firstTabId = openFile(hook.result.current, '/repo/src/first.ts')
   const secondTabId = openFile(hook.result.current, '/repo/src/second.ts')
@@ -45,7 +45,12 @@ test('a clean close returns the exact open tab ids it closed', () => {
     ])
   })
 
-  expect(closeResult).toEqual({ status: 'closed', tabIds: [secondTabId, firstTabId] })
+  expect(closeResult).toMatchObject({ status: 'closed', tabIds: [secondTabId, firstTabId] })
+  if (closeResult?.status !== 'closed') return expect.unreachable('clean close did not start')
+  const completion = closeResult.completion
+  await act(async () => {
+    expect(await completion).toEqual({ status: 'applied' })
+  })
   expect(openTabs(hook.result.current)).toEqual([])
 })
 
@@ -91,9 +96,9 @@ test('a dirty close disables Save while the workspace mutation gate is closed', 
   expect(dialogCanSave(hook.result.current.dirtyTabCloseDialog)).toBe(false)
 })
 
-test('a dirty settings tab offers Save for its writable JSON buffer', () => {
+test('a dirty settings tab offers Save for its writable JSON buffer', async () => {
   const hook = renderDirtyTabClose()
-  const tabId = openDirtySettings(hook.result.current)
+  const tabId = await openDirtySettings(hook.result.current)
   expect(tabId).not.toBeNull()
   if (!tabId) return
 
@@ -259,10 +264,10 @@ function openFile(harness: DirtyTabCloseHarness, path: string, dirty = false) {
   return openTabs(harness).find((tab) => tab.path === path)?.id ?? null
 }
 
-function openDirtySettings(harness: DirtyTabCloseHarness) {
+async function openDirtySettings(harness: DirtyTabCloseHarness) {
   const documentId = settingsJsonDocumentId('user')
-  act(() => {
-    harness.commands.openSettingsEditor()
+  await act(async () => {
+    await harness.commands.openSettingsEditor()
     harness.documentStore.getState().ensureUnsyncedEditorDocument({
       content: '{}\n',
       id: documentId,

@@ -2,13 +2,17 @@ import {
   testWorkspaceAddress,
   testWorkspaceToken,
 } from '../../../../test/factories/workspace-address'
-import { afterEach, describe, vi } from 'vitest'
+import { describe } from 'vitest'
 
 import { expect, test } from '../../../../test/fixtures'
 
 import { formatAddress } from '@workspace/client-core/address/grammar'
-import { addressFromSnapshot, emptyAddressSnapshot } from '@/features/address/utils/snapshot'
-import { log } from '@/lib/client-logging'
+import {
+  addressFromSnapshot,
+  budgetAddress,
+  completeAddressFromSnapshot,
+  emptyAddressSnapshot,
+} from '@/features/address/utils/snapshot'
 
 /**
  * Three slots carry whatever the user typed — or pasted: `s.q`, `s.in`/`s.x` and
@@ -19,10 +23,6 @@ import { log } from '@/lib/client-logging'
 
 const ROOT = '/repo'
 const BUDGET = 4000
-
-afterEach(() => {
-  vi.restoreAllMocks()
-})
 
 function snapshotWith(extra: Partial<ReturnType<typeof emptyAddressSnapshot>>) {
   return addressFromSnapshot({
@@ -88,25 +88,35 @@ describe('the URL budget', () => {
     expect(address.logs).toBeNull()
   })
 
-  test('debug-logs each omitted tab signature once', () => {
-    const debug = vi.spyOn(log, 'debug').mockImplementation(() => {})
-    const warn = vi.spyOn(log, 'warn').mockImplementation(() => {})
-    const tabs = Array.from(
-      { length: 17 },
-      (_, index) => `${ROOT}/src/${'nested/'.repeat(12)}file-${index}.ts`,
-    )
+  test('reports omissions without changing the complete captured view', () => {
+    const complete = completeAddressFromSnapshot({
+      ...emptyAddressSnapshot(),
+      rootPath: ROOT,
+      mode: 'workbench',
+      activeDocumentPath: `${ROOT}/a.ts`,
+      editorTabPaths: Array.from({ length: 70 }, (_, index) => `${ROOT}/${index}.ts`),
+      search: { q: 'x'.repeat(8000) },
+    })
+    const result = budgetAddress(complete)
+    expect(result.omissions).toEqual(['tabs', 'search'])
+    expect(result.address.tabs).toBeNull()
+    expect(result.address.search).toBeNull()
+    expect(complete.tabs).toHaveLength(71)
+    expect(complete.search?.q).toHaveLength(8000)
+    expect(result.destinationOverBudget).toBe(false)
+  })
 
-    snapshotWith({ editorTabPaths: tabs })
-    snapshotWith({ editorTabPaths: tabs, sidebarTab: 'search' })
-    snapshotWith({ editorTabPaths: [...tabs, `${ROOT}/src/another-file.ts`] })
-
-    expect(debug).toHaveBeenCalledTimes(2)
-    expect(debug).toHaveBeenCalledWith(
-      expect.objectContaining({ action: 'address.tabs_omitted', area: 'address' }),
+  test('different complete queries can share one lossy URL', () => {
+    const complete = completeAddressFromSnapshot({
+      ...emptyAddressSnapshot(),
+      mode: 'workbench',
+      search: { q: 'a'.repeat(8000) },
+    })
+    const next = { ...complete, search: { q: 'b'.repeat(8000) } }
+    expect(formatAddress(budgetAddress(complete).address)).toBe(
+      formatAddress(budgetAddress(next).address),
     )
-    expect(warn).not.toHaveBeenCalledWith(
-      expect.objectContaining({ action: 'address.tabs_omitted' }),
-    )
+    expect(complete.search).not.toEqual(next.search)
   })
 
   // A pathological path cannot be dropped — it IS the address — so the budget must not
@@ -119,5 +129,6 @@ describe('the URL budget', () => {
     expect(address.document).toContain('f/')
     expect(address.search).toBeNull()
     expect(address.tabs).toBeNull()
+    expect(budgetAddress(address).destinationOverBudget).toBe(true)
   })
 })

@@ -1,3 +1,4 @@
+import { useNavigation } from '@/hooks/use-navigation'
 import { readCachedEnvironmentBindings } from '@/features/chat/state/chat-projection-cache'
 import { useEnvironmentsStore } from '@/lib/environments/state/store'
 import { createBootRuntime } from '@/state/bootstrap-runtime'
@@ -25,6 +26,7 @@ export function ApplicationBootstrap({
   readonly boot: { readonly 'workbench.density': 'compact' | 'cozy' }
   readonly children: ReactNode
 }) {
+  const navigation = useNavigation()
   const [application, setApplication] = useState<ApplicationRuntime | null>(null)
   const [error, setError] = useState<string | null>(null)
   const [attempt, setAttempt] = useState(0)
@@ -34,8 +36,14 @@ export function ApplicationBootstrap({
       (binding) => binding.origin === primaryServerOrigin(),
     )
     let runtime: ApplicationRuntime | null = null
+    let detachNavigation: (() => void) | undefined
+    const attach = (owner: ApplicationRuntime) => {
+      detachNavigation?.()
+      detachNavigation = navigation.attach(owner)
+      return owner
+    }
     try {
-      if (cached) runtime = createBootRuntime(cached.descriptor, true)
+      if (cached) runtime = attach(createBootRuntime(cached.descriptor, navigation.initial, true))
     } catch {
       // Cached metadata cannot prevent a fresh descriptor check.
     }
@@ -47,7 +55,7 @@ export function ApplicationBootstrap({
     )
       .then((descriptor) => {
         if (abort.signal.aborted) return
-        runtime ??= createBootRuntime(descriptor)
+        runtime ??= attach(createBootRuntime(descriptor, navigation.initial))
         setApplication(runtime)
         setError(null)
       })
@@ -60,9 +68,10 @@ export function ApplicationBootstrap({
       })
     return () => {
       abort.abort()
+      detachNavigation?.()
       runtime?.dispose()
     }
-  }, [attempt])
+  }, [attempt, navigation])
   if (error)
     return (
       <div role='alert' className='text-destructive p-4'>

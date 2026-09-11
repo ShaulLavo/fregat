@@ -1,7 +1,7 @@
 # TanStack Router evaluation for Plan 086
 
 Evaluated on 2026-09-11 against Platform `99550068` and current official Router documentation.
-Status: recommend Router as the web navigation owner. No application migration or dependency installation has been performed.
+Status: Router migration implemented. The [full migration plan](086-tanstack-router-migration.md) owns the implementation, verification evidence, and remaining live checks. The evaluation below records the original decision before implementation.
 
 ## Recommendation
 
@@ -114,7 +114,7 @@ T3 Code is a useful reference for typed route navigation, not a mandate to copy 
 
 Current projection/controller files total 398 lines; these are deletion candidates, not a promised net code reduction. The 645-line restore module mostly contains domain rules that remain. A source scan found roughly 30 file/chat selection call sites behind concentrated command seams. Budget this as M–L, roughly 20–35 implementation files plus focused tests, depending on route organization and whether sidebar-chat addressing is included. These are estimates, not measured implementation totals. No bundle-size or performance claim is established by this evaluation.
 
-## Migration sequence if selected
+## Migration sequence evaluated
 
 1. **Prove the boundary.** Build typed local/remote file and chat routes with the real custom codec, sparse search validation, and retained application shell. Check invalid navigation types fail. Verify raw URL round-trips and one actual file → chat → Back → Forward flow. This is the first implementation unit, not a second permanent navigation system.
 2. **Expand to every current destination.** Cover draft, settings/search, comparisons, refs, snapshots, checkpoints, folderless state, and TUI interoperability before cutting over. Keep the branded IDs and runtime boundary checks.
@@ -122,7 +122,7 @@ Current projection/controller files total 398 lines; these are deletion candidat
 4. **Finish the cleanup in Router-owned state.** Apply active-tab compression, ordered/empty tab restoration, sparse defaults, accepted-address persistence, and current-state copy. Do not first polish the old controller only to delete it.
 5. **Verify real history and lifetime.** Reuse the running app for Plan 086's rapid navigation, paused typing, pending-edit traversal, bare relaunch, dirty-tab, copy, and environment retention cases. Add targeted memory-history/type checks; use plain Node for real-browser orchestration. No new dev server.
 
-Retain Plan 086's open product decisions for marker spelling, full-view link scope, sidebar chats, and the exact meaning of whole workspace view. The sharing backend, clone execution, portable conversation transport, hidden tab history state, and stored view IDs remain out of scope.
+The full migration plan now selects the `@` tab marker, includes sidebar chat selection, defines the addressed workspace view, and uses immediate URL replacements without debouncing. It supersedes tentative choices and estimates in this evaluation. Full-view link scope, the sharing backend, clone execution, portable conversation transport, hidden tab history state, and stored view IDs remain out of scope.
 
 ## Evaluation limits
 

@@ -9,6 +9,7 @@ import { emptyAddress, formatAddress, parseAddress } from '@workspace/client-cor
 const BUFFER = {
   caseSensitive: true,
   excludeGlobText: '**/tests/**',
+  filtersVisible: true,
   includeGlobText: 'apps/web/**',
   matchMode: 'regex' as const,
   query: 'createStructuredError',
@@ -38,8 +39,13 @@ describe('search params', () => {
     ).toEqual({ q: 'createStructuredError' })
   })
 
-  test('is absent without a query — an empty search is not a place', () => {
-    expect(searchParamsFor({ ...BUFFER, query: '' })).toBeNull()
+  test('keeps selected flags and globs before a query is entered', () => {
+    expect(searchParamsFor({ ...BUFFER, query: '' })).toEqual({
+      case: '1',
+      in: 'apps/web/**',
+      m: 'regex',
+      x: '**/tests/**',
+    })
     expect(searchParamsFor(null)).toBeNull()
   })
 
@@ -50,6 +56,30 @@ describe('search params', () => {
       includeGlobText: 'apps/web/**',
       matchMode: 'regex',
       query: 'createStructuredError',
+    })
+  })
+
+  test('keeps disabled glob drafts and blank filter-panel visibility out of the URL', () => {
+    expect(searchParamsFor({ ...BUFFER, filtersVisible: false })).toEqual({
+      case: '1',
+      m: 'regex',
+      q: 'createStructuredError',
+    })
+    expect(searchParamsFor({ ...BUFFER, includeGlobText: '', excludeGlobText: '' })).toEqual({
+      case: '1',
+      m: 'regex',
+      q: 'createStructuredError',
+    })
+  })
+
+  test('preserves explicit defaults and leaves omitted incoming fields unspecified', () => {
+    expect(searchStateFor({ case: '0', m: 'literal' })).toEqual({
+      caseSensitive: false,
+      matchMode: 'literal',
+      query: undefined,
+      wholeWord: undefined,
+      includeGlobText: undefined,
+      excludeGlobText: undefined,
     })
   })
 

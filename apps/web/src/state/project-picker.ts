@@ -4,10 +4,10 @@ import { dispatchChatCommand } from '@/features/chat/utils/command-dispatch'
 import { reportError, toClientError } from '@/lib/client-error-taxonomy'
 import type { ConfirmedMachine } from '@/lib/environments/utils/machines'
 import { createClientInvariantError } from '@/lib/structured-errors'
-import type { ApplicationRuntime } from '@/state/application-runtime'
+import type { Navigation } from '@/state/navigation'
 
 export async function openPickedMachineProject(
-  application: ApplicationRuntime,
+  navigation: Navigation,
   machine: ConfirmedMachine,
   path: string,
 ) {
@@ -28,5 +28,5 @@ export async function openPickedMachineProject(
     reportError(toClientError(outcome.error))
     return
   }
-  await application.openEnvironmentWorkspaceRoot(machine.environmentId, path)
+  await navigation.openWorkspace({ environmentId: machine.environmentId, path })
 }

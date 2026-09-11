@@ -8,7 +8,13 @@ import '@singapor/diff/style.css'
 import '@singapor/find/style.css'
 import '@workspace/ui/globals.css'
 import { App } from '@/App'
-import { restoreAddressFromStorage } from '@/features/address/state/storage.ts'
+import { selectInitialAddress } from '@/features/address/state/storage'
+import { parseAddressIntent } from '@/features/address/utils/intent'
+import { browserAddressHref } from '@/features/address/utils/browser-url'
+import { createBrowserHistory } from '@tanstack/react-router'
+import { createApplicationRouter } from '@/state/router'
+import { createNavigation } from '@/state/navigation'
+import { NavigationProvider } from '@/providers/navigation-provider'
 import { LoggingErrorBoundary } from '@/components/logging-error-boundary.tsx'
 import {
   bootAppearance,
@@ -54,10 +60,15 @@ log.info({
 // `AppearanceProvider` had already corrected it.
 void loadNerdFont(boot['editor.fontFamily'])
 
-// Before `createRoot`, deliberately: `EditorStateProvider` seeds its stores from the
-// address during its first render, so the stored address has to be in the URL by then.
-// A desktop launch always arrives at `/`, which is exactly the case this covers.
-restoreAddressFromStorage()
+// Preserve explicit fields before Router normalizes defaults; boot merges them with the cache.
+const initialHref = selectInitialAddress(window.location.href)
+const initialIntent = parseAddressIntent(initialHref)
+const routerHistory = createBrowserHistory()
+const initialBrowserHref = browserAddressHref(initialHref)
+if (routerHistory.location.href !== initialBrowserHref) routerHistory.replace(initialBrowserHref)
+routerHistory.flush()
+const router = createApplicationRouter({ history: routerHistory })
+const navigation = createNavigation(router, initialIntent)
 
 createRoot(document.getElementById('root')!, {
   onCaughtError: (error, errorInfo) => {
@@ -72,9 +83,11 @@ createRoot(document.getElementById('root')!, {
 }).render(
   <StrictMode>
     <LoggingErrorBoundary>
-      <ApplicationBootstrap boot={boot}>
-        <App />
-      </ApplicationBootstrap>
+      <NavigationProvider navigation={navigation}>
+        <ApplicationBootstrap boot={boot}>
+          <App />
+        </ApplicationBootstrap>
+      </NavigationProvider>
     </LoggingErrorBoundary>
   </StrictMode>,
 )

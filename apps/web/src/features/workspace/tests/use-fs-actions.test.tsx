@@ -4,7 +4,7 @@ import type { ReactNode } from 'react'
 import { vi } from 'vitest'
 import { createEditorBufferSession } from '@singapor/core'
 
-import { useEditorCommands } from '@/features/editor/state/commands'
+import { useEditorCommands } from '@/features/editor/hooks/use-editor-commands'
 import { useEditorRuntime } from '@/features/editor/hooks/use-runtime'
 import { WorkspaceEditServiceContext } from '@/features/editor/providers/workspace-edit-context'
 import type { WorkspaceEditService } from '@/features/editor/state/workspace-edit-service'
@@ -60,10 +60,10 @@ for (const { isFolder, dirty } of [
     )
     const { documentStore, workspaceStore } = hook.result.current.runtime
     setFileSnapshotQueryData(queryClient, file)
-    act(() => {
-      hook.result.current.commands.openFileSurface(sibling)
-      hook.result.current.commands.openFileSurface(unrelated)
-      hook.result.current.commands.openFileSurface(from)
+    await act(async () => {
+      await hook.result.current.commands.openFileSurface(sibling)
+      await hook.result.current.commands.openFileSurface(unrelated)
+      await hook.result.current.commands.openFileSurface(from)
     })
     const tabId = workspaceStore.getState().workbenchPanels.activeEditorTabId!
     const view = documentStore.getState().ensureEditorView(tabId, file)

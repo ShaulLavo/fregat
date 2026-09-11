@@ -1,50 +1,90 @@
-import type { SessionId } from '@workspace/contracts'
-import { useCallback, useEffect, useMemo, useRef, useState } from 'react'
+import { useApplicationRuntime } from '@/hooks/use-application-runtime'
+import { selectWorktreeAtPath } from '@workspace/client-core/chat/selectors'
+import {
+  selectChatProjectionSlice,
+  useChatProjectionStore,
+} from '@/features/chat/state/chat-projection-store'
+import { confirmedEnvironmentOrigin } from '@/lib/environments/state/domain'
+import {
+  scopedSessionKey,
+  type EnvironmentId,
+  type ProjectId,
+  type SessionId,
+} from '@workspace/contracts'
+import { useEffect, useRef } from 'react'
+import { useNavigation } from '@/hooks/use-navigation'
+import { useSidebarSelectionStore } from '@/features/chat/state/sidebar-selection-store'
 
-type ChatSessionSelection =
-  | { kind: 'auto' }
-  | { kind: 'draft' }
-  | { kind: 'session'; sessionId: SessionId }
-
-export function useActiveChatSessionId(sessionIds: readonly SessionId[]) {
-  const [selection, setSelection] = useState<ChatSessionSelection>({ kind: 'auto' })
-  const selectedWasAvailable = useRef(false)
-  const availableSessionIds = useMemo(() => new Set(sessionIds), [sessionIds])
-  const selectedSessionId = selection.kind === 'session' ? selection.sessionId : null
-  const activeSessionId =
-    selection.kind === 'draft' ? null : (selectedSessionId ?? sessionIds[0] ?? null)
+export function useActiveChatSessionId({
+  sessionIds,
+  environmentId,
+  projectId,
+}: {
+  readonly sessionIds: readonly SessionId[]
+  readonly environmentId: EnvironmentId
+  readonly projectId: ProjectId | undefined
+}) {
+  const navigation = useNavigation()
+  const application = useApplicationRuntime()
+  const selection = useSidebarSelectionStore((state) => state.selection)
+  const selectedWasAvailable = useRef<string | null>(null)
+  const scoped =
+    selection.kind !== 'auto' &&
+    selection.environmentId === environmentId &&
+    selection.projectId === projectId
+  const selectedSessionId = scoped && selection.kind === 'session' ? selection.sessionId : null
+  const selectedKey = selectedSessionId
+    ? scopedSessionKey({ environmentId, sessionId: selectedSessionId })
+    : null
+  const draft = scoped && selection.kind === 'draft'
+  const activeSessionId = draft ? null : (selectedSessionId ?? sessionIds[0] ?? null)
 
   useEffect(() => {
-    if (selection.kind !== 'session') return
-    if (!selectedSessionId) return
-    if (availableSessionIds.has(selectedSessionId)) {
-      selectedWasAvailable.current = true
+    if (!selectedSessionId || !projectId) return
+    if (sessionIds.includes(selectedSessionId)) {
+      selectedWasAvailable.current = selectedKey
       return
     }
-    if (!selectedWasAvailable.current) return
+    if (selectedWasAvailable.current !== selectedKey) return
+    selectedWasAvailable.current = null
+    void navigation.reconcileSessions({
+      environmentId,
+      projectId,
+      removedSessionIds: [selectedSessionId],
+      successorSessionId: sessionIds[0] ?? null,
+    })
+  }, [environmentId, navigation, projectId, selectedKey, selectedSessionId, sessionIds])
 
-    selectedWasAvailable.current = false
-    // Syncing local selection to the external session list: a session we were showing
-    // got deleted, so fall back to auto. This can't be derived during render —
-    // telling "deleted" apart from the create-time race (selected before the session
-    // lands in the projection store) needs the selectedWasAvailable history, and
-    // reading a ref or setting state during render trips the other compiler rules.
-    // oxlint-disable-next-line oxc-react-compiler/set-state-in-effect
-    setSelection({ kind: 'auto' })
-  }, [availableSessionIds, selectedSessionId, selection.kind])
+  function selectSession(sessionId: SessionId, replace = false) {
+    if (!projectId) return
+    void navigation.openChat({ environmentId, projectId, sessionId, surface: 'sidebar', replace })
+  }
 
-  const setActiveSessionId = useCallback((sessionId: SessionId) => {
-    setSelection({ kind: 'session', sessionId })
-  }, [])
-
-  const selectDraftSession = useCallback(() => {
-    selectedWasAvailable.current = false
-    setSelection({ kind: 'draft' })
-  }, [])
+  function promoteDraftSession(sessionId: SessionId) {
+    const current = useSidebarSelectionStore.getState().selection
+    if (
+      current.kind !== 'auto' &&
+      (current.kind !== 'draft' ||
+        current.environmentId !== environmentId ||
+        current.projectId !== projectId)
+    )
+      return
+    if (activeSessionId !== null) return
+    const owner = application.getSnapshot()
+    if (!owner || owner.origin !== confirmedEnvironmentOrigin(environmentId)) return
+    const root = owner.editor.workspaceStore.getState().rootFolder?.path
+    const slice = selectChatProjectionSlice(useChatProjectionStore.getState(), environmentId)
+    if (root === undefined || selectWorktreeAtPath(slice, root)?.projectId !== projectId) return
+    selectSession(sessionId, true)
+  }
 
   return {
     activeSessionId,
-    selectDraftSession,
-    setActiveSessionId,
+    promoteDraftSession,
+    selectDraftSession: () => {
+      if (!projectId) return
+      void navigation.openChat({ environmentId, projectId, sessionId: null, surface: 'sidebar' })
+    },
+    setActiveSessionId: (sessionId: SessionId) => selectSession(sessionId),
   }
 }

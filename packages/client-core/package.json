@@ -46,6 +46,7 @@
     "./settings/recording": "./src/settings/recording.ts",
     "./transport/connectivity-error": "./src/transport/connectivity-error.ts",
     "./transport/rpc-error": "./src/transport/rpc-error.ts",
+    "./address/references": "./src/address/references.ts",
     "./address/grammar": "./src/address/grammar.ts",
     "./address/workspace": "./src/address/workspace.ts",
     "./address/path-hash": "./src/address/path-hash.ts",

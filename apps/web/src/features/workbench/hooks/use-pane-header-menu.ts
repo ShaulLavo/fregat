@@ -1,3 +1,4 @@
+import { useNavigation } from '@/hooks/use-navigation'
 import {
   isChatModeToolTab,
   showChatModeToolTab,
@@ -14,28 +15,29 @@ import { setWorkbenchSidebarTab } from '@/features/workbench/utils/panels'
  * rather than prop-drilled through the two panels they share.
  */
 export function usePaneHeaderMenu(title: string) {
+  const navigation = useNavigation()
   const chatModePanels = useEditorWorkspaceState((state) => state.chatModePanels)
-  const setChatModePanels = useEditorWorkspaceState((state) => state.setChatModePanels)
   const uiMode = useEditorWorkspaceState((state) => state.uiMode)
   const workbenchPanels = useEditorWorkspaceState((state) => state.workbenchPanels)
-  const setWorkbenchPanels = useEditorWorkspaceState((state) => state.setWorkbenchPanels)
 
   function selectChatView(value: string) {
     if (!isChatModeToolTab(value)) return
 
-    setChatModePanels(showChatModeToolTab(chatModePanels, value))
+    void navigation.setChatModePanels(showChatModeToolTab(chatModePanels, value))
   }
 
   function selectSidebarView(value: string) {
     if (!isWorkbenchSidebarView(value)) return
 
-    setWorkbenchPanels(setWorkbenchSidebarTab(workbenchPanels, value))
+    void navigation.setWorkbenchPanels(setWorkbenchSidebarTab(workbenchPanels, value))
   }
 
   // Toggling the tab that is already showing collapses the pane, and the header
   // only exists while the pane is open, so this is always the hide direction.
   function hideChatPane() {
-    setChatModePanels(toggleChatModeToolTab(chatModePanels, chatModePanels.activeToolTab))
+    void navigation.setChatModePanels(
+      toggleChatModeToolTab(chatModePanels, chatModePanels.activeToolTab),
+    )
   }
 
   if (uiMode === 'chat') {

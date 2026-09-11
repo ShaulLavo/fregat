@@ -1,29 +1,18 @@
 import type { Address } from '@workspace/client-core/address/grammar'
-import { log } from '@/lib/client-logging'
-import { reportTabOmission } from '@/features/address/state/tab-omission-logging'
 import { documentTokenForPath } from '@/features/address/utils/document-token'
 import {
   emptyAddress,
   formatAddress,
   MAX_APPLIED_TABS,
-  TAB_SEPARATOR,
+  TABS_BUDGET_BYTES,
+  compressedTabs,
+  editorDocumentToken,
 } from '@workspace/client-core/address/grammar'
 import { NO_WORKSPACE_TOKEN, workspaceToken } from '@workspace/client-core/address/workspace'
 import type { WorkspaceAddress } from '@workspace/contracts'
 import { isSettingsDocumentId } from '@/features/settings/utils/document'
 
-/**
- * The narrow record the encoder takes, instead of a store.
- *
- * This is half of what makes the deny-list structural. `Address` is a `strictObject`
- * with no field for a dangerous value; `AddressSnapshot` is a hand-written record with
- * no field to read one FROM. The terminal command inbox and the composer inbox are
- * `take`-once queues — a URL that replayed one would run a shell command or inject
- * prompt text on page load — and neither store is reachable from here.
- *
- * Every field is what the user is looking at, never how it is drawn: no pane
- * percentages, no theme, no scroll offsets, no open/closed chrome booleans.
- */
+// Capture only addressed view data; commands, drafts, and document contents never enter this record.
 export type AddressSnapshot = {
   readonly environmentId: Address['environmentId']
   readonly activeDocumentPath: string | null
@@ -37,13 +26,9 @@ export type AddressSnapshot = {
   readonly railView: Address['rail']
   readonly rootPath: string | null
   readonly settingsCategory: string | null
-  /**
-   * Chat mode's session, as a token: `t/<sessionId>`, `t/new`, or absent for an
-   * auto-pick. Chat mode's selection only — the workbench sidebar's chat tab keeps
-   * its own unpersisted pick, and addressing both would make `t/` ambiguous about
-   * which surface it targets.
-   */
+  /** Main chat selection is independent from the sidebar conversation. */
   readonly sessionToken: string | null
+  readonly sidebarSessionToken: string | null
   /** `s.*` — query and flags only. `replaceText` has no field here, by construction. */
   readonly search: Readonly<Record<string, string>> | null
   /** `log.*` — the dashboard's filters. */
@@ -68,6 +53,7 @@ export function emptyAddressSnapshot(): AddressSnapshot {
     logs: null,
     search: null,
     sessionToken: null,
+    sidebarSessionToken: null,
     settingsCategory: null,
     sidebarTab: null,
     sessionDiffScope: null,
@@ -75,16 +61,17 @@ export function emptyAddressSnapshot(): AddressSnapshot {
   }
 }
 
-export function addressFromSnapshot(snapshot: AddressSnapshot): Address {
+export function completeAddressFromSnapshot(snapshot: AddressSnapshot): Address {
   const rootPath = snapshot.rootPath
   const active = snapshot.activeDocumentPath
     ? documentTokenForPath(rootPath, snapshot.activeDocumentPath)
     : null
 
-  return withinUrlBudget({
+  return {
     ...emptyAddress(),
     environmentId: snapshot.environmentId,
     bottom: snapshot.bottomTab,
+    chat: snapshot.sidebarTab === 'chat' ? snapshot.sidebarSessionToken : null,
     diff: snapshot.sessionDiffScope,
     document: snapshot.mode === 'chat' ? snapshot.sessionToken : documentToken(active),
     editor: snapshot.mode === 'chat' ? documentToken(active) : null,
@@ -96,63 +83,46 @@ export function addressFromSnapshot(snapshot: AddressSnapshot): Address {
     search: snapshot.search ? { ...snapshot.search } : null,
     settings: settingsCategory(snapshot),
     side: snapshot.sidebarTab,
-    tabs: tabTokens(rootPath, snapshot.editorTabPaths),
+    tabs: tabTokens(rootPath, snapshot.editorTabPaths, documentToken(active)),
     tool: snapshot.toolTab,
     workspace: snapshot.workspaceAddress
       ? workspaceToken(snapshot.workspaceAddress)
       : NO_WORKSPACE_TOKEN,
-  })
+  }
 }
 
-/**
- * A total ceiling on the emitted URL, because three slots are unbounded free text:
- * `s.q`, `s.in`/`s.x` and `log.find` all carry whatever the user typed — or pasted.
- *
- * Measured against the real servers: both the Vite dev server (Node) and the Elysia
- * backend (Bun) answer **431** past roughly 16KB, which is a blank error page rather
- * than a degraded app, and it strikes on reload or on opening a shared link — the
- * moments the URL travels over HTTP before React exists. 4000 leaves room under the
- * 8KB default that nginx (`large_client_header_buffers`) and Apache
- * (`LimitRequestLine`) impose if this ever sits behind a proxy, and absorbs the 3.75×
- * blow-up that percent-encoding inflicts on a non-ASCII path.
- */
-const URL_BUDGET_BYTES = 4000
+export function addressFromSnapshot(snapshot: AddressSnapshot): Address {
+  return budgetAddress(completeAddressFromSnapshot(snapshot)).address
+}
 
-/**
- * Dropped in ascending order of how much the recipient of a link would miss them. The
- * identity — workspace, mode, document, focus — is never dropped, so an over-budget
- * address still lands you on the right file; it just arrives without the search query
- * that was never yours anyway.
- */
-const DROPPABLE_SLOTS: readonly (readonly [string, (address: Address) => Address])[] = [
-  ['search', (address) => ({ ...address, search: null })],
-  ['logs', (address) => ({ ...address, logs: null })],
-  ['tabs', (address) => ({ ...address, tabs: null })],
-]
+export const URL_BUDGET_BYTES = 4000
+export type AddressOmission = 'search' | 'logs' | 'tabs'
+export type BudgetedAddress = {
+  readonly address: Address
+  readonly omissions: readonly AddressOmission[]
+  readonly destinationOverBudget: boolean
+}
 
-function withinUrlBudget(address: Address): Address {
-  if (formatAddress(address).length <= URL_BUDGET_BYTES) return address
-
-  const dropped: string[] = []
-  let trimmed = address
-  for (const [slot, drop] of DROPPABLE_SLOTS) {
-    trimmed = drop(trimmed)
-    dropped.push(slot)
-    if (formatAddress(trimmed).length <= URL_BUDGET_BYTES) break
+// Drop whole collections: a truncated list would close tabs the sender kept open.
+export function budgetAddress(complete: Address): BudgetedAddress {
+  const omissions: AddressOmission[] = []
+  let address = complete
+  const signature = compressedTabs(complete.tabs, editorDocumentToken(complete))
+  if (
+    complete.tabs &&
+    (complete.tabs.length > MAX_APPLIED_TABS || (signature?.length ?? 0) > TABS_BUDGET_BYTES)
+  ) {
+    address = { ...address, tabs: null }
+    omissions.push('tabs')
   }
-
-  log.warn({
-    action: 'address.truncated',
-    area: 'address',
-    budgetBytes: URL_BUDGET_BYTES,
-    dropped,
-    // Lengths, never the content: an over-budget address is over budget precisely
-    // because it carries a lot of what the user typed.
-    finalLength: formatAddress(trimmed).length,
-    originalLength: formatAddress(address).length,
-  })
-
-  return trimmed
+  for (const slot of ['search', 'logs', 'tabs'] as const) {
+    if (formatAddress(address).length <= URL_BUDGET_BYTES) break
+    if (address[slot] === null) continue
+    address = { ...address, [slot]: null }
+    omissions.push(slot)
+  }
+  const finalLength = formatAddress(address).length
+  return { address, omissions, destinationOverBudget: finalLength > URL_BUDGET_BYTES }
 }
 
 function settingsCategory(snapshot: AddressSnapshot) {
@@ -162,34 +132,12 @@ function settingsCategory(snapshot: AddressSnapshot) {
   return snapshot.settingsCategory
 }
 
-/**
- * Over budget, `tabs` is dropped ENTIRELY and never truncated: a partial tab set
- * would delete tabs on apply. The path still names the active document, so the link
- * degrades to something useful rather than to something wrong.
- */
-const TABS_BUDGET_BYTES = 1500
-
-function tabTokens(rootPath: string | null, paths: readonly string[]) {
+function tabTokens(rootPath: string | null, paths: readonly string[], selected: string | null) {
   const tokens = paths
     .map((path) => documentTokenForPath(rootPath, path))
     .flatMap((result) => (result.kind === 'token' ? [result.token] : []))
-  if (tokens.length === 0) return null
-
-  // Two ceilings, because they bind on different link shapes. `MAX_APPLIED_TABS` is the
-  // reader's rule, and emitting past it would hand the recipient a set their own applier
-  // discards whole — sixty-five short tokens sit far under the byte budget, so the byte
-  // check alone let the two sides disagree. `TABS_BUDGET_BYTES` still catches the few
-  // very long tokens that fit the count but not the URL.
-  const signature = tokens.join(TAB_SEPARATOR)
-  const bytes = signature.length
-  if (tokens.length <= MAX_APPLIED_TABS && bytes <= TABS_BUDGET_BYTES) return tokens
-
-  reportTabOmission({
-    bytes,
-    signature,
-    tabCount: tokens.length,
-  })
-  return null
+  if (selected && !tokens.includes(selected)) tokens.push(selected)
+  return tokens
 }
 
 function documentToken(active: ReturnType<typeof documentTokenForPath> | null) {

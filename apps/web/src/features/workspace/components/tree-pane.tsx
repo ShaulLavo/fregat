@@ -32,7 +32,7 @@ import { useFileTreeMutationEvents } from '@/features/workspace/hooks/use-file-t
 import { useOptionalWorkspaceEditService } from '@/features/editor/providers/workspace-edit-context'
 import { useFsActions } from '@/features/workspace/hooks/use-fs-actions'
 import { useTreeSearchSession } from '@/features/workspace/hooks/use-tree-search-session'
-import { useEditorCommands } from '@/features/editor/state/commands'
+import { useEditorCommands } from '@/features/editor/hooks/use-editor-commands'
 import { useEditorWorkspaceState } from '@/features/editor/state/workspace-state'
 import { fileBackedDocumentPath } from '@/features/editor/utils/file-backed-document'
 import { preparedTreeInputForPaths } from '@/features/workspace/state/prepared-tree-input-cache'

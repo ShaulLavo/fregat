@@ -1,7 +1,6 @@
 import { WorktreeManager } from '@/features/chat-mode/components/worktree-manager'
-import { useApplicationRuntime } from '@/hooks/use-application-runtime'
 import { useActiveChatProjection } from '@/features/chat/hooks/use-active-projection'
-import { useEffect, type ReactNode } from 'react'
+import type { ReactNode } from 'react'
 import { useQueryClient } from '@tanstack/react-query'
 
 import { useChatTransport } from '@/features/chat/hooks/use-chat-transport'
@@ -19,12 +18,10 @@ import {
   ChatModeSessionContext,
   type ChatModeSession,
 } from '@/features/chat-mode/providers/session-context'
-import { setSessionProjectOpener } from '@/features/chat-mode/state/session-commands'
 import { useSessionSelectionStore } from '@/features/chat-mode/state/session-selection-store'
 import { activeSession } from '@/features/chat-mode/utils/active-session'
 import { activeWorktree } from '@/features/chat-mode/utils/active-worktree'
 import { compareSessionsForRail } from '@workspace/client-core/chat/rail/session-order'
-import { useOpenWorkspaceRoot } from '@/features/workspace/hooks/use-open-root'
 import { useActiveProjectStore } from '@/features/workspace/state/active-project'
 
 export function ChatModeSessionController({
@@ -35,7 +32,6 @@ export function ChatModeSessionController({
   /** Where the editor currently is. Chat follows it only until a project is activated. */
   readonly editorRootPath: string
 }) {
-  const application = useApplicationRuntime()
   const transport = useChatTransport()
   const origin = originForQueryClient(useQueryClient())
   const shellError = useEnvironmentsStore((state) => state.entries[origin]?.lastError ?? null)
@@ -59,21 +55,10 @@ export function ChatModeSessionController({
   const draftWorktree = useActiveChatProjection((state) =>
     draftWorktreeId ? state.worktreeById[draftWorktreeId] : undefined,
   )
-  const selectSession = useSessionSelectionStore((state) => state.selectSession)
-  const startDraft = useSessionSelectionStore((state) => state.startDraft)
-  const openWorkspaceRoot = useOpenWorkspaceRoot()
   const retry = useProjectRetry({ transport, rootPath })
   // Reuses the workspace picker already mounted by AppWorkspace: picking a folder
   // opens it, and useWorkspaceChatProject creates the project for it.
   const addProject = useEditorWorkspaceState((state) => state.openPicker)
-
-  // Keyboard session commands run from the app keymap, far above this tree, so the
-  // one app-level thing they need is handed down to them for as long as chat mode is up.
-  useEffect(() => {
-    setSessionProjectOpener(application.openEnvironmentWorkspaceRoot)
-
-    return () => setSessionProjectOpener(null)
-  }, [application])
 
   const resolvedSession = activeSession({
     environmentId: transport.environmentId,
@@ -104,16 +89,12 @@ export function ChatModeSessionController({
       retryError: retry.error,
       shellError,
     }),
-    openProject: (workspaceRoot) => void openWorkspaceRoot(workspaceRoot),
     project: projectState.project,
     worktree: selectedWorktree,
     ready: projectState.status === 'ready',
     retrying: retry.retrying,
     retryProject: retry.retryProject,
     rootPath: selectedWorktree?.path ?? rootPath,
-    selectSession: (projectId, sessionId) =>
-      selectSession(transport.environmentId, projectId, sessionId),
-    startDraft: (projectId) => startDraft(transport.environmentId, projectId),
   }
 
   return (

@@ -25,14 +25,18 @@ const ORCHESTRATION_SNAPSHOT_TIMEOUT_MS = 60_000
  * frames they deliver — stay on the socket, where ordering against the event
  * stream is the whole point.
  */
-export function fetchOrchestrationShellSnapshotHttp(client: Client) {
+export function fetchOrchestrationShellSnapshotHttp(client: Client, signal?: AbortSignal) {
   return observeClientOperation(
     { ...clientLogContext(client), action: 'chat.shell_snapshot.http', area: 'chat' },
     async () => {
       const response = await client.orchestration['shell-snapshot'].get({
-        fetch: { signal: snapshotTimeoutSignal() },
+        fetch: {
+          signal: signal
+            ? AbortSignal.any([signal, snapshotTimeoutSignal()])
+            : snapshotTimeoutSignal(),
+        },
       })
-
+      signal?.throwIfAborted()
       return unwrapEdenResponse<OrchestrationShellSnapshot>(response, {
         emptyMessage: 'the shell snapshot response carried no data',
         // Eden revives every date-shaped string on the way out. The projection

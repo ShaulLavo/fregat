@@ -1,5 +1,8 @@
+import {
+  createFocusRequestToken,
+  type FocusTransitionOutcome,
+} from '@workspace/client-core/commands/focus'
 import type { CommandTargetKind } from '@workspace/client-core/commands/metadata'
-import { showChatModeToolTab } from '@/features/chat-mode/utils/panels'
 import { parseCompareSavedDocumentId } from '@/features/editor/utils/compare-saved-document'
 import { isSavableEditorDocument } from '@/features/editor/utils/save'
 import { activeSettingsBufferId } from '@/features/settings/state/active-buffer'
@@ -28,6 +31,7 @@ import type {
   FocusTargetSnapshot,
   FocusTargetToken,
 } from '@/lib/focus/state/service'
+import { focusTargetById } from '@/lib/focus/state/service'
 import { matchesActiveSurface } from '@/lib/focus/utils/active-surface'
 
 export type PlatformCommandDefinition = CommandDefinition<
@@ -118,13 +122,23 @@ export function openWorkspaceSettings(
   focus: FocusService,
   workspace: WorkspaceCommandRuntime['workspace'],
   editor: WorkspaceCommandRuntime['editor'],
+  category?: string | null,
 ) {
-  const workspaceState = workspace.getState()
-  if (workspaceState.uiMode === 'chat') {
-    workspaceState.setChatModePanels(showChatModeToolTab(workspaceState.chatModePanels, 'editor'))
+  return {
+    token: createFocusRequestToken(),
+    completion: editor
+      .openSettingsEditor(category)
+      .then((result): FocusTransitionOutcome | Promise<FocusTransitionOutcome> => {
+        if (result.status !== 'applied')
+          return { status: 'rejected', reason: 'destination-invalid' }
+        return focusOpenedSettings(focus, workspace).completion
+      }),
   }
+}
 
-  editor.openSettingsEditor()
+function focusOpenedSettings(focus: FocusService, workspace: WorkspaceCommandRuntime['workspace']) {
+  if (workspace.getState().rootFolder === null)
+    return focus.request(focusTargetById({ kind: 'settings-dialog' }))
   const activeTab = activeEditorTabForWorkbenchPanels(workspace.getState().workbenchPanels)
   if (!activeTab) {
     return focus.request({ isValid: () => false, kind: 'match', matches: () => false })

@@ -1,7 +1,6 @@
-import { addressHrefFromBrowser } from '@/features/address/utils/browser-url'
 import type { HealthDescriptor } from '@workspace/contracts'
 import { addressedWorkspaceCache, panelsForAddress } from '@/features/address/utils/cache'
-import { parseAddress } from '@workspace/client-core/address/grammar'
+import type { AddressIntent } from '@/features/address/utils/intent'
 import { readWorkspaceCache } from '@/features/workspace/state/cache'
 import { getSelectedEditorThemeId } from '@/features/editor/state/color-theme-store'
 import { systemPrefersDark } from '@/features/settings/providers/appearance-provider'
@@ -13,7 +12,11 @@ import { useEnvironmentsStore } from '@/lib/environments/state/store'
 import { createApplicationRuntime } from '@/state/application-runtime'
 import { createClientInvariantError } from '@/lib/structured-errors'
 
-export function createBootRuntime(descriptor: HealthDescriptor, cached = false) {
+export function createBootRuntime(
+  descriptor: HealthDescriptor,
+  intent: AddressIntent,
+  cached = false,
+) {
   if (
     cached &&
     !useEnvironmentsStore.getState().restoreDescriptor(primaryServerOrigin(), descriptor)
@@ -24,7 +27,7 @@ export function createBootRuntime(descriptor: HealthDescriptor, cached = false) 
   if (!cached) useEnvironmentsStore.getState().recordDescriptor(primaryServerOrigin(), descriptor)
   if (cached) useEnvironmentsStore.getState().setPhase(primaryServerOrigin(), 'offline')
   primaryQueryClient().setQueryData(['environment-descriptor'], descriptor)
-  const address = parseAddress(addressHrefFromBrowser(window.location.href))
+  const address = intent.address
   const application = createApplicationRuntime({
     workspaceCache: addressedWorkspaceCache(
       readWorkspaceCache(environmentScopedStorage(descriptor.environmentId)),

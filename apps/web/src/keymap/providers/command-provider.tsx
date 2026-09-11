@@ -3,7 +3,6 @@ import { selectSettingsView } from '@/features/settings/state/view-store'
 import { selectSettingsScope } from '@/features/settings/state/scope-store'
 import { useEditorRuntime } from '@/features/editor/hooks/use-runtime'
 import { MachinePickerDialog } from '@/components/machine-picker-dialog'
-import { selectSettingsCategory } from '@/features/settings/state/category-store'
 import { useEffect, useLayoutEffect, useMemo, useRef, useState, type ReactNode } from 'react'
 import { useQueryClient } from '@tanstack/react-query'
 import { DEFAULT_SETTING_VALUES, type SettingsSnapshot } from '@workspace/contracts'
@@ -13,9 +12,13 @@ import { CommandPalette } from '@/components/command-palette'
 import type { PaletteScope } from '@/features/command-palette/command-palette-types'
 import { paletteScopeForPrefix } from '@/features/command-palette/command-palette-utils'
 import { useEditorTabActions } from '@/features/editor/hooks/use-editor-tab-actions'
-import { useEditorCommands } from '@/features/editor/state/commands'
+import { useEditorCommands } from '@/features/editor/hooks/use-editor-commands'
 import { useEditorDocumentStoreApi } from '@/features/editor/state/document-state'
-import { useEditorWorkspaceStoreApi } from '@/features/editor/state/workspace-state'
+import {
+  useEditorWorkspaceStoreApi,
+  useEditorWorkspaceState,
+} from '@/features/editor/state/workspace-state'
+import { isSettingsDocumentId } from '@/features/settings/utils/document'
 import { useWorkspaceEditService } from '@/features/editor/providers/workspace-edit-context'
 import { useOpenFileAtRef } from '@/features/git/hooks/use-open-file-at-ref'
 import { SettingsDialog } from '@/features/settings/components/dialog'
@@ -108,7 +111,9 @@ export function CommandProvider({ children }: { readonly children: ReactNode }) 
   const [environmentDialog, setEnvironmentDialog] = useState<
     'switch' | 'connect' | 'disconnect' | null
   >(null)
-  const [settingsOpen, setSettingsOpen] = useState(false)
+  const settingsOpen = useEditorWorkspaceState(
+    (state) => state.rootFolder === null && isSettingsDocumentId(state.selectedFilePath ?? ''),
+  )
   const [settingsOrigin, setSettingsOrigin] = useState<FocusTargetToken | null>(null)
   const adaptersRef = useRef(
     runtimeAdapters({
@@ -127,7 +132,6 @@ export function CommandProvider({ children }: { readonly children: ReactNode }) 
   const paletteSearchRef = useRef('')
   const paletteScopeRef = useRef<PaletteScope | null>(null)
   const paletteRestoreRef = useRef<FocusTargetToken | null | undefined>(undefined)
-  const settingsOpenRef = useRef(false)
   const settingsRestoreRef = useRef<FocusTargetToken | null | undefined>(undefined)
 
   useLayoutEffect(() => {
@@ -193,6 +197,8 @@ export function CommandProvider({ children }: { readonly children: ReactNode }) 
     documents: { queryClient, store: documentStore, save: editorRuntime.saveService },
     editor: {
       closeTab: (...args) => adaptersRef.current.editor.closeTab(...args),
+      closeTabs: (...args) => adaptersRef.current.editor.closeTabs(...args),
+      discardAndCloseTabs: (...args) => adaptersRef.current.editor.discardAndCloseTabs(...args),
       discardAndCloseTab: (...args) => adaptersRef.current.editor.discardAndCloseTab(...args),
       discardLiveEditorDocument: (...args) =>
         adaptersRef.current.editor.discardLiveEditorDocument(...args),
@@ -211,7 +217,6 @@ export function CommandProvider({ children }: { readonly children: ReactNode }) 
       selectTab: (...args) => adaptersRef.current.editor.selectTab(...args),
       setActivePane: (...args) => adaptersRef.current.editor.setActivePane(...args),
       splitTab: (...args) => adaptersRef.current.editor.splitTab(...args),
-      switchRootFolder: (...args) => adaptersRef.current.editor.switchRootFolder(...args),
     },
     files: {
       openFileAtRef: (path, ref) => adaptersRef.current.openFileAtRef(path, ref),
@@ -234,8 +239,8 @@ export function CommandProvider({ children }: { readonly children: ReactNode }) 
       showEnvironmentDialog: setEnvironmentDialog,
       showMachines: () => {
         selectSettingsScope('user')
-        selectSettingsCategory('Machines')
-        setSettingsOpen(true)
+        void openWorkspaceSettings(focus, workspace, adaptersRef.current.editor, 'Machines')
+          .completion
       },
       openPicker: () => workspace.getState().openPicker(),
       openWorkspaceRoot: (rootPath) => adaptersRef.current.openWorkspaceRoot(rootPath),
@@ -249,19 +254,16 @@ export function CommandProvider({ children }: { readonly children: ReactNode }) 
       },
       showSettings: (origin, search) => {
         if (search !== undefined) {
-          selectSettingsCategory(null)
           selectSettingsSearch(search)
           selectSettingsView('form')
         }
-        const rootOpen = workspace.getState().rootFolder !== null
-        if (rootOpen) {
-          return openWorkspaceSettings(focus, workspace, adaptersRef.current.editor)
-        }
-        if (!settingsOpenRef.current) setSettingsOrigin(origin ?? focus.captureOrigin())
-
-        settingsOpenRef.current = true
-        setSettingsOpen(true)
-        return focus.request(focusTargetById({ kind: 'settings-dialog' }))
+        if (!workspace.getState().rootFolder) setSettingsOrigin(origin ?? focus.captureOrigin())
+        return openWorkspaceSettings(
+          focus,
+          workspace,
+          adaptersRef.current.editor,
+          search === undefined ? undefined : null,
+        )
       },
     },
     tabs: {
@@ -311,13 +313,9 @@ export function CommandProvider({ children }: { readonly children: ReactNode }) 
     closePalette(true)
   }
   const handleSettingsOpenChange = (open: boolean) => {
-    settingsOpenRef.current = open
-    setSettingsOpen(open)
-    if (open) {
-      settingsRestoreRef.current = undefined
-      return
-    }
-
+    if (open) return
+    const tabId = workspace.getState().workbenchPanels.activeEditorTabId
+    if (tabId) void adaptersRef.current.editor.closeTab(tabId)
     settingsRestoreRef.current = settingsOrigin
     setSettingsOrigin(null)
   }

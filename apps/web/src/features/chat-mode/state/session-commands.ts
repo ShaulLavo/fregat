@@ -1,6 +1,5 @@
 import {
   scopedSessionKey,
-  type EnvironmentId,
   type ProjectId,
   type ScopedProjectRef,
   type ScopedWorktreeRef,
@@ -29,35 +28,18 @@ import { compareSessionsForRail } from '@workspace/client-core/chat/rail/session
 import { sessionRailModel, type SessionRailItem } from '@workspace/client-core/chat/rail/model'
 import { useActiveProjectStore } from '@/features/workspace/state/active-project'
 import { activeEnvironmentId } from '@/lib/environments/state/domain'
-import type { OpenWorkspaceRootResult } from '@/features/workspace/hooks/use-open-root'
+import { getNavigation } from '@/state/navigation-binding'
 export type SessionTraversalDirection = 'next' | 'previous'
-type SessionProjectOpener = (
-  environmentId: EnvironmentId,
-  workspaceRoot: string,
-) => Promise<OpenWorkspaceRootResult>
-let openProjectRoot: SessionProjectOpener | null = null
-let openingGeneration = 0
-export function setSessionProjectOpener(opener: SessionProjectOpener | null) {
-  openProjectRoot = opener
-}
 export type SessionOpenOptions = {
-  readonly openProject?: SessionProjectOpener
   readonly baseWorktree?: ScopedWorktreeRef
 }
-export async function openSessionRow(session: SessionRailItem, options: SessionOpenOptions = {}) {
-  const generation = ++openingGeneration
-  const slice = selectChatProjectionSlice(useChatProjectionStore.getState(), session.environmentId)
-  const navigationPath =
-    session.worktree.lifecycle.state === 'ready'
-      ? session.worktreePath
-      : selectCurrentWorktree(slice, session.projectId)?.path
-  if (navigationPath === undefined) return false
-  const opened = await openRoot(session.environmentId, navigationPath, options)
-  if (!opened || generation !== openingGeneration) return false
-  useSessionSelectionStore
-    .getState()
-    .selectSession(session.environmentId, session.projectId, session.id)
-  return true
+export async function openSessionRow(session: SessionRailItem) {
+  const result = await getNavigation().openChat({
+    environmentId: session.environmentId,
+    sessionId: session.id,
+    surface: 'main',
+  })
+  return result.status === 'applied'
 }
 export function activateSessionRow(session: SessionRailItem, intent: SessionClickIntent) {
   const multi = useSessionMultiSelectStore.getState()
@@ -79,25 +61,10 @@ export function clearSessionMultiSelect() {
   useSessionMultiSelectStore.getState().clear()
 }
 export async function startSessionDraft(ref: ScopedProjectRef, options: SessionOpenOptions = {}) {
-  const generation = ++openingGeneration
-  const slice = selectChatProjectionSlice(useChatProjectionStore.getState(), ref.environmentId)
   const base = options.baseWorktree
   if (base && base.environmentId !== ref.environmentId) return false
-  const worktree = base
-    ? slice.worktreeById[base.worktreeId]
-    : selectCurrentWorktree(slice, ref.projectId)
-  if (worktree && worktree.projectId !== ref.projectId) return false
-  if (!worktree) return false
-  const navigationPath =
-    worktree.lifecycle.state === 'ready'
-      ? worktree.path
-      : selectCurrentWorktree(slice, ref.projectId)?.path
-  if (navigationPath === undefined) return false
-  const opened = await openRoot(ref.environmentId, navigationPath, options)
-  if (!opened || generation !== openingGeneration) return false
-  useSessionRailStore.getState().setView('active')
-  useSessionSelectionStore.getState().startDraft(ref.environmentId, ref.projectId, worktree.id)
-  return true
+  const result = await getNavigation().startDraft(ref, base?.worktreeId)
+  return result.status === 'applied'
 }
 export function startScopedSessionDraft() {
   const projectId = useSessionRailStore.getState().scope ?? activeProjectId()
@@ -170,10 +137,4 @@ function activeProjectId(): ProjectId | null {
   return workspaceRoot !== null
     ? (selectWorktreeAtPath(activeChatProjection(), workspaceRoot)?.projectId ?? null)
     : null
-}
-async function openRoot(environmentId: EnvironmentId, path: string, options: SessionOpenOptions) {
-  const opener = options.openProject ?? openProjectRoot
-  if (!opener) return false
-  const result = await opener(environmentId, path)
-  return result === 'opened' || result === 'already-open'
 }

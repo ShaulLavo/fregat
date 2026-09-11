@@ -135,7 +135,7 @@ test('resolves a file address through real server paths without changing the act
   expect(await readServerPaths({ client, signal })).toEqual(paths)
 })
 
-test('workbench addresses preserve project, pane and file position across each pane', async ({
+test('workbench addresses preserve project, nondefault panes and file position', async ({
   client,
   server,
 }) => {
@@ -150,7 +150,11 @@ test('workbench addresses preserve project, pane and file position across each p
       pane,
     } as const
     const address = await workbenchAddress(environmentId, location, { client, signal })
-    expect(await resolveAddress(address, client, environmentId, signal)).toEqual(location)
+    // Terminal and files are simultaneous web defaults; their TUI focus is not addressed.
+    expect(await resolveAddress(address, client, environmentId, signal)).toEqual({
+      ...location,
+      pane: pane === 'terminal' ? 'files' : pane,
+    })
   }
 })
 

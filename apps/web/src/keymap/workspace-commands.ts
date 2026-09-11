@@ -33,7 +33,8 @@ import {
 } from '@phosphor-icons/react'
 import type { QueryClient } from '@tanstack/react-query'
 
-import { shareableAddress } from '@/features/address/state/storage'
+import { getNavigation } from '@/state/navigation-binding'
+import type { NavigationResult } from '@/state/navigation-coordinator'
 import {
   jumpToSession,
   selectAdjacentSession,
@@ -58,7 +59,6 @@ import { parseDiffDocumentId } from '@/features/git/utils/diff-document'
 import { parseSearchBufferDocumentId } from '@/features/search/utils/buffer-document'
 import {
   activeEditorTabForWorkbenchPanels,
-  openEditorPathInWorkbenchPanels,
   showWorkbenchBottomTab,
   showWorkbenchSidebarTab,
   toggleWorkbenchBottomTab,
@@ -138,6 +138,26 @@ function operationStart(operation: Promise<boolean>): StartedCommand {
   return {
     completion: operation.then((accepted) => dispositionFor(accepted)),
     status: 'started',
+  }
+}
+
+function navigationStart(operation: Promise<NavigationResult>): StartedCommand {
+  return afterNavigation(operation, () => handled)
+}
+
+function afterNavigation(
+  operation: Promise<NavigationResult>,
+  next: () => StartedCommand | ImmediateCommandDisposition,
+): StartedCommand {
+  return {
+    status: 'started',
+    completion: operation.then((result) => {
+      if (result.status === 'superseded')
+        return { reason: 'domain-discarded', status: 'cancelled' } as const
+      if (result.status === 'unavailable') return declined
+      const outcome = next()
+      return outcome.status === 'started' ? outcome.completion : outcome
+    }),
   }
 }
 
@@ -231,8 +251,17 @@ function settingStart(
 function focusActiveSurface(runtime: WorkspaceCommandRuntime): StartedCommand {
   let workspace = runtime.workspace.getState()
   if (workspace.uiMode === 'chat') {
-    workspace.setChatModePanels(showChatModeToolTab(workspace.chatModePanels, 'editor'))
-    workspace = runtime.workspace.getState()
+    if (
+      workspace.chatModePanels.activeToolTab !== 'editor' ||
+      !workspace.chatModePanels.toolPaneOpen
+    )
+      return afterNavigation(
+        getNavigation().setChatModePanels(
+          showChatModeToolTab(workspace.chatModePanels, 'editor'),
+          runtime.workspace,
+        ),
+        () => focusActiveSurface(runtime),
+      )
   }
   const activeTab = activeEditorTabForWorkbenchPanels(workspace.workbenchPanels)
   if (!activeTab) {
@@ -409,16 +438,22 @@ export const workspaceCommands = [
     when: ['workspaceOpen', 'workspaceMutable'],
     icon: FilePlusIcon,
     run: ({ runtime, snapshot }) => {
-      if (!snapshot.rootPath) return declined
+      const rootPath = snapshot.rootPath
+      if (!rootPath) return declined
 
-      const workspace = runtime.workspace.getState()
-      workspace.setUiMode('workbench')
-      workspace.setWorkbenchPanels(showWorkbenchSidebarTab(snapshot.workbenchPanels, 'files'))
-      return focusIdInLayoutStart(
-        runtime,
-        { kind: 'file-tree', rootPath: snapshot.rootPath },
-        'workbench',
-        'create-file',
+      return afterNavigation(
+        getNavigation().setWorkbenchPanels(
+          showWorkbenchSidebarTab(snapshot.workbenchPanels, 'files'),
+          runtime.workspace,
+          'workbench',
+        ),
+        () =>
+          focusIdInLayoutStart(
+            runtime,
+            { kind: 'file-tree', rootPath },
+            'workbench',
+            'create-file',
+          ),
       )
     },
   }),
@@ -428,16 +463,22 @@ export const workspaceCommands = [
     when: ['workspaceOpen', 'workspaceMutable'],
     icon: FolderPlusIcon,
     run: ({ runtime, snapshot }) => {
-      if (!snapshot.rootPath) return declined
+      const rootPath = snapshot.rootPath
+      if (!rootPath) return declined
 
-      const workspace = runtime.workspace.getState()
-      workspace.setUiMode('workbench')
-      workspace.setWorkbenchPanels(showWorkbenchSidebarTab(snapshot.workbenchPanels, 'files'))
-      return focusIdInLayoutStart(
-        runtime,
-        { kind: 'file-tree', rootPath: snapshot.rootPath },
-        'workbench',
-        'create-folder',
+      return afterNavigation(
+        getNavigation().setWorkbenchPanels(
+          showWorkbenchSidebarTab(snapshot.workbenchPanels, 'files'),
+          runtime.workspace,
+          'workbench',
+        ),
+        () =>
+          focusIdInLayoutStart(
+            runtime,
+            { kind: 'file-tree', rootPath },
+            'workbench',
+            'create-folder',
+          ),
       )
     },
   }),
@@ -459,19 +500,21 @@ export const workspaceCommands = [
     ...workspaceCommandMetadata['workspace.openSearchEditor'],
     icon: FileMagnifyingGlassIcon,
     run: ({ runtime, snapshot }) => {
-      if (!snapshot.rootPath) return declined
+      const rootPath = snapshot.rootPath
+      if (!rootPath) return declined
 
-      runtime.editor.openSearchEditor(snapshot.rootPath)
-      return focusActiveSurface(runtime)
+      return afterNavigation(runtime.editor.openSearchEditor(snapshot.rootPath), () =>
+        focusActiveSurface(runtime),
+      )
     },
   }),
   defineCommand({
     ...workspaceCommandMetadata['workspace.quickOpenPreviousEditor'],
     icon: ClockCounterClockwiseIcon,
     run: ({ runtime }) => {
-      if (!runtime.editor.selectPreviousEditor()) return declined
-
-      return focusActiveSurface(runtime)
+      return afterNavigation(runtime.editor.selectPreviousEditor(), () =>
+        focusActiveSurface(runtime),
+      )
     },
   }),
   defineCommand({
@@ -542,12 +585,9 @@ export const workspaceCommands = [
       const path = fileBackedDocumentPath(snapshot.activeFilePath)
       if (!path) return declined
 
-      runtime.workspace
-        .getState()
-        .setWorkbenchPanels(
-          openEditorPathInWorkbenchPanels(snapshot.workbenchPanels, compareSavedDocumentId(path)),
-        )
-      return focusActiveSurface(runtime)
+      return afterNavigation(runtime.editor.openFileSurface(compareSavedDocumentId(path)), () =>
+        focusActiveSurface(runtime),
+      )
     },
   }),
   defineCommand({
@@ -585,16 +625,15 @@ export const workspaceCommands = [
     ...workspaceCommandMetadata['workspace.reopenClosedEditor'],
     icon: ArrowClockwiseIcon,
     run: ({ runtime }) => {
-      if (!runtime.editor.reopenClosedEditor()) return declined
-
-      return focusActiveSurface(runtime)
+      return afterNavigation(runtime.editor.reopenClosedEditor(), () => focusActiveSurface(runtime))
     },
   }),
   defineCommand({
     ...workspaceCommandMetadata['workspace.toggleSidebarVisibility'],
     icon: SidebarSimpleIcon,
     run: ({ runtime, snapshot }) => {
-      if (!snapshot.rootPath) return declined
+      const rootPath = snapshot.rootPath
+      if (!rootPath) return declined
 
       const workspace = runtime.workspace.getState()
       // Arriving from chat mode reveals the pane rather than toggling it: the
@@ -604,14 +643,12 @@ export const workspaceCommands = [
       const panels = revealing
         ? showWorkbenchSidebarTab(snapshot.workbenchPanels, 'files')
         : toggleWorkbenchSidebarTab(snapshot.workbenchPanels, 'files')
-      workspace.setUiMode('workbench')
-      workspace.setWorkbenchPanels(panels)
-      if (!panels.sidebarOpen) return handled
-
-      return focusIdInLayoutStart(
-        runtime,
-        { kind: 'file-tree', rootPath: snapshot.rootPath },
-        'workbench',
+      return afterNavigation(
+        getNavigation().setWorkbenchPanels(panels, runtime.workspace, 'workbench'),
+        () => {
+          if (!panels.sidebarOpen) return handled
+          return focusIdInLayoutStart(runtime, { kind: 'file-tree', rootPath }, 'workbench')
+        },
       )
     },
   }),
@@ -619,25 +656,28 @@ export const workspaceCommands = [
     ...workspaceCommandMetadata['workspace.togglePanel'],
     icon: SquareHalfBottomIcon,
     run: ({ runtime, snapshot }) => {
-      if (!snapshot.rootPath) return declined
+      const rootPath = snapshot.rootPath
+      if (!rootPath) return declined
 
       const workspace = runtime.workspace.getState()
       const revealing = workspace.uiMode !== 'workbench'
       const panels = revealing
         ? showWorkbenchBottomTab(snapshot.workbenchPanels, 'terminal')
         : toggleWorkbenchBottomTab(snapshot.workbenchPanels, 'terminal')
-      workspace.setUiMode('workbench')
-      workspace.setWorkbenchPanels(panels)
-      if (!panels.bottomPanelOpen) return handled
-
-      return focusStart(runtime, {
-        isValid: () => runtime.workspace.getState().uiMode === 'workbench',
-        kind: 'match',
-        matches: (target) =>
-          target.id.kind === 'terminal' &&
-          target.id.rootPath === snapshot.rootPath &&
-          target.layout === 'workbench',
-      })
+      return afterNavigation(
+        getNavigation().setWorkbenchPanels(panels, runtime.workspace, 'workbench'),
+        () => {
+          if (!panels.bottomPanelOpen) return handled
+          return focusStart(runtime, {
+            isValid: () => runtime.workspace.getState().uiMode === 'workbench',
+            kind: 'match',
+            matches: (target) =>
+              target.id.kind === 'terminal' &&
+              target.id.rootPath === snapshot.rootPath &&
+              target.layout === 'workbench',
+          })
+        },
+      )
     },
   }),
   defineCommand({
@@ -664,15 +704,16 @@ export const workspaceCommands = [
     ...workspaceCommandMetadata['workspace.focusFileTree'],
     icon: CrosshairIcon,
     run: ({ runtime, snapshot }) => {
-      if (!snapshot.rootPath) return declined
+      const rootPath = snapshot.rootPath
+      if (!rootPath) return declined
 
-      const workspace = runtime.workspace.getState()
-      workspace.setUiMode('workbench')
-      workspace.setWorkbenchPanels(showWorkbenchSidebarTab(snapshot.workbenchPanels, 'files'))
-      return focusIdInLayoutStart(
-        runtime,
-        { kind: 'file-tree', rootPath: snapshot.rootPath },
-        'workbench',
+      return afterNavigation(
+        getNavigation().setWorkbenchPanels(
+          showWorkbenchSidebarTab(snapshot.workbenchPanels, 'files'),
+          runtime.workspace,
+          'workbench',
+        ),
+        () => focusIdInLayoutStart(runtime, { kind: 'file-tree', rootPath }, 'workbench'),
       )
     },
   }),
@@ -680,16 +721,22 @@ export const workspaceCommands = [
     ...workspaceCommandMetadata['workspace.findInFileTree'],
     icon: FileMagnifyingGlassIcon,
     run: ({ runtime, snapshot }) => {
-      if (!snapshot.rootPath) return declined
+      const rootPath = snapshot.rootPath
+      if (!rootPath) return declined
 
-      const workspace = runtime.workspace.getState()
-      workspace.setUiMode('workbench')
-      workspace.setWorkbenchPanels(showWorkbenchSidebarTab(snapshot.workbenchPanels, 'files'))
-      return focusIdInLayoutStart(
-        runtime,
-        { kind: 'file-tree', rootPath: snapshot.rootPath },
-        'workbench',
-        'open-search',
+      return afterNavigation(
+        getNavigation().setWorkbenchPanels(
+          showWorkbenchSidebarTab(snapshot.workbenchPanels, 'files'),
+          runtime.workspace,
+          'workbench',
+        ),
+        () =>
+          focusIdInLayoutStart(
+            runtime,
+            { kind: 'file-tree', rootPath },
+            'workbench',
+            'open-search',
+          ),
       )
     },
   }),
@@ -698,16 +745,22 @@ export const workspaceCommands = [
     icon: CrosshairIcon,
     run: ({ runtime, snapshot }) => {
       if (!fileBackedDocumentPath(snapshot.activeFilePath)) return declined
-      if (!snapshot.rootPath) return declined
+      const rootPath = snapshot.rootPath
+      if (!rootPath) return declined
 
-      const workspace = runtime.workspace.getState()
-      workspace.setUiMode('workbench')
-      workspace.setWorkbenchPanels(showWorkbenchSidebarTab(snapshot.workbenchPanels, 'files'))
-      return focusIdInLayoutStart(
-        runtime,
-        { kind: 'file-tree', rootPath: snapshot.rootPath },
-        'workbench',
-        'reveal-active',
+      return afterNavigation(
+        getNavigation().setWorkbenchPanels(
+          showWorkbenchSidebarTab(snapshot.workbenchPanels, 'files'),
+          runtime.workspace,
+          'workbench',
+        ),
+        () =>
+          focusIdInLayoutStart(
+            runtime,
+            { kind: 'file-tree', rootPath },
+            'workbench',
+            'reveal-active',
+          ),
       )
     },
   }),
@@ -715,15 +768,16 @@ export const workspaceCommands = [
     ...workspaceCommandMetadata['workspace.focusGit'],
     icon: CrosshairIcon,
     run: ({ runtime, snapshot }) => {
-      if (!snapshot.rootPath) return declined
+      const rootPath = snapshot.rootPath
+      if (!rootPath) return declined
 
-      const workspace = runtime.workspace.getState()
-      workspace.setUiMode('workbench')
-      workspace.setWorkbenchPanels(showWorkbenchSidebarTab(snapshot.workbenchPanels, 'git'))
-      return focusIdInLayoutStart(
-        runtime,
-        { kind: 'git', rootPath: snapshot.rootPath },
-        'workbench',
+      return afterNavigation(
+        getNavigation().setWorkbenchPanels(
+          showWorkbenchSidebarTab(snapshot.workbenchPanels, 'git'),
+          runtime.workspace,
+          'workbench',
+        ),
+        () => focusIdInLayoutStart(runtime, { kind: 'git', rootPath }, 'workbench'),
       )
     },
   }),
@@ -732,35 +786,22 @@ export const workspaceCommands = [
     run: () => {
       if (!navigator.clipboard?.writeText) return declined
 
-      // The address bar already holds the full address — session, tool pane, filters and
-      // all. Rebuilding a workbench-only subset here copied a strictly weaker link than
-      // the one on screen, which defeats the point of the command.
-      //
-      // Through `shareableAddress`, not the raw location: a copied link needs an origin
-      // to be openable at all, and it must not carry the dev params, which belong to the
-      // session someone typed them into rather than to everyone they send the link to.
-      return resolvedOperationStart(navigator.clipboard.writeText(shareableAddress()))
+      return resolvedOperationStart(
+        navigator.clipboard.writeText(getNavigation().copyAddress().href),
+      )
     },
   }),
-  // History is the browser's, so back and forward are one call each. The popstate
-  // listener in the address layer is what turns the move into applied state.
-  //
-  // Mod+[ and Mod+] are app bindings too, not only the editor's outdent/indent
-  // pair. Outside the editor these keys used to reach the browser untouched,
-  // which was harmless only while there was no history to walk; now that there
-  // is, the app has to own them or a back press in the file tree leaves the
-  // workspace entirely.
   defineCommand({
     ...workspaceCommandMetadata['workspace.navigateBack'],
     run: () => {
-      history.back()
+      getNavigation().back()
       return handled
     },
   }),
   defineCommand({
     ...workspaceCommandMetadata['workspace.navigateForward'],
     run: () => {
-      history.forward()
+      getNavigation().forward()
       return handled
     },
   }),
@@ -771,9 +812,13 @@ export const workspaceCommands = [
     ...workspaceCommandMetadata['workspace.revealChat'],
     run: ({ runtime, snapshot }) => {
       if (snapshot.uiMode !== 'chat') {
-        runtime.workspace
-          .getState()
-          .setWorkbenchPanels(showWorkbenchSidebarTab(snapshot.workbenchPanels, 'chat'))
+        return afterNavigation(
+          getNavigation().setWorkbenchPanels(
+            showWorkbenchSidebarTab(snapshot.workbenchPanels, 'chat'),
+            runtime.workspace,
+          ),
+          () => chatFocusStart(runtime, snapshot.rootPath, snapshot.uiMode),
+        )
       }
 
       return chatFocusStart(runtime, snapshot.rootPath, snapshot.uiMode)
@@ -785,19 +830,25 @@ export const workspaceCommands = [
   defineCommand({
     ...workspaceCommandMetadata['workspace.revealTerminal'],
     run: ({ runtime, snapshot }) => {
-      if (!snapshot.rootPath) return declined
+      const rootPath = snapshot.rootPath
+      if (!rootPath) return declined
 
-      const workspace = runtime.workspace.getState()
-      workspace.setUiMode('workbench')
-      workspace.setWorkbenchPanels(showWorkbenchBottomTab(snapshot.workbenchPanels, 'terminal'))
-      return focusStart(runtime, {
-        isValid: () => runtime.workspace.getState().uiMode === 'workbench',
-        kind: 'match',
-        matches: (target) =>
-          target.id.kind === 'terminal' &&
-          target.id.rootPath === snapshot.rootPath &&
-          target.layout === 'workbench',
-      })
+      return afterNavigation(
+        getNavigation().setWorkbenchPanels(
+          showWorkbenchBottomTab(snapshot.workbenchPanels, 'terminal'),
+          runtime.workspace,
+          'workbench',
+        ),
+        () =>
+          focusStart(runtime, {
+            isValid: () => runtime.workspace.getState().uiMode === 'workbench',
+            kind: 'match',
+            matches: (target) =>
+              target.id.kind === 'terminal' &&
+              target.id.rootPath === snapshot.rootPath &&
+              target.layout === 'workbench',
+          }),
+      )
     },
   }),
   defineCommand({
@@ -817,7 +868,7 @@ export const workspaceCommands = [
         )
       }
 
-      return focusActiveSurfaceOrShell(runtime)
+      return afterNavigation(result.completion, () => focusActiveSurfaceOrShell(runtime))
     },
   }),
   defineCommand({
@@ -838,24 +889,26 @@ export const workspaceCommands = [
     ...workspaceCommandMetadata['workspace.toggleUiMode'],
     run: ({ runtime, snapshot }) => {
       const nextMode = toggledWorkspaceUiMode(snapshot.uiMode)
-      runtime.workspace.getState().setUiMode(nextMode)
-      if (nextMode === 'chat') return chatFocusStart(runtime, snapshot.rootPath, 'chat')
-
-      return focusWorkbench(runtime)
+      return afterNavigation(getNavigation().setMode(nextMode, runtime.workspace), () => {
+        if (nextMode === 'chat') return chatFocusStart(runtime, snapshot.rootPath, 'chat')
+        return focusWorkbench(runtime)
+      })
     },
   }),
   defineCommand({
     ...workspaceCommandMetadata['workspace.showChatMode'],
     run: ({ runtime, snapshot }) => {
-      runtime.workspace.getState().setUiMode('chat')
-      return chatFocusStart(runtime, snapshot.rootPath, 'chat')
+      return afterNavigation(getNavigation().setMode('chat', runtime.workspace), () =>
+        chatFocusStart(runtime, snapshot.rootPath, 'chat'),
+      )
     },
   }),
   defineCommand({
     ...workspaceCommandMetadata['workspace.showWorkbenchMode'],
     run: ({ runtime }) => {
-      runtime.workspace.getState().setUiMode('workbench')
-      return focusWorkbench(runtime)
+      return afterNavigation(getNavigation().setMode('workbench', runtime.workspace), () =>
+        focusWorkbench(runtime),
+      )
     },
   }),
   defineCommand({
@@ -924,16 +977,15 @@ export const workspaceCommands = [
     ...workspaceCommandMetadata['workspace.toggleSessionRail'],
     run: (context) => {
       if (context.snapshot.uiMode !== 'chat') return declined
-      context.runtime.workspace
-        .getState()
-        .setChatModePanels(
+      return navigationStart(
+        getNavigation().setChatModePanels(
           setChatModeSessionRailOpen(
             context.snapshot.chatModePanels,
             !context.snapshot.chatModePanels.sessionRailOpen,
           ),
-        )
-
-      return handled
+          context.runtime.workspace,
+        ),
+      )
     },
   }),
   ...sessionJumpCommands(),

@@ -1,3 +1,4 @@
+import { useNavigation } from '@/hooks/use-navigation'
 import { useSettingsSearch, selectSettingsSearch } from '@/features/settings/state/search-store'
 import { descriptorFor, type SettingId } from '@workspace/contracts'
 import { Button } from '@workspace/ui/components/button'
@@ -30,10 +31,7 @@ import { matchingSettingIds } from '@workspace/client-core/settings/search'
 import { documentBackdrop } from '@/lib/platform/backdrop'
 import { isDesktop } from '@/lib/platform/bridge'
 import type { EditorRenderDocument } from '@/features/editor/utils/render-document'
-import {
-  selectSettingsCategory,
-  useSettingsCategory,
-} from '@/features/settings/state/category-store'
+import { useSettingsCategory } from '@/features/settings/state/category-store'
 import { useFocusTarget } from '@/lib/focus/hooks/use-target'
 
 /**
@@ -51,6 +49,7 @@ export function SettingsPage({
   rootPath?: string
   tabId?: string
 } = {}) {
+  const navigation = useNavigation()
   const view = useSettingsView()
   const showJson = view === 'json' && tabId !== ''
   const editorOwner = useQueryClient()
@@ -162,13 +161,11 @@ export function SettingsPage({
               Saving
             </span>
           ) : null}
-          {/* The only way out of a category a link pinned. Without it the page showed
-              one section while the header counted every setting, and nothing in the UI
-              could clear it — `selectSettingsCategory` had no caller but the applier. */}
+          {/* Clear a category supplied by an incoming address. */}
           {selectedCategory ? (
             <Button
               aria-label={`Show all settings, not just ${selectedCategory}`}
-              onClick={() => selectSettingsCategory(null)}
+              onClick={() => void navigation.setSettingsCategory(null)}
               size='sm'
               variant='secondary'
             >

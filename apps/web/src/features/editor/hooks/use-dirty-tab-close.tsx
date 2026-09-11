@@ -11,7 +11,7 @@ import type {
 } from '@/features/editor/state/workspace-edit-service'
 import { editorTabDocumentIds } from '@/features/workspace/utils/tab-dirty'
 import { isDirtyLiveEditorDocument, isSavableEditorDocument } from '@/features/editor/utils/save'
-import { useEditorCommands } from '@/features/editor/state/commands'
+import { useEditorCommands } from '@/features/editor/hooks/use-editor-commands'
 import { useEditorDocumentStoreApi } from '@/features/editor/state/document-state'
 import { useEditorWorkspaceStoreApi } from '@/features/editor/state/workspace-state'
 import {
@@ -20,7 +20,6 @@ import {
   editorTabRecordsForWorkbenchPanels,
   type WorkbenchPanels,
 } from '@/features/workbench/utils/panels'
-import { showChatModeToolTab } from '@/features/chat-mode/utils/panels'
 import { parseCompareSavedDocumentId } from '@/features/editor/utils/compare-saved-document'
 import { parseDiffDocumentId } from '@/features/git/utils/diff-document'
 import { parseSearchBufferDocumentId } from '@/features/search/utils/buffer-document'
@@ -34,6 +33,7 @@ import {
   type FocusTargetToken,
 } from '@/lib/focus/state/service'
 import { matchesActiveSurface } from '@/lib/focus/utils/active-surface'
+import type { NavigationResult } from '@/state/navigation-coordinator'
 
 declare const unsavedDialogTargetBrand: unique symbol
 
@@ -42,7 +42,11 @@ export type UnsavedDialogTarget = {
 }
 
 export type CloseRequestResult =
-  | { readonly status: 'closed'; readonly tabIds: readonly string[] }
+  | {
+      readonly status: 'closed'
+      readonly tabIds: readonly string[]
+      readonly completion: Promise<NavigationResult>
+    }
   | {
       readonly status: 'deferred'
       readonly dialogTarget: UnsavedDialogTarget
@@ -72,7 +76,7 @@ export function useDirtyTabCloseRequest() {
   const workspaceEdits = useOptionalWorkspaceEditService()
   const mutationsEnabled = useWorkspaceMutationAllowed()
   const { saveService } = useEditorRuntime()
-  const { closeTab, discardAndCloseTab } = useEditorCommands()
+  const { closeTabs, discardAndCloseTabs } = useEditorCommands()
   const closeOriginRef = useRef<FocusTargetToken | null>(null)
   const pendingFocusRef = useRef<PendingCloseFocus | null>(null)
   const pendingClosesRef = useRef<readonly PendingClose[]>(EMPTY_PENDING_CLOSES)
@@ -168,6 +172,7 @@ export function useDirtyTabCloseRequest() {
       if (openTabs.length === 0) return { status: 'rejected', reason: 'not-found' }
       const state = documentStore.getState()
       const pending: PendingClose[] = []
+      const cleanTabIds: string[] = []
       const closingPathCounts = tabClosePathCounts(openTabs)
       const openPathCounts = editorPathCountsForWorkbenchPanels(workspace.workbenchPanels)
 
@@ -184,9 +189,10 @@ export function useDirtyTabCloseRequest() {
           continue
         }
 
-        closeTab(tab.id)
+        cleanTabIds.push(tab.id)
       }
 
+      const completion = closeTabs(cleanTabIds)
       publishPendingCloses(pendingClosesForRequest(pendingClosesRef.current, pending))
       setSaveError(null)
 
@@ -194,7 +200,7 @@ export function useDirtyTabCloseRequest() {
       const firstPending = pending[0]
       if (!firstPending) {
         closeOriginRef.current = null
-        return { status: 'closed', tabIds: requestedTabIds }
+        return { status: 'closed', tabIds: requestedTabIds, completion }
       }
 
       closeOriginRef.current = origin
@@ -205,7 +211,7 @@ export function useDirtyTabCloseRequest() {
         tabIds: requestedTabIds,
       }
     },
-    [closeTab, documentStore, focus, publishPendingCloses, workspaceStore],
+    [closeTabs, documentStore, focus, publishPendingCloses, workspaceStore],
   )
 
   const requestCloseTab = useCallback<RequestCloseTab>(
@@ -229,7 +235,7 @@ export function useDirtyTabCloseRequest() {
     clearPendingClose()
   }, [clearPendingClose, saving])
 
-  const handleDiscard = useCallback(() => {
+  const handleDiscard = useCallback(async () => {
     if (!pendingClose) return
     if (saving) return
     if (!pendingCloseIsOpen(pendingClose, workspaceStore.getState())) {
@@ -237,11 +243,9 @@ export function useDirtyTabCloseRequest() {
       return
     }
 
-    for (const tabId of pendingClose.tabIds) {
-      discardAndCloseTab(tabId)
-    }
+    await discardAndCloseTabs(pendingClose.tabIds)
     advancePendingClose()
-  }, [advancePendingClose, discardAndCloseTab, pendingClose, saving, workspaceStore])
+  }, [advancePendingClose, discardAndCloseTabs, pendingClose, saving, workspaceStore])
 
   const handleSave = useCallback(() => {
     if (!pendingClose) return
@@ -250,7 +254,7 @@ export function useDirtyTabCloseRequest() {
 
     void saveAndClosePendingTab(pendingClose, {
       advancePendingClose,
-      closeTab,
+      closeTabs,
       documentStore,
       saveService,
       setSaveError,
@@ -260,7 +264,7 @@ export function useDirtyTabCloseRequest() {
     })
   }, [
     advancePendingClose,
-    closeTab,
+    closeTabs,
     documentStore,
     pendingClose,
     saveService,
@@ -310,11 +314,7 @@ function restoreRegisteredOrigin(focus: FocusService, origin: FocusTargetToken |
 function activeCloseSuccessorDestination(
   workspaceStore: ReturnType<typeof useEditorWorkspaceStoreApi>,
 ): FocusDestination | null {
-  let workspace = workspaceStore.getState()
-  if (workspace.uiMode === 'chat') {
-    workspace.setChatModePanels(showChatModeToolTab(workspace.chatModePanels, 'editor'))
-    workspace = workspaceStore.getState()
-  }
+  const workspace = workspaceStore.getState()
 
   const activeTab = activeEditorTabForWorkbenchPanels(workspace.workbenchPanels)
   if (!activeTab) return null
@@ -381,9 +381,7 @@ async function saveAndClosePendingTab(pendingClose: PendingClose, context: SaveA
       return
     }
 
-    for (const tabId of pendingClose.tabIds) {
-      context.closeTab(tabId)
-    }
+    await context.closeTabs(pendingClose.tabIds)
     context.advancePendingClose()
   } catch (error: unknown) {
     context.setSaveError(errorMessage(error))
@@ -394,7 +392,9 @@ async function saveAndClosePendingTab(pendingClose: PendingClose, context: SaveA
 
 type SaveAndCloseContext = {
   advancePendingClose: () => void
-  closeTab: (tabId: string) => void
+  closeTabs: (
+    tabIds: readonly string[],
+  ) => Promise<import('@/state/navigation-coordinator').NavigationResult>
   documentStore: ReturnType<typeof useEditorDocumentStoreApi>
   saveService: EditorSaveService
   setSaveError: (error: string | null) => void

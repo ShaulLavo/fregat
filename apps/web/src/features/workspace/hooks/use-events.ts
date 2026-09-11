@@ -1,6 +1,6 @@
 import type { PickedFsEntry } from '@/lib/file-system-types'
 import { fileBackedDocumentPath } from '@/features/editor/utils/file-backed-document'
-import { useEditorCommands } from '@/features/editor/state/commands'
+import { useEditorCommands } from '@/features/editor/hooks/use-editor-commands'
 import {
   useEditorConflictStoreApi,
   type EditorConflictStoreApi,

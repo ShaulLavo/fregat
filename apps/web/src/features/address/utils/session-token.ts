@@ -1,23 +1,12 @@
 import type { SessionSelection } from '@/features/chat-mode/utils/active-session'
+import { type EnvironmentId, type ProjectId, type SessionId } from '@workspace/contracts'
 import {
-  sessionIdSchema,
-  type EnvironmentId,
-  type ProjectId,
-  type SessionId,
-} from '@workspace/contracts'
-import * as v from 'valibot'
-
-const SESSION_TOKEN_PREFIX = 't'
-const DRAFT_TOKEN = 't/new'
+  chatReferenceForToken,
+  tokenForChatReference,
+} from '@workspace/client-core/address/references'
 
 export function sessionTokenFor(selection: SessionSelection) {
-  if (selection.kind === 'session') {
-    return `${SESSION_TOKEN_PREFIX}/${encodeURIComponent(selection.sessionId)}`
-  }
-  if (selection.kind === 'draft') return DRAFT_TOKEN
-
-  // `auto` is the absence of a pick, and absence is how the grammar spells it.
-  return null
+  return selection.kind === 'auto' ? null : tokenForChatReference(selection)
 }
 
 export type ParsedSessionToken =
@@ -26,16 +15,8 @@ export type ParsedSessionToken =
   | { readonly kind: 'rejected' }
 
 export function parseSessionToken(token: string | null): ParsedSessionToken | null {
-  if (!token) return null
-  if (token === DRAFT_TOKEN) return { kind: 'draft' }
-
-  const [prefix, ...rest] = token.split('/')
-  if (prefix !== SESSION_TOKEN_PREFIX) return null
-
-  const sessionId = decodeSessionId(rest.join('/'))
-  if (!sessionId) return { kind: 'rejected' }
-
-  return { kind: 'session', sessionId }
+  if (!token?.startsWith('t/')) return null
+  return chatReferenceForToken(token) ?? { kind: 'rejected' }
 }
 
 export function sessionSelectionFor(
@@ -48,20 +29,4 @@ export function sessionSelectionFor(
     return { kind: 'session', environmentId, projectId, sessionId: parsed.sessionId }
 
   return null
-}
-
-/**
- * Session ids are compared by exact equality everywhere, so an abbreviated one does
- * not resolve — a prefix is rejected rather than guessed at.
- */
-function decodeSessionId(raw: string) {
-  if (!raw) return null
-
-  try {
-    const sessionId = decodeURIComponent(raw)
-    const parsed = v.safeParse(sessionIdSchema, sessionId)
-    return parsed.success ? parsed.output : null
-  } catch {
-    return null
-  }
 }

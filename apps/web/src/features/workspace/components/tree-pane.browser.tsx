@@ -14,7 +14,8 @@ import { afterEach, expect, test } from 'vitest'
 import { ForesightManager } from 'js.foresight'
 
 import { TestEditorStateProvider as EditorStateProvider } from '../../../../test/factories/editor-state-provider'
-import { useEditorCommands, type EditorCommands } from '@/features/editor/state/commands'
+import { useEditorCommands } from '@/features/editor/hooks/use-editor-commands'
+import { type EditorCommands } from '@/features/editor/state/commands'
 import {
   useEditorDocumentStoreApi,
   type EditorDocumentStoreApi,
@@ -91,7 +92,7 @@ test(
     editorDiagnosticGlobal.__editorPerfTrace = { mark: () => undefined }
     const shadowRoot = await fileTreeShadowRoot()
     await expect.poll(treeRuntimeIsReady).toBe(true)
-    flushSync(() => requiredTreeEditorCommands().switchRootFolder(preparedRootFolder()))
+    flushSync(() => requiredTreeWorkspaceStore().getState().switchWorkspace(preparedRootFolder()))
 
     const directoryRow = rowButton(shadowRoot, 'src/')
     expect(directoryRow).not.toBeNull()
@@ -678,11 +679,6 @@ function nextAnimationFrame(): Promise<void> {
 function requiredTreeDocumentStore(): EditorDocumentStoreApi {
   if (!treeDocumentStore) throw new RangeError('file-tree document store unavailable')
   return treeDocumentStore
-}
-
-function requiredTreeEditorCommands(): EditorCommands {
-  if (!treeEditorCommands) throw new RangeError('file-tree editor commands unavailable')
-  return treeEditorCommands
 }
 
 function requiredTreeWorkspaceStore(): EditorWorkspaceStoreApi {

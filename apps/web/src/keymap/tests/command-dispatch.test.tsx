@@ -15,6 +15,9 @@ import { FocusService, focusTargetById } from '@/lib/focus/state/service'
 import { createTestCommandRuntime } from '../../../test/factories/command-runtime'
 import { expect, test } from '../../../test/fixtures'
 import { createTestQueryClient } from '../../../test/render'
+import { navigationWorkspace } from '../../../test/factories/navigation-workspace'
+import { renderAddressHarness, seedWorkspaceCache, waitForNavigation } from '../../../test/address'
+import { waitFor } from '@testing-library/react'
 
 const registrations: FocusTargetRegistration[] = []
 const focusServices: FocusService[] = []
@@ -145,16 +148,28 @@ test('editor dispatch resolves the active tab only in the snapshot layout', asyn
   expect(chatDispatch).not.toHaveBeenCalled()
 })
 
-test('test settings runtime reveals chat editor and accepts its nested JSON editor', async () => {
+test('settings navigation reveals chat editor and accepts its nested JSON editor', async ({
+  client,
+  server,
+}) => {
   const focus = trackedFocusService()
-  const commandRuntime = createTestCommandRuntime({
-    focus,
-    options: { rootPath: '/repo' },
-    queryClient: createTestQueryClient(),
+  const workspace = await navigationWorkspace(client, server)
+  seedWorkspaceCache(workspace)
+  const { application, navigation } = await renderAddressHarness({
+    initialEntries: [workspace.base.replace('/workbench', '/chat')],
   })
-  commandRuntime.runtime.workspace.getState().setUiMode('chat')
+  await waitForNavigation(navigation)
+  const commandRuntime = createTestCommandRuntime({
+    application,
+    navigation,
+    focus,
+    queryClient: application.getSnapshot().queryClient,
+  })
 
   const ticket = commandRuntime.runtime.shell.showSettings()
+  await waitFor(() =>
+    expect(commandRuntime.runtime.workspace.getState().chatModePanels.activeToolTab).toBe('editor'),
+  )
   const state = commandRuntime.runtime.workspace.getState()
   const activeTab = activeEditorTabForWorkbenchPanels(state.workbenchPanels)
 
@@ -218,7 +233,7 @@ test('an editor open that produces no active tab settles unavailable', async () 
     focus,
     options: {
       rootPath: '/repo',
-      runtime: { editor: { openSearchEditor: () => {} } },
+      runtime: { editor: { openSearchEditor: async () => ({ status: 'applied' as const }) } },
     },
     queryClient: createTestQueryClient(),
   })
@@ -411,7 +426,14 @@ test('close current tab waits for the exact dirty-dialog focus acknowledgement',
 test('a clean close settles only after app-shell focus acknowledgement', async () => {
   const focus = trackedFocusService()
   const shell = registerPassiveTarget(focus, 'global', { kind: 'app-shell' }, 'App shell')
-  const requestCloseTab = vi.fn(() => ({ status: 'closed', tabIds: ['tab-1'] }) as const)
+  const requestCloseTab = vi.fn(
+    () =>
+      ({
+        status: 'closed',
+        completion: Promise.resolve({ status: 'applied' as const }),
+        tabIds: ['tab-1'],
+      }) as const,
+  )
   const commandRuntime = closeCommandRuntime(focus, requestCloseTab)
 
   const ticket = commandRuntime.bus.dispatch('workspace.closeCurrentTab', invocation())

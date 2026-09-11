@@ -224,7 +224,7 @@ export function createSearchBufferStore({
         })),
       selectNextQuery: (rootPath) =>
         set((state) => ({
-          active: selectSearchHistoryQuery(state.active, rootPath, 1),
+          active: searchHistoryQuerySnapshot(state.active, rootPath, 1),
         })),
       selectNextReplaceText: (rootPath) =>
         set((state) => ({
@@ -233,7 +233,7 @@ export function createSearchBufferStore({
       selectNextMatch: () => set((state) => ({ active: selectSearchMatch(state.active, 1) })),
       selectPreviousQuery: (rootPath) =>
         set((state) => ({
-          active: selectSearchHistoryQuery(state.active, rootPath, -1),
+          active: searchHistoryQuerySnapshot(state.active, rootPath, -1),
         })),
       selectPreviousReplaceText: (rootPath) =>
         set((state) => ({
@@ -738,7 +738,7 @@ function activeRun(snapshot: SearchBufferSnapshot | null, runId: number) {
   return snapshot
 }
 
-function emptySearchBuffer(rootPath: string): SearchBufferSnapshot {
+export function emptySearchBuffer(rootPath: string): SearchBufferSnapshot {
   // Seeded from settings, not hardcoded: these are the defaults a *new* search
   // starts from. The per-buffer values the user toggles afterwards stay in the
   // buffer — a setting that reached back in and reset them mid-session would be
@@ -1083,7 +1083,7 @@ function toggleSearchGroup(snapshot: SearchBufferSnapshot | null, path: string) 
   })
 }
 
-function selectSearchHistoryQuery(
+export function searchHistoryQuerySnapshot(
   snapshot: SearchBufferSnapshot | null,
   rootPath: string,
   direction: 1 | -1,

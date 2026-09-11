@@ -4,6 +4,7 @@ import { confirmedEnvironmentId } from '@/lib/environments/state/domain'
 import { act, screen, waitFor } from '@testing-library/react'
 import { useQueryClient } from '@tanstack/react-query'
 import { join } from 'node:path'
+import { rm } from 'node:fs/promises'
 
 import { useEditorWorkspaceState } from '@/features/editor/state/workspace-state'
 import { useValidateRootFolder } from '@/features/workspace/hooks/use-validate-root-folder'
@@ -19,6 +20,7 @@ import { createInProcessClient } from '../../../../test/client'
 import { expect, test } from '../../../../test/fixtures'
 import { renderApplication } from '../../../../test/render'
 import { makeTestServer } from '../../../../test/server'
+import { registerTestWorkspaceAddress } from '../../../../test/factories/workspace-address'
 
 test.for([
   {
@@ -39,7 +41,13 @@ test.for([
   const secondServer = await makeTestServer({ filesystemWatch: false })
   const clientB = createInProcessClient(secondServer)
   const rootAEntry = await createFolderPath('a', client)
-  const rootBEntry = await createFolderPath(rootB, missingOnB ? client : clientB)
+  const rootAAddress = await registerTestWorkspaceAddress(client, rootAEntry.path)
+  const rootBEntry = await createFolderPath(rootB, clientB)
+  const rootBAddress = await registerTestWorkspaceAddress(clientB, rootBEntry.path)
+  if (missingOnB) {
+    await createFolderPath(rootB, client)
+    await rm(join(secondServer.root, rootB), { recursive: true })
+  }
   const previousOrigin = activeServerOrigin()
   const previousEnvironments = useEnvironmentsStore.getState()
   const previousProject = useActiveProjectStore.getState()
@@ -55,6 +63,7 @@ test.for([
   writeRootFolderCache(environmentScopedStorage(confirmedEnvironmentId(originA)), {
     ...rootAEntry,
     type: 'directory',
+    workspaceAddress: rootAAddress,
   })
   const application = createApplicationRuntime({
     workspaceCache: readWorkspaceCache(environmentScopedStorage(confirmedEnvironmentId(originA))),
@@ -80,6 +89,7 @@ test.for([
     writeRootFolderCache(environmentScopedStorage(confirmedEnvironmentId(originB)), {
       ...rootBEntry,
       type: 'directory',
+      workspaceAddress: rootBAddress,
     })
     act(() => {
       application.activateEnvironment(originB)

@@ -1,9 +1,12 @@
 import { EMPTY_GIT_FILES } from '@/features/workspace/utils/tab-model'
 import { ChatModeLayout } from '@/features/chat-mode/components/layout'
-import { useRevealOpenedEditors } from '@/features/chat-mode/hooks/use-reveal-opened-editors'
+import { useNavigation } from '@/hooks/use-navigation'
 import { ChatModeSessionProvider } from '@/features/chat-mode/providers/session-provider'
 import { useEditorConflictState } from '@/features/editor/state/conflict-state'
-import { useEditorWorkspaceState } from '@/features/editor/state/workspace-state'
+import {
+  useEditorWorkspaceState,
+  useEditorWorkspaceStoreApi,
+} from '@/features/editor/state/workspace-state'
 import { useStatus } from '@/features/git/hooks'
 
 export function ChatModeSurfaceView({ rootPath }: { readonly rootPath: string }) {
@@ -12,9 +15,8 @@ export function ChatModeSurfaceView({ rootPath }: { readonly rootPath: string })
   const gitFiles = gitStatus.data?.files ?? EMPTY_GIT_FILES
   const panels = useEditorWorkspaceState((state) => state.chatModePanels)
   const workbenchPanels = useEditorWorkspaceState((state) => state.workbenchPanels)
-  const setChatModePanels = useEditorWorkspaceState((state) => state.setChatModePanels)
-
-  useRevealOpenedEditors()
+  const navigation = useNavigation()
+  const owner = useEditorWorkspaceStoreApi()
 
   return (
     <ChatModeSessionProvider editorRootPath={rootPath}>
@@ -24,7 +26,9 @@ export function ChatModeSurfaceView({ rootPath }: { readonly rootPath: string })
         panels={panels}
         rootPath={rootPath}
         workbenchPanels={workbenchPanels}
-        onPanelsChange={setChatModePanels}
+        onPanelsChange={(next) => {
+          void navigation.setChatModePanels(next, owner)
+        }}
       />
     </ChatModeSessionProvider>
   )

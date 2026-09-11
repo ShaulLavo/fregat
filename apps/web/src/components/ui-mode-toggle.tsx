@@ -1,3 +1,4 @@
+import { useNavigation } from '@/hooks/use-navigation'
 import { ChatCircleIcon, SidebarSimpleIcon, SquaresFourIcon } from '@phosphor-icons/react'
 import type { ReactNode } from 'react'
 
@@ -9,13 +10,14 @@ import { Button } from '@workspace/ui/components/button'
 import { cn } from '@workspace/ui/lib/utils'
 
 export function UiModeToggle() {
+  const navigation = useNavigation()
   const uiMode = useEditorWorkspaceState((state) => state.uiMode)
-  const setUiMode = useEditorWorkspaceState((state) => state.setUiMode)
   const chatModePanels = useEditorWorkspaceState((state) => state.chatModePanels)
-  const setChatModePanels = useEditorWorkspaceState((state) => state.setChatModePanels)
 
   function toggleSessionRail() {
-    setChatModePanels(setChatModeSessionRailOpen(chatModePanels, !chatModePanels.sessionRailOpen))
+    void navigation.setChatModePanels(
+      setChatModeSessionRailOpen(chatModePanels, !chatModePanels.sessionRailOpen),
+    )
   }
 
   return (
@@ -39,13 +41,13 @@ export function UiModeToggle() {
           active: uiMode === 'workbench',
           icon: <SquaresFourIcon className='size-3.5' />,
           label: `${workspaceUiModeLabel('workbench')} mode`,
-          onClick: () => setUiMode('workbench'),
+          onClick: () => void navigation.setMode('workbench'),
         })}
         {modeButton({
           active: uiMode === 'chat',
           icon: <ChatCircleIcon className='size-3.5' />,
           label: `${workspaceUiModeLabel('chat')} mode`,
-          onClick: () => setUiMode('chat'),
+          onClick: () => void navigation.setMode('chat'),
         })}
       </div>
     </div>

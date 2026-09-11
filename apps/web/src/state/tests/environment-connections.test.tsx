@@ -129,7 +129,6 @@ test('authoritative removal hides a mirrored cached machine, preserves its disk 
   onTestFinished(() => writeBootMirror(DEFAULT_SETTING_VALUES))
   const created: string[] = []
   const restored = createEnvironmentConnections({
-    activateEnvironment: () => undefined,
     createTransport: (origin) => {
       created.push(origin)
       const owner = origin === h.originA ? h.serverA : h.serverB
@@ -197,7 +196,7 @@ test('a missing boot mirror keeps desired names pending and hydrates only after 
   h.connections.stop()
   useChatProjectionStore.getState().dropEnvironment(h.descriptorB.environmentId)
   writeBootMirror(DEFAULT_SETTING_VALUES)
-  const restored = createEnvironmentConnections({ activateEnvironment: () => undefined })
+  const restored = createEnvironmentConnections()
   onTestFinished(() => restored.stop())
   expect(restored.store.getState().machines).toEqual([])
   expect(readConnectedMachines()).toEqual(['remote'])

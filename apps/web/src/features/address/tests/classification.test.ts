@@ -106,6 +106,7 @@ describe('the encoder cannot emit what it cannot reach', () => {
 
     expect(Object.keys(address).sort()).toEqual([
       'bottom',
+      'chat',
       'diff',
       'document',
       'editor',
@@ -127,9 +128,8 @@ describe('the encoder cannot emit what it cannot reach', () => {
     expect(JSON.stringify(address)).not.toContain('queryHistory')
   })
 
-  // The projection overwrites the whole URL, so a dropped dev param is gone for the
-  // session — and two of them are read late enough that nothing would report it.
-  test('carries the reserved dev params into every projected address', () => {
+  // Some dev params are read after startup, so view replacements must preserve them.
+  test('carries the reserved dev params into every captured address', () => {
     const passthrough = {
       decode: 'diffusion',
       editorPerfLayout: 'transform',
@@ -152,7 +152,7 @@ describe('the encoder cannot emit what it cannot reach', () => {
   test('emits no workspace document at all when no folder is open', () => {
     const address = addressFromSnapshot(emptyAddressSnapshot())
 
-    expect(address).toMatchObject({ document: null, tabs: null, workspace: '-' })
+    expect(address).toMatchObject({ document: null, tabs: [], workspace: '-' })
   })
 
   test('drops a conflict document from the tab set rather than encoding it', () => {

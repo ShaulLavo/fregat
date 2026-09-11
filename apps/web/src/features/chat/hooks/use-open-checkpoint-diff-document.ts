@@ -1,9 +1,8 @@
-import type { EnvironmentId } from '@workspace/contracts'
 import { useEnvironmentId } from '@/lib/environments/hooks/use-environment-id'
 import { clientForQueryClient } from '@/lib/environments/state/query-clients'
 import { useQueryClient } from '@tanstack/react-query'
 
-import { useEditorCommands } from '@/features/editor/state/commands'
+import { useEditorCommands } from '@/features/editor/hooks/use-editor-commands'
 import { checkpointDiffDocumentId } from '@/features/git/utils/diff-document'
 import {
   canOpenCheckpointDiff,
@@ -19,16 +18,18 @@ import {
   matchingCheckpointDiff,
 } from '@/features/chat/utils/checkpoint-diff-query'
 import type { ChatTurnDiffSummary } from '@workspace/client-core/chat/types'
-import { useSessionDiffScopeStore } from '../state/session-diff-scope-store'
+import { useNavigation } from '@/hooks/use-navigation'
 
 export function useOpenCheckpointDiffDocument() {
   const queryClient = useQueryClient()
   const environmentId = useEnvironmentId()
   const { selectFile } = useEditorCommands()
+  const navigation = useNavigation()
 
   async function openCheckpointDiff(summary: ChatTurnDiffSummary, path?: string) {
     if (!canOpenCheckpointDiff(summary)) return false
 
+    const operation = navigation.getSnapshot()
     const rangeInput = checkpointDiffInputForSummary(summary)
     const diffs = await queryClient.fetchQuery({
       queryFn: ({ signal, client }) =>
@@ -38,11 +39,13 @@ export function useOpenCheckpointDiffDocument() {
       retryDelay: checkpointDiffRetryDelay,
       staleTime: Infinity,
     })
+    if (navigation.getSnapshot() !== operation) return false
     if (!path) {
       const documentInput = checkpointTurnDiffDocumentInput(summary)
       queryClient.setQueryData(checkpointDiffQueryKey(documentInput), diffs)
-      selectFile(checkpointDiffDocumentId(documentInput))
-      rememberTurnScope(environmentId, summary, null)
+      const opened = await selectFile(checkpointDiffDocumentId(documentInput))
+      if (opened.status !== 'applied') return false
+      await rememberTurnScope(summary, null)
 
       return true
     }
@@ -56,8 +59,9 @@ export function useOpenCheckpointDiffDocument() {
     // seeded entry as final, so seeding an empty list for a file the range fetch
     // missed would pin the tab to "no changes" instead of letting it ask again.
     if (diff) queryClient.setQueryData(checkpointDiffQueryKey(documentInput), [diff])
-    selectFile(checkpointDiffDocumentId(documentInput))
-    rememberTurnScope(environmentId, summary, documentPath)
+    const opened = await selectFile(checkpointDiffDocumentId(documentInput))
+    if (opened.status !== 'applied') return false
+    await rememberTurnScope(summary, documentPath)
 
     return true
   }
@@ -65,6 +69,7 @@ export function useOpenCheckpointDiffDocument() {
   async function openFullSessionCheckpointDiff(summary: ChatTurnDiffSummary) {
     if (!canOpenCheckpointDiff(summary)) return false
 
+    const operation = navigation.getSnapshot()
     const input = checkpointFullSessionDiffInputForSummary(summary)
     const diffs = await queryClient.fetchQuery({
       queryFn: ({ signal, client }) =>
@@ -74,35 +79,18 @@ export function useOpenCheckpointDiffDocument() {
       retryDelay: checkpointDiffRetryDelay,
       staleTime: Infinity,
     })
+    if (navigation.getSnapshot() !== operation) return false
     const documentInput = checkpointFullSessionDiffDocumentInput(summary)
     queryClient.setQueryData(checkpointDiffQueryKey(documentInput), diffs)
-    selectFile(checkpointDiffDocumentId(documentInput))
+    return (await selectFile(checkpointDiffDocumentId(documentInput))).status === 'applied'
+  }
 
-    return true
+  async function rememberTurnScope(summary: ChatTurnDiffSummary, filePath: string | null) {
+    await navigation.setDiffScope(
+      { filePath, kind: 'turn', turnId: summary.turnId },
+      { environmentId, sessionId: summary.sessionId },
+    )
   }
 
   return { openCheckpointDiff, openFullSessionCheckpointDiff }
-}
-
-/**
- * Opening a turn's diff is the act that makes it the session's current diff, so
- * the tool pane comes back to it after a reload — wherever the open came from,
- * the transcript's changed-files card included. Read through `getState` rather
- * than subscribed: this hook must not re-render every consumer of a card when
- * the pick changes. The full-session diff is deliberately not recorded; it is not
- * one of the three scopes the pane can return to.
- */
-function rememberTurnScope(
-  environmentId: EnvironmentId,
-  summary: ChatTurnDiffSummary,
-  filePath: string | null,
-) {
-  useSessionDiffScopeStore.getState().selectSessionDiffScope(
-    { environmentId, sessionId: summary.sessionId },
-    {
-      filePath,
-      kind: 'turn',
-      turnId: summary.turnId,
-    },
-  )
 }

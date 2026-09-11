@@ -27,7 +27,7 @@ import {
 } from '@/lib/client'
 import { useChatProjectionStore } from '@/features/chat/state/chat-projection-store'
 import { createProjectRegistrationCommand } from '@workspace/client-core/chat/registration'
-import { queryClientFor } from '@/lib/environments/state/query-clients'
+import { installTestClient } from './client-binding'
 import { createInProcessClient } from '../client'
 import { makeTestServer, type TestServer } from '../server'
 
@@ -43,9 +43,9 @@ export async function createFederationHarness(serverA: TestServer, remote?: Test
   const clientA = createInProcessClient(serverA)
   const clientB = createInProcessClient(serverB)
   setActiveServerOrigin(originB)
-  setClient(clientB)
+  const restoreClientB = installTestClient(clientB)
   setActiveServerOrigin(originA)
-  setClient(clientA)
+  const restoreClientA = installTestClient(clientA)
   const descriptorA = v.parse(healthDescriptorSchema, (await clientA.health.get()).data)
   const descriptorB = v.parse(healthDescriptorSchema, (await clientB.health.get()).data)
   useEnvironmentsStore.setState({
@@ -67,8 +67,6 @@ export async function createFederationHarness(serverA: TestServer, remote?: Test
   const sockets = new Map<string, FakeOrchestrationSocket[]>()
   const unavailable = new Set<string>()
   const connections = createEnvironmentConnections({
-    activateEnvironment: (id) =>
-      application.activateEnvironment(id === descriptorA.environmentId ? originA : originB),
     createTransport: (origin) =>
       createChatTransport(origin, {
         createSocket: () => {
@@ -94,8 +92,8 @@ export async function createFederationHarness(serverA: TestServer, remote?: Test
   onTestFinished(async () => {
     connections.stop()
     application.dispose()
-    queryClientFor(originA).clear()
-    queryClientFor(originB).clear()
+    restoreClientB()
+    restoreClientA()
     useEnvironmentsStore.setState(previousState, true)
     useChatProjectionStore.setState(previousProjection, true)
     setActiveServerOrigin(previousOrigin)

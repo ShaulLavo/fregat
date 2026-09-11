@@ -2,7 +2,7 @@ import type { FileTreeContextMenuItem, FileTreeContextMenuOpenContext } from '@w
 import { containerTreePath, entryName } from '@/features/workspace/utils/entry-paths'
 import { rowGitActions, treeRowMenu } from '@/features/workspace/utils/row-menu'
 import type { TreeFsActions } from '@/features/workspace/hooks/use-fs-actions'
-import { useEditorCommands } from '@/features/editor/state/commands'
+import { useEditorCommands } from '@/features/editor/hooks/use-editor-commands'
 import { useDiscardPathsMutation } from '@/features/git/hooks/use-discard-paths-mutation'
 import { useStagePathsMutation } from '@/features/git/hooks/use-stage-paths-mutation'
 import { useStatus } from '@/features/git/hooks/use-status'

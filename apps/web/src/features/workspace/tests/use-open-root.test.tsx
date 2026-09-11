@@ -2,16 +2,8 @@ import { screen, waitFor } from '@testing-library/react'
 import userEvent from '@testing-library/user-event'
 import { symlink } from 'node:fs/promises'
 import path from 'node:path'
-import { vi } from 'vitest'
-
-import { createDefaultChatModePanels } from '@/features/chat-mode/utils/panels'
-import { TestEditorStateProvider as EditorStateProvider } from '../../../../test/factories/editor-state-provider'
-import { WorkspaceEditServiceContext } from '@/features/editor/providers/workspace-edit-context'
-import type { WorkspaceEditService } from '@/features/editor/state/workspace-edit-service'
-import {
-  createEditorWorkspaceStore,
-  EditorWorkspaceStateContext,
-} from '@/features/editor/state/workspace-state'
+import { onTestFinished } from 'vitest'
+import type { Client } from '@/lib/client'
 import {
   useOpenWorkspaceRoot,
   type OpenWorkspaceRootResult,
@@ -22,18 +14,20 @@ import {
   fetchRecentEntries,
   fetchServerInfo,
 } from '@/lib/file-server'
-import { createDefaultWorkbenchLayout } from '@/features/workbench/utils/layout'
 import { expect, test } from '../../../../test/fixtures'
-import { renderWithProviders } from '../../../../test/render'
+import { renderApplication } from '../../../../test/render'
+import { createAddressTestRuntime } from '../../../../test/factories/address-runtime'
+import { createObservedInProcessClient } from '../../../../test/client'
+import { waitForNavigation } from '../../../../test/address'
 
 test('records an opened root as recent, so the project menu can order by it', async ({
   client,
 }) => {
   void client
   await ensureFolderPath('anubis')
-  renderOpener('anubis')
+  await renderOpeners(client, ['anubis'])
 
-  await userEvent.click(screen.getByRole('button', { name: 'Open root' }))
+  await userEvent.click(screen.getByRole('button', { name: 'Open anubis' }))
 
   // Recorded through the real route: the picker is no longer the only way in.
   await waitFor(async () => {
@@ -52,9 +46,7 @@ test('opening a folder through an alias keeps its canonical root and workspace I
   void client
   await ensureFolderPath('actual')
   await symlink('actual', path.join(server.root, 'alias'))
-  const store = emptyWorkspaceStore()
-  const results: Array<{ path: string; result: OpenWorkspaceRootResult }> = []
-  renderOpeners(store, ['actual', 'alias'], results)
+  const { store, results } = await renderOpeners(client, ['actual', 'alias'])
 
   await userEvent.click(screen.getByRole('button', { name: 'Open actual' }))
   await waitFor(() => expect(store.getState().rootFolder?.workspaceAddress).toBeDefined())
@@ -73,9 +65,7 @@ test('makes the latest rapid valid open the editor and index root', async ({ cli
   await ensureFolderPath('b')
   await createFileContent('a/only-a.ts', 'export const a = true\n')
   await createFileContent('b/only-b.ts', 'export const b = true\n')
-  const store = emptyWorkspaceStore()
-  const results: Array<{ path: string; result: OpenWorkspaceRootResult }> = []
-  renderOpeners(store, ['a', 'b'], results)
+  const { store, results } = await renderOpeners(client, ['a', 'b'])
 
   await userEvent.click(screen.getByRole('button', { name: 'Open rapidly' }))
 
@@ -95,9 +85,7 @@ test('does not retarget the index when a newer folder open is rejected', async (
   void client
   await ensureFolderPath('valid')
   await createFileContent('not-a-folder.txt', 'file\n')
-  const store = emptyWorkspaceStore()
-  const results: Array<{ path: string; result: OpenWorkspaceRootResult }> = []
-  renderOpeners(store, ['valid', 'not-a-folder.txt'], results)
+  const { store, results } = await renderOpeners(client, ['valid', 'not-a-folder.txt'])
 
   await userEvent.click(screen.getByRole('button', { name: 'Open valid' }))
   await waitFor(() => expect(store.getState().rootFolder?.path).toBe('valid'))
@@ -116,32 +104,26 @@ test('does not retarget the index when a newer folder open is rejected', async (
 
 test('does not start a root open when the workspace mutation gate refuses it', async ({
   client,
+  server,
 }) => {
-  void client
-  await ensureFolderPath('blocked')
-  const store = emptyWorkspaceStore()
-  const acquireRootSwitchReservation = vi.fn(() => null)
-  const workspaceEdits = {
-    acquireRootSwitchReservation,
-  } as unknown as WorkspaceEditService
-  renderOpener('blocked', store, workspaceEdits)
-
-  await userEvent.click(screen.getByRole('button', { name: 'Open root' }))
-
-  expect(acquireRootSwitchReservation).toHaveBeenCalledOnce()
-  expect(store.getState().rootFolder).toBeNull()
+  await ensureFolderPath('blocked', client)
+  const rootRequests: string[] = []
+  const observed = createObservedInProcessClient(server, (request) => {
+    if (new URL(request.url).pathname === '/fs/workspace-root') rootRequests.push(request.url)
+  })
+  const { store, editor, results } = await renderOpeners(observed, ['blocked'])
+  const released = Promise.withResolvers<void>()
+  const mutation = editor.workspaceEditService.runWorkspaceMutation([], () => released.promise)
+  try {
+    await userEvent.click(screen.getByRole('button', { name: 'Open blocked' }))
+    await waitFor(() => expect(results).toContainEqual({ path: 'blocked', result: 'failed' }))
+    expect(rootRequests).toEqual([])
+    expect(store.getState().rootFolder).toBeNull()
+  } finally {
+    released.resolve()
+    await mutation
+  }
 })
-
-/** The hook is the chokepoint for the project menu and the chat rail alike. */
-function OpenRootButton({ rootPath }: { readonly rootPath: string }) {
-  const openWorkspaceRoot = useOpenWorkspaceRoot()
-
-  return (
-    <button type='button' onClick={() => void openWorkspaceRoot(rootPath)}>
-      Open root
-    </button>
-  )
-}
 
 function OpenRootButtons({
   onResult,
@@ -175,48 +157,17 @@ function OpenRootButtons({
   )
 }
 
-function renderOpener(
-  rootPath: string,
-  store = emptyWorkspaceStore(),
-  workspaceEdits: WorkspaceEditService | null = null,
-) {
-  return renderWithProviders(
-    <EditorStateProvider>
-      <WorkspaceEditServiceContext value={workspaceEdits}>
-        <EditorWorkspaceStateContext.Provider value={store}>
-          <OpenRootButton rootPath={rootPath} />
-        </EditorWorkspaceStateContext.Provider>
-      </WorkspaceEditServiceContext>
-    </EditorStateProvider>,
+async function renderOpeners(client: Client, rootPaths: readonly string[]) {
+  const { application, editor } = await createAddressTestRuntime(client)
+  const results: Array<{ path: string; result: OpenWorkspaceRootResult }> = []
+  const rendered = renderApplication(
+    <OpenRootButtons
+      onResult={(path, result) => results.push({ path, result })}
+      rootPaths={rootPaths}
+    />,
+    application,
   )
-}
-
-function renderOpeners(
-  store: ReturnType<typeof emptyWorkspaceStore>,
-  rootPaths: readonly string[],
-  results: Array<{ path: string; result: OpenWorkspaceRootResult }>,
-) {
-  return renderWithProviders(
-    <EditorStateProvider>
-      <EditorWorkspaceStateContext.Provider value={store}>
-        <OpenRootButtons
-          onResult={(path, result) => results.push({ path, result })}
-          rootPaths={rootPaths}
-        />
-      </EditorWorkspaceStateContext.Provider>
-    </EditorStateProvider>,
-  )
-}
-
-function emptyWorkspaceStore() {
-  return createEditorWorkspaceStore({
-    chatModePanels: createDefaultChatModePanels(),
-    rootFolder: null,
-    searchBuffers: {},
-    uiMode: 'workbench',
-    workbenchLayout: createDefaultWorkbenchLayout(),
-    worktreeIdByRootPath: {},
-    workspaceOrder: [],
-    workspaces: {},
-  })
+  onTestFinished(() => rendered.unmount())
+  await waitForNavigation(rendered.navigation)
+  return { ...rendered, store: editor.workspaceStore, editor, results }
 }

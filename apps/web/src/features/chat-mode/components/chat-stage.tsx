@@ -1,3 +1,6 @@
+import { useApplicationRuntime } from '@/hooks/use-application-runtime'
+import { confirmedEnvironmentOrigin } from '@/lib/environments/state/domain'
+import { useNavigation } from '@/hooks/use-navigation'
 import { scopedSessionKey } from '@workspace/contracts'
 import { useActiveChatProjection } from '@/features/chat/hooks/use-active-projection'
 import type { SessionId } from '@workspace/contracts'
@@ -17,7 +20,10 @@ import { sessionCompletedAt } from '@workspace/client-core/chat/rail/unread'
 const EMPTY_ACTIVITIES: readonly [] = []
 
 export function ChatStage() {
-  const { activeSession, transport, error, project, worktree, ready, rootPath, selectSession } =
+  const navigation = useNavigation()
+  const application = useApplicationRuntime()
+  const draftGeneration = useSessionSelectionStore((state) => state.draftGeneration)
+  const { activeSession, transport, error, project, worktree, ready, rootPath } =
     useChatModeSession()
   // Read by id rather than from the provider's list: the archive browser can put a
   // filed-away session on the stage, and that list deliberately excludes them.
@@ -46,18 +52,25 @@ export function ChatStage() {
 
   function handleSessionCreated(sessionId: SessionId) {
     if (!project) return
-    // The dispatch may ack after the user has already picked something else; the
-    // draft that started it is stale by then and must not win.
-    if (
-      !isDraftFor(
-        useSessionSelectionStore.getState().selection,
-        transport.environmentId,
-        project.id,
-      )
-    )
-      return
+    const current = useSessionSelectionStore.getState()
+    if (current.draftGeneration !== draftGeneration) return
+    const draft = isDraftFor(current.selection, transport.environmentId, project.id)
+    const empty =
+      current.selection.kind === 'auto' &&
+      activeSession.status === 'auto' &&
+      activeSession.sessionId === null
+    if (!draft && !empty) return
+    const owner = application.getSnapshot()
+    if (owner?.origin !== confirmedEnvironmentOrigin(transport.environmentId)) return
+    if (owner.editor.workspaceStore.getState().rootFolder?.path !== rootPath) return
 
-    selectSession(project.id, sessionId)
+    void navigation.openChat({
+      environmentId: transport.environmentId,
+      projectId: project.id,
+      sessionId,
+      surface: 'main',
+      replace: true,
+    })
   }
 
   return (

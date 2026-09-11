@@ -24,6 +24,7 @@ import { isSettingsDocumentId, settingsDocumentId } from '@/features/settings/ut
 import { toWorkspaceAbsolute, toWorkspaceRelative } from '@workspace/client-core/files/path'
 import { sessionIdSchema, type SessionId } from '@workspace/contracts'
 import * as v from 'valibot'
+import { editorReferenceForToken } from '@workspace/client-core/address/references'
 
 export type DocumentTokenResult =
   /** An addressable document, as its token. */
@@ -68,6 +69,9 @@ export function documentTokenForPath(rootPath: string | null, path: string): Doc
 }
 
 export function pathForDocumentToken(rootPath: string | null, token: string): ParsedDocumentToken {
+  if (!editorReferenceForToken(token)) {
+    return { kind: 'rejected', reason: 'document token is malformed' }
+  }
   if (token === SETTINGS_DOCUMENT_TOKEN) return { kind: 'path', path: settingsDocumentId() }
   if (rootPath === null) return { kind: 'rejected', reason: 'document requires a workspace' }
 

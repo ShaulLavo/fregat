@@ -8,7 +8,7 @@ import type { QueryClient } from '@tanstack/react-query'
 
 import type { WorkspaceEditHost } from '@/features/editor/providers/workspace-edit-context'
 import { createEditorConflictStore } from '@/features/editor/state/conflict-state'
-import { createEditorActivation } from '@/features/editor/state/commands'
+import { createEditorActivation } from '@/features/editor/state/apply-actions'
 import { createEditorDocumentStore } from '@/features/editor/state/document-state'
 import { createEditorOpenBenchmarkControl } from '@/features/editor/state/editor-open-benchmark-control'
 import { FileSyncService } from '@/features/editor/state/file-sync-service'
@@ -34,13 +34,11 @@ export function createEditorRuntime({
   workspaceCache,
   storage,
   preparation,
-  restoreAddress = true,
 }: {
   readonly queryClient: QueryClient
   readonly storage: ScopedStorage
   readonly workspaceCache: CachedWorkspaceState
   readonly preparation: EditorPreparedEnvironment
-  readonly restoreAddress?: boolean
 }) {
   const conflictStore = createEditorConflictStore()
   const workspaceStore = createEditorWorkspaceStore(workspaceCache)
@@ -69,7 +67,8 @@ export function createEditorRuntime({
   const mountedEditors = new MountedEditorRegistry()
   const fileOpenIntentOwner = createFileOpenIntentServiceOwner({
     getLiveDocument: (path) => documentStore.getState().getLiveEditorDocument(path),
-    getRetainedScrollPosition: (path) => retainedScrollPosition(path, documentStore, workspaceStore),
+    getRetainedScrollPosition: (path) =>
+      retainedScrollPosition(path, documentStore, workspaceStore),
     isActive: (path) => workspaceStore.getState().selectedFilePath === path,
     mountedEditors,
     preparer: createPlatformFileOpenPreparer(preparation),
@@ -87,7 +86,6 @@ export function createEditorRuntime({
   let rootGeneration = 1
   let active = false
   let disposed = false
-  let addressRestored = !restoreAddress
   let recoveryDiscovery: { readonly generation: number; readonly promise: Promise<void> } | null =
     null
   const workspaceEditService = new WorkspaceEditService({
@@ -208,11 +206,6 @@ export function createEditorRuntime({
         state.dirtyFilePaths.size > 0 ||
         Object.values(state.liveDocumentsById).some((document) => document.buffer.isDirty())
       )
-    },
-    claimAddressRestore() {
-      if (addressRestored) return false
-      addressRestored = true
-      return true
     },
   }
 }

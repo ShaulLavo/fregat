@@ -1,27 +1,24 @@
+import { useNavigation } from '@/hooks/use-navigation'
 import { TerminalIcon, WarningCircleIcon } from '@phosphor-icons/react'
 import type { ReactNode } from 'react'
 
 import { TerminalPanel } from '@/features/terminal/components/panel'
 import { DiagnosticsPanel } from '@/features/workbench/components/diagnostics-panel'
-import {
-  setWorkbenchBottomTab,
-  type WorkbenchBottomTab,
-  type WorkbenchPanels,
-} from '@/features/workbench/utils/panels'
+import { type WorkbenchBottomTab, type WorkbenchPanels } from '@/features/workbench/utils/panels'
 import { Button } from '@workspace/ui/components/button'
 import { cn } from '@workspace/ui/lib/utils'
 
 export function BottomPanel({
   panels,
   rootPath,
-  onPanelsChange,
 }: {
   readonly panels: WorkbenchPanels
   readonly rootPath: string
-  readonly onPanelsChange: (panels: WorkbenchPanels) => void
 }) {
+  const navigation = useNavigation()
+
   function selectTab(tab: WorkbenchBottomTab) {
-    onPanelsChange(setWorkbenchBottomTab(panels, tab))
+    void navigation.setBottomPanel(tab)
   }
 
   return (

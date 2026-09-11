@@ -1,3 +1,4 @@
+import { NavigationStatus } from '@/components/navigation-status'
 import type { ReactNode } from 'react'
 import { AppTitlebar } from '@/components/app-titlebar'
 import { AppWorkspace } from '@/components/app-workspace'
@@ -28,6 +29,7 @@ export function AppShell({
       tabIndex={-1}
     >
       <AppTitlebar />
+      <NavigationStatus />
       <main className='min-h-0 flex-1'>
         <AppWorkspace restoringWorkspace={restoringWorkspace} />
       </main>

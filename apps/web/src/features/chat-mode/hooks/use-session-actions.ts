@@ -1,3 +1,4 @@
+import { sessionSummary, sessionRemoval } from '@/features/chat-mode/state/removal'
 import type { ClientOrchestrationCommand, ScopedSessionRef } from '@workspace/contracts'
 import { toast } from 'sonner'
 import { dispatchChatCommand } from '@/features/chat/utils/command-dispatch'
@@ -9,35 +10,26 @@ import {
   createSessionRuntimeStopCommand,
   createSessionUnarchiveCommand,
 } from '@workspace/client-core/chat/commands'
-import {
-  selectChatSessionsForProject,
-  selectSessionOwnership,
-} from '@workspace/client-core/chat/selectors'
-import {
-  useChatProjectionStore,
-  selectChatProjectionSlice,
-} from '@/features/chat/state/chat-projection-store'
 import { clearSessionMultiSelect } from '@/features/chat-mode/state/session-commands'
 import {
   useSessionDeleteRequestStore,
   type SessionDeleteRequest,
 } from '@/features/chat-mode/state/session-delete-request-store'
-import { useSessionSelectionStore } from '@/features/chat-mode/state/session-selection-store'
-import { compareSessionsForRail } from '@workspace/client-core/chat/rail/session-order'
+import { useNavigation } from '@/hooks/use-navigation'
 import { hasRunningTurn } from '@/features/chat-mode/utils/running-turn'
 
 export function useSessionActions() {
-  const releaseSession = useSessionSelectionStore((state) => state.releaseSession)
+  const navigation = useNavigation()
   const requestDelete = useSessionDeleteRequestStore((state) => state.requestDelete)
   const dismissDelete = useSessionDeleteRequestStore((state) => state.dismissDelete)
   function dispatch(ref: ScopedSessionRef, action: string, command: ClientOrchestrationCommand) {
-    void dispatchChatCommand({
+    return dispatchChatCommand({
       action,
       command,
       dispatchCommand: (command) => dispatchCommandForEnvironment(ref.environmentId, command),
     })
   }
-  function archive(ref: ScopedSessionRef) {
+  async function archive(ref: ScopedSessionRef) {
     const session = sessionSummary(ref)
     if (hasRunningTurn(session)) {
       toast.error(`“${session?.title ?? 'This session'}” is still running`, {
@@ -45,27 +37,33 @@ export function useSessionActions() {
       })
       return
     }
-    releaseSession(ref, railOrderSessionIds(ref))
-    dispatch(ref, 'chat.session.archive', createSessionArchiveCommand({ sessionId: ref.sessionId }))
+    const removal = sessionRemoval(ref)
+    const outcome = await dispatch(
+      ref,
+      'chat.session.archive',
+      createSessionArchiveCommand({ sessionId: ref.sessionId }),
+    )
+    if (outcome.ok && removal) await navigation.reconcileSessions(removal)
   }
   return {
     archive,
-    archiveSessions(refs: readonly ScopedSessionRef[]) {
-      for (const ref of refs) archive(ref)
+    async archiveSessions(refs: readonly ScopedSessionRef[]) {
+      for (const ref of refs) await archive(ref)
       clearSessionMultiSelect()
     },
     cancelDelete() {
       dismissDelete()
     },
-    confirmDelete(request: SessionDeleteRequest) {
+    async confirmDelete(request: SessionDeleteRequest) {
       dismissDelete()
       for (const ref of request.refs) {
-        releaseSession(ref, railOrderSessionIds(ref))
-        dispatch(
+        const removal = sessionRemoval(ref)
+        const outcome = await dispatch(
           ref,
           'chat.session.delete',
           createSessionDeleteCommand({ sessionId: ref.sessionId }),
         )
+        if (outcome.ok && removal) await navigation.reconcileSessions(removal)
       }
       clearSessionMultiSelect()
     },
@@ -99,16 +97,4 @@ export function useSessionActions() {
       )
     },
   }
-}
-function sessionSummary(ref: ScopedSessionRef) {
-  return selectChatProjectionSlice(useChatProjectionStore.getState(), ref.environmentId)
-    .sessionById[ref.sessionId]
-}
-function railOrderSessionIds(ref: ScopedSessionRef) {
-  const slice = selectChatProjectionSlice(useChatProjectionStore.getState(), ref.environmentId)
-  const owner = selectSessionOwnership(slice, ref.sessionId)
-  if (!owner) return []
-  return selectChatSessionsForProject(slice, owner.project.id)
-    .toSorted(compareSessionsForRail)
-    .map((session) => session.id)
 }

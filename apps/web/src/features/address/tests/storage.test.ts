@@ -6,7 +6,7 @@ import { expect, test } from '../../../../test/fixtures'
 import { parseAddress } from '@workspace/client-core/address/grammar'
 import {
   readAddressCache,
-  restoreAddressFromStorage,
+  selectInitialAddress,
   writeAddressCache,
 } from '@/features/address/state/storage'
 
@@ -17,7 +17,7 @@ import {
  * the whole query, re-escaping the `/` and `~` that `?tabs=` leaves bare.
  */
 
-const TABS = `/~${testWorkspaceToken('/repo')}/workbench/f/src/a.ts?tabs=f/src/a.ts~f/src/b.ts&side=git`
+const TABS = `/~${testWorkspaceToken('/repo')}/workbench/f/src/a.ts?tabs=@~f/src/b.ts&side=git`
 
 // The `node` project has no `localStorage`; this mirrors the shim `workspace-cache.test.ts`
 // already installs rather than growing a second way to do the same thing.
@@ -89,49 +89,13 @@ describe('writeAddressCache', () => {
   })
 })
 
-/**
- * The read half, which had no tests at all — and so carried the same re-encoding bug
- * one release longer than the write half. `mergeLiveSearch` reached for
- * `url.searchParams.set`, and merely touching `searchParams` re-serializes the whole
- * query, turning `?tabs=f/src/a.ts~f/src/b.ts` into one token the parser rejects.
- */
-describe('restoreAddressFromStorage', () => {
-  beforeEach(() => {
-    STORE.clear()
-    Object.defineProperty(globalThis, 'localStorage', {
-      configurable: true,
-      value: {
-        getItem: (key: string) => STORE.get(key) ?? null,
-        key: (index: number) => Array.from(STORE.keys())[index] ?? null,
-        get length() {
-          return STORE.size
-        },
-        removeItem: (key: string) => {
-          STORE.delete(key)
-        },
-        setItem: (key: string, value: string) => {
-          STORE.set(key, value)
-        },
-      },
-    })
+describe('selectInitialAddress', () => {
+  test('selects the stored address for a bare launch', () => {
+    expect(selectInitialAddress('/', TABS)).toBe(TABS)
   })
 
-  afterEach(() => {
-    delete (globalThis as { localStorage?: Storage }).localStorage
-  })
-
-  test('installs the stored address when the launch URL is bare', () => {
-    writeAddressCache(TABS)
-
-    expect(restoreAt('/', '')).toBe(TABS)
-  })
-
-  // The regression: a cold launch carrying a dev param must not re-encode the rest.
-  test('merges live dev params without re-escaping `?tabs=`', () => {
-    writeAddressCache(TABS)
-
-    const href = restoreAt('/', '?decode=diffusion') ?? ''
-
+  test('merges live development params without re-escaping tab tokens', () => {
+    const href = selectInitialAddress('/?decode=diffusion', TABS)
     expect(href).not.toContain('%2F')
     expect(href).not.toContain('%7E')
     expect(parseAddress(href).tabs).toEqual(['f/src/a.ts', 'f/src/b.ts'])
@@ -139,38 +103,32 @@ describe('restoreAddressFromStorage', () => {
     expect(parseAddress(href).side).toBe('git')
   })
 
-  test('lets a live param override the stored one of the same name', () => {
-    writeAddressCache(`${TABS}&decode=stored`)
-
-    const href = restoreAt('/', '?decode=live') ?? ''
-
-    expect(parseAddress(href).passthrough).toEqual({ decode: 'live' })
-    expect(parseAddress(href).tabs).toEqual(['f/src/a.ts', 'f/src/b.ts'])
+  test('keeps live explicit defaults before canonical omission', () => {
+    const href = selectInitialAddress(
+      '/?side=files&bottom=terminal&tool=git&rail=active',
+      `${TABS}&bottom=problems&tool=logs&rail=archived`,
+    )
+    expect(parseAddress(href)).toMatchObject({
+      side: 'files',
+      bottom: 'terminal',
+      tool: 'git',
+      rail: 'active',
+    })
   })
 
-  // A pasted link must never be overwritten by what this machine was doing last.
-  test('leaves a URL that already names a place alone', () => {
-    writeAddressCache(TABS)
+  test('replaces matching keys without changing encoded separators', () => {
+    const href = selectInitialAddress('/?tabs=@~f/a%7Eb.ts&s.q=live', `${TABS}&s.q=stored`)
+    expect(parseAddress(href).tabs).toEqual(['f/src/a.ts', 'f/a%7Eb.ts'])
+    expect(parseAddress(href).search).toEqual({ q: 'live' })
+  })
 
-    expect(restoreAt(`/~${testWorkspaceToken('other')}/workbench/f/z.ts`, '')).toBeNull()
+  test('preserves an explicit nonroot link', () => {
+    const href = `/~${testWorkspaceToken('other')}/workbench/f/z.ts`
+    expect(selectInitialAddress(href, TABS)).toBe(href)
+  })
+
+  test('retains bare startup when no address was remembered', () => {
+    expect(selectInitialAddress('/?decode=diffusion', null)).toBe('/?decode=diffusion')
+    expect(selectInitialAddress('/', '/')).toBe('/')
   })
 })
-
-/**
- * `restoreAddressFromStorage` reads `location` and writes through the `History` it is
- * given; only the history seam is injectable, so the location is stubbed around it.
- */
-function restoreAt(pathname: string, search: string) {
-  const original = Object.getOwnPropertyDescriptor(globalThis, 'location')
-  Object.defineProperty(globalThis, 'location', {
-    configurable: true,
-    value: { pathname, search },
-  })
-
-  try {
-    return restoreAddressFromStorage({ replaceState: () => {} } as unknown as History)
-  } finally {
-    if (original) Object.defineProperty(globalThis, 'location', original)
-    else delete (globalThis as { location?: Location }).location
-  }
-}

@@ -11,7 +11,7 @@ import {
 
 import { FilePickerDialog } from '@/components/file-picker-dialog'
 import { MachinePhase } from '@/components/machine-phase'
-import { useApplicationRuntime } from '@/hooks/use-application-runtime'
+import { useNavigation } from '@/hooks/use-navigation'
 import { queryClientFor } from '@/lib/environments/state/query-clients'
 import type { ConfirmedMachine } from '@/lib/environments/utils/machines'
 import { openPickedMachineProject } from '@/state/project-picker'
@@ -23,7 +23,7 @@ export function ProjectMachinePicker({
   readonly machines: readonly ConfirmedMachine[]
   readonly onClose: () => void
 }) {
-  const application = useApplicationRuntime()
+  const navigation = useNavigation()
   const [selected, setSelected] = useState<ConfirmedMachine | null>(() =>
     machines.length === 1 && machines[0]?.phase === 'live' ? machines[0] : null,
   )
@@ -38,7 +38,7 @@ export function ProjectMachinePicker({
             if (!open) onClose()
           }}
           onPick={(entry) => {
-            void openPickedMachineProject(application, selected, entry.path)
+            void openPickedMachineProject(navigation, selected, entry.path)
             onClose()
           }}
         />

@@ -6,9 +6,8 @@ import { TEST_ENVIRONMENT_ID } from '../factories/chat'
 import { cleanup } from '@testing-library/react'
 import { afterAll, afterEach, beforeAll } from 'vitest'
 
-import { type Client, getClient, setClient } from '@/lib/client'
-
 import { createInProcessClient } from '../client'
+import { installTestClient } from '../factories/client-binding'
 import { makeTestServer, type TestServer } from '../server'
 import './jest-dom'
 
@@ -19,13 +18,12 @@ import './jest-dom'
 // real in-process server per file is the honest default; tests that need their
 // own workspace still take the `client` fixture, which layers over this.
 let server: TestServer | undefined
-let productionClient: Client | undefined
+let restoreClient: (() => void) | undefined
 
 beforeAll(async () => {
   server = await makeTestServer({ environmentId: TEST_ENVIRONMENT_ID })
-  productionClient = getClient()
   const client = createInProcessClient(server)
-  setClient(client)
+  restoreClient = installTestClient(client)
   useEnvironmentsStore
     .getState()
     .recordDescriptor(
@@ -35,8 +33,8 @@ beforeAll(async () => {
 })
 
 afterAll(async () => {
-  if (productionClient) setClient(productionClient)
-  productionClient = undefined
+  restoreClient?.()
+  restoreClient = undefined
   await server?.cleanup()
   server = undefined
 })

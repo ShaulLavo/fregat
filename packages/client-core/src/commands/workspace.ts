@@ -637,7 +637,7 @@ export const workspaceCommandMetadata = {
     description: 'Show or hide the list of sessions.',
     id: 'workspace.toggleSessionRail',
     keys: [{ chord: ['Mod+Alt+B'], preventDefault: true }],
-    execution: 'sync',
+    execution: 'async',
     target: 'workspace',
     undoCategory: 'view-only',
     when: ['workspaceOpen', 'chatMode'],

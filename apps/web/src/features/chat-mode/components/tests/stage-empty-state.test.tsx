@@ -68,7 +68,6 @@ function renderEmptyState({
       }),
     } as ChatTransport,
     error,
-    openProject: () => {},
     project: null,
     worktree: null,
     ready: false,
@@ -77,8 +76,6 @@ function renderEmptyState({
       calls.retries += 1
     },
     rootPath,
-    selectSession: () => {},
-    startDraft: () => {},
   }
 
   renderWithProviders(

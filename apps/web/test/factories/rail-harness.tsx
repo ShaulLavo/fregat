@@ -28,8 +28,10 @@ import { ProjectRenameDialog } from '@/features/chat-mode/components/project-ren
 import { StageHeader } from '@/features/chat-mode/components/stage-header'
 import { sessionRailModel } from '@workspace/client-core/chat/rail/model'
 import { currentRailEnvironments } from '@/features/chat-mode/state/rail-environments'
-import { setSessionProjectOpener } from '@/features/chat-mode/state/session-commands'
-import { resetSessionSelectionStore } from '@/features/chat-mode/state/session-selection-store'
+import {
+  resetSessionSelectionStore,
+  useSessionSelectionStore,
+} from '@/features/chat-mode/state/session-selection-store'
 import { resetRailOrderStore } from '@/features/chat-mode/state/rail-order-store'
 import { useSessionRailStore } from '@/features/chat-mode/state/session-rail-store'
 import { useSessionMultiSelectStore } from '@/features/chat-mode/state/session-multi-select-store'
@@ -48,9 +50,9 @@ import {
 import { unwrapEdenResponse } from '@/lib/eden-events'
 import { createApplicationRuntime } from '@/state/application-runtime'
 import { readWorkspaceCache } from '@/features/workspace/state/cache'
-import { TestEditorStateProvider } from './editor-state-provider'
 import { inProcessOrchestrationSocketFactory } from '@workspace/client-core/test/in-process-orchestration-socket'
 import { renderWithProviders } from '../render'
+import { EditorStateProvider } from '@/features/editor/providers/state-provider'
 import type { TestServer } from '../server'
 
 let harnessOriginSequence = 0
@@ -59,6 +61,7 @@ export async function createRailHarness(
   client: Client,
   server: TestServer,
   titles: readonly string[] = ['First', 'Second'],
+  rootPath = 'project',
 ) {
   const previousEnvironments = useEnvironmentsStore.getState()
   const previousOrigin = activeServerOrigin()
@@ -81,6 +84,7 @@ export async function createRailHarness(
         origin,
         kind: 'primary',
         label: descriptor.label,
+        descriptor,
         environmentId: descriptor.environmentId,
       },
     },
@@ -95,9 +99,12 @@ export async function createRailHarness(
         emptyMessage: 'receipt missing',
       }),
     )
-  await mkdir(join(server.root, 'project'))
+  if (rootPath !== '') await mkdir(join(server.root, rootPath))
   const receipt = await dispatch(
-    createProjectRegistrationCommand({ workspaceRoot: 'project', title: 'Rail project' }),
+    createProjectRegistrationCommand({
+      workspaceRoot: rootPath || server.root,
+      title: 'Rail project',
+    }),
   )
   const { projectId, worktreeId } = receipt.result!
   const sessionIds = titles.map((_, index) =>
@@ -142,7 +149,11 @@ export async function createRailHarness(
       syntaxHighlightingEnabled: false,
     },
   })
-  setSessionProjectOpener(application.openEnvironmentWorkspaceRoot)
+  await application.openEnvironmentWorkspaceRoot(environmentId, rootPath)
+  application.getSnapshot().editor.workspaceStore.getState().setUiMode('chat')
+  const firstSessionId = sessionIds[0]
+  if (firstSessionId)
+    useSessionSelectionStore.getState().restoreSession(environmentId, projectId, firstSessionId)
   const transport = createChatTransport(origin, {
     createSocket: inProcessOrchestrationSocketFactory({
       app: server.app,
@@ -154,20 +165,14 @@ export async function createRailHarness(
     addProject: () => {},
     transport,
     error: null,
-    openProject: (path) => {
-      void application.openEnvironmentWorkspaceRoot(environmentId, path)
-    },
     project: snapshot.projects.find((project) => project.id === projectId)!,
     worktree: snapshot.worktrees.find((worktree) => worktree.id === worktreeId)!,
     ready: true,
     retrying: false,
     retryProject: () => {},
     rootPath: server.root,
-    selectSession: () => {},
-    startDraft: () => {},
   }
   onTestFinished(() => {
-    setSessionProjectOpener(null)
     transport.close()
     application.dispose()
     useEnvironmentsStore.setState(previousEnvironments, true)
@@ -193,7 +198,7 @@ export function renderRailHarness(
   const model = sessionRailModel({ environments: currentRailEnvironments() })
   const row = model.sessions.find((session) => session.id === harness.sessionIds[0]) ?? null
   return renderWithProviders(
-    <TestEditorStateProvider>
+    <EditorStateProvider runtime={harness.application.getSnapshot().editor}>
       <ChatModeSessionContext value={harness.context}>
         <ChatRailOrderProvider>
           {header ? (
@@ -213,6 +218,10 @@ export function renderRailHarness(
           <WorktreeManager />
         </ChatRailOrderProvider>
       </ChatModeSessionContext>
-    </TestEditorStateProvider>,
+    </EditorStateProvider>,
+    {
+      application: harness.application,
+      queryClient: harness.application.getSnapshot().queryClient,
+    },
   )
 }

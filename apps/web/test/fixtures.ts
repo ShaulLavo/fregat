@@ -1,9 +1,8 @@
 import { TEST_ENVIRONMENT_ID } from './factories/chat'
 import { test as base } from 'vitest'
 
-import { getClient, setClient } from '@/lib/client'
-
 import { createControlledInProcessClient, createInProcessClient } from './client'
+import { installTestClient } from './factories/client-binding'
 import { makeTestServer, type TestServer } from './server'
 
 type TestClient = ReturnType<typeof createInProcessClient>
@@ -28,23 +27,22 @@ export const test = base.extend<Fixtures>({
     await server.cleanup()
   },
   client: async ({ server }, provide) => {
-    // Point the app's RPC singleton at this test's server so code that calls
-    // `getClient()` (api.ts, hooks, components) hits the real server, not a
-    // mock. Restore whatever was there before rather than resetting to the
-    // production client: the dom project installs a file-wide in-process
-    // client, and resetting would hand every later test in the file a socket.
-    const previous = getClient()
     const client = createInProcessClient(server)
-    setClient(client)
-    await provide(client)
-    setClient(previous)
+    const restore = installTestClient(client)
+    try {
+      await provide(client)
+    } finally {
+      restore()
+    }
   },
   controlledClient: async ({ server }, provide) => {
-    const previous = getClient()
     const controlled = createControlledInProcessClient(server)
-    setClient(controlled.client)
-    await provide(controlled)
-    setClient(previous)
+    const restore = installTestClient(controlled.client)
+    try {
+      await provide(controlled)
+    } finally {
+      restore()
+    }
   },
 })
 

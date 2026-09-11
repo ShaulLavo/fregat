@@ -1,5 +1,7 @@
-import * as v from 'valibot'
-import { sessionIdSchema } from '@workspace/contracts'
+import {
+  chatReferenceForToken,
+  tokenForChatReference,
+} from '@workspace/client-core/address/references'
 import { readChatShell } from '@workspace/client-core/chat/snapshots'
 import type { ChatProjectionSlice } from '@workspace/client-core/chat/types'
 import type { AgentLocation } from '@/agent/utils/target'
@@ -63,7 +65,9 @@ export async function agentAddress(
     environmentId,
     mode: 'chat',
     workspace: workspace ? workspaceToken(workspace) : NO_WORKSPACE_TOKEN,
-    document: location.sessionId ? `t/${location.sessionId}` : 't/new',
+    document: tokenForChatReference(
+      location.sessionId ? { kind: 'session', sessionId: location.sessionId } : { kind: 'draft' },
+    ),
   })
 }
 
@@ -182,15 +186,12 @@ async function resolveAgentAddress(
   client: Client,
   signal: AbortSignal,
 ) {
-  const token = address.document ?? 't/new'
-  if (!token.startsWith('t/') || token.split('/').length !== 2)
+  const selection = chatReferenceForToken(address.document ?? 't/new')
+  if (!selection)
     return { kind: 'failed', message: 'This address does not identify a chat session.' } as const
   const snapshot = await readChatShell(client, signal)
-  if (token !== 't/new') {
-    const parsed = v.safeParse(sessionIdSchema, token.slice(2))
-    const session = parsed.success
-      ? snapshot.sessions.find((item) => item.id === parsed.output)
-      : null
+  if (selection.kind === 'session') {
+    const session = snapshot.sessions.find((item) => item.id === selection.sessionId)
     if (!session)
       return {
         kind: 'failed',

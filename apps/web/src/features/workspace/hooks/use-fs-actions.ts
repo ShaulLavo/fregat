@@ -6,7 +6,7 @@ import { useMutation, useQueryClient } from '@tanstack/react-query'
 import { useRef, useState, type RefObject } from 'react'
 
 import { useWorkspaceMutationAllowed } from '@/features/editor/hooks/use-workspace-mutation-allowed'
-import { useEditorCommands } from '@/features/editor/state/commands'
+import { useEditorCommands } from '@/features/editor/hooks/use-editor-commands'
 import { useEditorDocumentStoreApi } from '@/features/editor/state/document-state'
 import { useEditorWorkspaceStoreApi } from '@/features/editor/state/workspace-state'
 import { useOptionalWorkspaceEditService } from '@/features/editor/providers/workspace-edit-context'

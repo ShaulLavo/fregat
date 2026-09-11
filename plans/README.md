@@ -17,23 +17,36 @@ a bare root `bun run verify`.
 
 ## Executable plan inventory
 
-| Plan                                                                            | State                                                    |
-| ------------------------------------------------------------------------------- | -------------------------------------------------------- |
-| [078 — federated environments](078-federated-environments.md)                   | **IMPLEMENTED — AUTOMATED CHECKS PASS; LIVE GATES OPEN** |
-| [071 — syntax highlight retry](071-syntax-highlight-retry.md)                   | **PROPOSED — ROOT GO/NO-GO SCHEDULING**                  |
-| [080 — Platform and VS Code keybinding modes](080-platform-keybinding-modes.md) | **PROPOSED — INTERACTION RULES CONFIRMED**               |
-| [085 — instant workspace reload](085-instant-workspace-reload.md)               | **PROPOSED — IMPLEMENTATION NOT STARTED**                |
-| [086 — workspace URL cleanup](086-workspace-url-cleanup.md)                     | **PROPOSED — PRODUCT DECISIONS OPEN**                    |
-| [073 — Electrobun 2.x migration](073-electrobun-v2-migration.md)                | **PROPOSED — ROOT GO/NO-GO SCHEDULING**                  |
-| [075 — terminal renderer fallbacks](075-terminal-renderer-fallbacks.md)         | **PROPOSED — BLOCKED ON TIER DECISION**                  |
-| [076 — watch-reload child reaping](076-watch-reload-child-reaping.md)           | **PROPOSED — ROOT GO/NO-GO SCHEDULING**                  |
+| Plan                                                                            | State                                                         |
+| ------------------------------------------------------------------------------- | ------------------------------------------------------------- |
+| [078 — federated environments](078-federated-environments.md)                   | **IMPLEMENTED — AUTOMATED CHECKS PASS; LIVE GATES OPEN**      |
+| [071 — syntax highlight retry](071-syntax-highlight-retry.md)                   | **PROPOSED — ROOT GO/NO-GO SCHEDULING**                       |
+| [080 — Platform and VS Code keybinding modes](080-platform-keybinding-modes.md) | **PROPOSED — INTERACTION RULES CONFIRMED**                    |
+| [085 — instant workspace reload](085-instant-workspace-reload.md)               | **PROPOSED — IMPLEMENTATION NOT STARTED**                     |
+| [086 — full TanStack Router migration](086-tanstack-router-migration.md)        | **IMPLEMENTED — CHROMIUM/FIREFOX PASS; LIVE LIMITS RECORDED** |
+| [087 — stateless MCP support](087-stateless-mcp.md)                             | **PROPOSED — IMPLEMENTATION NOT STARTED**                     |
+| [088 — native code intelligence](088-native-code-intelligence.md)               | **PROPOSED — DEPENDS ON 087**                                 |
+| [073 — Electrobun 2.x migration](073-electrobun-v2-migration.md)                | **PROPOSED — ROOT GO/NO-GO SCHEDULING**                       |
+| [075 — terminal renderer fallbacks](075-terminal-renderer-fallbacks.md)         | **PROPOSED — BLOCKED ON TIER DECISION**                       |
+| [076 — watch-reload child reaping](076-watch-reload-child-reaping.md)           | **PROPOSED — ROOT GO/NO-GO SCHEDULING**                       |
 
 ## Dependency notes
 
-- Plan 086 keeps local workspace IDs and URL tabs, fixes history/persistence edges, and prepares
-  reusable view data for later sharing. The [Router evaluation](086-router-evaluation.md) recommends
-  Router as the web navigation owner; implementation is not started. Its boot/cache changes overlap
-  Plan 085, so reconcile that boundary first. No sharing backend is scheduled.
+- Plan 087 delivers managed external MCP connections and the native Platform tool endpoint using
+  protocol revision `2026-07-28` and SDK v2, with explicit stateless operation, scoped authentication,
+  and real provider integration. Plan 088 depends on its completion and implements the full native
+  semantic retrieval, transactional editing, refactoring, project memory, and debugging program.
+  The [Serena comparison](../docs/serena-implementation-comparison.md) records implementation lessons
+  and the required improvements to existing document, LSP, and transaction services.
+
+- Plan 086 makes TanStack Router the sole web navigation owner, migrates all navigation callers,
+  and deletes the custom URL controller. It keeps local workspace IDs and URL tabs, fixes
+  history/persistence, and supplies reusable view data for sharing. Implementation, focused automated checks, and
+  Chromium/Firefox browser gates pass. The initial and follow-up review findings are fixed, with
+  focused regression evidence recorded in the plan. WebKit is missing host libraries; a second configured live
+  environment remains unverified. The mandatory two-server in-process ownership gate passes.
+  Plan 085's first-paint work remains separate. The [evaluation](086-router-evaluation.md) records
+  the alternatives. No sharing backend is scheduled.
 
 - Plan 085 restores the visible workspace before live responses, starting with bootstrap, file tree,
   and settings. It reuses feature renderers and keeps native paint separate from current-state

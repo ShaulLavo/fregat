@@ -31,7 +31,6 @@ export function WorkbenchLayout({
   panels,
   rootPath,
   onLayoutChange,
-  onPanelsChange,
 }: {
   readonly conflicts: EditorTabConflictMap
 
@@ -40,7 +39,6 @@ export function WorkbenchLayout({
   readonly panels: WorkbenchPanels
   readonly rootPath: string
   readonly onLayoutChange: (layout: WorkbenchLayout) => void
-  readonly onPanelsChange: (panels: WorkbenchPanels) => void
 }) {
   function handleOuterLayoutChanged(next: Record<string, number>) {
     onLayoutChange(setWorkbenchOuterLayout(layout, next))
@@ -72,7 +70,7 @@ export function WorkbenchLayout({
               maxSize={SIDEBAR_MAX_SIZE}
               minSize={SIDEBAR_MIN_SIZE}
             >
-              <SidebarPanel panels={panels} rootPath={rootPath} onPanelsChange={onPanelsChange} />
+              <SidebarPanel panels={panels} rootPath={rootPath} />
             </ResizablePanel>
             <ResizableHandle id='sidebar-handle' withHandle />
           </>
@@ -102,11 +100,7 @@ export function WorkbenchLayout({
                   maxSize={BOTTOM_MAX_SIZE}
                   minSize={BOTTOM_MIN_SIZE}
                 >
-                  <BottomPanel
-                    panels={panels}
-                    rootPath={rootPath}
-                    onPanelsChange={onPanelsChange}
-                  />
+                  <BottomPanel panels={panels} rootPath={rootPath} />
                 </ResizablePanel>
               </>
             ) : null}

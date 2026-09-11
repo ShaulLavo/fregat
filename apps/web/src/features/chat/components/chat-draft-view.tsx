@@ -30,6 +30,7 @@ import { ChatWelcomeView } from './chat-welcome-view'
 import { WorktreePicker } from '@/features/chat/components/worktree-picker'
 import { newWorktreeTarget } from '@/features/chat/utils/worktree-target'
 import { useSettingValue } from '@/features/settings/hooks/use-setting-value'
+import { useNavigation } from '@/hooks/use-navigation'
 
 const DRAFT_CHAT_KEY = 'draft'
 
@@ -48,6 +49,7 @@ export function ChatDraftView({
   worktree: OrchestrationWorktreeShell | null
   rootPath: string
 }) {
+  const navigation = useNavigation()
   const [chosenTarget, setChosenTarget] = useState<SessionWorktreeTarget | null>(null)
   const target =
     chosenTarget ?? (worktree ? { kind: 'current' as const, worktreeId: worktree.id } : null)
@@ -100,6 +102,7 @@ export function ChatDraftView({
       setSendError('Workspace chat is still preparing.')
       return false
     }
+    const operation = navigation.getSnapshot()
 
     // Declared, not created. The server makes the worktree while the turn is
     // held at the gate, so a client that dies here cannot orphan a directory
@@ -160,7 +163,7 @@ export function ChatDraftView({
     }
 
     setSendError(null)
-    onSessionCreated(submission.command.sessionId)
+    if (navigation.getSnapshot() === operation) onSessionCreated(submission.command.sessionId)
 
     return true
   }

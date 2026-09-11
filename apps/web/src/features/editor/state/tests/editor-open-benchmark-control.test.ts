@@ -16,7 +16,7 @@ import type {
   FileOpenIntentServiceOwner,
 } from '@/lib/file-open-intent/state/service'
 import { MountedEditorRegistry } from '@/features/editor/state/mounted-editor-registry'
-import type { EditorActivation } from '@/features/editor/state/commands'
+import type { EditorActivation } from '@/features/editor/state/apply-actions'
 import { fileSnapshotQueryOptions } from '@/lib/file-snapshot-query-cache'
 
 describe('editor-open benchmark control', () => {

@@ -1,7 +1,9 @@
 import { registerTestWorkspaceAddress } from '../../../../test/factories/workspace-address'
 import { createEnvironmentEntry } from '@workspace/client-core/environments/utils/connection'
 import { waitFor } from '@testing-library/react'
-import { mkdir } from 'node:fs/promises'
+import { mkdir, writeFile } from 'node:fs/promises'
+import { readFilePreview } from '@workspace/client-core/files/read'
+import { removedProjectRoot } from '@/features/chat-mode/state/removal'
 import path from 'node:path'
 import {
   commandIdSchema,
@@ -28,7 +30,6 @@ import {
 import { queryClientFor } from '@/lib/environments/state/query-clients'
 import { useEnvironmentsStore } from '@/lib/environments/state/store'
 import { workspaceToken } from '@workspace/client-core/address/workspace'
-import { addressRootClaimed } from '@/features/address/state/root-claim'
 import { createInProcessClient, createObservedInProcessClient } from '../../../../test/client'
 import { expect, test } from '../../../../test/fixtures'
 import { makeTestServer } from '../../../../test/server'
@@ -37,7 +38,7 @@ import {
   renderAddressHarness,
   seedWorkspaceCache,
   startAt,
-  flushProjection,
+  waitForNavigation,
   pressBack,
 } from '../../../../test/address'
 
@@ -74,7 +75,7 @@ test('identity drift during a pending shell read cannot publish address state', 
       }),
     ).toThrow()
     release.resolve()
-    await waitFor(() => expect(addressRootClaimed()).toBe(false))
+    await waitFor(() => expect(rendered.navigation.getSnapshot().status).not.toBe('pending'))
     expect(useSessionSelectionStore.getState().selection).toEqual({ kind: 'auto' })
     expect(useChatProjectionStore.getState().slices[descriptor.environmentId]).toBeUndefined()
   } finally {
@@ -109,18 +110,23 @@ test.for(['d7b4079f-a895-42df-b472-ed1785c7cc54', ''])(
     resetSessionSelectionStore()
     seedWorkspaceCache({ rootPath: 'source' })
     startAt(`/~${workspaceToken(registration.workspaceAddress)}/chat/t/${sessionId}`)
-    const rendered = await renderAddressHarness()
     const rejectedAddress = `/@${rejectedEnvironment}/~${workspaceToken(registration.workspaceAddress)}/chat/t/${sessionId}`
+    const rendered = await renderAddressHarness({
+      initialEntries: [
+        rejectedAddress,
+        `/~${workspaceToken(registration.workspaceAddress)}/chat/t/${sessionId}`,
+      ],
+    })
     try {
       await started.promise
-      await pressBack(rejectedAddress)
+      await pressBack(rendered.navigation)
       release.resolve()
-      await flushProjection()
+      await waitForNavigation(rendered.navigation)
       expect(
         rendered.application.getSnapshot().editor.workspaceStore.getState().rootFolder?.path,
       ).toBe('source')
       expect(useSessionSelectionStore.getState().selection).toEqual({ kind: 'auto' })
-      expect(location.pathname).toBe(rejectedAddress)
+      expect(rendered.navigation.router.history.location.pathname).toBe(rejectedAddress)
     } finally {
       release.resolve()
       rendered.unmount()
@@ -131,10 +137,7 @@ test.for(['d7b4079f-a895-42df-b472-ed1785c7cc54', ''])(
   },
 )
 
-test('an older restore cannot release the root claim of a newer pending restore', async ({
-  client,
-  server,
-}) => {
+test('an older restore cannot settle a newer pending application', async ({ client, server }) => {
   await mkdir(path.join(server.root, 'target'))
   const registration = await registerSession(client, 'target', 'Target')
   const firstStarted = Promise.withResolvers<void>()
@@ -163,14 +166,16 @@ test('an older restore cannot release the root claim of a newer pending restore'
   seedWorkspaceCache({ rootPath: 'source' })
   const target = `/~${workspaceToken(registration.workspaceAddress)}/chat/t/${sessionId}`
   startAt(target)
-  const rendered = await renderAddressHarness()
+  const rendered = await renderAddressHarness({
+    initialEntries: [`${target}?s.q=second`, `${target}?s.q=first`],
+  })
   try {
     await firstStarted.promise
-    await pressBack(target)
+    rendered.navigation.back()
     await secondStarted.promise
     firstRelease.resolve()
-    await flushProjection()
-    expect(addressRootClaimed()).toBe(true)
+    await new Promise((resolve) => setTimeout(resolve, 0))
+    expect(rendered.navigation.getSnapshot().status).toBe('pending')
     secondRelease.resolve()
     await waitFor(() =>
       expect(useSessionSelectionStore.getState().selection).toMatchObject({
@@ -178,7 +183,7 @@ test('an older restore cannot release the root claim of a newer pending restore'
         sessionId,
       }),
     )
-    await waitFor(() => expect(addressRootClaimed()).toBe(false))
+    await waitFor(() => expect(rendered.navigation.getSnapshot().status).not.toBe('pending'))
   } finally {
     firstRelease.resolve()
     secondRelease.resolve()
@@ -188,7 +193,7 @@ test('an older restore cannot release the root claim of a newer pending restore'
   }
 })
 
-test('restores a shared UUID only inside the addressed environment and target editor', async ({
+test('A to B to A retains dirty documents, isolates shared session IDs and supersedes stale owners', async ({
   client,
   server,
 }) => {
@@ -239,12 +244,36 @@ test('restores a shared UUID only inside the addressed environment and target ed
   useEnvironmentsStore.getState().activate(originA)
   resetSessionSelectionStore()
   seedWorkspaceCache({ rootPath: 'source' })
-  startAt(
-    `/@${descriptorB.environmentId}/~${workspaceToken(registrationB.workspaceAddress)}/chat/t/${sessionId}`,
-  )
+  startAt(`/~${workspaceToken(registrationA.workspaceAddress)}/chat/t/${sessionId}`)
   const rendered = await renderAddressHarness()
 
   try {
+    await waitForNavigation(rendered.navigation)
+    const retainedA = rendered.application.getSnapshot().editor
+    expect(
+      removedProjectRoot(
+        { environmentId: descriptorA.environmentId, projectId: registrationA.projectId },
+        '',
+      ),
+    ).toBe('')
+    await writeFile(path.join(server.root, 'retained.ts'), 'export const retained = true\n')
+    const file = await readFilePreview({
+      client,
+      path: 'retained.ts',
+      signal: new AbortController().signal,
+    })
+    retainedA.documentStore.getState().ensureLiveEditorDocument(file)
+    retainedA.documentStore.getState().setLiveEditorDocumentDirty(file.path, true)
+    expect(
+      await rendered.navigation.openFile({ owner: retainedA.workspaceStore, path: file.path }),
+    ).toEqual({ status: 'applied' })
+    expect(
+      await rendered.navigation.openChat({
+        environmentId: descriptorB.environmentId,
+        sessionId,
+        surface: 'main',
+      }),
+    ).toEqual({ status: 'applied' })
     await waitFor(() =>
       expect(useSessionSelectionStore.getState().selection).toMatchObject({
         kind: 'session',
@@ -262,8 +291,26 @@ test('restores a shared UUID only inside the addressed environment and target ed
         ?.title,
     ).toBe('Session A')
     expect(registrationA.projectId).not.toBe(registrationB.projectId)
-    await flushProjection()
-    expect(location.pathname).toContain(`/@${descriptorB.environmentId}/`)
+    await waitForNavigation(rendered.navigation)
+    expect(rendered.navigation.router.history.location.pathname).toContain(
+      `/@${descriptorB.environmentId}/`,
+    )
+    const reachedB = rendered.navigation.router.history.location.href
+    expect(reachedB).toContain(`/chat/t/${sessionId}`)
+    expect(
+      await rendered.navigation.openFile({ owner: retainedA.workspaceStore, path: file.path }),
+    ).toEqual({ status: 'superseded' })
+    expect(rendered.navigation.router.history.location.href).toBe(reachedB)
+    expect(rendered.application.getSnapshot().origin).toBe(originB)
+    await pressBack(rendered.navigation)
+    expect(rendered.application.getSnapshot().origin).toBe(originA)
+    expect(rendered.application.getSnapshot().editor).toBe(retainedA)
+    expect(retainedA.documentStore.getState().dirtyFilePaths.has(file.path)).toBe(true)
+    expect(retainedA.workspaceStore.getState().selectedFilePath).toBe(file.path)
+    rendered.navigation.forward()
+    await waitForNavigation(rendered.navigation)
+    expect(rendered.navigation.router.history.location.href).toBe(reachedB)
+    expect(rendered.application.getSnapshot().origin).toBe(originB)
   } finally {
     rendered.unmount()
     rendered.application.dispose()

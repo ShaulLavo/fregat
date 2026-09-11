@@ -1,4 +1,5 @@
-import { useCallback, useMemo } from 'react'
+import { useNavigation } from '@/hooks/use-navigation'
+import { useEditorWorkspaceStoreApi } from '@/features/editor/state/workspace-state'
 
 import type { SearchBufferOptionPatch } from '@/features/search/state/buffer-state'
 import { useSearchBufferStoreApi } from '@/features/search/state/buffer-state'
@@ -6,6 +7,8 @@ import type { WorkspaceSearchQueryOptions } from '@/features/search/utils/buffer
 import { useSearchBufferValue } from '@/features/search/hooks/use-buffer-value'
 
 export function useSearchBufferInputs(rootPath: string) {
+  const navigation = useNavigation()
+  const owner = useEditorWorkspaceStoreApi()
   const caseSensitive = useSearchBufferValue(rootPath, (snapshot) => snapshot.caseSensitive, false)
   const excludeGlobText = useSearchBufferValue(rootPath, (snapshot) => snapshot.excludeGlobText, '')
   const filtersVisible = useSearchBufferValue(
@@ -29,50 +32,46 @@ export function useSearchBufferInputs(rootPath: string) {
   )
   const wholeWord = useSearchBufferValue(rootPath, (snapshot) => snapshot.wholeWord, false)
   const store = useSearchBufferStoreApi()
-  const searchOptions = useMemo<WorkspaceSearchQueryOptions>(
-    () => ({
-      caseSensitive,
-      excludeGlobText,
-      filtersVisible,
-      includeGlobText,
-      matchMode,
-      wholeWord,
-    }),
-    [caseSensitive, excludeGlobText, filtersVisible, includeGlobText, matchMode, wholeWord],
-  )
-  const setQuery = useCallback(
-    (nextQuery: string) => store.getState().setQuery(rootPath, nextQuery),
-    [rootPath, store],
-  )
-  const setReplaceText = useCallback(
-    (nextReplaceText: string) => store.getState().setReplaceText(rootPath, nextReplaceText),
-    [rootPath, store],
-  )
-  const setReplaceVisible = useCallback(
-    (nextReplaceVisible: boolean) =>
-      store.getState().setReplaceVisible(rootPath, nextReplaceVisible),
-    [rootPath, store],
-  )
-  const setSearchOptions = useCallback(
-    (options: SearchBufferOptionPatch) => store.getState().setSearchOptions(rootPath, options),
-    [rootPath, store],
-  )
-  const selectNextQuery = useCallback(
-    () => store.getState().selectNextQuery(rootPath),
-    [rootPath, store],
-  )
-  const selectNextReplaceText = useCallback(
-    () => store.getState().selectNextReplaceText(rootPath),
-    [rootPath, store],
-  )
-  const selectPreviousQuery = useCallback(
-    () => store.getState().selectPreviousQuery(rootPath),
-    [rootPath, store],
-  )
-  const selectPreviousReplaceText = useCallback(
-    () => store.getState().selectPreviousReplaceText(rootPath),
-    [rootPath, store],
-  )
+  const searchOptions: WorkspaceSearchQueryOptions = {
+    caseSensitive,
+    excludeGlobText,
+    filtersVisible,
+    includeGlobText,
+    matchMode,
+    wholeWord,
+  }
+
+  function setQuery(nextQuery: string) {
+    void navigation.setSearchQuery(nextQuery, owner, rootPath)
+  }
+
+  function setSearchOptions(options: SearchBufferOptionPatch) {
+    void navigation.setSearchOptions(options, owner, rootPath)
+  }
+
+  function selectNextQuery() {
+    void navigation.selectSearchQueryHistory(1, owner, rootPath)
+  }
+
+  function selectPreviousQuery() {
+    void navigation.selectSearchQueryHistory(-1, owner, rootPath)
+  }
+
+  function setReplaceText(nextReplaceText: string) {
+    store.getState().setReplaceText(rootPath, nextReplaceText)
+  }
+
+  function setReplaceVisible(nextReplaceVisible: boolean) {
+    store.getState().setReplaceVisible(rootPath, nextReplaceVisible)
+  }
+
+  function selectNextReplaceText() {
+    store.getState().selectNextReplaceText(rootPath)
+  }
+
+  function selectPreviousReplaceText() {
+    store.getState().selectPreviousReplaceText(rootPath)
+  }
 
   return {
     query,

@@ -2,10 +2,10 @@ import type { ScopedStorage } from '@/lib/environments/state/scoped-storage'
 import type { Query, QueryClient } from '@tanstack/react-query'
 
 import {
-  createEditorCommands,
+  createEditorApplyActions,
   type EditorActivation,
-  type EditorCommands,
-} from '@/features/editor/state/commands'
+  type EditorApplyActions,
+} from '@/features/editor/state/apply-actions'
 import type { EditorDocumentStoreApi } from '@/features/editor/state/document-state'
 import {
   type EditorOpenBenchmarkControl,
@@ -54,7 +54,8 @@ export function createEditorOpenBenchmarkControl({
   readonly uiStore: EditorUiStoreApi
   readonly workspaceStore: EditorWorkspaceStoreApi
 }): EditorOpenBenchmarkControl {
-  const commands = createEditorCommands({
+  // Reset is fixture setup; measured tab selection uses the normal navigation command.
+  const commands = createEditorApplyActions({
     activation,
     documentStore,
     searchStore,
@@ -122,7 +123,7 @@ async function resetEditorOpenSample({
   sample,
   workspaceStore,
 }: {
-  readonly commands: EditorCommands
+  readonly commands: EditorApplyActions
   readonly storage: ScopedStorage
   readonly documentStore: EditorDocumentStoreApi
   readonly mountedEditors: MountedEditorRegistry
@@ -178,7 +179,7 @@ function assertTargetIsClean(path: string, documentStore: EditorDocumentStoreApi
 
 function activateInertAndCloseTarget(
   path: string,
-  commands: EditorCommands,
+  commands: EditorApplyActions,
   workspaceStore: EditorWorkspaceStoreApi,
 ): void {
   const workspace = workspaceStore.getState()

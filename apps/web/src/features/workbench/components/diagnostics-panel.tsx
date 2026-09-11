@@ -8,7 +8,7 @@ import { cn } from '@workspace/ui/lib/utils'
 import { useCallback, useRef } from 'react'
 
 import { useEditorLanguageServerStatus } from '@/features/editor/hooks/use-editor-language-server-status'
-import { useEditorCommands } from '@/features/editor/state/commands'
+import { useEditorCommands } from '@/features/editor/hooks/use-editor-commands'
 import { createEditorLanguageServerStatusSource } from '@/features/editor/state/language-server-status-source'
 import type { EditorStatusBarSource } from '@/features/editor/state/status-bar-source'
 import { useEditorUiState, useEditorUiStoreApi } from '@/features/editor/state/ui-state'
@@ -64,7 +64,9 @@ export function DiagnosticsPanel() {
       {statusBarSource ? (
         renderDiagnosticsStatus({
           languageServerStatus,
-          onOpenDiagnostic: commands.openDefinition,
+          onOpenDiagnostic: (target) => {
+            void commands.openDefinition(target)
+          },
           onPreviewDiagnostic: previewDiagnostic,
           source: statusBarSource,
         })

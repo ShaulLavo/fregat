@@ -83,7 +83,7 @@ test('uses the primary machine SSH config while another machine is active', asyn
   const h = await createFederationHarness(server)
   await writeSshConfig(h.serverA.root, 'Host primary-host\n')
   await writeSshConfig(h.serverB.root, 'Host remote-host\n')
-  h.connections.activateEnvironment(h.descriptorB.environmentId)
+  h.application.activateEnvironment(h.originB)
   renderWithProviders(<MachineForm onCancel={() => {}} onSaved={() => {}} />, {
     connections: h.connections,
   })

@@ -1,4 +1,4 @@
-import { useEditorCommands } from '@/features/editor/state/commands'
+import { useEditorCommands } from '@/features/editor/hooks/use-editor-commands'
 import { copyTextToClipboard } from '@/lib/clipboard'
 import { toTreePath } from '@/lib/path-formatters'
 

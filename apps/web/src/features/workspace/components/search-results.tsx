@@ -1,7 +1,7 @@
 import { useCallback, useMemo } from 'react'
 import type { WorkspaceSearchMatch } from '@workspace/contracts'
 
-import { useEditorCommands } from '@/features/editor/state/commands'
+import { useEditorCommands } from '@/features/editor/hooks/use-editor-commands'
 import {
   SearchResultActionsContext,
   type SearchResultActions,

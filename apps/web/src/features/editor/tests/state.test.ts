@@ -9,7 +9,10 @@ import {
 import { describe, it, vi } from 'vitest'
 import { expect, test } from '../../../../test/fixtures'
 
-import { createEditorActivation, createEditorCommands } from '@/features/editor/state/commands'
+import {
+  createEditorActivation,
+  createEditorApplyActions,
+} from '@/features/editor/state/apply-actions'
 import { createEditorDocumentStore } from '@/features/editor/state/document-state'
 import { createEditorUiStore } from '@/features/editor/state/ui-state'
 import { createEditorWorkspaceStore } from '@/features/editor/state/workspace-state'
@@ -47,7 +50,7 @@ describe('editor workspace state', () => {
     const workspaceStore = createEditorWorkspaceStore(cachedWorkspace({}))
     const events: string[] = []
     workspaceStore.subscribe(() => events.push('published'))
-    const commands = createEditorCommands({
+    const commands = createEditorApplyActions({
       activation: {
         activate: (path) => events.push(`activated:${path}`),
         setRoot: () => undefined,
@@ -74,7 +77,7 @@ describe('editor workspace state', () => {
     const document = documentStore.getState().ensureEditorView(tabId, fileResult(path))
     createEditorBufferSession(document.buffer).applyText('dirty')
     const { owner } = fileOpenIntentService(documentStore)
-    const commands = createEditorCommands({
+    const commands = createEditorApplyActions({
       activation: createEditorActivation(owner.activation, documentStore, owner),
       documentStore,
       searchStore,
@@ -115,7 +118,7 @@ describe('editor workspace state', () => {
         queryClient,
         preparedDocument,
       )
-      const commands = createEditorCommands({
+      const commands = createEditorApplyActions({
         activation: createEditorActivation(owner.activation, documentStore, owner),
         documentStore,
         searchStore,
@@ -275,6 +278,54 @@ describe('editor workspace state', () => {
     ])
   })
 
+  test.for(['rename', 'discard'] as const)(
+    'a completed %s updates every parked workspace before it is restored',
+    (change) => {
+      const from = '/repo/src/a.ts'
+      const to = '/repo/src/renamed.ts'
+      const scroll = { left: 5, top: 480 }
+      const slice = {
+        editorHistory: [from],
+        recentlyClosedEditorPaths: [from],
+        scrollPositionByPath: { [from]: scroll },
+        workbenchPanels: workbenchPanelsForPaths([from], from),
+      }
+      const { commands, documentStore, workspaceStore } = editorHarness(slice)
+      documentStore.getState().ensureLiveEditorDocument(fileResult(from))
+      commands.switchRootFolder(pickedDirectory('/second'))
+      commands.openFileSurface(from)
+      workspaceStore.setState(slice)
+      commands.switchRootFolder(pickedDirectory('/other'))
+      commands.openFileSurface('/other/active.ts')
+
+      if (change === 'rename') commands.renameLiveEditorDocument(from, to)
+      if (change === 'discard') commands.discardLiveEditorDocument(from)
+
+      const paths = change === 'rename' ? [to] : []
+      const scrollPositionByPath = change === 'rename' ? { [to]: scroll } : {}
+      expect(workspaceStore.getState().selectedFilePath).toBe('/other/active.ts')
+      for (const root of ['/repo', '/second']) {
+        const parked = workspaceStore.getState().parkedWorkspaces.get(root)
+        expect(parked?.workbenchPanels.editorTabs.map((tab) => tab.path)).toEqual(paths)
+        expect(parked).toMatchObject({
+          editorHistory: paths,
+          recentlyClosedEditorPaths: paths,
+          scrollPositionByPath,
+        })
+        expect(parked?.scrollPositionByPath[from]).toBeUndefined()
+      }
+      commands.switchRootFolder(pickedDirectory('/repo'))
+      expect(workspaceStore.getState()).toMatchObject({
+        openFilePaths: paths,
+        selectedFilePath: paths[0] ?? null,
+        editorHistory: paths,
+        recentlyClosedEditorPaths: paths,
+        scrollPositionByPath,
+      })
+      expect(documentStore.getState().hasLiveEditorDocument(from)).toBe(false)
+    },
+  )
+
   it('keeps a parked project’s documents and views alive across a switch', () => {
     const { commands, documentStore, workspaceStore } = editorHarness({
       workbenchPanels: workbenchPanelsForPaths(['/repo/src/a.ts'], '/repo/src/a.ts'),
@@ -329,7 +380,7 @@ function editorHarness(slice: Partial<CachedWorkspaceSlice> = {}) {
   const searchStore = createSearchBufferStore()
   const uiStore = createEditorUiStore()
   const workspaceStore = createEditorWorkspaceStore(cachedWorkspace(slice))
-  const commands = createEditorCommands({
+  const commands = createEditorApplyActions({
     activation: { activate: () => undefined, setRoot: () => undefined },
     documentStore,
     searchStore,

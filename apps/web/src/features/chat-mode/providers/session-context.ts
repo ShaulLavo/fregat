@@ -1,9 +1,4 @@
-import type {
-  OrchestrationProjectShell,
-  OrchestrationWorktreeShell,
-  ProjectId,
-  SessionId,
-} from '@workspace/contracts'
+import type { OrchestrationProjectShell, OrchestrationWorktreeShell } from '@workspace/contracts'
 import { createContext, use } from 'react'
 
 import type { ChatTransport } from '@/features/chat/transport/chat-transport'
@@ -16,7 +11,6 @@ export type ChatModeSession = {
   readonly error: string | null
   /** Opens the folder picker so a directory can join the rail as a project. */
   readonly addProject: () => void
-  readonly openProject: (workspaceRoot: string) => void
   readonly project: OrchestrationProjectShell | null
   readonly worktree: OrchestrationWorktreeShell | null
   readonly ready: boolean
@@ -26,8 +20,6 @@ export type ChatModeSession = {
   readonly retryProject: () => void
   /** The active project's workspace root — what chat sends, not where the editor is. */
   readonly rootPath: string
-  readonly selectSession: (projectId: ProjectId, sessionId: SessionId) => void
-  readonly startDraft: (projectId: ProjectId) => void
 }
 
 export const ChatModeSessionContext = createContext<ChatModeSession | null>(null)

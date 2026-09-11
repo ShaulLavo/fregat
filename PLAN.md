@@ -196,6 +196,29 @@ cover three direct shell children, Ctrl-C/D, resize, exact 2 MiB binary echo, bo
 Neovim editing, and awaited cleanup. Windows remains completely untested; the current package
 platform guard permits Linux and macOS only.
 
+## Native agent tools lane
+
+Requested 2026-09-11. [Plan 087](plans/087-stateless-mcp.md) precedes
+[Plan 088](plans/088-native-code-intelligence.md). Both are proposed; implementation has not started.
+
+Plan 087 delivers managed external MCP servers and an authenticated native tool endpoint. The
+required wire revision is stateless MCP `2026-07-28`, implemented with explicitly configured SDK v2.
+Scoped machine-client authentication and real MCP calls from both providers are prerequisites,
+not assumptions supplied by existing provider MCP event handling.
+
+Plan 088 builds the full native capability on our document, language-server, search, and workspace
+transaction services. Its order is comparative baseline, explicit document views/native backend
+requests, retrieval/indexing, diagnostics, transactional edits, advanced refactors, memory/execution,
+native DAP debugging, and final comparative certification. Read-only tools do not close the plan.
+The [comparison](docs/serena-implementation-comparison.md) records what to adopt and what to improve.
+
+These plans absorb MCP and project-memory ownership from the unscheduled editor E7 strategy.
+They reuse the completed environment/session foundations and current Plan 078 implementation;
+remote completion still requires its relevant live gates. They do not depend on or reorder the
+keymap, reload, TUI, or Ghostty lanes. Any new Editor public contract lands in lockstep with Platform.
+General public hosting/pairing remains separate; the MCP prerequisite uses authenticated loopback
+endpoints and existing SSH access, with explicit grants for native clients.
+
 ## Verification boundaries
 
 - **Platform-only:** verify the narrow Platform tests/typechecks named by the active plan.

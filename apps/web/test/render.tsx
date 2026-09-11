@@ -7,7 +7,7 @@ import {
   type RenderResult,
 } from '@testing-library/react'
 import { TooltipProvider } from '@workspace/ui/components/tooltip'
-import { StrictMode, useState, type ReactElement, type ReactNode } from 'react'
+import { StrictMode, useEffect, useState, type ReactElement, type ReactNode } from 'react'
 
 import { EditorColorThemeProvider } from '@/features/editor/providers/color-theme-provider'
 import { AppearanceProvider } from '@/features/settings/providers/appearance-provider'
@@ -23,11 +23,15 @@ import { createCommandRuntimeBinding } from '@/keymap/state/runtime-binding'
 import { HotkeysProvider } from '@tanstack/react-hotkeys'
 import { ActiveEnvironmentApplication } from '@/components/active-environment-application'
 import { ApplicationRuntimeProvider } from '@/providers/application-runtime-provider'
-import type { ApplicationRuntime } from '@/state/application-runtime'
+import { createApplicationRuntime, type ApplicationRuntime } from '@/state/application-runtime'
+import { NavigationProvider } from '@/providers/navigation-provider'
+import type { Navigation } from '@/state/navigation'
+import { createTestNavigation } from './factories/navigation'
+import { readWorkspaceCache } from '@/features/workspace/state/cache'
+import { testScopedStorage } from './factories/scoped-storage'
 import type { EnvironmentConnections } from '@/state/environment-connections'
 import { EnvironmentConnectionsContext } from '@/providers/environment-connections-context'
 import { SettingsOwnerProvider } from '@/features/settings/providers/owner-provider'
-import { createTestEnvironmentConnections } from './factories/environment-connections'
 
 // Retry/gc off so failing queries surface immediately and no timers outlive a test.
 export function createTestQueryClient() {
@@ -40,6 +44,7 @@ export function createTestQueryClient() {
 
 export type RenderWithProvidersOptions = Omit<RenderOptions, 'wrapper'> & {
   application?: ApplicationRuntime
+  navigation?: Navigation
   connections?: EnvironmentConnections
   settingsOwner?: QueryClient
   command?: TestCommandRuntimeOptions | false
@@ -56,6 +61,7 @@ export type RenderWithProvidersResult = RenderResult & { queryClient: QueryClien
 // drifting copy of this stack.
 export function AppProviders({
   application,
+  navigation,
   connections,
   settingsOwner,
   children,
@@ -64,6 +70,7 @@ export function AppProviders({
   queryClient,
 }: {
   readonly application?: ApplicationRuntime
+  readonly navigation?: Navigation
   readonly connections?: EnvironmentConnections
   readonly settingsOwner?: QueryClient
   readonly children: ReactNode
@@ -72,40 +79,65 @@ export function AppProviders({
   readonly queryClient: QueryClient
 }) {
   const [binding] = useState(createCommandRuntimeBinding)
-  const [defaultConnections] = useState(
-    () => connections ?? application?.connections ?? createTestEnvironmentConnections(),
-  )
-  const child = application ? (
-    <ApplicationRuntimeProvider application={application}>{children}</ApplicationRuntimeProvider>
-  ) : (
-    children
-  )
+  const [runtime, setRuntime] = useState<{
+    readonly application: ApplicationRuntime
+    readonly navigation: Navigation
+  } | null>(null)
+  useEffect(() => {
+    const navigationOwner =
+      application ??
+      createApplicationRuntime({
+        workspaceCache: readWorkspaceCache(testScopedStorage),
+        preparation: {
+          appliedThemeContentHash: null,
+          appliedThemeId: null,
+          selectedThemeId: 'dark',
+          syntaxHighlightingEnabled: false,
+        },
+      })
+    const activeNavigation = navigation ?? createTestNavigation({ application: navigationOwner })
+    const detach = activeNavigation.attach(navigationOwner)
+    // Runtime subscriptions belong to this effect's lifetime, including StrictMode replay.
+    // oxlint-disable-next-line oxc-react-compiler/set-state-in-effect
+    setRuntime({ application: navigationOwner, navigation: activeNavigation })
+    return () => {
+      detach()
+      if (!navigation) activeNavigation.dispose()
+      if (!application) navigationOwner.dispose()
+    }
+  }, [application, navigation])
+  if (!runtime) return null
+  const { application: navigationOwner, navigation: activeNavigation } = runtime
   const content = (
-    <EnvironmentConnectionsContext value={connections ?? defaultConnections}>
-      <TooltipProvider delay={0}>{child}</TooltipProvider>
+    <EnvironmentConnectionsContext value={connections ?? navigationOwner.connections}>
+      <TooltipProvider delay={0}>{children}</TooltipProvider>
     </EnvironmentConnectionsContext>
   )
 
   return (
-    <QueryClientProvider client={queryClient}>
-      <SettingsOwnerProvider queryClient={settingsOwner ?? queryClient}>
-        <LanguageServerMatchProvider>
-          <FocusProvider service={focusService}>
-            <AppearanceProvider bootDensity={readSettingsMirror()['workbench.density']}>
-              <EditorColorThemeProvider>
-                {command === false ? (
-                  <CommandBusProvider binding={binding}>{content}</CommandBusProvider>
-                ) : (
-                  <TestCommandProvider options={command} queryClient={queryClient}>
-                    {content}
-                  </TestCommandProvider>
-                )}
-              </EditorColorThemeProvider>
-            </AppearanceProvider>
-          </FocusProvider>
-        </LanguageServerMatchProvider>
-      </SettingsOwnerProvider>
-    </QueryClientProvider>
+    <ApplicationRuntimeProvider application={navigationOwner}>
+      <NavigationProvider navigation={activeNavigation}>
+        <QueryClientProvider client={queryClient}>
+          <SettingsOwnerProvider queryClient={settingsOwner ?? queryClient}>
+            <LanguageServerMatchProvider>
+              <FocusProvider service={focusService}>
+                <AppearanceProvider bootDensity={readSettingsMirror()['workbench.density']}>
+                  <EditorColorThemeProvider>
+                    {command === false ? (
+                      <CommandBusProvider binding={binding}>{content}</CommandBusProvider>
+                    ) : (
+                      <TestCommandProvider options={command} queryClient={queryClient}>
+                        {content}
+                      </TestCommandProvider>
+                    )}
+                  </EditorColorThemeProvider>
+                </AppearanceProvider>
+              </FocusProvider>
+            </LanguageServerMatchProvider>
+          </SettingsOwnerProvider>
+        </QueryClientProvider>
+      </NavigationProvider>
+    </ApplicationRuntimeProvider>
   )
 }
 
@@ -139,6 +171,7 @@ export function renderWithProviders(
   ui: ReactElement,
   {
     application,
+    navigation,
     connections,
     settingsOwner,
     command,
@@ -154,6 +187,7 @@ export function renderWithProviders(
     return (
       <AppProviders
         application={application}
+        navigation={navigation}
         connections={connections}
         settingsOwner={settingsOwner}
         command={command}
@@ -172,6 +206,7 @@ export function renderHookWithProviders<Result, Props>(
   callback: (props: Props) => Result,
   {
     application,
+    navigation,
     connections,
     settingsOwner,
     command,
@@ -187,6 +222,7 @@ export function renderHookWithProviders<Result, Props>(
     return (
       <AppProviders
         application={application}
+        navigation={navigation}
         connections={connections}
         settingsOwner={settingsOwner}
         command={command}
@@ -201,21 +237,39 @@ export function renderHookWithProviders<Result, Props>(
   return { queryClient, ...renderHook(callback, { wrapper: Wrapper, ...options }) }
 }
 
-export function renderApplication(ui: ReactNode, application: ApplicationRuntime) {
+export function renderApplication(
+  ui: ReactNode,
+  application: ApplicationRuntime,
+  { navigation = createTestNavigation({ application }) }: { readonly navigation?: Navigation } = {},
+) {
   seedBootMirrorTheme('dark')
-  return render(
+  const detach = navigation.attach(application)
+  const rendered = render(
     <StrictMode>
-      <ApplicationRuntimeProvider application={application}>
-        <EnvironmentConnectionsContext value={application.connections}>
-          <FocusProvider>
-            <HotkeysProvider>
-              <CommandBusProvider binding={application.commandBinding}>
-                <ActiveEnvironmentApplication bootDensity='cozy'>{ui}</ActiveEnvironmentApplication>
-              </CommandBusProvider>
-            </HotkeysProvider>
-          </FocusProvider>
-        </EnvironmentConnectionsContext>
-      </ApplicationRuntimeProvider>
+      <NavigationProvider navigation={navigation}>
+        <ApplicationRuntimeProvider application={application}>
+          <EnvironmentConnectionsContext value={application.connections}>
+            <FocusProvider>
+              <HotkeysProvider>
+                <CommandBusProvider binding={application.commandBinding}>
+                  <ActiveEnvironmentApplication bootDensity='cozy'>
+                    {ui}
+                  </ActiveEnvironmentApplication>
+                </CommandBusProvider>
+              </HotkeysProvider>
+            </FocusProvider>
+          </EnvironmentConnectionsContext>
+        </ApplicationRuntimeProvider>
+      </NavigationProvider>
     </StrictMode>,
   )
+  return {
+    ...rendered,
+    navigation,
+    unmount() {
+      rendered.unmount()
+      detach()
+      navigation.dispose()
+    },
+  }
 }

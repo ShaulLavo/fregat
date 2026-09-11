@@ -11,7 +11,6 @@ export function EditorSurfaceLayoutView({ rootPath }: { readonly rootPath: strin
   const panels = useEditorWorkspaceState((state) => state.workbenchPanels)
   const layout = useEditorWorkspaceState((state) => state.workbenchLayout)
   const setWorkbenchLayout = useEditorWorkspaceState((state) => state.setWorkbenchLayout)
-  const setWorkbenchPanels = useEditorWorkspaceState((state) => state.setWorkbenchPanels)
 
   return (
     <WorkbenchLayout
@@ -21,7 +20,6 @@ export function EditorSurfaceLayoutView({ rootPath }: { readonly rootPath: strin
       panels={panels}
       rootPath={rootPath}
       onLayoutChange={setWorkbenchLayout}
-      onPanelsChange={setWorkbenchPanels}
     />
   )
 }

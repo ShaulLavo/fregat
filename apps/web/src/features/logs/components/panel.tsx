@@ -1,3 +1,4 @@
+import { useNavigation } from '@/hooks/use-navigation'
 import { useQueryClient } from '@tanstack/react-query'
 import { memo, useCallback, useEffect, useMemo, useRef, useState } from 'react'
 
@@ -9,13 +10,14 @@ import { useLogSummary } from '@/features/logs/hooks/use-summary'
 import { LogsEventListContainer } from '@/features/logs/components/event-list-container'
 import { LogsTimeline } from '@/features/logs/components/timeline'
 import { LogsToolbar } from '@/features/logs/components/toolbar'
-import { setLogsFilters, useLogsFilters } from '@/features/logs/state/filter-store'
+import { useLogsFilters } from '@/features/logs/state/filter-store'
 
 type LogsPanelProps = {
   active: boolean
 }
 
 export const LogsPanel = memo(({ active }: LogsPanelProps) => {
+  const navigation = useNavigation()
   const queryClient = useQueryClient()
   const rootRef = useRef<HTMLElement | null>(null)
   const { ref: focusTargetRef } = useFocusTarget<HTMLElement>({
@@ -73,7 +75,7 @@ export const LogsPanel = memo(({ active }: LogsPanelProps) => {
         filters={filtersState}
         refreshing={summary.isFetching || optionSummary.isFetching}
         sources={optionSummary.data?.sources ?? []}
-        onFiltersChange={setLogsFilters}
+        onFiltersChange={(filters) => void navigation.setLogsFilters(filters)}
         onRefresh={handleRefresh}
       />
       <LogsTimeline summary={summary.data} />

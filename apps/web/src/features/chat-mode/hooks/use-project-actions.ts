@@ -1,23 +1,21 @@
+import { useApplicationRuntime } from '@/hooks/use-application-runtime'
+import { projectSessions, removedProjectRoot } from '@/features/chat-mode/state/removal'
 import type { ScopedProjectRef } from '@workspace/contracts'
 import { createProjectDeleteCommand } from '@workspace/client-core/chat/commands'
 import { dispatchChatCommand } from '@/features/chat/utils/command-dispatch'
 import { dispatchCommandForEnvironment } from '@/features/chat/state/active-transports'
-import { selectChatSessionsForProject } from '@workspace/client-core/chat/selectors'
-import {
-  useChatProjectionStore,
-  selectChatProjectionSlice,
-} from '@/features/chat/state/chat-projection-store'
 import { useSessionActions } from '@/features/chat-mode/hooks/use-session-actions'
 import {
   useProjectDeleteRequestStore,
   type ProjectDeleteRequest,
 } from '@/features/chat-mode/state/project-delete-request-store'
 import { clearSessionMultiSelect } from '@/features/chat-mode/state/session-commands'
-import { useSessionSelectionStore } from '@/features/chat-mode/state/session-selection-store'
+import { useNavigation } from '@/hooks/use-navigation'
 import type { SessionRailProject } from '@workspace/client-core/chat/rail/model'
 export function useProjectActions() {
   const sessionActions = useSessionActions()
-  const releaseSession = useSessionSelectionStore((state) => state.releaseSession)
+  const navigation = useNavigation()
+  const application = useApplicationRuntime()
   const requestDelete = useProjectDeleteRequestStore((state) => state.requestDelete)
   const dismissDelete = useProjectDeleteRequestStore((state) => state.dismissDelete)
   return {
@@ -35,6 +33,10 @@ export function useProjectActions() {
       const state = useProjectDeleteRequestStore.getState()
       if (state.pending) return
       state.beginDelete()
+      const rootPath = removedProjectRoot(
+        request.ref,
+        application.getSnapshot().editor.workspaceStore.getState().rootFolder?.path,
+      )
       const outcome = await dispatchChatCommand({
         action: 'chat.project.delete',
         command: createProjectDeleteCommand({ projectId: request.ref.projectId }),
@@ -46,8 +48,7 @@ export function useProjectActions() {
         return
       }
       dismissDelete()
-      for (const session of projectSessions(request.ref))
-        releaseSession({ environmentId: request.ref.environmentId, sessionId: session.id }, [])
+      await navigation.removeProject({ ...request.ref, rootPath })
       clearSessionMultiSelect()
     },
     deleteProject(project: SessionRailProject) {
@@ -58,10 +59,4 @@ export function useProjectActions() {
       })
     },
   }
-}
-function projectSessions(ref: ScopedProjectRef) {
-  return selectChatSessionsForProject(
-    selectChatProjectionSlice(useChatProjectionStore.getState(), ref.environmentId),
-    ref.projectId,
-  )
 }

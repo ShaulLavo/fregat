@@ -2,12 +2,17 @@ import { FileSyncService } from '@/features/editor/state/file-sync-service'
 import { EditorSaveService } from '@/features/editor/state/save-service'
 import { SettingsSyncService } from '@/features/settings/state/sync-service'
 import type { QueryClient } from '@tanstack/react-query'
-import { useEffect, useRef, useState, type ReactNode } from 'react'
+import { use, useEffect, useRef, useState, type ReactNode } from 'react'
+import { ApplicationRuntimeContext } from '@/providers/application-runtime-context'
+import { NavigationContext } from '@/providers/navigation-context'
+import type { ApplicationRuntime } from '@/state/application-runtime'
+import type { Navigation } from '@/state/navigation'
 
 import { createDefaultChatModePanels } from '@/features/chat-mode/utils/panels'
 import type { PaletteScope } from '@/features/command-palette/command-palette-types'
 import { paletteScopeForPrefix } from '@/features/command-palette/command-palette-utils'
-import { createEditorCommands, type EditorCommands } from '@/features/editor/state/commands'
+import type { EditorCommands } from '@/features/editor/state/commands'
+import { createEditorApplyActions } from '@/features/editor/state/apply-actions'
 import {
   createEditorDocumentStore,
   type EditorDocumentStoreApi,
@@ -82,15 +87,19 @@ export type TestCommandRuntime = {
 }
 
 export function createTestCommandRuntime({
+  application,
   focus,
+  navigation,
   options = {},
   queryClient,
 }: {
+  readonly application?: ApplicationRuntime
   readonly focus: FocusService
+  readonly navigation?: Navigation
   readonly options?: TestCommandRuntimeOptions
   readonly queryClient: QueryClient
 }): TestCommandRuntime {
-  const runtime = createRuntime(focus, queryClient, options)
+  const runtime = createRuntime(focus, queryClient, options, application, navigation)
   const captureSnapshot = () => ({
     ...captureCommandSnapshot(runtime),
     ...snapshotPatch(options.snapshot),
@@ -124,6 +133,8 @@ export function TestCommandProvider({
   readonly options?: TestCommandRuntimeOptions
   readonly queryClient: QueryClient
 }) {
+  const application = use(ApplicationRuntimeContext) ?? undefined
+  const navigation = use(NavigationContext) ?? undefined
   const focus = useFocusService()
   const focusSnapshot = useFocusSnapshot()
   const [paletteOpen, setPaletteOpenState] = useState(options.paletteOpen ?? false)
@@ -137,7 +148,8 @@ export function TestCommandProvider({
   const paletteRestoreRef = useRef<FocusTargetToken | null | undefined>(undefined)
   const [commandRuntime] = useState(() => {
     const showCommandPalette = options.runtime?.shell?.showCommandPalette
-    if (showCommandPalette) return createTestCommandRuntime({ focus, options, queryClient })
+    if (showCommandPalette)
+      return createTestCommandRuntime({ application, navigation, focus, options, queryClient })
 
     const runtime = withShellOverride(options.runtime, {
       showCommandPalette: (initialSearch = '', origin) => {
@@ -149,6 +161,8 @@ export function TestCommandProvider({
       },
     })
     return createTestCommandRuntime({
+      application,
+      navigation,
       focus,
       options: { ...options, runtime },
       queryClient,
@@ -262,21 +276,33 @@ function createRuntime(
   focus: FocusService,
   queryClient: QueryClient,
   options: TestCommandRuntimeOptions,
+  application?: ApplicationRuntime,
+  navigation?: Navigation,
 ): WorkspaceCommandRuntime {
   const overrides = options.runtime
-  const workspace = overrides?.workspace ?? createTestWorkspaceStore(options.rootPath ?? null)
-  const store = overrides?.documents?.store ?? createEditorDocumentStore()
+  const owner = application?.getSnapshot().editor
+  const workspace =
+    overrides?.workspace ??
+    owner?.workspaceStore ??
+    createTestWorkspaceStore(options.rootPath ?? null)
+  const store = overrides?.documents?.store ?? owner?.documentStore ?? createEditorDocumentStore()
   const documents: WorkspaceCommandRuntime['documents'] = {
     queryClient,
     store,
-    save: new EditorSaveService(
-      store,
-      new FileSyncService(store, queryClient),
-      new SettingsSyncService(store, queryClient),
-    ),
+    save:
+      owner?.documentStore === store
+        ? owner.saveService
+        : new EditorSaveService(
+            store,
+            new FileSyncService(store, queryClient),
+            new SettingsSyncService(store, queryClient),
+          ),
     ...overrides?.documents,
   }
-  const editor = createTestEditor(documents.store, workspace, overrides?.editor)
+  const editor =
+    navigation && owner?.workspaceStore === workspace && owner.documentStore === store
+      ? { ...navigation.editorCommands(workspace), ...overrides?.editor }
+      : createTestEditor(documents.store, workspace, overrides?.editor)
   const files: WorkspaceCommandRuntime['files'] = {
     openFileAtRef: async () => false,
     ...overrides?.files,
@@ -292,7 +318,7 @@ function createRuntime(
     showEnvironmentDialog: () => {},
     showMachines: () => {},
     openPicker: () => workspace.getState().openPicker(),
-    openWorkspaceRoot: (rootPath) => openTestWorkspaceRoot(rootPath, editor, workspace),
+    openWorkspaceRoot: (rootPath) => openTestWorkspaceRoot(rootPath, workspace),
     showCommandPalette: () => focus.request(focusTargetById({ kind: 'command-palette' })),
     showSettings: () => showTestSettings(editor, focus, workspace),
     ...overrides?.shell,
@@ -323,7 +349,7 @@ function createTestEditor(
   workspaceStore: EditorWorkspaceStoreApi,
   overrides?: Partial<EditorCommands>,
 ): EditorCommands {
-  const editor = createEditorCommands({
+  const apply = createEditorApplyActions({
     activation: { activate: () => undefined, setRoot: () => undefined },
     documentStore,
     searchStore: createSearchBufferStore({ rootPath: workspaceStore.getState().rootFolder?.path }),
@@ -331,6 +357,70 @@ function createTestEditor(
     workspaceStore,
   })
 
+  const applied = () => Promise.resolve({ status: 'applied' } as const)
+  const editor: EditorCommands = {
+    ...apply,
+    openFileSurface: (path) => {
+      apply.openFileSurface(path)
+      return applied()
+    },
+    selectFile: (path) => {
+      apply.selectFile(path)
+      return applied()
+    },
+    openDefinition: (target) => {
+      apply.openDefinition(target)
+      return applied()
+    },
+    openSearchEditor: (rootPath) => {
+      apply.openSearchEditor(rootPath)
+      return applied()
+    },
+    openSettingsEditor: () => {
+      apply.openSettingsEditor()
+      return applied()
+    },
+    selectTab: (paneId, tabId) => {
+      apply.selectTab(paneId, tabId)
+      return applied()
+    },
+    closeTab: (tabId) => {
+      apply.closeTab(tabId)
+      return applied()
+    },
+    closeTabs: (tabIds) => {
+      tabIds.forEach(apply.closeTab)
+      return applied()
+    },
+    discardAndCloseTab: (tabId) => {
+      apply.discardAndCloseTab(tabId)
+      return applied()
+    },
+    discardAndCloseTabs: (tabIds) => {
+      tabIds.forEach(apply.discardAndCloseTab)
+      return applied()
+    },
+    reorderTab: (paneId, tabId, index) => {
+      apply.reorderTab(paneId, tabId, index)
+      return applied()
+    },
+    selectPreviousEditor: () => {
+      apply.selectPreviousEditor()
+      return applied()
+    },
+    reopenClosedEditor: () => {
+      apply.reopenClosedEditor()
+      return applied()
+    },
+    renameLiveEditorDocument: (from, to) => ({
+      ...apply.renameLiveEditorDocument(from, to),
+      settled: applied(),
+    }),
+    discardLiveEditorDocument: (path) => ({
+      ...apply.discardLiveEditorDocument(path),
+      settled: applied(),
+    }),
+  }
   return { ...editor, ...overrides }
 }
 
@@ -371,14 +461,10 @@ function defaultSettingsSnapshot() {
   return { diffViewMode: DEFAULT_DIFF_VIEW_MODE, wallpaperEnabled: true } as const
 }
 
-async function openTestWorkspaceRoot(
-  rootPath: string,
-  editor: EditorCommands,
-  workspace: EditorWorkspaceStoreApi,
-) {
+async function openTestWorkspaceRoot(rootPath: string, workspace: EditorWorkspaceStoreApi) {
   if (workspace.getState().rootFolder?.path === rootPath) return 'already-open' as const
 
-  editor.switchRootFolder(pickedDirectory(rootPath))
+  workspace.getState().switchWorkspace(pickedDirectory(rootPath))
   return 'opened' as const
 }
 
@@ -398,8 +484,8 @@ function closeTestTab(tabId: string, editor: EditorCommands, workspace: EditorWo
   const open = workspace.getState().workbenchPanels.editorTabs.some((tab) => tab.id === tabId)
   if (!open) return { reason: 'not-found', status: 'rejected' } as const
 
-  editor.closeTab(tabId)
-  return { status: 'closed', tabIds: [tabId] } as const
+  const completion = editor.closeTab(tabId)
+  return { status: 'closed', tabIds: [tabId], completion } as const
 }
 
 function snapshotPatch(source?: TestCommandSnapshotSource) {

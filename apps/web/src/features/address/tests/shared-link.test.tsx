@@ -10,7 +10,7 @@ import { scopeAddressEnvironment } from '../../../../test/factories/address-envi
 import { registerTestWorkspaceAddress } from '../../../../test/factories/workspace-address'
 import {
   editorTabPaths,
-  flushProjection,
+  waitForNavigation,
   renderAddressHarness,
   seedWorkspaceCache,
   startAt,
@@ -52,10 +52,12 @@ test('an empty browser opens the exact shared checkout while recent-folder reads
         workspaceAddress: target,
       }),
     )
-    await flushProjection()
+    await waitForNavigation(rendered.navigation)
     expect(editorTabPaths(rendered.harness.workspace)).toEqual(['projects/platform/shared.ts'])
     expect(requests).toContain(`/fs/workspace-address/${target.id}`)
-    expect(location.pathname).toBe(`/~${workspaceToken(target)}/workbench/f/shared.ts`)
+    expect(rendered.navigation.router.history.location.pathname).toBe(
+      `/~${workspaceToken(target)}/workbench/f/shared.ts`,
+    )
   } finally {
     releaseRecents.resolve()
     rendered.unmount()
@@ -91,9 +93,11 @@ test('changing the readable name never redirects a shared link to a remembered c
     await waitFor(() =>
       expect(rendered.harness.workspace.getState().rootFolder?.workspaceAddress).toEqual(target),
     )
-    await flushProjection()
+    await waitForNavigation(rendered.navigation)
     expect(editorTabPaths(rendered.harness.workspace)).toEqual(['projects/platform/shared.ts'])
-    expect(location.pathname).toBe(`/~${workspaceToken(target)}/workbench/f/shared.ts`)
+    expect(rendered.navigation.router.history.location.pathname).toBe(
+      `/~${workspaceToken(target)}/workbench/f/shared.ts`,
+    )
   } finally {
     rendered.unmount()
     rendered.application.dispose()
@@ -130,9 +134,11 @@ test('an alias shares the canonical workspace ID and restores files under the ca
         workspaceAddress: canonical,
       }),
     )
-    await flushProjection()
+    await waitForNavigation(rendered.navigation)
     expect(editorTabPaths(rendered.harness.workspace)).toEqual(['projects/platform/shared.ts'])
-    expect(location.pathname).toBe(`/~${workspaceToken(canonical)}/workbench/f/shared.ts`)
+    expect(rendered.navigation.router.history.location.pathname).toBe(
+      `/~${workspaceToken(canonical)}/workbench/f/shared.ts`,
+    )
   } finally {
     rendered.unmount()
     rendered.application.dispose()
