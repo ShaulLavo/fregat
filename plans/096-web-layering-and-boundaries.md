@@ -99,8 +99,9 @@ generators `shellStream` and `sessionDetailStream`; WS RPC is their live consume
 
 ## Make the lib/ rule enforceable
 
-Do this before anything else in the plan. It costs nothing and turns the rule the rest of the plan
-relies on into something a check can see.
+This prerequisite is now owned by [Plan 098](098-document-and-tab-domain.md). Execute or reuse
+its coalesced-log move and proven shared-layer import guard before this plan's other moves.
+Completion of its entire document-model migration is not a prerequisite.
 
 `apps/web/src/lib/file-server.ts:16` imports `createCoalescedLogQueue` from
 `@/features/workspace/utils/coalesced-log` and uses it at `:33` and `:39`. The helper is generic:
@@ -112,18 +113,16 @@ Verified consumers: two, in two buckets — `lib/file-server.ts:16` and
 `features/workspace/utils/tests/coalesced-log.test.ts:3`. It qualifies for `lib/` on both readings
 of the rule: two consumers, and it is a dependency of a `lib/` module that qualifies.
 
-Move it to `apps/web/src/lib/coalesced-log.ts` and its test to `apps/web/src/lib/tests/coalesced-log.test.ts`.
-There is nothing to reconcile: one implementation, two call sites, identical usage. State that in
-the commit message so the step is not mistaken for a silent merge.
+Plan 098 moves it to `apps/web/src/lib/coalesced-log.ts` and its test to
+`apps/web/src/lib/tests/coalesced-log.test.ts`. There is one implementation and two production
+call sites; preserve its behavior and avoid performing the move twice.
 
-Correct the census claim while doing it. `lib/**` has 18 `@/features/*` imports at this baseline,
-not one; the other 17 are in `lib/environments/tests/` and `lib/tests/`. After this move the
-production count is zero and only test files import across the boundary.
+The refreshed census at `fb797f07` has 19 `lib/**` imports into features: one production
+declaration and 18 test declarations across four files. After the move the production count
+must be zero; narrowly scoped test exceptions remain in the architecture rule.
 
-Then add the guard. Prefer a `no-restricted-imports` entry in `.oxlintrc.json` scoped to
-`apps/web/src/lib/**` and excluding `lib/**/tests/**`; confirm oxlint 1.70.0 supports the rule with
-a path override before relying on it. If it does not, gate with a one-line grep in the existing
-staged-files pre-commit check instead of leaving the rule unenforced.
+Use Plan 098's calibrated Oxlint guard for alias, relative, type-only, re-export and dynamic
+imports through the normal local and CI lint paths. A spelling-only grep is insufficient.
 
 ## Demote the lib/ modules below the bar
 
@@ -318,11 +317,10 @@ reads in either file, so Cmd+ArrowDown is swallowed by both. Fix that in the sha
 
 Do not merge the two view models first. The port is what makes the row shapes irrelevant.
 
-**e. Two document-scheme factories, five codecs.** `apps/web/src/lib/document-scheme.ts` with
-`defineDocumentScheme(prefix, { allowEmpty })` and `defineJsonDocumentScheme(prefix, version, guard)`.
-This one does qualify for `lib/`: consumers are `features/editor`, `features/search` and
-`features/git` — three buckets. Prefixes, payload validators and label functions stay in their
-features.
+**e. Document schemes: superseded by Plan 098.** The proposed standalone codec factories and
+feature-local validators/labels are replaced by the shared document/tab domain in
+[Plan 098](098-document-and-tab-domain.md). Do not implement the older factory approach.
+Preserve the distinctions recorded below in characterization before moving their ownership.
 
 The three bare-payload codecs disagree on the empty payload, each differently:
 
@@ -336,10 +334,12 @@ The three bare-payload codecs disagree on the empty payload, each differently:
 Return shapes differ too: bare string from compare-saved, record from the other two. The two JSON
 codecs differ on an empty path: `features/git/utils/ref-document.ts:43-44` requires a non-empty path
 **and** ref; `features/git/utils/diff-document.ts:199` allows an empty path. Decide each, per codec,
-before the factory exists.
+before introducing the shared model.
 
-Do not build a central registry. `features/editor/utils/file-backed-document.ts:20` explains in its
-header why it matches on prefix instead of running each parser, and that reasoning still holds.
+Plan 098 uses exhaustive typed descriptors, not a runtime registration registry.
+`features/editor/utils/file-backed-document.ts:20` explains why malformed reserved synthetic
+IDs must remain non-files. The shared boundary must preserve that property without per-consumer
+prefix checks.
 
 **f. Share only the FNV-1a per-character step.** Six open-coded copies:
 `packages/client-core/src/address/path-hash.ts:2`,

@@ -5,6 +5,11 @@ the linked Editor checkout `6492651` on 2026-09-12. Priority P1, effort L across
 bounded changes, implementation risk medium. No dependency on completing the duplication
 plans, but coordinate overlapping files with Plans 091, 093, 094, and 096.
 
+Plan 098 now owns the shared document/tab model and the coalesced-log move/import guard.
+When both plans execute together, settle its characterized document identity types before
+adapting this plan's source evidence. Keep async ownership, lifetime and commit changes here;
+neither plan depends on completion of the other's entire scope.
+
 The outcome is one captured owner from the first operation read through preparation,
 confirmation, persistence, recovery, and local completion. Changes calculated from a source
 keep that source's revision. A newer read cannot certify an older calculation.
@@ -425,6 +430,7 @@ Completion requires all of these:
 - [ ] No compatibility APIs, duplicate transaction state machines or unrelated changes remain.
 
 Plan 091 may move file-server errors; 093 may consolidate Git hooks; 094 owns web/TUI replacement
-semantics; 096 may move coalesced logging and shared web modules. Reconcile those moves while
-keeping their behavioral changes separate. This plan owns operation capture/provenance and
-its regressions. Root scheduling remains in `PLAN.md`; this proposal does not reorder it.
+semantics; 096 may move shared web modules; 098 owns the document/tab model and coalesced-log
+move. Reconcile those moves while keeping their behavioral changes separate. This plan owns
+operation capture/provenance and its regressions. Root scheduling remains in `PLAN.md`; this
+proposal does not reorder it.
