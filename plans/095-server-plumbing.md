@@ -349,7 +349,7 @@ migration and `lstatOptional` collapses. No repository-wide suite, no absolute t
 
 ## Do not do this here
 
-- `jsonEqual` (6.1) and its contracts re-export — [Plan 090](090-duplicate-borne-defects.md).
+- `jsonEqual` (6.1) and its contracts re-export — [Plan 090 regression record](../docs/duplicate-defect-regressions.md).
 - `elapsedMs`, `errorSummary`, `errorMessage`, `isRecord` and the client-core `performance.now`
   fallback — [Plan 091](091-error-and-timing-helpers.md).
 - Path, URI and `basename` unification, including `apps/server/src/fs/path.ts` containment and the

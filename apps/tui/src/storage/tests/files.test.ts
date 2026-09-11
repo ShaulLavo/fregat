@@ -121,22 +121,54 @@ test('corrupt cache files are diagnosed without changing their bytes', async ({ 
   }
 })
 
-test('invalid persisted history is diagnosed without silently replacing it', async ({ server }) => {
-  const directory = `${server.root}/cache`
-  const storage = await openFileStorage(directory, firstEnvironment)
-  recordRecentCommand(storage, 'original.command')
-  storage.close()
-  const filename = `${directory}/${firstEnvironment}.sqlite`
-  for (const value of ['{', '[3]']) {
-    const database = new Database(filename)
+test.for(['{', '[3]', ''])(
+  'opens corrupt recent history, deletes it on read, and warns once: %s',
+  async (value, { server, storageWarnings }) => {
+    const directory = `${server.root}/cache`
+    const storage = await openFileStorage(directory, firstEnvironment)
+    recordRecentCommand(storage, 'original.command')
+    storage.setItem('unrelated', 'preserve this')
+    storage.close()
+    const database = new Database(`${directory}/${firstEnvironment}.sqlite`)
     database.query('UPDATE state SET value = ? WHERE key = ?').run(value, RECENT_COMMANDS)
     database.close()
-    const before = await readFile(filename)
-    await expect(openFileStorage(directory, firstEnvironment)).rejects.toMatchObject({
-      message: 'Could not read saved TUI state.',
-    })
-    expect(await readFile(filename)).toEqual(before)
-  }
+    const reopened = await openFileStorage(directory, firstEnvironment)
+    try {
+      expect(readRecentCommands(reopened)).toEqual([])
+      expect(reopened.getItem(RECENT_COMMANDS)).toBeNull()
+      expect(reopened.getItem('unrelated')).toBe('preserve this')
+      expect(readRecentCommands(reopened)).toEqual([])
+      expect(storageWarnings).toMatchObject([{ level: 'warn', storageKey: RECENT_COMMANDS }])
+    } finally {
+      reopened.close()
+    }
+  },
+)
+
+test.for(['{', '[3]', ''])(
+  'records a new command after discarding corrupt history: %s',
+  async (value, { server, storageWarnings }) => {
+    const directory = `${server.root}/cache`
+    const storage = await openFileStorage(directory, firstEnvironment)
+    const database = new Database(`${directory}/${firstEnvironment}.sqlite`)
+    database.query('INSERT INTO state (key, value) VALUES (?, ?)').run(RECENT_COMMANDS, value)
+    database.close()
+    try {
+      recordRecentCommand(storage, 'new.command')
+      expect(readRecentCommands(storage)).toEqual(['new.command'])
+      expect(storageWarnings).toMatchObject([{ level: 'warn', storageKey: RECENT_COMMANDS }])
+    } finally {
+      storage.close()
+    }
+  },
+)
+
+test('absent recent commands return an empty history without warning', ({
+  storage,
+  storageWarnings,
+}) => {
+  expect(readRecentCommands(storage)).toEqual([])
+  expect(storageWarnings).toEqual([])
 })
 
 test('invalid recent-command writes are rejected before they can poison a running cache', async ({
@@ -144,7 +176,10 @@ test('invalid recent-command writes are rejected before they can poison a runnin
 }) => {
   const storage = await openFileStorage(`${server.root}/cache`, firstEnvironment)
   recordRecentCommand(storage, 'workspace.showSettings')
-  expect(() => storage.setItem(RECENT_COMMANDS, '{')).toThrow()
+  for (const invalid of ['{', '[3]', '']) {
+    expect(() => storage.setItem(RECENT_COMMANDS, invalid)).toThrow()
+    expect(() => storage.updateItem(RECENT_COMMANDS, () => invalid)).toThrow()
+  }
   expect(readRecentCommands(storage)).toEqual(['workspace.showSettings'])
   await storage.flush()
   storage.close()

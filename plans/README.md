@@ -26,12 +26,11 @@ a bare root `bun run verify`.
 | [086 — full TanStack Router migration](086-tanstack-router-migration.md)        | **IMPLEMENTED — CHROMIUM/FIREFOX PASS; LIVE LIMITS RECORDED** |
 | [087 — stateless MCP support](087-stateless-mcp.md)                             | **PROPOSED — IMPLEMENTATION NOT STARTED**                     |
 | [088 — native code intelligence](088-native-code-intelligence.md)               | **PROPOSED — DEPENDS ON 087**                                 |
-| [090 — duplicate-borne defects](090-duplicate-borne-defects.md)                 | **PROPOSED — IMPLEMENTATION NOT STARTED**                     |
-| [091 — error and timing helpers](091-error-and-timing-helpers.md)               | **PROPOSED — DEPENDS ON 090**                                 |
-| [092 — path and URI helpers](092-path-and-uri-helpers.md)                       | **PROPOSED — DEPENDS ON 090**                                 |
-| [093 — web React and store ceremony](093-web-react-and-store-ceremony.md)       | **PROPOSED — DEPENDS ON 090, 091**                            |
+| [091 — error and timing helpers](091-error-and-timing-helpers.md)               | **PROPOSED — DEFECT FIXES IMPLEMENTED**                       |
+| [092 — path and URI helpers](092-path-and-uri-helpers.md)                       | **PROPOSED — DEFECT FIXES IMPLEMENTED**                       |
+| [093 — web React and store ceremony](093-web-react-and-store-ceremony.md)       | **PROPOSED — DEPENDS ON 091**                                 |
 | [096 — apps/web layering](096-web-layering-and-boundaries.md)                   | **PROPOSED — IMPLEMENTATION NOT STARTED**                     |
-| [094 — client-core web and TUI parity](094-client-core-web-tui-parity.md)       | **PROPOSED — DEPENDS ON 090, 091; CO-PASS WITH 096**          |
+| [094 — client-core web and TUI parity](094-client-core-web-tui-parity.md)       | **PROPOSED — DEPENDS ON 091; CO-PASS WITH 096**               |
 | [095 — server plumbing](095-server-plumbing.md)                                 | **PROPOSED — IMPLEMENTATION NOT STARTED**                     |
 | [073 — Electrobun 2.x migration](073-electrobun-v2-migration.md)                | **PROPOSED — ROOT GO/NO-GO SCHEDULING**                       |
 | [075 — terminal renderer fallbacks](075-terminal-renderer-fallbacks.md)         | **PROPOSED — BLOCKED ON TIER DECISION**                       |
@@ -46,17 +45,13 @@ a bare root `bun run verify`.
   The [Serena comparison](../docs/serena-implementation-comparison.md) records implementation lessons
   and the required improvements to existing document, LSP, and transaction services.
 
-- Plans 090 through 096 come from one verified duplication census taken at Platform base `75caae88`.
-  Plan 090 runs first and repairs the fourteen live defects hiding inside near-identical helpers, each
-  with a reproduction and a regression test, so the later merges cannot erase the evidence that the
-  wrong variant shipped. Plans 091, 092, 093, and 094 then consolidate error and timing helpers, path
-  and URI helpers, web React and store ceremony, and runtime-neutral web/TUI logic onto
-  `packages/observability`, `packages/contracts`, and `packages/client-core`. Plan 095 collapses
-  duplicated `apps/server` plumbing and Plan 096 settles `apps/web` layering; neither carries a
-  dependency and both may run at any point, except that 096 settles the shared Git contract and web Git
-  API files before 094's co-pass over them. Every unification step names the behavioural divergence it
-  reconciles and which behaviour wins, because these variants share signatures and a wrong merge
-  typechecks.
+- Plans 091 through 096 come from the duplication census at Platform base `75caae88`.
+  The prerequisite defect fixes are implemented and documented in the
+  [regression reference](../docs/duplicate-defect-regressions.md). Each consolidation must preserve
+  those tests. Plans 091, 092, 093, and 094 consolidate error and timing helpers, path and URI helpers,
+  web React and store ceremony, and runtime-neutral web/TUI logic. Plan 095 consolidates server
+  plumbing, and Plan 096 settles web layering. Plan 096 settles the shared Git contract and web Git
+  API files before Plan 094's co-pass over them.
 
 - Plan 086 makes TanStack Router the sole web navigation owner, migrates all navigation callers,
   and deletes the custom URL controller. It keeps local workspace IDs and URL tabs, fixes

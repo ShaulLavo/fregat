@@ -987,7 +987,7 @@ function virtualEnvironmentPaths(root: string) {
 function isInsideOrEqual(root: string, candidate: string) {
   const relative = path.relative(root, candidate)
   if (relative === '') return true
-  if (relative.startsWith('..')) return false
+  if (relative === '..' || relative.startsWith(`..${path.sep}`)) return false
 
   return !path.isAbsolute(relative)
 }

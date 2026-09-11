@@ -56,7 +56,7 @@ export function repositoryRelativePath(rootPath: string, filePath: string) {
 export function relativeInsideRoot(root: string, candidate: string) {
   const relative = path.relative(root, candidate)
   if (relative === '') return ''
-  if (relative.startsWith('..')) return null
+  if (relative === '..' || relative.startsWith(`..${path.sep}`)) return null
   if (path.isAbsolute(relative)) return null
 
   return toPosix(relative)

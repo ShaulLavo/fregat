@@ -204,6 +204,44 @@ describe('ProviderService', () => {
     fixture.close()
   })
 
+  it('reuses session bindings when only model option key order changes', async () => {
+    const fixture = createFixture()
+    const adapter = new MockProviderAdapter()
+    const service = new ProviderService({
+      adapterRegistry: new ProviderAdapterRegistry([adapter]),
+      sessionDirectory: new ProviderSessionDirectory(fixture.database),
+    })
+    const turn = providerTurnInput()
+    const input = {
+      providerInstanceId: turn.providerInstanceId,
+      runtimeMode: turn.runtimeMode,
+      runtimeEpoch: turn.runtimeEpoch,
+      sessionId: turn.sessionId,
+      runtimePayload: providerSessionPayload(turn),
+    }
+    try {
+      await service.ensureRuntime({
+        ...input,
+        runtimePayload: {
+          ...input.runtimePayload,
+          modelSelection: { ...turn.modelSelection, options: { effort: 'high', budget: 100 } },
+        },
+      })
+      const reused = await service.ensureRuntime({
+        ...input,
+        runtimePayload: {
+          ...input.runtimePayload,
+          modelSelection: { ...turn.modelSelection, options: { budget: 100, effort: 'high' } },
+        },
+      })
+
+      expect(reused).toMatchObject({ reused: true })
+    } finally {
+      await service.shutdown()
+      fixture.close()
+    }
+  })
+
   it('carries the resume cursor across a mid-conversation model switch', async () => {
     const fixture = createFixture()
     const adapter = new MockProviderAdapter()

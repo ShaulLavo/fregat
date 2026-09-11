@@ -86,7 +86,7 @@ function ResizableHandle({
   )
 }
 
-function readPersistedResizableLayout(
+export function readPersistedResizableLayout(
   storageKey: string,
   storage?: ResizablePrimitive.LayoutStorage | null,
 ) {
@@ -164,7 +164,7 @@ function isResizableLayoutSize(value: unknown) {
 function isRecord(value: unknown): value is Record<string, unknown> {
   if (!value) return false
 
-  return typeof value === 'object'
+  return typeof value === 'object' && !Array.isArray(value)
 }
 
 function browserLayoutStorage() {

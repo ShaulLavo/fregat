@@ -568,6 +568,26 @@ describe('workspace edit transactions', () => {
     await fixture.service.workspaceEditAbort(transition(prepared))
   })
 
+  it('blocks a parent directory mutation while a nested workspace has a lease', async () => {
+    const fixture = await createFixture()
+    const expected = await seedFile(fixture, 'parent/project/file.txt', 'before')
+    const prepared = await fixture.service.workspaceEditPrepare(
+      prepareRequest(
+        randomUUID(),
+        [writeOperation(0, 'file.txt', expected, 'after')],
+        'parent/project',
+      ),
+    )
+
+    await expect(fixture.service.delete({ path: 'parent', recursive: true })).rejects.toMatchObject(
+      {
+        code: 'WORKSPACE_EDIT_BUSY',
+      },
+    )
+    expect(await readText(fixture, 'parent/project/file.txt')).toBe('before')
+    await fixture.service.workspaceEditAbort(transition(prepared))
+  })
+
   it('serializes overlapping transactions and allows disjoint workspace transactions', async () => {
     const fixture = await createFixture()
     await mkdir(workspacePath(fixture, 'one'), { recursive: true })

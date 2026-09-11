@@ -10,6 +10,6 @@ export function definitionTargetFor(path: string, focus: NonNullable<Address['fo
       end: { character: focus.endLine ? 0 : character, line: endLine },
       start: { character, line },
     },
-    uri: `file://${path.startsWith('/') ? path : `/${path}`}`,
+    uri: `file:///${path.replace(/^\/+/, '').split('/').map(encodeURIComponent).join('/')}`,
   }
 }

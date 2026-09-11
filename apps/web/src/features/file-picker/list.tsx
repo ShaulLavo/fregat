@@ -633,7 +633,7 @@ function observeFileListViewport(
   viewportRef: FileListViewportRef,
 ) {
   updateFileListViewport(element, setViewport, viewportRef)
-  if (typeof ResizeObserver === 'undefined') return
+  if (!('ResizeObserver' in window)) return
 
   const observer = new ResizeObserver(() =>
     updateFileListViewport(element, setViewport, viewportRef),

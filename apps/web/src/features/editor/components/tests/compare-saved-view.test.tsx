@@ -11,7 +11,10 @@ import {
 import { expect, test } from '../../../../../test/fixtures'
 import { testDiffLanguageHost } from '../../../../../test/factories/diff-language-host'
 import { stubHighlightApi } from '../../../../../test/env/highlight-api'
+import { stubEditorViewport } from '../../../../../test/env/editor-viewport'
 import { renderWithProviders } from '../../../../../test/render'
+import { createObservedInProcessClient } from '../../../../../test/client'
+import { installTestClient } from '../../../../../test/factories/client-binding'
 
 // The second of the two mount sites, and the harsher one: both sides are read live, so every
 // keystroke rebuilds the `DiffFile` and pushes a new buffer. Its own logic is the three notices and
@@ -28,6 +31,7 @@ const FILE = 'repo/a.ts'
 
 test('a buffer that differs from disk is shown as a diff', async ({ client, server }) => {
   void client
+  stubEditorViewport()
   await renderCompare(server.root, { buffer: EDITED })
 
   await waitFor(() => {
@@ -47,6 +51,27 @@ test('a file that was never opened asks for it to be opened', async ({ client, s
   await renderCompare(server.root, { buffer: null })
 
   expect(await screen.findByText('Open the file to compare it with disk.')).toBeInTheDocument()
+})
+
+test('shows loading while the saved file read is pending', async ({ client, server }) => {
+  void client
+  const readGate = Promise.withResolvers<void>()
+  const restore = installTestClient(
+    createObservedInProcessClient(server, (request) => {
+      if (new URL(request.url).pathname === '/fs/read') return readGate.promise
+    }),
+  )
+
+  try {
+    await renderCompare(server.root, { buffer: null })
+    expect(screen.getByRole('status', { name: 'Loading saved file' })).toBeInTheDocument()
+    expect(screen.queryByText('Open the file to compare it with disk.')).not.toBeInTheDocument()
+    readGate.resolve()
+    expect(await screen.findByText('Open the file to compare it with disk.')).toBeInTheDocument()
+  } finally {
+    readGate.resolve()
+    restore()
+  }
 })
 
 async function renderCompare(root: string, { buffer }: { buffer: string | null }) {

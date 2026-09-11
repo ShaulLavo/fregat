@@ -1,7 +1,11 @@
 import { mkdir, mkdtemp, readFile, readdir, rm, writeFile } from 'node:fs/promises'
 import { tmpdir } from 'node:os'
 import path from 'node:path'
-import { afterEach, describe, expect, it } from 'vitest'
+import { afterEach, describe, expect, it, vi } from 'vitest'
+import { Elysia } from 'elysia'
+import { applyObservability } from '../elysia'
+import { captureRequestLogger, recordRequestError } from '../logging'
+import { createInternalError } from '../structured-errors'
 import { readFsLogs } from 'evlog/fs'
 import type { WideEvent } from 'evlog'
 
@@ -20,6 +24,57 @@ afterEach(async () => {
 })
 
 describe('observability runtime', () => {
+  it('redacts credential properties on errors and nested causes in the file drain', async () => {
+    const logDir = await fixtureRoot()
+    initializeObservability(testObservabilityEnv(logDir))
+    const credentials = Object.fromEntries(
+      [
+        'authorization',
+        'body',
+        'content',
+        'cookie',
+        'password',
+        'patch',
+        'secret',
+        'set-cookie',
+        'text',
+        'token',
+        'x-api-key',
+      ].map((key) => [key, `private-${key}`]),
+    )
+    let loggedError: unknown
+    const app = new Elysia()
+    applyObservability(app)
+    app.get('/credential-error', ({ set }) => {
+      const cause = Object.assign(createInternalError('nested failure'), credentials)
+      const error = Object.assign(createInternalError('request failure', cause), credentials, {
+        requestId: 'diagnostic-request',
+      })
+      const logger = captureRequestLogger()
+      if (!logger) throw createInternalError('Request logger was not installed')
+      const recorded = vi.spyOn(logger, 'error')
+      recordRequestError(error)
+      loggedError = recorded.mock.calls[0]?.[0]
+      set.status = 500
+      return { failed: true }
+    })
+
+    const response = await app.handle(new Request('http://local/credential-error'))
+    expect(response.status).toBe(500)
+    await response.text()
+    const event = eventForPath(await flushedEvents(logDir), '/credential-error')
+    const redacted = Object.fromEntries(Object.keys(credentials).map((key) => [key, '[redacted]']))
+
+    expect(loggedError).toMatchObject({
+      ...redacted,
+      requestId: 'diagnostic-request',
+      cause: redacted,
+    })
+    expect(event).toMatchObject({ error: { cause: redacted } })
+    const serialized = JSON.stringify(event)
+    for (const value of Object.values(credentials)) expect(serialized).not.toContain(value)
+  })
+
   it('writes successful request events to the file drain and drops routine health checks', async () => {
     const root = await fixtureRoot()
     const logDir = await fixtureRoot()

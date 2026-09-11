@@ -8,7 +8,6 @@ import { createTuiError } from '@/host/utils/structured-errors'
 import { parseRecentCommands, RECENT_COMMANDS } from '@/storage/recents'
 
 type Update = (current: string | null) => string | null
-const storedRows = v.array(v.object({ key: v.string(), value: v.string() }))
 
 export async function openFileStorage(directory: string, environmentId: EnvironmentId) {
   const id = v.parse(environmentIdSchema, environmentId)
@@ -55,8 +54,6 @@ function initialize(database: Database) {
   database.exec(
     'CREATE TABLE IF NOT EXISTS state (key TEXT PRIMARY KEY, value TEXT NOT NULL) STRICT',
   )
-  const rows = v.parse(storedRows, database.query('SELECT key, value FROM state').all())
-  for (const row of rows) validateItem(row.key, row.value)
 }
 
 function createStorage(database: Database, environmentId: EnvironmentId) {
@@ -65,6 +62,7 @@ function createStorage(database: Database, environmentId: EnvironmentId) {
     'INSERT INTO state (key, value) VALUES (?, ?) ON CONFLICT(key) DO UPDATE SET value = excluded.value',
   )
   const remove = database.query('DELETE FROM state WHERE key = ?')
+  const removeIfValue = database.query('DELETE FROM state WHERE key = ? AND value = ?')
   const list = database.query<{ key: string }, [string]>(
     'SELECT key FROM state WHERE substr(key, 1, length(?1)) = ?1 ORDER BY key',
   )
@@ -92,6 +90,9 @@ function createStorage(database: Database, environmentId: EnvironmentId) {
     },
     removeItem(key: string) {
       remove.run(key)
+    },
+    removeItemIfValue(key: string, expected: string) {
+      return removeIfValue.run(key, expected).changes !== 0
     },
     keys: (prefix: string) => list.all(prefix).map((row) => row.key),
     async flush() {

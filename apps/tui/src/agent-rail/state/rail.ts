@@ -1,4 +1,5 @@
 import type { SessionSeenStamps } from '@workspace/client-core/chat/rail/unread'
+import { recordObservabilityWarning } from '@workspace/observability'
 import * as v from 'valibot'
 import {
   commandIdSchema,
@@ -21,6 +22,7 @@ import { normalizeEdenDates } from '@workspace/client-core/transport/normalize-d
 import { connectionFailure } from '@/connection/utils/failure'
 import { createTuiError } from '@/host/utils/structured-errors'
 import type { SettingsSession, SessionState } from '@/connection/state/session'
+import type { FileStorage } from '@/storage/files'
 
 type State = {
   readonly query: string
@@ -44,8 +46,6 @@ export function createAgentRailState(
   const listeners = new Set<() => void>()
   let request = new AbortController()
   let timer: ReturnType<typeof setTimeout> | null = null
-  const collapsed = ready.storage.getItem('agent:rail:collapsed')
-  const seen = ready.storage.getItem('agent:rail:seen')
   let state: State = {
     query: '',
     view: 'active',
@@ -54,8 +54,8 @@ export function createAgentRailState(
     anchor: null,
     search: {},
     searching: false,
-    collapsed: collapsed ? v.parse(v.array(projectIdSchema), JSON.parse(collapsed)) : [],
-    seen: seen ? v.parse(v.record(v.string(), v.string()), JSON.parse(seen)) : {},
+    collapsed: readCollapsed(ready.storage),
+    seen: readSeen(ready.storage),
     busy: false,
     error: null,
   }
@@ -188,5 +188,61 @@ export function createAgentRailState(
       if (timer) clearTimeout(timer)
       listeners.clear()
     },
+  }
+}
+
+function readCollapsed(
+  storage: Pick<FileStorage, 'getItem' | 'removeItemIfValue'>,
+): readonly ProjectId[] {
+  const key = 'agent:rail:collapsed'
+  let raw = storage.getItem(key)
+  while (raw !== null) {
+    const collapsed = readCollapsedValue(storage, key, raw)
+    if (collapsed !== null) return collapsed
+    raw = storage.getItem(key)
+  }
+  return []
+}
+
+function readCollapsedValue(
+  storage: Pick<FileStorage, 'removeItemIfValue'>,
+  key: string,
+  raw: string,
+) {
+  try {
+    return v.parse(v.array(projectIdSchema), JSON.parse(raw))
+  } catch {
+    if (!storage.removeItemIfValue(key, raw)) return null
+    recordObservabilityWarning('tui.storage.read', {
+      area: 'storage',
+      storageKey: key,
+      outcome: 'discarded',
+    })
+    return []
+  }
+}
+
+function readSeen(storage: Pick<FileStorage, 'getItem' | 'removeItemIfValue'>): SessionSeenStamps {
+  const key = 'agent:rail:seen'
+  let raw = storage.getItem(key)
+  while (raw !== null) {
+    const seen = readSeenValue(storage, key, raw)
+    if (seen !== null) return seen
+    raw = storage.getItem(key)
+  }
+  return {}
+}
+
+function readSeenValue(storage: Pick<FileStorage, 'removeItemIfValue'>, key: string, raw: string) {
+  try {
+    return v.parse(v.record(v.string(), v.string()), JSON.parse(raw))
+  } catch {
+    if (!storage.removeItemIfValue(key, raw)) return null
+    recordObservabilityWarning('tui.storage.read', {
+      area: 'storage',
+      storageKey: key,
+      outcome: 'discarded',
+    })
+    return {}
   }
 }

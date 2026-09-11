@@ -150,6 +150,21 @@ describe('LSP server registry', () => {
     expect(matches.every((match) => match.root === root)).toBe(true)
   })
 
+  it('detects a package root whose name begins with two dots', async () => {
+    const root = await fixtureRoot({
+      '..foo/package.json': '{}',
+      '..foo/index.ts': 'export const value = 1\n',
+    })
+
+    const matches = await matchLspServers({
+      settings: NO_OVERRIDES,
+      filePath: path.join(root, '..foo/index.ts'),
+      workspaceRoot: root,
+    })
+
+    expect(matches).toContainEqual(expect.objectContaining({ root: path.join(root, '..foo') }))
+  })
+
   it('prefers deno for TypeScript files inside a Deno project', async () => {
     const root = await fixtureRoot({
       'deno.json': '{}',

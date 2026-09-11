@@ -1,42 +1,42 @@
 import { screen, waitFor } from '@testing-library/react'
 import userEvent from '@testing-library/user-event'
-import type { ReactNode } from 'react'
 
-import { TestEditorStateProvider as EditorStateProvider } from '../../../../../test/factories/editor-state-provider'
-import { useEditorUiState } from '@/features/editor/state/ui-state'
-import {
-  createEditorWorkspaceStore,
-  EditorWorkspaceStateContext,
-  useEditorWorkspaceState,
-} from '@/features/editor/state/workspace-state'
-import { createDefaultChatModePanels } from '@/features/chat-mode/utils/panels'
-import { createDefaultWorkbenchLayout } from '@/features/workbench/utils/layout'
-import { AssistantMarkdown } from '@/features/chat/components/assistant-markdown'
 import { serializeRenderedMarkdownFragment } from '@/features/chat/utils/markdown-clipboard'
 import { markdownHighlightCache } from '@/features/chat/state/markdown-highlight-cache'
 import { expect, test } from '../../../../../test/fixtures'
-import { renderWithProviders } from '../../../../../test/render'
+import { createMarkdownWorkspace, renderMarkdown } from '../../../../../test/factories/markdown'
 
-const ROOT_PATH = '/repo'
-
-test('an inline file reference opens the referenced file at its line', async () => {
+test('an inline file reference opens the referenced file at its line', async ({
+  client,
+  server,
+}) => {
   const user = userEvent.setup()
-  const { getByRole, getByTestId } = renderMarkdown('See `src/foo.ts:42` for the fix.')
+  const { application, editor } = await createMarkdownWorkspace(client, server)
+  const { getByRole } = renderMarkdown('See `src/foo.ts:42` for the fix.', { application })
 
   await user.click(getByRole('link', { name: /src\/foo\.ts:42/u }))
 
-  expect(getByTestId('selected-path')).toHaveTextContent('/repo/src/foo.ts')
-  expect(getByTestId('definition-target')).toHaveTextContent('/repo/src/foo.ts@41')
+  await waitFor(() =>
+    expect(editor.workspaceStore.getState().selectedFilePath).toBe('repo/src/foo.ts'),
+  )
+  expect(editor.uiStore.getState().definitionTarget).toMatchObject({
+    path: 'repo/src/foo.ts',
+    uri: 'file:///repo/src/foo.ts',
+    range: { start: { character: 0, line: 41 } },
+  })
 })
 
-test('a markdown link to a workspace file opens that file', async () => {
+test('a markdown link to a workspace file opens that file', async ({ client, server }) => {
   const user = userEvent.setup()
-  const { getByRole, getByTestId } = renderMarkdown('Look at [the module](src/deep/mod.ts).')
+  const { application, editor } = await createMarkdownWorkspace(client, server)
+  const { getByRole } = renderMarkdown('Look at [the module](src/deep/mod.ts).', { application })
 
   await user.click(getByRole('link', { name: /src\/deep\/mod\.ts/u }))
 
-  expect(getByTestId('selected-path')).toHaveTextContent('/repo/src/deep/mod.ts')
-  expect(getByTestId('definition-target')).toHaveTextContent('none')
+  await waitFor(() =>
+    expect(editor.workspaceStore.getState().selectedFilePath).toBe('repo/src/deep/mod.ts'),
+  )
+  expect(editor.uiStore.getState().definitionTarget).toBeNull()
 })
 
 test('a web link is left to the markdown renderer, not turned into a file chip', () => {
@@ -179,62 +179,4 @@ function recordScrollIntoView() {
 
 function highlightTokens(container: HTMLElement) {
   return container.querySelectorAll('[data-streamdown="code-block-body"] code span span')
-}
-
-function renderMarkdown(text: string, { streaming = false }: { streaming?: boolean } = {}) {
-  return renderWithProviders(
-    withEditorWorkspace(
-      <>
-        <AssistantMarkdown streaming={streaming} text={text} />
-        <EditorSelectionProbe />
-      </>,
-    ),
-  )
-}
-
-function withEditorWorkspace(children: ReactNode) {
-  return (
-    <EditorStateProvider>
-      <EditorWorkspaceStateContext.Provider value={createWorkspaceStore()}>
-        {children}
-      </EditorWorkspaceStateContext.Provider>
-    </EditorStateProvider>
-  )
-}
-
-function EditorSelectionProbe() {
-  const selectedFilePath = useEditorWorkspaceState((state) => state.selectedFilePath)
-  const definitionTarget = useEditorUiState((state) => state.definitionTarget)
-
-  return (
-    <>
-      <span data-testid='selected-path'>{selectedFilePath ?? 'none'}</span>
-      <span data-testid='definition-target'>
-        {definitionTarget
-          ? `${definitionTarget.path}@${definitionTarget.range.start.line}`
-          : 'none'}
-      </span>
-    </>
-  )
-}
-
-function createWorkspaceStore() {
-  return createEditorWorkspaceStore({
-    chatModePanels: createDefaultChatModePanels(),
-    rootFolder: {
-      birthtimeMs: 0,
-      mtimeMs: 0,
-      name: 'repo',
-      path: ROOT_PATH,
-      size: 0,
-      type: 'directory',
-      version: '',
-    },
-    searchBuffers: {},
-    uiMode: 'workbench',
-    workbenchLayout: createDefaultWorkbenchLayout(),
-    worktreeIdByRootPath: {},
-    workspaceOrder: [ROOT_PATH],
-    workspaces: {},
-  })
 }

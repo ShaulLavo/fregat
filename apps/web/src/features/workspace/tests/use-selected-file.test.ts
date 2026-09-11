@@ -1,10 +1,18 @@
-import { describe, expect, it } from 'vitest'
+import { describe } from 'vitest'
+
+import { expect, test } from '../../../../test/fixtures'
 
 import { fileLoadState } from '@/features/workspace/hooks/use-selected-file'
 import type { FileResult } from '@/lib/file-system-types'
 
 describe('fileLoadState', () => {
-  it('does not enter a loading state for placeholder data from another path', () => {
+  test('reports a pending file read as loading', () => {
+    expect(
+      fileLoadState({ data: undefined, error: null, isError: false, isPending: true }, 'repo/a.ts'),
+    ).toEqual({ status: 'loading' })
+  })
+
+  test('does not enter a loading state for placeholder data from another path', () => {
     const state = fileLoadState(
       {
         data: file('repo/a.ts'),
@@ -18,7 +26,7 @@ describe('fileLoadState', () => {
     expect(state).toEqual({ status: 'idle' })
   })
 
-  it('returns ready when the loaded file matches the selected path', () => {
+  test('returns ready when the loaded file matches the selected path', () => {
     const loadedFile = file('repo/a.ts')
     const state = fileLoadState(
       {

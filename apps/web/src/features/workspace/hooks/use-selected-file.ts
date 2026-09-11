@@ -70,7 +70,7 @@ export function fileLoadState(
   }
   if (query.isError) return { status: 'error', message: errorMessage(query.error) }
   if (query.data) return idleState
-  if (query.isPending) return idleState
+  if (query.isPending) return { status: 'loading' }
 
   return idleState
 }

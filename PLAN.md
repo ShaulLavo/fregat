@@ -221,18 +221,14 @@ endpoints and existing SSH access, with explicit grants for native clients.
 
 ## Duplication census lane
 
-Requested 2026-09-11. A verified duplication census of the repository produced seven executable plans.
-[Plan 090](plans/090-duplicate-borne-defects.md) runs first.
+Requested 2026-09-11. Plan 090 is implemented. Its [regression reference](docs/duplicate-defect-regressions.md)
+records the fixes, baseline corrections, and focused checks. The remaining six plans are proposed.
+
 [Plan 091](plans/091-error-and-timing-helpers.md), [Plan 092](plans/092-path-and-uri-helpers.md),
 [Plan 093](plans/093-web-react-and-store-ceremony.md), and
-[Plan 094](plans/094-client-core-web-tui-parity.md) follow it.
-[Plan 095](plans/095-server-plumbing.md) and [Plan 096](plans/096-web-layering-and-boundaries.md) carry
-no dependency and may run at any point. All seven are proposed; implementation has not started.
-
-Plan 090 repairs the fourteen live defects found inside near-identical helpers — redaction holes,
-containment bugs, unguarded refs, and two test-harness failures — each with a reproduction and a
-regression test. It lands before every merge so no consolidation erases the evidence that the wrong
-variant shipped.
+[Plan 094](plans/094-client-core-web-tui-parity.md) consolidate on top of those fixes.
+[Plan 095](plans/095-server-plumbing.md) and [Plan 096](plans/096-web-layering-and-boundaries.md)
+can proceed independently of the middle plans, while preserving the same defect regressions.
 
 The middle plans consolidate onto the shared packages. Plan 091 widens the observability sanitizer,
 `errorSummary`, and the timing helpers into shared modules and gives `errorMessage`, `isRecord`, and the

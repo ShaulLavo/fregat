@@ -4,7 +4,7 @@ Status: proposed, implementation not started. Requested 2026-09-11.
 
 This plan owns duplication-census items 4.1, 4.2, 4.3, 4.4, 4.5, 4.7, 4.8, 4.9, 4.11, 5.4, and the
 wire-vocabulary half of Theme 8 (8.1–8.8, 8.12). Siblings own the rest:
-[Plan 090](090-duplicate-borne-defects.md) the duplicate-borne bugs including the TUI storage crash
+[Plan 090 regression record](../docs/duplicate-defect-regressions.md) the duplicate-borne bugs including the TUI storage crash
 (4.6) and the session-busy predicate (4.10), [Plan 091](091-error-and-timing-helpers.md) the error
 and timing helpers, [Plan 092](092-path-and-uri-helpers.md) the path and URI helpers,
 [Plan 093](093-web-react-and-store-ceremony.md) the web React and store ceremony,
@@ -267,7 +267,7 @@ Reconcile before merging:
 
 ## Move the recent-commands ledger
 
-Sequence after [Plan 090](090-duplicate-borne-defects.md): its corrupt-storage fix lands in
+Sequence after [Plan 090 regression record](../docs/duplicate-defect-regressions.md): its corrupt-storage fix lands in
 `apps/tui/src/storage/recents.ts`, the file this item then relocates.
 
 Home: `packages/client-core/src/commands/recent-commands.ts` over the existing `KeyValueStorage`
@@ -278,18 +278,18 @@ Reconcile before merging:
 
 - **Cap.** 30 (`apps/web/src/features/command-palette/state/recent-commands-store.ts:10`) versus 50
   (inline at `apps/tui/src/storage/recents.ts:20`).
-- **Corrupt storage.** `parseRecentCommands` (`recents.ts:8-11`) calls `JSON.parse` then `v.parse`
-  with no guard, so one malformed row throws on palette open; web's reader returns `[]` for every
-  failure (`recent-commands-store.ts:51-69`). Web's behaviour wins. Per the greenfield rule the
-  shared reader deletes the bad key rather than healing it.
+- **Corrupt storage.** Plan 090 guards reads and returns `[]` after invalid data. Its cleanup uses
+  `FileStorage.removeItemIfValue` so a stale reader cannot delete another instance's valid write.
+  Preserve conditional deletion and the two-connection regressions when defining the shared port.
+  `parseRecentCommands` remains a strict write validator.
 - **Envelope.** `{ commandIds, version: 1 }` (web, `:77`) versus a bare array (TUI, `:20`).
 - **Recency policy at the call site.** `apps/tui/src/commands/utils/palette.ts:26` passes
   `search ? [] : recents`; `apps/web/src/features/command-palette/content.tsx:136` passes recents
   unconditionally. Same ranker, different order for the same input — decide one, then delete the other.
-- **The write path costs extra.** The TUI writes through `FileStorage.updateItem`
-  (`recents.ts:17-21`), which is not on the `KeyValueStorage` port, and
-  `apps/tui/src/storage/files.ts:8` imports `parseRecentCommands` to validate rows at load. Either
-  widen the port or express the write as get-then-set.
+- **Atomic writes.** The TUI writes through `FileStorage.updateItem`, which holds an immediate
+  SQLite transaction. It validates new history before writing; startup no longer validates saved
+  history eagerly. The shared port must preserve atomic updates and conditional deletion.
+  A get-then-set implementation loses updates between TUI instances.
 - **What stays behind.** The cached array identity at `recent-commands-store.ts:14-16` exists because
   `useSyncExternalStore` re-renders forever on a fresh array; it is a React requirement and must not
   move into client-core.
@@ -514,7 +514,7 @@ What must stay in each host, and why the machine is injected rather than shared 
 
 - It does not fix the duplicate-borne defects: the TUI's unguarded JSON storage reads (4.6) and the
   session-busy predicate including the web LRU eviction bug (4.10) belong to
-  [Plan 090](090-duplicate-borne-defects.md). This plan sequences after 090 where they overlap.
+  [Plan 090 regression record](../docs/duplicate-defect-regressions.md). This plan sequences after 090 where they overlap.
 - It does not merge `errorMessage`, `errorSummary`, `elapsedMs`, the Eden error envelopes, or the two
   `createRpcError` implementations — [Plan 091](091-error-and-timing-helpers.md).
 - It does not touch `fileUriForPath`, `parentPath`, containment predicates, or the `basename` census

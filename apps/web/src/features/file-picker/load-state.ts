@@ -30,12 +30,12 @@ export function entriesLoadState(
   enabled: boolean,
 ): EntriesLoadState {
   if (!enabled) return { status: 'loading' }
-  if (query.data) return { status: 'ready', data: query.data }
   if (query.isError)
     return {
       status: 'error',
       message: errorMessage(query.error, 'The file server did not return a usable response.'),
     }
+  if (query.data) return { status: 'ready', data: query.data }
   if (query.isPending) return { status: 'loading' }
 
   return { status: 'idle' }
