@@ -46,6 +46,7 @@ export function WorkspaceEditPreviewDialog() {
     if (open || !focus.currentOwner || focus.currentOwner.capabilities.overlay) return
     restoreTarget.current = focus.currentOwner.token
   }, [focus.currentOwner, open])
+
   useLayoutEffect(() => {
     const closed = wasOpen.current && !open
     wasOpen.current = open
