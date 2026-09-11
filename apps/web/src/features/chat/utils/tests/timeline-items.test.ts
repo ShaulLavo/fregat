@@ -20,7 +20,7 @@ import { chatTimelineItems, type ChatTimelineItem } from '@/features/chat/utils/
 
 describe('chat timeline items', () => {
   it.each(['completed', 'interrupted', 'error'] as const)(
-    'clears activity running identity when a turn is %s',
+    'removes the live activity when a turn is %s',
     (state) => {
       const sessionId = v.parse(sessionIdSchema, 'ad686244-5b2e-59be-805f-ef86eac80feb')
       const turnId = v.parse(turnIdSchema, 'unfinished-tool-turn')
@@ -38,18 +38,17 @@ describe('chat timeline items', () => {
         proposedPlans: [],
       }
       const before = flattenTimelineItems(chatTimelineItems(input)).find(
-        (item) => item.type === 'activity-group',
+        (item) => item.type === 'live-activity',
       )
       const after = flattenTimelineItems(
         chatTimelineItems({
           ...input,
           latestTurn: { ...latestTurn, state, completedAt: timestamp(3) },
         }),
-      ).find((item) => item.type === 'activity-group')
+      ).find((item) => item.type === 'live-activity')
 
-      expect(before).toMatchObject({ activeTurnId: turnId })
-      expect(after).toMatchObject({ activeTurnId: null })
-      expect(after).not.toBe(before)
+      expect(before).toMatchObject({ activity: { active: true } })
+      expect(after).toBeUndefined()
     },
   )
 
@@ -79,9 +78,10 @@ describe('chat timeline items', () => {
     expect(items.map((item) => item.id)).toEqual([
       'message:message-1',
       'message:message-2',
+      'working:turn-1',
       'activity-group:event-1',
       'proposed-plan:plan-1',
-      'working:turn-1',
+      'live-activity:message-2',
     ])
   })
 
@@ -152,14 +152,14 @@ describe('chat timeline items', () => {
 
     expect(items.map((item) => item.id)).toEqual([
       'message:message-1',
+      'working:turn-1',
       'activity-group:event-1',
       'proposed-plan:plan-1',
-      'activity-group:event-2',
-      'working:turn-1',
+      'live-activity:message-1',
     ])
   })
 
-  it('keeps older turns in the work log and groups them where they happened', () => {
+  it('keeps promptless continuation work in the active response', () => {
     const sessionId = v.parse(sessionIdSchema, 'ad686244-5b2e-59be-805f-ef86eac80feb')
     const turnId = v.parse(turnIdSchema, 'turn-2')
     const latestTurn: OrchestrationLatestTurn = {
@@ -190,20 +190,21 @@ describe('chat timeline items', () => {
 
     expect(items.map((item) => item.id)).toEqual([
       'message:message-1',
-      // The finished turn keeps its work, folded where it happened.
-      'turn-fold:turn-1',
-      'activity-group:thinking',
       'working:turn-2',
+      'live-activity:message-1',
     ])
-    expect(items[1]).toMatchObject({
-      items: [{ activities: [{ title: 'old-turn-tool', turnId: 'turn-1' }] }],
-    })
+    expect(items[1]).toMatchObject({ startedAt: timestamp(1) })
     expect(items[2]).toMatchObject({
-      activities: [{ title: 'Inspecting repository state', tone: 'thinking', turnId: 'turn-2' }],
+      activity: {
+        activities: [
+          { title: 'old-turn-tool', turnId: 'turn-1' },
+          { title: 'Inspecting repository state', tone: 'thinking', turnId: 'turn-2' },
+        ],
+      },
     })
   })
 
-  it('hands the running turn its plan so the working row can name the current step', () => {
+  it('leaves plan step progress to the composer', () => {
     const sessionId = v.parse(sessionIdSchema, 'ad686244-5b2e-59be-805f-ef86eac80feb')
     const turnId = v.parse(turnIdSchema, 'turn-1')
     const latestTurn: OrchestrationLatestTurn = {
@@ -232,11 +233,8 @@ describe('chat timeline items', () => {
       optimisticMessages: [],
       proposedPlans: [],
     })
-    const workingItem = items.find((item) => item.type === 'working')
-
-    expect(workingItem).toMatchObject({
-      plan: { completedCount: 1, currentStep: 'Write the test' },
-    })
+    expect(items.map((item) => item.type)).toEqual(['working', 'live-activity'])
+    expect(items.at(-1)).toMatchObject({ activity: { activities: [] } })
   })
 
   it('derives T3 assistant row metadata before rendering', () => {
@@ -530,14 +528,16 @@ describe('chat timeline items', () => {
 
     expect(after.map((item) => item.id)).toEqual([
       'message:message-1',
+      'working:turn-1',
       'activity-group:tool-1',
       'message:message-2',
-      'working:turn-1',
+      'live-activity:message-1',
     ])
     expect(after[0]).toBe(before[0])
     expect(after[1]).toBe(before[1])
-    expect(after[3]).toBe(before[3])
-    expect(after[2]).not.toBe(before[2])
+    expect(after[2]).toBe(before[2])
+    expect(after[4]).toBe(before[4])
+    expect(after[3]).not.toBe(before[3])
     // A tick that changes nothing hands back the same array, so the consumer's
     // memo — and every effect keyed on it — sees no change at all.
     expect(render(chunk)).toBe(after)

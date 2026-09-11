@@ -3,6 +3,7 @@ import {
   isTimelineAtContentEnd,
   isTimelineWithinFollowBand,
   resolveTimelineAnchorItemId,
+  shouldReleaseTimelineAnchorForActivity,
   timelineAnchoredTurnMetrics,
   timelineContentScrollsUp,
   timelineDistanceToContentEnd,
@@ -16,8 +17,46 @@ import {
   type TimelineViewportMetrics,
 } from '@/features/chat/utils/timeline-scroll-anchoring'
 import { expect, test } from '../../../../../test/fixtures'
+import { workLogEntry } from '../../../../../test/factories/work-log'
 
 const VIEWPORT_HEIGHT = 600
+
+test('live tool activity releases the send-time anchor beside the composer', () => {
+  const entry = workLogEntry({ lifecycle: 'running', sourceKind: 'tool.started' })
+
+  expect(
+    shouldReleaseTimelineAnchorForActivity([
+      {
+        activity: { active: true, activities: [entry], entry, label: 'Running rg' },
+        id: 'live-activity:turn-1',
+        timestamp: entry.createdAt,
+        type: 'live-activity',
+      },
+    ]),
+  ).toBe(true)
+})
+
+test('reasoning and historical tool groups retain the new-turn anchor', () => {
+  const reasoning = workLogEntry({ sourceKind: 'thinking.updated', tone: 'thinking' })
+  const tool = workLogEntry()
+
+  expect(
+    shouldReleaseTimelineAnchorForActivity([
+      {
+        activities: [tool],
+        id: 'activity-group:old-turn',
+        timestamp: tool.createdAt,
+        type: 'activity-group',
+      },
+      {
+        activity: { active: true, activities: [reasoning], entry: reasoning, label: 'Thinking' },
+        id: 'live-activity:turn-1',
+        timestamp: reasoning.createdAt,
+        type: 'live-activity',
+      },
+    ]),
+  ).toBe(false)
+})
 
 function viewport(overrides: Partial<TimelineViewportMetrics> = {}): TimelineViewportMetrics {
   return {

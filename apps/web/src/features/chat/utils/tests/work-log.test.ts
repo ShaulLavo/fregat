@@ -476,7 +476,81 @@ describe('chat work log entries', () => {
     expect(chatActiveWorkLogPlan(entries, v.parse(turnIdSchema, 'turn-1'))).toMatchObject({
       currentStep: 'Old work',
     })
-    expect(chatActiveWorkLogPlan(entries, null)).toMatchObject({ currentStep: 'New work' })
+    expect(chatActiveWorkLogPlan(entries, v.parse(turnIdSchema, 'turn-3'))).toBeNull()
+    expect(chatActiveWorkLogPlan(entries, null)).toBeNull()
+  })
+
+  it('drops generic reasoning markers while preserving substantive streamed reasoning', () => {
+    const entries = chatWorkLogEntries({
+      activities: [
+        activity('generic-1', { kind: 'task.progress', tone: 'thinking', summary: 'Thinking' }),
+        activity('generic-2', {
+          kind: 'task.progress',
+          tone: 'thinking',
+          summary: 'Reasoning update',
+          payload: { summary: 'Thinking' },
+        }),
+        activity('summary', {
+          kind: 'task.progress',
+          tone: 'thinking',
+          summary: 'Reasoning update',
+          payload: { summary: 'Inspecting editor styles' },
+        }),
+      ],
+    })
+
+    expect(entries.map((entry) => entry.title)).toEqual(['Inspecting editor styles'])
+  })
+
+  it('does not revive a terminal tool when a later output update arrives', () => {
+    const entries = chatWorkLogEntries({
+      activities: [
+        activity('start', {
+          kind: 'tool.updated',
+          payload: { toolCallId: 'one', status: 'inProgress', data: { command: 'bun test' } },
+        }),
+        activity('end', {
+          kind: 'tool.completed',
+          payload: { toolCallId: 'one', status: 'completed' },
+        }),
+        activity('output', {
+          kind: 'tool.updated',
+          payload: { toolCallId: 'one', data: { output: 'Passed' } },
+        }),
+      ],
+    })
+
+    expect(entries).toMatchObject([
+      {
+        id: 'start',
+        lifecycle: 'completed',
+        status: 'Completed',
+        command: 'bun test',
+        output: 'Passed',
+      },
+    ])
+  })
+
+  it('retains request identities for concurrent approval and question lifecycles', () => {
+    const entries = chatWorkLogEntries({
+      activities: [
+        activity('approval', {
+          kind: 'approval.requested',
+          tone: 'approval',
+          payload: { requestId: 'approval-1' },
+        }),
+        activity('question', {
+          kind: 'user-input.requested',
+          tone: 'info',
+          payload: { requestId: 'question-1' },
+        }),
+      ],
+    })
+
+    expect(entries.map((entry) => [entry.sourceKind, entry.requestId])).toEqual([
+      ['approval.requested', 'approval-1'],
+      ['user-input.requested', 'question-1'],
+    ])
   })
 
   it("keeps the caller's order when createdAt disagrees with sequence", () => {

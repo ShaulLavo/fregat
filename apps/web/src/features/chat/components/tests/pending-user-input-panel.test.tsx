@@ -2,7 +2,7 @@ import {
   shellSnapshot,
   TEST_ENVIRONMENT_ID as FIXTURE_ENVIRONMENT_ID,
 } from '../../../../../test/factories/chat'
-import { screen } from '@testing-library/react'
+import { screen, within } from '@testing-library/react'
 import userEvent from '@testing-library/user-event'
 import { eventIdSchema, type ClientOrchestrationCommand } from '@workspace/contracts'
 import * as v from 'valibot'
@@ -19,7 +19,10 @@ const REQUEST_ID = 'user-input-1'
 test('a single-select question renders its options and submits the chosen value', async () => {
   const { dispatched } = renderPanel([requestedActivity([framework()])])
 
-  expect(screen.getByRole('alert', { name: 'Agent question' })).toBeInTheDocument()
+  const card = screen.getByRole('region', { name: 'Agent question' })
+  const arrival = within(card).getByRole('status')
+  expect(arrival).toHaveTextContent('Which test runner should this use?')
+  expect(within(arrival).queryByRole('button')).not.toBeInTheDocument()
   await userEvent.click(screen.getByRole('button', { name: /Vitest/ }))
   await userEvent.click(screen.getByRole('button', { name: 'Submit' }))
 
@@ -28,6 +31,7 @@ test('a single-select question renders its options and submits the chosen value'
     requestId: REQUEST_ID,
     type: 'session.user-input.respond',
   })
+  expect(screen.getByText('Response sent. Waiting for agent…')).toBeVisible()
 })
 
 test('submit stays disabled until every question is answered', async () => {
@@ -68,7 +72,26 @@ test('a multi-select keeps collecting values instead of advancing', async () => 
 test('a resolved prompt leaves nothing to answer', () => {
   renderPanel([requestedActivity([framework()]), resolvedActivity()])
 
-  expect(screen.queryByRole('alert', { name: 'Agent question' })).not.toBeInTheDocument()
+  expect(screen.queryByRole('region', { name: 'Agent question' })).not.toBeInTheDocument()
+})
+
+test('next cannot skip an unanswered question', async () => {
+  renderPanel([requestedActivity([notes(), framework()])])
+
+  expect(screen.getByRole('button', { name: 'Next' })).toBeDisabled()
+  await userEvent.type(screen.getByLabelText('Your answer'), 'Check the editor')
+  expect(screen.getByRole('button', { name: 'Next' })).toBeEnabled()
+})
+
+test('a failed response keeps the answer and reports why it can be retried', async () => {
+  renderPanel([requestedActivity([notes()])], () => Promise.reject('offline'))
+
+  await userEvent.type(screen.getByLabelText('Your answer'), 'Keep this answer')
+  await userEvent.click(screen.getByRole('button', { name: 'Submit' }))
+
+  expect(await screen.findByText('Could not send your response. offline')).toBeVisible()
+  expect(screen.getByLabelText('Your answer')).toHaveValue('Keep this answer')
+  expect(screen.getByRole('button', { name: 'Submit' })).toBeEnabled()
 })
 
 function framework() {
@@ -119,7 +142,10 @@ function resolvedActivity() {
   })
 }
 
-function renderPanel(activities: ReturnType<typeof sessionActivity>[]) {
+function renderPanel(
+  activities: ReturnType<typeof sessionActivity>[],
+  dispatch?: () => Promise<{ result: null; deduped: boolean; sequence: number }>,
+) {
   const seeded = sessionFactory({ activities })
   useChatProjectionStore.getState().resetChatProjection()
   useChatProjectionStore.getState().syncShellSnapshot(
@@ -146,6 +172,7 @@ function renderPanel(activities: ReturnType<typeof sessionActivity>[]) {
     <ChatPendingRequestsProvider
       dispatchCommand={async (command) => {
         dispatched.push(command)
+        if (dispatch) return dispatch()
         return { result: null, deduped: false, sequence: 1 }
       }}
       sessionId={seeded.id}

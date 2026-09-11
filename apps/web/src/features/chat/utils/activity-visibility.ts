@@ -2,6 +2,7 @@ import type { OrchestrationSessionActivity } from '@workspace/contracts'
 
 import { chatActivityHasFailure } from '@/features/chat/utils/activity-presentation'
 import type { ChatWorkLogEntry } from '@/features/chat/utils/work-log'
+import { isWorkLogToolEntry } from '@/features/chat/utils/tool-label'
 
 const QUIET_ACTIVITY_KINDS = new Set([
   'account.updated',
@@ -55,46 +56,25 @@ function isCodexDiagnosticActivity(activity: OrchestrationSessionActivity) {
   return CODEX_DIAGNOSTIC_LINE.test(message)
 }
 
-export function visibleActivityGroupRows(activities: readonly ChatWorkLogEntry[], maxRows: number) {
-  if (maxRows <= 0) return []
-  if (activities.length <= maxRows) return [...activities]
-
-  const selectedIds = new Set(activities.slice(-maxRows).map((activity) => activity.id))
-  return activities.filter(
-    (activity) =>
-      selectedIds.has(activity.id) ||
-      activity.tone === 'error' ||
-      activity.outcome === 'failed' ||
-      activity.icon === 'approval' ||
-      activity.icon === 'user-input',
-  )
-}
-
-export function activeActivityGroupEntry(
-  activities: readonly ChatWorkLogEntry[],
-  activeTurnId: OrchestrationSessionActivity['turnId'],
-) {
-  if (!activeTurnId) return undefined
-
-  return activities.findLast(
-    (activity) =>
-      activity.turnId === activeTurnId &&
-      activity.outcome === 'neutral' &&
-      activity.status !== 'Stopped',
-  )
-}
-
 export function activityGroupSummary(activities: readonly ChatWorkLogEntry[]) {
-  const commands = activities.filter((activity) => activity.itemType === 'command_execution').length
-  const edits = activities.filter((activity) => activity.itemType === 'file_change')
+  const tools = activities.filter((activity) => !activity.plan && isWorkLogToolEntry(activity))
+  const commands = tools.filter(
+    (activity) => activity.command || activity.itemType === 'command_execution',
+  ).length
+  const edits = tools.filter(
+    (activity) => activity.itemType === 'file_change' || activity.tool?.kind === 'edit',
+  )
   const files = new Set(edits.flatMap((activity) => activity.changedFiles)).size || edits.length
-  const others = activities.length - commands - edits.length
+  const reads = tools.filter((activity) => activity.tool?.kind === 'read').length
+  const searches = tools.filter((activity) => activity.tool?.kind === 'search').length
+  const others = tools.length - commands - edits.length - reads - searches
   const parts: string[] = []
   if (commands > 0) parts.push(`Ran ${commands} ${commands === 1 ? 'command' : 'commands'}`)
   if (files > 0) parts.push(`Changed ${files} ${files === 1 ? 'file' : 'files'}`)
+  if (reads > 0) parts.push(`Read ${reads} ${reads === 1 ? 'file' : 'files'}`)
+  if (searches > 0) parts.push(`Searched ${searches} ${searches === 1 ? 'time' : 'times'}`)
   if (others > 0) parts.push(`Used ${others} ${others === 1 ? 'tool' : 'tools'}`)
+  if (parts.length === 0) return `${activities.length} steps`
 
-  return parts
-    .map((part, index) => (index === 0 ? part : part[0]?.toLowerCase() + part.slice(1)))
-    .join(' and ')
+  return parts.join(' · ')
 }

@@ -3,42 +3,28 @@ import userEvent from '@testing-library/user-event'
 
 import { ActivityRow } from '@/features/chat/components/activity-row'
 import { ActivityGroupRow } from '@/features/chat/components/activity-group-row'
-import type { ChatWorkLogEntry } from '@/features/chat/utils/work-log'
 import { useChatWorkLogExpansionStore } from '@/features/chat/state/chat-work-log-expansion-store'
-import { sessionActivity } from '../../../../../test/factories/chat'
+import { workLogEntry as entry } from '../../../../../test/factories/work-log'
 import { expect, test } from '../../../../../test/fixtures'
 import { renderWithProviders } from '../../../../../test/render'
-
-test('the tool spinner stops when its turn settles or is no longer current', () => {
-  resetExpansion()
-  const turnId = sessionActivity().turnId
-  const activities = [entry({ outcome: 'neutral', status: 'Started', turnId })]
-  const { rerender } = renderWithProviders(
-    <ActivityGroupRow activities={activities} activeTurnId={turnId} />,
-  )
-
-  expect(screen.getByLabelText('Tool running')).toBeInTheDocument()
-  rerender(<ActivityGroupRow activities={activities} activeTurnId={null} />)
-  expect(screen.queryByLabelText('Tool running')).not.toBeInTheDocument()
-  expect(screen.getByRole('button', { name: 'Ran 1 command' })).toBeInTheDocument()
-
-  rerender(
-    <ActivityGroupRow
-      activities={[entry({ outcome: 'neutral', status: 'Started', turnId: null })]}
-      activeTurnId={turnId}
-    />,
-  )
-  expect(screen.queryByLabelText('Tool running')).not.toBeInTheDocument()
-})
 
 test('tool groups collapse to a useful summary and open on click', async () => {
   resetExpansion()
   renderWithProviders(
     <ActivityGroupRow
-      activeTurnId={null}
       activities={[
-        entry({ id: 'one', title: 'First command', outcome: 'succeeded' }),
-        entry({ id: 'two', title: 'Second command', outcome: 'succeeded' }),
+        entry({
+          itemType: 'command_execution',
+          id: 'one',
+          title: 'First command',
+          outcome: 'succeeded',
+        }),
+        entry({
+          itemType: 'command_execution',
+          id: 'two',
+          title: 'Second command',
+          outcome: 'succeeded',
+        }),
       ]}
     />,
   )
@@ -53,7 +39,6 @@ test('a collapsed group keeps failed calls visible after a later success', () =>
   resetExpansion()
   renderWithProviders(
     <ActivityGroupRow
-      activeTurnId={null}
       activities={[
         entry({ id: 'failed', title: 'Failed command', outcome: 'failed' }),
         entry({ id: 'ok', title: 'Successful command', outcome: 'succeeded' }),
@@ -87,7 +72,14 @@ test('expanded MCP rows expose their arguments and full detail', async () => {
 
 test('a failed tool call is distinguishable from a successful one', () => {
   const { unmount } = renderWithProviders(
-    <ActivityRow activity={entry({ id: 'ok', outcome: 'succeeded', title: 'Command run' })} />,
+    <ActivityRow
+      activity={entry({
+        id: 'ok',
+        lifecycle: 'completed',
+        outcome: 'succeeded',
+        title: 'Command run',
+      })}
+    />,
   )
 
   expect(screen.getByLabelText('Succeeded')).toBeInTheDocument()
@@ -98,6 +90,7 @@ test('a failed tool call is distinguishable from a successful one', () => {
     <ActivityRow
       activity={entry({
         id: 'broken',
+        lifecycle: 'failed',
         outcome: 'failed',
         output: 'cat: missing.txt: No such file or directory',
         title: 'Command run',
@@ -106,7 +99,7 @@ test('a failed tool call is distinguishable from a successful one', () => {
   )
 
   expect(screen.getByLabelText('Failed')).toBeInTheDocument()
-  expect(screen.getByText('Command run')).toHaveClass('text-destructive')
+  expect(screen.getByText('Failed command')).toHaveClass('text-destructive')
 })
 
 test('expanding a row reveals its raw command, output and changed files', async () => {
@@ -144,55 +137,26 @@ test('expansion survives the row unmounting', async () => {
   expect(screen.getByLabelText('Command')).toHaveTextContent('bun test')
 })
 
-test('a plan row renders every step and marks the one in progress', () => {
-  resetExpansion()
-  renderWithProviders(
-    <ActivityRow
-      activity={entry({
-        icon: 'task',
-        id: 'turn-plan:turn-1',
-        plan: {
-          completedCount: 1,
-          currentStep: 'Write the test',
-          steps: [
-            { status: 'completed', step: 'Read the code' },
-            { status: 'inProgress', step: 'Write the test' },
-            { status: 'pending', step: 'Ship it' },
-          ],
-        },
-        title: 'Plan updated',
-        tone: 'info',
-      })}
-    />,
-  )
-
-  expect(screen.getByText('Read the code')).toBeInTheDocument()
-  expect(screen.getByText('Ship it')).toBeInTheDocument()
-  expect(screen.getByText('Write the test')).toHaveClass('text-foreground/85')
-  expect(screen.getByLabelText('Plan progress')).toHaveTextContent('Plan 1/3')
-})
-
 function resetExpansion() {
   useChatWorkLogExpansionStore.setState({ expandedGroupIds: {}, expandedRowIds: {} })
 }
 
-function entry(overrides: Partial<ChatWorkLogEntry> = {}): ChatWorkLogEntry {
-  return {
-    changedFiles: [],
-    command: null,
-    createdAt: '2026-05-28T00:00:00.000Z',
-    detail: null,
-    icon: 'tool',
-    id: 'activity-1',
-    input: null,
-    itemType: 'command_execution',
-    outcome: null,
-    output: null,
-    plan: null,
-    status: 'Completed',
-    title: 'Command run',
-    tone: 'tool',
-    turnId: null,
-    ...overrides,
-  }
-}
+test('a reasoning summary can be expanded to read the entire text', async () => {
+  resetExpansion()
+  const reasoning =
+    'The gutter needs a solid background matching the editor while the surrounding pane keeps its own transparency.'
+  renderWithProviders(
+    <ActivityRow
+      activity={entry({
+        id: 'reasoning-full',
+        sourceKind: 'task.progress',
+        icon: 'thinking',
+        tone: 'thinking',
+        title: reasoning,
+      })}
+    />,
+  )
+  expect(screen.queryByLabelText('Reasoning')).not.toBeInTheDocument()
+  await userEvent.click(screen.getByRole('button', { name: reasoning }))
+  expect(screen.getByLabelText('Reasoning')).toHaveTextContent(reasoning)
+})

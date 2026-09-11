@@ -1,6 +1,7 @@
-import type { OrchestrationLatestTurn, OrchestrationMessage } from '@workspace/contracts'
+import type { OrchestrationLatestTurn, OrchestrationMessage, TurnId } from '@workspace/contracts'
 
 import type { OptimisticChatMessage } from '@/features/chat/state/chat-optimistic-store'
+import { chatActiveResponseTurnIds } from '@/features/chat/utils/active-response'
 import { formatChatElapsed } from '@/features/chat/utils/formatters'
 
 export type ChatTimelineMessage = OrchestrationMessage | OptimisticChatMessage
@@ -19,17 +20,19 @@ export function chatMessageTimelineMetadata({
   latestTurn,
   messages,
   showCompletionSummary = true,
+  activeResponseTurnIds = chatActiveResponseTurnIds({ messages, entries: [], latestTurn }),
 }: {
   latestTurn: OrchestrationLatestTurn | null
   messages: readonly ChatTimelineMessage[]
   showCompletionSummary?: boolean
+  activeResponseTurnIds?: ReadonlySet<TurnId>
 }) {
   const orderedMessages = messages.toSorted(compareMessagesByCreatedAt)
   const durationStartByMessageId = computeMessageDurationStart(orderedMessages)
   const terminalAssistantMessageIds = deriveTerminalAssistantMessageIds(orderedMessages)
   const completionSummary =
     showCompletionSummary && latestTurn?.startedAt && latestTurn.completedAt
-      ? formatCompletionSummary(latestTurn.startedAt, latestTurn.completedAt)
+      ? formatCompletionSummary(latestTurn)
       : null
   const completionDividerMessageId = completionSummary
     ? deriveCompletionDividerMessageId(orderedMessages, latestTurn)
@@ -37,7 +40,7 @@ export function chatMessageTimelineMetadata({
   const metadataByMessageId = new Map<string, ChatMessageTimelineMetadata>()
 
   for (const message of messages) {
-    const assistantTurnInProgress = isAssistantTurnInProgress(message, latestTurn)
+    const assistantTurnInProgress = isAssistantTurnInProgress(message, activeResponseTurnIds)
     metadataByMessageId.set(message.id, {
       assistantStreaming: isAssistantMessageStreaming(message, latestTurn),
       assistantTurnInProgress,
@@ -88,7 +91,7 @@ export function resolveAssistantMessageChromeState({
   return {
     copyText,
     copyVisible: showCopyButton && copyText !== null && !streaming,
-    metaVisible: showCopyButton,
+    metaVisible: showCopyButton && !streaming,
   }
 }
 
@@ -175,13 +178,12 @@ function deriveCompletionDividerMessageId(
 
 function isAssistantTurnInProgress(
   message: ChatTimelineMessage,
-  latestTurn: OrchestrationLatestTurn | null,
+  activeResponseTurnIds: ReadonlySet<TurnId>,
 ) {
   if (message.role !== 'assistant') return false
   if (!message.turnId) return false
-  if (latestTurn?.turnId !== message.turnId) return false
 
-  return latestTurn.state === 'running' && latestTurn.completedAt === null
+  return activeResponseTurnIds.has(message.turnId)
 }
 
 function isAssistantMessageStreaming(
@@ -192,7 +194,11 @@ function isAssistantMessageStreaming(
   if (!message.streaming) return false
   if (!message.turnId) return true
 
-  return isAssistantTurnInProgress(message, latestTurn)
+  return (
+    latestTurn?.turnId === message.turnId &&
+    latestTurn.state === 'running' &&
+    latestTurn.completedAt === null
+  )
 }
 
 function durationEndForMessage(
@@ -212,9 +218,12 @@ function compareMessagesByCreatedAt(left: ChatTimelineMessage, right: ChatTimeli
   return left.createdAt.localeCompare(right.createdAt)
 }
 
-function formatCompletionSummary(startIso: string, endIso: string) {
-  const elapsed = formatChatElapsed(startIso, endIso)
+function formatCompletionSummary(turn: OrchestrationLatestTurn) {
+  if (!turn.completedAt) return null
+  const elapsed = formatChatElapsed(turn.startedAt ?? turn.requestedAt, turn.completedAt)
   if (!elapsed) return null
+  if (turn.state === 'interrupted') return `You stopped after ${elapsed}`
+  if (turn.state === 'error') return `Failed after ${elapsed}`
 
   return `Worked for ${elapsed}`
 }

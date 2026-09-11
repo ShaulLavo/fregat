@@ -1,6 +1,10 @@
 import { LoadingState } from '@workspace/ui/components/loading-state'
 import { useActiveChatProjection } from '@/features/chat/hooks/use-active-projection'
-import type { ModelSelection, SessionId } from '@workspace/contracts'
+import { useComposerConnection } from '@/features/chat/hooks/use-composer-connection'
+import { ComposerActivityStatus } from '@/features/chat/components/composer-activity-status'
+import { composerPendingAction } from '@/features/chat/utils/composer-state'
+import { sessionStopFailure } from '@/features/chat/utils/session-stop'
+import type { ModelSelection, SessionId, SessionTurnInterruptCommand } from '@workspace/contracts'
 import { useCallback, useEffect, useMemo, useState } from 'react'
 
 import { notifyChatCommandError } from '@/features/chat/notify-command-error'
@@ -74,11 +78,20 @@ export function ChatView({
   const session = useActiveChatProjection(sessionSelector)
   const optimisticMessages = useChatOptimisticStore(optimisticMessagesSelector)
   const [sendError, setSendError] = useState<string | null>(null)
-  const [interrupting, setInterrupting] = useState(false)
+  const [interruptCommand, setInterruptCommand] = useState<SessionTurnInterruptCommand | null>(null)
   const [revertingCheckpoint, setRevertingCheckpoint] = useState(false)
   const [pendingCheckpoint, setPendingCheckpoint] = useState<number | null>(null)
   const [sending, setSending] = useState(false)
   const busy = isChatSessionBusy(session)
+  const interruptFailure = sessionStopFailure(session, interruptCommand)
+  const interrupting =
+    busy &&
+    interruptCommand !== null &&
+    interruptCommand.sessionId === session?.id &&
+    interruptCommand.turnId === session?.latestTurn?.turnId &&
+    interruptFailure === null
+  const connection = useComposerConnection(transport, activeSessionId)
+  const disabledReason = connection.kind === 'live' ? null : connection.label
   // Stable identity is required because this is part of the timeline action context value.
   const handleRevertToCheckpoint = useCallback(
     (turnCount: number) => {
@@ -143,13 +156,19 @@ export function ChatView({
   async function handleSend(payload: ChatInputSubmitPayload) {
     if (!session) return false
 
+    setInterruptCommand(null)
     return submitChatTurn({ transport, payload, setSendError, setSending, session })
   }
 
   async function handleStop() {
-    if (!session) return
+    if (!session || interrupting || disabledReason) return
 
-    await dispatchSessionStop({ transport, setInterrupting, setSendError, session })
+    await dispatchSessionStop({
+      transport,
+      setInterruptCommand,
+      setSendError,
+      session,
+    })
   }
 
   async function handleConfirmRevert() {
@@ -174,7 +193,6 @@ export function ChatView({
         onCancel={() => setPendingCheckpoint(null)}
         onConfirm={() => void handleConfirmRevert()}
       />
-      <ChatRuntimeStatus commandFailure={sendError} session={session} />
       <ChatTransportContext value={transport}>
         <ChatTimelineActionsProvider revertToCheckpoint={handleRevertToCheckpoint}>
           <MessagesTimeline
@@ -184,6 +202,7 @@ export function ChatView({
           />
         </ChatTimelineActionsProvider>
       </ChatTransportContext>
+      <ChatRuntimeStatus commandFailure={sendError ?? interruptFailure} session={session} />
       {/* The panels sit above the composer rather than inside it: each one is a
           request holding the turn open, so it stays visible while the user
           types their answer. */}
@@ -193,9 +212,20 @@ export function ChatView({
         sessionId={session.id}
       >
         <ChatPendingRequestsProvider
+          disabledReason={disabledReason}
           dispatchCommand={transport.dispatchCommand}
           sessionId={session.id}
         >
+          <ComposerActivityStatus
+            connection={connection}
+            pendingAction={composerPendingAction({
+              sending,
+              interrupting,
+              awaitingProjection: optimisticMessages.length > 0 && !busy,
+              session,
+            })}
+            session={session}
+          />
           <PendingApprovalPanel />
           <PendingUserInputPanel />
           <ChatPlanFollowUpProvider
@@ -211,7 +241,13 @@ export function ChatView({
           ) : null}
           <ChatInput
             busy={busy}
-            commandStatusLabel={interrupting ? 'Interrupting' : null}
+            disabledReason={disabledReason}
+            pendingAction={composerPendingAction({
+              sending,
+              interrupting,
+              awaitingProjection: optimisticMessages.length > 0 && !busy,
+              session,
+            })}
             disabled={
               sending ||
               interrupting ||
@@ -320,29 +356,36 @@ async function submitChatTurn({
 
 async function dispatchSessionStop({
   transport,
-  setInterrupting,
+  setInterruptCommand,
   setSendError,
   session,
 }: {
   transport: ChatTransport
-  setInterrupting: (value: boolean) => void
+  setInterruptCommand: (value: SessionTurnInterruptCommand | null) => void
   setSendError: (value: string | null) => void
   session: ChatSession
 }) {
-  setInterrupting(true)
-  try {
-    const outcome = await dispatchChatCommand({
-      action: 'chat.stop.dispatch.summary',
-      command: createSessionInterruptCommand({
+  const command = createSessionInterruptCommand({
+    sessionId: session.id,
+    turnId: session.latestTurn?.turnId,
+  })
+  setInterruptCommand(command)
+  setSendError(null)
+  const outcome = await dispatchChatCommand({
+    action: 'chat.stop.dispatch.summary',
+    command,
+    dispatchCommand: transport.dispatchCommand,
+    onAccepted: (result) =>
+      scheduleSessionProjectionSyncAfterDispatch({
+        transport,
+        replayAfterSequence: replayAfterDispatch(command, result),
         sessionId: session.id,
-        turnId: session.latestTurn?.turnId,
       }),
-      dispatchCommand: transport.dispatchCommand,
-    })
-    if (!outcome.ok) setSendError(outcome.message)
-  } finally {
-    setInterrupting(false)
-  }
+  })
+  if (outcome.ok) return
+
+  setSendError(outcome.message)
+  setInterruptCommand(null)
 }
 
 async function revertSessionToCheckpoint({

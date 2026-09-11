@@ -12,6 +12,13 @@ export type ChatActivityIconKey =
 
 export type ChatActivityOutcome = 'failed' | 'neutral' | 'succeeded'
 
+export type ChatActivityLifecycle = 'running' | 'completed' | 'failed' | 'declined' | 'stopped'
+
+export type ChatActivityTool = {
+  kind: 'read' | 'edit' | 'search' | 'browse' | 'mcp'
+  target: string
+}
+
 export type ChatActivityPlanStepStatus = 'completed' | 'inProgress' | 'pending'
 
 export type ChatActivityPlanStep = {
@@ -25,10 +32,12 @@ export type ChatActivityPresentation = {
   detail: string | null
   icon: ChatActivityIconKey
   input: string | null
+  lifecycle: ChatActivityLifecycle | null
   outcome: ChatActivityOutcome | null
   output: string | null
   status: string | null
   title: string
+  tool?: ChatActivityTool
   toolCallId: string | null
 }
 
@@ -65,17 +74,25 @@ export function chatActivityPresentation(
   const command = activityCommand(data)
   const output = activityOutput(data)
   const detail = activityDetail(activity, payload, title)
+  const outcome = activityOutcome(activity, payload, data, [
+    detail === command ? null : detail,
+    output,
+  ])
+  const lifecycle = activityLifecycle(activity, payload, data, outcome)
+  const tool = activityTool(activity, payload, data)
 
   return {
-    changedFiles: activityChangedFiles(data),
+    changedFiles: tool?.kind === 'read' ? [] : activityChangedFiles(data),
     command,
     detail,
     icon: activityIcon(activity),
     input: activityInput(data, command),
-    outcome: activityOutcome(activity, payload, data, [detail === command ? null : detail, output]),
+    lifecycle,
+    outcome,
     output,
-    status: activityStatus(activity, payload),
+    status: activityStatus(activity, payload, lifecycle),
     title,
+    ...(tool ? { tool } : {}),
     toolCallId: chatActivityToolCallId(activity),
   }
 }
@@ -189,6 +206,8 @@ function taskProgressTitle(
   activity: OrchestrationSessionActivity,
   payload: Record<string, unknown>,
 ) {
+  const delta = chatActivityReasoningDelta(activity)
+  if (delta !== null) return delta
   const summary = stringValue(payload.summary)
   if (summary) return summary
   const detail = stringValue(payload.detail)
@@ -196,6 +215,16 @@ function taskProgressTitle(
   if (activity.summary !== 'Reasoning update') return activity.summary
 
   return 'Thinking'
+}
+
+export function chatActivityReasoningDelta(activity: OrchestrationSessionActivity) {
+  if (activity.kind !== 'task.progress') return null
+  const payload = recordPayload(activity.payload)
+  if (payload.streamKind !== 'reasoning_text' && payload.streamKind !== 'reasoning_summary_text')
+    return null
+
+  const text = payload.summary ?? payload.detail
+  return typeof text === 'string' ? text : null
 }
 
 function toolTitle(activity: OrchestrationSessionActivity, payload: Record<string, unknown>) {
@@ -250,7 +279,12 @@ function activityDetail(
   return null
 }
 
-function activityStatus(activity: OrchestrationSessionActivity, payload: Record<string, unknown>) {
+function activityStatus(
+  activity: OrchestrationSessionActivity,
+  payload: Record<string, unknown>,
+  lifecycle: ChatActivityLifecycle | null,
+) {
+  if (lifecycle) return lifecycle === 'running' ? 'In progress' : formatStatus(lifecycle)
   const status = stringValue(payload.status)
   if (status) return formatStatus(status)
   if (activity.kind === 'tool.started') return 'Started'
@@ -275,14 +309,86 @@ function activityOutcome(
   if (recordPayload(data.result).isError === true || data.error) return 'failed'
   if (isFailedExitCode(data)) return 'failed'
 
-  const status = stringValue(payload.status)
+  const status = normalizedLifecycle(stringValue(payload.status) ?? stringValue(data.status))
   if (status === 'failed' || status === 'declined') return 'failed'
   if (toolTextLooksLikeFailure(texts.filter(Boolean).join('\n'))) return 'failed'
   if (activity.kind === 'tool.started') return 'neutral'
   if (activity.kind === 'tool.updated' && !status) return 'neutral'
-  if (status === 'inProgress' || status === 'stopped') return 'neutral'
+  if (status === 'running' || status === 'stopped') return 'neutral'
 
   return 'succeeded'
+}
+
+function activityLifecycle(
+  activity: OrchestrationSessionActivity,
+  payload: Record<string, unknown>,
+  data: Record<string, unknown>,
+  outcome: ChatActivityOutcome | null,
+): ChatActivityLifecycle | null {
+  if (!activity.kind.startsWith('tool.') && !activity.kind.startsWith('task.')) return null
+
+  const status = normalizedLifecycle(stringValue(payload.status) ?? stringValue(data.status))
+  if (status === 'declined' || status === 'stopped') return status
+  if (outcome === 'failed' || activity.tone === 'error') return 'failed'
+  if (status) return status
+  if (activity.kind.endsWith('.completed')) return 'completed'
+
+  return 'running'
+}
+
+function normalizedLifecycle(status: string | null): ChatActivityLifecycle | null {
+  if (status === 'inProgress' || status === 'in_progress' || status === 'running') return 'running'
+  if (status === 'completed' || status === 'succeeded') return 'completed'
+  if (status === 'failed' || status === 'declined') return status
+  if (status === 'stopped' || status === 'cancelled' || status === 'interrupted') return 'stopped'
+
+  return null
+}
+
+function activityTool(
+  activity: OrchestrationSessionActivity,
+  payload: Record<string, unknown>,
+  data: Record<string, unknown>,
+): ChatActivityTool | null {
+  if (!activity.kind.startsWith('tool.')) return null
+  const server = stringValue(data.server)
+  const tool = stringValue(data.tool)
+  if (server && tool) return { kind: 'mcp', target: `${server} · ${tool}` }
+
+  const input = recordPayload(data.arguments ?? data.input ?? data.rawInput)
+  const name =
+    stringValue(data.name) ??
+    stringValue(payload.title) ??
+    stringValue(payload.itemType) ??
+    compactActivityLabel(activity.summary)
+  const mcpName = /^mcp__(.+?)__(.+)$/.exec(name)
+  if (mcpName) return { kind: 'mcp', target: `${mcpName[1]} · ${mcpName[2]}` }
+  const normalizedName = name.replace(/[\s_-]/g, '').toLowerCase()
+  const path =
+    firstStringValue(input, ['file_path', 'path', 'notebook_path']) ?? stringValue(data.path)
+  if (/^(read|readfile|fileread)$/.test(normalizedName) && path)
+    return { kind: 'read', target: path }
+  if (/^(edit|write|editfile|writefile|filechange|notebookedit)$/.test(normalizedName)) {
+    const target = path ?? changedFileTarget(activityChangedFiles(data))
+    return target ? { kind: 'edit', target } : null
+  }
+  if (/^(websearch|search|grep|glob|codesearch)$/.test(normalizedName)) {
+    const query = firstStringValue(input, ['query', 'pattern']) ?? stringValue(data.query)
+    return query ? { kind: 'search', target: query } : null
+  }
+  if (/^(webfetch|browse|openurl)$/.test(normalizedName)) {
+    const url = stringValue(input.url) ?? stringValue(data.url)
+    return url ? { kind: 'browse', target: url } : null
+  }
+
+  return null
+}
+
+function changedFileTarget(files: readonly string[]) {
+  if (files.length === 1) return files[0] ?? 'file'
+  if (files.length > 1) return `${files.length} files`
+
+  return null
 }
 
 function isFailedExitCode(data: Record<string, unknown>) {

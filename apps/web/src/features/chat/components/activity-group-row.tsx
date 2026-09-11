@@ -1,63 +1,54 @@
 import { CaretRightIcon } from '@phosphor-icons/react'
 import { Button } from '@workspace/ui/components/button'
-import { OrbitLoader } from '@workspace/ui/components/orbit-loader'
 import { cn } from '@workspace/ui/lib/utils'
 
 import { ActivityRow } from '@/features/chat/components/activity-row'
+import { useWorkLogScroll } from '@/features/chat/hooks/use-work-log-scroll'
 import { useChatWorkLogExpansionStore } from '@/features/chat/state/chat-work-log-expansion-store'
-import {
-  activeActivityGroupEntry,
-  activityGroupSummary,
-  visibleActivityGroupRows,
-} from '@/features/chat/utils/activity-visibility'
 import type { ChatWorkLogEntry } from '@/features/chat/utils/work-log'
+import { isWorkLogFailure } from '@/features/chat/utils/work-row'
+import { activityGroupSummary } from '@/features/chat/utils/activity-visibility'
+import { workLogContentLength } from '@/features/chat/utils/work-log-content-length'
 
-export function ActivityGroupRow({
-  activities,
-  activeTurnId,
-}: {
-  activities: readonly ChatWorkLogEntry[]
-  activeTurnId: ChatWorkLogEntry['turnId']
-}) {
+export function ActivityGroupRow({ activities }: { activities: readonly ChatWorkLogEntry[] }) {
   const groupId = activities[0]?.id ?? ''
   const expanded = useChatWorkLogExpansionStore((state) => state.expandedGroupIds[groupId] ?? false)
-  const toggleGroupExpanded = useChatWorkLogExpansionStore((state) => state.toggleGroupExpanded)
-  const onlyTools = activities.every((activity) => activity.tone === 'tool')
-  const collapsedRows = onlyTools
-    ? activities.filter((activity) => activity.outcome === 'failed')
-    : visibleActivityGroupRows(activities, 1)
-  const visibleRows = expanded ? activities : collapsedRows
-  const hiddenCount = activities.length - collapsedRows.length
-  const running = onlyTools ? activeActivityGroupEntry(activities, activeTurnId) : undefined
-  const failed = onlyTools && activities.some((activity) => activity.outcome === 'failed')
-  const summary = onlyTools ? activityGroupSummary(activities) : `Show ${hiddenCount} more`
-  const label = running ? (running.command ?? running.title) : summary
+  const toggle = useChatWorkLogExpansionStore((state) => state.toggleGroupExpanded)
+  const scrollRef = useWorkLogScroll(`group:${groupId}`, workLogContentLength(activities))
+  const visible = expanded
+    ? activities
+    : activities.filter(
+        (entry) =>
+          isWorkLogFailure(entry) || entry.icon === 'approval' || entry.icon === 'user-input',
+      )
+  const hiddenCount = activities.length - visible.length
+  const summary = activityGroupSummary(activities)
+
+  if (activities.length === 1 && activities[0]) return <ActivityRow activity={activities[0]} />
 
   return (
-    <section className='space-y-0.5'>
-      {hiddenCount > 0 ? (
+    <section className='min-w-0 space-y-0.5'>
+      {expanded || hiddenCount > 0 ? (
         <Button
           aria-expanded={expanded}
-          className={cn(
-            'text-muted-foreground h-auto max-w-full justify-start gap-2 px-1 py-1 text-xs font-normal tabular-nums',
-            failed && 'text-destructive',
-          )}
+          className='text-muted-foreground h-auto max-w-full justify-start gap-2 px-1 py-1 text-xs font-normal tabular-nums'
+          data-scroll-anchor-ignore
           variant='ghost'
-          onClick={() => toggleGroupExpanded(groupId)}
+          onClick={() => toggle(groupId)}
         >
-          {running ? (
-            <OrbitLoader className='size-3 shrink-0' label='Tool running' />
-          ) : (
-            <CaretRightIcon
-              className={cn('size-3 shrink-0 transition-transform', expanded && 'rotate-90')}
-            />
-          )}
-          <span className='truncate'>{expanded && !onlyTools ? 'Show less' : label}</span>
-          {failed ? <span className='sr-only'>A tool call failed</span> : null}
+          <CaretRightIcon
+            aria-hidden='true'
+            className={cn('size-3 shrink-0 transition-transform', expanded && 'rotate-90')}
+          />
+          <span className='truncate'>{summary}</span>
         </Button>
       ) : null}
-      <div className={expanded ? 'border-border ml-2 border-l pl-2' : undefined}>
-        {visibleRows.map((activity) => (
+      <div
+        className={expanded ? 'border-border ml-2 max-h-72 overflow-auto border-l pl-2' : undefined}
+        data-tool-group-scroll={expanded || undefined}
+        ref={expanded ? scrollRef : undefined}
+      >
+        {visible.map((activity) => (
           <ActivityRow activity={activity} key={activity.id} />
         ))}
       </div>

@@ -32,6 +32,7 @@ export function ChatInputEditor({
   rootPath,
   sendButtonRef,
   submitting,
+  submissionDisabled = false,
   trigger,
 }: {
   busy: boolean
@@ -49,6 +50,7 @@ export function ChatInputEditor({
   rootPath: string
   sendButtonRef: RefObject<HTMLButtonElement | null>
   submitting: boolean
+  submissionDisabled?: boolean
   trigger: ChatInputTrigger | null
 }) {
   const [editor] = useLexicalComposerContext()
@@ -108,6 +110,7 @@ export function ChatInputEditor({
         rootPath={rootPath}
         sendButtonRef={sendButtonRef}
         submitting={submitting}
+        submissionDisabled={submissionDisabled}
         onEditorReady={onEditorReady}
         onTriggerChange={onTriggerChange}
       />

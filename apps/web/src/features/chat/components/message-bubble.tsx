@@ -57,7 +57,8 @@ export function MessageBubble({
   const optimistic = 'optimistic' in message
   const attachments = message.attachments ?? []
   const assistantText = assistant
-    ? message.text || (effectiveAssistantStreaming ? '' : '(empty response)')
+    ? message.text ||
+      (effectiveAssistantStreaming || assistantTurnInProgress ? '' : 'No response text')
     : ''
   // The composer appends captured terminal output as an XML block after the
   // prompt. Split it back off so the reader sees the words they typed plus the

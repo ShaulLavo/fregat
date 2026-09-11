@@ -4,10 +4,13 @@ import {
   chatActivityHasFailure,
   chatActivityPlanSteps,
   chatActivityPresentation,
+  chatActivityReasoningDelta,
   chatActivityToolCallId,
   type ChatActivityIconKey,
+  type ChatActivityLifecycle,
   type ChatActivityOutcome,
   type ChatActivityPlanStep,
+  type ChatActivityTool,
 } from '@/features/chat/utils/activity-presentation'
 import { isVisibleChatActivity } from '@/features/chat/utils/activity-visibility'
 
@@ -28,12 +31,16 @@ export type ChatWorkLogEntry = {
   id: string
   input: string | null
   itemType: string | null
+  lifecycle: ChatActivityLifecycle | null
   outcome: ChatActivityOutcome | null
   output: string | null
   plan: ChatWorkLogPlan | null
+  requestId: string | null
+  sourceKind: string
   status: string | null
   title: string
   tone: ChatWorkLogTone
+  tool?: ChatActivityTool
   turnId: OrchestrationSessionActivity['turnId']
 }
 
@@ -59,8 +66,11 @@ const WORK_LOG_SCALAR_FIELDS = [
   'id',
   'input',
   'itemType',
+  'lifecycle',
   'outcome',
   'output',
+  'requestId',
+  'sourceKind',
   'status',
   'title',
   'tone',
@@ -105,17 +115,16 @@ export function chatWorkLogEntries({
   )
 }
 
-/** The plan the working row narrates: this turn's, falling back to the session's most recent. */
+/** A new turn must not narrate unfinished steps from an earlier response. */
 export function chatActiveWorkLogPlan(
   entries: readonly ChatWorkLogEntry[],
   latestTurnId: OrchestrationLatestTurn['turnId'] | null | undefined,
 ) {
-  const planEntries = entries.filter((entry) => entry.plan !== null)
-  const turnPlan = latestTurnId
-    ? planEntries.findLast((entry) => entry.turnId === latestTurnId)
-    : undefined
+  if (!latestTurnId) return null
 
-  return (turnPlan ?? planEntries.at(-1))?.plan ?? null
+  return (
+    entries.findLast((entry) => entry.turnId === latestTurnId && entry.plan !== null)?.plan ?? null
+  )
 }
 
 /**
@@ -129,6 +138,7 @@ export function chatWorkLogEntryEquals(left: ChatWorkLogEntry, right: ChatWorkLo
   const scalarsMatch = WORK_LOG_SCALAR_FIELDS.every((field) => left[field] === right[field])
   if (!scalarsMatch) return false
   if (!stringListsEqual(left.changedFiles, right.changedFiles)) return false
+  if (left.tool?.kind !== right.tool?.kind || left.tool?.target !== right.tool?.target) return false
 
   return chatWorkLogPlanEquals(left.plan, right.plan)
 }
@@ -156,11 +166,23 @@ function stringListsEqual(left: readonly string[], right: readonly string[]) {
 function isActivityForWorkLog(activity: OrchestrationSessionActivity) {
   if (!isVisibleChatActivity(activity)) return false
   if (isPlanBoundaryToolActivity(activity)) return false
+  if (isGenericReasoningActivity(activity)) return false
   // A start with no tool-call id cannot fold into its completion, so it would
   // duplicate the row it belongs to.
   if (activity.kind === 'tool.started') return chatActivityToolCallId(activity) !== null
 
   return true
+}
+
+function isGenericReasoningActivity(activity: OrchestrationSessionActivity) {
+  if (activity.kind !== 'task.progress') return false
+  if (chatActivityReasoningDelta(activity) !== null) return false
+  const summary = stringPayloadValue(activity.payload, 'summary')
+  const detail = stringPayloadValue(activity.payload, 'detail')
+
+  return [summary, detail, activity.summary].every(
+    (text) => !text || /^(?:Thinking|Reasoning update|task\.progress)$/i.test(text.trim()),
+  )
 }
 
 function isPlanBoundaryToolActivity(activity: OrchestrationSessionActivity) {
@@ -252,9 +274,12 @@ function planWorkLogEntry(
     id: `turn-plan:${key}`,
     input: null,
     itemType: null,
+    lifecycle: null,
     outcome: null,
     output: null,
     plan,
+    requestId: null,
+    sourceKind: activity.kind,
     status: null,
     title: activity.summary || 'Plan updated',
     toolCallKey: null,
@@ -277,15 +302,18 @@ function derivedWorkLogEntry(activity: OrchestrationSessionActivity): DerivedCha
     id: activity.id,
     input: presentation.input,
     itemType: stringPayloadValue(activity.payload, 'itemType'),
+    lifecycle: presentation.lifecycle,
     outcome: presentation.outcome,
     output: presentation.output,
     plan: null,
+    requestId: stringPayloadValue(activity.payload, 'requestId'),
+    sourceKind: activity.kind,
     status: presentation.status,
     title: presentation.title,
     toolCallKey: workLogIdentity(activity, presentation.toolCallId),
-    reasoningDelta:
-      stringPayloadValue(activity.payload, 'streamKind')?.startsWith('reasoning') ?? false,
+    reasoningDelta: chatActivityReasoningDelta(activity) !== null,
     tone: workLogTone(activity),
+    ...(presentation.tool ? { tool: presentation.tool } : {}),
     turnId: activity.turnId,
   }
 
@@ -377,6 +405,7 @@ function mergeWorkLogEntries(
   previous: DerivedChatWorkLogEntry,
   next: DerivedChatWorkLogEntry,
 ): DerivedChatWorkLogEntry {
+  const lifecycle = mergedLifecycle(previous.lifecycle, next.lifecycle)
   return {
     ...previous,
     ...next,
@@ -387,21 +416,47 @@ function mergeWorkLogEntries(
     id: previous.id,
     input: next.input ?? previous.input,
     itemType: next.itemType ?? previous.itemType,
-    outcome: mergedOutcome(previous.outcome, next.outcome),
+    lifecycle,
+    outcome: mergedOutcome(previous.outcome, next.outcome, lifecycle),
     output: next.output ?? previous.output,
-    status: next.status ?? previous.status,
-    title:
-      previous.reasoningDelta && next.reasoningDelta
-        ? previous.title + next.title
-        : next.title || previous.title,
+    status: lifecycleStatus(lifecycle) ?? next.status ?? previous.status,
+    title: mergedTitle(previous, next),
+    tool: next.tool ?? previous.tool,
   }
+}
+
+function mergedTitle(previous: DerivedChatWorkLogEntry, next: DerivedChatWorkLogEntry) {
+  if (!previous.reasoningDelta || !next.reasoningDelta) return next.title || previous.title
+
+  return previous.title + next.title
+}
+
+function mergedLifecycle(
+  previous: ChatActivityLifecycle | null,
+  next: ChatActivityLifecycle | null,
+) {
+  if (previous === 'failed' || next === 'failed') return 'failed'
+  if (next && next !== 'running') return next
+  if (previous && previous !== 'running') return previous
+
+  return next ?? previous
+}
+
+function lifecycleStatus(lifecycle: ChatActivityLifecycle | null) {
+  if (!lifecycle) return null
+  if (lifecycle === 'running') return 'In progress'
+
+  return lifecycle.charAt(0).toUpperCase() + lifecycle.slice(1)
 }
 
 function mergedOutcome(
   previous: ChatActivityOutcome | null,
   next: ChatActivityOutcome | null,
+  lifecycle: ChatActivityLifecycle | null,
 ): ChatActivityOutcome | null {
   if (previous === 'failed' || next === 'failed') return 'failed'
+  if (previous === null && next === null) return null
+  if (lifecycle === 'completed') return 'succeeded'
 
   return next ?? previous
 }

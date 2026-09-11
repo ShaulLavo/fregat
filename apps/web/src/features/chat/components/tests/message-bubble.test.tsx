@@ -10,6 +10,7 @@ import {
   ChatTimelineActionsContext,
   type ChatTimelineActions,
 } from '@/features/chat/providers/timeline-actions-context'
+import { createTestApplicationRuntime } from '../../../../../test/factories/application-runtime'
 import { chatMessage } from '../../../../../test/factories/chat'
 import { expect, test } from '../../../../../test/fixtures'
 import { activeServerOrigin, setActiveServerOrigin } from '@/lib/client'
@@ -147,11 +148,12 @@ test('a sent image renders as a thumbnail and opens in a lightbox', async () => 
 test('attachment URLs stay with the transcript query client after an active environment switch', () => {
   const ownerOrigin = activeServerOrigin()
   const queryClient = createTestQueryClient()
+  const application = createTestApplicationRuntime()
   setActiveServerOrigin('http://other-machine.test')
   try {
     const { container } = renderWithProviders(
       <ChatAttachmentThumbnails attachments={[imageAttachment('owned-image', 'owned.png')]} />,
-      { queryClient },
+      { application, queryClient },
     )
     expect(container.querySelector('img')?.getAttribute('src')).toBe(
       `${ownerOrigin}/attachments/owned-image.png`,

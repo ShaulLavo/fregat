@@ -1,3 +1,6 @@
+import type { ChatTimelineItem } from '@/features/chat/utils/timeline-items'
+import { isWorkLogToolEntry } from '@/features/chat/utils/tool-label'
+
 /**
  * Every scroll decision the chat transcript makes, as pure functions over
  * geometry. The component owns the DOM and the virtualizer; it never decides
@@ -158,6 +161,12 @@ export function resolveTimelineAnchorItemId(
   }
 
   return null
+}
+
+export function shouldReleaseTimelineAnchorForActivity(items: readonly ChatTimelineItem[]) {
+  return items.some(
+    (item) => item.type === 'live-activity' && item.activity.activities.some(isWorkLogToolEntry),
+  )
 }
 
 export function timelineAnchoredTurnMetrics({

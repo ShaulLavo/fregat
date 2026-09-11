@@ -855,7 +855,11 @@ describe('orchestration engine', () => {
       (await interruptEngine.sessionDetailSnapshot('00000000-0000-4000-8000-000000000001')).session
         .activities,
     ).toContainEqual(
-      expect.objectContaining({ kind: 'provider.turn.interrupt.failed', tone: 'error' }),
+      expect.objectContaining({
+        kind: 'provider.turn.interrupt.failed',
+        payload: expect.objectContaining({ commandId: 'cmd-turn-interrupt' }),
+        tone: 'error',
+      }),
     )
     interruptFixture.close()
 

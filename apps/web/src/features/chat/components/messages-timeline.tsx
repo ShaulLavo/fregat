@@ -13,10 +13,9 @@ import type { OptimisticChatMessage } from '../state/chat-optimistic-store'
 import {
   initialTimelineScrollState,
   isTimelineAtContentEnd,
-  isTimelineWithinFollowBand,
   resolveTimelineAnchorItemId,
+  shouldReleaseTimelineAnchorForActivity,
   timelineAnchoredTurnMetrics,
-  timelineContentScrollsUp,
   timelinePrependedScrollTop,
   timelineRemeasureScrollDelta,
   timelineScrollReducer,
@@ -36,14 +35,16 @@ import {
   type TimelineMinimapMark,
 } from '../utils/timeline-minimap'
 import { useSessionEarlierPage } from '../hooks/use-session-earlier-page'
+import {
+  attachTimelineNavigationListeners,
+  readTimelineViewport,
+} from '@/features/chat/state/timeline-navigation'
 import { ChatWelcomeView } from './chat-welcome-view'
 import { TimelineLoadEarlier } from './timeline-load-earlier'
 import { TimelineMinimap } from './timeline-minimap'
 import { TimelineRow } from './timeline-row'
 
 const CHAT_TIMELINE_OVERSCAN = 6
-/** Disclosure toggles mark themselves so their growth is never treated as stream growth. */
-const DISCLOSURE_SELECTOR = '[data-scroll-anchor-ignore]'
 
 type TimelineVirtualizer = Virtualizer<HTMLDivElement, Element>
 
@@ -96,6 +97,8 @@ export function MessagesTimeline({
     paddingStart: TIMELINE_TOP_INSET_PX,
   })
   const virtualItems = virtualizer.getVirtualItems()
+  const contentHeight = virtualizer.getTotalSize()
+  const viewportHeight = virtualizer.scrollRect?.height ?? 0
   const disclosureSettling = disclosureSettleTick !== null
   const earlierPage = useSessionEarlierPage(session.id)
   // Offered only to a reader who has walked back to the oldest row held. Pinned
@@ -158,12 +161,24 @@ export function MessagesTimeline({
       scrollState,
       virtualizer,
     })
-  }, [disclosureSettling, items, scrollElement, scrollState, virtualizer])
+  }, [
+    contentHeight,
+    disclosureSettling,
+    items,
+    scrollElement,
+    scrollState,
+    viewportHeight,
+    virtualizer,
+  ])
 
   useEffect(() => {
     if (!scrollElement) return
 
-    return attachNavigationListeners(scrollElement, dispatch, setDisclosureSettleTick)
+    return attachTimelineNavigationListeners({
+      element: scrollElement,
+      dispatch,
+      suspendForDisclosure: () => setDisclosureSettleTick((current) => (current ?? 0) + 1),
+    })
   }, [scrollElement])
 
   useEffect(() => {
@@ -171,14 +186,22 @@ export function MessagesTimeline({
 
     let second: number | null = null
     const first = requestAnimationFrame(() => {
-      second = requestAnimationFrame(() => setDisclosureSettleTick(null))
+      second = requestAnimationFrame(() => {
+        setDisclosureSettleTick(null)
+        if (!scrollElement) return
+
+        dispatch({
+          atContentEnd: isTimelineAtContentEnd(readTimelineViewport(scrollElement)),
+          type: 'scrolled',
+        })
+      })
     })
 
     return () => {
       cancelAnimationFrame(first)
       if (second !== null) cancelAnimationFrame(second)
     }
-  }, [disclosureSettleTick])
+  }, [disclosureSettleTick, scrollElement])
 
   if (items.length === 0) {
     return <ChatWelcomeView />
@@ -214,9 +237,9 @@ export function MessagesTimeline({
   // own tracked geometry is the cheapest honest read of the viewport: no DOM
   // measurement during render, and the same coordinate space as the rows.
   const minimapViewport: TimelineViewportMetrics = {
-    contentHeight: virtualizer.getTotalSize(),
+    contentHeight,
     scrollTop: virtualizer.scrollOffset ?? 0,
-    viewportHeight: virtualizer.scrollRect?.height ?? 0,
+    viewportHeight,
   }
   const minimapMarks = timelineMinimapMarks({
     contentHeight: minimapViewport.contentHeight,
@@ -228,15 +251,16 @@ export function MessagesTimeline({
     <div className='relative min-h-0 flex-1'>
       <div
         aria-label='Messages'
-        className='app-scrollbar-thin h-full overflow-x-hidden overflow-y-auto px-3 sm:px-5'
+        className='app-scrollbar-thin focus-visible:ring-ring h-full overflow-x-hidden overflow-y-auto overscroll-y-contain px-3 outline-none [scrollbar-gutter:stable] focus-visible:ring-1 focus-visible:ring-inset sm:px-5'
         ref={setScrollElement}
         role='log'
+        tabIndex={0}
         onScroll={handleScroll}
       >
         <div
           className='relative w-full'
           style={{
-            height: virtualizer.getTotalSize(),
+            height: contentHeight,
             // Scroll anchoring is ours: the browser's would fight the
             // compensation we apply when an estimated row is first measured.
             overflowAnchor: 'none',
@@ -292,16 +316,17 @@ export function MessagesTimeline({
       <Button
         aria-label='Scroll to latest message'
         className={cn(
-          'border-border/70 bg-background backdrop-material absolute right-4 bottom-4 size-8 rounded-full shadow-sm transition-opacity hover:bg-muted compact:right-3 compact:bottom-3 compact:size-7',
+          'border-border/70 bg-popover-solid absolute right-4 bottom-4 size-8 rounded-full shadow-sm transition-opacity hover:bg-muted compact:right-3 compact:bottom-3 compact:size-7',
           scrollState.followMode !== 'free-scrolling' && 'pointer-events-none opacity-0',
         )}
         size='icon-sm'
+        tabIndex={scrollState.followMode === 'free-scrolling' ? 0 : -1}
         title='Scroll to latest message'
         type='button'
         variant='outline'
         onClick={() => dispatch({ type: 'jump-to-end' })}
       >
-        <ArrowDownIcon className='size-3.5' />
+        <ArrowDownIcon aria-hidden='true' className='size-3.5' />
       </Button>
     </div>
   )
@@ -364,6 +389,10 @@ function applyTimelineScroll({
   }
   if (disclosureSettling) return
   if (scrollState.followMode === 'anchoring-new-turn') {
+    if (shouldReleaseTimelineAnchorForActivity(items)) {
+      dispatch({ type: 'jump-to-end' })
+      return
+    }
     applyAnchoredTurnScroll({ dispatch, items, scrollElement, scrollState, virtualizer })
     return
   }
@@ -413,92 +442,4 @@ function applyAnchoredTurnScroll({
   virtualizer.scrollToOffset(viewport.scrollTop + metrics.scrollDeltaToRevealEnd, {
     behavior: 'auto',
   })
-}
-
-/**
- * Only a real navigation gesture breaks follow — scroll events cannot tell one
- * from our own programmatic moves, and breaking follow on those would stop the
- * transcript following its own stream.
- */
-function attachNavigationListeners(
-  element: HTMLDivElement,
-  dispatch: Dispatch<TimelineScrollEvent>,
-  suspendForDisclosure: (update: (current: number | null) => number) => void,
-) {
-  const contentScrollsUp = () => timelineContentScrollsUp(readTimelineViewport(element))
-  // The band rather than a strict at-end test: streaming growth flickers the
-  // strict flag false for a frame, and a gesture landing in that window would
-  // break follow with no scroll left to re-arm it.
-  const awayFromEnd = () =>
-    !isTimelineWithinFollowBand(readTimelineViewport(element), TIMELINE_COMPOSER_INSET_PX)
-  const navigate = () => dispatch({ type: 'user-navigated' })
-  const settleDisclosure = () => suspendForDisclosure((current) => (current ?? 0) + 1)
-
-  // Only an upward wheel is navigation intent; wheeling down either does
-  // nothing or moves toward the edge we are already following.
-  const handleWheel = (event: WheelEvent) => {
-    if (event.deltaY >= 0) return
-    if (!contentScrollsUp()) return
-
-    navigate()
-  }
-  // Touch direction is not observable here, so break only once the drag has
-  // actually carried the viewport out of the band.
-  const handleTouchMove = () => {
-    if (!awayFromEnd()) return
-
-    navigate()
-  }
-  const handlePointerDown = (event: PointerEvent) => {
-    if (isDisclosureTarget(event.target)) {
-      settleDisclosure()
-      return
-    }
-    // A scrollbar drag produces no wheel or touch events, and it is the only
-    // pointerdown whose target is the scroll node itself.
-    if (event.target === element) {
-      if (!contentScrollsUp()) return
-
-      navigate()
-      return
-    }
-    // Clicking inside content near the live edge keeps following; selecting
-    // text up in the history must not be yanked away.
-    if (!awayFromEnd()) return
-
-    navigate()
-  }
-  // Keyboard scrolling bypasses wheel and pointer events entirely.
-  const handleKeyDown = (event: KeyboardEvent) => {
-    if (event.key !== 'ArrowUp' && event.key !== 'Home' && event.key !== 'PageUp') return
-    if (!contentScrollsUp()) return
-
-    navigate()
-  }
-
-  element.addEventListener('wheel', handleWheel, { passive: true })
-  element.addEventListener('touchmove', handleTouchMove, { passive: true })
-  element.addEventListener('pointerdown', handlePointerDown, { passive: true })
-  element.addEventListener('keydown', handleKeyDown)
-
-  return () => {
-    element.removeEventListener('wheel', handleWheel)
-    element.removeEventListener('touchmove', handleTouchMove)
-    element.removeEventListener('pointerdown', handlePointerDown)
-    element.removeEventListener('keydown', handleKeyDown)
-  }
-}
-
-function isDisclosureTarget(target: EventTarget | null) {
-  if (!(target instanceof Element)) return false
-
-  return target.closest(DISCLOSURE_SELECTOR) !== null
-}
-
-function readTimelineViewport(element: HTMLDivElement): TimelineViewportMetrics {
-  return {
-    contentHeight: element.scrollHeight,
-    scrollTop: element.scrollTop,
-    viewportHeight: element.clientHeight,
-  }
 }

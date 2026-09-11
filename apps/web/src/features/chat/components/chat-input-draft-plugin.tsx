@@ -18,6 +18,7 @@ export function ChatInputDraftPlugin({
   rootPath,
   sendButtonRef,
   submitting,
+  submissionDisabled,
 }: {
   busy: boolean
   disabled: boolean
@@ -28,6 +29,7 @@ export function ChatInputDraftPlugin({
   rootPath: string
   sendButtonRef: RefObject<HTMLButtonElement | null>
   submitting: boolean
+  submissionDisabled: boolean
 }) {
   const environmentId = useEnvironmentId()
   const [editor] = useLexicalComposerContext()
@@ -39,10 +41,11 @@ export function ChatInputDraftPlugin({
         disabled,
         hasStagedContent,
         submitting,
+        submissionDisabled,
         text,
       })
     },
-    [busy, disabled, hasStagedContent, sendButtonRef, submitting],
+    [busy, disabled, hasStagedContent, sendButtonRef, submitting, submissionDisabled],
   )
 
   useEffect(() => {
@@ -89,16 +92,23 @@ function updateSendButtonDisabled(
     disabled,
     hasStagedContent,
     submitting,
+    submissionDisabled,
     text,
   }: {
     busy: boolean
     disabled: boolean
     hasStagedContent: boolean
     submitting: boolean
+    submissionDisabled: boolean
     text: string
   },
 ) {
   if (!button) return
 
-  button.disabled = busy ? disabled : disabled || submitting || (!hasStagedContent && !text.trim())
+  if (disabled || submitting || submissionDisabled) {
+    button.disabled = true
+    return
+  }
+
+  button.disabled = !busy && !hasStagedContent && !text.trim()
 }

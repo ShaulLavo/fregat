@@ -627,7 +627,10 @@ export class ProviderCommandReactor {
       eventId: runtimeEventId(input.kind),
       runtimeEpoch: input.runtimeEpoch,
       kind: input.kind,
-      payload: providerFailurePayload(input.detail, input.requestId),
+      payload: {
+        ...providerFailurePayload(input.detail, input.requestId),
+        commandId: input.event.commandId,
+      },
       summary: input.summary,
       sessionId: input.event.payload.sessionId,
       tone: 'error',

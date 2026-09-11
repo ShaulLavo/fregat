@@ -170,6 +170,8 @@ test('persistent app chrome changes compactly and leaves content text unchanged'
         />
       </section>
       <ChatInputSubmitButton
+        disabledReason={null}
+        pendingAction={null}
         busy={false}
         disabled={false}
         sendDisabled={false}

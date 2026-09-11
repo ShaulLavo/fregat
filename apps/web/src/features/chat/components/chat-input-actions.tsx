@@ -13,6 +13,7 @@ import { ContextUsageRing } from './context-usage-ring'
 import { ModelOptionsMenu } from './model-options-menu'
 import { ModelPicker } from './model-picker'
 import { PromptStashBadge } from './prompt-stash-badge'
+import type { ComposerPendingAction } from '@/features/chat/utils/composer-state'
 
 /**
  * Below this the control row cannot hold its labels and the send button at once.
@@ -26,11 +27,13 @@ const EMPTY_ACTIVITIES: readonly [] = []
 export function ChatInputActions({
   busy,
   disabled,
+  disabledReason = null,
   draftTarget,
   interactionMode,
   onSelectImageFiles,
   onStop,
   onSubmit,
+  pendingAction = null,
   runtimeMode,
   sendButtonRef,
   sendDisabled,
@@ -38,6 +41,8 @@ export function ChatInputActions({
 }: {
   busy: boolean
   disabled: boolean
+  disabledReason?: string | null
+  pendingAction?: ComposerPendingAction
   draftTarget: ChatInputDraftTarget
   interactionMode: InteractionMode
   onSelectImageFiles: (files: readonly File[]) => void
@@ -96,6 +101,8 @@ export function ChatInputActions({
           <ChatInputSubmitButton
             busy={busy}
             disabled={disabled}
+            disabledReason={disabledReason}
+            pendingAction={pendingAction}
             ref={sendButtonRef}
             sendDisabled={sendDisabled}
             onStop={onStop}

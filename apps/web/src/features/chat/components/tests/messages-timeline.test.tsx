@@ -1,5 +1,5 @@
 import { TEST_ENVIRONMENT_ID as FIXTURE_ENVIRONMENT_ID } from '../../../../../test/factories/chat'
-import { fireEvent, screen } from '@testing-library/react'
+import { fireEvent, screen, waitFor } from '@testing-library/react'
 import {
   messageIdSchema,
   ORCHESTRATION_SESSION_DETAIL_PAGE_SIZE,
@@ -84,6 +84,7 @@ test('the jump-to-latest control stays out of the way while the transcript follo
 
   expect(screen.getByText('First question')).toBeInTheDocument()
   expect(jumpToLatest()).toHaveClass('opacity-0')
+  expect(jumpToLatest()).toHaveAttribute('tabindex', '-1')
 })
 
 test('scrolling up mid-stream stops the transcript following', () => {
@@ -93,6 +94,35 @@ test('scrolling up mid-stream stops the transcript following', () => {
   fireEvent.wheel(transcript(), { deltaY: -140 })
 
   expect(jumpToLatest()).not.toHaveClass('opacity-0')
+  expect(jumpToLatest()).toHaveAttribute('tabindex', '0')
+})
+
+test('keyboard disclosure activation keeps the expanded message in place during new output', async () => {
+  const longMessage = userMessage('u1', 'Keep my reading position.\n'.repeat(20))
+  const { rerender } = renderTimeline([longMessage])
+  scrollHeightOverride = 4000
+  const disclosure = screen.getByRole('button', { name: 'Show full message' })
+  disclosure.focus()
+
+  fireEvent.click(disclosure, { detail: 0 })
+  await waitFor(() => expect(disclosure).toHaveAttribute('aria-expanded', 'true'))
+  const scrollTop = transcript().scrollTop
+  rerender(timelineOf([longMessage, chatMessage({ text: 'The assistant continues responding.' })]))
+
+  expect(jumpToLatest()).not.toHaveClass('opacity-0')
+  expect(transcript().scrollTop).toBe(scrollTop)
+})
+
+test('closing output that reveals the content end resumes following without a scroll event', async () => {
+  renderTimeline([userMessage('u1', 'Keep my reading position.\n'.repeat(20))])
+  scrollHeightOverride = 4000
+  fireEvent.click(screen.getByRole('button', { name: 'Show full message' }))
+  expect(jumpToLatest()).not.toHaveClass('opacity-0')
+  scrollHeightOverride = VIEWPORT_HEIGHT
+
+  fireEvent.click(screen.getByRole('button', { name: 'Show less' }))
+
+  await waitFor(() => expect(jumpToLatest()).toHaveClass('opacity-0'))
 })
 
 test('an upward wheel with nothing above to read keeps following', () => {

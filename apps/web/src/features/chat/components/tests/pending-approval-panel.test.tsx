@@ -42,6 +42,8 @@ test('allowing dispatches the respond command for that request', async () => {
     requestId: REQUEST_ID,
     type: 'session.approval.respond',
   })
+  expect(screen.getByText('Response sent. Waiting for agent…')).toBeVisible()
+  expect(screen.getByRole('button', { name: 'Allow' })).toBeDisabled()
 })
 
 test('each decision sends its own verb', async () => {
@@ -108,6 +110,7 @@ test('the decisions stay disabled while a response is in flight', async () => {
 
   expect(await screen.findByRole('button', { name: 'Allow' })).toBeDisabled()
   expect(screen.getByRole('button', { name: 'Deny' })).toBeDisabled()
+  expect(screen.getByText('Sending response…')).toBeVisible()
 })
 
 test('a failed dispatch re-enables the row so the agent can still be unblocked', async () => {
@@ -116,6 +119,7 @@ test('a failed dispatch re-enables the row so the agent can still be unblocked',
   await userEvent.click(screen.getByRole('button', { name: 'Allow' }))
 
   expect(await screen.findByRole('button', { name: 'Allow' })).toBeEnabled()
+  expect(screen.getByText('Could not send your response. offline')).toBeVisible()
 })
 
 function requestedActivity() {

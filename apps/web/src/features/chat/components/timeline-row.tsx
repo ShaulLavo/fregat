@@ -6,6 +6,8 @@ import { MessageBubble } from './message-bubble'
 import { MessageCompletionDivider } from './message-completion-divider'
 import { ProposedPlanCard } from './proposed-plan-card'
 import { WorkingRow } from './working-row'
+import { LiveActivityRow } from '@/features/chat/components/live-activity-row'
+import { ActivityRow } from '@/features/chat/components/activity-row'
 
 export function TimelineRow({
   checkpointRevertPending = false,
@@ -78,23 +80,34 @@ function timelineRowContent({
         />
         {foldExpanded ? (
           <div className='space-y-3'>
-            {item.items.map((folded) => (
-              <TimelineRow
-                checkpointRevertPending={checkpointRevertPending}
-                item={folded}
-                key={folded.id}
-              />
-            ))}
+            {item.items.map((folded) =>
+              folded.type === 'activity-group' ? (
+                <div key={folded.id}>
+                  {folded.activities.map((activity) => (
+                    <ActivityRow activity={activity} key={activity.id} />
+                  ))}
+                </div>
+              ) : (
+                <TimelineRow
+                  checkpointRevertPending={checkpointRevertPending}
+                  item={folded}
+                  key={folded.id}
+                />
+              ),
+            )}
           </div>
         ) : null}
       </>
     )
   }
-  if (item.type === 'activity-group')
-    return <ActivityGroupRow activities={item.activities} activeTurnId={item.activeTurnId} />
+  if (item.type === 'activity-group') return <ActivityGroupRow activities={item.activities} />
   if (item.type === 'proposed-plan') return <ProposedPlanCard plan={item.plan} />
+  if (item.type === 'live-activity')
+    return <LiveActivityRow activity={item.activity} groupId={item.id} />
+  if (item.type === 'turn-status')
+    return <MessageCompletionDivider completionSummary={item.label} />
 
-  return <WorkingRow latestTurn={item.latestTurn} />
+  return <WorkingRow latestTurn={item.latestTurn} startedAt={item.startedAt} />
 }
 
 function renderAssistantCopyButton(text: string) {

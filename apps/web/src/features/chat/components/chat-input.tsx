@@ -53,6 +53,7 @@ import { ChatInputEditor } from './chat-input-editor'
 import { ChatInputTerminalContextList } from './chat-input-terminal-context-list'
 import { CHAT_INPUT_EDITOR_NODES } from './chat-input-mention-node'
 import { useFocusTarget } from '@/lib/focus/hooks/use-target'
+import type { ComposerPendingAction } from '@/features/chat/utils/composer-state'
 
 export type ChatInputSubmitPayload = {
   attachments: ChatAttachmentUpload[]
@@ -66,8 +67,8 @@ export type ChatInputSubmitPayload = {
 
 export function ChatInput({
   busy,
-  commandStatusLabel,
   disabled,
+  disabledReason = null,
   draftKey,
   error,
   interactionMode,
@@ -76,12 +77,14 @@ export function ChatInput({
   onPersistModelSelection,
   onStop,
   onSubmit,
+  pendingAction = null,
   rootPath,
   runtimeMode,
 }: {
   busy: boolean
-  commandStatusLabel?: string | null
   disabled: boolean
+  disabledReason?: string | null
+  pendingAction?: ComposerPendingAction
   draftKey: string
   error: string | null
   interactionMode: InteractionMode
@@ -146,9 +149,11 @@ export function ChatInput({
   // chip attached is a legitimate turn, so it must not read as an empty draft.
   const hasStagedContent = images.length > 0 || terminalContexts.length > 0
   const composerDisabled = disabled || submitting
-  const sendDisabled = disabled || submitting || (!hasStagedContent && !initialDraft.trim())
-  const statusLabel =
-    attachmentError ?? error ?? (submitting ? 'Sending' : (commandStatusLabel ?? busyLabel(busy)))
+  const submissionDisabled = disabledReason !== null || (!busy && pendingAction !== null)
+  const sendDisabled =
+    composerDisabled || submissionDisabled || (!hasStagedContent && !initialDraft.trim())
+  const visiblePendingAction = submitting ? 'sending' : pendingAction
+  const statusLabel = attachmentError ?? error
   const projectEntries = useProjectEntrySearch({
     enabled: trigger?.kind === 'mention',
     query: trigger?.kind === 'mention' ? trigger.query : '',
@@ -220,7 +225,7 @@ export function ChatInput({
   }, [clearStoredDraft, draftTarget])
 
   const handleSubmit = useCallback(async () => {
-    if (busy || disabled || submitting) return false
+    if (busy || disabled || submitting || submissionDisabled) return false
 
     const editor = editorRef.current
     const text = editor ? readChatInputText(editor).trim() : ''
@@ -258,6 +263,7 @@ export function ChatInput({
     onSubmit,
     runtimeMode,
     submitting,
+    submissionDisabled,
   ])
 
   const handleImageFiles = useCallback(
@@ -429,6 +435,7 @@ export function ChatInput({
                 rootPath={rootPath}
                 sendButtonRef={submitButtonRef}
                 submitting={submitting}
+                submissionDisabled={submissionDisabled}
                 trigger={trigger}
                 onCommandMenuCommit={handleCommandMenuCommit}
                 onCommandMenuMove={handleCommandMenuMove}
@@ -450,7 +457,9 @@ export function ChatInput({
               />
               <ChatInputActions
                 busy={busy}
-                disabled={disabled}
+                disabled={composerDisabled}
+                disabledReason={disabledReason}
+                pendingAction={visiblePendingAction}
                 draftTarget={draftTarget}
                 interactionMode={interactionMode}
                 runtimeMode={runtimeMode}
@@ -474,10 +483,6 @@ export function ChatInput({
       </ChatModelPickerProvider>
     </div>
   )
-}
-
-function busyLabel(busy: boolean) {
-  return busy ? 'Working' : null
 }
 
 /**

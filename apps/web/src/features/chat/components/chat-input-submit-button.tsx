@@ -2,11 +2,20 @@ import { ArrowUpIcon, StopIcon } from '@phosphor-icons/react'
 import { Button } from '@workspace/ui/components/button'
 import { Tooltip, TooltipContent, TooltipTrigger } from '@workspace/ui/components/tooltip'
 import { cn } from '@workspace/ui/lib/utils'
+import { Spinner } from '@workspace/ui/components/spinner'
 import { forwardRef } from 'react'
+import {
+  composerSubmitAction,
+  type ComposerPendingAction,
+} from '@/features/chat/utils/composer-state'
 
 export const ChatInputSubmitButton = forwardRef<HTMLButtonElement, ChatInputSubmitButtonProps>(
-  function ChatInputSubmitButton({ busy, disabled, onStop, onSubmit, sendDisabled }, ref) {
-    const label = busy ? 'Stop current turn' : 'Send message'
+  function ChatInputSubmitButton(
+    { busy, disabled, disabledReason, onStop, onSubmit, pendingAction, sendDisabled },
+    ref,
+  ) {
+    const action = composerSubmitAction({ busy, disabledReason, pendingAction })
+    const { label } = action
 
     async function handleClick() {
       if (busy) {
@@ -30,7 +39,10 @@ export const ChatInputSubmitButton = forwardRef<HTMLButtonElement, ChatInputSubm
                 // so the idle/ready look must key off :disabled, not a React prop.
                 'disabled:bg-muted disabled:text-muted-foreground/50 disabled:opacity-100',
               )}
-              disabled={busy ? disabled : sendDisabled}
+              disabled={
+                action.kind === 'pending' ||
+                (busy ? disabled || disabledReason !== null : sendDisabled)
+              }
               ref={ref}
               size='icon-sm'
               title={label}
@@ -40,11 +52,11 @@ export const ChatInputSubmitButton = forwardRef<HTMLButtonElement, ChatInputSubm
             />
           }
         >
-          {busy ? (
-            <StopIcon className='size-4' weight='fill' />
-          ) : (
-            <ArrowUpIcon className='size-4' />
-          )}
+          {action.kind === 'pending' ? <Spinner aria-hidden='true' className='size-4' /> : null}
+          {action.kind === 'stop' ? (
+            <StopIcon aria-hidden='true' className='size-4' weight='fill' />
+          ) : null}
+          {action.kind === 'send' ? <ArrowUpIcon aria-hidden='true' className='size-4' /> : null}
         </TooltipTrigger>
         <TooltipContent>{label}</TooltipContent>
       </Tooltip>
@@ -55,6 +67,8 @@ export const ChatInputSubmitButton = forwardRef<HTMLButtonElement, ChatInputSubm
 type ChatInputSubmitButtonProps = {
   busy: boolean
   disabled: boolean
+  disabledReason: string | null
+  pendingAction: ComposerPendingAction
   onStop: () => void
   onSubmit: () => Promise<boolean>
   sendDisabled: boolean

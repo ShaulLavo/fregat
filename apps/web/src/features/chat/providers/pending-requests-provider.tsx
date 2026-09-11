@@ -17,46 +17,42 @@ import { dispatchChatCommand } from '@/features/chat/utils/command-dispatch'
 import {
   ChatPendingRequestsContext,
   type ChatPendingRequests,
+  type PendingRequestResponse,
 } from '@/features/chat/providers/pending-requests-context'
 import { selectChatSessionById } from '@workspace/client-core/chat/selectors'
 import { derivePendingApprovals } from '@workspace/client-core/chat/pending-approvals'
 import { derivePendingUserInputs } from '@workspace/client-core/chat/pending-user-input'
 
 type DispatchCommand = ChatTransport['dispatchCommand']
-type RespondingRequestIds = ReadonlySet<ApprovalRequestId>
-type SetResponding = (update: (current: RespondingRequestIds) => RespondingRequestIds) => void
+type RequestResponses = ReadonlyMap<ApprovalRequestId, PendingRequestResponse>
+type SetResponses = (update: (current: RequestResponses) => RequestResponses) => void
 
 const NO_ACTIVITIES: readonly OrchestrationSessionActivity[] = []
-const NONE_RESPONDING: RespondingRequestIds = new Set()
+const NO_RESPONSES: RequestResponses = new Map()
+const IDLE_RESPONSE: PendingRequestResponse = { kind: 'idle' }
 
-/**
- * Owns the session's blocking requests: it derives the open approvals and user
- * input prompts straight from the activity stream, so a request becomes
- * answerable the moment its activity lands, and it turns the two answers into
- * dispatched commands.
- *
- * The dispatch seam arrives as a prop rather than being reached for, which
- * keeps the panels renderable against any `ChatTransport` — including the
- * real in-process one under test.
- */
+/** The activity stream owns open requests; local state tracks their response dispatch. */
 export function ChatPendingRequestsProvider({
   children,
+  disabledReason = null,
   dispatchCommand,
   sessionId,
 }: {
   readonly children: ReactNode
+  readonly disabledReason?: string | null
   readonly dispatchCommand: DispatchCommand
   readonly sessionId: SessionId
 }) {
   const activities = useActiveChatProjection(
     (state) => selectChatSessionById(state, sessionId)?.activities ?? NO_ACTIVITIES,
   )
-  const [responding, setResponding] = useState<RespondingRequestIds>(NONE_RESPONDING)
+  const [responses, setResponses] = useState<RequestResponses>(NO_RESPONSES)
   // Context value identity: these panels sit beside the composer, so a fresh
   // object on every composer render would repaint them for nothing.
   const value = useMemo<ChatPendingRequests>(
     () => ({
-      isResponding: (requestId) => responding.has(requestId),
+      disabledReason,
+      responseState: (requestId) => responses.get(requestId) ?? IDLE_RESPONSE,
       pendingApprovals: derivePendingApprovals(activities),
       pendingUserInputs: derivePendingUserInputs(activities),
       respondToApproval: (requestId, decision) =>
@@ -69,7 +65,7 @@ export function ChatPendingRequestsProvider({
           context: { decision },
           dispatchCommand,
           requestId,
-          setResponding,
+          setResponses,
         }),
       respondToUserInput: (requestId, answers) =>
         dispatchPendingRequestResponse({
@@ -82,10 +78,10 @@ export function ChatPendingRequestsProvider({
           context: { answerCount: Object.keys(answers).length },
           dispatchCommand,
           requestId,
-          setResponding,
+          setResponses,
         }),
     }),
-    [activities, dispatchCommand, responding, sessionId],
+    [activities, disabledReason, dispatchCommand, responses, sessionId],
   )
 
   return <ChatPendingRequestsContext value={value}>{children}</ChatPendingRequestsContext>
@@ -96,40 +92,36 @@ async function dispatchPendingRequestResponse({
   context,
   dispatchCommand,
   requestId,
-  setResponding,
+  setResponses,
 }: {
   command: SessionApprovalRespondCommand | SessionUserInputRespondCommand
   context: Record<string, unknown>
   dispatchCommand: DispatchCommand
   requestId: ApprovalRequestId
-  setResponding: SetResponding
+  setResponses: SetResponses
 }): Promise<boolean> {
-  setResponding((current) => withRequestId(current, requestId))
+  setResponses((current) => withResponse(current, requestId, { kind: 'submitting' }))
   const outcome = await dispatchChatCommand({
     action: 'chat.pending_request.respond.summary',
     command,
     context: { ...context, requestId },
     dispatchCommand,
-    // A dropped command leaves the agent blocked, so the row has to come back
-    // enabled. A success stays disabled until the resolved activity drops it.
-    onFailed: () => setResponding((current) => withoutRequestId(current, requestId)),
   })
+  const response: PendingRequestResponse = outcome.ok
+    ? { kind: 'accepted' }
+    : { kind: 'failed', message: outcome.message }
+  setResponses((current) => withResponse(current, requestId, response))
 
   return outcome.ok
 }
 
-function withRequestId(current: RespondingRequestIds, requestId: ApprovalRequestId) {
-  const next = new Set(current)
-  next.add(requestId)
-
-  return next
-}
-
-function withoutRequestId(current: RespondingRequestIds, requestId: ApprovalRequestId) {
-  if (!current.has(requestId)) return current
-
-  const next = new Set(current)
-  next.delete(requestId)
+function withResponse(
+  current: RequestResponses,
+  requestId: ApprovalRequestId,
+  response: PendingRequestResponse,
+) {
+  const next = new Map(current)
+  next.set(requestId, response)
 
   return next
 }

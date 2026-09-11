@@ -143,7 +143,8 @@ describe('chat activity presentation', () => {
     ).toMatchObject({
       detail: 'unused duplicate detail',
       icon: 'thinking',
-      status: null,
+      lifecycle: 'running',
+      status: 'In progress',
       title: 'Searching for API endpoints',
     })
   })
@@ -176,6 +177,41 @@ describe('chat activity presentation', () => {
       detail: null,
       title: 'Failed to deploy changes',
     })
+  })
+  it.each([
+    ['inProgress', 'running'],
+    ['completed', 'completed'],
+    ['declined', 'declined'],
+    ['stopped', 'stopped'],
+  ])('normalizes nested provider lifecycle status %s', (status, lifecycle) => {
+    expect(
+      chatActivityPresentation(
+        activity('tool.updated', 'tool', {
+          data: { item: { status, command: 'rg gutter' } },
+        }),
+      ),
+    ).toMatchObject({ lifecycle })
+  })
+
+  it('describes structured read and search targets without guessing command intent', () => {
+    expect(
+      chatActivityPresentation(
+        activity('tool.updated', 'tool', {
+          title: 'Read',
+          status: 'inProgress',
+          data: { input: { file_path: 'src/editor.ts' } },
+        }),
+      ),
+    ).toMatchObject({ tool: { kind: 'read', target: 'src/editor.ts' } })
+    expect(
+      chatActivityPresentation(
+        activity('tool.updated', 'tool', {
+          title: 'Grep',
+          status: 'inProgress',
+          data: { input: { pattern: 'gutter' } },
+        }),
+      ),
+    ).toMatchObject({ tool: { kind: 'search', target: 'gutter' } })
   })
 })
 

@@ -19,28 +19,8 @@ const LATEST_TURN: OrchestrationLatestTurn = {
   turnId: v.parse(turnIdSchema, 'turn-1'),
 }
 
-test('the working row names the plan step in progress and how far the plan has come', () => {
-  renderWithProviders(
-    <WorkingRow
-      latestTurn={LATEST_TURN}
-      plan={{
-        completedCount: 2,
-        currentStep: 'Write the test',
-        steps: [
-          { status: 'completed', step: 'Read the code' },
-          { status: 'completed', step: 'Design the fix' },
-          { status: 'inProgress', step: 'Write the test' },
-        ],
-      }}
-    />,
-  )
-
-  expect(screen.getByText('2/3')).toBeInTheDocument()
-  expect(screen.getByText('Write the test')).toBeInTheDocument()
-})
-
 test('the working row stays a bare progress line without a plan', () => {
-  renderWithProviders(<WorkingRow latestTurn={LATEST_TURN} />)
+  renderWithProviders(<WorkingRow latestTurn={LATEST_TURN} startedAt={LATEST_TURN.requestedAt} />)
 
   expect(screen.getByText(/Working for/)).toBeInTheDocument()
   expect(screen.queryByText('2/3')).not.toBeInTheDocument()

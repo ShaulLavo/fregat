@@ -2,6 +2,7 @@ import type { ApprovalRequestId, ProviderApprovalDecision } from '@workspace/con
 import { Button } from '@workspace/ui/components/button'
 
 import { usePendingRequests } from '@/features/chat/hooks/use-pending-requests'
+import { PendingRequestFeedback } from '@/features/chat/components/pending-request-feedback'
 
 /** The four `providerApprovalDecisionSchema` decisions, in product language. */
 const DECISIONS: ReadonlyArray<{
@@ -16,23 +17,27 @@ const DECISIONS: ReadonlyArray<{
 ]
 
 export function PendingApprovalActions({ requestId }: { readonly requestId: ApprovalRequestId }) {
-  const { isResponding, respondToApproval } = usePendingRequests()
-  const responding = isResponding(requestId)
+  const { disabledReason, responseState, respondToApproval } = usePendingRequests()
+  const response = responseState(requestId)
+  const responding = response.kind === 'submitting' || response.kind === 'accepted'
 
   return (
-    <div aria-busy={responding} className='flex flex-wrap items-center justify-end gap-1.5'>
-      {DECISIONS.map((option) => (
-        <Button
-          disabled={responding}
-          key={option.decision}
-          onClick={() => void respondToApproval(requestId, option.decision)}
-          size='sm'
-          type='button'
-          variant={option.variant}
-        >
-          {option.label}
-        </Button>
-      ))}
+    <div aria-busy={responding} className='flex flex-col gap-2'>
+      <PendingRequestFeedback response={response} />
+      <div className='flex flex-wrap items-center justify-end gap-1.5'>
+        {DECISIONS.map((option) => (
+          <Button
+            disabled={responding || disabledReason !== null}
+            key={option.decision}
+            onClick={() => void respondToApproval(requestId, option.decision)}
+            size='sm'
+            type='button'
+            variant={option.variant}
+          >
+            {option.label}
+          </Button>
+        ))}
+      </div>
     </div>
   )
 }
