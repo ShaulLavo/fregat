@@ -225,6 +225,26 @@ async function verifyBrowser(name) {
       false,
     )
     await runCase(browser, name, 'file chat Back Forward', fileChatHistory)
+    await runCase(
+      browser,
+      name,
+      'sidebar utility changes stay outside file chat history',
+      sidebarUtilityHistory,
+    )
+    await runCase(
+      browser,
+      name,
+      'clean open tabs and reordered collection survive Back Forward',
+      cleanTabHistory,
+      false,
+    )
+    await runCase(
+      browser,
+      name,
+      'explicitly closed tabs stay closed until destination revisit',
+      closedTabHistory,
+      false,
+    )
     await runCase(browser, name, 'successive closed editors reopen in order', reopenClosedEditors)
     await runCase(
       browser,
@@ -249,7 +269,12 @@ async function verifyBrowser(name) {
     )
     await runCase(browser, name, 'rapid completed selections', rapidSelections)
     await runCase(browser, name, 'paused and sustained filter replacements', filterHistory)
-    await runCase(browser, name, 'search glob toggle drafts and traversal', searchGlobFilters)
+    await runCase(
+      browser,
+      name,
+      'search glob edits persist across file traversal',
+      searchGlobFilters,
+    )
     await runCase(browser, name, 'delayed file application loses to Back', delayedApplication)
     await runCase(browser, name, 'tab order traversal reload and additive startup', tabOrder)
     await runCase(
@@ -265,7 +290,18 @@ async function verifyBrowser(name) {
       'reached address persists after Back and bare startup',
       reachedPersistence,
     )
-    await runCase(browser, name, 'panels replace and sidebar conversations push', sidebarHistory)
+    await runCase(
+      browser,
+      name,
+      'sidebar conversations stay navigable after utility switches',
+      sidebarHistory,
+    )
+    await runCase(
+      browser,
+      name,
+      'incidental sidebar selection survives file traversal',
+      incidentalSidebarHistory,
+    )
     await runCase(browser, name, 'immediate copy matches current view', copyCurrentView)
     report.cases.push({
       browser: name,
@@ -291,13 +327,16 @@ async function runCase(browser, browserName, name, verify, initialize = true) {
   page.setDefaultTimeout(15_000)
   const entry = { browser: browserName, name, status: 'pending', reached: [], errors: [] }
   page.on('pageerror', (error) => entry.errors.push(error.message))
-  const record = async (label) =>
+  const record = async (label) => {
+    const position = await historyPosition(page)
     entry.reached.push({
       label,
       href: page.url(),
-      historyLength: await page.evaluate(() => history.length),
+      historyLength: position.length,
+      historyIndex: position.index,
       tabs: await visibleTabs(page),
     })
+  }
   try {
     if (initialize) await openInitial(page)
     await verify({ page, context, record, entry })
@@ -551,6 +590,15 @@ async function visibleTabs(page) {
     )
 }
 
+async function historyPosition(page) {
+  const position = await page.evaluate(() => ({
+    length: history.length,
+    index: history.state?.__TSR_index,
+  }))
+  expect(Number.isInteger(position.index)).toBe(true)
+  return position
+}
+
 async function selectFile(page, name) {
   const tab = fileTab(page, name)
   if (await tab.count()) await tab.click()
@@ -571,6 +619,7 @@ async function selectMainChat(page) {
 }
 
 async function fileChatHistory({ page, record }) {
+  const tabs = await visibleTabs(page)
   await record('A')
   await selectFile(page, 'b.ts')
   await record('B')
@@ -578,24 +627,143 @@ async function fileChatHistory({ page, record }) {
   await record('main C')
   await page.goBack()
   await expectFile(page, 'b.ts')
+  expect(await visibleTabs(page)).toEqual(tabs)
   await record('Back B')
   await page.goBack()
   await expectFile(page, 'a.ts')
+  expect(await visibleTabs(page)).toEqual(tabs)
   await record('Back A')
   await page.goForward()
   await expectFile(page, 'b.ts')
+  expect(await visibleTabs(page)).toEqual(tabs)
   await page.goForward()
   await expect(page).toHaveURL(new RegExp(`/chat/t/${fixture.sessionIds[0]}(?:[?#]|$)`))
   await record('Forward C')
 }
 
+async function sidebarUtilityHistory({ page, record }) {
+  const sidebar = page.getByRole('navigation', { name: 'Sidebar tabs', exact: true })
+  const initial = await historyPosition(page)
+  for (const label of ['Git', 'Search', 'Logs', 'Chat', 'Files']) {
+    const tab = sidebar.getByRole('button', { name: label, exact: true })
+    await tab.click()
+    await expect(tab).toHaveAttribute('aria-pressed', 'true')
+    expect(await historyPosition(page)).toEqual(initial)
+  }
+  await palette(page, '> Toggle Files pane', 'Toggle Files pane')
+  await expect(sidebar).toHaveCount(0)
+  expect(await historyPosition(page)).toEqual(initial)
+  await palette(page, '> Toggle Files pane', 'Toggle Files pane')
+  await expect(sidebar).toBeVisible()
+  expect(await historyPosition(page)).toEqual(initial)
+  await record('sidebar selection and visibility leave history untouched')
+
+  await selectFile(page, 'b.ts')
+  const filePosition = await historyPosition(page)
+  await sidebar.getByRole('button', { name: 'Search', exact: true }).click()
+  const search = page.getByRole('searchbox', { name: 'Search workspace' })
+  await search.fill('navigation proof')
+  await expect(page).toHaveURL(/s.q=navigation/)
+  expect(await historyPosition(page)).toEqual(filePosition)
+  const tabs = await visibleTabs(page)
+  await selectMainChat(page)
+  const chatPosition = await historyPosition(page)
+  const sessions = page.getByRole('button', { name: 'Toggle sessions', exact: true })
+  await expect(sessions).toHaveAttribute('aria-pressed', 'true')
+  await sessions.click()
+  await expect(sessions).toHaveAttribute('aria-pressed', 'false')
+  expect(await historyPosition(page)).toEqual(chatPosition)
+
+  for (const name of ['b.ts', 'a.ts']) {
+    await page.goBack()
+    await expectFile(page, name)
+    await expect(sidebar.getByRole('button', { name: 'Search', exact: true })).toHaveAttribute(
+      'aria-pressed',
+      'true',
+    )
+    await expect(search).toHaveValue('navigation proof')
+    expect(await visibleTabs(page)).toEqual(tabs)
+    await record(`Back ${name} preserves the current sidebar and open tabs`)
+  }
+  await page.goForward()
+  await expectFile(page, 'b.ts')
+  await expect(search).toHaveValue('navigation proof')
+  await page.goForward()
+  await expect(page).toHaveURL(new RegExp(`/chat/t/${fixture.sessionIds[0]}(?:[?#]|$)`))
+  await expect(sessions).toHaveAttribute('aria-pressed', 'false')
+  await record('Forward restores the chat without reopening its session rail')
+}
+
+async function cleanTabHistory({ page, record }) {
+  await openInitial(page, '?tabs=@')
+  await selectFile(page, 'b.ts')
+  await selectFile(page, 'c.ts')
+  const beforeReorder = await historyPosition(page)
+  await moveTabBefore(page, 'c.ts', 'a.ts')
+  const tabs = ['c.ts', 'a.ts', 'b.ts']
+  expect(await historyPosition(page)).toEqual(beforeReorder)
+  for (const name of ['b.ts', 'a.ts']) {
+    await page.goBack()
+    await expectFile(page, name)
+    expect(await visibleTabs(page)).toEqual(tabs)
+    await record(`Back ${name} keeps every clean tab in current order`)
+  }
+  for (const name of ['b.ts', 'c.ts']) {
+    await page.goForward()
+    await expectFile(page, name)
+    expect(await visibleTabs(page)).toEqual(tabs)
+  }
+  await selectMainChat(page)
+  await page.goBack()
+  await expectFile(page, 'c.ts')
+  expect(await visibleTabs(page)).toEqual(tabs)
+  await page.goForward()
+  await expect(page).toHaveURL(new RegExp(`/chat/t/${fixture.sessionIds[0]}(?:[?#]|$)`))
+  await page.goBack()
+  await expectFile(page, 'c.ts')
+  expect(await visibleTabs(page)).toEqual(tabs)
+  await record('file and chat traversal keeps the reordered clean tab collection')
+}
+
+async function closedTabHistory({ page, record }) {
+  await openInitial(page, '?tabs=@')
+  await selectFile(page, 'c.ts')
+  await selectFile(page, 'b.ts')
+  await selectFile(page, 'a.ts')
+  const beforeClose = await historyPosition(page)
+  await closeFile(page, 'c.ts')
+  expect(await historyPosition(page)).toEqual(beforeClose)
+  expect(await visibleTabs(page)).toEqual(['a.ts', 'b.ts'])
+  await page.goBack()
+  await expectFile(page, 'b.ts')
+  expect(await visibleTabs(page)).toEqual(['a.ts', 'b.ts'])
+  await record('Back B leaves explicitly closed C closed despite its historical tab list')
+  await page.goBack()
+  await expectFile(page, 'c.ts')
+  expect(await visibleTabs(page)).toEqual(['a.ts', 'b.ts', 'c.ts'])
+  await record('Back explicitly reaching C reopens that destination at the end')
+  await page.goBack()
+  await expectFile(page, 'a.ts')
+  expect(await visibleTabs(page)).toEqual(['a.ts', 'b.ts', 'c.ts'])
+  for (const name of ['c.ts', 'b.ts', 'a.ts']) {
+    await page.goForward()
+    await expectFile(page, name)
+    expect(await visibleTabs(page)).toEqual(['a.ts', 'b.ts', 'c.ts'])
+  }
+  await record('Forward preserves the reopened tab and current order')
+}
+
+async function closeFile(page, name) {
+  const tab = fileTab(page, name)
+  await tab.hover()
+  const title = await tab.getAttribute('title')
+  await tab.getByRole('button', { name: `Close ${title}`, exact: true }).click()
+  await expect(tab).toHaveCount(0)
+}
+
 async function reopenClosedEditors({ page, record }) {
   for (const name of ['c.ts', 'b.ts']) {
-    const tab = fileTab(page, name)
-    await tab.hover()
-    const title = await tab.getAttribute('title')
-    await tab.getByRole('button', { name: `Close ${title}`, exact: true }).click()
-    await expect(tab).toHaveCount(0)
+    await closeFile(page, name)
   }
   await expectFile(page, 'a.ts')
   const initialLength = await page.evaluate(() => history.length)
@@ -638,6 +806,35 @@ async function revealChatEditor({ page, record }) {
   await expect(fileTab(page, 'b.ts')).toHaveAttribute('aria-selected', 'true')
   expect(await page.evaluate(() => history.length)).toBe(initialLength + 1)
   await record('opening the same B destination reveals the editor without another history entry')
+
+  await palette(page, `sess ${fixture.sidebarTitle}`, fixture.sidebarTitle)
+  await expect(page).toHaveURL(new RegExp(`/chat/t/${fixture.sessionIds[1]}(?:[?#]|$)`))
+  const toolTabs = page.getByRole('navigation', { name: 'Tool tabs', exact: true })
+  const logsTool = toolTabs.getByRole('button', { name: 'Logs', exact: true })
+  const beforeLogs = await historyPosition(page)
+  await logsTool.click()
+  await expect(logsTool).toHaveAttribute('aria-pressed', 'true')
+  expect(await historyPosition(page)).toEqual(beforeLogs)
+  await page.goBack()
+  await expect(editorTool).toHaveAttribute('aria-pressed', 'true')
+  await expect(fileTab(page, 'b.ts')).toHaveAttribute('aria-selected', 'true')
+  expect(await visibleTabs(page)).toEqual(['a.ts', 'b.ts', 'c.ts'])
+  await record('Back to an explicit file visit reveals its editor after selecting Logs')
+  await logsTool.click()
+  await expect(logsTool).toHaveAttribute('aria-pressed', 'true')
+  await page.goBack()
+  await expect(page).toHaveURL(new RegExp(`/chat/t/${fixture.sessionIds[0]}(?:[?#]|$)`))
+  await expect(logsTool).toHaveAttribute('aria-pressed', 'true')
+  await record('Back to a main conversation keeps Logs instead of replaying an incidental editor')
+  await page.goForward()
+  await expect(editorTool).toHaveAttribute('aria-pressed', 'true')
+  await expect(fileTab(page, 'b.ts')).toHaveAttribute('aria-selected', 'true')
+  await logsTool.click()
+  await expect(logsTool).toHaveAttribute('aria-pressed', 'true')
+  await page.goForward()
+  await expect(page).toHaveURL(new RegExp(`/chat/t/${fixture.sessionIds[1]}(?:[?#]|$)`))
+  await expect(logsTool).toHaveAttribute('aria-pressed', 'true')
+  await record('Forward distinguishes explicit file destinations from incidental editor snapshots')
 }
 
 async function archivedSelection({ page, record }) {
@@ -681,16 +878,17 @@ async function rapidSelections({ page, record, entry }) {
 
 async function filterHistory({ page, record }) {
   await selectFile(page, 'b.ts')
-  const initialLength = await page.evaluate(() => history.length)
+  const initial = await historyPosition(page)
   await page.getByRole('button', { name: 'Search', exact: true }).click()
   const search = page.getByRole('searchbox', { name: 'Search workspace' })
   await search.pressSequentially('hello', { delay: 180 })
   await expect(search).toHaveValue('hello')
   await expect(page).toHaveURL(/s.q=hello/)
-  expect(await page.evaluate(() => history.length)).toBe(initialLength)
+  expect(await historyPosition(page)).toEqual(initial)
   await page.goBack()
   await expectFile(page, 'a.ts')
-  await record('Back skips search prefixes')
+  await expect(search).toHaveValue('hello')
+  await record('Back skips search prefixes and preserves the current query')
   await page.goForward()
   await expectFile(page, 'b.ts')
   await page.getByRole('button', { name: 'Logs', exact: true }).click()
@@ -701,10 +899,11 @@ async function filterHistory({ page, record }) {
   await logs.pressSequentially('x'.repeat(140), { delay: 5 })
   await expect(logs).toHaveValue('x'.repeat(140))
   await expect.poll(() => new URL(page.url()).searchParams.get('log.find')).toBe('x'.repeat(140))
-  expect(await page.evaluate(() => history.length)).toBe(initialLength)
+  expect(await historyPosition(page)).toEqual(initial)
   await page.goBack()
   await expectFile(page, 'a.ts')
-  await record('Back skips log prefixes')
+  await expect(logs).toHaveValue('x'.repeat(140))
+  await record('Back skips log prefixes and preserves the current log filter')
 }
 
 async function searchGlobFilters({ page, record }) {
@@ -717,7 +916,7 @@ async function searchGlobFilters({ page, record }) {
   const include = page.getByRole('textbox', { name: 'Files to include', exact: true })
   const exclude = page.getByRole('textbox', { name: 'Files to exclude', exact: true })
   await expect(resultB).toBeVisible()
-  const initialLength = await page.evaluate(() => history.length)
+  const initial = await historyPosition(page)
   await toggle.click()
   await expect(toggle).toHaveAttribute('aria-pressed', 'true')
   await expect(include).toBeVisible()
@@ -732,7 +931,7 @@ async function searchGlobFilters({ page, record }) {
   await expect.poll(() => new URL(page.url()).searchParams.get('s.x')).toBe('b.ts')
   await expect(resultB).toHaveCount(0)
   await expect(resultA).toBeVisible()
-  expect(await page.evaluate(() => history.length)).toBe(initialLength)
+  expect(await historyPosition(page)).toEqual(initial)
   await record('A filtered to TypeScript excluding B')
 
   await selectFile(page, 'b.ts')
@@ -742,7 +941,10 @@ async function searchGlobFilters({ page, record }) {
   await expect.poll(() => new URL(page.url()).searchParams.get('s.in')).toBeNull()
   await expect.poll(() => new URL(page.url()).searchParams.get('s.x')).toBeNull()
   await expect(resultB).toBeVisible()
-  expect(await page.evaluate(() => history.length)).toBe(initialLength + 1)
+  expect(await historyPosition(page)).toEqual({
+    index: initial.index + 1,
+    length: initial.length + 1,
+  })
   await record('hiding B filters replaces and search includes B')
 
   await selectFile(page, 'c.ts')
@@ -755,21 +957,23 @@ async function searchGlobFilters({ page, record }) {
   await record('Back B keeps hidden filters disabled')
   await page.goBack()
   await expectFile(page, 'a.ts')
-  await expect(toggle).toHaveAttribute('aria-pressed', 'true')
-  await expect(include).toHaveValue('*.ts')
-  await expect(exclude).toHaveValue('b.ts')
-  await expect(resultB).toHaveCount(0)
-  await record('Back A restores explicitly addressed globs')
+  await expect(toggle).toHaveAttribute('aria-pressed', 'false')
+  await expect(include).toHaveCount(0)
+  await expect.poll(() => new URL(page.url()).searchParams.get('s.in')).toBeNull()
+  await expect(resultB).toBeVisible()
+  await record('Back A preserves the current hidden filters instead of restoring old globs')
 
   await page.goForward()
   await expectFile(page, 'b.ts')
   await expect(toggle).toHaveAttribute('aria-pressed', 'false')
+  const beforeReopen = await historyPosition(page)
   await toggle.click()
   await expect(include).toHaveValue('*.ts')
   await expect(exclude).toHaveValue('b.ts')
   await expect.poll(() => new URL(page.url()).searchParams.get('s.in')).toBe('*.ts')
   await expect.poll(() => new URL(page.url()).searchParams.get('s.x')).toBe('b.ts')
   await expect(resultB).toHaveCount(0)
+  expect(await historyPosition(page)).toEqual(beforeReopen)
   await record('reopening B restores local glob drafts')
 }
 
@@ -815,16 +1019,7 @@ async function delayedApplication({ page, record }) {
 }
 
 async function tabOrder({ page, record }) {
-  const source = await fileTab(page, 'c.ts').boundingBox()
-  const target = await fileTab(page, 'a.ts').boundingBox()
-  if (!source || !target) throw createBenchmarkError('Tab drag targets are not visible')
-  await page.mouse.move(source.x + source.width / 2, source.y + source.height / 2)
-  await page.mouse.down()
-  await page.mouse.move(target.x + 8, target.y + target.height / 2, { steps: 12 })
-  await page.mouse.up()
-  await expect.poll(() => visibleTabs(page)).toEqual(['c.ts', 'a.ts', 'b.ts'])
-  // dnd-kit suppresses clicks for 50ms after releasing a pointer drag.
-  await page.waitForTimeout(60)
+  await moveTabBefore(page, 'c.ts', 'a.ts')
   await selectFile(page, 'b.ts')
   await page.goBack()
   await expectFile(page, 'a.ts')
@@ -836,6 +1031,19 @@ async function tabOrder({ page, record }) {
   await expectFile(page, 'a.ts')
   await expect.poll(() => visibleTabs(page)).toEqual(['c.ts', 'a.ts', 'b.ts'])
   await record('additive boot retains cached order')
+}
+
+async function moveTabBefore(page, name, before) {
+  const source = await fileTab(page, name).boundingBox()
+  const target = await fileTab(page, before).boundingBox()
+  if (!source || !target) throw createBenchmarkError('Tab drag targets are not visible')
+  await page.mouse.move(source.x + source.width / 2, source.y + source.height / 2)
+  await page.mouse.down()
+  await page.mouse.move(target.x + 8, target.y + target.height / 2, { steps: 12 })
+  await page.mouse.up()
+  await expect.poll(() => visibleTabs(page)).toEqual(['c.ts', 'a.ts', 'b.ts'])
+  // dnd-kit suppresses clicks for 50ms after releasing a pointer drag.
+  await page.waitForTimeout(60)
 }
 
 async function dirtyTabs({ page, record, entry }) {
@@ -882,27 +1090,95 @@ async function sidebarHistory({ page, record }) {
   await selectMainChat(page)
   await page.getByRole('button', { name: 'Workbench mode', exact: true }).click()
   await expectFile(page, 'b.ts')
-  const initialLength = await page.evaluate(() => history.length)
+  const initial = await historyPosition(page)
   await page.getByRole('button', { name: 'Chat', exact: true }).click()
-  expect(await page.evaluate(() => history.length)).toBe(initialLength)
-  await page.getByRole('button', { name: 'Conversation history', exact: true }).click()
-  await page.getByRole('menuitem').filter({ hasText: fixture.sidebarTitle }).click()
-  await expect
-    .poll(() => new URL(page.url()).searchParams.get('chat'))
-    .toBe(`t/${fixture.sessionIds[1]}`)
+  expect(await historyPosition(page)).toEqual(initial)
+  await selectSidebarChat(page, fixture.mainTitle, fixture.sessionIds[0])
+  const beforeSwitch = await historyPosition(page)
+  await selectSidebarChat(page, fixture.sidebarTitle, fixture.sessionIds[1])
   await expectFile(page, 'b.ts')
-  expect(await page.evaluate(() => history.length)).toBe(initialLength + 1)
+  expect(await historyPosition(page)).toEqual({
+    index: beforeSwitch.index + 1,
+    length: beforeSwitch.length + 1,
+  })
   await page.goBack()
   await expectFile(page, 'b.ts')
-  await expect.poll(() => new URL(page.url()).searchParams.get('chat')).toBeNull()
+  await expectSidebarChat(page, fixture.mainTitle)
+  await page.goBack()
+  await expectFile(page, 'b.ts')
+  await expectSidebarChat(page, fixture.mainTitle)
+  await record('an earlier file entry without a sidebar chat keeps the current conversation')
   await page.goForward()
-  await expect
-    .poll(() => new URL(page.url()).searchParams.get('chat'))
-    .toBe(`t/${fixture.sessionIds[1]}`)
+  await expectSidebarChat(page, fixture.mainTitle)
+  await page.goForward()
+  await expectSidebarChat(page, fixture.sidebarTitle)
+  const afterSwitch = await historyPosition(page)
+  const sidebar = page.getByRole('navigation', { name: 'Sidebar tabs', exact: true })
+  const files = sidebar.getByRole('button', { name: 'Files', exact: true })
+  await files.click()
+  await expect(files).toHaveAttribute('aria-pressed', 'true')
+  expect(await historyPosition(page)).toEqual(afterSwitch)
+  await page.goBack()
+  await expect.poll(() => historyPosition(page)).toMatchObject({ index: beforeSwitch.index })
+  await expectSidebarChat(page, fixture.mainTitle)
+  await page.goForward()
+  await expect.poll(() => historyPosition(page)).toEqual(afterSwitch)
+  await expectSidebarChat(page, fixture.sidebarTitle)
+  expect(await historyPosition(page)).toEqual(afterSwitch)
+  await record(
+    'Back and Forward reveal explicit sidebar conversations after a Files utility switch',
+  )
   await page.getByRole('button', { name: 'Chat mode', exact: true }).click()
   await expect(page).toHaveURL(new RegExp(`/chat/t/${fixture.sessionIds[0]}(?:[?#]|$)`))
   await expect(page.locator(`[title="${fixture.mainTitle}"][aria-current="true"]`)).toBeVisible()
   await record('sidebar chat is independent of remembered main chat')
+}
+
+async function incidentalSidebarHistory({ page, record }) {
+  const sidebar = page.getByRole('navigation', { name: 'Sidebar tabs', exact: true })
+  await sidebar.getByRole('button', { name: 'Chat', exact: true }).click()
+  await selectSidebarChat(page, fixture.mainTitle, fixture.sessionIds[0])
+  await selectFile(page, 'b.ts')
+  const filePosition = await historyPosition(page)
+  expect(new URL(page.url()).searchParams.get('chat')).toBe(`t/${fixture.sessionIds[0]}`)
+  await selectSidebarChat(page, fixture.sidebarTitle, fixture.sessionIds[1])
+  const afterSwitch = await historyPosition(page)
+  const files = sidebar.getByRole('button', { name: 'Files', exact: true })
+  await files.click()
+  await expect(files).toHaveAttribute('aria-pressed', 'true')
+  expect(await historyPosition(page)).toEqual(afterSwitch)
+  await page.goBack()
+  await expectFile(page, 'b.ts')
+  await expect.poll(() => historyPosition(page)).toMatchObject({ index: filePosition.index })
+  await expect(files).toHaveAttribute('aria-pressed', 'true')
+  await record('Back to a primary file keeps Files despite its incidental sidebar chat snapshot')
+  await sidebar.getByRole('button', { name: 'Chat', exact: true }).click()
+  await expectSidebarChat(page, fixture.sidebarTitle)
+  expect(await historyPosition(page)).toEqual({
+    index: filePosition.index,
+    length: afterSwitch.length,
+  })
+  await record('revealing Chat confirms the current sidebar conversation survived file traversal')
+  await page.goForward()
+  await expectSidebarChat(page, fixture.sidebarTitle)
+  await expect.poll(() => historyPosition(page)).toEqual(afterSwitch)
+  await record('Forward still reaches the explicit sidebar conversation destination')
+}
+
+async function selectSidebarChat(page, title, sessionId) {
+  await page.getByRole('button', { name: 'Conversation history', exact: true }).click()
+  await page.getByRole('menuitem').filter({ hasText: title }).click()
+  await expect.poll(() => new URL(page.url()).searchParams.get('chat')).toBe(`t/${sessionId}`)
+  await expectSidebarChat(page, title)
+}
+
+async function expectSidebarChat(page, title) {
+  const sidebar = page.getByRole('navigation', { name: 'Sidebar tabs', exact: true })
+  await expect(sidebar.getByRole('button', { name: 'Chat', exact: true })).toHaveAttribute(
+    'aria-pressed',
+    'true',
+  )
+  await expect(sidebar.locator('..').getByText(title, { exact: true })).toBeVisible()
 }
 
 async function copyCurrentView({ page, context, entry }) {

@@ -19,6 +19,10 @@ import {
   type AddressIntent,
 } from '@/features/address/utils/intent'
 import {
+  addressForHistoryTraversal,
+  type NavigationHistoryTarget,
+} from '@/features/address/utils/history'
+import {
   buildAddressLocation,
   navigateAddress,
   hasAvailableRoute,
@@ -81,6 +85,7 @@ export type NavigationPreparation = {
 type Destination = {
   readonly address: Address
   readonly replace: boolean
+  readonly historyTarget?: NavigationHistoryTarget | null
   readonly preserveTransient?: boolean
   readonly beforeApply?: () => void
 }
@@ -153,7 +158,7 @@ export function createNavigationCoordinator(router: ApplicationRouter, initial: 
 
   function reachedIntent(op: Operation) {
     if (op.complete)
-      return intentForAddress(payloadAddress(op.complete), {
+      return intentForAddress(reachedAddress(op, payloadAddress(op.complete)), {
         complete: op.complete.kind === 'command',
       })
     if (op.reason === 'boot')
@@ -161,9 +166,19 @@ export function createNavigationCoordinator(router: ApplicationRouter, initial: 
         initial,
         addressEnvironments(useEnvironmentsStore.getState().entries),
       )
-    return parseAddressIntent(
+    const incoming = parseAddressIntent(
       addressHrefFromBrowser(router.history.location.href),
       addressEnvironments(useEnvironmentsStore.getState().entries),
+    )
+    return intentForAddress(reachedAddress(op, incoming.address))
+  }
+
+  function reachedAddress(op: Operation, address: Address) {
+    if (op.reason !== 'traverse') return address
+
+    return addressForHistoryTraversal(
+      address,
+      router.history.location.state.platformNavigationTarget,
     )
   }
 
@@ -263,7 +278,10 @@ export function createNavigationCoordinator(router: ApplicationRouter, initial: 
     op.href = buildAddressLocation(router, wire).publicHref
     op.historyIdentity = null
     op.writing = true
-    await navigateAddress(router, wire, { replace: destination.replace })
+    await navigateAddress(router, wire, {
+      replace: destination.replace,
+      historyTarget: destination.historyTarget,
+    })
     if (!isCurrent(op)) return
     await apply(op)
   }

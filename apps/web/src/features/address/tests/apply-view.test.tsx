@@ -14,7 +14,7 @@ import { useSessionSelectionStore } from '@/features/chat-mode/state/session-sel
 import { useSessionDiffScopeStore } from '@/features/chat/state/session-diff-scope-store'
 import { scopedSessionKey } from '@workspace/contracts'
 
-test('boot adds tabs while traversal orders addressed tabs and retains dirty and outside-root extras', async ({
+test('boot adds tabs while explicit navigation orders addressed tabs and retains dirty and outside-root extras', async ({
   client,
   server,
 }) => {
@@ -22,7 +22,7 @@ test('boot adds tabs while traversal orders addressed tabs and retains dirty and
   const workspace = await registerTestWorkspaceAddress(client, 'repo')
   const { application, editor, commands } = await createAddressTestRuntime(client)
   const href = `/~${workspaceToken(workspace)}/workbench`
-  const apply = (suffix: string, reason: 'boot' | 'traverse') =>
+  const apply = (suffix: string, reason: 'boot' | 'navigate') =>
     applyAddressView({
       application,
       address: parseAddressIntent(href + suffix),
@@ -50,7 +50,7 @@ test('boot adds tabs while traversal orders addressed tabs and retains dirty and
     'repo/dirty.ts',
     'outside.ts',
   ])
-  await apply('/f/b.ts?tabs=f/c.ts~@~f/a.ts', 'traverse')
+  await apply('/f/b.ts?tabs=f/c.ts~@~f/a.ts', 'navigate')
   expect(editor.workspaceStore.getState().openFilePaths).toEqual([
     'repo/c.ts',
     'repo/b.ts',
@@ -58,13 +58,13 @@ test('boot adds tabs while traversal orders addressed tabs and retains dirty and
     'repo/dirty.ts',
     'outside.ts',
   ])
-  await apply('?tabs=-', 'traverse')
+  await apply('?tabs=-', 'navigate')
   expect(editor.workspaceStore.getState().openFilePaths).toEqual(['repo/dirty.ts', 'outside.ts'])
   expect(editor.workspaceStore.getState().selectedFilePath).toBeNull()
   expect(editor.documentStore.getState().dirtyFilePaths.has('repo/dirty.ts')).toBe(true)
 })
 
-test('traversal resets omitted panels, rail, sidebar selection, search flags and focus', async ({
+test('traversal preserves utility panels and filters while restoring document focus', async ({
   client,
   server,
 }) => {
@@ -102,17 +102,17 @@ test('traversal resets omitted panels, rail, sidebar selection, search flags and
     isCurrent: () => true,
   })
   expect(editor.workspaceStore.getState().workbenchPanels).toMatchObject({
-    activeSidebarTab: 'files',
-    activeBottomTab: 'terminal',
+    activeSidebarTab: 'git',
+    activeBottomTab: 'problems',
   })
-  expect(editor.workspaceStore.getState().chatModePanels.activeToolTab).toBe('git')
-  expect(useSessionRailStore.getState().view).toBe('active')
+  expect(editor.workspaceStore.getState().chatModePanels.activeToolTab).toBe('logs')
+  expect(useSessionRailStore.getState().view).toBe('archived')
   expect(useSidebarSelectionStore.getState().selection).toEqual({ kind: 'auto' })
   expect(editor.searchBufferStore.getState().active).toMatchObject({
-    query: '',
+    query: 'hello',
     matchMode: 'literal',
     includeGlobText: 'src',
-    filtersVisible: false,
+    filtersVisible: true,
   })
   expect(editor.uiStore.getState().definitionTarget).toBeNull()
   const state = editor.workspaceStore.getState()

@@ -1,4 +1,5 @@
 import { createBrowserHistory, createRouter, type RouterHistory } from '@tanstack/react-router'
+import type { NavigationHistoryTarget } from '@/features/address/utils/history'
 import {
   parseRouteSearch,
   stringifyRouteSearch,
@@ -47,6 +48,10 @@ export function createApplicationRouter({
 export type ApplicationRouter = ReturnType<typeof createApplicationRouter>
 
 declare module '@tanstack/react-router' {
+  interface HistoryState {
+    platformNavigationTarget?: NavigationHistoryTarget | null
+  }
+
   interface Register {
     router: ApplicationRouter
   }

@@ -59,6 +59,8 @@ export function applyAddressEditors(context: EditorApplyContext) {
 
 function applyTabs(context: EditorApplyContext, transient: boolean): string | null {
   const { address, rootPath, commands, reason } = context
+  // History selects a document; it does not restore an older tab collection.
+  if (reason === 'traverse') return null
   if (address.tabs === null) return null
   const tokens = context.complete ? address.tabs : applicableTabs(address.tabs)
   if (!tokens) return 'tab collection exceeds the supported limit'

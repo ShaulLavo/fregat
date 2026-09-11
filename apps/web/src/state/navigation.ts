@@ -1,5 +1,10 @@
 import { createChatNavigation } from '@/state/navigation-chat'
 import { captureMainSession } from '@/state/navigation-capture'
+import {
+  historyTargetAfterSessionRemoval,
+  historyTargetForEditorChange,
+} from '@/features/address/utils/history'
+import { useSidebarSelectionStore } from '@/features/chat/state/sidebar-selection-store'
 import { scopedMainSelection, workspaceAddressFor } from '@/state/navigation-workspace'
 import { fetchDiff, fetchGitFile } from '@/features/git/utils/api'
 import { hasDiffDocumentSnapshot, snapshotDiffDocumentId } from '@/features/git/utils/diff-document'
@@ -185,6 +190,7 @@ export function createNavigation(router: ApplicationRouter, initial: AddressInte
       return {
         address: { ...next, settings: categoryForAddress(settingsCategory, next.settings) },
         replace: replace ?? editorDocumentToken(next) === editorDocumentToken(address),
+        historyTarget: { kind: 'editor' },
         beforeApply: () => revealEditor(application),
       }
     })
@@ -230,7 +236,11 @@ export function createNavigation(router: ApplicationRouter, initial: AddressInte
       const next = same
         ? address
         : await workspaceAddressFor(application, environmentId, workspace, address)
-      return { address: { ...next, environmentId, workspace: workspaceToken(workspace) }, replace }
+      return {
+        address: { ...next, environmentId, workspace: workspaceToken(workspace) },
+        replace,
+        historyTarget: null,
+      }
     })
   }
 
@@ -255,6 +265,7 @@ export function createNavigation(router: ApplicationRouter, initial: AddressInte
         address: { ...next, tabs, side: panels.activeSidebarTab, bottom: panels.activeBottomTab },
         replace:
           next.mode === address.mode && editorDocumentToken(next) === editorDocumentToken(address),
+        historyTarget: historyTargetForEditorChange(address, next),
         preserveTransient: true,
         beforeApply: () => editor.workspaceStore.getState().setWorkbenchPanels(panels),
       }
@@ -276,6 +287,7 @@ export function createNavigation(router: ApplicationRouter, initial: AddressInte
       return {
         address: { ...next, tabs },
         replace: editorDocumentToken(next) === editorDocumentToken(address),
+        historyTarget: historyTargetForEditorChange(address, next),
         preserveTransient: true,
         beforeApply: () => {
           const apply = actions(application)
@@ -424,6 +436,7 @@ export function createNavigation(router: ApplicationRouter, initial: AddressInte
           throw createClientInvariantError('The requested change has no workspace address.')
         return {
           address: next,
+          historyTarget: { kind: 'editor' },
           replace: editorDocumentToken(next) === editorDocumentToken(address),
           beforeApply: () => revealEditor(application),
         }
@@ -470,6 +483,7 @@ export function createNavigation(router: ApplicationRouter, initial: AddressInte
         return {
           address: next,
           replace: false,
+          historyTarget: { kind: 'editor' },
           beforeApply: () => {
             revealEditor(application)
             if (isCurrent())
@@ -611,6 +625,7 @@ export function createNavigation(router: ApplicationRouter, initial: AddressInte
     },
     reconcileSessions({
       environmentId,
+      projectId,
       removedSessionIds,
       successorSessionId,
     }: {
@@ -622,10 +637,17 @@ export function createNavigation(router: ApplicationRouter, initial: AddressInte
       const current = coordinator.currentAddress()
       const owner = coordinator.getApplication()?.getSnapshot()
       const removed = new Set(removedSessionIds.map((id) => `t/${id}`))
+      const historyTarget = historyTargetAfterSessionRemoval({
+        target: router.history.location.state.platformNavigationTarget,
+        removedSessionIds,
+        successorSessionId,
+      })
       if (
         !owner ||
         confirmedEnvironmentId(owner.origin) !== environmentId ||
-        (!removed.has(current.document ?? '') && !removed.has(current.chat ?? ''))
+        (historyTarget === undefined &&
+          !removed.has(current.document ?? '') &&
+          !removed.has(current.chat ?? ''))
       )
         return Promise.resolve({ status: 'superseded' } satisfies NavigationResult)
       return coordinator.request(({ application, address }) => {
@@ -644,6 +666,13 @@ export function createNavigation(router: ApplicationRouter, initial: AddressInte
           },
           replace: true,
           preserveTransient: true,
+          historyTarget,
+          beforeApply: () => {
+            if (historyTarget?.kind !== 'sidebar-chat') return
+            useSidebarSelectionStore
+              .getState()
+              .restoreSelection({ ...historyTarget.chat, environmentId, projectId })
+          },
         }
       })
     },
@@ -667,6 +696,7 @@ export function createNavigation(router: ApplicationRouter, initial: AddressInte
           passthrough: address.passthrough,
         },
         replace: true,
+        historyTarget: null,
       }))
     },
     openEnvironment(environmentId: EnvironmentId) {

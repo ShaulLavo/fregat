@@ -18,6 +18,7 @@ import {
   type EditorReference,
 } from '@/features/address/utils/intent'
 import type { ApplicationRouter } from '@/state/router'
+import type { NavigationHistoryTarget } from '@/features/address/utils/history'
 
 const text = v.pipe(v.string(), v.nonEmpty())
 const optionalText = v.fallback(v.optional(text), undefined)
@@ -204,9 +205,20 @@ export function buildAddressLocation(router: ApplicationRouter, address: Address
 export function navigateAddress(
   router: ApplicationRouter,
   address: Address,
-  { replace = false }: { replace?: boolean } = {},
+  {
+    replace = false,
+    historyTarget,
+  }: { replace?: boolean; historyTarget?: NavigationHistoryTarget | null } = {},
 ) {
-  return router.navigate({ ...addressRouteOptions(address), replace, resetScroll: false })
+  return router.navigate({
+    ...addressRouteOptions(address),
+    replace,
+    resetScroll: false,
+    state:
+      replace && historyTarget === undefined
+        ? true
+        : { platformNavigationTarget: historyTarget ?? null },
+  })
 }
 
 function addressRouteOptions(address: Address) {

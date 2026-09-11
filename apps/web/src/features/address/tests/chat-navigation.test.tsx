@@ -4,6 +4,7 @@ import { worktreeIdSchema } from '@workspace/contracts'
 import * as v from 'valibot'
 import { useSessionSelectionStore } from '@/features/chat-mode/state/session-selection-store'
 import { useSessionRailStore } from '@/features/chat-mode/state/session-rail-store'
+import { useSidebarSelectionStore } from '@/features/chat/state/sidebar-selection-store'
 import {
   selectChatProjectionSlice,
   useChatProjectionStore,
@@ -15,7 +16,102 @@ import {
   DOMAIN_MODEL,
   DOMAIN_SESSION,
 } from '../../../../test/factories/session-domain'
-import { pressBack } from '../../../../test/address'
+import { pressBack, waitForNavigation } from '../../../../test/address'
+
+test('file history in chat mode reveals the editor while main chat history preserves its tools', async () => {
+  const { domain, editor, environmentId, navigation, registration, refresh } =
+    await createChatNavigationFixture()
+  await domain.createSession(registration.worktreeId, DOMAIN_SESSION)
+  writeFileSync(path.join(domain.main, 'other.txt'), 'other file')
+  await refresh()
+  await navigation.openChat({ environmentId, sessionId: DOMAIN_SESSION, surface: 'main' })
+  await navigation.openFile({ owner: editor.workspaceStore, path: 'main/keep.txt' })
+  await navigation.openFile({ owner: editor.workspaceStore, path: 'main/other.txt' })
+  await navigation.setToolPanel('logs')
+  await pressBack(navigation)
+  expect(editor.workspaceStore.getState().selectedFilePath).toBe('main/keep.txt')
+  expect(editor.workspaceStore.getState().chatModePanels).toMatchObject({
+    activeToolTab: 'editor',
+    toolPaneOpen: true,
+  })
+  await navigation.setToolPanel('logs')
+  await pressBack(navigation)
+  expect(useSessionSelectionStore.getState().selection).toMatchObject({ sessionId: DOMAIN_SESSION })
+  expect(editor.workspaceStore.getState().chatModePanels.activeToolTab).toBe('logs')
+})
+
+test('sidebar conversation history reveals its destination after utility changes', async () => {
+  const { domain, editor, environmentId, navigation, registration, refresh } =
+    await createChatNavigationFixture()
+  await domain.createSession(registration.worktreeId, DOMAIN_SESSION)
+  await domain.createSession(registration.worktreeId, AMBIGUOUS_SESSION)
+  await refresh()
+  await navigation.openWorkspace({ environmentId, path: 'main' })
+  await navigation.openFile({ owner: editor.workspaceStore, path: 'main/keep.txt' })
+  const initialIndex = navigation.router.history.location.state.__TSR_index
+  await navigation.openChat({ environmentId, sessionId: DOMAIN_SESSION, surface: 'sidebar' })
+  await navigation.openChat({ environmentId, sessionId: AMBIGUOUS_SESSION, surface: 'sidebar' })
+  expect(navigation.router.history.location.state.__TSR_index).toBe(initialIndex + 2)
+  await navigation.setSidePanel('files')
+  await navigation.setBottomPanel('problems')
+  await navigation.setWorkbenchPanels({
+    ...editor.workspaceStore.getState().workbenchPanels,
+    sidebarOpen: false,
+  })
+  expect(navigation.router.history.location.state.__TSR_index).toBe(initialIndex + 2)
+  await pressBack(navigation)
+  expect(editor.workspaceStore.getState().workbenchPanels).toMatchObject({
+    activeSidebarTab: 'chat',
+    sidebarOpen: true,
+    activeBottomTab: 'problems',
+  })
+  expect(useSidebarSelectionStore.getState().selection).toMatchObject({
+    sessionId: DOMAIN_SESSION,
+  })
+  navigation.forward()
+  await waitForNavigation(navigation)
+  expect(useSidebarSelectionStore.getState().selection).toMatchObject({
+    sessionId: AMBIGUOUS_SESSION,
+  })
+  expect(editor.workspaceStore.getState().workbenchPanels.activeSidebarTab).toBe('chat')
+  await pressBack(navigation)
+  await navigation.setSidePanel('logs')
+  await pressBack(navigation)
+  expect(editor.workspaceStore.getState().selectedFilePath).toBe('main/keep.txt')
+  expect(editor.workspaceStore.getState().workbenchPanels.activeSidebarTab).toBe('logs')
+  expect(useSidebarSelectionStore.getState().selection).toMatchObject({
+    sessionId: DOMAIN_SESSION,
+  })
+})
+
+test('file history ignores incidental sidebar conversations even after they are deleted', async () => {
+  const { domain, editor, environmentId, navigation, registration, refresh } =
+    await createChatNavigationFixture()
+  await domain.createSession(registration.worktreeId, DOMAIN_SESSION)
+  await domain.createSession(registration.worktreeId, AMBIGUOUS_SESSION)
+  writeFileSync(path.join(domain.main, 'other.txt'), 'other file')
+  await refresh()
+  await navigation.openWorkspace({ environmentId, path: 'main' })
+  await navigation.openChat({ environmentId, sessionId: DOMAIN_SESSION, surface: 'sidebar' })
+  await navigation.openFile({ owner: editor.workspaceStore, path: 'main/other.txt' })
+  await navigation.openChat({ environmentId, sessionId: AMBIGUOUS_SESSION, surface: 'sidebar' })
+  await navigation.openFile({ owner: editor.workspaceStore, path: 'main/keep.txt' })
+  await pressBack(navigation)
+  await navigation.setSidePanel('logs')
+  await domain.dispatch({
+    type: 'session.delete',
+    commandId: 'delete-incidental-sidebar-session',
+    sessionId: DOMAIN_SESSION,
+  })
+  await refresh()
+  await pressBack(navigation)
+  expect(navigation.getSnapshot().status).toBe('applied')
+  expect(editor.workspaceStore.getState().selectedFilePath).toBe('main/other.txt')
+  expect(editor.workspaceStore.getState().workbenchPanels.activeSidebarTab).toBe('logs')
+  expect(useSidebarSelectionStore.getState().selection).toMatchObject({
+    sessionId: AMBIGUOUS_SESSION,
+  })
+})
 
 test('starting a draft in another worktree of the same project updates its execution target', async () => {
   const { domain, editor, environmentId, navigation, registration, refresh } =

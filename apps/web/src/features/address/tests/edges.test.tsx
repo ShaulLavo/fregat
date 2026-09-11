@@ -56,7 +56,7 @@ test('going back preserves Forward without another push', async () => {
   writes.restore()
 })
 
-test('walking back out of settings closes it and clears its category', async () => {
+test('walking back out of settings retains its tab and clears its active category', async () => {
   seedWorkspaceCache({ rootPath: ROOT, tabPaths: [`${ROOT}/a.ts`] })
   const { harness, navigation } = await renderAddressHarness({
     initialEntries: [`${BASE}/f/a.ts?tabs=@`],
@@ -66,7 +66,7 @@ test('walking back out of settings closes it and clears its category', async () 
   await navigation.setSettingsCategory('Providers')
   expect(readSettingsCategory()).toBe('Providers')
   await pressBack(navigation)
-  expect(editorTabPaths(harness.workspace)).toEqual([`${ROOT}/a.ts`])
+  expect(editorTabPaths(harness.workspace)).toEqual([`${ROOT}/a.ts`, settingsDocumentId()])
   expect(readSettingsCategory()).toBeNull()
 })
 

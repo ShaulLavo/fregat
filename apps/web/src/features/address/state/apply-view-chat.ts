@@ -102,8 +102,6 @@ export function applyAddressChat(
       draftWorktreeId: null,
     })
   if (prepared?.sidebar) useSidebarSelectionStore.getState().restoreSelection(prepared.sidebar)
-  if (!prepared?.sidebar && reason !== 'boot')
-    useSidebarSelectionStore.getState().restoreSelection({ kind: 'auto' })
   if (main?.kind !== 'session') return
   const scope =
     diffScopeFor(intent.address.diff) ?? (reason !== 'boot' ? DEFAULT_SESSION_DIFF_SCOPE : null)

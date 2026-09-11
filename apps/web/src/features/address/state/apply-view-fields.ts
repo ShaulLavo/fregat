@@ -37,11 +37,22 @@ export function applyAddressFields({
   const state = workspaceStore.getState()
   const mode = address.mode ?? (reason === 'boot' ? null : 'workbench')
   if (mode) state.setUiMode(mode)
+  if (address.settings || reason !== 'boot') applySettingsCategory(address)
+  if (reason === 'traverse') {
+    if (address.mode === 'chat' && address.editor && address.tool === 'editor')
+      state.setChatModePanels(showChatModeToolTab(state.chatModePanels, 'editor'))
+    if (address.chat)
+      state.setWorkbenchPanels({
+        ...state.workbenchPanels,
+        activeSidebarTab: 'chat',
+        sidebarOpen: true,
+      })
+    return
+  }
   applyPanels(address, workspaceStore, reason)
   applyTool(address, workspaceStore, reason)
   if (address.rail || reason !== 'boot')
     useSessionRailStore.getState().setView(address.rail ?? 'active')
-  if (address.settings || reason !== 'boot') applySettingsCategory(address)
   if (rootPath !== null) applySearch(address, rootPath, searchStore, reason)
   applyLogs(address, reason)
 }
@@ -63,7 +74,11 @@ function applyTool(address: Address, store: EditorWorkspaceStoreApi, reason: Add
     address.tool ?? (reason !== 'boot' ? createDefaultChatModePanels().activeToolTab : null)
   if (!isChatModeToolTab(tool)) return
   if (state.chatModePanels.activeToolTab === tool) return
-  state.setChatModePanels(showChatModeToolTab(state.chatModePanels, tool))
+  state.setChatModePanels(
+    address.tool
+      ? showChatModeToolTab(state.chatModePanels, tool)
+      : { ...state.chatModePanels, activeToolTab: tool },
+  )
 }
 
 function applySettingsCategory(address: Address) {
@@ -91,10 +106,7 @@ function applySearch(
     wanted?.excludeGlobText ?? (inherited?.filtersVisible ? inherited.excludeGlobText : '')
   const hasGlobs = Boolean(includeGlobText || excludeGlobText)
   const emptyFiltersOpen =
-    reason !== 'traverse' &&
-    prepared.filtersVisible &&
-    !prepared.includeGlobText &&
-    !prepared.excludeGlobText
+    prepared.filtersVisible && !prepared.includeGlobText && !prepared.excludeGlobText
   state.setSearchOptions(rootPath, {
     caseSensitive: wanted?.caseSensitive ?? inherited?.caseSensitive ?? false,
     excludeGlobText: hasGlobs ? excludeGlobText : prepared.excludeGlobText,

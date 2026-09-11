@@ -7,6 +7,8 @@ The outcome is one web navigation owner, typed destinations and search, useful b
 
 Implementation was requested on 2026-09-11 and uses the existing worktree at `eb926925`. The pre-existing plan/evaluation/index edits are preserved. No branch, commit, push, or PR was created. The startup cutover preserves the existing bootstrap/cache behavior; Plan 085's first-paint work remains separate.
 
+The history contract below incorporates the later user review: Back/Forward visits files and conversations while retaining each workspace's current tabs and utility state. Earlier verification records remain historical evidence.
+
 ## Decisions used by this plan
 
 | Question           | Decision                                                                                                                                                                                                              |
@@ -14,15 +16,17 @@ Implementation was requested on 2026-09-11 and uses the existing worktree at `eb
 | Router scope       | TanStack Router owns all web and HTTP-desktop destinations, search, and browser history. TUI keeps its own navigation, sharing the framework-neutral address contract.                                                |
 | Route declarations | Code-based, registered concrete route families, with explicit local and remote-environment branches.                                                                                                                  |
 | Validation         | Existing Valibot through Standard Schema. Validate route params, search, and hash at input boundaries; preserve branded domain IDs and live ownership checks.                                                         |
-| History            | Immediate pushes for deliberate file/chat/workspace/mode destinations; immediate replacements for text, filters, focus, and panels. No URL debounce in this migration.                                                |
+| History            | Push deliberate file/chat/workspace/mode destinations. Utility edits replace the current URL for copying and startup, but their old values are not replayed by Back/Forward.                                          |
 | Tabs               | Whole-token `@` marks the selected editor in its ordered position. `tabs=-` means explicitly empty; absence means unspecified. Keep singleton `tabs=@`.                                                               |
 | Startup            | Preserve additive URL-over-cache restoration. Capture explicit input before removing defaults.                                                                                                                        |
-| Traversal          | Restore addressed order and defaults, retaining dirty or unaddressable tabs. Never push in response to Back/Forward.                                                                                                  |
-| Sidebar chats      | Include conversation selection in this migration, separate from full chat-mode selection. Use workbench search `chat=t/<sessionId>` or `chat=t/new`, emitted with `side=chat`.                                        |
+| Traversal          | Select or reopen the historical destination. Retain every workspace's current tab collection, order, and dirty buffers. Preserve current utility panels and filters. Never push.                                      |
+| Sidebar chats      | Deliberate conversation visits create history entries marked in browser history state. File entries ignore incidental `chat` snapshots. Shared links retain `chat=t/<sessionId>` or `chat=t/new` with `side=chat`.    |
 | View data          | Selected file/chat, ordered addressable tabs, addressed panels, search/log filters, settings category, and line focus. Runtime content, drafts, jobs, terminals, and layout dimensions stay in their existing owners. |
 | Sharing            | Fix current Copy Workspace Address to copy current state. File/chat/full-view copy menus, portable import, clone offers, and sharing transport are follow-ups.                                                        |
 
-These choices give the executor a complete contract. Marker spelling and sidebar-chat addressing are concrete plan decisions, not claims about behavior already shipped. Panel-only history remains replacement; a later product review can decide whether panels deserve Back steps.
+Utility sidebar, bottom, tool, rail, search, and log state stays with its current owner during traversal. Actual sidebar conversation visits remain independent destinations.
+
+Browser history state also marks explicit editor visits, so a file destination in chat mode reveals its editor. Main-chat visits preserve current utility-pane choices.
 
 ## Pre-migration implementation and defects
 
@@ -79,7 +83,7 @@ text/filter/panel edit → typed Router replacement → apply addressed view fie
 browser Back/Forward → Router subscription → the same application boundary
 ```
 
-Router owns addressable destinations and URL view state. Existing stores own document contents, unsaved buffers, execution, transports, and the applied view needed by existing renderers. Addressable active-selection fields become projections of the accepted route, not independent navigation sources. Unaddressable documents retain the narrow transient-selection behavior specified below. Local input drafts may remain for responsive editing, but traversal resets them from the route. Search execution debouncing is separate from URL replacement.
+Router owns addressable destinations and URL view state. Existing stores own document contents, unsaved buffers, execution, transports, and the applied view needed by existing renderers. Addressable destination selections follow the accepted route. Traversal preserves current utility state and input drafts instead of replaying incidental snapshots. Unaddressable documents retain the narrow transient-selection behavior specified below. Search execution debouncing is separate from URL replacement.
 
 Caller usage should stay small and domain-specific:
 
@@ -184,22 +188,22 @@ Use Valibot directly through Standard Schema, without adding a schema adapter. U
 
 The selected editor supplies the marker target: the workbench path or chat `editor` field. Expand/compress only at the wire boundary. A file called `@` still uses an `f/...` token. Split raw `~` delimiters before decoding; prove percent signs, spaces, Unicode, `@`, `~`, and encoded `/` survive without double encoding. Keep raw document tokens distinct from decoded Router params.
 
-| Input                                                                   | Boot from remembered state                                                                     | Back/Forward                                                                                                                                |
-| ----------------------------------------------------------------------- | ---------------------------------------------------------------------------------------------- | ------------------------------------------------------------------------------------------------------------------------------------------- |
-| Absent tabs                                                             | Leave remembered tabs unspecified by link.                                                     | Leave collection unspecified; selection still applies.                                                                                      |
-| Nonempty valid tabs                                                     | Keep cached order, append missing addressed tabs, apply explicit selection.                    | Addressed tabs in exact URL order, then dirty/unaddressable extras in their existing relative order. Close only clean representable extras. |
-| `tabs=-` with no selected editor                                        | Retain remembered tabs under additive boot.                                                    | Close clean representable tabs; retain protected extras.                                                                                    |
-| Empty list plus selected editor                                         | Reject the contradictory collection, preserve destination, close nothing because of that list. | Same.                                                                                                                                       |
-| Nonempty list missing selected editor                                   | Append selected editor deterministically before validating limits.                             | Same, then use the resulting addressed order.                                                                                               |
-| Duplicate/unresolvable `@`, mixed `-` and tokens, or invalid collection | Reject the collection, preserve independently valid destination.                               | Same; never interpret malformed input as a request to close tabs.                                                                           |
+| Input                                                                   | Boot from remembered state                                                                     | Back/Forward                                                                      |
+| ----------------------------------------------------------------------- | ---------------------------------------------------------------------------------------------- | --------------------------------------------------------------------------------- |
+| Absent tabs                                                             | Leave remembered tabs unspecified by link.                                                     | Keep all current tabs and their order; apply the selected destination.            |
+| Nonempty valid tabs                                                     | Keep cached order, append missing addressed tabs, apply explicit selection.                    | Ignore the historical collection. Reopen only the selected destination if needed. |
+| `tabs=-` with no selected editor                                        | Retain remembered tabs under additive boot.                                                    | Retain all current tabs; clear the addressed editor selection.                    |
+| Empty list plus selected editor                                         | Reject the contradictory collection, preserve destination, close nothing because of that list. | Ignore the collection; apply the independently valid destination.                 |
+| Nonempty list missing selected editor                                   | Append selected editor deterministically before validating limits.                             | Select or append only that editor, preserving current tab order.                  |
+| Duplicate/unresolvable `@`, mixed `-` and tokens, or invalid collection | Reject the collection, preserve independently valid destination.                               | Ignore the collection; apply the independently valid destination.                 |
 
-Normalize empty owned params to absence and omit static defaults, including file-tree side, terminal bottom, Git tool, and active rail. Retain `side=chat`. Resolve log defaults from the effective setting. During boot, explicit defaults such as `side=files` override a cached nondefault before canonical omission. During traversal, absent owned fields reset consistently, including tool/rail/diff, empty filters, and sidebar conversation. Define absent sidebar selection as automatic/default selection, without carrying a stale selected conversation from a later entry.
+Normalize empty owned params to absence and omit static defaults, including file-tree side, terminal bottom, Git tool, and active rail. Retain `side=chat`. Resolve log defaults from the effective setting. Boot and explicit shared links honor their supplied fields; additive boot tab restoration remains unchanged. During traversal, preserve current sidebar, bottom, tool, rail, search, and log state, whether historical fields are present or absent. Explicit tab-close commands still close their requested tabs.
 
-Sidebar selection remains independent of the remembered full chat-mode session. An incoming valid `chat=t/...` implies opening the sidebar chat panel; canonical output emits `side=chat` with it. If explicit `side` selects another panel, that explicit panel wins and the inactive `chat` query is removed. Opening the sidebar alone replaces; selecting a conversation pushes. Validate a sidebar session against the same environment/project, even when it belongs to another worktree, and keep the editor root fixed. Main-chat selection still opens the session's worktree. Keep composer text/draft generation outside this URL-owned selection.
+Sidebar selection remains independent of the remembered full chat-mode session. An incoming valid `chat=t/...` implies opening the sidebar chat panel; canonical output emits `side=chat` with it. If explicit `side` selects another panel, that explicit panel wins and the inactive `chat` query is removed. Opening the sidebar alone replaces; selecting a conversation pushes and marks that destination in browser history state. Back/Forward reopens those deliberate conversation visits. Ordinary file entries ignore incidental sidebar chat fields and preserve the current panel. Validate a sidebar session against the same environment/project while keeping the editor root fixed. Main-chat selection still opens the session's worktree. Keep composer drafts outside this URL-owned selection.
 
 Capture the complete view before budgets. Preserve current limits of 4000 URL characters, 1500 tab-field characters, and 64 tabs. The existing budget fallback drops search, then logs, then the entire tab collection. Never partially trim tabs and interpret the remainder as exact. Budget omission means unspecified, not empty. If the destination itself exceeds a limit, preserve its current fallback policy explicitly and report it in the focused budget tests. Budgeting must not mutate the complete in-memory view or feed omitted fields back as an instruction to erase the user's current filters/tabs during the same navigation. Restoration of a later lossy URL remains bounded by what that URL contains.
 
-Implement that distinction with an operation-scoped command payload containing the complete view and the codec's omission result. Apply it only to its originating accepted destination, including when two different oversized edits serialize to the same href and Router emits no new event. Discard the payload on completion, traversal, supersession, or runtime disposal. Incoming links and browser traversal use decoded intent alone. This payload is neither a durable second view store nor hidden history data. Test successive over-budget queries with the same href, then revisit that URL and apply normal omission rules.
+Implement that distinction with an operation-scoped command payload containing the complete view and the codec's omission result. Apply it only to its originating accepted destination, including when two different oversized edits serialize to the same href and Router emits no new event. Discard the payload on completion, traversal, supersession, or runtime disposal. Incoming links use decoded intent. Traversal also reads the explicit editor or sidebar-conversation target from browser history state; it stores no tab collection or complete view. Test successive over-budget queries with the same href, then traverse without replacing current utility filters.
 
 ### Transient editor selection
 
@@ -211,14 +215,15 @@ This is the explicit exception to route-derived editor selection. Addressable fi
 
 | Operation                                                                   | History result                                                                                                                                                                |
 | --------------------------------------------------------------------------- | ----------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
-| Select/open a different file, full chat, or sidebar conversation            | Push one complete destination immediately.                                                                                                                                    |
+| Select/open a different file, full chat, or sidebar conversation            | Push one destination immediately. Mark explicit editor and sidebar-conversation targets in browser history state.                                                             |
 | Switch workspace, environment, or UI mode                                   | Push one complete destination. Resolve a main-chat session's owner before building the route, with no new-root/old-session entry. Sidebar selection retains the current root. |
 | Close selected tab and choose its successor; reopen closed editor           | Preserve destination behavior: push the successor/reopened destination. Dirty-close confirmation remains owned by existing editor logic.                                      |
-| Close inactive tab, reorder/move tabs, edit text/filter/settings/focus      | Replace. Same-file definition/line changes replace; different-file definitions push.                                                                                          |
-| Switch side/bottom/tool/rail/diff panels                                    | Replace, preserving current panel history semantics.                                                                                                                          |
+| Close inactive tab, reorder/move tabs, edit text/filter/settings/focus      | Replace. Traversal retains current tabs and utility filters. Same-file definition/line changes replace; different-file definitions push.                                      |
+| Switch side/bottom/tool/rail panels                                         | Replace for current-view persistence and sharing. Back/Forward preserves their current values.                                                                                |
+| Change session diff scope                                                   | Replace the current conversation destination's diff scope.                                                                                                                    |
 | Create a real session from its draft                                        | Replace the draft URL with the new session, preserving composer ownership and avoiding a dead draft Back step.                                                                |
 | Archive/delete selected session; rename/delete selected resource externally | Replace with the domain-selected successor, renamed target, or explicit unavailable state. No passive store observer decides navigation.                                      |
-| Startup/default normalization/Back/Forward                                  | Replace only if canonicalization is necessary. Traversal itself never pushes; persist successful reached view even without a write.                                           |
+| Startup/default normalization/Back/Forward                                  | Never push. Persist the reached destination with current tabs and utility state; replace only to synchronize or canonicalize that address.                                    |
 | Select already-current destination                                          | No duplicate history entry; still apply changed over-budget fields or clear a transient editor selection before returning completed status.                                   |
 
 Removing URL debounce leaves no application timer to flush on pagehide. TanStack still owns its microtask write queue; use supported `history.flush()` at startup, completed-destination, and pagehide boundaries as needed by the installed version. Preserve existing search execution scheduling. If replacement frequency later proves expensive, add optional debounce only to replacements, with ownership guards and explicit flush-on-user-navigation/discard-on-traversal tests. Every pause must still replace. Do not retain the current timer as a shortcut.
@@ -265,7 +270,7 @@ Expected: valid routes infer params/search, negative type checks are exercised, 
 ### 2. Cut over startup, application, and every producer together
 
 - Wire the startup/lifecycle design above, with one Router/history instance and one accepted-route application owner.
-- Extract substantive restore logic, preserving dirty-tab and retained-environment protections. Implement reason-aware additive boot, traversal order/defaults, successful-address persistence, and unavailable status.
+- Extract substantive restore logic, preserving dirty buffers and retained environments. Implement additive boot, destination-only traversal, current tab and utility-state retention, successful-address persistence, and unavailable status.
 - Migrate every producer group and its command completion. Route resource-reconciliation changes explicitly with replace. Include both chat surfaces and remove the editor-tool observer. Make Copy Workspace Address build a link from the current complete view and the typed route builder, including current edits, origin/base path, and development-param removal.
 - Delete `features/address/state/projection.ts`, `hooks/use-projection.ts`, `hooks/use-restore.ts`, and `state/root-claim.ts` after their live responsibilities move. Remove their mounts, timers, native writes/listeners, `restoreAddressFromStorage`, and `setSessionProjectOpener`. Retain pure codec/domain helpers that still have consumers.
 - Replace `projection.test.ts` with `navigation.test.tsx` covering real coordinator/store integration. Adapt `edges.test.tsx`, `environment-restore.test.tsx`, `shared-link.test.tsx`, and storage tests to the new owner. Update `apps/web/test/address.tsx` and `test/render.tsx` to mirror the actual provider stack with Router memory history. Do not preserve tests asserting the old bugs.
@@ -286,12 +291,12 @@ Expected: all focused checks pass, including the matrix below. Use `apps/web/tes
 | File/chat/local/remote route apply, stale owner continuation, A → B → A with dirty buffers                                | Wrong-workspace writes, lost retained runtime, application resolved too early.             |
 | Read-only preload, cached loader with changed search, already-current command                                             | Navigation caused by preload, dropped view edit, hanging completion.                       |
 | Rejected required param/loader, retry or unmount during application                                                       | Requests never settling, stale application attached to a replacement runtime.              |
-| Exact traversal order, additive boot, absent/empty/malformed/oversized tabs, protected extras                             | Reordered or closed unsaved work, lossy links treated as exact.                            |
+| Current tab order across Back/Forward, explicit closes, additive boot, absent/empty/malformed/oversized historical tabs   | Clean tabs closed by Back, unrelated closed tabs reopened, lost dirty buffers or order.    |
 | Select retained conflict tab, edit a panel, return to addressed file                                                      | Protected tabs preserved but unusable; transient selection swallowing a no-op navigation.  |
 | Main/sidebar chat steps, cross-worktree sidebar session with fixed editor root, draft promotion, archive/delete successor | Chat surfaces bypassing Router or applying main-chat ownership rules to sidebar selection. |
 | Paused `hello`, rapid deliberate destinations, pending async apply followed by Back                                       | Extra typing entries, missing destinations, stale apply after traversal.                   |
 | Different oversized filters serialize to the same href; later traversal to that href                                      | Lost input/search execution without a route event, budget-induced feedback loop.           |
-| Nondefault panels/filters followed by omitted defaults                                                                    | Later state leaking backward, tool observer undoing restoration.                           |
+| Utility edits followed by Back/Forward; explicit sidebar conversation visits                                              | Replayed incidental panels/filters, sidebar chat snapshots mistaken for destinations.      |
 | A → B → Back A, then bare startup; unavailable destination; copy immediately after selection                              | Stale persistence, invalid last-view cache, copied stale address.                          |
 
 ### 3. Prove the browser stack and remove bypasses
@@ -312,9 +317,9 @@ Expected: script exits 0 and writes the reached URLs, UI assertions, and failure
 2. Repeat with completed selections less than 250 ms apart. No deliberate destination disappears.
 3. Type `hello` with pauses into addressed search and log fields. One Back reaches the previous destination, never a text prefix. Also exercise sustained input on supported browser targets to catch native history-rate limits or dropped final replacements.
 4. Begin a delayed resource application and traverse Back. Late completion cannot reselect the abandoned destination or truncate Forward.
-5. Reorder tabs, navigate, traverse, and reload. Verify traversal order and protected dirty tabs; verify additive boot separately.
+5. Reorder tabs, navigate, and traverse. Verify that all tabs, their order, and dirty buffers remain. Explicitly close tabs, then Back reopens only its destination. Verify additive boot separately.
 6. Back to A, close the isolated page, open bare `/` in the same context. A is restored.
-7. Switch panels without adding a history step; select sidebar conversations with steps. Verify main and sidebar selections stay independent.
+7. Change utility panels and filters, then traverse. Their current state remains. Visit sidebar conversations with history steps; ordinary file entries must not replay incidental sidebar chats.
 8. Copy immediately after a selection/edit and open that URL. Verify the copied destination/view fields and dev-param stripping.
 9. With two existing configured environments, A → B → A retains dirty documents and operation ownership. The focused in-process test is mandatory even if a second live environment is unavailable; record the live case as unverified, not passed.
 
@@ -365,6 +370,8 @@ Resolve routine path/API drift autonomously and update this plan when the eviden
 Audit limits: source tracing and actual-code probes established the current defects. Prior focused projection/storage/edge suites passed; they do not prove actual browser Forward history. No Router prototype has been compiled and no dependency installed during planning. Step 1 proves the supported APIs against the installed version. This document makes no measured bundle-size, startup-speed, or net-line-count claim.
 
 ## Implementation and verification record — 2026-09-11
+
+This record describes verification before the later history-contract revision above. Its tab and utility-state replay descriptions document that earlier implementation.
 
 The installed Router is `@tanstack/react-router@1.170.35`, with `@tanstack/router-core@1.171.29`
 and `@tanstack/history@1.162.3`. The implementation uses its supported

@@ -1,4 +1,5 @@
 import { editorDocumentToken } from '@workspace/client-core/address/grammar'
+import type { ChatReference } from '@workspace/client-core/address/references'
 import {
   selectCurrentWorktree,
   selectSessionOwnership,
@@ -60,7 +61,14 @@ export function createChatNavigation(coordinator: ReturnType<typeof createNaviga
           throw createClientInvariantError(
             'A sidebar conversation must belong to the active environment.',
           )
-        return { address: { ...address, chat: token, side: 'chat' }, replace }
+        const sidebarChat: ChatReference = sessionId
+          ? { kind: 'session', sessionId }
+          : { kind: 'draft' }
+        return {
+          address: { ...address, chat: token, side: 'chat' },
+          replace,
+          historyTarget: { kind: 'sidebar-chat', chat: sidebarChat },
+        }
       }
       const { slice, snapshot } = await chatProjectionForNavigation(
         environmentId,
@@ -103,6 +111,7 @@ export function createChatNavigation(coordinator: ReturnType<typeof createNaviga
           rail: newDraft ? null : next.rail,
         },
         replace,
+        historyTarget: null,
         beforeApply: () =>
           applyPreparedChat({
             snapshot,

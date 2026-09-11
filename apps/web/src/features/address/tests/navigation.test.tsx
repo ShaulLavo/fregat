@@ -45,14 +45,17 @@ test('completed rapid file destinations each retain their own history entry', as
   })
   await pressBack(navigation)
   expect(harness.workspace.getState().selectedFilePath).toBe('repo/b.ts')
+  expect(editorTabPaths(harness.workspace)).toEqual(['repo/a.ts', 'repo/b.ts', 'repo/c.ts'])
   await pressBack(navigation)
   expect(harness.workspace.getState().selectedFilePath).toBe('repo/a.ts')
+  expect(editorTabPaths(harness.workspace)).toEqual(['repo/a.ts', 'repo/b.ts', 'repo/c.ts'])
   navigation.forward()
   await waitForNavigation(navigation)
   expect(harness.workspace.getState().selectedFilePath).toBe('repo/b.ts')
+  expect(editorTabPaths(harness.workspace)).toEqual(['repo/a.ts', 'repo/b.ts', 'repo/c.ts'])
 })
 
-test('paused text edits replace one destination and Back clears omitted filters', async ({
+test('paused text edits replace one destination and Back preserves sidebar filters', async ({
   client,
   server,
 }) => {
@@ -73,8 +76,8 @@ test('paused text edits replace one destination and Back clears omitted filters'
   expect(readLogsFilters().search).toBe('hello')
   await pressBack(navigation)
   expect(harness.workspace.getState().selectedFilePath).toBe('repo/a.ts')
-  expect(application.getSnapshot().editor.searchBufferStore.getState().active?.query).toBe('')
-  expect(readLogsFilters().search).toBe('')
+  expect(application.getSnapshot().editor.searchBufferStore.getState().active?.query).toBe('hello')
+  expect(readLogsFilters().search).toBe('hello')
 })
 
 test('successive oversized queries apply even when their wire href is identical', async ({
@@ -97,10 +100,10 @@ test('successive oversized queries apply even when their wire href is identical'
   expect(navigation.copyAddress().omissions).toContain('search')
   await navigation.openFile({ owner: harness.workspace, path: 'repo/b.ts' })
   await pressBack(navigation)
-  expect(application.getSnapshot().editor.searchBufferStore.getState().active?.query).toBe('')
+  expect(application.getSnapshot().editor.searchBufferStore.getState().active?.query).toBe(second)
 })
 
-test('traversal restores exact order followed by dirty and unaddressable extras', async ({
+test('traversal preserves current tab order including dirty and unaddressable documents', async ({
   client,
   server,
 }) => {
@@ -129,16 +132,16 @@ test('traversal restores exact order followed by dirty and unaddressable extras'
   harness.documents.getState().setLiveEditorDocumentDirty(file.path, true)
   await pressBack(navigation)
   expect(editorTabPaths(harness.workspace)).toEqual([
-    'repo/c.ts',
-    'repo/b.ts',
     'repo/a.ts',
+    'repo/b.ts',
+    'repo/c.ts',
     'repo/dirty.ts',
     conflict,
   ])
   expect(harness.documents.getState().dirtyFilePaths.has('repo/dirty.ts')).toBe(true)
 })
 
-test('absent and malformed collections preserve tabs while explicit empty closes clean tabs', async ({
+test('traversal preserves tabs for absent, malformed and historical empty collections', async ({
   client,
   server,
 }) => {
@@ -155,7 +158,7 @@ test('absent and malformed collections preserve tabs while explicit empty closes
   await pressBack(navigation)
   expect(editorTabPaths(harness.workspace)).toEqual(['repo/a.ts', 'repo/b.ts'])
   await pressBack(navigation)
-  expect(editorTabPaths(harness.workspace)).toEqual([])
+  expect(editorTabPaths(harness.workspace)).toEqual(['repo/a.ts', 'repo/b.ts'])
 })
 
 test('transient conflict selection survives panel edits and a current addressed file resumes route selection', async ({
@@ -183,7 +186,7 @@ test('transient conflict selection survives panel edits and a current addressed 
   expect(editorTabPaths(harness.workspace)).toContain(conflict)
 })
 
-test('returning to defaults resets tool, rail and panels without adding Back entries', async ({
+test('Back and Forward preserve current tools, rail and panels without adding entries', async ({
   client,
   server,
 }) => {
@@ -194,17 +197,26 @@ test('returning to defaults resets tool, rail and panels without adding Back ent
   })
   await waitForNavigation(navigation)
   await navigation.openFile({ owner: harness.workspace, path: 'repo/b.ts' })
+  const historyLength = navigation.router.history.length
+  const historyIndex = navigation.router.history.location.state.__TSR_index
   await navigation.setToolPanel('logs')
   await navigation.setRail('archived')
   await navigation.setSidePanel('search')
   await navigation.setBottomPanel('problems')
+  expect(navigation.router.history.length).toBe(historyLength)
+  expect(navigation.router.history.location.state.__TSR_index).toBe(historyIndex)
   await pressBack(navigation)
   expect(harness.workspace.getState().workbenchPanels).toMatchObject({
-    activeSidebarTab: 'files',
-    activeBottomTab: 'terminal',
+    activeSidebarTab: 'search',
+    activeBottomTab: 'problems',
   })
-  expect(harness.workspace.getState().chatModePanels.activeToolTab).toBe('git')
-  expect(useSessionRailStore.getState().view).toBe('active')
+  expect(harness.workspace.getState().chatModePanels.activeToolTab).toBe('logs')
+  expect(useSessionRailStore.getState().view).toBe('archived')
+  await navigation.setSidePanel('git')
+  navigation.forward()
+  await waitForNavigation(navigation)
+  expect(harness.workspace.getState().selectedFilePath).toBe('repo/b.ts')
+  expect(harness.workspace.getState().workbenchPanels.activeSidebarTab).toBe('git')
 })
 
 test('Back persists the reached address and immediate copying captures current edits', async ({
@@ -217,7 +229,6 @@ test('Back persists the reached address and immediate copying captures current e
     initialEntries: [`${workspace.base}/f/a.ts?decode=diffusion`],
   })
   await waitForNavigation(navigation)
-  const first = navigation.router.history.location.href
   await navigation.openFile({ owner: harness.workspace, path: 'repo/b.ts' })
   await navigation.setSearchQuery('just typed')
   const copied = navigation.copyAddress('https://example.test')
@@ -225,9 +236,12 @@ test('Back persists the reached address and immediate copying captures current e
   expect(copied.href).toContain('s.q=just+typed')
   expect(copied.href).not.toContain('decode=')
   await pressBack(navigation)
-  expect(readAddressCache()).toBe(
-    first.replace('&decode=diffusion', '').replace('?decode=diffusion', ''),
-  )
+  expect(parseAddress(readAddressCache() ?? '')).toMatchObject({
+    document: 'f/a.ts',
+    tabs: ['f/a.ts', 'f/b.ts'],
+    search: { q: 'just typed' },
+  })
+  expect(readAddressCache()).not.toContain('decode=')
   expect(selectInitialAddress('/')).toBe(readAddressCache())
 })
 
@@ -347,7 +361,7 @@ test('reattachment consumes the reached location instead of replaying startup', 
   detach()
 })
 
-test('Back between equal hrefs discards an oversized command payload', async ({
+test('Back between equal hrefs preserves the current oversized search query', async ({
   client,
   server,
 }) => {
@@ -359,7 +373,9 @@ test('Back between equal hrefs discards an oversized command payload', async ({
   await navigation.setSearchQuery('x'.repeat(8000))
   expect(navigation.router.history.location.href).toBe(href)
   await pressBack(navigation)
-  expect(application.getSnapshot().editor.searchBufferStore.getState().active?.query).toBe('')
+  expect(application.getSnapshot().editor.searchBufferStore.getState().active?.query).toBe(
+    'x'.repeat(8000),
+  )
 })
 
 test('effect cleanup before initial application preserves additive boot on reattachment', async ({
