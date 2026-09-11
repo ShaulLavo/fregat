@@ -48,6 +48,9 @@ jobs:
       - name: Typecheck
         run: bun run typecheck
 
+      - name: Check generated artifacts
+        run: bun run generated:check
+
       # Runs the scripts suite plus every workspace's own. The `test` scripts in
       # `apps/web` and `packages/tree` are scoped to `--project node --project
       # dom`; their browser projects are the separate job below.

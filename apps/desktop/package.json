@@ -8,6 +8,7 @@
     "dev:standalone": "bun run build:native && bun ../../scripts/run-with-env.ts electrobun dev",
     "build": "bun run build:native && electrobun build",
     "build:native": "bun scripts/build-native.ts",
+    "test": "bun --bun vitest run",
     "lint": "oxlint .",
     "format": "oxfmt --write .",
     "format:check": "oxfmt --check .",
