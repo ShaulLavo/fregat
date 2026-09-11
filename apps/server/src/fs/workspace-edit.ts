@@ -1063,11 +1063,6 @@ export class WorkspaceEditController {
 
   private canonicalMutationPath(input: string) {
     const absolutePath = path.resolve(input)
-    if (isSameOrDescendant(this.paths.workspaceRoot, absolutePath)) {
-      const relativePath = path.relative(this.paths.workspaceRoot, absolutePath)
-      return path.resolve(this.paths.workspaceRootReal, relativePath)
-    }
-
     assertInside(this.paths.workspaceRootReal, absolutePath)
     return absolutePath
   }
@@ -1082,7 +1077,7 @@ export class WorkspaceEditController {
   private async assertRealParentInside(workspaceAbsolute: string, target: string) {
     let candidate = target
 
-    while (candidate !== workspaceAbsolute) {
+    while (true) {
       const stats = await this.lstatOptional(candidate)
       if (stats) {
         if (stats.isSymbolicLink()) throw new FsError('WORKSPACE_EDIT_INVALID')
@@ -1090,6 +1085,7 @@ export class WorkspaceEditController {
         assertInside(workspaceAbsolute, canonical)
       }
 
+      if (candidate === workspaceAbsolute) return
       candidate = path.dirname(candidate)
     }
   }
@@ -1630,7 +1626,7 @@ export class WorkspaceEditController {
     manifest: WorkspaceEditJournalManifest,
     step: WorkspaceEditProgramStep,
   ) {
-    const workspace = await this.driver.realpath(this.workspaceAbsolute(manifest))
+    const workspace = this.workspaceAbsolute(manifest)
     for (const reference of stepReferences(step)) {
       if (reference.startsWith('workspace:')) {
         await this.resolveTarget(workspace, reference.slice('workspace:'.length))

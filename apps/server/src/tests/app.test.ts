@@ -310,16 +310,22 @@ describe('fs rpc filesystem limits', () => {
     expect(await errorCode(response)).toBe('FILE_CHANGED')
   })
 
-  it('loads symlink directory targets through the tree API', async () => {
+  it('loads symlink directory targets through the tree API with the default root', async () => {
     const root = await fixtureRoot()
     const outside = await fixtureRoot()
     await mkdir(path.join(outside, 'target'), { recursive: true })
     await writeFile(path.join(outside, 'target', 'secret.txt'), 'hidden')
     await symlink(path.join(outside, 'target'), path.join(root, 'linked'))
-    const app = testApp(root)
+    const app = createTestApp({
+      auth: { allowedOrigins: [TRUSTED_ORIGIN] },
+      settings: testSettingsOptions(root),
+      watch: false,
+    })
+    const rootPath = path.relative(path.parse(root).root, root).replaceAll(path.sep, '/')
+    const linkedPath = `${rootPath}/linked`
 
     const response = await app.handle(
-      new Request('http://local/fs/tree?path=&depth=2', {
+      new Request(`http://local/fs/tree?${new URLSearchParams({ path: rootPath, depth: '2' })}`, {
         headers: trustedOriginHeaders(),
       }),
     )
@@ -331,36 +337,42 @@ describe('fs rpc filesystem limits', () => {
         type: string
       }>
     }
-    const linked = payload.entries.find((entry) => entry.path === 'linked')
+    const linked = payload.entries.find((entry) => entry.path === linkedPath)
 
     expect(response.status).toBe(200)
     expect(linked).toMatchObject({
-      path: 'linked',
+      path: linkedPath,
       targetType: 'directory',
       type: 'symlink',
     })
     expect(linked?.children).toContainEqual(
-      expect.objectContaining({ path: 'linked/secret.txt', type: 'file' }),
+      expect.objectContaining({ path: `${linkedPath}/secret.txt`, type: 'file' }),
     )
+    expect((await lstat(path.join(root, 'linked'))).isSymbolicLink()).toBe(true)
   })
 
-  it('reads and writes symlink file targets without replacing the link', async () => {
+  it('reads and writes symlink file targets without replacing the link with the default root', async () => {
     const root = await fixtureRoot()
     const outside = await fixtureRoot()
     const target = path.join(outside, 'target.txt')
     const linked = path.join(root, 'linked.txt')
     await writeFile(target, 'before')
     await symlink(target, linked)
-    const app = testApp(root)
+    const app = createTestApp({
+      auth: { allowedOrigins: [TRUSTED_ORIGIN] },
+      settings: testSettingsOptions(root),
+      watch: false,
+    })
+    const linkedPath = path.relative(path.parse(linked).root, linked).replaceAll(path.sep, '/')
 
     const read = await app.handle(
-      new Request('http://local/fs/read?path=linked.txt', {
+      new Request(`http://local/fs/read?${new URLSearchParams({ path: linkedPath })}`, {
         headers: trustedOriginHeaders(),
       }),
     )
     const written = await app.handle(
       new Request('http://local/fs/write', {
-        body: JSON.stringify({ path: 'linked.txt', content: 'after' }),
+        body: JSON.stringify({ path: linkedPath, content: 'after' }),
         headers: trustedOriginHeaders({ 'content-type': 'application/json' }),
         method: 'POST',
       }),
@@ -369,11 +381,11 @@ describe('fs rpc filesystem limits', () => {
     expect(read.status).toBe(200)
     expect(await read.json()).toMatchObject({
       content: 'before',
-      path: 'linked.txt',
+      path: linkedPath,
     })
     expect(written.status).toBe(200)
     expect(await written.json()).toMatchObject({
-      path: 'linked.txt',
+      path: linkedPath,
       targetType: 'file',
       type: 'symlink',
     })

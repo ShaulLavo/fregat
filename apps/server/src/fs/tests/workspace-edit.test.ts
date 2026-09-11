@@ -6,6 +6,7 @@ import {
   mkdtemp,
   readFile,
   readdir,
+  rename,
   rm,
   stat,
   symlink,
@@ -595,6 +596,25 @@ describe('workspace edit transactions', () => {
     ])
   })
 
+  it.each(['directory-alias/file.txt', 'file-alias'])(
+    'reserves a transaction against writes through %s',
+    async (alias) => {
+      const fixture = await createFixture()
+      const expected = await seedFile(fixture, 'project/file.txt', 'before')
+      await symlink('project', workspacePath(fixture, 'directory-alias'))
+      await symlink('project/file.txt', workspacePath(fixture, 'file-alias'))
+      const prepared = await fixture.service.workspaceEditPrepare(
+        prepareRequest(randomUUID(), [writeOperation(0, 'file.txt', expected, 'after')], 'project'),
+      )
+
+      const write = fixture.service.write({ content: 'unreserved write', path: alias })
+      await write.catch(() => {})
+      expect(await readText(fixture, 'project/file.txt')).toBe('before')
+      await expect(write).rejects.toMatchObject({ code: 'WORKSPACE_EDIT_BUSY' })
+      await fixture.service.workspaceEditAbort(transition(prepared))
+    },
+  )
+
   it('reserved journal paths never appear in tree search index or watch', async () => {
     const fixture = await createFixture({ journalInsideWorkspace: true })
     const expected = await seedFile(fixture, 'file.txt', 'journal-exclusion-before')
@@ -843,6 +863,54 @@ describe('workspace edit transactions', () => {
       expect(serialized).not.toContain('secret-after')
       expect(serialized).not.toContain(fixture.journalRoot)
       expect(serialized).not.toContain('stage/')
+    } finally {
+      await restarted.close()
+    }
+  })
+
+  it('rejects a prepared create after its workspace root becomes an outside symlink', async () => {
+    const fixture = await createFixture()
+    const project = workspacePath(fixture, 'project')
+    const outside = path.join(fixture.baseRoot, 'outside')
+    await mkdir(project)
+    await mkdir(outside)
+    const prepared = await fixture.service.workspaceEditPrepare(
+      prepareRequest(randomUUID(), [createOperation(0, 'created.txt')], 'project'),
+    )
+    await rename(project, workspacePath(fixture, 'original-project'))
+    await symlink(outside, project)
+
+    const commit = fixture.service.workspaceEditCommit(transition(prepared))
+    await commit.catch(() => {})
+    expect(await readdir(outside)).toEqual([])
+    await expect(commit).rejects.toMatchObject({ code: 'WORKSPACE_EDIT_INVALID' })
+    expect(await readManifest(fixture, prepared.operationId)).toMatchObject({ state: 'prepared' })
+  })
+
+  it('retains recovery data when its workspace root becomes an outside symlink', async () => {
+    const fixture = await createFixture()
+    const expected = await seedFile(fixture, 'project/deleted.txt', 'original bytes')
+    const prepared = await fixture.service.workspaceEditPrepare(
+      prepareRequest(randomUUID(), [deleteOperation(0, 'deleted.txt', expected)], 'project'),
+    )
+    await fixture.service.workspaceEditCommit(transition(prepared))
+    const project = workspacePath(fixture, 'project')
+    const outside = path.join(fixture.baseRoot, 'outside')
+    await mkdir(outside)
+    await rename(project, workspacePath(fixture, 'original-project'))
+    await symlink(outside, project)
+    const restarted = restartedService(fixture)
+
+    try {
+      const status = await restarted.workspaceEditStatus(prepared.operationId)
+      expect(await readdir(outside)).toEqual([])
+      expect(status).toMatchObject({ found: true, result: { state: 'partial' } })
+      const manifest = await readManifest(fixture, prepared.operationId)
+      const reservedPath = manifest.legs[0]?.reservedPath
+      expect(reservedPath).toEqual(expect.any(String))
+      expect(
+        await readFile(path.join(fixture.journalRoot, prepared.operationId, reservedPath!), 'utf8'),
+      ).toBe('original bytes')
     } finally {
       await restarted.close()
     }

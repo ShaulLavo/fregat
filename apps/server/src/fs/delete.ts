@@ -1,14 +1,10 @@
 import { lstat, rm } from 'node:fs/promises'
 import { FsError, mapNodeError } from './errors'
-import type { WorkspacePaths } from './path'
+import type { MutationTarget } from './mutation-target'
 import type { DeleteBody } from './contracts'
 
-export async function deletePath(paths: WorkspacePaths, body: DeleteBody) {
-  const target = paths.resolve(body.path)
-
+export async function deletePath(target: MutationTarget<'entry'>, body: Omit<DeleteBody, 'path'>) {
   try {
-    if (!target.relativePath) throw new FsError('INVALID_PATH', 'cannot delete workspace root')
-
     const stats = await lstat(target.absolutePath)
     if (stats.isDirectory() && !body.recursive)
       throw new FsError('INVALID_PATH', 'directory delete requires recursive: true')

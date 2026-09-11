@@ -17,6 +17,11 @@ import { renamePath } from './rename'
 import { deletePath } from './delete'
 import { copyPath } from './copy'
 import {
+  resolveMutationTarget,
+  type MutationTarget,
+  type MutationTargetKind,
+} from './mutation-target'
+import {
   elapsedMs,
   errorSummary,
   observeRequestOperation,
@@ -273,18 +278,20 @@ export class FileSystemService {
         path: body.path,
         writeId: body.writeId,
       },
-      () => this.withLegacyMutation([body.path], () => this.writeObserved(body)),
+      () =>
+        this.withMutation({ path: body.path, kind: 'content' }, (target) =>
+          this.writeObserved(target, body),
+        ),
       (result) => ({ entryType: result.type, size: result.size }),
     )
   }
 
-  private async writeObserved(body: WriteBody) {
-    const target = this.paths.resolve(body.path)
+  private async writeObserved(target: MutationTarget<'content'>, body: WriteBody) {
     recordAppSave(target.absolutePath)
 
     let path: string
     try {
-      path = await writeTextFile(this.paths, body)
+      path = await writeTextFile(target, body)
     } catch (error) {
       forgetAppSave(target.absolutePath)
       throw error
@@ -317,13 +324,17 @@ export class FileSystemService {
         operation: 'create_file',
         path: body.path,
       },
-      () => this.withLegacyMutation([body.path], () => this.createFileObserved(body)),
+      () =>
+        this.withMutation(
+          { path: body.path, kind: body.overwrite ? 'content' : 'entry' },
+          (target) => this.createFileObserved(target, body),
+        ),
       (result) => ({ entryType: result.type, size: result.size }),
     )
   }
 
-  private async createFileObserved(body: CreateFileBody) {
-    const path = await createFile(this.paths, body)
+  private async createFileObserved(target: MutationTarget, body: CreateFileBody) {
+    const path = await createFile(target, body)
     const entry = await this.statEntry(path)
     this.changes.emit({ type: 'created', path, entry })
 
@@ -338,13 +349,16 @@ export class FileSystemService {
         path: body.path,
         recursive: body.recursive,
       },
-      () => this.withLegacyMutation([body.path], () => this.createFolderObserved(body)),
+      () =>
+        this.withMutation({ path: body.path, kind: 'content' }, (target) =>
+          this.createFolderObserved(target, body),
+        ),
       (result) => ({ entryType: result.type }),
     )
   }
 
-  private async createFolderObserved(body: CreateFolderBody) {
-    const path = await createFolder(this.paths, body)
+  private async createFolderObserved(target: MutationTarget<'content'>, body: CreateFolderBody) {
+    const path = await createFolder(target, body)
     const entry = await this.statEntry(path)
     this.changes.emit({ type: 'created', path, entry })
 
@@ -359,13 +373,16 @@ export class FileSystemService {
         operation: 'rename',
         path: body.to,
       },
-      () => this.withLegacyMutation([body.from, body.to], () => this.renameObserved(body)),
+      () => this.withTransfer(body, (targets) => this.renameObserved(targets, body)),
       (result) => ({ entryType: result.type, size: result.size }),
     )
   }
 
-  private async renameObserved(body: RenameBody) {
-    const result = await renamePath(this.paths, body)
+  private async renameObserved(
+    targets: { from: MutationTarget<'entry'>; to: MutationTarget<'entry'> },
+    body: RenameBody,
+  ) {
+    const result = await renamePath(targets, body)
     const entry = await this.statEntry(result.to)
     this.changes.emit({
       entry,
@@ -385,13 +402,16 @@ export class FileSystemService {
         operation: 'copy',
         path: body.to,
       },
-      () => this.withLegacyMutation([body.from, body.to], () => this.copyObserved(body)),
+      () => this.withTransfer(body, (targets) => this.copyObserved(targets, body)),
       (result) => ({ entryType: result.type, size: result.size }),
     )
   }
 
-  private async copyObserved(body: CopyBody) {
-    const result = await copyPath(this.paths, body)
+  private async copyObserved(
+    targets: { from: MutationTarget<'entry'>; to: MutationTarget<'entry'> },
+    body: CopyBody,
+  ) {
+    const result = await copyPath(targets, body)
     const entry = await this.statEntry(result.to)
     this.changes.emit({ type: 'created', path: result.to, entry })
 
@@ -401,13 +421,16 @@ export class FileSystemService {
   async delete(body: DeleteBody) {
     return observeRequestOperation(
       { area: 'fs', operation: 'delete', path: body.path },
-      () => this.withLegacyMutation([body.path], () => this.deleteObserved(body)),
+      () =>
+        this.withMutation({ path: body.path, kind: 'entry' }, (target) =>
+          this.deleteObserved(target, body),
+        ),
       (result) => ({ deleted: result.deleted }),
     )
   }
 
-  private async deleteObserved(body: DeleteBody) {
-    const path = await deletePath(this.paths, body)
+  private async deleteObserved(target: MutationTarget<'entry'>, body: DeleteBody) {
+    const path = await deletePath(target, body)
     this.changes.emit({ type: 'deleted', path })
 
     return { path, deleted: true as const }
@@ -548,9 +571,28 @@ export class FileSystemService {
     this.metadata.close()
   }
 
-  private withLegacyMutation<T>(relativePaths: readonly string[], mutation: () => Promise<T>) {
-    const absolutePaths = relativePaths.map((input) => this.paths.resolve(input).absolutePath)
-    return this.workspaceEdits.withLegacyMutation(absolutePaths, mutation)
+  private async withMutation<Kind extends MutationTargetKind, T>(
+    input: { path: string; kind: Kind },
+    mutation: (target: MutationTarget<Kind>) => Promise<T>,
+  ) {
+    const target = await resolveMutationTarget(this.paths, input)
+    return this.workspaceEdits.withLegacyMutation([target.absolutePath], () => mutation(target))
+  }
+
+  private async withTransfer<T>(
+    input: { from: string; to: string },
+    mutation: (targets: {
+      from: MutationTarget<'entry'>
+      to: MutationTarget<'entry'>
+    }) => Promise<T>,
+  ) {
+    const [from, to] = await Promise.all([
+      resolveMutationTarget(this.paths, { path: input.from, kind: 'entry' }),
+      resolveMutationTarget(this.paths, { path: input.to, kind: 'entry' }),
+    ])
+    return this.workspaceEdits.withLegacyMutation([from.absolutePath, to.absolutePath], () =>
+      mutation({ from, to }),
+    )
   }
 
   private claimWorkspaceOpen(generation: number) {

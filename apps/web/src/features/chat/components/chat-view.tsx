@@ -24,6 +24,7 @@ import { type ChatSession } from '@workspace/client-core/chat/types'
 import { ChatTransportContext } from '@/features/chat/providers/transport-context'
 import { ChatInput, type ChatInputSubmitPayload } from './chat-input'
 import { ImportedChatNotice } from '@/features/chat/components/imported-chat-notice'
+import { CheckpointRevertDialog } from '@/features/chat/components/checkpoint-revert-dialog'
 import { ChatRuntimeStatus } from './chat-runtime-status'
 import { MessagesTimeline } from './messages-timeline'
 import { PendingApprovalPanel } from './pending-approval-panel'
@@ -75,27 +76,20 @@ export function ChatView({
   const [sendError, setSendError] = useState<string | null>(null)
   const [interrupting, setInterrupting] = useState(false)
   const [revertingCheckpoint, setRevertingCheckpoint] = useState(false)
+  const [pendingCheckpoint, setPendingCheckpoint] = useState<number | null>(null)
   const [sending, setSending] = useState(false)
   const busy = isChatSessionBusy(session)
   // Stable identity is required because this is part of the timeline action context value.
   const handleRevertToCheckpoint = useCallback(
-    async (turnCount: number) => {
-      if (!session) return
+    (turnCount: number) => {
+      if (!session || revertingCheckpoint) return
       if (busy) {
         setSendError('Interrupt the current turn before reverting checkpoints.')
         return
       }
-      if (!confirmCheckpointRevert(turnCount)) return
-
-      await revertSessionToCheckpoint({
-        transport,
-        setRevertingCheckpoint,
-        setSendError,
-        session,
-        turnCount,
-      })
+      setPendingCheckpoint(turnCount)
     },
-    [busy, transport, session],
+    [busy, revertingCheckpoint, session],
   )
 
   const projectId = session?.project.id
@@ -158,8 +152,28 @@ export function ChatView({
     await dispatchSessionStop({ transport, setInterrupting, setSendError, session })
   }
 
+  async function handleConfirmRevert() {
+    if (!session || pendingCheckpoint === null || busy || sending || revertingCheckpoint) return
+
+    const turnCount = pendingCheckpoint
+    setPendingCheckpoint(null)
+    await revertSessionToCheckpoint({
+      transport,
+      setRevertingCheckpoint,
+      setSendError,
+      session,
+      turnCount,
+    })
+  }
+
   return (
     <section className='flex min-h-0 flex-1 flex-col'>
+      <CheckpointRevertDialog
+        turnCount={pendingCheckpoint}
+        disabled={busy || sending || revertingCheckpoint}
+        onCancel={() => setPendingCheckpoint(null)}
+        onConfirm={() => void handleConfirmRevert()}
+      />
       <ChatRuntimeStatus commandFailure={sendError} session={session} />
       <ChatTransportContext value={transport}>
         <ChatTimelineActionsProvider revertToCheckpoint={handleRevertToCheckpoint}>
@@ -199,7 +213,10 @@ export function ChatView({
             busy={busy}
             commandStatusLabel={interrupting ? 'Interrupting' : null}
             disabled={
-              sending || interrupting || (!busy && session.worktree.lifecycle.state !== 'ready')
+              sending ||
+              interrupting ||
+              revertingCheckpoint ||
+              (!busy && session.worktree.lifecycle.state !== 'ready')
             }
             draftKey={session.id}
             error={null}
@@ -360,17 +377,4 @@ async function revertSessionToCheckpoint({
   } finally {
     setRevertingCheckpoint(false)
   }
-}
-
-function confirmCheckpointRevert(turnCount: number) {
-  if (typeof window === 'undefined') return true
-  if (typeof window.confirm !== 'function') return true
-
-  return window.confirm(
-    [
-      `Revert this session to checkpoint ${turnCount}?`,
-      'This will discard newer messages and turn diffs in this session.',
-      'This action cannot be undone.',
-    ].join('\n'),
-  )
 }

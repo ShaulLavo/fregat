@@ -1,17 +1,18 @@
 import { mkdir, writeFile } from 'node:fs/promises'
 import { FsError, mapNodeError } from './errors'
-import { assertNotRootTarget } from './mutation-target'
-import type { WorkspacePaths } from './path'
+import type { MutationTarget } from './mutation-target'
 import type { CreateFileBody, CreateFolderBody } from './contracts'
+import { writeTextFile } from './write'
 
-export async function createFile(paths: WorkspacePaths, body: CreateFileBody) {
-  const target = paths.resolve(body.path)
-
+export async function createFile(
+  target: MutationTarget<'content'> | MutationTarget<'entry'>,
+  body: Pick<CreateFileBody, 'content'>,
+) {
+  if (target.kind === 'content') return writeTextFile(target, { content: body.content ?? '' })
   try {
-    assertNotRootTarget(target.relativePath)
     await writeFile(target.absolutePath, body.content ?? '', {
       encoding: 'utf8',
-      flag: body.overwrite ? 'w' : 'wx',
+      flag: 'wx',
     })
 
     return target.relativePath
@@ -21,11 +22,11 @@ export async function createFile(paths: WorkspacePaths, body: CreateFileBody) {
   }
 }
 
-export async function createFolder(paths: WorkspacePaths, body: CreateFolderBody) {
-  const target = paths.resolve(body.path)
-
+export async function createFolder(
+  target: MutationTarget<'content'>,
+  body: Omit<CreateFolderBody, 'path'>,
+) {
   try {
-    assertNotRootTarget(target.relativePath)
     await mkdir(target.absolutePath, { recursive: body.recursive })
 
     return target.relativePath

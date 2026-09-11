@@ -4,6 +4,7 @@
   "jsPlugins": ["oxc-plugin-react-compiler/eslint"],
   "ignorePatterns": ["apps/desktop/build/**"],
   "rules": {
+    "no-alert": "error",
     "react/rules-of-hooks": "error",
     "react/exhaustive-deps": "warn",
     "oxc-react-compiler/static-components": "error",

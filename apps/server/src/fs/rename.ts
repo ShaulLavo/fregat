@@ -2,19 +2,18 @@ import { rename } from 'node:fs/promises'
 import { FsError, mapNodeError } from './errors'
 import {
   assertExistingPath,
-  assertNotRootTarget,
+  assertDisjointTargets,
   removeDestinationIfAllowed,
+  type MutationTarget,
 } from './mutation-target'
-import type { WorkspacePaths } from './path'
 import type { RenameBody } from './contracts'
 
-export async function renamePath(paths: WorkspacePaths, body: RenameBody) {
-  const from = paths.resolve(body.from)
-  const to = paths.resolve(body.to)
-
+export async function renamePath(
+  { from, to }: { from: MutationTarget<'entry'>; to: MutationTarget<'entry'> },
+  body: Omit<RenameBody, 'from' | 'to'>,
+) {
   try {
-    assertNotRootTarget(from.relativePath)
-    assertNotRootTarget(to.relativePath)
+    assertDisjointTargets(from, to)
     await assertExistingPath(from.absolutePath)
     await removeDestinationIfAllowed(to.absolutePath, body.overwrite)
     await rename(from.absolutePath, to.absolutePath)

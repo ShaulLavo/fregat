@@ -19,6 +19,8 @@ rough rule: anything with side effects lives on the server, product workflows an
 
 user-facing knobs are registry entries in `packages/contracts/src/settings/keys.ts`, never a stray localStorage key. `docs/settings-reference.md` is generated, rerun `bun run settings:reference` after you touch the registry
 
+[filesystem boundaries](docs/filesystem-boundaries.md) explains normal editor access, the optional server root restriction, and separate agent permissions.
+
 ## the editor packages
 
 you need a sibling checkout of the editor repo at `../Editor` — there's no npm fallback right now, `@singapor/decode` isn't published. the root `overrides` map points every `@singapor/*` at it via bun's `link:` protocol (`"@singapor/core": "link:@singapor/core"`), backed by `bun link` global links. so: run `bun link` inside each `../Editor/packages/*` once, then `bun install` here, and local editor changes show up in typecheck, tests and the dev server. ci does the same thing by cloning `ShaulLavo/singapor` as a sibling and linking each package

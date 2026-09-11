@@ -23,11 +23,17 @@ a bare root `bun run verify`.
 | [071 — syntax highlight retry](071-syntax-highlight-retry.md)                   | **PROPOSED — ROOT GO/NO-GO SCHEDULING**                  |
 | [080 — Platform and VS Code keybinding modes](080-platform-keybinding-modes.md) | **PROPOSED — INTERACTION RULES CONFIRMED**               |
 | [085 — instant workspace reload](085-instant-workspace-reload.md)               | **PROPOSED — IMPLEMENTATION NOT STARTED**                |
+| [086 — workspace URL cleanup](086-workspace-url-cleanup.md)                     | **PROPOSED — PRODUCT DECISIONS OPEN**                    |
 | [073 — Electrobun 2.x migration](073-electrobun-v2-migration.md)                | **PROPOSED — ROOT GO/NO-GO SCHEDULING**                  |
 | [075 — terminal renderer fallbacks](075-terminal-renderer-fallbacks.md)         | **PROPOSED — BLOCKED ON TIER DECISION**                  |
 | [076 — watch-reload child reaping](076-watch-reload-child-reaping.md)           | **PROPOSED — ROOT GO/NO-GO SCHEDULING**                  |
 
 ## Dependency notes
+
+- Plan 086 keeps local workspace IDs and URL tabs, fixes history/persistence edges, and prepares
+  reusable view data for later sharing. The [Router evaluation](086-router-evaluation.md) recommends
+  Router as the web navigation owner; implementation is not started. Its boot/cache changes overlap
+  Plan 085, so reconcile that boundary first. No sharing backend is scheduled.
 
 - Plan 085 restores the visible workspace before live responses, starting with bootstrap, file tree,
   and settings. It reuses feature renderers and keeps native paint separate from current-state

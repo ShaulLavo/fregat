@@ -1,35 +1,47 @@
 import { randomUUID } from 'node:crypto'
 import type { Stats } from 'node:fs'
-import { chmod, open, readFile, realpath, rm, rename, writeFile } from 'node:fs/promises'
+import { open, readFile, rm, rename, type FileHandle } from 'node:fs/promises'
 import path from 'node:path'
 import { FsError, mapNodeError } from './errors'
-import { lstatOptional, statOptional } from './mutation-target'
-import type { WorkspacePaths } from './path'
+import { statOptional, type MutationTarget } from './mutation-target'
 import { assertFile } from './stat'
 import type { WriteBody } from './contracts'
 import { fileVersion, textFileVersion } from './version'
 
-export async function writeTextFile(paths: WorkspacePaths, body: WriteBody) {
-  const target = paths.resolve(body.path)
+export async function writeTextFile(
+  target: MutationTarget<'content'>,
+  body: Omit<WriteBody, 'path'>,
+) {
   let tempPath: string | null = null
 
   try {
-    const writePath = await writablePath(target.absolutePath)
-    tempPath = temporaryPath(writePath)
+    const writePath = target.absolutePath
     const existing = await assertWritableTarget(writePath, {
       baseVersion: body.baseVersion,
       expectedMtimeMs: body.expectedMtimeMs,
     })
-    await writeFile(tempPath, body.content, 'utf8')
-    if (existing) await chmod(tempPath, existing.mode)
-    await syncPath(tempPath)
+    const temporary = temporaryPath(writePath)
+    const handle = await open(temporary, 'wx')
+    tempPath = temporary
+    await writeTemporaryContent(handle, body.content, existing?.mode)
     await rename(tempPath, writePath)
+    tempPath = null
     await syncPath(path.dirname(writePath))
     return target.relativePath
   } catch (error) {
     await removeTempFile(tempPath)
     if (error instanceof FsError) throw error
     throw mapNodeError(error)
+  }
+}
+
+async function writeTemporaryContent(handle: FileHandle, content: string, mode?: number) {
+  try {
+    await handle.writeFile(content, 'utf8')
+    if (mode !== undefined) await handle.chmod(mode)
+    await handle.sync()
+  } finally {
+    await handle.close()
   }
 }
 
@@ -67,13 +79,6 @@ async function targetVersion(absolutePath: string, stats: Stats, baseVersion: st
   if (!baseVersion.startsWith('sha256:')) return fileVersion(stats)
 
   return textFileVersion(await readFile(absolutePath, 'utf8'))
-}
-
-async function writablePath(absolutePath: string) {
-  const stats = await lstatOptional(absolutePath)
-  if (!stats?.isSymbolicLink()) return absolutePath
-
-  return realpath(absolutePath)
 }
 
 function temporaryPath(absolutePath: string) {
