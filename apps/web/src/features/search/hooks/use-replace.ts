@@ -1,4 +1,5 @@
 import { useCallback, useRef } from 'react'
+import { useQueryClient } from '@tanstack/react-query'
 
 import { useWorkspaceEditService } from '@/features/editor/providers/workspace-edit-context'
 import { useEditorDocumentStoreApi } from '@/features/editor/state/document-state'
@@ -12,10 +13,13 @@ import {
   workspaceSearchReplaceSummary,
 } from '@/features/search/utils/replace-runner'
 import { errorMessage } from '@/lib/error-message'
+import type { Client } from '@/lib/client'
+import { clientForQueryClient } from '@/lib/environments/state/query-clients'
 import { fetchFile } from '@/lib/file-server'
 import type { WorkspaceSearchMatch, WorkspaceSearchQuery } from '@workspace/contracts'
 
 export function useWorkspaceSearchReplace(rootPath: string, enabled = true) {
+  const client = clientForQueryClient(useQueryClient())
   const canReplaceValue = useSearchBufferState((state) => {
     if (!enabled) return false
     if (state.active?.rootPath !== rootPath) return false
@@ -34,6 +38,7 @@ export function useWorkspaceSearchReplace(rootPath: string, enabled = true) {
       controllerRef.current = controller
 
       void runReplace({
+        client,
         controller,
         documentStore,
         matches,
@@ -44,7 +49,7 @@ export function useWorkspaceSearchReplace(rootPath: string, enabled = true) {
         if (controllerRef.current === controller) controllerRef.current = null
       })
     },
-    [documentStore, rootPath, store, workspaceEdits],
+    [client, documentStore, rootPath, store, workspaceEdits],
   )
   const replaceAll = useCallback(() => {
     const snapshot = store.getState().active
@@ -78,6 +83,7 @@ export function useWorkspaceSearchReplace(rootPath: string, enabled = true) {
 }
 
 type RunReplaceInput = {
+  client: Client
   controller: AbortController
   documentStore: ReturnType<typeof useEditorDocumentStoreApi>
   matches: readonly WorkspaceSearchMatch[]
@@ -87,6 +93,7 @@ type RunReplaceInput = {
 }
 
 async function runReplace({
+  client,
   controller,
   documentStore,
   matches,
@@ -107,7 +114,7 @@ async function runReplace({
     const result = await replaceWorkspaceSearchMatches({
       context: {
         applyWorkspaceChange: workspaceEdits.applyWorkspaceChange,
-        fetchFile,
+        fetchFile: (path, signal) => fetchFile(path, signal, client),
         getLiveEditorDocument: documentStore.getState().getLiveEditorDocument,
         rootPath,
         signal: controller.signal,

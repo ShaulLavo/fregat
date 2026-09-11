@@ -55,8 +55,10 @@ type SearchTargetSource = {
   readonly pieceSnapshot: PieceTableSnapshot
   readonly textSnapshot: TextSnapshot
   readonly uri: string
-  readonly version: number | null
-}
+} & (
+  | { readonly version: number; readonly fileVersion: null }
+  | { readonly version: null; readonly fileVersion: FileResult['version'] }
+)
 
 type PreparedSearchRequest = {
   readonly changedFiles: number
@@ -64,6 +66,7 @@ type PreparedSearchRequest = {
   readonly operations: readonly WorkspaceEditOperation[]
   readonly replacedMatches: number
   readonly skippedMatches: number
+  readonly sourceFileVersions: ReadonlyMap<string, FileResult['version']>
 }
 
 export async function replaceWorkspaceSearchMatches({
@@ -101,6 +104,7 @@ export async function replaceWorkspaceSearchMatches({
     serverId: 'workspace-search',
     signal: context.signal,
     source: 'search-replace',
+    sourceFileVersions: prepared.sourceFileVersions,
   })
   if (result.status !== 'applied') return result
 
@@ -129,6 +133,7 @@ async function prepareSearchRequest(
   replaceText: string,
 ): Promise<PreparedSearchRequest> {
   const liveSources = new Map<string, SearchTargetSource>()
+  const sourceFileVersions = new Map<string, FileResult['version']>()
   const operations: WorkspaceEditOperation[] = []
   let changedFiles = 0
   let replacedMatches = 0
@@ -150,6 +155,7 @@ async function prepareSearchRequest(
     replacedMatches += plan.appliedCount
     operations.push(textOperation(source, plan.edits))
     if (source.version !== null) liveSources.set(source.uri, source)
+    if (source.fileVersion !== null) sourceFileVersions.set(source.uri, source.fileVersion)
   }
 
   return {
@@ -158,6 +164,7 @@ async function prepareSearchRequest(
     operations,
     replacedMatches,
     skippedMatches,
+    sourceFileVersions,
   }
 }
 
@@ -169,29 +176,28 @@ async function searchTargetSource(
   if (live) return liveTargetSource(live)
 
   const file = await context.fetchFile(path, context.signal)
-  return transientTargetSource(path, file.content)
+  return transientTargetSource(path, file)
 }
 
 function liveTargetSource(document: SearchLiveDocument): SearchTargetSource {
-  return targetSource(document.path, document.buffer, 0)
+  return { ...targetSource(document.path, document.buffer), fileVersion: null, version: 0 }
 }
 
-function transientTargetSource(path: string, text: string): SearchTargetSource {
-  return targetSource(path, createEditorTextBuffer(text), null)
+function transientTargetSource(path: string, file: FileResult): SearchTargetSource {
+  return {
+    ...targetSource(path, createEditorTextBuffer(file.content)),
+    fileVersion: file.version,
+    version: null,
+  }
 }
 
-function targetSource(
-  path: string,
-  buffer: EditorTextBuffer,
-  version: number | null,
-): SearchTargetSource {
+function targetSource(path: string, buffer: EditorTextBuffer) {
   return {
     buffer,
     path,
     pieceSnapshot: buffer.getSnapshot(),
     textSnapshot: buffer.getTextSnapshot(),
     uri: fileNameToDocumentUri(path),
-    version,
   }
 }
 

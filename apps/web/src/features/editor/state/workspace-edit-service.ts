@@ -177,6 +177,7 @@ export type WorkspaceEditServiceOptions = {
 
 export type WorkspaceEditApplicationRequest = Omit<ApplyWorkspaceEditRequest, 'source'> & {
   readonly source: ApplyWorkspaceEditRequest['source'] | 'search-replace'
+  readonly sourceFileVersions?: ReadonlyMap<string, WorkspaceFileSnapshot['version']>
 }
 
 type WorkspaceEditSettlement = {
@@ -1487,6 +1488,10 @@ class WorkspaceEditPreparationBuilder {
     const node = await this.existingNode(path)
     if (!node) throw workspaceEditError('missing-target', 'Text target does not exist')
     const target = await this.ensureTextTarget(node, path)
+    const sourceVersion = this.request.sourceFileVersions?.get(operation.uri)
+    if (sourceVersion !== undefined && sourceVersion !== node.snapshot?.version) {
+      throw workspaceEditError('snapshot-drift', 'File changed since replacement planning')
+    }
     validateDirtyTargetProvenance(this.request, operation, target)
 
     const segmentIndex = target.segments.length

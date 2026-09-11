@@ -1,4 +1,6 @@
 import { QueryClient } from '@tanstack/react-query'
+import { readFile, writeFile } from 'node:fs/promises'
+import { join } from 'node:path'
 import type {
   WorkspaceEditPrepareRequest,
   WorkspaceEditRecoverRequest,
@@ -20,11 +22,13 @@ import {
   WorkspaceEditService,
   type WorkspaceEditServicePhase,
 } from '@/features/editor/state/workspace-edit-service'
+import { createFileSyncPorts } from '@/features/editor/utils/file-sync-ports'
 import {
   replaceWorkspaceSearchMatches,
   workspaceSearchReplaceSummary,
 } from '@/features/search/utils/replace-runner'
 import type { FileResult, TreeEntry } from '@/lib/file-system-types'
+import { fetchFile } from '@/lib/file-server'
 import { expect, test } from '../../../../test/fixtures'
 
 const ROOT = '/repo'
@@ -38,6 +42,50 @@ const QUERY: WorkspaceSearchQuery = {
 }
 
 test.describe('workspace search replacement runner', () => {
+  test('rejects an unopened file changed after replacement planning', async ({
+    server,
+    client,
+  }) => {
+    const path = 'unopened.ts'
+    const diskPath = join(server.root, path)
+    await writeFile(diskPath, 'needle')
+    const store = createEditorDocumentStore()
+    const fileSync = new FileSyncService(store, new QueryClient(), createFileSyncPorts(client))
+    const service = new WorkspaceEditService({
+      documentStore: store,
+      fileSync,
+      getRoot: () => ({ generation: 1, path: '', uriPath: '/', workspacePath: '' }),
+    })
+    const phases: WorkspaceEditServicePhase[] = []
+    const unsubscribe = service.subscribe(() => {
+      const { phase } = service.getSnapshot()
+      phases.push(phase)
+      if (phase === 'awaiting-confirmation') service.cancelPreview()
+    })
+
+    const result = await replaceWorkspaceSearchMatches({
+      context: {
+        applyWorkspaceChange: service.applyWorkspaceChange,
+        fetchFile: async (filePath, signal) => {
+          const file = await fetchFile(filePath, signal, client)
+          await writeFile(diskPath, 'prefix needle')
+          return file
+        },
+        getLiveEditorDocument: store.getState().getLiveEditorDocument,
+        rootPath: '/',
+        signal: new AbortController().signal,
+      },
+      matches: [match(path, 1, 7)],
+      query: { ...QUERY, path: '' },
+      replaceText: 'pin',
+    })
+    unsubscribe()
+
+    expect(result).toMatchObject({ code: 'snapshot-drift', status: 'failed' })
+    expect(phases).not.toContain('awaiting-confirmation')
+    expect(await readFile(diskPath, 'utf8')).toBe('prefix needle')
+  })
+
   test('applies exact live-buffer and guarded unopened text through one service request', async () => {
     const harness = createHarness()
     const live = addLiveFile(harness, '/repo/live.ts', 'needle')
