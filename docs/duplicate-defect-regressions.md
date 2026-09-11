@@ -56,7 +56,7 @@ read-then-delete path could erase a valid replacement from another TUI instance.
 two SQLite handles to interleave writes and deletions at each reader. A lost conditional delete
 re-reads the current value instead of returning stale defaults. The terminal read-and-save test
 preserves the competing tabs when the caller persists its initial state. Transactional inbox and
-recent-command updates retain their write lock and strict validation.
+recent-command updates retain their write lock. Recent-command writes retain strict validation.
 
 The TypeScript session had another containment predicate beyond the plan's four listed sites.
 Changing only the shared boundary admitted `..foo.ts` to handlers while excluding it from the
