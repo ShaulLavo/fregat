@@ -170,7 +170,8 @@ function activityId(index: number) {
 }
 
 function messageCreatedAt(index: number) {
-  return new Date(Date.UTC(2026, 4, 24) + index * 1000).toISOString()
+  // Each timestamp spans multiple pages, so the walk must use the ID tie breaker.
+  return new Date(Date.UTC(2026, 4, 24) + Math.floor(index / 500) * 1000).toISOString()
 }
 
 function activityCreatedAt(index: number) {

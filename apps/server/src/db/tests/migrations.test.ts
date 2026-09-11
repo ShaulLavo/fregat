@@ -68,6 +68,26 @@ describe('platform migration ledger', () => {
     expect(ledgerRow(handle, 11)?.applied_at).toEqual(expect.any(String))
   })
 
+  it('upgrades the message index to serve the complete page order without sorting', () => {
+    const handle = openTempDatabase()
+    migratePlatformDatabase(
+      handle.db,
+      platformMigrations.filter((migration) => migration.version < 15),
+    )
+    const plan = () => messagePaginationPlan(handle)
+    expect(plan()).toEqual(expect.arrayContaining([expect.stringContaining('TEMP B-TREE')]))
+
+    expect(migratePlatformDatabase(handle.db).map((migration) => migration.version)).toEqual([15])
+
+    expect(plan()).toEqual(
+      expect.arrayContaining([
+        expect.stringContaining('USING INDEX projection_session_messages_session_created_idx'),
+      ]),
+    )
+    expect(plan()).not.toEqual(expect.arrayContaining([expect.stringContaining('TEMP B-TREE')]))
+    expect(migratePlatformDatabase(handle.db)).toEqual([])
+  })
+
   it('matches every current Drizzle table, index and foreign key', () => {
     const handle = openTempDatabase()
     migratePlatformDatabase(handle.db)
@@ -94,7 +114,7 @@ describe('platform migration ledger', () => {
     )
     seedVersion11Worktrees(handle.db)
     expect(migratePlatformDatabase(handle.db).map((migration) => migration.version)).toEqual([
-      12, 13, 14,
+      12, 13, 14, 15,
     ])
     const query = new OrchestrationSnapshotQuery(handle.db)
     const migrated = query.shellSnapshot()
@@ -423,6 +443,19 @@ function indexNames(handle: MetadataDatabaseHandle, tableName: string) {
     handle,
     sql`SELECT name FROM pragma_index_list(${tableName}) ORDER BY name`,
   ).map((row) => row.name)
+}
+
+function messagePaginationPlan(handle: MetadataDatabaseHandle) {
+  const statement = handle.db.$client.prepare<{ detail: string }, [string]>(`
+    EXPLAIN QUERY PLAN SELECT * FROM projection_session_messages
+    WHERE session_id = ?
+    ORDER BY created_at DESC, message_id DESC LIMIT 201
+  `)
+  try {
+    return statement.all(DOMAIN_IDS.session).map((row) => row.detail)
+  } finally {
+    statement.finalize()
+  }
 }
 
 function ledgerVersions(handle: MetadataDatabaseHandle) {

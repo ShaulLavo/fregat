@@ -18,7 +18,16 @@ export const platformMigrations: readonly Migration[] = [
   { version: 12, name: 'worktree_lifecycle', up: applyWorktreeLifecycle },
   { version: 13, name: 'workspace_addresses', up: applyWorkspaceAddresses },
   { version: 14, name: 'agent_terminal_handoffs', up: applyAgentTerminalHandoffs },
+  { version: 15, name: 'message_pagination_order', up: applyMessagePaginationOrder },
 ]
+
+function applyMessagePaginationOrder(database: PlatformDatabase) {
+  database.run(sql`DROP INDEX projection_session_messages_session_created_idx`)
+  database.run(sql`
+    CREATE INDEX projection_session_messages_session_created_idx
+    ON projection_session_messages (session_id, created_at, message_id)
+  `)
+}
 
 function applyAgentTerminalHandoffs(database: PlatformDatabase) {
   database.run(sql`

@@ -345,7 +345,11 @@ export const projectionSessionMessages = sqliteTable(
     updatedAt: text('updated_at').notNull(),
   },
   (table) => [
-    index('projection_session_messages_session_created_idx').on(table.sessionId, table.createdAt),
+    index('projection_session_messages_session_created_idx').on(
+      table.sessionId,
+      table.createdAt,
+      table.messageId,
+    ),
   ],
 )
 
