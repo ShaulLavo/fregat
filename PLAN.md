@@ -219,6 +219,38 @@ keymap, reload, TUI, or Ghostty lanes. Any new Editor public contract lands in l
 General public hosting/pairing remains separate; the MCP prerequisite uses authenticated loopback
 endpoints and existing SSH access, with explicit grants for native clients.
 
+## Duplication census lane
+
+Requested 2026-09-11. A verified duplication census of the repository produced seven executable plans.
+[Plan 090](plans/090-duplicate-borne-defects.md) runs first.
+[Plan 091](plans/091-error-and-timing-helpers.md), [Plan 092](plans/092-path-and-uri-helpers.md),
+[Plan 093](plans/093-web-react-and-store-ceremony.md), and
+[Plan 094](plans/094-client-core-web-tui-parity.md) follow it.
+[Plan 095](plans/095-server-plumbing.md) and [Plan 096](plans/096-web-layering-and-boundaries.md) carry
+no dependency and may run at any point. All seven are proposed; implementation has not started.
+
+Plan 090 repairs the fourteen live defects found inside near-identical helpers — redaction holes,
+containment bugs, unguarded refs, and two test-harness failures — each with a reproduction and a
+regression test. It lands before every merge so no consolidation erases the evidence that the wrong
+variant shipped.
+
+The middle plans consolidate onto the shared packages. Plan 091 widens the observability sanitizer,
+`errorSummary`, and the timing helpers into shared modules and gives `errorMessage`, `isRecord`, and the
+client error catalog one home each in `packages/contracts` and `packages/client-core`. Plan 092 collapses
+the seven `file:` URI copies, the eight server containment spellings, and the walker/LSP path twins onto
+one owner each, keeping the `parentPath` families deliberately split. Plan 093 collapses the 32-site
+context guard, six store contexts, the deferred-commit widgets, and the Git mutation and test runners in
+`apps/web`. Plan 094 moves the domain logic `apps/web` and `apps/tui` each wrote twice into
+`packages/client-core` and `packages/contracts`. Plan 095 collapses the duplicated WebSocket adapters,
+atomic writers, listener bridges, and Git common-directory resolutions in `apps/server`. Plan 096 settles
+`apps/web` layering, moving modules to the layer that owns them and deleting unused contracts exports and
+clientless routes.
+
+Every unification step names the behavioural divergences it reconciles and states which behaviour wins;
+these variants share signatures, so a wrong merge typechecks. Plan 096 settles the shared Git contract and
+web Git API files before Plan 094's co-pass over them. This lane does not reorder or depend on the keymap,
+reload, TUI, Ghostty, or MCP lanes.
+
 ## Verification boundaries
 
 - **Platform-only:** verify the narrow Platform tests/typechecks named by the active plan.
@@ -230,6 +262,10 @@ endpoints and existing SSH access, with explicit grants for native clients.
   loopback servers and distinct databases; the SSH gate uses the `localhost` target only. No test or demo binds
   non-loopback. Pairing, sessions, and TLS refusal are one later security boundary, not part of
   these three plans.
+- **Duplication census (090–096):** Platform-only. Each plan names its own narrow checks — focused
+  Vitest paths, the affected workspace typecheck, and diff review over the files it merges. Run those
+  and compare against a captured baseline delta. A repository-wide suite or a bare test count proves
+  nothing here, because the merged variants share signatures.
 - Preserve pre-existing dirty work in every linked worktree. Use baseline deltas and the narrowest
   checks that can catch a plausible regression; never use a bare root test count as completion proof.
 
