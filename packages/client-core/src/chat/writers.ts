@@ -47,7 +47,7 @@ export function syncChatProjectionShellSnapshot(
   if (!shouldApplyShellSnapshot(state, snapshot)) return state
 
   const nextSessionIds = new Set(snapshot.sessions.map((session) => session.id))
-  let nextState: ChatProjectionSlice = {
+  const nextState: ChatProjectionSlice = {
     ...state,
     ...projectStateFromShell(snapshot.projects),
     worktreeById: recordById(snapshot.worktrees, (worktree) => worktree.id),
@@ -60,11 +60,11 @@ export function syncChatProjectionShellSnapshot(
     lastAppliedShellSequence: snapshot.snapshotSequence,
     lastShellItemKeys: null,
     lastAppliedShellUpdatedAt: snapshot.updatedAt,
-    sessionIds: [],
+    sessionIds: [...nextSessionIds],
   }
 
   for (const session of snapshot.sessions) {
-    nextState = writeSessionFromShell(nextState, session)
+    nextState.sessionById[session.id] = sessionFromShell(session, nextState.sessionById[session.id])
   }
 
   return nextState
