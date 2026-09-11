@@ -53,27 +53,22 @@ export class OpenBufferSearchProvider implements SearchProvider {
     signal?: AbortSignal,
   ): AsyncGenerator<WorkspaceSearchEvent> {
     let count = 0
-    let truncated = false
+    if (signal?.aborted) return
     const matcher = createWorkspaceSearchMatcher(query)
 
     for (const document of this.documents) {
       if (signal?.aborted) return
+      if (count >= query.limit) break
       if (!canSearchOpenBuffer(document, query, matcher)) continue
 
-      for (const match of openBufferMatches(document, matcher)) {
-        if (count >= query.limit) {
-          truncated = true
-          break
-        }
-
+      for (const match of openBufferMatches(document, matcher, query.limit - count)) {
         count += 1
         yield { match, type: 'match' }
+        if (signal?.aborted) return
       }
-
-      if (truncated) break
     }
 
-    yield doneEvent(query, count, truncated)
+    yield doneEvent(query, count, count >= query.limit)
   }
 }
 
@@ -331,17 +326,33 @@ function doneEvent(
   }
 }
 
-function openBufferMatches(document: OpenBufferSearchDocument, matcher: WorkspaceSearchMatcher) {
-  const matches: WorkspaceSearchMatch[] = []
-  const lines = document.text.split(/\r\n|\r|\n/u)
+function* openBufferMatches(
+  document: OpenBufferSearchDocument,
+  matcher: WorkspaceSearchMatcher,
+  remaining: number,
+): Generator<WorkspaceSearchMatch> {
+  let lineIndex = 0
 
-  for (const [index, line] of lines.entries()) {
-    for (const match of matcher.lineMatches(line)) {
-      matches.push(openBufferMatch(document.path, line, index, match))
+  for (const line of openBufferLines(document.text)) {
+    for (const match of matcher.lineMatches(line, remaining)) {
+      remaining -= 1
+      yield openBufferMatch(document.path, line, lineIndex, match)
+      if (remaining <= 0) return
     }
+    lineIndex += 1
   }
+}
 
-  return matches
+function* openBufferLines(text: string): Generator<string> {
+  const terminator = /\r\n|\r|\n/gu
+  let start = 0
+
+  while (true) {
+    const match = terminator.exec(text)
+    yield text.slice(start, match?.index ?? text.length)
+    if (!match) return
+    start = terminator.lastIndex
+  }
 }
 
 function openBufferMatch(

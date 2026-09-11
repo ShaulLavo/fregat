@@ -8,7 +8,7 @@ export type WorkspaceSearchTextMatch = {
 }
 
 export type WorkspaceSearchMatcher = {
-  lineMatches: (line: string) => WorkspaceSearchTextMatch[]
+  lineMatches: (line: string, limit?: number) => WorkspaceSearchTextMatch[]
   pathMatches: (path: string) => boolean
 }
 
@@ -98,16 +98,17 @@ function createLiteralLineMatcher(
 ) {
   const needle = query.caseSensitive ? query.query : query.query.toLocaleLowerCase()
 
-  return (line: string) => literalLineMatches(line, needle, query)
+  return (line: string, limit = Infinity) => literalLineMatches(line, needle, query, limit)
 }
 
 function literalLineMatches(
   line: string,
   needle: string,
   query: Pick<WorkspaceSearchQuery, 'caseSensitive' | 'query' | 'wholeWord'>,
+  limit: number,
 ) {
   const matches: WorkspaceSearchTextMatch[] = []
-  if (!needle) return matches
+  if (!needle || limit <= 0) return matches
 
   const haystack = query.caseSensitive ? line : line.toLocaleLowerCase()
   let index = haystack.indexOf(needle)
@@ -117,6 +118,7 @@ function literalLineMatches(
     if (isWholeWordMatch(line, index, end, query.wholeWord)) {
       matches.push({ end, start: index })
     }
+    if (matches.length >= limit) return matches
     index = haystack.indexOf(needle, end)
   }
 
@@ -129,7 +131,7 @@ function createRegexLineMatcher(
   const regex = compiledRegex(query)
   if (!regex) return () => []
 
-  return (line: string) => regexLineMatches(line, regex, query.wholeWord)
+  return (line: string, limit = Infinity) => regexLineMatches(line, regex, limit, query.wholeWord)
 }
 
 function compiledRegex(query: Pick<WorkspaceSearchQuery, 'caseSensitive' | 'query'>) {
@@ -141,8 +143,9 @@ function compiledRegex(query: Pick<WorkspaceSearchQuery, 'caseSensitive' | 'quer
   }
 }
 
-function regexLineMatches(line: string, regex: RegExp, wholeWord?: boolean) {
+function regexLineMatches(line: string, regex: RegExp, limit: number, wholeWord?: boolean) {
   const matches: WorkspaceSearchTextMatch[] = []
+  if (limit <= 0) return matches
   regex.lastIndex = 0
 
   while (true) {
@@ -154,6 +157,7 @@ function regexLineMatches(line: string, regex: RegExp, wholeWord?: boolean) {
     if (end > start && isWholeWordMatch(line, start, end, wholeWord)) {
       matches.push({ end, start })
     }
+    if (matches.length >= limit) return matches
     if (end > start) continue
     advancePastEmptyMatch(regex, line)
   }
