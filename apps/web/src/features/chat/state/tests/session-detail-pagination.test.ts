@@ -214,6 +214,79 @@ test('an authoritative snapshot invalidates older pages even when its boundary s
   expect(selectChatSessionHasEarlier(state, SESSION_ID)).toBe(true)
 })
 
+test.each(['replace', 'reconcile'] as const)(
+  'a delayed page cannot restore history after a %s snapshot',
+  (mode) => {
+    const obsoleteActivity = sessionActivity({ sessionId: SESSION_ID })
+    let state = syncChatProjectionSessionDetailSnapshot(
+      createInitialChatProjectionSlice(),
+      detailSnapshot([message(2), message(3)], [obsoleteActivity]),
+    )
+    const pendingPage = { ...page([message(0), message(1)], true), activities: [obsoleteActivity] }
+    state = syncChatProjectionSessionDetailSnapshot(
+      state,
+      { ...detailSnapshot([message(10)]), snapshotSequence: 5 },
+      mode,
+    )
+
+    expect(prependChatProjectionSessionDetailPage(state, pendingPage)).toBe(state)
+    expect(state.messageIdsBySessionId[SESSION_ID]).toEqual(['message-10'])
+    expect(state.activityIdsBySessionId[SESSION_ID]).toEqual([])
+    expect(selectChatSessionHasEarlier(state, SESSION_ID)).toBe(false)
+  },
+)
+
+test('live appends do not invalidate a pending page or let it advance the event cursor', () => {
+  let state = syncChatProjectionSessionDetailSnapshot(
+    createInitialChatProjectionSlice(),
+    detailSnapshot([message(2)]),
+  )
+  state = applyChatProjectionEvent(state, messageSentEvent(message(3), 5))
+  state = prependChatProjectionSessionDetailPage(state, page([message(1)], true))
+  state = prependChatProjectionSessionDetailPage(state, {
+    ...page([message(0)], false),
+    snapshotSequence: 10,
+  })
+
+  expect(state.messageIdsBySessionId[SESSION_ID]).toEqual([
+    'message-0',
+    'message-1',
+    'message-2',
+    'message-3',
+  ])
+  expect(state.sessionDetailSequenceById[SESSION_ID]).toBe(5)
+  state = applyChatProjectionEvent(state, messageSentEvent(message(4), 6))
+  expect(state.messageIdsBySessionId[SESSION_ID]?.at(-1)).toBe('message-4')
+})
+
+test.each(['session.reverted', 'session.history-imported'] as const)(
+  'a delayed page is rejected after %s',
+  (type) => {
+    let state = syncChatProjectionSessionDetailSnapshot(
+      createInitialChatProjectionSlice(),
+      detailSnapshot([message(2)]),
+    )
+    const payload =
+      type === 'session.reverted'
+        ? { sessionId: SESSION_ID, turnCount: 0, revertedAt: createdAt(5) }
+        : { sessionId: SESSION_ID, messages: [], sourceUpdatedAt: createdAt(5) }
+    state = applyChatProjectionEvent(
+      state,
+      v.parse(orchestrationEventSchema, {
+        ...messageSentEvent(message(3), 5),
+        type,
+        payload,
+      }),
+    )
+
+    expect(prependChatProjectionSessionDetailPage(state, page([message(1)], true))).toBe(state)
+    const freshPage = { ...page([message(0)], false), snapshotSequence: 5 }
+    expect(
+      prependChatProjectionSessionDetailPage(state, freshPage).messageIdsBySessionId[SESSION_ID],
+    ).toContain('message-0')
+  },
+)
+
 function windowMessages(count: number) {
   return Array.from({ length: count }, (_, index) => message(index))
 }

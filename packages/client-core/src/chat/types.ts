@@ -76,6 +76,8 @@ export type ChatProjectionSlice = {
    */
   sessionHasEarlierById: Record<SessionId, boolean>
   sessionDetailSequenceById: Record<SessionId, number>
+  /** Pages must be at least as recent as the last snapshot or destructive history event. */
+  sessionHistorySequenceById: Record<SessionId, number>
   sessionIds: SessionId[]
   turnDiffIdsBySessionId: Record<SessionId, TurnId[]>
   turnDiffSummaryBySessionId: Record<SessionId, Record<TurnId, ChatTurnDiffSummary>>
@@ -100,6 +102,7 @@ export function createInitialChatProjectionSlice(): ChatProjectionSlice {
     proposedPlanIdsBySessionId: {},
     sessionById: {},
     sessionDetailSequenceById: {},
+    sessionHistorySequenceById: {},
     sessionHasEarlierById: {},
     sessionIds: [],
     turnDiffIdsBySessionId: {},

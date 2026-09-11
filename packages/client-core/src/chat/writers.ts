@@ -80,7 +80,11 @@ export function syncChatProjectionSessionDetailSnapshot(
 
   const nextState = writeSessionDetailState(state, snapshot, mode)
 
-  return markSessionSequence(nextState, sessionId, snapshot.snapshotSequence)
+  return markSessionSequence(
+    markSessionHistorySequence(nextState, sessionId, snapshot.snapshotSequence),
+    sessionId,
+    snapshot.snapshotSequence,
+  )
 }
 
 /**
@@ -93,6 +97,9 @@ export function prependChatProjectionSessionDetailPage(
   page: OrchestrationSessionDetailPage,
 ): ChatProjectionSlice {
   const sessionId = page.sessionId
+  if (!state.sessionById[sessionId]) return state
+  if (page.snapshotSequence < (state.sessionHistorySequenceById[sessionId] ?? 0)) return state
+
   const messages = prependUnheld(page.messages, selectMessages(state, sessionId), messageKey)
   const activities = prependUnheld(page.activities, selectActivities(state, sessionId), activityKey)
   const withRows = {
@@ -126,6 +133,20 @@ function prependUnheld<TValue, TKey extends string>(
   const heldKeys = new Set(held.map(getKey))
 
   return [...older.filter((value) => !heldKeys.has(getKey(value))), ...held]
+}
+
+function markSessionHistorySequence(
+  state: ChatProjectionSlice,
+  sessionId: SessionId,
+  sequence: number,
+): ChatProjectionSlice {
+  return {
+    ...state,
+    sessionHistorySequenceById: {
+      ...state.sessionHistorySequenceById,
+      [sessionId]: sequence,
+    },
+  }
 }
 
 function messageKey(message: OrchestrationMessage) {
@@ -203,6 +224,10 @@ function retainSurvivingSessionSlices(
       sessionIds,
     ),
     sessionHasEarlierById: retainSessionScopedRecord(state.sessionHasEarlierById, sessionIds),
+    sessionHistorySequenceById: retainSessionScopedRecord(
+      state.sessionHistorySequenceById,
+      sessionIds,
+    ),
     turnDiffIdsBySessionId: retainSessionScopedRecord(state.turnDiffIdsBySessionId, sessionIds),
     turnDiffSummaryBySessionId: retainSessionScopedRecord(
       state.turnDiffSummaryBySessionId,
@@ -454,7 +479,13 @@ function applyFreshSessionEvent(
     case 'session.checkpoint-revert-requested':
       return state
     case 'session.reverted':
-      return applySessionRevertedEvent(state, event)
+      return markSessionHistorySequence(
+        applySessionRevertedEvent(state, event),
+        event.payload.sessionId,
+        event.sequence,
+      )
+    case 'session.history-imported':
+      return markSessionHistorySequence(state, event.payload.sessionId, event.sequence)
     case 'session.approval-response-requested':
     case 'session.user-input-response-requested':
       return state
@@ -1295,6 +1326,7 @@ function removeSessionState(state: ChatProjectionSlice, sessionId: SessionId): C
     sessionById: removeRecordKey(state.sessionById, sessionId),
     sessionDetailSequenceById: removeRecordKey(state.sessionDetailSequenceById, sessionId),
     sessionHasEarlierById: removeRecordKey(state.sessionHasEarlierById, sessionId),
+    sessionHistorySequenceById: removeRecordKey(state.sessionHistorySequenceById, sessionId),
     sessionIds: removeId(state.sessionIds, sessionId),
     turnDiffIdsBySessionId: removeRecordKey(state.turnDiffIdsBySessionId, sessionId),
     turnDiffSummaryBySessionId: removeRecordKey(state.turnDiffSummaryBySessionId, sessionId),
