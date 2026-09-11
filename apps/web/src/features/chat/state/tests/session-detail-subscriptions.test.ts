@@ -107,6 +107,43 @@ describe('session detail subscription cache', () => {
     cache.disposeAll()
   })
 
+  test.each(['ready', 'interrupted', 'error'] as const)(
+    'evicts a released %s session by timeout and capacity',
+    (status) => {
+      const fake = createFakeEnvironment()
+      const timers = createManualTimers()
+      const cache = createSessionDetailSubscriptionCache({
+        environmentId: FIXTURE_ENVIRONMENT_ID,
+        transport: fake.transport,
+        scheduleTimeout: timers.schedule,
+        clearScheduledTimeout: timers.clear,
+        maxCachedSubscriptions: 1,
+        now: incrementingClock(),
+      })
+      const session = sessionShell({ latestTurn: null })
+      expect(session.runtime).not.toBeNull()
+      if (!session.runtime) return
+
+      useChatProjectionStore
+        .getState()
+        .syncShellSnapshot(
+          FIXTURE_ENVIRONMENT_ID,
+          shellSnapshot({ sessions: [{ ...session, runtime: { ...session.runtime, status } }] }),
+        )
+
+      cache.retain(session.id)()
+      expect(cache.snapshot()[0]?.hasEvictionTimer).toBe(true)
+      timers.runAll()
+      expect(cache.size()).toBe(0)
+
+      cache.retain(session.id)()
+      const otherSessionId = parseSessionId('83820f69-dec0-53d9-9ab5-fddbd1dabb2d')
+      cache.retain(otherSessionId)()
+      expect(cache.snapshot().map((entry) => entry.sessionId)).toEqual([otherSessionId])
+      cache.disposeAll()
+    },
+  )
+
   test('evicts the oldest idle entries when the cache exceeds capacity', async () => {
     const fake = createFakeEnvironment()
     const cache = createSessionDetailSubscriptionCache({

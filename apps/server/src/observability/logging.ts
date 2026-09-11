@@ -26,14 +26,27 @@ type OperationSummary = OperationContext & {
 const streamRequestLogger = new AsyncLocalStorage<RequestLogger<Record<string, unknown>>>()
 
 const redactedDiagnosticValue = '[redacted]'
+// Error diagnostics redact quoted substrings and keep 500-character tails;
+// the shared sanitizer keeps 2000-character heads and preserves quoted text.
 const sensitiveErrorFields = new Set([
   'absolutePath',
+  'authorization',
+  'body',
+  'content',
+  'cookie',
   'cwd',
   'dest',
   'destination',
   'fileName',
   'filename',
+  'password',
+  'patch',
   'path',
+  'secret',
+  'set-cookie',
+  'text',
+  'token',
+  'x-api-key',
 ])
 
 export async function observeRequestOperation<T>(

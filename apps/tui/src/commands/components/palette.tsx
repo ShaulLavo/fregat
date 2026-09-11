@@ -3,7 +3,6 @@ import type { SessionId } from '@workspace/contracts'
 import type { ChatOwner } from '@workspace/client-core/chat/owner'
 import { quickAccessMode } from '@workspace/client-core/commands/palette'
 import { useTerminalDimensions } from '@opentui/react'
-import type { KeyValueStorage } from '@workspace/client-core/storage'
 import type { CommandId } from '@workspace/client-core/commands/catalog'
 import type { SettingsOwner } from '@workspace/client-core/settings/owner'
 
@@ -13,6 +12,7 @@ import type { FocusToken } from '@/commands/state/focus'
 import { paletteModeRows } from '@/commands/utils/palette-mode'
 import { setThemePreference } from '@/commands/utils/theme'
 import { readRecentCommands } from '@/storage/recents'
+import type { FileStorage } from '@/storage/files'
 import { Dialog } from '@/components/dialog'
 import { Prompt } from '@/components/prompt'
 import { Select } from '@/components/select'
@@ -36,7 +36,7 @@ export function CommandPalette({
   initialQuery = '>',
 }: {
   origin: FocusToken | null
-  storage: KeyValueStorage
+  storage: Pick<FileStorage, 'getItem' | 'removeItemIfValue' | 'setItem'>
   theme: Theme
   onClose: () => void
   onRun: (id: CommandId) => void

@@ -708,3 +708,5 @@ export {
   type OriginMachineDefinition,
   type Machines,
 } from './machines'
+
+export { jsonEqual } from './settings/json-equal'

@@ -5,6 +5,7 @@ import { claudeTerminalResumeArgv } from './utils/claude-terminal-resume'
 import { createInternalError } from '../observability/structured-errors'
 
 import {
+  jsonEqual,
   providerListResultSchema,
   type ProviderDriverKind,
   type ProviderInstanceId,
@@ -673,7 +674,7 @@ function unavailableSnapshot(entry: ProviderInstanceConfig, reason: string): Pro
 }
 
 function configEqual(left: ProviderInstanceConfig, right: ProviderInstanceConfig) {
-  return JSON.stringify(left) === JSON.stringify(right)
+  return jsonEqual(left, right)
 }
 
 function compareProviderSnapshots(left: ProviderSnapshot, right: ProviderSnapshot) {

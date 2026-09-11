@@ -2635,14 +2635,16 @@ function assertRelativeWorkspaceEditPath(input: string) {
 function assertInside(root: string, target: string) {
   const relative = path.relative(root, target)
   if (relative === '') return
-  if (!relative.startsWith(`..${path.sep}`) && !path.isAbsolute(relative)) return
+  if (relative !== '..' && !relative.startsWith(`..${path.sep}`) && !path.isAbsolute(relative))
+    return
 
   throw new FsError('WORKSPACE_EDIT_INVALID')
 }
 
-function isSameOrDescendant(root: string, target: string) {
+export function isSameOrDescendant(root: string, target: string) {
   const relative = path.relative(root, target)
   if (relative === '') return true
+  if (relative === '..') return false
   return !relative.startsWith(`..${path.sep}`) && !path.isAbsolute(relative)
 }
 

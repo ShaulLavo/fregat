@@ -17,12 +17,21 @@ const redactedDiagnosticValue = '[redacted]'
 const sensitiveFields = new Set([
   'absolutePath',
   'authorization',
+  'body',
+  'content',
+  'cookie',
   'cwd',
   'dest',
   'destination',
   'fileName',
   'filename',
+  'password',
+  'patch',
+  'secret',
+  'set-cookie',
+  'text',
   'token',
+  'x-api-key',
 ])
 
 export function reportClientError(report: ClientErrorReport): void {

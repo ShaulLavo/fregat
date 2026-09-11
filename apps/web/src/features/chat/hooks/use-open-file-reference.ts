@@ -34,7 +34,7 @@ export function useOpenFileReference() {
 }
 
 /** Editor positions are zero-based; transcript references are one-based. */
-function fileReferenceDefinitionTarget(reference: MarkdownFileReference) {
+export function fileReferenceDefinitionTarget(reference: MarkdownFileReference) {
   const line = Math.max(0, (reference.line ?? 1) - 1)
   const character = Math.max(0, (reference.column ?? 1) - 1)
 
@@ -44,6 +44,6 @@ function fileReferenceDefinitionTarget(reference: MarkdownFileReference) {
       end: { character: character + 1, line },
       start: { character, line },
     },
-    uri: `file://${reference.path.split('/').map(encodeURIComponent).join('/')}`,
+    uri: `file:///${reference.path.replace(/^\/+/, '').split('/').map(encodeURIComponent).join('/')}`,
   }
 }

@@ -1,4 +1,6 @@
 import assert from 'node:assert/strict'
+import { tmpdir } from 'node:os'
+import path from 'node:path'
 import { createEnvironmentClient } from '@workspace/client-core/transport/client'
 import { ORCHESTRATION_WS_PROTOCOL_VERSION, TUI_CLIENT_ORIGIN } from '@workspace/contracts'
 
@@ -6,6 +8,16 @@ import { createTestSettingsSession } from '../../../test/factories/session'
 import { createControlledInProcessTransport } from '../../../test/client'
 import { test, expect } from '../../../test/fixtures'
 import { makeTestServer } from '../../../test/server'
+
+test('creates the test workspace in the configured temporary directory', ({ server }) => {
+  expect(path.dirname(server.root)).toBe(tmpdir())
+})
+
+test('machine discovery uses the stopped test command', async ({ client }) => {
+  const response = await client.machines['tailnet-hosts'].get()
+  expect(response.status).toBe(200)
+  expect(response.data).toEqual({ status: 'unavailable', hosts: [], reason: 'not-running' })
+})
 
 test('reads real health and settings with the dedicated origin and client instance', async ({
   server,

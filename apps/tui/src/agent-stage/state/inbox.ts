@@ -1,5 +1,6 @@
 import * as v from 'valibot'
 import type { WorktreeId } from '@workspace/contracts'
+import { recordObservabilityWarning } from '@workspace/observability'
 import {
   normalizeTerminalContextSelection,
   type TerminalContextSelection,
@@ -16,12 +17,36 @@ export function queuePrompt(
   if (!normalized) return
   const key = `agent.inbox.worktree:${worktreeId}`
   storage.updateItem(key, (value) => {
-    const contexts = value ? v.parse(v.array(terminalContextSchema), JSON.parse(value)) : []
+    const contexts = readContexts(storage, key, value)
     return JSON.stringify([...contexts, normalized])
   })
 }
 
 export function readInbox(storage: FileStorage, worktreeId: WorktreeId) {
-  const value = storage.getItem(`agent.inbox.worktree:${worktreeId}`)
-  return value ? v.parse(v.array(terminalContextSchema), JSON.parse(value)) : []
+  const key = `agent.inbox.worktree:${worktreeId}`
+  return readContexts(storage, key, storage.getItem(key))
+}
+
+function readContexts(storage: FileStorage, key: string, raw: string | null) {
+  let current = raw
+  while (current !== null) {
+    const contexts = readContextsValue(storage, key, current)
+    if (contexts !== null) return contexts
+    current = storage.getItem(key)
+  }
+  return []
+}
+
+function readContextsValue(storage: FileStorage, key: string, raw: string) {
+  try {
+    return v.parse(v.array(terminalContextSchema), JSON.parse(raw))
+  } catch {
+    if (!storage.removeItemIfValue(key, raw)) return null
+    recordObservabilityWarning('tui.storage.read', {
+      area: 'storage',
+      storageKey: key,
+      outcome: 'discarded',
+    })
+    return []
+  }
 }

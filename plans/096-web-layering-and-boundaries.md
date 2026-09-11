@@ -5,7 +5,7 @@ Status: proposed, implementation not started. Requested 2026-09-11.
 This plan moves `apps/web` modules to the layer that owns them and deletes two dead surfaces. It
 covers duplication-census items 7.3, 7.4, 7.5, 7.6, the dead-export half of 8.9, and 9.13.
 [Root PLAN.md](../PLAN.md) owns execution order. It is independent of
-[Plan 090](090-duplicate-borne-defects.md), [Plan 091](091-error-and-timing-helpers.md),
+[Plan 090 regression record](../docs/duplicate-defect-regressions.md), [Plan 091](091-error-and-timing-helpers.md),
 [Plan 092](092-path-and-uri-helpers.md), [Plan 093](093-web-react-and-store-ceremony.md),
 [Plan 094](094-client-core-web-tui-parity.md) and [Plan 095](095-server-plumbing.md), but it renames
 and moves files those plans also edit. Run it last: rebasing a rename under their content edits is
@@ -399,7 +399,7 @@ inline icon (`:23`) at `p-6 text-xs`; `CompareNotice` carries neither, at `h-ful
 
 Separately, and in the same commit: `event-list.tsx:41` branches on `events.length === 0` only, so
 it renders "No logs match the current filters." while the query is still pending. `AGENTS.md`
-requires branching on pending before empty. [Plan 090](090-duplicate-borne-defects.md) owns the
+requires branching on pending before empty. [Plan 090 regression record](../docs/duplicate-defect-regressions.md) owns the
 doubled error banner in the same feature and [Plan 094](094-client-core-web-tui-parity.md) owns the
 log-dashboard client move; all three touch `features/logs/*` and should land together or in a
 declared order.
@@ -560,7 +560,7 @@ that could catch the regression. Never a repo-wide suite, never a bare test coun
   [Plan 095](095-server-plumbing.md) owns server plumbing; the only server file this plan edits is
   `apps/server/src/orchestration/routes.ts`, and only to delete two routes.
 - It does not fix the doubled logs error banner or the git mutation double-report.
-  [Plan 090](090-duplicate-borne-defects.md) owns the bug-bearing duplicates, including
+  [Plan 090 regression record](../docs/duplicate-defect-regressions.md) owns the bug-bearing duplicates, including
   `notify-mutation-error.ts` and `features/git/utils/api.ts`.
 
 ## Completion checklist

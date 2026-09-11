@@ -12,6 +12,52 @@ import { openTestChat, draftChatTurn } from '../../../test/factories/chat'
 import { createRailSession } from '../../../test/factories/agent-rail'
 import { createControlledInProcessTransport } from '../../../test/client'
 
+test.for([
+  { key: 'agent:rail:collapsed', raw: '{' },
+  { key: 'agent:rail:collapsed', raw: '[3]' },
+  { key: 'agent:rail:collapsed', raw: '' },
+  { key: 'agent:rail:seen', raw: '{' },
+  { key: 'agent:rail:seen', raw: '[3]' },
+  { key: 'agent:rail:seen', raw: '' },
+])(
+  'deletes corrupt rail state and warns once: $key = $raw',
+  async ({ key, raw }, { server, storageWarnings }) => {
+    const { session } = await openTestChat(server)
+    try {
+      const ready = session.getSnapshot()
+      assert(ready.kind === 'ready')
+      ready.storage.setItem(key, raw)
+      const store = createAgentRailState(session, ready)
+      expect(store.getSnapshot()).toMatchObject({ collapsed: [], seen: {} })
+      expect(ready.storage.getItem(key)).toBeNull()
+      store.dispose()
+      const reopened = createAgentRailState(session, ready)
+      expect(reopened.getSnapshot()).toMatchObject({ collapsed: [], seen: {} })
+      reopened.dispose()
+      expect(storageWarnings).toMatchObject([{ level: 'warn', storageKey: key }])
+    } finally {
+      session.dispose()
+    }
+  },
+)
+
+test('absent rail state uses empty defaults without warning', async ({
+  server,
+  storageWarnings,
+}) => {
+  const { session } = await openTestChat(server)
+  try {
+    const ready = session.getSnapshot()
+    assert(ready.kind === 'ready')
+    const store = createAgentRailState(session, ready)
+    expect(store.getSnapshot()).toMatchObject({ collapsed: [], seen: {} })
+    store.dispose()
+    expect(storageWarnings).toEqual([])
+  } finally {
+    session.dispose()
+  }
+})
+
 test('project registration, durable collapse and read stamps, and partial bulk failures use real state', async ({
   server,
 }) => {

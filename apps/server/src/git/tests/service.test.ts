@@ -5,6 +5,7 @@ import { afterEach, describe, expect, it, vi } from 'vitest'
 import { closeTestApps, createTestApp } from '../../../test/server'
 import { DEFAULT_MAX_TEXT_FILE_BYTES } from '../../fs/limits'
 import { createWorkspacePaths } from '../../fs/path'
+import { relativeInsideRoot } from '../path-utils'
 import { GitService } from '../service'
 import { testSettingsOptions } from '../../settings/testing'
 
@@ -14,6 +15,44 @@ const roots: string[] = []
 afterEach(async () => {
   await closeTestApps()
   await Promise.all(roots.splice(0).map((root) => rm(root, { recursive: true, force: true })))
+})
+
+describe('git paths beginning with two dots', () => {
+  it('maps a ..foo file to its repository path', () => {
+    expect(relativeInsideRoot('/repo', '/repo/..foo')).toBe('..foo')
+    expect(relativeInsideRoot('/repo', '/')).toBeNull()
+    expect(relativeInsideRoot('/repo', '/sibling')).toBeNull()
+  })
+
+  it('includes a ..foo file in status', async () => {
+    const root = await fixtureRepo()
+    await writeFile(path.join(root, '..foo'), 'inside\n')
+    const response = await testApp(root).handle(
+      new Request('http://local/git/status', {
+        headers: trustedOriginHeaders(),
+      }),
+    )
+
+    expect(response.status).toBe(200)
+    expect(await response.json()).toMatchObject({
+      files: expect.arrayContaining([expect.objectContaining({ path: '..foo' })]),
+    })
+  })
+
+  it('accepts a ..foo file as a stage pathspec', async () => {
+    const root = await fixtureRepo()
+    await writeFile(path.join(root, '..foo'), 'inside\n')
+    const response = await testApp(root).handle(
+      new Request('http://local/git/stage', {
+        body: JSON.stringify({ paths: ['..foo'] }),
+        headers: trustedOriginHeaders({ 'content-type': 'application/json' }),
+        method: 'POST',
+      }),
+    )
+
+    expect(response.status).toBe(200)
+    expect((await runGit(root, ['diff', '--cached', '--name-only'])).stdout.trim()).toBe('..foo')
+  })
 })
 
 describe('git rpc branches', () => {

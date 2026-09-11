@@ -550,7 +550,7 @@ function samePath(left: string, right: string): boolean {
 function isInsidePath(root: string, candidate: string): boolean {
   const relative = path.relative(root, candidate)
   if (relative === '') return true
-  if (relative.startsWith('..')) return false
+  if (relative === '..' || relative.startsWith(`..${path.sep}`)) return false
   return !path.isAbsolute(relative)
 }
 

@@ -473,5 +473,7 @@ function connectingStatus(entry: SessionDetailSubscriptionEntry): SessionDetailS
 function isBusySession(runtime: SessionRuntimeState | null) {
   if (!runtime) return false
 
-  return runtime.status !== 'idle' && runtime.status !== 'stopped'
+  return (
+    runtime.status === 'starting' || runtime.status === 'running' || runtime.status === 'waiting'
+  )
 }

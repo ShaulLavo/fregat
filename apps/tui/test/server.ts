@@ -1,4 +1,5 @@
-import { mkdir, mkdtemp, rm } from 'node:fs/promises'
+import { mkdtemp, rm } from 'node:fs/promises'
+import { tmpdir } from 'node:os'
 import path from 'node:path'
 import { TUI_CLIENT_ORIGIN } from '@workspace/contracts'
 import {
@@ -26,8 +27,7 @@ type TestServerOptions = Pick<AppOptions, 'terminal' | 'lsp' | 'workspaceEditDri
 }
 
 export async function makeTestServer(options: TestServerOptions = {}) {
-  await mkdir('/work/tmp', { recursive: true })
-  const root = await mkdtemp('/work/tmp/platform-tui-test-')
+  const root = await mkdtemp(path.join(tmpdir(), 'platform-tui-test-'))
   try {
     return buildTestServer(root, options)
   } catch (error) {
@@ -65,6 +65,7 @@ function createServerWithDatabase(
       auth: { allowedOrigins: [TEST_CLIENT_ORIGIN] },
       fonts: new NerdFontService({ cacheRoot: path.join(root, '.platform-test', 'fonts') }),
       metadataDatabase: database,
+      machines: { tailnetStatusCommand: async () => '{"BackendState":"Stopped"}' },
       orchestration: {
         attachmentsDir: path.join(root, '.platform-test', 'attachments'),
         database: database.db,

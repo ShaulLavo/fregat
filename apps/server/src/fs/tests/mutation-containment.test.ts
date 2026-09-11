@@ -9,10 +9,18 @@ import {
   writeFile,
 } from 'node:fs/promises'
 import path from 'node:path'
+import { createWorkspacePaths } from '../path'
+import { FileChangeHub } from '../watch'
+import { isSameOrDescendant, WorkspaceEditController } from '../workspace-edit'
 import { expect } from 'vitest'
 import { test, workspaceRequest as request } from '../../../test/factories/workspace-address'
 
 const escapingMutations = [
+  {
+    name: 'create a folder at the workspace parent',
+    route: 'create-folder',
+    body: { path: '..', recursive: true },
+  },
   {
     name: 'write through a file link',
     route: 'write',
@@ -101,6 +109,38 @@ for (const scenario of escapingMutations) {
     expect(await response.json()).toMatchObject({ error: { code: 'PATH_OUTSIDE_WORKSPACE' } })
   })
 }
+
+test('workspace edit directional containment excludes the immediate parent', () => {
+  const root = path.resolve('/workspace/project')
+
+  expect(isSameOrDescendant(root, path.dirname(root))).toBe(false)
+  expect(isSameOrDescendant(path.dirname(root), root)).toBe(true)
+  expect(isSameOrDescendant(root, path.join(root, '..foo'))).toBe(true)
+})
+
+test('workspace edit mutation gate rejects the workspace parent before calling the mutation', async ({
+  workspace,
+}) => {
+  const paths = createWorkspacePaths(workspace.root)
+  const changes = new FileChangeHub(paths, { enabled: false })
+  const controller = new WorkspaceEditController({
+    paths,
+    changes,
+    journalRoot: path.join(workspace.directory, 'journal'),
+  })
+  let called = false
+  try {
+    await expect(
+      controller.withLegacyMutation([workspace.directory], async () => {
+        called = true
+      }),
+    ).rejects.toMatchObject({ code: 'WORKSPACE_EDIT_INVALID' })
+    expect(called).toBe(false)
+  } finally {
+    await controller.close()
+    await changes.close()
+  }
+})
 
 test('mutates internal file and directory aliases without replacing the links', async ({
   workspace,

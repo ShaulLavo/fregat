@@ -6,6 +6,7 @@ import { logsKeys } from '@/lib/query-keys'
 import { useFocusTarget } from '@/lib/focus/hooks/use-target'
 import { logDashboardFilters } from '@/features/logs/utils/filter-params'
 import { logFilterQuery, logToolbarOptionFilters } from '@/features/logs/utils/filter-params'
+import { useLogEvents } from '@/features/logs/hooks/use-events'
 import { useLogSummary } from '@/features/logs/hooks/use-summary'
 import { LogsEventListContainer } from '@/features/logs/components/event-list-container'
 import { LogsTimeline } from '@/features/logs/components/timeline'
@@ -46,6 +47,7 @@ export const LogsPanel = memo(({ active }: LogsPanelProps) => {
   const queryFilters = useMemo(() => logFilterQuery(filters), [filters])
   const optionFilters = useMemo(() => logToolbarOptionFilters(filters), [filters])
   const optionQueryFilters = useMemo(() => logFilterQuery(optionFilters), [optionFilters])
+  const events = useLogEvents(filters, active)
   const summary = useLogSummary(filters, active)
   const optionSummary = useLogSummary(optionFilters, active)
 
@@ -79,13 +81,14 @@ export const LogsPanel = memo(({ active }: LogsPanelProps) => {
         onRefresh={handleRefresh}
       />
       <LogsTimeline summary={summary.data} />
-      {summary.isError ? (
+      {summary.isError || events.isError ? (
         <div className='bg-destructive/10 text-destructive compact:px-2 compact:py-1.5 border-b px-3 py-2 text-xs'>
           Could not read local logs.
         </div>
       ) : null}
       <LogsEventListContainer
         active={active}
+        data={events.data}
         filters={filters}
         inspectedEventId={inspectedEventId}
         onInspectEvent={handleInspectEvent}

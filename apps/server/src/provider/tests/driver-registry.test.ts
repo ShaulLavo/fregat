@@ -84,6 +84,18 @@ describe('provider driver registry', () => {
     expect(await work.hasRuntime({ sessionId: sessionId() })).toBe(false)
   })
 
+  it('keeps an adapter when only provider config key order changes', async () => {
+    const home = await fixtureRoot()
+    const credentialsPath = path.join(home, 'work.json')
+    const registry = createRegistry()
+    await registry.reconcile([instance(WORK, { credentialsPath, responseText: 'same' })])
+    const before = adapterFor(registry, WORK)
+
+    await registry.reconcile([instance(WORK, { responseText: 'same', credentialsPath })])
+
+    expect(adapterFor(registry, WORK)).toBe(before)
+  })
+
   it('rebuilds an instance whose config changed', async () => {
     const home = await fixtureRoot()
     const registry = createRegistry()

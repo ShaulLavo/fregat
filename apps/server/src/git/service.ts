@@ -798,7 +798,7 @@ export class GitService {
     const absolutePath = this.resolveServicePath(input).absolutePath
     const relative = path.relative(rootAbsolutePath, absolutePath)
     if (relative === '') return null
-    if (relative.startsWith('..') || path.isAbsolute(relative)) {
+    if (relative === '..' || relative.startsWith(`..${path.sep}`) || path.isAbsolute(relative)) {
       throw new FsError('GIT_REPOSITORY_NOT_FOUND')
     }
 

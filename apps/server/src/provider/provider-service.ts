@@ -13,6 +13,7 @@ import type {
 } from '@workspace/contracts'
 import {
   DEFAULT_INTERACTION_MODE,
+  jsonEqual,
   DEFAULT_RUNTIME_MODE,
   sessionIdSchema,
   turnIdSchema,
@@ -1082,10 +1083,6 @@ function modelSelectionsEqual(left: ModelSelection | undefined, right: ModelSele
   if (left.model !== right.model) return false
 
   return jsonEqual(left.options ?? null, right.options ?? null)
-}
-
-function jsonEqual(left: unknown, right: unknown) {
-  return JSON.stringify(left) === JSON.stringify(right)
 }
 
 function noop() {}

@@ -1,7 +1,7 @@
 import { mkdir, mkdtemp, rm, writeFile } from 'node:fs/promises'
 import { tmpdir } from 'node:os'
 import path from 'node:path'
-import { afterEach, describe, expect, it } from 'vitest'
+import { afterEach, describe, expect, it, onTestFinished } from 'vitest'
 import { TypeScriptLspSession } from '../session'
 
 type JsonMessage = Record<string, unknown>
@@ -13,6 +13,46 @@ afterEach(async () => {
 })
 
 describe('TypeScriptLspSession', () => {
+  it.each(['normal.ts', '..foo.ts'])(
+    'answers hover and publishes diagnostics for the root-level file %s',
+    async (fileName) => {
+      const text = 'export const value: string = 1\n'
+      const root = await fixtureRoot({ [fileName]: text })
+      const { messages, session } = sessionForRoot(root)
+      onTestFinished(() => session.dispose())
+      const uri = fileUri(path.join(root, fileName))
+
+      initialize(session)
+      openDocument(session, uri, text)
+      const hover = await request(session, messages, 2, 'textDocument/hover', {
+        textDocument: { uri },
+        position: { line: 0, character: 15 },
+      })
+
+      expect.soft(hover).toMatchObject({
+        result: {
+          contents: {
+            kind: 'markdown',
+            value: expect.stringContaining('const value: string'),
+          },
+        },
+      })
+      await expect
+        .poll(() =>
+          messages.find((message) => message.method === 'textDocument/publishDiagnostics'),
+        )
+        .toMatchObject({
+          params: {
+            uri,
+            version: 0,
+            diagnostics: [
+              expect.objectContaining({ code: 2322, source: 'typescript', severity: 1 }),
+            ],
+          },
+        })
+    },
+  )
+
   it('publishes diagnostics from dirty open-document text instead of disk', async () => {
     const root = await fixtureRoot({
       'src/index.ts': "export const value: string = 'ok'\n",

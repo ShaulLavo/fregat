@@ -9,7 +9,7 @@ mechanical web copies. [Root PLAN.md](../PLAN.md) owns execution order; nothing 
 
 Two sequencing constraints bind this plan to its siblings. [Plan 091](091-error-and-timing-helpers.md)
 item 1.4 rewrites `apps/web/src/lib/structured-errors.ts`, which item 5.1 rewrites too — 1.4 lands
-first. [Plan 090](090-duplicate-borne-defects.md) item 7.1a rewrites
+first. [Plan 090 regression record](../docs/duplicate-defect-regressions.md) item 7.1a rewrites
 `apps/web/src/features/git/utils/api.ts`, which item 7.2c rewrites too — one pass, 090 first.
 [Plan 094](094-client-core-web-tui-parity.md) owns census 5.4 (the twelve TUI state factories) and
 4.11b, which touches the same git api file. [Plan 096](096-web-layering-and-boundaries.md) owns 7.3
@@ -449,7 +449,7 @@ lints staged files only, so a repo-wide import change needs the explicit run.
 - It does not fix `notify-mutation-error`'s double wide event, the doubled logs banner, the
   `use-element-width` ref bug, `fileLoadState`'s pending-as-empty fall-through, or the
   `panelTabTitle`/`chatModeToolTabLabel` fork. Census 7.1 belongs to
-  [Plan 090](090-duplicate-borne-defects.md).
+  [Plan 090 regression record](../docs/duplicate-defect-regressions.md).
 - It does not move `features/menus`, refolder `features/environments`, relocate `lib/` modules below
   the two-consumer bar, or take any of the feature-local extractions in census 7.4 — including the
   chat storage modules (7.4a, 7.6), the two rankers (7.4b) and the document schemes (7.4e). Census 7.3,

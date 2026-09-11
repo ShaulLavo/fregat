@@ -4,7 +4,7 @@ Status: proposed, implementation not started. Requested 2026-09-11.
 
 [Root PLAN.md](../PLAN.md) owns execution order; this plan owns only the sequence inside itself.
 It takes census items 1.1, 1.3, 1.4, 1.5, 2.1, 2.2, 2.3, 2.4, the export half of 6.1, and the two
-LEAVE-IT records 9.1 and 9.3. [Plan 090](090-duplicate-borne-defects.md) owns the in-place credential
+LEAVE-IT records 9.1 and 9.3. [Plan 090 regression record](../docs/duplicate-defect-regressions.md) owns the in-place credential
 redaction fix and must land first. [Plan 092](092-path-and-uri-helpers.md) owns every path and URI
 helper, [Plan 093](093-web-react-and-store-ceremony.md) the React and store ceremony,
 [Plan 094](094-client-core-web-tui-parity.md) the web↔TUI clients, [Plan 095](095-server-plumbing.md)
@@ -146,10 +146,11 @@ and its message rule (`:178`) is byte-identical to `logging.ts:290`: every singl
 becomes `'[redacted]'`. The shared walker has no analogue for that rule, so folding `sanitizeCause`
 into it deletes a redaction.
 
-`sanitizeCause` therefore stays where it is. Its credential-blind field list is the same defect
-[Plan 090](090-duplicate-borne-defects.md) fixes in `logging.ts:29`; add `fs/errors.ts:29` to that
-plan's fix rather than to this one's merge. Leave a two-line comment at `fs/errors.ts:136` naming the
-quote-stripping rule as the reason it is not the shared sanitizer.
+`sanitizeCause` therefore stays where it is. Plan 090 widened the request logger's field set,
+but left this constructor's list unchanged. Current responses omit causes, and request logging
+redacts them again. This plan owns widening the constructor's list before any consolidation, with
+a direct `FsError.cause` regression. Keep a short comment naming quote stripping as the reason
+this sanitizer remains separate.
 
 ## Give `errorSummary` one implementation and name the losing rules
 
@@ -343,7 +344,7 @@ correct move is a private `src/internal/is-record.ts` that both import, rather t
 **Reconcile** Nothing; all six bodies are identical. Do **not** pull in
 `packages/ui/src/components/resizable.tsx:164`: it omits `!Array.isArray`, `packages/ui` has zero
 workspace dependencies, and swapping in the contracts version changes what `isResizableLayout` accepts.
-That one is census item 9.2 and belongs to [Plan 090](090-duplicate-borne-defects.md).
+That one is census item 9.2 and belongs to [Plan 090 regression record](../docs/duplicate-defect-regressions.md).
 
 ## Collapse the duplicate `client` error catalog
 
@@ -475,10 +476,9 @@ site. Prove it with the diff and a typecheck, not a test.
 
 ## Do not do these here
 
-- **The in-place credential-key fixes** at `apps/server/src/observability/logging.ts:29` and
-  `apps/server/src/fs/errors.ts:29`, and the `packages/ui/src/components/resizable.tsx:164` guard.
-  [Plan 090](090-duplicate-borne-defects.md) owns them. This plan depends on 090 landing first so the
-  merge does not appear to fix a hole it did not.
+- **The completed request-logger credential fixes** and the persisted resizable-layout guard
+  belong to the [Plan 090 regression record](../docs/duplicate-defect-regressions.md).
+  Preserve their tests. The separate `FsError.cause` hardening above remains this plan's work.
 - **Converting `jsonEqual`'s four consumers** (`apps/server/src/settings/store.ts:1121`,
   `apps/web/src/features/settings/utils/default-value.ts:22`,
   `apps/server/src/provider/provider-service.ts:1087`,

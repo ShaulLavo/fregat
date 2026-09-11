@@ -5,7 +5,7 @@ Status: proposed, implementation not started. Requested 2026-09-11.
 This is the `basename`-trap plan. Every step below states the behavioural divergence before the merge
 and names which behaviour wins. A step that reads "extract the shared helper" without that statement
 is not ready to execute. [Root PLAN.md](../PLAN.md) owns execution order; this plan owns only the
-merges. It depends on [Plan 090](090-duplicate-borne-defects.md) landing two URI bug fixes first.
+merges. It depends on [Plan 090 regression record](../docs/duplicate-defect-regressions.md) landing two URI bug fixes first.
 
 The rule this plan exists to respect is [AGENTS.md:18](../AGENTS.md): six `basename` variants in
 `apps/web/src` share `(string) => string` and disagree on the empty-path answer, so a wrong merge
@@ -44,7 +44,7 @@ variants feed:
 - `apps/web/src/features/address/utils/definition-target.ts:13` emits `` `file://${path.startsWith('/') ? path : `/${path}`}` `` — unencoded, so a path containing a space or `#` never string-compares equal to the URI the LSP layer opened the document under.
 - `apps/web/src/features/chat/hooks/use-open-file-reference.ts:47` emits `` `file://${reference.path.split('/').map(encodeURIComponent).join('/')}` `` with no leading-slash strip, so relative `src/a.ts` becomes `file://src/a.ts`, where `src` parses as the **host** and `new URL(…).pathname` is `/a.ts` — the wrong file.
 
-Both belong to [Plan 090](090-duplicate-borne-defects.md). Swapping them onto a shared helper in the
+Both belong to [Plan 090 regression record](../docs/duplicate-defect-regressions.md). Swapping them onto a shared helper in the
 same pass repairs them silently and destroys the evidence that they were broken. Do not start the
 next section until 090's fixes and their regression tests are on `main`.
 
@@ -420,7 +420,7 @@ new contracts exports.
 ## Stay out of these
 
 - **The two false-twin URI bugs** at `definition-target.ts:13` and `use-open-file-reference.ts:47`
-  belong to [Plan 090](090-duplicate-borne-defects.md). This plan depends on them; it does not fix
+  belong to [Plan 090 regression record](../docs/duplicate-defect-regressions.md). This plan depends on them; it does not fix
   them.
 - **`errorMessage`, `errorSummary`, `elapsedMs`, and error construction** belong to
   [Plan 091](091-error-and-timing-helpers.md), including the copies inside the files touched here.

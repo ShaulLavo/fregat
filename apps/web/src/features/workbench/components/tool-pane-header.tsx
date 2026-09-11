@@ -151,7 +151,7 @@ function stopToolPaneHeaderPointerDown(event: PointerEvent<HTMLButtonElement>) {
 function panelTabTitle(tab: ToolPaneHeaderTab | undefined) {
   if (tab === 'chat') return 'Chat'
   if (tab === 'files') return 'Files'
-  if (tab === 'git') return 'Source Control'
+  if (tab === 'git') return 'Git'
   if (tab === 'logs') return 'Logs'
   if (tab === 'problems') return 'Problems'
   if (tab === 'search') return 'Search'
