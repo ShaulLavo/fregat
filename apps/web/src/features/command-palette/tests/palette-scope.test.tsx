@@ -1,6 +1,6 @@
 import { testScopedStorage } from '../../../../test/factories/scoped-storage'
 import { createTestApplicationRuntime } from '../../../../test/factories/application-runtime'
-import { screen, waitFor } from '@testing-library/react'
+import { screen, waitFor, within } from '@testing-library/react'
 import { useQueryClient } from '@tanstack/react-query'
 import userEvent from '@testing-library/user-event'
 
@@ -39,7 +39,7 @@ test('typing filters the sub-picker, and deleting it back to empty stays inside'
   await user.type(input, 'monokai')
 
   await waitFor(() => expect(screen.queryByText('Dark Plus')).toBeNull())
-  expect(screen.getByText('Monokai')).toBeInTheDocument()
+  expect(within(screen.getByRole('listbox')).getByText('Monokai')).toBeInTheDocument()
 
   // The bug this guards: the mode used to live in the input as the text `theme `,
   // so deleting a query one character at a time walked straight out of the picker.

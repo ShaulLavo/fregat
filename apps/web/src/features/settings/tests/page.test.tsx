@@ -17,9 +17,16 @@ import { emptyWorkspaceState } from '@/features/workspace/state/cache'
 import { TestEditorStateProvider as EditorStateProvider } from '../../../../test/factories/editor-state-provider'
 import { selectSettingsScope } from '@/features/settings/state/scope-store'
 import { selectSettingsView } from '@/features/settings/state/view-store'
+import { selectSettingsSearch } from '@/features/settings/state/search-store'
 import { settingsJsonDocumentId } from '@/features/settings/utils/json-document'
 import { FocusService } from '@/lib/focus/state/service'
 import { matchesActiveSurface } from '@/lib/focus/utils/active-surface'
+
+test.afterEach(() => {
+  selectSettingsScope('user')
+  selectSettingsView('form')
+  selectSettingsSearch('')
+})
 
 test('renders a row per user-visible setting and writes a toggle through', async ({ client }) => {
   expect(client).toBeDefined()
