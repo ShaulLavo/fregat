@@ -36,6 +36,11 @@ export interface FileTreeFocusCoordinator {
   readonly suppressNextPointerFocusScroll: (path: string) => void
 }
 
+interface PendingScrollSettlement {
+  readonly path: string
+  readonly request: NonNullable<ReturnType<FileTreeController['getScrollRequest']>>
+}
+
 interface UseFileTreeFocusSyncOptions {
   readonly controller: FileTreeController
   readonly dom: FileTreeRowDom
@@ -90,8 +95,7 @@ export function useFileTreeFocusSync(
   const previousFocusedPathRef = useRef<string | null>(null)
   const processedFocusRequestIdRef = useRef<number | null>(null)
   const processedScrollRequestIdRef = useRef(0)
-  const pendingScrollSettlementRef =
-    useRef<ReturnType<FileTreeController['getScrollRequest']>>(null)
+  const pendingScrollSettlementRef = useRef<PendingScrollSettlement | null>(null)
   const restoreTreeFocusAfterSearchCloseRef = useRef(false)
   const restoreTreeFocusViewportOffsetRef = useRef<number | null>(null)
   const stickyKeyboardFocusRef = useRef<StickyKeyboardFocusMode>(NO_STICKY_KEYBOARD_FOCUS)
@@ -141,7 +145,7 @@ export function useFileTreeFocusSync(
     (request: NonNullable<typeof scrollRequest>, behavior = request.behavior) => {
       const scrollElement = getScroll()
       const row = controller.getVisibleRows(request.visibleIndex, request.visibleIndex)[0]
-      if (!scrollElement || !row) return false
+      if (!scrollElement || !row) return null
       const topInset = stickyFolders
         ? Math.max(
             0,
@@ -151,25 +155,31 @@ export function useFileTreeFocusSync(
             ),
           )
         : stickyOverlayHeight
-      return scrollFocusedRowToOffset(
-        scrollElement,
-        request.visibleIndex,
-        itemHeight,
-        resolvedViewportHeight,
-        totalScrollableHeight,
-        request.offset,
-        topInset,
-        behavior,
-      )
+      return {
+        path: row.path,
+        scrolled: scrollFocusedRowToOffset(
+          scrollElement,
+          request.visibleIndex,
+          itemHeight,
+          resolvedViewportHeight,
+          totalScrollableHeight,
+          request.offset,
+          topInset,
+          behavior,
+        ),
+      }
     },
   )
   const settleScrollRequest = useEffectEvent(() => {
-    const request = pendingScrollSettlementRef.current
+    const pending = pendingScrollSettlementRef.current
     pendingScrollSettlementRef.current = null
-    if (!request) return
+    if (!pending) return
+    const { request, path } = pending
     const newerRequest = controller.getScrollRequest()
     if (newerRequest && newerRequest.id !== request.id) return
-    if (applyScrollRequest(request, 'auto')) updateViewport.current()
+    const row = controller.getVisibleRows(request.visibleIndex, request.visibleIndex)[0]
+    if (row?.path !== path) return
+    if (applyScrollRequest(request, 'auto')?.scrolled) updateViewport.current()
   })
 
   useLayoutEffect(() => {
@@ -230,10 +240,15 @@ export function useFileTreeFocusSync(
     if (scrollRequest != null && scrollRequest.id !== processedScrollRequestIdRef.current) {
       processedScrollRequestIdRef.current = scrollRequest.id
       pendingScrollSettlementRef.current = null
-      shouldSuppressDomFocusForScrollRequest = true
-      shouldUpdateViewportForScrollRequest = applyScrollRequest(scrollRequest)
-      // Cancellation can still deliver one queued compositor scroll event.
-      if (!shouldUpdateViewportForScrollRequest) pendingScrollSettlementRef.current = scrollRequest
+      const result = applyScrollRequest(scrollRequest)
+      if (result) {
+        shouldSuppressDomFocusForScrollRequest = true
+        shouldUpdateViewportForScrollRequest = result.scrolled
+        // Cancellation can still deliver one queued compositor scroll event.
+        pendingScrollSettlementRef.current = result.scrolled
+          ? null
+          : { path: result.path, request: scrollRequest }
+      }
       controller.clearScrollRequest(scrollRequest.id)
     }
 

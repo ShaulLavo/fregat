@@ -220,6 +220,73 @@ describe('FileTree browser behavior', () => {
     ).toBeGreaterThanOrEqual(scrollElement.getBoundingClientRect().top)
   })
 
+  it('invalidates a cancelled reveal when projection order changes its row', async () => {
+    const { model: currentModel, shadowRoot } = await mountBrowserTree({
+      pathCount: 80,
+      stickyFolders: false,
+    })
+    const scrollElement = virtualScroll(shadowRoot)
+    await startSmoothReveal(currentModel, shadowRoot)
+    flushSync(() => {
+      currentModel.scrollToPath('src/features/a-0.ts', { behavior: 'smooth', focus: false })
+    })
+    flushSync(() => {
+      currentModel.resetPaths([...browserPaths(80), 'src/features/0-before.ts'])
+    })
+    const rows = shadowRoot.querySelectorAll<HTMLButtonElement>('button[data-item-path]')
+    expect(rows[1]?.dataset.itemPath).toBe('src/features/0-before.ts')
+    expect(rows[2]?.dataset.itemPath).toBe('src/features/a-0.ts')
+
+    scrollElement.scrollTop = 24
+    await threeAnimationFrames()
+
+    expect(scrollElement.scrollTop).toBe(24)
+    expect(
+      rowButton(shadowRoot, 'src/features/a-0.ts').getBoundingClientRect().top,
+    ).toBeGreaterThanOrEqual(scrollElement.getBoundingClientRect().top)
+  })
+
+  it('discards a cancelled reveal when its path is removed', async () => {
+    const { model: currentModel, shadowRoot } = await mountBrowserTree({
+      pathCount: 80,
+      stickyFolders: false,
+    })
+    const scrollElement = virtualScroll(shadowRoot)
+    await startSmoothReveal(currentModel, shadowRoot)
+    flushSync(() => {
+      currentModel.scrollToPath('src/features/a-0.ts', { behavior: 'smooth', focus: false })
+    })
+    flushSync(() => {
+      currentModel.remove('src/features/a-0.ts')
+    })
+    expect(currentModel.getItem('src/features/a-0.ts')).toBeNull()
+    const rows = shadowRoot.querySelectorAll<HTMLButtonElement>('button[data-item-path]')
+    expect(rows[1]?.dataset.itemPath).toBe('src/features/a-1.ts')
+
+    scrollElement.scrollTop = 24
+    await threeAnimationFrames()
+
+    expect(scrollElement.scrollTop).toBe(24)
+  })
+
+  it('a missing scroll row does not suppress an explicit focus request', async () => {
+    const { model: currentModel, shadowRoot } = await mountBrowserTree({ pathCount: 80 })
+    const outsideButton = document.createElement('button')
+    document.body.prepend(outsideButton)
+    outsideButton.focus()
+
+    flushSync(() => {
+      currentModel.scrollToPath('src/features/a-79.ts', { focus: false })
+      currentModel.resetPaths(browserPaths(4))
+      currentModel.focusPath('src/features/a-0.ts')
+      currentModel.focus()
+    })
+
+    expect(currentModel.getItem('src/features/a-79.ts')).toBeNull()
+    expect(currentModel.getFocusedPath()).toBe('src/features/a-0.ts')
+    expect(activePath(shadowRoot)).toBe('src/features/a-0.ts')
+  })
+
   it('a cancelled reveal cannot overwrite a newer scroll request', async () => {
     const { model: currentModel, shadowRoot } = await mountBrowserTree({
       pathCount: 80,
