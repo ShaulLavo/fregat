@@ -345,6 +345,8 @@ function activityLifecycle(
   const status = normalizedLifecycle(stringValue(payload.status) ?? stringValue(data.status))
   if (status === 'declined' || status === 'stopped') return status
   if (outcome === 'failed' || activity.tone === 'error') return 'failed'
+  // A search with no matches exits 1 but finishes normally.
+  if (status === 'failed' && outcome === 'neutral') return 'completed'
   if (status) return status
   if (activity.kind.endsWith('.completed')) return 'completed'
 

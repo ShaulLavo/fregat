@@ -3,7 +3,9 @@ import userEvent from '@testing-library/user-event'
 
 import { ActivityRow } from '@/features/chat/components/activity-row'
 import { ActivityGroupRow } from '@/features/chat/components/activity-group-row'
+import { chatWorkLogEntries } from '@/features/chat/utils/work-log'
 import { useChatWorkLogExpansionStore } from '@/features/chat/state/chat-work-log-expansion-store'
+import { sessionActivity } from '../../../../../test/factories/chat'
 import { workLogEntry as entry } from '../../../../../test/factories/work-log'
 import { expect, test } from '../../../../../test/fixtures'
 import { renderWithProviders } from '../../../../../test/render'
@@ -140,6 +142,34 @@ test('expansion survives the row unmounting', async () => {
 function resetExpansion() {
   useChatWorkLogExpansionStore.setState({ expandedGroupIds: {}, expandedRowIds: {} })
 }
+
+test('a native no-match search finishes without failure styling', async () => {
+  resetExpansion()
+  const [activity] = chatWorkLogEntries({
+    activities: [
+      sessionActivity({
+        kind: 'tool.completed',
+        tone: 'tool',
+        payload: {
+          itemType: 'command_execution',
+          toolCallId: 'no-match-search',
+          status: 'failed',
+          data: {
+            command: 'rg absent existing.txt',
+            status: 'failed',
+            exitCode: 1,
+            aggregatedOutput: '',
+          },
+        },
+      }),
+    ],
+  })
+  expect(activity).toMatchObject({ outcome: 'neutral', lifecycle: 'completed' })
+  renderWithProviders(<ActivityRow activity={activity!} />)
+  expect(screen.queryByLabelText('Failed')).not.toBeInTheDocument()
+  await userEvent.click(screen.getByRole('button', { name: 'rg absent existing.txt' }))
+  expect(screen.getByLabelText('Result')).toHaveTextContent('No matches · Exit code 1')
+})
 
 test('a reasoning summary can be expanded to read the entire text', async () => {
   resetExpansion()

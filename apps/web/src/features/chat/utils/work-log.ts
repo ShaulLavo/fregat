@@ -318,7 +318,7 @@ function derivedWorkLogEntry(activity: OrchestrationSessionActivity): DerivedCha
     title: presentation.title,
     toolCallKey: workLogIdentity(activity, presentation.toolCallId),
     reasoningDelta: chatActivityReasoningDelta(activity) !== null,
-    tone: workLogTone(activity),
+    tone: workLogTone(activity, presentation.outcome),
     ...(presentation.tool ? { tool: presentation.tool } : {}),
     turnId: activity.turnId,
   }
@@ -350,8 +350,11 @@ function reasoningSection(payload: unknown) {
   return `${payload.streamKind}:${contentIndex ?? ''}:${summaryIndex ?? ''}`
 }
 
-function workLogTone(activity: OrchestrationSessionActivity): ChatWorkLogTone {
-  if (chatActivityHasFailure(activity)) return 'error'
+function workLogTone(
+  activity: OrchestrationSessionActivity,
+  outcome: ChatActivityOutcome | null,
+): ChatWorkLogTone {
+  if (outcome !== 'neutral' && chatActivityHasFailure(activity)) return 'error'
   if (activity.kind === 'task.progress') return 'thinking'
   if (activity.tone === 'approval') return 'info'
   if (activity.tone === 'thinking') return 'thinking'
