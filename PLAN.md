@@ -268,9 +268,11 @@ one owner each, keeping the `parentPath` families deliberately split. Plan 093 c
 context guard, six store contexts, the deferred-commit widgets, and the Git mutation and test runners in
 `apps/web`. Plan 094 moves the domain logic `apps/web` and `apps/tui` each wrote twice into
 `packages/client-core` and `packages/contracts`. Plan 095 collapses the duplicated WebSocket adapters,
-atomic writers, listener bridges, and Git common-directory resolutions in `apps/server`. Plan 096 settles
-`apps/web` layering, moving modules to the layer that owns them and deleting unused contracts exports and
-clientless routes.
+atomic writers, listener bridges, and Git common-directory resolutions in `apps/server`. Plan 096 has
+implemented web layering, shared helper ownership, and unused API removal on `main`. Its
+[implementation reference](docs/web-layering.md) records the isolated moves and passing focused,
+typecheck, lint, build, and browser checks. The executable plan retains its unchecked clean-Knip gate
+because the calibrated audit still reports pre-existing unused declarations.
 
 Every unification step names the behavioural divergences it reconciles and states which behaviour wins;
 these variants share signatures, so a wrong merge typechecks. Plan 096 settles the shared Git contract and

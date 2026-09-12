@@ -1,6 +1,9 @@
 # Settle apps/web layering
 
-Status: proposed, implementation not started. Requested 2026-09-11.
+Status: implemented on main, 2026-09-12. Focused checks, lint, typecheck, build, and browser
+verification pass. The original clean-Knip gate still has pre-existing baseline findings.
+See [implementation reference](../docs/web-layering.md) for decisions, retained owners,
+commit boundaries, and verification. Requested 2026-09-11.
 
 This plan moves `apps/web` modules to the layer that owns them and deletes two dead surfaces. It
 covers duplication-census items 7.3, 7.4, 7.5, 7.6, the dead-export half of 8.9, and 9.13.
@@ -34,9 +37,9 @@ called out separately when they change the picture.
 
 ## Reconcile the baseline
 
-Platform base `75caae889d967fed0e0c8df85aa315670ef9fe49`. Working tree is clean apart from the
-sibling plans in `plans/`. Re-run the drift check and capture HEAD plus the full dirty diff before
-editing.
+The proposal used Platform base `75caae889d967fed0e0c8df85aa315670ef9fe49`. Implementation
+started at `3c935f6a` with substantial local changes, captured before editing and committed as
+`bfbdbf6d` with user authorization. The implementation reference records the reconciled owners.
 
 | Existing owner                                           | Work to build on                                                           |
 | -------------------------------------------------------- | -------------------------------------------------------------------------- |
@@ -535,15 +538,17 @@ that could catch the regression. Never a repo-wide suite, never a bare test coun
 
 ## Completion checklist
 
-- [ ] `apps/web/src/lib/**` has zero non-test `@/features/*` imports, and a check enforces it.
-- [ ] Every move in this plan landed with its consumer count recorded in the commit message.
-- [ ] `globalChromeStorage` catches on all four accessors, and that landed before any repointing.
-- [ ] The four 7.6 reconciles are answered in writing; unadopted modules say why they stayed.
-- [ ] No migration or healing code was written for state the previous storage readers persisted; the
+- [x] `apps/web/src/lib/**` has zero non-test `@/features/*` imports, and a check enforces it.
+- [x] Every move in this plan landed with its consumer count recorded in the commit message.
+- [x] `globalChromeStorage` catches on all four accessors, and that landed before any repointing.
+- [x] The four 7.6 reconciles are answered in writing; unadopted modules say why they stayed.
+- [x] No migration or healing code was written for state the previous storage readers persisted; the
       keys a developer may clear are named in this plan.
-- [ ] Each divergence listed in 7.4 has an explicit winner, or the extraction did not happen.
-- [ ] Pass A, Pass B and Pass C are three commits, each containing nothing else.
-- [ ] `packages/contracts/src/order-key.ts` keeps only the primitives with production callers, and
+- [x] Each divergence listed in 7.4 has an explicit winner, or the extraction did not happen.
+- [x] Pass A, Pass B and Pass C are three commits, each containing nothing else.
+- [x] `packages/contracts/src/order-key.ts` keeps only the primitives with production callers, and
       `docs/logseq-parity-gap-matrix.md:92,357` cite real code.
-- [ ] `apps/server/src/orchestration/routes.ts` has no SSE registration, and WS RPC coverage is intact.
-- [ ] `bun run knip` is clean on every touched workspace.
+- [x] `apps/server/src/orchestration/routes.ts` has no SSE registration, and WS RPC coverage is intact.
+- [ ] `bun run knip` is clean on every touched workspace. The calibrated report has no
+      unresolved imports or newly unused export/type symbols; unrelated baseline findings
+      remain visible in the implementation reference.

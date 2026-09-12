@@ -1,5 +1,7 @@
 # Plan 097: Carry operation owners and source revisions through async workflows
 
+Implementation note, 2026-09-12: Plan 096 implemented helper and module ownership changes after the recorded source baseline. Re-run this plan's drift check before implementation. Application environment connections and persistence remain at app scope; environment UI and discovery moved into their feature. See [web layering](../docs/web-layering.md).
+
 Status: proposed; Plan 098 prerequisite completed and verified; implementation has not started.
 Refreshed against Platform `3c935f6a` plus the completed, uncommitted Plan 098 changes on
 2026-09-12. The linked Editor baseline remains `6492651`. Priority P1, effort L across several

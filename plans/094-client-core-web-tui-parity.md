@@ -1,5 +1,7 @@
 # Move runtime-neutral web and TUI logic into packages/client-core
 
+Implementation note, 2026-09-12: Plan 096 removed the five web Git contract aliases and moved menus to `keymap/menus`. Log query keys now live in `features/logs/utils/query-keys.ts`; pending logs use the shared loader before empty. Preserve the existing single error banner during this plan's client move. See [web layering](../docs/web-layering.md).
+
 Status: proposed, implementation not started. Requested 2026-09-11.
 
 This plan owns duplication-census items 4.1, 4.2, 4.3, 4.4, 4.5, 4.7, 4.8, 4.9, 4.11, 5.4, and the

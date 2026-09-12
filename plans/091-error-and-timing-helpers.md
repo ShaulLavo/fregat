@@ -1,5 +1,7 @@
 # Consolidate error construction, error formatting, and timing helpers
 
+Implementation note, 2026-09-12: Plan 096 now reports corrupt cache entries with existing `OPERATION_FAILED`, replacing the incorrect `INVALID_PATH`. It does not add an error catalog. See [web layering](../docs/web-layering.md).
+
 Status: proposed, implementation not started. Requested 2026-09-11.
 
 [Root PLAN.md](../PLAN.md) owns execution order; this plan owns only the sequence inside itself.
