@@ -11,14 +11,14 @@ type EditorPaletteRowProps = {
 }
 
 export function EditorPaletteRow({ item }: EditorPaletteRowProps) {
-  const { selectFile } = useCommandPaletteActions()
+  const { selectContent } = useCommandPaletteActions()
   const icon = iconForEntry({ name: item.name, type: 'file' })
 
   return (
     <CommandItem
-      keywords={[item.name, item.path, item.pathLabel]}
-      value={`editor:${item.path}`}
-      onSelect={() => selectFile(item.path)}
+      keywords={[item.name, item.pathLabel]}
+      value={`editor:${item.key}`}
+      onSelect={() => selectContent(item.content)}
     >
       <span aria-hidden='true' className='size-4' style={fileIconStyle(icon)} />
       <span className='max-w-[55%] shrink-0 truncate font-medium'>{item.name}</span>

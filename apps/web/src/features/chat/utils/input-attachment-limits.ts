@@ -61,7 +61,7 @@ function longestChatImageDataUrlPrefix() {
   return Math.max(...CHAT_IMAGE_MIME_ALLOWLIST.map((type) => chatImageDataUrlPrefix(type).length))
 }
 
-export type ChatImageRejectionReason = 'empty' | 'too-large' | 'too-many' | 'unsupported-type'
+type ChatImageRejectionReason = 'empty' | 'too-large' | 'too-many' | 'unsupported-type'
 
 export type ChatImageClassification =
   | {

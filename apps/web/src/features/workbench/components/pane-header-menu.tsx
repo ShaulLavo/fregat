@@ -1,6 +1,6 @@
 import type { ReactElement } from 'react'
 
-import { MenuSurface } from '@/features/menus/components/surface'
+import { MenuSurface } from '@/keymap/menus/components/surface'
 import { usePaneHeaderMenu } from '@/features/workbench/hooks/use-pane-header-menu'
 
 export function PaneHeaderMenu({

@@ -1,3 +1,4 @@
+import { filesystemPath } from '@/lib/documents/utils/identity'
 import { describe } from 'vitest'
 
 import { expect, test } from '../../../../test/fixtures'
@@ -8,7 +9,10 @@ import type { FileResult } from '@/lib/file-system-types'
 describe('fileLoadState', () => {
   test('reports a pending file read as loading', () => {
     expect(
-      fileLoadState({ data: undefined, error: null, isError: false, isPending: true }, 'repo/a.ts'),
+      fileLoadState(
+        { data: undefined, error: null, isError: false, isPending: true },
+        filesystemPath('repo/a.ts'),
+      ),
     ).toEqual({ status: 'loading' })
   })
 
@@ -20,7 +24,7 @@ describe('fileLoadState', () => {
         isError: false,
         isPending: false,
       },
-      'repo/b.ts',
+      filesystemPath('repo/b.ts'),
     )
 
     expect(state).toEqual({ status: 'idle' })
@@ -35,7 +39,7 @@ describe('fileLoadState', () => {
         isError: false,
         isPending: false,
       },
-      'repo/a.ts',
+      filesystemPath('repo/a.ts'),
     )
 
     expect(state).toEqual({ status: 'ready', data: loadedFile })
@@ -46,7 +50,7 @@ function file(path: string): FileResult {
   return {
     content: '',
     mtimeMs: 1,
-    path,
+    path: filesystemPath(path),
     size: 1,
     version: 'test:1:1',
   }

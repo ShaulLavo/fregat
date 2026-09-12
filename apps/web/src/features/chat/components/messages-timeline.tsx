@@ -43,6 +43,7 @@ import { ChatWelcomeView } from './chat-welcome-view'
 import { TimelineLoadEarlier } from './timeline-load-earlier'
 import { TimelineMinimap } from './timeline-minimap'
 import { TimelineRow } from './timeline-row'
+import { AgentsPanel } from '@/features/chat/components/agents-panel'
 
 const CHAT_TIMELINE_OVERSCAN = 6
 
@@ -249,6 +250,7 @@ export function MessagesTimeline({
 
   return (
     <div className='relative min-h-0 flex-1'>
+      <AgentsPanel activities={session.activities} />
       <div
         aria-label='Messages'
         className='app-scrollbar-thin focus-visible:ring-ring h-full overflow-x-hidden overflow-y-auto overscroll-y-contain px-3 outline-none [scrollbar-gutter:stable] focus-visible:ring-1 focus-visible:ring-inset sm:px-5'
@@ -278,7 +280,7 @@ export function MessagesTimeline({
           >
             {virtualItems.map((virtualItem) => (
               <div
-                className='w-full py-1.5'
+                className='w-full'
                 data-index={virtualItem.index}
                 key={virtualItem.key}
                 ref={virtualizer.measureElement}

@@ -13,7 +13,8 @@ import { createStore, type Mutate, type StoreApi } from 'zustand/vanilla'
 import type { CachedSearchBufferState } from '@/features/workspace/state/cache'
 import { basename, toTreePath } from '@/lib/path-formatters'
 import { clientErrors } from '@/lib/structured-errors'
-import { searchBufferDocumentId } from '@/features/search/utils/buffer-document'
+import { documentKey, filesystemPath } from '@/lib/documents/utils/identity'
+import type { DocumentKey } from '@/lib/documents/utils/types'
 import { compareSearchPaths } from '@/features/search/utils/sort'
 import { readSettingsMirror } from '@/features/settings/utils/boot-mirror'
 import {
@@ -59,7 +60,7 @@ export type SearchBufferSnapshot = {
   excludeGlobText: string
   filtersVisible: boolean
   groups: readonly WorkspaceSearchFileGroup[]
-  id: string
+  key: DocumentKey
   includeGlobText: string
   matchMode: WorkspaceSearchMatchMode
   matches: readonly WorkspaceSearchMatch[]
@@ -374,7 +375,7 @@ function searchBufferSnapshotFromCache(
     excludeGlobText: cached.excludeGlobText,
     filtersVisible: cached.filtersVisible,
     groups: searchGroupsWithCollapsedPaths(groups, collapsedPaths),
-    id: searchBufferDocumentId(cached.rootPath),
+    key: documentKey({ kind: 'search', root: filesystemPath(cached.rootPath) }),
     includeGlobText: cached.includeGlobText,
     matchMode: cached.matchMode,
     matches: cached.matches,
@@ -753,7 +754,7 @@ export function emptySearchBuffer(rootPath: string): SearchBufferSnapshot {
     excludeGlobText: '',
     filtersVisible: false,
     groups: EMPTY_SEARCH_GROUPS,
-    id: searchBufferDocumentId(rootPath),
+    key: documentKey({ kind: 'search', root: filesystemPath(rootPath) }),
     includeGlobText: '',
     matchMode: settings['search.defaultMatchMode'],
     matches: [],
@@ -803,7 +804,7 @@ function loadingSearchBuffer(
     excludeGlobText: previous?.excludeGlobText ?? globTextForQuery(query.excludeGlobs),
     filtersVisible: previous?.filtersVisible ?? hasWorkspaceSearchGlobs(query),
     groups: previous?.groups ?? EMPTY_SEARCH_GROUPS,
-    id: searchBufferDocumentId(query.path),
+    key: documentKey({ kind: 'search', root: filesystemPath(query.path) }),
     includeGlobText: previous?.includeGlobText ?? globTextForQuery(query.includeGlobs),
     matchMode: query.matchMode ?? previous?.matchMode ?? 'literal',
     matches: previous?.matches ?? [],

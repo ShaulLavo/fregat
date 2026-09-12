@@ -61,7 +61,7 @@ test('an implemented plan is never actionable again', () => {
   expect(actionableProposedPlan(plans)).toBeNull()
 })
 
-test('an older open plan still wins over a newer implemented one', () => {
+test('an older plan stays superseded after the newer plan was implemented', () => {
   const plans = [
     plan({ id: planId('plan-1'), updatedAt: '2026-05-28T00:00:01.000Z' }),
     plan({
@@ -71,7 +71,7 @@ test('an older open plan still wins over a newer implemented one', () => {
     }),
   ]
 
-  expect(actionableProposedPlan(plans)?.id).toBe('plan-1')
+  expect(actionableProposedPlan(plans)).toBeNull()
 })
 
 test('the export keeps the heading the card strips and ends in a newline', () => {

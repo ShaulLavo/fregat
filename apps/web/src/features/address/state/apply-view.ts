@@ -2,7 +2,7 @@ import { editorDocumentToken } from '@workspace/client-core/address/grammar'
 import { retainedTextBudgetFromSettings } from '@/features/editor/utils/retained-text-budget'
 import { NO_WORKSPACE_TOKEN, parseWorkspaceToken } from '@workspace/client-core/address/workspace'
 import { readWorkspaceAddress } from '@workspace/client-core/files/workspace-address'
-import type { EnvironmentId } from '@workspace/contracts'
+import type { EnvironmentId, WorktreeId } from '@workspace/contracts'
 import {
   applyAddressChat,
   needsChatSnapshot,
@@ -10,7 +10,7 @@ import {
 } from '@/features/address/state/apply-view-chat'
 import { applyAddressEditors } from '@/features/address/state/apply-view-editors'
 import { applyAddressFields } from '@/features/address/state/apply-view-fields'
-import { pathForDocumentToken } from '@/features/address/utils/document-token'
+import { contentForDocumentToken } from '@/features/address/utils/document-token'
 import { addressEnvironments } from '@/features/address/utils/environments'
 import type { AddressIntent } from '@/features/address/utils/intent'
 import { useChatProjectionStore } from '@/features/chat/state/chat-projection-store'
@@ -39,6 +39,7 @@ type ApplyOptions = {
   readonly isCurrent: () => boolean
   readonly signal?: AbortSignal
   readonly preserveTransient?: boolean
+  readonly draftWorktreeId?: WorktreeId
   readonly reconcileResources?: (owner: EditorWorkspaceStoreApi, rootPath: string | null) => void
 }
 
@@ -110,7 +111,14 @@ async function applyCurrentView(
     confirmedEnvironmentId(owner.origin)
     useChatProjectionStore.getState().syncShellSnapshot(environmentId, snapshot)
   }
-  const chat = prepareAddressChat(intent, environmentId, addressedRoot)
+  const currentRootPath = owner.editor.workspaceStore.getState().rootFolder?.path
+  const chat = prepareAddressChat(
+    intent,
+    environmentId,
+    addressedRoot,
+    options.draftWorktreeId,
+    currentRootPath === addressedRoot,
+  )
   if (chat.kind === 'unavailable') return { status: 'unavailable', reason: chat.reason }
   if (chat.rootPath !== addressedRoot) trace.workspaceSource = 'session'
   options.reconcileResources?.(owner.editor.workspaceStore, chat.rootPath)
@@ -170,8 +178,8 @@ function openRoot(
 function documentFailure(intent: AddressIntent, rootPath: string | null) {
   const token = editorDocumentToken(intent.address)
   if (!token) return null
-  const parsed = pathForDocumentToken(rootPath, token)
-  return parsed.kind === 'path' ? null : parsed.reason
+  const parsed = contentForDocumentToken(rootPath, token)
+  return parsed.kind === 'content' ? null : parsed.reason
 }
 
 function applyFolderless(

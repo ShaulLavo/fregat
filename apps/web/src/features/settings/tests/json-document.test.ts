@@ -1,55 +1,6 @@
 import { getClient } from '@/lib/client'
 import { fetchSettings, saveSettingsText } from '@/features/settings/utils/api'
-import {
-  parseSettingsJsonDocumentId,
-  settingsJsonDocumentId,
-  settingsJsonDocumentLabel,
-} from '@/features/settings/utils/json-document'
-import { documentLabel } from '@/features/workspace/utils/document-label'
-import { settingsDocumentId } from '@/features/settings/utils/document'
-import {
-  fileBackedDocumentPath,
-  savableDocumentPath,
-} from '@/features/editor/utils/file-backed-document'
-
 import { expect, test } from '../../../../test/fixtures'
-
-test('a settings json id round-trips its layer and refuses anything else', () => {
-  expect(parseSettingsJsonDocumentId(settingsJsonDocumentId('user'))).toBe('user')
-  expect(parseSettingsJsonDocumentId(settingsJsonDocumentId('workspace'))).toBe('workspace')
-  // `policy` is an environment variable with no file, so it is not a writable
-  // target and must not resolve to a tab that offers to save it.
-  expect(parseSettingsJsonDocumentId('settings-json:policy')).toBe(null)
-  expect(parseSettingsJsonDocumentId('settings-json:')).toBe(null)
-  expect(parseSettingsJsonDocumentId('/repo/settings.json')).toBe(null)
-  expect(parseSettingsJsonDocumentId(null)).toBe(null)
-})
-
-// One tab, two views, one name. Without a branch it renders its own id, because
-// `settings:` has no path segment for `basename` to take.
-test('the settings tab is called settings.json', () => {
-  expect(documentLabel(settingsDocumentId())).toBe('settings.json')
-})
-
-// The buffers are per scope and never tabs, so their labels only ever show up in
-// diagnostics — but they still have to name which file they are.
-test('a settings buffer names its scope', () => {
-  expect(settingsJsonDocumentLabel(settingsJsonDocumentId('user'))).toBe('settings.json (user)')
-  expect(settingsJsonDocumentLabel('settings-json:nonsense')).toBe('settings.json')
-})
-
-/**
- * The three questions the command gates ask, and the one tab that answers them
- * differently from every other surface: it is savable without being a file.
- */
-test('a raw settings buffer is savable but is not a file', () => {
-  const id = settingsJsonDocumentId('user')
-
-  expect(savableDocumentPath(id)).toBe(id)
-  // Load-bearing: `useSelectedFile` and the prefetch both gate on this, and a
-  // non-null answer here sends them to read a file named `settings-json:user`.
-  expect(fileBackedDocumentPath(id)).toBe(null)
-})
 
 test('the snapshot carries each layer bytes, so a JSON view needs no second fetch', async ({
   client,

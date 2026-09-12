@@ -7,6 +7,13 @@ import { subscribeWithSelector } from 'zustand/middleware'
 import { createStore, type Mutate, type StoreApi } from 'zustand/vanilla'
 import type { DocumentRetention } from '@/features/editor/utils/document-retention'
 import type { PreparedFileOpenClaim } from '@/lib/file-open-intent/types'
+import type {
+  DocumentKey,
+  FilesystemPath,
+  ReopenScrollPosition,
+  SettingsDocumentRef,
+  TabId,
+} from '@/lib/documents/utils/types'
 import {
   WorkspaceDocumentService,
   type EditorDocumentView,
@@ -37,20 +44,19 @@ type DeleteLiveEditorDocumentResult = {
 }
 
 type CreateEditorDocumentStoreOptions = {
-  /** Scroll positions restored from the workspace cache, keyed by document path. */
-  scrollPositionSeeds?: Readonly<Record<string, EditorScrollPosition>>
+  scrollPositionSeeds?: readonly ReopenScrollPosition[]
 }
 
 type EditorDocumentStoreActions = {
-  deleteLiveEditorDocument: (documentId: string) => DeleteLiveEditorDocumentResult
+  deleteLiveEditorDocument: (documentKey: DocumentKey) => DeleteLiveEditorDocumentResult
   ensureEditorView: (
-    tabId: string,
+    tabId: TabId,
     file: FileResult,
     claim?: PreparedFileOpenClaim | null,
   ) => LiveEditorViewDocument
   ensureEditorViewForDocument: (
-    tabId: string,
-    documentId: string,
+    tabId: TabId,
+    documentKey: DocumentKey,
     claim?: PreparedFileOpenClaim | null,
   ) => LiveEditorViewDocument
   ensureLiveEditorDocument: (
@@ -58,47 +64,53 @@ type EditorDocumentStoreActions = {
     claim?: PreparedFileOpenClaim | null,
   ) => LiveEditorDocument
   ensureUnsyncedEditorDocument: (input: UnsyncedLiveEditorDocumentInput) => LiveEditorDocument
+  ensureSettingsDocument: (
+    target: SettingsDocumentRef,
+    snapshot: { readonly content: string; readonly revision: string },
+  ) => LiveEditorDocument
   forceReplaceLiveEditorDocument: (file: FileResult) => { wasDirty: boolean }
-  getEditorView: (tabId: string) => EditorDocumentView | null
   /** Retained text size per live document; the only input to the retention budget. */
-  editorDocumentSizes: () => ReadonlyMap<string, number>
-  getLiveEditorDocument: (documentId: string) => LiveEditorDocument | null
-  hasLiveEditorDocument: (documentId: string) => boolean
+  editorDocumentSizes: () => ReadonlyMap<DocumentKey, number>
+  getEditorView: (tabId: TabId) => EditorDocumentView | null
+  getLiveEditorDocument: (documentKey: DocumentKey) => LiveEditorDocument | null
+  hasLiveEditorDocument: (documentKey: DocumentKey) => boolean
   markLiveEditorDocumentSaved: (input: {
-    documentId: string
+    documentKey: DocumentKey
     fileVersion: string
     mtimeMs: number
     savedContentRevision: string
     savedText: string
   }) => boolean
   markSettingsDocumentSaved: (input: {
-    documentId: string
+    documentKey: DocumentKey
     revision: string
     savedContentRevision: string
     savedText: string
   }) => boolean
   markSettingsDocumentConflict: (
-    documentId: string,
+    documentKey: DocumentKey,
     confirmedText: string | null,
     revision: string | null,
   ) => boolean
-  reloadSettingsDocument: (documentId: string) => boolean
+  reloadSettingsDocument: (documentKey: DocumentKey) => boolean
   /** Re-seeds a synthetic buffer from text the server rewrote; see the service. */
-  replaceUnsyncedEditorDocumentText: (documentId: string, text: string) => boolean
+  replaceUnsyncedEditorDocumentText: (documentKey: DocumentKey, text: string) => boolean
   /** Brings a clean settings buffer back in step with the file; see the service. */
-  reconcileSettingsDocument: (documentId: string, text: string, revision: string) => boolean
-  prepareWorkspaceDocumentTarget: (documentId: string) => WorkspaceDocumentTargetStamp | null
+  reconcileSettingsDocument: (documentKey: DocumentKey, text: string, revision: string) => boolean
+  prepareWorkspaceDocumentTarget: (documentKey: DocumentKey) => WorkspaceDocumentTargetStamp | null
   isWorkspaceDocumentTargetCurrent: (stamp: WorkspaceDocumentTargetStamp) => boolean
   prepareWorkspaceDocumentDelete: (
-    path: string,
+    path: FilesystemPath,
     reservation?: WorkspaceDocumentPathReservation | null,
   ) => WorkspaceDocumentDeleteProjection | null
   prepareWorkspaceDocumentRename: (
-    from: string,
-    to: string,
+    from: FilesystemPath,
+    to: FilesystemPath,
     reservation?: WorkspaceDocumentPathReservation | null,
   ) => WorkspaceDocumentRenameProjection | null
-  prepareWorkspaceDocumentPathReservation: (path: string) => WorkspaceDocumentPathReservationRequest
+  prepareWorkspaceDocumentPathReservation: (
+    path: FilesystemPath,
+  ) => WorkspaceDocumentPathReservationRequest
   reserveWorkspaceDocumentPaths: (
     requests: readonly WorkspaceDocumentPathReservationRequest[],
     ownerId: string,
@@ -113,35 +125,35 @@ type EditorDocumentStoreActions = {
   releaseWorkspaceDocumentMutationLeases: (leaseSet: WorkspaceDocumentMutationLeaseSet) => boolean
   retainWorkspaceDocumentMutationLeasesForPaths: (
     leaseSet: WorkspaceDocumentMutationLeaseSet,
-    affectedPaths: readonly string[],
+    affectedPaths: readonly FilesystemPath[],
   ) => WorkspaceDocumentMutationLeaseSet
   markWorkspaceDocumentRecoveryConflict: (
-    affectedPaths: readonly string[],
+    affectedPaths: readonly FilesystemPath[],
     operationId: string,
   ) => WorkspaceDocumentRecoveryConflictResult
-  clearWorkspaceDocumentRecoveryConflict: (operationId: string) => readonly string[]
+  clearWorkspaceDocumentRecoveryConflict: (operationId: string) => readonly FilesystemPath[]
   prepareWorkspaceDocumentRecoveryConflictTransfer: (
     leaseSet: WorkspaceDocumentMutationLeaseSet,
-    affectedPaths: readonly string[],
+    affectedPaths: readonly FilesystemPath[],
     operationId: string,
   ) => WorkspaceDocumentRecoveryLeaseTransferPreparationResult
   commitWorkspaceDocumentRecoveryConflictTransfer: (
     transfer: WorkspaceDocumentRecoveryLeaseTransfer,
-  ) => readonly string[]
+  ) => readonly FilesystemPath[]
   commitWorkspaceDocumentProjection: (projection: WorkspaceDocumentProjection) => boolean
   rollbackWorkspaceDocumentProjection: (projection: WorkspaceDocumentProjection) => boolean
-  removeEditorView: (tabId: string) => boolean
-  renameLiveEditorDocumentPath: (from: string, to: string) => { wasDirty: boolean }
+  removeEditorView: (tabId: TabId) => boolean
+  renameLiveEditorDocumentPath: (from: FilesystemPath, to: FilesystemPath) => { wasDirty: boolean }
   runWorkspaceDocumentBatch: <T>(run: () => T) => T
   /** Replaces the scroll-restore seeds (e.g. after a workspace switch). Not reactive. */
-  seedEditorScrollPositions: (byPath: Readonly<Record<string, EditorScrollPosition>>) => void
+  seedEditorScrollPositions: (entries: readonly ReopenScrollPosition[]) => void
   /** The single eviction path: everything outside the keep sets is dropped. */
   retainEditorDocuments: (keep: DocumentRetention) => {
-    evictedDocumentIds: string[]
-    evictedTabIds: string[]
+    evictedDocumentKeys: DocumentKey[]
+    evictedTabIds: TabId[]
   }
-  setEditorViewScrollPosition: (tabId: string, scrollPosition: EditorScrollPosition) => void
-  setLiveEditorDocumentDirty: (documentId: string, dirty: boolean) => void
+  setEditorViewScrollPosition: (tabId: TabId, scrollPosition: EditorScrollPosition) => void
+  setLiveEditorDocumentDirty: (documentKey: DocumentKey, dirty: boolean) => void
 }
 
 /**
@@ -186,8 +198,8 @@ export function createEditorDocumentStore(options: CreateEditorDocumentStoreOpti
 
       return {
         ...service.state(),
-        deleteLiveEditorDocument: (documentId) => {
-          const result = service.deleteLiveDocument(documentId)
+        deleteLiveEditorDocument: (documentKey) => {
+          const result = service.deleteLiveDocument(documentKey)
           publish()
           return result
         },
@@ -196,8 +208,8 @@ export function createEditorDocumentStore(options: CreateEditorDocumentStoreOpti
           publish()
           return viewDocument
         },
-        ensureEditorViewForDocument: (tabId, documentId, claim) => {
-          const viewDocument = service.ensureViewForDocument(tabId, documentId, claim)
+        ensureEditorViewForDocument: (tabId, documentKey, claim) => {
+          const viewDocument = service.ensureViewForDocument(tabId, documentKey, claim)
           publish()
           return viewDocument
         },
@@ -211,6 +223,11 @@ export function createEditorDocumentStore(options: CreateEditorDocumentStoreOpti
           publish()
           return document
         },
+        ensureSettingsDocument: (target, snapshot) => {
+          const document = service.ensureSettingsDocument(target, snapshot)
+          publish()
+          return document
+        },
         forceReplaceLiveEditorDocument: (file) => {
           const result = service.forceReplaceLiveDocument(file)
           if (result.changed) publish()
@@ -218,8 +235,8 @@ export function createEditorDocumentStore(options: CreateEditorDocumentStoreOpti
         },
         getEditorView: (tabId) => service.getView(tabId),
         editorDocumentSizes: () => service.documentSizes(),
-        getLiveEditorDocument: (documentId) => service.getLiveDocument(documentId),
-        hasLiveEditorDocument: (documentId) => service.hasLiveDocument(documentId),
+        getLiveEditorDocument: (documentKey) => service.getLiveDocument(documentKey),
+        hasLiveEditorDocument: (documentKey) => service.hasLiveDocument(documentKey),
         markLiveEditorDocumentSaved: (input) => {
           const marked = service.markSaved(input)
           publish()
@@ -230,27 +247,27 @@ export function createEditorDocumentStore(options: CreateEditorDocumentStoreOpti
           publish()
           return marked
         },
-        markSettingsDocumentConflict: (documentId, confirmedText, revision) => {
-          const marked = service.markSettingsConflict(documentId, confirmedText, revision)
+        markSettingsDocumentConflict: (documentKey, confirmedText, revision) => {
+          const marked = service.markSettingsConflict(documentKey, confirmedText, revision)
           if (marked) publish()
           return marked
         },
-        reloadSettingsDocument: (documentId) => {
-          const reloaded = service.reloadSettingsDocument(documentId)
+        reloadSettingsDocument: (documentKey) => {
+          const reloaded = service.reloadSettingsDocument(documentKey)
           if (reloaded) publish()
           return reloaded
         },
-        replaceUnsyncedEditorDocumentText: (documentId, text) => {
-          const replaced = service.replaceUnsyncedDocumentText(documentId, text)
+        replaceUnsyncedEditorDocumentText: (documentKey, text) => {
+          const replaced = service.replaceUnsyncedDocumentText(documentKey, text)
           if (replaced) publish()
           return replaced
         },
-        reconcileSettingsDocument: (documentId, text, revision) => {
-          const reconciled = service.reconcileSettingsDocument(documentId, text, revision)
+        reconcileSettingsDocument: (documentKey, text, revision) => {
+          const reconciled = service.reconcileSettingsDocument(documentKey, text, revision)
           if (reconciled) publish()
           return reconciled
         },
-        prepareWorkspaceDocumentTarget: (documentId) => service.prepareTargetStamp(documentId),
+        prepareWorkspaceDocumentTarget: (documentKey) => service.prepareTargetStamp(documentKey),
         isWorkspaceDocumentTargetCurrent: (stamp) => service.isTargetStampCurrent(stamp),
         prepareWorkspaceDocumentDelete: (path, reservation) =>
           service.prepareDeleteProjection(path, reservation),
@@ -321,8 +338,8 @@ export function createEditorDocumentStore(options: CreateEditorDocumentStoreOpti
           if (changed) publish()
         },
         seedEditorScrollPositions: (byPath) => service.seedScrollPositions(byPath),
-        setLiveEditorDocumentDirty: (documentId, dirty) => {
-          service.setDirty(documentId, dirty)
+        setLiveEditorDocumentDirty: (documentKey, dirty) => {
+          service.setDirty(documentKey, dirty)
           publish()
         },
       }

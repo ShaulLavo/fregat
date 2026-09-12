@@ -1,3 +1,4 @@
+import type { WorkspaceRoot } from '@/lib/documents/utils/types'
 import { createContext } from 'react'
 
 import type { PaletteScope } from '@/features/command-palette/command-palette-types'
@@ -25,7 +26,7 @@ export type CommandContextValue = {
   readonly bus: PlatformCommandBus
   readonly claimKeybinding: (event: KeyboardEvent) => boolean
   readonly closePalette: (restoreOrigin: boolean) => void
-  readonly openWorkspaceRoot: (rootPath: string) => Promise<OpenWorkspaceRootResult>
+  readonly openWorkspaceRoot: (rootPath: WorkspaceRoot) => Promise<OpenWorkspaceRootResult>
   readonly paletteOpen: boolean
   readonly paletteOrigin: FocusTargetToken | null
   readonly paletteScope: PaletteScope | null

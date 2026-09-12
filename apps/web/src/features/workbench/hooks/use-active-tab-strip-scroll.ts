@@ -1,3 +1,4 @@
+import { prefersReducedMotion } from '@/features/workbench/utils/wallpaper'
 import { useLayoutEffect, useRef } from 'react'
 
 import {
@@ -57,7 +58,5 @@ export function useActiveTabStripScroll(activeTabId: string | null) {
 
 /** Motion is the point, but not against the wishes of someone who asked the OS for less of it. */
 function revealBehavior(): ScrollBehavior {
-  if (typeof window.matchMedia !== 'function') return 'auto'
-
-  return window.matchMedia('(prefers-reduced-motion: reduce)').matches ? 'auto' : 'smooth'
+  return prefersReducedMotion() ? 'auto' : 'smooth'
 }

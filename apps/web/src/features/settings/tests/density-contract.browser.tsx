@@ -347,7 +347,9 @@ test('custom composer, picker, search, and references chrome follows density', a
   const editorShell = requiredElement<HTMLElement>(
     '[data-testid="chat-input-editor"]',
   ).parentElement!
-  const attachmentStrip = buttonByLabel('Open density.png').parentElement!.parentElement!
+  const attachmentStrip = requiredElement<HTMLElement>(
+    '[role="group"][aria-label="Image attachments"]',
+  )
   const commandItem = requiredElement<HTMLElement>('[data-chat-input-command-item-id]')
   const modelRail = requiredElement<HTMLElement>('[data-testid="model-rail"] > div')
   const searchShell = requiredElement<HTMLElement>('[data-testid="search-controls"] > div')

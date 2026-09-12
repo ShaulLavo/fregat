@@ -17,7 +17,7 @@ import {
 } from '@/keymap/utils/when'
 import type { MenuSurfaceId } from '@/keymap/types'
 
-export type CommandSource =
+type CommandSource =
   | { readonly kind: 'keybinding' }
   | { readonly kind: 'menu'; readonly surface: MenuSurfaceId }
   | { readonly kind: 'palette' }
@@ -29,7 +29,7 @@ export type CommandInvocation = {
   readonly source: CommandSource
 }
 
-export type CommandFailure =
+type CommandFailure =
   | { readonly error: ClientError; readonly owner: 'command-bus' }
   | { readonly operationId: string; readonly owner: 'domain' }
 
@@ -143,7 +143,7 @@ export type ReadyCommandInspection<
   readonly target: Target
 }
 
-export type DisabledCommandInspection<
+type DisabledCommandInspection<
   Id extends string,
   Runtime,
   Snapshot extends CommandWhenSnapshot,
@@ -217,7 +217,7 @@ export type CommandBusOptions<
   readonly toClientError?: (error: unknown) => ClientError
 }
 
-export const commandInspectionDisabledReasons = {
+const commandInspectionDisabledReasons = {
   runtimeUnavailable: 'The environment is switching.',
   targetUnavailable: 'No compatible command target is available.',
   unknownCommand: 'Command is not registered.',

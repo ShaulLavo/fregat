@@ -1,5 +1,7 @@
+import path from 'node:path'
+import { tmpdir } from 'node:os'
 import type { AgentTerminalProcess } from '../terminal/agent-launch'
-import { mkdir, mkdtemp, rm } from 'node:fs/promises'
+import { mkdtemp, rm } from 'node:fs/promises'
 import { createInternalError } from '../observability/structured-errors'
 import { sessionIdentityErrors } from './structured-errors'
 
@@ -46,6 +48,7 @@ import type {
   ProviderRuntimeStartInput,
   ProviderTurnControlInput,
   ProviderTurnInput,
+  ProviderTurnSteerInput,
   ProviderUserInputResponseInput,
   ProviderSessionDiscoveryInput,
   ProviderSessionHistoryInput,
@@ -308,6 +311,21 @@ export class ProviderService {
     }
   }
 
+  requireSteeringAvailable(sessionId: SessionId) {
+    this.requireSdkOwnership(sessionId)
+    this.requireRunning()
+    const routed = this.routeSession(sessionId)
+    if (!routed?.adapter.steerTurn) throw sessionIdentityErrors.STEERING_UNAVAILABLE()
+    return routed
+  }
+
+  async steerTurn(input: ProviderTurnSteerInput) {
+    const routed = this.requireSteeringAvailable(input.sessionId)
+    const steer = routed.adapter.steerTurn
+    if (!steer) throw sessionIdentityErrors.STEERING_UNAVAILABLE()
+    await steer.call(routed.adapter, input)
+  }
+
   /** Runs one provider turn on the shared adapters without creating a chat projection. */
   async generateText(input: ProviderTextGenerationInput): Promise<ProviderTextGenerationResult> {
     const startedAt = performance.now()
@@ -354,8 +372,7 @@ export class ProviderService {
 
     try {
       throwIfTextGenerationAborted(input.signal)
-      await mkdir('/work/tmp', { recursive: true })
-      isolatedCwd = await mkdtemp('/work/tmp/platform-provider-text-')
+      isolatedCwd = await mkdtemp(path.join(tmpdir(), 'platform-provider-text-'))
       startPromise = adapter.startRuntime({
         cwd: isolatedCwd,
         ephemeral: true,

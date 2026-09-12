@@ -1,3 +1,8 @@
+import { fileDocumentKey, filesystemPath } from '@/lib/documents/utils/identity'
+import { documentSourcePath } from '@/lib/documents/utils/capabilities'
+import { documentTab, sameTabContent } from '@/lib/documents/utils/tabs'
+import { fileDocument } from '@/lib/documents/utils/identity'
+import type { FilesystemPath } from '@/lib/documents/utils/types'
 import type { ScopedWorktreeRef } from '@workspace/contracts'
 import { useChatProjectionStore } from '@/features/chat/state/chat-projection-store'
 import { createGitStore, type GitStoreApi } from '@/features/git/state/store'
@@ -57,7 +62,7 @@ export function createEditorRuntime({
   }
   bindWorktrees()
   const documentStore = createEditorDocumentStore({
-    scrollPositionSeeds: workspaceStore.getState().scrollPositionByPath,
+    scrollPositionSeeds: workspaceStore.getState().reopenScrollPositions,
   })
   const searchBufferStore = createSearchBufferStore({
     cachedByRootPath: workspaceCache.searchBuffers,
@@ -66,10 +71,14 @@ export function createEditorRuntime({
   const uiStore = createEditorUiStore()
   const mountedEditors = new MountedEditorRegistry()
   const fileOpenIntentOwner = createFileOpenIntentServiceOwner({
-    getLiveDocument: (path) => documentStore.getState().getLiveEditorDocument(path),
+    getLiveDocument: (path) =>
+      documentStore.getState().getLiveEditorDocument(fileDocumentKey(path)),
     getRetainedScrollPosition: (path) =>
       retainedScrollPosition(path, documentStore, workspaceStore),
-    isActive: (path) => workspaceStore.getState().selectedFilePath === path,
+    isActive: (path) => {
+      const content = workspaceStore.getState().selectedTabContent
+      return content?.kind === 'document' && documentSourcePath(content.document) === path
+    },
     mountedEditors,
     preparer: createPlatformFileOpenPreparer(preparation),
     prefetchRelated: () => undefined,
@@ -145,7 +154,7 @@ export function createEditorRuntime({
       },
     ),
     workspaceStore.subscribe(
-      (state) => state.scrollPositionByPath,
+      (state) => state.reopenScrollPositions,
       (positions) => documentStore.getState().seedEditorScrollPositions(positions),
     ),
   ]
@@ -160,11 +169,11 @@ export function createEditorRuntime({
   return {
     storage,
     queryClient,
-    worktreeRefForRoot(rootPath: string): ScopedWorktreeRef | null {
+    worktreeRefForRoot(rootPath: FilesystemPath): ScopedWorktreeRef | null {
       const worktreeId = workspaceStore.getState().worktreeIdByRootPath[rootPath]
       return worktreeId ? { environmentId: storage.environmentId, worktreeId } : null
     },
-    gitStoreForRoot(rootPath: string) {
+    gitStoreForRoot(rootPath: FilesystemPath) {
       const worktreeId = workspaceStore.getState().worktreeIdByRootPath[rootPath] ?? null
       const key = workspaceLocationId(rootPath, worktreeId)
       const store = gitStores.get(key) ?? createGitStore()
@@ -203,30 +212,36 @@ export function createEditorRuntime({
     hasUnsavedDocuments() {
       const state = documentStore.getState()
       return (
-        state.dirtyFilePaths.size > 0 ||
-        Object.values(state.liveDocumentsById).some((document) => document.buffer.isDirty())
+        state.dirtyDocumentKeys.size > 0 ||
+        Object.values(state.liveDocumentsByKey).some((document) => document.buffer.isDirty())
       )
     },
   }
 }
 
 function retainedScrollPosition(
-  path: string,
+  path: FilesystemPath,
   documentStore: ReturnType<typeof createEditorDocumentStore>,
   workspaceStore: ReturnType<typeof createEditorWorkspaceStore>,
 ) {
   const documents = documentStore.getState()
-  const document = Object.values(documents.liveDocumentsById).find(
-    (candidate) => candidate.path === path,
+  const document = Object.values(documents.liveDocumentsByKey).find(
+    (candidate) => candidate.target.kind === 'file' && candidate.target.resource.path === path,
   )
   if (document) {
     const view = Object.values(documents.viewsByTabId).find(
-      (candidate) => candidate.documentId === document.id && candidate.scrollPosition,
+      (candidate) => candidate.documentKey === document.key && candidate.scrollPosition,
     )
     if (view?.scrollPosition) return view.scrollPosition
   }
 
-  return workspaceStore.getState().scrollPositionByPath[path] ?? null
+  return (
+    workspaceStore
+      .getState()
+      .reopenScrollPositions.find((entry) =>
+        sameTabContent(entry.content, documentTab(fileDocument({ path }))),
+      )?.position ?? null
+  )
 }
 
 function workspaceRoot(store: ReturnType<typeof createEditorWorkspaceStore>, generation: number) {
@@ -236,7 +251,7 @@ function workspaceRoot(store: ReturnType<typeof createEditorWorkspaceStore>, gen
   return {
     generation,
     path: root.path,
-    uriPath: normalized ? `/${normalized}` : '/',
+    uriPath: filesystemPath(normalized ? `/${normalized}` : '/'),
     workspacePath: root.path,
   }
 }

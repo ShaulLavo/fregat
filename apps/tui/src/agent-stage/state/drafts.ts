@@ -42,7 +42,7 @@ const emptyDraft: ComposerDraft = {
   elements: [],
   terminalContexts: [],
 }
-export type Drafts = ReturnType<typeof createDrafts>
+type Drafts = ReturnType<typeof createDrafts>
 const owners = new WeakMap<FileStorage, Drafts>()
 
 export function draftsForStorage(storage: FileStorage) {

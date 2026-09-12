@@ -1,6 +1,7 @@
+import { tmpdir } from 'node:os'
 import type { ProviderHistoryMessage } from '../../src/provider/types'
 import { createInternalError } from '../../src/observability/structured-errors'
-import { mkdir, mkdtemp, rm } from 'node:fs/promises'
+import { mkdtemp, rm } from 'node:fs/promises'
 import path from 'node:path'
 import * as v from 'valibot'
 import {
@@ -32,8 +33,7 @@ export async function createAgentTerminalFixture(
     detachTtlMs?: number
   } = {},
 ) {
-  await mkdir('/work/tmp', { recursive: true })
-  const root = await mkdtemp('/work/tmp/platform-agent-terminal-')
+  const root = await mkdtemp(path.join(tmpdir(), 'platform-agent-terminal-'))
   const databasePath = path.join(root, 'runtime.sqlite')
   let handle = createMetadataDatabase({ databasePath })
   const driverKind = v.parse(providerDriverKindSchema, options.driverKind ?? 'claude')

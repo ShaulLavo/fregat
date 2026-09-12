@@ -1,3 +1,6 @@
+import { filePathsForTabs, filesystemResource } from '@/lib/documents/utils/capabilities'
+import { filesystemPath } from '@/lib/documents/utils/identity'
+import type { FilesystemPath } from '@/lib/documents/utils/types'
 import type { Client } from '@/lib/client'
 import { clientForQueryClient } from '@/lib/environments/state/query-clients'
 import type { FileTreeRenameEvent } from '@workspace/tree'
@@ -39,7 +42,7 @@ export type DeleteTarget = {
   readonly isDirectory: boolean
   readonly name: string
   /** Server path. Already resolved, so the dialog can show what will be removed. */
-  readonly path: string
+  readonly path: FilesystemPath
 }
 
 /**
@@ -69,7 +72,7 @@ export function useFsActions({
   treeRef,
 }: {
   modelRef: RefObject<TreeModel>
-  rootPath: string
+  rootPath: FilesystemPath
   treeRef: RefObject<FileTreeModel | null>
 }) {
   const queryClient = useQueryClient()
@@ -178,21 +181,26 @@ export function useFsActions({
   }
 
   function runWorkspaceMutation<T>(
-    affectedPaths: readonly string[] | 'all',
+    affectedPaths: readonly FilesystemPath[] | 'all',
     operation: () => Promise<T>,
   ) {
     if (!workspaceEdits) return operation()
     return workspaceEdits.runWorkspaceMutation(affectedPaths, operation)
   }
 
-  function renameEditorPaths(from: string, to: string) {
+  function renameEditorPaths(from: FilesystemPath, to: FilesystemPath) {
     const workspace = workspaceStore.getState()
     const renames = editorPathRenames(
       [
-        ...workspace.openFilePaths,
-        ...workspace.editorHistory,
-        ...workspace.recentlyClosedEditorPaths,
-        ...Object.keys(documentStore.getState().liveDocumentsById),
+        ...filePathsForTabs([
+          ...workspace.openTabContents,
+          ...workspace.editorHistory,
+          ...workspace.recentlyClosedTabs,
+        ]),
+        ...Object.values(documentStore.getState().liveDocumentsByKey).flatMap((document) => {
+          const resource = filesystemResource(document.target)
+          return resource ? [resource.path] : []
+        }),
       ],
       from,
       to,
@@ -200,8 +208,8 @@ export function useFsActions({
     for (const rename of renames) {
       const queryKey = fileSystemKeys.fileSnapshot(rename.from)
       const file = queryClient.getQueryData<FileResult>(queryKey)
-      if (file) setFileSnapshotQueryData(queryClient, { ...file, path: rename.to })
-      renameLiveEditorDocument(rename.from, rename.to)
+      if (file) setFileSnapshotQueryData(queryClient, { ...file, path: filesystemPath(rename.to) })
+      renameLiveEditorDocument(filesystemPath(rename.from), filesystemPath(rename.to))
       queryClient.removeQueries({ exact: true, queryKey })
     }
     return renames
@@ -295,7 +303,7 @@ export function useFsActions({
   }
 }
 
-function createEntryOnDisk(path: string, isFolder: boolean, client: Client) {
+function createEntryOnDisk(path: FilesystemPath, isFolder: boolean, client: Client) {
   if (isFolder) return ensureFolderPath(path, client)
 
   return createFileContent(path, '', client)

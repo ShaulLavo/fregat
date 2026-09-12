@@ -1,6 +1,6 @@
 import { isDirectoryEntry, type FileTreeEntry } from '@workspace/contracts'
 
-export function localTreePath(path: string, rootPath: string) {
+function localTreePath(path: string, rootPath: string) {
   return rootPath ? path.slice(rootPath.replace(/\/$/, '').length + 1) : path
 }
 

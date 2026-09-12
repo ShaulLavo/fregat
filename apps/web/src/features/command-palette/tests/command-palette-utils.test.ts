@@ -2,6 +2,7 @@ import { expect, test } from '../../../../test/fixtures'
 
 import {
   commandPaletteItems,
+  searchFilePaletteItems,
   editorPaletteItems,
   groupedCommandItems,
   OTHER_COMMANDS_HEADING,
@@ -9,7 +10,8 @@ import {
   RECENTLY_USED_COMMANDS_HEADING,
   quickAccessQuery,
 } from '@/features/command-palette/command-palette-utils'
-import { searchBufferDocumentId } from '@/features/search/utils/buffer-document'
+import { filesystemPath } from '@/lib/documents/utils/identity'
+import { documentTab, tabContentKey } from '@/lib/documents/utils/tabs'
 import { platformCommandSpecs } from '@/keymap/command-registry'
 import { defaultPlatformKeyBindings } from '@/keymap/default-bindings'
 import { resolvedPlatformKeyBindings } from '@/keymap/active-bindings'
@@ -142,13 +144,14 @@ test('recents that do not match the query are not dragged into the results', () 
 })
 
 test('open editor items format search buffers as search tabs', () => {
-  const searchPath = searchBufferDocumentId('/repo')
+  const content = documentTab({ kind: 'search', root: filesystemPath('/repo') })
 
-  expect(editorPaletteItems([searchPath], searchPath)).toEqual([
+  expect(editorPaletteItems([content], content)).toEqual([
     {
       active: true,
       name: 'Search',
-      path: searchPath,
+      content,
+      key: tabContentKey(content),
       pathLabel: '/repo search results',
     },
   ])
@@ -162,4 +165,50 @@ test('quick access prefixes select the expected mode and query', () => {
   expect(quickAccessQuery('theme monokai')).toBe('monokai')
   expect(quickAccessQuery('> save')).toBe('save')
   expect(quickAccessMode('@ Component')).toBe('symbols')
+})
+
+test('search entries preserve metadata and palette-relative labels', () => {
+  expect(
+    searchFilePaletteItems(
+      [
+        {
+          path: '/repo/src/link.ts',
+          type: 'symlink',
+          targetType: 'file',
+          birthtimeMs: 2,
+          mtimeMs: 5,
+          size: 10,
+        },
+        { path: '/repo/src/new.ts', type: 'file' },
+      ],
+      '/repo',
+    ),
+  ).toEqual([
+    {
+      entry: {
+        path: '/repo/src/link.ts',
+        name: 'link.ts',
+        type: 'symlink',
+        targetType: 'file',
+        birthtimeMs: 2,
+        mtimeMs: 5,
+        size: 10,
+        version: 'search:5:10',
+      },
+      pathLabel: 'src/link.ts',
+    },
+    {
+      entry: {
+        path: '/repo/src/new.ts',
+        name: 'new.ts',
+        type: 'file',
+        targetType: undefined,
+        birthtimeMs: 0,
+        mtimeMs: 0,
+        size: 0,
+        version: 'search:0:0',
+      },
+      pathLabel: 'src/new.ts',
+    },
+  ])
 })

@@ -1,3 +1,4 @@
+import { readWorkspaceCacheEntry, writeWorkspaceCacheEntry } from '@/lib/workspace-cache-storage'
 import type { EnvironmentId } from '@workspace/contracts'
 import { createClientInvariantError } from '@/lib/structured-errors'
 import type { ScopedStorage } from '@/lib/environments/state/scoped-storage'
@@ -40,31 +41,21 @@ type PromptStashStore = {
 }
 
 function readPersistedEntries(storage: ScopedStorage): readonly PromptStashEntry[] {
-  try {
-    const raw = storage.getItem(PROMPT_STASH_STORAGE_KEY)
-    if (!raw) return []
-
-    const parsed = v.safeParse(stashStorageSchema, JSON.parse(raw))
-
-    return parsed.success ? parsed.output.entries : []
-  } catch {
-    return []
-  }
+  const stored = readWorkspaceCacheEntry<v.InferOutput<typeof stashStorageSchema> | null>(
+    PROMPT_STASH_STORAGE_KEY,
+    stashStorageSchema,
+    null,
+    { storage },
+  )
+  return stored?.entries ?? []
 }
 
-/**
- * Persists immediately rather than debounced: stashing is one deliberate
- * keystroke, not a per-character autosave, so there is nothing to coalesce and
- * the caller needs an honest answer about whether the write landed.
- */
+// The composer clears only after this synchronous write succeeds.
 function writeEntries(storage: ScopedStorage, entries: readonly PromptStashEntry[]) {
-  try {
-    storage.setItem(PROMPT_STASH_STORAGE_KEY, JSON.stringify({ entries }))
-
-    return true
-  } catch {
-    return false
-  }
+  return (
+    writeWorkspaceCacheEntry(PROMPT_STASH_STORAGE_KEY, { entries }, { storage }).status ===
+    'written'
+  )
 }
 
 export function createPromptStashStore(storage: ScopedStorage) {

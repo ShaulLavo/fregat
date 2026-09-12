@@ -29,7 +29,7 @@ export type SearchResultFileBlock = {
   readonly pathLabel: string
 }
 
-export type SearchResultExcerpt = {
+type SearchResultExcerpt = {
   readonly id: SearchResultId
   readonly languageId: EditorSyntaxLanguageId | null
   readonly matchRanges: readonly SearchResultRange[]

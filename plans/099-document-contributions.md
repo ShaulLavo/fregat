@@ -68,6 +68,39 @@ decision is strings; implementation validation must still prove correctness and 
 The measured Platform development page had SAB unavailable. That observation does not disable or
 remove the independent atomic cancellation mechanism on hosts that support it.
 
+### Session diff source completeness
+
+The 2026-09-12 session diff investigation found a source-contract defect that contribution
+registration alone will not fix. Regular snapshot diffs and checkpoint diffs already share
+`DiffView` and `DiffEditor`. Their acquisition paths differ in
+[`useDiffDocumentDiffs`](../apps/web/src/features/git/hooks/use-diff-document-diffs.ts): snapshots
+fetch complete old/new contents through `fetchBlobDiff`; checkpoint file, turn, and session scopes
+pass patches directly to the same renderer. The server deliberately leaves whole-file loading to
+the blob route because a turn can touch every file in a repository.
+
+[`editorDiffFiles`](../packages/client-core/src/git/diff-files.ts) passes those patches through
+`parseGitPatch`. The parser concatenates hunk lines without omitted source lines, but
+[`diffSyntax`](../../Editor/packages/diff/src/diffSyntax.ts) indexes the resulting arrays by original
+file line number. In the reproduced session, visible source line 2 receives line 3's tokens.
+Using the captured response, all 48 displayed new-side rows select different source text;
+using the same checkpoint blobs as complete files produces zero mismatches.
+The live `/git/diff/blob` endpoint returns both complete texts for this exact pair, matching those
+checkpoint blobs. The missing step is checkpoint content loading, not a separate session renderer.
+
+Unit 2 must align source acquisition as well as contribution ownership. Resolve checkpoint ranges
+to immutable blob pairs, then reuse the regular complete-content path for each displayed file.
+Retain checkpoint identity and its query adapter as required by [completed Plan 098](../docs/document-and-tab-domain.md).
+Share the resolved content-loading stage without converting checkpoint tabs into snapshot tabs.
+Keep summary requests lightweight. Preserve checkpoint scope, file identity, environment ownership,
+and whitespace-display policy. Historical contents must never be replaced with current disk text
+or published as the live editable document merely because their paths match.
+
+Model complete source documents separately from partial patches at the syntax boundary. Partial
+patches may still display changed lines, but cannot masquerade as complete syntax inputs. If a
+binary, oversized, or unavailable blob prevents complete loading, expose that state and omit
+unsupported syntax. Do not silently invent empty source text. Keep this distinction in the typed
+contract so every contribution uses the same source semantics.
+
 ## Chosen architecture
 
 ### Publish once, synchronize on demand
@@ -515,6 +548,11 @@ Remove the replaced provider session entry points only after their entire caller
 contribution contract, in this same unit. Do not defer those callers to unit 5 or add a temporary
 compatibility adapter. Public cutover therefore follows the host prerequisites listed below.
 
+Include the session diff source-completeness correction above in this unit. Share the regular
+blob acquisition path across snapshot and checkpoint consumers, then register each complete old/new
+source with the contribution runtime. Keep display-row projection separate from source identity.
+Remove the path that submits concatenated patch hunks as complete source documents.
+
 Use their real worker results to prove source equivalence, lifecycle independence, exact pinned
 reads, missed-history reset, and stale completion rejection. Compare input and syntax-visible
 costs before proceeding. Rework the design if a consumer must recreate generic cursor logic.
@@ -602,17 +640,26 @@ global registries, or wrappers whose only behavior is forwarding the same argume
 Add tests only where they catch these plausible failures. Use real buffers and real worker
 implementations. Mock external HTTP/process boundaries using the repository's existing fixtures.
 
-| Scenario                                                             | Failure the check must catch                                                                           |
-| -------------------------------------------------------------------- | ------------------------------------------------------------------------------------------------------ |
-| Every mutation path, including logical-only and sequence transitions | Missing or double publication; lost logical revisions; changed undo grouping.                          |
-| Two views and two compatible consumers                               | Duplicate worker open/source copies; disposal of another view's session; configuration aliasing.       |
-| Slow worker, cancellation, and exhausted edit history                | Wrong-base patch application, unbounded queues, or a result computed from the wrong revision.          |
-| Worker crash, document close/reopen, and endpoint replacement        | Old generation results accepted as current; failed operations replayed.                                |
-| UTF-16 boundaries, line endings, sparse edits, undo branches         | Text corruption, normalization changes, or a broad read across untouched regions.                      |
-| Scroll/selection/theme changes                                       | Unnecessary text synchronization or mismatched presentation configuration.                             |
-| Prepared adoption and diff/headless consumption                      | Double initialization, lost first-paint tokens/folds, leaked leases, late prepared result application. |
-| Multi-server LSP, environment switching, save, and compensation      | Cross-owner edits, protocol order/version loss, or publication delayed until server finalization.      |
-| Reentrant notification and a failing contribution                    | Out-of-order revisions or an accepted commit hidden from another observer.                             |
+| Scenario                                                             | Failure the check must catch                                                                            |
+| -------------------------------------------------------------------- | ------------------------------------------------------------------------------------------------------- |
+| Every mutation path, including logical-only and sequence transitions | Missing or double publication; lost logical revisions; changed undo grouping.                           |
+| Two views and two compatible consumers                               | Duplicate worker open/source copies; disposal of another view's session; configuration aliasing.        |
+| Slow worker, cancellation, and exhausted edit history                | Wrong-base patch application, unbounded queues, or a result computed from the wrong revision.           |
+| Worker crash, document close/reopen, and endpoint replacement        | Old generation results accepted as current; failed operations replayed.                                 |
+| UTF-16 boundaries, line endings, sparse edits, undo branches         | Text corruption, normalization changes, or a broad read across untouched regions.                       |
+| Scroll/selection/theme changes                                       | Unnecessary text synchronization or mismatched presentation configuration.                              |
+| Prepared adoption and diff/headless consumption                      | Double initialization, lost first-paint tokens/folds, leaked leases, late prepared result application.  |
+| Regular and checkpoint file/turn/session diffs of the same blob pair | Different source contents or syntax spans; checkpoint scope lost during common blob loading.            |
+| Patch starts after line 1, separated hunks, expansion, stacked/split | Tokens painted on another line or word; missing parser context across omitted regions.                  |
+| Unavailable/binary/oversized diff sources and late blob responses    | Partial text accepted as a complete document; stale file/environment response attached to a newer diff. |
+| Multi-server LSP, environment switching, save, and compensation      | Cross-owner edits, protocol order/version loss, or publication delayed until server finalization.       |
+| Reentrant notification and a failing contribution                    | Out-of-order revisions or an accepted commit hidden from another observer.                              |
+
+For diff coverage, build real checkpoint state and drive the real routes. Compare regular and
+checkpoint views using the same immutable contents, including additions, deletions, renames, and
+whitespace-only edits. Verify actual browser highlight ranges against the text they paint with both
+Tree-sitter and Shiki. A nonempty `setTokens` call or a fixture built only with `createTextDiff`
+does not prove that a patch-backed session view uses the correct source coordinates.
 
 ### Measurement matrix
 
@@ -698,9 +745,8 @@ large payloads onto the system SSD as a side effect of verification.
 publication, common runtime with syntax consumers, minimap, LSP, remaining callers, string delivery verification,
 and complete validation. Writing the plan does not schedule production execution ahead of another lane.
 
-- [Plan 098](098-document-and-tab-domain.md) owns Platform document and tab identity. Map its
-  implemented identity to the Editor buffer incarnation. The current roadmap requires all of
-  098 to complete before any implementation of Plan 097 begins; preserve that order.
+- [completed Plan 098](../docs/document-and-tab-domain.md) owns Platform document and tab identity. Map its
+  implemented identity to the Editor buffer incarnation. Plan 098 is complete; Plan 097 has not started. Preserve its completed identity contract.
 - [Plan 097](097-async-operation-ownership.md) owns host operation provenance and WorkspaceEdit
   source evidence. Share its implemented captured owner/source types; do not create another host
   operation service. Baseline/publication work in units 0–1 can proceed independently. Public
@@ -728,6 +774,7 @@ and complete validation. Writing the plan does not schedule production execution
 - [ ] Every first-party secondary document consumer enters through contribution registration.
 - [ ] Domain APIs remain typed; synchronous view/input behavior stays synchronous.
 - [ ] Source synchronization and result provenance have one owner, including prepared and diff callers.
+- [ ] Regular and checkpoint diffs share complete-source acquisition; partial patches cannot enter whole-document syntax, and browser spans match their displayed text.
 - [ ] Multiple views, endpoints, environments, logical revisions, and compensation pass focused proof.
 - [ ] Queues, mirrors, pinned snapshots, and disposal have measured bounded lifetimes.
 - [ ] Old source publishers, duplicate generic sync state, unused APIs, and compatibility paths are deleted.

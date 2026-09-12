@@ -1,13 +1,15 @@
+import { filesystemPath, tabId } from '@/lib/documents/utils/identity'
+import { testDocumentKey } from '../../../../test/factories/document-targets'
 import { retentionForProjects } from '@/features/editor/utils/document-retention'
 import { expect, test } from '../../../../test/fixtures'
 
-function slice(rootPath: string, lastActiveAt: number, documentIds: readonly string[]) {
+function slice(rootPath: string, lastActiveAt: number, documentKeys: readonly string[]) {
   return {
-    documentIds,
+    documentKeys: documentKeys.map((path) => testDocumentKey(path)),
     lastActiveAt,
-    rootPath,
+    rootPath: filesystemPath(rootPath),
     // Tab ids are unique per tab, so the same file open in two roots is two tabs.
-    tabIds: documentIds.map((id) => `tab:${rootPath}:${id}`),
+    tabIds: documentKeys.map((id) => tabId(`tab:${rootPath}:${id}`)),
   }
 }
 
@@ -20,66 +22,64 @@ const slices = [
 
 test('keeps the active project plus the most recent others, trimming the oldest', () => {
   const retention = retentionForProjects({
-    activeRootPath: '/repo/a',
+    activeRootPath: filesystemPath('/repo/a'),
     byteBudget: Number.MAX_SAFE_INTEGER,
     documentSizes: new Map(),
     projectLimit: 3,
     slices,
   })
 
-  expect([...retention.documentIds].toSorted()).toEqual([
-    '/repo/a/one.ts',
-    '/repo/b/one.ts',
-    '/repo/c/one.ts',
-  ])
-  expect(retention.tabIds.has('tab:/repo/a:/repo/a/one.ts')).toBe(true)
+  expect([...retention.documentKeys].toSorted()).toEqual(
+    ['/repo/a/one.ts', '/repo/b/one.ts', '/repo/c/one.ts'].map((path) => testDocumentKey(path)),
+  )
+  expect(retention.tabIds.has(tabId('tab:/repo/a:/repo/a/one.ts'))).toBe(true)
 })
 
 test('never trims the active project, however stale it is', () => {
   const retention = retentionForProjects({
-    activeRootPath: '/repo/d',
+    activeRootPath: filesystemPath('/repo/d'),
     byteBudget: Number.MAX_SAFE_INTEGER,
     documentSizes: new Map(),
     projectLimit: 2,
     slices,
   })
 
-  expect(retention.documentIds.has('/repo/d/one.ts')).toBe(true)
-  expect(retention.documentIds.size).toBe(2)
+  expect(retention.documentKeys.has(testDocumentKey('/repo/d/one.ts'))).toBe(true)
+  expect(retention.documentKeys.size).toBe(2)
 })
 
 test('a byte budget trims a project that the count alone would have kept', () => {
   const retention = retentionForProjects({
-    activeRootPath: '/repo/a',
+    activeRootPath: filesystemPath('/repo/a'),
     byteBudget: 150,
     documentSizes: new Map([
-      ['/repo/a/one.ts', 100],
-      ['/repo/b/one.ts', 40],
-      ['/repo/c/one.ts', 100],
+      [testDocumentKey('/repo/a/one.ts'), 100],
+      [testDocumentKey('/repo/b/one.ts'), 40],
+      [testDocumentKey('/repo/c/one.ts'), 100],
     ]),
     projectLimit: 3,
     slices,
   })
 
-  expect(retention.documentIds.has('/repo/a/one.ts')).toBe(true)
-  expect(retention.documentIds.has('/repo/b/one.ts')).toBe(true)
+  expect(retention.documentKeys.has(testDocumentKey('/repo/a/one.ts'))).toBe(true)
+  expect(retention.documentKeys.has(testDocumentKey('/repo/b/one.ts'))).toBe(true)
   // Inside the project limit, but 100 + 40 + 100 overruns the 150-byte budget.
-  expect(retention.documentIds.has('/repo/c/one.ts')).toBe(false)
+  expect(retention.documentKeys.has(testDocumentKey('/repo/c/one.ts'))).toBe(false)
 })
 
 test('charges a document shared by nested roots only once', () => {
   const shared = '/repo/shared.ts'
   const retention = retentionForProjects({
-    activeRootPath: '/repo',
+    activeRootPath: filesystemPath('/repo'),
     byteBudget: 100,
-    documentSizes: new Map([[shared, 100]]),
+    documentSizes: new Map([[testDocumentKey(shared), 100]]),
     projectLimit: 3,
     slices: [slice('/repo', 200, [shared]), slice('/repo/apps/web', 100, [shared])],
   })
 
   // Counting the shared document twice would blow the budget and drop the nested
   // root, taking a document the active root still displays with it.
-  expect(retention.documentIds.has(shared)).toBe(true)
+  expect(retention.documentKeys.has(testDocumentKey(shared))).toBe(true)
   expect(retention.tabIds.size).toBe(2)
 })
 
@@ -88,12 +88,12 @@ test('charges a document shared by nested roots only once', () => {
 test('a rejected project does not pay for the documents a later project shares', () => {
   const shared = '/repo/shared.ts'
   const retention = retentionForProjects({
-    activeRootPath: '/repo/active',
+    activeRootPath: filesystemPath('/repo/active'),
     byteBudget: 100,
     documentSizes: new Map([
-      ['/repo/active/one.ts', 10],
-      ['/repo/big/one.ts', 100],
-      [shared, 100],
+      [testDocumentKey('/repo/active/one.ts'), 10],
+      [testDocumentKey('/repo/big/one.ts'), 100],
+      [testDocumentKey(shared), 100],
     ]),
     projectLimit: 3,
     slices: [
@@ -106,41 +106,42 @@ test('a rejected project does not pay for the documents a later project shares',
     ],
   })
 
-  expect(retention.documentIds.has('/repo/active/one.ts')).toBe(true)
-  expect(retention.documentIds.has('/repo/big/one.ts')).toBe(false)
-  expect(retention.documentIds.has(shared)).toBe(false)
+  expect(retention.documentKeys.has(testDocumentKey('/repo/active/one.ts'))).toBe(true)
+  expect(retention.documentKeys.has(testDocumentKey('/repo/big/one.ts'))).toBe(false)
+  expect(retention.documentKeys.has(testDocumentKey(shared))).toBe(false)
 })
 
 test('charges a document listed twice in one slice only once', () => {
+  const duplicate = testDocumentKey('/repo/dup.ts')
   const retention = retentionForProjects({
-    activeRootPath: '/repo/a',
+    activeRootPath: filesystemPath('/repo/a'),
     byteBudget: 100,
-    documentSizes: new Map([['/repo/dup.ts', 100]]),
+    documentSizes: new Map([[duplicate, 100]]),
     projectLimit: 3,
     slices: [
       slice('/repo/a', 200, ['/repo/a/one.ts']),
-      { ...slice('/repo/b', 100, ['/repo/dup.ts']), documentIds: ['/repo/dup.ts', '/repo/dup.ts'] },
+      { ...slice('/repo/b', 100, ['/repo/dup.ts']), documentKeys: [duplicate, duplicate] },
     ],
   })
 
-  // Double-charging would make the slice cost 200 against a 100 budget and drop
-  // a document the tab still displays.
-  expect(retention.documentIds.has('/repo/dup.ts')).toBe(true)
+  // Double-charging would cost 200 against a 100 budget and drop a document the
+  // tab still displays.
+  expect(retention.documentKeys.has(duplicate)).toBe(true)
 })
 
 test('retains the rootless active slice, which has no root path to match', () => {
+  const rootless = testDocumentKey('/repo/rootless.ts')
   const retention = retentionForProjects({
     activeRootPath: null,
     byteBudget: 10,
-    documentSizes: new Map([['settings:json:user', 1_000]]),
+    documentSizes: new Map([[rootless, 1_000]]),
     projectLimit: 3,
     slices: [
       slice('/repo/parked', 100, ['/repo/parked/one.ts']),
-      { ...slice('/repo/x', 200, ['settings:json:user']), rootPath: null },
+      { ...slice('/repo/x', 200, ['/repo/rootless.ts']), rootPath: null },
     ],
   })
 
-  // The active slice is never trimmed, even over budget and even with no root:
-  // its documents are on screen.
-  expect(retention.documentIds.has('settings:json:user')).toBe(true)
+  // The active slice is never trimmed, even over budget and even with no root.
+  expect(retention.documentKeys.has(rootless)).toBe(true)
 })

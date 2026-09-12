@@ -57,8 +57,8 @@ import { clientForQueryClient } from '@/lib/environments/state/query-clients'
 import { useSettingsProjection } from '@/features/settings/hooks/use-settings-projection'
 import { withMovedModel } from '@/features/settings/utils/patch'
 
-export const SETTINGS_MUTATION_KEY = ['settings', 'mutation'] as const
-export const SETTINGS_MUTATION_SCOPE = 'settings-document'
+const SETTINGS_MUTATION_KEY = ['settings', 'mutation'] as const
+const SETTINGS_MUTATION_SCOPE = 'settings-document'
 
 /** Semantic settings actions shared by commands and settings controls. */
 export function useSettingsActions() {

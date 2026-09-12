@@ -1,3 +1,5 @@
+import { filesystemPath } from '@/lib/documents/utils/identity'
+import { testNullableTabContent } from '../../../../test/factories/document-targets'
 import { mkdirSync, writeFileSync } from 'node:fs'
 import path from 'node:path'
 import { worktreeIdSchema } from '@workspace/contracts'
@@ -25,11 +27,16 @@ test('file history in chat mode reveals the editor while main chat history prese
   writeFileSync(path.join(domain.main, 'other.txt'), 'other file')
   await refresh()
   await navigation.openChat({ environmentId, sessionId: DOMAIN_SESSION, surface: 'main' })
-  await navigation.openFile({ owner: editor.workspaceStore, path: 'main/keep.txt' })
-  await navigation.openFile({ owner: editor.workspaceStore, path: 'main/other.txt' })
+  await navigation.openFile({ owner: editor.workspaceStore, path: filesystemPath('main/keep.txt') })
+  await navigation.openFile({
+    owner: editor.workspaceStore,
+    path: filesystemPath('main/other.txt'),
+  })
   await navigation.setToolPanel('logs')
   await pressBack(navigation)
-  expect(editor.workspaceStore.getState().selectedFilePath).toBe('main/keep.txt')
+  expect(editor.workspaceStore.getState().selectedTabContent).toEqual(
+    testNullableTabContent('main/keep.txt'),
+  )
   expect(editor.workspaceStore.getState().chatModePanels).toMatchObject({
     activeToolTab: 'editor',
     toolPaneOpen: true,
@@ -47,7 +54,7 @@ test('sidebar conversation history reveals its destination after utility changes
   await domain.createSession(registration.worktreeId, AMBIGUOUS_SESSION)
   await refresh()
   await navigation.openWorkspace({ environmentId, path: 'main' })
-  await navigation.openFile({ owner: editor.workspaceStore, path: 'main/keep.txt' })
+  await navigation.openFile({ owner: editor.workspaceStore, path: filesystemPath('main/keep.txt') })
   const initialIndex = navigation.router.history.location.state.__TSR_index
   await navigation.openChat({ environmentId, sessionId: DOMAIN_SESSION, surface: 'sidebar' })
   await navigation.openChat({ environmentId, sessionId: AMBIGUOUS_SESSION, surface: 'sidebar' })
@@ -77,7 +84,9 @@ test('sidebar conversation history reveals its destination after utility changes
   await pressBack(navigation)
   await navigation.setSidePanel('logs')
   await pressBack(navigation)
-  expect(editor.workspaceStore.getState().selectedFilePath).toBe('main/keep.txt')
+  expect(editor.workspaceStore.getState().selectedTabContent).toEqual(
+    testNullableTabContent('main/keep.txt'),
+  )
   expect(editor.workspaceStore.getState().workbenchPanels.activeSidebarTab).toBe('logs')
   expect(useSidebarSelectionStore.getState().selection).toMatchObject({
     sessionId: DOMAIN_SESSION,
@@ -93,9 +102,12 @@ test('file history ignores incidental sidebar conversations even after they are 
   await refresh()
   await navigation.openWorkspace({ environmentId, path: 'main' })
   await navigation.openChat({ environmentId, sessionId: DOMAIN_SESSION, surface: 'sidebar' })
-  await navigation.openFile({ owner: editor.workspaceStore, path: 'main/other.txt' })
+  await navigation.openFile({
+    owner: editor.workspaceStore,
+    path: filesystemPath('main/other.txt'),
+  })
   await navigation.openChat({ environmentId, sessionId: AMBIGUOUS_SESSION, surface: 'sidebar' })
-  await navigation.openFile({ owner: editor.workspaceStore, path: 'main/keep.txt' })
+  await navigation.openFile({ owner: editor.workspaceStore, path: filesystemPath('main/keep.txt') })
   await pressBack(navigation)
   await navigation.setSidePanel('logs')
   await domain.dispatch({
@@ -106,7 +118,9 @@ test('file history ignores incidental sidebar conversations even after they are 
   await refresh()
   await pressBack(navigation)
   expect(navigation.getSnapshot().status).toBe('applied')
-  expect(editor.workspaceStore.getState().selectedFilePath).toBe('main/other.txt')
+  expect(editor.workspaceStore.getState().selectedTabContent).toEqual(
+    testNullableTabContent('main/other.txt'),
+  )
   expect(editor.workspaceStore.getState().workbenchPanels.activeSidebarTab).toBe('logs')
   expect(useSidebarSelectionStore.getState().selection).toMatchObject({
     sessionId: AMBIGUOUS_SESSION,
@@ -136,6 +150,11 @@ test('starting a draft in another worktree of the same project updates its execu
     status: 'applied',
   })
   expect(useSessionSelectionStore.getState().draftGeneration).toBe(generation + 1)
+  expect(await navigation.openWorkspace({ environmentId, path: 'linked' })).toEqual({
+    status: 'applied',
+  })
+  expect(editor.workspaceStore.getState().rootFolder?.path).toBe('linked')
+  expect(useSessionSelectionStore.getState().draftWorktreeId).toBe(linked.worktreeId)
 })
 
 test('opening an archived session preserves the archived rail', async () => {

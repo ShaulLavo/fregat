@@ -7,7 +7,7 @@ import {
 import {
   dirtySearchDocuments,
   dirtySearchRevisionKey,
-} from '@/features/search/utils/buffer-dirty-documents'
+} from '@/features/search/state/dirty-documents'
 import type { WorkspaceSearchQueryOptions } from '@/features/search/utils/buffer-query'
 import { workspaceSearchQuery } from '@/features/search/utils/buffer-query'
 import { useSearchBufferStoreApi } from '@/features/search/state/buffer-state'
@@ -30,8 +30,8 @@ export function useRunDirtySearchBufferOverlay(
   const dirtyRevisionKey = useEditorDocumentState((state) =>
     query
       ? dirtySearchRevisionKey(
-          state.liveDocumentsById,
-          state.dirtyFilePaths,
+          state.liveDocumentsByKey,
+          state.dirtyDocumentKeys,
           state.documentContentRevisions,
           rootPath,
         )
@@ -58,8 +58,8 @@ export function useRunDirtySearchBufferOverlay(
     })
     const documentState = documentStore.getState()
     const dirtyDocuments = dirtySearchDocuments(
-      documentState.liveDocumentsById,
-      documentState.dirtyFilePaths,
+      documentState.liveDocumentsByKey,
+      documentState.dirtyDocumentKeys,
       rootPath,
     )
     const dirtyPaths = new Set(dirtyDocuments.map((document) => document.path))

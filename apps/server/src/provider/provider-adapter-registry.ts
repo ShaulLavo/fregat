@@ -211,7 +211,7 @@ export class ProviderAdapterRegistry {
     return [...this.instances.values()]
       .filter(
         ({ adapter, config }) =>
-          config.enabled && adapter.discoverSessions && adapter.readSessionHistory,
+          config.enabled !== false && adapter.discoverSessions && adapter.readSessionHistory,
       )
       .map(({ config }) => ({
         providerInstanceId: config.providerInstanceId,

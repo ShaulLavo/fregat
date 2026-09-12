@@ -1,4 +1,5 @@
 import type { DiffFile } from '@singapor/diff'
+import { fnv1a32 } from '@workspace/client-core/address/path-hash'
 
 import type { DiffLanguageDocument } from '@/features/editor/state/diff-language-session'
 import { languageIdForFilePath } from '@/features/editor/utils/file-path'
@@ -119,13 +120,7 @@ function phantomUri(documentPath: string, side: string, text: string): string {
 
 /** FNV-1a. Not a checksum — just enough to keep two different texts from sharing a name. */
 function textKey(text: string): string {
-  let hash = 0x811c9dc5
-  for (let index = 0; index < text.length; index += 1) {
-    hash ^= text.charCodeAt(index)
-    hash = Math.imul(hash, 0x01000193)
-  }
-
-  return (hash >>> 0).toString(36)
+  return (fnv1a32(text) >>> 0).toString(36)
 }
 
 function fileUri(path: string): string {

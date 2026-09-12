@@ -1,3 +1,4 @@
+import { filesystemPath } from '@/lib/documents/utils/identity'
 import { act, renderHook } from '@testing-library/react'
 
 import { expect, test } from '../../../../test/fixtures'
@@ -124,7 +125,7 @@ function entry(path: string, type: 'directory' | 'file'): FsEntry {
     birthtimeMs: 0,
     mtimeMs: 0,
     name: path.split('/').at(-1) ?? path,
-    path,
+    path: filesystemPath(path),
     size: 0,
     type,
     version: '1',

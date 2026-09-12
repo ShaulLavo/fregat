@@ -1,6 +1,6 @@
+import { copyPathSection } from '@/keymap/menus/utils/copy-path-section'
 import {
   ArrowBendUpLeftIcon,
-  CopyIcon,
   CopySimpleIcon,
   FilePlusIcon,
   FolderOpenIcon,
@@ -14,7 +14,7 @@ import {
 import type { GitFileStatus } from '@workspace/contracts'
 
 import { isStagedStatus, isWorktreeStatus } from '@/features/git/utils/change-rows'
-import { actionItem, section, type Menu } from '@/features/menus/utils/model'
+import { actionItem, section, type Menu } from '@/keymap/menus/utils/model'
 
 export type RowGitActions = {
   readonly canStage: boolean
@@ -138,21 +138,11 @@ export function treeRowMenu(context: TreeRowMenuContext): Menu {
           run: context.discard,
         }),
     ]),
-    section('copy', [
-      actionItem({
-        disabled: unresolved,
-        icon: CopyIcon,
-        id: 'copyPath',
-        label: 'Copy Path',
-        run: () => context.copyPath(context.path ?? '', 'path'),
-      }),
-      actionItem({
-        icon: CopyIcon,
-        id: 'copyRelativePath',
-        label: 'Copy Relative Path',
-        run: () => context.copyPath(context.relativePath, 'relative path'),
-      }),
-    ]),
+    copyPathSection({
+      copyPath: context.copyPath,
+      path: context.path,
+      relativePath: context.relativePath,
+    }),
     section('edit', [
       actionItem({
         disabled: unresolved || mutationsDisabled,

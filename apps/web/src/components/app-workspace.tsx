@@ -1,6 +1,6 @@
 import { EmptyWorkspace } from '@/components/empty-workspace'
 import { LoadingState } from '@workspace/ui/components/loading-state'
-import { ProjectMachinePicker } from '@/components/project-machine-picker'
+import { ProjectPicker } from '@/features/environments/components/project-picker'
 import { useConnectedMachines } from '@/hooks/use-connected-machines'
 import { useQueryClient } from '@tanstack/react-query'
 import { originForQueryClient } from '@/lib/environments/state/query-clients'
@@ -58,7 +58,7 @@ export function AppWorkspace({ restoringWorkspace }: { readonly restoringWorkspa
       </div>
       {picker}
       {pickerOpen && chooseMachine ? (
-        <ProjectMachinePicker machines={machines} onClose={() => setPickerOpen(false)} />
+        <ProjectPicker machines={machines} onClose={() => setPickerOpen(false)} />
       ) : null}
     </>
   )

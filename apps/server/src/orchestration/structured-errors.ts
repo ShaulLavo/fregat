@@ -36,6 +36,18 @@ export const checkpointErrors = defineErrorCatalog('checkpoint', {
 })
 
 export const sessionDomainErrors = defineErrorCatalog('orchestration', {
+  STEER_TURN_NOT_ACTIVE: {
+    status: 409,
+    message: 'The turn has finished or is waiting for a response. Your message was not sent.',
+    why: 'A correction must name the currently running turn and cannot bypass a pending request.',
+    fix: 'Answer the pending request or send the message as a new turn.',
+  },
+  SOURCE_PLAN_PROJECT_MISMATCH: {
+    status: 409,
+    message: 'The proposed plan belongs to another project.',
+    why: 'A plan implementation must run in the project where the plan was written.',
+    fix: 'Implement the plan from its own session or another checkout of the same project.',
+  },
   WORKTREE_NOT_FOUND: {
     status: 404,
     message: ({ worktreeId }: { worktreeId: string }) => `Worktree not found: ${worktreeId}`,

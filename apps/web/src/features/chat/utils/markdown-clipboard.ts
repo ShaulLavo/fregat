@@ -51,6 +51,9 @@ export function serializeRenderedMarkdownFragment(container: Node) {
 }
 
 function sanitizedHtml(container: Element) {
+  for (const imageButton of container.querySelectorAll('[data-markdown-image]')) {
+    imageButton.replaceWith(...imageButton.childNodes)
+  }
   for (const node of container.querySelectorAll(SANITIZED_HTML_SELECTOR)) {
     node.remove()
   }
@@ -74,6 +77,7 @@ function serializeNode(node: Node): string {
   const element = node as Element
   const copyOverride = element.getAttribute('data-markdown-copy')
   if (copyOverride !== null) return copyOverride
+  if (element.hasAttribute('data-markdown-image')) return serializeChildren(element)
   if (isSkipped(element)) return ''
 
   const headingLevel = /^H([1-6])$/u.exec(element.tagName)?.[1]
@@ -206,7 +210,7 @@ function serializeAnchor(anchor: Element) {
 function serializeImage(image: Element) {
   const alt = image.getAttribute('alt') ?? ''
   const src = image.getAttribute('src') ?? ''
-  if (!alt || !src) return ''
+  if (!src) return ''
 
   return `![${alt}](${src})`
 }

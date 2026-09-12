@@ -581,7 +581,8 @@ describe('ProviderService', () => {
 
     expect(result).toEqual({ text: 'Generated title' })
     expect(adapter.startedSessions).toHaveLength(1)
-    expect(adapter.startedSessions[0]?.cwd).toMatch(/^\/work\/tmp\/platform-provider-text-/)
+    expect(path.dirname(adapter.startedSessions[0]!.cwd)).toBe(tmpdir())
+    expect(path.basename(adapter.startedSessions[0]!.cwd)).toMatch(/^platform-provider-text-/)
     expect(adapter.startedSessions[0]?.cwd).not.toBe(input.cwd)
     expect(adapter.startedTurns[0]?.cwd).toBe(adapter.startedSessions[0]?.cwd)
     expect(adapter.startedSessions[0]).toMatchObject({

@@ -6,10 +6,7 @@ import {
   type ChatShellSubscriptionState,
 } from '@/features/chat/state/shell-subscription'
 
-export type {
-  ChatShellConnectionPhase,
-  ChatShellSubscriptionState,
-} from '@/features/chat/state/shell-subscription'
+export type { ChatShellSubscriptionState } from '@/features/chat/state/shell-subscription'
 
 export function useChatShellSubscription(transport: ChatTransport): ChatShellSubscriptionState {
   const [state, setState] = useState<ChatShellSubscriptionState>(CONNECTING_STATE)

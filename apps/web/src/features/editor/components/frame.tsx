@@ -10,7 +10,7 @@ import {
 } from 'react'
 
 import { EditorTextMenu } from '@/features/editor/components/text-menu'
-import { useContextMenu } from '@/features/menus/hooks/use-context-menu'
+import { useContextMenu } from '@/keymap/menus/hooks/use-context-menu'
 
 type EditorFrameProps = {
   active: boolean

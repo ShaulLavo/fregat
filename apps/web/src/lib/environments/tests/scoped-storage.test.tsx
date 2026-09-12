@@ -1,8 +1,14 @@
-import { healthDescriptorSchema } from '@workspace/contracts'
+import { filesystemPath } from '@/lib/documents/utils/identity'
+import { testTabContents } from '../../../../test/factories/document-targets'
+import { healthDescriptorSchema, environmentIdSchema } from '@workspace/contracts'
 import {
   readCachedEnvironmentBindings,
   recordEnvironmentCacheBinding,
   CHAT_PROJECTION_CACHE_STORAGE_KEY,
+  chatProjectionCacheFromState,
+  readChatProjectionCache,
+  writeChatProjectionCache,
+  hydrateChatProjectionState,
 } from '@/features/chat/state/chat-projection-cache'
 import {
   initializeSessionSelectionStorage,
@@ -12,6 +18,12 @@ import {
 import {
   readSessionSelectionCache,
   writeSessionSelectionCache,
+  emptyWorkspaceSlice,
+  readWorkspaceCache,
+  workspaceSliceStorageKey,
+  writeRootFolderCache,
+  writeWorkspaceIndexCache,
+  writeWorkspaceSliceCache,
 } from '@/features/workspace/state/cache'
 import { TEST_PROJECT_ID, TEST_SESSION_ID, TEST_WORKTREE_ID } from '../../../../test/factories/chat'
 import {
@@ -21,18 +33,9 @@ import {
 } from '@/features/chat/state/chat-changed-files-expansion-store'
 import { CHAT_CHANGED_FILES_EXPANSION_LIMIT } from '@/features/chat/utils/changed-files-expansion-storage'
 import { beforeEach } from 'vitest'
-import { environmentIdSchema } from '@workspace/contracts'
 import * as v from 'valibot'
 import { expect, test } from '../../../../test/fixtures'
 import { environmentScopedStorage } from '@/lib/environments/state/scoped-storage'
-import {
-  emptyWorkspaceSlice,
-  readWorkspaceCache,
-  workspaceSliceStorageKey,
-  writeRootFolderCache,
-  writeWorkspaceIndexCache,
-  writeWorkspaceSliceCache,
-} from '@/features/workspace/state/cache'
 import { createPromptStashStore } from '@/features/chat/state/prompt-stash-store'
 import {
   hydrateChatInputDraftStoreFromStorage,
@@ -40,12 +43,6 @@ import {
   useChatInputDraftStore,
 } from '@/features/chat/state/chat-input-draft-store'
 import { readPersistedChatInputDrafts } from '@/features/chat/utils/draft-storage'
-import {
-  chatProjectionCacheFromState,
-  readChatProjectionCache,
-  writeChatProjectionCache,
-  hydrateChatProjectionState,
-} from '@/features/chat/state/chat-projection-cache'
 import { createInitialChatProjectionSlice } from '@workspace/client-core/chat/types'
 import { createInitialChatProjectionState } from '@/features/chat/state/chat-projection-store'
 
@@ -64,7 +61,7 @@ beforeEach(() => {
 test('matching root paths retain independent tabs and workspace indexes', () => {
   const root = {
     name: 'repo',
-    path: '/repo',
+    path: filesystemPath('/repo'),
     type: 'directory',
     birthtimeMs: 0,
     mtimeMs: 0,
@@ -72,14 +69,24 @@ test('matching root paths retain independent tabs and workspace indexes', () => 
     version: '',
   } as const
   writeRootFolderCache(a, root)
-  writeWorkspaceSliceCache(a, '/repo', { ...emptyWorkspaceSlice(), editorHistory: ['/repo/a.ts'] })
+  writeWorkspaceSliceCache(a, '/repo', {
+    ...emptyWorkspaceSlice(),
+    editorHistory: testTabContents(['/repo/a.ts']),
+  })
   writeWorkspaceIndexCache(a, ['/repo'])
   expect(readWorkspaceCache(b).rootFolder).toBeNull()
   writeRootFolderCache(b, root)
-  writeWorkspaceSliceCache(b, '/repo', { ...emptyWorkspaceSlice(), editorHistory: ['/repo/b.ts'] })
+  writeWorkspaceSliceCache(b, '/repo', {
+    ...emptyWorkspaceSlice(),
+    editorHistory: testTabContents(['/repo/b.ts']),
+  })
   writeWorkspaceIndexCache(b, ['/repo'])
-  expect(readWorkspaceCache(a).workspaces['/repo']?.editorHistory).toEqual(['/repo/a.ts'])
-  expect(readWorkspaceCache(b).workspaces['/repo']?.editorHistory).toEqual(['/repo/b.ts'])
+  expect(readWorkspaceCache(a).workspaces['/repo']?.editorHistory).toEqual(
+    testTabContents(['/repo/a.ts']),
+  )
+  expect(readWorkspaceCache(b).workspaces['/repo']?.editorHistory).toEqual(
+    testTabContents(['/repo/b.ts']),
+  )
   writeWorkspaceIndexCache(a, [])
   expect(b.getItem(workspaceSliceStorageKey('/repo'))).not.toBeNull()
 })
@@ -230,7 +237,7 @@ test('cold machine discovery keeps aliases with their confirmed identity and pre
 test('registered checkout cache keys use WorktreeId and cold root selection restores that owner', () => {
   const root = {
     name: 'repo',
-    path: '/repo',
+    path: filesystemPath('/repo'),
     type: 'directory',
     birthtimeMs: 0,
     mtimeMs: 0,
@@ -241,7 +248,7 @@ test('registered checkout cache keys use WorktreeId and cold root selection rest
   writeWorkspaceSliceCache(
     a,
     root.path,
-    { ...emptyWorkspaceSlice(), editorHistory: ['/repo/owned.ts'] },
+    { ...emptyWorkspaceSlice(), editorHistory: testTabContents(['/repo/owned.ts']) },
     TEST_WORKTREE_ID,
   )
   writeWorkspaceIndexCache(a, [root.path], { [root.path]: TEST_WORKTREE_ID })
@@ -250,17 +257,23 @@ test('registered checkout cache keys use WorktreeId and cold root selection rest
     workspaceSliceStorageKey(root.path, TEST_WORKTREE_ID),
   )
   expect(readWorkspaceCache(a).worktreeIdByRootPath[root.path]).toBe(TEST_WORKTREE_ID)
-  expect(readWorkspaceCache(a).workspaces[root.path]?.editorHistory).toEqual(['/repo/owned.ts'])
+  expect(readWorkspaceCache(a).workspaces[root.path]?.editorHistory).toEqual(
+    testTabContents(['/repo/owned.ts']),
+  )
   writeRootFolderCache(b, root, TEST_WORKTREE_ID)
   writeWorkspaceSliceCache(
     b,
     root.path,
-    { ...emptyWorkspaceSlice(), editorHistory: ['/repo/b.ts'] },
+    { ...emptyWorkspaceSlice(), editorHistory: testTabContents(['/repo/b.ts']) },
     TEST_WORKTREE_ID,
   )
   writeWorkspaceIndexCache(b, [root.path], { [root.path]: TEST_WORKTREE_ID })
-  expect(readWorkspaceCache(b).workspaces[root.path]?.editorHistory).toEqual(['/repo/b.ts'])
-  expect(readWorkspaceCache(a).workspaces[root.path]?.editorHistory).toEqual(['/repo/owned.ts'])
+  expect(readWorkspaceCache(b).workspaces[root.path]?.editorHistory).toEqual(
+    testTabContents(['/repo/b.ts']),
+  )
+  expect(readWorkspaceCache(a).workspaces[root.path]?.editorHistory).toEqual(
+    testTabContents(['/repo/owned.ts']),
+  )
   writeWorkspaceIndexCache(a, [])
   expect(b.getItem(workspaceSliceStorageKey(root.path, TEST_WORKTREE_ID))).not.toBeNull()
 })

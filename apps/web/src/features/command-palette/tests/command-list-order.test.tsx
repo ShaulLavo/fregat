@@ -22,6 +22,7 @@ const COMMAND_PALETTE_ACTIONS: CommandPaletteActions = {
   disabledReasonForCommand: () => null,
   previewColorTheme: () => undefined,
   selectColorTheme: () => undefined,
+  selectContent: () => Promise.resolve(),
   selectFile: () => Promise.resolve(),
   selectGotoLine: () => Promise.resolve(),
   selectPlatformCommand: () => Promise.resolve(),

@@ -7,7 +7,7 @@ export const discoveryInputSchema = v.object({
   offset: v.pipe(v.number(), v.integer(), v.minValue(0)),
 })
 
-export const discoveredSessionSchema = v.object({
+const discoveredSessionSchema = v.object({
   sessionId: sessionIdSchema,
   cwd: v.nullable(v.string()),
   title: v.pipe(v.string(), v.trim(), v.minLength(1)),

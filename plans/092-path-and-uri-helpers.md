@@ -1,5 +1,7 @@
 # Unify path, URI, and containment helpers
 
+Implementation note, 2026-09-12: Plan 096 moved native-picker path conversion to `components/utils/picked-path.ts`. The warning in `lib/path-formatters.ts` points to that path and retains all basename distinctions. See [web layering](../docs/web-layering.md).
+
 Status: proposed, implementation not started. Requested 2026-09-11.
 
 This is the `basename`-trap plan. Every step below states the behavioural divergence before the merge
@@ -435,7 +437,7 @@ new contracts exports.
   [Plan 095](095-server-plumbing.md), even where they sit in `apps/server/src/fs/workspace-edit.ts`
   alongside helpers this plan deletes.
 - **`features/menus` → `keymap/menus/` and the other `apps/web` layering moves** belong to
-  [Plan 096](096-web-layering-and-boundaries.md).
+  [Plan 096](../docs/web-layering.md).
 
 ## Completion checklist
 

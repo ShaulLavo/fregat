@@ -8,11 +8,7 @@ import {
   type EditorApplyActions,
 } from '@/features/editor/state/apply-actions'
 import type { EditorDocumentStoreApi } from '@/features/editor/state/document-state'
-import {
-  type EditorOpenBenchmarkControl,
-  type EditorOpenSampleResetRequest,
-  type EditorOpenSampleTarget,
-} from '@/features/editor/state/performance-trace'
+import { type EditorOpenBenchmarkControl } from '@/features/editor/state/performance-trace'
 import type { EditorUiStoreApi } from '@/features/editor/state/ui-state'
 import type { EditorWorkspaceStoreApi } from '@/features/editor/state/workspace-state'
 import {
@@ -29,8 +25,19 @@ import type {
 } from '@/lib/file-open-intent/state/service'
 import type { MountedEditorRegistry } from '@/features/editor/state/mounted-editor-registry'
 import { createClientInvariantError } from '@/lib/structured-errors'
-import { fileBackedDocumentPath } from '@/features/editor/utils/file-backed-document'
+import {
+  fileDocumentKey,
+  filesystemPath,
+  fileDocument,
+  tabId,
+} from '@/lib/documents/utils/identity'
+import { filesystemResource } from '@/lib/documents/utils/capabilities'
+import { documentTab, sameTabContent } from '@/lib/documents/utils/tabs'
+import type { FilesystemPath } from '@/lib/documents/utils/types'
 import { closeEditorTabInWorkbenchPanels } from '@/features/workbench/utils/panels'
+
+type EditorOpenSampleTarget = { readonly path: FilesystemPath; readonly rootPath: FilesystemPath }
+type EditorOpenSampleResetRequest = EditorOpenSampleTarget & { readonly sampleId: string }
 
 const BENCHMARK_TARGET_TAB_PREFIX = 'editor-open-benchmark-target:'
 
@@ -68,7 +75,12 @@ export function createEditorOpenBenchmarkControl({
   let resetRunning = false
 
   return {
-    begin: (request) => {
+    begin: (input) => {
+      const request = {
+        ...input,
+        path: filesystemPath(input.path),
+        rootPath: filesystemPath(input.rootPath),
+      }
       assertTargetRoot(request, workspaceStore)
       assertTargetStateCleared(request, documentStore, mountedEditors, queryClient, workspaceStore)
       if (samples.has(request.sampleId)) {
@@ -78,13 +90,23 @@ export function createEditorOpenBenchmarkControl({
       samples.set(request.sampleId, sample)
       installInactiveTargetTab(request.path, workspaceStore)
     },
-    prime: async (request) => {
+    prime: async (input) => {
+      const request = {
+        ...input,
+        path: filesystemPath(input.path),
+        rootPath: filesystemPath(input.rootPath),
+      }
       assertTargetRoot(request, workspaceStore)
       assertActiveSampleTarget(request, samples)
       await ensureFileSnapshotQuery(queryClient, request.path)
       return { ready: true }
     },
-    reset: async (request) => {
+    reset: async (input) => {
+      const request = {
+        ...input,
+        path: filesystemPath(input.path),
+        rootPath: filesystemPath(input.rootPath),
+      }
       if (resetRunning) {
         throw createClientInvariantError('Editor-open benchmark reset is already running')
       }
@@ -172,20 +194,22 @@ function assertTargetRoot(
   throw createClientInvariantError('Editor-open benchmark target root is not active')
 }
 
-function assertTargetIsClean(path: string, documentStore: EditorDocumentStoreApi): void {
-  const document = documentStore.getState().getLiveEditorDocument(path)
+function assertTargetIsClean(path: FilesystemPath, documentStore: EditorDocumentStoreApi): void {
+  const document = documentStore.getState().getLiveEditorDocument(fileDocumentKey(path))
   if (!document || !document.buffer.isDirty()) return
 
   throw createClientInvariantError('Editor-open benchmark cannot reset a dirty target')
 }
 
 function activateInertAndCloseTarget(
-  path: string,
+  path: FilesystemPath,
   commands: EditorApplyActions,
   workspaceStore: EditorWorkspaceStoreApi,
 ): void {
   const workspace = workspaceStore.getState()
-  const targetTabs = workspace.workbenchPanels.editorTabs.filter((tab) => tab.path === path)
+  const targetTabs = workspace.workbenchPanels.editorTabs.filter((tab) =>
+    sameTabContent(tab.content, documentTab(fileDocument({ path }))),
+  )
   if (targetTabs.length > 1) {
     throw createClientInvariantError('Editor-open benchmark target is shared by multiple tabs')
   }
@@ -195,7 +219,9 @@ function activateInertAndCloseTarget(
   }
 
   const inertTab = workspace.workbenchPanels.editorTabs.find(
-    (tab) => tab.id !== targetTab.id && !fileBackedDocumentPath(tab.path),
+    (tab) =>
+      tab.id !== targetTab.id &&
+      (tab.content.kind !== 'document' || !filesystemResource(tab.content.document)),
   )
   if (!inertTab) {
     throw createClientInvariantError('Editor-open benchmark requires a dedicated inert surface')
@@ -240,14 +266,17 @@ function assertActiveSampleTarget(
   throw createClientInvariantError('Editor-open benchmark query primer requires an active sample')
 }
 
-function deleteCleanTargetDocument(path: string, documentStore: EditorDocumentStoreApi): void {
-  const document = documentStore.getState().getLiveEditorDocument(path)
+function deleteCleanTargetDocument(
+  path: FilesystemPath,
+  documentStore: EditorDocumentStoreApi,
+): void {
+  const document = documentStore.getState().getLiveEditorDocument(fileDocumentKey(path))
   if (!document) return
   if (document.buffer.isDirty()) {
     throw createClientInvariantError('Editor-open benchmark target became dirty during reset')
   }
 
-  documentStore.getState().deleteLiveEditorDocument(document.id)
+  documentStore.getState().deleteLiveEditorDocument(document.key)
 }
 
 async function clearTargetQueries(
@@ -297,17 +326,21 @@ function assertTargetStateCleared(
   workspaceStore: EditorWorkspaceStoreApi,
 ): void {
   const workspace = workspaceStore.getState()
-  if (workspace.workbenchPanels.editorTabs.some((tab) => tab.path === request.path)) {
+  if (
+    workspace.workbenchPanels.editorTabs.some((tab) =>
+      sameTabContent(tab.content, documentTab(fileDocument({ path: request.path }))),
+    )
+  ) {
     throw createClientInvariantError('Editor-open benchmark target tab reappeared during reset')
   }
-  if (documentStore.getState().getLiveEditorDocument(request.path)) {
+  if (documentStore.getState().getLiveEditorDocument(fileDocumentKey(request.path))) {
     throw createClientInvariantError(
       'Editor-open benchmark target document reappeared during reset',
     )
   }
   if (
     Object.values(documentStore.getState().viewsByTabId).some(
-      (view) => view.documentId === request.path,
+      (view) => view.documentKey === fileDocumentKey(request.path),
     )
   ) {
     throw createClientInvariantError('Editor-open benchmark target view reappeared during reset')
@@ -320,16 +353,27 @@ function assertTargetStateCleared(
   }
 }
 
-function installInactiveTargetTab(path: string, workspaceStore: EditorWorkspaceStoreApi): void {
+function installInactiveTargetTab(
+  path: FilesystemPath,
+  workspaceStore: EditorWorkspaceStoreApi,
+): void {
   const workspace = workspaceStore.getState()
   const panels = workspace.workbenchPanels
-  if (panels.editorTabs.some((tab) => tab.path === path)) return
+  if (
+    panels.editorTabs.some((tab) =>
+      sameTabContent(tab.content, documentTab(fileDocument({ path }))),
+    )
+  )
+    return
 
   workspace.setWorkbenchPanels({
     ...panels,
     editorTabs: [
       ...panels.editorTabs,
-      { id: `${BENCHMARK_TARGET_TAB_PREFIX}${crypto.randomUUID()}`, path },
+      {
+        id: tabId(`${BENCHMARK_TARGET_TAB_PREFIX}${crypto.randomUUID()}`),
+        content: documentTab(fileDocument({ path })),
+      },
     ],
   })
 }

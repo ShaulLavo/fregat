@@ -1,50 +1,51 @@
-# Test baseline at `d0bbaa2b`
+# Test baseline
 
-Captured with `bun run test` in this worktree before any fix landed. Completion for every unit is
-**no new failures against this list** — never "the suite is green", which it is not.
+## After merging `origin/main` (`dd3565e3`) — the baseline is now green
 
-| Workspace                                                                                                                   | Files                  | Tests                               |
-| --------------------------------------------------------------------------------------------------------------------------- | ---------------------- | ----------------------------------- |
-| `packages/contracts`                                                                                                        | 2 failed / 21 passed   | 2 failed / 209 passed               |
-| `apps/tui`                                                                                                                  | 6 failed / 93 passed   | 7 failed / 360 passed               |
-| `apps/web`                                                                                                                  | 19 failed / 429 passed | 40 failed / 2884 passed (5 skipped) |
-| `apps/server`                                                                                                               | 0 failed / 154 passed  | 0 failed / 1438 passed (2 skipped)  |
-| `packages/tree`, `packages/pty`, `packages/client-core`, `packages/ui`, `packages/observability`, `apps/desktop`, `scripts` | all passed             | all passed                          |
+`main` moved 70+ commits while this branch was in flight, landing Plan 098, Plan 096, and a knip
+`unused:check` CI gate. It also repaired every failure this branch had been measuring against. On the
+merged tree, every workspace passes:
 
-Totals: **27 failing files, 49 failing tests.**
+| Workspace               | Result                                           |
+| ----------------------- | ------------------------------------------------ |
+| `apps/web` (node + dom) | 459 files / 3495 tests, 5 skipped — **all pass** |
+| `apps/server`           | 1483 tests, 2 skipped — **all pass**             |
+| `apps/tui`              | 99 files / 367 tests — **all pass**              |
+| `packages/contracts`    | 23 files / 202 tests — **all pass**              |
+| `packages/client-core`  | 4 files / 17 tests — **all pass**                |
 
-## The two `packages/contracts` failures are stale expectations, not product bugs
+`typecheck`, `lint`, `format:check`, `generated:check` and `unused:check` are all clean.
 
-Both track intentional upstream change from `afe4f727` ("sync editor and terminal revisions") and
-both were confirmed by running them:
+So completion for the remaining units is the ordinary bar — the suite stays green — not a delta. Two
+caveats worth keeping:
 
-1. **`src/tests/settings-mutations.test.ts:46`** — `SCALAR_SETTING_IDS` has **two extra** entries
-   (45 received vs 43 expected): `editor.codeTheme.dark` and `editor.codeTheme.light`. Direction
-   matters and one audit pass reported it backwards. Cause: `SCALAR_SETTING_IDS` is `SETTING_IDS`
-   minus eight explicitly non-scalar ids (`settings/mutations.ts:25-43`), while the test's `expected`
-   filters by `widget ∈ {boolean, enum, font, multiline, number, string}` and those two keys carry
-   `widget: 'code-theme'` (`keys.ts:81,91`).
+- `apps/tui` has flaky tests. One file failed on the first full run of the merged tree and passed on
+  the second with no change in between; `terminal/tests/host.test.ts` spawns real PTYs and
+  `navigation/tests/files.test.tsx` has behaved the same way. Re-run before concluding a TUI failure
+  is real.
+- `apps/web` `src/state/tests/checkout-ownership.test.tsx` was load-flaky before the merge (passing
+  alone, failing in a full project run) and now passes in both. Its history is recorded below in case
+  it returns.
 
-   **The test is what is stale.** Those keys are written through the scalar path in production —
-   `color-theme-provider.tsx:50-56` calls `setSetting('editor.codeTheme.' + resolvedTheme, themeId)`
-   — so removing them from `SCALAR_SETTING_IDS` would break the code-theme pickers. The fix is to add
-   `'code-theme'` to the test's `scalarWidgets` set. Owned here as unit 2's prerequisite, because
-   unit 2 registers a key against the same assertion.
+## What the pre-merge baseline was, and why it is kept here
 
-2. **`src/tests/session-vocabulary.test.ts`** — the codex protocol generator now emits `thread/list`,
-   which the test's expected vocabulary does not list. **Left as baseline deliberately.** That test
-   exists to force a human to review vocabulary additions, and the addition belongs to the sync
-   commit, not to this work. Do not silently update it.
+Captured at `d0bbaa2b` before the first fix landed: **27 failing files, 49 failing tests**
+(`packages/contracts` 2/2, `apps/tui` 6/7, `apps/web` 19/40, `apps/server` clean). Every commit on
+this branch up to the merge was verified as a delta against that list, which is why their messages
+say "no new failures" rather than "green".
 
-## A load-dependent failure the first capture missed
+Two of those failures were fixed here rather than worked around, and both are worth knowing about
+because the diagnosis was the interesting part:
 
-`apps/web` `src/state/tests/checkout-ownership.test.tsx > confirmed worktrees retain Git drafts
-across A/B/A …` **passes in isolation** (run twice) but **fails in every full-project run**. It is
-absent from the `bun run test` capture above because that run schedules `node` and `dom` together and
-did not hit it.
+1. **`packages/contracts/src/tests/settings-mutations.test.ts`** — `SCALAR_SETTING_IDS` carried two
+   **extra** entries, `editor.codeTheme.dark` and `.light`, not two missing ones. One audit pass
+   reported the direction backwards. The test was stale, not the registry: those keys hold a plain
+   theme-id string and `color-theme-provider.tsx` writes them through the scalar path, so excluding
+   them would break the code-theme pickers. `main` reached the same fix independently.
+2. **`apps/web/test/integration/server-in-process.test.ts`** — imported a deleted module
+   (`@/lib/workspace-search-client`) and could not load at all. `main` repointed it independently and
+   more cleanly, so its version was taken in the merge.
 
-Confirmed pre-existing rather than caused by this work: reverting
-`packages/client-core/src/files/search-client.ts` to `d0bbaa2b` and re-running the whole `dom`
-project reproduces it with byte-identical totals — 14 files / 26 tests failed either way. Treat it as
-baseline, and prefer whole-project totals over per-test lists when checking for new failures, because
-the per-test set shifts with scheduling.
+`session-vocabulary.test.ts` was deliberately left red here — it exists to make a human review
+protocol-vocabulary additions, and the addition belonged to a dependency-sync commit. `main` has
+since settled it.

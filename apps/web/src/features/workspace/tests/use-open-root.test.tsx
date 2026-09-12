@@ -1,3 +1,4 @@
+import { filesystemPath } from '@/lib/documents/utils/identity'
 import { screen, waitFor } from '@testing-library/react'
 import userEvent from '@testing-library/user-event'
 import { symlink } from 'node:fs/promises'
@@ -24,7 +25,7 @@ test('records an opened root as recent, so the project menu can order by it', as
   client,
 }) => {
   void client
-  await ensureFolderPath('anubis')
+  await ensureFolderPath(filesystemPath('anubis'))
   await renderOpeners(client, ['anubis'])
 
   await userEvent.click(screen.getByRole('button', { name: 'Open anubis' }))
@@ -44,7 +45,7 @@ test('opening a folder through an alias keeps its canonical root and workspace I
   server,
 }) => {
   void client
-  await ensureFolderPath('actual')
+  await ensureFolderPath(filesystemPath('actual'))
   await symlink('actual', path.join(server.root, 'alias'))
   const { store, results } = await renderOpeners(client, ['actual', 'alias'])
 
@@ -61,10 +62,10 @@ test('opening a folder through an alias keeps its canonical root and workspace I
 
 test('makes the latest rapid valid open the editor and index root', async ({ client, server }) => {
   void client
-  await ensureFolderPath('a')
-  await ensureFolderPath('b')
-  await createFileContent('a/only-a.ts', 'export const a = true\n')
-  await createFileContent('b/only-b.ts', 'export const b = true\n')
+  await ensureFolderPath(filesystemPath('a'))
+  await ensureFolderPath(filesystemPath('b'))
+  await createFileContent(filesystemPath('a/only-a.ts'), 'export const a = true\n')
+  await createFileContent(filesystemPath('b/only-b.ts'), 'export const b = true\n')
   const { store, results } = await renderOpeners(client, ['a', 'b'])
 
   await userEvent.click(screen.getByRole('button', { name: 'Open rapidly' }))
@@ -83,8 +84,8 @@ test('does not retarget the index when a newer folder open is rejected', async (
   server,
 }) => {
   void client
-  await ensureFolderPath('valid')
-  await createFileContent('not-a-folder.txt', 'file\n')
+  await ensureFolderPath(filesystemPath('valid'))
+  await createFileContent(filesystemPath('not-a-folder.txt'), 'file\n')
   const { store, results } = await renderOpeners(client, ['valid', 'not-a-folder.txt'])
 
   await userEvent.click(screen.getByRole('button', { name: 'Open valid' }))
@@ -106,7 +107,7 @@ test('does not start a root open when the workspace mutation gate refuses it', a
   client,
   server,
 }) => {
-  await ensureFolderPath('blocked', client)
+  await ensureFolderPath(filesystemPath('blocked'), client)
   const rootRequests: string[] = []
   const observed = createObservedInProcessClient(server, (request) => {
     if (new URL(request.url).pathname === '/fs/workspace-root') rootRequests.push(request.url)

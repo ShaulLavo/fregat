@@ -2,7 +2,7 @@ import { useQueryClient } from '@tanstack/react-query'
 import type { LogDashboardFilters, LogEventsResult, LogLiveStreamItem } from '@workspace/contracts'
 import { useEffect, useMemo } from 'react'
 
-import { logsKeys } from '@/lib/query-keys'
+import { logsKeys } from '@/features/logs/utils/query-keys'
 import { subscribeLogEvents } from '@/features/logs/utils/api'
 import { createLiveEventBatcher } from '@/features/logs/state/live-batcher'
 import { logFilterQuery } from '@/features/logs/utils/filter-params'

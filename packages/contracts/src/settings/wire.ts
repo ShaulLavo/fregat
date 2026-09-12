@@ -4,7 +4,7 @@ import { SETTINGS_LAYER_ORDER } from './resolve'
 
 export const settingIdSchema = v.picklist(SETTING_IDS)
 
-export const settingsLayerIdSchema = v.picklist(SETTINGS_LAYER_ORDER)
+const settingsLayerIdSchema = v.picklist(SETTINGS_LAYER_ORDER)
 
 /** A layer a client may write to. Policy is read-only by definition. */
 export const settingsWriteTargetSchema = v.picklist(['user', 'workspace'] as const)
@@ -15,7 +15,7 @@ export const settingsServerVersionSchema = v.strictObject({
   sequence: v.pipe(v.number(), v.integer(), v.minValue(0)),
 })
 
-export const settingsDiagnosticSchema = v.object({
+const settingsDiagnosticSchema = v.object({
   kind: v.picklist(['unknown-key', 'scope-not-allowed', 'invalid-value'] as const),
   id: v.string(),
   layer: settingsLayerIdSchema,
@@ -23,14 +23,14 @@ export const settingsDiagnosticSchema = v.object({
 })
 
 /** Where a syntax error is, so the JSON view can put a squiggle on it. */
-export const settingsParseErrorSchema = v.object({
+const settingsParseErrorSchema = v.object({
   message: v.string(),
   offset: v.number(),
   length: v.number(),
 })
 
 /** A source span in the exact settings document bytes carried beside it. */
-export const settingsTextRangeSchema = v.object({
+const settingsTextRangeSchema = v.object({
   offset: v.number(),
   length: v.number(),
 })
@@ -47,7 +47,7 @@ export const settingsTextRangeSchema = v.object({
  * parse rather than what these bytes mean — the two disagree exactly while the
  * file is broken, which is the state the banner exists to explain.
  */
-export const settingsLayerFileSchema = v.object({
+const settingsLayerFileSchema = v.object({
   text: v.string(),
   revision: v.string(),
   parseErrors: v.array(settingsParseErrorSchema),
@@ -58,7 +58,7 @@ export const settingsLayerFileSchema = v.object({
  * One layer as the client sees it: the unfiltered contents, so the page can
  * render "set here but not applied" without a second round trip.
  */
-export const settingsLayerSnapshotSchema = v.object({
+const settingsLayerSnapshotSchema = v.object({
   id: settingsLayerIdSchema,
   /** Absent when the layer has no file — no workspace open, no policy configured. */
   present: v.boolean(),

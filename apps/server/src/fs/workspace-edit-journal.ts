@@ -141,7 +141,7 @@ export type WorkspaceEditJournalRecord =
       readonly type: 'compensated'
     }
 
-export type WorkspaceEditTransitionCacheEntry = {
+type WorkspaceEditTransitionCacheEntry = {
   readonly fingerprint: string
   readonly result: WorkspaceEditResult
 }

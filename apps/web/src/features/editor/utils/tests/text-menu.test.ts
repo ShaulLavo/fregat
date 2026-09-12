@@ -1,5 +1,7 @@
+import { tabId } from '@/lib/documents/utils/identity'
+import { testDocumentRef } from '../../../../../test/factories/document-targets'
 import { editorTextMenu } from '@/features/editor/utils/text-menu'
-import type { MenuCommandItem } from '@/features/menus/utils/model'
+import type { MenuCommandItem } from '@/keymap/menus/utils/model'
 import { platformCommand } from '@/keymap/table'
 import type { PlatformCommandId } from '@/keymap/types'
 import {
@@ -11,8 +13,9 @@ import {
 import { expect, test } from '../../../../../test/fixtures'
 
 const OPEN_FILE_SNAPSHOT: CommandWhenSnapshot = {
-  activeFilePath: '/repo/src/app.ts',
-  activeTabId: 'tab-1',
+  activeDocument: testDocumentRef('/repo/src/app.ts'),
+  activeDocumentSavable: true,
+  activeTabId: tabId('tab-1'),
   chatMode: false,
   workspaceOpen: true,
 }
@@ -104,7 +107,8 @@ test('read-only editor targets allow navigation and occurrence selection but rej
 
 test('the palette item survives a workspace with nothing open', () => {
   const snapshot: CommandWhenSnapshot = {
-    activeFilePath: null,
+    activeDocument: null,
+    activeDocumentSavable: false,
     activeTabId: null,
     chatMode: false,
     workspaceOpen: false,

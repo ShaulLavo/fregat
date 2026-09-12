@@ -1,4 +1,6 @@
-import { describe, expect, it } from 'vitest'
+import { filesystemPath } from '@/lib/documents/utils/identity'
+import { describe } from 'vitest'
+import { expect, test as it } from '../../../../test/fixtures'
 
 import {
   canPrefetchFileEntry,
@@ -50,7 +52,7 @@ function entry(path: string, type: TreeEntry['type'], size: number): TreeEntry {
     birthtimeMs: 1,
     mtimeMs: 1,
     name: path.split('/').at(-1) ?? path,
-    path,
+    path: filesystemPath(path),
     size,
     type,
     version: `test:1:${path}:${size}`,

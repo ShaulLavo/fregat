@@ -1,7 +1,7 @@
 import type { OrchestrationMessage } from '@workspace/contracts'
 
-import { MenuSurface } from '@/features/menus/components/surface'
-import type { MenuAnchor } from '@/features/menus/utils/virtual-anchor'
+import { MenuSurface } from '@/keymap/menus/components/surface'
+import type { MenuAnchor } from '@/keymap/menus/utils/virtual-anchor'
 
 import { useMessageMenu } from '../hooks/use-message-menu'
 import type { OptimisticChatMessage } from '../state/chat-optimistic-store'

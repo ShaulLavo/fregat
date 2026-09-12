@@ -7,7 +7,7 @@ export type HoverResponse = {
   readonly contents: HoverContents | readonly HoverContents[]
 }
 
-export type HoverContents = string | { readonly value: string }
+type HoverContents = string | { readonly value: string }
 
 /**
  * The shapes `Hover.contents` is allowed to take, flattened to the text a tooltip shows.

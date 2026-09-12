@@ -1,3 +1,4 @@
+import { readWorkspaceCacheEntry, writeWorkspaceCacheEntry } from '@/lib/workspace-cache-storage'
 import type { ScopedStorage } from '@/lib/environments/state/scoped-storage'
 import type { EnvironmentId } from '@workspace/contracts'
 import {
@@ -62,26 +63,19 @@ export function chatInputDraftStorageId(
 export function readPersistedChatInputDrafts(
   storage: ScopedStorage,
 ): PersistedChatInputDraftStorage {
-  const fallback = emptyPersistedChatInputDrafts()
-
-  try {
-    const raw = storage.getItem(CHAT_INPUT_DRAFT_STORAGE_KEY)
-    if (!raw) return fallback
-
-    const parsed = v.safeParse(persistedChatInputDraftStorageSchema, JSON.parse(raw))
-    if (!parsed.success) return fallback
-
-    return parsed.output
-  } catch {
-    return fallback
-  }
+  return readWorkspaceCacheEntry(
+    CHAT_INPUT_DRAFT_STORAGE_KEY,
+    persistedChatInputDraftStorageSchema,
+    emptyPersistedChatInputDrafts(),
+    { storage },
+  )
 }
 
 export function writePersistedChatInputDrafts(
   adapter: ScopedStorage,
   storage: PersistedChatInputDraftStorage,
 ) {
-  adapter.setItem(CHAT_INPUT_DRAFT_STORAGE_KEY, JSON.stringify(storage))
+  return writeWorkspaceCacheEntry(CHAT_INPUT_DRAFT_STORAGE_KEY, storage, { storage: adapter })
 }
 
 export function emptyPersistedChatInputDrafts(): PersistedChatInputDraftStorage {

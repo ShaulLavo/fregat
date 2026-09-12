@@ -1,3 +1,4 @@
+import { filesystemPath } from '@/lib/documents/utils/identity'
 import { renderHook } from '@testing-library/react'
 import { useLayoutEffect, type ReactNode } from 'react'
 import { vi } from 'vitest'
@@ -21,7 +22,7 @@ test('keeps the mounted editor registered through a StrictMode effect replay', a
   const hook = renderHook(
     () => {
       const mountedEditors = useMountedEditorRegistry()
-      useLayoutEffect(() => mountedEditors.register(EDITOR_PATH), [mountedEditors])
+      useLayoutEffect(() => mountedEditors.register(filesystemPath(EDITOR_PATH)), [mountedEditors])
       return mountedEditors
     },
     { reactStrictMode: true, wrapper },

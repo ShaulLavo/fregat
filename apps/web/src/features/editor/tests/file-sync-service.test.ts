@@ -1,20 +1,19 @@
+import { filesystemPath } from '@/lib/documents/utils/identity'
+import { testDocumentKey } from '../../../../test/factories/document-targets'
 import { createEditorDocumentStore } from '@/features/editor/state/document-state'
 import {
   FileSyncService,
   type FileSyncWriteFileContent,
   type WorkspaceMutationTransport,
 } from '@/features/editor/state/file-sync-service'
-import type { FileResult, TreeEntry } from '@/lib/file-system-types'
+import type { FileResult, TreeEntry, WorkspaceEditPrepareRequest } from '@/lib/file-system-types'
 import { fileSystemKeys, gitKeys } from '@/lib/query-keys'
 import { treeModel } from '@/lib/tree-model'
 import { createEditorBufferSession } from '@singapor/core'
 import { QueryClient } from '@tanstack/react-query'
-import { describe, expect, it } from 'vitest'
-import type {
-  WorkspaceEditPrepareRequest,
-  WorkspaceEditResult,
-  WorkspaceEditTransitionRequest,
-} from '@workspace/contracts'
+import { describe } from 'vitest'
+import { expect, test as it } from '../../../../test/fixtures'
+import type { WorkspaceEditResult, WorkspaceEditTransitionRequest } from '@workspace/contracts'
 
 describe('FileSyncService', () => {
   it('saves with a base file version and marks unchanged saved buffers clean', async () => {
@@ -30,9 +29,9 @@ describe('FileSyncService', () => {
         writes.push({ content, options })
         return entry(path, content, 200)
       },
-    }).save(store.getState().getLiveEditorDocument(document.path)!)
+    }).save(store.getState().getLiveEditorDocument(document.key)!)
 
-    const saved = store.getState().getLiveEditorDocument(document.path)!
+    const saved = store.getState().getLiveEditorDocument(document.key)!
     expect(writes).toEqual([
       {
         content: 'old!',
@@ -45,14 +44,14 @@ describe('FileSyncService', () => {
       },
     ])
     expect(saved.sync.kind).toBe('file')
-    if (saved.sync.kind !== 'file') throw new Error('expected file sync metadata')
+    if (saved.sync.kind !== 'file') throw new RangeError('expected file sync metadata')
     expect(saved.sync.fileVersion).toBe('test:200:4')
     expect(saved.sync.mtimeMs).toBe(200)
     expect(saved.buffer.isDirty()).toBe(false)
-    expect(store.getState().dirtyFilePaths.has(document.path)).toBe(false)
-    expect(queryClient.getQueryData(fileSystemKeys.fileSnapshot(document.path))).toEqual(
-      file('src/app.ts', 'old!', 200),
-    )
+    expect(store.getState().dirtyDocumentKeys.has(document.key)).toBe(false)
+    expect(
+      queryClient.getQueryData(fileSystemKeys.fileSnapshot(filesystemPath('src/app.ts'))),
+    ).toEqual(file('src/app.ts', 'old!', 200))
   })
 
   it('keeps the document dirty when edits land during an in-flight save', async () => {
@@ -60,28 +59,28 @@ describe('FileSyncService', () => {
     const queryClient = new QueryClient()
     const document = store.getState().ensureLiveEditorDocument(file('src/app.ts', 'old', 100))
     createEditorBufferSession(document.buffer).applyText('!')
-    const savingDocument = store.getState().getLiveEditorDocument(document.path)!
+    const savingDocument = store.getState().getLiveEditorDocument(document.key)!
 
     await new FileSyncService(store, queryClient, {
       readFileContent: async () => file('unused', '', 0),
       writeFileContent: async (path, content) => {
-        const latest = store.getState().getLiveEditorDocument(path)!
+        const latest = store.getState().getLiveEditorDocument(testDocumentKey(path))!
         createEditorBufferSession(latest.buffer).applyText('?')
         return entry(path, content, 200)
       },
     }).save(savingDocument)
 
-    const afterSave = store.getState().getLiveEditorDocument(document.path)!
+    const afterSave = store.getState().getLiveEditorDocument(document.key)!
     expect(afterSave.buffer.materializeFullText()).toBe('old!?')
     expect(afterSave.sync.kind).toBe('file')
-    if (afterSave.sync.kind !== 'file') throw new Error('expected file sync metadata')
+    if (afterSave.sync.kind !== 'file') throw new RangeError('expected file sync metadata')
     expect(afterSave.sync.fileVersion).toBe('test:200:4')
     expect(afterSave.sync.mtimeMs).toBe(200)
     expect(afterSave.buffer.isDirty()).toBe(true)
-    expect(store.getState().dirtyFilePaths.has(document.path)).toBe(true)
-    expect(queryClient.getQueryData(fileSystemKeys.fileSnapshot(document.path))).toEqual(
-      file('src/app.ts', 'old!', 200),
-    )
+    expect(store.getState().dirtyDocumentKeys.has(document.key)).toBe(true)
+    expect(
+      queryClient.getQueryData(fileSystemKeys.fileSnapshot(filesystemPath('src/app.ts'))),
+    ).toEqual(file('src/app.ts', 'old!', 200))
   })
 
   it('reads an abortable unopened text snapshot without creating a live document', async () => {
@@ -97,7 +96,7 @@ describe('FileSyncService', () => {
     })
 
     await expect(
-      service.readWorkspaceSnapshot('src/unopened.ts', controller.signal),
+      service.readWorkspaceSnapshot(filesystemPath('src/unopened.ts'), controller.signal),
     ).resolves.toEqual({
       byteLength: 6,
       mtimeMs: 123,
@@ -105,7 +104,7 @@ describe('FileSyncService', () => {
       text: '\uFEFFhello',
       version: 'test:123:6',
     })
-    expect(store.getState().hasLiveEditorDocument('src/unopened.ts')).toBe(false)
+    expect(store.getState().hasLiveEditorDocument(testDocumentKey('src/unopened.ts'))).toBe(false)
   })
 
   it('inspects the injected document path without changing its namespace', async () => {
@@ -123,7 +122,7 @@ describe('FileSyncService', () => {
     })
 
     await expect(
-      service.inspectWorkspacePath('/injected/root/file.ts', controller.signal),
+      service.inspectWorkspacePath(filesystemPath('/injected/root/file.ts'), controller.signal),
     ).resolves.toMatchObject({
       canonicalPath: '/injected/root/file.ts',
       exists: true,
@@ -146,13 +145,16 @@ describe('FileSyncService', () => {
         }),
       writeFileContent: async (path, content) => entry(path, content, 200),
     })
-    const pending = service.readWorkspaceSnapshot('src/unopened.ts', controller.signal)
+    const pending = service.readWorkspaceSnapshot(
+      filesystemPath('src/unopened.ts'),
+      controller.signal,
+    )
 
     controller.abort()
     settle(file('src/unopened.ts', 'late', 123))
 
     await expect(pending).rejects.toMatchObject({ name: 'AbortError' })
-    expect(store.getState().hasLiveEditorDocument('src/unopened.ts')).toBe(false)
+    expect(store.getState().hasLiveEditorDocument(testDocumentKey('src/unopened.ts'))).toBe(false)
   })
 
   it('prepares an ordered workspace mutation with exact expected versions', async () => {
@@ -171,7 +173,7 @@ describe('FileSyncService', () => {
           expected: { kind: 'snapshot', mtimeMs: 10, version: 'v1' },
           index: 1,
           kind: 'write',
-          path: 'src/a.ts',
+          path: filesystemPath('src/a.ts'),
           text: 'A',
         },
         {
@@ -180,11 +182,11 @@ describe('FileSyncService', () => {
           index: 2,
           kind: 'create',
           overwrite: false,
-          path: 'src/b.ts',
+          path: filesystemPath('src/b.ts'),
         },
       ],
       origin: 'workspace-edit',
-      workspace: '/repo',
+      workspace: filesystemPath('/repo'),
     }
 
     await expect(
@@ -248,7 +250,7 @@ describe('FileSyncService', () => {
     queryClient.setQueryData(gitKeys.status('/repo'), { changed: false })
     queryClient.setQueryData(
       fileSystemKeys.tree('/repo'),
-      treeModel({ entries: [entry(path, 'old', 10)], path: '/repo' }, '/repo'),
+      treeModel({ entries: [entry(path, 'old', 10)], path: filesystemPath('/repo') }, '/repo'),
     )
     const service = new FileSyncService(store, queryClient, {
       readFileContent: async () => oldFile,
@@ -263,7 +265,7 @@ describe('FileSyncService', () => {
       beforeContents: new Map([[path, 'old']]),
       entries: committed.entries,
       renames: [],
-      rootPath: '/repo',
+      rootPath: filesystemPath('/repo'),
     })
 
     expect(queryClient.getQueryData(fileSystemKeys.fileSnapshot(path))).toEqual(
@@ -310,7 +312,7 @@ describe('FileSyncService', () => {
       beforeContents: new Map([[path, 'before']]),
       entries: forward.entries,
       renames: [],
-      rootPath: '/repo',
+      rootPath: filesystemPath('/repo'),
     })
     expect(
       service.sealWorkspaceMutationProjection(
@@ -360,7 +362,9 @@ describe('FileSyncService', () => {
       writeFileContent: async (nextPath, content) => entry(nextPath, content, 30),
     })
 
-    await service.reconcileWorkspaceMutationProjection('/repo', [path])
+    await service.reconcileWorkspaceMutationProjection(filesystemPath('/repo'), [
+      filesystemPath(path),
+    ])
 
     expect(reads).toEqual([path])
     expect(queryClient.getQueryData(fileSystemKeys.fileSnapshot(path))).toEqual(
@@ -436,7 +440,7 @@ function file(path: string, content: string, mtimeMs: number): FileResult {
   return {
     content,
     mtimeMs,
-    path,
+    path: filesystemPath(path),
     size: content.length,
     version: `test:${mtimeMs}:${content.length}`,
   }
@@ -447,7 +451,7 @@ function entry(path: string, content: string, mtimeMs: number): TreeEntry {
     birthtimeMs: mtimeMs,
     mtimeMs,
     name: path.split('/').at(-1) ?? path,
-    path,
+    path: filesystemPath(path),
     size: content.length,
     type: 'file',
     version: `test:${mtimeMs}:${content.length}`,

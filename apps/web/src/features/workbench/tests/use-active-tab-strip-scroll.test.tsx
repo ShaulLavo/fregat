@@ -58,10 +58,14 @@ function recordScrollTo() {
   }
 }
 
-function stubReducedMotion(reduce: boolean) {
+function stubReducedMotion(reduce: boolean | undefined) {
   const original = window.matchMedia
-  window.matchMedia = ((query: string) =>
-    ({ matches: reduce, media: query }) as MediaQueryList) as typeof window.matchMedia
+  Object.defineProperty(window, 'matchMedia', {
+    configurable: true,
+    value:
+      reduce === undefined ? undefined : (query: string) => ({ matches: reduce, media: query }),
+    writable: true,
+  })
 
   return () => {
     window.matchMedia = original
@@ -157,6 +161,24 @@ test('someone who asked the OS for less motion gets none', () => {
 
     expect(scrolls.calls).toHaveLength(1)
     expect(scrolls.calls[0]?.behavior).toBe('auto')
+  } finally {
+    scrolls.restore()
+    restoreMotion()
+    restoreRects()
+  }
+})
+
+test('missing matchMedia keeps the shared default of allowing motion', () => {
+  const restoreRects = stubClippedSecondTab()
+  const restoreMotion = stubReducedMotion(undefined)
+  const scrolls = recordScrollTo()
+
+  try {
+    const { rerender } = render(<Strip activeTabId='a' />)
+    rerender(<Strip activeTabId='b' />)
+
+    expect(scrolls.calls).toHaveLength(1)
+    expect(scrolls.calls[0]?.behavior).toBe('smooth')
   } finally {
     scrolls.restore()
     restoreMotion()

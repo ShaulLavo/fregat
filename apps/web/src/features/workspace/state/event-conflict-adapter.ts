@@ -1,5 +1,19 @@
 import { FilesystemConflictToast } from '@/features/editor/components/filesystem-conflict-toast'
-import { conflictDiffDocumentId } from '@/features/editor/utils/conflict-diff-document'
+import {
+  conflictId,
+  documentKey,
+  fileDocument,
+  fileDocumentKey,
+  fileResource,
+  filesystemPath,
+} from '@/lib/documents/utils/identity'
+import { documentTab } from '@/lib/documents/utils/tabs'
+import type {
+  DocumentKey,
+  DocumentRef,
+  FilesystemPath,
+  TabContent,
+} from '@/lib/documents/utils/types'
 import type {
   EditorConflictStoreApi,
   FilesystemConflict,
@@ -20,33 +34,36 @@ import { toast } from 'sonner'
 
 export type WorkspaceConflictContext = {
   conflictStore: EditorConflictStoreApi
-  discardLiveEditorDocument: (path: string) => { wasDirty: boolean }
+  discardLiveEditorDocument: (document: DocumentRef) => { wasDirty: boolean }
   ensureUnsyncedEditorDocument: (input: UnsyncedLiveEditorDocumentInput) => void
-  fetchFile: (path: string, signal: AbortSignal) => Promise<FileResult>
+  fetchFile: (path: FilesystemPath, signal: AbortSignal) => Promise<FileResult>
   forceReplaceLiveEditorDocument: (file: FileResult) => { wasDirty: boolean }
-  getLiveEditorDocument: (path: string) => LiveEditorDocument | null
+  getLiveEditorDocument: (key: DocumentKey) => LiveEditorDocument | null
   queryClient: QueryClient
-  renameLiveEditorDocument: (from: string, to: string) => { wasDirty: boolean }
-  selectFile: (path: string | null) => void
+  renameLiveEditorDocument: (from: FilesystemPath, to: FilesystemPath) => { wasDirty: boolean }
+  selectContent: (content: TabContent) => void
 }
 
 let nextConflictId = 0
 
 export function notifyChangedFilesystemConflict(
-  path: string,
+  path: FilesystemPath,
   remoteFile: FileResult,
   context: WorkspaceConflictContext,
 ) {
   notifyFilesystemConflict(changedConflict(path, remoteFile, context), context)
 }
 
-export function notifyDeletedFilesystemConflict(path: string, context: WorkspaceConflictContext) {
+export function notifyDeletedFilesystemConflict(
+  path: FilesystemPath,
+  context: WorkspaceConflictContext,
+) {
   notifyFilesystemConflict(deletedConflict(path, context), context)
 }
 
 export async function notifyRenamedFilesystemConflict(
-  localPath: string,
-  remotePath: string,
+  localPath: FilesystemPath,
+  remotePath: FilesystemPath,
   context: WorkspaceConflictContext,
 ) {
   const remoteFile = await context.fetchFile(remotePath, new AbortController().signal)
@@ -75,7 +92,7 @@ export function dismissFilesystemConflicts(conflictStore: EditorConflictStoreApi
 }
 
 function changedConflict(
-  path: string,
+  path: FilesystemPath,
   remoteFile: FileResult,
   context: WorkspaceConflictContext,
 ): FilesystemConflict {
@@ -92,7 +109,10 @@ function changedConflict(
   }
 }
 
-function deletedConflict(path: string, context: WorkspaceConflictContext): FilesystemConflict {
+function deletedConflict(
+  path: FilesystemPath,
+  context: WorkspaceConflictContext,
+): FilesystemConflict {
   return {
     eventType: 'deleted',
     id: createConflictId(),
@@ -141,7 +161,7 @@ function refreshedConflict(
 ): FilesystemConflict {
   return {
     ...next,
-    diffDocumentId: current.diffDocumentId,
+    diffDocumentKey: current.diffDocumentKey,
     id: current.id,
     toastId: current.toastId,
   }
@@ -151,24 +171,21 @@ function openConflictDiff(id: string, context: WorkspaceConflictContext) {
   const conflict = context.conflictStore.getState().conflicts[id]
   if (!conflict) return
 
-  const documentId = conflict.diffDocumentId ?? conflictDiffDocumentId(id)
-  ensureConflictEditorDocument(documentId, conflict, context)
-  context.conflictStore.getState().updateConflict(id, { diffDocumentId: documentId })
-  context.selectFile(documentId)
+  const target = { kind: 'conflict', conflictId: conflictId(id) } as const
+  const key = documentKey(target)
+  ensureConflictEditorDocument(target, conflict, context)
+  context.conflictStore.getState().updateConflict(id, { diffDocumentKey: key })
+  context.selectContent(documentTab(target))
 }
 
 function ensureConflictEditorDocument(
-  documentId: string,
+  target: Extract<DocumentRef, { kind: 'conflict' }>,
   conflict: FilesystemConflict,
   context: WorkspaceConflictContext,
 ) {
-  if (context.getLiveEditorDocument(documentId)) return
-
+  if (context.getLiveEditorDocument(documentKey(target))) return
   const content = createMergeConflictDocumentText(conflict)
-  context.ensureUnsyncedEditorDocument({
-    content,
-    id: documentId,
-  })
+  context.ensureUnsyncedEditorDocument({ content, target })
 }
 
 async function resolveConflict(
@@ -204,7 +221,7 @@ async function applyLocalConflict(conflict: FilesystemConflict, context: Workspa
 }
 
 async function restoreDeletedLocalConflict(conflict: FilesystemConflict) {
-  await ensureFolderPath(parentPath(conflict.remotePath, ''))
+  await ensureFolderPath(parentPath(conflict.remotePath, filesystemPath('')))
   await createFileContent(conflict.remotePath, conflict.localText)
 }
 
@@ -221,7 +238,7 @@ async function applyRemoteConflict(
 }
 
 function replaceResolvedEditorFile(
-  localPath: string,
+  localPath: FilesystemPath,
   file: FileResult,
   context: WorkspaceConflictContext,
 ) {
@@ -234,8 +251,8 @@ function replaceResolvedEditorFile(
   context.forceReplaceLiveEditorDocument(file)
 }
 
-function discardResolvedEditorFile(path: string, context: WorkspaceConflictContext) {
-  context.discardLiveEditorDocument(path)
+function discardResolvedEditorFile(path: FilesystemPath, context: WorkspaceConflictContext) {
+  context.discardLiveEditorDocument(fileDocument(fileResource(path)))
   context.queryClient.removeQueries({
     exact: true,
     queryKey: fileSystemKeys.fileSnapshot(path),
@@ -243,8 +260,8 @@ function discardResolvedEditorFile(path: string, context: WorkspaceConflictConte
 }
 
 function finishConflict(conflict: FilesystemConflict, context: WorkspaceConflictContext) {
-  if (conflict.diffDocumentId) {
-    context.discardLiveEditorDocument(conflict.diffDocumentId)
+  if (conflict.diffDocumentKey) {
+    context.discardLiveEditorDocument({ kind: 'conflict', conflictId: conflictId(conflict.id) })
   }
   if (conflict.toastId) toast.dismiss(conflict.toastId)
 
@@ -263,8 +280,8 @@ function remoteFileResult(conflict: FilesystemConflict): FileResult {
   }
 }
 
-function localConflictText(path: string, context: WorkspaceConflictContext) {
-  return context.getLiveEditorDocument(path)?.buffer.materializeFullText() ?? ''
+function localConflictText(path: FilesystemPath, context: WorkspaceConflictContext) {
+  return context.getLiveEditorDocument(fileDocumentKey(path))?.buffer.materializeFullText() ?? ''
 }
 
 function createConflictId() {
@@ -276,7 +293,7 @@ function syntheticFileVersion(mtimeMs: number, size: number) {
   return `synthetic:${mtimeMs}:${size}`
 }
 
-function moveFileQueryData(queryClient: QueryClient, from: string, to: string) {
+function moveFileQueryData(queryClient: QueryClient, from: FilesystemPath, to: FilesystemPath) {
   const file = queryClient.getQueryData<FileResult>(fileSystemKeys.fileSnapshot(from))
   queryClient.removeQueries({
     exact: true,
@@ -287,11 +304,11 @@ function moveFileQueryData(queryClient: QueryClient, from: string, to: string) {
   setFileSnapshotQueryData(queryClient, { ...file, path: to })
 }
 
-function parentPath(path: string, rootPath: string) {
+function parentPath(path: FilesystemPath, rootPath: FilesystemPath) {
   if (path === rootPath) return rootPath
 
   const index = path.lastIndexOf('/')
   if (index < 0) return rootPath
 
-  return path.slice(0, index)
+  return filesystemPath(path.slice(0, index))
 }

@@ -1,3 +1,4 @@
+import type { GitFileStatus } from '@workspace/contracts'
 import {
   PersistedResizablePanelGroup,
   ResizableHandle,
@@ -21,7 +22,7 @@ import {
   type ChatModePanels,
   type ChatModeToolTab,
 } from '@/features/chat-mode/utils/panels'
-import type { FileStatus } from '@/features/git/utils/types'
+
 import { Wallpaper } from '@/features/workbench/components/wallpaper'
 import type { WorkbenchPanels } from '@/features/workbench/utils/panels'
 
@@ -36,7 +37,7 @@ export function ChatModeLayout({
 }: {
   readonly conflicts: EditorTabConflictMap
 
-  readonly gitFiles: readonly FileStatus[]
+  readonly gitFiles: readonly GitFileStatus[]
   readonly panels: ChatModePanels
   readonly rootPath: string
   readonly workbenchPanels: WorkbenchPanels

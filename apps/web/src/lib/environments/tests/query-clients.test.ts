@@ -4,7 +4,7 @@ import { healthDescriptorSchema } from '@workspace/contracts'
 import { afterEach, beforeEach } from 'vitest'
 import * as v from 'valibot'
 
-import { activeServerOrigin, environmentClientFor, setActiveServerOrigin } from '@/lib/client'
+import { activeServerOrigin, setActiveServerOrigin } from '@/lib/client'
 import {
   clientForQueryClient,
   originForQueryClient,
@@ -144,7 +144,9 @@ test('pins refetches to their owning real server after the active environment sw
   }
 })
 
-test('refuses unowned query clients and changes to an existing owner', async ({ client }) => {
+test('refuses unowned query clients and changes to an existing owner origin', async ({
+  client,
+}) => {
   const cache = new QueryClient()
   expect(() => clientForQueryClient(cache)).toThrow(
     expect.objectContaining({ code: 'QUERY_CLIENT_OWNER_MISSING' }),
@@ -158,9 +160,21 @@ test('refuses unowned query clients and changes to an existing owner', async ({ 
   expect(() => registerEnvironmentQueryClient(cache, originB, client)).toThrow(
     expect.objectContaining({ code: 'QUERY_CLIENT_OWNER_CONFLICT' }),
   )
-  expect(() =>
-    registerEnvironmentQueryClient(cache, originA, environmentClientFor(originA)),
-  ).toThrow(expect.objectContaining({ code: 'QUERY_CLIENT_OWNER_CONFLICT' }))
   expect(clientForQueryClient(cache)).toBe(client)
   expect(originForQueryClient(cache)).toBe(originA)
+})
+
+test('replaces the transport for the same origin while retaining its cached state', async ({
+  client,
+  server,
+}) => {
+  const cache = new QueryClient()
+  registerEnvironmentQueryClient(cache, originA, client)
+  cache.setQueryData(['saved'], 'cached state')
+  const replacement = createInProcessClient(server)
+  registerEnvironmentQueryClient(cache, originA, replacement)
+  expect(clientForQueryClient(cache)).toBe(replacement)
+  expect(originForQueryClient(cache)).toBe(originA)
+  expect(cache.getQueryData(['saved'])).toBe('cached state')
+  expect((await clientForQueryClient(cache).health.get()).status).toBe(200)
 })

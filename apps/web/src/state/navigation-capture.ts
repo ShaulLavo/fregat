@@ -1,3 +1,4 @@
+import type { TabContent } from '@/lib/documents/utils/types'
 import {
   selectChatSessionsForProject,
   selectWorktreeAtPath,
@@ -36,7 +37,7 @@ import { settingsCategorySlug } from '@/features/address/utils/settings-category
 import type { EditorUiStoreApi } from '@/features/editor/state/ui-state'
 import type { EditorWorkspaceStoreApi } from '@/features/editor/state/workspace-state'
 import type { ApplicationRuntime } from '@/state/application-runtime'
-import { documentTokenForPath } from '@/features/address/utils/document-token'
+import { documentTokenForContent } from '@/features/address/utils/document-token'
 import type { Address } from '@workspace/client-core/address/grammar'
 
 function snapshotFromStore(
@@ -58,10 +59,10 @@ function snapshotFromStore(
     ...emptyAddressSnapshot(),
     environmentId,
     sidebarSessionToken: sidebarSessionToken(rootPath),
-    activeDocumentPath: activeEditorTabForWorkbenchPanels(panels)?.path ?? null,
-    focus: focusFor(uiStoreApi, activeEditorTabForWorkbenchPanels(panels)?.path ?? null),
+    activeTabContent: activeEditorTabForWorkbenchPanels(panels)?.content ?? null,
+    focus: focusFor(uiStoreApi, activeEditorTabForWorkbenchPanels(panels)?.content ?? null),
     bottomTab: orAbsent(panels.activeBottomTab, defaults.activeBottomTab),
-    editorTabPaths: panels.editorTabs.map((tab) => tab.path),
+    editorTabContents: panels.editorTabs.map((tab) => tab.content),
     workspaceAddress: state.rootFolder?.workspaceAddress ?? null,
     passthrough,
     mode: state.uiMode === 'chat' ? ('chat' as const) : ('workbench' as const),
@@ -80,9 +81,11 @@ function snapshotFromStore(
   }
 }
 
-function focusFor(uiStoreApi: EditorUiStoreApi, activePath: string | null) {
+function focusFor(uiStoreApi: EditorUiStoreApi, activeContent: TabContent | null) {
   const target = uiStoreApi.getState().definitionTarget
-  if (!target || !activePath || target.path !== activePath) return null
+  if (!target || activeContent?.kind !== 'document' || activeContent.document.kind !== 'file')
+    return null
+  if (target.path !== activeContent.document.resource.path) return null
 
   const line = target.range.start.line + 1
   const endLine = target.range.end.line + 1
@@ -152,9 +155,9 @@ export function captureAddress(application: ApplicationRuntime, accepted: Addres
     accepted.passthrough,
   )
   const address = completeAddressFromSnapshot(snapshot)
-  const selected = snapshot.activeDocumentPath
+  const selected = snapshot.activeTabContent
   const transient =
-    selected !== null && documentTokenForPath(snapshot.rootPath, selected).kind !== 'token'
+    selected !== null && documentTokenForContent(snapshot.rootPath, selected).kind !== 'token'
   if (!transient) return address
   return { ...address, document: accepted.document, editor: accepted.editor, focus: accepted.focus }
 }

@@ -1,6 +1,8 @@
+import { filesystemPath, tabId } from '@/lib/documents/utils/identity'
+import { testTabContent } from '../../../../../test/factories/document-targets'
 import type { EditorTabCloseTarget } from '@/features/workspace/utils/tab-close-targets'
 import type { EditorTabModel } from '@/features/workspace/utils/tab-types'
-import type { MenuActionItem } from '@/features/menus/utils/model'
+import type { MenuActionItem } from '@/keymap/menus/utils/model'
 import {
   editorTabMenu,
   type EditorTabMenuContext,
@@ -136,11 +138,11 @@ function byId(entries: readonly MenuActionItem[], id: string) {
 }
 
 function target(id: string, dirty = false): EditorTabCloseTarget {
-  return { dirty, id, path: `/repo/src/${id}.ts` }
+  return { dirty, id: tabId(id) }
 }
 
 function diffTabModel({ onDisk }: { onDisk: boolean }): EditorTabModel {
-  return { ...tabModel('b'), diffSource: { onDisk, path: '/repo/src/b.ts' } }
+  return { ...tabModel('b'), diffSource: { onDisk, path: filesystemPath('/repo/src/b.ts') } }
 }
 
 function tabModel(id: string): EditorTabModel {
@@ -152,9 +154,9 @@ function tabModel(id: string): EditorTabModel {
     diffStatus: null,
     diffSuffix: '',
     icon: iconForEntry({ name: `${id}.ts`, type: 'file' }),
-    id,
+    id: tabId(id),
     name: `${id}.ts`,
-    path: `/repo/src/${id}.ts`,
+    content: testTabContent(`/repo/src/${id}.ts`),
     title: `src/${id}.ts`,
   }
 }

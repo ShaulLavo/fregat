@@ -21,13 +21,7 @@ export {
   type WorkspaceRootEntry,
 } from './workspace-address'
 export { TUI_CLIENT_ORIGIN } from './client-origins'
-export {
-  generateSpreadOrderKeys,
-  isValidOrderKey,
-  orderKeyBetween,
-  planPinnedReorder,
-  sortByOrderKey,
-} from './order-key'
+export { isValidOrderKey, orderKeyBetween } from './order-key'
 export type {
   GitBaseRefChoice,
   GitBaseRefChoicesResult,
@@ -230,6 +224,7 @@ export {
   projectMetaUpdateCommandSchema,
   sessionTurnBootstrapSchema,
   sessionTurnStartCommandSchema,
+  sessionTurnSteerCommandSchema,
   type ClientOrchestrationCommand,
   type InternalOrchestrationCommand,
   type OrchestrationCommand,
@@ -249,6 +244,7 @@ export {
   type SessionRuntimeStopCommand,
   type SessionTurnInterruptCommand,
   type SessionTurnStartCommand,
+  type SessionTurnSteerCommand,
   type SessionUnarchiveCommand,
   type SessionUserInputRespondCommand,
 } from './orchestration-commands'
@@ -603,9 +599,7 @@ export {
   projectMetaUpdatedPayloadSchema,
   projectReorderedPayloadSchema,
   projectDeletedPayloadSchema,
-  projectRevivedPayloadSchema,
   worktreeRegisteredPayloadSchema,
-  worktreeRevivedPayloadSchema,
   worktreeRetiredPayloadSchema,
   worktreeMetaUpdatedPayloadSchema,
   sessionCreatedPayloadSchema,
@@ -624,6 +618,7 @@ export {
   sessionInteractionModeSetPayloadSchema,
   sessionMessageSentPayloadSchema,
   sessionTurnStartRequestedPayloadSchema,
+  sessionTurnSteerRequestedPayloadSchema,
   sessionTurnInterruptRequestedPayloadSchema,
   sessionRuntimeStopRequestedPayloadSchema,
   sessionRuntimeSetPayloadSchema,
@@ -710,3 +705,6 @@ export {
 } from './machines'
 
 export { jsonEqual } from './settings/json-equal'
+
+export { chatAgentSchema, chatAgentToolSchema } from './chat-agent'
+export type { ChatAgent, ChatAgentTool } from './chat-agent'

@@ -9,20 +9,24 @@ import type {
   WorkspaceEditService,
   WorkspaceMutationReporter,
 } from '@/features/editor/state/workspace-edit-service'
-import { editorTabDocumentIds } from '@/features/workspace/utils/tab-dirty'
-import { isDirtyLiveEditorDocument, isSavableEditorDocument } from '@/features/editor/utils/save'
+import { documentKey } from '@/lib/documents/utils/identity'
+import { documentSourcePath } from '@/lib/documents/utils/capabilities'
+import { sameTabContent, tabContentKey, tabDocuments } from '@/lib/documents/utils/tabs'
+import type { EditorTabRecord, TabContent, TabId } from '@/lib/documents/utils/types'
+import {
+  filePathsForDocumentKeys,
+  isDirtyLiveEditorDocument,
+  isSavableEditorDocument,
+} from '@/features/editor/utils/save'
 import { useEditorCommands } from '@/features/editor/hooks/use-editor-commands'
 import { useEditorDocumentStoreApi } from '@/features/editor/state/document-state'
 import { useEditorWorkspaceStoreApi } from '@/features/editor/state/workspace-state'
 import {
   activeEditorTabForWorkbenchPanels,
-  editorPathCountsForWorkbenchPanels,
+  editorContentCountsForWorkbenchPanels,
   editorTabRecordsForWorkbenchPanels,
   type WorkbenchPanels,
 } from '@/features/workbench/utils/panels'
-import { parseCompareSavedDocumentId } from '@/features/editor/utils/compare-saved-document'
-import { parseDiffDocumentId } from '@/features/git/utils/diff-document'
-import { parseSearchBufferDocumentId } from '@/features/search/utils/buffer-document'
 import { errorMessage } from '@/lib/file-server'
 import { useFocusService } from '@/lib/focus/hooks/use-service'
 import {
@@ -44,23 +48,23 @@ export type UnsavedDialogTarget = {
 export type CloseRequestResult =
   | {
       readonly status: 'closed'
-      readonly tabIds: readonly string[]
+      readonly tabIds: readonly TabId[]
       readonly completion: Promise<NavigationResult>
     }
   | {
       readonly status: 'deferred'
       readonly dialogTarget: UnsavedDialogTarget
-      readonly tabIds: readonly string[]
+      readonly tabIds: readonly TabId[]
     }
   | { readonly status: 'rejected'; readonly reason: 'busy' | 'not-found' }
 
-export type RequestCloseTab = (tabId: string) => CloseRequestResult
-export type RequestCloseTabs = (tabIds: readonly string[]) => CloseRequestResult
+export type RequestCloseTab = (tabId: TabId) => CloseRequestResult
+export type RequestCloseTabs = (tabIds: readonly TabId[]) => CloseRequestResult
 
 type PendingClose = {
   dialogTarget: UnsavedDialogTarget
-  path: string
-  tabIds: readonly string[]
+  content: TabContent
+  tabIds: readonly TabId[]
 }
 
 type PendingCloseFocus =
@@ -82,20 +86,20 @@ export function useDirtyTabCloseRequest() {
   const pendingClosesRef = useRef<readonly PendingClose[]>(EMPTY_PENDING_CLOSES)
   const [pendingCloses, setPendingCloses] = useState(EMPTY_PENDING_CLOSES)
   const pendingClose = pendingCloses[0] ?? null
-  const pendingPath = pendingClose?.path ?? null
+  const pendingContent = pendingClose?.content ?? null
   const [saveError, setSaveError] = useState<string | null>(null)
   const [saving, setSaving] = useState(false)
   // Savable, not file-backed: closing a dirty settings.json tab has to offer
   // Save, and that save goes to the settings route rather than the fs one.
   const pendingDocumentState = documentStore.getState()
-  const pendingDocumentIds = pendingPath ? editorTabDocumentIds(pendingPath) : []
-  const dirtyPendingDocumentIds = pendingDocumentIds.filter((id) =>
+  const pendingDocumentKeys = pendingContent ? tabDocuments(pendingContent).map(documentKey) : []
+  const dirtyPendingDocumentKeys = pendingDocumentKeys.filter((id) =>
     isDirtyLiveEditorDocument(pendingDocumentState, id),
   )
-  const canSavePendingPath =
+  const canSavePendingContent =
     mutationsEnabled &&
-    dirtyPendingDocumentIds.length > 0 &&
-    dirtyPendingDocumentIds.every((id) => {
+    dirtyPendingDocumentKeys.length > 0 &&
+    dirtyPendingDocumentKeys.every((id) => {
       const document = pendingDocumentState.getLiveEditorDocument(id)
       return document ? isSavableEditorDocument(document) : false
     })
@@ -172,20 +176,19 @@ export function useDirtyTabCloseRequest() {
       if (openTabs.length === 0) return { status: 'rejected', reason: 'not-found' }
       const state = documentStore.getState()
       const pending: PendingClose[] = []
-      const cleanTabIds: string[] = []
-      const closingPathCounts = tabClosePathCounts(openTabs)
-      const openPathCounts = editorPathCountsForWorkbenchPanels(workspace.workbenchPanels)
+      const cleanTabIds: TabId[] = []
+      const closingContentCounts = tabCloseContentCounts(openTabs)
+      const openContentCounts = editorContentCountsForWorkbenchPanels(workspace.workbenchPanels)
 
       for (const tab of openTabs) {
-        // Of the documents behind the tab: the settings tab's text lives in
-        // per-scope buffers, so asking its own path is always false and it
-        // closed without a prompt.
-        const dirty = editorTabDocumentIds(tab.path).some((id) =>
-          isDirtyLiveEditorDocument(state, id),
-        )
-        const closingLastPathTab = closingPathCounts.get(tab.path) === openPathCounts.get(tab.path)
-        if (dirty && closingLastPathTab) {
-          appendPendingClose(pending, tab.path, tab.id)
+        const dirty = tabDocuments(tab.content)
+          .map(documentKey)
+          .some((id) => isDirtyLiveEditorDocument(state, id))
+        const closingLastContentTab =
+          closingContentCounts.get(tabContentKey(tab.content)) ===
+          openContentCounts.get(tabContentKey(tab.content))
+        if (dirty && closingLastContentTab) {
+          appendPendingClose(pending, tab.content, tab.id)
           continue
         }
 
@@ -277,10 +280,10 @@ export function useDirtyTabCloseRequest() {
   return {
     dirtyTabCloseDialog: (
       <UnsavedChangesDialog
-        canSave={canSavePendingPath}
+        canSave={canSavePendingContent}
         error={saveError}
-        open={pendingPath !== null}
-        path={pendingPath}
+        open={pendingContent !== null}
+        content={pendingContent}
         saving={saving}
         target={pendingClose?.dialogTarget ?? null}
         onCancel={handleCancel}
@@ -320,9 +323,12 @@ function activeCloseSuccessorDestination(
   if (!activeTab) return null
 
   const layout = workspace.uiMode
+  const document = activeTab.content.kind === 'document' ? activeTab.content.document : null
   const diffPath =
-    parseCompareSavedDocumentId(activeTab.path) ?? parseDiffDocumentId(activeTab.path)?.path ?? null
-  const searchRoot = parseSearchBufferDocumentId(activeTab.path)?.rootPath ?? null
+    document?.kind === 'compare-saved' || document?.kind === 'git-diff'
+      ? documentSourcePath(document)
+      : null
+  const searchRoot = document?.kind === 'search' ? document.root : null
   const identity = { diffPath, layout, searchRoot, tabId: activeTab.id } as const
   return {
     isValid: () => {
@@ -331,7 +337,7 @@ function activeCloseSuccessorDestination(
       return (
         current.uiMode === layout &&
         currentTab?.id === activeTab.id &&
-        currentTab.path === activeTab.path
+        sameTabContent(currentTab.content, activeTab.content)
       )
     },
     kind: 'match',
@@ -364,17 +370,19 @@ async function saveAndClosePendingTab(pendingClose: PendingClose, context: SaveA
       return
     }
 
-    // Every document behind the tab, for the same reason the dirty check above
-    // covers them: saving `settings:` finds no live document and reports a
-    // failure the user cannot act on.
     const state = context.documentStore.getState()
-    const documentIds = editorTabDocumentIds(pendingClose.path).filter((id) =>
-      isDirtyLiveEditorDocument(state, id),
-    )
+    const documentKeys = tabDocuments(pendingClose.content)
+      .map(documentKey)
+      .filter((id) => isDirtyLiveEditorDocument(state, id))
     const saveDocuments = (reportAffectedPaths?: WorkspaceMutationReporter) =>
-      context.saveService.saveMany(documentIds, (path) => reportAffectedPaths?.([path]))
+      context.saveService.saveMany(documentKeys, (key) =>
+        reportAffectedPaths?.(filePathsForDocumentKeys(state, [key])),
+      )
     const results = context.workspaceEdits
-      ? await context.workspaceEdits.runWorkspaceMutation(documentIds, saveDocuments)
+      ? await context.workspaceEdits.runWorkspaceMutation(
+          filePathsForDocumentKeys(state, documentKeys),
+          saveDocuments,
+        )
       : await saveDocuments()
     if (results.some((saved) => !saved)) {
       context.setSaveError('This tab could not be saved.')
@@ -393,7 +401,7 @@ async function saveAndClosePendingTab(pendingClose: PendingClose, context: SaveA
 type SaveAndCloseContext = {
   advancePendingClose: () => void
   closeTabs: (
-    tabIds: readonly string[],
+    tabIds: readonly TabId[],
   ) => Promise<import('@/state/navigation-coordinator').NavigationResult>
   documentStore: ReturnType<typeof useEditorDocumentStoreApi>
   saveService: EditorSaveService
@@ -403,9 +411,9 @@ type SaveAndCloseContext = {
   workspaceStore: ReturnType<typeof useEditorWorkspaceStoreApi>
 }
 
-function openTabCloseTargets(tabIds: readonly string[], workbenchPanels: WorkbenchPanels) {
-  const seen = new Set<string>()
-  const tabs: Array<{ id: string; path: string }> = []
+function openTabCloseTargets(tabIds: readonly TabId[], workbenchPanels: WorkbenchPanels) {
+  const seen = new Set<TabId>()
+  const tabs: EditorTabRecord[] = []
   const tabsById = new Map(
     editorTabRecordsForWorkbenchPanels(workbenchPanels).map((tab) => [tab.id, tab]),
   )
@@ -421,25 +429,26 @@ function openTabCloseTargets(tabIds: readonly string[], workbenchPanels: Workben
   return tabs
 }
 
-function tabClosePathCounts(tabs: readonly { path: string }[]) {
+function tabCloseContentCounts(tabs: readonly EditorTabRecord[]) {
   const counts = new Map<string, number>()
   for (const tab of tabs) {
-    counts.set(tab.path, (counts.get(tab.path) ?? 0) + 1)
+    const key = tabContentKey(tab.content)
+    counts.set(key, (counts.get(key) ?? 0) + 1)
   }
 
   return counts
 }
 
-function appendPendingClose(pending: PendingClose[], path: string, tabId: string) {
-  const current = pending.find((close) => close.path === path)
+function appendPendingClose(pending: PendingClose[], content: TabContent, tabId: TabId) {
+  const current = pending.find((close) => sameTabContent(close.content, content))
   if (!current) {
-    pending.push({ dialogTarget: createUnsavedDialogTarget(), path, tabIds: [tabId] })
+    pending.push({ dialogTarget: createUnsavedDialogTarget(), content, tabIds: [tabId] })
     return
   }
 
   pending.splice(pending.indexOf(current), 1, {
     dialogTarget: current.dialogTarget,
-    path,
+    content,
     tabIds: current.tabIds.concat(tabId),
   })
 }

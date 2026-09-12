@@ -1,3 +1,4 @@
+import { fileDocumentKey, filesystemPath } from '@/lib/documents/utils/identity'
 import { useCallback, useRef } from 'react'
 import { useQueryClient } from '@tanstack/react-query'
 
@@ -114,8 +115,14 @@ async function runReplace({
     const result = await replaceWorkspaceSearchMatches({
       context: {
         applyWorkspaceChange: workspaceEdits.applyWorkspaceChange,
-        fetchFile: (path, signal) => fetchFile(path, signal, client),
-        getLiveEditorDocument: documentStore.getState().getLiveEditorDocument,
+        fetchFile: (path, signal) => fetchFile(filesystemPath(path), signal, client),
+        getLiveEditorDocument: (path) => {
+          const document = documentStore
+            .getState()
+            .getLiveEditorDocument(fileDocumentKey(filesystemPath(path)))
+          if (document?.target.kind !== 'file') return null
+          return { buffer: document.buffer, path: document.target.resource.path }
+        },
         rootPath,
         signal: controller.signal,
       },

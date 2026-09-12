@@ -1,4 +1,8 @@
 import {
+  testNullableTabContent,
+  testTabContents,
+} from '../../../../test/factories/document-targets'
+import {
   testWorkspaceAddress,
   testWorkspaceToken,
 } from '../../../../test/factories/workspace-address'
@@ -27,7 +31,7 @@ const BUDGET = 4000
 function snapshotWith(extra: Partial<ReturnType<typeof emptyAddressSnapshot>>) {
   return addressFromSnapshot({
     ...emptyAddressSnapshot(),
-    activeDocumentPath: `${ROOT}/src/main.ts`,
+    activeTabContent: testNullableTabContent(`${ROOT}/src/main.ts`),
     workspaceAddress: testWorkspaceAddress(ROOT),
     mode: 'workbench' as const,
     rootPath: ROOT,
@@ -67,7 +71,7 @@ describe('the URL budget', () => {
   test('drops search before logs, and logs before tabs', () => {
     const tabs = Array.from({ length: 6 }, (_, index) => `${ROOT}/src/file-${index}.ts`)
     const onlySearchTooBig = snapshotWith({
-      editorTabPaths: tabs,
+      editorTabContents: testTabContents(tabs),
       logs: { level: 'error' },
       search: { q: 'x'.repeat(8000) },
     })
@@ -93,8 +97,10 @@ describe('the URL budget', () => {
       ...emptyAddressSnapshot(),
       rootPath: ROOT,
       mode: 'workbench',
-      activeDocumentPath: `${ROOT}/a.ts`,
-      editorTabPaths: Array.from({ length: 70 }, (_, index) => `${ROOT}/${index}.ts`),
+      activeTabContent: testNullableTabContent(`${ROOT}/a.ts`),
+      editorTabContents: testTabContents(
+        Array.from({ length: 70 }, (_, index) => `${ROOT}/${index}.ts`),
+      ),
       search: { q: 'x'.repeat(8000) },
     })
     const result = budgetAddress(complete)
@@ -123,8 +129,7 @@ describe('the URL budget', () => {
   // loop forever or return something malformed trying.
   test('still returns a usable address when the document alone exceeds the budget', () => {
     const deep = Array.from({ length: 400 }, () => 'ünïcödé').join('/')
-    const address = snapshotWith({ activeDocumentPath: `${ROOT}/${deep}.ts` })
-
+    const address = snapshotWith({ activeTabContent: testNullableTabContent(`${ROOT}/${deep}.ts`) })
     expect(address.workspace).toBe(testWorkspaceToken('/repo'))
     expect(address.document).toContain('f/')
     expect(address.search).toBeNull()

@@ -8,9 +8,11 @@ import {
 import { useSidebarSelectionStore } from '@/features/chat/state/sidebar-selection-store'
 import { scopedMainSelection, workspaceAddressFor } from '@/state/navigation-workspace'
 import { fetchDiff, fetchGitFile } from '@/features/git/utils/api'
-import { hasDiffDocumentSnapshot, snapshotDiffDocumentId } from '@/features/git/utils/diff-document'
+import { snapshotDocument } from '@/lib/documents/utils/comparisons'
+import { fileDocument, fileResource, filesystemPath } from '@/lib/documents/utils/identity'
+import { documentTab, settingsTab } from '@/lib/documents/utils/tabs'
+import type { DocumentRef, FilesystemPath, TabContent, TabId } from '@/lib/documents/utils/types'
 import type { ChangeRow } from '@/features/git/utils/types'
-import { refDocumentId } from '@/features/git/utils/ref-document'
 import { gitKeys } from '@/lib/query-keys'
 import { emptySearchBuffer, searchHistoryQuerySnapshot } from '@/features/search/state/buffer-state'
 import { readWorkspaceCache } from '@/features/workspace/state/cache'
@@ -39,7 +41,7 @@ import type { LanguageServerDefinitionTarget } from '@singapor/lsp-plugin'
 import { createNavigationCoordinator, type NavigationResult } from '@/state/navigation-coordinator'
 import type { ApplicationRouter } from '@/state/router'
 import type { AddressIntent } from '@/features/address/utils/intent'
-import { documentTokenForPath } from '@/features/address/utils/document-token'
+import { documentTokenForContent } from '@/features/address/utils/document-token'
 import { definitionTargetFor } from '@/features/address/utils/definition-target'
 import {
   addressForDeletedFile,
@@ -70,12 +72,10 @@ import {
   type ChatModeToolTab,
 } from '@/features/chat-mode/utils/panels'
 import {
-  previousOpenEditorPath,
-  recentlyClosedEditorPathsForReopen,
-} from '@/features/editor/state/tab-paths'
+  previousOpenTabContent,
+  recentlyClosedTabsForReopen,
+} from '@/features/editor/utils/tab-history'
 import type { EditorRuntime } from '@/features/editor/state/runtime'
-import { settingsDocumentId } from '@/features/settings/utils/document'
-import { searchBufferDocumentId } from '@/features/search/utils/buffer-document'
 import type { SearchBufferOptionPatch } from '@/features/search/state/buffer-state'
 import { searchParamsFor } from '@/features/address/utils/search-params'
 import { logsParamsFor } from '@/features/address/utils/logs-params'
@@ -141,13 +141,13 @@ export function createNavigation(router: ApplicationRouter, initial: AddressInte
       throw createClientInvariantError('The command belongs to a previous environment.')
   }
 
-  function addressWithFile(
+  function addressWithContent(
     address: Address,
-    path: string,
+    content: TabContent,
     rootPath: string | null,
     focus: Address['focus'] = null,
   ) {
-    const token = documentTokenForPath(rootPath, path)
+    const token = documentTokenForContent(rootPath, content)
     if (token.kind !== 'token') return null
     const tabs = address.tabs?.includes(token.token)
       ? address.tabs
@@ -157,15 +157,15 @@ export function createNavigation(router: ApplicationRouter, initial: AddressInte
     return { ...address, ...selected, tabs, focus }
   }
 
-  function openFile({
+  function openContent({
     owner,
-    path,
+    content,
     focus = null,
     replace,
     settingsCategory,
   }: {
     readonly owner?: EditorWorkspaceStoreApi
-    readonly path: string
+    readonly content: TabContent
     readonly focus?: Address['focus']
     readonly replace?: boolean
     readonly settingsCategory?: string | null
@@ -174,20 +174,23 @@ export function createNavigation(router: ApplicationRouter, initial: AddressInte
       return Promise.resolve({ status: 'superseded' })
     const current = coordinator.currentAddress()
     const rootPath = owner?.getState().rootFolder?.path ?? null
-    if (owner && !addressWithFile(current, path, rootPath, focus)) {
+    if (owner && !addressWithContent(current, content, rootPath, focus)) {
       return coordinator.transient((application) => {
         assertOwner(application, owner)
         revealEditor(application)
         const apply = actions(application)
-        if (focus) apply.openDefinition(definitionTargetFor(path, focus))
-        if (!focus) apply.openFileSurface(path)
+        if (focus && content.kind === 'document' && content.document.kind === 'file') {
+          apply.openDefinition(definitionTargetFor(content.document.resource.path, focus))
+          return
+        }
+        apply.openTabContent(content)
       })
     }
     return ownedRequest(owner, ({ application, address }) => {
       assertOwner(application, owner)
       const root =
         application.getSnapshot().editor.workspaceStore.getState().rootFolder?.path ?? null
-      const next = addressWithFile(address, path, root, focus)
+      const next = addressWithContent(address, content, root, focus)
       if (!next) throw createClientInvariantError('This document has no workspace address.')
       return {
         address: { ...next, settings: categoryForAddress(settingsCategory, next.settings) },
@@ -198,6 +201,18 @@ export function createNavigation(router: ApplicationRouter, initial: AddressInte
     })
   }
 
+  function openFile({
+    path,
+    ...options
+  }: {
+    readonly owner?: EditorWorkspaceStoreApi
+    readonly path: FilesystemPath
+    readonly focus?: Address['focus']
+    readonly replace?: boolean
+  }): Promise<NavigationResult> {
+    return openContent({ ...options, content: documentTab(fileDocument(fileResource(path))) })
+  }
+
   function addressForPanels(
     address: Address,
     panels: WorkbenchPanels,
@@ -205,7 +220,7 @@ export function createNavigation(router: ApplicationRouter, initial: AddressInte
     focus: Address['focus'] = null,
   ) {
     const selected = activeEditorTabForWorkbenchPanels(panels)
-    if (selected) return addressWithFile(address, selected.path, rootPath, focus) ?? address
+    if (selected) return addressWithContent(address, selected.content, rootPath, focus) ?? address
     return {
       ...address,
       document: address.mode === 'chat' ? address.document : null,
@@ -260,7 +275,7 @@ export function createNavigation(router: ApplicationRouter, initial: AddressInte
         : address
       const next = addressForPanels(base, panels, rootPath, address.focus)
       const tabs = panels.editorTabs.flatMap((tab) => {
-        const token = documentTokenForPath(rootPath, tab.path)
+        const token = documentTokenForContent(rootPath, tab.content)
         return token.kind === 'token' ? [token.token] : []
       })
       return {
@@ -274,7 +289,7 @@ export function createNavigation(router: ApplicationRouter, initial: AddressInte
     })
   }
 
-  function closeTabs(tabIds: readonly string[], owner: EditorWorkspaceStoreApi, discard = false) {
+  function closeTabs(tabIds: readonly TabId[], owner: EditorWorkspaceStoreApi, discard = false) {
     if (tabIds.length === 0)
       return Promise.resolve({ status: 'applied' } satisfies NavigationResult)
     return ownedRequest(owner, ({ application, address }) => {
@@ -283,7 +298,7 @@ export function createNavigation(router: ApplicationRouter, initial: AddressInte
       const panels = tabIds.reduce(closeEditorTabInWorkbenchPanels, workspace.workbenchPanels)
       const next = addressForPanels(address, panels, workspace.rootFolder?.path ?? null)
       const tabs = panels.editorTabs.flatMap((tab) => {
-        const token = documentTokenForPath(workspace.rootFolder?.path ?? null, tab.path)
+        const token = documentTokenForContent(workspace.rootFolder?.path ?? null, tab.content)
         return token.kind === 'token' ? [token.token] : []
       })
       return {
@@ -304,8 +319,10 @@ export function createNavigation(router: ApplicationRouter, initial: AddressInte
 
   function editorCommands(owner: EditorWorkspaceStoreApi) {
     return {
-      openFileSurface: (path: string) => openFile({ owner, path }),
-      selectFile: (path: string | null) =>
+      openTabContent: (content: TabContent) => openContent({ owner, content }),
+      selectContent: (content: TabContent) => openContent({ owner, content }),
+      openFileSurface: (path: FilesystemPath) => openFile({ owner, path }),
+      selectFile: (path: FilesystemPath | null) =>
         path
           ? openFile({ owner, path })
           : Promise.resolve({ status: 'applied' } satisfies NavigationResult),
@@ -313,8 +330,10 @@ export function createNavigation(router: ApplicationRouter, initial: AddressInte
         if (coordinator.getApplication()?.getSnapshot().editor.workspaceStore !== owner)
           return supersededNavigation()
         if (
-          documentTokenForPath(owner.getState().rootFolder?.path ?? null, target.path).kind !==
-          'token'
+          documentTokenForContent(
+            owner.getState().rootFolder?.path ?? null,
+            documentTab(fileDocument(fileResource(filesystemPath(target.path)))),
+          ).kind !== 'token'
         ) {
           return coordinator.transient((application) => {
             revealEditor(application)
@@ -323,7 +342,7 @@ export function createNavigation(router: ApplicationRouter, initial: AddressInte
         }
         return openFile({
           owner,
-          path: target.path,
+          path: filesystemPath(target.path),
           focus: {
             line: target.range.start.line + 1,
             column: target.range.start.character + 1,
@@ -332,48 +351,46 @@ export function createNavigation(router: ApplicationRouter, initial: AddressInte
           },
         })
       },
-      openSearchEditor: (rootPath: string) =>
-        openFile({ owner, path: searchBufferDocumentId(rootPath) }),
+      openSearchEditor: (rootPath: FilesystemPath) =>
+        openContent({ owner, content: documentTab({ kind: 'search', root: rootPath }) }),
       openSettingsEditor: (category?: string | null) =>
-        openFile({ owner, path: settingsDocumentId(), settingsCategory: category }),
-      selectTab: (_paneId: string, tabId: string) => {
+        openContent({ owner, content: settingsTab(), settingsCategory: category }),
+      selectTab: (_paneId: string, tabId: TabId) => {
         const tab = owner.getState().workbenchPanels.editorTabs.find((item) => item.id === tabId)
         return tab
-          ? openFile({ owner, path: tab.path })
+          ? openContent({ owner, content: tab.content })
           : Promise.resolve({ status: 'superseded' } satisfies NavigationResult)
       },
-      closeTab: (tabId: string) => closeTabs([tabId], owner),
-      closeTabs: (tabIds: readonly string[]) => closeTabs(tabIds, owner),
-      discardAndCloseTabs: (tabIds: readonly string[]) => closeTabs(tabIds, owner, true),
-      discardAndCloseTab: (tabId: string) => closeTabs([tabId], owner, true),
-      reorderTab: (_paneId: string, tabId: string, targetIndex: number) =>
+      closeTab: (tabId: TabId) => closeTabs([tabId], owner),
+      closeTabs: (tabIds: readonly TabId[]) => closeTabs(tabIds, owner),
+      discardAndCloseTabs: (tabIds: readonly TabId[]) => closeTabs(tabIds, owner, true),
+      discardAndCloseTab: (tabId: TabId) => closeTabs([tabId], owner, true),
+      reorderTab: (_paneId: string, tabId: TabId, targetIndex: number) =>
         setWorkbenchPanels(
           reorderEditorTabInWorkbenchPanels(owner.getState().workbenchPanels, tabId, targetIndex),
           owner,
         ),
       selectPreviousEditor: () => {
         const state = owner.getState()
-        const path = previousOpenEditorPath(
+        const content = previousOpenTabContent(
           state.editorHistory,
-          state.openFilePaths,
-          state.selectedFilePath,
+          state.openTabContents,
+          state.selectedTabContent,
         )
-        return path
-          ? openFile({ owner, path })
+        return content
+          ? openContent({ owner, content })
           : Promise.resolve({ status: 'superseded' } satisfies NavigationResult)
       },
       reopenClosedEditor: async () => {
-        const path = owner.getState().recentlyClosedEditorPaths[0]
-        if (!path) return { status: 'superseded' } satisfies NavigationResult
-        const result = await openFile({ owner, path })
+        const content = owner.getState().recentlyClosedTabs[0]
+        if (!content) return { status: 'superseded' } satisfies NavigationResult
+        const result = await openContent({ owner, content })
         if (result.status !== 'applied') return result
         const state = owner.getState()
-        state.setRecentlyClosedEditorPaths(
-          recentlyClosedEditorPathsForReopen(state.recentlyClosedEditorPaths, path),
-        )
+        state.setRecentlyClosedTabs(recentlyClosedTabsForReopen(state.recentlyClosedTabs, content))
         return result
       },
-      renameLiveEditorDocument: (from: string, to: string) => {
+      renameLiveEditorDocument: (from: FilesystemPath, to: FilesystemPath) => {
         const editor = coordinator.getApplication()?.getEditorForWorkspace(owner)
         if (!editor) return { wasDirty: false, settled: supersededNavigation() }
         const { wasDirty } = editorActions(editor).renameLiveEditorDocument(from, to)
@@ -382,12 +399,14 @@ export function createNavigation(router: ApplicationRouter, initial: AddressInte
         )
         return { wasDirty, settled }
       },
-      discardLiveEditorDocument: (path: string) => {
+      discardLiveEditorDocument: (document: DocumentRef) => {
         const editor = coordinator.getApplication()?.getEditorForWorkspace(owner)
         if (!editor) return { wasDirty: false, settled: supersededNavigation() }
-        const { wasDirty } = editorActions(editor).discardLiveEditorDocument(path)
+        const { wasDirty } = editorActions(editor).discardLiveEditorDocument(document)
         const settled = coordinator.reconcileAddress(owner, (address, root) =>
-          addressForDeletedFile(address, root, path),
+          document.kind === 'file'
+            ? addressForDeletedFile(address, root, document.resource.path)
+            : address,
         )
         return { wasDirty, settled }
       },
@@ -408,6 +427,7 @@ export function createNavigation(router: ApplicationRouter, initial: AddressInte
     currentAddress: coordinator.currentAddress,
     permitsRecentRoot: coordinator.permitsRecentRoot,
     openFile,
+    openContent,
     openChat,
     openWorkspace,
     openDiff({ owner, row }: { readonly owner: EditorWorkspaceStoreApi; readonly row: ChangeRow }) {
@@ -427,11 +447,12 @@ export function createNavigation(router: ApplicationRouter, initial: AddressInte
         const diff = diffs.find(
           (entry) => entry.path === row.file.path || entry.oldPath === row.file.path,
         )
-        if (!diff || !hasDiffDocumentSnapshot(diff))
+        const document = diff ? snapshotDocument(diff) : null
+        if (!document)
           throw createClientInvariantError('The requested change has no available file snapshot.')
-        const next = addressWithFile(
+        const next = addressWithContent(
           address,
-          snapshotDiffDocumentId(diff),
+          documentTab(document),
           owner.getState().rootFolder?.path ?? null,
         )
         if (!next)
@@ -463,7 +484,7 @@ export function createNavigation(router: ApplicationRouter, initial: AddressInte
       ref,
     }: {
       readonly owner: EditorWorkspaceStoreApi
-      readonly path: string
+      readonly path: FilesystemPath
       readonly ref: string
     }) {
       return ownedRequest(owner, async ({ application, address, signal, isCurrent }) => {
@@ -479,8 +500,12 @@ export function createNavigation(router: ApplicationRouter, initial: AddressInte
               clientForQueryClient(client),
             ),
         })
-        const documentId = refDocumentId({ path, ref })
-        const next = addressWithFile(address, documentId, owner.getState().rootFolder?.path ?? null)
+        const document = { kind: 'git-ref', source: { path, ref } } as const
+        const next = addressWithContent(
+          address,
+          documentTab(document),
+          owner.getState().rootFolder?.path ?? null,
+        )
         if (!next) throw createClientInvariantError('The file reference has no workspace address.')
         return {
           address: next,
@@ -491,7 +516,7 @@ export function createNavigation(router: ApplicationRouter, initial: AddressInte
             if (isCurrent())
               runtime.editor.documentStore
                 .getState()
-                .ensureUnsyncedEditorDocument({ content: file.content, id: documentId })
+                .ensureUnsyncedEditorDocument({ content: file.content, target: document })
           },
         }
       })

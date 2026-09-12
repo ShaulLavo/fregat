@@ -1,3 +1,4 @@
+import { filesystemPath } from '@/lib/documents/utils/identity'
 import { DEFAULT_SETTING_VALUES, type SettingsSnapshot } from '@workspace/contracts'
 import { act, fireEvent, screen, waitFor } from '@testing-library/react'
 
@@ -154,7 +155,7 @@ function entry(path: string): FsEntry {
     birthtimeMs: 0,
     mtimeMs: 0,
     name: path,
-    path,
+    path: filesystemPath(path),
     size: 0,
     type: 'file',
     version: '1',

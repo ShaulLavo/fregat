@@ -6,7 +6,7 @@ import { createRpcError } from '@/lib/structured-errors'
 
 const LANGUAGE_SERVER_MATCH_STALE_MS = 30_000
 
-export type LanguageServerMatchConfiguration = Pick<
+type LanguageServerMatchConfiguration = Pick<
   SettingsValues,
   'lsp.experimental.tyForPython' | 'lsp.languageServers' | 'lsp.servers'
 >

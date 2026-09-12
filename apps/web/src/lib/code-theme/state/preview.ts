@@ -27,7 +27,12 @@ async function highlightPreview(themeId: string): Promise<TokensResult> {
     loadPreviewRegistration(themeId),
   ])
   await engine.loadTheme(registration)
-  return engine.codeToTokens(CODE_THEME_PREVIEW_SAMPLE, { lang: 'typescript', theme: themeId })
+  return engine.codeToTokens(CODE_THEME_PREVIEW_SAMPLE, {
+    lang: 'typescript',
+    theme: themeId,
+    // This fixed sample must retain its syntax colors even when the worker is paused.
+    tokenizeTimeLimit: 0,
+  })
 }
 
 function previewHighlighter(): Promise<HighlighterCore> {

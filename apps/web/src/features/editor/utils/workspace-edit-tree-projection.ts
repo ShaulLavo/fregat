@@ -1,3 +1,4 @@
+import { filesystemPath } from '@/lib/documents/utils/identity'
 import type { WorkspaceEditResultEntry } from '@workspace/contracts'
 
 import type { TreeEntry } from '@/lib/file-system-types'
@@ -57,7 +58,7 @@ function treeEntry(
     ...(current?.children ? { children: current.children } : {}),
     mtimeMs: entry.mtimeMs,
     name: basename(entry.path),
-    path: entry.path,
+    path: filesystemPath(entry.path),
     size: entry.size,
     type: entry.type,
     version: entry.version,

@@ -1,4 +1,5 @@
-import type { WorkspaceSearchMatch, WorkspaceSearchQuery } from '@workspace/contracts'
+import { handleSearchResultKeyDown } from '@/features/search/utils/result-sidebar-keyboard'
+import type { WorkspaceSearchQuery } from '@workspace/contracts'
 import { useVirtualizer } from '@tanstack/react-virtual'
 import {
   memo,
@@ -7,7 +8,6 @@ import {
   useMemo,
   useRef,
   useState,
-  type KeyboardEvent,
   type MouseEvent,
   type RefObject,
 } from 'react'
@@ -20,11 +20,6 @@ import type {
 import { SearchMatchRow, SearchNameMatchRow } from '@/features/search/components/match-row'
 import { useSearchResultActions } from '@/features/search/hooks/use-result-actions'
 import {
-  firstSearchResultChildId,
-  firstSearchResultId,
-  lastSearchResultId,
-  parentSearchResultId,
-  searchResultIdByOffset,
   searchResultItemById,
   searchResultItems,
   type SearchResultItem,
@@ -382,109 +377,6 @@ function searchPreviewMaxLength(width: number | null, replaceVisible: boolean | 
     SEARCH_PREVIEW_MAX_CHARACTERS,
     Math.max(SEARCH_PREVIEW_MIN_CHARACTERS, visibleCharacters),
   )
-}
-
-function handleSearchResultKeyDown({
-  activeResultId,
-  event,
-  items,
-  onOpenMatch,
-  onSelectResult,
-  onToggleGroup,
-}: {
-  activeResultId: string | null
-  event: KeyboardEvent<HTMLDivElement>
-  items: readonly SearchResultItem[]
-  onOpenMatch: (match: WorkspaceSearchMatch) => void
-  onSelectResult: (id: string | null) => void
-  onToggleGroup: (path: string) => void
-}) {
-  if (event.key === 'ArrowDown') {
-    event.preventDefault()
-    onSelectResult(searchResultIdByOffset({ activeResultId, items, offset: 1 }))
-    return
-  }
-  if (event.key === 'ArrowUp') {
-    event.preventDefault()
-    onSelectResult(searchResultIdByOffset({ activeResultId, items, offset: -1 }))
-    return
-  }
-  if (event.key === 'Home') {
-    event.preventDefault()
-    onSelectResult(firstSearchResultId(items))
-    return
-  }
-  if (event.key === 'End') {
-    event.preventDefault()
-    onSelectResult(lastSearchResultId(items))
-    return
-  }
-  if (event.key === 'ArrowRight') {
-    event.preventDefault()
-    moveIntoSearchResultGroup(items, activeResultId, onSelectResult, onToggleGroup)
-    return
-  }
-  if (event.key === 'ArrowLeft') {
-    event.preventDefault()
-    moveOutOfSearchResultGroup(items, activeResultId, onSelectResult, onToggleGroup)
-    return
-  }
-  if (event.key !== 'Enter') return
-
-  event.preventDefault()
-  commitSearchResult(items, activeResultId, onOpenMatch, onToggleGroup)
-}
-
-function moveIntoSearchResultGroup(
-  items: readonly SearchResultItem[],
-  activeResultId: string | null,
-  onSelectResult: (id: string | null) => void,
-  onToggleGroup: (path: string) => void,
-) {
-  const active = searchResultItemById(items, activeResultId)
-  if (active?.type !== 'group') return
-
-  if (active.group.collapsed) {
-    onToggleGroup(active.group.path)
-    return
-  }
-
-  onSelectResult(firstSearchResultChildId(items, active.id) ?? active.id)
-}
-
-function moveOutOfSearchResultGroup(
-  items: readonly SearchResultItem[],
-  activeResultId: string | null,
-  onSelectResult: (id: string | null) => void,
-  onToggleGroup: (path: string) => void,
-) {
-  const parentId = parentSearchResultId(items, activeResultId)
-  if (parentId) {
-    onSelectResult(parentId)
-    return
-  }
-
-  const active = searchResultItemById(items, activeResultId)
-  if (active?.type !== 'group') return
-  if (active.group.collapsed) return
-
-  onToggleGroup(active.group.path)
-}
-
-function commitSearchResult(
-  items: readonly SearchResultItem[],
-  activeResultId: string | null,
-  onOpenMatch: (match: WorkspaceSearchMatch) => void,
-  onToggleGroup: (path: string) => void,
-) {
-  const active = searchResultItemById(items, activeResultId)
-  if (!active) return
-  if (active.type === 'group') {
-    onToggleGroup(active.group.path)
-    return
-  }
-
-  onOpenMatch(active.match)
 }
 
 function searchResultDomId(treeId: string, itemId: string) {

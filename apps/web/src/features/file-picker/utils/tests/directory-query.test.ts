@@ -1,3 +1,4 @@
+import { filesystemPath } from '@/lib/documents/utils/identity'
 import { QueryClient } from '@tanstack/react-query'
 
 import { expect, test } from '../../../../../test/fixtures'
@@ -46,7 +47,7 @@ function entryFields(path: string) {
     birthtimeMs: 0,
     mtimeMs: 0,
     name: path.split('/').at(-1) ?? path,
-    path,
+    path: filesystemPath(path),
     size: 0,
     version: '1',
   }

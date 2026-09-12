@@ -18,6 +18,11 @@ import {
   type SessionId,
 } from '@workspace/contracts'
 import * as v from 'valibot'
+import {
+  readWorkspaceCacheEntry,
+  removeWorkspaceCacheEntry,
+  writeWorkspaceCacheEntry,
+} from '@/lib/workspace-cache-storage'
 
 import {
   CHAT_PROJECTION_CACHE_ACTIVITY_LIMIT,
@@ -77,22 +82,19 @@ export type CachedChatProjection = v.InferOutput<typeof cachedProjectionSchema>
 type CachedSlice = v.InferOutput<typeof cachedSliceSchema>
 
 export function readChatProjectionCache(storage: ScopedStorage): CachedChatProjection | null {
-  try {
-    const raw = storage.getItem(CHAT_PROJECTION_CACHE_STORAGE_KEY)
-    if (!raw) return null
-    const parsed = v.safeParse(cachedProjectionSchema, JSON.parse(raw))
-    if (!parsed.success) return invalidChatProjectionCache(storage)
-    const cached = parsed.output
-    if (cached.binding && cached.binding.descriptor.environmentId !== storage.environmentId)
-      return invalidChatProjectionCache(storage)
-    if (!cached.slices.every((slice) => slice.environmentId === storage.environmentId))
-      return invalidChatProjectionCache(storage)
-    if (cached.binding) cacheBindings.set(storage.environmentId, cached.binding)
-    return cached
-  } catch {
-    removeChatProjectionCache(storage)
-    return null
-  }
+  const cached = readWorkspaceCacheEntry<CachedChatProjection | null>(
+    CHAT_PROJECTION_CACHE_STORAGE_KEY,
+    cachedProjectionSchema,
+    null,
+    { storage },
+  )
+  if (!cached) return null
+  if (cached.binding && cached.binding.descriptor.environmentId !== storage.environmentId)
+    return invalidChatProjectionCache(storage)
+  if (!cached.slices.every((slice) => slice.environmentId === storage.environmentId))
+    return invalidChatProjectionCache(storage)
+  if (cached.binding) cacheBindings.set(storage.environmentId, cached.binding)
+  return cached
 }
 
 export function recordEnvironmentCacheBinding(
@@ -123,7 +125,7 @@ export function readCachedEnvironmentBindings(
 }
 
 function invalidChatProjectionCache(storage: ScopedStorage): null {
-  removeChatProjectionCache(storage)
+  removeWorkspaceCacheEntry(CHAT_PROJECTION_CACHE_STORAGE_KEY, storage)
   return null
 }
 
@@ -134,32 +136,21 @@ export function writeChatProjectionCache(storage: ScopedStorage, cached: CachedC
     slices: cached.slices.map((slice) => ({ ...slice, transcripts: [] })),
   }
   if (setCacheEntry(storage, shellOnly)) return true
-  removeChatProjectionCache(storage)
+  removeWorkspaceCacheEntry(CHAT_PROJECTION_CACHE_STORAGE_KEY, storage)
   return false
 }
 
 function setCacheEntry(storage: ScopedStorage, cached: CachedChatProjection) {
-  try {
-    storage.setItem(
-      CHAT_PROJECTION_CACHE_STORAGE_KEY,
-      JSON.stringify({
-        ...cached,
-        binding: cacheBindings.get(storage.environmentId) ?? cached.binding,
-        slices: cached.slices.filter((slice) => slice.environmentId === storage.environmentId),
-      }),
-    )
-    return true
-  } catch {
-    return false
-  }
-}
-
-function removeChatProjectionCache(storage: ScopedStorage) {
-  try {
-    storage.removeItem(CHAT_PROJECTION_CACHE_STORAGE_KEY)
-  } catch {
-    return
-  }
+  const result = writeWorkspaceCacheEntry(
+    CHAT_PROJECTION_CACHE_STORAGE_KEY,
+    {
+      ...cached,
+      binding: cacheBindings.get(storage.environmentId) ?? cached.binding,
+      slices: cached.slices.filter((slice) => slice.environmentId === storage.environmentId),
+    },
+    { storage },
+  )
+  return result.status === 'written'
 }
 
 export function chatProjectionCacheFromState(state: ChatProjectionState): CachedChatProjection {

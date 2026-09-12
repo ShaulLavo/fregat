@@ -1,4 +1,6 @@
-import { describe, expect, it } from 'vitest'
+import { filesystemPath } from '@/lib/documents/utils/identity'
+import { describe } from 'vitest'
+import { expect, test as it } from '../../../test/fixtures'
 import type { TreeEntry, TreeResult } from '@/lib/file-system-types'
 import {
   moveTreeModelPaths,
@@ -192,7 +194,7 @@ describe('moveTreeModelPaths', () => {
 })
 
 function tree(path: string, entries: TreeEntry[]): TreeResult {
-  return { entries, path }
+  return { entries, path: filesystemPath(path) }
 }
 
 function directory(path: string, children?: TreeEntry[]): TreeEntry {
@@ -216,7 +218,7 @@ function entry(path: string, type: TreeEntry['type'], children?: TreeEntry[]): T
     children,
     mtimeMs: 1,
     name: path.split('/').at(-1) ?? path,
-    path,
+    path: filesystemPath(path),
     size: 1,
     type,
     version: `test:1:${path}`,

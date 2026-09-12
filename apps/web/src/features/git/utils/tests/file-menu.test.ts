@@ -1,5 +1,5 @@
 import { fileMenu, type FileMenuContext } from '@/features/git/utils/file-menu'
-import type { MenuActionItem } from '@/features/menus/utils/model'
+import type { MenuActionItem } from '@/keymap/menus/utils/model'
 import { expect, test } from '../../../../../test/fixtures'
 
 test('a worktree row offers open, stage, discard, and copy in that order', () => {

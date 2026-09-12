@@ -11,7 +11,7 @@ import * as schema from '../../db/schema'
 import { migrateOrchestrationDatabase } from '../../db/migrations'
 import { OrchestrationEngine } from '../engine'
 import { orchestrationCommandSummary } from '../orchestration-logging'
-import { orchestrationCommandSchema, type OrchestrationCommand } from '../schemas'
+import { orchestrationCommandSchema, type OrchestrationCommand } from '@workspace/contracts'
 
 const now = '2026-06-20T00:00:00.000Z'
 const later = '2026-06-20T00:01:00.000Z'

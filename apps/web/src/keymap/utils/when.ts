@@ -1,7 +1,5 @@
-import {
-  fileBackedDocumentPath,
-  savableDocumentPath,
-} from '@/features/editor/utils/file-backed-document'
+import { filesystemResource, saveCapability } from '@/lib/documents/utils/capabilities'
+import type { DocumentRef, TabId } from '@/lib/documents/utils/types'
 import type { CommandTargetKind, CommandWhen } from '@workspace/client-core/commands/metadata'
 import {
   editorKeyConditionMatches,
@@ -19,9 +17,9 @@ export function editorBindingConditionsMatch(
 }
 
 export type CommandWhenSnapshot = {
-  readonly activeDocumentSavable?: boolean
-  readonly activeFilePath: string | null
-  readonly activeTabId: string | null
+  readonly activeDocumentSavable: boolean
+  readonly activeDocument: DocumentRef | null
+  readonly activeTabId: TabId | null
   readonly chatMode: boolean
   readonly workspaceOpen: boolean
   readonly workspaceEditRedoable?: boolean
@@ -77,14 +75,14 @@ function conditionDisabledReason(
       : commandWhenDisabledReasons.editorWritable
   }
   if (condition === 'fileBackedTab') {
-    return fileBackedDocumentPath(snapshot.activeFilePath)
+    return filesystemResource(snapshot.activeDocument)
       ? null
       : commandWhenDisabledReasons.fileBackedTab
   }
   if (condition === 'saveableTab') {
-    const pathIsSavable = savableDocumentPath(snapshot.activeFilePath)
-    const documentIsSavable = snapshot.activeDocumentSavable ?? true
-    return pathIsSavable && documentIsSavable ? null : commandWhenDisabledReasons.saveableTab
+    const savable =
+      snapshot.activeDocument && saveCapability(snapshot.activeDocument).kind !== 'none'
+    return savable && snapshot.activeDocumentSavable ? null : commandWhenDisabledReasons.saveableTab
   }
   if (condition === 'tabOpen') {
     return snapshot.activeTabId !== null ? null : commandWhenDisabledReasons.tabOpen

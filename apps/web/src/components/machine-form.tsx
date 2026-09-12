@@ -8,7 +8,7 @@ import {
 } from '@workspace/ui/components/collapsible'
 import { CaretRightIcon, PlugsConnectedIcon } from '@phosphor-icons/react'
 import { MachineConnectionOption } from '@/components/machine-connection-option'
-import { SshHostPicker } from '@/components/ssh-host-picker'
+import { SshHostPicker } from '@/features/environments/components/ssh-host-picker'
 import { useId } from 'react'
 
 import { useMachineForm, type MachineFormOptions } from '@/hooks/use-machine-form'

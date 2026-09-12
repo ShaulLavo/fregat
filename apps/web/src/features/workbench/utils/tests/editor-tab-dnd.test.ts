@@ -1,3 +1,4 @@
+import { tabId } from '@/lib/documents/utils/identity'
 import { expect, test } from '../../../../../test/fixtures'
 
 import { editorTabReorderIntent } from '@/features/workbench/utils/editor-tab-dnd'
@@ -20,5 +21,5 @@ test('ignores no-op and unknown active tab drops', () => {
 })
 
 function editorTabs() {
-  return [{ id: 'tab-a' }, { id: 'tab-b' }, { id: 'tab-c' }]
+  return [{ id: tabId('tab-a') }, { id: tabId('tab-b') }, { id: tabId('tab-c') }]
 }

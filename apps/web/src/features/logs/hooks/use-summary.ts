@@ -2,7 +2,7 @@ import { clientForQueryClient } from '@/lib/environments/state/query-clients'
 import { useQuery } from '@tanstack/react-query'
 import type { LogDashboardFilters } from '@workspace/contracts'
 
-import { logsKeys } from '@/lib/query-keys'
+import { logsKeys } from '@/features/logs/utils/query-keys'
 import { fetchLogSummary } from '@/features/logs/utils/api'
 import { logFilterQuery } from '@/features/logs/utils/filter-params'
 

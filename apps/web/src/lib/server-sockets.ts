@@ -54,7 +54,7 @@ export function connectLanguageServerSocket(
   )
 }
 
-export class EdenLanguageServerWebSocket implements EdenServerSocket {
+class EdenLanguageServerWebSocket implements EdenServerSocket {
   readonly #socket: EdenServerSocket
 
   constructor(

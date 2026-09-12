@@ -241,29 +241,25 @@ endpoints and existing SSH access, with explicit grants for native clients.
 
 ## Document and async operation ownership
 
-The required execution order is **098 → 097**:
+Plan 098 is complete. Its [implementation reference](docs/document-and-tab-domain.md) records
+verified document/tab APIs, cache version 21, correctness fixes, and baseline test limitations.
 
-1. **[Plan 098 — document and tab domain](plans/098-document-and-tab-domain.md).** Complete its
-   characterization, settings save acknowledgement correction, shared domain model, caller
-   migrations, and mechanical enforcement. All completion criteria and focused verification
-   gates must pass before Plan 097 starts.
-2. **[Plan 097 — async operation ownership](plans/097-async-operation-ownership.md).** Record
-   Plan 098's completion evidence and implemented document API locations in this plan. Refresh
-   its source anchors, API sketches, and drift baseline, then begin implementation against the
-   settled document model.
-
-Design agreement or partial implementation of Plan 098 does not satisfy this dependency.
+**[Plan 097 — async operation ownership](plans/097-async-operation-ownership.md) is next.** Its
+source anchors, typed API sketches, and source hashes have been refreshed against the completed
+document model. Plan 097 implementation has not started. The required **098 → 097** dependency
+is satisfied.
 
 ## Duplication census lane
 
 Requested 2026-09-11. Plan 090 is implemented. Its [regression reference](docs/duplicate-defect-regressions.md)
-records the fixes, baseline corrections, and focused checks. The remaining six plans are proposed.
+records the fixes, baseline corrections, and focused checks. Plan 096 is also complete. The remaining five plans are proposed.
 
 [Plan 091](plans/091-error-and-timing-helpers.md), [Plan 092](plans/092-path-and-uri-helpers.md),
 [Plan 093](plans/093-web-react-and-store-ceremony.md), and
 [Plan 094](plans/094-client-core-web-tui-parity.md) consolidate on top of those fixes.
-[Plan 095](plans/095-server-plumbing.md) and [Plan 096](plans/096-web-layering-and-boundaries.md)
-can proceed independently of the middle plans, while preserving the same defect regressions.
+[Plan 095](plans/095-server-plumbing.md) can proceed independently of the middle plans,
+while preserving the same defect regressions. Plan 096 is complete; its
+[web layering reference](docs/web-layering.md) records the implementation and review.
 
 The middle plans consolidate onto the shared packages. Plan 091 widens the observability sanitizer,
 `errorSummary`, and the timing helpers into shared modules and gives `errorMessage`, `isRecord`, and the
@@ -273,14 +269,29 @@ one owner each, keeping the `parentPath` families deliberately split. Plan 093 c
 context guard, six store contexts, the deferred-commit widgets, and the Git mutation and test runners in
 `apps/web`. Plan 094 moves the domain logic `apps/web` and `apps/tui` each wrote twice into
 `packages/client-core` and `packages/contracts`. Plan 095 collapses the duplicated WebSocket adapters,
-atomic writers, listener bridges, and Git common-directory resolutions in `apps/server`. Plan 096 settles
-`apps/web` layering, moving modules to the layer that owns them and deleting unused contracts exports and
-clientless routes.
+atomic writers, listener bridges, and Git common-directory resolutions in `apps/server`. Plan 096 has
+implemented web layering, shared helper ownership, and unused API removal on `main`. Its
+[implementation reference](docs/web-layering.md) records the isolated moves and passing focused,
+typecheck, lint, build, and browser checks. The review fixed cache diagnostics, completed cache
+helper adoption, and strengthened the import census and boundary guard. Knip is clean across
+the repository and runs in CI. The completed executable plan is deleted.
 
 Every unification step names the behavioural divergences it reconciles and states which behaviour wins;
 these variants share signatures, so a wrong merge typechecks. Plan 096 settles the shared Git contract and
 web Git API files before Plan 094's co-pass over them. This lane does not reorder or depend on the keymap,
 reload, TUI, Ghostty, or MCP lanes.
+
+## Web design language lane
+
+Requested 2026-09-12. [Plan 100](plans/100-web-design-language.md) is proposed; implementation has
+not started. It settles corners, bar heights, density, dividers, type steps and interaction fills
+for `apps/web` and `packages/ui`, then enforces them with a census script and a mandatory
+triple-check sweep. Its one product-facing decision, the corner language (D1), needs the user's
+confirmation before Phase 1 lands; every other phase removes call-site noise under the decisions
+table. The plan is Platform-only and touches class strings and theme tokens, so it is independent
+of the duplication census lane, but it edits the same `apps/web` component files that Plans 093
+and 096 rename or restructure. Land it after 096 when both are in flight: rebasing class-string
+edits under a rename is cheap, the reverse is not.
 
 ## Verification boundaries
 

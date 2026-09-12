@@ -4,13 +4,14 @@ import type {
   EditorTextBuffer,
   EditorViewSession,
 } from '@singapor/core'
+import type { DocumentKey, DocumentRef } from '@/lib/documents/utils/types'
 
 export type EditorRenderDocument = {
   readonly buffer: EditorTextBuffer
   readonly contentRevision?: string
   readonly editability: 'editable' | 'readonly'
-  readonly id: string
-  readonly path: string
+  readonly key: DocumentKey
+  readonly target: DocumentRef
   readonly preparedDocument?: EditorPreparedDocument | null
   readonly scrollPosition?: EditorScrollPosition
   readonly view: EditorViewSession

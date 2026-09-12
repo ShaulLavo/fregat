@@ -56,7 +56,7 @@ test('registration receipts survive reconstruction, including a no-event registr
   }
 })
 
-test('restart catches up before readiness, imports terminal metadata, and converges scoped web projections', async () => {
+test('restart catches up before readiness, imports terminal history, and converges scoped web projections', async () => {
   const fixture = await makeSessionDomainFixture()
   const second = await makeTestServer({ filesystemWatch: false })
   const previousProjection = useChatProjectionStore.getState()
@@ -83,7 +83,7 @@ test('restart catches up before readiness, imports terminal metadata, and conver
     useChatProjectionStore
       .getState()
       .syncShellSnapshot(fixture.descriptor.environmentId, beforeCrash)
-    const events = fixture.appendUnapplied(registered.result.projectId, 1105)
+    const events = await fixture.appendUnapplied(registered.result.projectId, 1105)
     const adapter = new MetadataProviderAdapter()
     adapter.rows = [
       {
@@ -99,7 +99,9 @@ test('restart catches up before readiness, imports terminal metadata, and conver
     expect(firstSnapshot.snapshotSequence).toBeGreaterThanOrEqual(
       events.at(-1)?.sequence ?? Infinity,
     )
-    expect(firstSnapshot.projects[0]?.title).toBe('Catchup 1104')
+    expect(
+      firstSnapshot.projects.find((project) => project.id === registered.result?.projectId)?.title,
+    ).toBe('Catchup 1104')
     expect(
       firstSnapshot.sessions.find((session) => session.id === AMBIGUOUS_SESSION),
     ).toMatchObject({
@@ -107,6 +109,7 @@ test('restart catches up before readiness, imports terminal metadata, and conver
       latestTurn: { providerStartState: 'interrupted', state: 'interrupted' },
     })
     await fixture.engine.providerRuntimeIdle()
+    await fixture.engine.importSessions(DOMAIN_MODEL.providerInstanceId)
     await waitFor(async () =>
       expect(
         (await fixture.snapshot()).sessions.some((session) => session.id === TERMINAL_SESSION),
@@ -119,7 +122,9 @@ test('restart catches up before readiness, imports terminal metadata, and conver
     })
     const discovered = await fixture.session(TERMINAL_SESSION)
     expect(discovered).toMatchObject({ origin: 'discovered', title: 'Terminal session' })
-    expect(discovered.messages).toEqual([])
+    expect(discovered.messages).toEqual([
+      expect.objectContaining({ role: 'user', text: 'Existing terminal conversation' }),
+    ])
     const importedOwner = (await fixture.engine.readModelSnapshot()).worktrees.get(
       discovered.worktreeId,
     )
@@ -316,7 +321,10 @@ test('deletion cleanup retries from disk, preserves a shared checkout, and block
       providerStop: 'failed',
       blobCleanup: 'completed',
     })
-    await expect(fixture.register('revival-while-live')).rejects.toThrow('REGISTRATION_BUSY')
+    await expect(fixture.register('revival-while-live')).rejects.toMatchObject({
+      name: 'TypeError',
+      message: expect.stringContaining('REGISTRATION_BUSY'),
+    })
     await fixture.server.restart({ providerAdapter: new MetadataProviderAdapter() })
     await fixture.engine.ready
     const revived = await fixture.register('revival-after-cleanup')

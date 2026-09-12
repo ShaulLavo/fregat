@@ -1,3 +1,4 @@
+import { filesystemPath } from '@/lib/documents/utils/identity'
 import { selectSettingsSearch } from '@/features/settings/state/search-store'
 import { selectSettingsCategory } from '@/features/settings/state/category-store'
 import { selectSettingsView } from '@/features/settings/state/view-store'
@@ -17,12 +18,14 @@ import { writeRootFolderCache } from '@/features/workspace/state/cache'
 import { useCommand } from '@/keymap/hooks/use-command'
 import { CommandProvider } from '@/keymap/providers/command-provider'
 import type { PlatformCommandBus } from '@/keymap/providers/command-context'
-import { activeServerOrigin, getClient, setActiveServerOrigin, setClient } from '@/lib/client'
+import { installTestEnvironment } from '../../../test/factories/client-binding'
 import { createFolderPath } from '@/lib/file-server'
 import { createInProcessClient } from '../../../test/client'
 import { expect, test } from '../../../test/fixtures'
 import { createTestQueryClient, renderWithProviders } from '../../../test/render'
 import { makeTestServer } from '../../../test/server'
+import { createTestApplicationRuntime } from '../../../test/factories/application-runtime'
+import { activeEnvironmentId } from '@/lib/environments/state/domain'
 
 let capturedBus: PlatformCommandBus | null = null
 
@@ -206,19 +209,17 @@ test.for([
     primary.setQueryData(settingsKeys.document(), primaryBefore)
     const remoteServer = await makeTestServer({ filesystemWatch: false })
     const remoteClient = createInProcessClient(remoteServer)
-    const previousOrigin = activeServerOrigin()
-    setActiveServerOrigin('http://localhost:3521')
-    const previousRemoteClient = getClient()
-    setClient(remoteClient)
+    const restoreEnvironment = await installTestEnvironment('http://localhost:3521', remoteClient)
     const editor = createTestQueryClient()
     let view: ReturnType<typeof renderCommandProvider> | null = null
 
     try {
       const remoteBefore = await fetchSettings(undefined, remoteClient)
       editor.setQueryData(settingsKeys.document(), remoteBefore)
-      const root = await createFolderPath('remote-project', remoteClient)
-      writeRootFolderCache(testScopedStorage, { ...root, type: 'directory' })
-      view = renderCommandProvider(editor, primary)
+      const root = await createFolderPath(filesystemPath('remote-project'), remoteClient)
+      const application = createTestApplicationRuntime()
+      await application.openEnvironmentWorkspaceRoot(activeEnvironmentId(), root.path)
+      view = renderCommandProvider(editor, primary, application)
       await waitFor(() => expect(capturedBus).not.toBeNull())
 
       await act(async () => {
@@ -239,8 +240,7 @@ test.for([
       resetSettingsSnapshotAdmission(editor)
       primary.clear()
       editor.clear()
-      setClient(previousRemoteClient)
-      setActiveServerOrigin(previousOrigin)
+      restoreEnvironment()
       await remoteServer.cleanup()
     }
   },
@@ -259,6 +259,7 @@ function captureBus(bus: PlatformCommandBus) {
 function renderCommandProvider(
   queryClient: ReturnType<typeof createTestQueryClient>,
   settingsOwner = queryClient,
+  application?: ReturnType<typeof createTestApplicationRuntime>,
 ) {
   return renderWithProviders(
     <EditorStateProvider>
@@ -268,7 +269,7 @@ function renderCommandProvider(
         </CommandProvider>
       </EditorTabActionsProvider>
     </EditorStateProvider>,
-    { command: false, queryClient, settingsOwner },
+    { command: false, queryClient, settingsOwner, application },
   )
 }
 

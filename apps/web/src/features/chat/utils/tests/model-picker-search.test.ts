@@ -96,3 +96,30 @@ test('ties fall back to the caller order', () => {
 
   expect(ranked.map((option) => option.modelSelection.model)).toEqual(['nova', 'nova-2'])
 })
+
+test('picker keeps the overlap between match tiers and field penalties', () => {
+  const prefix = `rev${'x'.repeat(300)}`
+  const fuzzy = `r${'x'.repeat(300)}e${'x'.repeat(300)}v`
+  const options = [
+    { name: fuzzy, shortName: null, driverKind: '', providerLabel: '' },
+    { name: prefix, shortName: null, driverKind: '', providerLabel: '' },
+    { name: 'provider-only', shortName: null, driverKind: '', providerLabel: 'rev' },
+    { name: 'x-rev', shortName: null, driverKind: '', providerLabel: '' },
+  ]
+  expect(rankModelPickerOptions(options, 'rev').map((option) => option.name)).toEqual([
+    'x-rev',
+    'provider-only',
+    prefix,
+    fuzzy,
+  ])
+})
+
+test.each([':', '.'])('picker keeps %s as an ordinary substring character', (separator) => {
+  const options = ['aarev', `x${separator}rev`].map((name) => ({
+    name,
+    shortName: null,
+    driverKind: '',
+    providerLabel: '',
+  }))
+  expect(rankModelPickerOptions(options, 'rev')).toEqual(options)
+})

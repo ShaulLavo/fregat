@@ -1,5 +1,7 @@
 # Move runtime-neutral web and TUI logic into packages/client-core
 
+Implementation note, 2026-09-12: Plan 096 removed the five web Git contract aliases and moved menus to `keymap/menus`. Log query keys now live in `features/logs/utils/query-keys.ts`; pending logs use the shared loader before empty. Preserve the existing single error banner during this plan's client move. See [web layering](../docs/web-layering.md).
+
 Status: proposed, implementation not started. Requested 2026-09-11.
 
 This plan owns duplication-census items 4.1, 4.2, 4.3, 4.4, 4.5, 4.7, 4.8, 4.9, 4.11, 5.4, and the
@@ -9,7 +11,7 @@ wire-vocabulary half of Theme 8 (8.1–8.8, 8.12). Siblings own the rest:
 and timing helpers, [Plan 092](092-path-and-uri-helpers.md) the path and URI helpers,
 [Plan 093](093-web-react-and-store-ceremony.md) the web React and store ceremony,
 [Plan 095](095-server-plumbing.md) the server-internal plumbing, and
-[Plan 096](096-web-layering-and-boundaries.md) the `apps/web` layering passes.
+[Plan 096](../docs/web-layering.md) the `apps/web` layering passes.
 [Root PLAN.md](../PLAN.md) owns execution order; this plan owns only the order inside itself.
 
 ## Reconcile the baseline
@@ -93,8 +95,8 @@ first. Keep the file type-and-tuple only — it still has no valibot import.
   (`references.ts:26`, `document-token.ts:42`); fold it in the same pass.
 
 `packages/contracts/src/git.ts` is also touched by census item 8.13's blob-diff query shape, which
-this plan does not own. Coordinate with [Plan 096](096-web-layering-and-boundaries.md) so the file
-is edited once.
+this plan does not own. Plan 096 is complete; use the current contracts recorded in
+[web layering](../docs/web-layering.md) as this plan's baseline.
 
 ## Move the status-row partition into client-core
 
@@ -396,7 +398,7 @@ Each of these is small, and each has a divergence that must be settled first.
   duck-types every frame, drops the stream channel, and truncates to 8000 chars. Failure is a
   structured `GIT_COMMIT_REJECTED` versus `createTuiError` with different copy per case. Web's
   `syncRemote` (`api.ts:374`) has no TUI counterpart. This file is also rewritten by
-  [Plan 096](096-web-layering-and-boundaries.md)'s `apps/web/src/features/git/utils/api.ts` items;
+  [Plan 096](../docs/web-layering.md)'s `apps/web/src/features/git/utils/api.ts` items;
   land them in one pass.
 - **c. Worktree actions and confirmations.** `apps/tui/src/worktrees/utils/choices.ts:49` and
   `apps/web/src/features/chat-mode/components/worktree-manager-row.tsx:44-80`;
@@ -525,7 +527,7 @@ What must stay in each host, and why the machine is injected rather than shared 
 - It does not do the server-internal collapses: `jsonEqual`, the WebSocket adapters, the atomic-write
   implementations, the listener bridges, or the git common-dir lane — [Plan 095](095-server-plumbing.md).
 - It does not move `features/menus`, delete the `features/git/utils/types.ts` aliases, or fix the
-  logs pending-versus-empty fall-through — [Plan 096](096-web-layering-and-boundaries.md), which also
+  logs pending-versus-empty fall-through — [Plan 096](../docs/web-layering.md), which also
   owns census item 8.13 and therefore shares the `packages/contracts/src/git.ts` and
   `apps/web/src/features/git/utils/api.ts` passes named above.
 - It does not delete the unused `order-key.ts` exports (8.9) or collapse the client-core-internal
@@ -562,7 +564,7 @@ No repository-wide suite, and no bare test count as evidence.
 
 - [ ] Every decision above is answered in writing before its item is implemented.
 - [ ] `packages/contracts/src/git.ts` is edited once, covering the predicates, `isBinaryGitDiff`, and
-      `GIT_FILE_STATUSES`, coordinated with [Plan 096](096-web-layering-and-boundaries.md).
+      `GIT_FILE_STATUSES`, building on the completed [Plan 096 changes](../docs/web-layering.md).
 - [ ] Every new `packages/client-core` module has an exports-map entry; no barrel file was added.
 - [ ] `packages/client-core` still imports no React, no DOM global, and no `node:` builtin.
 - [ ] Each moved helper names, in the diff or a one-line comment, what stayed in the app and why.

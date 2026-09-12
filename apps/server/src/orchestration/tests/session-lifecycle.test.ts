@@ -3,12 +3,15 @@ import { eq } from 'drizzle-orm'
 import { drizzle } from 'drizzle-orm/bun-sqlite'
 import { afterEach, describe, expect, it } from 'vitest'
 import * as v from 'valibot'
-import { orderKeyBetween, planPinnedReorder } from '@workspace/contracts'
+import {
+  orderKeyBetween,
+  orchestrationCommandSchema,
+  type OrchestrationCommand,
+} from '@workspace/contracts'
 import { migrateOrchestrationDatabase } from '../../db/migrations'
 import * as schema from '../../db/schema'
 import { projectionSessions } from '../../db/schema'
 import { OrchestrationEngine } from '../engine'
-import { orchestrationCommandSchema, type OrchestrationCommand } from '../schemas'
 
 const modelSelection = { model: 'gpt-5-codex', providerInstanceId: 'codex' }
 const fixtures: Array<{ close: () => void }> = []
@@ -422,17 +425,9 @@ describe('pinning', () => {
       '287d7571-b9f0-5489-8ea1-7dc0decb92ee',
     ])
 
-    const writes = planPinnedReorder({
-      keysById: new Map(pinnedRows(database).map((row) => [row.sessionId, row.pinOrderKey])),
-      movedId: '287d7571-b9f0-5489-8ea1-7dc0decb92ee',
-      orderedIds: [
-        '00000000-0000-4000-8000-000000000001',
-        '287d7571-b9f0-5489-8ea1-7dc0decb92ee',
-        '19e557ea-fa7c-515a-9051-e990f8aa54c6',
-      ],
-    })
-    expect(writes).toHaveLength(1)
-    await engine.dispatch(pinReorderCommand(writes[0]!.orderKey, writes[0]!.id))
+    const orderKey = orderKeyBetween('b', 'd')
+    expect(orderKey).not.toBeNull()
+    await engine.dispatch(pinReorderCommand(orderKey!, '287d7571-b9f0-5489-8ea1-7dc0decb92ee'))
 
     expect(pinnedOrder(database)).toEqual([
       '00000000-0000-4000-8000-000000000001',

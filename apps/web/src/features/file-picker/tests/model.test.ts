@@ -1,3 +1,4 @@
+import { filesystemPath } from '@/lib/documents/utils/identity'
 import { expect, test } from '../../../../test/fixtures'
 
 import { entryByOffset } from '@/features/file-picker/model'
@@ -15,7 +16,7 @@ function entry(index: number): FsEntry {
     birthtimeMs: 0,
     mtimeMs: 0,
     name: `entry-${index}`,
-    path: `entry-${index}`,
+    path: filesystemPath(`entry-${index}`),
     size: 0,
     type: 'file',
     version: 'test',

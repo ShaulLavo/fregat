@@ -55,6 +55,11 @@ test.each(families)('matches concrete local and remote family %s', async (suffix
     expect(hasAvailableRoute(router)).toBe(true)
     expect(router.state.matches.at(-1)?.params.workspace).toBe(workspace)
     expect(router.state.matches.at(-1)?.routeId).not.toBe('__root__')
+    const address = parseAddress(`${prefix}${suffix}`, {
+      knownEnvironmentIds: [environmentId],
+      primaryEnvironmentId: null,
+    })
+    expect(buildAddressLocation(router, address).publicHref).toBe(formatAddress(address))
   }
 })
 

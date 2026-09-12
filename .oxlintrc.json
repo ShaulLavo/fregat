@@ -1,7 +1,13 @@
 {
   "$schema": "https://raw.githubusercontent.com/oxc-project/oxc/main/npm/oxlint/configuration_schema.json",
   "plugins": ["unicorn", "typescript", "oxc", "react"],
-  "jsPlugins": ["oxc-plugin-react-compiler/eslint"],
+  "jsPlugins": [
+    "oxc-plugin-react-compiler/eslint",
+    {
+      "name": "platform-boundaries",
+      "specifier": "./scripts/lint/web-boundaries.mjs"
+    }
+  ],
   "ignorePatterns": ["apps/desktop/build/**"],
   "rules": {
     "no-alert": "error",
@@ -22,6 +28,9 @@
     "oxc-react-compiler/unsupported-syntax": "warn",
     "oxc-react-compiler/config": "error",
     "oxc-react-compiler/gating": "error",
-    "oxc-react-compiler/no-unused-directives": "error"
+    "oxc-react-compiler/no-unused-directives": "error",
+    "platform-boundaries/lib-imports": "error",
+    "platform-boundaries/document-dependencies": "error",
+    "platform-boundaries/document-codecs": "error"
   }
 }

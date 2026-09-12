@@ -42,7 +42,7 @@ export type OrchestrationDomainEventReactor = {
   readonly handleEvents: (events: OrchestrationEvent[]) => void
 }
 
-export type OrchestrationReactorFailure = {
+type OrchestrationReactorFailure = {
   readonly code?: string
   readonly message: string
   readonly reactor: string
@@ -53,7 +53,7 @@ export type OrchestrationDomainPublishResult = {
   readonly reactorCount: number
 }
 
-export type OrchestrationResumeSkipReason =
+type OrchestrationResumeSkipReason =
   | 'cursor-ahead'
   | 'gap-too-large'
   | 'history-evicted'

@@ -1,4 +1,4 @@
-import { pathForDocumentToken } from '@/features/address/utils/document-token'
+import { contentForDocumentToken } from '@/features/address/utils/document-token'
 import {
   applicableTabs,
   editorDocumentToken,
@@ -8,7 +8,7 @@ import { NO_WORKSPACE_TOKEN, parseWorkspaceToken } from '@workspace/client-core/
 import { isChatModeToolTab, showChatModeToolTab } from '@/features/chat-mode/utils/panels'
 import {
   activeEditorTabForWorkbenchPanels,
-  openEditorPathInWorkbenchPanels,
+  openEditorContentInWorkbenchPanels,
   selectEditorTabInWorkbenchPanels,
   setWorkbenchBottomTab,
   setWorkbenchSidebarTab,
@@ -106,10 +106,10 @@ export function panelsForAddress(
 }
 
 function withDocumentToken(panels: WorkbenchPanels, rootPath: string | null, token: string) {
-  const parsed = pathForDocumentToken(rootPath, token)
-  if (parsed.kind !== 'path') return panels
+  const parsed = contentForDocumentToken(rootPath, token)
+  if (parsed.kind !== 'content') return panels
 
-  return openEditorPathInWorkbenchPanels(panels, parsed.path)
+  return openEditorContentInWorkbenchPanels(panels, parsed.content)
 }
 
 function withSidebarTab(panels: WorkbenchPanels, address: Address) {

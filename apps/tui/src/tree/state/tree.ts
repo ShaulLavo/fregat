@@ -149,5 +149,3 @@ export function createWorkbenchTree(session: SettingsSession, rootPath: string) 
     },
   }
 }
-
-export type WorkbenchTree = ReturnType<typeof createWorkbenchTree>

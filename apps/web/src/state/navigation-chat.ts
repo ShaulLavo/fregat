@@ -112,11 +112,12 @@ export function createChatNavigation(coordinator: ReturnType<typeof createNaviga
         },
         replace,
         historyTarget: null,
+        draftWorktreeId: sessionId === null ? worktree.id : undefined,
         beforeApply: () =>
           applyPreparedChat({
             snapshot,
             environmentId,
-            worktree: editorWorktree,
+            worktree,
             restartDraft: newDraft && sameRoot,
           }),
       }

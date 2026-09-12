@@ -2,9 +2,10 @@ import { chatAttachmentUrlPath, type ChatAttachment } from '@workspace/contracts
 
 /** What both the composer and the transcript hand the lightbox to paint. */
 export type ChatAttachmentImage = {
+  crossOrigin?: 'anonymous'
   id: string
   name: string
-  sizeBytes: number
+  sizeBytes: number | null
   src: string
 }
 
@@ -21,7 +22,7 @@ type StagedAttachment = {
  * stored allowlist — the server dropped that blob at ingest, so there is
  * genuinely nothing to show and the caller must fall back to the file name.
  */
-export function chatAttachmentImageSrc(attachment: ChatAttachment, origin: string): string | null {
+function chatAttachmentImageSrc(attachment: ChatAttachment, origin: string): string | null {
   const urlPath = chatAttachmentUrlPath(attachment)
   if (!urlPath) return null
 
@@ -39,6 +40,7 @@ export function chatAttachmentImages(
     if (!src) continue
 
     images.push({
+      crossOrigin: 'anonymous',
       id: attachment.id,
       name: attachment.name,
       sizeBytes: attachment.sizeBytes,
@@ -59,9 +61,17 @@ export function stagedAttachmentImages(
   attachments: readonly StagedAttachment[],
 ): ChatAttachmentImage[] {
   return attachments.map((attachment) => ({
+    crossOrigin: 'anonymous' as const,
     id: attachment.id,
     name: attachment.name,
     sizeBytes: attachment.sizeBytes,
     src: attachment.previewUrl,
   }))
+}
+
+export function chatImageCrossOrigin(source: string) {
+  const url = URL.parse(source)
+  return url?.pathname.endsWith('/fs/blob') && url.searchParams.has('path')
+    ? 'anonymous'
+    : undefined
 }

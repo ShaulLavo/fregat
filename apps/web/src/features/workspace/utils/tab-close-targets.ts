@@ -1,3 +1,4 @@
+import type { TabId } from '@/lib/documents/utils/types'
 export type EditorTabCloseTargetKind =
   | 'close'
   | 'closeAll'
@@ -7,13 +8,12 @@ export type EditorTabCloseTargetKind =
 
 export type EditorTabCloseTarget = {
   dirty: boolean
-  id: string
-  path: string
+  id: TabId
 }
 
 export function editorTabCloseTargetIds(
   tabs: readonly EditorTabCloseTarget[],
-  targetId: string,
+  targetId: TabId,
   kind: EditorTabCloseTargetKind,
 ) {
   const targetIndex = tabs.findIndex((tab) => tab.id === targetId)

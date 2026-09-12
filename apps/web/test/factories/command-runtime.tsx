@@ -1,3 +1,5 @@
+import { workspaceRoot } from '@/lib/documents/utils/identity'
+import type { FilesystemPath, TabId } from '@/lib/documents/utils/types'
 import { FileSyncService } from '@/features/editor/state/file-sync-service'
 import { EditorSaveService } from '@/features/editor/state/save-service'
 import { SettingsSyncService } from '@/features/settings/state/sync-service'
@@ -65,7 +67,7 @@ export type TestCommandRuntimeOverrides = {
   readonly workspaceEdits?: WorkspaceCommandRuntime['workspaceEdits']
 }
 
-export type TestCommandSnapshotSource =
+type TestCommandSnapshotSource =
   | Partial<WorkspaceCommandSnapshot>
   | (() => Partial<WorkspaceCommandSnapshot>)
 
@@ -335,7 +337,7 @@ function createRuntime(
       >,
     redo: async () => false,
     runWorkspaceMutation: async <T,>(
-      _affectedPaths: readonly string[] | 'all',
+      _affectedPaths: readonly FilesystemPath[] | 'all',
       operation: (reportAffectedPaths: WorkspaceMutationReporter) => Promise<T>,
     ) => operation(() => undefined),
     undo: async () => false,
@@ -361,8 +363,16 @@ function createTestEditor(
   const applied = () => Promise.resolve({ status: 'applied' } as const)
   const editor: EditorCommands = {
     ...apply,
+    openTabContent: (content) => {
+      apply.openTabContent(content)
+      return applied()
+    },
     openFileSurface: (path) => {
       apply.openFileSurface(path)
+      return applied()
+    },
+    selectContent: (content) => {
+      apply.selectContent(content)
       return applied()
     },
     selectFile: (path) => {
@@ -447,7 +457,7 @@ function pickedDirectory(path: string) {
     birthtimeMs: 0,
     mtimeMs: 0,
     name: path.split('/').filter(Boolean).at(-1) ?? path,
-    path,
+    path: workspaceRoot(path),
     size: 0,
     type: 'directory' as const,
     version: '',
@@ -462,7 +472,7 @@ function defaultSettingsSnapshot() {
   return { diffViewMode: DEFAULT_DIFF_VIEW_MODE, wallpaperEnabled: true } as const
 }
 
-async function openTestWorkspaceRoot(rootPath: string, workspace: EditorWorkspaceStoreApi) {
+async function openTestWorkspaceRoot(rootPath: FilesystemPath, workspace: EditorWorkspaceStoreApi) {
   if (workspace.getState().rootFolder?.path === rootPath) return 'already-open' as const
 
   workspace.getState().switchWorkspace(pickedDirectory(rootPath))
@@ -481,7 +491,7 @@ function showTestSettings(
   return openWorkspaceSettings(focus, workspace, editor)
 }
 
-function closeTestTab(tabId: string, editor: EditorCommands, workspace: EditorWorkspaceStoreApi) {
+function closeTestTab(tabId: TabId, editor: EditorCommands, workspace: EditorWorkspaceStoreApi) {
   const open = workspace.getState().workbenchPanels.editorTabs.some((tab) => tab.id === tabId)
   if (!open) return { reason: 'not-found', status: 'rejected' } as const
 

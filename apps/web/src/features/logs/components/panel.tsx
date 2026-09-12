@@ -2,7 +2,7 @@ import { useNavigation } from '@/hooks/use-navigation'
 import { useQueryClient } from '@tanstack/react-query'
 import { memo, useCallback, useEffect, useMemo, useRef, useState } from 'react'
 
-import { logsKeys } from '@/lib/query-keys'
+import { logsKeys } from '@/features/logs/utils/query-keys'
 import { useFocusTarget } from '@/lib/focus/hooks/use-target'
 import { logDashboardFilters } from '@/features/logs/utils/filter-params'
 import { logFilterQuery, logToolbarOptionFilters } from '@/features/logs/utils/filter-params'
@@ -91,6 +91,7 @@ export const LogsPanel = memo(({ active }: LogsPanelProps) => {
         data={events.data}
         filters={filters}
         inspectedEventId={inspectedEventId}
+        pending={events.isPending}
         onInspectEvent={handleInspectEvent}
       />
     </section>

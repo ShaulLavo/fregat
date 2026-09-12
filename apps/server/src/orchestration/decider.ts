@@ -8,10 +8,11 @@ import {
   DEFAULT_INTERACTION_MODE,
   DEFAULT_RUNTIME_MODE,
   type OrchestrationCommand,
-} from './schemas'
+  approvalRequestIdSchema,
+  type OrchestrationEventMetadata,
+} from '@workspace/contracts'
 import * as v from 'valibot'
-import { approvalRequestIdSchema } from '@workspace/contracts'
-import type { OrchestrationEventMetadata } from '@workspace/contracts'
+
 import { orchestrationErrors } from '../observability'
 import { activityRequestId } from './pending-requests'
 import { event, one } from './event-factory'
@@ -29,7 +30,6 @@ import {
   requireSnoozable,
   requireSessionAbsent,
   requireSessionArchived,
-  requireActionableSourcePlan,
   requireSessionNotArchived,
   requireSessionNotDeleted,
   requireValidOrderKey,
@@ -157,6 +157,8 @@ export function decideOrchestrationCommand(
       })
     case 'session.turn.start':
       return turnStartRequested(command, model, at)
+    case 'session.turn.steer':
+      return turnSteerRequested(command, model, at)
     case 'session.turn.interrupt':
       requireSessionNotDeleted(model, command.sessionId)
 
@@ -736,11 +738,6 @@ function turnStartRequested(
       throw sessionDomainErrors.START_STATE_CONFLICT({ sessionId: command.sessionId })
     }
   }
-  // Checked before any event is planned: the projector clears the cited
-  // session's actionable-plan flag unconditionally, so an unvalidated reference
-  // is a write to a session this turn has nothing to do with.
-  requireActionableSourcePlan(model, command.sourceProposedPlan)
-
   const messageEvent = event(command, at, 'session.message-sent', {
     attachments: command.message.attachments,
     createdAt: at,
@@ -789,6 +786,42 @@ function turnStartRequested(
     )
   }
   return bootstrapEvent ? [...bootstrapEvent, ...turnEvents] : turnEvents
+}
+
+function turnSteerRequested(
+  command: Extract<OrchestrationCommand, { type: 'session.turn.steer' }>,
+  model: OrchestrationReadModel,
+  at: string,
+) {
+  const session = requireSessionNotArchived(model, command.sessionId, command.type)
+  if (
+    session.latestTurn?.turnId !== command.turnId ||
+    session.latestTurn.state !== 'running' ||
+    session.latestTurn.providerStartState !== 'adopted' ||
+    session.pendingApprovalCount > 0 ||
+    session.pendingUserInputCount > 0
+  ) {
+    throw sessionDomainErrors.STEER_TURN_NOT_ACTIVE()
+  }
+  return [
+    event(command, at, 'session.message-sent', {
+      attachments: command.message.attachments,
+      createdAt: at,
+      messageId: command.message.messageId,
+      role: 'user',
+      streaming: false,
+      text: command.message.text,
+      sessionId: command.sessionId,
+      turnId: command.turnId,
+      updatedAt: at,
+    }),
+    event(command, at, 'session.turn-steer-requested', {
+      createdAt: at,
+      sessionId: command.sessionId,
+      turnId: command.turnId,
+      messageId: command.message.messageId,
+    }),
+  ]
 }
 
 function bootstrapSessionCreated(

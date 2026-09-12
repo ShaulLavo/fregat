@@ -24,7 +24,11 @@ export function ChatInputAttachmentList({
   const images = stagedAttachmentImages(attachments)
 
   return (
-    <div className='compact:gap-1.5 compact:px-2 compact:pb-1.5 flex min-w-0 gap-2 overflow-x-auto px-3 pb-2'>
+    <div
+      aria-label='Image attachments'
+      className='compact:gap-1.5 compact:px-2 compact:pb-1.5 flex min-w-0 gap-2 overflow-x-auto px-3 pb-2'
+      role='group'
+    >
       {attachments.map((attachment, index) => (
         <div
           className='border-border/70 bg-muted/35 flex max-w-48 shrink-0 items-center gap-2 rounded-md border p-1 pr-1.5'

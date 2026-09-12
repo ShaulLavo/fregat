@@ -1,8 +1,10 @@
+import { globalChromeStorage } from '@/lib/environments/state/scoped-storage'
+
 const KEY = 'platform.environments.connected.v1'
 
 export function readConnectedMachines(): readonly string[] {
   try {
-    const names: unknown = JSON.parse(localStorage.getItem(KEY) ?? '[]')
+    const names: unknown = JSON.parse(globalChromeStorage.getItem(KEY) ?? '[]')
     return Array.isArray(names)
       ? names.filter((name): name is string => typeof name === 'string')
       : []
@@ -12,9 +14,5 @@ export function readConnectedMachines(): readonly string[] {
 }
 
 export function writeConnectedMachines(names: ReadonlySet<string>) {
-  try {
-    localStorage.setItem(KEY, JSON.stringify([...names]))
-  } catch {
-    return
-  }
+  globalChromeStorage.setItem(KEY, JSON.stringify([...names]))
 }

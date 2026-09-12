@@ -5,6 +5,7 @@ import {
   isDirtyLiveEditorDocument,
   isSavableEditorDocument,
 } from '@/features/editor/utils/save'
+import type { DocumentKey } from '@/lib/documents/utils/types'
 import type { SettingsSyncService } from '@/features/settings/state/sync-service'
 
 export class EditorSaveService {
@@ -14,15 +15,14 @@ export class EditorSaveService {
     private readonly settingsSync: SettingsSyncService,
   ) {}
 
-  async save(path: string): Promise<boolean> {
+  async save(key: DocumentKey): Promise<boolean> {
     const state = this.documentStore.getState()
-    const document = state.getLiveEditorDocument(path)
+    const document = state.getLiveEditorDocument(key)
     if (!document || !isSavableEditorDocument(document)) return false
-    if (!isDirtyLiveEditorDocument(state, path)) return true
+    if (!isDirtyLiveEditorDocument(state, key)) return true
 
     if (document.sync.kind === 'settings') {
-      await this.settingsSync.save(document)
-      return true
+      return this.settingsSync.save(document)
     }
 
     await this.fileSync.save(document)
@@ -30,16 +30,16 @@ export class EditorSaveService {
   }
 
   async saveMany(
-    paths: readonly string[],
-    onSaved?: (path: string) => void,
+    keys: readonly DocumentKey[],
+    onSaved?: (key: DocumentKey) => void,
   ): Promise<readonly boolean[]> {
     const results: boolean[] = []
     const failures: unknown[] = []
 
     // A failed document must not prevent later documents from reaching their owner.
-    for (const path of paths) {
+    for (const key of keys) {
       try {
-        results.push(await this.saveAndReport(path, onSaved))
+        results.push(await this.saveAndReport(key, onSaved))
       } catch (error) {
         results.push(false)
         failures.push(error)
@@ -50,17 +50,20 @@ export class EditorSaveService {
     return results
   }
 
-  async saveAll(onSaved?: (path: string) => void): Promise<void> {
-    const paths = dirtySavableEditorDocuments(this.documentStore.getState()).map(
-      (document) => document.id,
+  async saveAll(onSaved?: (key: DocumentKey) => void): Promise<void> {
+    const keys = dirtySavableEditorDocuments(this.documentStore.getState()).map(
+      (document) => document.key,
     )
-    await this.saveMany(paths, onSaved)
+    await this.saveMany(keys, onSaved)
   }
 
-  private async saveAndReport(path: string, onSaved?: (path: string) => void): Promise<boolean> {
-    const wasDirty = isDirtyLiveEditorDocument(this.documentStore.getState(), path)
-    const saved = await this.save(path)
-    if (saved && wasDirty) onSaved?.(path)
+  private async saveAndReport(
+    key: DocumentKey,
+    onSaved?: (key: DocumentKey) => void,
+  ): Promise<boolean> {
+    const wasDirty = isDirtyLiveEditorDocument(this.documentStore.getState(), key)
+    const saved = await this.save(key)
+    if (saved && wasDirty) onSaved?.(key)
     return saved
   }
 }

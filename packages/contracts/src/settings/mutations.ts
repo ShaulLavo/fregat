@@ -67,13 +67,13 @@ export type RemoveKeybindingOperation = {
   readonly command: string
 }
 
-export type SetMachineOperation = {
+type SetMachineOperation = {
   readonly kind: 'machine.set'
   readonly name: string
   readonly machine: MachineDefinition
 }
 
-export type RemoveMachineOperation = {
+type RemoveMachineOperation = {
   readonly kind: 'machine.remove'
   readonly name: string
 }

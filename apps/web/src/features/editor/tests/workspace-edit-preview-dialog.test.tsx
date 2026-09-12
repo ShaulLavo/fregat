@@ -1,3 +1,4 @@
+import { filesystemPath } from '@/lib/documents/utils/identity'
 import { act, screen, waitFor, within } from '@testing-library/react'
 import userEvent from '@testing-library/user-event'
 import { vi } from 'vitest'
@@ -16,10 +17,12 @@ import { expect, test } from '../../../../test/fixtures'
 import { renderWithProviders } from '../../../../test/render'
 
 const RECOVERY: WorkspaceEditRecovery = {
-  affectedPaths: ['src/already-restored.ts', 'src/remaining.ts', 'package.json'],
+  affectedPaths: ['src/already-restored.ts', 'src/remaining.ts', 'package.json'].map(
+    filesystemPath,
+  ),
   generation: 7,
   operationId: '10000000-0000-4000-8000-000000000063',
-  unrecoveredPaths: ['src/remaining.ts', 'package.json'],
+  unrecoveredPaths: ['src/remaining.ts', 'package.json'].map(filesystemPath),
 }
 
 test('shows ordered diffs and dirty open unopened and resource labels', () => {
@@ -406,7 +409,7 @@ function workspacePreview(overrides: Partial<WorkspaceEditPreview> = {}): Worksp
         ignored: false,
         index: 0,
         kind: 'text-document',
-        path: '/repo/src/dirty.ts',
+        path: filesystemPath('/repo/src/dirty.ts'),
         targetKind: 'dirty',
       },
       {
@@ -416,7 +419,7 @@ function workspacePreview(overrides: Partial<WorkspaceEditPreview> = {}): Worksp
         ignored: false,
         index: 1,
         kind: 'text-document',
-        path: '/repo/src/open.ts',
+        path: filesystemPath('/repo/src/open.ts'),
         targetKind: 'open',
       },
       {
@@ -426,7 +429,7 @@ function workspacePreview(overrides: Partial<WorkspaceEditPreview> = {}): Worksp
         ignored: false,
         index: 2,
         kind: 'text-document',
-        path: '/repo/src/unopened.ts',
+        path: filesystemPath('/repo/src/unopened.ts'),
         targetKind: 'unopened',
       },
       {
@@ -434,30 +437,30 @@ function workspacePreview(overrides: Partial<WorkspaceEditPreview> = {}): Worksp
         ignored: false,
         index: 3,
         kind: 'create',
-        path: '/repo/src/new.ts',
+        path: filesystemPath('/repo/src/new.ts'),
       },
       {
         annotationIds: [],
-        fromPath: '/repo/src/old.ts',
+        fromPath: filesystemPath('/repo/src/old.ts'),
         ignored: false,
         index: 4,
         kind: 'rename',
-        path: '/repo/src/old.ts',
-        toPath: '/repo/src/renamed.ts',
+        path: filesystemPath('/repo/src/old.ts'),
+        toPath: filesystemPath('/repo/src/renamed.ts'),
       },
       {
         annotationIds: [],
         ignored: false,
         index: 5,
         kind: 'delete',
-        path: '/repo/src/removed.ts',
+        path: filesystemPath('/repo/src/removed.ts'),
       },
       {
         annotationIds: [],
         ignored: true,
         index: 6,
         kind: 'create',
-        path: '/repo/src/already-there.ts',
+        path: filesystemPath('/repo/src/already-there.ts'),
       },
     ],
     undoCategory: 'workspace',

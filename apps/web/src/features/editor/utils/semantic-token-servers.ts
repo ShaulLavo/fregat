@@ -25,7 +25,7 @@
  * nothing — is indistinguishable by eye from a name that painted, and is how a
  * legend ends up two thirds on the floor while everything looks fine.
  */
-export type SemanticTokenUncoveredReason =
+type SemanticTokenUncoveredReason =
   /**
    * The grammar already paints this identically. A comma is a comma to
    * tree-sitter and to shiki; the server knows nothing about it that they do
@@ -175,7 +175,7 @@ const GOPLS: SemanticTokenServerProfile = {
 }
 
 /**
- * clangd (Apple 15) — measured: `full: { delta: true }` and **`range: false`**.
+ * clangd (Apple 15 and LLVM 22.1.8) — measured: `full: { delta: true }` and **`range: false`**.
  * A `semanticTokens/range` request answers *method not found*.
  *
  * That single fact is why request policy is per server rather than universal: a
@@ -190,8 +190,8 @@ const CLANGD: SemanticTokenServerProfile = {
   enabledByDefault: true,
   maxFullRequestBytes: null,
   requests: { full: { delta: true }, range: false },
-  scopeAliases: { concept: 'interface' },
-  uncovered: { unknown: 'server-uncertain' },
+  scopeAliases: { concept: 'interface', label: 'typeParameter' },
+  uncovered: { bracket: 'grammar-equivalent', unknown: 'server-uncertain' },
 }
 
 /**
@@ -254,7 +254,8 @@ const TERRAFORM_LS: SemanticTokenServerProfile = {
 /**
  * typescript-language-server — measured: `full: true`, `range: true`, **12 types
  * / 6 modifiers**, with `member` the one non-standard type and `local` a
- * non-standard modifier.
+ * non-standard modifier. Native TypeScript 7.0.2 advertises 22 standard types
+ * with the same full/range request capabilities.
  *
  * Shipped off pending a look against a real theme — highest traffic, smallest gain, largest
  * regression risk. Looked at against rose-pine, so it is on.

@@ -1,7 +1,8 @@
+import { filesystemPath, tabId as typedTabId } from '@/lib/documents/utils/identity'
+import { testDocumentRef } from '../../../test/factories/document-targets'
 import { expect, test } from '../../../test/fixtures'
 
-import { searchBufferDocumentId } from '@/features/search/utils/buffer-document'
-import { settingsJsonDocumentId } from '@/features/settings/utils/json-document'
+import { settingsJsonDocument } from '@/lib/documents/utils/identity'
 import {
   commandWhenDisabledReason,
   commandWhenDisabledReasons,
@@ -10,8 +11,9 @@ import {
 } from '@/keymap/utils/when'
 
 const enabledSnapshot: CommandWhenSnapshot = {
-  activeFilePath: '/repo/src/app.ts',
-  activeTabId: 'tab-1',
+  activeDocumentSavable: true,
+  activeDocument: testDocumentRef('/repo/src/app.ts'),
+  activeTabId: typedTabId('tab-1'),
   chatMode: true,
   workspaceOpen: true,
 }
@@ -35,7 +37,7 @@ test('derives tab and persistence conditions from the captured active tab', () =
   expect(
     commandWhenDisabledReason(
       ['tabOpen'],
-      { ...enabledSnapshot, activeFilePath: null },
+      { ...enabledSnapshot, activeDocument: null },
       workspaceTarget,
     ),
   ).toBeNull()
@@ -50,7 +52,7 @@ test('derives tab and persistence conditions from the captured active tab', () =
 
   const settingsSnapshot = {
     ...enabledSnapshot,
-    activeFilePath: settingsJsonDocumentId('user'),
+    activeDocument: settingsJsonDocument('user'),
   }
   expect(commandWhenDisabledReason(['saveableTab'], settingsSnapshot, workspaceTarget)).toBeNull()
   expect(commandWhenDisabledReason(['fileBackedTab'], settingsSnapshot, workspaceTarget)).toBe(
@@ -61,7 +63,7 @@ test('derives tab and persistence conditions from the captured active tab', () =
 test('takes editor availability and writability from the resolved target', () => {
   const searchSnapshot = {
     ...enabledSnapshot,
-    activeFilePath: searchBufferDocumentId('/repo'),
+    activeDocument: { kind: 'search' as const, root: filesystemPath('/repo') },
   }
 
   expect(commandWhenDisabledReason(['editorTarget'], searchSnapshot, editorTarget)).toBeNull()

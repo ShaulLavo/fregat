@@ -1,3 +1,4 @@
+import { fileDocumentKey, filesystemPath } from '@/lib/documents/utils/identity'
 import { act, renderHook } from '@testing-library/react'
 import type {
   EditorPlugin,
@@ -28,18 +29,21 @@ test('a deferred snapshot keeps the callback that owned its document', () => {
   const hook = renderHook(
     ({ path, onChange }) =>
       useScrollPersistencePlugin({
-        document: { path },
+        document: { key: fileDocumentKey(filesystemPath(path)) },
         onScrollPositionChange: onChange,
       }),
     { initialProps: { onChange: firstOwner, path: '/repo/a.ts' } },
   )
   const contribution = activate(hook.result.current)
 
-  contribution.update(snapshot('/repo/a.ts', 1_962), 'viewport')
+  contribution.update(snapshot(fileDocumentKey(filesystemPath('/repo/a.ts')), 1_962), 'viewport')
   hook.rerender({ onChange: secondOwner, path: '/repo/b.ts' })
   flushFirstFrame(frames)
 
-  expect(firstOwner).toHaveBeenCalledWith('/repo/a.ts', { left: 0, top: 1_962 })
+  expect(firstOwner).toHaveBeenCalledWith(fileDocumentKey(filesystemPath('/repo/a.ts')), {
+    left: 0,
+    top: 1_962,
+  })
   expect(secondOwner).not.toHaveBeenCalled()
 })
 
@@ -47,16 +51,19 @@ test('persists the bottom row at the viewport bottom instead of the trailing emp
   const onChange = vi.fn()
   const hook = renderHook(() =>
     useScrollPersistencePlugin({
-      document: { path: '/repo/a.ts' },
+      document: { key: fileDocumentKey(filesystemPath('/repo/a.ts')) },
       onScrollPositionChange: onChange,
     }),
   )
   const contribution = activate(hook.result.current)
 
-  contribution.update(snapshot('/repo/a.ts', 3_980), 'viewport')
+  contribution.update(snapshot(fileDocumentKey(filesystemPath('/repo/a.ts')), 3_980), 'viewport')
   contribution.dispose?.()
 
-  expect(onChange).toHaveBeenCalledWith('/repo/a.ts', { left: 0, top: 3_400 })
+  expect(onChange).toHaveBeenCalledWith(fileDocumentKey(filesystemPath('/repo/a.ts')), {
+    left: 0,
+    top: 3_400,
+  })
 })
 
 function activate(plugin: EditorPlugin): EditorViewContribution {

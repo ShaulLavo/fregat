@@ -953,12 +953,13 @@ function taskProgressActivity(event: Extract<ProviderRuntimeEvent, { type: 'task
     taskId: event.payload.taskId,
     title,
     usage: event.payload.usage,
+    tool: event.payload.tool,
   })
   return {
     ...activity,
     id: v.parse(
       eventIdSchema,
-      `task-progress:${event.sessionId}:${event.turnId ?? 'session'}:${event.payload.taskId}`,
+      `task-progress:${event.sessionId}:${event.turnId ?? 'session'}:${event.payload.taskId}${event.payload.tool ? `:tool:${event.payload.tool.itemId}` : ''}`,
     ),
   }
 }
@@ -1136,7 +1137,11 @@ function baseActivity(
     createdAt: event.createdAt,
     id: v.parse(eventIdSchema, event.eventId),
     kind,
-    payload: compactPayload(payload),
+    payload: compactPayload(
+      'agent' in event && event.agent && isPlainRecord(payload)
+        ? { ...payload, agent: event.agent }
+        : payload,
+    ),
     summary,
     sessionId: event.sessionId,
     tone,

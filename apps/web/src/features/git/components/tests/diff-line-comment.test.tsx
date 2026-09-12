@@ -1,3 +1,4 @@
+import { filesystemPath } from '@/lib/documents/utils/identity'
 import { execFileSync } from 'node:child_process'
 import { mkdir, writeFile } from 'node:fs/promises'
 import path from 'node:path'
@@ -13,17 +14,12 @@ import {
 import { TestEditorStateProvider as EditorStateProvider } from '../../../../../test/factories/editor-state-provider'
 import { fetchDiff } from '@/features/git/utils/api'
 import { DiffView } from '@/features/git/components/diff-view'
-import { parseDiffDocumentId, snapshotDiffDocumentId } from '@/features/git/utils/diff-document'
-import type {
-  DiffDocumentInfo,
-  SnapshotDiffDocumentInput,
-} from '@/features/git/utils/diff-document'
-import type { FileDiff } from '@/features/git/utils/types'
+import { snapshotComparison } from '../../../../../test/factories/git-diff'
 import { testDiffLanguageHost } from '../../../../../test/factories/diff-language-host'
 import { expect, test } from '../../../../../test/fixtures'
-import { createTestQueryClient, renderWithProviders } from '../../../../../test/render'
-import { DEFAULT_SETTING_VALUES } from '@workspace/contracts'
-import { settingsKeys } from '@workspace/client-core/settings/query-keys'
+import { renderWithProviders } from '../../../../../test/render'
+import { saveSettings } from '@/features/settings/utils/api'
+import { stubEditorViewport } from '../../../../../test/env/editor-viewport'
 
 // Real git, real routes, and the editor's real diff view: its rows are ordinary
 // elements carrying `data-editor-virtual-row`, which is the only thing the
@@ -32,14 +28,22 @@ import { settingsKeys } from '@workspace/client-core/settings/query-keys'
 
 const FORTY_LINES = Array.from({ length: 40 }, (_, index) => `line ${index + 1}`).join('\n')
 
+test.beforeEach(() => {
+  stubEditorViewport()
+})
+
 test('a range dragged in the new pane reaches the composer addressed to the new side', async ({
   client,
   server,
 }) => {
   void client
   const { documentInfo } = await twoEditRepo(server.root)
-  renderDiffView(
-    <DiffView documentInfo={documentInfo} languageHost={testDiffLanguageHost} rootPath='repo' />,
+  await renderDiffView(
+    <DiffView
+      comparison={documentInfo}
+      languageHost={testDiffLanguageHost}
+      rootPath={filesystemPath('repo')}
+    />,
   )
 
   await dragRows('new', 0, 2)
@@ -58,8 +62,12 @@ test('the same rows dragged in the old pane are addressed to the old side', asyn
 }) => {
   void client
   const { documentInfo } = await twoEditRepo(server.root)
-  renderDiffView(
-    <DiffView documentInfo={documentInfo} languageHost={testDiffLanguageHost} rootPath='repo' />,
+  await renderDiffView(
+    <DiffView
+      comparison={documentInfo}
+      languageHost={testDiffLanguageHost}
+      rootPath={filesystemPath('repo')}
+    />,
   )
 
   // Row 1 of the old pane is the deletion; the new pane's row 1 is the addition.
@@ -81,8 +89,12 @@ test('a row still addresses its own line after the skipped range above it is exp
 }) => {
   void client
   const { documentInfo } = await twoEditRepo(server.root, { alsoEditLine35: true })
-  renderDiffView(
-    <DiffView documentInfo={documentInfo} languageHost={testDiffLanguageHost} rootPath='repo' />,
+  await renderDiffView(
+    <DiffView
+      comparison={documentInfo}
+      languageHost={testDiffLanguageHost}
+      rootPath={filesystemPath('repo')}
+    />,
   )
   await waitFor(() => expect(paneRows('new').length).toBeGreaterThan(6))
 
@@ -105,8 +117,12 @@ test('dismissing a selection takes the offer back without attaching anything', a
 }) => {
   void client
   const { documentInfo } = await twoEditRepo(server.root)
-  renderDiffView(
-    <DiffView documentInfo={documentInfo} languageHost={testDiffLanguageHost} rootPath='repo' />,
+  await renderDiffView(
+    <DiffView
+      comparison={documentInfo}
+      languageHost={testDiffLanguageHost}
+      rootPath={filesystemPath('repo')}
+    />,
   )
 
   await dragRows('new', 0, 2)
@@ -141,23 +157,16 @@ async function dragRows(side: PaneSide, anchorRow: number, headRow: number) {
   rows[headRow]?.dispatchEvent(new MouseEvent('mouseup', { bubbles: true, button: 0 }))
 }
 
-/** The diff pane reads `editor.diff.viewMode` from settings. Split, because a
- *  side-addressed comment is only ambiguous when the two sides are drawn in
- *  separate panes. */
-function renderDiffView(ui: ReactElement) {
+async function renderDiffView(ui: ReactElement) {
   stubHighlightApi()
   resetComposerInboxStore()
-  const queryClient = createTestQueryClient()
-  // Seeded rather than written through the server: this suite is about diff
-  // addressing, and a real save would make every case wait on a round trip.
-  queryClient.setQueryData(settingsKeys.document(), {
-    diagnostics: [],
-    layers: [],
-    revision: '',
-    values: { ...DEFAULT_SETTING_VALUES, 'editor.diff.viewMode': 'split' },
+  await saveSettings({
+    mutationId: 'diff-comments-split',
+    operations: [{ key: 'editor.diff.viewMode', kind: 'set', value: 'split' }],
+    target: 'user',
   })
 
-  return renderWithProviders(<EditorStateProvider>{ui}</EditorStateProvider>, { queryClient })
+  return renderWithProviders(<EditorStateProvider>{ui}</EditorStateProvider>)
 }
 
 function stubHighlightApi() {
@@ -180,14 +189,7 @@ async function twoEditRepo(root: string, { alsoEditLine35 = false } = {}) {
   await writeFile(path.join(repo, 'lines.ts'), `${text}\n`)
   const diff = (await fetchDiff('repo/lines.ts', false))[0]!
 
-  return { documentInfo: snapshotDocument(diff), repo }
-}
-
-function snapshotDocument(diff: FileDiff): DiffDocumentInfo {
-  const info = parseDiffDocumentId(snapshotDiffDocumentId(diff as SnapshotDiffDocumentInput))
-  expect(info).not.toBeNull()
-
-  return info!
+  return { documentInfo: snapshotComparison(diff), repo }
 }
 
 function git(cwd: string, ...args: string[]) {

@@ -7,7 +7,7 @@ import {
   type Menu,
   type MenuRadioGroupItem,
   type MenuRadioItem,
-} from '@/features/menus/utils/model'
+} from '@/keymap/menus/utils/model'
 import type { WorkbenchSidebarTab } from '@/features/workbench/utils/panels'
 
 /**
@@ -15,7 +15,7 @@ import type { WorkbenchSidebarTab } from '@/features/workbench/utils/panels'
  * can offer: the chat tool pane has real open/closed state, while the workbench
  * sidebar is always on screen and can only swap the view inside it.
  */
-export type PaneHeaderHost = 'chat-pane' | 'workbench-sidebar'
+type PaneHeaderHost = 'chat-pane' | 'workbench-sidebar'
 
 export type PaneHeaderMenuContext = {
   /** The view this pane currently shows. Matches one of the radio option values. */
@@ -55,7 +55,7 @@ export function paneHeaderMenu(context: PaneHeaderMenuContext): Menu {
   ]
 }
 
-export function paneHeaderViews(host: PaneHeaderHost): readonly MenuRadioItem[] {
+function paneHeaderViews(host: PaneHeaderHost): readonly MenuRadioItem[] {
   if (host === 'workbench-sidebar') return WORKBENCH_SIDEBAR_VIEWS
 
   return CHAT_MODE_TOOL_TABS.map((tab) => ({ label: chatModeToolTabLabel(tab), value: tab }))

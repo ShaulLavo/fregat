@@ -216,7 +216,7 @@ export async function discardStagedSettingsFile(staged: StagedSettingsFile): Pro
  * caller read earlier. The gap between a store's read and its write is exactly
  * where a hand-edit lands, and a counter-style revision cannot see it.
  */
-export async function currentSettingsFileRevision(filePath: string): Promise<string | null> {
+async function currentSettingsFileRevision(filePath: string): Promise<string | null> {
   try {
     await stat(filePath)
 

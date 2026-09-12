@@ -1,5 +1,5 @@
 import { groupMenu, type GroupMenuContext } from '@/features/git/utils/group-menu'
-import type { MenuActionItem } from '@/features/menus/utils/model'
+import type { MenuActionItem } from '@/keymap/menus/utils/model'
 import { expect, test } from '../../../../../test/fixtures'
 
 test('the worktree group offers open all diffs, stage all, then discard all', () => {

@@ -1,3 +1,4 @@
+import { filesystemPath } from '@/lib/documents/utils/identity'
 import { useActiveChatProjection } from '@/features/chat/hooks/use-active-projection'
 import type { Client } from '@/lib/client'
 import { clientForQueryClient } from '@/lib/environments/state/query-clients'
@@ -52,14 +53,14 @@ export function useCommandPaletteScripts({
 }
 
 async function discoverPackageScripts(rootPath: string, signal: AbortSignal, client: Client) {
-  const tree = await fetchTree(rootPath, signal, client).catch(() => null)
+  const tree = await fetchTree(filesystemPath(rootPath), signal, client).catch(() => null)
   if (!tree) return NO_SCRIPTS
 
   const names = tree.entries.map((entry) => entry.name)
   if (!names.includes('package.json')) return NO_SCRIPTS
 
   const manifest = await fetchFile(
-    rootPath ? `${rootPath}/package.json` : 'package.json',
+    filesystemPath(rootPath ? `${rootPath}/package.json` : 'package.json'),
     signal,
     client,
   ).catch(() => null)

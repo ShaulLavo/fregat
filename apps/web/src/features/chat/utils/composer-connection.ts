@@ -30,7 +30,7 @@ export function composerConnection({
     return {
       kind: reconnecting ? 'reconnecting' : 'disconnected',
       label: reconnecting ? `Reconnecting to ${machine}…` : `${machine} disconnected`,
-      detail: 'Your draft is saved. You can keep drafting while we reconnect.',
+      detail: 'You can keep drafting while we reconnect.',
     }
   }
   if (sync.status === 'blocked') {

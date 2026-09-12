@@ -93,6 +93,7 @@ function commandPaletteActions(): CommandPaletteActions {
     disabledReasonForCommand: vi.fn(() => null),
     previewColorTheme: vi.fn(),
     selectColorTheme: vi.fn(),
+    selectContent: () => Promise.resolve(),
     selectFile: vi.fn(),
     selectPlatformCommand: vi.fn(),
     selectScript: vi.fn(),

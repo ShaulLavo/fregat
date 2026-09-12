@@ -1,6 +1,7 @@
 import { defineErrorCatalog } from 'evlog'
 import { isValidOrderKey } from '@workspace/contracts'
 import { orchestrationErrors } from '../observability'
+import { sessionDomainErrors } from './structured-errors'
 import type { OrchestrationProjectedSession, OrchestrationReadModel } from './read-model'
 
 /**
@@ -8,12 +9,12 @@ import type { OrchestrationProjectedSession, OrchestrationReadModel } from './re
  * (the pinned session block, the project list) so one malformed key is refused
  * the same way everywhere instead of being persisted and corrupting the sort.
  */
-export const orderKeyErrors = defineErrorCatalog('orchestration', {
+const orderKeyErrors = defineErrorCatalog('orchestration', {
   ORDER_KEY_INVALID: {
     status: 400,
     message: ({ orderKey }: { orderKey: string }) => `Order key is malformed: ${orderKey}`,
     why: 'The list sorts by plain string comparison, so a key outside the a-z alphabet — or one ending in the minimum digit, which leaves no room to insert before it — silently corrupts the arranged order for every client.',
-    fix: 'Mint the key with orderKeyBetween or generateSpreadOrderKeys instead of hand-writing it.',
+    fix: 'Mint the key with orderKeyBetween instead of hand-writing it.',
   },
 })
 
@@ -22,7 +23,7 @@ export const orderKeyErrors = defineErrorCatalog('orchestration', {
  * `orchestration` prefix with the aggregate-level catalog so the client keeps
  * one namespace to branch on.
  */
-export const sessionLifecycleErrors = defineErrorCatalog('orchestration', {
+const sessionLifecycleErrors = defineErrorCatalog('orchestration', {
   SESSION_BLOCKING_REQUEST: {
     status: 409,
     message: ({ commandType, sessionId }: { commandType: string; sessionId: string }) =>
@@ -93,12 +94,24 @@ export function requireProject(model: OrchestrationReadModel, projectId: string)
 
 export function requireActionableSourcePlan(
   model: OrchestrationReadModel,
-  source: { readonly sessionId: string } | undefined,
+  source: { readonly sessionId: string; readonly planId: string },
+  targetWorktreeId: string | undefined,
+  plan: { planId: string; implementedAt: string | null } | null,
 ) {
-  if (!source) return
   const session = requireSessionNotDeleted(model, source.sessionId)
-  if (session.hasActionableProposedPlan) return
-  throw orchestrationErrors.SOURCE_PLAN_NOT_ACTIONABLE({ planSessionId: source.sessionId })
+  if (
+    !plan ||
+    plan.planId !== source.planId ||
+    plan.implementedAt !== null ||
+    !session.hasActionableProposedPlan
+  ) {
+    throw orchestrationErrors.SOURCE_PLAN_NOT_ACTIONABLE({ planSessionId: source.sessionId })
+  }
+  const sourceWorktree = model.worktrees.get(session.worktreeId)
+  const targetWorktree = targetWorktreeId ? model.worktrees.get(targetWorktreeId) : undefined
+  if (!sourceWorktree || !targetWorktree || sourceWorktree.projectId !== targetWorktree.projectId) {
+    throw sessionDomainErrors.SOURCE_PLAN_PROJECT_MISMATCH()
+  }
 }
 
 export function requireValidOrderKey(orderKey: string) {
@@ -139,16 +152,16 @@ export function requirePinned(session: OrchestrationProjectedSession) {
   throw sessionLifecycleErrors.SESSION_NOT_PINNED({ sessionId: session.id })
 }
 
-export function hasOpenBlockingRequest(session: OrchestrationProjectedSession) {
+function hasOpenBlockingRequest(session: OrchestrationProjectedSession) {
   return session.pendingApprovalCount + session.pendingUserInputCount > 0
 }
 
-export function hasQueuedTurnStart(session: OrchestrationProjectedSession) {
+function hasQueuedTurnStart(session: OrchestrationProjectedSession) {
   const state = session.latestTurn?.providerStartState
   return state === 'queued' || state === 'claimed' || state === 'adopted'
 }
 
-export function isSessionAlive(session: OrchestrationProjectedSession) {
+function isSessionAlive(session: OrchestrationProjectedSession) {
   const status = session.runtime?.status
   return status === 'starting' || status === 'running' || status === 'waiting'
 }

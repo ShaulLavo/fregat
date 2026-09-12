@@ -1,9 +1,10 @@
+import type { TabContent } from '@/lib/documents/utils/types'
 import type { QuickAccessMode } from '@workspace/client-core/commands/palette'
 import type { Theme } from '@/features/settings/providers/theme-context'
 import type { TreeEntry } from '@/lib/file-system-types'
 import type { PlatformCommandId } from '@/keymap/types'
 
-export type CommandPaletteSelection = {
+type CommandPaletteSelection = {
   readonly command: PlatformCommandId
   readonly kind: 'platform'
 }
@@ -43,7 +44,8 @@ export type ColorModePaletteItem = {
 export type EditorPaletteItem = {
   readonly active: boolean
   readonly name: string
-  readonly path: string
+  readonly content: TabContent
+  readonly key: string
   readonly pathLabel: string
 }
 

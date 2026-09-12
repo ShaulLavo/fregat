@@ -1,3 +1,4 @@
+import { filesystemPath } from '@/lib/documents/utils/identity'
 import { execFileSync } from 'node:child_process'
 import { onlineManager } from '@tanstack/react-query'
 import { act, fireEvent, screen, waitFor } from '@testing-library/react'
@@ -33,7 +34,7 @@ test.for(cases)(
       act(() =>
         h.application
           .getSnapshot()
-          .editor.gitStoreForRoot('repo')
+          .editor.gitStoreForRoot(filesystemPath('repo'))
           .getState()
           .setCommitMessage('B draft'),
       )
@@ -46,10 +47,13 @@ test.for(cases)(
     ).toBe('Commit owned by A')
     if (scenario.switchAway)
       expect(
-        h.application.getSnapshot().editor.gitStoreForRoot('repo').getState().commitMessage,
+        h.application.getSnapshot().editor.gitStoreForRoot(filesystemPath('repo')).getState()
+          .commitMessage,
       ).toBe('B draft')
     act(() => h.application.activateEnvironment(h.originA))
-    expect(h.application.getSnapshot().editor.gitStoreForRoot('repo')).toBe(h.ownerA)
+    expect(h.application.getSnapshot().editor.gitStoreForRoot(filesystemPath('repo'))).toBe(
+      h.ownerA,
+    )
     expect(h.ownerA.getState().commitMessage).toBe(scenario.newerDraft ? 'Next A commit' : '')
   },
 )

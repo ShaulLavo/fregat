@@ -1,6 +1,6 @@
 import { useEditorTextMenu } from '@/features/editor/hooks/use-editor-text-menu'
-import { MenuSurface } from '@/features/menus/components/surface'
-import type { MenuAnchor } from '@/features/menus/utils/virtual-anchor'
+import { MenuSurface } from '@/keymap/menus/components/surface'
+import type { MenuAnchor } from '@/keymap/menus/utils/virtual-anchor'
 
 /**
  * Mounted by the editor frame only while the menu is open. The frame is the

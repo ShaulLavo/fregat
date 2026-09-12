@@ -12,6 +12,7 @@ type LogsEventListContainerProps = {
   data: LogEventsResult | undefined
   filters: LogDashboardFilters
   inspectedEventId: string | null
+  pending: boolean
   onInspectEvent: (eventId: string | null) => void
 }
 
@@ -23,6 +24,7 @@ export function LogsEventListContainer({
   filters,
   inspectedEventId,
   onInspectEvent,
+  pending,
 }: LogsEventListContainerProps) {
   useLogLive(filters, active)
 
@@ -31,6 +33,7 @@ export function LogsEventListContainer({
       detailsById={data?.detailsById ?? emptyDetailsById}
       events={data?.events ?? []}
       inspectedEventId={inspectedEventId}
+      pending={pending}
       onInspectEvent={onInspectEvent}
     />
   )

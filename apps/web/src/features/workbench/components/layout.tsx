@@ -1,3 +1,5 @@
+import type { GitFileStatus } from '@workspace/contracts'
+import type { FilesystemPath } from '@/lib/documents/utils/types'
 import {
   ResizableHandle,
   ResizablePanel,
@@ -5,7 +7,7 @@ import {
 } from '@workspace/ui/components/resizable'
 
 import type { EditorTabConflictMap } from '@/features/workspace/utils/tab-types'
-import type { FileStatus } from '@/features/git/utils/types'
+
 import { BottomPanel } from '@/features/workbench/components/bottom-panel'
 import { CodePanel } from '@/features/workbench/components/code-panel'
 import { SidebarPanel } from '@/features/workbench/components/sidebar-panel'
@@ -34,10 +36,10 @@ export function WorkbenchLayout({
 }: {
   readonly conflicts: EditorTabConflictMap
 
-  readonly gitFiles: readonly FileStatus[]
+  readonly gitFiles: readonly GitFileStatus[]
   readonly layout: WorkbenchLayout
   readonly panels: WorkbenchPanels
-  readonly rootPath: string
+  readonly rootPath: FilesystemPath
   readonly onLayoutChange: (layout: WorkbenchLayout) => void
 }) {
   function handleOuterLayoutChanged(next: Record<string, number>) {

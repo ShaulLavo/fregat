@@ -1,7 +1,6 @@
 import type { EditorRangeDecoration, EditorScrollMode } from '@singapor/core'
 import type { CSSProperties, KeyboardEvent, RefObject } from 'react'
 
-import type { WorkspaceSearchFileGroup } from '@/features/search/state/buffer-state'
 import type { SearchResultId } from '@/features/search/utils/result-items'
 import {
   searchResultFileDocumentLineAtRow,
@@ -97,7 +96,7 @@ export function searchResultFileRangeDecorations(
   return decorations
 }
 
-export function searchResultRangeDecoration(
+function searchResultRangeDecoration(
   range: SearchResultRange,
   active: boolean,
 ): EditorRangeDecoration {
@@ -119,15 +118,6 @@ export function fileBlockLineDigits(block: SearchResultFileBlock) {
   }
 
   return digits
-}
-
-export function groupMap(groups: readonly WorkspaceSearchFileGroup[]) {
-  const map = new Map<string, WorkspaceSearchFileGroup>()
-  for (const group of groups) {
-    map.set(group.path, group)
-  }
-
-  return map
 }
 
 export function searchResultVirtualRowIndex(
@@ -161,21 +151,21 @@ export function searchResultVirtualRowScrollTarget(
   }
 }
 
-export function searchResultFileExcerptOffset(index: number) {
+function searchResultFileExcerptOffset(index: number) {
   const rowStep = EXCERPT_EDITOR_LINE_HEIGHT + SEARCH_RESULT_FILE_EDITOR_ROW_GAP
   const visibleIndex = Math.min(index, SEARCH_RESULT_STATIC_EDITOR_LINE_LIMIT - 1)
 
   return FILE_RESULTS_ROW_VERTICAL_PADDING / 2 + Math.max(0, visibleIndex) * rowStep
 }
 
-export function searchResultVirtualRowEstimate(row: SearchResultVirtualRow | undefined) {
+function searchResultVirtualRowEstimate(row: SearchResultVirtualRow | undefined) {
   if (row?.type === 'file') return FILE_ROW_ESTIMATE
   if (row?.type === 'file-results') return searchResultFileEditorRowHeight(row.file)
 
   return FILE_RESULTS_EDITOR_MIN_HEIGHT
 }
 
-export function searchResultVirtualRowKey(row: SearchResultVirtualRow | undefined, index: number) {
+function searchResultVirtualRowKey(row: SearchResultVirtualRow | undefined, index: number) {
   if (!row) return `missing:${index}`
 
   return searchResultVirtualRowId(row)
@@ -257,13 +247,6 @@ export function searchResultVirtualOverscanLevel(
   return 0
 }
 
-export function equalSearchResultVirtualViewport(
-  current: SearchResultVirtualListViewport,
-  next: SearchResultVirtualListViewport,
-) {
-  return current.height === next.height && current.top === next.top
-}
-
 export function searchResultFileEditorRenderViewport(
   viewport: SearchResultVirtualListViewport,
 ): SearchResultVirtualListViewport {
@@ -328,10 +311,7 @@ export function searchResultFileLineIdAtClientY(
   return searchResultFileLineIdAtOffsetY(document, offsetY)
 }
 
-export function searchResultFileLineIdAtOffsetY(
-  document: SearchResultFileDocument,
-  offsetY: number,
-) {
+function searchResultFileLineIdAtOffsetY(document: SearchResultFileDocument, offsetY: number) {
   if (offsetY < 0) return null
 
   const rowStride = EXCERPT_EDITOR_LINE_HEIGHT + SEARCH_RESULT_FILE_EDITOR_ROW_GAP
@@ -404,7 +384,7 @@ export function fileIconStyle(icon: ResolvedFileIcon): CSSProperties {
   }
 }
 
-export function decimalDigitCount(value: number) {
+function decimalDigitCount(value: number) {
   return String(Math.max(1, Math.floor(value))).length
 }
 

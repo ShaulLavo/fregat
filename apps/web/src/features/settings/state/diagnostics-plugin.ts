@@ -7,7 +7,7 @@ import type {
 } from '@singapor/core'
 import { DiagnosticsPresenter } from '@singapor/lsp-plugin/diagnostics-presenter'
 
-import { settingsJsonDocumentId } from '@/features/settings/utils/json-document'
+import { documentKey, settingsJsonDocument } from '@/lib/documents/utils/identity'
 import { settingsEditorDiagnostics } from '@/features/settings/utils/diagnostics'
 import type { SettingsDiagnosticsSource } from '@/features/settings/state/diagnostics-source'
 
@@ -60,7 +60,7 @@ class SettingsDiagnosticsContribution implements EditorViewContribution {
 
   private render(editor: EditorViewSnapshot): void {
     const snapshot = this.source.getSnapshot()
-    const documentId = settingsJsonDocumentId(snapshot.target)
+    const documentId = documentKey(settingsJsonDocument(snapshot.target))
     if (!snapshot.file || editor.documentId !== documentId) {
       this.presenter.clear()
       return

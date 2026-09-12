@@ -69,7 +69,7 @@ export function EditorTabButton({
       )}
       data-editor-tab-id={tab.id}
       data-editor-tab-loading={loading || undefined}
-      data-editor-tab-path={tab.path}
+      data-editor-tab-path={tab.copyPath}
       draggable={false}
       ref={buttonRef}
       role='tab'

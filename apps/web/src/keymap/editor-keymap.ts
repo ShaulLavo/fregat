@@ -6,7 +6,7 @@ export const HOSTED_EDITOR_KEYMAP = { enabled: false } satisfies EditorKeymapOpt
 const EDITOR_COMMAND_PREFIX = 'editor.'
 type EditorAdapterPlatformCommandId = `editor.${EditorCommandId}`
 
-export function isEditorPlatformCommandId(
+function isEditorPlatformCommandId(
   command: EditorAdapterPlatformCommandId | PlatformCommandId | null,
 ): command is EditorAdapterPlatformCommandId {
   if (!command) return false

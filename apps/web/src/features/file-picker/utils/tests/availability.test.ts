@@ -1,3 +1,4 @@
+import { filesystemPath } from '@/lib/documents/utils/identity'
 import type { FsEntry } from '@/lib/file-system-types'
 import { expect, test } from '../../../../../test/fixtures'
 
@@ -18,7 +19,7 @@ function entry(name: string, type: FsEntry['type']): FsEntry {
     birthtimeMs: 0,
     mtimeMs: 0,
     name,
-    path: name,
+    path: filesystemPath(name),
     size: 0,
     type,
     version: 'test',

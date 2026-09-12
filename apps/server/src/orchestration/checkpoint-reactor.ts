@@ -1,5 +1,12 @@
 import { resolveSessionOwner } from './session-owner'
-import { commandIdSchema, type MessageId, type SessionId, type TurnId } from '@workspace/contracts'
+import {
+  commandIdSchema,
+  type MessageId,
+  type SessionId,
+  type TurnId,
+  type OrchestrationCommand,
+  type OrchestrationEvent,
+} from '@workspace/contracts'
 import * as v from 'valibot'
 
 import { GitCheckpointStore } from '../git/checkpoint-store'
@@ -17,7 +24,7 @@ import {
   type OrchestrationProjectedSession,
   type OrchestrationReadModel,
 } from './read-model'
-import type { OrchestrationCommand, OrchestrationEvent } from './schemas'
+
 import { SerialWorker } from './serial-worker'
 import type { OrchestrationDomainEventReactor } from './streams'
 

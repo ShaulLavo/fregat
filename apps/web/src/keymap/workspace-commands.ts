@@ -42,21 +42,18 @@ import {
   type SessionTraversalDirection,
 } from '@/features/chat-mode/state/session-commands'
 import { setChatModeSessionRailOpen, showChatModeToolTab } from '@/features/chat-mode/utils/panels'
+import { documentKey } from '@/lib/documents/utils/identity'
 import {
-  compareSavedDocumentId,
-  parseCompareSavedDocumentId,
-} from '@/features/editor/utils/compare-saved-document'
-import {
-  fileBackedDocumentPath,
-  savableDocumentPath,
-} from '@/features/editor/utils/file-backed-document'
-import { activeSettingsBufferId } from '@/features/settings/state/active-buffer'
-import { dirtySavableEditorDocuments } from '@/features/editor/utils/save'
+  documentSourcePath,
+  filesystemResource,
+  saveCapability,
+} from '@/lib/documents/utils/capabilities'
+import { documentTab, sameTabContent } from '@/lib/documents/utils/tabs'
+import type { DocumentRef } from '@/lib/documents/utils/types'
+import { dirtySavableEditorDocuments, filePathsForDocumentKeys } from '@/features/editor/utils/save'
 import type { EditorDocumentStoreApi } from '@/features/editor/state/document-state'
 import type { WorkspaceMutationReporter } from '@/features/editor/state/workspace-edit-service'
 import { nextEditorDiffViewMode } from '@/features/editor/utils/diff-view-mode'
-import { parseDiffDocumentId } from '@/features/git/utils/diff-document'
-import { parseSearchBufferDocumentId } from '@/features/search/utils/buffer-document'
 import {
   activeEditorTabForWorkbenchPanels,
   showWorkbenchBottomTab,
@@ -123,12 +120,12 @@ function dispositionFor(accepted: boolean): ImmediateCommandDisposition {
 async function revertSelectedEditorDocument(
   documentStore: EditorDocumentStoreApi,
   queryClient: QueryClient,
-  activeFilePath: string | null,
+  activeDocument: DocumentRef | null,
 ) {
-  const path = fileBackedDocumentPath(activeFilePath)
-  if (!path) return false
+  const resource = filesystemResource(activeDocument)
+  if (!resource) return false
 
-  const file = await fetchFile(path, new AbortController().signal)
+  const file = await fetchFile(resource.path, new AbortController().signal)
   setFileSnapshotQueryData(queryClient, file)
   documentStore.getState().forceReplaceLiveEditorDocument(file)
   return true
@@ -269,9 +266,12 @@ function focusActiveSurface(runtime: WorkspaceCommandRuntime): StartedCommand {
   }
   const layout = workspace.uiMode
 
+  const document = activeTab.content.kind === 'document' ? activeTab.content.document : null
   const activeDiffPath =
-    parseCompareSavedDocumentId(activeTab.path) ?? parseDiffDocumentId(activeTab.path)?.path ?? null
-  const activeSearchRoot = parseSearchBufferDocumentId(activeTab.path)?.rootPath ?? null
+    document?.kind === 'compare-saved' || document?.kind === 'git-diff'
+      ? documentSourcePath(document)
+      : null
+  const activeSearchRoot = document?.kind === 'search' ? document.root : null
   const identity = {
     diffPath: activeDiffPath,
     layout,
@@ -287,7 +287,7 @@ function focusActiveSurface(runtime: WorkspaceCommandRuntime): StartedCommand {
       return (
         runtime.workspace.getState().uiMode === layout &&
         current?.id === activeTab.id &&
-        current.path === activeTab.path
+        sameTabContent(current.content, activeTab.content)
       )
     },
     kind: 'match',
@@ -529,7 +529,7 @@ export const workspaceCommands = [
     ...workspaceCommandMetadata['workspace.gotoSymbol'],
     icon: BracketsCurlyIcon,
     run: ({ invocation, runtime, snapshot }) => {
-      if (!fileBackedDocumentPath(snapshot.activeFilePath)) return declined
+      if (!filesystemResource(snapshot.activeDocument)) return declined
 
       return transitionStart(
         runtime.shell.showCommandPalette('@', invocation.origin as FocusTargetToken | null),
@@ -548,18 +548,19 @@ export const workspaceCommands = [
     ...workspaceCommandMetadata['workspace.saveFile'],
     icon: FloppyDiskIcon,
     run: ({ runtime, snapshot }) => {
-      // The settings tab is one document with two views, and only the JSON view
-      // has a buffer. Resolving here rather than in `save.ts` keeps the fact
-      // that the settings page has modes inside the feature that owns them.
-      const path = activeSettingsBufferId(snapshot.activeFilePath) ?? snapshot.activeFilePath
-      if (!path || !savableDocumentPath(path)) return declined
-      const save = () => runtime.documents.save.save(path)
-      const dirty = dirtySavableEditorDocuments(runtime.documents.store.getState()).some(
-        (document) => document.id === path,
-      )
-
+      const document = snapshot.activeDocument
+      if (!document || saveCapability(document).kind === 'none') return declined
+      const key = documentKey(document)
+      const state = runtime.documents.store.getState()
+      const save = () => runtime.documents.save.save(key)
+      const dirty = dirtySavableEditorDocuments(state).some((live) => live.key === key)
       return operationStart(
-        dirty ? runtime.workspaceEdits.runWorkspaceMutation([path], save) : save(),
+        dirty
+          ? runtime.workspaceEdits.runWorkspaceMutation(
+              filePathsForDocumentKeys(state, [key]),
+              save,
+            )
+          : save(),
       )
     },
   }),
@@ -567,37 +568,38 @@ export const workspaceCommands = [
     ...workspaceCommandMetadata['workspace.saveAllFiles'],
     icon: FloppyDiskBackIcon,
     run: ({ runtime }) => {
-      const affectedPaths = dirtySavableEditorDocuments(runtime.documents.store.getState()).map(
-        (document) => document.id,
-      )
+      const state = runtime.documents.store.getState()
+      const keys = dirtySavableEditorDocuments(state).map((document) => document.key)
+      const affectedPaths = filePathsForDocumentKeys(state, keys)
       const save = (reportAffectedPaths?: WorkspaceMutationReporter) =>
-        runtime.documents.save.saveAll((path) => reportAffectedPaths?.([path]))
+        runtime.documents.save.saveAll((key) =>
+          reportAffectedPaths?.(filePathsForDocumentKeys(state, [key])),
+        )
       const operation =
-        affectedPaths.length > 0
-          ? runtime.workspaceEdits.runWorkspaceMutation(affectedPaths, save)
-          : save()
+        keys.length > 0 ? runtime.workspaceEdits.runWorkspaceMutation(affectedPaths, save) : save()
       return resolvedOperationStart(operation)
     },
   }),
   defineCommand({
     ...workspaceCommandMetadata['workspace.compareWithSaved'],
     run: ({ runtime, snapshot }) => {
-      const path = fileBackedDocumentPath(snapshot.activeFilePath)
-      if (!path) return declined
+      const resource = filesystemResource(snapshot.activeDocument)
+      if (!resource) return declined
 
-      return afterNavigation(runtime.editor.openFileSurface(compareSavedDocumentId(path)), () =>
-        focusActiveSurface(runtime),
+      return afterNavigation(
+        runtime.editor.openTabContent(documentTab({ kind: 'compare-saved', file: resource })),
+        () => focusActiveSurface(runtime),
       )
     },
   }),
   defineCommand({
     ...workspaceCommandMetadata['workspace.openFileAtHead'],
     run: ({ runtime, snapshot }) => {
-      const path = fileBackedDocumentPath(snapshot.activeFilePath)
-      if (!path) return declined
+      const resource = filesystemResource(snapshot.activeDocument)
+      if (!resource) return declined
 
       return {
-        completion: runtime.files.openFileAtRef(path, 'HEAD').then(async (opened) => {
+        completion: runtime.files.openFileAtRef(resource.path, 'HEAD').then(async (opened) => {
           if (!opened) return declined
 
           return focusActiveSurface(runtime).completion
@@ -610,13 +612,13 @@ export const workspaceCommands = [
     ...workspaceCommandMetadata['workspace.revertFile'],
     icon: ArrowCounterClockwiseIcon,
     run: ({ runtime, snapshot }) => {
-      if (!fileBackedDocumentPath(snapshot.activeFilePath)) return declined
+      if (!filesystemResource(snapshot.activeDocument)) return declined
 
       return operationStart(
         revertSelectedEditorDocument(
           runtime.documents.store,
           runtime.documents.queryClient,
-          snapshot.activeFilePath,
+          snapshot.activeDocument,
         ),
       )
     },
@@ -744,7 +746,7 @@ export const workspaceCommands = [
     ...workspaceCommandMetadata['workspace.revealActiveFileInTree'],
     icon: CrosshairIcon,
     run: ({ runtime, snapshot }) => {
-      if (!fileBackedDocumentPath(snapshot.activeFilePath)) return declined
+      if (!filesystemResource(snapshot.activeDocument)) return declined
       const rootPath = snapshot.rootPath
       if (!rootPath) return declined
 

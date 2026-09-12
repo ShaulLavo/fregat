@@ -4,14 +4,14 @@ import { describe, expect, it } from 'vitest'
 import * as v from 'valibot'
 import {
   orderKeyBetween,
-  sortByOrderKey,
   projectIdSchema,
   commandIdSchema,
+  clientOrchestrationCommandSchema,
+  orchestrationCommandSchema,
 } from '@workspace/contracts'
 import * as schema from '../../db/schema'
 import { projectionProjects } from '../../db/schema'
 import { ProjectionShellRowReader } from '../shell-row-reader'
-import { clientOrchestrationCommandSchema, orchestrationCommandSchema } from '../schemas'
 
 import { createDomainEngine, projectRegistrationCommand } from './factories/engine'
 
@@ -144,13 +144,9 @@ type TestDatabase = ReturnType<typeof drizzle<typeof schema>>
 
 /** The project list as the client renders it: keys compared as plain strings. */
 function arrangedProjectIds(database: TestDatabase) {
-  const rows = database
-    .select()
-    .from(projectionProjects)
-    .all()
-    .map((row) => ({ createdAt: row.createdAt, id: row.projectId, orderKey: row.orderKey }))
+  const rows = database.select().from(projectionProjects).orderBy(projectionProjects.orderKey).all()
 
-  return sortByOrderKey(rows).map((row) => row.id)
+  return rows.map((row) => row.projectId)
 }
 
 function projectRow(database: TestDatabase, projectId: string) {

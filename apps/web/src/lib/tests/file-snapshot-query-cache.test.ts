@@ -1,5 +1,7 @@
+import { filesystemPath } from '@/lib/documents/utils/identity'
 import { QueryClient } from '@tanstack/react-query'
-import { describe, expect, it } from 'vitest'
+import { describe } from 'vitest'
+import { expect, test as it } from '../../../test/fixtures'
 
 import {
   FILE_SNAPSHOT_QUERY_GC_TIME_MS,
@@ -41,7 +43,7 @@ describe('file snapshot query cache policy', () => {
     let fetchCount = 0
 
     setFileSnapshotQueryData(client, file('repo/a.ts'))
-    await prefetchFileSnapshotQuery(client, 'repo/a.ts', {
+    await prefetchFileSnapshotQuery(client, filesystemPath('repo/a.ts'), {
       fetcher: async (path) => {
         fetchCount += 1
         return file(path)
@@ -59,14 +61,14 @@ describe('file snapshot query cache policy', () => {
       resolveFetch = resolve
     })
 
-    const firstPrefetch = prefetchFileSnapshotQuery(client, 'repo/a.ts', {
+    const firstPrefetch = prefetchFileSnapshotQuery(client, filesystemPath('repo/a.ts'), {
       fetcher: async (path) => {
         fetchCount += 1
         await fetchWait
         return file(path)
       },
     })
-    const secondPrefetch = prefetchFileSnapshotQuery(client, 'repo/a.ts', {
+    const secondPrefetch = prefetchFileSnapshotQuery(client, filesystemPath('repo/a.ts'), {
       fetcher: async (path) => {
         fetchCount += 1
         return file(path)
@@ -83,7 +85,7 @@ function file(path: string): FileResult {
   return {
     content: path,
     mtimeMs: 1,
-    path,
+    path: filesystemPath(path),
     size: path.length,
     version: `test:1:${path.length}`,
   }

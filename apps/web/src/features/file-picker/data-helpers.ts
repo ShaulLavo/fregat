@@ -1,3 +1,4 @@
+import { filesystemPath } from '@/lib/documents/utils/identity'
 import type { FsEntry, PickedFsEntry } from '@/lib/file-system-types'
 import { isDirectoryEntry } from '@/lib/file-system-types'
 import {
@@ -86,7 +87,7 @@ export function pickerFolderPath(parentPath: string, inputName: string) {
   const error = folderNameError(inputName)
   if (error) throw invalidFolderNameError(error)
 
-  return joinPaths(parentPath, inputName.trim())
+  return filesystemPath(joinPaths(parentPath, inputName.trim()))
 }
 
 export function folderNameError(inputName: string) {
@@ -114,7 +115,7 @@ export function visiblePickerEntries<TEntries extends readonly FsEntry[]>(
   return entries.filter((entry) => !hasHiddenPathSegment(entry.path, currentPath))
 }
 
-export function hasHiddenPathSegment(path: string, currentPath: string) {
+function hasHiddenPathSegment(path: string, currentPath: string) {
   const relativePath = pathBelowCurrent(path, currentPath)
   return relativePath.split('/').some((segment) => segment.startsWith('.'))
 }
@@ -146,7 +147,7 @@ async function loadEntries(
 }
 
 async function fetchCurrentEntry(path: string, signal: AbortSignal, client: Client) {
-  const entry = await statPath(path, signal, client)
+  const entry = await statPath(filesystemPath(path), signal, client)
   if (!isDirectoryEntry(entry)) {
     throw clientErrors.CURRENT_PATH_NOT_FOLDER()
   }
@@ -164,7 +165,7 @@ async function fetchTreeEntries(
   signal: AbortSignal,
   client: Client,
 ) {
-  const result = await fetchTree(path, signal, client)
+  const result = await fetchTree(filesystemPath(path), signal, client)
   return visiblePickerEntries(result.entries, path, showHidden)
 }
 

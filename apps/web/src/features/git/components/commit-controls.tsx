@@ -1,3 +1,4 @@
+import type { GitRepositoryInfo } from '@workspace/contracts'
 import { ArrowsClockwiseIcon, CheckIcon, SparkleIcon } from '@phosphor-icons/react'
 import { Button } from '@workspace/ui/components/button'
 import {
@@ -13,7 +14,7 @@ import { useCommitAction } from '@/features/git/hooks/use-commit-action'
 import { useGenerateCommitMessage } from '@/features/git/hooks/use-generate-commit-message'
 import { useSyncChangesMutation } from '@/features/git/hooks/use-sync-changes-mutation'
 import { CommitProgress } from './commit-progress'
-import type { RepositoryInfo } from '@/features/git/utils/types'
+
 import { canSyncChanges, syncChangesLabel } from '../utils/repository'
 
 export function CommitControls({
@@ -22,7 +23,7 @@ export function CommitControls({
   rootPath,
 }: {
   hasLocalChanges: boolean
-  repository: RepositoryInfo
+  repository: GitRepositoryInfo
   rootPath: string
 }) {
   const commit = useCommitAction(rootPath)

@@ -60,7 +60,7 @@ export function compareFuzzyRankedTargets(
   return compareFuzzyRanks(leftRank, rightRank)
 }
 
-export function compareFuzzyRanks(left: FuzzyRank, right: FuzzyRank) {
+function compareFuzzyRanks(left: FuzzyRank, right: FuzzyRank) {
   return (
     compareBooleans(left.exact, right.exact) ||
     compareNumbers(right.score, left.score) ||

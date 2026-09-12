@@ -21,10 +21,7 @@ export type ClaudeRuntimeSelection = {
   runtimeMode: RuntimeMode
 }
 
-export type ClaudePermissionOptions = Pick<
-  Options,
-  'allowDangerouslySkipPermissions' | 'permissionMode'
->
+type ClaudePermissionOptions = Pick<Options, 'allowDangerouslySkipPermissions' | 'permissionMode'>
 
 export type ClaudeQueryOptionsInput = ClaudeRuntimeSelection & {
   abortController: AbortController
@@ -41,7 +38,7 @@ export type ClaudeQueryOptionsInput = ClaudeRuntimeSelection & {
   sessionId: SessionId
 }
 
-export type ClaudeSessionOptions = Pick<Options, 'resume' | 'sessionId'>
+type ClaudeSessionOptions = Pick<Options, 'resume' | 'sessionId'>
 
 export function claudePermissionMode(input: ClaudeRuntimeSelection): PermissionMode {
   if (input.interactionMode === 'plan') return 'plan'
@@ -60,7 +57,7 @@ export function claudePermissionMode(input: ClaudeRuntimeSelection): PermissionM
  * two are only ever produced together, here, so no call site can emit one
  * without the other.
  */
-export function claudePermissionOptions(input: ClaudeRuntimeSelection): ClaudePermissionOptions {
+function claudePermissionOptions(input: ClaudeRuntimeSelection): ClaudePermissionOptions {
   const permissionMode = claudePermissionMode(input)
   if (permissionMode !== 'bypassPermissions') return { permissionMode }
 
@@ -90,7 +87,7 @@ export function claudeModelId(input: {
  * the CLI already persisted; a fresh conversation adopts the id we minted, which
  * is what lets the caller know the session id before the CLI announces it.
  */
-export function claudeSessionOptions(input: {
+function claudeSessionOptions(input: {
   resumeExisting?: boolean
   sessionId: SessionId
 }): ClaudeSessionOptions {

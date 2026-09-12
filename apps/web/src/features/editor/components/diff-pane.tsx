@@ -1,3 +1,4 @@
+import type { TabId } from '@/lib/documents/utils/types'
 import type { EditorTheme } from '@singapor/core'
 import {
   createDiffPlugin,
@@ -54,7 +55,7 @@ export function DiffPane({
   side: DiffGutterSide
   syntaxBackend: DiffSyntaxBackend
   syntaxHighlight?: boolean
-  tabId?: string
+  tabId?: TabId
   theme: EditorTheme
   onFocus?: (side: DiffGutterSide) => void
   onRegisterEditor?: (side: DiffGutterSide, editor: Editor | null) => void

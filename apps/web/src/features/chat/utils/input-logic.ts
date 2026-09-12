@@ -287,7 +287,7 @@ export function chatInputMentionCommandItems(
 }
 
 /** What the provider advertises for this project, ranked into menu rows. */
-export function chatInputProviderCommandItems(
+function chatInputProviderCommandItems(
   catalog: ProviderCommandCatalog | null,
   query: string,
 ): ChatInputCommandItem[] {
@@ -302,7 +302,7 @@ export function chatInputProviderCommandItems(
   }))
 }
 
-export function chatInputSkillItems(
+function chatInputSkillItems(
   catalog: ProviderCommandCatalog | null,
   query: string,
 ): ChatInputCommandItem[] {

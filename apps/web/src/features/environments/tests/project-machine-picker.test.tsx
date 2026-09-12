@@ -3,7 +3,7 @@ import { join } from 'node:path'
 import { screen, waitFor } from '@testing-library/react'
 import userEvent from '@testing-library/user-event'
 
-import { ProjectMachinePicker } from '@/components/project-machine-picker'
+import { ProjectPicker } from '@/features/environments/components/project-picker'
 import { useChatProjectionStore } from '@/features/chat/state/chat-projection-store'
 import { queryClientFor } from '@/lib/environments/state/query-clients'
 import { useEnvironmentsStore } from '@/lib/environments/state/store'
@@ -24,7 +24,7 @@ test('picking a project on B lists B folders and registers only on B before open
     ).toBe('live'),
   )
   renderWithProviders(
-    <ProjectMachinePicker
+    <ProjectPicker
       machines={connectedMachines(useEnvironmentsStore.getState().entries)}
       onClose={() => {}}
     />,

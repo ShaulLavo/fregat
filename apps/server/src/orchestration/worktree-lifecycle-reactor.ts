@@ -553,7 +553,7 @@ export class WorktreeLifecycleReactor {
   }
 }
 
-export function commandKey(...parts: Array<string | number>) {
+function commandKey(...parts: Array<string | number>) {
   return v.parse(commandIdSchema, internalCommandKey('worktree', ...parts))
 }
 

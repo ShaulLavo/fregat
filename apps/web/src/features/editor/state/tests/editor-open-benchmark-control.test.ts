@@ -2,7 +2,8 @@ import { testScopedStorage } from '../../../../../test/factories/scoped-storage'
 // @vitest-environment happy-dom
 
 import { QueryClient } from '@tanstack/react-query'
-import { describe, expect, test, vi } from 'vitest'
+import { describe, vi } from 'vitest'
+import { expect, test } from '../../../../../test/fixtures'
 
 import { createEditorOpenBenchmarkControl } from '@/features/editor/state/editor-open-benchmark-control'
 import { createEditorDocumentStore } from '@/features/editor/state/document-state'
@@ -10,7 +11,9 @@ import { createEditorUiStore } from '@/features/editor/state/ui-state'
 import { createEditorWorkspaceStore } from '@/features/editor/state/workspace-state'
 import { createSearchBufferStore } from '@/features/search/state/buffer-state'
 import { createDefaultWorkbenchPanels } from '@/features/workbench/utils/panels'
-import { createEditorTabRecord } from '@/features/workspace/utils/tab-model'
+import { createEditorTabRecord, sameTabContent } from '@/lib/documents/utils/tabs'
+import { filesystemPath } from '@/lib/documents/utils/identity'
+import { testTabContent, testDocumentKey } from '../../../../../test/factories/document-targets'
 import type {
   FileOpenIntentBenchmarkSample,
   FileOpenIntentServiceOwner,
@@ -22,7 +25,7 @@ import { fileSnapshotQueryOptions } from '@/lib/file-snapshot-query-cache'
 describe('editor-open benchmark control', () => {
   test('rejects a target shared by multiple tabs before closing either tab', async () => {
     const path = '/repo/a.ts'
-    const inert = createEditorTabRecord('search-buffer:%2Frepo')
+    const inert = createEditorTabRecord(testTabContent('search-buffer:%2Frepo'))
     const workspaceStore = createEditorWorkspaceStore()
     workspaceStore.getState().switchWorkspace(rootFolder())
     workspaceStore.getState().setWorkbenchPanels({
@@ -30,7 +33,10 @@ describe('editor-open benchmark control', () => {
       activeEditorTabId: inert.id,
       editorTabs: [inert],
     })
-    const sample = benchmarkSample({ path, rootPath: '/repo' })
+    const sample = benchmarkSample({
+      path: filesystemPath(path),
+      rootPath: filesystemPath('/repo'),
+    })
     const control = createEditorOpenBenchmarkControl({
       storage: testScopedStorage,
       activation: inertActivation,
@@ -45,8 +51,8 @@ describe('editor-open benchmark control', () => {
     control.begin({ path, rootPath: '/repo', sampleId: 'shared-target' })
     const first = workspaceStore
       .getState()
-      .workbenchPanels.editorTabs.find((tab) => tab.path === path)!
-    const second = createEditorTabRecord(path)
+      .workbenchPanels.editorTabs.find((tab) => sameTabContent(tab.content, testTabContent(path)))!
+    const second = createEditorTabRecord(testTabContent(path))
     workspaceStore.getState().setWorkbenchPanels({
       ...workspaceStore.getState().workbenchPanels,
       activeEditorTabId: first.id,
@@ -64,7 +70,7 @@ describe('editor-open benchmark control', () => {
 
   test('waits for the next task and frame before requiring the target editor to unmount', async () => {
     const path = '/repo/a.ts'
-    const inert = createEditorTabRecord('search-buffer:%2Frepo')
+    const inert = createEditorTabRecord(testTabContent('search-buffer:%2Frepo'))
     const workspaceStore = createEditorWorkspaceStore()
     workspaceStore.getState().switchWorkspace(rootFolder())
     workspaceStore.getState().setWorkbenchPanels({
@@ -73,7 +79,10 @@ describe('editor-open benchmark control', () => {
       editorTabs: [inert],
     })
     const mountedEditors = new MountedEditorRegistry()
-    const sample = benchmarkSample({ path, rootPath: '/repo' })
+    const sample = benchmarkSample({
+      path: filesystemPath(path),
+      rootPath: filesystemPath('/repo'),
+    })
     const control = createEditorOpenBenchmarkControl({
       storage: testScopedStorage,
       activation: inertActivation,
@@ -88,12 +97,12 @@ describe('editor-open benchmark control', () => {
     control.begin({ path, rootPath: '/repo', sampleId: 'async-unmount' })
     const target = workspaceStore
       .getState()
-      .workbenchPanels.editorTabs.find((tab) => tab.path === path)!
+      .workbenchPanels.editorTabs.find((tab) => sameTabContent(tab.content, testTabContent(path)))!
     workspaceStore.getState().setWorkbenchPanels({
       ...workspaceStore.getState().workbenchPanels,
       activeEditorTabId: target.id,
     })
-    const unregisterTarget = mountedEditors.register(path)
+    const unregisterTarget = mountedEditors.register(filesystemPath(path))
 
     setTimeout(() => requestAnimationFrame(unregisterTarget), 0)
 
@@ -107,7 +116,10 @@ describe('editor-open benchmark control', () => {
   test('rejects a reset target that does not match the immutable sample target', async () => {
     const path = '/repo/a.ts'
     const workspaceStore = workspaceWithInertTab()
-    const sample = benchmarkSample({ path, rootPath: '/repo' })
+    const sample = benchmarkSample({
+      path: filesystemPath(path),
+      rootPath: filesystemPath('/repo'),
+    })
     const control = createEditorOpenBenchmarkControl({
       storage: testScopedStorage,
       activation: inertActivation,
@@ -139,7 +151,10 @@ describe('editor-open benchmark control', () => {
     const workspaceStore = workspaceWithInertTab()
     const documentStore = createEditorDocumentStore()
     const queryClient = new QueryClient()
-    const sample = benchmarkSample({ path, rootPath })
+    const sample = benchmarkSample({
+      path: filesystemPath(path),
+      rootPath: filesystemPath(rootPath),
+    })
     const owner = benchmarkOwner(sample)
     const activation: EditorActivation = {
       activate: vi.fn(),
@@ -160,13 +175,13 @@ describe('editor-open benchmark control', () => {
 
     control.begin({ path, rootPath, sampleId: 'query-primer' })
     const panelsBeforePrime = workspaceStore.getState().workbenchPanels
-    const queryKey = fileSnapshotQueryOptions(path).queryKey
+    const queryKey = fileSnapshotQueryOptions(filesystemPath(path)).queryKey
     queryClient.setQueryData(queryKey, fileResult(path))
 
     await expect(control.prime({ path, rootPath })).resolves.toEqual({ ready: true })
 
     expect(workspaceStore.getState().workbenchPanels).toBe(panelsBeforePrime)
-    expect(documentStore.getState().liveDocumentsById).toEqual({})
+    expect(documentStore.getState().liveDocumentsByKey).toEqual({})
     expect(documentStore.getState().viewsByTabId).toEqual({})
     expect(
       queryClient
@@ -184,7 +199,10 @@ describe('editor-open benchmark control', () => {
   test('keeps a failed reset quarantined and never releases it', async () => {
     const path = '/repo/a.ts'
     const workspaceStore = workspaceWithInertTab()
-    const sample = benchmarkSample({ path, rootPath: '/repo' }, new Error('quiesce failed'))
+    const sample = benchmarkSample(
+      { path: filesystemPath(path), rootPath: filesystemPath('/repo') },
+      new Error('quiesce failed'),
+    )
     const control = createEditorOpenBenchmarkControl({
       storage: testScopedStorage,
       activation: inertActivation,
@@ -212,7 +230,10 @@ describe('editor-open benchmark control', () => {
     const workspaceStore = workspaceWithInertTab()
     const documentStore = createEditorDocumentStore()
     const queryClient = new QueryClient()
-    const sample = benchmarkSample({ path, rootPath })
+    const sample = benchmarkSample({
+      path: filesystemPath(path),
+      rootPath: filesystemPath(rootPath),
+    })
     const control = createEditorOpenBenchmarkControl({
       storage: testScopedStorage,
       activation: inertActivation,
@@ -227,14 +248,14 @@ describe('editor-open benchmark control', () => {
     control.begin({ path, rootPath, sampleId: 'query-order' })
     const target = workspaceStore
       .getState()
-      .workbenchPanels.editorTabs.find((tab) => tab.path === path)!
+      .workbenchPanels.editorTabs.find((tab) => sameTabContent(tab.content, testTabContent(path)))!
     workspaceStore.getState().setWorkbenchPanels({
       ...workspaceStore.getState().workbenchPanels,
       activeEditorTabId: target.id,
     })
     const file = fileResult(path)
     documentStore.getState().ensureEditorView(target.id, file)
-    const targetFileKey = fileSnapshotQueryOptions(path).queryKey
+    const targetFileKey = fileSnapshotQueryOptions(filesystemPath(path)).queryKey
     const firstTargetLsp = ['language-server-matches', rootPath, path, 1] as const
     const secondTargetLsp = ['language-server-matches', rootPath, path, 2] as const
     const unrelatedLsp = ['language-server-matches', rootPath, '/repo/other.ts', 1] as const
@@ -246,13 +267,13 @@ describe('editor-open benchmark control', () => {
       expect(queryClient.getQueryData(targetFileKey)).toBeUndefined()
       expect(queryClient.getQueryData(firstTargetLsp)).toBeUndefined()
       expect(queryClient.getQueryData(secondTargetLsp)).toBeUndefined()
-      expect(documentStore.getState().getLiveEditorDocument(path)).not.toBeNull()
+      expect(documentStore.getState().getLiveEditorDocument(testDocumentKey(path))).not.toBeNull()
       return benchmarkSampleResult()
     })
 
     await control.reset({ path, rootPath, sampleId: 'query-order' })
 
-    expect(documentStore.getState().getLiveEditorDocument(path)).toBeNull()
+    expect(documentStore.getState().getLiveEditorDocument(testDocumentKey(path))).toBeNull()
     expect(queryClient.getQueryData(unrelatedLsp)).toEqual(['keep'])
     expect(sample.release).toHaveBeenCalledOnce()
   })
@@ -316,7 +337,7 @@ const inertActivation: EditorActivation = {
 }
 
 function workspaceWithInertTab() {
-  const inert = createEditorTabRecord('search-buffer:%2Frepo')
+  const inert = createEditorTabRecord(testTabContent('search-buffer:%2Frepo'))
   const workspaceStore = createEditorWorkspaceStore()
   workspaceStore.getState().switchWorkspace(rootFolder())
   workspaceStore.getState().setWorkbenchPanels({
@@ -332,7 +353,7 @@ function rootFolder() {
     birthtimeMs: 0,
     mtimeMs: 0,
     name: 'repo',
-    path: '/repo',
+    path: filesystemPath('/repo'),
     size: 0,
     type: 'directory' as const,
     version: 'test',
@@ -343,7 +364,7 @@ function fileResult(path: string) {
   return {
     content: 'alpha\n',
     mtimeMs: 1,
-    path,
+    path: filesystemPath(path),
     size: 6,
     version: 'v1',
   }

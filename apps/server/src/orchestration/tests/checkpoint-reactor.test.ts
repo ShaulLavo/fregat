@@ -11,6 +11,8 @@ import {
   sessionIdSchema,
   turnIdSchema,
   type ProviderInstanceId,
+  orchestrationCommandSchema,
+  type OrchestrationCommand,
 } from '@workspace/contracts'
 
 import * as schema from '../../db/schema'
@@ -26,7 +28,6 @@ import { OrchestrationCheckpointDiffQuery } from '../checkpoint-diff-query'
 import { checkpointRefForSessionTurn } from '../checkpoint-refs'
 import { OrchestrationEngine } from '../engine'
 import { ProviderRuntimeIngestion } from '../provider-runtime-ingestion'
-import { orchestrationCommandSchema, type OrchestrationCommand } from '../schemas'
 
 const now = '2026-06-01T00:00:00.000Z'
 const later = '2026-06-01T00:01:00.000Z'

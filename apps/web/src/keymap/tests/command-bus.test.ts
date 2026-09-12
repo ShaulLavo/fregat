@@ -1,3 +1,5 @@
+import { tabId as typedTabId } from '@/lib/documents/utils/identity'
+import { testDocumentRef } from '../../../test/factories/document-targets'
 import { vi } from 'vitest'
 
 import { expect, test } from '../../../test/fixtures'
@@ -31,8 +33,9 @@ type TestDefinition = CommandDefinition<
 const invocation: CommandInvocation = { source: { kind: 'keybinding' } }
 const runtime: TestRuntime = { label: 'runtime' }
 const enabledSnapshot: TestSnapshot = {
-  activeFilePath: '/repo/src/app.ts',
-  activeTabId: 'tab-1',
+  activeDocumentSavable: true,
+  activeDocument: testDocumentRef('/repo/src/app.ts'),
+  activeTabId: typedTabId('tab-1'),
   chatMode: true,
   generation: 1,
   workspaceOpen: true,

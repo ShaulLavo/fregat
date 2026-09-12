@@ -1,5 +1,7 @@
 # Consolidate error construction, error formatting, and timing helpers
 
+Implementation note, 2026-09-12: Plan 096 now reports corrupt cache entries with existing `OPERATION_FAILED`, replacing the incorrect `INVALID_PATH`. It does not add an error catalog. See [web layering](../docs/web-layering.md).
+
 Status: proposed, implementation not started. Requested 2026-09-11.
 
 [Root PLAN.md](../PLAN.md) owns execution order; this plan owns only the sequence inside itself.
@@ -8,7 +10,7 @@ LEAVE-IT records 9.1 and 9.3. [Plan 090 regression record](../docs/duplicate-def
 redaction fix and must land first. [Plan 092](092-path-and-uri-helpers.md) owns every path and URI
 helper, [Plan 093](093-web-react-and-store-ceremony.md) the React and store ceremony,
 [Plan 094](094-client-core-web-tui-parity.md) the web↔TUI clients, [Plan 095](095-server-plumbing.md)
-the server-internal plumbing, and [Plan 096](096-web-layering-and-boundaries.md) the `lib/` layering
+the server-internal plumbing, and [Plan 096](../docs/web-layering.md) the `lib/` layering
 sweep.
 
 The governing hazard is stated in [AGENTS.md](../AGENTS.md): six `basename` variants share the
@@ -494,7 +496,7 @@ site. Prove it with the diff and a typecheck, not a test.
   `apps/web/src/lib/structured-errors.ts`; item 1.4 must land before it.
 - **The TUI half of the Eden peel and every other web↔TUI parallel.**
   [Plan 094](094-client-core-web-tui-parity.md).
-- **The `apps/web/src/lib/` two-consumer audit.** [Plan 096](096-web-layering-and-boundaries.md).
+- **The `apps/web/src/lib/` two-consumer audit.** [Plan 096](../docs/web-layering.md).
 
 ## Completion checklist
 

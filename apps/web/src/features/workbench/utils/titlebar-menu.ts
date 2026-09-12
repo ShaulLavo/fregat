@@ -22,7 +22,7 @@ import {
   type Menu,
   type MenuRadioGroupItem,
   type MenuRadioItem,
-} from '@/features/menus/utils/model'
+} from '@/keymap/menus/utils/model'
 import type { ProjectMenuEntry } from '@/features/workbench/utils/project-menu-model'
 import type { PlatformCommandId } from '@/keymap/types'
 import type { WorkspaceUiMode } from '@/lib/ui-mode'

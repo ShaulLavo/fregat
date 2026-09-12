@@ -1,10 +1,15 @@
 import { createClientInvariantError } from '@/lib/structured-errors'
 
 import { FilePickerDialog, type FilePickerMode } from '@/components/file-picker-dialog'
-import { errorMessage } from '@/lib/file-server'
-import { isDirectoryEntry, isFileEntry, type PickedFsEntry } from '@/lib/file-system-types'
+import { errorMessage, statPath } from '@/lib/file-server'
+import {
+  isDirectoryEntry,
+  isFileEntry,
+  isPickedFsEntry,
+  type PickedFsEntry,
+} from '@/lib/file-system-types'
 import { getPlatformBridge } from '@/lib/platform/bridge'
-import { hydratePickedEntry } from '@/lib/platform/hydrate-picked-entry'
+import { basenameFromOsPath, clientPathFromOsPath } from '@/components/utils/picked-path'
 import { createWideEventScope } from '@/lib/wide-event-scope'
 import type { WideEventScope } from '@workspace/observability/scope'
 import { useEffect } from 'react'
@@ -183,4 +188,16 @@ function assertEntryMatchesMode(entry: PickedFsEntry, mode: FilePickerMode) {
 
 function elapsedMs(startedAt: number) {
   return Math.round((performance.now() - startedAt) * 100) / 100
+}
+
+async function hydratePickedEntry(path: string, signal: AbortSignal): Promise<PickedFsEntry> {
+  const statInput = clientPathFromOsPath(path)
+  const entry = {
+    ...(await statPath(statInput, signal)),
+    name: basenameFromOsPath(path),
+  }
+
+  if (isPickedFsEntry(entry)) return entry
+
+  throw createClientInvariantError(`Picked path is not a file or directory: ${path}`)
 }

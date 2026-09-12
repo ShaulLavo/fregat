@@ -25,7 +25,7 @@ import {
 } from 'react'
 
 import { useTheme } from '@/features/settings/hooks/use-theme'
-import { useContextMenu } from '@/features/menus/hooks/use-context-menu'
+import { useContextMenu } from '@/keymap/menus/hooks/use-context-menu'
 import { reportError, toClientError } from '@/lib/client-error-taxonomy'
 import { DEFAULT_MONO_FONT_STACK } from '@/lib/default-nerd-font'
 import { useFocusService } from '@/lib/focus/hooks/use-service'

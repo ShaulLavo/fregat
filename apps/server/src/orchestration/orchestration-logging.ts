@@ -1,10 +1,12 @@
-import type { ClientOrchestrationCommand, SessionId } from '@workspace/contracts'
+import {
+  type ClientOrchestrationCommand,
+  type SessionId,
+  type OrchestrationCommand,
+  type OrchestrationEvent,
+  type OrchestrationReplayEventsInput,
+} from '@workspace/contracts'
 import { recordProcessInfo, recordProcessWarning, type OperationContext } from '../observability'
-import type {
-  OrchestrationCommand,
-  OrchestrationEvent,
-  OrchestrationReplayEventsInput,
-} from './schemas'
+
 import type {
   ProviderRuntimeEvent,
   ProviderTurnControlInput,
@@ -124,6 +126,12 @@ export function providerRuntimeEventSummary(event: ProviderRuntimeEvent) {
   }
 
   if ('turnId' in event) summary.turnId = event.turnId
+  if ('providerRefs' in event) Object.assign(summary, event.providerRefs)
+  if ('agent' in event && event.agent) {
+    summary.agentThreadId = event.agent.threadId
+    summary.agentPath = event.agent.path
+    summary.agentStatus = event.agent.status
+  }
   if ('providerInstanceId' in event) summary.providerInstanceId = event.providerInstanceId
 
   if (event.type === 'runtime.set') {

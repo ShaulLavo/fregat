@@ -7,7 +7,7 @@ import { OrchestrationEventStore, type PendingOrchestrationEvent } from '../../e
 import { OrchestrationProjectionPipeline } from '../../projection-pipeline'
 import { OrchestrationSnapshotQuery } from '../../snapshot-query'
 
-export const WORKSPACE_PROJECT_ID = '10000000-0000-4000-8000-000000000002'
+const WORKSPACE_PROJECT_ID = '10000000-0000-4000-8000-000000000002'
 
 const WORKTREE_ID = '20000000-0000-4000-8000-000000000002'
 const CREATED_AT = '2026-05-24T00:00:00.000Z'

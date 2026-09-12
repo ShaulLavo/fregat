@@ -729,13 +729,6 @@ export function settingRowIds(id: SettingId): readonly SettingId[] {
   return [id, ...SETTING_IDS.filter((other) => descriptorFor(other).rowOwner === id)]
 }
 
-/** The row a key is edited from, which is itself for all but the shared keys. */
-export function settingRowOwner(id: SettingId): SettingId {
-  const owner = descriptorFor(id).rowOwner
-
-  return owner !== undefined && isSettingId(owner) ? owner : id
-}
-
 /**
  * Registry defaults as a resolved document.
  *

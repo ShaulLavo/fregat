@@ -46,12 +46,14 @@ export function ChatImageLightbox({
         <img
           alt={image.name}
           className='max-h-[78vh] w-full rounded-md object-contain'
-          crossOrigin='anonymous'
+          crossOrigin={image.crossOrigin}
           draggable={false}
           src={image.src}
         />
         <div className='text-muted-foreground compact:gap-1.5 flex items-center justify-between gap-2 text-[11px]'>
-          <span className='tabular-nums'>{formatSize(image.sizeBytes)}</span>
+          {image.sizeBytes !== null ? (
+            <span className='tabular-nums'>{formatSize(image.sizeBytes)}</span>
+          ) : null}
           {images.length > 1 ? (
             <span className='compact:gap-0.5 flex items-center gap-1'>
               <Button

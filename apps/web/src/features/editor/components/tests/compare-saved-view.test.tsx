@@ -1,3 +1,4 @@
+import { filesystemPath } from '@/lib/documents/utils/identity'
 import { mkdir, writeFile } from 'node:fs/promises'
 import path from 'node:path'
 
@@ -84,7 +85,7 @@ async function renderCompare(root: string, { buffer }: { buffer: string | null }
     store.getState().ensureLiveEditorDocument({
       content: buffer,
       mtimeMs: 1,
-      path: FILE,
+      path: filesystemPath(FILE),
       size: buffer.length,
       version: `v-${buffer.length}`,
     })
@@ -94,7 +95,11 @@ async function renderCompare(root: string, { buffer }: { buffer: string | null }
   // here to stand a buffer up in it, and that provider builds its own.
   return renderWithProviders(
     <EditorDocumentStateContext.Provider value={store}>
-      <CompareSavedView languageHost={testDiffLanguageHost} path={FILE} rootPath='repo' />
+      <CompareSavedView
+        languageHost={testDiffLanguageHost}
+        path={filesystemPath(FILE)}
+        rootPath={filesystemPath('repo')}
+      />
     </EditorDocumentStateContext.Provider>,
   )
 }

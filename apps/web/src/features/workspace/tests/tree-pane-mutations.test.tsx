@@ -1,3 +1,4 @@
+import { filesystemPath } from '@/lib/documents/utils/identity'
 import { vi } from 'vitest'
 
 import {
@@ -36,6 +37,7 @@ test('projects a file move only after reservation and reports its exact paths', 
 })
 
 test('does not project when the authoritative reservation refuses the move', async () => {
+  const failure = new TypeError('busy')
   const project = vi.fn()
   const rename = vi.fn(async () => undefined)
 
@@ -45,10 +47,10 @@ test('does not project when the authoritative reservation refuses the move', asy
       project,
       rename,
       runWorkspaceMutation: async () => {
-        throw new TypeError('busy')
+        throw failure
       },
     }),
-  ).rejects.toThrow('busy')
+  ).rejects.toBe(failure)
 
   expect(project).not.toHaveBeenCalled()
   expect(rename).not.toHaveBeenCalled()
@@ -81,11 +83,12 @@ test('uses all-path invalidation when any dragged source is a directory', async 
 })
 
 test('reports only completed renames when a later move fails', async () => {
+  const failure = new TypeError('second rename failed')
   const reported: Array<readonly string[] | 'all'> = []
   const rename = vi
     .fn<TreeDropMoveMutationOptions['rename']>()
     .mockResolvedValueOnce(undefined)
-    .mockRejectedValueOnce(new TypeError('second rename failed'))
+    .mockRejectedValueOnce(failure)
   const request = moveRequest([
     { fromTreePath: 'a.ts', toTreePath: 'nested/a.ts' },
     { fromTreePath: 'b.ts', toTreePath: 'nested/b.ts' },
@@ -99,17 +102,17 @@ test('reports only completed renames when a later move fails', async () => {
       runWorkspaceMutation: async (_affectedPaths, operation) =>
         operation((paths) => reported.push(paths)),
     }),
-  ).rejects.toThrow('second rename failed')
+  ).rejects.toBe(failure)
 
   expect(reported).toEqual([['/repo/a.ts', '/repo/nested/a.ts']])
 })
 
 function moveRequest(moves: TreeDropMoveRequest['moves']): TreeDropMoveRequest {
-  return { moves, rootPath: '/repo' }
+  return { moves, rootPath: filesystemPath('/repo') }
 }
 
 function fileTreeModel(entries: readonly TreeEntry[]) {
-  return treeModel({ entries: [...entries], path: '/repo' }, '/repo')
+  return treeModel({ entries: [...entries], path: filesystemPath('/repo') }, '/repo')
 }
 
 function file(path: string): TreeEntry {
@@ -125,7 +128,7 @@ function entry(path: string, type: TreeEntry['type']): TreeEntry {
     birthtimeMs: 1,
     mtimeMs: 1,
     name: path.split('/').at(-1) ?? path,
-    path,
+    path: filesystemPath(path),
     size: 1,
     type,
     version: `v:${path}`,

@@ -1,6 +1,6 @@
 import { createClientInvariantError } from '@/lib/structured-errors'
 
-import type { ChatAttachmentUpload } from '@workspace/contracts'
+import { MAX_CHAT_ATTACHMENTS, type ChatAttachmentUpload } from '@workspace/contracts'
 
 import type {
   ChatInputDraftTarget,
@@ -53,7 +53,7 @@ export async function stageChatInputImageFiles({
   files,
   onError,
 }: {
-  addImages: (target: ChatInputDraftTarget, images: readonly ChatInputImageAttachment[]) => void
+  addImages: (target: ChatInputDraftTarget, images: readonly ChatInputImageAttachment[]) => number
   draftTarget: ChatInputDraftTarget
   existingImageCount: number
   files: readonly File[]
@@ -76,7 +76,8 @@ export async function stageChatInputImageFiles({
     staged.push(prepared.attachment)
   }
 
-  if (staged.length > 0) addImages(draftTarget, staged)
+  const accepted = staged.length > 0 ? addImages(draftTarget, staged) : 0
+  if (accepted < staged.length) rejection ??= `Up to ${MAX_CHAT_ATTACHMENTS} images per message.`
   onError(rejection)
 }
 

@@ -1,3 +1,4 @@
+import type { FilesystemPath } from '@/lib/documents/utils/types'
 import { useNavigation } from '@/hooks/use-navigation'
 import { TerminalIcon, WarningCircleIcon } from '@phosphor-icons/react'
 import type { ReactNode } from 'react'
@@ -13,7 +14,7 @@ export function BottomPanel({
   rootPath,
 }: {
   readonly panels: WorkbenchPanels
-  readonly rootPath: string
+  readonly rootPath: FilesystemPath
 }) {
   const navigation = useNavigation()
 

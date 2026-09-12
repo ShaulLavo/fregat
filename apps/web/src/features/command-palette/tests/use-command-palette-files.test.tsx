@@ -1,3 +1,4 @@
+import { filesystemPath } from '@/lib/documents/utils/identity'
 import { waitFor } from '@testing-library/react'
 import { renderHookWithProviders } from '../../../../test/render'
 
@@ -18,7 +19,7 @@ test('does not show stale quick-open file results after the query changes', asyn
         mode: 'files',
         open: true,
         query,
-        rootPath: 'repo',
+        rootPath: filesystemPath('repo'),
         treeState: emptyTreeState(),
       }),
     {

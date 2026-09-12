@@ -7,7 +7,9 @@ import { MessageCompletionDivider } from './message-completion-divider'
 import { ProposedPlanCard } from './proposed-plan-card'
 import { WorkingRow } from './working-row'
 import { LiveActivityRow } from '@/features/chat/components/live-activity-row'
-import { ActivityRow } from '@/features/chat/components/activity-row'
+import { timelineRowSpacing } from '@/features/chat/utils/timeline-items'
+import { cn } from '@workspace/ui/lib/utils'
+import { AgentsRow } from '@/features/chat/components/agents-row'
 
 export function TimelineRow({
   checkpointRevertPending = false,
@@ -26,7 +28,7 @@ export function TimelineRow({
 
   return (
     <div
-      className='mx-auto w-full max-w-3xl min-w-0'
+      className={cn('mx-auto w-full max-w-3xl min-w-0', timelineRowSpacing(item))}
       data-timeline-row-id={item.id}
       data-timeline-row-type={item.type}
     >
@@ -51,6 +53,7 @@ function timelineRowContent({
   item: ChatTimelineItem
   toggleFold: () => void
 }) {
+  if (item.type === 'agent-group') return <AgentsRow group={item.group} />
   if (item.type === 'message') {
     return (
       <MessageBubble
@@ -79,22 +82,14 @@ function timelineRowContent({
           onToggle={toggleFold}
         />
         {foldExpanded ? (
-          <div className='space-y-3'>
-            {item.items.map((folded) =>
-              folded.type === 'activity-group' ? (
-                <div key={folded.id}>
-                  {folded.activities.map((activity) => (
-                    <ActivityRow activity={activity} key={activity.id} />
-                  ))}
-                </div>
-              ) : (
-                <TimelineRow
-                  checkpointRevertPending={checkpointRevertPending}
-                  item={folded}
-                  key={folded.id}
-                />
-              ),
-            )}
+          <div className='pt-1.5'>
+            {item.items.map((folded) => (
+              <TimelineRow
+                checkpointRevertPending={checkpointRevertPending}
+                item={folded}
+                key={folded.id}
+              />
+            ))}
           </div>
         ) : null}
       </>

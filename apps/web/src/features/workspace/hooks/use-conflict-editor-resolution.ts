@@ -6,7 +6,8 @@ import {
   resolveConflictEditorSnapshot,
   type ConflictResolutionDebouncers,
 } from '@/features/workspace/utils/conflict-editor-resolution'
-import { parseConflictDiffDocumentId } from '@/features/editor/utils/conflict-diff-document'
+import { documentKey } from '@/lib/documents/utils/identity'
+import type { DocumentRef, FilesystemPath } from '@/lib/documents/utils/types'
 import { useEditorConflictStoreApi } from '@/features/editor/state/conflict-state'
 import type { FileResult } from '@/lib/file-system-types'
 import type { TextSnapshot } from '@singapor/core'
@@ -17,9 +18,9 @@ export function useConflictEditorResolution({
   forceReplaceLiveEditorDocument,
   renameLiveEditorDocument,
 }: {
-  discardLiveEditorDocument: (path: string) => { wasDirty: boolean }
+  discardLiveEditorDocument: (document: DocumentRef) => { wasDirty: boolean }
   forceReplaceLiveEditorDocument: (file: FileResult) => { wasDirty: boolean }
-  renameLiveEditorDocument: (from: string, to: string) => { wasDirty: boolean }
+  renameLiveEditorDocument: (from: FilesystemPath, to: FilesystemPath) => { wasDirty: boolean }
 }) {
   const conflictStore = useEditorConflictStoreApi()
   const queryClient = useQueryClient()
@@ -29,13 +30,12 @@ export function useConflictEditorResolution({
   useEffect(() => () => cancelConflictResolutions(pendingResolutions.current), [])
 
   return useCallback(
-    (path: string, textSnapshot: TextSnapshot) => {
-      const conflictDiff = parseConflictDiffDocumentId(path)
-      if (!conflictDiff) return
+    (target: Extract<DocumentRef, { kind: 'conflict' }>, textSnapshot: TextSnapshot) => {
+      const key = documentKey(target)
 
-      scheduleConflictResolution(pendingResolutions.current, path, () => {
-        pendingResolutions.current.delete(path)
-        resolveConflictEditorSnapshot(conflictDiff, textSnapshot, {
+      scheduleConflictResolution(pendingResolutions.current, key, () => {
+        pendingResolutions.current.delete(key)
+        resolveConflictEditorSnapshot(target, textSnapshot, {
           conflictStore,
           discardLiveEditorDocument,
           forceReplaceLiveEditorDocument,

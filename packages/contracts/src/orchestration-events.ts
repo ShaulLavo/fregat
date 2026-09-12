@@ -83,9 +83,7 @@ export const projectDeletedPayloadSchema = v.object({
   deletedAt: isoDateTimeSchema,
 })
 
-export const projectRevivedPayloadSchema = projectCreatedPayloadSchema
 export const worktreeRegisteredPayloadSchema = v.object(worktreeRegistrationEntries)
-export const worktreeRevivedPayloadSchema = worktreeRegisteredPayloadSchema
 export const worktreeRetiredPayloadSchema = v.object({
   worktreeId: worktreeIdSchema,
   retiredAt: isoDateTimeSchema,
@@ -216,6 +214,13 @@ export const sessionTurnStartRequestedPayloadSchema = v.object({
 export const sessionTurnInterruptRequestedPayloadSchema = v.object({
   sessionId: sessionIdSchema,
   turnId: v.optional(turnIdSchema),
+  createdAt: isoDateTimeSchema,
+})
+
+export const sessionTurnSteerRequestedPayloadSchema = v.object({
+  sessionId: sessionIdSchema,
+  turnId: turnIdSchema,
+  messageId: messageIdSchema,
   createdAt: isoDateTimeSchema,
 })
 
@@ -352,12 +357,12 @@ const eventBaseSchema = {
  */
 export const ORCHESTRATION_EVENT_PAYLOADS = {
   'project.created': projectCreatedPayloadSchema,
-  'project.revived': projectRevivedPayloadSchema,
+  'project.revived': projectCreatedPayloadSchema,
   'project.meta-updated': projectMetaUpdatedPayloadSchema,
   'project.reordered': projectReorderedPayloadSchema,
   'project.deleted': projectDeletedPayloadSchema,
   'worktree.registered': worktreeRegisteredPayloadSchema,
-  'worktree.revived': worktreeRevivedPayloadSchema,
+  'worktree.revived': worktreeRegisteredPayloadSchema,
   'worktree.retired': worktreeRetiredPayloadSchema,
   'worktree.meta-updated': worktreeMetaUpdatedPayloadSchema,
   ...WORKTREE_EVENT_PAYLOADS,
@@ -382,6 +387,7 @@ export const ORCHESTRATION_EVENT_PAYLOADS = {
     sourceUpdatedAt: isoDateTimeSchema,
   }),
   'session.turn-start-requested': sessionTurnStartRequestedPayloadSchema,
+  'session.turn-steer-requested': sessionTurnSteerRequestedPayloadSchema,
   'session.turn-interrupt-requested': sessionTurnInterruptRequestedPayloadSchema,
   'session.runtime-stop-requested': sessionRuntimeStopRequestedPayloadSchema,
   'session.runtime-set': sessionRuntimeSetPayloadSchema,

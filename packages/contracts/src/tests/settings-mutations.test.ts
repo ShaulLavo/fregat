@@ -55,7 +55,13 @@ describe('settings mutation schemas', () => {
 
     expect(SCALAR_SETTING_IDS).toEqual(expected)
     expect(SCALAR_SETTING_IDS).toEqual(
-      expect.arrayContaining(['workbench.palette', 'workbench.density', 'files.showHidden']),
+      expect.arrayContaining([
+        'workbench.palette',
+        'workbench.density',
+        'files.showHidden',
+        'editor.codeTheme.dark',
+        'editor.codeTheme.light',
+      ]),
     )
   })
 

@@ -1,6 +1,8 @@
 import type {
   ApprovalRequestId,
   ChatAttachment,
+  ChatAgent,
+  ChatAgentTool,
   InteractionMode,
   ModelSelection,
   ProviderApprovalDecision,
@@ -55,6 +57,11 @@ export type ProviderRuntimeStartInput = {
   sessionId: SessionId
 }
 
+export type ProviderTurnSteerInput = Pick<
+  ProviderTurnInput,
+  'sessionId' | 'turnId' | 'messageText' | 'attachments'
+>
+
 export type ProviderTurnControlInput = {
   sessionId: SessionId
   turnId?: TurnId
@@ -73,6 +80,7 @@ export type ProviderUserInputResponseInput = {
 }
 
 type ProviderRuntimeBaseEvent = {
+  agent?: ChatAgent
   createdAt: string
   eventId: string
   itemId?: string
@@ -105,6 +113,7 @@ type RuntimeEventRaw = {
 }
 
 type ProviderRefs = {
+  providerThreadId?: string
   providerItemId?: string
   providerRequestId?: string
   providerTurnId?: string
@@ -251,6 +260,7 @@ export type ProviderRuntimeEventPayload =
   | (ProviderRuntimeBaseEvent & {
       type: 'task.progress'
       payload: {
+        tool?: ChatAgentTool
         description: string
         lastToolName?: string
         summary?: string
@@ -530,6 +540,7 @@ export type ProviderAdapter = {
   snapshot: () => Promise<ProviderSnapshot>
   startRuntime: (input: ProviderRuntimeStartInput) => Promise<ProviderAdapterRuntime>
   sendTurn: (input: ProviderTurnInput) => Promise<void>
+  steerTurn?: (input: ProviderTurnSteerInput) => Promise<void>
   subscribeEvents: (subscriber: (event: ProviderRuntimeEvent) => void) => () => void
   stopAll: () => Promise<void>
   stopRuntime: (input: { sessionId: SessionId }) => Promise<void>

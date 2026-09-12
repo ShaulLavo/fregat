@@ -67,7 +67,7 @@ export function assertDisjointTargets(from: MutationTarget<'entry'>, to: Mutatio
   throw new FsError('INVALID_PATH', 'source and destination must not overlap')
 }
 
-export function assertNotRootTarget(relativePath: string) {
+function assertNotRootTarget(relativePath: string) {
   if (relativePath) return
 
   throw new FsError('INVALID_PATH', 'operation cannot target the workspace root')
@@ -85,7 +85,7 @@ export async function statOptional(absolutePath: string): Promise<Stats | null> 
   return statSafely(() => stat(absolutePath))
 }
 
-export async function lstatOptional(absolutePath: string): Promise<Stats | null> {
+async function lstatOptional(absolutePath: string): Promise<Stats | null> {
   return statSafely(() => lstat(absolutePath))
 }
 

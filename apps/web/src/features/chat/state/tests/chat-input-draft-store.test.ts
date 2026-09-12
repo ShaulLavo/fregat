@@ -57,6 +57,19 @@ test('persists a draft with images without writing the image bytes', () => {
   expect(useChatInputDraftStore.getState().getDraft(TARGET).images).toHaveLength(1)
 })
 
+test('concurrent prepared batches cannot overfill the attachment contract', () => {
+  const drafts = useChatInputDraftStore.getState()
+  expect(
+    drafts.addImages(
+      TARGET,
+      Array.from({ length: 7 }, (_, index) => imageAttachment(`existing-${index}`)),
+    ),
+  ).toBe(7)
+  expect(drafts.addImages(TARGET, [imageAttachment('batch-a')])).toBe(1)
+  expect(drafts.addImages(TARGET, [imageAttachment('batch-b')])).toBe(0)
+  expect(drafts.getDraft(TARGET).images).toHaveLength(8)
+})
+
 test('restores prompt and model selection but drops attachments on hydrate', () => {
   useChatInputDraftStore.getState().setPrompt(TARGET, 'Explain this screenshot')
   useChatInputDraftStore.getState().setModelSelection(TARGET, {

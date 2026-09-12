@@ -1,3 +1,7 @@
+import { markdownWorkspaceFilePath } from '@/features/chat/utils/markdown-workspace-path'
+import { use } from 'react'
+import { ChatWorkspaceRootContext } from '@/features/chat/providers/workspace-root-context'
+import { filesystemPath } from '@/lib/documents/utils/identity'
 import { useEditorCommands } from '@/features/editor/hooks/use-editor-commands'
 import { useEditorWorkspaceState } from '@/features/editor/state/workspace-state'
 import type { MarkdownFileReference } from '@/features/chat/utils/markdown-file-links'
@@ -10,9 +14,14 @@ import { log } from '@/lib/client-logging'
  */
 export function useOpenFileReference() {
   const { openDefinition, openFileSurface } = useEditorCommands()
-  const rootPath = useEditorWorkspaceState((state) => state.rootFolder?.path ?? null)
+  const chatWorkspace = use(ChatWorkspaceRootContext)
+  const editorRoot = useEditorWorkspaceState((state) => state.rootFolder?.path ?? null)
+  const rootPath = chatWorkspace?.canonicalPath ?? editorRoot
+  const workspacePath = chatWorkspace?.path ?? editorRoot
 
-  function openFileReference(reference: MarkdownFileReference) {
+  function openFileReference(source: MarkdownFileReference) {
+    const path = markdownWorkspaceFilePath(source.path, rootPath, workspacePath) ?? source.path
+    const reference = { ...source, path }
     log.info({
       action: 'chat.markdown.open_file_reference',
       area: 'chat',
@@ -23,14 +32,14 @@ export function useOpenFileReference() {
     })
 
     if (reference.line === null) {
-      openFileSurface(reference.path)
+      openFileSurface(filesystemPath(reference.path))
       return
     }
 
     openDefinition(fileReferenceDefinitionTarget(reference))
   }
 
-  return { openFileReference, rootPath }
+  return { openFileReference, rootPath, workspacePath }
 }
 
 /** Editor positions are zero-based; transcript references are one-based. */

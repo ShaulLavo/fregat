@@ -1,12 +1,6 @@
 import {
   workspaceAddressIdSchema,
   workspaceSearchGlobPatterns,
-  type WorkspaceEditPrepareRequest,
-  type WorkspaceEditRecoverRequest,
-  type WorkspaceEditReleaseRequest,
-  type WorkspaceEditResult,
-  type WorkspaceEditTransitionRequest,
-  type WorkspacePersistenceOperation,
   type WorkspaceResourcePrecondition,
 } from '@workspace/contracts'
 import * as v from 'valibot'
@@ -260,10 +254,6 @@ const workspaceEditTransactionPreconditionSchema = v.strictObject({
   afterOperation: workspaceEditIndexSchema,
   kind: v.literal('transaction'),
 })
-const workspaceEditExternalPreconditionSchema = v.union([
-  workspaceEditMissingPreconditionSchema,
-  workspaceEditSnapshotPreconditionSchema,
-])
 const workspaceEditExistingPreconditionSchema = v.union([
   workspaceEditSnapshotPreconditionSchema,
   workspaceEditTransactionPreconditionSchema,
@@ -440,27 +430,6 @@ export type WorkspaceEditPrepareBody = v.InferOutput<typeof workspaceEditPrepare
 export type WorkspaceEditTransitionBody = v.InferOutput<typeof workspaceEditTransitionBodySchema>
 export type WorkspaceEditRecoverBody = v.InferOutput<typeof workspaceEditRecoverBodySchema>
 export type WorkspaceEditReleaseBody = v.InferOutput<typeof workspaceEditReleaseBodySchema>
-
-export type WorkspaceEditPrepareBodyMatchesContract =
-  WorkspaceEditPrepareBody extends WorkspaceEditPrepareRequest ? true : never
-export type WorkspaceEditTransitionBodyMatchesContract =
-  WorkspaceEditTransitionBody extends WorkspaceEditTransitionRequest ? true : never
-export type WorkspaceEditRecoverBodyMatchesContract =
-  WorkspaceEditRecoverBody extends WorkspaceEditRecoverRequest ? true : never
-export type WorkspaceEditReleaseBodyMatchesContract =
-  WorkspaceEditReleaseBody extends WorkspaceEditReleaseRequest ? true : never
-export type WorkspacePersistenceOperationMatchesContract =
-  v.InferOutput<typeof workspacePersistenceOperationSchema> extends WorkspacePersistenceOperation
-    ? true
-    : never
-export type WorkspaceResourcePreconditionMatchesContract =
-  v.InferOutput<
-    typeof workspaceEditExternalPreconditionSchema
-  > extends WorkspaceResourcePrecondition
-    ? true
-    : never
-export type WorkspaceEditResultMatchesContract =
-  v.InferOutput<typeof workspaceEditResultSchema> extends WorkspaceEditResult ? true : never
 
 export type { EntryTypeFilter, TreeEntry, WatchServerMessage } from '@workspace/contracts'
 

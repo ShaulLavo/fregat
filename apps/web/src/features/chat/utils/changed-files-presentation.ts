@@ -8,10 +8,10 @@ import {
  * reading inline. Past either limit the tree is taller than the message it
  * belongs to, so the card opens collapsed and the reader asks for it.
  */
-export const CHANGED_FILES_AUTO_EXPAND_FILE_LIMIT = 5
-export const CHANGED_FILES_AUTO_EXPAND_LINE_LIMIT = 200
-export const CHANGED_FILES_PREVIEW_FILE_LIMIT = 3
-export const CHANGED_FILES_PREVIEW_SCOPE_LIMIT = 4
+const CHANGED_FILES_AUTO_EXPAND_FILE_LIMIT = 5
+const CHANGED_FILES_AUTO_EXPAND_LINE_LIMIT = 200
+const CHANGED_FILES_PREVIEW_FILE_LIMIT = 3
+const CHANGED_FILES_PREVIEW_SCOPE_LIMIT = 4
 
 /** Scaled units, largest first, so the first match is the right magnitude. */
 const COMPACT_DIFF_UNITS = [

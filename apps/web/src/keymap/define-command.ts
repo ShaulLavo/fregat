@@ -1,3 +1,10 @@
+import type {
+  DocumentRef,
+  FilesystemPath,
+  TabContent,
+  TabId,
+  WorkspaceRoot,
+} from '@/lib/documents/utils/types'
 import type { CommandMetadata, CommandExecution } from '@workspace/client-core/commands/metadata'
 import type { EditorKeymapContext } from '@singapor/core/keymap'
 import type { EditorSaveService } from '@/features/editor/state/save-service'
@@ -25,12 +32,13 @@ import type { WorkspaceUiMode } from '@/lib/ui-mode'
 
 export type WorkspaceCommandSnapshot = {
   readonly activeDocumentSavable: boolean
-  readonly activeFilePath: string | null
-  readonly activeTabId: string | null
+  readonly activeTabContent: TabContent | null
+  readonly activeDocument: DocumentRef | null
+  readonly activeTabId: TabId | null
   readonly chatMode: boolean
   readonly chatModePanels: ChatModePanels
   readonly diffViewMode: EditorDiffViewMode
-  readonly rootPath: string | null
+  readonly rootPath: WorkspaceRoot | null
   readonly uiMode: WorkspaceUiMode
   readonly wallpaperEnabled: boolean
   readonly workbenchPanels: WorkbenchPanels
@@ -48,7 +56,7 @@ export type WorkspaceCommandRuntime = {
   }
   readonly editor: EditorCommands
   readonly files: {
-    readonly openFileAtRef: (path: string, ref: string) => Promise<boolean>
+    readonly openFileAtRef: (path: FilesystemPath, ref: string) => Promise<boolean>
   }
   readonly focus: FocusService
   readonly settings: {
@@ -63,7 +71,7 @@ export type WorkspaceCommandRuntime = {
   readonly shell: {
     readonly openPicker: () => void
     readonly openWorkspaceRoot: (
-      rootPath: string,
+      rootPath: WorkspaceRoot,
     ) => Promise<'already-open' | 'failed' | 'opened' | 'superseded'>
     readonly showEnvironmentDialog: (mode: 'switch' | 'connect' | 'disconnect') => void
     readonly showMachines: () => void
@@ -119,13 +127,6 @@ export type WorkspaceCommand<
     context: WorkspaceCommandHandlerContext,
   ) => Execution extends 'sync' ? ImmediateCommandDisposition : AsyncCommandStart
 }
-
-export type EditorCommand<Id extends string = string> = CommandBase<Id> & {
-  readonly execution: 'sync'
-  readonly target: 'editor'
-}
-
-export type PlatformCommand = EditorCommand | WorkspaceCommand
 
 export function defineCommand<
   const Id extends `workspace.${string}` | `environment.${string}` | `fileTree.${string}`,

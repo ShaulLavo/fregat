@@ -4,6 +4,12 @@ import type { ThemeInput } from '@streamdown/code'
 import { math } from '@streamdown/math'
 import { mermaid } from '@streamdown/mermaid'
 import { cn } from '@workspace/ui/lib/utils'
+import { useQueryClient } from '@tanstack/react-query'
+import { originForQueryClient } from '@/lib/environments/state/query-clients'
+import { serverEndpoint } from '@/lib/client'
+import { useEnvironmentsStore } from '@/lib/environments/state/store'
+import { remarkWorkspaceImages } from '@/features/chat/utils/markdown-images'
+import { AssistantMarkdownImage } from '@/features/chat/components/assistant-markdown-image'
 import { useMemo, type ClipboardEvent, type ComponentProps } from 'react'
 import { defaultRemarkPlugins, Streamdown, type Components } from 'streamdown'
 
@@ -26,6 +32,7 @@ import { AssistantMarkdownStrong } from './assistant-markdown-strong'
 
 const markdownComponents = {
   a: AssistantMarkdownLink,
+  img: AssistantMarkdownImage,
   inlineCode: AssistantMarkdownInlineCode,
   strong: AssistantMarkdownStrong,
 } as unknown as Components
@@ -49,7 +56,10 @@ export function AssistantMarkdown({
   text: string
 }) {
   const { colorMode, definition, editorTheme, registration } = useEditorColorTheme()
-  const { openFileReference, rootPath } = useOpenFileReference()
+  const { openFileReference, rootPath, workspacePath } = useOpenFileReference()
+  const owner = originForQueryClient(useQueryClient())
+  const environment = useEnvironmentsStore((state) => state.entries[owner])
+  const origin = serverEndpoint(environment?.origin ?? owner)
   const streamdownThemes = useMemo(
     () =>
       streamdownThemesForEditorTheme(
@@ -108,13 +118,15 @@ export function AssistantMarkdown({
     () => ({ openFileReference, rootPath }),
     [openFileReference, rootPath],
   )
-  const remarkPlugins = useMemo(
+  // Streamdown caches processors by plugin name/options; closures would reuse another workspace.
+  const remarkPlugins = useMemo<StreamdownProps['remarkPlugins']>(
     () => [
       ...STREAMDOWN_REMARK_PLUGINS,
       remarkNormalizeListItemIndentation,
-      remarkFileLinkChips(rootPath),
+      [remarkFileLinkChips, { rootPath }],
+      [remarkWorkspaceImages, { rootPath, workspacePath, origin }],
     ],
-    [rootPath],
+    [rootPath, workspacePath, origin],
   )
   const renderedText = useMemo(() => normalizeAgentMarkdown(text), [text])
 

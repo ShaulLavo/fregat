@@ -26,6 +26,37 @@ number is here and the original is named as wrong — the point of the audit is 
 Figures still labelled projections are projections: they are marked where they appear, and the three
 places that need re-measuring against a real implementation say so.
 
+## Merged `origin/main` (`dd3565e3`)
+
+`main` moved 70+ commits while this branch was in flight. Two of the nine findings are now fixed
+upstream, which is the outcome this plan asked for rather than a collision:
+
+- **F1 — settings save acknowledgement.** Plan 098 landed it. `save-service.ts` now returns
+  `this.settingsSync.save(document)` instead of a bare `true`. Staying out of it was correct.
+- **F9a — the `lib/` → `features/*` guard.** Landed as `scripts/lint/web-boundaries.mjs`, the oxlint
+  jsPlugin design this plan verified works on the installed binary. `scripts/web-layering.mjs` is
+  there too.
+
+Three things the merge forced, each recorded because a reader will otherwise wonder:
+
+1. **Plan 098's branded identities landed without the retention fixes.** `document-retention.ts` on
+   `main` is the original logic in `DocumentKey` / `FilesystemPath` / `TabId` clothing — still
+   `documentSizes?` optional, still `DEFAULT_BYTE_BUDGET`, still committing charges while measuring.
+   This plan predicted the ordering ("land this first so 098 carries it") and lost the race, so unit
+   2's semantics were re-applied on top of their types: sizes required and branded, the budget from
+   settings, `rootPath: FilesystemPath | null` for the rootless slice, measure/commit split.
+2. **`main` fixed the close-path keep set independently**, by handing the whole workspace with
+   `nextPanels` to the shared builder. The merge keeps that shape and routes it through
+   `editorRetention` so the byte budget and the eviction log survive. The rootless-slice half was
+   still missing on `main` and is retained from here.
+3. **`main` added a knip `unused:check` CI gate, and it flags the restored `eslint`.** Knip cannot see
+   a dependency resolved at runtime by a spawned language server, which is the same blind spot that
+   produced the original regression — now enforced. `apps/server` already ignores
+   `vscode-langservers-extracted` for exactly this reason, so `eslint` joins it there.
+
+The merge also made [`BASELINE.md`](BASELINE.md) obsolete: `main` repaired every failure this branch
+was measuring against, so the whole tree is green and completion for units 4-7 is the ordinary bar.
+
 ## Progress
 
 Landed on `worktree-plan099-audit-findings`, each commit verified against

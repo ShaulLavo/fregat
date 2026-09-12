@@ -1,6 +1,7 @@
+import { tmpdir } from 'node:os'
 import { mkdirSync, writeFileSync } from 'node:fs'
 import { migratePlatformDatabase } from '../../src/db/migrations'
-import { mkdir, mkdtemp, rm, writeFile } from 'node:fs/promises'
+import { mkdtemp, rm, writeFile } from 'node:fs/promises'
 import path from 'node:path'
 import * as v from 'valibot'
 import { worktreeIdSchema, sessionIdSchema } from '@workspace/contracts'
@@ -20,8 +21,7 @@ export const lifecycleSessionId = v.parse(sessionIdSchema, '22222222-2222-4222-8
 export const sharedSessionId = v.parse(sessionIdSchema, '33333333-3333-4333-8333-333333333369')
 
 export async function worktreeLifecycleFixture() {
-  await mkdir('/work/tmp', { recursive: true })
-  const root = await mkdtemp('/work/tmp/platform-lifecycle-')
+  const root = await mkdtemp(path.join(tmpdir(), 'platform-lifecycle-'))
   await executeGit(root, 'init', '-b', 'main')
   await executeGit(root, 'config', 'user.name', 'Lifecycle Test')
   await executeGit(root, 'config', 'user.email', 'lifecycle@example.invalid')

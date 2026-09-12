@@ -1,7 +1,6 @@
 import type { VscodeThemeRegistration } from '@singapor/core/shiki'
 
-const FNV_OFFSET_BASIS = 0x811c9dc5
-const FNV_PRIME = 0x01000193
+import { fnv1a32 } from '@workspace/client-core/address/path-hash'
 
 /** Stable FNV-1a fingerprint for logs and semantic subscription comparisons. */
 export function shikiThemeContentHash(
@@ -9,12 +8,5 @@ export function shikiThemeContentHash(
   registration?: VscodeThemeRegistration,
 ): string {
   const content = registration ? JSON.stringify(registration) : `name:${themeId}`
-  let hash = FNV_OFFSET_BASIS
-
-  for (let index = 0; index < content.length; index += 1) {
-    hash ^= content.charCodeAt(index)
-    hash = Math.imul(hash, FNV_PRIME)
-  }
-
-  return (hash >>> 0).toString(16).padStart(8, '0')
+  return (fnv1a32(content) >>> 0).toString(16).padStart(8, '0')
 }

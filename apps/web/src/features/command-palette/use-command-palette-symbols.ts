@@ -4,36 +4,40 @@ import {
   useEditorDocumentStoreApi,
 } from '@/features/editor/state/document-state'
 import { fetchDocumentSymbols } from '@/features/command-palette/document-symbols'
-import { fileBackedDocumentPath } from '@/features/editor/utils/file-backed-document'
-import { documentSymbolKeys } from '@/lib/query-keys'
+import { tabFileResource } from '@/lib/documents/utils/capabilities'
+import { fileDocumentKey } from '@/lib/documents/utils/identity'
+import type { FilesystemPath, TabContent } from '@/lib/documents/utils/types'
+import { documentSymbolKeys } from '@/features/command-palette/utils/query-keys'
 import { useQuery } from '@tanstack/react-query'
 
 import type { QuickAccessMode } from '@/features/command-palette/command-palette-types'
 
 type UseCommandPaletteSymbolsOptions = {
   readonly mode: QuickAccessMode
-  readonly rootPath: string | null
-  readonly selectedFilePath: string | null
+  readonly rootPath: FilesystemPath | null
+  readonly selectedTabContent: TabContent | null
 }
 
 export function useCommandPaletteSymbols({
   mode,
   rootPath,
-  selectedFilePath,
+  selectedTabContent,
 }: UseCommandPaletteSymbolsOptions) {
   const documentStore = useEditorDocumentStoreApi()
-  const selectedFileBackedPath = fileBackedDocumentPath(selectedFilePath)
-  const symbolsEnabled = mode === 'symbols' && Boolean(rootPath && selectedFileBackedPath)
+  const selectedFileBackedPath = selectedTabContent
+    ? (tabFileResource(selectedTabContent)?.path ?? null)
+    : null
+  const selectedKey =
+    selectedFileBackedPath === null ? null : fileDocumentKey(selectedFileBackedPath)
+  const symbolsEnabled = mode === 'symbols' && rootPath !== null && selectedFileBackedPath !== null
   const selectedDocumentContentRevision = useEditorDocumentState((state) =>
-    symbolsEnabled && selectedFileBackedPath
-      ? (state.documentContentRevisions[selectedFileBackedPath] ?? null)
-      : null,
+    symbolsEnabled && selectedKey ? (state.documentContentRevisions[selectedKey] ?? null) : null,
   )
   const symbolQuery = useQuery({
     enabled: symbolsEnabled,
     queryFn: ({ signal, client }) => {
-      const selectedDocument = selectedFileBackedPath
-        ? documentStore.getState().liveDocumentsById[selectedFileBackedPath]
+      const selectedDocument = selectedKey
+        ? documentStore.getState().liveDocumentsByKey[selectedKey]
         : null
 
       return fetchDocumentSymbols(

@@ -1,3 +1,5 @@
+import { filesystemPath } from '@/lib/documents/utils/identity'
+import type { FilesystemPath } from '@/lib/documents/utils/types'
 import type { Query, QueryClient, QueryKey } from '@tanstack/react-query'
 
 import type { FileResult } from '@/lib/file-system-types'
@@ -9,7 +11,7 @@ export const FILE_SNAPSHOT_QUERY_GC_TIME_MS = 2 * 60 * 1000
 const FILE_SNAPSHOT_QUERY_CACHE_LIMIT = 64
 export const FILE_SNAPSHOT_STALE_MS = 5_000
 
-type FileSnapshotFetcher = (path: string, signal: AbortSignal) => Promise<FileResult>
+type FileSnapshotFetcher = (path: FilesystemPath, signal: AbortSignal) => Promise<FileResult>
 
 type FileSnapshotQueryConfig = {
   readonly fetcher?: FileSnapshotFetcher
@@ -19,7 +21,10 @@ type FileSnapshotQueryConfig = {
 // intent prefetches, and workspace event sync all build their options here so
 // they share one query key, one freshness window, and one in-flight fetch
 // instead of racing duplicate reads of the same file.
-export function fileSnapshotQueryOptions(path: string, config: FileSnapshotQueryConfig = {}) {
+export function fileSnapshotQueryOptions(
+  path: FilesystemPath,
+  config: FileSnapshotQueryConfig = {},
+) {
   return {
     gcTime: FILE_SNAPSHOT_QUERY_GC_TIME_MS,
     queryFn: ({ client, signal }: { client: QueryClient; signal: AbortSignal }) => {
@@ -32,7 +37,7 @@ export function fileSnapshotQueryOptions(path: string, config: FileSnapshotQuery
   }
 }
 
-function markEditorOpenBenchmark(name: string, path: string): void {
+function markEditorOpenBenchmark(name: string, path: FilesystemPath): void {
   const traceGlobal = globalThis as typeof globalThis & { readonly __editorPerfTrace?: unknown }
   if (!traceGlobal.__editorPerfTrace) return
 
@@ -57,7 +62,7 @@ export function setFileSnapshotQueryData(
 
 export function prefetchFileSnapshotQuery(
   queryClient: QueryClient,
-  path: string,
+  path: FilesystemPath,
   config: FileSnapshotQueryConfig = {},
 ) {
   if (!shouldPrefetchFileSnapshotQuery(queryClient, path)) {
@@ -69,7 +74,7 @@ export function prefetchFileSnapshotQuery(
 
 export function ensureFileSnapshotQuery(
   queryClient: QueryClient,
-  path: string,
+  path: FilesystemPath,
   config: FileSnapshotQueryConfig = {},
 ) {
   return queryClient.fetchQuery(fileSnapshotQueryOptions(path, config))
@@ -113,7 +118,7 @@ export function pruneFileSnapshotQueryCache(
   return removed
 }
 
-function shouldPrefetchFileSnapshotQuery(queryClient: QueryClient, path: string) {
+function shouldPrefetchFileSnapshotQuery(queryClient: QueryClient, path: FilesystemPath) {
   const state = queryClient.getQueryState<FileResult>(fileSystemKeys.fileSnapshot(path))
   if (!state) return true
   if (state.fetchStatus === 'fetching') return false
@@ -149,8 +154,8 @@ function isFileSnapshotQueryKey(
   )
 }
 
-export function fileSnapshotPathFromQueryKey(queryKey: QueryKey): string | null {
+export function fileSnapshotPathFromQueryKey(queryKey: QueryKey): FilesystemPath | null {
   if (!isFileSnapshotQueryKey(queryKey)) return null
 
-  return queryKey[2]
+  return filesystemPath(queryKey[2])
 }

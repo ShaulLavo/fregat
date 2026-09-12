@@ -1,3 +1,4 @@
+import { filesystemPath } from '@/lib/documents/utils/identity'
 import { execFileSync } from 'node:child_process'
 import { mkdir, writeFile } from 'node:fs/promises'
 import { join } from 'node:path'
@@ -55,7 +56,7 @@ export async function createGitCommitHarness(server: TestServer, caseId: number)
   execFileSync('git', ['config', 'user.email', 'commit@example.com'], { cwd })
   await writeFile(join(cwd, 'shared.txt'), 'A staged change\n')
   execFileSync('git', ['add', 'shared.txt'], { cwd })
-  const ownerA = application.getSnapshot().editor.gitStoreForRoot('repo')
+  const ownerA = application.getSnapshot().editor.gitStoreForRoot(filesystemPath('repo'))
   const view = renderApplication(
     <GitStoreProvider rootPath='repo'>
       <CommitProbe />

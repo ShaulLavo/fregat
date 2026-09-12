@@ -10,6 +10,14 @@ import {
   queryClientFor,
   registerEnvironmentQueryClient,
 } from '@/lib/environments/state/query-clients'
+import { healthDescriptorSchema } from '@workspace/contracts'
+import * as v from 'valibot'
+import { scopeAddressEnvironment } from './address-environment'
+
+export async function installTestEnvironment(origin: string, client: Client) {
+  const descriptor = v.parse(healthDescriptorSchema, (await client.health.get()).data)
+  return scopeAddressEnvironment(origin, descriptor.environmentId, client)
+}
 
 export function installTestClient(client: Client) {
   const origin = activeServerOrigin()
