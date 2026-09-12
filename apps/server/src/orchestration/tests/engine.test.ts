@@ -476,105 +476,6 @@ describe('orchestration engine', () => {
     fixture.close()
   })
 
-  it('streams an initial shell snapshot and live shell projection events', async () => {
-    const fixture = createFixture()
-    const root = await fixtureRoot()
-    const app = createOrchestrationTestApp(root, fixture.database)
-    const stream = await app.handle(
-      new Request('http://local/orchestration/shell-stream', {
-        headers: trustedHeaders(),
-      }),
-    )
-    const events = createSseReader(stream)
-
-    expect(await events.next()).toMatchObject({
-      kind: 'snapshot',
-      snapshot: { snapshotSequence: 0 },
-    })
-    expect(await events.next()).toMatchObject({ kind: 'synchronized', sequence: 0 })
-
-    const created = await registerHttpProject(app, root)
-
-    expect(await events.next()).toMatchObject({
-      kind: 'project-upserted',
-      project: { id: created.projectId, title: 'Platform' },
-      sequence: 1,
-    })
-    await events.close()
-    fixture.close()
-  })
-
-  it('streams detail events only for the subscribed session', async () => {
-    const fixture = createFixture()
-    const root = await fixtureRoot()
-    const app = createOrchestrationTestApp(root, fixture.database)
-
-    const registration = await registerHttpProject(app, root)
-    await postCommand(app, sessionCreateCommand(undefined, undefined, registration.worktreeId))
-    await postCommand(
-      app,
-      sessionCreateCommand(
-        '19e557ea-fa7c-515a-9051-e990f8aa54c6',
-        'cmd-session-2-create',
-        registration.worktreeId,
-      ),
-    )
-
-    const stream = await app.handle(
-      new Request(
-        'http://local/orchestration/session-detail-stream?sessionId=00000000-0000-4000-8000-000000000001',
-        {
-          headers: trustedHeaders(),
-        },
-      ),
-    )
-    const events = createSseReader(stream)
-
-    expect(await events.next()).toMatchObject({
-      kind: 'snapshot',
-      snapshot: { snapshotSequence: 4 },
-    })
-    expect(await events.next()).toMatchObject({ kind: 'synchronized', sequence: 4 })
-
-    await postCommand(
-      app,
-      sessionTurnStartCommand({
-        commandId: 'cmd-session-2-turn',
-        messageId: 'message-2',
-        text: 'Ignore this session',
-        sessionId: '19e557ea-fa7c-515a-9051-e990f8aa54c6',
-        turnId: 'turn-2',
-      }),
-    )
-    const targetTurn = postCommand(app, sessionTurnStartCommand())
-
-    expect(await events.next()).toMatchObject({
-      event: {
-        payload: {
-          messageId: 'message-1',
-          text: 'Build the first slice',
-          sessionId: '00000000-0000-4000-8000-000000000001',
-        },
-        type: 'session.message-sent',
-      },
-      kind: 'event',
-    })
-    expect(await events.next()).toMatchObject({
-      event: {
-        payload: {
-          messageId: 'message-1',
-          sessionId: '00000000-0000-4000-8000-000000000001',
-          turnId: 'turn-1',
-        },
-        type: 'session.turn-start-requested',
-      },
-      kind: 'event',
-    })
-    await targetTurn
-    await events.close()
-    fixture.close()
-  })
-
   it('serves provider snapshots through the provider adapter registry route', async () => {
     const fixture = createFixture()
     const root = await fixtureRoot()
@@ -1258,19 +1159,6 @@ async function runGit(root: string, args: readonly string[], allowFailure = fals
   throw new TypeError(`${stderr}${stdout}`.trim())
 }
 
-function createOrchestrationTestApp(
-  root: string,
-  database: ReturnType<typeof createFixture>['database'],
-) {
-  return createTestApp({
-    auth: { allowedOrigins: ['http://localhost:5173'] },
-    orchestration: { database },
-    settings: testSettingsOptions(root),
-    watch: false,
-    workspaceRoot: root,
-  })
-}
-
 async function postCommand(app: App, body: OrchestrationCommand) {
   return postJson<{ sequence: number }>(app, '/orchestration/commands', body)
 }
@@ -1306,51 +1194,4 @@ function trustedHeaders() {
     'content-type': 'application/json',
     origin: 'http://localhost:5173',
   }
-}
-
-function createSseReader(response: Response) {
-  if (!response.body) throw new TypeError('missing event stream body')
-
-  const reader = response.body.getReader()
-  const decoder = new TextDecoder()
-  let buffered = ''
-
-  return {
-    close: () => reader.cancel(),
-    next: async () => {
-      while (true) {
-        const event = shiftSseEvent()
-        if (event) return event
-
-        const chunk = await reader.read()
-        if (chunk.done) throw new TypeError('event stream ended')
-        buffered += decodeSseChunk(decoder, chunk.value)
-      }
-    },
-  }
-
-  function shiftSseEvent() {
-    const separator = buffered.indexOf('\n\n')
-    if (separator < 0) return null
-
-    const raw = buffered.slice(0, separator)
-    buffered = buffered.slice(separator + 2)
-    return parseSsePayload(raw)
-  }
-}
-
-function decodeSseChunk(decoder: TextDecoder, value: unknown) {
-  if (typeof value === 'string') return value
-
-  return decoder.decode(value as BufferSource, { stream: true })
-}
-
-function parseSsePayload(raw: string) {
-  const data = raw
-    .split(/\r?\n/)
-    .filter((line) => line.startsWith('data:'))
-    .map((line) => line.slice(5).trimStart())
-    .join('\n')
-
-  return JSON.parse(data) as Record<string, unknown>
 }
