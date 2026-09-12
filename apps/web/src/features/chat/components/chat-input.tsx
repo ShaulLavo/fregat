@@ -156,7 +156,6 @@ export function ChatInput({
     : null
   const [validationError, setValidationError] = useState<string | null>(null)
   const [dropTargetActive, setDropTargetActive] = useState(false)
-  const [editorFocused, setEditorFocused] = useState(false)
   const [submitting, setSubmitting] = useState(false)
   const [trigger, setTrigger] = useState<ChatInputTrigger | null>(null)
   // Captured terminal output is content in its own right: "look at this" with a
@@ -221,12 +220,6 @@ export function ChatInput({
 
     setActiveCommandItemId(commandMenuItems[0]?.id ?? null)
   }, [activeCommandItemId, commandMenuItems])
-
-  useEffect(() => {
-    if (!disabled && !submitting) return
-
-    setEditorFocused(false)
-  }, [disabled, submitting])
 
   const handleEditorReady = useCallback((editor: LexicalEditor | null) => {
     editorRef.current = editor
@@ -417,9 +410,10 @@ export function ChatInput({
                 nothing at all. */}
             <div
               className={cn(
-                'border-border bg-background relative overflow-hidden rounded-lg border transition-[border-color,box-shadow]',
-                editorFocused && 'border-foreground/25 ring-2 ring-foreground/[0.07]',
-                dropTargetActive && 'border-primary',
+                'focus-ring-within border-border bg-background relative overflow-hidden rounded-lg border',
+                // Tint rather than restate: the utility owns the border colour under
+                // :focus-within, so a bare border-primary would lose to it mid-drag.
+                dropTargetActive && 'border-primary [--focus-ring-color:var(--primary)]',
               )}
               ref={focusTarget.ref}
               onDragLeave={handleComposerDragLeave}
@@ -440,7 +434,6 @@ export function ChatInput({
                 onCommandMenuCommit={handleCommandMenuCommit}
                 onCommandMenuMove={handleCommandMenuMove}
                 onEditorReady={handleEditorReady}
-                onFocusChange={setEditorFocused}
                 onImageFiles={handleImageFiles}
                 onSubmitRequest={handleSubmit}
                 onTriggerChange={setTrigger}

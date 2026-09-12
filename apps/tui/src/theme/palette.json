@@ -1,16 +1,16 @@
 {
   "graphite": {
     "light": {
-      "background": "#ffffff",
+      "background": "#f8f4f1",
       "card": "#ffffff",
       "popover": "#ffffff",
-      "muted": "#f8f4f1",
-      "accent": "#f8f4f1",
+      "muted": "#eeeae7",
+      "accent": "#eeeae7",
       "primary": "#241e18",
       "primaryForeground": "#fdf9f6",
       "foreground": "#0c0a08",
-      "mutedForeground": "#767370",
-      "border": "#e8e5e1",
+      "mutedForeground": "#6b6865",
+      "border": "#dad7d3",
       "destructive": "#c03a4a",
       "info": "#007dad",
       "success": "#00885f",

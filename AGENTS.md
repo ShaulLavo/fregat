@@ -111,6 +111,16 @@ Interaction treatments are utilities, not strings to copy:
   a duration or an easing curve. When a transition animates a focus ring, name `box-shadow` in the
   property list: `transition-colors` does not include it, so the border would fade while the ring
   snapped in.
+- A custom `@utility` is invisible to `tailwind-merge`, so it never conflicts with anything and both
+  classes survive a merge. Two focus utilities on one element would therefore both set `box-shadow`
+  and the element would draw whichever was emitted last, so they are registered as one class group
+  in `packages/ui/src/lib/utils.ts`; anything else you add as a `@utility` needs the same treatment.
+  A Tailwind `ring-*` or `shadow-*` class does still win the property at CSS level, because it is
+  emitted after the custom utilities at equal specificity — so `focus-visible:ring-0` is how a call
+  site opts out of the halo, though not out of the `border-color` half. Inside a wrapper that draws
+  the ring for the whole field, suppress the inner control's own ring with `shadow-none!` for the
+  utility's raw shadow and `aria-invalid:ring-0` for the primitive's invalid ring; `shadow-none!`
+  cannot do the second, because it zeroes `--tw-shadow` while still composing `--tw-ring-shadow`.
 - Composite fields — anything with a leading icon, a trailing button or a trailing count — are
   built from `InputGroup` with addons. Never position an icon absolutely over a padded input, and
   never hand-pick a `pl-*`/`pr-*` to clear one.

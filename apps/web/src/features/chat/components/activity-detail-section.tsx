@@ -16,7 +16,7 @@ export function ActivityDetailSection({
       <p className='text-muted-foreground mb-1 text-xs'>{label}</p>
       <pre
         aria-label={label}
-        className='text-muted-foreground focus-visible:ring-ring max-h-64 overflow-auto font-mono text-xs leading-relaxed break-words whitespace-pre-wrap outline-none focus-visible:ring-1 focus-visible:ring-inset'
+        className='focus-ring-inset text-muted-foreground max-h-64 overflow-auto font-mono text-xs leading-relaxed break-words whitespace-pre-wrap outline-none'
         data-tool-group-scroll
         ref={scrollRef}
         tabIndex={0}

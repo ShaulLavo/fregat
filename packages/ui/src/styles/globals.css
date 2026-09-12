@@ -177,7 +177,12 @@
   --content-opacity: 95%;
   --surface-blur: 9px;
   --surface-saturation: 160%;
-  --background-solid: oklch(1 0.006 70);
+  /* The pane ground sits BELOW the card ground on purpose: the titlebar and the
+     editor well are --card, the sidebar and the shell are --background, and light
+     mode needs that gap for the same reason dark mode has one (0.145 against
+     0.205). With both at pure white the workbench was a single flat field, because
+     [data-workbench] also paints every border inside it transparent. */
+  --background-solid: oklch(0.97 0.006 70);
   --background: color-mix(in oklch, var(--background-solid) var(--surface-opacity), transparent);
   --foreground: oklch(0.145 0.006 70);
   --card-light-solid: oklch(1 0.006 70);
@@ -191,12 +196,12 @@
   --popover-foreground: oklch(0.145 0.006 70);
   --primary: oklch(0.24 0.014 70);
   --primary-foreground: oklch(0.985 0.006 70);
-  --secondary: oklch(0.97 0.006 70);
+  --secondary: oklch(0.94 0.006 70);
   --secondary-foreground: oklch(0.205 0.006 70);
-  --muted-solid: oklch(0.97 0.006 70);
+  --muted-solid: oklch(0.94 0.006 70);
   --muted: color-mix(in oklch, var(--muted-solid) var(--surface-opacity), transparent);
-  --muted-foreground: oklch(0.556 0.006 70);
-  --accent-solid: oklch(0.97 0.006 70);
+  --muted-foreground: oklch(0.52 0.006 70);
+  --accent-solid: oklch(0.94 0.006 70);
   --accent: color-mix(in oklch, var(--accent-solid) var(--surface-opacity), transparent);
   --accent-foreground: oklch(0.205 0.006 70);
   --destructive: oklch(0.55 0.17 18);
@@ -237,13 +242,13 @@
   /* OpenAI's mark is monochrome and follows the text color by design, so it
      aliases --foreground rather than pinning black. */
   --brand-openai: var(--foreground);
-  --border: oklch(0.922 0.006 70);
+  --border: oklch(0.88 0.006 70);
   /* The lighter divider weight, derived once. Every palette block below
      redefines --border on this same element (<html>), so this formula
      re-resolves against whichever one wins; a copied literal would drift. */
   --border-subtle: color-mix(in oklch, var(--border) 55%, transparent);
-  --input: oklch(0.922 0.006 70);
-  --ring: oklch(0.708 0.006 70);
+  --input: oklch(0.88 0.006 70);
+  --ring: oklch(0.62 0.006 70);
   --chart-1: oklch(0.87 0.006 70);
   --chart-2: oklch(0.556 0.006 70);
   --chart-3: oklch(0.439 0.006 70);
@@ -655,12 +660,16 @@ html[data-palette='sage'] {
   }
 }
 
-/* The same treatment for a text surface and its wrapper, on :focus-within: the
-   caret has to be findable whether the field was reached by keyboard or mouse. */
+/* The same treatment for a text surface and its wrapper. Keyed on a focused text
+   control inside rather than plain :focus-within, because these wrappers also
+   hold buttons — an input group's trailing action, the composer's send button —
+   and :focus-within would ring the whole wrapper around a button that already
+   draws its own ring, on a mouse click as well. A text control gets :focus, not
+   :focus-visible: the caret has to be findable however the field was reached. */
 @utility focus-ring-within {
   @apply transition-[color,background-color,border-color,box-shadow];
 
-  &:focus-within {
+  &:has(:is(input, textarea, [contenteditable='true']):focus) {
     border-color: var(--focus-ring-color, var(--ring));
     box-shadow: 0 0 0 2px color-mix(in oklch, var(--focus-ring-color, var(--ring)) 45%, transparent);
   }

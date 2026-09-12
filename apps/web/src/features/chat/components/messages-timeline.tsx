@@ -253,7 +253,7 @@ export function MessagesTimeline({
       <AgentsPanel activities={session.activities} />
       <div
         aria-label='Messages'
-        className='app-scrollbar-thin focus-visible:ring-ring h-full overflow-x-hidden overflow-y-auto overscroll-y-contain px-3 outline-none [scrollbar-gutter:stable] focus-visible:ring-1 focus-visible:ring-inset sm:px-5'
+        className='app-scrollbar-thin focus-ring-inset h-full overflow-x-hidden overflow-y-auto overscroll-y-contain px-3 outline-none [scrollbar-gutter:stable] sm:px-5'
         ref={setScrollElement}
         role='log'
         tabIndex={0}

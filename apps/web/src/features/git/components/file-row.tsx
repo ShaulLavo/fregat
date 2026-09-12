@@ -50,7 +50,7 @@ export function FileRow({
     <>
       <div
         aria-busy={inputPending || undefined}
-        className='group/row hover:bg-row-hover focus-visible:ring-ring/50 grid h-(--density-row-height) cursor-pointer grid-cols-[22px_minmax(0,1fr)_auto_28px] items-center px-(--density-row-padding-x) text-xs leading-4 outline-none focus-visible:ring-1'
+        className='group/row focus-ring hover:bg-row-hover active:bg-row-active grid h-(--density-row-height) cursor-pointer grid-cols-[22px_minmax(0,1fr)_auto_28px] items-center px-(--density-row-padding-x) text-xs leading-4 outline-none'
         data-git-file-loading={inputPending || undefined}
         role='button'
         tabIndex={0}

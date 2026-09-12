@@ -12,7 +12,7 @@ function InputGroup({ className, ...props }: React.ComponentProps<'div'>) {
       data-slot='input-group'
       role='group'
       className={cn(
-        'group/input-group relative flex h-(--density-control-height) w-full min-w-0 items-center rounded-md border border-input transition-[color,background-color,border-color,box-shadow] outline-none in-data-[slot=combobox-content]:focus-within:border-inherit in-data-[slot=combobox-content]:focus-within:ring-0 has-disabled:bg-input/50 has-disabled:opacity-50 has-[[data-slot=input-group-control]:focus-visible]:border-ring has-[[data-slot=input-group-control]:focus-visible]:ring-1 has-[[data-slot=input-group-control]:focus-visible]:ring-ring/50 has-[[data-slot][aria-invalid=true]]:border-destructive has-[[data-slot][aria-invalid=true]]:ring-1 has-[[data-slot][aria-invalid=true]]:ring-destructive/20 has-[>[data-align=block-end]]:h-auto has-[>[data-align=block-end]]:flex-col has-[>[data-align=block-start]]:h-auto has-[>[data-align=block-start]]:flex-col has-[>textarea]:h-auto dark:bg-input/30 dark:has-disabled:bg-input/80 dark:has-[[data-slot][aria-invalid=true]]:ring-destructive/40 has-[>[data-align=block-end]]:[&>input]:pt-(--density-input-group-input-block-padding) has-[>[data-align=block-start]]:[&>input]:pb-(--density-input-group-input-block-padding) has-[>[data-align=inline-end]]:[&>input]:pr-1.5 has-[>[data-align=inline-start]]:[&>input]:pl-1.5',
+        'focus-ring-within group/input-group relative flex h-(--density-control-height) w-full min-w-0 items-center rounded-md border border-input outline-none has-disabled:bg-input/50 has-disabled:opacity-50 has-[[data-slot][aria-invalid=true]]:border-destructive has-[[data-slot][aria-invalid=true]]:ring-1 has-[[data-slot][aria-invalid=true]]:ring-destructive/20 has-[>[data-align=block-end]]:h-auto has-[>[data-align=block-end]]:flex-col has-[>[data-align=block-start]]:h-auto has-[>[data-align=block-start]]:flex-col has-[>textarea]:h-auto dark:bg-input/30 dark:has-disabled:bg-input/80 dark:has-[[data-slot][aria-invalid=true]]:ring-destructive/40 has-[>[data-align=block-end]]:[&>input]:pt-(--density-input-group-input-block-padding) has-[>[data-align=block-start]]:[&>input]:pb-(--density-input-group-input-block-padding) has-[>[data-align=inline-end]]:[&>input]:pr-1.5 has-[>[data-align=inline-start]]:[&>input]:pl-1.5',
         className,
       )}
       {...props}
@@ -111,13 +111,17 @@ function InputGroupText({ className, ...props }: React.ComponentProps<'span'>) {
 }
 
 // InputGroupInput and InputGroupTextarea fill the group edge to edge, so the group owns the
-// radius and these stay square rather than drawing a corner inside a corner.
+// radius and these stay square rather than drawing a corner inside a corner. The group also owns
+// both rings, and silencing the control's own takes two different classes:
+// `shadow-none!` kills the focus utility's raw box-shadow, while `aria-invalid:ring-0` kills the
+// primitive's invalid ring — `shadow-none!` cannot, because it zeroes `--tw-shadow` and still
+// composes `--tw-ring-shadow`.
 function InputGroupInput({ className, ...props }: React.ComponentProps<'input'>) {
   return (
     <Input
       data-slot='input-group-control'
       className={cn(
-        'flex-1 rounded-none border-0 bg-transparent shadow-none ring-0 focus-visible:ring-0 disabled:bg-transparent aria-invalid:ring-0 dark:bg-transparent dark:disabled:bg-transparent',
+        'flex-1 rounded-none border-0 bg-transparent shadow-none! disabled:bg-transparent aria-invalid:ring-0 dark:bg-transparent dark:disabled:bg-transparent',
         className,
       )}
       {...props}
@@ -130,7 +134,7 @@ function InputGroupTextarea({ className, ...props }: React.ComponentProps<'texta
     <Textarea
       data-slot='input-group-control'
       className={cn(
-        'flex-1 resize-none rounded-none border-0 bg-transparent shadow-none ring-0 focus-visible:ring-0 disabled:bg-transparent aria-invalid:ring-0 dark:bg-transparent dark:disabled:bg-transparent',
+        'flex-1 resize-none rounded-none border-0 bg-transparent shadow-none! disabled:bg-transparent aria-invalid:ring-0 dark:bg-transparent dark:disabled:bg-transparent',
         className,
       )}
       {...props}

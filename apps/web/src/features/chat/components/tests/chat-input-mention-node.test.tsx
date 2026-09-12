@@ -104,7 +104,6 @@ function renderComposer(initialText: string) {
         onCommandMenuCommit={() => false}
         onCommandMenuMove={() => false}
         onEditorReady={() => {}}
-        onFocusChange={() => {}}
         onImageFiles={() => {}}
         onSubmitRequest={async () => false}
         onTriggerChange={() => {}}

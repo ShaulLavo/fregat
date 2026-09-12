@@ -36,7 +36,7 @@ export const SearchFileGroupHeader = memo(
           'grid w-full grid-cols-[minmax(0,1fr)_auto_auto] items-center gap-1.5 px-2 py-1.5 text-left',
           compact && 'h-6 gap-1 overflow-hidden px-1.5 py-0',
           active && 'bg-row-selected',
-          !active && 'hover:bg-row-hover',
+          !active && 'hover:bg-row-hover active:bg-row-active',
           className,
         )}
       >
@@ -44,7 +44,7 @@ export const SearchFileGroupHeader = memo(
             (radius, fixed height, hover fill) is what a row must not have. */}
         <button
           className={cn(
-            'grid min-w-0 grid-cols-[16px_16px_minmax(0,1fr)] items-center gap-1.5 text-left outline-none hover:text-foreground focus-visible:ring-1 focus-visible:ring-ring/50',
+            'focus-ring grid min-w-0 grid-cols-[16px_16px_minmax(0,1fr)] items-center gap-1.5 text-left outline-none hover:text-foreground',
             compact && 'h-full grid-cols-[14px_14px_minmax(0,1fr)] gap-1 overflow-hidden',
           )}
           tabIndex={-1}

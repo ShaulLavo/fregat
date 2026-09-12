@@ -300,7 +300,6 @@ test('custom composer, picker, search, and references chrome follows density', a
               onCommandMenuCommit={() => false}
               onCommandMenuMove={() => false}
               onEditorReady={() => undefined}
-              onFocusChange={() => undefined}
               onImageFiles={() => undefined}
               onSubmitRequest={() => Promise.resolve(false)}
               onTriggerChange={() => undefined}
@@ -473,6 +472,15 @@ function pixelValue(value: string) {
   return Number.parseFloat(value)
 }
 
+// An infinite animation cannot be finished — skeleton-sweep is one, and calling
+// finish() on it throws. Pause those instead; finish the ones that do end.
 function finishAnimations() {
-  for (const animation of document.getAnimations()) animation.finish()
+  for (const animation of document.getAnimations()) {
+    const endTime = animation.effect?.getComputedTiming().endTime
+    if (endTime === Number.POSITIVE_INFINITY) {
+      animation.pause()
+      continue
+    }
+    animation.finish()
+  }
 }

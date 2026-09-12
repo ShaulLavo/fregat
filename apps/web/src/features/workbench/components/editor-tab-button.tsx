@@ -65,9 +65,9 @@ export function EditorTabButton({
       aria-selected={tab.active}
       className={cn(
         // The tab sits on a 4px top inset inside the strip, so it is the bar height minus that inset.
-        'group/proof-tab flex h-[calc(var(--bar-height)-0.25rem)] w-36 min-w-24 max-w-48 shrink-0 cursor-grab touch-none items-center gap-(--density-control-gap) rounded-t-md border px-(--density-row-padding-x) text-left text-xs outline-none transition-[background-color,border-color,opacity] active:cursor-grabbing focus-visible:ring-1 focus-visible:ring-ring/50',
+        'group/proof-tab focus-ring flex h-[calc(var(--bar-height)-0.25rem)] w-36 min-w-24 max-w-48 shrink-0 cursor-grab touch-none items-center gap-(--density-control-gap) rounded-t-md border px-(--density-row-padding-x) text-left text-xs outline-none transition-[color,background-color,border-color,box-shadow,opacity] active:cursor-grabbing',
         tab.active
-          ? 'border-border bg-background-solid text-foreground'
+          ? 'border-border bg-card-solid text-foreground'
           : 'border-transparent text-muted-foreground hover:bg-accent hover:text-accent-foreground',
         dragging && 'relative z-10 opacity-60',
       )}

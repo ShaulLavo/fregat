@@ -66,7 +66,7 @@ export function WorkspaceEditPreviewDialog() {
   return (
     <Dialog open={open} onOpenChange={(nextOpen) => !nextOpen && close()}>
       <DialogContent
-        className='bg-background-solid max-h-[min(760px,calc(100vh-2rem))] w-[min(760px,calc(100vw-2rem))] max-w-none overflow-hidden border sm:max-w-none'
+        className='max-h-[min(760px,calc(100vh-2rem))] w-[min(760px,calc(100vw-2rem))] max-w-none overflow-hidden border sm:max-w-none'
         finalFocus={false}
         showCloseButton={false}
       >

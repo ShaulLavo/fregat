@@ -25,7 +25,6 @@ export function ChatInputEditor({
   onCommandMenuCommit,
   onCommandMenuMove,
   onEditorReady,
-  onFocusChange,
   onImageFiles,
   onSubmitRequest,
   onTriggerChange,
@@ -43,7 +42,6 @@ export function ChatInputEditor({
   onCommandMenuCommit: () => boolean
   onCommandMenuMove: (offset: number) => boolean
   onEditorReady: (editor: LexicalEditor | null) => void
-  onFocusChange: (focused: boolean) => void
   onImageFiles: (files: readonly File[]) => void
   onSubmitRequest: () => Promise<boolean>
   onTriggerChange: (trigger: ChatInputTrigger | null) => void
@@ -78,8 +76,6 @@ export function ChatInputEditor({
     },
     [editor, onImageFiles],
   )
-  const handleBlur = useCallback(() => onFocusChange(false), [onFocusChange])
-  const handleFocus = useCallback(() => onFocusChange(true), [onFocusChange])
 
   return (
     <div className='relative px-(--density-section-padding) pt-(--density-section-padding) pb-(--density-section-gap)'>
@@ -91,8 +87,6 @@ export function ChatInputEditor({
             className='app-scrollbar-thin text-foreground block max-h-48 min-h-14 w-full overflow-y-auto bg-transparent text-sm leading-6 break-words whitespace-pre-wrap outline-none'
             data-testid='chat-input-editor'
             placeholder={<span />}
-            onBlur={handleBlur}
-            onFocus={handleFocus}
             onPaste={handlePaste}
           />
         }

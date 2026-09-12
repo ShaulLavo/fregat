@@ -49,11 +49,11 @@ export function ChangeGroup({
       onOpenChange={(nextOpen) => setSectionOpen(section, nextOpen)}
     >
       <div
-        className='group/group hover:bg-row-hover flex h-(--density-control-height-sm) w-full items-center px-(--density-row-padding-x) text-xs font-medium transition-colors'
+        className='group/group hover:bg-row-hover active:bg-row-active flex h-(--density-control-height-sm) w-full items-center px-(--density-row-padding-x) text-xs font-medium transition-colors'
         onContextMenu={handleContextMenu}
         onKeyDown={handleHeaderKeyDown}
       >
-        <CollapsibleTrigger className='focus-visible:ring-ring/50 flex min-w-0 flex-1 items-center gap-2 text-left outline-none focus-visible:ring-1'>
+        <CollapsibleTrigger className='focus-ring flex min-w-0 flex-1 items-center gap-2 text-left outline-none'>
           <CaretDownIcon
             className={cn(
               'size-3.5 shrink-0 text-muted-foreground transition-transform',

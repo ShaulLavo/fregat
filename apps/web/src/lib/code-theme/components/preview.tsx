@@ -18,7 +18,7 @@ export function CodeThemePreview({
   return (
     <div
       aria-label={colorMode === 'light' ? 'Light code theme preview' : 'Dark code theme preview'}
-      className={cn('bg-background-solid min-w-0 overflow-hidden', className)}
+      className={cn('bg-card-solid min-w-0 overflow-hidden', className)}
       data-code-theme-preview={themeId}
       role='region'
     >

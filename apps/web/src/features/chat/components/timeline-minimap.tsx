@@ -73,7 +73,7 @@ export function TimelineMinimap({
           <button
             aria-current={mark.id === activeMarkId ? 'true' : undefined}
             aria-label={`Jump to turn ${mark.ordinal} of ${marks.length}`}
-            className='focus-visible:ring-ring pointer-events-auto absolute right-0 flex h-3 w-full -translate-y-1/2 items-center justify-end focus-visible:ring-1 focus-visible:outline-none'
+            className='focus-ring pointer-events-auto absolute right-0 flex h-3 w-full -translate-y-1/2 items-center justify-end focus-visible:outline-none'
             data-turn={index}
             key={mark.id}
             style={{ top: `${mark.startFraction * 100}%` }}

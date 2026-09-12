@@ -49,7 +49,7 @@ export function WorkspaceEditRecoveryDialog() {
         }}
       >
         <DialogContent
-          className='bg-background-solid w-[min(520px,calc(100vw-2rem))] max-w-none border sm:max-w-none'
+          className='w-[min(520px,calc(100vw-2rem))] max-w-none border sm:max-w-none'
           finalFocus={false}
           showCloseButton={false}
         >
@@ -140,7 +140,7 @@ export function WorkspaceEditRecoveryDialog() {
 
       <Dialog open={confirmDiscard} onOpenChange={setConfirmDiscard}>
         <DialogContent
-          className='bg-background-solid w-[min(480px,calc(100vw-2rem))] max-w-none border sm:max-w-none'
+          className='w-[min(480px,calc(100vw-2rem))] max-w-none border sm:max-w-none'
           showCloseButton={false}
         >
           <DialogHeader>

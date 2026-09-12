@@ -152,10 +152,10 @@ export const SearchNameMatchRow = memo(
       // shape (radius, fixed height, hover fill) is exactly what rows must not have.
       <button
         className={cn(
-          'grid w-full min-w-0 grid-cols-[16px_minmax(0,1fr)_auto] items-center gap-1.5 overflow-hidden px-2 py-1.5 text-left outline-none focus-visible:ring-1 focus-visible:ring-ring/50',
+          'focus-ring grid w-full min-w-0 grid-cols-[16px_minmax(0,1fr)_auto] items-center gap-1.5 overflow-hidden px-2 py-1.5 text-left outline-none',
           compact && 'h-6 grid-cols-[14px_minmax(0,1fr)_auto] gap-1 px-1.5 py-0',
           active && 'bg-row-selected',
-          !active && 'hover:bg-row-hover',
+          !active && 'hover:bg-row-hover active:bg-row-active',
           className,
         )}
         tabIndex={-1}

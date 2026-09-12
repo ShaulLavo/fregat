@@ -171,7 +171,7 @@ function renderDiagnosticList({
           >
             {/* Raw <button>: a full-width, two-line row; Button is a fixed-height centered control. */}
             <button
-              className='hover:bg-row-hover focus-visible:ring-ring/50 block w-full px-2 py-2 text-left outline-none focus-visible:ring-1'
+              className='focus-ring hover:bg-row-hover active:bg-row-active block w-full px-2 py-2 text-left outline-none'
               type='button'
               onClick={() => onOpenDiagnostic(target)}
               onFocus={() => onPreviewDiagnostic(target)}

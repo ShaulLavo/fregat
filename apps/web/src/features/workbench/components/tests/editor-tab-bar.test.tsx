@@ -31,9 +31,9 @@ test('hides the horizontal tab strip scrollbar', () => {
 test('only the active tab carries a background fill, and inactive tabs react to hover', () => {
   const { container } = renderWithProviders(<TestEditorTabs tabs={editorTabs()} />)
 
-  expect(editorTabElement(container, 'tab-a')).toHaveClass('bg-background-solid')
+  expect(editorTabElement(container, 'tab-a')).toHaveClass('bg-card-solid')
   expect(editorTabElement(container, 'tab-a')).not.toHaveClass('hover:bg-accent')
-  expect(editorTabElement(container, 'tab-b')).not.toHaveClass('bg-background-solid')
+  expect(editorTabElement(container, 'tab-b')).not.toHaveClass('bg-card-solid')
   expect(editorTabElement(container, 'tab-b')).toHaveClass('hover:bg-accent')
 })
 

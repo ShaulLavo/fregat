@@ -71,7 +71,7 @@ function ResizableHandle({
     <ResizablePrimitive.Separator
       data-slot='resizable-handle'
       className={cn(
-        'relative flex w-1 items-center justify-center bg-transparent ring-offset-background transition-colors after:absolute after:inset-y-0 after:left-1/2 after:w-2 after:-translate-x-1/2 hover:bg-foreground/10 focus-visible:bg-foreground/15 focus-visible:ring-1 focus-visible:ring-ring focus-visible:outline-hidden aria-[orientation=horizontal]:h-1 aria-[orientation=horizontal]:w-full aria-[orientation=horizontal]:after:left-0 aria-[orientation=horizontal]:after:h-2 aria-[orientation=horizontal]:after:w-full aria-[orientation=horizontal]:after:translate-x-0 aria-[orientation=horizontal]:after:-translate-y-1/2 [&[data-separator=active]]:bg-foreground/20 [&[data-separator=hover]]:bg-foreground/10',
+        'focus-ring relative flex w-1 items-center justify-center bg-transparent after:absolute after:inset-y-0 after:left-1/2 after:w-2 after:-translate-x-1/2 hover:bg-foreground/10 focus-visible:bg-foreground/15 focus-visible:outline-hidden aria-[orientation=horizontal]:h-1 aria-[orientation=horizontal]:w-full aria-[orientation=horizontal]:after:left-0 aria-[orientation=horizontal]:after:h-2 aria-[orientation=horizontal]:after:w-full aria-[orientation=horizontal]:after:translate-x-0 aria-[orientation=horizontal]:after:-translate-y-1/2 [&[data-separator=active]]:bg-foreground/20 [&[data-separator=hover]]:bg-foreground/10',
         className,
       )}
       {...props}

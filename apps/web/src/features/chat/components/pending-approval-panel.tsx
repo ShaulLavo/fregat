@@ -32,7 +32,7 @@ export function PendingApprovalPanel() {
         </div>
         <pre
           aria-label={detailLabel(approval.requestKind)}
-          className='text-foreground/85 focus-visible:ring-ring text-2xs max-h-20 overflow-auto rounded-md font-mono leading-relaxed whitespace-pre outline-none focus-visible:ring-2'
+          className='focus-ring text-foreground/85 text-2xs max-h-20 overflow-auto rounded-md font-mono leading-relaxed whitespace-pre outline-none'
           tabIndex={0}
         >
           {approval.detail || approvalTitle(approval.requestKind)}

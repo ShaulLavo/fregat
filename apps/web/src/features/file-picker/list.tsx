@@ -242,7 +242,7 @@ export function FileList({
         aria-busy={isBusy || loadState.status === 'loading'}
         aria-describedby={showStatus ? statusId : undefined}
         aria-label={listLabel(mode)}
-        className='focus-visible:ring-ring/50 absolute inset-0 overflow-auto outline-none focus-visible:ring-1 focus-visible:ring-inset'
+        className='focus-ring-inset absolute inset-0 overflow-auto outline-none'
         onKeyDown={(event) =>
           onKeyDown(event, {
             pageSize: fileListPageSize(
@@ -453,7 +453,7 @@ function FileRow({
         'grid h-full w-full cursor-default items-center gap-(--density-control-gap) px-2 text-left text-xs',
         fileListGridClass(mode),
         selected && 'bg-row-selected text-foreground',
-        !isBusy && !selected && 'hover:bg-row-hover',
+        !isBusy && !selected && 'hover:bg-row-hover active:bg-row-active',
         isBusy && 'pointer-events-none opacity-60',
         !pickable && !selected && 'text-muted-foreground/65',
       )}

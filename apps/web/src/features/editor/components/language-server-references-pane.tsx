@@ -147,7 +147,7 @@ function ReferenceGroupHeader({
   // Raw element: Button centres its content and owns a radius and hover fill a full-width row cannot take.
   return (
     <button
-      className='hover:bg-row-hover focus-visible:ring-ring/50 grid h-(--density-control-height-sm) w-full grid-cols-[14px_14px_minmax(0,1fr)_auto] items-center gap-(--density-control-gap) px-(--density-row-padding-x) text-left text-xs outline-none focus-visible:ring-1'
+      className='focus-ring hover:bg-row-hover active:bg-row-active grid h-(--density-control-height-sm) w-full grid-cols-[14px_14px_minmax(0,1fr)_auto] items-center gap-(--density-control-gap) px-(--density-row-padding-x) text-left text-xs outline-none'
       type='button'
       onClick={() => onToggle(group.path)}
     >
@@ -190,7 +190,7 @@ function ReferenceRow({
   // Raw element: Button centres its content and owns a radius and hover fill a full-width row cannot take.
   return (
     <button
-      className='group hover:bg-row-hover focus-visible:ring-ring/50 grid h-(--density-row-height) w-full grid-cols-[38px_minmax(0,1fr)] items-center gap-2 px-(--density-row-padding-x) pl-7 text-left text-xs outline-none focus-visible:ring-1'
+      className='group focus-ring hover:bg-row-hover active:bg-row-active grid h-(--density-row-height) w-full grid-cols-[38px_minmax(0,1fr)] items-center gap-2 px-(--density-row-padding-x) pl-7 text-left text-xs outline-none'
       type='button'
       onClick={() => onOpenReference(target)}
       onFocus={() => onPreviewReference(target)}

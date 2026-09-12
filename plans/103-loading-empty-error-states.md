@@ -467,6 +467,28 @@ seven files; no test asserts "has a button" usefully.
    draws one placeholder per real element") and D5 ("`LoadingState` never wraps a loader") to it, and
    nothing else — the section is already the longest in the file.
 
+## Evidence from the visual pass
+
+Captured 2026-09-12 through the browser harness at
+`apps/web/src/features/workbench/components/tests/surface-pass.browser.tsx`, which stacks the real
+surface classes inside `[data-workbench]`.
+
+**An `Alert` rendered inside the workbench is invisible.** Its base is `bg-card text-card-foreground`
+plus `border`, and two things cancel both halves at once: `[data-workbench]` sets
+`--border: transparent`, so the border does not paint, and `--content-well` is derived from
+`--card-solid`, so the fill is within a couple of percent of the editor surface behind it. What
+renders is bare text with no box.
+
+This is the strongest argument for decision D6. Giving `Alert` the
+`border-<tone>/30 bg-<tone>/10 text-<tone>` formula that roughly a dozen call sites already
+hand-roll does not just deduplicate them — it is what makes the primitive visible at all in the
+place it is most often used. Any migration onto `Alert` that keeps the current neutral default
+would make those call sites worse, not better, so D6 is a prerequisite for the migration rather
+than a companion to it.
+
+The same applies to any neutral bordered box inside the workbench: it needs a fill, because its
+border is transparent by design.
+
 ## Verification boundaries
 
 Narrow checks only, per repository policy and `PLAN.md`'s Platform-only boundary. Never a repo-wide

@@ -53,3 +53,6 @@ tsconfig.tsbuildinfo
 
 # Local agent worktrees
 .claude/worktrees/
+
+# Screenshots written by the design surface pass (a manual tool, not an assertion).
+apps/web/src/**/surface-*.png
