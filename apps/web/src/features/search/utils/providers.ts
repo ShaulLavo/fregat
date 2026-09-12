@@ -174,9 +174,8 @@ function createCompositeState(): CompositeSearchState {
   }
 }
 
-// `outcome: 'ok'` said nothing about whether the run actually finished, so a
-// truncated result and a complete one were indistinguishable in the logs. The
-// terminal condition is the field a reader needs.
+// The terminal condition, not a bare 'ok': truncated and complete runs were
+// indistinguishable in the logs.
 function logSearchCompleted(
   query: WorkspaceSearchQuery,
   state: CompositeSearchState,

@@ -246,11 +246,8 @@ export class WorkspaceDocumentService {
   constructor(private readonly onStateChange: () => void = () => undefined) {}
 
   /**
-   * Retained text size per live document, for the retention budget.
-   *
-   * Every live document, not only the evictable ones: an unevictable document
-   * still occupies memory. `getTextSnapshot().length` is a retained field, so this
-   * allocates one map and reads nothing.
+   * Retained text size per live document. Every one, not only the evictable: an
+   * unevictable document still occupies memory. `length` is a retained field.
    */
   documentSizes(): ReadonlyMap<string, number> {
     const sizes = new Map<string, number>()

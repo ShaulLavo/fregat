@@ -34,10 +34,8 @@ export function createSearchWorkbench(client: Client) {
       return
     }
 
-    // The run owns its own State rather than reading the shared `state`. A run
-    // only finishes after a later `search()` has already replaced `state` with
-    // its own loading snapshot, so logging from `state` reported the superseding
-    // run's counts — and aborts are the common case while typing.
+    // The run owns its State: it finishes after a later `search()` has already
+    // replaced the shared one, so logging from that reports the wrong run.
     let run: State = {
       key: JSON.stringify(query),
       kind: 'loading',
@@ -55,10 +53,8 @@ export function createSearchWorkbench(client: Client) {
       recordSearch(query, controller.signal, startedAt, run, outcome)
     }
 
-    // No `kind: 'ready'` on loop exit. That was the defect: it fired whether or
-    // not a terminal `done` arrived, so a stream that simply ended published a
-    // complete-looking result with `truncated: false` — the two fields the
-    // replace gate reads.
+    // No `kind: 'ready'` on loop exit: reaching it proves a terminal `done`
+    // already set the state, because the producer throws otherwise.
     try {
       for await (const event of streamWorkspaceSearch(query, controller.signal, client)) {
         if (controller.signal.aborted) return

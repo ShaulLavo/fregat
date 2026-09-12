@@ -4,20 +4,16 @@ const HEADER_SEPARATOR = '\r\n\r\n'
 const HEADER_SEPARATOR_BYTES = Buffer.byteLength(HEADER_SEPARATOR)
 const INITIAL_HEADER_CAPACITY = 256
 
-// Headers are tens of bytes. A server that never sends a separator would
-// otherwise grow this buffer without limit, so cap it and treat the overflow as
-// a malformed frame rather than a leak.
+// Without a cap, a server that never sends a separator grows this buffer
+// without limit. Overflow is treated as a malformed frame, not a leak.
 const MAX_HEADER_BYTES = 8 * 1024
 
-// A frame larger than this is rejected as malformed. Not an allocator limit —
-// `buffer.constants.MAX_LENGTH` is larger — but a body no language server in this
-// registry produces; the configurable per-server ceiling is separate work.
+// Policy, not an allocator limit: `buffer.constants.MAX_LENGTH` is larger. The
+// configurable per-server ceiling is separate work.
 const MAX_BODY_BYTES = 2 ** 31 - 1
 
-// The header declares the body length; it does not get to reserve it. Allocating
-// `contentLength` up front let 30 bytes of stdout reserve 2 GiB, and the throw
-// when that allocation fails escapes `push` inside `stdout.on('data')`, which
-// nothing catches. Growth is geometric, so total copies stay linear.
+// The header declares the body length; it does not get to reserve it — 30 bytes
+// of stdout could otherwise claim 2 GiB. Geometric growth keeps copies linear.
 const INITIAL_BODY_CAPACITY = 64 * 1024
 
 export type LspStdioMessageHandler = (message: string, byteLength: number) => void
@@ -32,14 +28,9 @@ export type LspStdioFramingStats = {
 /**
  * Reads `Content-Length` framed messages from a child process's stdout.
  *
- * Each body is assembled once, into a buffer that grows as bytes arrive rather
- * than being sized from the header. The previous implementation concatenated the
- * whole pending message per chunk, which is quadratic: a 4 MiB body in 16 KiB
- * reads would copy 522 MiB.
- *
  * The header region is contiguous by construction, so a separator split across
- * two chunks needs no resumable scan cursor: it is always findable in the
- * accumulated header alone.
+ * chunks needs no resumable scan cursor. Bodies grow as bytes arrive; sizing one
+ * from its header lets an unbacked header reserve its whole declared length.
  */
 export class LspStdioMessageReader {
   private header = Buffer.allocUnsafe(INITIAL_HEADER_CAPACITY)
@@ -83,9 +74,8 @@ export class LspStdioMessageReader {
   }
 
   /**
-   * Copies chunk bytes into the header until the separator appears. Bytes taken
-   * past the separator belong to the body, so the returned offset rewinds to
-   * exactly where the header ended and the next loop pass assembles them.
+   * Bytes taken past the separator belong to the body, so the returned offset
+   * rewinds to where the header ended and the next pass assembles them.
    */
   private fillHeader(bytes: Buffer, offset: number) {
     const scanFrom = Math.max(0, this.headerLength - (HEADER_SEPARATOR_BYTES - 1))
@@ -150,9 +140,8 @@ export class LspStdioMessageReader {
   }
 
   /**
-   * Resets before the handout, so a throw from the handler cannot re-deliver this
-   * body. A `push` from inside the handler is unsupported: it would frame ahead
-   * of the outer chunk's remaining bytes.
+   * Resets before the handout, so a throw from the handler cannot re-deliver the
+   * body. A `push` from inside it would frame ahead of the outer chunk's bytes.
    */
   private flushCompleteBody() {
     const body = this.body

@@ -377,10 +377,8 @@ describe('editor workspace state', () => {
     ])
   })
 
-  // The close path used to build its keep set from the closing workspace's panels
-  // alone, ignoring every parked project. Closing one tab therefore evicted
-  // another project's clean documents and disposed its views: switching back
-  // refetched them and lost their undo history.
+  // A keep set built from the closing workspace's panels alone evicts every other
+  // project's clean documents.
   it("closing a tab in one project keeps a parked project's clean documents", () => {
     const parkedPath = '/repo/parked.ts'
     const { commands, documentStore, workspaceStore } = editorHarness()
@@ -408,10 +406,8 @@ describe('editor workspace state', () => {
     expect(documentStore.getState().getLiveEditorDocument(first)).not.toBeNull()
   })
 
-  // The defect this fixes was a production caller that neutered the ceiling, so
-  // the pair matters: a binding budget must evict, and a generous one must not.
-  // Without the second half a regression that hands over a non-binding budget
-  // again would pass every test.
+  // Both directions matter: without the generous half, a caller handing over a
+  // non-binding budget again would pass.
   it('evicts a parked project over the retained-text budget, and keeps it under one', () => {
     const parkedPath = '/repo/parked.ts'
 

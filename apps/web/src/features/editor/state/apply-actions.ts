@@ -275,9 +275,7 @@ function switchRootFolder(
     path: rootFolder.path,
     previousPath: previousRootPath,
     restoredTabCount: workspace.workbenchPanels.editorTabs.length,
-    // Read after the trim. `documentSizes` is the pre-eviction snapshot, so
-    // summing it here reported everything just evicted as still retained —
-    // worst exactly when the trim was biggest, and unusable next to `byteBudget`.
+    // Read after the trim: `documentSizes` is the pre-eviction snapshot.
     retainedDocumentSize: totalRetainedSize(documentStore.getState().editorDocumentSizes()),
   })
 }
@@ -293,8 +291,8 @@ function totalRetainedSize(documentSizes: ReadonlyMap<string, number>) {
  * The keep set for both retention triggers: a project switch and a tab close.
  *
  * The active slice is built even when `rootPath` is null, or `clearRootFolder` and
- * rootless surfaces like the settings editor would put every open document outside
- * the keep set. That rootless slice does spend one of the `projectLimit` slots.
+ * rootless surfaces would put every open document outside it. That rootless slice
+ * spends one of the `projectLimit` slots.
  */
 function editorRetention(
   workspace: EditorWorkspaceStore,
@@ -358,19 +356,16 @@ function closeTab(
   if (!options.discard || remainingCount > 0) {
     documentStore.getState().removeEditorView(tabId)
     if (remainingCount === 0) {
-      // One eviction policy in the codebase: keep everything the remaining tabs
-      // still reference, and let retain() decide what that leaves behind. The keep
-      // set spans every project, not just this one — building it from the closing
-      // workspace's panels alone is what evicted parked projects' documents.
+      // The keep set spans every project, not just this one: built from the
+      // closing workspace's panels alone it evicts parked projects' documents.
       const documentSizes = documentStore.getState().editorDocumentSizes()
       const byteBudget = retainedTextBudget()
       const evicted = documentStore
         .getState()
         .retainEditorDocuments(editorRetention(workspace, nextPanels, documentSizes, byteBudget))
       log.info({
-        // Named for retention, not for the command: this fires only when the
-        // closed path had no other tab, so an `editor.command.*` name would be
-        // uncountable against actual closes.
+        // Named for retention, not the command: fires only when the closed path
+        // had no other tab, so `editor.command.*` would be uncountable.
         action: 'editor.retention.close_tab',
         area: 'editor',
         byteBudget,

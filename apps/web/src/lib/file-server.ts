@@ -212,10 +212,8 @@ export async function fetchQuickOpenFiles(
       path,
       queryLength: query.length,
       route: '/fs/search/events',
-      // Quick open aborts on every keystroke. `throwIfAborted` raises a real
-      // AbortError which `isAbortError` already suppresses, but Chromium
-      // surfaces mid-stream cancellation as a bare TypeError that no error-shape
-      // check can identify — the signal is the only ground truth for those.
+      // Chromium surfaces mid-stream cancellation as a bare TypeError that no
+      // error-shape check can identify, so the signal is the only ground truth.
       signal,
     },
     async () => {

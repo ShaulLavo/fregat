@@ -4,11 +4,8 @@ import type { Client } from '../../transport/client'
 import { collectWorkspaceSearch, streamWorkspaceSearch } from '../search-client'
 
 /**
- * A stream that ends without a terminal `done` is not something any current
- * server route produces, so the condition has to be supplied at the transport.
- * This injects the one route `streamWorkspaceSearch` calls rather than mocking a
- * module: the real client is a parameter, so a stand-in for it is dependency
- * injection, which is what the repo's test doctrine prescribes.
+ * No server route ends a stream without `done`, so the condition is supplied at
+ * the transport. `client` is a real parameter, so this is injection, not mocking.
  */
 function clientStreaming(chunks: readonly unknown[]): Client {
   async function* stream() {
@@ -74,8 +71,7 @@ describe('collectWorkspaceSearch', () => {
     expect(result.truncated).toBe(true)
   })
 
-  // `truncated` was previously defaulted to `false` whenever `done` was absent,
-  // which is what let a partial run read as a finished, untruncated one.
+  // A defaulted `truncated: false` is what let a partial run read as finished.
   it('never defaults truncated to false when the stream did not complete', async () => {
     const client = clientStreaming([match('src/a.ts')])
 
@@ -89,8 +85,7 @@ describe('collectWorkspaceSearch', () => {
     const pending = collectWorkspaceSearch(QUERY, controller.signal, client)
     controller.abort()
 
-    // Must name the mechanism: a bare `toThrow()` also passes when the stream
-    // merely ends without `done`, which is a different bug with a different fix.
+    // Names the mechanism: a bare `toThrow()` also passes for a missing `done`.
     await expect(pending).rejects.toMatchObject({ name: 'AbortError' })
   })
 

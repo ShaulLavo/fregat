@@ -71,9 +71,8 @@ test('documentSizes reports every live document, including the unevictable ones'
 
   const sizes = service.documentSizes()
 
-  // An unevictable document still occupies memory. Reporting only evictables
-  // would make the retention budget a claim about a smaller number than the real
-  // footprint — the same class of defect the budget exists to prevent.
+  // An unevictable document still occupies memory, so charging it zero would
+  // make the budget a claim about less than the real footprint.
   expect(sizes.get('/repo/clean.ts')).toBe('hello'.length)
   expect(sizes.get('/repo/dirty.ts')).toBe('hello'.length)
   expect(sizes.get('conflict:1')).toBe('conflict body'.length)

@@ -5,9 +5,7 @@
  * with defaults and scopes is a table that is wrong within a month. Run `bun run settings:reference`
  * after changing `packages/contracts/src/settings/keys.ts`.
  *
- * `--check` is what makes that instruction enforceable: `generated:check` runs it
- * in CI, so a registry change that forgets to regenerate fails there instead of
- * leaving the reference quietly stale.
+ * `--check` makes that instruction enforceable: `generated:check` runs it in CI.
  */
 import { existsSync, readFileSync, writeFileSync } from 'node:fs'
 import path from 'node:path'
@@ -132,10 +130,8 @@ function writeReference(target: string): void {
   console.log(`wrote ${target} (${SETTING_IDS.length} settings)`)
 }
 
-// Compares the rendered body directly rather than writing to a temp file the way
-// the schema generator does: the full body is already in memory here, and the
-// comparison has to be on the rendered text because `SCOPE_NOTES` is
-// interpolated into prose, not just into the table.
+// Compares the rendered body, not just the table: `SCOPE_NOTES` is interpolated
+// into prose too.
 function checkReference(target: string): void {
   if (!existsSync(target)) {
     console.error(`settings reference is missing at ${target}`)

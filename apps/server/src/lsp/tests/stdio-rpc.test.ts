@@ -82,9 +82,7 @@ describe('LSP stdio framing', () => {
     expect(byteLengths).toEqual([0])
   })
 
-  // The pre-fix reader returned null after discarding a bad header block, which
-  // exited its drain loop and stranded an already-complete frame behind it until
-  // another chunk happened to arrive.
+  // Discarding a bad header block must not strand a complete frame behind it.
   it('discards a header block with no Content-Length and still delivers the frame behind it', () => {
     const { messages, reader } = collect()
 
@@ -111,8 +109,7 @@ describe('LSP stdio framing', () => {
     const small = encodeLspStdioMessage('{"id":9}')
     const large = encodeLspStdioMessage(`{"id":10,"v":"${'x'.repeat(4096)}"}`)
 
-    // Largest is not last: otherwise the assertion cannot tell `Math.max(...)`
-    // from `body.length`, and surviving later messages is the stat's whole point.
+    // Largest is not last, or the assertion cannot tell `max` from `body.length`.
     reader.push(large.slice(0, 40))
     reader.push(large.slice(40))
     reader.push(small)
@@ -124,10 +121,8 @@ describe('LSP stdio framing', () => {
     expect(reader.stats.malformedCount).toBe(0)
   })
 
-  // Bounded memory is the property here, not clever recovery: a server emitting
-  // unframed bytes gets them dropped a header-cap at a time rather than
-  // accumulated. Recovery only follows because this input ends on a cap
-  // boundary, leaving nothing retained to poison the next header block.
+  // Bounded memory, not recovery: unframed bytes are dropped a header-cap at a
+  // time. Recovery follows only because this input ends on a cap boundary.
   it('drops unframed bytes at the header cap instead of buffering without limit', () => {
     const { messages, reader } = collect()
     const garbage = 8 * 1024 * 2

@@ -164,9 +164,8 @@ function warningCode(value: unknown): WorkspaceSearchWarningCode {
   return 'content-tool-partial-failure'
 }
 
-// A fabricated zeroed `done` is indistinguishable from a legitimate empty
-// result — `path: ''` is a valid workspace root — so a malformed payload has to
-// fail here rather than be smoothed into a terminal event.
+// A zeroed `done` is indistinguishable from a legitimate empty result —
+// `path: ''` is a valid root — so a malformed payload has to fail here.
 function doneEventFromData(data: unknown): WorkspaceSearchDoneEvent {
   if (!isRecord(data)) throw clientErrors.SEARCH_DONE_INVALID()
 

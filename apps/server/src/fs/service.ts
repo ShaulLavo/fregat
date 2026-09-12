@@ -812,9 +812,8 @@ async function* observedSearchEvents(
     },
   })
 
-  // `recorded` is load-bearing: without it the `finally` would emit a second
-  // `fs.operations[]` entry on every completed and every failed search, turning
-  // one wide event into two.
+  // Without `recorded`, the `finally` adds a second `fs.operations[]` entry to
+  // every completed and failed search — one wide event becomes two.
   let recorded = false
   const record = (outcome: SearchStreamOutcome, error?: unknown) => {
     if (recorded) return
@@ -841,11 +840,8 @@ async function* observedSearchEvents(
     record('error', error)
     throw error
   } finally {
-    // A client disconnect calls `events.return()`, which resumes this generator
-    // at the `yield` with no error and no completion — previously that recorded
-    // nothing at all, so an aborted search left no trace and `completed` never
-    // reached the log. Quick-open aborts on every keystroke, so this was the
-    // common case and it was invisible.
+    // A client disconnect calls `events.return()`, resuming at the `yield` with
+    // neither an error nor a completion — so nothing above this records it.
     record('aborted')
   }
 }
@@ -918,9 +914,7 @@ function searchStreamSummary(
   options: FileSystemSearchOptions,
   startedAt: number,
   state: SearchStreamState,
-  // 'aborted' is a real terminal condition, not an absence of one: a client
-  // disconnect used to record nothing at all, which is why no line in logs/ ever
-  // carried `completed`.
+  // 'aborted' is a terminal condition, not an absence of one.
   status: SearchStreamOutcome,
 ) {
   return {

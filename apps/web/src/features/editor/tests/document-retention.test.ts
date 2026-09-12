@@ -83,11 +83,8 @@ test('charges a document shared by nested roots only once', () => {
   expect(retention.tabIds.size).toBe(2)
 })
 
-// The measure/commit split exists for this: measuring used to mark documents
-// charged as a side effect, so a slice that was then rejected still consumed
-// their size, and a later slice sharing them was charged nothing and admitted
-// over budget. The budget here is chosen so the two accountings disagree — at a
-// looser budget both keep the late slice and the test proves nothing.
+// The budget is chosen so measure-then-commit and commit-while-measuring
+// disagree. At a looser one both keep the late slice and this proves nothing.
 test('a rejected project does not pay for the documents a later project shares', () => {
   const shared = '/repo/shared.ts'
   const retention = retentionForProjects({
@@ -103,9 +100,8 @@ test('a rejected project does not pay for the documents a later project shares',
       slice('/repo/active', 400, ['/repo/active/one.ts']),
       // Rejected: 10 + 100 + 100 overruns 100.
       slice('/repo/big', 300, ['/repo/big/one.ts', shared]),
-      // Also rejected: `shared` is still uncharged, so this costs its full 100 on
-      // top of the active 10. Under the old accounting the rejected slice above
-      // had already marked it charged, so this measured 0 and was admitted.
+      // Also rejected: `shared` is uncharged, so this costs its full 100 on top
+      // of the active 10.
       slice('/repo/late', 200, [shared]),
     ],
   })

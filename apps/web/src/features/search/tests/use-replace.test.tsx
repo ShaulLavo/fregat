@@ -92,9 +92,8 @@ test('keeps replacement reads on the original machine when the selection changes
   }
 })
 
-// A run that fails mid-stream keeps the matches it already delivered. The gate
-// used to block only `'loading'`, so `'error'` passed and replace stayed enabled
-// over a set the app itself knows is incomplete.
+// A run that fails mid-stream keeps the matches it delivered, so `'error'` must
+// not be replaceable.
 test('refuses to replace over the partial matches of a failed search', async ({ client }) => {
   void client
   const application = createTestApplicationRuntime()

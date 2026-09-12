@@ -76,11 +76,8 @@ export function ReplaceDialog({
       if (phase.kind !== 'preview' || value !== 'replace' || !phase.plan.operations.length) return
       setPhase({ kind: 'applying', plan: phase.plan })
       await applyReplacement(client, query.path, phase.plan, lifetime.signal)
-      // A replacement rewrites every occurrence in each matched file, so the
-      // search's completeness is the fact that matters afterwards. `searchKind`
-      // and `searchTruncated` are what the enabling gate itself saw: today it
-      // only admits a complete, untruncated run, so these are constant — and
-      // that is the point. If the gate ever regresses, the log says so.
+      // `searchKind`/`searchTruncated` are what the enabling gate saw. Constant
+      // today, so a regression in that gate shows up here.
       recordObservabilityInfo('tui.search.replace', {
         area: 'search',
         matchCount: matches.length,

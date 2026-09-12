@@ -259,10 +259,8 @@ export const SETTINGS_REGISTRY = {
     // in front of it. 0 retains only the active project, which is never trimmed.
     schema: v.pipe(v.number(), v.integer(), v.minValue(0), v.maxValue(1_073_741_824)),
     default: 67_108_864,
-    // Machine scope, following `lsp.idleTimeoutMs`: a per-box RAM tradeoff. A
-    // ceiling that is right on a workstation is wrong on a small laptop, and a
-    // workspace file ships inside a cloned repository, so this must not be
-    // window-scoped.
+    // Machine scope, following `lsp.idleTimeoutMs`: a per-box RAM tradeoff, and a
+    // workspace file ships inside a clone, so this must not be window-scoped.
     scope: 'machine',
     widget: 'number',
     category: 'Editor',

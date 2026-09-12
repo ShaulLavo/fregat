@@ -102,12 +102,9 @@ async function eslintFixtureRoot(): Promise<string> {
   return root
 }
 
-// The fixture root is created inside `apps/server` so the language server
-// resolves `eslint` from `apps/server/node_modules` — that devDependency is this
-// test's fixture library, not lint tooling this repo runs. Asserted rather than
-// assumed: without it the server answers with an empty diagnostic list and no
-// error, which reads as a mysterious `[] !== arrayContaining` instead of a
-// missing dependency.
+// The fixture lives inside `apps/server` so the language server resolves
+// `eslint` from its node_modules — a fixture library, not this repo's linter.
+// Asserted, because without it the server returns [] with no error.
 function assertEslintResolvable(root: string) {
   createRequire(path.join(root, 'probe.js')).resolve('eslint')
 }

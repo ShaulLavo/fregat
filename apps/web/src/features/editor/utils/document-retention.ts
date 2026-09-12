@@ -14,18 +14,11 @@ export type DocumentRetention = {
 }
 
 /**
- * Which documents and views survive a project switch or a tab close. Two
- * ceilings, because either alone is defeated: a project count says nothing about
- * size (one 100MB file per project blows past any count), and a size budget
- * alone would keep an unbounded number of tiny projects alive.
+ * Which documents and views survive a project switch or a tab close.
  *
- * The keep set is the UNION over every retained slice, never per-slice. Roots nest
- * (/repo and /repo/apps/web), so one absolute path can be referenced by two slices,
- * and computing per slice would drop a document the other slice still displays.
- *
- * `documentSizes` is required: only the document store can produce that map, so a
- * caller cannot omit it. Sizes are UTF-16 code-unit counts read in O(1) —
- * byte-exact for ASCII, an under-count for multi-byte UTF-8.
+ * Two ceilings, because either alone is defeated: a count ignores size, a size
+ * budget keeps unboundedly many tiny projects. The keep set is the UNION over
+ * retained slices — roots nest, so per-slice drops a document another still shows.
  */
 export function retentionForProjects({
   activeRootPath,
@@ -35,7 +28,9 @@ export function retentionForProjects({
   slices,
 }: {
   readonly activeRootPath: string | null
+  /** UTF-16 code units, not bytes: byte-exact for ASCII, an under-count otherwise. */
   readonly byteBudget: number
+  /** Required, and only the document store can produce it — so a caller cannot omit it. */
   readonly documentSizes: ReadonlyMap<string, number>
   readonly projectLimit?: number
   readonly slices: readonly RetainedWorkspaceSlice[]
@@ -83,8 +78,8 @@ function withinByteBudget(
   byteBudget: number,
   documentSizes: ReadonlyMap<string, number>,
 ) {
-  // Measure without committing: a rejected slice must not charge documents that a
-  // later, kept slice shares. Active slices commit unconditionally — never trimmed.
+  // A rejected slice must not charge documents a later, kept slice shares.
+  // Active slices commit unconditionally — they are never trimmed.
   const charged = new Set<string>()
   let total = 0
   for (const slice of active) total += commitSliceSize(slice, documentSizes, charged)
@@ -92,9 +87,8 @@ function withinByteBudget(
   const kept: RetainedWorkspaceSlice[] = []
   for (const slice of parked) {
     const size = measureSliceSize(slice, documentSizes, charged)
-    // A slice whose documents are all charged already cannot move `total`, so
-    // dropping it frees no text and only costs its view sessions. This is the
-    // nested-root case the union rule above exists for.
+    // A fully-charged slice cannot move `total`, so dropping it frees no text and
+    // only costs its views. This is the nested-root case.
     if (size > 0 && total + size > byteBudget) continue
 
     total += size
