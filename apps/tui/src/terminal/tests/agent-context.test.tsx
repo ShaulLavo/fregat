@@ -16,6 +16,16 @@ test('selected terminal output reaches the checkout prompt through the durable i
   try {
     await expect.poll(() => pty.processes.length).toBe(1)
     await expect.poll(() => frame.renderer.currentFocusedRenderable?.id).toMatch(/^terminal-/)
+    // Wait for the live footer: while the connection is still opening, the loader
+    // overlays the terminal's origin at a higher zIndex and swallows the drag below,
+    // leaving an empty selection. `captureCharFrame` only moves when a frame renders,
+    // so the poll has to pump one itself.
+    await expect
+      .poll(async () => {
+        await frame.renderOnce()
+        return frame.captureCharFrame()
+      })
+      .toContain('d detaches')
     const terminal = frame.renderer.currentFocusedRenderable as
       | EmbeddedTerminalRenderable
       | undefined
