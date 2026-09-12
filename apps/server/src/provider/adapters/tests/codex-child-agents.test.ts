@@ -127,6 +127,34 @@ describe('Codex child notification routing', () => {
     })
   })
 
+  it.each(['failed', 'interrupted', 'closed'] as const)(
+    'preserves the %s summary when a same-turn tool completes late',
+    (status) => {
+      const { agents, events } = fixture()
+      register(agents)
+      const params = { threadId: 'child', turnId: 'child-turn' }
+      agents.handle('turn/started', { threadId: 'child', turn: { id: params.turnId } })
+      agents.handle('item/completed', {
+        ...params,
+        item: { id: 'explanation', type: 'agentMessage', text: 'The operation stopped.' },
+      })
+      if (status === 'closed') agents.handle('thread/closed', { threadId: 'child' })
+      if (status !== 'closed')
+        agents.handle('turn/completed', {
+          threadId: 'child',
+          turn: { id: params.turnId, status },
+        })
+      agents.handle('item/completed', {
+        ...params,
+        item: { id: 'late-tool', type: 'commandExecution', command: 'pwd', status: 'completed' },
+      })
+      expect(events.at(-1)).toMatchObject({
+        agent: { status },
+        payload: { summary: 'The operation stopped.', tool: { title: 'pwd', status: 'completed' } },
+      })
+    },
+  )
+
   it.each([false, true])(
     'ignores old child terminal events with deferred registration=%s',
     (deferred) => {

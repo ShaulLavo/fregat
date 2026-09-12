@@ -1282,6 +1282,7 @@ describe('CodexProviderAdapter', () => {
           const payloadSchema = v.object({
             agent: chatAgentSchema,
             tool: v.optional(chatAgentToolSchema),
+            summary: v.optional(v.string()),
           })
           const progress = snapshot.session.activities.flatMap((activity, index) => {
             if (activity.kind !== 'task.progress') return []
@@ -1294,7 +1295,11 @@ describe('CodexProviderAdapter', () => {
             'command_execution',
             'command_execution',
           ])
-          expect(state).toMatchObject({ agent: { nickname: 'Reviewer', status: 'idle' } })
+          expect(state).toMatchObject({
+            agent: { nickname: 'Reviewer', status: 'idle' },
+            summary: 'pwd',
+          })
+          expect(tools[1]?.summary).toBe('pwd')
           expect(state?.index).toBeLessThan(tools[0]?.index ?? 0)
           expect(state?.agent.revision).toBeGreaterThan(tools[1]?.agent.revision ?? 0)
           expect(tools[0]?.agent.status).toBe('waiting')
