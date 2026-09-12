@@ -1,8 +1,8 @@
 import * as v from 'valibot'
-import { eventIdSchema, turnIdSchema } from '@workspace/contracts'
+import { eventIdSchema, messageIdSchema, turnIdSchema } from '@workspace/contracts'
 
 import { test, expect } from '../../../../test/fixtures'
-import { sessionActivity } from '../../../../test/factories/chat'
+import { chatMessage, sessionActivity } from '../../../../test/factories/chat'
 import { agentConversation } from '../../../../test/factories/chat-agents'
 import { chatTimelineItems } from '@/features/chat/utils/timeline-items'
 import {
@@ -166,4 +166,133 @@ test('keeps child warnings and approval details inspectable without counting the
       (item) => item.type === 'activity-group',
     ),
   ).toBe(false)
+})
+
+test('joins early child requests only to explicit ownership of the same child thread', () => {
+  const snapshot = agentConversation(true)
+  const approval = sessionActivity({
+    id: v.parse(eventIdSchema, 'early-child-approval'),
+    kind: 'approval.requested',
+    turnId: null,
+    payload: { agent: { threadId: 'proof-child', status: 'waiting' }, requestId: 'child-request' },
+  })
+  const groups = chatAgentGroups([approval, ...snapshot.activities])
+  expect(groups).toHaveLength(1)
+  expect(groups[0]?.turnId).toBe(snapshot.latestTurn!.turnId)
+  expect(groups[0]?.agents[0]?.activities[0]).toMatchObject({
+    requestId: 'child-request',
+    turnId: snapshot.latestTurn!.turnId,
+  })
+})
+
+test('uses the latest agent snapshot time when projection upserts preserve creation time', () => {
+  const snapshot = agentConversation(false)
+  const initial = snapshot.activities[0]!
+  const final = sessionActivity({
+    ...initial,
+    id: v.parse(eventIdSchema, 'upserted-state'),
+    kind: 'task.progress',
+    sequence: 3,
+    payload: {
+      agent: { threadId: 'proof-child', status: 'idle', updatedAt: '2026-09-12T08:48:47.000Z' },
+    },
+  })
+  const entry = chatAgentGroups([initial, final])[0]!.agents[0]!
+  expect(entry.startedAt).toBe('2026-09-12T08:46:50.000Z')
+  expect(entry.updatedAt).toBe('2026-09-12T08:48:47.000Z')
+})
+
+test('does not let stable row order resurrect a completed agent from a stale tool snapshot', () => {
+  const snapshot = agentConversation(false)
+  const state = sessionActivity({
+    id: v.parse(eventIdSchema, 'early-state-row'),
+    kind: 'task.progress',
+    sequence: 2,
+    turnId: snapshot.latestTurn!.turnId,
+    payload: {
+      agent: {
+        threadId: 'proof-child',
+        status: 'idle',
+        revision: 3,
+        updatedAt: '2026-09-12T08:48:47.000Z',
+      },
+      summary: 'Investigation complete',
+      usage: { totalTokens: 9000 },
+    },
+  })
+  const tool = sessionActivity({
+    id: v.parse(eventIdSchema, 'later-tool-row'),
+    kind: 'task.progress',
+    sequence: 3,
+    turnId: snapshot.latestTurn!.turnId,
+    payload: {
+      agent: {
+        threadId: 'proof-child',
+        status: 'running',
+        revision: 2,
+        updatedAt: '2026-09-12T08:48:47.000Z',
+      },
+      summary: 'Running rg',
+      usage: { totalTokens: 5000 },
+      tool: {
+        itemId: 'command',
+        itemType: 'command_execution',
+        status: 'completed',
+        data: { command: 'rg foo', exitCode: 0 },
+      },
+    },
+  })
+  const agent = chatAgentGroups([state, tool])[0]!.agents[0]!
+  expect(agent.agent.status).toBe('idle')
+  expect(agent.summary).toBe('Investigation complete')
+  expect(agent.totalTokens).toBe(9000)
+  expect(agent.activities).toHaveLength(1)
+})
+
+test('accepts a newer snapshot when a resumed provider resets its local revision counter', () => {
+  const activities = [
+    sessionActivity({
+      payload: {
+        agent: {
+          threadId: 'child',
+          status: 'idle',
+          revision: 10,
+          updatedAt: '2026-09-12T08:48:47.000Z',
+        },
+        summary: 'Earlier result',
+      },
+    }),
+    sessionActivity({
+      payload: {
+        agent: {
+          threadId: 'child',
+          status: 'running',
+          revision: 1,
+          updatedAt: '2026-09-12T09:00:00.000Z',
+        },
+        summary: 'Resumed work',
+      },
+    }),
+  ]
+  const agent = chatAgentGroups(activities)[0]!.agents[0]!
+  expect(agent.agent.status).toBe('running')
+  expect(agent.summary).toBe('Resumed work')
+})
+
+test('keeps elapsed work anchored to the original prompt after a same-turn correction', () => {
+  const snapshot = agentConversation(true)
+  snapshot.messages.push(
+    chatMessage({
+      id: v.parse(messageIdSchema, 'correction'),
+      role: 'user',
+      text: 'Also check the command results.',
+      turnId: snapshot.latestTurn!.turnId,
+      createdAt: '2026-09-12T08:47:40.000Z',
+      updatedAt: '2026-09-12T08:47:40.000Z',
+    }),
+  )
+  const working = chatTimelineItems({ ...snapshot, optimisticMessages: [] }).find(
+    (item) => item.type === 'working',
+  )
+  expect(working).toMatchObject({ startedAt: snapshot.messages[0]!.createdAt })
 })

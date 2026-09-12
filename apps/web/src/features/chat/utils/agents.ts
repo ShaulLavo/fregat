@@ -33,22 +33,29 @@ type GroupAccumulator = Omit<ChatAgentGroup, 'agents'> & {
   agents: Map<string, AgentAccumulator>
 }
 
+type AgentSnapshot = Pick<
+  ChatAgentEntry,
+  'agent' | 'updatedAt' | 'description' | 'summary' | 'totalTokens'
+>
+
 export function chatAgentGroups(
   activities: readonly OrchestrationSessionActivity[],
 ): ChatAgentGroup[] {
   const groups = new Map<string, GroupAccumulator>()
+  const owners = agentOwners(activities)
   for (const activity of activities) {
     const payload = chatAgentActivity(activity.payload)
     if (!payload) continue
 
-    const id = `agents:${activity.sessionId}:${activity.turnId ?? payload.agent.threadId}`
+    const turnId = activity.turnId ?? owners.get(payload.agent.threadId) ?? null
+    const id = `agents:${activity.sessionId}:${turnId ?? payload.agent.threadId}`
     const group = groups.get(id) ?? {
       id,
-      turnId: activity.turnId,
+      turnId,
       createdAt: activity.createdAt,
       agents: new Map(),
     }
-    updateAgent(group, activity, payload)
+    updateAgent(group, { ...activity, turnId }, payload)
     groups.set(id, group)
   }
 
@@ -61,20 +68,40 @@ export function chatAgentGroups(
   }))
 }
 
+function agentOwners(activities: readonly OrchestrationSessionActivity[]) {
+  const owners = new Map<string, TurnId>()
+  for (const activity of activities) {
+    if (!activity.turnId) continue
+    const payload = chatAgentActivity(activity.payload)
+    if (!payload || owners.has(payload.agent.threadId)) continue
+    owners.set(payload.agent.threadId, activity.turnId)
+  }
+  return owners
+}
+
 function updateAgent(
   group: GroupAccumulator,
   activity: OrchestrationSessionActivity,
   payload: NonNullable<ReturnType<typeof chatAgentActivity>>,
 ) {
   const previous = group.agents.get(payload.agent.threadId)
+  const incoming: AgentSnapshot = {
+    agent: payload.agent,
+    updatedAt: payload.agent.updatedAt ?? activity.createdAt,
+    description: payload.description ?? null,
+    summary: payload.summary ?? null,
+    totalTokens: payload.usage?.totalTokens ?? null,
+  }
+  const incomingIsLatest = !previous || isNewerAgentSnapshot(incoming, previous)
+  const current = incomingIsLatest ? incoming : previous!
+  const fallback = incomingIsLatest ? previous : incoming
   const next: AgentAccumulator = {
-    agent: { ...previous?.agent, ...payload.agent },
+    agent: { ...fallback?.agent, ...current.agent },
     startedAt: previous?.startedAt ?? activity.createdAt,
-    updatedAt:
-      previous && previous.updatedAt > activity.createdAt ? previous.updatedAt : activity.createdAt,
-    description: payload.description ?? previous?.description ?? null,
-    summary: payload.summary ?? previous?.summary ?? null,
-    totalTokens: payload.usage?.totalTokens ?? previous?.totalTokens ?? null,
+    updatedAt: current.updatedAt,
+    description: current.description ?? fallback?.description ?? null,
+    summary: current.summary ?? fallback?.summary ?? null,
+    totalTokens: current.totalTokens ?? fallback?.totalTokens ?? null,
     tools: previous?.tools ?? [],
   }
   if (payload.tool) next.tools.push(agentToolActivity(activity, payload.tool))
@@ -83,6 +110,18 @@ function updateAgent(
     next.tools.push({ ...activity, payload: detail })
   }
   group.agents.set(payload.agent.threadId, next)
+}
+
+function isNewerAgentSnapshot(incoming: AgentSnapshot, previous: AgentSnapshot) {
+  const order = incoming.updatedAt.localeCompare(previous.updatedAt)
+  if (order !== 0) return order > 0
+  const nextRevision = incoming.agent.revision
+  const previousRevision = previous.agent.revision
+  if (nextRevision !== undefined && previousRevision !== undefined)
+    return nextRevision >= previousRevision
+  if (previousRevision !== undefined) return false
+  if (nextRevision !== undefined) return true
+  return true
 }
 
 function agentToolActivity(
@@ -128,7 +167,7 @@ export function chatAgentGroupLabel(group: ChatAgentGroup) {
   if (workingCount === count) return `${count} ${count === 1 ? 'agent' : 'agents'} working`
   if (workingCount > 0) return `${workingCount} of ${count} agents working`
   const failedCount = group.agents.filter((entry) => entry.agent.status === 'failed').length
-  if (failedCount > 0) return `${count} agents · ${failedCount} failed`
+  if (failedCount > 0) return `${count} ${count === 1 ? 'agent' : 'agents'} · ${failedCount} failed`
   return `${count} ${count === 1 ? 'agent' : 'agents'} finished`
 }
 

@@ -283,10 +283,17 @@ function appendActiveResponse(
     (item) => item.type === 'message' && item.message.role === 'user',
   )
   const userItem = items[userIndex]
+  const originalUserItem = items.find(
+    (item) =>
+      item.type === 'message' &&
+      item.message.role === 'user' &&
+      item.message.turnId === latestTurn.turnId,
+  )
   const responseId = userItem?.type === 'message' ? userItem.message.id : latestTurn.turnId
+  const boundary = originalUserItem ?? userItem
   const startedAt =
-    userItem?.type === 'message'
-      ? userItem.timestamp
+    boundary?.type === 'message'
+      ? boundary.timestamp
       : (latestTurn.startedAt ?? latestTurn.requestedAt)
   const trailing = items.at(-1)
   const trailingActivities = trailingLiveActivities(trailing, activeResponseTurnIds)

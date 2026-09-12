@@ -22,6 +22,7 @@ export function AgentsPanel({
 
   return (
     <Dialog
+      disablePointerDismissal
       modal={false}
       open={group !== undefined}
       onOpenChange={(open) => {

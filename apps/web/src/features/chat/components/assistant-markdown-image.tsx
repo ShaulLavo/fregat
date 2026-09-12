@@ -1,6 +1,7 @@
 import { useState, type ComponentProps } from 'react'
 import { Button } from '@workspace/ui/components/button'
 import { ChatImageLightbox } from '@/features/chat/components/chat-image-lightbox'
+import { chatImageCrossOrigin } from '@/features/chat/utils/attachment-image'
 
 export function AssistantMarkdownImage({ src, alt = '', title }: ComponentProps<'img'>) {
   const [failedSource, setFailedSource] = useState<string | null>(null)
@@ -27,6 +28,7 @@ export function AssistantMarkdownImage({ src, alt = '', title }: ComponentProps<
         <img
           alt={alt}
           className='max-h-[30rem] max-w-full object-contain'
+          crossOrigin={chatImageCrossOrigin(source)}
           loading='lazy'
           onError={() => setFailedSource(source)}
           src={source}
@@ -34,7 +36,15 @@ export function AssistantMarkdownImage({ src, alt = '', title }: ComponentProps<
         />
       </Button>
       <ChatImageLightbox
-        images={[{ id: source, name, src: source, sizeBytes: 0 }]}
+        images={[
+          {
+            id: source,
+            name,
+            src: source,
+            sizeBytes: null,
+            crossOrigin: chatImageCrossOrigin(source),
+          },
+        ]}
         openIndex={openIndex}
         onOpenIndexChange={setOpenIndex}
       />
