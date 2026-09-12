@@ -11,6 +11,10 @@ import { log } from '@/lib/client-logging'
 import { useFocusTarget } from '@/lib/focus/hooks/use-target'
 import { expect, test } from '../../../../../test/fixtures'
 import { renderWithProviders } from '../../../../../test/render'
+import { navigationWorkspace } from '../../../../../test/factories/navigation-workspace'
+import { seedWorkspaceCache } from '../../../../../test/address'
+import { createTestApplicationRuntime } from '../../../../../test/factories/application-runtime'
+import { TestEditorStateProvider as EditorStateProvider } from '../../../../../test/factories/editor-state-provider'
 
 test.beforeEach(() => {
   resetComposerInboxStore()
@@ -21,9 +25,20 @@ test.afterEach(() => {
   vi.restoreAllMocks()
 })
 
-test('records command claim and settled reveal outcome in one attachment event', async () => {
+test('records command claim and settled reveal outcome in one attachment event', async ({
+  client,
+  server,
+}) => {
   const info = vi.spyOn(log, 'info').mockImplementation(() => {})
-  renderWithProviders(<AttachHarness />, { command: { rootPath: '/repo' } })
+  const workspace = await navigationWorkspace(client, server)
+  seedWorkspaceCache(workspace)
+  const application = createTestApplicationRuntime()
+  renderWithProviders(
+    <EditorStateProvider>
+      <AttachHarness rootPath={workspace.rootPath} />
+    </EditorStateProvider>,
+    { application },
+  )
   const user = userEvent.setup()
 
   await user.click(screen.getByRole('button', { name: 'Attach context' }))
@@ -46,11 +61,11 @@ test('records command claim and settled reveal outcome in one attachment event',
   expect(attachmentEvent(info.mock.calls)).not.toHaveProperty('revealed')
 })
 
-function AttachHarness() {
+function AttachHarness({ rootPath }: { readonly rootPath: string }) {
   const { attachText } = useAttachToComposer()
   const { ref } = useFocusTarget<HTMLButtonElement>({
     area: 'chat',
-    id: { key: '/repo', kind: 'chat-composer' },
+    id: { key: rootPath, kind: 'chat-composer' },
     onIntent: () => true,
   })
 
