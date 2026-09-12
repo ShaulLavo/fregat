@@ -19,6 +19,7 @@ type PreparedChat = {
   readonly kind: 'ready'
   readonly rootPath: string
   readonly worktreeId: WorktreeId | null
+  readonly draftWorktreeId: WorktreeId | null
   readonly main: SidebarSelection | null
   readonly sidebar: SidebarSelection | null
 }
@@ -41,9 +42,17 @@ export function prepareAddressChat(
   intent: AddressIntent,
   environmentId: EnvironmentId,
   rootPath: string,
+  draftWorktreeId?: WorktreeId,
 ): PreparedChat | { readonly kind: 'unavailable'; readonly reason: string } {
   if (!intent.mainChat && !intent.sidebarChat)
-    return { kind: 'ready', rootPath, worktreeId: null, main: null, sidebar: null }
+    return {
+      kind: 'ready',
+      rootPath,
+      worktreeId: null,
+      draftWorktreeId: null,
+      main: null,
+      sidebar: null,
+    }
   const slice = selectChatProjectionSlice(useChatProjectionStore.getState(), environmentId)
   const addressed = selectWorktreeAtPath(slice, rootPath)
   if (!addressed)
@@ -73,6 +82,7 @@ export function prepareAddressChat(
     kind: 'ready',
     rootPath: sessionWorktree?.path ?? rootPath,
     worktreeId: sessionWorktree?.id ?? addressed.id,
+    draftWorktreeId: main?.kind === 'draft' ? (draftWorktreeId ?? addressed.id) : null,
     main,
     sidebar,
   }
@@ -94,7 +104,7 @@ export function applyAddressChat(
   reason: AddressApplyReason,
 ) {
   const main = prepared?.main
-  if (main) applyMainSelection(main, prepared?.worktreeId ?? null)
+  if (main) applyMainSelection(main, prepared?.draftWorktreeId ?? null)
   if (!main && intent.address.mode === 'chat' && reason !== 'boot')
     useSessionSelectionStore.setState({
       restored: false,

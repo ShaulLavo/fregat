@@ -1,7 +1,7 @@
 import { editorDocumentToken } from '@workspace/client-core/address/grammar'
 import { NO_WORKSPACE_TOKEN, parseWorkspaceToken } from '@workspace/client-core/address/workspace'
 import { readWorkspaceAddress } from '@workspace/client-core/files/workspace-address'
-import type { EnvironmentId } from '@workspace/contracts'
+import type { EnvironmentId, WorktreeId } from '@workspace/contracts'
 import {
   applyAddressChat,
   needsChatSnapshot,
@@ -38,6 +38,7 @@ type ApplyOptions = {
   readonly isCurrent: () => boolean
   readonly signal?: AbortSignal
   readonly preserveTransient?: boolean
+  readonly draftWorktreeId?: WorktreeId
   readonly reconcileResources?: (owner: EditorWorkspaceStoreApi, rootPath: string | null) => void
 }
 
@@ -109,7 +110,7 @@ async function applyCurrentView(
     confirmedEnvironmentId(owner.origin)
     useChatProjectionStore.getState().syncShellSnapshot(environmentId, snapshot)
   }
-  const chat = prepareAddressChat(intent, environmentId, addressedRoot)
+  const chat = prepareAddressChat(intent, environmentId, addressedRoot, options.draftWorktreeId)
   if (chat.kind === 'unavailable') return { status: 'unavailable', reason: chat.reason }
   if (chat.rootPath !== addressedRoot) trace.workspaceSource = 'session'
   options.reconcileResources?.(owner.editor.workspaceStore, chat.rootPath)
