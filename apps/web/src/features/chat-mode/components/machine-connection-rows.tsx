@@ -1,7 +1,7 @@
 import { Button } from '@workspace/ui/components/button'
 import { cn } from '@workspace/ui/lib/utils'
 
-import { MachinePhase } from '@/components/machine-phase'
+import { Phase } from '@/lib/environments/components/phase'
 import { useEnvironmentConnections } from '@/hooks/use-environment-connections'
 import { primaryServerOrigin } from '@/lib/client'
 import { useEnvironmentsStore } from '@/lib/environments/state/store'
@@ -52,7 +52,7 @@ export function MachineConnectionRows() {
           )}
         >
           <div className='flex items-center gap-2'>
-            <MachinePhase phase={machine.phase} label={machine.label} />
+            <Phase phase={machine.phase} label={machine.label} />
             <span className='min-w-0 flex-1 truncate'>{machine.label}</span>
             <span>{machine.phase}</span>
           </div>

@@ -1,7 +1,12 @@
+import { machineKeys } from '@/features/environments/utils/query-keys'
+import { SshHostList } from '@/features/environments/components/ssh-host-list'
+import { primaryServerOrigin } from '@/lib/client'
+import { createObservedInProcessClient } from '../../../../test/client'
+import { installTestClient } from '../../../../test/factories/client-binding'
 import { mkdir, rm } from 'node:fs/promises'
 import path from 'node:path'
-import { afterEach } from 'vitest'
-import { screen, waitFor } from '@testing-library/react'
+import { afterEach, onTestFinished } from 'vitest'
+import { act, screen, waitFor } from '@testing-library/react'
 import userEvent from '@testing-library/user-event'
 
 import { MachineForm } from '@/components/machine-form'
@@ -89,4 +94,40 @@ test('uses the primary machine SSH config while another machine is active', asyn
   })
   expect(await screen.findByRole('button', { name: 'primary-host' })).toBeVisible()
   expect(screen.queryByRole('button', { name: 'remote-host' })).toBeNull()
+})
+
+test('disables SSH Retry while a retained discovery result is being refetched', async ({
+  server,
+  client,
+}) => {
+  void client
+  const pending = Promise.withResolvers<void>()
+  onTestFinished(() => pending.resolve())
+  let requests = 0
+  const observed = createObservedInProcessClient(server, (request) => {
+    if (new URL(request.url).pathname !== '/machines/ssh-hosts') return
+    requests += 1
+    if (requests >= 3) return pending.promise
+  })
+  onTestFinished(installTestClient(observed))
+  const config = await writeSshConfig(server.root, 'Host original\n')
+  renderWithProviders(<SshHostList value='' onSelect={() => {}} />)
+  await screen.findByRole('button', { name: 'original' })
+  await rm(config)
+  await mkdir(config)
+  await act(() =>
+    primaryQueryClient().invalidateQueries({
+      queryKey: machineKeys.sshHosts(primaryServerOrigin()),
+    }),
+  )
+  await screen.findByText('Could not read SSH hosts')
+  await rm(config, { recursive: true })
+  await writeSshConfig(server.root, 'Host repaired\n')
+  const retry = screen.getByRole('button', { name: 'Retry' })
+  await userEvent.click(retry)
+  await waitFor(() => expect(retry).toBeDisabled())
+  await userEvent.click(retry)
+  expect(requests).toBe(3)
+  await act(async () => pending.resolve())
+  expect(await screen.findByRole('button', { name: 'repaired' })).toBeVisible()
 })

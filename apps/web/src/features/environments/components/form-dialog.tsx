@@ -8,7 +8,7 @@ import {
 } from '@workspace/ui/components/dialog'
 import { MachineForm } from '@/components/machine-form'
 
-export function MachineFormDialog(props: ComponentProps<typeof MachineForm>) {
+export function FormDialog(props: ComponentProps<typeof MachineForm>) {
   return (
     <Dialog
       open

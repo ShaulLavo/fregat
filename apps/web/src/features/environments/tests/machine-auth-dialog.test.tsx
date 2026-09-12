@@ -1,7 +1,7 @@
 import { act, screen, waitFor } from '@testing-library/react'
 import userEvent from '@testing-library/user-event'
 import { onTestFinished } from 'vitest'
-import { MachineAuthDialog } from '@/components/machine-auth-dialog'
+import { AuthDialog } from '@/features/environments/components/auth-dialog'
 import {
   activeServerOrigin,
   environmentClientFor,
@@ -40,7 +40,7 @@ test('SSH authentication masks and clears the secret while submitting only to th
   connections.authStore.setState({
     prompt: { id: 'expired-prompt', name: 'remote', kind: 'secret', prompt: 'Password:' },
   })
-  renderWithProviders(<MachineAuthDialog />, { connections })
+  renderWithProviders(<AuthDialog />, { connections })
   const field = screen.getByLabelText('Password:')
   expect(field).toHaveAttribute('type', 'password')
   await userEvent.type(field, 'private-test-response')
@@ -86,7 +86,7 @@ test('SSH host confirmation shows the fingerprint and sends null when canceled',
       prompt: 'ED25519 fingerprint SHA256:fixture',
     },
   })
-  renderWithProviders(<MachineAuthDialog />, { connections })
+  renderWithProviders(<AuthDialog />, { connections })
   expect(screen.getByText('ED25519 fingerprint SHA256:fixture')).toBeVisible()
   expect(screen.getByRole('button', { name: 'Trust and connect' })).toBeEnabled()
   expect(screen.queryByRole('textbox')).toBeNull()
@@ -101,7 +101,7 @@ test.for(['button', 'escape'] as const)(
     connections.authStore.setState({
       prompt: { id: 'expired', name: 'remote', kind: 'secret', prompt: 'Password:' },
     })
-    renderWithProviders(<MachineAuthDialog />, { connections })
+    renderWithProviders(<AuthDialog />, { connections })
     if (action === 'button') await userEvent.click(screen.getByRole('button', { name: 'Cancel' }))
     if (action === 'escape') await userEvent.keyboard('{Escape}')
     expect(screen.queryByRole('dialog')).toBeNull()
@@ -134,7 +134,7 @@ test('authentication remains cancelable while its response request is pending', 
   connections.authStore.setState({
     prompt: { id: 'expired', name: 'remote', kind: 'secret', prompt: 'Password:' },
   })
-  renderWithProviders(<MachineAuthDialog />, { connections })
+  renderWithProviders(<AuthDialog />, { connections })
   await userEvent.type(screen.getByLabelText('Password:'), 'private-test-response')
   await userEvent.click(screen.getByRole('button', { name: 'Continue' }))
   await waitFor(() => expect(responseStarted).toBe(true))
@@ -164,7 +164,7 @@ test('canceling authentication stops the pending SSH connection and removes auto
   h.connections.authStore.setState({
     prompt: { id: 'expired', name: 'remote', kind: 'secret', prompt: 'Password:' },
   })
-  renderWithProviders(<MachineAuthDialog />, { connections: h.connections })
+  renderWithProviders(<AuthDialog />, { connections: h.connections })
   await userEvent.click(screen.getByRole('button', { name: 'Cancel' }))
   expect(screen.queryByRole('dialog')).toBeNull()
   expect(await pending).toBe('cancelled')

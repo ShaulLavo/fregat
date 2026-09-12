@@ -1,5 +1,5 @@
 import type { MachineEvent } from '@workspace/contracts'
-import { subscribeMachineEvents } from '@/utils/machine-client'
+import { subscribeMachineEvents } from '@/lib/environments/machine-client'
 import { createEnvironmentRecovery } from '@/state/environment-recovery'
 import { createWideEventScope } from '@/lib/wide-event-scope'
 

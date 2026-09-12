@@ -1,8 +1,9 @@
 import { Button } from '@workspace/ui/components/button'
 import { EmptyState } from '@workspace/ui/components/empty-state'
 import { LoadingState } from '@workspace/ui/components/loading-state'
-import { useSshHosts } from '@/hooks/use-ssh-hosts'
-import { SshHostOption } from '@/components/ssh-host-option'
+import { Spinner } from '@workspace/ui/components/spinner'
+import { useSshHosts } from '@/features/environments/hooks/use-ssh-hosts'
+import { SshHostOption } from '@/features/environments/components/ssh-host-option'
 
 export function SshHostList({
   value,
@@ -27,8 +28,14 @@ export function SshHostList({
         description='You can still enter an address above.'
         tone='error'
         action={
-          <Button type='button' variant='outline' size='sm' onClick={() => void query.refetch()}>
-            Retry
+          <Button
+            type='button'
+            variant='outline'
+            size='sm'
+            disabled={query.isFetching}
+            onClick={() => void query.refetch()}
+          >
+            {query.isFetching ? <Spinner /> : null}Retry
           </Button>
         }
       />

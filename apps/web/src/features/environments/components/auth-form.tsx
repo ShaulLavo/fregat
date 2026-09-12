@@ -11,12 +11,12 @@ import {
   DialogHeader,
   DialogTitle,
 } from '@workspace/ui/components/dialog'
-import { useMachineAuth } from '@/hooks/use-machine-auth'
+import { useAuth } from '@/features/environments/hooks/use-auth'
 
-export function MachineAuthForm({ prompt }: { readonly prompt: MachineAuthPrompt }) {
+export function AuthForm({ prompt }: { readonly prompt: MachineAuthPrompt }) {
   const id = useId()
   const [secret, setSecret] = useState('')
-  const { answer, pending, error } = useMachineAuth()
+  const { answer, pending, error } = useAuth()
   const confirmation = prompt.kind === 'confirmation'
   function submit(event: FormEvent) {
     event.preventDefault()

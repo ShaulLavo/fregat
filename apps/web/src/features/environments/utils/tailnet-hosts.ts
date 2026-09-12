@@ -1,4 +1,4 @@
-import type { fetchTailnetHosts } from '@/utils/machine-client'
+import type { fetchTailnetHosts } from '@/lib/environments/machine-client'
 
 type Unavailable = Extract<Awaited<ReturnType<typeof fetchTailnetHosts>>, { status: 'unavailable' }>
 

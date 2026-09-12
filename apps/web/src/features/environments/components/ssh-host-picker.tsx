@@ -1,6 +1,6 @@
 import { Input } from '@workspace/ui/components/input'
-import { SshHostList } from '@/components/ssh-host-list'
-import { TailnetHostList } from '@/components/tailnet-host-list'
+import { SshHostList } from '@/features/environments/components/ssh-host-list'
+import { TailnetHostList } from '@/features/environments/components/tailnet-host-list'
 
 export function SshHostPicker({
   id,

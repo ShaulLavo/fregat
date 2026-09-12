@@ -10,13 +10,13 @@ import {
 } from '@workspace/ui/components/dialog'
 
 import { FilePickerDialog } from '@/components/file-picker-dialog'
-import { MachinePhase } from '@/components/machine-phase'
+import { Phase } from '@/lib/environments/components/phase'
 import { useNavigation } from '@/hooks/use-navigation'
 import { queryClientFor } from '@/lib/environments/state/query-clients'
 import type { ConfirmedMachine } from '@/lib/environments/utils/machines'
 import { openPickedMachineProject } from '@/state/project-picker'
 
-export function ProjectMachinePicker({
+export function ProjectPicker({
   machines,
   onClose,
 }: {
@@ -66,7 +66,7 @@ export function ProjectMachinePicker({
               disabled={machine.phase !== 'live'}
               onClick={() => setSelected(machine)}
             >
-              <MachinePhase phase={machine.phase} label={machine.label ?? machine.name} />
+              <Phase phase={machine.phase} label={machine.label ?? machine.name} />
               <span className='min-w-0 flex-1 truncate text-left'>
                 {machine.label ?? machine.name}
               </span>

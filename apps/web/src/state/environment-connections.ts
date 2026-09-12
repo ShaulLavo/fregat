@@ -36,7 +36,11 @@ import { errorMessage } from '@/lib/error-message'
 import { createEnvironmentRecovery } from '@/state/environment-recovery'
 import { initializeEnvironmentPersistence } from '@/state/environment-persistence'
 import { readConnectedMachines, writeConnectedMachines } from '@/state/connected-machines'
-import { answerMachineAuth, connectSshMachine, disconnectSshMachine } from '@/utils/machine-client'
+import {
+  answerMachineAuth,
+  connectSshMachine,
+  disconnectSshMachine,
+} from '@/lib/environments/machine-client'
 import { startMachineEvents } from '@/state/machine-events'
 
 export type ConnectedMachine = {

@@ -2,7 +2,7 @@ import { use, useSyncExternalStore } from 'react'
 import { EnvironmentConnectionsContext } from '@/providers/environment-connections-context'
 import { createClientInvariantError } from '@/lib/structured-errors'
 
-export function useMachineAuth() {
+export function useAuth() {
   const connections = use(EnvironmentConnectionsContext)
   if (!connections)
     throw createClientInvariantError(

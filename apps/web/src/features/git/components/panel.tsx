@@ -17,7 +17,7 @@ import { PanelLoading } from '@/features/git/components/panel-loading'
 import { diffDocumentQueryKey } from '@/features/git/utils/diff-document-query'
 import { useFocusTarget } from '@/lib/focus/hooks/use-target'
 import { queryHasNoData } from '@/lib/query-state'
-import { EnvironmentStaleNotice } from '@/components/environment-stale-notice'
+import { StaleNotice } from '@/lib/environments/components/stale-notice'
 
 const DISABLED_DIFF_QUERY = ['git', 'diffs', 'disabled'] as const
 
@@ -79,7 +79,7 @@ function PanelContent({ className, rootPath }: ComponentProps<'section'> & { roo
         ref={setRootRef}
         tabIndex={-1}
       >
-        <EnvironmentStaleNotice />
+        <StaleNotice />
         {children}
       </section>
     )

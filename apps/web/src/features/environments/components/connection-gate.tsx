@@ -10,7 +10,7 @@ import { useEnvironmentsStore } from '@/lib/environments/state/store'
 import { readEnvironmentDescriptor } from '@/lib/environments/utils/descriptor'
 import { toClientError } from '@/lib/client-error-taxonomy'
 
-export function EnvironmentConnectionGate({
+export function ConnectionGate({
   origin,
   children,
 }: {

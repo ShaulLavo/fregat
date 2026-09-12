@@ -2,9 +2,9 @@ import { Button } from '@workspace/ui/components/button'
 import { EmptyState } from '@workspace/ui/components/empty-state'
 import { LoadingState } from '@workspace/ui/components/loading-state'
 import { Spinner } from '@workspace/ui/components/spinner'
-import { useTailnetHosts } from '@/hooks/use-tailnet-hosts'
-import { SshHostOption } from '@/components/ssh-host-option'
-import { tailnetUnavailableMessage } from '@/utils/tailnet-hosts'
+import { useTailnetHosts } from '@/features/environments/hooks/use-tailnet-hosts'
+import { SshHostOption } from '@/features/environments/components/ssh-host-option'
+import { tailnetUnavailableMessage } from '@/features/environments/utils/tailnet-hosts'
 
 export function TailnetHostList({
   value,

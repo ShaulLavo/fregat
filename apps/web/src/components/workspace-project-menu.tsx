@@ -8,7 +8,7 @@ import {
 import { useQuery, useQueryClient } from '@tanstack/react-query'
 import { useState } from 'react'
 import { Button } from '@workspace/ui/components/button'
-import { MachinePhase } from '@/components/machine-phase'
+import { Phase } from '@/lib/environments/components/phase'
 import { useEnvironmentsStore } from '@/lib/environments/state/store'
 import { originForQueryClient } from '@/lib/environments/state/query-clients'
 import { useCommand } from '@/keymap/hooks/use-command'
@@ -84,7 +84,7 @@ export function WorkspaceProjectMenu({ workspaceTitle }: { readonly workspaceTit
         <span className='truncate text-xs font-medium'>{workspaceTitle}</span>
         {machine ? (
           <span className='text-muted-foreground flex min-w-0 items-center gap-1 text-[10px]'>
-            <MachinePhase label={machine.label ?? machine.name} phase={machine.phase} />
+            <Phase label={machine.label ?? machine.name} phase={machine.phase} />
             <span className='truncate'>{machine.label ?? machine.name}</span>
           </span>
         ) : null}

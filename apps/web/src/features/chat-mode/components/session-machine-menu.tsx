@@ -9,7 +9,7 @@ import {
   DropdownMenuTrigger,
 } from '@workspace/ui/components/dropdown-menu'
 
-import { MachinePhase } from '@/components/machine-phase'
+import { Phase } from '@/lib/environments/components/phase'
 import { useSessionRailStore } from '@/features/chat-mode/state/session-rail-store'
 import { useConnectedMachines } from '@/hooks/use-connected-machines'
 
@@ -48,7 +48,7 @@ export function SessionMachineMenu() {
               value={machine.environmentId}
               onClick={() => select(machine.environmentId)}
             >
-              <MachinePhase phase={machine.phase} label={machine.label ?? machine.name} />
+              <Phase phase={machine.phase} label={machine.label ?? machine.name} />
               <span className='truncate'>{machine.label ?? machine.name}</span>
             </DropdownMenuRadioItem>
           ))}

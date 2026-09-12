@@ -2,7 +2,7 @@ import { WarningCircleIcon } from '@phosphor-icons/react'
 import { useUnavailableEnvironment } from '@/lib/environments/hooks/use-unavailable-environment'
 import { hasConnectionNotice } from '@/lib/environments/utils/availability'
 
-export function EnvironmentStaleNotice() {
+export function StaleNotice() {
   const unavailable = useUnavailableEnvironment()
   if (!unavailable || !hasConnectionNotice(unavailable)) return null
   return (

@@ -3,12 +3,12 @@ import { useState } from 'react'
 import { Button } from '@workspace/ui/components/button'
 import { Dialog, DialogContent, DialogHeader, DialogTitle } from '@workspace/ui/components/dialog'
 import { Spinner } from '@workspace/ui/components/spinner'
-import { MachineFormDialog } from '@/components/machine-form-dialog'
+import { FormDialog } from '@/features/environments/components/form-dialog'
 import { useEnvironmentConnections } from '@/hooks/use-environment-connections'
 import { useEnvironmentsStore } from '@/lib/environments/state/store'
 import { errorMessage } from '@/lib/error-message'
 
-export function MachinePickerDialog({
+export function PickerDialog({
   mode,
   onClose,
 }: {
@@ -57,7 +57,7 @@ export function MachinePickerDialog({
   }
   if (showForm)
     return (
-      <MachineFormDialog
+      <FormDialog
         intent='connect'
         onCancel={() => {
           if (connections.machines.length === 0) return onClose()

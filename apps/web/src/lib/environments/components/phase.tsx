@@ -2,7 +2,7 @@ import type { EnvironmentPhase } from '@workspace/client-core/environments/utils
 import { OrbitLoader } from '@workspace/ui/components/orbit-loader'
 import { cn } from '@workspace/ui/lib/utils'
 
-export function MachinePhase({
+export function Phase({
   phase,
   label,
 }: {

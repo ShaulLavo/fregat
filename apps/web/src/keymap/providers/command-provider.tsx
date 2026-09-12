@@ -2,7 +2,7 @@ import { selectSettingsSearch } from '@/features/settings/state/search-store'
 import { selectSettingsView } from '@/features/settings/state/view-store'
 import { selectSettingsScope } from '@/features/settings/state/scope-store'
 import { useEditorRuntime } from '@/features/editor/hooks/use-runtime'
-import { MachinePickerDialog } from '@/components/machine-picker-dialog'
+import { PickerDialog } from '@/features/environments/components/picker-dialog'
 import { useEffect, useLayoutEffect, useMemo, useRef, useState, type ReactNode } from 'react'
 import { useQueryClient } from '@tanstack/react-query'
 import { DEFAULT_SETTING_VALUES, type SettingsSnapshot } from '@workspace/contracts'
@@ -366,7 +366,7 @@ export function CommandProvider({ children }: { readonly children: ReactNode }) 
     <CommandContext value={value}>
       {children}
       {environmentDialog ? (
-        <MachinePickerDialog mode={environmentDialog} onClose={() => setEnvironmentDialog(null)} />
+        <PickerDialog mode={environmentDialog} onClose={() => setEnvironmentDialog(null)} />
       ) : null}
       <AppKeymapController />
       <CommandPalette />
