@@ -18,14 +18,6 @@
 @theme inline {
   --font-heading: var(--font-mono);
   --font-ui: -apple-system, BlinkMacSystemFont, 'Segoe UI', sans-serif;
-  --color-sidebar-ring: var(--sidebar-ring);
-  --color-sidebar-border: var(--sidebar-border);
-  --color-sidebar-accent-foreground: var(--sidebar-accent-foreground);
-  --color-sidebar-accent: var(--sidebar-accent);
-  --color-sidebar-primary-foreground: var(--sidebar-primary-foreground);
-  --color-sidebar-primary: var(--sidebar-primary);
-  --color-sidebar-foreground: var(--sidebar-foreground);
-  --color-sidebar: var(--sidebar);
   --color-chart-5: var(--chart-5);
   --color-chart-4: var(--chart-4);
   --color-chart-3: var(--chart-3);
@@ -34,6 +26,9 @@
   --color-ring: var(--ring);
   --color-input: var(--input);
   --color-border: var(--border);
+  /* Keyed `subtle`, not `border-subtle`: the border utility resolves its color
+     from `--color-<name>`, so only this spelling yields `border-subtle`. */
+  --color-subtle: var(--border-subtle);
   --color-destructive: var(--destructive);
   --color-info: var(--info);
   --color-info-foreground: var(--info-foreground);
@@ -85,6 +80,12 @@
   --radius-2xl: calc(var(--radius) * 1.8);
   --radius-3xl: calc(var(--radius) * 2.2);
   --radius-4xl: calc(var(--radius) * 2.6);
+  /* The two UI steps below text-xs. The scale stops at 10px; smaller labels are
+     a bug, not a size. */
+  --text-2xs: 0.6875rem;
+  --text-2xs--line-height: 1rem;
+  --text-3xs: 0.625rem;
+  --text-3xs--line-height: 0.875rem;
   --font-mono:
     'JetBrains Mono Nerd Font', 'JetBrains Mono Variable', ui-monospace, SFMono-Regular, monospace;
   --animate-accordion-down: app-accordion-down 150ms ease-out;
@@ -109,6 +110,13 @@
 :root {
   color-scheme: light;
 
+  /* Every horizontal bar — titlebar, pane and dialog headers, tab strips — is
+     --bar-height, and the vertical icon rail is exactly that wide so it lines
+     up with the header beside it. */
+  --bar-height: 2.5rem;
+  --bar-padding-x: 0.75rem;
+  --rail-width: var(--bar-height);
+
   /* Density changes chrome and controls. Cozy also restores the tree's
      pre-compaction typography through its shadow host. */
   --density-control-height: 2rem;
@@ -117,6 +125,13 @@
   --density-control-gap: 0.375rem;
   --density-control-padding-x: 0.625rem;
   --density-control-padding-x-tight: 0.5rem;
+  --density-row-height: 1.5rem;
+  --density-row-padding-x: 0.5rem;
+  --density-row-padding-y: 0.375rem;
+  --density-chip-height: 1.25rem;
+  /* The step below --density-section-gap: a hairline inset or gap that only has
+     room to shrink by 2px. Anything tighter than this should not be a knob. */
+  --density-gap-tight: 0.25rem;
   --density-input-group-addon-gap: 0.5rem;
   --density-input-group-addon-padding-y: 0.375rem;
   --density-input-group-block-padding: 0.625rem;
@@ -216,6 +231,10 @@
      aliases --foreground rather than pinning black. */
   --brand-openai: var(--foreground);
   --border: oklch(0.922 0.006 70);
+  /* The lighter divider weight, derived once. Every palette block below
+     redefines --border on this same element (<html>), so this formula
+     re-resolves against whichever one wins; a copied literal would drift. */
+  --border-subtle: color-mix(in oklch, var(--border) 55%, transparent);
   --input: oklch(0.922 0.006 70);
   --ring: oklch(0.708 0.006 70);
   --chart-1: oklch(0.87 0.006 70);
@@ -224,14 +243,6 @@
   --chart-4: oklch(0.371 0.006 70);
   --chart-5: oklch(0.269 0.006 70);
   --radius: 0.625rem;
-  --sidebar: oklch(0.985 0.006 70);
-  --sidebar-foreground: oklch(0.145 0.006 70);
-  --sidebar-primary: oklch(0.205 0.006 70);
-  --sidebar-primary-foreground: oklch(0.985 0.006 70);
-  --sidebar-accent: oklch(0.97 0.006 70);
-  --sidebar-accent-foreground: oklch(0.205 0.006 70);
-  --sidebar-border: oklch(0.922 0.006 70);
-  --sidebar-ring: oklch(0.708 0.006 70);
   --trees-file-icon-color-astro: #a631be;
   --trees-file-icon-color-babel: #d5a910;
   --trees-file-icon-color-bash: #199f43;
@@ -325,11 +336,22 @@
 }
 
 :root[data-density='compact'] {
+  --bar-height: 2.25rem;
+  --bar-padding-x: 0.5rem;
   --density-control-height: 1.75rem;
   --density-control-height-sm: 1.5rem;
   --density-control-height-lg: 2rem;
   --density-control-padding-x: 0.5rem;
   --density-control-padding-x-tight: 0.375rem;
+  /* The one control dimension that had no compact value: gaps stayed 6px at both
+     densities while every neighbouring token tightened. 6/4 completes the gap
+     scale between --density-gap-tight (4/2) and --density-section-gap (8/6). */
+  --density-control-gap: 0.25rem;
+  --density-row-height: 1.25rem;
+  --density-row-padding-x: 0.375rem;
+  --density-row-padding-y: 0.25rem;
+  --density-chip-height: 1.125rem;
+  --density-gap-tight: 0.125rem;
   --density-input-group-addon-gap: 0.375rem;
   --density-input-group-addon-padding-y: 0.25rem;
   --density-input-group-block-padding: 0.5rem;
@@ -412,14 +434,6 @@
   --chart-3: oklch(0.439 0.006 70);
   --chart-4: oklch(0.371 0.006 70);
   --chart-5: oklch(0.269 0.006 70);
-  --sidebar: oklch(0.205 0.006 70);
-  --sidebar-foreground: oklch(0.985 0.006 70);
-  --sidebar-primary: oklch(0.92 0.012 70);
-  --sidebar-primary-foreground: oklch(0.985 0.006 70);
-  --sidebar-accent: oklch(0.269 0.006 70);
-  --sidebar-accent-foreground: oklch(0.985 0.006 70);
-  --sidebar-border: oklch(1 0 0 / 10%);
-  --sidebar-ring: oklch(0.556 0.006 70);
   --trees-file-icon-color-astro: #d568ea;
   --trees-file-icon-color-babel: #ffd452;
   --trees-file-icon-color-bash: #5ecc71;
@@ -550,14 +564,6 @@ html[data-palette='sage'] {
   --chart-3: oklch(0.5 0.14 310);
   --chart-4: oklch(0.7 0.12 90);
   --chart-5: oklch(0.65 0.15 30);
-  --sidebar: oklch(0.97 0.003 90);
-  --sidebar-foreground: oklch(0.16 0.01 260);
-  --sidebar-primary: oklch(0.47 0.08 170);
-  --sidebar-primary-foreground: oklch(0.98 0.005 170);
-  --sidebar-accent: oklch(0.95 0.008 170);
-  --sidebar-accent-foreground: oklch(0.22 0.01 260);
-  --sidebar-border: oklch(0.9 0.005 90);
-  --sidebar-ring: oklch(0.47 0.08 170);
 }
 
 .dark[data-palette='sage'] {
@@ -588,14 +594,6 @@ html[data-palette='sage'] {
   --chart-3: oklch(0.62 0.1 310);
   --chart-4: oklch(0.78 0.12 90);
   --chart-5: oklch(0.72 0.15 30);
-  --sidebar: oklch(0.21 0.01 260);
-  --sidebar-foreground: oklch(0.92 0.008 90);
-  --sidebar-primary: oklch(0.72 0.1 175);
-  --sidebar-primary-foreground: oklch(0.17 0.03 175);
-  --sidebar-accent: oklch(0.24 0.015 260);
-  --sidebar-accent-foreground: oklch(0.92 0.008 90);
-  --sidebar-border: oklch(1 0 0 / 9%);
-  --sidebar-ring: oklch(0.72 0.1 175);
 }
 
 /* Both shells give the editor and terminal a pane that already paints the
@@ -613,6 +611,10 @@ html[data-palette='sage'] {
 
 [data-workbench] {
   --border: transparent;
+  /* Re-derive rather than inherit: a custom property is substituted on the element that declares
+     it, so the :root definition of --border-subtle already froze the visible grey before it got
+     here and would paint a line where --border deliberately paints none. */
+  --border-subtle: color-mix(in oklch, var(--border) 55%, transparent);
 }
 
 @media (forced-colors: active) {

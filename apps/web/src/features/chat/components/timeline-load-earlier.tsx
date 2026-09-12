@@ -19,7 +19,7 @@ export function TimelineLoadEarlier({
   return (
     <div className='pointer-events-none absolute inset-x-0 top-2 flex justify-center'>
       <Button
-        className='border-border/70 bg-background backdrop-material compact:h-6 compact:gap-1 compact:px-2 pointer-events-auto h-7 gap-1.5 rounded-full px-3 text-xs shadow-sm'
+        className='backdrop-material pointer-events-auto shadow-md'
         disabled={pending}
         size='sm'
         type='button'

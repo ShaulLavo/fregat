@@ -32,7 +32,7 @@ export function AssistantMarkdownCodeBody({
 
   return (
     <pre
-      className='overflow-x-auto rounded-sm bg-transparent p-2 text-xs leading-5'
+      className='overflow-x-auto bg-transparent p-2 text-xs leading-5'
       data-streamdown='code-block-body'
     >
       <code className='font-mono'>

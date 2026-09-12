@@ -17,11 +17,11 @@ export function ComposerActivePlan({
   separated: boolean
 }) {
   return (
-    <Collapsible className={cn('group/plan', separated && 'border-border/60 border-t')}>
+    <Collapsible className={cn('group/plan', separated && 'border-subtle border-t')}>
       <CollapsibleTrigger
         render={
           <Button
-            className='text-muted-foreground h-auto w-full justify-start gap-2 px-2 py-1.5 text-[11px] font-normal'
+            className='text-muted-foreground text-2xs h-auto w-full justify-start gap-2 px-2 py-1.5 font-normal'
             variant='ghost'
           />
         }
@@ -45,10 +45,7 @@ export function ComposerActivePlan({
           data-tool-group-scroll
         >
           {plan.steps.map((step, index) => (
-            <li
-              className='flex items-start gap-2 text-[11px] leading-5'
-              key={`${index}:${step.step}`}
-            >
+            <li className='text-2xs flex items-start gap-2 leading-5' key={`${index}:${step.step}`}>
               {step.status === 'completed' ? (
                 <CheckIcon aria-label='Completed' className='text-success mt-1 size-3 shrink-0' />
               ) : null}

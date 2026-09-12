@@ -1,4 +1,5 @@
 import { CaretRightIcon } from '@phosphor-icons/react'
+import { Button } from '@workspace/ui/components/button'
 import { cn } from '@workspace/ui/lib/utils'
 import { Fragment } from 'react'
 
@@ -14,16 +15,18 @@ export function Breadcrumbs({ currentPath }: { currentPath: string }) {
       {crumbs.map((crumb, index) => (
         <Fragment key={crumb.path || 'root'}>
           {index > 0 && <CaretRightIcon className='text-muted-foreground size-3 shrink-0' />}
-          <button
+          <Button
             className={cn(
-              'compact:px-1.5 compact:py-1 min-w-0 shrink truncate rounded-sm px-2 py-1.5 text-muted-foreground transition-colors duration-150 ease-[cubic-bezier(0.23,1,0.32,1)] outline-none hover:bg-muted hover:text-foreground focus-visible:ring-1 focus-visible:ring-ring/50',
+              'text-muted-foreground min-w-0 shrink truncate',
               crumb.path === currentPath && 'text-foreground',
             )}
             onClick={() => navigateTo(crumb.path)}
+            size='sm'
             type='button'
+            variant='ghost'
           >
             {crumb.label}
-          </button>
+          </Button>
         </Fragment>
       ))}
     </div>

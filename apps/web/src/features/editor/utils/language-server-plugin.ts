@@ -32,6 +32,7 @@ import { languageServerWebSocketConstructor } from '@/lib/server-sockets'
 import { activeServerOrigin, environmentClientFor } from '@/lib/client'
 import { environmentActivitySignal } from '@/lib/environments/state/activity'
 import { log } from '@/lib/client-logging'
+import type { LanguageServerDocument } from '@/lib/language-server-document'
 
 export type LanguageServerMatch = LspMatch
 
@@ -44,6 +45,7 @@ export type LanguageServerDocumentTarget = {
 }
 
 type MatchedLanguageServerPluginOptions = {
+  document: LanguageServerDocument | null
   origin?: string
   documentSyncController: LanguageServerDocumentSyncController
   enabled: boolean
@@ -61,6 +63,7 @@ type MatchedLanguageServerPluginOptions = {
 }
 
 export function createMatchedLanguageServerPlugin({
+  document,
   origin = activeServerOrigin(),
   documentSyncController,
   enabled,
@@ -75,7 +78,8 @@ export function createMatchedLanguageServerPlugin({
   onDidNavigateDiagnostic,
 }: MatchedLanguageServerPluginOptions): LanguageServerPlugin {
   const eligible = enabled ? (matches ?? []) : []
-  if (eligible.length === 0) return createIdleLanguageServerPlugin(statusSource)
+  if (eligible.length === 0 || document === null)
+    return createIdleLanguageServerPlugin(statusSource)
 
   const descriptors = eligible.map((match) => ({
     ...match,
@@ -97,10 +101,11 @@ export function createMatchedLanguageServerPlugin({
     lanes,
     documentSync: {
       controller: documentSyncController,
+      uriForDocument: (snapshot) => (snapshot.documentId === document.key ? document.uri : null),
       languageIdForDocument: (_languageId, uri) => lspLanguageIdForPath(uri),
     },
     semanticTokens: descriptors.some((match) => match.features.semanticTokens !== undefined)
-      ? semanticTokenOwnerFactory(semanticControllers)
+      ? semanticTokenOwnerFactory(semanticControllers, document)
       : undefined,
     onApplyWorkspaceEdit,
     onDefinitionLinkHover,
@@ -217,6 +222,7 @@ function laneNotificationHandlers(
 
 function semanticTokenOwnerFactory(
   controllers: Map<string, SemanticTokenController>,
+  document: LanguageServerDocument,
 ): LanguageServerSemanticTokensFactory {
   return (owner) => {
     controllers.get(owner.id)?.dispose()
@@ -226,7 +232,7 @@ function semanticTokenOwnerFactory(
     controller.handleConnected()
 
     return {
-      ...semanticTokenLayerOptions(controller),
+      ...semanticTokenLayerOptions(controller, document),
       dispose: () => {
         if (controllers.get(owner.id) === controller) controllers.delete(owner.id)
         controller.dispose()
@@ -235,13 +241,17 @@ function semanticTokenOwnerFactory(
   }
 }
 
-function semanticTokenLayerOptions(semanticTokens: SemanticTokenController) {
+function semanticTokenLayerOptions(
+  semanticTokens: SemanticTokenController,
+  target: LanguageServerDocument,
+) {
   return {
     onLayer: (
       layer: Parameters<SemanticTokenController['attachLayer']>[0],
       document: Parameters<SemanticTokenController['attachLayer']>[1],
     ) => {
-      semanticTokens.attachLayer(layer, document)
+      const uri = document.documentId === target.key ? target.uri : null
+      semanticTokens.attachLayer(layer, document, uri)
     },
     onRangeNeeded: semanticTokens.handleRangeNeeded.bind(semanticTokens),
     onResyncRequired: semanticTokens.handleResyncRequired.bind(semanticTokens),

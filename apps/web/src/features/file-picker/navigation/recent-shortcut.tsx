@@ -1,5 +1,6 @@
 import type { FsEntry } from '@/lib/file-system-types'
 import { isDirectoryEntry } from '@/lib/file-system-types'
+import { Button } from '@workspace/ui/components/button'
 import { cn } from '@workspace/ui/lib/utils'
 
 import { EntryIcon } from '@/features/file-picker/entry-ui'
@@ -16,7 +17,7 @@ export function RecentShortcut({ currentPath, entry }: { currentPath: string; en
   const selected = isDirectoryEntry(entry) && currentPath === entry.path
 
   return (
-    <button
+    <Button
       aria-current={selected ? 'page' : undefined}
       className={cn(
         SIDEBAR_NAV_BUTTON_BASE_CLASS,
@@ -25,9 +26,10 @@ export function RecentShortcut({ currentPath, entry }: { currentPath: string; en
       )}
       onClick={() => revealEntry(entry)}
       type='button'
+      variant='ghost'
     >
       <EntryIcon className='size-4' entry={entry} iconMode='default' selected={selected} />
       <span className='truncate'>{entry.name}</span>
-    </button>
+    </Button>
   )
 }

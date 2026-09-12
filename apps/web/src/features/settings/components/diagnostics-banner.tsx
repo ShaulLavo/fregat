@@ -18,7 +18,7 @@ export function DiagnosticsBanner({ diagnostics }: { diagnostics: readonly Setti
   if (diagnostics.length === 0) return null
 
   return (
-    <div className='border-warning/30 bg-warning/10 compact:mb-3 compact:p-2 mb-4 rounded-md border p-3'>
+    <div className='border-warning/30 bg-warning/10 mb-(--density-section-padding) rounded-lg border p-(--density-section-padding)'>
       <p className='text-warning text-xs font-medium'>
         {diagnostics.length} {diagnostics.length === 1 ? 'entry' : 'entries'} in your settings files{' '}
         {diagnostics.length === 1 ? 'was' : 'were'} not applied

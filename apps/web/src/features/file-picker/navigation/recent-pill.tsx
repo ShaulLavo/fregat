@@ -1,5 +1,6 @@
 import type { FsEntry } from '@/lib/file-system-types'
 import { isDirectoryEntry } from '@/lib/file-system-types'
+import { Button } from '@workspace/ui/components/button'
 import { cn } from '@workspace/ui/lib/utils'
 
 import { useFilePickerSessionActions } from '@/features/file-picker/hooks/use-file-picker-session-actions'
@@ -14,7 +15,7 @@ export function RecentPill({ currentPath, entry }: { currentPath: string; entry:
   const selected = isDirectoryEntry(entry) && currentPath === entry.path
 
   return (
-    <button
+    <Button
       aria-current={selected ? 'page' : undefined}
       className={cn(
         PILL_NAV_BUTTON_BASE_CLASS,
@@ -22,9 +23,11 @@ export function RecentPill({ currentPath, entry }: { currentPath: string; entry:
         !selected && PILL_NAV_BUTTON_IDLE_CLASS,
       )}
       onClick={() => revealEntry(entry)}
+      size='sm'
       type='button'
+      variant='ghost'
     >
       {entry.name}
-    </button>
+    </Button>
   )
 }

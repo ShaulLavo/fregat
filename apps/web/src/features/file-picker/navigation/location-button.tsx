@@ -1,3 +1,4 @@
+import { Button } from '@workspace/ui/components/button'
 import { cn } from '@workspace/ui/lib/utils'
 
 import {
@@ -20,7 +21,7 @@ export function LocationButton({
   const Icon = selected && 'openIcon' in location ? location.openIcon : location.icon
 
   return (
-    <button
+    <Button
       aria-current={selected ? 'page' : undefined}
       className={cn(
         SIDEBAR_NAV_BUTTON_BASE_CLASS,
@@ -29,12 +30,13 @@ export function LocationButton({
       )}
       onClick={() => jumpTo(location.path)}
       type='button'
+      variant='ghost'
     >
       <Icon
         className={cn('size-4 shrink-0', selected ? 'text-info' : 'text-muted-foreground')}
         weight='duotone'
       />
       <span className='truncate'>{location.label}</span>
-    </button>
+    </Button>
   )
 }

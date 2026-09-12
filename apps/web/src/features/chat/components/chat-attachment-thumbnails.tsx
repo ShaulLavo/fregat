@@ -3,6 +3,7 @@ import { originForQueryClient } from '@/lib/environments/state/query-clients'
 import { serverEndpoint } from '@/lib/client'
 import { useEnvironmentsStore } from '@/lib/environments/state/store'
 import type { ChatAttachment } from '@workspace/contracts'
+import { Button } from '@workspace/ui/components/button'
 import { cn } from '@workspace/ui/lib/utils'
 import { useState } from 'react'
 
@@ -33,13 +34,15 @@ export function ChatAttachmentThumbnails({
   return (
     <div className={cn('flex flex-wrap gap-1.5', className)} data-chat-attachments='true'>
       {images.map((image, index) => (
-        <button
+        <Button
           aria-label={`Open ${image.name}`}
-          className='border-border/70 hover:border-border focus-visible:ring-ring size-16 shrink-0 overflow-hidden rounded-md border transition-colors focus-visible:ring-2 focus-visible:outline-none'
+          className='size-16 shrink-0 overflow-hidden'
           data-scroll-anchor-ignore
           key={image.id}
+          size='icon'
           title={image.name}
           type='button'
+          variant='outline'
           onClick={() => setOpenIndex(index)}
         >
           <img
@@ -49,11 +52,11 @@ export function ChatAttachmentThumbnails({
             draggable={false}
             src={image.src}
           />
-        </button>
+        </Button>
       ))}
       {unrenderable.map((attachment) => (
         <span
-          className='border-border text-muted-foreground rounded border px-1.5 py-0.5 text-[10px]'
+          className='border-border text-muted-foreground text-3xs rounded-md border px-1.5 py-0.5'
           key={attachment.id}
           title='This image type was not stored, so it cannot be shown.'
         >

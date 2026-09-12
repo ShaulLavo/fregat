@@ -26,10 +26,10 @@ export function HighlightedPreview({
     return (
       <span className='block max-w-full overflow-hidden text-ellipsis whitespace-nowrap'>
         {highlight.before}
-        <mark className='bg-diff-removed/15 text-diff-removed decoration-diff-removed/70 inline-block max-w-full overflow-hidden rounded-sm px-0.5 align-bottom text-ellipsis whitespace-nowrap line-through'>
+        <mark className='bg-diff-removed/15 text-diff-removed decoration-diff-removed/70 inline-block max-w-full overflow-hidden rounded-md px-0.5 align-bottom text-ellipsis whitespace-nowrap line-through'>
           {highlight.match}
         </mark>
-        <mark className='bg-diff-added/15 text-diff-added ml-0.5 inline-block max-w-full overflow-hidden rounded-sm px-0.5 align-bottom text-ellipsis whitespace-nowrap'>
+        <mark className='bg-diff-added/15 text-diff-added ml-0.5 inline-block max-w-full overflow-hidden rounded-md px-0.5 align-bottom text-ellipsis whitespace-nowrap'>
           {replacementText}
         </mark>
         {highlight.after}
@@ -42,7 +42,7 @@ export function HighlightedPreview({
       {highlight.before}
       <mark
         className={cn(
-          'text-foreground inline-block max-w-full overflow-hidden rounded-sm px-0.5 align-bottom text-ellipsis whitespace-nowrap',
+          'text-foreground inline-block max-w-full overflow-hidden rounded-md px-0.5 align-bottom text-ellipsis whitespace-nowrap',
           // Same tokens the editor-backed result tabs paint with, so a match
           // looks the same in the sidebar and in a result tab — including the
           // forced-colors mapping, where every background collapses to the

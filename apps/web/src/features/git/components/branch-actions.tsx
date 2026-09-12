@@ -36,7 +36,7 @@ export function BranchActions({
     <span className='flex shrink-0 items-center gap-1'>
       {pushLabel(state) ? (
         <Button
-          className='h-6 gap-1 rounded-md px-1.5 text-[11px]'
+          className='text-2xs'
           disabled={push.isPending}
           size='sm'
           type='button'
@@ -50,8 +50,8 @@ export function BranchActions({
       {pullRequestState?.pullRequest ? (
         <a
           className={cn(
-            'flex h-6 items-center gap-1 rounded-md px-1.5 text-[11px]',
-            'hover:bg-accent',
+            'flex h-(--density-control-height-sm) items-center gap-1 rounded-md px-(--density-control-padding-x) text-2xs',
+            'hover:bg-muted',
             pullRequestToneClass(pullRequestState.pullRequest.state),
           )}
           href={pullRequestState.pullRequest.url}
@@ -65,7 +65,7 @@ export function BranchActions({
       ) : null}
       {canCreatePullRequest(state, pullRequestState) ? (
         <Button
-          className='h-6 gap-1 rounded-md px-1.5 text-[11px]'
+          className='text-2xs'
           disabled={createPullRequest.isPending}
           size='sm'
           type='button'

@@ -32,7 +32,7 @@ export function KeybindingSection() {
         omitted={defaults.omitted}
         unmapped={defaults.unmapped}
       />
-      <div className='border-border flex max-h-64 flex-col overflow-y-auto rounded-md border'>
+      <div className='border-border flex max-h-64 flex-col overflow-y-auto rounded-lg border'>
         {visible.length === 0 ? <EmptyRow>No commands match this search.</EmptyRow> : null}
         {visible.map((row) => (
           <KeybindingRow

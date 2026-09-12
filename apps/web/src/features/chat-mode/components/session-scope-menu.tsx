@@ -29,7 +29,7 @@ export function SessionScopeMenu({
       <DropdownMenuTrigger
         render={
           <Button
-            className='text-muted-foreground hover:text-foreground compact:h-6 h-7 max-w-full min-w-0 justify-start gap-1 rounded-md px-1.5 text-[11px] font-medium'
+            className='text-muted-foreground hover:text-foreground text-2xs max-w-full min-w-0 justify-start gap-1 px-1.5 font-medium'
             size='sm'
             type='button'
             variant='ghost'
@@ -39,10 +39,7 @@ export function SessionScopeMenu({
           </Button>
         }
       />
-      <DropdownMenuContent
-        align='start'
-        className='max-h-[60vh] w-60 overflow-y-auto rounded-md p-1'
-      >
+      <DropdownMenuContent align='start' className='max-h-[60vh] w-60 overflow-y-auto p-1'>
         <DropdownMenuRadioGroup value={scope ?? ALL_PROJECTS_VALUE}>
           {/* Inside the group: base-ui resolves the label against its group context. */}
           <DropdownMenuLabel>Show sessions from</DropdownMenuLabel>
@@ -58,12 +55,12 @@ export function SessionScopeMenu({
               <span className='flex min-w-0 flex-1 items-baseline gap-1.5'>
                 <span className='truncate'>{project.title}</span>
                 {project.qualifier ? (
-                  <span className='text-muted-foreground/70 shrink-0 truncate text-[11px]'>
+                  <span className='text-muted-foreground/70 text-2xs shrink-0 truncate'>
                     {project.qualifier}
                   </span>
                 ) : null}
               </span>
-              <span className='text-muted-foreground shrink-0 text-[11px] tabular-nums'>
+              <span className='text-muted-foreground text-2xs shrink-0 tabular-nums'>
                 {project.sessionCount}
               </span>
             </DropdownMenuRadioItem>

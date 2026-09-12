@@ -54,11 +54,11 @@ function StatusLine({
     <div
       className={
         tone === 'destructive'
-          ? 'text-destructive compact:px-2 compact:py-1.5 border-t px-3 py-2 text-[11px]'
-          : 'text-warning compact:px-2 compact:py-1.5 border-t px-3 py-2 text-[11px]'
+          ? 'text-destructive text-2xs border-t px-(--density-control-padding-x) py-(--density-section-gap)'
+          : 'text-warning text-2xs border-t px-(--density-control-padding-x) py-(--density-section-gap)'
       }
     >
-      <div className='compact:gap-1 flex min-w-0 items-center gap-1.5'>{children}</div>
+      <div className='flex min-w-0 items-center gap-(--density-control-gap)'>{children}</div>
     </div>
   )
 }

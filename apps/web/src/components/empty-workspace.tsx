@@ -8,7 +8,7 @@ export function EmptyWorkspace({ onChooseFolder }: { onChooseFolder: () => void 
   return (
     <section className='bg-background relative isolate flex min-h-0 flex-1 items-center justify-center overflow-hidden px-4 py-10'>
       <Wallpaper />
-      <div className='bg-card backdrop-material relative z-10 flex w-full max-w-sm flex-col items-center gap-4 rounded-md border p-6 text-center shadow-lg'>
+      <div className='bg-card backdrop-material relative z-10 flex w-full max-w-sm flex-col items-center gap-4 rounded-lg border p-6 text-center'>
         <span className='bg-muted flex size-11 items-center justify-center rounded-md border'>
           <FolderOpenIcon className='size-5' weight='duotone' />
         </span>

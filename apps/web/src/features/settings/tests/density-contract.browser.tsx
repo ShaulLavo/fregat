@@ -42,6 +42,11 @@ import { LogsToolbar } from '@/features/logs/components/toolbar'
 import { SearchControls } from '@/features/workspace/components/search-controls'
 import { AppProviders, createTestQueryClient, seedBootMirrorTheme } from '../../../../test/render'
 
+// Every horizontal bar and every vertical icon rail resolves to --bar-height.
+// Naming it once is the contract: a bar that disagrees is the header-jump bug
+// this suite exists to catch.
+const BAR_HEIGHT = { compact: 36, cozy: 40 } as const
+
 let root: Root | null = null
 
 afterEach(() => {
@@ -226,7 +231,7 @@ test('persistent app chrome changes compactly and leaves content text unchanged'
   const loadEarlierFontSize = getComputedStyle(loadEarlier).fontSize
 
   setDensity('compact')
-  expect(header.getBoundingClientRect().height).toBe(40)
+  expect(header.getBoundingClientRect().height).toBe(BAR_HEIGHT.compact)
   expect(submit.getBoundingClientRect().height).toBe(24)
   expect(pixelValue(getComputedStyle(chatStatus).paddingLeft)).toBe(8)
   expect(pixelValue(getComputedStyle(chatStatus).paddingTop)).toBe(6)
@@ -238,13 +243,13 @@ test('persistent app chrome changes compactly and leaves content text unchanged'
   expect(pixelValue(getComputedStyle(banner).paddingTop)).toBe(4)
 
   setDensity('cozy')
-  expect(header.getBoundingClientRect().height).toBe(48)
+  expect(header.getBoundingClientRect().height).toBe(BAR_HEIGHT.cozy)
   expect(submit.getBoundingClientRect().height).toBe(28)
-  expect(pixelValue(getComputedStyle(chatStatus).paddingLeft)).toBe(12)
+  expect(pixelValue(getComputedStyle(chatStatus).paddingLeft)).toBe(10)
   expect(pixelValue(getComputedStyle(chatStatus).paddingTop)).toBe(8)
   expect(pixelValue(getComputedStyle(chatStatusContent).gap)).toBe(6)
   expect(loadEarlier.getBoundingClientRect().height).toBe(28)
-  expect(pixelValue(getComputedStyle(loadEarlier).paddingLeft)).toBe(12)
+  expect(pixelValue(getComputedStyle(loadEarlier).paddingLeft)).toBe(10)
   expect(timeRange.getBoundingClientRect().height).toBe(28)
   expect(pixelValue(getComputedStyle(logsToolbar).paddingTop)).toBe(6)
   expect(pixelValue(getComputedStyle(banner).paddingTop)).toBe(6)
@@ -362,22 +367,22 @@ test('custom composer, picker, search, and references chrome follows density', a
   expect(pixelValue(getComputedStyle(editorShell).paddingTop)).toBe(12)
   expect(pixelValue(getComputedStyle(attachmentStrip).paddingLeft)).toBe(8)
   expect(pixelValue(getComputedStyle(commandItem).paddingTop)).toBe(6)
-  expect(modelRail.getBoundingClientRect().width).toBe(40)
+  expect(modelRail.getBoundingClientRect().width).toBe(BAR_HEIGHT.compact)
   expect(pixelValue(getComputedStyle(searchShell).paddingTop)).toBe(4)
   expect(searchInput.getBoundingClientRect().height).toBe(24)
   expect(pixelValue(getComputedStyle(searchInput).paddingRight)).toBe(88)
-  expect(referencesHeader.getBoundingClientRect().height).toBe(36)
+  expect(referencesHeader.getBoundingClientRect().height).toBe(BAR_HEIGHT.compact)
 
   setDensity('cozy')
   expect(pixelValue(getComputedStyle(editorShell).paddingLeft)).toBe(16)
   expect(pixelValue(getComputedStyle(editorShell).paddingTop)).toBe(16)
-  expect(pixelValue(getComputedStyle(attachmentStrip).paddingLeft)).toBe(12)
+  expect(pixelValue(getComputedStyle(attachmentStrip).paddingLeft)).toBe(10)
   expect(pixelValue(getComputedStyle(commandItem).paddingTop)).toBe(8)
-  expect(modelRail.getBoundingClientRect().width).toBe(44)
+  expect(modelRail.getBoundingClientRect().width).toBe(BAR_HEIGHT.cozy)
   expect(pixelValue(getComputedStyle(searchShell).paddingTop)).toBe(6)
   expect(searchInput.getBoundingClientRect().height).toBe(28)
   expect(pixelValue(getComputedStyle(searchInput).paddingRight)).toBe(88)
-  expect(referencesHeader.getBoundingClientRect().height).toBe(40)
+  expect(referencesHeader.getBoundingClientRect().height).toBe(BAR_HEIGHT.cozy)
 })
 
 test('file-picker path controls and breadcrumbs follow density', () => {
@@ -412,7 +417,7 @@ test('file-picker path controls and breadcrumbs follow density', () => {
   const pathInput = inputByLabel('Folder path')
   const breadcrumb = requiredElement<HTMLButtonElement>('[data-testid="breadcrumbs"] button')
 
-  expect(pathInput.getBoundingClientRect().height).toBe(24)
+  expect(pathInput.getBoundingClientRect().height).toBe(28)
   expect(breadcrumb.getBoundingClientRect().height).toBe(24)
 
   setDensity('cozy')

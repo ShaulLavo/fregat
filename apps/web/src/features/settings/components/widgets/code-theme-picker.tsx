@@ -52,11 +52,11 @@ export function CodeThemePicker({
               <span className='flex min-w-0 flex-col gap-0.5'>
                 <span className='truncate'>{theme.label}</span>
                 {theme.subtitle ? (
-                  <span className='text-muted-foreground text-[10px]'>{theme.subtitle}</span>
+                  <span className='text-muted-foreground text-3xs'>{theme.subtitle}</span>
                 ) : null}
               </span>
               {theme.id === value ? (
-                <CommandShortcut className='text-[10px] tracking-normal'>Current</CommandShortcut>
+                <CommandShortcut className='text-3xs tracking-normal'>Current</CommandShortcut>
               ) : null}
             </CommandItem>
           ))}
@@ -64,9 +64,9 @@ export function CodeThemePicker({
         <div className='border-border min-w-0 border-t sm:border-t-0 sm:border-l'>
           {highlighted ? (
             <>
-              <div className='flex h-10 items-center justify-between gap-3 px-3 text-xs'>
+              <div className='flex h-(--bar-height) items-center justify-between gap-3 px-(--bar-padding-x) text-xs'>
                 <span className='truncate font-medium'>{highlighted.label}</span>
-                <span className='text-muted-foreground text-[10px]'>Preview</span>
+                <span className='text-muted-foreground text-3xs'>Preview</span>
               </div>
               <CodeThemePreview themeId={highlighted.id} />
             </>
@@ -77,7 +77,7 @@ export function CodeThemePicker({
           )}
         </div>
       </div>
-      <p className='text-muted-foreground border-border border-t px-3 py-2 text-[11px]'>
+      <p className='text-muted-foreground border-border text-2xs border-t px-3 py-2'>
         Arrow keys to preview · Enter to use theme · Esc to cancel
       </p>
     </Command>

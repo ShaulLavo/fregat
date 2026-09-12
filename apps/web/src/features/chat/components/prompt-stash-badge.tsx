@@ -27,7 +27,7 @@ export function PromptStashBadge({
         render={
           <Button
             aria-label={`Stashed prompts: ${entries.length}`}
-            className='text-muted-foreground hover:text-foreground compact:h-6 compact:px-1 h-7 shrink-0 gap-1 rounded-md px-1.5 text-[11px] font-normal'
+            className='text-muted-foreground hover:text-foreground text-2xs shrink-0 gap-1 font-normal'
             disabled={disabled}
             size='sm'
             title='Stashed prompts (⌘S)'

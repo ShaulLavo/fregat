@@ -71,7 +71,7 @@ export const LogsEventRow = memo(
         <Accordion className='block' value={value}>
           <AccordionItem className='border-b-0' value={event.id}>
             <div
-              className='hover:bg-row-hover grid min-h-[54px] w-full cursor-pointer grid-cols-[64px_minmax(0,1fr)_auto] items-center gap-2 px-2 py-2 transition-colors'
+              className='hover:bg-row-hover grid min-h-[54px] w-full cursor-pointer grid-cols-[64px_minmax(0,1fr)_auto] items-center gap-2 px-(--density-row-padding-x) py-2 transition-colors'
               aria-expanded={expanded}
               aria-label={expanded ? 'Collapse log event' : 'Expand log event'}
               data-log-row-summary=''
@@ -81,29 +81,29 @@ export const LogsEventRow = memo(
               onKeyDown={handleRowKeyDown}
               onPointerDown={handleRowPointerDown}
             >
-              <span className='text-muted-foreground flex min-w-0 items-center gap-1.5 font-mono text-[10px] tabular-nums'>
+              <span className='text-muted-foreground text-3xs flex min-w-0 items-center gap-1.5 font-mono tabular-nums'>
                 <span
                   className={cn('size-1.5 shrink-0 rounded-full', logLevelDotClass(event.level))}
                 />
                 {formatLogTime(event.timestamp)}
               </span>
               <span className='min-w-0'>
-                <span className='block truncate text-[11px] font-medium'>
+                <span className='text-2xs block truncate font-medium'>
                   {formatLogPrimary(event)}
                 </span>
-                <span className='text-muted-foreground block truncate text-[10px]'>
+                <span className='text-muted-foreground text-3xs block truncate'>
                   {formatLogSecondary(event)}
                 </span>
               </span>
               <div className='flex min-w-0 items-center gap-1.5'>
                 {event.durationMs !== null ? (
-                  <span className='text-muted-foreground font-mono text-[10px] tabular-nums'>
+                  <span className='text-muted-foreground text-3xs font-mono tabular-nums'>
                     {formatDuration(event.durationMs)}
                   </span>
                 ) : null}
                 <span
                   className={cn(
-                    'rounded-sm border px-1.5 py-0.5 font-mono text-[9px] uppercase leading-3',
+                    'rounded-md border px-1.5 py-0.5 font-mono text-3xs uppercase leading-3',
                     logLevelClass(event.level),
                   )}
                 >
@@ -112,7 +112,7 @@ export const LogsEventRow = memo(
                 <LogsRowChevron expanded={expanded} />
               </div>
             </div>
-            <AccordionContent className='border-t px-2 py-2'>
+            <AccordionContent className='border-t px-(--density-row-padding-x) py-2'>
               <LogsEventInlineDetail detail={detail} event={event} />
             </AccordionContent>
           </AccordionItem>

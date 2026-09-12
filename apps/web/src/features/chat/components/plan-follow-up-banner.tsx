@@ -40,10 +40,10 @@ export function PlanFollowUpBanner({
   return (
     <div
       aria-label='Plan ready'
-      className='border-border/60 compact:px-2 compact:pt-2 shrink-0 border-t px-3 pt-3'
+      className='border-border shrink-0 border-t px-(--density-control-padding-x) pt-(--density-control-padding-x)'
       role='status'
     >
-      <div className='border-info/25 bg-info/10 compact:gap-1.5 compact:px-2 compact:py-1.5 mx-auto flex w-full max-w-3xl flex-wrap items-center gap-2 rounded-lg border px-3 py-2'>
+      <div className='border-info/25 bg-info/10 mx-auto flex w-full max-w-3xl flex-wrap items-center gap-(--density-control-gap) rounded-lg border px-(--density-control-padding-x) py-(--density-section-gap)'>
         <Badge className='border-info/40 text-info uppercase' variant='outline'>
           Plan ready
         </Badge>

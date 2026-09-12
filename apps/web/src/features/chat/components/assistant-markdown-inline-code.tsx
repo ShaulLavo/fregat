@@ -34,7 +34,7 @@ export function AssistantMarkdownInlineCode({
 
   return (
     <code
-      className={cn('bg-muted rounded px-1.5 py-0.5 font-mono text-sm', className)}
+      className={cn('bg-muted rounded-md px-1.5 py-0.5 font-mono text-sm', className)}
       data-streamdown='inline-code'
       {...props}
     >

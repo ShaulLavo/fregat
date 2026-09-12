@@ -32,10 +32,13 @@ export function SidebarPanel({
   }
 
   return (
-    <aside className='bg-card backdrop-material border-border flex h-full min-h-0 min-w-0 overflow-hidden border-r'>
+    // The pane surface, not the card surface the titlebar uses: two card-toned
+    // slabs meeting at the corner read as one L-shaped block. The resizable
+    // handle is the divider, so this edge carries no border.
+    <aside className='bg-background backdrop-material flex h-full min-h-0 min-w-0 overflow-hidden'>
       <nav
         aria-label='Sidebar tabs'
-        className='border-border compact:w-10 flex w-11 shrink-0 flex-col items-center gap-1 border-r p-1'
+        className='border-border flex w-(--rail-width) shrink-0 flex-col items-center gap-1 border-r p-1'
       >
         {sidebarTabButton({
           active: panels.activeSidebarTab === 'files',
@@ -93,10 +96,7 @@ function sidebarTabButton({
     <Button
       aria-label={label}
       aria-pressed={active}
-      className={cn(
-        'text-muted-foreground hover:text-foreground size-8 rounded-md compact:size-7',
-        active && 'bg-accent text-accent-foreground',
-      )}
+      className={cn('text-muted-foreground', active && 'bg-accent text-accent-foreground')}
       size='icon-sm'
       title={label}
       type='button'

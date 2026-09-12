@@ -12,12 +12,12 @@ export function PendingApprovalPanel() {
   return (
     <div
       aria-label='Pending approvals'
-      className='compact:px-2 compact:pb-1.5 shrink-0 px-3 pb-2'
+      className='shrink-0 px-(--density-control-padding-x) pb-(--density-section-gap)'
       role='alert'
     >
       <section
         aria-label={approvalTitle(approval.requestKind)}
-        className='border-border bg-card compact:gap-1.5 compact:p-2 mx-auto flex max-w-3xl flex-col gap-2 rounded-md border p-2.5'
+        className='border-border bg-card mx-auto flex max-w-3xl flex-col gap-(--density-control-gap) rounded-lg border p-(--density-section-padding)'
       >
         <div className='flex min-w-0 items-center gap-2'>
           <WarningCircleIcon aria-hidden='true' className='text-warning size-3.5 shrink-0' />
@@ -25,14 +25,14 @@ export function PendingApprovalPanel() {
             {approvalTitle(approval.requestKind)}
           </span>
           {pendingApprovals.length > 1 ? (
-            <span className='text-muted-foreground shrink-0 text-[10px] tabular-nums'>
+            <span className='text-muted-foreground text-3xs shrink-0 tabular-nums'>
               1/{pendingApprovals.length}
             </span>
           ) : null}
         </div>
         <pre
           aria-label={detailLabel(approval.requestKind)}
-          className='text-foreground/85 focus-visible:ring-ring max-h-20 overflow-auto rounded-sm font-mono text-[11px] leading-relaxed whitespace-pre outline-none focus-visible:ring-2'
+          className='text-foreground/85 focus-visible:ring-ring text-2xs max-h-20 overflow-auto rounded-md font-mono leading-relaxed whitespace-pre outline-none focus-visible:ring-2'
           tabIndex={0}
         >
           {approval.detail || approvalTitle(approval.requestKind)}

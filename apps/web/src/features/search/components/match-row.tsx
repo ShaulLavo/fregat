@@ -65,15 +65,13 @@ export const SearchMatchRow = memo(
             compact && 'grid-cols-[34px_minmax(0,1fr)] gap-1.5',
           )}
         >
-          <span className='text-muted-foreground text-right text-[11px] tabular-nums'>
-            {location}
-          </span>
+          <span className='text-muted-foreground text-2xs text-right tabular-nums'>{location}</span>
           <span
             className={cn('flex min-w-0 items-center gap-2 overflow-hidden', compact && 'gap-1.5')}
           >
             <span
               className={cn(
-                'block min-w-0 flex-1 truncate font-mono text-[11px] leading-5',
+                'block min-w-0 flex-1 truncate font-mono text-2xs leading-5',
                 compact && 'leading-4',
               )}
             >
@@ -86,7 +84,7 @@ export const SearchMatchRow = memo(
               />
             </span>
             {match.source === 'open-buffer' ? (
-              <span className='bg-muted/50 text-muted-foreground shrink-0 rounded px-1 text-[10px] leading-4'>
+              <span className='bg-muted/50 text-muted-foreground text-3xs shrink-0 rounded-md px-1 leading-4'>
                 unsaved
               </span>
             ) : null}
@@ -110,7 +108,7 @@ export const SearchMatchRow = memo(
           </Button>
           {replaceVisible ? (
             <Button
-              className={cn('h-6 px-1.5 text-[10px]', compact && 'h-5 px-1')}
+              className={cn('h-6 px-1.5 text-3xs', compact && 'h-5 px-1')}
               disabled={!canReplace}
               size='xs'
               title='Replace this match'
@@ -150,6 +148,8 @@ export const SearchNameMatchRow = memo(
     })
 
     return (
+      // Raw button: the whole list row is the hit target, and Button's control
+      // shape (radius, fixed height, hover fill) is exactly what rows must not have.
       <button
         className={cn(
           'grid w-full min-w-0 grid-cols-[16px_minmax(0,1fr)_auto] items-center gap-1.5 overflow-hidden px-2 py-1.5 text-left outline-none focus-visible:ring-1 focus-visible:ring-ring/50',
@@ -168,7 +168,7 @@ export const SearchNameMatchRow = memo(
         </span>
         <span
           className={cn(
-            'rounded bg-muted/50 px-1.5 text-[10px] leading-4 text-muted-foreground',
+            'rounded-md bg-muted/50 px-1.5 text-3xs leading-4 text-muted-foreground',
             compact && 'px-1',
           )}
         >

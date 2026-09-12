@@ -16,7 +16,7 @@ export function FormDialog(props: ComponentProps<typeof MachineForm>) {
         if (!open) props.onCancel()
       }}
     >
-      <DialogContent className='max-h-[80dvh] w-[calc(100vw_-_2rem)] gap-6 overflow-y-auto rounded-xl p-6 sm:max-w-2xl'>
+      <DialogContent className='max-h-[80dvh] w-[calc(100vw_-_2rem)] gap-6 overflow-y-auto p-6 sm:max-w-2xl'>
         <DialogHeader>
           <DialogTitle>{props.name ? 'Edit machine' : 'Connect machine'}</DialogTitle>
           <DialogDescription>

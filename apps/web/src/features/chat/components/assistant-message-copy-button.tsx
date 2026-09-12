@@ -40,10 +40,7 @@ export function AssistantMessageCopyButton({
         render={
           <Button
             aria-label={copied ? 'Copied response' : 'Copy response'}
-            className={cn(
-              'border-border/50 bg-background/35 text-muted-foreground/45 shadow-none hover:border-border/70 hover:bg-background/55 hover:text-muted-foreground/70',
-              className,
-            )}
+            className={cn('border-subtle bg-background/35 text-muted-foreground/45', className)}
             size='icon-xs'
             type='button'
             variant='outline'

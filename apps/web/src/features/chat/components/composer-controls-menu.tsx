@@ -95,7 +95,7 @@ export function ComposerControlsMenu({
         render={
           <Button
             aria-label='Agent access and mode'
-            className='text-muted-foreground hover:text-foreground compact:h-6 compact:px-1.5 h-7 min-w-0 gap-1 rounded-md px-2 text-xs font-normal'
+            className='text-muted-foreground hover:text-foreground min-w-0 text-xs font-normal'
             disabled={disabled}
             size='sm'
             title={triggerTitle(activeRuntimeMode, activeInteractionMode)}
@@ -107,7 +107,7 @@ export function ComposerControlsMenu({
             {/* Plan mode changes what a send does, so it is called out on the
                 composer itself rather than only inside the menu. */}
             {planActive ? (
-              <span className='border-info/40 text-info shrink-0 rounded-sm border px-1 text-[10px] leading-4 font-medium'>
+              <span className='border-info/40 text-info text-3xs shrink-0 rounded-md border px-1 leading-4 font-medium'>
                 Plan
               </span>
             ) : null}
@@ -115,7 +115,7 @@ export function ComposerControlsMenu({
           </Button>
         }
       />
-      <DropdownMenuContent align='start' className='w-72 rounded-md p-1' side='top'>
+      <DropdownMenuContent align='start' className='w-72 p-1' side='top'>
         <DropdownMenuRadioGroup value={activeRuntimeMode}>
           {/* Inside the group: base-ui resolves the label against its group context. */}
           <DropdownMenuLabel>Access</DropdownMenuLabel>
@@ -159,7 +159,7 @@ function OptionText({
   return (
     <span className='flex min-w-0 flex-col gap-0.5'>
       <span className='font-medium'>{label}</span>
-      <span className='text-muted-foreground text-[11px] leading-snug'>{description}</span>
+      <span className='text-muted-foreground text-2xs leading-snug'>{description}</span>
     </span>
   )
 }

@@ -66,7 +66,7 @@ export function WorkspaceEditPreviewDialog() {
   return (
     <Dialog open={open} onOpenChange={(nextOpen) => !nextOpen && close()}>
       <DialogContent
-        className='bg-background-solid max-h-[min(760px,calc(100vh-2rem))] w-[min(760px,calc(100vw-2rem))] max-w-none overflow-hidden rounded-xl border shadow-xl sm:max-w-none'
+        className='bg-background-solid max-h-[min(760px,calc(100vh-2rem))] w-[min(760px,calc(100vw-2rem))] max-w-none overflow-hidden border sm:max-w-none'
         finalFocus={false}
         showCloseButton={false}
       >
@@ -126,11 +126,11 @@ export function WorkspaceEditPreviewDialog() {
                         {row.ignored ? 'ignored / no-op' : targetLabel(row)}
                       </span>
                     </div>
-                    <div className='text-muted-foreground mt-1 truncate font-mono text-[11px]'>
+                    <div className='text-muted-foreground text-2xs mt-1 truncate font-mono'>
                       {resourcePathLabel(row)}
                     </div>
                     {row.beforeText !== undefined && row.afterText !== undefined ? (
-                      <div className='mt-2 grid max-h-52 grid-cols-2 overflow-auto rounded-md border font-mono text-[11px] leading-relaxed'>
+                      <div className='text-2xs mt-2 grid max-h-52 grid-cols-2 overflow-auto rounded-lg border font-mono leading-relaxed'>
                         <pre className='bg-diff-removed/10 text-diff-removed min-w-0 overflow-visible p-2 whitespace-pre-wrap'>
                           {row.beforeText}
                         </pre>

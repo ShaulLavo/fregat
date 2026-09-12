@@ -79,7 +79,7 @@ export const SearchResultFileLineActionRow = memo(
         </Button>
         {replaceVisible ? (
           <Button
-            className={cn('h-5 px-1.5 text-[10px]', searchResultLineActionClassName())}
+            className={cn('h-5 px-1.5 text-3xs', searchResultLineActionClassName())}
             disabled={!canReplace}
             size='xs'
             title='Replace this match'

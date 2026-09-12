@@ -8,7 +8,7 @@ import { ArrowsLeftRightIcon } from '@phosphor-icons/react'
 export function UnchangedDiffBanner({ message }: { message: string }) {
   return (
     <div
-      className='text-muted-foreground border-border compact:gap-1 compact:px-2 compact:py-1 flex shrink-0 items-center gap-1.5 border-b px-3 py-1.5 text-xs'
+      className='text-muted-foreground border-border flex shrink-0 items-center gap-(--density-control-gap) border-b px-(--density-control-padding-x) py-(--density-control-gap) text-xs'
       role='status'
     >
       <ArrowsLeftRightIcon aria-hidden='true' className='size-3.5 shrink-0' />

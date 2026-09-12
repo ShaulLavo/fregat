@@ -19,8 +19,8 @@ export function MachineConnectionOption({
       aria-pressed={selected}
       onClick={onSelect}
       className={cn(
-        'h-auto min-h-24 items-start justify-start gap-3 rounded-lg p-4 text-left whitespace-normal',
-        selected && 'border-primary/50 bg-primary/5 hover:bg-primary/10',
+        'h-auto min-h-24 items-start justify-start gap-3 p-4 text-left whitespace-normal',
+        selected && 'border-primary/50 bg-accent',
       )}
     >
       <span className='border-border text-muted-foreground flex size-8 shrink-0 items-center justify-center rounded-md border'>

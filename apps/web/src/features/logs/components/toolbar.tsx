@@ -32,7 +32,7 @@ const levelOptions: Array<{ label: string; value: LogDashboardLevel | 'all' }> =
 ]
 
 const selectClassName =
-  'border-input bg-background text-foreground compact:h-6 compact:px-1.5 h-7 rounded-none border px-2 text-[11px] outline-none transition-colors focus-visible:border-ring focus-visible:ring-1 focus-visible:ring-ring/50 disabled:cursor-not-allowed disabled:opacity-50'
+  'border-input bg-background text-foreground h-(--density-control-height-sm) border px-(--density-row-padding-x) text-2xs outline-none transition-colors focus-visible:border-ring focus-visible:ring-1 focus-visible:ring-ring/50 disabled:cursor-not-allowed disabled:opacity-50'
 
 export function LogsToolbar({
   areas,
@@ -46,7 +46,7 @@ export function LogsToolbar({
   const areaValues = logBreakdownOptionValues(areas, filters.area)
 
   return (
-    <div className='compact:p-1 border-b p-1.5'>
+    <div className='border-b p-(--density-control-gap)'>
       <div className='flex items-center gap-1'>
         <select
           aria-label='Log time range'
@@ -81,7 +81,7 @@ export function LogsToolbar({
         </select>
         <Button
           aria-label='Refresh logs'
-          className='compact:size-6 size-7 shrink-0'
+          className='shrink-0'
           disabled={refreshing}
           size='icon-sm'
           title='Refresh logs'
@@ -92,19 +92,19 @@ export function LogsToolbar({
           <ArrowClockwiseIcon className='size-4' />
         </Button>
       </div>
-      <div className='compact:mt-1 mt-1.5 flex items-center gap-1'>
+      <div className='mt-(--density-section-gap) flex items-center gap-1'>
         <div className='relative min-w-0 flex-1'>
           <MagnifyingGlassIcon className='text-muted-foreground pointer-events-none absolute top-1/2 left-2 size-3.5 -translate-y-1/2' />
           <Input
             aria-label='Search logs'
-            className='bg-background compact:h-6 h-7 pl-7 text-[11px]'
+            className='bg-background text-2xs h-(--density-control-height-sm) pl-7'
             placeholder='Search logs'
             value={filters.search}
             onChange={(event) => onFiltersChange({ ...filters, search: event.target.value })}
           />
         </div>
       </div>
-      <div className='compact:mt-1 mt-1.5 flex items-center gap-1'>
+      <div className='mt-(--density-section-gap) flex items-center gap-1'>
         <select
           aria-label='Log source'
           className={`${selectClassName} min-w-0 flex-1`}

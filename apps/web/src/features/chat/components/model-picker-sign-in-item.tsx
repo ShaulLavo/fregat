@@ -17,7 +17,7 @@ export function ModelPickerSignInItem({
 }) {
   return (
     <CommandItem
-      className='compact:gap-1.5 compact:px-1.5 compact:py-1.5 cursor-pointer gap-2 rounded-md px-2 py-2'
+      className='cursor-pointer'
       value={`sign-in:${target.providerInstanceId}`}
       onSelect={() => onSelect(target)}
     >
@@ -26,7 +26,7 @@ export function ModelPickerSignInItem({
         <span className='block truncate text-xs leading-snug font-medium'>
           Sign in to {target.providerLabel}
         </span>
-        <span className='text-muted-foreground/70 compact:mt-0.5 mt-1 block truncate text-xs leading-snug font-normal'>
+        <span className='text-muted-foreground/70 mt-(--density-gap-tight) block truncate text-xs leading-snug font-normal'>
           Opens a browser tab through the {target.providerLabel} CLI.
         </span>
       </span>

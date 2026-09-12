@@ -29,7 +29,7 @@ export function SessionMachineMenu() {
             aria-label='Filter machines'
             size='sm'
             variant='ghost'
-            className='text-muted-foreground h-7 min-w-0 gap-1 px-1 text-[11px]'
+            className='text-muted-foreground text-2xs min-w-0 gap-1 px-1'
           >
             <span className='truncate'>{title}</span>
             <CaretUpDownIcon className='size-3 shrink-0' />

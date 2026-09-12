@@ -26,19 +26,21 @@ export function ChatInputAttachmentList({
   return (
     <div
       aria-label='Image attachments'
-      className='compact:gap-1.5 compact:px-2 compact:pb-1.5 flex min-w-0 gap-2 overflow-x-auto px-3 pb-2'
+      className='flex min-w-0 gap-(--density-control-gap) overflow-x-auto px-(--density-control-padding-x) pb-(--density-section-gap)'
       role='group'
     >
       {attachments.map((attachment, index) => (
         <div
-          className='border-border/70 bg-muted/35 flex max-w-48 shrink-0 items-center gap-2 rounded-md border p-1 pr-1.5'
+          className='border-subtle bg-muted/35 flex max-w-48 shrink-0 items-center gap-2 rounded-md border p-1 pr-1.5'
           key={attachment.id}
         >
-          <button
+          <Button
             aria-label={`Open ${attachment.name}`}
-            className='focus-visible:ring-ring size-9 shrink-0 overflow-hidden rounded focus-visible:ring-2 focus-visible:outline-none'
+            className='size-9 shrink-0 overflow-hidden'
+            size='icon'
             title={attachment.name}
             type='button'
+            variant='ghost'
             onClick={() => setOpenIndex(index)}
           >
             <img
@@ -47,7 +49,7 @@ export function ChatInputAttachmentList({
               draggable={false}
               src={attachment.previewUrl}
             />
-          </button>
+          </Button>
           <span className='min-w-0 flex-1 text-xs'>
             <span className='block truncate font-medium'>{attachment.name}</span>
             <span className='text-muted-foreground block tabular-nums'>
@@ -59,7 +61,7 @@ export function ChatInputAttachmentList({
               render={
                 <Button
                   aria-label={`Remove ${attachment.name}`}
-                  className='text-muted-foreground hover:text-foreground rounded-md'
+                  className='text-muted-foreground'
                   disabled={disabled}
                   size='icon-xs'
                   title='Remove attachment'

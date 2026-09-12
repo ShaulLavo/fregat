@@ -25,7 +25,7 @@ export function TerminalContextChip({
   return (
     <span
       className={cn(
-        'border-border bg-muted text-foreground inline-flex max-w-full items-center gap-1.5 rounded border px-1.5 py-0.5 align-baseline font-mono text-[0.9em] leading-tight select-none',
+        'border-border bg-muted text-foreground inline-flex max-w-full items-center gap-1.5 rounded-md border px-1.5 py-0.5 align-baseline font-mono text-[0.9em] leading-tight select-none',
         className,
       )}
       data-terminal-context-source={selection.source}

@@ -22,7 +22,7 @@ export function RowLabel({
       {description ? (
         <span
           className={cn(
-            'text-muted-foreground min-w-0 flex-1 truncate text-[11px]',
+            'text-muted-foreground min-w-0 flex-1 truncate text-2xs',
             descriptionClassName,
           )}
         >

@@ -35,7 +35,7 @@ export function ModelPickerRailItem({
               aria-disabled={blocked}
               aria-label={group.displayLabel}
               className={cn(
-                'hover:bg-foreground/10 focus-visible:bg-foreground/10 aspect-square h-auto w-full rounded-md p-0',
+                'hover:bg-foreground/10 focus-visible:bg-foreground/10 aspect-square h-auto w-full p-0',
                 blocked && 'cursor-not-allowed opacity-50 hover:bg-transparent',
               )}
               size='icon-sm'
@@ -44,7 +44,7 @@ export function ModelPickerRailItem({
               onClick={blocked ? undefined : () => onSelect(group.providerInstanceId)}
             >
               <ProviderGlyph
-                className='size-5 text-[10px]'
+                className='text-3xs size-5'
                 displayLabel={group.displayLabel}
                 driverKind={group.driverKind}
               />

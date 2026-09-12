@@ -1,6 +1,7 @@
 import type { SessionId } from '@workspace/contracts'
 import { Button } from '@workspace/ui/components/button'
 import { cn } from '@workspace/ui/lib/utils'
+import { PaneBar } from '@workspace/ui/components/pane-bar'
 import {
   DropdownMenu,
   DropdownMenuContent,
@@ -31,17 +32,16 @@ export function ChatPanelHeader({
   const activeSession = sessions.find((session) => session.id === activeSessionId)
 
   return (
-    <header className='border-border/70 compact:h-10 compact:px-2 flex h-12 shrink-0 items-center justify-between border-b px-3'>
-      <div className='compact:pr-2 min-w-0 pr-3'>
-        <div className='truncate text-sm font-semibold'>Chat</div>
+    <PaneBar as='header' border='bottom' className='justify-between'>
+      <div className='min-w-0 pr-(--density-control-padding-x)'>
+        <div className='truncate text-xs font-medium'>Chat</div>
         {activeSession ? (
-          <div className='text-muted-foreground truncate text-[11px]'>{activeSession.title}</div>
+          <div className='text-muted-foreground text-2xs truncate'>{activeSession.title}</div>
         ) : null}
       </div>
       <div className='flex items-center gap-1'>
         <Button
           aria-label='New chat'
-          className='rounded-md'
           disabled={disabled || creating}
           size='icon-sm'
           title='New chat'
@@ -59,7 +59,6 @@ export function ChatPanelHeader({
             render={
               <Button
                 aria-label='Conversation history'
-                className='rounded-md'
                 disabled={historyDisabled}
                 size='icon-sm'
                 title='Conversation history'
@@ -70,12 +69,12 @@ export function ChatPanelHeader({
           >
             <ClockCounterClockwiseIcon className='size-4' />
           </DropdownMenuTrigger>
-          <DropdownMenuContent align='end' className='w-72 rounded-md p-1'>
+          <DropdownMenuContent align='end' className='w-72 p-1'>
             {sessions.map((session) => (
               <DropdownMenuItem
                 className={cn(
-                  'compact:gap-x-2 compact:px-2 compact:py-2 grid grid-cols-[1fr_auto] gap-x-3 gap-y-0.5 rounded-md px-2.5 py-2.5',
-                  session.id === activeSessionId && 'bg-muted/70',
+                  'grid grid-cols-[1fr_auto] gap-y-0.5',
+                  session.id === activeSessionId && 'bg-row-selected',
                 )}
                 key={session.id}
                 onClick={() => onSelectSession(session.id)}
@@ -84,10 +83,10 @@ export function ChatPanelHeader({
                   {session.id === activeSessionId ? 'Current: ' : ''}
                   {session.title}
                 </span>
-                <span className='text-muted-foreground text-[11px] tabular-nums'>
+                <span className='text-muted-foreground text-2xs tabular-nums'>
                   {formatChatDateLabel(session.activityAt)}
                 </span>
-                <span className='text-muted-foreground col-span-2 truncate text-[11px] tabular-nums'>
+                <span className='text-muted-foreground text-2xs col-span-2 truncate tabular-nums'>
                   {chatSessionPreview(session)}
                 </span>
               </DropdownMenuItem>
@@ -95,6 +94,6 @@ export function ChatPanelHeader({
           </DropdownMenuContent>
         </DropdownMenu>
       </div>
-    </header>
+    </PaneBar>
   )
 }

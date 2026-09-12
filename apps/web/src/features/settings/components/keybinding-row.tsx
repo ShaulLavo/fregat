@@ -25,7 +25,7 @@ export function KeybindingRow({
   const title = spec?.title ?? binding.command
 
   return (
-    <div className='border-border compact:px-2 compact:py-1.5 flex items-center gap-2 border-b px-3 py-2 last:border-b-0 @max-3xl/settings:grid @max-3xl/settings:grid-cols-[minmax(0,1fr)_auto_auto]'>
+    <div className='border-border flex items-center gap-2 border-b px-(--density-control-padding-x) py-(--density-section-gap) last:border-b-0 @max-3xl/settings:grid @max-3xl/settings:grid-cols-[minmax(0,1fr)_auto_auto]'>
       <div className='flex min-w-0 flex-1 flex-col @max-3xl/settings:col-span-full'>
         <span className='text-foreground truncate text-sm'>{title}</span>
         {spec ? (

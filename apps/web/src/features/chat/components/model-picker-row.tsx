@@ -31,7 +31,6 @@ export function ModelPickerRow({
   const row = (
     <CommandItem
       className={cn(
-        'compact:gap-1.5 compact:px-1.5 compact:py-1.5 gap-2 rounded-md px-2 py-2',
         !disabled && 'cursor-pointer',
         // A natively inert row swallows hover, and the tooltip below is the only
         // place a blocked model says why it is blocked.
@@ -47,14 +46,14 @@ export function ModelPickerRow({
         <span className='flex min-w-0 items-center gap-1.5'>
           <span className='min-w-0 truncate text-xs leading-snug font-medium'>{option.label}</span>
           {isNewProviderModel(option) ? (
-            <span className='border-update/35 bg-update/15 text-update shrink-0 rounded border px-0.5 py-px text-[10px] leading-none font-bold tracking-wide uppercase'>
+            <span className='border-update/35 bg-update/15 text-update text-3xs shrink-0 rounded-md border px-0.5 py-px leading-none font-bold tracking-wide uppercase'>
               New
             </span>
           ) : null}
         </span>
-        <span className='compact:mt-0.5 mt-1 flex min-w-0 items-center gap-1.5'>
+        <span className='mt-(--density-gap-tight) flex min-w-0 items-center gap-1.5'>
           <ProviderGlyph
-            className='size-3 text-[6px]'
+            className='text-3xs size-3'
             displayLabel={option.providerLabel}
             driverKind={option.driverKind}
           />
@@ -66,7 +65,7 @@ export function ModelPickerRow({
       <span className='flex shrink-0 items-center gap-1'>
         {badges.map((badge) => (
           <Badge
-            className='text-muted-foreground/80 h-4 min-w-0 rounded-sm px-1.5 text-[10px] font-medium'
+            className='text-muted-foreground/80 text-3xs h-4 min-w-0 px-1.5 font-medium'
             key={badge.key}
             title={badge.title}
             variant='outline'

@@ -72,7 +72,7 @@ export function ChatInputActions({
 
   return (
     <div
-      className='compact:px-2 compact:pb-2 flex min-w-0 flex-col gap-1 px-3 pb-2.5'
+      className='flex min-w-0 flex-col gap-1 px-(--density-control-padding-x) pb-(--density-section-gap)'
       data-composer-actions
       data-compact={compact}
       ref={actionsRef}
@@ -91,7 +91,7 @@ export function ChatInputActions({
           {contextUsage ? <ContextUsageRing compact={compact} usage={contextUsage} /> : null}
           {statusLabel && !compact ? (
             <span
-              className='text-muted-foreground min-w-0 flex-1 truncate pl-1 text-[11px]'
+              className='text-muted-foreground text-2xs min-w-0 flex-1 truncate pl-1'
               title={statusLabel}
             >
               {statusLabel}
@@ -116,7 +116,7 @@ export function ChatInputActions({
       {/* Narrow: the status wraps onto its own line instead of squeezing the
           controls it shares the row with down to their icons. */}
       {statusLabel && compact ? (
-        <span className='text-muted-foreground min-w-0 truncate text-[11px]' title={statusLabel}>
+        <span className='text-muted-foreground text-2xs min-w-0 truncate' title={statusLabel}>
           {statusLabel}
         </span>
       ) : null}

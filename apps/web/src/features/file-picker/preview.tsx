@@ -32,12 +32,12 @@ export function PreviewPane({
   return (
     <aside className='hidden min-h-0 lg:flex lg:flex-col'>
       <div
-        className='border-border/60 text-muted-foreground/70 compact:px-2 compact:text-[10px] compact:tracking-wide flex shrink-0 items-center border-b px-3 text-[11px] font-medium tracking-normal uppercase'
+        className='border-border text-muted-foreground/70 text-2xs flex shrink-0 items-center border-b px-(--density-control-padding-x) font-medium tracking-normal uppercase'
         style={{ height: metrics.headerSize }}
       >
         Preview
       </div>
-      <div className='compact:p-2 flex min-h-0 flex-1 flex-col p-3'>
+      <div className='flex min-h-0 flex-1 flex-col p-(--density-section-padding)'>
         {entry ? (
           <EntryPreviewDetails entry={entry} iconMode={iconMode} />
         ) : (
@@ -86,14 +86,14 @@ function EntryPreviewDetails({
   return (
     <div className='flex min-h-0 flex-1 flex-col items-center text-center'>
       <EntryPreviewTile entry={entry} iconMode={iconMode} selected={false} size='lg' />
-      <div className='compact:mt-2 mt-2.5 w-full min-w-0'>
+      <div className='mt-(--density-section-gap) w-full min-w-0'>
         <div className='truncate text-xs font-medium'>{entry.name}</div>
       </div>
-      <div className='compact:mt-1.5 mt-2'>
+      <div className='mt-(--density-section-gap)'>
         <KindBadge entry={entry} />
       </div>
-      <Separator className='compact:my-2 my-3' />
-      <dl className='compact:gap-1 grid w-full gap-1.5 text-left text-[11px]'>
+      <Separator className='my-(--density-section-padding)' />
+      <dl className='text-2xs grid w-full gap-(--density-control-gap) text-left'>
         <PreviewFact label='Kind' value={kindLabel(entry)} />
         {!isDirectoryEntry(entry) && <PreviewFact label='Size' value={formatSize(entry.size)} />}
         <PreviewFact label='Modified' value={formatModified(entry.mtimeMs)} />
@@ -124,7 +124,7 @@ function NoPreview({ isSearching, mode }: { isSearching: boolean; mode: FilePick
           <FolderOpenIcon className='size-7' weight='duotone' />
         )}
       </div>
-      <div className='text-muted-foreground mt-2 text-[11px]'>{copy.emptyPreviewTitle}</div>
+      <div className='text-muted-foreground text-2xs mt-2'>{copy.emptyPreviewTitle}</div>
     </div>
   )
 }

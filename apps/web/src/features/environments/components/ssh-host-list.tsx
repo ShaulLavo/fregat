@@ -16,8 +16,8 @@ export function SshHostList({
   if (query.isPending)
     return (
       <LoadingState label='Loading SSH hosts' className='space-y-2 p-3'>
-        <div className='skeleton-sweep h-7 rounded' />
-        <div className='skeleton-sweep h-7 rounded' />
+        <div className='skeleton-sweep h-7 rounded-md' />
+        <div className='skeleton-sweep h-7 rounded-md' />
       </LoadingState>
     )
   if (query.isError)

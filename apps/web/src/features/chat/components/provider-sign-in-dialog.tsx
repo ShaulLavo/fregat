@@ -83,14 +83,14 @@ export function ProviderSignInDialog({
 
   return (
     <Dialog open={open} onOpenChange={handleOpenChange}>
-      <DialogContent className='compact:gap-2 flex w-[min(460px,calc(100vw-2rem))] max-w-none flex-col gap-3 rounded-lg border sm:max-w-none'>
+      <DialogContent className='flex w-[min(460px,calc(100vw-2rem))] max-w-none flex-col border sm:max-w-none'>
         <DialogHeader>
           <DialogTitle>{phaseCopy.title}</DialogTitle>
           <DialogDescription>{phaseCopy.description}</DialogDescription>
         </DialogHeader>
 
         {signIn.isAuthenticated ? (
-          <div className='border-success/30 bg-success/10 text-success compact:gap-1.5 compact:px-2.5 compact:py-1.5 flex items-center gap-2 border px-3 py-2 text-xs'>
+          <div className='border-success/30 bg-success/10 text-success flex items-center gap-(--density-control-gap) border px-(--density-control-padding-x) py-(--density-section-gap) text-xs'>
             <CheckCircleIcon className='size-3.5 shrink-0' />
             <span className='min-w-0 flex-1 truncate'>
               {accountLabel ?? `${providerLabel} is signed in.`}
@@ -99,7 +99,7 @@ export function ProviderSignInDialog({
         ) : null}
 
         {busy ? (
-          <div className='border-border bg-muted compact:gap-2 compact:px-2.5 compact:py-2 flex items-start gap-3 border px-3 py-3 text-xs'>
+          <div className='border-border bg-muted flex items-start gap-(--density-control-gap) border px-(--density-control-padding-x) py-(--density-section-gap) text-xs'>
             <Spinner className='text-muted-foreground mt-0.5' />
             <div className='min-w-0 flex-1'>
               <p className='text-foreground font-medium'>
@@ -111,11 +111,11 @@ export function ProviderSignInDialog({
             </div>
           </div>
         ) : (
-          <div className='compact:gap-1.5 flex flex-col gap-2'>
+          <div className='flex flex-col gap-(--density-control-gap)'>
             {PROVIDER_AUTH_METHODS.map((option) => (
               <Button
                 key={option}
-                className='compact:px-2.5 compact:py-1.5 h-auto w-full flex-col items-start gap-0.5 px-3 py-2 text-left whitespace-normal'
+                className='h-auto w-full flex-col items-start gap-0.5 py-(--density-section-gap) text-left whitespace-normal'
                 onClick={() => signIn.signIn(option)}
                 type='button'
                 variant={option === DEFAULT_PROVIDER_AUTH_METHOD ? 'default' : 'outline'}
@@ -123,7 +123,7 @@ export function ProviderSignInDialog({
                 <span className='font-medium'>{providerAuthMethodCopy(option).label}</span>
                 <span
                   className={cn(
-                    'text-[11px] font-normal',
+                    'text-2xs font-normal',
                     option === DEFAULT_PROVIDER_AUTH_METHOD
                       ? 'text-primary-foreground/80'
                       : 'text-muted-foreground',
@@ -133,7 +133,7 @@ export function ProviderSignInDialog({
                 </span>
               </Button>
             ))}
-            <p className='text-muted-foreground text-[11px]'>
+            <p className='text-muted-foreground text-2xs'>
               Sign-in is machine-wide: it signs the {providerLabel} CLI in for every workspace.
             </p>
           </div>
@@ -141,7 +141,7 @@ export function ProviderSignInDialog({
 
         {signIn.statusError ? (
           <div
-            className='border-warning/30 bg-warning/10 text-warning compact:gap-1.5 compact:px-2.5 compact:py-1.5 flex items-start gap-2 border px-3 py-2 text-xs'
+            className='border-warning/30 bg-warning/10 text-warning flex items-start gap-(--density-control-gap) border px-(--density-control-padding-x) py-(--density-section-gap) text-xs'
             role='status'
           >
             <WarningCircleIcon className='mt-0.5 size-3.5 shrink-0' />
@@ -151,7 +151,7 @@ export function ProviderSignInDialog({
 
         {signIn.attemptError ? (
           <div
-            className='border-destructive/30 bg-destructive/10 text-destructive compact:gap-1.5 compact:px-2.5 compact:py-1.5 flex items-start gap-2 border px-3 py-2 text-xs'
+            className='border-destructive/30 bg-destructive/10 text-destructive flex items-start gap-(--density-control-gap) border px-(--density-control-padding-x) py-(--density-section-gap) text-xs'
             role='alert'
           >
             <WarningCircleIcon className='mt-0.5 size-3.5 shrink-0' />
@@ -159,11 +159,11 @@ export function ProviderSignInDialog({
           </div>
         ) : null}
 
-        <div className='border-border compact:gap-1 compact:px-2.5 compact:py-1.5 flex flex-col gap-1.5 border px-3 py-2'>
-          <p className='text-muted-foreground text-[11px]'>
+        <div className='border-border flex flex-col gap-(--density-control-gap) border px-(--density-control-padding-x) py-(--density-section-gap)'>
+          <p className='text-muted-foreground text-2xs'>
             No browser tab? Run this in a terminal instead:
           </p>
-          <div className='compact:gap-1.5 flex items-center gap-2'>
+          <div className='flex items-center gap-(--density-control-gap)'>
             <code className='text-foreground min-w-0 flex-1 truncate font-mono text-xs'>
               {command}
             </code>

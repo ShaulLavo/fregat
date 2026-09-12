@@ -1,6 +1,7 @@
 import type { GitFileStatus } from '@workspace/contracts'
 import { filesystemPath } from '@/lib/documents/utils/identity'
 import { Button } from '@workspace/ui/components/button'
+import { PaneBar } from '@workspace/ui/components/pane-bar'
 
 import { SearchPane } from '@/features/workspace/components/search-pane'
 import type { EditorTabConflictMap } from '@/features/workspace/utils/tab-types'
@@ -110,11 +111,7 @@ function gitToolPane(rootPath: string, diffScope: SessionDiffScopeState) {
   return (
     <section className='flex h-full min-h-0 min-w-0 flex-col overflow-hidden'>
       <ToolPaneHeader tab='git' />
-      <div
-        aria-label='Diff scope'
-        className='border-border compact:py-0.5 flex shrink-0 items-center gap-1 border-b px-2 py-1'
-        role='group'
-      >
+      <PaneBar aria-label='Diff scope' border='bottom' role='group'>
         {scopeButton({
           active: scope.kind === 'working-tree',
           label: 'Working tree',
@@ -132,7 +129,7 @@ function gitToolPane(rootPath: string, diffScope: SessionDiffScopeState) {
             selectTurnScope(latestTurnId)
           },
         })}
-      </div>
+      </PaneBar>
       <div className='min-h-0 min-w-0 flex-1 overflow-hidden'>
         {scope.kind === 'turn' ? (
           turnScopeBody(diffScope)
@@ -177,20 +174,20 @@ function turnScopeBody({ openTurnFile, turnSummary }: SessionDiffScopeState) {
   }
   if (turnSummary.status !== 'ready' || turnSummary.files.length === 0) {
     return (
-      <p className='text-muted-foreground compact:px-2 compact:py-1.5 px-3 py-2 text-[11px]'>
+      <p className='text-muted-foreground text-2xs px-(--density-control-padding-x) py-(--density-section-gap)'>
         No checkpoint diff for turn {turnSummary.checkpointTurnCount}.
       </p>
     )
   }
 
   return (
-    <div className='app-scrollbar-thin compact:py-0.5 h-full min-h-0 overflow-auto py-1'>
-      <p className='text-muted-foreground compact:px-2 compact:pb-0.5 px-3 pb-1 text-[11px] tabular-nums'>
+    <div className='app-scrollbar-thin h-full min-h-0 overflow-auto py-(--density-gap-tight)'>
+      <p className='text-muted-foreground text-2xs px-(--density-control-padding-x) pb-(--density-gap-tight) tabular-nums'>
         Turn {turnSummary.checkpointTurnCount} · {turnSummary.files.length} files
       </p>
       {turnSummary.files.map((file) => (
         <Button
-          className='compact:gap-1.5 compact:px-2 w-full justify-between gap-2 px-3 font-normal'
+          className='w-full justify-between font-normal'
           key={file.path}
           size='sm'
           type='button'

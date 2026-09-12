@@ -14,7 +14,7 @@ export function PendingRequestFeedback({ response }: { response: PendingRequestR
   }
 
   return (
-    <div className='text-muted-foreground flex items-center gap-1.5 text-[11px]' role='status'>
+    <div className='text-muted-foreground text-2xs flex items-center gap-1.5' role='status'>
       {response.kind === 'submitting' ? (
         <Spinner aria-hidden='true' className='size-3' />
       ) : (

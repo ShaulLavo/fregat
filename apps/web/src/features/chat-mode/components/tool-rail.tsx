@@ -28,14 +28,14 @@ export function ToolRail({
   return (
     <nav
       aria-label='Tool tabs'
-      className='bg-card backdrop-material border-border compact:w-10 flex w-11 shrink-0 flex-col items-center gap-1 border-l p-1'
+      className='bg-card backdrop-material border-border flex w-(--rail-width) shrink-0 flex-col items-center gap-1 border-l p-1'
     >
       {CHAT_MODE_TOOL_TABS.map((tab) => (
         <Button
           aria-label={chatModeToolTabLabel(tab)}
           aria-pressed={panels.toolPaneOpen && panels.activeToolTab === tab}
           className={cn(
-            'text-muted-foreground hover:text-foreground size-8 rounded-md compact:size-7',
+            'text-muted-foreground hover:text-foreground',
             panels.toolPaneOpen &&
               panels.activeToolTab === tab &&
               'bg-accent text-accent-foreground',

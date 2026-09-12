@@ -29,7 +29,7 @@ export function MalformedBanner({ layers }: { layers: readonly SettingsLayerSnap
   if (broken.length === 0) return null
 
   return (
-    <div className='border-destructive/30 bg-destructive/10 compact:mb-3 compact:p-2 mb-4 rounded-md border p-3'>
+    <div className='border-destructive/30 bg-destructive/10 mb-(--density-section-padding) rounded-lg border p-(--density-section-padding)'>
       {broken.map(({ file, target }) => (
         <div className='flex flex-wrap items-center justify-between gap-2' key={target}>
           <div>

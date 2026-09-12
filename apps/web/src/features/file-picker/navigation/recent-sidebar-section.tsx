@@ -13,7 +13,7 @@ export function RecentSidebarSection({
 }) {
   return (
     <div>
-      <div className='text-muted-foreground compact:mb-0.5 compact:px-1.5 compact:py-0.5 mb-1 flex items-center gap-1.5 px-2 py-1 text-[11px] font-medium tracking-normal uppercase'>
+      <div className='text-muted-foreground text-2xs mb-1 flex items-center gap-1.5 px-(--density-row-padding-x) py-1 font-medium tracking-normal uppercase'>
         <ClockCounterClockwiseIcon className='size-3.5' />
         Recent
       </div>

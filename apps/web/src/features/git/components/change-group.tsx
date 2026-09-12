@@ -44,12 +44,12 @@ export function ChangeGroup({
 
   return (
     <Collapsible
-      className='compact:pb-0.5 pb-1'
+      className='pb-(--density-gap-tight)'
       open={open}
       onOpenChange={(nextOpen) => setSectionOpen(section, nextOpen)}
     >
       <div
-        className='group/group hover:bg-row-hover compact:h-6 flex h-7 w-full items-center px-2 text-xs font-medium transition-colors'
+        className='group/group hover:bg-row-hover flex h-(--density-control-height-sm) w-full items-center px-(--density-row-padding-x) text-xs font-medium transition-colors'
         onContextMenu={handleContextMenu}
         onKeyDown={handleHeaderKeyDown}
       >
@@ -63,7 +63,7 @@ export function ChangeGroup({
           <span className='min-w-0 flex-1 truncate'>{label}</span>
         </CollapsibleTrigger>
         <GroupActions rows={rows} section={section} />
-        <span className='bg-background text-muted-foreground ml-1 flex h-5 min-w-5 items-center justify-center rounded-full border px-1.5 text-[11px] font-normal tabular-nums'>
+        <span className='bg-background text-muted-foreground text-2xs ml-1 flex h-(--density-chip-height) min-w-(--density-chip-height) items-center justify-center rounded-full border px-1.5 font-normal tabular-nums'>
           {rows.length}
         </span>
       </div>

@@ -43,7 +43,7 @@ export function SearchSummary({
   return (
     <div
       className={cn(
-        'mt-2 flex min-h-5 items-center gap-2 px-1 text-[11px] text-muted-foreground',
+        'mt-2 flex min-h-5 items-center gap-2 px-1 text-2xs text-muted-foreground',
         className,
       )}
     >

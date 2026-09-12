@@ -40,6 +40,8 @@ export const SearchFileGroupHeader = memo(
           className,
         )}
       >
+        {/* Raw button: it fills the row's grid cell, and Button's control shape
+            (radius, fixed height, hover fill) is what a row must not have. */}
         <button
           className={cn(
             'grid min-w-0 grid-cols-[16px_16px_minmax(0,1fr)] items-center gap-1.5 text-left outline-none hover:text-foreground focus-visible:ring-1 focus-visible:ring-ring/50',
@@ -65,7 +67,7 @@ export const SearchFileGroupHeader = memo(
         </button>
         <span
           className={cn(
-            'rounded bg-muted/50 px-1.5 text-[10px] leading-4 text-muted-foreground',
+            'rounded-md bg-muted/50 px-1.5 text-3xs leading-4 text-muted-foreground',
             compact && 'h-4 px-1 leading-4',
           )}
         >
@@ -73,7 +75,7 @@ export const SearchFileGroupHeader = memo(
         </span>
         {replaceVisible ? (
           <Button
-            className='h-6 px-1.5 text-[10px]'
+            className='text-3xs h-6 px-1.5'
             disabled={!canReplace}
             size='xs'
             title='Replace matches in this file'
@@ -102,7 +104,7 @@ function SearchFileGroupTitle({
         <span className='max-w-[55%] min-w-0 shrink-0 truncate text-xs leading-4 font-medium'>
           {group.name}
         </span>
-        <span className='text-muted-foreground min-w-0 flex-1 truncate text-[11px] leading-4'>
+        <span className='text-muted-foreground text-2xs min-w-0 flex-1 truncate leading-4'>
           {group.pathLabel}
         </span>
       </span>
@@ -112,7 +114,7 @@ function SearchFileGroupTitle({
   return (
     <span className='min-w-0'>
       <span className='block truncate text-xs font-medium'>{group.name}</span>
-      <span className='text-muted-foreground block truncate text-[11px]'>{group.pathLabel}</span>
+      <span className='text-muted-foreground text-2xs block truncate'>{group.pathLabel}</span>
     </span>
   )
 }

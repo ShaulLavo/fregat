@@ -6,12 +6,14 @@ import type {
 import type { LanguageServerConnectionContext } from '@singapor/lsp-plugin'
 import { arrayLspLineStarts, LspRequestCancelledError, LspWorkspace } from '@singapor/lsp'
 import { createStringTextSnapshot } from '@singapor/core/document'
-import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest'
+import { afterEach, beforeEach, describe, vi } from 'vitest'
+import { test as it, expect } from '../../../../test/fixtures'
+import { fileDocumentKey, filesystemPath } from '@/lib/documents/utils/identity'
 
 import { SemanticTokenController } from '@/features/editor/state/semantic-token-controller'
 import { log } from '@/lib/client-logging'
 
-const DOCUMENT_ID = '/repo/src/lib.rs'
+const DOCUMENT_ID = fileDocumentKey(filesystemPath('/repo/src/lib.rs'))
 const URI = 'file:///repo/src/lib.rs'
 const TEXT = Array.from({ length: 200 }, (_, line) => `let value_${line} = ${line};`).join('\n')
 
@@ -159,7 +161,7 @@ function attached(serverCapabilities: unknown, serverId = 'rust', text: string =
   const connection = fakeConnection(serverCapabilities, text)
   const layer = fakeLayer()
   controller.attachConnection(connection.context)
-  controller.attachLayer(layer, { documentId: DOCUMENT_ID, languageId: 'rust' })
+  controller.attachLayer(layer, { documentId: DOCUMENT_ID, languageId: 'rust' }, URI)
 
   return { connection, controller, layer }
 }
@@ -201,6 +203,7 @@ describe('SemanticTokenController request policy', () => {
 
     expect(connection.requests).toHaveLength(1)
     expect(connection.requests[0]?.method).toBe('textDocument/semanticTokens/range')
+    expect(connection.requests[0]?.params).toMatchObject({ textDocument: { uri: URI } })
   })
 
   it('waits out a burst of typing before asking again', async () => {
@@ -346,7 +349,7 @@ describe('SemanticTokenController request policy', () => {
     }
     const layer = fakeLayer()
     controller.attachConnection({ client, workspace } as unknown as LanguageServerConnectionContext)
-    controller.attachLayer(layer, { documentId: DOCUMENT_ID, languageId: 'rust' })
+    controller.attachLayer(layer, { documentId: DOCUMENT_ID, languageId: 'rust' }, URI)
 
     controller.handleRangeNeeded(demand())
     await vi.advanceTimersByTimeAsync(500)
@@ -409,7 +412,7 @@ describe('SemanticTokenController request policy', () => {
     const connection = fakeConnection(undefined)
     const layer = fakeLayer()
     controller.attachConnection(connection.context)
-    controller.attachLayer(layer, { documentId: DOCUMENT_ID, languageId: 'rust' })
+    controller.attachLayer(layer, { documentId: DOCUMENT_ID, languageId: 'rust' }, URI)
 
     controller.handleRangeNeeded(demand())
     await vi.advanceTimersByTimeAsync(500)
@@ -679,7 +682,11 @@ describe('SemanticTokenController staleness', () => {
   it('drops a layer for a document it no longer owns', async () => {
     const { connection, controller } = attached(RUST_LIKE)
     const next = fakeLayer()
-    controller.attachLayer(next, { documentId: '/repo/src/other.rs', languageId: 'rust' })
+    controller.attachLayer(
+      next,
+      { documentId: fileDocumentKey(filesystemPath('/repo/src/other.rs')), languageId: 'rust' },
+      'file:///repo/src/other.rs',
+    )
 
     // Addressed to the layer that was replaced, which is the ordinary case on a
     // tab switch rather than a theoretical one.

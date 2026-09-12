@@ -50,7 +50,7 @@ export function FileRow({
     <>
       <div
         aria-busy={inputPending || undefined}
-        className='group/row hover:bg-row-hover focus-visible:ring-ring/50 grid h-6 cursor-pointer grid-cols-[22px_minmax(0,1fr)_auto_28px] items-center px-2 text-xs leading-4 outline-none focus-visible:ring-1'
+        className='group/row hover:bg-row-hover focus-visible:ring-ring/50 grid h-(--density-row-height) cursor-pointer grid-cols-[22px_minmax(0,1fr)_auto_28px] items-center px-(--density-row-padding-x) text-xs leading-4 outline-none focus-visible:ring-1'
         data-git-file-loading={inputPending || undefined}
         role='button'
         tabIndex={0}
@@ -69,7 +69,7 @@ export function FileRow({
         <FileActions path={row.file.path} section={row.section} />
         <span
           className={cn(
-            'flex h-6 items-center justify-self-end pb-px text-xs font-semibold leading-none',
+            'flex h-(--density-row-height) items-center justify-self-end pb-px text-xs font-semibold leading-none',
             status.className,
           )}
           title={status.title}

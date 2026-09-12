@@ -54,6 +54,7 @@ export function EditorTabButton({
     requestCloseTab(tab.id)
   }
 
+  // Raw <button>: spreads dnd-kit drag listeners and needs role='tab'; Button offers neither.
   const trigger = (
     <button
       {...dragAttributes}
@@ -61,10 +62,11 @@ export function EditorTabButton({
       aria-busy={loading || undefined}
       aria-selected={tab.active}
       className={cn(
-        'group/proof-tab flex h-9 w-36 min-w-24 max-w-48 shrink-0 cursor-grab touch-none items-center gap-1.5 rounded-t-md border px-2 text-left text-xs outline-none transition-[background-color,border-color,opacity,box-shadow] active:cursor-grabbing focus-visible:ring-1 focus-visible:ring-ring/50 compact:h-8 compact:gap-1 compact:px-1.5',
+        // The tab sits on a 4px top inset inside the strip, so it is the bar height minus that inset.
+        'group/proof-tab flex h-[calc(var(--bar-height)-0.25rem)] w-36 min-w-24 max-w-48 shrink-0 cursor-grab touch-none items-center gap-(--density-control-gap) rounded-t-md border px-(--density-row-padding-x) text-left text-xs outline-none transition-[background-color,border-color,opacity] active:cursor-grabbing focus-visible:ring-1 focus-visible:ring-ring/50',
         tab.active
-          ? 'border-border bg-background-solid text-foreground shadow-sm'
-          : 'border-transparent text-muted-foreground shadow-none hover:bg-accent hover:text-accent-foreground',
+          ? 'border-border bg-background-solid text-foreground'
+          : 'border-transparent text-muted-foreground hover:bg-accent hover:text-accent-foreground',
         dragging && 'relative z-10 opacity-60',
       )}
       data-editor-tab-id={tab.id}

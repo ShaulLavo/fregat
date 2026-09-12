@@ -1,5 +1,6 @@
 import { CrosshairIcon, FilePlusIcon, FolderPlusIcon } from '@phosphor-icons/react'
 import { Button } from '@workspace/ui/components/button'
+import { PaneBar } from '@workspace/ui/components/pane-bar'
 
 import { TreeSearchActions } from '@/features/workspace/components/tree-search-actions'
 
@@ -31,9 +32,10 @@ export function TreeToolbar({
   readonly query: string
 }) {
   return (
-    <div
+    <PaneBar
       aria-label='File tree actions'
-      className='border-border flex min-w-0 items-center justify-between gap-1 border-b px-1 py-0.5'
+      border='bottom'
+      className='min-w-0 justify-between'
       role='toolbar'
     >
       <div className='flex shrink-0 items-center gap-0.5'>
@@ -83,6 +85,6 @@ export function TreeToolbar({
           <CrosshairIcon className='size-3.5' />
         </Button>
       </div>
-    </div>
+    </PaneBar>
   )
 }

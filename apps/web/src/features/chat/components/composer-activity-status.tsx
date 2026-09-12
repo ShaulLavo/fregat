@@ -39,8 +39,8 @@ export function ComposerActivityStatus({
   const disconnected = connection.kind === 'disconnected'
 
   return (
-    <div className='compact:px-2 shrink-0 px-3 pt-2' data-composer-activity>
-      <div className='border-border/60 bg-card mx-auto max-w-3xl overflow-hidden rounded-lg border'>
+    <div className='shrink-0 px-(--density-control-padding-x) pt-2' data-composer-activity>
+      <div className='border-border bg-card mx-auto max-w-3xl overflow-hidden rounded-lg border'>
         {label ? (
           <div className='flex min-w-0 items-center gap-2 px-2 py-1.5'>
             {active ? (
@@ -62,7 +62,7 @@ export function ComposerActivityStatus({
           </div>
         ) : null}
         {connection.kind !== 'live' && connection.detail ? (
-          <p className='text-muted-foreground px-2 pb-2 text-[11px]'>{connection.detail}</p>
+          <p className='text-muted-foreground text-2xs px-2 pb-2'>{connection.detail}</p>
         ) : null}
         {plan ? <ComposerActivePlan plan={plan} separated={label !== null} /> : null}
       </div>

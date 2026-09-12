@@ -1,3 +1,4 @@
+import { Button } from '@workspace/ui/components/button'
 import { cn } from '@workspace/ui/lib/utils'
 
 import {
@@ -19,7 +20,7 @@ export function LocationPill({
   const selected = currentPath === location.path
 
   return (
-    <button
+    <Button
       aria-current={selected ? 'page' : undefined}
       className={cn(
         PILL_NAV_BUTTON_BASE_CLASS,
@@ -27,9 +28,11 @@ export function LocationPill({
         !selected && PILL_NAV_BUTTON_IDLE_CLASS,
       )}
       onClick={() => jumpTo(location.path)}
+      size='sm'
       type='button'
+      variant='ghost'
     >
       {location.label}
-    </button>
+    </Button>
   )
 }

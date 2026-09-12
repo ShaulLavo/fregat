@@ -35,9 +35,9 @@ type ModelPickerList = {
 
 /**
  * The panel is a fixed 360x346 two-pane surface. It floats free of the chat
- * sidebar it is triggered from — the popup is portalled, so a 44px rail plus a
- * 316px list never has to fit the sidebar's width — but it is still clamped to
- * the viewport for the narrow-window case.
+ * sidebar it is triggered from — the popup is portalled, so the rail plus the
+ * list never has to fit the sidebar's width — but it is still clamped to the
+ * viewport for the narrow-window case.
  */
 const PANEL_CLASS =
   'h-86.5 max-h-[calc(100svh-4rem)] w-90 max-w-[calc(100vw-1.5rem)] flex-row gap-0 overflow-hidden p-0 [clip-path:inset(0_round_var(--radius))]'
@@ -50,9 +50,8 @@ const PANEL_CLASS =
  * padding no matter which stylesheet order Tailwind emits.
  */
 const SEARCH_FIELD_CLASS = [
-  '[&_[data-slot=command-input-wrapper]]:border-border/70',
-  '[&_[data-slot=command-input-wrapper]]:pb-2.5',
-  'compact:[&_[data-slot=command-input-wrapper]]:pb-2',
+  '[&_[data-slot=command-input-wrapper]]:border-subtle',
+  '[&_[data-slot=command-input-wrapper]]:pb-(--density-popover-padding)',
   '[&_[data-slot=command-input-wrapper]]:transition-colors',
   '[&_[data-slot=command-input-wrapper]]:focus-within:border-ring',
   '[&_[data-slot=input-group]]:h-6.5',
@@ -146,11 +145,16 @@ export function ModelPicker({
             />
           ) : null}
           <Command
-            className={cn('min-w-0 flex-1', activeGroup && 'border-border/70 border-l')}
+            className={cn('min-w-0 flex-1', activeGroup && 'border-border border-l')}
             label='Models'
             shouldFilter={false}
           >
-            <div className={cn('compact:px-1.5 compact:pt-1.5 px-2 pt-2', SEARCH_FIELD_CLASS)}>
+            <div
+              className={cn(
+                'px-(--density-row-padding-x) pt-(--density-section-gap)',
+                SEARCH_FIELD_CLASS,
+              )}
+            >
               <CommandInput
                 className='h-6.5'
                 placeholder='Search models'
@@ -159,7 +163,7 @@ export function ModelPicker({
               />
             </div>
             <div className='relative min-h-0 flex-1 overflow-hidden'>
-              <CommandList className='compact:p-1 h-full max-h-full px-1.5 py-1.5'>
+              <CommandList className='h-full max-h-full p-(--density-row-padding-y)'>
                 {providersQuery.isPending ? <ModelsLoading /> : null}
                 {emptyLabel ? (
                   <CommandEmpty className='text-muted-foreground text-xs leading-snug font-normal'>

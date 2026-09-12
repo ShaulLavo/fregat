@@ -27,17 +27,19 @@ export const SearchResultFileHeader = memo(
     return (
       <div
         className={cn(
-          'grid w-full grid-cols-[auto_minmax(0,1fr)_auto_auto] items-center gap-1.5 rounded-sm border-l border-transparent px-2 py-1.5 text-left',
+          'grid w-full grid-cols-[auto_minmax(0,1fr)_auto_auto] items-center gap-1.5 border-l border-transparent px-2 py-1.5 text-left',
           active && 'bg-row-selected',
           !active && 'hover:bg-row-hover',
         )}
       >
-        <button
+        <Button
           aria-label={file.collapsed ? 'Expand file results' : 'Collapse file results'}
-          className='text-muted-foreground hover:bg-muted hover:text-foreground focus-visible:ring-ring/50 grid size-5 place-items-center rounded-sm outline-none focus-visible:ring-1'
+          className='text-muted-foreground'
           disabled={file.excerpts.length === 0}
+          size='icon-xs'
           tabIndex={-1}
           type='button'
+          variant='ghost'
           onClick={handleToggle}
         >
           <CaretRightIcon
@@ -46,7 +48,7 @@ export const SearchResultFileHeader = memo(
               !file.collapsed && file.excerpts.length > 0 && 'rotate-90',
             )}
           />
-        </button>
+        </Button>
         <div
           className='grid min-w-0 grid-cols-[16px_minmax(0,1fr)] items-center gap-1.5 text-left'
           title={file.path}
@@ -54,17 +56,15 @@ export const SearchResultFileHeader = memo(
           <span aria-hidden='true' className='size-4' style={fileIconStyle(icon)} />
           <span className='min-w-0'>
             <span className='block truncate text-xs font-medium'>{name}</span>
-            <span className='text-muted-foreground block truncate text-[11px]'>
-              {file.pathLabel}
-            </span>
+            <span className='text-muted-foreground text-2xs block truncate'>{file.pathLabel}</span>
           </span>
         </div>
-        <span className='bg-muted/55 text-muted-foreground rounded-sm px-1.5 text-[10px] leading-4 tabular-nums'>
+        <span className='bg-muted/55 text-muted-foreground text-3xs rounded-md px-1.5 leading-4 tabular-nums'>
           {file.matchCount.toLocaleString()} {matchNoun(file.matchCount)}
         </span>
         {replaceVisible ? (
           <Button
-            className='h-6 px-1.5 text-[10px]'
+            className='text-3xs h-6 px-1.5'
             disabled={!canReplace}
             size='xs'
             title='Replace matches in this file'

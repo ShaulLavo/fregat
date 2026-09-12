@@ -52,7 +52,7 @@ export function TreeSearchActions({
         <output
           aria-label={matchLabel}
           aria-live='polite'
-          className='text-muted-foreground min-w-0 truncate px-1 text-[10px] tabular-nums'
+          className='text-muted-foreground text-3xs min-w-0 truncate px-1 tabular-nums'
         >
           {matchCount} {matchNoun}
         </output>

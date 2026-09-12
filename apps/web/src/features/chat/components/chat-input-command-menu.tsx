@@ -17,8 +17,7 @@ import { CommandMenuLoading } from '@/features/chat/components/command-menu-load
  * that resize constantly, so a fixed cap would either clip the list or float it
  * over the messages.
  */
-const MENU_CLASS =
-  'max-h-(--available-height) w-(--anchor-width) gap-0 overflow-hidden rounded-md p-0'
+const MENU_CLASS = 'max-h-(--available-height) w-(--anchor-width) gap-0 overflow-hidden p-0'
 
 export function ChatInputCommandMenu({
   activeItemId,
@@ -83,15 +82,17 @@ export function ChatInputCommandMenu({
               <div key={group.id}>
                 {groupIndex > 0 ? <div className='bg-border my-0.5 h-px' /> : null}
                 {group.label ? (
-                  <div className='text-muted-foreground/55 compact:px-2.5 compact:pt-1.5 px-3 pt-2 pb-1 text-[10px] font-semibold tracking-[0.08em] uppercase'>
+                  <div className='text-muted-foreground/55 text-3xs px-(--density-command-heading-padding-x) pt-(--density-command-heading-padding-top) pb-1 font-semibold tracking-[0.08em] uppercase'>
                     {group.label}
                   </div>
                 ) : null}
                 {group.items.map((item) => (
+                  // Raw button: the highlight follows keyboard state, so this
+                  // option must not take the Button primitive's own hover fill.
                   <button
                     aria-selected={activeItemId === item.id}
                     className={cn(
-                      'hover:bg-transparent hover:text-inherit data-[highlighted=true]:bg-transparent data-[highlighted=true]:text-inherit compact:gap-1.5 compact:px-1.5 compact:py-1.5 flex w-full min-w-0 cursor-pointer items-center gap-2 px-2 py-2 text-left text-xs select-none',
+                      'hover:bg-transparent hover:text-inherit data-[highlighted=true]:bg-transparent data-[highlighted=true]:text-inherit flex w-full min-w-0 cursor-pointer items-center gap-(--density-control-gap) px-(--density-row-padding-x) py-(--density-command-item-padding-y) text-left text-xs select-none',
                       activeItemId === item.id && 'bg-accent! text-accent-foreground!',
                     )}
                     data-chat-input-command-item-id={item.id}
@@ -117,9 +118,9 @@ export function ChatInputCommandMenu({
             ))}
           </div>
         ) : (
-          <div className='compact:px-2.5 compact:py-1.5 px-3 py-2'>
+          <div className='px-(--density-command-item-padding-x) py-(--density-command-item-padding-y)'>
             {triggerKind === 'slash-command' ? (
-              <div className='text-muted-foreground/55 pb-1 text-[10px] font-semibold tracking-[0.08em] uppercase'>
+              <div className='text-muted-foreground/55 text-3xs pb-1 font-semibold tracking-[0.08em] uppercase'>
                 Built-in
               </div>
             ) : null}

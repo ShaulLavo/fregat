@@ -37,7 +37,7 @@ export function ProposedPlanCard({ plan }: { plan: OrchestrationProposedPlan }) 
   const exportMarkdown = proposedPlanExportMarkdown(plan.planMarkdown)
 
   return (
-    <article className='border-border/80 bg-card/70 rounded-lg border p-4 text-sm sm:p-5'>
+    <article className='border-border bg-card/70 rounded-lg border p-4 text-sm sm:p-5'>
       <div className='flex min-w-0 flex-wrap items-center justify-between gap-3'>
         <div className='flex min-w-0 items-center gap-2'>
           <Badge variant='secondary'>Plan</Badge>
@@ -49,7 +49,7 @@ export function ProposedPlanCard({ plan }: { plan: OrchestrationProposedPlan }) 
           <p className='text-foreground truncate text-sm font-medium'>{title}</p>
         </div>
         <div className='flex shrink-0 items-center gap-2'>
-          <span className='text-muted-foreground/50 text-[10px] tabular-nums'>
+          <span className='text-muted-foreground/50 text-3xs tabular-nums'>
             {formatChatTimestamp(plan.updatedAt)}
           </span>
           <DropdownMenu>
@@ -90,7 +90,6 @@ export function ProposedPlanCard({ plan }: { plan: OrchestrationProposedPlan }) 
         {canCollapse ? (
           <div className='mt-4 flex justify-center'>
             <Button
-              className='rounded-md'
               size='sm'
               type='button'
               variant='outline'

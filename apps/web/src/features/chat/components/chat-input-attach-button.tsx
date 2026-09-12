@@ -54,7 +54,7 @@ export function ChatInputAttachButton({
           render={
             <Button
               aria-label='Attach images'
-              className='text-muted-foreground hover:text-foreground rounded-md'
+              className='text-muted-foreground'
               disabled={disabled}
               size='icon-sm'
               type='button'

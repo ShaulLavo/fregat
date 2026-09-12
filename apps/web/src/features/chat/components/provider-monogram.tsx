@@ -17,7 +17,7 @@ export function ProviderMonogram({
     <span
       aria-hidden='true'
       className={cn(
-        'bg-muted-foreground/15 text-muted-foreground inline-flex shrink-0 items-center justify-center rounded-sm font-semibold tracking-tight',
+        'bg-muted-foreground/15 text-muted-foreground inline-flex shrink-0 items-center justify-center rounded-md font-semibold tracking-tight',
         className,
       )}
     >

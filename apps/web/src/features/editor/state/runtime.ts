@@ -1,5 +1,5 @@
 import { fileDocumentKey, filesystemPath } from '@/lib/documents/utils/identity'
-import { documentSourcePath } from '@/lib/documents/utils/capabilities'
+import { tabFileResource } from '@/lib/documents/utils/capabilities'
 import { documentTab, sameTabContent } from '@/lib/documents/utils/tabs'
 import { fileDocument } from '@/lib/documents/utils/identity'
 import type { FilesystemPath } from '@/lib/documents/utils/types'
@@ -75,10 +75,8 @@ export function createEditorRuntime({
       documentStore.getState().getLiveEditorDocument(fileDocumentKey(path)),
     getRetainedScrollPosition: (path) =>
       retainedScrollPosition(path, documentStore, workspaceStore),
-    isActive: (path) => {
-      const content = workspaceStore.getState().selectedTabContent
-      return content?.kind === 'document' && documentSourcePath(content.document) === path
-    },
+    isActive: (path) =>
+      tabFileResource(workspaceStore.getState().selectedTabContent)?.path === path,
     mountedEditors,
     preparer: createPlatformFileOpenPreparer(preparation),
     prefetchRelated: () => undefined,

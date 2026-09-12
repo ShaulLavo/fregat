@@ -95,9 +95,9 @@ export function DiffLineCommentAction({
   }
 
   return (
-    <div className='compact:p-2 pointer-events-none absolute inset-x-0 bottom-0 flex justify-center p-3'>
-      <div className='bg-popover-solid border-border compact:p-0.5 pointer-events-auto flex items-center gap-1 rounded-md border p-1 shadow-lg'>
-        <span className='text-muted-foreground compact:px-1 px-1.5 text-xs tabular-nums'>
+    <div className='pointer-events-none absolute inset-x-0 bottom-0 flex justify-center p-(--density-section-padding)'>
+      <div className='bg-popover-solid border-border pointer-events-auto flex items-center gap-1 rounded-lg border p-(--density-gap-tight) shadow-md'>
+        <span className='text-muted-foreground px-(--density-control-padding-x-tight) text-xs tabular-nums'>
           {diffLineAddressLabel(address)}
         </span>
         <Button onClick={ask} size='sm' variant='ghost'>

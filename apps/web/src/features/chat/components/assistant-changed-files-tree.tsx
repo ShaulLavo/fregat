@@ -111,8 +111,10 @@ function renderDirectoryNode({
 
   return (
     <div key={`dir:${node.path}`}>
+      {/* Raw button: a row owns the list hover fill, and Button's ghost variant
+          re-declares it in dark mode at a specificity this cannot override. */}
       <button
-        className='group hover:bg-background/80 flex w-full items-center gap-1.5 rounded-md py-1 pr-2 text-left'
+        className='group hover:bg-row-hover flex w-full items-center gap-1.5 py-1 pr-2 text-left'
         data-scroll-anchor-ignore
         style={treeNodeStyle(depth)}
         type='button'
@@ -130,11 +132,11 @@ function renderDirectoryNode({
         ) : (
           <FolderIcon className='text-muted-foreground/75 size-3.5 shrink-0' />
         )}
-        <span className='text-muted-foreground/90 group-hover:text-foreground/90 truncate font-mono text-[11px]'>
+        <span className='text-muted-foreground/90 group-hover:text-foreground/90 text-2xs truncate font-mono'>
           {node.name}
         </span>
         {hasNonZeroChatTurnDiffStat(node.stat) ? (
-          <span className='ml-auto shrink-0 font-mono text-[10px] tabular-nums'>
+          <span className='text-3xs ml-auto shrink-0 font-mono tabular-nums'>
             <ChatDiffStatLabel additions={node.stat.additions} deletions={node.stat.deletions} />
           </span>
         ) : null}
@@ -165,11 +167,11 @@ function renderFileNode({ depth, node, onOpenFileDiff }: RenderTreeNodeOptions):
     <>
       <span aria-hidden='true' className='size-3.5 shrink-0' />
       <span aria-hidden='true' className='size-3.5 shrink-0' style={fileIconStyle(icon)} />
-      <span className='text-muted-foreground/80 group-hover:text-foreground/90 truncate font-mono text-[11px]'>
+      <span className='text-muted-foreground/80 group-hover:text-foreground/90 text-2xs truncate font-mono'>
         {node.name}
       </span>
       {node.stat ? (
-        <span className='ml-auto shrink-0 font-mono text-[10px] tabular-nums'>
+        <span className='text-3xs ml-auto shrink-0 font-mono tabular-nums'>
           <ChatDiffStatLabel additions={node.stat.additions} deletions={node.stat.deletions} />
         </span>
       ) : null}
@@ -178,8 +180,10 @@ function renderFileNode({ depth, node, onOpenFileDiff }: RenderTreeNodeOptions):
 
   if (onOpenFileDiff) {
     return (
+      // Raw button for the same reason as the directory row above: the list
+      // hover fill must survive the Button primitive's dark-mode ghost hover.
       <button
-        className='group hover:bg-background/80 flex w-full items-center gap-1.5 rounded-md py-1 pr-2 text-left'
+        className='group hover:bg-row-hover flex w-full items-center gap-1.5 py-1 pr-2 text-left'
         data-scroll-anchor-ignore
         key={`file:${node.path}`}
         style={treeNodeStyle(depth)}
@@ -194,7 +198,7 @@ function renderFileNode({ depth, node, onOpenFileDiff }: RenderTreeNodeOptions):
 
   return (
     <div
-      className='group hover:bg-background/80 flex w-full items-center gap-1.5 rounded-md py-1 pr-2 text-left'
+      className='group hover:bg-row-hover flex w-full items-center gap-1.5 py-1 pr-2 text-left'
       key={`file:${node.path}`}
       style={treeNodeStyle(depth)}
       title={node.path}

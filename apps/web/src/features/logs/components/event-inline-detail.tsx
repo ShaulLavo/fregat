@@ -18,7 +18,7 @@ export function LogsEventInlineDetail({ detail, event }: LogsEventInlineDetailPr
 
   return (
     <div className='select-text'>
-      <div className='grid grid-cols-2 gap-x-3 gap-y-1 text-[10px]'>
+      <div className='text-3xs grid grid-cols-2 gap-x-3 gap-y-1'>
         <LogsDetailField label='event' value={formatLogPrimary(visibleEvent)} />
         <LogsDetailField label='time' value={formatLogDateTime(visibleEvent.timestamp)} />
         <LogsDetailField label='duration' value={formatDuration(visibleEvent.durationMs)} />
@@ -27,7 +27,7 @@ export function LogsEventInlineDetail({ detail, event }: LogsEventInlineDetailPr
         <LogsDetailField label='path' value={visibleEvent.path ?? 'none'} />
       </div>
       {detail ? (
-        <pre className='bg-background/70 mt-2 max-h-52 overflow-auto border p-2 font-mono text-[10px] leading-4 break-words whitespace-pre-wrap'>
+        <pre className='bg-background/70 text-3xs mt-2 max-h-52 overflow-auto border p-2 font-mono leading-4 break-words whitespace-pre-wrap'>
           {JSON.stringify(detail.rawJson, null, 2)}
         </pre>
       ) : (

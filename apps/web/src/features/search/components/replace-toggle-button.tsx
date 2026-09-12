@@ -16,7 +16,7 @@ export function SearchReplaceToggleButton({
     <Button
       aria-pressed={active}
       className={cn(
-        'h-8 shrink-0 px-2 text-[11px] text-muted-foreground hover:text-foreground aria-pressed:bg-muted aria-pressed:text-foreground',
+        'shrink-0 text-2xs text-muted-foreground hover:text-foreground aria-pressed:bg-accent aria-pressed:text-foreground',
         className,
       )}
       size='sm'

@@ -65,7 +65,7 @@ export function UnsavedChangesDialog({
     <Dialog open={open} onOpenChange={onOpenChange}>
       <DialogContent
         data-unsaved-dialog-target={target ? 'true' : undefined}
-        className='bg-background w-[min(420px,calc(100vw-2rem))] max-w-none rounded-lg border text-sm shadow-xl sm:max-w-none'
+        className='bg-background w-[min(420px,calc(100vw-2rem))] max-w-none border text-sm sm:max-w-none'
         finalFocus={false}
         ref={dialogFocusTargetRef}
         showCloseButton={false}
@@ -75,13 +75,13 @@ export function UnsavedChangesDialog({
           <DialogDescription>{description}</DialogDescription>
         </DialogHeader>
         {resource ? (
-          <div className='bg-muted/30 text-muted-foreground compact:px-2.5 compact:py-1.5 truncate rounded-md border px-3 py-2 text-xs'>
+          <div className='bg-muted/30 text-muted-foreground truncate rounded-lg border px-(--density-control-padding-x) py-(--density-section-gap) text-xs'>
             {resource.path}
           </div>
         ) : null}
         {error ? (
           <div
-            className='border-destructive/25 bg-destructive/10 text-destructive compact:gap-1.5 compact:px-2.5 compact:py-1.5 flex items-start gap-2 rounded-md border px-3 py-2 text-xs'
+            className='border-destructive/25 bg-destructive/10 text-destructive flex items-start gap-(--density-control-gap) rounded-lg border px-(--density-control-padding-x) py-(--density-section-gap) text-xs'
             role='alert'
           >
             <WarningCircleIcon className='mt-0.5 size-3.5 shrink-0' />

@@ -15,6 +15,7 @@ import { StageSessionMenu } from '@/features/chat-mode/components/stage-session-
 import { useChatModeSession } from '@/features/chat-mode/providers/session-context'
 import { useSessionRailStore } from '@/features/chat-mode/state/session-rail-store'
 import type { SessionRailItem } from '@workspace/client-core/chat/rail/model'
+import { PaneBar } from '@workspace/ui/components/pane-bar'
 import { cn } from '@workspace/ui/lib/utils'
 
 export function StageHeader({
@@ -35,8 +36,8 @@ export function StageHeader({
     scopedSessionKey(renaming.ref) === session?.key
 
   return (
-    <header className='border-border/60 compact:h-10 compact:gap-1.5 compact:px-2 flex h-11 shrink-0 items-center gap-2 border-b px-3'>
-      <nav aria-label='Session' className='flex min-w-0 flex-1 items-center gap-1.5 text-[12px]'>
+    <PaneBar as='header' border='bottom'>
+      <nav aria-label='Session' className='flex min-w-0 flex-1 items-center gap-1.5 text-xs'>
         {projectTitle ? (
           <>
             <span className='text-muted-foreground max-w-[9rem] shrink-0 truncate'>
@@ -53,7 +54,7 @@ export function StageHeader({
         ) : null}
         {session && editing ? (
           <SessionRename
-            className='text-foreground compact:h-6 compact:px-1.5 h-7 min-w-0 flex-1 rounded-md px-2 text-[13px] font-medium'
+            className='text-foreground h-(--density-control-height-sm) min-w-0 flex-1 px-(--density-row-padding-x) text-xs font-medium'
             session={session}
           />
         ) : (
@@ -71,7 +72,7 @@ export function StageHeader({
       {session && session.status !== 'settled' ? (
         <span
           className={cn(
-            'flex shrink-0 items-center gap-1.5 text-[11px]',
+            'flex shrink-0 items-center gap-1.5 text-2xs',
             sessionStatusTextClass(session.status),
           )}
         >
@@ -81,6 +82,6 @@ export function StageHeader({
       ) : null}
       {contextUsage ? <ContextUsageRing usage={contextUsage} /> : null}
       {session ? <StageSessionMenu session={session} /> : null}
-    </header>
+    </PaneBar>
   )
 }

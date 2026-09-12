@@ -1,5 +1,6 @@
 import { CaretDownIcon } from '@phosphor-icons/react'
 import type { ProviderSnapshot } from '@workspace/contracts'
+import { Button } from '@workspace/ui/components/button'
 import { PopoverTrigger } from '@workspace/ui/components/popover'
 import { Tooltip, TooltipContent, TooltipTrigger } from '@workspace/ui/components/tooltip'
 import { cn } from '@workspace/ui/lib/utils'
@@ -35,17 +36,19 @@ export function ModelPickerTrigger({
         render={
           <PopoverTrigger
             render={
-              <button
+              <Button
                 aria-label='Provider and model'
-                className='text-muted-foreground hover:text-foreground focus-visible:border-ring focus-visible:ring-ring/50 compact:h-6 compact:px-1.5 flex h-7 max-w-44 items-center gap-1 truncate rounded-md px-2 text-xs transition-colors focus-visible:ring-1 focus-visible:outline-none disabled:pointer-events-none disabled:opacity-50'
+                className='text-muted-foreground hover:text-foreground max-w-44 min-w-0 truncate'
                 disabled={disabled}
+                size='sm'
                 type='button'
+                variant='ghost'
               />
             }
           >
             {display ? (
               <ProviderGlyph
-                className='size-3.5 text-[7px]'
+                className='text-3xs size-3.5'
                 displayLabel={display.displayLabel}
                 driverKind={display.driverKind}
               />

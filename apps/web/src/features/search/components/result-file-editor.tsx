@@ -240,7 +240,7 @@ export const SearchResultFileEditor = memo(
 
     return (
       <div
-        className='ml-5 min-w-0 rounded-sm border-l border-transparent px-2 py-0.5'
+        className='ml-5 min-w-0 border-l border-transparent px-2 py-0.5'
         ref={focusTarget.ref}
         onBeforeInputCapture={preventReadonlyInput}
         onDropCapture={preventReadonlyInput}

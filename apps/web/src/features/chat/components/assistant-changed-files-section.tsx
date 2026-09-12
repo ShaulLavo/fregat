@@ -1,5 +1,6 @@
 import { useChatTransport } from '@/features/chat/hooks/use-chat-transport'
 import { CaretRightIcon } from '@phosphor-icons/react'
+import { Button } from '@workspace/ui/components/button'
 import { cn } from '@workspace/ui/lib/utils'
 import { useState } from 'react'
 
@@ -23,9 +24,6 @@ import {
 import type { ChatTurnDiffSummary } from '@workspace/client-core/chat/types'
 import { AssistantChangedFilesTree } from './assistant-changed-files-tree'
 import { ChatDiffStatLabel } from './chat-diff-stat-label'
-
-const ACTION_BUTTON_CLASS =
-  'border-border bg-background hover:bg-muted hover:text-foreground h-6 border px-2 text-xs font-medium transition-colors'
 
 export function AssistantChangedFilesSection({ summary }: { summary: ChatTurnDiffSummary }) {
   const { openCheckpointDiff, openSessionCheckpointDiff } = useChatTimelineActions()
@@ -69,15 +67,17 @@ export function AssistantChangedFilesSection({ summary }: { summary: ChatTurnDif
 
   return (
     <section
-      className='border-border/80 bg-card/45 mt-2 rounded-lg border p-2.5'
+      className='border-border bg-card/45 mt-2 rounded-lg border p-2.5'
       data-changed-files-state={expanded ? 'expanded' : 'preview'}
     >
       <div className='flex items-center justify-between gap-2'>
-        <button
+        <Button
           aria-expanded={expanded}
-          className='hover:bg-background/60 flex min-w-0 flex-1 items-center gap-1.5 rounded-md py-1 pr-1 text-left'
+          className='h-auto min-w-0 flex-1 justify-start gap-1.5 py-1 pr-1 pl-0 text-left font-normal'
           data-scroll-anchor-ignore
+          size='sm'
           type='button'
+          variant='ghost'
           onClick={() => setCardExpanded(expansionKey, !expanded)}
         >
           <CaretRightIcon
@@ -87,53 +87,56 @@ export function AssistantChangedFilesSection({ summary }: { summary: ChatTurnDif
               expanded && 'rotate-90',
             )}
           />
-          <span className='text-muted-foreground/65 truncate text-[10px] tracking-[0.12em] uppercase'>
+          <span className='text-muted-foreground/65 text-3xs truncate tracking-[0.12em] uppercase'>
             <span className='tabular-nums'>{files.length}</span>
             {files.length === 1 ? ' changed file' : ' changed files'}
           </span>
           {hasNonZeroChatTurnDiffStat(summaryStat) ? (
-            <span className='shrink-0 font-mono text-[10px]'>
+            <span className='text-3xs shrink-0 font-mono tabular-nums'>
               <ChatDiffStatLabel
                 additions={summaryStat.additions}
                 deletions={summaryStat.deletions}
               />
             </span>
           ) : null}
-        </button>
+        </Button>
         <div className='flex shrink-0 items-center gap-1.5'>
           {diffAvailable ? (
-            <button
-              className={ACTION_BUTTON_CLASS}
+            <Button
               data-scroll-anchor-ignore
+              size='xs'
               type='button'
+              variant='outline'
               onClick={() => void handleOpenCheckpointDiff()}
             >
               View diff
-            </button>
+            </Button>
           ) : (
-            <span className='text-muted-foreground/55 text-[10px]'>
+            <span className='text-muted-foreground/55 text-3xs'>
               {checkpointStatusLabel(summary.status)}
             </span>
           )}
           {diffAvailable ? (
-            <button
-              className={ACTION_BUTTON_CLASS}
+            <Button
               data-scroll-anchor-ignore
+              size='xs'
               type='button'
+              variant='outline'
               onClick={() => void handleOpenSessionDiff()}
             >
               Session diff
-            </button>
+            </Button>
           ) : null}
           {expanded ? (
-            <button
-              className={ACTION_BUTTON_CLASS}
+            <Button
               data-scroll-anchor-ignore
+              size='xs'
               type='button'
+              variant='outline'
               onClick={() => setDirectoriesExpanded(expansionKey, !allDirectoriesExpanded)}
             >
               {allDirectoriesExpanded ? 'Collapse all' : 'Expand all'}
-            </button>
+            </Button>
           ) : null}
         </div>
       </div>
@@ -149,7 +152,7 @@ export function AssistantChangedFilesSection({ summary }: { summary: ChatTurnDif
       ) : null}
       {expanded ? null : (
         <div className='mt-1'>
-          <p className='text-muted-foreground flex flex-wrap items-center gap-x-1.5 text-[11px]'>
+          <p className='text-muted-foreground text-2xs flex flex-wrap items-center gap-x-1.5'>
             {summarizeChangedFileScopes(files).map((scope, index) => (
               <span className='inline-flex items-center gap-1' key={scope.label}>
                 {index > 0 ? <span aria-hidden='true'>·</span> : null}
@@ -161,30 +164,34 @@ export function AssistantChangedFilesSection({ summary }: { summary: ChatTurnDif
           </p>
           <div className='mt-1.5 flex flex-wrap items-center gap-1.5'>
             {selectChangedFilePreview(files).map((file) => (
-              <button
-                className='border-border/70 bg-background/45 text-muted-foreground hover:bg-muted hover:text-foreground inline-flex max-w-48 items-center rounded-md border px-1.5 py-1 font-mono text-[10px] transition-colors disabled:cursor-default disabled:opacity-70'
+              <Button
+                className='text-muted-foreground text-3xs max-w-48 px-1.5 font-mono'
                 data-scroll-anchor-ignore
                 disabled={!diffAvailable}
                 key={file.path}
+                size='xs'
                 title={file.path}
                 type='button'
+                variant='outline'
                 onClick={() => void handleOpenCheckpointDiff(file.path)}
               >
                 <span className='truncate'>{changedFileName(file.path)}</span>
-              </button>
+              </Button>
             ))}
-            <button
-              className='text-muted-foreground hover:bg-muted hover:text-foreground rounded-md px-1.5 py-1 text-[11px] font-medium transition-colors'
+            <Button
+              className='text-muted-foreground text-2xs px-1.5'
               data-scroll-anchor-ignore
+              size='xs'
               type='button'
+              variant='ghost'
               onClick={() => setCardExpanded(expansionKey, true)}
             >
               Show all <span className='tabular-nums'>{files.length}</span> files
-            </button>
+            </Button>
           </div>
         </div>
       )}
-      {diffError ? <p className='text-destructive mt-1.5 text-[11px]'>{diffError}</p> : null}
+      {diffError ? <p className='text-destructive text-2xs mt-1.5'>{diffError}</p> : null}
     </section>
   )
 }
