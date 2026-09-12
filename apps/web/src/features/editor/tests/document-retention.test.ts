@@ -25,6 +25,7 @@ test('keeps the active project plus the most recent others, trimming the oldest'
     activeRootPath: filesystemPath('/repo/a'),
     byteBudget: Number.MAX_SAFE_INTEGER,
     documentSizes: new Map(),
+    unevictableDocumentKeys: new Set(),
     projectLimit: 3,
     slices,
   })
@@ -40,6 +41,7 @@ test('never trims the active project, however stale it is', () => {
     activeRootPath: filesystemPath('/repo/d'),
     byteBudget: Number.MAX_SAFE_INTEGER,
     documentSizes: new Map(),
+    unevictableDocumentKeys: new Set(),
     projectLimit: 2,
     slices,
   })
@@ -57,6 +59,7 @@ test('a byte budget trims a project that the count alone would have kept', () =>
       [testDocumentKey('/repo/b/one.ts'), 40],
       [testDocumentKey('/repo/c/one.ts'), 100],
     ]),
+    unevictableDocumentKeys: new Set(),
     projectLimit: 3,
     slices,
   })
@@ -73,6 +76,7 @@ test('charges a document shared by nested roots only once', () => {
     activeRootPath: filesystemPath('/repo'),
     byteBudget: 100,
     documentSizes: new Map([[testDocumentKey(shared), 100]]),
+    unevictableDocumentKeys: new Set(),
     projectLimit: 3,
     slices: [slice('/repo', 200, [shared]), slice('/repo/apps/web', 100, [shared])],
   })
@@ -95,6 +99,7 @@ test('a rejected project does not pay for the documents a later project shares',
       [testDocumentKey('/repo/big/one.ts'), 100],
       [testDocumentKey(shared), 100],
     ]),
+    unevictableDocumentKeys: new Set(),
     projectLimit: 3,
     slices: [
       slice('/repo/active', 400, ['/repo/active/one.ts']),
@@ -117,6 +122,7 @@ test('charges a document listed twice in one slice only once', () => {
     activeRootPath: filesystemPath('/repo/a'),
     byteBudget: 100,
     documentSizes: new Map([[duplicate, 100]]),
+    unevictableDocumentKeys: new Set(),
     projectLimit: 3,
     slices: [
       slice('/repo/a', 200, ['/repo/a/one.ts']),
@@ -135,6 +141,7 @@ test('retains the rootless active slice, which has no root path to match', () =>
     activeRootPath: null,
     byteBudget: 10,
     documentSizes: new Map([[rootless, 1_000]]),
+    unevictableDocumentKeys: new Set(),
     projectLimit: 3,
     slices: [
       slice('/repo/parked', 100, ['/repo/parked/one.ts']),
@@ -144,4 +151,54 @@ test('retains the rootless active slice, which has no root path to match', () =>
 
   // The active slice is never trimmed, even over budget and even with no root.
   expect(retention.documentKeys.has(rootless)).toBe(true)
+})
+
+// `retain` keeps dirty, non-`file` and unreachable documents whatever the keep set
+// says, so their text is unavoidable. Charging it only when their slice happens to
+// be admitted let optional parked text be admitted on top of it: this case used to
+// keep the clean 800 beside an unevictable 800 against a 1,000 budget, leaving
+// 1,600 resident the moment the trim finished.
+test('charges unevictable text before admitting an optional parked project', () => {
+  const dirty = testDocumentKey('/repo/dirty/one.ts')
+  const clean = testDocumentKey('/repo/clean/one.ts')
+  const retention = retentionForProjects({
+    activeRootPath: filesystemPath('/repo/active'),
+    byteBudget: 1_000,
+    documentSizes: new Map([
+      [dirty, 800],
+      [clean, 800],
+    ]),
+    unevictableDocumentKeys: new Set([dirty]),
+    projectLimit: 3,
+    slices: [
+      slice('/repo/active', 400, []),
+      slice('/repo/clean', 300, ['/repo/clean/one.ts']),
+      slice('/repo/dirty', 200, ['/repo/dirty/one.ts']),
+    ],
+  })
+
+  // The dirty slice is still retained — its document cannot be evicted, so keeping
+  // its tab costs nothing — but the clean 800 no longer fits beside it.
+  expect(retention.documentKeys.has(dirty)).toBe(true)
+  expect(retention.documentKeys.has(clean)).toBe(false)
+})
+
+test('keeps an unevictable document from being charged twice over', () => {
+  const dirty = testDocumentKey('/repo/dirty/one.ts')
+  const retention = retentionForProjects({
+    activeRootPath: filesystemPath('/repo/active'),
+    byteBudget: 900,
+    documentSizes: new Map([[dirty, 800]]),
+    unevictableDocumentKeys: new Set([dirty]),
+    projectLimit: 3,
+    slices: [
+      slice('/repo/active', 400, ['/repo/dirty/one.ts']),
+      slice('/repo/dirty', 200, ['/repo/dirty/one.ts']),
+    ],
+  })
+
+  // Charged once at 800, not 1,600: the active slice and the parked slice name the
+  // same document, and it is already in the unevictable floor.
+  expect(retention.documentKeys.has(dirty)).toBe(true)
+  expect(retention.tabIds.size).toBe(2)
 })

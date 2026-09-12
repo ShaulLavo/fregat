@@ -1386,7 +1386,10 @@ class PooledLspProxySession {
         serverId: this.match.server.id,
         ...this.reader.stats,
       })
-      this.closeFromProcess('framing_error')
+      // `dispose`, not `closeFromProcess`: the child is still alive. The latter is
+      // for a process that already exited, so it never kills one — and having
+      // already left the pool, nothing would reap it later either.
+      this.dispose('framing_error')
     }
   }
 

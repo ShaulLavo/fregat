@@ -96,6 +96,23 @@ describe('collectWorkspaceSearch', () => {
       /invalid completion event/u,
     )
   })
+
+  // Checking only the wrapper is not enough: the property helpers default a
+  // missing field, so each of these would otherwise read as a complete,
+  // untruncated run — the exact fabrication the guard exists to stop.
+  it.each([
+    ['empty object', {}],
+    ['missing truncated', { count: 1, path: 'src', query: 'needle' }],
+    ['truncated not boolean', { count: 1, path: 'src', query: 'needle', truncated: 'no' }],
+    ['count not a number', { count: '1', path: 'src', query: 'needle', truncated: false }],
+    ['missing path', { count: 1, query: 'needle', truncated: false }],
+  ])('rejects a done payload with %s', async (_label, data) => {
+    const client = clientStreaming([match('src/a.ts'), { event: 'done', data }])
+
+    await expect(collectWorkspaceSearch(QUERY, undefined, client)).rejects.toThrow(
+      /invalid completion event/u,
+    )
+  })
 })
 
 describe('streamWorkspaceSearch', () => {

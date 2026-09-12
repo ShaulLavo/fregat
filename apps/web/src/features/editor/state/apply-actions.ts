@@ -292,7 +292,13 @@ function switchRootFolder(
   const evicted = documentStore
     .getState()
     .retainEditorDocuments(
-      editorRetention(workspace, workspace.workbenchPanels, documentSizes, byteBudget),
+      editorRetention(
+        workspace,
+        workspace.workbenchPanels,
+        documentSizes,
+        byteBudget,
+        documentStore.getState().unevictableEditorDocumentKeys(),
+      ),
     )
 
   log.info({
@@ -330,6 +336,7 @@ function editorRetention(
   activePanels: WorkbenchPanels,
   documentSizes: ReadonlyMap<DocumentKey, number>,
   byteBudget: number,
+  unevictableDocumentKeys: ReadonlySet<DocumentKey>,
 ) {
   const activeRootPath = workspace.rootFolder?.path ?? null
   const parked = Array.from(workspace.parkedWorkspaces, ([rootPath, entry]) =>
@@ -341,6 +348,7 @@ function editorRetention(
     byteBudget,
     documentSizes,
     slices: [...parked, retainedSlice(activeRootPath, activePanels, Date.now())],
+    unevictableDocumentKeys,
   })
 }
 
@@ -392,7 +400,15 @@ function closeTab(
       const byteBudget = retainedTextBudget()
       const evicted = documentStore
         .getState()
-        .retainEditorDocuments(editorRetention(workspace, nextPanels, documentSizes, byteBudget))
+        .retainEditorDocuments(
+          editorRetention(
+            workspace,
+            nextPanels,
+            documentSizes,
+            byteBudget,
+            documentStore.getState().unevictableEditorDocumentKeys(),
+          ),
+        )
       log.info({
         // Named for retention, not the command: fires only when the closed path
         // had no other tab, so `editor.command.*` would be uncountable.

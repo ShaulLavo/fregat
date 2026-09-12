@@ -28,6 +28,7 @@ export function retentionForProjects({
   documentSizes,
   projectLimit = DEFAULT_PROJECT_LIMIT,
   slices,
+  unevictableDocumentKeys,
 }: {
   readonly activeRootPath: FilesystemPath | null
   /** UTF-16 code units, not bytes: byte-exact for ASCII, an under-count otherwise. */
@@ -36,6 +37,8 @@ export function retentionForProjects({
   readonly documentSizes: ReadonlyMap<DocumentKey, number>
   readonly projectLimit?: number
   readonly slices: readonly RetainedWorkspaceSlice[]
+  /** Documents `retain` keeps regardless of the keep set; their text is unavoidable. */
+  readonly unevictableDocumentKeys: ReadonlySet<DocumentKey>
 }): DocumentRetention {
   const retained = retainedSlices({
     activeRootPath,
@@ -43,6 +46,7 @@ export function retentionForProjects({
     documentSizes,
     projectLimit,
     slices,
+    unevictableDocumentKeys,
   })
 
   return {
@@ -57,12 +61,14 @@ function retainedSlices({
   documentSizes,
   projectLimit,
   slices,
+  unevictableDocumentKeys,
 }: {
   activeRootPath: FilesystemPath | null
   byteBudget: number
   documentSizes: ReadonlyMap<DocumentKey, number>
   projectLimit: number
   slices: readonly RetainedWorkspaceSlice[]
+  unevictableDocumentKeys: ReadonlySet<DocumentKey>
 }) {
   const active = slices.filter((slice) => slice.rootPath === activeRootPath)
   const parked = slices
@@ -70,7 +76,10 @@ function retainedSlices({
     .toSorted((left, right) => right.lastActiveAt - left.lastActiveAt)
     .slice(0, Math.max(0, projectLimit - active.length))
 
-  return [...active, ...withinByteBudget(active, parked, byteBudget, documentSizes)]
+  return [
+    ...active,
+    ...withinByteBudget(active, parked, byteBudget, documentSizes, unevictableDocumentKeys),
+  ]
 }
 
 /** The active project is never trimmed; parked slices are admitted newest-first, each skipped if it would not fit. */
@@ -79,11 +88,21 @@ function withinByteBudget(
   parked: readonly RetainedWorkspaceSlice[],
   byteBudget: number,
   documentSizes: ReadonlyMap<DocumentKey, number>,
+  unevictableDocumentKeys: ReadonlySet<DocumentKey>,
 ) {
+  // Unevictable text is charged first and once, wherever it lives. Rejecting a
+  // slice does not evict its dirty or non-file documents, so leaving them out of
+  // the total let optional parked text be admitted on top of them and overshoot.
+  // Seeding `charged` also makes a slice that merely contains one cost nothing
+  // extra, which is correct — keeping it frees no text either.
+  const charged = new Set<DocumentKey>(unevictableDocumentKeys)
+  let total = 0
+  for (const documentKey of unevictableDocumentKeys) {
+    total += documentSizes.get(documentKey) ?? 0
+  }
+
   // A rejected slice must not charge documents a later, kept slice shares.
   // Active slices commit unconditionally — they are never trimmed.
-  const charged = new Set<DocumentKey>()
-  let total = 0
   for (const slice of active) total += commitSliceSize(slice, documentSizes, charged)
 
   const kept: RetainedWorkspaceSlice[] = []

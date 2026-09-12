@@ -164,18 +164,23 @@ function warningCode(value: unknown): WorkspaceSearchWarningCode {
   return 'content-tool-partial-failure'
 }
 
-// A zeroed `done` is indistinguishable from a legitimate empty result —
-// `path: ''` is a valid root — so a malformed payload has to fail here.
+// Every required field is checked, not just the wrapper: the property helpers
+// default a missing one to 0/''/false, so `{}` would otherwise read as a
+// complete, untruncated, empty run — the fabrication this exists to reject.
 function doneEventFromData(data: unknown): WorkspaceSearchDoneEvent {
   if (!isRecord(data)) throw clientErrors.SEARCH_DONE_INVALID()
+  if (typeof data.count !== 'number') throw clientErrors.SEARCH_DONE_INVALID()
+  if (typeof data.path !== 'string') throw clientErrors.SEARCH_DONE_INVALID()
+  if (typeof data.query !== 'string') throw clientErrors.SEARCH_DONE_INVALID()
+  if (typeof data.truncated !== 'boolean') throw clientErrors.SEARCH_DONE_INVALID()
 
   return {
-    count: propertyNumber(data, 'count'),
+    count: data.count,
     fileCount: optionalNumber(data.fileCount),
     measurement: searchMeasurement(data.measurement),
-    path: propertyString(data, 'path'),
-    query: propertyString(data, 'query'),
-    truncated: propertyBoolean(data, 'truncated'),
+    path: data.path,
+    query: data.query,
+    truncated: data.truncated,
     type: 'done',
   }
 }
@@ -317,10 +322,6 @@ function searchEventError(data: unknown) {
 
 function propertyNumber(data: Record<string, unknown>, key: string) {
   return typeof data[key] === 'number' ? data[key] : 0
-}
-
-function propertyBoolean(data: Record<string, unknown>, key: string) {
-  return data[key] === true
 }
 
 function propertyString(data: Record<string, unknown>, key: string) {

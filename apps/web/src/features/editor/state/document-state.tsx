@@ -71,6 +71,8 @@ type EditorDocumentStoreActions = {
   forceReplaceLiveEditorDocument: (file: FileResult) => { wasDirty: boolean }
   /** Retained text size per live document; the only input to the retention budget. */
   editorDocumentSizes: () => ReadonlyMap<DocumentKey, number>
+  /** Documents `retain` keeps whatever the keep set says; their text is unavoidable. */
+  unevictableEditorDocumentKeys: () => ReadonlySet<DocumentKey>
   getEditorView: (tabId: TabId) => EditorDocumentView | null
   getLiveEditorDocument: (documentKey: DocumentKey) => LiveEditorDocument | null
   hasLiveEditorDocument: (documentKey: DocumentKey) => boolean
@@ -235,6 +237,7 @@ export function createEditorDocumentStore(options: CreateEditorDocumentStoreOpti
         },
         getEditorView: (tabId) => service.getView(tabId),
         editorDocumentSizes: () => service.documentSizes(),
+        unevictableEditorDocumentKeys: () => service.unevictableDocumentKeys(),
         getLiveEditorDocument: (documentKey) => service.getLiveDocument(documentKey),
         hasLiveEditorDocument: (documentKey) => service.hasLiveDocument(documentKey),
         markLiveEditorDocumentSaved: (input) => {

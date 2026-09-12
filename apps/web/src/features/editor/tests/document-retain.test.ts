@@ -132,6 +132,7 @@ test('retains an overlapping root buffer while evicting only the abandoned root 
     activeRootPath: filesystemPath('/repo/nested'),
     byteBudget: Number.MAX_SAFE_INTEGER,
     documentSizes: new Map(),
+    unevictableDocumentKeys: new Set(),
     projectLimit: 1,
     slices: [
       {
