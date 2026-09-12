@@ -4,6 +4,7 @@ import { act } from 'react'
 import { Application } from '@/components/application'
 import { createTestSettingsSession } from '../../../test/factories/session'
 import { test, expect } from '../../../test/fixtures'
+import { runPaletteCommand } from '../../../test/actions'
 
 test('edits a setting through real keyboard input and restores settings search', async ({
   server,
@@ -83,15 +84,7 @@ test('palette editing returns to the settings list that invoked it', async ({ se
     await act(async () => {
       frame.mockInput.pressKey('TAB')
     })
-    await act(async () => {
-      frame.mockInput.pressKey('F1')
-    })
-    await act(async () => {
-      await frame.mockInput.typeText('Edit setting')
-    })
-    await act(async () => {
-      frame.mockInput.pressKey('RETURN')
-    })
+    await runPaletteCommand(frame, 'Edit selected setting')
     await frame.renderOnce()
     expect(frame.captureCharFrame()).toContain('editor.fontSize · user')
     await act(async () => {
