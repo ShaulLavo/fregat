@@ -50,3 +50,6 @@ apps/desktop/native/build/
 # TypeScript incremental build state
 tsconfig.tsbuildinfo
 *.tsbuildinfo
+
+# Local agent worktrees
+.claude/worktrees/

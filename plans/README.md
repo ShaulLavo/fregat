@@ -43,8 +43,10 @@ a bare root `bun run verify`.
 
 - Plan 099 owns canonical Editor buffer publication and shared document synchronization through
   contributions. Baseline/publication groundwork can proceed independently. Its public cutover follows
-  the completed identity and source-ownership contracts from 098 then 097. Editor E009 informs
-  its transport comparison; future E013 shared storage and E014 parallel search reuse its runtime.
+  the completed identity and source-ownership contracts from 098 then 097. It uses strings and
+  incremental edits in the existing separate workers, removing SAB text transport with the syntax
+  migration. Editor E009 supplies measurement evidence; E013 shared storage is deferred outside
+  this refactor. E014 parallel search must reuse the runtime if implemented.
 
 - **Required order: 098 → 097**, as recorded in [`PLAN.md`](../PLAN.md#document-and-async-operation-ownership).
   Complete and verify all of Plan 098 before starting any implementation in Plan 097. Design

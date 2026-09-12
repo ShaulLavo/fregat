@@ -112,17 +112,19 @@ the delivered shared runtime and has not started.
 It extends Editor's existing buffer owner with one committed-revision publication path and a
 document contribution runtime. Tree-sitter, Shiki, minimap, and language-service adapters share
 source synchronization while retaining typed APIs, independent queues, and domain-specific data.
+Text delivery uses ordinary strings/chunks and incremental edits in the existing separate workers.
+The syntax migration removes SAB text transport while preserving atomic cancellation and packed results.
 
 Its internal order is calibrated baseline and consumer inventory, canonical publication, shared
 runtime with all syntax callers, minimap, local/external LSP, remaining ownership checks, a
-separate SAB transport decision, and final correctness/performance gates. Baseline/publication work
+string-delivery verification, and final correctness/performance gates. Baseline/publication work
 can proceed independently. Public backend cutover follows completed Plan 098 then Plan 097 contracts;
 it does not bypass their required order. Preserve WorkspaceEdit segment publication and
 compensation, prepared adoption, and the existing input latency limits.
 
-This proposal does not reorder other lanes. Editor E009 supplies transport measurement scope;
-future E013 shared storage and E014 parallel search reuse this runtime rather than create another
-document synchronization path. SAB storage research is not a prerequisite for the refactor.
+This proposal does not reorder other lanes. Editor E009 supplies transport measurement scope and
+evidence for the strings decision. E014 parallel search must reuse this runtime if implemented.
+Shared text storage and worker consolidation are outside the refactor; E013 remains deferred research.
 
 ## Instant workspace reload
 

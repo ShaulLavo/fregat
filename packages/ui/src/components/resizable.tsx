@@ -38,9 +38,12 @@ function PersistedResizablePanelGroup({
     [storage, storageKey],
   )
 
-  function handleLayoutChanged(layout: ResizablePrimitive.Layout) {
+  function handleLayoutChanged(
+    layout: ResizablePrimitive.Layout,
+    meta: ResizablePrimitive.LayoutChangedMeta,
+  ) {
     writePersistedResizableLayout(storageKey, layout, storage)
-    onLayoutChanged?.(layout)
+    onLayoutChanged?.(layout, meta)
   }
 
   return (

@@ -29,9 +29,10 @@ Audit find, Markdown, folds, gutters, scope lines, and other document-reading pl
 Keep synchronous, inexpensive consumers synchronous through their existing typed contribution
 hooks. This plan does not move every reader to a worker or turn every API into a promise.
 
-Deliver the common runtime with ordinary worker synchronization first. It must work with SAB
-unavailable. Evaluate the existing SAB text transport separately. A shared allocator or packed
-shared piece tree is not a prerequisite and is not promised by this plan.
+Use ordinary strings/chunks and incremental edit batches for text synchronization. Keep the
+existing separate workers. Remove the existing SAB text transport with the syntax migration;
+shared text storage, worker consolidation, and an intermediate relay worker are outside this plan.
+Preserve the separate atomic cancellation flag and existing packed-result buffer transfers.
 
 The existing text buffer remains the sole authority for content. Platform continues to own files,
 environments, save policy, and WorkspaceEdit transactions. The refactor must remove superseded
@@ -60,9 +61,12 @@ to this repository. Line numbers describe the inspected baseline and must be che
 | [Platform runtime](../apps/web/src/features/editor/state/runtime.ts) and [document state](../apps/web/src/features/editor/state/document-state.tsx)             | Own retained documents within an environment. They must supply explicit ownership, not an active-editor singleton.                                               |
 | [WorkspaceEdit service](../apps/web/src/features/editor/state/workspace-edit-service.ts), around line 1000                                                      | Commits local buffer changes before awaiting server finalization. Compensation can emit reverse changes later. Preserve this visibility and ordering.            |
 
-The earlier local Chromium check found SAB unavailable on Platform at `http://127.0.0.1:3300/`.
-That is one observed environment, not a permanent capability claim. Recheck the actual deployment
-when measuring. Historical parse timings do not prove a current end-to-end SAB benefit.
+The [2026-09-12 measurements](../../Editor/docs/performance/sab-transport-2026-09-12.md) found no
+repeatable overall Tree-sitter SAB advantage. Direct shared readers gained in a synthetic four-worker
+case, but that gain does not justify shared-storage complexity for this refactor. The text transport
+decision is strings; implementation validation must still prove correctness and latency budgets.
+The measured Platform development page had SAB unavailable. That observation does not disable or
+remove the independent atomic cancellation mechanism on hosts that support it.
 
 ## Chosen architecture
 
@@ -82,17 +86,22 @@ flowchart TD
     A[Typing, commands, undo, reload, WorkspaceEdit] --> B[Existing buffer mutation and history rules]
     B --> C[One committed revision publication]
     C --> D[Synchronous view update]
-    C --> E[Document contribution runtime]
-    E --> F[Tree-sitter and Shiki sessions]
+    C --> E[Main-thread document contribution runtime]
+    E --> F[Tree-sitter adapter and existing worker]
+    E --> J[Shiki adapter and existing worker]
     E --> G[Minimap projection and view renderer]
     E --> H[LSP connection adapters]
     F --> I[Typed revision-tagged results]
+    J --> I
     G --> I
     H --> I
 ```
 
 “One place” means one owner of document publication and synchronization policy. It does not mean
 one worker, a global serial queue, or one untyped request/result format.
+The runtime lives with the main-thread document owner. Each existing worker retains its own text
+or derived state; canonical publication does not eliminate cross-worker copies. Send only the
+source changes each consumer needs, and keep unchanged worker state between requests.
 
 ### Alternatives and synthesis
 
@@ -102,6 +111,7 @@ one worker, a global serial queue, or one untyped request/result format.
 | Document-owned revision reader with typed requests and retained synchronization demand | Chosen base. It centralizes progress while allowing hidden views and obsolete work to skip unnecessary computation. Stateful parsers survive between requests. |
 | Uniform worker-message wrapper around existing clients                                 | Reject. It would leave each feature responsible for its own document baseline, resets, and result freshness.                                                   |
 | Move the authoritative document into a worker or SAB immediately                       | Reject for this refactor. It changes synchronous editing and storage ownership before the shared consumer boundary is proven.                                  |
+| Consolidate text consumers into one worker or introduce a relay worker                 | Reject. Preserve existing execution independence; the contribution runtime runs with the main-thread document owner.                                           |
 
 The public contract hides synchronization and lifetime management. Feature code retains only the
 knowledge required by its parser, tokenizer, renderer, or external protocol. Do not create chains
@@ -317,7 +327,7 @@ collapses resource segments into an invented cross-document atomic event.
 ### Common synchronization state
 
 Own source progress once per document and execution endpoint. Compatible contribution sessions
-within that endpoint reuse a reader. Different workers can require separate ordinary mirrors;
+already within that endpoint reuse a reader. Preserve separate mirrors in separate workers;
 the runtime must not claim that message passing makes those copies shared memory.
 
 Before dispatching work for revision R, establish that the endpoint can read R. Use its last
@@ -337,7 +347,7 @@ release, and acknowledgement. Every message carries the document and endpoint ge
 its exact base/target identity. An advance with the wrong base cannot be applied optimistically.
 Do not expose functions or class instances as serialized snapshot payloads.
 
-For ordinary local workers, send initial text chunks and then canonical edit batches. Construct
+For local text-consuming workers, send initial string chunks and then canonical edit batches. Construct
 a worker-local immutable reader using the existing DOM-free text operations. Validate UTF-16
 offset and edit-batch coordinate conventions at the boundary. Preserve lone surrogates, surrogate
 pairs across chunk boundaries, line endings, and sparse separated edits exactly.
@@ -494,6 +504,11 @@ and packed results. Remove their feature-owned source history/recovery and direc
 Keep only domain-specific synchronization required to update parser/tokenizer state after the
 common reader advances.
 
+Keep their separate workers. Delete the `shared-utf16` text payload, encode/decode helpers, source
+capability selection, and obsolete transport-only tests in this same unit. Carry forward exact
+UTF-16, chunk identity, and retention coverage against strings. Preserve atomic cancellation and
+packed-result transfer behavior; neither is shared document storage.
+
 Migrate every caller of these two backends in this unit: mounted controllers, prepared creation
 and adoption, diff/headless syntax, examples, framework wrappers, and Platform registration.
 Remove the replaced provider session entry points only after their entire caller set uses the
@@ -537,21 +552,17 @@ For every remaining family, migrate its full caller set and delete the replaced 
 points in the same unit. Preserve typed language-service and view APIs through the contribution
 registry. Recheck React, Solid, standalone examples, built consumers, and Platform for bypasses.
 
-### 6. Decide the SAB implementation beneath the contract
+### 6. Verify string delivery costs and text-transport removal
 
-Compare ordinary strings/chunks, transferable buffers where ownership permits, and the existing
-SAB chunk path under the new runtime. Separate this comparison from the improvement due to
-centralized publication and synchronization. Preserve the SAB cancellation mechanism where
-supported and useful; it is a different use from text storage.
+Measure initial string/chunk delivery, acknowledged edits, resets, source retention, and complete
+consumer readiness against the frozen baseline. Attribute centralized publication improvements
+separately from source transport costs. Preserve clipped minimap payloads and LSP protocol behavior.
 
-Keep a SAB source implementation only if complete-consumer latency or memory savings beat the
-declared target and repeated-control variation without regressing input latency. Otherwise delete
-the old `shared-utf16` path and its obsolete tests. Record unavailable channels as unavailable.
-If no representative SAB-capable channel can be measured, remove the unproven text transport as
-an explicit complexity decision, not a measured performance loss. Record the evidence gap and
-keep the ordinary runtime rollout independent of SAB availability.
-If shared immutable storage is still promising, update E013 against this runtime as a separate
-measured implementation proposal. Do not keep an unused production SAB abstraction for that future.
+Confirm unit 2 removed all production SAB text paths and their unused capability abstractions.
+Verify cancellation on supported hosts and packed-result transfers independently. The text transport
+decision is settled; this unit does not add a competing shared-storage prototype or a relay worker.
+Keep the recorded SAB measurements as evidence, without maintaining obsolete production transport
+solely to rerun them. Report remaining E009 measurement gaps without making SAB research a rollout gate.
 
 ### 7. Enforce the boundary and close the refactor
 
@@ -684,7 +695,7 @@ large payloads onto the system SSD as a side effect of verification.
 ## Related plans and execution order
 
 [Root PLAN.md](../PLAN.md) remains the scheduler. This plan's internal order is baseline,
-publication, common runtime with syntax consumers, minimap, LSP, remaining callers, SAB decision,
+publication, common runtime with syntax consumers, minimap, LSP, remaining callers, string delivery verification,
 and complete validation. Writing the plan does not schedule production execution ahead of another lane.
 
 - [Plan 098](098-document-and-tab-domain.md) owns Platform document and tab identity. Map its
@@ -698,12 +709,14 @@ and complete validation. Writing the plan does not schedule production execution
 - [E007](../../Editor/plans/e007-chunked-document-consumers.md) and
   [E033](../../Editor/plans/e033-explicit-full-text-boundary.md) supply range/full-text constraints.
   Reconcile overlapping consumer moves instead of implementing parallel abstractions.
-- [E032](../../Editor/plans/e032-incremental-edit-batches.md) owns incremental batch improvements.
-  Preserve its sparse-region requirements and existing canonical batch semantics.
+- [Completed E032](../../Editor/docs/performance/e032-edit-batches.md) supplies incremental batch
+  behavior and measurements. Preserve its sparse-region requirements and canonical batch semantics.
 - [E009](../../Editor/plans/e009-worker-transport-costs.md) supplies transport measurement scope.
-  Unit 6 executes its relevant decision against the new runtime and records what remains.
-- [E013](../../Editor/plans/e013-shared-document-snapshots.md) remains shared-storage research.
-  Its future reader must implement this contribution contract. E010–E012 are not prerequisites here.
+  Its initial measurements informed the decision to remove SAB text transport in unit 2. Unit 6
+  validates string delivery under the new runtime and records remaining measurement gaps.
+- [E013](../../Editor/plans/e013-shared-document-snapshots.md) and E010–E012 are deferred shared-storage
+  research outside this architecture. Reopening shared text storage requires a separate explicit
+  decision; this plan provides no production abstraction or implementation dependency for it.
 - [E014](../../Editor/plans/e014-parallel-search.md) must reuse the common reader and job lifecycle
   if parallel search is implemented. This plan does not add a parallel search engine.
 - [Plan 071](071-syntax-highlight-retry.md) remains separate retry policy. Common endpoint lifecycle
@@ -720,7 +733,7 @@ and complete validation. Writing the plan does not schedule production execution
 - [ ] Old source publishers, duplicate generic sync state, unused APIs, and compatibility paths are deleted.
 - [ ] Built exports and all affected framework/Platform consumers use the new contract.
 - [ ] Calibrated browser gates pass, and the declared multiple-consumer improvement is measured.
-- [ ] The SAB keep/remove decision is documented separately from runtime consolidation results.
+- [ ] SAB text transport is removed; separate workers, atomic cancellation, and packed-result transfers are preserved.
 - [ ] Permanent architecture/performance references and all overlapping plan links are reconciled.
 
 If two independent adapters need their own generic source cursor, reset policy, or revision check
