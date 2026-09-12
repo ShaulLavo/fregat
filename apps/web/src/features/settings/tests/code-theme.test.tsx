@@ -1,3 +1,4 @@
+import { getClient } from '@/lib/client'
 import { act, screen, waitFor } from '@testing-library/react'
 import userEvent from '@testing-library/user-event'
 import type { SettingsSubmission } from '@workspace/client-core/settings/intent-store'
@@ -28,7 +29,7 @@ test('settings saves native code themes per mode and reset restores the editor d
   await userEvent.click(await screen.findByRole('option', { name: /^Native Dark/ }))
 
   await waitFor(async () => {
-    const snapshot = await fetchSettings()
+    const snapshot = await fetchSettings(undefined, getClient())
     expect(snapshot.values['editor.codeTheme.dark']).toBe('tree-sitter-dark')
     expect(snapshot.values['editor.codeTheme.light']).toBe('light-plus')
     expect(getCommittedEditorThemeId('dark')).toBe('tree-sitter-dark')
@@ -39,7 +40,7 @@ test('settings saves native code themes per mode and reset restores the editor d
   await userEvent.click(await screen.findByRole('option', { name: /^Native Light/ }))
 
   await waitFor(async () => {
-    const snapshot = await fetchSettings()
+    const snapshot = await fetchSettings(undefined, getClient())
     expect(snapshot.values['editor.codeTheme.light']).toBe('tree-sitter-light')
     expect(snapshot.values['editor.codeTheme.dark']).toBe('tree-sitter-dark')
   })
@@ -48,7 +49,7 @@ test('settings saves native code themes per mode and reset restores the editor d
   await userEvent.click(await screen.findByRole('menuitem', { name: 'Reset setting' }))
 
   await waitFor(async () => {
-    const snapshot = await fetchSettings()
+    const snapshot = await fetchSettings(undefined, getClient())
     expect(snapshot.values['editor.codeTheme.dark']).toBe('dark-plus')
     expect(snapshot.values['editor.codeTheme.light']).toBe('tree-sitter-light')
     expect(getCommittedEditorThemeId('dark')).toBe('dark-plus')
@@ -58,7 +59,7 @@ test('settings saves native code themes per mode and reset restores the editor d
 test('browsing and filtering code themes can be canceled without saving either mode', async ({
   controlledClient,
 }) => {
-  const before = await fetchSettings()
+  const before = await fetchSettings(undefined, getClient())
   const user = userEvent.setup()
   renderWithProviders(<SettingsPage />)
 
@@ -80,7 +81,7 @@ test('browsing and filtering code themes can be canceled without saving either m
     await waitFor(() => expect(search).not.toBeInTheDocument())
   }
 
-  const after = await fetchSettings()
+  const after = await fetchSettings(undefined, getClient())
   expect(after.values['editor.codeTheme.dark']).toBe(before.values['editor.codeTheme.dark'])
   expect(after.values['editor.codeTheme.light']).toBe(before.values['editor.codeTheme.light'])
   expect(controlledClient.controller.settingsWriteCount).toBe(0)
@@ -90,7 +91,7 @@ test('searching and selecting an imported theme saves only its mode', async ({
   controlledClient,
 }) => {
   const user = userEvent.setup()
-  const before = await fetchSettings()
+  const before = await fetchSettings(undefined, getClient())
   renderWithProviders(<SettingsPage />)
 
   await user.click(await screen.findByRole('button', { name: 'Code theme in dark mode' }))
@@ -100,7 +101,7 @@ test('searching and selecting an imported theme saves only its mode', async ({
   await user.click(await screen.findByRole('option', { name: /^Monokai$/ }))
 
   await waitFor(async () => {
-    const after = await fetchSettings()
+    const after = await fetchSettings(undefined, getClient())
     expect(after.values['editor.codeTheme.dark']).toBe('monokai')
     expect(after.values['editor.codeTheme.light']).toBe(before.values['editor.codeTheme.light'])
     expect(controlledClient.controller.settingsWriteCount).toBe(1)
@@ -124,7 +125,9 @@ test('palette code-theme actions use settings while canceled previews do not per
 
   act(() => previewEditorTheme('dark', 'tree-sitter-dark'))
   expect(getSelectedEditorThemeId('dark')).toBe('tree-sitter-dark')
-  expect((await fetchSettings()).values['editor.codeTheme.dark']).toBe('dark-plus')
+  expect((await fetchSettings(undefined, getClient())).values['editor.codeTheme.dark']).toBe(
+    'dark-plus',
+  )
   act(() => clearEditorThemePreview())
   expect(getSelectedEditorThemeId('dark')).toBe('dark-plus')
 
@@ -132,7 +135,9 @@ test('palette code-theme actions use settings while canceled previews do not per
     holder.selectTheme?.('monokai', 'command-palette')
   })
   await waitFor(async () => {
-    expect((await fetchSettings()).values['editor.codeTheme.dark']).toBe('monokai')
+    expect((await fetchSettings(undefined, getClient())).values['editor.codeTheme.dark']).toBe(
+      'monokai',
+    )
     expect(readSettingsMirror()['editor.codeTheme.dark']).toBe('monokai')
     expect(getCommittedEditorThemeId('dark')).toBe('monokai')
   })
@@ -147,7 +152,7 @@ test('a rejected code-theme save restores the confirmed theme after preview clos
     status: 400,
   })
   const queryClient = createTestQueryClient()
-  queryClient.setQueryData(settingsKeys.document(), await fetchSettings())
+  queryClient.setQueryData(settingsKeys.document(), await fetchSettings(undefined, getClient()))
   const holder: {
     selectTheme?: ReturnType<typeof useEditorColorTheme>['selectTheme']
     submission?: SettingsSubmission

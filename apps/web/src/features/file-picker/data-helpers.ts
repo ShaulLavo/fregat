@@ -11,7 +11,7 @@ import {
 } from '@/lib/file-server'
 import { createClientError } from '@workspace/client-core/errors'
 import { clientErrors } from '@/lib/structured-errors'
-import { getClient, type Client } from '@/lib/client'
+import type { Client } from '@/lib/client'
 import { streamWorkspaceSearch } from '@workspace/client-core/files/search-client'
 
 import {
@@ -47,7 +47,7 @@ export async function loadDirectoryData(
   signal: AbortSignal,
   onEntries: (entries: FsEntry[]) => void,
   options: DirectoryLoadOptions = {},
-  client: Client = getClient(),
+  client: Client,
 ): Promise<DirectoryLoadData> {
   const showHidden = options.showHidden ?? false
   const [currentEntry, entries] = await Promise.all([
@@ -58,7 +58,7 @@ export async function loadDirectoryData(
   return { currentEntry, entries }
 }
 
-export function fetchServerInfo(signal: AbortSignal, client: Client = getClient()) {
+export function fetchServerInfo(signal: AbortSignal, client: Client) {
   return fetchSharedServerInfo(signal, client)
 }
 
@@ -66,19 +66,16 @@ export function fetchRecentEntries(
   mode: FilePickerMode,
   showHidden: boolean,
   signal: AbortSignal,
-  client: Client = getClient(),
+  client: Client,
 ) {
   return fetchSharedRecentEntries({ limit: RECENT_LIMIT, mode, showHidden }, signal, client)
 }
 
-export async function recordRecent(entry: PickedFsEntry, client: Client = getClient()) {
+export async function recordRecent(entry: PickedFsEntry, client: Client) {
   await recordRecentEntry(entry.path, client)
 }
 
-export async function createPickerFolder(
-  request: CreatePickerFolderRequest,
-  client: Client = getClient(),
-) {
+export async function createPickerFolder(request: CreatePickerFolderRequest, client: Client) {
   const path = pickerFolderPath(request.parentPath, request.name)
   return createFolderPath(path, client)
 }

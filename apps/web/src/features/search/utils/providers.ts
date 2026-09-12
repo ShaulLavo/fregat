@@ -1,4 +1,4 @@
-import { getClient } from '@/lib/client'
+import type { Client } from '@/lib/client'
 import {
   createWorkspaceSearchMatcher,
   errorNumberField,
@@ -29,6 +29,7 @@ export type OpenBufferSearchDocument = {
 }
 
 export class DiskSearchProvider implements SearchProvider {
+  constructor(private readonly client: Client) {}
   async *search(
     query: WorkspaceSearchQuery,
     signal?: AbortSignal,
@@ -36,7 +37,7 @@ export class DiskSearchProvider implements SearchProvider {
     yield* streamWorkspaceSearch(
       { ...query, entryType: query.entryType ?? 'file' },
       signal,
-      getClient(),
+      this.client,
     )
   }
 }

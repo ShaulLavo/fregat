@@ -1,3 +1,4 @@
+import { getClient } from '@/lib/client'
 import { describe, expect, it } from 'vitest'
 import type {
   WorkspaceSearchEvent,
@@ -199,7 +200,7 @@ describe('open buffer search provider', () => {
 describe('disk search provider', () => {
   it('passes includeNames to the streaming search endpoint', async () => {
     const restoreFetch = stubFetchWithSseDone()
-    const provider = new DiskSearchProvider()
+    const provider = new DiskSearchProvider(getClient())
 
     try {
       await collectEvents(provider.search({ ...QUERY, includeNames: false }))
@@ -211,7 +212,7 @@ describe('disk search provider', () => {
 
   it('passes search mode options to the streaming search endpoint', async () => {
     const restoreFetch = stubFetchWithSseDone()
-    const provider = new DiskSearchProvider()
+    const provider = new DiskSearchProvider(getClient())
 
     try {
       await collectEvents(
@@ -238,7 +239,7 @@ describe('disk search provider', () => {
 
   it('passes query whitespace to the streaming search endpoint', async () => {
     const restoreFetch = stubFetchWithSseDone()
-    const provider = new DiskSearchProvider()
+    const provider = new DiskSearchProvider(getClient())
 
     try {
       await collectEvents(provider.search({ ...QUERY, query: ' needle ' }))

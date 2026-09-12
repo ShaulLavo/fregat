@@ -94,7 +94,7 @@ The migration includes five separately verified corrections:
    results. The previous overlay treated their synthetic identifiers as paths.
 
 File auto-save scope, editable Git references, comparison rename behavior, and transaction
-semantics remain as characterized. Async operation ownership changes belong to Plan 097.
+semantics remain as characterized. The [async operation ownership reference](async-operation-ownership.md) describes the subsequent ownership changes.
 
 ## Enforcement and verification
 
@@ -133,5 +133,5 @@ recorded during initial characterization. Tests were not weakened to make these 
 The existing preview at port 3300 serves the built artifact, but its backend rejects that
 origin with `FORBIDDEN_ORIGIN`; live UI smoke verification is limited by that configuration.
 
-Plan 097 contains the current source baseline and consumes these completed APIs. No Plan 097
-runtime work is included in this migration.
+The [async operation ownership implementation](async-operation-ownership.md) consumes these completed APIs.
+Its later runtime changes and verification are recorded separately.

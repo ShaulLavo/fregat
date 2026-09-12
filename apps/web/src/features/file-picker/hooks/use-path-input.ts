@@ -4,7 +4,7 @@ import { errorMessage } from '@/lib/error-message'
 import type { ServerInfo } from '@/lib/file-system-types'
 import { isDirectoryEntry } from '@/lib/file-system-types'
 import { statPath } from '@/lib/file-server'
-import { useEffect, useEffectEvent, useRef, useState } from 'react'
+import { useEffect, useRef, useState } from 'react'
 import { useQueryClient } from '@tanstack/react-query'
 
 import { absolutePickerPath, parsePickerPathInput } from '@workspace/client-core/files/path-input'
@@ -27,8 +27,6 @@ export function useFilePickerPathInput({
   const [error, setError] = useState<string | null>(null)
   const [isEditing, setIsEditing] = useState(false)
   const [isPending, setIsPending] = useState(false)
-  const beginNavigationIntent = useEffectEvent(onIntentStart)
-  const navigate = useEffectEvent(onNavigate)
 
   useEffect(() => {
     if (!isEditing) return
@@ -37,7 +35,7 @@ export function useFilePickerPathInput({
     inputRef.current?.select()
   }, [isEditing])
 
-  useEffect(() => () => requestRef.current?.abort(), [])
+  useEffect(() => () => requestRef.current?.abort(), [client])
 
   function open() {
     if (!serverInfo) return
@@ -71,7 +69,8 @@ export function useFilePickerPathInput({
       return
     }
 
-    const intentId = beginNavigationIntent()
+    const intentId = onIntentStart()
+    const navigate = onNavigate
     const controller = new AbortController()
     requestRef.current?.abort()
     requestRef.current = controller
@@ -80,6 +79,7 @@ export function useFilePickerPathInput({
 
     try {
       const entry = await statPath(filesystemPath(parsed.path), controller.signal, client)
+      if (controller.signal.aborted || requestRef.current !== controller) return
       if (!isDirectoryEntry(entry)) {
         setError('That path is not a folder.')
         return
@@ -88,7 +88,7 @@ export function useFilePickerPathInput({
       navigate(parsed.path, intentId)
       setIsEditing(false)
     } catch (cause) {
-      if (controller.signal.aborted) return
+      if (controller.signal.aborted || requestRef.current !== controller) return
 
       setError(errorMessage(cause, 'Could not open that folder.'))
     } finally {

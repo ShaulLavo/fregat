@@ -1,7 +1,7 @@
 import { queryOptions } from '@tanstack/react-query'
 import type { ProviderInstanceId, ProviderSignInMethod } from '@workspace/contracts'
 
-import { getClient, type Client } from '@/lib/client'
+import type { Client } from '@/lib/client'
 import { clientForQueryClient } from '@/lib/environments/state/query-clients'
 import { createRpcError } from '@/lib/structured-errors'
 
@@ -27,17 +27,14 @@ function authRoutes(providerInstanceId: ProviderInstanceId, client: Client) {
 }
 
 /** Answers for every provider: the ones with no in-app flow report `supportsSignIn: false`. */
-export async function fetchProviderAuth(
-  providerInstanceId: ProviderInstanceId,
-  client: Client = getClient(),
-) {
+export async function fetchProviderAuth(providerInstanceId: ProviderInstanceId, client: Client) {
   return unwrap(await authRoutes(providerInstanceId, client).get())
 }
 
 export async function startProviderLogin(
   providerInstanceId: ProviderInstanceId,
   method: ProviderSignInMethod,
-  client: Client = getClient(),
+  client: Client,
 ) {
   return unwrap(await authRoutes(providerInstanceId, client).login.post({ method }))
 }
@@ -45,7 +42,7 @@ export async function startProviderLogin(
 export async function fetchProviderLoginAttempt(
   providerInstanceId: ProviderInstanceId,
   attemptId: string,
-  client: Client = getClient(),
+  client: Client,
 ) {
   return unwrap(await authRoutes(providerInstanceId, client).login({ attemptId }).get())
 }
@@ -55,15 +52,12 @@ export async function fetchProviderLoginAttempt(
 export async function cancelProviderLoginAttempt(
   providerInstanceId: ProviderInstanceId,
   attemptId: string,
-  client: Client = getClient(),
+  client: Client,
 ) {
   return unwrap(await authRoutes(providerInstanceId, client).login({ attemptId }).cancel.post())
 }
 
-export async function signOutProvider(
-  providerInstanceId: ProviderInstanceId,
-  client: Client = getClient(),
-) {
+export async function signOutProvider(providerInstanceId: ProviderInstanceId, client: Client) {
   return unwrap(await authRoutes(providerInstanceId, client).logout.post())
 }
 

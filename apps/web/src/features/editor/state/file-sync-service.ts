@@ -136,12 +136,27 @@ export type WorkspaceMutationProjectionReceipt = {
 export class FileSyncService {
   private readonly epochListeners = new Set<(serverEpoch: string) => void>()
   private serverEpoch: string | null = null
+  private readonly writeIdPrefix = `${createWriteId()}:`
+  private issuedWriteCount = 0
 
   constructor(
     private readonly documentStore: EditorDocumentStoreApi,
     private readonly queryClient: QueryClient,
     private readonly ports: FileSyncPorts = ownedFileSyncPorts(queryClient),
   ) {}
+
+  readonly issueWriteId = (): string => `${this.writeIdPrefix}${++this.issuedWriteCount}`
+
+  readonly isOwnWriteEvent = (writeId: string): boolean => {
+    if (!writeId.startsWith(this.writeIdPrefix)) return false
+    const sequence = Number(writeId.slice(this.writeIdPrefix.length))
+    return (
+      Number.isSafeInteger(sequence) &&
+      sequence > 0 &&
+      sequence <= this.issuedWriteCount &&
+      writeId === `${this.writeIdPrefix}${sequence}`
+    )
+  }
 
   readonly inspectWorkspacePath = async (
     path: FilesystemPath,

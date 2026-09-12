@@ -1,56 +1,28 @@
-import { useCallback, useEffect, useRef } from 'react'
+import { useEffect, useMemo } from 'react'
 
-import {
-  cancelConflictResolutions,
-  scheduleConflictResolution,
-  resolveConflictEditorSnapshot,
-  type ConflictResolutionDebouncers,
-} from '@/features/workspace/utils/conflict-editor-resolution'
-import { documentKey } from '@/lib/documents/utils/identity'
-import type { DocumentRef, FilesystemPath } from '@/lib/documents/utils/types'
-import { useEditorConflictStoreApi } from '@/features/editor/state/conflict-state'
-import type { FileResult } from '@/lib/file-system-types'
-import type { TextSnapshot } from '@singapor/core'
-import { useQueryClient } from '@tanstack/react-query'
+import { ConflictEditorResolutionCoordinator } from '@/features/workspace/state/conflict-editor-resolution'
+import { useEditorRuntime } from '@/features/editor/hooks/use-runtime'
+import { useEditorCommands } from '@/features/editor/hooks/use-editor-commands'
+import { clientForQueryClient } from '@/lib/environments/state/query-clients'
 
-export function useConflictEditorResolution({
-  discardLiveEditorDocument,
-  forceReplaceLiveEditorDocument,
-  renameLiveEditorDocument,
-}: {
-  discardLiveEditorDocument: (document: DocumentRef) => { wasDirty: boolean }
-  forceReplaceLiveEditorDocument: (file: FileResult) => { wasDirty: boolean }
-  renameLiveEditorDocument: (from: FilesystemPath, to: FilesystemPath) => { wasDirty: boolean }
-}) {
-  const conflictStore = useEditorConflictStoreApi()
-  const queryClient = useQueryClient()
-  const resolvingConflictIds = useRef(new Set<string>())
-  const pendingResolutions = useRef<ConflictResolutionDebouncers>(new Map())
-
-  useEffect(() => () => cancelConflictResolutions(pendingResolutions.current), [])
-
-  return useCallback(
-    (target: Extract<DocumentRef, { kind: 'conflict' }>, textSnapshot: TextSnapshot) => {
-      const key = documentKey(target)
-
-      scheduleConflictResolution(pendingResolutions.current, key, () => {
-        pendingResolutions.current.delete(key)
-        resolveConflictEditorSnapshot(target, textSnapshot, {
-          conflictStore,
-          discardLiveEditorDocument,
-          forceReplaceLiveEditorDocument,
-          queryClient,
-          renameLiveEditorDocument,
-          resolvingConflictIds,
-        })
-      })
-    },
-    [
-      conflictStore,
-      discardLiveEditorDocument,
-      forceReplaceLiveEditorDocument,
-      queryClient,
-      renameLiveEditorDocument,
-    ],
+export function useConflictEditorResolution() {
+  const runtime = useEditorRuntime()
+  const commands = useEditorCommands()
+  // The coordinator owns debounce and in-flight writes across editor renders.
+  const coordinator = useMemo(
+    () =>
+      new ConflictEditorResolutionCoordinator({
+        client: clientForQueryClient(runtime.queryClient),
+        conflictStore: runtime.conflictStore,
+        documentStore: runtime.documentStore,
+        queryClient: runtime.queryClient,
+        getOperationRoot: runtime.getOperationRoot,
+        issueWriteId: runtime.issueFileWriteId,
+        discardLiveEditorDocument: commands.discardLiveEditorDocument,
+        renameLiveEditorDocument: commands.renameLiveEditorDocument,
+      }),
+    [runtime, commands],
   )
+  useEffect(() => coordinator.connect(), [coordinator])
+  return coordinator.schedule
 }

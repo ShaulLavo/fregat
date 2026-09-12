@@ -1,3 +1,4 @@
+import { getClient } from '@/lib/client'
 import { providerInstanceIdSchema } from '@workspace/contracts'
 import * as v from 'valibot'
 
@@ -33,7 +34,7 @@ async function codeOf(call: Promise<unknown>) {
 test('the auth read reaches an unknown provider instance', async ({ client }) => {
   void client
 
-  expect(await codeOf(fetchProviderAuth(missing))).toBe('provider.INSTANCE_NOT_FOUND')
+  expect(await codeOf(fetchProviderAuth(missing, getClient()))).toBe('provider.INSTANCE_NOT_FOUND')
 })
 
 test('every sign-in route resolves and reports that codex has no in-app flow', async ({
@@ -42,10 +43,10 @@ test('every sign-in route resolves and reports that codex has no in-app flow', a
   void client
 
   const codes = await Promise.all([
-    codeOf(startProviderLogin(codex, 'subscription')),
-    codeOf(fetchProviderLoginAttempt(codex, 'attempt-1')),
-    codeOf(cancelProviderLoginAttempt(codex, 'attempt-1')),
-    codeOf(signOutProvider(codex)),
+    codeOf(startProviderLogin(codex, 'subscription', getClient())),
+    codeOf(fetchProviderLoginAttempt(codex, 'attempt-1', getClient())),
+    codeOf(cancelProviderLoginAttempt(codex, 'attempt-1', getClient())),
+    codeOf(signOutProvider(codex, getClient())),
   ])
 
   expect(codes).toEqual([

@@ -1,3 +1,4 @@
+import { getClient } from '@/lib/client'
 import { execFileSync } from 'node:child_process'
 import { mkdir, writeFile } from 'node:fs/promises'
 import path from 'node:path'
@@ -28,7 +29,7 @@ describe('git api against the real server', () => {
     void client
     await initRepo(server.root)
 
-    const status = await api.fetchStatus('repo')
+    const status = await api.fetchStatus('repo', undefined, getClient())
 
     expect(status.repository?.branch).toBe('main')
     expect(status.files).toEqual([])
@@ -39,7 +40,7 @@ describe('git api against the real server', () => {
     const repo = await initRepo(server.root)
     await writeFile(path.join(repo, 'a.ts'), 'export const a = 2\n')
 
-    const status = await api.fetchStatus('repo')
+    const status = await api.fetchStatus('repo', undefined, getClient())
 
     const changed = status.files.find((file) => file.path.endsWith('a.ts'))
     expect(changed?.worktree).toBe('modified')
@@ -49,7 +50,7 @@ describe('git api against the real server', () => {
     void client
     await initRepo(server.root)
 
-    const result = await api.fetchBranches('repo')
+    const result = await api.fetchBranches('repo', undefined, getClient())
 
     expect(result.branches.map((branch) => branch.name)).toContain('main')
   })

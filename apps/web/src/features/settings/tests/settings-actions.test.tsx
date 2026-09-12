@@ -1,3 +1,4 @@
+import { getClient } from '@/lib/client'
 import { act, renderHook, screen, waitFor } from '@testing-library/react'
 import userEvent from '@testing-library/user-event'
 import type { SettingsMutationRequest } from '@workspace/contracts'
@@ -32,7 +33,7 @@ test('publishes semantic intent before three scoped transports can settle', asyn
 }) => {
   resetSettingsIntentStore()
   const queryClient = createTestQueryClient()
-  const confirmed = await fetchSettings()
+  const confirmed = await fetchSettings(undefined, getClient())
   queryClient.setQueryData(settingsKeys.document(), confirmed)
   const first = renderHook(() => useSettingsActions(), { wrapper: wrapper(queryClient) })
   const second = renderHook(() => useSettingsActions(), { wrapper: wrapper(queryClient) })
@@ -88,7 +89,9 @@ test('publishes semantic intent before three scoped transports can settle', asyn
     'acknowledged',
   ])
   await waitFor(() => expect(useSettingsIntentStore.getState().active).toEqual([]))
-  expect((await fetchSettings()).values['workbench.colorTheme']).toBe('system')
+  expect((await fetchSettings(undefined, getClient())).values['workbench.colorTheme']).toBe(
+    'system',
+  )
 
   first.unmount()
   second.unmount()
@@ -101,7 +104,7 @@ test('automatic transport retries retain one projected intent and one mutation i
   resetSettingsIntentStore()
   const controller = controlledClient.controller
   const queryClient = createTestQueryClient()
-  const confirmed = await fetchSettings()
+  const confirmed = await fetchSettings(undefined, getClient())
   queryClient.setQueryData(settingsKeys.document(), confirmed)
   controller.rejectNextSettingsWrite(temporaryWriteFailure('first'))
   const actions = renderHook(() => useSettingsActions(), { wrapper: wrapper(queryClient) })
@@ -126,7 +129,7 @@ test('automatic transport retries retain one projected intent and one mutation i
   await controller.waitForSettingsWriteRequest(3)
   await expect(submission.settled).resolves.toBe('acknowledged')
   await waitFor(() => expect(useSettingsIntentStore.getState().active).toEqual([]))
-  expect((await fetchSettings()).values['workbench.colorTheme']).toBe('dark')
+  expect((await fetchSettings(undefined, getClient())).values['workbench.colorTheme']).toBe('dark')
 
   const requests = (await controller.settingsWriteRequests()) as SettingsMutationRequest[]
   expect(requests).toHaveLength(3)
@@ -146,7 +149,7 @@ test('exhausted retries remove only their intent and Retry reuses its mutation i
   resetSettingsIntentStore()
   const controller = controlledClient.controller
   const queryClient = createTestQueryClient()
-  const confirmed = await fetchSettings()
+  const confirmed = await fetchSettings(undefined, getClient())
   queryClient.setQueryData(settingsKeys.document(), confirmed)
   controller.rejectNextSettingsWrite(temporaryWriteFailure('first'))
   const actions = renderHook(() => useSettingsActions(), {
@@ -187,7 +190,9 @@ test('exhausted retries remove only their intent and Retry reuses its mutation i
 
   await controller.waitForSettingsWriteRequest(4)
   await waitFor(async () => {
-    expect((await fetchSettings()).values['workbench.colorTheme']).toBe('dark')
+    expect((await fetchSettings(undefined, getClient())).values['workbench.colorTheme']).toBe(
+      'dark',
+    )
   })
   expect(useSettingsIntentStore.getState().active.map(intentId)).toEqual([unrelatedMutationId])
   const requests = (await controller.settingsWriteRequests()) as SettingsMutationRequest[]
@@ -208,7 +213,7 @@ test('WRITE_CONTENDED does not retry and leaves unrelated projection active', as
   resetSettingsIntentStore()
   const controller = controlledClient.controller
   const queryClient = createTestQueryClient()
-  const confirmed = await fetchSettings()
+  const confirmed = await fetchSettings(undefined, getClient())
   queryClient.setQueryData(settingsKeys.document(), confirmed)
   controller.rejectNextSettingsWrite({
     code: 'settings.WRITE_CONTENDED',
@@ -259,7 +264,7 @@ test('an admitted SSE acknowledgement survives a later HTTP failure without Retr
   resetSettingsIntentStore()
   const controller = controlledClient.controller
   const queryClient = createTestQueryClient()
-  const confirmed = await fetchSettings()
+  const confirmed = await fetchSettings(undefined, getClient())
   queryClient.setQueryData(settingsKeys.document(), confirmed)
   const deferred = controller.deferNextSettingsWrite()
   const actions = renderHook(() => useSettingsActions(), {
@@ -326,12 +331,15 @@ test('derives targets from the projected layers without crossing application sco
   client,
 }) => {
   expect(client).toBeDefined()
-  await saveSettings({
-    mutationId: 'settings-actions-workspace-seed',
-    operations: [{ key: 'workbench.colorTheme', kind: 'set', value: 'dark' }],
-    target: 'workspace',
-  })
-  const confirmed = await fetchSettings()
+  await saveSettings(
+    {
+      mutationId: 'settings-actions-workspace-seed',
+      operations: [{ key: 'workbench.colorTheme', kind: 'set', value: 'dark' }],
+      target: 'workspace',
+    },
+    getClient(),
+  )
+  const confirmed = await fetchSettings(undefined, getClient())
   const queryClient = createTestQueryClient()
   queryClient.setQueryData(settingsKeys.document(), confirmed)
   resetSettingsIntentStore()
@@ -356,7 +364,7 @@ test('derives targets from the projected layers without crossing application sco
     'acknowledged',
     'acknowledged',
   ])
-  const persisted = await fetchSettings()
+  const persisted = await fetchSettings(undefined, getClient())
   expect(persisted.values['workbench.colorTheme']).toBe('light')
   expect(persisted.values['chat.defaultInteractionMode']).toBe('plan')
   expect(persisted.values['editor.fontSize']).toBe(19)
@@ -369,7 +377,7 @@ test('a deterministic rejection exposes same-id Retry and explicit Discard', asy
   expect(client).toBeDefined()
   resetSettingsIntentStore()
   const queryClient = createTestQueryClient()
-  queryClient.setQueryData(settingsKeys.document(), await fetchSettings())
+  queryClient.setQueryData(settingsKeys.document(), await fetchSettings(undefined, getClient()))
   const actions = renderHook(() => useSettingsActions(), { wrapper: wrapper(queryClient) })
   const captured: { current?: SettingsSubmission } = {}
 
@@ -399,8 +407,10 @@ test('a deterministic rejection exposes same-id Retry and explicit Discard', asy
   expect(retried?.request.mutationId).toBe(mutationId)
   expect(retried?.clientSequence).toBe(2)
   expect(
-    projectSettings(await fetchSettings(), useSettingsIntentStore.getState().active)
-      .pendingMutationIds,
+    projectSettings(
+      await fetchSettings(undefined, getClient()),
+      useSettingsIntentStore.getState().active,
+    ).pendingMutationIds,
   ).toEqual([mutationId])
 
   expect(failSettingsIntent(mutationId, { code: 'settings.SCOPE_NOT_ALLOWED' })).not.toBeNull()

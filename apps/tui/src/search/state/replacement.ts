@@ -10,7 +10,19 @@ import type {
 import { replacementText } from '@/search/utils/replacement'
 import { createTuiError } from '@/host/utils/structured-errors'
 
-export type ReplacementPlan = { operations: WorkspacePersistenceOperation[]; count: number }
+const replacementPlanBrand = Symbol('ReplacementPlan')
+export type ReplacementPlan = {
+  readonly [replacementPlanBrand]: true
+  readonly operations: readonly WorkspacePersistenceOperation[]
+  readonly count: number
+}
+type ReplacementOwner = {
+  readonly client: Client
+  readonly rootPath: string
+  readonly signal: AbortSignal
+  submission?: ReturnType<typeof commitWorkspaceEdits>
+}
+const owners = new WeakMap<ReplacementPlan, ReplacementOwner>()
 export async function prepareReplacement({
   client,
   query,
@@ -24,36 +36,45 @@ export async function prepareReplacement({
   replacement: string
   signal: AbortSignal
 }): Promise<ReplacementPlan> {
+  const capturedQuery = { ...query }
+  const owner = { client, rootPath: capturedQuery.path, signal }
   const operations: WorkspacePersistenceOperation[] = []
   let count = 0
   for (const path of new Set(
     matches.filter((match) => match.kind === 'content').map((match) => match.path),
   )) {
-    const relativePath = toWorkspaceRelative(query.path, path)
+    const relativePath = toWorkspaceRelative(capturedQuery.path, path)
     if (relativePath === null)
       throw createTuiError(
         'Replacement file is outside the selected workspace.',
         'Refresh search results before preparing the replacement.',
       )
     const file = await readFilePreview({ client, path, signal })
-    const result = replacementText(file.content, query, replacement)
+    const result = replacementText(file.content, capturedQuery, replacement)
     if (!result.count || result.content === file.content) continue
     count += result.count
-    operations.push({
-      kind: 'write',
-      index: operations.length,
-      path: relativePath,
-      text: result.content,
-      expected: { kind: 'snapshot', mtimeMs: file.mtimeMs, version: file.version },
-    })
+    operations.push(
+      Object.freeze({
+        kind: 'write',
+        index: operations.length,
+        path: relativePath,
+        text: result.content,
+        expected: Object.freeze({ kind: 'snapshot', mtimeMs: file.mtimeMs, version: file.version }),
+      }),
+    )
   }
-  return { operations, count }
+  signal.throwIfAborted()
+  const plan = Object.freeze({
+    [replacementPlanBrand]: true,
+    operations: Object.freeze(operations),
+    count,
+  } satisfies ReplacementPlan)
+  owners.set(plan, owner)
+  return plan
 }
-export function applyReplacement(
-  client: Client,
-  rootPath: string,
-  plan: ReplacementPlan,
-  signal: AbortSignal,
-) {
-  return commitWorkspaceEdits({ client, rootPath, operations: plan.operations, signal })
+export function applyReplacement(plan: ReplacementPlan) {
+  const owner = owners.get(plan)
+  if (!owner) throw createTuiError('Replacement plan is invalid.', 'Prepare the replacement again.')
+  owner.submission ??= commitWorkspaceEdits({ ...owner, operations: plan.operations })
+  return owner.submission
 }

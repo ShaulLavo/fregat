@@ -1,3 +1,4 @@
+import { getClient } from '@/lib/client'
 import { documentKey, settingsJsonDocument } from '@/lib/documents/utils/identity'
 import { screen, waitFor } from '@testing-library/react'
 import userEvent from '@testing-library/user-event'
@@ -25,7 +26,7 @@ test('raw conflict keeps local text through Compare, intervening writes, Overwri
   expect(client).toBeDefined()
   const queryClient = createTestQueryClient()
   const documentStore = createEditorDocumentStore()
-  const initial = await fetchSettings()
+  const initial = await fetchSettings(undefined, getClient())
   seedLocalDocument(documentStore, LOCAL_TEXT, rawRevision(initial))
   const firstExternal = await writeExternal(
     'raw-conflict-external-one',
@@ -44,12 +45,14 @@ test('raw conflict keeps local text through Compare, intervening writes, Overwri
   expect(screen.getByText('settings.json changed elsewhere')).toBeDefined()
   expect(screen.queryByText('Could not save settings')).toBeNull()
 
-  const beforeCompare = await fetchSettings()
+  const beforeCompare = await fetchSettings(undefined, getClient())
   await user.click(screen.getByRole('button', { name: 'Compare' }))
   expect(screen.getByText('Local edits')).toBeDefined()
   expect(screen.getByText('Confirmed file')).toBeDefined()
   expect(screen.getByText(LOCAL_TEXT.trim(), { selector: 'pre' })).toBeDefined()
-  expect((await fetchSettings()).serverVersion).toEqual(beforeCompare.serverVersion)
+  expect((await fetchSettings(undefined, getClient())).serverVersion).toEqual(
+    beforeCompare.serverVersion,
+  )
   expect(currentText(documentStore)).toBe(LOCAL_TEXT)
 
   await user.click(screen.getByRole('button', { name: 'Reload' }))
@@ -63,9 +66,10 @@ test('raw conflict keeps local text through Compare, intervening writes, Overwri
   await waitFor(() =>
     expect(settingsSync(documentStore)?.state, 'first overwrite settles').toBe('idle'),
   )
-  expect((await fetchSettings()).layers.find((layer) => layer.id === 'user')?.file?.text).toBe(
-    LOCAL_TEXT,
-  )
+  expect(
+    (await fetchSettings(undefined, getClient())).layers.find((layer) => layer.id === 'user')?.file
+      ?.text,
+  ).toBe(LOCAL_TEXT)
 
   documentStore.getState().setLiveEditorDocumentDirty(DOCUMENT_ID, true)
   const secondExternal = await writeExternal(
@@ -95,9 +99,10 @@ test('raw conflict keeps local text through Compare, intervening writes, Overwri
   await waitFor(() =>
     expect(settingsSync(documentStore)?.state, 'second overwrite settles').toBe('idle'),
   )
-  expect((await fetchSettings()).layers.find((layer) => layer.id === 'user')?.file?.text).toBe(
-    LOCAL_TEXT,
-  )
+  expect(
+    (await fetchSettings(undefined, getClient())).layers.find((layer) => layer.id === 'user')?.file
+      ?.text,
+  ).toBe(LOCAL_TEXT)
 
   documentStore.getState().setLiveEditorDocumentDirty(DOCUMENT_ID, true)
   const finalExternal = await writeExternal(
@@ -139,13 +144,16 @@ function seedLocalDocument(store: EditorDocumentStoreApi, text: string, revision
 }
 
 async function writeExternal(writeId: string, text: string) {
-  const current = await fetchSettings()
-  const result = await saveSettingsText({
-    baseRevision: rawRevision(current),
-    target: 'user',
-    text,
-    writeId,
-  })
+  const current = await fetchSettings(undefined, getClient())
+  const result = await saveSettingsText(
+    {
+      baseRevision: rawRevision(current),
+      target: 'user',
+      text,
+      writeId,
+    },
+    getClient(),
+  )
 
   return result.snapshot
 }

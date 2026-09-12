@@ -1,4 +1,9 @@
 import { filesystemPath } from '@/lib/documents/utils/identity'
+import { readFile, writeFile } from 'node:fs/promises'
+import { join } from 'node:path'
+import { createObservedInProcessClient } from '../../../../test/client'
+import { createWorkspaceTextChanges } from '../../../../test/factories/workspace-text-changes'
+import { fetchFile } from '@/lib/file-server'
 import { testDocumentKey } from '../../../../test/factories/document-targets'
 import type {
   ApplyWorkspaceEditRequest,
@@ -51,6 +56,7 @@ type Harness = ReturnType<typeof createHarness>
 
 type HarnessOptions = {
   readonly abortPrepare?: boolean
+  readonly beforeRead?: () => Promise<void>
   readonly failFinalize?: boolean
   readonly failReleaseAttempts?: number
   readonly partialUndo?: boolean
@@ -66,6 +72,133 @@ type RejectionCase = {
 }
 
 test.describe('WorkspaceEditService', () => {
+  test.for([
+    {
+      name: 'rename source',
+      path: 'source.ts',
+      operation: renameOperation('file:///source.ts', 'file:///renamed.ts'),
+    },
+    {
+      name: 'rename destination',
+      path: 'destination.ts',
+      operation: {
+        ...renameOperation('file:///source.ts', 'file:///destination.ts'),
+        ignoreIfExists: true,
+      },
+    },
+    {
+      name: 'create target',
+      path: 'destination.ts',
+      operation: {
+        kind: 'create',
+        uri: 'file:///destination.ts',
+        overwrite: false,
+        ignoreIfExists: true,
+      } satisfies WorkspaceEditOperation,
+    },
+    {
+      name: 'delete target',
+      path: 'source.ts',
+      operation: deleteOperation('file:///source.ts'),
+    },
+  ])('rejects known $name drift before the host captures its stamp', async (entry, { server }) => {
+    await Promise.all([
+      writeFile(join(server.root, 'origin.ts'), 'origin'),
+      writeFile(join(server.root, 'source.ts'), 'source'),
+      writeFile(join(server.root, 'destination.ts'), 'destination'),
+    ])
+    const started = Promise.withResolvers<void>()
+    const gate = Promise.withResolvers<void>()
+    const client = createObservedInProcessClient(server, async (request) => {
+      if (new URL(request.url).pathname !== '/fs/stat') return
+      started.resolve()
+      await gate.promise
+    })
+    const { service, store } = createWorkspaceTextChanges(client)
+    const signal = new AbortController().signal
+    const originFile = await fetchFile(filesystemPath('origin.ts'), signal, client)
+    const targetFile = await fetchFile(filesystemPath(entry.path), signal, client)
+    const origin = store.getState().ensureLiveEditorDocument(originFile)
+    const target = store.getState().ensureLiveEditorDocument(targetFile)
+    const targetRevision = target.buffer.getRevision()
+    const originUri = 'file:///origin.ts'
+    const targetUri = `file:///${entry.path}`
+    const application = request([entry.operation], {
+      originUri,
+      documents: [
+        currentProvenance(origin.buffer.getTextSnapshot(), originUri, 1),
+        currentProvenance(target.buffer.getTextSnapshot(), targetUri, 1),
+      ],
+    })
+    const unsubscribe = service.subscribe(() => {
+      const snapshot = service.getSnapshot()
+      if (snapshot.phase !== 'awaiting-confirmation' || !snapshot.preview) return
+      service.confirmPreview(snapshot.preview.operationId)
+    })
+    const pending = service.onApplyWorkspaceEdit({
+      ...application,
+      guard: {
+        documents: application.guard.documents,
+        isCurrent: (uri) => uri === originUri || target.buffer.getRevision() === targetRevision,
+      },
+    })
+    await started.promise
+    createEditorBufferSession(target.buffer).applyText(' newer')
+    if (entry.name !== 'rename source') target.buffer.undo()
+    gate.resolve()
+    const result = await pending
+    unsubscribe()
+
+    expect(result).toMatchObject({ status: 'failed', code: 'version-mismatch' })
+    expect(service.getSnapshot().preview).toBeNull()
+    expect(await readFile(join(server.root, 'source.ts'), 'utf8')).toBe('source')
+    expect(await readFile(join(server.root, 'destination.ts'), 'utf8')).toBe('destination')
+    expect(target.buffer.materializeFullText()).toBe(
+      entry.name === 'rename source' ? 'source newer' : targetFile.content,
+    )
+  })
+
+  test('rejects origin drift at the final local-only commit boundary', async () => {
+    const harness = createHarness()
+    const origin = addLiveDocument(harness, '/repo/origin.ts', 'origin')
+    const target = addLiveDocument(harness, '/repo/target.ts', 'target')
+    const originUri = fileUri(origin.target)
+    const targetUri = fileUri(target.target)
+    const originSnapshot = origin.buffer.getTextSnapshot()
+    const targetSnapshot = target.buffer.getTextSnapshot()
+    const original = request([textOperation(targetUri, 7, 0, 1, 'T')], {
+      originUri,
+      documents: [
+        currentProvenance(originSnapshot, originUri, 7),
+        currentProvenance(targetSnapshot, targetUri, 7),
+      ],
+    })
+    const pending = harness.service.onApplyWorkspaceEdit({
+      ...original,
+      guard: {
+        documents: original.guard.documents,
+        isCurrent: (uri) =>
+          uri === originUri
+            ? origin.buffer.getTextSnapshot() === originSnapshot
+            : target.buffer.getTextSnapshot() === targetSnapshot,
+      },
+    })
+    await waitForPhase(harness.service, 'awaiting-confirmation')
+    const unsubscribe = harness.service.subscribe(() => {
+      if (harness.service.getSnapshot().phase !== 'committing') return
+      unsubscribe()
+      queueMicrotask(() =>
+        queueMicrotask(() => createEditorBufferSession(origin.buffer).applyText('!')),
+      )
+    })
+    harness.service.confirmPreview(harness.service.getSnapshot().preview!.operationId)
+    expect(await pending).toMatchObject({ status: 'failed', code: 'version-mismatch' })
+    unsubscribe()
+    expect(origin.buffer.materializeFullText()).toBe('origin!')
+    expect(target.buffer.materializeFullText()).toBe('target')
+    expect(harness.transport.prepares).toEqual([])
+  })
+
   test('applies one active-buffer edit as one Editor undo transaction without preview', async () => {
     const harness = createHarness()
     const document = addLiveDocument(harness, '/repo/active.ts', 'alpha')
@@ -154,7 +287,7 @@ test.describe('WorkspaceEditService', () => {
     ])
     expect(harness.service.getSnapshot()).toMatchObject({ canCancel: true })
 
-    harness.service.cancelPreview()
+    harness.service.cancelPreview(harness.service.getSnapshot().preview!.operationId)
     await expect(pending).resolves.toEqual({ status: 'cancelled' })
     expect(active.buffer.materializeFullText()).toBe('active!')
     expect(secondary.buffer.materializeFullText()).toBe('secondary')
@@ -224,7 +357,7 @@ test.describe('WorkspaceEditService', () => {
     )
     await waitForPhase(harness.service, 'awaiting-confirmation')
 
-    harness.service.confirmPreview()
+    harness.service.confirmPreview(harness.service.getSnapshot().preview!.operationId)
     await expect(pending).resolves.toEqual({ status: 'applied' })
 
     expect(harness.transport.prepares).toHaveLength(1)
@@ -268,7 +401,7 @@ test.describe('WorkspaceEditService', () => {
       path: 'client/project/unopened.ts',
       targetKind: 'unopened',
     })
-    harness.service.confirmPreview()
+    harness.service.confirmPreview(harness.service.getSnapshot().preview!.operationId)
     await expect(pending).resolves.toEqual({ status: 'applied' })
 
     expect(canMutateWorkspace()).toBe(true)
@@ -297,7 +430,7 @@ test.describe('WorkspaceEditService', () => {
     await waitForPhase(harness.service, 'awaiting-confirmation')
 
     createEditorBufferSession(live.buffer).applyText('!')
-    harness.service.confirmPreview()
+    harness.service.confirmPreview(harness.service.getSnapshot().preview!.operationId)
     const result = await pending
 
     expect(result).toMatchObject({ code: 'snapshot-drift', status: 'failed' })
@@ -323,7 +456,7 @@ test.describe('WorkspaceEditService', () => {
     )
     await waitForPhase(harness.service, 'awaiting-confirmation')
 
-    harness.service.confirmPreview()
+    harness.service.confirmPreview(harness.service.getSnapshot().preview!.operationId)
     await expect(pending).resolves.toEqual({ status: 'applied' })
     expect(first.buffer.materializeFullText()).toBe('First')
     expect(second.buffer.materializeFullText()).toBe('Second')
@@ -452,7 +585,7 @@ test.describe('WorkspaceEditService', () => {
       '/repo/a.ts',
       '/repo/A.ts',
     ])
-    harness.service.cancelPreview()
+    harness.service.cancelPreview(harness.service.getSnapshot().preview!.operationId)
     await expect(pending).resolves.toEqual({ status: 'cancelled' })
   })
 
@@ -471,7 +604,7 @@ test.describe('WorkspaceEditService', () => {
     )
     await waitForPhase(harness.service, 'awaiting-confirmation')
 
-    harness.service.confirmPreview()
+    harness.service.confirmPreview(harness.service.getSnapshot().preview!.operationId)
     const result = await pending
 
     expect(result).toMatchObject({ code: 'workspace-edit-rolled-back', status: 'rolled-back' })
@@ -497,7 +630,7 @@ test.describe('WorkspaceEditService', () => {
     )
     await waitForPhase(harness.service, 'awaiting-confirmation')
 
-    harness.service.confirmPreview()
+    harness.service.confirmPreview(harness.service.getSnapshot().preview!.operationId)
     const result = await pending
 
     expect(result).toMatchObject({
@@ -538,7 +671,7 @@ test.describe('WorkspaceEditService', () => {
       }),
     )
     await waitForPhase(harness.service, 'awaiting-confirmation')
-    harness.service.confirmPreview()
+    harness.service.confirmPreview(harness.service.getSnapshot().preview!.operationId)
     await expect(pending).resolves.toEqual({ status: 'applied' })
 
     await expect(harness.service.runWorkspaceMutation('all', async () => true)).resolves.toBe(true)
@@ -565,7 +698,7 @@ test.describe('WorkspaceEditService', () => {
     )
     await waitForPhase(harness.service, 'awaiting-confirmation')
 
-    harness.service.confirmPreview()
+    harness.service.confirmPreview(harness.service.getSnapshot().preview!.operationId)
     await expect(pending).resolves.toMatchObject({ status: 'recovery-required' })
     expect(
       harness.store.getState().getLiveEditorDocument(testDocumentKey('/repo/before.ts'))?.buffer,
@@ -620,7 +753,7 @@ test.describe('WorkspaceEditService', () => {
       }),
     )
     await waitForPhase(harness.service, 'awaiting-confirmation')
-    harness.service.confirmPreview()
+    harness.service.confirmPreview(harness.service.getSnapshot().preview!.operationId)
     await expect(pending).resolves.toMatchObject({ status: 'recovery-required' })
 
     createEditorBufferSession(source.buffer).applyText(' blocked')
@@ -653,7 +786,7 @@ test.describe('WorkspaceEditService', () => {
     )
     await waitForPhase(harness.service, 'awaiting-confirmation')
 
-    harness.service.confirmPreview()
+    harness.service.confirmPreview(harness.service.getSnapshot().preview!.operationId)
     await expect(pending).resolves.toEqual({ status: 'applied' })
 
     expect(events).toEqual(['change', 'uri'])
@@ -687,7 +820,7 @@ test.describe('WorkspaceEditService', () => {
     )
     await waitForPhase(harness.service, 'awaiting-confirmation')
 
-    harness.service.confirmPreview()
+    harness.service.confirmPreview(harness.service.getSnapshot().preview!.operationId)
     await expect(pending).resolves.toEqual({ status: 'applied' })
 
     expect(events).toEqual(['uri', 'change'])
@@ -709,7 +842,7 @@ test.describe('WorkspaceEditService', () => {
     )
     await waitForPhase(harness.service, 'awaiting-confirmation')
 
-    harness.service.confirmPreview()
+    harness.service.confirmPreview(harness.service.getSnapshot().preview!.operationId)
     await expect(pending).resolves.toEqual({ status: 'applied' })
     expect(harness.transport.prepares[0]?.operations).toMatchObject([
       {
@@ -785,7 +918,7 @@ test.describe('WorkspaceEditService', () => {
     )
     await waitForPhase(harness.service, 'awaiting-confirmation')
 
-    harness.service.confirmPreview()
+    harness.service.confirmPreview(harness.service.getSnapshot().preview!.operationId)
 
     await expect(pending).resolves.toEqual({ status: 'cancelled' })
     expect(harness.service.getSnapshot()).toMatchObject({ phase: 'cancelled', recovery: null })
@@ -801,7 +934,7 @@ test.describe('WorkspaceEditService', () => {
       }),
     )
     await waitForPhase(harness.service, 'awaiting-confirmation')
-    harness.service.confirmPreview()
+    harness.service.confirmPreview(harness.service.getSnapshot().preview!.operationId)
     await expect(pending).resolves.toEqual({ status: 'applied' })
 
     await expect(harness.service.undo()).resolves.toBe(false)
@@ -1046,6 +1179,138 @@ test.describe('WorkspaceEditService', () => {
     expect(disjointA.buffer.materializeFullText()).toBe('disjoint-a')
     expect(disjointB.buffer.materializeFullText()).toBe('disjoint-b')
   })
+  test('LSP unknown clean live source requires preview and retains unknown provenance', async () => {
+    const harness = createHarness()
+    const origin = addLiveDocument(harness, '/repo/origin.ts', 'origin')
+    const target = addLiveDocument(harness, '/repo/unknown.ts', 'target')
+    const originUri = fileUri(origin.target)
+    const application = request([textOperation(fileUri(target.target), null, 0, 1, 'T')], {
+      documents: [currentProvenance(origin.buffer.getTextSnapshot(), originUri, 1)],
+      originUri,
+    })
+
+    const pending = harness.service.onApplyWorkspaceEdit(application)
+    await waitForPhase(harness.service, 'awaiting-confirmation')
+    expect(target.buffer.materializeFullText()).toBe('target')
+    expect(application.guard.documents.map((document) => document.uri)).toEqual([originUri])
+    expect(harness.service.getSnapshot().preview?.rows[0]).toMatchObject({ targetKind: 'open' })
+
+    harness.service.confirmPreview(harness.service.getSnapshot().preview!.operationId)
+    await expect(pending).resolves.toEqual({ status: 'applied' })
+    expect(target.buffer.materializeFullText()).toBe('Target')
+    expect(origin.buffer.materializeFullText()).toBe('origin')
+    expect(harness.transport.prepares).toEqual([])
+  })
+
+  test('LSP unknown dirty secondary source rejects despite a current known origin', async () => {
+    const harness = createHarness()
+    const origin = addLiveDocument(harness, '/repo/origin.ts', 'origin')
+    const target = addLiveDocument(harness, '/repo/unknown.ts', 'target')
+    createEditorBufferSession(target.buffer).applyText(' newer')
+    const originUri = fileUri(origin.target)
+
+    const result = await harness.service.onApplyWorkspaceEdit(
+      request([textOperation(fileUri(target.target), null, 0, 1, 'T')], {
+        documents: [currentProvenance(origin.buffer.getTextSnapshot(), originUri, 1)],
+        originUri,
+      }),
+    )
+
+    expect(result).toMatchObject({ code: 'version-mismatch', status: 'failed' })
+    expect(target.buffer.materializeFullText()).toBe('target newer')
+    expect(harness.transport.prepares).toEqual([])
+  })
+
+  test('LSP unknown clean source drifting after preview stays untouched', async () => {
+    const harness = createHarness()
+    const origin = addLiveDocument(harness, '/repo/origin.ts', 'origin')
+    const target = addLiveDocument(harness, '/repo/unknown.ts', 'target')
+    const originUri = fileUri(origin.target)
+    const pending = harness.service.onApplyWorkspaceEdit(
+      request([textOperation(fileUri(target.target), null, 0, 1, 'T')], {
+        documents: [currentProvenance(origin.buffer.getTextSnapshot(), originUri, 1)],
+        originUri,
+      }),
+    )
+    await waitForPhase(harness.service, 'awaiting-confirmation')
+    createEditorBufferSession(target.buffer).applyText(' newer')
+
+    harness.service.confirmPreview(harness.service.getSnapshot().preview!.operationId)
+    await expect(pending).resolves.toMatchObject({ code: 'snapshot-drift', status: 'failed' })
+    expect(target.buffer.materializeFullText()).toBe('target newer')
+    expect(harness.transport.prepares).toEqual([])
+  })
+
+  test('LSP unknown closed source opened during preparation rejects ownership drift', async () => {
+    const reading = Promise.withResolvers<void>()
+    const release = Promise.withResolvers<void>()
+    const harness = createHarness({
+      beforeRead: () => {
+        reading.resolve()
+        return release.promise
+      },
+    })
+    const origin = addLiveDocument(harness, '/repo/origin.ts', 'origin')
+    const file = addDiskFile(harness, '/repo/unknown.ts', 'target', 90)
+    const originUri = fileUri(origin.target)
+    const application = request([textOperation(fileUri(file.path), null, 0, 1, 'T')], {
+      documents: [currentProvenance(origin.buffer.getTextSnapshot(), originUri, 1)],
+      originUri,
+    })
+
+    const pending = harness.service.onApplyWorkspaceEdit(application)
+    await reading.promise
+    const opened = harness.store.getState().ensureLiveEditorDocument(file)
+    release.resolve()
+
+    await expect(pending).resolves.toMatchObject({ code: 'snapshot-drift', status: 'failed' })
+    expect(opened.buffer.materializeFullText()).toBe('target')
+    expect(application.guard.documents.map((document) => document.uri)).toEqual([originUri])
+    expect(harness.transport.prepares).toEqual([])
+    expect(harness.service.getSnapshot().preview).toBeNull()
+  })
+
+  test.each([true, false])(
+    'LSP checks origin-only drift and ignores unrelated catalog drift: %s',
+    async (driftOrigin) => {
+      const harness = createHarness()
+      const origin = addLiveDocument(harness, '/repo/origin.ts', 'origin')
+      const unrelated = addLiveDocument(harness, '/repo/unrelated.ts', 'unrelated')
+      const target = addLiveDocument(harness, '/repo/target.ts', 'target')
+      const originUri = fileUri(origin.target)
+      const unrelatedUri = fileUri(unrelated.target)
+      const originSnapshot = origin.buffer.getTextSnapshot()
+      const unrelatedSnapshot = unrelated.buffer.getTextSnapshot()
+      const application = request([textOperation(fileUri(target.target), null, 0, 1, 'T')], {
+        documents: [
+          currentProvenance(originSnapshot, originUri, 1),
+          currentProvenance(unrelatedSnapshot, unrelatedUri, 2),
+        ],
+        originUri,
+      })
+      const pending = harness.service.onApplyWorkspaceEdit({
+        ...application,
+        guard: {
+          documents: application.guard.documents,
+          isCurrent: (uri) => {
+            if (uri === originUri) return origin.buffer.getTextSnapshot() === originSnapshot
+            if (uri === unrelatedUri)
+              return unrelated.buffer.getTextSnapshot() === unrelatedSnapshot
+            return false
+          },
+        },
+      })
+      await waitForPhase(harness.service, 'awaiting-confirmation')
+      createEditorBufferSession(driftOrigin ? origin.buffer : unrelated.buffer).applyText(' newer')
+
+      harness.service.confirmPreview(harness.service.getSnapshot().preview!.operationId)
+      const result = await pending
+      if (driftOrigin) expect(result).toMatchObject({ code: 'version-mismatch', status: 'failed' })
+      else expect(result).toEqual({ status: 'applied' })
+      expect(target.buffer.materializeFullText()).toBe(driftOrigin ? 'target' : 'Target')
+      expect(harness.transport.prepares).toEqual([])
+    },
+  )
 })
 
 function createHarness(options: HarnessOptions = {}) {
@@ -1060,6 +1325,7 @@ function createHarness(options: HarnessOptions = {}) {
   let onUriTransition: () => void = () => undefined
   const fileSync = new FileSyncService(store, new QueryClient(), {
     readFileContent: async (path, signal) => {
+      await options.beforeRead?.()
       signal.throwIfAborted()
       const file = files.get(path)
       if (file) return file
@@ -1069,6 +1335,7 @@ function createHarness(options: HarnessOptions = {}) {
     writeFileContent: async (path, content) => treeEntry(path, content, 1),
   })
   const service = new WorkspaceEditService({
+    owner: { environmentId: null, machine: null },
     createOperationId: () => OPERATION_ID,
     createOperationEvent: (eventOptions) => {
       const event = new CapturedWorkspaceOperationEvent(
@@ -1294,7 +1561,9 @@ function request(
   },
 ): ApplyWorkspaceEditRequest {
   const documents = options.documents ?? []
-  const currentUris = new Set(options.currentUris ?? documents.map((entry) => entry.uri))
+  const currentUris = new Set(
+    options.currentUris ?? [options.originUri, ...documents.map((entry) => entry.uri)],
+  )
   const plan: ParsedWorkspaceEdit = { annotations: new Map(), operations }
   return {
     guard: {
@@ -1381,7 +1650,7 @@ async function applyTwoBufferGroup(
     }),
   )
   await waitForPhase(harness.service, 'awaiting-confirmation')
-  harness.service.confirmPreview()
+  harness.service.confirmPreview(harness.service.getSnapshot().preview!.operationId)
   await expect(pending).resolves.toEqual({ status: 'applied' })
 }
 

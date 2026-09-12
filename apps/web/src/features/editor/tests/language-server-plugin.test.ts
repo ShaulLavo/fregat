@@ -77,6 +77,7 @@ describe('createMatchedLanguageServerPlugin', () => {
       const document = languageServerDocument(target)
       if (!document) return expect.unreachable('Expected an LSP document')
       createMatchedLanguageServerPlugin({
+        origin: 'http://localhost:3001',
         document,
         documentSyncController,
         enabled: true,
@@ -102,6 +103,7 @@ describe('createMatchedLanguageServerPlugin', () => {
   test('stays idle without eligible matches', () => {
     const source = createEditorLanguageServerStatusSource()
     const plugin = createMatchedLanguageServerPlugin({
+      origin: 'http://localhost:3001',
       document,
       documentSyncController,
       enabled: true,
@@ -122,6 +124,7 @@ describe('createMatchedLanguageServerPlugin', () => {
   test('stays idle when a view has no language-server document', () => {
     const source = createEditorLanguageServerStatusSource()
     const plugin = createMatchedLanguageServerPlugin({
+      origin: 'http://localhost:3001',
       document: languageServerDocument({ kind: 'search', root: filesystemPath('/repo') }),
       documentSyncController,
       enabled: true,
@@ -141,6 +144,7 @@ describe('createMatchedLanguageServerPlugin', () => {
     const onDefinitionLinkHover = vi.fn()
     const onDidNavigateDiagnostic = vi.fn(() => ({ kind: 'ignored' as const }))
     const plugin = createMatchedLanguageServerPlugin({
+      origin: 'http://localhost:3001',
       document,
       documentSyncController,
       enabled: true,
@@ -180,6 +184,7 @@ describe('createMatchedLanguageServerPlugin', () => {
 
   test('applies feature exclusions and named ready notifications before lane construction', () => {
     createMatchedLanguageServerPlugin({
+      origin: 'http://localhost:3001',
       document,
       documentSyncController,
       enabled: true,
@@ -208,6 +213,7 @@ describe('createMatchedLanguageServerPlugin', () => {
   test('keeps a ready primary aggregate ready when a secondary errors', () => {
     const source = createEditorLanguageServerStatusSource()
     const plugin = createMatchedLanguageServerPlugin({
+      origin: 'http://localhost:3001',
       document,
       documentSyncController,
       enabled: true,
@@ -230,6 +236,7 @@ describe('createMatchedLanguageServerPlugin', () => {
   test('keeps a lane ready after a routed request fails', () => {
     const source = createEditorLanguageServerStatusSource()
     const plugin = createMatchedLanguageServerPlugin({
+      origin: 'http://localhost:3001',
       document,
       documentSyncController,
       enabled: true,
@@ -256,6 +263,7 @@ describe('createMatchedLanguageServerPlugin', () => {
   test('orders composite diagnostics by diagnostic rank', () => {
     const source = createEditorLanguageServerStatusSource()
     const plugin = createMatchedLanguageServerPlugin({
+      origin: 'http://localhost:3001',
       document,
       documentSyncController,
       enabled: true,
@@ -281,6 +289,7 @@ describe('createMatchedLanguageServerPlugin', () => {
 describe('semantic token ownership', () => {
   test('creates layer options for the runtime-elected semantic owner', () => {
     createMatchedLanguageServerPlugin({
+      origin: 'http://localhost:3001',
       document,
       documentSyncController,
       enabled: true,
@@ -305,6 +314,7 @@ describe('semantic token ownership', () => {
   test('keeps initialization capabilities stable per server', () => {
     for (const root of ['/repo', '/other']) {
       createMatchedLanguageServerPlugin({
+        origin: 'http://localhost:3001',
         document,
         documentSyncController,
         enabled: true,

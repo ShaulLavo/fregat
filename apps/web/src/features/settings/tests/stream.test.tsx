@@ -1,3 +1,4 @@
+import { getClient } from '@/lib/client'
 import type { QueryClient } from '@tanstack/react-query'
 import { createTestQueryClient } from '../../../../test/render'
 import { renderHook, waitFor } from '@testing-library/react'
@@ -36,11 +37,14 @@ test('lands a change made by another writer in this tab’s cache', async ({ cli
 
   // Stands in for the other writer: a second window, or a hand-edit to the file.
   // Either way it reaches this tab over the stream, not by polling.
-  await saveSettings({
-    mutationId: 'stream-external-theme',
-    operations: [{ key: 'workbench.colorTheme', kind: 'set', value: 'dark' }],
-    target: 'user',
-  })
+  await saveSettings(
+    {
+      mutationId: 'stream-external-theme',
+      operations: [{ key: 'workbench.colorTheme', kind: 'set', value: 'dark' }],
+      target: 'user',
+    },
+    getClient(),
+  )
 
   await waitFor(() => {
     const cached = queryClient.getQueryData(settingsKeys.document())
@@ -57,12 +61,15 @@ test('first connection refetch closes the gap after the initial document GET', a
 }) => {
   const { controller } = controlledClient
   const queryClient = createTestQueryClient()
-  queryClient.setQueryData(settingsKeys.document(), await fetchSettings())
-  await saveSettings({
-    mutationId: 'controlled-stream-before-first-connect',
-    operations: [{ key: 'editor.fontSize', kind: 'set', value: 23 }],
-    target: 'user',
-  })
+  queryClient.setQueryData(settingsKeys.document(), await fetchSettings(undefined, getClient()))
+  await saveSettings(
+    {
+      mutationId: 'controlled-stream-before-first-connect',
+      operations: [{ key: 'editor.fontSize', kind: 'set', value: 23 }],
+      target: 'user',
+    },
+    getClient(),
+  )
   const abort = new AbortController()
   const supervisor = superviseSettingsStream(queryClient, abort.signal)
 
@@ -85,12 +92,15 @@ test('a failed confirming refetch aborts the attempt and retries recovery', asyn
 }) => {
   const { controller } = controlledClient
   const queryClient = createTestQueryClient()
-  queryClient.setQueryData(settingsKeys.document(), await fetchSettings())
-  await saveSettings({
-    mutationId: 'controlled-stream-before-failed-refetch',
-    operations: [{ key: 'editor.fontSize', kind: 'set', value: 24 }],
-    target: 'user',
-  })
+  queryClient.setQueryData(settingsKeys.document(), await fetchSettings(undefined, getClient()))
+  await saveSettings(
+    {
+      mutationId: 'controlled-stream-before-failed-refetch',
+      operations: [{ key: 'editor.fontSize', kind: 'set', value: 24 }],
+      target: 'user',
+    },
+    getClient(),
+  )
   controller.rejectNextSettingsRead({
     code: 'settings.READ_FAILED',
     message: 'Injected stream recovery failure',
@@ -125,7 +135,7 @@ test('refetches and reconnects a real SSE response without dropping projection',
 }) => {
   const { controller } = controlledClient
   const queryClient = createTestQueryClient()
-  const confirmed = await fetchSettings()
+  const confirmed = await fetchSettings(undefined, getClient())
   queryClient.setQueryData(settingsKeys.document(), confirmed)
   resetSettingsIntentStore()
   const pending = submitSettingsIntent(queryClient, 'user', [
@@ -139,22 +149,28 @@ test('refetches and reconnects a real SSE response without dropping projection',
     { wrapper: wrapper(queryClient) },
   )
 
-  await saveSettings({
-    mutationId: 'controlled-stream-open',
-    operations: [{ key: 'editor.fontSize', kind: 'set', value: 14 }],
-    target: 'user',
-  })
+  await saveSettings(
+    {
+      mutationId: 'controlled-stream-open',
+      operations: [{ key: 'editor.fontSize', kind: 'set', value: 14 }],
+      target: 'user',
+    },
+    getClient(),
+  )
   await controller.waitForSettingsStreamAttempt(1)
   expect(stream.result.current?.values['workbench.colorTheme']).toBe('dark')
   expect(controller.terminateSettingsStream(1)).toBe(true)
 
   await controller.waitForSettingsStreamRequest(2)
   await waitFor(() => expect(controller.settingsReadCount).toBeGreaterThanOrEqual(2))
-  await saveSettings({
-    mutationId: 'controlled-stream-reconnect',
-    operations: [{ key: 'editor.fontSize', kind: 'set', value: 15 }],
-    target: 'user',
-  })
+  await saveSettings(
+    {
+      mutationId: 'controlled-stream-reconnect',
+      operations: [{ key: 'editor.fontSize', kind: 'set', value: 15 }],
+      target: 'user',
+    },
+    getClient(),
+  )
   await controller.waitForSettingsStreamAttempt(2)
   await waitFor(() => {
     expect(queryClient.getQueryData(settingsKeys.document())).toMatchObject({
@@ -175,7 +191,7 @@ test('recovers a write made during reconnect backoff after opening the replaceme
 }) => {
   const { controller } = controlledClient
   const queryClient = createTestQueryClient()
-  queryClient.setQueryData(settingsKeys.document(), await fetchSettings())
+  queryClient.setQueryData(settingsKeys.document(), await fetchSettings(undefined, getClient()))
   const abort = new AbortController()
   const backoffStarted = deferred<void>()
   const resumeBackoff = deferred<void>()
@@ -187,19 +203,25 @@ test('recovers a write made during reconnect backoff after opening the replaceme
     },
   })
 
-  await saveSettings({
-    mutationId: 'controlled-stream-before-backoff',
-    operations: [{ key: 'editor.fontSize', kind: 'set', value: 20 }],
-    target: 'user',
-  })
+  await saveSettings(
+    {
+      mutationId: 'controlled-stream-before-backoff',
+      operations: [{ key: 'editor.fontSize', kind: 'set', value: 20 }],
+      target: 'user',
+    },
+    getClient(),
+  )
   await controller.waitForSettingsStreamAttempt(1)
   expect(controller.terminateSettingsStream(1)).toBe(true)
   await backoffStarted.promise
-  await saveSettings({
-    mutationId: 'controlled-stream-during-backoff',
-    operations: [{ key: 'editor.fontSize', kind: 'set', value: 21 }],
-    target: 'user',
-  })
+  await saveSettings(
+    {
+      mutationId: 'controlled-stream-during-backoff',
+      operations: [{ key: 'editor.fontSize', kind: 'set', value: 21 }],
+      target: 'user',
+    },
+    getClient(),
+  )
   resumeBackoff.resolve()
 
   await controller.waitForSettingsStreamRequest(2)
@@ -233,11 +255,14 @@ test('aborting reconnect backoff prevents another real SSE attempt', async ({
     },
   })
 
-  await saveSettings({
-    mutationId: 'controlled-stream-abort',
-    operations: [{ key: 'editor.fontSize', kind: 'set', value: 16 }],
-    target: 'user',
-  })
+  await saveSettings(
+    {
+      mutationId: 'controlled-stream-abort',
+      operations: [{ key: 'editor.fontSize', kind: 'set', value: 16 }],
+      target: 'user',
+    },
+    getClient(),
+  )
   await controller.waitForSettingsStreamAttempt(1)
   expect(controller.terminateSettingsStream(1)).toBe(true)
   await backoffStarted.promise
@@ -255,34 +280,40 @@ test('same-epoch recovery invalidates providers only when provider settings chan
 }) => {
   expect(client).toBeDefined()
   const queryClient = createTestQueryClient()
-  const initial = await fetchSettings()
+  const initial = await fetchSettings(undefined, getClient())
   queryClient.setQueryData(settingsKeys.document(), initial)
   queryClient.setQueryData(providerQueryKeys.list(), { providers: [] })
 
-  await saveSettings({
-    mutationId: 'stream-unrelated-recovery',
-    operations: [{ key: 'editor.fontSize', kind: 'set', value: 17 }],
-    target: 'user',
-  })
+  await saveSettings(
+    {
+      mutationId: 'stream-unrelated-recovery',
+      operations: [{ key: 'editor.fontSize', kind: 'set', value: 17 }],
+      target: 'user',
+    },
+    getClient(),
+  )
   const unrelated = await refreshConfirmedSettings(queryClient)
   expect(unrelated.serverVersion.epoch).toBe(initial.serverVersion.epoch)
   expect(queryClient.getQueryState(providerQueryKeys.list())?.isInvalidated).toBe(false)
 
   const providerInstanceId = v.parse(providerInstanceIdSchema, 'stream-provider')
-  await saveSettings({
-    mutationId: 'stream-provider-recovery',
-    operations: [
-      {
-        createIfMissing: {
-          driverKind: v.parse(providerDriverKindSchema, 'codex'),
+  await saveSettings(
+    {
+      mutationId: 'stream-provider-recovery',
+      operations: [
+        {
+          createIfMissing: {
+            driverKind: v.parse(providerDriverKindSchema, 'codex'),
+          },
+          enabled: true,
+          kind: 'provider.setEnabled',
+          providerInstanceId,
         },
-        enabled: true,
-        kind: 'provider.setEnabled',
-        providerInstanceId,
-      },
-    ],
-    target: 'user',
-  })
+      ],
+      target: 'user',
+    },
+    getClient(),
+  )
   const providerUpdate = await refreshConfirmedSettings(queryClient)
   expect(providerUpdate.serverVersion.epoch).toBe(initial.serverVersion.epoch)
   expect(queryClient.getQueryState(providerQueryKeys.list())?.isInvalidated).toBe(true)

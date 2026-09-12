@@ -1,3 +1,4 @@
+import type { Client } from '@/lib/client'
 import { encodedViewTarget } from '@/lib/documents/utils/codec'
 import { fileDocument, fileResource, settingsJsonDocument } from '@/lib/documents/utils/identity'
 import { documentTab } from '@/lib/documents/utils/tabs'
@@ -29,45 +30,46 @@ export function checkIdentityBoundaries(
   signal: AbortSignal,
   save: EditorSaveService,
   documents: WorkspaceDocumentService,
+  client: Client,
 ) {
   // @ts-expect-error Files require an explicit storage or URL namespace.
   encodedViewTarget(fileDocument(fileResource(path)))
   // @ts-expect-error Document identity is not a filesystem resource.
-  fetchFile(key, signal)
+  fetchFile(key, signal, client)
   // @ts-expect-error A tab instance cannot select a filesystem directory.
-  fetchTree(tab, signal)
+  fetchTree(tab, signal, client)
   // @ts-expect-error Save accepts a document key, not a filesystem path.
   save.save(path)
   // @ts-expect-error A tab may own several documents and cannot identify a save.
   save.save(tab)
   // @ts-expect-error Writes accept only filesystem paths.
-  writeFileContent(key, '')
+  writeFileContent(key, '', undefined, client)
   // @ts-expect-error Creation cannot use a tab identity.
-  createFileContent(tab, '')
+  createFileContent(tab, '', client)
   // @ts-expect-error Metadata reads cannot use synthetic document identity.
-  statPath(key, signal)
+  statPath(key, signal, client)
   // @ts-expect-error Deletion cannot use a tab identity.
-  deletePath(tab, false)
+  deletePath(tab, false, client)
   // @ts-expect-error Recent entries contain actual filesystem paths.
-  recordRecentEntry(key)
+  recordRecentEntry(key, client)
   // @ts-expect-error Folder creation cannot use document identity.
-  ensureFolderPath(key)
+  ensureFolderPath(key, client)
   // @ts-expect-error Folder creation cannot use tab identity.
-  createFolderPath(tab)
+  createFolderPath(tab, client)
   // @ts-expect-error Workspace selection requires a filesystem root.
-  openWorkspaceRootPath(key, 1, signal)
+  openWorkspaceRootPath(key, 1, signal, client)
   // @ts-expect-error Nested quick-open request paths retain the filesystem contract.
-  fetchQuickOpenFiles({ path: key, query: '', signal })
+  fetchQuickOpenFiles({ path: key, query: '', signal }, client)
   // @ts-expect-error Source paths cannot be document keys.
-  renamePath(key, path)
+  renamePath(key, path, client)
   // @ts-expect-error Destination paths cannot be tab identities.
-  renamePath(path, tab)
+  renamePath(path, tab, client)
   // @ts-expect-error Copy source paths cannot be tab identities.
-  copyPath(tab, path)
+  copyPath(tab, path, client)
   // @ts-expect-error Copy destination paths cannot be document keys.
-  copyPath(path, key)
+  copyPath(path, key, client)
   // @ts-expect-error Recovery discovery requires a filesystem workspace root.
-  fetchWorkspaceEditRecovery(key, signal)
+  fetchWorkspaceEditRecovery(key, signal, client)
   prepareWorkspaceEditMutation(
     {
       bodyDigest: 'digest',
@@ -78,6 +80,7 @@ export function checkIdentityBoundaries(
       workspace: key,
     },
     signal,
+    client,
   )
   prepareWorkspaceEditMutation(
     {
@@ -97,6 +100,7 @@ export function checkIdentityBoundaries(
       ],
     },
     signal,
+    client,
   )
   prepareWorkspaceEditMutation(
     {
@@ -120,6 +124,7 @@ export function checkIdentityBoundaries(
       ],
     },
     signal,
+    client,
   )
   // @ts-expect-error Internal settings buffers cannot be standalone tabs.
   documentTab(settingsJsonDocument('user'))

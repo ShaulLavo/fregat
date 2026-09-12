@@ -1,3 +1,4 @@
+import { getClient } from '@/lib/client'
 import { filesystemPath } from '@/lib/documents/utils/identity'
 import { screen, waitFor } from '@testing-library/react'
 import userEvent from '@testing-library/user-event'
@@ -25,7 +26,7 @@ test('records an opened root as recent, so the project menu can order by it', as
   client,
 }) => {
   void client
-  await ensureFolderPath(filesystemPath('anubis'))
+  await ensureFolderPath(filesystemPath('anubis'), getClient())
   await renderOpeners(client, ['anubis'])
 
   await userEvent.click(screen.getByRole('button', { name: 'Open anubis' }))
@@ -35,6 +36,7 @@ test('records an opened root as recent, so the project menu can order by it', as
     const recents = await fetchRecentEntries(
       { limit: 10, mode: 'folder', showHidden: true },
       new AbortController().signal,
+      getClient(),
     )
     expect(recents.map((entry) => entry.path)).toEqual(['anubis'])
   })
@@ -45,7 +47,7 @@ test('opening a folder through an alias keeps its canonical root and workspace I
   server,
 }) => {
   void client
-  await ensureFolderPath(filesystemPath('actual'))
+  await ensureFolderPath(filesystemPath('actual'), getClient())
   await symlink('actual', path.join(server.root, 'alias'))
   const { store, results } = await renderOpeners(client, ['actual', 'alias'])
 
@@ -62,10 +64,10 @@ test('opening a folder through an alias keeps its canonical root and workspace I
 
 test('makes the latest rapid valid open the editor and index root', async ({ client, server }) => {
   void client
-  await ensureFolderPath(filesystemPath('a'))
-  await ensureFolderPath(filesystemPath('b'))
-  await createFileContent(filesystemPath('a/only-a.ts'), 'export const a = true\n')
-  await createFileContent(filesystemPath('b/only-b.ts'), 'export const b = true\n')
+  await ensureFolderPath(filesystemPath('a'), getClient())
+  await ensureFolderPath(filesystemPath('b'), getClient())
+  await createFileContent(filesystemPath('a/only-a.ts'), 'export const a = true\n', getClient())
+  await createFileContent(filesystemPath('b/only-b.ts'), 'export const b = true\n', getClient())
   const { store, results } = await renderOpeners(client, ['a', 'b'])
 
   await userEvent.click(screen.getByRole('button', { name: 'Open rapidly' }))
@@ -73,7 +75,7 @@ test('makes the latest rapid valid open the editor and index root', async ({ cli
   await waitFor(() => expect(store.getState().rootFolder?.path).toBe('b'))
   await waitFor(() => expect(results).toContainEqual({ path: 'b', result: 'opened' }))
   await waitFor(async () => {
-    const info = await fetchServerInfo(new AbortController().signal)
+    const info = await fetchServerInfo(new AbortController().signal, getClient())
     expect(info.workspaceIndex?.scanRoot).toBe(path.join(server.root, 'b'))
   })
   expect(results).toContainEqual({ path: 'a', result: 'superseded' })
@@ -84,19 +86,19 @@ test('does not retarget the index when a newer folder open is rejected', async (
   server,
 }) => {
   void client
-  await ensureFolderPath(filesystemPath('valid'))
-  await createFileContent(filesystemPath('not-a-folder.txt'), 'file\n')
+  await ensureFolderPath(filesystemPath('valid'), getClient())
+  await createFileContent(filesystemPath('not-a-folder.txt'), 'file\n', getClient())
   const { store, results } = await renderOpeners(client, ['valid', 'not-a-folder.txt'])
 
   await userEvent.click(screen.getByRole('button', { name: 'Open valid' }))
   await waitFor(() => expect(store.getState().rootFolder?.path).toBe('valid'))
-  const baseline = await fetchServerInfo(new AbortController().signal)
+  const baseline = await fetchServerInfo(new AbortController().signal, getClient())
 
   await userEvent.click(screen.getByRole('button', { name: 'Open not-a-folder.txt' }))
   await waitFor(() =>
     expect(results).toContainEqual({ path: 'not-a-folder.txt', result: 'failed' }),
   )
-  const afterRejectedOpen = await fetchServerInfo(new AbortController().signal)
+  const afterRejectedOpen = await fetchServerInfo(new AbortController().signal, getClient())
 
   expect(store.getState().rootFolder?.path).toBe('valid')
   expect(afterRejectedOpen.workspaceIndex?.scanRoot).toBe(baseline.workspaceIndex?.scanRoot)

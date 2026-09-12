@@ -1,3 +1,4 @@
+import { getClient } from '@/lib/client'
 import { filesystemPath } from '@/lib/documents/utils/identity'
 import { symlink } from 'node:fs/promises'
 import path from 'node:path'
@@ -12,8 +13,8 @@ test('merges chat-only aliases with recent folders using their canonical roots',
   server,
 }) => {
   void client
-  await ensureFolderPath(filesystemPath('projects/platform'))
-  await ensureFolderPath(filesystemPath('projects/another'))
+  await ensureFolderPath(filesystemPath('projects/platform'), getClient())
+  await ensureFolderPath(filesystemPath('projects/another'), getClient())
   await symlink('projects', path.join(server.root, 'Projects'))
 
   const { result } = renderHookWithProviders(() =>

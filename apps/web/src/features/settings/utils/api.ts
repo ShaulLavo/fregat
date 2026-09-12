@@ -11,13 +11,13 @@ import {
   type SettingsSnapshot,
 } from '@workspace/contracts'
 
-import { getClient, type Client } from '@/lib/client'
+import type { Client } from '@/lib/client'
 import { observeClientOperation } from '@/lib/client-logging'
 import { createRpcError } from '@/lib/structured-errors'
 
 export async function fetchSettings(
-  signal?: AbortSignal,
-  client: Client = getClient(),
+  signal: AbortSignal | undefined,
+  client: Client,
 ): Promise<SettingsSnapshot> {
   return observeClientOperation(
     { ...clientLogContext(client), action: 'settings.read', area: 'settings', signal },
@@ -31,7 +31,7 @@ export async function fetchSettings(
 
 export async function saveSettings(
   request: SettingsMutationRequest,
-  client: Client = getClient(),
+  client: Client,
 ): Promise<SettingsMutationResult> {
   return writeSettings({ client, request }).catch((error: unknown) => {
     throw createRpcError(error)
@@ -41,7 +41,7 @@ export async function saveSettings(
 /** Whole-document compare-and-swap for the raw JSON editor. */
 export async function saveSettingsText(
   request: SettingsRawWriteRequest,
-  client: Client = getClient(),
+  client: Client,
 ): Promise<SettingsRawWriteResult> {
   return observeClientOperation(
     {

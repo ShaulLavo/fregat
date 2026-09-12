@@ -56,8 +56,8 @@ export function WorkspaceEditPreviewDialog() {
   }, [focusService, open])
 
   const close = () => {
-    if (awaiting) {
-      service.cancelPreview()
+    if (awaiting && preview) {
+      service.cancelPreview(preview.operationId)
       return
     }
     if (stale) service.dismissResult()
@@ -175,7 +175,7 @@ export function WorkspaceEditPreviewDialog() {
           </Button>
           <Button
             disabled={!awaiting || processing}
-            onClick={() => service.confirmPreview()}
+            onClick={() => preview && service.confirmPreview(preview.operationId)}
             type='button'
           >
             {processing ? (

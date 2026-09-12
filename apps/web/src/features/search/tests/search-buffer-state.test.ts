@@ -1,4 +1,5 @@
-import { describe, expect, it } from 'vitest'
+import { expect, test as it } from '../../../../test/fixtures'
+const describe = it.describe
 import type { WorkspaceSearchMatch } from '@workspace/contracts'
 
 import {
@@ -804,7 +805,7 @@ describe('search buffer store', () => {
     store.getState().prepareBuffer('repo')
     store.getState().setReplaceVisible('repo', true)
     store.getState().setReplaceText('repo', 'pin')
-    store.getState().finishReplace('repo', '1 match replaced.')
+    store.getState().finishReplace(store.getState().startReplace('repo')!, '1 match replaced.')
     store.getState().startSearch({
       includeContent: true,
       limit: 20,
@@ -1350,3 +1351,70 @@ function activeMatchPosition(snapshot: SearchBufferSnapshot | null) {
 function groupByPath(groups: ReturnType<typeof searchGroupsForSnapshot>, path: string) {
   return groups.find((group) => group.path === path)
 }
+
+it('ignores a completion after reset to the same root and leaves its new request running', () => {
+  const store = createSearchBufferStore()
+  store.getState().prepareBuffer('repo')
+  const old = store.getState().startReplace('repo')!
+  store.getState().resetBuffer('repo')
+  const current = store.getState().startReplace('repo')!
+  const before = store.getState().active
+  store.getState().finishReplace(old, 'Old result', true)
+  store.getState().failReplace(old, 'Old failure')
+  expect(store.getState().active).toBe(before)
+  expect(store.getState().active?.replaceRequest).toBe(current)
+  expect(store.getState().active?.replaceStatus).toBe('running')
+})
+
+it('settles an owned parked buffer without altering the selected root', () => {
+  const store = createSearchBufferStore()
+  store.getState().prepareBuffer('repo')
+  const token = store.getState().startReplace('repo')!
+  store.getState().switchWorkspace('other')
+  const before = store.getState().active
+  store.getState().finishReplace(token, 'Done')
+  expect(store.getState().active).toBe(before)
+  expect(store.getState().parked.get('repo')?.replaceStatus).toBe('success')
+  store.getState().switchWorkspace('repo')
+  expect(store.getState().active?.replaceRequest).toBeNull()
+  expect(store.getState().active?.replaceStatus).toBe('success')
+})
+
+it('settles an earlier result generation without refreshing newer search inputs', () => {
+  const store = createSearchBufferStore()
+  store.getState().prepareBuffer('repo')
+  const token = store.getState().startReplace('repo')!
+  store.getState().startSearch({ path: 'repo', query: 'new', includeContent: true, limit: 20 })
+  const revision = store.getState().active?.searchRevision
+  const runId = store.getState().active?.runId
+  store.getState().finishReplace(token, 'Old result', true)
+  expect(store.getState().active).toMatchObject({
+    replaceStatus: 'idle',
+    replaceMessage: null,
+    replaceRequest: null,
+    query: 'new',
+    runId,
+    searchRevision: revision,
+  })
+})
+
+it('an old replacement cannot settle a newer request in the same incarnation', () => {
+  const store = createSearchBufferStore()
+  store.getState().prepareBuffer('repo')
+  const first = store.getState().startReplace('repo')!
+  store.getState().setReplaceText('repo', 'new')
+  const second = store.getState().startReplace('repo')!
+  store.getState().finishReplace(first, 'Old', true)
+  expect(store.getState().active).toMatchObject({
+    replaceRequest: second,
+    replaceStatus: 'running',
+    replaceMessage: null,
+    replaceText: 'new',
+  })
+  store.getState().finishReplace(second, 'New')
+  expect(store.getState().active).toMatchObject({
+    replaceRequest: null,
+    replaceStatus: 'success',
+    replaceMessage: 'New',
+  })
+})

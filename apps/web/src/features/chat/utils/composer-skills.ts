@@ -6,7 +6,7 @@ import type {
   ProviderSlashCommand,
 } from '@workspace/contracts'
 
-import { getClient, type Client } from '@/lib/client'
+import type { Client } from '@/lib/client'
 import { clientForQueryClient } from '@/lib/environments/state/query-clients'
 import { createRpcError } from '@/lib/structured-errors'
 
@@ -32,7 +32,7 @@ export const providerCommandCatalogKeys = {
 export async function fetchProviderCommandCatalog(
   providerInstanceId: ProviderInstanceId,
   cwd: string | null,
-  client: Client = getClient(),
+  client: Client,
 ): Promise<ProviderCommandCatalog> {
   const response = await client
     .providers({ providerInstanceId })

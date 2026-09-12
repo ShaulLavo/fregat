@@ -9,7 +9,7 @@ import {
 } from '@workspace/contracts'
 import * as v from 'valibot'
 
-import { getClient, type Client } from '@/lib/client'
+import type { Client } from '@/lib/client'
 import { parseEdenSseStream } from '@workspace/client-core/transport/eden'
 import { unwrapEdenResponse } from '@/lib/eden-events'
 import { clientErrors, createRpcError } from '@/lib/structured-errors'
@@ -17,8 +17,8 @@ import { logFilterQuery } from '@/features/logs/utils/filter-params'
 
 export async function fetchLogSummary(
   filters: LogDashboardFilters,
-  signal?: AbortSignal,
-  client: Client = getClient(),
+  signal: AbortSignal | undefined,
+  client: Client,
 ): Promise<LogDashboardSummary> {
   const response = await client._log.dashboard.summary.get({
     fetch: { signal },
@@ -30,8 +30,8 @@ export async function fetchLogSummary(
 
 export async function fetchLogEvents(
   filters: LogDashboardFilters,
-  signal?: AbortSignal,
-  client: Client = getClient(),
+  signal: AbortSignal | undefined,
+  client: Client,
 ): Promise<LogEventsResult> {
   const response = await client._log.dashboard.events.get({
     fetch: { signal },
@@ -46,8 +46,8 @@ export async function fetchLogEvents(
 
 export async function* subscribeLogEvents(
   filters: LogDashboardFilters,
-  signal?: AbortSignal,
-  client: Client = getClient(),
+  signal: AbortSignal | undefined,
+  client: Client,
 ): AsyncGenerator<LogLiveStreamItem> {
   const response = await client._log.dashboard.live.get({
     fetch: { signal },

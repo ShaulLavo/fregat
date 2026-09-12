@@ -86,7 +86,7 @@ test('applies one group across a dirty active buffer an open secondary and an un
       targetKind: 'unopened',
     },
   ])
-  harness.service.confirmPreview()
+  harness.service.confirmPreview(harness.service.getSnapshot().preview!.operationId)
   await expect(pending).resolves.toEqual({ status: 'applied' })
 
   expect(active.buffer.materializeFullText()).toBe('Active!')
@@ -119,7 +119,7 @@ test('rejects live and unopened drift after preview with zero net mutation', asy
     [untouchedPath, 'untouched'],
   ])
   const live = await openDocument(harness, livePath)
-  const unopened = await fetchFile(unopenedPath, signal())
+  const unopened = await fetchFile(unopenedPath, signal(), harness.client)
   const liveUri = fileUri(livePath)
   const pending = harness.service.onApplyWorkspaceEdit(
     request(
@@ -135,11 +135,16 @@ test('rejects live and unopened drift after preview with zero net mutation', asy
   await waitForPhase(harness.service, 'awaiting-confirmation')
 
   createEditorBufferSession(live.buffer).applyEdits([{ from: 4, to: 4, text: '!' }])
-  await writeFileContent(unopenedPath, 'external change', {
-    baseVersion: unopened.version,
-    expectedMtimeMs: unopened.mtimeMs,
-  })
-  harness.service.confirmPreview()
+  await writeFileContent(
+    unopenedPath,
+    'external change',
+    {
+      baseVersion: unopened.version,
+      expectedMtimeMs: unopened.mtimeMs,
+    },
+    harness.client,
+  )
+  harness.service.confirmPreview(harness.service.getSnapshot().preview!.operationId)
 
   await expect(pending).resolves.toMatchObject({ code: 'snapshot-drift', status: 'failed' })
   expect(live.buffer.materializeFullText()).toBe('live!')
@@ -171,7 +176,7 @@ test('rejects an unopened target that becomes a clean live document after previe
   await waitForPhase(harness.service, 'awaiting-confirmation')
 
   const opened = await openDocument(harness, unopenedPath)
-  harness.service.confirmPreview()
+  harness.service.confirmPreview(harness.service.getSnapshot().preview!.operationId)
 
   await expect(pending).resolves.toMatchObject({ code: 'snapshot-drift', status: 'failed' })
   expect(opened.buffer.materializeFullText()).toBe('unopened')
@@ -192,7 +197,7 @@ test('rolls back when an unopened target becomes dirty after server prepare star
       [unopenedPath, 'unopened'],
     ])
     const live = await openDocument(harness, livePath)
-    const unopenedFile = await fetchFile(unopenedPath, signal())
+    const unopenedFile = await fetchFile(unopenedPath, signal(), harness.client)
     const liveUri = fileUri(livePath)
     const pending = harness.service.onApplyWorkspaceEdit(
       request(
@@ -205,7 +210,7 @@ test('rolls back when an unopened target becomes dirty after server prepare star
       ),
     )
     await waitForPhase(harness.service, 'awaiting-confirmation')
-    harness.service.confirmPreview()
+    harness.service.confirmPreview(harness.service.getSnapshot().preview!.operationId)
     await entered.promise
 
     const opened = harness.store.getState().ensureLiveEditorDocument(unopenedFile)
@@ -235,8 +240,8 @@ test('commits and reconciles create edit rename delete options in order', async 
   const renamedPath = 'renamed.ts'
   const deletedPath = 'deleted.ts'
   await writeWorkspaceFiles(server.root, [[deletedPath, 'delete me']])
-  const deletedSnapshot = await fetchFile(deletedPath, signal())
-  const initialTree = await fetchTree('', signal())
+  const deletedSnapshot = await fetchFile(deletedPath, signal(), harness.client)
+  const initialTree = await fetchTree('', signal(), harness.client)
   harness.queryClient.setQueryData(fileSystemKeys.fileSnapshot(deletedPath), deletedSnapshot)
   harness.queryClient.setQueryData(fileSystemKeys.tree(''), treeModel(initialTree, ''))
   const createdUri = fileUri(createdPath)
@@ -259,7 +264,7 @@ test('commits and reconciles create edit rename delete options in order', async 
     'rename',
     'delete',
   ])
-  harness.service.confirmPreview()
+  harness.service.confirmPreview(harness.service.getSnapshot().preview!.operationId)
   await expect(pending).resolves.toEqual({ status: 'applied' })
 
   expect(await pathExists(server.root, createdPath)).toBe(false)
@@ -271,7 +276,7 @@ test('commits and reconciles create edit rename delete options in order', async 
   expect(
     harness.store.getState().hasLiveEditorDocument(fileDocumentKey(filesystemPath(renamedPath))),
   ).toBe(false)
-  const snapshot = await fetchFile(renamedPath, signal())
+  const snapshot = await fetchFile(renamedPath, signal(), harness.client)
   expect(snapshot).toMatchObject({ content: 'created text', path: renamedPath })
   expect(harness.queryClient.getQueryData(fileSystemKeys.fileSnapshot(renamedPath))).toMatchObject({
     content: 'created text',
@@ -283,7 +288,7 @@ test('commits and reconciles create edit rename delete options in order', async 
   )
   expect(projectedTree?.entriesByTreePath.has(renamedPath)).toBe(true)
   expect(projectedTree?.entriesByTreePath.has(deletedPath)).toBe(false)
-  const tree = await fetchTree('', signal())
+  const tree = await fetchTree('', signal(), harness.client)
   expect(tree.entries.map((entry) => entry.name)).toContain('renamed.ts')
   expect(tree.entries.map((entry) => entry.name)).not.toContain('deleted.ts')
 })
@@ -300,7 +305,7 @@ test('undoes and redoes an applied group only while every after stamp matches', 
     [livePath, 'live'],
     [unopenedPath, 'disk'],
   ])
-  const unopenedSnapshot = await fetchFile(unopenedPath, signal())
+  const unopenedSnapshot = await fetchFile(unopenedPath, signal(), harness.client)
   harness.queryClient.setQueryData(fileSystemKeys.fileSnapshot(unopenedPath), unopenedSnapshot)
   const live = await openDocument(harness, livePath)
   const uri = fileUri(livePath)
@@ -312,7 +317,7 @@ test('undoes and redoes an applied group only while every after stamp matches', 
     ),
   )
   await waitForPhase(harness.service, 'awaiting-confirmation')
-  harness.service.confirmPreview()
+  harness.service.confirmPreview(harness.service.getSnapshot().preview!.operationId)
   await expect(pending).resolves.toEqual({ status: 'applied' })
 
   await expect(harness.service.undo()).resolves.toBe(true)
@@ -379,7 +384,7 @@ test('evicts the oldest history group at the cap and releases every path', async
       ),
     )
     await waitForPhase(harness.service, 'awaiting-confirmation')
-    harness.service.confirmPreview()
+    harness.service.confirmPreview(harness.service.getSnapshot().preview!.operationId)
     await expect(pending).resolves.toEqual({ status: 'applied' })
   }
 
@@ -429,7 +434,7 @@ test('invalidates history when the server epoch changes after restart', async ()
       ),
     )
     await waitForPhase(harness.service, 'awaiting-confirmation')
-    harness.service.confirmPreview()
+    harness.service.confirmPreview(harness.service.getSnapshot().preview!.operationId)
     await expect(pending).resolves.toEqual({ status: 'applied' })
     expect(harness.service.getSnapshot().canUndo).toBe(true)
 
@@ -478,7 +483,7 @@ test('compensates a later persistence failure and restores live state', async ()
     )
     await waitForPhase(harness.service, 'awaiting-confirmation')
 
-    harness.service.confirmPreview()
+    harness.service.confirmPreview(harness.service.getSnapshot().preview!.operationId)
     await expect(pending).resolves.toMatchObject({ status: 'rolled-back' })
     expect(live.buffer.materializeFullText()).toBe('live!')
     expect(live.buffer.isDirty()).toBe(true)
@@ -517,7 +522,7 @@ test('surfaces exact recovery state and resumes it from a fresh service', async 
       ),
     )
     await waitForPhase(harness.service, 'awaiting-confirmation')
-    harness.service.confirmPreview()
+    harness.service.confirmPreview(harness.service.getSnapshot().preview!.operationId)
 
     await expect(pending).resolves.toMatchObject({ status: 'recovery-required' })
     expect(harness.service.getSnapshot()).toMatchObject({
@@ -569,7 +574,7 @@ test('acknowledges exact partial paths and keeps unsaved live text read only', a
       ),
     )
     await waitForPhase(harness.service, 'awaiting-confirmation')
-    harness.service.confirmPreview()
+    harness.service.confirmPreview(harness.service.getSnapshot().preview!.operationId)
     await expect(pending).resolves.toMatchObject({ status: 'recovery-required' })
 
     expect(live.buffer.materializeFullText()).toBe('first!')
@@ -606,21 +611,26 @@ test('excludes an overlapping legacy write while commit holds the transaction le
     const harness = createHarness()
     const filePath = 'lease.ts'
     await writeWorkspaceFiles(server.root, [[filePath, 'before']])
-    const before = await fetchFile(filePath, signal())
+    const before = await fetchFile(filePath, signal(), harness.client)
     const uri = fileUri(filePath)
     const pending = harness.service.onApplyWorkspaceEdit(
       request([textOperation(uri, null, 0, 1, 'A')], uri),
     )
     await waitForPhase(harness.service, 'awaiting-confirmation')
-    harness.service.confirmPreview()
+    harness.service.confirmPreview(harness.service.getSnapshot().preview!.operationId)
     await entered.promise
 
     try {
       await expect(
-        writeFileContent(filePath, 'legacy', {
-          baseVersion: before.version,
-          expectedMtimeMs: before.mtimeMs,
-        }),
+        writeFileContent(
+          filePath,
+          'legacy',
+          {
+            baseVersion: before.version,
+            expectedMtimeMs: before.mtimeMs,
+          },
+          harness.client,
+        ),
       ).rejects.toMatchObject({ code: 'WORKSPACE_EDIT_BUSY' })
     } finally {
       release.resolve()
@@ -628,12 +638,17 @@ test('excludes an overlapping legacy write while commit holds the transaction le
 
     await expect(pending).resolves.toEqual({ status: 'applied' })
     expect(await readText(server.root, filePath)).toBe('Aefore')
-    const committed = await fetchFile(filePath, signal())
+    const committed = await fetchFile(filePath, signal(), harness.client)
     await expect(
-      writeFileContent(filePath, 'after lease', {
-        baseVersion: committed.version,
-        expectedMtimeMs: committed.mtimeMs,
-      }),
+      writeFileContent(
+        filePath,
+        'after lease',
+        {
+          baseVersion: committed.version,
+          expectedMtimeMs: committed.mtimeMs,
+        },
+        harness.client,
+      ),
     ).resolves.toMatchObject({ path: filePath })
     expect(await readText(server.root, filePath)).toBe('after lease')
   })
@@ -652,7 +667,7 @@ test('cancels a paused prepare and blocks root reset during commit', async () =>
     )
     await waitForPhase(harness.service, 'awaiting-confirmation')
     const operationId = harness.service.getSnapshot().preview!.operationId
-    harness.service.confirmPreview()
+    harness.service.confirmPreview(harness.service.getSnapshot().preview!.operationId)
     await entered.promise
 
     expect(harness.service.canSwitchRoot()).toBe(false)
@@ -741,7 +756,7 @@ test('preserves old disk bytes for open edit then rename until explicit save', a
   const sourcePath = 'before.ts'
   const destinationPath = 'after.ts'
   await writeWorkspaceFiles(server.root, [[sourcePath, 'saved bytes']])
-  const sourceFile = await fetchFile(sourcePath, signal())
+  const sourceFile = await fetchFile(sourcePath, signal(), harness.client)
   const live = harness.store.getState().ensureEditorView(tabId('source-tab'), sourceFile)
   const sourceUri = fileUri(sourcePath)
   const pending = harness.service.onApplyWorkspaceEdit(
@@ -755,7 +770,7 @@ test('preserves old disk bytes for open edit then rename until explicit save', a
     ),
   )
   await waitForPhase(harness.service, 'awaiting-confirmation')
-  harness.service.confirmPreview()
+  harness.service.confirmPreview(harness.service.getSnapshot().preview!.operationId)
   await expect(pending).resolves.toEqual({ status: 'applied' })
 
   const renamed = harness.store
@@ -782,15 +797,17 @@ test('preserves old disk bytes for open edit then rename until explicit save', a
 type IntegrationHarness = ReturnType<typeof createHarness>
 
 function createHarness() {
+  const client = getClient()
   const store = createEditorDocumentStore()
   const queryClient = createTestQueryClient()
   const fileSync = new FileSyncService(store, queryClient)
   const service = new WorkspaceEditService({
+    owner: { environmentId: null, machine: null },
     documentStore: store,
     fileSync,
     getRoot: () => ({ generation: 1, path: '', uriPath: '/', workspacePath: '' }),
   })
-  return { fileSync, queryClient, service, store }
+  return { client, fileSync, queryClient, service, store }
 }
 
 async function withCustomServer(
@@ -928,7 +945,7 @@ function deferred<T>(): Deferred<T> {
 }
 
 async function openDocument(harness: IntegrationHarness, filePath: string) {
-  const file = await fetchFile(filePath, signal())
+  const file = await fetchFile(filePath, signal(), harness.client)
   return harness.store.getState().ensureLiveEditorDocument(file)
 }
 
@@ -949,7 +966,7 @@ function request(
   documents: readonly WorkspaceTextDocumentProvenance[] = [],
 ): ApplyWorkspaceEditRequest {
   const plan: ParsedWorkspaceEdit = { annotations: new Map(), operations }
-  const currentUris = new Set(documents.map((document) => document.uri))
+  const currentUris = new Set([originUri, ...documents.map((document) => document.uri)])
   return {
     guard: {
       documents,

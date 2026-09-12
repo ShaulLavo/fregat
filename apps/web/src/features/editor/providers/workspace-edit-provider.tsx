@@ -1,3 +1,4 @@
+import { WorkspaceTextChangesContext } from '@/lib/workspace-edits/providers/context'
 import type { ReactNode } from 'react'
 
 import {
@@ -18,7 +19,9 @@ export function WorkspaceEditProvider({
 }) {
   return (
     <WorkspaceEditServiceContext value={service}>
-      <WorkspaceEditHostContext value={host}>{children}</WorkspaceEditHostContext>
+      <WorkspaceTextChangesContext value={service}>
+        <WorkspaceEditHostContext value={host}>{children}</WorkspaceEditHostContext>
+      </WorkspaceTextChangesContext>
     </WorkspaceEditServiceContext>
   )
 }

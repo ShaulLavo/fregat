@@ -1,3 +1,4 @@
+import { getClient } from '@/lib/client'
 import { testScopedStorage } from '../../../../test/factories/scoped-storage'
 import { createTestApplicationRuntime } from '../../../../test/factories/application-runtime'
 import { screen, waitFor } from '@testing-library/react'
@@ -24,7 +25,7 @@ test('real palette preview and cancel write nothing while selection dispatches o
   resetSettingsIntentStore()
   writeRootFolderCache(testScopedStorage, null)
   const queryClient = createTestQueryClient()
-  const before = await fetchSettings()
+  const before = await fetchSettings(undefined, getClient())
   queryClient.setQueryData(settingsKeys.document(), before)
   const firstPalette = renderPalette(queryClient)
   const user = userEvent.setup()
@@ -51,7 +52,7 @@ test('real palette preview and cancel write nothing while selection dispatches o
   expect(document.documentElement).toHaveClass('dark')
   expect(useSettingsIntentStore.getState().active).toEqual([])
   expect(controlledClient.controller.settingsWriteCount).toBe(0)
-  expect((await fetchSettings()).serverVersion).toEqual(before.serverVersion)
+  expect((await fetchSettings(undefined, getClient())).serverVersion).toEqual(before.serverVersion)
   firstPalette.unmount()
 
   const secondPalette = renderPalette(queryClient)
@@ -60,7 +61,9 @@ test('real palette preview and cancel write nothing while selection dispatches o
 
   await controlledClient.controller.waitForSettingsWriteRequest(1)
   await waitFor(async () => {
-    expect((await fetchSettings()).values['workbench.colorTheme']).toBe('dark')
+    expect((await fetchSettings(undefined, getClient())).values['workbench.colorTheme']).toBe(
+      'dark',
+    )
     expect(useSettingsIntentStore.getState().active).toEqual([])
   })
   expect(controlledClient.controller.settingsWriteCount).toBe(1)
@@ -73,7 +76,9 @@ test('real palette preview and cancel write nothing while selection dispatches o
       target: 'user',
     }),
   ])
-  expect((await fetchSettings()).serverVersion.sequence).toBe(before.serverVersion.sequence + 1)
+  expect((await fetchSettings(undefined, getClient())).serverVersion.sequence).toBe(
+    before.serverVersion.sequence + 1,
+  )
 
   secondPalette.unmount()
   resetSettingsSnapshotAdmission(queryClient)

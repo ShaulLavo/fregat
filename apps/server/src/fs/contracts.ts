@@ -204,6 +204,8 @@ export const createFileBodySchema = v.object({
   path: pathSchema,
   content: v.optional(v.string()),
   overwrite: v.optional(v.boolean()),
+  origin: v.optional(v.string()),
+  writeId: v.optional(v.string()),
 })
 
 export const createFolderBodySchema = v.object({

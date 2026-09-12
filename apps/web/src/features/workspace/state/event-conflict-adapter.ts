@@ -27,12 +27,14 @@ import { setFileSnapshotQueryData } from '@/lib/file-snapshot-query-cache'
 import { createFileContent, ensureFolderPath, writeFileContent } from '@/lib/file-server'
 import type { FileResult } from '@/lib/file-system-types'
 import { fileSystemKeys } from '@/lib/query-keys'
+import type { Client } from '@/lib/client'
 import { createMergeConflictDocumentText } from '@singapor/core'
 import type { QueryClient } from '@tanstack/react-query'
 import { createElement } from 'react'
 import { toast } from 'sonner'
 
 export type WorkspaceConflictContext = {
+  client: Client
   conflictStore: EditorConflictStoreApi
   discardLiveEditorDocument: (document: DocumentRef) => { wasDirty: boolean }
   ensureUnsyncedEditorDocument: (input: UnsyncedLiveEditorDocumentInput) => void
@@ -149,9 +151,7 @@ function matchingConflict(conflict: FilesystemConflict, context: WorkspaceConfli
   const conflicts = Object.values(context.conflictStore.getState().conflicts)
   return conflicts.find(
     (current) =>
-      current.eventType === conflict.eventType &&
-      current.localPath === conflict.localPath &&
-      current.remotePath === conflict.remotePath,
+      current.localPath === conflict.localPath && current.remotePath === conflict.remotePath,
   )
 }
 
@@ -207,22 +207,27 @@ async function resolveConflict(
 
 async function applyLocalConflict(conflict: FilesystemConflict, context: WorkspaceConflictContext) {
   if (conflict.eventType === 'deleted') {
-    await restoreDeletedLocalConflict(conflict)
+    await restoreDeletedLocalConflict(conflict, context.client)
   } else {
-    await writeFileContent(conflict.remotePath, conflict.localText, {
-      baseVersion: conflict.remoteVersion,
-      expectedMtimeMs: conflict.remoteMtimeMs,
-      origin: 'conflict-resolution',
-    })
+    await writeFileContent(
+      conflict.remotePath,
+      conflict.localText,
+      {
+        baseVersion: conflict.remoteVersion,
+        expectedMtimeMs: conflict.remoteMtimeMs,
+        origin: 'conflict-resolution',
+      },
+      context.client,
+    )
   }
 
   const file = await context.fetchFile(conflict.remotePath, new AbortController().signal)
   replaceResolvedEditorFile(conflict.localPath, file, context)
 }
 
-async function restoreDeletedLocalConflict(conflict: FilesystemConflict) {
-  await ensureFolderPath(parentPath(conflict.remotePath, filesystemPath('')))
-  await createFileContent(conflict.remotePath, conflict.localText)
+async function restoreDeletedLocalConflict(conflict: FilesystemConflict, client: Client) {
+  await ensureFolderPath(parentPath(conflict.remotePath, filesystemPath('')), client)
+  await createFileContent(conflict.remotePath, conflict.localText, client)
 }
 
 async function applyRemoteConflict(

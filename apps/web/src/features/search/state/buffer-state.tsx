@@ -52,7 +52,17 @@ export type WorkspaceSearchFileGroup = {
   pathLabel: string
 }
 
+type SearchReplaceToken = Readonly<{
+  rootPath: string
+  incarnation: object
+  runId: number
+  query: WorkspaceSearchQuery | null
+  replaceText: string
+}>
+
 export type SearchBufferSnapshot = {
+  readonly incarnation: object
+  replaceRequest: SearchReplaceToken | null
   activeResultId: SearchResultId | null
   caseSensitive: boolean
   collapsedPaths: readonly string[]
@@ -107,8 +117,8 @@ type SearchBufferStoreActions = {
   collapseAllGroups: () => void
   expandAllGroups: () => void
   failSearch: (runId: number, error: string) => void
-  failReplace: (rootPath: string, error: string) => void
-  finishReplace: (rootPath: string, message: string) => void
+  failReplace: (token: SearchReplaceToken, error: string) => void
+  finishReplace: (token: SearchReplaceToken, message: string, refresh?: boolean) => void
   prepareBuffer: (rootPath: string) => SearchBufferSnapshot
   resetBuffer: (rootPath: string) => void
   requestSearchRefresh: (rootPath: string) => void
@@ -123,7 +133,7 @@ type SearchBufferStoreActions = {
   selectPreviousReplaceText: (rootPath: string) => void
   selectPreviousMatch: () => void
   selectResult: (id: SearchResultId | null) => void
-  startReplace: (rootPath: string) => void
+  startReplace: (rootPath: string) => SearchReplaceToken | null
   startSearch: (query: WorkspaceSearchQuery) => number
   /** Parks the open project's results and restores the target's. */
   switchWorkspace: (rootPath: string | null) => void
@@ -176,20 +186,10 @@ export function createSearchBufferStore({
       collapseAllGroups: () => set((state) => ({ active: collapseSearchGroups(state.active) })),
       expandAllGroups: () => set((state) => ({ active: expandSearchGroups(state.active) })),
       failSearch: (runId, error) => set((state) => failSearchBuffer(state, runId, error)),
-      failReplace: (rootPath, error) =>
-        set((state) => ({
-          active: replaceSearchBuffer(state.active, rootPath, {
-            replaceMessage: error,
-            replaceStatus: 'error',
-          }),
-        })),
-      finishReplace: (rootPath, message) =>
-        set((state) => ({
-          active: replaceSearchBuffer(state.active, rootPath, {
-            replaceMessage: message,
-            replaceStatus: 'success',
-          }),
-        })),
+      failReplace: (token, error) =>
+        set((state) => settleReplace(state, token, error, 'error', false)),
+      finishReplace: (token, message, refresh = false) =>
+        set((state) => settleReplace(state, token, message, 'success', refresh)),
       prepareBuffer: (rootPath) => {
         const current = get().active
         if (current?.rootPath === rootPath) return current
@@ -242,10 +242,19 @@ export function createSearchBufferStore({
         })),
       selectPreviousMatch: () => set((state) => ({ active: selectSearchMatch(state.active, -1) })),
       selectResult: (id) => set((state) => ({ active: selectSearchResult(state.active, id) })),
-      startReplace: (rootPath) =>
-        set((state) => ({
-          active: startReplaceSearchBuffer(state.active, rootPath),
-        })),
+      startReplace: (rootPath) => {
+        const snapshot = get().active
+        if (!snapshot || snapshot.rootPath !== rootPath) return null
+        const token = Object.freeze({
+          rootPath,
+          incarnation: snapshot.incarnation,
+          runId: snapshot.runId,
+          query: snapshot.resultsSearchQuery,
+          replaceText: snapshot.replaceText,
+        })
+        set({ active: { ...startReplaceSearchBuffer(snapshot, rootPath), replaceRequest: token } })
+        return token
+      },
       startSearch: (query) => {
         const current = get().active
         const runId = (current?.runId ?? 0) + 1
@@ -368,6 +377,8 @@ function searchBufferSnapshotFromCache(
   const collapsedPaths = prunedCollapsedPaths(cached.collapsedPaths, groups)
 
   return resolveActiveSearchResult({
+    incarnation: Object.freeze({}),
+    replaceRequest: null,
     activeResultId: cached.activeResultId,
     caseSensitive: cached.caseSensitive,
     collapsedPaths,
@@ -698,8 +709,7 @@ function replaceTextSearchBuffer(
   })
 }
 
-function startReplaceSearchBuffer(snapshot: SearchBufferSnapshot | null, rootPath: string) {
-  if (!snapshot) return null
+function startReplaceSearchBuffer(snapshot: SearchBufferSnapshot, rootPath: string) {
   if (snapshot.rootPath !== rootPath) return snapshot
 
   const historyNavigation = activeReplaceHistoryNavigation(snapshot)
@@ -711,6 +721,34 @@ function startReplaceSearchBuffer(snapshot: SearchBufferSnapshot | null, rootPat
     replaceMessage: null,
     replaceStatus: 'running' as const,
   }
+}
+
+function settleReplace(
+  state: SearchBufferStoreState,
+  token: SearchReplaceToken,
+  message: string,
+  status: SearchReplaceStatus,
+  refresh: boolean,
+): Partial<SearchBufferStoreState> {
+  const active = state.active?.incarnation === token.incarnation
+  const snapshot = active ? state.active : state.parked.get(token.rootPath)
+  if (!snapshot || snapshot.incarnation !== token.incarnation || snapshot.replaceRequest !== token)
+    return {}
+  const matches =
+    snapshot.runId === token.runId &&
+    snapshot.resultsSearchQuery === token.query &&
+    snapshot.replaceText === token.replaceText
+  let next: SearchBufferSnapshot = {
+    ...snapshot,
+    replaceRequest: null,
+    replaceStatus: matches ? status : 'idle',
+    replaceMessage: matches ? message : null,
+  }
+  if (matches && refresh) next = refreshSearchBuffer(next, token.rootPath) ?? next
+  if (active) return { active: next }
+  const parked = new Map(state.parked)
+  parked.set(token.rootPath, next)
+  return { parked }
 }
 
 function refreshSearchBuffer(snapshot: SearchBufferSnapshot | null, rootPath: string) {
@@ -747,6 +785,8 @@ export function emptySearchBuffer(rootPath: string): SearchBufferSnapshot {
   const settings = readSettingsMirror()
 
   return {
+    incarnation: Object.freeze({}),
+    replaceRequest: null,
     activeResultId: null,
     caseSensitive: settings['search.caseSensitive'],
     collapsedPaths: [],
@@ -797,6 +837,8 @@ function loadingSearchBuffer(
   const streamBaseMatches = streamBaseMatchesForSearch(previous, query)
 
   return {
+    incarnation: previous?.incarnation ?? Object.freeze({}),
+    replaceRequest: previous?.replaceRequest ?? null,
     activeResultId: previous?.activeResultId ?? null,
     caseSensitive: query.caseSensitive ?? previous?.caseSensitive ?? false,
     collapsedPaths: previous?.collapsedPaths ?? [],

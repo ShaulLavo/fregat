@@ -52,10 +52,14 @@ describe('logs api', () => {
     })
     clientWith({ _log: { dashboard: { summary: { get: summaryGet } } } })
 
-    const result = await api.fetchLogSummary({
-      since: '2026-05-25T10:00:00.000Z',
-      slowMs: 500,
-    })
+    const result = await api.fetchLogSummary(
+      {
+        since: '2026-05-25T10:00:00.000Z',
+        slowMs: 500,
+      },
+      undefined,
+      getClient(),
+    )
 
     expect(result.generatedAt).toBe('2026-05-25T10:01:00.000Z')
     expect(result.timeline[0].start).toBe('2026-05-25T10:00:00.000Z')
@@ -112,7 +116,7 @@ describe('logs api', () => {
     })
     clientWith({ _log: { dashboard: { events: { get: eventsGet } } } })
 
-    const result = await api.fetchLogEvents({})
+    const result = await api.fetchLogEvents({}, undefined, getClient())
 
     expect(result.events[0].timestamp).toBe('2026-05-25T10:02:00.000Z')
     expect(result.detailsById['event-1']?.event.timestamp).toBe('2026-05-25T10:02:00.000Z')

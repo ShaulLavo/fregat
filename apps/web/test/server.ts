@@ -40,7 +40,7 @@ export type TestServer = {
 // app routes, valibot contracts, and filesystem are the genuine article.
 type TestServerOptions = Pick<
   AppOptions,
-  'workspaceEditClock' | 'workspaceEditDriver' | 'machines'
+  'workspaceEditClock' | 'workspaceEditDriver' | 'machines' | 'watchBackend'
 > & {
   persistentDatabase?: boolean
   providerRuntime?: boolean
@@ -59,6 +59,7 @@ export async function makeTestServer({
   settingsWatch = false,
   workspaceEditClock,
   workspaceEditDriver,
+  watchBackend,
   machines,
 }: TestServerOptions = {}): Promise<TestServer> {
   const root = await mkdtemp(path.join(tmpdir(), 'web-itest-'))
@@ -91,6 +92,7 @@ export async function makeTestServer({
       },
       settings: testSettingsOptions(root, { watch: settingsWatch }),
       watch: filesystemWatch,
+      watchBackend,
       workspaceEditClock,
       workspaceEditDriver,
       workspaceEditJournalRoot,

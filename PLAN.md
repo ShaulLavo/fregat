@@ -244,10 +244,11 @@ endpoints and existing SSH access, with explicit grants for native clients.
 Plan 098 is complete. Its [implementation reference](docs/document-and-tab-domain.md) records
 verified document/tab APIs, cache version 21, correctness fixes, and baseline test limitations.
 
-**[Plan 097 — async operation ownership](plans/097-async-operation-ownership.md) is next.** Its
-source anchors, typed API sketches, and source hashes have been refreshed against the completed
-document model. Plan 097 implementation has not started. The required **098 → 097** dependency
-is satisfied.
+Plan 097 is complete. The [async operation ownership reference](docs/async-operation-ownership.md)
+records captured transport owners, service-issued text sources, operation-bound previews,
+conditional conflict reconciliation, TUI plans, and request-time LSP provenance. The focused
+verification script passes across Platform and the linked Editor package. The required
+**098 → 097** dependency is complete; Plan 099 consumes these settled contracts.
 
 ## Duplication census lane
 

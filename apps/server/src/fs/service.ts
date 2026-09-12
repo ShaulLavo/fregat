@@ -287,28 +287,38 @@ export class FileSystemService {
   }
 
   private async writeObserved(target: MutationTarget<'content'>, body: WriteBody) {
+    const write = this.beginWriteEvents(target, body)
     recordAppSave(target.absolutePath)
-
-    let path: string
     try {
-      path = await writeTextFile(target, body)
+      return await this.publishWrittenFile(target, body, write)
     } catch (error) {
       forgetAppSave(target.absolutePath)
       throw error
+    } finally {
+      if (write) this.changes.finishWrite(write)
     }
+  }
 
+  private async publishWrittenFile(
+    target: MutationTarget<'content'>,
+    body: WriteBody,
+    write: ReturnType<FileChangeHub['beginWrite']> | undefined,
+  ) {
+    const path = await writeTextFile(target, body)
     const entry = {
       ...(await this.statEntry(path)),
       version: textFileVersion(body.content),
     }
-    this.changes.emit({
+    const event: WatchServerMessage = {
       type: 'changed',
       path,
       entry,
       origin: body.origin,
       version: entry.version,
       writeId: body.writeId,
-    })
+    }
+    if (write) this.changes.finishWrite(write, event)
+    else this.changes.emit(event)
 
     return {
       ...(await this.stat(path)),
@@ -323,6 +333,7 @@ export class FileSystemService {
         contentBytes: body.content ? Buffer.byteLength(body.content, 'utf8') : 0,
         operation: 'create_file',
         path: body.path,
+        writeId: body.writeId,
       },
       () =>
         this.withMutation(
@@ -334,11 +345,37 @@ export class FileSystemService {
   }
 
   private async createFileObserved(target: MutationTarget, body: CreateFileBody) {
-    const path = await createFile(target, body)
-    const entry = await this.statEntry(path)
-    this.changes.emit({ type: 'created', path, entry })
+    const write = this.beginWriteEvents(target, body)
+    try {
+      const version = textFileVersion(body.content ?? '')
+      const path = await createFile(target, body)
+      const entry = { ...(await this.statEntry(path)), version }
+      const event: WatchServerMessage = {
+        type: 'created',
+        path,
+        entry,
+        origin: body.origin,
+        writeId: body.writeId,
+        version,
+      }
+      if (write) this.changes.finishWrite(write, event)
+      else this.changes.emit(event)
 
-    return this.stat(path)
+      return { ...(await this.stat(path)), version }
+    } finally {
+      if (write) this.changes.finishWrite(write)
+    }
+  }
+
+  private beginWriteEvents(
+    target: MutationTarget,
+    body: { readonly origin?: string; readonly writeId?: string },
+  ) {
+    if (!body.origin || !body.writeId) return undefined
+    return this.changes.beginWrite([
+      target.relativePath,
+      this.paths.toRealRelative(target.absolutePath),
+    ])
   }
 
   async createFolder(body: CreateFolderBody) {

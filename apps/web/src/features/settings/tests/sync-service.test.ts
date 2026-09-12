@@ -1,3 +1,4 @@
+import { getClient } from '@/lib/client'
 import { documentKey, settingsJsonDocument } from '@/lib/documents/utils/identity'
 import { createEditorDocumentStore } from '@/features/editor/state/document-state'
 import { SettingsSyncService } from '@/features/settings/state/sync-service'
@@ -45,7 +46,7 @@ test('a save the server rewrites leaves the buffer clean and holding the file', 
   const queryClient = createTestQueryClient()
   const posted = documentWith(TYPED_BY_HAND)
 
-  const before = await fetchSettings()
+  const before = await fetchSettings(undefined, getClient())
   store.getState().ensureSettingsDocument(settingsJsonDocument('user'), {
     content: posted,
     revision: before.layers.find((layer) => layer.id === 'user')?.file?.revision ?? '',
@@ -77,7 +78,7 @@ test('a save the server does not rewrite keeps the posted text', async ({ client
   const queryClient = createTestQueryClient()
   const posted = '{ "editor.fontSize": 19 }\n'
 
-  const before = await fetchSettings()
+  const before = await fetchSettings(undefined, getClient())
   store.getState().ensureSettingsDocument(settingsJsonDocument('user'), {
     content: posted,
     revision: before.layers.find((layer) => layer.id === 'user')?.file?.revision ?? '',
@@ -90,7 +91,7 @@ test('a save the server does not rewrite keeps the posted text', async ({ client
   const document = store.getState().getLiveEditorDocument(ID)
   expect(document?.buffer.materializeFullText()).toBe(posted)
   expect(document?.buffer.isDirty()).toBe(false)
-  expect((await fetchSettings()).values['editor.fontSize']).toBe(19)
+  expect((await fetchSettings(undefined, getClient())).values['editor.fontSize']).toBe(19)
 })
 
 test('failed conflict refresh preserves dirty text and a scheduled retry confirms revision', async ({
@@ -99,19 +100,22 @@ test('failed conflict refresh preserves dirty text and a scheduled retry confirm
   const store = createEditorDocumentStore()
   const queryClient = createTestQueryClient()
   const localText = '{ "editor.fontSize": 18 }\n'
-  const initial = await fetchSettings()
+  const initial = await fetchSettings(undefined, getClient())
   const initialRevision = rawRevision(initial)
   store.getState().ensureSettingsDocument(settingsJsonDocument('user'), {
     content: localText,
     revision: initialRevision,
   })
   store.getState().setLiveEditorDocumentDirty(ID, true)
-  const external = await saveSettingsText({
-    baseRevision: initialRevision,
-    target: 'user',
-    text: '{ "editor.lineHeight": 30 }\n',
-    writeId: 'sync-conflict-recovery-external',
-  })
+  const external = await saveSettingsText(
+    {
+      baseRevision: initialRevision,
+      target: 'user',
+      text: '{ "editor.lineHeight": 30 }\n',
+      writeId: 'sync-conflict-recovery-external',
+    },
+    getClient(),
+  )
   controlledClient.controller.rejectNextSettingsRead({
     code: 'settings.READ_FAILED',
     message: 'Injected conflict refresh failure',
@@ -135,7 +139,7 @@ test('uncertain raw transport retry reuses one write id', async ({ controlledCli
   const store = createEditorDocumentStore()
   const queryClient = createTestQueryClient()
   const posted = '{ "editor.fontSize": 20 }\n'
-  const before = await fetchSettings()
+  const before = await fetchSettings(undefined, getClient())
   store.getState().ensureSettingsDocument(settingsJsonDocument('user'), {
     content: posted,
     revision: rawRevision(before),
@@ -157,7 +161,7 @@ test('uncertain raw transport retry reuses one write id', async ({ controlledCli
   expect((requests[0] as { writeId: string }).writeId).toBe(
     (requests[1] as { writeId: string }).writeId,
   )
-  expect((await fetchSettings()).values['editor.fontSize']).toBe(20)
+  expect((await fetchSettings(undefined, getClient())).values['editor.fontSize']).toBe(20)
 })
 
 test('an overwrite completes when its cache reconciliation reaches the conflict first', async ({
@@ -167,7 +171,7 @@ test('an overwrite completes when its cache reconciliation reaches the conflict 
   const store = createEditorDocumentStore()
   const queryClient = createTestQueryClient()
   const posted = '{ "editor.fontSize": 22 }\n'
-  const before = await fetchSettings()
+  const before = await fetchSettings(undefined, getClient())
   const beforeRevision = rawRevision(before)
   queryClient.setQueryData(settingsKeys.document(), before)
   store.getState().ensureSettingsDocument(settingsJsonDocument('user'), {
@@ -203,7 +207,7 @@ test('an overwrite completes when its cache reconciliation reaches the conflict 
   expect(reconciledBeforeFinish).toBe(true)
   expect(store.getState().getLiveEditorDocument(ID)?.sync).toMatchObject({ state: 'idle' })
   expect(store.getState().getLiveEditorDocument(ID)?.buffer.isDirty()).toBe(false)
-  expect((await fetchSettings()).values['editor.fontSize']).toBe(22)
+  expect((await fetchSettings(undefined, getClient())).values['editor.fontSize']).toBe(22)
 })
 
 function rawRevision(snapshot: Awaited<ReturnType<typeof fetchSettings>>) {

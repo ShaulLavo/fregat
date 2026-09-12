@@ -1,3 +1,4 @@
+import { getClient } from '@/lib/client'
 import { defaultPlatformKeyBindings } from '@/keymap/default-bindings'
 import { fireEvent, screen, waitFor } from '@testing-library/react'
 import userEvent from '@testing-library/user-event'
@@ -45,13 +46,13 @@ test('records and resets a command omitted by the default preset', async ({ clie
   fireEvent.keyDown(recorder, { key: 'F2' })
 
   await waitFor(async () => {
-    const snapshot = await fetchSettings()
+    const snapshot = await fetchSettings(undefined, getClient())
     expect(snapshot.values['keybindings.overrides']['editor.editor.action.rename']).toBe('F2')
   })
   await userEvent.click(screen.getByRole('button', { name: 'Reset Rename symbol' }))
 
   await waitFor(async () => {
-    const snapshot = await fetchSettings()
+    const snapshot = await fetchSettings(undefined, getClient())
     expect(snapshot.values['keybindings.overrides']).not.toHaveProperty(
       'editor.editor.action.rename',
     )
@@ -91,7 +92,7 @@ test('recording a chord writes the override through, and Reset takes it back out
   fireEvent.keyDown(recorder, { altKey: true, key: 'j', metaKey: true })
 
   await waitFor(async () => {
-    const snapshot = await fetchSettings()
+    const snapshot = await fetchSettings(undefined, getClient())
     expect(snapshot.values['keybindings.overrides']['workspace.saveFile']).toBe('Mod+Alt+J')
   })
 
@@ -100,7 +101,7 @@ test('recording a chord writes the override through, and Reset takes it back out
   // `saveCollection` sends no value once the record is back at the registry
   // default, so the key leaves the user file entirely rather than becoming null.
   await waitFor(async () => {
-    const snapshot = await fetchSettings()
+    const snapshot = await fetchSettings(undefined, getClient())
     expect(snapshot.values['keybindings.overrides']).not.toHaveProperty('workspace.saveFile')
   })
 })
@@ -114,7 +115,7 @@ test('Unbind writes null rather than removing the key', async ({ client }) => {
   await userEvent.click(await screen.findByRole('button', { name: 'Unbind Save' }))
 
   await waitFor(async () => {
-    const snapshot = await fetchSettings()
+    const snapshot = await fetchSettings(undefined, getClient())
     expect(snapshot.values['keybindings.overrides']['workspace.saveFile']).toBeNull()
   })
 })
@@ -128,13 +129,13 @@ test('records two strokes through the server and renders the saved shortcut as g
   await userEvent.click(recorder)
   fireEvent.keyDown(recorder, { ctrlKey: true, key: 'k' })
 
-  expect((await fetchSettings()).values['keybindings.overrides']).not.toHaveProperty(
-    'workspace.saveFile',
-  )
+  expect(
+    (await fetchSettings(undefined, getClient())).values['keybindings.overrides'],
+  ).not.toHaveProperty('workspace.saveFile')
   fireEvent.keyDown(recorder, { ctrlKey: true, key: 's' })
 
   await waitFor(async () => {
-    const snapshot = await fetchSettings()
+    const snapshot = await fetchSettings(undefined, getClient())
     expect(snapshot.values['keybindings.overrides']['workspace.saveFile']).toBe('Mod+K Mod+S')
   })
   await waitFor(() => expect(recorder.textContent).toBe(formatChord('Mod+K Mod+S')))
@@ -142,11 +143,14 @@ test('records two strokes through the server and renders the saved shortcut as g
 
 test('reads the selected preset before showing shortcut rows', async ({ client }) => {
   expect(client).toBeDefined()
-  await saveSettings({
-    mutationId: 'keybinding-vscode-preset',
-    operations: [{ kind: 'set', key: 'keybindings.preset', value: 'vscode' }],
-    target: 'user',
-  })
+  await saveSettings(
+    {
+      mutationId: 'keybinding-vscode-preset',
+      operations: [{ kind: 'set', key: 'keybindings.preset', value: 'vscode' }],
+      target: 'user',
+    },
+    getClient(),
+  )
   renderWithProviders(<KeybindingSection />)
   const recorder = await screen.findByRole('button', {
     name: 'Record a shortcut for editor.editor.fold',

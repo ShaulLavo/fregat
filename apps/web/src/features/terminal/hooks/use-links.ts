@@ -1,6 +1,10 @@
 import { filesystemPath } from '@/lib/documents/utils/identity'
 import type { Terminal, ProvidedLink } from 'ghostty-webgpu'
-import { useEffectEvent } from 'react'
+import { useEffect, useEffectEvent, useRef } from 'react'
+import { useQueryClient } from '@tanstack/react-query'
+import type { Client } from '@/lib/client'
+import { clientForQueryClient } from '@/lib/environments/state/query-clients'
+import { clientLogContext } from '@/lib/environments/state/log-context'
 
 import { useOpenFileReference } from '@/features/chat/hooks/use-open-file-reference'
 import {
@@ -23,13 +27,26 @@ const STAT_TIMEOUT_MS = 2000
  */
 export function useTerminalLinks(rootPath: string) {
   const { openFileReference } = useOpenFileReference()
+  const client = clientForQueryClient(useQueryClient())
+  const intentRef = useRef(0)
+
+  useEffect(
+    () => () => {
+      intentRef.current += 1
+    },
+    [client, rootPath],
+  )
 
   // Reading the open command through an effect event keeps a click pointed at
   // the current editor instead of the one that existed at registration.
   const openTerminalPathLink = useEffectEvent(async (link: TerminalSnapshotPathLink) => {
-    const target = await statTerminalLinkTarget(link.reference.path)
+    const intentId = ++intentRef.current
+    const owner = clientLogContext(client)
+    const target = await statTerminalLinkTarget(link.reference.path, client)
+    if (intentRef.current !== intentId) return
 
     log.info({
+      ...owner,
       action: 'terminal.link.open',
       area: 'terminal',
       column: link.reference.column,
@@ -81,11 +98,12 @@ function ghosttyLink(
  * user `cd`-ed into. Confirming the file exists is what keeps that from opening
  * a tab on a path nothing ever wrote; the click reports the miss instead.
  */
-async function statTerminalLinkTarget(path: string) {
+async function statTerminalLinkTarget(path: string, client: Client) {
   try {
     const entry = await statPath(
       filesystemPath(workspaceRequestPath(path)),
       AbortSignal.timeout(STAT_TIMEOUT_MS),
+      client,
     )
 
     return { error: null, isFile: isFileEntry(entry) }

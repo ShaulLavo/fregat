@@ -1,3 +1,4 @@
+import { getClient } from '@/lib/client'
 import { filesystemPath } from '@/lib/documents/utils/identity'
 import { waitFor } from '@testing-library/react'
 import { useEffect } from 'react'
@@ -19,8 +20,8 @@ test('restores the most recent backend folder when browser workspace state is em
   client,
 }) => {
   localStorage.removeItem(WORKSPACE_CACHE_STORAGE_KEYS.rootFolder)
-  await ensureFolderPath(filesystemPath('anubis'))
-  await recordRecentEntry(filesystemPath('anubis'))
+  await ensureFolderPath(filesystemPath('anubis'), getClient())
+  await recordRecentEntry(filesystemPath('anubis'), getClient())
   const { application } = await createAddressTestRuntime(client)
   const queryClient = application.getSnapshot().queryClient
   const navigation = createTestNavigation({ initialEntries: ['/'] })

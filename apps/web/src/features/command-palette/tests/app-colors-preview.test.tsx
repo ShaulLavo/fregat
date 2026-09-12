@@ -1,3 +1,4 @@
+import { getClient } from '@/lib/client'
 import { screen, waitFor } from '@testing-library/react'
 import userEvent from '@testing-library/user-event'
 
@@ -12,7 +13,7 @@ import { settingsKeys } from '@workspace/client-core/settings/query-keys'
 test('app colors preview cancels without saving and selection updates the shared settings value', async ({
   controlledClient,
 }) => {
-  const before = await fetchSettings()
+  const before = await fetchSettings(undefined, getClient())
   const queryClient = createTestQueryClient()
   queryClient.setQueryData(settingsKeys.document(), before)
   const application = createTestApplicationRuntime()
@@ -49,7 +50,7 @@ test('app colors preview cancels without saving and selection updates the shared
   )
   await user.click(await screen.findByText('Sage'))
   await waitFor(async () =>
-    expect((await fetchSettings()).values['workbench.palette']).toBe('sage'),
+    expect((await fetchSettings(undefined, getClient())).values['workbench.palette']).toBe('sage'),
   )
   expect(controlledClient.controller.settingsWriteCount).toBe(1)
   expect(document.documentElement).toHaveAttribute('data-palette', 'sage')

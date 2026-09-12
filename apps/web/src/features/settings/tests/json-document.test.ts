@@ -6,7 +6,7 @@ test('the snapshot carries each layer bytes, so a JSON view needs no second fetc
   client,
 }) => {
   expect(client).toBeDefined()
-  const before = await fetchSettings()
+  const before = await fetchSettings(undefined, getClient())
   await getClient().settings.raw.post({
     baseRevision: before.layers.find((layer) => layer.id === 'user')?.file?.revision ?? '',
     target: 'user',
@@ -16,7 +16,7 @@ test('the snapshot carries each layer bytes, so a JSON view needs no second fetc
     writeId: 'json-document-seed',
   })
 
-  const snapshot = await fetchSettings()
+  const snapshot = await fetchSettings(undefined, getClient())
   const file = snapshot.layers.find((layer) => layer.id === 'user')?.file
 
   expect(file?.text).toContain('// why this is set')
@@ -28,15 +28,18 @@ test('the snapshot carries each layer bytes, so a JSON view needs no second fetc
 
 test('a raw save round-trips through the same route the tab uses', async ({ client }) => {
   expect(client).toBeDefined()
-  const before = await fetchSettings()
+  const before = await fetchSettings(undefined, getClient())
   const revision = before.layers.find((layer) => layer.id === 'user')?.file?.revision ?? ''
 
-  const after = await saveSettingsText({
-    baseRevision: revision,
-    target: 'user',
-    text: '{ "editor.fontSize": 19 }\n',
-    writeId: 'json-document-round-trip',
-  })
+  const after = await saveSettingsText(
+    {
+      baseRevision: revision,
+      target: 'user',
+      text: '{ "editor.fontSize": 19 }\n',
+      writeId: 'json-document-round-trip',
+    },
+    getClient(),
+  )
 
   expect(after.snapshot.values['editor.fontSize']).toBe(19)
   expect(after.snapshot.layers.find((layer) => layer.id === 'user')?.file?.text).toBe(
@@ -48,25 +51,31 @@ test('a raw save round-trips through the same route the tab uses', async ({ clie
 // did not advance it would refuse every subsequent save of the same tab.
 test('a stale base revision is refused rather than overwriting', async ({ client }) => {
   expect(client).toBeDefined()
-  const before = await fetchSettings()
+  const before = await fetchSettings(undefined, getClient())
   const stale = before.layers.find((layer) => layer.id === 'user')?.file?.revision ?? ''
 
-  await saveSettingsText({
-    baseRevision: stale,
-    target: 'user',
-    text: '{ "editor.fontSize": 17 }\n',
-    writeId: 'json-document-first-stale-test-write',
-  })
-
-  await expect(
-    saveSettingsText({
+  await saveSettingsText(
+    {
       baseRevision: stale,
       target: 'user',
-      text: '{ "editor.fontSize": 18 }\n',
-      writeId: 'json-document-stale-write',
-    }),
+      text: '{ "editor.fontSize": 17 }\n',
+      writeId: 'json-document-first-stale-test-write',
+    },
+    getClient(),
+  )
+
+  await expect(
+    saveSettingsText(
+      {
+        baseRevision: stale,
+        target: 'user',
+        text: '{ "editor.fontSize": 18 }\n',
+        writeId: 'json-document-stale-write',
+      },
+      getClient(),
+    ),
   ).rejects.toThrow()
 
-  const after = await fetchSettings()
+  const after = await fetchSettings(undefined, getClient())
   expect(after.values['editor.fontSize']).toBe(17)
 })

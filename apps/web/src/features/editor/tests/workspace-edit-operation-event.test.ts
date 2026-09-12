@@ -7,6 +7,9 @@ test('emits one content-free operation event with counts phase durations and rec
   const context: Record<string, unknown> = {}
   const times = [10, 14, 24, 30, 38]
   const event = new WorkspaceEditOperationEvent({
+    owner: { environmentId: 'owner-a', machine: 'Machine A' },
+    rootGeneration: 7,
+    sourceKind: 'language-server',
     createScope: (base) => scope(context, ended, base),
     now: () => times.shift() ?? 38,
     operationId: '10000000-0000-4000-8000-000000000063',
@@ -32,6 +35,10 @@ test('emits one content-free operation event with counts phase durations and rec
 
   expect(ended).toEqual([
     {
+      environmentId: 'owner-a',
+      machine: 'Machine A',
+      rootGeneration: 7,
+      sourceKind: 'language-server',
       action: 'workspace_edit.apply',
       area: 'workspace-edit',
       counts: {

@@ -1,3 +1,4 @@
+import { getClient } from '@/lib/client'
 import { createRequire } from 'node:module'
 import { act, waitFor } from '@testing-library/react'
 import { createElement } from 'react'
@@ -39,13 +40,16 @@ test('a late older theme load cannot overwrite the newer applied theme id', asyn
   const { renderWithProviders, createTestQueryClient } = await import('../../../../../test/render')
   const { settingsKeys } = await import('@workspace/client-core/settings/query-keys')
   const { fetchSettings, saveSettings } = await import('@/features/settings/utils/api')
-  await saveSettings({
-    mutationId: 'theme-load-seed',
-    operations: [{ kind: 'set', key: 'editor.codeTheme.dark', value: 'monokai' }],
-    target: 'user',
-  })
+  await saveSettings(
+    {
+      mutationId: 'theme-load-seed',
+      operations: [{ kind: 'set', key: 'editor.codeTheme.dark', value: 'monokai' }],
+      target: 'user',
+    },
+    getClient(),
+  )
   const queryClient = createTestQueryClient()
-  queryClient.setQueryData(settingsKeys.document(), await fetchSettings())
+  queryClient.setQueryData(settingsKeys.document(), await fetchSettings(undefined, getClient()))
   store.resetEditorColorThemeStore()
   let selectTheme: ReturnType<typeof useEditorColorTheme>['selectTheme'] | undefined
 

@@ -1,3 +1,4 @@
+import { getClient } from '@/lib/client'
 import { filesystemPath } from '@/lib/documents/utils/identity'
 import { execFileSync } from 'node:child_process'
 import { mkdir, writeFile } from 'node:fs/promises'
@@ -31,7 +32,7 @@ test('a two-edit file maps to one diff carrying both changes and the whole file'
   void client
   const repo = await initRepo(server.root)
   await writeFile(path.join(repo, 'lines.ts'), twoEditFile())
-  const diffs = await fetchDiff('repo/lines.ts', false)
+  const diffs = await fetchDiff('repo/lines.ts', false, undefined, getClient())
 
   const [file] = editorDiffFiles(diffs)
 
@@ -50,7 +51,7 @@ test('whole-file text produces an expandable, fully-typed model', async ({ clien
   // What the git panel actually opens: the blob-diff route carries both sides'
   // text, which is what lets the reader expand past git's context and what the
   // syntax pass needs to highlight a whole file rather than one with holes.
-  const [diff] = await fetchDiff('repo/lines.ts', false)
+  const [diff] = await fetchDiff('repo/lines.ts', false, undefined, getClient())
   const withText = { ...diff!, newText: twoEditFile(), oldText: `${FORTY_LINES}\n` }
 
   const [file] = editorDiffFiles([withText])
@@ -67,7 +68,7 @@ test('keeps the diff editor mounted with an empty model while the blob resolves'
   void client
   const repo = await initRepo(server.root)
   await writeFile(path.join(repo, 'lines.ts'), twoEditFile())
-  const [diff] = await fetchDiff('repo/lines.ts', false)
+  const [diff] = await fetchDiff('repo/lines.ts', false, undefined, getClient())
 
   const { container } = renderDiffView(
     <DiffView
@@ -95,7 +96,7 @@ test('a rename with edits keeps both paths on the mapped file', async ({ client,
   git(repo, 'mv', 'lines.ts', 'renamed.ts')
   await writeFile(path.join(repo, 'renamed.ts'), twoEditFile())
   git(repo, 'add', '-A')
-  const diffs = await fetchDiff('repo/renamed.ts', true)
+  const diffs = await fetchDiff('repo/renamed.ts', true, undefined, getClient())
 
   const [file] = editorDiffFiles(diffs)
 
@@ -109,7 +110,7 @@ test('an added file maps with no old side', async ({ client, server }) => {
   const repo = await initRepo(server.root)
   await writeFile(path.join(repo, 'added.ts'), 'export const added = true\n')
   git(repo, 'add', '-A')
-  const diffs = await fetchDiff('repo/added.ts', true)
+  const diffs = await fetchDiff('repo/added.ts', true, undefined, getClient())
 
   const [file] = editorDiffFiles(diffs)
 
@@ -125,7 +126,7 @@ test('a pure rename shows the file, with a line saying where it came from', asyn
   const repo = await initRepo(server.root)
   git(repo, 'mv', 'lines.ts', 'renamed.ts')
   git(repo, 'add', '-A')
-  const diff = (await fetchDiff('repo/renamed.ts', true))[0]!
+  const diff = (await fetchDiff('repo/renamed.ts', true, undefined, getClient()))[0]!
 
   renderDiffView(
     <DiffView
@@ -150,16 +151,20 @@ test('a pure rename carries the whole file, unchanged on both sides', async ({
   const repo = await initRepo(server.root)
   git(repo, 'mv', 'lines.ts', 'renamed.ts')
   git(repo, 'add', '-A')
-  const diff = (await fetchDiff('repo/renamed.ts', true))[0]!
+  const diff = (await fetchDiff('repo/renamed.ts', true, undefined, getClient()))[0]!
 
   // What the pane itself fetches: the blob route, which is where an identical pair used to come
   // back as nothing at all.
-  const diffs = await fetchBlobDiff({
-    newObjectId: diff.newObjectId,
-    oldObjectId: diff.oldObjectId,
-    oldPath: diff.oldPath,
-    path: diff.path,
-  })
+  const diffs = await fetchBlobDiff(
+    {
+      newObjectId: diff.newObjectId,
+      oldObjectId: diff.oldObjectId,
+      oldPath: diff.oldPath,
+      path: diff.path,
+    },
+    undefined,
+    getClient(),
+  )
   const [file] = editorDiffFiles(diffs)
 
   expect(file?.hunks).toEqual([])

@@ -1,3 +1,4 @@
+import { getClient } from '@/lib/client'
 import { filesystemPath } from '@/lib/documents/utils/identity'
 import { selectSettingsSearch } from '@/features/settings/state/search-store'
 import { selectSettingsCategory } from '@/features/settings/state/category-store'
@@ -52,7 +53,7 @@ test.each([
   ['workspace.showTransparencySettings', 'workbench.surface'],
 ] as const)('%s opens the settings controls matching its search', async (command, query) => {
   const queryClient = createTestQueryClient()
-  queryClient.setQueryData(settingsKeys.document(), await fetchSettings())
+  queryClient.setQueryData(settingsKeys.document(), await fetchSettings(undefined, getClient()))
   selectSettingsCategory('Machines')
   selectSettingsView('json')
   const view = renderCommandProvider(queryClient)
@@ -75,7 +76,7 @@ test('consecutive toggles project landed settings intents before React renders',
   controlledClient,
 }) => {
   const queryClient = createTestQueryClient()
-  const before = await fetchSettings()
+  const before = await fetchSettings(undefined, getClient())
   queryClient.setQueryData(settingsKeys.document(), before)
   const view = renderWithProviders(
     <EditorStateProvider>
@@ -157,7 +158,7 @@ test('consecutive color-mode commands read intents before React renders', async 
   controlledClient,
 }) => {
   const queryClient = createTestQueryClient()
-  const confirmed = await fetchSettings()
+  const confirmed = await fetchSettings(undefined, getClient())
   queryClient.setQueryData(settingsKeys.document(), confirmed)
   const view = renderCommandProvider(queryClient)
   await waitFor(() => expect(capturedBus).not.toBeNull())

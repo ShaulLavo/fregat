@@ -1,4 +1,10 @@
 import { fileDocumentKey, filesystemPath } from '@/lib/documents/utils/identity'
+import type {
+  TextChangePreparation,
+  TextChangeRequest,
+  TextChangeSource,
+  TextChangeTarget,
+} from '@/lib/workspace-edits/utils/types'
 import type { FilesystemPath } from '@/lib/documents/utils/types'
 import type { WorkspaceEditPrepareRequest } from '@/lib/file-system-types'
 import type {
@@ -19,6 +25,8 @@ import {
   completePreparedDocumentTransactionSequence,
   completeReverseDocumentTransactionSequence,
   createEditorTextBuffer,
+  createDocumentLogicalRevisionScope,
+  offsetToPoint,
   documentTextRoundTripStatus,
   pieceTableDocumentText,
   releaseDocumentTransactionReceipt,
@@ -164,6 +172,7 @@ export type WorkspaceEditOperationEventPort = Pick<
 >
 
 export type WorkspaceEditServiceOptions = {
+  readonly owner: WorkspaceEditOperationEventOptions['owner']
   readonly documentSyncController?: Pick<
     LanguageServerDocumentSyncController,
     'transitionDocumentUri'
@@ -182,10 +191,27 @@ export type WorkspaceEditServiceOptions = {
   readonly operationEventNow?: () => number
 }
 
-export type WorkspaceEditApplicationRequest = Omit<ApplyWorkspaceEditRequest, 'source'> & {
-  readonly source: ApplyWorkspaceEditRequest['source'] | 'search-replace'
-  readonly sourceFileVersions?: ReadonlyMap<string, WorkspaceFileSnapshot['version']>
-}
+type SourceEvidence = {
+  readonly source: TextChangeSource
+  readonly pathRequest: WorkspaceDocumentPathReservationRequest
+  readonly buffer: EditorTextBuffer
+} & (
+  | { readonly kind: 'live'; readonly stamp: WorkspaceDocumentTargetStamp }
+  | { readonly kind: 'disk'; readonly snapshot: WorkspaceFileSnapshot }
+)
+
+type WorkspaceEditApplicationRequest =
+  | (ApplyWorkspaceEditRequest & { readonly kind: 'language-server' })
+  | {
+      readonly kind: 'computed-text'
+      readonly source: TextChangeRequest['source']
+      readonly label: string
+      readonly signal: AbortSignal
+      readonly logicalRevisionScope: ApplyWorkspaceEditRequest['logicalRevisionScope']
+      readonly plan: ApplyWorkspaceEditRequest['plan']
+      readonly requireConfirmation: boolean
+      readonly sources: ReadonlyMap<FilesystemPath, SourceEvidence>
+    }
 
 type WorkspaceEditSettlement = {
   readonly resolve: (result: ApplyWorkspaceEditResult) => void
@@ -368,16 +394,42 @@ export class WorkspaceEditService {
 
   readonly onApplyWorkspaceEdit = (
     request: ApplyWorkspaceEditRequest,
-  ): Promise<ApplyWorkspaceEditResult> => this.applyWorkspaceChange(request)
+  ): Promise<ApplyWorkspaceEditResult> =>
+    this.applyOperation(
+      'language-server',
+      request.source,
+      request.signal,
+      async (_root, signal) => ({
+        ...request,
+        kind: 'language-server',
+        plan: structuredClone(request.plan),
+        signal,
+      }),
+    )
 
-  readonly applyWorkspaceChange = async (
-    request: WorkspaceEditApplicationRequest,
-  ): Promise<ApplyWorkspaceEditResult> => {
+  readonly applyTextChange = (request: TextChangeRequest): Promise<ApplyWorkspaceEditResult> =>
+    this.applyOperation('computed-text', request.source, request.signal, (root, signal) =>
+      prepareTextChangeRequest(this.options, root, signal, request),
+    )
+
+  private async applyOperation(
+    sourceKind: WorkspaceEditApplicationRequest['kind'],
+    source: WorkspaceEditApplicationRequest['source'],
+    signal: AbortSignal,
+    prepare: (
+      root: WorkspaceEditRoot,
+      signal: AbortSignal,
+    ) => Promise<WorkspaceEditApplicationRequest>,
+  ): Promise<ApplyWorkspaceEditResult> {
     void this.flushPendingWorkspaceMutationCleanup()
     const operationId = this.createOperationId()
+    const capturedRoot = this.options.getRoot()
     const event = this.createOperationEvent({
       operationId,
-      source: request.source,
+      source,
+      owner: this.options.owner,
+      rootGeneration: capturedRoot?.generation ?? null,
+      sourceKind,
     })
     if (this.externalMutationReservation) {
       const result = failedResult('workspace-edit-busy', 'Another workspace mutation is active')
@@ -391,19 +443,26 @@ export class WorkspaceEditService {
     }
     this.cancelPreCommitActive()
 
-    const controller = linkedAbortController(request.signal)
+    const controller = linkedAbortController(signal)
     this.preparingController = controller
     this.preparingEvent = event
-    this.publish({ phase: 'preparing' })
+    this.publish({ phase: 'preparing', preview: null, code: null, message: null })
     let prepared: PreparedWorkspaceEdit
     try {
+      const currentRoot = capturedRoot
+      if (!currentRoot) throw workspaceEditError('workspace-missing', 'No workspace is open')
+      const root = Object.freeze({ ...currentRoot })
+      const request = await prepare(root, controller.signal)
+      assertCapturedRootCurrent(this.options, root, controller.signal)
       prepared = await prepareWorkspaceEdit(
         this.options,
         this.inspectPath,
         request,
         controller.signal,
         operationId,
+        root,
       )
+      assertPreparedRequestCurrent(this.options, prepared)
     } catch (error) {
       const isCurrent = this.preparingController === controller
       if (isCurrent) {
@@ -423,14 +482,21 @@ export class WorkspaceEditService {
     event.setPrepared(workspaceOperationCounts(prepared))
 
     return new Promise<ApplyWorkspaceEditResult>((resolve) => {
+      const cancel = () => this.cancelPreview(prepared.operationId)
       const active: ActiveWorkspaceEdit = {
         commitStarted: false,
         controller,
         event,
         prepared,
-        settlement: { resolve },
+        settlement: {
+          resolve: (result) => {
+            controller.signal.removeEventListener('abort', cancel)
+            resolve(result)
+          },
+        },
       }
       this.active = active
+      controller.signal.addEventListener('abort', cancel, { once: true })
       if (!prepared.immediate) {
         event.transition('preview')
         this.publish({ phase: 'awaiting-confirmation', preview: prepared.preview })
@@ -659,18 +725,18 @@ export class WorkspaceEditService {
     }
   }
 
-  confirmPreview(): void {
+  confirmPreview(operationId: string): void {
     const active = this.active
-    if (!active || active.commitStarted) return
+    if (!active || active.commitStarted || active.prepared.operationId !== operationId) return
     if (this.snapshot.phase !== 'awaiting-confirmation') return
     void this.commitActive(active)
   }
 
-  cancelPreview(): void {
+  cancelPreview(operationId: string): void {
     const active = this.active
-    if (!active || active.commitStarted) return
-    active.controller.abort()
+    if (!active || active.commitStarted || active.prepared.operationId !== operationId) return
     this.active = null
+    active.controller.abort()
     const result: ApplyWorkspaceEditResult = { status: 'cancelled' }
     active.event.end(workspaceOperationSettlement(result))
     this.publishResult(result)
@@ -1016,6 +1082,7 @@ export class WorkspaceEditService {
       assertPreparedRequestCurrent(this.options, prepared)
       server = await commitServer(this.options.fileSync, server)
       assertWorkspaceServerState(server, ['committed'])
+      if (!server) assertPreparedRequestCurrent(this.options, prepared)
       local = this.runInternalDocumentMutation(() =>
         commitLocalWorkspaceEdit(this.options, prepared, locks!, server),
       )
@@ -1074,7 +1141,7 @@ export class WorkspaceEditService {
     locks: HeldWorkspaceLocks | null,
     error: unknown,
   ): Promise<ApplyWorkspaceEditResult> {
-    if (!server && !local) return failureResult(error)
+    if (!server && !local) return resultForPreparationError(error, prepared.request.signal)
     if (server?.state === 'aborted' && !local) {
       this.ownOperationIds.delete(prepared.operationId)
       return { status: 'cancelled' }
@@ -1355,8 +1422,8 @@ export class WorkspaceEditService {
     this.preparingEvent = null
     const active = this.active
     if (!active || active.commitStarted) return
-    active.controller.abort()
     this.active = null
+    active.controller.abort()
     active.event.end({ outcome: 'cancelled' })
     active.settlement.resolve({ status: 'cancelled' })
   }
@@ -1424,6 +1491,10 @@ class WorkspaceEditPreparationBuilder {
   private readonly operations: ResolvedOperation[] = []
   private readonly rawUriByPath = new Map<FilesystemPath, string>()
   private readonly targets = new Set<PreparedTarget>()
+  private readonly initialPathRequests = new Map<
+    FilesystemPath,
+    WorkspaceDocumentPathReservationRequest
+  >()
 
   constructor(
     private readonly options: WorkspaceEditServiceOptions,
@@ -1453,8 +1524,10 @@ class WorkspaceEditPreparationBuilder {
       operations,
       immediate ? 'editor' : 'workspace',
     )
-    const pathRequests = affectedPaths.map((path) =>
-      this.options.documentStore.getState().prepareWorkspaceDocumentPathReservation(path),
+    const pathRequests = affectedPaths.map(
+      (path) =>
+        this.initialPathRequests.get(path) ??
+        this.options.documentStore.getState().prepareWorkspaceDocumentPathReservation(path),
     )
 
     return {
@@ -1497,11 +1570,16 @@ class WorkspaceEditPreparationBuilder {
     const node = await this.existingNode(path)
     if (!node) throw workspaceEditError('missing-target', 'Text target does not exist')
     const target = await this.ensureTextTarget(node, path)
-    const sourceVersion = this.request.sourceFileVersions?.get(operation.uri)
-    if (sourceVersion !== undefined && sourceVersion !== node.snapshot?.version) {
-      throw workspaceEditError('snapshot-drift', 'File changed since replacement planning')
+    if (this.request.kind === 'computed-text') {
+      const evidence = this.request.sources.get(path)
+      if (!evidence) throw workspaceEditError('invalid-source', 'Text source is missing')
+      assertSourceCurrent(this.options, evidence)
+      if (evidence.kind === 'disk' && evidence.snapshot.version !== node.snapshot?.version) {
+        throw workspaceEditError('snapshot-drift', 'File changed since replacement planning')
+      }
+    } else {
+      validateDirtyTargetProvenance(this.request, operation, target)
     }
-    validateDirtyTargetProvenance(this.request, operation, target)
 
     const segmentIndex = target.segments.length
     target.segments.push({
@@ -1741,6 +1819,12 @@ class WorkspaceEditPreparationBuilder {
 
   private resolveUri(uri: string): FilesystemPath {
     const path = workspacePathFromFileUri(uri, this.root)
+    if (!this.initialPathRequests.has(path)) {
+      this.initialPathRequests.set(
+        path,
+        this.options.documentStore.getState().prepareWorkspaceDocumentPathReservation(path),
+      )
+    }
     const existing = this.rawUriByPath.get(path)
     if (existing && existing !== uri) {
       throw workspaceEditError('ambiguous-resource-alias', 'Multiple URIs resolve to one path')
@@ -1802,6 +1886,7 @@ class WorkspaceEditPreparationBuilder {
 
   private isImmediateCandidate(): boolean {
     if (this.operations.length === 0) return true
+    if (this.request.kind === 'computed-text') return false
     if (this.operations.some((operation) => operation.kind !== 'text')) return false
     const targets = new Set(this.operations.map((operation) => operation.target))
     if (targets.size !== 1) return false
@@ -1826,11 +1911,180 @@ async function prepareWorkspaceEdit(
   request: WorkspaceEditApplicationRequest,
   signal: AbortSignal,
   operationId: string,
+  root: WorkspaceEditRoot,
 ): Promise<PreparedWorkspaceEdit> {
-  const root = options.getRoot()
-  if (!root) throw workspaceEditError('workspace-missing', 'No workspace is open')
   const builder = new WorkspaceEditPreparationBuilder(options, inspectPath, request, root, signal)
   return builder.build(operationId)
+}
+
+class TextChangeSources implements TextChangePreparation {
+  private open = true
+  private readonly issued = new WeakMap<TextChangeSource, SourceEvidence>()
+  private readonly reads = new Map<FilesystemPath, Promise<TextChangeSource>>()
+
+  constructor(
+    private readonly options: WorkspaceEditServiceOptions,
+    private readonly root: WorkspaceEditRoot,
+    private readonly signal: AbortSignal,
+  ) {}
+
+  readonly readText = (path: FilesystemPath): Promise<TextChangeSource> => {
+    this.assertOpen()
+    const canonical = workspacePathFromFileUri(fileNameToDocumentUri(path), this.root)
+    const previous = this.reads.get(canonical)
+    if (previous) return previous
+    const pending = this.capture(canonical)
+    this.reads.set(canonical, pending)
+    return pending
+  }
+
+  close(): void {
+    this.open = false
+  }
+
+  accept(targets: readonly TextChangeTarget[]): {
+    sources: ReadonlyMap<FilesystemPath, SourceEvidence>
+    operations: readonly WorkspaceEditOperation[]
+  } {
+    const sources = new Map<FilesystemPath, SourceEvidence>()
+    const operations: WorkspaceEditOperation[] = []
+    for (const target of targets) {
+      const evidence = this.issued.get(target.source)
+      if (!evidence)
+        throw workspaceEditError('invalid-source', 'Text source was not issued by this operation')
+      if (sources.has(evidence.source.path))
+        throw workspaceEditError('duplicate-target', 'Text targets must be unique')
+      assertSourceCurrent(this.options, evidence)
+      sources.set(evidence.source.path, evidence)
+      operations.push(sourceTextOperation(evidence, target.edits))
+    }
+    return { sources, operations }
+  }
+
+  private assertOpen(): void {
+    if (!this.open) throw workspaceEditError('preparation-closed', 'Text preparation has finished')
+    assertCapturedRootCurrent(this.options, this.root, this.signal)
+  }
+
+  private async capture(path: FilesystemPath): Promise<TextChangeSource> {
+    const state = this.options.documentStore.getState()
+    const pathRequest = state.prepareWorkspaceDocumentPathReservation(path)
+    const live = state.getLiveEditorDocument(fileDocumentKey(path))
+    if (live) {
+      const stamp = state.prepareWorkspaceDocumentTarget(live.key)
+      if (!stamp || live.target.kind !== 'file')
+        throw workspaceEditError('snapshot-drift', 'Text source changed')
+      const source = issueTextSource(path, live.buffer)
+      this.issued.set(source, { kind: 'live', buffer: live.buffer, pathRequest, source, stamp })
+      return source
+    }
+    const snapshot = await this.options.fileSync.readWorkspaceSnapshot(path, this.signal)
+    this.assertOpen()
+    assertSafeRoundTrip(snapshot)
+    const buffer = createEditorTextBuffer(snapshot.text)
+    const source = issueTextSource(path, buffer)
+    const evidence: SourceEvidence = { kind: 'disk', buffer, pathRequest, snapshot, source }
+    assertSourceCurrent(this.options, evidence)
+    this.issued.set(source, evidence)
+    return source
+  }
+}
+
+function issueTextSource(path: FilesystemPath, buffer: EditorTextBuffer): TextChangeSource {
+  return Object.freeze({ path, textSnapshot: buffer.getTextSnapshot() }) as TextChangeSource
+}
+
+function sourceTextOperation(
+  evidence: SourceEvidence,
+  edits: TextChangeTarget['edits'],
+): WorkspaceEditOperation {
+  const snapshot = evidence.buffer.getSnapshot()
+  return {
+    kind: 'text-document',
+    uri: fileNameToDocumentUri(evidence.source.path),
+    version: null,
+    edits: edits.map((edit) => {
+      const start = offsetToPoint(snapshot, edit.from)
+      const end = offsetToPoint(snapshot, edit.to)
+      return {
+        newText: edit.text,
+        range: {
+          start: { line: start.row, character: start.column },
+          end: { line: end.row, character: end.column },
+        },
+      }
+    }),
+  }
+}
+
+async function prepareTextChangeRequest(
+  options: WorkspaceEditServiceOptions,
+  root: WorkspaceEditRoot,
+  signal: AbortSignal,
+  request: TextChangeRequest,
+): Promise<WorkspaceEditApplicationRequest> {
+  const reader = new TextChangeSources(options, root, signal)
+  try {
+    const planned = await abortablePreparation(() => request.prepare(reader), signal)
+    reader.close()
+    const accepted = reader.accept(planned.targets)
+    return {
+      kind: 'computed-text',
+      source: request.source,
+      label: planned.label,
+      signal,
+      logicalRevisionScope: createDocumentLogicalRevisionScope(),
+      requireConfirmation: planned.requireConfirmation,
+      sources: accepted.sources,
+      plan: { annotations: new Map(), operations: accepted.operations },
+    }
+  } finally {
+    reader.close()
+  }
+}
+
+function abortablePreparation<T>(prepare: () => Promise<T>, signal: AbortSignal): Promise<T> {
+  signal.throwIfAborted()
+  return new Promise<T>((resolve, reject) => {
+    const abort = () => {
+      signal.removeEventListener('abort', abort)
+      reject(signal.reason)
+    }
+    signal.addEventListener('abort', abort, { once: true })
+    Promise.resolve()
+      .then(() => {
+        signal.throwIfAborted()
+        return prepare()
+      })
+      .then(resolve, reject)
+      .finally(() => signal.removeEventListener('abort', abort))
+  })
+}
+
+function assertCapturedRootCurrent(
+  options: WorkspaceEditServiceOptions,
+  root: WorkspaceEditRoot,
+  signal: AbortSignal,
+): void {
+  signal.throwIfAborted()
+  const current = options.getRoot()
+  if (current && sameWorkspaceEditRoot(current, root)) return
+  throw workspaceEditError('workspace-root-changed', 'Workspace changed after operation started')
+}
+
+function assertSourceCurrent(options: WorkspaceEditServiceOptions, evidence: SourceEvidence): void {
+  const state = options.documentStore.getState()
+  const current = state.prepareWorkspaceDocumentPathReservation(evidence.source.path)
+  if (!samePathReservationRequest(current, evidence.pathRequest)) {
+    throw workspaceEditError('snapshot-drift', 'Text source ownership changed')
+  }
+  if (evidence.kind !== 'live') return
+  if (
+    state.isWorkspaceDocumentTargetCurrent(evidence.stamp) &&
+    evidence.buffer.getTextSnapshot() === evidence.source.textSnapshot
+  )
+    return
+  throw workspaceEditError('snapshot-drift', 'Text source changed since planning')
 }
 
 function collapseImmediateTextOperations(
@@ -1855,7 +2109,7 @@ function prepareTextTargets(
 
     const prepared = prepareWorkspaceTextReplay({
       logicalRevisionScope: request.logicalRevisionScope,
-      provenance: request.guard.documents,
+      provenance: request.kind === 'language-server' ? request.guard.documents : [],
       segments,
       target: {
         buffer: target.buffer,
@@ -2170,18 +2424,22 @@ function workspaceEditPreview(
 ): WorkspaceEditPreview {
   return Object.freeze({
     annotations: Object.freeze(
-      Array.from(request.plan.annotations, ([id, annotation]) => ({ id, ...annotation })),
+      Array.from(request.plan.annotations, ([id, annotation]) =>
+        Object.freeze({ id, ...annotation }),
+      ),
     ),
     label: request.label,
     operationCount: operations.length,
     operationId,
-    rows: Object.freeze(operations.map(workspaceEditPreviewRow)),
+    rows: Object.freeze(
+      operations.map((operation) => Object.freeze(workspaceEditPreviewRow(operation))),
+    ),
     undoCategory,
   })
 }
 
 function workspaceEditPreviewRow(resolved: ResolvedOperation): WorkspaceEditPreviewRow {
-  const annotationIds = operationAnnotationIds(resolved.operation)
+  const annotationIds = Object.freeze(operationAnnotationIds(resolved.operation))
   if (resolved.kind === 'text') {
     const segment = preparedSegment(resolved)
     return {
@@ -2242,7 +2500,10 @@ function validateDirtyTargetProvenance(
   operation: Extract<WorkspaceEditOperation, { readonly kind: 'text-document' }>,
   target: PreparedTarget,
 ): void {
-  if (!target.dirtyInitially && operation.version === null) return
+  const known =
+    request.kind === 'language-server' &&
+    request.guard.documents.some((entry) => entry.uri === operation.uri)
+  if (!known && !target.dirtyInitially && operation.version === null) return
   const provenance = currentExactProvenance(request, operation.uri, target)
   if (!provenance) {
     throw workspaceEditError('version-mismatch', 'No current lane provenance matches live text')
@@ -2264,7 +2525,7 @@ function currentExactProvenance(
   uri: string,
   target: PreparedTarget,
 ) {
-  if (!request.guard.isCurrent(uri)) return null
+  if (request.kind !== 'language-server' || !request.guard.isCurrent(uri)) return null
   return (
     request.guard.documents.find(
       (entry) => entry.uri === uri && entry.textSnapshot === target.initialSnapshot,
@@ -2359,9 +2620,9 @@ function assertPreparedRequestCurrent(
   options: WorkspaceEditServiceOptions,
   prepared: PreparedWorkspaceEdit,
 ): void {
-  const root = options.getRoot()
-  if (!root || !sameWorkspaceEditRoot(root, prepared.root)) {
-    throw workspaceEditError('workspace-root-changed', 'Workspace changed after edit preparation')
+  assertCapturedRootCurrent(options, prepared.root, prepared.request.signal)
+  if (prepared.request.kind === 'computed-text') {
+    for (const evidence of prepared.request.sources.values()) assertSourceCurrent(options, evidence)
   }
 
   const state = options.documentStore.getState()
@@ -2391,10 +2652,30 @@ function samePathReservationRequest(
 }
 
 function assertWorkspaceEditProvenanceCurrent(prepared: PreparedWorkspaceEdit): void {
+  if (prepared.request.kind === 'computed-text') return
+  if (!prepared.request.guard.isCurrent(prepared.request.originUri)) {
+    throw workspaceEditError('version-mismatch', 'Originating language snapshot changed')
+  }
+  const affectedUris = new Set(
+    prepared.request.plan.operations.flatMap((operation) =>
+      operation.kind === 'rename' ? [operation.oldUri, operation.newUri] : [operation.uri],
+    ),
+  )
+  for (const document of prepared.request.guard.documents) {
+    if (!affectedUris.has(document.uri)) continue
+    if (prepared.request.guard.isCurrent(document.uri)) continue
+    throw workspaceEditError('version-mismatch', 'Affected language snapshot changed')
+  }
   for (const resolved of prepared.operations) {
     if (resolved.kind !== 'text' || !resolved.target.liveStamp) continue
+    const known = prepared.request.guard.documents.some(
+      (entry) => entry.uri === resolved.operation.uri,
+    )
     const requiresExact =
-      prepared.immediate || resolved.target.dirtyInitially || resolved.operation.version !== null
+      known ||
+      prepared.immediate ||
+      resolved.target.dirtyInitially ||
+      resolved.operation.version !== null
     if (!requiresExact) continue
     if (exactProvenanceForTarget(prepared.request, resolved.operation.uri, resolved.target))
       continue

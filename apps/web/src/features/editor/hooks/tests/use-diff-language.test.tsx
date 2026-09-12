@@ -86,7 +86,7 @@ test('gives every diff a browser owner while retaining one backend route', () =>
     onPublishDiagnostics: () => undefined,
     onUnavailable: () => undefined,
   }
-  const key = { rootPath: '/repo', serverId: 'typescript' }
+  const key = { origin: 'http://localhost:3001', rootPath: '/repo', serverId: 'typescript' }
   const leases = [
     languageServerConnectionProvider(key).acquire(options, callbacks),
     languageServerConnectionProvider(key).acquire(options, callbacks),
@@ -119,7 +119,9 @@ async function assertInitializeContractAndHostPolicy(
   const host = harness.service.onApplyWorkspaceEdit
   const normal = testLaneOptions(
     languageServerLaneOptions({
+      origin: 'http://localhost:3001',
       connectionProvider: languageServerConnectionProvider({
+        origin: 'http://localhost:3001',
         rootPath: ROOT_PATH,
         serverId: SERVER_ID,
       }),
@@ -131,7 +133,9 @@ async function assertInitializeContractAndHostPolicy(
   )
   const diff = testLaneOptions(
     languageServerLaneOptions({
+      origin: 'http://localhost:3001',
       connectionProvider: diffLanguageServerConnectionProvider({
+        origin: 'http://localhost:3001',
         rootPath: ROOT_PATH,
         serverId: SERVER_ID,
         sessionId: 'host-policy',
@@ -236,6 +240,7 @@ function createHostPolicyHarness() {
     writeFileContent: rejectUnexpectedFileAccess,
   })
   const service = new WorkspaceEditService({
+    owner: { environmentId: null, machine: null },
     documentStore: store,
     fileSync,
     getRoot: () => ({ generation: 1, path: ROOT_PATH }),

@@ -1,6 +1,5 @@
 import type { TerminalOpenInput } from '@workspace/contracts'
-import { activeServerOrigin, getClient, type Client } from '@/lib/client'
-import { environmentActivitySignal } from '@/lib/environments/state/activity'
+import type { Client } from '@/lib/client'
 
 export type EdenServerSocket = {
   readonly readyState?: number
@@ -31,8 +30,8 @@ type LanguageServerSocketOptions = {
 
 export function connectTerminalSocket(
   input: TerminalOpenInput,
-  client: Client = getClient(),
-  signal: AbortSignal = environmentActivitySignal(activeServerOrigin()),
+  client: Client,
+  signal: AbortSignal,
 ): EdenServerSocket {
   signal.throwIfAborted()
   const socket = client.terminal.subscribe({ query: input })
@@ -42,8 +41,8 @@ export function connectTerminalSocket(
 
 export function connectLanguageServerSocket(
   { path, rootPath, serverId }: LanguageServerSocketOptions,
-  client: Client = getClient(),
-  signal: AbortSignal = environmentActivitySignal(activeServerOrigin()),
+  client: Client,
+  signal: AbortSignal,
 ): EdenServerSocket {
   signal.throwIfAborted()
   return adaptEdenSocket(
@@ -59,9 +58,9 @@ class EdenLanguageServerWebSocket implements EdenServerSocket {
 
   constructor(
     url: string | URL,
-    _protocols?: string | readonly string[],
-    client: Client = getClient(),
-    signal?: AbortSignal,
+    _protocols: string | readonly string[] | undefined,
+    client: Client,
+    signal: AbortSignal,
   ) {
     void _protocols
     this.#socket = connectLanguageServerSocket(languageServerSocketOptions(url), client, signal)

@@ -1,4 +1,5 @@
 import { createControlledInProcessTransport } from '../../../test/client'
+import { makeTestServer } from '../../../test/server'
 import { createEnvironmentClient } from '@workspace/client-core/transport/client'
 import { mkdir, readFile, writeFile } from 'node:fs/promises'
 import { test, expect } from '../../../test/fixtures'
@@ -30,10 +31,10 @@ test('replacement applies one transaction across files and snapshot checks rejec
     const stale = await prepareReplacement({ client, query, matches, replacement: 'pin', signal })
     expect(stale.count).toBe(3)
     await writeFile(`${server.root}/b.txt`, 'needle newer\n')
-    await expect(applyReplacement(client, '', stale, signal)).rejects.toThrow()
+    await expect(applyReplacement(stale)).rejects.toThrow()
     expect(await readFile(`${server.root}/a.txt`, 'utf8')).toBe('needle needlework\r\nneedle\r\n')
     const fresh = await prepareReplacement({ client, query, matches, replacement: 'pin', signal })
-    await applyReplacement(client, '', fresh, signal)
+    await applyReplacement(fresh)
     expect(await readFile(`${server.root}/a.txt`, 'utf8')).toBe('pin needlework\r\npin\r\n')
     expect(await readFile(`${server.root}/b.txt`, 'utf8')).toBe('pin newer\n')
   } finally {
@@ -75,7 +76,7 @@ test('replacement in a nested workspace changes only the searched target', async
       replacement: 'pin',
       signal,
     })
-    await applyReplacement(client, scopedQuery.path, plan, signal)
+    await applyReplacement(plan)
     expect(await readFile(`${server.root}/project/sample.txt`, 'utf8')).toBe('pin\n')
     expect(await readFile(`${server.root}/sample.txt`, 'utf8')).toBe('needle outside\n')
     expect(await readFile(`${server.root}/project-other/sample.txt`, 'utf8')).toBe(
@@ -141,7 +142,7 @@ test('cancellation after disk commit still finalizes and releases the transactio
   })
   const gate = transport.pauseNextResponse('/fs/workspace-edit/commit')
   try {
-    const applying = applyReplacement(client, '', plan, controller.signal)
+    const applying = applyReplacement(plan)
     await gate.reached
     controller.abort()
     gate.release()
@@ -155,10 +156,54 @@ test('cancellation after disk commit still finalizes and releases the transactio
       replacement: 'done',
       signal: new AbortController().signal,
     })
-    await expect(
-      applyReplacement(client, '', next, new AbortController().signal),
-    ).resolves.toMatchObject({ state: 'released' })
+    await expect(applyReplacement(next)).resolves.toMatchObject({ state: 'released' })
   } finally {
     gate.release()
+  }
+})
+
+test('prepared replacement retains its owner and inputs and submits only once', async ({
+  server,
+}) => {
+  const other = await makeTestServer()
+  const transport = createControlledInProcessTransport(server)
+  const client = createEnvironmentClient({
+    origin: server.origin,
+    headers: () => ({ origin: server.clientOrigin }),
+    fetcher: transport.fetcher,
+  })
+  const capturedQuery = { ...query }
+  await writeFile(`${server.root}/a.txt`, 'needle\n')
+  await writeFile(`${other.root}/a.txt`, 'needle on other server\n')
+  const read = transport.pauseNextResponse('/fs/read')
+  try {
+    const preparing = prepareReplacement({
+      client,
+      query: capturedQuery,
+      matches: [{ path: 'a.txt', kind: 'content', source: 'disk', type: 'file' }],
+      replacement: 'pin',
+      signal: new AbortController().signal,
+    })
+    await read.reached
+    capturedQuery.path = 'another-root'
+    capturedQuery.query = 'different'
+    read.release()
+    const plan = await preparing
+    expect(Object.isFrozen(plan.operations)).toBe(true)
+    expect(Object.isFrozen(plan.operations[0])).toBe(true)
+    const applying = applyReplacement(plan)
+    expect(applyReplacement(plan)).toBe(applying)
+    await applying
+    expect(applyReplacement(plan)).toBe(applying)
+    expect(await readFile(`${server.root}/a.txt`, 'utf8')).toBe('pin\n')
+    expect(await readFile(`${other.root}/a.txt`, 'utf8')).toBe('needle on other server\n')
+    expect(
+      transport.requests.filter(
+        (request) => new URL(request.url).pathname === '/fs/workspace-edit/commit',
+      ),
+    ).toHaveLength(1)
+  } finally {
+    read.release()
+    await other.cleanup()
   }
 })

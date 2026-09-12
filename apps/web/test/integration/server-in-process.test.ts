@@ -41,11 +41,14 @@ test('quick-open file search reuses the workspace search index', async ({ client
 
   const query = quickOpenSearchQuery('command-palette')
   const indexed = await waitForSearchProvider({ client, query, source: 'index' })
-  const matches = await fetchQuickOpenFiles({
-    path: filesystemPath(''),
-    query: query.query,
-    signal: new AbortController().signal,
-  })
+  const matches = await fetchQuickOpenFiles(
+    {
+      path: filesystemPath(''),
+      query: query.query,
+      signal: new AbortController().signal,
+    },
+    client,
+  )
 
   expect(indexed.measurement?.providerSources).toEqual(['index'])
   expect(matches).toContainEqual(

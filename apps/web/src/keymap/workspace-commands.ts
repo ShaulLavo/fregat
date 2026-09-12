@@ -1,3 +1,4 @@
+import { clientForQueryClient } from '@/lib/environments/state/query-clients'
 import { workbenchCommandMetadata } from '@workspace/client-core/commands/workbench'
 import {
   workspaceCommandMetadata,
@@ -125,7 +126,11 @@ async function revertSelectedEditorDocument(
   const resource = filesystemResource(activeDocument)
   if (!resource) return false
 
-  const file = await fetchFile(resource.path, new AbortController().signal)
+  const file = await fetchFile(
+    resource.path,
+    new AbortController().signal,
+    clientForQueryClient(queryClient),
+  )
   setFileSnapshotQueryData(queryClient, file)
   documentStore.getState().forceReplaceLiveEditorDocument(file)
   return true

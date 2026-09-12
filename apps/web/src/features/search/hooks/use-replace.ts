@@ -1,9 +1,6 @@
-import { fileDocumentKey, filesystemPath } from '@/lib/documents/utils/identity'
 import { useCallback, useRef } from 'react'
-import { useQueryClient } from '@tanstack/react-query'
 
-import { useWorkspaceEditService } from '@/features/editor/providers/workspace-edit-context'
-import { useEditorDocumentStoreApi } from '@/features/editor/state/document-state'
+import { useWorkspaceTextChanges } from '@/lib/workspace-edits/hooks/use-text-changes'
 import type {
   SearchBufferSnapshot,
   WorkspaceSearchFileGroup,
@@ -14,13 +11,9 @@ import {
   workspaceSearchReplaceSummary,
 } from '@/features/search/utils/replace-runner'
 import { errorMessage } from '@/lib/error-message'
-import type { Client } from '@/lib/client'
-import { clientForQueryClient } from '@/lib/environments/state/query-clients'
-import { fetchFile } from '@/lib/file-server'
 import type { WorkspaceSearchMatch, WorkspaceSearchQuery } from '@workspace/contracts'
 
 export function useWorkspaceSearchReplace(rootPath: string, enabled = true) {
-  const client = clientForQueryClient(useQueryClient())
   const canReplaceValue = useSearchBufferState((state) => {
     if (!enabled) return false
     if (state.active?.rootPath !== rootPath) return false
@@ -28,8 +21,7 @@ export function useWorkspaceSearchReplace(rootPath: string, enabled = true) {
     return canReplace(state.active)
   })
   const store = useSearchBufferStoreApi()
-  const documentStore = useEditorDocumentStoreApi()
-  const workspaceEdits = useWorkspaceEditService()
+  const workspaceEdits = useWorkspaceTextChanges()
   const controllerRef = useRef<AbortController | null>(null)
 
   const replaceMatches = useCallback(
@@ -39,9 +31,7 @@ export function useWorkspaceSearchReplace(rootPath: string, enabled = true) {
       controllerRef.current = controller
 
       void runReplace({
-        client,
         controller,
-        documentStore,
         matches,
         rootPath,
         store,
@@ -50,7 +40,7 @@ export function useWorkspaceSearchReplace(rootPath: string, enabled = true) {
         if (controllerRef.current === controller) controllerRef.current = null
       })
     },
-    [client, documentStore, rootPath, store, workspaceEdits],
+    [rootPath, store, workspaceEdits],
   )
   const replaceAll = useCallback(() => {
     const snapshot = store.getState().active
@@ -84,19 +74,15 @@ export function useWorkspaceSearchReplace(rootPath: string, enabled = true) {
 }
 
 type RunReplaceInput = {
-  client: Client
   controller: AbortController
-  documentStore: ReturnType<typeof useEditorDocumentStoreApi>
   matches: readonly WorkspaceSearchMatch[]
   rootPath: string
   store: ReturnType<typeof useSearchBufferStoreApi>
-  workspaceEdits: ReturnType<typeof useWorkspaceEditService>
+  workspaceEdits: ReturnType<typeof useWorkspaceTextChanges>
 }
 
 async function runReplace({
-  client,
   controller,
-  documentStore,
   matches,
   rootPath,
   store,
@@ -109,43 +95,33 @@ async function runReplace({
   const contentMatches = matches.filter((match) => match.kind === 'content')
   if (contentMatches.length === 0) return
 
-  store.getState().startReplace(rootPath)
+  const token = store.getState().startReplace(rootPath)
+  if (!token) return
 
   try {
     const result = await replaceWorkspaceSearchMatches({
-      context: {
-        applyWorkspaceChange: workspaceEdits.applyWorkspaceChange,
-        fetchFile: (path, signal) => fetchFile(filesystemPath(path), signal, client),
-        getLiveEditorDocument: (path) => {
-          const document = documentStore
-            .getState()
-            .getLiveEditorDocument(fileDocumentKey(filesystemPath(path)))
-          if (document?.target.kind !== 'file') return null
-          return { buffer: document.buffer, path: document.target.resource.path }
-        },
-        rootPath,
-        signal: controller.signal,
-      },
+      workspaceEdits,
+      signal: controller.signal,
       matches: contentMatches,
       query: snapshot.resultsSearchQuery,
       replaceText: snapshot.replaceText,
     })
-    if (controller.signal.aborted) return
 
     if (result.status === 'applied') {
-      store.getState().finishReplace(rootPath, workspaceSearchReplaceSummary(result))
-      store.getState().requestSearchRefresh(rootPath)
+      store.getState().finishReplace(token, workspaceSearchReplaceSummary(result), true)
       return
     }
     if (result.status === 'cancelled') {
-      store.getState().finishReplace(rootPath, 'Replace cancelled.')
+      store.getState().finishReplace(token, 'Replace cancelled.')
       return
     }
-    store.getState().failReplace(rootPath, result.message)
+    store.getState().failReplace(token, result.message)
   } catch (error) {
-    if (controller.signal.aborted) return
-
-    store.getState().failReplace(rootPath, errorMessage(error, 'Replace failed.'))
+    if (controller.signal.aborted) {
+      store.getState().finishReplace(token, 'Replace cancelled.')
+      return
+    }
+    store.getState().failReplace(token, errorMessage(error, 'Replace failed.'))
   }
 }
 

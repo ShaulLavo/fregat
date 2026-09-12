@@ -1,3 +1,4 @@
+import { getClient } from '@/lib/client'
 import { testDocumentKey, testTabContent } from '../../../../test/factories/document-targets'
 import { filesystemPath } from '@/lib/documents/utils/identity'
 import { waitFor } from '@testing-library/react'
@@ -33,8 +34,8 @@ test('clears a cached root folder that no longer exists on disk', async ({ clien
 
 test('clears a cached root folder that points at a file', async ({ client }) => {
   void client
-  await ensureFolderPath(filesystemPath('repo'))
-  await createFileContent(filesystemPath('repo/notes.txt'), 'hello')
+  await ensureFolderPath(filesystemPath('repo'), getClient())
+  await createFileContent(filesystemPath('repo/notes.txt'), 'hello', getClient())
   const { store } = await renderValidation(client, 'repo/notes.txt')
 
   await waitFor(() => expect(store.getState().rootFolder).toBeNull())
@@ -45,11 +46,11 @@ test('keeps a cached root folder that still exists and makes it the index scope'
   server,
 }) => {
   void client
-  await ensureFolderPath(filesystemPath('repo'))
+  await ensureFolderPath(filesystemPath('repo'), getClient())
   const { store } = await renderValidation(client, 'repo')
 
   await waitFor(async () => {
-    const info = await fetchServerInfo(new AbortController().signal)
+    const info = await fetchServerInfo(new AbortController().signal, getClient())
     expect(info.workspaceIndex?.scanRoot).toBe(path.join(server.root, 'repo'))
   })
   expect(store.getState().rootFolder?.path).toBe('repo')
@@ -63,7 +64,7 @@ test('restores a cached alias through the canonical workspace switch', async ({
   server,
 }) => {
   void client
-  await ensureFolderPath(filesystemPath('actual'))
+  await ensureFolderPath(filesystemPath('actual'), getClient())
   await symlink('actual', path.join(server.root, 'alias'))
   const { store } = await renderValidation(client, 'alias')
 
@@ -77,9 +78,13 @@ test('late invalidation survives same-workspace navigation and preserves the dir
   server,
 }) => {
   void client
-  await ensureFolderPath(filesystemPath('repo'))
-  await createFileContent(filesystemPath('repo/a.ts'), 'saved\n')
-  const file = await fetchFile(filesystemPath('repo/a.ts'), new AbortController().signal)
+  await ensureFolderPath(filesystemPath('repo'), getClient())
+  await createFileContent(filesystemPath('repo/a.ts'), 'saved\n', getClient())
+  const file = await fetchFile(
+    filesystemPath('repo/a.ts'),
+    new AbortController().signal,
+    getClient(),
+  )
   const started = Promise.withResolvers<void>()
   const released = Promise.withResolvers<void>()
   const observed = createObservedInProcessClient(server, async (request) => {
@@ -127,7 +132,7 @@ test('late invalidation clears only the old root while a newer workspace finishe
   client,
   server,
 }) => {
-  await ensureFolderPath(filesystemPath('second'))
+  await ensureFolderPath(filesystemPath('second'), getClient())
   const second = await registerTestWorkspaceAddress(client, 'second')
   const validationStarted = Promise.withResolvers<void>()
   const validationRelease = Promise.withResolvers<void>()

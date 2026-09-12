@@ -27,7 +27,6 @@ a bare root `bun run verify`.
 | [091 — error and timing helpers](091-error-and-timing-helpers.md)               | **PROPOSED — DEFECT FIXES IMPLEMENTED**              |
 | [092 — path and URI helpers](092-path-and-uri-helpers.md)                       | **PROPOSED — DEFECT FIXES IMPLEMENTED**              |
 | [093 — web React and store ceremony](093-web-react-and-store-ceremony.md)       | **PROPOSED — DEPENDS ON 091**                        |
-| [097 — async operation ownership](097-async-operation-ownership.md)             | **PROPOSED — 098 COMPLETE; READY TO IMPLEMENT**      |
 | [099 — document contribution runtime](099-document-contributions.md)            | **PROPOSED — BASELINE AND PUBLICATION FIRST**        |
 | [101 — truncation and value recovery](101-truncation-recovery.md)               | **PROPOSED — DECISIONS D5 AND D7 NEED CONFIRMATION** |
 | [102 — scroll and keyboard affordance](102-scroll-and-keyboard-affordance.md)   | **PROPOSED — DECISIONS D2 AND D7 NEED CONFIRMATION** |
@@ -61,13 +60,9 @@ a bare root `bun run verify`.
   migration. Editor E009 supplies measurement evidence; E013 shared storage is deferred outside
   this refactor. E014 parallel search must reuse the runtime if implemented.
 
-- **Required order: 098 → 097**, as recorded in [`PLAN.md`](../PLAN.md#document-and-async-operation-ownership).
-  Complete and verify all of Plan 098 before starting any implementation in Plan 097. Design
-  agreement or partial migration does not release Plan 097. Record completion evidence and the
-  implemented document API locations in Plan 097, then refresh its source anchors and drift baseline.
-  Plan 098 owns the document and tab model, with behavioral characterization before production
-  changes. It supersedes Plan 096's document-scheme factory proposal and takes over its
-  coalesced-log move and shared-layer import guard.
+- The required **098 → 097** order is complete. The [document model](../docs/document-and-tab-domain.md)
+  and [async operation ownership](../docs/async-operation-ownership.md) references describe the
+  implemented contracts. Plan 099 reuses the retained workspace-edit service and its issued sources.
 
 - Plan 087 delivers managed external MCP connections and the native Platform tool endpoint using
   protocol revision `2026-07-28` and SDK v2, with explicit stateless operation, scoped authentication,

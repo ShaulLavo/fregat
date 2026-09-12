@@ -1,6 +1,5 @@
 import { LspConnectionPool, type LspConnectionPoolEvent } from '@singapor/lsp-plugin'
 
-import { activeServerOrigin } from '@/lib/client'
 import { log } from '@/lib/client-logging'
 
 /** Separates the two halves of a pool key without colliding with either. */
@@ -10,7 +9,7 @@ const KEY_SEPARATOR = '\u0000'
 const pool = new LspConnectionPool({ onEvent: report })
 
 export type LanguageServerConnectionKey = {
-  readonly origin?: string
+  readonly origin: string
   readonly rootPath: string
   readonly serverId: string
 }
@@ -21,7 +20,7 @@ export type DiffLanguageServerConnectionKey = LanguageServerConnectionKey & {
 
 /** The same pair the server's own session pool keys its child processes on. */
 export function languageServerConnectionProvider({
-  origin = activeServerOrigin(),
+  origin,
   rootPath,
   serverId,
 }: LanguageServerConnectionKey) {
@@ -29,7 +28,7 @@ export function languageServerConnectionProvider({
 }
 
 export function diffLanguageServerConnectionProvider({
-  origin = activeServerOrigin(),
+  origin,
   rootPath,
   serverId,
   sessionId,

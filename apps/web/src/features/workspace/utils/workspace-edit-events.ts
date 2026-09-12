@@ -40,7 +40,8 @@ function isMatchingWorkspaceEditEvent(
   event: WorkspaceEditAwareFilesystemEvent,
   isOwnWorkspaceEditEvent: (writeId: string) => boolean,
 ): boolean {
-  if (event.origin !== 'workspace-edit') return false
+  if (event.origin !== 'workspace-edit' && event.origin !== 'conflict-editor-resolution')
+    return false
   if (!event.writeId) return false
   return isOwnWorkspaceEditEvent(event.writeId)
 }

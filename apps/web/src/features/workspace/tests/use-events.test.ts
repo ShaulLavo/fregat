@@ -358,3 +358,53 @@ function treeEntry(path: string) {
     version: `test:2:${path}`,
   }
 }
+
+describe('conflict resolution event reconciliation', () => {
+  const openFiles = [{ hasLiveDocument: true, isDirty: true, path: 'repo/a.ts' }]
+  const isOwnEvent = (writeId: string) => writeId === 'resolution-1'
+
+  it.each(['created', 'changed'] as const)(
+    'keeps tree and Git effects for its own %s event',
+    (type) => {
+      const event = {
+        entry: treeEntry('repo/a.ts'),
+        type,
+        path: 'repo/a.ts',
+        origin: 'conflict-editor-resolution',
+        writeId: 'resolution-1',
+      }
+      const plan = planWorkspaceEditAwareEventBatch([event], openFiles, 'repo', isOwnEvent)
+      expect(plan.openFileOperations).toEqual([])
+      expect(plan.treeOperations.length).toBeGreaterThan(0)
+      expect(plan.shouldInvalidateGitState).toBe(true)
+    },
+  )
+
+  it.each([undefined, 'another-resolution'])('keeps external writes with ID %s', (writeId) => {
+    const plan = planWorkspaceEditAwareEventBatch(
+      [{ type: 'changed', path: 'repo/a.ts', origin: 'conflict-editor-resolution', writeId }],
+      openFiles,
+      'repo',
+      isOwnEvent,
+    )
+    expect(plan.openFileOperations).toEqual([{ type: 'refresh-open-file', path: 'repo/a.ts' }])
+  })
+
+  it('preserves an external change batched with an owned resolution event', () => {
+    const plan = planWorkspaceEditAwareEventBatch(
+      [
+        {
+          type: 'changed',
+          path: 'repo/a.ts',
+          origin: 'conflict-editor-resolution',
+          writeId: 'resolution-1',
+        },
+        { type: 'deleted', path: 'repo/a.ts' },
+      ],
+      openFiles,
+      'repo',
+      isOwnEvent,
+    )
+    expect(plan.openFileOperations).toEqual([{ type: 'deleted-conflict', path: 'repo/a.ts' }])
+  })
+})

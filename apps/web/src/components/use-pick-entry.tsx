@@ -1,3 +1,6 @@
+import { useQueryClient } from '@tanstack/react-query'
+import type { Client } from '@/lib/client'
+import { clientForQueryClient } from '@/lib/environments/state/query-clients'
 import { createClientInvariantError } from '@/lib/structured-errors'
 
 import { FilePickerDialog, type FilePickerMode } from '@/components/file-picker-dialog'
@@ -35,6 +38,7 @@ export function usePickEntry({
   onPick,
 }: UsePickEntryOptions) {
   const bridge = getPlatformBridge()
+  const client = clientForQueryClient(useQueryClient())
 
   useEffect(() => {
     if (!bridge) return
@@ -48,6 +52,7 @@ export function usePickEntry({
       value,
     })
     void handleNativePickResult(pickPromise, {
+      client,
       isActive: () => active,
       mode,
       onOpenChange,
@@ -57,7 +62,7 @@ export function usePickEntry({
     return () => {
       active = false
     }
-  }, [accept, bridge, mode, onOpenChange, onPick, open, value])
+  }, [accept, bridge, client, mode, onOpenChange, onPick, open, value])
 
   if (bridge || !open) return null
 
@@ -81,6 +86,7 @@ type PickNativeEntryOptions = {
 }
 
 type NativePickResultHandlers = {
+  client: Client
   isActive: () => boolean
   mode: FilePickerMode
   onOpenChange: (open: boolean) => void
@@ -97,7 +103,7 @@ function startNativePick(options: PickNativeEntryOptions) {
 
 async function handleNativePickResult(
   pickPromise: Promise<string | null>,
-  { isActive, mode, onOpenChange, onPick }: NativePickResultHandlers,
+  { client, isActive, mode, onOpenChange, onPick }: NativePickResultHandlers,
 ) {
   const startedAt = performance.now()
   const scope = createWideEventScope({
@@ -121,7 +127,7 @@ async function handleNativePickResult(
   try {
     scope.increment('picker.selectedCount')
     scope.set({ path })
-    const entry = await hydratePickedEntry(path, controller.signal)
+    const entry = await hydratePickedEntry(path, controller.signal, client)
     if (!isActive()) {
       scope.end({ aborted: true, durationMs: elapsedMs(startedAt) })
       return
@@ -190,10 +196,14 @@ function elapsedMs(startedAt: number) {
   return Math.round((performance.now() - startedAt) * 100) / 100
 }
 
-async function hydratePickedEntry(path: string, signal: AbortSignal): Promise<PickedFsEntry> {
+async function hydratePickedEntry(
+  path: string,
+  signal: AbortSignal,
+  client: Client,
+): Promise<PickedFsEntry> {
   const statInput = clientPathFromOsPath(path)
   const entry = {
-    ...(await statPath(statInput, signal)),
+    ...(await statPath(statInput, signal, client)),
     name: basenameFromOsPath(path),
   }
 

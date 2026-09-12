@@ -1,3 +1,5 @@
+import { useQueryClient } from '@tanstack/react-query'
+import { clientForQueryClient } from '@/lib/environments/state/query-clients'
 import { useEffect } from 'react'
 
 import { useEditorDocumentStoreApi } from '@/features/editor/state/document-state'
@@ -22,6 +24,7 @@ export function useRunSearchBuffer(
   const { caseSensitive, excludeGlobText, filtersVisible, includeGlobText, matchMode, wholeWord } =
     searchOptions
   const store = useSearchBufferStoreApi()
+  const client = clientForQueryClient(useQueryClient())
   const documentStore = useEditorDocumentStoreApi()
 
   useEffect(() => {
@@ -45,7 +48,7 @@ export function useRunSearchBuffer(
       documentState.dirtyDocumentKeys,
       rootPath,
     )
-    const provider = workspaceSearchProvider(dirtyDocuments)
+    const provider = workspaceSearchProvider(dirtyDocuments, client)
     const deferInitialOpenBufferMatches = shouldDeferInitialOpenBufferMatches(
       activeSnapshot,
       searchQuery,
@@ -58,6 +61,7 @@ export function useRunSearchBuffer(
 
     return () => controller.abort()
   }, [
+    client,
     documentStore,
     query,
     rootPath,

@@ -746,8 +746,8 @@ publication, common runtime with syntax consumers, minimap, LSP, remaining calle
 and complete validation. Writing the plan does not schedule production execution ahead of another lane.
 
 - [completed Plan 098](../docs/document-and-tab-domain.md) owns Platform document and tab identity. Map its
-  implemented identity to the Editor buffer incarnation. Plan 098 is complete; Plan 097 has not started. Preserve its completed identity contract.
-- [Plan 097](097-async-operation-ownership.md) owns host operation provenance and WorkspaceEdit
+  implemented identity to the Editor buffer incarnation. Plans 098 and 097 are complete. Preserve its completed identity contract.
+- [Async operation ownership](../docs/async-operation-ownership.md) owns host operation provenance and WorkspaceEdit
   source evidence. Share its implemented captured owner/source types; do not create another host
   operation service. Baseline/publication work in units 0–1 can proceed independently. Public
   backend cutover starts in unit 2 and follows completed 098 and 097 contracts. Refresh anchors and measurements

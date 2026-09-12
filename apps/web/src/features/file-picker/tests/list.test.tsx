@@ -1,3 +1,4 @@
+import { getClient } from '@/lib/client'
 import { filesystemPath } from '@/lib/documents/utils/identity'
 import { DEFAULT_SETTING_VALUES, type SettingsSnapshot } from '@workspace/contracts'
 import { act, fireEvent, screen, waitFor } from '@testing-library/react'
@@ -50,11 +51,14 @@ test('exposes complete positions for virtualized options', () => {
 
 test('keeps cozy painted rows aligned with the virtual list height', async ({ client }) => {
   expect(client).toBeDefined()
-  await saveSettings({
-    mutationId: 'file-picker-density-cozy',
-    operations: [{ key: 'workbench.density', kind: 'set', value: 'cozy' }],
-    target: 'user',
-  })
+  await saveSettings(
+    {
+      mutationId: 'file-picker-density-cozy',
+      operations: [{ key: 'workbench.density', kind: 'set', value: 'cozy' }],
+      target: 'user',
+    },
+    getClient(),
+  )
   const entries = [entry('alpha.ts'), entry('beta.ts')]
 
   renderList(entries, { status: 'ready', data: entries })

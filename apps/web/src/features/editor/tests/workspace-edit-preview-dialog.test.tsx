@@ -143,7 +143,7 @@ test('cancel restores focus and settles the producer as cancelled', async () => 
 
     await expect(harness.producerSettlement).resolves.toEqual({ status: 'cancelled' })
     await waitFor(() => expect(document.activeElement).toBe(opener))
-    expect(harness.cancelPreview).toHaveBeenCalledOnce()
+    expect(harness.cancelPreview).toHaveBeenCalledWith('10000000-0000-4000-8000-000000000063')
   } finally {
     registration.unregister()
     opener.remove()
@@ -158,7 +158,7 @@ test('apply uses Spinner and disables cancel after commit begins', async () => {
   await user.click(screen.getByRole('button', { name: 'Apply all' }))
 
   const apply = screen.getByRole('button', { name: 'Apply all' })
-  expect(harness.confirmPreview).toHaveBeenCalledOnce()
+  expect(harness.confirmPreview).toHaveBeenCalledWith('10000000-0000-4000-8000-000000000063')
   expect(apply).toBeDisabled()
   expect(screen.getByRole('button', { name: 'Cancel' })).toBeDisabled()
   expect(apply.querySelector('svg[aria-label="Loading"]')).not.toBeNull()

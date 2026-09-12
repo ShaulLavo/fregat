@@ -8,7 +8,7 @@ import {
 } from '@/lib/file-system-types'
 import { readDirectory, readFilePreview } from '@workspace/client-core/files/read'
 import { clientLogContext } from '@/lib/environments/state/log-context'
-import { getClient, type Client } from '@/lib/client'
+import type { Client } from '@/lib/client'
 import type {
   FileResult,
   FindMatch,
@@ -34,17 +34,32 @@ import type {
   WorkspaceRootEntry,
 } from '@workspace/contracts'
 
-const TREE_LOG_DELAY_MS = 250
-const treeLogs = createCoalescedLogQueue({
-  delayMs: TREE_LOG_DELAY_MS,
-  emit: (event) => log.info(event),
-  merge: mergeTreeLogEvents,
-})
-const READ_LOG_DELAY_MS = 250
-const readLogs = createCoalescedLogQueue({
-  delayMs: READ_LOG_DELAY_MS,
-  emit: (event) => log.info(event),
-})
+const FILE_LOG_DELAY_MS = 250
+const ownerLogQueues = new WeakMap<Client, ReturnType<typeof createOwnerLogQueues>>()
+type FileLogOwner = ReturnType<typeof clientLogContext>
+
+function createOwnerLogQueues() {
+  return {
+    tree: createCoalescedLogQueue({
+      delayMs: FILE_LOG_DELAY_MS,
+      emit: (event) => log.info(event),
+      merge: mergeTreeLogEvents,
+    }),
+    read: createCoalescedLogQueue({
+      delayMs: FILE_LOG_DELAY_MS,
+      emit: (event) => log.info(event),
+    }),
+  }
+}
+
+function fileLogQueues(client: Client) {
+  const existing = ownerLogQueues.get(client)
+  if (existing) return existing
+
+  const queues = createOwnerLogQueues()
+  ownerLogQueues.set(client, queues)
+  return queues
+}
 
 type DeleteResult = {
   deleted: boolean
@@ -81,7 +96,7 @@ export type WorkspaceEditTransitionRoute =
 export async function prepareWorkspaceEditMutation(
   request: WorkspaceEditPrepareRequest,
   signal: AbortSignal,
-  client: Client = getClient(),
+  client: Client,
 ): Promise<WorkspaceEditResult> {
   const response = await client.fs['workspace-edit'].prepare.post(request, {
     fetch: { signal },
@@ -93,7 +108,7 @@ export async function transitionWorkspaceEditMutation(
   transition: WorkspaceEditTransitionRoute,
   request: WorkspaceEditTransitionRequest,
   signal: AbortSignal,
-  client: Client = getClient(),
+  client: Client,
 ): Promise<WorkspaceEditResult> {
   const routes = client.fs['workspace-edit']
   if (transition === 'abort') {
@@ -117,7 +132,7 @@ export async function transitionWorkspaceEditMutation(
 export async function recoverWorkspaceEditMutation(
   request: WorkspaceEditRecoverRequest,
   signal: AbortSignal,
-  client: Client = getClient(),
+  client: Client,
 ): Promise<WorkspaceEditResult> {
   const response = await client.fs['workspace-edit'].recover.post(request, {
     fetch: { signal },
@@ -128,7 +143,7 @@ export async function recoverWorkspaceEditMutation(
 export async function releaseWorkspaceEditMutation(
   request: WorkspaceEditReleaseRequest,
   signal: AbortSignal,
-  client: Client = getClient(),
+  client: Client,
 ): Promise<WorkspaceEditResult> {
   const response = await client.fs['workspace-edit'].release.post(request, {
     fetch: { signal },
@@ -139,7 +154,7 @@ export async function releaseWorkspaceEditMutation(
 export async function fetchWorkspaceEditStatus(
   operationId: string,
   signal: AbortSignal,
-  client: Client = getClient(),
+  client: Client,
 ): Promise<WorkspaceEditStatusResult> {
   const response = await client.fs['workspace-edit'].status.get({
     fetch: { signal },
@@ -151,7 +166,7 @@ export async function fetchWorkspaceEditStatus(
 export async function fetchWorkspaceEditRecovery(
   workspace: FilesystemPath,
   signal: AbortSignal,
-  client: Client = getClient(),
+  client: Client,
 ): Promise<WorkspaceEditRecoveryListResult> {
   const response = await client.fs['workspace-edit'].recovery.get({
     fetch: { signal },
@@ -160,12 +175,10 @@ export async function fetchWorkspaceEditRecovery(
   return unwrapWorkspaceEditResponse(response)
 }
 
-export async function fetchTree(
-  path: FilesystemPath,
-  signal: AbortSignal,
-  client: Client = getClient(),
-) {
+export async function fetchTree(path: FilesystemPath, signal: AbortSignal, client: Client) {
   const startedAt = performance.now()
+  const owner = clientLogContext(client)
+  const queues = fileLogQueues(client)
 
   try {
     const response = await readDirectory({ client, path, signal })
@@ -173,35 +186,33 @@ export async function fetchTree(
       path: filesystemPath(response.path),
       entries: response.entries.map(entryFromResponse),
     }
-    queueTreeSuccessLog(path, result, startedAt)
+    queueTreeSuccessLog(path, result, startedAt, owner, queues.tree)
     return result
   } catch (error) {
     annotateClientError(error, {
       context: { method: 'GET', path, route: '/fs/tree' },
       operation: 'fs.tree',
     })
-    logTreeError(path, error, startedAt, signal)
+    logTreeError(path, error, startedAt, signal, owner)
     throw error
   }
 }
 
-export async function fetchFile(
-  path: FilesystemPath,
-  signal: AbortSignal,
-  client: Client = getClient(),
-) {
+export async function fetchFile(path: FilesystemPath, signal: AbortSignal, client: Client) {
   const startedAt = performance.now()
+  const owner = clientLogContext(client)
+  const queues = fileLogQueues(client)
 
   try {
     const result = fileResultFromResponse(await readFilePreview({ client, path, signal }))
-    queueReadSuccessLog(path, result, startedAt)
+    queueReadSuccessLog(path, result, startedAt, owner, queues.read)
     return result
   } catch (error) {
     annotateClientError(error, {
       context: { method: 'GET', path, route: '/fs/read' },
       operation: 'fs.read',
     })
-    logReadError(path, error, startedAt, signal)
+    logReadError(path, error, startedAt, signal, owner)
     throw error
   }
 }
@@ -216,7 +227,7 @@ export async function fetchQuickOpenFiles(
     query: string
     signal: AbortSignal
   },
-  client: Client = getClient(),
+  client: Client,
 ) {
   let measurement: WorkspaceSearchMeasurement | undefined
 
@@ -267,8 +278,8 @@ export async function fetchQuickOpenFiles(
 export async function writeFileContent(
   path: FilesystemPath,
   content: string,
-  options?: number | null | WriteFileContentOptions,
-  client: Client = getClient(),
+  options: number | null | WriteFileContentOptions | undefined,
+  client: Client,
 ) {
   const writeOptions = normalizeWriteFileContentOptions(options)
   return observeClientOperation(
@@ -332,12 +343,14 @@ function writeFileContentBody(path: string, content: string, options: WriteFileC
 export async function createFileContent(
   path: FilesystemPath,
   content: string,
-  client: Client = getClient(),
+  client: Client,
+  identity?: { readonly origin: string; readonly writeId: string },
 ) {
   return observeClientOperation(
     {
       ...clientLogContext(client),
       action: 'fs.create_file',
+      ...identity,
       area: 'fs',
       contentBytes: new Blob([content]).size,
       method: 'POST',
@@ -345,7 +358,7 @@ export async function createFileContent(
       route: '/fs/create-file',
     },
     async () => {
-      const response = await client.fs['create-file'].post({ content, path })
+      const response = await client.fs['create-file'].post({ content, path, ...identity })
 
       if (response.error) throw createRpcError(response.error)
 
@@ -355,21 +368,17 @@ export async function createFileContent(
   )
 }
 
-export async function ensureFolderPath(path: FilesystemPath, client: Client = getClient()) {
+export async function ensureFolderPath(path: FilesystemPath, client: Client) {
   if (!path) return null
 
   return requestFolderCreation(path, true, client)
 }
 
-export async function createFolderPath(path: FilesystemPath, client: Client = getClient()) {
+export async function createFolderPath(path: FilesystemPath, client: Client) {
   return requestFolderCreation(path, false, client)
 }
 
-async function requestFolderCreation(
-  path: string,
-  recursive: boolean,
-  client: Client = getClient(),
-) {
+async function requestFolderCreation(path: string, recursive: boolean, client: Client) {
   return observeClientOperation(
     {
       ...clientLogContext(client),
@@ -394,11 +403,7 @@ async function requestFolderCreation(
   )
 }
 
-export async function renamePath(
-  from: FilesystemPath,
-  to: FilesystemPath,
-  client: Client = getClient(),
-) {
+export async function renamePath(from: FilesystemPath, to: FilesystemPath, client: Client) {
   return observeClientOperation(
     {
       ...clientLogContext(client),
@@ -420,11 +425,7 @@ export async function renamePath(
   )
 }
 
-export async function copyPath(
-  from: FilesystemPath,
-  to: FilesystemPath,
-  client: Client = getClient(),
-) {
+export async function copyPath(from: FilesystemPath, to: FilesystemPath, client: Client) {
   return observeClientOperation(
     {
       ...clientLogContext(client),
@@ -449,11 +450,7 @@ export async function copyPath(
   )
 }
 
-export async function deletePath(
-  path: FilesystemPath,
-  recursive: boolean,
-  client: Client = getClient(),
-) {
+export async function deletePath(path: FilesystemPath, recursive: boolean, client: Client) {
   return observeClientOperation(
     {
       ...clientLogContext(client),
@@ -475,7 +472,7 @@ export async function deletePath(
   )
 }
 
-export async function fetchServerInfo(signal: AbortSignal, client: Client = getClient()) {
+export async function fetchServerInfo(signal: AbortSignal, client: Client) {
   return observeClientOperation(
     {
       ...clientLogContext(client),
@@ -499,11 +496,7 @@ export async function fetchServerInfo(signal: AbortSignal, client: Client = getC
   )
 }
 
-export async function statPath(
-  path: FilesystemPath,
-  signal: AbortSignal,
-  client: Client = getClient(),
-) {
+export async function statPath(path: FilesystemPath, signal: AbortSignal, client: Client) {
   return observeClientOperation(
     {
       ...clientLogContext(client),
@@ -536,7 +529,7 @@ export async function openWorkspaceRootPath(
   path: FilesystemPath,
   generation: number,
   signal: AbortSignal,
-  client: Client = getClient(),
+  client: Client,
 ) {
   return observeClientOperation(
     {
@@ -571,11 +564,11 @@ export async function openWorkspaceRootPath(
   )
 }
 
-/** `signal` is optional: a caller with no lifecycle to hang it on must not fake one. */
+/** Pass undefined when the caller has no request lifetime. */
 export async function fetchRecentEntries(
   options: RecentEntriesOptions,
-  signal?: AbortSignal,
-  client: Client = getClient(),
+  signal: AbortSignal | undefined,
+  client: Client,
 ) {
   return observeClientOperation(
     {
@@ -598,7 +591,7 @@ export async function fetchRecentEntries(
   )
 }
 
-export async function recordRecentEntry(path: FilesystemPath, client: Client = getClient()) {
+export async function recordRecentEntry(path: FilesystemPath, client: Client) {
   return observeClientOperation(
     {
       ...clientLogContext(client),
@@ -622,8 +615,15 @@ export function errorMessage(error: unknown) {
   return clientErrorMessage(error)
 }
 
-function queueTreeSuccessLog(path: string, result: TreeResult, startedAt: number) {
-  treeLogs.queue('fs.tree', {
+function queueTreeSuccessLog(
+  path: string,
+  result: TreeResult,
+  startedAt: number,
+  owner: FileLogOwner,
+  queue: ReturnType<typeof createCoalescedLogQueue>,
+) {
+  queue.queue('fs.tree', {
+    ...owner,
     action: 'fs.tree',
     area: 'fs',
     durationMs: elapsedMs(startedAt),
@@ -633,8 +633,15 @@ function queueTreeSuccessLog(path: string, result: TreeResult, startedAt: number
   })
 }
 
-function queueReadSuccessLog(path: string, result: FileResult, startedAt: number) {
-  readLogs.queue(`fs.read:${path}`, {
+function queueReadSuccessLog(
+  path: string,
+  result: FileResult,
+  startedAt: number,
+  owner: FileLogOwner,
+  queue: ReturnType<typeof createCoalescedLogQueue>,
+) {
+  queue.queue(`fs.read:${path}`, {
+    ...owner,
     action: 'fs.read',
     area: 'fs',
     durationMs: elapsedMs(startedAt),
@@ -644,11 +651,18 @@ function queueReadSuccessLog(path: string, result: FileResult, startedAt: number
   })
 }
 
-function logReadError(path: string, error: unknown, startedAt: number, signal: AbortSignal) {
+function logReadError(
+  path: string,
+  error: unknown,
+  startedAt: number,
+  signal: AbortSignal,
+  owner: FileLogOwner,
+) {
   if (signal.aborted) return
   if (isAbortError(error)) return
 
   log.warn({
+    ...owner,
     action: 'fs.read',
     area: 'fs',
     durationMs: elapsedMs(startedAt),
@@ -658,11 +672,18 @@ function logReadError(path: string, error: unknown, startedAt: number, signal: A
   })
 }
 
-function logTreeError(path: string, error: unknown, startedAt: number, signal: AbortSignal) {
+function logTreeError(
+  path: string,
+  error: unknown,
+  startedAt: number,
+  signal: AbortSignal,
+  owner: FileLogOwner,
+) {
   if (signal.aborted) return
   if (isAbortError(error)) return
 
   log.warn({
+    ...owner,
     action: 'fs.tree',
     area: 'fs',
     durationMs: elapsedMs(startedAt),
@@ -674,6 +695,8 @@ function logTreeError(path: string, error: unknown, startedAt: number, signal: A
 
 function mergeTreeLogEvents(current: Record<string, unknown>, next: Record<string, unknown>) {
   return {
+    environmentId: current.environmentId,
+    machine: current.machine,
     action: 'fs.tree',
     area: 'fs',
     latestPath: stringField(next, 'path') ?? stringField(next, 'latestPath'),

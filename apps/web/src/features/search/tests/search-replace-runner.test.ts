@@ -1,4 +1,4 @@
-import { fileDocumentKey, filesystemPath } from '@/lib/documents/utils/identity'
+import { filesystemPath } from '@/lib/documents/utils/identity'
 import { QueryClient } from '@tanstack/react-query'
 import { readFile, writeFile } from 'node:fs/promises'
 import { join } from 'node:path'
@@ -51,8 +51,19 @@ test.describe('workspace search replacement runner', () => {
     const diskPath = join(server.root, path)
     await writeFile(diskPath, 'needle')
     const store = createEditorDocumentStore()
-    const fileSync = new FileSyncService(store, new QueryClient(), createFileSyncPorts(client))
+    const ports = createFileSyncPorts(client)
+    let firstRead = true
+    const fileSync = new FileSyncService(store, new QueryClient(), {
+      ...ports,
+      readFileContent: async (filePath, signal) => {
+        const file = await fetchFile(filePath, signal, client)
+        if (firstRead) await writeFile(diskPath, 'prefix needle')
+        firstRead = false
+        return file
+      },
+    })
     const service = new WorkspaceEditService({
+      owner: { environmentId: null, machine: null },
       documentStore: store,
       fileSync,
       getRoot: () => ({
@@ -66,27 +77,13 @@ test.describe('workspace search replacement runner', () => {
     const unsubscribe = service.subscribe(() => {
       const { phase } = service.getSnapshot()
       phases.push(phase)
-      if (phase === 'awaiting-confirmation') service.cancelPreview()
+      if (phase === 'awaiting-confirmation')
+        service.cancelPreview(service.getSnapshot().preview!.operationId)
     })
 
     const result = await replaceWorkspaceSearchMatches({
-      context: {
-        applyWorkspaceChange: service.applyWorkspaceChange,
-        fetchFile: async (filePath, signal) => {
-          const file = await fetchFile(filesystemPath(filePath), signal, client)
-          await writeFile(diskPath, 'prefix needle')
-          return file
-        },
-        getLiveEditorDocument: (path) => {
-          const document = store
-            .getState()
-            .getLiveEditorDocument(fileDocumentKey(filesystemPath(path)))
-          if (document?.target.kind !== 'file') return null
-          return { path: document.target.resource.path, buffer: document.buffer }
-        },
-        rootPath: '/',
-        signal: new AbortController().signal,
-      },
+      workspaceEdits: service,
+      signal: new AbortController().signal,
       matches: [match(path, 1, 7)],
       query: { ...QUERY, path: '' },
       replaceText: 'pin',
@@ -123,7 +120,7 @@ test.describe('workspace search replacement runner', () => {
         targetKind: 'unopened',
       },
     ])
-    harness.service.confirmPreview()
+    harness.service.confirmPreview(harness.service.getSnapshot().preview!.operationId)
 
     await expect(pending).resolves.toEqual({
       changedFiles: 2,
@@ -155,7 +152,7 @@ test.describe('workspace search replacement runner', () => {
       match('/repo/second.ts', 1, 7),
     ])
     await waitForPhase(harness.service, 'awaiting-confirmation')
-    harness.service.confirmPreview()
+    harness.service.confirmPreview(harness.service.getSnapshot().preview!.operationId)
 
     await expect(pending).resolves.toMatchObject({ status: 'rolled-back' })
     expect(requiredFile(harness, '/repo/first.ts').content).toBe('needle')
@@ -174,7 +171,7 @@ test.describe('workspace search replacement runner', () => {
       match('/repo/unopened.ts', 1, 7),
     ])
     await waitForPhase(harness.service, 'awaiting-confirmation')
-    harness.service.cancelPreview()
+    harness.service.cancelPreview(harness.service.getSnapshot().preview!.operationId)
 
     await expect(pending).resolves.toEqual({ status: 'cancelled' })
     expect(live.buffer.materializeFullText()).toBe('needle')
@@ -193,7 +190,7 @@ test.describe('workspace search replacement runner', () => {
       match('/repo/unopened.ts', 1, 7),
     ])
     await waitForPhase(harness.service, 'awaiting-confirmation')
-    harness.service.confirmPreview()
+    harness.service.confirmPreview(harness.service.getSnapshot().preview!.operationId)
     await expect(pending).resolves.toMatchObject({ status: 'applied' })
 
     await expect(harness.service.undo()).resolves.toBe(true)
@@ -229,6 +226,7 @@ function createHarness(options: { readonly failFinalize?: boolean } = {}) {
     writeFileContent: async (path, content) => treeEntry(path, content, 1),
   })
   const service = new WorkspaceEditService({
+    owner: { environmentId: null, machine: null },
     createOperationId: () => OPERATION_ID,
     documentStore: store,
     fileSync,
@@ -253,22 +251,8 @@ function createHarness(options: { readonly failFinalize?: boolean } = {}) {
 function runReplace(harness: Harness, matches: readonly WorkspaceSearchMatch[]) {
   const signal = new AbortController().signal
   return replaceWorkspaceSearchMatches({
-    context: {
-      applyWorkspaceChange: harness.service.applyWorkspaceChange,
-      fetchFile: async (path, nextSignal) => {
-        nextSignal.throwIfAborted()
-        return requiredFile(harness, path)
-      },
-      getLiveEditorDocument: (path) => {
-        const document = harness.store
-          .getState()
-          .getLiveEditorDocument(fileDocumentKey(filesystemPath(path)))
-        if (document?.target.kind !== 'file') return null
-        return { path: document.target.resource.path, buffer: document.buffer }
-      },
-      rootPath: ROOT,
-      signal,
-    },
+    workspaceEdits: harness.service,
+    signal,
     matches,
     query: QUERY,
     replaceText: 'pin',

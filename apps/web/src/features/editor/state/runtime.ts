@@ -1,3 +1,5 @@
+import { clientLogContext } from '@/lib/environments/state/log-context'
+import { clientForQueryClient } from '@/lib/environments/state/query-clients'
 import { fileDocumentKey, filesystemPath } from '@/lib/documents/utils/identity'
 import { tabFileResource } from '@/lib/documents/utils/capabilities'
 import { documentTab, sameTabContent } from '@/lib/documents/utils/tabs'
@@ -96,6 +98,7 @@ export function createEditorRuntime({
   let recoveryDiscovery: { readonly generation: number; readonly promise: Promise<void> } | null =
     null
   const workspaceEditService = new WorkspaceEditService({
+    owner: clientLogContext(clientForQueryClient(queryClient)),
     documentStore,
     documentSyncController,
     fileSync,
@@ -103,7 +106,8 @@ export function createEditorRuntime({
   })
   const workspaceEditHost: WorkspaceEditHost = {
     documentSyncController,
-    isOwnEvent: (writeId) => workspaceEditService.isOwnEvent(writeId),
+    isOwnEvent: (writeId) =>
+      workspaceEditService.isOwnEvent(writeId) || fileSync.isOwnWriteEvent(writeId),
     onApplyWorkspaceEdit: workspaceEditService.onApplyWorkspaceEdit,
   }
   const saveService = new EditorSaveService(
@@ -165,6 +169,8 @@ export function createEditorRuntime({
   }
 
   return {
+    getOperationRoot: () => workspaceRoot(workspaceStore, rootGeneration),
+    issueFileWriteId: fileSync.issueWriteId,
     storage,
     queryClient,
     worktreeRefForRoot(rootPath: FilesystemPath): ScopedWorktreeRef | null {

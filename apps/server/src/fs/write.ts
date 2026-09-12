@@ -8,6 +8,9 @@ import { assertFile } from './stat'
 import type { WriteBody } from './contracts'
 import { fileVersion, textFileVersion } from './version'
 
+const temporaryFilePrefix = `.platform-write-${randomUUID()}-`
+let issuedTemporaryFileCount = 0
+
 export async function writeTextFile(
   target: MutationTarget<'content'>,
   body: Omit<WriteBody, 'path'>,
@@ -84,7 +87,19 @@ async function targetVersion(absolutePath: string, stats: Stats, baseVersion: st
 function temporaryPath(absolutePath: string) {
   return path.join(
     path.dirname(absolutePath),
-    `.${path.basename(absolutePath)}.${randomUUID()}.tmp`,
+    `${temporaryFilePrefix}${++issuedTemporaryFileCount}.tmp`,
+  )
+}
+
+export function isWriteTemporaryPath(input: string) {
+  const name = path.basename(input)
+  if (!name.startsWith(temporaryFilePrefix) || !name.endsWith('.tmp')) return false
+  const sequence = Number(name.slice(temporaryFilePrefix.length, -4))
+  return (
+    Number.isSafeInteger(sequence) &&
+    sequence > 0 &&
+    sequence <= issuedTemporaryFileCount &&
+    name === `${temporaryFilePrefix}${sequence}.tmp`
   )
 }
 

@@ -1,5 +1,6 @@
 import parcelWatcher from '@parcel/watcher'
-import { watch } from 'node:fs'
+import { createHash } from 'node:crypto'
+import { createReadStream, watch } from 'node:fs'
 import path from 'node:path'
 import { errorSummary, recordRequestWarning, runDetached } from '../observability'
 import { FsError } from './errors'
@@ -7,11 +8,13 @@ import {
   defaultIgnoredNames,
   isIgnoredPath,
   isOutsideRoot,
+  resolveExistingPath,
   toPosix,
   type WorkspacePaths,
 } from './path'
 import { entryFromStat } from './entry'
 import { statPath } from './stat'
+import { isWriteTemporaryPath } from './write'
 import type { TreeEntry, WatchServerMessage } from './contracts'
 
 type Listener = (event: WatchServerMessage) => void
@@ -40,6 +43,17 @@ type TransactionResultSignature = {
   readonly exists: boolean
   readonly path: string
   readonly version?: string
+}
+type WriteBarrier = {
+  readonly paths: ReadonlySet<string>
+  readonly queued: WatchServerMessage[]
+  readonly settled: Promise<void>
+  readonly release: () => void
+}
+type WriteResultMarker = {
+  readonly origin: string
+  readonly writeId: string
+  readonly version: string
 }
 
 const watcherIgnoredChildGlobs = defaultIgnoredNames.flatMap((name) => [
@@ -72,6 +86,8 @@ export class FileChangeHub {
   private readonly rawListeners = new Set<Listener>()
   private readonly transactionBarriers = new Map<string, TransactionBarrier>()
   private readonly transactionResultMarkers = new Map<string, TransactionResultMarker>()
+  private readonly writes = new Set<WriteBarrier>()
+  private readonly writeResultMarkers = new Map<string, WriteResultMarker>()
   private readonly watchEnabled: boolean
   private nextSequence = 1
 
@@ -83,7 +99,12 @@ export class FileChangeHub {
 
   emit(event: WatchServerMessage) {
     if (isInternalFilesystemEvent(this.paths, event)) return
-    const attributedEvent = this.attributeTransactionEvent(event)
+    const write = this.writeBarrierFor(event)
+    if (write) {
+      write.queued.push(event)
+      return
+    }
+    const attributedEvent = this.attributeTransactionEvent(this.attributeWriteEvent(event))
     const barrier = this.transactionBarrierFor(attributedEvent)
     if (barrier) {
       barrier.queued.push(attributedEvent)
@@ -130,6 +151,29 @@ export class FileChangeHub {
       paths: new Set(paths.map((input) => this.paths.resolve(input).relativePath)),
       queued: [],
     })
+  }
+
+  beginWrite(paths: readonly string[]): WriteBarrier {
+    const { promise: settled, resolve: release } = Promise.withResolvers<void>()
+    const write: WriteBarrier = {
+      paths: new Set(paths.map((input) => this.paths.resolve(input).relativePath)),
+      queued: [],
+      settled,
+      release,
+    }
+    this.writes.add(write)
+    return write
+  }
+
+  finishWrite(write: WriteBarrier, event?: WatchServerMessage) {
+    if (!this.writes.delete(write)) return
+    if (event && isFilesystemEvent(event) && event.origin && event.writeId && event.version) {
+      const marker = { origin: event.origin, writeId: event.writeId, version: event.version }
+      for (const relativePath of write.paths) this.writeResultMarkers.set(relativePath, marker)
+    }
+    if (event) this.emit(event)
+    for (const queued of write.queued) this.emit(queued)
+    write.release()
   }
 
   addTransactionPaths(operationId: string, paths: readonly string[]) {
@@ -198,6 +242,9 @@ export class FileChangeHub {
     this.rawListeners.clear()
     this.transactionBarriers.clear()
     this.transactionResultMarkers.clear()
+    for (const write of this.writes) write.release()
+    this.writes.clear()
+    this.writeResultMarkers.clear()
     await releaseWatchers(releases)
   }
 
@@ -211,6 +258,59 @@ export class FileChangeHub {
     if (!eventMatchesTransactionResult(event, marker)) return event
 
     return { ...event, origin: 'workspace-edit', writeId: marker.operationId }
+  }
+
+  private attributeWriteEvent(event: WatchServerMessage): WatchServerMessage {
+    if (!isFilesystemEvent(event) || event.origin || event.writeId) return event
+    const marker = this.writeResultMarkers.get(event.path)
+    if (!marker) return event
+    if (event.type !== 'deleted' && event.version === marker.version) {
+      return { ...event, origin: marker.origin, writeId: marker.writeId }
+    }
+    this.writeResultMarkers.delete(event.path)
+    return event
+  }
+
+  private writeBarrierFor(event: WatchServerMessage) {
+    for (const write of this.writes) {
+      if (eventTouchesBarrier(event, write.paths)) return write
+    }
+    return undefined
+  }
+
+  private writeForPath(relativePath: string) {
+    for (const write of this.writes) {
+      if (write.paths.has(relativePath)) return write
+    }
+    return undefined
+  }
+
+  private async waitForWrite(relativePath: string) {
+    let write = this.writeForPath(relativePath)
+    while (write) {
+      await write.settled
+      write = this.writeForPath(relativePath)
+    }
+  }
+
+  private async emitNativeEvent(
+    relativePath: string,
+    classify: (entry: TreeEntry | undefined) => 'created' | 'changed' | 'deleted' | null,
+  ) {
+    while (true) {
+      await this.waitForWrite(relativePath)
+      const marker = this.writeResultMarkers.get(relativePath)
+      const entry = await nativeEventEntry(this.paths, relativePath, marker !== undefined)
+      if (this.writeForPath(relativePath) || this.writeResultMarkers.get(relativePath) !== marker)
+        continue
+      let type = classify(entry)
+      if (!type) return
+      if (type === 'deleted' && marker && entry?.version === marker.version) type = 'changed'
+      this.emit(
+        nativeWatchEvent(type, relativePath, isIgnoredPath(relativePath) ? undefined : entry),
+      )
+      return
+    }
   }
 
   private async retainWatcher(relativeRoot: string): Promise<WatchRelease> {
@@ -314,15 +414,7 @@ export class FileChangeHub {
     if (relativePath === null) return
     if (isStaleParcelRootCreate(relativeRoot, event, relativePath)) return
 
-    const type = parcelEventType(event.type)
-    if (isIgnoredPath(relativePath)) {
-      this.emit(nativeWatchEvent(type, relativePath, undefined))
-      return
-    }
-
-    const entry = type === 'deleted' ? undefined : await nativeEventEntry(this.paths, relativePath)
-
-    this.emit(nativeWatchEvent(type, relativePath, entry))
+    await this.emitNativeEvent(relativePath, () => parcelEventType(event.type))
   }
 
   private async handleNodeEvent(
@@ -332,18 +424,9 @@ export class FileChangeHub {
     attachedAtMs: number,
   ) {
     const relativePath = watchEventPath(relativeRoot, filename)
-    // One stat answers both questions the event leaves open — whether the path
-    // still exists, and whether it is new — and doubles as the emitted entry.
-    const entry = await nativeEventEntry(this.paths, relativePath)
-    const type = nativeEventType(nativeEvent, entry, attachedAtMs)
-    if (!type) return
-
-    if (isIgnoredPath(relativePath)) {
-      this.emit(nativeWatchEvent(type, relativePath, undefined))
-      return
-    }
-
-    this.emit(nativeWatchEvent(type, relativePath, entry))
+    await this.emitNativeEvent(relativePath, (entry) =>
+      nativeEventType(nativeEvent, entry, attachedAtMs),
+    )
   }
 
   private async *createStream(
@@ -572,10 +655,10 @@ function eventMatchesTransactionResult(event: WatchServerMessage, marker: Transa
 
 function isInternalFilesystemEvent(paths: WorkspacePaths, event: WatchServerMessage) {
   if (!isFilesystemEvent(event)) return false
-  if (paths.isInternalPath(event.path)) return true
+  if (paths.isInternalPath(event.path) || isWriteTemporaryPath(event.path)) return true
   if (event.type !== 'renamed') return false
 
-  return paths.isInternalPath(event.oldPath)
+  return paths.isInternalPath(event.oldPath) || isWriteTemporaryPath(event.oldPath)
 }
 
 function nativeWatchEvent(
@@ -637,12 +720,40 @@ function wallClockMs() {
 async function nativeEventEntry(
   paths: WorkspacePaths,
   relativePath: string,
+  includeContentVersion = false,
 ): Promise<TreeEntry | undefined> {
   try {
-    return entryFromStat(await statPath(paths, relativePath))
+    const entry = entryFromStat(await statPath(paths, relativePath))
+    if (!includeContentVersion || entry.type !== 'file') return entry
+    return withNativeContentVersion(paths, relativePath, entry)
   } catch {
     return undefined
   }
+}
+
+async function withNativeContentVersion(
+  paths: WorkspacePaths,
+  relativePath: string,
+  entry: TreeEntry,
+) {
+  try {
+    return { ...entry, version: await nativeContentVersion(paths, relativePath) }
+  } catch (error) {
+    recordRequestWarning('fs.watch.content_version_failed', {
+      area: 'fs',
+      operation: 'watch_event',
+      path: relativePath,
+      error: errorSummary(error),
+    })
+    return entry
+  }
+}
+
+async function nativeContentVersion(paths: WorkspacePaths, relativePath: string) {
+  const target = await resolveExistingPath(paths, relativePath)
+  const hash = createHash('sha256')
+  for await (const bytes of createReadStream(target.absolutePath)) hash.update(bytes)
+  return `sha256:${hash.digest('hex')}`
 }
 
 function watchError(error: unknown, path: string): WatchServerMessage {

@@ -98,9 +98,6 @@ export function EditorSurfaceTabBody({
     (state) => state.ensureEditorViewForDocument,
   )
   const getLiveEditorDocument = useEditorDocumentState((state) => state.getLiveEditorDocument)
-  const forceReplaceLiveEditorDocument = useEditorDocumentState(
-    (state) => state.forceReplaceLiveEditorDocument,
-  )
   const setEditorViewScrollPosition = useEditorDocumentState(
     (state) => state.setEditorViewScrollPosition,
   )
@@ -110,14 +107,9 @@ export function EditorSurfaceTabBody({
   const clearStatusBarSource = useEditorUiState((state) => state.clearStatusBarSource)
   const setStatusBarSource = useEditorUiState((state) => state.setStatusBarSource)
   const uiStore = useEditorUiStoreApi()
-  const { discardLiveEditorDocument, openDefinition, renameLiveEditorDocument } =
-    useEditorCommands()
+  const { openDefinition } = useEditorCommands()
   const applyWorkspaceEdit = useWorkspaceEditHost()
-  const resolveConflictEditorDocument = useConflictEditorResolution({
-    discardLiveEditorDocument,
-    forceReplaceLiveEditorDocument,
-    renameLiveEditorDocument,
-  })
+  const resolveConflictEditorDocument = useConflictEditorResolution()
   const selectedFile = readyFile(fileState)
 
   useLayoutEffect(() => {

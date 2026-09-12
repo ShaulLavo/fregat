@@ -1,5 +1,8 @@
+import { statPath } from '@/lib/file-server'
+import { filesystemPath } from '@/lib/documents/utils/identity'
+import { makeTestServer } from '../../../../test/server'
 import { act, waitFor } from '@testing-library/react'
-import { writeFile } from 'node:fs/promises'
+import { readFile, writeFile } from 'node:fs/promises'
 import { join } from 'node:path'
 import { Button } from '@workspace/ui/components/button'
 
@@ -17,13 +20,14 @@ test('keeps replacement reads on the original machine when the selection changes
   client,
 }) => {
   void client
+  const otherServer = await makeTestServer()
   const originalOrigin = activeServerOrigin()
   const otherOrigin = 'http://replacement-other.test'
   setActiveServerOrigin(otherOrigin)
   const previousOtherClient = getClient()
   const otherReads: string[] = []
   setClient(
-    createObservedInProcessClient(server, (request) => {
+    createObservedInProcessClient(otherServer, (request) => {
       if (new URL(request.url).pathname === '/fs/read') otherReads.push(request.url)
     }),
   )
@@ -38,35 +42,12 @@ test('keeps replacement reads on the original machine when the selection changes
       setActiveServerOrigin(otherOrigin)
     }),
   )
+  const root = await statPath(filesystemPath(''), new AbortController().signal, client)
   const paths = ['first.ts', 'second.ts']
   await Promise.all(paths.map((path) => writeFile(join(server.root, path), 'needle')))
+  await Promise.all(paths.map((path) => writeFile(join(otherServer.root, path), 'other needle')))
   const application = createTestApplicationRuntime()
   const { editor } = application.getSnapshot()
-  const search = editor.searchBufferStore.getState()
-  search.prepareBuffer('')
-  search.setReplaceText('', 'pin')
-  const runId = search.startSearch({ path: '', query: 'needle', includeContent: true, limit: 20 })
-  for (const path of paths) {
-    search.appendEvent(runId, {
-      type: 'match',
-      match: {
-        path,
-        kind: 'content',
-        type: 'file',
-        source: 'disk',
-        line: 1,
-        column: 1,
-        endColumn: 7,
-      },
-    })
-  }
-  search.appendEvent(runId, {
-    type: 'done',
-    path: '',
-    query: 'needle',
-    count: 2,
-    truncated: false,
-  })
 
   const view = renderWithProviders(
     <TestEditorStateProvider>
@@ -76,12 +57,59 @@ test('keeps replacement reads on the original machine when the selection changes
   )
   try {
     const button = await view.findByRole('button', { name: 'Replace all' })
+    act(() => {
+      editor.workspaceStore.getState().switchWorkspace({ ...root, name: 'Root', type: 'directory' })
+      const search = editor.searchBufferStore.getState()
+      search.prepareBuffer('')
+      search.setReplaceText('', 'pin')
+      const runId = search.startSearch({
+        path: '',
+        query: 'needle',
+        includeContent: true,
+        limit: 20,
+      })
+      for (const path of paths) {
+        search.appendEvent(runId, {
+          type: 'match',
+          match: {
+            path,
+            kind: 'content',
+            type: 'file',
+            source: 'disk',
+            line: 1,
+            column: 1,
+            endColumn: 7,
+          },
+        })
+      }
+      search.appendEvent(runId, {
+        type: 'done',
+        path: '',
+        query: 'needle',
+        count: 2,
+        truncated: false,
+      })
+    })
     expect(button).toBeEnabled()
     act(() => button.click())
     await waitFor(() =>
-      expect(editor.searchBufferStore.getState().active?.replaceStatus).not.toBe('running'),
+      expect(editor.workspaceEditService.getSnapshot().phase).toBe('awaiting-confirmation'),
     )
-    expect(originalReads).toEqual(paths)
+    act(() =>
+      editor.workspaceEditService.confirmPreview(
+        editor.workspaceEditService.getSnapshot().preview!.operationId,
+      ),
+    )
+    await waitFor(() =>
+      expect(editor.searchBufferStore.getState().active?.replaceStatus).toBe('success'),
+    )
+    expect([...new Set(originalReads)]).toEqual(paths)
+    expect(
+      await Promise.all(paths.map((path) => readFile(join(server.root, path), 'utf8'))),
+    ).toEqual(['pin', 'pin'])
+    expect(
+      await Promise.all(paths.map((path) => readFile(join(otherServer.root, path), 'utf8'))),
+    ).toEqual(['other needle', 'other needle'])
     expect(otherReads).toEqual([])
   } finally {
     view.unmount()
@@ -89,6 +117,7 @@ test('keeps replacement reads on the original machine when the selection changes
     setClient(previousOtherClient)
     setActiveServerOrigin(originalOrigin)
     restore()
+    await otherServer.cleanup()
   }
 })
 

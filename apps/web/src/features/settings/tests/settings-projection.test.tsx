@@ -1,3 +1,4 @@
+import { getClient } from '@/lib/client'
 import {
   REDACTED_SETTINGS_VALUE,
   providerDriverKindSchema,
@@ -431,7 +432,7 @@ test('unexpected-epoch provider recovery invalidates once after intent acknowled
       providerInstanceId,
     },
   ]).entry
-  const result = await saveSettings(intent.request)
+  const result = await saveSettings(intent.request, getClient())
   const invalidateQueries = vi.spyOn(queryClient, 'invalidateQueries')
   const invalidationStatuses: Array<ReturnType<typeof settingsIntentStatus>> = []
   let providerWasInvalidated = false
@@ -533,7 +534,7 @@ test('unexpected epoch refetches confirmed state and keeps pending intent projec
     changedSettingIds: ['editor.fontSize'],
     snapshot: surprising,
   })
-  const fetched = await fetchSettings()
+  const fetched = await fetchSettings(undefined, getClient())
   const confirmed = queryClient.getQueryData<SettingsSnapshot>(settingsKeys.document()) ?? fetched
 
   expect(admission.admitted).toBe(false)
@@ -576,7 +577,7 @@ test('failed epoch recovery keeps intent pending until active confirmed evidence
   const intent = submitSettingsIntent(queryClient, 'user', [
     { key: 'workbench.colorTheme', kind: 'set', value: 'dark' },
   ]).entry
-  const result = await saveSettings(intent.request)
+  const result = await saveSettings(intent.request, getClient())
   controlledClient.controller.rejectNextSettingsRead({
     code: 'settings.READ_FAILED',
     message: 'Injected recovery failure',

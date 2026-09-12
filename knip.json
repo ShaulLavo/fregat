@@ -56,6 +56,7 @@
     },
     "apps/tui": {
       "entry": [
+        "src/search/tests/replacement.test-d.ts",
         "test/processes/job-control-launcher.ts",
         "test/processes/job-control-session.ts",
         "test/processes/storage-writer.ts"

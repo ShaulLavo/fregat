@@ -1,3 +1,4 @@
+import { getClient } from '@/lib/client'
 import { providerInstanceIdSchema } from '@workspace/contracts'
 import * as v from 'valibot'
 
@@ -27,7 +28,7 @@ const missing = v.parse(providerInstanceIdSchema, 'not-a-provider')
 test('a provider that lists commands answers with its catalog', async ({ client }) => {
   void client
 
-  const catalog = await fetchProviderCommandCatalog(codex, null)
+  const catalog = await fetchProviderCommandCatalog(codex, null, getClient())
 
   expect(catalog.providerInstanceId).toBe('codex')
   expect(catalog.supported).toBe(true)
@@ -39,7 +40,7 @@ test('an unavailable provider answers with an empty catalog instead of an error'
 }) => {
   void client
 
-  expect(await fetchProviderCommandCatalog(missing, '/tmp/some-project')).toEqual({
+  expect(await fetchProviderCommandCatalog(missing, '/tmp/some-project', getClient())).toEqual({
     commands: [],
     providerInstanceId: 'not-a-provider',
     skills: [],

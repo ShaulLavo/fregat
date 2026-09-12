@@ -1,9 +1,7 @@
 import { searchMatchEntry } from '@/lib/search-match-entry'
 import { filesystemPath } from '@/lib/documents/utils/identity'
-import { getClient } from '@/lib/client'
 import type { WorkspaceSearchEvent, WorkspaceSearchQuery } from '@workspace/contracts'
 import type { FindMatch, FsEntry, SearchScope } from '@/lib/file-system-types'
-import { streamWorkspaceSearch } from '@workspace/client-core/files/search-client'
 
 import { ROOT_PATH, compareSearchEntries, type FilePickerMode } from '@/features/file-picker/model'
 import { readSettingsMirror } from '@/features/settings/utils/boot-mirror'
@@ -11,17 +9,14 @@ import { readSettingsMirror } from '@/features/settings/utils/boot-mirror'
 const SEARCH_SCOPE_TIMEOUT_MS = 6000
 export const PICKER_HIDDEN_SEARCH_EXCLUDE_GLOBS = ['**/.*', '**/.*/**'] as const
 
-/**
- * Streaming search source. Defaults to the workspace SSE client but is injectable
- * so the picker search orchestration can be unit tested with mocked events.
- */
+/** The caller supplies the transport captured for this search. */
 export type WorkspaceSearchStream = (
   query: WorkspaceSearchQuery,
   signal: AbortSignal,
 ) => AsyncIterable<WorkspaceSearchEvent>
 
 export type StreamPickerSearchOptions = {
-  search?: WorkspaceSearchStream
+  search: WorkspaceSearchStream
   showHidden?: boolean
   scopeTimeoutMs?: number | null
 }
@@ -34,10 +29,9 @@ export async function streamPickerSearchEntries(
   mode: FilePickerMode,
   signal: AbortSignal,
   onEntries: (entries: FsEntry[]) => void,
-  options: StreamPickerSearchOptions = {},
+  options: StreamPickerSearchOptions,
 ): Promise<FsEntry[]> {
-  const search =
-    options.search ?? ((query, signal) => streamWorkspaceSearch(query, signal, getClient()))
+  const search = options.search
   const showHidden = options.showHidden ?? false
   const scopeTimeoutMs = options.scopeTimeoutMs ?? SEARCH_SCOPE_TIMEOUT_MS
   const matches: FindMatch[] = []

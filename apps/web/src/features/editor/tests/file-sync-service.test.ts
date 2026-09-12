@@ -1,5 +1,6 @@
 import { filesystemPath } from '@/lib/documents/utils/identity'
 import { testDocumentKey } from '../../../../test/factories/document-targets'
+import { createFileSyncPorts } from '@/features/editor/utils/file-sync-ports'
 import { createEditorDocumentStore } from '@/features/editor/state/document-state'
 import {
   FileSyncService,
@@ -457,3 +458,19 @@ function entry(path: string, content: string, mtimeMs: number): TreeEntry {
     version: `test:${mtimeMs}:${content.length}`,
   }
 }
+
+it('classifies only canonical write IDs issued by the retained file owner', ({ client }) => {
+  const ports = createFileSyncPorts(client)
+  const owner = new FileSyncService(createEditorDocumentStore(), new QueryClient(), ports)
+  const other = new FileSyncService(createEditorDocumentStore(), new QueryClient(), ports)
+  const first = owner.issueWriteId()
+  const prefix = first.slice(0, first.lastIndexOf(':') + 1)
+  expect(owner.isOwnWriteEvent(first)).toBe(true)
+  for (const suffix of ['0', '2', '01', '1.0', '1e0', '-1', 'Infinity', '']) {
+    expect(owner.isOwnWriteEvent(`${prefix}${suffix}`)).toBe(false)
+  }
+  expect(owner.isOwnWriteEvent(other.issueWriteId())).toBe(false)
+  const second = owner.issueWriteId()
+  expect(owner.isOwnWriteEvent(second)).toBe(true)
+  expect(owner.isOwnWriteEvent(first)).toBe(true)
+})

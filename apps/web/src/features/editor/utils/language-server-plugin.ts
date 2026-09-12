@@ -29,7 +29,7 @@ import {
   semanticTokensCapabilityForServer,
 } from '@/features/editor/utils/semantic-token-capability'
 import { languageServerWebSocketConstructor } from '@/lib/server-sockets'
-import { activeServerOrigin, environmentClientFor } from '@/lib/client'
+import { environmentClientFor } from '@/lib/client'
 import { environmentActivitySignal } from '@/lib/environments/state/activity'
 import { log } from '@/lib/client-logging'
 import type { LanguageServerDocument } from '@/lib/language-server-document'
@@ -46,7 +46,7 @@ export type LanguageServerDocumentTarget = {
 
 type MatchedLanguageServerPluginOptions = {
   document: LanguageServerDocument | null
-  origin?: string
+  origin: string
   documentSyncController: LanguageServerDocumentSyncController
   enabled: boolean
   matches: readonly LanguageServerMatch[] | null
@@ -64,7 +64,7 @@ type MatchedLanguageServerPluginOptions = {
 
 export function createMatchedLanguageServerPlugin({
   document,
-  origin = activeServerOrigin(),
+  origin,
   documentSyncController,
   enabled,
   matches,
@@ -169,14 +169,14 @@ function liveLanguageServerLane({
 }
 
 export function languageServerLaneOptions({
-  origin = activeServerOrigin(),
+  origin,
   connectionProvider,
   match,
   onApplyWorkspaceEdit,
   rootPath,
   target,
 }: {
-  origin?: string
+  origin: string
   connectionProvider: LspConnectionProvider
   match: LanguageServerMatch
   onApplyWorkspaceEdit: OnApplyWorkspaceEdit

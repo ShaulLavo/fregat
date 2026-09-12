@@ -25,6 +25,9 @@ export type WorkspaceEditOperationSettlement = {
 export type WorkspaceEditOperationEventOptions = {
   readonly createScope?: typeof createWideEventScope
   readonly now?: () => number
+  readonly owner: { readonly environmentId: string | null; readonly machine: string | null }
+  readonly rootGeneration: number | null
+  readonly sourceKind: 'computed-text' | 'language-server'
   readonly operationId: string
   readonly source: string
 }
@@ -44,6 +47,9 @@ export class WorkspaceEditOperationEvent {
     this.phaseStartedAt = this.startedAt
     const createScope = options.createScope ?? createWideEventScope
     this.scope = createScope({
+      ...options.owner,
+      rootGeneration: options.rootGeneration,
+      sourceKind: options.sourceKind,
       action: 'workspace_edit.apply',
       area: 'workspace-edit',
       operationId: options.operationId,

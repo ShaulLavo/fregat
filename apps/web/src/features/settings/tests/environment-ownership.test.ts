@@ -100,7 +100,7 @@ test('an unfinished raw save retries on its original server after a switch', asy
     expect(
       (await fetchSettings(undefined, controlledClient.client)).values['editor.fontSize'],
     ).toBe(21)
-    expect((await fetchSettings()).values['editor.fontSize']).toBe(
+    expect((await fetchSettings(undefined, getClient())).values['editor.fontSize']).toBe(
       secondBefore.values['editor.fontSize'],
     )
     expect(documentStore.getState().getLiveEditorDocument(documentId)?.buffer.isDirty()).toBe(false)

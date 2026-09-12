@@ -1,3 +1,4 @@
+import { getClient } from '@/lib/client'
 import { screen, waitFor, within } from '@testing-library/react'
 import userEvent from '@testing-library/user-event'
 
@@ -12,7 +13,7 @@ import { settingsKeys } from '@workspace/client-core/settings/query-keys'
 test('code theme sample follows highlighted rows and labels a retained sample after an empty search', async ({
   controlledClient,
 }) => {
-  const before = await fetchSettings()
+  const before = await fetchSettings(undefined, getClient())
   const queryClient = createTestQueryClient()
   queryClient.setQueryData(settingsKeys.document(), before)
   renderWithProviders(
@@ -54,7 +55,7 @@ test('code theme sample follows highlighted rows and labels a retained sample af
   await waitFor(() =>
     expect(screen.queryByRole('region', { name: 'Code theme sample' })).toBeNull(),
   )
-  expect((await fetchSettings()).values['editor.codeTheme.dark']).toBe(
+  expect((await fetchSettings(undefined, getClient())).values['editor.codeTheme.dark']).toBe(
     before.values['editor.codeTheme.dark'],
   )
 })

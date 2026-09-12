@@ -1,3 +1,4 @@
+import { getClient } from '@/lib/client'
 import { filesystemPath } from '@/lib/documents/utils/identity'
 import { execFileSync } from 'node:child_process'
 import { mkdir, writeFile } from 'node:fs/promises'
@@ -160,11 +161,14 @@ async function dragRows(side: PaneSide, anchorRow: number, headRow: number) {
 async function renderDiffView(ui: ReactElement) {
   stubHighlightApi()
   resetComposerInboxStore()
-  await saveSettings({
-    mutationId: 'diff-comments-split',
-    operations: [{ key: 'editor.diff.viewMode', kind: 'set', value: 'split' }],
-    target: 'user',
-  })
+  await saveSettings(
+    {
+      mutationId: 'diff-comments-split',
+      operations: [{ key: 'editor.diff.viewMode', kind: 'set', value: 'split' }],
+      target: 'user',
+    },
+    getClient(),
+  )
 
   return renderWithProviders(<EditorStateProvider>{ui}</EditorStateProvider>)
 }
@@ -187,7 +191,7 @@ async function twoEditRepo(root: string, { alsoEditLine35 = false } = {}) {
   const edited = FORTY_LINES.replace('line 2\n', 'line two\n')
   const text = alsoEditLine35 ? edited.replace('line 35\n', 'thirty five\n') : edited
   await writeFile(path.join(repo, 'lines.ts'), `${text}\n`)
-  const diff = (await fetchDiff('repo/lines.ts', false))[0]!
+  const diff = (await fetchDiff('repo/lines.ts', false, undefined, getClient()))[0]!
 
   return { documentInfo: snapshotComparison(diff), repo }
 }

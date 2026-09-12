@@ -1,6 +1,6 @@
 import type { GitFileDiff } from '@workspace/contracts'
 import { clientLogContext } from '@/lib/environments/state/log-context'
-import { getClient, type Client } from '@/lib/client'
+import type { Client } from '@/lib/client'
 import { observeClientOperation } from '@/lib/client-logging'
 import { unwrapEdenResponse } from '@/lib/eden-events'
 import { gitKeys } from '@/lib/query-keys'
@@ -22,8 +22,8 @@ export function blobDiffQueryKey(query: BlobDiffRequest) {
  */
 export async function fetchBlobDiff(
   query: BlobDiffRequest,
-  signal?: AbortSignal,
-  client: Client = getClient(),
+  signal: AbortSignal | undefined,
+  client: Client,
 ): Promise<GitFileDiff[]> {
   return observeClientOperation(
     {

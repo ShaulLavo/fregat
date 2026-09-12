@@ -1,3 +1,4 @@
+import type { Client } from '@/lib/client'
 import type {
   WorkspaceSearchEvent,
   WorkspaceSearchMatch,
@@ -233,9 +234,12 @@ export function shouldDeferInitialOpenBufferMatches(
   return !sameWorkspaceSearchQuery(snapshot.resultsSearchQuery, query)
 }
 
-export function workspaceSearchProvider(documents: readonly OpenBufferSearchDocument[]) {
+export function workspaceSearchProvider(
+  documents: readonly OpenBufferSearchDocument[],
+  client: Client,
+) {
   return new CompositeSearchProvider({
-    disk: new DiskSearchProvider(),
+    disk: new DiskSearchProvider(client),
     openBufferPaths: new Set(documents.map((document) => document.path)),
     openBuffers: new OpenBufferSearchProvider(documents),
   })

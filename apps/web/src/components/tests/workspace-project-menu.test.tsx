@@ -1,3 +1,4 @@
+import { getClient } from '@/lib/client'
 import { filesystemPath } from '@/lib/documents/utils/identity'
 import { symlink } from 'node:fs/promises'
 import path from 'node:path'
@@ -43,10 +44,10 @@ test('lists a folder only once when recents include a symlink through its parent
   client,
   server,
 }) => {
-  await ensureFolderPath(filesystemPath('projects/platform'))
+  await ensureFolderPath(filesystemPath('projects/platform'), getClient())
   await symlink('projects', path.join(server.root, 'Projects'))
-  await recordRecentEntry(filesystemPath('projects/platform'))
-  await recordRecentEntry(filesystemPath('Projects/platform'))
+  await recordRecentEntry(filesystemPath('projects/platform'), getClient())
+  await recordRecentEntry(filesystemPath('Projects/platform'), getClient())
   const { queryClient } = await renderMenu(client, 'projects/platform')
 
   await userEvent.click(screen.getByRole('button', { name: 'Switch project' }))
@@ -64,9 +65,9 @@ test('lists a folder only once when recents include a symlink through its parent
 })
 
 test('keeps distinct case-sensitive folders and opens the selected folder', async ({ client }) => {
-  await ensureFolderPath(filesystemPath('projects/platform'))
-  await ensureFolderPath(filesystemPath('Projects/platform'))
-  await recordRecentEntry(filesystemPath('Projects/platform'))
+  await ensureFolderPath(filesystemPath('projects/platform'), getClient())
+  await ensureFolderPath(filesystemPath('Projects/platform'), getClient())
+  await recordRecentEntry(filesystemPath('Projects/platform'), getClient())
   const { store } = await renderMenu(client, 'projects/platform')
 
   await userEvent.click(screen.getByRole('button', { name: 'Switch project' }))
@@ -78,7 +79,7 @@ test('keeps distinct case-sensitive folders and opens the selected folder', asyn
 })
 
 test('opens without a render failure and lists recents under a heading', async ({ client }) => {
-  await ensureFolderPath(filesystemPath('repo/platform'))
+  await ensureFolderPath(filesystemPath('repo/platform'), getClient())
   await renderMenu(client, 'repo/platform')
 
   // Opening is the assertion: base-ui throws outright if a group label sits
@@ -90,7 +91,7 @@ test('opens without a render failure and lists recents under a heading', async (
 })
 
 test('offers the open project as the checked entry before recents load', async ({ client }) => {
-  await ensureFolderPath(filesystemPath('repo/platform'))
+  await ensureFolderPath(filesystemPath('repo/platform'), getClient())
   await renderMenu(client, 'repo/platform')
 
   await userEvent.click(screen.getByRole('button', { name: 'Switch project' }))

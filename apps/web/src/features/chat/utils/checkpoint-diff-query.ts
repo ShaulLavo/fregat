@@ -2,7 +2,7 @@ import type { GitFileDiff, GitFileStatus } from '@workspace/contracts'
 import { clientLogContext } from '@/lib/environments/state/log-context'
 import type { SessionId } from '@workspace/contracts'
 
-import { getClient, type Client } from '@/lib/client'
+import type { Client } from '@/lib/client'
 import { observeClientOperation } from '@/lib/client-logging'
 import { unwrapEdenResponse } from '@/lib/eden-events'
 import { gitKeys } from '@/lib/query-keys'
@@ -145,8 +145,8 @@ export function matchingCheckpointDiff(diffs: readonly GitFileDiff[], path: stri
 
 export async function fetchCheckpointDiff(
   input: CheckpointDiffQueryInput,
-  signal?: AbortSignal,
-  client: Client = getClient(),
+  signal: AbortSignal | undefined,
+  client: Client,
 ) {
   if (input.scope === 'session') {
     return fetchFullSessionCheckpointDiff(input, signal, client)

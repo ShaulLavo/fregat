@@ -1,6 +1,6 @@
 import { connectLanguageServerSocket, type EdenServerSocket } from '@/lib/server-sockets'
 import { clientErrors } from '@/lib/structured-errors'
-import { getClient, type Client } from '@/lib/client'
+import type { Client } from '@/lib/client'
 
 type DocumentSymbolRange = {
   start: { line: number; character: number }
@@ -38,10 +38,10 @@ export async function fetchDocumentSymbols(
   }: {
     path: string
     rootPath: string
-    signal?: AbortSignal
+    signal: AbortSignal
     text?: string | null
   },
-  client: Client = getClient(),
+  client: Client,
 ): Promise<readonly FlatDocumentSymbol[]> {
   const symbols = await requestDocumentSymbols(
     {
@@ -67,7 +67,7 @@ function requestDocumentSymbols(
   }: {
     path: string
     rootPath: string
-    signal?: AbortSignal
+    signal: AbortSignal
     text?: string | null
   },
   client: Client,

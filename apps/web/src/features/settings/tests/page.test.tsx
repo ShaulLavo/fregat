@@ -47,7 +47,7 @@ test('renders a row per user-visible setting and writes a toggle through', async
   // Asserted against the server, not the control: the point is that the click
   // reached the settings file, not that a switch flipped locally.
   await waitFor(async () => {
-    const snapshot = await fetchSettings()
+    const snapshot = await fetchSettings(undefined, getClient())
     expect(snapshot.values['workbench.wallpaper.enabled']).toBe(false)
   })
 })
@@ -67,7 +67,7 @@ test('offers a reset once a value differs from its default', async ({ client }) 
   // Reset removes the key rather than writing the default into the file, which
   // is what keeps the default coming from the running build.
   await waitFor(async () => {
-    const snapshot = await fetchSettings()
+    const snapshot = await fetchSettings(undefined, getClient())
     expect(snapshot.values['workbench.wallpaper.enabled']).toBe(true)
     expect(snapshot.layers.find((layer) => layer.id === 'user')?.raw).not.toHaveProperty(
       'workbench.wallpaper.enabled',
@@ -99,7 +99,7 @@ test('shows a diagnostic for a key the settings file holds but cannot apply', as
   // holding a key this build does not register. The resolver keeps it in the
   // file and reports it rather than applying it, and the page has to say so —
   // otherwise a renamed key just looks like a setting that stopped working.
-  const before = await fetchSettings()
+  const before = await fetchSettings(undefined, getClient())
   await getClient().settings.raw.post({
     baseRevision: before.layers.find((layer) => layer.id === 'user')?.file?.revision ?? '',
     target: 'user',
@@ -115,21 +115,24 @@ test('shows a diagnostic for a key the settings file holds but cannot apply', as
 
 test('reset all clears every key from the layer in one write', async ({ client }) => {
   expect(client).toBeDefined()
-  await saveSettings({
-    mutationId: 'page-reset-all-seed',
-    operations: [
-      { key: 'workbench.colorTheme', kind: 'set', value: 'light' },
-      { key: 'workbench.surface.opacity', kind: 'set', value: 40 },
-    ],
-    target: 'user',
-  })
+  await saveSettings(
+    {
+      mutationId: 'page-reset-all-seed',
+      operations: [
+        { key: 'workbench.colorTheme', kind: 'set', value: 'light' },
+        { key: 'workbench.surface.opacity', kind: 'set', value: 40 },
+      ],
+      target: 'user',
+    },
+    getClient(),
+  )
 
   renderWithProviders(<SettingsPage />)
   await userEvent.click(await screen.findByRole('button', { name: 'Settings actions' }))
   await userEvent.click(await screen.findByRole('menuitem', { name: /Reset all/ }))
 
   await waitFor(async () => {
-    const snapshot = await fetchSettings()
+    const snapshot = await fetchSettings(undefined, getClient())
     // Removed, not overwritten with defaults: what is in the file is what the
     // user changed, so a default that moves in a later build still applies.
     expect(snapshot.layers.find((layer) => layer.id === 'user')?.raw).toEqual({})
@@ -204,7 +207,7 @@ test('lists the real model catalog, and hiding one keeps its row to bring it bac
   await userEvent.click(first!)
 
   await waitFor(async () => {
-    const snapshot = await fetchSettings()
+    const snapshot = await fetchSettings(undefined, getClient())
     expect(snapshot.values['models.hidden']).toHaveLength(1)
   })
 
@@ -255,7 +258,7 @@ test('a collection edited back to empty leaves no key behind to look modified', 
   const label = first!.getAttribute('aria-label')
   await userEvent.click(first!)
   await waitFor(async () => {
-    expect((await fetchSettings()).values['models.hidden']).toHaveLength(1)
+    expect((await fetchSettings(undefined, getClient())).values['models.hidden']).toHaveLength(1)
   })
 
   await userEvent.click(await screen.findByRole('switch', { name: label! }))
@@ -264,7 +267,7 @@ test('a collection edited back to empty leaves no key behind to look modified', 
   // which is what the page reads as modified. The row then claimed a change it
   // could not describe and offered a Reset with nothing to remove.
   await waitFor(async () => {
-    const snapshot = await fetchSettings()
+    const snapshot = await fetchSettings(undefined, getClient())
     expect(snapshot.layers.find((layer) => layer.id === 'user')?.raw).not.toHaveProperty(
       'models.hidden',
     )
@@ -313,7 +316,7 @@ test('every visible row is reachable and operable from the keyboard', async ({ c
   await userEvent.keyboard(' ')
 
   await waitFor(async () => {
-    const snapshot = await fetchSettings()
+    const snapshot = await fetchSettings(undefined, getClient())
     expect(snapshot.values['workbench.wallpaper.enabled']).toBe(false)
   })
 })

@@ -1,5 +1,6 @@
 import { execFile } from 'node:child_process'
-import { chmod, mkdir, mkdtemp, rename, rm, symlink, writeFile } from 'node:fs/promises'
+import { writeFileSync } from 'node:fs'
+import { chmod, mkdir, mkdtemp, readFile, rename, rm, symlink, writeFile } from 'node:fs/promises'
 import { tmpdir } from 'node:os'
 import path from 'node:path'
 import { promisify } from 'node:util'
@@ -8,6 +9,7 @@ import { afterEach, describe, expect, it } from 'vitest'
 import { createWorkspacePaths } from '../path'
 import type { WatchServerMessage } from '../contracts'
 import { FileSystemService } from '../service'
+import { textFileVersion } from '../version'
 import { WorkspaceIndex, buildWorkspaceIndex, watchWorkspaceIndex } from '../workspace-index'
 
 // Tests must not depend on whatever the developer has in their global git
@@ -436,6 +438,41 @@ describe('workspace index', () => {
       await service.delete({ path: 'src/main.ts' })
       await waitForMissingEntry(index, 'src/main.ts')
     } finally {
+      await service.close()
+    }
+  })
+
+  it('binds create acknowledgement to submitted bytes despite a change listener overwrite', async () => {
+    const root = await fixtureRoot()
+    const service = new FileSystemService({
+      metadataDatabasePath: ':memory:',
+      workspaceEditJournalRoot: path.join(root, '.workspace-edit-journals'),
+      workspaceRoot: root,
+      watch: false,
+    })
+    const abort = new AbortController()
+    const events = service.changes.stream([''], abort.signal)
+    try {
+      expect((await events.next()).value).toMatchObject({ type: 'ready' })
+      const overwrite = events.next().then((event) => {
+        expect(event.value).toMatchObject({ path: 'created.txt', type: 'created' })
+        writeFileSync(path.join(root, 'created.txt'), 'external replacement')
+      })
+
+      const receipt = await service.createFile({ content: 'resolution A', path: 'created.txt' })
+      await overwrite
+      await expect(
+        service.write({
+          baseVersion: receipt.version,
+          content: 'resolution B',
+          path: 'created.txt',
+        }),
+      ).rejects.toMatchObject({ code: 'FILE_CHANGED' })
+      expect(receipt.version).toBe(textFileVersion('resolution A'))
+      expect(await readFile(path.join(root, 'created.txt'), 'utf8')).toBe('external replacement')
+    } finally {
+      abort.abort()
+      await events.return(undefined)
       await service.close()
     }
   })

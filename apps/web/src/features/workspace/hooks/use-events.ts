@@ -246,7 +246,7 @@ function workspaceEventsScopeHasWork(eventsScope: WideEventScope) {
   return eventsScope.count('stream.errorCount') > 0
 }
 
-async function applyWorkspaceEvents({
+export async function applyWorkspaceEvents({
   conflictStore,
   discardLiveEditorDocument,
   dirtyDocumentKeys,
@@ -458,12 +458,13 @@ async function applyWorkspaceEventPlan({
   selectContent: (content: TabContent) => void
   signal: AbortSignal
 }) {
+  const client = clientForQueryClient(queryClient)
   const conflictContext: WorkspaceConflictContext = {
+    client,
     conflictStore,
     discardLiveEditorDocument,
     ensureUnsyncedEditorDocument,
-    fetchFile: (path, signal) =>
-      fetchFileWithRetry(path, signal, clientForQueryClient(queryClient)),
+    fetchFile: (path, signal) => fetchFileWithRetry(path, signal, client),
     forceReplaceLiveEditorDocument,
     getLiveEditorDocument,
     queryClient,
@@ -833,7 +834,7 @@ function shouldRefreshDirectory(model: TreeModel, rootPath: string, path: string
   return model.loadedDirectoryPaths.has(treePath)
 }
 
-async function streamWorkspaceEvents(
+export async function streamWorkspaceEvents(
   client: Client,
   rootPath: string,
   signal: AbortSignal,

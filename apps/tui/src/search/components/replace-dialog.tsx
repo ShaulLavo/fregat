@@ -75,7 +75,7 @@ export function ReplaceDialog({
       }
       if (phase.kind !== 'preview' || value !== 'replace' || !phase.plan.operations.length) return
       setPhase({ kind: 'applying', plan: phase.plan })
-      await applyReplacement(client, query.path, phase.plan, lifetime.signal)
+      await applyReplacement(phase.plan)
       // `searchKind`/`searchTruncated` are what the enabling gate saw. Constant
       // today, so a regression in that gate shows up here.
       recordObservabilityInfo('tui.search.replace', {

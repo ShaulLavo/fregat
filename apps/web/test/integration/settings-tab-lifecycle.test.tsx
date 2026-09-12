@@ -14,6 +14,7 @@ import { fetchSettings, saveSettingsText } from '@/features/settings/utils/api'
 import { createEditorTabRecord, settingsTab } from '@/lib/documents/utils/tabs'
 import { FocusService } from '@/lib/focus/state/service'
 import { statPath } from '@/lib/file-server'
+import type { Client } from '@/lib/client'
 import { log } from '@/lib/client-logging'
 
 import { createObservedInProcessClient } from '../client'
@@ -55,10 +56,12 @@ test('active Save follows JSON scope, form ignores its retained JSON view, and S
   })
   expectSettings(lifecycle, 'user', USER_TEXT, false)
   expectSettings(lifecycle, 'workspace', WORKSPACE_TEXT, true)
-  expect(settingsLayerFile(await fetchSettings(), 'user').text).toBe(USER_TEXT)
-  expect(settingsLayerFile(await fetchSettings(), 'workspace').text).toBe(
-    lifecycle.initialWorkspaceText,
+  expect(settingsLayerFile(await fetchSettings(undefined, lifecycle.client), 'user').text).toBe(
+    USER_TEXT,
   )
+  expect(
+    settingsLayerFile(await fetchSettings(undefined, lifecycle.client), 'workspace').text,
+  ).toBe(lifecycle.initialWorkspaceText)
 
   selectSettingsScope('workspace')
   lifecycle.editor.documentStore
@@ -85,7 +88,9 @@ test('active Save follows JSON scope, form ignores its retained JSON view, and S
   })
   expectSettings(lifecycle, 'user', USER_TEXT, false)
   expectSettings(lifecycle, 'workspace', WORKSPACE_TEXT, false)
-  expect(settingsLayerFile(await fetchSettings(), 'workspace').text).toBe(WORKSPACE_TEXT)
+  expect(
+    settingsLayerFile(await fetchSettings(undefined, lifecycle.client), 'workspace').text,
+  ).toBe(WORKSPACE_TEXT)
   expect(lifecycle.rawWrites.map((write) => write.target)).toEqual(['user', 'user', 'workspace'])
 })
 
@@ -120,7 +125,7 @@ for (const choice of ['Save', 'Discard', 'Cancel'] as const) {
           .getLiveEditorDocument(documentKey(settingsJsonDocument('workspace'))),
       ).toBeNull()
       expect(lifecycle.rawWrites).toEqual([])
-      const saved = await fetchSettings()
+      const saved = await fetchSettings(undefined, lifecycle.client)
       expect(settingsLayerFile(saved, 'user').text).toBe(lifecycle.initialUserText)
       expect(settingsLayerFile(saved, 'workspace').text).toBe(lifecycle.initialWorkspaceText)
       return
@@ -128,7 +133,7 @@ for (const choice of ['Save', 'Discard', 'Cancel'] as const) {
     expectSettings(lifecycle, 'user', USER_TEXT, false)
     expectSettings(lifecycle, 'workspace', WORKSPACE_TEXT, false)
     expect(lifecycle.rawWrites.map((write) => write.target)).toEqual(['user', 'workspace'])
-    const saved = await fetchSettings()
+    const saved = await fetchSettings(undefined, lifecycle.client)
     expect(settingsLayerFile(saved, 'user').text).toBe(USER_TEXT)
     expect(settingsLayerFile(saved, 'workspace').text).toBe(WORKSPACE_TEXT)
   })
@@ -166,7 +171,7 @@ for (const conflict of ['already conflicted', 'newly stale'] as const) {
   }) => {
     const lifecycle = await mountLifecycle(server)
     seedBothScopes(lifecycle)
-    const external = await writeExternal(lifecycle.initial)
+    const external = await writeExternal(lifecycle.initial, lifecycle.client)
     if (conflict === 'already conflicted') {
       lifecycle.editor.documentStore
         .getState()
@@ -206,14 +211,20 @@ for (const conflict of ['already conflicted', 'newly stale'] as const) {
     })
     expectSettings(lifecycle, 'user', USER_TEXT, true)
     expectSettings(lifecycle, 'workspace', WORKSPACE_TEXT, false)
-    expect(settingsLayerFile(await fetchSettings(), 'user').text).toBe(EXTERNAL_TEXT)
-    expect(settingsLayerFile(await fetchSettings(), 'workspace').text).toBe(WORKSPACE_TEXT)
+    expect(settingsLayerFile(await fetchSettings(undefined, lifecycle.client), 'user').text).toBe(
+      EXTERNAL_TEXT,
+    )
+    expect(
+      settingsLayerFile(await fetchSettings(undefined, lifecycle.client), 'workspace').text,
+    ).toBe(WORKSPACE_TEXT)
     fireEvent.click(screen.getByRole('button', { name: 'Cancel', exact: true }))
     await waitFor(() => expect(screen.queryByRole('dialog')).toBeNull())
     const sync = new SettingsSyncService(lifecycle.editor.documentStore, lifecycle.queryClient)
     await act(async () => sync.overwrite(currentDocument(lifecycle, 'user')))
     expectSettings(lifecycle, 'user', USER_TEXT, false)
-    expect(settingsLayerFile(await fetchSettings(), 'user').text).toBe(USER_TEXT)
+    expect(settingsLayerFile(await fetchSettings(undefined, lifecycle.client), 'user').text).toBe(
+      USER_TEXT,
+    )
     act(() => {
       createEditorBufferSession(currentDocument(lifecycle, 'user').buffer).applyText(' ')
     })
@@ -223,7 +234,9 @@ for (const conflict of ['already conflicted', 'newly stale'] as const) {
     await waitFor(() => expect(screen.getByLabelText('Settings tab count')).toHaveTextContent('0'))
     expect(await saves.mock.results[2]?.value).toBe(true)
     expectSettings(lifecycle, 'user', `${USER_TEXT} `, false)
-    expect(settingsLayerFile(await fetchSettings(), 'user').text).toBe(`${USER_TEXT} `)
+    expect(settingsLayerFile(await fetchSettings(undefined, lifecycle.client), 'user').text).toBe(
+      `${USER_TEXT} `,
+    )
   })
 }
 
@@ -237,11 +250,11 @@ async function mountLifecycle(server: TestServer) {
   })
   const restore = installTestClient(client)
   onTestFinished(restore)
-  const initial = await fetchSettings()
+  const initial = await fetchSettings(undefined, client)
   const application = createTestApplicationRuntime()
   const { editor, queryClient } = application.getSnapshot()
   await mkdir(join(server.root, 'project'))
-  const folder = await statPath('project', new AbortController().signal)
+  const folder = await statPath('project', new AbortController().signal, client)
   const workspaceAddress = await registerTestWorkspaceAddress(client, 'project')
   editor.workspaceStore.getState().switchWorkspace({ ...folder, workspaceAddress })
   queryClient.setQueryData(settingsKeys.document(), initial)
@@ -261,6 +274,7 @@ async function mountLifecycle(server: TestServer) {
       expect(decodeURIComponent(request.url)).not.toMatch(/settings-json:|settings:/)
   })
   return {
+    client,
     application,
     editor,
     initial,
@@ -317,13 +331,16 @@ function settingsTabId(lifecycle: Lifecycle) {
   return tab!.id
 }
 
-async function writeExternal(initial: SettingsSnapshot) {
-  const result = await saveSettingsText({
-    baseRevision: settingsLayerFile(initial, 'user').revision,
-    target: 'user',
-    text: EXTERNAL_TEXT,
-    writeId: 'settings-lifecycle-external',
-  })
+async function writeExternal(initial: SettingsSnapshot, client: Client) {
+  const result = await saveSettingsText(
+    {
+      baseRevision: settingsLayerFile(initial, 'user').revision,
+      target: 'user',
+      text: EXTERNAL_TEXT,
+      writeId: 'settings-lifecycle-external',
+    },
+    client,
+  )
   return result.snapshot
 }
 

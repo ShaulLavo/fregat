@@ -1,5 +1,5 @@
 import { tabFileResource } from '@/lib/documents/utils/capabilities'
-import { waitFor } from '@testing-library/react'
+import { act, waitFor } from '@testing-library/react'
 import type { Terminal, LinkLineSnapshot, LinkProvider } from 'ghostty-webgpu'
 import { mkdir, writeFile } from 'node:fs/promises'
 import path from 'node:path'
@@ -11,7 +11,17 @@ import { useEditorWorkspaceState } from '@/features/editor/state/workspace-state
 import { useTerminalLinks } from '@/features/terminal/hooks/use-links'
 import { expect, test } from '../../../../../test/fixtures'
 import { renderWithProviders } from '../../../../../test/render'
-import type { Client } from '@/lib/client'
+import {
+  activeServerOrigin,
+  getClient,
+  setActiveServerOrigin,
+  setClient,
+  type Client,
+} from '@/lib/client'
+import { createInProcessClient, createObservedInProcessClient } from '../../../../../test/client'
+import { createRequestGate } from '../../../../../test/factories/request-gate'
+import { installTestClient } from '../../../../../test/factories/client-binding'
+import { makeTestServer } from '../../../../../test/server'
 import type { TestServer } from '../../../../../test/server'
 import { navigationWorkspace } from '../../../../../test/factories/navigation-workspace'
 import { seedWorkspaceCache } from '../../../../../test/address'
@@ -103,6 +113,82 @@ test('a path that is not on disk reports instead of opening a phantom tab', asyn
   expect(opened.paths).toEqual(['repo/src/a.ts'])
 })
 
+test('a retained terminal validates and opens on its owner after another server is selected', async ({
+  server,
+}) => {
+  const secondServer = await makeTestServer({ filesystemWatch: false })
+  const gate = createRequestGate((request) => new URL(request.url).pathname === '/fs/stat')
+  const client = createObservedInProcessClient(server, gate.beforeRequest)
+  const restore = installTestClient(client)
+  const terminal = fakeTerminal(['  at src/a.ts:3'])
+  const opened = openedPaths()
+  const view = await renderTerminalLinks(client, server, terminal, opened)
+  await writeWorkspaceFile(server.root, 'src/a.ts')
+  await waitFor(() => expect(terminal.providers).toHaveLength(1))
+  const origin = activeServerOrigin()
+  setActiveServerOrigin('http://localhost:3499')
+  const previousB = getClient()
+  const clientB = createInProcessClient(secondServer)
+  setClient(clientB)
+
+  try {
+    const opening = activateLink(terminal, 0, clickEvent())
+    await gate.entered
+    gate.release()
+    await opening
+    await waitFor(() =>
+      expect(view.getByTestId('selected-path')).toHaveTextContent('repo/src/a.ts'),
+    )
+    expect(opened.paths).toEqual(['repo/src/a.ts'])
+    expect((await clientB.fs.stat.get({ query: { path: 'repo/src/a.ts' } })).data).toBeNull()
+  } finally {
+    gate.release()
+    view.unmount()
+    view.queryClient.clear()
+    setClient(previousB)
+    setActiveServerOrigin(origin)
+    restore()
+    await secondServer.cleanup()
+  }
+})
+
+test('a slow link validation cannot replace the navigation from a newer click', async ({
+  server,
+}) => {
+  const gate = createRequestGate((request) => {
+    const url = new URL(request.url)
+    return url.pathname === '/fs/stat' && url.searchParams.get('path') === 'repo/src/a.ts'
+  })
+  const client = createObservedInProcessClient(server, gate.beforeRequest)
+  const restore = installTestClient(client)
+  const terminal = fakeTerminal(['  at src/a.ts:3', '  at src/b.ts:3'])
+  const opened = openedPaths()
+  const view = await renderTerminalLinks(client, server, terminal, opened)
+  await writeWorkspaceFile(server.root, 'src/a.ts')
+  await writeWorkspaceFile(server.root, 'src/b.ts')
+
+  try {
+    await waitFor(() => expect(terminal.providers).toHaveLength(1))
+    const first = activateLink(terminal, 0, clickEvent())
+    await gate.entered
+    await activateLink(terminal, 1, clickEvent())
+    await waitFor(() =>
+      expect(view.getByTestId('selected-path')).toHaveTextContent('repo/src/b.ts'),
+    )
+    await act(async () => {
+      gate.release()
+      await first
+    })
+    expect(opened.paths).toEqual(['repo/src/b.ts'])
+    expect(view.getByTestId('selected-path')).toHaveTextContent('repo/src/b.ts')
+  } finally {
+    gate.release()
+    view.unmount()
+    view.queryClient.clear()
+    restore()
+  }
+})
+
 async function writeWorkspaceFile(workspaceRoot: string, relativePath: string) {
   const target = path.join(workspaceRoot, PROJECT_ROOT, relativePath)
   await mkdir(path.dirname(target), { recursive: true })
@@ -111,7 +197,7 @@ async function writeWorkspaceFile(workspaceRoot: string, relativePath: string) {
 
 async function activateLink(terminal: FakeTerminal, row: number, event: MouseEvent) {
   const link = (await provideLinks(terminal, row))?.[0]
-  link?.activate(event)
+  return link?.activate(event)
 }
 
 function openedPaths(): OpenedPaths {

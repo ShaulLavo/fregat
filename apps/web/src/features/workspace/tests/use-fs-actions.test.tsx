@@ -1,3 +1,4 @@
+import { getClient } from '@/lib/client'
 import { testDocumentKey, testTabContent } from '../../../../test/factories/document-targets'
 import { filesystemPath } from '@/lib/documents/utils/identity'
 import { act, renderHook, waitFor } from '@testing-library/react'
@@ -31,17 +32,17 @@ for (const { isFolder, dirty } of [
     client,
   }) => {
     void client
-    await ensureFolderPath(filesystemPath('repo/src'))
+    await ensureFolderPath(filesystemPath('repo/src'), getClient())
     const from = 'repo/src/a.ts'
     const to = isFolder ? 'repo/renamed/a.ts' : 'repo/src/b.ts'
-    await createFileContent(filesystemPath(from), 'original\n')
+    await createFileContent(filesystemPath(from), 'original\n', getClient())
     const sibling = 'repo/src/c.ts'
     const unrelated = 'repo/src-other.ts'
-    await createFileContent(filesystemPath(sibling), 'sibling\n')
-    await createFileContent(filesystemPath(unrelated), 'unrelated\n')
-    const file = await fetchFile(filesystemPath(from), signal())
+    await createFileContent(filesystemPath(sibling), 'sibling\n', getClient())
+    await createFileContent(filesystemPath(unrelated), 'unrelated\n', getClient())
+    const file = await fetchFile(filesystemPath(from), signal(), getClient())
     const modelRef = {
-      current: treeModel(await fetchTree(filesystemPath('repo'), signal()), 'repo'),
+      current: treeModel(await fetchTree(filesystemPath('repo'), signal(), getClient()), 'repo'),
     }
     const treeRef = {
       current: new FileTreeModel({ paths: modelRef.current.paths, renaming: true }),
@@ -116,10 +117,10 @@ test('gates file create, rename, copy, and delete with their exact mutated paths
   client,
 }) => {
   void client
-  await ensureFolderPath(filesystemPath('repo'))
-  await createFileContent(filesystemPath('repo/rename.ts'), 'rename\n')
-  await createFileContent(filesystemPath('repo/copy.ts'), 'copy\n')
-  await createFileContent(filesystemPath('repo/delete.ts'), 'delete\n')
+  await ensureFolderPath(filesystemPath('repo'), getClient())
+  await createFileContent(filesystemPath('repo/rename.ts'), 'rename\n', getClient())
+  await createFileContent(filesystemPath('repo/copy.ts'), 'copy\n', getClient())
+  await createFileContent(filesystemPath('repo/delete.ts'), 'delete\n', getClient())
   const harness = await renderFsActions('repo')
 
   act(() => {
@@ -171,12 +172,12 @@ test('gates file create, rename, copy, and delete with their exact mutated paths
 
 test('invalidates all workspace-edit history for directory tree mutations', async ({ client }) => {
   void client
-  await ensureFolderPath(filesystemPath('repo/rename-dir'))
-  await ensureFolderPath(filesystemPath('repo/copy-dir'))
-  await ensureFolderPath(filesystemPath('repo/delete-dir'))
-  await createFileContent(filesystemPath('repo/rename-dir/a.ts'), 'rename\n')
-  await createFileContent(filesystemPath('repo/copy-dir/a.ts'), 'copy\n')
-  await createFileContent(filesystemPath('repo/delete-dir/a.ts'), 'delete\n')
+  await ensureFolderPath(filesystemPath('repo/rename-dir'), getClient())
+  await ensureFolderPath(filesystemPath('repo/copy-dir'), getClient())
+  await ensureFolderPath(filesystemPath('repo/delete-dir'), getClient())
+  await createFileContent(filesystemPath('repo/rename-dir/a.ts'), 'rename\n', getClient())
+  await createFileContent(filesystemPath('repo/copy-dir/a.ts'), 'copy\n', getClient())
+  await createFileContent(filesystemPath('repo/delete-dir/a.ts'), 'delete\n', getClient())
   const harness = await renderFsActions('repo')
 
   act(() => {
@@ -214,11 +215,11 @@ test('keeps optimistic rollback when the authoritative mutation reservation reje
   client,
 }) => {
   void client
-  await ensureFolderPath(filesystemPath('repo'))
-  await createFileContent(filesystemPath('repo/old.ts'), 'old\n')
+  await ensureFolderPath(filesystemPath('repo'), getClient())
+  await createFileContent(filesystemPath('repo/old.ts'), 'old\n', getClient())
   const service = new RecordingWorkspaceEditService({ reject: true })
   const harness = await renderFsActions('repo', service)
-  const file = await fetchFile(filesystemPath('repo/old.ts'), signal())
+  const file = await fetchFile(filesystemPath('repo/old.ts'), signal(), getClient())
   setFileSnapshotQueryData(harness.queryClient, file)
   act(() => harness.result.current.commands.openFileSurface(file.path))
   const { documentStore, workspaceStore } = harness.result.current.runtime
@@ -249,7 +250,10 @@ test('keeps optimistic rollback when the authoritative mutation reservation reje
 })
 
 async function renderFsActions(rootPath: string, service = new RecordingWorkspaceEditService()) {
-  const model = treeModel(await fetchTree(filesystemPath(rootPath), signal()), rootPath)
+  const model = treeModel(
+    await fetchTree(filesystemPath(rootPath), signal(), getClient()),
+    rootPath,
+  )
   const tree = new FileTreeModel({ paths: model.paths, renaming: true })
   const queryClient = createTestQueryClient()
 
@@ -332,12 +336,12 @@ function busyError() {
 }
 
 async function readContent(path: string) {
-  const result = await fetchFile(filesystemPath(path), signal())
+  const result = await fetchFile(filesystemPath(path), signal(), getClient())
   return result.content
 }
 
 async function treePaths(path: string) {
-  const result = await fetchTree(filesystemPath(path), signal())
+  const result = await fetchTree(filesystemPath(path), signal(), getClient())
   return flattenedPaths(result.entries)
 }
 

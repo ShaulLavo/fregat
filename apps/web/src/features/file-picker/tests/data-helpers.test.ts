@@ -1,3 +1,4 @@
+import { getClient } from '@/lib/client'
 import { filesystemPath } from '@/lib/documents/utils/identity'
 import {
   createPickerFolder,
@@ -54,25 +55,25 @@ test('creates a non-recursive folder and reports duplicate names', async ({ clie
   await client.fs['create-folder'].post({ path: 'project', recursive: true })
 
   await expect(
-    createPickerFolder({ name: 'assets', parentPath: 'project' }),
+    createPickerFolder({ name: 'assets', parentPath: 'project' }, getClient()),
   ).resolves.toMatchObject({
     name: 'assets',
     path: 'project/assets',
     type: 'directory',
     version: expect.any(String),
   })
-  await expect(createPickerFolder({ name: 'assets', parentPath: 'project' })).rejects.toMatchObject(
-    { code: 'ALREADY_EXISTS', status: 409 },
-  )
+  await expect(
+    createPickerFolder({ name: 'assets', parentPath: 'project' }, getClient()),
+  ).rejects.toMatchObject({ code: 'ALREADY_EXISTS', status: 409 })
 })
 
 test('records picked files as recents', async ({ client }) => {
   const response = await client.fs['create-file'].post({ content: '', path: 'recent.ts' })
   expect(response.error).toBeNull()
 
-  await recordRecent(fileEntry('recent.ts'))
+  await recordRecent(fileEntry('recent.ts'), getClient())
 
-  const recents = await fetchRecentEntries('file', false, new AbortController().signal)
+  const recents = await fetchRecentEntries('file', false, new AbortController().signal, getClient())
   expect(recents.map((recent) => recent.path)).toContain('recent.ts')
 })
 
