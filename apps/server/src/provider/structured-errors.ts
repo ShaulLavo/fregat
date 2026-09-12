@@ -1,6 +1,12 @@
 import { defineErrorCatalog } from 'evlog'
 
 export const sessionIdentityErrors = defineErrorCatalog('provider', {
+  STEERING_UNAVAILABLE: {
+    status: 409,
+    message: 'This provider cannot accept a correction while running.',
+    why: 'No active provider session supports native turn steering.',
+    fix: 'Stop the turn or wait for it to finish, then send the message.',
+  },
   TERMINAL_OWNERSHIP_UNKNOWN: {
     status: 409,
     message: 'The previous terminal process may still own this session',

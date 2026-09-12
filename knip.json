@@ -20,12 +20,16 @@
     "apps/web": {
       "entry": [
         "src/features/address/tests/navigation.types.ts",
+        "scripts/chat-parity-proof.mjs",
+        "scripts/chat-review-proof.mjs",
+        "scripts/chat-review-proof-entry.mjs",
         "scripts/chat-scroll-proof.mjs",
         "scripts/chat-scroll-proof-entry.mjs",
         "scripts/chat-snapshot-benchmark.ts",
         "scripts/file-tree-prepared-input-benchmark.ts",
         "scripts/keymap-baseline.mjs",
-        "scripts/verify-workspace-navigation.mjs"
+        "scripts/verify-workspace-navigation.mjs",
+        "test/factories/chat-proof-workspace.tsx"
       ],
       "ignoreFiles": ["test/fixtures/workbench-file-server/repo/src/editor-tab-{a,b,c}.ts"],
       "ignoreUnresolved": ["src/index.ts"]

@@ -32,6 +32,7 @@ import { useEnvironmentsStore } from '@/lib/environments/state/store'
 import { errorMessage } from '@/lib/error-message'
 import { log } from '@/lib/client-logging'
 import type { ApplicationRuntime } from '@/state/application-runtime'
+import type { WorktreeId } from '@workspace/contracts'
 import type { EditorWorkspaceStoreApi } from '@/features/editor/state/workspace-state'
 import type { ApplicationRouter } from '@/state/router'
 import { captureAddress } from '@/state/navigation-capture'
@@ -68,6 +69,7 @@ type Operation = {
   href: string | null
   complete: OperationPayload | null
   beforeApply?: () => void
+  draftWorktreeId?: WorktreeId
   preserveTransient: boolean
   applying: boolean
   historyIdentity: string | null
@@ -88,6 +90,7 @@ type Destination = {
   readonly historyTarget?: NavigationHistoryTarget | null
   readonly preserveTransient?: boolean
   readonly beforeApply?: () => void
+  readonly draftWorktreeId?: WorktreeId
 }
 
 export function createNavigationCoordinator(router: ApplicationRouter, initial: AddressIntent) {
@@ -243,6 +246,7 @@ export function createNavigationCoordinator(router: ApplicationRouter, initial: 
       isCurrent: () => isCurrent(op, owner) && op.complete === payload,
       signal: op.abort.signal,
       preserveTransient: op.preserveTransient,
+      draftWorktreeId: op.draftWorktreeId,
       reconcileResources: (workspace, rootPath) =>
         reconcileResolvedAddress(op, workspace, rootPath),
     })
@@ -273,6 +277,7 @@ export function createNavigationCoordinator(router: ApplicationRouter, initial: 
     const address = destination.address
     op.complete = payloadForAddress(address)
     op.beforeApply = destination.beforeApply
+    op.draftWorktreeId = destination.draftWorktreeId
     op.preserveTransient = destination.preserveTransient ?? false
     const wire = budgetAddress(address).address
     op.href = buildAddressLocation(router, wire).publicHref

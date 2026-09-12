@@ -1,4 +1,11 @@
+import { createClientError } from '@workspace/client-core/errors'
+import { providerListQueryOptions } from '@/features/chat/utils/provider-query'
+import {
+  resetChatInputDraftStore,
+  useChatInputDraftStore,
+} from '@/features/chat/state/chat-input-draft-store'
 import { act, fireEvent, waitFor } from '@testing-library/react'
+import { useComposerInboxStore } from '@/features/chat/state/composer-inbox-store'
 import { vi } from 'vitest'
 import {
   eventIdSchema,
@@ -20,6 +27,7 @@ import {
   chatMessage,
   session,
   sessionActivity,
+  providerSnapshot,
   shellSnapshot,
   TEST_ENVIRONMENT_ID,
 } from '../../../../../test/factories/chat'
@@ -239,6 +247,177 @@ test('a provider interrupt failure restores Stop and a retry waits for its own o
       environmentId: TEST_ENVIRONMENT_ID,
       sessionId: running.id,
     })
+    useChatProjectionStore.setState(previousProjection, true)
+  }
+})
+
+test('correction retry consumes content while model and mode choices reach the next new turn', async () => {
+  const previousProjection = useChatProjectionStore.getState()
+  resetChatInputDraftStore()
+  initializePromptStashStore(environmentScopedStorage(TEST_ENVIRONMENT_ID))
+  const running = session()
+  running.latestTurn = { ...running.latestTurn!, providerStartState: 'adopted' }
+  const target = {
+    environmentId: TEST_ENVIRONMENT_ID,
+    draftKey: running.id,
+    rootPath: '/repo/platform',
+  }
+  useChatInputDraftStore.getState().setPrompt(target, 'Use the existing files.')
+  const nextModel = {
+    ...running.modelSelection,
+    model: 'next-turn-model',
+    options: { reasoningEffort: 'high' },
+  }
+  useChatInputDraftStore.getState().setModelSelection(target, nextModel)
+  useChatInputDraftStore.getState().setRuntimeMode(target, 'approval-required')
+  useChatInputDraftStore.getState().setInteractionMode(target, 'plan')
+  useChatInputDraftStore.getState().addTerminalContexts(target, [
+    {
+      id: 'captured-error',
+      source: 'terminal-1',
+      lineStart: 1,
+      lineEnd: 1,
+      text: 'Missing file',
+    },
+  ])
+  let snapshot: OrchestrationSessionDetailSnapshot = {
+    checkpoints: [],
+    proposedPlans: [],
+    snapshotSequence: 1,
+    session: { ...running, deletedAt: null, deletion: null },
+  }
+  useChatProjectionStore.getState().syncShellSnapshot(
+    TEST_ENVIRONMENT_ID,
+    shellSnapshot({
+      projects: [running.project],
+      worktrees: [running.worktree],
+      sessions: [running],
+    }),
+  )
+  useChatProjectionStore.getState().syncSessionDetailSnapshot(TEST_ENVIRONMENT_ID, snapshot)
+  const commands: ClientOrchestrationCommand[] = []
+  const transport = unsupportedChatTransport({
+    close: () => {},
+    retainSessionDetail: () => () => {},
+    replayEvents: async () => ({ events: [] }),
+    sessionDetailSnapshot: async () => snapshot,
+    dispatchCommand: async (command) => {
+      commands.push(command)
+      if (commands.length === 1)
+        throw createClientError({
+          code: 'STEER_TURN_NOT_ACTIVE',
+          status: 409,
+          message: 'Your message was not sent.',
+          why: 'The active turn changed.',
+          fix: 'Send again.',
+        })
+      if (command.type === 'session.turn.steer')
+        snapshot = {
+          ...snapshot,
+          snapshotSequence: 2,
+          session: {
+            ...snapshot.session,
+            messages: [
+              chatMessage({
+                id: command.message.messageId,
+                turnId: command.turnId,
+                role: 'user',
+                text: command.message.text,
+              }),
+            ],
+          },
+        }
+      return { deduped: false, result: null, sequence: snapshot.snapshotSequence }
+    },
+  })
+  const disconnect = registerChatTransport(transport)
+  const height = vi.spyOn(HTMLElement.prototype, 'offsetHeight', 'get').mockReturnValue(600)
+  const view = renderCachedChatSelection(running.id)
+  view.queryClient.setQueryData(providerListQueryOptions().queryKey, {
+    providers: [providerSnapshot()],
+  })
+  try {
+    fireEvent.click(view.getByRole('button', { name: 'Open cached session' }))
+    await waitFor(() => expect(view.getByRole('button', { name: 'Send correction' })).toBeEnabled())
+    fireEvent.click(view.getByRole('button', { name: 'Send correction' }))
+    await waitFor(() => expect(view.getByText('Your message was not sent.')).toBeVisible())
+    expect(view.getByRole('textbox', { name: 'Message' })).toHaveTextContent(
+      'Use the existing files.',
+    )
+    expect(useChatInputDraftStore.getState().getDraft(target).prompt).toBe(
+      'Use the existing files.',
+    )
+    expect(useChatInputDraftStore.getState().getDraft(target).terminalContexts).toHaveLength(1)
+    expect(view.getByRole('button', { name: 'Stop current turn' })).toBeEnabled()
+    fireEvent.click(view.getByRole('button', { name: 'Send correction' }))
+    await waitFor(() => expect(useChatInputDraftStore.getState().getDraft(target).prompt).toBe(''))
+    expect(commands).toHaveLength(2)
+    expect(
+      commands.every(
+        (command) =>
+          command.type === 'session.turn.steer' && command.turnId === running.latestTurn?.turnId,
+      ),
+    ).toBe(true)
+    await waitFor(() =>
+      expect(view.getByRole('textbox', { name: 'Message' })).toHaveTextContent(''),
+    )
+    await waitFor(() => expect(view.getByText('Use the existing files.')).toBeVisible())
+    expect(useChatInputDraftStore.getState().getDraft(target)).toMatchObject({
+      prompt: '',
+      modelSelection: nextModel,
+      runtimeMode: 'approval-required',
+      interactionMode: 'plan',
+      terminalContexts: [],
+    })
+
+    snapshot = {
+      ...snapshot,
+      snapshotSequence: 3,
+      session: {
+        ...snapshot.session,
+        runtime: null,
+        latestTurn: { ...running.latestTurn, state: 'completed' },
+      },
+    }
+    act(() => {
+      useChatProjectionStore.getState().syncShellSnapshot(TEST_ENVIRONMENT_ID, {
+        ...shellSnapshot({
+          projects: [running.project],
+          worktrees: [running.worktree],
+          sessions: [{ ...running, ...snapshot.session }],
+        }),
+        snapshotSequence: snapshot.snapshotSequence,
+      })
+      useChatProjectionStore.getState().syncSessionDetailSnapshot(TEST_ENVIRONMENT_ID, snapshot)
+    })
+    act(() => useComposerInboxStore.getState().queueText('Now implement it.'))
+    await waitFor(() =>
+      expect(useChatInputDraftStore.getState().getDraft(target).prompt).toBe('Now implement it. '),
+    )
+    expect(view.getByRole('button', { name: 'Send message' })).toBeEnabled()
+    fireEvent.click(view.getByRole('button', { name: 'Send message' }))
+    await waitFor(() => expect(commands).toHaveLength(3))
+    expect(commands[2]).toMatchObject({
+      type: 'session.turn.start',
+      modelSelection: nextModel,
+      runtimeMode: 'approval-required',
+      interactionMode: 'plan',
+      message: { text: 'Now implement it.' },
+    })
+    await waitFor(() =>
+      expect(useChatInputDraftStore.getState().getDraft(target)).toMatchObject({
+        prompt: '',
+        modelSelection: null,
+        runtimeMode: null,
+        interactionMode: null,
+      }),
+    )
+    expect(view.getByRole('textbox', { name: 'Message' }).textContent).toBe('')
+  } finally {
+    view.unmount()
+    disconnect()
+    height.mockRestore()
+    resetChatInputDraftStore()
     useChatProjectionStore.setState(previousProjection, true)
   }
 })

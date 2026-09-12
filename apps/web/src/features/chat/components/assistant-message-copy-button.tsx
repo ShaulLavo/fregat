@@ -4,6 +4,7 @@ import { cn } from '@workspace/ui/lib/utils'
 import { CheckIcon, CopyIcon } from '@phosphor-icons/react'
 import { useCallback, useEffect, useRef, useState } from 'react'
 import { toast } from 'sonner'
+import { codexFileCitationsMarkdown } from '@/features/chat/utils/codex-file-citations'
 
 export function AssistantMessageCopyButton({
   className,
@@ -64,7 +65,7 @@ async function copyAssistantMessageText(text: string, onCopied: () => void) {
   }
 
   try {
-    await navigator.clipboard.writeText(text)
+    await navigator.clipboard.writeText(codexFileCitationsMarkdown(text))
     onCopied()
   } catch {
     toast.error('Could not copy response')

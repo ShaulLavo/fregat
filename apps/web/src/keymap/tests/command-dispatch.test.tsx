@@ -70,39 +70,49 @@ test.each([
   expect(searches).toEqual([prefix])
 })
 
-test.each([
+test.for([
   ['fileTree.newFile', 'create-file'],
   ['fileTree.newFolder', 'create-folder'],
-] as const)('%s opens Files and delegates creation to its focus owner', async (id, intent) => {
-  const focus = trackedFocusService()
-  const layout = layoutElement('workbench')
-  const element = document.createElement('button')
-  layout.append(element)
-  const intents: string[] = []
-  registrations.push(
-    focus.register({
-      area: 'file-tree',
-      element,
-      id: { kind: 'file-tree', rootPath: '/repo' },
-      onIntent: (received) => {
-        intents.push(received)
-        element.focus()
-        return true
-      },
-    }),
-  )
-  const commandRuntime = createTestCommandRuntime({
-    focus,
-    options: { rootPath: '/repo' },
-    queryClient: createTestQueryClient(),
-  })
-  commandRuntime.runtime.workspace.getState().setUiMode('chat')
+] as const)(
+  '%s opens Files and delegates creation to its focus owner',
+  async ([id, intent], { client, server }) => {
+    const focus = trackedFocusService()
+    const workspace = await navigationWorkspace(client, server)
+    seedWorkspaceCache(workspace)
+    const { application, navigation } = await renderAddressHarness({
+      initialEntries: [workspace.base.replace('/workbench', '/chat')],
+    })
+    await waitForNavigation(navigation)
+    const layout = layoutElement('workbench')
+    const element = document.createElement('button')
+    layout.append(element)
+    const intents: string[] = []
+    registrations.push(
+      focus.register({
+        area: 'file-tree',
+        element,
+        id: { kind: 'file-tree', rootPath: workspace.rootPath },
+        onIntent: (received) => {
+          intents.push(received)
+          element.focus()
+          return true
+        },
+      }),
+    )
+    const commandRuntime = createTestCommandRuntime({
+      application,
+      navigation,
+      focus,
+      queryClient: application.getSnapshot().queryClient,
+    })
+    commandRuntime.runtime.workspace.getState().setUiMode('chat')
 
-  const ticket = commandRuntime.bus.dispatch(id, invocation())
-  await expect(ticket.completion).resolves.toEqual({ status: 'handled' })
-  expect(commandRuntime.runtime.workspace.getState().uiMode).toBe('workbench')
-  expect(intents).toEqual([intent])
-})
+    const ticket = commandRuntime.bus.dispatch(id, invocation())
+    await expect(ticket.completion).resolves.toEqual({ status: 'handled' })
+    expect(commandRuntime.runtime.workspace.getState().uiMode).toBe('workbench')
+    expect(intents).toEqual([intent])
+  },
+)
 
 test('workspace editor focus acknowledges the active new-side diff target', async () => {
   const focus = trackedFocusService()

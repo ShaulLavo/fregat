@@ -1,11 +1,42 @@
+import { mkdir, writeFile } from 'node:fs/promises'
+import path from 'node:path'
 import { testTabContent } from '../../../../../test/factories/document-targets'
 import { screen, waitFor } from '@testing-library/react'
 import userEvent from '@testing-library/user-event'
 
-import { serializeRenderedMarkdownFragment } from '@/features/chat/utils/markdown-clipboard'
+import {
+  chatMarkdownClipboardPayload,
+  serializeRenderedMarkdownFragment,
+} from '@/features/chat/utils/markdown-clipboard'
 import { markdownHighlightCache } from '@/features/chat/state/markdown-highlight-cache'
 import { expect, test } from '../../../../../test/fixtures'
 import { createMarkdownWorkspace, renderMarkdown } from '../../../../../test/factories/markdown'
+
+test.each(['Result', ''])(
+  'selected Markdown images keep their source in plain and rich copy: %s',
+  (alt) => {
+    const text = `Before ![${alt}](https://example.com/result.png) after.`
+    const { container } = renderMarkdown(text)
+    const paragraph = container.querySelector('p')!
+    const range = document.createRange()
+    range.selectNodeContents(paragraph)
+    const selection = window.getSelection()!
+    selection.removeAllRanges()
+    selection.addRange(range)
+    try {
+      const payload = chatMarkdownClipboardPayload(selection)
+      expect(payload?.text).toBe(text)
+      const rich = document.createElement('div')
+      rich.innerHTML = payload?.html ?? ''
+      expect(rich.querySelector('img')?.getAttribute('src')).toBe('https://example.com/result.png')
+      expect(rich.querySelector('img')?.getAttribute('alt')).toBe(alt)
+      expect(rich.querySelector('button')).toBeNull()
+      expect(rich.textContent).toBe('Before  after.')
+    } finally {
+      selection.removeAllRanges()
+    }
+  },
+)
 
 test('an inline file reference opens the referenced file at its line', async ({
   client,
@@ -49,6 +80,70 @@ test('a web link is left to the markdown renderer, not turned into a file chip',
 
   expect(container.querySelector('[data-chat-file-link]')).toBeNull()
   expect(container.textContent).toContain('the docs')
+})
+
+test('a Codex output citation uses the existing file link action', async ({ client, server }) => {
+  const { application, editor } = await createMarkdownWorkspace(client, server)
+  const view = renderMarkdown(':codex-file-citation{path="src/foo.ts" purpose="output"}', {
+    application,
+  })
+  await userEvent.click(view.getByRole('link', { name: /src\/foo\.ts/u }))
+  await waitFor(() =>
+    expect(editor.workspaceStore.getState().selectedTabContent).toEqual(
+      testTabContent('repo/src/foo.ts'),
+    ),
+  )
+})
+
+test('a managed chat resolves citations and images in its worktree while the editor remains at the base', async ({
+  client,
+  server,
+}) => {
+  const { application, editor } = await createMarkdownWorkspace(client, server)
+  const worktreePath = 'repo/.worktrees/chat-fix'
+  const worktreeRoot = path.join(server.root, worktreePath)
+  await mkdir(path.join(worktreeRoot, 'src'), { recursive: true })
+  await mkdir(path.join(worktreeRoot, 'assets'), { recursive: true })
+  await writeFile(
+    path.join(worktreeRoot, 'assets/result.png'),
+    Buffer.from(
+      'iVBORw0KGgoAAAANSUhEUgAAAAEAAAABCAQAAAC1HAwCAAAAC0lEQVR42mP8/x8AAwMCAO+aWQAAAABJRU5ErkJggg==',
+      'base64',
+    ),
+  )
+  await writeFile(path.join(worktreeRoot, 'src/foo.ts'), 'export const managed = true\n')
+  const view = renderMarkdown(
+    ':codex-file-citation{path="src/foo.ts" line_range_start="2"}\n\n![Result](assets/result.png)',
+    { application, workspaceRoot: { canonicalPath: worktreeRoot, path: worktreePath } },
+  )
+  const file = view.getByRole('link', { name: /src\/foo\.ts/u })
+  expect(file).toHaveAttribute('data-chat-file-link', `${worktreeRoot}/src/foo.ts`)
+  expect(file).toHaveAttribute('title', `${worktreeRoot}/src/foo.ts:2`)
+  const imageUrl = new URL(view.getByAltText('Result').getAttribute('src')!)
+  expect(imageUrl.searchParams.get('path')).toBe(`${worktreePath}/assets/result.png`)
+  expect(
+    (await client.fs.blob.get({ query: { path: imageUrl.searchParams.get('path')! } })).status,
+  ).toBe(200)
+  expect(editor.workspaceStore.getState().rootFolder?.path).toBe('repo')
+  await userEvent.click(file)
+  await waitFor(() =>
+    expect(editor.uiStore.getState().definitionTarget).toMatchObject({
+      path: `${worktreePath}/src/foo.ts`,
+      range: { start: { line: 1, character: 0 } },
+    }),
+  )
+})
+
+test('workspace markdown images use the filesystem route and have an explicit failure state', async ({
+  client,
+  server,
+}) => {
+  const { application } = await createMarkdownWorkspace(client, server)
+  const view = renderMarkdown('![Result](assets/result.png)', { application })
+  const image = view.getByAltText('Result')
+  expect(image.getAttribute('src')).toContain('/fs/blob?path=repo%2Fassets%2Fresult.png')
+  image.dispatchEvent(new Event('error'))
+  await waitFor(() => expect(view.getByText('Result · Image unavailable')).toBeVisible())
 })
 
 test('an over-indented list item renders as a list, not a code block', () => {

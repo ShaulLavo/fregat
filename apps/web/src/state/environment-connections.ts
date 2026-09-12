@@ -42,6 +42,7 @@ import {
   disconnectSshMachine,
 } from '@/lib/environments/machine-client'
 import { startMachineEvents } from '@/state/machine-events'
+import { createConnectionNotices } from '@/state/connection-notices'
 
 export type ConnectedMachine = {
   readonly name: string
@@ -68,6 +69,7 @@ export function createEnvironmentConnections({
   readonly createTransport?: (origin: string) => ChatTransport
 } = {}) {
   const store = createStore<{ machines: readonly ConnectedMachine[] }>(() => ({ machines: [] }))
+  const notices = createConnectionNotices()
   const authStore = createStore<{
     prompt: MachineAuthPrompt | null
     pending: boolean
@@ -91,6 +93,7 @@ export function createEnvironmentConnections({
     throw createClientInvariantError(`Machine ${name} is no longer configured.`)
   }
   function update(name: string, change: Partial<Omit<ConnectedMachine, 'name' | 'config'>>) {
+    if (change.phase === 'live' || change.phase === 'idle') notices.reset(`machine:${name}`)
     store.setState(({ machines }) => ({
       machines: machines.map((entry) => (entry.name === name ? { ...entry, ...change } : entry)),
     }))
@@ -120,6 +123,7 @@ export function createEnvironmentConnections({
   ) {
     useEnvironmentsStore.getState().setPhase(origin, next, error)
     const actual = useEnvironmentsStore.getState().entries[origin]?.phase ?? next
+    if (origin === primaryServerOrigin() && actual === 'live') notices.reset('primary')
     for (const machine of store.getState().machines) {
       if (machine.environmentId !== environmentId || !desired.has(machine.name)) continue
       if (
@@ -386,6 +390,7 @@ export function createEnvironmentConnections({
       const definition = config[entry.name]
       return definition && !sameConnectionConfiguration(entry.config, definition)
     })
+    for (const machine of changed) notices.reset(`machine:${machine.name}`)
     const obsoleteNames =
       authority === 'settings' ? [...desired].filter((name) => !config[name]) : []
     for (const name of obsoleteNames) {
@@ -612,6 +617,7 @@ export function createEnvironmentConnections({
   }
   return {
     store,
+    notices,
     authStore,
     answerAuth,
     start,
@@ -622,6 +628,7 @@ export function createEnvironmentConnections({
     cancelMachine,
     retryPrimary,
     retryMachine: async (name: string) => {
+      notices.reset(`machine:${name}`)
       const machine = machineFor(name)
       if (machine.environmentId && !hasAnotherOwner(machine)) stopConnection(machine.environmentId)
       phase(name, 'reconnecting')

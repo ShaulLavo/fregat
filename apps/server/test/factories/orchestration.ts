@@ -1,3 +1,4 @@
+import { tmpdir } from 'node:os'
 import { mkdtemp, mkdir, rm } from 'node:fs/promises'
 import path from 'node:path'
 import * as v from 'valibot'
@@ -17,7 +18,7 @@ export const FIXTURE_SESSION_ID = '974a8f3c-3bc1-44d1-bc82-da59e3dc6cde'
 export const FIXTURE_MODEL = { providerInstanceId: 'codex', model: 'mock-model' }
 
 export async function createOrchestrationFixture(options: { repositoryCacheTtlMs?: number } = {}) {
-  const root = await mkdtemp(path.join('/work/tmp', 'platform-domain-'))
+  const root = await mkdtemp(path.join(tmpdir(), 'platform-domain-'))
   const checkout = path.join(root, 'checkout')
   await mkdir(checkout)
   const handle = createMetadataDatabase({ databasePath: path.join(root, 'metadata.sqlite') })

@@ -9,7 +9,7 @@ describe('work log labels', () => {
     ['/usr/bin/bash -lc "rg -n gutter apps/web"', 'Running rg'],
     ["/usr/bin/bash -lc 'bun --bun vitest run'", 'Running bun'],
     ['env CI=1 /usr/bin/bun test', 'Running bun'],
-    ['rg gutter apps; sed -n 1,20p file', 'Running command'],
+    ['rg gutter apps; sed -n 1,20p file', 'Running rg'],
     ['if test -f file; then rg gutter file; fi', 'Running command'],
     ['$(get_binary) file', 'Running command'],
   ])('describes static commands conservatively: %s', (command, expected) => {

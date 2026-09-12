@@ -7,20 +7,28 @@ import { ActivityIcon } from '@/features/chat/components/activity-icon'
 import { useChatWorkLogExpansionStore } from '@/features/chat/state/chat-work-log-expansion-store'
 import { workLogEntryLabel } from '@/features/chat/utils/tool-label'
 import type { ChatWorkLogEntry } from '@/features/chat/utils/work-log'
-import { workRowExpandable } from '@/features/chat/utils/work-row'
+import { isWorkLogFailure, workRowExpandable } from '@/features/chat/utils/work-row'
 
 export function ActivityRow({ activity }: { activity: ChatWorkLogEntry }) {
   const expanded = useChatWorkLogExpansionStore(
     (state) => state.expandedRowIds[activity.id] ?? false,
   )
   const toggle = useChatWorkLogExpansionStore((state) => state.toggleRowExpanded)
-  const failed = activity.outcome === 'failed' || activity.tone === 'error'
+  const failed = isWorkLogFailure(activity)
   const expandable = workRowExpandable(activity)
-  const label = workLogEntryLabel(activity, false)
+  const label = activity.command ?? workLogEntryLabel(activity, false)
+  const severeFailure = failed && activity.tone === 'error'
   const summary = (
     <>
       <ActivityIcon icon={activity.icon} />
-      <span className={cn('min-w-0 flex-1 truncate', failed && 'text-destructive')} title={label}>
+      <span
+        className={cn(
+          'min-w-0 flex-1 truncate',
+          severeFailure && 'text-destructive',
+          activity.command && 'font-mono',
+        )}
+        title={label}
+      >
         {label}
       </span>
       {failed ? <XIcon aria-label='Failed' className='text-destructive size-3.5' /> : null}
@@ -37,10 +45,11 @@ export function ActivityRow({ activity }: { activity: ChatWorkLogEntry }) {
   )
 
   return (
-    <div className='min-w-0 rounded-md'>
+    <div className='min-w-0 rounded-md' data-work-log-entry-id={activity.id}>
       {expandable ? (
         <Button
           aria-expanded={expanded}
+          aria-label={failed ? `${label}, tool call failed` : label}
           className='text-muted-foreground h-auto w-full min-w-0 justify-start gap-2 px-1 py-1 text-left text-xs font-normal'
           data-scroll-anchor-ignore
           variant='ghost'

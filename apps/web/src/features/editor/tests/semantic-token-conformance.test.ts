@@ -10,7 +10,11 @@ import {
 } from 'node:fs'
 import { homedir, tmpdir } from 'node:os'
 import path from 'node:path'
-import { afterAll, describe, expect, it } from 'vitest'
+import { afterAll, describe } from 'vitest'
+import { spawnTypeScript } from 'server/testing'
+import { test as it, expect } from '../../../../test/fixtures'
+import { createClientInvariantError } from '@/lib/structured-errors'
+import { SEMANTIC_TOKEN_LEGENDS } from '../../../../test/factories/semantic-token-legends'
 
 import { createSemanticTokenStyles } from '@singapor/core/syntax'
 import { SEMANTIC_TOKEN_TYPES } from '@singapor/lsp'
@@ -19,20 +23,8 @@ import { decodeSemanticTokens } from '@singapor/lsp-plugin'
 import { semanticTokensCapabilityForServer } from '@/features/editor/utils/semantic-token-capability'
 import { semanticTokenProfileFor } from '@/features/editor/utils/semantic-token-servers'
 
-/**
- * What each shortlist server actually advertises, asked over real stdio.
- *
- * The only defence against a server upgrade silently changing the answer — every
- * per-server fact this app relies on came out of one version of one binary, and
- * a table of those facts with nothing checking them is a table that is wrong
- * within a release. Each case **skips** when its binary is absent rather than
- * failing, because none of these are installed on a normal machine and a suite
- * that demanded six language servers would simply never run.
- *
- * It drives the real capability block, so it is also the end-to-end counterpart
- * of the byte-identity unit test: what a server says back is a function of what
- * this app said first.
- */
+// Probe installed optional servers and the application's bundled TypeScript runtime.
+// Exact recorded legends make additions, removals, and reordered indices fail.
 /** The twenty-three LSP defines. Every one already has a rule in the editor's theme. */
 const STANDARD_TOKEN_TYPES = new Set(SEMANTIC_TOKEN_TYPES)
 
@@ -44,21 +36,16 @@ afterAll(() => {
 
 type ServerCase = {
   readonly serverId: string
-  readonly binary: () => string | null
-  readonly args: readonly string[]
+  readonly resolve: () => typeof spawnTypeScript | null
   readonly files: Readonly<Record<string, string>>
   /** The row this test is pinning, from the per-server table's measurements. */
-  readonly expected: { full: boolean; range: boolean; delta: boolean; typeCount: number }
+  readonly expected: { full: boolean; range: boolean; delta: boolean }
 }
 
 const CASES: readonly ServerCase[] = [
   {
-    args: [],
-    // Deliberately not the app's own resolver: this test is about what the
-    // *server* answers, and reaching into another app's spawn helpers to find
-    // out would couple it to resolution logic that has its own test.
-    binary: () => rustAnalyzerBinary(),
-    expected: { delta: true, full: true, range: true, typeCount: 57 },
+    resolve: () => installedServer(rustAnalyzerBinary()),
+    expected: { delta: true, full: true, range: true },
     files: {
       'Cargo.toml': '[package]\nname = "probe"\nversion = "0.1.0"\nedition = "2021"\n',
       'src/lib.rs': 'pub const MAX: usize = 10;\npub fn value() -> usize { MAX }\n',
@@ -66,11 +53,10 @@ const CASES: readonly ServerCase[] = [
     serverId: 'rust',
   },
   {
-    args: ['serve'],
-    binary: () => onPath('gopls'),
+    resolve: () => installedServer(onPath('gopls'), ['serve']),
     // `full: true` as a bare boolean, which is exactly why nothing reads a
     // `resultId` to decide delta: gopls returns one and refuses delta anyway.
-    expected: { delta: false, full: true, range: true, typeCount: 14 },
+    expected: { delta: false, full: true, range: true },
     files: {
       'go.mod': 'module probe\n\ngo 1.21\n',
       'main.go': 'package main\n\nfunc main() { println("x") }\n',
@@ -78,34 +64,30 @@ const CASES: readonly ServerCase[] = [
     serverId: 'gopls',
   },
   {
-    args: [],
-    binary: () => onPath('clangd'),
+    resolve: () => installedServer(onPath('clangd')),
     // `range: false`. The fact that makes request policy per server.
-    expected: { delta: true, full: true, range: false, typeCount: 21 },
+    expected: { delta: true, full: true, range: false },
     files: { 'main.c': '#include <stdio.h>\nint main(void){ printf("x"); return 0; }\n' },
     serverId: 'clangd',
   },
   {
-    args: [],
-    binary: () => onPath('zls'),
+    resolve: () => installedServer(onPath('zls')),
     // Measured on 0.16.0. `escapeSequence` sits at index 19, mid-legend.
-    expected: { delta: false, full: true, range: true, typeCount: 28 },
+    expected: { delta: false, full: true, range: true },
     files: { 'main.zig': 'pub fn main() void {}\n' },
     serverId: 'zls',
   },
   {
-    args: ['serve'],
-    binary: () => onPath('terraform-ls'),
+    resolve: () => installedServer(onPath('terraform-ls'), ['serve']),
     // 9, and only 9 because this server intersects its legend against the
     // `tokenTypes` we declare. Change that list and this number changes with it.
-    expected: { delta: false, full: true, range: false, typeCount: 9 },
+    expected: { delta: false, full: true, range: false },
     files: { 'main.tf': 'resource "null_resource" "probe" {}\n' },
     serverId: 'terraform',
   },
   {
-    args: ['--stdio'],
-    binary: () => onPath('typescript-language-server'),
-    expected: { delta: false, full: true, range: true, typeCount: 12 },
+    resolve: () => spawnTypeScript,
+    expected: { delta: false, full: true, range: true },
     files: { 'a.ts': 'export const value = 1\n', 'package.json': '{"name":"probe"}\n' },
     serverId: 'typescript',
   },
@@ -114,10 +96,10 @@ const CASES: readonly ServerCase[] = [
 describe('semantic token conformance', () => {
   for (const testCase of CASES) {
     it(`reproduces the recorded row for ${testCase.serverId}`, async ({ skip }) => {
-      const binary = testCase.binary()
-      if (!binary) return skip(`${testCase.serverId} is not installed on this machine`)
+      const launch = testCase.resolve()
+      if (!launch) return skip(`${testCase.serverId} is not installed on this machine`)
 
-      const provider = await negotiate(binary, testCase)
+      const provider = await negotiate(launch, testCase)
       expect(provider, `${testCase.serverId} advertised no semanticTokensProvider`).toBeTruthy()
 
       const full = (provider as { full?: unknown }).full
@@ -132,12 +114,12 @@ describe('semantic token conformance', () => {
         range: testCase.expected.range,
       })
 
-      // Every count here was measured against the real binary, so all six are
-      // pinned: a server upgrade that adds, drops or reorders a legend entry is
-      // exactly the silent change this file exists to catch.
       const legend = (provider as { legend?: { tokenTypes?: string[] } }).legend
       const tokenTypes = legend?.tokenTypes ?? []
-      expect(tokenTypes).toHaveLength(testCase.expected.typeCount)
+      const recordedLegends = SEMANTIC_TOKEN_LEGENDS.filter(
+        ({ serverId }) => serverId === testCase.serverId,
+      ).map(({ tokenTypes }) => tokenTypes)
+      expect(recordedLegends).toContainEqual(tokenTypes)
 
       // The assertion the alias table exists for, against a live legend rather
       // than a recorded one.
@@ -213,7 +195,15 @@ describe('semantic tokens end to end', () => {
   }, 120_000)
 })
 
-async function negotiate(binary: string, testCase: ServerCase): Promise<unknown> {
+function installedServer(
+  binary: string | null,
+  args: readonly string[] = [],
+): typeof spawnTypeScript | null {
+  if (!binary) return null
+  return async (root) => ({ process: spawn(binary, args, { cwd: root, stdio: 'pipe' }) })
+}
+
+async function negotiate(launch: typeof spawnTypeScript, testCase: ServerCase): Promise<unknown> {
   const root = mkdtempSync(path.join(tmpdir(), `platform-lsp-conformance-${testCase.serverId}-`))
   roots.push(root)
   for (const [name, content] of Object.entries(testCase.files)) {
@@ -222,15 +212,22 @@ async function negotiate(binary: string, testCase: ServerCase): Promise<unknown>
     writeFileSync(target, content)
   }
 
-  const child = spawn(binary, [...testCase.args], { cwd: root, stdio: 'pipe' })
+  const handle = await launch(root)
+  if (!handle) throw createClientInvariantError(`${testCase.serverId} did not start`)
+  const child = handle.process
   const messages: Record<string, unknown>[] = []
   readLspMessages(child.stdout, (message) => messages.push(message))
-  child.stderr.resume()
+  let stderr = ''
+  child.stderr.setEncoding('utf8')
+  child.stderr.on('data', (chunk: string) => {
+    stderr += chunk
+  })
 
   const params = {
     capabilities: semanticTokensCapabilityForServer(testCase.serverId),
     clientInfo: { name: '@singapor/lsp' },
     processId: process.pid,
+    initializationOptions: handle.initializationOptions,
     rootUri: `file://${root}`,
     workspaceFolders: [{ name: 'probe', uri: `file://${root}` }],
   }
@@ -238,6 +235,8 @@ async function negotiate(binary: string, testCase: ServerCase): Promise<unknown>
 
   try {
     const response = await waitFor(() => messages.find((message) => message.id === 1), 60_000)
+    expect(response, `${testCase.serverId} initialize timed out: ${stderr}`).toBeDefined()
+    expect(response?.error, `${testCase.serverId} initialize failed: ${stderr}`).toBeUndefined()
     const result = response?.result as { capabilities?: Record<string, unknown> } | undefined
     return result?.capabilities?.semanticTokensProvider ?? null
   } finally {

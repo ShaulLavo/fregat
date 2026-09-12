@@ -14,6 +14,7 @@ import * as v from 'valibot'
 
 import { PendingApprovalPanel } from '@/features/chat/components/pending-approval-panel'
 import { ChatPendingRequestsProvider } from '@/features/chat/providers/pending-requests-provider'
+import { unsupportedChatTransport } from '../../../../../test/factories/chat-transport'
 import { useChatProjectionStore } from '@/features/chat/state/chat-projection-store'
 import { expect, test } from '../../../../../test/fixtures'
 import { sessionActivity, session as sessionFactory } from '../../../../../test/factories/chat'
@@ -43,6 +44,31 @@ test('allowing dispatches the respond command for that request', async () => {
     type: 'session.approval.respond',
   })
   expect(screen.getByText('Response sent. Waiting for agent…')).toBeVisible()
+  expect(screen.getByRole('button', { name: 'Allow' })).toBeDisabled()
+})
+
+test('an accepted response becomes retryable when the provider rejects that attempt', async () => {
+  const { dispatched, updateActivities } = renderPanel([requestedActivity()])
+  await userEvent.click(screen.getByRole('button', { name: 'Allow' }))
+  act(() =>
+    updateActivities([
+      requestedActivity(),
+      sessionActivity({
+        id: v.parse(eventIdSchema, 'approval-attempt-failed'),
+        kind: 'provider.approval.respond.failed',
+        tone: 'error',
+        payload: {
+          commandId: dispatched[0]?.commandId,
+          requestId: REQUEST_ID,
+          detail: 'The provider could not accept the response.',
+        },
+      }),
+    ]),
+  )
+  expect(screen.getByRole('button', { name: 'Allow' })).toBeEnabled()
+  expect(screen.getByText(/The provider could not accept the response\./u)).toBeVisible()
+  await userEvent.click(screen.getByRole('button', { name: 'Allow' }))
+  expect(dispatched).toHaveLength(2)
   expect(screen.getByRole('button', { name: 'Allow' })).toBeDisabled()
 })
 
@@ -206,7 +232,10 @@ function Wrap({
   sessionId: SessionId
 }) {
   return (
-    <ChatPendingRequestsProvider dispatchCommand={dispatchCommand} sessionId={sessionId}>
+    <ChatPendingRequestsProvider
+      transport={{ ...unsupportedChatTransport(), dispatchCommand }}
+      sessionId={sessionId}
+    >
       {children}
     </ChatPendingRequestsProvider>
   )

@@ -1,3 +1,5 @@
+import path from 'node:path'
+import { tmpdir } from 'node:os'
 import { createEnvironmentClient } from '@workspace/client-core/transport/client'
 import { mkdir, writeFile, symlink, mkdtemp, rm } from 'node:fs/promises'
 
@@ -211,7 +213,7 @@ test('a restricted browser cannot leave its filesystem root through a link or ab
   server,
   client,
 }) => {
-  const outside = await mkdtemp('/work/tmp/platform-tui-outside-')
+  const outside = await mkdtemp(path.join(tmpdir(), 'platform-tui-outside-'))
   await writeFile(`${outside}/private.txt`, 'Outside contents must not be listed')
   await symlink(outside, `${server.root}/outside`)
   const session = createTestSettingsSession(server)

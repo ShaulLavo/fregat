@@ -61,7 +61,14 @@ test('Git pane commands remain in the palette and commit restores native focus',
     expect(await gitCommand(server.root, 'log', '-1', '--format=%s')).toContain(
       'Commit from TUI pane',
     )
-    expect(frame.renderer.currentFocusedRenderable?.id).toBe('workbench-git')
+    await expect
+      .poll(async () => {
+        await act(async () => {
+          await frame.renderOnce()
+        })
+        return frame.renderer.currentFocusedRenderable?.id
+      })
+      .toBe('workbench-git')
   } finally {
     await frame.cleanup()
     session.dispose()

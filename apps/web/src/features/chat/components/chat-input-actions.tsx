@@ -26,6 +26,7 @@ const EMPTY_ACTIVITIES: readonly [] = []
 
 export function ChatInputActions({
   busy,
+  correctionDisabledReason = null,
   disabled,
   disabledReason = null,
   draftTarget,
@@ -40,6 +41,7 @@ export function ChatInputActions({
   statusLabel,
 }: {
   busy: boolean
+  correctionDisabledReason?: string | null
   disabled: boolean
   disabledReason?: string | null
   pendingAction?: ComposerPendingAction
@@ -99,6 +101,7 @@ export function ChatInputActions({
         <div className='flex shrink-0 items-center gap-1'>
           <PromptStashBadge disabled={disabled} draftTarget={draftTarget} />
           <ChatInputSubmitButton
+            correctionDisabledReason={correctionDisabledReason}
             busy={busy}
             disabled={disabled}
             disabledReason={disabledReason}

@@ -36,6 +36,7 @@ const CLIENT_REQUEST_METHODS = [
   'thread/start',
   'thread/resume',
   'turn/start',
+  'turn/steer',
   'turn/interrupt',
   'thread/read',
   'thread/list',

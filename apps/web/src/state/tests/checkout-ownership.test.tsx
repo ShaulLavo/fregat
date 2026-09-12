@@ -36,10 +36,12 @@ test('confirmed worktrees retain Git drafts across A/B/A and promote an open raw
   expect(readWorkspaceCache(editorA.storage).worktreeIdByRootPath.repo).toBe(a.worktreeId)
   h.application.activateEnvironment(h.originB)
   const editorB = h.application.getSnapshot().editor
-  expect(editorB.worktreeRefForRoot(filesystemPath('repo'))).toEqual({
-    environmentId: h.descriptorB.environmentId,
-    worktreeId: b.worktreeId,
-  })
+  await waitFor(() =>
+    expect(editorB.worktreeRefForRoot(filesystemPath('repo'))).toEqual({
+      environmentId: h.descriptorB.environmentId,
+      worktreeId: b.worktreeId,
+    }),
+  )
   const gitB = editorB.gitStoreForRoot(filesystemPath('repo'))
   expect(gitB.getState().commitMessage).toBe('')
   gitB.getState().setCommitMessage('Unfinished B commit')

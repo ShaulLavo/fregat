@@ -137,7 +137,7 @@ test('reports a requested terminating signal and reaps the child', async ({ laun
   const exit = await captured.pty.exited
   expect(exit.signal).toBe('SIGTERM')
   expect(processExists(captured.pty.pid)).toBe(false)
-  expect(terminalDescriptors()).toEqual(before)
+  await expect.poll(terminalDescriptors).toEqual(before)
 })
 
 test('escalates an ignored signal to SIGKILL after the grace period', async ({ launch }) => {
@@ -172,7 +172,8 @@ test('closes PTY descriptors after natural exit and explicit disposal', async ({
     await captured.pty[Symbol.asyncDispose]()
     expect(captured.text).toBe('done')
   }
-  expect(terminalDescriptors()).toEqual(before)
+  // Bun closes the PTY reader/writer descriptors on its native worker pool.
+  await expect.poll(terminalDescriptors).toEqual(before)
 })
 
 test('fails invalid spawns without leaking PTY descriptors', async () => {
@@ -198,7 +199,7 @@ test('rejects completion and releases the child and terminal when output deliver
   try {
     await expect(pty.exited).rejects.toMatchObject({ cause: failure })
     expect(processExists(pty.pid)).toBe(false)
-    expect(terminalDescriptors()).toEqual(before)
+    await expect.poll(terminalDescriptors).toEqual(before)
   } finally {
     await Promise.resolve(pty[Symbol.asyncDispose]()).catch(() => {})
   }
@@ -220,7 +221,7 @@ test('cleans up after the session leader exits with a live descendant', async ({
     }
     expect(performance.now() - started).toBeLessThan(3000)
     expect(await captured.pty.exited).toEqual({ exitCode: 7, signal: null })
-    expect(terminalDescriptors()).toEqual(before)
+    await expect.poll(terminalDescriptors).toEqual(before)
   } finally {
     if (descendantPid > 0 && processExists(descendantPid)) process.kill(descendantPid, 'SIGKILL')
   }

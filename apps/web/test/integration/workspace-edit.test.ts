@@ -17,6 +17,7 @@ import {
   type WorkspaceEditFileSystemDriver,
 } from 'server/testing'
 
+import { fileDocumentKey, filesystemPath, tabId } from '@/lib/documents/utils/identity'
 import { createEditorDocumentStore } from '@/features/editor/state/document-state'
 import { FileSyncService } from '@/features/editor/state/file-sync-service'
 import {
@@ -95,8 +96,10 @@ test('applies one group across a dirty active buffer an open secondary and an un
   expect(await readText(server.root, activePath)).toBe('active')
   expect(await readText(server.root, secondaryPath)).toBe('secondary')
   expect(await readText(server.root, unopenedPath)).toBe('Unopened')
-  expect(harness.store.getState().hasLiveEditorDocument(unopenedPath)).toBe(false)
-  expect(Object.keys(harness.store.getState().liveDocumentsById)).toHaveLength(2)
+  expect(
+    harness.store.getState().hasLiveEditorDocument(fileDocumentKey(filesystemPath(unopenedPath))),
+  ).toBe(false)
+  expect(Object.keys(harness.store.getState().liveDocumentsByKey)).toHaveLength(2)
   expect(harness.service.getSnapshot()).toMatchObject({ canRedo: false, canUndo: true })
   expectPathsAvailable(harness, [activePath, secondaryPath, unopenedPath])
 })
@@ -143,7 +146,9 @@ test('rejects live and unopened drift after preview with zero net mutation', asy
   expect(await readText(server.root, livePath)).toBe('live')
   expect(await readText(server.root, unopenedPath)).toBe('external change')
   expect(await readText(server.root, untouchedPath)).toBe('untouched')
-  expect(harness.store.getState().hasLiveEditorDocument(unopenedPath)).toBe(false)
+  expect(
+    harness.store.getState().hasLiveEditorDocument(fileDocumentKey(filesystemPath(unopenedPath))),
+  ).toBe(false)
   expect(harness.service.getSnapshot().canUndo).toBe(false)
   await expect(harness.fileSync.discoverWorkspaceRecovery('')).resolves.toMatchObject({
     operations: [],
@@ -260,8 +265,12 @@ test('commits and reconciles create edit rename delete options in order', async 
   expect(await pathExists(server.root, createdPath)).toBe(false)
   expect(await pathExists(server.root, deletedPath)).toBe(false)
   expect(await readText(server.root, renamedPath)).toBe('created text')
-  expect(harness.store.getState().hasLiveEditorDocument(createdPath)).toBe(false)
-  expect(harness.store.getState().hasLiveEditorDocument(renamedPath)).toBe(false)
+  expect(
+    harness.store.getState().hasLiveEditorDocument(fileDocumentKey(filesystemPath(createdPath))),
+  ).toBe(false)
+  expect(
+    harness.store.getState().hasLiveEditorDocument(fileDocumentKey(filesystemPath(renamedPath))),
+  ).toBe(false)
   const snapshot = await fetchFile(renamedPath, signal())
   expect(snapshot).toMatchObject({ content: 'created text', path: renamedPath })
   expect(harness.queryClient.getQueryData(fileSystemKeys.fileSnapshot(renamedPath))).toMatchObject({
@@ -568,12 +577,14 @@ test('acknowledges exact partial paths and keeps unsaved live text read only', a
     const unrecoveredPaths = harness.service.getSnapshot().recovery!.unrecoveredPaths
     expect(unrecoveredPaths).toEqual([firstPath, renamedPath])
     await expect(harness.service.discardRecoveryData(unrecoveredPaths)).resolves.toBe(true)
-    const retained = harness.store.getState().getLiveEditorDocument(firstPath)!
+    const retained = harness.store
+      .getState()
+      .getLiveEditorDocument(fileDocumentKey(filesystemPath(firstPath)))!
     expect(retained.buffer).toBe(live.buffer)
+    expect(retained.target).toEqual({ kind: 'file', resource: { path: firstPath } })
     expect(retained.sync).toMatchObject({
       affectedPaths: [firstPath, renamedPath, secondPath],
       kind: 'recovery-conflict',
-      path: firstPath,
     })
     createEditorBufferSession(retained.buffer).applyEdits([{ from: 6, to: 6, text: '?' }])
     expect(retained.buffer.materializeFullText()).toBe('first!')
@@ -731,7 +742,7 @@ test('preserves old disk bytes for open edit then rename until explicit save', a
   const destinationPath = 'after.ts'
   await writeWorkspaceFiles(server.root, [[sourcePath, 'saved bytes']])
   const sourceFile = await fetchFile(sourcePath, signal())
-  const live = harness.store.getState().ensureEditorView('source-tab', sourceFile)
+  const live = harness.store.getState().ensureEditorView(tabId('source-tab'), sourceFile)
   const sourceUri = fileUri(sourcePath)
   const pending = harness.service.onApplyWorkspaceEdit(
     request(
@@ -747,18 +758,25 @@ test('preserves old disk bytes for open edit then rename until explicit save', a
   harness.service.confirmPreview()
   await expect(pending).resolves.toEqual({ status: 'applied' })
 
-  const renamed = harness.store.getState().getLiveEditorDocument(destinationPath)
+  const renamed = harness.store
+    .getState()
+    .getLiveEditorDocument(fileDocumentKey(filesystemPath(destinationPath)))
   expect(renamed?.buffer.materializeFullText()).toBe('edited saved bytes')
   expect(renamed?.buffer.isDirty()).toBe(true)
   expect(await pathExists(server.root, sourcePath)).toBe(false)
   expect(await readText(server.root, destinationPath)).toBe('saved bytes')
-  expect(harness.store.getState().getEditorView('source-tab')?.documentId).toBe(destinationPath)
+  expect(harness.store.getState().getEditorView(tabId('source-tab'))?.documentKey).toBe(
+    fileDocumentKey(filesystemPath(destinationPath)),
+  )
 
   if (renamed) await harness.fileSync.save(renamed)
   expect(await readText(server.root, destinationPath)).toBe('edited saved bytes')
-  expect(harness.store.getState().getLiveEditorDocument(destinationPath)?.buffer.isDirty()).toBe(
-    false,
-  )
+  expect(
+    harness.store
+      .getState()
+      .getLiveEditorDocument(fileDocumentKey(filesystemPath(destinationPath)))
+      ?.buffer.isDirty(),
+  ).toBe(false)
 })
 
 type IntegrationHarness = ReturnType<typeof createHarness>
@@ -916,7 +934,9 @@ async function openDocument(harness: IntegrationHarness, filePath: string) {
 
 function expectPathsAvailable(harness: IntegrationHarness, paths: readonly string[]): void {
   const state = harness.store.getState()
-  const requests = paths.map((filePath) => state.prepareWorkspaceDocumentPathReservation(filePath))
+  const requests = paths.map((filePath) =>
+    state.prepareWorkspaceDocumentPathReservation(filesystemPath(filePath)),
+  )
   const result = state.reserveWorkspaceDocumentPaths(requests, 'integration-probe')
   expect(result.status).toBe('acquired')
   if (result.status !== 'acquired') return

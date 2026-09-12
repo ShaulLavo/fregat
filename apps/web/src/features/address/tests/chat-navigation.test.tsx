@@ -150,6 +150,11 @@ test('starting a draft in another worktree of the same project updates its execu
     status: 'applied',
   })
   expect(useSessionSelectionStore.getState().draftGeneration).toBe(generation + 1)
+  expect(await navigation.openWorkspace({ environmentId, path: 'linked' })).toEqual({
+    status: 'applied',
+  })
+  expect(editor.workspaceStore.getState().rootFolder?.path).toBe('linked')
+  expect(useSessionSelectionStore.getState().draftWorktreeId).toBe(linked.worktreeId)
 })
 
 test('opening an archived session preserves the archived rail', async () => {

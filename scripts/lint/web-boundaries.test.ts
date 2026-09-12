@@ -1,4 +1,5 @@
 import { copyFile, mkdir, mkdtemp, rm, symlink, writeFile } from 'node:fs/promises'
+import { tmpdir } from 'node:os'
 import { dirname, join, resolve } from 'node:path'
 import { expect, test } from 'vitest'
 
@@ -187,7 +188,7 @@ const probes: readonly Probe[] = [
 ]
 
 test('the configured CLI rejects shared imports of features at their source and accepts controls', async () => {
-  const fixture = await mkdtemp('/work/tmp/platform-web-boundaries-')
+  const fixture = await mkdtemp(join(tmpdir(), 'platform-web-boundaries-'))
   try {
     await installFixture(fixture)
     const process = Bun.spawn(

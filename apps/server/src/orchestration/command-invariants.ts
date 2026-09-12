@@ -1,6 +1,7 @@
 import { defineErrorCatalog } from 'evlog'
 import { isValidOrderKey } from '@workspace/contracts'
 import { orchestrationErrors } from '../observability'
+import { sessionDomainErrors } from './structured-errors'
 import type { OrchestrationProjectedSession, OrchestrationReadModel } from './read-model'
 
 /**
@@ -93,12 +94,24 @@ export function requireProject(model: OrchestrationReadModel, projectId: string)
 
 export function requireActionableSourcePlan(
   model: OrchestrationReadModel,
-  source: { readonly sessionId: string } | undefined,
+  source: { readonly sessionId: string; readonly planId: string },
+  targetWorktreeId: string | undefined,
+  plan: { planId: string; implementedAt: string | null } | null,
 ) {
-  if (!source) return
   const session = requireSessionNotDeleted(model, source.sessionId)
-  if (session.hasActionableProposedPlan) return
-  throw orchestrationErrors.SOURCE_PLAN_NOT_ACTIONABLE({ planSessionId: source.sessionId })
+  if (
+    !plan ||
+    plan.planId !== source.planId ||
+    plan.implementedAt !== null ||
+    !session.hasActionableProposedPlan
+  ) {
+    throw orchestrationErrors.SOURCE_PLAN_NOT_ACTIONABLE({ planSessionId: source.sessionId })
+  }
+  const sourceWorktree = model.worktrees.get(session.worktreeId)
+  const targetWorktree = targetWorktreeId ? model.worktrees.get(targetWorktreeId) : undefined
+  if (!sourceWorktree || !targetWorktree || sourceWorktree.projectId !== targetWorktree.projectId) {
+    throw sessionDomainErrors.SOURCE_PLAN_PROJECT_MISMATCH()
+  }
 }
 
 export function requireValidOrderKey(orderKey: string) {

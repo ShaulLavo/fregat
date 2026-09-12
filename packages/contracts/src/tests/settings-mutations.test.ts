@@ -40,12 +40,26 @@ const MODEL_B = modelRef('claude', 'sonnet')
 
 describe('settings mutation schemas', () => {
   it('covers every live scalar, including the committed post-plan additions', () => {
-    const scalarWidgets = new Set(['boolean', 'enum', 'font', 'multiline', 'number', 'string'])
+    const scalarWidgets = new Set([
+      'boolean',
+      'code-theme',
+      'enum',
+      'font',
+      'multiline',
+      'number',
+      'string',
+    ])
     const expected = SETTING_IDS.filter((id) => scalarWidgets.has(descriptorFor(id).widget))
 
     expect(SCALAR_SETTING_IDS).toEqual(expected)
     expect(SCALAR_SETTING_IDS).toEqual(
-      expect.arrayContaining(['workbench.palette', 'workbench.density', 'files.showHidden']),
+      expect.arrayContaining([
+        'workbench.palette',
+        'workbench.density',
+        'files.showHidden',
+        'editor.codeTheme.dark',
+        'editor.codeTheme.light',
+      ]),
     )
   })
 

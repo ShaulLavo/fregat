@@ -65,6 +65,21 @@ export class OrchestrationSnapshotQuery {
     this.database = database
   }
 
+  latestProposedPlan(sessionId: string) {
+    return (
+      this.database
+        .select()
+        .from(projectionSessionProposedPlans)
+        .where(eq(projectionSessionProposedPlans.sessionId, sessionId))
+        .orderBy(
+          desc(projectionSessionProposedPlans.updatedAt),
+          desc(projectionSessionProposedPlans.planId),
+        )
+        .limit(1)
+        .get() ?? null
+    )
+  }
+
   /**
    * Hydrates the engine's in-memory model, so it takes only the tail of each
    * session: the decider and the provider reactor ask about the live turn, and

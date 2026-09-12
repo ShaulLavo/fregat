@@ -1,5 +1,6 @@
 import assert from 'node:assert/strict'
 import { act } from 'react'
+import { orchestrationForApp } from 'server/testing'
 import { test, expect } from '../../../test/fixtures'
 import { makeTestServer } from '../../../test/server'
 import { renderAgentStage } from '../../../test/factories/agent-stage'
@@ -36,7 +37,14 @@ test('native worktree choice preserves the prompt and creates only on send', asy
     await act(async () => {
       frame.mockInput.pressEnter()
     })
-    await expect.poll(() => server.providerAdapter.startedTurns).toHaveLength(1)
+    const engine = orchestrationForApp(server.app)
+    assert(engine)
+    await act(async () => {
+      await expect.poll(() => chat.getSnapshot().selectedSessionId).not.toBeNull()
+      await engine.providerRuntimeIdle()
+      await chat.refresh()
+    })
+    expect(server.providerAdapter.startedTurns).toHaveLength(1)
     const created = Object.values(chat.getSnapshot().projection.sessionById)[0]
     assert(created)
     expect(created.worktreeId).not.toBe(worktreeId)

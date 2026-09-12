@@ -34,7 +34,9 @@ def check_attach(bun, directory):
         terminal.send(b"nvim --clean -n +'call setline(1, \"RAW_ATTACH_NATIVE\")'\r")
         terminal.expect(b"\x1b[?1049h")
         terminal.expect(b"RAW_ATTACH_NATIVE")
+        terminal.buffer = b""
         fcntl.ioctl(terminal.fd, termios.TIOCSWINSZ, struct.pack("HHHH", 40, 120, 0, 0))
+        terminal.expect(b"[No Name]")
         terminal.send(b':echo &lines . "x" . &columns\r')
         terminal.expect(b"40x120")
         terminal.buffer = b""

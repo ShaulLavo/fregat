@@ -8,13 +8,12 @@ import { useChatWorkLogExpansionStore } from '@/features/chat/state/chat-work-lo
 import type { ChatWorkLogEntry } from '@/features/chat/utils/work-log'
 import { isWorkLogFailure } from '@/features/chat/utils/work-row'
 import { activityGroupSummary } from '@/features/chat/utils/activity-visibility'
-import { workLogContentLength } from '@/features/chat/utils/work-log-content-length'
 
 export function ActivityGroupRow({ activities }: { activities: readonly ChatWorkLogEntry[] }) {
   const groupId = activities[0]?.id ?? ''
   const expanded = useChatWorkLogExpansionStore((state) => state.expandedGroupIds[groupId] ?? false)
   const toggle = useChatWorkLogExpansionStore((state) => state.toggleGroupExpanded)
-  const scrollRef = useWorkLogScroll(`group:${groupId}`, workLogContentLength(activities))
+  const scrollRef = useWorkLogScroll(`group:${groupId}`, activities.length)
   const visible = expanded
     ? activities
     : activities.filter(
@@ -44,7 +43,14 @@ export function ActivityGroupRow({ activities }: { activities: readonly ChatWork
         </Button>
       ) : null}
       <div
-        className={expanded ? 'border-border ml-2 max-h-72 overflow-auto border-l pl-2' : undefined}
+        className={
+          expanded
+            ? 'border-border ml-2 max-h-[min(18rem,50dvh)] overflow-auto border-l pl-2'
+            : undefined
+        }
+        aria-label={expanded ? 'Tool calls' : undefined}
+        role={expanded ? 'region' : undefined}
+        tabIndex={expanded ? 0 : undefined}
         data-tool-group-scroll={expanded || undefined}
         ref={expanded ? scrollRef : undefined}
       >

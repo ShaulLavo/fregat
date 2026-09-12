@@ -592,6 +592,60 @@ describe('provider runtime ingestion', () => {
       },
       { kind: 'task.progress', turnId: 'turn-2', payload: { title: 'Fix the API' } },
     ])
+
+    for (const [itemId, status] of [
+      ['command-1', 'inProgress'],
+      ['command-1', 'failed'],
+      ['command-2', 'completed'],
+    ] as const) {
+      await ingestion.ingest({
+        ...base,
+        eventId: `agent-${itemId}-${status}`,
+        type: 'task.progress',
+        agent: { threadId: 'child-thread', path: '/root/review', status: 'running' },
+        payload: {
+          taskId: 'child-thread',
+          description: 'Reviewer',
+          tool: {
+            itemId,
+            itemType: 'command_execution',
+            status,
+            title: 'rg missing',
+            data: { exitCode: 2 },
+          },
+        },
+      })
+    }
+    await ingestion.ingest({
+      ...base,
+      eventId: 'agent-idle',
+      type: 'task.progress',
+      agent: { threadId: 'child-thread', path: '/root/review', status: 'idle' },
+      payload: { taskId: 'child-thread', description: 'Reviewer', summary: 'Finished review' },
+    })
+    expect(model.sessions.get(sessionId)?.activities.slice(-3)).toMatchObject([
+      {
+        turnId,
+        payload: {
+          agent: { threadId: 'child-thread' },
+          tool: { itemId: 'command-1', status: 'failed' },
+        },
+      },
+      {
+        turnId,
+        payload: {
+          agent: { threadId: 'child-thread' },
+          tool: { itemId: 'command-2', status: 'completed' },
+        },
+      },
+      {
+        turnId,
+        payload: {
+          agent: { threadId: 'child-thread', status: 'idle' },
+          summary: 'Finished review',
+        },
+      },
+    ])
   })
 
   it('normalizes reasoning content deltas into thinking activities', async () => {

@@ -15,6 +15,7 @@ import { ChatInputLineBoundaryPlugin } from './chat-input-line-boundary-plugin'
 import { ChatInputMentionPlugin } from './chat-input-mention-plugin'
 import { ChatInputSubmitPlugin } from './chat-input-submit-plugin'
 import { ChatInputSurroundPlugin } from './chat-input-surround-plugin'
+import { ChatInputHistoryPlugin } from '@/features/chat/components/chat-input-history-plugin'
 
 export function ChatInputEditor({
   busy,
@@ -122,6 +123,11 @@ export function ChatInputEditor({
         onSubmitRequest={onSubmitRequest}
       />
       <ChatInputLineBoundaryPlugin />
+      <ChatInputHistoryPlugin
+        disabled={disabled || trigger !== null}
+        draftKey={draftKey}
+        rootPath={rootPath}
+      />
       <ChatInputMentionPlugin />
       <ChatInputSurroundPlugin />
       <HistoryPlugin />

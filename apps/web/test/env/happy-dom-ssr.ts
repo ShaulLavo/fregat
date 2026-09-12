@@ -9,6 +9,12 @@ const happyDomSsrEnvironment: Environment = {
   async setup(global, options) {
     const environment = await happyDomEnvironment.setup(global, options)
     configureStandardsDocument(global.document)
+    // Happy DOM canvas objects cannot cross the native Worker's transfer boundary.
+    Object.defineProperty(global, 'OffscreenCanvas', {
+      configurable: true,
+      value: undefined,
+      writable: true,
+    })
 
     return environment
   },

@@ -15,6 +15,10 @@ pre-commit:
       glob: '*.{ts,tsx,js,jsx,mjs,cjs}'
       run: PATH="$HOME/.bun/bin:/opt/homebrew/bin:/usr/local/bin:$PATH" bun x oxlint {staged_files}
 
+    - name: format check staged files
+      glob: '*.{ts,tsx,js,jsx,mjs,cjs,json,jsonc,css,md,mdx,yml,yaml}'
+      run: PATH="$HOME/.bun/bin:/opt/homebrew/bin:/usr/local/bin:$PATH" bun x oxfmt --check {staged_files}
+
     - name: typecheck repo
       run: PATH="$HOME/.bun/bin:/opt/homebrew/bin:/usr/local/bin:$PATH" bun run typecheck
 

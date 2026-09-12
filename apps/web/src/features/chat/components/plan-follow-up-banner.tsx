@@ -1,6 +1,7 @@
 import { ArrowRightIcon, ArrowSquareOutIcon, PencilSimpleIcon } from '@phosphor-icons/react'
 import { Badge } from '@workspace/ui/components/badge'
 import { Button } from '@workspace/ui/components/button'
+import { Spinner } from '@workspace/ui/components/spinner'
 
 import { usePlanFollowUp } from '@/features/chat/hooks/use-plan-follow-up'
 import { proposedPlanTitle } from '@workspace/client-core/chat/proposed-plan'
@@ -28,7 +29,8 @@ export function PlanFollowUpBanner({
 }: {
   readonly draftTarget: ChatInputDraftTarget
 }) {
-  const { implementInNewSession, plan, submitFollowUp, submitting } = usePlanFollowUp()
+  const { disabledReason, implementInNewSession, plan, submitFollowUp, submitting } =
+    usePlanFollowUp()
   const draftText = useChatInputDraftStore((state) => state.getDraft(draftTarget).prompt)
   if (!plan) return null
 
@@ -51,7 +53,8 @@ export function PlanFollowUpBanner({
         {refining ? null : (
           <Button
             aria-label='Implement in a new session'
-            disabled={submitting}
+            disabled={submitting || disabledReason !== null}
+            title={disabledReason ?? undefined}
             size='sm'
             type='button'
             variant='outline'
@@ -61,8 +64,14 @@ export function PlanFollowUpBanner({
             New session
           </Button>
         )}
-        <Button disabled={submitting} size='sm' type='button' onClick={() => void submitFollowUp()}>
-          <ActionIcon className='size-3.5' />
+        <Button
+          disabled={submitting || disabledReason !== null}
+          title={disabledReason ?? undefined}
+          size='sm'
+          type='button'
+          onClick={() => void submitFollowUp()}
+        >
+          {submitting ? <Spinner className='size-3.5' /> : <ActionIcon className='size-3.5' />}
           {refining ? 'Refine' : 'Implement'}
         </Button>
       </div>

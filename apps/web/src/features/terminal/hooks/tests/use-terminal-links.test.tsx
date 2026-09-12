@@ -1,23 +1,21 @@
 import { tabFileResource } from '@/lib/documents/utils/capabilities'
-import { filesystemPath } from '@/lib/documents/utils/identity'
 import { waitFor } from '@testing-library/react'
 import type { Terminal, LinkLineSnapshot, LinkProvider } from 'ghostty-webgpu'
 import { mkdir, writeFile } from 'node:fs/promises'
 import path from 'node:path'
-import { useEffect, useEffectEvent, type ReactNode } from 'react'
+import { useEffect, useEffectEvent } from 'react'
 
-import { createDefaultChatModePanels } from '@/features/chat-mode/utils/panels'
 import { TestEditorStateProvider as EditorStateProvider } from '../../../../../test/factories/editor-state-provider'
 import { useEditorUiState } from '@/features/editor/state/ui-state'
-import {
-  createEditorWorkspaceStore,
-  EditorWorkspaceStateContext,
-  useEditorWorkspaceState,
-} from '@/features/editor/state/workspace-state'
+import { useEditorWorkspaceState } from '@/features/editor/state/workspace-state'
 import { useTerminalLinks } from '@/features/terminal/hooks/use-links'
-import { createDefaultWorkbenchLayout } from '@/features/workbench/utils/layout'
 import { expect, test } from '../../../../../test/fixtures'
 import { renderWithProviders } from '../../../../../test/render'
+import type { Client } from '@/lib/client'
+import type { TestServer } from '../../../../../test/server'
+import { navigationWorkspace } from '../../../../../test/factories/navigation-workspace'
+import { seedWorkspaceCache } from '../../../../../test/address'
+import { createTestApplicationRuntime } from '../../../../../test/factories/application-runtime'
 
 const COLUMNS = 24
 /**
@@ -27,9 +25,12 @@ const COLUMNS = 24
  */
 const PROJECT_ROOT = 'repo'
 
-test('the provider is registered with the terminal and asked for every row', async () => {
+test('the provider is registered with the terminal and asked for every row', async ({
+  client,
+  server,
+}) => {
   const terminal = fakeTerminal(['  at src/a.ts:3', 'nothing to click here'])
-  renderTerminalLinks(terminal)
+  await renderTerminalLinks(client, server, terminal)
 
   // Registration is the whole contract with ghostty: skip it and the feature is
   // gone while every pure detection test still passes.
@@ -42,10 +43,10 @@ test('the provider is registered with the terminal and asked for every row', asy
   expect(await provideLinks(terminal, 1)).toBeUndefined()
 })
 
-test('a link range is 0-based and inclusive at both ends', async () => {
+test('a link range is 0-based and inclusive at both ends', async ({ client, server }) => {
   const row = '  at src/a.ts:3'
   const terminal = fakeTerminal([row])
-  renderTerminalLinks(terminal)
+  await renderTerminalLinks(client, server, terminal)
 
   await waitFor(() => expect(terminal.providers).toHaveLength(1))
   const link = (await provideLinks(terminal, 0))?.[0]
@@ -60,13 +61,13 @@ test('an activated native link opens the file without a second modifier gate', a
   client,
   server,
 }) => {
+  const terminal = fakeTerminal(['  at src/a.ts:3'])
+  const opened = openedPaths()
+  const { getByTestId } = await renderTerminalLinks(client, server, terminal, opened)
   await writeWorkspaceFile(server.root, 'src/a.ts')
   // Requesting the client fixture is what points the app's RPC singleton at
   // this server, and it doubles as the precondition: the file is really there.
   expect((await client.fs.stat.get({ query: { path: 'repo/src/a.ts' } })).data?.type).toBe('file')
-  const terminal = fakeTerminal(['  at src/a.ts:3'])
-  const opened = openedPaths()
-  const { getByTestId } = renderTerminalLinks(terminal, opened)
   await waitFor(() => expect(terminal.providers).toHaveLength(1))
 
   await activateLink(terminal, 0, clickEvent())
@@ -83,6 +84,9 @@ test('a path that is not on disk reports instead of opening a phantom tab', asyn
   client,
   server,
 }) => {
+  const terminal = fakeTerminal(['  at src/gone.ts:3', '  at src/a.ts:3'])
+  const opened = openedPaths()
+  const { getByTestId } = await renderTerminalLinks(client, server, terminal, opened)
   // What `cd apps/web && bun test` produces: output relative to a cwd this side
   // cannot see, resolved against the panel root into a file that is not there.
   // Opening a tab on it would read as the file having come up empty.
@@ -90,9 +94,6 @@ test('a path that is not on disk reports instead of opening a phantom tab', asyn
   // Ground truth from the same server the click will ask: one path is a real
   // file, the other was never written.
   expect((await client.fs.stat.get({ query: { path: 'repo/src/gone.ts' } })).data).toBeNull()
-  const terminal = fakeTerminal(['  at src/gone.ts:3', '  at src/a.ts:3'])
-  const opened = openedPaths()
-  const { getByTestId } = renderTerminalLinks(terminal, opened)
   await waitFor(() => expect(terminal.providers).toHaveLength(1))
 
   await activateLink(terminal, 0, clickEvent())
@@ -117,14 +118,23 @@ function openedPaths(): OpenedPaths {
   return { paths: [] }
 }
 
-function renderTerminalLinks(terminal: FakeTerminal, opened: OpenedPaths = openedPaths()) {
+async function renderTerminalLinks(
+  client: Client,
+  server: TestServer,
+  terminal: FakeTerminal,
+  opened: OpenedPaths = openedPaths(),
+) {
+  const workspace = await navigationWorkspace(client, server)
+  seedWorkspaceCache(workspace)
+  const application = createTestApplicationRuntime()
   return renderWithProviders(
-    withEditorWorkspace(
+    <EditorStateProvider>
       <>
         <TerminalLinkHost rootPath={PROJECT_ROOT} terminal={terminal.terminal} />
         <EditorSelectionProbe opened={opened} />
-      </>,
-    ),
+      </>
+    </EditorStateProvider>,
+    { application },
   )
 }
 
@@ -168,37 +178,6 @@ function EditorSelectionProbe({ opened }: { opened: OpenedPaths }) {
       </span>
     </>
   )
-}
-
-function withEditorWorkspace(children: ReactNode) {
-  return (
-    <EditorStateProvider>
-      <EditorWorkspaceStateContext.Provider value={createWorkspaceStore()}>
-        {children}
-      </EditorWorkspaceStateContext.Provider>
-    </EditorStateProvider>
-  )
-}
-
-function createWorkspaceStore() {
-  return createEditorWorkspaceStore({
-    chatModePanels: createDefaultChatModePanels(),
-    rootFolder: {
-      birthtimeMs: 0,
-      mtimeMs: 0,
-      name: 'repo',
-      path: filesystemPath(PROJECT_ROOT),
-      size: 0,
-      type: 'directory',
-      version: '',
-    },
-    searchBuffers: {},
-    uiMode: 'workbench',
-    workbenchLayout: createDefaultWorkbenchLayout(),
-    worktreeIdByRootPath: {},
-    workspaceOrder: [PROJECT_ROOT],
-    workspaces: {},
-  })
 }
 
 async function provideLinks(terminal: FakeTerminal, row: number) {

@@ -10,6 +10,7 @@ import { chatMessageMenu } from '@/features/chat/utils/message-menu'
 import { markdownToPlainText } from '@/features/chat/utils/message-text'
 import { copyTextToClipboard } from '@/lib/clipboard'
 import { errorMessage } from '@/lib/error-message'
+import { codexFileCitationsMarkdown } from '@/features/chat/utils/codex-file-citations'
 
 export function useMessageMenu({
   checkpointRevertPending,
@@ -26,7 +27,9 @@ export function useMessageMenu({
   const assistant = message.role === 'assistant'
   // Copy hands over what the bubble shows. For a user message that is the
   // prompt without the attached `<terminal_context>` block.
-  const text = assistant ? message.text : extractTerminalContexts(message.text).text
+  const text = assistant
+    ? codexFileCitationsMarkdown(message.text)
+    : extractTerminalContexts(message.text).text
 
   function handleRevertToCheckpoint() {
     if (typeof revertTurnCount !== 'number') return

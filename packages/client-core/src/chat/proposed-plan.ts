@@ -77,23 +77,15 @@ export function collapsedProposedPlanMarkdown(planMarkdown: string) {
   return previewLines.join('\n')
 }
 
-/**
- * The one plan a session can still act on: the newest one nothing has been built
- * from yet. `implementedAt` is the server's stamp, so a plan stops being
- * actionable the moment its implementation turn starts — not when this client
- * happens to guess it did.
- */
+/** The newest plan decides availability, matching the server projection. */
 export function actionableProposedPlan(plans: readonly OrchestrationProposedPlan[]) {
-  let actionable: OrchestrationProposedPlan | null = null
-
+  let latest: OrchestrationProposedPlan | null = null
   for (const plan of plans) {
-    if (plan.implementedAt) continue
-    if (actionable && actionable.updatedAt > plan.updatedAt) continue
-
-    actionable = plan
+    if (latest && latest.updatedAt > plan.updatedAt) continue
+    if (latest && latest.updatedAt === plan.updatedAt && latest.id > plan.id) continue
+    latest = plan
   }
-
-  return actionable
+  return latest?.implementedAt ? null : latest
 }
 
 export function planImplementationPrompt(planMarkdown: string) {

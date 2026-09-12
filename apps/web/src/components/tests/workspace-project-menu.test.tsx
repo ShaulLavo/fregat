@@ -1,5 +1,3 @@
-import { getClient } from '@/lib/client'
-import { registerTestWorkspaceAddress } from '../../../test/factories/workspace-address'
 import { filesystemPath } from '@/lib/documents/utils/identity'
 import { symlink } from 'node:fs/promises'
 import path from 'node:path'
@@ -8,43 +6,35 @@ import userEvent from '@testing-library/user-event'
 
 import { WorkspaceProjectMenu } from '@/components/workspace-project-menu'
 import { TestEditorStateProvider as EditorStateProvider } from '../../../test/factories/editor-state-provider'
-import { createTestApplicationRuntime } from '../../../test/factories/application-runtime'
 import { expect, test } from '../../../test/fixtures'
 import { renderWithProviders } from '../../../test/render'
 import { ensureFolderPath, recordRecentEntry } from '@/lib/file-server'
 import type { TestCommandRuntimeOverrides } from '../../../test/factories/command-runtime'
+import type { Client } from '@/lib/client'
+import { seedWorkspaceCache } from '../../../test/address'
+import { createTestApplicationRuntime } from '../../../test/factories/application-runtime'
+import { registerTestWorkspaceAddress } from '../../../test/factories/workspace-address'
+import { testScopedStorage } from '../../../test/factories/scoped-storage'
+import { writeRootFolderCache } from '@/features/workspace/state/cache'
 
 async function renderMenu(
+  client: Client,
   rootPath: string | null,
   shell: TestCommandRuntimeOverrides['shell'] = {},
 ) {
+  if (rootPath) {
+    const workspaceAddress = await registerTestWorkspaceAddress(client, rootPath)
+    seedWorkspaceCache({ rootPath, workspaceAddress })
+  }
+  if (!rootPath) writeRootFolderCache(testScopedStorage, null)
+
   const application = createTestApplicationRuntime()
   const store = application.getSnapshot().editor.workspaceStore
-  store.getState().clearRootFolder()
-  store.getState().setUiMode('workbench')
-  if (rootPath) {
-    await ensureFolderPath(filesystemPath(rootPath))
-    const workspaceAddress = await registerTestWorkspaceAddress(getClient(), rootPath)
-    store.getState().switchWorkspace({
-      workspaceAddress,
-      birthtimeMs: 0,
-      mtimeMs: 0,
-      name: rootPath.split('/').filter(Boolean).at(-1) ?? rootPath,
-      path: filesystemPath(rootPath),
-      size: 0,
-      type: 'directory',
-      version: '',
-    })
-  }
   const rendered = renderWithProviders(
     <EditorStateProvider>
       <WorkspaceProjectMenu workspaceTitle='platform' />
     </EditorStateProvider>,
-    {
-      application,
-      queryClient: application.getSnapshot().queryClient,
-      command: { runtime: { workspace: store, shell } },
-    },
+    { application, command: { runtime: { shell } } },
   )
   return { ...rendered, store }
 }
@@ -53,12 +43,11 @@ test('lists a folder only once when recents include a symlink through its parent
   client,
   server,
 }) => {
-  void client
   await ensureFolderPath(filesystemPath('projects/platform'))
   await symlink('projects', path.join(server.root, 'Projects'))
   await recordRecentEntry(filesystemPath('projects/platform'))
   await recordRecentEntry(filesystemPath('Projects/platform'))
-  const { queryClient } = await renderMenu('projects/platform')
+  const { queryClient } = await renderMenu(client, 'projects/platform')
 
   await userEvent.click(screen.getByRole('button', { name: 'Switch project' }))
   await waitFor(() => {
@@ -75,11 +64,10 @@ test('lists a folder only once when recents include a symlink through its parent
 })
 
 test('keeps distinct case-sensitive folders and opens the selected folder', async ({ client }) => {
-  void client
   await ensureFolderPath(filesystemPath('projects/platform'))
   await ensureFolderPath(filesystemPath('Projects/platform'))
   await recordRecentEntry(filesystemPath('Projects/platform'))
-  const { store } = await renderMenu('projects/platform')
+  const { store } = await renderMenu(client, 'projects/platform')
 
   await userEvent.click(screen.getByRole('button', { name: 'Switch project' }))
   const other = await screen.findByRole('menuitemradio', { name: 'platform Projects' })
@@ -89,8 +77,9 @@ test('keeps distinct case-sensitive folders and opens the selected folder', asyn
   await waitFor(() => expect(store.getState().rootFolder?.path).toBe('Projects/platform'))
 })
 
-test('opens without a render failure and lists recents under a heading', async () => {
-  await renderMenu('repo/platform')
+test('opens without a render failure and lists recents under a heading', async ({ client }) => {
+  await ensureFolderPath(filesystemPath('repo/platform'))
+  await renderMenu(client, 'repo/platform')
 
   // Opening is the assertion: base-ui throws outright if a group label sits
   // outside its group, and nothing catches that until the menu is rendered.
@@ -100,8 +89,9 @@ test('opens without a render failure and lists recents under a heading', async (
   expect(screen.getByRole('menuitem', { name: /Open folder/ })).toBeVisible()
 })
 
-test('offers the open project as the checked entry before recents load', async () => {
-  await renderMenu('repo/platform')
+test('offers the open project as the checked entry before recents load', async ({ client }) => {
+  await ensureFolderPath(filesystemPath('repo/platform'))
+  await renderMenu(client, 'repo/platform')
 
   await userEvent.click(screen.getByRole('button', { name: 'Switch project' }))
 
@@ -110,8 +100,8 @@ test('offers the open project as the checked entry before recents load', async (
   expect(items[0]).toHaveTextContent('platform')
 })
 
-test('still offers a way out when no workspace is open', async () => {
-  await renderMenu(null)
+test('still offers a way out when no workspace is open', async ({ client }) => {
+  await renderMenu(client, null)
 
   await userEvent.click(screen.getByRole('button', { name: 'Switch project' }))
 
@@ -119,9 +109,11 @@ test('still offers a way out when no workspace is open', async () => {
   expect(await screen.findByRole('menuitem', { name: /Open folder/ })).toBeVisible()
 })
 
-test('opens the connect machine flow from the project dropdown with no workspace open', async () => {
+test('opens the connect machine flow from the project dropdown with no workspace open', async ({
+  client,
+}) => {
   const dialogs: string[] = []
-  await renderMenu(null, {
+  await renderMenu(client, null, {
     showEnvironmentDialog: (mode) => {
       dialogs.push(mode)
     },

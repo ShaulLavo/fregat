@@ -13,6 +13,7 @@ import {
   type ChatActivityTool,
 } from '@/features/chat/utils/activity-presentation'
 import { isVisibleChatActivity } from '@/features/chat/utils/activity-visibility'
+import { chatAgentActivity } from '@/features/chat/utils/agent-activity'
 
 type ChatWorkLogTone = 'error' | 'info' | 'thinking' | 'tool'
 
@@ -34,6 +35,7 @@ export type ChatWorkLogEntry = {
   lifecycle: ChatActivityLifecycle | null
   outcome: ChatActivityOutcome | null
   output: string | null
+  result?: string
   plan: ChatWorkLogPlan | null
   requestId: string | null
   sourceKind: string
@@ -69,6 +71,7 @@ const WORK_LOG_SCALAR_FIELDS = [
   'lifecycle',
   'outcome',
   'output',
+  'result',
   'requestId',
   'sourceKind',
   'status',
@@ -95,6 +98,7 @@ export function chatWorkLogEntries({
   const entries: DerivedChatWorkLogEntry[] = []
 
   for (const activity of activities) {
+    if (chatAgentActivity(activity.payload)) continue
     if (activity.kind === 'turn.plan.updated') {
       appendTurnPlanRow(entries, planRows, activity)
       continue
@@ -200,6 +204,7 @@ function turnPlanRows(ordered: readonly OrchestrationSessionActivity[]) {
   const rows = new Map<string, TurnPlanRow>()
 
   for (const activity of ordered) {
+    if (chatAgentActivity(activity.payload)) continue
     if (activity.kind !== 'turn.plan.updated') continue
 
     const key = turnPlanKey(activity)
@@ -305,6 +310,7 @@ function derivedWorkLogEntry(activity: OrchestrationSessionActivity): DerivedCha
     lifecycle: presentation.lifecycle,
     outcome: presentation.outcome,
     output: presentation.output,
+    ...(presentation.result ? { result: presentation.result } : {}),
     plan: null,
     requestId: stringPayloadValue(activity.payload, 'requestId'),
     sourceKind: activity.kind,
@@ -312,7 +318,7 @@ function derivedWorkLogEntry(activity: OrchestrationSessionActivity): DerivedCha
     title: presentation.title,
     toolCallKey: workLogIdentity(activity, presentation.toolCallId),
     reasoningDelta: chatActivityReasoningDelta(activity) !== null,
-    tone: workLogTone(activity),
+    tone: workLogTone(activity, presentation.outcome),
     ...(presentation.tool ? { tool: presentation.tool } : {}),
     turnId: activity.turnId,
   }
@@ -344,8 +350,11 @@ function reasoningSection(payload: unknown) {
   return `${payload.streamKind}:${contentIndex ?? ''}:${summaryIndex ?? ''}`
 }
 
-function workLogTone(activity: OrchestrationSessionActivity): ChatWorkLogTone {
-  if (chatActivityHasFailure(activity)) return 'error'
+function workLogTone(
+  activity: OrchestrationSessionActivity,
+  outcome: ChatActivityOutcome | null,
+): ChatWorkLogTone {
+  if (outcome !== 'neutral' && chatActivityHasFailure(activity)) return 'error'
   if (activity.kind === 'task.progress') return 'thinking'
   if (activity.tone === 'approval') return 'info'
   if (activity.tone === 'thinking') return 'thinking'
@@ -419,6 +428,7 @@ function mergeWorkLogEntries(
     lifecycle,
     outcome: mergedOutcome(previous.outcome, next.outcome, lifecycle),
     output: next.output ?? previous.output,
+    result: next.result ?? previous.result,
     status: lifecycleStatus(lifecycle) ?? next.status ?? previous.status,
     title: mergedTitle(previous, next),
     tool: next.tool ?? previous.tool,

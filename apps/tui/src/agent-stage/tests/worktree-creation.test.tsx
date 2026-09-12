@@ -46,10 +46,14 @@ test('a rejected worktree send preserves its draft and retries with a fresh iden
     await act(async () => {
       frame.mockInput.pressEnter()
     })
+    const engine = orchestrationForApp(server.app)
+    assert(engine)
     await act(async () => {
-      await expect.poll(() => server.providerAdapter.startedTurns.length).toBe(1)
       await expect.poll(() => chat.getSnapshot().selectedSessionId).not.toBeNull()
+      await engine.providerRuntimeIdle()
+      await chat.refresh()
     })
+    expect(server.providerAdapter.startedTurns).toHaveLength(1)
     const accepted = chat.getSnapshot().selectedSessionId
     expect(accepted).not.toBe(rejected.sessionId)
     expect(Object.keys(chat.getSnapshot().projection.worktreeById)).toHaveLength(2)

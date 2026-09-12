@@ -18,6 +18,9 @@ import { newWorktreeTarget } from '@/features/chat/utils/worktree-target'
 import { createDraftSessionSubmission } from '@workspace/client-core/chat/commands'
 import { createProjectRegistrationCommand } from '@workspace/client-core/chat/registration'
 import { expect, test } from '../../../test/fixtures'
+import { renderWithProviders } from '../../../test/render'
+import { waitForNavigation } from '../../../test/address'
+import { getNavigation } from '@/state/navigation-binding'
 test('every session command is reachable from the keyboard', () => {
   const bound = boundCommands()
 
@@ -45,6 +48,8 @@ test('jumping selects the requested scoped row only after its real root opens', 
   server,
 }) => {
   const h = await createRailHarness(client, server, ['First', 'Second', 'Third'])
+  renderWithProviders(<></>, { application: h.application })
+  await waitForNavigation(getNavigation())
   expect(await jumpToSession(2)).toBe(true)
   expect(selectedSessionId()).toBe(h.sessionIds[1])
   expect(h.application.getSnapshot().editor.workspaceStore.getState().rootFolder?.path).toBe(
@@ -56,6 +61,8 @@ test('session navigation and new drafts accept the workspace root empty relative
   server,
 }) => {
   const h = await createRailHarness(client, server, [])
+  renderWithProviders(<></>, { application: h.application })
+  await waitForNavigation(getNavigation())
   const registration = await h.dispatch(
     createProjectRegistrationCommand({ workspaceRoot: '', title: 'Workspace root' }),
   )
@@ -80,6 +87,8 @@ test('session navigation and new drafts accept the workspace root empty relative
 })
 test('jumping past the end preserves selection', async ({ client, server }) => {
   const h = await createRailHarness(client, server)
+  renderWithProviders(<></>, { application: h.application })
+  await waitForNavigation(getNavigation())
   await jumpToSession(1)
   const selected = selectedSessionId()
   expect(await jumpToSession(3)).toBe(false)
@@ -87,7 +96,9 @@ test('jumping past the end preserves selection', async ({ client, server }) => {
   expect(h.sessionIds).toContain(selected)
 })
 test('next and previous traverse the visible order and wrap', async ({ client, server }) => {
-  await createRailHarness(client, server, ['First', 'Second', 'Third'])
+  const h = await createRailHarness(client, server, ['First', 'Second', 'Third'])
+  renderWithProviders(<></>, { application: h.application })
+  await waitForNavigation(getNavigation())
   await jumpToSession(1)
   const first = selectedSessionId()
   await selectAdjacentSession('next')
@@ -102,6 +113,8 @@ test('next and previous traverse the visible order and wrap', async ({ client, s
 })
 test('traversal uses the same filtered rows as the rail', async ({ client, server }) => {
   const h = await createRailHarness(client, server)
+  renderWithProviders(<></>, { application: h.application })
+  await waitForNavigation(getNavigation())
   useSessionRailStore.getState().setQuery('Second')
   expect(await jumpToSession(1)).toBe(true)
   expect(selectedSessionId()).toBe(h.sessionIds[1])
@@ -113,6 +126,8 @@ test('new session uses the scoped project and leaves the archive view', async ({
   server,
 }) => {
   const h = await createRailHarness(client, server)
+  renderWithProviders(<></>, { application: h.application })
+  await waitForNavigation(getNavigation())
   useSessionRailStore.getState().setScope(h.projectId)
   useSessionRailStore.getState().setView('archived')
   expect(await startScopedSessionDraft()).toBe(true)
@@ -129,6 +144,8 @@ test('an active-session draft preserves its missing checkout identity while open
   server,
 }) => {
   const h = await createWorktreeLifecycleHarness(client, server)
+  renderWithProviders(<></>, { application: h.application })
+  await waitForNavigation(getNavigation())
   const target = newWorktreeTarget(h.worktreeId)
   const sessionId = await h.create(target)
   const worktree = await h.worktree(target.worktreeId)
@@ -143,6 +160,10 @@ test('an active-session draft preserves its missing checkout identity while open
   expect(h.application.getSnapshot().editor.workspaceStore.getState().rootFolder?.path).toBe(
     (await h.worktree()).path,
   )
+  const draftGeneration = useSessionSelectionStore.getState().draftGeneration
+  expect(await getNavigation().setRail('archived')).toEqual({ status: 'applied' })
+  expect(useSessionSelectionStore.getState().draftWorktreeId).toBe(target.worktreeId)
+  expect(useSessionSelectionStore.getState().draftGeneration).toBe(draftGeneration)
 })
 
 test('new session uses the linked checkout of the session selected automatically by the stage', async ({
@@ -150,6 +171,8 @@ test('new session uses the linked checkout of the session selected automatically
   server,
 }) => {
   const h = await createWorktreeLifecycleHarness(client, server)
+  renderWithProviders(<></>, { application: h.application })
+  await waitForNavigation(getNavigation())
   const target = newWorktreeTarget(h.worktreeId)
   await h.create(target)
   useSessionRailStore.getState().setScope(h.projectId)

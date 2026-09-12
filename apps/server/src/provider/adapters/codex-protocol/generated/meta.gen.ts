@@ -12,6 +12,7 @@ export const CODEX_CLIENT_REQUEST_METHODS = {
   'thread/read': 'thread/read',
   'skills/list': 'skills/list',
   'turn/start': 'turn/start',
+  'turn/steer': 'turn/steer',
   'turn/interrupt': 'turn/interrupt',
   'model/list': 'model/list',
   'account/read': 'account/read',
@@ -87,6 +88,7 @@ export interface CodexClientRequestParamsByMethod {
   readonly 'thread/read': CodexSchema.V2ThreadReadParams
   readonly 'skills/list': CodexSchema.V2SkillsListParams
   readonly 'turn/start': CodexSchema.V2TurnStartParams
+  readonly 'turn/steer': CodexSchema.V2TurnSteerParams
   readonly 'turn/interrupt': CodexSchema.V2TurnInterruptParams
   readonly 'model/list': CodexSchema.V2ModelListParams
   readonly 'account/read': CodexSchema.V2GetAccountParams
@@ -101,6 +103,7 @@ export interface CodexClientRequestResultByMethod {
   readonly 'thread/read': CodexSchema.V2ThreadReadResponse
   readonly 'skills/list': CodexSchema.V2SkillsListResponse
   readonly 'turn/start': CodexSchema.V2TurnStartResponse
+  readonly 'turn/steer': CodexSchema.V2TurnSteerResponse
   readonly 'turn/interrupt': CodexSchema.V2TurnInterruptResponse
   readonly 'model/list': CodexSchema.V2ModelListResponse
   readonly 'account/read': CodexSchema.V2GetAccountResponse
@@ -173,6 +176,7 @@ export const CODEX_CLIENT_REQUEST_PARAMS = {
   'thread/read': CodexSchema.V2ThreadReadParamsSchema,
   'skills/list': CodexSchema.V2SkillsListParamsSchema,
   'turn/start': CodexSchema.V2TurnStartParamsSchema,
+  'turn/steer': CodexSchema.V2TurnSteerParamsSchema,
   'turn/interrupt': CodexSchema.V2TurnInterruptParamsSchema,
   'model/list': CodexSchema.V2ModelListParamsSchema,
   'account/read': CodexSchema.V2GetAccountParamsSchema,
@@ -187,6 +191,7 @@ export const CODEX_CLIENT_REQUEST_RESULTS = {
   'thread/read': CodexSchema.V2ThreadReadResponseSchema,
   'skills/list': CodexSchema.V2SkillsListResponseSchema,
   'turn/start': CodexSchema.V2TurnStartResponseSchema,
+  'turn/steer': CodexSchema.V2TurnSteerResponseSchema,
   'turn/interrupt': CodexSchema.V2TurnInterruptResponseSchema,
   'model/list': CodexSchema.V2ModelListResponseSchema,
   'account/read': CodexSchema.V2GetAccountResponseSchema,

@@ -7,7 +7,6 @@ import { ActivityRow } from '@/features/chat/components/activity-row'
 import { useWorkLogScroll } from '@/features/chat/hooks/use-work-log-scroll'
 import { useChatWorkLogExpansionStore } from '@/features/chat/state/chat-work-log-expansion-store'
 import type { ChatLiveActivity } from '@/features/chat/utils/live-activity'
-import { workLogContentLength } from '@/features/chat/utils/work-log-content-length'
 
 export function LiveActivityRow({
   activity,
@@ -22,10 +21,7 @@ export function LiveActivityRow({
   )
   const toggle = useChatWorkLogExpansionStore((state) => state.toggleGroupExpanded)
   const expandable = activity.activities.length > 0
-  const scrollRef = useWorkLogScroll(
-    `group:${historyId}`,
-    workLogContentLength(activity.activities),
-  )
+  const scrollRef = useWorkLogScroll(`group:${historyId}`, activity.activities.length)
   const label = (
     <>
       {activity.active ? (
@@ -64,7 +60,10 @@ export function LiveActivityRow({
       )}
       {expanded && expandable ? (
         <div
-          className='border-border ml-2 max-h-72 overflow-auto border-l pl-2'
+          className='border-border ml-2 max-h-[min(18rem,50dvh)] overflow-auto border-l pl-2'
+          aria-label='Tool calls'
+          role='region'
+          tabIndex={0}
           data-tool-group-scroll
           ref={scrollRef}
         >

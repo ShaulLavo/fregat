@@ -111,7 +111,14 @@ test('narrow layout returns from the viewer to its tree and back', async ({ serv
         return frame.renderer.currentFocusedRenderable?.id
       })
       .toBe('workbench-file-tree')
-    expect(frame.captureCharFrame()).toContain('sample.txt')
+    await expect
+      .poll(async () => {
+        await act(async () => {
+          await frame.renderOnce()
+        })
+        return frame.captureCharFrame()
+      })
+      .toContain('sample.txt')
     expect(frame.captureCharFrame()).not.toContain('Opened in the narrow viewer')
     await runPaletteCommand(frame, 'Focus editor')
     await expect

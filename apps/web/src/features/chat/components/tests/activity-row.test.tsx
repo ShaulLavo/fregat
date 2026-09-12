@@ -3,7 +3,9 @@ import userEvent from '@testing-library/user-event'
 
 import { ActivityRow } from '@/features/chat/components/activity-row'
 import { ActivityGroupRow } from '@/features/chat/components/activity-group-row'
+import { chatWorkLogEntries } from '@/features/chat/utils/work-log'
 import { useChatWorkLogExpansionStore } from '@/features/chat/state/chat-work-log-expansion-store'
+import { sessionActivity } from '../../../../../test/factories/chat'
 import { workLogEntry as entry } from '../../../../../test/factories/work-log'
 import { expect, test } from '../../../../../test/fixtures'
 import { renderWithProviders } from '../../../../../test/render'
@@ -99,7 +101,7 @@ test('a failed tool call is distinguishable from a successful one', () => {
   )
 
   expect(screen.getByLabelText('Failed')).toBeInTheDocument()
-  expect(screen.getByText('Failed command')).toHaveClass('text-destructive')
+  expect(screen.getByText('Failed command')).not.toHaveClass('text-destructive')
 })
 
 test('expanding a row reveals its raw command, output and changed files', async () => {
@@ -141,6 +143,34 @@ function resetExpansion() {
   useChatWorkLogExpansionStore.setState({ expandedGroupIds: {}, expandedRowIds: {} })
 }
 
+test('a native no-match search finishes without failure styling', async () => {
+  resetExpansion()
+  const [activity] = chatWorkLogEntries({
+    activities: [
+      sessionActivity({
+        kind: 'tool.completed',
+        tone: 'tool',
+        payload: {
+          itemType: 'command_execution',
+          toolCallId: 'no-match-search',
+          status: 'failed',
+          data: {
+            command: 'rg absent existing.txt',
+            status: 'failed',
+            exitCode: 1,
+            aggregatedOutput: '',
+          },
+        },
+      }),
+    ],
+  })
+  expect(activity).toMatchObject({ outcome: 'neutral', lifecycle: 'completed' })
+  renderWithProviders(<ActivityRow activity={activity!} />)
+  expect(screen.queryByLabelText('Failed')).not.toBeInTheDocument()
+  await userEvent.click(screen.getByRole('button', { name: 'rg absent existing.txt' }))
+  expect(screen.getByLabelText('Result')).toHaveTextContent('No matches · Exit code 1')
+})
+
 test('a reasoning summary can be expanded to read the entire text', async () => {
   resetExpansion()
   const reasoning =
@@ -159,4 +189,23 @@ test('a reasoning summary can be expanded to read the entire text', async () => 
   expect(screen.queryByLabelText('Reasoning')).not.toBeInTheDocument()
   await userEvent.click(screen.getByRole('button', { name: reasoning }))
   expect(screen.getByLabelText('Reasoning')).toHaveTextContent(reasoning)
+})
+
+test('historical commands show their actual invocation and an expandable process result', async () => {
+  resetExpansion()
+  renderWithProviders(
+    <ActivityRow
+      activity={entry({
+        command: 'rg missing src; true',
+        lifecycle: 'failed',
+        outcome: 'failed',
+        result: 'Exit code 0\nrg: missing: No such file or directory',
+      })}
+    />,
+  )
+  await userEvent.click(
+    screen.getByRole('button', { name: 'rg missing src; true, tool call failed' }),
+  )
+  expect(screen.getByLabelText('Result')).toHaveTextContent('Exit code 0')
+  expect(screen.getByLabelText('Result')).toHaveTextContent('No such file or directory')
 })

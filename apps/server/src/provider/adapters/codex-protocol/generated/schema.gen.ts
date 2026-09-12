@@ -8008,6 +8008,43 @@ export type V2TurnStartResponse__Turn = v.InferOutput<typeof V2TurnStartResponse
 export const V2TurnStartResponseSchema = v.looseObject({ turn: V2TurnStartResponse__TurnSchema })
 export type V2TurnStartResponse = v.InferOutput<typeof V2TurnStartResponseSchema>
 
+export const V2TurnSteerParams__ByteRangeSchema = v.looseObject({
+  end: v.pipe(v.number(), v.integer(), v.minValue(0)),
+  start: v.pipe(v.number(), v.integer(), v.minValue(0)),
+})
+export type V2TurnSteerParams__ByteRange = v.InferOutput<typeof V2TurnSteerParams__ByteRangeSchema>
+
+export const V2TurnSteerParams__TextElementSchema = v.looseObject({
+  byteRange: V2TurnSteerParams__ByteRangeSchema,
+  placeholder: v.optional(v.union([v.string(), v.null()])),
+})
+export type V2TurnSteerParams__TextElement = v.InferOutput<
+  typeof V2TurnSteerParams__TextElementSchema
+>
+
+export const V2TurnSteerParams__UserInputSchema = v.union([
+  v.looseObject({
+    text: v.string(),
+    text_elements: v.optional(v.array(V2TurnSteerParams__TextElementSchema)),
+    type: v.literal('text'),
+  }),
+  v.looseObject({ type: v.literal('image'), url: v.string() }),
+  v.looseObject({ path: v.string(), type: v.literal('localImage') }),
+  v.looseObject({ name: v.string(), path: v.string(), type: v.literal('skill') }),
+  v.looseObject({ name: v.string(), path: v.string(), type: v.literal('mention') }),
+])
+export type V2TurnSteerParams__UserInput = v.InferOutput<typeof V2TurnSteerParams__UserInputSchema>
+
+export const V2TurnSteerParamsSchema = v.looseObject({
+  expectedTurnId: v.string(),
+  input: v.array(V2TurnSteerParams__UserInputSchema),
+  threadId: v.string(),
+})
+export type V2TurnSteerParams = v.InferOutput<typeof V2TurnSteerParamsSchema>
+
+export const V2TurnSteerResponseSchema = v.looseObject({ turnId: v.string() })
+export type V2TurnSteerResponse = v.InferOutput<typeof V2TurnSteerResponseSchema>
+
 export const V2WarningNotificationSchema = v.looseObject({
   message: v.string(),
   threadId: v.optional(v.union([v.string(), v.null()])),
