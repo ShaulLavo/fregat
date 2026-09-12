@@ -26,6 +26,48 @@ number is here and the original is named as wrong — the point of the audit is 
 Figures still labelled projections are projections: they are marked where they appear, and the three
 places that need re-measuring against a real implementation say so.
 
+## Progress
+
+Landed on `worktree-plan099-audit-findings`, each commit verified against
+[`BASELINE.md`](BASELINE.md) before the next started.
+
+| Unit | Finding                    | Commit     | State                                                                                                    |
+| ---- | -------------------------- | ---------- | -------------------------------------------------------------------------------------------------------- |
+| 3    | LSP framing copies         | `669afeac` | **DONE** — 44.7x at 16 KiB chunks, 6.4x at the real 102 KiB read size, 0 fuzz regressions in 4,000 cases |
+| 8    | Dead lint surface, CI gate | `3d1ea53e` | **DONE** — 5 configs and 24 deps deleted, `settings-reference` gate added, file-tree bench in CI         |
+| 1    | Search stream completion   | `7ac493a6` | **DONE** — producer throws, replace gate is an allowlist, search now logs at all                         |
+| 2    | Retention byte budget      | `d1d94b0b` | **DONE** — budget connected and registered, close-path eviction fixed                                    |
+| 4    | Workspace open generation  | —          | not started                                                                                              |
+| 5    | Provider command queue     | —          | not started                                                                                              |
+| 6    | TUI draft attachments      | —          | not started                                                                                              |
+| 7    | Session history pagination | —          | not started                                                                                              |
+
+Decisions taken while executing, each recorded in its commit message:
+
+- **Unit 8 / open decision 5** — `apps/server/eslint.config.js` is deleted and the language-server
+  adoption change accepted. Keeping a dead lint config alive to preserve an accidental
+  `lsp/registry.ts` adoption marker is not a reason to keep it. The registry and routes tests write
+  their own fixture configs and are unaffected.
+- **Unit 8** — the plan's instruction to delete the `eslint-disable` comments was **wrong and was not
+  followed**. Oxlint honours those directives and all twelve name rules it enforces; deleting them
+  turns `bun run lint` red.
+- **Unit 2 / open decision 1** — the growth-point ceiling is **out of scope**, so the delivered
+  property is "enforced at a switch and a close", not "always binding". Said so in the unit, the
+  commit and the test name.
+- **Unit 2 / open decision 7** — `'code-theme'` is a scalar widget; the test was stale, not the
+  registry. `color-theme-provider.tsx` writes both keys through the scalar path.
+- **Unit 2 / plan correction** — `RetainedWorkspaceSlice.rootPath` became `string | null` rather than
+  taking a sentinel string, so Plan 098's branding has something honest to brand.
+- **Unit 1 / plan correction** — the plan's `isCompleteDone` value predicate is not derivable
+  (`path: ''` is a legal root). Fixed at the only place that knows instead: `doneEventFromData` now
+  rejects a non-record payload rather than fabricating a zeroed terminal event.
+
+Two baseline failures fixed as prerequisites rather than worked around:
+`packages/contracts/src/tests/settings-mutations.test.ts` (unit 2) and
+`apps/web/test/integration/server-in-process.test.ts`, which could not even load (unit 1).
+
+Still open for a human: decisions 2, 3, 4, 6, 8, 9 and 10.
+
 ## Verdicts at a glance
 
 | #   | Finding                                                 | Verdict                      | Owner                               | Effort                  |
