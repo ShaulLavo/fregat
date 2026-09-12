@@ -6,24 +6,29 @@ import { chatSubmissionValidation } from '@/features/chat/utils/submission-valid
 import { promptHistoryEntries, stepPromptHistory } from '@/features/chat/utils/prompt-history'
 
 test('workspace images resolve within the workspace and remote files never become local reads', () => {
-  expect(markdownImageSource('./assets/shot.png', '/work/project', 'https://host')).toBe(
-    'https://host/fs/blob?path=%2Fwork%2Fproject%2Fassets%2Fshot.png',
+  expect(markdownImageSource('./assets/shot.png', '/work/project', 'https://host', 'project')).toBe(
+    'https://host/fs/blob?path=project%2Fassets%2Fshot.png',
   )
-  expect(markdownImageSource('/work/project/a.png', '/work/project', 'https://host')).toBe(
-    'https://host/fs/blob?path=%2Fwork%2Fproject%2Fa.png',
-  )
-  expect(markdownImageSource('../private/a.png', '/work/project', 'https://host')).toBeNull()
+  expect(
+    markdownImageSource('/work/project/a.png', '/work/project', 'https://host', 'project'),
+  ).toBe('https://host/fs/blob?path=project%2Fa.png')
+  expect(
+    markdownImageSource('../private/a.png', '/work/project', 'https://host', 'project'),
+  ).toBeNull()
   expect(
     markdownImageSource(
       'file://another-machine/work/project/a.png',
       '/work/project',
       'https://host',
+      'project',
     ),
   ).toBeNull()
-  expect(markdownImageSource('https://remote/a.png', '/work/project', 'https://host')).toBe(
-    'https://remote/a.png',
-  )
-  expect(markdownImageSource('javascript:alert(1)', '/work/project', 'https://host')).toBeNull()
+  expect(
+    markdownImageSource('https://remote/a.png', '/work/project', 'https://host', 'project'),
+  ).toBe('https://remote/a.png')
+  expect(
+    markdownImageSource('javascript:alert(1)', '/work/project', 'https://host', 'project'),
+  ).toBeNull()
 })
 
 test('file citations become readable links while literal code remains unchanged', () => {

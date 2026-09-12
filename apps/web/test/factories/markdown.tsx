@@ -1,3 +1,7 @@
+import {
+  ChatWorkspaceRootContext,
+  type ChatWorkspaceRoot,
+} from '@/features/chat/providers/workspace-root-context'
 import { mkdir, writeFile } from 'node:fs/promises'
 import path from 'node:path'
 
@@ -25,11 +29,18 @@ export function renderMarkdown(
   {
     application,
     streaming = false,
-  }: { readonly application?: ApplicationRuntime; readonly streaming?: boolean } = {},
+    workspaceRoot = null,
+  }: {
+    readonly application?: ApplicationRuntime
+    readonly streaming?: boolean
+    readonly workspaceRoot?: ChatWorkspaceRoot | null
+  } = {},
 ) {
   return renderWithProviders(
     <TestEditorStateProvider>
-      <AssistantMarkdown streaming={streaming} text={text} />
+      <ChatWorkspaceRootContext value={workspaceRoot}>
+        <AssistantMarkdown streaming={streaming} text={text} />
+      </ChatWorkspaceRootContext>
     </TestEditorStateProvider>,
     { application },
   )

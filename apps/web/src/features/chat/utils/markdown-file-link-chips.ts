@@ -17,8 +17,8 @@ type MarkdownAstNode = {
  * remark: Streamdown hardens hrefs on the hast, which blanks bare relative
  * destinations and rewrites `./x` to `/x` before any component sees them.
  */
-export function remarkFileLinkChips(rootPath: string | null) {
-  return () => (tree: MarkdownAstNode) => {
+export function remarkFileLinkChips({ rootPath }: { rootPath: string | null }) {
+  return (tree: MarkdownAstNode) => {
     rewriteFileLinks(tree, rootPath)
   }
 }

@@ -56,7 +56,7 @@ export function AssistantMarkdown({
   text: string
 }) {
   const { colorMode, definition, editorTheme, registration } = useEditorColorTheme()
-  const { openFileReference, rootPath } = useOpenFileReference()
+  const { openFileReference, rootPath, workspacePath } = useOpenFileReference()
   const owner = originForQueryClient(useQueryClient())
   const environment = useEnvironmentsStore((state) => state.entries[owner])
   const origin = serverEndpoint(environment?.origin ?? owner)
@@ -118,14 +118,15 @@ export function AssistantMarkdown({
     () => ({ openFileReference, rootPath }),
     [openFileReference, rootPath],
   )
-  const remarkPlugins = useMemo(
+  // Streamdown caches processors by plugin name/options; closures would reuse another workspace.
+  const remarkPlugins = useMemo<StreamdownProps['remarkPlugins']>(
     () => [
       ...STREAMDOWN_REMARK_PLUGINS,
       remarkNormalizeListItemIndentation,
-      remarkFileLinkChips(rootPath),
-      remarkWorkspaceImages(rootPath, origin),
+      [remarkFileLinkChips, { rootPath }],
+      [remarkWorkspaceImages, { rootPath, workspacePath, origin }],
     ],
-    [rootPath, origin],
+    [rootPath, workspacePath, origin],
   )
   const renderedText = useMemo(() => normalizeAgentMarkdown(text), [text])
 
