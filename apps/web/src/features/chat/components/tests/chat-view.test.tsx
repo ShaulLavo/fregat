@@ -271,17 +271,15 @@ test('correction retry consumes content while model and mode choices reach the n
   useChatInputDraftStore.getState().setModelSelection(target, nextModel)
   useChatInputDraftStore.getState().setRuntimeMode(target, 'approval-required')
   useChatInputDraftStore.getState().setInteractionMode(target, 'plan')
-  useChatInputDraftStore
-    .getState()
-    .addTerminalContexts(target, [
-      {
-        id: 'captured-error',
-        source: 'terminal-1',
-        lineStart: 1,
-        lineEnd: 1,
-        text: 'Missing file',
-      },
-    ])
+  useChatInputDraftStore.getState().addTerminalContexts(target, [
+    {
+      id: 'captured-error',
+      source: 'terminal-1',
+      lineStart: 1,
+      lineEnd: 1,
+      text: 'Missing file',
+    },
+  ])
   let snapshot: OrchestrationSessionDetailSnapshot = {
     checkpoints: [],
     proposedPlans: [],
