@@ -159,7 +159,9 @@ function canReplace(
   if (!snapshot) return false
   if (!snapshot.resultsSearchQuery) return false
   if (snapshot.replaceStatus === 'running') return false
-  if (snapshot.status === 'loading') return false
+  // An allowlist: a run that fails mid-stream keeps its partial matches, so a
+  // denylist blocking only `'loading'` let replace run over an incomplete set.
+  if (snapshot.status !== 'ready') return false
 
   return firstContentMatch(snapshot.matches) !== null
 }

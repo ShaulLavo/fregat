@@ -1,12 +1,12 @@
 import type { DocumentKey, FilesystemPath, TabId } from '@/lib/documents/utils/types'
 
 const DEFAULT_PROJECT_LIMIT = 3
-const DEFAULT_BYTE_BUDGET = 64 * 1024 * 1024
 
 export type RetainedWorkspaceSlice = {
   readonly documentKeys: readonly DocumentKey[]
   readonly lastActiveAt: number
-  readonly rootPath: FilesystemPath
+  /** `null` is the rootless active slice; a real root can never collide with it. */
+  readonly rootPath: FilesystemPath | null
   readonly tabIds: readonly TabId[]
 }
 
@@ -16,27 +16,29 @@ export type DocumentRetention = {
 }
 
 /**
- * Which documents and views survive a project switch. Two ceilings, because either
- * alone is defeated: a project count says nothing about bytes (one 100MB file per
- * project blows past any count), and a byte budget alone would keep an unbounded
- * number of tiny projects alive.
+ * Which documents and views survive a project switch or a tab close.
  *
- * The keep set is the UNION over every retained slice, never per-slice. Roots nest
- * (/repo and /repo/apps/web), so one absolute path can be referenced by two slices,
- * and computing per slice would drop a document the other slice still displays.
+ * Two ceilings, because either alone is defeated: a count ignores size, a size
+ * budget keeps unboundedly many tiny projects. The keep set is the UNION over
+ * retained slices — roots nest, so per-slice drops a document another still shows.
  */
 export function retentionForProjects({
   activeRootPath,
-  byteBudget = DEFAULT_BYTE_BUDGET,
+  byteBudget,
   documentSizes,
   projectLimit = DEFAULT_PROJECT_LIMIT,
   slices,
+  unevictableDocumentKeys,
 }: {
   readonly activeRootPath: FilesystemPath | null
-  readonly byteBudget?: number
-  readonly documentSizes?: ReadonlyMap<DocumentKey, number>
+  /** UTF-16 code units, not bytes: byte-exact for ASCII, an under-count otherwise. */
+  readonly byteBudget: number
+  /** Required, and only the document store can produce it — so a caller cannot omit it. */
+  readonly documentSizes: ReadonlyMap<DocumentKey, number>
   readonly projectLimit?: number
   readonly slices: readonly RetainedWorkspaceSlice[]
+  /** Documents `retain` keeps regardless of the keep set; their text is unavoidable. */
+  readonly unevictableDocumentKeys: ReadonlySet<DocumentKey>
 }): DocumentRetention {
   const retained = retainedSlices({
     activeRootPath,
@@ -44,6 +46,7 @@ export function retentionForProjects({
     documentSizes,
     projectLimit,
     slices,
+    unevictableDocumentKeys,
   })
 
   return {
@@ -58,12 +61,14 @@ function retainedSlices({
   documentSizes,
   projectLimit,
   slices,
+  unevictableDocumentKeys,
 }: {
   activeRootPath: FilesystemPath | null
   byteBudget: number
-  documentSizes: ReadonlyMap<DocumentKey, number> | undefined
+  documentSizes: ReadonlyMap<DocumentKey, number>
   projectLimit: number
   slices: readonly RetainedWorkspaceSlice[]
+  unevictableDocumentKeys: ReadonlySet<DocumentKey>
 }) {
   const active = slices.filter((slice) => slice.rootPath === activeRootPath)
   const parked = slices
@@ -71,47 +76,82 @@ function retainedSlices({
     .toSorted((left, right) => right.lastActiveAt - left.lastActiveAt)
     .slice(0, Math.max(0, projectLimit - active.length))
 
-  return [...active, ...withinByteBudget(active, parked, byteBudget, documentSizes)]
+  return [
+    ...active,
+    ...withinByteBudget(active, parked, byteBudget, documentSizes, unevictableDocumentKeys),
+  ]
 }
 
-/** The active project is never trimmed; parked ones drop oldest-first until it fits. */
+/** The active project is never trimmed; parked slices are admitted newest-first, each skipped if it would not fit. */
 function withinByteBudget(
   active: readonly RetainedWorkspaceSlice[],
   parked: readonly RetainedWorkspaceSlice[],
   byteBudget: number,
-  documentSizes: ReadonlyMap<DocumentKey, number> | undefined,
+  documentSizes: ReadonlyMap<DocumentKey, number>,
+  unevictableDocumentKeys: ReadonlySet<DocumentKey>,
 ) {
-  if (!documentSizes) return parked
-
-  const counted = new Set<DocumentKey>()
+  // Unevictable text is charged first and once, wherever it lives. Rejecting a
+  // slice does not evict its dirty or non-file documents, so leaving them out of
+  // the total let optional parked text be admitted on top of them and overshoot.
+  // Seeding `charged` also makes a slice that merely contains one cost nothing
+  // extra, which is correct — keeping it frees no text either.
+  const charged = new Set<DocumentKey>(unevictableDocumentKeys)
   let total = 0
-  for (const slice of active) total += sliceBytes(slice, documentSizes, counted)
+  for (const documentKey of unevictableDocumentKeys) {
+    total += documentSizes.get(documentKey) ?? 0
+  }
+
+  // A rejected slice must not charge documents a later, kept slice shares.
+  // Active slices commit unconditionally — they are never trimmed.
+  for (const slice of active) total += commitSliceSize(slice, documentSizes, charged)
 
   const kept: RetainedWorkspaceSlice[] = []
   for (const slice of parked) {
-    const bytes = sliceBytes(slice, documentSizes, counted)
-    if (total + bytes > byteBudget) continue
+    const size = measureSliceSize(slice, documentSizes, charged)
+    // A fully-charged slice cannot move `total`, so dropping it frees no text and
+    // only costs its views. This is the nested-root case.
+    if (size > 0 && total + size > byteBudget) continue
 
-    total += bytes
-    kept.push(slice)
+    total += size
+    kept.push(commitSlice(slice, charged))
   }
 
   return kept
 }
 
-/** Shared documents are charged once — `counted` carries across slices deliberately. */
-function sliceBytes(
+/** Shared documents are charged once — `charged` carries across slices deliberately. */
+function measureSliceSize(
   slice: RetainedWorkspaceSlice,
   documentSizes: ReadonlyMap<DocumentKey, number>,
-  counted: Set<DocumentKey>,
+  charged: ReadonlySet<DocumentKey>,
 ) {
-  let bytes = 0
+  // `seen` is what mutating `charged` used to provide: a document listed twice in
+  // one slice must still be charged once.
+  const seen = new Set<DocumentKey>()
+  let size = 0
   for (const documentKey of slice.documentKeys) {
-    if (counted.has(documentKey)) continue
+    if (charged.has(documentKey)) continue
+    if (seen.has(documentKey)) continue
 
-    counted.add(documentKey)
-    bytes += documentSizes.get(documentKey) ?? 0
+    seen.add(documentKey)
+    size += documentSizes.get(documentKey) ?? 0
   }
 
-  return bytes
+  return size
+}
+
+function commitSliceSize(
+  slice: RetainedWorkspaceSlice,
+  documentSizes: ReadonlyMap<DocumentKey, number>,
+  charged: Set<DocumentKey>,
+) {
+  const size = measureSliceSize(slice, documentSizes, charged)
+  commitSlice(slice, charged)
+  return size
+}
+
+function commitSlice(slice: RetainedWorkspaceSlice, charged: Set<DocumentKey>) {
+  for (const documentKey of slice.documentKeys) charged.add(documentKey)
+
+  return slice
 }

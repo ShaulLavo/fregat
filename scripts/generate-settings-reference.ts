@@ -4,8 +4,10 @@
  * Generated rather than written, because a hand-maintained table of ~36 keys
  * with defaults and scopes is a table that is wrong within a month. Run `bun run settings:reference`
  * after changing `packages/contracts/src/settings/keys.ts`.
+ *
+ * `--check` makes that instruction enforceable: `generated:check` runs it in CI.
  */
-import { writeFileSync } from 'node:fs'
+import { existsSync, readFileSync, writeFileSync } from 'node:fs'
 import path from 'node:path'
 
 import { SETTING_IDS, descriptorFor, type SettingId } from '../packages/contracts/src/index'
@@ -101,6 +103,47 @@ stays safe to read, share and export.
 ${sections.join('\n\n')}
 `
 
-const target = path.join(import.meta.dirname, '..', 'docs', 'settings-reference.md')
-writeFileSync(target, body, 'utf8')
-console.log(`wrote ${target} (${SETTING_IDS.length} settings)`)
+const DEFAULT_TARGET = path.join(import.meta.dirname, '..', 'docs', 'settings-reference.md')
+
+function targetArgument(): string {
+  const inline = process.argv.find((argument) => argument.startsWith('--target='))
+  if (inline) return resolveTarget(inline.slice('--target='.length))
+
+  const index = process.argv.indexOf('--target')
+  if (index === -1) return DEFAULT_TARGET
+
+  return resolveTarget(process.argv[index + 1])
+}
+
+/** A valueless `--target` used to fall through to the default and overwrite it. */
+function resolveTarget(value: string | undefined): string {
+  if (!value || value.startsWith('--')) {
+    console.error('--target requires a path')
+    process.exit(1)
+  }
+
+  return path.resolve(value)
+}
+
+function writeReference(target: string): void {
+  writeFileSync(target, body, 'utf8')
+  console.log(`wrote ${target} (${SETTING_IDS.length} settings)`)
+}
+
+// Compares the rendered body, not just the table: `SCOPE_NOTES` is interpolated
+// into prose too.
+function checkReference(target: string): void {
+  if (!existsSync(target)) {
+    console.error(`settings reference is missing at ${target}`)
+    process.exitCode = 1
+    return
+  }
+  if (readFileSync(target, 'utf8') === body) return
+
+  console.error('settings reference is stale: run bun run settings:reference')
+  process.exitCode = 1
+}
+
+const target = targetArgument()
+if (process.argv.includes('--check')) checkReference(target)
+else writeReference(target)

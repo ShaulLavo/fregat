@@ -16,7 +16,9 @@ export type OperationContext = {
 
 type OperationSummary = OperationContext & {
   durationMs: number
-  status: 'error' | 'ok'
+  // 'aborted' is for a streamed operation the client abandoned: neither a
+  // success nor a failure, and previously recorded as nothing at all.
+  status: 'aborted' | 'error' | 'ok'
 }
 
 // A streamed response outlives the hooks that bind evlog's own request storage,

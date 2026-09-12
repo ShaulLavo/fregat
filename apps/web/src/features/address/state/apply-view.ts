@@ -1,4 +1,5 @@
 import { editorDocumentToken } from '@workspace/client-core/address/grammar'
+import { retainedTextBudgetFromSettings } from '@/features/editor/utils/retained-text-budget'
 import { NO_WORKSPACE_TOKEN, parseWorkspaceToken } from '@workspace/client-core/address/workspace'
 import { readWorkspaceAddress } from '@workspace/client-core/files/workspace-address'
 import type { EnvironmentId, WorktreeId } from '@workspace/contracts'
@@ -195,6 +196,7 @@ function applyFolderless(
   if (!options.isCurrent()) return superseded()
   if (editor.workspaceStore.getState().rootFolder) {
     createEditorApplyActions({
+      retainedTextBudget: retainedTextBudgetFromSettings,
       activation: editor.editorActivation,
       documentStore: editor.documentStore,
       searchStore: editor.searchBufferStore,
@@ -216,6 +218,7 @@ function applyOwnedView(
 ) {
   const editor = owner.editor
   const commands = createEditorApplyActions({
+    retainedTextBudget: retainedTextBudgetFromSettings,
     activation: editor.editorActivation,
     documentStore: editor.documentStore,
     searchStore: editor.searchBufferStore,

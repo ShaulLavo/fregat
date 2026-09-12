@@ -40,6 +40,8 @@ const MODEL_B = modelRef('claude', 'sonnet')
 
 describe('settings mutation schemas', () => {
   it('covers every live scalar, including the committed post-plan additions', () => {
+    // 'code-theme' holds a theme-id string and is written through the scalar path
+    // by `color-theme-provider.tsx`, so excluding it breaks the pickers.
     const scalarWidgets = new Set([
       'boolean',
       'code-theme',

@@ -130,6 +130,9 @@ test('retains an overlapping root buffer while evicting only the abandoned root 
   const nested = service.ensureView(tabId('nested-tab'), fileResult(path))
   const retained = retentionForProjects({
     activeRootPath: filesystemPath('/repo/nested'),
+    byteBudget: Number.MAX_SAFE_INTEGER,
+    documentSizes: new Map(),
+    unevictableDocumentKeys: new Set(),
     projectLimit: 1,
     slices: [
       {
@@ -153,4 +156,17 @@ test('retains an overlapping root buffer while evicting only the abandoned root 
   })
   expect(service.getLiveDocument(testDocumentKey(path))?.buffer).toBe(parent.buffer)
   expect(service.getViewDocument(tabId('nested-tab'))?.view).toBe(nested.view)
+})
+
+test('documentSizes reports every live document, including the unevictable ones', () => {
+  const service = serviceWithFourDocuments()
+
+  const sizes = service.documentSizes()
+
+  // An unevictable document still occupies memory, so charging it zero would
+  // make the budget a claim about less than the real footprint.
+  expect(sizes.get(testDocumentKey('/repo/clean.ts'))).toBe('hello'.length)
+  expect(sizes.get(testDocumentKey('/repo/dirty.ts'))).toBe('hello'.length)
+  expect(sizes.get(testDocumentKey('conflict-diff:1'))).toBe('conflict body'.length)
+  expect(sizes.size).toBe(4)
 })

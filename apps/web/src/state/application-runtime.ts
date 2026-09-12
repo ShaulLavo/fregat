@@ -1,4 +1,5 @@
 import type { EnvironmentId } from '@workspace/contracts'
+import { retainedTextBudgetFromSettings } from '@/features/editor/utils/retained-text-budget'
 import { confirmedEnvironmentOrigin } from '@/lib/environments/state/domain'
 import { openWorkspaceRootForOwner } from '@/features/workspace/state/open-root'
 import { createEditorApplyActions } from '@/features/editor/state/apply-actions'
@@ -117,6 +118,7 @@ export function createApplicationRuntime({
       const owner = current
       const editor = owner.editor
       const commands = createEditorApplyActions({
+        retainedTextBudget: retainedTextBudgetFromSettings,
         activation: editor.editorActivation,
         documentStore: editor.documentStore,
         searchStore: editor.searchBufferStore,

@@ -50,14 +50,18 @@ export async function collectWorkspaceSearch(
     if (event.type === 'done') done = event
   }
 
+  // No terminal field is defaulted: a defaulted `truncated: false` reads as a
+  // finished run. Belt-and-braces — the producer already throws without `done`.
+  if (!done) throw clientErrors.SEARCH_INCOMPLETE({ matchCount: matches.length })
+
   return {
-    count: done?.count ?? matches.length,
-    fileCount: done?.fileCount,
+    count: done.count,
+    fileCount: done.fileCount,
     matches,
-    measurement: done?.measurement,
-    path: done?.path ?? query.path,
-    query: done?.query ?? query.query,
-    truncated: done?.truncated ?? false,
+    measurement: done.measurement,
+    path: done.path,
+    query: done.query,
+    truncated: done.truncated,
     warnings,
   }
 }
@@ -74,11 +78,21 @@ export async function* streamWorkspaceSearch(
   if (response.error) throw clientErrors.SEARCH_FAILED({ status: response.status })
   if (!response.data) throw clientErrors.EDEN_STREAM_MISSING({ label: 'Search' })
 
-  for await (const event of parseEdenSseStream(response.data)) {
-    if (signal?.aborted) return
+  let matchCount = 0
+  let terminated = false
 
-    yield workspaceSearchEventFromSse(event)
+  for await (const event of parseEdenSseStream(response.data)) {
+    signal?.throwIfAborted()
+
+    const parsed = workspaceSearchEventFromSse(event)
+    if (parsed.type === 'match') matchCount += 1
+    if (parsed.type === 'done') terminated = true
+    yield parsed
   }
+
+  // Throwing, not returning: `for await` discards a generator's return value with
+  // no diagnostic, so a consumer's catch is the only enforceable handoff.
+  if (!terminated) throw clientErrors.SEARCH_INCOMPLETE({ matchCount })
 }
 
 function workspaceSearchRequestQuery(query: WorkspaceSearchQuery) {
@@ -150,18 +164,23 @@ function warningCode(value: unknown): WorkspaceSearchWarningCode {
   return 'content-tool-partial-failure'
 }
 
+// Every required field is checked, not just the wrapper: the property helpers
+// default a missing one to 0/''/false, so `{}` would otherwise read as a
+// complete, untruncated, empty run — the fabrication this exists to reject.
 function doneEventFromData(data: unknown): WorkspaceSearchDoneEvent {
-  if (!isRecord(data)) {
-    return { count: 0, path: '', query: '', truncated: false, type: 'done' }
-  }
+  if (!isRecord(data)) throw clientErrors.SEARCH_DONE_INVALID()
+  if (typeof data.count !== 'number') throw clientErrors.SEARCH_DONE_INVALID()
+  if (typeof data.path !== 'string') throw clientErrors.SEARCH_DONE_INVALID()
+  if (typeof data.query !== 'string') throw clientErrors.SEARCH_DONE_INVALID()
+  if (typeof data.truncated !== 'boolean') throw clientErrors.SEARCH_DONE_INVALID()
 
   return {
-    count: propertyNumber(data, 'count'),
+    count: data.count,
     fileCount: optionalNumber(data.fileCount),
     measurement: searchMeasurement(data.measurement),
-    path: propertyString(data, 'path'),
-    query: propertyString(data, 'query'),
-    truncated: propertyBoolean(data, 'truncated'),
+    path: data.path,
+    query: data.query,
+    truncated: data.truncated,
     type: 'done',
   }
 }
@@ -303,10 +322,6 @@ function searchEventError(data: unknown) {
 
 function propertyNumber(data: Record<string, unknown>, key: string) {
   return typeof data[key] === 'number' ? data[key] : 0
-}
-
-function propertyBoolean(data: Record<string, unknown>, key: string) {
-  return data[key] === true
 }
 
 function propertyString(data: Record<string, unknown>, key: string) {

@@ -1,4 +1,5 @@
 import type { ScopedStorage } from '@/lib/environments/state/scoped-storage'
+import { retainedTextBudgetFromSettings } from '@/features/editor/utils/retained-text-budget'
 import type { Query, QueryClient } from '@tanstack/react-query'
 
 import {
@@ -63,6 +64,7 @@ export function createEditorOpenBenchmarkControl({
 }): EditorOpenBenchmarkControl {
   // Reset is fixture setup; measured tab selection uses the normal navigation command.
   const commands = createEditorApplyActions({
+    retainedTextBudget: retainedTextBudgetFromSettings,
     activation,
     documentStore,
     searchStore,

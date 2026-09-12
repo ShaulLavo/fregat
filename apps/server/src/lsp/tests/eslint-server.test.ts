@@ -1,4 +1,5 @@
 import { mkdtemp, rm, writeFile } from 'node:fs/promises'
+import { createRequire } from 'node:module'
 import path from 'node:path'
 import { afterEach, describe, expect, it } from 'vitest'
 
@@ -32,6 +33,7 @@ class RecordingSocket implements LspProxySocket {
 describe('ESLint against a real server', () => {
   it('pulls diagnostics and returns code actions with the registry configuration', async () => {
     const root = await eslintFixtureRoot()
+    assertEslintResolvable(root)
     const match = eslintMatch(root)
     expect(match).not.toBeNull()
     if (!match) return
@@ -98,6 +100,13 @@ async function eslintFixtureRoot(): Promise<string> {
   )
   await writeFile(path.join(root, 'probe.js'), 'const value = 1\n')
   return root
+}
+
+// The fixture lives inside `apps/server` so the language server resolves
+// `eslint` from its node_modules — a fixture library, not this repo's linter.
+// Asserted, because without it the server returns [] with no error.
+function assertEslintResolvable(root: string) {
+  createRequire(path.join(root, 'probe.js')).resolve('eslint')
 }
 
 function eslintMatch(root: string): LspServerMatch | null {
