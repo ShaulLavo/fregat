@@ -139,3 +139,9 @@ export function childTokenUsage(params: unknown) {
 function validTokenCount(value: unknown): value is number {
   return typeof value === 'number' && Number.isSafeInteger(value) && value >= 0
 }
+
+export const CODEX_CHILD_PENDING_LIMITS = {
+  threads: 128,
+  events: 512,
+  bytes: 2 * 1024 * 1024,
+} as const

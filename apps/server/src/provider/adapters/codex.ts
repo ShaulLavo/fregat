@@ -873,6 +873,19 @@ class CodexAppServerSession {
   private handleMessage(message: JsonRpcMessage) {
     if (!message.method) return
     this.attachNotificationTurn(message.params)
+    const previousDropped = this.childAgents.pendingStats().droppedEvents
+    const handling =
+      message.id === undefined
+        ? this.handleNotification(message)
+        : this.handleServerRequest(message)
+    void handling.catch((error) => {
+      if (message.id !== undefined) {
+        this.client.respondError(message.id, -32000, providerErrorMessage(error))
+        return
+      }
+      this.rejectActiveTurn(error)
+    })
+    const pending = this.childAgents.pendingStats()
     recordChatPipelineInfo('chat.pipeline.codex_session.message', {
       hasId: message.id !== undefined,
       method: message.method,
@@ -881,15 +894,10 @@ class CodexAppServerSession {
       canonicalTurnId: this.childAgents.owner(message.params).turnId,
       agentThreadId: this.childAgents.owner(message.params).agent?.threadId,
       route: this.notificationRoute(message.params),
+      pendingChildNotifications: pending,
+      droppedPendingChildNotifications: pending.droppedEvents - previousDropped,
       sessionId: this.sessionId,
     })
-    if (message.id !== undefined) {
-      void this.handleServerRequest(message).catch((error) => {
-        this.client.respondError(message.id as JsonRpcId, -32000, providerErrorMessage(error))
-      })
-      return
-    }
-    void this.handleNotification(message).catch((error) => this.rejectActiveTurn(error))
   }
 
   private async handleServerRequest(message: JsonRpcMessage) {

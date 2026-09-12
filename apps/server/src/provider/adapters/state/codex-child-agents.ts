@@ -3,6 +3,7 @@ import type { ProviderRuntimeEventPayload } from '../../types'
 import { asRecord, stringField } from '../utils/records'
 import {
   childName,
+  CODEX_CHILD_PENDING_LIMITS,
   childNotificationMethods,
   childRegistration,
   childStatus,
@@ -22,7 +23,7 @@ type Child = {
   summary?: string
   usage?: unknown
 }
-type Notification = { method: string; params: unknown }
+type Notification = { method: string; params: unknown; bytes: number }
 export type CodexChildAgentEvent = (
   | Pick<Extract<TaskEvent, { type: 'task.started' }>, 'type' | 'payload'>
   | Pick<Extract<TaskEvent, { type: 'task.progress' }>, 'type' | 'payload'>
@@ -39,6 +40,9 @@ export class CodexChildAgents {
   private readonly children = new Map<string, Child>()
   private readonly pending = new Map<string, Notification[]>()
   private readonly liveTurns = new Map<string, string>()
+  private pendingEventCount = 0
+  private pendingBytes = 0
+  private droppedPendingEvents = 0
 
   private readonly options: Options
 
@@ -63,6 +67,15 @@ export class CodexChildAgents {
     return Array.from(this.liveTurns, ([threadId, turnId]) => ({ threadId, turnId }))
   }
 
+  pendingStats() {
+    return {
+      threads: this.pending.size,
+      events: this.pendingEventCount,
+      bytes: this.pendingBytes,
+      droppedEvents: this.droppedPendingEvents,
+    }
+  }
+
   handle(method: string, params: unknown) {
     const registration = childRegistration(method, params)
     if (registration && registration.threadId !== this.options.rootThreadId) {
@@ -79,10 +92,45 @@ export class CodexChildAgents {
       this.update(child, method, params)
       return true
     }
-    const pending = this.pending.get(threadId) ?? []
-    pending.push({ method, params })
-    this.pending.set(threadId, pending)
+    this.bufferPending(threadId, method, params)
     return true
+  }
+
+  private bufferPending(threadId: string, method: string, params: unknown) {
+    const bytes = Buffer.byteLength(method) + Buffer.byteLength(JSON.stringify(params) ?? '')
+    if (bytes > CODEX_CHILD_PENDING_LIMITS.bytes) {
+      this.droppedPendingEvents += 1
+      return
+    }
+    while (this.pendingAtCapacity(threadId, bytes)) this.dropOldestPendingThread()
+    const pending = this.pending.get(threadId) ?? []
+    pending.push({ method, params, bytes })
+    this.pending.set(threadId, pending)
+    this.pendingEventCount += 1
+    this.pendingBytes += bytes
+  }
+
+  private pendingAtCapacity(threadId: string, bytes: number) {
+    const needsThread = !this.pending.has(threadId)
+    return (
+      (needsThread && this.pending.size >= CODEX_CHILD_PENDING_LIMITS.threads) ||
+      this.pendingEventCount >= CODEX_CHILD_PENDING_LIMITS.events ||
+      this.pendingBytes + bytes > CODEX_CHILD_PENDING_LIMITS.bytes
+    )
+  }
+
+  private dropOldestPendingThread() {
+    const oldest = this.pending.keys().next().value
+    if (oldest === undefined) return
+    this.droppedPendingEvents += this.takePending(oldest).length
+  }
+
+  private takePending(threadId: string) {
+    const pending = this.pending.get(threadId) ?? []
+    this.pending.delete(threadId)
+    this.pendingEventCount -= pending.length
+    this.pendingBytes -= pending.reduce((bytes, notification) => bytes + notification.bytes, 0)
+    return pending
   }
 
   private register(identity: Omit<ChatAgent, 'status'>, method: string, params: unknown) {
@@ -123,8 +171,7 @@ export class CodexChildAgents {
         description: childName(child.agent),
       },
     })
-    const pending = this.pending.get(identity.threadId) ?? []
-    this.pending.delete(identity.threadId)
+    const pending = this.takePending(identity.threadId)
     for (const notification of pending) this.update(child, notification.method, notification.params)
   }
 

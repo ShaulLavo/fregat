@@ -2,6 +2,7 @@ import { describe, expect, it } from 'vitest'
 import { turnIdSchema } from '@workspace/contracts'
 import * as v from 'valibot'
 import { CodexChildAgents, type CodexChildAgentEvent } from '../state/codex-child-agents'
+import { CODEX_CHILD_PENDING_LIMITS } from '../utils/codex-child-notifications'
 
 const firstTurn = v.parse(turnIdSchema, 'parent-turn-1')
 const secondTurn = v.parse(turnIdSchema, 'parent-turn-2')
@@ -42,6 +43,70 @@ function register(agents: CodexChildAgents, turnId = 'native-parent-1') {
 }
 
 describe('Codex child notification routing', () => {
+  it('bounds pending threads, events, and bytes while retaining stop targets and registered tools', () => {
+    const { agents, events } = fixture()
+    register(agents)
+    agents.handle('item/started', {
+      threadId: 'child',
+      item: { id: 'saved-command', type: 'commandExecution', command: 'pwd' },
+    })
+    for (let index = 0; index < 200; index += 1) {
+      agents.handle('turn/started', { threadId: `unknown-${index}`, turn: { id: `turn-${index}` } })
+    }
+    expect(agents.pendingStats().threads).toBeLessThanOrEqual(CODEX_CHILD_PENDING_LIMITS.threads)
+    expect(agents.activeTurns()).toHaveLength(200)
+    for (let index = 0; index < 700; index += 1) {
+      agents.handle('item/started', {
+        threadId: 'many-events',
+        item: { id: `command-${index}`, type: 'commandExecution', command: 'pwd' },
+      })
+    }
+    expect(agents.pendingStats().events).toBeLessThanOrEqual(CODEX_CHILD_PENDING_LIMITS.events)
+    for (let index = 0; index < 140; index += 1) {
+      agents.handle('item/commandExecution/outputDelta', {
+        threadId: `large-output-${index}`,
+        itemId: 'command',
+        delta: 'x'.repeat(32_768),
+      })
+    }
+    expect(agents.pendingStats().bytes).toBeLessThanOrEqual(CODEX_CHILD_PENDING_LIMITS.bytes)
+    const beforeOversized = agents.pendingStats()
+    agents.handle('item/commandExecution/outputDelta', {
+      threadId: 'oversized',
+      itemId: 'command',
+      delta: 'x'.repeat(CODEX_CHILD_PENDING_LIMITS.bytes + 1),
+    })
+    expect(agents.pendingStats()).toEqual({
+      ...beforeOversized,
+      droppedEvents: beforeOversized.droppedEvents + 1,
+    })
+    agents.handle('item/commandExecution/outputDelta', {
+      threadId: 'child',
+      itemId: 'saved-command',
+      delta: '/workspace',
+    })
+    expect(events.at(-1)).toMatchObject({
+      payload: { tool: { itemId: 'saved-command', detail: '/workspace' } },
+    })
+    const beforeRegistration = agents.pendingStats()
+    agents.handle('thread/started', {
+      thread: {
+        id: 'large-output-139',
+        source: {
+          subAgent: { thread_spawn: { parent_thread_id: 'root', agent_nickname: 'Late agent' } },
+        },
+      },
+    })
+    expect(agents.owner({ threadId: 'large-output-139' })).toMatchObject({
+      agent: { nickname: 'Late agent' },
+      turnId: firstTurn,
+    })
+    expect(agents.pendingStats().threads).toBe(beforeRegistration.threads - 1)
+    expect(agents.pendingStats().bytes).toBeLessThan(beforeRegistration.bytes)
+    expect(agents.activeTurns()).toContainEqual({ threadId: 'unknown-0', turnId: 'turn-0' })
+    expect(agents.pendingStats().droppedEvents).toBeGreaterThan(0)
+  })
+
   it('orders latest state independently from retained tool row order and timestamp ties', () => {
     const { agents, events } = fixture()
     register(agents)
