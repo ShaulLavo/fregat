@@ -78,9 +78,14 @@ export function childTool(
       stringField(item, 'title') ??
       stringField(item, 'tool') ??
       itemType,
-    detail: stringField(item, 'aggregatedOutput') ?? stringField(item, 'text') ?? undefined,
+    detail: childToolDetail(item),
     data: item,
   }
+}
+
+function childToolDetail(item: Record<string, unknown>) {
+  if (typeof item.aggregatedOutput === 'string') return item.aggregatedOutput
+  if (typeof item.text === 'string') return item.text
 }
 
 export const childNotificationMethods: ReadonlySet<string> = new Set([

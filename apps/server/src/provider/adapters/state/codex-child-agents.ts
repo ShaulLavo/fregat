@@ -39,7 +39,7 @@ type Options = {
 export class CodexChildAgents {
   private readonly children = new Map<string, Child>()
   private readonly pending = new Map<string, Notification[]>()
-  private readonly liveTurns = new Map<string, string>()
+  private readonly turns = new Map<string, { id: string; active: boolean }>()
   private pendingEventCount = 0
   private pendingBytes = 0
   private droppedPendingEvents = 0
@@ -64,7 +64,9 @@ export class CodexChildAgents {
   }
 
   activeTurns() {
-    return Array.from(this.liveTurns, ([threadId, turnId]) => ({ threadId, turnId }))
+    return Array.from(this.turns).flatMap(([threadId, turn]) =>
+      turn.active ? [{ threadId, turnId: turn.id }] : [],
+    )
   }
 
   pendingStats() {
@@ -100,6 +102,7 @@ export class CodexChildAgents {
     const bytes = Buffer.byteLength(method) + Buffer.byteLength(JSON.stringify(params) ?? '')
     if (bytes > CODEX_CHILD_PENDING_LIMITS.bytes) {
       this.droppedPendingEvents += 1
+      this.forgetUnregisteredTerminalTurn(threadId)
       return
     }
     while (this.pendingAtCapacity(threadId, bytes)) this.dropOldestPendingThread()
@@ -123,6 +126,12 @@ export class CodexChildAgents {
     const oldest = this.pending.keys().next().value
     if (oldest === undefined) return
     this.droppedPendingEvents += this.takePending(oldest).length
+    this.forgetUnregisteredTerminalTurn(oldest)
+  }
+
+  private forgetUnregisteredTerminalTurn(threadId: string) {
+    if (this.children.has(threadId) || this.turns.get(threadId)?.active) return
+    this.turns.delete(threadId)
   }
 
   private takePending(threadId: string) {
@@ -209,20 +218,48 @@ export class CodexChildAgents {
 
   private trackTurn(threadId: string, method: string, params: unknown) {
     const turnId = notificationTurnId(params)
-    if (method === 'turn/started' && turnId) this.liveTurns.set(threadId, turnId)
-    if (method === 'turn/completed' || method === 'thread/closed') this.liveTurns.delete(threadId)
-    if (method === 'error' && asRecord(params).willRetry !== true) this.liveTurns.delete(threadId)
+    const current = this.turns.get(threadId)
+    if (method === 'turn/started' && turnId) {
+      if (current?.id !== turnId) this.turns.set(threadId, { id: turnId, active: true })
+      return
+    }
+    const terminal =
+      method === 'turn/completed' ||
+      method === 'thread/closed' ||
+      (method === 'error' && asRecord(params).willRetry !== true)
+    if (!terminal || !this.isCurrentTurn(threadId, params)) return
+    if (current) current.active = false
+  }
+
+  private isCurrentTurn(threadId: string, params: unknown) {
+    const turnId = notificationTurnId(params)
+    const current = this.turns.get(threadId)
+    return !turnId || !current || turnId === current.id
   }
 
   private update(child: Child, method: string, params: unknown) {
     const record = asRecord(params)
+    if (method === 'item/started' || method === 'item/completed') {
+      this.updateItem(child, method, params)
+      return
+    }
+    if (
+      method === 'item/commandExecution/outputDelta' ||
+      method === 'command/exec/outputDelta' ||
+      method === 'item/fileChange/outputDelta'
+    ) {
+      this.updateOutput(child, method, params)
+      return
+    }
+    if (!this.isCurrentTurn(child.agent.threadId, params)) return
     switch (method) {
       case 'turn/started':
+        if (!this.turns.get(child.agent.threadId)?.active) return
         child.agent.status = 'running'
         child.summary = undefined
         break
       case 'turn/completed':
-        child.agent.status = completedChildStatus(asRecord(record.turn).status)
+        this.completeChildTurn(child, asRecord(record.turn).status)
         break
       case 'thread/status/changed':
         child.agent.status = childStatus(params) ?? child.agent.status
@@ -241,19 +278,20 @@ export class CodexChildAgents {
       case 'model/rerouted':
         this.updateMetadata(child, method, record)
         break
-      case 'item/started':
-      case 'item/completed':
-        this.updateItem(child, method, params)
-        return
-      case 'item/commandExecution/outputDelta':
-      case 'command/exec/outputDelta':
-      case 'item/fileChange/outputDelta':
-        this.updateOutput(child, method, params)
-        return
       default:
         return
     }
     this.emit(child, method, params)
+  }
+
+  private completeChildTurn(child: Child, status: unknown) {
+    const completed = completedChildStatus(status)
+    const failed =
+      child.agent.status === 'failed' ||
+      child.agent.status === 'interrupted' ||
+      child.agent.status === 'closed'
+    if (completed === 'idle' && failed) return
+    child.agent.status = completed
   }
 
   private updateMetadata(child: Child, method: string, record: Record<string, unknown>) {
@@ -269,12 +307,20 @@ export class CodexChildAgents {
     const item = asRecord(asRecord(params).item)
     const tool = childTool(item, method)
     if (tool) {
+      const previous = child.tools.get(tool.itemId)
+      if (previous && previous.status !== 'inProgress' && tool.status === 'inProgress') return
+      tool.detail ??= previous?.detail
       child.tools.set(tool.itemId, tool)
-      child.summary = tool.title
+      if (
+        this.isCurrentTurn(child.agent.threadId, params) &&
+        (child.agent.status === 'running' || child.agent.status === 'waiting')
+      )
+        child.summary = tool.title
       this.emit(child, method, params, tool)
       return
     }
     if (item.type !== 'agentMessage' || method !== 'item/completed') return
+    if (!this.isCurrentTurn(child.agent.threadId, params)) return
     child.summary = stringField(item, 'text') ?? child.summary
     this.emit(child, method, params)
   }
@@ -284,7 +330,9 @@ export class CodexChildAgents {
     const itemId = stringField(record, 'itemId')
     const tool = itemId ? child.tools.get(itemId) : undefined
     if (!tool) return
-    tool.detail = `${tool.detail ?? ''}${stringField(record, 'delta') ?? ''}`
+    const delta = typeof record.delta === 'string' ? record.delta : record.output
+    if (typeof delta !== 'string') return
+    tool.detail = `${tool.detail ?? ''}${delta}`
     this.emit(child, method, params, tool)
   }
 

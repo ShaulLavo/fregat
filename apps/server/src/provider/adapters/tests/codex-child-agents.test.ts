@@ -43,6 +43,156 @@ function register(agents: CodexChildAgents, turnId = 'native-parent-1') {
 }
 
 describe('Codex child notification routing', () => {
+  it.each([undefined, null])(
+    'retains streamed output when completed output is %s',
+    (aggregatedOutput) => {
+      const { agents, events } = fixture()
+      register(agents)
+      const item = { id: 'command', type: 'commandExecution', command: 'check' }
+      const params = { threadId: 'child', turnId: 'child-turn' }
+      agents.handle('item/started', { ...params, item: { ...item, status: 'inProgress' } })
+      for (const delta of ['specific failure', '\n', 'details']) {
+        agents.handle('item/commandExecution/outputDelta', { ...params, itemId: item.id, delta })
+      }
+      agents.handle('item/completed', {
+        ...params,
+        item: { ...item, status: 'failed', exitCode: 1, aggregatedOutput },
+      })
+      expect(events.at(-1)).toMatchObject({
+        payload: {
+          tool: { status: 'failed', detail: 'specific failure\ndetails', data: { exitCode: 1 } },
+        },
+      })
+    },
+  )
+
+  it.each(['replacement output', ''])(
+    'uses explicit completed output %j without duplicating streamed bytes',
+    (aggregatedOutput) => {
+      const { agents, events } = fixture()
+      register(agents)
+      const item = { id: 'command', type: 'commandExecution', command: 'check' }
+      const params = { threadId: 'child', turnId: 'child-turn' }
+      agents.handle('item/started', { ...params, item: { ...item, status: 'inProgress' } })
+      agents.handle('item/commandExecution/outputDelta', {
+        ...params,
+        itemId: item.id,
+        delta: 'partial output',
+      })
+      agents.handle('item/completed', {
+        ...params,
+        item: { ...item, status: 'completed', aggregatedOutput },
+      })
+      expect(events.at(-1)).toMatchObject({
+        payload: { tool: { status: 'completed', detail: aggregatedOutput } },
+      })
+    },
+  )
+
+  it('keeps file-change output and late command details without replacing the running summary', () => {
+    const { agents, events } = fixture()
+    register(agents)
+    agents.handle('turn/started', { threadId: 'child', turn: { id: 'old-turn' } })
+    const oldParams = { threadId: 'child', turnId: 'old-turn' }
+    const item = { id: 'patch', type: 'fileChange', changes: [] }
+    agents.handle('item/started', { ...oldParams, item: { ...item, status: 'inProgress' } })
+    agents.handle('item/fileChange/outputDelta', {
+      ...oldParams,
+      itemId: item.id,
+      delta: 'patch diagnostic',
+    })
+    agents.handle('turn/completed', {
+      threadId: 'child',
+      turn: { id: 'old-turn', status: 'completed' },
+    })
+    agents.handle('turn/started', { threadId: 'child', turn: { id: 'current-turn' } })
+    agents.handle('item/started', {
+      threadId: 'child',
+      turnId: 'current-turn',
+      item: {
+        id: 'current',
+        type: 'commandExecution',
+        command: 'current work',
+        status: 'inProgress',
+      },
+    })
+    agents.handle('item/completed', { ...oldParams, item: { ...item, status: 'failed' } })
+    agents.handle('item/fileChange/outputDelta', { ...oldParams, itemId: item.id, delta: '\n' })
+    expect(events.at(-1)).toMatchObject({
+      agent: { status: 'running' },
+      payload: {
+        summary: 'current work',
+        tool: { status: 'failed', detail: 'patch diagnostic\n' },
+      },
+    })
+  })
+
+  it.each([false, true])(
+    'ignores old child terminal events with deferred registration=%s',
+    (deferred) => {
+      const { agents, events } = fixture()
+      if (!deferred) register(agents)
+      agents.handle('turn/started', { threadId: 'child', turn: { id: 'old-turn' } })
+      agents.handle('turn/completed', {
+        threadId: 'child',
+        turn: { id: 'old-turn', status: 'completed' },
+      })
+      agents.handle('turn/started', { threadId: 'child', turn: { id: 'current-turn' } })
+      agents.handle('item/completed', {
+        threadId: 'child',
+        turnId: 'current-turn',
+        item: {
+          id: 'current-command',
+          type: 'commandExecution',
+          command: 'current work',
+          status: 'completed',
+        },
+      })
+      agents.handle('turn/completed', {
+        threadId: 'child',
+        turn: { id: 'old-turn', status: 'completed' },
+      })
+      agents.handle('error', {
+        threadId: 'child',
+        turnId: 'old-turn',
+        willRetry: false,
+        error: { message: 'Old failure' },
+      })
+      if (deferred) register(agents)
+      expect(agents.activeTurns()).toEqual([{ threadId: 'child', turnId: 'current-turn' }])
+      expect(agents.owner({ threadId: 'child' }).agent?.status).toBe('running')
+      expect(events.at(-1)?.payload).toMatchObject({ summary: 'current work' })
+      agents.handle('error', {
+        threadId: 'child',
+        turnId: 'current-turn',
+        willRetry: false,
+        error: { message: 'Current failure' },
+      })
+      expect(agents.activeTurns()).toEqual([])
+      expect(agents.owner({ threadId: 'child' }).agent?.status).toBe('failed')
+      agents.handle('item/started', {
+        threadId: 'child',
+        turnId: 'current-turn',
+        item: {
+          id: 'current-command',
+          type: 'commandExecution',
+          command: 'current work',
+          status: 'inProgress',
+        },
+      })
+      expect(events.at(-1)?.payload).toMatchObject({ summary: 'Current failure' })
+      expect(agents.owner({ threadId: 'child' }).agent?.status).toBe('failed')
+      agents.handle('turn/completed', {
+        threadId: 'child',
+        turn: { id: 'current-turn', status: 'failed' },
+      })
+      expect(agents.owner({ threadId: 'child' }).agent?.status).toBe('failed')
+      agents.handle('turn/started', { threadId: 'child', turn: { id: 'current-turn' } })
+      expect(agents.activeTurns()).toEqual([])
+      expect(agents.owner({ threadId: 'child' }).agent?.status).toBe('failed')
+    },
+  )
+
   it('bounds pending threads, events, and bytes while retaining stop targets and registered tools', () => {
     const { agents, events } = fixture()
     register(agents)
