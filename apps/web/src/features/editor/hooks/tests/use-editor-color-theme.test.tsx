@@ -1,3 +1,4 @@
+import { createRequire } from 'node:module'
 import { act, waitFor } from '@testing-library/react'
 import { createElement } from 'react'
 import { afterEach, vi } from 'vitest'
@@ -5,23 +6,30 @@ import { afterEach, vi } from 'vitest'
 import { expect, test } from '../../../../../test/fixtures'
 import { deferredThemeModule } from '../../../../../test/factories/deferred-theme-module'
 
+// Resolve from the dependency owner; app-relative mocks miss these imports on clean installs.
+const themeModuleResolver = createRequire(
+  import.meta.resolve('@workspace/client-core/themes/registration'),
+)
+const monokaiModuleId = themeModuleResolver.resolve('@shikijs/themes/monokai')
+const draculaModuleId = themeModuleResolver.resolve('@shikijs/themes/dracula')
+
 let restoreClient: (() => void) | undefined
 
 afterEach(() => {
   restoreClient?.()
   restoreClient = undefined
-  vi.doUnmock('@shikijs/themes/monokai')
-  vi.doUnmock('@shikijs/themes/dracula')
+  vi.doUnmock(monokaiModuleId)
+  vi.doUnmock(draculaModuleId)
   vi.resetModules()
 })
 
 test('a late older theme load cannot overwrite the newer applied theme id', async ({ client }) => {
   expect(client).toBeDefined()
   vi.resetModules()
-  const monokai = deferredThemeModule(() => vi.importActual('@shikijs/themes/monokai'))
-  const dracula = deferredThemeModule(() => vi.importActual('@shikijs/themes/dracula'))
-  vi.doMock('@shikijs/themes/monokai', monokai.load)
-  vi.doMock('@shikijs/themes/dracula', dracula.load)
+  const monokai = deferredThemeModule(() => vi.importActual(monokaiModuleId))
+  const dracula = deferredThemeModule(() => vi.importActual(draculaModuleId))
+  vi.doMock(monokaiModuleId, monokai.load)
+  vi.doMock(draculaModuleId, dracula.load)
 
   const store = await import('@/features/editor/state/color-theme-store')
   const { activeServerOrigin } = await import('@/lib/client')

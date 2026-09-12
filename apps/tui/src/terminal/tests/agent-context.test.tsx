@@ -28,7 +28,7 @@ test('selected terminal output reaches the checkout prompt through the durable i
     await act(async () => {
       await frame.mockMouse.drag(terminal.x, terminal.y, terminal.x + 27, terminal.y)
     })
-    expect(terminal.getSelectedText()).toContain('Build failed: missing config')
+    await expect.poll(() => terminal.getSelectedText()).toContain('Build failed: missing config')
     await runPaletteCommand(frame, 'terminal.askAgent')
     await expect.poll(() => frame.renderer.currentFocusedRenderable?.id).toBe('agent-composer')
     await frame.renderOnce()

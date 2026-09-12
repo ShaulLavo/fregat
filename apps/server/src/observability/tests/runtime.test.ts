@@ -162,7 +162,12 @@ describe('observability runtime', () => {
         }),
       })
     } finally {
-      fetchRecorder.restore()
+      try {
+        await closeTestApps()
+        await resetObservabilityForTests()
+      } finally {
+        fetchRecorder.restore()
+      }
     }
   })
 
