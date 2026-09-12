@@ -1,4 +1,5 @@
-type WorkLogScrollPosition = { top: number; left: number }
+type WorkLogScrollAnchor = { id: string; offset: number }
+type WorkLogScrollPosition = { top: number; left: number; anchor: WorkLogScrollAnchor | null }
 
 const positions = new Map<string, WorkLogScrollPosition>()
 const MAX_POSITIONS = 500
@@ -8,6 +9,7 @@ export function attachWorkLogScroll(element: HTMLElement, key: string) {
   if (saved) {
     element.scrollTop = saved.top
     element.scrollLeft = saved.left
+    restoreEntryAnchor(element, saved.anchor)
   }
   let contentLength: number | null = null
   let atEnd = isAtEnd(element)
@@ -44,8 +46,34 @@ function isAtEnd(element: HTMLElement) {
 
 function savePosition(key: string, element: HTMLElement) {
   positions.delete(key)
-  positions.set(key, { top: element.scrollTop, left: element.scrollLeft })
+  positions.set(key, {
+    top: element.scrollTop,
+    left: element.scrollLeft,
+    anchor: readEntryAnchor(element),
+  })
   if (positions.size <= MAX_POSITIONS) return
   const oldest = positions.keys().next().value
   if (oldest !== undefined) positions.delete(oldest)
+}
+
+function readEntryAnchor(element: HTMLElement): WorkLogScrollAnchor | null {
+  const top = element.getBoundingClientRect().top
+  const rows = element.querySelectorAll<HTMLElement>('[data-work-log-entry-id]')
+  for (const row of rows) {
+    const bounds = row.getBoundingClientRect()
+    if (bounds.bottom <= top) continue
+    const id = row.dataset.workLogEntryId
+    if (id) return { id, offset: bounds.top - top }
+  }
+  return null
+}
+
+function restoreEntryAnchor(element: HTMLElement, anchor: WorkLogScrollAnchor | null) {
+  if (!anchor) return
+  const rows = element.querySelectorAll<HTMLElement>('[data-work-log-entry-id]')
+  const row = Array.from(rows).find((candidate) => candidate.dataset.workLogEntryId === anchor.id)
+  if (!row) return
+
+  element.scrollTop +=
+    row.getBoundingClientRect().top - element.getBoundingClientRect().top - anchor.offset
 }

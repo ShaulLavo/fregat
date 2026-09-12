@@ -48,8 +48,8 @@ export function ActivityGroupRow({ activities }: { activities: readonly ChatWork
             ? 'border-border ml-2 max-h-[min(18rem,50dvh)] overflow-auto border-l pl-2'
             : undefined
         }
-        aria-label='Tool calls'
-        role='region'
+        aria-label={expanded ? 'Tool calls' : undefined}
+        role={expanded ? 'region' : undefined}
         tabIndex={expanded ? 0 : undefined}
         data-tool-group-scroll={expanded || undefined}
         ref={expanded ? scrollRef : undefined}
