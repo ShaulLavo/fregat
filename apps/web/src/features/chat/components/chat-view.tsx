@@ -1,3 +1,4 @@
+import { ChatWorkspaceRootContext } from '@/features/chat/providers/workspace-root-context'
 import { LoadingState } from '@workspace/ui/components/loading-state'
 import { useActiveChatProjection } from '@/features/chat/hooks/use-active-projection'
 import { useComposerConnection } from '@/features/chat/hooks/use-composer-connection'
@@ -197,15 +198,17 @@ export function ChatView({
         onCancel={() => setPendingCheckpoint(null)}
         onConfirm={() => void handleConfirmRevert()}
       />
-      <ChatTransportContext value={transport}>
-        <ChatTimelineActionsProvider revertToCheckpoint={handleRevertToCheckpoint}>
-          <MessagesTimeline
-            checkpointRevertPending={revertingCheckpoint}
-            optimisticMessages={optimisticMessages}
-            session={session}
-          />
-        </ChatTimelineActionsProvider>
-      </ChatTransportContext>
+      <ChatWorkspaceRootContext value={session.worktree}>
+        <ChatTransportContext value={transport}>
+          <ChatTimelineActionsProvider revertToCheckpoint={handleRevertToCheckpoint}>
+            <MessagesTimeline
+              checkpointRevertPending={revertingCheckpoint}
+              optimisticMessages={optimisticMessages}
+              session={session}
+            />
+          </ChatTimelineActionsProvider>
+        </ChatTransportContext>
+      </ChatWorkspaceRootContext>
       <ChatRuntimeStatus commandFailure={sendError ?? interruptFailure} session={session} />
       {/* The panels sit above the composer rather than inside it: each one is a
           request holding the turn open, so it stays visible while the user

@@ -1,3 +1,5 @@
+import { mkdir, writeFile } from 'node:fs/promises'
+import path from 'node:path'
 import { screen, waitFor } from '@testing-library/react'
 import userEvent from '@testing-library/user-event'
 
@@ -54,6 +56,45 @@ test('a Codex output citation uses the existing file link action', async ({ clie
   await userEvent.click(view.getByRole('link', { name: /src\/foo\.ts/u }))
   await waitFor(() =>
     expect(editor.workspaceStore.getState().selectedFilePath).toBe('repo/src/foo.ts'),
+  )
+})
+
+test('a managed chat resolves citations and images in its worktree while the editor remains at the base', async ({
+  client,
+  server,
+}) => {
+  const { application, editor } = await createMarkdownWorkspace(client, server)
+  const worktreePath = 'repo/.worktrees/chat-fix'
+  const worktreeRoot = path.join(server.root, worktreePath)
+  await mkdir(path.join(worktreeRoot, 'src'), { recursive: true })
+  await mkdir(path.join(worktreeRoot, 'assets'), { recursive: true })
+  await writeFile(
+    path.join(worktreeRoot, 'assets/result.png'),
+    Buffer.from(
+      'iVBORw0KGgoAAAANSUhEUgAAAAEAAAABCAQAAAC1HAwCAAAAC0lEQVR42mP8/x8AAwMCAO+aWQAAAABJRU5ErkJggg==',
+      'base64',
+    ),
+  )
+  await writeFile(path.join(worktreeRoot, 'src/foo.ts'), 'export const managed = true\n')
+  const view = renderMarkdown(
+    ':codex-file-citation{path="src/foo.ts" line_range_start="2"}\n\n![Result](assets/result.png)',
+    { application, workspaceRoot: { canonicalPath: worktreeRoot, path: worktreePath } },
+  )
+  const file = view.getByRole('link', { name: /src\/foo\.ts/u })
+  expect(file).toHaveAttribute('data-chat-file-link', `${worktreeRoot}/src/foo.ts`)
+  expect(file).toHaveAttribute('title', `${worktreeRoot}/src/foo.ts:2`)
+  const imageUrl = new URL(view.getByAltText('Result').getAttribute('src')!)
+  expect(imageUrl.searchParams.get('path')).toBe(`${worktreePath}/assets/result.png`)
+  expect(
+    (await client.fs.blob.get({ query: { path: imageUrl.searchParams.get('path')! } })).status,
+  ).toBe(200)
+  expect(editor.workspaceStore.getState().rootFolder?.path).toBe('repo')
+  await userEvent.click(file)
+  await waitFor(() =>
+    expect(editor.uiStore.getState().definitionTarget).toMatchObject({
+      path: `${worktreePath}/src/foo.ts`,
+      range: { start: { line: 1, character: 0 } },
+    }),
   )
 })
 
