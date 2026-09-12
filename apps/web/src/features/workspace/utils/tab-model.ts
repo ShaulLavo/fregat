@@ -1,10 +1,11 @@
+import type { GitFileStatus } from '@workspace/contracts'
 import type {
   EditorTabConflictMap,
   EditorTabDiffSource,
   EditorTabModel,
 } from '@/features/workspace/utils/tab-types'
 import { gitStatusSymbol, type GitSymbolSource } from '@/features/git/utils/status-symbols'
-import type { FileStatus } from '@/features/git/utils/types'
+
 import { iconForEntry } from '@/lib/file-icons'
 import { basename } from '@/lib/path-formatters'
 import { documentSourcePath } from '@/lib/documents/utils/capabilities'
@@ -23,7 +24,7 @@ import type {
   WorkspaceRoot,
 } from '@/lib/documents/utils/types'
 
-export const EMPTY_GIT_FILES: readonly FileStatus[] = []
+export const EMPTY_GIT_FILES: readonly GitFileStatus[] = []
 
 export type EditorSplitDirection = 'horizontal' | 'vertical'
 export type EditorSnapZone = 'bottom' | 'center' | 'left' | 'right' | 'top'
@@ -37,7 +38,7 @@ export function editorTabModel({
   tab,
 }: {
   conflicts: EditorTabConflictMap
-  gitFiles: readonly FileStatus[]
+  gitFiles: readonly GitFileStatus[]
   rootPath: WorkspaceRoot
   selectedTabId: TabId | null
   tab: EditorTabRecord
@@ -87,12 +88,12 @@ function normalizedCopyPath(path: string) {
 
 type TabDiffChange = {
   source: GitSymbolSource
-  status: FileStatus['index'] | FileStatus['worktree']
+  status: GitFileStatus['index'] | GitFileStatus['worktree']
 }
 
 function tabDiffChange(
   content: TabContent,
-  files: readonly FileStatus[],
+  files: readonly GitFileStatus[],
   rootPath: string,
 ): TabDiffChange | null {
   if (content.kind !== 'document' || content.document.kind !== 'git-diff') return null
@@ -131,11 +132,11 @@ function tabDiffSuffix(hash: string, status: string | undefined) {
   return `(${hash} ${status})`
 }
 
-function diffStatusMatchesFile(diff: GitComparison, file: FileStatus, rootPath: string) {
+function diffStatusMatchesFile(diff: GitComparison, file: GitFileStatus, rootPath: string) {
   return pathSetsOverlap(diffStatusPaths(diff), statusPaths(file), rootPath)
 }
 
-function liveChangeForDiff(diff: GitComparison, file: FileStatus): TabDiffChange | null {
+function liveChangeForDiff(diff: GitComparison, file: GitFileStatus): TabDiffChange | null {
   const preferred = diff.kind === 'snapshot' ? diff.source : undefined
   const source = liveSymbolSource(file, preferred)
   if (!source) return null
@@ -144,7 +145,7 @@ function liveChangeForDiff(diff: GitComparison, file: FileStatus): TabDiffChange
 }
 
 function liveSymbolSource(
-  file: FileStatus,
+  file: GitFileStatus,
   preferred: GitSymbolSource | undefined,
 ): GitSymbolSource | null {
   if (preferred === 'staged' && isStagedStatus(file.index)) return 'staged'
@@ -155,18 +156,18 @@ function liveSymbolSource(
   return null
 }
 
-function statusForSymbolSource(file: FileStatus, source: GitSymbolSource) {
+function statusForSymbolSource(file: GitFileStatus, source: GitSymbolSource) {
   if (source === 'staged') return file.index
   if (source === 'worktree') return file.worktree
 
   return file.status
 }
 
-function isStagedStatus(status: FileStatus['index']) {
+function isStagedStatus(status: GitFileStatus['index']) {
   return status !== 'unmodified' && status !== 'untracked'
 }
 
-function isWorktreeStatus(status: FileStatus['worktree']) {
+function isWorktreeStatus(status: GitFileStatus['worktree']) {
   return status !== 'unmodified'
 }
 
@@ -176,7 +177,7 @@ function diffStatusPaths(diff: GitComparison) {
   )
 }
 
-function statusPaths(file: FileStatus) {
+function statusPaths(file: GitFileStatus) {
   return [file.path, file.oldPath].filter(isPresentPath)
 }
 

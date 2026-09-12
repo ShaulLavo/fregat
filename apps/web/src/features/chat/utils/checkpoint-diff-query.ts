@@ -1,3 +1,4 @@
+import type { GitFileDiff, GitFileStatus } from '@workspace/contracts'
 import { clientLogContext } from '@/lib/environments/state/log-context'
 import type { SessionId } from '@workspace/contracts'
 
@@ -7,7 +8,7 @@ import { unwrapEdenResponse } from '@/lib/eden-events'
 import { gitKeys } from '@/lib/query-keys'
 import { fileResource, filesystemPath } from '@/lib/documents/utils/identity'
 import type { GitComparison, FilesystemPath, WorkspaceRoot } from '@/lib/documents/utils/types'
-import type { FileDiff, FileStatus } from '@/features/git/utils/types'
+
 import type { ChatTurnDiffSummary } from '@workspace/client-core/chat/types'
 
 export type CheckpointDiffQueryInput = {
@@ -75,7 +76,7 @@ export function canOpenCheckpointDiff(summary: ChatTurnDiffSummary) {
 export function checkpointFileDocument(
   summary: ChatTurnDiffSummary,
   path: FilesystemPath,
-  diff: FileDiff | null,
+  diff: GitFileDiff | null,
   owner: WorkspaceRoot,
 ): {
   readonly kind: 'git-diff'
@@ -136,7 +137,7 @@ export function checkpointSessionDocument(
   }
 }
 
-export function matchingCheckpointDiff(diffs: readonly FileDiff[], path: string | undefined) {
+export function matchingCheckpointDiff(diffs: readonly GitFileDiff[], path: string | undefined) {
   if (!path) return null
 
   return diffs.find((diff) => checkpointDiffMatchesPath(diff, path)) ?? null
@@ -172,7 +173,7 @@ export async function fetchCheckpointDiff(
           toTurnCount: input.toTurnCount,
         },
       })
-      const diffs = unwrapEdenResponse<FileDiff[]>(response)
+      const diffs = unwrapEdenResponse<GitFileDiff[]>(response)
 
       return filterCheckpointDiffsForPath(diffs, checkpointDiffFilePath(input))
     },
@@ -203,7 +204,7 @@ async function fetchFullSessionCheckpointDiff(
         },
       })
 
-      return unwrapEdenResponse<FileDiff[]>(response)
+      return unwrapEdenResponse<GitFileDiff[]>(response)
     },
     (diffs) => ({ diffCount: diffs.length }),
   )
@@ -237,13 +238,13 @@ function checkpointDiffFilePath(input: CheckpointDiffQueryInput) {
   return input.filePath ?? (input.scope === 'file' ? input.path : undefined)
 }
 
-function filterCheckpointDiffsForPath(diffs: readonly FileDiff[], path: string | undefined) {
+function filterCheckpointDiffsForPath(diffs: readonly GitFileDiff[], path: string | undefined) {
   if (!path) return diffs
 
   return diffs.filter((diff) => checkpointDiffMatchesPath(diff, path))
 }
 
-function checkpointDiffMatchesPath(diff: FileDiff, path: string) {
+function checkpointDiffMatchesPath(diff: GitFileDiff, path: string) {
   if (samePath(diff.path, path)) return true
   if (!diff.oldPath) return false
 
@@ -263,7 +264,7 @@ function normalizeDiffPath(path: string) {
   return path.replaceAll('\\', '/').replace(/^\.\//, '').replace(/^\/+/, '')
 }
 
-function diffStatus(diff: FileDiff): FileStatus['index'] | FileStatus['worktree'] {
+function diffStatus(diff: GitFileDiff): GitFileStatus['index'] | GitFileStatus['worktree'] {
   if (diff.oldPath && diff.oldPath !== diff.path) return 'renamed'
   if (diff.oldFileMissing) return 'added'
   if (diff.newFileMissing) return 'deleted'

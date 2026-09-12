@@ -1,9 +1,10 @@
+import type { GitFileDiff } from '@workspace/contracts'
 import { clientLogContext } from '@/lib/environments/state/log-context'
 import { getClient, type Client } from '@/lib/client'
 import { observeClientOperation } from '@/lib/client-logging'
 import { unwrapEdenResponse } from '@/lib/eden-events'
 import { gitKeys } from '@/lib/query-keys'
-import type { BlobDiffRequest, FileDiff } from '@/features/git/utils/types'
+import type { BlobDiffRequest } from '@/features/git/utils/types'
 
 export function blobDiffQueryKey(query: BlobDiffRequest) {
   return gitKeys.blobDiff({
@@ -23,7 +24,7 @@ export async function fetchBlobDiff(
   query: BlobDiffRequest,
   signal?: AbortSignal,
   client: Client = getClient(),
-): Promise<FileDiff[]> {
+): Promise<GitFileDiff[]> {
   return observeClientOperation(
     {
       ...clientLogContext(client),
@@ -45,7 +46,7 @@ export async function fetchBlobDiff(
         },
       })
 
-      const diffs = unwrapEdenResponse<FileDiff[]>(response, {
+      const diffs = unwrapEdenResponse<GitFileDiff[]>(response, {
         requireData: true,
         emptyMessage: 'git server returned an empty response',
       })
@@ -62,7 +63,7 @@ export async function fetchBlobDiff(
  * names the exact pair being diffed — one blob against one blob — so take the
  * identity from the request and keep only the content from the response.
  */
-function withRequestedPaths(diff: FileDiff, query: BlobDiffRequest): FileDiff {
+function withRequestedPaths(diff: GitFileDiff, query: BlobDiffRequest): GitFileDiff {
   const renamed = Boolean(query.oldPath && query.oldPath !== query.path)
 
   return { ...diff, oldPath: renamed ? query.oldPath : undefined, path: query.path }

@@ -1,3 +1,4 @@
+import type { GitFileStatus } from '@workspace/contracts'
 import { EmptyState } from '@workspace/ui/components/empty-state'
 import { cn } from '@workspace/ui/lib/utils'
 import { memo, useCallback, useMemo, useRef, type ComponentProps, type ReactNode } from 'react'
@@ -7,7 +8,7 @@ import { useEditorWorkspaceState } from '@/features/editor/state/workspace-state
 import { errorMessage } from '@/lib/file-server'
 import { useStatus } from '@/features/git/hooks'
 import { useGitState } from '@/features/git/state/store'
-import type { FileStatus } from '@/features/git/utils/types'
+
 import { changeRows } from '@/features/git/utils/change-rows'
 import { ChangeGroup } from '@/features/git/components/change-group'
 import { CommitControls } from '@/features/git/components/commit-controls'
@@ -20,7 +21,7 @@ import { EnvironmentStaleNotice } from '@/components/environment-stale-notice'
 
 const DISABLED_DIFF_QUERY = ['git', 'diffs', 'disabled'] as const
 
-const EMPTY_FILES: readonly FileStatus[] = []
+const EMPTY_FILES: readonly GitFileStatus[] = []
 
 export const Panel = memo(
   ({ className, rootPath }: ComponentProps<'section'> & { rootPath: string }) => {

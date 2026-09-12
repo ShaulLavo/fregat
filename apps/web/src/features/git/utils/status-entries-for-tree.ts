@@ -1,10 +1,10 @@
+import type { GitFileStatus, GitTreeStatus } from '@workspace/contracts'
 import type { GitStatusEntry } from '@workspace/tree'
 
 import { toTreePath } from '@/lib/path-formatters'
-import type { FileStatus, TreeStatus } from '@/features/git/utils/types'
 
 export function statusEntriesForTree(
-  files: readonly FileStatus[],
+  files: readonly GitFileStatus[],
   rootPath: string,
 ): GitStatusEntry[] {
   const entries: GitStatusEntry[] = []
@@ -27,7 +27,7 @@ function treePathForStatus(path: string, rootPath: string) {
   return toTreePath(path, rootPath)
 }
 
-function fileTreeStatus(status: TreeStatus | 'conflicted'): GitStatusEntry['status'] | null {
+function fileTreeStatus(status: GitTreeStatus | 'conflicted'): GitStatusEntry['status'] | null {
   if (status === 'conflicted') return 'modified'
 
   return status

@@ -1,3 +1,4 @@
+import type { GitFileStatus } from '@workspace/contracts'
 import { filesystemPath } from '@/lib/documents/utils/identity'
 import { Button } from '@workspace/ui/components/button'
 
@@ -9,7 +10,7 @@ import { useSessionTerminalId } from '@/features/chat-mode/hooks/use-session-ter
 import { useSessionToolRoot } from '@/features/chat-mode/hooks/use-session-tool-root'
 import { useSessionDiffScope } from '@/features/chat/hooks/use-session-diff-scope'
 import { Panel as GitPanel } from '@/features/git/components/panel'
-import type { FileStatus } from '@/features/git/utils/types'
+
 import { LogsPanel } from '@/features/logs/components/panel'
 import { TerminalPanel } from '@/features/terminal/components/panel'
 import { CodePanel } from '@/features/workbench/components/code-panel'
@@ -31,7 +32,7 @@ export function ToolPane({
 }: {
   readonly conflicts: EditorTabConflictMap
 
-  readonly gitFiles: readonly FileStatus[]
+  readonly gitFiles: readonly GitFileStatus[]
   /** The project root. Individual tools act on the session's checkout below. */
   readonly rootPath: string
   readonly tab: ChatModeToolTab

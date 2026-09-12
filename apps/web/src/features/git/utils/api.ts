@@ -1,3 +1,4 @@
+import type { GitStatusResult } from '@workspace/contracts'
 import { clientLogContext } from '@/lib/environments/state/log-context'
 import type {
   GitBranchRemoteState,
@@ -12,7 +13,6 @@ import { observeClientOperation } from '@/lib/client-logging'
 import { parseEdenSseStream } from '@workspace/client-core/transport/eden'
 import { unwrapEdenResponse } from '@/lib/eden-events'
 import { createClientError } from '@workspace/client-core/errors'
-import type { StatusResult } from '@/features/git/utils/types'
 
 /**
  * A hook rejecting a commit is an expected outcome, not a transport fault — the
@@ -396,7 +396,7 @@ function observeGitPathsOperation(
   client: Client,
   action: string,
   paths: readonly string[],
-  operation: () => Promise<StatusResult>,
+  operation: () => Promise<GitStatusResult>,
 ) {
   return observeGitOperation(
     { ...clientLogContext(client), action, path: paths[0] ?? '', pathCount: paths.length },
@@ -405,7 +405,7 @@ function observeGitPathsOperation(
   )
 }
 
-function statusSummary(result: StatusResult) {
+function statusSummary(result: GitStatusResult) {
   return {
     fileCount: result.files.length,
     hasRepository: result.repository !== null,

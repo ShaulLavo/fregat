@@ -1,6 +1,7 @@
+import type { GitFileStatus } from '@workspace/contracts'
 import { editorTabModel } from '@/features/workspace/utils/tab-model'
 import type { EditorTabConflictMap } from '@/features/workspace/utils/tab-types'
-import type { FileStatus } from '@/features/git/utils/types'
+
 import type { SessionId } from '@workspace/contracts'
 import { createEditorTabRecord, documentTab } from '@/lib/documents/utils/tabs'
 import {
@@ -47,7 +48,7 @@ test('a diff of a file deleted in the worktree has nothing left on disk', () => 
 })
 
 test('live status wins over the status baked into the document target', () => {
-  const restored: FileStatus = {
+  const restored: GitFileStatus = {
     path: FILE,
     index: 'unmodified',
     status: 'modified',
@@ -110,7 +111,7 @@ function model(
   {
     conflicts = {},
     gitFiles = [],
-  }: { conflicts?: EditorTabConflictMap; gitFiles?: readonly FileStatus[] } = {},
+  }: { conflicts?: EditorTabConflictMap; gitFiles?: readonly GitFileStatus[] } = {},
 ) {
   return editorTabModel({
     conflicts,

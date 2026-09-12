@@ -1,3 +1,4 @@
+import type { GitFileDiff } from '@workspace/contracts'
 import { comparisonRequest } from '@/lib/documents/utils/comparisons'
 import { clientForQueryClient } from '@/lib/environments/state/query-clients'
 import { useQuery, type UseQueryOptions } from '@tanstack/react-query'
@@ -12,9 +13,8 @@ import { errorMessage } from '@/lib/error-message'
 import { fetchBlobDiff } from '@/features/git/utils/blob-diff-query'
 import type { GitComparison } from '@/lib/documents/utils/types'
 import { diffDocumentQueryKey } from '@/features/git/utils/diff-document-query'
-import type { FileDiff } from '@/features/git/utils/types'
 
-type DiffList = readonly FileDiff[]
+type DiffList = readonly GitFileDiff[]
 type DiffQueryOptions = UseQueryOptions<DiffList, Error, DiffList, readonly unknown[]>
 
 /**
