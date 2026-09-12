@@ -8,6 +8,15 @@ import {
   type OrchestrationShellStreamFrame,
   type OrchestrationSessionStreamFrame,
   type OrchestrationWsServerConfig,
+  orchestrationWsClientMessageSchema,
+  type OrchestrationSessionDetailPage,
+  type OrchestrationWsClientMessage,
+  type OrchestrationWsRequest,
+  type OrchestrationWsRequestOf,
+  type OrchestrationWsResult,
+  type OrchestrationWsServerMessage,
+  type OrchestrationWsSubscribe,
+  type OrchestrationWsSubscriptionId,
 } from '@workspace/contracts'
 import { Elysia } from 'elysia'
 
@@ -21,17 +30,6 @@ import {
   recordChatPipelineWarning,
 } from './orchestration-logging'
 import type { OrchestrationEngine } from './engine'
-import {
-  orchestrationWsClientMessageSchema,
-  type OrchestrationSessionDetailPage,
-  type OrchestrationWsClientMessage,
-  type OrchestrationWsRequest,
-  type OrchestrationWsRequestOf,
-  type OrchestrationWsResult,
-  type OrchestrationWsServerMessage,
-  type OrchestrationWsSubscribe,
-  type OrchestrationWsSubscriptionId,
-} from './schemas'
 
 /**
  * Identity of this server process. `serverInstanceId` changes on every restart,

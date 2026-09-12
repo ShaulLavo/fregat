@@ -2,11 +2,16 @@ import { eq } from 'drizzle-orm'
 import { drizzle } from 'drizzle-orm/bun-sqlite'
 import { describe, expect, it } from 'vitest'
 import * as v from 'valibot'
-import { orderKeyBetween, projectIdSchema, commandIdSchema } from '@workspace/contracts'
+import {
+  orderKeyBetween,
+  projectIdSchema,
+  commandIdSchema,
+  clientOrchestrationCommandSchema,
+  orchestrationCommandSchema,
+} from '@workspace/contracts'
 import * as schema from '../../db/schema'
 import { projectionProjects } from '../../db/schema'
 import { ProjectionShellRowReader } from '../shell-row-reader'
-import { clientOrchestrationCommandSchema, orchestrationCommandSchema } from '../schemas'
 
 import { createDomainEngine, projectRegistrationCommand } from './factories/engine'
 

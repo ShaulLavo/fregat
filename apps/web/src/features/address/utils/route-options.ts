@@ -132,7 +132,7 @@ function tabTokens(tabs: NonNullable<RouteSearch['tabs']>) {
   return tabs.map((tab) => (tab.kind === 'selected' ? '@' : tokenForEditorReference(tab))).join('~')
 }
 
-export function searchForAddress(address: Address): RouteSearch {
+function searchForAddress(address: Address): RouteSearch {
   return parseRouteSearch(serializeAddress(address).search)
 }
 
@@ -172,7 +172,7 @@ function canonicalPath(url: URL) {
   return url
 }
 
-export function stripRouterBasepath(href: string, basepath = '/') {
+function stripRouterBasepath(href: string, basepath = '/') {
   const url = new URL(href, 'http://localhost')
   const prefix = basepath.replace(/\/+$/, '')
   if (prefix && (url.pathname === prefix || url.pathname.startsWith(`${prefix}/`))) {

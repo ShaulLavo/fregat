@@ -6,11 +6,12 @@ import {
   projectIdSchema,
   worktreeIdSchema,
   type PreparedProjectCreateCommand,
+  orchestrationCommandSchema,
 } from '@workspace/contracts'
 import { migratePlatformDatabase } from '../../../db/migrations'
 import * as schema from '../../../db/schema'
 import { OrchestrationEngine } from '../../engine'
-import { orchestrationCommandSchema } from '../../schemas'
+
 import { DOMAIN_AT, DOMAIN_IDS, DOMAIN_MODEL } from './session-domain'
 
 export function domainCommand(value: unknown) {

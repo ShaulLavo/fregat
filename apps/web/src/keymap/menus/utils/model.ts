@@ -35,7 +35,7 @@ export type MenuActionItem = MenuItemShared & {
   readonly shortcut?: string
 }
 
-export type MenuCheckboxItem = MenuItemShared & {
+type MenuCheckboxItem = MenuItemShared & {
   readonly kind: 'checkbox'
   readonly id: string
   readonly label: string

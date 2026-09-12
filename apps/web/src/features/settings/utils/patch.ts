@@ -1,9 +1,4 @@
-import {
-  modelRefKey,
-  type KeybindingOverrides,
-  type ModelRef,
-  type ProviderInstanceConfig,
-} from '@workspace/contracts'
+import { modelRefKey, type ModelRef, type ProviderInstanceConfig } from '@workspace/contracts'
 
 /**
  * Sections are replaced whole, so every edit rebuilds the list it touches
@@ -32,36 +27,6 @@ export function withProviderEnabled(
 
     return { ...saved, enabled }
   })
-}
-
-export function withModelHidden(
-  hiddenModels: readonly ModelRef[],
-  ref: ModelRef,
-  hidden: boolean,
-): ModelRef[] {
-  const key = modelRefKey(ref)
-  const without = hiddenModels.filter((entry) => modelRefKey(entry) !== key)
-
-  return hidden ? [...without, ref] : without
-}
-
-export function withKeybindingOverride(
-  overrides: KeybindingOverrides,
-  command: string,
-  keys: string | null,
-): KeybindingOverrides {
-  return { ...overrides, [command]: keys }
-}
-
-/**
- * Dropping the key, not writing `null` over it: `null` is an explicit unbind,
- * so only an absent key hands the command back to its default.
- */
-export function withoutKeybindingOverride(
-  overrides: KeybindingOverrides,
-  command: string,
-): KeybindingOverrides {
-  return Object.fromEntries(Object.entries(overrides).filter(([key]) => key !== command))
 }
 
 /**

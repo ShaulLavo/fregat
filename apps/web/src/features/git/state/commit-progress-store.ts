@@ -12,9 +12,9 @@ import { createStore, type StoreApi } from 'zustand/vanilla'
  * something anyone scrolls back through — the last screenful is what says
  * whether it is progressing or wedged.
  */
-export const MAX_COMMIT_PROGRESS_LINES = 200
+const MAX_COMMIT_PROGRESS_LINES = 200
 
-export type CommitProgressLine = {
+type CommitProgressLine = {
   readonly stream: 'stderr' | 'stdout'
   readonly text: string
 }

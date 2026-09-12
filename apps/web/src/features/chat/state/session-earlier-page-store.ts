@@ -12,7 +12,7 @@ export type SessionEarlierPageState = {
 }
 
 /** Shared identity so a session that has never paged never re-renders on this. */
-export const IDLE_SESSION_EARLIER_PAGE: SessionEarlierPageState = {
+const IDLE_SESSION_EARLIER_PAGE: SessionEarlierPageState = {
   error: null,
   pending: false,
 }

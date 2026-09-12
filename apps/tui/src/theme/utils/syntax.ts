@@ -26,7 +26,7 @@ export function createSyntaxStyle(
   return SyntaxStyle.fromTheme(styles)
 }
 
-export function jsonHighlights(text: string, syntax: SyntaxStyle, tabWidth = 4) {
+function jsonHighlights(text: string, syntax: SyntaxStyle, tabWidth = 4) {
   const highlights: Highlight[] = []
   let cursor = 0
   let position = 0

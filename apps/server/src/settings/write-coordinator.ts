@@ -27,7 +27,7 @@ const coordinators = new Map<string, Coordinator>()
  * Missing files are keyed through their nearest existing real parent so a
  * symlink spelling cannot acquire one lock before creation and another after.
  */
-export async function acquireSettingsWriteLease(filePath: string): Promise<SettingsWriteLease> {
+async function acquireSettingsWriteLease(filePath: string): Promise<SettingsWriteLease> {
   const canonicalPath = await canonicalSettingsPath(filePath)
   const coordinator = coordinatorFor(canonicalPath)
   const startedAt = performance.now()
@@ -62,7 +62,7 @@ export async function withSettingsWriteCoordinator<T>(
   }
 }
 
-export async function canonicalSettingsPath(filePath: string): Promise<string> {
+async function canonicalSettingsPath(filePath: string): Promise<string> {
   const absolute = path.resolve(filePath)
   const unresolved: string[] = []
   let candidate = absolute

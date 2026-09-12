@@ -58,7 +58,7 @@ export const gitCommitBodySchema = v.object({
   message: v.string(),
 })
 
-export const gitCommitMessageSourceSchema = v.picklist(['staged', 'working'])
+const gitCommitMessageSourceSchema = v.picklist(['staged', 'working'])
 
 export const gitCommitMessageResultSchema = v.object({
   message: v.string(),

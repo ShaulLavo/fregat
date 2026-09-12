@@ -5,7 +5,7 @@ import type { GitBaseRefChoice } from '@workspace/contracts'
  * says otherwise. Order matters: `main` is checked before `master` so a
  * repository carrying both compares against the one it actually develops on.
  */
-export const DEFAULT_BASE_BRANCH_CANDIDATES = ['main', 'master'] as const
+const DEFAULT_BASE_BRANCH_CANDIDATES = ['main', 'master'] as const
 
 export type BaseRefCandidateInput = {
   /** The remote's own default branch, from `<remote>/HEAD`. */
@@ -73,7 +73,7 @@ export function baseRefChoiceId(choices: readonly GitBaseRefChoice[], ref: strin
 }
 
 /** `origin/main` -> `main`, for any configured remote name. */
-export function stripRemotePrefix(ref: string | null, remoteNames: readonly string[]) {
+function stripRemotePrefix(ref: string | null, remoteNames: readonly string[]) {
   if (!ref) return null
 
   // Longest first: a repository with remotes `up` and `upstream` must not have

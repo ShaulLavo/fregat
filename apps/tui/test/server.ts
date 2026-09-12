@@ -16,8 +16,8 @@ import {
   type AppOptions,
 } from 'server/testing'
 
-export const TEST_SERVER_ORIGIN = 'http://platform-tui.test'
-export const TEST_CLIENT_ORIGIN = TUI_CLIENT_ORIGIN
+const TEST_SERVER_ORIGIN = 'http://platform-tui.test'
+const TEST_CLIENT_ORIGIN = TUI_CLIENT_ORIGIN
 
 export type TestServer = Awaited<ReturnType<typeof makeTestServer>>
 

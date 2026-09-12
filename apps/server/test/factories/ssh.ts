@@ -20,7 +20,7 @@ export const machine = {
   kind: 'ssh',
   target: 'fixture',
 } satisfies Machines[string]
-export const installation = {
+const installation = {
   kind: 'source',
   directory: "/work/space ' $(touch unwanted)",
   executable: process.execPath,

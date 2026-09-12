@@ -357,7 +357,7 @@ migration and `lstatOptional` collapses. No repository-wide suite, no absolute t
 - The session-busy predicate, the git-status partition, and anything landing in
   `packages/client-core` for web↔TUI parity — [Plan 094](094-client-core-web-tui-parity.md).
 - Deleting the unused contracts exports and the dead orchestration SSE routes —
-  [Plan 096](096-web-layering-and-boundaries.md).
+  [Plan 096](../docs/web-layering.md).
 
 ## Completion checklist
 

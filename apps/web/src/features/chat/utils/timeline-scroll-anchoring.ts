@@ -12,14 +12,14 @@ import { isWorkLogToolEntry } from '@/features/chat/utils/tool-label'
  * whether a gesture is navigation. Deliberately tight: a generous band reads a
  * reader moving through history as sitting at the live edge.
  */
-export const TIMELINE_FOLLOW_REARM_BAND_PX = 40
+const TIMELINE_FOLLOW_REARM_BAND_PX = 40
 
 /**
  * Slack allowed when testing whether the viewport is parked on the scroll
  * bottom. Only fractional-pixel noise, never a usable gesture distance — a band
  * here would swallow small scrolls whole (see `isTimelineAtContentEnd`).
  */
-export const TIMELINE_AT_END_EPSILON_PX = 2
+const TIMELINE_AT_END_EPSILON_PX = 2
 
 /**
  * Space reserved below the last row so the final line never sits flush against
@@ -40,7 +40,7 @@ export const TIMELINE_ANCHOR_OFFSET_PX = 16
  * whole point is that the text being read does not move. `free-scrolling` is the
  * user reading history: nothing moves the viewport until they come back.
  */
-export type TimelineFollowMode = 'anchoring-new-turn' | 'following-end' | 'free-scrolling'
+type TimelineFollowMode = 'anchoring-new-turn' | 'following-end' | 'free-scrolling'
 
 /** Viewport geometry, in the scroll container's own coordinate space. */
 export interface TimelineViewportMetrics {

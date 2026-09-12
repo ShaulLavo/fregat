@@ -1,6 +1,6 @@
 import { describe, expect, it } from 'vitest'
 import * as v from 'valibot'
-import { orchestrationCommandSchema } from '../schemas'
+import { orchestrationCommandSchema } from '@workspace/contracts'
 
 import { createEngineWithSession } from './factories/engine'
 

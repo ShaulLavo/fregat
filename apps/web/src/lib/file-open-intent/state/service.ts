@@ -38,7 +38,7 @@ export type FileOpenIntentLiveDocument = {
   readonly localRevision: number
 }
 
-export type FileOpenIntentPreparationFamily = 'highlighter' | 'structural'
+type FileOpenIntentPreparationFamily = 'highlighter' | 'structural'
 
 export type FileOpenIntentStructuralRange = {
   readonly endIndex: number
@@ -53,7 +53,7 @@ export type FileOpenIntent = {
   readonly tabId?: TabId
 }
 
-export type FileOpenIntentEnvironmentIdentity = {
+type FileOpenIntentEnvironmentIdentity = {
   readonly configurationTag: readonly EditorPreparedTagValue[]
   readonly highlighterProvider: object | null
   readonly structuralProvider: object | null
@@ -72,7 +72,7 @@ export type FileOpenIntentPreparationConfiguration = {
   readonly stages: readonly FileOpenIntentPreparationStage[]
 }
 
-export type FileOpenIntentPreparation = FileOpenIntentPreparationConfiguration & {
+type FileOpenIntentPreparation = FileOpenIntentPreparationConfiguration & {
   readonly buffer: EditorTextBuffer
   readonly preparedDocument: EditorPreparedDocument
 }
@@ -108,7 +108,7 @@ export type FileOpenIntentRuntime = {
   scheduleTimer(task: () => void, delayMs: number): () => void
 }
 
-export type FileOpenIntentBenchmarkResult = {
+type FileOpenIntentBenchmarkResult = {
   readonly evictions: number
   readonly nonTargetIntents: number
   readonly preparedClaims: number

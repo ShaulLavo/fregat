@@ -12,7 +12,7 @@ import {
   orchestrationGetTurnDiffInputSchema,
   type OrchestrationGetFullSessionDiffInput,
   type OrchestrationGetTurnDiffInput,
-} from './schemas'
+} from '@workspace/contracts'
 
 type SessionCheckpointContext = {
   checkpoints: ProjectionSessionCheckpointRow[]

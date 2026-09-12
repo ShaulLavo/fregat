@@ -19,7 +19,7 @@ export type TerminalBufferLine = {
 export type TerminalBufferLineReader = (row: number) => TerminalBufferLine | undefined
 
 /** Inclusive at both ends and 0-based: the coordinates ghostty's `ILink` wants. */
-export type TerminalLinkRange = {
+type TerminalLinkRange = {
   readonly end: TerminalBufferPosition
   readonly start: TerminalBufferPosition
 }

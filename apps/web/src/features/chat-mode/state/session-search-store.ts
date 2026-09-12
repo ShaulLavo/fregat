@@ -39,6 +39,3 @@ export const useSessionSearchStore = create<SessionSearchStore>()((set) => ({
       return { matchBySessionKey: { ...kept, ...own }, matchedQuery: query, searching }
     }),
 }))
-export function resetSessionSearchStore() {
-  useSessionSearchStore.setState({ matchBySessionKey: {}, matchedQuery: '', searching: false })
-}

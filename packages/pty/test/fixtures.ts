@@ -8,7 +8,7 @@ import { spawnPty } from '../src/index'
 
 type SpawnOptions = Parameters<typeof spawnPty>[0]
 
-export class CapturedPty {
+class CapturedPty {
   readonly chunks: Uint8Array[] = []
   readonly pty: ReturnType<typeof spawnPty>
 

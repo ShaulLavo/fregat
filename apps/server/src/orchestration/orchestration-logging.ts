@@ -1,10 +1,12 @@
-import type { ClientOrchestrationCommand, SessionId } from '@workspace/contracts'
+import {
+  type ClientOrchestrationCommand,
+  type SessionId,
+  type OrchestrationCommand,
+  type OrchestrationEvent,
+  type OrchestrationReplayEventsInput,
+} from '@workspace/contracts'
 import { recordProcessInfo, recordProcessWarning, type OperationContext } from '../observability'
-import type {
-  OrchestrationCommand,
-  OrchestrationEvent,
-  OrchestrationReplayEventsInput,
-} from './schemas'
+
 import type {
   ProviderRuntimeEvent,
   ProviderTurnControlInput,

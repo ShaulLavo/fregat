@@ -5,10 +5,9 @@ Plan 096 implementation landed on `main` on 2026-09-12. The original checkout wa
 That baseline includes Plan 098's document domain and shared-layer lint guard. This
 refactor reuses both.
 
-Implementation and focused verification are finished. The original requirement for a
-clean workspace-wide Knip report remains open because the captured baseline contains
-unrelated unused declarations. The executable plan remains until that audit gate closes.
-No unused-export exceptions hide those findings.
+Implementation and review are complete. The repository-wide Knip audit is clean,
+including the unused code that predated this refactor. The executable plan is retired.
+`bun run unused:check` now runs in CI and in `bun run verify`.
 
 ## Module ownership
 
@@ -78,8 +77,11 @@ The smaller moves follow the same rule:
 
 `node scripts/web-layering.mjs '@/lib/search-match-entry'` regenerates an import census.
 It reports production import statements, files, consumer buckets, and test consumers.
-The existing `platform-boundaries/lib-imports` rule enforces the shared-layer boundary
-for static, relative, type-only, re-export, and dynamic imports.
+The census parses source with Oxc, excludes test directories and fixtures from production
+counts, and includes the app-level test directory in test consumers. Its `--root` option
+accepts another web checkout. The existing `platform-boundaries/lib-imports` rule enforces
+the shared-layer boundary for static, relative, type-only, re-export, and dynamic imports,
+including static template literals.
 
 ## Storage behavior
 
@@ -88,9 +90,11 @@ All four browser accessors catch blocked-storage failures. Reads and enumeration
 empty results; removal returns. Writes return `written`, `unavailable`, or `storage-failed`.
 The shared cache writer preserves that result and handles serialization and size limits.
 
-All six planned caches use shared reading and writing. Invalid JSON, schemas, and versions
-are removed and reported with the existing `OPERATION_FAILED` taxonomy code. The previous
-`INVALID_PATH` code described the wrong failure. Validation remains at each consumer.
+The six planned caches and chat projection caching use shared reading and writing.
+Invalid JSON, schemas, and versions are removed. Recovery reports the cache key and a
+bounded failure reason through client logging, without a filesystem-error toast or stored
+contents. A failed read preserves the entry because failed access does not prove corruption.
+Validation and projection quota fallback remain at their consumers.
 No migration or repair code was added. The first-paint settings mirror keeps its documented
 synchronous storage access.
 
@@ -170,15 +174,42 @@ Production build and browser checks cover the actual notice icon dimensions, hov
 reveal, grid columns, and the rebuilt application's moved command and machine-picker paths.
 The existing preview and public proxy were reused; no server was started.
 
-Knip entry declarations now describe real standalone scripts, workers, typecheck inputs,
-and child-process scenarios. Exact exceptions describe fixture content, runtime-selected
-language-server binaries, and subprocess arguments resolved under a different working
-directory. The audit retains all unused export/type findings.
+## Review and Knip closeout
 
-The scoped report has zero unresolved imports and no newly unused export/type symbols after
-normalizing the renamed paths. Remaining baseline findings are two orphan files, 130 unused
-exports, 111 unused types, two duplicate-export groups, and the web dependency on
-`@shikijs/themes`. Declaring the existing navigation proof script also exposes its deliberate
-lookup of `@tanstack/history` through the router package's own dependency context; that exact
-runtime resolution succeeds. These findings remain visible rather than expanding this
-refactor into the other consolidation plans.
+The review compared the original implementations with the final callers, then checked the
+ownership decisions against the consumer census. It found and fixed four gaps:
+
+- Static template literals bypassed the shared-layer lint rule. Real Oxlint CLI probes now
+  reject both quoted and backtick imports and retain an allowed shared-module control.
+- The import census could count comments and strings, treated test factories as production,
+  and omitted app-level tests. AST extraction and a CLI fixture check cover those cases.
+- Corrupt-cache recovery showed a filesystem-error toast and omitted the cache key and
+  failure reason. Cache-specific diagnostics now describe recovery without exposing data.
+- Chat projection caching still duplicated serialization and storage access. It now uses
+  the shared helpers while retaining environment validation and full-to-shell quota retry.
+
+Knip cleanup removed unused export modifiers from declarations still needed locally and
+removed dead declarations, orphan editor activation context wiring, and unused TUI root-list
+persistence. TUI still stores the last location and each root's location. The server's pure
+orchestration schema barrel was deleted; callers import canonical contracts directly.
+Duplicate revived-event schema aliases were removed without changing wire tags or schema
+objects. Seven inert filesystem type aliases became compiler assertions that fail on drift.
+
+Knip entry declarations describe real standalone scripts, workers, compiler assertions,
+and child-process scenarios. Exact exceptions cover editor fixture content, runtime-selected
+language-server binaries, and subprocess arguments resolved under a different working
+directory. The root-only Turbo exception covers its actual launches in `scripts/dev.ts` and
+`scripts/prod.ts`; the installed CLI was checked directly. Stale exceptions were removed.
+The navigation proof script declares its existing `@tanstack/history` dependency, and web
+no longer declares the unused `@shikijs/themes` dependency owned by client-core.
+
+No unused-export or unused-type exceptions were added. The full Knip run is clean,
+including configuration hints. Source removal is checked by the repository typecheck and
+focused lint. Existing tests cover event revival, TUI history restoration, and projection
+quota fallback. The review also independently compared ranker ordering, keyboard adapters,
+route-builder output, hash encodings, tab selection, and search metadata against the baseline.
+
+The closeout rebuilt the web app and exercised the command palette, Connect and Switch
+machine dialogs, SSH/tailnet discovery, and titlebar menu through the existing preview.
+No page or console errors occurred. Final repository typecheck, touched-source lint and
+format checks, and the full Knip audit pass.

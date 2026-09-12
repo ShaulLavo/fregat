@@ -13,7 +13,7 @@ import {
 } from '@/features/chat/utils/changed-files-expansion-storage'
 import type { ChatTurnDiffSummary } from '@workspace/client-core/chat/types'
 
-export type ChatChangedFilesExpansion = PersistedChatChangedFilesExpansion
+type ChatChangedFilesExpansion = PersistedChatChangedFilesExpansion
 
 type ChatChangedFilesExpansionChanges = Partial<
   Pick<ChatChangedFilesExpansion, 'cardExpanded' | 'directoriesExpanded'>

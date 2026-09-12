@@ -19,7 +19,7 @@ export type MenuResolveContext = {
 export type ResolvedMenuInvocation = CommandDispatchTicket | void
 
 /** Command and action items collapse to one shape — both just run something. */
-export type ResolvedRunItem = {
+type ResolvedRunItem = {
   readonly kind: 'run'
   readonly key: string
   readonly label: string
@@ -32,7 +32,7 @@ export type ResolvedRunItem = {
   readonly run: () => ResolvedMenuInvocation
 }
 
-export type ResolvedCheckboxItem = {
+type ResolvedCheckboxItem = {
   readonly kind: 'checkbox'
   readonly key: string
   readonly label: string
@@ -42,7 +42,7 @@ export type ResolvedCheckboxItem = {
   readonly toggle: (checked: boolean) => void
 }
 
-export type ResolvedRadioGroupItem = {
+type ResolvedRadioGroupItem = {
   readonly kind: 'radio-group'
   readonly key: string
   readonly value: string
@@ -50,7 +50,7 @@ export type ResolvedRadioGroupItem = {
   readonly select: (value: string) => ResolvedMenuInvocation
 }
 
-export type ResolvedSubmenuItem = {
+type ResolvedSubmenuItem = {
   readonly kind: 'submenu'
   readonly key: string
   readonly label: string

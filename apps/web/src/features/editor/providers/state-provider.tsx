@@ -1,7 +1,6 @@
 import { useEffect, useLayoutEffect, type ReactNode } from 'react'
 
 import { useEditorColorTheme } from '@/features/editor/hooks/use-editor-color-theme'
-import { EditorActivationContext } from '@/features/editor/providers/file-open-activation-context'
 import { useLanguageServerMatchConfiguration } from '@/features/editor/providers/language-server-match-context'
 import { MountedEditorProvider } from '@/features/editor/providers/mounted-editor-provider'
 import { EditorRuntimeContext } from '@/features/editor/providers/runtime-context'
@@ -73,16 +72,14 @@ export function EditorStateProvider({
             <SearchBufferStateContext value={runtime.searchBufferStore}>
               <EditorUiStateContext value={runtime.uiStore}>
                 <FileOpenIntentProvider value={runtime.fileOpenIntent}>
-                  <EditorActivationContext value={runtime.editorActivation}>
-                    <MountedEditorProvider registry={runtime.mountedEditors}>
-                      <WorkspaceEditProvider
-                        host={runtime.workspaceEditHost}
-                        service={runtime.workspaceEditService}
-                      >
-                        {children}
-                      </WorkspaceEditProvider>
-                    </MountedEditorProvider>
-                  </EditorActivationContext>
+                  <MountedEditorProvider registry={runtime.mountedEditors}>
+                    <WorkspaceEditProvider
+                      host={runtime.workspaceEditHost}
+                      service={runtime.workspaceEditService}
+                    >
+                      {children}
+                    </WorkspaceEditProvider>
+                  </MountedEditorProvider>
                 </FileOpenIntentProvider>
               </EditorUiStateContext>
             </SearchBufferStateContext>

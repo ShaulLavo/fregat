@@ -1,26 +1,24 @@
 {
   "$schema": "https://unpkg.com/knip@6/schema.json",
-  "ignoreWorkspaces": ["packages/editor-*", "../Editor/packages/*"],
-  "ignoreDependencies": ["@lydell/node-pty", "@typescript/native-preview"],
+  "ignoreDependencies": ["@typescript/native-preview"],
   "workspaces": {
     "apps/desktop": {
       "entry": ["src/bun/index.ts", "src/preload/index.ts", "electrobun.config.ts"]
     },
     "apps/server": {
       "entry": [
-        "src/index.ts",
         "src/provider/claude-discovery-worker.ts",
         "scripts/pty-benchmark.ts",
         "scripts/pty-smoke.ts",
         "scripts/workspace-search-benchmark.ts",
         "test/openssh-scenario.ts",
-        "test/service-openssh-scenario.ts"
+        "test/service-openssh-scenario.ts",
+        "src/fs/tests/contracts.test-d.ts"
       ],
       "ignoreDependencies": ["vscode-langservers-extracted"]
     },
     "apps/web": {
       "entry": [
-        "src/main.tsx",
         "src/features/address/tests/navigation.types.ts",
         "scripts/chat-scroll-proof.mjs",
         "scripts/chat-scroll-proof-entry.mjs",
@@ -35,9 +33,6 @@
     "packages/contracts": {
       "ignoreUnresolved": ["scripts/generate-settings-schema.ts"]
     },
-    "packages/tree": {
-      "ignoreFiles": ["test/factories/tree-paths.ts"]
-    },
     "scripts": {
       "entry": [
         "desktop-dev.ts",
@@ -50,6 +45,19 @@
         "web-layering.mjs",
         "lint/web-boundaries.mjs"
       ]
+    },
+    ".": {
+      "ignoreDependencies": ["turbo"]
+    },
+    "apps/tui": {
+      "entry": [
+        "test/processes/job-control-launcher.ts",
+        "test/processes/job-control-session.ts",
+        "test/processes/storage-writer.ts"
+      ]
+    },
+    "packages/pty": {
+      "entry": ["test/nvim-smoke.ts", "test/fixtures/child.ts"]
     }
   }
 }

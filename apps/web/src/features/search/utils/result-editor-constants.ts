@@ -1,11 +1,9 @@
 import type { BrowserTextMetrics } from '@singapor/core'
 import type { CSSProperties } from 'react'
 
-import type { SearchResultVirtualListViewport } from '@/features/search/utils/result-virtual-list'
-
 export const FILE_ROW_ESTIMATE = 44
 export const EXCERPT_EDITOR_LINE_HEIGHT = 22
-export const EXCERPT_EDITOR_CHARACTER_WIDTH = 8
+const EXCERPT_EDITOR_CHARACTER_WIDTH = 8
 export const SEARCH_RESULT_FILE_EDITOR_ROW_GAP = 6
 export const SEARCH_RESULT_VIRTUAL_FALLBACK_COUNT = 8
 export const SEARCH_RESULT_VIRTUAL_BASE_MIN_OVERSCAN = 640
@@ -21,10 +19,6 @@ export const SEARCH_RESULT_FILE_EDITOR_FULL_RENDER_LINE_LIMIT = 16
 export const SEARCH_RESULT_FILE_EDITOR_LINE_OVERSCAN = 560
 export const SEARCH_RESULT_VIRTUAL_PADDING = 12
 export const SEARCH_RESULT_VIRTUAL_ROW_OFFSET = 6
-export const INITIAL_SEARCH_RESULT_VIRTUAL_VIEWPORT = {
-  height: 0,
-  top: 0,
-} satisfies SearchResultVirtualListViewport
 export const FILE_RESULTS_EDITOR_MIN_HEIGHT = 28
 export const FILE_RESULTS_ROW_VERTICAL_PADDING = 8
 export const SEARCH_RESULT_STATIC_EDITOR_LINE_LIMIT = 200

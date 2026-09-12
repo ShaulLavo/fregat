@@ -10,7 +10,7 @@ export function modelOptionValue(options: ModelOptions, key: string): unknown {
   return asRecord(options)[key]
 }
 
-export function modelOptionArrayValue(options: unknown[], key: string) {
+function modelOptionArrayValue(options: unknown[], key: string) {
   for (const option of options) {
     const record = asRecord(option)
     if (record.id === key) return record.value

@@ -54,7 +54,7 @@ export type SettingWidget =
  * is reachable only through the JSON view — it exists so an engineering constant
  * can be overridable and greppable without cluttering the page.
  */
-export type SettingVisibility = 'user' | 'advanced' | 'internal'
+type SettingVisibility = 'user' | 'advanced' | 'internal'
 
 /**
  * Which widget kinds can render a value of type `TValue`.
@@ -93,7 +93,7 @@ type ValueWidget<TValue> =
  * entry without erasing the user's — `keybindings.overrides` is the case that
  * motivates it.
  */
-export type SettingMerge = 'replace' | 'record'
+type SettingMerge = 'replace' | 'record'
 
 export type SettingDescriptor<TSchema extends v.GenericSchema = v.GenericSchema> = {
   /** Validates a stored value. Also the source of the key's TypeScript type. */

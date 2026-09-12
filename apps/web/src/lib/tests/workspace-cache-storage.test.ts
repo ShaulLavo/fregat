@@ -1,7 +1,10 @@
 import { afterEach, beforeEach, vi } from 'vitest'
 import * as v from 'valibot'
+import { log as evlog } from 'evlog'
+import { toast } from 'sonner'
 
 import { expect, test } from '../../../test/fixtures'
+import { globalChromeStorage } from '@/lib/environments/state/scoped-storage'
 import {
   readWorkspaceCacheEntry,
   removeWorkspaceCacheEntry,
@@ -16,6 +19,9 @@ const TEST_KEY = workspaceCacheStorageKey('test')
 
 beforeEach(() => {
   STORE.clear()
+  vi.stubEnv('OBSERVABILITY_ENABLED', 'true')
+  vi.spyOn(evlog, 'error').mockImplementation(() => {})
+  vi.spyOn(toast, 'error').mockImplementation(() => 'observed-toast')
   Object.defineProperty(globalThis, 'localStorage', {
     configurable: true,
     value: memoryLocalStorage(),
@@ -25,6 +31,7 @@ beforeEach(() => {
 afterEach(() => {
   STORE.clear()
   vi.restoreAllMocks()
+  vi.unstubAllEnvs()
   delete (globalThis as { localStorage?: Storage }).localStorage
 })
 
@@ -46,6 +53,72 @@ test('removes an invalid entry without touching another key', () => {
   expect(readWorkspaceCacheEntry(TEST_KEY, schema, null)).toBeNull()
   expect(STORE.has(TEST_KEY)).toBe(false)
   expect(STORE.get('unrelated')).toBe('keep')
+})
+
+test.each([
+  {
+    reason: 'invalid-json',
+    serialized: '{"value":"private-cache-content"',
+    maxSerializedBytes: undefined,
+  },
+  { reason: 'invalid-json', serialized: '', maxSerializedBytes: undefined },
+  {
+    reason: 'schema',
+    serialized: '{"value":1,"secret":"private-cache-content"}',
+    maxSerializedBytes: undefined,
+  },
+  { reason: 'oversized', serialized: '{"value":"private-cache-content"}', maxSerializedBytes: 1 },
+])(
+  'disposes $reason with one cache diagnostic and no filesystem toast',
+  ({ reason, serialized, maxSerializedBytes }) => {
+    STORE.set(TEST_KEY, serialized)
+    STORE.set('unrelated', 'keep')
+
+    expect(
+      readWorkspaceCacheEntry(TEST_KEY, v.strictObject({ value: v.string() }), null, {
+        maxSerializedBytes,
+      }),
+    ).toBeNull()
+    expect(STORE.has(TEST_KEY)).toBe(false)
+    expect(STORE.get('unrelated')).toBe('keep')
+    expect(toast.error).not.toHaveBeenCalled()
+    expect(evlog.error).toHaveBeenCalledExactlyOnceWith(
+      expect.objectContaining({
+        action: 'client.error',
+        area: 'workspace-cache',
+        operation: 'cache.read',
+        message: 'Invalid local cache entry was discarded.',
+        context: { cacheKey: TEST_KEY, reason },
+      }),
+    )
+    expect(JSON.stringify(vi.mocked(evlog.error).mock.calls)).not.toContain('private-cache-content')
+  },
+)
+
+test('a failed read reports its key and preserves the entry because corruption is unknown', () => {
+  STORE.set(TEST_KEY, '{"value":"keep"}')
+  const storage = {
+    ...globalChromeStorage,
+    getItem() {
+      throw new DOMException('Storage access blocked', 'SecurityError')
+    },
+  }
+
+  expect(
+    readWorkspaceCacheEntry(TEST_KEY, v.strictObject({ value: v.string() }), null, {
+      storage,
+    }),
+  ).toBeNull()
+  expect(STORE.get(TEST_KEY)).toBe('{"value":"keep"}')
+  expect(toast.error).not.toHaveBeenCalled()
+  expect(evlog.error).toHaveBeenCalledExactlyOnceWith(
+    expect.objectContaining({
+      area: 'workspace-cache',
+      operation: 'cache.read',
+      message: 'Local cache could not be read.',
+      context: { cacheKey: TEST_KEY, reason: 'read-failed' },
+    }),
+  )
 })
 
 test('rejects an oversized entry before parsing it', () => {

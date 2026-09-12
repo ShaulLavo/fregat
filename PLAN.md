@@ -252,13 +252,14 @@ is satisfied.
 ## Duplication census lane
 
 Requested 2026-09-11. Plan 090 is implemented. Its [regression reference](docs/duplicate-defect-regressions.md)
-records the fixes, baseline corrections, and focused checks. The remaining six plans are proposed.
+records the fixes, baseline corrections, and focused checks. Plan 096 is also complete. The remaining five plans are proposed.
 
 [Plan 091](plans/091-error-and-timing-helpers.md), [Plan 092](plans/092-path-and-uri-helpers.md),
 [Plan 093](plans/093-web-react-and-store-ceremony.md), and
 [Plan 094](plans/094-client-core-web-tui-parity.md) consolidate on top of those fixes.
-[Plan 095](plans/095-server-plumbing.md) and [Plan 096](plans/096-web-layering-and-boundaries.md)
-can proceed independently of the middle plans, while preserving the same defect regressions.
+[Plan 095](plans/095-server-plumbing.md) can proceed independently of the middle plans,
+while preserving the same defect regressions. Plan 096 is complete; its
+[web layering reference](docs/web-layering.md) records the implementation and review.
 
 The middle plans consolidate onto the shared packages. Plan 091 widens the observability sanitizer,
 `errorSummary`, and the timing helpers into shared modules and gives `errorMessage`, `isRecord`, and the
@@ -271,8 +272,9 @@ context guard, six store contexts, the deferred-commit widgets, and the Git muta
 atomic writers, listener bridges, and Git common-directory resolutions in `apps/server`. Plan 096 has
 implemented web layering, shared helper ownership, and unused API removal on `main`. Its
 [implementation reference](docs/web-layering.md) records the isolated moves and passing focused,
-typecheck, lint, build, and browser checks. The executable plan retains its unchecked clean-Knip gate
-because the calibrated audit still reports pre-existing unused declarations.
+typecheck, lint, build, and browser checks. The review fixed cache diagnostics, completed cache
+helper adoption, and strengthened the import census and boundary guard. Knip is clean across
+the repository and runs in CI. The completed executable plan is deleted.
 
 Every unification step names the behavioural divergences it reconciles and states which behaviour wins;
 these variants share signatures, so a wrong merge typechecks. Plan 096 settles the shared Git contract and

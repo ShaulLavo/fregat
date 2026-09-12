@@ -56,7 +56,7 @@ export function createControlledInProcessClient(server: TestServer) {
   return { client: createClient(server, fetcher), controller }
 }
 
-export class SettingsStreamFetchController {
+class SettingsStreamFetchController {
   private readonly activeAttempts = new Map<number, () => void>()
   private attemptCount = 0
   private nextSettingsReadResponse: Response | null = null

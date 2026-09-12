@@ -64,7 +64,7 @@ export async function readDesktopWallpaperStillMedia(): Promise<DesktopWallpaper
   return readDesktopWallpaperStillMediaFromPath(sourcePath)
 }
 
-export async function readDesktopWallpaperInfoFromPath(
+async function readDesktopWallpaperInfoFromPath(
   sourcePath: string,
 ): Promise<DesktopWallpaperInfo | null> {
   const animatedSource = await animatedMediaSource(sourcePath)

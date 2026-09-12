@@ -112,7 +112,7 @@ export function removeEditorVisibleSnapshotCacheForRoot(storage: ScopedStorage, 
   removeEditorVisibleSnapshotCache(storage)
 }
 
-export function removeEditorVisibleSnapshotCache(storage: ScopedStorage) {
+function removeEditorVisibleSnapshotCache(storage: ScopedStorage) {
   removeWorkspaceCacheEntry(EDITOR_VISIBLE_SNAPSHOT_CACHE_STORAGE_KEY, storage)
 }
 

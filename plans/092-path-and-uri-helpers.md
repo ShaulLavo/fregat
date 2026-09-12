@@ -437,7 +437,7 @@ new contracts exports.
   [Plan 095](095-server-plumbing.md), even where they sit in `apps/server/src/fs/workspace-edit.ts`
   alongside helpers this plan deletes.
 - **`features/menus` → `keymap/menus/` and the other `apps/web` layering moves** belong to
-  [Plan 096](096-web-layering-and-boundaries.md).
+  [Plan 096](../docs/web-layering.md).
 
 ## Completion checklist
 

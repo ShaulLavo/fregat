@@ -24,7 +24,7 @@ export const reasoningEffortSchema = v.pipe(v.string(), v.trim(), v.minLength(1)
  * `options` rather than as a sibling field so the Codex adapter, which already
  * reads `options.reasoningEffort`, keeps working untouched.
  */
-export const modelSelectionOptionsSchema = v.looseObject({
+const modelSelectionOptionsSchema = v.looseObject({
   reasoningEffort: v.optional(reasoningEffortSchema),
 })
 
@@ -49,7 +49,7 @@ const trimmedText = v.pipe(v.string(), v.trim(), v.minLength(1))
  * question with no options still renders as a free-text field rather than an
  * empty picker.
  */
-export const userInputAnswerKindSchema = v.picklist(['text', 'single-select', 'multi-select'])
+const userInputAnswerKindSchema = v.picklist(['text', 'single-select', 'multi-select'])
 
 /**
  * `value` is what goes back to the provider, `label` is what the user reads.
@@ -89,7 +89,6 @@ export type InteractionMode = v.InferOutput<typeof interactionModeSchema>
 export type ProviderDriverKind = v.InferOutput<typeof providerDriverKindSchema>
 export type ModelSelection = v.InferOutput<typeof modelSelectionSchema>
 export type ModelSelectionOptions = v.InferOutput<typeof modelSelectionOptionsSchema>
-export type ReasoningEffort = v.InferOutput<typeof reasoningEffortSchema>
 export type ProviderUserInputAnswers = v.InferOutput<typeof providerUserInputAnswersSchema>
 export type ProviderApprovalDecision = v.InferOutput<typeof providerApprovalDecisionSchema>
 export type UserInputAnswerKind = v.InferOutput<typeof userInputAnswerKindSchema>

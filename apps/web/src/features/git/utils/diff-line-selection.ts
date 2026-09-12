@@ -8,7 +8,7 @@ import {
 /** Which pane a row was read from — the split view's two, or the stacked one. */
 export type DiffPaneSide = 'new' | 'old' | 'stacked'
 
-export type DiffLineRange = { readonly start: number; readonly end: number }
+type DiffLineRange = { readonly start: number; readonly end: number }
 
 /**
  * Which lines a comment is about, in the only terms the two sides of a diff both

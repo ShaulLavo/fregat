@@ -14,6 +14,6 @@ export { usePushRemoteMutation } from './use-push-remote-mutation'
 export { useStagePathMutation } from './use-stage-path-mutation'
 export { useStagePathsMutation } from './use-stage-paths-mutation'
 export { useStatus } from './use-status'
-export { useSyncChangesMutation } from './use-sync-changes-mutation'
+
 export { useUnstagePathMutation } from './use-unstage-path-mutation'
 export { useUnstagePathsMutation } from './use-unstage-paths-mutation'

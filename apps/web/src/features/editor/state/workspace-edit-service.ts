@@ -70,7 +70,7 @@ import { createClientInvariantError } from '@/lib/structured-errors'
 
 type WorkspacePersistenceOperation = WorkspaceEditPrepareRequest['operations'][number]
 
-export const MAX_WORKSPACE_EDIT_UNDO_GROUPS = 20
+const MAX_WORKSPACE_EDIT_UNDO_GROUPS = 20
 
 export type WorkspaceEditServicePhase =
   | 'idle'
@@ -92,7 +92,7 @@ export type WorkspaceEditServicePhase =
   | 'releasing-recovery'
   | 'released'
 
-export type WorkspaceEditPreviewTargetKind = 'dirty' | 'open' | 'unopened'
+type WorkspaceEditPreviewTargetKind = 'dirty' | 'open' | 'unopened'
 
 export type WorkspaceEditPreviewRow = {
   readonly afterText?: string

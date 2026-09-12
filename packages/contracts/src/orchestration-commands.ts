@@ -471,12 +471,12 @@ export const sessionDeletionUpdateCommandSchema = v.object({
   deletion: sessionDeletionStateSchema,
 })
 
-export const preparedSessionCreateCommandSchema = v.object({
+const preparedSessionCreateCommandSchema = v.object({
   ...sessionCreateCommandSchema.entries,
   worktreeProvisioning: v.optional(worktreeProvisioningSchema),
   intentFingerprint: v.optional(trimmedNonEmptyStringSchema),
 })
-export const preparedSessionTurnStartCommandSchema = v.object({
+const preparedSessionTurnStartCommandSchema = v.object({
   ...sessionTurnStartCommandSchema.entries,
   worktreeProvisioning: v.optional(worktreeProvisioningSchema),
   intentFingerprint: v.optional(trimmedNonEmptyStringSchema),

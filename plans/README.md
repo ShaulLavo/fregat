@@ -29,17 +29,20 @@ a bare root `bun run verify`.
 | [091 — error and timing helpers](091-error-and-timing-helpers.md)               | **PROPOSED — DEFECT FIXES IMPLEMENTED**                       |
 | [092 — path and URI helpers](092-path-and-uri-helpers.md)                       | **PROPOSED — DEFECT FIXES IMPLEMENTED**                       |
 | [093 — web React and store ceremony](093-web-react-and-store-ceremony.md)       | **PROPOSED — DEPENDS ON 091**                                 |
-| [096 — apps/web layering](096-web-layering-and-boundaries.md)                   | **IMPLEMENTED — PRE-EXISTING KNIP FINDINGS REMAIN**           |
 | [097 — async operation ownership](097-async-operation-ownership.md)             | **PROPOSED — 098 COMPLETE; READY TO IMPLEMENT**               |
 | [099 — document contribution runtime](099-document-contributions.md)            | **PROPOSED — BASELINE AND PUBLICATION FIRST**                 |
 | [100 — web design language](100-web-design-language.md)                         | **PROPOSED — CORNER DECISION (D1) NEEDS CONFIRMATION**        |
-| [094 — client-core web and TUI parity](094-client-core-web-tui-parity.md)       | **PROPOSED — DEPENDS ON 091; CO-PASS WITH 096**               |
+| [094 — client-core web and TUI parity](094-client-core-web-tui-parity.md)       | **PROPOSED — DEPENDS ON 091; 096 COMPLETE**                   |
 | [095 — server plumbing](095-server-plumbing.md)                                 | **PROPOSED — IMPLEMENTATION NOT STARTED**                     |
 | [073 — Electrobun 2.x migration](073-electrobun-v2-migration.md)                | **PROPOSED — ROOT GO/NO-GO SCHEDULING**                       |
 | [075 — terminal renderer fallbacks](075-terminal-renderer-fallbacks.md)         | **PROPOSED — BLOCKED ON TIER DECISION**                       |
 | [076 — watch-reload child reaping](076-watch-reload-child-reaping.md)           | **PROPOSED — ROOT GO/NO-GO SCHEDULING**                       |
 
 ## Dependency notes
+
+- Plan 096 is complete and its executable plan is deleted. The
+  [web layering reference](../docs/web-layering.md) records ownership decisions, review fixes,
+  and verification. The repository-wide Knip check is clean and now runs in CI.
 
 - Plan 099 owns canonical Editor buffer publication and shared document synchronization through
   contributions. Baseline/publication groundwork can proceed independently. Its public cutover follows

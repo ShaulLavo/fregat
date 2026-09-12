@@ -57,7 +57,7 @@ export function layerAllowsScope(layer: SettingsLayerId, scope: SettingScope): b
   return SCOPES_BY_LAYER[layer].includes(scope)
 }
 
-export type SettingsDiagnosticKind = 'unknown-key' | 'scope-not-allowed' | 'invalid-value'
+type SettingsDiagnosticKind = 'unknown-key' | 'scope-not-allowed' | 'invalid-value'
 
 /**
  * Something a layer held that did not become a value. Never thrown: one bad key
@@ -152,7 +152,7 @@ export function policyControlledIds(
   return Object.keys(policy.raw).filter((id) => Object.hasOwn(registry, id))
 }
 
-export type SettingLayerValue = {
+type SettingLayerValue = {
   readonly layer: SettingsLayerId
   /** Straight from `raw`: present even when scope or validation rejected it. */
   readonly value: unknown

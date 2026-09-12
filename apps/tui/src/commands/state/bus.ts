@@ -10,12 +10,12 @@ export type CommandContext = {
   readonly origin: FocusToken | null
   readonly target: FocusTarget | null
 }
-export type CommandHandler = {
+type CommandHandler = {
   readonly disabledReason?: (context: CommandContext) => string | null
   readonly run: (context: CommandContext) => void | boolean | Promise<void | boolean>
 }
 export type CommandHandlers = Readonly<Partial<Record<CommandId, CommandHandler>>>
-export type CommandOutcome =
+type CommandOutcome =
   | { readonly status: 'handled' | 'unhandled' }
   | { readonly status: 'disabled'; readonly reason: string }
   | { readonly status: 'failed'; readonly error: unknown }

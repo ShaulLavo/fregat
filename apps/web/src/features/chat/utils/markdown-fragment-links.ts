@@ -8,7 +8,7 @@
 const HEADING_SELECTOR = 'h1, h2, h3, h4, h5, h6'
 const NON_SLUG_CHARACTERS = /[^\p{L}\p{N} _-]+/gu
 
-export function markdownFragmentId(href: string | undefined) {
+function markdownFragmentId(href: string | undefined) {
   if (!href?.startsWith('#')) return null
 
   const raw = href.slice(1)
@@ -40,7 +40,7 @@ function targetWithin(root: Element, fragment: string) {
   return elementWithId(root, fragment) ?? headingWithSlug(root, fragment)
 }
 
-export function markdownHeadingSlug(text: string) {
+function markdownHeadingSlug(text: string) {
   return text.trim().toLowerCase().replace(NON_SLUG_CHARACTERS, '').replaceAll(' ', '-')
 }
 

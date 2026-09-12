@@ -47,7 +47,7 @@ import {
 
 import { renderApplication } from './render'
 
-export type AddressHarness = {
+type AddressHarness = {
   readonly documents: EditorDocumentStoreApi
   readonly workspace: EditorWorkspaceStoreApi
 }

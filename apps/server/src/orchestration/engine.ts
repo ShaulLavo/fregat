@@ -10,20 +10,30 @@ import { TerminalLeaseController } from './terminal-lease-controller'
 import { GitWorktreeService } from '../git/worktrees'
 import type { TerminalService } from '../terminal/service'
 import { worktreeRuntimeErrors } from './worktree-runtime-errors'
-import type { ProviderInstanceId, SessionId, WorktreeId } from '@workspace/contracts'
-import * as v from 'valibot'
-import type { ChatAttachment, ChatAttachmentUpload } from '@workspace/contracts'
-import { defaultAttachmentsDir, writeAttachmentFromDataUrl } from '../attachments/store'
-import { migrateOrchestrationDatabase } from '../db/migrations'
-import { orchestrationErrors } from '../observability'
 import {
+  type ProviderInstanceId,
+  type SessionId,
+  type WorktreeId,
+  type ChatAttachment,
+  type ChatAttachmentUpload,
   clientOrchestrationCommandSchema,
   orchestrationCommandSchema,
   type OrchestrationCommand,
   type OrchestrationDispatchResult,
   type OrchestrationEvent,
   type OrchestrationSessionDetailPageInput,
-} from './schemas'
+  commandIdSchema,
+  eventIdSchema,
+  errorStringField,
+  type ClientOrchestrationCommand,
+  type OrchestrationCommandReceipt,
+} from '@workspace/contracts'
+import * as v from 'valibot'
+
+import { defaultAttachmentsDir, writeAttachmentFromDataUrl } from '../attachments/store'
+import { migrateOrchestrationDatabase } from '../db/migrations'
+import { orchestrationErrors } from '../observability'
+
 import { CheckpointReactor } from './checkpoint-reactor'
 import { isDurableCommandRejection, OrchestrationCommandReceipts } from './command-receipts'
 import { decideOrchestrationCommand } from './decider'
@@ -37,13 +47,7 @@ import { commandFingerprint } from './utils/command-intent'
 import { internalCommandKey } from './utils/repository-ids'
 import { verifyReceiptIntent } from './command-receipts'
 import { sessionDomainErrors } from './structured-errors'
-import {
-  commandIdSchema,
-  eventIdSchema,
-  errorStringField,
-  type ClientOrchestrationCommand,
-  type OrchestrationCommandReceipt,
-} from '@workspace/contracts'
+
 import { ProviderCommandReactor } from './provider-command-reactor'
 import { ProviderRuntimeIngestion, type ProviderRuntimeSource } from './provider-runtime-ingestion'
 import { SessionDeletionReactor } from './session-deletion-reactor'

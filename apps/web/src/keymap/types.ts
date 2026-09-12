@@ -15,13 +15,9 @@ export type KeyBindingSource = 'default' | 'user'
 export {
   SESSION_JUMP_POSITIONS,
   sessionJumpCommandId,
-  type SessionJumpPosition,
-  type SessionJumpCommandId,
 } from '@workspace/client-core/commands/session-jump'
 
-export type { WorkspaceCommandId }
-
-export type EditorPlatformCommandId = (typeof editorCommands)[number]['id']
+type EditorPlatformCommandId = (typeof editorCommands)[number]['id']
 
 export type PlatformCommandId =
   | WorkspaceCommandId
@@ -58,22 +54,6 @@ export type PlatformKeyBinding = {
   readonly preventDefault?: boolean
   readonly stopPropagation?: boolean
   readonly meta?: HotkeyMeta
-}
-
-/**
- * The parts of a `KeyboardEvent` a binding is matched against, narrowed so the
- * matcher can be exercised without a DOM.
- */
-export type KeyBindingKeyboardEvent = {
-  readonly altKey: boolean
-  readonly code?: string
-  readonly ctrlKey: boolean
-  readonly key: string
-  readonly isComposing?: boolean
-  readonly keyCode?: number
-  readonly repeat?: boolean
-  readonly metaKey: boolean
-  readonly shiftKey: boolean
 }
 
 /** One command's effective binding, as the settings editor lists it. */

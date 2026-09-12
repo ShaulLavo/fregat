@@ -19,7 +19,7 @@ import { sessionDomainErrors } from './structured-errors'
  */
 export const MAX_SESSION_MESSAGES = 2_000
 export const MAX_SESSION_ACTIVITIES = 500
-export const MAX_SESSION_CHECKPOINTS = 500
+const MAX_SESSION_CHECKPOINTS = 500
 
 export type OrchestrationProjectedCheckpoint = {
   assistantMessageId: MessageId | null

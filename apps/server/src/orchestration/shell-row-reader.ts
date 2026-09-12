@@ -90,7 +90,7 @@ export class ProjectionShellRowReader implements OrchestrationShellRowReader {
   }
 }
 
-export class SnapshotShellRowReader implements OrchestrationShellRowReader {
+class SnapshotShellRowReader implements OrchestrationShellRowReader {
   private window: OrchestrationShellSnapshot | null = null
 
   private readonly snapshots: OrchestrationSnapshotQuery

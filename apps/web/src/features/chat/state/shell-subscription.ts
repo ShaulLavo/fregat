@@ -17,12 +17,7 @@ import {
  * - `blocked` — the server refused us (auth) or the resource is gone; retrying
  *   on a timer would never succeed, so we wait for the user to come back.
  */
-export type ChatShellConnectionPhase =
-  | 'blocked'
-  | 'connecting'
-  | 'live'
-  | 'offline'
-  | 'reconnecting'
+type ChatShellConnectionPhase = 'blocked' | 'connecting' | 'live' | 'offline' | 'reconnecting'
 
 export type ChatShellSubscriptionState = {
   /** Consecutive failed attempts; zero while live. */

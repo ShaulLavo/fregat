@@ -115,7 +115,7 @@ export function visiblePickerEntries<TEntries extends readonly FsEntry[]>(
   return entries.filter((entry) => !hasHiddenPathSegment(entry.path, currentPath))
 }
 
-export function hasHiddenPathSegment(path: string, currentPath: string) {
+function hasHiddenPathSegment(path: string, currentPath: string) {
   const relativePath = pathBelowCurrent(path, currentPath)
   return relativePath.split('/').some((segment) => segment.startsWith('.'))
 }

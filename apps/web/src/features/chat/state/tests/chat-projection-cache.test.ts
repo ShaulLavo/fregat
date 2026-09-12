@@ -220,6 +220,19 @@ test('a quota failure retries the shell without transcripts before discarding th
   expect(cached?.slices[0]?.transcripts).toEqual([])
 })
 
+test('failed full and shell writes remove the previous cached projection', () => {
+  useChatProjectionStore.getState().syncShellSnapshot(FIXTURE_ENVIRONMENT_ID, shellSnapshot())
+  expect(flushChatProjectionCache()).toBe(true)
+  expect(scopedHas(CHAT_PROJECTION_CACHE_STORAGE_KEY)).toBe(true)
+  const write = vi.spyOn(localStorage, 'setItem').mockImplementation(() => {
+    throw new DOMException('Storage quota exceeded', 'QuotaExceededError')
+  })
+
+  expect(flushChatProjectionCache()).toBe(false)
+  expect(write).toHaveBeenCalledTimes(2)
+  expect(scopedHas(CHAT_PROJECTION_CACHE_STORAGE_KEY)).toBe(false)
+})
+
 function sessionDetailSnapshot(
   shell: OrchestrationSessionShell,
   messages: OrchestrationSession['messages'],

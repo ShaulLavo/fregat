@@ -67,7 +67,7 @@ export function resetLogsFilters() {
   for (const listener of listeners) listener()
 }
 
-export function subscribeLogsFilters(listener: () => void) {
+function subscribeLogsFilters(listener: () => void) {
   listeners.add(listener)
 
   return () => {

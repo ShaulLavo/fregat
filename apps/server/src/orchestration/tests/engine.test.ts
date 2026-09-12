@@ -12,6 +12,10 @@ import {
   orchestrationEventSchema,
   sessionIdSchema,
   turnIdSchema,
+  orchestrationCommandSchema,
+  type OrchestrationCommand,
+  type OrchestrationEvent,
+  type OrchestrationReplayEventsResult,
 } from '@workspace/contracts'
 import type { App } from '../../app'
 import { closeTestApps, createTestApp } from '../../../test/server'
@@ -29,12 +33,7 @@ import { OrchestrationSnapshotQuery } from '../snapshot-query'
 import { MockProviderAdapter } from '../../provider/adapters/mock'
 import { ProviderAdapterRegistry } from '../../provider/provider-adapter-registry'
 import { checkpointRefForSessionTurn } from '../checkpoint-refs'
-import {
-  orchestrationCommandSchema,
-  type OrchestrationCommand,
-  type OrchestrationEvent,
-  type OrchestrationReplayEventsResult,
-} from '../schemas'
+
 import { testSettingsOptions } from '../../settings/testing'
 
 const now = '2026-05-24T00:00:00.000Z'

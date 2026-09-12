@@ -37,7 +37,7 @@ export function settingDraft(
   return JSON.stringify(value, null, 2)
 }
 
-export function parseSettingDraft(id: SettingId, draft: string) {
+function parseSettingDraft(id: SettingId, draft: string) {
   const widget = descriptorFor(id).widget
   const value: unknown = ['string', 'font', 'multiline'].includes(widget)
     ? draft
@@ -45,7 +45,7 @@ export function parseSettingDraft(id: SettingId, draft: string) {
   return v.parse(descriptorFor(id).schema, value)
 }
 
-export function settingOperations(
+function settingOperations(
   id: SettingId,
   value: unknown,
   snapshot: SettingsSnapshot,

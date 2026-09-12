@@ -232,7 +232,7 @@ function killIfRunning(child: Bun.Subprocess) {
 }
 
 /** One line of a running command's output, tagged with the pipe it came from. */
-export type GitProcessLine = {
+type GitProcessLine = {
   readonly stream: 'stderr' | 'stdout'
   readonly text: string
 }

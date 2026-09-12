@@ -12,7 +12,7 @@ import type { SessionRailScope, SessionRailView } from '@workspace/client-core/c
 /** Rename happens in two places, and only the one that was asked may swap for a field. */
 export type SessionRenameSurface = 'header' | 'rail'
 
-export type SessionRenameTarget = {
+type SessionRenameTarget = {
   readonly surface: SessionRenameSurface
   readonly ref: ScopedSessionRef
 }
@@ -93,11 +93,6 @@ export const useSessionRailStore = create<SessionRailStore>()((set) => ({
     }),
   view: 'active',
 }))
-
-export function resetSessionRailCollapse() {
-  persistRailCollapse(NO_PROJECT_IDS)
-  useSessionRailStore.setState({ collapsedProjectIds: NO_PROJECT_IDS })
-}
 
 function toggledProjectIds(projectIds: readonly ProjectId[], projectId: ProjectId) {
   if (!projectIds.includes(projectId)) return [...projectIds, projectId]

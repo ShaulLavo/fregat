@@ -5,13 +5,15 @@ import {
   commandIdSchema,
   type SessionId,
   type SessionDeletionState,
+  type OrchestrationCommand,
+  type OrchestrationEvent,
 } from '@workspace/contracts'
 import { deleteAttachmentBlobs } from '../attachments/store'
 import { projectionSessionMessages } from '../db/schema'
 import type { OrchestrationDatabase } from './event-store'
 import type { ProviderService } from '../provider/provider-service'
 import type { OrchestrationReadModel } from './read-model'
-import type { OrchestrationCommand, OrchestrationEvent } from './schemas'
+
 import { internalCommandKey } from './utils/repository-ids'
 import { recordChatPipelineInfo, recordChatPipelineWarning } from './orchestration-logging'
 import { SerialWorker } from './serial-worker'

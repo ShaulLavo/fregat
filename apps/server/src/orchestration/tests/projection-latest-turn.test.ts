@@ -1,7 +1,7 @@
 import { describe, expect, it } from 'vitest'
 import * as v from 'valibot'
 import { OrchestrationEngine } from '../engine'
-import { orchestrationCommandSchema } from '../schemas'
+import { orchestrationCommandSchema } from '@workspace/contracts'
 
 const assistantStartedAt = '2026-05-24T00:02:00.000Z'
 const assistantCompletedAt = '2026-05-24T00:03:00.000Z'

@@ -67,7 +67,7 @@ export type TestCommandRuntimeOverrides = {
   readonly workspaceEdits?: WorkspaceCommandRuntime['workspaceEdits']
 }
 
-export type TestCommandSnapshotSource =
+type TestCommandSnapshotSource =
   | Partial<WorkspaceCommandSnapshot>
   | (() => Partial<WorkspaceCommandSnapshot>)
 

@@ -5,12 +5,11 @@ import {
   worktreeIdSchema,
   providerInstanceIdSchema,
   orchestrationSearchSessionsInputSchema,
-} from '@workspace/contracts'
-import {
   clientOrchestrationCommandSchema,
   orchestrationReplayEventsInputSchema,
   sessionIdSchema,
-} from './schemas'
+} from '@workspace/contracts'
+
 import type { OrchestrationEngine } from './engine'
 import type { OrchestrationCheckpointDiffQuery } from './checkpoint-diff-query'
 import type { OrchestrationSessionSearchQuery } from './session-search-query'

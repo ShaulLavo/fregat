@@ -4,7 +4,7 @@ import { parseWorkspaceToken } from '@workspace/client-core/address/workspace'
 import * as v from 'valibot'
 import { rootRoute } from '@/state/routes/root'
 
-export const workspaceParamSchema = v.pipe(
+const workspaceParamSchema = v.pipe(
   v.string(),
   v.check((value) => parseWorkspaceToken(value).kind !== 'invalid', 'Invalid workspace token'),
 )

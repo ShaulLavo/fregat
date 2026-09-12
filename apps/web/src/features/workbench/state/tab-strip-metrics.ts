@@ -4,7 +4,7 @@ const TAB_SELECTOR = '[data-editor-tab-id]'
 /** A landed smooth scroll rarely stops on the exact pixel it was aimed at. */
 const ARRIVAL_EPSILON_PX = 1
 
-export type TabStripGeometry = Omit<TabStripScrollBounds, 'gutter'>
+type TabStripGeometry = Omit<TabStripScrollBounds, 'gutter'>
 
 export type TabStripMetrics = {
   /** Content-space bounds for a tab, or null when the cache cannot prove it is current. */

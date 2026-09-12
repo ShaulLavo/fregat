@@ -16,7 +16,7 @@ export type SessionDetailSyncState = {
 }
 
 /** Shared identity so selectors for unsubscribed sessions never re-render. */
-export const IDLE_SESSION_DETAIL_SYNC: SessionDetailSyncState = {
+const IDLE_SESSION_DETAIL_SYNC: SessionDetailSyncState = {
   attempt: 0,
   error: null,
   status: 'idle',

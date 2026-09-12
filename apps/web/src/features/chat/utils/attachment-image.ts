@@ -21,7 +21,7 @@ type StagedAttachment = {
  * stored allowlist — the server dropped that blob at ingest, so there is
  * genuinely nothing to show and the caller must fall back to the file name.
  */
-export function chatAttachmentImageSrc(attachment: ChatAttachment, origin: string): string | null {
+function chatAttachmentImageSrc(attachment: ChatAttachment, origin: string): string | null {
   const urlPath = chatAttachmentUrlPath(attachment)
   if (!urlPath) return null
 

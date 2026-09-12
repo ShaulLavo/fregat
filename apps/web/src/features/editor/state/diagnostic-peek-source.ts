@@ -23,7 +23,7 @@ import {
   diagnosticTargetForUri,
 } from '@/lib/diagnostic'
 
-export type DiagnosticPeekGeometry =
+type DiagnosticPeekGeometry =
   | {
       readonly kind: 'visible'
       readonly range: { readonly start: number; readonly end: number }
@@ -35,7 +35,7 @@ export type DiagnosticPeekGeometry =
       readonly range: { readonly start: number; readonly end: number }
     }
 
-export type DiagnosticPeekRelatedInformation = {
+type DiagnosticPeekRelatedInformation = {
   readonly label: string
   readonly line: number
   readonly column: number
@@ -58,8 +58,6 @@ export type DiagnosticPeekSnapshot = DiagnosticPeekModel | null
 type ActiveTracker =
   | { readonly kind: 'point'; readonly tracker: EditorTrackedPoint }
   | { readonly kind: 'range'; readonly tracker: EditorTrackedRanges }
-
-export type DiagnosticPeekSource = ReturnType<typeof createDiagnosticPeekSource>
 
 export function createDiagnosticPeekSource(documentUri: string) {
   let context: EditorViewContributionContext | null = null

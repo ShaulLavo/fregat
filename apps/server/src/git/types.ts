@@ -1,7 +1,6 @@
 import type { GitRepositoryInfo } from '@workspace/contracts'
 
 export type {
-  GitBaseRefChoice,
   GitBaseRefChoicesResult,
   GitBranch,
   GitBranchDiffResult,
