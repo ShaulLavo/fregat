@@ -1,6 +1,6 @@
+import { copyPathSection } from '@/features/menus/utils/copy-path-section'
 import {
   ArrowBendUpLeftIcon,
-  CopyIcon,
   CopySimpleIcon,
   FilePlusIcon,
   FolderOpenIcon,
@@ -138,21 +138,11 @@ export function treeRowMenu(context: TreeRowMenuContext): Menu {
           run: context.discard,
         }),
     ]),
-    section('copy', [
-      actionItem({
-        disabled: unresolved,
-        icon: CopyIcon,
-        id: 'copyPath',
-        label: 'Copy Path',
-        run: () => context.copyPath(context.path ?? '', 'path'),
-      }),
-      actionItem({
-        icon: CopyIcon,
-        id: 'copyRelativePath',
-        label: 'Copy Relative Path',
-        run: () => context.copyPath(context.relativePath, 'relative path'),
-      }),
-    ]),
+    copyPathSection({
+      copyPath: context.copyPath,
+      path: context.path,
+      relativePath: context.relativePath,
+    }),
     section('edit', [
       actionItem({
         disabled: unresolved || mutationsDisabled,

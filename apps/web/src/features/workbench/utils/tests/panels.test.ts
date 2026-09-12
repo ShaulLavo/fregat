@@ -187,6 +187,14 @@ describe('workbench panel-state model', () => {
     expect(setWorkbenchBottomTab(panels, 'terminal')).toBe(panels)
   })
 
+  it('preserves an unset selection even when editor tabs remain', () => {
+    const panels = workbenchPanelsForPaths(['/repo/a.ts', '/repo/b.ts'])
+    const result = normalizeWorkbenchPanels({ ...panels, activeEditorTabId: null })
+
+    expect(result.activeEditorTabId).toBeNull()
+    expect(result.editorTabs).toHaveLength(2)
+  })
+
   it('normalizes a stale active editor id', () => {
     const panels = workbenchPanelsForPaths(['/repo/a.ts', '/repo/b.ts'])
     const firstTabId = editorTabIdAt(panels, 0)

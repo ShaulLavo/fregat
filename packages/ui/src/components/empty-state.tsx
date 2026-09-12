@@ -31,6 +31,7 @@ function EmptyState({
   description,
   hint,
   icon,
+  iconPosition = 'stacked',
   title,
   tone = 'muted',
 }: {
@@ -40,6 +41,7 @@ function EmptyState({
   description?: ReactNode
   hint?: ReactNode
   icon?: ReactNode
+  iconPosition?: 'stacked' | 'inline'
   title: string
   tone?: 'error' | 'muted' | 'warning'
 }) {
@@ -51,6 +53,7 @@ function EmptyState({
         className,
       )}
       data-slot='empty-state'
+      role='status'
     >
       <div
         className={cn(
@@ -58,12 +61,22 @@ function EmptyState({
           align === 'center' && 'items-center text-center',
         )}
       >
-        {icon ? (
+        {icon && iconPosition === 'stacked' ? (
           <span aria-hidden='true' className={cn('[&>svg]:size-6', emptyStateIconTone[tone])}>
             {icon}
           </span>
         ) : null}
-        <span className={cn('font-medium', emptyStateTitleTone[tone])}>{title}</span>
+        <span className={cn('flex items-center gap-2 font-medium', emptyStateTitleTone[tone])}>
+          {icon && iconPosition === 'inline' ? (
+            <span
+              aria-hidden='true'
+              className={cn('shrink-0 [&>svg]:size-4', emptyStateIconTone[tone])}
+            >
+              {icon}
+            </span>
+          ) : null}
+          {title}
+        </span>
         {description ? (
           <span className='text-muted-foreground max-w-64 text-[11px]'>{description}</span>
         ) : null}

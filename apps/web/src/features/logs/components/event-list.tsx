@@ -1,5 +1,7 @@
 import { useVirtualizer } from '@tanstack/react-virtual'
 import type { LogEventDetailsById, LogEventSummary } from '@workspace/contracts'
+import { EmptyState } from '@workspace/ui/components/empty-state'
+import { LoadingState } from '@workspace/ui/components/loading-state'
 import { useRef } from 'react'
 
 import { logRowCollapsedHeightPx } from '@/features/logs/utils/row-layout'
@@ -9,6 +11,7 @@ type LogsEventListProps = {
   detailsById: LogEventDetailsById
   events: readonly LogEventSummary[]
   inspectedEventId: string | null
+  pending: boolean
   onInspectEvent: (eventId: string | null) => void
 }
 
@@ -17,6 +20,7 @@ export function LogsEventList({
   events,
   inspectedEventId,
   onInspectEvent,
+  pending,
 }: LogsEventListProps) {
   const parentRef = useRef<HTMLDivElement | null>(null)
   // eslint-disable-next-line react-hooks/incompatible-library -- TanStack Virtual is the logs row virtualization layer.
@@ -38,12 +42,18 @@ export function LogsEventList({
   // carries its own binding and does not need the receiver.
   const measureElement = virtualizer.measureElement
 
-  if (events.length === 0) {
+  if (pending) {
     return (
-      <div className='text-muted-foreground flex min-h-0 flex-1 items-center justify-center px-6 text-center text-xs'>
-        No logs match the current filters.
-      </div>
+      <LoadingState className='flex min-h-0 flex-1 flex-col gap-3 p-6' label='Loading logs'>
+        <div className='bg-muted h-4 w-3/4 rounded' />
+        <div className='bg-muted h-4 w-1/2 rounded' />
+        <div className='bg-muted h-4 w-2/3 rounded' />
+      </LoadingState>
     )
+  }
+
+  if (events.length === 0) {
+    return <EmptyState className='flex-1 px-6' title='No logs match the current filters.' />
   }
 
   return (

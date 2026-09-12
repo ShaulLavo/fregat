@@ -1,3 +1,4 @@
+import { activeEditorTabId } from '@/lib/documents/utils/active-tab'
 import {
   workspaceLocation,
   workspaceLocationId,
@@ -45,12 +46,7 @@ import {
   storedTabContentSchema,
   type StoredTabContent,
 } from '@/lib/documents/utils/storage-codec'
-import type {
-  ReopenScrollPosition,
-  TabContent,
-  TabId,
-  WorkspaceRoot,
-} from '@/lib/documents/utils/types'
+import type { ReopenScrollPosition, TabContent, WorkspaceRoot } from '@/lib/documents/utils/types'
 import {
   environmentIdSchema,
   workspaceAddressSchema,
@@ -555,10 +551,9 @@ function storedSliceForWorkspace(
     }),
     workbenchPanels: {
       ...slice.workbenchPanels,
-      activeEditorTabId: activeEditorTabIdForTabs(
-        editorTabs,
-        slice.workbenchPanels.activeEditorTabId,
-      ),
+      activeEditorTabId: activeEditorTabId(editorTabs, slice.workbenchPanels.activeEditorTabId, {
+        fallbackToFirstWhenUnset: true,
+      }),
       editorTabs,
     },
   }
@@ -582,10 +577,9 @@ function restoredSliceForWorkspace(
     }),
     workbenchPanels: normalizeWorkbenchPanels({
       ...slice.workbenchPanels,
-      activeEditorTabId: activeEditorTabIdForTabs(
-        editorTabs,
-        slice.workbenchPanels.activeEditorTabId,
-      ),
+      activeEditorTabId: activeEditorTabId(editorTabs, slice.workbenchPanels.activeEditorTabId, {
+        fallbackToFirstWhenUnset: true,
+      }),
       editorTabs,
     }),
   }
@@ -673,14 +667,4 @@ export function emptyWorkspaceState(): CachedWorkspaceState {
     workspaceOrder: [],
     workspaces: {},
   }
-}
-
-function activeEditorTabIdForTabs(
-  editorTabs: readonly { readonly id: TabId }[],
-  activeEditorTabId: TabId | null,
-) {
-  if (!activeEditorTabId) return editorTabs[0]?.id ?? null
-  if (editorTabs.some((tab) => tab.id === activeEditorTabId)) return activeEditorTabId
-
-  return editorTabs[0]?.id ?? null
 }

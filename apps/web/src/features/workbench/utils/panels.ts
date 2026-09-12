@@ -1,3 +1,4 @@
+import { activeEditorTabId } from '@/lib/documents/utils/active-tab'
 import {
   createEditorTabRecord,
   rekeyTabFile,
@@ -231,7 +232,10 @@ function activeEditorTabIdAfterClose(
   closedIndex: number,
   closedTabId: TabId,
 ) {
-  if (panels.activeEditorTabId !== closedTabId) return normalizedActiveTabIdFor(nextTabs, panels)
+  if (panels.activeEditorTabId !== closedTabId)
+    return activeEditorTabId(nextTabs, panels.activeEditorTabId, {
+      fallbackToFirstWhenUnset: false,
+    })
 
   return nextTabs[Math.min(closedIndex, nextTabs.length - 1)]?.id ?? null
 }
@@ -240,21 +244,13 @@ function activeEditorTabIdAfterPathClose(
   panels: WorkbenchPanels,
   nextTabs: readonly EditorTabRecord[],
 ) {
-  return normalizedActiveTabIdFor(nextTabs, panels)
+  return activeEditorTabId(nextTabs, panels.activeEditorTabId, { fallbackToFirstWhenUnset: false })
 }
 
 function normalizedActiveTabId(panels: WorkbenchPanels) {
-  return normalizedActiveTabIdFor(panels.editorTabs, panels)
-}
-
-function normalizedActiveTabIdFor(
-  tabs: readonly EditorTabRecord[],
-  panels: Pick<WorkbenchPanels, 'activeEditorTabId'>,
-) {
-  if (!panels.activeEditorTabId) return null
-  if (tabs.some((tab) => tab.id === panels.activeEditorTabId)) return panels.activeEditorTabId
-
-  return tabs[0]?.id ?? null
+  return activeEditorTabId(panels.editorTabs, panels.activeEditorTabId, {
+    fallbackToFirstWhenUnset: false,
+  })
 }
 
 function clampedInsertionIndex(index: number, length: number) {

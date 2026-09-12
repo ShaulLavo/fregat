@@ -1,3 +1,4 @@
+import { fileListGridClass } from '@/features/file-picker/utils/list-layout'
 import type { FsEntry } from '@/lib/file-system-types'
 import { isDirectoryEntry } from '@/lib/file-system-types'
 import { useForesight } from '@foresightjs/react'
@@ -714,14 +715,6 @@ function sameFileListRows(first: readonly FileListRow[], second: readonly FileLi
 
 function fileListPageSize(viewportHeight: number, rowSize: number) {
   return Math.max(1, Math.floor(viewportHeight / rowSize))
-}
-
-function fileListGridClass(mode: FilePickerMode) {
-  if (mode === 'folder') {
-    return 'grid-cols-[minmax(0,1fr)_116px_74px] max-sm:grid-cols-1'
-  }
-
-  return 'grid-cols-[minmax(0,1fr)_80px_116px_74px] max-sm:grid-cols-[minmax(0,1fr)_68px]'
 }
 
 function formatFileListModified(mtimeMs: number) {

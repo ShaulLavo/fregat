@@ -2,7 +2,7 @@ import { act, screen, waitFor } from '@testing-library/react'
 import { createError } from 'evlog'
 
 import { LogsPanel } from '@/features/logs/components/panel'
-import { logsKeys } from '@/lib/query-keys'
+import { logsKeys } from '@/features/logs/utils/query-keys'
 import { expect, test } from '../../../../test/fixtures'
 import { renderWithProviders } from '../../../../test/render'
 
@@ -26,3 +26,21 @@ test.each(['summary', 'events', 'both'])(
     })
   },
 )
+
+test('shows loading before declaring an empty log result', async () => {
+  const { queryClient } = renderWithProviders(<LogsPanel active={false} />)
+  expect(screen.getByRole('status', { name: 'Loading logs' })).toBeVisible()
+  expect(screen.queryByText('No logs match the current filters.')).toBeNull()
+
+  act(() => {
+    queryClient.setQueriesData(
+      { queryKey: [...logsKeys.all, 'events'] },
+      { detailsById: {}, events: [], nextCursor: null, total: 0 },
+    )
+  })
+
+  await waitFor(() => {
+    expect(screen.queryByRole('status', { name: 'Loading logs' })).toBeNull()
+    expect(screen.getByRole('status')).toHaveTextContent('No logs match the current filters.')
+  })
+})

@@ -8,7 +8,7 @@ export {
   RECENTLY_USED_COMMANDS_HEADING,
   OTHER_COMMANDS_HEADING,
 } from '@workspace/client-core/commands/palette'
-import { filesystemPath } from '@/lib/documents/utils/identity'
+import { searchMatchEntry } from '@/lib/search-match-entry'
 import { comparisonDisplayPath, tabPalettePresentation } from '@/lib/documents/utils/labels'
 import { sameTabContent, tabContentKey } from '@/lib/documents/utils/tabs'
 import type { TabContent } from '@/lib/documents/utils/types'
@@ -25,7 +25,7 @@ import type {
 } from '@/lib/focus/state/service'
 import { matchesActiveSurface } from '@/lib/focus/utils/active-surface'
 import type { LoadState } from '@/lib/load-state'
-import { basename, toTreePath } from '@/lib/path-formatters'
+import { toTreePath } from '@/lib/path-formatters'
 import type { TreeModel } from '@/lib/tree-model'
 import type { CommandSpec } from '@/keymap/command-registry'
 import type { PlatformCommandId, PlatformKeyBinding } from '@/keymap/types'
@@ -71,16 +71,7 @@ export function searchFilePaletteItems(
   rootPath: string,
 ): readonly FilePaletteItem[] {
   return matches.map((match) => ({
-    entry: {
-      birthtimeMs: match.birthtimeMs ?? 0,
-      mtimeMs: match.mtimeMs ?? 0,
-      name: basename(match.path),
-      path: filesystemPath(match.path),
-      size: match.size ?? 0,
-      targetType: match.targetType,
-      type: match.type,
-      version: searchEntryVersion(match.mtimeMs ?? 0, match.size ?? 0),
-    },
+    entry: searchMatchEntry(match),
     pathLabel: toTreePath(match.path, rootPath),
   }))
 }
@@ -337,10 +328,6 @@ export function symbolKindLabel(kind: number) {
 export function fileUriForPath(path: string) {
   const normalized = path.replace(/^\/+/, '')
   return `file:///${normalized.split('/').map(encodeURIComponent).join('/')}`
-}
-
-function searchEntryVersion(mtimeMs: number, size: number) {
-  return `search:${mtimeMs}:${size}`
 }
 
 function platformCommandPaletteItem(

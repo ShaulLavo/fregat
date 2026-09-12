@@ -2,6 +2,7 @@ import { fileDocumentKey } from '@/lib/documents/utils/identity'
 import type { FilesystemPath, TabId } from '@/lib/documents/utils/types'
 import { createTextDiff } from '@singapor/diff'
 import { LoadingState } from '@workspace/ui/components/loading-state'
+import { EmptyState } from '@workspace/ui/components/empty-state'
 import { useMemo } from 'react'
 
 import { DiffEditor } from '@/features/editor/components/diff-editor'
@@ -59,7 +60,7 @@ export function CompareSavedView({
   }, [path, savedText, snapshot])
 
   if (fileState.status === 'error') {
-    return <CompareNotice message='Could not read the saved file.' tone='error' />
+    return <EmptyState className='h-full' title='Could not read the saved file.' tone='error' />
   }
   if (fileState.status === 'loading') {
     return (
@@ -73,23 +74,9 @@ export function CompareSavedView({
   if (!file) {
     if (buffer) return <DiffEditor file={null} mode={mode} tabId={tabId} />
 
-    return <CompareNotice message='Open the file to compare it with disk.' />
+    return <EmptyState className='h-full' title='Open the file to compare it with disk.' />
   }
-  if (file.hunks.length === 0) return <CompareNotice message='No unsaved changes.' />
+  if (file.hunks.length === 0) return <EmptyState className='h-full' title='No unsaved changes.' />
 
   return <DiffEditor file={file} languageServer={languageServer} mode={mode} tabId={tabId} />
-}
-
-function CompareNotice({ message, tone }: { message: string; tone?: 'error' }) {
-  return (
-    <div
-      className={
-        tone === 'error'
-          ? 'text-destructive flex h-full items-center justify-center p-4 text-sm'
-          : 'text-muted-foreground flex h-full items-center justify-center p-4 text-sm'
-      }
-    >
-      {message}
-    </div>
-  )
 }

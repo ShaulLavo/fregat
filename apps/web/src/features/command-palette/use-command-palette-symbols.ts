@@ -7,7 +7,7 @@ import { fetchDocumentSymbols } from '@/features/command-palette/document-symbol
 import { tabFileResource } from '@/lib/documents/utils/capabilities'
 import { fileDocumentKey } from '@/lib/documents/utils/identity'
 import type { FilesystemPath, TabContent } from '@/lib/documents/utils/types'
-import { documentSymbolKeys } from '@/lib/query-keys'
+import { documentSymbolKeys } from '@/features/command-palette/utils/query-keys'
 import { useQuery } from '@tanstack/react-query'
 
 import type { QuickAccessMode } from '@/features/command-palette/command-palette-types'

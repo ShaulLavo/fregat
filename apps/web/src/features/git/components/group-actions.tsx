@@ -1,5 +1,5 @@
+import { ActionCluster } from '@/features/git/components/action-cluster'
 import { ArrowBendUpLeftIcon, FilePlusIcon, MinusIcon, PlusIcon } from '@phosphor-icons/react'
-import type { ReactNode } from 'react'
 
 import {
   useDiscardPathsMutation,
@@ -38,7 +38,7 @@ function WorktreeGroupActions({
   const stage = useStagePathsMutation(paths)
 
   return (
-    <ActionCluster>
+    <ActionCluster hoverGroup='group'>
       <RowActionButton
         disabled={discard.isPending}
         label='Discard all changes'
@@ -69,7 +69,7 @@ function StagedGroupActions({
   const unstage = useUnstagePathsMutation(paths)
 
   return (
-    <ActionCluster>
+    <ActionCluster hoverGroup='group'>
       <RowActionButton
         disabled={discard.isPending}
         label='Discard all staged changes'
@@ -96,13 +96,5 @@ function OpenAllDiffsButton({ rows }: { rows: readonly ChangeRow[] }) {
     <RowActionButton disabled={false} label='Open all diffs' onClick={() => void openDiffs(rows)}>
       <FilePlusIcon />
     </RowActionButton>
-  )
-}
-
-function ActionCluster({ children }: { children: ReactNode }) {
-  return (
-    <div className='pointer-events-none flex opacity-0 transition-opacity group-hover/group:pointer-events-auto group-hover/group:opacity-100 focus-within:pointer-events-auto focus-within:opacity-100'>
-      {children}
-    </div>
   )
 }

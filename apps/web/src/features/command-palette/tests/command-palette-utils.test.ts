@@ -2,6 +2,7 @@ import { expect, test } from '../../../../test/fixtures'
 
 import {
   commandPaletteItems,
+  searchFilePaletteItems,
   editorPaletteItems,
   groupedCommandItems,
   OTHER_COMMANDS_HEADING,
@@ -164,4 +165,50 @@ test('quick access prefixes select the expected mode and query', () => {
   expect(quickAccessQuery('theme monokai')).toBe('monokai')
   expect(quickAccessQuery('> save')).toBe('save')
   expect(quickAccessMode('@ Component')).toBe('symbols')
+})
+
+test('search entries preserve metadata and palette-relative labels', () => {
+  expect(
+    searchFilePaletteItems(
+      [
+        {
+          path: '/repo/src/link.ts',
+          type: 'symlink',
+          targetType: 'file',
+          birthtimeMs: 2,
+          mtimeMs: 5,
+          size: 10,
+        },
+        { path: '/repo/src/new.ts', type: 'file' },
+      ],
+      '/repo',
+    ),
+  ).toEqual([
+    {
+      entry: {
+        path: '/repo/src/link.ts',
+        name: 'link.ts',
+        type: 'symlink',
+        targetType: 'file',
+        birthtimeMs: 2,
+        mtimeMs: 5,
+        size: 10,
+        version: 'search:5:10',
+      },
+      pathLabel: 'src/link.ts',
+    },
+    {
+      entry: {
+        path: '/repo/src/new.ts',
+        name: 'new.ts',
+        type: 'file',
+        targetType: undefined,
+        birthtimeMs: 0,
+        mtimeMs: 0,
+        size: 0,
+        version: 'search:0:0',
+      },
+      pathLabel: 'src/new.ts',
+    },
+  ])
 })

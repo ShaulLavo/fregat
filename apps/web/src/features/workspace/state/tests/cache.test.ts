@@ -139,6 +139,24 @@ describe('workspace cache', () => {
     },
   )
 
+  it('promotes the first restored editor tab when the selection was unset', () => {
+    const slice = {
+      ...emptyWorkspaceSlice(),
+      workbenchPanels: {
+        ...workbenchPanelsForPaths(['/repo/a.ts', '/repo/b.ts'], null),
+        activeEditorTabId: null,
+      },
+    }
+    writeRootFolderCache(testScopedStorage, pickedDirectory('/repo'))
+    writeWorkspaceSliceCache(testScopedStorage, '/repo', slice)
+
+    const restored = readWorkspaceCache(testScopedStorage).workspaces['/repo']
+    expect(restored?.workbenchPanels.editorTabs).toHaveLength(2)
+    expect(restored?.workbenchPanels.activeEditorTabId).toBe(
+      restored?.workbenchPanels.editorTabs[0]?.id,
+    )
+  })
+
   it('keeps duplicate tab IDs and selection while projecting scroll per content', () => {
     const file = testTabContent(documentTargets.file)
     const comparison = testTabContent(documentTargets.savedComparison)

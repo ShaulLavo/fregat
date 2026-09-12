@@ -1,11 +1,5 @@
-import {
-  ArrowRightIcon,
-  CopyIcon,
-  FileIcon,
-  FilesIcon,
-  FloppyDiskIcon,
-  XIcon,
-} from '@phosphor-icons/react'
+import { copyPathSection } from '@/features/menus/utils/copy-path-section'
+import { ArrowRightIcon, FileIcon, FilesIcon, FloppyDiskIcon, XIcon } from '@phosphor-icons/react'
 
 import {
   editorTabCloseTargetIds,
@@ -47,20 +41,11 @@ export function editorTabMenu(context: EditorTabMenuContext): Menu {
           run: () => context.openFile(diffSource.path),
         }),
     ]),
-    section('copy', [
-      actionItem({
-        icon: CopyIcon,
-        id: 'copyPath',
-        label: 'Copy Path',
-        run: () => context.copyPath(context.tab.copyPath, 'path'),
-      }),
-      actionItem({
-        icon: CopyIcon,
-        id: 'copyRelativePath',
-        label: 'Copy Relative Path',
-        run: () => context.copyPath(context.tab.copyRelativePath, 'relative path'),
-      }),
-    ]),
+    copyPathSection({
+      copyPath: context.copyPath,
+      path: context.tab.copyPath,
+      relativePath: context.tab.copyRelativePath,
+    }),
   ]
 }
 

@@ -130,7 +130,7 @@ function PanelContent({ className, rootPath }: ComponentProps<'section'> & { roo
               section='worktree'
             />
             {!hasLocalChanges && (
-              <div className='text-muted-foreground px-7 py-4 text-xs'>Working tree clean</div>
+              <EmptyState align='start' className='px-7 py-4' title='Working tree clean' />
             )}
           </div>
         </>
