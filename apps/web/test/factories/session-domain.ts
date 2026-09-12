@@ -177,7 +177,9 @@ export async function makeSessionDomainFixture(options: { providerRuntime?: bool
           payload: { projectId, title: `Catchup ${index}`, updatedAt: DOMAIN_TIME },
         }),
       )
-      return new OrchestrationEventStore(server.database.db).append(events)
+      return server.database.db.transaction(() =>
+        new OrchestrationEventStore(server.database.db).append(events),
+      )
     },
     blobPath: path.join(server.root, '.platform-test', 'attachments', 'domain-image.png'),
   }

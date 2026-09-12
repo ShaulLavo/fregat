@@ -72,7 +72,7 @@ export class OrchestrationProjectionPipeline {
     let pageCount = 0
     while (true) {
       const events = this.eventStore.readAfter({ afterSequence: sequence })
-      this.applyEvents(events)
+      this.database.transaction(() => this.applyEvents(events))
       sequence = events.at(-1)?.sequence ?? sequence
       eventCount += events.length
       pageCount += 1
