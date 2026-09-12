@@ -202,6 +202,29 @@ CHAT_PROOF_SERVER=https://omarchy.mesh.shaulavo.dev/platform-api \
 node scripts/chat-review-proof.mjs
 ```
 
+## CI review and baseline repairs
+
+PR #24 initially stopped at Format, so that CI run supplied no lint, typecheck, or unit-test evidence. The user's clean-worktree review confirmed those static checks separately and found one new density browser failure. The user then explicitly expanded the repair to unrelated failures already present on main. The earlier focused-check results above remain historical evidence; they do not establish that the original whole-repository gates passed.
+
+The formatter failure came from `oxfmt` 0.64.0 producing output that changed on a second formatting pass. Both repository-root and web-directory checks rejected the first output; `oxlint --fix` was not responsible. The call is now formatted, and the pre-commit hook verifies final staged formatting after its mutating jobs. [Reproduction and controls](/work/tmp/platform-chat-parity/ci-format-review.md).
+
+The density assertion walked two DOM ancestors and landed on a newly introduced unpadded row. The attachment strip now has an accessible **Image attachments** group, which the test selects directly. The permanent unsent-image instruction and its redundant wrapper were removed. The existing density suite passed all five browser cases after reproducing the reported failure. Images still remain memory-only.
+
+The broader repair found several application defects:
+
+- Provider history import treated omitted `enabled` as disabled, contrary to the registry's default-on contract. It now excludes only explicit `false`; the test covers all three configurations.
+- A draft opened from a missing checkout correctly fell back to the available project root for the editor, but incorrectly adopted that root as its execution target. Navigation now carries the requested draft identity separately from the root opened by the editor.
+- A new file-tree reveal targeting an already-visible row left the previous smooth reveal running. The tree now cancels that older scroll request.
+- Theme previews could cache incomplete syntax colors when Shiki's default tokenization time budget expired under load. The fixed nine-line preview disables that budget, with a failing-before/passing-after clock-boundary regression.
+- New clangd token names lacked presentation policy: `label` now uses the existing label scope, and `bracket` explicitly falls back to grammar coloring. Conformance tests compare exact recorded legends and use the application's bundled TypeScript runtime, including its initialization options. The existing absent-server skips were retained; no new skip was added.
+- The linked Editor started with a zero-sized viewport and deferred its first text rows to a later animation frame. [Editor PR #14](https://github.com/ShaulLavo/singapor/pull/14) measures the initial viewport before ready/prepared document installation. Platform CI pins its published commit `b4ddbc3043c0a8bafdfc299de0563f581b7fe9a7`; the shared local Editor checkout was not changed. Existing first-frame and duplicate-work assertions were retained.
+
+Other failures came from stale test setup and inventories: native-provider protocol fields, code-theme settings widgets, TUI synchronization, settings search/scope leakage, selection of duplicate palette text, retained query clients bound to disposed test servers, and fixtures that supplied a workspace different from the one owned by application navigation. The fixes use actual application, navigation, settings, transport, and workspace owners. Editor DOM tests supply viewport measurements at the DOM boundary; the late-theme-load test delays external theme modules while running the real internal registration code. Recovery checks stop the old application before appending simulated crash records and import real adapter history through the current explicit import flow. No failing assertion was skipped to make these checks pass.
+
+Independent review reopened the draft correction: changing the rail after opening a missing-checkout draft reset its target to the fallback root. Same-root panel navigation now preserves the current scoped draft, while explicit draft/workspace navigation chooses the requested checkout. All 92 address and session checks pass, including the failing-before panel mutation. Review also caught a new-origin test cleanup leak; the real-module proof now confirms both the direct client and retained query owner are restored.
+
+Detailed baseline and focused evidence is preserved in the [unit repair report](/work/tmp/platform-chat-parity/ci-unit-findings.md), [browser repair report](/work/tmp/platform-chat-parity/ci-browser-findings.md), [UI fixture report](/work/tmp/platform-chat-parity/ci-navigation-ui-findings.md), and [language-server report](/work/tmp/platform-chat-parity/ci-lsp-findings.md). The first integrated browser rerun passed 47 of 48 web checks and all 14 tree checks, exposing a remaining app tree-scroll failure; that result is an intermediate checkpoint, not the final gate verdict. The first full unit run passed the server and packages but exposed two additional assertions ahead of file loading and remote projection; those now wait for the actual result without changing their expectations.
+
 ## Scope and remaining differences
 
 No paid/live Codex prompt was submitted. Deterministic protocol checks and the real running filesystem route supply the execution evidence. The original app has not been switched to this branch.
