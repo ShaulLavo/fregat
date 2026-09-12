@@ -2,22 +2,27 @@ import { LoadingState } from '@workspace/ui/components/loading-state'
 
 export function PageLoading({ showJson }: { showJson: boolean }) {
   return (
-    <LoadingState className='flex h-full min-h-0 flex-col' label='Loading settings'>
+    <LoadingState
+      className='@container/settings flex h-full min-h-0 flex-col'
+      label='Loading settings'
+    >
       <div aria-hidden='true' className='flex h-full min-h-0 flex-col overflow-hidden'>
-        <header className='border-border flex shrink-0 flex-col gap-(--density-control-gap) border-b px-(--density-section-padding) pt-2 pb-(--density-section-padding)'>
-          <div className='flex h-(--density-control-height-sm) items-center justify-end gap-1'>
+        <header className='border-border flex shrink-0 flex-col gap-(--density-control-gap) border-b px-(--density-section-padding) pt-2 pb-(--density-section-padding) @max-3xl/settings:grid @max-3xl/settings:grid-cols-[minmax(0,1fr)_auto]'>
+          <div className='flex h-(--density-control-height-sm) items-center justify-end gap-1 @max-3xl/settings:order-2 @max-3xl/settings:h-10'>
             <div className='skeleton-sweep h-5 w-14 rounded-md' />
             <div className='skeleton-sweep h-5 w-16 rounded-md' />
           </div>
           <div className='flex gap-1'>
-            <div className='skeleton-sweep h-(--density-control-height-sm) w-20 rounded-md' />
-            <div className='skeleton-sweep h-(--density-control-height-sm) w-24 rounded-md' />
-            <div className='skeleton-sweep h-(--density-control-height-sm) w-20 rounded-md' />
+            <div className='skeleton-sweep h-(--density-control-height-sm) w-20 rounded-md @max-3xl/settings:h-10' />
+            <div className='skeleton-sweep h-(--density-control-height-sm) w-24 rounded-md @max-3xl/settings:h-10' />
+            <div className='skeleton-sweep h-(--density-control-height-sm) w-20 rounded-md @max-3xl/settings:h-10' />
           </div>
           {showJson ? null : (
-            <div className='skeleton-sweep h-(--density-control-height) w-full rounded-md' />
+            <div className='skeleton-sweep h-(--density-control-height) w-full rounded-md @max-3xl/settings:order-3 @max-3xl/settings:col-span-full @max-3xl/settings:h-10' />
           )}
-          {showJson ? null : <div className='skeleton-sweep h-3 w-24 rounded-md' />}
+          {showJson ? null : (
+            <div className='skeleton-sweep h-4 w-24 rounded-md @max-3xl/settings:order-4 @max-3xl/settings:col-span-full' />
+          )}
         </header>
         {showJson ? (
           <div className='min-h-0 flex-1 overflow-hidden py-3 font-mono'>

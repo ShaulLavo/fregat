@@ -22,27 +22,27 @@
   {
     "file": "apps/web/src/features/chat/components/assistant-changed-files-tree.tsx",
     "class": "<button>",
-    "reason": "Full-width list row. The Button primitive is a fixed-height, centred control that owns a radius and a hover fill, and a row is none of those things; it stays a raw element until a Row primitive exists. The full reasoning, including the specificity problem, is recorded under \"The Row primitive gap\" in plans/100-web-design-language.md."
+    "reason": "Full-width list row. The Button primitive is a fixed-height, centred control that owns a radius and a hover fill, and a row is none of those things; it stays a raw element until a Row primitive exists. The full reasoning, including the specificity problem, is recorded under \"The Row primitive gap\" in docs/web-design-language.md#the-row-primitive-gap."
   },
   {
     "file": "apps/web/src/features/editor/components/language-server-references-pane.tsx",
     "class": "<button>",
-    "reason": "Full-width list row. The Button primitive is a fixed-height, centred control that owns a radius and a hover fill, and a row is none of those things; it stays a raw element until a Row primitive exists. The full reasoning, including the specificity problem, is recorded under \"The Row primitive gap\" in plans/100-web-design-language.md."
+    "reason": "Full-width list row. The Button primitive is a fixed-height, centred control that owns a radius and a hover fill, and a row is none of those things; it stays a raw element until a Row primitive exists. The full reasoning, including the specificity problem, is recorded under \"The Row primitive gap\" in docs/web-design-language.md#the-row-primitive-gap."
   },
   {
     "file": "apps/web/src/features/search/components/file-group.tsx",
     "class": "<button>",
-    "reason": "Full-width list row. The Button primitive is a fixed-height, centred control that owns a radius and a hover fill, and a row is none of those things; it stays a raw element until a Row primitive exists. The full reasoning, including the specificity problem, is recorded under \"The Row primitive gap\" in plans/100-web-design-language.md."
+    "reason": "Full-width list row. The Button primitive is a fixed-height, centred control that owns a radius and a hover fill, and a row is none of those things; it stays a raw element until a Row primitive exists. The full reasoning, including the specificity problem, is recorded under \"The Row primitive gap\" in docs/web-design-language.md#the-row-primitive-gap."
   },
   {
     "file": "apps/web/src/features/search/components/match-row.tsx",
     "class": "<button>",
-    "reason": "Full-width list row. The Button primitive is a fixed-height, centred control that owns a radius and a hover fill, and a row is none of those things; it stays a raw element until a Row primitive exists. The full reasoning, including the specificity problem, is recorded under \"The Row primitive gap\" in plans/100-web-design-language.md."
+    "reason": "Full-width list row. The Button primitive is a fixed-height, centred control that owns a radius and a hover fill, and a row is none of those things; it stays a raw element until a Row primitive exists. The full reasoning, including the specificity problem, is recorded under \"The Row primitive gap\" in docs/web-design-language.md#the-row-primitive-gap."
   },
   {
     "file": "apps/web/src/features/workbench/components/diagnostics-panel.tsx",
     "class": "<button>",
-    "reason": "Full-width two-line list row. The Button primitive is a fixed-height, centred control that owns a radius and a hover fill, and a row is none of those things; it stays a raw element until a Row primitive exists. The full reasoning, including the specificity problem, is recorded under \"The Row primitive gap\" in plans/100-web-design-language.md."
+    "reason": "Full-width two-line list row. The Button primitive is a fixed-height, centred control that owns a radius and a hover fill, and a row is none of those things; it stays a raw element until a Row primitive exists. The full reasoning, including the specificity problem, is recorded under \"The Row primitive gap\" in docs/web-design-language.md#the-row-primitive-gap."
   },
   {
     "file": "packages/ui/src/components/input-group.tsx",
@@ -72,16 +72,16 @@
   {
     "file": "apps/web/src/features/chat/components/model-picker-rail-item.tsx",
     "class": "<button>",
-    "reason": "Full-width list row. The Button primitive is a fixed-height, centred control that owns a radius and a hover fill, and a row is none of those things; it stays a raw element until a Row primitive exists. Converted from a ghost Button because the primitive's hover:bg-muted outranks bg-row-selected on specificity, so the row vocabulary could never win while it stayed a Button. The full reasoning, including the specificity problem, is recorded under \"The Row primitive gap\" in plans/100-web-design-language.md."
+    "reason": "Full-width list row. The Button primitive is a fixed-height, centred control that owns a radius and a hover fill, and a row is none of those things; it stays a raw element until a Row primitive exists. Converted from a ghost Button because the primitive's hover:bg-muted outranks bg-row-selected on specificity, so the row vocabulary could never win while it stayed a Button. The full reasoning, including the specificity problem, is recorded under \"The Row primitive gap\" in docs/web-design-language.md#the-row-primitive-gap."
   },
   {
     "file": "apps/web/src/features/chat-mode/components/session-row.tsx",
     "class": "<button>",
-    "reason": "Full-width list row. The Button primitive is a fixed-height, centred control that owns a radius and a hover fill, and a row is none of those things; it stays a raw element until a Row primitive exists. Converted from a ghost Button because the primitive's hover:bg-muted outranks bg-row-selected on specificity, so the row vocabulary could never win while it stayed a Button. The full reasoning, including the specificity problem, is recorded under \"The Row primitive gap\" in plans/100-web-design-language.md."
+    "reason": "Full-width list row. The Button primitive is a fixed-height, centred control that owns a radius and a hover fill, and a row is none of those things; it stays a raw element until a Row primitive exists. Converted from a ghost Button because the primitive's hover:bg-muted outranks bg-row-selected on specificity, so the row vocabulary could never win while it stayed a Button. The full reasoning, including the specificity problem, is recorded under \"The Row primitive gap\" in docs/web-design-language.md#the-row-primitive-gap."
   },
   {
     "file": "apps/web/src/features/chat-mode/components/tool-pane.tsx",
     "class": "<button>",
-    "reason": "Full-width list row. The Button primitive is a fixed-height, centred control that owns a radius and a hover fill, and a row is none of those things; it stays a raw element until a Row primitive exists. Converted from a ghost Button because the primitive's hover:bg-muted outranks bg-row-selected on specificity, so the row vocabulary could never win while it stayed a Button. The full reasoning, including the specificity problem, is recorded under \"The Row primitive gap\" in plans/100-web-design-language.md."
+    "reason": "Full-width list row. The Button primitive is a fixed-height, centred control that owns a radius and a hover fill, and a row is none of those things; it stays a raw element until a Row primitive exists. Converted from a ghost Button because the primitive's hover:bg-muted outranks bg-row-selected on specificity, so the row vocabulary could never win while it stayed a Button. The full reasoning, including the specificity problem, is recorded under \"The Row primitive gap\" in docs/web-design-language.md#the-row-primitive-gap."
   }
 ]

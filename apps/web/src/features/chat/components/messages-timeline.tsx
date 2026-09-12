@@ -259,15 +259,8 @@ export function MessagesTimeline({
         tabIndex={0}
         onScroll={handleScroll}
       >
-        <div
-          className='relative w-full'
-          style={{
-            height: contentHeight,
-            // Scroll anchoring is ours: the browser's would fight the
-            // compensation we apply when an estimated row is first measured.
-            overflowAnchor: 'none',
-          }}
-        >
+        {/* Browser anchoring would fight the measured-row compensation we own. */}
+        <div className='relative w-full [overflow-anchor:none]' style={{ height: contentHeight }}>
           {/* Rows stack in normal flow and only the window is translated. Giving
               each row its own absolute offset paints a broken frame on every
               width change: the reflow lands immediately but the offsets it

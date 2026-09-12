@@ -283,26 +283,20 @@ reload, TUI, Ghostty, or MCP lanes.
 
 ## Web design language lane
 
-Requested 2026-09-12. [Plan 100](plans/100-web-design-language.md) is implemented: the tokens,
-primitives and call sites landed, `scripts/lint/web-design-census.mjs` gates the decisions in root
-`verify` and in CI, and a 129-agent audit's confirmed findings were applied. Three follow-ups came
-out of that work and are proposed, independent of each other and of 100:
+Completed 2026-09-12. The [web design language](docs/web-design-language.md) supplies the
+shared tokens and controls. The census gates its decisions in root `verify` and CI, and the
+independent implementation audit and widened closeout review are recorded. The real Mesh app
+passed 52 surface cases and 52 loading cases across both densities and color schemes. Closeout
+fixed Search and Settings loading shifts, file-tree row corners, and remaining shared-bar gaps.
+The completed plan file is deleted; the implementation reference owns the contracts and evidence.
+
+Three independent follow-ups remain proposed:
 [Plan 101](plans/101-truncation-recovery.md) recovers the values truncation hides,
 [Plan 102](plans/102-scroll-and-keyboard-affordance.md) settles scrollbars, nested-scroll
-containment and the keyboard chip that the tooltip primitive was already built to hold, and
+containment and keyboard chips, and
 [Plan 103](plans/103-loading-empty-error-states.md) finishes the loading, empty and error states
-`CLAUDE.md` already decided. Each names the one or two decisions that need confirmation before its
-implementation starts. Plan 101 and Plan 100 touch eight of the same files; sequence them rather
-than interleaving.
-
-The original scoping note follows. It settles corners, bar heights, density, dividers, type steps and interaction fills
-for `apps/web` and `packages/ui`, then enforces them with a census script and a mandatory
-triple-check sweep. Its one product-facing decision, the corner language (D1), needs the user's
-confirmation before Phase 1 lands; every other phase removes call-site noise under the decisions
-table. The plan is Platform-only and touches class strings and theme tokens, so it is independent
-of the duplication census lane, but it edits the same `apps/web` component files that Plans 093
-and 096 rename or restructure. Land it after 096 when both are in flight: rebasing class-string
-edits under a rename is cheap, the reverse is not.
+`CLAUDE.md` already decided. Each names the decisions that need confirmation before implementation.
+They preserve the implemented design tokens and extend the existing census and browser verifier.
 
 ## Theme standardization
 
@@ -313,7 +307,7 @@ Saved customization, reset, and portable import/export use one resolved appearan
 existing primary-server settings pipeline. [The research](docs/theme-standardization-reference.md)
 records the Omarchy reuse strategy and the T3 Code and CodexThemes-App comparisons.
 
-Plan 100's token and primitive foundation is implemented. Coordinate shared styles and controls
+The [design-token foundation](docs/web-design-language.md) is implemented. Coordinate shared styles and controls
 with Plans 101–103; do not interleave edits to the same files. Plan 085 and Plan 104 share the boot
 mirror and first-paint path, so whichever lands second reuses the first's ownership. TUI readers
 must migrate with the shared settings cutover. This proposal does not reschedule other lanes or

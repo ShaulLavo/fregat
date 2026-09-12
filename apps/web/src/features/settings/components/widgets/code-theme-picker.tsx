@@ -64,7 +64,7 @@ export function CodeThemePicker({
         <div className='border-border min-w-0 border-t sm:border-t-0 sm:border-l'>
           {highlighted ? (
             <>
-              <div className='flex h-(--bar-height) items-center justify-between gap-3 px-(--bar-padding-x) text-xs'>
+              <div className='flex h-(--bar-height) items-center justify-between gap-(--density-control-gap) px-(--bar-padding-x) text-xs'>
                 <span className='truncate font-medium'>{highlighted.label}</span>
                 <span className='text-muted-foreground text-3xs'>Preview</span>
               </div>

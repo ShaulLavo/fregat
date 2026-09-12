@@ -150,10 +150,9 @@ export function SearchResultsView({
       }
     >
       <div
-        className='relative'
+        className='relative [overflow-anchor:none]'
         style={{
           height: virtualizer.getTotalSize() + resultListPadding(compact) * 2,
-          overflowAnchor: 'none',
         }}
       >
         {virtualizer.getVirtualItems().map((virtualItem) => {

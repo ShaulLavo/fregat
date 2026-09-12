@@ -231,7 +231,7 @@ Reconcile source drift first. This plan was written at `a01bf78f63cb94b4985a925d
 5. **Deliver portable import and export.** Reuse staged publication and reference retention for native archives, VS Code JSON import, export, revision selection, and deletion. Prove a customized pack round-trips into an empty library and renders without its original source repository.
 6. **Verify and remove remaining drift.** Run the focused gates below, regenerate settings schema/reference and any catalog outputs, inspect the real app, and update stable documentation. Remove this plan only when its implementation and completion checks pass.
 
-Plan 100's settled tokens and primitives are prerequisites already implemented. Coordinate edits to `globals.css` and shared controls with current UI work and Plans 101–103. Plan 085 overlaps the boot mirror and first-paint path; whichever lands second must reuse the first's boot ownership. This plan does not reschedule the editor contribution, Ghostty, or environment lanes.
+The [web design language](../docs/web-design-language.md) supplies the implemented token and control prerequisites. Coordinate edits to `globals.css` and shared controls with current UI work and Plans 101–103. Plan 085 overlaps the boot mirror and first-paint path; whichever lands second must reuse the first's boot ownership. This plan does not reschedule the editor contribution, Ghostty, or environment lanes.
 
 Greenfield rules apply. Delete replaced setting IDs and update every caller. Do not add compatibility aliases or convert old persisted combinations into new themes. Document the obsolete keys/cache to remove on development machines; do not delete unrelated settings or perform that cleanup during planning.
 

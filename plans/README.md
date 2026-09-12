@@ -17,35 +17,35 @@ a bare root `bun run verify`.
 
 ## Executable plan inventory
 
-| Plan                                                                            | State                                                       |
-| ------------------------------------------------------------------------------- | ----------------------------------------------------------- |
-| [071 — syntax highlight retry](071-syntax-highlight-retry.md)                   | **PROPOSED — ROOT GO/NO-GO SCHEDULING**                     |
-| [080 — Platform and VS Code keybinding modes](080-platform-keybinding-modes.md) | **PROPOSED — INTERACTION RULES CONFIRMED**                  |
-| [085 — instant workspace reload](085-instant-workspace-reload.md)               | **PROPOSED — IMPLEMENTATION NOT STARTED**                   |
-| [087 — stateless MCP support](087-stateless-mcp.md)                             | **PROPOSED — IMPLEMENTATION NOT STARTED**                   |
-| [088 — native code intelligence](088-native-code-intelligence.md)               | **PROPOSED — DEPENDS ON 087**                               |
-| [091 — error and timing helpers](091-error-and-timing-helpers.md)               | **PROPOSED — DEFECT FIXES IMPLEMENTED**                     |
-| [092 — path and URI helpers](092-path-and-uri-helpers.md)                       | **PROPOSED — DEFECT FIXES IMPLEMENTED**                     |
-| [093 — web React and store ceremony](093-web-react-and-store-ceremony.md)       | **PROPOSED — DEPENDS ON 091**                               |
-| [097 — async operation ownership](097-async-operation-ownership.md)             | **PROPOSED — 098 COMPLETE; READY TO IMPLEMENT**             |
-| [099 — document contribution runtime](099-document-contributions.md)            | **PROPOSED — BASELINE AND PUBLICATION FIRST**               |
-| [100 — web design language](100-web-design-language.md)                         | **IMPLEMENTED — CENSUS GATE GREEN; AUDIT FINDINGS APPLIED** |
-| [101 — truncation and value recovery](101-truncation-recovery.md)               | **PROPOSED — DECISIONS D5 AND D7 NEED CONFIRMATION**        |
-| [102 — scroll and keyboard affordance](102-scroll-and-keyboard-affordance.md)   | **PROPOSED — DECISIONS D2 AND D7 NEED CONFIRMATION**        |
-| [103 — loading, empty and error states](103-loading-empty-error-states.md)      | **PROPOSED — DECISIONS D4 AND D6 NEED CONFIRMATION**        |
-| [104 — theme standardization](104-theme-standardization.md)                     | **PROPOSED — IMPLEMENTATION NOT STARTED**                   |
-| [105 — one server and mesh deployment](105-one-server-mesh-deployment.md)       | **PROPOSED — PHASE 1 READY TO IMPLEMENT**                   |
-| [094 — client-core web and TUI parity](094-client-core-web-tui-parity.md)       | **PROPOSED — DEPENDS ON 091; 096 COMPLETE**                 |
-| [095 — server plumbing](095-server-plumbing.md)                                 | **PROPOSED — IMPLEMENTATION NOT STARTED**                   |
-| [073 — Electrobun 2.x migration](073-electrobun-v2-migration.md)                | **PROPOSED — ROOT GO/NO-GO SCHEDULING**                     |
-| [075 — terminal renderer fallbacks](075-terminal-renderer-fallbacks.md)         | **PROPOSED — BLOCKED ON TIER DECISION**                     |
-| [076 — watch-reload child reaping](076-watch-reload-child-reaping.md)           | **PROPOSED — ROOT GO/NO-GO SCHEDULING**                     |
+| Plan                                                                            | State                                                |
+| ------------------------------------------------------------------------------- | ---------------------------------------------------- |
+| [071 — syntax highlight retry](071-syntax-highlight-retry.md)                   | **PROPOSED — ROOT GO/NO-GO SCHEDULING**              |
+| [080 — Platform and VS Code keybinding modes](080-platform-keybinding-modes.md) | **PROPOSED — INTERACTION RULES CONFIRMED**           |
+| [085 — instant workspace reload](085-instant-workspace-reload.md)               | **PROPOSED — IMPLEMENTATION NOT STARTED**            |
+| [087 — stateless MCP support](087-stateless-mcp.md)                             | **PROPOSED — IMPLEMENTATION NOT STARTED**            |
+| [088 — native code intelligence](088-native-code-intelligence.md)               | **PROPOSED — DEPENDS ON 087**                        |
+| [091 — error and timing helpers](091-error-and-timing-helpers.md)               | **PROPOSED — DEFECT FIXES IMPLEMENTED**              |
+| [092 — path and URI helpers](092-path-and-uri-helpers.md)                       | **PROPOSED — DEFECT FIXES IMPLEMENTED**              |
+| [093 — web React and store ceremony](093-web-react-and-store-ceremony.md)       | **PROPOSED — DEPENDS ON 091**                        |
+| [097 — async operation ownership](097-async-operation-ownership.md)             | **PROPOSED — 098 COMPLETE; READY TO IMPLEMENT**      |
+| [099 — document contribution runtime](099-document-contributions.md)            | **PROPOSED — BASELINE AND PUBLICATION FIRST**        |
+| [101 — truncation and value recovery](101-truncation-recovery.md)               | **PROPOSED — DECISIONS D5 AND D7 NEED CONFIRMATION** |
+| [102 — scroll and keyboard affordance](102-scroll-and-keyboard-affordance.md)   | **PROPOSED — DECISIONS D2 AND D7 NEED CONFIRMATION** |
+| [103 — loading, empty and error states](103-loading-empty-error-states.md)      | **PROPOSED — DECISIONS D4 AND D6 NEED CONFIRMATION** |
+| [104 — theme standardization](104-theme-standardization.md)                     | **PROPOSED — IMPLEMENTATION NOT STARTED**            |
+| [105 — one server and mesh deployment](105-one-server-mesh-deployment.md)       | **PROPOSED — PHASE 1 READY TO IMPLEMENT**            |
+| [094 — client-core web and TUI parity](094-client-core-web-tui-parity.md)       | **PROPOSED — DEPENDS ON 091; 096 COMPLETE**          |
+| [095 — server plumbing](095-server-plumbing.md)                                 | **PROPOSED — IMPLEMENTATION NOT STARTED**            |
+| [073 — Electrobun 2.x migration](073-electrobun-v2-migration.md)                | **PROPOSED — ROOT GO/NO-GO SCHEDULING**              |
+| [075 — terminal renderer fallbacks](075-terminal-renderer-fallbacks.md)         | **PROPOSED — BLOCKED ON TIER DECISION**              |
+| [076 — watch-reload child reaping](076-watch-reload-child-reaping.md)           | **PROPOSED — ROOT GO/NO-GO SCHEDULING**              |
 
 ## Dependency notes
 
 - Plan 104 replaces independent app palette and code-theme selections with complete themes,
-  saved customization, and wallpaper collections. It builds on Plan 100's implemented design
-  tokens, coordinates shared style edits with Plans 101–103, and shares boot ownership with
+  saved customization, and wallpaper collections. It builds on the implemented
+  [web design language](../docs/web-design-language.md), coordinates shared style edits with
+  Plans 101–103, and shares boot ownership with
   Plan 085. The [research reference](../docs/theme-standardization-reference.md) records pinned
   Omarchy, T3 Code, and CodexThemes-App findings. TUI consumers migrate with shared settings;
   native Swift theming and OS theme synchronization are outside this plan.

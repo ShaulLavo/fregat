@@ -82,12 +82,10 @@ below is a hint; the symbol name is the anchor.** Re-run the census and re-deriv
 before starting, and capture HEAD plus the full dirty diff so this work does not fold into whatever
 else is in flight.
 
-Plan 100 is partly landed: `PaneBar`, `--bar-height`, `text-2xs`, `bg-row-hover` and
-`scripts/lint/web-design-census.mjs` are all live, and `design:census` runs inside root `verify`.
-That is why this plan extends that script instead of adding a second one. The two plans' file lists
-overlap in `highlight.tsx`, `file-group.tsx`, `match-row.tsx`, `file-picker/list.tsx`,
-`app-titlebar.tsx`, `stage-header.tsx`, `language-server-references-pane.tsx` and
-`assistant-changed-files-tree.tsx`. Do not run both in the same working tree at the same time.
+The [web design language](../docs/web-design-language.md) is implemented. `PaneBar`,
+`--bar-height`, `text-2xs`, `bg-row-hover` and `scripts/lint/web-design-census.mjs` are live,
+and `design:census` runs inside root `verify`. Extend that script instead of adding a second one.
+Preserve the shared tokens when editing the overlapping call sites.
 
 ### Count the same way every time
 
@@ -395,7 +393,7 @@ by `src/features/workbench/components/tests/editor-tab-bar.test.tsx`, which alre
   different behaviours. This plan moves the two that are byte-identical and names the one that is
   not; it does not open the rest.
 - **Radius, spacing, density, colour and elevation belong to
-  [Plan 100](100-web-design-language.md).** Several files here are on both lists. Sequence, do not
-  interleave.
+  the [web design language](../docs/web-design-language.md).** Preserve its settled tokens and
+  shared controls when changing truncation.
 - **Accessible naming is not in scope.** `title` is a recovery affordance, not a label;
   `aria-label` and `aria-labelledby` stay exactly as they are.

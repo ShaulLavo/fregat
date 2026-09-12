@@ -64,7 +64,7 @@ export const SearchResultFileHeader = memo(
         </span>
         {replaceVisible ? (
           <Button
-            className='text-3xs h-6 px-1.5'
+            className='text-3xs px-1.5'
             disabled={!canReplace}
             size='xs'
             title='Replace matches in this file'

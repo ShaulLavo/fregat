@@ -17,7 +17,7 @@ live user-facing bug: the command palette tells you a project has no scripts, an
 you no files match, while the fetch that would answer is still in flight.
 
 This plan does not re-open the loader taxonomy, does not touch motion, colour or the corner/bar/
-density decisions (those are [Plan 100](100-web-design-language.md)), and does not add a sixth
+density decisions (see the [web design language](../docs/web-design-language.md)), and does not add a sixth
 primitive. It finishes adopting decisions that already exist, in `apps/web` and `packages/ui`.
 The TUI renders its own loaders in `apps/tui` and is out of scope. [Root PLAN.md](../PLAN.md) owns
 execution order.
@@ -267,8 +267,8 @@ Two rules while doing this:
    heights will drift from the row it stands in for the moment density changes.
 
 Gate: C3 drops by 7. For each converted pane, a manual before/after at both densities confirming the
-first row does not move when data arrives — this is the same parity check Plan 100 Phase 7 step 5
-runs, and if that plan has landed, record the evidence there rather than twice.
+first row does not move when data arrives. Extend the existing
+[design verifier](../docs/web-design-language.md#verification) and record its pending/loaded evidence.
 
 ## Phase 4 — a wait with nothing to mirror is a loader (D4, D5)
 
@@ -510,15 +510,15 @@ App tests run `bun --bun vitest` against the `node` and `dom` projects in `apps/
 `packages/ui` runs plain `vitest`. Import `{ test, expect }` from `apps/web/test/fixtures.ts`, not
 from `vitest`. No new browser test is needed: nothing here depends on real layout or paint that
 happy-dom cannot answer, and the one thing that does — header parity between skeleton and loaded
-view — is Plan 100's browser gate, not a second one.
+view — uses the existing [real-app design verifier](../docs/web-design-language.md#verification).
+Extend its loading cases for panes changed here.
 
 ## What this plan does not do
 
 - **Corners, bar heights, density variables, dividers, type steps, elevation.**
-  [Plan 100](100-web-design-language.md) owns all six, including the bar-height token that
-  `panel-loading.tsx` and `tree-loading.tsx` already consume through `PaneBar`. If both plans are in
-  flight, land 100 first: its Phase 2 converts skeleton headers onto `PaneBar`, and redoing that
-  under this plan's row-shape edits is wasted work.
+  The [web design language](../docs/web-design-language.md) settles these, including the bar-height
+  token that `panel-loading.tsx` and `tree-loading.tsx` already consume through `PaneBar`.
+  Preserve that shared geometry when changing row shapes.
 - **Motion.** Neither the sweep timing, the loader speeds, nor the 120ms `delayMs` change. Reduced
   motion is already handled inside the primitives and in `globals.css`; `CLAUDE.md` bans
   `motion-reduce:` at the call site and there are none left.

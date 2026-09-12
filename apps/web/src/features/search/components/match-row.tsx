@@ -108,7 +108,7 @@ export const SearchMatchRow = memo(
           </Button>
           {replaceVisible ? (
             <Button
-              className={cn('h-6 px-1.5 text-3xs', compact && 'h-5 px-1')}
+              className={cn('px-1.5 text-3xs', compact && 'h-5 px-1')}
               disabled={!canReplace}
               size='xs'
               title='Replace this match'

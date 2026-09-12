@@ -65,7 +65,7 @@ export function EditorTabBar({
       <SortableContext items={tabs.map((tab) => tab.id)} strategy={horizontalListSortingStrategy}>
         <div
           aria-label='Editor tabs'
-          className='no-scrollbar border-border flex h-(--bar-height) shrink-0 items-end gap-1 overflow-x-auto border-b px-(--bar-padding-x) pt-1'
+          className='no-scrollbar border-border flex h-(--bar-height) shrink-0 items-end gap-(--density-control-gap) overflow-x-auto border-b px-(--bar-padding-x) pt-1'
           ref={stripRef}
           role='tablist'
         >

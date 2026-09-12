@@ -8,14 +8,8 @@ import { afterEach, expect, test } from 'vitest'
 import { PanelLoading } from '@/features/git/components/panel-loading'
 import { TreeLoading } from '@/features/workspace/components/tree-loading'
 
-// --bar-height, resolved. Every horizontal bar in the app answers to this one
-// number; a bar that disagrees is a header that visibly jumps.
-//
-// This file owns the half of the bar contract only a real browser can settle:
-// that the token resolves to these pixels and that a skeleton bar lands on the
-// same ones. The other half — that every bar in apps/web spells its height
-// h-(--bar-height) rather than hard-coding it — is enforced statically by
-// scripts/lint/web-design-census.mjs, which fails when a second bar height exists.
+// Primitive geometry only. scripts/verify-web-design.mjs measures the real app
+// and compares retained and replaced headers while real requests are pending.
 const BAR_HEIGHT = { compact: 36, cozy: 40 } as const
 
 let root: Root | null = null
@@ -40,9 +34,7 @@ test('the bar token resolves to one height per density', () => {
   }
 })
 
-// The defect Plan 100 names by hand: a loading header that is a different height
-// from the loaded one, so the layout flinches the moment data arrives. The Files
-// pane was 28px while loading and 36px once loaded.
+// The Files skeleton previously measured 28px while its loaded header was 36px.
 test('a skeleton bar is the same height as a real bar', async () => {
   mount(
     <>

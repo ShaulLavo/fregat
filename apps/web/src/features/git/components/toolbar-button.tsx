@@ -15,7 +15,7 @@ export function ToolbarButton({
   return (
     <Button
       aria-label={label}
-      className='text-muted-foreground hover:text-foreground relative size-6'
+      className='text-muted-foreground hover:text-foreground relative'
       disabled={disabled}
       onClick={onClick}
       size='icon-xs'

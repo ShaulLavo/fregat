@@ -20,7 +20,7 @@ export function RowActionButton({
   return (
     <Button
       aria-label={label}
-      className='text-muted-foreground hover:text-foreground size-6'
+      className='text-muted-foreground hover:text-foreground'
       disabled={disabled}
       onClick={handleClick}
       size='icon-xs'

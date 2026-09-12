@@ -699,7 +699,7 @@ const treeUnsafeCss = `
   }
 
   button[data-type='item'] {
-    border-radius: 6px;
+    border-radius: 0;
   }
 
   button[data-item-loading='true'] [data-item-section='content'] {

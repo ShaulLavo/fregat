@@ -65,14 +65,11 @@ Before starting, capture HEAD and the full dirty diff, re-run the census, and re
 lists from its output rather than from the tables here. A finding that no longer reproduces is
 dropped, not patched around.
 
-Two neighbours to know about. `scripts/lint/web-design-census.mjs` and `bun run design:census` exist
-and are in flight for [Plan 100](100-web-design-language.md); it is an `oxc-parser` class-string
-extractor with a `TARGETS` table, which is a far better home for these measures than grep. This
-plan does not depend on it: the commands below stand alone. If it has landed and is green when this
-plan starts, add `scrollIdiom`, `uncontainedScroller` and `kbdSpelling` to its `TARGETS` and use
-`--check` as the gate instead of the shell counts. Plan 100 also owns corners, bar heights, type
-steps and dividers in these same files; land this plan after it when both are in flight, for the
-same reason 100 gives: rebasing a class-string edit under a rename is cheap, the reverse is not.
+The [web design language](../docs/web-design-language.md) is implemented, and
+`scripts/lint/web-design-census.mjs` passes through `bun run design:census`. Its `oxc-parser`
+class-string extractor and `TARGETS` table own these measures. Add `scrollIdiom`,
+`uncontainedScroller` and `kbdSpelling` there and use `--check` as the gate; the shell counts below
+remain useful for exploration. Preserve the settled corners, bar heights, type steps and dividers.
 
 ### Count the same way every time
 
@@ -467,17 +464,17 @@ Narrow checks only, per repository policy. Never a repo-wide suite, never a bare
 Workspace checks: `packages/ui` typecheck, lint, and `vitest run src/components/tests/` (four files,
 five after Phase 3). `apps/web` typecheck, lint, the two or three named `browser` files via
 `bun run --filter web test:browser`, and the dom tests of the components whose markup
-changed. `bun run design:census` only if Plan 100's script has landed.
+changed. Run `bun run design:census`.
 
 ## What this plan does not do
 
 - **Corners, bar heights, density, dividers, type steps, elevation, interaction fills.**
-  [Plan 100](100-web-design-language.md) owns all six and edits the same files. This plan adds
+  The [web design language](../docs/web-design-language.md) settles these. This plan adds
   `overscroll-contain`, `app-scrollbar-thin`, `scroll-gutter` and `Kbd`, and changes no radius, no
   height and no colour token except the one new `--scrollbar-thumb`.
 - **Adding tooltips where none exist.** The sidebar rail and the bottom-panel tabs are icon-only
   and have no tooltip at all today; giving them one is a new affordance, not a consolidation, and it
-  interacts with Plan 100's rail-tab idiom decision. A future pass owns it.
+  interacts with the settled rail-tab treatment. A future pass owns it.
 - **Showing shortcuts on palette rows that do not show one.** `features/command-palette/view-groups.tsx`
   and the colour/theme groups render `CommandItem`s with a real `PlatformCommandId` and no trailing
   shortcut, while `command-palette-row.tsx` shows one. That is a genuine inconsistency and it is a

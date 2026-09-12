@@ -30,7 +30,7 @@ export function CodeThemeWidget({
           disabled={disabled}
           render={
             <Button
-              className='h-(--bar-height) w-full justify-between gap-3 border-0 px-(--bar-padding-x) text-xs'
+              className='h-(--bar-height) w-full justify-between gap-(--density-control-gap) border-0 px-(--bar-padding-x) text-xs'
               disabled={disabled}
               id={id}
               variant='ghost'
