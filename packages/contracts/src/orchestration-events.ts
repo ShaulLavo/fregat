@@ -219,6 +219,13 @@ export const sessionTurnInterruptRequestedPayloadSchema = v.object({
   createdAt: isoDateTimeSchema,
 })
 
+export const sessionTurnSteerRequestedPayloadSchema = v.object({
+  sessionId: sessionIdSchema,
+  turnId: turnIdSchema,
+  messageId: messageIdSchema,
+  createdAt: isoDateTimeSchema,
+})
+
 export const sessionRuntimeStopRequestedPayloadSchema = v.object({
   sessionId: sessionIdSchema,
   createdAt: isoDateTimeSchema,
@@ -382,6 +389,7 @@ export const ORCHESTRATION_EVENT_PAYLOADS = {
     sourceUpdatedAt: isoDateTimeSchema,
   }),
   'session.turn-start-requested': sessionTurnStartRequestedPayloadSchema,
+  'session.turn-steer-requested': sessionTurnSteerRequestedPayloadSchema,
   'session.turn-interrupt-requested': sessionTurnInterruptRequestedPayloadSchema,
   'session.runtime-stop-requested': sessionRuntimeStopRequestedPayloadSchema,
   'session.runtime-set': sessionRuntimeSetPayloadSchema,

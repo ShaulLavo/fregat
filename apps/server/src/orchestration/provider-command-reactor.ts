@@ -43,6 +43,7 @@ type ProviderIntentEvent = Extract<
   {
     type:
       | 'session.turn-start-requested'
+      | 'session.turn-steer-requested'
       | 'session.turn-interrupt-requested'
       | 'session.runtime-stop-requested'
       | 'session.checkpoint-revert-requested'
@@ -173,6 +174,9 @@ export class ProviderCommandReactor {
     switch (event.type) {
       case 'session.turn-start-requested':
         await this.startTurn(event)
+        return
+      case 'session.turn-steer-requested':
+        await this.steerTurn(event)
         return
       case 'session.turn-interrupt-requested':
         await this.interruptTurn(event)
@@ -392,6 +396,31 @@ export class ProviderCommandReactor {
       })
     } catch (error) {
       await this.handleTurnFailure(event, context, error)
+    }
+  }
+
+  private async steerTurn(
+    event: Extract<ProviderIntentEvent, { type: 'session.turn-steer-requested' }>,
+  ) {
+    const session = this.getReadModel().sessions.get(event.payload.sessionId)
+    const message = session?.messages.find((entry) => entry.id === event.payload.messageId)
+    const runtimeEpoch = this.runtimeEpochFor(event.payload.sessionId)
+    try {
+      if (!message) throw createInternalError('The correction message is unavailable.')
+      await this.providerService.steerTurn({
+        sessionId: event.payload.sessionId,
+        turnId: event.payload.turnId,
+        messageText: message.text,
+        attachments: message.attachments,
+      })
+    } catch (error) {
+      await this.appendProviderFailureActivity({
+        runtimeEpoch,
+        detail: providerErrorMessage(error),
+        event,
+        kind: 'provider.turn.steer.failed',
+        summary: 'Correction was not delivered',
+      })
     }
   }
 
@@ -616,6 +645,7 @@ export class ProviderCommandReactor {
       | 'provider.runtime.stop.failed'
       | 'provider.turn.interrupt.failed'
       | 'provider.turn.start.failed'
+      | 'provider.turn.steer.failed'
       | 'provider.user-input.respond.failed'
     requestId?: string
     runtimeEpoch: string
@@ -830,6 +860,7 @@ async function revertedIndexSummary(git: GitService, workspacePath: string) {
 function isProviderIntentEvent(event: OrchestrationEvent): event is ProviderIntentEvent {
   switch (event.type) {
     case 'session.turn-start-requested':
+    case 'session.turn-steer-requested':
     case 'session.turn-interrupt-requested':
     case 'session.runtime-stop-requested':
     case 'session.checkpoint-revert-requested':

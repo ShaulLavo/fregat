@@ -88,7 +88,6 @@ function readCurrentEditorText(editor: LexicalEditor) {
 function updateSendButtonDisabled(
   button: HTMLButtonElement | null,
   {
-    busy,
     disabled,
     hasStagedContent,
     submitting,
@@ -110,5 +109,5 @@ function updateSendButtonDisabled(
     return
   }
 
-  button.disabled = !busy && !hasStagedContent && !text.trim()
+  button.disabled = !hasStagedContent && !text.trim()
 }

@@ -65,6 +65,21 @@ export class OrchestrationSnapshotQuery {
     this.database = database
   }
 
+  sourceProposedPlan(source: { sessionId: string; planId: string }) {
+    return (
+      this.database
+        .select()
+        .from(projectionSessionProposedPlans)
+        .where(
+          and(
+            eq(projectionSessionProposedPlans.sessionId, source.sessionId),
+            eq(projectionSessionProposedPlans.planId, source.planId),
+          ),
+        )
+        .get() ?? null
+    )
+  }
+
   /**
    * Hydrates the engine's in-memory model, so it takes only the tail of each
    * session: the decider and the provider reactor ask about the live turn, and

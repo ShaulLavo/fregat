@@ -73,3 +73,23 @@ test('an unavailable connection explains why stop is disabled', () => {
 
   expect(screen.getByRole('button', { name: 'Reconnecting chat…' })).toBeDisabled()
 })
+
+test('a running turn can receive a correction while Stop remains available', async () => {
+  const sent = vi.fn(async () => true)
+  const stop = vi.fn()
+  renderWithProviders(
+    <ChatInputSubmitButton
+      busy
+      disabled={false}
+      disabledReason={null}
+      pendingAction={null}
+      sendDisabled={false}
+      onStop={stop}
+      onSubmit={sent}
+    />,
+  )
+  await userEvent.click(screen.getByRole('button', { name: 'Send correction' }))
+  expect(sent).toHaveBeenCalledOnce()
+  expect(stop).not.toHaveBeenCalled()
+  expect(screen.getByRole('button', { name: 'Stop current turn' })).toBeEnabled()
+})

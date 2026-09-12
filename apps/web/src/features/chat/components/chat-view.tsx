@@ -2,7 +2,10 @@ import { LoadingState } from '@workspace/ui/components/loading-state'
 import { useActiveChatProjection } from '@/features/chat/hooks/use-active-projection'
 import { useComposerConnection } from '@/features/chat/hooks/use-composer-connection'
 import { ComposerActivityStatus } from '@/features/chat/components/composer-activity-status'
-import { composerPendingAction } from '@/features/chat/utils/composer-state'
+import {
+  composerPendingAction,
+  correctionUnavailableReason,
+} from '@/features/chat/utils/composer-state'
 import { sessionStopFailure } from '@/features/chat/utils/session-stop'
 import type { ModelSelection, SessionId, SessionTurnInterruptCommand } from '@workspace/contracts'
 import { useCallback, useEffect, useMemo, useState } from 'react'
@@ -14,6 +17,7 @@ import {
   createProjectDefaultModelCommand,
   createSessionInterruptCommand,
   createTurnSubmission,
+  createSteerSubmission,
 } from '@workspace/client-core/chat/commands'
 import { dispatchChatCommand, replayAfterDispatch } from '@/features/chat/utils/command-dispatch'
 import { scheduleSessionProjectionSyncAfterDispatch } from '@/features/chat/utils/command-sync'
@@ -213,7 +217,7 @@ export function ChatView({
       >
         <ChatPendingRequestsProvider
           disabledReason={disabledReason}
-          dispatchCommand={transport.dispatchCommand}
+          transport={transport}
           sessionId={session.id}
         >
           <ComposerActivityStatus
@@ -230,6 +234,10 @@ export function ChatView({
           <PendingUserInputPanel />
           <ChatPlanFollowUpProvider
             draftTarget={draftTarget}
+            disabledReason={
+              disabledReason ??
+              (sending || revertingCheckpoint ? 'Finishing the current action…' : null)
+            }
             transport={transport}
             onSessionCreated={onSessionCreated}
             sessionId={session.id}
@@ -241,6 +249,7 @@ export function ChatView({
           ) : null}
           <ChatInput
             busy={busy}
+            correctionDisabledReason={correctionUnavailableReason(session)}
             disabledReason={disabledReason}
             pendingAction={composerPendingAction({
               sending,
@@ -286,7 +295,7 @@ async function submitChatTurn({
 }): Promise<boolean> {
   const { attachments, interactionMode, modelSelection, runtimeMode, terminalContexts, text } =
     payload
-  const submission = createTurnSubmission({
+  const input = {
     attachments,
     createdAt: new Date().toISOString(),
     interactionMode,
@@ -295,7 +304,11 @@ async function submitChatTurn({
     terminalContexts,
     text,
     sessionId: session.id,
-  })
+  }
+  const submission =
+    isChatSessionBusy(session) && session.latestTurn
+      ? createSteerSubmission({ ...input, turnId: session.latestTurn.turnId })
+      : createTurnSubmission(input)
   setSendError(null)
   setSending(true)
   try {

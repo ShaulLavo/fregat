@@ -1,4 +1,6 @@
 import { useActiveChatProjection } from '@/features/chat/hooks/use-active-projection'
+import { notifyChatCommandError } from '@/features/chat/notify-command-error'
+import { chatSubmissionValidation } from '@/features/chat/utils/submission-validation'
 import type {
   OrchestrationMessage,
   OrchestrationProposedPlan,
@@ -29,6 +31,7 @@ import {
 } from '@/features/chat/providers/plan-follow-up-context'
 import {
   useChatInputDraftStore,
+  chatInputImagesPreparing,
   type ChatInputDraftTarget,
 } from '@/features/chat/state/chat-input-draft-store'
 import { useChatOptimisticStore } from '@/features/chat/state/chat-optimistic-store'
@@ -65,12 +68,14 @@ type PlanDispatchContext = {
  */
 export function ChatPlanFollowUpProvider({
   children,
+  disabledReason = null,
   draftTarget,
   transport,
   onSessionCreated,
   sessionId,
 }: {
   readonly children: ReactNode
+  readonly disabledReason?: string | null
   readonly draftTarget: ChatInputDraftTarget
   readonly transport: ChatTransport
   /**
@@ -83,6 +88,10 @@ export function ChatPlanFollowUpProvider({
 }) {
   const session = useActiveChatProjection((state) => selectChatSessionById(state, sessionId))
   const [submitting, setSubmitting] = useState(false)
+  const preparingImages = useChatInputDraftStore((state) =>
+    chatInputImagesPreparing(state, draftTarget),
+  )
+  const unavailableReason = planUnavailableReason(disabledReason, session, preparingImages)
   // A running turn already owns the composer: the plan has been answered, and a
   // second Implement would start a duplicate build.
   const plan = isChatSessionBusy(session)
@@ -94,7 +103,7 @@ export function ChatPlanFollowUpProvider({
     // One follow-up in flight at a time whichever button started it: both end in
     // a turn against the same plan, and only one of them can be its implementation.
     const once = (dispatch: (context: PlanDispatchContext) => Promise<boolean>) => async () => {
-      if (!plan || !session || submitting) return false
+      if (!plan || !session || submitting || unavailableReason) return false
 
       setSubmitting(true)
       try {
@@ -105,12 +114,13 @@ export function ChatPlanFollowUpProvider({
     }
 
     return {
+      disabledReason: unavailableReason,
       implementInNewSession: once(dispatchPlanImplementationSession),
       plan,
       submitFollowUp: once(dispatchPlanFollowUpTurn),
       submitting,
     }
-  }, [draftTarget, transport, onSessionCreated, plan, submitting, session])
+  }, [draftTarget, transport, onSessionCreated, plan, submitting, session, unavailableReason])
 
   return <ChatPlanFollowUpContext value={value}>{children}</ChatPlanFollowUpContext>
 }
@@ -130,6 +140,11 @@ async function dispatchPlanFollowUpTurn({
     planMarkdown: plan.planMarkdown,
   })
   const sourceProposedPlan = followUp.implementsPlan ? planReference(plan) : undefined
+  const validation = chatSubmissionValidation(followUp.text, draft.terminalContexts)
+  if (validation) {
+    notifyChatCommandError(validation, 'Message is too long')
+    return false
+  }
   const submission = createTurnSubmission({
     attachments: chatInputUploadAttachments(draft.images),
     createdAt: new Date().toISOString(),
@@ -175,6 +190,11 @@ async function dispatchPlanImplementationSession({
   session,
 }: PlanDispatchContext): Promise<boolean> {
   const draft = useChatInputDraftStore.getState().getDraft(draftTarget)
+  const validation = chatSubmissionValidation(planImplementationPrompt(plan.planMarkdown), [])
+  if (validation) {
+    notifyChatCommandError(validation, 'Plan is too long')
+    return false
+  }
   const submission = createDraftSessionSubmission({
     createdAt: new Date().toISOString(),
     // The composer's live pick, same as the in-session path: switching model and
@@ -259,6 +279,7 @@ async function dispatchPlanTurn({
         ),
   })
 
+  if (!outcome.ok) notifyChatCommandError(outcome.error, 'Could not send the plan follow-up')
   return outcome.ok
 }
 
@@ -302,4 +323,17 @@ function syncSessionsAfterPlanTurn({
 
 function planReference(plan: OrchestrationProposedPlan): SourceProposedPlanReference {
   return { planId: plan.id, sessionId: plan.sessionId }
+}
+
+function planUnavailableReason(
+  disabledReason: string | null,
+  session: ChatSession | undefined,
+  preparingImages: boolean,
+) {
+  if (disabledReason) return disabledReason
+  if (preparingImages) return 'Preparing images…'
+  if (session && session.worktree.lifecycle.state !== 'ready') return 'Workspace is not ready'
+  if (session?.pendingApprovalCount || session?.pendingUserInputCount)
+    return 'Answer the pending request first'
+  return null
 }

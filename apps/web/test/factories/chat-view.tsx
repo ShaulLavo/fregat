@@ -27,7 +27,7 @@ export function renderChatDraft(props: ComponentProps<typeof ChatDraftView>) {
 export function renderComposerActivity(props: ComponentProps<typeof ComposerActivityStatus>) {
   return renderWithProviders(
     <ChatPendingRequestsProvider
-      dispatchCommand={unsupportedChatTransport().dispatchCommand}
+      transport={unsupportedChatTransport()}
       sessionId={props.session.id}
     >
       <ComposerActivityStatus {...props} />

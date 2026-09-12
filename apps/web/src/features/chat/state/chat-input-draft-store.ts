@@ -1,4 +1,5 @@
 import { createEnvironmentRecordPersistence } from '@/lib/environments/state/record-persistence'
+import { MAX_CHAT_ATTACHMENTS } from '@workspace/contracts'
 import type { ScopedStorage } from '@/lib/environments/state/scoped-storage'
 import type {
   ChatAttachment,
@@ -56,11 +57,13 @@ export type ChatInputDraft = {
 
 type ChatInputDraftState = {
   draftsByKey: Record<string, ChatInputDraft>
+  preparingImagesByKey: Record<string, number>
   persistenceError: string | null
 }
 
 type ChatInputDraftActions = {
-  addImages: (target: ChatInputDraftTarget, images: readonly ChatInputImageAttachment[]) => void
+  changeImagePreparation: (target: ChatInputDraftTarget, delta: 1 | -1) => void
+  addImages: (target: ChatInputDraftTarget, images: readonly ChatInputImageAttachment[]) => number
   addTerminalContexts: (
     target: ChatInputDraftTarget,
     contexts: readonly ChatInputTerminalContext[],
@@ -108,9 +111,27 @@ const draftPersist = new Debouncer(() => flushChatInputDraftStorage(), {
 
 export const useChatInputDraftStore = create<ChatInputDraftStore>((set, get) => ({
   ...createInitialChatInputDraftState(),
+  changeImagePreparation: (target, delta) => {
+    const key = chatInputDraftStorageId(target.environmentId, target.rootPath, target.draftKey)
+    if (!key) return
+    set((state) => {
+      const preparingImagesByKey = { ...state.preparingImagesByKey }
+      const count = Math.max(0, (preparingImagesByKey[key] ?? 0) + delta)
+      if (count === 0) delete preparingImagesByKey[key]
+      else preparingImagesByKey[key] = count
+      return { preparingImagesByKey }
+    })
+  },
   addImages: (target, images) => {
-    set((state) => updateDraftForTarget(state, target, (draft) => addImagesToDraft(draft, images)))
+    const accepted = images.slice(
+      0,
+      Math.max(0, MAX_CHAT_ATTACHMENTS - get().getDraft(target).images.length),
+    )
+    set((state) =>
+      updateDraftForTarget(state, target, (draft) => addImagesToDraft(draft, accepted)),
+    )
     draftPersist.maybeExecute()
+    return accepted.length
   },
   addTerminalContexts: (target, contexts) => {
     set((state) =>
@@ -225,6 +246,7 @@ export function resetChatInputDraftStore() {
   draftPersist.cancel()
   useChatInputDraftStore.setState({
     draftsByKey: {},
+    preparingImagesByKey: {},
     persistenceError: null,
   })
 }
@@ -232,8 +254,14 @@ export function resetChatInputDraftStore() {
 function createInitialChatInputDraftState(): ChatInputDraftState {
   return {
     draftsByKey: {},
+    preparingImagesByKey: {},
     persistenceError: null,
   }
+}
+
+export function chatInputImagesPreparing(state: ChatInputDraftState, target: ChatInputDraftTarget) {
+  const key = chatInputDraftStorageId(target.environmentId, target.rootPath, target.draftKey)
+  return key !== null && (state.preparingImagesByKey[key] ?? 0) > 0
 }
 
 function chatInputDraftForTarget(

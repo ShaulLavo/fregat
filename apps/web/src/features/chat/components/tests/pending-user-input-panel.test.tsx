@@ -9,6 +9,7 @@ import * as v from 'valibot'
 
 import { PendingUserInputPanel } from '@/features/chat/components/pending-user-input-panel'
 import { ChatPendingRequestsProvider } from '@/features/chat/providers/pending-requests-provider'
+import { unsupportedChatTransport } from '../../../../../test/factories/chat-transport'
 import { useChatProjectionStore } from '@/features/chat/state/chat-projection-store'
 import { expect, test } from '../../../../../test/fixtures'
 import { sessionActivity, session as sessionFactory } from '../../../../../test/factories/chat'
@@ -170,10 +171,13 @@ function renderPanel(
 
   renderWithProviders(
     <ChatPendingRequestsProvider
-      dispatchCommand={async (command) => {
-        dispatched.push(command)
-        if (dispatch) return dispatch()
-        return { result: null, deduped: false, sequence: 1 }
+      transport={{
+        ...unsupportedChatTransport(),
+        dispatchCommand: async (command) => {
+          dispatched.push(command)
+          if (dispatch) return dispatch()
+          return { result: null, deduped: false, sequence: 1 }
+        },
       }}
       sessionId={seeded.id}
     >

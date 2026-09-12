@@ -46,6 +46,21 @@ test('a plan waiting on the user offers to implement it', () => {
   expect(screen.getByRole('button', { name: 'Implement' })).toBeEnabled()
 })
 
+test('plan actions cannot bypass a disconnected composer', async () => {
+  const { dispatched } = renderBanner({ disabledReason: 'Reconnecting chat…' })
+  expect(screen.getByRole('button', { name: 'Implement' })).toBeDisabled()
+  expect(screen.getByRole('button', { name: 'Implement in a new session' })).toBeDisabled()
+  await userEvent.click(screen.getByRole('button', { name: 'Implement' }))
+  expect(dispatched).toHaveLength(0)
+})
+
+test('plan actions wait for staged image preparation', async () => {
+  const { dispatched } = renderBanner()
+  useChatInputDraftStore.getState().changeImagePreparation(draftTarget, 1)
+  expect(await screen.findByRole('button', { name: 'Implement' })).toBeDisabled()
+  expect(dispatched).toHaveLength(0)
+})
+
 test('typed feedback turns the same action into a refinement', async () => {
   renderBanner()
 
@@ -224,11 +239,13 @@ test('a rejected dispatch drops the optimistic message so the timeline stays hon
 
 function renderBanner({
   busy = false,
+  disabledReason = null,
   dispatch,
   onSessionCreated,
   plan: planOverrides,
 }: {
   busy?: boolean
+  disabledReason?: string | null
   dispatch?: () => Promise<{ result: null; deduped: boolean; sequence: number }>
   onSessionCreated?: (sessionId: SessionId) => void
   plan?: Partial<OrchestrationProposedPlan>
@@ -290,6 +307,7 @@ function renderBanner({
   renderWithProviders(
     <ChatPlanFollowUpProvider
       draftTarget={draftTarget}
+      disabledReason={disabledReason}
       transport={transport}
       sessionId={seeded.id}
       onSessionCreated={(sessionId) => {

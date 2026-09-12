@@ -1,3 +1,5 @@
+import { codexFileCitationsMarkdown } from '@/features/chat/utils/codex-file-citations'
+
 const FENCE_LINE_REGEX = /^([ \t]{0,3})(`{3,}|~{3,})(.*)$/
 
 type LanguageRepair = {
@@ -51,24 +53,26 @@ const SORTED_LANGUAGE_REPAIRS = CODE_FENCE_LANGUAGE_REPAIRS.map((repair) => ({
 }))
 
 export function normalizeAgentMarkdown(markdown: string) {
-  return markdown.split(/(\r\n|\n|\r)/).reduce(
-    (state, part, index, parts) => {
-      if (index % 2 === 1) {
-        state.output += part
-        return state
-      }
+  return codexFileCitationsMarkdown(markdown)
+    .split(/(\r\n|\n|\r)/)
+    .reduce(
+      (state, part, index, parts) => {
+        if (index % 2 === 1) {
+          state.output += part
+          return state
+        }
 
-      const nextLine = state.inFence ? part : normalizeFenceOpeningLine(part)
-      state.output += nextLine
-      state.inFence = nextFenceState({
-        inFence: state.inFence,
-        line: nextLine,
-        nextPart: parts[index + 1],
-      })
-      return state
-    },
-    { inFence: false, output: '' },
-  ).output
+        const nextLine = state.inFence ? part : normalizeFenceOpeningLine(part)
+        state.output += nextLine
+        state.inFence = nextFenceState({
+          inFence: state.inFence,
+          line: nextLine,
+          nextPart: parts[index + 1],
+        })
+        return state
+      },
+      { inFence: false, output: '' },
+    ).output
 }
 
 function normalizeFenceOpeningLine(line: string) {

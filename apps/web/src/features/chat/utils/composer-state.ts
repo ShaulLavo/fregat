@@ -46,3 +46,11 @@ export function composerSubmitAction({
 
   return { kind: 'send', label: disabledReason ?? 'Send message' }
 }
+
+export function correctionUnavailableReason(session: ChatSession) {
+  if (session.pendingApprovalCount || session.pendingUserInputCount)
+    return 'Answer the pending request before sending a correction'
+  if (session.latestTurn?.providerStartState !== 'adopted')
+    return 'Wait for the agent to start before sending a correction'
+  return null
+}

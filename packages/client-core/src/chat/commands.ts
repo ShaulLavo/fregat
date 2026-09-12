@@ -37,6 +37,7 @@ import {
   type SessionRuntimeStopCommand,
   type SessionTurnInterruptCommand,
   type SessionTurnStartCommand,
+  type SessionTurnSteerCommand,
   type SessionUnarchiveCommand,
   type SessionUserInputRespondCommand,
   type TurnId,
@@ -155,6 +156,26 @@ export function createTurnSubmission({
       turnId,
       updatedAt: createdAt,
     },
+  }
+}
+
+export function createSteerSubmission({
+  turnId,
+  ...input
+}: Parameters<typeof createTurnSubmission>[0] & { turnId: TurnId }): {
+  command: SessionTurnSteerCommand
+  optimisticMessage: OrchestrationMessage
+} {
+  const submission = createTurnSubmission(input)
+  return {
+    command: {
+      commandId: submission.command.commandId,
+      type: 'session.turn.steer',
+      sessionId: input.sessionId,
+      turnId,
+      message: submission.command.message,
+    },
+    optimisticMessage: { ...submission.optimisticMessage, turnId },
   }
 }
 
