@@ -4,8 +4,12 @@
  * Generated rather than written, because a hand-maintained table of ~36 keys
  * with defaults and scopes is a table that is wrong within a month. Run `bun run settings:reference`
  * after changing `packages/contracts/src/settings/keys.ts`.
+ *
+ * `--check` is what makes that instruction enforceable: `generated:check` runs it
+ * in CI, so a registry change that forgets to regenerate fails there instead of
+ * leaving the reference quietly stale.
  */
-import { writeFileSync } from 'node:fs'
+import { existsSync, readFileSync, writeFileSync } from 'node:fs'
 import path from 'node:path'
 
 import { SETTING_IDS, descriptorFor, type SettingId } from '../packages/contracts/src/index'
@@ -101,6 +105,31 @@ stays safe to read, share and export.
 ${sections.join('\n\n')}
 `
 
-const target = path.join(import.meta.dirname, '..', 'docs', 'settings-reference.md')
-writeFileSync(target, body, 'utf8')
-console.log(`wrote ${target} (${SETTING_IDS.length} settings)`)
+const DEFAULT_TARGET = path.join(import.meta.dirname, '..', 'docs', 'settings-reference.md')
+
+function targetArgument(): string {
+  const index = process.argv.indexOf('--target')
+  const target = index === -1 ? undefined : process.argv[index + 1]
+  return target ? path.resolve(target) : DEFAULT_TARGET
+}
+
+function writeReference(target: string): void {
+  writeFileSync(target, body, 'utf8')
+  console.log(`wrote ${target} (${SETTING_IDS.length} settings)`)
+}
+
+// Compares the rendered body directly rather than writing to a temp file the way
+// the schema generator does: the full body is already in memory here, and the
+// comparison has to be on the rendered text because `SCOPE_NOTES` is
+// interpolated into prose, not just into the table.
+function checkReference(target: string): void {
+  const actual = existsSync(target) ? readFileSync(target, 'utf8') : ''
+  if (actual === body) return
+
+  console.error('settings reference is stale: run bun run settings:reference')
+  process.exitCode = 1
+}
+
+const target = targetArgument()
+if (process.argv.includes('--check')) checkReference(target)
+else writeReference(target)

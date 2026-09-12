@@ -18,6 +18,8 @@
     "bench:editor-typing:gate": "bun scripts/editor-typing-benchmark.mjs --gate --browsers=chromium",
     "bench:editor-typing:gate:all": "bun scripts/editor-typing-benchmark.mjs --gate --browsers=chromium,webkit,firefox",
     "bench:editor-typing:huge": "node scripts/generate-bench-fixture.mjs && bun scripts/editor-typing-benchmark.mjs --file=.bench-fixtures/huge.ts --start-fraction=0.5 --page-timeout-ms=180000 --app-url=http://localhost:3000/",
+    "bench:file-tree-prepared-input": "bun scripts/file-tree-prepared-input-benchmark.ts",
+    "bench:file-tree-prepared-input:gate": "bun scripts/file-tree-prepared-input-benchmark.ts --gate",
     "bench:fixture": "node scripts/generate-bench-fixture.mjs",
     "start": "bun --env-file=../../.env vite preview",
     "lint": "oxlint .",
@@ -83,7 +85,6 @@
     "zustand": "^5.0.15"
   },
   "devDependencies": {
-    "@eslint/js": "^10.0.1",
     "@tailwindcss/vite": "^4.3.3",
     "@testing-library/dom": "^10.4.1",
     "@testing-library/jest-dom": "^6.10.0",
@@ -96,10 +97,6 @@
     "@typescript/native-preview": "7.0.0-dev.20260707.2",
     "@vitejs/plugin-react": "^6.1.1",
     "@vitest/browser-playwright": "^4.1.11",
-    "eslint": "^10.10.0",
-    "eslint-plugin-react-hooks": "^7.1.1",
-    "eslint-plugin-react-refresh": "^0.5.6",
-    "globals": "^17.12.0",
     "happy-dom": "^20.14.5",
     "msw": "^2.15.0",
     "oxc-transform-react": "^0.145.0",
@@ -107,7 +104,6 @@
     "oxlint": "1.70.0",
     "playwright": "^1.63.0",
     "typescript": "^7.0.2",
-    "typescript-eslint": "^8.70.0",
     "vite": "^8.3.0",
     "vitest": "^4.1.11"
   }

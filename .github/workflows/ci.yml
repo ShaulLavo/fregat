@@ -51,6 +51,17 @@ jobs:
       - name: Check generated artifacts
         run: bun run generated:check
 
+      # The one benchmark that survives a shared runner. Its thresholds are
+      # ratios (remount speedup >= 0.2, cold slowdown <= 0.15), so runner speed
+      # cancels out, and it is pure in-process: no browser, no server, no sibling
+      # Editor checkout. ~4s, currently passing with ~4x margin. Every other
+      # bench here gates on absolute milliseconds calibrated on one developer
+      # machine, and `bench:editor-open:gate` cannot run in CI at all — its
+      # calibration identity is a hash of `apps/web/src`, so any PR invalidates
+      # it before a measurement happens.
+      - name: Benchmark gate (file tree prepared input)
+        run: bun run --cwd apps/web bench:file-tree-prepared-input:gate
+
       # Runs the scripts suite plus every workspace's own. The `test` scripts in
       # `apps/web` and `packages/tree` are scoped to `--project node --project
       # dom`; their browser projects are the separate job below.

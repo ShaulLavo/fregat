@@ -17,7 +17,3 @@ pre-commit:
 
     - name: typecheck repo
       run: PATH="$HOME/.bun/bin:/opt/homebrew/bin:/usr/local/bin:$PATH" bun run typecheck
-
-    # TODO: Move the editor scroll benchmark gate to CI, where the web and API servers can be started reliably.
-    # - name: editor scroll bench gate
-    #   run: PATH="$HOME/.bun/bin:/opt/homebrew/bin:/usr/local/bin:$PATH" bun run --cwd apps/web bench:editor-scroll:gate
