@@ -25,13 +25,13 @@ export function SshHostPicker({
         autoCapitalize='none'
         spellCheck={false}
       />
-      <div role='group' aria-label='SSH hosts' className='border-border rounded-md border'>
+      <div role='group' aria-label='SSH hosts' className='border-border rounded-lg border'>
         <p className='text-muted-foreground border-border border-b px-3 py-2 text-xs font-medium'>
           SSH config
         </p>
         <SshHostList value={value} onSelect={onChange} />
       </div>
-      <div role='group' aria-label='Tailnet machines' className='border-border rounded-md border'>
+      <div role='group' aria-label='Tailnet machines' className='border-border rounded-lg border'>
         <p className='text-muted-foreground border-border border-b px-3 py-2 text-xs font-medium'>
           Tailnet
         </p>

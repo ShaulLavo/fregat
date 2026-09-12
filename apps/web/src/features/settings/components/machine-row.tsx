@@ -60,7 +60,7 @@ export function MachineRow({
     )
 
   return (
-    <div className='border-border flex flex-col gap-2 rounded-md border p-3'>
+    <div className='border-border flex flex-col gap-2 rounded-lg border p-3'>
       <div className='flex items-center gap-2'>
         <Phase label={machine.label ?? name} phase={phase} />
         <span className='min-w-0 flex-1 truncate text-sm font-medium'>{machine.label ?? name}</span>

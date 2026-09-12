@@ -13,6 +13,7 @@ import {
 
 import { Button } from '@workspace/ui/components/button'
 import { OrbitLoader } from '@workspace/ui/components/orbit-loader'
+import { PaneBar } from '@workspace/ui/components/pane-bar'
 import { cn } from '@workspace/ui/lib/utils'
 import { PaneHeaderMenu } from '@/features/workbench/components/pane-header-menu'
 import type { LoadState } from '@/lib/load-state'
@@ -54,19 +55,14 @@ export function ToolPaneHeader({
   const rowLabel = rowActive ? `Expand ${title}` : `Collapse ${title} to row`
   const actionsVisible = Boolean(onClose || onToggleCollapse || onCollapseToRow)
 
-  const header = (
-    <div
-      className={cn(
-        'border-border flex shrink-0 text-foreground',
-        orientation === 'vertical'
-          ? 'h-full w-full flex-col items-center gap-1 border-r px-1 py-1'
-          : 'h-10 items-center gap-2 border-b px-3 compact:h-9 compact:gap-1.5 compact:px-2',
-        className,
-      )}
-      data-workbench-tool-pane-header=''
-      data-workbench-tool-pane-header-collapsed={collapsed ? 'true' : 'false'}
-      data-workbench-tool-pane-header-orientation={orientation}
-    >
+  const headerAttributes = {
+    'data-workbench-tool-pane-header': '',
+    'data-workbench-tool-pane-header-collapsed': collapsed ? 'true' : 'false',
+    'data-workbench-tool-pane-header-orientation': orientation,
+  }
+
+  const headerChildren = (
+    <>
       {toolPaneHeaderIcon(tab)}
       <div
         className={cn(
@@ -83,7 +79,7 @@ export function ToolPaneHeader({
           {title}
         </div>
         {detail ? (
-          <div className='text-muted-foreground truncate text-[11px] tabular-nums'>{detail}</div>
+          <div className='text-muted-foreground text-2xs truncate tabular-nums'>{detail}</div>
         ) : null}
       </div>
       {actionsVisible ? (
@@ -97,7 +93,7 @@ export function ToolPaneHeader({
           {onCollapseToRow ? (
             <Button
               aria-label={rowLabel}
-              className='text-muted-foreground hover:text-foreground compact:size-6 size-7 rounded-md'
+              className='text-muted-foreground'
               size='icon-sm'
               title={rowLabel}
               type='button'
@@ -111,7 +107,7 @@ export function ToolPaneHeader({
           {!onCollapseToRow && onToggleCollapse ? (
             <Button
               aria-label={toggleLabel}
-              className='text-muted-foreground hover:text-foreground compact:size-6 size-7 rounded-md'
+              className='text-muted-foreground'
               size='icon-sm'
               title={toggleLabel}
               type='button'
@@ -125,7 +121,7 @@ export function ToolPaneHeader({
           {onClose ? (
             <Button
               aria-label={`Close ${title}`}
-              className='text-muted-foreground hover:text-foreground compact:size-6 size-7 rounded-md'
+              className='text-muted-foreground'
               size='icon-sm'
               title={`Close ${title}`}
               type='button'
@@ -138,8 +134,25 @@ export function ToolPaneHeader({
           ) : null}
         </div>
       ) : null}
-    </div>
+    </>
   )
+
+  const header =
+    orientation === 'vertical' ? (
+      <div
+        className={cn(
+          'border-border text-foreground flex h-full w-(--rail-width) shrink-0 flex-col items-center gap-1 border-r px-1 py-1',
+          className,
+        )}
+        {...headerAttributes}
+      >
+        {headerChildren}
+      </div>
+    ) : (
+      <PaneBar border='bottom' className={cn('text-foreground', className)} {...headerAttributes}>
+        {headerChildren}
+      </PaneBar>
+    )
 
   return <PaneHeaderMenu title={title} trigger={header} />
 }

@@ -81,7 +81,7 @@ function ResizableHandle({
           <div aria-hidden className='absolute -inset-1' />
           <div
             data-resizable-handle-indicator=''
-            className='z-10 flex w-1 shrink-0 self-stretch rounded-none bg-transparent'
+            className='z-10 flex w-1 shrink-0 self-stretch bg-transparent'
           />
         </>
       )}

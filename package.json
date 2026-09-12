@@ -41,7 +41,7 @@
     "settings:reference:check": "bun scripts/generate-settings-reference.ts --check",
     "settings:schema": "bun scripts/generate-settings-schema.ts",
     "settings:schema:check": "bun scripts/generate-settings-schema.ts --check",
-    "test:scripts": "bun --bun vitest run scripts/runtime-network.test.ts scripts/web-layering.test.ts scripts/lint/web-boundaries.test.ts --environment node",
+    "test:scripts": "bun --bun vitest run scripts/runtime-network.test.ts scripts/web-layering.test.ts scripts/lint/web-boundaries.test.ts scripts/lint/web-design-census.test.ts --environment node",
     "verify": "bun run typecheck && bun run lint && bun run format:check && bun run generated:check && bun run unused:check && bun run test",
     "dupes": "jscpd apps packages",
     "dupes:report": "jscpd apps packages --reporters html,console --output ./jscpd-report",

@@ -22,7 +22,7 @@ export function MessageCompletionDivider({
   })
 
   return (
-    <div className='border-border/60 text-muted-foreground border-b pt-1 pb-2 text-xs tabular-nums'>
+    <div className='border-subtle text-muted-foreground border-b pt-1 pb-2 text-xs tabular-nums'>
       {onToggle ? (
         <Button
           aria-expanded={expanded}

@@ -37,7 +37,7 @@ export function SearchReplaceFields({
     <div className={cn('mt-2 grid grid-cols-[minmax(0,1fr)_auto_auto] gap-1.5', className)}>
       <SearchHistoryInput
         aria-label='Replace in workspace'
-        inputClassName={cn('h-7 text-[11px]', inputClassName)}
+        inputClassName={cn('h-(--density-control-height-sm) text-2xs', inputClassName)}
         label='Replace'
         value={replaceText}
         onSelectNextHistory={onSelectNextHistory}
@@ -45,7 +45,7 @@ export function SearchReplaceFields({
         onValueChange={onReplaceTextChange}
       />
       <Button
-        className={cn('h-7 px-2 text-[11px]', buttonClassName)}
+        className={cn('text-2xs', buttonClassName)}
         disabled={!canReplace || replacing}
         size='sm'
         type='button'
@@ -55,7 +55,7 @@ export function SearchReplaceFields({
         Next
       </Button>
       <Button
-        className={cn('h-7 px-2 text-[11px]', buttonClassName)}
+        className={cn('text-2xs', buttonClassName)}
         disabled={!canReplace || replacing}
         size='sm'
         type='button'

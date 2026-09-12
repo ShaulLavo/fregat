@@ -4,8 +4,17 @@ import {
   type LanguageServerSetPluginOptions,
 } from '@singapor/lsp-plugin'
 import { beforeEach, describe, vi } from 'vitest'
+import { activeDocumentForSnapshot } from '@singapor/lsp-plugin/document-sync'
 
 import { createEditorLanguageServerStatusSource } from '@/features/editor/state/language-server-status-source'
+import {
+  fileDocument,
+  fileResource,
+  filesystemPath,
+  settingsJsonDocument,
+} from '@/lib/documents/utils/identity'
+import { languageServerDocument } from '@/lib/language-server-document'
+import { languageServerSnapshot } from '../../../../test/factories/language-server-snapshot'
 import { expect, test } from '../../../../test/fixtures'
 
 const { createdServerSets } = vi.hoisted(() => ({
@@ -24,15 +33,76 @@ const { createMatchedLanguageServerPlugin, languageServerMatches } =
 
 const onApplyWorkspaceEdit = vi.fn(async () => ({ status: 'applied' as const }))
 const documentSyncController = new LanguageServerDocumentSyncController()
+const document = languageServerDocument(fileDocument(fileResource(filesystemPath('src/a.ts'))))
 
 beforeEach(() => {
   createdServerSets.length = 0
 })
 
 describe('createMatchedLanguageServerPlugin', () => {
+  test.each([
+    {
+      target: fileDocument(fileResource(filesystemPath('settings-json:app.tsx'))),
+      uri: 'file:///settings-json%3Aapp.tsx',
+      languageId: 'typescript',
+      expectedLanguage: 'typescriptreact',
+    },
+    {
+      target: fileDocument(fileResource(filesystemPath('src/app.tsx'))),
+      uri: 'file:///src/app.tsx',
+      languageId: 'typescript',
+      expectedLanguage: 'typescriptreact',
+    },
+    {
+      target: fileDocument(fileResource(filesystemPath('/repo/a [b] #1.tsx'))),
+      uri: 'file:///repo/a%20%5Bb%5D%20%231.tsx',
+      languageId: 'typescript',
+      expectedLanguage: 'typescriptreact',
+    },
+    {
+      target: settingsJsonDocument('user'),
+      uri: 'settings-json:user',
+      languageId: 'json',
+      expectedLanguage: 'json',
+    },
+    {
+      target: settingsJsonDocument('workspace'),
+      uri: 'settings-json:workspace',
+      languageId: 'json',
+      expectedLanguage: 'json',
+    },
+  ] as const)(
+    'syncs $uri independently of the native document key',
+    ({ target, uri, languageId, expectedLanguage }) => {
+      const document = languageServerDocument(target)
+      if (!document) return expect.unreachable('Expected an LSP document')
+      createMatchedLanguageServerPlugin({
+        document,
+        documentSyncController,
+        enabled: true,
+        matches: [match('typescript', '/repo', 0)],
+        rootPath: '/repo',
+        statusSource: createEditorLanguageServerStatusSource(),
+        target: { matchPath: 'src/app.tsx' },
+        onApplyWorkspaceEdit,
+      })
+      const snapshot = languageServerSnapshot(document.key, languageId)
+      const options = createdServerSets[0]?.documentSync ?? {}
+      const active = activeDocumentForSnapshot(snapshot, options)
+
+      expect(active?.uri).toBe(uri)
+      expect(active?.languageId).toBe(expectedLanguage)
+      expect(snapshot.documentId).toBe(document.key)
+      expect(
+        activeDocumentForSnapshot(languageServerSnapshot('outgoing-document'), options),
+      ).toBeNull()
+    },
+  )
+
   test('stays idle without eligible matches', () => {
     const source = createEditorLanguageServerStatusSource()
     const plugin = createMatchedLanguageServerPlugin({
+      document,
       documentSyncController,
       enabled: true,
       matches: [],
@@ -49,11 +119,29 @@ describe('createMatchedLanguageServerPlugin', () => {
     expect(createdServerSets).toEqual([])
   })
 
+  test('stays idle when a view has no language-server document', () => {
+    const source = createEditorLanguageServerStatusSource()
+    const plugin = createMatchedLanguageServerPlugin({
+      document: languageServerDocument({ kind: 'search', root: filesystemPath('/repo') }),
+      documentSyncController,
+      enabled: true,
+      matches: [match('typescript', '/repo', 0)],
+      rootPath: '/repo',
+      statusSource: source,
+      target: { matchPath: 'src/a.ts' },
+      onApplyWorkspaceEdit,
+    })
+
+    expect(plugin.name).toBe('editor.language-server.idle')
+    expect(createdServerSets).toEqual([])
+  })
+
   test('builds one composite with one distinct lane per descriptor', () => {
     const source = createEditorLanguageServerStatusSource()
     const onDefinitionLinkHover = vi.fn()
     const onDidNavigateDiagnostic = vi.fn(() => ({ kind: 'ignored' as const }))
     const plugin = createMatchedLanguageServerPlugin({
+      document,
       documentSyncController,
       enabled: true,
       matches: [match('typescript', '/repo/package', 0), match('eslint', '/repo', 5)],
@@ -92,6 +180,7 @@ describe('createMatchedLanguageServerPlugin', () => {
 
   test('applies feature exclusions and named ready notifications before lane construction', () => {
     createMatchedLanguageServerPlugin({
+      document,
       documentSyncController,
       enabled: true,
       matches: [match('typescript', '/repo', 0), match('eslint', '/repo', 5)],
@@ -119,6 +208,7 @@ describe('createMatchedLanguageServerPlugin', () => {
   test('keeps a ready primary aggregate ready when a secondary errors', () => {
     const source = createEditorLanguageServerStatusSource()
     const plugin = createMatchedLanguageServerPlugin({
+      document,
       documentSyncController,
       enabled: true,
       matches: [match('typescript', '/repo', 0), match('eslint', '/repo', 5)],
@@ -140,6 +230,7 @@ describe('createMatchedLanguageServerPlugin', () => {
   test('keeps a lane ready after a routed request fails', () => {
     const source = createEditorLanguageServerStatusSource()
     const plugin = createMatchedLanguageServerPlugin({
+      document,
       documentSyncController,
       enabled: true,
       matches: [match('typescript', '/repo', 0)],
@@ -165,6 +256,7 @@ describe('createMatchedLanguageServerPlugin', () => {
   test('orders composite diagnostics by diagnostic rank', () => {
     const source = createEditorLanguageServerStatusSource()
     const plugin = createMatchedLanguageServerPlugin({
+      document,
       documentSyncController,
       enabled: true,
       matches: [match('typescript', '/repo', 5), match('eslint', '/repo', 0)],
@@ -189,6 +281,7 @@ describe('createMatchedLanguageServerPlugin', () => {
 describe('semantic token ownership', () => {
   test('creates layer options for the runtime-elected semantic owner', () => {
     createMatchedLanguageServerPlugin({
+      document,
       documentSyncController,
       enabled: true,
       matches: [match('typescript', '/repo', 5), match('rust', '/repo', 0)],
@@ -212,6 +305,7 @@ describe('semantic token ownership', () => {
   test('keeps initialization capabilities stable per server', () => {
     for (const root of ['/repo', '/other']) {
       createMatchedLanguageServerPlugin({
+        document,
         documentSyncController,
         enabled: true,
         matches: [match('rust', root, 0)],

@@ -82,7 +82,7 @@ export function ChatInputEditor({
   const handleFocus = useCallback(() => onFocusChange(true), [onFocusChange])
 
   return (
-    <div className='compact:px-3 compact:pt-3 compact:pb-1.5 relative px-4 pt-4 pb-2'>
+    <div className='relative px-(--density-section-padding) pt-(--density-section-padding) pb-(--density-section-gap)'>
       <PlainTextPlugin
         contentEditable={
           <ContentEditable
@@ -98,7 +98,7 @@ export function ChatInputEditor({
         }
         ErrorBoundary={LexicalErrorBoundary}
         placeholder={
-          <div className='text-muted-foreground/65 compact:top-3 compact:right-3 compact:left-3 pointer-events-none absolute top-4 right-4 left-4 text-sm leading-6'>
+          <div className='text-muted-foreground/65 pointer-events-none absolute inset-x-(--density-section-padding) top-(--density-section-padding) text-sm leading-6'>
             {placeholder}
           </div>
         }

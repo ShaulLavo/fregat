@@ -9,7 +9,7 @@ export function ProviderRow({ instance }: { instance: ProviderInstanceConfig }) 
   const label = instance.displayLabel ?? instance.providerInstanceId
 
   return (
-    <div className='border-border compact:gap-2 compact:px-2 compact:py-1.5 flex items-center gap-3 border-b px-3 py-2 last:border-b-0'>
+    <div className='border-border flex items-center gap-(--density-control-gap) border-b px-(--density-control-padding-x) py-(--density-section-gap) last:border-b-0'>
       <div className='flex min-w-0 flex-1 flex-col'>
         <span className='text-foreground truncate text-sm'>{label}</span>
         <span className='text-muted-foreground truncate text-xs'>

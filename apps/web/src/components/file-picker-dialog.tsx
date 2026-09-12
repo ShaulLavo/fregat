@@ -20,6 +20,7 @@ import {
   DialogTitle,
 } from '@workspace/ui/components/dialog'
 import { Input } from '@workspace/ui/components/input'
+import { PaneBar } from '@workspace/ui/components/pane-bar'
 import { Separator } from '@workspace/ui/components/separator'
 import { deriveWriteTarget, policyControlledIds } from '@workspace/contracts'
 import {
@@ -442,7 +443,7 @@ export function FilePickerDialog({
   return (
     <Dialog onOpenChange={onOpenChange} open={open}>
       <DialogContent
-        className='bg-popover-solid flex h-[min(760px,calc(100svh-2rem))] w-[min(1080px,calc(100vw-1.5rem))] max-w-none flex-col gap-0 overflow-hidden rounded-xl border p-0 text-sm shadow-2xl sm:max-w-none'
+        className='bg-popover-solid flex h-[min(760px,calc(100svh-2rem))] w-[min(1080px,calc(100vw-1.5rem))] max-w-none flex-col gap-0 overflow-hidden border p-0 text-sm sm:max-w-none'
         onKeyDownCapture={handleDialogKeyDownCapture}
         showCloseButton={false}
       >
@@ -455,7 +456,7 @@ export function FilePickerDialog({
             <DialogDescription>{`Browsing ${displayPath(session.currentPath)}.`}</DialogDescription>
           </DialogHeader>
 
-          <div className='border-border/60 compact:h-9 compact:px-1.5 flex h-11 shrink-0 items-center gap-0.5 border-b px-2'>
+          <PaneBar border='bottom'>
             <div
               aria-label='Folder history'
               className='flex shrink-0 items-center gap-0.5'
@@ -499,7 +500,7 @@ export function FilePickerDialog({
                 </Button>
               </IconTooltip>
             </div>
-            <Separator className='compact:mx-1 mx-1.5 h-4' orientation='vertical' />
+            <Separator className='h-4' orientation='vertical' />
             <LocationBar
               currentPath={session.currentPath}
               draft={pathInput.draft}
@@ -512,20 +513,20 @@ export function FilePickerDialog({
               onEdit={pathInput.open}
               onSubmit={pathInput.submit}
             />
-            <div className='compact:ml-1 relative ml-1.5 w-52 shrink-0 max-sm:w-32'>
+            <div className='relative w-52 shrink-0 max-sm:w-32'>
               <MagnifyingGlassIcon className='text-muted-foreground pointer-events-none absolute top-1/2 left-2 size-3.5 -translate-y-1/2' />
               <Input
                 ref={searchInputRef}
                 aria-label={copy.searchLabel}
                 autoFocus
-                className='compact:h-6 h-7 pl-7 text-xs'
+                className='h-(--density-control-height-sm) pl-7 text-xs'
                 onChange={handleSearchChange}
                 onKeyDown={handleSearchKeyDown}
                 placeholder={copy.searchPlaceholder}
                 value={session.query}
               />
             </div>
-            <Separator className='compact:mx-1 mx-1.5 h-4' orientation='vertical' />
+            <Separator className='h-4' orientation='vertical' />
             <div
               aria-label='Folder display actions'
               className='flex shrink-0 items-center gap-0.5'
@@ -560,9 +561,9 @@ export function FilePickerDialog({
                 </Button>
               </IconTooltip>
             </div>
-          </div>
+          </PaneBar>
 
-          <div className='border-border/60 compact:px-1.5 border-b px-2 lg:hidden'>
+          <div className='border-border border-b px-(--bar-padding-x) lg:hidden'>
             <MobileLocations
               currentPath={session.currentPath}
               homePath={homePath}
@@ -576,7 +577,7 @@ export function FilePickerDialog({
               homePath={homePath}
               recentState={recentState}
             />
-            <div className='border-border/60 bg-background grid min-h-0 grid-rows-[auto_minmax(0,1fr)] lg:border-x'>
+            <div className='border-border bg-background grid min-h-0 grid-rows-[auto_minmax(0,1fr)] lg:border-x'>
               <ListHeader
                 isLoading={loadState.status === 'loading' || listInteractionPending}
                 isSearching={isSearching}
@@ -608,7 +609,7 @@ export function FilePickerDialog({
             />
           </div>
 
-          <DialogFooter className='border-border/60 compact:h-10 compact:gap-2 compact:px-2 flex h-12 shrink-0 flex-row items-center justify-between gap-3 border-t px-2.5 sm:justify-between'>
+          <DialogFooter className='border-border flex h-(--bar-height) shrink-0 flex-row items-center justify-between gap-(--density-control-gap) border-t px-(--bar-padding-x) sm:justify-between'>
             <SelectedSummary entry={selectedPickable} iconMode={displayedIconMode} mode={mode} />
             <div className='flex shrink-0 gap-1.5'>
               <Button onClick={() => onOpenChange(false)} size='sm' type='button' variant='ghost'>

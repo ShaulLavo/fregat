@@ -1,0 +1,47 @@
+[
+  {
+    "file": "apps/web/src/features/chat/components/messages-timeline.tsx",
+    "class": "rounded-full",
+    "reason": "D1 rule 2: the jump-to-latest control is a circle, so it overrides the Button primitive's control radius. The only circular button in the app."
+  },
+  {
+    "file": "apps/web/src/features/workbench/components/editor-tab-button.tsx",
+    "class": "<button>",
+    "reason": "Spreads dnd-kit drag attributes and listeners onto the element and needs role='tab'. The Button primitive offers neither."
+  },
+  {
+    "file": "apps/web/src/features/chat/components/timeline-minimap.tsx",
+    "class": "<button>",
+    "reason": "An absolutely positioned minimap mark. Button's ghost hover would paint a block over the transcript and its active translate fights the mark's own -translate-y-1/2."
+  },
+  {
+    "file": "apps/web/src/features/chat/components/chat-input-command-menu.tsx",
+    "class": "<button>",
+    "reason": "role='option' whose highlight follows keyboard state via aria-selected, and which deliberately neutralises hover. On a Button that would mean re-declaring hover on the primitive, which D6 bans."
+  },
+  {
+    "file": "apps/web/src/features/chat/components/assistant-changed-files-tree.tsx",
+    "class": "<button>",
+    "reason": "Full-width list row. See the Row primitive gap recorded in plans/100-web-design-language.md: Button is a fixed-height centred control that owns a radius and a hover fill, which is exactly what a row must not have."
+  },
+  {
+    "file": "apps/web/src/features/editor/components/language-server-references-pane.tsx",
+    "class": "<button>",
+    "reason": "Full-width list row. See the Row primitive gap recorded in plans/100-web-design-language.md: Button is a fixed-height centred control that owns a radius and a hover fill, which is exactly what a row must not have."
+  },
+  {
+    "file": "apps/web/src/features/search/components/file-group.tsx",
+    "class": "<button>",
+    "reason": "Full-width list row. See the Row primitive gap recorded in plans/100-web-design-language.md: Button is a fixed-height centred control that owns a radius and a hover fill, which is exactly what a row must not have."
+  },
+  {
+    "file": "apps/web/src/features/search/components/match-row.tsx",
+    "class": "<button>",
+    "reason": "Full-width list row. See the Row primitive gap recorded in plans/100-web-design-language.md: Button is a fixed-height centred control that owns a radius and a hover fill, which is exactly what a row must not have."
+  },
+  {
+    "file": "apps/web/src/features/workbench/components/diagnostics-panel.tsx",
+    "class": "<button>",
+    "reason": "Full-width two-line list row. See the Row primitive gap recorded in plans/100-web-design-language.md: Button is a fixed-height centred control that owns a radius and a hover fill, which is exactly what a row must not have."
+  }
+]

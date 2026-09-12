@@ -5,7 +5,7 @@ export function Status({ children, tone }: { children: string; tone?: 'destructi
     <p
       role='status'
       className={cn(
-        'p-4 text-sm compact:p-3',
+        'p-(--density-section-padding) text-sm',
         tone === 'destructive' ? 'text-destructive' : 'text-muted-foreground',
       )}
     >

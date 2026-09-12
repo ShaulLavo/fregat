@@ -1,7 +1,6 @@
 import { useQuery } from '@tanstack/react-query'
 import { Alert, AlertAction, AlertDescription, AlertTitle } from '@workspace/ui/components/alert'
 import { Button } from '@workspace/ui/components/button'
-import { cn } from '@workspace/ui/lib/utils'
 import { WarningCircleIcon, XIcon } from '@phosphor-icons/react'
 import { useState } from 'react'
 
@@ -53,15 +52,15 @@ export function ChatRuntimeStatus({
   return (
     <div
       aria-label='Runtime notices'
-      className='compact:px-2 compact:pt-2 shrink-0 px-3 pt-3'
+      className='shrink-0 px-(--density-control-padding-x) pt-(--density-control-padding-x)'
       role='status'
     >
-      <div className='compact:space-y-1.5 mx-auto max-w-3xl space-y-2'>
+      <div className='mx-auto max-w-3xl space-y-(--density-control-gap)'>
         <RuntimeAlert alert={front} onDismiss={dismiss} onSignIn={openSignIn} />
         {folded.length === 0 ? null : (
           <Button
             aria-expanded={expanded}
-            className='text-muted-foreground hover:text-foreground h-6 px-1.5 text-[11px] font-normal'
+            className='text-muted-foreground hover:text-foreground text-2xs px-1.5 font-normal'
             size='xs'
             type='button'
             variant='ghost'
@@ -99,7 +98,7 @@ function RuntimeAlert({
 
   return (
     <Alert
-      className={cn(runtimeAlertClass(alert.tone), 'rounded-md')}
+      className={runtimeAlertClass(alert.tone)}
       variant={alert.tone === 'error' ? 'destructive' : 'default'}
     >
       <WarningCircleIcon className='size-4' />
@@ -119,7 +118,6 @@ function RuntimeAlert({
           {alert.dismissKey ? (
             <Button
               aria-label={`Dismiss ${alert.title}`}
-              className='size-6'
               onClick={() => onDismiss(alert)}
               size='icon-sm'
               type='button'
@@ -139,5 +137,5 @@ function runtimeAlertClass(tone: ChatRuntimeAlertTone) {
     return 'border-warning/30 bg-warning/10 text-warning'
   }
 
-  return null
+  return undefined
 }

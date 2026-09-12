@@ -43,7 +43,7 @@ export function SessionRow({
   if (renaming?.surface === 'rail' && scopedSessionKey(renaming.ref) === session.key) {
     return (
       <SessionRename
-        className='bg-accent text-foreground compact:px-1.5 compact:py-1 h-auto rounded-md border-transparent px-2 py-1.5 text-[13px] leading-5'
+        className='bg-accent text-foreground h-auto border-transparent px-(--density-row-padding-x) py-(--density-row-padding-y) text-xs leading-5'
         session={session}
       />
     )
@@ -59,12 +59,10 @@ export function SessionRow({
           {...listeners}
           aria-current={active ? 'true' : undefined}
           className={cn(
-            'group/session focus-visible:ring-ring/50 flex h-auto w-full touch-none flex-col items-start justify-start gap-1 rounded-md px-2 py-1.5 text-left outline-none focus-visible:ring-1 compact:gap-0.5 compact:px-1.5 compact:py-1',
-            // Hover material only when not selected: bg-accent already carries
-            // --surface-opacity, so a /60 hover on top of it composites *lighter*.
+            'group/session flex h-auto w-full touch-none flex-col items-start justify-start gap-(--density-gap-tight) px-(--density-row-padding-x) py-(--density-row-padding-y) text-left',
             'text-muted-foreground',
-            !active && !marked && 'hover:bg-accent hover:text-foreground',
-            active && 'bg-accent text-accent-foreground',
+            !active && !marked && 'hover:bg-row-hover hover:text-foreground',
+            active && 'bg-row-selected text-foreground',
             // A marked row is not the row on the stage, so it gets a ring rather than
             // the fill — the two states have to be readable at the same time.
             marked && !active && 'ring-ring/40 text-foreground ring-1',
@@ -83,7 +81,7 @@ export function SessionRow({
             <SessionAttentionIndicator status={session.status} />
             <span
               className={cn(
-                'min-w-0 flex-1 truncate text-[13px] leading-5',
+                'min-w-0 flex-1 truncate text-xs leading-5',
                 session.unread && !active && 'text-foreground font-medium',
               )}
             >
@@ -97,22 +95,22 @@ export function SessionRow({
                 title='Finished since you last opened it'
               />
             ) : null}
-            <span className='shrink-0 text-[10px] tabular-nums opacity-50'>
+            <span className='text-3xs shrink-0 tabular-nums opacity-50'>
               {formatChatRelativeTime(session.activityAt, nowMs)}
             </span>
           </span>
           {session.origin === 'discovered' ? (
-            <span className='text-muted-foreground pl-[14px] text-[11px]'>Imported chat</span>
+            <span className='text-muted-foreground text-2xs pl-[14px]'>Imported chat</span>
           ) : null}
           <span className='flex min-w-0 items-center gap-1.5 pl-[14px]'>
             {session.machineLabel ? <MachineChip label={session.machineLabel} /> : null}
             <WorktreeChip worktree={session.worktree} repositoryKind={session.repositoryKind} />
           </span>
           {session.stale ? (
-            <span className='text-warning pl-[14px] text-[10px]'>Cached · machine unavailable</span>
+            <span className='text-warning text-3xs pl-[14px]'>Cached · machine unavailable</span>
           ) : null}
           {session.hasError ? (
-            <span className='text-destructive pl-[14px] text-[11px]'>Error</span>
+            <span className='text-destructive text-2xs pl-[14px]'>Error</span>
           ) : null}
           <SessionRowSnippet sessionKey={session.key} />
         </Button>

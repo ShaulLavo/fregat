@@ -23,22 +23,27 @@ export function AppTitlebar() {
       aria-label='Window toolbar'
       className={cn(
         NATIVE_WINDOW_DRAG_CLASS,
-        'bg-card backdrop-material border-border grid h-11 shrink-0 select-none border-b compact:h-10',
+        'bg-card backdrop-material border-border grid h-(--bar-height) shrink-0 select-none border-b',
       )}
       data-native-window-drag-region=''
       style={{ gridTemplateColumns: model.gridTemplateColumns }}
     >
-      <div className={cn('flex min-w-0 items-center px-1.5', isDesktop() && 'pl-[4.75rem]')}>
+      <div
+        className={cn(
+          'flex min-w-0 items-center px-(--bar-padding-x)',
+          isDesktop() && 'pl-[4.75rem]',
+        )}
+      >
         <WorkspaceProjectMenu workspaceTitle={model.workspaceTitle} />
       </div>
       {model.documentTitle ? (
-        <div className='border-border compact:gap-1.5 compact:px-2 flex min-w-0 items-center gap-2 border-l px-3'>
+        <div className='border-subtle flex min-w-0 items-center gap-(--density-control-gap) border-l px-(--bar-padding-x)'>
           <FileIcon className='text-muted-foreground size-4 shrink-0' />
           <span className='truncate text-xs font-medium'>{model.documentTitle}</span>
           <div aria-hidden='true' className='min-w-16 flex-1 self-stretch' />
         </div>
       ) : null}
-      <div className='compact:px-2 flex items-center px-3'>
+      <div className='flex items-center px-(--bar-padding-x)'>
         <UiModeToggle />
       </div>
     </header>

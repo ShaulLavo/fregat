@@ -4,7 +4,7 @@ export function SearchSummary({ rootPath }: { rootPath: string }) {
   return (
     <SearchBufferSummary
       buttonClassName='size-[18px]'
-      className='mt-1 min-h-4 gap-1 px-0 text-[10px]'
+      className='text-3xs mt-1 min-h-4 gap-1 px-0'
       rootPath={rootPath}
     />
   )

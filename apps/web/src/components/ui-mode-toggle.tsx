@@ -26,7 +26,7 @@ export function UiModeToggle() {
         <Button
           aria-label='Toggle sessions'
           aria-pressed={chatModePanels.sessionRailOpen}
-          className='text-muted-foreground hover:text-foreground compact:size-6 size-7 rounded-md'
+          className='text-muted-foreground'
           size='icon-sm'
           title='Toggle sessions'
           type='button'
@@ -36,7 +36,7 @@ export function UiModeToggle() {
           <SidebarSimpleIcon className='size-4' />
         </Button>
       ) : null}
-      <div className='border-border bg-muted/50 flex items-center gap-0.5 rounded-md border p-0.5'>
+      <div className='flex items-center gap-(--density-gap-tight)'>
         {modeButton({
           active: uiMode === 'workbench',
           icon: <SquaresFourIcon className='size-3.5' />,
@@ -69,10 +69,7 @@ function modeButton({
     <Button
       aria-label={label}
       aria-pressed={active}
-      className={cn(
-        'text-muted-foreground hover:text-foreground size-6 rounded-sm',
-        active && 'bg-card-solid text-foreground',
-      )}
+      className={cn('text-muted-foreground', active && 'bg-accent text-accent-foreground')}
       size='icon-sm'
       title={label}
       type='button'

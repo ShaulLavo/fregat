@@ -120,7 +120,7 @@ export function SettingsPage({
       ref={setRootRef}
       tabIndex={-1}
     >
-      <header className='border-border compact:gap-1.5 compact:px-3 compact:pb-3 flex shrink-0 flex-col gap-2 border-b px-4 pt-2 pb-4 @max-3xl/settings:grid @max-3xl/settings:grid-cols-[minmax(0,1fr)_auto] @max-3xl/settings:[&_[data-slot=button]]:min-h-10 @max-3xl/settings:[&_input]:h-10 @max-3xl/settings:[&_input]:text-base'>
+      <header className='border-border flex shrink-0 flex-col gap-(--density-control-gap) border-b px-(--density-section-padding) pt-2 pb-(--density-section-padding) @max-3xl/settings:grid @max-3xl/settings:grid-cols-[minmax(0,1fr)_auto] @max-3xl/settings:[&_[data-slot=button]]:min-h-10 @max-3xl/settings:[&_input]:h-10 @max-3xl/settings:[&_input]:text-base'>
         {/* The tab's own action strip, above the scope tabs: these act on the tab,
             the row below picks which file the tab is showing. */}
         <div className='flex items-center justify-end gap-1 @max-3xl/settings:order-2'>
@@ -185,7 +185,7 @@ export function SettingsPage({
           it. */}
       {showJson ? (
         <div className='flex min-h-0 flex-1 flex-col'>
-          <div className='compact:px-3 compact:pt-3 px-4 pt-4'>
+          <div className='px-(--density-section-padding) pt-(--density-section-padding)'>
             <MalformedBanner layers={document.data.layers} />
           </div>
           <div className='min-h-0 flex-1'>
@@ -201,7 +201,7 @@ export function SettingsPage({
         </div>
       ) : (
         <div
-          className='compact:p-3 min-h-0 min-w-0 flex-1 overflow-y-auto p-4 @max-3xl/settings:[&_[data-slot=button]]:min-h-10 @max-3xl/settings:[&_[data-slot=select-trigger]]:min-h-10 @max-3xl/settings:[&_input]:h-10 @max-3xl/settings:[&_input]:text-base'
+          className='min-h-0 min-w-0 flex-1 overflow-y-auto p-(--density-section-padding) @max-3xl/settings:[&_[data-slot=button]]:min-h-10 @max-3xl/settings:[&_[data-slot=select-trigger]]:min-h-10 @max-3xl/settings:[&_input]:h-10 @max-3xl/settings:[&_input]:text-base'
           onKeyDown={(event) => {
             if (event.key !== 'Escape') return
             // Not while a control is mid-interaction: a recorder is capturing, and
@@ -217,7 +217,7 @@ export function SettingsPage({
             <Status>{emptySettingsMessage(query, selectedCategory)}</Status>
           ) : (
             shown.map(([category, ids]) => (
-              <section className='compact:mb-4 mb-6' key={category}>
+              <section className='mb-6' key={category}>
                 <h2 className='text-foreground mb-1 text-sm font-semibold'>{category}</h2>
                 {ids.includes('chat.keepImportedSessionsUpdated') ? <ImportSection /> : null}
                 {ids.map((id) => (

@@ -1,7 +1,7 @@
 import { cva } from 'class-variance-authority'
 
 const buttonVariants = cva(
-  "group/button inline-flex shrink-0 items-center justify-center rounded-none border border-transparent bg-clip-padding text-xs font-medium whitespace-nowrap transition-[background-color,border-color,color,box-shadow] duration-(--duration-exit) ease-out-strong outline-none select-none focus-visible:border-ring focus-visible:ring-1 focus-visible:ring-ring/50 active:not-aria-[haspopup]:translate-y-px disabled:pointer-events-none disabled:opacity-50 aria-invalid:border-destructive aria-invalid:ring-1 aria-invalid:ring-destructive/20 dark:aria-invalid:border-destructive/50 dark:aria-invalid:ring-destructive/40 [&_svg]:pointer-events-none [&_svg]:shrink-0 [&_svg:not([class*='size-'])]:size-4",
+  "group/button inline-flex shrink-0 items-center justify-center rounded-md border border-transparent bg-clip-padding text-xs font-medium whitespace-nowrap transition-[background-color,border-color,color,box-shadow] duration-(--duration-exit) ease-out-strong outline-none select-none focus-visible:border-ring focus-visible:ring-1 focus-visible:ring-ring/50 active:not-aria-[haspopup]:translate-y-px disabled:pointer-events-none disabled:opacity-50 aria-invalid:border-destructive aria-invalid:ring-1 aria-invalid:ring-destructive/20 dark:aria-invalid:border-destructive/50 dark:aria-invalid:ring-destructive/40 [&_svg]:pointer-events-none [&_svg]:shrink-0 [&_svg:not([class*='size-'])]:size-4",
   {
     variants: {
       variant: {
@@ -19,12 +19,12 @@ const buttonVariants = cva(
       size: {
         default:
           'h-(--density-control-height) gap-(--density-control-gap) px-(--density-control-padding-x) has-data-[icon=inline-end]:pr-(--density-control-padding-x-tight) has-data-[icon=inline-start]:pl-(--density-control-padding-x-tight)',
-        xs: "h-6 gap-1 rounded-none px-2 text-xs has-data-[icon=inline-end]:pr-1.5 has-data-[icon=inline-start]:pl-1.5 [&_svg:not([class*='size-'])]:size-3",
-        sm: "h-(--density-control-height-sm) gap-1 rounded-none px-(--density-control-padding-x) has-data-[icon=inline-end]:pr-1.5 has-data-[icon=inline-start]:pl-1.5 [&_svg:not([class*='size-'])]:size-3.5",
+        xs: "h-6 gap-1 px-2 text-xs has-data-[icon=inline-end]:pr-1.5 has-data-[icon=inline-start]:pl-1.5 [&_svg:not([class*='size-'])]:size-3",
+        sm: "h-(--density-control-height-sm) gap-1 px-(--density-control-padding-x) has-data-[icon=inline-end]:pr-1.5 has-data-[icon=inline-start]:pl-1.5 [&_svg:not([class*='size-'])]:size-3.5",
         lg: 'h-(--density-control-height-lg) gap-(--density-control-gap) px-(--density-control-padding-x) has-data-[icon=inline-end]:pr-(--density-control-padding-x-tight) has-data-[icon=inline-start]:pl-(--density-control-padding-x-tight)',
         icon: 'size-(--density-control-height)',
-        'icon-xs': "size-6 rounded-none [&_svg:not([class*='size-'])]:size-3",
-        'icon-sm': 'size-(--density-control-height-sm) rounded-none',
+        'icon-xs': "size-6 [&_svg:not([class*='size-'])]:size-3",
+        'icon-sm': 'size-(--density-control-height-sm)',
         'icon-lg': 'size-(--density-control-height-lg)',
       },
     },

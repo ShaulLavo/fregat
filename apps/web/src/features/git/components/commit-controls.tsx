@@ -54,7 +54,7 @@ export function CommitControls({
 
   return (
     <>
-      <div className='compact:pt-1 shrink-0 px-2 pt-1.5'>
+      <div className='shrink-0 px-(--density-row-padding-x) pt-(--density-section-gap)'>
         <InputGroup className='bg-background'>
           <InputGroupInput
             aria-label='Commit message'
@@ -94,10 +94,10 @@ export function CommitControls({
           </p>
         ) : null}
       </div>
-      <div className='compact:pt-2 shrink-0 px-2 pt-3'>
+      <div className='shrink-0 px-(--density-row-padding-x) pt-(--density-section-padding)'>
         {showSyncChanges ? (
           <Button
-            className='compact:h-7 h-8 w-full text-sm tabular-nums'
+            className='w-full text-sm tabular-nums'
             disabled={syncChanges.isPending}
             onClick={() => syncChanges.mutate()}
             type='button'
@@ -113,7 +113,7 @@ export function CommitControls({
           </Button>
         ) : (
           <Button
-            className='compact:h-7 h-8 w-full text-sm'
+            className='w-full text-sm'
             disabled={commit.isPending}
             onClick={commit.submit}
             type='button'

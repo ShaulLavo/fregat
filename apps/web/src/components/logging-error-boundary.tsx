@@ -67,10 +67,10 @@ export class LoggingErrorBoundary extends Component<
           className='max-w-[calc(100%-2rem)] gap-0 overflow-hidden p-0 sm:max-w-md'
           showCloseButton={false}
         >
-          <div className='border-border bg-muted/30 compact:px-3 compact:py-2 border-b px-4 py-3'>
-            <DialogHeader className='compact:gap-1.5 gap-2'>
-              <div className='compact:gap-2 flex items-start gap-3'>
-                <div className='border-destructive/30 bg-destructive/10 text-destructive compact:size-7 mt-0.5 flex size-8 shrink-0 items-center justify-center border'>
+          <div className='border-border bg-muted/30 border-b p-(--density-dialog-padding)'>
+            <DialogHeader className='gap-(--density-control-gap)'>
+              <div className='flex items-start gap-(--density-section-gap)'>
+                <div className='border-destructive/30 bg-destructive/10 text-destructive mt-0.5 flex size-(--density-control-height) shrink-0 items-center justify-center border'>
                   <WarningCircleIcon className='size-4' weight='fill' />
                 </div>
                 <div className='min-w-0 space-y-1'>
@@ -83,8 +83,8 @@ export class LoggingErrorBoundary extends Component<
               </div>
             </DialogHeader>
           </div>
-          <div className='compact:gap-2 compact:px-3 compact:py-3 grid min-w-0 gap-3 px-4 py-4'>
-            <div className='border-border bg-card text-card-foreground compact:p-2.5 grid gap-1 border p-3'>
+          <div className='grid min-w-0 gap-(--density-section-gap) p-(--density-dialog-padding)'>
+            <div className='border-border bg-card text-card-foreground grid gap-1 border p-(--density-section-padding)'>
               <div className='text-muted-foreground text-xs font-medium'>{errorName}</div>
               <div className='text-foreground font-mono text-xs/relaxed wrap-anywhere'>
                 {errorMessage}
@@ -95,16 +95,18 @@ export class LoggingErrorBoundary extends Component<
             </p>
             <Accordion className='border-border border' keepMounted>
               <AccordionItem value='stack-trace'>
-                <AccordionTrigger className='compact:px-2.5 px-3'>Stack trace</AccordionTrigger>
-                <AccordionContent className='compact:px-2.5 px-3'>
-                  <pre className='app-scrollbar-thin bg-muted/30 text-muted-foreground border-border compact:p-2 max-h-64 overflow-y-auto overscroll-contain border p-2.5 font-mono text-[11px]/relaxed wrap-anywhere whitespace-pre-wrap'>
+                <AccordionTrigger className='px-(--density-control-padding-x)'>
+                  Stack trace
+                </AccordionTrigger>
+                <AccordionContent className='px-(--density-control-padding-x)'>
+                  <pre className='app-scrollbar-thin bg-muted/30 text-muted-foreground border-border text-2xs/relaxed max-h-64 overflow-y-auto overscroll-contain border p-(--density-control-padding-x) font-mono wrap-anywhere whitespace-pre-wrap'>
                     {stackTrace || 'No stack trace available.'}
                   </pre>
                 </AccordionContent>
               </AccordionItem>
             </Accordion>
           </div>
-          <DialogFooter className='border-border bg-muted/20 compact:px-3 compact:py-2 border-t px-4 py-3'>
+          <DialogFooter className='border-border bg-muted/20 h-(--bar-height) items-center border-t px-(--bar-padding-x)'>
             <Button onClick={reloadPage}>
               <ArrowsClockwiseIcon data-icon='inline-start' />
               Reload app

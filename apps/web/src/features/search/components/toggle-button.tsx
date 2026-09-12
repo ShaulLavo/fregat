@@ -27,7 +27,7 @@ export function SearchToggleButton({
             aria-label={label}
             aria-pressed={active}
             className={cn(
-              'size-6 text-muted-foreground hover:text-foreground aria-pressed:bg-muted aria-pressed:text-foreground',
+              'text-muted-foreground hover:text-foreground aria-pressed:bg-accent aria-pressed:text-foreground',
               className,
             )}
             size='icon-xs'

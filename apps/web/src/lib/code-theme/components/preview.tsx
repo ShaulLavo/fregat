@@ -24,11 +24,11 @@ export function CodeThemePreview({
     >
       {preview.kind === 'loading' && (
         <LoadingState className='flex h-51 flex-col gap-2.5 p-4' label='Loading code theme preview'>
-          <div className='bg-muted-foreground/10 h-2.5 w-3/5 rounded-sm' />
-          <div className='bg-muted-foreground/10 h-2.5 w-4/5 rounded-sm' />
-          <div className='bg-muted-foreground/10 mt-2 h-2.5 w-3/4 rounded-sm' />
-          <div className='bg-muted-foreground/10 h-2.5 w-1/2 rounded-sm' />
-          <div className='bg-muted-foreground/10 h-2.5 w-2/3 rounded-sm' />
+          <div className='bg-muted-foreground/10 h-2.5 w-3/5 rounded-md' />
+          <div className='bg-muted-foreground/10 h-2.5 w-4/5 rounded-md' />
+          <div className='bg-muted-foreground/10 mt-2 h-2.5 w-3/4 rounded-md' />
+          <div className='bg-muted-foreground/10 h-2.5 w-1/2 rounded-md' />
+          <div className='bg-muted-foreground/10 h-2.5 w-2/3 rounded-md' />
         </LoadingState>
       )}
       {preview.kind === 'error' && (

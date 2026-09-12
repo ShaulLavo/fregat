@@ -11,7 +11,9 @@ const toastThemeStyle = {
   '--normal-border-hover': 'var(--border)',
   '--normal-bg-hover': 'var(--muted-solid)',
   '--normal-text': 'var(--popover-foreground)',
-  '--border-radius': 'var(--radius-md)',
+  // The lg step (D1: a toast is a floating surface). Spelled `--radius` because
+  // the radius scale is `@theme inline`, which emits no custom properties.
+  '--border-radius': 'var(--radius)',
   // Oklab tints toward each status color without rotating the popover's hue.
   '--error-bg': 'color-mix(in oklab, var(--destructive) 12%, var(--popover-solid))',
   '--error-border': 'color-mix(in oklab, var(--destructive) 45%, transparent)',
@@ -26,6 +28,10 @@ const toastThemeStyle = {
   '--info-border': 'color-mix(in oklab, var(--info) 45%, transparent)',
   '--info-text': 'color-mix(in oklab, var(--info) 70%, var(--popover-foreground))',
 } satisfies ToastThemeStyle
+
+// Sonner appends an unlayered stylesheet at runtime, so a layered utility loses
+// to its built-in toast shadow; `!` is what makes the D6 step stick.
+const TOAST_SURFACE_CLASS = 'shadow-md!'
 
 export function Toaster({
   className,
@@ -43,7 +49,10 @@ export function Toaster({
       richColors={richColors}
       style={{ ...toastThemeStyle, ...style }}
       theme={theme}
-      toastOptions={toastOptions}
+      toastOptions={{
+        ...toastOptions,
+        classNames: { toast: TOAST_SURFACE_CLASS, ...toastOptions?.classNames },
+      }}
       {...props}
     />
   )

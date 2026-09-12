@@ -37,7 +37,7 @@ export function ModelSection() {
   const displayed = rows.map((row) => row.ref)
 
   return (
-    <div className='border-border flex max-h-64 w-96 max-w-full min-w-0 flex-col overflow-y-auto rounded-md border @max-3xl/settings:w-full'>
+    <div className='border-border flex max-h-64 w-96 max-w-full min-w-0 flex-col overflow-y-auto rounded-lg border @max-3xl/settings:w-full'>
       {rows.map((row, index) => (
         <ModelRow
           canMoveDown={index < rows.length - 1}

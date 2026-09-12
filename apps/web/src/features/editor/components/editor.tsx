@@ -30,6 +30,7 @@ import { useDiagnosticPeek } from '@/features/editor/hooks/use-diagnostic-peek'
 import type { LanguageServerDocumentTarget } from '@/features/editor/utils/language-server-plugin'
 import { editorPerformanceLayoutVariant } from '@/features/editor/state/performance-trace'
 import { documentKey } from '@/lib/documents/utils/identity'
+import { languageServerDocument } from '@/lib/language-server-document'
 import { documentSourcePath, filesystemResource } from '@/lib/documents/utils/capabilities'
 import type { DocumentKey, DocumentRef, FilesystemPath, TabId } from '@/lib/documents/utils/types'
 import { useFocusTarget } from '@/lib/focus/hooks/use-target'
@@ -108,6 +109,7 @@ export function Editor({
   const mountedEditors = useMountedEditorRegistry()
   const diagnosticPeek = useDiagnosticPeek({ active, filePath })
   const { languageServer, languageServerStatusSource } = useLanguageServerPlugin({
+    document: languageServerDocument(currentTarget),
     enabled:
       active &&
       liveDocument !== null &&

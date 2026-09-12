@@ -19,6 +19,7 @@ import { basename, toTreePath } from '@/lib/path-formatters'
 import { colorForFileIcon, iconForEntry, type ResolvedFileIcon } from '@/lib/file-icons'
 import { Button } from '@workspace/ui/components/button'
 import { EmptyState } from '@workspace/ui/components/empty-state'
+import { PaneBar } from '@workspace/ui/components/pane-bar'
 import { cn } from '@workspace/ui/lib/utils'
 
 type LanguageServerReferencesPaneProps = {
@@ -79,16 +80,16 @@ export function LanguageServerReferencesPane({
       aria-label='References'
       className='grid h-full min-h-0 grid-rows-[auto_minmax(0,1fr)] border-l'
     >
-      <div className='compact:h-9 compact:gap-1.5 compact:px-2 flex h-10 items-center justify-between gap-2 border-b px-3'>
-        <div className='compact:gap-1.5 flex min-w-0 items-center gap-2'>
+      <PaneBar border='bottom' className='justify-between'>
+        <div className='flex min-w-0 items-center gap-(--density-control-gap)'>
           <span className='truncate text-xs font-medium'>References</span>
-          <span className='bg-muted/70 text-muted-foreground rounded px-1.5 text-[10px] leading-4 tabular-nums'>
+          <span className='bg-muted/70 text-muted-foreground text-3xs rounded-full px-1.5 leading-4 tabular-nums'>
             {references.targets.length.toLocaleString()}
           </span>
         </div>
         <Button
           aria-label='Close references'
-          className='text-muted-foreground hover:text-foreground compact:size-6 size-7 shrink-0'
+          className='text-muted-foreground shrink-0'
           size='icon-sm'
           title='Close references'
           type='button'
@@ -97,12 +98,12 @@ export function LanguageServerReferencesPane({
         >
           <XIcon className='size-4' />
         </Button>
-      </div>
+      </PaneBar>
       <div className='min-h-0 overflow-y-auto py-1'>
         {groups.length === 0 ? (
           <EmptyState
             align='start'
-            className='compact:px-2 compact:py-3 px-3 py-4'
+            className='px-(--density-control-padding-x) py-(--density-section-padding)'
             title='No references found'
           />
         ) : (
@@ -143,9 +144,10 @@ function ReferenceGroupHeader({
 }) {
   const icon = iconForEntry({ name: group.name, type: 'file' })
 
+  // Raw element: Button centres its content and owns a radius and hover fill a full-width row cannot take.
   return (
     <button
-      className='hover:bg-row-hover focus-visible:ring-ring/50 compact:h-6 compact:gap-1 compact:px-1.5 grid h-7 w-full grid-cols-[14px_14px_minmax(0,1fr)_auto] items-center gap-1.5 px-2 text-left text-xs outline-none focus-visible:ring-1'
+      className='hover:bg-row-hover focus-visible:ring-ring/50 grid h-(--density-control-height-sm) w-full grid-cols-[14px_14px_minmax(0,1fr)_auto] items-center gap-(--density-control-gap) px-(--density-row-padding-x) text-left text-xs outline-none focus-visible:ring-1'
       type='button'
       onClick={() => onToggle(group.path)}
     >
@@ -160,11 +162,11 @@ function ReferenceGroupHeader({
       </span>
       <span className='flex min-w-0 items-center gap-1.5 overflow-hidden whitespace-nowrap'>
         <span className='max-w-[55%] min-w-0 shrink-0 truncate font-medium'>{group.name}</span>
-        <span className='text-muted-foreground min-w-0 flex-1 truncate text-[11px]'>
+        <span className='text-muted-foreground text-2xs min-w-0 flex-1 truncate'>
           {group.pathLabel}
         </span>
       </span>
-      <span className='bg-muted/50 text-muted-foreground rounded px-1 text-[10px] leading-4 tabular-nums'>
+      <span className='bg-muted/50 text-muted-foreground text-3xs rounded-full px-1 leading-4 tabular-nums'>
         {group.targets.length}
       </span>
     </button>
@@ -185,6 +187,7 @@ function ReferenceRow({
   const line = target.range.start.line + 1
   const preview = referencePreview(document, target)
 
+  // Raw element: Button centres its content and owns a radius and hover fill a full-width row cannot take.
   return (
     <button
       className='group hover:bg-row-hover focus-visible:ring-ring/50 grid h-6 w-full grid-cols-[38px_minmax(0,1fr)] items-center gap-2 px-2 pl-7 text-left text-xs outline-none focus-visible:ring-1'
@@ -193,8 +196,8 @@ function ReferenceRow({
       onFocus={() => onPreviewReference(target)}
       onMouseEnter={() => onPreviewReference(target)}
     >
-      <span className='text-muted-foreground text-right text-[11px] tabular-nums'>{line}</span>
-      <span className='text-muted-foreground group-hover:text-foreground min-w-0 truncate font-mono text-[11px]'>
+      <span className='text-muted-foreground text-2xs text-right tabular-nums'>{line}</span>
+      <span className='text-muted-foreground group-hover:text-foreground text-2xs min-w-0 truncate font-mono'>
         {preview}
       </span>
     </button>

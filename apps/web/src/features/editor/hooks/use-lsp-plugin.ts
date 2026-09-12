@@ -1,4 +1,5 @@
 import { filesystemPath } from '@/lib/documents/utils/identity'
+import type { LanguageServerDocument } from '@/lib/language-server-document'
 import { useQueryClient } from '@tanstack/react-query'
 import { originForQueryClient } from '@/lib/environments/state/query-clients'
 import type {
@@ -22,6 +23,7 @@ import {
 } from '@/features/editor/providers/workspace-edit-context'
 
 type UseLanguageServerPluginOptions = {
+  document: LanguageServerDocument | null
   enabled?: boolean
   filePath: string
   languageServerTarget?: LanguageServerDocumentTarget
@@ -34,6 +36,7 @@ type UseLanguageServerPluginOptions = {
 }
 
 export function useLanguageServerPlugin({
+  document,
   enabled = true,
   filePath,
   languageServerTarget,
@@ -42,6 +45,8 @@ export function useLanguageServerPlugin({
   onOpenReferences,
   onDidNavigateDiagnostic,
 }: UseLanguageServerPluginOptions) {
+  const documentKey = document?.key ?? null
+  const documentUri = document?.uri ?? null
   const origin = originForQueryClient(useQueryClient())
   const { service: fileOpenIntent } = useFileOpenIntent()
   const languageServerStatusSource = useMemo(() => createEditorLanguageServerStatusSource(), [])
@@ -51,10 +56,14 @@ export function useLanguageServerPlugin({
     () => languageServerTarget ?? { matchPath: filePath },
     [filePath, languageServerTarget],
   )
-  const matches = useLanguageServerMatches(rootPath, target.matchPath, enabled)
+  const matches = useLanguageServerMatches(rootPath, target.matchPath, enabled && document !== null)
 
   const languageServer = useMemo(() => {
     return createMatchedLanguageServerPlugin({
+      document:
+        documentKey !== null && documentUri !== null
+          ? { key: documentKey, uri: documentUri }
+          : null,
       origin,
       enabled,
       documentSyncController,
@@ -75,6 +84,8 @@ export function useLanguageServerPlugin({
       onDidNavigateDiagnostic,
     })
   }, [
+    documentKey,
+    documentUri,
     origin,
     enabled,
     documentSyncController,

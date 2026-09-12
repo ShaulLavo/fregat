@@ -38,12 +38,12 @@ export function SearchControls({
   const replace = useWorkspaceSearchReplace(rootPath, replaceVisible)
 
   return (
-    <div className='compact:p-1 border-b p-1.5'>
+    <div className='border-b p-(--density-control-gap)'>
       <div className='flex items-center gap-1'>
         <SearchHistoryInput
           aria-label='Search workspace'
           className='flex-1'
-          inputClassName='compact:h-6 compact:pl-1.5 h-7 px-2 pr-[5.5rem] text-[11px]'
+          inputClassName='h-(--density-control-height-sm) px-(--density-row-padding-x) pr-[5.5rem] text-2xs'
           label='Search'
           rightAdornment={
             <SearchModeButtons
@@ -59,15 +59,11 @@ export function SearchControls({
           onSelectPreviousHistory={selectPreviousQuery}
           onValueChange={setQuery}
         />
-        <SearchReplaceToggleButton
-          active={replaceVisible}
-          className='compact:h-6 compact:px-1 h-7 px-1.5'
-          onToggle={setReplaceVisible}
-        />
+        <SearchReplaceToggleButton active={replaceVisible} onToggle={setReplaceVisible} />
         {showOpenInEditorButton ? (
           <Button
             aria-label='Open search editor'
-            className='text-muted-foreground hover:text-foreground compact:size-6 size-7 shrink-0'
+            className='text-muted-foreground hover:text-foreground shrink-0'
             size='icon-sm'
             title='Open search editor'
             type='button'
@@ -79,16 +75,16 @@ export function SearchControls({
         ) : null}
       </div>
       <SearchFilterFields
-        className='compact:mt-1 mt-1.5 gap-1'
-        inputClassName='h-6 px-1.5 text-[11px]'
+        className='mt-(--density-control-gap) gap-1'
+        inputClassName='h-6 px-1.5 text-2xs'
         options={searchOptions}
         onOptionsChange={setSearchOptions}
       />
       <SearchReplaceFields
-        buttonClassName='h-6 px-1.5 text-[10px]'
+        buttonClassName='h-6 px-1.5 text-3xs'
         canReplace={replace.canReplace}
-        className='compact:mt-1 mt-1.5 gap-1'
-        inputClassName='h-6 px-1.5 text-[11px]'
+        className='mt-(--density-control-gap) gap-1'
+        inputClassName='h-6 px-1.5 text-2xs'
         replaceText={replaceText}
         replaceVisible={replaceVisible}
         replacing={replacing}

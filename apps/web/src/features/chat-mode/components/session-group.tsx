@@ -71,7 +71,7 @@ export function SessionGroup({
       {/* Said out loud: a fold that silently swallows rows leaves the counts in the
           header looking wrong to anyone reading the list under it. */}
       {group.hiddenCount > 0 ? (
-        <p className='text-muted-foreground/50 px-2 pb-1 pl-[26px] text-[11px] tabular-nums'>
+        <p className='text-muted-foreground/50 text-2xs px-2 pb-1 pl-[26px] tabular-nums'>
           {group.hiddenCount} hidden
         </p>
       ) : null}

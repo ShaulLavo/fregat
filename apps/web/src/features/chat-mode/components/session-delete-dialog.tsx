@@ -39,7 +39,7 @@ export function SessionDeleteDialog() {
   return (
     <Dialog onOpenChange={(open) => open || actions.cancelDelete()} open={request !== null}>
       <DialogContent
-        className='w-[min(420px,calc(100vw-2rem))] max-w-none rounded-lg border text-sm sm:max-w-none'
+        className='w-[min(420px,calc(100vw-2rem))] max-w-none border text-sm sm:max-w-none'
         showCloseButton={false}
       >
         <DialogHeader>

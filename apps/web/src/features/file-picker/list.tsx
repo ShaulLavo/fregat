@@ -108,7 +108,7 @@ export function ListHeader({
     <div
       aria-label='File list sorting'
       className={cn(
-        'border-border/60 text-muted-foreground/70 grid items-center gap-3 border-b px-3 text-[11px] font-medium tracking-normal uppercase compact:gap-2 compact:px-2 compact:text-[10px] compact:tracking-wide cozy:bg-background cozy:backdrop-material cozy:border-border cozy:text-muted-foreground',
+        'border-border text-muted-foreground/70 grid items-center gap-(--density-control-gap) border-b px-(--density-control-padding-x) text-2xs font-medium tracking-normal uppercase',
         fileListGridClass(mode),
       )}
       role='group'
@@ -284,7 +284,7 @@ export function FileList({
                 Retry
               </Button>
             }
-            className='compact:p-4 h-full p-6'
+            className='h-full'
             description={loadState.message}
             icon={<WarningCircleIcon className='size-8' weight='duotone' />}
             title='Could not load this folder'
@@ -300,7 +300,7 @@ export function FileList({
       {showEmpty ? (
         <div className='absolute inset-0' id={statusId}>
           <EmptyState
-            className='compact:p-4 h-full p-6'
+            className='h-full'
             description={pickerCopy(mode).emptyDescription}
             icon={<FolderOpenIcon className='size-8' weight='duotone' />}
             title='Nothing here'
@@ -354,13 +354,13 @@ function FileListVirtualRow({
 
   return (
     <div
-      className='compact:right-1 compact:left-1 absolute top-0 right-1.5 left-1.5'
+      className='absolute inset-x-1.5 top-0'
       style={{ height: virtualRow.size, transform: `translateY(${virtualRow.start}px)` }}
     >
       {row.kind === 'section' ? (
         <div
           aria-hidden='true'
-          className='text-muted-foreground/70 compact:text-[10px] compact:tracking-wide flex h-full items-center px-2 text-[11px] font-medium tracking-normal uppercase'
+          className='text-muted-foreground/70 text-2xs flex h-full items-center px-2 font-medium tracking-normal uppercase'
         >
           {row.label}
         </div>
@@ -450,7 +450,7 @@ function FileRow({
       aria-selected={selected}
       aria-setsize={setSize}
       className={cn(
-        'grid h-full w-full cursor-default items-center gap-3 rounded-sm px-2 text-left text-xs compact:gap-2',
+        'grid h-full w-full cursor-default items-center gap-(--density-control-gap) px-2 text-left text-xs',
         fileListGridClass(mode),
         selected && 'bg-row-selected text-foreground',
         !isBusy && !selected && 'hover:bg-row-hover',
@@ -472,9 +472,7 @@ function FileRow({
         <div className='min-w-0'>
           <div className='truncate'>{entry.name}</div>
           {showPath ? (
-            <div className='text-muted-foreground truncate text-[11px]'>
-              {displayPath(entry.path)}
-            </div>
+            <div className='text-muted-foreground text-2xs truncate'>{displayPath(entry.path)}</div>
           ) : null}
         </div>
       </div>
@@ -516,7 +514,7 @@ function SortableColumnHeader({
       <Button
         aria-label={sortButtonLabel(keyName, direction)}
         className={cn(
-          'text-muted-foreground/70 hover:text-foreground h-6 min-w-0 gap-1 px-1.5 text-[11px] font-medium tracking-normal uppercase compact:text-[10px] compact:tracking-wide cozy:text-muted-foreground',
+          'text-muted-foreground/70 min-w-0 px-1.5 text-2xs font-medium tracking-normal uppercase',
           align === 'start' && '-ml-1.5',
           align === 'end' && '-mr-1.5',
         )}

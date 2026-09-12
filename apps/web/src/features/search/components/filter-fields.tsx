@@ -34,7 +34,7 @@ export function SearchFilterFields({
         aria-label='Files to include'
         autoCapitalize='off'
         autoCorrect='off'
-        className={cn('h-7 text-[11px]', inputClassName)}
+        className={cn('h-(--density-control-height-sm) text-2xs', inputClassName)}
         placeholder='include'
         spellCheck={false}
         value={options.includeGlobText}
@@ -44,7 +44,7 @@ export function SearchFilterFields({
         aria-label='Files to exclude'
         autoCapitalize='off'
         autoCorrect='off'
-        className={cn('h-7 text-[11px]', inputClassName)}
+        className={cn('h-(--density-control-height-sm) text-2xs', inputClassName)}
         placeholder='exclude'
         spellCheck={false}
         value={options.excludeGlobText}

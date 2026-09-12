@@ -1,13 +1,16 @@
 import { filesystemPath, tabId } from '@/lib/documents/utils/identity'
+import { documentTab } from '@/lib/documents/utils/tabs'
+import type { StandaloneDocumentRef } from '@/lib/documents/utils/types'
 import { testDocumentKey } from '../../../../test/factories/document-targets'
 import { testScopedStorage } from '../../../../test/factories/scoped-storage'
 import { createEditorBufferSession } from '@singapor/core'
 import { QueryClient } from '@tanstack/react-query'
-import { readFile, writeFile } from 'node:fs/promises'
+import { mkdir, readFile, writeFile } from 'node:fs/promises'
 import { join } from 'node:path'
 
 import { createEditorRuntime } from '@/features/editor/state/runtime'
 import { readWorkspaceCache } from '@/features/workspace/state/cache'
+import { openEditorContentInWorkbenchPanels } from '@/features/workbench/utils/panels'
 import { getClient, setClient } from '@/lib/client'
 import { registerEnvironmentQueryClient } from '@/lib/environments/state/query-clients'
 import { fetchFile } from '@/lib/file-server'
@@ -23,6 +26,60 @@ const preparation = {
   selectedThemeId: 'dark',
   syntaxHighlightingEnabled: false,
 }
+
+const preparationPath = filesystemPath('repo/review.ts')
+
+test.for([
+  { kind: 'git-ref', source: { path: preparationPath, ref: 'HEAD' } },
+  { kind: 'git-diff', source: { kind: 'snapshot', path: preparationPath } },
+  { kind: 'compare-saved', file: { path: preparationPath } },
+] satisfies readonly StandaloneDocumentRef[])(
+  'prepares the working file while a $kind tab is selected',
+  async (target, { server, client }) => {
+    await mkdir(join(server.root, 'repo'))
+    await writeFile(join(server.root, preparationPath), 'const answer = 42\n')
+    const queryClient = new QueryClient()
+    registerEnvironmentQueryClient(queryClient, 'http://localhost:7077', client)
+    const runtime = createEditorRuntime({
+      storage: testScopedStorage,
+      preparation,
+      queryClient,
+      workspaceCache: readWorkspaceCache(testScopedStorage),
+    })
+    const rootPath = filesystemPath('repo')
+
+    try {
+      runtime.workspaceStore.getState().switchWorkspace({
+        birthtimeMs: 0,
+        mtimeMs: 0,
+        name: 'repo',
+        path: rootPath,
+        size: 0,
+        type: 'directory',
+        version: '',
+      })
+      const workspace = runtime.workspaceStore.getState()
+      workspace.setWorkbenchPanels(
+        openEditorContentInWorkbenchPanels(workspace.workbenchPanels, documentTab(target)),
+      )
+      runtime.fileOpenIntentOwner.connect()
+      expect(runtime.mountedEditors.has(preparationPath)).toBe(false)
+
+      runtime.fileOpenIntent.service.prepare({
+        path: preparationPath,
+        rootPath,
+        source: 'file-tree',
+      })
+
+      await expect
+        .poll(() => queryClient.getQueryData(fileSystemKeys.fileSnapshot(preparationPath)))
+        .toMatchObject({ path: preparationPath, content: 'const answer = 42\n' })
+    } finally {
+      runtime.dispose()
+      queryClient.clear()
+    }
+  },
+)
 
 test('retains dirty buffers, editor views, and undo history through A/B/A at the same path', async ({
   server,

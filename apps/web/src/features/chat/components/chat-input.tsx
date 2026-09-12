@@ -388,7 +388,7 @@ export function ChatInput({
   }
 
   return (
-    <div className='border-border/60 compact:px-2 compact:py-2 shrink-0 border-t px-3 pt-2.5 pb-3'>
+    <div className='border-border shrink-0 border-t px-(--density-control-padding-x) py-(--density-section-gap)'>
       <ChatModelPickerProvider
         draftTarget={draftTarget}
         sessionProviderInstanceId={sessionProviderInstanceId}
@@ -417,7 +417,7 @@ export function ChatInput({
                 nothing at all. */}
             <div
               className={cn(
-                'border-border/80 bg-background relative overflow-hidden rounded-xl border shadow-[0_1px_2px_color-mix(in_oklch,var(--foreground)_5%,transparent)] transition-[border-color,box-shadow]',
+                'border-border bg-background relative overflow-hidden rounded-lg border transition-[border-color,box-shadow]',
                 editorFocused && 'border-foreground/25 ring-2 ring-foreground/[0.07]',
                 dropTargetActive && 'border-primary',
               )}

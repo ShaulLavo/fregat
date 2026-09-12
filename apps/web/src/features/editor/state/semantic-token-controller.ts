@@ -2,7 +2,7 @@ import type {
   LanguageServerConnectionContext,
   LanguageServerSemanticTokensDocument,
 } from '@singapor/lsp-plugin'
-import { decodeSemanticTokens, pathOrUriToDocumentUri } from '@singapor/lsp-plugin'
+import { decodeSemanticTokens } from '@singapor/lsp-plugin'
 import type {
   SemanticTokenDropReason,
   SemanticTokenLayer,
@@ -191,9 +191,13 @@ export class SemanticTokenController {
    * on a disposed layer is a call on a dead object, not a safeguard — and
    * re-derives everything hanging off the document with it.
    */
-  public attachLayer(layer: SemanticTokenLayer, document: LanguageServerSemanticTokensDocument) {
+  public attachLayer(
+    layer: SemanticTokenLayer,
+    document: LanguageServerSemanticTokensDocument,
+    uri: lsp.DocumentUri | null,
+  ) {
     this.#dropLayer()
-    if (this.#disposed) return
+    if (this.#disposed || uri === null) return
 
     this.#pending = {
       abort: null,
@@ -207,11 +211,7 @@ export class SemanticTokenController {
       loggedOutcomes: new Set(),
       loggedOversizeDocument: false,
       requestId: 0,
-      // The document id *is* the path this app opened, and the plugin's own
-      // sync derives the uri from it the same way. Resolving it here rather
-      // than caching one per connection is what keeps a late answer for a
-      // document the user already left from being pushed at the new one.
-      uri: pathOrUriToDocumentUri(document.documentId),
+      uri,
       timer: null,
     }
   }

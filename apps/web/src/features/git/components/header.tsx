@@ -7,6 +7,9 @@ import {
   UploadSimpleIcon,
 } from '@phosphor-icons/react'
 
+import { Button } from '@workspace/ui/components/button'
+import { PaneBar } from '@workspace/ui/components/pane-bar'
+
 import {
   useCommitAction,
   useFetchRemoteMutation,
@@ -29,11 +32,13 @@ export function Header({
   const setPanelOpen = useGitState((state) => state.setPanelOpen)
 
   return (
-    <header className='compact:h-8 flex h-9 shrink-0 items-center gap-1 border-b px-2'>
-      <button
-        type='button'
+    <PaneBar as='header' border='bottom'>
+      <Button
         aria-expanded={open}
-        className='focus-visible:ring-ring/50 flex min-w-0 flex-1 items-center gap-1 text-left outline-none focus-visible:ring-1'
+        className='min-w-0 flex-1 justify-start px-1'
+        size='sm'
+        type='button'
+        variant='ghost'
         onClick={() => setPanelOpen(!open)}
       >
         <CaretDownIcon
@@ -42,16 +47,16 @@ export function Header({
             open ? '' : '-rotate-90',
           ].join(' ')}
         />
-        <span className='shrink-0 text-sm font-semibold'>Changes</span>
-        <span className='text-muted-foreground min-w-0 truncate text-xs font-normal tabular-nums'>
+        <span className='shrink-0'>Changes</span>
+        <span className='text-muted-foreground text-2xs min-w-0 truncate font-normal tabular-nums'>
           {aheadBehindLabel(repository)}
         </span>
-      </button>
+      </Button>
       <HeaderCommitButton rootPath={rootPath} />
       <FetchToolbarButton rootPath={rootPath} />
       <PullToolbarButton rootPath={rootPath} />
       <PushToolbarButton rootPath={rootPath} />
-    </header>
+    </PaneBar>
   )
 }
 

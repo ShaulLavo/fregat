@@ -67,17 +67,17 @@ export function PendingUserInputCard({ pending }: { readonly pending: PendingUse
   return (
     <div
       aria-label='Agent question'
-      className='compact:px-2 compact:pb-1.5 shrink-0 px-3 pb-2'
+      className='shrink-0 px-(--density-control-padding-x) pb-(--density-section-gap)'
       role='region'
     >
-      <div className='border-warning/30 bg-warning/10 compact:gap-1.5 compact:p-2 mx-auto flex max-w-3xl flex-col gap-2 border p-3'>
-        <div className='compact:gap-1.5 flex flex-wrap items-center gap-2'>
+      <div className='border-warning/30 bg-warning/10 mx-auto flex max-w-3xl flex-col gap-(--density-control-gap) rounded-lg border p-(--density-section-padding)'>
+        <div className='flex flex-wrap items-center gap-(--density-control-gap)'>
           <QuestionIcon aria-hidden='true' className='text-warning size-4' />
-          <span className='text-warning text-[11px] font-semibold tracking-widest uppercase'>
+          <span className='text-warning text-2xs font-semibold tracking-widest uppercase'>
             {question.header ?? 'Input needed'}
           </span>
           {questions.length > 1 ? (
-            <span className='text-muted-foreground text-[10px] tabular-nums'>
+            <span className='text-muted-foreground text-3xs tabular-nums'>
               {activeIndex + 1}/{questions.length}
             </span>
           ) : null}
@@ -92,13 +92,13 @@ export function PendingUserInputCard({ pending }: { readonly pending: PendingUse
             className='flex flex-col gap-1'
             role='group'
           >
-            <p className='text-muted-foreground text-[11px]' id={`${fieldId}-hint`}>
+            <p className='text-muted-foreground text-2xs' id={`${fieldId}-hint`}>
               {selectHint(question.answerKind)}
             </p>
             {question.options.map((option) => (
               <Button
                 aria-pressed={picked.includes(option.value)}
-                className='compact:px-2 compact:py-1 h-auto justify-start px-2.5 py-1.5 text-left'
+                className='h-auto justify-start px-(--density-control-padding-x) py-1.5 text-left'
                 disabled={responding}
                 key={option.value}
                 onClick={() => selectOption(option.value)}
@@ -109,7 +109,7 @@ export function PendingUserInputCard({ pending }: { readonly pending: PendingUse
                 <span className='flex min-w-0 flex-1 flex-col gap-0.5'>
                   <span className='font-medium whitespace-normal'>{option.label}</span>
                   {option.description ? (
-                    <span className='text-muted-foreground text-[11px] font-normal whitespace-normal'>
+                    <span className='text-muted-foreground text-2xs font-normal whitespace-normal'>
                       {option.description}
                     </span>
                   ) : null}
@@ -123,7 +123,7 @@ export function PendingUserInputCard({ pending }: { readonly pending: PendingUse
         ) : null}
         {showTextField ? (
           <div className='flex flex-col gap-1'>
-            <label className='text-muted-foreground text-[11px] font-medium' htmlFor={fieldId}>
+            <label className='text-muted-foreground text-2xs font-medium' htmlFor={fieldId}>
               {showOptions ? 'Other' : 'Your answer'}
             </label>
             {question.secret ? (
@@ -149,7 +149,7 @@ export function PendingUserInputCard({ pending }: { readonly pending: PendingUse
         {response.kind !== 'submitting' ? <PendingRequestFeedback response={response} /> : null}
         <div
           aria-busy={responding}
-          className='compact:gap-1 flex flex-wrap items-center justify-end gap-1.5'
+          className='flex flex-wrap items-center justify-end gap-(--density-control-gap)'
         >
           {activeIndex > 0 ? (
             <Button

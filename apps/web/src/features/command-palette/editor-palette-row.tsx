@@ -22,7 +22,7 @@ export function EditorPaletteRow({ item }: EditorPaletteRowProps) {
     >
       <span aria-hidden='true' className='size-4' style={fileIconStyle(icon)} />
       <span className='max-w-[55%] shrink-0 truncate font-medium'>{item.name}</span>
-      <span className='text-muted-foreground min-w-0 flex-1 truncate text-[11px]'>
+      <span className='text-muted-foreground text-2xs min-w-0 flex-1 truncate'>
         {item.pathLabel}
       </span>
       {item.active && <CommandShortcut>active</CommandShortcut>}

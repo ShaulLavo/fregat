@@ -70,7 +70,7 @@ export function LocationBar({
           aria-describedby={error ? 'file-picker-path-error' : undefined}
           aria-invalid={Boolean(error)}
           aria-label='Folder path'
-          className='compact:h-6 h-8 min-w-0 font-mono'
+          className='min-w-0 font-mono'
           disabled={isPending}
           onChange={(event) => onChange(event.target.value)}
           onKeyDown={handleInputKeyDown}
@@ -101,7 +101,7 @@ export function LocationBar({
         </IconTooltip>
       </div>
       {error ? (
-        <p className='text-destructive mt-1 text-[11px]' id='file-picker-path-error' role='alert'>
+        <p className='text-destructive text-2xs mt-1' id='file-picker-path-error' role='alert'>
           {error}
         </p>
       ) : null}

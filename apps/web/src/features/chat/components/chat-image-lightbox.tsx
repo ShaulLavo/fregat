@@ -39,23 +39,23 @@ export function ChatImageLightbox({
   return (
     <Dialog open onOpenChange={(open) => onOpenIndexChange(open ? index : null)}>
       <DialogContent
-        className='bg-popover-solid compact:gap-1.5 compact:p-2 max-w-[min(92vw,72rem)] gap-2 rounded-lg p-3 sm:max-w-[min(92vw,72rem)]'
+        className='max-w-[min(92vw,72rem)] sm:max-w-[min(92vw,72rem)]'
         onKeyDown={handleKeyDown}
       >
         <DialogTitle className='truncate pr-8 text-xs'>{image.name}</DialogTitle>
         <img
           alt={image.name}
-          className='max-h-[78vh] w-full rounded-md object-contain'
+          className='max-h-[78vh] w-full object-contain'
           crossOrigin={image.crossOrigin}
           draggable={false}
           src={image.src}
         />
-        <div className='text-muted-foreground compact:gap-1.5 flex items-center justify-between gap-2 text-[11px]'>
+        <div className='text-muted-foreground text-2xs flex items-center justify-between gap-(--density-control-gap)'>
           {image.sizeBytes !== null ? (
             <span className='tabular-nums'>{formatSize(image.sizeBytes)}</span>
           ) : null}
           {images.length > 1 ? (
-            <span className='compact:gap-0.5 flex items-center gap-1'>
+            <span className='flex items-center gap-(--density-control-gap)'>
               <Button
                 aria-label='Previous image'
                 size='icon-xs'

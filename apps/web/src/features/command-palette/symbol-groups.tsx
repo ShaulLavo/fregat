@@ -41,7 +41,9 @@ export function SymbolGroups({ isPending, items }: SymbolGroupsProps) {
         >
           <TextTIcon className='text-muted-foreground' />
           <RowLabel label={item.name} description={symbolDescription(item)} />
-          <CommandShortcut>{item.selectionRange.start.line + 1}</CommandShortcut>
+          <CommandShortcut className='tabular-nums'>
+            {item.selectionRange.start.line + 1}
+          </CommandShortcut>
         </CommandItem>
       ))}
     </CommandGroup>

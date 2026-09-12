@@ -53,7 +53,7 @@ export function CodePanel({
             className='h-full'
             hint={
               <>
-                <kbd className='border-border bg-muted text-muted-foreground rounded border px-1.5 py-0.5 font-mono text-[10px]'>
+                <kbd className='border-border bg-muted text-muted-foreground text-3xs rounded-md border px-1.5 py-0.5 font-mono'>
                   ⌘P
                 </kbd>
                 Quick access

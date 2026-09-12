@@ -1,3 +1,4 @@
+import { Button } from '@workspace/ui/components/button'
 import { Popover, PopoverContent, PopoverTrigger } from '@workspace/ui/components/popover'
 import { cn } from '@workspace/ui/lib/utils'
 
@@ -35,14 +36,15 @@ export function ContextUsageRing({
     <Popover>
       <PopoverTrigger
         render={
-          <button
+          <Button
             aria-label={contextUsageLabel(usage, percent)}
             className={cn(
-              'flex shrink-0 cursor-pointer items-center gap-1.5 rounded-md px-1 py-0.5',
-              'hover:bg-accent focus-visible:ring-ring outline-none focus-visible:ring-2',
+              'h-auto cursor-pointer gap-1.5 px-1 py-0.5 font-normal',
               toneClass(usage.ratio),
             )}
+            size='sm'
             type='button'
+            variant='ghost'
           >
             <svg
               aria-hidden
@@ -71,8 +73,8 @@ export function ContextUsageRing({
                 />
               )}
             </svg>
-            {compact ? null : <span className='text-[11px] tabular-nums'>{readout}</span>}
-          </button>
+            {compact ? null : <span className='text-2xs tabular-nums'>{readout}</span>}
+          </Button>
         }
       />
       <PopoverContent align='end' className='w-64 text-xs' side='top'>

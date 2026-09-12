@@ -3,7 +3,7 @@ import { ChatTeardropDotsIcon } from '@phosphor-icons/react'
 export function ChatWelcomeView() {
   return (
     <div className='flex min-h-0 flex-1 flex-col items-center justify-center gap-4 px-6 text-center'>
-      <div className='border-border/70 bg-muted/40 text-muted-foreground flex size-11 items-center justify-center rounded-xl border'>
+      <div className='border-subtle bg-muted/40 text-muted-foreground flex size-11 items-center justify-center rounded-lg border'>
         <ChatTeardropDotsIcon className='size-5' />
       </div>
       <div className='space-y-1'>
@@ -12,7 +12,7 @@ export function ChatWelcomeView() {
           Reference files, run commands, or just start typing.
         </p>
       </div>
-      <div className='text-muted-foreground flex flex-wrap items-center justify-center gap-1.5 text-[11px]'>
+      <div className='text-muted-foreground text-2xs flex flex-wrap items-center justify-center gap-1.5'>
         <WelcomeHint glyph='@' label='mention files' />
         <WelcomeHint glyph='/' label='commands' />
       </div>
@@ -22,8 +22,8 @@ export function ChatWelcomeView() {
 
 function WelcomeHint({ glyph, label }: { glyph: string; label: string }) {
   return (
-    <span className='border-border/70 bg-muted/40 inline-flex items-center gap-1.5 rounded-md border py-0.5 pr-2 pl-1.5'>
-      <kbd className='text-foreground bg-background border-border/70 rounded border px-1 font-mono text-[10px] leading-none'>
+    <span className='border-subtle bg-muted/40 inline-flex items-center gap-1.5 rounded-md border py-0.5 pr-2 pl-1.5'>
+      <kbd className='text-foreground bg-background border-subtle text-3xs rounded-md border px-1 font-mono leading-none'>
         {glyph}
       </kbd>
       {label}

@@ -68,10 +68,12 @@ export function TimelineMinimap({
           />
         )}
         {marks.map((mark, index) => (
+          // Raw button: Button's ghost hover would paint a block over the transcript,
+          // and its active translate would fight this mark's own -translate-y-1/2.
           <button
             aria-current={mark.id === activeMarkId ? 'true' : undefined}
             aria-label={`Jump to turn ${mark.ordinal} of ${marks.length}`}
-            className='focus-visible:ring-ring pointer-events-auto absolute right-0 flex h-3 w-full -translate-y-1/2 items-center justify-end rounded-sm focus-visible:ring-1 focus-visible:outline-none'
+            className='focus-visible:ring-ring pointer-events-auto absolute right-0 flex h-3 w-full -translate-y-1/2 items-center justify-end focus-visible:ring-1 focus-visible:outline-none'
             data-turn={index}
             key={mark.id}
             style={{ top: `${mark.startFraction * 100}%` }}

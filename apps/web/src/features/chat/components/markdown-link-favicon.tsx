@@ -3,7 +3,7 @@ import { useState } from 'react'
 
 import { faviconUrlForHost } from '@/features/chat/utils/markdown-external-links'
 
-const GLYPH_CLASS_NAME = 'mr-1 inline-block size-3.5 shrink-0 rounded-[2px] align-[-0.15em]'
+const GLYPH_CLASS_NAME = 'mr-1 inline-block size-3.5 shrink-0 rounded-md align-[-0.15em]'
 
 /**
  * The site's own mark, so a link reads as "GitHub" before it reads as text.

@@ -318,10 +318,10 @@ export function MessagesTimeline({
       <Button
         aria-label='Scroll to latest message'
         className={cn(
-          'border-border/70 bg-popover-solid absolute right-4 bottom-4 size-8 rounded-full shadow-sm transition-opacity hover:bg-muted compact:right-3 compact:bottom-3 compact:size-7',
+          'bg-popover-solid absolute right-(--density-section-padding) bottom-(--density-section-padding) rounded-full shadow-md transition-opacity',
           scrollState.followMode !== 'free-scrolling' && 'pointer-events-none opacity-0',
         )}
-        size='icon-sm'
+        size='icon'
         tabIndex={scrollState.followMode === 'free-scrolling' ? 0 : -1}
         title='Scroll to latest message'
         type='button'

@@ -88,7 +88,7 @@ export function NewFolderPopover({
           <PopoverTitle>New folder</PopoverTitle>
           <PopoverDescription>{`Create inside ${displayPath(currentPath)}.`}</PopoverDescription>
         </PopoverHeader>
-        <form className='compact:space-y-1.5 space-y-2' onSubmit={handleSubmit}>
+        <form className='space-y-(--density-control-gap)' onSubmit={handleSubmit}>
           <Input
             autoFocus
             aria-describedby={displayedError ? 'file-picker-new-folder-error' : undefined}
@@ -100,15 +100,11 @@ export function NewFolderPopover({
             value={name}
           />
           {displayedError ? (
-            <p
-              className='text-destructive text-[11px]'
-              id='file-picker-new-folder-error'
-              role='alert'
-            >
+            <p className='text-destructive text-2xs' id='file-picker-new-folder-error' role='alert'>
               {displayedError}
             </p>
           ) : null}
-          <div className='compact:gap-1.5 flex justify-end gap-2'>
+          <div className='flex justify-end gap-(--density-control-gap)'>
             <Button
               disabled={mutation.isPending}
               onClick={() => setOpen(false)}

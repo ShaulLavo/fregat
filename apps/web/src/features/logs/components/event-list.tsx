@@ -45,9 +45,9 @@ export function LogsEventList({
   if (pending) {
     return (
       <LoadingState className='flex min-h-0 flex-1 flex-col gap-3 p-6' label='Loading logs'>
-        <div className='bg-muted h-4 w-3/4 rounded' />
-        <div className='bg-muted h-4 w-1/2 rounded' />
-        <div className='bg-muted h-4 w-2/3 rounded' />
+        <div className='bg-muted h-4 w-3/4 rounded-md' />
+        <div className='bg-muted h-4 w-1/2 rounded-md' />
+        <div className='bg-muted h-4 w-2/3 rounded-md' />
       </LoadingState>
     )
   }

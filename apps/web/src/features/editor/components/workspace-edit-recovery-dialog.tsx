@@ -49,7 +49,7 @@ export function WorkspaceEditRecoveryDialog() {
         }}
       >
         <DialogContent
-          className='bg-background-solid w-[min(520px,calc(100vw-2rem))] max-w-none rounded-xl border shadow-xl sm:max-w-none'
+          className='bg-background-solid w-[min(520px,calc(100vw-2rem))] max-w-none border sm:max-w-none'
           finalFocus={false}
           showCloseButton={false}
         >
@@ -74,7 +74,7 @@ export function WorkspaceEditRecoveryDialog() {
                 Save and resource operations are disabled for affected live buffers. Close and
                 reopen them from disk before editing again.
               </p>
-              <ul className='grid gap-1 font-mono text-[11px]'>
+              <ul className='text-2xs grid gap-1 font-mono'>
                 {recovery.unrecoveredPaths.map((path) => (
                   <li key={path}>{path}</li>
                 ))}
@@ -89,7 +89,7 @@ export function WorkspaceEditRecoveryDialog() {
                   {recovery?.unrecoveredPaths.length === 1 ? 'path' : 'paths'}
                 </span>
               </div>
-              <ul className='grid gap-1 font-mono text-[11px]'>
+              <ul className='text-2xs grid gap-1 font-mono'>
                 {recovery?.unrecoveredPaths.map((path) => (
                   <li key={path}>{path}</li>
                 ))}
@@ -140,7 +140,7 @@ export function WorkspaceEditRecoveryDialog() {
 
       <Dialog open={confirmDiscard} onOpenChange={setConfirmDiscard}>
         <DialogContent
-          className='bg-background-solid w-[min(480px,calc(100vw-2rem))] max-w-none rounded-xl border shadow-xl sm:max-w-none'
+          className='bg-background-solid w-[min(480px,calc(100vw-2rem))] max-w-none border sm:max-w-none'
           showCloseButton={false}
         >
           <DialogHeader>
@@ -150,7 +150,7 @@ export function WorkspaceEditRecoveryDialog() {
               the workspace was restored.
             </DialogDescription>
           </DialogHeader>
-          <ul className='bg-muted grid max-h-40 gap-1 overflow-auto rounded-lg border p-3 font-mono text-[11px]'>
+          <ul className='bg-muted text-2xs grid max-h-40 gap-1 overflow-auto rounded-lg border p-3 font-mono'>
             {recovery?.unrecoveredPaths.map((path) => (
               <li key={path}>{path}</li>
             ))}

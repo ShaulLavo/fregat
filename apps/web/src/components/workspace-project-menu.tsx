@@ -74,7 +74,7 @@ export function WorkspaceProjectMenu({ workspaceTitle }: { readonly workspaceTit
             variant='ghost'
             className={cn(
               NATIVE_WINDOW_NO_DRAG_CLASS,
-              'hover:bg-accent focus-visible:ring-ring/50 compact:gap-1.5 compact:px-1.5 compact:py-0.5 flex min-w-0 items-center gap-2 rounded-md px-2 py-1 text-left outline-none focus-visible:ring-1',
+              'flex min-w-0 items-center gap-(--density-control-gap) px-(--density-row-padding-x) text-left',
             )}
             type='button'
           />
@@ -83,23 +83,20 @@ export function WorkspaceProjectMenu({ workspaceTitle }: { readonly workspaceTit
         <FolderOpenIcon className='text-muted-foreground size-4 shrink-0' weight='duotone' />
         <span className='truncate text-xs font-medium'>{workspaceTitle}</span>
         {machine ? (
-          <span className='text-muted-foreground flex min-w-0 items-center gap-1 text-[10px]'>
+          <span className='text-muted-foreground text-3xs flex min-w-0 items-center gap-1'>
             <Phase label={machine.label ?? machine.name} phase={machine.phase} />
             <span className='truncate'>{machine.label ?? machine.name}</span>
           </span>
         ) : null}
         <CaretDownIcon className='text-muted-foreground size-3 shrink-0' />
       </DropdownMenuTrigger>
-      <DropdownMenuContent
-        align='start'
-        className='max-h-[60vh] w-64 overflow-y-auto rounded-md p-1'
-      >
+      <DropdownMenuContent align='start' className='max-h-[60vh] w-64 overflow-y-auto p-1'>
         <DropdownMenuRadioGroup value={rootPath ?? ''}>
           {/* Inside the group: base-ui resolves the label against its group context. */}
           <DropdownMenuLabel>Recent</DropdownMenuLabel>
           {recentFolders.isPending || isPending ? (
             <LoadingState label='Loading projects' className='px-2 py-1'>
-              <div aria-hidden='true' className='skeleton-sweep h-4 w-full rounded-sm' />
+              <div aria-hidden='true' className='skeleton-sweep h-4 w-full rounded-md' />
             </LoadingState>
           ) : null}
           {entries.map((entry) => (
@@ -111,7 +108,7 @@ export function WorkspaceProjectMenu({ workspaceTitle }: { readonly workspaceTit
               <span className='flex min-w-0 flex-1 items-baseline gap-1.5'>
                 <span className='truncate'>{entry.title}</span>
                 {entry.qualifier ? (
-                  <span className='text-muted-foreground/70 shrink-0 truncate text-[11px]'>
+                  <span className='text-muted-foreground/70 text-2xs shrink-0 truncate'>
                     {entry.qualifier}
                   </span>
                 ) : null}

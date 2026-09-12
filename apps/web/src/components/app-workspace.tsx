@@ -41,8 +41,8 @@ export function AppWorkspace({ restoringWorkspace }: { readonly restoringWorkspa
   if (!rootFolder && restoringWorkspace) {
     return (
       <LoadingState label='Restoring workspace' className='flex h-full flex-col gap-3 p-6'>
-        <div className='skeleton-sweep h-4 w-48 rounded' />
-        <div className='skeleton-sweep h-4 w-32 rounded' />
+        <div className='skeleton-sweep h-4 w-48 rounded-md' />
+        <div className='skeleton-sweep h-4 w-32 rounded-md' />
       </LoadingState>
     )
   }

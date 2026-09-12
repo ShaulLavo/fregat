@@ -27,7 +27,7 @@ export function SessionPaletteRow({ session }: { readonly session: SessionRailIt
       <SessionAttentionIndicator status={session.status} />
       <span className='max-w-[55%] shrink-0 truncate font-medium'>{session.title}</span>
       {session.machineLabel ? <ScopeChip label={session.machineLabel} /> : null}
-      <span className='text-muted-foreground flex min-w-0 flex-1 items-center gap-1.5 truncate text-[11px]'>
+      <span className='text-muted-foreground text-2xs flex min-w-0 flex-1 items-center gap-1.5 truncate'>
         <span className='truncate'>{session.projectTitle}</span>
         {session.branch ? <GitBranchIcon className='size-3 shrink-0' /> : null}
         {session.branch ? <span className='truncate'>{session.branch}</span> : null}

@@ -18,10 +18,7 @@ function Command({ className, ...props }: React.ComponentProps<typeof CommandPri
   return (
     <CommandPrimitive
       data-slot='command'
-      className={cn(
-        'flex size-full flex-col overflow-hidden rounded-none text-popover-foreground',
-        className,
-      )}
+      className={cn('flex size-full flex-col overflow-hidden text-popover-foreground', className)}
       {...props}
     />
   )
@@ -60,7 +57,7 @@ function CommandDialog({
         // window rather than centered, so the palette never sits on top of the
         // content it is being used to act on.
         className={cn(
-          'top-8 w-full translate-y-0 overflow-hidden rounded-none p-0 shadow-2xl shadow-black/25 sm:max-w-[600px]',
+          'top-8 w-full translate-y-0 overflow-hidden p-0 shadow-xl sm:max-w-[600px]',
           className,
         )}
         overlayClassName={overlayClassName}
@@ -163,7 +160,7 @@ function CommandItem({
     <CommandPrimitive.Item
       data-slot='command-item'
       className={cn(
-        "group/command-item relative flex cursor-default items-center gap-(--density-command-item-gap) rounded-none px-(--density-command-item-padding-x) py-(--density-command-item-padding-y) text-xs outline-hidden select-none in-data-[slot=dialog-content]:rounded-none! data-[disabled=true]:pointer-events-none data-[disabled=true]:opacity-50 data-selected:bg-row-selected data-selected:text-foreground [&_svg]:pointer-events-none [&_svg]:shrink-0 [&_svg:not([class*='size-'])]:size-4 data-selected:*:[svg]:text-foreground",
+        "group/command-item relative flex cursor-default items-center gap-(--density-command-item-gap) rounded-md px-(--density-command-item-padding-x) py-(--density-command-item-padding-y) text-xs outline-hidden select-none data-[disabled=true]:pointer-events-none data-[disabled=true]:opacity-50 data-selected:bg-row-selected data-selected:text-foreground [&_svg]:pointer-events-none [&_svg]:shrink-0 [&_svg:not([class*='size-'])]:size-4 data-selected:*:[svg]:text-foreground",
         className,
       )}
       {...props}

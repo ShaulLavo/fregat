@@ -109,7 +109,7 @@ export function MessageBubble({
           className={cn(
             'min-w-0 text-sm leading-5',
             user
-              ? 'max-w-[80%] rounded-2xl rounded-br-sm border border-border bg-secondary px-4 py-3 text-secondary-foreground'
+              ? 'max-w-[80%] rounded-lg border border-border bg-secondary px-4 py-3 text-secondary-foreground'
               : 'w-full max-w-full px-1 py-0.5 text-foreground',
           )}
           onContextMenu={handleContextMenu}
@@ -145,7 +145,7 @@ export function MessageBubble({
           )}
           {user ? (
             <div
-              className='text-muted-foreground mt-1 flex items-center justify-end gap-1.5 text-[10px] tabular-nums transition-opacity duration-150 group-focus-within/message:pointer-events-auto group-focus-within/message:opacity-100 group-hover/message:pointer-events-auto group-hover/message:opacity-100 [@media(hover:hover)]:pointer-events-none [@media(hover:hover)]:opacity-0'
+              className='text-muted-foreground text-3xs mt-1 flex items-center justify-end gap-1.5 tabular-nums transition-opacity duration-150 group-focus-within/message:pointer-events-auto group-focus-within/message:opacity-100 group-hover/message:pointer-events-auto group-hover/message:opacity-100 [@media(hover:hover)]:pointer-events-none [@media(hover:hover)]:opacity-0'
               data-user-message-meta='true'
             >
               <span className='size-5 shrink-0'>
@@ -173,7 +173,7 @@ export function MessageBubble({
               className='mt-1.5 flex items-center gap-2 transition-opacity duration-150 group-focus-within/message:pointer-events-auto group-focus-within/message:opacity-100 group-hover/message:pointer-events-auto group-hover/message:opacity-100 [@media(hover:hover)]:pointer-events-none [@media(hover:hover)]:opacity-0'
               data-assistant-message-meta='true'
             >
-              <p className='text-muted-foreground text-[10px] tabular-nums'>
+              <p className='text-muted-foreground text-3xs tabular-nums'>
                 <AssistantMessageMeta
                   createdAt={message.createdAt}
                   durationEnd={durationEnd ?? message.updatedAt}

@@ -58,6 +58,13 @@ Navigation exposes `openTabContent` and `selectContent` for generic content. Fil
 such as `openFileSurface` and `selectFile` accept `FilesystemPath`. Native rendering receives a
 document key and a separate `paintKey`; visual cache identity is not document identity.
 
+`lib/language-server-document.ts` derives a separate LSP URI from the typed target. Native
+editor IDs remain document keys. The linked Editor LSP plugin accepts `documentSync.uriForDocument`
+for synchronization and rename projection; semantic-token requests use that same target URI.
+Settings schema associations match these URIs. File preparation checks actual file tabs, so a
+Git reference or comparison does not suppress preparation of its working file. Focused tests
+cover URI encoding, TSX language IDs, settings completion, and preparation from derived views.
+
 Checkpoint comparisons carry an explicit owning workspace. `checkpoint-file` also carries a
 file resource. Session and turn comparison labels are presentation strings, never ownership
 or filesystem evidence. The Git and checkpoint query adapters remain separate.

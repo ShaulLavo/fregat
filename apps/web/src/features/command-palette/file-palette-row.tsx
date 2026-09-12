@@ -23,7 +23,7 @@ export function FilePaletteRow({ item }: FilePaletteRowProps) {
     >
       <span aria-hidden='true' className='size-4' style={fileIconStyle(icon)} />
       <span className='max-w-[55%] shrink-0 truncate font-medium'>{item.entry.name}</span>
-      <span className='text-muted-foreground min-w-0 flex-1 truncate text-[11px]'>
+      <span className='text-muted-foreground text-2xs min-w-0 flex-1 truncate'>
         {item.pathLabel}
       </span>
     </CommandItem>

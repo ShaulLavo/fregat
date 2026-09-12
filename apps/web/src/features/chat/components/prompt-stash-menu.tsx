@@ -18,27 +18,27 @@ export function PromptStashMenu({
 }) {
   return (
     <div className='flex min-w-0 flex-col gap-1'>
-      <p className='text-muted-foreground/70 px-1 text-[10px] font-medium tracking-wide uppercase'>
+      <p className='text-muted-foreground/70 text-3xs px-1 font-medium tracking-wide uppercase'>
         Stashed prompts
       </p>
       <ul className='flex max-h-72 min-w-0 flex-col gap-0.5 overflow-y-auto overscroll-contain'>
         {entries.map((entry) => (
           <li className='group/stash flex min-w-0 items-center gap-1' key={entry.id}>
             <Button
-              className='compact:gap-1.5 compact:px-1 compact:py-0.5 h-auto min-w-0 flex-1 justify-start gap-2 rounded-md px-1.5 py-1 text-left text-xs font-normal'
+              className='h-auto min-w-0 flex-1 justify-start gap-(--density-control-gap) py-(--density-gap-tight) text-left text-xs font-normal'
               type='button'
               variant='ghost'
               onClick={() => onRestore(entry)}
             >
               <BookmarkSimpleIcon className='text-muted-foreground size-3.5 shrink-0' />
               <span className='min-w-0 flex-1 truncate'>{promptSnippet(entry.prompt)}</span>
-              <span className='text-muted-foreground shrink-0 text-[10px] tabular-nums'>
+              <span className='text-muted-foreground text-3xs shrink-0 tabular-nums'>
                 {formatChatTimestamp(entry.createdAt)}
               </span>
             </Button>
             <Button
               aria-label={`Delete stashed prompt: ${promptSnippet(entry.prompt)}`}
-              className='size-6 shrink-0 opacity-0 group-hover/stash:opacity-100 focus-visible:opacity-100'
+              className='shrink-0 opacity-0 group-hover/stash:opacity-100 focus-visible:opacity-100'
               size='icon-sm'
               type='button'
               variant='ghost'

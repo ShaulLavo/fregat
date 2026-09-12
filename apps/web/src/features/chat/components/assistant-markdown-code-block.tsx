@@ -36,7 +36,7 @@ export function AssistantMarkdownCodeBlock({
 
   return (
     <div
-      className='border-border bg-sidebar my-4 flex w-full min-w-0 flex-col gap-2 rounded-md border p-2 data-[wrap=true]:[&_pre]:break-words data-[wrap=true]:[&_pre]:whitespace-pre-wrap'
+      className='border-border bg-card my-4 flex w-full min-w-0 flex-col gap-2 rounded-lg border p-2 data-[wrap=true]:[&_pre]:break-words data-[wrap=true]:[&_pre]:whitespace-pre-wrap'
       data-incomplete={isIncomplete || undefined}
       data-language={language}
       data-streamdown='code-block'
@@ -78,7 +78,7 @@ export function AssistantMarkdownCodeBlock({
       <MarkdownRenderErrorBoundary
         fallback={
           <pre
-            className='overflow-x-auto rounded-sm bg-transparent p-2 text-xs leading-5'
+            className='overflow-x-auto bg-transparent p-2 text-xs leading-5'
             data-streamdown='code-block-body'
           >
             <code className='font-mono'>{text}</code>

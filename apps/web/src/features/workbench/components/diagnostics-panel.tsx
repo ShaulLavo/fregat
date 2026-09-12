@@ -135,7 +135,7 @@ function renderDiagnosticCount({
 }) {
   return (
     <div
-      className={cn('rounded border px-2 py-1', diagnosticTileClass(severity, value))}
+      className={cn('rounded-lg border px-2 py-1', diagnosticTileClass(severity, value))}
       key={label}
     >
       <div className='text-muted-foreground'>{label}</div>
@@ -166,17 +166,18 @@ function renderDiagnosticList({
 
         return (
           <li
-            className={cn('rounded border border-l-2', diagnosticRuleClass(diagnostic.severity))}
+            className={cn('rounded-lg border border-l-2', diagnosticRuleClass(diagnostic.severity))}
             key={diagnosticKey(diagnostic, index)}
           >
+            {/* Raw <button>: a full-width, two-line row; Button is a fixed-height centered control. */}
             <button
-              className='hover:bg-row-hover focus-visible:ring-ring/50 block w-full rounded px-2 py-2 text-left outline-none focus-visible:ring-1'
+              className='hover:bg-row-hover focus-visible:ring-ring/50 block w-full rounded-lg px-2 py-2 text-left outline-none focus-visible:ring-1'
               type='button'
               onClick={() => onOpenDiagnostic(target)}
               onFocus={() => onPreviewDiagnostic(target)}
               onMouseEnter={() => onPreviewDiagnostic(target)}
             >
-              <div className='text-muted-foreground text-[11px]'>
+              <div className='text-muted-foreground text-2xs'>
                 {diagnosticSeverityLabel(diagnostic.severity)}
               </div>
               <div className='text-foreground'>{diagnosticMessageText(diagnostic.message)}</div>

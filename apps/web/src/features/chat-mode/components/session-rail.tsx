@@ -122,9 +122,9 @@ export function SessionRail() {
       className='bg-card backdrop-material border-border flex h-full min-h-0 min-w-0 flex-col overflow-hidden border-r'
       onKeyDown={handleKeyDown}
     >
-      <div className='compact:pt-1.5 flex shrink-0 items-center gap-1 px-2 pt-2'>
+      <div className='flex shrink-0 items-center gap-1 px-2 pt-(--density-section-gap)'>
         <Button
-          className='compact:h-7 compact:gap-1.5 compact:px-1.5 h-8 min-w-0 flex-1 justify-start gap-2 rounded-md px-2 text-[13px]'
+          className='min-w-0 flex-1 justify-start'
           disabled={!ready && !scope}
           size='sm'
           type='button'
@@ -150,7 +150,7 @@ export function SessionRail() {
         </Button>
         <Button
           aria-label='Add project'
-          className='text-muted-foreground hover:text-foreground compact:size-7 size-8 shrink-0 rounded-md'
+          className='text-muted-foreground hover:text-foreground shrink-0'
           size='icon-sm'
           title='Add project'
           type='button'
@@ -160,7 +160,7 @@ export function SessionRail() {
           <FolderPlusIcon className='size-4' />
         </Button>
       </div>
-      <div className='compact:pt-0.5 flex shrink-0 items-center gap-1 px-2 pt-1'>
+      <div className='flex shrink-0 items-center gap-1 px-2 pt-(--density-gap-tight)'>
         <SessionScopeMenu
           projects={model.projects}
           scope={scope}
@@ -172,7 +172,7 @@ export function SessionRail() {
           aria-label='Archived sessions'
           aria-pressed={view === 'archived'}
           className={cn(
-            'text-muted-foreground hover:text-foreground ml-auto size-7 shrink-0 rounded-md compact:size-6',
+            'text-muted-foreground hover:text-foreground ml-auto shrink-0',
             view === 'archived' && 'bg-accent text-accent-foreground',
           )}
           size='icon-sm'
@@ -183,16 +183,16 @@ export function SessionRail() {
         >
           <ArchiveIcon className='size-3.5' />
         </Button>
-        <span className='text-muted-foreground/60 shrink-0 text-[11px] tabular-nums'>
+        <span className='text-muted-foreground/60 text-2xs shrink-0 tabular-nums'>
           {model.scopedCount}
         </span>
       </div>
-      <div className='compact:py-1.5 relative shrink-0 px-2 py-2'>
+      <div className='relative shrink-0 px-2 py-(--density-section-gap)'>
         <MagnifyingGlassIcon className='text-muted-foreground/60 pointer-events-none absolute top-1/2 left-4 size-3.5 -translate-y-1/2' />
         <Input
           aria-label='Search sessions'
           // The native search affordances duplicate our own clear button.
-          className='compact:h-6 h-7 rounded-md pr-7 pl-7 text-[12px] [&::-webkit-search-cancel-button]:hidden [&::-webkit-search-decoration]:hidden'
+          className='h-(--density-control-height-sm) pr-7 pl-7 text-xs [&::-webkit-search-cancel-button]:hidden [&::-webkit-search-decoration]:hidden'
           placeholder='Search sessions'
           type='search'
           value={query}
@@ -201,7 +201,7 @@ export function SessionRail() {
         {query ? (
           <Button
             aria-label='Clear search'
-            className='text-muted-foreground hover:text-foreground absolute top-1/2 right-3 size-5 -translate-y-1/2 rounded-sm'
+            className='text-muted-foreground hover:text-foreground absolute top-1/2 right-3 size-5 -translate-y-1/2'
             size='icon-sm'
             type='button'
             variant='ghost'
@@ -213,7 +213,7 @@ export function SessionRail() {
       </div>
       <MachineConnectionRows />
       <div className='min-h-0 flex-1 overflow-y-auto'>
-        <div className='compact:gap-1 compact:pb-2 flex flex-col gap-2 px-1 pb-3'>
+        <div className='flex flex-col gap-(--density-control-gap) px-1 pb-(--density-section-padding)'>
           <DndContext
             collisionDetection={closestCenter}
             modifiers={RAIL_DND_MODIFIERS}
@@ -228,7 +228,7 @@ export function SessionRail() {
             >
               {model.sections.map((section) => (
                 <section key={section.state} aria-label={section.title}>
-                  <h2 className='text-muted-foreground px-2 py-1 text-[11px] font-medium'>
+                  <h2 className='text-muted-foreground text-2xs px-2 py-1 font-medium'>
                     {section.title}
                   </h2>
                   {section.groups.map((group) => (
@@ -252,7 +252,7 @@ export function SessionRail() {
                 session row — made a project drag a page-sized slab. */}
             <DragOverlay dropAnimation={null}>
               {draggingGroup ? (
-                <div className='bg-popover border-border pointer-events-none rounded-md border shadow-lg'>
+                <div className='bg-popover border-border pointer-events-none rounded-lg border shadow-md'>
                   <SessionGroupHeader group={draggingGroup} />
                 </div>
               ) : null}
