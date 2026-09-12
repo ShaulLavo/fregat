@@ -42,6 +42,19 @@ function register(agents: CodexChildAgents, turnId = 'native-parent-1') {
 }
 
 describe('Codex child notification routing', () => {
+  it('emits canonical tool types while preserving native data', () => {
+    const { agents, events } = fixture()
+    register(agents)
+    agents.handle('item/completed', {
+      threadId: 'child',
+      turnId: 'child-turn',
+      item: { id: 'command-1', type: 'commandExecution', command: 'pwd', status: 'completed' },
+    })
+    expect(events.at(-1)).toMatchObject({
+      payload: { tool: { itemType: 'command_execution', data: { type: 'commandExecution' } } },
+    })
+  })
+
   it('preserves the original parent turn across child resume and later registration', () => {
     const { agents, events, advanceTurn } = fixture()
     register(agents)
