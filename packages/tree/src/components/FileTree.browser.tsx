@@ -179,6 +179,26 @@ describe('FileTree browser behavior', () => {
     })
   })
 
+  it('cancels an earlier smooth reveal when the new target is already visible', async () => {
+    const { model: currentModel, shadowRoot } = await mountBrowserTree()
+    const scrollElement = virtualScroll(shadowRoot)
+
+    flushSync(() => {
+      currentModel.scrollToPath('src/features/a-20.ts', { behavior: 'smooth', focus: false })
+    })
+    flushSync(() => {
+      currentModel.scrollToPath('src/features/a-0.ts', { behavior: 'smooth', focus: false })
+    })
+    for (let frame = 0; frame < 3; frame++) {
+      await new Promise<void>((resolve) => requestAnimationFrame(() => resolve()))
+    }
+
+    expect(scrollElement.scrollTop).toBe(0)
+    expect(
+      rowButton(shadowRoot, 'src/features/a-0.ts').getBoundingClientRect().top,
+    ).toBeGreaterThanOrEqual(scrollElement.getBoundingClientRect().top)
+  })
+
   it('settles controller scroll requests and opens search from a printable row key', async () => {
     const { model: currentModel, shadowRoot } = await mountBrowserTree()
     const directoryRow = rowButton(shadowRoot, 'src/features/')

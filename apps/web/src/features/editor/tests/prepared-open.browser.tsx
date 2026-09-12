@@ -8,6 +8,7 @@ import { flushSync } from 'react-dom'
 import { createRoot, type Root } from 'react-dom/client'
 import { afterEach, expect, test } from 'vitest'
 import { ForesightManager } from 'js.foresight'
+import { createBrowserWorkspace } from '../../../../test/factories/browser-workspace'
 
 import { TestEditorStateProvider as EditorStateProvider } from '../../../../test/factories/editor-state-provider'
 import { useEditorColorTheme } from '@/features/editor/hooks/use-editor-color-theme'
@@ -45,7 +46,7 @@ import {
   FILE_SNAPSHOT_STALE_MS,
 } from '@/lib/file-snapshot-query-cache'
 import type { FileResult } from '@/lib/file-system-types'
-import { AppProviders, createTestQueryClient, seedBootMirrorTheme } from '../../../../test/render'
+import { AppProviders, seedBootMirrorTheme } from '../../../../test/render'
 import {
   installDelayedFileReadClient,
   type DelayedFileReadClient,
@@ -90,16 +91,12 @@ test(
     resetEditorColorThemeStore()
     syncEditorThemeSelection('dark', 'dark-plus')
     installBenchmarkTrace()
-    const queryClient = createTestQueryClient()
-    mountHarness(queryClient)
+    await mountHarness()
     await expect.poll(() => runtime).not.toBeNull()
     await expect.poll(activeThemeIdentity, { timeout: 10_000 }).toBe('dark-plus|dark-plus')
     const harness = requiredRuntime()
 
-    flushSync(() => {
-      harness.workspaceStore.getState().switchWorkspace(rootFolder())
-      harness.commands.openSearchEditor(ROOT_PATH)
-    })
+    expect(await harness.commands.openSearchEditor(ROOT_PATH)).toEqual({ status: 'applied' })
     const sampleId = await beginBenchmarkSampleWhenReady()
     await expect.poll(registeredForesightTarget).toMatchObject({
       meta: { path: PATH, rootPath: ROOT_PATH, tabId: 'prepared-open-browser-target' },
@@ -157,13 +154,10 @@ test(
       diagnostics.push(diagnostic)
     }
     editorDiagnosticGlobal.__editorPerfTrace = { mark: () => undefined }
-    const queryClient = createTestQueryClient()
-    mountHarness(queryClient)
+    const queryClient = await mountHarness()
     await expect.poll(() => runtime).not.toBeNull()
     await expect.poll(activeThemeIdentity, { timeout: 10_000 }).toBe('dark-plus|dark-plus')
-    const harness = requiredRuntime()
 
-    flushSync(() => harness.workspaceStore.getState().switchWorkspace(rootFolder()))
     await ensureFileSnapshotQuery(queryClient, PATH)
     diagnostics = []
     performance.clearMarks('editor.file_open.file_read')
@@ -190,12 +184,9 @@ test(
     resetEditorColorThemeStore()
     syncEditorThemeSelection('dark', 'dark-plus')
     installBenchmarkTrace()
-    const queryClient = createTestQueryClient()
-    mountHarness(queryClient)
+    const queryClient = await mountHarness()
     await expect.poll(() => runtime).not.toBeNull()
     await expect.poll(activeThemeIdentity, { timeout: 10_000 }).toBe('dark-plus|dark-plus')
-    const harness = requiredRuntime()
-    flushSync(() => harness.workspaceStore.getState().switchWorkspace(rootFolder()))
     delayedFileRead = installDelayedFileReadClient(queryClient)
 
     const firstFrame = await activateAndCaptureFirstFrame()
@@ -229,12 +220,10 @@ test(
     resetEditorColorThemeStore()
     syncEditorThemeSelection('dark', 'dark-plus')
     editorDiagnosticGlobal.__editorPerfTrace = { mark: () => undefined }
-    const queryClient = createTestQueryClient()
-    mountHarness(queryClient)
+    const queryClient = await mountHarness()
     await expect.poll(() => runtime).not.toBeNull()
     await expect.poll(activeThemeIdentity, { timeout: 10_000 }).toBe('dark-plus|dark-plus')
     const harness = requiredRuntime()
-    flushSync(() => harness.workspaceStore.getState().switchWorkspace(rootFolder()))
     await ensureFileSnapshotQuery(queryClient, PATH)
     await activateAndCaptureFirstFrame()
     await expect
@@ -248,7 +237,7 @@ test(
     createEditorBufferSession(retained.buffer).applyText('retained dirty browser text')
     const activeTabId = harness.workspaceStore.getState().workbenchPanels.activeEditorTabId
     if (!activeTabId) throw new RangeError('active browser tab unavailable')
-    flushSync(() => harness.commands.closeTab(activeTabId))
+    expect(await harness.commands.closeTab(activeTabId)).toEqual({ status: 'applied' })
     const queryKey = fileSnapshotQueryOptions(PATH).queryKey
     await queryClient.cancelQueries({ exact: true, queryKey })
     queryClient.removeQueries({ exact: true, queryKey })
@@ -283,15 +272,11 @@ test(
     resetEditorColorThemeStore()
     syncEditorThemeSelection('dark', 'dark-plus')
     installBenchmarkTrace()
-    const queryClient = createTestQueryClient()
-    mountHarness(queryClient)
+    await mountHarness()
     await expect.poll(() => runtime).not.toBeNull()
     await expect.poll(activeThemeIdentity, { timeout: 10_000 }).toBe('dark-plus|dark-plus')
     const harness = requiredRuntime()
-    flushSync(() => {
-      harness.workspaceStore.getState().switchWorkspace(rootFolder())
-      harness.commands.openSearchEditor(ROOT_PATH)
-    })
+    expect(await harness.commands.openSearchEditor(ROOT_PATH)).toEqual({ status: 'applied' })
     const sampleId = await beginBenchmarkSampleWhenReady()
     workerRequestGate = installEditorWorkerRequestGate(['queryRange'])
 
@@ -334,12 +319,9 @@ test(
       diagnostics.push(diagnostic)
     }
     editorDiagnosticGlobal.__editorPerfTrace = { mark: () => undefined }
-    const queryClient = createTestQueryClient()
-    mountHarness(queryClient)
+    const queryClient = await mountHarness()
     await expect.poll(() => runtime).not.toBeNull()
     await expect.poll(activeThemeIdentity, { timeout: 10_000 }).toBe('dark-plus|dark-plus')
-    const harness = requiredRuntime()
-    flushSync(() => harness.workspaceStore.getState().switchWorkspace(rootFolder()))
     await triggerForesightIntent()
     await expect
       .poll(preparationRequestTypes, { timeout: 20_000 })
@@ -401,7 +383,9 @@ test('delivers an imperative row prediction through the real Foresight manager',
   }
 })
 
-function mountHarness(queryClient: QueryClient): void {
+async function mountHarness() {
+  const fixture = await createBrowserWorkspace(ROOT_PATH)
+  const { queryClient } = fixture
   const host = document.createElement('main')
   host.dataset.workbench = ''
   host.style.height = '240px'
@@ -411,13 +395,19 @@ function mountHarness(queryClient: QueryClient): void {
   root = createRoot(host)
   flushSync(() => {
     root?.render(
-      <AppProviders command={false} queryClient={queryClient}>
+      <AppProviders
+        application={fixture.application}
+        navigation={fixture.navigation}
+        command={false}
+        queryClient={queryClient}
+      >
         <EditorStateProvider>
           <PreparedOpenHarness />
         </EditorStateProvider>
       </AppProviders>,
     )
   })
+  return queryClient
 }
 
 function PreparedOpenHarness() {
@@ -563,7 +553,10 @@ async function activateAndCaptureFirstFrame() {
       resolve({
         rowCount: document.querySelectorAll('.editor-virtualized-row').length,
         selectedPath: requiredRuntime().workspaceStore.getState().selectedFilePath,
-        text: surface?.textContent ?? '',
+        text: Array.from(
+          surface?.querySelectorAll('.editor-virtualized-row') ?? [],
+          (row) => row.textContent ?? '',
+        ).join('\n'),
         viewportHeight: viewport?.height ?? 0,
         viewportWidth: viewport?.width ?? 0,
       })
@@ -668,18 +661,6 @@ function workerRequestType(value: unknown): string | null {
 function requiredRuntime(): PreparedOpenRuntime {
   if (!runtime) throw new RangeError('prepared-open runtime unavailable')
   return runtime
-}
-
-function rootFolder() {
-  return {
-    birthtimeMs: 0,
-    mtimeMs: 0,
-    name: ROOT_PATH,
-    path: ROOT_PATH,
-    size: 0,
-    type: 'directory' as const,
-    version: 'browser-fixture',
-  }
 }
 
 type PreparedOpenRuntime = {
