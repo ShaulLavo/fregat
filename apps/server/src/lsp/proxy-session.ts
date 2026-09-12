@@ -350,7 +350,9 @@ class PooledLspProxySession {
     this.handle = handle
     this.process = handle.process
     this.rootPath = rootPath
-    this.reader = new LspStdioMessageReader((message) => this.handleServerMessage(message))
+    this.reader = new LspStdioMessageReader((message, byteLength) =>
+      this.handleServerMessage(message, byteLength),
+    )
     this.bindProcess()
   }
 
@@ -1103,8 +1105,10 @@ class PooledLspProxySession {
     return { connection, documents }
   }
 
-  private handleServerMessage(message: string): void {
-    this.serverBytes += Buffer.byteLength(message, 'utf8')
+  private handleServerMessage(message: string, byteLength: number): void {
+    // The reader already framed this body, so its length is known exactly and
+    // does not need re-measuring.
+    this.serverBytes += byteLength
     this.serverMessageCount += 1
     const parsed = parseJsonMessage(message)
     if (isJsonRpcRequest(parsed)) {
@@ -1441,6 +1445,7 @@ class PooledLspProxySession {
   }
 
   private recordSession(outcome: string): void {
+    const framing = this.reader.stats
     const initialized = this.initializeResult?.result
     const context = {
       activeConnectionCount: this.connections.size,
@@ -1455,6 +1460,13 @@ class PooledLspProxySession {
       outcome,
       rootPath: this.rootPath,
       serverBytes: this.serverBytes,
+      // Framing cost: `serverBytes / serverChunkCount` is the mean read size,
+      // which is what makes a quadratic accumulator visible from a log line, and
+      // `serverMaxMessageBytes` names the response that paid for it.
+      serverChunkCount: framing.chunkCount,
+      framingDiscardedBytes: framing.discardedBytes,
+      framingMalformedCount: framing.malformedCount,
+      serverMaxMessageBytes: framing.maxMessageBytes,
       serverHandledRequestCount: this.serverHandledRequestCount,
       serverId: this.match.server.id,
       serverInfo: isRecord(initialized) ? initialized.serverInfo : undefined,
