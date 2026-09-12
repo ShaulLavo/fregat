@@ -7,6 +7,8 @@ import type { EditorTabModel } from '@/features/workspace/utils/tab-types'
 import { useEditorTabActions } from '@/features/editor/hooks/use-editor-tab-actions'
 import { EditorTabMenu } from '@/features/workbench/components/editor-tab-menu'
 import { TabTrailingSlot } from '@/features/workbench/components/tab-trailing-slot'
+import { tabFileResource } from '@/lib/documents/utils/capabilities'
+import { tabContentKey } from '@/lib/documents/utils/tabs'
 import { fileIconStyle } from '@/lib/file-icon-style'
 import { Shimmer } from '@workspace/ui/components/shimmer'
 import { cn } from '@workspace/ui/lib/utils'
@@ -70,8 +72,10 @@ export function EditorTabButton({
         dragging && 'relative z-10 opacity-60',
       )}
       data-editor-tab-id={tab.id}
+      data-editor-tab-key={tabContentKey(tab.content)}
       data-editor-tab-loading={loading || undefined}
-      data-editor-tab-path={tab.copyPath}
+      // copyPath resolves to the source file, which a diff tab shares with the file tab.
+      data-editor-tab-path={tabFileResource(tab.content)?.path}
       draggable={false}
       ref={buttonRef}
       role='tab'

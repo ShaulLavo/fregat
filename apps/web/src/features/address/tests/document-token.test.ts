@@ -2,19 +2,12 @@ import { describe } from 'vitest'
 
 import { expect, test } from '../../../../test/fixtures'
 import { testWorkspaceToken } from '../../../../test/factories/workspace-address'
-import {
-  DOCUMENT_TARGET_CASES,
-  INTERNAL_SETTINGS_DOCUMENT_IDS,
-  INVALID_DOCUMENT_IDS,
-  INVALID_SETTINGS_SURFACE_IDS,
-  testTabContent,
-} from '../../../../test/factories/document-targets'
+import { DOCUMENT_TARGET_CASES, testTabContent } from '../../../../test/factories/document-targets'
 import { TEST_SESSION_ID } from '../../../../test/factories/chat'
 import {
   contentForDocumentToken,
   documentTokenForContent,
 } from '@/features/address/utils/document-token'
-import { decodeDocumentTarget } from '@/lib/documents/utils/codec'
 import {
   fileDocument,
   fileResource,
@@ -40,21 +33,6 @@ test.each(DOCUMENT_TARGET_CASES)(
     }
     expect(result).toEqual({ kind: 'token', token })
     expect(throughUrl(rootPath, content)).toEqual(content)
-  },
-)
-
-test.each([...INVALID_DOCUMENT_IDS, ...INVALID_SETTINGS_SURFACE_IDS])(
-  'rejects malformed reserved target %s before URL encoding',
-  (path) => {
-    expect(decodeDocumentTarget(path, workspaceRoot('')).kind).toBe('invalid')
-    expect(decodeDocumentTarget(path, workspaceRoot('/repo/nested')).kind).toBe('invalid')
-  },
-)
-
-test.each(INTERNAL_SETTINGS_DOCUMENT_IDS)(
-  'keeps internal settings member %s out of standalone tab targets',
-  (path) => {
-    expect(decodeDocumentTarget(path, workspaceRoot('')).kind).toBe('internal')
   },
 )
 

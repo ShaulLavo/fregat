@@ -3,6 +3,7 @@ import {
   documentKey,
   fileDocument,
   fileResource,
+  sameDocument,
   settingsJsonDocument,
 } from '@/lib/documents/utils/identity'
 import type {
@@ -57,7 +58,9 @@ export function tabContentKey(content: TabContent): string {
 }
 
 export function sameTabContent(left: TabContent, right: TabContent): boolean {
-  return left === right || tabContentKey(left) === tabContentKey(right)
+  if (left === right) return true
+  if (left.kind === 'settings' || right.kind === 'settings') return left.kind === right.kind
+  return sameDocument(left.document, right.document)
 }
 
 export function retainedTabDocuments(content: TabContent): readonly DocumentRef[] {

@@ -61,6 +61,7 @@ export function FileEditorBody({
   const visibleSnapshot = useEditorVisibleSnapshot({
     storage,
     active: snapshotActive,
+    documentKey: key,
     renderedDocument:
       editorDocument && resource
         ? {

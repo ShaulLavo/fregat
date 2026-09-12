@@ -55,8 +55,19 @@ export function documentKey(document: DocumentRef): DocumentKey {
   return JSON.stringify(identityParts(document)) as DocumentKey
 }
 
+// Equality without the key: this runs inside store equality functions, where stringifying
+// every document on every comparison is the cost that shows up.
+export function sameDocument(left: DocumentRef, right: DocumentRef): boolean {
+  return left === right || sameIdentityParts(identityParts(left), identityParts(right))
+}
+
 export function fileDocumentKey(path: FilesystemPath): DocumentKey {
   return documentKey(fileDocument(fileResource(path)))
+}
+
+function sameIdentityParts(left: readonly unknown[], right: readonly unknown[]): boolean {
+  if (left.length !== right.length) return false
+  return left.every((part, index) => part === right[index])
 }
 
 function identityParts(document: DocumentRef): readonly unknown[] {

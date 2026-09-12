@@ -774,9 +774,9 @@ function readMeasuredPipeline(page, path, activationAt, detectedAt) {
 async function assertResetState(page, path) {
   const state = await page.evaluate(
     (targetPath) => ({
-      activePath: document
-        .querySelector('[data-editor-tab-path][aria-selected="true"]')
-        ?.getAttribute('data-editor-tab-path'),
+      activeKey: document
+        .querySelector('[data-editor-tab-key][aria-selected="true"]')
+        ?.getAttribute('data-editor-tab-key'),
       targetTabs: Array.from(document.querySelectorAll('[data-editor-tab-path]')).filter(
         (tab) => tab.getAttribute('data-editor-tab-path') === targetPath,
       ).length,
@@ -784,8 +784,8 @@ async function assertResetState(page, path) {
     path,
   )
   if (state.targetTabs !== 0) throw createBenchmarkError('reset left the target tab mounted')
-  if (!state.activePath?.startsWith('search-buffer:')) {
-    throw createBenchmarkError(`reset did not restore the inert surface: ${state.activePath}`)
+  if (!state.activeKey?.startsWith('["search"')) {
+    throw createBenchmarkError(`reset did not restore the inert surface: ${state.activeKey}`)
   }
 }
 

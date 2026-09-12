@@ -25,6 +25,7 @@ type SnapshotTheme = {
 type SnapshotOptions = {
   readonly storage: ScopedStorage
   readonly active: boolean
+  readonly documentKey: DocumentKey
   readonly renderedDocument: {
     readonly buffer: EditorTextBuffer
     readonly documentKey: DocumentKey
@@ -38,6 +39,7 @@ type SnapshotOptions = {
 export function useEditorVisibleSnapshot({
   storage,
   active,
+  documentKey,
   renderedDocument,
   selectedTarget,
   theme,
@@ -46,7 +48,9 @@ export function useEditorVisibleSnapshot({
   const path = selectedTarget?.path ?? null
   const rootPath = selectedTarget?.rootPath ?? null
   const { appliedThemeId, committedThemeId, selectedThemeId } = theme
-  const paintKey = selectedTarget ? `${storage.environmentId}\u0000${rootPath}\u0000${path}` : null
+  // Keyed by the document, not the file: a null key detaches the document inside useEditor,
+  // and the kinds without a filesystem resource still render one.
+  const paintKey = `${storage.environmentId}\u0000${documentKey}`
   const cacheKey = `${paintKey}\u0000${committedThemeId}`
   const [cached, setCached] = useState(() => ({
     key: cacheKey,
@@ -85,7 +89,7 @@ export function useEditorVisibleSnapshot({
   const themeReady = appliedThemeId === committedThemeId && selectedThemeId === committedThemeId
 
   useLayoutEffect(() => {
-    if (path === null || rootPath === null || paintKey === null) {
+    if (path === null || rootPath === null) {
       capture.setIdentity(null)
       return
     }

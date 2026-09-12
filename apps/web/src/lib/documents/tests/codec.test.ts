@@ -5,7 +5,7 @@ import {
   testDocumentRef,
   testTabContent,
 } from '../../../../test/factories/document-targets'
-import { decodeDocumentTarget, encodedViewTarget } from '@/lib/documents/utils/codec'
+import { encodedViewTarget } from '@/lib/documents/utils/codec'
 import { filesystemPath, conflictId } from '@/lib/documents/utils/identity'
 import {
   documentLabel,
@@ -15,53 +15,40 @@ import {
 } from '@/lib/documents/utils/labels'
 import { comparisonRequest } from '@/lib/documents/utils/comparisons'
 
-const root = filesystemPath('/repo')
+const viewTargets = Object.entries(documentTargets).filter(
+  ([name]) => !['settings', 'file', 'relativeFile'].includes(name),
+)
 
-test.each(
-  Object.entries(documentTargets).filter(
-    ([name]) => !['settings', 'file', 'relativeFile'].includes(name),
-  ),
-)('round-trips the characterized %s target through its boundary format', (_, raw) => {
-  const document = testDocumentRef(raw)
-  if (document.kind === 'file') throw createClientInvariantError('View fixture must not be a file')
-  expect(decodeDocumentTarget(encodedViewTarget(document), root)).toEqual({
-    kind: 'tab',
-    content: { kind: 'document', document },
+// This string is the language-server URI for a document with no file of its own, so two
+// documents sharing one would hand the server a single view of both.
+test('every characterized view target encodes to its own identity', () => {
+  const encoded = viewTargets.map(([, raw]) => {
+    const document = testDocumentRef(raw)
+    if (document.kind === 'file')
+      throw createClientInvariantError('View fixture must not be a file')
+    return encodedViewTarget(document)
   })
+  expect(new Set(encoded).size).toBe(encoded.length)
 })
 
-test('reference paths and refs preserve colons and slashes', () => {
-  const document = {
+test('view identities escape the punctuation a URI cannot carry raw', () => {
+  const reference = {
     kind: 'git-ref',
     source: { path: filesystemPath('src/a:b.ts'), ref: 'refs/heads/feat:x' },
   } as const
-  expect(decodeDocumentTarget(encodedViewTarget(document), root)).toEqual({
-    kind: 'tab',
-    content: { kind: 'document', document },
-  })
-  expect(documentLabel(document)).toBe('a:b.ts (refs/heads/feat:x)')
-})
-
-test('compare paths preserve spaces, URL punctuation and their working-tree label', () => {
-  const document = {
+  const compared = {
     kind: 'compare-saved',
     file: { path: filesystemPath('src/a b/c#d?e.ts') },
   } as const
-  expect(decodeDocumentTarget(encodedViewTarget(document), root)).toEqual({
-    kind: 'tab',
-    content: { kind: 'document', document },
-  })
-  expect(documentLabel(document)).toBe('c#d?e.ts (working tree)')
+  expect(encodedViewTarget(reference)).not.toMatch(/[\s#?]/)
+  expect(encodedViewTarget(compared)).not.toMatch(/[\s#?]/)
+  expect(documentLabel(reference)).toBe('a:b.ts (refs/heads/feat:x)')
+  expect(documentLabel(compared)).toBe('c#d?e.ts (working tree)')
 })
 
 test('conflict targets carry only the record identity and use explicit presentation facts', () => {
   const document = { kind: 'conflict', conflictId: conflictId('conflict/1:changed') } as const
-  const encoded = encodedViewTarget(document)
-  expect(encoded).toBe('conflict-diff:conflict%2F1%3Achanged')
-  expect(decodeDocumentTarget(encoded, root)).toEqual({
-    kind: 'tab',
-    content: { kind: 'document', document },
-  })
+  expect(encodedViewTarget(document)).toBe('conflict-diff:conflict%2F1%3Achanged')
   expect(documentLabel(document, { conflictPath: '/repo/src/app.ts' })).toBe('app.ts')
   expect(documentTitle(document, { conflictPath: '/repo/src/app.ts' })).toBe(
     '/repo/src/app.ts conflict editor',

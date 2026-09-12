@@ -6,7 +6,7 @@ import {
   INVALID_DOCUMENT_IDS,
   INVALID_SETTINGS_SURFACE_IDS,
 } from '../../../../test/factories/document-targets'
-import { decodeDocumentTarget } from '@/lib/documents/utils/codec'
+import { decodeDocumentTarget } from '../../../../test/factories/document-target-codec'
 import { filesystemPath } from '@/lib/documents/utils/identity'
 import { tabFileResource } from '@/lib/documents/utils/capabilities'
 

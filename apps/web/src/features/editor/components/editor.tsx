@@ -51,7 +51,8 @@ const NO_ADDITIONAL_PLUGINS: readonly EditorPlugin[] = []
 type EditorProps = {
   active: boolean
   document: EditorRenderDocument | null
-  paintKey?: string | null
+  /** Omitted means "no snapshot"; a null key would detach the document inside useEditor. */
+  paintKey?: string
   target: DocumentRef
   snapshot?: string | null
   onCaptureSourceChange?: (source: SnapshotCaptureSource | null) => void

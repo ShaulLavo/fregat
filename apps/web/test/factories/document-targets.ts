@@ -1,4 +1,4 @@
-import { decodeDocumentTarget } from '@/lib/documents/utils/codec'
+import { decodeDocumentTarget } from './document-target-codec'
 import { documentKey, workspaceRoot } from '@/lib/documents/utils/identity'
 import { sameTabContent } from '@/lib/documents/utils/tabs'
 import type { DocumentRef, ReopenScrollPosition, TabContent } from '@/lib/documents/utils/types'

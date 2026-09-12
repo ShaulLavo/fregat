@@ -474,15 +474,14 @@ function scrollPositionsEqual(
   left: readonly ReopenScrollPosition[],
   right: readonly ReopenScrollPosition[],
 ) {
-  if (left.length !== right.length) return false
-  const rightByKey = new Map(right.map((entry) => [tabContentKey(entry.content), entry.position]))
-  for (const entry of left) {
-    const position = rightByKey.get(tabContentKey(entry.content))
-    if (!position || position.left !== entry.position.left || position.top !== entry.position.top)
-      return false
-  }
+  return readonlyArraysEqual(left, right, sameScrollPosition)
+}
 
-  return true
+// Order matters: readers of this list take the first entry that matches a tab.
+function sameScrollPosition(left: ReopenScrollPosition, right: ReopenScrollPosition) {
+  if (left.position.left !== right.position.left) return false
+  if (left.position.top !== right.position.top) return false
+  return sameTabContent(left.content, right.content)
 }
 
 function mapsEqual<TValue>(

@@ -9,7 +9,12 @@ import {
 } from '@/features/workbench/utils/panels'
 import { documentTab, rekeyTabFile, sameTabContent } from '@/lib/documents/utils/tabs'
 import { fileDocument, fileResource } from '@/lib/documents/utils/identity'
-import type { DocumentRef, FilesystemPath, TabContent } from '@/lib/documents/utils/types'
+import type {
+  DocumentRef,
+  FilesystemPath,
+  ReopenScrollPosition,
+  TabContent,
+} from '@/lib/documents/utils/types'
 
 export type WorkspaceDocumentChange =
   | { readonly kind: 'remove'; readonly document: DocumentRef }
@@ -43,11 +48,28 @@ export function updateWorkspaceDocument(
       change.from,
       change.to,
     ),
-    reopenScrollPositions: slice.reopenScrollPositions.map((entry) => ({
-      content: rekeyTabFile(entry.content, change.from, change.to),
-      position: entry.position,
-    })),
+    reopenScrollPositions: rekeyScrollPositions(
+      slice.reopenScrollPositions,
+      change.from,
+      change.to,
+    ),
   }
+}
+
+// A rename can land on a destination a closed file already left an entry for. Readers disagree
+// on duplicates — one takes the first match, one the last — so the renamed tab's entry wins here.
+function rekeyScrollPositions(
+  positions: readonly ReopenScrollPosition[],
+  from: FilesystemPath,
+  to: FilesystemPath,
+): readonly ReopenScrollPosition[] {
+  const source = documentTab(fileDocument(fileResource(from)))
+  if (!positions.some((entry) => sameTabContent(entry.content, source))) return positions
+
+  const destination = documentTab(fileDocument(fileResource(to)))
+  return positions
+    .filter((entry) => !sameTabContent(entry.content, destination))
+    .map((entry) => ({ content: rekeyTabFile(entry.content, from, to), position: entry.position }))
 }
 
 function changedContent(change: WorkspaceDocumentChange): TabContent | null {

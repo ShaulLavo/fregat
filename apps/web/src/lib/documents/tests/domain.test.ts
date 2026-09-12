@@ -21,7 +21,7 @@ import {
   filesystemResource,
   saveCapability,
 } from '@/lib/documents/utils/capabilities'
-import { decodeDocumentTarget } from '@/lib/documents/utils/codec'
+import { decodeDocumentTarget } from '../../../../test/factories/document-target-codec'
 import { tabLabel, tabTitle } from '@/lib/documents/utils/labels'
 import type { DocumentRef } from '@/lib/documents/utils/types'
 import { TEST_SESSION_ID } from '../../../../test/factories/chat'
