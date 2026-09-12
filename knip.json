@@ -27,6 +27,7 @@
         "scripts/chat-scroll-proof-entry.mjs",
         "scripts/chat-snapshot-benchmark.ts",
         "scripts/keymap-baseline.mjs",
+        "scripts/verify-federated-environments.mjs",
         "scripts/verify-workspace-navigation.mjs",
         "test/factories/chat-proof-workspace.tsx"
       ],
