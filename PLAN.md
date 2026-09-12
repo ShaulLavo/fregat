@@ -106,6 +106,24 @@ while numbered panel shortcuts use a separate combination. Held-modifier hints f
 targets. Interaction rules are confirmed; the exact keys remain proposed. Implementation follows
 the delivered shared runtime and has not started.
 
+## Document contribution refactor
+
+[Plan 099](plans/099-document-contributions.md) is proposed; implementation has not started.
+It extends Editor's existing buffer owner with one committed-revision publication path and a
+document contribution runtime. Tree-sitter, Shiki, minimap, and language-service adapters share
+source synchronization while retaining typed APIs, independent queues, and domain-specific data.
+
+Its internal order is calibrated baseline and consumer inventory, canonical publication, shared
+runtime with all syntax callers, minimap, local/external LSP, remaining ownership checks, a
+separate SAB transport decision, and final correctness/performance gates. Baseline/publication work
+can proceed independently. Public backend cutover follows completed Plan 098 then Plan 097 contracts;
+it does not bypass their required order. Preserve WorkspaceEdit segment publication and
+compensation, prepared adoption, and the existing input latency limits.
+
+This proposal does not reorder other lanes. Editor E009 supplies transport measurement scope;
+future E013 shared storage and E014 parallel search reuse this runtime rather than create another
+document synchronization path. SAB storage research is not a prerequisite for the refactor.
+
 ## Instant workspace reload
 
 [Plan 085](plans/085-instant-workspace-reload.md) is proposed and implementation has not started.
@@ -218,6 +236,21 @@ remote completion still requires its relevant live gates. They do not depend on 
 keymap, reload, TUI, or Ghostty lanes. Any new Editor public contract lands in lockstep with Platform.
 General public hosting/pairing remains separate; the MCP prerequisite uses authenticated loopback
 endpoints and existing SSH access, with explicit grants for native clients.
+
+## Document and async operation ownership
+
+The required execution order is **098 → 097**:
+
+1. **[Plan 098 — document and tab domain](plans/098-document-and-tab-domain.md).** Complete its
+   characterization, settings save acknowledgement correction, shared domain model, caller
+   migrations, and mechanical enforcement. All completion criteria and focused verification
+   gates must pass before Plan 097 starts.
+2. **[Plan 097 — async operation ownership](plans/097-async-operation-ownership.md).** Record
+   Plan 098's completion evidence and implemented document API locations in this plan. Refresh
+   its source anchors, API sketches, and drift baseline, then begin implementation against the
+   settled document model.
+
+Design agreement or partial implementation of Plan 098 does not satisfy this dependency.
 
 ## Duplication census lane
 

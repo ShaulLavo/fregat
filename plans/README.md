@@ -30,8 +30,9 @@ a bare root `bun run verify`.
 | [092 — path and URI helpers](092-path-and-uri-helpers.md)                       | **PROPOSED — DEFECT FIXES IMPLEMENTED**                       |
 | [093 — web React and store ceremony](093-web-react-and-store-ceremony.md)       | **PROPOSED — DEPENDS ON 091**                                 |
 | [096 — apps/web layering](096-web-layering-and-boundaries.md)                   | **PROPOSED — IMPLEMENTATION NOT STARTED**                     |
-| [097 — async operation ownership](097-async-operation-ownership.md)             | **PROPOSED — IMPLEMENTATION NOT STARTED**                     |
 | [098 — document and tab domain](098-document-and-tab-domain.md)                 | **PROPOSED — CHARACTERIZATION REQUIRED FIRST**                |
+| [097 — async operation ownership](097-async-operation-ownership.md)             | **PROPOSED — DEPENDS ON COMPLETION OF 098**                   |
+| [099 — document contribution runtime](099-document-contributions.md)            | **PROPOSED — BASELINE AND PUBLICATION FIRST**                 |
 | [094 — client-core web and TUI parity](094-client-core-web-tui-parity.md)       | **PROPOSED — DEPENDS ON 091; CO-PASS WITH 096**               |
 | [095 — server plumbing](095-server-plumbing.md)                                 | **PROPOSED — IMPLEMENTATION NOT STARTED**                     |
 | [073 — Electrobun 2.x migration](073-electrobun-v2-migration.md)                | **PROPOSED — ROOT GO/NO-GO SCHEDULING**                       |
@@ -40,11 +41,18 @@ a bare root `bun run verify`.
 
 ## Dependency notes
 
-- Plan 098 owns the document/tab model, with behavioral characterization before production
+- Plan 099 owns canonical Editor buffer publication and shared document synchronization through
+  contributions. Baseline/publication groundwork can proceed independently. Its public cutover follows
+  the completed identity and source-ownership contracts from 098 then 097. Editor E009 informs
+  its transport comparison; future E013 shared storage and E014 parallel search reuse its runtime.
+
+- **Required order: 098 → 097**, as recorded in [`PLAN.md`](../PLAN.md#document-and-async-operation-ownership).
+  Complete and verify all of Plan 098 before starting any implementation in Plan 097. Design
+  agreement or partial migration does not release Plan 097. Record completion evidence and the
+  implemented document API locations in Plan 097, then refresh its source anchors and drift baseline.
+  Plan 098 owns the document and tab model, with behavioral characterization before production
   changes. It supersedes Plan 096's document-scheme factory proposal and takes over its
-  coalesced-log move and shared-layer import guard. When 098 and 097 are executed together,
-  settle document identity types before adapting async operation source types; serialize their
-  shared document/save/service edits. Neither requires the other's entire implementation.
+  coalesced-log move and shared-layer import guard.
 
 - Plan 087 delivers managed external MCP connections and the native Platform tool endpoint using
   protocol revision `2026-07-28` and SDK v2, with explicit stateless operation, scoped authentication,

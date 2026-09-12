@@ -4,6 +4,10 @@ Status: proposed; implementation has not started. Planned at Platform `fb797f07`
 2026-09-12. Priority P1, effort L, change risk high. Characterization is a prerequisite to
 production changes, not a final verification task.
 
+**Execution order: complete and verify this plan before starting
+[Plan 097](097-async-operation-ownership.md).** Plan 097 depends on the finished document and tab
+model and its migrated consumers. It cannot start after design agreement or partial implementation.
+
 A tab currently stores `{ id: string, path: string }`. The second string may identify a file,
 search, comparison, conflict, Git revision, or the settings surface. Saving, labels, navigation,
 persistence and closing decode that meaning separately. Replace those independent interpretations
@@ -442,9 +446,8 @@ payload distinctions and its separate cache-versus-panels active-tab fallback po
 096 consolidation work remains independent.
 
 Plan 097 owns async operation capture, revision evidence, preview tokens and conflict completion.
-When executing both, settle this plan's document types before adapting 097's source types;
-serialize edits to document/service/save files. Neither plan requires implementing the other's
-whole scope. Preserve existing retained owner and revision guarantees throughout this refactor.
+It starts only after this plan meets all completion criteria and its focused verification gates
+pass. Preserve existing retained owner and revision guarantees throughout this refactor.
 
 Drift check before implementation:
 
@@ -463,3 +466,7 @@ content and keys throughout migrated consumers; both settings members covered by
 but active Save correctly scoped; no synthetic value accepted as a filesystem path; typed
 cache and valid URLs round-tripping; no stale old schema readers or classifier aliases; and
 proven lint/type boundaries passing through the repository's actual CI path.
+
+Before closing this plan, record its completion evidence and implemented document API locations
+in Plan 097. Refresh Plan 097's source anchors, API sketches, and drift baseline so it starts from
+the settled implementation.

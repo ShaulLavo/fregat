@@ -1,14 +1,19 @@
 # Plan 097: Carry operation owners and source revisions through async workflows
 
-Status: proposed; implementation has not started. Planned against Platform `bc013a3a` and
+Status: proposed; depends on completion of Plan 098; implementation has not started.
+Planned against Platform `bc013a3a` and
 the linked Editor checkout `6492651` on 2026-09-12. Priority P1, effort L across several
 bounded changes, implementation risk medium. No dependency on completing the duplication
 plans, but coordinate overlapping files with Plans 091, 093, 094, and 096.
 
-Plan 098 now owns the shared document/tab model and the coalesced-log move/import guard.
-When both plans execute together, settle its characterized document identity types before
-adapting this plan's source evidence. Keep async ownership, lifetime and commit changes here;
-neither plan depends on completion of the other's entire scope.
+**Prerequisite: complete and verify [Plan 098](098-document-and-tab-domain.md) before starting
+any implementation in this plan.** This includes its characterization, document and tab model,
+caller migrations, save acknowledgement correction, and mechanical enforcement. Settling only
+the proposed types does not satisfy the prerequisite.
+
+Before starting, record Plan 098's completion evidence here and refresh this plan's source
+anchors, API sketches, and drift baseline against its implemented document APIs. Keep async
+ownership, lifetime and commit changes here. Execution order is **098 → 097**.
 
 The outcome is one captured owner from the first operation read through preparation,
 confirmation, persistence, recovery, and local completion. Changes calculated from a source
@@ -217,7 +222,8 @@ A global operation framework or universal revision registry would duplicate exis
 
 ## Implementation units
 
-Execute each unit with its focused verification before proceeding. Independent Editor work in
+Start these units only after the Plan 098 prerequisite above is satisfied. Execute each unit
+with its focused verification before proceeding. Within this plan, independent Editor work in
 unit 5 can run alongside Platform work; both are required for the final claimed scope.
 
 ### 1. Require transport ownership at reusable boundaries
@@ -416,6 +422,8 @@ it with unconditional writes or force-replacement.
 
 Completion requires all of these:
 
+- [ ] Plan 098 completed before implementation began; its verification evidence and the refreshed
+      document API anchors and drift baseline are recorded here.
 - [ ] No reusable helper in the migrated set falls back to selected environment ownership.
 - [ ] Search source reads and application come from one retained service operation.
 - [ ] Every host-generated text edit carries service-issued source evidence; the optional map
@@ -430,7 +438,7 @@ Completion requires all of these:
 - [ ] No compatibility APIs, duplicate transaction state machines or unrelated changes remain.
 
 Plan 091 may move file-server errors; 093 may consolidate Git hooks; 094 owns web/TUI replacement
-semantics; 096 may move shared web modules; 098 owns the document/tab model and coalesced-log
-move. Reconcile those moves while keeping their behavioral changes separate. This plan owns
-operation capture/provenance and its regressions. Root scheduling remains in `PLAN.md`; this
-proposal does not reorder it.
+semantics; 096 may move shared web modules. Reconcile those moves while keeping their behavioral
+changes separate. Consume Plan 098's completed document and tab model and coalesced-log move.
+This plan owns operation capture/provenance and its regressions. The required **098 → 097**
+execution order is recorded in `PLAN.md`.
