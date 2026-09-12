@@ -200,6 +200,8 @@ export function SearchPane({
           client={session.client}
           query={searchQuery(rootPath, options)}
           matches={state.matches}
+          searchKind={state.kind}
+          searchTruncated={state.truncated}
           theme={theme}
           onClose={closeReplacement}
           onApplied={() => {

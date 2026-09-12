@@ -152,7 +152,10 @@ function canReplace(
   if (!snapshot) return false
   if (!snapshot.resultsSearchQuery) return false
   if (snapshot.replaceStatus === 'running') return false
-  if (snapshot.status === 'loading') return false
+  // An allowlist, not a denylist. Blocking only `'loading'` let `'error'`
+  // through, and a run that fails mid-stream keeps its partial matches in
+  // `snapshot.matches` — so replace stayed enabled over a proven-incomplete set.
+  if (snapshot.status !== 'ready') return false
 
   return firstContentMatch(snapshot.matches) !== null
 }

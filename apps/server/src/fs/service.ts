@@ -812,21 +812,42 @@ async function* observedSearchEvents(
     },
   })
 
+  // `recorded` is load-bearing: without it the `finally` would emit a second
+  // `fs.operations[]` entry on every completed and every failed search, turning
+  // one wide event into two.
+  let recorded = false
+  const record = (outcome: SearchStreamOutcome, error?: unknown) => {
+    if (recorded) return
+    recorded = true
+    if (error !== undefined) {
+      recordRequestError(error, searchStreamSummary(options, startedAt, state, outcome))
+      recordStreamSummary({
+        ...searchStreamSummary(options, startedAt, state, outcome),
+        error: errorSummary(error),
+      })
+      return
+    }
+
+    recordStreamSummary(searchStreamSummary(options, startedAt, state, outcome))
+  }
+
   try {
     for await (const event of events) {
       updateSearchState(state, event)
       yield event
     }
+    record('ok')
   } catch (error) {
-    recordRequestError(error, searchStreamSummary(options, startedAt, state, 'error'))
-    recordStreamSummary({
-      ...searchStreamSummary(options, startedAt, state, 'error'),
-      error: errorSummary(error),
-    })
+    record('error', error)
     throw error
+  } finally {
+    // A client disconnect calls `events.return()`, which resumes this generator
+    // at the `yield` with no error and no completion — previously that recorded
+    // nothing at all, so an aborted search left no trace and `completed` never
+    // reached the log. Quick-open aborts on every keystroke, so this was the
+    // common case and it was invisible.
+    record('aborted')
   }
-
-  recordStreamSummary(searchStreamSummary(options, startedAt, state, 'ok'))
 }
 
 async function* observedWatchEvents(
@@ -891,11 +912,16 @@ function updateWatchState(
   if (event.type === 'error') state.errorEventCount += 1
 }
 
+type SearchStreamOutcome = 'aborted' | 'error' | 'ok'
+
 function searchStreamSummary(
   options: FileSystemSearchOptions,
   startedAt: number,
   state: SearchStreamState,
-  status: 'error' | 'ok',
+  // 'aborted' is a real terminal condition, not an absence of one: a client
+  // disconnect used to record nothing at all, which is why no line in logs/ ever
+  // carried `completed`.
+  status: SearchStreamOutcome,
 ) {
   return {
     area: 'fs',

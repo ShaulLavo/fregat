@@ -116,7 +116,10 @@ export class CompositeSearchProvider implements SearchProvider {
         state.paths.size,
       )
     } catch (error) {
-      if (!signal?.aborted) logSearchFailed(query, error, startedAt)
+      // An abort is a terminal condition of its own, not a silent non-event: the
+      // run produced partial results that nothing downstream may treat as whole.
+      if (signal?.aborted) logSearchAborted(query, state, startedAt)
+      else logSearchFailed(query, error, startedAt)
 
       throw error
     }
@@ -171,6 +174,9 @@ function createCompositeState(): CompositeSearchState {
   }
 }
 
+// `outcome: 'ok'` said nothing about whether the run actually finished, so a
+// truncated result and a complete one were indistinguishable in the logs. The
+// terminal condition is the field a reader needs.
 function logSearchCompleted(
   query: WorkspaceSearchQuery,
   state: CompositeSearchState,
@@ -182,9 +188,24 @@ function logSearchCompleted(
     action: 'search.query',
     fileCount: state.paths.size,
     matchCount: state.emittedCount,
-    outcome: 'ok',
+    outcome: truncated ? 'truncated' : 'complete',
     truncated,
     warningCodes: state.warningCodes.length > 0 ? state.warningCodes : undefined,
+  })
+}
+
+function logSearchAborted(
+  query: WorkspaceSearchQuery,
+  state: CompositeSearchState,
+  startedAt: number,
+) {
+  log.info({
+    ...searchLogContext(query, startedAt),
+    action: 'search.query',
+    fileCount: state.paths.size,
+    matchCount: state.emittedCount,
+    outcome: 'aborted',
+    truncated: state.truncated,
   })
 }
 

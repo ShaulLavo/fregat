@@ -1,6 +1,7 @@
 import { useEffect, useState } from 'react'
 import type { Client } from '@workspace/client-core/transport/client'
 import type { WorkspaceSearchMatch, WorkspaceSearchQuery } from '@workspace/contracts'
+import { recordObservabilityInfo } from '@workspace/observability'
 import { useCommandFocus } from '@/commands/hooks/use-command-focus'
 import { useCommands } from '@/commands/hooks/use-commands'
 import { Dialog } from '@/components/dialog'
@@ -23,6 +24,8 @@ export function ReplaceDialog({
   client,
   query,
   matches,
+  searchKind,
+  searchTruncated,
   theme,
   onClose,
   onApplied,
@@ -30,6 +33,8 @@ export function ReplaceDialog({
   client: Client
   query: WorkspaceSearchQuery
   matches: readonly WorkspaceSearchMatch[]
+  searchKind: 'empty' | 'loading' | 'ready' | 'failed'
+  searchTruncated: boolean
   theme: Theme
   onClose: () => void
   onApplied: () => void
@@ -71,6 +76,21 @@ export function ReplaceDialog({
       if (phase.kind !== 'preview' || value !== 'replace' || !phase.plan.operations.length) return
       setPhase({ kind: 'applying', plan: phase.plan })
       await applyReplacement(client, query.path, phase.plan, lifetime.signal)
+      // A replacement rewrites every occurrence in each matched file, so the
+      // search's completeness is the fact that matters afterwards. `searchKind`
+      // and `searchTruncated` are what the enabling gate itself saw: today it
+      // only admits a complete, untruncated run, so these are constant — and
+      // that is the point. If the gate ever regresses, the log says so.
+      recordObservabilityInfo('tui.search.replace', {
+        area: 'search',
+        matchCount: matches.length,
+        operationCount: phase.plan.operations.length,
+        outcome: 'applied',
+        path: query.path,
+        replacedCount: phase.plan.count,
+        searchKind,
+        searchTruncated,
+      })
       if (!lifetime.signal.aborted) onApplied()
     } catch (error) {
       if (lifetime.signal.aborted) return

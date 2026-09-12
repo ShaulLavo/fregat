@@ -50,14 +50,21 @@ export async function collectWorkspaceSearch(
     if (event.type === 'done') done = event
   }
 
+  // Every terminal field comes from the `done` event and none is defaulted. The
+  // old fallbacks (`done?.count ?? matches.length`, `done?.truncated ?? false`)
+  // are what made a partial stream look like a finished one. `streamWorkspaceSearch`
+  // throws when no `done` arrives, so this guard is belt-and-braces — it keeps the
+  // function correct on its own terms rather than on its producer's.
+  if (!done) throw clientErrors.SEARCH_INCOMPLETE({ matchCount: matches.length })
+
   return {
-    count: done?.count ?? matches.length,
-    fileCount: done?.fileCount,
+    count: done.count,
+    fileCount: done.fileCount,
     matches,
-    measurement: done?.measurement,
-    path: done?.path ?? query.path,
-    query: done?.query ?? query.query,
-    truncated: done?.truncated ?? false,
+    measurement: done.measurement,
+    path: done.path,
+    query: done.query,
+    truncated: done.truncated,
     warnings,
   }
 }
@@ -74,11 +81,23 @@ export async function* streamWorkspaceSearch(
   if (response.error) throw clientErrors.SEARCH_FAILED({ status: response.status })
   if (!response.data) throw clientErrors.EDEN_STREAM_MISSING({ label: 'Search' })
 
-  for await (const event of parseEdenSseStream(response.data)) {
-    if (signal?.aborted) return
+  let matchCount = 0
+  let terminated = false
 
-    yield workspaceSearchEventFromSse(event)
+  for await (const event of parseEdenSseStream(response.data)) {
+    signal?.throwIfAborted()
+
+    const parsed = workspaceSearchEventFromSse(event)
+    if (parsed.type === 'match') matchCount += 1
+    terminated = parsed.type === 'done'
+    yield parsed
   }
+
+  // A stream that simply ends is indistinguishable from a completed one unless
+  // the producer says so. Throwing rather than returning is what makes that
+  // unignorable: `for await` discards a generator's return value with no
+  // diagnostic, so every consumer's existing catch is the enforcement point.
+  if (!terminated) throw clientErrors.SEARCH_INCOMPLETE({ matchCount })
 }
 
 function workspaceSearchRequestQuery(query: WorkspaceSearchQuery) {
@@ -150,10 +169,11 @@ function warningCode(value: unknown): WorkspaceSearchWarningCode {
   return 'content-tool-partial-failure'
 }
 
+// A fabricated zeroed `done` is indistinguishable from a legitimate empty
+// result — `path: ''` is a valid workspace root — so a malformed payload has to
+// fail here rather than be smoothed into a terminal event.
 function doneEventFromData(data: unknown): WorkspaceSearchDoneEvent {
-  if (!isRecord(data)) {
-    return { count: 0, path: '', query: '', truncated: false, type: 'done' }
-  }
+  if (!isRecord(data)) throw clientErrors.SEARCH_DONE_INVALID()
 
   return {
     count: propertyNumber(data, 'count'),
