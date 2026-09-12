@@ -9,6 +9,7 @@ import { DiffPane } from '@/features/editor/components/diff-pane'
 import { log } from '@/lib/client-logging'
 import { expect, test } from '../../../../../test/fixtures'
 import { stubHighlightApi } from '../../../../../test/env/highlight-api'
+import { stubEditorViewport } from '../../../../../test/env/editor-viewport'
 import { renderWithProviders } from '../../../../../test/render'
 
 // Expanding a collapsed region rewrites the whole buffer. The reader is somewhere in it, and the
@@ -17,6 +18,10 @@ import { renderWithProviders } from '../../../../../test/render'
 
 const LINE_COUNT = 60
 
+test.beforeEach(() => {
+  stubEditorViewport({ height: 160 })
+})
+
 test('expanding a skipped range splices rows in without moving the reader', async () => {
   const { editor, rowElements } = await mountStackedDiff()
   editor.setScrollPosition({ top: 120 })
@@ -24,14 +29,14 @@ test('expanding a skipped range splices rows in without moving the reader', asyn
   // A scroll offset that clamped to zero would make the assertion below say nothing.
   expect(scrolled).toBeGreaterThan(0)
 
-  const before = rowElements().length
+  const before = textLineCount(editor)
   const separator = rowElements().find((row) =>
     row.classList.contains('editor-diff-row-expandable'),
   )
   expect(separator).toBeDefined()
   await userEvent.click(separator!)
 
-  await waitFor(() => expect(rowElements().length).toBeGreaterThan(before))
+  await waitFor(() => expect(textLineCount(editor)).toBeGreaterThan(before))
   expect(editor.getScrollPosition().top).toBe(scrolled)
 })
 

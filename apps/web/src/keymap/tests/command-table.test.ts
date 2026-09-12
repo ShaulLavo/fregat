@@ -66,6 +66,7 @@ const ASYNC_COMMAND_IDS = [
   'workspace.revertFile',
   'workspace.reopenClosedEditor',
   'workspace.toggleSidebarVisibility',
+  'workspace.toggleSessionRail',
   'workspace.togglePanel',
   'workspace.focusFirstEditorGroup',
   'workspace.focusSecondEditorGroup',
