@@ -20,8 +20,9 @@ JSON-RPC `2.0` alone does not identify the MCP revision. The official
 
 This plan promotes MCP management and runtime integration from the unscheduled E7 item in
 [the editor strategy](../docs/editor-parity-implementation-plan.md). Plans 068 and 077 are completed
-ownership foundations. Reuse current Plan 078 federation code; its remaining live verification
-gates still apply to remote acceptance. Plans 080, 085, and 086 are not MCP prerequisites.
+ownership foundations. Reuse the [verified federation transport](../docs/federated-environments.md).
+Remote acceptance must prove MCP authentication and tool calls over it. Plans 080 and 085 are not
+MCP prerequisites; the web navigation migration is already implemented.
 
 ## Reconcile the baseline
 
@@ -282,4 +283,4 @@ verification reuses the running development server. Do not start another dev ser
 - [ ] Native and external tools preserve machine/worktree ownership and authentication.
 - [ ] Settings reference is regenerated with `bun run settings:reference` when registry entries land.
 - [ ] Documentation records supported versions and configurations; no legacy compatibility path was added.
-- [ ] Remote acceptance includes Plan 078's relevant outstanding live gates.
+- [ ] Remote acceptance proves authenticated MCP tool calls over the verified federation transport.

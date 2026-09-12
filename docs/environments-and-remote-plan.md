@@ -1,9 +1,9 @@
 # Environments strategy
 
-> **Status: Implemented; automated checks pass; live SSH/browser gates open.** Root
+> **Status: Implemented; automated and live Linux/macOS checks pass.** Root
 > [`PLAN.md`](../PLAN.md) owns execution order. The [session domain](session-domain.md) supplies
 > repository identity, checkout ownership, recovery, and scoped browser records.
-> [Plan 078](../plans/078-federated-environments.md) remains open for its localhost SSH and browser checks.
+> The [implementation reference](federated-environments.md#verification) records the browser and SSH proof.
 > This strategy document authorizes nothing by itself.
 
 ## 0. What changed since the first design, and why
@@ -309,12 +309,12 @@ Its dev-only loopback origin switch has been removed by Plan 078.
 Plan 068 is also implemented. The [session-domain reference](session-domain.md) links its
 repository identity, checkout ownership, recovery, and environment-scoped navigation owners.
 
-Plan 078 is implemented and its automated verification passed. Machines settings, SSH launch,
-concurrent chat connections, scoped persistence, the cross-machine rail, and retained workbench
-switching are described in [the implementation reference](federated-environments.md). Its live
-localhost SSH and browser gates remain open, so the executable plan remains in place.
+Federated environments are complete. Machines settings, backend SSH launch, concurrent chat
+connections, scoped persistence, the cross-machine rail, and retained workbench switching are
+described in [the implementation reference](federated-environments.md). Linux/macOS browser and
+real SSH checks pass, including reconnect and managed-process cleanup; the executable plan is deleted.
 
-The [implementation reference](federated-environments.md#verification) records the automated
+The [implementation reference](federated-environments.md#verification) records automated and live
 verification results. The checks are defined in `scripts/verify-federated-environments.sh`.
 Plan 069 is implemented. The [worktree lifecycle reference](worktree-lifecycle.md) describes
 worktree selection, creation, and cleanup on one machine. The Git overview in §5.6 remains

@@ -1,7 +1,7 @@
-# TanStack Router evaluation for Plan 086
+# TanStack Router evaluation
 
 Evaluated on 2026-09-11 against Platform `99550068` and current official Router documentation.
-Status: Router migration implemented. The [full migration plan](086-tanstack-router-migration.md) owns the implementation, verification evidence, and remaining live checks. The evaluation below records the original decision before implementation.
+Status: Implemented and verified. The [workspace navigation reference](workspace-navigation.md) records current ownership, behavior, and verification. The evaluation below records the original decision before implementation.
 
 ## Recommendation
 
@@ -122,7 +122,7 @@ Current projection/controller files total 398 lines; these are deletion candidat
 4. **Finish the cleanup in Router-owned state.** Apply active-tab compression, ordered/empty tab restoration, sparse defaults, accepted-address persistence, and current-state copy. Do not first polish the old controller only to delete it.
 5. **Verify real history and lifetime.** Reuse the running app for Plan 086's rapid navigation, paused typing, pending-edit traversal, bare relaunch, dirty-tab, copy, and environment retention cases. Add targeted memory-history/type checks; use plain Node for real-browser orchestration. No new dev server.
 
-The full migration plan now selects the `@` tab marker, includes sidebar chat selection, defines the addressed workspace view, and uses immediate URL replacements without debouncing. It supersedes tentative choices and estimates in this evaluation. Full-view link scope, the sharing backend, clone execution, portable conversation transport, hidden tab history state, and stored view IDs remain out of scope.
+The implementation selects the `@` tab marker, includes sidebar chat selection, and defines the addressed workspace view. Destination selections publish immediately; continuous filter edits apply immediately and share a 250 ms URL publication cadence. These choices supersede tentative choices and estimates in this evaluation. Full-view link scope, the sharing backend, clone execution, portable conversation transport, hidden tab history state, and stored view IDs remain out of scope.
 
 ## Evaluation limits
 

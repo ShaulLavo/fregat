@@ -255,9 +255,25 @@ async function registerFixture(base, rootPath, side) {
 }
 
 async function palette(query, label) {
-  await page.keyboard.press(query.startsWith('>') ? 'Control+Shift+p' : 'Control+p')
-  await page.locator('[cmdk-input]').fill(query)
-  await page.locator('[cmdk-item]').filter({ hasText: label }).first().click()
+  const input = page.locator('[cmdk-input]')
+  await expect(async () => {
+    if (!(await input.isVisible()))
+      await page.keyboard.press(query.startsWith('>') ? 'Control+Shift+p' : 'Control+p')
+    await expect(input).toBeVisible({ timeout: 1000 })
+  }).toPass({ timeout: 15_000 })
+  await input.fill(query)
+  const items = page.locator('[cmdk-item]')
+  const target = items.filter({ has: page.getByText(label, { exact: true }) }).first()
+  await expect(target).toBeVisible()
+  const value = await target.getAttribute('data-value')
+  const selected = page.locator('[cmdk-item][aria-selected="true"]')
+  for (let index = 0; index < (await items.count()); index++) {
+    if ((await selected.getAttribute('data-value')) === value) break
+    await input.press('ArrowDown')
+  }
+  await expect(selected).toHaveAttribute('data-value', value)
+  await input.press('Enter')
+  await expect(input).not.toBeVisible()
 }
 
 async function machineAction(title) {
@@ -281,6 +297,7 @@ async function expectFile(fixture) {
 async function selectFixture(fixture) {
   await palette(`sess ${fixture.title}`, fixture.title)
   await expect(page).toHaveURL(new RegExp(`/chat/t/${fixture.sessionId}(?:[?#]|$)`))
+  await expect(page.locator(`[title="${fixture.title}"][aria-current="true"]`)).toBeVisible()
   await palette('federation.txt', 'federation.txt')
   await expectFile(fixture)
 }

@@ -129,8 +129,8 @@ Shared text storage and worker consolidation are outside the refactor; E013 rema
 ## Instant workspace reload
 
 [Plan 085](plans/085-instant-workspace-reload.md) is proposed and implementation has not started.
-It follows the existing environment, workspace-address, settings-admission, and Editor paint
-foundations. Its internal order is calibrated browser proof and budgets, synchronous bootstrap,
+It follows the existing environment, [verified workspace navigation](docs/workspace-navigation.md),
+settings-admission, and Editor paint foundations. Its internal order is calibrated browser proof and budgets, synchronous bootstrap,
 tree/settings, Git/diff, search/chat, continuous native handoff, remaining visible tools, and
 complete reload verification. The first complete slice is bootstrap plus tree and settings.
 
@@ -139,7 +139,7 @@ native contract is absent, record that package dependency before implementing it
 The plan remains incomplete until the visible terminal and all other scoped panes pass. This
 proposal does not reorder Plan 080 or the existing TUI and Ghostty lanes.
 
-## Environments lane (foundation completed 2026-09-05)
+## Environments lane (completed 2026-09-12)
 
 [`docs/environments-and-remote-plan.md`](docs/environments-and-remote-plan.md) is the reviewed
 strategy: several machines connected at once, chat across all of them, and the workbench following
@@ -161,15 +161,14 @@ durable provider-start claims and crash recovery, and environment-scoped web pro
 navigation. One current-schema migration replaces obsolete orchestration history. Its executable
 plan has been deleted; source and tests are linked from the domain reference.
 
-The remaining order is:
+[Federated environments](docs/federated-environments.md) is complete. Machines settings, backend
+SSH launch, independent chat connections, scoped persistence, the cross-machine rail, machine
+selection, and per-machine failure states pass automated and live Linux/macOS verification.
+Browser reconnect and shared managed-server cleanup are verified; the executable plan is deleted.
 
-1. **Plan 078 — federated environments.** Implemented; automated checks pass.
-   Machines settings, the desktop SSH launcher, independent chat connections, scoped persistence,
-   the cross-machine rail, machine selection, and per-machine failure states are in place.
-   Live localhost SSH and browser gates remain open; retain the plan until they pass.
-2. **Later, on demand only:** the direct `https://` origin check through the mesh proxy, then pairing,
-   issued sessions, and revocation for a client that cannot SSH. The auth analysis in Git history
-   (`docs/environments-and-remote-plan.md@1325b003`) remains the reference for that plan.
+On demand only, the remaining work is direct `https://` origin verification through the mesh proxy,
+then pairing, issued sessions, and revocation for a client that cannot SSH. The auth analysis in Git
+history (`docs/environments-and-remote-plan.md@1325b003`) remains the reference for that plan.
 
 Plan 069 is complete (2026-09-06). The [worktree lifecycle reference](docs/worktree-lifecycle.md)
 records explicit checkout choice, recoverable provisioning and cleanup, runtime ownership, and
@@ -233,8 +232,9 @@ native DAP debugging, and final comparative certification. Read-only tools do no
 The [comparison](docs/serena-implementation-comparison.md) records what to adopt and what to improve.
 
 These plans absorb MCP and project-memory ownership from the unscheduled editor E7 strategy.
-They reuse the completed environment/session foundations and current Plan 078 implementation;
-remote completion still requires its relevant live gates. They do not depend on or reorder the
+They reuse the completed environment/session foundations and
+[verified federation transport](docs/federated-environments.md#verification). Remote MCP acceptance
+must still prove its own authentication and tool calls over that transport. They do not depend on or reorder the
 keymap, reload, TUI, or Ghostty lanes. Any new Editor public contract lands in lockstep with Platform.
 General public hosting/pairing remains separate; the MCP prerequisite uses authenticated loopback
 endpoints and existing SSH access, with explicit grants for native clients.
@@ -326,9 +326,9 @@ reopen the dropped Ghostty appearance inheritance work. Native Swift theme UI is
 - **Platform + Editor lockstep:** plan 057 requires focused checks and diff review in both
   worktrees. Neither repository's half is complete alone.
 - **`ghostty-webgpu`:** run its package gates in that repository.
-- **Environments (068, 078, extending completed 077):** verify with two isolated in-process or
-  loopback servers and distinct databases; the SSH gate uses the `localhost` target only. No test or demo binds
-  non-loopback. Pairing, sessions, and TLS refusal are one later security boundary, not part of
+- **Environments:** verify with two isolated in-process or loopback servers and distinct databases.
+  Live SSH checks use an authorized machine; the 2026-09-12 closeout used the operator's Mac.
+  Server and forwarded listeners remain on loopback. Pairing, sessions, and TLS refusal are one later security boundary, not part of
   these three plans.
 - **Duplication census (090–096):** Platform-only. Each plan names its own narrow checks — focused
   Vitest paths, the affected workspace typecheck, and diff review over the files it merges. Run those
@@ -342,8 +342,8 @@ reopen the dropped Ghostty appearance inheritance work. Native Swift theme UI is
 - **Deleted:** completed plans 038, 068, 069, and 077, and superseded plan 058.
 - **Editor lane:** Plans 056 and 057 are complete. Standalone Editor chord execution was
   verified before Platform adopted the shared runtime.
-- **Promoted:** environments foundations 077 and 068 are complete; Plan 078 is implemented with
-  automated checks passing and live SSH/browser gates open.
+- **Promoted:** environments foundations and federation are complete, with automated and live
+  Linux/macOS browser and SSH checks recorded in the implementation reference.
 - **Deferred:** the mesh https proxy check and pairing/sessions, until a client that cannot SSH
   exists; all compatibility work for the obsolete per-tab/active-editor/one-server architecture.
 - **Dropped:** Ghostty config appearance plans 066 and 067; see the decision above.

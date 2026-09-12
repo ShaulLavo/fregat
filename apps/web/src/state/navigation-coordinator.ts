@@ -36,6 +36,11 @@ import type { WorktreeId } from '@workspace/contracts'
 import type { EditorWorkspaceStoreApi } from '@/features/editor/state/workspace-state'
 import type { ApplicationRouter } from '@/state/router'
 import { captureAddress } from '@/state/navigation-capture'
+import {
+  clearPendingPublication,
+  rememberPendingPublication,
+  takePendingPublication,
+} from '@/state/navigation-publication'
 
 export type NavigationResult =
   | { readonly status: 'applied' }
@@ -97,6 +102,14 @@ type Destination = {
 }
 
 export function createNavigationCoordinator(router: ApplicationRouter, initial: AddressIntent) {
+  const resumedHref = takePendingPublication({
+    identity: historyIdentity(),
+    href: router.history.location.href,
+    reload: performance
+      .getEntriesByType('navigation')
+      .some((entry) => 'type' in entry && entry.type === 'reload'),
+  })
+  if (resumedHref) initial = parseAddressIntent(resumedHref)
   const initialLocation = router.buildLocation({
     to: router.latestLocation.pathname,
     search: true,
@@ -168,10 +181,16 @@ export function createNavigationCoordinator(router: ApplicationRouter, initial: 
     historyTimer = null
     pendingHistory = null
     publication = null
+    clearPendingPublication()
   }
 
-  function scheduleHistory(owner: ApplicationRuntime) {
+  function scheduleHistory(owner: ApplicationRuntime, address: Address) {
     pendingHistory = { owner, identity: historyIdentity() }
+    rememberPendingPublication({
+      identity: pendingHistory.identity,
+      sourceHref: router.history.location.href,
+      href: formatAddress(address),
+    })
     if (historyTimer !== null) return
     // Share one cadence across edits; per-keystroke writes exhaust Safari's history quota.
     historyTimer = setTimeout(() => void publishHistory(), 250)
@@ -185,12 +204,16 @@ export function createNavigationCoordinator(router: ApplicationRouter, initial: 
     if (pending.identity !== historyIdentity()) return
     const canonical = budgetAddress(captureAddress(pending.owner, accepted)).address
     const href = buildAddressLocation(router, canonical).publicHref
-    if (href === router.history.location.href) return
+    if (href === router.history.location.href) {
+      clearPendingPublication()
+      return
+    }
     const writing = { href }
     publication = writing
     try {
       const navigation = navigateAddress(router, canonical, { replace: true })
       router.history.flush()
+      clearPendingPublication()
       await navigation
     } catch (error) {
       if (publication !== writing) return
@@ -200,11 +223,6 @@ export function createNavigationCoordinator(router: ApplicationRouter, initial: 
     } finally {
       if (publication === writing) publication = null
     }
-  }
-
-  function flushHistory() {
-    if (historyTimer !== null) clearTimeout(historyTimer)
-    void publishHistory()
   }
 
   function isCurrent(op: Operation, owner = application) {
@@ -333,7 +351,7 @@ export function createNavigationCoordinator(router: ApplicationRouter, initial: 
     accepted = canonical
     bootIntentAvailable = false
     writeAddressCache(formatAddress(canonical))
-    if (op.historyWriteMode === 'continuous') scheduleHistory(owner)
+    if (op.historyWriteMode === 'continuous') scheduleHistory(owner, canonical)
     finish(op, { status: 'applied' })
   }
 
@@ -485,9 +503,7 @@ export function createNavigationCoordinator(router: ApplicationRouter, initial: 
 
   function observe() {
     if (subscriptions.length) return
-    window.addEventListener('pagehide', flushHistory)
     subscriptions = [
-      () => window.removeEventListener('pagehide', flushHistory),
       router.history.subscribe(onHistory),
       router.subscribe('onBeforeNavigate', () => {
         const href = router.history.location.href

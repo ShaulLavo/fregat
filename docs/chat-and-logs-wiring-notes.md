@@ -20,8 +20,8 @@ Chat:
 
 - `main.tsx` owns the application runtime, focus, hotkeys, and command bus. `components/active-environment-application.tsx` mounts the selected QueryClient, verifies server identity, and supplies the retained editor runtime and tooltip provider.
 - Module state: `useChatProjectionStore` and related chat projection/detail subscription stores under `apps/web/src/features/chat/state/`.
-- `ChatTransportProvider` owns a closable transport from `features/chat/transport/create-chat-transport.ts`; `useChatTransport` reads it. Each effect setup owns a fresh connection, including StrictMode replay.
-- The transport captures its QueryClient owner's origin. Switching closes the outgoing connection and resets its chat projection; simultaneous connections are deferred to Plan 078.
+- The environment transport registry owns one closable chat transport per confirmed environment; `useChatTransport` selects the addressed owner.
+- Each transport captures its QueryClient owner's origin. Workbench switches preserve the independent connections and projections. The [federation reference](federated-environments.md) records ownership and recovery.
 - Backend routes: `orchestrationWsRoutes` and `orchestrationRoutes` registered in `apps/server/src/app.ts`.
 
 Logs:

@@ -15,6 +15,7 @@ import {
 } from '../../../../test/address'
 import { navigationWorkspace } from '../../../../test/factories/navigation-workspace'
 import { testTabContent } from '../../../../test/factories/document-targets'
+import { takePendingPublication } from '@/state/navigation-publication'
 
 for (const field of ['logs', 'search', 'globs'] as const) {
   test(`140 awaited ${field} edits apply immediately without exhausting browser history`, async ({
@@ -202,7 +203,7 @@ test('reattaching the same runtime preserves filters awaiting URL publication', 
   detachAgain()
 })
 
-test('leaving the page publishes an applied filter before reload can read an old URL', async ({
+test('a reload can recover the applied filter awaiting publication to its exact history entry', async ({
   client,
   server,
 }) => {
@@ -210,7 +211,14 @@ test('leaving the page publishes an applied filter before reload can read an old
   seedWorkspaceCache(workspace)
   const { navigation } = await renderAddressHarness({ initialEntries: [`${workspace.base}/s`] })
   await waitForNavigation(navigation)
+  const { href, state } = navigation.router.history.location
   await navigation.setSearchQuery('latest before reload')
-  window.dispatchEvent(new Event('pagehide'))
-  expect(navigation.router.history.location.href).toContain('s.q=latest+before+reload')
+  expect(navigation.router.history.location.href).toBe(href)
+  expect(
+    takePendingPublication({
+      href,
+      identity: `${state.__TSR_index}:${state.__TSR_key ?? ''}`,
+      reload: true,
+    }),
+  ).toContain('s.q=latest+before+reload')
 })

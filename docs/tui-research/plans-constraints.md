@@ -1,5 +1,7 @@
 > Historical research from before Plan 068. The implemented domain and current contracts are
-> documented in [Session domain](../session-domain.md).
+> documented in [Session domain](../session-domain.md) and [Federated environments](../federated-environments.md).
+> References to the deleted federation plan below are historical; its final text is available with
+> `git show ade95c26:plans/078-federated-environments.md`.
 
 # plans-constraints — what the plans and docs impose on a new (TUI) front end
 

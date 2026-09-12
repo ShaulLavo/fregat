@@ -6,6 +6,8 @@ the server port is optional under Options. Add any number of projects after conn
 The local machine is implicit. SSH runs on the primary backend using that user's SSH configuration,
 keys, and available agent. SSH discovers the remote user's Platform server installation.
 Browser and desktop clients use the same connection API and authentication prompts.
+The retained-machine notice can reconnect SSH directly from either client.
+The add-project folder picker validates typed paths through the selected machine's client.
 
 Connect machine lists explicit `Host` aliases from the primary backend user's `~/.ssh/config`
 and `/etc/ssh/ssh_config`. Discovery follows relative, absolute, `~/` and glob `Include` paths,
@@ -73,7 +75,7 @@ edited that draft since submitting it.
 
 Browser storage uses `env:<environmentId>|`. Registered checkout caches use confirmed `WorktreeId`
 values. Ordinary folders have explicit folder locations until the server registers a checkout.
-Workspace cache version 20 and chat projection cache version 3 replace the old caches without a
+Workspace cache version 21 and chat projection cache version 3 replace the old caches without a
 migration. Clear the old development site data once when adopting this change.
 
 Cached descriptors supply expected identity and stale display data. Fresh health responses and
@@ -140,3 +142,50 @@ Verify unknown-host confirmation, encrypted-key authentication, forwarding, rele
 listening port, and reconnection with reused authentication. Process substitutes alone cannot
 prove these behaviors because OpenSSH's control master owns forwarded listeners independently of
 the command that requests them.
+
+The live browser verifier uses the running app and an existing SSH machine:
+
+```sh
+node apps/web/scripts/verify-federated-environments.mjs \
+  --app-url <running-web-url> --server-url <running-api-url> \
+  --machine <configured-machine-name> \
+  --primary-root <disposable-local-checkout> --remote-root <disposable-remote-checkout> \
+  --output-dir /work/tmp/platform-federation-verification
+```
+
+Both disposable checkouts need the same unique Git origin and a `federation.txt` file with
+different contents. The verifier rejects already registered checkout paths and refuses deletion
+ownership for pre-existing project IDs. It saves an edit in the remote file, closes its browser
+before deleting its own project/session registrations, and leaves the supplied checkout files
+for the caller to remove. Browser verifiers run serially because the primary filesystem index
+has one active root.
+
+The 2026-09-12 Chromium run against Linux and the SSH-connected Mac passed all eight live checks:
+confirmed distinct identities, grouped repository rows and machine filtering, remote folder input,
+retained unsaved text with saves confined to the selected machine, terminal commands on both
+machines, unavailable terminal state with the actual forwarded listener released, and reconnect
+from the browser without reloading. It reported no browser errors. The report, reached state,
+terminal output, and cleanup receipts are in
+`/work/tmp/platform-078-closeout/final/results.json`.
+
+The closeout corrected two client bugs. Typed remote paths previously used the active machine's
+HTTP client; the picker now captures its own QueryClient's client. Retained SSH connection notices
+previously disabled their Connect button in browsers; the shared backend connection API now handles
+that action. Focused tests cover both failures alongside the two-server ownership and cold-cache
+checks. Real OpenSSH checks cover host confirmation, encrypted-key prompts, reused authentication,
+forwarded listener release, cancellation, and connection ownership transfer.
+
+The same-day live SSH lifecycle check passed all nine gates. Two aliases reused the active Mac
+server with independent leases and local forwards. Releasing them left its existing user
+connection intact. A separate managed process on remote port `57119` used local ports `41381`
+and `41813`; its first release preserved the remaining alias, and its final release stopped PID
+`50015`. Reconnecting started PID `50082` with the same durable environment ID, then final release
+stopped it. All four tested local forwards closed and the remote launch records returned to their
+baseline. The primary PID `3998664` and existing Mac PID `42071` remained healthy and unchanged.
+
+The primary identity was `13c7d86d-fa6c-4548-a7da-ff69e46b40eb`; the Mac identity was
+`95237832-cbc4-4e61-a7b6-7be96baa2e66`. The report records process start stamps, ports, leases,
+health descriptors, database identity, and the drained client event stream:
+`/work/tmp/platform-closeout-20260912/ssh-lifecycle-2026-09-12T16-16-06.632Z/results.json`.
+The Mac source installation remains at `/Users/shaul/projects/platform-verification` because the
+active `shaul-mac` connection uses it. Its launcher and isolated database remain with it.

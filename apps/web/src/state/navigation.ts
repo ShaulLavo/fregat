@@ -426,7 +426,7 @@ export function createNavigation(router: ApplicationRouter, initial: AddressInte
 
   return {
     router,
-    initial,
+    initial: coordinator.initial,
     attach: coordinator.attach,
     dispose: coordinator.dispose,
     subscribe: coordinator.subscribe,

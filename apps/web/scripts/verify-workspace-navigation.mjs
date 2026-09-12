@@ -8,10 +8,13 @@ import { createBenchmarkError } from './structured-errors.mjs'
 
 const options = parseOptions(process.argv.slice(2))
 const instanceId = randomUUID()
+const machineEvents = new AbortController()
+let drainMachineEvents = null
 const browsers = { chromium, firefox, webkit }
 const report = {
   startedAt: new Date().toISOString(),
   options,
+  clientInstanceId: instanceId,
   cases: [],
   prerequisites: {},
   cleanup: [],
@@ -25,7 +28,10 @@ try {
   if (!options.historyOnly) {
     await verifyConfiguredApp()
     fixture = await createFixture(report.prerequisites.server)
-    if (options.secondMachine) secondFixture = await createSecondFixture()
+    if (options.secondMachine) {
+      await startMachineEvents()
+      secondFixture = await createSecondFixture()
+    }
   }
   for (const name of options.browsers) await verifyBrowser(name)
 } catch (error) {
@@ -33,6 +39,8 @@ try {
 } finally {
   if (secondFixture) await cleanupSecondFixture(secondFixture)
   if (fixture) await cleanupFixture(fixture)
+  machineEvents.abort()
+  await drainMachineEvents
   report.finishedAt = new Date().toISOString()
   report.status = report.cases.some((entry) => entry.status === 'failed') ? 'failed' : 'passed'
   writeFileSync(join(options.outputDir, 'results.json'), JSON.stringify(report, null, 2))
@@ -104,6 +112,26 @@ async function dispatch(command) {
     ...command,
     commandId: `navigation-proof-${randomUUID()}`,
   })
+}
+
+async function startMachineEvents() {
+  const response = await fetch(new URL('machines/events', options.serverUrl), {
+    headers: {
+      Origin: new URL(options.appUrl).origin,
+      'x-client-instance': instanceId,
+    },
+    signal: machineEvents.signal,
+  })
+  if (!response.ok) throw createBenchmarkError(`Machine events returned HTTP ${response.status}`)
+  drainMachineEvents = response.body.pipeTo(new WritableStream()).then(
+    () => recordMachineEventsFailure('Machine events ended before verification cleanup'),
+    (error) => recordMachineEventsFailure(error.message),
+  )
+}
+
+function recordMachineEventsFailure(error) {
+  if (machineEvents.signal.aborted) return
+  report.cases.push({ name: 'machine events lifetime', status: 'failed', error })
 }
 
 async function verifyConfiguredApp() {
@@ -472,12 +500,19 @@ async function secondEnvironment({ page, record, entry }) {
     localStorage.setItem('platform.environments.connected.v1', JSON.stringify([name]))
   }, options.secondMachine)
   await openInitial(page)
+  await palette(page, '> Switch machine', 'Switch machine')
+  const picker = page.getByRole('dialog', { name: 'Switch machine', exact: true })
+  await expect(picker.getByRole('button').filter({ hasText: secondFixture.label })).toBeEnabled({
+    timeout: 25_000,
+  })
+  await page.keyboard.press('Escape')
+  await expect(picker).toHaveCount(0)
   const remoteHref = new URL(
     `@${secondFixture.health.environmentId}/~${secondFixture.workspace}/workbench/f/remote.ts?tabs=@`,
     options.appUrl,
   ).href
   await page.goto(remoteHref)
-  await expectFile(page, 'remote.ts')
+  await expectFile(page, 'remote.ts', 25_000)
   await dirtyCurrentFile(page, 'unsaved remote environment proof')
   await record('remote B has an unsaved document')
   await switchMachine(page, report.prerequisites.server.label)
@@ -636,7 +671,7 @@ function address(suffix = '/workbench/f/a.ts', query = '?tabs=@~f/b.ts~f/c.ts') 
 
 async function openInitial(page, query) {
   await page.goto(address('/workbench/f/a.ts', query))
-  await expectFile(page, 'a.ts')
+  await expectFile(page, 'a.ts', 25_000)
 }
 
 async function automaticDiffScope({ page, record, entry }) {
@@ -728,9 +763,11 @@ function fileTab(page, name) {
   return page.locator(`[data-editor-tab-path$="/${name}"]`)
 }
 
-async function expectFile(page, name) {
-  await expect(fileTab(page, name)).toHaveAttribute('aria-selected', 'true')
-  await expect(fileTab(page, name)).not.toHaveAttribute('data-editor-tab-loading', 'true')
+async function expectFile(page, name, timeout = 5_000) {
+  await expect(fileTab(page, name)).toHaveAttribute('aria-selected', 'true', { timeout })
+  await expect(fileTab(page, name)).not.toHaveAttribute('data-editor-tab-loading', 'true', {
+    timeout,
+  })
   await expect(page).toHaveURL(new RegExp(`/workbench/f/${name.replace('.', '\\.')}(?:[?#]|$)`))
 }
 
@@ -1097,6 +1134,7 @@ async function earlyFilterReload({ page, record, entry }) {
         href: location.href,
         historyState: history.state,
         savedAddress: localStorage.getItem('platform.address.v2'),
+        pendingPublication: sessionStorage.getItem('platform.navigation.pending'),
         elapsedMs: performance.now() - window.navigationProofInputAt,
       }
       location.reload()
@@ -1111,6 +1149,7 @@ async function earlyFilterReload({ page, record, entry }) {
   entry.reloadResult = await page.evaluate(() => ({
     href: location.href,
     historyState: history.state,
+    pendingPublication: sessionStorage.getItem('platform.navigation.pending'),
   }))
   await expect(input).toHaveValue(query)
   await expect.poll(() => new URL(page.url()).searchParams.get('log.find')).toBe(query)
@@ -1125,8 +1164,8 @@ async function searchGlobFilters({ page, record }) {
   const resultA = results.getByRole('button', { name: 'a.ts a.ts', exact: true })
   const resultB = results.getByRole('button', { name: 'b.ts b.ts', exact: true })
   const toggle = page.getByRole('button', { name: 'Include and exclude files', exact: true })
-  const include = page.getByRole('textbox', { name: 'Files to include', exact: true })
-  const exclude = page.getByRole('textbox', { name: 'Files to exclude', exact: true })
+  const include = page.getByRole('textbox', { name: 'Include', exact: true })
+  const exclude = page.getByRole('textbox', { name: 'Exclude', exact: true })
   await expect(resultB).toBeVisible()
   const initial = await historyPosition(page)
   await toggle.click()
@@ -1400,7 +1439,7 @@ async function copyCurrentView({ page, context, entry }) {
   await page.getByRole('button', { name: 'Search', exact: true }).click()
   await page.getByRole('searchbox', { name: 'Search workspace' }).fill('copy-current')
   await palette(page, '> Copy address', 'Copy address')
-  const copied = await pasteCopiedAddress(page)
+  const copied = await readCopiedAddress(page, entry.browser)
   expect(new URL(copied).pathname).toContain('/workbench/f/b.ts')
   expect(new URL(copied).searchParams.get('s.q')).toBe('copy-current')
   expect(new URL(copied).searchParams.has('editorPerfTrace')).toBe(false)
@@ -1413,6 +1452,28 @@ async function copyCurrentView({ page, context, entry }) {
   entry.copiedHref = copied
 }
 
+async function readCopiedAddress(page, browserName) {
+  if (browserName !== 'chromium') return pasteCopiedAddress(page)
+  let copied = ''
+  await expect
+    .poll(async () => {
+      copied = await page.evaluate(() => navigator.clipboard.readText())
+      return isCurrentCopiedAddress(copied)
+    })
+    .toBe(true)
+  return copied
+}
+
+function isCurrentCopiedAddress(copied) {
+  if (!URL.canParse(copied)) return false
+  const url = new URL(copied)
+  return (
+    url.origin === new URL(options.appUrl).origin &&
+    url.pathname === new URL(address('/workbench/f/b.ts')).pathname &&
+    url.searchParams.get('s.q') === 'copy-current'
+  )
+}
+
 async function pasteCopiedAddress(page) {
   await page.evaluate(() => {
     const field = document.createElement('textarea')
@@ -1422,8 +1483,13 @@ async function pasteCopiedAddress(page) {
   })
   const field = page.getByRole('textbox', { name: 'Copied workspace address verification' })
   try {
-    await field.press('ControlOrMeta+v')
-    await expect(field).toHaveValue(new RegExp(`^${new URL(options.appUrl).origin}/`))
+    await expect
+      .poll(async () => {
+        await field.fill('')
+        await field.press('ControlOrMeta+v')
+        return isCurrentCopiedAddress(await field.inputValue())
+      })
+      .toBe(true)
     return await field.inputValue()
   } finally {
     await field.evaluate((element) => element.remove())
