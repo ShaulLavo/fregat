@@ -119,6 +119,7 @@ export function ChatInput({
   const terminalContexts = useChatInputDraftStore(terminalContextsSelector)
   const persistenceError = useChatInputDraftStore((store) => store.persistenceError)
   const clearStoredDraft = useChatInputDraftStore((store) => store.clearDraft)
+  const clearStoredDraftContent = useChatInputDraftStore((store) => store.clearDraftContent)
   const removeImage = useChatInputDraftStore((store) => store.removeImage)
   const removeTerminalContext = useChatInputDraftStore((store) => store.removeTerminalContext)
   const setInteractionMode = useChatInputDraftStore((store) => store.setInteractionMode)
@@ -235,7 +236,9 @@ export function ChatInput({
     const editor = editorRef.current
     if (editor) clearChatInputEditor(editor)
 
-    clearStoredDraft(draftTarget)
+    // A correction consumes content; model and mode picks apply to the next new turn.
+    if (busy) clearStoredDraftContent(draftTarget)
+    else clearStoredDraft(draftTarget)
     imagePreparation.clearError()
     setValidationError(null)
     setTrigger(null)

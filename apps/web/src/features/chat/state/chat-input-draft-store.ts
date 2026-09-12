@@ -69,6 +69,7 @@ type ChatInputDraftActions = {
     contexts: readonly ChatInputTerminalContext[],
   ) => void
   clearDraft: (target: ChatInputDraftTarget) => void
+  clearDraftContent: (target: ChatInputDraftTarget) => void
   flush: () => boolean
   getDraft: (target: ChatInputDraftTarget) => ChatInputDraft
   removeImage: (target: ChatInputDraftTarget, imageId: string) => void
@@ -141,6 +142,18 @@ export const useChatInputDraftStore = create<ChatInputDraftStore>((set, get) => 
   },
   clearDraft: (target) => {
     set((state) => removeDraftForTarget(state, target))
+    draftPersist.maybeExecute()
+  },
+  clearDraftContent: (target) => {
+    set((state) =>
+      updateDraftForTarget(state, target, (draft) =>
+        withDraftPatch(draft, {
+          prompt: '',
+          images: EMPTY_IMAGES,
+          terminalContexts: EMPTY_TERMINAL_CONTEXTS,
+        }),
+      ),
+    )
     draftPersist.maybeExecute()
   },
   flush: () => flushChatInputDraftStorage(),
