@@ -761,6 +761,7 @@ function preparedDocumentLease(): EditorPreparedDocument {
   return {
     dispose: vi.fn(),
     estimatedBytes: 1,
+    fallbackReady: Promise.resolve(true),
     runtimeSessionIds: () => ({ highlighter: [], structural: [] }),
     startStage: vi.fn(() => null),
     take: vi.fn(() => null),

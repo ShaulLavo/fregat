@@ -53,6 +53,13 @@ function done(overrides: Record<string, unknown> = {}) {
 }
 
 describe('collectWorkspaceSearch', () => {
+  it('review: rejects a done object missing completion fields', async () => {
+    const client = clientStreaming([match('src/a.ts'), { event: 'done', data: {} }])
+    await expect(collectWorkspaceSearch(QUERY, undefined, client)).rejects.toThrow(
+      /invalid completion event/u,
+    )
+  })
+
   it('rejects a stream that ends after matches without a terminal done', async () => {
     const client = clientStreaming([match('src/a.ts'), match('src/b.ts')])
 

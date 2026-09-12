@@ -932,6 +932,7 @@ describe('file open intent service', () => {
       preparation: {
         documentConfigurationTag: [],
         estimatedBytes: 1,
+        fallbackReady: Promise.resolve(true),
         providerConfiguration: {
           highlighter: { configurationTag: ['test-stage', 0], generation: 0 },
         },
@@ -1479,6 +1480,7 @@ function preparedDocumentLease(
   return {
     dispose: vi.fn(),
     estimatedBytes: 1,
+    fallbackReady: Promise.resolve(true),
     runtimeSessionIds: () => runtimeSessionIds,
     startStage: vi.fn(() => null),
     take: vi.fn(() => null),

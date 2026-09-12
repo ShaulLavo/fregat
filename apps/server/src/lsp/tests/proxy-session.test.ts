@@ -17,6 +17,24 @@ const databases: { close: () => void }[] = []
 const pools: LspSessionPool[] = []
 const roots: string[] = []
 
+it('review: kills the child after a framing allocation failure', async () => {
+  const fixture = await lspFixture()
+  await fixture.pool.acquire(fixture.firstSocket, fixture.match, '')
+  const bytes = Buffer.from('Content-Length: 1\r\n\r\nx')
+  const allocation = vi.spyOn(Buffer, 'allocUnsafe').mockImplementationOnce(() => {
+    throw new RangeError('review: allocation failed')
+  })
+  try {
+    fixture.process.stdout.emit('data', bytes)
+  } finally {
+    allocation.mockRestore()
+  }
+
+  expect(fixture.firstSocket.closed).toBe(true)
+  fixture.pool.disposeAll()
+  expect(fixture.kill).toHaveBeenCalledTimes(1)
+})
+
 afterEach(async () => {
   for (const pool of pools.splice(0)) pool.disposeAll()
   // Same reason `appCleanup` closes the settings store: an unclosed SQLite

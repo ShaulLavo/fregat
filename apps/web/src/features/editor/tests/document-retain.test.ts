@@ -40,6 +40,40 @@ function serviceWithFourDocuments() {
   return service
 }
 
+test('review: charges protected dirty text before retaining clean parked text', () => {
+  const service = new WorkspaceDocumentService()
+  const dirty = testDocumentKey('/dirty/a.ts')
+  const clean = testDocumentKey('/clean/b.ts')
+  service.ensureView(tabId('dirty'), fileResult('/dirty/a.ts', 'd'.repeat(800)))
+  service.setDirty(dirty, true)
+  service.ensureView(tabId('clean'), fileResult('/clean/b.ts', 'c'.repeat(800)))
+
+  const retention = retentionForProjects({
+    activeRootPath: filesystemPath('/active'),
+    byteBudget: 1000,
+    documentSizes: service.documentSizes(),
+    slices: [
+      { rootPath: filesystemPath('/active'), lastActiveAt: 3, documentKeys: [], tabIds: [] },
+      {
+        rootPath: filesystemPath('/clean'),
+        lastActiveAt: 2,
+        documentKeys: [clean],
+        tabIds: [tabId('clean')],
+      },
+      {
+        rootPath: filesystemPath('/dirty'),
+        lastActiveAt: 1,
+        documentKeys: [dirty],
+        tabIds: [tabId('dirty')],
+      },
+    ],
+  })
+  service.retain(retention)
+
+  expect(service.hasLiveDocument(dirty)).toBe(true)
+  expect(service.hasLiveDocument(clean)).toBe(false)
+})
+
 test('evicts only the clean, unreferenced, disk-backed document', () => {
   const service = serviceWithFourDocuments()
 
