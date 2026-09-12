@@ -1,5 +1,6 @@
 import { KeybindingResolution } from '@/features/settings/components/keybinding-resolution'
-import { Input } from '@workspace/ui/components/input'
+import { MagnifyingGlassIcon } from '@phosphor-icons/react'
+import { InputGroup, InputGroupAddon, InputGroupInput } from '@workspace/ui/components/input-group'
 import { useState } from 'react'
 
 import { commandKeyBindings, keyBindingResolution } from '@/keymap/active-bindings'
@@ -21,12 +22,21 @@ export function KeybindingSection() {
 
   return (
     <div className='flex w-[28rem] max-w-full min-w-0 flex-col gap-1 @max-3xl/settings:w-full'>
-      <Input
-        aria-label='Search keyboard shortcuts'
-        onChange={(event) => setQuery(event.currentTarget.value)}
-        placeholder='Search commands'
-        value={query}
-      />
+      <InputGroup>
+        <InputGroupAddon align='inline-start'>
+          <MagnifyingGlassIcon aria-hidden />
+        </InputGroupAddon>
+        <InputGroupInput
+          aria-label='Search keyboard shortcuts'
+          autoCapitalize='off'
+          autoComplete='off'
+          autoCorrect='off'
+          onChange={(event) => setQuery(event.currentTarget.value)}
+          placeholder='Search commands'
+          spellCheck={false}
+          value={query}
+        />
+      </InputGroup>
       <KeybindingResolution
         report={report}
         omitted={defaults.omitted}

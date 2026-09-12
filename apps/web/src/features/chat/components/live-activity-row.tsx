@@ -46,7 +46,7 @@ export function LiveActivityRow({
       {expandable ? (
         <Button
           aria-expanded={expanded}
-          className='text-muted-foreground h-auto max-w-full justify-start gap-2 px-1 py-1 text-sm font-normal'
+          className='text-muted-foreground h-auto max-w-full justify-start gap-2 px-1 py-1 text-xs font-normal'
           data-scroll-anchor-ignore
           variant='ghost'
           onClick={() => toggle(historyId)}
@@ -54,7 +54,7 @@ export function LiveActivityRow({
           {label}
         </Button>
       ) : (
-        <div className='text-muted-foreground flex min-h-7 items-center gap-2 px-1 py-1 text-sm'>
+        <div className='text-muted-foreground flex min-h-7 items-center gap-2 px-1 py-1 text-xs'>
           {label}
         </div>
       )}

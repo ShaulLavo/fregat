@@ -145,7 +145,7 @@ export function MessageBubble({
           )}
           {user ? (
             <div
-              className='text-muted-foreground text-3xs mt-1 flex items-center justify-end gap-1.5 tabular-nums transition-opacity duration-150 group-focus-within/message:pointer-events-auto group-focus-within/message:opacity-100 group-hover/message:pointer-events-auto group-hover/message:opacity-100 [@media(hover:hover)]:pointer-events-none [@media(hover:hover)]:opacity-0'
+              className='text-muted-foreground text-3xs mt-1 flex items-center justify-end gap-1.5 tabular-nums transition-opacity group-focus-within/message:pointer-events-auto group-focus-within/message:opacity-100 group-hover/message:pointer-events-auto group-hover/message:opacity-100 [@media(hover:hover)]:pointer-events-none [@media(hover:hover)]:opacity-0'
               data-user-message-meta='true'
             >
               <span className='size-5 shrink-0'>
@@ -170,7 +170,7 @@ export function MessageBubble({
           ) : null}
           {!user && assistantChrome.metaVisible ? (
             <div
-              className='mt-1.5 flex items-center gap-2 transition-opacity duration-150 group-focus-within/message:pointer-events-auto group-focus-within/message:opacity-100 group-hover/message:pointer-events-auto group-hover/message:opacity-100 [@media(hover:hover)]:pointer-events-none [@media(hover:hover)]:opacity-0'
+              className='mt-1.5 flex items-center gap-2 transition-opacity group-focus-within/message:pointer-events-auto group-focus-within/message:opacity-100 group-hover/message:pointer-events-auto group-hover/message:opacity-100 [@media(hover:hover)]:pointer-events-none [@media(hover:hover)]:opacity-0'
               data-assistant-message-meta='true'
             >
               <p className='text-muted-foreground text-3xs tabular-nums'>

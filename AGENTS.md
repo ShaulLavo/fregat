@@ -63,6 +63,58 @@
 - Floating UI is always opaque: dialogs, menus, popovers, toasts, tooltips, and editor hover/completion panels. Use `bg-popover-solid` or another solid theme token. Do not add backdrop blur, wallpaper layers, or transparency derived from pane settings.
 - `bg-popover` also resolves to the solid popover token. The `-solid` utilities deliberately ignore the user's transparency setting.
 
+## The Design Language
+
+These six are settled. A call site never re-decides them; if one does not cover your case, the
+answer is a missing token, not a local choice. `scripts/lint/web-design-census.mjs` enforces them
+and runs in `verify` and CI; `scripts/lint/web-design-allow.json` holds the exceptions, and an
+entry without a real reason is itself a violation.
+
+- **Corners belong to the primitives.** Controls (button, input, select, textarea, input group,
+  badge) are the `md` step; floating surfaces (dialog, popover, dropdown, context menu, command
+  palette, tooltip) are `lg`; chips, tags, thumbnails, inline code, kbd, count badges and skeleton
+  placeholder bars are `md`; circles and pills are `rounded-full`. List rows, bars, headers, pane
+  surfaces and tabs inside a bar are square. A `@workspace/ui` primitive call site carries no
+  radius class at all. Bare `rounded` is off-scale and banned, and a redundant `rounded-none` is
+  just noise — no class already means no radius.
+- **One bar height.** Every horizontal bar — titlebar, pane headers, tab strips, dialog headers and
+  footers — is `h-(--bar-height)` with `px-(--bar-padding-x)`, ideally by composing `PaneBar`.
+  Vertical icon rails are `w-(--rail-width)`, which equals the bar height so a rail lines up with
+  the header beside it. A skeleton bar uses the same token as the bar it stands in for; a header
+  that changes height when data arrives is the bug this rule exists to prevent.
+- **One density system.** The `--density-*` custom properties. Never hand-write a
+  `compact:`-prefixed pair; the variant no longer exists.
+- **Dividers.** `border-border` between regions, `border-subtle` inside content. No opacity
+  modifier on either. Note that `[data-workbench]` sets `--border: transparent`, so borders inside
+  the workbench are deliberately invisible and separation there comes from surface tone.
+- **Four type sizes.** `text-sm`, `text-xs`, `text-2xs` (11px), `text-3xs` (10px). An arbitrary
+  `text-[Npx]` is banned. A bar title is `text-xs font-medium`; a pane section heading is
+  `text-sm font-semibold`.
+- **Fills and elevation.** Elevation is three levels: `shadow-xl` on a modal dialog, `shadow-md` on
+  a menu or popover, nothing anywhere else. List rows use `bg-row-hover`, `bg-row-active` and
+  `bg-row-selected`, never an opacity modifier on them — the alpha is the design. Toggled controls
+  use `bg-accent` with `aria-pressed` or `aria-selected`. A `Button` call site never re-declares
+  hover; the primitive owns it.
+
+Interaction treatments are utilities, not strings to copy:
+
+- `focus-ring` for anything you act on (gated on `:focus-visible`, so a clicked control never
+  glows), `focus-ring-within` for anything you type into and its wrappers (gated on `:focus-within`,
+  because a text surface must show where the caret went however it was reached), and
+  `focus-ring-inset` for full-bleed scroll containers whose outset ring would be clipped. Tint one
+  by setting `--focus-ring-color`; do not add a `ring-*` class, which cannot work because the
+  utility owns the box-shadow.
+- `pressable` for press feedback. It deliberately does not nudge a control that opens a menu,
+  because the popup would travel with it.
+- Motion comes from `--duration-enter`, `--duration-exit` and the `ease-*-strong` curves. Those are
+  Tailwind's configured defaults, so a bare `transition-*` already inherits them. Never hand-write
+  a duration or an easing curve. When a transition animates a focus ring, name `box-shadow` in the
+  property list: `transition-colors` does not include it, so the border would fade while the ring
+  snapped in.
+- Composite fields — anything with a leading icon, a trailing button or a trailing count — are
+  built from `InputGroup` with addons. Never position an icon absolutely over a padded input, and
+  never hand-pick a `pl-*`/`pr-*` to clear one.
+
 ## Loading And Empty States
 
 - Never hand-roll a loader. There are five, they live in `@workspace/ui`, and every waiting state in the app is one of them. No `animate-spin` on a borrowed icon, no `animate-pulse` dots, no bare "Loading…" paragraph.

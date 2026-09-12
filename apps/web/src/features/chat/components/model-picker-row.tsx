@@ -52,8 +52,10 @@ export function ModelPickerRow({
           ) : null}
         </span>
         <span className='mt-(--density-gap-tight) flex min-w-0 items-center gap-1.5'>
+          {/* 16px, not 12px: the monogram fallback for a provider we ship no mark
+              for sets two letters at 10px, the smallest type step. */}
           <ProviderGlyph
-            className='text-3xs size-3'
+            className='text-3xs size-4'
             displayLabel={option.providerLabel}
             driverKind={option.driverKind}
           />

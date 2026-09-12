@@ -283,8 +283,19 @@ reload, TUI, Ghostty, or MCP lanes.
 
 ## Web design language lane
 
-Requested 2026-09-12. [Plan 100](plans/100-web-design-language.md) is proposed; implementation has
-not started. It settles corners, bar heights, density, dividers, type steps and interaction fills
+Requested 2026-09-12. [Plan 100](plans/100-web-design-language.md) is implemented: the tokens,
+primitives and call sites landed, `scripts/lint/web-design-census.mjs` gates the decisions in root
+`verify` and in CI, and a 129-agent audit's confirmed findings were applied. Three follow-ups came
+out of that work and are proposed, independent of each other and of 100:
+[Plan 101](plans/101-truncation-recovery.md) recovers the values truncation hides,
+[Plan 102](plans/102-scroll-and-keyboard-affordance.md) settles scrollbars, nested-scroll
+containment and the keyboard chip that the tooltip primitive was already built to hold, and
+[Plan 103](plans/103-loading-empty-error-states.md) finishes the loading, empty and error states
+`CLAUDE.md` already decided. Each names the one or two decisions that need confirmation before its
+implementation starts. Plan 101 and Plan 100 touch eight of the same files; sequence them rather
+than interleaving.
+
+The original scoping note follows. It settles corners, bar heights, density, dividers, type steps and interaction fills
 for `apps/web` and `packages/ui`, then enforces them with a census script and a mandatory
 triple-check sweep. Its one product-facing decision, the corner language (D1), needs the user's
 confirmation before Phase 1 lands; every other phase removes call-site noise under the decisions

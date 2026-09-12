@@ -21,12 +21,18 @@ describe('PaneBar', () => {
   })
 
   it('puts the border on the requested edge and on no edge by default', () => {
-    expect(classesOf(bar(<PaneBar border='bottom' />))).toContain('border-b')
-    expect(classesOf(bar(<PaneBar border='top' />))).toContain('border-t')
+    const bottom = classesOf(bar(<PaneBar border='bottom' />))
+    expect(bottom).toContain('border-b')
+    expect(bottom).toContain('border-border')
+
+    const top = classesOf(bar(<PaneBar border='top' />))
+    expect(top).toContain('border-t')
+    expect(top).toContain('border-border')
 
     const plain = classesOf(bar(<PaneBar />))
     expect(plain).not.toContain('border-b')
     expect(plain).not.toContain('border-t')
+    expect(plain).not.toContain('border-border')
   })
 
   it('merges className with the base classes', () => {
@@ -35,6 +41,7 @@ describe('PaneBar', () => {
     expect(classes).toContain('justify-between')
     expect(classes).toContain('h-(--bar-height)')
     expect(classes).toContain('px-(--bar-padding-x)')
+    expect(classes).toContain('gap-(--density-control-gap)')
   })
 
   it('renders children', () => {

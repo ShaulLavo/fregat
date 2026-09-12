@@ -1,10 +1,10 @@
 import type { FsEntry, PickedFsEntry } from '@/lib/file-system-types'
 import { isDirectoryEntry } from '@/lib/file-system-types'
 import { FolderOpenIcon, MagnifyingGlassIcon, ProhibitIcon } from '@phosphor-icons/react'
+import { PaneBar } from '@workspace/ui/components/pane-bar'
 import { Separator } from '@workspace/ui/components/separator'
 
 import { EntryIcon, EntryPreviewTile, KindBadge } from '@/features/file-picker/entry-ui'
-import { useWorkbenchDensity } from '@/features/settings/hooks/use-workbench-density'
 import {
   formatModified,
   formatSize,
@@ -13,7 +13,6 @@ import {
   type FilePickerIconMode,
   type FilePickerMode,
 } from '@/features/file-picker/model'
-import { filePickerDensityMetrics } from '@/features/file-picker/utils/density'
 
 export function PreviewPane({
   entry,
@@ -26,17 +25,14 @@ export function PreviewPane({
   isSearching: boolean
   mode: FilePickerMode
 }) {
-  const density = useWorkbenchDensity()
-  const metrics = filePickerDensityMetrics(density)
-
   return (
     <aside className='hidden min-h-0 lg:flex lg:flex-col'>
-      <div
-        className='border-border text-muted-foreground/70 text-2xs flex shrink-0 items-center border-b px-(--density-control-padding-x) font-medium tracking-normal uppercase'
-        style={{ height: metrics.headerSize }}
+      <PaneBar
+        border='bottom'
+        className='text-muted-foreground/70 text-2xs font-medium tracking-normal uppercase'
       >
         Preview
-      </div>
+      </PaneBar>
       <div className='flex min-h-0 flex-1 flex-col p-(--density-section-padding)'>
         {entry ? (
           <EntryPreviewDetails entry={entry} iconMode={iconMode} />

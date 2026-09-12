@@ -1,107 +1,103 @@
-import type { ChangeEvent, ComponentProps, FocusEvent, KeyboardEvent, ReactNode } from 'react'
+import type { ChangeEvent, ComponentProps, KeyboardEvent, ReactNode } from 'react'
 import { useState } from 'react'
 
 import { Input } from '@workspace/ui/components/input'
+import { InputGroup, InputGroupAddon, InputGroupInput } from '@workspace/ui/components/input-group'
 import { cn } from '@workspace/ui/lib/utils'
 
-type SearchHistoryInputProps = Omit<
-  ComponentProps<'input'>,
-  'aria-label' | 'className' | 'onBlur' | 'onChange' | 'onFocus' | 'placeholder' | 'value'
-> & {
-  'aria-label'?: string
+type SearchHistoryInputProps = {
+  'aria-label': string
   className?: string
-  inputClassName?: string
+  endAddon?: ReactNode
   label: string
-  leftAdornment?: ReactNode
-  rightAdornment?: ReactNode
+  size?: 'default' | 'sm'
+  startAddon?: ReactNode
+  type?: 'search' | 'text'
   value: string
-  onBlur?: (event: FocusEvent<HTMLInputElement>) => void
-  onFocus?: (event: FocusEvent<HTMLInputElement>) => void
-  onKeyDown?: (event: KeyboardEvent<HTMLInputElement>) => void
   onSelectNextHistory: () => void
   onSelectPreviousHistory: () => void
   onValueChange: (value: string) => void
 }
 
+const FIELD_HEIGHT = {
+  default: 'h-(--density-control-height)',
+  sm: 'h-(--density-control-height-sm)',
+} as const
+
+const FIELD_TEXT = {
+  default: 'text-xs',
+  sm: 'text-2xs',
+} as const
+
+// A native search input paints its own cancel affordance, which would duplicate the
+// trailing addon controls this field already carries.
+const HIDE_NATIVE_SEARCH_AFFORDANCES =
+  '[&::-webkit-search-cancel-button]:hidden [&::-webkit-search-decoration]:hidden'
+
 export function SearchHistoryInput({
-  autoCapitalize = 'off',
-  autoCorrect = 'off',
+  'aria-label': ariaLabel,
   className,
-  inputClassName,
+  endAddon,
   label,
-  leftAdornment,
-  rightAdornment,
-  spellCheck = false,
+  size = 'default',
+  startAddon,
   type = 'text',
   value,
-  onBlur,
-  onFocus,
-  onKeyDown,
   onSelectNextHistory,
   onSelectPreviousHistory,
   onValueChange,
-  ...inputProps
 }: SearchHistoryInputProps) {
   const [focused, setFocused] = useState(false)
-  const placeholder = focused ? `${label} (↑↓ for history)` : label
 
-  function handleBlur(event: FocusEvent<HTMLInputElement>) {
-    setFocused(false)
-    onBlur?.(event)
+  function handleKeyDown(event: KeyboardEvent<HTMLInputElement>) {
+    if (event.altKey || event.ctrlKey || event.metaKey) return
+    if (event.key === 'ArrowUp') {
+      event.preventDefault()
+      onSelectPreviousHistory()
+      return
+    }
+    if (event.key !== 'ArrowDown') return
+
+    event.preventDefault()
+    onSelectNextHistory()
   }
 
   function handleChange(event: ChangeEvent<HTMLInputElement>) {
     onValueChange(event.target.value)
   }
 
-  function handleFocus(event: FocusEvent<HTMLInputElement>) {
-    setFocused(true)
-    onFocus?.(event)
+  // Query and replacement text are code, never prose: autocorrect would rewrite them.
+  const fieldProps: ComponentProps<'input'> = {
+    'aria-label': ariaLabel,
+    autoCapitalize: 'off',
+    autoComplete: 'off',
+    autoCorrect: 'off',
+    placeholder: focused ? `${label} (↑↓ for history)` : label,
+    spellCheck: false,
+    type,
+    value,
+    onBlur: () => setFocused(false),
+    onChange: handleChange,
+    onFocus: () => setFocused(true),
+    onKeyDown: handleKeyDown,
   }
+  const controlClassName = cn(FIELD_TEXT[size], type === 'search' && HIDE_NATIVE_SEARCH_AFFORDANCES)
 
-  function handleKeyDown(event: KeyboardEvent<HTMLInputElement>) {
-    if (handleHistoryKeyDown(event)) return
-
-    onKeyDown?.(event)
-  }
-
-  function handleHistoryKeyDown(event: KeyboardEvent<HTMLInputElement>) {
-    if (searchInputHistoryModifier(event)) return false
-    if (event.key === 'ArrowUp') {
-      event.preventDefault()
-      onSelectPreviousHistory()
-      return true
-    }
-    if (event.key !== 'ArrowDown') return false
-
-    event.preventDefault()
-    onSelectNextHistory()
-    return true
+  if (!startAddon && !endAddon) {
+    return <Input {...fieldProps} className={cn(FIELD_HEIGHT[size], controlClassName, className)} />
   }
 
   return (
-    <div className={cn('relative min-w-0', className)}>
-      {leftAdornment}
-      <Input
-        aria-label={inputProps['aria-label'] ?? label}
-        autoCapitalize={autoCapitalize}
-        autoCorrect={autoCorrect}
-        className={inputClassName}
-        placeholder={placeholder}
-        spellCheck={spellCheck}
-        type={type}
-        value={value}
-        onBlur={handleBlur}
-        onChange={handleChange}
-        onFocus={handleFocus}
-        onKeyDown={handleKeyDown}
-        {...inputProps}
-      />
-      {rightAdornment}
-    </div>
+    <InputGroup className={cn(FIELD_HEIGHT[size], className)}>
+      {startAddon ? <InputGroupAddon align='inline-start'>{startAddon}</InputGroupAddon> : null}
+      <InputGroupInput {...fieldProps} className={cn('h-full', controlClassName)} />
+      {/* The group already centers the addon, so its block padding only pushes controls
+          past the field border once the field is sized small. */}
+      {endAddon ? (
+        <InputGroupAddon align='inline-end' className='py-0'>
+          {endAddon}
+        </InputGroupAddon>
+      ) : null}
+    </InputGroup>
   )
-}
-
-function searchInputHistoryModifier(event: KeyboardEvent<HTMLInputElement>) {
-  return event.altKey || event.ctrlKey || event.metaKey
 }

@@ -4,6 +4,7 @@ import { captureRequestLogger, runWithRequestLogger } from './observability/logg
 import { createInternalError } from './observability/structured-errors'
 
 export const SSE_HEARTBEAT_EVENT = 'heartbeat'
+const SSE_HEARTBEAT_MS = 15_000
 
 // Elysia's own set, kept whole: `transfer-encoding` is what selects its streaming
 // path for a handler-returned Response, and there is no reason to take the other one.
@@ -154,7 +155,7 @@ function nextSseEventResult<T>(event: IteratorResult<T>): NextSseEventResult<T> 
 }
 
 function normalizeHeartbeatMs(heartbeatMs: number | undefined) {
-  if (heartbeatMs === undefined) return undefined
+  if (heartbeatMs === undefined) return SSE_HEARTBEAT_MS
   if (!Number.isFinite(heartbeatMs)) return undefined
   if (heartbeatMs <= 0) return undefined
 

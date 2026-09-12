@@ -14,15 +14,17 @@ export function ScopeTabs({ hasWorkspace }: { hasWorkspace: boolean }) {
     <div className='flex min-w-0 items-center gap-1 @max-3xl/settings:order-1' role='tablist'>
       <Button
         aria-selected={scope === 'user'}
+        className='text-muted-foreground hover:text-foreground aria-selected:bg-accent aria-selected:text-accent-foreground'
         onClick={() => selectSettingsScope('user')}
         role='tab'
         size='sm'
-        variant={scope === 'user' ? 'secondary' : 'ghost'}
+        variant='ghost'
       >
         User
       </Button>
       <Button
         aria-selected={scope === 'workspace'}
+        className='text-muted-foreground hover:text-foreground aria-selected:bg-accent aria-selected:text-accent-foreground'
         // Gated on a folder being open rather than hidden: the tab is real, it
         // just has no file to write to until there is a workspace.
         disabled={!hasWorkspace}
@@ -30,7 +32,7 @@ export function ScopeTabs({ hasWorkspace }: { hasWorkspace: boolean }) {
         role='tab'
         size='sm'
         title={hasWorkspace ? undefined : 'Open a folder to use workspace settings'}
-        variant={scope === 'workspace' ? 'secondary' : 'ghost'}
+        variant='ghost'
       >
         Workspace
       </Button>

@@ -13,14 +13,11 @@ afterEach(() => {
   for (const link of document.querySelectorAll('link[rel="preload"][as="image"]')) link.remove()
 })
 
-test('HTML discovers both wallpaper images before the application module loads', () => {
+test('HTML preloads the desktop wallpaper without fetching an unused fallback', () => {
   vi.stubGlobal('navigator', { userAgentData: { platform: 'macOS' }, userAgent: '' })
   runBootScript()
 
-  expect(preloadSources()).toEqual([
-    'https://example.test/platform-api/wallpaper/still',
-    '/platform/workbench/wallpaper.jpg',
-  ])
+  expect(preloadSources()).toEqual(['https://example.test/platform-api/wallpaper/still'])
   for (const link of document.querySelectorAll('link[rel="preload"][as="image"]')) {
     expect(link).toHaveAttribute('crossorigin', 'anonymous')
   }

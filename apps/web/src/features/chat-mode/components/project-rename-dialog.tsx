@@ -73,6 +73,9 @@ export function ProjectRenameDialog() {
         </DialogHeader>
         <Input
           aria-label='Project name'
+          autoCapitalize='off'
+          autoComplete='off'
+          autoCorrect='off'
           autoFocus
           onChange={(event) => setTitle(event.target.value)}
           onKeyDown={(event) => {
@@ -81,6 +84,7 @@ export function ProjectRenameDialog() {
             event.preventDefault()
             void save()
           }}
+          spellCheck={false}
           value={title}
         />
         <DialogFooter>

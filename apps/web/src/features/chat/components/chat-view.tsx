@@ -152,8 +152,9 @@ export function ChatView({
         className='flex min-h-0 flex-1 flex-col gap-4 p-4'
         label={activeSessionId ? 'Loading session' : 'Preparing workspace chat'}
       >
+        {/* Only the user message is a bubble; an assistant reply is plain text. */}
         <div className='skeleton-sweep ml-auto h-12 w-2/3 rounded-lg' />
-        <div className='skeleton-sweep h-24 w-3/4 rounded-lg' />
+        <div className='skeleton-sweep h-24 w-3/4 rounded-md' />
       </LoadingState>
     )
   }

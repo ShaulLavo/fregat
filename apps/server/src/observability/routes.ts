@@ -5,8 +5,6 @@ import { recordClientLog } from './client-ingest'
 import { LogReaderService } from './log-reader'
 import { sseResponse, toSse } from '../sse'
 
-const LOG_LIVE_HEARTBEAT_MS = 15_000
-
 const logLevelQueryValueSchema = v.union([
   v.literal('debug'),
   v.literal('error'),
@@ -84,7 +82,6 @@ export function observabilityRoutes(options: { logs?: LogReaderService } = {}) {
               sseResponse(
                 toSse(logs.live({ ...query, signal: request.signal }), {
                   event: (item) => item.kind,
-                  heartbeatMs: LOG_LIVE_HEARTBEAT_MS,
                 }),
                 request.signal,
               ),

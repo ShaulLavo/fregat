@@ -1,5 +1,4 @@
 import type { ProviderInstanceId } from '@workspace/contracts'
-import { Button } from '@workspace/ui/components/button'
 import { Tooltip, TooltipContent, TooltipTrigger } from '@workspace/ui/components/tooltip'
 import { cn } from '@workspace/ui/lib/utils'
 
@@ -8,9 +7,9 @@ import type { ProviderModelOptionGroup } from '@workspace/client-core/chat/provi
 
 /**
  * One provider button in the rail, with the active marker riding its right edge.
- * Hover is a `foreground` tint rather than a surface token: the rail is already
- * `bg-muted`, and `bg-accent` resolves to the same colour, so a surface hover
- * would be invisible here.
+ * Raw button rather than a ghost Button: the rail is already `bg-muted`, so the
+ * ghost hover fill is invisible here and outranks anything the call site sets.
+ * The row tints are mixed from `foreground`, so they read on any surface.
  */
 export function ModelPickerRailItem({
   active,
@@ -31,16 +30,15 @@ export function ModelPickerRailItem({
       <Tooltip>
         <TooltipTrigger
           render={
-            <Button
+            <button
               aria-disabled={blocked}
               aria-label={group.displayLabel}
               className={cn(
-                'hover:bg-foreground/10 focus-visible:bg-foreground/10 aspect-square h-auto w-full p-0',
-                blocked && 'cursor-not-allowed opacity-50 hover:bg-transparent',
+                'focus-ring flex aspect-square w-full items-center justify-center rounded-md border border-transparent bg-clip-padding outline-none select-none',
+                !blocked && 'hover:bg-row-hover active:bg-row-active',
+                blocked && 'cursor-not-allowed opacity-50',
               )}
-              size='icon-sm'
               type='button'
-              variant='ghost'
               onClick={blocked ? undefined : () => onSelect(group.providerInstanceId)}
             >
               <ProviderGlyph
@@ -48,7 +46,7 @@ export function ModelPickerRailItem({
                 displayLabel={group.displayLabel}
                 driverKind={group.driverKind}
               />
-            </Button>
+            </button>
           }
         />
         <TooltipContent align='center' className='max-w-64 leading-snug text-balance' side='left'>

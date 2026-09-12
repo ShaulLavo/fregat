@@ -358,7 +358,12 @@ test('custom composer, picker, search, and references chrome follows density', a
   const commandItem = requiredElement<HTMLElement>('[data-chat-input-command-item-id]')
   const modelRail = requiredElement<HTMLElement>('[data-testid="model-rail"] > div')
   const searchShell = requiredElement<HTMLElement>('[data-testid="search-controls"] > div')
-  const searchInput = inputByLabel('Search workspace')
+  // The workspace search is an InputGroup now: the group carries the density
+  // height and its addons reserve their own space, so there is no hand-written
+  // padding on the input left to assert.
+  const searchField = requiredElement<HTMLElement>(
+    '[data-slot="input-group"]:has(input[aria-label="Search workspace"])',
+  )
   const referencesHeader = requiredElement<HTMLElement>(
     '[data-testid="references-pane"] aside > div:first-child',
   )
@@ -369,8 +374,7 @@ test('custom composer, picker, search, and references chrome follows density', a
   expect(pixelValue(getComputedStyle(commandItem).paddingTop)).toBe(6)
   expect(modelRail.getBoundingClientRect().width).toBe(BAR_HEIGHT.compact)
   expect(pixelValue(getComputedStyle(searchShell).paddingTop)).toBe(4)
-  expect(searchInput.getBoundingClientRect().height).toBe(24)
-  expect(pixelValue(getComputedStyle(searchInput).paddingRight)).toBe(88)
+  expect(searchField.getBoundingClientRect().height).toBe(24)
   expect(referencesHeader.getBoundingClientRect().height).toBe(BAR_HEIGHT.compact)
 
   setDensity('cozy')
@@ -380,8 +384,7 @@ test('custom composer, picker, search, and references chrome follows density', a
   expect(pixelValue(getComputedStyle(commandItem).paddingTop)).toBe(8)
   expect(modelRail.getBoundingClientRect().width).toBe(BAR_HEIGHT.cozy)
   expect(pixelValue(getComputedStyle(searchShell).paddingTop)).toBe(6)
-  expect(searchInput.getBoundingClientRect().height).toBe(28)
-  expect(pixelValue(getComputedStyle(searchInput).paddingRight)).toBe(88)
+  expect(searchField.getBoundingClientRect().height).toBe(28)
   expect(referencesHeader.getBoundingClientRect().height).toBe(BAR_HEIGHT.cozy)
 })
 
@@ -449,8 +452,10 @@ function inputByLabel(label: string) {
   return requiredElement<HTMLInputElement>(`input[aria-label="${label}"]`)
 }
 
+// The log filters are the Select primitive now, not native <select>: the trigger
+// is a button, so the element type changed even though its height did not.
 function selectByLabel(label: string) {
-  return requiredElement<HTMLSelectElement>(`select[aria-label="${label}"]`)
+  return requiredElement<HTMLButtonElement>(`[data-slot="select-trigger"][aria-label="${label}"]`)
 }
 
 function buttonByLabel(label: string) {

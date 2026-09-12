@@ -83,7 +83,7 @@ export function LanguageServerReferencesPane({
       <PaneBar border='bottom' className='justify-between'>
         <div className='flex min-w-0 items-center gap-(--density-control-gap)'>
           <span className='truncate text-xs font-medium'>References</span>
-          <span className='bg-muted/70 text-muted-foreground text-3xs rounded-full px-1.5 leading-4 tabular-nums'>
+          <span className='bg-muted/70 text-muted-foreground text-3xs rounded-md px-1.5 leading-4 tabular-nums'>
             {references.targets.length.toLocaleString()}
           </span>
         </div>
@@ -166,7 +166,7 @@ function ReferenceGroupHeader({
           {group.pathLabel}
         </span>
       </span>
-      <span className='bg-muted/50 text-muted-foreground text-3xs rounded-full px-1 leading-4 tabular-nums'>
+      <span className='bg-muted/50 text-muted-foreground text-3xs rounded-md px-1 leading-4 tabular-nums'>
         {group.targets.length}
       </span>
     </button>
@@ -190,7 +190,7 @@ function ReferenceRow({
   // Raw element: Button centres its content and owns a radius and hover fill a full-width row cannot take.
   return (
     <button
-      className='group hover:bg-row-hover focus-visible:ring-ring/50 grid h-6 w-full grid-cols-[38px_minmax(0,1fr)] items-center gap-2 px-2 pl-7 text-left text-xs outline-none focus-visible:ring-1'
+      className='group hover:bg-row-hover focus-visible:ring-ring/50 grid h-(--density-row-height) w-full grid-cols-[38px_minmax(0,1fr)] items-center gap-2 px-(--density-row-padding-x) pl-7 text-left text-xs outline-none focus-visible:ring-1'
       type='button'
       onClick={() => onOpenReference(target)}
       onFocus={() => onPreviewReference(target)}

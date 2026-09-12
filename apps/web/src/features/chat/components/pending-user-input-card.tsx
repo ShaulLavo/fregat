@@ -128,10 +128,13 @@ export function PendingUserInputCard({ pending }: { readonly pending: PendingUse
             </label>
             {question.secret ? (
               <Input
+                autoCapitalize='off'
                 autoComplete='off'
+                autoCorrect='off'
                 disabled={responding}
                 id={fieldId}
                 onChange={(event) => changeCustomAnswer(event.target.value)}
+                spellCheck={false}
                 type='password'
                 value={draft?.customAnswer ?? ''}
               />

@@ -94,9 +94,13 @@ export function NewFolderPopover({
             aria-describedby={displayedError ? 'file-picker-new-folder-error' : undefined}
             aria-invalid={Boolean(displayedError)}
             aria-label='Folder name'
+            autoCapitalize='off'
+            autoComplete='off'
+            autoCorrect='off'
             disabled={mutation.isPending}
             onChange={(event) => handleNameChange(event.target.value)}
             placeholder='Untitled folder'
+            spellCheck={false}
             value={name}
           />
           {displayedError ? (

@@ -19,7 +19,7 @@ export function ViewToggle() {
   const view = useSettingsView()
 
   return (
-    <div className='bg-muted flex items-center gap-0.5 rounded-md p-0.5'>
+    <div className='flex items-center gap-0.5'>
       <ViewButton
         active={view === 'form'}
         icon={<SlidersHorizontalIcon aria-hidden />}
@@ -54,9 +54,10 @@ function ViewButton({
           <Button
             aria-label={label}
             aria-pressed={active}
+            className='text-muted-foreground hover:text-foreground aria-pressed:bg-accent aria-pressed:text-accent-foreground'
             onClick={onSelect}
             size='icon-sm'
-            variant={active ? 'secondary' : 'ghost'}
+            variant='ghost'
           >
             {icon}
           </Button>

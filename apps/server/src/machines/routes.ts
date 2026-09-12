@@ -65,7 +65,6 @@ export function machineRoutes(
       sseResponse(
         toSse(machines.changes(clientId(request), request.signal), {
           event: () => 'machine',
-          heartbeatMs: 15_000,
         }),
         request.signal,
       ),

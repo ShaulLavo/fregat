@@ -29,10 +29,7 @@ export function AgentsPanel({
         if (!open) close()
       }}
     >
-      <DialogContent
-        overlayClassName='hidden'
-        className='top-0 right-0 left-auto flex h-dvh max-h-dvh w-full max-w-xl translate-x-0 translate-y-0 flex-col gap-0 rounded-none sm:max-w-xl'
-      >
+      <DialogContent className='flex flex-col gap-0' overlayClassName='hidden' side='right'>
         <DialogHeader className='border-border border-b pb-4'>
           <DialogTitle>Agents</DialogTitle>
           <DialogDescription>

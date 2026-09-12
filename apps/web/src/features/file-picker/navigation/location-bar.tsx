@@ -1,6 +1,11 @@
 import { ArrowRightIcon, PencilSimpleIcon, XIcon } from '@phosphor-icons/react'
 import { Button } from '@workspace/ui/components/button'
-import { Input } from '@workspace/ui/components/input'
+import {
+  InputGroup,
+  InputGroupAddon,
+  InputGroupButton,
+  InputGroupInput,
+} from '@workspace/ui/components/input-group'
 import { Spinner } from '@workspace/ui/components/spinner'
 import type { FormEvent, KeyboardEvent, RefObject } from 'react'
 
@@ -64,42 +69,57 @@ export function LocationBar({
 
   return (
     <form className='min-w-0' onSubmit={handleSubmit}>
-      <div className='flex min-w-0 items-center gap-1'>
-        <Input
+      <InputGroup>
+        <InputGroupInput
           ref={inputRef}
           aria-describedby={error ? 'file-picker-path-error' : undefined}
           aria-invalid={Boolean(error)}
           aria-label='Folder path'
-          className='min-w-0 font-mono'
+          autoCapitalize='off'
+          autoComplete='off'
+          autoCorrect='off'
+          className='font-mono'
           disabled={isPending}
           onChange={(event) => onChange(event.target.value)}
           onKeyDown={handleInputKeyDown}
           spellCheck={false}
           value={draft}
         />
-        <IconTooltip label='Open folder'>
-          <Button
-            aria-label='Open folder path'
-            disabled={isPending}
-            size='icon-sm'
-            type='submit'
-            variant='secondary'
-          >
-            {isPending ? <Spinner className='size-3.5' /> : <ArrowRightIcon />}
-          </Button>
-        </IconTooltip>
-        <IconTooltip label='Cancel path entry'>
-          <Button
-            aria-label='Cancel path entry'
-            onClick={onCancel}
-            size='icon-sm'
-            type='button'
-            variant='ghost'
-          >
-            <XIcon />
-          </Button>
-        </IconTooltip>
-      </div>
+        <InputGroupAddon align='inline-end'>
+          {isPending ? (
+            <span aria-live='polite' className='sr-only' role='status'>
+              Opening folder…
+            </span>
+          ) : null}
+          <IconTooltip label='Open folder'>
+            <InputGroupButton
+              aria-busy={isPending}
+              aria-label='Open folder path'
+              disabled={isPending}
+              size='icon-sm'
+              type='submit'
+              variant='secondary'
+            >
+              {isPending ? (
+                <Spinner aria-hidden='true' role='presentation' />
+              ) : (
+                <ArrowRightIcon aria-hidden='true' />
+              )}
+            </InputGroupButton>
+          </IconTooltip>
+          <IconTooltip label='Cancel path entry'>
+            <InputGroupButton
+              aria-label='Cancel path entry'
+              onClick={onCancel}
+              size='icon-sm'
+              type='button'
+              variant='ghost'
+            >
+              <XIcon aria-hidden='true' />
+            </InputGroupButton>
+          </IconTooltip>
+        </InputGroupAddon>
+      </InputGroup>
       {error ? (
         <p className='text-destructive text-2xs mt-1' id='file-picker-path-error' role='alert'>
           {error}

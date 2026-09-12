@@ -1,12 +1,8 @@
 <!doctype html>
 <html lang="en">
   <head>
-    <!-- <script
-      src="https://unpkg.com/react-scan/dist/auto.global.js"
-      crossorigin="anonymous"
-    ></script> -->
     <meta charset="UTF-8" />
-    <link rel="icon" type="image/svg+xml" href="/vite.svg" />
+    <link rel="icon" type="image/svg+xml" href="%BASE_URL%vscode-icons/code.svg" />
     <meta name="viewport" content="width=device-width, initial-scale=1.0" />
     <title>vite-monorepo</title>
     <style>
@@ -94,23 +90,20 @@
           configuredServer.startsWith('%') ? 'http://localhost:3001' : configuredServer,
         )
         const desktopStill = `${server.origin}${server.pathname.replace(/\/+$/, '')}/wallpaper/still`
-        const sources = [desktopStill, '%BASE_URL%workbench/wallpaper.jpg']
-        for (const source of sources) {
-          const preload = document.createElement('link')
-          preload.rel = 'preload'
-          preload.as = 'image'
-          preload.crossOrigin = 'anonymous'
-          preload.href = source
-          preload.fetchPriority = source === desktopStill ? 'high' : 'low'
-          preload.dataset.workbenchWallpaperPreload = 'pending'
-          preload.onload = () => {
-            preload.dataset.workbenchWallpaperPreload = 'ready'
-          }
-          preload.onerror = () => {
-            preload.dataset.workbenchWallpaperPreload = 'error'
-          }
-          document.head.append(preload)
+        const preload = document.createElement('link')
+        preload.rel = 'preload'
+        preload.as = 'image'
+        preload.crossOrigin = 'anonymous'
+        preload.href = desktopStill
+        preload.fetchPriority = 'high'
+        preload.dataset.workbenchWallpaperPreload = 'pending'
+        preload.onload = () => {
+          preload.dataset.workbenchWallpaperPreload = 'ready'
         }
+        preload.onerror = () => {
+          preload.dataset.workbenchWallpaperPreload = 'error'
+        }
+        document.head.append(preload)
       }
     </script>
   </head>

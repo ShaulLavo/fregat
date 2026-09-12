@@ -15,9 +15,12 @@ import { useMachineForm, type MachineFormOptions } from '@/hooks/use-machine-for
 
 export function MachineForm(props: MachineFormOptions) {
   const id = useId()
+  const errorId = useId()
   const { name } = props
   const { draft, error, saving, optionsOpen, setOptionsOpen, update, save, cancel, submitLabel } =
     useMachineForm(props)
+  // One form-level error at a time: the active address field owns it.
+  const addressErrorId = error ? errorId : undefined
 
   return (
     <form className='flex flex-col gap-5' onSubmit={(event) => void save(event)}>
@@ -42,6 +45,7 @@ export function MachineForm(props: MachineFormOptions) {
           <>
             <SshHostPicker
               id={`${id}-target`}
+              errorId={addressErrorId}
               value={draft.target}
               onChange={(target) => update('target', target)}
             />
@@ -51,14 +55,19 @@ export function MachineForm(props: MachineFormOptions) {
           </>
         ) : (
           <div className='flex flex-col gap-1 sm:col-span-2'>
-            <label className='text-xs font-medium' htmlFor={`${id}-url`}>
+            <label className='text-muted-foreground text-2xs font-medium' htmlFor={`${id}-url`}>
               Server URL
             </label>
             <Input
               id={`${id}-url`}
+              aria-describedby={addressErrorId}
+              aria-invalid={addressErrorId ? true : undefined}
               value={draft.url}
               onChange={(event) => update('url', event.currentTarget.value)}
               placeholder='https://machine.example.com'
+              autoCapitalize='off'
+              autoComplete='off'
+              autoCorrect='off'
               spellCheck={false}
             />
           </div>
@@ -80,7 +89,10 @@ export function MachineForm(props: MachineFormOptions) {
           <CollapsibleContent className='grid gap-4 pt-3 sm:grid-cols-2'>
             {draft.kind === 'ssh' ? (
               <div className='flex flex-col gap-1'>
-                <label className='text-xs font-medium' htmlFor={`${id}-port`}>
+                <label
+                  className='text-muted-foreground text-2xs font-medium'
+                  htmlFor={`${id}-port`}
+                >
                   Remote server port
                 </label>
                 <Input
@@ -92,11 +104,12 @@ export function MachineForm(props: MachineFormOptions) {
                   value={draft.remotePort}
                   onChange={(event) => update('remotePort', event.currentTarget.value)}
                   placeholder='Automatic'
+                  autoComplete='off'
                 />
               </div>
             ) : null}
             <div className='flex flex-col gap-1'>
-              <label className='text-xs font-medium' htmlFor={`${id}-name`}>
+              <label className='text-muted-foreground text-2xs font-medium' htmlFor={`${id}-name`}>
                 Machine name
               </label>
               <Input
@@ -105,11 +118,15 @@ export function MachineForm(props: MachineFormOptions) {
                 value={draft.name}
                 onChange={(event) => update('name', event.currentTarget.value)}
                 placeholder='Automatic from server address'
+                autoCapitalize='off'
+                autoComplete='off'
+                autoCorrect='off'
+                spellCheck={false}
               />
             </div>
             <div className='flex flex-col gap-1'>
-              <label className='text-xs font-medium' htmlFor={`${id}-label`}>
-                Display label <span className='text-muted-foreground font-normal'>optional</span>
+              <label className='text-muted-foreground text-2xs font-medium' htmlFor={`${id}-label`}>
+                Display label <span className='font-normal'>optional</span>
               </label>
               <Input
                 id={`${id}-label`}
@@ -122,7 +139,7 @@ export function MachineForm(props: MachineFormOptions) {
         </Collapsible>
       </fieldset>
       {error ? (
-        <p role='alert' className='text-destructive text-xs'>
+        <p role='alert' id={errorId} className='text-destructive text-xs'>
           {error}
         </p>
       ) : null}

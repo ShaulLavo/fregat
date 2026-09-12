@@ -49,6 +49,7 @@ export function NumberWidget({
 
   return (
     <Input
+      autoComplete='off'
       className='w-28 tabular-nums'
       disabled={disabled}
       id={id}
@@ -79,6 +80,7 @@ export function NumberWidget({
 
         commit()
       }}
+      spellCheck={false}
       type='number'
       value={inputValue}
     />

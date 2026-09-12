@@ -78,12 +78,10 @@ function EmptyState({
           {title}
         </span>
         {description ? (
-          <span className='text-muted-foreground max-w-64 text-[11px]'>{description}</span>
+          <span className='text-muted-foreground text-2xs max-w-64'>{description}</span>
         ) : null}
         {hint ? (
-          <span className='text-muted-foreground/70 flex items-center gap-2 text-[11px]'>
-            {hint}
-          </span>
+          <span className='text-muted-foreground/70 text-2xs flex items-center gap-2'>{hint}</span>
         ) : null}
         {action ? <span className='mt-1'>{action}</span> : null}
       </div>

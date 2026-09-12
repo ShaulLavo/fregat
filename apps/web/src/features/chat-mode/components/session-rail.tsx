@@ -47,7 +47,12 @@ import { useSessionReadStore } from '@/features/chat-mode/state/session-read-sto
 import { useSessionSearchStore } from '@/features/chat-mode/state/session-search-store'
 import { sessionRailModel } from '@workspace/client-core/chat/rail/model'
 import { Button } from '@workspace/ui/components/button'
-import { Input } from '@workspace/ui/components/input'
+import {
+  InputGroup,
+  InputGroupAddon,
+  InputGroupButton,
+  InputGroupInput,
+} from '@workspace/ui/components/input-group'
 import { cn } from '@workspace/ui/lib/utils'
 
 const RAIL_DND_MODIFIERS = [restrictToVerticalAxis]
@@ -187,29 +192,37 @@ export function SessionRail() {
           {model.scopedCount}
         </span>
       </div>
-      <div className='relative shrink-0 px-2 py-(--density-section-gap)'>
-        <MagnifyingGlassIcon className='text-muted-foreground/60 pointer-events-none absolute top-1/2 left-4 size-3.5 -translate-y-1/2' />
-        <Input
-          aria-label='Search sessions'
-          // The native search affordances duplicate our own clear button.
-          className='h-(--density-control-height-sm) pr-7 pl-7 text-xs [&::-webkit-search-cancel-button]:hidden [&::-webkit-search-decoration]:hidden'
-          placeholder='Search sessions'
-          type='search'
-          value={query}
-          onChange={(event) => setQuery(event.target.value)}
-        />
-        {query ? (
-          <Button
-            aria-label='Clear search'
-            className='text-muted-foreground hover:text-foreground absolute top-1/2 right-3 size-5 -translate-y-1/2'
-            size='icon-sm'
-            type='button'
-            variant='ghost'
-            onClick={() => setQuery('')}
-          >
-            <XIcon className='size-3' />
-          </Button>
-        ) : null}
+      <div className='shrink-0 px-2 py-(--density-section-gap)'>
+        <InputGroup className='h-(--density-control-height-sm)'>
+          <InputGroupAddon align='inline-start'>
+            <MagnifyingGlassIcon aria-hidden='true' className='size-3.5' />
+          </InputGroupAddon>
+          <InputGroupInput
+            aria-label='Search sessions'
+            autoCapitalize='off'
+            autoComplete='off'
+            autoCorrect='off'
+            // The native search affordances duplicate our own clear button.
+            className='h-full text-xs [&::-webkit-search-cancel-button]:hidden [&::-webkit-search-decoration]:hidden'
+            placeholder='Search sessions'
+            spellCheck={false}
+            type='search'
+            value={query}
+            onChange={(event) => setQuery(event.target.value)}
+          />
+          {query ? (
+            <InputGroupAddon align='inline-end'>
+              <InputGroupButton
+                aria-label='Clear search'
+                className='text-muted-foreground hover:text-foreground'
+                size='icon-xs'
+                onClick={() => setQuery('')}
+              >
+                <XIcon className='size-3' />
+              </InputGroupButton>
+            </InputGroupAddon>
+          ) : null}
+        </InputGroup>
       </div>
       <MachineConnectionRows />
       <div className='min-h-0 flex-1 overflow-y-auto'>

@@ -65,9 +65,9 @@ export function CompareSavedView({
   if (fileState.status === 'loading') {
     return (
       <LoadingState className='flex h-full flex-col gap-3 p-4' label='Loading saved file'>
-        <div className='bg-muted h-4 w-3/4 rounded-md' />
-        <div className='bg-muted h-4 w-1/2 rounded-md' />
-        <div className='bg-muted h-4 w-2/3 rounded-md' />
+        <div className='skeleton-sweep h-4 w-3/4 rounded-md' />
+        <div className='skeleton-sweep h-4 w-1/2 rounded-md' />
+        <div className='skeleton-sweep h-4 w-2/3 rounded-md' />
       </LoadingState>
     )
   }

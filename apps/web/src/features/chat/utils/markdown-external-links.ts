@@ -16,6 +16,9 @@ export function externalLinkHost(href: string | undefined) {
   }
 }
 
-export function faviconUrlForHost(host: string) {
-  return `https://www.google.com/s2/favicons?domain=${encodeURIComponent(host)}&sz=32`
+export function faviconUrlForHost(host: string, pageHost: string) {
+  if (host === pageHost) return `${import.meta.env.BASE_URL}vscode-icons/code.svg`
+
+  // The s2 redirect lacks CORP; the image endpoint permits cross-origin embedding.
+  return `https://t2.gstatic.com/faviconV2?client=SOCIAL&type=FAVICON&fallback_opts=TYPE,SIZE,URL&url=${encodeURIComponent(`https://${host}`)}&size=32`
 }

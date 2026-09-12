@@ -1,3 +1,5 @@
+import { readFileSync } from 'node:fs'
+
 import { expect, test } from 'vitest'
 
 // @ts-expect-error The census is a plain ES module and the scripts workspace has no `allowJs`.
@@ -12,7 +14,12 @@ type Result = {
 }
 
 function census(...lines: readonly string[]): Census {
-  return censusSource('probe.tsx', `${lines.join('\n')}\n`)
+  return censusFile('probe.tsx', ...lines)
+}
+
+/** The path decides which root a measure is scoped to, and whether the file renders markup. */
+function censusFile(file: string, ...lines: readonly string[]): Census {
+  return censusSource(file, `${lines.join('\n')}\n`)
 }
 
 function values(subject: Census, measure: string): readonly string[] {
@@ -227,4 +234,122 @@ test('excludes every flavour of test file from the walk', () => {
   expect(isTestFile('features/git/components/header.test.tsx')).toBe(true)
   expect(isTestFile('features/git/components/header.browser.tsx')).toBe(true)
   expect(isTestFile('features/git/components/header.test-d.tsx')).toBe(true)
+})
+
+test('excludes test files written as .ts, not only .tsx', () => {
+  expect(isTestFile('features/git/utils/parse.ts')).toBe(false)
+  expect(isTestFile('features/git/utils/parse.test.ts')).toBe(true)
+  expect(isTestFile('features/git/utils/parse.test-d.ts')).toBe(true)
+  expect(isTestFile('features/git/tests/factory.ts')).toBe(true)
+})
+
+test('censuses a .ts module that exports class-name strings', () => {
+  const subject = censusFile(
+    'apps/web/src/features/file-picker/navigation/navigation-styles.ts',
+    "export const PILL_BASE = 'shrink-0 rounded-sm bg-blue-600'",
+    "export const PILL_SELECTED = 'hover:bg-row-hover'",
+  )
+
+  expect(values(subject, 'radius')).toEqual(['rounded-sm'])
+  expect(values(subject, 'paletteLeaks')).toEqual(['bg-blue-600'])
+  expect(values(subject, 'hoverFills')).toEqual(['hover:bg-row-hover'])
+  expect(gate(subject).offenders.radius).toHaveLength(1)
+})
+
+test('counts a hex literal in markup and leaves one in a .ts module as data', () => {
+  const markup = censusFile('apps/web/src/components/dot.tsx', "export const dot = '#ff0000'")
+  const data = censusFile(
+    'apps/web/src/lib/code-theme/utils/catalog.ts',
+    "export const c = '#1e1e1e'",
+  )
+  const className = censusFile('apps/web/src/lib/nav.ts', "export const c = 'bg-blue-600'")
+
+  expect(values(markup, 'paletteLeaks')).toEqual(['#ff0000'])
+  expect(values(data, 'paletteLeaks')).toEqual([])
+  expect(values(className, 'paletteLeaks')).toEqual(['bg-blue-600'])
+})
+
+test('walks the primitives package but drops the two measures a primitive cannot break', () => {
+  const source = [
+    'export function Control() {',
+    '  return (',
+    '    <div>',
+    "      <button type='button' className='rounded text-[11px]'>a</button>",
+    "      <Button className='rounded-md'>b</Button>",
+    '    </div>',
+    '  )',
+    '}',
+  ] as const
+  const app = gate(censusFile('apps/web/src/components/control.tsx', ...source))
+  const ui = gate(censusFile('packages/ui/src/components/button.tsx', ...source))
+
+  expect(app.offenders.rawButtons).toHaveLength(1)
+  expect(app.offenders.buttonRadius).toHaveLength(1)
+  expect(ui.offenders.rawButtons).toEqual([])
+  expect(ui.offenders.buttonRadius).toEqual([])
+  // The measures that do judge a primitive keep judging it.
+  expect(ui.offenders.bareRadius).toHaveLength(1)
+  expect(ui.offenders.arbitraryText).toHaveLength(1)
+})
+
+test('flags a redundant rounded-none until an allow-list entry explains it', () => {
+  const subject = census("export const panel = 'flex flex-col rounded-none'")
+  const excused = gate(subject, [
+    { file: 'probe.tsx', class: 'rounded-none', reason: 'the arrow is a rotated square' },
+  ])
+
+  expect(gate(subject).offenders.nullRadius).toHaveLength(1)
+  expect(gate(subject).offenders.radius).toEqual([])
+  expect(excused.offenders.nullRadius).toEqual([])
+  expect(excused.passed).toBe(true)
+})
+
+test('reads a grid bar with a border edge as a bar', () => {
+  const grid = census("export const titlebar = 'grid h-9 shrink-0 border-b'")
+  const block = census("export const panel = 'grid h-9 gap-2'")
+  const responsive = census(
+    "export const header = 'flex flex-col border-b @max-3xl:grid @max-3xl:[&_input]:h-10'",
+  )
+
+  expect(values(grid, 'barHeights')).toEqual(['h-9'])
+  expect(gate(grid).offenders.barHeights).toHaveLength(1)
+  expect(values(block, 'barHeights')).toEqual([])
+  expect(values(responsive, 'barHeights')).toEqual([])
+})
+
+test('flags an arbitrary text size in any unit and leaves arbitrary colours alone', () => {
+  const sizes = census("export const a = 'text-[0.9em] text-[11px] text-[1.5rem] text-[2vw]'")
+  const colour = census("export const b = 'text-[var(--sdm-c,inherit)]'")
+
+  expect(values(sizes, 'arbitraryText')).toEqual([
+    'text-[0.9em]',
+    'text-[11px]',
+    'text-[1.5rem]',
+    'text-[2vw]',
+  ])
+  expect(gate(sizes).offenders.arbitraryText).toHaveLength(4)
+  expect(values(colour, 'arbitraryText')).toEqual([])
+})
+
+test('gates an opacity modifier on a row fill and only reports every other hover', () => {
+  const rows = census(
+    "export const a = 'hover:bg-row-hover/50'",
+    "export const b = 'bg-row-selected/40'",
+  )
+  const plain = census("export const c = 'hover:bg-accent hover:bg-row-hover'")
+
+  expect(values(rows, 'hoverFills')).toEqual(['hover:bg-row-hover/50', 'bg-row-selected/40'])
+  expect(gate(rows).offenders.hoverFills).toHaveLength(2)
+  expect(values(plain, 'hoverFills')).toEqual(['hover:bg-accent', 'hover:bg-row-hover'])
+  expect(gate(plain).offenders.hoverFills).toEqual([])
+  expect(typeof TARGETS.hoverFills.gates).toBe('string')
+})
+
+test('is wired into the repository: a script entry and a place in the verify chain', () => {
+  const manifest = JSON.parse(
+    readFileSync(new URL('../../package.json', import.meta.url), 'utf8'),
+  ) as { readonly scripts: Readonly<Record<string, string>> }
+
+  expect(manifest.scripts['design:census']).toContain('web-design-census.mjs --check')
+  expect(manifest.scripts.verify).toContain('bun run design:census')
 })

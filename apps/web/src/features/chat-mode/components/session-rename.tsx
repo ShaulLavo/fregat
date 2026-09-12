@@ -53,9 +53,13 @@ export function SessionRename({
   return (
     <Input
       aria-label='Session title'
+      autoCapitalize='off'
+      autoComplete='off'
+      autoCorrect='off'
       autoFocus
       className={className}
       defaultValue={session.title}
+      spellCheck={false}
       onBlur={(event) => commit(event.currentTarget.value)}
       onKeyDown={handleKeyDown}
     />

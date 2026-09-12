@@ -103,12 +103,11 @@ export function CommitControls({
             type='button'
             variant='default'
           >
-            <ArrowsClockwiseIcon
-              className={[
-                'size-4',
-                syncChanges.isPending ? 'animate-spin motion-reduce:animate-none' : '',
-              ].join(' ')}
-            />
+            {syncChanges.isPending ? (
+              <Spinner aria-hidden='true' role='presentation' />
+            ) : (
+              <ArrowsClockwiseIcon className='size-4' />
+            )}
             {syncChangesLabel(repository)}
           </Button>
         ) : (

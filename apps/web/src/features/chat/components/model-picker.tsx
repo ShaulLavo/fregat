@@ -52,8 +52,6 @@ const PANEL_CLASS =
 const SEARCH_FIELD_CLASS = [
   '[&_[data-slot=command-input-wrapper]]:border-subtle',
   '[&_[data-slot=command-input-wrapper]]:pb-(--density-popover-padding)',
-  '[&_[data-slot=command-input-wrapper]]:transition-colors',
-  '[&_[data-slot=command-input-wrapper]]:focus-within:border-ring',
   '[&_[data-slot=input-group]]:h-6.5',
   '[&_[data-slot=input-group]]:bg-transparent',
   '[&_[data-slot=input-group]_[data-slot=input-group-addon]]:pl-0!',

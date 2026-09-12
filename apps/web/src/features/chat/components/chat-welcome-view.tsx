@@ -3,7 +3,7 @@ import { ChatTeardropDotsIcon } from '@phosphor-icons/react'
 export function ChatWelcomeView() {
   return (
     <div className='flex min-h-0 flex-1 flex-col items-center justify-center gap-4 px-6 text-center'>
-      <div className='border-subtle bg-muted/40 text-muted-foreground flex size-11 items-center justify-center rounded-lg border'>
+      <div className='border-subtle bg-muted/40 text-muted-foreground flex size-11 items-center justify-center rounded-md border'>
         <ChatTeardropDotsIcon className='size-5' />
       </div>
       <div className='space-y-1'>

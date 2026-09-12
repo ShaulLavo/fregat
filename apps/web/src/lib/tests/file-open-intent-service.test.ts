@@ -1479,6 +1479,7 @@ function preparedDocumentLease(
   return {
     dispose: vi.fn(),
     estimatedBytes: 1,
+    fallbackReady: Promise.resolve(true),
     runtimeSessionIds: () => runtimeSessionIds,
     startStage: vi.fn(() => null),
     take: vi.fn(() => null),

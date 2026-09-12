@@ -5,18 +5,40 @@ import { parseArgs } from 'node:util'
 import { parseSync } from 'oxc-parser'
 
 const REPOSITORY = path.resolve(import.meta.dirname, '../..')
-const DEFAULT_ROOT = path.join(REPOSITORY, 'apps/web/src')
+// The app and the primitives it composes are one design surface; measuring only the app leaves
+// every class the primitives encode unmeasured.
+const DEFAULT_ROOTS = ['apps/web/src', 'packages/ui/src'].map((root) => path.join(REPOSITORY, root))
+const UI_PACKAGE = 'packages/ui/src/'
 const DEFAULT_ALLOW = path.join(REPOSITORY, 'scripts/lint/web-design-allow.json')
 const LIST_CAP = 40
 const BAR_HEIGHT = 'h-(--bar-height)'
 
-/** Every measure the census reports, and the target each one has to reach. */
+/**
+ * Every measure the census reports, and the target each one has to reach.
+ *
+ * `limit` and `allowed` gate: a hit outside them fails `--check` unless the allow-list excuses it.
+ * `histogramOnly` reports instead of failing; where it is paired with `gates`, the one slice named
+ * there still fails. `skipUnder` drops a root from a measure that cannot apply there.
+ */
 export const TARGETS = {
-  radius: { title: 'radius steps', allowed: ['md', 'lg', 'full', 'none'], histogram: true },
+  radius: {
+    title: 'radius steps',
+    // `none` stays on this list so a `rounded-none` is not counted twice. It gates on its own as
+    // `nullRadius`, which is a different defect from picking a step off the scale.
+    allowed: ['md', 'lg', 'full', 'none'],
+    histogram: true,
+  },
   bareRadius: { title: "bare 'rounded'", limit: 0, listed: true },
-  buttonRadius: { title: 'radius on <Button>', limit: 0 },
+  nullRadius: { title: "redundant 'rounded-none'", limit: 0, listed: true },
+  buttonRadius: {
+    title: 'radius on <Button>',
+    limit: 0,
+    // In the primitives package a radius beside a <Button> is the control defining its own corner,
+    // not an app overriding it.
+    skipUnder: [UI_PACKAGE],
+  },
   compactVariant: { title: "'compact:' utilities", limit: 0 },
-  densityVars: { title: 'density variables', histogram: true },
+  densityVars: { title: 'density variables', histogram: true, histogramOnly: true },
   barHeights: { title: 'bar heights', allowed: [BAR_HEIGHT], histogram: true },
   dividerOpacity: { title: 'border-border/N dividers', limit: 0, listed: true },
   arbitraryText: { title: 'arbitrary text sizes', limit: 0, histogram: true, listed: true },
@@ -25,12 +47,28 @@ export const TARGETS = {
     allowed: ['shadow-md', 'shadow-xl', 'shadow-none'],
     histogram: true,
   },
-  rawButtons: { title: 'raw <button> elements', allowListed: true, listed: true },
-  hoverFills: { title: 'hover fills', histogram: true },
+  rawButtons: {
+    title: 'raw <button> elements',
+    allowListed: true,
+    listed: true,
+    // A primitive is the button, so the raw element has to be written somewhere in packages/ui.
+    skipUnder: [UI_PACKAGE],
+  },
+  hoverFills: {
+    title: 'hover fills',
+    histogram: true,
+    // Mostly reported, not gated: the script cannot tell a list row, which owes `bg-row-hover`,
+    // from a chip or a toggled control, which does not. One slice is unambiguous and does gate.
+    histogramOnly: true,
+    gates: 'an opacity modifier on bg-row-hover / bg-row-selected, whose alpha is the design',
+  },
   paletteLeaks: { title: 'raw palette colours', limit: 0, listed: true },
 }
 
-const MEASURES = Object.keys(TARGETS).filter((measure) => measure !== 'bareRadius')
+/** Measures read back out of the radius histogram rather than collected in a bucket of their own. */
+const DERIVED = { bareRadius: bareRadiusHits, nullRadius: nullRadiusHits }
+const MEASURES = Object.keys(TARGETS).filter((measure) => !(measure in DERIVED))
+const ALL_MEASURES = MEASURES.concat(Object.keys(DERIVED))
 
 const RADIUS_SIDES = new Set([
   't',
@@ -54,10 +92,17 @@ const PALETTE_HUES =
 const PALETTE_CLASS = new RegExp(`^(?:bg|text|border|ring)-(?:${PALETTE_HUES})-\\d+(?:/\\d+)?$`)
 const COLOR_LITERAL = /#(?:[0-9a-f]{3,4}|[0-9a-f]{6}|[0-9a-f]{8})\b|oklch\(/gi
 const DENSITY_VAR = /\((--density-[a-z-]+|--bar-height|--rail-width)\)/g
-const ARBITRARY_TEXT = /^text-\[[0-9.]+(?:px|rem)\]$/
+// Any unit, not just px and rem: `text-[0.9em]` is as much an off-scale size as `text-[11px]`.
+// A leading digit is what separates a size from `text-[var(--x)]` or `text-[#abc]`, which are
+// colours and belong to the palette measure.
+const ARBITRARY_TEXT = /^text-\[(?:length:)?\d*\.?\d+[a-z%]*\]$/i
+// The row fills carry their own alpha (see the row tokens in globals.css), so an opacity modifier
+// on one always fights the design rather than expressing it.
+const ROW_FILL_OPACITY = /^(?:hover:)?bg-row-(?:hover|selected)\/\d+$/
 const DIVIDER_OPACITY = /^border(?:-(?:[trbl]|x|y|s|e))?-border\/\d+$/
 const HEIGHT_TOKEN = /^h-(?:\d+(?:\.\d+)?|px|\[[^\]]*\]|\([^)]*\))$/
-const TEST_FILE = /(?:^|\/)tests?\/|\.(?:test|browser|test-d)\.tsx$/
+const SOURCE_FILE = /\.tsx?$/
+const TEST_FILE = /(?:^|\/)tests?\/|\.(?:test|browser|test-d)\.tsx?$/
 
 // A class string is any literal whose whitespace-separated words all read as utilities. The
 // dash-or-colon check keeps prose such as 'Hello world' out of the census.
@@ -167,7 +212,11 @@ export function censusSource(file, source) {
   const { strings, elements } = scan(parsed.program)
   for (const element of elements) recordElement(census, file, element, lineAt)
   const groups = new Map()
-  for (const entry of strings) recordString(census, file, entry, lineAt, groups)
+  const markup = file.endsWith('.tsx')
+  for (const entry of strings) {
+    if (markup) recordColorLiterals(census, file, entry, lineOfEntry(entry, lineAt))
+    recordString(census, file, entry, lineAt, groups)
+  }
   recordBarHeights(census, groups)
   return census
 }
@@ -176,7 +225,8 @@ function sourceFiles(root) {
   return fs.readdirSync(root, { withFileTypes: true }).flatMap((entry) => {
     const filename = path.join(root, entry.name)
     if (entry.isDirectory()) return sourceFiles(filename)
-    return entry.name.endsWith('.tsx') ? [filename] : []
+    // `.ts` too: a module that exports class-name strings is a design decision like any other.
+    return SOURCE_FILE.test(entry.name) ? [filename] : []
   })
 }
 
@@ -273,9 +323,12 @@ function recordElement(census, file, element, lineAt) {
   census.hits.rawButtons.push({ file, line: lineAt(element.start), value: '<button>' })
 }
 
+function lineOfEntry(entry, lineAt) {
+  return (index) => lineAt(entry.start) + newlinesBefore(entry.value, index)
+}
+
 function recordString(census, file, entry, lineAt, groups) {
-  const lineOf = (index) => lineAt(entry.start) + newlinesBefore(entry.value, index)
-  recordColorLiterals(census, file, entry, lineOf)
+  const lineOf = lineOfEntry(entry, lineAt)
   if (!looksLikeClassString(entry.value)) return
   recordDensityVars(census, file, entry, lineOf)
   const group = groupFor(groups, entry)
@@ -283,6 +336,9 @@ function recordString(census, file, entry, lineAt, groups) {
     recordToken(census, file, entry, token, lineOf, group)
 }
 
+// Only markup is scanned for these. A hex in a component is a styling decision that owed a token;
+// in a plain `.ts` module it is data — a CodeMirror theme, a canvas fillStyle — with no token form.
+// A palette *class* still counts in either kind of file.
 function recordColorLiterals(census, file, entry, lineOf) {
   for (const match of entry.value.matchAll(COLOR_LITERAL)) {
     census.hits.paletteLeaks.push({ file, line: lineOf(match.index), value: match[0] })
@@ -306,17 +362,31 @@ function groupFor(groups, entry) {
 
 function recordToken(census, file, entry, token, lineOf, group) {
   const hit = { file, line: lineOf(token.index), value: token.base }
-  group.bases.add(token.base)
-  if (HEIGHT_TOKEN.test(token.base)) group.heights.push(hit)
+  // Only an unconditional class describes this element. Behind a variant it is an override for a
+  // breakpoint, a state or — with `[&_input]:` — a descendant, and none of those make it a bar.
+  if (token.variants.length === 0) recordBarShape(group, hit, token.base)
   if (token.variants.includes('compact'))
     census.hits.compactVariant.push({ ...hit, value: token.raw })
   if (DIVIDER_OPACITY.test(token.base)) census.hits.dividerOpacity.push(hit)
   if (ARBITRARY_TEXT.test(token.base)) census.hits.arbitraryText.push(hit)
   if (PALETTE_CLASS.test(token.base)) census.hits.paletteLeaks.push(hit)
-  if (token.variants.includes('hover') && token.base.startsWith('bg-'))
-    census.hits.hoverFills.push({ ...hit, value: `hover:${token.base}` })
+  recordHoverFill(census, token, hit)
   recordShadow(census, token, hit)
   recordRadius(census, entry, token, hit)
+}
+
+function recordBarShape(group, hit, base) {
+  group.bases.add(base)
+  if (HEIGHT_TOKEN.test(base)) group.heights.push(hit)
+}
+
+// A hovered fill of any kind is histogram material; a row token wearing an opacity modifier is
+// recorded whatever variant it carries, because that is the slice this measure gates.
+function recordHoverFill(census, token, hit) {
+  const hovers = token.variants.includes('hover')
+  const fill = hovers && token.base.startsWith('bg-')
+  if (!fill && !ROW_FILL_OPACITY.test(token.base)) return
+  census.hits.hoverFills.push({ ...hit, value: hovers ? `hover:${token.base}` : token.base })
 }
 
 function recordShadow(census, token, hit) {
@@ -331,14 +401,20 @@ function recordRadius(census, entry, token, hit) {
   if (entry.elementName === 'Button') census.hits.buttonRadius.push(hit)
 }
 
-// A bar is an element that carries a top or bottom rule and centres its children. Every explicit
-// `h-(--bar-height)` counts wherever it sits, so the token shows up as the single settled value.
+// A bar carries a top or bottom rule and lays its cells out along one line: `items-center` for a
+// flex bar, `grid` for the titlebar, which sizes its cells with grid columns instead. Requiring a
+// fixed height as well is what keeps a bordered content block out: those grow with their content.
+function isBar(bases) {
+  if (!bases.has('border-b') && !bases.has('border-t')) return false
+  return bases.has('items-center') || bases.has('grid')
+}
+
+// Every explicit `h-(--bar-height)` counts wherever it sits, so the token shows up in the
+// histogram as the single settled value.
 function recordBarHeights(census, groups) {
   const seen = new Set()
   for (const group of groups.values()) {
-    const bar =
-      (group.bases.has('border-b') || group.bases.has('border-t')) &&
-      group.bases.has('items-center')
+    const bar = isBar(group.bases)
     for (const hit of group.heights) {
       if (!bar && hit.value !== BAR_HEIGHT) continue
       if (seen.has(`${hit.file}:${hit.line}:${hit.value}`)) continue
@@ -395,6 +471,23 @@ function bareRadiusHits(census) {
   return census.hits.radius.filter((hit) => radiusInfo(hit.value).step === null)
 }
 
+// No radius class already means no radius, so a `rounded-none` only ever cancels a corner a
+// primitive owns. Where that is deliberate it needs an allow-list entry saying so.
+function nullRadiusHits(census) {
+  return census.hits.radius.filter((hit) => radiusInfo(hit.value).step === 'none')
+}
+
+function rowFillOpacityHits(census) {
+  return census.hits.hoverFills.filter((hit) => ROW_FILL_OPACITY.test(hit.value))
+}
+
+/** Drops the hits a measure cannot judge in the root they came from. */
+function scoped(measure, hits) {
+  const skip = TARGETS[measure].skipUnder
+  if (skip === undefined) return hits
+  return hits.filter((hit) => !skip.some((prefix) => hit.file.startsWith(prefix)))
+}
+
 function offScaleRadius(census) {
   return census.hits.radius.filter((hit) => {
     const step = radiusInfo(hit.value).step
@@ -409,17 +502,20 @@ function offTarget(hits, allowed) {
 export function evaluate(census, allowEntries = []) {
   const allowProblems = validateAllowEntries(allowEntries)
   const allow = allowIndex(allowEntries)
+  const gate = (measure, hits) => unallowed(scoped(measure, hits), allow)
   const offenders = {
-    radius: unallowed(offScaleRadius(census), allow),
-    bareRadius: unallowed(bareRadiusHits(census), allow),
-    buttonRadius: unallowed(census.hits.buttonRadius, allow),
-    compactVariant: unallowed(census.hits.compactVariant, allow),
-    barHeights: unallowed(offTarget(census.hits.barHeights, TARGETS.barHeights.allowed), allow),
-    dividerOpacity: unallowed(census.hits.dividerOpacity, allow),
-    arbitraryText: unallowed(census.hits.arbitraryText, allow),
-    shadow: unallowed(offTarget(census.hits.shadow, TARGETS.shadow.allowed), allow),
-    rawButtons: unallowed(census.hits.rawButtons, allow),
-    paletteLeaks: unallowed(census.hits.paletteLeaks, allow),
+    radius: gate('radius', offScaleRadius(census)),
+    bareRadius: gate('bareRadius', bareRadiusHits(census)),
+    nullRadius: gate('nullRadius', nullRadiusHits(census)),
+    buttonRadius: gate('buttonRadius', census.hits.buttonRadius),
+    compactVariant: gate('compactVariant', census.hits.compactVariant),
+    barHeights: gate('barHeights', offTarget(census.hits.barHeights, TARGETS.barHeights.allowed)),
+    dividerOpacity: gate('dividerOpacity', census.hits.dividerOpacity),
+    arbitraryText: gate('arbitraryText', census.hits.arbitraryText),
+    shadow: gate('shadow', offTarget(census.hits.shadow, TARGETS.shadow.allowed)),
+    rawButtons: gate('rawButtons', census.hits.rawButtons),
+    hoverFills: gate('hoverFills', rowFillOpacityHits(census)),
+    paletteLeaks: gate('paletteLeaks', census.hits.paletteLeaks),
   }
   const failures = Object.entries(offenders)
     .filter(([, hits]) => hits.length > 0)
@@ -432,15 +528,17 @@ export function evaluate(census, allowEntries = []) {
   }
 }
 
-function toJson(census, result, root) {
+function toJson(census, result, roots) {
   const measures = {}
   for (const measure of MEASURES)
     measures[measure] = Object.fromEntries(histogram(census.hits[measure]))
   return {
-    root,
+    roots,
     files: census.files,
     measures,
-    totals: Object.fromEntries(MEASURES.map((measure) => [measure, census.hits[measure].length])),
+    totals: Object.fromEntries(
+      ALL_MEASURES.map((measure) => [measure, hitsFor(census, measure).length]),
+    ),
     violations: Object.fromEntries(
       Object.entries(result.offenders).map(([measure, hits]) => [measure, hits]),
     ),
@@ -464,9 +562,9 @@ function formatHistogram(title, hits) {
 }
 
 function formatCounts(census) {
-  const rows = MEASURES.concat('bareRadius').map((measure) => [
+  const rows = ALL_MEASURES.map((measure) => [
     TARGETS[measure].title,
-    measure === 'bareRadius' ? bareRadiusHits(census).length : census.hits[measure].length,
+    hitsFor(census, measure).length,
   ])
   const width = Math.max(...rows.map(([title]) => title.length))
   return [
@@ -490,10 +588,14 @@ function formatGate(result) {
   return `gate: ${lines.length} measure(s) off target\n${lines.join('\n')}`
 }
 
-function formatReport(census, result, root) {
-  const listed = MEASURES.concat('bareRadius').filter((measure) => TARGETS[measure].listed)
+function formatRoots(roots) {
+  return roots.map(({ root, files }) => `${root} ${files}`).join(', ')
+}
+
+function formatReport(census, result, roots) {
+  const listed = ALL_MEASURES.filter((measure) => TARGETS[measure].listed)
   return [
-    `Web design census — ${census.files} .tsx files under ${root} (tests excluded)`,
+    `Web design census — ${census.files} .ts/.tsx files, tests excluded: ${formatRoots(roots)}`,
     '',
     formatCounts(census),
     '',
@@ -507,7 +609,15 @@ function formatReport(census, result, root) {
 }
 
 function hitsFor(census, measure) {
-  return measure === 'bareRadius' ? bareRadiusHits(census) : census.hits[measure]
+  const derived = DERIVED[measure]
+  return derived === undefined ? census.hits[measure] : derived(census)
+}
+
+function walkRoots(roots) {
+  return roots.map((root) => {
+    const census = censusTree(root)
+    return { root: posix(path.relative(REPOSITORY, root)) || root, files: census.files, census }
+  })
 }
 
 function main() {
@@ -516,17 +626,20 @@ function main() {
       allow: { type: 'string', default: DEFAULT_ALLOW },
       check: { type: 'boolean', default: false },
       json: { type: 'boolean', default: false },
-      root: { type: 'string', default: DEFAULT_ROOT },
+      // Repeatable, and any `--root` replaces the default pair rather than adding to it.
+      root: { type: 'string', multiple: true },
     },
   })
-  const root = path.resolve(values.root)
-  const census = censusTree(root)
+  const requested = values.root ?? []
+  const roots = requested.length === 0 ? DEFAULT_ROOTS : requested.map((root) => path.resolve(root))
+  const walked = walkRoots(roots)
+  const census = mergeCensus(walked.map((entry) => entry.census))
   const allowEntries = readAllowList(path.resolve(values.allow))
   const result = evaluate(census, allowEntries)
-  const relativeRoot = posix(path.relative(REPOSITORY, root)) || root
+  const summary = walked.map(({ root, files }) => ({ root, files }))
   const output = values.json
-    ? `${JSON.stringify(toJson(census, result, relativeRoot), null, 2)}\n`
-    : formatReport(census, result, relativeRoot)
+    ? `${JSON.stringify(toJson(census, result, summary), null, 2)}\n`
+    : formatReport(census, result, summary)
   process.stdout.write(output)
   process.exitCode = values.check && !result.passed ? 1 : 0
 }

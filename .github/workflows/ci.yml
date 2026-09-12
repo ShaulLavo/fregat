@@ -45,6 +45,9 @@ jobs:
       - name: Lint
         run: bun run lint
 
+      - name: Design language census
+        run: bun run design:census
+
       - name: Unused code
         run: bun run unused:check
 

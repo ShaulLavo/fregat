@@ -87,8 +87,8 @@ export function ChatInputCommandMenu({
                   </div>
                 ) : null}
                 {group.items.map((item) => (
-                  // Raw button: the highlight follows keyboard state, so this
-                  // option must not take the Button primitive's own hover fill.
+                  // A listbox option, not a button: the highlight is keyboard state
+                  // on aria-selected, and hovering moves that state instead of painting.
                   <button
                     aria-selected={activeItemId === item.id}
                     className={cn(

@@ -1,7 +1,6 @@
 import { SessionAttentionIndicator } from '@/features/chat-mode/components/session-attention-indicator'
 import { MachineChip } from '@/features/chat-mode/components/machine-chip'
 import { scopedSessionKey } from '@workspace/contracts'
-import { Button } from '@workspace/ui/components/button'
 import { useSortable } from '@dnd-kit/sortable'
 import { CSS } from '@dnd-kit/utilities'
 import { WorktreeChip } from '@/features/chat-mode/components/worktree-chip'
@@ -53,15 +52,16 @@ export function SessionRow({
     <SessionMenu
       session={session}
       trigger={
-        <Button
-          variant='ghost'
+        // Raw button: a row owns the list fill, and Button's ghost variant
+        // re-declares it in dark mode at a specificity this cannot override.
+        <button
           {...attributes}
           {...listeners}
           aria-current={active ? 'true' : undefined}
           className={cn(
-            'group/session flex h-auto w-full touch-none flex-col items-start justify-start gap-(--density-gap-tight) px-(--density-row-padding-x) py-(--density-row-padding-y) text-left',
+            'group/session focus-ring-inset flex w-full shrink-0 touch-none flex-col items-start justify-start gap-(--density-gap-tight) px-(--density-row-padding-x) py-(--density-row-padding-y) text-left text-xs outline-none select-none',
             'text-muted-foreground',
-            !active && !marked && 'hover:bg-row-hover hover:text-foreground',
+            !active && !marked && 'hover:bg-row-hover active:bg-row-active hover:text-foreground',
             active && 'bg-row-selected text-foreground',
             // A marked row is not the row on the stage, so it gets a ring rather than
             // the fill — the two states have to be readable at the same time.
@@ -113,7 +113,7 @@ export function SessionRow({
             <span className='text-destructive text-2xs pl-[14px]'>Error</span>
           ) : null}
           <SessionRowSnippet sessionKey={session.key} />
-        </Button>
+        </button>
       }
     />
   )

@@ -79,9 +79,9 @@ export function WorkspaceEditPreviewDialog() {
 
         {preparing ? (
           <LoadingState className='grid gap-2 py-2' label='Preparing workspace edit preview'>
-            <div className='bg-muted h-10 rounded-md' />
-            <div className='bg-muted h-16 rounded-md' />
-            <div className='bg-muted h-12 rounded-md' />
+            <div className='skeleton-sweep h-10 rounded-md' />
+            <div className='skeleton-sweep h-16 rounded-md' />
+            <div className='skeleton-sweep h-12 rounded-md' />
           </LoadingState>
         ) : null}
 

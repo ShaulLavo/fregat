@@ -1,5 +1,5 @@
 import { filesystemPath } from '@/lib/documents/utils/identity'
-import { ArrowSquareOutIcon } from '@phosphor-icons/react'
+import { ArrowSquareOutIcon, MagnifyingGlassIcon } from '@phosphor-icons/react'
 
 import { SearchSummary } from '@/features/workspace/components/search-summary'
 import { useEditorCommands } from '@/features/editor/hooks/use-editor-commands'
@@ -43,16 +43,17 @@ export function SearchControls({
         <SearchHistoryInput
           aria-label='Search workspace'
           className='flex-1'
-          inputClassName='h-(--density-control-height-sm) px-(--density-row-padding-x) pr-[5.5rem] text-2xs'
-          label='Search'
-          rightAdornment={
+          endAddon={
             <SearchModeButtons
               buttonClassName='size-5'
-              className='absolute top-1/2 right-0.5 -translate-y-1/2 gap-0'
+              className='gap-0'
               options={searchOptions}
               onOptionsChange={setSearchOptions}
             />
           }
+          label='Search'
+          size='sm'
+          startAddon={<MagnifyingGlassIcon aria-hidden='true' className='size-3.5' />}
           type='search'
           value={query}
           onSelectNextHistory={selectNextQuery}
@@ -74,17 +75,9 @@ export function SearchControls({
           </Button>
         ) : null}
       </div>
-      <SearchFilterFields
-        className='mt-(--density-control-gap) gap-1'
-        inputClassName='h-6 px-1.5 text-2xs'
-        options={searchOptions}
-        onOptionsChange={setSearchOptions}
-      />
+      <SearchFilterFields options={searchOptions} onOptionsChange={setSearchOptions} />
       <SearchReplaceFields
-        buttonClassName='h-6 px-1.5 text-3xs'
         canReplace={replace.canReplace}
-        className='mt-(--density-control-gap) gap-1'
-        inputClassName='h-6 px-1.5 text-2xs'
         replaceText={replaceText}
         replaceVisible={replaceVisible}
         replacing={replacing}

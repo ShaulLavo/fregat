@@ -26,7 +26,7 @@ function Command({ className, ...props }: React.ComponentProps<typeof CommandPri
 
 function CommandDialog({
   title = 'Command Palette',
-  description = 'Search for a command to run...',
+  description = 'Search for a command to run…',
   children,
   className,
   commandProps,
@@ -77,7 +77,12 @@ function CommandInput({
   ...props
 }: React.ComponentProps<typeof CommandPrimitive.Input> & { scope?: React.ReactNode }) {
   return (
-    <div data-slot='command-input-wrapper' className='border-b pb-0'>
+    // A bare line, not a boxed field: the group inside carries border-none, so
+    // this bottom border is the only thing that can show focus.
+    <div
+      data-slot='command-input-wrapper'
+      className='focus-within:border-ring border-b pb-0 transition-[border-color]'
+    >
       <InputGroup className='border-input/30 bg-input/30 h-(--density-command-input-height) border-none shadow-none! *:data-[slot=input-group-addon]:pl-(--density-command-input-padding-x)!'>
         <CommandPrimitive.Input
           data-slot='command-input'
@@ -130,7 +135,7 @@ function CommandGroup({
     <CommandPrimitive.Group
       data-slot='command-group'
       className={cn(
-        'overflow-hidden text-foreground **:[[cmdk-group-heading]]:px-(--density-command-heading-padding-x) **:[[cmdk-group-heading]]:pt-(--density-command-heading-padding-top) **:[[cmdk-group-heading]]:pb-1 **:[[cmdk-group-heading]]:text-[11px] **:[[cmdk-group-heading]]:font-medium **:[[cmdk-group-heading]]:tracking-wide **:[[cmdk-group-heading]]:text-muted-foreground/70 **:[[cmdk-group-heading]]:uppercase',
+        'overflow-hidden text-foreground **:[[cmdk-group-heading]]:px-(--density-command-heading-padding-x) **:[[cmdk-group-heading]]:pt-(--density-command-heading-padding-top) **:[[cmdk-group-heading]]:pb-1 **:[[cmdk-group-heading]]:text-2xs **:[[cmdk-group-heading]]:font-medium **:[[cmdk-group-heading]]:tracking-wide **:[[cmdk-group-heading]]:text-muted-foreground/70 **:[[cmdk-group-heading]]:uppercase',
         className,
       )}
       {...props}

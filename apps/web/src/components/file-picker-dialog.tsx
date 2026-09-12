@@ -19,7 +19,7 @@ import {
   DialogHeader,
   DialogTitle,
 } from '@workspace/ui/components/dialog'
-import { Input } from '@workspace/ui/components/input'
+import { InputGroup, InputGroupAddon, InputGroupInput } from '@workspace/ui/components/input-group'
 import { PaneBar } from '@workspace/ui/components/pane-bar'
 import { Separator } from '@workspace/ui/components/separator'
 import { deriveWriteTarget, policyControlledIds } from '@workspace/contracts'
@@ -513,19 +513,25 @@ export function FilePickerDialog({
               onEdit={pathInput.open}
               onSubmit={pathInput.submit}
             />
-            <div className='relative w-52 shrink-0 max-sm:w-32'>
-              <MagnifyingGlassIcon className='text-muted-foreground pointer-events-none absolute top-1/2 left-2 size-3.5 -translate-y-1/2' />
-              <Input
+            <InputGroup className='h-(--density-control-height-sm) w-52 shrink-0 max-sm:w-32'>
+              <InputGroupAddon align='inline-start'>
+                <MagnifyingGlassIcon aria-hidden='true' className='size-3.5' />
+              </InputGroupAddon>
+              <InputGroupInput
                 ref={searchInputRef}
                 aria-label={copy.searchLabel}
+                autoCapitalize='off'
+                autoComplete='off'
+                autoCorrect='off'
                 autoFocus
-                className='h-(--density-control-height-sm) pl-7 text-xs'
+                className='h-full text-xs'
                 onChange={handleSearchChange}
                 onKeyDown={handleSearchKeyDown}
                 placeholder={copy.searchPlaceholder}
+                spellCheck={false}
                 value={session.query}
               />
-            </div>
+            </InputGroup>
             <Separator className='h-4' orientation='vertical' />
             <div
               aria-label='Folder display actions'

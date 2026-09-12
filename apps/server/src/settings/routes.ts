@@ -17,8 +17,6 @@ import { sseResponse, toSse } from '../sse'
 import type { SettingsStore } from './store'
 import { settingsErrors } from './structured-errors'
 
-const SETTINGS_HEARTBEAT_MS = 15_000
-
 const targetSchema = v.optional(v.picklist(['user', 'workspace'] as const), 'user')
 
 const rawQuerySchema = v.object({ target: targetSchema })
@@ -49,7 +47,6 @@ export function settingsRoutes(settings: SettingsStore) {
       sseResponse(
         toSse(settings.changes(request.signal), {
           event: () => 'settings',
-          heartbeatMs: SETTINGS_HEARTBEAT_MS,
         }),
         request.signal,
       ),

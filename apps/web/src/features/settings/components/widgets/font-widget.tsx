@@ -53,6 +53,9 @@ export function FontWidget({
     <div className='flex min-w-0 items-center gap-1 @max-3xl/settings:flex-1'>
       <Input
         aria-label='Font family'
+        autoCapitalize='off'
+        autoComplete='off'
+        autoCorrect='off'
         className='w-52 @max-3xl/settings:w-full'
         disabled={disabled}
         id={id}
@@ -82,6 +85,7 @@ export function FontWidget({
 
           commit()
         }}
+        spellCheck={false}
         type='text'
         value={inputValue}
       />

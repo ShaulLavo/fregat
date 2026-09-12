@@ -305,6 +305,31 @@ model files. Nothing in this phase is optional.
 The plan is complete when steps 1 to 6 each have recorded evidence in the PR. A green census
 alone is not completion.
 
+## The Row primitive gap
+
+Eight full-width list rows stayed raw `<button>` elements rather than composing `Button`, and five
+allow-list entries point here for the reason. It is one reason, not eight judgement calls.
+
+`Button` is a control: fixed height, centred content, its own radius, and its own hover fill. A list
+row is none of those. It is full width, left-aligned, often a CSS grid of columns, its height comes
+from `--density-row-height`, it must be square, and its hover must be `bg-row-hover` so it agrees
+with every other row in the app.
+
+The fill is the part that cannot be worked around. `Button`'s ghost variant ships `hover:bg-muted`
+and `dark:hover:bg-muted/50`, which are selector specificity (0,3,0). A call site adding
+`hover:bg-row-hover` (0,2,0) or `bg-row-selected` (0,1,0) loses. Three rows had already been
+converted to the row tokens and were still painting the Button's muted fill, invisibly, because of
+this. Piling on specificity at the call site would be a worse answer than staying raw.
+
+The real fix is a `Row` primitive in `@workspace/ui` — full width, left-aligned, square, row height,
+the row fill vocabulary, and no hover declaration of its own — at which point those eight sites
+compose it and the allow-list entries go away. That is out of scope here because it is a new
+primitive with its own API decisions, not a class-string change. Until it exists, a raw `<button>`
+with a one-line comment is the correct answer, and the census allow-list records each one.
+
+Two survivors are not row-shaped and would not compose a `Row` either: the editor tab spreads
+dnd-kit listeners and needs `role='tab'`, and the timeline minimap mark is absolutely positioned.
+
 ## Verification boundaries
 
 Narrow checks only, per repository policy. `packages/ui`: typecheck, lint, `button.test.tsx`,

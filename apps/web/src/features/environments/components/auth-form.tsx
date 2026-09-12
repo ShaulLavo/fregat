@@ -15,6 +15,7 @@ import { useAuth } from '@/features/environments/hooks/use-auth'
 
 export function AuthForm({ prompt }: { readonly prompt: MachineAuthPrompt }) {
   const id = useId()
+  const errorId = useId()
   const [secret, setSecret] = useState('')
   const { answer, pending, error } = useAuth()
   const confirmation = prompt.kind === 'confirmation'
@@ -41,25 +42,34 @@ export function AuthForm({ prompt }: { readonly prompt: MachineAuthPrompt }) {
           <DialogDescription>{prompt.name}</DialogDescription>
         </DialogHeader>
         <form className='flex flex-col gap-4' onSubmit={submit}>
-          <label
-            htmlFor={confirmation ? undefined : id}
-            className='break-words whitespace-pre-wrap'
-          >
-            {prompt.prompt}
-          </label>
-          {!confirmation ? (
-            <Input
-              id={id}
-              type='password'
-              autoComplete='off'
-              autoFocus
-              value={secret}
-              disabled={pending}
-              onChange={(event) => setSecret(event.currentTarget.value)}
-            />
-          ) : null}
+          {confirmation ? (
+            <p className='break-words whitespace-pre-wrap'>{prompt.prompt}</p>
+          ) : (
+            <div className='flex flex-col gap-1'>
+              <label
+                className='text-muted-foreground text-2xs font-medium break-words whitespace-pre-wrap'
+                htmlFor={id}
+              >
+                {prompt.prompt}
+              </label>
+              <Input
+                id={id}
+                aria-describedby={error ? errorId : undefined}
+                aria-invalid={error ? true : undefined}
+                type='password'
+                autoCapitalize='off'
+                autoComplete='current-password'
+                autoCorrect='off'
+                autoFocus
+                spellCheck={false}
+                value={secret}
+                disabled={pending}
+                onChange={(event) => setSecret(event.currentTarget.value)}
+              />
+            </div>
+          )}
           {error ? (
-            <p role='alert' className='text-destructive'>
+            <p role='alert' id={errorId} className='text-destructive'>
               {error}
             </p>
           ) : null}

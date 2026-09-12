@@ -7,7 +7,7 @@ import type {
 
 import { useBranchRemoteState, useCreatePullRequestMutation, usePullRequestState } from '../hooks'
 import { usePushRemoteMutation } from '../hooks/use-push-remote-mutation'
-import { Button } from '@workspace/ui/components/button'
+import { Button, buttonVariants } from '@workspace/ui/components/button'
 import { cn } from '@workspace/ui/lib/utils'
 
 /**
@@ -48,10 +48,12 @@ export function BranchActions({
         </Button>
       ) : null}
       {pullRequestState?.pullRequest ? (
+        // buttonVariants rather than <Button render={<a />}>: Base UI's Button stamps
+        // type/role onto whatever it renders, which would cost this link its link semantics.
         <a
           className={cn(
-            'flex h-(--density-control-height-sm) items-center gap-1 rounded-md px-(--density-control-padding-x) text-2xs',
-            'hover:bg-muted',
+            buttonVariants({ size: 'sm', variant: 'ghost' }),
+            'text-2xs',
             pullRequestToneClass(pullRequestState.pullRequest.state),
           )}
           href={pullRequestState.pullRequest.url}

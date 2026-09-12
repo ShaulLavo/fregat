@@ -37,6 +37,9 @@ export function StringWidget({
 
   return (
     <Input
+      autoCapitalize='off'
+      autoComplete='off'
+      autoCorrect='off'
       className='w-64 @max-3xl/settings:w-full'
       disabled={disabled}
       id={id}
@@ -66,6 +69,7 @@ export function StringWidget({
 
         commit()
       }}
+      spellCheck={false}
       type='text'
       value={inputValue}
     />

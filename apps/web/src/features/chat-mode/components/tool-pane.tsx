@@ -155,10 +155,11 @@ function scopeButton({
   return (
     <Button
       aria-pressed={active}
+      className='text-muted-foreground hover:text-foreground aria-pressed:bg-accent aria-pressed:text-accent-foreground'
       disabled={disabled}
       size='xs'
       type='button'
-      variant={active ? 'secondary' : 'ghost'}
+      variant='ghost'
       onClick={onSelect}
     >
       {label}
@@ -186,17 +187,17 @@ function turnScopeBody({ openTurnFile, turnSummary }: SessionDiffScopeState) {
         Turn {turnSummary.checkpointTurnCount} · {turnSummary.files.length} files
       </p>
       {turnSummary.files.map((file) => (
-        <Button
-          className='w-full justify-between font-normal'
+        // Raw button: a row owns the list fill, and Button's ghost variant
+        // re-declares it in dark mode at a specificity this cannot override.
+        <button
+          className='focus-ring-inset hover:bg-row-hover active:bg-row-active flex h-(--density-control-height-sm) w-full items-center justify-between gap-(--density-control-gap) px-(--density-row-padding-x) text-left text-xs outline-none select-none'
           key={file.path}
-          size='sm'
           type='button'
-          variant='ghost'
           onClick={() => openTurnFile(file.path)}
         >
-          <span className='min-w-0 truncate text-left'>{file.path}</span>
+          <span className='min-w-0 truncate'>{file.path}</span>
           <ChatDiffStatLabel additions={file.additions} deletions={file.deletions} />
-        </Button>
+        </button>
       ))}
     </div>
   )

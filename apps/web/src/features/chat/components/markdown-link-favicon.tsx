@@ -24,7 +24,7 @@ export function MarkdownLinkFavicon({ host }: { host: string }) {
       data-chat-link-favicon={host}
       draggable={false}
       loading='lazy'
-      src={faviconUrlForHost(host)}
+      src={faviconUrlForHost(host, window.location.hostname)}
       onError={() => setFailedHost(host)}
     />
   )

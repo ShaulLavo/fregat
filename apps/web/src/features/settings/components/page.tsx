@@ -4,9 +4,9 @@ import { useNavigation } from '@/hooks/use-navigation'
 import { useSettingsSearch, selectSettingsSearch } from '@/features/settings/state/search-store'
 import { descriptorFor, type SettingId } from '@workspace/contracts'
 import { Button } from '@workspace/ui/components/button'
-import { Input } from '@workspace/ui/components/input'
+import { InputGroup, InputGroupAddon, InputGroupInput } from '@workspace/ui/components/input-group'
 import { OrbitLoader } from '@workspace/ui/components/orbit-loader'
-import { XIcon } from '@phosphor-icons/react'
+import { MagnifyingGlassIcon, XIcon } from '@phosphor-icons/react'
 import { useCallback, useRef } from 'react'
 import { useQueryClient } from '@tanstack/react-query'
 
@@ -115,12 +115,14 @@ export function SettingsPage({
     : [...categories]
 
   return (
+    // Narrow container is the touch layout: 40px controls, and 16px inputs because
+    // anything smaller makes mobile Safari zoom the page on focus.
     <div
       className='@container/settings flex h-full min-h-0 min-w-0 flex-col'
       ref={setRootRef}
       tabIndex={-1}
     >
-      <header className='border-border flex shrink-0 flex-col gap-(--density-control-gap) border-b px-(--density-section-padding) pt-2 pb-(--density-section-padding) @max-3xl/settings:grid @max-3xl/settings:grid-cols-[minmax(0,1fr)_auto] @max-3xl/settings:[&_[data-slot=button]]:min-h-10 @max-3xl/settings:[&_input]:h-10 @max-3xl/settings:[&_input]:text-base'>
+      <header className='border-border flex shrink-0 flex-col gap-(--density-control-gap) border-b px-(--density-section-padding) pt-2 pb-(--density-section-padding) @max-3xl/settings:grid @max-3xl/settings:grid-cols-[minmax(0,1fr)_auto] @max-3xl/settings:[&_[data-slot=button]]:min-h-10 @max-3xl/settings:[&_[data-slot=input-group]]:h-10 @max-3xl/settings:[&_input]:h-10 @max-3xl/settings:[&_input]:text-base'>
         {/* The tab's own action strip, above the scope tabs: these act on the tab,
             the row below picks which file the tab is showing. */}
         <div className='flex items-center justify-end gap-1 @max-3xl/settings:order-2'>
@@ -134,15 +136,23 @@ export function SettingsPage({
         </div>
         <ScopeTabs hasWorkspace={hasWorkspace} />
         {showJson ? null : (
-          <Input
-            aria-label='Search settings'
-            className='@max-3xl/settings:order-3 @max-3xl/settings:col-span-full'
-            autoFocus
-            ref={searchRef}
-            onChange={(event) => setQuery(event.currentTarget.value)}
-            placeholder='Search settings'
-            value={query}
-          />
+          <InputGroup className='@max-3xl/settings:order-3 @max-3xl/settings:col-span-full'>
+            <InputGroupAddon align='inline-start'>
+              <MagnifyingGlassIcon aria-hidden />
+            </InputGroupAddon>
+            <InputGroupInput
+              aria-label='Search settings'
+              autoCapitalize='off'
+              autoComplete='off'
+              autoCorrect='off'
+              autoFocus
+              ref={searchRef}
+              onChange={(event) => setQuery(event.currentTarget.value)}
+              placeholder='Search settings'
+              spellCheck={false}
+              value={query}
+            />
+          </InputGroup>
         )}
         <div
           className={
@@ -201,7 +211,7 @@ export function SettingsPage({
         </div>
       ) : (
         <div
-          className='min-h-0 min-w-0 flex-1 overflow-y-auto p-(--density-section-padding) @max-3xl/settings:[&_[data-slot=button]]:min-h-10 @max-3xl/settings:[&_[data-slot=select-trigger]]:min-h-10 @max-3xl/settings:[&_input]:h-10 @max-3xl/settings:[&_input]:text-base'
+          className='min-h-0 min-w-0 flex-1 overflow-y-auto p-(--density-section-padding) @max-3xl/settings:[&_[data-slot=button]]:min-h-10 @max-3xl/settings:[&_[data-slot=input-group]]:h-10 @max-3xl/settings:[&_[data-slot=select-trigger]]:min-h-10 @max-3xl/settings:[&_input]:h-10 @max-3xl/settings:[&_input]:text-base'
           onKeyDown={(event) => {
             if (event.key !== 'Escape') return
             // Not while a control is mid-interaction: a recorder is capturing, and

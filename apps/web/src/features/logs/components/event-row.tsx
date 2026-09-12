@@ -17,9 +17,14 @@ import {
   shouldToggleLogRowKey,
   type LogRowPointerStart,
 } from '@/features/logs/utils/row-interactions'
+import { logRowCollapsedHeightPx } from '@/features/logs/utils/row-layout'
 import { LogsEventInlineDetail } from '@/features/logs/components/event-inline-detail'
 import { LogsRowChevron } from '@/features/logs/components/row-chevron'
 import { cn } from '@workspace/ui/lib/utils'
+
+// The virtualizer estimates every collapsed row at this height, so the markup
+// reads the same constant instead of restating the number.
+const collapsedRowStyle = { minHeight: logRowCollapsedHeightPx }
 
 type LogsEventRowProps = {
   detail: LogEventDetail | null
@@ -71,11 +76,12 @@ export const LogsEventRow = memo(
         <Accordion className='block' value={value}>
           <AccordionItem className='border-b-0' value={event.id}>
             <div
-              className='hover:bg-row-hover grid min-h-[54px] w-full cursor-pointer grid-cols-[64px_minmax(0,1fr)_auto] items-center gap-2 px-(--density-row-padding-x) py-2 transition-colors'
+              className='hover:bg-row-hover grid w-full cursor-pointer grid-cols-[64px_minmax(0,1fr)_auto] items-center gap-2 px-(--density-row-padding-x) py-2 transition-colors'
               aria-expanded={expanded}
               aria-label={expanded ? 'Collapse log event' : 'Expand log event'}
               data-log-row-summary=''
               role='button'
+              style={collapsedRowStyle}
               tabIndex={0}
               onClick={handleRowClick}
               onKeyDown={handleRowKeyDown}
