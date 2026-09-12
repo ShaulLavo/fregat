@@ -7,6 +7,11 @@ import type {
 } from '@workspace/contracts'
 
 import type { OptimisticChatMessage } from '@/features/chat/state/chat-optimistic-store'
+import {
+  chatAgentGroups,
+  chatAgentGroupsEqual,
+  type ChatAgentGroup,
+} from '@/features/chat/utils/agents'
 import type { ChatTurnDiffSummary } from '@workspace/client-core/chat/types'
 import { chatActiveResponseTurnIds } from '@/features/chat/utils/active-response'
 import { isWorkLogFailure } from '@/features/chat/utils/work-row'
@@ -24,6 +29,12 @@ import {
 } from '@/features/chat/utils/work-log'
 
 export type ChatTimelineItem =
+  | {
+      group: ChatAgentGroup
+      id: string
+      timestamp: string
+      type: 'agent-group'
+    }
   | {
       activity: ChatLiveActivity
       id: string
@@ -81,6 +92,13 @@ export type ChatTimelineItem =
     }
 
 type ChronologicalTimelineItem =
+  | {
+      group: ChatAgentGroup
+      id: string
+      sourceOrder: number
+      timestamp: string
+      type: 'agent-group'
+    }
   | {
       activity: ChatWorkLogEntry
       id: string
@@ -167,6 +185,7 @@ export function chatTimelineItems({
   )
   const timelineMessages = [...messages, ...visibleOptimisticMessages]
   const workLogEntries = chatWorkLogEntries({ activities })
+  const agentGroups = chatAgentGroups(activities)
   const activeResponseTurnIds = chatActiveResponseTurnIds({
     messages: timelineMessages,
     entries: workLogEntries,
@@ -178,7 +197,9 @@ export function chatTimelineItems({
     messages: timelineMessages,
     // The completion divider reports the latest turn's duration, so only that turn's
     // work decides whether there was anything to report.
-    showCompletionSummary: latestTurnWorkLogEntryCount(workLogEntries, latestTurn) > 0,
+    showCompletionSummary:
+      latestTurnWorkLogEntryCount(workLogEntries, latestTurn) > 0 ||
+      agentGroups.some((group) => group.turnId === latestTurn?.turnId),
   })
   const turnDiffSummaryByAssistantMessageId = deriveTurnDiffSummaryByAssistantMessageId(
     turnDiffSummaries,
@@ -223,6 +244,16 @@ export function chatTimelineItems({
     if (activity.plan) continue
 
     items.push(activityTimelineItem(activity, sourceOrder))
+    sourceOrder += 1
+  }
+  for (const group of agentGroups) {
+    items.push({
+      group,
+      id: group.id,
+      sourceOrder,
+      timestamp: group.createdAt,
+      type: 'agent-group',
+    })
     sourceOrder += 1
   }
 
@@ -337,16 +368,18 @@ function appendEmptyTurnStatus(
 
 function foldableTurnEntries(group: TurnFoldGroup) {
   const terminalIndex = group.entries.findIndex((entry) => entry.id === group.terminalMessageId)
-  if (terminalIndex < 0) return group.entries.filter((entry) => !isFailedTimelineEntry(entry))
+  const foldable = group.entries.filter((entry, index) => {
+    if (isFailedTimelineEntry(entry)) return false
+    if (index === terminalIndex) return false
+    if (isCompactionEntry(entry)) return true
+    if (terminalIndex < 0 || index < terminalIndex) return true
+    return entry.type === 'activity' && group.entries.length === terminalIndex + 2
+  })
+  return foldable.some((entry) => !isCompactionEntry(entry)) ? foldable : []
+}
 
-  const beforeAnswer = group.entries
-    .slice(0, terminalIndex)
-    .filter((entry) => !isFailedTimelineEntry(entry))
-  const trailing = group.entries.slice(terminalIndex + 1)
-  if (trailing.length === 1 && !isFailedTimelineEntry(trailing[0]!))
-    return [...beforeAnswer, ...trailing]
-
-  return beforeAnswer
+function isCompactionEntry(entry: ChronologicalTimelineItem) {
+  return entry.type === 'activity' && entry.activity.sourceKind === 'context-compaction'
 }
 
 function isFailedTimelineEntry(entry: ChronologicalTimelineItem) {
@@ -365,7 +398,12 @@ function latestTurnWorkLogEntryCount(
 export function timelineRowSpacing(item: ChatTimelineItem) {
   if (item.type === 'turn-fold' || item.type === 'working' || item.type === 'turn-status')
     return 'pb-1.5'
-  if (item.type === 'activity-group' || item.type === 'live-activity') return 'pb-2'
+  if (
+    item.type === 'activity-group' ||
+    item.type === 'live-activity' ||
+    item.type === 'agent-group'
+  )
+    return 'pb-2'
   if (item.type === 'message' && item.message.role === 'assistant' && !item.showAssistantCopyButton)
     return 'pb-2'
 
@@ -374,6 +412,7 @@ export function timelineRowSpacing(item: ChatTimelineItem) {
 
 export function chatTimelineItemEstimate(item: ChatTimelineItem | undefined) {
   if (!item) return 64
+  if (item.type === 'agent-group') return 36
   if (item.type === 'activity-group') {
     const visibleFailures = item.activities.filter(isWorkLogFailure).length
     return 36 + visibleFailures * 28
@@ -530,6 +569,8 @@ function timelineItemFromEntry(
   item: Exclude<ChronologicalTimelineItem, { type: 'activity' }>,
   foldedTurnIds: ReadonlySet<TurnId>,
 ): ChatTimelineItem {
+  if (item.type === 'agent-group')
+    return { group: item.group, id: item.id, timestamp: item.timestamp, type: item.type }
   if (item.type === 'message') {
     const turnId = entryTurnId(item)
 
@@ -871,6 +912,8 @@ function timelineItemsEqual(left: ChatTimelineItem, right: ChatTimelineItem): bo
   if (left === right) return true
   if (left.id !== right.id) return false
   if (left.timestamp !== right.timestamp) return false
+  if (left.type === 'agent-group' && right.type === 'agent-group')
+    return chatAgentGroupsEqual(left.group, right.group)
   if (left.type === 'turn-status' && right.type === 'turn-status') return left.label === right.label
   if (left.type === 'live-activity' && right.type === 'live-activity') {
     return (

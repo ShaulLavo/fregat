@@ -13,6 +13,7 @@ import {
   type ChatActivityTool,
 } from '@/features/chat/utils/activity-presentation'
 import { isVisibleChatActivity } from '@/features/chat/utils/activity-visibility'
+import { chatAgentActivity } from '@/features/chat/utils/agent-activity'
 
 export type ChatWorkLogTone = 'error' | 'info' | 'thinking' | 'tool'
 
@@ -97,6 +98,7 @@ export function chatWorkLogEntries({
   const entries: DerivedChatWorkLogEntry[] = []
 
   for (const activity of activities) {
+    if (chatAgentActivity(activity.payload)) continue
     if (activity.kind === 'turn.plan.updated') {
       appendTurnPlanRow(entries, planRows, activity)
       continue
@@ -202,6 +204,7 @@ function turnPlanRows(ordered: readonly OrchestrationSessionActivity[]) {
   const rows = new Map<string, TurnPlanRow>()
 
   for (const activity of ordered) {
+    if (chatAgentActivity(activity.payload)) continue
     if (activity.kind !== 'turn.plan.updated') continue
 
     const key = turnPlanKey(activity)

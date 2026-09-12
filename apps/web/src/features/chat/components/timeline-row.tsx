@@ -9,6 +9,7 @@ import { WorkingRow } from './working-row'
 import { LiveActivityRow } from '@/features/chat/components/live-activity-row'
 import { timelineRowSpacing } from '@/features/chat/utils/timeline-items'
 import { cn } from '@workspace/ui/lib/utils'
+import { AgentsRow } from '@/features/chat/components/agents-row'
 
 export function TimelineRow({
   checkpointRevertPending = false,
@@ -52,6 +53,7 @@ function timelineRowContent({
   item: ChatTimelineItem
   toggleFold: () => void
 }) {
+  if (item.type === 'agent-group') return <AgentsRow group={item.group} />
   if (item.type === 'message') {
     return (
       <MessageBubble
