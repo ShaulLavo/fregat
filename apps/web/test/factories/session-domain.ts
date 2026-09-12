@@ -14,6 +14,7 @@ import {
   type WorktreeId,
 } from '@workspace/contracts'
 import {
+  closeApp,
   MockProviderAdapter,
   OrchestrationEventStore,
   orchestrationForApp,
@@ -47,6 +48,17 @@ export class MetadataProviderAdapter extends MockProviderAdapter {
 
   async discoverSessions(input: ProviderSessionDiscoveryInput) {
     return this.rows.slice(input.offset, input.offset + input.limit)
+  }
+
+  async readSessionHistory({ sessionId }: { readonly sessionId: SessionId }) {
+    return this.rows
+      .filter((row) => row.sessionId === sessionId)
+      .map((row) => ({
+        sourceId: `${row.sessionId}:user`,
+        role: 'user' as const,
+        text: 'Existing terminal conversation',
+        createdAt: DOMAIN_TIME,
+      }))
   }
 }
 
@@ -147,7 +159,8 @@ export async function makeSessionDomainFixture(options: { providerRuntime?: bool
       if (!session) throw new TypeError(`Missing fixture session ${sessionId}`)
       return session
     },
-    appendUnapplied: (projectId: ProjectId, count: number) => {
+    appendUnapplied: async (projectId: ProjectId, count: number) => {
+      await closeApp(server.app)
       const events = Array.from({ length: count }, (_, index) =>
         v.parse(orchestrationEventSchema, {
           sequence: 0,
