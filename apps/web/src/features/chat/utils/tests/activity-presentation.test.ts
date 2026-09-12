@@ -297,3 +297,18 @@ function activity(
     turnId: v.parse(turnIdSchema, 'turn-1'),
   }
 }
+
+it.each(['…', '...'])(
+  'ignores a truncated command echo ending in %s when classifying errors',
+  (suffix) => {
+    const command = 'rg "no such file or directory" src/long-file-name.ts'
+    expect(
+      chatActivityPresentation(
+        activity('tool.completed', 'tool', {
+          detail: `Bash: ${command.slice(0, 38)}${suffix}`,
+          data: { command, exitCode: 0, stdout: '3 matches' },
+        }),
+      ),
+    ).toMatchObject({ detail: null, outcome: 'succeeded', result: 'Exit code 0' })
+  },
+)

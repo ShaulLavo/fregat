@@ -45,7 +45,7 @@ export function ActivityRow({ activity }: { activity: ChatWorkLogEntry }) {
   )
 
   return (
-    <div className='min-w-0 rounded-md'>
+    <div className='min-w-0 rounded-md' data-work-log-entry-id={activity.id}>
       {expandable ? (
         <Button
           aria-expanded={expanded}

@@ -75,7 +75,7 @@ export function chatActivityPresentation(
   const title = activityTitle(activity, payload)
   const command = activityCommand(data)
   const output = activityOutput(data)
-  const detail = activityDetail(activity, payload, title)
+  const detail = commandDetail(activityDetail(activity, payload, title), command)
   const outcome = activityOutcome(activity, payload, data, [
     detail === command ? null : detail,
     output,
@@ -299,6 +299,16 @@ function activityStatus(
   if (activity.kind.endsWith('.resolved')) return 'Resolved'
 
   return null
+}
+
+function commandDetail(detail: string | null, command: string | null) {
+  if (!detail || !command) return detail
+  const text = detail.replace(/^(?:Bash|Shell|Command):\s*/i, '').trim()
+  if (text === command.trim()) return null
+  const prefix = text.replace(/(?:\.\.\.|…)$/, '')
+  if (prefix !== text && prefix.length > 0 && command.startsWith(prefix)) return null
+
+  return detail
 }
 
 function activityOutcome(
