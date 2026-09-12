@@ -197,6 +197,19 @@ Interaction treatments are utilities, not strings to copy:
 
 - A dev server is always running. Never spin up your own server to test or verify changes — reuse the running one.
 
+## Deployment: The Mesh
+
+- Every change ships to the mesh once it is done, so a production build is always available to look at. Treat the deploy as the last step of the task, not an extra.
+- The mesh is a plain local deployment. Mesh (`mesh serve`) publishes a port on this machine to the owner's Tailscale network, so the production build is reachable from their own devices at `https://omarchy.mesh.shaulavo.dev/platform`. Nothing is public. This is the deployment until a packaged release exists, and it may stay the deployment.
+- Two routes, two `systemd --user` services on omarchy:
+  - `/platform` → port 3300, `platform-web-prod.service`, a Vite preview of `/work/platform-production/current-web`. `current-web` is a symlink into `/work/platform-production/releases/<UTC stamp>-<commit>-<slug>/web`.
+  - `/platform-api` → port 3301, `platform-prod.service`, running `apps/server/dist/index.js` straight from this checkout.
+- Web deploy, from `apps/web`: `bunx tsgo --build`, then `VITE_SERVER_URL=https://omarchy.mesh.shaulavo.dev/platform-api NODE_ENV=production BUN_ENV=production bun --env-file=../../.env vite build --base /platform/ --outDir <release>/web`. Write `build-config.json` and `web-build.log` next to `web/` like the earlier releases. Check the candidate's `index.html` carries the `platform-api` server URL and `/platform/assets/` paths, then swap the symlink (`ln -sfn` + `mv -T`) and `systemctl --user restart platform-web-prod.service`.
+- Server deploy: `bun run --cwd apps/server build`, then `systemctl --user restart platform-prod.service`. Only when the server changed — a restart drops every live terminal and agent session.
+- `ghostty-webgpu` is a `link:` to `/work/projects/ghostty-webgpu`. A change there needs `bun run build` in that repo before the web build picks it up.
+- Verify through the mesh URL, not localhost: the served `index.html` names the new asset, the asset contains the change, and the headless check from an earlier release (`verify-web.mjs live`) reports no page or console errors.
+- [Plan 105](plans/105-one-server-mesh-deployment.md) turns this into `bun run deploy` and one server behind one route. Until it lands, the steps above are the procedure.
+
 ## Testing
 
 - Do not run tests unless they are necessary. Before running one, identify the specific plausible failure it could catch; if there is none, skip it.

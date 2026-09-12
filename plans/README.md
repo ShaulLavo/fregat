@@ -17,30 +17,29 @@ a bare root `bun run verify`.
 
 ## Executable plan inventory
 
-| Plan                                                                            | State                                                         |
-| ------------------------------------------------------------------------------- | ------------------------------------------------------------- |
-| [078 — federated environments](078-federated-environments.md)                   | **IMPLEMENTED — AUTOMATED CHECKS PASS; LIVE GATES OPEN**      |
-| [071 — syntax highlight retry](071-syntax-highlight-retry.md)                   | **PROPOSED — ROOT GO/NO-GO SCHEDULING**                       |
-| [080 — Platform and VS Code keybinding modes](080-platform-keybinding-modes.md) | **PROPOSED — INTERACTION RULES CONFIRMED**                    |
-| [085 — instant workspace reload](085-instant-workspace-reload.md)               | **PROPOSED — IMPLEMENTATION NOT STARTED**                     |
-| [086 — full TanStack Router migration](086-tanstack-router-migration.md)        | **IMPLEMENTED — CHROMIUM/FIREFOX PASS; LIVE LIMITS RECORDED** |
-| [087 — stateless MCP support](087-stateless-mcp.md)                             | **PROPOSED — IMPLEMENTATION NOT STARTED**                     |
-| [088 — native code intelligence](088-native-code-intelligence.md)               | **PROPOSED — DEPENDS ON 087**                                 |
-| [091 — error and timing helpers](091-error-and-timing-helpers.md)               | **PROPOSED — DEFECT FIXES IMPLEMENTED**                       |
-| [092 — path and URI helpers](092-path-and-uri-helpers.md)                       | **PROPOSED — DEFECT FIXES IMPLEMENTED**                       |
-| [093 — web React and store ceremony](093-web-react-and-store-ceremony.md)       | **PROPOSED — DEPENDS ON 091**                                 |
-| [097 — async operation ownership](097-async-operation-ownership.md)             | **PROPOSED — 098 COMPLETE; READY TO IMPLEMENT**               |
-| [099 — document contribution runtime](099-document-contributions.md)            | **PROPOSED — BASELINE AND PUBLICATION FIRST**                 |
-| [100 — web design language](100-web-design-language.md)                         | **IMPLEMENTED — CENSUS GATE GREEN; AUDIT FINDINGS APPLIED**   |
-| [101 — truncation and value recovery](101-truncation-recovery.md)               | **PROPOSED — DECISIONS D5 AND D7 NEED CONFIRMATION**          |
-| [102 — scroll and keyboard affordance](102-scroll-and-keyboard-affordance.md)   | **PROPOSED — DECISIONS D2 AND D7 NEED CONFIRMATION**          |
-| [103 — loading, empty and error states](103-loading-empty-error-states.md)      | **PROPOSED — DECISIONS D4 AND D6 NEED CONFIRMATION**          |
-| [104 — theme standardization](104-theme-standardization.md)                     | **PROPOSED — IMPLEMENTATION NOT STARTED**                     |
-| [094 — client-core web and TUI parity](094-client-core-web-tui-parity.md)       | **PROPOSED — DEPENDS ON 091; 096 COMPLETE**                   |
-| [095 — server plumbing](095-server-plumbing.md)                                 | **PROPOSED — IMPLEMENTATION NOT STARTED**                     |
-| [073 — Electrobun 2.x migration](073-electrobun-v2-migration.md)                | **PROPOSED — ROOT GO/NO-GO SCHEDULING**                       |
-| [075 — terminal renderer fallbacks](075-terminal-renderer-fallbacks.md)         | **PROPOSED — BLOCKED ON TIER DECISION**                       |
-| [076 — watch-reload child reaping](076-watch-reload-child-reaping.md)           | **PROPOSED — ROOT GO/NO-GO SCHEDULING**                       |
+| Plan                                                                            | State                                                       |
+| ------------------------------------------------------------------------------- | ----------------------------------------------------------- |
+| [071 — syntax highlight retry](071-syntax-highlight-retry.md)                   | **PROPOSED — ROOT GO/NO-GO SCHEDULING**                     |
+| [080 — Platform and VS Code keybinding modes](080-platform-keybinding-modes.md) | **PROPOSED — INTERACTION RULES CONFIRMED**                  |
+| [085 — instant workspace reload](085-instant-workspace-reload.md)               | **PROPOSED — IMPLEMENTATION NOT STARTED**                   |
+| [087 — stateless MCP support](087-stateless-mcp.md)                             | **PROPOSED — IMPLEMENTATION NOT STARTED**                   |
+| [088 — native code intelligence](088-native-code-intelligence.md)               | **PROPOSED — DEPENDS ON 087**                               |
+| [091 — error and timing helpers](091-error-and-timing-helpers.md)               | **PROPOSED — DEFECT FIXES IMPLEMENTED**                     |
+| [092 — path and URI helpers](092-path-and-uri-helpers.md)                       | **PROPOSED — DEFECT FIXES IMPLEMENTED**                     |
+| [093 — web React and store ceremony](093-web-react-and-store-ceremony.md)       | **PROPOSED — DEPENDS ON 091**                               |
+| [097 — async operation ownership](097-async-operation-ownership.md)             | **PROPOSED — 098 COMPLETE; READY TO IMPLEMENT**             |
+| [099 — document contribution runtime](099-document-contributions.md)            | **PROPOSED — BASELINE AND PUBLICATION FIRST**               |
+| [100 — web design language](100-web-design-language.md)                         | **IMPLEMENTED — CENSUS GATE GREEN; AUDIT FINDINGS APPLIED** |
+| [101 — truncation and value recovery](101-truncation-recovery.md)               | **PROPOSED — DECISIONS D5 AND D7 NEED CONFIRMATION**        |
+| [102 — scroll and keyboard affordance](102-scroll-and-keyboard-affordance.md)   | **PROPOSED — DECISIONS D2 AND D7 NEED CONFIRMATION**        |
+| [103 — loading, empty and error states](103-loading-empty-error-states.md)      | **PROPOSED — DECISIONS D4 AND D6 NEED CONFIRMATION**        |
+| [104 — theme standardization](104-theme-standardization.md)                     | **PROPOSED — IMPLEMENTATION NOT STARTED**                   |
+| [105 — one server and mesh deployment](105-one-server-mesh-deployment.md)       | **PROPOSED — PHASE 1 READY TO IMPLEMENT**                   |
+| [094 — client-core web and TUI parity](094-client-core-web-tui-parity.md)       | **PROPOSED — DEPENDS ON 091; 096 COMPLETE**                 |
+| [095 — server plumbing](095-server-plumbing.md)                                 | **PROPOSED — IMPLEMENTATION NOT STARTED**                   |
+| [073 — Electrobun 2.x migration](073-electrobun-v2-migration.md)                | **PROPOSED — ROOT GO/NO-GO SCHEDULING**                     |
+| [075 — terminal renderer fallbacks](075-terminal-renderer-fallbacks.md)         | **PROPOSED — BLOCKED ON TIER DECISION**                     |
+| [076 — watch-reload child reaping](076-watch-reload-child-reaping.md)           | **PROPOSED — ROOT GO/NO-GO SCHEDULING**                     |
 
 ## Dependency notes
 
@@ -85,14 +84,11 @@ a bare root `bun run verify`.
   plumbing, and Plan 096 settles web layering. Plan 096 settles the shared Git contract and web Git
   API files before Plan 094's co-pass over them.
 
-- Plan 086 makes TanStack Router the sole web navigation owner, migrates all navigation callers,
-  and deletes the custom URL controller. It keeps local workspace IDs and URL tabs, fixes
-  history/persistence, and supplies reusable view data for sharing. Implementation, focused automated checks, and
-  Chromium/Firefox browser gates pass. The initial and follow-up review findings are fixed, with
-  focused regression evidence recorded in the plan. WebKit is missing host libraries; a second configured live
-  environment remains unverified. The mandatory two-server in-process ownership gate passes.
-  Plan 085's first-paint work remains separate. The [evaluation](086-router-evaluation.md) records
-  the alternatives. No sharing backend is scheduled.
+- [Workspace navigation](../docs/workspace-navigation.md) uses TanStack Router as its sole browser
+  history owner, preserving local workspace IDs, URL tabs, unsaved documents, and environment
+  ownership. The full Chromium, Firefox, and macOS WebKit replay passes, including a second live
+  machine and reload during continuous input. Plan 085's first-paint work remains separate. The
+  [evaluation](../docs/router-evaluation.md) records the alternatives. No sharing backend is scheduled.
 
 - Plan 085 restores the visible workspace before live responses, starting with bootstrap, file tree,
   and settings. It reuses feature renderers and keeps native paint separate from current-state
@@ -120,18 +116,18 @@ a bare root `bun run verify`.
   before editor consumers mount. Switching preserves unsaved buffers and routes pending work to
   its original owner. Query consumers remount under one outer command bus that captures the active
   runtime. Chat transports close explicitly and WebSocket auth refusal uses `1008`. Focused tests
-  and the two-server A → B → A browser workflow pass. Plan 078 removes the dev-only loopback
-  switch and scopes browser persistence by confirmed environment identity.
+  and the two-server A → B → A browser workflow pass.
+  [Federation](../docs/federated-environments.md) replaces the dev-only loopback switch and scopes
+  browser persistence by confirmed environment identity.
 - Plan 068 is implemented and its executable plan is deleted. The
   [session-domain reference](../docs/session-domain.md) links the contracts, registration,
   recovery, discovery, and environment-scoped navigation tests. It supplies explicit
   Project → Worktree → Session ownership and the server's three attention states.
-- Plan 078 is implemented with automated checks passing and live localhost SSH
-  and browser gates open. It supplies the `environments.machines` setting and page, the
-  desktop SSH launcher (probe, reuse-or-launch, loopback forward, no install, no pairing), one chat
-  connection per machine, scoped persistence, the flat cross-machine rail with repository grouping,
-  chips and a machine filter, add-project-on-machine, and the workbench switch. Direct `https://`
-  origins are accepted but the mesh proxy check and pairing are scheduled separately, on demand.
+- [Federated environments](../docs/federated-environments.md) supplies Machines settings, backend
+  SSH launch and forwarding, concurrent chat connections, scoped persistence, repository grouping,
+  machine filtering, remote project selection, and retained workbench switching. Live Linux/macOS
+  checks cover browser reconnect and managed-process ownership. Direct `https://` origins are
+  accepted; direct remote deployment checks and pairing remain separate, on demand.
 - Plan 071 is an independent Editor-only resilience proposal. Its prerequisite is now stable:
   Platform owns Shiki registration resolution, Editor's Oniguruma worker is self-contained, and
   built-dist highlighting is covered by a real-browser and shared-log proof. Root `PLAN.md` has not
