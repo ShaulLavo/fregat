@@ -2,7 +2,7 @@ import { Tooltip, TooltipContent, TooltipTrigger } from '@workspace/ui/component
 import { cn } from '@workspace/ui/lib/utils'
 import type { ComponentProps, MouseEvent } from 'react'
 
-import { useContextMenu } from '@/features/menus/hooks/use-context-menu'
+import { useContextMenu } from '@/keymap/menus/hooks/use-context-menu'
 
 import { externalLinkHost } from '@/features/chat/utils/markdown-external-links'
 import { findMarkdownFragmentTarget } from '@/features/chat/utils/markdown-fragment-links'

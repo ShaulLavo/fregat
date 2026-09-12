@@ -2,7 +2,7 @@ import { filesystemPath, tabId } from '@/lib/documents/utils/identity'
 import { testTabContent } from '../../../../../test/factories/document-targets'
 import type { EditorTabCloseTarget } from '@/features/workspace/utils/tab-close-targets'
 import type { EditorTabModel } from '@/features/workspace/utils/tab-types'
-import type { MenuActionItem } from '@/features/menus/utils/model'
+import type { MenuActionItem } from '@/keymap/menus/utils/model'
 import {
   editorTabMenu,
   type EditorTabMenuContext,

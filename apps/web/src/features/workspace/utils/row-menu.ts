@@ -1,4 +1,4 @@
-import { copyPathSection } from '@/features/menus/utils/copy-path-section'
+import { copyPathSection } from '@/keymap/menus/utils/copy-path-section'
 import {
   ArrowBendUpLeftIcon,
   CopySimpleIcon,
@@ -14,7 +14,7 @@ import {
 import type { GitFileStatus } from '@workspace/contracts'
 
 import { isStagedStatus, isWorktreeStatus } from '@/features/git/utils/change-rows'
-import { actionItem, section, type Menu } from '@/features/menus/utils/model'
+import { actionItem, section, type Menu } from '@/keymap/menus/utils/model'
 
 export type RowGitActions = {
   readonly canStage: boolean

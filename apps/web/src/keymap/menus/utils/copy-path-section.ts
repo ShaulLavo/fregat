@@ -1,6 +1,6 @@
 import { CopyIcon } from '@phosphor-icons/react'
 
-import { actionItem, section } from '@/features/menus/utils/model'
+import { actionItem, section } from '@/keymap/menus/utils/model'
 
 export function copyPathSection({
   copyPath,

@@ -1,4 +1,4 @@
-import { copyPathSection } from '@/features/menus/utils/copy-path-section'
+import { copyPathSection } from '@/keymap/menus/utils/copy-path-section'
 import {
   ArrowBendUpLeftIcon,
   FileIcon,
@@ -7,7 +7,7 @@ import {
   PlusIcon,
 } from '@phosphor-icons/react'
 
-import { actionItem, section, type Menu } from '@/features/menus/utils/model'
+import { actionItem, section, type Menu } from '@/keymap/menus/utils/model'
 
 import type { PanelSection } from '@/features/git/utils/types'
 

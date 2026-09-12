@@ -4,7 +4,7 @@ import { Button } from '@workspace/ui/components/button'
 import { cn } from '@workspace/ui/lib/utils'
 import type { MouseEvent, ReactNode } from 'react'
 
-import { useContextMenu } from '@/features/menus/hooks/use-context-menu'
+import { useContextMenu } from '@/keymap/menus/hooks/use-context-menu'
 
 import { formatChatTimestamp } from '@/features/chat/utils/formatters'
 import { resolveAssistantMessageChromeState } from '@/features/chat/utils/message-metadata'

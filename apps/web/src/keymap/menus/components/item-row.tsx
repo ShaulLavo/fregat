@@ -1,4 +1,4 @@
-import type { ResolvedMenuInvocation, ResolvedMenuItem } from '@/features/menus/utils/resolve'
+import type { ResolvedMenuInvocation, ResolvedMenuItem } from '@/keymap/menus/utils/resolve'
 import {
   ContextMenuCheckboxItem,
   ContextMenuItem,

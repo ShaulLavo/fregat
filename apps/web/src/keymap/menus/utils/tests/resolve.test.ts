@@ -1,6 +1,6 @@
 import { binding } from '../../../../../test/factories/key-binding'
-import { actionItem, commandItem, section } from '@/features/menus/utils/model'
-import { resolveMenu, type MenuResolveContext } from '@/features/menus/utils/resolve'
+import { actionItem, commandItem, section } from '@/keymap/menus/utils/model'
+import { resolveMenu, type MenuResolveContext } from '@/keymap/menus/utils/resolve'
 import type { PlatformCommandId } from '@/keymap/types'
 import { expect, test } from '../../../../../test/fixtures'
 

@@ -7,7 +7,7 @@ import {
   type Menu,
   type MenuRadioGroupItem,
   type MenuRadioItem,
-} from '@/features/menus/utils/model'
+} from '@/keymap/menus/utils/model'
 import type { WorkbenchSidebarTab } from '@/features/workbench/utils/panels'
 
 /**

@@ -11,7 +11,7 @@ import {
 
 import type { SessionRuntimeState, SessionRuntimeStatus } from '@workspace/contracts'
 
-import { actionItem, section, type Menu } from '@/features/menus/utils/model'
+import { actionItem, section, type Menu } from '@/keymap/menus/utils/model'
 
 /**
  * A provider process is still holding this session in these states, so stopping it

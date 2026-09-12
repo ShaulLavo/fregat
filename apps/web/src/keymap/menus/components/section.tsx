@@ -1,4 +1,4 @@
-import type { ResolvedMenuItem, ResolvedMenuSection } from '@/features/menus/utils/resolve'
+import type { ResolvedMenuItem, ResolvedMenuSection } from '@/keymap/menus/utils/resolve'
 import {
   ContextMenuGroup,
   ContextMenuLabel,

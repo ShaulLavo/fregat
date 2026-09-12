@@ -2,8 +2,8 @@ import { useCommand } from '@/keymap/hooks/use-command'
 import type { CommandInvocation } from '@/keymap/state/command-bus'
 import type { MenuSurfaceId } from '@/keymap/types'
 import type { FocusTargetToken } from '@/lib/focus/state/service'
-import type { Menu } from '@/features/menus/utils/model'
-import { resolveMenu, type ResolvedMenu } from '@/features/menus/utils/resolve'
+import type { Menu } from '@/keymap/menus/utils/model'
+import { resolveMenu, type ResolvedMenu } from '@/keymap/menus/utils/resolve'
 
 /**
  * Binds a menu definition to the live command table. Availability is read from

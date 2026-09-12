@@ -1,7 +1,7 @@
 import { tabId } from '@/lib/documents/utils/identity'
 import { testDocumentRef } from '../../../../../test/factories/document-targets'
 import { editorTextMenu } from '@/features/editor/utils/text-menu'
-import type { MenuCommandItem } from '@/features/menus/utils/model'
+import type { MenuCommandItem } from '@/keymap/menus/utils/model'
 import { platformCommand } from '@/keymap/table'
 import type { PlatformCommandId } from '@/keymap/types'
 import {

@@ -1,5 +1,5 @@
 import { projectMenu, type ProjectMenuContext } from '@/features/chat-mode/utils/project-menu'
-import type { MenuActionItem, MenuItem } from '@/features/menus/utils/model'
+import type { MenuActionItem, MenuItem } from '@/keymap/menus/utils/model'
 import { expect, test } from '../../../../../test/fixtures'
 
 test('offers a new session first, then manage, then the view controls, then copy', () => {

@@ -10,7 +10,7 @@ import {
   TrashIcon,
 } from '@phosphor-icons/react'
 
-import { actionItem, section, type Menu } from '@/features/menus/utils/model'
+import { actionItem, section, type Menu } from '@/keymap/menus/utils/model'
 
 export type ProjectMenuContext = {
   /** False once every session is already filed away — archiving nothing is not an action. */

@@ -1,9 +1,9 @@
 import { useRef, useState, type ReactElement } from 'react'
 
-import { useResolvedMenu } from '@/features/menus/hooks/use-resolved-menu'
-import type { Menu } from '@/features/menus/utils/model'
-import type { ResolvedMenuInvocation, ResolvedMenuItem } from '@/features/menus/utils/resolve'
-import type { MenuAnchor } from '@/features/menus/utils/virtual-anchor'
+import { useResolvedMenu } from '@/keymap/menus/hooks/use-resolved-menu'
+import type { Menu } from '@/keymap/menus/utils/model'
+import type { ResolvedMenuInvocation, ResolvedMenuItem } from '@/keymap/menus/utils/resolve'
+import type { MenuAnchor } from '@/keymap/menus/utils/virtual-anchor'
 import type { MenuSurfaceId } from '@/keymap/types'
 import { useFocusService } from '@/lib/focus/hooks/use-service'
 import {

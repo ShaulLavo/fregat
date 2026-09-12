@@ -1,4 +1,4 @@
-import { copyPathSection } from '@/features/menus/utils/copy-path-section'
+import { copyPathSection } from '@/keymap/menus/utils/copy-path-section'
 import { ArrowRightIcon, FileIcon, FilesIcon, FloppyDiskIcon, XIcon } from '@phosphor-icons/react'
 
 import {
@@ -8,7 +8,7 @@ import {
 } from '@/features/workspace/utils/tab-close-targets'
 import type { EditorTabModel } from '@/features/workspace/utils/tab-types'
 import type { FilesystemPath, TabId } from '@/lib/documents/utils/types'
-import { actionItem, section, type Menu } from '@/features/menus/utils/model'
+import { actionItem, section, type Menu } from '@/keymap/menus/utils/model'
 
 export type EditorTabMenuContext = {
   readonly closeTargets: readonly EditorTabCloseTarget[]

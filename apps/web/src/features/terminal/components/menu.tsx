@@ -1,5 +1,5 @@
-import { MenuSurface } from '@/features/menus/components/surface'
-import type { MenuAnchor } from '@/features/menus/utils/virtual-anchor'
+import { MenuSurface } from '@/keymap/menus/components/surface'
+import type { MenuAnchor } from '@/keymap/menus/utils/virtual-anchor'
 import { useTerminalMenu } from '@/features/terminal/hooks/use-menu'
 import type { TerminalMenuTarget } from '@/features/terminal/utils/commands'
 

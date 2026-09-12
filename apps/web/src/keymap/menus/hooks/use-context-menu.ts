@@ -1,6 +1,6 @@
 import { useState } from 'react'
 
-import { pointAnchor, rectAnchor, type MenuAnchor } from '@/features/menus/utils/virtual-anchor'
+import { pointAnchor, rectAnchor, type MenuAnchor } from '@/keymap/menus/utils/virtual-anchor'
 
 type ContextMenuPointerEvent = {
   readonly clientX: number
