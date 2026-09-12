@@ -114,6 +114,39 @@ Model and effort choices, project defaults, per-session provider identity, runti
 
 The transcript already supports GFM, math, Mermaid, highlighted code, file links, external link previews/context menus, Markdown selection copying, collapsed user messages, plan copy/download/expand, changed-file trees, and checkpoint diff/revert. Revert confirms and refuses while busy. Earlier history has loading/retry states; missing sessions have a separate state. Session detail recovery and connection feedback are wired. Earlier parity reports claiming these were absent are historical, not evidence of current gaps.
 
+## Fresh review corrections
+
+A subsequent review of `d4e0c5f9..bb8bf4fe` reproduced six defects that the earlier checks missed. The earlier clean-review checkpoint does not apply to these paths. All six are corrected in the same integration worktree; the failing reproductions remain in [the review report](/work/tmp/platform-chat-parity/review-findings.md).
+
+| Reproduced defect                                                                                                                          | Correction                                                                                                                                                                                        | Evidence                                                                                                |
+| ------------------------------------------------------------------------------------------------------------------------------------------ | ------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- | ------------------------------------------------------------------------------------------------------- |
+| Stop waited behind a pending provider correction acknowledgement.                                                                          | Track steering as an independent provider action, preserving error handling and drain behavior while the serialized command worker handles Stop immediately.                                      | `bae9d924`; same-session and other-session Stop checks.                                                 |
+| A delayed old child completion/error cleared the current child turn and its Stop target.                                                   | Retain the latest native child turn ID after completion; apply status changes only to that turn. Historical tool events do not replace its current summary.                                       | `bae9d924`; old completion/error and duplicate-start cases.                                             |
+| Child tool completion without final output discarded previously streamed output.                                                           | Preserve streamed detail when the final item omits it; honor explicit final strings, including an empty string.                                                                                   | `bae9d924`; command and file-change output cases.                                                       |
+| An accepted correction reset model, effort, runtime mode, and interaction mode even though those choices belong to the next ordinary turn. | Consume prompt and attachment content separately from next-turn choices. Ordinary sends still clear the complete draft.                                                                           | `539d1cae`; rejection, accepted retry, next-turn dispatch, and final cleanup through the real ChatView. |
+| Copying rendered Markdown lost images wrapped in the lightbox Button.                                                                      | Serialize and unwrap the marked image wrapper before excluding ordinary controls. Preserve plain Markdown and rich HTML images, including empty alt text.                                         | `539d1cae`; exact copied Markdown and sanitized HTML assertions.                                        |
+| A no-match search was classified as neutral but still displayed a red failure.                                                             | Use that verdict in both lifecycle selection and work-log tone. Native `failed` status no longer overrides a confirmed no-match result. Diagnostic and compound-command failures remain failures. | `82f8c2dd`; real ActivityRow rendering and command-classification controls.                             |
+
+The runtime additions failed before the changes and then passed with the complete focused runtime set: [55 checks across three files](/work/tmp/platform-chat-parity/fix-runtime-after.log). The composer and clipboard additions also failed first, then passed with [34 checks across four files](/work/tmp/platform-chat-parity/fix-composer-after.log). No-match verification passed [40 logic checks](/work/tmp/platform-chat-parity/fix-no-match-logic.log) and [nine component checks](/work/tmp/platform-chat-parity/fix-no-match-dom.log). These counts describe separate runs, not a unique-test total.
+
+Independent review of these fixes caught one further regression: an idle child could retain the transient **Retrying child** summary because the new guard excluded legitimate late tool completions from the same successful turn. Commit `12f50f37` allows those idle updates while preserving the native-turn ownership check and failed/interrupted/closed summaries. Explicit final-summary assertions failed in all three native projection modes before the fix; [58 focused runtime checks now pass](/work/tmp/platform-chat-parity/fix-runtime-summary-after.log).
+
+The integrated [native snapshot](/work/tmp/platform-chat-parity/fix-native-session.json) was regenerated through all three delivery modes after that correction. The [rerun browser proof](/work/tmp/platform-chat-parity/fix-browser/proof.json) confirms the final idle summary is `pwd`, both native commands survive, and the retry warning is absent. The existing child inspector, narrow layout, and real filesystem image checks also pass with no page errors. [Final native-agent screenshot](/work/tmp/platform-chat-parity/fix-browser/native-agent-projection.png).
+
+## Connection errors and the shaul-mac notice
+
+The running server's September 12 log lives in `/work/platform-production/logs`. At 09:13:21 UTC, `machines.ssh.connect` reached `shaul-mac` but failed the Platform installation probe. The client event at 09:13:23 UTC contains the expanded diagnostic with duplicated installation instructions. The generic opening sentence made this sound like an unreachable SSH host, although the underlying failure was missing server setup.
+
+The UI problem was independent of that connection failure: `MachineConnectionRows` rendered every saved machine's complete error in the chat rail, regardless of the selected environment, with no dismissal. Settings already owned the machine's status and recovery controls.
+
+The local t3code reference keeps saved connection errors in the affected settings row: `references/t3code/apps/web/src/components/settings/ConnectionsSettings.tsx`, particularly `SavedBackendListRow`. Its `ConnectionStatusDot.tsx` and `cloud/cloudEnvironmentConnectionPresentation.ts` also keep routine status compact. Platform now follows that contextual placement; its new X and Details controls are Platform-specific additions.
+
+Commit `14040e75` makes the chat notice a compact row with the machine name, short status, Details, Retry/Connect, and an accessible X. This specific failure reads **Server setup needed**. The full diagnostic is available in an opaque Details popover. Settings → Machines keeps the error discoverable even when it is dismissed from chat.
+
+Only a machine owning the selected environment appears in the chat rail. The primary server may still show a notice because it owns machine management and SSH forwarding. Dismissal belongs to the existing connection owner in memory. The same error, a new timestamp, automatic pending transitions, and component remounts do not reopen it. A different error appears; recovery, explicit Retry, disconnect, or a configuration change clears dismissal for the next incident. No new setting or browser-storage key was added.
+
+[Seven focused component checks](/work/tmp/platform-chat-parity/fix-machines-tests.log) cover notice scope, Settings discovery, Details, X, repeat/remount behavior, real retry dispatch against an injected external HTTP boundary, and in-process connection loss/recovery. No connection or installation was attempted on the real `shaul-mac`; its underlying setup remains unchanged.
+
 ## Verification and reproducible evidence
 
 The focused checks targeted plausible failures in changed paths. Counts below describe separate runs with overlapping coverage; they are not a unique-test total.
@@ -158,6 +191,17 @@ The optional captured-session input contains private local history and is not co
 
 Inspect [the native projected agent](/work/tmp/platform-chat-parity/browser/native-agent-projection.png), [the narrow inspector](/work/tmp/platform-chat-parity/browser/agents-narrow.png), and [the original session after presentation repairs](/work/tmp/platform-chat-parity/browser/last-chat-replay.png).
 
+The connection-notice and fresh-review browser check bundles the actual components and connection owner under the same running app origin. Its synthetic remote machine and image are external network fixtures. The check confirms a 34px notice at both desktop and 390px width, Details, dismissal across repeated and pending updates, a newly visible changed failure, neutral no-match rendering, and exact plain/rich image copying, with no page errors. Browser Retry coverage is control availability and dismissal reset; the component test above proves the real request. [Proof](/work/tmp/platform-chat-parity/review-fix-browser/proof.json), [compact notice](/work/tmp/platform-chat-parity/review-fix-browser/compact-notice.png), [Details](/work/tmp/platform-chat-parity/review-fix-browser/notice-details.png), [narrow notice](/work/tmp/platform-chat-parity/review-fix-browser/narrow-notice.png).
+
+Run this additional browser check from `apps/web`:
+
+```sh
+PLAYWRIGHT_BROWSERS_PATH=/work/cache/ms-playwright \
+CHAT_PROOF_URL=https://omarchy.mesh.shaulavo.dev \
+CHAT_PROOF_SERVER=https://omarchy.mesh.shaulavo.dev/platform-api \
+node scripts/chat-review-proof.mjs
+```
+
 ## Scope and remaining differences
 
 No paid/live Codex prompt was submitted. Deterministic protocol checks and the real running filesystem route supply the execution evidence. The original app has not been switched to this branch.
@@ -170,4 +214,4 @@ The reference's opportunistic `thread/read` metadata lookup was not copied. Nati
 
 Pending notification bodies are bounded. The separate native live-turn registry deliberately retains potentially running targets until terminal or closed events arrive, so Stop can still reach unregistered children. A malformed provider stream that starts unlimited turns without terminating them can still grow that registry and Stop fan-out. This is a remaining low-severity resilience limit.
 
-Independent review used `gpt-5.6-sol`. It found snapshot-version ordering, native text duplication, late completion ownership, stale plan validation, citation escaping, workspace/cache boundaries, and unbounded pending payloads; each has a focused reproduction and an implemented correction. The remaining flags concern the explicit scope and resilience limits above. The append-only [decision trail](chat-t3code-decisions.tsv) records integration choices, corrections, and verification checkpoints.
+The initial independent review used `gpt-5.6-sol`. It found snapshot-version ordering, native text duplication, late completion ownership, stale plan validation, citation escaping, workspace/cache boundaries, and unbounded pending payloads; each has a focused reproduction and an implemented correction. The fresh review above then found six additional defects and reopened the earlier clean-review conclusion. The append-only [decision trail](chat-t3code-decisions.tsv) records both rounds, their corrections, and verification checkpoints.

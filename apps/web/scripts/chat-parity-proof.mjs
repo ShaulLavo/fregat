@@ -151,16 +151,23 @@ try {
       'idle',
       'A projected old tool snapshot cannot resurrect a completed agent.',
     )
+    assert.equal(
+      group.group.agents[0].summary,
+      'pwd',
+      'An idle agent must not keep a transient retry warning.',
+    )
     const commands = group.group.agents[0].activities.filter((activity) => activity.command)
     assert.equal(commands.length, 2, 'Both native child commands must survive projection upserts.')
     assert.equal(items.filter((item) => item.type === 'activity-group').length, 0)
     await page.getByRole('button', { name: '1 agent finished' }).click()
     await dialog.getByRole('button', { name: /Reviewer/ }).click()
     await dialog.getByText('Idle · resumable', { exact: true }).waitFor()
+    assert.equal(await dialog.getByText('Retrying child', { exact: true }).count(), 0)
     await page.screenshot({ path: resolve(artifacts, 'native-agent-projection.png') })
     native = {
       name: group.group.agents[0].agent.nickname,
       status: group.group.agents[0].agent.status,
+      summary: group.group.agents[0].summary,
       commands: commands.map((command) => ({
         itemType: command.itemType,
         outcome: command.outcome,
