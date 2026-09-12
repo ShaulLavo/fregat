@@ -176,7 +176,7 @@ export class ProviderCommandReactor {
         await this.startTurn(event)
         return
       case 'session.turn-steer-requested':
-        await this.steerTurn(event)
+        this.trackProviderAction(this.steerTurn(event))
         return
       case 'session.turn-interrupt-requested':
         await this.interruptTurn(event)
