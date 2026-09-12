@@ -1,4 +1,6 @@
 import { spawn, type ChildProcessWithoutNullStreams } from 'node:child_process'
+import { mkdtemp, rm } from 'node:fs/promises'
+import { tmpdir } from 'node:os'
 import path from 'node:path'
 import { fileURLToPath } from 'node:url'
 
@@ -10,16 +12,28 @@ const DEFAULT_FILE_SERVER_URL = 'http://127.0.0.1:33201'
 export default async function setupBrowserFileServer() {
   const serverUrl = new URL(process.env.VITEST_BROWSER_FILE_SERVER_URL ?? DEFAULT_FILE_SERVER_URL)
   const browserPort = process.env.VITEST_BROWSER_PORT ?? DEFAULT_BROWSER_PORT
-  const server = startServer(serverUrl, browserPort)
+  const runtimeRoot = await mkdtemp(path.join(tmpdir(), 'platform-browser-'))
+  const server = startServer(serverUrl, browserPort, runtimeRoot)
 
-  await waitForServer(server, serverUrl, browserPort)
+  try {
+    await waitForServer(server, serverUrl, browserPort)
+  } catch (error) {
+    await cleanupServer(server, runtimeRoot)
+    throw error
+  }
 
-  return async () => {
+  return () => cleanupServer(server, runtimeRoot)
+}
+
+async function cleanupServer(server: TrackedServer, runtimeRoot: string) {
+  try {
     await stopServer(server)
+  } finally {
+    await rm(runtimeRoot, { recursive: true, force: true })
   }
 }
 
-function startServer(serverUrl: URL, browserPort: string) {
+function startServer(serverUrl: URL, browserPort: string, runtimeRoot: string) {
   const repoRoot = path.resolve(path.dirname(fileURLToPath(import.meta.url)), '../../../..')
   const serverRoot = path.join(repoRoot, 'apps/server')
   const fixtureRoot = path.join(repoRoot, 'apps/web/test/fixtures/workbench-file-server')
@@ -34,6 +48,8 @@ function startServer(serverUrl: URL, browserPort: string) {
       FS_WATCH: 'false',
       FS_WORKSPACE_ROOT: fixtureRoot,
       PORT: serverUrl.port,
+      PLATFORM_SETTINGS_FILE: path.join(runtimeRoot, 'settings.json'),
+      PLATFORM_SECRETS_FILE: path.join(runtimeRoot, 'secrets.json'),
       SERVER_ALLOWED_ORIGINS: allowedOrigins(browserPort).join(','),
     },
     stdio: ['ignore', 'pipe', 'pipe'],
