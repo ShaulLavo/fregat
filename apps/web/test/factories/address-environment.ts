@@ -23,14 +23,14 @@ export function scopeAddressEnvironment(
   const previousEnvironments = useEnvironmentsStore.getState()
   setActiveServerOrigin(origin)
   const previousClient = getClient()
+  const queryClient = queryClientFor(origin)
+  const previousBoundClient = clientForQueryClient(queryClient)
   setClient(client)
   useEnvironmentsStore.setState({
     activeOrigin: origin,
     entries: { [origin]: { ...createEnvironmentEntry(origin, origin), environmentId } },
     connectionByOrigin: {},
   })
-  const queryClient = queryClientFor(origin)
-  const previousBoundClient = clientForQueryClient(queryClient)
   registerEnvironmentQueryClient(queryClient, origin, client)
   return () => {
     queryClient.clear()
