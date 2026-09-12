@@ -1,3 +1,9 @@
+import { filesystemPath } from '@/lib/documents/utils/identity'
+import {
+  testNullableTabContent,
+  testTabContents,
+  testTabContent,
+} from '../../../../test/factories/document-targets'
 import {
   testWorkspaceAddress,
   testWorkspaceToken,
@@ -5,12 +11,10 @@ import {
 import { formatAddress, parseAddress } from '@workspace/client-core/address/grammar'
 import { addressedWorkspaceCache, panelsForAddress } from '@/features/address/utils/cache'
 import { addressFromSnapshot, emptyAddressSnapshot } from '@/features/address/utils/snapshot'
-import { settingsDocumentId } from '@/features/settings/utils/document'
-import { searchBufferDocumentId } from '@/features/search/utils/buffer-document'
 import {
-  activeEditorPathForWorkbenchPanels,
+  activeEditorContentForWorkbenchPanels,
   createDefaultWorkbenchPanels,
-  openEditorPathInWorkbenchPanels,
+  openEditorContentInWorkbenchPanels,
 } from '@/features/workbench/utils/panels'
 import { emptyWorkspaceSlice, emptyWorkspaceState } from '@/features/workspace/state/cache'
 
@@ -18,16 +22,19 @@ import { expect, test } from '../../../../test/fixtures'
 
 const ROOT = '/repo'
 const SESSION = 't/99dc0669-0262-4f92-a8d2-85ff6baea075'
-const PATHS = [`${ROOT}/a.ts`, settingsDocumentId(), searchBufferDocumentId(ROOT)]
+const PATHS = [`${ROOT}/a.ts`, 'settings:', `search-buffer:${encodeURIComponent(ROOT)}`]
 function cachedWorkspace() {
-  const panels = PATHS.reduce(openEditorPathInWorkbenchPanels, createDefaultWorkbenchPanels())
+  const panels = testTabContents(PATHS).reduce(
+    openEditorContentInWorkbenchPanels,
+    createDefaultWorkbenchPanels(),
+  )
   return {
     ...emptyWorkspaceState(),
     rootFolder: {
       birthtimeMs: 0,
       mtimeMs: 0,
       name: 'repo',
-      path: ROOT,
+      path: filesystemPath(ROOT),
       size: 0,
       type: 'directory' as const,
       version: '',
@@ -45,8 +52,8 @@ test.each(PATHS)('chat restores %s before any effects regardless of the last tab
     workspaceAddress: testWorkspaceAddress(ROOT),
     mode: 'chat',
     sessionToken: SESSION,
-    activeDocumentPath: path,
-    editorTabPaths: PATHS,
+    activeTabContent: testNullableTabContent(path),
+    editorTabContents: testTabContents(PATHS),
   })
   const parsed = parseAddress(formatAddress(address))
   const restored = addressedWorkspaceCache(cachedWorkspace(), parsed).workspaces[ROOT]
@@ -54,8 +61,8 @@ test.each(PATHS)('chat restores %s before any effects regardless of the last tab
 
   expect(parsed.document).toBe(SESSION)
   expect(parsed.tabs).toEqual(['f/a.ts', 'settings', 's'])
-  expect(activeEditorPathForWorkbenchPanels(restored)).toBe(path)
-  expect(restored.editorTabs.map((tab) => tab.path)).toEqual(PATHS)
+  expect(activeEditorContentForWorkbenchPanels(restored)).toEqual(testNullableTabContent(path))
+  expect(restored.editorTabs.map((tab) => tab.content)).toEqual(testTabContents(PATHS))
 })
 
 test.each(PATHS)('workbench restores %s through the same document pipeline', (path) => {
@@ -64,13 +71,15 @@ test.each(PATHS)('workbench restores %s through the same document pipeline', (pa
     rootPath: ROOT,
     workspaceAddress: testWorkspaceAddress(ROOT),
     mode: 'workbench',
-    activeDocumentPath: path,
-    editorTabPaths: PATHS,
+    activeTabContent: testNullableTabContent(path),
+    editorTabContents: testTabContents(PATHS),
   })
   const restored = addressedWorkspaceCache(cachedWorkspace(), parseAddress(formatAddress(address)))
 
   expect(address.editor).toBeNull()
-  expect(activeEditorPathForWorkbenchPanels(restored.workspaces[ROOT].workbenchPanels)).toBe(path)
+  expect(activeEditorContentForWorkbenchPanels(restored.workspaces[ROOT].workbenchPanels)).toEqual(
+    testNullableTabContent(path),
+  )
 })
 
 test('a tab collection without a selection preserves the cached active tab', () => {
@@ -79,9 +88,12 @@ test('a tab collection without a selection preserves the cached active tab', () 
   )
   const restored = addressedWorkspaceCache(cachedWorkspace(), address).workspaces[ROOT]
     .workbenchPanels
-
-  expect(restored.editorTabs.map((tab) => tab.path)).toContain(`${ROOT}/new.ts`)
-  expect(activeEditorPathForWorkbenchPanels(restored)).toBe(searchBufferDocumentId(ROOT))
+  expect(restored.editorTabs.map((tab) => tab.content)).toContainEqual(
+    testTabContent(`${ROOT}/new.ts`),
+  )
+  expect(activeEditorContentForWorkbenchPanels(restored)).toEqual(
+    testNullableTabContent(`search-buffer:${encodeURIComponent(ROOT)}`),
+  )
 })
 
 test('a settings category does not select a background settings tab', () => {
@@ -90,8 +102,9 @@ test('a settings category does not select a background settings tab', () => {
   )
   const restored = addressedWorkspaceCache(cachedWorkspace(), address).workspaces[ROOT]
     .workbenchPanels
-
-  expect(activeEditorPathForWorkbenchPanels(restored)).toBe(`${ROOT}/a.ts`)
+  expect(activeEditorContentForWorkbenchPanels(restored)).toEqual(
+    testNullableTabContent(`${ROOT}/a.ts`),
+  )
 })
 
 test('boot restores the addressed file by cached ID even when its readable name changed', () => {
@@ -99,9 +112,8 @@ test('boot restores the addressed file by cached ID even when its readable name 
     `/~${testWorkspaceToken(ROOT, 'old.checkout.name')}/workbench/f/new.ts`,
   )
   const restored = addressedWorkspaceCache(cachedWorkspace(), address)
-
-  expect(activeEditorPathForWorkbenchPanels(restored.workspaces[ROOT].workbenchPanels)).toBe(
-    `${ROOT}/new.ts`,
+  expect(activeEditorContentForWorkbenchPanels(restored.workspaces[ROOT].workbenchPanels)).toEqual(
+    testNullableTabContent(`${ROOT}/new.ts`),
   )
 })
 
@@ -116,8 +128,8 @@ test('folderless settings retains its document, tab and category in the address'
   const address = addressFromSnapshot({
     ...emptyAddressSnapshot(),
     mode: 'workbench',
-    activeDocumentPath: settingsDocumentId(),
-    editorTabPaths: [settingsDocumentId()],
+    activeTabContent: testNullableTabContent('settings:'),
+    editorTabContents: testTabContents(['settings:']),
     settingsCategory: 'providers',
   })
 
@@ -133,9 +145,8 @@ test('folderless settings retains its document, tab and category in the address'
 test('folderless settings is selected by the synchronous boot panel merge', () => {
   const address = parseAddress('/~-/workbench/settings?tabs=settings&settings=providers')
   const panels = panelsForAddress(createDefaultWorkbenchPanels(), null, address)
-
-  expect(panels.editorTabs.map((tab) => tab.path)).toEqual([settingsDocumentId()])
-  expect(activeEditorPathForWorkbenchPanels(panels)).toBe(settingsDocumentId())
+  expect(panels.editorTabs.map((tab) => tab.content)).toEqual(testTabContents(['settings:']))
+  expect(activeEditorContentForWorkbenchPanels(panels)).toEqual(testNullableTabContent('settings:'))
 })
 
 test.each(PATHS)('chat selection %s survives omission of an oversized tab collection', (path) => {
@@ -145,15 +156,17 @@ test.each(PATHS)('chat selection %s survives omission of an oversized tab collec
     workspaceAddress: testWorkspaceAddress(ROOT),
     mode: 'chat',
     sessionToken: SESSION,
-    activeDocumentPath: path,
-    editorTabPaths: [
+    activeTabContent: testNullableTabContent(path),
+    editorTabContents: testTabContents([
       ...PATHS,
       ...Array.from({ length: 20 }, (_, index) => `${ROOT}/${'nested/'.repeat(15)}${index}.ts`),
-    ],
+    ]),
   })
   const restored = addressedWorkspaceCache(cachedWorkspace(), parseAddress(formatAddress(address)))
 
   expect(address.tabs).toBeNull()
   expect(address.document).toBe(SESSION)
-  expect(activeEditorPathForWorkbenchPanels(restored.workspaces[ROOT].workbenchPanels)).toBe(path)
+  expect(activeEditorContentForWorkbenchPanels(restored.workspaces[ROOT].workbenchPanels)).toEqual(
+    testNullableTabContent(path),
+  )
 })

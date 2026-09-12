@@ -1,3 +1,4 @@
+import { testTabContents } from '../../../../test/factories/document-targets'
 import { waitFor } from '@testing-library/react'
 import { workspaceToken } from '@workspace/client-core/address/workspace'
 import { healthDescriptorSchema } from '@workspace/contracts'
@@ -9,7 +10,7 @@ import { createObservedInProcessClient } from '../../../../test/client'
 import { scopeAddressEnvironment } from '../../../../test/factories/address-environment'
 import { registerTestWorkspaceAddress } from '../../../../test/factories/workspace-address'
 import {
-  editorTabPaths,
+  editorTabContents,
   waitForNavigation,
   renderAddressHarness,
   seedWorkspaceCache,
@@ -53,7 +54,9 @@ test('an empty browser opens the exact shared checkout while recent-folder reads
       }),
     )
     await waitForNavigation(rendered.navigation)
-    expect(editorTabPaths(rendered.harness.workspace)).toEqual(['projects/platform/shared.ts'])
+    expect(editorTabContents(rendered.harness.workspace)).toEqual(
+      testTabContents(['projects/platform/shared.ts']),
+    )
     expect(requests).toContain(`/fs/workspace-address/${target.id}`)
     expect(rendered.navigation.router.history.location.pathname).toBe(
       `/~${workspaceToken(target)}/workbench/f/shared.ts`,
@@ -94,7 +97,9 @@ test('changing the readable name never redirects a shared link to a remembered c
       expect(rendered.harness.workspace.getState().rootFolder?.workspaceAddress).toEqual(target),
     )
     await waitForNavigation(rendered.navigation)
-    expect(editorTabPaths(rendered.harness.workspace)).toEqual(['projects/platform/shared.ts'])
+    expect(editorTabContents(rendered.harness.workspace)).toEqual(
+      testTabContents(['projects/platform/shared.ts']),
+    )
     expect(rendered.navigation.router.history.location.pathname).toBe(
       `/~${workspaceToken(target)}/workbench/f/shared.ts`,
     )
@@ -135,7 +140,9 @@ test('an alias shares the canonical workspace ID and restores files under the ca
       }),
     )
     await waitForNavigation(rendered.navigation)
-    expect(editorTabPaths(rendered.harness.workspace)).toEqual(['projects/platform/shared.ts'])
+    expect(editorTabContents(rendered.harness.workspace)).toEqual(
+      testTabContents(['projects/platform/shared.ts']),
+    )
     expect(rendered.navigation.router.history.location.pathname).toBe(
       `/~${workspaceToken(canonical)}/workbench/f/shared.ts`,
     )

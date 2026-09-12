@@ -1,3 +1,4 @@
+import { filesystemPath } from '@/lib/documents/utils/identity'
 import { Button } from '@workspace/ui/components/button'
 
 import { SearchPane } from '@/features/workspace/components/search-pane'
@@ -52,11 +53,11 @@ export function ToolPane({
         conflicts={conflicts}
         gitFiles={gitFiles}
         panels={workbenchPanels}
-        rootPath={rootPath}
+        rootPath={filesystemPath(rootPath)}
       />
     )
   }
-  if (tab === 'files') return <FileNavigatorPanel rootPath={toolRoot} />
+  if (tab === 'files') return <FileNavigatorPanel rootPath={filesystemPath(toolRoot)} />
   if (tab === 'git') return gitToolPane(toolRoot, diffScope)
   if (tab === 'logs') {
     return (
@@ -132,7 +133,11 @@ function gitToolPane(rootPath: string, diffScope: SessionDiffScopeState) {
         })}
       </div>
       <div className='min-h-0 min-w-0 flex-1 overflow-hidden'>
-        {scope.kind === 'turn' ? turnScopeBody(diffScope) : <GitPanel rootPath={rootPath} />}
+        {scope.kind === 'turn' ? (
+          turnScopeBody(diffScope)
+        ) : (
+          <GitPanel rootPath={filesystemPath(rootPath)} />
+        )}
       </div>
     </section>
   )

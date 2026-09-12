@@ -1,3 +1,4 @@
+import type { FilesystemPath } from '@/lib/documents/utils/types'
 import {
   ResizableHandle,
   ResizablePanel,
@@ -37,7 +38,7 @@ export function WorkbenchLayout({
   readonly gitFiles: readonly FileStatus[]
   readonly layout: WorkbenchLayout
   readonly panels: WorkbenchPanels
-  readonly rootPath: string
+  readonly rootPath: FilesystemPath
   readonly onLayoutChange: (layout: WorkbenchLayout) => void
 }) {
   function handleOuterLayoutChanged(next: Record<string, number>) {

@@ -1,3 +1,5 @@
+import { testTabContent } from '../../../../../test/factories/document-targets'
+import { tabId } from '@/lib/documents/utils/identity'
 import { fireEvent, screen } from '@testing-library/react'
 import { vi } from 'vitest'
 
@@ -112,7 +114,7 @@ function TestEditorTabs({
           selectTab: onSelectTab,
         }}
       >
-        <EditorTabBar loadingTabId={loadingTabId} tabs={tabs} />
+        <EditorTabBar loadingTabId={loadingTabId ? tabId(loadingTabId) : null} tabs={tabs} />
       </EditorTabActionsContext>
     </EditorStateProvider>
   )
@@ -149,9 +151,9 @@ function editorTab({
     diffStatus: null,
     diffSuffix: '',
     icon: { name: 'typescript', src: '' },
-    id,
+    id: tabId(id),
     name,
-    path,
+    content: testTabContent(path),
     title: path,
   }
 }

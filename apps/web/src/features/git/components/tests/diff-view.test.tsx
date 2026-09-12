@@ -1,3 +1,4 @@
+import { filesystemPath } from '@/lib/documents/utils/identity'
 import { execFileSync } from 'node:child_process'
 import { mkdir, writeFile } from 'node:fs/promises'
 import path from 'node:path'
@@ -9,12 +10,7 @@ import { TestEditorStateProvider as EditorStateProvider } from '../../../../../t
 import { fetchDiff } from '@/features/git/utils/api'
 import { fetchBlobDiff } from '@/features/git/utils/blob-diff-query'
 import { DiffView } from '@/features/git/components/diff-view'
-import { parseDiffDocumentId, snapshotDiffDocumentId } from '@/features/git/utils/diff-document'
-import type {
-  DiffDocumentInfo,
-  SnapshotDiffDocumentInput,
-} from '@/features/git/utils/diff-document'
-import type { FileDiff } from '@/features/git/utils/types'
+import { snapshotComparison } from '../../../../../test/factories/git-diff'
 import { editorDiffFiles } from '@workspace/client-core/git/diff-files'
 import { testDiffLanguageHost } from '../../../../../test/factories/diff-language-host'
 import { gitFileDiff } from '../../../../../test/factories/git-diff'
@@ -75,9 +71,9 @@ test('keeps the diff editor mounted with an empty model while the blob resolves'
 
   const { container } = renderDiffView(
     <DiffView
-      documentInfo={snapshotDocument(diff!)}
+      comparison={snapshotComparison(diff!)}
       languageHost={testDiffLanguageHost}
-      rootPath='repo'
+      rootPath={filesystemPath('repo')}
     />,
   )
 
@@ -133,9 +129,9 @@ test('a pure rename shows the file, with a line saying where it came from', asyn
 
   renderDiffView(
     <DiffView
-      documentInfo={snapshotDocument(diff)}
+      comparison={snapshotComparison(diff)}
       languageHost={testDiffLanguageHost}
-      rootPath='repo'
+      rootPath={filesystemPath('repo')}
     />,
   )
 
@@ -177,13 +173,17 @@ test('a binary file says so instead of rendering an empty pane', async ({ client
   const repo = await initRepo(server.root)
   await writeFile(path.join(repo, 'logo.png'), Buffer.from([0, 1, 2, 0, 3, 255, 0, 9]))
   const objectId = git(repo, 'hash-object', '-w', 'logo.png').trim()
-  const documentInfo = snapshotDocument({
+  const documentInfo = snapshotComparison({
     ...gitFileDiff({ path: 'repo/logo.png' }),
     newObjectId: objectId,
   })
 
   renderDiffView(
-    <DiffView documentInfo={documentInfo} languageHost={testDiffLanguageHost} rootPath='repo' />,
+    <DiffView
+      comparison={documentInfo}
+      languageHost={testDiffLanguageHost}
+      rootPath={filesystemPath('repo')}
+    />,
   )
 
   expect(await screen.findByText(/Binary file/)).toBeInTheDocument()
@@ -196,13 +196,17 @@ test('a document whose two sides are identical still shows the file', async ({
   void client
   const repo = await initRepo(server.root)
   const objectId = git(repo, 'rev-parse', 'HEAD:lines.ts').trim()
-  const documentInfo = snapshotDocument({
+  const documentInfo = snapshotComparison({
     ...gitFileDiff({ oldObjectId: objectId, path: 'repo/lines.ts' }),
     newObjectId: objectId,
   })
 
   renderDiffView(
-    <DiffView documentInfo={documentInfo} languageHost={testDiffLanguageHost} rootPath='repo' />,
+    <DiffView
+      comparison={documentInfo}
+      languageHost={testDiffLanguageHost}
+      rootPath={filesystemPath('repo')}
+    />,
   )
 
   expect(await screen.findByText('No content changes')).toBeInTheDocument()
@@ -219,13 +223,6 @@ function renderDiffView(ui: ReactElement) {
 
 function twoEditFile() {
   return `${FORTY_LINES.replace('line 2\n', 'line two\n').replace('line 35\n', 'thirty five\n')}\n`
-}
-
-function snapshotDocument(diff: FileDiff): DiffDocumentInfo {
-  const info = parseDiffDocumentId(snapshotDiffDocumentId(diff as SnapshotDiffDocumentInput))
-  expect(info).not.toBeNull()
-
-  return info!
 }
 
 async function initRepo(root: string) {

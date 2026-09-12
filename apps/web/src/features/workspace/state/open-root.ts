@@ -1,3 +1,5 @@
+import { filesystemPath } from '@/lib/documents/utils/identity'
+import type { FilesystemPath } from '@/lib/documents/utils/types'
 import { confirmedEnvironmentId } from '@/lib/environments/state/domain'
 import type { QueryClient } from '@tanstack/react-query'
 import type { EditorApplyActions } from '@/features/editor/state/apply-actions'
@@ -45,7 +47,12 @@ export async function openWorkspaceRootForOwner(
 
   try {
     confirmedEnvironmentId(origin)
-    const result = await openWorkspaceRootPath(workspaceRoot, generation, activity, client)
+    const result = await openWorkspaceRootPath(
+      filesystemPath(workspaceRoot),
+      generation,
+      activity,
+      client,
+    )
     // A later request already claimed the app; landing now would drag it back.
     if (
       activity.aborted ||
@@ -93,7 +100,7 @@ export async function openWorkspaceRootForOwner(
 }
 
 /** Trails the open: a lost recency stamp is a worse menu, never a failed switch. */
-async function recordRootAsRecent(queryClient: QueryClient, workspaceRoot: string) {
+async function recordRootAsRecent(queryClient: QueryClient, workspaceRoot: FilesystemPath) {
   try {
     await recordRecentEntry(workspaceRoot, clientForQueryClient(queryClient))
   } catch {

@@ -1,3 +1,4 @@
+import { filesystemPath } from '@/lib/documents/utils/identity'
 import { createEditorBufferSession } from '@singapor/core'
 import { QueryClient } from '@tanstack/react-query'
 import { healthDescriptorSchema } from '@workspace/contracts'
@@ -38,8 +39,8 @@ test('offline A refuses saves without changing its buffer while B saves through 
       writeFile(join(serverB.root, 'same.txt'), 'B'),
     ])
     const [fileA, fileB] = await Promise.all([
-      fetchFile('same.txt', new AbortController().signal, client),
-      fetchFile('same.txt', new AbortController().signal, clientB),
+      fetchFile(filesystemPath('same.txt'), new AbortController().signal, client),
+      fetchFile(filesystemPath('same.txt'), new AbortController().signal, clientB),
     ])
     const documentA = documentsA.getState().ensureLiveEditorDocument(fileA)
     const documentB = documentsB.getState().ensureLiveEditorDocument(fileB)
@@ -110,7 +111,7 @@ test('retrying a cached owner refuses saves until its connection becomes live', 
   const saves = new FileSyncService(documents, queries)
   try {
     await writeFile(join(server.root, 'cached.txt'), 'cached')
-    const file = await fetchFile('cached.txt', new AbortController().signal, client)
+    const file = await fetchFile(filesystemPath('cached.txt'), new AbortController().signal, client)
     const document = documents.getState().ensureLiveEditorDocument(file)
     createEditorBufferSession(document.buffer).applyText(' edited')
     const environments = useEnvironmentsStore.getState()

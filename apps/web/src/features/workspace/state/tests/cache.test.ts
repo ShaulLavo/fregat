@@ -1,19 +1,28 @@
+import { decodeTabContent } from '@/lib/documents/utils/storage-codec'
+import { TEST_SESSION_ID } from '../../../../../test/factories/chat'
+import { filesystemPath, tabId, workspaceRoot } from '@/lib/documents/utils/identity'
+import { documentTab, settingsTab } from '@/lib/documents/utils/tabs'
+import type { TabContent } from '@/lib/documents/utils/types'
 import { testScopedStorage } from '../../../../../test/factories/scoped-storage'
 import { testWorkspaceAddress } from '../../../../../test/factories/workspace-address'
+import {
+  documentTargets,
+  DOCUMENT_TARGET_CASES,
+  DOCUMENT_OLD_OBJECT_ID,
+  DOCUMENT_NEW_OBJECT_ID,
+  testTabContent,
+  testScrollPositions,
+  INTERNAL_SETTINGS_DOCUMENT_IDS,
+  INVALID_DOCUMENT_IDS,
+  INVALID_SETTINGS_SURFACE_IDS,
+} from '../../../../../test/factories/document-targets'
 import { afterEach, beforeEach, describe } from 'vitest'
 import { expect, test as it } from '../../../../../test/fixtures'
 
 import type { PickedFsEntry } from '@/lib/file-system-types'
-import { conflictDiffDocumentId } from '@/features/editor/utils/conflict-diff-document'
-import { settingsDocumentId } from '@/features/settings/utils/document'
-import { refDocumentId } from '@/features/git/utils/ref-document'
-import { compareSavedDocumentId } from '@/features/editor/utils/compare-saved-document'
-import { snapshotDiffDocumentId } from '@/features/git/utils/diff-document'
-import type { FileDiff } from '@/features/git/utils/types'
-import { searchBufferDocumentId } from '@/features/search/utils/buffer-document'
 import {
   createDefaultWorkbenchPanels,
-  openEditorPathInWorkbenchPanels,
+  openEditorContentInWorkbenchPanels,
   setWorkbenchBottomTab,
   setWorkbenchSidebarTab,
 } from '@/features/workbench/utils/panels'
@@ -59,131 +68,243 @@ describe('workspace cache', () => {
     delete (globalThis as { localStorage?: Storage }).localStorage
   })
 
-  it('persists every durable editor tab through the same ordered collection and selection', () => {
-    const paths = [
-      '/repo/main.ts',
-      settingsDocumentId(),
-      searchBufferDocumentId('/repo'),
-      refDocumentId({ path: '/repo/main.ts', ref: 'HEAD' }),
-      compareSavedDocumentId('/repo/main.ts'),
-    ]
+  it.each(['', '/repo/nested'])(
+    'uses one admission rule for every collection at root %s',
+    (rootPath) => {
+      const filePath = rootPath === '' ? 'src/a.ts' : '/repo/nested/src/a.ts'
+      const admitted = [
+        testTabContent(filePath, rootPath),
+        settingsTab(),
+        documentTab({ kind: 'search', root: workspaceRoot(rootPath) }),
+      ]
+      const rejected = [
+        testTabContent(documentTargets.conflict),
+        testTabContent('/other/a.ts'),
+        documentTab({ kind: 'search', root: workspaceRoot('/other') }),
+      ]
+      const contents = [...admitted, ...rejected]
+      writeRootFolderCache(testScopedStorage, pickedDirectory(rootPath))
+      writeWorkspaceSliceCache(testScopedStorage, rootPath, {
+        editorHistory: contents,
+        recentlyClosedTabs: contents,
+        reopenScrollPositions: contents.map((content) => ({
+          content,
+          position: { left: 4, top: 80 },
+        })),
+        workbenchPanels: panelsForContents(contents, admitted[2]!),
+      })
+      const restored = readWorkspaceCache(testScopedStorage).workspaces[rootPath]
+      expect(restored?.editorHistory).toEqual(admitted)
+      expect(restored?.recentlyClosedTabs).toEqual(admitted)
+      expect(restored?.workbenchPanels.editorTabs.map((tab) => tab.content)).toEqual(admitted)
+      expect(restored?.reopenScrollPositions).toEqual(
+        admitted.map((content) => ({ content, position: { left: 4, top: 80 } })),
+      )
+    },
+  )
+
+  it.each([
+    ...INVALID_DOCUMENT_IDS,
+    ...INVALID_SETTINGS_SURFACE_IDS,
+    ...INTERNAL_SETTINGS_DOCUMENT_IDS,
+  ])('rejects untyped reserved content %s from stored history', (path) => {
+    writeRootFolderCache(testScopedStorage, pickedDirectory(''))
+    testScopedStorage.setItem(
+      workspaceSliceStorageKey(''),
+      JSON.stringify({ ...emptyWorkspaceSlice(), editorHistory: [path] }),
+    )
+    expect(readWorkspaceCache(testScopedStorage).workspaces['']?.editorHistory).toEqual([])
+    expect(testScopedStorage.getItem(workspaceSliceStorageKey(''))).toBeNull()
+  })
+
+  it.each([documentTargets.checkpointSession, documentTargets.checkpointTurn])(
+    'persists multi-file checkpoint %s under its workspace owner',
+    (path) => {
+      const rootPath = '/repo/nested'
+      const content = testTabContent(path, rootPath)
+      const slice: CachedWorkspaceSlice = {
+        editorHistory: [content],
+        recentlyClosedTabs: [content],
+        reopenScrollPositions: [{ content, position: { left: 4, top: 80 } }],
+        workbenchPanels: panelsForContents([content], content),
+      }
+      writeRootFolderCache(testScopedStorage, pickedDirectory(rootPath))
+      writeWorkspaceSliceCache(testScopedStorage, rootPath, slice)
+      expect(readWorkspaceCache(testScopedStorage).workspaces[rootPath]).toEqual(slice)
+      writeWorkspaceSliceCache(testScopedStorage, '/other', slice)
+      writeWorkspaceIndexCache(testScopedStorage, [rootPath, '/other'])
+      expect(readWorkspaceCache(testScopedStorage).workspaces['/other']).toEqual(
+        emptyWorkspaceSlice(),
+      )
+    },
+  )
+
+  it('keeps duplicate tab IDs and selection while projecting scroll per content', () => {
+    const file = testTabContent(documentTargets.file)
+    const comparison = testTabContent(documentTargets.savedComparison)
+    const slice: CachedWorkspaceSlice = {
+      editorHistory: [file, settingsTab()],
+      recentlyClosedTabs: [comparison],
+      reopenScrollPositions: [
+        { content: file, position: { left: 8, top: 320 } },
+        { content: settingsTab(), position: { left: 0, top: 40 } },
+      ],
+      workbenchPanels: {
+        ...createDefaultWorkbenchPanels(),
+        activeEditorTabId: tabId('duplicate-2'),
+        editorTabs: [
+          { id: tabId('duplicate-1'), content: file },
+          { id: tabId('duplicate-2'), content: file },
+        ],
+      },
+    }
     writeRootFolderCache(testScopedStorage, pickedDirectory('/repo'))
-    for (const selected of paths) {
-      const panels = workbenchPanelsForPaths(paths, selected)
+    writeWorkspaceSliceCache(testScopedStorage, '/repo', slice)
+    expect(readWorkspaceCache(testScopedStorage).workspaces['/repo']).toEqual(slice)
+    expect(cachedSlice('/repo')).toMatchObject({
+      reopenScrollPositions: [
+        {
+          content: { kind: 'document', document: { kind: 'file', relativePath: 'src/a.ts' } },
+          position: { left: 8, top: 320 },
+        },
+        { content: { kind: 'settings' }, position: { left: 0, top: 40 } },
+      ],
+      recentlyClosedTabs: [
+        { kind: 'document', document: { kind: 'compare-saved', file: { path: '/repo/src/a.ts' } } },
+      ],
+    })
+  })
+
+  it('persists every durable editor tab through the same ordered collection and selection', () => {
+    const contents = DOCUMENT_TARGET_CASES.filter(
+      (entry) => entry.rootPath === '/repo' && entry.kind !== 'conflict',
+    ).map((entry) => testTabContent(entry.path, entry.rootPath))
+    writeRootFolderCache(testScopedStorage, pickedDirectory('/repo'))
+    for (const selected of contents) {
+      const panels = panelsForContents(contents, selected)
       writeWorkspaceSliceCache(testScopedStorage, '/repo', {
         ...emptyWorkspaceSlice(),
         workbenchPanels: panels,
-        recentlyClosedEditorPaths: paths,
+        recentlyClosedTabs: contents,
       })
       const restored = readWorkspaceCache(testScopedStorage).workspaces['/repo']!
       expect(restored.workbenchPanels).toEqual(panels)
-      expect(restored.recentlyClosedEditorPaths).toEqual(paths)
+      expect(restored.recentlyClosedTabs).toEqual(contents)
     }
   })
 
-  it('persists git diff tabs when their backing file is in the workspace', () => {
-    const diffPath = snapshotDiffDocumentId(snapshotDiff('/repo/src/app.ts'))
-
-    writeRootFolderCache(testScopedStorage, pickedDirectory('/repo'))
-    writeWorkspaceSliceCache(testScopedStorage, '/repo', {
-      editorHistory: [diffPath, '/repo/src/readme.md'],
-      recentlyClosedEditorPaths: ['/repo/src/closed.ts'],
-      scrollPositionByPath: {},
-      workbenchPanels: workbenchPanelsForPaths(['/repo/src/readme.md', diffPath], diffPath),
-    })
-    writeWorkspaceIndexCache(testScopedStorage, ['/repo'])
-
-    expect(readWorkspaceCache(testScopedStorage).workspaces['/repo']).toMatchObject({
-      editorHistory: [diffPath, '/repo/src/readme.md'],
-      recentlyClosedEditorPaths: ['/repo/src/closed.ts'],
-    })
-    // Stored file paths are workspace-relative. A diff document id is not a workspace
-    // path, so it is stored whole — its portable form is an address token, not a slice.
-    expect(cachedSlice('/repo').workbenchPanels.editorTabs.map((tab) => tab.path)).toEqual([
-      './src/readme.md',
-      diffPath,
-    ])
-  })
-
-  it('restores files and synthetic tabs at the configured filesystem root', () => {
-    const diffPath = snapshotDiffDocumentId(snapshotDiff('src/app.ts'))
-    const searchPath = searchBufferDocumentId('')
-    writeRootFolderCache(testScopedStorage, pickedDirectory(''))
-    writeWorkspaceSliceCache(testScopedStorage, '', {
-      ...emptyWorkspaceSlice(),
-      editorHistory: ['src/app.ts', diffPath, searchPath, 'settings:', '/outside.ts'],
-      workbenchPanels: workbenchPanelsForPaths(['src/app.ts', diffPath, searchPath], diffPath),
-    })
-
-    expect(readWorkspaceCache(testScopedStorage).workspaceOrder).toEqual([''])
-    expect(readWorkspaceCache(testScopedStorage).workspaces['']?.editorHistory).toEqual([
-      'src/app.ts',
-      diffPath,
-      searchPath,
-      'settings:',
-    ])
-    expect(cachedSlice('').workbenchPanels.editorTabs.map((tab) => tab.path)).toEqual([
-      './src/app.ts',
-      diffPath,
-      searchPath,
-    ])
-  })
-
-  it('filters paths that belong to another workspace out of the slice that owns them', () => {
-    const diffPath = snapshotDiffDocumentId(snapshotDiff('/other/src/app.ts'))
-
-    writeWorkspaceSliceCache(testScopedStorage, '/repo', {
-      editorHistory: [diffPath, conflictDiffDocumentId('conflict-1')],
-      recentlyClosedEditorPaths: ['/other/src/closed.ts'],
-      scrollPositionByPath: {},
-      workbenchPanels: workbenchPanelsForPaths([diffPath, '/repo/src/a.ts'], diffPath),
-    })
-
-    expect(cachedSlice('/repo')).toMatchObject({
-      editorHistory: [],
-      recentlyClosedEditorPaths: [],
-    })
-    expect(cachedSlice('/repo').workbenchPanels.editorTabs.map((tab) => tab.path)).toEqual([
-      './src/a.ts',
-    ])
-  })
-
-  it('persists scroll positions for workspace paths only', () => {
-    writeWorkspaceSliceCache(testScopedStorage, '/repo', {
-      ...emptyWorkspaceSlice(),
-      scrollPositionByPath: {
-        '/other/src/elsewhere.ts': { left: 0, top: 40 },
-        '/repo/src/app.ts': { left: 8, top: 320 },
+  it('preserves an explicitly empty comparison side when the other side names a snapshot', () => {
+    const content = documentTab({
+      kind: 'git-diff',
+      source: {
+        kind: 'snapshot',
+        path: filesystemPath('/repo/a.ts'),
+        oldObjectId: '',
+        newObjectId: DOCUMENT_NEW_OBJECT_ID,
       },
     })
-
-    expect(cachedSlice('/repo').scrollPositionByPath).toEqual({
-      './src/app.ts': { left: 8, top: 320 },
-    })
+    const slice: CachedWorkspaceSlice = { ...emptyWorkspaceSlice(), editorHistory: [content] }
+    writeRootFolderCache(testScopedStorage, pickedDirectory('/repo'))
+    writeWorkspaceSliceCache(testScopedStorage, '/repo', slice)
+    expect(readWorkspaceCache(testScopedStorage).workspaces['/repo']).toEqual(slice)
   })
 
-  it('keeps a search editor tab only for the workspace it searches', () => {
-    writeWorkspaceSliceCache(testScopedStorage, '/repo', {
-      ...emptyWorkspaceSlice(),
-      editorHistory: [searchBufferDocumentId('/repo'), searchBufferDocumentId('/other')],
-    })
-
-    expect(cachedSlice('/repo').editorHistory).toEqual([searchBufferDocumentId('/repo')])
+  it.each([
+    { kind: 'settings', path: 'unexpected' },
+    { kind: 'document', document: { kind: 'settings-json', target: 'user' } },
+    { kind: 'document', document: { kind: 'file', relativePath: '../outside.ts' } },
+    { kind: 'document', document: { kind: 'file', relativePath: '/outside.ts' } },
+    { kind: 'document', document: { kind: 'git-ref', source: { path: '/repo/a.ts', ref: '' } } },
+    {
+      kind: 'document',
+      document: { kind: 'git-diff', source: { kind: 'snapshot', path: '/repo/a.ts' } },
+    },
+    {
+      kind: 'document',
+      document: {
+        kind: 'git-diff',
+        source: {
+          kind: 'checkpoint-session',
+          owner: '/repo',
+          sessionId: TEST_SESSION_ID,
+          fromTurnCount: 2,
+          toTurnCount: 1,
+        },
+      },
+    },
+  ])('rejects malformed stored descriptors without creating a document: %j', (stored) => {
+    expect(decodeTabContent(stored, workspaceRoot('/repo'))).toBeNull()
   })
 
-  // The filter runs in both directions and only understands absolute paths, so
-  // relativizing inside it would make every restored path fail the workspace test and
-  // empty the slice on the first reload — silently, since an empty-but-valid slice is
-  // not a schema miss. This is the test that fails if the two directions are ever fused.
-  it('restores a written slice unchanged, with every path absolute again', () => {
+  it('stores ordinary files relatively while preserving comparison metadata', () => {
+    const file = testTabContent('/repo/src/readme.md')
+    const comparison = testTabContent(documentTargets.snapshot)
+    writeRootFolderCache(testScopedStorage, pickedDirectory('/repo'))
     const slice: CachedWorkspaceSlice = {
-      editorHistory: ['/repo/src/a.ts', '/repo/src/b.ts'],
-      recentlyClosedEditorPaths: ['/repo/src/closed.ts'],
-      scrollPositionByPath: { '/repo/src/a.ts': { left: 8, top: 320 } },
-      workbenchPanels: workbenchPanelsForPaths(
-        ['/repo/src/a.ts', '/repo/src/b.ts'],
-        '/repo/src/b.ts',
-      ),
+      editorHistory: [comparison, file],
+      recentlyClosedTabs: [file],
+      reopenScrollPositions: [],
+      workbenchPanels: panelsForContents([file, comparison], comparison),
+    }
+    writeWorkspaceSliceCache(testScopedStorage, '/repo', slice)
+    expect(readWorkspaceCache(testScopedStorage).workspaces['/repo']).toEqual(slice)
+    expect(cachedSlice('/repo')).toMatchObject({
+      workbenchPanels: {
+        editorTabs: [
+          {
+            content: {
+              kind: 'document',
+              document: { kind: 'file', relativePath: 'src/readme.md' },
+            },
+          },
+          {
+            content: {
+              kind: 'document',
+              document: {
+                kind: 'git-diff',
+                source: {
+                  kind: 'snapshot',
+                  path: '/repo/src/a.ts',
+                  oldPath: '/repo/src/old.ts',
+                  oldObjectId: DOCUMENT_OLD_OBJECT_ID,
+                  newObjectId: DOCUMENT_NEW_OBJECT_ID,
+                  status: 'renamed',
+                },
+              },
+            },
+          },
+        ],
+      },
+    })
+  })
+
+  it('rejects another workspace source even when the tab is selected', () => {
+    const foreign = testTabContent(documentTargets.snapshot)
+    const file = testTabContent('/other/src/a.ts')
+    writeRootFolderCache(testScopedStorage, pickedDirectory('/other'))
+    writeWorkspaceSliceCache(testScopedStorage, '/other', {
+      editorHistory: [foreign],
+      recentlyClosedTabs: [foreign],
+      reopenScrollPositions: [{ content: foreign, position: { left: 0, top: 40 } }],
+      workbenchPanels: panelsForContents([foreign, file], foreign),
+    })
+    const restored = readWorkspaceCache(testScopedStorage).workspaces['/other']!
+    expect(restored.editorHistory).toEqual([])
+    expect(restored.recentlyClosedTabs).toEqual([])
+    expect(restored.reopenScrollPositions).toEqual([])
+    expect(restored.workbenchPanels.editorTabs.map((tab) => tab.content)).toEqual([file])
+    expect(restored.workbenchPanels.activeEditorTabId).toBe(
+      restored.workbenchPanels.editorTabs[0]?.id,
+    )
+  })
+
+  it('restores a written slice and its workspace identity unchanged', () => {
+    const contents = [testTabContent('/repo/src/a.ts'), testTabContent('/repo/src/b.ts')]
+    const slice: CachedWorkspaceSlice = {
+      editorHistory: contents,
+      recentlyClosedTabs: [testTabContent('/repo/src/closed.ts')],
+      reopenScrollPositions: testScrollPositions({ '/repo/src/a.ts': { left: 8, top: 320 } }),
+      workbenchPanels: panelsForContents(contents, contents[1]!),
     }
 
     const workspaceAddress = testWorkspaceAddress('/repo')
@@ -227,9 +348,11 @@ describe('workspace cache', () => {
       workbenchPanels: panels,
     })
 
-    expect(cachedSlice('/repo').workbenchPanels).toMatchObject({
-      activeBottomTab: 'problems',
-      activeSidebarTab: 'git',
+    expect(cachedSlice('/repo')).toMatchObject({
+      workbenchPanels: {
+        activeBottomTab: 'problems',
+        activeSidebarTab: 'git',
+      },
     })
   })
 
@@ -248,9 +371,9 @@ describe('workspace cache', () => {
     const cached = readWorkspaceCache(testScopedStorage)
 
     expect(cached.workspaceOrder).toEqual(['/repo', '/other'])
-    expect(cached.workspaces['/other']?.workbenchPanels.editorTabs.map((tab) => tab.path)).toEqual([
-      '/other/src/b.ts',
-    ])
+    expect(
+      cached.workspaces['/other']?.workbenchPanels.editorTabs.map((tab) => tab.content),
+    ).toEqual([testTabContent('/other/src/b.ts')])
   })
 
   it('leads with the open root even when the index has not caught up', () => {
@@ -263,7 +386,7 @@ describe('workspace cache', () => {
   it('deletes the storage of projects that fall off the index', () => {
     writeWorkspaceSliceCache(testScopedStorage, '/other', {
       ...emptyWorkspaceSlice(),
-      editorHistory: ['/other/src/b.ts'],
+      editorHistory: [testTabContent('/other/src/b.ts')],
     })
     writeSearchBufferCache(testScopedStorage, '/other', emptySearchBuffer('/other'))
     writeEditorVisibleSnapshotCache(testScopedStorage, cachedEditorVisibleSnapshot('/other'))
@@ -327,7 +450,7 @@ describe('workspace cache', () => {
     writeRootFolderCache(testScopedStorage, pickedDirectory('/repo'))
     writeWorkspaceSliceCache(testScopedStorage, '/repo', {
       ...emptyWorkspaceSlice(),
-      editorHistory: ['/repo/src/readme.md'],
+      editorHistory: [testTabContent('/repo/src/readme.md')],
     })
     writeWorkspaceIndexCache(testScopedStorage, ['/repo'])
     testScopedStorage.setItem(
@@ -339,7 +462,9 @@ describe('workspace cache', () => {
 
     expect(scopedHas(searchBufferStorageKey('/repo'))).toBe(false)
     expect(cached.searchBuffers).toEqual({})
-    expect(cached.workspaces['/repo']?.editorHistory).toEqual(['/repo/src/readme.md'])
+    expect(cached.workspaces['/repo']?.editorHistory).toEqual([
+      testTabContent('/repo/src/readme.md'),
+    ])
   })
 
   it('keeps a project’s tabs when its search results are too big to write', () => {
@@ -351,7 +476,7 @@ describe('workspace cache', () => {
     writeRootFolderCache(testScopedStorage, pickedDirectory('/repo'))
     writeWorkspaceSliceCache(testScopedStorage, '/repo', {
       ...emptyWorkspaceSlice(),
-      editorHistory: ['/repo/src/readme.md'],
+      editorHistory: [testTabContent('/repo/src/readme.md')],
     })
     writeSearchBufferCache(testScopedStorage, '/repo', emptySearchBuffer('/repo'))
     writeWorkspaceIndexCache(testScopedStorage, ['/repo'])
@@ -359,7 +484,9 @@ describe('workspace cache', () => {
     const cached = readWorkspaceCache(testScopedStorage)
 
     expect(cached.searchBuffers).toEqual({})
-    expect(cached.workspaces['/repo']?.editorHistory).toEqual(['/repo/src/readme.md'])
+    expect(cached.workspaces['/repo']?.editorHistory).toEqual([
+      testTabContent('/repo/src/readme.md'),
+    ])
   })
 
   it('keeps workspace-independent entries in their own keys', () => {
@@ -382,21 +509,8 @@ describe('workspace cache', () => {
   })
 })
 
-function cachedSlice(rootPath: string): CachedWorkspaceSlice {
-  return JSON.parse(
-    testScopedStorage.getItem(workspaceSliceStorageKey(rootPath)) ?? 'null',
-  ) as CachedWorkspaceSlice
-}
-
-function snapshotDiff(path: string): FileDiff & { newObjectId: string; oldObjectId: string } {
-  return {
-    hunks: [],
-    newObjectId: 'b'.repeat(40),
-    oldObjectId: 'a'.repeat(40),
-    patch: '',
-    path,
-    staged: false,
-  }
+function cachedSlice(rootPath: string): unknown {
+  return JSON.parse(testScopedStorage.getItem(workspaceSliceStorageKey(rootPath)) ?? 'null')
 }
 
 function pickedDirectory(path: string): PickedFsEntry {
@@ -404,7 +518,7 @@ function pickedDirectory(path: string): PickedFsEntry {
     birthtimeMs: 1,
     mtimeMs: 1,
     name: 'repo',
-    path,
+    path: filesystemPath(path),
     size: 1,
     type: 'directory',
     version: 'test:1:1',
@@ -487,10 +601,11 @@ function cachedEditorVisibleSnapshot(rootPath: string): CachedEditorVisibleSnaps
 
 function workbenchPanelsForPaths(paths: readonly string[], activePath: string | null) {
   let panels = createDefaultWorkbenchPanels()
-  for (const path of paths) panels = openEditorPathInWorkbenchPanels(panels, path)
+  for (const path of paths)
+    panels = openEditorContentInWorkbenchPanels(panels, testTabContent(path))
   if (!activePath) return panels
 
-  return openEditorPathInWorkbenchPanels(panels, activePath)
+  return openEditorContentInWorkbenchPanels(panels, testTabContent(activePath))
 }
 
 type FakeLocalStorageOptions = {
@@ -518,4 +633,10 @@ function fakeLocalStorage(options: FakeLocalStorageOptions = {}) {
 
 function scopedHas(key: string) {
   return testScopedStorage.getItem(key) !== null
+}
+
+function panelsForContents(contents: readonly TabContent[], active: TabContent) {
+  let panels = createDefaultWorkbenchPanels()
+  for (const content of contents) panels = openEditorContentInWorkbenchPanels(panels, content)
+  return openEditorContentInWorkbenchPanels(panels, active)
 }

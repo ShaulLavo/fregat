@@ -3,7 +3,7 @@ import { reportError, toClientError } from '@/lib/client-error-taxonomy'
 import * as v from 'valibot'
 
 // Local-only UI cache versions are dropped on mismatch, never migrated.
-export const WORKSPACE_CACHE_VERSION = 20
+export const WORKSPACE_CACHE_VERSION = 21
 export const WORKSPACE_CACHE_STORAGE_PREFIX = `platform.workspace-state.v${WORKSPACE_CACHE_VERSION}`
 export const WORKSPACE_CACHE_STORAGE_NAMESPACE = 'platform.workspace-state.v'
 

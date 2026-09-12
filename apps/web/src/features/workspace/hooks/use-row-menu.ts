@@ -1,3 +1,4 @@
+import { filesystemPath } from '@/lib/documents/utils/identity'
 import type { FileTreeContextMenuItem, FileTreeContextMenuOpenContext } from '@workspace/tree'
 import { containerTreePath, entryName } from '@/features/workspace/utils/entry-paths'
 import { rowGitActions, treeRowMenu } from '@/features/workspace/utils/row-menu'
@@ -64,7 +65,11 @@ export function useRowMenu({
     relativePath: treePath,
     rename: () => startInlineEdit(() => actions.renameEntry(item.path)),
     requestDelete: () =>
-      actions.requestDelete({ isDirectory, name: entryName(treePath), path: path ?? '' }),
+      actions.requestDelete({
+        isDirectory,
+        name: entryName(treePath),
+        path: path ?? filesystemPath(''),
+      }),
     stage: () => stage.mutate(),
     unstage: () => unstage.mutate(),
   })

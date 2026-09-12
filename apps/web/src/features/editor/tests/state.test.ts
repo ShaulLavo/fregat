@@ -1,3 +1,14 @@
+import {
+  testContentMatches,
+  testTabContents,
+  testNullableTabContent,
+  testTabContent,
+  testDocumentKey,
+  testScrollPositions,
+  testDocumentRef,
+  documentTargets,
+} from '../../../../test/factories/document-targets'
+import { filesystemPath, tabId as testTabId } from '@/lib/documents/utils/identity'
 import { createDefaultWorkbenchLayout } from '@/features/workbench/utils/layout'
 import { createDefaultChatModePanels } from '@/features/chat-mode/utils/panels'
 import { QueryClient } from '@tanstack/react-query'
@@ -6,9 +17,8 @@ import {
   type EditorPreparedDocument,
   type EditorTextBuffer,
 } from '@singapor/core'
-import { describe, it, vi } from 'vitest'
+import { describe, vi } from 'vitest'
 import { expect, test } from '../../../../test/fixtures'
-
 import {
   createEditorActivation,
   createEditorApplyActions,
@@ -16,11 +26,10 @@ import {
 import { createEditorDocumentStore } from '@/features/editor/state/document-state'
 import { createEditorUiStore } from '@/features/editor/state/ui-state'
 import { createEditorWorkspaceStore } from '@/features/editor/state/workspace-state'
-import { searchBufferDocumentId } from '@/features/search/utils/buffer-document'
 import { createSearchBufferStore } from '@/features/search/state/buffer-state'
 import {
   createDefaultWorkbenchPanels,
-  openEditorPathInWorkbenchPanels,
+  openEditorContentInWorkbenchPanels,
 } from '@/features/workbench/utils/panels'
 import type { PickedFsEntry } from '@/lib/file-system-types'
 import type { CachedWorkspaceSlice, CachedWorkspaceState } from '@/features/workspace/state/cache'
@@ -28,22 +37,19 @@ import { createFileOpenIntentServiceOwner } from '@/lib/file-open-intent/state/s
 import { fileSnapshotQueryOptions } from '@/lib/file-snapshot-query-cache'
 
 describe('editor workspace state', () => {
-  it('opens files as flat editor tabs and records history', () => {
+  test('opens files as flat editor tabs and records history', () => {
     const { commands, workspaceStore } = editorHarness()
-
-    commands.openFileSurface('/repo/src/app.ts')
-
+    commands.openFileSurface(filesystemPath('/repo/src/app.ts'))
     expect(workspaceStore.getState()).toMatchObject({
-      editorHistory: ['/repo/src/app.ts'],
-      openFilePaths: ['/repo/src/app.ts'],
-      selectedFilePath: '/repo/src/app.ts',
+      editorHistory: testTabContents(['/repo/src/app.ts']),
+      openTabContents: testTabContents(['/repo/src/app.ts']),
+      selectedTabContent: testNullableTabContent('/repo/src/app.ts'),
     })
     expect(workspaceStore.getState().workbenchPanels.editorTabs).toEqual([
-      expect.objectContaining({ path: '/repo/src/app.ts' }),
+      expect.objectContaining({ content: testTabContent('/repo/src/app.ts') }),
     ])
   })
-
-  it('activates the target before publishing the selected tab', () => {
+  test('activates the target before publishing the selected tab', () => {
     const documentStore = createEditorDocumentStore()
     const searchStore = createSearchBufferStore()
     const uiStore = createEditorUiStore()
@@ -52,7 +58,10 @@ describe('editor workspace state', () => {
     workspaceStore.subscribe(() => events.push('published'))
     const commands = createEditorApplyActions({
       activation: {
-        activate: (path) => events.push(`activated:${path}`),
+        activate: (content) =>
+          events.push(
+            `activated:${content.kind === 'document' && content.document.kind === 'file' ? content.document.resource.path : ''}`,
+          ),
         setRoot: () => undefined,
       },
       documentStore,
@@ -60,13 +69,10 @@ describe('editor workspace state', () => {
       uiStore,
       workspaceStore,
     })
-
-    commands.openFileSurface('/repo/src/app.ts')
-
+    commands.openFileSurface(filesystemPath('/repo/src/app.ts'))
     expect(events).toEqual(['activated:/repo/src/app.ts', 'published'])
   })
-
-  it('reopens a tabless dirty buffer before publishing its new selection', () => {
+  test('reopens a tabless dirty buffer before publishing its new selection', () => {
     const path = '/repo/src/app.ts'
     const panels = workbenchPanelsForPaths([path], path)
     const documentStore = createEditorDocumentStore()
@@ -74,7 +80,7 @@ describe('editor workspace state', () => {
     const uiStore = createEditorUiStore()
     const workspaceStore = createEditorWorkspaceStore(cachedWorkspace({ workbenchPanels: panels }))
     const tabId = workspaceStore.getState().workbenchPanels.activeEditorTabId!
-    const document = documentStore.getState().ensureEditorView(tabId, fileResult(path))
+    const document = documentStore.getState().ensureEditorView(testTabId(tabId), fileResult(path))
     createEditorBufferSession(document.buffer).applyText('dirty')
     const { owner } = fileOpenIntentService(documentStore)
     const commands = createEditorApplyActions({
@@ -84,27 +90,32 @@ describe('editor workspace state', () => {
       uiStore,
       workspaceStore,
     })
-
-    commands.closeTab(tabId)
-    expect(documentStore.getState().getLiveEditorDocument(path)?.buffer).toBe(document.buffer)
+    commands.closeTab(testTabId(tabId))
+    expect(documentStore.getState().getLiveEditorDocument(testDocumentKey(path))?.buffer).toBe(
+      document.buffer,
+    )
     let viewAtPublication = null
     const unsubscribe = workspaceStore.subscribe((state) => {
-      if (state.selectedFilePath !== path) return
+      if (!testContentMatches(state.selectedTabContent, path)) return
       const activeTabId = state.workbenchPanels.activeEditorTabId
-      viewAtPublication = activeTabId ? documentStore.getState().getEditorView(activeTabId) : null
+      viewAtPublication = activeTabId
+        ? documentStore.getState().getEditorView(testTabId(activeTabId))
+        : null
     })
 
     commands.reopenClosedEditor()
     unsubscribe()
 
     expect(viewAtPublication).not.toBeNull()
-    expect(documentStore.getState().getLiveEditorDocument(path)?.buffer).toBe(document.buffer)
+    expect(documentStore.getState().getLiveEditorDocument(testDocumentKey(path))?.buffer).toBe(
+      document.buffer,
+    )
   })
 
   test.for(['tab', 'definition'] as const)(
     'installs a %s preparation before publishing a new tab',
     async (source) => {
-      const path = '/repo/src/prepared.ts'
+      const path = filesystemPath('/repo/src/prepared.ts')
       const file = fileResult(path)
       const documentStore = createEditorDocumentStore()
       const searchStore = createSearchBufferStore()
@@ -125,24 +136,25 @@ describe('editor workspace state', () => {
         uiStore,
         workspaceStore,
       })
-      service.prepare({ path, rootPath: '/repo', source })
+      service.prepare({ path, rootPath: filesystemPath('/repo'), source })
       await vi.waitFor(() => expect(prepare).toHaveBeenCalledOnce())
       let preparedAtPublication: EditorPreparedDocument | null = null
       const unsubscribe = workspaceStore.subscribe((state) => {
-        if (state.selectedFilePath !== path) return
+        if (!testContentMatches(state.selectedTabContent, path)) return
         const activeTabId = state.workbenchPanels.activeEditorTabId
         preparedAtPublication = activeTabId
-          ? (documentStore.getState().getEditorView(activeTabId)?.preparedDocument ?? null)
+          ? (documentStore.getState().getEditorView(testTabId(activeTabId))?.preparedDocument ??
+            null)
           : null
       })
 
       const definition = {
-        path,
+        path: filesystemPath(path),
         uri: `file://${path}`,
         range: { start: { line: 0, character: 6 }, end: { line: 0, character: 7 } },
       }
       if (source === 'definition') commands.openDefinition(definition)
-      if (source === 'tab') commands.openFileSurface(path)
+      if (source === 'tab') commands.openFileSurface(filesystemPath(path))
       unsubscribe()
 
       expect(preparedAtPublication).toBe(preparedDocument)
@@ -151,70 +163,64 @@ describe('editor workspace state', () => {
       queryClient.clear()
     },
   )
-
-  it('opens search as an editor tab for the workspace root', () => {
+  test('opens search as an editor tab for the workspace root', () => {
     const { commands, workspaceStore } = editorHarness()
-    const searchPath = searchBufferDocumentId('/repo')
-
-    commands.openSearchEditor('/repo')
-
+    const searchPath = 'search-buffer:%2Frepo'
+    commands.openSearchEditor(filesystemPath('/repo'))
     expect(workspaceStore.getState()).toMatchObject({
-      editorHistory: [searchPath],
-      openFilePaths: [searchPath],
-      selectedFilePath: searchPath,
+      editorHistory: testTabContents([searchPath]),
+      openTabContents: testTabContents([searchPath]),
+      selectedTabContent: testNullableTabContent(searchPath),
     })
     expect(workspaceStore.getState().workbenchPanels.editorTabs).toEqual([
-      expect.objectContaining({ path: searchPath }),
+      expect.objectContaining({ content: testTabContent(searchPath) }),
     ])
   })
-
-  it('selects existing tabs without duplicating open paths', () => {
+  test('selects existing tabs without duplicating open paths', () => {
     const panels = workbenchPanelsForPaths(['/repo/src/a.ts', '/repo/src/b.ts'], '/repo/src/a.ts')
     const { commands, workspaceStore } = editorHarness({ workbenchPanels: panels })
     const tab = workspaceStore
       .getState()
-      .workbenchPanels.editorTabs.find((candidate) => candidate.path === '/repo/src/b.ts')
+      .workbenchPanels.editorTabs.find((candidate) =>
+        testContentMatches(candidate.content, '/repo/src/b.ts'),
+      )
     expect(tab).toBeTruthy()
 
     commands.selectTab('main', tab!.id)
 
     expect(workspaceStore.getState()).toMatchObject({
-      editorHistory: ['/repo/src/b.ts'],
-      openFilePaths: ['/repo/src/a.ts', '/repo/src/b.ts'],
-      selectedFilePath: '/repo/src/b.ts',
+      editorHistory: testTabContents(['/repo/src/b.ts']),
+      openTabContents: testTabContents(['/repo/src/a.ts', '/repo/src/b.ts']),
+      selectedTabContent: testNullableTabContent('/repo/src/b.ts'),
     })
   })
-
-  it('closes editor tabs and reopens the most recently closed path', () => {
+  test('closes editor tabs and reopens the most recently closed path', () => {
     const panels = workbenchPanelsForPaths(['/repo/src/a.ts', '/repo/src/b.ts'], '/repo/src/b.ts')
     const { commands, workspaceStore } = editorHarness({
-      editorHistory: ['/repo/src/b.ts', '/repo/src/a.ts'],
+      editorHistory: testTabContents(['/repo/src/b.ts', '/repo/src/a.ts']),
       workbenchPanels: panels,
     })
     const activeTabId = workspaceStore.getState().workbenchPanels.activeEditorTabId
     expect(activeTabId).toBeTruthy()
-
-    commands.closeTab(activeTabId!)
-
+    commands.closeTab(testTabId(activeTabId!))
     expect(workspaceStore.getState()).toMatchObject({
-      openFilePaths: ['/repo/src/a.ts'],
-      recentlyClosedEditorPaths: ['/repo/src/b.ts'],
-      selectedFilePath: '/repo/src/a.ts',
+      openTabContents: testTabContents(['/repo/src/a.ts']),
+      recentlyClosedTabs: testTabContents(['/repo/src/b.ts']),
+      selectedTabContent: testNullableTabContent('/repo/src/a.ts'),
     })
 
     expect(commands.reopenClosedEditor()).toBe(true)
     expect(workspaceStore.getState()).toMatchObject({
-      openFilePaths: ['/repo/src/a.ts', '/repo/src/b.ts'],
-      recentlyClosedEditorPaths: [],
-      selectedFilePath: '/repo/src/b.ts',
+      openTabContents: testTabContents(['/repo/src/a.ts', '/repo/src/b.ts']),
+      recentlyClosedTabs: testTabContents([]),
+      selectedTabContent: testNullableTabContent('/repo/src/b.ts'),
     })
   })
-
-  it('renames editor paths across panels, history, and recent closes', () => {
+  test('renames editor paths across panels, history, and recent closes', () => {
     const panels = workbenchPanelsForPaths(['/repo/src/a.ts'], '/repo/src/a.ts')
     const { commands, uiStore, workspaceStore } = editorHarness({
-      editorHistory: ['/repo/src/a.ts'],
-      recentlyClosedEditorPaths: ['/repo/src/a.ts'],
+      editorHistory: testTabContents(['/repo/src/a.ts']),
+      recentlyClosedTabs: testTabContents(['/repo/src/a.ts']),
       workbenchPanels: panels,
     })
     uiStore.getState().setDefinitionTarget({
@@ -225,19 +231,65 @@ describe('editor workspace state', () => {
       },
       uri: 'file:///repo/src/a.ts',
     })
-
-    commands.renameLiveEditorDocument('/repo/src/a.ts', '/repo/src/renamed.ts')
-
+    commands.renameLiveEditorDocument(
+      filesystemPath('/repo/src/a.ts'),
+      filesystemPath('/repo/src/renamed.ts'),
+    )
     expect(workspaceStore.getState()).toMatchObject({
-      editorHistory: ['/repo/src/renamed.ts'],
-      openFilePaths: ['/repo/src/renamed.ts'],
-      recentlyClosedEditorPaths: ['/repo/src/renamed.ts'],
-      selectedFilePath: '/repo/src/renamed.ts',
+      editorHistory: testTabContents(['/repo/src/renamed.ts']),
+      openTabContents: testTabContents(['/repo/src/renamed.ts']),
+      recentlyClosedTabs: testTabContents(['/repo/src/renamed.ts']),
+      selectedTabContent: testNullableTabContent('/repo/src/renamed.ts'),
     })
     expect(uiStore.getState().definitionTarget?.path).toBe('/repo/src/renamed.ts')
   })
-
-  it('keeps split and pane movement commands inert in the workbench', () => {
+  test.each([false, true])(
+    'preserves encoded comparison targets when renaming a file, parked: %s',
+    (parked) => {
+      const comparisons = [
+        documentTargets.savedComparison,
+        documentTargets.reference,
+        documentTargets.snapshot,
+        documentTargets.checkpointFile,
+      ]
+      const paths = [documentTargets.file, ...comparisons]
+      const panels = workbenchPanelsForPaths(paths, documentTargets.savedComparison)
+      const positions = Object.fromEntries(paths.map((path) => [path, { left: 3, top: 120 }]))
+      const { commands, documentStore, workspaceStore } = editorHarness({
+        editorHistory: testTabContents(paths),
+        recentlyClosedTabs: testTabContents(paths),
+        reopenScrollPositions: testScrollPositions(positions),
+        workbenchPanels: panels,
+      })
+      const file = documentStore
+        .getState()
+        .ensureLiveEditorDocument(fileResult(documentTargets.file))
+      if (parked) commands.switchRootFolder(pickedDirectory('/other'))
+      commands.renameLiveEditorDocument(
+        filesystemPath(documentTargets.file),
+        filesystemPath('/repo/src/renamed.ts'),
+      )
+      if (parked) commands.switchRootFolder(pickedDirectory('/repo'))
+      const expectedPaths = ['/repo/src/renamed.ts', ...comparisons]
+      expect(workspaceStore.getState()).toMatchObject({
+        editorHistory: testTabContents(expectedPaths),
+        recentlyClosedTabs: testTabContents(expectedPaths),
+        openTabContents: testTabContents(expectedPaths),
+        selectedTabContent: testNullableTabContent(documentTargets.savedComparison),
+        reopenScrollPositions: testScrollPositions(
+          Object.fromEntries(expectedPaths.map((path) => [path, { left: 3, top: 120 }])),
+        ),
+      })
+      expect(workspaceStore.getState().workbenchPanels.editorTabs.map((tab) => tab.id)).toEqual(
+        panels.editorTabs.map((tab) => tab.id),
+      )
+      expect(
+        documentStore.getState().getLiveEditorDocument(testDocumentKey('/repo/src/renamed.ts'))
+          ?.buffer,
+      ).toBe(file.buffer)
+    },
+  )
+  test('keeps split and pane movement commands inert in the workbench', () => {
     const panels = workbenchPanelsForPaths(['/repo/src/a.ts'], '/repo/src/a.ts')
     const { commands, workspaceStore } = editorHarness({ workbenchPanels: panels })
     const activeTabId = workspaceStore.getState().workbenchPanels.activeEditorTabId
@@ -247,35 +299,52 @@ describe('editor workspace state', () => {
     expect(commands.moveTabToPane(activeTabId!, 'secondary')).toBe(false)
     expect(commands.moveTabToSplit(activeTabId!, 'main', 'right')).toBe(false)
   })
-
-  it('parks the open project on a switch and restores it on the way back', () => {
+  test('parks the open project on a switch and restores it on the way back', () => {
     const { commands, workspaceStore } = editorHarness({
-      editorHistory: ['/repo/src/a.ts'],
+      editorHistory: testTabContents(['/repo/src/a.ts']),
       workbenchPanels: workbenchPanelsForPaths(['/repo/src/a.ts'], '/repo/src/a.ts'),
     })
 
     commands.switchRootFolder(pickedDirectory('/other'))
 
     expect(workspaceStore.getState()).toMatchObject({
-      editorHistory: [],
-      openFilePaths: [],
-      selectedFilePath: null,
+      editorHistory: testTabContents([]),
+      openTabContents: testTabContents([]),
+      selectedTabContent: testNullableTabContent(null),
     })
     expect(workspaceStore.getState().parkedWorkspaces.get('/repo')).toMatchObject({
-      editorHistory: ['/repo/src/a.ts'],
+      editorHistory: testTabContents(['/repo/src/a.ts']),
     })
-
-    commands.openFileSurface('/other/src/b.ts')
+    commands.openFileSurface(filesystemPath('/other/src/b.ts'))
     commands.switchRootFolder(pickedDirectory('/repo'))
 
     expect(workspaceStore.getState()).toMatchObject({
-      editorHistory: ['/repo/src/a.ts'],
-      openFilePaths: ['/repo/src/a.ts'],
-      selectedFilePath: '/repo/src/a.ts',
+      editorHistory: testTabContents(['/repo/src/a.ts']),
+      openTabContents: testTabContents(['/repo/src/a.ts']),
+      selectedTabContent: testNullableTabContent('/repo/src/a.ts'),
     })
-    expect(workspaceStore.getState().parkedWorkspaces.get('/other')?.editorHistory).toEqual([
-      '/other/src/b.ts',
-    ])
+    expect(workspaceStore.getState().parkedWorkspaces.get('/other')?.editorHistory).toEqual(
+      testTabContents(['/other/src/b.ts']),
+    )
+  })
+  test('parks and restores the empty filesystem root with its search tab and scroll', () => {
+    const panels = workbenchPanelsForPaths(['src/a.ts', 'search-buffer:'], 'search-buffer:')
+    const slice: CachedWorkspaceSlice = {
+      editorHistory: testTabContents(['search-buffer:', 'src/a.ts']),
+      recentlyClosedTabs: testTabContents(['src/closed.ts']),
+      reopenScrollPositions: testScrollPositions({ 'search-buffer:': { left: 0, top: 240 } }),
+      workbenchPanels: panels,
+    }
+    const store = createEditorWorkspaceStore({
+      ...cachedWorkspace({}),
+      rootFolder: pickedDirectory(''),
+      workspaceOrder: [''],
+      workspaces: { '': slice },
+    })
+    store.getState().switchWorkspace(pickedDirectory('/other'))
+    store.getState().switchWorkspace(pickedDirectory(''))
+    expect(store.getState()).toMatchObject(slice)
+    expect(store.getState().selectedTabContent).toEqual(testNullableTabContent('search-buffer:'))
   })
 
   test.for(['rename', 'discard'] as const)(
@@ -285,64 +354,69 @@ describe('editor workspace state', () => {
       const to = '/repo/src/renamed.ts'
       const scroll = { left: 5, top: 480 }
       const slice = {
-        editorHistory: [from],
-        recentlyClosedEditorPaths: [from],
-        scrollPositionByPath: { [from]: scroll },
+        editorHistory: testTabContents([from]),
+        recentlyClosedTabs: testTabContents([from]),
+        reopenScrollPositions: testScrollPositions({ [from]: scroll }),
         workbenchPanels: workbenchPanelsForPaths([from], from),
       }
       const { commands, documentStore, workspaceStore } = editorHarness(slice)
       documentStore.getState().ensureLiveEditorDocument(fileResult(from))
       commands.switchRootFolder(pickedDirectory('/second'))
-      commands.openFileSurface(from)
+      commands.openFileSurface(filesystemPath(from))
       workspaceStore.setState(slice)
       commands.switchRootFolder(pickedDirectory('/other'))
-      commands.openFileSurface('/other/active.ts')
-
-      if (change === 'rename') commands.renameLiveEditorDocument(from, to)
-      if (change === 'discard') commands.discardLiveEditorDocument(from)
-
+      commands.openFileSurface(filesystemPath('/other/active.ts'))
+      if (change === 'rename')
+        commands.renameLiveEditorDocument(filesystemPath(from), filesystemPath(to))
+      if (change === 'discard') commands.discardLiveEditorDocument(testDocumentRef(from))
       const paths = change === 'rename' ? [to] : []
-      const scrollPositionByPath = change === 'rename' ? { [to]: scroll } : {}
-      expect(workspaceStore.getState().selectedFilePath).toBe('/other/active.ts')
+      const scrollPositionByPath: Record<string, { left: number; top: number }> =
+        change === 'rename' ? { [to]: scroll } : {}
+      expect(workspaceStore.getState().selectedTabContent).toEqual(
+        testNullableTabContent('/other/active.ts'),
+      )
       for (const root of ['/repo', '/second']) {
         const parked = workspaceStore.getState().parkedWorkspaces.get(root)
-        expect(parked?.workbenchPanels.editorTabs.map((tab) => tab.path)).toEqual(paths)
+        expect(parked?.workbenchPanels.editorTabs.map((tab) => tab.content)).toEqual(
+          testTabContents(paths),
+        )
         expect(parked).toMatchObject({
-          editorHistory: paths,
-          recentlyClosedEditorPaths: paths,
-          scrollPositionByPath,
+          editorHistory: testTabContents(paths),
+          recentlyClosedTabs: testTabContents(paths),
+          reopenScrollPositions: testScrollPositions(scrollPositionByPath),
         })
-        expect(parked?.scrollPositionByPath[from]).toBeUndefined()
+        expect(
+          parked?.reopenScrollPositions.some((entry) => testContentMatches(entry.content, from)),
+        ).toBe(false)
       }
       commands.switchRootFolder(pickedDirectory('/repo'))
       expect(workspaceStore.getState()).toMatchObject({
-        openFilePaths: paths,
-        selectedFilePath: paths[0] ?? null,
-        editorHistory: paths,
-        recentlyClosedEditorPaths: paths,
-        scrollPositionByPath,
+        openTabContents: testTabContents(paths),
+        selectedTabContent: testNullableTabContent(paths[0] ?? null),
+        editorHistory: testTabContents(paths),
+        recentlyClosedTabs: testTabContents(paths),
+        reopenScrollPositions: testScrollPositions(scrollPositionByPath),
       })
-      expect(documentStore.getState().hasLiveEditorDocument(from)).toBe(false)
+      expect(documentStore.getState().hasLiveEditorDocument(testDocumentKey(from))).toBe(false)
     },
   )
-
-  it('keeps a parked project’s documents and views alive across a switch', () => {
+  test('keeps a parked project’s documents and views alive across a switch', () => {
     const { commands, documentStore, workspaceStore } = editorHarness({
       workbenchPanels: workbenchPanelsForPaths(['/repo/src/a.ts'], '/repo/src/a.ts'),
     })
     const tabId = workspaceStore.getState().workbenchPanels.activeEditorTabId
     expect(tabId).toBeTruthy()
-    documentStore.getState().ensureEditorView(tabId!, fileResult('/repo/src/a.ts'))
-
+    documentStore.getState().ensureEditorView(testTabId(tabId!), fileResult('/repo/src/a.ts'))
     commands.switchRootFolder(pickedDirectory('/other'))
 
     // Under the old wipe this document and its view were both gone, taking any
     // unsaved edit with them.
-    expect(documentStore.getState().hasLiveEditorDocument('/repo/src/a.ts')).toBe(true)
-    expect(documentStore.getState().getEditorView(tabId!)).not.toBeNull()
+    expect(documentStore.getState().hasLiveEditorDocument(testDocumentKey('/repo/src/a.ts'))).toBe(
+      true,
+    )
+    expect(documentStore.getState().getEditorView(testTabId(tabId!))).not.toBeNull()
   })
-
-  it('carries search results across a switch and hands them back', () => {
+  test('carries search results across a switch and hands them back', () => {
     const { commands, searchStore } = editorHarness()
     searchStore
       .getState()
@@ -354,8 +428,7 @@ describe('editor workspace state', () => {
     commands.switchRootFolder(pickedDirectory('/repo'))
     expect(searchStore.getState().active).toMatchObject({ query: 'needle', rootPath: '/repo' })
   })
-
-  it('reorders editor tabs without changing the selected path', () => {
+  test('reorders editor tabs without changing the selected path', () => {
     const panels = workbenchPanelsForPaths(
       ['/repo/src/a.ts', '/repo/src/b.ts', '/repo/src/c.ts'],
       '/repo/src/b.ts',
@@ -365,13 +438,12 @@ describe('editor workspace state', () => {
     expect(tabId).toBeTruthy()
 
     expect(commands.reorderTab('main', tabId!, 2)).toBe(true)
-
-    expect(workspaceStore.getState().selectedFilePath).toBe('/repo/src/b.ts')
-    expect(workspaceStore.getState().workbenchPanels.editorTabs.map((tab) => tab.path)).toEqual([
-      '/repo/src/b.ts',
-      '/repo/src/c.ts',
-      '/repo/src/a.ts',
-    ])
+    expect(workspaceStore.getState().selectedTabContent).toEqual(
+      testNullableTabContent('/repo/src/b.ts'),
+    )
+    expect(workspaceStore.getState().workbenchPanels.editorTabs.map((tab) => tab.content)).toEqual(
+      testTabContents(['/repo/src/b.ts', '/repo/src/c.ts', '/repo/src/a.ts']),
+    )
   })
 })
 
@@ -404,9 +476,9 @@ function cachedWorkspace(slice: Partial<CachedWorkspaceSlice>): CachedWorkspaceS
     workspaceOrder: [rootFolder.path],
     workspaces: {
       [rootFolder.path]: {
-        editorHistory: [],
-        recentlyClosedEditorPaths: [],
-        scrollPositionByPath: {},
+        editorHistory: testTabContents([]),
+        recentlyClosedTabs: testTabContents([]),
+        reopenScrollPositions: testScrollPositions({}),
         workbenchPanels: createDefaultWorkbenchPanels(),
         ...slice,
       },
@@ -416,10 +488,10 @@ function cachedWorkspace(slice: Partial<CachedWorkspaceSlice>): CachedWorkspaceS
 
 function workbenchPanelsForPaths(paths: readonly string[], activePath: string | null) {
   let panels = createDefaultWorkbenchPanels()
-  for (const path of paths) panels = openEditorPathInWorkbenchPanels(panels, path)
+  for (const path of paths)
+    panels = openEditorContentInWorkbenchPanels(panels, testTabContent(path))
   if (!activePath) return panels
-
-  return openEditorPathInWorkbenchPanels(panels, activePath)
+  return openEditorContentInWorkbenchPanels(panels, testTabContent(activePath))
 }
 
 function fileResult(path: string, content = 'const a = 1') {
@@ -427,7 +499,7 @@ function fileResult(path: string, content = 'const a = 1') {
     birthtimeMs: 0,
     content,
     mtimeMs: 0,
-    path,
+    path: filesystemPath(path),
     size: content.length,
     type: 'file' as const,
     version: 'v1',
@@ -441,7 +513,8 @@ function fileOpenIntentService(
 ) {
   const prepare = vi.fn((buffer: EditorTextBuffer) => ({ buffer, preparedDocument }))
   const owner = createFileOpenIntentServiceOwner({
-    getLiveDocument: (path) => documentStore.getState().getLiveEditorDocument(path),
+    getLiveDocument: (path) =>
+      documentStore.getState().getLiveEditorDocument(testDocumentKey(path)),
     getRetainedScrollPosition: () => null,
     isActive: () => false,
     mountedEditors: {
@@ -465,7 +538,7 @@ function fileOpenIntentService(
     queryClient,
     subscribeLiveDocuments: (listener) => documentStore.subscribe(() => listener()),
   })
-  owner.setRoot('/repo')
+  owner.setRoot(filesystemPath('/repo'))
   owner.connect()
   return { owner, prepare, service: owner.service }
 }
@@ -485,7 +558,7 @@ function pickedDirectory(path: string): PickedFsEntry {
     birthtimeMs: 1,
     mtimeMs: 1,
     name: path.split('/').filter(Boolean).at(-1) ?? path,
-    path,
+    path: filesystemPath(path),
     size: 1,
     type: 'directory',
     version: 'test:1:1',

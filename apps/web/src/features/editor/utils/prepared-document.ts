@@ -83,8 +83,8 @@ export function createPlatformFileOpenPreparer(
 export function editorPreparedDocumentTags(
   path: string,
   environment: EditorPreparedEnvironment,
+  languageId = languageIdForFilePath(path),
 ): EditorPreparedDocumentTags {
-  const languageId = languageIdForFilePath(path)
   const source = environment.syntaxHighlightingEnabled
     ? editorSyntaxHighlightingSource(environment.selectedThemeId)
     : 'disabled'

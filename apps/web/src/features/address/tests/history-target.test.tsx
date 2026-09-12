@@ -1,3 +1,5 @@
+import { filesystemPath } from '@/lib/documents/utils/identity'
+import { testNullableTabContent } from '../../../../test/factories/document-targets'
 import { writeFileSync } from 'node:fs'
 import path from 'node:path'
 
@@ -15,7 +17,7 @@ test('deleting a hidden sidebar destination replaces its history target with the
   writeFileSync(path.join(domain.main, 'other.txt'), 'other file')
   await refresh()
   await navigation.openWorkspace({ environmentId, path: 'main' })
-  await navigation.openFile({ owner: editor.workspaceStore, path: 'main/keep.txt' })
+  await navigation.openFile({ owner: editor.workspaceStore, path: filesystemPath('main/keep.txt') })
   await navigation.openChat({ environmentId, sessionId: DOMAIN_SESSION, surface: 'sidebar' })
   await navigation.setSidePanel('files')
   await domain.dispatch({
@@ -30,7 +32,10 @@ test('deleting a hidden sidebar destination replaces its history target with the
     removedSessionIds: [DOMAIN_SESSION],
     successorSessionId: AMBIGUOUS_SESSION,
   })
-  await navigation.openFile({ owner: editor.workspaceStore, path: 'main/other.txt' })
+  await navigation.openFile({
+    owner: editor.workspaceStore,
+    path: filesystemPath('main/other.txt'),
+  })
   await navigation.setSidePanel('logs')
   await pressBack(navigation)
   expect(navigation.getSnapshot().status).toBe('applied')
@@ -47,12 +52,17 @@ test('explicitly reopening the same file replaces a sidebar conversation destina
   writeFileSync(path.join(domain.main, 'other.txt'), 'other file')
   await refresh()
   await navigation.openWorkspace({ environmentId, path: 'main' })
-  await navigation.openFile({ owner: editor.workspaceStore, path: 'main/keep.txt' })
+  await navigation.openFile({ owner: editor.workspaceStore, path: filesystemPath('main/keep.txt') })
   await navigation.openChat({ environmentId, sessionId: DOMAIN_SESSION, surface: 'sidebar' })
-  await navigation.openFile({ owner: editor.workspaceStore, path: 'main/keep.txt' })
-  await navigation.openFile({ owner: editor.workspaceStore, path: 'main/other.txt' })
+  await navigation.openFile({ owner: editor.workspaceStore, path: filesystemPath('main/keep.txt') })
+  await navigation.openFile({
+    owner: editor.workspaceStore,
+    path: filesystemPath('main/other.txt'),
+  })
   await navigation.setSidePanel('logs')
   await pressBack(navigation)
-  expect(editor.workspaceStore.getState().selectedFilePath).toBe('main/keep.txt')
+  expect(editor.workspaceStore.getState().selectedTabContent).toEqual(
+    testNullableTabContent('main/keep.txt'),
+  )
   expect(editor.workspaceStore.getState().workbenchPanels.activeSidebarTab).toBe('logs')
 })

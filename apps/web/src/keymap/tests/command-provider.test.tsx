@@ -1,3 +1,7 @@
+import { healthDescriptorSchema } from '@workspace/contracts'
+import * as v from 'valibot'
+import { useEnvironmentsStore } from '@/lib/environments/state/store'
+import { filesystemPath } from '@/lib/documents/utils/identity'
 import { selectSettingsSearch } from '@/features/settings/state/search-store'
 import { selectSettingsCategory } from '@/features/settings/state/category-store'
 import { selectSettingsView } from '@/features/settings/state/view-store'
@@ -206,6 +210,13 @@ test.for([
     primary.setQueryData(settingsKeys.document(), primaryBefore)
     const remoteServer = await makeTestServer({ filesystemWatch: false })
     const remoteClient = createInProcessClient(remoteServer)
+    const previousEnvironments = useEnvironmentsStore.getState()
+    useEnvironmentsStore
+      .getState()
+      .recordDescriptor(
+        'http://localhost:3521',
+        v.parse(healthDescriptorSchema, (await remoteClient.health.get()).data),
+      )
     const previousOrigin = activeServerOrigin()
     setActiveServerOrigin('http://localhost:3521')
     const previousRemoteClient = getClient()
@@ -216,7 +227,7 @@ test.for([
     try {
       const remoteBefore = await fetchSettings(undefined, remoteClient)
       editor.setQueryData(settingsKeys.document(), remoteBefore)
-      const root = await createFolderPath('remote-project', remoteClient)
+      const root = await createFolderPath(filesystemPath('remote-project'), remoteClient)
       writeRootFolderCache(testScopedStorage, { ...root, type: 'directory' })
       view = renderCommandProvider(editor, primary)
       await waitFor(() => expect(capturedBus).not.toBeNull())
@@ -241,6 +252,7 @@ test.for([
       editor.clear()
       setClient(previousRemoteClient)
       setActiveServerOrigin(previousOrigin)
+      useEnvironmentsStore.setState(previousEnvironments)
       await remoteServer.cleanup()
     }
   },

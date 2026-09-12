@@ -1,5 +1,15 @@
+import {
+  documentKey,
+  filesystemPath,
+  settingsJsonDocument,
+  tabId as typedTabId,
+} from '@/lib/documents/utils/identity'
+import { documentSourcePath } from '@/lib/documents/utils/capabilities'
+import { documentTab, sameTabContent } from '@/lib/documents/utils/tabs'
+import { testDocumentKey, testTabContent } from '../../../../../test/factories/document-targets'
 import { act, fireEvent, render, renderHook, screen, waitFor } from '@testing-library/react'
-import { isValidElement, type ReactNode } from 'react'
+import { isValidElement, type ComponentProps, type ReactNode } from 'react'
+import { createEditorBufferSession } from '@singapor/core'
 
 import { UnsavedChangesDialog } from '@/features/editor/components/unsaved-changes-dialog'
 import {
@@ -22,8 +32,6 @@ import {
 } from '@/features/workbench/utils/panels'
 import { useFocusTarget } from '@/lib/focus/hooks/use-target'
 import type { FileResult } from '@/lib/file-system-types'
-import { settingsDocumentId } from '@/features/settings/utils/document'
-import { settingsJsonDocumentId } from '@/features/settings/utils/json-document'
 import { expect, test } from '../../../../../test/fixtures'
 import { AppProviders, createTestQueryClient } from '../../../../../test/render'
 
@@ -39,7 +47,7 @@ test('a clean close returns the exact open tab ids it closed', async () => {
   act(() => {
     closeResult = hook.result.current.requestCloseTabs([
       secondTabId,
-      'missing-tab',
+      typedTabId('missing-tab'),
       firstTabId,
       secondTabId,
     ])
@@ -109,12 +117,59 @@ test('a dirty settings tab offers Save for its writable JSON buffer', async () =
   expect(dialogCanSave(hook.result.current.dirtyTabCloseDialog)).toBe(true)
 })
 
+test.for(['Cancel', 'Discard'] as const)(
+  '%s on the final dirty Git reference tab preserves or removes the unsavable buffer',
+  async (action) => {
+    const hook = renderDirtyTabClose()
+    const target = {
+      kind: 'git-ref',
+      source: { path: filesystemPath('/repo/src/app.ts'), ref: 'HEAD' },
+    } as const
+    const key = documentKey(target)
+    const content = documentTab(target)
+    act(() => {
+      hook.result.current.commands.openTabContent(content)
+      const document = hook.result.current.documentStore
+        .getState()
+        .ensureUnsyncedEditorDocument({ content: 'reference', target })
+      createEditorBufferSession(document.buffer).applyText(' edited')
+    })
+    const tab = openTabs(hook.result.current).find((candidate) =>
+      sameTabContent(candidate.content, content),
+    )
+    if (!tab) return expect.unreachable('reference tab did not open')
+
+    act(() => {
+      expect(hook.result.current.requestCloseTab(tab.id).status).toBe('deferred')
+    })
+    expect(dialogCanSave(hook.result.current.dirtyTabCloseDialog)).toBe(false)
+    const dialog = hook.result.current.dirtyTabCloseDialog
+    if (!isValidElement<ComponentProps<typeof UnsavedChangesDialog>>(dialog)) {
+      return expect.unreachable('dirty close dialog did not render')
+    }
+    await act(async () => {
+      if (action === 'Cancel') dialog.props.onCancel()
+      if (action === 'Discard') dialog.props.onDiscard()
+    })
+
+    const remaining = hook.result.current.documentStore.getState().getLiveEditorDocument(key)
+    if (action === 'Cancel') {
+      expect(openTabs(hook.result.current)).toContainEqual(tab)
+      expect(remaining?.buffer.materializeFullText()).toBe('reference edited')
+      expect(remaining?.buffer.isDirty()).toBe(true)
+      return
+    }
+    await waitFor(() => expect(openTabs(hook.result.current)).not.toContainEqual(tab))
+    expect(remaining).toBeNull()
+  },
+)
+
 test('a missing tab is rejected as not found', () => {
   const hook = renderDirtyTabClose()
   let closeResult: CloseRequestResult | undefined
 
   act(() => {
-    closeResult = hook.result.current.requestCloseTab('missing-tab')
+    closeResult = hook.result.current.requestCloseTab(typedTabId('missing-tab'))
   })
 
   expect(closeResult).toEqual({
@@ -194,11 +249,13 @@ function DirtyFocusHarness() {
   const documentStore = useEditorDocumentStoreApi()
   const workspace = useEditorWorkspaceState((state) => state.workbenchPanels)
   const activeTab = activeEditorTabForWorkbenchPanels(workspace)
+  const activePath =
+    activeTab?.content.kind === 'document' ? documentSourcePath(activeTab.content.document) : null
   const { ref: activeTargetRef } = useFocusTarget<HTMLButtonElement>({
     area: 'editor',
     capabilities: { editor: { dispatch: () => false, writable: true } },
     id: {
-      key: activeTab?.path ?? '',
+      key: activePath ?? '',
       kind: 'editor',
       surface: 'document',
       tabId: activeTab?.id,
@@ -212,11 +269,11 @@ function DirtyFocusHarness() {
   })
 
   function prepare() {
-    commands.openFileSurface('/repo/src/next.ts')
+    commands.openFileSurface(filesystemPath('/repo/src/next.ts'))
     documentStore.getState().ensureLiveEditorDocument(fileResult('/repo/src/next.ts'))
-    commands.openFileSurface('/repo/src/dirty.ts')
+    commands.openFileSurface(filesystemPath('/repo/src/dirty.ts'))
     documentStore.getState().ensureLiveEditorDocument(fileResult('/repo/src/dirty.ts'))
-    documentStore.getState().setLiveEditorDocumentDirty('/repo/src/dirty.ts', true)
+    documentStore.getState().setLiveEditorDocumentDirty(testDocumentKey('/repo/src/dirty.ts'), true)
   }
 
   function requestClose() {
@@ -235,7 +292,7 @@ function DirtyFocusHarness() {
       </button>
       {activeTab ? (
         <button ref={activeTargetRef} type='button'>
-          Active {activeTab.path}
+          Active {activePath}
         </button>
       ) : null}
       {close.dirtyTabCloseDialog}
@@ -256,27 +313,27 @@ type DirtyTabCloseHarness = ReturnType<typeof useDirtyTabCloseHarness>
 
 function openFile(harness: DirtyTabCloseHarness, path: string, dirty = false) {
   act(() => {
-    harness.commands.openFileSurface(path)
+    harness.commands.openFileSurface(filesystemPath(path))
     harness.documentStore.getState().ensureLiveEditorDocument(fileResult(path))
-    harness.documentStore.getState().setLiveEditorDocumentDirty(path, dirty)
+    harness.documentStore.getState().setLiveEditorDocumentDirty(testDocumentKey(path), dirty)
   })
 
-  return openTabs(harness).find((tab) => tab.path === path)?.id ?? null
+  return (
+    openTabs(harness).find((tab) => sameTabContent(tab.content, testTabContent(path)))?.id ?? null
+  )
 }
 
 async function openDirtySettings(harness: DirtyTabCloseHarness) {
-  const documentId = settingsJsonDocumentId('user')
+  const documentId = documentKey(settingsJsonDocument('user'))
   await act(async () => {
     await harness.commands.openSettingsEditor()
-    harness.documentStore.getState().ensureUnsyncedEditorDocument({
-      content: '{}\n',
-      id: documentId,
-      sync: { kind: 'settings', revision: 'rev-1', state: 'idle', target: 'user' },
-    })
+    harness.documentStore
+      .getState()
+      .ensureSettingsDocument(settingsJsonDocument('user'), { content: '{}\n', revision: 'rev-1' })
     harness.documentStore.getState().setLiveEditorDocumentDirty(documentId, true)
   })
 
-  return openTabs(harness).find((tab) => tab.path === settingsDocumentId())?.id ?? null
+  return openTabs(harness).find((tab) => tab.content.kind === 'settings')?.id ?? null
 }
 
 function openTabs(harness: DirtyTabCloseHarness) {
@@ -301,7 +358,7 @@ function fileResult(path: string): FileResult {
   return {
     content: `contents of ${path}`,
     mtimeMs: 100,
-    path,
+    path: filesystemPath(path),
     size: 20,
     version: `test:${path}`,
   }

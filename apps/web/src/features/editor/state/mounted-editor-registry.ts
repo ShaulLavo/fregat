@@ -1,10 +1,12 @@
-export class MountedEditorRegistry {
-  private readonly counts = new Map<string, number>()
-  private readonly emittedMounted = new Set<string>()
-  private readonly listeners = new Set<(path: string, mounted: boolean) => void>()
-  private readonly transitionGeneration = new Map<string, number>()
+import type { FilesystemPath } from '@/lib/documents/utils/types'
 
-  register(path: string): () => void {
+export class MountedEditorRegistry {
+  private readonly counts = new Map<FilesystemPath, number>()
+  private readonly emittedMounted = new Set<FilesystemPath>()
+  private readonly listeners = new Set<(path: FilesystemPath, mounted: boolean) => void>()
+  private readonly transitionGeneration = new Map<FilesystemPath, number>()
+
+  register(path: FilesystemPath): () => void {
     const previousCount = this.counts.get(path) ?? 0
     this.counts.set(path, previousCount + 1)
     if (previousCount === 0) this.cancelPendingUnmount(path)
@@ -27,24 +29,24 @@ export class MountedEditorRegistry {
     }
   }
 
-  has(path: string): boolean {
+  has(path: FilesystemPath): boolean {
     return this.counts.has(path)
   }
 
-  subscribe(listener: (path: string, mounted: boolean) => void): () => void {
+  subscribe(listener: (path: FilesystemPath, mounted: boolean) => void): () => void {
     this.listeners.add(listener)
     return () => this.listeners.delete(listener)
   }
 
-  private emit(path: string, mounted: boolean): void {
+  private emit(path: FilesystemPath, mounted: boolean): void {
     for (const listener of this.listeners) listener(path, mounted)
   }
 
-  private cancelPendingUnmount(path: string): void {
+  private cancelPendingUnmount(path: FilesystemPath): void {
     this.transitionGeneration.set(path, (this.transitionGeneration.get(path) ?? 0) + 1)
   }
 
-  private scheduleUnmount(path: string): void {
+  private scheduleUnmount(path: FilesystemPath): void {
     const generation = (this.transitionGeneration.get(path) ?? 0) + 1
     this.transitionGeneration.set(path, generation)
     queueMicrotask(() => {

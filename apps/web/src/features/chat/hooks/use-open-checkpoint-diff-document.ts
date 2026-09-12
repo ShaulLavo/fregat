@@ -3,17 +3,20 @@ import { clientForQueryClient } from '@/lib/environments/state/query-clients'
 import { useQueryClient } from '@tanstack/react-query'
 
 import { useEditorCommands } from '@/features/editor/hooks/use-editor-commands'
-import { checkpointDiffDocumentId } from '@/features/git/utils/diff-document'
+import { documentTab } from '@/lib/documents/utils/tabs'
+import { filesystemPath } from '@/lib/documents/utils/identity'
+import { checkpointRequest } from '@/lib/documents/utils/comparisons'
+import { useEditorWorkspaceStoreApi } from '@/features/editor/state/workspace-state'
 import {
   canOpenCheckpointDiff,
-  checkpointDiffDocumentInput,
+  checkpointFileDocument,
   checkpointDiffRetry,
   checkpointDiffRetryDelay,
-  checkpointFullSessionDiffDocumentInput,
+  checkpointSessionDocument,
   checkpointFullSessionDiffInputForSummary,
   checkpointDiffInputForSummary,
   checkpointDiffQueryKey,
-  checkpointTurnDiffDocumentInput,
+  checkpointTurnDocument,
   fetchCheckpointDiff,
   matchingCheckpointDiff,
 } from '@/features/chat/utils/checkpoint-diff-query'
@@ -23,12 +26,16 @@ import { useNavigation } from '@/hooks/use-navigation'
 export function useOpenCheckpointDiffDocument() {
   const queryClient = useQueryClient()
   const environmentId = useEnvironmentId()
-  const { selectFile } = useEditorCommands()
+  const { selectContent } = useEditorCommands()
   const navigation = useNavigation()
+  const workspaceStore = useEditorWorkspaceStoreApi()
 
   async function openCheckpointDiff(summary: ChatTurnDiffSummary, path?: string) {
     if (!canOpenCheckpointDiff(summary)) return false
 
+    const rootPath = workspaceStore.getState().rootFolder?.path ?? null
+    if (rootPath === null) return false
+    const owner = filesystemPath(rootPath)
     const operation = navigation.getSnapshot()
     const rangeInput = checkpointDiffInputForSummary(summary)
     const diffs = await queryClient.fetchQuery({
@@ -41,9 +48,12 @@ export function useOpenCheckpointDiffDocument() {
     })
     if (navigation.getSnapshot() !== operation) return false
     if (!path) {
-      const documentInput = checkpointTurnDiffDocumentInput(summary)
-      queryClient.setQueryData(checkpointDiffQueryKey(documentInput), diffs)
-      const opened = await selectFile(checkpointDiffDocumentId(documentInput))
+      const documentInput = checkpointTurnDocument(summary, owner)
+      queryClient.setQueryData(
+        checkpointDiffQueryKey(checkpointRequest(documentInput.source)),
+        diffs,
+      )
+      const opened = await selectContent(documentTab(documentInput))
       if (opened.status !== 'applied') return false
       await rememberTurnScope(summary, null)
 
@@ -54,12 +64,15 @@ export function useOpenCheckpointDiffDocument() {
     const documentPath = diff?.path ?? path ?? summary.files[0]?.path
     if (!documentPath) return false
 
-    const documentInput = checkpointDiffDocumentInput(summary, documentPath, diff)
+    const documentInput = checkpointFileDocument(summary, filesystemPath(documentPath), diff, owner)
     // Seed only a diff we actually have: the viewer reads this key and treats a
     // seeded entry as final, so seeding an empty list for a file the range fetch
     // missed would pin the tab to "no changes" instead of letting it ask again.
-    if (diff) queryClient.setQueryData(checkpointDiffQueryKey(documentInput), [diff])
-    const opened = await selectFile(checkpointDiffDocumentId(documentInput))
+    if (diff)
+      queryClient.setQueryData(checkpointDiffQueryKey(checkpointRequest(documentInput.source)), [
+        diff,
+      ])
+    const opened = await selectContent(documentTab(documentInput))
     if (opened.status !== 'applied') return false
     await rememberTurnScope(summary, documentPath)
 
@@ -69,6 +82,9 @@ export function useOpenCheckpointDiffDocument() {
   async function openFullSessionCheckpointDiff(summary: ChatTurnDiffSummary) {
     if (!canOpenCheckpointDiff(summary)) return false
 
+    const rootPath = workspaceStore.getState().rootFolder?.path ?? null
+    if (rootPath === null) return false
+    const owner = filesystemPath(rootPath)
     const operation = navigation.getSnapshot()
     const input = checkpointFullSessionDiffInputForSummary(summary)
     const diffs = await queryClient.fetchQuery({
@@ -80,9 +96,9 @@ export function useOpenCheckpointDiffDocument() {
       staleTime: Infinity,
     })
     if (navigation.getSnapshot() !== operation) return false
-    const documentInput = checkpointFullSessionDiffDocumentInput(summary)
-    queryClient.setQueryData(checkpointDiffQueryKey(documentInput), diffs)
-    return (await selectFile(checkpointDiffDocumentId(documentInput))).status === 'applied'
+    const documentInput = checkpointSessionDocument(summary, owner)
+    queryClient.setQueryData(checkpointDiffQueryKey(checkpointRequest(documentInput.source)), diffs)
+    return (await selectContent(documentTab(documentInput))).status === 'applied'
   }
 
   async function rememberTurnScope(summary: ChatTurnDiffSummary, filePath: string | null) {

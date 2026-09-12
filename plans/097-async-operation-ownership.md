@@ -1,19 +1,39 @@
 # Plan 097: Carry operation owners and source revisions through async workflows
 
-Status: proposed; depends on completion of Plan 098; implementation has not started.
-Planned against Platform `bc013a3a` and
-the linked Editor checkout `6492651` on 2026-09-12. Priority P1, effort L across several
+Status: proposed; Plan 098 prerequisite completed and verified; implementation has not started.
+Refreshed against Platform `3c935f6a` plus the completed, uncommitted Plan 098 changes on
+2026-09-12. The linked Editor baseline remains `6492651`. Priority P1, effort L across several
 bounded changes, implementation risk medium. No dependency on completing the duplication
 plans, but coordinate overlapping files with Plans 091, 093, 094, and 096.
 
-**Prerequisite: complete and verify [Plan 098](098-document-and-tab-domain.md) before starting
-any implementation in this plan.** This includes its characterization, document and tab model,
-caller migrations, save acknowledgement correction, and mechanical enforcement. Settling only
-the proposed types does not satisfy the prerequisite.
+## Completed prerequisite
 
-Before starting, record Plan 098's completion evidence here and refresh this plan's source
-anchors, API sketches, and drift baseline against its implemented document APIs. Keep async
-ownership, lifetime and commit changes here. Execution order is **098 → 097**.
+[Plan 098's implementation reference](../docs/document-and-tab-domain.md) records the model,
+cache version 21 reset, five characterized corrections, verification, and baseline limitations.
+Its focused lifecycle, identity, cache, address/history, recovery, and environment gates pass.
+Web typecheck, build, configured lint, and actual CLI calibration pass. Expanded DOM and
+prepared-open browser failures match the original checkout, as listed in the reference.
+
+Use these settled APIs:
+
+- `apps/web/src/lib/documents/utils/{types,identity,tabs,capabilities}.ts`: `DocumentRef`,
+  `DocumentKey`, `TabId`, `FilesystemPath`, `FileResource`, membership, and static save capability.
+- `features/editor/state/workspace-document-service.ts`: live records have `key` and `target`;
+  views have `documentKey` and `tabId`. Filesystem stamps carry an explicit `path`.
+- `features/editor/state/document-state.tsx`: `liveDocumentsByKey`, `dirtyDocumentKeys`,
+  and file/settings/unsynced constructors that derive identity and synchronization state.
+- `features/editor/state/save-service.ts`: saves take `DocumentKey`; settings saves return
+  the actual acknowledgement. A document key does not encode operation revision evidence.
+- `features/editor/state/workspace-state.tsx`: typed `selectedTabContent`, `openTabContents`,
+  history, closed tabs, and reopen scroll. Navigation uses `openTabContent`/`selectContent`.
+- `lib/file-server.ts` and `lib/file-system-types.ts`: filesystem operations and prepared
+  request fields accept `FilesystemPath`; wire schemas stay unchanged.
+- `lib/coalesced-log.ts`: shared queue, protected by the installed web-boundaries lint plugin.
+
+`097-source-baseline.sha256` records the settled Platform source inputs. It includes uncommitted
+Plan 098 work because no commit was requested. Before implementation, verify these hashes and
+reconcile any changed APIs. Async ownership, lifetime, provenance, and commit changes remain here.
+The execution order **098 → 097** is now satisfied for starting this plan.
 
 The outcome is one captured owner from the first operation read through preparation,
 confirmation, persistence, recovery, and local completion. Changes calculated from a source
@@ -25,26 +45,26 @@ do not create branches, commits, pushes, or PRs without a separate instruction.
 ## Grounding and constraints
 
 Search's immediate bug is already fixed by `79bfd3e6`. In
-`apps/web/src/features/search/hooks/use-replace.ts:20`, the hook captures
+`apps/web/src/features/search/hooks/use-replace.ts` (`useWorkspaceSearchReplace`), the hook captures
 `clientForQueryClient(useQueryClient())`; its read callback passes that client explicitly.
 `utils/replace-runner.ts` carries disk versions into the workspace-edit request. Preserve
 the existing wrong-machine and planning-to-preparation drift regressions.
 
 The remaining defects and permissive contracts are:
 
-| Area                | Current evidence                                                                                                                       | Consequence                                                                                                                                                             |
-| ------------------- | -------------------------------------------------------------------------------------------------------------------------------------- | ----------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
-| Search construction | `features/search/utils/replace-runner.ts:37` accepts independent read, live-document, and apply callbacks                              | A caller can assemble inconsistent owners.                                                                                                                              |
-| Source provenance   | `features/editor/state/workspace-edit-service.ts:178` declares `sourceFileVersions?`; `:1491` checks only entries that happen to exist | Omitting evidence remains a valid API call.                                                                                                                             |
-| Preview actions     | `workspace-edit-service.ts:655` exposes parameterless `confirmPreview()`                                                               | An old callback can act on a newer active preview. Cancellation has the same shape.                                                                                     |
-| Host validation     | `workspace-edit-service.ts:2333` checks root, target stamps and path ownership; `:2368` checks selected target provenance              | Originating-document validity and pre-commit cancellation are not independent required checks. A local-only edit has no abortable HTTP request to enforce cancellation. |
-| Conflict resolution | `features/workspace/utils/conflict-editor-resolution.ts:73` uses default clients for create/write/refetch                              | Requests can cross machines while the editor/cache remain on the original owner.                                                                                        |
-| Conflict completion | The same file `:89` refetches, force-replaces documents, discards the diff, and removes the conflict                                   | New edits or a newer conflict incarnation can be discarded while an earlier resolution finishes.                                                                        |
-| Search completion   | `features/search/state/buffer-state.tsx:178` settles replacement state by root path; `hooks/use-replace.ts:129` refreshes by root      | An earlier completion can change a reset buffer or newer request at the same root.                                                                                      |
-| TUI replacement     | `apps/tui/src/search/state/replacement.ts:13` returns ownerless operations; `:52` accepts a fresh client/root at apply time            | Its API permits retargeting a prepared plan. Current keyed UI lifetime avoids a demonstrated switch bug.                                                                |
-| Navigation reads    | Terminal `hooks/use-links.ts:85` and picker `hooks/use-path-input.ts:78` use ambient `statPath`                                        | Validation can use a different owner than the intent it later completes.                                                                                                |
-| Delayed logging     | `lib/file-server.ts:586` queues reads by path without owner; workspace-edit events omit owner                                          | Events can be attributed to the selected machine or coalesced across machines.                                                                                          |
-| LSP producer        | Linked Editor `packages/lsp-plugin/src/serverSet.ts:118,240,310` and `src/plugin.ts:793` capture or replace provenance after responses | Older calculations can acquire newer source evidence.                                                                                                                   |
+| Area                | Current evidence                                                                                                                         | Consequence                                                                                                                                                             |
+| ------------------- | ---------------------------------------------------------------------------------------------------------------------------------------- | ----------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| Search construction | `features/search/utils/replace-runner.ts` (`WorkspaceSearchReplaceContext`) accepts independent read, live-document, and apply callbacks | A caller can assemble inconsistent owners.                                                                                                                              |
+| Source provenance   | `features/editor/state/workspace-edit-service.ts` declares `sourceFileVersions?`; `resolveTextOperation` checks supplied entries         | Omitting evidence remains a valid API call.                                                                                                                             |
+| Preview actions     | `workspace-edit-service.ts` exposes parameterless `confirmPreview()` and `cancelPreview()`                                               | An old callback can act on a newer active preview. Cancellation has the same shape.                                                                                     |
+| Host validation     | `workspace-edit-service.ts` uses `assertPreparedRequestCurrent` and `assertWorkspaceEditProvenanceCurrent`                               | Originating-document validity and pre-commit cancellation are not independent required checks. A local-only edit has no abortable HTTP request to enforce cancellation. |
+| Conflict resolution | `features/workspace/utils/conflict-editor-resolution.ts` (`applyConflictEditorResolution`) uses default clients for create/write/refetch | Requests can cross machines while the editor/cache remain on the original owner.                                                                                        |
+| Conflict completion | `applyConflictEditorResolution` refetches, force-replaces documents, discards the resolution key, and removes the conflict               | New edits or a newer conflict incarnation can be discarded while an earlier resolution finishes.                                                                        |
+| Search completion   | `buffer-state.tsx` (`finishReplace`) and `hooks/use-replace.ts` settle and refresh by root                                               | An earlier completion can change a reset buffer or newer request at the same root.                                                                                      |
+| TUI replacement     | `apps/tui/src/search/state/replacement.ts:13` returns ownerless operations; `:52` accepts a fresh client/root at apply time              | Its API permits retargeting a prepared plan. Current keyed UI lifetime avoids a demonstrated switch bug.                                                                |
+| Navigation reads    | Terminal `hooks/use-links.ts` (`statTerminalLinkTarget`) and picker `hooks/use-path-input.ts` use ambient `statPath`                     | Validation can use a different owner than the intent it later completes.                                                                                                |
+| Delayed logging     | `lib/file-server.ts` (`queueReadSuccessLog`) queues reads by path without owner; workspace-edit events omit owner                        | Events can be attributed to the selected machine or coalesced across machines.                                                                                          |
+| LSP producer        | Linked Editor `packages/lsp-plugin/src/serverSet.ts:118,240,310` and `src/plugin.ts:793` capture or replace provenance after responses   | Older calculations can acquire newer source evidence.                                                                                                                   |
 
 Web paths above are relative to `apps/web/src` unless fully qualified. Evidence is from
 source inspection, not runtime reproduction during planning. Recent local logs were inspected;
@@ -56,8 +76,8 @@ Keep the existing ownership foundations:
   endpoint its route. Validated endpoint replacement preserves Client and QueryClient objects.
   Each HTTP request captures its endpoint at invocation. Do not freeze an endpoint URL for an
   entire multi-request operation or introduce another environment registry.
-- `features/editor/state/runtime.ts:85` already composes document store, root generation,
-  FileSyncService, and WorkspaceEditService. `utils/file-sync-ports.ts:15` binds reads and all
+- `features/editor/state/runtime.ts` (`createEditorRuntime`) already composes document store, root generation,
+  FileSyncService, and WorkspaceEditService. `utils/file-sync-ports.ts` (`createFileSyncPorts`) binds reads and all
   mutation transitions to one explicit client. Extend these owners.
 - The existing edit engine owns locks, preview, commit, compensation, undo, redo, and recovery.
   Its server checks snapshot preconditions at preparation and revalidates the complete target
@@ -109,15 +129,17 @@ that the existing engine requires.
 Derive these types from the caller's needs:
 
 ```ts
+import type { FilesystemPath } from '@/lib/documents/utils/types'
+
 interface TextChangePreparation {
-  readText(path: string): Promise<TextChangeSource>
+  readText(path: FilesystemPath): Promise<TextChangeSource>
 }
 
 declare const textChangeSourceBrand: unique symbol
 
 interface TextChangeSource {
   readonly [textChangeSourceBrand]: true
-  readonly path: string
+  readonly path: FilesystemPath
   readonly textSnapshot: TextSnapshot
 }
 
@@ -131,7 +153,7 @@ The source object itself is opaque and service-issued. Freeze its exposed metada
 its evidence in an operation-owned WeakMap keyed by exact source-object identity. A caller
 cannot copy an object, substitute its path/snapshot and retain valid evidence. The private
 evidence representation is a discriminated union of live-document and disk-file
-sources. Live evidence includes document identity, path ownership, buffer revision and exact
+sources. Live evidence includes the `DocumentKey`, its file resource, path ownership, buffer revision and exact
 snapshot. Disk evidence includes the version returned with the exact content used to calculate
 the edits. Every source also belongs to one operation and captured root generation. Use
 existing document stamps and file-version types; do not create parallel counters for them.
@@ -222,7 +244,7 @@ A global operation framework or universal revision registry would duplicate exis
 
 ## Implementation units
 
-Start these units only after the Plan 098 prerequisite above is satisfied. Execute each unit
+The Plan 098 prerequisite above is satisfied. Execute each unit
 with its focused verification before proceeding. Within this plan, independent Editor work in
 unit 5 can run alongside Platform work; both are required for the final claimed scope.
 
@@ -409,7 +431,8 @@ strings, or a second transaction engine. New projects, caches and build output s
 Start by checking both checkouts' status and drift:
 
 ```sh
-git diff --stat bc013a3a..HEAD -- apps/web apps/tui packages/client-core plans/097-async-operation-ownership.md
+sha256sum -c plans/097-source-baseline.sha256
+git diff --stat 3c935f6a -- apps/web apps/tui packages/client-core plans/097-async-operation-ownership.md
 git -C /work/projects/Editor diff --stat 6492651..HEAD -- packages/lsp-plugin
 ```
 
@@ -422,7 +445,7 @@ it with unconditional writes or force-replacement.
 
 Completion requires all of these:
 
-- [ ] Plan 098 completed before implementation began; its verification evidence and the refreshed
+- [x] Plan 098 completed before implementation began; its verification evidence and the refreshed
       document API anchors and drift baseline are recorded here.
 - [ ] No reusable helper in the migrated set falls back to selected environment ownership.
 - [ ] Search source reads and application come from one retained service operation.

@@ -1,3 +1,4 @@
+import { filesystemPath } from '@/lib/documents/utils/identity'
 import { applyAddressView } from '@/features/address/state/apply-view'
 import { parseAddressIntent } from '@/features/address/utils/intent'
 import { workspaceSearchQuery } from '@/features/search/utils/buffer-query'
@@ -37,7 +38,7 @@ test('blank filter controls survive boot and navigation while hidden glob drafts
     isCurrent: () => true,
   })
   expect(store.getState().active?.filtersVisible).toBe(true)
-  await navigation.openFile({ owner: harness.workspace, path: 'repo/a.ts' })
+  await navigation.openFile({ owner: harness.workspace, path: filesystemPath('repo/a.ts') })
   expect(store.getState().active?.filtersVisible).toBe(true)
   await navigation.setSearchOptions(
     { includeGlobText: '*.ts', excludeGlobText: 'c.ts' },
@@ -56,8 +57,8 @@ test('blank filter controls survive boot and navigation while hidden glob drafts
     includeGlobText: '*.ts',
     excludeGlobText: 'c.ts',
   })
-  await navigation.openFile({ owner: harness.workspace, path: 'repo/b.ts' })
-  await navigation.openFile({ owner: harness.workspace, path: 'repo/c.ts' })
+  await navigation.openFile({ owner: harness.workspace, path: filesystemPath('repo/b.ts') })
+  await navigation.openFile({ owner: harness.workspace, path: filesystemPath('repo/c.ts') })
   await pressBack(navigation)
   const hidden = store.getState().active
   if (!hidden) return expect.unreachable('search buffer disappeared')

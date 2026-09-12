@@ -1,4 +1,6 @@
-import { describe, expect, it } from 'vitest'
+import { filesystemPath } from '@/lib/documents/utils/identity'
+import { describe } from 'vitest'
+import { expect, test as it } from '../../../../test/fixtures'
 import type {
   FileTreeDirectoryHandle,
   FileTreeFileHandle,
@@ -724,7 +726,7 @@ function isFileHandle(item: FileTreeItemHandle | null): item is FileTreeFileHand
 }
 
 function tree(path: string, entries: TreeEntry[]): TreeResult {
-  return { entries, path }
+  return { entries, path: filesystemPath(path) }
 }
 
 function symlinkDirectory(path: string): TreeEntry {
@@ -732,7 +734,7 @@ function symlinkDirectory(path: string): TreeEntry {
     birthtimeMs: 1,
     mtimeMs: 1,
     name: path.split('/').at(-1) ?? path,
-    path,
+    path: filesystemPath(path),
     size: 1,
     targetType: 'directory',
     type: 'symlink',
@@ -745,7 +747,7 @@ function directory(path: string): TreeEntry {
     birthtimeMs: 1,
     mtimeMs: 1,
     name: path.split('/').at(-1) ?? path,
-    path,
+    path: filesystemPath(path),
     size: 1,
     type: 'directory',
     version: `test:1:${path}`,
@@ -757,7 +759,7 @@ function file(path: string): TreeEntry {
     birthtimeMs: 1,
     mtimeMs: 1,
     name: path.split('/').at(-1) ?? path,
-    path,
+    path: filesystemPath(path),
     size: 1,
     type: 'file',
     version: `test:1:${path}`,

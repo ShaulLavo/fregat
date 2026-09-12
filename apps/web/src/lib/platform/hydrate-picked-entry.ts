@@ -1,3 +1,4 @@
+import { filesystemPath } from '@/lib/documents/utils/identity'
 import { createClientInvariantError } from '@/lib/structured-errors'
 
 import { statPath } from '@/lib/file-server'
@@ -20,7 +21,7 @@ export async function hydratePickedEntry(
 
 function clientPathFromOsPath(path: string) {
   const normalized = path.replaceAll('\\', '/')
-  return normalized.replace(/^\/+/, '')
+  return filesystemPath(normalized.replace(/^\/+/, ''))
 }
 
 function basenameFromOsPath(path: string) {

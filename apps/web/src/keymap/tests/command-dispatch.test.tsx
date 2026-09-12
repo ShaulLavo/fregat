@@ -1,10 +1,16 @@
+import { documentTab } from '@/lib/documents/utils/tabs'
+import { fileResource, filesystemPath, tabId as typedTabId } from '@/lib/documents/utils/identity'
+import {
+  testDocumentKey,
+  testDocumentRef,
+  testTabContent,
+} from '../../../test/factories/document-targets'
 import { afterEach, vi } from 'vitest'
 
 import type {
   RequestCloseTab,
   UnsavedDialogTarget,
 } from '@/features/editor/hooks/use-dirty-tab-close'
-import { compareSavedDocumentId } from '@/features/editor/utils/compare-saved-document'
 import type {
   WorkspaceEditServiceSnapshot,
   WorkspaceMutationReporter,
@@ -43,7 +49,10 @@ test.each([
     focus,
     options: {
       rootPath: '/repo',
-      snapshot: { activeFilePath: '/repo/src/active.ts', activeTabId: 'tab-1' },
+      snapshot: {
+        activeDocument: testDocumentRef('/repo/src/active.ts'),
+        activeTabId: typedTabId('tab-1'),
+      },
       runtime: {
         shell: {
           showCommandPalette: (search = '') => {
@@ -108,7 +117,9 @@ test('workspace editor focus acknowledges the active new-side diff target', asyn
     options: { rootPath: '/repo' },
     queryClient: createTestQueryClient(),
   })
-  commandRuntime.runtime.editor.openFileSurface(compareSavedDocumentId(path))
+  commandRuntime.runtime.editor.openTabContent(
+    documentTab({ kind: 'compare-saved', file: fileResource(filesystemPath(path)) }),
+  )
 
   const ticket = commandRuntime.bus.dispatch('workspace.focusEditor', {
     source: { caller: 'command-dispatch-test', kind: 'programmatic' },
@@ -132,8 +143,8 @@ test('editor dispatch resolves the active tab only in the snapshot layout', asyn
     focus,
     options: {
       snapshot: {
-        activeFilePath: '/repo/src/active.ts',
-        activeTabId: 'tab-1',
+        activeDocument: testDocumentRef('/repo/src/active.ts'),
+        activeTabId: typedTabId('tab-1'),
         uiMode: 'workbench',
       },
     },
@@ -199,7 +210,7 @@ test('a same-path stale diff cannot acknowledge a newly opened compare tab', asy
     options: { rootPath: '/repo' },
     queryClient: createTestQueryClient(),
   })
-  commandRuntime.runtime.editor.openFileSurface(path)
+  commandRuntime.runtime.editor.openTabContent(testTabContent(path))
 
   const ticket = commandRuntime.bus.dispatch('workspace.compareWithSaved', {
     source: { caller: 'command-dispatch-test', kind: 'programmatic' },
@@ -217,7 +228,9 @@ test('a same-path stale diff cannot acknowledge a newly opened compare tab', asy
   const activeTab = activeEditorTabForWorkbenchPanels(
     commandRuntime.runtime.workspace.getState().workbenchPanels,
   )
-  expect(activeTab?.path).toBe(compareSavedDocumentId(path))
+  expect(activeTab?.content).toEqual(
+    documentTab({ kind: 'compare-saved', file: fileResource(filesystemPath(path)) }),
+  )
   expect(activeTab).not.toBeNull()
   if (!activeTab) return
 
@@ -321,7 +334,7 @@ test.each(['workspace.saveFile', 'workspace.saveAllFiles'] as const)(
         rootPath: '/repo',
         snapshot: {
           activeDocumentSavable: true,
-          activeFilePath: '/repo/a.ts',
+          activeDocument: testDocumentRef('/repo/a.ts'),
           workspaceMutable: false,
         },
       },
@@ -346,7 +359,7 @@ test('a recovery-conflicted active document is not exposed as savable', () => {
     options: { rootPath: '/repo' },
     queryClient: createTestQueryClient(),
   })
-  const path = '/repo/a.ts'
+  const path = filesystemPath('/repo/a.ts')
   commandRuntime.runtime.documents.store.getState().ensureLiveEditorDocument({
     content: 'unsaved',
     mtimeMs: 1,
@@ -354,13 +367,26 @@ test('a recovery-conflicted active document is not exposed as savable', () => {
     size: 7,
     version: 'v1',
   })
-  commandRuntime.runtime.editor.openFileSurface(path)
+  commandRuntime.runtime.editor.openTabContent(testTabContent(path))
   commandRuntime.runtime.documents.store
     .getState()
     .markWorkspaceDocumentRecoveryConflict([path], 'partial')
 
   expect(commandRuntime.captureSnapshot().activeDocumentSavable).toBe(false)
   expect(commandRuntime.bus.dispatch('workspace.saveFile', invocation()).claimed).toBe(false)
+
+  const document = commandRuntime.runtime.documents.store
+    .getState()
+    .getLiveEditorDocument(testDocumentKey(path))
+  commandRuntime.runtime.documents.store
+    .getState()
+    .clearWorkspaceDocumentRecoveryConflict('partial')
+
+  expect(commandRuntime.captureSnapshot().activeDocumentSavable).toBe(true)
+  expect(
+    commandRuntime.runtime.documents.store.getState().getLiveEditorDocument(testDocumentKey(path))
+      ?.buffer,
+  ).toBe(document?.buffer)
 })
 
 test.each(['busy', 'not-found'] as const)(
@@ -398,7 +424,7 @@ test('close current tab waits for the exact dirty-dialog focus acknowledgement',
     'Dirty dialog',
   )
   const requestCloseTab = vi.fn(
-    () => ({ dialogTarget, status: 'deferred', tabIds: ['tab-1'] }) as const,
+    () => ({ dialogTarget, status: 'deferred', tabIds: ['tab-1'].map(typedTabId) }) as const,
   )
   const commandRuntime = closeCommandRuntime(focus, requestCloseTab)
 
@@ -431,7 +457,7 @@ test('a clean close settles only after app-shell focus acknowledgement', async (
       ({
         status: 'closed',
         completion: Promise.resolve({ status: 'applied' as const }),
-        tabIds: ['tab-1'],
+        tabIds: ['tab-1'].map(typedTabId),
       }) as const,
   )
   const commandRuntime = closeCommandRuntime(focus, requestCloseTab)
@@ -463,7 +489,10 @@ function closeCommandRuntime(focus: FocusService, requestCloseTab: RequestCloseT
     options: {
       rootPath: '/repo',
       runtime: { tabs: { requestCloseTab } },
-      snapshot: { activeFilePath: '/repo/src/active.ts', activeTabId: 'tab-1' },
+      snapshot: {
+        activeDocument: testDocumentRef('/repo/src/active.ts'),
+        activeTabId: typedTabId('tab-1'),
+      },
     },
     queryClient: createTestQueryClient(),
   })

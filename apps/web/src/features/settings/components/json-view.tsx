@@ -6,7 +6,8 @@ import { JsonLoading } from '@/features/settings/components/json-loading'
 import { RawConflictBanner } from '@/features/settings/components/raw-conflict-banner'
 import { useSettingsDiagnosticsPlugin } from '@/features/settings/hooks/use-settings-diagnostics-plugin'
 import type { SettingsScope } from '@/features/settings/state/scope-store'
-import { settingsJsonDocumentId } from '@/features/settings/utils/json-document'
+import { documentKey, settingsJsonDocument } from '@/lib/documents/utils/identity'
+import type { TabId, WorkspaceRoot } from '@/lib/documents/utils/types'
 import { SETTINGS_LANGUAGE_SERVER_TARGET } from '@/features/settings/utils/language-server'
 
 /**
@@ -29,25 +30,26 @@ export function SettingsJsonView({
 
   file: SettingsLayerFile | null
   liveDocument: EditorRenderDocument | null
-  rootPath: string
+  rootPath: WorkspaceRoot
   scope: SettingsScope
-  tabId: string
+  tabId: TabId
 }) {
   const diagnosticsPlugins = useSettingsDiagnosticsPlugin({ diagnostics, file, target: scope })
   // The buffer is seeded and bound in effects, so the first render after opening
   // the view — or after a scope switch — still has the previous document or none.
-  if (!liveDocument || liveDocument.path !== settingsJsonDocumentId(scope)) {
+  if (!liveDocument || liveDocument.key !== documentKey(settingsJsonDocument(scope))) {
     return <JsonLoading />
   }
 
   return (
     <div className='flex h-full min-h-0 flex-col'>
-      <RawConflictBanner documentId={settingsJsonDocumentId(scope)} />
+      <RawConflictBanner documentKey={documentKey(settingsJsonDocument(scope))} />
       <div className='min-h-0 flex-1'>
         <Editor
           active
           additionalPlugins={diagnosticsPlugins}
           document={liveDocument}
+          target={liveDocument.target}
           languageServerTarget={SETTINGS_LANGUAGE_SERVER_TARGET}
           rootPath={rootPath}
           tabId={tabId}

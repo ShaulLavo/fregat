@@ -1,3 +1,4 @@
+import { filesystemPath } from '@/lib/documents/utils/identity'
 import type { Terminal, ProvidedLink } from 'ghostty-webgpu'
 import { useEffectEvent } from 'react'
 
@@ -82,7 +83,10 @@ function ghosttyLink(
  */
 async function statTerminalLinkTarget(path: string) {
   try {
-    const entry = await statPath(workspaceRequestPath(path), AbortSignal.timeout(STAT_TIMEOUT_MS))
+    const entry = await statPath(
+      filesystemPath(workspaceRequestPath(path)),
+      AbortSignal.timeout(STAT_TIMEOUT_MS),
+    )
 
     return { error: null, isFile: isFileEntry(entry) }
   } catch (error) {

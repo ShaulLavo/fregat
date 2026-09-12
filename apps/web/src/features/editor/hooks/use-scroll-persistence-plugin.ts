@@ -1,24 +1,25 @@
 import type { EditorPlugin, EditorScrollPosition, EditorViewSnapshot } from '@singapor/core'
 import { useLayoutEffect, useMemo, useRef, type RefObject } from 'react'
 
+import type { DocumentKey } from '@/lib/documents/utils/types'
 import type { EditorRenderDocument } from '@/features/editor/utils/render-document'
 import { capOverscrollTop } from '@/features/editor/utils/scroll-position'
 import { editorPerformanceFeatureDisabled } from '@/features/editor/state/performance-trace'
 
 type UseScrollPersistencePluginOptions = {
-  document: Pick<EditorRenderDocument, 'path'>
-  onScrollPositionChange?: (path: string, scrollPosition: EditorScrollPosition) => void
+  document: Pick<EditorRenderDocument, 'key'>
+  onScrollPositionChange?: (key: DocumentKey, scrollPosition: EditorScrollPosition) => void
 }
 
 type ScrollPersistenceState = {
-  path: string
-  onChange?: (path: string, scrollPosition: EditorScrollPosition) => void
+  key: DocumentKey
+  onChange?: (key: DocumentKey, scrollPosition: EditorScrollPosition) => void
 }
 
 type PendingScrollPosition = {
   left: number
   onChange: ScrollPersistenceState['onChange']
-  path: string
+  key: DocumentKey
   top: number
 }
 
@@ -28,15 +29,15 @@ export function useScrollPersistencePlugin({
 }: UseScrollPersistencePluginOptions) {
   const stateRef = useRef<ScrollPersistenceState>({
     onChange: onScrollPositionChange,
-    path: document.path,
+    key: document.key,
   })
 
   useLayoutEffect(() => {
     stateRef.current = {
       onChange: onScrollPositionChange,
-      path: document.path,
+      key: document.key,
     }
-  }, [document.path, onScrollPositionChange])
+  }, [document.key, onScrollPositionChange])
 
   return useMemo<EditorPlugin>(
     () => ({
@@ -64,7 +65,7 @@ export function useScrollPersistencePlugin({
 // arrive synchronously inside the editor's scroll render pass, and notifying
 // React subscribers there puts their work back into the hot frame.
 function createScrollPositionPersister(stateRef: RefObject<ScrollPersistenceState>) {
-  let lastPath = ''
+  let lastKey: DocumentKey | null = null
   let lastLeft = -1
   let lastTop = -1
   let pending: PendingScrollPosition | null = null
@@ -75,28 +76,29 @@ function createScrollPositionPersister(stateRef: RefObject<ScrollPersistenceStat
     const next = pending
     pending = null
     if (!next) return
-    if (next.path === lastPath && next.left === lastLeft && next.top === lastTop) {
+    if (next.key === lastKey && next.left === lastLeft && next.top === lastTop) {
       return
     }
 
-    lastPath = next.path
+    lastKey = next.key
     lastLeft = next.left
     lastTop = next.top
-    next.onChange?.(next.path, { left: next.left, top: next.top })
+    next.onChange?.(next.key, { left: next.left, top: next.top })
   }
 
   return {
     persistSnapshot: (snapshot: EditorViewSnapshot) => {
       // The ref can move to another tab before this frame flushes.
       const state = stateRef.current
+      if (snapshot.documentId !== null && snapshot.documentId !== state.key) return
       pending = {
         left: snapshot.viewport.scrollLeft,
         onChange: state.onChange,
-        path: snapshot.documentId ?? state.path,
+        key: state.key,
         top: capOverscrollTop(snapshot.viewport.scrollTop, snapshot),
       }
       if (frame !== null) return
-      if (pending.path === lastPath && pending.left === lastLeft && pending.top === lastTop) return
+      if (pending.key === lastKey && pending.left === lastLeft && pending.top === lastTop) return
 
       frame = requestAnimationFrame(flush)
     },

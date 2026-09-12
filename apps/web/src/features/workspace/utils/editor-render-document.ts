@@ -1,3 +1,4 @@
+import type { DocumentKey, DocumentRef } from '@/lib/documents/utils/types'
 import type { EditorRenderDocument } from '@/features/editor/utils/render-document'
 import type { FileResult } from '@/lib/file-system-types'
 import type { LoadState } from '@/lib/load-state'
@@ -10,29 +11,29 @@ export function readyFile(fileState: LoadState<FileResult>) {
 
 export function joinedEditorRenderDocument({
   buffer,
-  documentId,
+  documentKey,
   editability,
-  path,
+  target,
   preparedDocument,
   view,
 }: {
   buffer: EditorRenderDocument['buffer'] | null
-  documentId: string | null
+  documentKey: DocumentKey | null
   editability: EditorRenderDocument['editability']
-  path: string | null
+  target: DocumentRef | null
   preparedDocument?: EditorRenderDocument['preparedDocument']
   view: EditorRenderDocument['view'] | null
 }): EditorRenderDocument | null {
   if (!buffer) return null
-  if (!documentId) return null
-  if (!path) return null
+  if (!documentKey) return null
+  if (!target) return null
   if (!view) return null
 
   return {
     buffer,
     editability,
-    id: documentId,
-    path,
+    key: documentKey,
+    target,
     preparedDocument,
     view,
   }

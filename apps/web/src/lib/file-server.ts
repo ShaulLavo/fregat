@@ -1,24 +1,29 @@
+import { filesystemPath } from '@/lib/documents/utils/identity'
+import type { FilesystemPath } from '@/lib/documents/utils/types'
+import {
+  entryFromResponse,
+  fileResultFromResponse,
+  metadataFromResponse,
+  type WorkspaceEditPrepareRequest,
+} from '@/lib/file-system-types'
 import { readDirectory, readFilePreview } from '@workspace/client-core/files/read'
 import { clientLogContext } from '@/lib/environments/state/log-context'
 import { getClient, type Client } from '@/lib/client'
 import type {
   FileResult,
   FindMatch,
-  RecentResult,
   ServerInfo,
   StatResult,
-  TreeEntry,
   TreeResult,
 } from '@/lib/file-system-types'
 import { clientErrorMessage } from '@/lib/client-error-taxonomy'
 import { annotateClientError } from '@/lib/client-error-context'
 import { log, observeClientOperation } from '@/lib/client-logging'
-import { createCoalescedLogQueue } from '@/features/workspace/utils/coalesced-log'
+import { createCoalescedLogQueue } from '@/lib/coalesced-log'
 import { omitNullish } from '@/lib/objects'
 import { createRpcError } from '@/lib/structured-errors'
 import { collectWorkspaceSearch } from '@workspace/client-core/files/search-client'
 import type {
-  WorkspaceEditPrepareRequest,
   WorkspaceEditRecoverRequest,
   WorkspaceEditRecoveryListResult,
   WorkspaceEditReleaseRequest,
@@ -47,7 +52,7 @@ type DeleteResult = {
 }
 
 type OpenWorkspaceRootResult = {
-  entry?: WorkspaceRootEntry
+  entry?: Omit<WorkspaceRootEntry, 'path'> & { path: FilesystemPath }
   status: 'opened' | 'superseded'
   workspaceIndex: NonNullable<ServerInfo['workspaceIndex']>
 }
@@ -144,7 +149,7 @@ export async function fetchWorkspaceEditStatus(
 }
 
 export async function fetchWorkspaceEditRecovery(
-  workspace: string,
+  workspace: FilesystemPath,
   signal: AbortSignal,
   client: Client = getClient(),
 ): Promise<WorkspaceEditRecoveryListResult> {
@@ -155,11 +160,19 @@ export async function fetchWorkspaceEditRecovery(
   return unwrapWorkspaceEditResponse(response)
 }
 
-export async function fetchTree(path: string, signal: AbortSignal, client: Client = getClient()) {
+export async function fetchTree(
+  path: FilesystemPath,
+  signal: AbortSignal,
+  client: Client = getClient(),
+) {
   const startedAt = performance.now()
 
   try {
-    const result = await readDirectory({ client, path, signal })
+    const response = await readDirectory({ client, path, signal })
+    const result: TreeResult = {
+      path: filesystemPath(response.path),
+      entries: response.entries.map(entryFromResponse),
+    }
     queueTreeSuccessLog(path, result, startedAt)
     return result
   } catch (error) {
@@ -172,11 +185,15 @@ export async function fetchTree(path: string, signal: AbortSignal, client: Clien
   }
 }
 
-export async function fetchFile(path: string, signal: AbortSignal, client: Client = getClient()) {
+export async function fetchFile(
+  path: FilesystemPath,
+  signal: AbortSignal,
+  client: Client = getClient(),
+) {
   const startedAt = performance.now()
 
   try {
-    const result = await readFilePreview({ client, path, signal })
+    const result = fileResultFromResponse(await readFilePreview({ client, path, signal }))
     queueReadSuccessLog(path, result, startedAt)
     return result
   } catch (error) {
@@ -195,7 +212,7 @@ export async function fetchQuickOpenFiles(
     query,
     signal,
   }: {
-    path: string
+    path: FilesystemPath
     query: string
     signal: AbortSignal
   },
@@ -232,7 +249,10 @@ export async function fetchQuickOpenFiles(
       )
       measurement = result.measurement
 
-      return result.matches as FindMatch[]
+      return result.matches.map((match): FindMatch => ({
+        ...match,
+        path: filesystemPath(match.path),
+      }))
     },
     (matches) => ({
       matchCount: matches.length,
@@ -242,7 +262,7 @@ export async function fetchQuickOpenFiles(
 }
 
 export async function writeFileContent(
-  path: string,
+  path: FilesystemPath,
   content: string,
   options?: number | null | WriteFileContentOptions,
   client: Client = getClient(),
@@ -268,7 +288,7 @@ export async function writeFileContent(
 
       if (response.error) throw createRpcError(response.error)
 
-      return response.data as TreeEntry
+      return metadataFromResponse(response.data)
     },
     (entry) => ({ entryType: entry.type, size: entry.size }),
   )
@@ -307,7 +327,7 @@ function writeFileContentBody(path: string, content: string, options: WriteFileC
 }
 
 export async function createFileContent(
-  path: string,
+  path: FilesystemPath,
   content: string,
   client: Client = getClient(),
 ) {
@@ -326,19 +346,19 @@ export async function createFileContent(
 
       if (response.error) throw createRpcError(response.error)
 
-      return response.data as TreeEntry
+      return metadataFromResponse(response.data)
     },
     (entry) => ({ entryType: entry.type, size: entry.size }),
   )
 }
 
-export async function ensureFolderPath(path: string, client: Client = getClient()) {
+export async function ensureFolderPath(path: FilesystemPath, client: Client = getClient()) {
   if (!path) return null
 
   return requestFolderCreation(path, true, client)
 }
 
-export async function createFolderPath(path: string, client: Client = getClient()) {
+export async function createFolderPath(path: FilesystemPath, client: Client = getClient()) {
   return requestFolderCreation(path, false, client)
 }
 
@@ -365,13 +385,17 @@ async function requestFolderCreation(
 
       if (response.error) throw createRpcError(response.error)
 
-      return response.data as TreeEntry
+      return metadataFromResponse(response.data)
     },
     (entry) => ({ entryType: entry.type }),
   )
 }
 
-export async function renamePath(from: string, to: string, client: Client = getClient()) {
+export async function renamePath(
+  from: FilesystemPath,
+  to: FilesystemPath,
+  client: Client = getClient(),
+) {
   return observeClientOperation(
     {
       ...clientLogContext(client),
@@ -387,13 +411,17 @@ export async function renamePath(from: string, to: string, client: Client = getC
 
       if (response.error) throw response.error
 
-      return response.data as TreeEntry
+      return metadataFromResponse(response.data)
     },
     (entry) => ({ entryType: entry.type, size: entry.size }),
   )
 }
 
-export async function copyPath(from: string, to: string, client: Client = getClient()) {
+export async function copyPath(
+  from: FilesystemPath,
+  to: FilesystemPath,
+  client: Client = getClient(),
+) {
   return observeClientOperation(
     {
       ...clientLogContext(client),
@@ -412,13 +440,17 @@ export async function copyPath(from: string, to: string, client: Client = getCli
 
       if (response.error) throw createRpcError(response.error)
 
-      return response.data as TreeEntry
+      return metadataFromResponse(response.data)
     },
     (entry) => ({ entryType: entry.type, size: entry.size }),
   )
 }
 
-export async function deletePath(path: string, recursive: boolean, client: Client = getClient()) {
+export async function deletePath(
+  path: FilesystemPath,
+  recursive: boolean,
+  client: Client = getClient(),
+) {
   return observeClientOperation(
     {
       ...clientLogContext(client),
@@ -464,7 +496,11 @@ export async function fetchServerInfo(signal: AbortSignal, client: Client = getC
   )
 }
 
-export async function statPath(path: string, signal: AbortSignal, client: Client = getClient()) {
+export async function statPath(
+  path: FilesystemPath,
+  signal: AbortSignal,
+  client: Client = getClient(),
+) {
   return observeClientOperation(
     {
       ...clientLogContext(client),
@@ -480,14 +516,21 @@ export async function statPath(path: string, signal: AbortSignal, client: Client
 
       if (response.error) throw createRpcError(response.error)
 
-      return response.data as StatResult
+      return {
+        ...response.data,
+        path: filesystemPath(response.data.path),
+        canonicalPath:
+          response.data.canonicalPath === undefined
+            ? undefined
+            : filesystemPath(response.data.canonicalPath),
+      } satisfies StatResult
     },
     (entry) => ({ entryType: entry.type, size: entry.size }),
   )
 }
 
 export async function openWorkspaceRootPath(
-  path: string,
+  path: FilesystemPath,
   generation: number,
   signal: AbortSignal,
   client: Client = getClient(),
@@ -511,7 +554,11 @@ export async function openWorkspaceRootPath(
 
       if (response.error) throw createRpcError(response.error)
 
-      return response.data as OpenWorkspaceRootResult
+      const result = response.data
+      return {
+        ...result,
+        entry: result.entry ? metadataFromResponse(result.entry) : undefined,
+      } satisfies OpenWorkspaceRootResult
     },
     (result) => ({
       openStatus: result.status,
@@ -542,13 +589,13 @@ export async function fetchRecentEntries(
 
       if (response.error) throw createRpcError(response.error)
 
-      return (response.data as RecentResult).entries
+      return response.data.entries.map(entryFromResponse)
     },
     (entries) => ({ entryCount: entries.length }),
   )
 }
 
-export async function recordRecentEntry(path: string, client: Client = getClient()) {
+export async function recordRecentEntry(path: FilesystemPath, client: Client = getClient()) {
   return observeClientOperation(
     {
       ...clientLogContext(client),

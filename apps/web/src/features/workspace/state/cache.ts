@@ -8,13 +8,6 @@ import {
 } from '@/features/workspace/utils/location'
 import { type ScopedStorage } from '@/lib/environments/state/scoped-storage'
 import type { PickedFsEntry } from '@/lib/file-system-types'
-import { fileBackedDocumentPath } from '@/features/editor/utils/file-backed-document'
-import { parseConflictDiffDocumentId } from '@/features/editor/utils/conflict-diff-document'
-import { parseDiffDocumentId } from '@/features/git/utils/diff-document'
-import { parseRefDocumentId } from '@/features/git/utils/ref-document'
-import { parseCompareSavedDocumentId } from '@/features/editor/utils/compare-saved-document'
-import { isSettingsDocumentId } from '@/features/settings/utils/document'
-import { parseSearchBufferDocumentId } from '@/features/search/utils/buffer-document'
 import {
   createDefaultChatModePanels,
   isChatModeToolTab,
@@ -44,11 +37,20 @@ import {
   workspaceCacheStorageKey,
   writeWorkspaceCacheEntry as writeCacheEntry,
 } from '@/lib/workspace-cache-storage'
+import { filesystemPath, tabId, workspaceRoot } from '@/lib/documents/utils/identity'
+import { tabContentKey } from '@/lib/documents/utils/tabs'
 import {
-  isPathInWorkspace,
-  toWorkspaceAbsolute,
-  toWorkspaceRelative,
-} from '@workspace/client-core/files/path'
+  encodeTabContent,
+  decodeTabContent,
+  storedTabContentSchema,
+  type StoredTabContent,
+} from '@/lib/documents/utils/storage-codec'
+import type {
+  ReopenScrollPosition,
+  TabContent,
+  TabId,
+  WorkspaceRoot,
+} from '@/lib/documents/utils/types'
 import {
   environmentIdSchema,
   workspaceAddressSchema,
@@ -61,7 +63,6 @@ import {
   type WorkspaceSearchWarningEvent,
 } from '@workspace/contracts'
 import * as v from 'valibot'
-import type { EditorScrollPosition } from '@singapor/core'
 
 const WORKSPACE_SLICE_KEY_PREFIX = workspaceCacheStorageKey('workspace:')
 const SEARCH_BUFFER_KEY_PREFIX = workspaceCacheStorageKey('search:')
@@ -123,7 +124,7 @@ const pickedDirectorySchema = v.object({
   birthtimeMs: v.number(),
   mtimeMs: v.number(),
   name: v.string(),
-  path: v.string(),
+  path: v.pipe(v.string(), v.transform(filesystemPath)),
   size: v.number(),
   type: v.literal('directory'),
   version: v.optional(v.string(), ''),
@@ -133,7 +134,7 @@ const pickedSymlinkDirectorySchema = v.object({
   birthtimeMs: v.number(),
   mtimeMs: v.number(),
   name: v.string(),
-  path: v.string(),
+  path: v.pipe(v.string(), v.transform(filesystemPath)),
   size: v.number(),
   targetType: v.literal('directory'),
   type: v.literal('symlink'),
@@ -155,7 +156,6 @@ const cachedRootSchema = v.pipe(
 )
 
 const nullableStringSchema = v.nullable(v.string())
-const stringArraySchema = v.array(v.string())
 const entryTypeSchema = v.union([
   v.literal('file'),
   v.literal('directory'),
@@ -240,9 +240,10 @@ const sidebarTabSchema = v.union([
   v.literal('search'),
 ])
 const bottomTabSchema = v.union([v.literal('terminal'), v.literal('problems')])
+const tabIdSchema = v.pipe(v.string(), v.minLength(1), v.transform(tabId))
 const editorTabRecordSchema = v.strictObject({
-  id: v.string(),
-  path: v.string(),
+  id: tabIdSchema,
+  content: storedTabContentSchema,
 })
 const scrollPositionSchema = v.strictObject({
   left: v.number(),
@@ -258,7 +259,7 @@ const mainLayoutSchema = v.strictObject({
 })
 const workbenchPanelsSchema = v.strictObject({
   activeBottomTab: bottomTabSchema,
-  activeEditorTabId: nullableStringSchema,
+  activeEditorTabId: v.nullable(tabIdSchema),
   activeSidebarTab: sidebarTabSchema,
   bottomPanelOpen: v.boolean(),
   editorTabs: v.array(editorTabRecordSchema),
@@ -269,11 +270,15 @@ const workbenchLayoutSchema = v.strictObject({
   outerLayout: outerLayoutSchema,
 })
 const workspaceSliceSchema = v.strictObject({
-  editorHistory: stringArraySchema,
-  recentlyClosedEditorPaths: stringArraySchema,
-  scrollPositionByPath: v.record(v.string(), scrollPositionSchema),
+  editorHistory: v.array(storedTabContentSchema),
+  recentlyClosedTabs: v.array(storedTabContentSchema),
+  reopenScrollPositions: v.array(
+    v.strictObject({ content: storedTabContentSchema, position: scrollPositionSchema }),
+  ),
   workbenchPanels: workbenchPanelsSchema,
 })
+type StoredWorkspaceSlice = v.InferOutput<typeof workspaceSliceSchema>
+
 const uiModeSchema = v.custom<WorkspaceUiMode>(isWorkspaceUiMode)
 const chatModePanelsSchema = v.strictObject({
   activeToolTab: v.custom<ChatModeToolTab>(isChatModeToolTab),
@@ -299,9 +304,9 @@ const AUTO_SESSION_SELECTION: SessionSelection = { kind: 'auto' }
 
 /** Each checkout keeps an independent editor slice. */
 export type CachedWorkspaceSlice = {
-  editorHistory: string[]
-  recentlyClosedEditorPaths: string[]
-  scrollPositionByPath: Record<string, EditorScrollPosition>
+  editorHistory: readonly TabContent[]
+  recentlyClosedTabs: readonly TabContent[]
+  reopenScrollPositions: readonly ReopenScrollPosition[]
   workbenchPanels: WorkbenchPanels
 }
 
@@ -510,10 +515,10 @@ function readWorkspaceSlice(
 ): CachedWorkspaceSlice {
   return restoredSliceForWorkspace(
     rootPath,
-    readCacheEntry<CachedWorkspaceSlice>(
+    readCacheEntry<StoredWorkspaceSlice>(
       workspaceSliceStorageKey(rootPath, worktreeId),
       workspaceSliceSchema,
-      emptyWorkspaceSlice(),
+      storedSliceForWorkspace(rootPath, emptyWorkspaceSlice()),
       { storage },
     ),
   )
@@ -532,109 +537,81 @@ function readSearchBuffer(storage: ScopedStorage, rootPath: string, worktreeId: 
   return searchBuffer
 }
 
-function sliceForWorkspace(rootPath: string, slice: CachedWorkspaceSlice): CachedWorkspaceSlice {
-  const editorTabs = slice.workbenchPanels.editorTabs.filter((tab) =>
-    pathForWorkspace(rootPath, tab.path),
-  )
-
+function storedSliceForWorkspace(
+  rootPath: string,
+  slice: CachedWorkspaceSlice,
+): StoredWorkspaceSlice {
+  const root = workspaceRoot(rootPath)
+  const editorTabs = slice.workbenchPanels.editorTabs.flatMap((tab) => {
+    const content = encodeTabContent(tab.content, root)
+    return content === null ? [] : [{ id: tab.id, content }]
+  })
   return {
-    editorHistory: workspacePathsForCache(rootPath, slice.editorHistory),
-    recentlyClosedEditorPaths: workspacePathsForCache(rootPath, slice.recentlyClosedEditorPaths),
-    scrollPositionByPath: scrollPositionsForWorkspace(rootPath, slice.scrollPositionByPath),
-    workbenchPanels: normalizeWorkbenchPanels({
-      activeBottomTab: slice.workbenchPanels.activeBottomTab,
+    editorHistory: storedContents(root, slice.editorHistory),
+    recentlyClosedTabs: storedContents(root, slice.recentlyClosedTabs),
+    reopenScrollPositions: slice.reopenScrollPositions.flatMap((entry) => {
+      const content = encodeTabContent(entry.content, root)
+      return content === null ? [] : [{ content, position: { ...entry.position } }]
+    }),
+    workbenchPanels: {
+      ...slice.workbenchPanels,
       activeEditorTabId: activeEditorTabIdForTabs(
         editorTabs,
         slice.workbenchPanels.activeEditorTabId,
       ),
-      activeSidebarTab: slice.workbenchPanels.activeSidebarTab,
-      bottomPanelOpen: slice.workbenchPanels.bottomPanelOpen,
       editorTabs,
-      sidebarOpen: slice.workbenchPanels.sidebarOpen,
+    },
+  }
+}
+
+function restoredSliceForWorkspace(
+  rootPath: string,
+  slice: StoredWorkspaceSlice,
+): CachedWorkspaceSlice {
+  const root = workspaceRoot(rootPath)
+  const editorTabs = slice.workbenchPanels.editorTabs.flatMap((tab) => {
+    const content = decodeTabContent(tab.content, root)
+    return content === null ? [] : [{ id: tab.id, content }]
+  })
+  return {
+    editorHistory: restoredContents(root, slice.editorHistory),
+    recentlyClosedTabs: restoredContents(root, slice.recentlyClosedTabs),
+    reopenScrollPositions: slice.reopenScrollPositions.flatMap((entry) => {
+      const content = decodeTabContent(entry.content, root)
+      return content === null ? [] : [{ content, position: entry.position }]
+    }),
+    workbenchPanels: normalizeWorkbenchPanels({
+      ...slice.workbenchPanels,
+      activeEditorTabId: activeEditorTabIdForTabs(
+        editorTabs,
+        slice.workbenchPanels.activeEditorTabId,
+      ),
+      editorTabs,
     }),
   }
 }
 
-function workspacePathsForCache(rootPath: string, paths: readonly string[]) {
-  return Array.from(new Set(paths.filter((path) => pathForWorkspace(rootPath, path))))
+function storedContents(root: WorkspaceRoot, contents: readonly TabContent[]): StoredTabContent[] {
+  return uniqueContents(contents).flatMap((content) => {
+    const encoded = encodeTabContent(content, root)
+    return encoded === null ? [] : [encoded]
+  })
 }
 
-function scrollPositionsForWorkspace(
-  rootPath: string,
-  scrollPositionByPath: Readonly<Record<string, EditorScrollPosition>>,
-) {
-  return Object.fromEntries(
-    Object.entries(scrollPositionByPath).filter(([path]) => pathForWorkspace(rootPath, path)),
+function restoredContents(
+  root: WorkspaceRoot,
+  contents: readonly StoredTabContent[],
+): TabContent[] {
+  return uniqueContents(
+    contents.flatMap((content) => {
+      const decoded = decodeTabContent(content, root)
+      return decoded === null ? [] : [decoded]
+    }),
   )
 }
 
-function pathForWorkspace(rootPath: string, path: string) {
-  if (isSettingsDocumentId(path)) return true
-  if (parseConflictDiffDocumentId(path)) return false
-
-  const searchBuffer = parseSearchBufferDocumentId(path)
-  if (searchBuffer) return searchBuffer.rootPath === rootPath
-
-  const backingPath = fileBackedDocumentPath(backingPathForWorkspace(path))
-  return backingPath !== null && isPathInWorkspace(backingPath, rootPath)
-}
-
-function backingPathForWorkspace(path: string) {
-  const diff = parseDiffDocumentId(path)
-  if (diff) return diff.path
-  return parseRefDocumentId(path)?.path ?? parseCompareSavedDocumentId(path) ?? path
-}
-
-// The marker distinguishes persisted workspace-relative paths from filesystem API paths.
-const RELATIVE_PATH_MARKER = './'
-
-function storedPath(rootPath: string, path: string) {
-  if (fileBackedDocumentPath(path) === null) return path
-  const relative = toWorkspaceRelative(rootPath, path)
-  if (!relative) return path
-
-  return `${RELATIVE_PATH_MARKER}${relative}`
-}
-
-function restoredPath(rootPath: string, path: string) {
-  if (!path.startsWith(RELATIVE_PATH_MARKER)) return path
-
-  return toWorkspaceAbsolute(rootPath, path.slice(RELATIVE_PATH_MARKER.length)) ?? path
-}
-
-// Filter in the filesystem API namespace before storing and after restoring paths.
-function storedSliceForWorkspace(rootPath: string, slice: CachedWorkspaceSlice) {
-  return mapSlicePaths(sliceForWorkspace(rootPath, slice), (path) => storedPath(rootPath, path))
-}
-
-function restoredSliceForWorkspace(rootPath: string, slice: CachedWorkspaceSlice) {
-  return sliceForWorkspace(
-    rootPath,
-    mapSlicePaths(slice, (path) => restoredPath(rootPath, path)),
-  )
-}
-
-function mapSlicePaths(
-  slice: CachedWorkspaceSlice,
-  mapPath: (path: string) => string,
-): CachedWorkspaceSlice {
-  return {
-    editorHistory: slice.editorHistory.map(mapPath),
-    recentlyClosedEditorPaths: slice.recentlyClosedEditorPaths.map(mapPath),
-    scrollPositionByPath: Object.fromEntries(
-      Object.entries(slice.scrollPositionByPath).map(([path, position]) => [
-        mapPath(path),
-        position,
-      ]),
-    ),
-    workbenchPanels: {
-      ...slice.workbenchPanels,
-      editorTabs: slice.workbenchPanels.editorTabs.map((tab) => ({
-        ...tab,
-        path: mapPath(tab.path),
-      })),
-    },
-  }
+function uniqueContents(contents: readonly TabContent[]): TabContent[] {
+  return Array.from(new Map(contents.map((content) => [tabContentKey(content), content])).values())
 }
 
 /**
@@ -679,8 +656,8 @@ function supersededCacheKeys(storage: ScopedStorage) {
 export function emptyWorkspaceSlice(): CachedWorkspaceSlice {
   return {
     editorHistory: [],
-    recentlyClosedEditorPaths: [],
-    scrollPositionByPath: {},
+    recentlyClosedTabs: [],
+    reopenScrollPositions: [],
     workbenchPanels: createDefaultWorkbenchPanels(),
   }
 }
@@ -699,8 +676,8 @@ export function emptyWorkspaceState(): CachedWorkspaceState {
 }
 
 function activeEditorTabIdForTabs(
-  editorTabs: WorkbenchPanels['editorTabs'],
-  activeEditorTabId: string | null,
+  editorTabs: readonly { readonly id: TabId }[],
+  activeEditorTabId: TabId | null,
 ) {
   if (!activeEditorTabId) return editorTabs[0]?.id ?? null
   if (editorTabs.some((tab) => tab.id === activeEditorTabId)) return activeEditorTabId

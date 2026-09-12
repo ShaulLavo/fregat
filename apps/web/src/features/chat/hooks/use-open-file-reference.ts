@@ -1,3 +1,4 @@
+import { filesystemPath } from '@/lib/documents/utils/identity'
 import { useEditorCommands } from '@/features/editor/hooks/use-editor-commands'
 import { useEditorWorkspaceState } from '@/features/editor/state/workspace-state'
 import type { MarkdownFileReference } from '@/features/chat/utils/markdown-file-links'
@@ -23,7 +24,7 @@ export function useOpenFileReference() {
     })
 
     if (reference.line === null) {
-      openFileSurface(reference.path)
+      openFileSurface(filesystemPath(reference.path))
       return
     }
 

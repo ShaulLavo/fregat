@@ -1,3 +1,8 @@
+import {
+  testTabContents,
+  testNullableTabContent,
+} from '../../../../test/factories/document-targets'
+import { filesystemPath } from '@/lib/documents/utils/identity'
 import { mkdir, writeFile } from 'node:fs/promises'
 import path from 'node:path'
 import { createMemoryHistory } from '@tanstack/react-router'
@@ -14,7 +19,7 @@ import { createTestNavigation } from '../../../../test/factories/navigation'
 import { registerTestWorkspaceAddress } from '../../../../test/factories/workspace-address'
 import { renderApplication } from '../../../../test/render'
 import {
-  editorTabPaths,
+  editorTabContents,
   renderAddressHarness,
   renderPendingNavigation,
   seedWorkspaceCache,
@@ -34,11 +39,9 @@ test.for(['', '&side=files', '&bottom=terminal', '&tool=git', '&rail=active'])(
     pending.unmount()
     const rendered = await renderAddressHarness({ navigation })
     expect((await waitForNavigation(navigation)).status).toBe('applied')
-    expect(editorTabPaths(rendered.harness.workspace)).toEqual([
-      'repo/a.ts',
-      'repo/b.ts',
-      'repo/c.ts',
-    ])
+    expect(editorTabContents(rendered.harness.workspace)).toEqual(
+      testTabContents(['repo/a.ts', 'repo/b.ts', 'repo/c.ts']),
+    )
   },
 )
 
@@ -61,8 +64,8 @@ test('startup resolves a remote environment after the initial intent was parsed 
     expect((await waitForNavigation(navigation)).status).toBe('applied')
     expect(federation.application.getSnapshot().origin).toBe(federation.originB)
     expect(
-      federation.application.getSnapshot().editor.workspaceStore.getState().selectedFilePath,
-    ).toBe('repo/a.ts')
+      federation.application.getSnapshot().editor.workspaceStore.getState().selectedTabContent,
+    ).toEqual(testNullableTabContent('repo/a.ts'))
   } finally {
     rendered.unmount()
     navigation.dispose()
@@ -101,13 +104,19 @@ test('a visible file click keeps its workspace while a different workspace is pe
     })
     await started.promise
     expect(harness.workspace.getState().rootFolder?.path).toBe('repo')
-    expect(harness.workspace.getState().selectedFilePath).toBe('repo/b.ts')
-    expect(await navigation.openFile({ owner: harness.workspace, path: 'repo/a.ts' })).toEqual({
+    expect(harness.workspace.getState().selectedTabContent).toEqual(
+      testNullableTabContent('repo/b.ts'),
+    )
+    expect(
+      await navigation.openFile({ owner: harness.workspace, path: filesystemPath('repo/a.ts') }),
+    ).toEqual({
       status: 'applied',
     })
     expect(await pending).toEqual({ status: 'superseded' })
     expect(harness.workspace.getState().rootFolder?.path).toBe('repo')
-    expect(harness.workspace.getState().selectedFilePath).toBe('repo/a.ts')
+    expect(harness.workspace.getState().selectedTabContent).toEqual(
+      testNullableTabContent('repo/a.ts'),
+    )
   } finally {
     released.resolve()
     registerEnvironmentQueryClient(owner.queryClient, owner.origin, client)

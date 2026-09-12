@@ -1,7 +1,7 @@
 import { useEffect } from 'react'
 
 import { useEditorDocumentStoreApi } from '@/features/editor/state/document-state'
-import { dirtySearchDocuments } from '@/features/search/utils/buffer-dirty-documents'
+import { dirtySearchDocuments } from '@/features/search/state/dirty-documents'
 import type { WorkspaceSearchQueryOptions } from '@/features/search/utils/buffer-query'
 import { workspaceSearchQuery } from '@/features/search/utils/buffer-query'
 import { useSearchBufferStoreApi } from '@/features/search/state/buffer-state'
@@ -41,8 +41,8 @@ export function useRunSearchBuffer(
 
     const documentState = documentStore.getState()
     const dirtyDocuments = dirtySearchDocuments(
-      documentState.liveDocumentsById,
-      documentState.dirtyFilePaths,
+      documentState.liveDocumentsByKey,
+      documentState.dirtyDocumentKeys,
       rootPath,
     )
     const provider = workspaceSearchProvider(dirtyDocuments)

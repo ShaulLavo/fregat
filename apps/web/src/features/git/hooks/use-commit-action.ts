@@ -1,3 +1,4 @@
+import { fileDocument, fileResource, filesystemPath } from '@/lib/documents/utils/identity'
 import { useEditorCommands } from '@/features/editor/hooks/use-editor-commands'
 import { useGitState } from '@/features/git/state/store'
 import { useCommitMutation } from './use-commit-mutation'
@@ -17,9 +18,9 @@ export function useCommitAction(rootPath: string) {
     commit.mutate(trimmedMessage, {
       onSuccess: (result) => {
         if (result.kind !== 'message-file') return
-        discardLiveEditorDocument(result.path)
+        discardLiveEditorDocument(fileDocument(fileResource(filesystemPath(result.path))))
         // TODO: when save is implemented, saving COMMIT_EDITMSG should complete or abort the git commit.
-        selectFile(result.path)
+        selectFile(filesystemPath(result.path))
       },
     })
   }

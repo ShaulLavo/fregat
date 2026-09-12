@@ -1,5 +1,8 @@
+import { filesystemPath, tabId } from '@/lib/documents/utils/identity'
+import { testDocumentKey } from '../../../test/factories/document-targets'
 import { QueryClient } from '@tanstack/react-query'
-import { describe, expect, it, vi } from 'vitest'
+import { describe, vi } from 'vitest'
+import { expect, test as it } from '../../../test/fixtures'
 
 import {
   createEditorBufferSession,
@@ -35,12 +38,12 @@ describe('file open intent service', () => {
       () => false,
       () => undefined,
     )
-    service.setRoot('/repo')
+    service.setRoot(filesystemPath('/repo'))
 
     service.prepare(intent('/repo/a.ts'))
     expect(prepare).not.toHaveBeenCalled()
     await vi.waitFor(() => expect(prepare).toHaveBeenCalledTimes(1))
-    const claim = service.claimReadyClean('/repo/a.ts')
+    const claim = service.claimReadyClean(filesystemPath('/repo/a.ts'))
 
     expect(claim).toMatchObject({
       file,
@@ -50,7 +53,7 @@ describe('file open intent service', () => {
       preparedDocument,
     })
     expect(claim?.buffer.getSnapshot()).toBe(claim?.snapshot)
-    expect(service.claimReadyClean('/repo/a.ts')).toBeNull()
+    expect(service.claimReadyClean(filesystemPath('/repo/a.ts'))).toBeNull()
   })
 
   it('enforces root boundaries including the filesystem root', async () => {
@@ -66,15 +69,15 @@ describe('file open intent service', () => {
       () => false,
       () => undefined,
     )
-    service.setRoot('/repo')
+    service.setRoot(filesystemPath('/repo'))
 
     service.prepare(intent('/repo-other/a.ts'))
     await Promise.resolve()
 
     expect(prepare).not.toHaveBeenCalled()
 
-    service.setRoot('/')
-    service.prepare({ ...intent(file.path), rootPath: '/' })
+    service.setRoot(filesystemPath('/'))
+    service.prepare({ ...intent(file.path), rootPath: filesystemPath('/') })
     await vi.waitFor(() => expect(prepare).toHaveBeenCalledOnce())
   })
 
@@ -84,9 +87,8 @@ describe('file open intent service', () => {
     const preparedDocument = preparedDocumentLease()
     let liveDocument: FileOpenIntentLiveDocument | null = {
       buffer,
-      id: '/repo/a.ts',
+      key: testDocumentKey('/repo/a.ts'),
       localRevision: 1,
-      path: '/repo/a.ts',
     }
     const prepare = vi.fn((preparedBuffer) => ({
       buffer: preparedBuffer,
@@ -100,16 +102,16 @@ describe('file open intent service', () => {
       () => false,
       () => undefined,
     )
-    service.setRoot('/repo')
+    service.setRoot(filesystemPath('/repo'))
     service.prepare(intent('/repo/a.ts'))
     await vi.waitFor(() => expect(prepare).toHaveBeenCalledTimes(1))
 
     createEditorBufferSession(buffer).applyText('x')
     liveDocument = { ...liveDocument, localRevision: 2 }
 
-    expect(service.claimLive('/repo/a.ts')).toMatchObject({
+    expect(service.claimLive(filesystemPath('/repo/a.ts'))).toMatchObject({
       buffer,
-      documentId: '/repo/a.ts',
+      documentKey: testDocumentKey('/repo/a.ts'),
       kind: 'live',
       localRevision: 2,
       preparedDocument: null,
@@ -131,7 +133,7 @@ describe('file open intent service', () => {
       () => false,
       () => undefined,
     )
-    service.setRoot('/repo')
+    service.setRoot(filesystemPath('/repo'))
     service.connect()
     service.prepare(intent(file.path))
     await vi.waitFor(() => expect(prepare).toHaveBeenCalledOnce())
@@ -157,7 +159,7 @@ describe('file open intent service', () => {
     service.disposeNow()
 
     expect(() => service.connect()).toThrow('disposed')
-    expect(() => service.setRoot('/repo')).toThrow('disposed')
+    expect(() => service.setRoot(filesystemPath('/repo'))).toThrow('disposed')
   })
 
   it('owns one subscription set across an idempotent connect and StrictMode replay', async () => {
@@ -186,7 +188,7 @@ describe('file open intent service', () => {
       runtime,
       subscribeLiveDocuments: liveDocuments.subscribe,
     })
-    owner.setRoot('/repo')
+    owner.setRoot(filesystemPath('/repo'))
 
     owner.connect()
     owner.connect()
@@ -219,9 +221,8 @@ describe('file open intent service', () => {
     const buffer = createEditorTextBuffer('alpha\n')
     let liveDocument: FileOpenIntentLiveDocument = {
       buffer,
-      id: '/repo/a.ts',
+      key: testDocumentKey('/repo/a.ts'),
       localRevision: buffer.getRevision(),
-      path: '/repo/a.ts',
     }
     const liveDocuments = listenerChannel<[]>()
     const preparedDocument = preparedDocumentLease()
@@ -239,9 +240,9 @@ describe('file open intent service', () => {
       queryClient: new QueryClient(),
       subscribeLiveDocuments: liveDocuments.subscribe,
     })
-    owner.setRoot('/repo')
+    owner.setRoot(filesystemPath('/repo'))
     owner.connect()
-    owner.service.prepare(intent(liveDocument.path))
+    owner.service.prepare(intent('/repo/a.ts'))
     await vi.waitFor(() => expect(prepare).toHaveBeenCalledOnce())
 
     createEditorBufferSession(buffer).applyText('changed')
@@ -249,7 +250,7 @@ describe('file open intent service', () => {
     liveDocuments.emit()
 
     expect(preparedDocument.dispose).toHaveBeenCalledOnce()
-    expect(owner.service.claimLive(liveDocument.path)).toMatchObject({
+    expect(owner.service.claimLive(filesystemPath('/repo/a.ts'))).toMatchObject({
       localRevision: liveDocument.localRevision,
       preparedDocument: null,
     })
@@ -311,7 +312,7 @@ describe('file open intent service', () => {
       () => false,
       () => undefined,
     )
-    service.setRoot('/repo')
+    service.setRoot(filesystemPath('/repo'))
 
     service.prepare(intent(file.path))
 
@@ -325,7 +326,7 @@ describe('file open intent service', () => {
     const content = 'a'.repeat(800_000)
     const file = { ...fileResult(path), content, size: content.length }
     const queryClient = new QueryClient()
-    queryClient.setQueryData(fileSnapshotQueryOptions(path).queryKey, file)
+    queryClient.setQueryData(fileSnapshotQueryOptions(filesystemPath(path)).queryKey, file)
     const runtime = manualRuntime()
     const preparedDocument = preparedDocumentLease()
     const events = recordingEvents()
@@ -335,14 +336,14 @@ describe('file open intent service', () => {
     const structural = vi.fn(async () => undefined)
     const preparer: FileOpenIntentPreparer = {
       environment: testEnvironment('ranges'),
-      prepare: (buffer, _documentId, _path, _abortSignal, structuralRange) => {
+      prepare: (buffer, _documentKey, _path, _abortSignal, structuralRange) => {
         ranges.push(structuralRange)
         return rangePreparation(buffer, preparedDocument, structuralRange, highlighter, structural)
       },
       reconfigure: (
         _preparedDocument,
         buffer,
-        _documentId,
+        _documentKey,
         _path,
         _abortSignal,
         structuralRange,
@@ -363,7 +364,7 @@ describe('file open intent service', () => {
       runtime,
       subscribeLiveDocuments: () => () => undefined,
     })
-    owner.setRoot('/repo')
+    owner.setRoot(filesystemPath('/repo'))
     owner.connect()
 
     owner.service.prepare(intent(path))
@@ -391,16 +392,19 @@ describe('file open intent service', () => {
     const first = deferred<FileResult>()
     const paths = ['/repo/a.ts', '/repo/b.ts', '/repo/c.ts'] as const
     void queryClient.fetchQuery({
-      ...fileSnapshotQueryOptions(paths[0]),
+      ...fileSnapshotQueryOptions(filesystemPath(paths[0])),
       queryFn: () => first.promise,
     })
     for (const path of paths.slice(1)) {
-      queryClient.setQueryData(fileSnapshotQueryOptions(path).queryKey, fileResult(path))
+      queryClient.setQueryData(
+        fileSnapshotQueryOptions(filesystemPath(path)).queryKey,
+        fileResult(path),
+      )
     }
     const order: string[] = []
     const service = createTestFileOpenIntentOwner(
       queryClient,
-      testPreparer((buffer, _documentId, path) => {
+      testPreparer((buffer, _documentKey, path) => {
         order.push(path)
         return { buffer, preparedDocument: preparedDocumentLease() }
       }),
@@ -409,7 +413,7 @@ describe('file open intent service', () => {
       () => false,
       () => undefined,
     )
-    service.setRoot('/repo')
+    service.setRoot(filesystemPath('/repo'))
 
     service.prepare(intent(paths[0]))
     service.prepare(intent(paths[1]))
@@ -424,7 +428,10 @@ describe('file open intent service', () => {
     const queryClient = new QueryClient()
     const paths = Array.from({ length: 8 }, (_, index) => `/repo/${index}.ts`)
     for (const path of paths) {
-      queryClient.setQueryData(fileSnapshotQueryOptions(path).queryKey, fileResult(path))
+      queryClient.setQueryData(
+        fileSnapshotQueryOptions(filesystemPath(path)).queryKey,
+        fileResult(path),
+      )
     }
     let settledStages = 0
     const service = createTestFileOpenIntentOwner(
@@ -451,14 +458,14 @@ describe('file open intent service', () => {
       () => false,
       () => undefined,
     )
-    service.setRoot('/repo')
+    service.setRoot(filesystemPath('/repo'))
 
     for (const path of paths) service.prepare(intent(path))
     await vi.waitFor(() => expect(settledStages).toBe(paths.length))
 
-    expect(service.claimReadyClean(paths[0]!)).toBeNull()
-    expect(service.claimReadyClean(paths.at(-1)!)).toBeNull()
-    expect(service.claimReadyClean(paths[1]!)).not.toBeNull()
+    expect(service.claimReadyClean(filesystemPath(paths[0])!)).toBeNull()
+    expect(service.claimReadyClean(filesystemPath(paths.at(-1)!))).toBeNull()
+    expect(service.claimReadyClean(filesystemPath(paths[1])!)).not.toBeNull()
   })
 
   it('lets activation claim document data before queued provider stages start', async () => {
@@ -481,7 +488,7 @@ describe('file open intent service', () => {
       () => undefined,
       runtime,
     )
-    service.setRoot('/repo')
+    service.setRoot(filesystemPath('/repo'))
 
     service.prepare(intent(file.path))
     expect(runtime.queued()).toBe(1)
@@ -516,7 +523,7 @@ describe('file open intent service', () => {
       () => undefined,
       runtime,
     )
-    service.setRoot('/repo')
+    service.setRoot(filesystemPath('/repo'))
 
     service.prepare(intent(file.path))
     runtime.startNext()
@@ -537,7 +544,7 @@ describe('file open intent service', () => {
     queryClient.setQueryData(fileSnapshotQueryOptions(file.path).queryKey, file)
     const service = createTestFileOpenIntentOwner(
       queryClient,
-      testPreparer((buffer, _documentId, _path, abortSignal) => {
+      testPreparer((buffer, _documentKey, _path, abortSignal) => {
         preparationSignal = abortSignal
         return {
           buffer,
@@ -550,7 +557,7 @@ describe('file open intent service', () => {
       () => false,
       () => undefined,
     )
-    service.setRoot('/repo')
+    service.setRoot(filesystemPath('/repo'))
 
     service.prepare(intent(file.path))
     await vi.waitFor(() => expect(preparationSignal).not.toBeNull())
@@ -578,7 +585,7 @@ describe('file open intent service', () => {
       () => undefined,
       runtime,
     )
-    service.setRoot('/repo')
+    service.setRoot(filesystemPath('/repo'))
 
     service.prepare(intent(file.path))
     runtime.startNext()
@@ -604,7 +611,7 @@ describe('file open intent service', () => {
       () => undefined,
       runtime,
     )
-    service.setRoot('/repo')
+    service.setRoot(filesystemPath('/repo'))
 
     service.prepare(intent(file.path))
     runtime.startNext()
@@ -629,7 +636,7 @@ describe('file open intent service', () => {
     const newMarkdownDocument = preparedDocumentLease()
     const oldStage = vi.fn(async () => 'ready')
     const newStage = vi.fn(async () => 'ready')
-    const prepareInitial = vi.fn((buffer, _documentId, path) => ({
+    const prepareInitial = vi.fn((buffer, _documentKey, path) => ({
       buffer,
       documentConfigurationTag: ['document', path],
       preparedDocument: path === typescript.path ? typescriptDocument : oldMarkdownDocument,
@@ -650,7 +657,7 @@ describe('file open intent service', () => {
       {
         environment: testEnvironment('old'),
         prepare: prepareInitial,
-        reconfigure: (_preparedDocument, _buffer, _documentId, path) => ({
+        reconfigure: (_preparedDocument, _buffer, _documentKey, path) => ({
           documentConfigurationTag: ['document', path],
           stages:
             path === markdown.path
@@ -670,13 +677,13 @@ describe('file open intent service', () => {
       () => false,
       () => undefined,
     )
-    service.setRoot('/repo')
+    service.setRoot(filesystemPath('/repo'))
     service.prepare(intent(typescript.path))
     service.prepare(intent(markdown.path))
     await vi.waitFor(() => expect(prepareInitial).toHaveBeenCalledTimes(2))
     await vi.waitFor(() => expect(oldStage).toHaveBeenCalledOnce())
 
-    const prepareNext = vi.fn((buffer, _documentId, path) => ({
+    const prepareNext = vi.fn((buffer, _documentKey, path) => ({
       buffer,
       documentConfigurationTag: ['document', path],
       preparedDocument: path === markdown.path ? newMarkdownDocument : typescriptDocument,
@@ -695,7 +702,7 @@ describe('file open intent service', () => {
     service.setEnvironment({
       environment: testEnvironment('new'),
       prepare: prepareNext,
-      reconfigure: (_preparedDocument, _buffer, _documentId, path) => ({
+      reconfigure: (_preparedDocument, _buffer, _documentKey, path) => ({
         documentConfigurationTag: ['document', path],
         stages:
           path === markdown.path
@@ -769,7 +776,7 @@ describe('file open intent service', () => {
       () => undefined,
       runtime,
     )
-    service.setRoot('/repo')
+    service.setRoot(filesystemPath('/repo'))
 
     service.prepare(intent(file.path))
     runtime.startNext()
@@ -831,7 +838,7 @@ describe('file open intent service', () => {
       () => false,
       () => undefined,
     )
-    service.setRoot('/repo')
+    service.setRoot(filesystemPath('/repo'))
     service.prepare(intent(file.path))
     await vi.waitFor(() => expect(prepare).toHaveBeenCalledOnce())
 
@@ -872,13 +879,13 @@ describe('file open intent service', () => {
       runtime,
       events.factory,
     )
-    service.setRoot('/repo')
+    service.setRoot(filesystemPath('/repo'))
 
     service.prepare(intent(file.path))
     service.prepare({
       knownSize: file.size,
       path: file.path,
-      rootPath: '/repo',
+      rootPath: filesystemPath('/repo'),
       source: 'file-tree',
     })
     runtime.startNext()
@@ -891,14 +898,14 @@ describe('file open intent service', () => {
     expect(events.emitted).toEqual([])
     service.recordInitialPaint(file.path, {
       documentGeneration: 1,
-      documentId: file.path,
+      documentId: testDocumentKey(file.path),
       phase: 'text',
       textVersion: 1,
     })
     expect(events.emitted).toEqual([])
     service.recordInitialPaint(file.path, {
       documentGeneration: 1,
-      documentId: file.path,
+      documentId: testDocumentKey(file.path),
       phase: 'highlight-settled',
       status: 'painted',
       textVersion: 1,
@@ -967,9 +974,8 @@ describe('file open intent service', () => {
     const file = fileResult('/repo/a.ts')
     const liveDocument: FileOpenIntentLiveDocument = {
       buffer: createEditorTextBuffer(file.content),
-      id: 'document-a',
+      key: testDocumentKey(file.path),
       localRevision: 1,
-      path: file.path,
     }
     const runtime = manualRuntime()
     const events = recordingEvents()
@@ -986,15 +992,15 @@ describe('file open intent service', () => {
       runtime,
       events.factory,
     )
-    service.setRoot('/repo')
+    service.setRoot(filesystemPath('/repo'))
     service.prepare(intent(file.path))
     runtime.startNext()
     await runtime.settled()
-    expect(service.claimLive(file.path)?.documentId).toBe(liveDocument.id)
+    expect(service.claimLive(file.path)?.documentKey).toBe(liveDocument.key)
 
     const textPaint = {
       documentGeneration: 7,
-      documentId: liveDocument.id,
+      documentId: liveDocument.key,
       phase: 'text',
       textVersion: 3,
     } satisfies EditorInitialPaintEvent
@@ -1004,12 +1010,18 @@ describe('file open intent service', () => {
       status: 'painted',
     } satisfies EditorInitialPaintEvent
 
-    service.recordInitialPaint(file.path, { ...textPaint, documentId: file.path })
+    service.recordInitialPaint(file.path, {
+      ...textPaint,
+      documentId: testDocumentKey('/repo/other.ts'),
+    })
     service.recordInitialPaint(file.path, highlightPaint)
     expect(events.emitted).toEqual([])
 
     service.recordInitialPaint(file.path, textPaint)
-    service.recordInitialPaint(file.path, { ...highlightPaint, documentId: file.path })
+    service.recordInitialPaint(file.path, {
+      ...highlightPaint,
+      documentId: testDocumentKey('/repo/other.ts'),
+    })
     expect(events.emitted).toEqual([])
     service.recordInitialPaint(file.path, { ...highlightPaint, documentGeneration: 8 })
     expect(events.emitted).toEqual([])
@@ -1044,11 +1056,11 @@ describe('file open intent service', () => {
       () => false,
       () => undefined,
     )
-    service.setRoot('/repo')
+    service.setRoot(filesystemPath('/repo'))
     service.prepare(intent(file.path))
 
     service.setRoot(null)
-    service.setRoot('/repo')
+    service.setRoot(filesystemPath('/repo'))
     pending.resolve(file)
     await vi.waitFor(() =>
       expect(queryClient.getQueryData(fileSnapshotQueryOptions(file.path).queryKey)).toEqual(file),
@@ -1072,11 +1084,11 @@ describe('file open intent service', () => {
       () => false,
       () => undefined,
     )
-    service.setRoot('/repo')
+    service.setRoot(filesystemPath('/repo'))
     service.prepare(intent(file.path))
     await vi.waitFor(() => expect(prepare).toHaveBeenCalledOnce())
 
-    service.setRoot('/repo/./')
+    service.setRoot(filesystemPath('/repo/./'))
 
     expect(service.claimReadyClean(file.path)?.preparedDocument).toBe(preparedDocument)
     expect(preparedDocument.dispose).not.toHaveBeenCalled()
@@ -1094,7 +1106,7 @@ describe('file open intent service', () => {
       () => true,
       prefetchRelated,
     )
-    service.setRoot('/repo')
+    service.setRoot(filesystemPath('/repo'))
 
     service.prepare(intent('/repo/a.ts'))
     await Promise.resolve()
@@ -1115,7 +1127,7 @@ describe('file open intent service', () => {
       () => false,
       () => undefined,
     )
-    service.setRoot('/repo')
+    service.setRoot(filesystemPath('/repo'))
 
     service.prepare(intent('/repo/a.ts'))
     await Promise.resolve()
@@ -1136,9 +1148,12 @@ describe('file open intent service', () => {
       () => false,
       () => undefined,
     )
-    service.setRoot('/repo')
+    service.setRoot(filesystemPath('/repo'))
     service.connect()
-    const sample = service.beginBenchmarkSample({ path: file.path, rootPath: '/repo' })
+    const sample = service.beginBenchmarkSample({
+      path: file.path,
+      rootPath: filesystemPath('/repo'),
+    })
 
     service.prepare(intent(file.path))
     await vi.waitFor(() => expect(service.claimReadyClean(file.path)).not.toBeNull())
@@ -1176,18 +1191,21 @@ describe('file open intent service', () => {
     ])
     const service = createTestFileOpenIntentOwner(
       queryClient,
-      testPreparer((buffer, _documentId, path) => ({
+      testPreparer((buffer, _documentKey, path) => ({
         buffer,
-        preparedDocument: documents.get(path)!,
+        preparedDocument: documents.get(filesystemPath(path))!,
       })),
       () => null,
       () => false,
       () => false,
       () => undefined,
     )
-    service.setRoot('/repo')
+    service.setRoot(filesystemPath('/repo'))
     service.connect()
-    const sample = service.beginBenchmarkSample({ path: target.path, rootPath: '/repo' })
+    const sample = service.beginBenchmarkSample({
+      path: target.path,
+      rootPath: filesystemPath('/repo'),
+    })
 
     service.prepare(intent(target.path))
     service.prepare(intent(nonTarget.path))
@@ -1252,7 +1270,7 @@ function createConnectedOwner({
     queryClient,
     subscribeLiveDocuments: () => () => undefined,
   })
-  owner.setRoot('/repo')
+  owner.setRoot(filesystemPath('/repo'))
   owner.connect()
   return { owner, prepare }
 }
@@ -1312,20 +1330,25 @@ function fileResult(path: string): FileResult {
   return {
     content: 'alpha\n',
     mtimeMs: 1,
-    path,
+    path: filesystemPath(path),
     size: 6,
     version: 'v1',
   }
 }
 
 function intent(path: string) {
-  return { path, rootPath: '/repo', source: 'tab' as const, tabId: 'test-tab' }
+  return {
+    path: filesystemPath(path),
+    rootPath: filesystemPath('/repo'),
+    source: 'tab' as const,
+    tabId: tabId('test-tab'),
+  }
 }
 
 function testPreparer(
   prepare: (
     buffer: ReturnType<typeof createEditorTextBuffer>,
-    documentId: string,
+    documentKey: string,
     path: string,
     abortSignal: AbortSignal,
     structuralRange: FileOpenIntentStructuralRange,
@@ -1360,7 +1383,7 @@ function testPreparer(
       startsByDocument.set(preparation.preparedDocument, starts)
       return { ...preparation, ...configuration(starts, args[4]) }
     },
-    reconfigure: (preparedDocument, _buffer, _documentId, _path, _abortSignal, structuralRange) =>
+    reconfigure: (preparedDocument, _buffer, _documentKey, _path, _abortSignal, structuralRange) =>
       configuration(startsByDocument.get(preparedDocument) ?? [], structuralRange),
   }
 }

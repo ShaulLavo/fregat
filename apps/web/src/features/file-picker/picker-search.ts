@@ -1,3 +1,4 @@
+import { filesystemPath } from '@/lib/documents/utils/identity'
 import { getClient } from '@/lib/client'
 import type { WorkspaceSearchEvent, WorkspaceSearchQuery } from '@workspace/contracts'
 import type { FindMatch, FsEntry, SearchScope } from '@/lib/file-system-types'
@@ -128,7 +129,7 @@ export function appendSearchMatch(
   if (seenPaths.has(match.path)) return false
 
   seenPaths.add(match.path)
-  matches.push({ ...match, searchScope: scope })
+  matches.push({ ...match, path: filesystemPath(match.path), searchScope: scope })
   return true
 }
 

@@ -13,13 +13,18 @@ import type { WriteFileContentOptions } from '@/lib/file-server'
 import { clientForQueryClient, originForQueryClient } from '@/lib/environments/state/query-clients'
 import { assertEnvironmentWritable } from '@/lib/environments/state/availability'
 import { createFileSyncPorts } from '@/features/editor/utils/file-sync-ports'
-import type { FileResult, StatResult, TreeEntry } from '@/lib/file-system-types'
+import {
+  fileResultFromResponse,
+  type FileResult,
+  type StatResult,
+  type WorkspaceEditPrepareRequest,
+} from '@/lib/file-system-types'
+import type { FilesystemPath } from '@/lib/documents/utils/types'
 import { fileSystemKeys, gitKeys } from '@/lib/query-keys'
 import type { TreeModel } from '@/lib/tree-model'
 import { toClientError } from '@/lib/client-error-taxonomy'
 import { notifyManager, type QueryClient, type QueryKey } from '@tanstack/react-query'
 import type {
-  WorkspaceEditPrepareRequest,
   WorkspaceEditRecoverRequest,
   WorkspaceEditRecoveryListResult,
   WorkspaceEditReleaseRequest,
@@ -30,34 +35,34 @@ import type {
 } from '@workspace/contracts'
 
 export type FileSyncWriteFileContent = (
-  path: string,
+  path: FilesystemPath,
   content: string,
   options?: WriteFileContentOptions,
-) => Promise<TreeEntry>
+) => Promise<StatResult>
 
 export type WorkspaceFileSnapshot = {
   readonly byteLength: number
   readonly mtimeMs: number
-  readonly path: string
+  readonly path: FilesystemPath
   readonly text: string
   readonly version: string
 }
 
 export type WorkspaceFileInspection =
-  | { readonly exists: false; readonly path: string }
+  | { readonly exists: false; readonly path: FilesystemPath }
   | {
-      readonly canonicalPath: string
+      readonly canonicalPath: FilesystemPath
       readonly exists: true
       readonly mtimeMs: number
-      readonly path: string
+      readonly path: FilesystemPath
       readonly type: StatResult['type']
       readonly version: string
     }
 
 export type FileSyncPorts = {
   readonly assertWritable?: () => void
-  readonly inspectPath?: (path: string, signal: AbortSignal) => Promise<StatResult>
-  readonly readFileContent: (path: string, signal: AbortSignal) => Promise<FileResult>
+  readonly inspectPath?: (path: FilesystemPath, signal: AbortSignal) => Promise<StatResult>
+  readonly readFileContent: (path: FilesystemPath, signal: AbortSignal) => Promise<FileResult>
   readonly writeFileContent: FileSyncWriteFileContent
   readonly workspaceMutations?: WorkspaceMutationTransport
 }
@@ -90,7 +95,7 @@ export type WorkspaceMutationTransport = {
   ) => Promise<WorkspaceEditResult>
   readonly status: (operationId: string, signal: AbortSignal) => Promise<WorkspaceEditStatusResult>
   readonly recovery: (
-    workspace: string,
+    workspace: FilesystemPath,
     signal: AbortSignal,
   ) => Promise<WorkspaceEditRecoveryListResult>
 }
@@ -100,7 +105,7 @@ export type WorkspaceMutationProjectionRequest = {
   readonly beforeContents: ReadonlyMap<string, string>
   readonly entries: readonly WorkspaceEditResultEntry[]
   readonly renames: readonly WorkspaceEditTreeRename[]
-  readonly rootPath: string
+  readonly rootPath: FilesystemPath
 }
 
 type QueryProjectionSnapshot<T> = {
@@ -123,7 +128,7 @@ export type WorkspaceMutationProjectionReceipt = {
   readonly operationId: string
   phase: 'provisional' | 'sealed'
   readonly renames: readonly WorkspaceEditTreeRename[]
-  readonly rootPath: string
+  readonly rootPath: FilesystemPath
   readonly serverEpoch: string
   readonly tree: QueryProjection<TreeModel> | null
 }
@@ -139,7 +144,7 @@ export class FileSyncService {
   ) {}
 
   readonly inspectWorkspacePath = async (
-    path: string,
+    path: FilesystemPath,
     signal: AbortSignal,
   ): Promise<WorkspaceFileInspection> => {
     const inspect = this.ports.inspectPath
@@ -163,7 +168,10 @@ export class FileSyncService {
     }
   }
 
-  async readWorkspaceSnapshot(path: string, signal: AbortSignal): Promise<WorkspaceFileSnapshot> {
+  async readWorkspaceSnapshot(
+    path: FilesystemPath,
+    signal: AbortSignal,
+  ): Promise<WorkspaceFileSnapshot> {
     signal.throwIfAborted()
     const file = await this.ports.readFileContent(path, signal)
     signal.throwIfAborted()
@@ -177,26 +185,27 @@ export class FileSyncService {
   }
 
   async save(document: LiveEditorDocument): Promise<FileResult> {
-    if (document.sync.kind !== 'file') {
-      throw createClientInvariantError(`Cannot save unsynced editor document ${document.id}`)
+    if (document.sync.kind !== 'file' || document.target.kind !== 'file') {
+      throw createClientInvariantError(`Cannot save unsynced editor document ${document.key}`)
     }
 
     this.ports.assertWritable?.()
 
     const sync = document.sync
+    const path = document.target.resource.path
     const text = document.buffer.materializeFullText()
     const savedContentRevision = document.contentRevision
     const writeId = createWriteId()
-    const entry = await this.ports.writeFileContent(sync.path, text, {
+    const entry = await this.ports.writeFileContent(path, text, {
       baseVersion: sync.fileVersion,
       expectedMtimeMs: sync.mtimeMs,
       origin: 'editor',
       writeId,
     })
-    const file = fileResultForSavedDocument(sync.path, text, entry)
+    const file = fileResultForSavedDocument(path, text, entry)
 
     this.documentStore.getState().markLiveEditorDocumentSaved({
-      documentId: document.id,
+      documentKey: document.key,
       fileVersion: entry.version,
       mtimeMs: entry.mtimeMs,
       savedContentRevision,
@@ -292,7 +301,10 @@ export class FileSyncService {
     return true
   }
 
-  invalidateWorkspaceMutationProjection(rootPath: string, paths: readonly string[]): void {
+  invalidateWorkspaceMutationProjection(
+    rootPath: FilesystemPath,
+    paths: readonly FilesystemPath[],
+  ): void {
     for (const path of new Set(paths)) {
       void this.queryClient.invalidateQueries({
         exact: true,
@@ -304,8 +316,8 @@ export class FileSyncService {
   }
 
   async reconcileWorkspaceMutationProjection(
-    rootPath: string,
-    paths: readonly string[],
+    rootPath: FilesystemPath,
+    paths: readonly FilesystemPath[],
   ): Promise<void> {
     this.invalidateWorkspaceMutationProjection(rootPath, paths)
     const signal = neverAbortedSignal()
@@ -409,7 +421,7 @@ export class FileSyncService {
   }
 
   discoverWorkspaceRecovery(
-    workspace: string,
+    workspace: FilesystemPath,
     signal: AbortSignal = neverAbortedSignal(),
   ): Promise<WorkspaceEditRecoveryListResult> {
     return this.workspaceMutationTransport()
@@ -481,7 +493,7 @@ export class FileSyncService {
     }
   }
 
-  private async reconcileWorkspaceFile(path: string, signal: AbortSignal): Promise<void> {
+  private async reconcileWorkspaceFile(path: FilesystemPath, signal: AbortSignal): Promise<void> {
     try {
       const file = await this.ports.readFileContent(path, signal)
       setFileSnapshotQueryData(this.queryClient, file)
@@ -547,13 +559,16 @@ export class FileSyncService {
       this.queryClient.removeQueries({ exact: true, queryKey })
       return
     }
-    this.queryClient.setQueryData<FileResult>(queryKey, {
-      content,
-      mtimeMs: entry.mtimeMs,
-      path: entry.path,
-      size: entry.size,
-      version: entry.version,
-    })
+    this.queryClient.setQueryData<FileResult>(
+      queryKey,
+      fileResultFromResponse({
+        content,
+        mtimeMs: entry.mtimeMs,
+        path: entry.path,
+        size: entry.size,
+        version: entry.version,
+      }),
+    )
   }
 
   private projectRootTree(
@@ -647,7 +662,11 @@ function ownedFileSyncPorts(queryClient: QueryClient): FileSyncPorts {
   }
 }
 
-function fileResultForSavedDocument(path: string, content: string, entry: TreeEntry): FileResult {
+function fileResultForSavedDocument(
+  path: FilesystemPath,
+  content: string,
+  entry: StatResult,
+): FileResult {
   return {
     content,
     mtimeMs: entry.mtimeMs,

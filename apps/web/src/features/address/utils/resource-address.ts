@@ -1,14 +1,17 @@
+import { fileDocument, fileResource } from '@/lib/documents/utils/identity'
+import { documentTab } from '@/lib/documents/utils/tabs'
+import type { FilesystemPath } from '@/lib/documents/utils/types'
 import { editorDocumentToken, type Address } from '@workspace/client-core/address/grammar'
-import { documentTokenForPath } from '@/features/address/utils/document-token'
+import { documentTokenForContent } from '@/features/address/utils/document-token'
 
 export function addressForRenamedFile(
   address: Address,
   root: string | null,
-  from: string,
-  to: string,
+  from: FilesystemPath,
+  to: FilesystemPath,
 ): Address {
-  const before = documentTokenForPath(root, from)
-  const after = documentTokenForPath(root, to)
+  const before = documentTokenForContent(root, documentTab(fileDocument(fileResource(from))))
+  const after = documentTokenForContent(root, documentTab(fileDocument(fileResource(to))))
   if (before.kind !== 'token' || after.kind !== 'token') return address
   const replace = (token: string | null) => (token === before.token ? after.token : token)
   return {
@@ -22,9 +25,9 @@ export function addressForRenamedFile(
 export function addressForDeletedFile(
   address: Address,
   root: string | null,
-  path: string,
+  path: FilesystemPath,
 ): Address {
-  const token = documentTokenForPath(root, path)
+  const token = documentTokenForContent(root, documentTab(fileDocument(fileResource(path))))
   if (token.kind !== 'token') return address
   const tabs = address.tabs?.filter((entry) => entry !== token.token) ?? null
   if (editorDocumentToken(address) !== token.token) return { ...address, tabs }

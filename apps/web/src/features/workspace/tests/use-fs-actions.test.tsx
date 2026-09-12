@@ -1,3 +1,5 @@
+import { testDocumentKey, testTabContent } from '../../../../test/factories/document-targets'
+import { filesystemPath } from '@/lib/documents/utils/identity'
 import { act, renderHook, waitFor } from '@testing-library/react'
 import { FileTreeModel } from '@workspace/tree'
 import type { ReactNode } from 'react'
@@ -29,16 +31,18 @@ for (const { isFolder, dirty } of [
     client,
   }) => {
     void client
-    await ensureFolderPath('repo/src')
+    await ensureFolderPath(filesystemPath('repo/src'))
     const from = 'repo/src/a.ts'
     const to = isFolder ? 'repo/renamed/a.ts' : 'repo/src/b.ts'
-    await createFileContent(from, 'original\n')
+    await createFileContent(filesystemPath(from), 'original\n')
     const sibling = 'repo/src/c.ts'
     const unrelated = 'repo/src-other.ts'
-    await createFileContent(sibling, 'sibling\n')
-    await createFileContent(unrelated, 'unrelated\n')
-    const file = await fetchFile(from, signal())
-    const modelRef = { current: treeModel(await fetchTree('repo', signal()), 'repo') }
+    await createFileContent(filesystemPath(sibling), 'sibling\n')
+    await createFileContent(filesystemPath(unrelated), 'unrelated\n')
+    const file = await fetchFile(filesystemPath(from), signal())
+    const modelRef = {
+      current: treeModel(await fetchTree(filesystemPath('repo'), signal()), 'repo'),
+    }
     const treeRef = {
       current: new FileTreeModel({ paths: modelRef.current.paths, renaming: true }),
     }
@@ -53,7 +57,7 @@ for (const { isFolder, dirty } of [
     const hook = renderHook(
       () => ({
         commands: useEditorCommands(),
-        fs: useFsActions({ modelRef, rootPath: 'repo', treeRef }),
+        fs: useFsActions({ modelRef, rootPath: filesystemPath('repo'), treeRef }),
         runtime: useEditorRuntime(),
       }),
       { wrapper: Wrapper },
@@ -61,9 +65,9 @@ for (const { isFolder, dirty } of [
     const { documentStore, workspaceStore } = hook.result.current.runtime
     setFileSnapshotQueryData(queryClient, file)
     await act(async () => {
-      await hook.result.current.commands.openFileSurface(sibling)
-      await hook.result.current.commands.openFileSurface(unrelated)
-      await hook.result.current.commands.openFileSurface(from)
+      await hook.result.current.commands.openFileSurface(filesystemPath(sibling))
+      await hook.result.current.commands.openFileSurface(filesystemPath(unrelated))
+      await hook.result.current.commands.openFileSurface(filesystemPath(from))
     })
     const tabId = workspaceStore.getState().workbenchPanels.activeEditorTabId!
     const view = documentStore.getState().ensureEditorView(tabId, file)
@@ -78,24 +82,26 @@ for (const { isFolder, dirty } of [
       }),
     )
 
-    await waitFor(() => expect(workspaceStore.getState().selectedFilePath).toBe(to))
-    expect(workspaceStore.getState().openFilePaths).toEqual([
-      isFolder ? 'repo/renamed/c.ts' : sibling,
-      unrelated,
-      to,
-    ])
-    expect(workspaceStore.getState().editorHistory).toContain(to)
-    expect(workspaceStore.getState().editorHistory).not.toContain(from)
+    await waitFor(() =>
+      expect(workspaceStore.getState().selectedTabContent).toEqual(testTabContent(to)),
+    )
+    expect(workspaceStore.getState().openTabContents).toEqual(
+      [isFolder ? 'repo/renamed/c.ts' : sibling, unrelated, to].map((path) => testTabContent(path)),
+    )
+    expect(workspaceStore.getState().editorHistory).toContainEqual(testTabContent(to))
+    expect(workspaceStore.getState().editorHistory).not.toContainEqual(testTabContent(from))
     expect(workspaceStore.getState().workbenchPanels.activeEditorTabId).toBe(tabId)
-    expect(documentStore.getState().getLiveEditorDocument(from)).toBeNull()
-    expect(documentStore.getState().getLiveEditorDocument(to)?.buffer).toBe(view.buffer)
+    expect(documentStore.getState().getLiveEditorDocument(testDocumentKey(from))).toBeNull()
+    expect(documentStore.getState().getLiveEditorDocument(testDocumentKey(to))?.buffer).toBe(
+      view.buffer,
+    )
     expect(view.buffer.materializeFullText()).toBe(text)
-    expect(documentStore.getState().dirtyFilePaths.has(to)).toBe(dirty)
+    expect(documentStore.getState().dirtyDocumentKeys.has(testDocumentKey(to))).toBe(dirty)
     expect(queryClient.getQueryData(fileSystemKeys.fileSnapshot(from))).toBeUndefined()
     expect(queryClient.getQueryData(fileSystemKeys.fileSnapshot(to))).toMatchObject({ path: to })
     await expect(readContent(to)).resolves.toBe('original\n')
     await act(async () => {
-      expect(await hook.result.current.runtime.saveService.save(to)).toBe(true)
+      expect(await hook.result.current.runtime.saveService.save(testDocumentKey(to))).toBe(true)
     })
     await expect(readContent(to)).resolves.toBe(text)
     await expect(treePaths('repo')).resolves.not.toContain(from)
@@ -110,10 +116,10 @@ test('gates file create, rename, copy, and delete with their exact mutated paths
   client,
 }) => {
   void client
-  await ensureFolderPath('repo')
-  await createFileContent('repo/rename.ts', 'rename\n')
-  await createFileContent('repo/copy.ts', 'copy\n')
-  await createFileContent('repo/delete.ts', 'delete\n')
+  await ensureFolderPath(filesystemPath('repo'))
+  await createFileContent(filesystemPath('repo/rename.ts'), 'rename\n')
+  await createFileContent(filesystemPath('repo/copy.ts'), 'copy\n')
+  await createFileContent(filesystemPath('repo/delete.ts'), 'delete\n')
   const harness = await renderFsActions('repo')
 
   act(() => {
@@ -142,7 +148,7 @@ test('gates file create, rename, copy, and delete with their exact mutated paths
     harness.result.current.actions.requestDelete({
       isDirectory: false,
       name: 'delete.ts',
-      path: 'repo/delete.ts',
+      path: filesystemPath('repo/delete.ts'),
     })
   })
   await waitFor(() => expect(harness.result.current.deleteDialog.target).not.toBeNull())
@@ -165,12 +171,12 @@ test('gates file create, rename, copy, and delete with their exact mutated paths
 
 test('invalidates all workspace-edit history for directory tree mutations', async ({ client }) => {
   void client
-  await ensureFolderPath('repo/rename-dir')
-  await ensureFolderPath('repo/copy-dir')
-  await ensureFolderPath('repo/delete-dir')
-  await createFileContent('repo/rename-dir/a.ts', 'rename\n')
-  await createFileContent('repo/copy-dir/a.ts', 'copy\n')
-  await createFileContent('repo/delete-dir/a.ts', 'delete\n')
+  await ensureFolderPath(filesystemPath('repo/rename-dir'))
+  await ensureFolderPath(filesystemPath('repo/copy-dir'))
+  await ensureFolderPath(filesystemPath('repo/delete-dir'))
+  await createFileContent(filesystemPath('repo/rename-dir/a.ts'), 'rename\n')
+  await createFileContent(filesystemPath('repo/copy-dir/a.ts'), 'copy\n')
+  await createFileContent(filesystemPath('repo/delete-dir/a.ts'), 'delete\n')
   const harness = await renderFsActions('repo')
 
   act(() => {
@@ -189,7 +195,7 @@ test('invalidates all workspace-edit history for directory tree mutations', asyn
     harness.result.current.actions.requestDelete({
       isDirectory: true,
       name: 'delete-dir',
-      path: 'repo/delete-dir',
+      path: filesystemPath('repo/delete-dir'),
     })
   })
   await waitFor(() => expect(harness.result.current.deleteDialog.target).not.toBeNull())
@@ -208,11 +214,11 @@ test('keeps optimistic rollback when the authoritative mutation reservation reje
   client,
 }) => {
   void client
-  await ensureFolderPath('repo')
-  await createFileContent('repo/old.ts', 'old\n')
+  await ensureFolderPath(filesystemPath('repo'))
+  await createFileContent(filesystemPath('repo/old.ts'), 'old\n')
   const service = new RecordingWorkspaceEditService({ reject: true })
   const harness = await renderFsActions('repo', service)
-  const file = await fetchFile('repo/old.ts', signal())
+  const file = await fetchFile(filesystemPath('repo/old.ts'), signal())
   setFileSnapshotQueryData(harness.queryClient, file)
   act(() => harness.result.current.commands.openFileSurface(file.path))
   const { documentStore, workspaceStore } = harness.result.current.runtime
@@ -231,9 +237,11 @@ test('keeps optimistic rollback when the authoritative mutation reservation reje
 
   await waitFor(() => expect(move).toHaveBeenCalledWith('new.ts', 'old.ts'))
   expect(service.affectedPaths).toEqual([['repo/old.ts', 'repo/new.ts']])
-  expect(workspaceStore.getState().selectedFilePath).toBe('repo/old.ts')
-  expect(documentStore.getState().getLiveEditorDocument('repo/old.ts')?.buffer).toBe(view.buffer)
-  expect(documentStore.getState().getLiveEditorDocument('repo/new.ts')).toBeNull()
+  expect(workspaceStore.getState().selectedTabContent).toEqual(testTabContent('repo/old.ts'))
+  expect(
+    documentStore.getState().getLiveEditorDocument(testDocumentKey('repo/old.ts'))?.buffer,
+  ).toBe(view.buffer)
+  expect(documentStore.getState().getLiveEditorDocument(testDocumentKey('repo/new.ts'))).toBeNull()
   await expect(readContent('repo/old.ts')).resolves.toBe('old\n')
   await expect(treePaths('repo')).resolves.not.toContain('repo/new.ts')
 
@@ -241,7 +249,7 @@ test('keeps optimistic rollback when the authoritative mutation reservation reje
 })
 
 async function renderFsActions(rootPath: string, service = new RecordingWorkspaceEditService()) {
-  const model = treeModel(await fetchTree(rootPath, signal()), rootPath)
+  const model = treeModel(await fetchTree(filesystemPath(rootPath), signal()), rootPath)
   const tree = new FileTreeModel({ paths: model.paths, renaming: true })
   const queryClient = createTestQueryClient()
 
@@ -261,7 +269,7 @@ async function renderFsActions(rootPath: string, service = new RecordingWorkspac
   const treeRef = { current: tree }
   const hook = renderHook(
     () => ({
-      ...useFsActions({ modelRef, rootPath, treeRef }),
+      ...useFsActions({ modelRef, rootPath: filesystemPath(rootPath), treeRef }),
       commands: useEditorCommands(),
       runtime: useEditorRuntime(),
     }),
@@ -324,12 +332,12 @@ function busyError() {
 }
 
 async function readContent(path: string) {
-  const result = await fetchFile(path, signal())
+  const result = await fetchFile(filesystemPath(path), signal())
   return result.content
 }
 
 async function treePaths(path: string) {
-  const result = await fetchTree(path, signal())
+  const result = await fetchTree(filesystemPath(path), signal())
   return flattenedPaths(result.entries)
 }
 

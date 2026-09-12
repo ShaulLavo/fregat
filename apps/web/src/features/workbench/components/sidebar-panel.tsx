@@ -1,3 +1,4 @@
+import type { FilesystemPath } from '@/lib/documents/utils/types'
 import { useNavigation } from '@/hooks/use-navigation'
 import {
   ChatCircleIcon,
@@ -22,7 +23,7 @@ export function SidebarPanel({
   rootPath,
 }: {
   readonly panels: WorkbenchPanels
-  readonly rootPath: string
+  readonly rootPath: FilesystemPath
 }) {
   const navigation = useNavigation()
 
@@ -111,7 +112,7 @@ function renderSidebarPanel({
   rootPath,
   tab,
 }: {
-  readonly rootPath: string
+  readonly rootPath: FilesystemPath
   readonly tab: WorkbenchSidebarTab
 }) {
   if (tab === 'chat') return <ChatSidePanel rootPath={rootPath} />

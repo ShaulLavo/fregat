@@ -1,3 +1,5 @@
+import { fileDocumentKey, filesystemPath } from '@/lib/documents/utils/identity'
+import type { DocumentKey } from '@/lib/documents/utils/types'
 import { CaretRightIcon, FileCodeIcon, XIcon } from '@phosphor-icons/react'
 import type {
   LanguageServerDefinitionTarget,
@@ -42,16 +44,25 @@ export function LanguageServerReferencesPane({
   onPreviewReference,
 }: LanguageServerReferencesPaneProps) {
   const documentStore = useEditorDocumentStoreApi()
+  // Stable bindings keep live-store selectors free of descriptor construction.
+  const referenceTargets = useMemo(
+    () =>
+      references.targets.map((target) => ({
+        path: target.path,
+        key: fileDocumentKey(filesystemPath(target.path)),
+      })),
+    [references.targets],
+  )
   const documentRevisionKey = useEditorDocumentState((state) =>
-    referenceDocumentsRevisionKey(state.liveDocumentsById, references.targets),
+    referenceDocumentsRevisionKey(state.liveDocumentsByKey, referenceTargets),
   )
   const documents = useMemo(
-    () => referenceDocumentsByPath(documentStore.getState().liveDocumentsById, references.targets),
-    // documentRevisionKey is the intentional invalidation token: the memo reads liveDocumentsById
+    () => referenceDocumentsByPath(documentStore.getState().liveDocumentsByKey, referenceTargets),
+    // documentRevisionKey is the intentional invalidation token: the memo reads liveDocumentsByKey
     // imperatively via getState() instead of subscribing (to avoid a re-render storm), so the key
     // must stay in deps to rebuild when document content revisions change in place.
     // eslint-disable-next-line react-hooks/exhaustive-deps
-    [documentRevisionKey, documentStore, references.targets],
+    [documentRevisionKey, documentStore, referenceTargets],
   )
   const [collapsedPaths, setCollapsedPaths] = useState<ReadonlySet<string>>(() => new Set())
   const groups = useMemo(
@@ -243,8 +254,8 @@ function referencePreview(
 }
 
 function referenceDocumentsRevisionKey(
-  documents: Readonly<Record<string, LiveEditorDocument>>,
-  targets: readonly LanguageServerDefinitionTarget[],
+  documents: Readonly<Record<DocumentKey, LiveEditorDocument>>,
+  targets: readonly { readonly path: string; readonly key: DocumentKey }[],
 ) {
   let key = ''
   const seen = new Set<string>()
@@ -253,7 +264,7 @@ function referenceDocumentsRevisionKey(
     if (seen.has(target.path)) continue
 
     seen.add(target.path)
-    const document = documents[target.path]
+    const document = documents[target.key]
     key += `${target.path}\u0000${document?.contentRevision ?? ''}\u0000${referenceDocumentSnapshotRevision(document)}\u0001`
   }
 
@@ -268,15 +279,15 @@ function referenceDocumentSnapshotRevision(document: LiveEditorDocument | undefi
 }
 
 function referenceDocumentsByPath(
-  documents: Readonly<Record<string, LiveEditorDocument>>,
-  targets: readonly LanguageServerDefinitionTarget[],
+  documents: Readonly<Record<DocumentKey, LiveEditorDocument>>,
+  targets: readonly { readonly path: string; readonly key: DocumentKey }[],
 ) {
   const result: Record<string, LiveEditorDocument | undefined> = {}
 
   for (const target of targets) {
     if (target.path in result) continue
 
-    result[target.path] = documents[target.path]
+    result[target.path] = documents[target.key]
   }
 
   return result

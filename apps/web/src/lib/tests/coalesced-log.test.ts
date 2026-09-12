@@ -1,13 +1,15 @@
-import { afterEach, describe, expect, it, vi } from 'vitest'
+import { afterEach, describe, vi } from 'vitest'
 
-import { createCoalescedLogQueue } from '@/features/workspace/utils/coalesced-log'
+import { expect, test } from '../../../test/fixtures'
+
+import { createCoalescedLogQueue } from '@/lib/coalesced-log'
 
 describe('createCoalescedLogQueue', () => {
   afterEach(() => {
     vi.useRealTimers()
   })
 
-  it('coalesces repeated events with an optional merge function', () => {
+  test('coalesces repeated events with an optional merge function', () => {
     vi.useFakeTimers()
     const emitted: Record<string, unknown>[] = []
     const queue = createCoalescedLogQueue({

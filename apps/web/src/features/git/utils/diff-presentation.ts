@@ -1,9 +1,10 @@
+import { comparisonDisplayPath } from '@/lib/documents/utils/labels'
 import type { GitFileDiff } from '@workspace/contracts'
 import type { DiffFile } from '@singapor/diff'
 
 import { toTreePath } from '@/lib/path-formatters'
 
-import type { DiffDocumentInfo } from '@/features/git/utils/diff-document'
+import type { GitComparison } from '@/lib/documents/utils/types'
 
 /**
  * Shown when the diff request came back with no file entries at all. Headings,
@@ -11,9 +12,9 @@ import type { DiffDocumentInfo } from '@/features/git/utils/diff-document'
  * what stays here is deciding when there is nothing for it to render, because a
  * diff pane must never be a blank rectangle the reader has to interpret.
  */
-export function emptyDiffNotice(info: DiffDocumentInfo, rootPath: string): string {
-  const oldPath = info.query.oldPath
-  if (oldPath && oldPath !== info.path) {
+export function emptyDiffNotice(info: GitComparison, rootPath: string): string {
+  const oldPath = info.oldPath
+  if (oldPath && oldPath !== comparisonDisplayPath(info)) {
     return `Renamed from ${toTreePath(oldPath, rootPath)}. No content changes.`
   }
   if (info.status === 'renamed') return 'Renamed. No content changes.'
@@ -27,7 +28,7 @@ export function emptyDiffNotice(info: DiffDocumentInfo, rootPath: string): strin
  */
 export function unrenderableDiffNotice(
   diffs: readonly GitFileDiff[],
-  info: DiffDocumentInfo,
+  info: GitComparison,
   rootPath: string,
 ): string {
   if (diffs.some(isBinaryDiff)) return 'Binary file — no text diff to show.'

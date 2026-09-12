@@ -13,7 +13,6 @@ import { ChangeGroup } from '@/features/git/components/change-group'
 import { CommitControls } from '@/features/git/components/commit-controls'
 import { Header } from '@/features/git/components/header'
 import { PanelLoading } from '@/features/git/components/panel-loading'
-import { parseDiffDocumentId } from '@/features/git/utils/diff-document'
 import { diffDocumentQueryKey } from '@/features/git/utils/diff-document-query'
 import { useFocusTarget } from '@/lib/focus/hooks/use-target'
 import { queryHasNoData } from '@/lib/query-state'
@@ -56,8 +55,11 @@ function PanelContent({ className, rootPath }: ComponentProps<'section'> & { roo
     },
     [focusTargetRef],
   )
-  const selectedDocumentPath = useEditorWorkspaceState((state) => state.selectedFilePath)
-  const selectedDiff = parseDiffDocumentId(selectedDocumentPath)
+  const selectedContent = useEditorWorkspaceState((state) => state.selectedTabContent)
+  const selectedDiff =
+    selectedContent?.kind === 'document' && selectedContent.document.kind === 'git-diff'
+      ? selectedContent.document.source
+      : null
   const selectedDiffQueryKey = selectedDiff
     ? diffDocumentQueryKey(selectedDiff)
     : DISABLED_DIFF_QUERY

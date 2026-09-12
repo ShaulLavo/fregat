@@ -1,7 +1,8 @@
 import { clientForQueryClient } from '@/lib/environments/state/query-clients'
 import { errorMessage, statPath } from '@/lib/file-server'
 import type { FileResult, StatResult } from '@/lib/file-system-types'
-import { fileBackedDocumentPath } from '@/features/editor/utils/file-backed-document'
+import { filesystemPath } from '@/lib/documents/utils/identity'
+import type { FilesystemPath } from '@/lib/documents/utils/types'
 import { fileStatVersion } from '@/features/workspace/utils/file-version'
 import { fileSnapshotQueryOptions } from '@/lib/file-snapshot-query-cache'
 import { idleState, type LoadState } from '@/lib/load-state'
@@ -9,11 +10,10 @@ import { fileSystemKeys } from '@/lib/query-keys'
 import { useQuery, useQueryClient } from '@tanstack/react-query'
 import { useMemo } from 'react'
 
-export function useSelectedFile(selectedFilePath: string | null) {
+export function useSelectedFile(filePath: FilesystemPath | null) {
   const queryClient = useQueryClient()
-  const filePath = fileBackedDocumentPath(selectedFilePath)
   const query = useQuery<FileResult>({
-    ...fileSnapshotQueryOptions(filePath ?? ''),
+    ...fileSnapshotQueryOptions(filePath ?? filesystemPath('')),
     enabled: Boolean(filePath),
     placeholderData: (previousFile) => previousFile,
   })
@@ -21,8 +21,9 @@ export function useSelectedFile(selectedFilePath: string | null) {
   const metadataQuery = useQuery<StatResult>({
     enabled: Boolean(filePath),
     gcTime: 0,
-    queryFn: ({ signal, client }) => statPath(filePath ?? '', signal, clientForQueryClient(client)),
-    queryKey: fileSystemKeys.fileMetadata(filePath ?? ''),
+    queryFn: ({ signal, client }) =>
+      statPath(filePath ?? filesystemPath(''), signal, clientForQueryClient(client)),
+    queryKey: fileSystemKeys.fileMetadata(filePath ?? filesystemPath('')),
     refetchOnMount: 'always',
   })
   const fileState = useMemo(
@@ -45,7 +46,7 @@ export function useSelectedFile(selectedFilePath: string | null) {
 }
 
 function selectedFileVersion(
-  filePath: string | null,
+  filePath: FilesystemPath | null,
   fileState: LoadState<FileResult>,
   metadata: StatResult | undefined,
 ): string | null {
@@ -63,7 +64,7 @@ export function fileLoadState(
     isError: boolean
     isPending: boolean
   },
-  selectedFilePath: string,
+  selectedFilePath: FilesystemPath,
 ): LoadState<FileResult> {
   if (query.data?.path === selectedFilePath) {
     return { status: 'ready', data: query.data }

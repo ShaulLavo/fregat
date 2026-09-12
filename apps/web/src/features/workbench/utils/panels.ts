@@ -1,11 +1,22 @@
-import { createEditorTabRecord, type EditorTabRecord } from '@/features/workspace/utils/tab-model'
+import {
+  createEditorTabRecord,
+  rekeyTabFile,
+  sameTabContent,
+  tabContentKey,
+} from '@/lib/documents/utils/tabs'
+import type {
+  EditorTabRecord,
+  FilesystemPath,
+  TabContent,
+  TabId,
+} from '@/lib/documents/utils/types'
 
 export type WorkbenchSidebarTab = 'chat' | 'files' | 'git' | 'logs' | 'search'
 export type WorkbenchBottomTab = 'terminal' | 'problems'
 
 export type WorkbenchPanels = {
   readonly activeBottomTab: WorkbenchBottomTab
-  readonly activeEditorTabId: string | null
+  readonly activeEditorTabId: TabId | null
   readonly activeSidebarTab: WorkbenchSidebarTab
   readonly bottomPanelOpen: boolean
   readonly editorTabs: readonly EditorTabRecord[]
@@ -28,8 +39,8 @@ export function createDefaultWorkbenchPanels(): WorkbenchPanels {
   }
 }
 
-export function activeEditorPathForWorkbenchPanels(panels: WorkbenchPanels) {
-  return activeEditorTabForWorkbenchPanels(panels)?.path ?? null
+export function activeEditorContentForWorkbenchPanels(panels: WorkbenchPanels) {
+  return activeEditorTabForWorkbenchPanels(panels)?.content ?? null
 }
 
 export function activeEditorTabForWorkbenchPanels(panels: WorkbenchPanels) {
@@ -38,14 +49,17 @@ export function activeEditorTabForWorkbenchPanels(panels: WorkbenchPanels) {
   return editorTabById(panels, panels.activeEditorTabId) ?? panels.editorTabs[0] ?? null
 }
 
-export function editorOpenPathsForWorkbenchPanels(panels: WorkbenchPanels) {
-  return Array.from(new Set(panels.editorTabs.map((tab) => tab.path)))
+export function editorOpenContentsForWorkbenchPanels(panels: WorkbenchPanels) {
+  return Array.from(
+    new Map(panels.editorTabs.map((tab) => [tabContentKey(tab.content), tab.content])).values(),
+  )
 }
 
-export function editorPathCountsForWorkbenchPanels(panels: WorkbenchPanels) {
+export function editorContentCountsForWorkbenchPanels(panels: WorkbenchPanels) {
   const counts = new Map<string, number>()
   for (const tab of panels.editorTabs) {
-    counts.set(tab.path, (counts.get(tab.path) ?? 0) + 1)
+    const key = tabContentKey(tab.content)
+    counts.set(key, (counts.get(key) ?? 0) + 1)
   }
 
   return counts
@@ -55,11 +69,11 @@ export function editorTabRecordsForWorkbenchPanels(panels: WorkbenchPanels) {
   return panels.editorTabs
 }
 
-export function openEditorPathInWorkbenchPanels(panels: WorkbenchPanels, path: string) {
-  const existing = panels.editorTabs.find((tab) => tab.path === path)
+export function openEditorContentInWorkbenchPanels(panels: WorkbenchPanels, content: TabContent) {
+  const existing = panels.editorTabs.find((tab) => sameTabContent(tab.content, content))
   if (existing) return selectEditorTabInWorkbenchPanels(panels, existing.id)
 
-  const tab = createEditorTabRecord(path)
+  const tab = createEditorTabRecord(content)
   return {
     ...panels,
     activeEditorTabId: tab.id,
@@ -67,7 +81,7 @@ export function openEditorPathInWorkbenchPanels(panels: WorkbenchPanels, path: s
   }
 }
 
-export function closeEditorTabInWorkbenchPanels(panels: WorkbenchPanels, tabId: string) {
+export function closeEditorTabInWorkbenchPanels(panels: WorkbenchPanels, tabId: TabId) {
   const index = panels.editorTabs.findIndex((tab) => tab.id === tabId)
   if (index < 0) return panels
 
@@ -79,8 +93,8 @@ export function closeEditorTabInWorkbenchPanels(panels: WorkbenchPanels, tabId: 
   }
 }
 
-export function closeEditorPathInWorkbenchPanels(panels: WorkbenchPanels, path: string) {
-  const editorTabs = panels.editorTabs.filter((tab) => tab.path !== path)
+export function closeEditorContentInWorkbenchPanels(panels: WorkbenchPanels, content: TabContent) {
+  const editorTabs = panels.editorTabs.filter((tab) => !sameTabContent(tab.content, content))
   if (editorTabs.length === panels.editorTabs.length) return panels
 
   return {
@@ -90,17 +104,18 @@ export function closeEditorPathInWorkbenchPanels(panels: WorkbenchPanels, path: 
   }
 }
 
-export function renameEditorPathInWorkbenchPanels(
+export function renameEditorFileInWorkbenchPanels(
   panels: WorkbenchPanels,
-  from: string,
-  to: string,
+  from: FilesystemPath,
+  to: FilesystemPath,
 ): WorkbenchPanels {
   let renamed = false
   const editorTabs = panels.editorTabs.map((tab) => {
-    if (tab.path !== from) return tab
+    const content = rekeyTabFile(tab.content, from, to)
+    if (content === tab.content) return tab
 
     renamed = true
-    return { ...tab, path: to }
+    return { ...tab, content }
   })
   if (!renamed) return panels
 
@@ -109,7 +124,7 @@ export function renameEditorPathInWorkbenchPanels(
 
 export function reorderEditorTabInWorkbenchPanels(
   panels: WorkbenchPanels,
-  tabId: string,
+  tabId: TabId,
   targetIndex: number,
 ) {
   const sourceIndex = panels.editorTabs.findIndex((tab) => tab.id === tabId)
@@ -124,7 +139,7 @@ export function reorderEditorTabInWorkbenchPanels(
   return { ...panels, editorTabs }
 }
 
-export function selectEditorTabInWorkbenchPanels(panels: WorkbenchPanels, tabId: string) {
+export function selectEditorTabInWorkbenchPanels(panels: WorkbenchPanels, tabId: TabId) {
   if (!editorTabById(panels, tabId)) return panels
   if (panels.activeEditorTabId === tabId) return panels
 
@@ -206,7 +221,7 @@ export function normalizeWorkbenchPanels(value: WorkbenchPanels): WorkbenchPanel
   }
 }
 
-function editorTabById(panels: WorkbenchPanels, tabId: string) {
+function editorTabById(panels: WorkbenchPanels, tabId: TabId) {
   return panels.editorTabs.find((tab) => tab.id === tabId) ?? null
 }
 
@@ -214,7 +229,7 @@ function activeEditorTabIdAfterClose(
   panels: WorkbenchPanels,
   nextTabs: readonly EditorTabRecord[],
   closedIndex: number,
-  closedTabId: string,
+  closedTabId: TabId,
 ) {
   if (panels.activeEditorTabId !== closedTabId) return normalizedActiveTabIdFor(nextTabs, panels)
 

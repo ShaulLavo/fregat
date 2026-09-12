@@ -1,3 +1,4 @@
+import type { FilesystemPath } from '@/lib/documents/utils/types'
 import { FileDashedIcon } from '@phosphor-icons/react'
 import { EmptyState } from '@workspace/ui/components/empty-state'
 
@@ -20,7 +21,7 @@ export function CodePanel({
 
   readonly gitFiles?: readonly FileStatus[]
   readonly panels: WorkbenchPanels
-  readonly rootPath: string
+  readonly rootPath: FilesystemPath
 }) {
   const tabModels = panels.editorTabs.map((tab) =>
     editorTabModel({
@@ -32,7 +33,7 @@ export function CodePanel({
     }),
   )
   const activeTab = panels.editorTabs.find((tab) => tab.id === panels.activeEditorTabId) ?? null
-  const inputPending = useEditorInputPending(activeTab?.path)
+  const inputPending = useEditorInputPending(activeTab?.content)
   const loadingTabId = inputPending ? activeTab?.id : null
 
   return (
@@ -42,7 +43,7 @@ export function CodePanel({
         {activeTab ? (
           <EditorSurfaceTabBody
             active
-            path={activeTab.path}
+            content={activeTab.content}
             rootPath={rootPath}
             tabId={activeTab.id}
           />

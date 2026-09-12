@@ -1,3 +1,4 @@
+import type { FilesystemPath } from '@/lib/documents/utils/types'
 import { TreePane } from '@/features/workspace/components/tree-pane'
 import { useStatus } from '@/features/git/hooks'
 import { statusEntriesForTree } from '@/features/git/utils/status-entries-for-tree'
@@ -7,7 +8,7 @@ import { memo, useMemo } from 'react'
 import { EnvironmentStaleNotice } from '@/components/environment-stale-notice'
 
 export const FilesPane = memo(
-  ({ rootPath, state }: { rootPath: string; state: LoadState<TreeModel> }) => {
+  ({ rootPath, state }: { rootPath: FilesystemPath; state: LoadState<TreeModel> }) => {
     const gitStatus = useStatus(rootPath)
     const gitStatusEntries = useMemo(
       () => statusEntriesForTree(gitStatus.data?.files ?? [], rootPath),

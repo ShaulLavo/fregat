@@ -5,15 +5,16 @@ import type { ChatModePanels } from '@/features/chat-mode/utils/panels'
 import type { WorkbenchLayout } from '@/features/workbench/utils/layout'
 import type { WorkspaceUiMode } from '@/lib/ui-mode'
 import {
-  activeEditorPathForWorkbenchPanels,
-  editorOpenPathsForWorkbenchPanels,
+  activeEditorContentForWorkbenchPanels,
+  editorOpenContentsForWorkbenchPanels,
   normalizeWorkbenchPanels,
   type WorkbenchPanels,
 } from '@/features/workbench/utils/panels'
 import type { CachedWorkspaceSlice, CachedWorkspaceState } from '@/features/workspace/state/cache'
 import { emptyWorkspaceSlice, emptyWorkspaceState } from '@/features/workspace/state/cache'
 import { clientErrors } from '@/lib/structured-errors'
-import type { EditorScrollPosition } from '@singapor/core'
+import { sameTabContent, tabContentKey } from '@/lib/documents/utils/tabs'
+import type { ReopenScrollPosition, TabContent } from '@/lib/documents/utils/types'
 import { createContext, use } from 'react'
 import { useStore } from 'zustand'
 import { subscribeWithSelector } from 'zustand/middleware'
@@ -28,12 +29,12 @@ type ParkedWorkspace = CachedWorkspaceSlice & {
 type EditorWorkspaceStoreState = CachedWorkspaceSlice & {
   worktreeIdByRootPath: WorktreeIdsByRootPath
   chatModePanels: ChatModePanels
-  openFilePaths: string[]
+  openTabContents: readonly TabContent[]
   /** Every project except the open one, by root path. */
   parkedWorkspaces: ReadonlyMap<string, ParkedWorkspace>
   pickerOpen: boolean
   rootFolder: PickedFsEntry | null
-  selectedFilePath: string | null
+  selectedTabContent: TabContent | null
   uiMode: WorkspaceUiMode
   workbenchLayout: WorkbenchLayout
 }
@@ -43,11 +44,11 @@ type EditorWorkspaceStoreActions = {
   clearRootFolder: () => void
   openPicker: () => void
   setChatModePanels: (panels: ChatModePanels) => void
-  setEditorHistory: (paths: string[]) => void
+  setEditorHistory: (contents: readonly TabContent[]) => void
   /** Merges latest scroll positions; positions for closed tabs are kept for reopen. */
-  setEditorScrollPositions: (byPath: Record<string, EditorScrollPosition>) => void
+  setEditorScrollPositions: (positions: readonly ReopenScrollPosition[]) => void
   setPickerOpen: (open: boolean) => void
-  setRecentlyClosedEditorPaths: (paths: string[]) => void
+  setRecentlyClosedTabs: (contents: readonly TabContent[]) => void
   setUiMode: (mode: WorkspaceUiMode) => void
   setWorkbenchLayout: (layout: WorkbenchLayout) => void
   setWorkbenchPanels: (panels: WorkbenchPanels) => void
@@ -107,21 +108,20 @@ export function createEditorWorkspaceStore(
       openPicker: () => set({ pickerOpen: true }),
       setChatModePanels: (chatModePanels) => set({ chatModePanels }),
       setEditorHistory: (editorHistory) => set({ editorHistory }),
-      setEditorScrollPositions: (byPath) => {
-        const merged = mergedScrollPositions(get().scrollPositionByPath, byPath)
+      setEditorScrollPositions: (positions) => {
+        const merged = mergedScrollPositions(get().reopenScrollPositions, positions)
         if (!merged) return
 
-        set({ scrollPositionByPath: merged })
+        set({ reopenScrollPositions: merged })
       },
       setPickerOpen: (pickerOpen) => set({ pickerOpen }),
-      setRecentlyClosedEditorPaths: (recentlyClosedEditorPaths) =>
-        set({ recentlyClosedEditorPaths }),
+      setRecentlyClosedTabs: (recentlyClosedTabs) => set({ recentlyClosedTabs }),
       setUiMode: (uiMode) => set({ uiMode }),
       setWorkbenchLayout: (workbenchLayout) => set({ workbenchLayout }),
       setWorkbenchPanels: (workbenchPanels) =>
         set((state) =>
           editorWorkspaceSelectionForWorkbenchPanels(workbenchPanels, {
-            currentOpenFilePaths: state.openFilePaths,
+            currentOpenTabContents: state.openTabContents,
           }),
         ),
       switchWorkspace: (rootFolder) => set(switchedWorkspaceState(get(), rootFolder)),
@@ -143,15 +143,15 @@ function switchedWorkspaceState(
   if (nextRootPath === currentRootPath) return { pickerOpen: false, rootFolder }
 
   const parkedWorkspaces = new Map(state.parkedWorkspaces)
-  if (currentRootPath) {
+  if (currentRootPath !== null) {
     parkedWorkspaces.set(currentRootPath, {
       ...currentWorkspaceSlice(state),
       lastActiveAt: Date.now(),
     })
   }
 
-  const restored = nextRootPath ? parkedWorkspaces.get(nextRootPath) : undefined
-  if (nextRootPath) parkedWorkspaces.delete(nextRootPath)
+  const restored = nextRootPath !== null ? parkedWorkspaces.get(nextRootPath) : undefined
+  if (nextRootPath !== null) parkedWorkspaces.delete(nextRootPath)
 
   return {
     ...activeWorkspaceState(restored ?? emptyWorkspaceSlice()),
@@ -164,8 +164,8 @@ function switchedWorkspaceState(
 function currentWorkspaceSlice(state: EditorWorkspaceStore): CachedWorkspaceSlice {
   return {
     editorHistory: state.editorHistory,
-    recentlyClosedEditorPaths: state.recentlyClosedEditorPaths,
-    scrollPositionByPath: state.scrollPositionByPath,
+    recentlyClosedTabs: state.recentlyClosedTabs,
+    reopenScrollPositions: state.reopenScrollPositions,
     workbenchPanels: state.workbenchPanels,
   }
 }
@@ -174,8 +174,8 @@ function activeWorkspaceState(slice: CachedWorkspaceSlice) {
   return {
     ...editorWorkspaceSelectionForWorkbenchPanels(slice.workbenchPanels),
     editorHistory: slice.editorHistory,
-    recentlyClosedEditorPaths: slice.recentlyClosedEditorPaths,
-    scrollPositionByPath: slice.scrollPositionByPath,
+    recentlyClosedTabs: slice.recentlyClosedTabs,
+    reopenScrollPositions: slice.reopenScrollPositions,
   }
 }
 
@@ -207,48 +207,54 @@ function parkedWorkspacesFromCache(state: CachedWorkspaceState, activeRootPath: 
 
 export function editorWorkspaceSelectionForWorkbenchPanels(
   workbenchPanels: WorkbenchPanels,
-  options: { currentOpenFilePaths?: string[] } = {},
+  options: { currentOpenTabContents?: readonly TabContent[] } = {},
 ) {
   const normalizedPanels = normalizeWorkbenchPanels(workbenchPanels)
-  const openFilePaths = stableOpenFilePaths(
-    options.currentOpenFilePaths,
-    editorOpenPathsForWorkbenchPanels(normalizedPanels),
+  const openTabContents = stableOpenTabContents(
+    options.currentOpenTabContents,
+    editorOpenContentsForWorkbenchPanels(normalizedPanels),
   )
 
   return {
-    openFilePaths,
-    selectedFilePath: activeEditorPathForWorkbenchPanels(normalizedPanels),
+    openTabContents,
+    selectedTabContent: activeEditorContentForWorkbenchPanels(normalizedPanels),
     workbenchPanels: normalizedPanels,
   }
 }
 
-function stableOpenFilePaths(current: string[] | undefined, next: string[]) {
+function stableOpenTabContents(
+  current: readonly TabContent[] | undefined,
+  next: readonly TabContent[],
+) {
   if (!current) return next
-  if (!sameOpenFilePaths(current, next)) return next
+  if (!sameOpenTabContents(current, next)) return next
 
   return current
 }
 
-function sameOpenFilePaths(left: readonly string[], right: readonly string[]) {
+function sameOpenTabContents(left: readonly TabContent[], right: readonly TabContent[]) {
   if (left.length !== right.length) return false
 
-  return left.every((path, index) => path === right[index])
+  return left.every((content, index) => sameTabContent(content, right[index]!))
 }
 
 /** Returns null when nothing changed, so no-op writes keep the record's identity. */
 function mergedScrollPositions(
-  current: Readonly<Record<string, EditorScrollPosition>>,
-  incoming: Readonly<Record<string, EditorScrollPosition>>,
-): Record<string, EditorScrollPosition> | null {
+  current: readonly ReopenScrollPosition[],
+  incoming: readonly ReopenScrollPosition[],
+): readonly ReopenScrollPosition[] | null {
   let changed = false
-  const next: Record<string, EditorScrollPosition> = { ...current }
-  for (const [path, position] of Object.entries(incoming)) {
-    const existing = next[path]
-    if (existing && existing.left === position.left && existing.top === position.top) continue
-
-    next[path] = { left: position.left, top: position.top }
+  const next = new Map(current.map((entry) => [tabContentKey(entry.content), entry]))
+  for (const entry of incoming) {
+    const key = tabContentKey(entry.content)
+    const existing = next.get(key)
+    if (
+      existing?.position.left === entry.position.left &&
+      existing?.position.top === entry.position.top
+    )
+      continue
+    next.set(key, entry)
     changed = true
   }
-
-  return changed ? next : null
+  return changed ? Array.from(next.values()) : null
 }

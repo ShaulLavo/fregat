@@ -1,9 +1,10 @@
+import type { DocumentKey, FilesystemPath } from '@/lib/documents/utils/types'
 import type { EditorPreparedDocument, EditorTextBuffer, PieceTableSnapshot } from '@singapor/core'
 import type { FileResult } from '@/lib/file-system-types'
 
 type PreparedOpenClaimBase = {
   readonly buffer: EditorTextBuffer
-  readonly path: string
+  readonly path: FilesystemPath
   readonly snapshot: PieceTableSnapshot
 }
 
@@ -15,7 +16,7 @@ export type PreparedCleanFileOpenClaim = PreparedOpenClaimBase & {
 }
 
 export type PreparedLiveFileOpenClaim = PreparedOpenClaimBase & {
-  readonly documentId: string
+  readonly documentKey: DocumentKey
   readonly kind: 'live'
   readonly localRevision: number
   readonly preparedDocument: EditorPreparedDocument | null

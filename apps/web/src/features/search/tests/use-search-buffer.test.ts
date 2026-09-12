@@ -1,9 +1,17 @@
-import { describe, expect, it } from 'vitest'
+import {
+  fileDocument,
+  fileResource,
+  filesystemPath,
+  fileDocumentKey,
+} from '@/lib/documents/utils/identity'
+import { createClientInvariantError } from '@/lib/structured-errors'
+import { describe } from 'vitest'
+import { expect, test as it } from '../../../../test/fixtures'
 import { createEditorTextBuffer } from '@singapor/core'
 import type { WorkspaceSearchEvent } from '@workspace/contracts'
 
 import type { LiveEditorDocument } from '@/features/editor/state/document-state'
-import { dirtySearchRevisionKey } from '@/features/search/utils/buffer-dirty-documents'
+import { dirtySearchRevisionKey } from '@/features/search/state/dirty-documents'
 import { workspaceSearchQuery } from '@/features/search/utils/buffer-query'
 import {
   clientOnlyWorkspaceSearchProvider,
@@ -75,16 +83,24 @@ describe('workspace search dirty revision key', () => {
   it('tracks dirty document revisions without reading document text', () => {
     const dirtyBuffer = createEditorTextBuffer('local dirty text')
     dirtyBuffer.materializeFullText = () => {
-      throw new Error('dirty key should not read document text')
+      throw createClientInvariantError('dirty key should not read document text')
     }
 
     const key = dirtySearchRevisionKey(
       {
-        'outside/file.ts': liveDocument('outside/file.ts', 1),
-        'repo/src/dirty.ts': liveDocument('repo/src/dirty.ts', 7, dirtyBuffer),
+        [fileDocumentKey(filesystemPath('outside/file.ts'))]: liveDocument('outside/file.ts', 1),
+        [fileDocumentKey(filesystemPath('repo/src/dirty.ts'))]: liveDocument(
+          'repo/src/dirty.ts',
+          7,
+          dirtyBuffer,
+        ),
       },
-      new Set(['outside/file.ts', 'repo/src/dirty.ts']),
-      { 'repo/src/dirty.ts': 'e:4' },
+      new Set(
+        ['outside/file.ts', 'repo/src/dirty.ts'].map((path) =>
+          fileDocumentKey(filesystemPath(path)),
+        ),
+      ),
+      { [fileDocumentKey(filesystemPath('repo/src/dirty.ts'))]: 'e:4' },
       'repo',
     )
     const parts = key.split('\0')
@@ -97,9 +113,11 @@ describe('workspace search dirty revision key', () => {
   it('does not change for dirty paths outside the workspace', () => {
     expect(
       dirtySearchRevisionKey(
-        { 'outside/file.ts': liveDocument('outside/file.ts', 1) },
-        new Set(['outside/file.ts']),
-        { 'outside/file.ts': 'e:1' },
+        {
+          [fileDocumentKey(filesystemPath('outside/file.ts'))]: liveDocument('outside/file.ts', 1),
+        },
+        new Set(['outside/file.ts'].map((path) => fileDocumentKey(filesystemPath(path)))),
+        { [fileDocumentKey(filesystemPath('outside/file.ts'))]: 'e:1' },
         'repo',
       ),
     ).toBe('')
@@ -108,51 +126,85 @@ describe('workspace search dirty revision key', () => {
   it('changes for dirty content, file, path, and buffer revisions', () => {
     const buffer = createEditorTextBuffer('same')
     const key = dirtySearchRevisionKey(
-      { 'repo/src/a.ts': liveDocument('repo/src/a.ts', 1, buffer) },
-      new Set(['repo/src/a.ts']),
-      { 'repo/src/a.ts': 'e:1' },
+      {
+        [fileDocumentKey(filesystemPath('repo/src/a.ts'))]: liveDocument(
+          'repo/src/a.ts',
+          1,
+          buffer,
+        ),
+      },
+      new Set(['repo/src/a.ts'].map((path) => fileDocumentKey(filesystemPath(path)))),
+      { [fileDocumentKey(filesystemPath('repo/src/a.ts'))]: 'e:1' },
       'repo',
     )
 
     expect(
       dirtySearchRevisionKey(
-        { 'repo/src/a.ts': liveDocument('repo/src/a.ts', 1, buffer) },
-        new Set(['repo/src/a.ts']),
-        { 'repo/src/a.ts': 'e:1' },
+        {
+          [fileDocumentKey(filesystemPath('repo/src/a.ts'))]: liveDocument(
+            'repo/src/a.ts',
+            1,
+            buffer,
+          ),
+        },
+        new Set(['repo/src/a.ts'].map((path) => fileDocumentKey(filesystemPath(path)))),
+        { [fileDocumentKey(filesystemPath('repo/src/a.ts'))]: 'e:1' },
         'repo',
       ),
     ).toBe(key)
     expect(
       dirtySearchRevisionKey(
-        { 'repo/src/a.ts': liveDocument('repo/src/a.ts', 1, buffer) },
-        new Set(['repo/src/a.ts']),
-        { 'repo/src/a.ts': 'e:2' },
-        'repo',
-      ),
-    ).not.toBe(key)
-    expect(
-      dirtySearchRevisionKey(
-        { 'repo/src/a.ts': liveDocument('repo/src/a.ts', 2, buffer) },
-        new Set(['repo/src/a.ts']),
-        { 'repo/src/a.ts': 'e:1' },
+        {
+          [fileDocumentKey(filesystemPath('repo/src/a.ts'))]: liveDocument(
+            'repo/src/a.ts',
+            1,
+            buffer,
+          ),
+        },
+        new Set(['repo/src/a.ts'].map((path) => fileDocumentKey(filesystemPath(path)))),
+        { [fileDocumentKey(filesystemPath('repo/src/a.ts'))]: 'e:2' },
         'repo',
       ),
     ).not.toBe(key)
     expect(
       dirtySearchRevisionKey(
         {
-          'repo/src/a.ts': liveDocument('repo/src/a.ts', 1, createEditorTextBuffer('same')),
+          [fileDocumentKey(filesystemPath('repo/src/a.ts'))]: liveDocument(
+            'repo/src/a.ts',
+            2,
+            buffer,
+          ),
         },
-        new Set(['repo/src/a.ts']),
-        { 'repo/src/a.ts': 'e:1' },
+        new Set(['repo/src/a.ts'].map((path) => fileDocumentKey(filesystemPath(path)))),
+        { [fileDocumentKey(filesystemPath('repo/src/a.ts'))]: 'e:1' },
         'repo',
       ),
     ).not.toBe(key)
     expect(
       dirtySearchRevisionKey(
-        { 'repo/src/b.ts': liveDocument('repo/src/b.ts', 1, buffer) },
-        new Set(['repo/src/b.ts']),
-        { 'repo/src/b.ts': 'e:1' },
+        {
+          [fileDocumentKey(filesystemPath('repo/src/a.ts'))]: liveDocument(
+            'repo/src/a.ts',
+            1,
+            createEditorTextBuffer('same'),
+          ),
+        },
+        new Set(['repo/src/a.ts'].map((path) => fileDocumentKey(filesystemPath(path)))),
+        { [fileDocumentKey(filesystemPath('repo/src/a.ts'))]: 'e:1' },
+        'repo',
+      ),
+    ).not.toBe(key)
+    expect(
+      dirtySearchRevisionKey(
+        {
+          [fileDocumentKey(filesystemPath('repo/src/b.ts'))]: liveDocument(
+            'repo/src/b.ts',
+            1,
+            buffer,
+          ),
+        },
+        new Set(['repo/src/b.ts'].map((path) => fileDocumentKey(filesystemPath(path)))),
+        { [fileDocumentKey(filesystemPath('repo/src/b.ts'))]: 'e:1' },
         'repo',
       ),
     ).not.toBe(key)
@@ -562,14 +614,13 @@ function liveDocument(
   return {
     buffer,
     contentRevision: `h:test:${mtimeMs.toString(36)}`,
-    id: path,
+    key: fileDocumentKey(filesystemPath(path)),
     localRevision: buffer.getRevision(),
-    path,
+    target: fileDocument(fileResource(filesystemPath(path))),
     sync: {
       fileVersion: `test:${mtimeMs}`,
       kind: 'file',
       mtimeMs,
-      path,
       state: 'idle',
     },
   }

@@ -34,7 +34,9 @@ import { useFsActions } from '@/features/workspace/hooks/use-fs-actions'
 import { useTreeSearchSession } from '@/features/workspace/hooks/use-tree-search-session'
 import { useEditorCommands } from '@/features/editor/hooks/use-editor-commands'
 import { useEditorWorkspaceState } from '@/features/editor/state/workspace-state'
-import { fileBackedDocumentPath } from '@/features/editor/utils/file-backed-document'
+import { tabFileResource } from '@/lib/documents/utils/capabilities'
+import { filesystemPath } from '@/lib/documents/utils/identity'
+import type { FilesystemPath } from '@/lib/documents/utils/types'
 import { preparedTreeInputForPaths } from '@/features/workspace/state/prepared-tree-input-cache'
 import { treeCommandFocusCandidate } from '@/features/workspace/utils/tree-commands'
 import { treeGitStatusPatch } from '@/features/workspace/utils/tree-git-status-patch'
@@ -75,7 +77,7 @@ export const TreePane = memo(
     state,
   }: {
     gitStatus?: readonly GitStatusEntry[]
-    rootPath: string
+    rootPath: FilesystemPath
     state: LoadState<TreeModel>
   }) => {
     if (state.status === 'loading') return <TreeLoading />
@@ -102,12 +104,14 @@ function ReadyTreePane({
 }: {
   gitStatus?: readonly GitStatusEntry[]
   model: TreeModel
-  rootPath: string
+  rootPath: FilesystemPath
 }) {
   const { editorTheme } = useEditorColorTheme()
   const workbenchDensity = useWorkbenchDensity()
-  const selectedFilePath = useEditorWorkspaceState((store) => store.selectedFilePath)
-  const selectedDiskPath = fileBackedDocumentPath(selectedFilePath)
+  const selectedFilePath = useEditorWorkspaceState(
+    (store) => tabFileResource(store.selectedTabContent)?.path ?? null,
+  )
+  const selectedDiskPath = selectedFilePath
   const selectedFileQueryKey = selectedDiskPath
     ? fileSystemKeys.fileSnapshot(selectedDiskPath)
     : DISABLED_FILE_QUERY
@@ -153,10 +157,15 @@ function ReadyTreePane({
           moveProjectionReceiptsRef.current.set(request, receipt)
           pathsRef.current = receipt.nextModel.paths
         },
-        rename: (from, to) => renamePath(from, to, clientForQueryClient(client)),
+        rename: (from, to) =>
+          renamePath(filesystemPath(from), filesystemPath(to), clientForQueryClient(client)),
         runWorkspaceMutation: workspaceEdits
           ? (affectedPaths, operation) =>
-              workspaceEdits.runWorkspaceMutation(affectedPaths, operation)
+              workspaceEdits.runWorkspaceMutation(
+                affectedPaths === 'all' ? 'all' : affectedPaths.map(filesystemPath),
+                (report) =>
+                  operation((paths) => report(paths === 'all' ? 'all' : paths.map(filesystemPath))),
+              )
           : null,
       }),
     onMutate: () => {
@@ -230,7 +239,7 @@ function ReadyTreePane({
         model: modelRef.current,
         selectedFilePath: selectedFilePathRef.current,
         selectedPaths,
-        selectFile: selectFileRef.current,
+        selectFile: (path) => selectFileRef.current(path === null ? null : filesystemPath(path)),
       }),
     renaming: {
       onError: (error) => reportError(toClientError({ code: 'INVALID_PATH', error })),
@@ -410,7 +419,7 @@ function openSelectedTreeFile({
 }
 
 type SelectionSyncState = {
-  rootPath: string | null
+  rootPath: FilesystemPath | null
   selectedFilePath: string | null | undefined
 }
 
@@ -427,7 +436,7 @@ function selectionSyncPlan({
   state,
   tree,
 }: {
-  rootPath: string
+  rootPath: FilesystemPath
   selectedFilePath: string | null
   state: SelectionSyncState
   tree: FileTreeModel
@@ -445,7 +454,7 @@ function selectionSyncPlan({
   return { canComplete, reason: 'already-synced', shouldSync: false, treePath }
 }
 
-function selectedTreePath(rootPath: string, selectedFilePath: string | null) {
+function selectedTreePath(rootPath: FilesystemPath, selectedFilePath: string | null) {
   if (!selectedFilePath) return null
 
   return canonicalTreePath(treePathForSelectedPath(rootPath, selectedFilePath))
@@ -466,7 +475,7 @@ function selectedFilePathCanCompleteSync(
 function updateSelectionSyncState(
   state: SelectionSyncState,
   plan: SelectionSyncPlan,
-  rootPath: string,
+  rootPath: FilesystemPath,
   selectedFilePath: string | null,
 ) {
   if (!plan.canComplete) return
@@ -486,13 +495,13 @@ function treeRowDecoration(model: TreeModel, context: FileTreeRowDecorationConte
 
 export type TreeDropMoveRequest = {
   moves: readonly TreePathMove[]
-  rootPath: string
+  rootPath: FilesystemPath
 }
 
 type TreeDropMoveProjectionReceipt = {
   nextModel: TreeModel
   previousModel: TreeModel
-  rootPath: string
+  rootPath: FilesystemPath
 }
 
 type ReportTreeDropAffectedPaths = (affectedPaths: readonly string[] | 'all') => void

@@ -1,3 +1,5 @@
+import { tabFileResource } from '@/lib/documents/utils/capabilities'
+import { filesystemPath } from '@/lib/documents/utils/identity'
 import { waitFor } from '@testing-library/react'
 import type { Terminal, LinkLineSnapshot, LinkProvider } from 'ghostty-webgpu'
 import { mkdir, writeFile } from 'node:fs/promises'
@@ -144,7 +146,9 @@ function TerminalLinkHost({ rootPath, terminal }: { rootPath: string; terminal: 
  * trace in the final state.
  */
 function EditorSelectionProbe({ opened }: { opened: OpenedPaths }) {
-  const selectedFilePath = useEditorWorkspaceState((state) => state.selectedFilePath)
+  const selectedFilePath = useEditorWorkspaceState((state) =>
+    state.selectedTabContent ? (tabFileResource(state.selectedTabContent)?.path ?? null) : null,
+  )
   const definitionTarget = useEditorUiState((state) => state.definitionTarget)
 
   useEffect(() => {
@@ -183,7 +187,7 @@ function createWorkspaceStore() {
       birthtimeMs: 0,
       mtimeMs: 0,
       name: 'repo',
-      path: PROJECT_ROOT,
+      path: filesystemPath(PROJECT_ROOT),
       size: 0,
       type: 'directory',
       version: '',

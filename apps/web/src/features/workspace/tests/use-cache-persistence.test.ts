@@ -1,14 +1,21 @@
+import { filesystemPath, tabId } from '@/lib/documents/utils/identity'
+import {
+  testTabContents,
+  testNullableTabContent,
+  testTabContent,
+  testScrollPositions,
+} from '../../../../test/factories/document-targets'
 import { testScopedStorage } from '../../../../test/factories/scoped-storage'
 import { createDefaultWorkbenchLayout } from '@/features/workbench/utils/layout'
 import { createDefaultChatModePanels } from '@/features/chat-mode/utils/panels'
-import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest'
-
+import { afterEach, beforeEach, describe, vi } from 'vitest'
+import { expect, test as it } from '../../../../test/fixtures'
 import { createEditorWorkspaceStore } from '@/features/editor/state/workspace-state'
 import { createEditorDocumentStore } from '@/features/editor/state/document-state'
 import { createSearchBufferStore } from '@/features/search/state/buffer-state'
 import {
   createDefaultWorkbenchPanels,
-  openEditorPathInWorkbenchPanels,
+  openEditorContentInWorkbenchPanels,
 } from '@/features/workbench/utils/panels'
 import type { FileResult, PickedFsEntry } from '@/lib/file-system-types'
 import type {
@@ -22,14 +29,36 @@ import {
 } from '@/features/workspace/hooks/use-cache-persistence'
 
 type CacheWrite =
-  | { chatModePanels: CachedWorkspaceState['chatModePanels']; key: 'chatModePanels' }
-  | { key: 'uiMode'; uiMode: CachedWorkspaceState['uiMode'] }
-  | { key: 'rootFolder'; rootFolder: PickedFsEntry | null }
-  | { key: 'searchBuffer'; rootPath: string; searchBuffer: CachedSearchBufferState | null }
-  | { key: 'workbenchLayout'; workbenchLayout: CachedWorkspaceState['workbenchLayout'] }
-  | { key: 'workspaceIndex'; rootPaths: readonly string[] }
-  | { key: 'workspaceSlice'; rootPath: string; slice: CachedWorkspaceSlice }
-
+  | {
+      chatModePanels: CachedWorkspaceState['chatModePanels']
+      key: 'chatModePanels'
+    }
+  | {
+      key: 'uiMode'
+      uiMode: CachedWorkspaceState['uiMode']
+    }
+  | {
+      key: 'rootFolder'
+      rootFolder: PickedFsEntry | null
+    }
+  | {
+      key: 'searchBuffer'
+      rootPath: string
+      searchBuffer: CachedSearchBufferState | null
+    }
+  | {
+      key: 'workbenchLayout'
+      workbenchLayout: CachedWorkspaceState['workbenchLayout']
+    }
+  | {
+      key: 'workspaceIndex'
+      rootPaths: readonly string[]
+    }
+  | {
+      key: 'workspaceSlice'
+      rootPath: string
+      slice: CachedWorkspaceSlice
+    }
 describe('workspace cache persistence', () => {
   beforeEach(() => {
     vi.useFakeTimers()
@@ -97,8 +126,8 @@ describe('workspace cache persistence', () => {
     expect(writes).toHaveLength(0)
 
     workspaceStore.setState({
-      openFilePaths: ['/repo/src/a.ts'],
-      selectedFilePath: '/repo/src/a.ts',
+      openTabContents: testTabContents(['/repo/src/a.ts']),
+      selectedTabContent: testNullableTabContent('/repo/src/a.ts'),
     })
     vi.runAllTimers()
     expect(writes).toHaveLength(0)
@@ -106,16 +135,16 @@ describe('workspace cache persistence', () => {
     workspaceStore
       .getState()
       .setWorkbenchPanels(
-        openEditorPathInWorkbenchPanels(
+        openEditorContentInWorkbenchPanels(
           workspaceStore.getState().workbenchPanels,
-          '/repo/src/a.ts',
+          testTabContent('/repo/src/a.ts'),
         ),
       )
     vi.runAllTimers()
     expect(writeKeys(writes)).toEqual(['workspaceSlice'])
     expect(lastCacheWrite(writes, 'workspaceSlice')).toMatchObject({
       rootPath: '/repo',
-      slice: { workbenchPanels: { editorTabs: [{ path: '/repo/src/a.ts' }] } },
+      slice: { workbenchPanels: { editorTabs: [{ content: testTabContent('/repo/src/a.ts') }] } },
     })
 
     unsubscribe()
@@ -131,12 +160,12 @@ describe('workspace cache persistence', () => {
     writes.length = 0
 
     writes.length = 0
-    workspaceStore.getState().setEditorHistory(['/repo/src/a.ts'])
+    workspaceStore.getState().setEditorHistory(testTabContents(['/repo/src/a.ts']))
     vi.runAllTimers()
     expect(writeKeys(writes)).toEqual(['workspaceSlice'])
     expect(lastCacheWrite(writes, 'workspaceSlice')).toMatchObject({
       rootPath: '/repo',
-      slice: { editorHistory: ['/repo/src/a.ts'] },
+      slice: { editorHistory: testTabContents(['/repo/src/a.ts']) },
     })
 
     unsubscribe()
@@ -144,8 +173,7 @@ describe('workspace cache persistence', () => {
 
   it('files a switched-away project under its own key and records the new order', () => {
     const { unsubscribe, workspaceStore, writes } = harness()
-
-    workspaceStore.getState().setEditorHistory(['/repo/src/a.ts'])
+    workspaceStore.getState().setEditorHistory(testTabContents(['/repo/src/a.ts']))
     vi.runAllTimers()
     writes.length = 0
 
@@ -190,9 +218,9 @@ describe('workspace cache persistence', () => {
     workspaceStore
       .getState()
       .setWorkbenchPanels(
-        openEditorPathInWorkbenchPanels(
+        openEditorContentInWorkbenchPanels(
           workspaceStore.getState().workbenchPanels,
-          '/repo/src/a.ts',
+          testTabContent('/repo/src/a.ts'),
         ),
       )
     vi.runAllTimers()
@@ -200,14 +228,14 @@ describe('workspace cache persistence', () => {
 
     const tab = workspaceStore.getState().workbenchPanels.editorTabs[0]
     expect(tab).toBeTruthy()
-    documentStore.getState().ensureEditorView(tab!.id, fileResult('/repo/src/a.ts'))
-    documentStore.getState().setEditorViewScrollPosition(tab!.id, { left: 0, top: 240 })
+    documentStore.getState().ensureEditorView(tabId(tab!.id), fileResult('/repo/src/a.ts'))
+    documentStore.getState().setEditorViewScrollPosition(tabId(tab!.id), { left: 0, top: 240 })
     vi.runAllTimers()
-
-    expect(lastCacheWrite(writes, 'workspaceSlice')?.slice.scrollPositionByPath).toEqual({
-      '/repo/src/a.ts': { left: 0, top: 240 },
-    })
-
+    expect(lastCacheWrite(writes, 'workspaceSlice')?.slice.reopenScrollPositions).toEqual(
+      testScrollPositions({
+        '/repo/src/a.ts': { left: 0, top: 240 },
+      }),
+    )
     unsubscribe()
   })
 })
@@ -239,9 +267,9 @@ function cachedWorkspace(): CachedWorkspaceState {
     workspaceOrder: ['/repo'],
     workspaces: {
       '/repo': {
-        editorHistory: [],
-        recentlyClosedEditorPaths: [],
-        scrollPositionByPath: {},
+        editorHistory: testTabContents([]),
+        recentlyClosedTabs: testTabContents([]),
+        reopenScrollPositions: testScrollPositions({}),
         workbenchPanels: createDefaultWorkbenchPanels(),
       },
     },
@@ -253,7 +281,7 @@ function pickedDirectory(path: string): PickedFsEntry {
     birthtimeMs: 1,
     mtimeMs: 1,
     name: path.split('/').filter(Boolean).at(-1) ?? path,
-    path,
+    path: filesystemPath(path),
     size: 1,
     type: 'directory',
     version: 'test:1:1',
@@ -264,7 +292,7 @@ function fileResult(path: string): FileResult {
   return {
     content: `contents of ${path}`,
     mtimeMs: 1,
-    path,
+    path: filesystemPath(path),
     size: 1,
     version: `test:${path}`,
   }
@@ -295,6 +323,20 @@ function lastCacheWrite<TKey extends CacheWrite['key']>(writes: readonly CacheWr
 function cacheWrites<TKey extends CacheWrite['key']>(
   writes: readonly CacheWrite[],
   key: TKey,
-): Extract<CacheWrite, { key: TKey }>[] {
-  return writes.filter((write): write is Extract<CacheWrite, { key: TKey }> => write.key === key)
+): Extract<
+  CacheWrite,
+  {
+    key: TKey
+  }
+>[] {
+  return writes.filter(
+    (
+      write,
+    ): write is Extract<
+      CacheWrite,
+      {
+        key: TKey
+      }
+    > => write.key === key,
+  )
 }

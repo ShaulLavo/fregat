@@ -1,3 +1,4 @@
+import type { DocumentKey } from '@/lib/documents/utils/types'
 import { WarningCircleIcon } from '@phosphor-icons/react'
 import { useQueryClient } from '@tanstack/react-query'
 import { Button } from '@workspace/ui/components/button'
@@ -13,10 +14,10 @@ import { toClientError } from '@/lib/client-error-taxonomy'
 import { RawConflictReloadDialog } from '@/features/settings/components/raw-conflict-reload-dialog'
 import { SettingsSyncService } from '@/features/settings/state/sync-service'
 
-export function RawConflictBanner({ documentId }: { readonly documentId: string }) {
+export function RawConflictBanner({ documentKey }: { readonly documentKey: DocumentKey }) {
   const queryClient = useQueryClient()
   const documentStore = useEditorDocumentStoreApi()
-  const document = useEditorDocumentState((state) => state.liveDocumentsById[documentId])
+  const document = useEditorDocumentState((state) => state.liveDocumentsByKey[documentKey])
   const [compareOpen, setCompareOpen] = useState(false)
   const [reloadOpen, setReloadOpen] = useState(false)
   const [overwriting, setOverwriting] = useState(false)
@@ -28,7 +29,7 @@ export function RawConflictBanner({ documentId }: { readonly documentId: string 
   const awaitingConfirmed = document.sync.revision === null || confirmedText === null
 
   async function overwrite() {
-    const current = documentStore.getState().getLiveEditorDocument(documentId)
+    const current = documentStore.getState().getLiveEditorDocument(documentKey)
     if (!current || current.sync.kind !== 'settings' || current.sync.state !== 'conflict') return
 
     setError(null)
@@ -43,7 +44,7 @@ export function RawConflictBanner({ documentId }: { readonly documentId: string 
   }
 
   function reload() {
-    documentStore.getState().reloadSettingsDocument(documentId)
+    documentStore.getState().reloadSettingsDocument(documentKey)
     setReloadOpen(false)
   }
 

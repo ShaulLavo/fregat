@@ -1,51 +1,47 @@
+import type { DocumentKey } from '@/lib/documents/utils/types'
 import type { LiveEditorDocument } from '@/features/editor/state/document-state'
 import type { OpenBufferSearchDocument } from '@/features/search/utils/providers'
 import { compareSearchPaths } from '@/features/search/utils/sort'
 
 export function dirtySearchDocuments(
-  documents: Readonly<Record<string, LiveEditorDocument>>,
-  dirtyFilePaths: ReadonlySet<string>,
+  documents: Readonly<Record<DocumentKey, LiveEditorDocument>>,
+  dirtyDocumentKeys: ReadonlySet<DocumentKey>,
   rootPath: string,
 ) {
   const dirtyDocuments: OpenBufferSearchDocument[] = []
 
-  for (const path of dirtyFilePaths) {
+  for (const key of dirtyDocumentKeys) {
+    const document = documents[key]
+    if (document?.target.kind !== 'file') continue
+    const path = document.target.resource.path
     if (!isPathInWorkspace(path, rootPath)) continue
-
-    const document = documents[path]
-    if (!document) continue
-
-    dirtyDocuments.push({
-      path,
-      text: document.buffer.materializeFullText(),
-    })
+    dirtyDocuments.push({ path, text: document.buffer.materializeFullText() })
   }
 
   return dirtyDocuments.sort((a, b) => compareSearchPaths(a.path, b.path))
 }
 
 export function dirtySearchRevisionKey(
-  documents: Readonly<Record<string, LiveEditorDocument>>,
-  dirtyFilePaths: ReadonlySet<string>,
-  contentRevisions: Readonly<Record<string, string>>,
+  documents: Readonly<Record<DocumentKey, LiveEditorDocument>>,
+  dirtyDocumentKeys: ReadonlySet<DocumentKey>,
+  contentRevisions: Readonly<Record<DocumentKey, string>>,
   rootPath: string,
 ) {
   const parts: string[] = []
-  const paths = Array.from(dirtyFilePaths)
-    .filter((path) => isPathInWorkspace(path, rootPath))
-    .toSorted(compareSearchPaths)
+  const dirtyFiles = Array.from(dirtyDocumentKeys)
+    .flatMap((key) => {
+      const document = documents[key]
+      if (document?.target.kind !== 'file') return []
+      const path = document.target.resource.path
+      return isPathInWorkspace(path, rootPath) ? [{ document, key, path }] : []
+    })
+    .toSorted((left, right) => compareSearchPaths(left.path, right.path))
 
-  for (const path of paths) {
-    const document = documents[path]
-    if (!document) {
-      parts.push(path, '', '', '')
-      continue
-    }
-
+  for (const { document, key, path } of dirtyFiles) {
     parts.push(
       path,
       liveDocumentSnapshotRevision(document),
-      contentRevisions[path] ?? '',
+      contentRevisions[key] ?? '',
       dirtySearchBufferKey(document.buffer),
     )
   }

@@ -1,3 +1,4 @@
+import { filesystemPath } from '@/lib/documents/utils/identity'
 import {
   createPickerFolder,
   fetchRecentEntries,
@@ -80,7 +81,7 @@ function fileEntry(path: string): FsEntry & { type: 'file' } {
     birthtimeMs: 0,
     mtimeMs: 0,
     name: path.split('/').at(-1) ?? path,
-    path,
+    path: filesystemPath(path),
     size: 0,
     type: 'file',
     version: 'test',

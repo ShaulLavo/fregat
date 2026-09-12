@@ -1,3 +1,5 @@
+import { testDocumentKey, testTabContent } from '../../../../test/factories/document-targets'
+import { filesystemPath } from '@/lib/documents/utils/identity'
 import { waitFor } from '@testing-library/react'
 import { rm, symlink } from 'node:fs/promises'
 import { createEditorBufferSession } from '@singapor/core'
@@ -31,8 +33,8 @@ test('clears a cached root folder that no longer exists on disk', async ({ clien
 
 test('clears a cached root folder that points at a file', async ({ client }) => {
   void client
-  await ensureFolderPath('repo')
-  await createFileContent('repo/notes.txt', 'hello')
+  await ensureFolderPath(filesystemPath('repo'))
+  await createFileContent(filesystemPath('repo/notes.txt'), 'hello')
   const { store } = await renderValidation(client, 'repo/notes.txt')
 
   await waitFor(() => expect(store.getState().rootFolder).toBeNull())
@@ -43,7 +45,7 @@ test('keeps a cached root folder that still exists and makes it the index scope'
   server,
 }) => {
   void client
-  await ensureFolderPath('repo')
+  await ensureFolderPath(filesystemPath('repo'))
   const { store } = await renderValidation(client, 'repo')
 
   await waitFor(async () => {
@@ -61,7 +63,7 @@ test('restores a cached alias through the canonical workspace switch', async ({
   server,
 }) => {
   void client
-  await ensureFolderPath('actual')
+  await ensureFolderPath(filesystemPath('actual'))
   await symlink('actual', path.join(server.root, 'alias'))
   const { store } = await renderValidation(client, 'alias')
 
@@ -75,9 +77,9 @@ test('late invalidation survives same-workspace navigation and preserves the dir
   server,
 }) => {
   void client
-  await ensureFolderPath('repo')
-  await createFileContent('repo/a.ts', 'saved\n')
-  const file = await fetchFile('repo/a.ts', new AbortController().signal)
+  await ensureFolderPath(filesystemPath('repo'))
+  await createFileContent(filesystemPath('repo/a.ts'), 'saved\n')
+  const file = await fetchFile(filesystemPath('repo/a.ts'), new AbortController().signal)
   const started = Promise.withResolvers<void>()
   const released = Promise.withResolvers<void>()
   const observed = createObservedInProcessClient(server, async (request) => {
@@ -89,7 +91,7 @@ test('late invalidation survives same-workspace navigation and preserves the dir
   try {
     await started.promise
     expect((await waitForNavigation(navigation)).status).toBe('applied')
-    expect(await navigation.openFile({ owner: store, path: 'repo/a.ts' })).toEqual({
+    expect(await navigation.openFile({ owner: store, path: filesystemPath('repo/a.ts') })).toEqual({
       status: 'applied',
     })
     const editor = application.getSnapshot().editor
@@ -107,13 +109,15 @@ test('late invalidation survives same-workspace navigation and preserves the dir
       store
         .getState()
         .parkedWorkspaces.get('repo')
-        ?.workbenchPanels.editorTabs.map((tab) => tab.path),
-    ).toEqual(['repo/a.ts'])
-    expect(editor.documentStore.getState().getLiveEditorDocument('repo/a.ts')?.buffer).toBe(
-      view.buffer,
-    )
+        ?.workbenchPanels.editorTabs.map((tab) => tab.content),
+    ).toEqual([testTabContent('repo/a.ts')])
+    expect(
+      editor.documentStore.getState().getLiveEditorDocument(testDocumentKey('repo/a.ts'))?.buffer,
+    ).toBe(view.buffer)
     expect(view.buffer.materializeFullText()).toBe('saved\nunsaved\n')
-    expect(editor.documentStore.getState().dirtyFilePaths.has('repo/a.ts')).toBe(true)
+    expect(
+      editor.documentStore.getState().dirtyDocumentKeys.has(testDocumentKey('repo/a.ts')),
+    ).toBe(true)
   } finally {
     released.resolve()
   }
@@ -123,7 +127,7 @@ test('late invalidation clears only the old root while a newer workspace finishe
   client,
   server,
 }) => {
-  await ensureFolderPath('second')
+  await ensureFolderPath(filesystemPath('second'))
   const second = await registerTestWorkspaceAddress(client, 'second')
   const validationStarted = Promise.withResolvers<void>()
   const validationRelease = Promise.withResolvers<void>()
@@ -167,7 +171,7 @@ function pickedDirectory(path: string): PickedFsEntry {
     birthtimeMs: 0,
     mtimeMs: 0,
     name: path.split('/').at(-1) ?? path,
-    path,
+    path: filesystemPath(path),
     size: 0,
     type: 'directory',
     version: '',

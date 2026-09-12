@@ -1,3 +1,4 @@
+import { testTabContent } from '../../../../../test/factories/document-targets'
 import { screen, waitFor } from '@testing-library/react'
 import userEvent from '@testing-library/user-event'
 
@@ -17,7 +18,9 @@ test('an inline file reference opens the referenced file at its line', async ({
   await user.click(getByRole('link', { name: /src\/foo\.ts:42/u }))
 
   await waitFor(() =>
-    expect(editor.workspaceStore.getState().selectedFilePath).toBe('repo/src/foo.ts'),
+    expect(editor.workspaceStore.getState().selectedTabContent).toEqual(
+      testTabContent('repo/src/foo.ts'),
+    ),
   )
   expect(editor.uiStore.getState().definitionTarget).toMatchObject({
     path: 'repo/src/foo.ts',
@@ -34,7 +37,9 @@ test('a markdown link to a workspace file opens that file', async ({ client, ser
   await user.click(getByRole('link', { name: /src\/deep\/mod\.ts/u }))
 
   await waitFor(() =>
-    expect(editor.workspaceStore.getState().selectedFilePath).toBe('repo/src/deep/mod.ts'),
+    expect(editor.workspaceStore.getState().selectedTabContent).toEqual(
+      testTabContent('repo/src/deep/mod.ts'),
+    ),
   )
   expect(editor.uiStore.getState().definitionTarget).toBeNull()
 })

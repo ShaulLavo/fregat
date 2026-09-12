@@ -9,7 +9,8 @@ import {
   RECENTLY_USED_COMMANDS_HEADING,
   quickAccessQuery,
 } from '@/features/command-palette/command-palette-utils'
-import { searchBufferDocumentId } from '@/features/search/utils/buffer-document'
+import { filesystemPath } from '@/lib/documents/utils/identity'
+import { documentTab, tabContentKey } from '@/lib/documents/utils/tabs'
 import { platformCommandSpecs } from '@/keymap/command-registry'
 import { defaultPlatformKeyBindings } from '@/keymap/default-bindings'
 import { resolvedPlatformKeyBindings } from '@/keymap/active-bindings'
@@ -142,13 +143,14 @@ test('recents that do not match the query are not dragged into the results', () 
 })
 
 test('open editor items format search buffers as search tabs', () => {
-  const searchPath = searchBufferDocumentId('/repo')
+  const content = documentTab({ kind: 'search', root: filesystemPath('/repo') })
 
-  expect(editorPaletteItems([searchPath], searchPath)).toEqual([
+  expect(editorPaletteItems([content], content)).toEqual([
     {
       active: true,
       name: 'Search',
-      path: searchPath,
+      content,
+      key: tabContentKey(content),
       pathLabel: '/repo search results',
     },
   ])

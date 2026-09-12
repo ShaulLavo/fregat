@@ -1,3 +1,9 @@
+import { fileResultFromResponse } from '@/lib/file-system-types'
+import { filesystemPath } from '@/lib/documents/utils/identity'
+import {
+  testDocumentKey,
+  testNullableTabContent,
+} from '../../../../test/factories/document-targets'
 import { registerTestWorkspaceAddress } from '../../../../test/factories/workspace-address'
 import { createEnvironmentEntry } from '@workspace/client-core/environments/utils/connection'
 import { waitFor } from '@testing-library/react'
@@ -262,10 +268,13 @@ test('A to B to A retains dirty documents, isolates shared session IDs and super
       path: 'retained.ts',
       signal: new AbortController().signal,
     })
-    retainedA.documentStore.getState().ensureLiveEditorDocument(file)
-    retainedA.documentStore.getState().setLiveEditorDocumentDirty(file.path, true)
+    retainedA.documentStore.getState().ensureLiveEditorDocument(fileResultFromResponse(file))
+    retainedA.documentStore.getState().setLiveEditorDocumentDirty(testDocumentKey(file.path), true)
     expect(
-      await rendered.navigation.openFile({ owner: retainedA.workspaceStore, path: file.path }),
+      await rendered.navigation.openFile({
+        owner: retainedA.workspaceStore,
+        path: filesystemPath(file.path),
+      }),
     ).toEqual({ status: 'applied' })
     expect(
       await rendered.navigation.openChat({
@@ -298,15 +307,22 @@ test('A to B to A retains dirty documents, isolates shared session IDs and super
     const reachedB = rendered.navigation.router.history.location.href
     expect(reachedB).toContain(`/chat/t/${sessionId}`)
     expect(
-      await rendered.navigation.openFile({ owner: retainedA.workspaceStore, path: file.path }),
+      await rendered.navigation.openFile({
+        owner: retainedA.workspaceStore,
+        path: filesystemPath(file.path),
+      }),
     ).toEqual({ status: 'superseded' })
     expect(rendered.navigation.router.history.location.href).toBe(reachedB)
     expect(rendered.application.getSnapshot().origin).toBe(originB)
     await pressBack(rendered.navigation)
     expect(rendered.application.getSnapshot().origin).toBe(originA)
     expect(rendered.application.getSnapshot().editor).toBe(retainedA)
-    expect(retainedA.documentStore.getState().dirtyFilePaths.has(file.path)).toBe(true)
-    expect(retainedA.workspaceStore.getState().selectedFilePath).toBe(file.path)
+    expect(
+      retainedA.documentStore.getState().dirtyDocumentKeys.has(testDocumentKey(file.path)),
+    ).toBe(true)
+    expect(retainedA.workspaceStore.getState().selectedTabContent).toEqual(
+      testNullableTabContent(file.path),
+    )
     rendered.navigation.forward()
     await waitForNavigation(rendered.navigation)
     expect(rendered.navigation.router.history.location.href).toBe(reachedB)

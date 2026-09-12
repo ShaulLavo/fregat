@@ -1,10 +1,15 @@
+import {
+  testTabContents,
+  testTabContent,
+  testNullableTabContent,
+} from '../../../../test/factories/document-targets'
+import { filesystemPath } from '@/lib/documents/utils/identity'
 import { testWorkspaceToken } from '../../../../test/factories/workspace-address'
 import { MAX_APPLIED_TABS } from '@workspace/client-core/address/grammar'
 import { readSettingsCategory } from '@/features/settings/state/category-store'
-import { settingsDocumentId } from '@/features/settings/utils/document'
 import { expect, test } from '../../../../test/fixtures'
 import {
-  editorTabPaths,
+  editorTabContents,
   waitForNavigation,
   pressBack,
   recordHistoryWrites,
@@ -22,8 +27,12 @@ test('boot preserves cached order and appends missing addressed tabs', async () 
     initialEntries: [`${BASE}/f/b.ts?tabs=f/c.ts~@~f/new.ts`],
   })
   expect((await waitForNavigation(navigation)).status).toBe('applied')
-  expect(editorTabPaths(harness.workspace)).toEqual([...remembered, `${ROOT}/new.ts`])
-  expect(harness.workspace.getState().selectedFilePath).toBe(`${ROOT}/b.ts`)
+  expect(editorTabContents(harness.workspace)).toEqual(
+    testTabContents([...remembered, `${ROOT}/new.ts`]),
+  )
+  expect(harness.workspace.getState().selectedTabContent).toEqual(
+    testNullableTabContent(`${ROOT}/b.ts`),
+  )
 })
 
 test('boot rejects oversized collections while preserving the selected destination', async () => {
@@ -33,7 +42,7 @@ test('boot rejects oversized collections while preserving the selected destinati
     initialEntries: [`${BASE}/f/a.ts?tabs=${tokens.join('~')}`],
   })
   await waitForNavigation(navigation)
-  expect(editorTabPaths(harness.workspace)).toEqual([`${ROOT}/a.ts`])
+  expect(editorTabContents(harness.workspace)).toEqual(testTabContents([`${ROOT}/a.ts`]))
 })
 
 test('going back preserves Forward without another push', async () => {
@@ -42,12 +51,16 @@ test('going back preserves Forward without another push', async () => {
   await waitForNavigation(navigation)
   const first = navigation.router.history.location.href
   const writes = recordHistoryWrites(navigation)
-  expect(await navigation.openFile({ owner: harness.workspace, path: `${ROOT}/b.ts` })).toEqual({
+  expect(
+    await navigation.openFile({ owner: harness.workspace, path: filesystemPath(`${ROOT}/b.ts`) }),
+  ).toEqual({
     status: 'applied',
   })
   const second = navigation.router.history.location.href
   await pressBack(navigation)
-  expect(harness.workspace.getState().selectedFilePath).toBe(`${ROOT}/a.ts`)
+  expect(harness.workspace.getState().selectedTabContent).toEqual(
+    testNullableTabContent(`${ROOT}/a.ts`),
+  )
   expect(navigation.router.history.location.href).toBe(first)
   expect(writes.pushes).toHaveLength(1)
   navigation.forward()
@@ -62,11 +75,13 @@ test('walking back out of settings retains its tab and clears its active categor
     initialEntries: [`${BASE}/f/a.ts?tabs=@`],
   })
   await waitForNavigation(navigation)
-  await navigation.openFile({ owner: harness.workspace, path: settingsDocumentId() })
+  await navigation.openContent({ owner: harness.workspace, content: testTabContent('settings:') })
   await navigation.setSettingsCategory('Providers')
   expect(readSettingsCategory()).toBe('Providers')
   await pressBack(navigation)
-  expect(editorTabPaths(harness.workspace)).toEqual([`${ROOT}/a.ts`, settingsDocumentId()])
+  expect(editorTabContents(harness.workspace)).toEqual(
+    testTabContents([`${ROOT}/a.ts`, 'settings:']),
+  )
   expect(readSettingsCategory()).toBeNull()
 })
 
@@ -76,7 +91,7 @@ test('a category alone does not open settings', async () => {
     initialEntries: [`${BASE}/f/a.ts?settings=Providers`],
   })
   await waitForNavigation(navigation)
-  expect(editorTabPaths(harness.workspace)).toEqual([`${ROOT}/a.ts`])
+  expect(editorTabContents(harness.workspace)).toEqual(testTabContents([`${ROOT}/a.ts`]))
 })
 
 test('restoring background settings keeps the addressed file selected', async () => {
@@ -85,8 +100,10 @@ test('restoring background settings keeps the addressed file selected', async ()
     initialEntries: [`${BASE}/f/a.ts?tabs=@~settings&settings=Providers`],
   })
   await waitForNavigation(navigation)
-  expect(editorTabPaths(harness.workspace)).toContain(settingsDocumentId())
-  expect(harness.workspace.getState().selectedFilePath).toBe(`${ROOT}/a.ts`)
+  expect(editorTabContents(harness.workspace)).toContainEqual(testTabContent('settings:'))
+  expect(harness.workspace.getState().selectedTabContent).toEqual(
+    testNullableTabContent(`${ROOT}/a.ts`),
+  )
 })
 
 test('folderless settings keeps its tab and category', async () => {
@@ -94,7 +111,7 @@ test('folderless settings keeps its tab and category', async () => {
     initialEntries: ['/~-/workbench/settings?tabs=@&settings=Providers'],
   })
   await waitForNavigation(navigation)
-  expect(editorTabPaths(harness.workspace)).toEqual([settingsDocumentId()])
+  expect(editorTabContents(harness.workspace)).toEqual(testTabContents(['settings:']))
   expect(readSettingsCategory()).toBe('Providers')
   expect(navigation.router.history.location.pathname).toBe('/~-/workbench/settings')
 })

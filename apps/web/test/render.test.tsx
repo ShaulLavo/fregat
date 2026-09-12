@@ -1,7 +1,7 @@
 import { act, waitFor } from '@testing-library/react'
 import { useApplicationRuntime } from '@/hooks/use-application-runtime'
 import { useNavigation } from '@/hooks/use-navigation'
-import { settingsDocumentId } from '@/features/settings/utils/document'
+import { settingsTab } from '@/lib/documents/utils/tabs'
 import { environmentActivitySignal } from '@/lib/environments/state/activity'
 import { confirmedEnvironmentId } from '@/lib/environments/state/domain'
 import { expect, test } from './fixtures'
@@ -31,7 +31,7 @@ test.for([false, true])(
       document: 'settings',
       settings: 'providers',
     })
-    expect(owner.editor.workspaceStore.getState().selectedFilePath).toBe(settingsDocumentId())
+    expect(owner.editor.workspaceStore.getState().selectedTabContent).toEqual(settingsTab())
     rendered.unmount()
     expect(application.getEnvironment(confirmedEnvironmentId(owner.origin))).toBeUndefined()
   },

@@ -1,3 +1,6 @@
+import { fileDocumentKey } from '@/lib/documents/utils/identity'
+import type { FilesystemPath } from '@/lib/documents/utils/types'
+import { workspaceDocumentPath } from '@/features/editor/utils/diff-language-context'
 import { useMemo } from 'react'
 
 import { useEditorDocumentState } from '@/features/editor/state/document-state'
@@ -5,22 +8,22 @@ import type {
   DiffLanguageHost,
   DiffLanguageServerContext,
 } from '@/features/editor/utils/diff-language-context'
-import { isPathInWorkspace, toWorkspaceAbsolute } from '@workspace/client-core/files/path'
 
 /** Platform-owned live text and host capabilities for a reusable diff editor. */
 export function useDiffLanguageContext(
-  path: string | null,
-  rootPath: string,
+  path: FilesystemPath | null,
+  rootPath: FilesystemPath,
   newSideIsWorkingTree: boolean,
   host: DiffLanguageHost,
 ): DiffLanguageServerContext | null {
-  const documentId = path ? workspaceDocumentId(rootPath, path) : null
+  const documentPath = path ? workspaceDocumentPath(rootPath, path) : null
+  const key = documentPath ? fileDocumentKey(documentPath) : null
   const buffer = useEditorDocumentState((state) =>
-    documentId ? (state.liveDocumentsById[documentId]?.buffer ?? null) : null,
+    key ? (state.liveDocumentsByKey[key]?.buffer ?? null) : null,
   )
   // The buffer mutates in place, so its identity cannot invalidate materialized text.
   const revision = useEditorDocumentState((state) =>
-    documentId ? (state.documentContentRevisions[documentId] ?? '') : '',
+    key ? (state.documentContentRevisions[key] ?? '') : '',
   )
   const snapshot = useMemo(
     () => ({ revision, text: buffer?.materializeFullText() ?? null }),
@@ -30,16 +33,10 @@ export function useDiffLanguageContext(
   if (!path) return null
 
   return {
-    documentPath: documentId,
+    documentPath,
     host,
     newSideIsWorkingTree,
     ownedText: snapshot.text,
     rootPath,
   }
-}
-
-function workspaceDocumentId(rootPath: string, path: string) {
-  if (isPathInWorkspace(path, rootPath)) return path
-
-  return toWorkspaceAbsolute(rootPath, path)
 }

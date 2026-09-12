@@ -1,3 +1,5 @@
+import { fileDocumentKey } from '@/lib/documents/utils/identity'
+import type { FilesystemPath, TabId } from '@/lib/documents/utils/types'
 import { createTextDiff } from '@singapor/diff'
 import { LoadingState } from '@workspace/ui/components/loading-state'
 import { useMemo } from 'react'
@@ -24,16 +26,17 @@ export function CompareSavedView({
   tabId,
 }: {
   languageHost: DiffLanguageHost
-  path: string
-  rootPath: string
-  tabId?: string
+  path: FilesystemPath
+  rootPath: FilesystemPath
+  tabId?: TabId
 }) {
+  const key = fileDocumentKey(path)
   const mode = useSettingValue('editor.diff.viewMode')
   const { fileState } = useSelectedFile(path)
-  const buffer = useEditorDocumentState((state) => state.liveDocumentsById[path]?.buffer ?? null)
+  const buffer = useEditorDocumentState((state) => state.liveDocumentsByKey[key]?.buffer ?? null)
   // Revision, not the buffer object: the buffer is mutated in place, so its identity never changes
   // and would never re-run the diff.
-  const revision = useEditorDocumentState((state) => state.documentContentRevisions[path] ?? '')
+  const revision = useEditorDocumentState((state) => state.documentContentRevisions[key] ?? '')
   // Its new side IS the live buffer, so it is by construction the text the owning editor sent the
   // server — the file's own uri names exactly this text, and joining it is a no-op on the wire.
   const languageServer = useDiffLanguageContext(path, rootPath, true, languageHost)

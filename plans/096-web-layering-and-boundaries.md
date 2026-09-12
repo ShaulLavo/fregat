@@ -99,30 +99,15 @@ generators `shellStream` and `sessionDetailStream`; WS RPC is their live consume
 
 ## Make the lib/ rule enforceable
 
-This prerequisite is now owned by [Plan 098](098-document-and-tab-domain.md). Execute or reuse
-its coalesced-log move and proven shared-layer import guard before this plan's other moves.
-Completion of its entire document-model migration is not a prerequisite.
+This prerequisite is complete through [Plan 098](../docs/document-and-tab-domain.md).
+`apps/web/src/lib/coalesced-log.ts` contains the unchanged queue, and its test lives at
+`apps/web/src/lib/tests/coalesced-log.test.ts`. File-server and workspace tree hooks consume
+that shared implementation.
 
-`apps/web/src/lib/file-server.ts:16` imports `createCoalescedLogQueue` from
-`@/features/workspace/utils/coalesced-log` and uses it at `:33` and `:39`. The helper is generic:
-62 lines, `Record<string, unknown>` events, no React import, and its only domain-flavoured choice is
-the default `countField = 'coalescedCount'` (`:9`, `:22`, emitted at `:35`).
-
-Verified consumers: two, in two buckets — `lib/file-server.ts:16` and
-`features/workspace/hooks/use-tree.ts:14` (used at `:30`) — plus its own test at
-`features/workspace/utils/tests/coalesced-log.test.ts:3`. It qualifies for `lib/` on both readings
-of the rule: two consumers, and it is a dependency of a `lib/` module that qualifies.
-
-Plan 098 moves it to `apps/web/src/lib/coalesced-log.ts` and its test to
-`apps/web/src/lib/tests/coalesced-log.test.ts`. There is one implementation and two production
-call sites; preserve its behavior and avoid performing the move twice.
-
-The refreshed census at `fb797f07` has 19 `lib/**` imports into features: one production
-declaration and 18 test declarations across four files. After the move the production count
-must be zero; narrowly scoped test exceptions remain in the architecture rule.
-
-Use Plan 098's calibrated Oxlint guard for alias, relative, type-only, re-export and dynamic
-imports through the normal local and CI lint paths. A spelling-only grep is insufficient.
+The configured `platform-boundaries/lib-imports` Oxlint rule rejects production shared-layer
+imports of features, including type-only, relative, re-export, and dynamic imports. Its exact
+file-suffix test exceptions and actual CLI calibration are installed in normal lint and
+`test:scripts`. Reuse this guard; the move and enforcement need no further implementation here.
 
 ## Demote the lib/ modules below the bar
 
@@ -317,29 +302,14 @@ reads in either file, so Cmd+ArrowDown is swallowed by both. Fix that in the sha
 
 Do not merge the two view models first. The port is what makes the row shapes irrelevant.
 
-**e. Document schemes: superseded by Plan 098.** The proposed standalone codec factories and
-feature-local validators/labels are replaced by the shared document/tab domain in
-[Plan 098](098-document-and-tab-domain.md). Do not implement the older factory approach.
-Preserve the distinctions recorded below in characterization before moving their ownership.
+**e. Document schemes: completed by Plan 098.** The [shared document/tab domain](../docs/document-and-tab-domain.md)
+replaces the old feature codecs, classifiers, and label parsing. Preserve its typed descriptors
+and shared boundary rather than implementing standalone codec factories.
 
-The three bare-payload codecs disagree on the empty payload, each differently:
-
-- `features/search/utils/buffer-document.ts:10` **accepts** `'search-buffer:'` as
-  `{ id, rootPath: '' }` — no empty check at `:19-22` — which then claims the label `'Search'` at
-  `features/workspace/utils/document-label.ts:26`.
-- `features/editor/utils/conflict-diff-document.ts:10` **rejects after decoding** (`:21`).
-- `features/editor/utils/compare-saved-document.ts:12` **rejects twice**, before decoding (`:20`)
-  and after (`:24`), with a comment at `:26-27` saying why.
-
-Return shapes differ too: bare string from compare-saved, record from the other two. The two JSON
-codecs differ on an empty path: `features/git/utils/ref-document.ts:43-44` requires a non-empty path
-**and** ref; `features/git/utils/diff-document.ts:199` allows an empty path. Decide each, per codec,
-before introducing the shared model.
-
-Plan 098 uses exhaustive typed descriptors, not a runtime registration registry.
-`features/editor/utils/file-backed-document.ts:20` explains why malformed reserved synthetic
-IDs must remain non-files. The shared boundary must preserve that property without per-consumer
-prefix checks.
+Its characterized distinctions remain: empty search roots are valid; empty conflict and
+compare payloads are invalid; Git references require a path and ref; snapshot payloads allow an
+empty path when they have an object ID. Invalid ambiguous synthetic inputs never become files.
+An explicit file resource or `f/` URL token uses the filesystem namespace without reclassification.
 
 **f. Share only the FNV-1a per-character step.** Six open-coded copies:
 `packages/client-core/src/address/path-hash.ts:2`,

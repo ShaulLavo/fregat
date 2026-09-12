@@ -1,3 +1,4 @@
+import { filesystemPath } from '@/lib/documents/utils/identity'
 import { useQueryClient } from '@tanstack/react-query'
 import { originForQueryClient } from '@/lib/environments/state/query-clients'
 import type {
@@ -63,7 +64,11 @@ export function useLanguageServerPlugin({
       target,
       onApplyWorkspaceEdit,
       onDefinitionLinkHover: (definition) => {
-        fileOpenIntent.prepare({ path: definition.path, rootPath, source: 'definition' })
+        fileOpenIntent.prepare({
+          path: filesystemPath(definition.path),
+          rootPath: filesystemPath(rootPath),
+          source: 'definition',
+        })
       },
       onOpenDefinition,
       onOpenReferences,

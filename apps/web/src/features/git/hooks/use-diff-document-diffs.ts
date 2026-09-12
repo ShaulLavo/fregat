@@ -1,3 +1,4 @@
+import { comparisonRequest } from '@/lib/documents/utils/comparisons'
 import { clientForQueryClient } from '@/lib/environments/state/query-clients'
 import { useQuery, type UseQueryOptions } from '@tanstack/react-query'
 
@@ -9,7 +10,7 @@ import {
 import { errorMessage } from '@/lib/error-message'
 
 import { fetchBlobDiff } from '@/features/git/utils/blob-diff-query'
-import type { DiffDocumentInfo } from '@/features/git/utils/diff-document'
+import type { GitComparison } from '@/lib/documents/utils/types'
 import { diffDocumentQueryKey } from '@/features/git/utils/diff-document-query'
 import type { FileDiff } from '@/features/git/utils/types'
 
@@ -22,7 +23,7 @@ type DiffQueryOptions = UseQueryOptions<DiffList, Error, DiffList, readonly unkn
  * content-addressed and checkpoint ids are pinned to a turn range, so neither
  * result can go stale once fetched.
  */
-export function useDiffDocumentDiffs(info: DiffDocumentInfo) {
+export function useDiffDocumentDiffs(info: GitComparison) {
   const query = useQuery(diffDocumentQueryOptions(info))
 
   return {
@@ -32,9 +33,10 @@ export function useDiffDocumentDiffs(info: DiffDocumentInfo) {
   }
 }
 
-function diffDocumentQueryOptions(info: DiffDocumentInfo): DiffQueryOptions {
-  if (info.kind === 'checkpoint') {
-    const input = info.query
+function diffDocumentQueryOptions(info: GitComparison): DiffQueryOptions {
+  const request = comparisonRequest(info)
+  if (request.kind === 'checkpoint') {
+    const input = request.query
 
     return {
       queryFn: ({ signal, client }) =>
@@ -46,7 +48,7 @@ function diffDocumentQueryOptions(info: DiffDocumentInfo): DiffQueryOptions {
     }
   }
 
-  const input = info.query
+  const input = request.query
 
   return {
     queryFn: ({ signal, client }) => fetchBlobDiff(input, signal, clientForQueryClient(client)),

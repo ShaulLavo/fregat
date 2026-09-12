@@ -1,3 +1,4 @@
+import { filesystemPath } from '@/lib/documents/utils/identity'
 import { symlink } from 'node:fs/promises'
 import path from 'node:path'
 import { waitFor } from '@testing-library/react'
@@ -11,8 +12,8 @@ test('merges chat-only aliases with recent folders using their canonical roots',
   server,
 }) => {
   void client
-  await ensureFolderPath('projects/platform')
-  await ensureFolderPath('projects/another')
+  await ensureFolderPath(filesystemPath('projects/platform'))
+  await ensureFolderPath(filesystemPath('projects/another'))
   await symlink('projects', path.join(server.root, 'Projects'))
 
   const { result } = renderHookWithProviders(() =>

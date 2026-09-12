@@ -4,27 +4,19 @@ import {
   encodeSegment,
   decodeSegment,
 } from '@workspace/client-core/address/path-token'
-import {
-  parseCompareSavedDocumentId,
-  compareSavedDocumentId,
-} from '@/features/editor/utils/compare-saved-document'
-import { parseConflictDiffDocumentId } from '@/features/editor/utils/conflict-diff-document'
-import {
-  checkpointDiffDocumentId,
-  parseDiffDocumentId,
-  snapshotDiffDocumentId,
-} from '@/features/git/utils/diff-document'
-import { parseRefDocumentId, refDocumentId } from '@/features/git/utils/ref-document'
-import {
-  parseSearchBufferDocumentId,
-  searchBufferDocumentId,
-} from '@/features/search/utils/buffer-document'
 import { SETTINGS_DOCUMENT_TOKEN } from '@workspace/client-core/address/grammar'
-import { isSettingsDocumentId, settingsDocumentId } from '@/features/settings/utils/document'
-import { toWorkspaceAbsolute, toWorkspaceRelative } from '@workspace/client-core/files/path'
-import { sessionIdSchema, type SessionId } from '@workspace/contracts'
-import * as v from 'valibot'
 import { editorReferenceForToken } from '@workspace/client-core/address/references'
+import { toWorkspaceAbsolute, toWorkspaceRelative } from '@workspace/client-core/files/path'
+import { sessionIdSchema } from '@workspace/contracts'
+import * as v from 'valibot'
+import {
+  fileDocument,
+  fileResource,
+  filesystemPath,
+  workspaceRoot,
+} from '@/lib/documents/utils/identity'
+import { documentTab, settingsTab } from '@/lib/documents/utils/tabs'
+import type { GitComparison, GitChangeStatus, TabContent } from '@/lib/documents/utils/types'
 
 export type DocumentTokenResult =
   /** An addressable document, as its token. */
@@ -33,7 +25,7 @@ export type DocumentTokenResult =
   | { readonly kind: 'unaddressable'; readonly reason: string }
 
 export type ParsedDocumentToken =
-  | { readonly kind: 'path'; readonly path: string }
+  | { readonly kind: 'content'; readonly content: TabContent }
   | { readonly kind: 'unavailable'; readonly reason: string }
   | { readonly kind: 'rejected'; readonly reason: string }
 
@@ -43,47 +35,58 @@ const OBJECT_ID = /^[0-9a-f]{40,64}$/i
 const MISSING_OBJECT_ID = '_'
 const TURN_SCOPE_SUFFIX = '!turn'
 
-export function documentTokenForPath(rootPath: string | null, path: string): DocumentTokenResult {
-  // Reuses the cache's own predicate rather than re-deriving it: a conflict record is
-  // born from a watcher event and holds its text in memory, so it cannot survive a
-  // reload, let alone a machine.
-  if (parseConflictDiffDocumentId(path)) {
-    return { kind: 'unaddressable', reason: 'conflict documents are not addressable' }
-  }
-  if (isSettingsDocumentId(path)) return { kind: 'token', token: SETTINGS_DOCUMENT_TOKEN }
+export function documentTokenForContent(
+  rootPath: string | null,
+  content: TabContent,
+): DocumentTokenResult {
+  if (content.kind === 'settings') return { kind: 'token', token: SETTINGS_DOCUMENT_TOKEN }
   if (rootPath === null) return { kind: 'unaddressable', reason: 'document requires a workspace' }
-
-  const search = parseSearchBufferDocumentId(path)
-  if (search) return searchToken(rootPath, search.rootPath)
-
-  const diff = parseDiffDocumentId(path)
-  if (diff) return diffToken(rootPath, diff)
-
-  const ref = parseRefDocumentId(path)
-  if (ref) return relativeToken('r', rootPath, ref.path, [encodeSegment(ref.ref)])
-
-  const compareSaved = parseCompareSavedDocumentId(path)
-  if (compareSaved) return relativeToken('c', rootPath, compareSaved)
-
-  return relativeToken('f', rootPath, path)
+  const document = content.document
+  switch (document.kind) {
+    case 'file':
+      return relativeToken('f', rootPath, document.resource.path)
+    case 'search':
+      return searchToken(rootPath, document.root)
+    case 'git-diff':
+      return diffToken(rootPath, document.source)
+    case 'git-ref':
+      return relativeToken('r', rootPath, document.source.path, [
+        encodeSegment(document.source.ref),
+      ])
+    case 'compare-saved':
+      return relativeToken('c', rootPath, document.file.path)
+    case 'conflict':
+      return { kind: 'unaddressable', reason: 'conflict documents are not addressable' }
+    default: {
+      const exhaustive: never = document
+      return exhaustive
+    }
+  }
 }
 
-export function pathForDocumentToken(rootPath: string | null, token: string): ParsedDocumentToken {
+export function contentForDocumentToken(
+  rootPath: string | null,
+  token: string,
+): ParsedDocumentToken {
   if (!editorReferenceForToken(token)) {
     return { kind: 'rejected', reason: 'document token is malformed' }
   }
-  if (token === SETTINGS_DOCUMENT_TOKEN) return { kind: 'path', path: settingsDocumentId() }
+  if (token === SETTINGS_DOCUMENT_TOKEN) return { kind: 'content', content: settingsTab() }
   if (rootPath === null) return { kind: 'rejected', reason: 'document requires a workspace' }
 
   const segments = token.split('/')
   const kind = segments[0]
 
-  if (kind === 's') return { kind: 'path', path: searchBufferDocumentId(rootPath) }
-  if (kind === 'f') return filePath(rootPath, segments.slice(1))
-  if (kind === 'c') return compareSavedPath(rootPath, segments.slice(1))
-  if (kind === 'r') return refPath(rootPath, segments.slice(1))
-  if (kind === 'd') return snapshotDiffPath(rootPath, segments.slice(1))
-  if (kind === 'k') return checkpointDiffPath(rootPath, segments.slice(1))
+  if (kind === 's')
+    return {
+      kind: 'content',
+      content: documentTab({ kind: 'search', root: workspaceRoot(rootPath) }),
+    }
+  if (kind === 'f') return fileContent(rootPath, segments.slice(1))
+  if (kind === 'c') return compareSavedContent(rootPath, segments.slice(1))
+  if (kind === 'r') return refContent(rootPath, segments.slice(1))
+  if (kind === 'd') return snapshotDiffContent(rootPath, segments.slice(1))
+  if (kind === 'k') return checkpointDiffContent(rootPath, segments.slice(1))
 
   return { kind: 'rejected', reason: `unknown document token \`${kind ?? ''}\`` }
 }
@@ -97,61 +100,32 @@ function searchToken(rootPath: string, searchRootPath: string): DocumentTokenRes
   return { kind: 'token', token: 's' }
 }
 
-function diffToken(
-  rootPath: string,
-  diff: NonNullable<ReturnType<typeof parseDiffDocumentId>>,
-): DocumentTokenResult {
-  if (diff.kind === 'snapshot') {
-    const source = diff.source ?? 'worktree'
+function diffToken(rootPath: string, source: GitComparison): DocumentTokenResult {
+  if (source.kind === 'snapshot') {
     const revision = revisionSegment(
-      diff.query.oldObjectId,
-      diff.query.newObjectId,
-      diff.status,
-      relativeOrNull(rootPath, diff.query.oldPath),
+      source.oldObjectId,
+      source.newObjectId,
+      source.status,
+      relativeOrNull(rootPath, source.oldPath),
     )
     if (!revision) return { kind: 'unaddressable', reason: 'diff names no git object' }
-
-    return relativeToken('d', rootPath, diff.path, [source, revision])
+    return relativeToken('d', rootPath, source.path, [source.source ?? 'worktree', revision])
   }
-
-  return checkpointToken(rootPath, diff.query)
-}
-
-function checkpointToken(
-  rootPath: string,
-  query: {
-    sessionId: SessionId
-    fromTurnCount: number
-    toTurnCount: number
-    scope?: string
-    filePath?: string
-    oldPath?: string
-    status?: string
-    oldObjectId?: string
-    newObjectId?: string
-  },
-): DocumentTokenResult {
-  const scope = query.scope ?? 'file'
-  const turns = `${query.fromTurnCount}..${query.toTurnCount}`
-  // The object ids ride along because `checkpointDiffDocumentId` puts them IN the id:
-  // dropping them minted a different id on the way back, so a restored checkpoint tab
-  // never matched the one the app would open and the workbench kept both.
+  if (source.owner !== rootPath)
+    return { kind: 'unaddressable', reason: 'checkpoint belongs to another workspace' }
   const extras = tokenExtras({
-    newObjectId: query.newObjectId,
-    oldObjectId: query.oldObjectId,
-    oldPath: relativeOrNull(rootPath, query.oldPath),
-    status: query.status,
+    newObjectId: source.newObjectId,
+    oldObjectId: source.oldObjectId,
+    oldPath: relativeOrNull(rootPath, source.oldPath),
+    status: source.status,
   })
-  const head = `k/${encodeSegment(query.sessionId)}/${turns}${extras}`
-
-  if (scope === 'session') return { kind: 'token', token: head }
-  if (scope === 'turn') return { kind: 'token', token: `${head}${TURN_SCOPE_SUFFIX}` }
-
-  const relative = toWorkspaceRelative(rootPath, query.filePath ?? '')
-  if (!relative) {
+  const head = `k/${encodeSegment(source.sessionId)}/${source.fromTurnCount}..${source.toTurnCount}${extras}`
+  if (source.kind === 'checkpoint-session') return { kind: 'token', token: head }
+  if (source.kind === 'checkpoint-turn')
+    return { kind: 'token', token: `${head}${TURN_SCOPE_SUFFIX}` }
+  const relative = toWorkspaceRelative(rootPath, source.file.path)
+  if (!relative)
     return { kind: 'unaddressable', reason: 'checkpoint file is outside this workspace' }
-  }
-
   return { kind: 'token', token: `${head}/${encodePath(relative)}` }
 }
 
@@ -207,36 +181,37 @@ function tokenExtras({
   return extras.length > 0 ? `,${extras.join(',')}` : ''
 }
 
-function filePath(rootPath: string, segments: readonly string[]): ParsedDocumentToken {
+function fileContent(rootPath: string, segments: readonly string[]): ParsedDocumentToken {
   const path = decodePath(rootPath, segments)
-  if (!path) return { kind: 'rejected', reason: 'file token names no path' }
-
-  return { kind: 'path', path }
+  if (path === null) return { kind: 'rejected', reason: 'file token names no path' }
+  return { kind: 'content', content: documentTab(fileDocument(fileResource(filesystemPath(path)))) }
 }
 
-function compareSavedPath(rootPath: string, segments: readonly string[]): ParsedDocumentToken {
+function compareSavedContent(rootPath: string, segments: readonly string[]): ParsedDocumentToken {
   const path = decodePath(rootPath, segments)
   if (!path) return { kind: 'rejected', reason: 'compare token names no path' }
-
-  return { kind: 'path', path: compareSavedDocumentId(path) }
+  return {
+    kind: 'content',
+    content: documentTab({ kind: 'compare-saved', file: fileResource(filesystemPath(path)) }),
+  }
 }
 
-function refPath(rootPath: string, segments: readonly string[]): ParsedDocumentToken {
+function refContent(rootPath: string, segments: readonly string[]): ParsedDocumentToken {
   const ref = decodeSegment(segments[0])
   const path = decodePath(rootPath, segments.slice(1))
   if (!ref || !path) return { kind: 'rejected', reason: 'ref token needs a ref and a path' }
-
-  return { kind: 'path', path: refDocumentId({ path, ref }) }
+  return {
+    kind: 'content',
+    content: documentTab({ kind: 'git-ref', source: { path: filesystemPath(path), ref } }),
+  }
 }
 
-function snapshotDiffPath(rootPath: string, segments: readonly string[]): ParsedDocumentToken {
+function snapshotDiffContent(rootPath: string, segments: readonly string[]): ParsedDocumentToken {
   const source = segments[0]
   if (source === 'branch')
     return { kind: 'unavailable', reason: 'branch diffs are not rendered yet' }
-  if (source !== 'staged' && source !== 'worktree') {
+  if (source !== 'staged' && source !== 'worktree')
     return { kind: 'rejected', reason: 'diff source must be worktree, staged or branch' }
-  }
-
   const revision = parseRevisionSegment(segments[1] ?? '')
   if (!revision) return { kind: 'rejected', reason: 'diff names no usable git object' }
 
@@ -244,19 +219,34 @@ function snapshotDiffPath(rootPath: string, segments: readonly string[]): Parsed
   if (!path) return { kind: 'rejected', reason: 'diff token names no path' }
 
   return {
-    kind: 'path',
-    path: snapshotDiffDocumentId({
-      newObjectId: revision.newObjectId,
-      oldObjectId: revision.oldObjectId,
-      oldPath: absoluteOrUndefined(rootPath, revision.oldPath),
-      path,
-      staged: source === 'staged',
-      ...missingSidesForStatus(revision.status, revision.oldObjectId),
-    } as Parameters<typeof snapshotDiffDocumentId>[0]),
+    kind: 'content',
+    content: documentTab({
+      kind: 'git-diff',
+      source: {
+        kind: 'snapshot',
+        source,
+        newObjectId: revision.newObjectId,
+        oldObjectId: revision.oldObjectId,
+        oldPath: absoluteOrUndefined(rootPath, revision.oldPath),
+        path: filesystemPath(path),
+        status: snapshotStatus(revision.status, revision.oldObjectId, source),
+      },
+    }),
   }
 }
 
-function checkpointDiffPath(rootPath: string, segments: readonly string[]): ParsedDocumentToken {
+function snapshotStatus(
+  status: string | undefined,
+  oldObjectId: string | undefined,
+  source: 'staged' | 'worktree',
+): GitChangeStatus {
+  const parsed = gitStatusOrUndefined(status)
+  if (parsed !== undefined) return parsed
+  if (oldObjectId) return 'modified'
+  return source === 'staged' ? 'added' : 'untracked'
+}
+
+function checkpointDiffContent(rootPath: string, segments: readonly string[]): ParsedDocumentToken {
   const sessionId = sessionIdOrNull(decodeSegment(segments[0]))
   const turnSegment = segments[1] ?? ''
   const isTurnScope = turnSegment.endsWith(TURN_SCOPE_SUFFIX)
@@ -267,52 +257,24 @@ function checkpointDiffPath(rootPath: string, segments: readonly string[]): Pars
     return { kind: 'rejected', reason: 'checkpoint token needs a session id and a turn range' }
 
   const filePath = segments.length > 2 ? decodePath(rootPath, segments.slice(2)) : null
-  const scope = checkpointScope(filePath, isTurnScope)
-
-  return {
-    kind: 'path',
-    path: checkpointDiffDocumentId({
-      filePath: filePath ?? undefined,
-      fromTurnCount: turns.from,
-      newObjectId: turns.newObjectId,
-      oldObjectId: turns.oldObjectId,
-      oldPath: absoluteOrUndefined(rootPath, turns.oldPath),
-      // Session- and turn-scope checkpoints carry a synthetic path, matching what the
-      // checkpoint query mints for them.
-      path: filePath ?? `checkpoint-${scope}-${turns.to}`,
-      scope,
-      status: gitStatusOrUndefined(turns.status),
-      sessionId,
-      toTurnCount: turns.to,
-    }),
+  if (segments.length > 2 && filePath === null)
+    return { kind: 'rejected', reason: 'checkpoint file is outside this workspace' }
+  const range = {
+    owner: workspaceRoot(rootPath),
+    fromTurnCount: turns.from,
+    newObjectId: turns.newObjectId,
+    oldObjectId: turns.oldObjectId,
+    oldPath: absoluteOrUndefined(rootPath, turns.oldPath),
+    status: gitStatusOrUndefined(turns.status),
+    sessionId,
+    toTurnCount: turns.to,
   }
-}
-
-/** A trailing path means one file; otherwise the `!turn` marker decides the width. */
-function checkpointScope(filePath: string | null, isTurnScope: boolean) {
-  if (filePath) return 'file'
-  if (isTurnScope) return 'turn'
-
-  return 'session'
-}
-
-/**
- * `snapshotDiffDocumentId` does not take a status — it RE-DERIVES one from which side
- * is missing. So restoring the `s=` we carried means restoring the inputs that produce
- * it, not passing it through. Without this a deleted file came back as `modified` and
- * the diff rendered the wrong way round.
- */
-function missingSidesForStatus(status: string | undefined, oldObjectId: string | undefined) {
-  if (status === 'deleted') return { newFileMissing: true, oldFileMissing: false }
-  if (status === 'added' || status === 'untracked') {
-    return { newFileMissing: false, oldFileMissing: true }
-  }
-  if (status === 'modified' || status === 'renamed') {
-    return { newFileMissing: false, oldFileMissing: false }
-  }
-
-  // No status in the token: fall back to what the object ids imply.
-  return { newFileMissing: false, oldFileMissing: !oldObjectId }
+  let source: GitComparison
+  if (filePath !== null)
+    source = { ...range, kind: 'checkpoint-file', file: fileResource(filesystemPath(filePath)) }
+  else if (isTurnScope) source = { ...range, kind: 'checkpoint-turn' }
+  else source = { ...range, kind: 'checkpoint-session' }
+  return { kind: 'content', content: documentTab({ kind: 'git-diff', source }) }
 }
 
 function parseRevisionSegment(segment: string) {
@@ -361,7 +323,7 @@ function parseExtras(extras: readonly string[]) {
   }
 }
 
-const GIT_STATUSES = new Set([
+const gitStatusSchema = v.picklist([
   'added',
   'conflicted',
   'deleted',
@@ -372,23 +334,15 @@ const GIT_STATUSES = new Set([
   'untracked',
 ])
 
-/**
- * Validated, not cast, for the same reason as the status and the object ids beside it:
- * an arbitrary URL segment must not become a typed id. `parseSessionToken` already
- * applies this shape check to `t/` tokens; without it here a hand-edited `k/` token
- * minted a checkpoint document for a session that cannot exist, and the resulting tab
- * persisted into the cache.
- */
 function sessionIdOrNull(sessionId: string | null) {
   const parsed = v.safeParse(sessionIdSchema, sessionId)
   return parsed.success ? parsed.output : null
 }
 
 /** Validated, not cast: an arbitrary URL string must not become a typed git status. */
-function gitStatusOrUndefined(status: string | undefined) {
-  if (!status || !GIT_STATUSES.has(status)) return undefined
-
-  return status as Parameters<typeof checkpointDiffDocumentId>[0]['status']
+function gitStatusOrUndefined(status: string | undefined): GitChangeStatus | undefined {
+  const parsed = v.safeParse(gitStatusSchema, status)
+  return parsed.success ? parsed.output : undefined
 }
 
 function objectIdOrUndefined(value: string) {
@@ -400,5 +354,7 @@ function relativeOrNull(rootPath: string, path: string | undefined) {
 }
 
 function absoluteOrUndefined(rootPath: string, relative: string | undefined) {
-  return relative ? (toWorkspaceAbsolute(rootPath, relative) ?? undefined) : undefined
+  if (!relative) return undefined
+  const path = toWorkspaceAbsolute(rootPath, relative)
+  return path === null ? undefined : filesystemPath(path)
 }

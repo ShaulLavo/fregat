@@ -1,13 +1,13 @@
+import { documentKey, settingsJsonDocument } from '@/lib/documents/utils/identity'
 import { createEditorDocumentStore } from '@/features/editor/state/document-state'
 import { SettingsSyncService } from '@/features/settings/state/sync-service'
 import { fetchSettings, saveSettingsText } from '@/features/settings/utils/api'
-import { settingsJsonDocumentId } from '@/features/settings/utils/json-document'
 import { settingsKeys } from '@workspace/client-core/settings/query-keys'
 
 import { createTestQueryClient } from '../../../../test/render'
 import { expect, test } from '../../../../test/fixtures'
 
-const ID = settingsJsonDocumentId('user')
+const ID = documentKey(settingsJsonDocument('user'))
 
 /** A sentinel, not a credential: all that matters is that it is non-empty. */
 const TYPED_BY_HAND = 'value-typed-into-the-raw-editor'
@@ -46,15 +46,9 @@ test('a save the server rewrites leaves the buffer clean and holding the file', 
   const posted = documentWith(TYPED_BY_HAND)
 
   const before = await fetchSettings()
-  store.getState().ensureUnsyncedEditorDocument({
+  store.getState().ensureSettingsDocument(settingsJsonDocument('user'), {
     content: posted,
-    id: ID,
-    sync: {
-      kind: 'settings',
-      revision: before.layers.find((layer) => layer.id === 'user')?.file?.revision ?? '',
-      state: 'idle',
-      target: 'user',
-    },
+    revision: before.layers.find((layer) => layer.id === 'user')?.file?.revision ?? '',
   })
 
   await new SettingsSyncService(store, queryClient).save(
@@ -68,9 +62,10 @@ test('a save the server rewrites leaves the buffer clean and holding the file', 
   // posted text failed this check in exactly this case, leaving the tab dirty
   // forever with a secret on screen that the file no longer held.
   expect(document?.buffer.isDirty()).toBe(false)
-  expect(store.getState().dirtyFilePaths.has(ID)).toBe(false)
+  expect(store.getState().dirtyDocumentKeys.has(ID)).toBe(false)
   // The revision advanced, so the next save is not refused as stale.
-  expect(document?.sync).toMatchObject({ kind: 'settings', target: 'user' })
+  expect(document?.sync).toMatchObject({ kind: 'settings' })
+  expect(document?.target).toEqual(settingsJsonDocument('user'))
   const sync = document?.sync
   expect(sync?.kind === 'settings' ? sync.revision : '').not.toBe('')
 })
@@ -83,15 +78,9 @@ test('a save the server does not rewrite keeps the posted text', async ({ client
   const posted = '{ "editor.fontSize": 19 }\n'
 
   const before = await fetchSettings()
-  store.getState().ensureUnsyncedEditorDocument({
+  store.getState().ensureSettingsDocument(settingsJsonDocument('user'), {
     content: posted,
-    id: ID,
-    sync: {
-      kind: 'settings',
-      revision: before.layers.find((layer) => layer.id === 'user')?.file?.revision ?? '',
-      state: 'idle',
-      target: 'user',
-    },
+    revision: before.layers.find((layer) => layer.id === 'user')?.file?.revision ?? '',
   })
 
   await new SettingsSyncService(store, queryClient).save(
@@ -112,15 +101,9 @@ test('failed conflict refresh preserves dirty text and a scheduled retry confirm
   const localText = '{ "editor.fontSize": 18 }\n'
   const initial = await fetchSettings()
   const initialRevision = rawRevision(initial)
-  store.getState().ensureUnsyncedEditorDocument({
+  store.getState().ensureSettingsDocument(settingsJsonDocument('user'), {
     content: localText,
-    id: ID,
-    sync: {
-      kind: 'settings',
-      revision: initialRevision,
-      state: 'idle',
-      target: 'user',
-    },
+    revision: initialRevision,
   })
   store.getState().setLiveEditorDocumentDirty(ID, true)
   const external = await saveSettingsText({
@@ -140,7 +123,7 @@ test('failed conflict refresh preserves dirty text and a scheduled retry confirm
   )
 
   expect(store.getState().getLiveEditorDocument(ID)?.buffer.materializeFullText()).toBe(localText)
-  expect(store.getState().dirtyFilePaths.has(ID)).toBe(true)
+  expect(store.getState().dirtyDocumentKeys.has(ID)).toBe(true)
   await waitForRevision(store, rawRevision(external.snapshot))
   expect(store.getState().getLiveEditorDocument(ID)?.sync).toMatchObject({
     state: 'conflict',
@@ -153,15 +136,9 @@ test('uncertain raw transport retry reuses one write id', async ({ controlledCli
   const queryClient = createTestQueryClient()
   const posted = '{ "editor.fontSize": 20 }\n'
   const before = await fetchSettings()
-  store.getState().ensureUnsyncedEditorDocument({
+  store.getState().ensureSettingsDocument(settingsJsonDocument('user'), {
     content: posted,
-    id: ID,
-    sync: {
-      kind: 'settings',
-      revision: rawRevision(before),
-      state: 'idle',
-      target: 'user',
-    },
+    revision: rawRevision(before),
   })
   controlledClient.controller.rejectNextSettingsRawWrite({
     code: 'settings.WRITE_CONTENDED',
@@ -193,10 +170,9 @@ test('an overwrite completes when its cache reconciliation reaches the conflict 
   const before = await fetchSettings()
   const beforeRevision = rawRevision(before)
   queryClient.setQueryData(settingsKeys.document(), before)
-  store.getState().ensureUnsyncedEditorDocument({
+  store.getState().ensureSettingsDocument(settingsJsonDocument('user'), {
     content: posted,
-    id: ID,
-    sync: { kind: 'settings', revision: beforeRevision, state: 'idle', target: 'user' },
+    revision: beforeRevision,
   })
   store.getState().setLiveEditorDocumentDirty(ID, true)
   const beforeFile = before.layers.find((layer) => layer.id === 'user')?.file

@@ -241,18 +241,13 @@ endpoints and existing SSH access, with explicit grants for native clients.
 
 ## Document and async operation ownership
 
-The required execution order is **098 → 097**:
+Plan 098 is complete. Its [implementation reference](docs/document-and-tab-domain.md) records
+verified document/tab APIs, cache version 21, correctness fixes, and baseline test limitations.
 
-1. **[Plan 098 — document and tab domain](plans/098-document-and-tab-domain.md).** Complete its
-   characterization, settings save acknowledgement correction, shared domain model, caller
-   migrations, and mechanical enforcement. All completion criteria and focused verification
-   gates must pass before Plan 097 starts.
-2. **[Plan 097 — async operation ownership](plans/097-async-operation-ownership.md).** Record
-   Plan 098's completion evidence and implemented document API locations in this plan. Refresh
-   its source anchors, API sketches, and drift baseline, then begin implementation against the
-   settled document model.
-
-Design agreement or partial implementation of Plan 098 does not satisfy this dependency.
+**[Plan 097 — async operation ownership](plans/097-async-operation-ownership.md) is next.** Its
+source anchors, typed API sketches, and source hashes have been refreshed against the completed
+document model. Plan 097 implementation has not started. The required **098 → 097** dependency
+is satisfied.
 
 ## Duplication census lane
 
@@ -281,6 +276,18 @@ Every unification step names the behavioural divergences it reconciles and state
 these variants share signatures, so a wrong merge typechecks. Plan 096 settles the shared Git contract and
 web Git API files before Plan 094's co-pass over them. This lane does not reorder or depend on the keymap,
 reload, TUI, Ghostty, or MCP lanes.
+
+## Web design language lane
+
+Requested 2026-09-12. [Plan 100](plans/100-web-design-language.md) is proposed; implementation has
+not started. It settles corners, bar heights, density, dividers, type steps and interaction fills
+for `apps/web` and `packages/ui`, then enforces them with a census script and a mandatory
+triple-check sweep. Its one product-facing decision, the corner language (D1), needs the user's
+confirmation before Phase 1 lands; every other phase removes call-site noise under the decisions
+table. The plan is Platform-only and touches class strings and theme tokens, so it is independent
+of the duplication census lane, but it edits the same `apps/web` component files that Plans 093
+and 096 rename or restructure. Land it after 096 when both are in flight: rebasing class-string
+edits under a rename is cheap, the reverse is not.
 
 ## Verification boundaries
 

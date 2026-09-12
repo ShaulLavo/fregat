@@ -1,3 +1,5 @@
+import { testTabContent } from '../../../test/factories/document-targets'
+import { filesystemPath } from '@/lib/documents/utils/identity'
 import { createDefaultWorkbenchLayout } from '@/features/workbench/utils/layout'
 import { screen } from '@testing-library/react'
 
@@ -10,7 +12,7 @@ import {
 import { createDefaultChatModePanels } from '@/features/chat-mode/utils/panels'
 import {
   createDefaultWorkbenchPanels,
-  openEditorPathInWorkbenchPanels,
+  openEditorContentInWorkbenchPanels,
 } from '@/features/workbench/utils/panels'
 import { NATIVE_WINDOW_DRAG_CLASS } from '@/lib/platform/window-drag'
 import { expect, test } from '../../../test/fixtures'
@@ -47,9 +49,9 @@ function TitlebarTestProvider({
 }
 
 function createTitlebarStore() {
-  const panels = openEditorPathInWorkbenchPanels(
+  const panels = openEditorContentInWorkbenchPanels(
     createDefaultWorkbenchPanels(),
-    '/repo/src/app.tsx',
+    testTabContent('/repo/src/app.tsx'),
   )
 
   return createEditorWorkspaceStore({
@@ -58,7 +60,7 @@ function createTitlebarStore() {
       birthtimeMs: 0,
       mtimeMs: 0,
       name: 'repo',
-      path: '/repo',
+      path: filesystemPath('/repo'),
       size: 0,
       type: 'directory',
       version: '',
@@ -71,8 +73,8 @@ function createTitlebarStore() {
     workspaces: {
       '/repo': {
         editorHistory: [],
-        recentlyClosedEditorPaths: [],
-        scrollPositionByPath: {},
+        recentlyClosedTabs: [],
+        reopenScrollPositions: [],
         workbenchPanels: panels,
       },
     },

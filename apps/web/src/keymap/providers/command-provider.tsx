@@ -18,7 +18,6 @@ import {
   useEditorWorkspaceStoreApi,
   useEditorWorkspaceState,
 } from '@/features/editor/state/workspace-state'
-import { isSettingsDocumentId } from '@/features/settings/utils/document'
 import { useWorkspaceEditService } from '@/features/editor/providers/workspace-edit-context'
 import { useOpenFileAtRef } from '@/features/git/hooks/use-open-file-at-ref'
 import { SettingsDialog } from '@/features/settings/components/dialog'
@@ -112,7 +111,7 @@ export function CommandProvider({ children }: { readonly children: ReactNode }) 
     'switch' | 'connect' | 'disconnect' | null
   >(null)
   const settingsOpen = useEditorWorkspaceState(
-    (state) => state.rootFolder === null && isSettingsDocumentId(state.selectedFilePath ?? ''),
+    (state) => state.rootFolder === null && state.selectedTabContent?.kind === 'settings',
   )
   const [settingsOrigin, setSettingsOrigin] = useState<FocusTargetToken | null>(null)
   const adaptersRef = useRef(
@@ -205,6 +204,8 @@ export function CommandProvider({ children }: { readonly children: ReactNode }) 
       moveTabToPane: (...args) => adaptersRef.current.editor.moveTabToPane(...args),
       moveTabToSplit: (...args) => adaptersRef.current.editor.moveTabToSplit(...args),
       openDefinition: (...args) => adaptersRef.current.editor.openDefinition(...args),
+      openTabContent: (...args) => adaptersRef.current.editor.openTabContent(...args),
+      selectContent: (...args) => adaptersRef.current.editor.selectContent(...args),
       openFileSurface: (...args) => adaptersRef.current.editor.openFileSurface(...args),
       openSearchEditor: (...args) => adaptersRef.current.editor.openSearchEditor(...args),
       openSettingsEditor: (...args) => adaptersRef.current.editor.openSettingsEditor(...args),

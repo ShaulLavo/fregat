@@ -1,3 +1,4 @@
+import type { DocumentKey, FilesystemPath } from '@/lib/documents/utils/types'
 import type { EditorTextBuffer } from '@singapor/core'
 
 import { log } from '@/lib/client-logging'
@@ -12,10 +13,10 @@ export type SnapshotCaptureIdentity = {
   readonly active: boolean
   readonly buffer: EditorTextBuffer | null
   readonly contentVersion: string | null
-  readonly documentId: string | null
-  readonly documentKey: string
-  readonly path: string
-  readonly rootPath: string
+  readonly key: DocumentKey | null
+  readonly paintKey: string
+  readonly path: FilesystemPath
+  readonly rootPath: FilesystemPath
   readonly themeId: string | null
 }
 
@@ -41,7 +42,7 @@ export function createSnapshotCapture(storage: ScopedStorage) {
   return {
     cancel,
     flush,
-    setIdentity(next: SnapshotCaptureIdentity) {
+    setIdentity(next: SnapshotCaptureIdentity | null) {
       flush()
       identity = next
     },
@@ -71,8 +72,8 @@ function persistSnapshot(
 
   const started = performance.now()
   const capture = source()
-  if (!capture || capture.documentKey !== identity.documentKey) return
-  if (capture.documentId !== identity.documentId || capture.buffer !== buffer) return
+  if (!capture || capture.documentKey !== identity.paintKey) return
+  if (capture.documentId !== identity.key || capture.buffer !== buffer) return
   if (capture.bufferRevision !== buffer.getRevision()) return
 
   const result = writeEditorVisibleSnapshotCache(storage, {

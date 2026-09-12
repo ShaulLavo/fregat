@@ -1,3 +1,4 @@
+import type { FilesystemPath } from '@/lib/documents/utils/types'
 import { useSyncExternalStore } from 'react'
 
 import { ToolPaneHeader } from '@/features/workbench/components/tool-pane-header'
@@ -10,7 +11,7 @@ export function FileNavigatorHeader({
   treeState,
   visibleTreeItemCountStore,
 }: {
-  readonly rootPath: string
+  readonly rootPath: FilesystemPath
   readonly treeState: LoadState<TreeModel>
   readonly visibleTreeItemCountStore: VisibleTreeItemCountStore
 }) {

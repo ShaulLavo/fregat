@@ -5,7 +5,8 @@ import { getClient, type Client } from '@/lib/client'
 import { observeClientOperation } from '@/lib/client-logging'
 import { unwrapEdenResponse } from '@/lib/eden-events'
 import { gitKeys } from '@/lib/query-keys'
-import type { CheckpointDiffDocumentInput } from '@/features/git/utils/diff-document'
+import { fileResource, filesystemPath } from '@/lib/documents/utils/identity'
+import type { GitComparison, FilesystemPath, WorkspaceRoot } from '@/lib/documents/utils/types'
 import type { FileDiff, FileStatus } from '@/features/git/utils/types'
 import type { ChatTurnDiffSummary } from '@workspace/client-core/chat/types'
 
@@ -71,52 +72,67 @@ export function canOpenCheckpointDiff(summary: ChatTurnDiffSummary) {
   return summary.files.length > 0
 }
 
-export function checkpointDiffDocumentInput(
+export function checkpointFileDocument(
   summary: ChatTurnDiffSummary,
-  path: string,
+  path: FilesystemPath,
   diff: FileDiff | null,
-): CheckpointDiffDocumentInput {
-  const rangeInput = checkpointDiffInputForSummary(summary, path)
-
+  owner: WorkspaceRoot,
+): {
+  readonly kind: 'git-diff'
+  readonly source: Extract<GitComparison, { kind: 'checkpoint-file' }>
+} {
   return {
-    filePath: path,
-    fromTurnCount: rangeInput.fromTurnCount,
-    newObjectId: diff?.newObjectId,
-    oldObjectId: diff?.oldObjectId,
-    oldPath: diff?.oldPath,
-    path,
-    scope: 'file',
-    status: diff ? diffStatus(diff) : undefined,
-    sessionId: rangeInput.sessionId,
-    toTurnCount: rangeInput.toTurnCount,
+    kind: 'git-diff',
+    source: {
+      kind: 'checkpoint-file',
+      owner,
+      file: fileResource(path),
+      fromTurnCount: Math.max(0, summary.checkpointTurnCount - 1),
+      toTurnCount: summary.checkpointTurnCount,
+      sessionId: summary.sessionId,
+      newObjectId: diff?.newObjectId,
+      oldObjectId: diff?.oldObjectId,
+      oldPath: diff?.oldPath === undefined ? undefined : filesystemPath(diff.oldPath),
+      status: diff ? diffStatus(diff) : undefined,
+    },
   }
 }
 
-export function checkpointTurnDiffDocumentInput(
+export function checkpointTurnDocument(
   summary: ChatTurnDiffSummary,
-): CheckpointDiffDocumentInput {
-  const rangeInput = checkpointDiffInputForSummary(summary)
-
+  owner: WorkspaceRoot,
+): {
+  readonly kind: 'git-diff'
+  readonly source: Extract<GitComparison, { kind: 'checkpoint-turn' }>
+} {
   return {
-    fromTurnCount: rangeInput.fromTurnCount,
-    path: checkpointTurnDocumentPath(summary),
-    scope: 'turn',
-    sessionId: rangeInput.sessionId,
-    toTurnCount: rangeInput.toTurnCount,
+    kind: 'git-diff',
+    source: {
+      kind: 'checkpoint-turn',
+      owner,
+      fromTurnCount: Math.max(0, summary.checkpointTurnCount - 1),
+      toTurnCount: summary.checkpointTurnCount,
+      sessionId: summary.sessionId,
+    },
   }
 }
 
-export function checkpointFullSessionDiffDocumentInput(
+export function checkpointSessionDocument(
   summary: ChatTurnDiffSummary,
-): CheckpointDiffDocumentInput {
-  const input = checkpointFullSessionDiffInputForSummary(summary)
-
+  owner: WorkspaceRoot,
+): {
+  readonly kind: 'git-diff'
+  readonly source: Extract<GitComparison, { kind: 'checkpoint-session' }>
+} {
   return {
-    fromTurnCount: input.fromTurnCount,
-    path: input.path ?? checkpointFullSessionDocumentPath(summary),
-    scope: 'session',
-    sessionId: input.sessionId,
-    toTurnCount: input.toTurnCount,
+    kind: 'git-diff',
+    source: {
+      kind: 'checkpoint-session',
+      owner,
+      fromTurnCount: 0,
+      toTurnCount: summary.checkpointTurnCount,
+      sessionId: summary.sessionId,
+    },
   }
 }
 
@@ -253,10 +269,6 @@ function diffStatus(diff: FileDiff): FileStatus['index'] | FileStatus['worktree'
   if (diff.newFileMissing) return 'deleted'
 
   return 'modified'
-}
-
-function checkpointTurnDocumentPath(summary: ChatTurnDiffSummary) {
-  return `checkpoint-turn-${summary.checkpointTurnCount}`
 }
 
 function checkpointFullSessionDocumentPath(summary: ChatTurnDiffSummary) {

@@ -1,3 +1,4 @@
+import { filesystemPath } from '@/lib/documents/utils/identity'
 import { testScopedStorage } from '../../../../test/factories/scoped-storage'
 import { waitFor } from '@testing-library/react'
 
@@ -20,8 +21,8 @@ test('restores the most recent backend folder when browser workspace state is em
 }) => {
   void client
   localStorage.removeItem(WORKSPACE_CACHE_STORAGE_KEYS.rootFolder)
-  await ensureFolderPath('anubis')
-  await recordRecentEntry('anubis')
+  await ensureFolderPath(filesystemPath('anubis'))
+  await recordRecentEntry(filesystemPath('anubis'))
   const workspaceStore = emptyWorkspaceStore()
 
   const view = renderWithProviders(

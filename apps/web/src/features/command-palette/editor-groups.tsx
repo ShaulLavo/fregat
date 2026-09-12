@@ -11,7 +11,7 @@ export function EditorGroups({ items }: EditorGroupsProps) {
   return (
     <CommandGroup heading='Open Editors'>
       {items.map((item) => (
-        <EditorPaletteRow item={item} key={item.path} />
+        <EditorPaletteRow item={item} key={item.key} />
       ))}
     </CommandGroup>
   )

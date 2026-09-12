@@ -1,3 +1,4 @@
+import { tabId } from '@/lib/documents/utils/identity'
 import { QueryClient } from '@tanstack/react-query'
 import { act, screen, waitFor } from '@testing-library/react'
 import userEvent from '@testing-library/user-event'
@@ -41,7 +42,7 @@ test('page reset follows the remote JSON document and returns to the primary own
   editor.setQueryData(settingsKeys.document(), await fetchSettings(undefined, clientB))
   selectSettingsScope('user')
   selectSettingsView('json')
-  const rendered = renderWithProviders(<SettingsPage tabId='remote-settings' />, {
+  const rendered = renderWithProviders(<SettingsPage tabId={tabId('remote-settings')} />, {
     queryClient: editor,
     settingsOwner: primary,
   })

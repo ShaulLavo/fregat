@@ -1,3 +1,4 @@
+import { filesystemPath } from '@/lib/documents/utils/identity'
 import { readFile } from 'node:fs/promises'
 import { join } from 'node:path'
 import { waitFor } from '@testing-library/react'
@@ -38,7 +39,7 @@ test('two machines keep live projections and retained buffers, with isolated dis
   const documentA = editorA.documentStore
     .getState()
     .ensureLiveEditorDocument(
-      await fetchFile('repo/shared.txt', new AbortController().signal, h.clientA),
+      await fetchFile(filesystemPath('repo/shared.txt'), new AbortController().signal, h.clientA),
     )
   createEditorBufferSession(documentA.buffer).applyText(' dirty A')
   h.application.activateEnvironment(h.originB)
@@ -46,10 +47,10 @@ test('two machines keep live projections and retained buffers, with isolated dis
   const documentB = editorB.documentStore
     .getState()
     .ensureLiveEditorDocument(
-      await fetchFile('repo/shared.txt', new AbortController().signal, h.clientB),
+      await fetchFile(filesystemPath('repo/shared.txt'), new AbortController().signal, h.clientB),
     )
   createEditorBufferSession(documentB.buffer).applyText(' saved B')
-  await editorB.saveService.save(documentB.id)
+  await editorB.saveService.save(documentB.key)
   expect(await readFile(join(h.serverA.root, 'repo/shared.txt'), 'utf8')).toBe('A')
   expect(await readFile(join(h.serverB.root, 'repo/shared.txt'), 'utf8')).toBe('B saved B')
   h.application.activateEnvironment(h.originA)

@@ -1,3 +1,6 @@
+import { filesystemPath, fileDocumentKey, tabId } from '@/lib/documents/utils/identity'
+import { testTabContent } from '../../../../test/factories/document-targets'
+import type { TabContent } from '@/lib/documents/utils/types'
 import '@workspace/ui/globals.css'
 import '@singapor/core/style.css'
 import '@singapor/gutters/style.css'
@@ -51,8 +54,8 @@ import {
   type DelayedFileReadClient,
 } from '../../../../test/factories/delayed-file-read-client'
 
-const PATH = 'repo/src/editor-tab-a.ts'
-const ROOT_PATH = 'repo'
+const PATH = filesystemPath('repo/src/editor-tab-a.ts')
+const ROOT_PATH = filesystemPath('repo')
 const originalUrl = window.location.href
 let root: Root | null = null
 let runtime: PreparedOpenRuntime | null = null
@@ -200,7 +203,7 @@ test(
 
     const firstFrame = await activateAndCaptureFirstFrame()
 
-    expect(firstFrame.selectedPath).toBe(PATH)
+    expect(firstFrame.selectedContent).toEqual(testTabContent(PATH))
     expect(firstFrame.text).toBe('')
     expect(firstFrame.rowCount).toBe(0)
     await expect.poll(delayedFileRead.observedStatus).toBe(200)
@@ -243,7 +246,7 @@ test(
       })
       .toBe(1)
 
-    const retained = harness.documentStore.getState().getLiveEditorDocument(PATH)
+    const retained = harness.documentStore.getState().getLiveEditorDocument(fileDocumentKey(PATH))
     if (!retained) throw new RangeError('retained browser document unavailable')
     createEditorBufferSession(retained.buffer).applyText('retained dirty browser text')
     const activeTabId = harness.workspaceStore.getState().workbenchPanels.activeEditorTabId
@@ -258,12 +261,12 @@ test(
 
     const firstFrame = await activateAndCaptureFirstFrame()
 
-    expect(firstFrame.selectedPath).toBe(PATH)
+    expect(firstFrame.selectedContent).toEqual(testTabContent(PATH))
     expect(firstFrame.text).toContain('retained dirty browser text')
     expect(firstFrame.rowCount).toBeGreaterThan(0)
-    expect(harness.documentStore.getState().getLiveEditorDocument(PATH)?.buffer).toBe(
-      retained.buffer,
-    )
+    expect(
+      harness.documentStore.getState().getLiveEditorDocument(fileDocumentKey(PATH))?.buffer,
+    ).toBe(retained.buffer)
     await expect.poll(delayedFileRead.observedStatus).toBe(200)
     expect(performance.getEntriesByName('editor.authoritative_highlight_paint')).toHaveLength(0)
 
@@ -355,7 +358,7 @@ test(
 
     const firstFrame = await activateAndCaptureFirstFrame()
 
-    expect(firstFrame.selectedPath).toBe(PATH)
+    expect(firstFrame.selectedContent).toEqual(testTabContent(PATH))
     expect(firstFrame.text).toContain("export const editorTabA = 'real browser fixture A'")
     await expect
       .poll(() => performance.getEntriesByName('editor.authoritative_highlight_paint').length, {
@@ -441,7 +444,7 @@ function PreparedOpenHarness() {
       {activeTab ? (
         <EditorSurfaceTabBody
           active
-          path={activeTab.path}
+          content={activeTab.content}
           rootPath={ROOT_PATH}
           tabId={activeTab.id}
         />
@@ -454,8 +457,8 @@ function IntentTarget() {
   const commands = useEditorCommands()
   const elementRef = useEditorTabIntentPrefetch({
     active: false,
-    id: 'prepared-open-browser-target',
-    path: PATH,
+    id: tabId('prepared-open-browser-target'),
+    content: testTabContent(PATH),
   })
 
   return (
@@ -562,7 +565,7 @@ async function activateAndCaptureFirstFrame() {
       const viewport = surface?.getBoundingClientRect()
       resolve({
         rowCount: document.querySelectorAll('.editor-virtualized-row').length,
-        selectedPath: requiredRuntime().workspaceStore.getState().selectedFilePath,
+        selectedContent: requiredRuntime().workspaceStore.getState().selectedTabContent,
         text: surface?.textContent ?? '',
         viewportHeight: viewport?.height ?? 0,
         viewportWidth: viewport?.width ?? 0,
@@ -691,7 +694,7 @@ type PreparedOpenRuntime = {
 
 type FirstFrameCapture = {
   readonly rowCount: number
-  readonly selectedPath: string | null
+  readonly selectedContent: TabContent | null
   readonly text: string
   readonly viewportHeight: number
   readonly viewportWidth: number
