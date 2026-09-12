@@ -1,3 +1,4 @@
+import { filesystemPath } from '@/lib/documents/utils/identity'
 import { readEnvironmentDescriptor } from '@/lib/environments/utils/descriptor'
 import { environmentScopedStorage } from '@/lib/environments/state/scoped-storage'
 import { confirmedEnvironmentId } from '@/lib/environments/state/domain'
@@ -40,12 +41,12 @@ test.for([
 ])('$name', async ({ originA, originB, rootB, missingOnB }, { client, server }) => {
   const secondServer = await makeTestServer({ filesystemWatch: false })
   const clientB = createInProcessClient(secondServer)
-  const rootAEntry = await createFolderPath('a', client)
+  const rootAEntry = await createFolderPath(filesystemPath('a'), client)
   const rootAAddress = await registerTestWorkspaceAddress(client, rootAEntry.path)
-  const rootBEntry = await createFolderPath(rootB, clientB)
+  const rootBEntry = await createFolderPath(filesystemPath(rootB), clientB)
   const rootBAddress = await registerTestWorkspaceAddress(clientB, rootBEntry.path)
   if (missingOnB) {
-    await createFolderPath(rootB, client)
+    await createFolderPath(filesystemPath(rootB), client)
     await rm(join(secondServer.root, rootB), { recursive: true })
   }
   const previousOrigin = activeServerOrigin()

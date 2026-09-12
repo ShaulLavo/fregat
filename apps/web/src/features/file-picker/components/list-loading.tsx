@@ -1,3 +1,4 @@
+import { fileListGridClass } from '@/features/file-picker/utils/list-layout'
 import { LoadingState } from '@workspace/ui/components/loading-state'
 import { cn } from '@workspace/ui/lib/utils'
 
@@ -11,9 +12,7 @@ export function ListLoading({ mode }: { mode: FilePickerMode }) {
           <div
             className={cn(
               'compact:gap-2 compact:px-3 grid h-8 items-center gap-3 px-3.5',
-              mode === 'folder' && 'grid-cols-[minmax(0,1fr)_116px_74px] max-sm:grid-cols-1',
-              mode === 'file' &&
-                'grid-cols-[minmax(0,1fr)_80px_116px_74px] max-sm:grid-cols-[minmax(0,1fr)_68px]',
+              fileListGridClass(mode),
             )}
             key={row}
           >

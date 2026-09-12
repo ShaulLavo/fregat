@@ -1,15 +1,16 @@
+import { documentKey } from '@/lib/documents/utils/identity'
+import { filesystemResource } from '@/lib/documents/utils/capabilities'
+import type { FilesystemPath, StandaloneDocumentRef, TabId } from '@/lib/documents/utils/types'
 import { useEditorRuntime } from '@/features/editor/hooks/use-runtime'
 import { WarningCircleIcon } from '@phosphor-icons/react'
 
 import { CompareSavedView } from '@/features/editor/components/compare-saved-view'
-import { parseCompareSavedDocumentId } from '@/features/editor/utils/compare-saved-document'
 import { Editor } from '@/features/editor/components/editor'
 import { useEditorColorTheme } from '@/features/editor/hooks/use-editor-color-theme'
 import { OrbitLoader } from '@workspace/ui/components/orbit-loader'
 import { LanguageServerReferencesPane } from '@/features/editor/components/language-server-references-pane'
 import type { EditorRenderDocument } from '@/features/editor/utils/render-document'
 import { DiffView } from '@/features/git/components/diff-view'
-import { parseDiffDocumentId } from '@/features/git/utils/diff-document'
 import { useEditorSurfaceActions } from '@/features/workbench/hooks/use-editor-surface-actions'
 import { useEditorVisibleSnapshot } from '@/features/workbench/hooks/use-editor-visible-snapshot'
 import { useFileOpenIntent } from '@/lib/file-open-intent/providers/context'
@@ -29,7 +30,7 @@ export function FileEditorBody({
   fileState,
   fileVersion,
   languageServerReferences,
-  path,
+  target,
   rootPath,
   tabId,
 }: {
@@ -40,48 +41,48 @@ export function FileEditorBody({
   fileState: LoadState<FileResult>
   fileVersion: string | null
   languageServerReferences: LanguageServerReferencesResult | null
-  path: string
-  rootPath: string
-  tabId: string
+  target: StandaloneDocumentRef
+  rootPath: FilesystemPath
+  tabId: TabId
 }) {
   const { storage } = useEditorRuntime()
   const actions = useEditorSurfaceActions()
   const { service: fileOpenIntent } = useFileOpenIntent()
-  const diffDocument = parseDiffDocumentId(path)
-  const comparePath = parseCompareSavedDocumentId(path)
-  const editorDocument = liveDocument?.path === path ? liveDocument : null
+  const comparison = target.kind === 'git-diff' ? target.source : null
+  const comparePath = target.kind === 'compare-saved' ? target.file.path : null
+  const resource = filesystemResource(target)
+  const key = documentKey(target)
+  const editorDocument = liveDocument?.key === key ? liveDocument : null
   const ownsCurrentTab = editorDocument !== null
   const currentActions = ownsCurrentTab ? actions : null
   const currentReferences = currentActions ? languageServerReferences : null
   const { appliedThemeId, committedThemeId, selectedThemeId } = useEditorColorTheme()
-  const snapshotActive = active && !diffDocument && !comparePath
+  const snapshotActive = active && resource !== null
   const visibleSnapshot = useEditorVisibleSnapshot({
     storage,
     active: snapshotActive,
-    renderedDocument: editorDocument
-      ? {
-          buffer: editorDocument.buffer,
-          documentId: editorDocument.id,
-          path: editorDocument.path,
-          rootPath,
-        }
+    renderedDocument:
+      editorDocument && resource
+        ? {
+            buffer: editorDocument.buffer,
+            documentKey: editorDocument.key,
+            path: resource.path,
+            rootPath,
+          }
+        : null,
+    selectedTarget: resource
+      ? { contentVersion: fileVersion, path: resource.path, rootPath }
       : null,
-    selectedTarget: { contentVersion: fileVersion, path, rootPath },
     theme: { appliedThemeId, committedThemeId, selectedThemeId },
   })
 
   function recordInitialPaint(event: EditorInitialPaintEvent) {
-    fileOpenIntent.recordInitialPaint(path, event)
+    if (resource) fileOpenIntent.recordInitialPaint(resource.path, event)
   }
 
-  if (diffDocument) {
+  if (comparison) {
     return (
-      <DiffView
-        documentInfo={diffDocument}
-        languageHost={actions}
-        rootPath={rootPath}
-        tabId={tabId}
-      />
+      <DiffView comparison={comparison} languageHost={actions} rootPath={rootPath} tabId={tabId} />
     )
   }
 
@@ -110,8 +111,8 @@ export function FileEditorBody({
           additionalPlugins={visibleSnapshot.additionalPlugins}
           definitionTarget={currentActions ? definitionTarget : null}
           document={editorDocument}
-          documentKey={visibleSnapshot.documentKey}
-          path={path}
+          paintKey={visibleSnapshot.paintKey}
+          target={target}
           snapshot={visibleSnapshot.snapshot}
           onCaptureSourceChange={visibleSnapshot.onCaptureSourceChange}
           rootPath={rootPath}
@@ -119,8 +120,8 @@ export function FileEditorBody({
           onInitialPaint={recordInitialPaint}
           onScrollPositionChange={
             currentActions
-              ? (changedPath, scrollPosition) => {
-                  if (changedPath !== path) return
+              ? (changedKey, scrollPosition) => {
+                  if (changedKey !== key) return
 
                   currentActions.setScrollPosition(scrollPosition)
                 }

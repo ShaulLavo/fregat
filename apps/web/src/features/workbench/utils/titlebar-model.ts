@@ -1,4 +1,4 @@
-import { documentLabel } from '@/features/workspace/utils/document-label'
+import { tabLabel } from '@/lib/documents/utils/labels'
 import type { PickedFsEntry } from '@/lib/file-system-types'
 import {
   activeEditorTabForWorkbenchPanels,
@@ -36,7 +36,7 @@ export function titlebarModel(
 
   const activeTab = activeEditorTabForWorkbenchPanels(panels)
   return {
-    documentTitle: activeTab ? documentLabel(activeTab.path) : 'Workbench',
+    documentTitle: activeTab ? tabLabel(activeTab.content) : 'Workbench',
     gridTemplateColumns: `${layout.outerLayout.sidebar}% minmax(0, 1fr) auto`,
     workspaceTitle: rootFolder.name,
   }

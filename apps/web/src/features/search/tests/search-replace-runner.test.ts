@@ -1,3 +1,4 @@
+import { fileDocumentKey, filesystemPath } from '@/lib/documents/utils/identity'
 import { QueryClient } from '@tanstack/react-query'
 import { readFile, writeFile } from 'node:fs/promises'
 import { join } from 'node:path'
@@ -54,7 +55,12 @@ test.describe('workspace search replacement runner', () => {
     const service = new WorkspaceEditService({
       documentStore: store,
       fileSync,
-      getRoot: () => ({ generation: 1, path: '', uriPath: '/', workspacePath: '' }),
+      getRoot: () => ({
+        generation: 1,
+        path: filesystemPath(''),
+        uriPath: filesystemPath('/'),
+        workspacePath: filesystemPath(''),
+      }),
     })
     const phases: WorkspaceEditServicePhase[] = []
     const unsubscribe = service.subscribe(() => {
@@ -67,11 +73,17 @@ test.describe('workspace search replacement runner', () => {
       context: {
         applyWorkspaceChange: service.applyWorkspaceChange,
         fetchFile: async (filePath, signal) => {
-          const file = await fetchFile(filePath, signal, client)
+          const file = await fetchFile(filesystemPath(filePath), signal, client)
           await writeFile(diskPath, 'prefix needle')
           return file
         },
-        getLiveEditorDocument: store.getState().getLiveEditorDocument,
+        getLiveEditorDocument: (path) => {
+          const document = store
+            .getState()
+            .getLiveEditorDocument(fileDocumentKey(filesystemPath(path)))
+          if (document?.target.kind !== 'file') return null
+          return { path: document.target.resource.path, buffer: document.buffer }
+        },
         rootPath: '/',
         signal: new AbortController().signal,
       },
@@ -220,7 +232,7 @@ function createHarness(options: { readonly failFinalize?: boolean } = {}) {
     createOperationId: () => OPERATION_ID,
     documentStore: store,
     fileSync,
-    getRoot: () => ({ generation: 1, path: ROOT }),
+    getRoot: () => ({ generation: 1, path: filesystemPath(ROOT) }),
     inspectPath: async (path, signal) => {
       signal.throwIfAborted()
       const file = files.get(path)
@@ -247,7 +259,13 @@ function runReplace(harness: Harness, matches: readonly WorkspaceSearchMatch[]) 
         nextSignal.throwIfAborted()
         return requiredFile(harness, path)
       },
-      getLiveEditorDocument: harness.store.getState().getLiveEditorDocument,
+      getLiveEditorDocument: (path) => {
+        const document = harness.store
+          .getState()
+          .getLiveEditorDocument(fileDocumentKey(filesystemPath(path)))
+        if (document?.target.kind !== 'file') return null
+        return { path: document.target.resource.path, buffer: document.buffer }
+      },
       rootPath: ROOT,
       signal,
     },
@@ -277,7 +295,7 @@ function fileResult(path: string, content: string, mtimeMs: number): FileResult 
   return {
     content,
     mtimeMs,
-    path,
+    path: filesystemPath(path),
     size: new TextEncoder().encode(content).byteLength,
     version: `test:${mtimeMs}:${content.length}`,
   }
@@ -288,7 +306,7 @@ function treeEntry(path: string, content: string, mtimeMs: number): TreeEntry {
     birthtimeMs: mtimeMs,
     mtimeMs,
     name: path.split('/').at(-1) ?? path,
-    path,
+    path: filesystemPath(path),
     size: new TextEncoder().encode(content).byteLength,
     type: 'file',
     version: `test:${mtimeMs}:${content.length}`,

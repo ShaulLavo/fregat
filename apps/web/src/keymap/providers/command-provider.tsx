@@ -2,7 +2,7 @@ import { selectSettingsSearch } from '@/features/settings/state/search-store'
 import { selectSettingsView } from '@/features/settings/state/view-store'
 import { selectSettingsScope } from '@/features/settings/state/scope-store'
 import { useEditorRuntime } from '@/features/editor/hooks/use-runtime'
-import { MachinePickerDialog } from '@/components/machine-picker-dialog'
+import { PickerDialog } from '@/features/environments/components/picker-dialog'
 import { useEffect, useLayoutEffect, useMemo, useRef, useState, type ReactNode } from 'react'
 import { useQueryClient } from '@tanstack/react-query'
 import { DEFAULT_SETTING_VALUES, type SettingsSnapshot } from '@workspace/contracts'
@@ -18,7 +18,6 @@ import {
   useEditorWorkspaceStoreApi,
   useEditorWorkspaceState,
 } from '@/features/editor/state/workspace-state'
-import { isSettingsDocumentId } from '@/features/settings/utils/document'
 import { useWorkspaceEditService } from '@/features/editor/providers/workspace-edit-context'
 import { useOpenFileAtRef } from '@/features/git/hooks/use-open-file-at-ref'
 import { SettingsDialog } from '@/features/settings/components/dialog'
@@ -112,7 +111,7 @@ export function CommandProvider({ children }: { readonly children: ReactNode }) 
     'switch' | 'connect' | 'disconnect' | null
   >(null)
   const settingsOpen = useEditorWorkspaceState(
-    (state) => state.rootFolder === null && isSettingsDocumentId(state.selectedFilePath ?? ''),
+    (state) => state.rootFolder === null && state.selectedTabContent?.kind === 'settings',
   )
   const [settingsOrigin, setSettingsOrigin] = useState<FocusTargetToken | null>(null)
   const adaptersRef = useRef(
@@ -205,6 +204,8 @@ export function CommandProvider({ children }: { readonly children: ReactNode }) 
       moveTabToPane: (...args) => adaptersRef.current.editor.moveTabToPane(...args),
       moveTabToSplit: (...args) => adaptersRef.current.editor.moveTabToSplit(...args),
       openDefinition: (...args) => adaptersRef.current.editor.openDefinition(...args),
+      openTabContent: (...args) => adaptersRef.current.editor.openTabContent(...args),
+      selectContent: (...args) => adaptersRef.current.editor.selectContent(...args),
       openFileSurface: (...args) => adaptersRef.current.editor.openFileSurface(...args),
       openSearchEditor: (...args) => adaptersRef.current.editor.openSearchEditor(...args),
       openSettingsEditor: (...args) => adaptersRef.current.editor.openSettingsEditor(...args),
@@ -365,7 +366,7 @@ export function CommandProvider({ children }: { readonly children: ReactNode }) 
     <CommandContext value={value}>
       {children}
       {environmentDialog ? (
-        <MachinePickerDialog mode={environmentDialog} onClose={() => setEnvironmentDialog(null)} />
+        <PickerDialog mode={environmentDialog} onClose={() => setEnvironmentDialog(null)} />
       ) : null}
       <AppKeymapController />
       <CommandPalette />

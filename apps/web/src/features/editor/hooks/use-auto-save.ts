@@ -2,8 +2,8 @@ import { Debouncer } from '@tanstack/react-pacer/debouncer'
 import { useEditorRuntime } from '@/features/editor/hooks/use-runtime'
 import { useEffect } from 'react'
 
-import { fileBackedDocumentPath } from '@/features/editor/utils/file-backed-document'
-import { isDirtyLiveEditorDocument } from '@/features/editor/utils/save'
+import type { DocumentKey } from '@/lib/documents/utils/types'
+import { filePathsForDocumentKeys, isDirtyLiveEditorDocument } from '@/features/editor/utils/save'
 import { useOptionalWorkspaceEditService } from '@/features/editor/providers/workspace-edit-context'
 import type { WorkspaceMutationReporter } from '@/features/editor/state/workspace-edit-service'
 import { useEditorDocumentStoreApi } from '@/features/editor/state/document-state'
@@ -33,23 +33,27 @@ export function useAutoSave() {
 
     const saveDirtyDocuments = () => {
       const state = documentStore.getState()
-      const paths: string[] = []
-      for (const document of Object.values(state.liveDocumentsById)) {
+      const keys: DocumentKey[] = []
+      for (const document of Object.values(state.liveDocumentsByKey)) {
         if (document.sync.kind !== 'file') continue
 
-        const path = fileBackedDocumentPath(document.sync.path)
-        if (!path || !isDirtyLiveEditorDocument(state, path)) continue
-        paths.push(path)
+        if (document.target.kind !== 'file' || !isDirtyLiveEditorDocument(state, document.key))
+          continue
+        keys.push(document.key)
       }
 
-      if (paths.length === 0) return
+      if (keys.length === 0) return
       const save = (reportAffectedPaths?: WorkspaceMutationReporter) =>
-        saveService.saveMany(paths, (path) => reportAffectedPaths?.([path]))
+        saveService.saveMany(keys, (key) =>
+          reportAffectedPaths?.(filePathsForDocumentKeys(state, [key])),
+        )
       if (!workspaceEdits) {
         void save().catch(() => undefined)
         return
       }
-      void workspaceEdits.runWorkspaceMutation(paths, save).catch(() => undefined)
+      void workspaceEdits
+        .runWorkspaceMutation(filePathsForDocumentKeys(state, keys), save)
+        .catch(() => undefined)
     }
 
     if (mode !== 'afterDelay') {
@@ -58,7 +62,7 @@ export function useAutoSave() {
       return () => window.removeEventListener('blur', saveDirtyDocuments)
     }
 
-    // Subscribed to the content revisions, not to `dirtyFilePaths`: the dirty
+    // Subscribed to the content revisions, not to `dirtyDocumentKeys`: the dirty
     // set changes only when a file crosses clean↔dirty, so debouncing on it
     // would fire once when typing starts and then save mid-word `delay` later —
     // the opposite of quiet time. Revisions change on every edit, which is what

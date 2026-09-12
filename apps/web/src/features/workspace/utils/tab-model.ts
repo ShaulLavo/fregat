@@ -1,53 +1,34 @@
+import type { GitFileStatus } from '@workspace/contracts'
 import type {
   EditorTabConflictMap,
   EditorTabDiffSource,
   EditorTabModel,
 } from '@/features/workspace/utils/tab-types'
-import {
-  conflictDiffDocumentLabel,
-  conflictDiffDocumentTitle,
-  parseConflictDiffDocumentId,
-} from '@/features/editor/utils/conflict-diff-document'
-import { parseCompareSavedDocumentId } from '@/features/editor/utils/compare-saved-document'
-import { parseRefDocumentId } from '@/features/git/utils/ref-document'
-import { documentLabel } from '@/features/workspace/utils/document-label'
-import { isSettingsDocumentId } from '@/features/settings/utils/document'
-import {
-  diffDocumentShortHash,
-  diffDocumentTitle,
-  parseDiffDocumentId,
-  type DiffDocumentInfo,
-} from '@/features/git/utils/diff-document'
 import { gitStatusSymbol, type GitSymbolSource } from '@/features/git/utils/status-symbols'
-import type { FileStatus } from '@/features/git/utils/types'
-import {
-  parseSearchBufferDocumentId,
-  searchBufferDocumentTitle,
-} from '@/features/search/utils/buffer-document'
-import { iconForEntry } from '@/lib/file-icons'
-import { basename, displayPath } from '@/lib/path-formatters'
 
-export const EMPTY_GIT_FILES: readonly FileStatus[] = []
+import { iconForEntry } from '@/lib/file-icons'
+import { basename } from '@/lib/path-formatters'
+import { documentSourcePath } from '@/lib/documents/utils/capabilities'
+import {
+  comparisonShortHash,
+  tabCopyPath,
+  tabIconName,
+  tabLabel,
+  tabTitle,
+} from '@/lib/documents/utils/labels'
+import type {
+  EditorTabRecord,
+  GitComparison,
+  TabContent,
+  TabId,
+  WorkspaceRoot,
+} from '@/lib/documents/utils/types'
+
+export const EMPTY_GIT_FILES: readonly GitFileStatus[] = []
 
 export type EditorSplitDirection = 'horizontal' | 'vertical'
 export type EditorSnapZone = 'bottom' | 'center' | 'left' | 'right' | 'top'
 export type EditorSplitScope = 'pane' | 'root'
-
-export type EditorTabRecord = {
-  readonly id: string
-  readonly path: string
-}
-
-// Tab ids are persisted with the workspace layout, so they must stay unique
-// across reloads and HMR — a counter here resets and collides with restored
-// ids, routing tab clicks to the wrong surface.
-// TODO: replace crypto.randomUUID with fast-ulid.
-export function createEditorTabRecord(path: string): EditorTabRecord {
-  return {
-    id: `editor-tab:${crypto.randomUUID()}`,
-    path,
-  }
-}
 
 export function editorTabModel({
   conflicts,
@@ -57,92 +38,34 @@ export function editorTabModel({
   tab,
 }: {
   conflicts: EditorTabConflictMap
-  gitFiles: readonly FileStatus[]
-  rootPath: string
-  selectedTabId: string | null
+  gitFiles: readonly GitFileStatus[]
+  rootPath: WorkspaceRoot
+  selectedTabId: TabId | null
   tab: EditorTabRecord
 }): EditorTabModel {
-  const path = tab.path
-  const diffChange = tabDiffChange(path, gitFiles, rootPath)
+  const content = tab.content
+  const diffChange = tabDiffChange(content, gitFiles, rootPath)
   const diffStatus = diffChange ? gitStatusSymbol(diffChange.status, diffChange.source) : null
-  const diffHash = diffDocumentShortHash(path)
-  const copyPath = tabCopyPath(path, conflicts)
+  const diffHash =
+    content.kind === 'document' && content.document.kind === 'git-diff'
+      ? comparisonShortHash(content.document.source)
+      : ''
+  const facts = { conflictPath: conflictForTab(content, conflicts)?.remotePath }
+  const copyPath = tabCopyPath(content, facts)
 
   return {
     active: tab.id === selectedTabId,
+    content,
     copyPath,
     copyRelativePath: tabRelativeCopyPath(copyPath, rootPath),
-    diffSource: tabDiffSource(path, conflicts, diffChange),
+    diffSource: tabDiffSource(content, conflicts, diffChange),
     diffStatus,
     diffSuffix: tabDiffSuffix(diffHash, diffStatus?.label),
     id: tab.id,
-    icon: iconForEntry({
-      name: iconName(path, conflicts),
-      type: 'file',
-    }),
-    name: tabName(path, conflicts),
-    path,
-    title: tabTitle(path, conflicts),
+    icon: iconForEntry({ name: tabIconName(content, facts), type: 'file' }),
+    name: tabLabel(content, facts),
+    title: tabTitle(content, facts),
   }
-}
-
-function iconName(path: string, conflicts: EditorTabConflictMap) {
-  const diff = parseDiffDocumentId(path)
-  const searchBuffer = parseSearchBufferDocumentId(path)
-  if (searchBuffer) return 'search.txt'
-  if (diff) return basename(diff.path)
-  const conflict = conflictForDocument(path, conflicts)
-  if (conflict) return basename(conflict.remotePath)
-  if (parseConflictDiffDocumentId(path)) return 'conflict.txt'
-  // Resolves to the gear through the `settings` stem, which is the whole point:
-  // the settings tab reads as itself in a strip of file icons.
-  if (isSettingsDocumentId(path)) return 'settings.json'
-  const compared = parseCompareSavedDocumentId(path)
-  if (compared) return basename(compared)
-  const atRef = parseRefDocumentId(path)
-  if (atRef) return basename(atRef.path)
-
-  return basename(path)
-}
-
-function tabName(path: string, conflicts: EditorTabConflictMap) {
-  const conflict = conflictForDocument(path, conflicts)
-  if (conflict) return conflictDiffDocumentLabel(conflict.remotePath)
-
-  return documentLabel(path)
-}
-
-function tabTitle(path: string, conflicts: EditorTabConflictMap) {
-  if (parseDiffDocumentId(path)) return diffDocumentTitle(path)
-  const searchBuffer = parseSearchBufferDocumentId(path)
-  if (searchBuffer) return searchBufferDocumentTitle(searchBuffer.rootPath)
-  const conflict = conflictForDocument(path, conflicts)
-  if (conflict) return conflictDiffDocumentTitle(conflict.remotePath)
-  if (parseConflictDiffDocumentId(path)) return 'Filesystem conflict editor'
-  const comparedTitle = parseCompareSavedDocumentId(path)
-  if (comparedTitle) return `${displayPath(comparedTitle)} — working tree vs saved`
-  const atRefTitle = parseRefDocumentId(path)
-  if (atRefTitle) return `${displayPath(atRefTitle.path)} at ${atRefTitle.ref}`
-  return displayPath(path)
-}
-
-function tabCopyPath(path: string, conflicts: EditorTabConflictMap) {
-  const diff = parseDiffDocumentId(path)
-  if (diff) return diff.path
-
-  const searchBuffer = parseSearchBufferDocumentId(path)
-  if (searchBuffer) return searchBuffer.rootPath
-
-  const compared = parseCompareSavedDocumentId(path)
-  if (compared) return compared
-
-  const atRef = parseRefDocumentId(path)
-  if (atRef) return atRef.path
-
-  const conflict = conflictForDocument(path, conflicts)
-  if (conflict) return conflict.remotePath
-
-  return path
 }
 
 function tabRelativeCopyPath(path: string, rootPath: string) {
@@ -165,19 +88,16 @@ function normalizedCopyPath(path: string) {
 
 type TabDiffChange = {
   source: GitSymbolSource
-  status: FileStatus['index'] | FileStatus['worktree']
+  status: GitFileStatus['index'] | GitFileStatus['worktree']
 }
 
 function tabDiffChange(
-  path: string,
-  files: readonly FileStatus[],
+  content: TabContent,
+  files: readonly GitFileStatus[],
   rootPath: string,
 ): TabDiffChange | null {
-  if (parseConflictDiffDocumentId(path)) return null
-  if (parseSearchBufferDocumentId(path)) return null
-
-  const diff = parseDiffDocumentId(path)
-  if (!diff) return null
+  if (content.kind !== 'document' || content.document.kind !== 'git-diff') return null
+  const diff = content.document.source
 
   const file = files.find((file) => diffStatusMatchesFile(diff, file, rootPath))
   const live = file ? liveChangeForDiff(diff, file) : null
@@ -187,39 +107,22 @@ function tabDiffChange(
   return { source: 'historical', status: diff.status }
 }
 
-/**
- * A diff tab knows which file it is showing, so the tab menu can jump to it.
- * Session and turn checkpoint diffs span many files and have no single target.
- */
 function tabDiffSource(
-  path: string,
+  content: TabContent,
   conflicts: EditorTabConflictMap,
   change: TabDiffChange | null,
 ): EditorTabDiffSource | null {
-  const conflict = conflictForDocument(path, conflicts)
+  const conflict = conflictForTab(content, conflicts)
   if (conflict) return { onDisk: true, path: conflict.remotePath }
-
-  const diff = parseDiffDocumentId(path)
-  if (!diff) return null
-
-  const sourcePath = diffSourcePath(diff)
-  if (!sourcePath) return null
-
-  return { onDisk: change?.status !== 'deleted', path: sourcePath }
+  if (content.kind !== 'document' || content.document.kind !== 'git-diff') return null
+  const path = documentSourcePath(content.document)
+  if (path === null) return null
+  return { onDisk: change?.status !== 'deleted', path }
 }
 
-function diffSourcePath(diff: DiffDocumentInfo) {
-  if (diff.kind === 'snapshot') return diff.path
-  if ((diff.query.scope ?? 'file') !== 'file') return null
-
-  return diff.query.filePath ?? diff.path
-}
-
-function conflictForDocument(path: string | null | undefined, conflicts: EditorTabConflictMap) {
-  const conflictDiff = parseConflictDiffDocumentId(path)
-  if (!conflictDiff) return null
-
-  return conflicts[conflictDiff.conflictId] ?? null
+function conflictForTab(content: TabContent, conflicts: EditorTabConflictMap) {
+  if (content.kind !== 'document' || content.document.kind !== 'conflict') return null
+  return conflicts[content.document.conflictId] ?? null
 }
 
 function tabDiffSuffix(hash: string, status: string | undefined) {
@@ -229,11 +132,11 @@ function tabDiffSuffix(hash: string, status: string | undefined) {
   return `(${hash} ${status})`
 }
 
-function diffStatusMatchesFile(diff: DiffDocumentInfo, file: FileStatus, rootPath: string) {
+function diffStatusMatchesFile(diff: GitComparison, file: GitFileStatus, rootPath: string) {
   return pathSetsOverlap(diffStatusPaths(diff), statusPaths(file), rootPath)
 }
 
-function liveChangeForDiff(diff: DiffDocumentInfo, file: FileStatus): TabDiffChange | null {
+function liveChangeForDiff(diff: GitComparison, file: GitFileStatus): TabDiffChange | null {
   const preferred = diff.kind === 'snapshot' ? diff.source : undefined
   const source = liveSymbolSource(file, preferred)
   if (!source) return null
@@ -242,7 +145,7 @@ function liveChangeForDiff(diff: DiffDocumentInfo, file: FileStatus): TabDiffCha
 }
 
 function liveSymbolSource(
-  file: FileStatus,
+  file: GitFileStatus,
   preferred: GitSymbolSource | undefined,
 ): GitSymbolSource | null {
   if (preferred === 'staged' && isStagedStatus(file.index)) return 'staged'
@@ -253,30 +156,32 @@ function liveSymbolSource(
   return null
 }
 
-function statusForSymbolSource(file: FileStatus, source: GitSymbolSource) {
+function statusForSymbolSource(file: GitFileStatus, source: GitSymbolSource) {
   if (source === 'staged') return file.index
   if (source === 'worktree') return file.worktree
 
   return file.status
 }
 
-function isStagedStatus(status: FileStatus['index']) {
+function isStagedStatus(status: GitFileStatus['index']) {
   return status !== 'unmodified' && status !== 'untracked'
 }
 
-function isWorktreeStatus(status: FileStatus['worktree']) {
+function isWorktreeStatus(status: GitFileStatus['worktree']) {
   return status !== 'unmodified'
 }
 
-function diffStatusPaths(diff: DiffDocumentInfo) {
-  return [diff.path, diff.query.oldPath].filter(isPresentPath)
+function diffStatusPaths(diff: GitComparison) {
+  return [documentSourcePath({ kind: 'git-diff', source: diff }), diff.oldPath].filter(
+    isPresentPath,
+  )
 }
 
-function statusPaths(file: FileStatus) {
+function statusPaths(file: GitFileStatus) {
   return [file.path, file.oldPath].filter(isPresentPath)
 }
 
-function isPresentPath(path: string | undefined): path is string {
+function isPresentPath<T extends string>(path: T | null | undefined): path is T {
   return Boolean(path)
 }
 

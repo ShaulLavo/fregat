@@ -1,3 +1,5 @@
+import { filesystemPath } from '@/lib/documents/utils/identity'
+import type { FilesystemPath } from '@/lib/documents/utils/types'
 import { clientForQueryClient } from '@/lib/environments/state/query-clients'
 import type { LoadState } from '@/lib/load-state'
 import { fetchQuickOpenFiles } from '@/lib/file-server'
@@ -17,7 +19,7 @@ type UseCommandPaletteFilesOptions = {
   readonly mode: QuickAccessMode
   readonly open: boolean
   readonly query: string
-  readonly rootPath: string | null
+  readonly rootPath: FilesystemPath | null
   readonly treeState: LoadState<TreeModel>
 }
 
@@ -31,13 +33,13 @@ export function useCommandPaletteFiles({
   const [selectedFileItemValue, setSelectedFileItemValue] = useState<string | null>(null)
   const fileQuery = query.trim()
   const baseFileItems = filePaletteItems(treeState)
-  const fileSearchEnabled = open && mode === 'files' && Boolean(rootPath && fileQuery)
+  const fileSearchEnabled = open && mode === 'files' && rootPath !== null && fileQuery.length > 0
   const fileSearchQuery = useQuery({
     enabled: fileSearchEnabled,
     queryFn: ({ signal, client }) =>
       fetchQuickOpenFiles(
         {
-          path: rootPath ?? '',
+          path: rootPath ?? filesystemPath(''),
           query: fileQuery,
           signal,
         },

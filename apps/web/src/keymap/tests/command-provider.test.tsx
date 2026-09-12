@@ -1,3 +1,4 @@
+import { filesystemPath } from '@/lib/documents/utils/identity'
 import { selectSettingsSearch } from '@/features/settings/state/search-store'
 import { selectSettingsCategory } from '@/features/settings/state/category-store'
 import { selectSettingsView } from '@/features/settings/state/view-store'
@@ -215,7 +216,7 @@ test.for([
     try {
       const remoteBefore = await fetchSettings(undefined, remoteClient)
       editor.setQueryData(settingsKeys.document(), remoteBefore)
-      const root = await createFolderPath('remote-project', remoteClient)
+      const root = await createFolderPath(filesystemPath('remote-project'), remoteClient)
       const application = createTestApplicationRuntime()
       await application.openEnvironmentWorkspaceRoot(activeEnvironmentId(), root.path)
       view = renderCommandProvider(editor, primary, application)

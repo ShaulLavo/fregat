@@ -1,3 +1,4 @@
+import { documentKey, settingsJsonDocument } from '@/lib/documents/utils/identity'
 import { QueryClient } from '@tanstack/react-query'
 import { afterEach } from 'vitest'
 
@@ -13,7 +14,6 @@ import { readLiveSettingsProjection } from '@/features/settings/state/live-proje
 import { admitSettingsMutationResult } from '@/features/settings/state/snapshot-admission'
 import { SettingsSyncService } from '@/features/settings/state/sync-service'
 import { fetchSettings, saveSettings } from '@/features/settings/utils/api'
-import { settingsJsonDocumentId } from '@/features/settings/utils/json-document'
 import { settingsKeys } from '@workspace/client-core/settings/query-keys'
 import { activeServerOrigin, getClient, setActiveServerOrigin, setClient } from '@/lib/client'
 import { registerEnvironmentQueryClient } from '@/lib/environments/state/query-clients'
@@ -74,20 +74,14 @@ test('an unfinished raw save retries on its original server after a switch', asy
   const secondClient = createInProcessClient(secondServer)
   const queryClient = createTestQueryClient()
   const documentStore = createEditorDocumentStore()
-  const documentId = settingsJsonDocumentId('user')
+  const documentId = documentKey(settingsJsonDocument('user'))
   const before = await fetchSettings(undefined, controlledClient.client)
   const secondBefore = await fetchSettings(undefined, secondClient)
   const origin = activeServerOrigin()
   const service = new SettingsSyncService(documentStore, queryClient)
-  documentStore.getState().ensureUnsyncedEditorDocument({
+  documentStore.getState().ensureSettingsDocument(settingsJsonDocument('user'), {
     content: '{ "editor.fontSize": 21 }\n',
-    id: documentId,
-    sync: {
-      kind: 'settings',
-      revision: before.layers.find((layer) => layer.id === 'user')?.file?.revision ?? '',
-      state: 'idle',
-      target: 'user',
-    },
+    revision: before.layers.find((layer) => layer.id === 'user')?.file?.revision ?? '',
   })
   controlledClient.controller.rejectNextSettingsRawWrite({
     code: 'settings.WRITE_CONTENDED',

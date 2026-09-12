@@ -29,10 +29,9 @@ import { useLanguageServerPlugin } from '@/features/editor/hooks/use-lsp-plugin'
 import { useDiagnosticPeek } from '@/features/editor/hooks/use-diagnostic-peek'
 import type { LanguageServerDocumentTarget } from '@/features/editor/utils/language-server-plugin'
 import { editorPerformanceLayoutVariant } from '@/features/editor/state/performance-trace'
-import {
-  fileBackedDocumentPath,
-  savableDocumentPath,
-} from '@/features/editor/utils/file-backed-document'
+import { documentKey } from '@/lib/documents/utils/identity'
+import { documentSourcePath, filesystemResource } from '@/lib/documents/utils/capabilities'
+import type { DocumentKey, DocumentRef, FilesystemPath, TabId } from '@/lib/documents/utils/types'
 import { useFocusTarget } from '@/lib/focus/hooks/use-target'
 import type {
   DocumentSessionChange,
@@ -51,22 +50,22 @@ const NO_ADDITIONAL_PLUGINS: readonly EditorPlugin[] = []
 type EditorProps = {
   active: boolean
   document: EditorRenderDocument | null
-  documentKey?: string | null
-  path?: string
+  paintKey?: string | null
+  target: DocumentRef
   snapshot?: string | null
   onCaptureSourceChange?: (source: SnapshotCaptureSource | null) => void
 
   languageServerTarget?: LanguageServerDocumentTarget
   additionalPlugins?: readonly EditorPlugin[]
-  rootPath: string
-  tabId: string
+  rootPath: FilesystemPath
+  tabId: TabId
   definitionTarget?: LanguageServerDefinitionTarget | null
   onOpenDefinition?: (target: LanguageServerDefinitionTarget) => void | boolean
   onOpenReferences?: (result: LanguageServerReferencesResult) => void | boolean
   onInitialPaint?: (event: EditorInitialPaintEvent) => void
-  onScrollPositionChange?: (path: string, scrollPosition: EditorScrollPosition) => void
+  onScrollPositionChange?: (key: DocumentKey, scrollPosition: EditorScrollPosition) => void
   onStatusSourceChange?: (source: EditorStatusBarSource) => void
-  onTextChange?: (tabId: string, path: string, change: DocumentSessionChange) => void
+  onTextChange?: (tabId: TabId, key: DocumentKey, change: DocumentSessionChange) => void
 }
 
 export function Editor({
@@ -74,8 +73,8 @@ export function Editor({
   additionalPlugins = NO_ADDITIONAL_PLUGINS,
   definitionTarget,
   document: liveDocument,
-  documentKey,
-  path: requestedPath,
+  paintKey,
+  target,
   snapshot,
   onCaptureSourceChange,
 
@@ -91,7 +90,10 @@ export function Editor({
 }: EditorProps) {
   const [provisional, setProvisional] = useState(false)
   const unavailable = useUnavailableEnvironment()
-  const filePath = liveDocument?.path ?? requestedPath ?? ''
+  const currentTarget = liveDocument?.target ?? target
+  const key = liveDocument?.key ?? documentKey(target)
+  const resource = filesystemResource(currentTarget)
+  const filePath = languageServerTarget?.matchPath ?? documentSourcePath(currentTarget) ?? ''
   const editability = unavailable || !liveDocument ? 'readonly' : liveDocument.editability
   const { appliedThemeContentHash, appliedThemeId, editorTheme, selectedThemeId } =
     useEditorColorTheme()
@@ -106,7 +108,11 @@ export function Editor({
   const mountedEditors = useMountedEditorRegistry()
   const diagnosticPeek = useDiagnosticPeek({ active, filePath })
   const { languageServer, languageServerStatusSource } = useLanguageServerPlugin({
-    enabled: active && liveDocument !== null && unavailable === null,
+    enabled:
+      active &&
+      liveDocument !== null &&
+      unavailable === null &&
+      (resource !== null || languageServerTarget !== undefined),
     filePath,
     languageServerTarget,
     rootPath,
@@ -115,20 +121,32 @@ export function Editor({
     onDidNavigateDiagnostic: diagnosticPeek.onDidNavigateDiagnostic,
   })
   const scrollPersistencePlugin = useScrollPersistencePlugin({
-    document: { path: filePath },
+    document: { key },
     onScrollPositionChange: liveDocument ? onScrollPositionChange : undefined,
   })
-  const documentLanguageId = languageIdForFilePath(filePath)
+  const documentLanguageId =
+    currentTarget.kind === 'settings-json' ? 'json' : languageIdForFilePath(filePath)
   // Stable tags keep an unrelated render from looking like a document reattachment.
   const preparedTags = useMemo(
     () =>
-      editorPreparedDocumentTags(filePath, {
-        appliedThemeContentHash,
-        appliedThemeId,
-        selectedThemeId,
-        syntaxHighlightingEnabled,
-      }),
-    [appliedThemeContentHash, appliedThemeId, filePath, selectedThemeId, syntaxHighlightingEnabled],
+      editorPreparedDocumentTags(
+        filePath,
+        {
+          appliedThemeContentHash,
+          appliedThemeId,
+          selectedThemeId,
+          syntaxHighlightingEnabled,
+        },
+        documentLanguageId,
+      ),
+    [
+      appliedThemeContentHash,
+      appliedThemeId,
+      documentLanguageId,
+      filePath,
+      selectedThemeId,
+      syntaxHighlightingEnabled,
+    ],
   )
   // Plugin identity controls native registration lifetime.
   const criticalEditorCorePlugins = useMemo(
@@ -159,7 +177,7 @@ export function Editor({
     () =>
       liveDocument
         ? {
-            documentId: liveDocument.id,
+            documentId: liveDocument.key,
             buffer: liveDocument.buffer,
             ...preparedTags,
             languageId: documentLanguageId,
@@ -178,14 +196,14 @@ export function Editor({
       rowBackground: true,
     },
     document,
-    documentKey,
+    documentKey: paintKey,
     snapshot: decodeMode ? null : snapshot,
     editability,
     keymap: HOSTED_EDITOR_KEYMAP,
     onChange: (_state, change) => {
       if (!liveDocument || !change || change.kind === 'selection' || change.kind === 'none') return
 
-      onTextChange?.(tabId, filePath, change)
+      onTextChange?.(tabId, key, change)
     },
     onInitialPaint,
     onPresentationChange: (state) => setProvisional(state === 'provisional'),
@@ -200,12 +218,12 @@ export function Editor({
     )
     return () => onCaptureSourceChange?.(null)
   }, [controller, decodeMode, onCaptureSourceChange])
+  const mountedPath = liveDocument ? resource?.path : undefined
   useLayoutEffect(
-    () => (liveDocument ? mountedEditors.register(filePath) : undefined),
-    [filePath, liveDocument, mountedEditors],
+    () => (mountedPath ? mountedEditors.register(mountedPath) : undefined),
+    [mountedPath, mountedEditors],
   )
-  const settingsSurface =
-    savableDocumentPath(filePath) !== null && fileBackedDocumentPath(filePath) === null
+  const settingsSurface = currentTarget.kind === 'settings-json'
   const focusTarget = useFocusTarget<HTMLDivElement>({
     area: 'editor',
     capabilities: {
@@ -217,7 +235,7 @@ export function Editor({
       },
     },
     id: {
-      key: liveDocument?.id ?? documentKey ?? filePath,
+      key,
       kind: 'editor',
       surface: settingsSurface ? 'settings' : 'document',
       tabId,
@@ -255,7 +273,7 @@ export function Editor({
         controller.getEditor()?.getScrollPosition() ?? scrollPositionFromSnapshot(snapshot)
       if (!scrollPosition) return
 
-      onScrollPositionChange?.(filePath, {
+      onScrollPositionChange?.(key, {
         left: scrollPosition.left,
         top:
           scrollPosition.top === undefined
@@ -263,7 +281,7 @@ export function Editor({
             : capOverscrollTop(scrollPosition.top, snapshot),
       })
     }
-  }, [controller, filePath, liveDocument, onScrollPositionChange])
+  }, [controller, key, liveDocument, onScrollPositionChange])
 
   useEffect(() => {
     if (!selection) return

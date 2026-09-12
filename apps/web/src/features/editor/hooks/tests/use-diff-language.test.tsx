@@ -1,3 +1,4 @@
+import { filesystemPath } from '@/lib/documents/utils/identity'
 import { createTextDiff } from '@singapor/diff'
 import type {
   LspManagedTransport,
@@ -36,7 +37,7 @@ import { expect, test } from '../../../../../test/fixtures'
 
 afterEach(resetLanguageServerConnectionPool)
 
-const ROOT_PATH = '/repo'
+const ROOT_PATH = filesystemPath('/repo')
 const SERVER_ID = 'typescript'
 const ACQUISITION_ORDERS = [
   ['normal', 'diff'],
@@ -114,7 +115,7 @@ async function assertInitializeContractAndHostPolicy(
   resetLanguageServerConnectionPool()
   WorkspaceEditSocket.reset()
   const harness = createHostPolicyHarness()
-  const targetUri = createSyntheticDiffTarget(harness.store)
+  const targetUri = createSyntheticDiffTarget()
   const host = harness.service.onApplyWorkspaceEdit
   const normal = testLaneOptions(
     languageServerLaneOptions({
@@ -175,7 +176,7 @@ async function assertInitializeContractAndHostPolicy(
     await Promise.all([normalLane.ready, diffLane.ready])
 
     const result = await dispatchDiffWorkspaceEdit(diff, diffLane, targetUri)
-    expect(result).toMatchObject({ code: 'unsupported-target', status: 'failed' })
+    expect(result).toMatchObject({ code: 'missing-target', status: 'failed' })
     expect(harness.service.getSnapshot()).toMatchObject({ phase: 'failed', preview: null })
     expect(harness.readFileContent).not.toHaveBeenCalled()
   } finally {
@@ -252,7 +253,7 @@ function createHostPolicyHarness() {
   }
 }
 
-function createSyntheticDiffTarget(store: ReturnType<typeof createEditorDocumentStore>): string {
+function createSyntheticDiffTarget(): string {
   const file = createTextDiff({
     newFile: { path: 'src/index.ts', text: 'const next = 2\n' },
     oldFile: { path: 'src/index.ts', text: 'const prior = 1\n' },
@@ -265,8 +266,6 @@ function createSyntheticDiffTarget(store: ReturnType<typeof createEditorDocument
   }).find((document) => document.side === 'old')
   if (!target) throw new RangeError('Diff did not create its synthetic old-side document')
 
-  const path = decodeURIComponent(new URL(target.uri).pathname)
-  store.getState().ensureUnsyncedEditorDocument({ content: target.text, id: path })
   return target.uri
 }
 

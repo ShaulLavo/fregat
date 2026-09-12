@@ -1,3 +1,4 @@
+import { filesystemPath } from '@/lib/documents/utils/identity'
 import type { QueryClient } from '@tanstack/react-query'
 import type { WorkspaceRootEntry } from '@workspace/contracts'
 import type { Navigation } from '@/state/navigation'
@@ -87,7 +88,12 @@ async function validateRootPath(
   client: Client,
 ) {
   try {
-    const result = await openWorkspaceRootPath(path, claimWorkspaceOpenGeneration(), signal, client)
+    const result = await openWorkspaceRootPath(
+      filesystemPath(path),
+      claimWorkspaceOpenGeneration(),
+      signal,
+      client,
+    )
     if (result.status === 'opened' && result.entry) confirm(result.entry)
   } catch (error) {
     if (signal.aborted) return

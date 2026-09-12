@@ -1,3 +1,4 @@
+import { filesystemResource } from '@/lib/documents/utils/capabilities'
 import type { ReactEditorController } from '@singapor/react'
 import { useEffect, useRef } from 'react'
 
@@ -6,7 +7,7 @@ import { rowStartOffset } from '@/features/editor/utils/position'
 
 type UseCommitMessageEditorFocusOptions = {
   controller: ReactEditorController
-  document: Pick<EditorRenderDocument, 'buffer' | 'path'> | null
+  document: Pick<EditorRenderDocument, 'buffer' | 'target'> | null
 }
 
 export function useCommitMessageEditorFocus({
@@ -18,13 +19,14 @@ export function useCommitMessageEditorFocus({
   useEffect(() => {
     const editor = controller.getEditor()
     if (!editor || !document) return
-    if (!isGitCommitMessagePath(document.path)) {
+    const path = filesystemResource(document.target)?.path
+    if (!path || !isGitCommitMessagePath(path)) {
       preparedPathRef.current = null
       return
     }
-    if (preparedPathRef.current === document.path) return
+    if (preparedPathRef.current === path) return
 
-    preparedPathRef.current = document.path
+    preparedPathRef.current = path
     const offset = rowStartOffset(document.buffer.getTextSnapshot(), 1)
     editor.setSelection(offset, offset, offset)
     editor.focus()

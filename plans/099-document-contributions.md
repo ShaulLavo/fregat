@@ -89,7 +89,7 @@ checkpoint blobs. The missing step is checkpoint content loading, not a separate
 
 Unit 2 must align source acquisition as well as contribution ownership. Resolve checkpoint ranges
 to immutable blob pairs, then reuse the regular complete-content path for each displayed file.
-Retain checkpoint identity and its query adapter as required by [Plan 098](098-document-and-tab-domain.md).
+Retain checkpoint identity and its query adapter as required by [completed Plan 098](../docs/document-and-tab-domain.md).
 Share the resolved content-loading stage without converting checkpoint tabs into snapshot tabs.
 Keep summary requests lightweight. Preserve checkpoint scope, file identity, environment ownership,
 and whitespace-display policy. Historical contents must never be replaced with current disk text
@@ -745,9 +745,8 @@ large payloads onto the system SSD as a side effect of verification.
 publication, common runtime with syntax consumers, minimap, LSP, remaining callers, string delivery verification,
 and complete validation. Writing the plan does not schedule production execution ahead of another lane.
 
-- [Plan 098](098-document-and-tab-domain.md) owns Platform document and tab identity. Map its
-  implemented identity to the Editor buffer incarnation. The current roadmap requires all of
-  098 to complete before any implementation of Plan 097 begins; preserve that order.
+- [completed Plan 098](../docs/document-and-tab-domain.md) owns Platform document and tab identity. Map its
+  implemented identity to the Editor buffer incarnation. Plan 098 is complete; Plan 097 has not started. Preserve its completed identity contract.
 - [Plan 097](097-async-operation-ownership.md) owns host operation provenance and WorkspaceEdit
   source evidence. Share its implemented captured owner/source types; do not create another host
   operation service. Baseline/publication work in units 0–1 can proceed independently. Public

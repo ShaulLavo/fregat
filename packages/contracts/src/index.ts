@@ -21,13 +21,7 @@ export {
   type WorkspaceRootEntry,
 } from './workspace-address'
 export { TUI_CLIENT_ORIGIN } from './client-origins'
-export {
-  generateSpreadOrderKeys,
-  isValidOrderKey,
-  orderKeyBetween,
-  planPinnedReorder,
-  sortByOrderKey,
-} from './order-key'
+export { isValidOrderKey, orderKeyBetween } from './order-key'
 export type {
   GitBaseRefChoice,
   GitBaseRefChoicesResult,

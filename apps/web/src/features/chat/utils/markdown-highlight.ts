@@ -1,4 +1,5 @@
 import type { HighlightResult } from '@streamdown/code'
+import { fnv1a32 } from '@workspace/client-core/address/path-hash'
 
 /** Rough per-token overhead: content string plus the style/attr objects around it. */
 const TOKEN_OVERHEAD_BYTES = 96
@@ -16,7 +17,7 @@ export function markdownHighlightCacheKey({
   readonly language: string
   readonly themeKey: string
 }) {
-  return `${themeKey}:${language}:${code.length}:${fnv1a32(code).toString(36)}`
+  return `${themeKey}:${language}:${code.length}:${(fnv1a32(code) >>> 0).toString(36)}`
 }
 
 export function estimateHighlightBytes(result: HighlightResult) {
@@ -42,14 +43,4 @@ export function completedCodePrefix(code: string) {
   if (lastNewline < 0) return { highlightable: '', trailing: code }
 
   return { highlightable: code.slice(0, lastNewline), trailing: code.slice(lastNewline + 1) }
-}
-
-function fnv1a32(value: string) {
-  let hash = 0x811c9dc5
-  for (let index = 0; index < value.length; index += 1) {
-    hash ^= value.charCodeAt(index)
-    hash = Math.imul(hash, 0x01000193) >>> 0
-  }
-
-  return hash
 }

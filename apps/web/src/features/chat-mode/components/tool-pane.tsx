@@ -1,3 +1,5 @@
+import type { GitFileStatus } from '@workspace/contracts'
+import { filesystemPath } from '@/lib/documents/utils/identity'
 import { Button } from '@workspace/ui/components/button'
 
 import { SearchPane } from '@/features/workspace/components/search-pane'
@@ -8,7 +10,7 @@ import { useSessionTerminalId } from '@/features/chat-mode/hooks/use-session-ter
 import { useSessionToolRoot } from '@/features/chat-mode/hooks/use-session-tool-root'
 import { useSessionDiffScope } from '@/features/chat/hooks/use-session-diff-scope'
 import { Panel as GitPanel } from '@/features/git/components/panel'
-import type { FileStatus } from '@/features/git/utils/types'
+
 import { LogsPanel } from '@/features/logs/components/panel'
 import { TerminalPanel } from '@/features/terminal/components/panel'
 import { CodePanel } from '@/features/workbench/components/code-panel'
@@ -30,7 +32,7 @@ export function ToolPane({
 }: {
   readonly conflicts: EditorTabConflictMap
 
-  readonly gitFiles: readonly FileStatus[]
+  readonly gitFiles: readonly GitFileStatus[]
   /** The project root. Individual tools act on the session's checkout below. */
   readonly rootPath: string
   readonly tab: ChatModeToolTab
@@ -52,11 +54,11 @@ export function ToolPane({
         conflicts={conflicts}
         gitFiles={gitFiles}
         panels={workbenchPanels}
-        rootPath={rootPath}
+        rootPath={filesystemPath(rootPath)}
       />
     )
   }
-  if (tab === 'files') return <FileNavigatorPanel rootPath={toolRoot} />
+  if (tab === 'files') return <FileNavigatorPanel rootPath={filesystemPath(toolRoot)} />
   if (tab === 'git') return gitToolPane(toolRoot, diffScope)
   if (tab === 'logs') {
     return (
@@ -132,7 +134,11 @@ function gitToolPane(rootPath: string, diffScope: SessionDiffScopeState) {
         })}
       </div>
       <div className='min-h-0 min-w-0 flex-1 overflow-hidden'>
-        {scope.kind === 'turn' ? turnScopeBody(diffScope) : <GitPanel rootPath={rootPath} />}
+        {scope.kind === 'turn' ? (
+          turnScopeBody(diffScope)
+        ) : (
+          <GitPanel rootPath={filesystemPath(rootPath)} />
+        )}
       </div>
     </section>
   )

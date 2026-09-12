@@ -1,4 +1,4 @@
-import { pruneScopedRecord } from '@/lib/environments/utils/scoped-record'
+import { pruneScopedRecord } from '@/features/chat/utils/scoped-record'
 import type { EnvironmentId } from '@workspace/contracts'
 import { createEnvironmentRecordPersistence } from '@/lib/environments/state/record-persistence'
 import type { ScopedStorage } from '@/lib/environments/state/scoped-storage'
@@ -74,12 +74,7 @@ export function resetChatChangedFilesExpansionStore() {
 }
 
 function persistChatChangedFilesExpansion() {
-  try {
-    expansionPersistence.persist(useChatChangedFilesExpansionStore.getState().expansionByKey)
-  } catch {
-    // A full or blocked localStorage costs the user a remembered disclosure
-    // state, which is not worth surfacing anywhere in the transcript.
-  }
+  expansionPersistence.persist(useChatChangedFilesExpansionStore.getState().expansionByKey)
 }
 
 function withExpansion(

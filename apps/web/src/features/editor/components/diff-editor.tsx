@@ -1,3 +1,4 @@
+import type { TabId } from '@/lib/documents/utils/types'
 import { createDiffRegionStore, type DiffFile, type DiffRegionStore } from '@singapor/diff'
 import {
   ResizableHandle,
@@ -31,7 +32,7 @@ export function DiffEditor({
   languageServer?: DiffLanguageServerContext | null
   mode: EditorDiffViewMode
   regions?: DiffRegionStore
-  tabId?: string
+  tabId?: TabId
 }) {
   const { editorTheme, registration, shikiTheme } = useEditorColorTheme()
   // Theme selection and its async Shiki registration landing both require new per-file sessions.

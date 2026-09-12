@@ -6,7 +6,18 @@ import {
   textSnapshotEqualsText,
 } from '@/features/editor/utils/text-snapshot'
 import type { PreparedFileOpenClaim } from '@/lib/file-open-intent/types'
-import type { SettingsWriteTarget } from '@workspace/contracts'
+import { documentKey, fileDocument, fileDocumentKey } from '@/lib/documents/utils/identity'
+import { filesystemResource } from '@/lib/documents/utils/capabilities'
+import { tabDocuments } from '@/lib/documents/utils/tabs'
+import type {
+  DocumentKey,
+  DocumentRef,
+  FilesystemPath,
+  ReopenScrollPosition,
+  SettingsDocumentRef,
+  TabId,
+  UnsyncedDocumentRef,
+} from '@/lib/documents/utils/types'
 
 import type { FileResult } from '@/lib/file-system-types'
 import {
@@ -30,41 +41,26 @@ export type SettingsDocumentSync =
       kind: 'settings'
       revision: string
       state: Exclude<LiveDocumentSyncState, 'conflict'>
-      target: SettingsWriteTarget
     }
   | {
       confirmedText: string | null
       kind: 'settings'
       revision: string | null
       state: 'conflict'
-      target: SettingsWriteTarget
     }
 
-/**
- * Where a document's contents came from, and therefore where a save sends them.
- *
- * `settings` exists because "can this be saved" and "is this a path on disk" are
- * different questions. A raw settings.json buffer is written through
- * `POST /settings/raw` — the fs routes only take workspace-relative paths, and
- * the settings file is addressed by layer rather than by path — so it is savable
- * without ever being file-backed. Keeping that on the document rather than in a
- * predicate over the id is what stops the save path from growing a second
- * spelling of the same question.
- */
 type LiveDocumentSync =
   | {
       fileVersion: string
       kind: 'file'
       mtimeMs: number
-      path: string
       state: LiveDocumentSyncState
     }
   | SettingsDocumentSync
   | {
-      affectedPaths: readonly string[]
+      affectedPaths: readonly FilesystemPath[]
       kind: 'recovery-conflict'
       operationId: string
-      path: string
     }
   | {
       kind: 'none'
@@ -73,24 +69,24 @@ type LiveDocumentSync =
 export type LiveEditorDocument = {
   readonly buffer: EditorTextBuffer
   readonly contentRevision: string
-  readonly id: string
+  readonly key: DocumentKey
   readonly localRevision: number
-  readonly path: string
+  readonly target: DocumentRef
   readonly sync: LiveDocumentSync
 }
 
 export type EditorDocumentView = {
-  readonly documentId: string
+  readonly documentKey: DocumentKey
   readonly preparedDocument: EditorPreparedDocument | null
   readonly scrollPosition?: EditorScrollPosition
-  readonly tabId: string
+  readonly tabId: TabId
   readonly view: EditorViewSession
 }
 
 export type LiveEditorViewDocument = LiveEditorDocument & {
   readonly preparedDocument: EditorPreparedDocument | null
   readonly scrollPosition?: EditorScrollPosition
-  readonly tabId: string
+  readonly tabId: TabId
   readonly view: EditorViewSession
 }
 
@@ -99,19 +95,19 @@ export type WorkspaceDocumentTargetStamp = {
   readonly bufferRevision: number
   readonly contentRevision: string
   readonly dirty: boolean
-  readonly documentId: string
+  readonly documentKey: DocumentKey
   readonly localRevision: number
-  readonly path: string
+  readonly path: FilesystemPath
   readonly snapshot: PieceTableSnapshot
   readonly sync: LiveEditorDocument['sync']
 }
 
 export type WorkspaceDocumentRenameProjection = {
-  readonly from: string
+  readonly from: FilesystemPath
   readonly kind: 'rename'
   readonly reservation: WorkspaceDocumentPathReservation | null
   readonly source: WorkspaceDocumentTargetStamp | null
-  readonly to: string
+  readonly to: FilesystemPath
 }
 
 export type WorkspaceDocumentDeleteProjection = {
@@ -136,8 +132,8 @@ export type WorkspaceDocumentPathReservation = {
 }
 
 export type WorkspaceDocumentPathReservationRequest = {
-  readonly canonicalPath: string
-  readonly expectedDocumentId: string | null
+  readonly canonicalPath: FilesystemPath
+  readonly expectedDocumentKey: DocumentKey | null
   readonly expectedPathOwnershipRevision: number
 }
 
@@ -152,7 +148,7 @@ export type ReleaseWorkspaceDocumentPathReservationResult = {
 export type WorkspaceDocumentMutationLeaseEntry = {
   readonly buffer: EditorTextBuffer
   readonly lease: DocumentMutationLease
-  readonly path: string
+  readonly path: FilesystemPath
 }
 
 export type WorkspaceDocumentMutationLeaseSet = {
@@ -162,11 +158,11 @@ export type WorkspaceDocumentMutationLeaseSet = {
 
 export type WorkspaceDocumentMutationLeaseResult =
   | { readonly leaseSet: WorkspaceDocumentMutationLeaseSet; readonly status: 'acquired' }
-  | { readonly path: string; readonly status: 'busy' | 'stale' }
+  | { readonly path: FilesystemPath; readonly status: 'busy' | 'stale' }
 
 export type WorkspaceDocumentRecoveryConflictResult =
-  | { readonly conflictedPaths: readonly string[]; readonly status: 'acquired' }
-  | { readonly path: string; readonly status: 'busy' | 'stale' }
+  | { readonly conflictedPaths: readonly FilesystemPath[]; readonly status: 'acquired' }
+  | { readonly path: FilesystemPath; readonly status: 'busy' | 'stale' }
 
 export type WorkspaceDocumentRecoveryLeaseTransfer = {
   readonly operationId: string
@@ -177,7 +173,7 @@ export type WorkspaceDocumentRecoveryLeaseTransferPreparationResult =
       readonly status: 'prepared'
       readonly transfer: WorkspaceDocumentRecoveryLeaseTransfer
     }
-  | { readonly path: string; readonly status: 'busy' | 'stale' }
+  | { readonly path: FilesystemPath; readonly status: 'busy' | 'stale' }
 
 type WorkspaceDocumentRecoveryConflictEntry = {
   readonly lease: DocumentMutationLease
@@ -186,39 +182,38 @@ type WorkspaceDocumentRecoveryConflictEntry = {
 }
 
 type WorkspaceDocumentRecoveryLeaseTransferData = {
-  readonly affectedPaths: readonly string[]
+  readonly affectedPaths: readonly FilesystemPath[]
   readonly leaseSet: WorkspaceDocumentMutationLeaseSet
   readonly operationId: string
   readonly retained: readonly {
     readonly document: LiveEditorDocument
     readonly entry: WorkspaceDocumentMutationLeaseEntry
+    readonly path: FilesystemPath
   }[]
 }
 
 export type UnsyncedLiveEditorDocumentInput = {
-  content: string
-  id: string
-  /** Omitted for a buffer nothing can write back, such as a conflict snapshot. */
-  sync?: Exclude<LiveDocumentSync, { kind: 'file' } | { kind: 'recovery-conflict' }>
+  readonly content: string
+  readonly target: UnsyncedDocumentRef
 }
 
 export type WorkspaceDocumentServiceState = {
-  documentContentRevisions: Readonly<Record<string, string>>
+  documentContentRevisions: Readonly<Record<DocumentKey, string>>
   dirtyContentRevision: number
-  dirtyFilePaths: ReadonlySet<string>
-  liveDocumentsById: Readonly<Record<string, LiveEditorDocument>>
+  dirtyDocumentKeys: ReadonlySet<DocumentKey>
+  liveDocumentsByKey: Readonly<Record<DocumentKey, LiveEditorDocument>>
   pathOwnershipRevision: number
-  scrollPositionByTabId: Readonly<Record<string, EditorScrollPosition>>
-  viewsByTabId: Readonly<Record<string, EditorDocumentView>>
+  scrollPositionByTabId: Readonly<Record<TabId, EditorScrollPosition>>
+  viewsByTabId: Readonly<Record<TabId, EditorDocumentView>>
 }
 
 export class WorkspaceDocumentService {
-  private documentContentRevisions: Readonly<Record<string, string>> = {}
-  private dirtyFilePaths: ReadonlySet<string> = new Set()
+  private documentContentRevisions: Readonly<Record<DocumentKey, string>> = {}
+  private dirtyDocumentKeys: ReadonlySet<DocumentKey> = new Set()
   private dirtyContentRevision = 0
   private pathOwnershipRevision = 0
-  private readonly liveDocumentsById = new Map<string, LiveEditorDocument>()
-  private readonly documentIdsByBuffer = new Map<EditorTextBuffer, string>()
+  private readonly liveDocumentsByKey = new Map<DocumentKey, LiveEditorDocument>()
+  private readonly documentKeysByBuffer = new Map<EditorTextBuffer, DocumentKey>()
   private readonly unsubscribeByBuffer = new Map<EditorTextBuffer, () => void>()
   private readonly recoveryConflictByBuffer = new Map<
     EditorTextBuffer,
@@ -228,19 +223,19 @@ export class WorkspaceDocumentService {
     WorkspaceDocumentRecoveryLeaseTransfer,
     WorkspaceDocumentRecoveryLeaseTransferData
   >()
-  private readonly pathReservations = new Map<string, WorkspaceDocumentPathReservation>()
+  private readonly pathReservations = new Map<FilesystemPath, WorkspaceDocumentPathReservation>()
   private readonly reservedPathsByToken = new WeakMap<
     WorkspaceDocumentPathReservation,
-    readonly string[]
+    readonly FilesystemPath[]
   >()
-  private readonly ownershipRevisionByPath = new Map<string, number>()
-  private readonly viewsByTabId = new Map<string, EditorDocumentView>()
+  private readonly ownershipRevisionByPath = new Map<FilesystemPath, number>()
+  private readonly viewsByTabId = new Map<TabId, EditorDocumentView>()
   /**
    * Last known scroll position per document, seeded from the workspace cache.
    * Read when a view is created, so a reopened file (or a refreshed app)
    * lands where it was; updated on every scroll write.
    */
-  private readonly scrollPositionSeeds = new Map<string, EditorScrollPosition>()
+  private readonly scrollPositionSeeds = new Map<DocumentKey, EditorScrollPosition>()
   private cachedState: WorkspaceDocumentServiceState | null = null
 
   constructor(private readonly onStateChange: () => void = () => undefined) {}
@@ -256,27 +251,28 @@ export class WorkspaceDocumentService {
    * crash through getRequiredLiveDocument.
    */
   retain({
-    documentIds,
+    documentKeys,
     tabIds,
   }: {
-    documentIds: ReadonlySet<string>
-    tabIds: ReadonlySet<string>
-  }): { evictedDocumentIds: string[]; evictedTabIds: string[] } {
-    const evictedDocumentIds: string[] = []
-    for (const [documentId, document] of this.liveDocumentsById) {
-      if (documentIds.has(documentId)) continue
-      if (this.isDirtyDocument(documentId)) continue
+    documentKeys: ReadonlySet<DocumentKey>
+    tabIds: ReadonlySet<TabId>
+  }): { evictedDocumentKeys: DocumentKey[]; evictedTabIds: TabId[] } {
+    const evictedDocumentKeys: DocumentKey[] = []
+    for (const [documentKey, document] of this.liveDocumentsByKey) {
+      if (documentKeys.has(documentKey)) continue
+      if (this.isDirtyDocument(documentKey)) continue
       if (document.sync.kind !== 'file') continue
-      if (!this.pathsAvailable([document.path], null)) continue
+      const resource = filesystemResource(document.target)
+      if (!resource || !this.pathsAvailable([resource.path], null)) continue
 
-      this.deleteLiveDocument(documentId)
-      evictedDocumentIds.push(documentId)
+      this.deleteLiveDocument(documentKey)
+      evictedDocumentKeys.push(documentKey)
     }
 
     // After the document pass: deleteLiveDocument has already removed the views
     // belonging to evicted documents, so anything left here is a kept document
     // whose tab is simply gone.
-    const evictedTabIds: string[] = []
+    const evictedTabIds: TabId[] = []
     for (const tabId of this.viewsByTabId.keys()) {
       if (tabIds.has(tabId)) continue
 
@@ -285,33 +281,34 @@ export class WorkspaceDocumentService {
       evictedTabIds.push(tabId)
     }
 
-    return { evictedDocumentIds, evictedTabIds }
+    return { evictedDocumentKeys, evictedTabIds }
   }
 
-  deleteLiveDocument(documentId: string): { hadLiveDocument: boolean; wasDirty: boolean } {
-    this.assertPathsAvailable([documentId])
-    return this.removeLiveDocument(documentId)
+  deleteLiveDocument(documentKey: DocumentKey): { hadLiveDocument: boolean; wasDirty: boolean } {
+    const resource = filesystemResource(this.liveDocumentsByKey.get(documentKey)?.target)
+    if (resource) this.assertPathsAvailable([resource.path])
+    return this.removeLiveDocument(documentKey)
   }
 
-  private removeLiveDocument(documentId: string): {
+  private removeLiveDocument(documentKey: DocumentKey): {
     hadLiveDocument: boolean
     wasDirty: boolean
   } {
-    const document = this.liveDocumentsById.get(documentId)
-    const path = document?.path ?? documentId
-    const wasDirty = this.isDirtyDocument(documentId)
-    const hadLiveDocument = this.liveDocumentsById.delete(documentId)
+    const document = this.liveDocumentsByKey.get(documentKey)
+    const resource = filesystemResource(document?.target)
+    const wasDirty = this.isDirtyDocument(documentKey)
+    const hadLiveDocument = this.liveDocumentsByKey.delete(documentKey)
     if (document) this.detachBuffer(document.buffer)
     if (hadLiveDocument) {
       this.pathOwnershipRevision += 1
-      this.advancePathOwnership(path)
+      if (resource) this.advancePathOwnership(resource.path)
     }
 
-    this.deleteDirtyPath(path)
-    this.documentContentRevisions = omitKey(this.documentContentRevisions, documentId)
+    this.deleteDirtyKey(documentKey)
+    this.documentContentRevisions = omitKey(this.documentContentRevisions, documentKey)
 
     for (const [tabId, view] of this.viewsByTabId) {
-      if (view.documentId !== documentId) continue
+      if (view.documentKey !== documentKey) continue
 
       view.preparedDocument?.dispose()
       this.viewsByTabId.delete(tabId)
@@ -325,7 +322,7 @@ export class WorkspaceDocumentService {
     claim: PreparedFileOpenClaim | null = null,
   ): LiveEditorDocument {
     this.assertPathsAvailable([file.path])
-    const existing = this.liveDocumentsById.get(file.path)
+    const existing = this.liveDocumentsByKey.get(fileDocumentKey(file.path))
     const cleanClaim = cleanClaimForFile(claim, file)
     if (existing?.sync.kind === 'recovery-conflict') return existing
     if (existing?.buffer.isDirty()) return existing
@@ -335,23 +332,24 @@ export class WorkspaceDocumentService {
 
     const record = this.createFileDocument(file, cleanClaim)
     this.setLiveDocument(record)
-    this.setContentRevision(file.path, record.contentRevision)
-    this.deleteDirtyPath(file.path)
-    this.rebindViewsForDocument(file.path)
+    this.setContentRevision(record.key, record.contentRevision)
+    this.deleteDirtyKey(record.key)
+    this.rebindViewsForDocument(record.key)
     return record
   }
 
   ensureView(
-    tabId: string,
+    tabId: TabId,
     file: FileResult,
     claim: PreparedFileOpenClaim | null = null,
   ): LiveEditorViewDocument {
     const document = this.ensureLiveDocument(file, claim)
-    return this.ensureViewForDocument(tabId, document.id, claim)
+    return this.ensureViewForDocument(tabId, document.key, claim)
   }
 
   ensureUnsyncedDocument(input: UnsyncedLiveEditorDocumentInput): LiveEditorDocument {
-    const existing = this.liveDocumentsById.get(input.id)
+    const key = documentKey(input.target)
+    const existing = this.liveDocumentsByKey.get(key)
     if (existing?.buffer.isDirty()) return existing
     if (existing && textSnapshotEqualsText(existing.buffer.getTextSnapshot(), input.content)) {
       return existing
@@ -359,20 +357,43 @@ export class WorkspaceDocumentService {
 
     const record = this.createUnsyncedDocument(input)
     this.setLiveDocument(record)
-    this.setContentRevision(input.id, record.contentRevision)
-    this.rebindViewsForDocument(input.id)
+    this.setContentRevision(key, record.contentRevision)
+    this.rebindViewsForDocument(key)
+    return record
+  }
+
+  ensureSettingsDocument(
+    target: SettingsDocumentRef,
+    snapshot: { readonly content: string; readonly revision: string },
+  ): LiveEditorDocument {
+    const key = documentKey(target)
+    const existing = this.liveDocumentsByKey.get(key)
+    if (existing) return existing
+    const buffer = createEditorTextBuffer(snapshot.content)
+    buffer.markClean()
+    const record: LiveEditorDocument = {
+      buffer,
+      contentRevision: contentRevisionForText(snapshot.content),
+      key,
+      localRevision: buffer.getRevision(),
+      target,
+      sync: { kind: 'settings', revision: snapshot.revision, state: 'idle' },
+    }
+    this.setLiveDocument(record)
+    this.setContentRevision(key, record.contentRevision)
     return record
   }
 
   ensureViewForDocument(
-    tabId: string,
-    documentId: string,
+    tabId: TabId,
+    documentKey: DocumentKey,
     claim: PreparedFileOpenClaim | null = null,
   ): LiveEditorViewDocument {
-    this.assertPathsAvailable([documentId])
-    const document = this.getRequiredLiveDocument(documentId)
+    const document = this.getRequiredLiveDocument(documentKey)
+    const resource = filesystemResource(document.target)
+    if (resource) this.assertPathsAvailable([resource.path])
     const existing = this.viewsByTabId.get(tabId)
-    if (existing?.documentId === document.id) {
+    if (existing?.documentKey === document.key) {
       const preparedDocument = preparedDocumentForClaim(document, claim)
       if (preparedDocument) {
         existing.preparedDocument?.dispose()
@@ -382,11 +403,11 @@ export class WorkspaceDocumentService {
       return this.viewDocumentProjection(existing)
     }
 
-    const scrollPosition = existing?.scrollPosition ?? this.scrollPositionSeeds.get(document.id)
+    const scrollPosition = existing?.scrollPosition ?? this.scrollPositionSeeds.get(document.key)
     const view = createEditorViewSession(document.buffer, `tab:${tabId}`)
     view.setScrollPosition(scrollPosition)
     const nextView: EditorDocumentView = {
-      documentId: document.id,
+      documentKey: document.key,
       preparedDocument: preparedDocumentForClaim(document, claim),
       scrollPosition,
       tabId,
@@ -397,7 +418,7 @@ export class WorkspaceDocumentService {
     return this.viewDocumentProjection(nextView)
   }
 
-  removeView(tabId: string): boolean {
+  removeView(tabId: TabId): boolean {
     const view = this.viewsByTabId.get(tabId)
     if (!view) return false
 
@@ -408,8 +429,8 @@ export class WorkspaceDocumentService {
 
   forceReplaceLiveDocument(file: FileResult): { changed: boolean; wasDirty: boolean } {
     this.assertPathsAvailable([file.path])
-    const wasDirty = this.isDirtyDocument(file.path)
-    const existing = this.liveDocumentsById.get(file.path)
+    const wasDirty = this.isDirtyDocument(fileDocumentKey(file.path))
+    const existing = this.liveDocumentsByKey.get(fileDocumentKey(file.path))
     if (existing && !wasDirty && fileSyncVersion(existing) === file.version) {
       if (textSnapshotEqualsText(existing.buffer.getTextSnapshot(), file.content)) {
         return { changed: false, wasDirty: false }
@@ -419,60 +440,63 @@ export class WorkspaceDocumentService {
     const record = this.replacementDocument(file, existing)
 
     this.setLiveDocument(record)
-    this.setContentRevision(file.path, record.contentRevision)
-    this.deleteDirtyPath(file.path)
-    this.rebindViewsForDocument(file.path)
+    this.setContentRevision(record.key, record.contentRevision)
+    this.deleteDirtyKey(record.key)
+    this.rebindViewsForDocument(record.key)
     return { changed: true, wasDirty }
   }
 
-  getLiveDocument(documentId: string): LiveEditorDocument | null {
-    return this.liveDocumentsById.get(documentId) ?? null
+  getLiveDocument(documentKey: DocumentKey): LiveEditorDocument | null {
+    return this.liveDocumentsByKey.get(documentKey) ?? null
   }
 
-  getView(tabId: string): EditorDocumentView | null {
+  getView(tabId: TabId): EditorDocumentView | null {
     return this.viewsByTabId.get(tabId) ?? null
   }
 
-  getViewDocument(tabId: string): LiveEditorViewDocument | null {
+  getViewDocument(tabId: TabId): LiveEditorViewDocument | null {
     const record = this.viewsByTabId.get(tabId)
     if (!record) return null
 
     return this.viewDocumentProjection(record)
   }
 
-  prepareTargetStamp(documentId: string): WorkspaceDocumentTargetStamp | null {
-    const document = this.liveDocumentsById.get(documentId)
-    if (!document) return null
+  prepareTargetStamp(documentKey: DocumentKey): WorkspaceDocumentTargetStamp | null {
+    const document = this.liveDocumentsByKey.get(documentKey)
+    if (!document || document.target.kind !== 'file') return null
 
     return {
       buffer: document.buffer,
       bufferRevision: document.buffer.getRevision(),
       contentRevision: document.contentRevision,
-      dirty: this.isDirtyDocument(documentId),
-      documentId,
+      dirty: this.isDirtyDocument(documentKey),
+      documentKey,
       localRevision: document.localRevision,
-      path: document.path,
+      path: document.target.resource.path,
       snapshot: document.buffer.getSnapshot(),
       sync: document.sync,
     }
   }
 
   isTargetStampCurrent(stamp: WorkspaceDocumentTargetStamp): boolean {
-    const document = this.liveDocumentsById.get(stamp.documentId)
+    const document = this.liveDocumentsByKey.get(stamp.documentKey)
     if (!document) return false
     if (document.buffer !== stamp.buffer) return false
     if (document.buffer.getRevision() !== stamp.bufferRevision) return false
     if (document.buffer.getSnapshot() !== stamp.snapshot) return false
     if (document.localRevision !== stamp.localRevision) return false
     if (document.contentRevision !== stamp.contentRevision) return false
-    if (document.path !== stamp.path || document.sync !== stamp.sync) return false
-    return this.isDirtyDocument(stamp.documentId) === stamp.dirty
+    if (filesystemResource(document.target)?.path !== stamp.path || document.sync !== stamp.sync)
+      return false
+    return this.isDirtyDocument(stamp.documentKey) === stamp.dirty
   }
 
-  preparePathReservation(path: string): WorkspaceDocumentPathReservationRequest {
+  preparePathReservation(path: FilesystemPath): WorkspaceDocumentPathReservationRequest {
     return {
       canonicalPath: path,
-      expectedDocumentId: this.liveDocumentsById.has(path) ? path : null,
+      expectedDocumentKey: this.liveDocumentsByKey.has(fileDocumentKey(path))
+        ? fileDocumentKey(path)
+        : null,
       expectedPathOwnershipRevision: this.pathOwnershipRevisionFor(path),
     }
   }
@@ -542,15 +566,16 @@ export class WorkspaceDocumentService {
 
   retainMutationLeasesForPaths(
     leaseSet: WorkspaceDocumentMutationLeaseSet,
-    affectedPaths: readonly string[],
+    affectedPaths: readonly FilesystemPath[],
   ): WorkspaceDocumentMutationLeaseSet {
     const affected = new Set(affectedPaths)
     const retained: WorkspaceDocumentMutationLeaseEntry[] = []
     for (const entry of leaseSet.entries) {
-      const documentId = this.documentIdsByBuffer.get(entry.buffer)
-      const document = documentId ? this.liveDocumentsById.get(documentId) : null
-      if (document && affected.has(document.path)) {
-        retained.push({ ...entry, path: document.path })
+      const documentKey = this.documentKeysByBuffer.get(entry.buffer)
+      const document = documentKey ? this.liveDocumentsByKey.get(documentKey) : null
+      const resource = filesystemResource(document?.target)
+      if (resource && affected.has(resource.path)) {
+        retained.push({ ...entry, path: resource.path })
         continue
       }
       releaseDocumentMutationLease(entry.buffer, entry.lease)
@@ -560,20 +585,21 @@ export class WorkspaceDocumentService {
 
   prepareMutationLeaseRecoveryConflictTransfer(
     leaseSet: WorkspaceDocumentMutationLeaseSet,
-    affectedPaths: readonly string[],
+    affectedPaths: readonly FilesystemPath[],
     operationId: string,
   ): WorkspaceDocumentRecoveryLeaseTransferPreparationResult {
     const paths = Array.from(new Set(affectedPaths)).sort()
     const affected = new Set(paths)
     const retained = leaseSet.entries.flatMap((entry) => {
-      const documentId = this.documentIdsByBuffer.get(entry.buffer)
-      const document = documentId ? this.liveDocumentsById.get(documentId) : null
-      if (!document || !affected.has(document.path)) return []
-      return [{ document, entry }]
+      const documentKey = this.documentKeysByBuffer.get(entry.buffer)
+      const document = documentKey ? this.liveDocumentsByKey.get(documentKey) : null
+      const resource = filesystemResource(document?.target)
+      if (!document || !resource || !affected.has(resource.path)) return []
+      return [{ document, entry, path: resource.path }]
     })
-    for (const { document } of retained) {
+    for (const { document, path } of retained) {
       if (!this.recoveryConflictByBuffer.has(document.buffer)) continue
-      return { path: document.path, status: 'busy' }
+      return { path, status: 'busy' }
     }
 
     const transfer = Object.freeze({ operationId })
@@ -588,7 +614,7 @@ export class WorkspaceDocumentService {
 
   commitMutationLeaseRecoveryConflictTransfer(
     transfer: WorkspaceDocumentRecoveryLeaseTransfer,
-  ): readonly string[] {
+  ): readonly FilesystemPath[] {
     const prepared = this.recoveryLeaseTransfers.get(transfer)
     if (!prepared) {
       throw createClientInvariantError('Recovery lease transfer was not prepared')
@@ -612,33 +638,32 @@ export class WorkspaceDocumentService {
           affectedPaths: prepared.affectedPaths,
           kind: 'recovery-conflict',
           operationId: prepared.operationId,
-          path: document.path,
         },
       })
     }
-    return prepared.retained.map(({ document }) => document.path)
+    return prepared.retained.map(({ path }) => path)
   }
 
   markRecoveryConflict(
-    affectedPaths: readonly string[],
+    affectedPaths: readonly FilesystemPath[],
     operationId: string,
   ): WorkspaceDocumentRecoveryConflictResult {
     const paths = Array.from(new Set(affectedPaths)).sort()
     const documents = paths.flatMap((path) => {
-      const document = this.liveDocumentsById.get(path)
-      return document ? [document] : []
+      const document = this.liveDocumentsByKey.get(fileDocumentKey(path))
+      return document ? [{ document, path }] : []
     })
     const acquired: Array<{
       document: LiveEditorDocument
       entry: WorkspaceDocumentRecoveryConflictEntry
     }> = []
 
-    for (const document of documents) {
+    for (const { document, path } of documents) {
       const existing = this.recoveryConflictByBuffer.get(document.buffer)
       if (existing?.operationId === operationId) continue
       if (existing) {
         releaseRecoveryConflictEntries(acquired)
-        return { path: document.path, status: 'busy' }
+        return { path, status: 'busy' }
       }
 
       const result = acquireDocumentMutationLease(
@@ -649,7 +674,7 @@ export class WorkspaceDocumentService {
       )
       if (result.status !== 'acquired') {
         releaseRecoveryConflictEntries(acquired)
-        return { path: document.path, status: result.status }
+        return { path, status: result.status }
       }
       acquired.push({
         document,
@@ -669,59 +694,66 @@ export class WorkspaceDocumentService {
           affectedPaths: paths,
           kind: 'recovery-conflict',
           operationId,
-          path: document.path,
         },
       })
     }
     return {
-      conflictedPaths: documents.map((document) => document.path),
+      conflictedPaths: documents.map(({ path }) => path),
       status: 'acquired',
     }
   }
 
-  clearRecoveryConflict(operationId: string): readonly string[] {
-    const cleared: string[] = []
+  clearRecoveryConflict(operationId: string): readonly FilesystemPath[] {
+    const cleared: FilesystemPath[] = []
     for (const [buffer, entry] of this.recoveryConflictByBuffer) {
       if (entry.operationId !== operationId) continue
-      const documentId = this.documentIdsByBuffer.get(buffer)
-      const document = documentId ? this.liveDocumentsById.get(documentId) : null
+      const documentKey = this.documentKeysByBuffer.get(buffer)
+      const document = documentKey ? this.liveDocumentsByKey.get(documentKey) : null
       releaseDocumentMutationLease(buffer, entry.lease)
       this.recoveryConflictByBuffer.delete(buffer)
       if (!document || document.sync.kind !== 'recovery-conflict') continue
       if (document.sync.operationId !== operationId) continue
+      const resource = filesystemResource(document.target)
+      if (!resource) continue
       this.setLiveDocument({ ...document, sync: entry.previousSync })
-      cleared.push(document.path)
+      cleared.push(resource.path)
     }
     return cleared
   }
 
   prepareRenameProjection(
-    from: string,
-    to: string,
+    from: FilesystemPath,
+    to: FilesystemPath,
     reservation: WorkspaceDocumentPathReservation | null = null,
   ): WorkspaceDocumentRenameProjection | null {
     if (!this.pathsAvailable([from, to], reservation)) return null
     if (from === to) return { from, kind: 'rename', reservation, source: null, to }
-    if (this.liveDocumentsById.has(to)) return null
+    if (this.liveDocumentsByKey.has(fileDocumentKey(to))) return null
 
-    return { from, kind: 'rename', reservation, source: this.prepareTargetStamp(from), to }
+    return {
+      from,
+      kind: 'rename',
+      reservation,
+      source: this.prepareTargetStamp(fileDocumentKey(from)),
+      to,
+    }
   }
 
   prepareDeleteProjection(
-    path: string,
+    path: FilesystemPath,
     reservation: WorkspaceDocumentPathReservation | null = null,
   ): WorkspaceDocumentDeleteProjection | null {
     if (!this.pathsAvailable([path], reservation)) return null
-    const document = this.liveDocumentsById.get(path)
-    const stamp = this.prepareTargetStamp(path)
+    const document = this.liveDocumentsByKey.get(fileDocumentKey(path))
+    const stamp = this.prepareTargetStamp(fileDocumentKey(path))
     if (!document || !stamp) return null
 
     const views = Array.from(this.viewsByTabId.values()).filter(
-      (view) => view.documentId === document.id,
+      (view) => view.documentKey === document.key,
     )
     return {
-      contentRevision: this.documentContentRevisions[document.id],
-      dirty: this.isDirtyDocument(document.id),
+      contentRevision: this.documentContentRevisions[document.key],
+      dirty: this.isDirtyDocument(document.key),
       document,
       kind: 'delete',
       reservation,
@@ -735,7 +767,7 @@ export class WorkspaceDocumentService {
     if (projection.kind === 'delete') return this.commitDeleteProjection(projection)
     if (!projection.source) return true
     if (!this.isTargetStampCurrent(projection.source)) return false
-    if (this.liveDocumentsById.has(projection.to)) return false
+    if (this.liveDocumentsByKey.has(fileDocumentKey(projection.to))) return false
 
     this.renameLiveDocumentForOwner(projection.from, projection.to)
     return true
@@ -745,32 +777,32 @@ export class WorkspaceDocumentService {
     if (!this.projectionPathsAvailable(projection)) return false
     if (projection.kind === 'delete') return this.rollbackDeleteProjection(projection)
     if (!projection.source) return true
-    if (this.liveDocumentsById.has(projection.from)) return false
+    if (this.liveDocumentsByKey.has(fileDocumentKey(projection.from))) return false
 
-    const current = this.liveDocumentsById.get(projection.to)
+    const current = this.liveDocumentsByKey.get(fileDocumentKey(projection.to))
     if (current?.buffer !== projection.source.buffer) return false
     this.renameLiveDocumentForOwner(projection.to, projection.from)
     return true
   }
 
-  hasLiveDocument(documentId: string): boolean {
-    return this.liveDocumentsById.has(documentId)
+  hasLiveDocument(documentKey: DocumentKey): boolean {
+    return this.liveDocumentsByKey.has(documentKey)
   }
 
   markSaved({
     fileVersion,
-    documentId,
+    documentKey,
     mtimeMs,
     savedContentRevision,
     savedText,
   }: {
     fileVersion: string
-    documentId: string
+    documentKey: DocumentKey
     mtimeMs: number
     savedContentRevision: string
     savedText: string
   }): boolean {
-    const document = this.liveDocumentsById.get(documentId)
+    const document = this.liveDocumentsByKey.get(documentKey)
     if (!document) return false
     if (document.sync.kind !== 'file') return false
 
@@ -788,34 +820,34 @@ export class WorkspaceDocumentService {
    * buffer refuses itself as stale.
    */
   markSettingsSaved({
-    documentId,
+    documentKey,
     revision,
     savedContentRevision,
     savedText,
   }: {
-    documentId: string
+    documentKey: DocumentKey
     revision: string
     savedContentRevision: string
     savedText: string
   }): boolean {
-    const document = this.liveDocumentsById.get(documentId)
+    const document = this.liveDocumentsByKey.get(documentKey)
     if (!document) return false
     if (document.sync.kind !== 'settings') return false
 
     return this.applySaved(
       document,
-      { kind: 'settings', revision, state: 'idle', target: document.sync.target },
+      { kind: 'settings', revision, state: 'idle' },
       savedContentRevision,
       savedText,
     )
   }
 
   markSettingsConflict(
-    documentId: string,
+    documentKey: DocumentKey,
     confirmedText: string | null,
     revision: string | null,
   ): boolean {
-    const document = this.liveDocumentsById.get(documentId)
+    const document = this.liveDocumentsByKey.get(documentKey)
     if (!document) return false
     if (document.sync.kind !== 'settings') return false
 
@@ -826,19 +858,18 @@ export class WorkspaceDocumentService {
         kind: 'settings',
         revision,
         state: 'conflict',
-        target: document.sync.target,
       },
     })
     return true
   }
 
-  reloadSettingsDocument(documentId: string): boolean {
-    const document = this.liveDocumentsById.get(documentId)
+  reloadSettingsDocument(documentKey: DocumentKey): boolean {
+    const document = this.liveDocumentsByKey.get(documentKey)
     if (!document) return false
     if (document.sync.kind !== 'settings' || document.sync.state !== 'conflict') return false
     if (document.sync.confirmedText === null || document.sync.revision === null) return false
 
-    const { confirmedText, revision, target } = document.sync
+    const { confirmedText, revision } = document.sync
     const buffer = createEditorTextBuffer(confirmedText)
     buffer.markClean()
     const contentRevision = contentRevisionForText(confirmedText)
@@ -847,11 +878,11 @@ export class WorkspaceDocumentService {
       buffer,
       contentRevision,
       localRevision: buffer.getRevision(),
-      sync: { kind: 'settings', revision, state: 'idle', target },
+      sync: { kind: 'settings', revision, state: 'idle' },
     })
-    this.setContentRevision(documentId, contentRevision)
-    this.deleteDirtyPath(document.path)
-    this.rebindViewsForDocument(documentId)
+    this.setContentRevision(documentKey, contentRevision)
+    this.deleteDirtyKey(document.key)
+    this.rebindViewsForDocument(documentKey)
     return true
   }
 
@@ -864,8 +895,8 @@ export class WorkspaceDocumentService {
    * the buffer holding the old text would show a secret that is no longer in the
    * file, and the next save would put it back.
    */
-  replaceUnsyncedDocumentText(documentId: string, text: string): boolean {
-    const document = this.liveDocumentsById.get(documentId)
+  replaceUnsyncedDocumentText(documentKey: DocumentKey, text: string): boolean {
+    const document = this.liveDocumentsByKey.get(documentKey)
     if (!document) return false
     if (document.sync.kind === 'file') return false
     if (textSnapshotEqualsText(document.buffer.getTextSnapshot(), text)) return false
@@ -882,9 +913,9 @@ export class WorkspaceDocumentService {
     // The map mirrors the record; every other writer keeps them together, and a
     // consumer that reads the map to decide whether the text moved would
     // otherwise never notice this one.
-    this.setContentRevision(documentId, contentRevision)
-    this.deleteDirtyPath(document.path)
-    this.rebindViewsForDocument(documentId)
+    this.setContentRevision(documentKey, contentRevision)
+    this.deleteDirtyKey(document.key)
+    this.rebindViewsForDocument(documentKey)
     return true
   }
 
@@ -903,13 +934,13 @@ export class WorkspaceDocumentService {
    * their text is worse than the conflict they get on save, which at least says
    * what happened.
    */
-  reconcileSettingsDocument(documentId: string, text: string, revision: string): boolean {
-    const document = this.liveDocumentsById.get(documentId)
+  reconcileSettingsDocument(documentKey: DocumentKey, text: string, revision: string): boolean {
+    const document = this.liveDocumentsByKey.get(documentKey)
     if (!document) return false
     if (document.sync.kind !== 'settings') return false
     if (document.sync.revision === revision) return false
     if (document.sync.state === 'conflict') {
-      return this.markSettingsConflict(documentId, text, revision)
+      return this.markSettingsConflict(documentKey, text, revision)
     }
     if (document.buffer.isDirty()) return false
 
@@ -921,11 +952,11 @@ export class WorkspaceDocumentService {
       buffer,
       contentRevision,
       localRevision: buffer.getRevision(),
-      sync: { kind: 'settings', revision, state: 'idle', target: document.sync.target },
+      sync: { kind: 'settings', revision, state: 'idle' },
     })
-    this.setContentRevision(documentId, contentRevision)
-    this.deleteDirtyPath(document.path)
-    this.rebindViewsForDocument(documentId)
+    this.setContentRevision(documentKey, contentRevision)
+    this.deleteDirtyKey(document.key)
+    this.rebindViewsForDocument(documentKey)
     return true
   }
 
@@ -950,79 +981,83 @@ export class WorkspaceDocumentService {
       contentRevision: cleanContentRevision,
       localRevision: document.buffer.getRevision(),
     })
-    this.setContentRevision(document.id, cleanContentRevision)
-    this.deleteDirtyPath(document.path)
+    this.setContentRevision(document.key, cleanContentRevision)
+    this.deleteDirtyKey(document.key)
     return true
   }
 
-  renameLiveDocument(from: string, to: string): { wasDirty: boolean } {
+  renameLiveDocument(from: FilesystemPath, to: FilesystemPath): { wasDirty: boolean } {
     this.assertPathsAvailable([from, to])
-    const source = this.liveDocumentsById.get(from)
+    const source = this.liveDocumentsByKey.get(fileDocumentKey(from))
     if (source?.sync.kind === 'recovery-conflict') {
       throw createClientInvariantError('Recovery-conflicted documents cannot be renamed')
     }
     return this.renameLiveDocumentForOwner(from, to)
   }
 
-  private renameLiveDocumentForOwner(from: string, to: string): { wasDirty: boolean } {
-    const wasDirty = this.isDirtyDocument(from)
-    const document = this.liveDocumentsById.get(from)
-    const contentRevision = this.documentContentRevisions[from]
+  private renameLiveDocumentForOwner(
+    from: FilesystemPath,
+    to: FilesystemPath,
+  ): { wasDirty: boolean } {
+    const fromKey = fileDocumentKey(from)
+    const toKey = fileDocumentKey(to)
+    const wasDirty = this.isDirtyDocument(fromKey)
+    const document = this.liveDocumentsByKey.get(fromKey)
+    const contentRevision = this.documentContentRevisions[fromKey]
 
-    this.liveDocumentsById.delete(from)
-    this.documentContentRevisions = omitKey(this.documentContentRevisions, from)
-    this.renameDirtyPath(from, to)
+    this.liveDocumentsByKey.delete(fromKey)
+    this.documentContentRevisions = omitKey(this.documentContentRevisions, fromKey)
+    this.renameDirtyKey(fromKey, toKey)
 
-    if (contentRevision !== undefined) this.setContentRevision(to, contentRevision)
+    if (contentRevision !== undefined) this.setContentRevision(toKey, contentRevision)
     if (document) {
       const renamed = {
         ...document,
-        id: to,
-        path: to,
-        sync: document.sync.kind === 'file' ? { ...document.sync, path: to } : document.sync,
+        key: toKey,
+        target: fileDocument({ path: to }),
       }
-      this.liveDocumentsById.set(to, renamed)
-      this.documentIdsByBuffer.set(document.buffer, to)
+      this.liveDocumentsByKey.set(toKey, renamed)
+      this.documentKeysByBuffer.set(document.buffer, toKey)
       this.pathOwnershipRevision += 1
       this.advancePathOwnership(from)
       this.advancePathOwnership(to)
     }
 
     for (const [tabId, view] of this.viewsByTabId) {
-      if (view.documentId !== from) continue
+      if (view.documentKey !== fromKey) continue
 
       view.preparedDocument?.dispose()
-      this.viewsByTabId.set(tabId, { ...view, documentId: to, preparedDocument: null })
+      this.viewsByTabId.set(tabId, { ...view, documentKey: toKey, preparedDocument: null })
     }
 
     return { wasDirty }
   }
 
-  setDirty(documentId: string, dirty: boolean): void {
-    const path = this.liveDocumentsById.get(documentId)?.path ?? documentId
+  setDirty(documentKey: DocumentKey, dirty: boolean): void {
     if (dirty) {
-      this.addDirtyPath(path)
+      this.addDirtyKey(documentKey)
       return
     }
 
-    this.deleteDirtyPath(path)
+    this.deleteDirtyKey(documentKey)
   }
 
-  setViewScrollPosition(tabId: string, scrollPosition: EditorScrollPosition): boolean {
+  setViewScrollPosition(tabId: TabId, scrollPosition: EditorScrollPosition): boolean {
     const view = this.viewsByTabId.get(tabId)
     if (!view) return false
     if (scrollPositionsEqual(view.scrollPosition, scrollPosition)) return false
 
     this.viewsByTabId.set(tabId, { ...view, scrollPosition })
-    this.scrollPositionSeeds.set(view.documentId, scrollPosition)
+    this.scrollPositionSeeds.set(view.documentKey, scrollPosition)
     view.view.setScrollPosition(scrollPosition)
     return true
   }
 
-  seedScrollPositions(byPath: Readonly<Record<string, EditorScrollPosition>>): void {
+  seedScrollPositions(entries: readonly ReopenScrollPosition[]): void {
     this.scrollPositionSeeds.clear()
-    for (const [path, scrollPosition] of Object.entries(byPath)) {
-      this.scrollPositionSeeds.set(path, scrollPosition)
+    for (const { content, position } of entries) {
+      for (const target of tabDocuments(content))
+        this.scrollPositionSeeds.set(documentKey(target), position)
     }
   }
 
@@ -1039,8 +1074,8 @@ export class WorkspaceDocumentService {
     const next: WorkspaceDocumentServiceState = {
       documentContentRevisions: this.documentContentRevisions,
       dirtyContentRevision: this.dirtyContentRevision,
-      dirtyFilePaths: this.dirtyFilePaths,
-      liveDocumentsById: recordFromMap(this.liveDocumentsById, previous?.liveDocumentsById),
+      dirtyDocumentKeys: this.dirtyDocumentKeys,
+      liveDocumentsByKey: recordFromMap(this.liveDocumentsByKey, previous?.liveDocumentsByKey),
       pathOwnershipRevision: this.pathOwnershipRevision,
       scrollPositionByTabId: this.scrollPositionsState(
         viewsByTabId,
@@ -1053,7 +1088,7 @@ export class WorkspaceDocumentService {
   }
 
   private scrollPositionsState(
-    viewsByTabId: Readonly<Record<string, EditorDocumentView>>,
+    viewsByTabId: Readonly<Record<TabId, EditorDocumentView>>,
     previous: Readonly<Record<string, EditorScrollPosition>> | undefined,
   ): Readonly<Record<string, EditorScrollPosition>> {
     let count = 0
@@ -1075,19 +1110,19 @@ export class WorkspaceDocumentService {
   ): LiveEditorDocument {
     if (!claim) markEditorOpenBenchmark('editor.file_open.buffer_built', file.path)
     const buffer = claim?.buffer ?? createEditorTextBuffer(file.content)
+    const target = fileDocument({ path: file.path })
     buffer.markClean()
 
     return {
       buffer,
       contentRevision: fileContentRevision(file.version),
-      id: file.path,
+      key: documentKey(target),
       localRevision: buffer.getRevision(),
-      path: file.path,
+      target,
       sync: {
         fileVersion: file.version,
         kind: 'file',
         mtimeMs: file.mtimeMs,
-        path: file.path,
         state: 'idle',
       },
     }
@@ -1100,10 +1135,10 @@ export class WorkspaceDocumentService {
     return {
       buffer,
       contentRevision: contentRevisionForText(input.content),
-      id: input.id,
+      key: documentKey(input.target),
       localRevision: buffer.getRevision(),
-      path: input.id,
-      sync: input.sync ?? { kind: 'none' },
+      target: input.target,
+      sync: { kind: 'none' },
     }
   }
 
@@ -1125,18 +1160,17 @@ export class WorkspaceDocumentService {
         fileVersion: file.version,
         kind: 'file',
         mtimeMs: file.mtimeMs,
-        path: file.path,
         state: 'idle',
       },
     }
   }
 
-  private rebindViewsForDocument(documentId: string): void {
-    const document = this.liveDocumentsById.get(documentId)
+  private rebindViewsForDocument(documentKey: DocumentKey): void {
+    const document = this.liveDocumentsByKey.get(documentKey)
     if (!document) return
 
     for (const [tabId, view] of this.viewsByTabId) {
-      if (view.documentId !== documentId) continue
+      if (view.documentKey !== documentKey) continue
 
       const nextView = createEditorViewSession(document.buffer, `tab:${tabId}`)
       nextView.setScrollPosition(view.scrollPosition)
@@ -1150,7 +1184,7 @@ export class WorkspaceDocumentService {
   }
 
   private viewDocumentProjection(view: EditorDocumentView): LiveEditorViewDocument {
-    const document = this.getRequiredLiveDocument(view.documentId)
+    const document = this.getRequiredLiveDocument(view.documentKey)
 
     return {
       ...document,
@@ -1161,32 +1195,32 @@ export class WorkspaceDocumentService {
     }
   }
 
-  private getRequiredLiveDocument(documentId: string): LiveEditorDocument {
-    const document = this.liveDocumentsById.get(documentId)
+  private getRequiredLiveDocument(documentKey: DocumentKey): LiveEditorDocument {
+    const document = this.liveDocumentsByKey.get(documentKey)
     if (!document) {
-      throw createClientInvariantError(`Missing live document ${documentId}`)
+      throw createClientInvariantError(`Missing live document ${documentKey}`)
     }
 
     return document
   }
 
-  isDirtyDocument(documentId: string): boolean {
-    const document = this.liveDocumentsById.get(documentId)
-    if (!document) return this.dirtyFilePaths.has(documentId)
-    if (this.dirtyFilePaths.has(document.path)) return true
+  isDirtyDocument(documentKey: DocumentKey): boolean {
+    const document = this.liveDocumentsByKey.get(documentKey)
+    if (!document) return this.dirtyDocumentKeys.has(documentKey)
+    if (this.dirtyDocumentKeys.has(document.key)) return true
 
     return document.buffer.isDirty()
   }
 
   private projectionPathsAvailable(projection: WorkspaceDocumentProjection): boolean {
     if (projection.kind === 'delete') {
-      return this.pathsAvailable([projection.document.path], projection.reservation)
+      return this.pathsAvailable([projection.stamp.path], projection.reservation)
     }
     return this.pathsAvailable([projection.from, projection.to], projection.reservation)
   }
 
   private pathsAvailable(
-    paths: readonly string[],
+    paths: readonly FilesystemPath[],
     reservationToken: WorkspaceDocumentPathReservation | null,
   ): boolean {
     for (const path of paths) {
@@ -1198,7 +1232,7 @@ export class WorkspaceDocumentService {
     return true
   }
 
-  private assertPathsAvailable(paths: readonly string[]): void {
+  private assertPathsAvailable(paths: readonly FilesystemPath[]): void {
     if (this.pathsAvailable(paths, null)) return
     throw createClientInvariantError('Workspace document path is reserved by another mutation')
   }
@@ -1206,69 +1240,69 @@ export class WorkspaceDocumentService {
   private pathReservationRequestIsCurrent(
     request: WorkspaceDocumentPathReservationRequest,
   ): boolean {
-    const documentId = this.liveDocumentsById.has(request.canonicalPath)
-      ? request.canonicalPath
+    const documentKey = this.liveDocumentsByKey.has(fileDocumentKey(request.canonicalPath))
+      ? fileDocumentKey(request.canonicalPath)
       : null
-    if (documentId !== request.expectedDocumentId) return false
+    if (documentKey !== request.expectedDocumentKey) return false
     return (
       this.pathOwnershipRevisionFor(request.canonicalPath) === request.expectedPathOwnershipRevision
     )
   }
 
-  private pathOwnershipRevisionFor(path: string): number {
+  private pathOwnershipRevisionFor(path: FilesystemPath): number {
     return this.ownershipRevisionByPath.get(path) ?? 0
   }
 
-  private advancePathOwnership(path: string): void {
+  private advancePathOwnership(path: FilesystemPath): void {
     this.ownershipRevisionByPath.set(path, this.pathOwnershipRevisionFor(path) + 1)
   }
 
-  private renameDirtyPath(from: string, to: string): void {
-    if (!this.dirtyFilePaths.has(from)) return
+  private renameDirtyKey(from: DocumentKey, to: DocumentKey): void {
+    if (!this.dirtyDocumentKeys.has(from)) return
 
-    const next = new Set(this.dirtyFilePaths)
+    const next = new Set(this.dirtyDocumentKeys)
     next.delete(from)
     next.add(to)
-    this.dirtyFilePaths = next
+    this.dirtyDocumentKeys = next
   }
 
-  private addDirtyPath(path: string): void {
-    if (this.dirtyFilePaths.has(path)) return
+  private addDirtyKey(path: DocumentKey): void {
+    if (this.dirtyDocumentKeys.has(path)) return
 
-    const next = new Set(this.dirtyFilePaths)
+    const next = new Set(this.dirtyDocumentKeys)
     next.add(path)
-    this.dirtyFilePaths = next
+    this.dirtyDocumentKeys = next
   }
 
-  private deleteDirtyPath(path: string): void {
-    if (!this.dirtyFilePaths.has(path)) return
+  private deleteDirtyKey(path: DocumentKey): void {
+    if (!this.dirtyDocumentKeys.has(path)) return
 
-    const next = new Set(this.dirtyFilePaths)
+    const next = new Set(this.dirtyDocumentKeys)
     next.delete(path)
-    this.dirtyFilePaths = next
+    this.dirtyDocumentKeys = next
   }
 
-  private setContentRevision(documentId: string, contentRevision: string): void {
+  private setContentRevision(documentKey: DocumentKey, contentRevision: string): void {
     this.documentContentRevisions = {
       ...this.documentContentRevisions,
-      [documentId]: contentRevision,
+      [documentKey]: contentRevision,
     }
   }
 
   private commitDeleteProjection(projection: WorkspaceDocumentDeleteProjection): boolean {
     if (!this.isTargetStampCurrent(projection.stamp)) return false
-    this.removeLiveDocument(projection.document.id)
+    this.removeLiveDocument(projection.document.key)
     return true
   }
 
   private rollbackDeleteProjection(projection: WorkspaceDocumentDeleteProjection): boolean {
-    if (this.liveDocumentsById.has(projection.document.id)) return false
+    if (this.liveDocumentsByKey.has(projection.document.key)) return false
 
     this.setLiveDocument(projection.document)
     if (projection.contentRevision !== undefined) {
-      this.setContentRevision(projection.document.id, projection.contentRevision)
+      this.setContentRevision(projection.document.key, projection.contentRevision)
     }
-    if (projection.dirty) this.addDirtyPath(projection.document.path)
+    if (projection.dirty) this.addDirtyKey(projection.document.key)
     for (const view of projection.views) {
       this.viewsByTabId.set(view.tabId, { ...view, preparedDocument: null })
     }
@@ -1276,15 +1310,16 @@ export class WorkspaceDocumentService {
   }
 
   private setLiveDocument(document: LiveEditorDocument): void {
-    const previous = this.liveDocumentsById.get(document.id)
+    const previous = this.liveDocumentsByKey.get(document.key)
     if (previous?.buffer !== document.buffer) this.detachPreviousBuffer(previous)
 
-    this.liveDocumentsById.set(document.id, document)
+    this.liveDocumentsByKey.set(document.key, document)
     if (!previous) {
       this.pathOwnershipRevision += 1
-      this.advancePathOwnership(document.path)
+      const resource = filesystemResource(document.target)
+      if (resource) this.advancePathOwnership(resource.path)
     }
-    this.documentIdsByBuffer.set(document.buffer, document.id)
+    this.documentKeysByBuffer.set(document.buffer, document.key)
     if (this.unsubscribeByBuffer.has(document.buffer)) return
 
     const unsubscribe = document.buffer.subscribe((event) =>
@@ -1302,7 +1337,7 @@ export class WorkspaceDocumentService {
     this.releaseRecoveryConflict(buffer)
     this.unsubscribeByBuffer.get(buffer)?.()
     this.unsubscribeByBuffer.delete(buffer)
-    this.documentIdsByBuffer.delete(buffer)
+    this.documentKeysByBuffer.delete(buffer)
   }
 
   private releaseRecoveryConflict(buffer: EditorTextBuffer): void {
@@ -1313,17 +1348,17 @@ export class WorkspaceDocumentService {
   }
 
   private acceptBufferChange(buffer: EditorTextBuffer, event: EditorTextBufferChange): void {
-    const documentId = this.documentIdsByBuffer.get(buffer)
-    if (!documentId) return
+    const documentKey = this.documentKeysByBuffer.get(buffer)
+    if (!documentKey) return
 
-    const document = this.liveDocumentsById.get(documentId)
+    const document = this.liveDocumentsByKey.get(documentKey)
     if (!document || document.buffer !== buffer) return
 
     const localRevision = buffer.getRevision()
     if (localRevision <= document.localRevision) return
 
     if (event.change.kind === 'synchronize') {
-      this.liveDocumentsById.set(documentId, { ...document, localRevision })
+      this.liveDocumentsByKey.set(documentKey, { ...document, localRevision })
       this.onStateChange()
       return
     }
@@ -1335,17 +1370,17 @@ export class WorkspaceDocumentService {
   private acceptTextRevision(document: LiveEditorDocument, localRevision: number): void {
     this.dirtyContentRevision += 1
     const contentRevision = editedContentRevision(this.dirtyContentRevision)
-    this.liveDocumentsById.set(document.id, { ...document, contentRevision, localRevision })
-    this.setContentRevision(document.id, contentRevision)
+    this.liveDocumentsByKey.set(document.key, { ...document, contentRevision, localRevision })
+    this.setContentRevision(document.key, contentRevision)
     if (document.buffer.isDirty()) {
-      this.addDirtyPath(document.path)
+      this.addDirtyKey(document.key)
       return
     }
-    this.deleteDirtyPath(document.path)
+    this.deleteDirtyKey(document.key)
   }
 }
 
-function markEditorOpenBenchmark(name: string, path: string): void {
+function markEditorOpenBenchmark(name: string, path: FilesystemPath): void {
   const traceGlobal = globalThis as typeof globalThis & { readonly __editorPerfTrace?: unknown }
   if (!traceGlobal.__editorPerfTrace) return
 
@@ -1375,7 +1410,7 @@ function sameReservationRequest(
   right: WorkspaceDocumentPathReservationRequest,
 ): boolean {
   return (
-    left.expectedDocumentId === right.expectedDocumentId &&
+    left.expectedDocumentKey === right.expectedDocumentKey &&
     left.expectedPathOwnershipRevision === right.expectedPathOwnershipRevision
   )
 }
@@ -1466,11 +1501,11 @@ function preparedClaimMatchesDocument(
   document: LiveEditorDocument,
   claim: PreparedFileOpenClaim,
 ): boolean {
-  if (document.path !== claim.path) return false
+  if (filesystemResource(document.target)?.path !== claim.path) return false
   if (document.buffer !== claim.buffer) return false
   if (document.buffer.getSnapshot() !== claim.snapshot) return false
   if (claim.kind === 'live') {
-    if (document.id !== claim.documentId) return false
+    if (document.key !== claim.documentKey) return false
     return document.localRevision === claim.localRevision
   }
   if (document.sync.kind !== 'file') return false

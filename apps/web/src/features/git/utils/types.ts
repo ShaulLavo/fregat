@@ -1,16 +1,4 @@
-import type {
-  GitFileDiff,
-  GitFileStatus,
-  GitRepositoryInfo,
-  GitStatusResult,
-  GitTreeStatus,
-} from '@workspace/contracts'
-
-export type TreeStatus = GitTreeStatus
-export type FileStatus = GitFileStatus
-export type RepositoryInfo = GitRepositoryInfo
-export type StatusResult = GitStatusResult
-export type FileDiff = GitFileDiff
+import type { GitFileStatus } from '@workspace/contracts'
 
 export type PanelSection = 'staged' | 'worktree'
 
@@ -22,9 +10,9 @@ export type BlobDiffRequest = {
 }
 
 export type ChangeRow = {
-  file: FileStatus
+  file: GitFileStatus
   section: PanelSection
-  status: FileStatus['index'] | FileStatus['worktree']
+  status: GitFileStatus['index'] | GitFileStatus['worktree']
 }
 
 export type StatusPresentation = {

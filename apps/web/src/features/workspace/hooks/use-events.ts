@@ -1,5 +1,18 @@
+import { entryFromResponse } from '@/lib/file-system-types'
 import type { PickedFsEntry } from '@/lib/file-system-types'
-import { fileBackedDocumentPath } from '@/features/editor/utils/file-backed-document'
+import {
+  fileDocument,
+  fileDocumentKey,
+  fileResource,
+  filesystemPath,
+} from '@/lib/documents/utils/identity'
+import { filePathsForTabs } from '@/lib/documents/utils/capabilities'
+import type {
+  DocumentKey,
+  DocumentRef,
+  FilesystemPath,
+  TabContent,
+} from '@/lib/documents/utils/types'
 import { useEditorCommands } from '@/features/editor/hooks/use-editor-commands'
 import {
   useEditorConflictStoreApi,
@@ -77,7 +90,7 @@ export function useWorkspaceEvents(rootFolder: PickedFsEntry | null) {
   const conflictStore = useEditorConflictStoreApi()
   const documentStore = useEditorDocumentStoreApi()
   const workspaceStore = useEditorWorkspaceStoreApi()
-  const { discardLiveEditorDocument, renameLiveEditorDocument, selectFile } = useEditorCommands()
+  const { discardLiveEditorDocument, renameLiveEditorDocument, selectContent } = useEditorCommands()
   const isOwnWorkspaceEditEvent = useWorkspaceEditEventClassifier()
   const rootPath = rootFolder?.path ?? null
   const applyEvents = useEffectEvent(
@@ -94,18 +107,18 @@ export function useWorkspaceEvents(rootFolder: PickedFsEntry | null) {
       void applyWorkspaceEvents({
         conflictStore,
         discardLiveEditorDocument,
-        dirtyFilePaths: documentState.dirtyFilePaths,
+        dirtyDocumentKeys: documentState.dirtyDocumentKeys,
         ensureUnsyncedEditorDocument: documentState.ensureUnsyncedEditorDocument,
         events,
         forceReplaceLiveEditorDocument: documentState.forceReplaceLiveEditorDocument,
         getLiveEditorDocument: documentState.getLiveEditorDocument,
         isOwnWorkspaceEditEvent,
-        openFilePaths: workspaceState.openFilePaths,
+        openFilePaths: filePathsForTabs(workspaceState.openTabContents),
         queryClient,
         renameLiveEditorDocument,
         rootPath: currentRootPath,
         scheduleGitInvalidation,
-        selectFile,
+        selectContent,
         signal,
         scope: eventsScope,
       }).catch((error: unknown) => {
@@ -129,16 +142,16 @@ export function useWorkspaceEvents(rootFolder: PickedFsEntry | null) {
       void applyWorkspaceReady({
         conflictStore,
         discardLiveEditorDocument,
-        dirtyFilePaths: documentState.dirtyFilePaths,
+        dirtyDocumentKeys: documentState.dirtyDocumentKeys,
         ensureUnsyncedEditorDocument: documentState.ensureUnsyncedEditorDocument,
         forceReplaceLiveEditorDocument: documentState.forceReplaceLiveEditorDocument,
         getLiveEditorDocument: documentState.getLiveEditorDocument,
-        openFilePaths: workspaceState.openFilePaths,
+        openFilePaths: filePathsForTabs(workspaceState.openTabContents),
         queryClient,
         renameLiveEditorDocument,
         rootPath: currentRootPath,
         scheduleGitInvalidation,
-        selectFile,
+        selectContent,
         signal,
         scope: eventsScope,
       }).catch((error: unknown) => {
@@ -236,7 +249,7 @@ function workspaceEventsScopeHasWork(eventsScope: WideEventScope) {
 async function applyWorkspaceEvents({
   conflictStore,
   discardLiveEditorDocument,
-  dirtyFilePaths,
+  dirtyDocumentKeys,
   ensureUnsyncedEditorDocument,
   events,
   forceReplaceLiveEditorDocument,
@@ -247,30 +260,30 @@ async function applyWorkspaceEvents({
   renameLiveEditorDocument,
   rootPath,
   scheduleGitInvalidation,
-  selectFile,
+  selectContent,
   signal,
   scope,
 }: {
   conflictStore: EditorConflictStoreApi
-  discardLiveEditorDocument: (path: string) => { wasDirty: boolean }
-  dirtyFilePaths: ReadonlySet<string>
+  discardLiveEditorDocument: (document: DocumentRef) => { wasDirty: boolean }
+  dirtyDocumentKeys: ReadonlySet<DocumentKey>
   ensureUnsyncedEditorDocument: WorkspaceConflictContext['ensureUnsyncedEditorDocument']
   events: FilesystemEvent[]
   forceReplaceLiveEditorDocument: (file: FileResult) => { wasDirty: boolean }
-  getLiveEditorDocument: (path: string) => LiveEditorDocument | null
+  getLiveEditorDocument: (key: DocumentKey) => LiveEditorDocument | null
   isOwnWorkspaceEditEvent: (writeId: string) => boolean
   openFilePaths: readonly string[]
   queryClient: ReturnType<typeof useQueryClient>
-  renameLiveEditorDocument: (from: string, to: string) => { wasDirty: boolean }
+  renameLiveEditorDocument: (from: FilesystemPath, to: FilesystemPath) => { wasDirty: boolean }
   rootPath: string
   scheduleGitInvalidation: () => void
-  selectFile: (path: string | null) => void
+  selectContent: (content: TabContent) => void
   signal: AbortSignal
   scope: WideEventScope
 }) {
   const plan = planWorkspaceEditAwareEventBatch(
     events,
-    openFileSnapshots(openFilePaths, dirtyFilePaths, getLiveEditorDocument),
+    openFileSnapshots(openFilePaths, dirtyDocumentKeys, getLiveEditorDocument),
     rootPath,
     isOwnWorkspaceEditEvent,
   )
@@ -280,7 +293,7 @@ async function applyWorkspaceEvents({
   await applyWorkspaceEventPlan({
     conflictStore,
     discardLiveEditorDocument,
-    dirtyFilePaths,
+    dirtyDocumentKeys,
     ensureUnsyncedEditorDocument,
     forceReplaceLiveEditorDocument,
     getLiveEditorDocument,
@@ -289,7 +302,7 @@ async function applyWorkspaceEvents({
     renameLiveEditorDocument,
     rootPath,
     scheduleGitInvalidation,
-    selectFile,
+    selectContent,
     signal,
   })
 }
@@ -362,7 +375,7 @@ function recordEventChurn(scope: WideEventScope, churn: DirectoryChurn) {
 async function applyWorkspaceReady({
   conflictStore,
   discardLiveEditorDocument,
-  dirtyFilePaths,
+  dirtyDocumentKeys,
   ensureUnsyncedEditorDocument,
   forceReplaceLiveEditorDocument,
   getLiveEditorDocument,
@@ -371,27 +384,27 @@ async function applyWorkspaceReady({
   renameLiveEditorDocument,
   rootPath,
   scheduleGitInvalidation,
-  selectFile,
+  selectContent,
   signal,
   scope,
 }: {
   conflictStore: EditorConflictStoreApi
-  discardLiveEditorDocument: (path: string) => { wasDirty: boolean }
-  dirtyFilePaths: ReadonlySet<string>
+  discardLiveEditorDocument: (document: DocumentRef) => { wasDirty: boolean }
+  dirtyDocumentKeys: ReadonlySet<DocumentKey>
   ensureUnsyncedEditorDocument: WorkspaceConflictContext['ensureUnsyncedEditorDocument']
   forceReplaceLiveEditorDocument: (file: FileResult) => { wasDirty: boolean }
-  getLiveEditorDocument: (path: string) => LiveEditorDocument | null
+  getLiveEditorDocument: (key: DocumentKey) => LiveEditorDocument | null
   openFilePaths: readonly string[]
   queryClient: ReturnType<typeof useQueryClient>
-  renameLiveEditorDocument: (from: string, to: string) => { wasDirty: boolean }
+  renameLiveEditorDocument: (from: FilesystemPath, to: FilesystemPath) => { wasDirty: boolean }
   rootPath: string
   scheduleGitInvalidation: () => void
-  selectFile: (path: string | null) => void
+  selectContent: (content: TabContent) => void
   signal: AbortSignal
   scope: WideEventScope
 }) {
   const plan = planWorkspaceReady({
-    openFiles: openFileSnapshots(openFilePaths, dirtyFilePaths, getLiveEditorDocument),
+    openFiles: openFileSnapshots(openFilePaths, dirtyDocumentKeys, getLiveEditorDocument),
     rootPath,
   })
   logWorkspaceEventPlan(scope, 'workspace.events.ready_plan', plan)
@@ -399,7 +412,7 @@ async function applyWorkspaceReady({
   await applyWorkspaceEventPlan({
     conflictStore,
     discardLiveEditorDocument,
-    dirtyFilePaths,
+    dirtyDocumentKeys,
     ensureUnsyncedEditorDocument,
     forceReplaceLiveEditorDocument,
     getLiveEditorDocument,
@@ -409,7 +422,7 @@ async function applyWorkspaceReady({
     renameLiveEditorDocument,
     rootPath,
     scheduleGitInvalidation,
-    selectFile,
+    selectContent,
     signal,
   })
 }
@@ -417,7 +430,7 @@ async function applyWorkspaceReady({
 async function applyWorkspaceEventPlan({
   conflictStore,
   discardLiveEditorDocument,
-  dirtyFilePaths,
+  dirtyDocumentKeys,
   ensureUnsyncedEditorDocument,
   forceReplaceLiveEditorDocument,
   getLiveEditorDocument,
@@ -427,22 +440,22 @@ async function applyWorkspaceEventPlan({
   renameLiveEditorDocument,
   rootPath,
   scheduleGitInvalidation,
-  selectFile,
+  selectContent,
   signal,
 }: {
   conflictStore: EditorConflictStoreApi
-  discardLiveEditorDocument: (path: string) => { wasDirty: boolean }
-  dirtyFilePaths: ReadonlySet<string>
+  discardLiveEditorDocument: (document: DocumentRef) => { wasDirty: boolean }
+  dirtyDocumentKeys: ReadonlySet<DocumentKey>
   ensureUnsyncedEditorDocument: WorkspaceConflictContext['ensureUnsyncedEditorDocument']
   forceReplaceLiveEditorDocument: (file: FileResult) => { wasDirty: boolean }
-  getLiveEditorDocument: (path: string) => LiveEditorDocument | null
+  getLiveEditorDocument: (key: DocumentKey) => LiveEditorDocument | null
   ignoreOpenFileRefreshErrors?: boolean
   plan: WorkspaceEventPlan
   queryClient: ReturnType<typeof useQueryClient>
-  renameLiveEditorDocument: (from: string, to: string) => { wasDirty: boolean }
+  renameLiveEditorDocument: (from: FilesystemPath, to: FilesystemPath) => { wasDirty: boolean }
   rootPath: string
   scheduleGitInvalidation: () => void
-  selectFile: (path: string | null) => void
+  selectContent: (content: TabContent) => void
   signal: AbortSignal
 }) {
   const conflictContext: WorkspaceConflictContext = {
@@ -455,7 +468,7 @@ async function applyWorkspaceEventPlan({
     getLiveEditorDocument,
     queryClient,
     renameLiveEditorDocument,
-    selectFile,
+    selectContent,
   }
 
   if (plan.shouldInvalidateGitState) scheduleGitInvalidation()
@@ -463,7 +476,7 @@ async function applyWorkspaceEventPlan({
   await applyTreeOperations(queryClient, rootPath, plan.treeOperations, signal)
   await applyOpenFileOperations({
     conflictContext,
-    dirtyFilePaths,
+    dirtyDocumentKeys,
     forceReplaceLiveEditorDocument,
     ignoreRefreshErrors: ignoreOpenFileRefreshErrors,
     operations: plan.openFileOperations,
@@ -502,7 +515,10 @@ function patchChangedTreeEntries(
   queryClient.setQueryData(rootTreeKey, (current: TreeModel | undefined) => {
     if (!current) return current
 
-    return entries.reduce((model, entry) => patchTreeEntryMetadata(model, rootPath, entry), current)
+    return entries.reduce(
+      (model, entry) => patchTreeEntryMetadata(model, rootPath, entryFromResponse(entry)),
+      current,
+    )
   })
 }
 
@@ -556,7 +572,7 @@ async function refreshTreeDirectory(
   if (!model) return
   if (!shouldRefreshDirectory(model, rootPath, path)) return
 
-  const result = await fetchTree(path, signal, clientForQueryClient(queryClient))
+  const result = await fetchTree(filesystemPath(path), signal, clientForQueryClient(queryClient))
   queryClient.setQueryData(rootTreeKey, (current: TreeModel | undefined) => {
     if (!current) return current
 
@@ -566,7 +582,7 @@ async function refreshTreeDirectory(
 
 async function applyOpenFileOperations({
   conflictContext,
-  dirtyFilePaths,
+  dirtyDocumentKeys,
   forceReplaceLiveEditorDocument,
   ignoreRefreshErrors,
   operations,
@@ -574,7 +590,7 @@ async function applyOpenFileOperations({
   signal,
 }: {
   conflictContext: WorkspaceConflictContext
-  dirtyFilePaths: ReadonlySet<string>
+  dirtyDocumentKeys: ReadonlySet<DocumentKey>
   forceReplaceLiveEditorDocument: (file: FileResult) => { wasDirty: boolean }
   ignoreRefreshErrors: boolean
   operations: readonly WorkspaceOpenFileOperation[]
@@ -585,7 +601,7 @@ async function applyOpenFileOperations({
     try {
       await applyOpenFileOperation({
         conflictContext,
-        dirtyFilePaths,
+        dirtyDocumentKeys,
         forceReplaceLiveEditorDocument,
         operation,
         queryClient,
@@ -599,50 +615,42 @@ async function applyOpenFileOperations({
   }
 }
 
-/**
- * Through the shared answer, not a fourth copy of the scheme list: this one had
- * drifted three schemes behind — `compare-saved:`, `git-ref:` and the settings
- * ids all reached it — so an open settings tab had every workspace-ready event
- * schedule a retrying fs fetch for a path that cannot exist.
- */
-function fileBackedOpenPaths(openFilePaths: readonly string[]) {
-  return openFilePaths.filter((path) => fileBackedDocumentPath(path) !== null)
-}
-
 function openFileSnapshots(
   openFilePaths: readonly string[],
-  dirtyFilePaths: ReadonlySet<string>,
-  getLiveEditorDocument: (path: string) => LiveEditorDocument | null,
+  dirtyDocumentKeys: ReadonlySet<DocumentKey>,
+  getLiveEditorDocument: (key: DocumentKey) => LiveEditorDocument | null,
 ): WorkspaceOpenFileSnapshot[] {
-  return fileBackedOpenPaths(openFilePaths).map((path) =>
-    openFileSnapshot(path, dirtyFilePaths, getLiveEditorDocument),
+  return openFilePaths.map((path) =>
+    openFileSnapshot(path, dirtyDocumentKeys, getLiveEditorDocument),
   )
 }
 
 function openFileSnapshot(
   path: string,
-  dirtyFilePaths: ReadonlySet<string>,
-  getLiveEditorDocument: (path: string) => LiveEditorDocument | null,
+  dirtyDocumentKeys: ReadonlySet<DocumentKey>,
+  getLiveEditorDocument: (key: DocumentKey) => LiveEditorDocument | null,
 ): WorkspaceOpenFileSnapshot {
-  const liveDocument = getLiveEditorDocument(path)
+  const liveDocument = getLiveEditorDocument(fileDocumentKey(filesystemPath(path)))
 
   return {
     hasLiveDocument: Boolean(liveDocument),
-    isDirty: dirtyFilePaths.has(path) || liveDocument?.buffer.isDirty() === true,
+    isDirty:
+      dirtyDocumentKeys.has(fileDocumentKey(filesystemPath(path))) ||
+      liveDocument?.buffer.isDirty() === true,
     path,
   }
 }
 
 async function applyOpenFileOperation({
   conflictContext,
-  dirtyFilePaths,
+  dirtyDocumentKeys,
   forceReplaceLiveEditorDocument,
   operation,
   queryClient,
   signal,
 }: {
   conflictContext: WorkspaceConflictContext
-  dirtyFilePaths: ReadonlySet<string>
+  dirtyDocumentKeys: ReadonlySet<DocumentKey>
   forceReplaceLiveEditorDocument: (file: FileResult) => { wasDirty: boolean }
   operation: WorkspaceOpenFileOperation
   queryClient: ReturnType<typeof useQueryClient>
@@ -667,7 +675,7 @@ async function applyOpenFileOperation({
 
   await applyRefreshOpenFileOperation({
     conflictContext,
-    dirtyFilePaths,
+    dirtyDocumentKeys,
     forceReplaceLiveEditorDocument,
     path: operation.path,
     queryClient,
@@ -677,14 +685,14 @@ async function applyOpenFileOperation({
 
 async function applyRefreshOpenFileOperation({
   conflictContext,
-  dirtyFilePaths,
+  dirtyDocumentKeys,
   forceReplaceLiveEditorDocument,
   path,
   queryClient,
   signal,
 }: {
   conflictContext: WorkspaceConflictContext
-  dirtyFilePaths: ReadonlySet<string>
+  dirtyDocumentKeys: ReadonlySet<DocumentKey>
   forceReplaceLiveEditorDocument: (file: FileResult) => { wasDirty: boolean }
   path: string
   queryClient: ReturnType<typeof useQueryClient>
@@ -702,7 +710,7 @@ async function applyRefreshOpenFileOperation({
   if (signal.aborted) return
 
   const file = await queryClient.fetchQuery({
-    ...fileSnapshotQueryOptions(path, {
+    ...fileSnapshotQueryOptions(filesystemPath(path), {
       fetcher: (path, signal) =>
         fetchFileWithRetry(path, signal, clientForQueryClient(queryClient)),
     }),
@@ -713,7 +721,7 @@ async function applyRefreshOpenFileOperation({
 
   setFileSnapshotQueryData(queryClient, file)
   const operation = planFetchedOpenFileRefresh({
-    isDirty: isDirtyLiveDocument(path, dirtyFilePaths, conflictContext),
+    isDirty: isDirtyLiveDocument(path, dirtyDocumentKeys, conflictContext),
     liveText: liveDocumentText(path, conflictContext),
     path,
     remoteText: file.content,
@@ -728,17 +736,17 @@ function applyFetchedOpenFileOperation(
   context: WorkspaceConflictContext,
 ) {
   if (operation.type === 'changed-conflict') {
-    notifyChangedFilesystemConflict(operation.path, file, context)
+    notifyChangedFilesystemConflict(filesystemPath(operation.path), file, context)
     return
   }
-  if (!context.getLiveEditorDocument(file.path)) return
+  if (!context.getLiveEditorDocument(fileDocumentKey(file.path))) return
 
   const result = forceReplaceLiveEditorDocument(file)
   if (result.wasDirty && operation.notifyDirtyOverwrite) notifyDirtyOverwrite(operation.path)
 }
 
 function applyDiscardOpenFileOperation(path: string, context: WorkspaceConflictContext) {
-  const result = context.discardLiveEditorDocument(path)
+  const result = context.discardLiveEditorDocument(fileDocument(fileResource(filesystemPath(path))))
   context.queryClient.removeQueries({
     exact: true,
     queryKey: fileSystemKeys.fileSnapshot(path),
@@ -747,13 +755,13 @@ function applyDiscardOpenFileOperation(path: string, context: WorkspaceConflictC
 }
 
 function applyRenameOpenFileOperation(from: string, to: string, context: WorkspaceConflictContext) {
-  const result = context.renameLiveEditorDocument(from, to)
+  const result = context.renameLiveEditorDocument(filesystemPath(from), filesystemPath(to))
   moveFileQueryData(context.queryClient, from, to)
   if (result.wasDirty) notifyDirtyOverwrite(from)
 }
 
 function applyDeletedConflictOperation(path: string, context: WorkspaceConflictContext) {
-  notifyDeletedFilesystemConflict(path, context)
+  notifyDeletedFilesystemConflict(filesystemPath(path), context)
 }
 
 async function applyRenamedConflictOperation(
@@ -761,11 +769,19 @@ async function applyRenamedConflictOperation(
   remotePath: string,
   context: WorkspaceConflictContext,
 ) {
-  await notifyRenamedFilesystemConflict(localPath, remotePath, context)
+  await notifyRenamedFilesystemConflict(
+    filesystemPath(localPath),
+    filesystemPath(remotePath),
+    context,
+  )
 }
 
 function liveDocumentText(path: string, context: WorkspaceConflictContext) {
-  return context.getLiveEditorDocument(path)?.buffer.materializeFullText() ?? null
+  return (
+    context
+      .getLiveEditorDocument(fileDocumentKey(filesystemPath(path)))
+      ?.buffer.materializeFullText() ?? null
+  )
 }
 
 async function fetchFileWithRetry(path: string, signal: AbortSignal, client: Client) {
@@ -773,7 +789,7 @@ async function fetchFileWithRetry(path: string, signal: AbortSignal, client: Cli
 
   for (let attempt = 0; attempt < FILE_REFRESH_RETRY_ATTEMPTS; attempt += 1) {
     try {
-      return await fetchFile(path, signal, client)
+      return await fetchFile(filesystemPath(path), signal, client)
     } catch (error) {
       lastError = error
       if (signal.aborted) throw error
@@ -786,10 +802,13 @@ async function fetchFileWithRetry(path: string, signal: AbortSignal, client: Cli
 
 function isDirtyLiveDocument(
   path: string,
-  dirtyFilePaths: ReadonlySet<string>,
+  dirtyDocumentKeys: ReadonlySet<DocumentKey>,
   context: WorkspaceConflictContext,
 ) {
-  return dirtyFilePaths.has(path) || context.getLiveEditorDocument(path)?.buffer.isDirty() === true
+  return (
+    dirtyDocumentKeys.has(fileDocumentKey(filesystemPath(path))) ||
+    context.getLiveEditorDocument(fileDocumentKey(filesystemPath(path)))?.buffer.isDirty() === true
+  )
 }
 
 function moveFileQueryData(
@@ -804,7 +823,7 @@ function moveFileQueryData(
   })
   if (!file) return
 
-  setFileSnapshotQueryData(queryClient, { ...file, path: to })
+  setFileSnapshotQueryData(queryClient, { ...file, path: filesystemPath(to) })
 }
 
 function shouldRefreshDirectory(model: TreeModel, rootPath: string, path: string) {

@@ -1,3 +1,4 @@
+import { createScopedRecordStorage } from '@/features/chat/utils/scoped-record-storage'
 import type { ScopedStorage } from '@/lib/environments/state/scoped-storage'
 import { turnIdSchema, type TurnId } from '@workspace/contracts'
 import * as v from 'valibot'
@@ -47,76 +48,29 @@ export type PersistedSessionDiffScopeStorage = v.InferOutput<typeof persistedSto
  */
 export const DEFAULT_SESSION_DIFF_SCOPE: SessionDiffScope = { kind: 'working-tree' }
 
-function emptyPersistedSessionDiffScopes(): PersistedSessionDiffScopeStorage {
+const recordStorage = createScopedRecordStorage<PersistedSessionDiffScopeEntry>({
+  key: SESSION_DIFF_SCOPE_STORAGE_KEY,
+  limit: SESSION_DIFF_SCOPE_LIMIT,
+  recordKey: 'scopeBySessionKey',
+  schema: v.pipe(
+    persistedStorageSchema,
+    v.transform((stored) => stored.scopeBySessionKey),
+  ),
+  version: SESSION_DIFF_SCOPE_STORAGE_VERSION,
+})
+
+export function readPersistedSessionDiffScopes(
+  storage: ScopedStorage,
+): PersistedSessionDiffScopeStorage {
   return {
-    scopeBySessionKey: {},
+    scopeBySessionKey: recordStorage.read(storage),
     version: SESSION_DIFF_SCOPE_STORAGE_VERSION,
   }
 }
 
-/** Anything written by a different shape is dropped whole — a pick is a preference, not data. */
-export function readPersistedSessionDiffScopes(
-  storage: ScopedStorage,
-): PersistedSessionDiffScopeStorage {
-  const fallback = emptyPersistedSessionDiffScopes()
-
-  try {
-    const raw = storage.getItem(SESSION_DIFF_SCOPE_STORAGE_KEY)
-    if (!raw) return fallback
-
-    const parsed = v.safeParse(persistedStorageSchema, JSON.parse(raw))
-    if (!parsed.success) return fallback
-
-    return {
-      scopeBySessionKey: pruneSessionDiffScopes(parsed.output.scopeBySessionKey),
-      version: SESSION_DIFF_SCOPE_STORAGE_VERSION,
-    }
-  } catch {
-    return fallback
-  }
-}
-
-export function writePersistedSessionDiffScopes(
-  adapter: ScopedStorage,
-  scopeBySessionKey: Readonly<Record<string, PersistedSessionDiffScopeEntry>>,
-) {
-  adapter.setItem(
-    SESSION_DIFF_SCOPE_STORAGE_KEY,
-    JSON.stringify({
-      scopeBySessionKey,
-      version: SESSION_DIFF_SCOPE_STORAGE_VERSION,
-    }),
-  )
-}
-
-export function pruneSessionDiffScopes(
-  scopeBySessionKey: Readonly<Record<string, PersistedSessionDiffScopeEntry>>,
-  limit = SESSION_DIFF_SCOPE_LIMIT,
-): Record<string, PersistedSessionDiffScopeEntry> {
-  const entries = Object.entries(scopeBySessionKey)
-  if (entries.length <= limit) return { ...scopeBySessionKey }
-
-  return Object.fromEntries(
-    entries.toSorted(([, left], [, right]) => right.updatedAt - left.updatedAt).slice(0, limit),
-  )
-}
-
-/**
- * Stamps are compared, never displayed, so a wall clock that stands still (or
- * steps backwards) must not make two writes indistinguishable — eviction order
- * would become arbitrary. Always beat the highest stamp already stored.
- */
-export function nextSessionDiffScopeStamp(
-  scopeBySessionKey: Readonly<Record<string, PersistedSessionDiffScopeEntry>>,
-): number {
-  let highest = 0
-
-  for (const entry of Object.values(scopeBySessionKey)) {
-    if (entry.updatedAt > highest) highest = entry.updatedAt
-  }
-
-  return Math.max(Date.now(), highest + 1)
-}
+export const writePersistedSessionDiffScopes = recordStorage.write
+export const pruneSessionDiffScopes = recordStorage.prune
+export const nextSessionDiffScopeStamp = recordStorage.nextStamp
 
 /**
  * The reason this state is stored rather than derived: reverting to a checkpoint

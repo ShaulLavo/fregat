@@ -1,11 +1,12 @@
 import { SETTINGS_JSON_SCHEMA } from '@workspace/contracts'
 
 import type { LanguageServerDocumentTarget } from '@/features/editor/utils/language-server-plugin'
-import { SETTINGS_JSON_DOCUMENT_IDS } from '@/features/settings/utils/json-document'
+import { documentKey } from '@/lib/documents/utils/identity'
+import { settingsTab, tabDocuments } from '@/lib/documents/utils/tabs'
 
 const SETTINGS_SCHEMA_ASSOCIATION = {
   uri: 'platform://schemas/settings',
-  fileMatch: SETTINGS_JSON_DOCUMENT_IDS,
+  fileMatch: tabDocuments(settingsTab()).map(documentKey),
   schema: SETTINGS_JSON_SCHEMA,
 } as const
 

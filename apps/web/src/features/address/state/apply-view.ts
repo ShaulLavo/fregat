@@ -9,7 +9,7 @@ import {
 } from '@/features/address/state/apply-view-chat'
 import { applyAddressEditors } from '@/features/address/state/apply-view-editors'
 import { applyAddressFields } from '@/features/address/state/apply-view-fields'
-import { pathForDocumentToken } from '@/features/address/utils/document-token'
+import { contentForDocumentToken } from '@/features/address/utils/document-token'
 import { addressEnvironments } from '@/features/address/utils/environments'
 import type { AddressIntent } from '@/features/address/utils/intent'
 import { useChatProjectionStore } from '@/features/chat/state/chat-projection-store'
@@ -177,8 +177,8 @@ function openRoot(
 function documentFailure(intent: AddressIntent, rootPath: string | null) {
   const token = editorDocumentToken(intent.address)
   if (!token) return null
-  const parsed = pathForDocumentToken(rootPath, token)
-  return parsed.kind === 'path' ? null : parsed.reason
+  const parsed = contentForDocumentToken(rootPath, token)
+  return parsed.kind === 'content' ? null : parsed.reason
 }
 
 function applyFolderless(

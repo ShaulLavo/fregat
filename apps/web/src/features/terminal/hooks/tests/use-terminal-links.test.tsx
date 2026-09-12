@@ -1,3 +1,4 @@
+import { tabFileResource } from '@/lib/documents/utils/capabilities'
 import { waitFor } from '@testing-library/react'
 import type { Terminal, LinkLineSnapshot, LinkProvider } from 'ghostty-webgpu'
 import { mkdir, writeFile } from 'node:fs/promises'
@@ -155,7 +156,9 @@ function TerminalLinkHost({ rootPath, terminal }: { rootPath: string; terminal: 
  * trace in the final state.
  */
 function EditorSelectionProbe({ opened }: { opened: OpenedPaths }) {
-  const selectedFilePath = useEditorWorkspaceState((state) => state.selectedFilePath)
+  const selectedFilePath = useEditorWorkspaceState((state) =>
+    state.selectedTabContent ? (tabFileResource(state.selectedTabContent)?.path ?? null) : null,
+  )
   const definitionTarget = useEditorUiState((state) => state.definitionTarget)
 
   useEffect(() => {

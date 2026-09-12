@@ -1,4 +1,4 @@
-import type { MenuRadioGroupItem } from '@/features/menus/utils/model'
+import type { MenuRadioGroupItem } from '@/keymap/menus/utils/model'
 import {
   isWorkbenchSidebarView,
   paneHeaderMenu,

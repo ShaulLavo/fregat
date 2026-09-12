@@ -1,3 +1,5 @@
+import { workspaceRoot } from '@/lib/documents/utils/identity'
+import type { TabId, WorkspaceRoot } from '@/lib/documents/utils/types'
 import { useNavigation } from '@/hooks/use-navigation'
 import { useSettingsSearch, selectSettingsSearch } from '@/features/settings/state/search-store'
 import { descriptorFor, type SettingId } from '@workspace/contracts'
@@ -42,16 +44,16 @@ import { useFocusTarget } from '@/lib/focus/hooks/use-target'
  */
 export function SettingsPage({
   liveDocument = null,
-  rootPath = '',
-  tabId = '',
+  rootPath = workspaceRoot(''),
+  tabId,
 }: {
   liveDocument?: EditorRenderDocument | null
-  rootPath?: string
-  tabId?: string
+  rootPath?: WorkspaceRoot
+  tabId?: TabId
 } = {}) {
   const navigation = useNavigation()
   const view = useSettingsView()
-  const showJson = view === 'json' && tabId !== ''
+  const showJson = view === 'json' && tabId !== undefined
   const editorOwner = useQueryClient()
   const settingsOwner = useSettingsOwner()
   const document = useSettingsDocument(showJson ? editorOwner : undefined)
@@ -71,7 +73,7 @@ export function SettingsPage({
   const { ref: focusTargetRef } = useFocusTarget<HTMLDivElement>(
     {
       area: 'settings',
-      id: { kind: 'settings-page', tabId },
+      id: { kind: 'settings-page', tabId: tabId ?? '' },
       onIntent: (intent) => {
         if (intent !== 'focus') return false
 
@@ -82,7 +84,7 @@ export function SettingsPage({
         return true
       },
     },
-    tabId !== '' && !showJson,
+    tabId !== undefined && !showJson,
   )
   // JSON has a nested Editor target. Its parent must not become an ambiguous peer.
   const setRootRef = useCallback(

@@ -119,6 +119,7 @@ function validValue<K extends SettingId>(key: K, stored: unknown): SettingsValue
 }
 
 function parseStored(): Record<string, unknown> {
+  // This synchronous path selects the first-paint theme before React mounts.
   try {
     const raw = localStorage.getItem(BOOT_MIRROR_KEY)
     if (!raw) return {}

@@ -1,12 +1,16 @@
 import type { EnvironmentId } from '@workspace/contracts'
 import type { ScopedStorage } from '@/lib/environments/state/scoped-storage'
+import type { WorkspaceCacheWriteResult } from '@/lib/workspace-cache-storage'
 
 export function createEnvironmentRecordPersistence<T>({
   read,
   write,
 }: {
   readonly read: (storage: ScopedStorage) => Readonly<Record<string, T>>
-  readonly write: (storage: ScopedStorage, entries: Readonly<Record<string, T>>) => void
+  readonly write: (
+    storage: ScopedStorage,
+    entries: Readonly<Record<string, T>>,
+  ) => WorkspaceCacheWriteResult
 }) {
   const adapters = new Map<EnvironmentId, ScopedStorage>()
   return {
@@ -20,15 +24,12 @@ export function createEnvironmentRecordPersistence<T>({
       }
     },
     persist(entries: Readonly<Record<string, T>>) {
-      const failures: unknown[] = []
+      let written = true
       for (const storage of adapters.values()) {
-        try {
-          write(storage, ownedEntries(storage, entries))
-        } catch (error) {
-          failures.push(error)
-        }
+        const result = write(storage, ownedEntries(storage, entries))
+        if (result.status !== 'written') written = false
       }
-      if (failures.length > 0) throw failures[0]
+      return written
     },
   }
 }

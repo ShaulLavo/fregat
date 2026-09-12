@@ -1,3 +1,5 @@
+import type { FilesystemPath } from '@/lib/documents/utils/types'
+import { filesystemPath } from '@/lib/documents/utils/identity'
 import { useCallback, useMemo, useState } from 'react'
 
 import { FilesPane } from '@/features/workspace/components/files-pane'
@@ -9,7 +11,7 @@ import { FileNavigatorHeader } from '@/features/workbench/components/file-naviga
 import { createVisibleTreeItemCountStore } from '@/features/workbench/utils/visible-tree-item-count-store'
 import { useWorkspaceTreeForRootPath } from '@/features/workspace/hooks/use-tree'
 
-export function FileNavigatorPanel({ rootPath }: { readonly rootPath: string }) {
+export function FileNavigatorPanel({ rootPath }: { readonly rootPath: FilesystemPath }) {
   const { loadTreeDirectory, prefetchTreeDirectory, treeState } =
     useWorkspaceTreeForRootPath(rootPath)
   const [visibleTreeItemCountStore] = useState(() => createVisibleTreeItemCountStore())
@@ -31,13 +33,13 @@ export function FileNavigatorPanel({ rootPath }: { readonly rootPath: string }) 
   return (
     <section className='flex h-full min-h-0 min-w-0 flex-col overflow-hidden'>
       <FileNavigatorHeader
-        rootPath={rootPath}
+        rootPath={filesystemPath(rootPath)}
         treeState={treeState}
         visibleTreeItemCountStore={visibleTreeItemCountStore}
       />
       <div className='min-h-0 min-w-0 flex-1 overflow-hidden'>
         <FileTreeActionsContext value={fileTreeActions}>
-          <FilesPane key={rootPath} rootPath={rootPath} state={treeState} />
+          <FilesPane key={rootPath} rootPath={filesystemPath(rootPath)} state={treeState} />
         </FileTreeActionsContext>
       </div>
     </section>

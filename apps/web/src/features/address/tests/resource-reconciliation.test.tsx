@@ -1,9 +1,15 @@
+import {
+  testTabContents,
+  testDocumentRef,
+  testNullableTabContent,
+} from '../../../../test/factories/document-targets'
+import { filesystemPath } from '@/lib/documents/utils/identity'
 import { mkdir, rename, unlink } from 'node:fs/promises'
 import path from 'node:path'
 import { test, expect } from '../../../../test/fixtures'
 import { navigationWorkspace } from '../../../../test/factories/navigation-workspace'
 import {
-  editorTabPaths,
+  editorTabContents,
   renderAddressHarness,
   seedWorkspaceCache,
   waitForNavigation,
@@ -57,16 +63,23 @@ test.for([
       if (change === 'delete') await unlink(path.join(server.root, 'repo/b.ts'))
       const changed =
         change === 'rename'
-          ? commands.renameLiveEditorDocument('repo/b.ts', 'repo/renamed.ts')
-          : commands.discardLiveEditorDocument('repo/b.ts')
+          ? commands.renameLiveEditorDocument(
+              filesystemPath('repo/b.ts'),
+              filesystemPath('repo/renamed.ts'),
+            )
+          : commands.discardLiveEditorDocument(testDocumentRef('repo/b.ts'))
       released.resolve()
       expect(await changed.settled).toEqual({ status: 'applied' })
-      expect(editorTabPaths(harness.workspace)).toEqual(
-        change === 'rename'
-          ? ['repo/a.ts', 'repo/renamed.ts', 'repo/c.ts']
-          : ['repo/a.ts', 'repo/c.ts'],
+      expect(editorTabContents(harness.workspace)).toEqual(
+        testTabContents(
+          change === 'rename'
+            ? ['repo/a.ts', 'repo/renamed.ts', 'repo/c.ts']
+            : ['repo/a.ts', 'repo/c.ts'],
+        ),
       )
-      expect(harness.workspace.getState().selectedFilePath).toBe('repo/a.ts')
+      expect(harness.workspace.getState().selectedTabContent).toEqual(
+        testNullableTabContent('repo/a.ts'),
+      )
     } finally {
       released.resolve()
       registerEnvironmentQueryClient(owner.queryClient, owner.origin, client)
@@ -107,15 +120,18 @@ test.for(['rename', 'delete'] as const)(
       if (change === 'delete') await unlink(path.join(server.root, 'repo/a.ts'))
       const changed =
         change === 'rename'
-          ? commands.renameLiveEditorDocument('repo/a.ts', 'repo/renamed.ts')
-          : commands.discardLiveEditorDocument('repo/a.ts')
+          ? commands.renameLiveEditorDocument(
+              filesystemPath('repo/a.ts'),
+              filesystemPath('repo/renamed.ts'),
+            )
+          : commands.discardLiveEditorDocument(testDocumentRef('repo/a.ts'))
       released.resolve()
       await waitForNavigation(navigation)
-      expect(editorTabPaths(harness.workspace)).toEqual(
-        change === 'rename' ? ['repo/renamed.ts', 'repo/b.ts'] : ['repo/b.ts'],
+      expect(editorTabContents(harness.workspace)).toEqual(
+        testTabContents(change === 'rename' ? ['repo/renamed.ts', 'repo/b.ts'] : ['repo/b.ts']),
       )
-      expect(harness.workspace.getState().selectedFilePath).toBe(
-        change === 'rename' ? 'repo/renamed.ts' : 'repo/b.ts',
+      expect(harness.workspace.getState().selectedTabContent).toEqual(
+        testNullableTabContent(change === 'rename' ? 'repo/renamed.ts' : 'repo/b.ts'),
       )
       expect(navigation.router.history.location.href).toContain(
         change === 'rename' ? '/f/renamed.ts' : '/f/b.ts',
@@ -147,7 +163,10 @@ test('a completed rename in a retained environment follows its pending return wi
     ).toEqual({ status: 'applied' })
     const remote = federation.application.getSnapshot()
     expect(remote.origin).toBe(federation.originB)
-    await navigation.openFile({ owner: remote.editor.workspaceStore, path: 'repo/a.ts' })
+    await navigation.openFile({
+      owner: remote.editor.workspaceStore,
+      path: filesystemPath('repo/a.ts'),
+    })
     expect(
       await navigation.openWorkspace({
         environmentId: federation.descriptorA.environmentId,
@@ -156,8 +175,11 @@ test('a completed rename in a retained environment follows its pending return wi
     ).toEqual({ status: 'applied' })
     const local = federation.application.getSnapshot()
     expect(local.origin).toBe(federation.originA)
-    await navigation.openFile({ owner: local.editor.workspaceStore, path: 'repo/a.ts' })
-    const localPaths = editorTabPaths(local.editor.workspaceStore)
+    await navigation.openFile({
+      owner: local.editor.workspaceStore,
+      path: filesystemPath('repo/a.ts'),
+    })
+    const localPaths = editorTabContents(local.editor.workspaceStore)
     registerEnvironmentQueryClient(remote.queryClient, remote.origin, delayed.client)
     const pending = navigation.openWorkspace({
       environmentId: federation.descriptorB.environmentId,
@@ -170,16 +192,22 @@ test('a completed rename in a retained environment follows its pending return wi
     )
     const renamed = navigation
       .editorCommands(remote.editor.workspaceStore)
-      .renameLiveEditorDocument('repo/a.ts', 'repo/renamed.ts')
+      .renameLiveEditorDocument(filesystemPath('repo/a.ts'), filesystemPath('repo/renamed.ts'))
     expect(federation.application.getSnapshot()).toBe(local)
-    expect(editorTabPaths(local.editor.workspaceStore)).toEqual(localPaths)
-    expect(local.editor.workspaceStore.getState().selectedFilePath).toBe('repo/a.ts')
-    expect(editorTabPaths(remote.editor.workspaceStore)).toEqual(['repo/renamed.ts'])
+    expect(editorTabContents(local.editor.workspaceStore)).toEqual(localPaths)
+    expect(local.editor.workspaceStore.getState().selectedTabContent).toEqual(
+      testNullableTabContent('repo/a.ts'),
+    )
+    expect(editorTabContents(remote.editor.workspaceStore)).toEqual(
+      testTabContents(['repo/renamed.ts']),
+    )
     delayed.release()
     expect(await pending).toEqual({ status: 'applied' })
     expect(await renamed.settled).toEqual({ status: 'applied' })
     expect(federation.application.getSnapshot()).toBe(remote)
-    expect(remote.editor.workspaceStore.getState().selectedFilePath).toBe('repo/renamed.ts')
+    expect(remote.editor.workspaceStore.getState().selectedTabContent).toEqual(
+      testNullableTabContent('repo/renamed.ts'),
+    )
     expect(navigation.router.history.location.href).toContain('/f/renamed.ts')
   } finally {
     delayed.release()

@@ -1,6 +1,7 @@
 import type { RefObject } from 'react'
 
-import type { parseConflictDiffDocumentId } from '@/features/editor/utils/conflict-diff-document'
+import { conflictId, filesystemPath } from '@/lib/documents/utils/identity'
+import type { DocumentKey, DocumentRef, FilesystemPath } from '@/lib/documents/utils/types'
 import type {
   EditorConflictStoreApi,
   FilesystemConflict,
@@ -19,7 +20,7 @@ import { fileSystemKeys } from '@/lib/query-keys'
 const CONFLICT_RESOLUTION_DEBOUNCE_MS = 250
 
 export function resolveConflictEditorSnapshot(
-  conflictDiff: NonNullable<ReturnType<typeof parseConflictDiffDocumentId>>,
+  conflictDiff: Extract<DocumentRef, { kind: 'conflict' }>,
   textSnapshot: TextSnapshot,
   context: ConflictEditorResolutionContext & {
     resolvingConflictIds: RefObject<Set<string>>
@@ -42,14 +43,17 @@ export function resolveConflictEditorSnapshot(
     })
 }
 
-export type ConflictResolutionDebouncers = Map<string, Debouncer<(resolve: () => void) => void>>
+export type ConflictResolutionDebouncers = Map<
+  DocumentKey,
+  Debouncer<(resolve: () => void) => void>
+>
 
 export function scheduleConflictResolution(
   debouncers: ConflictResolutionDebouncers,
-  path: string,
+  key: DocumentKey,
   resolve: () => void,
 ) {
-  const current = debouncers.get(path)
+  const current = debouncers.get(key)
   if (current) {
     current.maybeExecute(resolve)
     return
@@ -58,7 +62,7 @@ export function scheduleConflictResolution(
   const debouncer = new Debouncer((run: () => void) => run(), {
     wait: CONFLICT_RESOLUTION_DEBOUNCE_MS,
   })
-  debouncers.set(path, debouncer)
+  debouncers.set(key, debouncer)
   debouncer.maybeExecute(resolve)
 }
 
@@ -93,14 +97,14 @@ async function applyConflictEditorResolution(
 
 type ConflictEditorResolutionContext = {
   conflictStore: EditorConflictStoreApi
-  discardLiveEditorDocument: (path: string) => { wasDirty: boolean }
+  discardLiveEditorDocument: (document: DocumentRef) => { wasDirty: boolean }
   forceReplaceLiveEditorDocument: (file: FileResult) => { wasDirty: boolean }
   queryClient: QueryClient
-  renameLiveEditorDocument: (from: string, to: string) => { wasDirty: boolean }
+  renameLiveEditorDocument: (from: FilesystemPath, to: FilesystemPath) => { wasDirty: boolean }
 }
 
 function replaceResolvedConflictFile(
-  localPath: string,
+  localPath: FilesystemPath,
   file: FileResult,
   context: ConflictEditorResolutionContext,
 ) {
@@ -117,15 +121,15 @@ function finishEditorResolvedConflict(
   conflict: FilesystemConflict,
   context: ConflictEditorResolutionContext,
 ) {
-  if (conflict.diffDocumentId) {
-    context.discardLiveEditorDocument(conflict.diffDocumentId)
+  if (conflict.diffDocumentKey) {
+    context.discardLiveEditorDocument({ kind: 'conflict', conflictId: conflictId(conflict.id) })
   }
   if (conflict.toastId) toast.dismiss(conflict.toastId)
 
   context.conflictStore.getState().removeConflict(conflict.id)
 }
 
-function moveFileQueryData(queryClient: QueryClient, from: string, to: string) {
+function moveFileQueryData(queryClient: QueryClient, from: FilesystemPath, to: FilesystemPath) {
   const file = queryClient.getQueryData<FileResult>(fileSystemKeys.fileSnapshot(from))
   queryClient.removeQueries({
     exact: true,
@@ -136,9 +140,9 @@ function moveFileQueryData(queryClient: QueryClient, from: string, to: string) {
   setFileSnapshotQueryData(queryClient, { ...file, path: to })
 }
 
-function parentPath(path: string) {
+function parentPath(path: FilesystemPath) {
   const index = path.lastIndexOf('/')
-  if (index < 0) return ''
+  if (index < 0) return filesystemPath('')
 
-  return path.slice(0, index)
+  return filesystemPath(path.slice(0, index))
 }

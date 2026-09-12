@@ -1,18 +1,23 @@
+import {
+  conflictId,
+  documentKey,
+  fileDocument,
+  fileResource,
+  filesystemPath,
+  settingsJsonDocument,
+} from '@/lib/documents/utils/identity'
 import { createEditorBufferSession } from '@singapor/core'
 
 import { createEditorDocumentStore } from '@/features/editor/state/document-state'
-import { settingsJsonDocumentId } from '@/features/settings/utils/json-document'
 
 import { expect, test } from '../../../../test/fixtures'
 
-const ID = settingsJsonDocumentId('user')
+const ID = documentKey(settingsJsonDocument('user'))
 
 function seed(store: ReturnType<typeof createEditorDocumentStore>, text: string, revision: string) {
-  store.getState().ensureUnsyncedEditorDocument({
-    content: text,
-    id: ID,
-    sync: { kind: 'settings', revision, state: 'idle', target: 'user' },
-  })
+  store
+    .getState()
+    .ensureSettingsDocument(settingsJsonDocument('user'), { content: text, revision: revision })
 }
 
 /**
@@ -71,12 +76,20 @@ test('a dirty buffer keeps what was typed rather than being replaced', () => {
 // replaced by a settings snapshot.
 test('only a settings-synced document can be reconciled', () => {
   const store = createEditorDocumentStore()
-  store.getState().ensureUnsyncedEditorDocument({ content: 'conflict text', id: 'conflict-diff:1' })
+  const target = { kind: 'conflict', conflictId: conflictId('1') } as const
+  const key = documentKey(target)
+  store.getState().ensureUnsyncedEditorDocument({ content: 'conflict text', target })
 
-  expect(store.getState().reconcileSettingsDocument('conflict-diff:1', 'other', 'rev-2')).toBe(
-    false,
-  )
-  expect(store.getState().reconcileSettingsDocument('nothing-here', 'other', 'rev-2')).toBe(false)
+  expect(store.getState().reconcileSettingsDocument(key, 'other', 'rev-2')).toBe(false)
+  expect(
+    store
+      .getState()
+      .reconcileSettingsDocument(
+        documentKey(fileDocument(fileResource(filesystemPath('nothing-here')))),
+        'other',
+        'rev-2',
+      ),
+  ).toBe(false)
 })
 
 /**
@@ -94,7 +107,7 @@ test('a save the server rewrote marks clean and takes the written text', () => {
 
   const document = store.getState().getLiveEditorDocument(ID)
   const marked = store.getState().markSettingsDocumentSaved({
-    documentId: ID,
+    documentKey: ID,
     revision: 'rev-2',
     savedContentRevision: document!.contentRevision,
     savedText: posted,
@@ -105,7 +118,7 @@ test('a save the server rewrote marks clean and takes the written text', () => {
   const after = store.getState().getLiveEditorDocument(ID)
   expect(after?.buffer.materializeFullText()).toBe(written)
   expect(after?.buffer.isDirty()).toBe(false)
-  expect(store.getState().dirtyFilePaths.has(ID)).toBe(false)
+  expect(store.getState().dirtyDocumentKeys.has(ID)).toBe(false)
 })
 
 // Typing while the request is in flight is the one case that must NOT be
@@ -121,7 +134,7 @@ test('a save does not mark clean over text typed while it was in flight', () => 
 
   expect(
     store.getState().markSettingsDocumentSaved({
-      documentId: ID,
+      documentKey: ID,
       revision: 'rev-2',
       savedContentRevision,
       savedText: posted,

@@ -1,4 +1,5 @@
-import type { FileStatus, PanelSection, StatusPresentation } from '@/features/git/utils/types'
+import type { GitFileStatus } from '@workspace/contracts'
+import type { PanelSection, StatusPresentation } from '@/features/git/utils/types'
 
 export type GitSymbolSource = PanelSection | 'historical'
 
@@ -6,7 +7,7 @@ export type GitSymbolSource = PanelSection | 'historical'
 // TODO(git): Support the full VS Code status alphabet: copied (C),
 // TODO(git): Split staged/worktree theme colors like VS Code's
 export function gitStatusSymbol(
-  status: FileStatus['index'] | FileStatus['worktree'],
+  status: GitFileStatus['index'] | GitFileStatus['worktree'],
   source: GitSymbolSource,
 ): StatusPresentation {
   const change = gitChangeSymbol(status)
@@ -19,7 +20,9 @@ export function gitStatusSymbol(
   }
 }
 
-function gitChangeSymbol(status: FileStatus['index'] | FileStatus['worktree']): StatusPresentation {
+function gitChangeSymbol(
+  status: GitFileStatus['index'] | GitFileStatus['worktree'],
+): StatusPresentation {
   if (status === 'added') {
     return { className: 'text-success', label: 'A', title: 'added' }
   }

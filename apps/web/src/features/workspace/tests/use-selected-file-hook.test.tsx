@@ -3,7 +3,8 @@ import { renderHook } from '@testing-library/react'
 import type { ReactNode } from 'react'
 import { vi } from 'vitest'
 
-import { settingsDocumentId } from '@/features/settings/utils/document'
+import { settingsTab } from '@/lib/documents/utils/tabs'
+import { tabFileResource } from '@/lib/documents/utils/capabilities'
 import { useSelectedFile } from '@/features/workspace/hooks/use-selected-file'
 import { expect, test } from '../../../../test/fixtures'
 import { createTestQueryClient } from '../../../../test/render'
@@ -12,7 +13,7 @@ test('never sends the settings document id to fs.read', async ({ client, server 
   void client
   const handle = vi.spyOn(server.app, 'handle')
   const queryClient = createTestQueryClient()
-  const hook = renderHook(() => useSelectedFile(settingsDocumentId()), {
+  const hook = renderHook(() => useSelectedFile(tabFileResource(settingsTab())?.path ?? null), {
     wrapper: queryClientWrapper(queryClient),
   })
 
@@ -24,7 +25,7 @@ test('never sends the settings document id to fs.read', async ({ client, server 
       handle.mock.calls.flatMap(([request]) => {
         const url = new URL(request.url)
         if (url.pathname !== '/fs/read') return []
-        if (url.searchParams.get('path') !== settingsDocumentId()) return []
+        if (url.searchParams.get('path') !== 'settings:') return []
         return [url.href]
       }),
     ).toEqual([])

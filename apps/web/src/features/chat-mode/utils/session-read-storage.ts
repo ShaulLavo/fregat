@@ -1,3 +1,4 @@
+import { readWorkspaceCacheEntry, writeWorkspaceCacheEntry } from '@/lib/workspace-cache-storage'
 import type { ScopedStorage } from '@/lib/environments/state/scoped-storage'
 import * as v from 'valibot'
 
@@ -18,29 +19,26 @@ const persistedSessionReadsSchema = v.object({
 })
 
 export function readPersistedSessionReads(storage: ScopedStorage): SessionSeenStamps {
-  try {
-    const raw = storage.getItem(SESSION_READ_STORAGE_KEY)
-    if (!raw) return {}
-
-    const parsed = v.safeParse(persistedSessionReadsSchema, JSON.parse(raw))
-    if (!parsed.success) return {}
-
-    return parsed.output.seenBySessionKey
-  } catch {
-    return {}
-  }
+  const stored = readWorkspaceCacheEntry<v.InferOutput<typeof persistedSessionReadsSchema> | null>(
+    SESSION_READ_STORAGE_KEY,
+    persistedSessionReadsSchema,
+    null,
+    { storage },
+  )
+  return stored?.seenBySessionKey ?? {}
 }
 
 export function writePersistedSessionReads(
-  adapter: ScopedStorage,
+  storage: ScopedStorage,
   seenBySessionKey: SessionSeenStamps,
 ) {
-  adapter.setItem(
+  return writeWorkspaceCacheEntry(
     SESSION_READ_STORAGE_KEY,
-    JSON.stringify({
+    {
       seenBySessionKey: prunedSessionReads(seenBySessionKey),
       version: SESSION_READ_STORAGE_VERSION,
-    }),
+    },
+    { storage },
   )
 }
 

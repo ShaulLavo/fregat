@@ -233,16 +233,15 @@ export function readChatInputDraftPrompt(target: ChatInputDraftTarget) {
 export function flushChatInputDraftStorage() {
   draftPersist.cancel()
 
-  try {
-    draftPersistence.persist(
-      persistedStorageFromState(useChatInputDraftStore.getState()).draftsByKey,
-    )
-    clearDraftPersistenceError()
-    return true
-  } catch {
+  const written = draftPersistence.persist(
+    persistedStorageFromState(useChatInputDraftStore.getState()).draftsByKey,
+  )
+  if (!written) {
     useChatInputDraftStore.setState({ persistenceError: CHAT_INPUT_DRAFT_PERSISTENCE_ERROR })
     return false
   }
+  clearDraftPersistenceError()
+  return true
 }
 
 export function hydrateChatInputDraftStoreFromStorage(storage: ScopedStorage) {

@@ -1,3 +1,4 @@
+import { filesystemPath } from '@/lib/documents/utils/identity'
 import { languageIdForFilePath } from '@/features/editor/utils/file-path'
 import { createDiffRegionStore } from '@singapor/diff'
 import { useMemo, useRef, useState } from 'react'
@@ -5,7 +6,7 @@ import { useMemo, useRef, useState } from 'react'
 import { DiffEditor } from '@/features/editor/components/diff-editor'
 import { useDiffLanguageContext } from '@/features/editor/hooks/use-diff-language-context'
 import type { DiffLanguageHost } from '@/features/editor/utils/diff-language-context'
-import type { DiffDocumentInfo } from '@/features/git/utils/diff-document'
+import type { FilesystemPath, GitComparison, TabId } from '@/lib/documents/utils/types'
 import { useDiffDocumentDiffs } from '../hooks/use-diff-document-diffs'
 import {
   emptyDiffNotice,
@@ -26,17 +27,17 @@ import { useSettingValue } from '@/features/settings/hooks/use-setting-value'
  * or `session` scope.
  */
 export function DiffView({
-  documentInfo,
+  comparison,
   languageHost,
   rootPath,
   tabId,
 }: {
-  documentInfo: DiffDocumentInfo
+  comparison: GitComparison
   languageHost: DiffLanguageHost
-  rootPath: string
-  tabId?: string
+  rootPath: FilesystemPath
+  tabId?: TabId
 }) {
-  const { diffs, failure, pending } = useDiffDocumentDiffs(documentInfo)
+  const { diffs, failure, pending } = useDiffDocumentDiffs(comparison)
   const mode = useSettingValue('editor.diff.viewMode')
   const containerRef = useRef<HTMLDivElement | null>(null)
   // One store, read by both split panes and by the comment layer. The layer does
@@ -62,19 +63,20 @@ export function DiffView({
   // Only an unstaged working-tree diff draws the file as it is on disk; a staged diff draws the
   // index blob and a checkpoint a historical commit. That decides whether the new side may be
   // published to the language server under the file's own uri.
+  const languagePath = file?.newPath || file?.path || null
   const languageServer = useDiffLanguageContext(
-    file?.newPath || file?.path || null,
+    languagePath === null ? null : filesystemPath(languagePath),
     rootPath,
-    documentInfo.kind === 'snapshot' && documentInfo.source === 'worktree',
+    comparison.kind === 'snapshot' && comparison.source === 'worktree',
     languageHost,
   )
 
   if (failure) return <DiffNotice message={failure} tone='error' />
   if (!pending && diffs.length === 0) {
-    return <DiffNotice message={emptyDiffNotice(documentInfo, rootPath)} />
+    return <DiffNotice message={emptyDiffNotice(comparison, rootPath)} />
   }
   if (!pending && !file) {
-    return <DiffNotice message={unrenderableDiffNotice(diffs, documentInfo, rootPath)} />
+    return <DiffNotice message={unrenderableDiffNotice(diffs, comparison, rootPath)} />
   }
 
   const unchanged = file ? unchangedFileNotice(file, rootPath) : null

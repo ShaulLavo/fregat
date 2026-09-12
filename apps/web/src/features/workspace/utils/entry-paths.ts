@@ -1,3 +1,5 @@
+import { filesystemPath } from '@/lib/documents/utils/identity'
+import type { FilesystemPath } from '@/lib/documents/utils/types'
 import { canonicalTreePath } from '@/lib/path-formatters'
 
 /**
@@ -14,13 +16,16 @@ export type TreePathLookup = {
  * the server's own namespace. Both halves are canonicalised because directory
  * rows arrive from the tree with a trailing slash.
  */
-export function workspacePathForTreePath(rootPath: string, treePath: string) {
+export function workspacePathForTreePath(
+  rootPath: FilesystemPath,
+  treePath: string,
+): FilesystemPath {
   const canonicalRootPath = canonicalTreePath(rootPath)
   const canonicalPath = canonicalTreePath(treePath)
-  if (!canonicalRootPath) return canonicalPath
-  if (!canonicalPath) return canonicalRootPath
+  if (!canonicalRootPath) return filesystemPath(canonicalPath)
+  if (!canonicalPath) return filesystemPath(canonicalRootPath)
 
-  return `${canonicalRootPath}/${canonicalPath}`
+  return filesystemPath(`${canonicalRootPath}/${canonicalPath}`)
 }
 
 /**

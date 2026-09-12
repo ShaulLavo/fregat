@@ -15,6 +15,7 @@ import {
   sortableKeyboardCoordinates,
 } from '@dnd-kit/sortable'
 
+import type { DocumentKey, TabId } from '@/lib/documents/utils/types'
 import type { EditorTabModel } from '@/features/workspace/utils/tab-types'
 import { useEditorDocumentState } from '@/features/editor/state/document-state'
 import type { EditorTabCloseTarget } from '@/features/workspace/utils/tab-close-targets'
@@ -29,12 +30,12 @@ export function EditorTabBar({
   loadingTabId = null,
   tabs,
 }: {
-  readonly loadingTabId?: string | null
+  readonly loadingTabId?: TabId | null
   readonly tabs: readonly EditorTabModel[]
 }) {
-  const dirtyFilePaths = useEditorDocumentState((state) => state.dirtyFilePaths)
+  const dirtyDocumentKeys = useEditorDocumentState((state) => state.dirtyDocumentKeys)
   const { reorderTab } = useEditorTabActions()
-  const closeTargets = editorTabCloseTargets(tabs, dirtyFilePaths)
+  const closeTargets = editorTabCloseTargets(tabs, dirtyDocumentKeys)
   const stripRef = useActiveTabStripScroll(tabs.find((tab) => tab.active)?.id ?? null)
   const sensors = useSensors(
     useSensor(PointerSensor, {
@@ -72,7 +73,7 @@ export function EditorTabBar({
             return (
               <SortableEditorTabButton
                 closeTargets={closeTargets}
-                dirty={isEditorTabDirty(tab.path, dirtyFilePaths)}
+                dirty={isEditorTabDirty(tab.content, dirtyDocumentKeys)}
                 key={tab.id}
                 loading={tab.id === loadingTabId}
                 tab={tab}
@@ -87,11 +88,10 @@ export function EditorTabBar({
 
 function editorTabCloseTargets(
   tabs: readonly EditorTabModel[],
-  dirtyFilePaths: ReadonlySet<string>,
+  dirtyDocumentKeys: ReadonlySet<DocumentKey>,
 ): EditorTabCloseTarget[] {
   return tabs.map((tab) => ({
-    dirty: isEditorTabDirty(tab.path, dirtyFilePaths),
+    dirty: isEditorTabDirty(tab.content, dirtyDocumentKeys),
     id: tab.id,
-    path: tab.path,
   }))
 }

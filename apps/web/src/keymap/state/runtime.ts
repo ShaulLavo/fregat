@@ -3,12 +3,13 @@ import {
   type FocusTransitionOutcome,
 } from '@workspace/client-core/commands/focus'
 import type { CommandTargetKind } from '@workspace/client-core/commands/metadata'
-import { parseCompareSavedDocumentId } from '@/features/editor/utils/compare-saved-document'
 import { isSavableEditorDocument } from '@/features/editor/utils/save'
-import { activeSettingsBufferId } from '@/features/settings/state/active-buffer'
-import { parseDiffDocumentId } from '@/features/git/utils/diff-document'
+import { settingsSelection } from '@/features/settings/state/selection'
+import { documentKey } from '@/lib/documents/utils/identity'
+import { documentSourcePath } from '@/lib/documents/utils/capabilities'
+import { activeTabDocument, sameTabContent } from '@/lib/documents/utils/tabs'
 import {
-  activeEditorPathForWorkbenchPanels,
+  activeEditorContentForWorkbenchPanels,
   activeEditorTabForWorkbenchPanels,
 } from '@/features/workbench/utils/panels'
 import type {
@@ -46,14 +47,17 @@ export function captureCommandSnapshot(runtime: WorkspaceCommandRuntime): Worksp
   const state = runtime.workspace.getState()
   const settings = runtime.settings.readSnapshot()
   const workspaceEdit = runtime.workspaceEdits.getSnapshot()
-  const activeFilePath = activeEditorPathForWorkbenchPanels(state.workbenchPanels)
-  const activeDocumentPath = activeSettingsBufferId(activeFilePath) ?? activeFilePath
-  const activeDocument = activeDocumentPath
-    ? runtime.documents.store.getState().getLiveEditorDocument(activeDocumentPath)
+  const activeTabContent = activeEditorContentForWorkbenchPanels(state.workbenchPanels)
+  const activeDocument = activeTabContent
+    ? activeTabDocument(activeTabContent, settingsSelection())
+    : null
+  const liveDocument = activeDocument
+    ? runtime.documents.store.getState().getLiveEditorDocument(documentKey(activeDocument))
     : null
   return {
-    activeDocumentSavable: activeDocument ? isSavableEditorDocument(activeDocument) : false,
-    activeFilePath,
+    activeDocumentSavable: liveDocument ? isSavableEditorDocument(liveDocument) : false,
+    activeTabContent,
+    activeDocument,
     activeTabId: activeEditorTabForWorkbenchPanels(state.workbenchPanels)?.id ?? null,
     chatMode: state.uiMode === 'chat',
     chatModePanels: state.chatModePanels,
@@ -165,9 +169,11 @@ function exactActiveEditor(target: FocusTargetSnapshot, snapshot: WorkspaceComma
   if (target.id.tabId !== undefined) return false
   if (target.id.surface !== 'diff') return false
 
+  const document = snapshot.activeDocument
   const diffPath =
-    parseCompareSavedDocumentId(snapshot.activeFilePath) ??
-    parseDiffDocumentId(snapshot.activeFilePath)?.path
+    document?.kind === 'compare-saved' || document?.kind === 'git-diff'
+      ? documentSourcePath(document)
+      : null
   if (!diffPath) return false
 
   return target.id.key === diffPath
@@ -186,5 +192,9 @@ function activeSettingsSurfaceIsValid(
 ) {
   const state = workspace.getState()
   const current = activeEditorTabForWorkbenchPanels(state.workbenchPanels)
-  return state.uiMode === layout && current?.id === activeTab.id && current.path === activeTab.path
+  return (
+    state.uiMode === layout &&
+    current?.id === activeTab.id &&
+    sameTabContent(current.content, activeTab.content)
+  )
 }

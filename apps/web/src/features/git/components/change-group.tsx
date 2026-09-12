@@ -7,7 +7,7 @@ import {
 import { cn } from '@workspace/ui/lib/utils'
 import type { KeyboardEvent, MouseEvent } from 'react'
 
-import { useContextMenu } from '@/features/menus/hooks/use-context-menu'
+import { useContextMenu } from '@/keymap/menus/hooks/use-context-menu'
 
 import { useGitState } from '@/features/git/state/store'
 import type { ChangeRow, PanelSection } from '@/features/git/utils/types'

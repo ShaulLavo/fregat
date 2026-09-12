@@ -1,13 +1,13 @@
+import { copyPathSection } from '@/keymap/menus/utils/copy-path-section'
 import {
   ArrowBendUpLeftIcon,
-  CopyIcon,
   FileIcon,
   GitDiffIcon,
   MinusIcon,
   PlusIcon,
 } from '@phosphor-icons/react'
 
-import { actionItem, section, type Menu } from '@/features/menus/utils/model'
+import { actionItem, section, type Menu } from '@/keymap/menus/utils/model'
 
 import type { PanelSection } from '@/features/git/utils/types'
 
@@ -74,20 +74,11 @@ export function fileMenu(context: FileMenuContext): Menu {
         run: context.discard,
       }),
     ]),
-    section('copy', [
-      actionItem({
-        icon: CopyIcon,
-        id: 'copyPath',
-        label: 'Copy Path',
-        run: () => context.copyPath(context.path, 'path'),
-      }),
-      actionItem({
-        icon: CopyIcon,
-        id: 'copyRelativePath',
-        label: 'Copy Relative Path',
-        run: () => context.copyPath(context.relativePath, 'relative path'),
-      }),
-    ]),
+    copyPathSection({
+      copyPath: context.copyPath,
+      path: context.path,
+      relativePath: context.relativePath,
+    }),
   ]
 }
 

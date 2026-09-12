@@ -1,3 +1,4 @@
+import { filesystemPath } from '@/lib/documents/utils/identity'
 import type { TreeEntry } from '@/lib/file-system-types'
 import { isFileEntry } from '@/lib/file-system-types'
 import type { FileOpenIntent } from '@/lib/file-open-intent/state/service'
@@ -36,7 +37,7 @@ export function fileTreeFileOpenIntent(rootPath: string, entry: TreeEntry): File
   return {
     knownSize: entry.size,
     path: entry.path,
-    rootPath,
+    rootPath: filesystemPath(rootPath),
     source: 'file-tree',
   }
 }

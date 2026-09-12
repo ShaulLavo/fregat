@@ -1,3 +1,4 @@
+import { filesystemPath } from '@/lib/documents/utils/identity'
 import { renderHook } from '@testing-library/react'
 import { createElement, type ReactNode } from 'react'
 
@@ -11,7 +12,14 @@ import { expect, test } from '../../../../../test/fixtures'
 
 test('fails loudly when Platform document state is absent', () => {
   expect(() =>
-    renderHook(() => useDiffLanguageContext('/repo/a.ts', '/repo', true, testDiffLanguageHost)),
+    renderHook(() =>
+      useDiffLanguageContext(
+        filesystemPath('/repo/a.ts'),
+        filesystemPath('/repo'),
+        true,
+        testDiffLanguageHost,
+      ),
+    ),
   ).toThrow('useEditorDocumentStoreApi must be used within EditorStateProvider')
 })
 
@@ -20,7 +28,7 @@ test('publishes live Platform text and explicit host capabilities', () => {
   store.getState().ensureLiveEditorDocument({
     content: 'const value = 1\n',
     mtimeMs: 1,
-    path: '/repo/a.ts',
+    path: filesystemPath('/repo/a.ts'),
     size: 16,
     version: 'v1',
   })
@@ -28,7 +36,13 @@ test('publishes live Platform text and explicit host capabilities', () => {
     createElement(EditorDocumentStateContext.Provider, { value: store }, children)
 
   const { result } = renderHook(
-    () => useDiffLanguageContext('a.ts', '/repo', true, testDiffLanguageHost),
+    () =>
+      useDiffLanguageContext(
+        filesystemPath('a.ts'),
+        filesystemPath('/repo'),
+        true,
+        testDiffLanguageHost,
+      ),
     { wrapper },
   )
 

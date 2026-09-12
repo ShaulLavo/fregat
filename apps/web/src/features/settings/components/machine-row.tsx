@@ -1,8 +1,8 @@
 import { errorStringField, type MachineDefinition } from '@workspace/contracts'
 import { Button } from '@workspace/ui/components/button'
-import { MachinePhase } from '@/components/machine-phase'
 import { MachineErrorDetails } from '@/components/machine-error-details'
 import { connectionNoticeSummary } from '@/lib/environments/utils/connection-notice'
+import { Phase } from '@/lib/environments/components/phase'
 import { useState } from 'react'
 
 import { MachineForm } from '@/components/machine-form'
@@ -62,7 +62,7 @@ export function MachineRow({
   return (
     <div className='border-border flex flex-col gap-2 rounded-md border p-3'>
       <div className='flex items-center gap-2'>
-        <MachinePhase label={machine.label ?? name} phase={phase} />
+        <Phase label={machine.label ?? name} phase={phase} />
         <span className='min-w-0 flex-1 truncate text-sm font-medium'>{machine.label ?? name}</span>
         <span className='text-muted-foreground text-xs'>{phase}</span>
       </div>

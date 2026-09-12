@@ -1,3 +1,4 @@
+import { filesystemPath } from '@/lib/documents/utils/identity'
 import { useEditorCommands } from '@/features/editor/hooks/use-editor-commands'
 import { copyTextToClipboard } from '@/lib/clipboard'
 import { toTreePath } from '@/lib/path-formatters'
@@ -11,7 +12,7 @@ import { useStagePathMutation } from './use-stage-path-mutation'
 import { useUnstagePathMutation } from './use-unstage-path-mutation'
 
 export function useFileMenu(row: ChangeRow, rootPath: string) {
-  const path = row.file.path
+  const path = filesystemPath(row.file.path)
   const staged = row.section === 'staged'
   const discard = useDiscardPathMutation(path)
   const discardStaged = useDiscardStagedPathsMutation([path])

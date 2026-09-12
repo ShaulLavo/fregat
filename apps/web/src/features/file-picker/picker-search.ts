@@ -1,14 +1,11 @@
+import { searchMatchEntry } from '@/lib/search-match-entry'
+import { filesystemPath } from '@/lib/documents/utils/identity'
 import { getClient } from '@/lib/client'
 import type { WorkspaceSearchEvent, WorkspaceSearchQuery } from '@workspace/contracts'
 import type { FindMatch, FsEntry, SearchScope } from '@/lib/file-system-types'
 import { streamWorkspaceSearch } from '@workspace/client-core/files/search-client'
 
-import {
-  ROOT_PATH,
-  basename,
-  compareSearchEntries,
-  type FilePickerMode,
-} from '@/features/file-picker/model'
+import { ROOT_PATH, compareSearchEntries, type FilePickerMode } from '@/features/file-picker/model'
 import { readSettingsMirror } from '@/features/settings/utils/boot-mirror'
 
 const SEARCH_SCOPE_TIMEOUT_MS = 6000
@@ -128,22 +125,12 @@ export function appendSearchMatch(
   if (seenPaths.has(match.path)) return false
 
   seenPaths.add(match.path)
-  matches.push({ ...match, searchScope: scope })
+  matches.push({ ...match, path: filesystemPath(match.path), searchScope: scope })
   return true
 }
 
 function fallbackEntry(match: FindMatch): FsEntry {
-  return {
-    birthtimeMs: match.birthtimeMs ?? 0,
-    mtimeMs: match.mtimeMs ?? 0,
-    name: basename(match.path),
-    path: match.path,
-    searchScope: match.searchScope,
-    size: match.size ?? 0,
-    targetType: match.targetType,
-    type: match.type,
-    version: fallbackEntryVersion(match.mtimeMs ?? 0, match.size ?? 0),
-  }
+  return { ...searchMatchEntry(match), searchScope: match.searchScope }
 }
 
 export function fallbackEntries(matches: FindMatch[], query: string) {
@@ -154,10 +141,6 @@ export function searchEntryType(mode: FilePickerMode) {
   if (mode === 'folder') return 'directory'
 
   return undefined
-}
-
-function fallbackEntryVersion(mtimeMs: number, size: number) {
-  return `search:${mtimeMs}:${size}`
 }
 
 function workspaceIndexEnabledForScope(scope: SearchScope) {

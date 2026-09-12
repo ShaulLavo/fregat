@@ -1,3 +1,4 @@
+import { filesystemPath } from '@/lib/documents/utils/identity'
 import { readEnvironmentDescriptor } from '@/lib/environments/utils/descriptor'
 import { environmentScopedStorage } from '@/lib/environments/state/scoped-storage'
 import { confirmedEnvironmentId } from '@/lib/environments/state/domain'
@@ -59,7 +60,7 @@ test('the real provider stack moves observers and mutation invalidations between
     expect(application.getSnapshot().editor).toBe(editorA)
     expect(queryClientFor(`${originA}/`)).toBe(queryClientFor(originA))
     await writeFile(join(server.root, 'draft.txt'), 'saved')
-    const file = await fetchFile('draft.txt', new AbortController().signal, client)
+    const file = await fetchFile(filesystemPath('draft.txt'), new AbortController().signal, client)
     const documentA = editorA.documentStore.getState().ensureLiveEditorDocument(file)
     createEditorBufferSession(documentA.buffer).applyText(' unsaved')
     const cacheA = queryClientFor(originA)

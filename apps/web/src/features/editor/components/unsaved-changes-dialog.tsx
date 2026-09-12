@@ -9,8 +9,9 @@ import {
   DialogTitle,
 } from '@workspace/ui/components/dialog'
 
-import { fileBackedDocumentPath } from '@/features/editor/utils/file-backed-document'
-import { documentLabel } from '@/features/workspace/utils/document-label'
+import { filesystemResource } from '@/lib/documents/utils/capabilities'
+import type { TabContent } from '@/lib/documents/utils/types'
+import { tabLabel } from '@/lib/documents/utils/labels'
 import { Spinner } from '@workspace/ui/components/spinner'
 import type { UnsavedDialogTarget } from '@/features/editor/hooks/use-dirty-tab-close'
 import { useFocusTarget } from '@/lib/focus/hooks/use-target'
@@ -21,7 +22,7 @@ type UnsavedChangesDialogProps = {
   canSave: boolean
   error: string | null
   open: boolean
-  path: string | null
+  content: TabContent | null
   saving: boolean
   target: UnsavedDialogTarget | null
   onCancel: () => void
@@ -34,7 +35,7 @@ export function UnsavedChangesDialog({
   canSave,
   error,
   open,
-  path,
+  content,
   saving,
   target,
   onCancel,
@@ -42,10 +43,8 @@ export function UnsavedChangesDialog({
   onOpenChange,
   onSave,
 }: UnsavedChangesDialogProps) {
-  // Through `documentLabel`, like the tab strip and the window title: `basename`
-  // renders a synthetic id raw, so this dialog asked whether to save changes to
-  // `settings:` or to an encoded diff blob.
-  const name = path ? documentLabel(path) : 'this tab'
+  const name = content ? tabLabel(content) : 'this tab'
+  const resource = content?.kind === 'document' ? filesystemResource(content.document) : null
   const description = canSave
     ? `Save changes to ${name} before closing?`
     : `${name} has unsaved changes that cannot be saved directly.`
@@ -75,12 +74,9 @@ export function UnsavedChangesDialog({
           <DialogTitle>Unsaved changes</DialogTitle>
           <DialogDescription>{description}</DialogDescription>
         </DialogHeader>
-        {/* Only a real path on disk. `path !== name` suppressed nothing that
-            mattered — every synthetic id differs from its label, so all of them
-            still rendered raw — while hiding the path for a file at the root. */}
-        {fileBackedDocumentPath(path) ? (
+        {resource ? (
           <div className='bg-muted/30 text-muted-foreground compact:px-2.5 compact:py-1.5 truncate rounded-md border px-3 py-2 text-xs'>
-            {path}
+            {resource.path}
           </div>
         ) : null}
         {error ? (

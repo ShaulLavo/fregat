@@ -16,7 +16,7 @@ import {
   PencilSimpleIcon,
 } from '@phosphor-icons/react'
 
-import { commandItem, section, type Menu } from '@/features/menus/utils/model'
+import { commandItem, section, type Menu } from '@/keymap/menus/utils/model'
 
 /**
  * The menu for a right-click inside editor text.

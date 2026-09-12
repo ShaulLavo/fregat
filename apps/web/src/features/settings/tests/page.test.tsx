@@ -1,3 +1,11 @@
+import { selectSettingsSearch } from '@/features/settings/state/search-store'
+import { selectSettingsCategory } from '@/features/settings/state/category-store'
+import {
+  documentKey,
+  settingsJsonDocument,
+  filesystemPath,
+  tabId,
+} from '@/lib/documents/utils/identity'
 import { screen, waitFor } from '@testing-library/react'
 import userEvent from '@testing-library/user-event'
 import { createEditorTextBuffer, createEditorViewSession } from '@singapor/core'
@@ -17,15 +25,14 @@ import { emptyWorkspaceState } from '@/features/workspace/state/cache'
 import { TestEditorStateProvider as EditorStateProvider } from '../../../../test/factories/editor-state-provider'
 import { selectSettingsScope } from '@/features/settings/state/scope-store'
 import { selectSettingsView } from '@/features/settings/state/view-store'
-import { selectSettingsSearch } from '@/features/settings/state/search-store'
-import { settingsJsonDocumentId } from '@/features/settings/utils/json-document'
 import { FocusService } from '@/lib/focus/state/service'
 import { matchesActiveSurface } from '@/lib/focus/utils/active-surface'
 
-test.afterEach(() => {
+test.beforeEach(() => {
   selectSettingsScope('user')
   selectSettingsView('form')
   selectSettingsSearch('')
+  selectSettingsCategory(null)
 })
 
 test('renders a row per user-visible setting and writes a toggle through', async ({ client }) => {
@@ -142,7 +149,7 @@ test('refuses an application-scoped key from the workspace tab, and says why', a
       birthtimeMs: 0,
       mtimeMs: 0,
       name: 'repo',
-      path: '/repo',
+      path: filesystemPath('/repo'),
       size: 0,
       type: 'directory',
       version: '',
@@ -314,13 +321,13 @@ test('every visible row is reachable and operable from the keyboard', async ({ c
 test('settings JSON exposes its nested editor as the sole active surface', async ({ client }) => {
   expect(client).toBeDefined()
   const focus = new FocusService()
-  const path = settingsJsonDocumentId('user')
+  const path = documentKey(settingsJsonDocument('user'))
   const buffer = createEditorTextBuffer('{}')
   const liveDocument = {
     buffer,
     editability: 'editable' as const,
-    id: path,
-    path,
+    key: path,
+    target: settingsJsonDocument('user'),
     view: createEditorViewSession(buffer, 'settings-focus-test'),
   }
   selectSettingsScope('user')
@@ -328,7 +335,11 @@ test('settings JSON exposes its nested editor as the sole active surface', async
   const rendered = renderWithProviders(
     <EditorStateProvider>
       <div data-workbench>
-        <SettingsPage liveDocument={liveDocument} rootPath='/repo' tabId='settings-tab' />
+        <SettingsPage
+          liveDocument={liveDocument}
+          rootPath={filesystemPath('/repo')}
+          tabId={tabId('settings-tab')}
+        />
       </div>
     </EditorStateProvider>,
     { focusService: focus },

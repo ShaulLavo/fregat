@@ -1,3 +1,10 @@
+import {
+  filesystemPath,
+  tabId,
+  fileDocument,
+  fileResource,
+  documentKey,
+} from '@/lib/documents/utils/identity'
 import { createEditorTextBuffer, createEditorViewSession } from '@singapor/core'
 import { vi } from 'vitest'
 
@@ -22,13 +29,13 @@ test('an outgoing document cannot publish its scroll position into the incoming 
   const incomingActions = editorActions(incomingScroll)
   const rendered = renderWithProviders(
     <EditorStateProvider>
-      {body({ actions: outgoingActions, document: outgoing, path: outgoing.path, tabId: 'tab-a' })}
+      {body({ actions: outgoingActions, document: outgoing, path: '/repo/a.ts', tabId: 'tab-a' })}
     </EditorStateProvider>,
   )
 
   rendered.rerender(
     <EditorStateProvider>
-      {body({ actions: incomingActions, document: null, path: incoming.path, tabId: 'tab-b' })}
+      {body({ actions: incomingActions, document: null, path: '/repo/b.ts', tabId: 'tab-b' })}
     </EditorStateProvider>,
   )
   const outgoingPosition = outgoingScroll.mock.calls.at(-1)?.[0]
@@ -36,7 +43,7 @@ test('an outgoing document cannot publish its scroll position into the incoming 
 
   rendered.rerender(
     <EditorStateProvider>
-      {body({ actions: incomingActions, document: incoming, path: incoming.path, tabId: 'tab-b' })}
+      {body({ actions: incomingActions, document: incoming, path: '/repo/b.ts', tabId: 'tab-b' })}
     </EditorStateProvider>,
   )
 
@@ -48,7 +55,7 @@ function body({
   actions,
   document,
   path,
-  tabId,
+  tabId: id,
 }: {
   actions: EditorSurfaceActions
   document: EditorRenderDocument | null
@@ -65,9 +72,9 @@ function body({
           fileVersion={null}
           languageServerReferences={null}
           liveDocument={document}
-          path={path}
-          rootPath='/repo'
-          tabId={tabId}
+          target={fileDocument(fileResource(filesystemPath(path)))}
+          rootPath={filesystemPath('/repo')}
+          tabId={tabId(id)}
         />
       </div>
     </EditorSurfaceActionsContext>
@@ -80,13 +87,8 @@ function editorDocument(path: string, lines: number, scrollTop: number): EditorR
   )
   const view = createEditorViewSession(buffer, `view:${path}`)
   view.setScrollPosition({ left: 0, top: scrollTop })
-  return {
-    buffer,
-    editability: 'editable',
-    id: path,
-    path,
-    view,
-  }
+  const target = fileDocument(fileResource(filesystemPath(path)))
+  return { buffer, editability: 'editable', key: documentKey(target), target, view }
 }
 
 function editorActions(

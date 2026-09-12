@@ -1,3 +1,4 @@
+import { filesystemPath } from '@/lib/documents/utils/identity'
 import { vi } from 'vitest'
 
 import {
@@ -107,11 +108,11 @@ test('reports only completed renames when a later move fails', async () => {
 })
 
 function moveRequest(moves: TreeDropMoveRequest['moves']): TreeDropMoveRequest {
-  return { moves, rootPath: '/repo' }
+  return { moves, rootPath: filesystemPath('/repo') }
 }
 
 function fileTreeModel(entries: readonly TreeEntry[]) {
-  return treeModel({ entries: [...entries], path: '/repo' }, '/repo')
+  return treeModel({ entries: [...entries], path: filesystemPath('/repo') }, '/repo')
 }
 
 function file(path: string): TreeEntry {
@@ -127,7 +128,7 @@ function entry(path: string, type: TreeEntry['type']): TreeEntry {
     birthtimeMs: 1,
     mtimeMs: 1,
     name: path.split('/').at(-1) ?? path,
-    path,
+    path: filesystemPath(path),
     size: 1,
     type,
     version: `v:${path}`,

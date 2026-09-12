@@ -1,3 +1,4 @@
+import { documentKey, settingsJsonDocument } from '@/lib/documents/utils/identity'
 import { screen, waitFor } from '@testing-library/react'
 import userEvent from '@testing-library/user-event'
 import type { SettingsSnapshot } from '@workspace/contracts'
@@ -11,12 +12,11 @@ import {
 import { RawConflictBanner } from '@/features/settings/components/raw-conflict-banner'
 import { SettingsSyncService } from '@/features/settings/state/sync-service'
 import { fetchSettings, saveSettingsText } from '@/features/settings/utils/api'
-import { settingsJsonDocumentId } from '@/features/settings/utils/json-document'
 
 import { expect, test } from '../../../../test/fixtures'
 import { createTestQueryClient, renderWithProviders } from '../../../../test/render'
 
-const DOCUMENT_ID = settingsJsonDocumentId('user')
+const DOCUMENT_ID = documentKey(settingsJsonDocument('user'))
 const LOCAL_TEXT = '{ "editor.fontSize": 18 }\n'
 
 test('raw conflict keeps local text through Compare, intervening writes, Overwrite, and Reload', async ({
@@ -33,11 +33,11 @@ test('raw conflict keeps local text through Compare, intervening writes, Overwri
   )
   const service = new SettingsSyncService(documentStore, queryClient)
 
-  await service.save(currentDocument(documentStore))
+  expect(await service.save(currentDocument(documentStore))).toBe(false)
 
   expectConflict(documentStore, firstExternal)
   expect(currentText(documentStore)).toBe(LOCAL_TEXT)
-  expect(documentStore.getState().dirtyFilePaths.has(DOCUMENT_ID)).toBe(true)
+  expect(documentStore.getState().dirtyDocumentKeys.has(DOCUMENT_ID)).toBe(true)
 
   renderWithProviders(<RawConflictHarness documentStore={documentStore} />, { queryClient })
   const user = userEvent.setup()
@@ -72,7 +72,7 @@ test('raw conflict keeps local text through Compare, intervening writes, Overwri
     'raw-conflict-external-two',
     '{ "editor.lineHeight": 32 }\n',
   )
-  await service.save(currentDocument(documentStore))
+  expect(await service.save(currentDocument(documentStore))).toBe(false)
   expectConflict(documentStore, secondExternal)
   expect(currentText(documentStore)).toBe(LOCAL_TEXT)
 
@@ -88,7 +88,7 @@ test('raw conflict keeps local text through Compare, intervening writes, Overwri
     })
   })
   expect(currentText(documentStore)).toBe(LOCAL_TEXT)
-  expect(documentStore.getState().dirtyFilePaths.has(DOCUMENT_ID)).toBe(true)
+  expect(documentStore.getState().dirtyDocumentKeys.has(DOCUMENT_ID)).toBe(true)
   expect(screen.queryByText('Could not save settings')).toBeNull()
 
   await user.click(screen.getByRole('button', { name: 'Overwrite' }))
@@ -104,7 +104,7 @@ test('raw conflict keeps local text through Compare, intervening writes, Overwri
     'raw-conflict-external-four',
     '{ "editor.fontSize": 24 }\n',
   )
-  await service.save(currentDocument(documentStore))
+  expect(await service.save(currentDocument(documentStore))).toBe(false)
   expectConflict(documentStore, finalExternal)
   expect(currentText(documentStore)).toBe(LOCAL_TEXT)
 
@@ -116,7 +116,7 @@ test('raw conflict keeps local text through Compare, intervening writes, Overwri
     state: 'idle',
   })
   expect(currentText(documentStore)).toBe('{ "editor.fontSize": 24 }\n')
-  expect(documentStore.getState().dirtyFilePaths.has(DOCUMENT_ID)).toBe(false)
+  expect(documentStore.getState().dirtyDocumentKeys.has(DOCUMENT_ID)).toBe(false)
   expect(screen.queryByText('Could not save settings')).toBeNull()
 
   queryClient.clear()
@@ -125,18 +125,16 @@ test('raw conflict keeps local text through Compare, intervening writes, Overwri
 function RawConflictHarness({ documentStore }: { readonly documentStore: EditorDocumentStoreApi }) {
   return (
     <EditorDocumentStateContext.Provider value={documentStore}>
-      <RawConflictBanner documentId={DOCUMENT_ID} />
+      <RawConflictBanner documentKey={DOCUMENT_ID} />
       <ThemeAwareToaster />
     </EditorDocumentStateContext.Provider>
   )
 }
 
 function seedLocalDocument(store: EditorDocumentStoreApi, text: string, revision: string) {
-  store.getState().ensureUnsyncedEditorDocument({
-    content: text,
-    id: DOCUMENT_ID,
-    sync: { kind: 'settings', revision, state: 'idle', target: 'user' },
-  })
+  store
+    .getState()
+    .ensureSettingsDocument(settingsJsonDocument('user'), { content: text, revision: revision })
   store.getState().setLiveEditorDocumentDirty(DOCUMENT_ID, true)
 }
 

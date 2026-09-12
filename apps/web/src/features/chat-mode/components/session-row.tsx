@@ -1,5 +1,5 @@
 import { SessionAttentionIndicator } from '@/features/chat-mode/components/session-attention-indicator'
-import { MachineChip } from '@/components/machine-chip'
+import { MachineChip } from '@/features/chat-mode/components/machine-chip'
 import { scopedSessionKey } from '@workspace/contracts'
 import { Button } from '@workspace/ui/components/button'
 import { useSortable } from '@dnd-kit/sortable'

@@ -90,14 +90,14 @@ export function CommandPaletteContent() {
   } = useTheme()
   const hasWorkspace = useEditorWorkspaceState((state) => Boolean(state.rootFolder))
   const rootFolder = useEditorWorkspaceState((state) => state.rootFolder)
-  const openFilePaths = useEditorWorkspaceState((state) => state.openFilePaths)
-  const selectedFilePath = useEditorWorkspaceState((state) => state.selectedFilePath)
-  const { openDefinition, selectFile } = useEditorCommands()
+  const openTabContents = useEditorWorkspaceState((state) => state.openTabContents)
+  const selectedTabContent = useEditorWorkspaceState((state) => state.selectedTabContent)
+  const { openDefinition, selectFile, selectContent } = useEditorCommands()
   // A scope holds the mode outside the input, so the input is the bare query.
   const mode = paletteScope?.mode ?? quickAccessMode(search)
   const query = paletteScope ? search : quickAccessQuery(search)
   const treeState = useWorkspaceTreeState(rootFolder)
-  const editorItems = editorPaletteItems(openFilePaths, selectedFilePath)
+  const editorItems = editorPaletteItems(openTabContents, selectedTabContent)
   const {
     fileQuery,
     fileSearchQuery,
@@ -114,7 +114,7 @@ export function CommandPaletteContent() {
   const { selectedFileBackedPath, symbolQuery, symbolsEnabled } = useCommandPaletteSymbols({
     mode,
     rootPath: rootFolder?.path ?? null,
-    selectedFilePath,
+    selectedTabContent,
   })
   const { projects: sessionProjects, sessions: sessionItems } = useCommandPaletteSessions()
   const queueTerminalCommand = useTerminalCommandInboxStore((state) => state.queueCommand)
@@ -246,6 +246,12 @@ export function CommandPaletteContent() {
         selectTheme(themeId, 'workspace.selectColorTheme')
         closePalette(true)
       },
+      selectContent: async (content) => {
+        if ((await selectContent(content)).status !== 'applied') return
+        if (!(await focusSelectedEditor())) return
+
+        closePalette(false)
+      },
       selectFile: async (path) => {
         if ((await selectFile(path)).status !== 'applied') return
         if (!(await focusSelectedEditor())) return
@@ -313,6 +319,7 @@ export function CommandPaletteContent() {
     resolvedTheme,
     saveProjectScript,
     selectFile,
+    selectContent,
     selectTheme,
     selectedFileBackedPath,
     workspace,

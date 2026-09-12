@@ -1,9 +1,14 @@
+import { sameTabContent, tabContentKey } from '@/lib/documents/utils/tabs'
+import type { TabContent } from '@/lib/documents/utils/types'
 import {
   applicableTabs,
   editorDocumentToken,
   type Address,
 } from '@workspace/client-core/address/grammar'
-import { documentTokenForPath, pathForDocumentToken } from '@/features/address/utils/document-token'
+import {
+  documentTokenForContent,
+  contentForDocumentToken,
+} from '@/features/address/utils/document-token'
 import { definitionTargetFor } from '@/features/address/utils/definition-target'
 import type { AddressApplyReason } from '@/features/address/state/apply-view'
 import type { EditorApplyActions } from '@/features/editor/state/apply-actions'
@@ -31,12 +36,12 @@ export function applyAddressEditors(context: EditorApplyContext) {
   const transient = Boolean(
     preserveTransient &&
     active &&
-    documentTokenForPath(context.rootPath, active.path).kind === 'unaddressable',
+    documentTokenForContent(context.rootPath, active.content).kind === 'unaddressable',
   )
   const rejected = applyTabs(context, transient)
   if (transient && active) {
-    if (workspaceStore.getState().selectedFilePath !== active.path)
-      commands.openFileSurface(active.path)
+    if (!selectedContentMatches(workspaceStore, active.content))
+      commands.openTabContent(active.content)
     return rejected
   }
 
@@ -46,8 +51,8 @@ export function applyAddressEditors(context: EditorApplyContext) {
     return rejected
   }
   if (context.reason === 'boot') {
-    if (active && workspaceStore.getState().selectedFilePath !== active.path)
-      commands.openFileSurface(active.path)
+    if (active && !selectedContentMatches(workspaceStore, active.content))
+      commands.openTabContent(active.content)
     return rejected
   }
 
@@ -64,55 +69,57 @@ function applyTabs(context: EditorApplyContext, transient: boolean): string | nu
   if (address.tabs === null) return null
   const tokens = context.complete ? address.tabs : applicableTabs(address.tabs)
   if (!tokens) return 'tab collection exceeds the supported limit'
-  const paths = pathsForTabs(tokens, rootPath)
-  if (paths === null) return 'tab collection contains an unavailable document'
-  const openPaths = new Set(context.workspaceStore.getState().openFilePaths)
+  const contents = contentsForTabs(tokens, rootPath)
+  if (contents === null) return 'tab collection contains an unavailable document'
+  const openKeys = new Set(context.workspaceStore.getState().openTabContents.map(tabContentKey))
   const selected = editorDocumentToken(address)
-  const anchored = selected ? pathForDocumentToken(rootPath, selected) : null
-  for (const path of paths) {
-    if (openPaths.has(path)) continue
-    if (transient && anchored?.kind === 'path' && anchored.path === path) continue
-    commands.openFileSurface(path)
+  const anchored = selected ? contentForDocumentToken(rootPath, selected) : null
+  for (const content of contents) {
+    if (openKeys.has(tabContentKey(content))) continue
+    if (transient && anchored?.kind === 'content' && sameTabContent(anchored.content, content))
+      continue
+    commands.openTabContent(content)
   }
   if (reason === 'boot') return null
 
-  closeTabsOutsideAddress(paths, context)
-  orderTabs(paths, context)
+  closeTabsOutsideAddress(contents, context)
+  orderTabs(contents, context)
   return null
 }
 
-function pathsForTabs(tokens: readonly string[], rootPath: string | null) {
-  const paths: string[] = []
+function contentsForTabs(tokens: readonly string[], rootPath: string | null) {
+  const contents: TabContent[] = []
   for (const token of tokens) {
-    const parsed = pathForDocumentToken(rootPath, token)
-    if (parsed.kind !== 'path') return null
-    if (!paths.includes(parsed.path)) paths.push(parsed.path)
+    const parsed = contentForDocumentToken(rootPath, token)
+    if (parsed.kind !== 'content') return null
+    if (!contents.some((content) => sameTabContent(content, parsed.content)))
+      contents.push(parsed.content)
   }
-  return paths
+  return contents
 }
 
-function closeTabsOutsideAddress(paths: readonly string[], context: EditorApplyContext) {
+function closeTabsOutsideAddress(contents: readonly TabContent[], context: EditorApplyContext) {
   const { commands, documentStore, rootPath, workspaceStore } = context
-  const wanted = new Set(paths)
-  const dirty = documentStore.getState().dirtyFilePaths
+  const wanted = new Set(contents.map(tabContentKey))
+  const dirty = documentStore.getState().dirtyDocumentKeys
   for (const tab of workspaceStore.getState().workbenchPanels.editorTabs) {
-    if (wanted.has(tab.path)) continue
-    if (documentTokenForPath(rootPath, tab.path).kind !== 'token') continue
-    if (isEditorTabDirty(tab.path, dirty)) continue
+    if (wanted.has(tabContentKey(tab.content))) continue
+    if (documentTokenForContent(rootPath, tab.content).kind !== 'token') continue
+    if (isEditorTabDirty(tab.content, dirty)) continue
     commands.closeTab(tab.id)
   }
 }
 
-function orderTabs(paths: readonly string[], { workspaceStore }: EditorApplyContext) {
+function orderTabs(contents: readonly TabContent[], { workspaceStore }: EditorApplyContext) {
   const state = workspaceStore.getState()
   const tabs = state.workbenchPanels.editorTabs
-  const byPath = new Map(tabs.map((tab) => [tab.path, tab]))
-  const addressed = paths.flatMap((path) => {
-    const tab = byPath.get(path)
+  const byKey = new Map(tabs.map((tab) => [tabContentKey(tab.content), tab]))
+  const addressed = contents.flatMap((content) => {
+    const tab = byKey.get(tabContentKey(content))
     return tab ? [tab] : []
   })
-  const wanted = new Set(paths)
-  const extras = tabs.filter((tab) => !wanted.has(tab.path))
+  const wanted = new Set(contents.map(tabContentKey))
+  const extras = tabs.filter((tab) => !wanted.has(tabContentKey(tab.content)))
   const editorTabs = [...addressed, ...extras]
   if (tabs.every((tab, index) => tab === editorTabs[index])) return
   state.setWorkbenchPanels({ ...state.workbenchPanels, editorTabs })
@@ -120,13 +127,24 @@ function orderTabs(paths: readonly string[], { workspaceStore }: EditorApplyCont
 
 function applyDocument(context: EditorApplyContext, token: string) {
   const { address, commands, rootPath, uiStore } = context
-  const parsed = pathForDocumentToken(rootPath, token)
-  if (parsed.kind !== 'path') return
-  if (address.focus) {
-    commands.openDefinition(definitionTargetFor(parsed.path, address.focus))
+  const parsed = contentForDocumentToken(rootPath, token)
+  if (parsed.kind !== 'content') return
+  if (
+    address.focus &&
+    parsed.content.kind === 'document' &&
+    parsed.content.document.kind === 'file'
+  ) {
+    commands.openDefinition(
+      definitionTargetFor(parsed.content.document.resource.path, address.focus),
+    )
     return
   }
-  if (context.workspaceStore.getState().selectedFilePath !== parsed.path)
-    commands.openFileSurface(parsed.path)
+  if (!selectedContentMatches(context.workspaceStore, parsed.content))
+    commands.openTabContent(parsed.content)
   if (context.reason !== 'boot') uiStore.setState({ definitionTarget: null })
+}
+
+function selectedContentMatches(store: EditorWorkspaceStoreApi, content: TabContent): boolean {
+  const selected = store.getState().selectedTabContent
+  return selected !== null && sameTabContent(selected, content)
 }

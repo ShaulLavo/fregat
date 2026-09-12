@@ -1,15 +1,21 @@
+import {
+  testTabContents,
+  testTabContent,
+  testNullableTabContent,
+  testDocumentKey,
+} from '../../../../test/factories/document-targets'
+import { fileResultFromResponse } from '@/lib/file-system-types'
+import { filesystemPath } from '@/lib/documents/utils/identity'
 import { readFilePreview } from '@workspace/client-core/files/read'
 import { readAddressCache, selectInitialAddress } from '@/features/address/state/storage'
 import { readLogsFilters } from '@/features/logs/state/filter-store'
 import { defaultLogsFilterState } from '@/features/logs/utils/filter-params'
 import { useSessionRailStore } from '@/features/chat-mode/state/session-rail-store'
-import { conflictDiffDocumentId } from '@/features/editor/utils/conflict-diff-document'
-import { settingsDocumentId } from '@/features/settings/utils/document'
 import { navigateAddress } from '@/features/address/utils/route-options'
 import { parseAddress } from '@workspace/client-core/address/grammar'
 import { expect, test } from '../../../../test/fixtures'
 import {
-  editorTabPaths,
+  editorTabContents,
   pressBack,
   renderAddressHarness,
   renderPendingNavigation,
@@ -37,22 +43,38 @@ test('completed rapid file destinations each retain their own history entry', as
     initialEntries: [`${workspace.base}/f/a.ts`],
   })
   await waitForNavigation(navigation)
-  expect(await navigation.openFile({ owner: harness.workspace, path: 'repo/b.ts' })).toEqual({
+  expect(
+    await navigation.openFile({ owner: harness.workspace, path: filesystemPath('repo/b.ts') }),
+  ).toEqual({
     status: 'applied',
   })
-  expect(await navigation.openFile({ owner: harness.workspace, path: 'repo/c.ts' })).toEqual({
+  expect(
+    await navigation.openFile({ owner: harness.workspace, path: filesystemPath('repo/c.ts') }),
+  ).toEqual({
     status: 'applied',
   })
   await pressBack(navigation)
-  expect(harness.workspace.getState().selectedFilePath).toBe('repo/b.ts')
-  expect(editorTabPaths(harness.workspace)).toEqual(['repo/a.ts', 'repo/b.ts', 'repo/c.ts'])
+  expect(harness.workspace.getState().selectedTabContent).toEqual(
+    testNullableTabContent('repo/b.ts'),
+  )
+  expect(editorTabContents(harness.workspace)).toEqual(
+    testTabContents(['repo/a.ts', 'repo/b.ts', 'repo/c.ts']),
+  )
   await pressBack(navigation)
-  expect(harness.workspace.getState().selectedFilePath).toBe('repo/a.ts')
-  expect(editorTabPaths(harness.workspace)).toEqual(['repo/a.ts', 'repo/b.ts', 'repo/c.ts'])
+  expect(harness.workspace.getState().selectedTabContent).toEqual(
+    testNullableTabContent('repo/a.ts'),
+  )
+  expect(editorTabContents(harness.workspace)).toEqual(
+    testTabContents(['repo/a.ts', 'repo/b.ts', 'repo/c.ts']),
+  )
   navigation.forward()
   await waitForNavigation(navigation)
-  expect(harness.workspace.getState().selectedFilePath).toBe('repo/b.ts')
-  expect(editorTabPaths(harness.workspace)).toEqual(['repo/a.ts', 'repo/b.ts', 'repo/c.ts'])
+  expect(harness.workspace.getState().selectedTabContent).toEqual(
+    testNullableTabContent('repo/b.ts'),
+  )
+  expect(editorTabContents(harness.workspace)).toEqual(
+    testTabContents(['repo/a.ts', 'repo/b.ts', 'repo/c.ts']),
+  )
 })
 
 test('paused text edits replace one destination and Back preserves sidebar filters', async ({
@@ -65,7 +87,7 @@ test('paused text edits replace one destination and Back preserves sidebar filte
     initialEntries: [`${workspace.base}/f/a.ts`],
   })
   await waitForNavigation(navigation)
-  await navigation.openFile({ owner: harness.workspace, path: 'repo/b.ts' })
+  await navigation.openFile({ owner: harness.workspace, path: filesystemPath('repo/b.ts') })
   for (const query of ['h', 'he', 'hel', 'hell', 'hello']) {
     expect((await navigation.setSearchQuery(query)).status).toBe('applied')
     expect(
@@ -75,7 +97,9 @@ test('paused text edits replace one destination and Back preserves sidebar filte
   expect(application.getSnapshot().editor.searchBufferStore.getState().active?.query).toBe('hello')
   expect(readLogsFilters().search).toBe('hello')
   await pressBack(navigation)
-  expect(harness.workspace.getState().selectedFilePath).toBe('repo/a.ts')
+  expect(harness.workspace.getState().selectedTabContent).toEqual(
+    testNullableTabContent('repo/a.ts'),
+  )
   expect(application.getSnapshot().editor.searchBufferStore.getState().active?.query).toBe('hello')
   expect(readLogsFilters().search).toBe('hello')
 })
@@ -98,7 +122,7 @@ test('successive oversized queries apply even when their wire href is identical'
   expect(navigation.router.history.location.href).toBe(href)
   expect(application.getSnapshot().editor.searchBufferStore.getState().active?.query).toBe(second)
   expect(navigation.copyAddress().omissions).toContain('search')
-  await navigation.openFile({ owner: harness.workspace, path: 'repo/b.ts' })
+  await navigation.openFile({ owner: harness.workspace, path: filesystemPath('repo/b.ts') })
   await pressBack(navigation)
   expect(application.getSnapshot().editor.searchBufferStore.getState().active?.query).toBe(second)
 })
@@ -108,7 +132,7 @@ test('traversal preserves current tab order including dirty and unaddressable do
   server,
 }) => {
   const workspace = await navigationWorkspace(client, server)
-  const conflict = conflictDiffDocumentId('retained-conflict')
+  const conflict = 'conflict-diff:retained-conflict'
   seedWorkspaceCache({
     ...workspace,
     tabPaths: ['repo/a.ts', 'repo/b.ts', 'repo/c.ts', 'repo/dirty.ts', conflict],
@@ -120,25 +144,23 @@ test('traversal preserves current tab order including dirty and unaddressable do
     ],
   })
   await waitForNavigation(navigation)
-  await navigation.openFile({ owner: harness.workspace, path: conflict })
-  await navigation.openFile({ owner: harness.workspace, path: 'repo/a.ts' })
-  expect(editorTabPaths(harness.workspace)).toContain(conflict)
+  await navigation.openContent({ owner: harness.workspace, content: testTabContent(conflict) })
+  await navigation.openFile({ owner: harness.workspace, path: filesystemPath('repo/a.ts') })
+  expect(editorTabContents(harness.workspace)).toContainEqual(testTabContent(conflict))
   const file = await readFilePreview({
     client,
     path: 'repo/dirty.ts',
     signal: new AbortController().signal,
   })
-  harness.documents.getState().ensureLiveEditorDocument(file)
-  harness.documents.getState().setLiveEditorDocumentDirty(file.path, true)
+  harness.documents.getState().ensureLiveEditorDocument(fileResultFromResponse(file))
+  harness.documents.getState().setLiveEditorDocumentDirty(testDocumentKey(file.path), true)
   await pressBack(navigation)
-  expect(editorTabPaths(harness.workspace)).toEqual([
-    'repo/a.ts',
-    'repo/b.ts',
-    'repo/c.ts',
-    'repo/dirty.ts',
-    conflict,
-  ])
-  expect(harness.documents.getState().dirtyFilePaths.has('repo/dirty.ts')).toBe(true)
+  expect(editorTabContents(harness.workspace)).toEqual(
+    testTabContents(['repo/a.ts', 'repo/b.ts', 'repo/c.ts', 'repo/dirty.ts', conflict]),
+  )
+  expect(harness.documents.getState().dirtyDocumentKeys.has(testDocumentKey('repo/dirty.ts'))).toBe(
+    true,
+  )
 })
 
 test('traversal preserves tabs for absent, malformed and historical empty collections', async ({
@@ -156,9 +178,9 @@ test('traversal preserves tabs for absent, malformed and historical empty collec
   })
   await waitForNavigation(navigation)
   await pressBack(navigation)
-  expect(editorTabPaths(harness.workspace)).toEqual(['repo/a.ts', 'repo/b.ts'])
+  expect(editorTabContents(harness.workspace)).toEqual(testTabContents(['repo/a.ts', 'repo/b.ts']))
   await pressBack(navigation)
-  expect(editorTabPaths(harness.workspace)).toEqual(['repo/a.ts', 'repo/b.ts'])
+  expect(editorTabContents(harness.workspace)).toEqual(testTabContents(['repo/a.ts', 'repo/b.ts']))
 })
 
 test('transient conflict selection survives panel edits and a current addressed file resumes route selection', async ({
@@ -166,24 +188,30 @@ test('transient conflict selection survives panel edits and a current addressed 
   server,
 }) => {
   const workspace = await navigationWorkspace(client, server)
-  const conflict = conflictDiffDocumentId('local-conflict')
+  const conflict = 'conflict-diff:local-conflict'
   seedWorkspaceCache({ ...workspace, tabPaths: ['repo/a.ts', conflict] })
   const { harness, navigation } = await renderAddressHarness({
     initialEntries: [`${workspace.base}/f/a.ts`],
   })
   await waitForNavigation(navigation)
   const href = navigation.router.history.location.href
-  expect(await navigation.openFile({ owner: harness.workspace, path: conflict })).toEqual({
+  expect(
+    await navigation.openContent({ owner: harness.workspace, content: testTabContent(conflict) }),
+  ).toEqual({
     status: 'applied',
   })
   expect(navigation.router.history.location.href).toBe(href)
   await navigation.setSidePanel('git')
-  expect(harness.workspace.getState().selectedFilePath).toBe(conflict)
-  expect(await navigation.openFile({ owner: harness.workspace, path: 'repo/a.ts' })).toEqual({
+  expect(harness.workspace.getState().selectedTabContent).toEqual(testNullableTabContent(conflict))
+  expect(
+    await navigation.openFile({ owner: harness.workspace, path: filesystemPath('repo/a.ts') }),
+  ).toEqual({
     status: 'applied',
   })
-  expect(harness.workspace.getState().selectedFilePath).toBe('repo/a.ts')
-  expect(editorTabPaths(harness.workspace)).toContain(conflict)
+  expect(harness.workspace.getState().selectedTabContent).toEqual(
+    testNullableTabContent('repo/a.ts'),
+  )
+  expect(editorTabContents(harness.workspace)).toContainEqual(testTabContent(conflict))
 })
 
 test('Back and Forward preserve current tools, rail and panels without adding entries', async ({
@@ -196,7 +224,7 @@ test('Back and Forward preserve current tools, rail and panels without adding en
     initialEntries: [`${workspace.base}/f/a.ts`],
   })
   await waitForNavigation(navigation)
-  await navigation.openFile({ owner: harness.workspace, path: 'repo/b.ts' })
+  await navigation.openFile({ owner: harness.workspace, path: filesystemPath('repo/b.ts') })
   const historyLength = navigation.router.history.length
   const historyIndex = navigation.router.history.location.state.__TSR_index
   await navigation.setToolPanel('logs')
@@ -215,7 +243,9 @@ test('Back and Forward preserve current tools, rail and panels without adding en
   await navigation.setSidePanel('git')
   navigation.forward()
   await waitForNavigation(navigation)
-  expect(harness.workspace.getState().selectedFilePath).toBe('repo/b.ts')
+  expect(harness.workspace.getState().selectedTabContent).toEqual(
+    testNullableTabContent('repo/b.ts'),
+  )
   expect(harness.workspace.getState().workbenchPanels.activeSidebarTab).toBe('git')
 })
 
@@ -229,7 +259,7 @@ test('Back persists the reached address and immediate copying captures current e
     initialEntries: [`${workspace.base}/f/a.ts?decode=diffusion`],
   })
   await waitForNavigation(navigation)
-  await navigation.openFile({ owner: harness.workspace, path: 'repo/b.ts' })
+  await navigation.openFile({ owner: harness.workspace, path: filesystemPath('repo/b.ts') })
   await navigation.setSearchQuery('just typed')
   const copied = navigation.copyAddress('https://example.test')
   expect(copied.href).toContain('/workbench/f/b.ts')
@@ -272,7 +302,9 @@ test('an already-current destination resolves without a route event', async ({
   })
   await waitForNavigation(navigation)
   const count = navigation.router.history.length
-  expect(await navigation.openFile({ owner: harness.workspace, path: 'repo/a.ts' })).toEqual({
+  expect(
+    await navigation.openFile({ owner: harness.workspace, path: filesystemPath('repo/a.ts') }),
+  ).toEqual({
     status: 'applied',
   })
   expect(navigation.router.history.length).toBe(count)
@@ -311,12 +343,17 @@ test.for(['supersede', 'dispose'] as const)(
       await delayed.started
       if (action === 'dispose') rendered.navigation.dispose()
       if (action === 'supersede')
-        await rendered.navigation.openFile({ owner: rendered.harness.workspace, path: 'repo/b.ts' })
+        await rendered.navigation.openFile({
+          owner: rendered.harness.workspace,
+          path: filesystemPath('repo/b.ts'),
+        })
       await waitFor(() => expect(completed).toEqual({ status: 'superseded' }))
       delayed.release()
       await pending
       if (action === 'supersede')
-        expect(rendered.harness.workspace.getState().selectedFilePath).toBe('repo/b.ts')
+        expect(rendered.harness.workspace.getState().selectedTabContent).toEqual(
+          testNullableTabContent('repo/b.ts'),
+        )
     } finally {
       delayed.release()
       rendered.unmount()
@@ -340,7 +377,9 @@ test('attaching after Router resolved another destination applies the current lo
   pending.unmount()
   const rendered = await renderAddressHarness({ navigation })
   await waitForNavigation(navigation)
-  expect(rendered.harness.workspace.getState().selectedFilePath).toBe('repo/b.ts')
+  expect(rendered.harness.workspace.getState().selectedTabContent).toEqual(
+    testNullableTabContent('repo/b.ts'),
+  )
   expect(navigation.router.history.location.pathname).toBe(`${workspace.base}/f/b.ts`)
 })
 
@@ -354,10 +393,12 @@ test('reattachment consumes the reached location instead of replaying startup', 
     initialEntries: [`${workspace.base}/f/a.ts`],
   })
   await waitForNavigation(navigation)
-  await navigation.openFile({ owner: harness.workspace, path: 'repo/b.ts' })
+  await navigation.openFile({ owner: harness.workspace, path: filesystemPath('repo/b.ts') })
   const detach = navigation.attach(application)
   await waitForNavigation(navigation)
-  expect(harness.workspace.getState().selectedFilePath).toBe('repo/b.ts')
+  expect(harness.workspace.getState().selectedTabContent).toEqual(
+    testNullableTabContent('repo/b.ts'),
+  )
   detach()
 })
 
@@ -390,11 +431,9 @@ test('effect cleanup before initial application preserves additive boot on reatt
   const rendered = renderApplication(null, application, { navigation })
   try {
     await waitForNavigation(navigation)
-    expect(editorTabPaths(application.getSnapshot().editor.workspaceStore)).toEqual([
-      'repo/a.ts',
-      'repo/b.ts',
-      'repo/c.ts',
-    ])
+    expect(editorTabContents(application.getSnapshot().editor.workspaceStore)).toEqual(
+      testTabContents(['repo/a.ts', 'repo/b.ts', 'repo/c.ts']),
+    )
   } finally {
     rendered.unmount()
   }
@@ -416,7 +455,7 @@ test('cleanup from an older attachment cannot detach the same runtime attached a
     expect(
       await navigation.openFile({
         owner: application.getSnapshot().editor.workspaceStore,
-        path: 'repo/b.ts',
+        path: filesystemPath('repo/b.ts'),
       }),
     ).toEqual({ status: 'applied' })
   } finally {
@@ -433,10 +472,15 @@ test('disposed navigation rejects an unaddressable editor command without mutati
   await waitForNavigation(navigation)
   const href = navigation.router.history.location.href
   navigation.dispose()
-  expect(await navigation.openFile({ owner: harness.workspace, path: '/outside-file.ts' })).toEqual(
-    { status: 'superseded' },
+  expect(
+    await navigation.openFile({
+      owner: harness.workspace,
+      path: filesystemPath('/outside-file.ts'),
+    }),
+  ).toEqual({ status: 'superseded' })
+  expect(harness.workspace.getState().selectedTabContent).toEqual(
+    testNullableTabContent('settings:'),
   )
-  expect(harness.workspace.getState().selectedFilePath).toBe(settingsDocumentId())
-  expect(editorTabPaths(harness.workspace)).toEqual([settingsDocumentId()])
+  expect(editorTabContents(harness.workspace)).toEqual(testTabContents(['settings:']))
   expect(navigation.router.history.location.href).toBe(href)
 })

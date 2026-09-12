@@ -1,3 +1,4 @@
+import { ActionCluster } from '@/features/git/components/action-cluster'
 import { ArrowBendUpLeftIcon, MinusIcon, PlusIcon } from '@phosphor-icons/react'
 
 import { useDiscardPathMutation, useStagePathMutation, useUnstagePathMutation } from '../hooks'
@@ -7,17 +8,17 @@ import { RowActionButton } from './row-action-button'
 export function FileActions({ path, section }: { path: string; section: PanelSection }) {
   if (section === 'staged') {
     return (
-      <div className='pointer-events-none flex opacity-0 transition-opacity group-hover/row:pointer-events-auto group-hover/row:opacity-100 focus-within:pointer-events-auto focus-within:opacity-100'>
+      <ActionCluster hoverGroup='row'>
         <UnstageFileButton path={path} />
-      </div>
+      </ActionCluster>
     )
   }
 
   return (
-    <div className='pointer-events-none flex opacity-0 transition-opacity group-hover/row:pointer-events-auto group-hover/row:opacity-100 focus-within:pointer-events-auto focus-within:opacity-100'>
+    <ActionCluster hoverGroup='row'>
       <DiscardFileButton path={path} />
       <StageFileButton path={path} />
-    </div>
+    </ActionCluster>
   )
 }
 

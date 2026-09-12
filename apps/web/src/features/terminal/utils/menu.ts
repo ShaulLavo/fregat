@@ -9,7 +9,7 @@ import {
   SelectionAllIcon,
 } from '@phosphor-icons/react'
 
-import { actionItem, section, type Menu } from '@/features/menus/utils/model'
+import { actionItem, section, type Menu } from '@/keymap/menus/utils/model'
 import { formatChord } from '@/keymap/utils/format-keys'
 
 /**

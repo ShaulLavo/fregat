@@ -1,5 +1,6 @@
 import { expect, test } from '../../../../../test/fixtures'
-import type { DiffDocumentInfo } from '@/features/git/utils/diff-document'
+import type { GitComparison } from '@/lib/documents/utils/types'
+import { filesystemPath } from '@/lib/documents/utils/identity'
 import { emptyDiffNotice } from '../diff-presentation'
 
 const ROOT = '/repo/platform'
@@ -25,12 +26,12 @@ function documentInfo({
   status,
 }: {
   oldPath?: string
-  status?: string
-}): DiffDocumentInfo {
+  status?: GitComparison['status']
+}): GitComparison {
   return {
     kind: 'snapshot',
-    path: `${ROOT}/src/new-name.ts`,
-    query: { oldPath, path: `${ROOT}/src/new-name.ts` },
+    path: filesystemPath(`${ROOT}/src/new-name.ts`),
+    oldPath: oldPath === undefined ? undefined : filesystemPath(oldPath),
     status,
-  } as DiffDocumentInfo
+  }
 }

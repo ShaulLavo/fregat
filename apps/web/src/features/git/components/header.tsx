@@ -1,3 +1,4 @@
+import type { GitRepositoryInfo } from '@workspace/contracts'
 import {
   ArrowsClockwiseIcon,
   CaretDownIcon,
@@ -13,11 +14,17 @@ import {
   usePushRemoteMutation,
 } from '../hooks'
 import { useGitState } from '@/features/git/state/store'
-import type { RepositoryInfo } from '@/features/git/utils/types'
+
 import { aheadBehindLabel } from '../utils/repository'
 import { ToolbarButton } from './toolbar-button'
 
-export function Header({ repository, rootPath }: { repository: RepositoryInfo; rootPath: string }) {
+export function Header({
+  repository,
+  rootPath,
+}: {
+  repository: GitRepositoryInfo
+  rootPath: string
+}) {
   const open = useGitState((state) => state.panelOpen)
   const setPanelOpen = useGitState((state) => state.setPanelOpen)
 

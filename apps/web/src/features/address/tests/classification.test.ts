@@ -1,3 +1,7 @@
+import {
+  testNullableTabContent,
+  testTabContents,
+} from '../../../../test/factories/document-targets'
 import { testWorkspaceAddress } from '../../../../test/factories/workspace-address'
 import { readdirSync, readFileSync } from 'node:fs'
 import { join } from 'node:path'
@@ -11,8 +15,7 @@ import {
   statesClassifiedAs,
 } from '@/features/address/utils/classification'
 import { applicableTabs, MAX_APPLIED_TABS } from '@workspace/client-core/address/grammar'
-import { addressFromSnapshot } from '@/features/address/utils/snapshot'
-import { emptyAddressSnapshot } from '@/features/address/utils/snapshot'
+import { addressFromSnapshot, emptyAddressSnapshot } from '@/features/address/utils/snapshot'
 
 const SOURCE_ROOT = join(import.meta.dirname, '../../..')
 const STORAGE_KEY_PATTERN = /['"`](platform[.:][\w.:-]*)['"`]/g
@@ -97,8 +100,8 @@ describe('the encoder cannot emit what it cannot reach', () => {
   test('produces only whitelisted fields, and nothing ephemeral', () => {
     const address = addressFromSnapshot({
       ...emptyAddressSnapshot(),
-      activeDocumentPath: '/repo/src/a.ts',
-      editorTabPaths: ['/repo/src/a.ts'],
+      activeTabContent: testNullableTabContent('/repo/src/a.ts'),
+      editorTabContents: testTabContents(['/repo/src/a.ts']),
       workspaceAddress: testWorkspaceAddress('/repo'),
       mode: 'workbench',
       rootPath: '/repo',
@@ -158,7 +161,7 @@ describe('the encoder cannot emit what it cannot reach', () => {
   test('drops a conflict document from the tab set rather than encoding it', () => {
     const address = addressFromSnapshot({
       ...emptyAddressSnapshot(),
-      editorTabPaths: ['/repo/src/a.ts', 'conflict-diff:abc'],
+      editorTabContents: testTabContents(['/repo/src/a.ts', 'conflict-diff:abc']),
       workspaceAddress: testWorkspaceAddress('/repo'),
       rootPath: '/repo',
     })
@@ -173,8 +176,8 @@ describe('the tab set budget', () => {
     const many = Array.from({ length: 400 }, (_, index) => `/repo/src/a-very-long-name-${index}.ts`)
     const address = addressFromSnapshot({
       ...emptyAddressSnapshot(),
-      activeDocumentPath: many[0],
-      editorTabPaths: many,
+      activeTabContent: testNullableTabContent(many[0]),
+      editorTabContents: testTabContents(many),
       workspaceAddress: testWorkspaceAddress('/repo'),
       rootPath: '/repo',
     })
@@ -194,7 +197,7 @@ describe('the tab set budget', () => {
     const many = Array.from({ length: MAX_APPLIED_TABS + 1 }, (_, index) => `/repo/${index}.ts`)
     const address = addressFromSnapshot({
       ...emptyAddressSnapshot(),
-      editorTabPaths: many,
+      editorTabContents: testTabContents(many),
       workspaceAddress: testWorkspaceAddress('/repo'),
       rootPath: '/repo',
     })
@@ -207,7 +210,7 @@ describe('the tab set budget', () => {
     const many = Array.from({ length: MAX_APPLIED_TABS }, (_, index) => `/repo/${index}.ts`)
     const address = addressFromSnapshot({
       ...emptyAddressSnapshot(),
-      editorTabPaths: many,
+      editorTabContents: testTabContents(many),
       workspaceAddress: testWorkspaceAddress('/repo'),
       rootPath: '/repo',
     })
@@ -219,7 +222,7 @@ describe('the tab set budget', () => {
   test('keeps a tab set that fits', () => {
     const address = addressFromSnapshot({
       ...emptyAddressSnapshot(),
-      editorTabPaths: ['/repo/src/a.ts', '/repo/src/b.ts'],
+      editorTabContents: testTabContents(['/repo/src/a.ts', '/repo/src/b.ts']),
       workspaceAddress: testWorkspaceAddress('/repo'),
       rootPath: '/repo',
     })
@@ -235,7 +238,7 @@ describe('the settings category belongs to an open settings document', () => {
     expect(
       addressFromSnapshot({
         ...emptyAddressSnapshot(),
-        editorTabPaths: ['/repo/src/a.ts'],
+        editorTabContents: testTabContents(['/repo/src/a.ts']),
         workspaceAddress: testWorkspaceAddress('/repo'),
         rootPath: '/repo',
         settingsCategory: 'providers',
@@ -247,7 +250,7 @@ describe('the settings category belongs to an open settings document', () => {
     expect(
       addressFromSnapshot({
         ...emptyAddressSnapshot(),
-        editorTabPaths: ['settings:'],
+        editorTabContents: testTabContents(['settings:']),
         workspaceAddress: testWorkspaceAddress('/repo'),
         rootPath: '/repo',
         settingsCategory: 'providers',
@@ -259,8 +262,8 @@ describe('the settings category belongs to an open settings document', () => {
     expect(
       addressFromSnapshot({
         ...emptyAddressSnapshot(),
-        activeDocumentPath: '/repo/src/a.ts',
-        editorTabPaths: ['/repo/src/a.ts', 'settings:'],
+        activeTabContent: testNullableTabContent('/repo/src/a.ts'),
+        editorTabContents: testTabContents(['/repo/src/a.ts', 'settings:']),
         workspaceAddress: testWorkspaceAddress('/repo'),
         rootPath: '/repo',
       }).settings,

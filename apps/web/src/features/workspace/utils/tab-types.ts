@@ -1,13 +1,14 @@
 import type { StatusPresentation } from '@/features/git/utils/types'
+import type { FilesystemPath, TabContent, TabId } from '@/lib/documents/utils/types'
 import type { ResolvedFileIcon } from '@/lib/file-icons'
 
-export type EditorTabConflictMap = Readonly<Record<string, { remotePath: string }>>
+export type EditorTabConflictMap = Readonly<Record<string, { remotePath: FilesystemPath }>>
 
 /** The working-tree file a diff tab is comparing, when it compares exactly one. */
 export type EditorTabDiffSource = {
   /** A deleted file has nothing left on disk to open. */
   onDisk: boolean
-  path: string
+  path: FilesystemPath
 }
 
 export type EditorTabModel = {
@@ -18,8 +19,8 @@ export type EditorTabModel = {
   diffStatus: StatusPresentation | null
   diffSuffix: string
   icon: ResolvedFileIcon
-  id: string
+  id: TabId
   name: string
-  path: string
+  content: TabContent
   title: string
 }

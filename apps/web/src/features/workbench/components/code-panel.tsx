@@ -1,3 +1,5 @@
+import type { GitFileStatus } from '@workspace/contracts'
+import type { FilesystemPath } from '@/lib/documents/utils/types'
 import { FileDashedIcon } from '@phosphor-icons/react'
 import { EmptyState } from '@workspace/ui/components/empty-state'
 
@@ -5,7 +7,7 @@ import { EMPTY_GIT_FILES, editorTabModel } from '@/features/workspace/utils/tab-
 import { EditorSurfaceTabBody } from '@/features/workbench/components/editor-surface-tab-body'
 import { EditorTabBar } from '@/features/workbench/components/editor-tab-bar'
 import { useEditorInputPending } from '@/features/workbench/hooks/use-editor-input-pending'
-import type { FileStatus } from '@/features/git/utils/types'
+
 import type { EditorTabConflictMap } from '@/features/workspace/utils/tab-types'
 import type { WorkbenchPanels } from '@/features/workbench/utils/panels'
 
@@ -18,9 +20,9 @@ export function CodePanel({
 }: {
   readonly conflicts: EditorTabConflictMap
 
-  readonly gitFiles?: readonly FileStatus[]
+  readonly gitFiles?: readonly GitFileStatus[]
   readonly panels: WorkbenchPanels
-  readonly rootPath: string
+  readonly rootPath: FilesystemPath
 }) {
   const tabModels = panels.editorTabs.map((tab) =>
     editorTabModel({
@@ -32,7 +34,7 @@ export function CodePanel({
     }),
   )
   const activeTab = panels.editorTabs.find((tab) => tab.id === panels.activeEditorTabId) ?? null
-  const inputPending = useEditorInputPending(activeTab?.path)
+  const inputPending = useEditorInputPending(activeTab?.content)
   const loadingTabId = inputPending ? activeTab?.id : null
 
   return (
@@ -42,7 +44,7 @@ export function CodePanel({
         {activeTab ? (
           <EditorSurfaceTabBody
             active
-            path={activeTab.path}
+            content={activeTab.content}
             rootPath={rootPath}
             tabId={activeTab.id}
           />

@@ -1,6 +1,6 @@
+import type { GitRepositoryInfo } from '@workspace/contracts'
 import { describe, expect, it } from 'vitest'
 
-import type { RepositoryInfo } from '@/features/git/utils/types'
 import { canSyncChanges, syncChangesLabel } from '../repository'
 
 describe('git repository labels', () => {
@@ -16,7 +16,7 @@ describe('git repository labels', () => {
   })
 })
 
-function repositoryInfo(overrides: Partial<RepositoryInfo> = {}): RepositoryInfo {
+function repositoryInfo(overrides: Partial<GitRepositoryInfo> = {}): GitRepositoryInfo {
   return {
     ahead: 0,
     behind: 0,

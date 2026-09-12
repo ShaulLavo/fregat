@@ -4,7 +4,7 @@ import { TooltipProvider } from '@workspace/ui/components/tooltip'
 import type { SettingsValues } from '@workspace/contracts'
 
 import { ThemeAwareToaster } from '@/components/theme-aware-toaster'
-import { EnvironmentConnectionGate } from '@/components/environment-connection-gate'
+import { ConnectionGate } from '@/features/environments/components/connection-gate'
 import { EditorColorThemeProvider } from '@/features/editor/providers/color-theme-provider'
 import { LanguageServerMatchProvider } from '@/features/editor/providers/language-server-match-provider'
 import { EditorStateProvider } from '@/features/editor/providers/state-provider'
@@ -23,7 +23,7 @@ export function ActiveEnvironmentApplication({
 
   return (
     <QueryClientProvider key={active.origin} client={active.queryClient}>
-      <EnvironmentConnectionGate origin={active.origin}>
+      <ConnectionGate origin={active.origin}>
         <LanguageServerMatchProvider>
           <AppearanceProvider bootDensity={bootDensity}>
             <EditorColorThemeProvider>
@@ -34,7 +34,7 @@ export function ActiveEnvironmentApplication({
             </EditorColorThemeProvider>
           </AppearanceProvider>
         </LanguageServerMatchProvider>
-      </EnvironmentConnectionGate>
+      </ConnectionGate>
     </QueryClientProvider>
   )
 }

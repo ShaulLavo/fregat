@@ -1,3 +1,6 @@
+import { fileDocumentKey, filesystemPath } from '@/lib/documents/utils/identity'
+import type { FilesystemPath } from '@/lib/documents/utils/types'
+import type { WorkspaceEditPrepareRequest } from '@/lib/file-system-types'
 import type {
   WorkspaceEditAnnotation,
   WorkspaceEditOperation,
@@ -30,14 +33,13 @@ import {
   type EditorTextBuffer,
 } from '@singapor/core/document'
 import type {
-  WorkspaceEditPrepareRequest,
   WorkspaceEditResult,
   WorkspaceEditResultEntry,
-  WorkspacePersistenceOperation,
   WorkspaceResourcePrecondition,
 } from '@workspace/contracts'
 
 import type {
+  EditorDocumentStore,
   EditorDocumentStoreApi,
   LiveEditorDocument,
 } from '@/features/editor/state/document-state'
@@ -65,6 +67,8 @@ import { normalizeWorkspaceRoot } from '@workspace/client-core/files/path'
 import { toClientError } from '@/lib/client-error-taxonomy'
 import { createClientError } from '@workspace/client-core/errors'
 import { createClientInvariantError } from '@/lib/structured-errors'
+
+type WorkspacePersistenceOperation = WorkspaceEditPrepareRequest['operations'][number]
 
 export const MAX_WORKSPACE_EDIT_UNDO_GROUPS = 20
 
@@ -94,13 +98,13 @@ export type WorkspaceEditPreviewRow = {
   readonly afterText?: string
   readonly annotationIds: readonly string[]
   readonly beforeText?: string
-  readonly fromPath?: string
+  readonly fromPath?: FilesystemPath
   readonly ignored: boolean
   readonly index: number
   readonly kind: WorkspaceEditOperation['kind']
-  readonly path: string
+  readonly path: FilesystemPath
   readonly targetKind?: WorkspaceEditPreviewTargetKind
-  readonly toPath?: string
+  readonly toPath?: FilesystemPath
 }
 
 export type WorkspaceEditPreview = {
@@ -113,10 +117,10 @@ export type WorkspaceEditPreview = {
 }
 
 export type WorkspaceEditRecovery = {
-  readonly affectedPaths: readonly string[]
+  readonly affectedPaths: readonly FilesystemPath[]
   readonly generation: number
   readonly operationId: string
-  readonly unrecoveredPaths: readonly string[]
+  readonly unrecoveredPaths: readonly FilesystemPath[]
 }
 
 export type WorkspaceEditServiceSnapshot = {
@@ -133,11 +137,11 @@ export type WorkspaceEditServiceSnapshot = {
 export type WorkspaceEditRoot = {
   readonly generation: number
   /** Document-store and ordinary filesystem client namespace. */
-  readonly path: string
+  readonly path: FilesystemPath
   /** Slash-prefixed LSP URI namespace. Defaults to `path` for injected callers. */
-  readonly uriPath?: string
+  readonly uriPath?: FilesystemPath
   /** Server workspace-edit request namespace. Defaults to `path` for injected callers. */
-  readonly workspacePath?: string
+  readonly workspacePath?: FilesystemPath
 }
 
 declare const workspaceMutationReservationBrand: unique symbol
@@ -146,7 +150,7 @@ export type WorkspaceMutationReservation = {
   readonly [workspaceMutationReservationBrand]: true
 }
 
-export type WorkspaceMutationAffectedPaths = readonly string[] | 'all'
+export type WorkspaceMutationAffectedPaths = readonly FilesystemPath[] | 'all'
 
 export type WorkspaceMutationReporter = (affectedPaths: WorkspaceMutationAffectedPaths) => void
 
@@ -167,7 +171,10 @@ export type WorkspaceEditServiceOptions = {
   readonly documentStore: EditorDocumentStoreApi
   readonly fileSync: FileSyncService
   readonly getRoot: () => WorkspaceEditRoot | null
-  readonly inspectPath?: (path: string, signal: AbortSignal) => Promise<WorkspaceEditPathInspection>
+  readonly inspectPath?: (
+    path: FilesystemPath,
+    signal: AbortSignal,
+  ) => Promise<WorkspaceEditPathInspection>
   readonly createOperationId?: () => string
   readonly createOperationEvent?: (
     options: WorkspaceEditOperationEventOptions,
@@ -188,21 +195,21 @@ type ResolvedTextOperation = {
   readonly index: number
   readonly kind: 'text'
   readonly operation: Extract<WorkspaceEditOperation, { readonly kind: 'text-document' }>
-  readonly path: string
+  readonly path: FilesystemPath
   readonly segmentIndex: number
   readonly target: PreparedTarget
 }
 
 type ResolvedResourceOperation = {
-  readonly fromPath?: string
+  readonly fromPath?: FilesystemPath
   readonly ignored: boolean
   readonly index: number
   readonly kind: 'resource'
   readonly operation: Exclude<WorkspaceEditOperation, { readonly kind: 'text-document' }>
-  readonly path: string
+  readonly path: FilesystemPath
   readonly projection: WorkspaceDocumentProjection | null
   readonly target: PreparedTarget | null
-  readonly toPath?: string
+  readonly toPath?: FilesystemPath
 }
 
 type ResolvedOperation = ResolvedResourceOperation | ResolvedTextOperation
@@ -210,24 +217,24 @@ type ResolvedOperation = ResolvedResourceOperation | ResolvedTextOperation
 type PreparedTarget = {
   readonly buffer: EditorTextBuffer
   readonly dirtyInitially: boolean
-  readonly initialPath: string
+  readonly initialPath: FilesystemPath
   readonly initialSnapshot: DocumentTextSnapshot
   readonly kind: WorkspaceEditPreviewTargetKind
   readonly liveStamp: WorkspaceDocumentTargetStamp | null
   readonly segments: WorkspaceTextReplaySegmentInput[]
-  currentPath: string
+  currentPath: FilesystemPath
   prepared: Extract<ReturnType<typeof prepareWorkspaceTextReplay>, { readonly ok: true }> | null
 }
 
 type PreparedWorkspaceEdit = {
-  readonly affectedPaths: readonly string[]
+  readonly affectedPaths: readonly FilesystemPath[]
   readonly immediate: boolean
   readonly operationId: string
   readonly operations: readonly ResolvedOperation[]
   readonly pathRequests: readonly WorkspaceDocumentPathReservationRequest[]
   readonly persistence: readonly WorkspacePersistenceOperation[]
-  readonly projectionAfterContents: ReadonlyMap<string, string>
-  readonly projectionBeforeContents: ReadonlyMap<string, string>
+  readonly projectionAfterContents: ReadonlyMap<FilesystemPath, string>
+  readonly projectionBeforeContents: ReadonlyMap<FilesystemPath, string>
   readonly preview: WorkspaceEditPreview
   readonly request: WorkspaceEditApplicationRequest
   readonly root: WorkspaceEditRoot
@@ -253,7 +260,7 @@ type LocalCommit = {
 }
 
 type WorkspaceEditGroup = {
-  readonly affectedPaths: readonly string[]
+  readonly affectedPaths: readonly FilesystemPath[]
   readonly legs: LocalLeg[]
   readonly operationId: string
   projection: WorkspaceMutationProjectionReceipt | null
@@ -331,7 +338,6 @@ export class WorkspaceEditService {
       this.handleServerEpoch,
     )
     this.unsubscribeDocumentContentRevisions = options.documentStore.subscribe(
-      (state) => state.documentContentRevisions,
       this.handleDocumentContentRevisions,
     )
   }
@@ -350,11 +356,12 @@ export class WorkspaceEditService {
   }
 
   private readonly handleDocumentContentRevisions = (
-    current: Readonly<Record<string, string>>,
-    previous: Readonly<Record<string, string>>,
+    current: EditorDocumentStore,
+    previous: EditorDocumentStore,
   ): void => {
     if (this.internalDocumentMutationDepth > 0) return
-    const affectedPaths = changedRecordKeys(previous, current)
+    if (current.documentContentRevisions === previous.documentContentRevisions) return
+    const affectedPaths = changedFileDocumentPaths(previous, current)
     if (affectedPaths.length === 0) return
     void this.invalidateHistoryForForward(affectedPaths)
   }
@@ -490,7 +497,7 @@ export class WorkspaceEditService {
       throw workspaceEditError('workspace-edit-busy', 'Another workspace mutation is active')
     }
 
-    const reportedPaths = new Set<string>()
+    const reportedPaths = new Set<FilesystemPath>()
     let reportedAll = false
     let hasReport = false
     const reportAffectedPaths: WorkspaceMutationReporter = (paths) => {
@@ -617,7 +624,7 @@ export class WorkspaceEditService {
     }
   }
 
-  async discardRecoveryData(unrecoveredPaths: readonly string[]): Promise<boolean> {
+  async discardRecoveryData(unrecoveredPaths: readonly FilesystemPath[]): Promise<boolean> {
     void this.flushPendingWorkspaceMutationCleanup()
     if (this.externalMutationReservation) return false
     const current = await this.currentRecoveryResult()
@@ -823,7 +830,7 @@ export class WorkspaceEditService {
   }
 
   private prepareRecoveryConflictTransfer(
-    affectedPaths: readonly string[],
+    affectedPaths: readonly FilesystemPath[],
     operationId: string,
   ): PreparedRecoveryConflictTransfer | null {
     const locks = this.recoveryLocks
@@ -909,7 +916,7 @@ export class WorkspaceEditService {
     const reserved = state.reserveWorkspaceDocumentPaths(requests, result.operationId)
     if (reserved.status !== 'acquired') return false
     const stamps = paths.flatMap((path) => {
-      const stamp = state.prepareWorkspaceDocumentTarget(path)
+      const stamp = state.prepareWorkspaceDocumentTarget(fileDocumentKey(path))
       return stamp ? [stamp] : []
     })
     if (stamps.length === 0) {
@@ -930,7 +937,7 @@ export class WorkspaceEditService {
 
   private retainRecoveryLocks(
     locks: HeldWorkspaceLocks,
-    affectedPaths: readonly string[],
+    affectedPaths: readonly FilesystemPath[],
     operationId: string,
   ): void {
     this.releaseRecoveryLocks()
@@ -967,8 +974,8 @@ export class WorkspaceEditService {
   }
 
   private async reconcileProjectionSafely(
-    rootPath: string,
-    paths: readonly string[],
+    rootPath: FilesystemPath,
+    paths: readonly FilesystemPath[],
   ): Promise<void> {
     try {
       await this.options.fileSync.reconcileWorkspaceMutationProjection(rootPath, paths)
@@ -1133,7 +1140,9 @@ export class WorkspaceEditService {
     if (oldest) await this.releaseGroup(oldest)
   }
 
-  private async invalidateHistoryForForward(paths: readonly string[] | 'all'): Promise<void> {
+  private async invalidateHistoryForForward(
+    paths: readonly FilesystemPath[] | 'all',
+  ): Promise<void> {
     const discarded = this.redoStack.splice(0)
     const retained: WorkspaceEditGroup[] = []
     const invalidatedPaths = paths === 'all' ? null : new Set(paths)
@@ -1306,7 +1315,7 @@ export class WorkspaceEditService {
 
   private async invalidateHistoryDependencyChain(
     source: WorkspaceEditGroup[],
-    seedPaths: readonly string[],
+    seedPaths: readonly FilesystemPath[],
   ): Promise<void> {
     const invalidatedPaths = new Set(seedPaths)
     const discarded: WorkspaceEditGroup[] = []
@@ -1399,7 +1408,7 @@ export class WorkspaceEditService {
 }
 
 type VirtualNode = {
-  readonly initialPath: string
+  readonly initialPath: FilesystemPath
   readonly initiallyExists: boolean
   pendingText: boolean
   snapshot: WorkspaceFileSnapshot | null
@@ -1407,13 +1416,13 @@ type VirtualNode = {
 }
 
 class WorkspaceEditPreparationBuilder {
-  private readonly inspectedPathByCanonicalPath = new Map<string, string>()
-  private readonly initialDiskContents = new Map<string, string>()
-  private readonly externalGuards = new Map<string, WorkspaceResourcePrecondition>()
-  private readonly inspections = new Map<string, WorkspaceEditPathInspection>()
-  private readonly nodesByPath = new Map<string, VirtualNode>()
+  private readonly inspectedPathByCanonicalPath = new Map<FilesystemPath, string>()
+  private readonly initialDiskContents = new Map<FilesystemPath, string>()
+  private readonly externalGuards = new Map<FilesystemPath, WorkspaceResourcePrecondition>()
+  private readonly inspections = new Map<FilesystemPath, WorkspaceEditPathInspection>()
+  private readonly nodesByPath = new Map<FilesystemPath, VirtualNode>()
   private readonly operations: ResolvedOperation[] = []
-  private readonly rawUriByPath = new Map<string, string>()
+  private readonly rawUriByPath = new Map<FilesystemPath, string>()
   private readonly targets = new Set<PreparedTarget>()
 
   constructor(
@@ -1620,18 +1629,18 @@ class WorkspaceEditPreparationBuilder {
     })
   }
 
-  private async nodeAt(path: string): Promise<VirtualNode | null> {
+  private async nodeAt(path: FilesystemPath): Promise<VirtualNode | null> {
     if (this.nodesByPath.has(path)) return this.nodesByPath.get(path) ?? null
     return this.loadExternalNode(path)
   }
 
-  private async existingNode(path: string): Promise<VirtualNode | null> {
+  private async existingNode(path: FilesystemPath): Promise<VirtualNode | null> {
     return this.nodeAt(path)
   }
 
-  private async loadExternalNode(path: string): Promise<VirtualNode | null> {
+  private async loadExternalNode(path: FilesystemPath): Promise<VirtualNode | null> {
     await this.assertSupportedPath(path)
-    const live = this.options.documentStore.getState().getLiveEditorDocument(path)
+    const live = this.options.documentStore.getState().getLiveEditorDocument(fileDocumentKey(path))
     if (live) {
       const node = this.liveNode(live)
       this.nodesByPath.set(path, node)
@@ -1662,25 +1671,25 @@ class WorkspaceEditPreparationBuilder {
   }
 
   private liveNode(document: LiveEditorDocument): VirtualNode {
-    if (document.sync.kind !== 'file') {
+    if (document.sync.kind !== 'file' || document.target.kind !== 'file') {
       throw workspaceEditError(
         'unsupported-target',
         'Synthetic documents cannot receive workspace edits',
       )
     }
-    this.externalGuards.set(document.path, {
+    this.externalGuards.set(document.target.resource.path, {
       kind: 'snapshot',
       mtimeMs: document.sync.mtimeMs,
       version: document.sync.fileVersion,
     })
-    const stamp = this.options.documentStore.getState().prepareWorkspaceDocumentTarget(document.id)
+    const stamp = this.options.documentStore.getState().prepareWorkspaceDocumentTarget(document.key)
     if (!stamp)
       throw workspaceEditError('snapshot-drift', 'Live document changed during preparation')
     const target: PreparedTarget = {
       buffer: document.buffer,
-      currentPath: document.path,
+      currentPath: document.target.resource.path,
       dirtyInitially: stamp.dirty,
-      initialPath: document.path,
+      initialPath: document.target.resource.path,
       initialSnapshot: document.buffer.getTextSnapshot(),
       kind: stamp.dirty ? 'dirty' : 'open',
       liveStamp: stamp,
@@ -1689,7 +1698,7 @@ class WorkspaceEditPreparationBuilder {
     }
     this.targets.add(target)
     return {
-      initialPath: document.path,
+      initialPath: document.target.resource.path,
       initiallyExists: true,
       pendingText: false,
       snapshot: null,
@@ -1697,7 +1706,7 @@ class WorkspaceEditPreparationBuilder {
     }
   }
 
-  private async ensureTextTarget(node: VirtualNode, path: string): Promise<PreparedTarget> {
+  private async ensureTextTarget(node: VirtualNode, path: FilesystemPath): Promise<PreparedTarget> {
     if (node.target) return node.target
     const snapshot = node.snapshot ?? (await this.readWorkspaceSnapshot(node, path))
     assertSafeRoundTrip(snapshot)
@@ -1708,14 +1717,14 @@ class WorkspaceEditPreparationBuilder {
     return target
   }
 
-  private async ensureResourceSnapshot(node: VirtualNode, path: string): Promise<void> {
+  private async ensureResourceSnapshot(node: VirtualNode, path: FilesystemPath): Promise<void> {
     if (!node.initiallyExists || node.snapshot) return
     await this.readWorkspaceSnapshot(node, path)
   }
 
   private async readWorkspaceSnapshot(
     node: VirtualNode,
-    path: string,
+    path: FilesystemPath,
   ): Promise<WorkspaceFileSnapshot> {
     const snapshot = await this.options.fileSync.readWorkspaceSnapshot(path, this.signal)
     assertSafeRoundTrip(snapshot)
@@ -1730,7 +1739,7 @@ class WorkspaceEditPreparationBuilder {
     throw workspaceEditError('open-overwrite-target', 'Cannot overwrite an open document')
   }
 
-  private resolveUri(uri: string): string {
+  private resolveUri(uri: string): FilesystemPath {
     const path = workspacePathFromFileUri(uri, this.root)
     const existing = this.rawUriByPath.get(path)
     if (existing && existing !== uri) {
@@ -1740,7 +1749,7 @@ class WorkspaceEditPreparationBuilder {
     return path
   }
 
-  private async assertSupportedPath(path: string): Promise<void> {
+  private async assertSupportedPath(path: FilesystemPath): Promise<void> {
     const relative = workspaceRelativePath(this.root.path, path)
     if (!relative || relative === '.') {
       throw workspaceEditError('unsupported-target', 'Workspace root is not a file target')
@@ -1748,10 +1757,11 @@ class WorkspaceEditPreparationBuilder {
     const segments = relative.split('/')
     let current = this.root.path
     for (const segment of segments) {
-      current = workspaceDocumentPath(current, segment) ?? ''
-      if (!current) {
+      const next = workspaceDocumentPath(current, segment)
+      if (!next) {
         throw workspaceEditError('outside-workspace', 'Workspace target path is invalid')
       }
+      current = next
       const inspected = await this.inspect(current)
       if (!inspected.exists) return
       if (inspected.type === 'symlink') {
@@ -1760,7 +1770,7 @@ class WorkspaceEditPreparationBuilder {
     }
   }
 
-  private async inspect(path: string): Promise<WorkspaceEditPathInspection> {
+  private async inspect(path: FilesystemPath): Promise<WorkspaceEditPathInspection> {
     const cached = this.inspections.get(path)
     if (cached) return cached
     const inspected = await this.inspectPath(path, this.signal)
@@ -1769,7 +1779,10 @@ class WorkspaceEditPreparationBuilder {
     return inspected
   }
 
-  private assertCanonicalInspection(path: string, inspected: WorkspaceEditPathInspection): void {
+  private assertCanonicalInspection(
+    path: FilesystemPath,
+    inspected: WorkspaceEditPathInspection,
+  ): void {
     if (!inspected.exists) return
     if (inspected.path !== inspected.canonicalPath) {
       throw workspaceEditError(
@@ -1908,8 +1921,8 @@ function workspaceReplayFailureMessage(error: {
 
 function buildPersistenceOperations(
   operations: readonly ResolvedOperation[],
-  initialGuards: ReadonlyMap<string, WorkspaceResourcePrecondition>,
-  rootPath: string,
+  initialGuards: ReadonlyMap<FilesystemPath, WorkspaceResourcePrecondition>,
+  rootPath: FilesystemPath,
 ): readonly WorkspacePersistenceOperation[] {
   const guards = new Map(initialGuards)
   const persistence: WorkspacePersistenceOperation[] = []
@@ -1924,9 +1937,9 @@ function buildPersistenceOperations(
 }
 
 function projectionContentsAfter(
-  before: ReadonlyMap<string, string>,
+  before: ReadonlyMap<FilesystemPath, string>,
   operations: readonly ResolvedOperation[],
-): ReadonlyMap<string, string> {
+): ReadonlyMap<FilesystemPath, string> {
   const after = new Map(before)
   for (const resolved of operations) {
     if (resolved.kind === 'text') {
@@ -1938,7 +1951,10 @@ function projectionContentsAfter(
   return after
 }
 
-function projectTextContent(contents: Map<string, string>, resolved: ResolvedTextOperation): void {
+function projectTextContent(
+  contents: Map<FilesystemPath, string>,
+  resolved: ResolvedTextOperation,
+): void {
   if (resolved.target.kind !== 'unopened') return
   const segment = preparedSegment(resolved)
   if (!segment || segment.logicalRevisionCount === 0) return
@@ -1946,7 +1962,7 @@ function projectTextContent(contents: Map<string, string>, resolved: ResolvedTex
 }
 
 function projectResourceContent(
-  contents: Map<string, string>,
+  contents: Map<FilesystemPath, string>,
   resolved: ResolvedResourceOperation,
 ): void {
   if (resolved.ignored) return
@@ -1967,9 +1983,9 @@ function projectResourceContent(
 
 function appendPersistenceWrite(
   persistence: WorkspacePersistenceOperation[],
-  guards: Map<string, WorkspaceResourcePrecondition>,
+  guards: Map<FilesystemPath, WorkspaceResourcePrecondition>,
   resolved: ResolvedTextOperation,
-  rootPath: string,
+  rootPath: FilesystemPath,
 ): void {
   if (resolved.target.kind !== 'unopened') return
   const segment = preparedSegment(resolved)
@@ -1987,9 +2003,9 @@ function appendPersistenceWrite(
 
 function appendPersistenceResource(
   persistence: WorkspacePersistenceOperation[],
-  guards: Map<string, WorkspaceResourcePrecondition>,
+  guards: Map<FilesystemPath, WorkspaceResourcePrecondition>,
   resolved: ResolvedResourceOperation,
-  rootPath: string,
+  rootPath: FilesystemPath,
 ): void {
   const operation = resolved.operation
   if (operation.kind === 'create') {
@@ -2039,8 +2055,8 @@ function preparedSegment(resolved: ResolvedTextOperation) {
 }
 
 function requiredGuard(
-  guards: ReadonlyMap<string, WorkspaceResourcePrecondition>,
-  path: string,
+  guards: ReadonlyMap<FilesystemPath, WorkspaceResourcePrecondition>,
+  path: FilesystemPath,
 ): WorkspaceResourcePrecondition {
   const guard = guards.get(path)
   if (guard) return guard
@@ -2048,8 +2064,8 @@ function requiredGuard(
 }
 
 function requiredExistingGuard(
-  guards: ReadonlyMap<string, WorkspaceResourcePrecondition>,
-  path: string,
+  guards: ReadonlyMap<FilesystemPath, WorkspaceResourcePrecondition>,
+  path: FilesystemPath,
 ): Exclude<WorkspaceResourcePrecondition, { readonly kind: 'missing' }> {
   const guard = requiredGuard(guards, path)
   if (guard.kind !== 'missing') return guard
@@ -2060,58 +2076,64 @@ function transactionGuard(afterOperation: number): WorkspaceResourcePrecondition
   return { afterOperation, kind: 'transaction' }
 }
 
-function requiredRelativePath(rootPath: string, path: string): string {
+function requiredRelativePath(rootPath: FilesystemPath, path: FilesystemPath): FilesystemPath {
   const relative = workspaceRelativePath(rootPath, path)
   if (relative && relative !== '.') return relative
   throw workspaceEditError('outside-workspace', 'Workspace edit target is outside the workspace')
 }
 
-function workspaceRelativePath(rootPath: string, path: string): string | null {
+function workspaceRelativePath(
+  rootPath: FilesystemPath,
+  path: FilesystemPath,
+): FilesystemPath | null {
   const root = normalizeWorkspaceNamespacePath(rootPath)
   const target = normalizeWorkspaceNamespacePath(path)
   if (root === '/') {
     if (!target.startsWith('/')) return null
-    return target === '/' ? '.' : target.slice(1)
+    return filesystemPath(target === '/' ? '.' : target.slice(1))
   }
   if (!root) {
     if (target.startsWith('/')) return null
-    return target || '.'
+    return filesystemPath(target || '.')
   }
-  if (target === root) return '.'
+  if (target === root) return filesystemPath('.')
   if (!target.startsWith(`${root}/`)) return null
-  return target.slice(root.length + 1)
+  return filesystemPath(target.slice(root.length + 1))
 }
 
-function workspaceDocumentPath(rootPath: string, relativePath: string): string | null {
+function workspaceDocumentPath(
+  rootPath: FilesystemPath,
+  relativePath: string,
+): FilesystemPath | null {
   if (!relativePath || relativePath.startsWith('/')) return null
   const root = normalizeWorkspaceNamespacePath(rootPath)
   if (relativePath === '.') return root
   if (relativePath.split('/').some((segment) => segment === '.' || segment === '..')) return null
-  if (root === '/') return `/${relativePath}`
-  if (!root) return relativePath
-  return `${root}/${relativePath}`
+  if (root === '/') return filesystemPath(`/${relativePath}`)
+  if (!root) return filesystemPath(relativePath)
+  return filesystemPath(`${root}/${relativePath}`)
 }
 
 function recoveryDocumentPaths(
   root: WorkspaceEditRoot,
   relativePaths: readonly string[],
-): readonly string[] {
+): readonly FilesystemPath[] {
   return relativePaths.flatMap((path) => {
     const documentPath = workspaceDocumentPath(root.path, path)
     return documentPath ? [documentPath] : []
   })
 }
 
-function normalizeWorkspaceNamespacePath(path: string): string {
+function normalizeWorkspaceNamespacePath(path: FilesystemPath): FilesystemPath {
   if (path === '/') return path
-  return normalizeWorkspaceRoot(path)
+  return filesystemPath(normalizeWorkspaceRoot(path))
 }
 
-function workspaceEditUriPath(root: WorkspaceEditRoot): string {
+function workspaceEditUriPath(root: WorkspaceEditRoot): FilesystemPath {
   return root.uriPath ?? root.path
 }
 
-function workspaceEditRequestPath(root: WorkspaceEditRoot): string {
+function workspaceEditRequestPath(root: WorkspaceEditRoot): FilesystemPath {
   return root.workspacePath ?? root.path
 }
 
@@ -2122,13 +2144,15 @@ function sameWorkspaceEditRoot(left: WorkspaceEditRoot, right: WorkspaceEditRoot
   return workspaceEditRequestPath(left) === workspaceEditRequestPath(right)
 }
 
-function requiredPath(path: string | undefined): string {
+function requiredPath(path: FilesystemPath | undefined): FilesystemPath {
   if (path) return path
   throw createClientInvariantError('Resolved workspace resource path is missing')
 }
 
-function affectedWorkspacePaths(operations: readonly ResolvedOperation[]): readonly string[] {
-  const paths = new Set<string>()
+function affectedWorkspacePaths(
+  operations: readonly ResolvedOperation[],
+): readonly FilesystemPath[] {
+  const paths = new Set<FilesystemPath>()
   for (const operation of operations) {
     paths.add(operation.path)
     if (operation.kind === 'text') continue
@@ -2197,7 +2221,7 @@ function operationAnnotationIds(operation: WorkspaceEditOperation): readonly str
   return Array.from(ids)
 }
 
-function transientTarget(path: string, text: string): PreparedTarget {
+function transientTarget(path: FilesystemPath, text: string): PreparedTarget {
   const buffer = createEditorTextBuffer(text)
   buffer.markClean()
   return {
@@ -2264,7 +2288,7 @@ function assertSafeRoundTrip(snapshot: WorkspaceFileSnapshot): void {
   )
 }
 
-function workspacePathFromFileUri(uri: string, root: WorkspaceEditRoot): string {
+function workspacePathFromFileUri(uri: string, root: WorkspaceEditRoot): FilesystemPath {
   if (!uri.startsWith('file:///')) {
     throw workspaceEditError('unsupported-uri', 'Workspace edits require a local file URI')
   }
@@ -2283,10 +2307,11 @@ function workspacePathFromFileUri(uri: string, root: WorkspaceEditRoot): string 
   if (decodedSegments.slice(1).some((segment) => segment.length === 0)) {
     throw workspaceEditError('unsupported-uri', 'Workspace file URI is not canonical')
   }
-  const path = decodedSegments.join('/')
-  if (!path.startsWith('/') || path.includes('\\') || path.includes('\0')) {
+  const decodedPath = decodedSegments.join('/')
+  if (!decodedPath.startsWith('/') || decodedPath.includes('\\') || decodedPath.includes('\0')) {
     throw workspaceEditError('unsupported-uri', 'Workspace file URI has an invalid path')
   }
+  const path = filesystemPath(decodedPath)
   const relative = workspaceRelativePath(workspaceEditUriPath(root), path)
   if (!relative) {
     throw workspaceEditError('outside-workspace', 'Workspace edit target is outside the workspace')
@@ -2360,7 +2385,7 @@ function samePathReservationRequest(
 ): boolean {
   return (
     left.canonicalPath === right.canonicalPath &&
-    left.expectedDocumentId === right.expectedDocumentId &&
+    left.expectedDocumentKey === right.expectedDocumentKey &&
     left.expectedPathOwnershipRevision === right.expectedPathOwnershipRevision
   )
 }
@@ -2552,8 +2577,8 @@ function transitionDocumentUri(
   options: WorkspaceEditServiceOptions,
   locks: HeldWorkspaceLocks,
   target: PreparedTarget,
-  fromPath: string,
-  toPath: string,
+  fromPath: FilesystemPath,
+  toPath: FilesystemPath,
 ): void {
   const lease = mutationLeaseForBuffer(locks.leases, target.buffer)
   if (!lease) {
@@ -2579,8 +2604,8 @@ function tryTransitionDocumentUri(
   options: WorkspaceEditServiceOptions,
   locks: HeldWorkspaceLocks,
   target: PreparedTarget,
-  fromPath: string,
-  toPath: string,
+  fromPath: FilesystemPath,
+  toPath: FilesystemPath,
 ): boolean {
   try {
     transitionDocumentUri(options, locks, target, fromPath, toPath)
@@ -2761,7 +2786,7 @@ function workspaceProjectionRequest(prepared: PreparedWorkspaceEdit, server: Wor
 }
 
 function workspaceProjectionEntries(
-  rootPath: string,
+  rootPath: FilesystemPath,
   result: WorkspaceEditResult,
 ): readonly WorkspaceEditResultEntry[] {
   return result.entries.map((entry) => {
@@ -2834,10 +2859,10 @@ function recoveryResult(
   const affectedPaths = server?.affectedPaths.length ? server.affectedPaths : fallbackPaths
   const unrecoveredPaths = server?.unrecoveredPaths.length ? server.unrecoveredPaths : affectedPaths
   return {
-    affectedPaths,
+    affectedPaths: affectedPaths.map(filesystemPath),
     generation: server?.generation ?? 0,
     operationId: server?.operationId ?? workspaceErrorOperationId(error),
-    unrecoveredPaths,
+    unrecoveredPaths: unrecoveredPaths.map(filesystemPath),
   }
 }
 
@@ -2915,7 +2940,7 @@ function groupLiveTargetStamps(
   }
   for (const target of targets) {
     if (!target.liveStamp) continue
-    const stamp = state.prepareWorkspaceDocumentTarget(target.currentPath)
+    const stamp = state.prepareWorkspaceDocumentTarget(fileDocumentKey(target.currentPath))
     if (!stamp || stamp.buffer !== target.buffer) {
       throw workspaceEditError('workspace-edit-stale', 'Workspace history document moved')
     }
@@ -3140,12 +3165,25 @@ function stringSetIntersects(left: readonly string[], right: ReadonlySet<string>
   return left.some((value) => right.has(value))
 }
 
-function changedRecordKeys(
-  previous: Readonly<Record<string, string>>,
-  current: Readonly<Record<string, string>>,
-): string[] {
-  const keys = new Set([...Object.keys(previous), ...Object.keys(current)])
-  return Array.from(keys).filter((key) => previous[key] !== current[key])
+function changedFileDocumentPaths(
+  previous: EditorDocumentStore,
+  current: EditorDocumentStore,
+): FilesystemPath[] {
+  const paths = new Set<FilesystemPath>()
+  const documents = [
+    ...Object.values(previous.liveDocumentsByKey),
+    ...Object.values(current.liveDocumentsByKey),
+  ]
+  for (const document of documents) {
+    if (document.target.kind !== 'file') continue
+    if (
+      previous.documentContentRevisions[document.key] ===
+      current.documentContentRevisions[document.key]
+    )
+      continue
+    paths.add(document.target.resource.path)
+  }
+  return Array.from(paths)
 }
 
 function isStaleWorkspaceEditCode(code: string): boolean {

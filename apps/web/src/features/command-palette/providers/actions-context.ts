@@ -1,3 +1,4 @@
+import type { FilesystemPath, TabContent } from '@/lib/documents/utils/types'
 import { createContext } from 'react'
 import type { OrchestrationProjectScript, ScopedProjectRef } from '@workspace/contracts'
 
@@ -10,7 +11,8 @@ export type CommandPaletteActions = {
   readonly disabledReasonForCommand: (command: PlatformCommandId) => string | null
   readonly previewColorTheme: (themeId: string) => void
   readonly selectColorTheme: (themeId: string) => void
-  readonly selectFile: (path: string) => Promise<void>
+  readonly selectContent: (content: TabContent) => Promise<void>
+  readonly selectFile: (path: FilesystemPath) => Promise<void>
   /** Moves the caret in the active editor to a hand-typed line and column. */
   readonly selectGotoLine: (target: GotoLineTarget) => Promise<void>
   readonly selectPlatformCommand: (command: PlatformCommandId) => Promise<void>

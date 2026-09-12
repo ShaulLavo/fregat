@@ -1,58 +1,66 @@
 import {
-  editorHistoryForClosedPath,
-  editorHistoryForRenamedPath,
-} from '@/features/editor/state/tab-paths'
+  editorHistoryForClosedContent,
+  editorHistoryForRenamedFile,
+} from '@/features/editor/utils/tab-history'
 import type { CachedWorkspaceSlice } from '@/features/workspace/state/cache'
 import {
-  closeEditorPathInWorkbenchPanels,
-  renameEditorPathInWorkbenchPanels,
+  closeEditorContentInWorkbenchPanels,
+  renameEditorFileInWorkbenchPanels,
 } from '@/features/workbench/utils/panels'
+import { documentTab, rekeyTabFile, sameTabContent } from '@/lib/documents/utils/tabs'
+import { fileDocument, fileResource } from '@/lib/documents/utils/identity'
+import type { DocumentRef, FilesystemPath, TabContent } from '@/lib/documents/utils/types'
 
-export type WorkspaceDocumentChange = {
-  readonly path: string
-  readonly replacement: string | null
-}
+export type WorkspaceDocumentChange =
+  | { readonly kind: 'remove'; readonly document: DocumentRef }
+  | { readonly kind: 'rename'; readonly from: FilesystemPath; readonly to: FilesystemPath }
 
 export function updateWorkspaceDocument(
   slice: CachedWorkspaceSlice,
   change: WorkspaceDocumentChange,
 ): CachedWorkspaceSlice {
-  if (!sliceContainsDocument(slice, change.path)) return slice
-  const { path, replacement } = change
+  const content = changedContent(change)
+  if (content === null || !sliceContainsContent(slice, content)) return slice
+  if (change.kind === 'remove') {
+    return {
+      workbenchPanels: closeEditorContentInWorkbenchPanels(slice.workbenchPanels, content),
+      editorHistory: editorHistoryForClosedContent(slice.editorHistory, content),
+      recentlyClosedTabs: editorHistoryForClosedContent(slice.recentlyClosedTabs, content),
+      reopenScrollPositions: slice.reopenScrollPositions.filter(
+        (entry) => !sameTabContent(entry.content, content),
+      ),
+    }
+  }
   return {
-    workbenchPanels:
-      replacement === null
-        ? closeEditorPathInWorkbenchPanels(slice.workbenchPanels, path)
-        : renameEditorPathInWorkbenchPanels(slice.workbenchPanels, path, replacement),
-    editorHistory: updateHistory(slice.editorHistory, change),
-    recentlyClosedEditorPaths: updateHistory(slice.recentlyClosedEditorPaths, change),
-    scrollPositionByPath: updateScrollPositions(slice.scrollPositionByPath, change),
+    workbenchPanels: renameEditorFileInWorkbenchPanels(
+      slice.workbenchPanels,
+      change.from,
+      change.to,
+    ),
+    editorHistory: editorHistoryForRenamedFile(slice.editorHistory, change.from, change.to),
+    recentlyClosedTabs: editorHistoryForRenamedFile(
+      slice.recentlyClosedTabs,
+      change.from,
+      change.to,
+    ),
+    reopenScrollPositions: slice.reopenScrollPositions.map((entry) => ({
+      content: rekeyTabFile(entry.content, change.from, change.to),
+      position: entry.position,
+    })),
   }
 }
 
-function sliceContainsDocument(slice: CachedWorkspaceSlice, path: string) {
+function changedContent(change: WorkspaceDocumentChange): TabContent | null {
+  if (change.kind === 'rename') return documentTab(fileDocument(fileResource(change.from)))
+  if (change.document.kind === 'settings-json') return null
+  return documentTab(change.document)
+}
+
+function sliceContainsContent(slice: CachedWorkspaceSlice, content: TabContent) {
   return (
-    slice.workbenchPanels.editorTabs.some((tab) => tab.path === path) ||
-    slice.editorHistory.includes(path) ||
-    slice.recentlyClosedEditorPaths.includes(path) ||
-    Object.hasOwn(slice.scrollPositionByPath, path)
+    slice.workbenchPanels.editorTabs.some((tab) => sameTabContent(tab.content, content)) ||
+    slice.editorHistory.some((entry) => sameTabContent(entry, content)) ||
+    slice.recentlyClosedTabs.some((entry) => sameTabContent(entry, content)) ||
+    slice.reopenScrollPositions.some((entry) => sameTabContent(entry.content, content))
   )
-}
-
-function updateHistory(paths: readonly string[], { path, replacement }: WorkspaceDocumentChange) {
-  return replacement === null
-    ? editorHistoryForClosedPath(paths, path)
-    : editorHistoryForRenamedPath(paths, path, replacement)
-}
-
-function updateScrollPositions(
-  positions: CachedWorkspaceSlice['scrollPositionByPath'],
-  { path, replacement }: WorkspaceDocumentChange,
-) {
-  const position = positions[path]
-  if (!position || path === replacement) return positions
-  const next = { ...positions }
-  delete next[path]
-  if (replacement !== null) next[replacement] = position
-  return next
 }

@@ -14,18 +14,11 @@ import {
 import type { OrchestrationEngine } from './engine'
 import type { OrchestrationCheckpointDiffQuery } from './checkpoint-diff-query'
 import type { OrchestrationSessionSearchQuery } from './session-search-query'
-import { sseResponse, toSse } from '../sse'
 import { observeRequestOperation } from '../observability'
 import { chatOperationContext, orchestrationReplaySummary } from './orchestration-logging'
 
-const ORCHESTRATION_STREAM_HEARTBEAT_MS = 15_000
-
 const sessionDetailQuerySchema = v.object({
   sessionId: sessionIdSchema,
-})
-
-const streamQuerySchema = v.object({
-  afterSequence: v.optional(v.pipe(v.string(), v.toNumber(), v.integer(), v.minValue(0)), '0'),
 })
 
 const turnCountQueryValueSchema = v.pipe(v.string(), v.toNumber(), v.integer(), v.minValue(0))
@@ -47,11 +40,6 @@ const fullSessionDiffQuerySchema = v.object({
   ignoreWhitespace: v.optional(booleanQueryValueSchema),
   sessionId: sessionIdSchema,
   toTurnCount: turnCountQueryValueSchema,
-})
-
-const sessionDetailStreamQuerySchema = v.object({
-  afterSequence: v.optional(v.pipe(v.string(), v.toNumber(), v.integer(), v.minValue(0)), '0'),
-  sessionId: sessionIdSchema,
 })
 
 export function orchestrationRoutes(
@@ -210,43 +198,6 @@ export function orchestrationRoutes(
           ),
         {
           query: fullSessionDiffQuerySchema,
-        },
-      )
-      .get(
-        '/shell-stream',
-        ({ query, request }) =>
-          sseResponse(
-            toSse(
-              engine.shellStream({ afterSequence: query.afterSequence, signal: request.signal }),
-              {
-                event: (event) => event.kind,
-                heartbeatMs: ORCHESTRATION_STREAM_HEARTBEAT_MS,
-              },
-            ),
-            request.signal,
-          ),
-        {
-          query: streamQuerySchema,
-        },
-      )
-      .get(
-        '/session-detail-stream',
-        ({ query, request }) =>
-          sseResponse(
-            toSse(
-              engine.sessionDetailStream(query.sessionId, {
-                afterSequence: query.afterSequence,
-                signal: request.signal,
-              }),
-              {
-                event: (event) => event.kind,
-                heartbeatMs: ORCHESTRATION_STREAM_HEARTBEAT_MS,
-              },
-            ),
-            request.signal,
-          ),
-        {
-          query: sessionDetailStreamQuerySchema,
         },
       )
       .post(

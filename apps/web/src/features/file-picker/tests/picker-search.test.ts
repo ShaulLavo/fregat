@@ -1,11 +1,9 @@
-import type {
-  WorkspaceSearchEvent,
-  WorkspaceSearchMatch,
-  WorkspaceSearchQuery,
-} from '@workspace/contracts'
+import { filesystemPath } from '@/lib/documents/utils/identity'
+import type { WorkspaceSearchEvent, WorkspaceSearchQuery } from '@workspace/contracts'
 import { createWorkspaceSearchMatcher } from '@workspace/contracts'
 import type { FindMatch } from '@/lib/file-system-types'
-import { describe, expect, it } from 'vitest'
+import { describe } from 'vitest'
+import { expect, test as it } from '../../../../test/fixtures'
 
 import {
   appendSearchMatch,
@@ -207,6 +205,6 @@ function doneEvent(): WorkspaceSearchEvent {
   return { type: 'done', count: 0, path: '', query: '', truncated: false }
 }
 
-function nameMatch(path: string): WorkspaceSearchMatch {
-  return { kind: 'name', path, source: 'disk', type: 'file' }
+function nameMatch(path: string): FindMatch {
+  return { kind: 'name', path: filesystemPath(path), source: 'disk', type: 'file' }
 }

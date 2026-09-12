@@ -1,3 +1,4 @@
+// Query keys used by one feature live in that feature; this module holds shared groups.
 export const fileSystemKeys = {
   all: ['file-system'] as const,
   fileMetadata: (path: string) => [...fileSystemKeys.all, 'file-metadata', path] as const,
@@ -47,17 +48,4 @@ export const gitKeys = {
   file: (path: string, ref: string) => [...gitKeys.all, 'file', path, ref] as const,
   statuses: () => [...gitKeys.all, 'statuses'] as const,
   status: (path: string) => [...gitKeys.statuses(), path] as const,
-}
-
-export const documentSymbolKeys = {
-  all: ['document-symbols'] as const,
-  document: (rootPath: string, path: string, contentRevision: string) =>
-    [...documentSymbolKeys.all, rootPath, path, contentRevision] as const,
-}
-
-// Consumed across features/logs/*; knip mis-reports this self-referential object const as unused.
-export const logsKeys = {
-  all: ['logs'] as const,
-  events: (filters: unknown) => [...logsKeys.all, 'events', filters] as const,
-  summary: (filters: unknown) => [...logsKeys.all, 'summary', filters] as const,
 }

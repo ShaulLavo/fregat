@@ -1,15 +1,14 @@
 import { addressHrefFromBrowser } from '@/features/address/utils/browser-url'
+import { globalChromeStorage } from '@/lib/environments/state/scoped-storage'
 import { DEV_SEARCH_KEYS } from '@workspace/client-core/address/grammar'
 
 const ADDRESS_STORAGE_KEY = 'platform.address.v2'
 
 export function writeAddressCache(href: string) {
-  if (typeof localStorage === 'undefined') return
-
   try {
-    localStorage.setItem(ADDRESS_STORAGE_KEY, withoutDevParams(href))
+    globalChromeStorage.setItem(ADDRESS_STORAGE_KEY, withoutDevParams(href))
   } catch {
-    // Storage restrictions must not prevent navigation.
+    // An invalid URL must not prevent navigation.
   }
 }
 
@@ -32,13 +31,7 @@ export function shareableAddress(href: string = location.href, origin = location
 }
 
 export function readAddressCache() {
-  if (typeof localStorage === 'undefined') return null
-
-  try {
-    return localStorage.getItem(ADDRESS_STORAGE_KEY)
-  } catch {
-    return null
-  }
+  return globalChromeStorage.getItem(ADDRESS_STORAGE_KEY)
 }
 
 export function selectInitialAddress(liveHref: string, stored: string | null = readAddressCache()) {

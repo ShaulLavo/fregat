@@ -104,6 +104,12 @@ test('a quota failure preserves the failed key', () => {
   expect(STORE.has('unrelated')).toBe(false)
 })
 
+test('a missing store reports an unavailable write', () => {
+  delete (globalThis as { localStorage?: Storage }).localStorage
+
+  expect(writeWorkspaceCacheEntry(TEST_KEY, { value: 'next' }).status).toBe('unavailable')
+})
+
 function memoryLocalStorage({ failingSetKey }: { readonly failingSetKey?: string } = {}): Storage {
   return {
     get length() {

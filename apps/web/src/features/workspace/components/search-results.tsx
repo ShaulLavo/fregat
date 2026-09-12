@@ -1,3 +1,4 @@
+import { filesystemPath } from '@/lib/documents/utils/identity'
 import { useCallback, useMemo } from 'react'
 import type { WorkspaceSearchMatch } from '@workspace/contracts'
 
@@ -44,7 +45,7 @@ export function SearchResults({
   const handleOpenTarget = useCallback(
     (target: SearchResultOpenTarget) => {
       if (!target.match) {
-        commands.openFileSurface(target.path)
+        commands.openFileSurface(filesystemPath(target.path))
         return
       }
 

@@ -1,3 +1,4 @@
+import type { DocumentKey, FilesystemPath } from '@/lib/documents/utils/types'
 import { createContext, use } from 'react'
 import { useStore } from 'zustand'
 import { createStore, type StoreApi } from 'zustand/vanilla'
@@ -7,13 +8,13 @@ import { clientErrors } from '@/lib/structured-errors'
 type FilesystemConflictEventType = 'changed' | 'deleted' | 'renamed'
 
 export type FilesystemConflict = {
-  diffDocumentId?: string
+  diffDocumentKey?: DocumentKey
   eventType: FilesystemConflictEventType
   id: string
-  localPath: string
+  localPath: FilesystemPath
   localText: string
   remoteMtimeMs: number | null
-  remotePath: string
+  remotePath: FilesystemPath
   remoteSize: number | null
   remoteText: string | null
   remoteVersion: string | null
@@ -30,7 +31,7 @@ type EditorConflictStoreActions = {
   removeConflict: (id: string) => void
   updateConflict: (
     id: string,
-    update: Partial<Pick<FilesystemConflict, 'diffDocumentId' | 'toastId'>>,
+    update: Partial<Pick<FilesystemConflict, 'diffDocumentKey' | 'toastId'>>,
   ) => void
 }
 

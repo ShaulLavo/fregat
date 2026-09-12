@@ -1,5 +1,5 @@
 import type { Address } from '@workspace/client-core/address/grammar'
-import { documentTokenForPath } from '@/features/address/utils/document-token'
+import { documentTokenForContent } from '@/features/address/utils/document-token'
 import {
   emptyAddress,
   formatAddress,
@@ -10,14 +10,14 @@ import {
 } from '@workspace/client-core/address/grammar'
 import { NO_WORKSPACE_TOKEN, workspaceToken } from '@workspace/client-core/address/workspace'
 import type { WorkspaceAddress } from '@workspace/contracts'
-import { isSettingsDocumentId } from '@/features/settings/utils/document'
+import type { TabContent } from '@/lib/documents/utils/types'
 
 // Capture only addressed view data; commands, drafts, and document contents never enter this record.
 export type AddressSnapshot = {
   readonly environmentId: Address['environmentId']
-  readonly activeDocumentPath: string | null
+  readonly activeTabContent: TabContent | null
   readonly bottomTab: Address['bottom']
-  readonly editorTabPaths: readonly string[]
+  readonly editorTabContents: readonly TabContent[]
   readonly focus: Address['focus']
   readonly workspaceAddress: WorkspaceAddress | null
   readonly mode: Address['mode']
@@ -41,9 +41,9 @@ export type AddressSnapshot = {
 export function emptyAddressSnapshot(): AddressSnapshot {
   return {
     environmentId: null,
-    activeDocumentPath: null,
+    activeTabContent: null,
     bottomTab: null,
-    editorTabPaths: [],
+    editorTabContents: [],
     focus: null,
     workspaceAddress: null,
     mode: null,
@@ -63,8 +63,8 @@ export function emptyAddressSnapshot(): AddressSnapshot {
 
 export function completeAddressFromSnapshot(snapshot: AddressSnapshot): Address {
   const rootPath = snapshot.rootPath
-  const active = snapshot.activeDocumentPath
-    ? documentTokenForPath(rootPath, snapshot.activeDocumentPath)
+  const active = snapshot.activeTabContent
+    ? documentTokenForContent(rootPath, snapshot.activeTabContent)
     : null
 
   return {
@@ -83,7 +83,7 @@ export function completeAddressFromSnapshot(snapshot: AddressSnapshot): Address 
     search: snapshot.search ? { ...snapshot.search } : null,
     settings: settingsCategory(snapshot),
     side: snapshot.sidebarTab,
-    tabs: tabTokens(rootPath, snapshot.editorTabPaths, documentToken(active)),
+    tabs: tabTokens(rootPath, snapshot.editorTabContents, documentToken(active)),
     tool: snapshot.toolTab,
     workspace: snapshot.workspaceAddress
       ? workspaceToken(snapshot.workspaceAddress)
@@ -126,20 +126,20 @@ export function budgetAddress(complete: Address): BudgetedAddress {
 }
 
 function settingsCategory(snapshot: AddressSnapshot) {
-  const open = snapshot.editorTabPaths.some(isSettingsDocumentId)
+  const open = snapshot.editorTabContents.some((content) => content.kind === 'settings')
   if (!open) return null
 
   return snapshot.settingsCategory
 }
 
-function tabTokens(rootPath: string | null, paths: readonly string[], selected: string | null) {
+function tabTokens(rootPath: string | null, paths: readonly TabContent[], selected: string | null) {
   const tokens = paths
-    .map((path) => documentTokenForPath(rootPath, path))
+    .map((path) => documentTokenForContent(rootPath, path))
     .flatMap((result) => (result.kind === 'token' ? [result.token] : []))
   if (selected && !tokens.includes(selected)) tokens.push(selected)
   return tokens
 }
 
-function documentToken(active: ReturnType<typeof documentTokenForPath> | null) {
+function documentToken(active: ReturnType<typeof documentTokenForContent> | null) {
   return active?.kind === 'token' ? active.token : null
 }

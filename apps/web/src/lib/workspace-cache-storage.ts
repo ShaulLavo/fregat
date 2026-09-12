@@ -1,20 +1,19 @@
-import { globalChromeStorage, type StorageAccess } from '@/lib/environments/state/scoped-storage'
+import {
+  globalChromeStorage,
+  type StorageAccess,
+  type StorageWriteStatus,
+} from '@/lib/environments/state/scoped-storage'
 import { reportError, toClientError } from '@/lib/client-error-taxonomy'
 import * as v from 'valibot'
 
 // Local-only UI cache versions are dropped on mismatch, never migrated.
-export const WORKSPACE_CACHE_VERSION = 20
+export const WORKSPACE_CACHE_VERSION = 21
 export const WORKSPACE_CACHE_STORAGE_PREFIX = `platform.workspace-state.v${WORKSPACE_CACHE_VERSION}`
 export const WORKSPACE_CACHE_STORAGE_NAMESPACE = 'platform.workspace-state.v'
 
 export type WorkspaceCacheWriteResult = {
   readonly serializedBytes: number | null
-  readonly status:
-    | 'written'
-    | 'unavailable'
-    | 'serialization-failed'
-    | 'oversized'
-    | 'storage-failed'
+  readonly status: StorageWriteStatus | 'serialization-failed' | 'oversized'
 }
 
 type WorkspaceCacheEntryOptions = {
@@ -80,8 +79,8 @@ export function writeWorkspaceCacheEntry(
   }
 
   try {
-    ;(options.storage ?? globalChromeStorage).setItem(key, serialized)
-    return { serializedBytes, status: 'written' }
+    const status = (options.storage ?? globalChromeStorage).setItem(key, serialized)
+    return { serializedBytes, status }
   } catch {
     return { serializedBytes, status: 'storage-failed' }
   }
@@ -105,5 +104,5 @@ function serializedEntryIsOversized(serialized: string, maxSerializedBytes?: num
 }
 
 function reportInvalidCacheEntry() {
-  reportError(toClientError({ code: 'INVALID_PATH' }))
+  reportError(toClientError({ code: 'OPERATION_FAILED' }))
 }

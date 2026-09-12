@@ -140,7 +140,7 @@ export function writeChatProjectionCache(storage: ScopedStorage, cached: CachedC
 
 function setCacheEntry(storage: ScopedStorage, cached: CachedChatProjection) {
   try {
-    storage.setItem(
+    const status = storage.setItem(
       CHAT_PROJECTION_CACHE_STORAGE_KEY,
       JSON.stringify({
         ...cached,
@@ -148,7 +148,7 @@ function setCacheEntry(storage: ScopedStorage, cached: CachedChatProjection) {
         slices: cached.slices.filter((slice) => slice.environmentId === storage.environmentId),
       }),
     )
-    return true
+    return status === 'written'
   } catch {
     return false
   }

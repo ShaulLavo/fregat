@@ -1,4 +1,4 @@
-import type { MenuActionItem } from '@/features/menus/utils/model'
+import type { MenuActionItem } from '@/keymap/menus/utils/model'
 import { terminalMenu, type TerminalMenuContext } from '@/features/terminal/utils/menu'
 import { expect, test } from '../../../../../test/fixtures'
 

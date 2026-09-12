@@ -1,3 +1,4 @@
+import { filesystemPath } from '@/lib/documents/utils/identity'
 import type { FileTreeContextMenuItem, FileTreeContextMenuOpenContext } from '@workspace/tree'
 import { containerTreePath, entryName } from '@/features/workspace/utils/entry-paths'
 import { rowGitActions, treeRowMenu } from '@/features/workspace/utils/row-menu'
@@ -7,7 +8,7 @@ import { useDiscardPathsMutation } from '@/features/git/hooks/use-discard-paths-
 import { useStagePathsMutation } from '@/features/git/hooks/use-stage-paths-mutation'
 import { useStatus } from '@/features/git/hooks/use-status'
 import { useUnstagePathsMutation } from '@/features/git/hooks/use-unstage-paths-mutation'
-import type { Menu } from '@/features/menus/utils/model'
+import type { Menu } from '@/keymap/menus/utils/model'
 import { copyTextToClipboard } from '@/lib/clipboard'
 import { canonicalTreePath } from '@/lib/path-formatters'
 import { entryForTreePath, type TreeModel } from '@/lib/tree-model'
@@ -64,7 +65,11 @@ export function useRowMenu({
     relativePath: treePath,
     rename: () => startInlineEdit(() => actions.renameEntry(item.path)),
     requestDelete: () =>
-      actions.requestDelete({ isDirectory, name: entryName(treePath), path: path ?? '' }),
+      actions.requestDelete({
+        isDirectory,
+        name: entryName(treePath),
+        path: path ?? filesystemPath(''),
+      }),
     stage: () => stage.mutate(),
     unstage: () => unstage.mutate(),
   })

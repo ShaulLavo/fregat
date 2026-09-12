@@ -1,3 +1,5 @@
+import { snapshotDocument } from '@/lib/documents/utils/comparisons'
+import { createClientInvariantError } from '@/lib/structured-errors'
 import type { GitDiffHunk, GitFileDiff, GitLineChange } from '@workspace/contracts'
 
 /**
@@ -61,4 +63,10 @@ function changeType(marker: string | undefined): GitLineChange['type'] {
   if (marker === '-') return 'deleted'
 
   return 'context'
+}
+
+export function snapshotComparison(diff: GitFileDiff) {
+  const document = snapshotDocument(diff)
+  if (!document) throw createClientInvariantError('A snapshot test fixture requires an object ID')
+  return document.source
 }

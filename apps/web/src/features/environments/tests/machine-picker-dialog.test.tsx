@@ -2,7 +2,7 @@ import { screen, waitFor } from '@testing-library/react'
 import userEvent from '@testing-library/user-event'
 import { delay, http, HttpResponse } from 'msw'
 
-import { MachinePickerDialog } from '@/components/machine-picker-dialog'
+import { PickerDialog } from '@/features/environments/components/picker-dialog'
 import { fetchSettings } from '@/features/settings/utils/api'
 import { createTestEnvironmentConnections } from '../../../../test/factories/environment-connections'
 import { createFederationHarness } from '../../../../test/factories/federation'
@@ -20,7 +20,7 @@ test('adds and connects a machine from the empty picker through real settings an
   h.connections.configureMachines({})
   let closed = false
   renderWithProviders(
-    <MachinePickerDialog
+    <PickerDialog
       mode='connect'
       onClose={() => {
         closed = true
@@ -53,7 +53,7 @@ test('offers another machine alongside existing choices and returns to the list 
   const connections = createTestEnvironmentConnections({
     existing: { kind: 'origin', url: 'http://localhost:37902' },
   })
-  renderWithProviders(<MachinePickerDialog mode='connect' onClose={() => {}} />, { connections })
+  renderWithProviders(<PickerDialog mode='connect' onClose={() => {}} />, { connections })
   expect(screen.getByRole('button', { name: /existing/ })).toBeVisible()
   await userEvent.click(screen.getByRole('button', { name: 'Add machine' }))
   expect(screen.getByLabelText('SSH target')).toBeVisible()
@@ -65,7 +65,7 @@ test('offers another machine alongside existing choices and returns to the list 
 test('canceling the first machine closes without saving', async ({ client }) => {
   let closed = false
   renderWithProviders(
-    <MachinePickerDialog
+    <PickerDialog
       mode='connect'
       onClose={() => {
         closed = true
@@ -80,7 +80,7 @@ test('canceling the first machine closes without saving', async ({ client }) => 
 })
 
 test('offers SSH alongside Remote URL in the browser', async () => {
-  renderWithProviders(<MachinePickerDialog mode='connect' onClose={() => {}} />)
+  renderWithProviders(<PickerDialog mode='connect' onClose={() => {}} />)
   expect(screen.getByRole('button', { name: /^SSH/ })).toHaveAttribute('aria-pressed', 'true')
   await userEvent.click(screen.getByRole('button', { name: /^SSH/ }))
   expect(screen.getByLabelText('SSH target')).toBeVisible()
@@ -96,7 +96,7 @@ test('connects a host selected from SSH config and saves no repository path', as
   h.connections.configureMachines({})
   let closed = false
   renderWithProviders(
-    <MachinePickerDialog
+    <PickerDialog
       mode='connect'
       onClose={() => {
         closed = true
@@ -124,7 +124,7 @@ test('keeps a saved machine available for retry when the connection fails', asyn
   )
   let closed = false
   renderWithProviders(
-    <MachinePickerDialog
+    <PickerDialog
       mode='connect'
       onClose={() => {
         closed = true
@@ -167,7 +167,7 @@ test('an edited retry stays open until the replacement connection succeeds', asy
   )
   let closed = false
   renderWithProviders(
-    <MachinePickerDialog
+    <PickerDialog
       mode='connect'
       onClose={() => {
         closed = true
@@ -199,7 +199,7 @@ test.for(['button', 'escape', 'unmount'] as const)(
     h.connections.configureMachines({})
     let closed = false
     const view = renderWithProviders(
-      <MachinePickerDialog
+      <PickerDialog
         mode='connect'
         onClose={() => {
           closed = true

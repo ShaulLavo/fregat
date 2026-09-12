@@ -1,3 +1,4 @@
+import { filesystemPath } from '@/lib/documents/utils/identity'
 import { errorMessage } from '@/lib/error-message'
 import type { ServerInfo } from '@/lib/file-system-types'
 import { isDirectoryEntry } from '@/lib/file-system-types'
@@ -75,7 +76,7 @@ export function useFilePickerPathInput({
     setError(null)
 
     try {
-      const entry = await statPath(parsed.path, controller.signal)
+      const entry = await statPath(filesystemPath(parsed.path), controller.signal)
       if (!isDirectoryEntry(entry)) {
         setError('That path is not a folder.')
         return

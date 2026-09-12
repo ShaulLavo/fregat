@@ -2,7 +2,8 @@ import { useEditorRuntime } from '@/features/editor/hooks/use-runtime'
 import type { ScopedStorage } from '@/lib/environments/state/scoped-storage'
 import { Debouncer } from '@tanstack/react-pacer/debouncer'
 import { useEffect } from 'react'
-import type { EditorScrollPosition } from '@singapor/core'
+import { sameTabContent, tabContentKey } from '@/lib/documents/utils/tabs'
+import type { ReopenScrollPosition } from '@/lib/documents/utils/types'
 
 import {
   type EditorDocumentStoreApi,
@@ -259,14 +260,17 @@ function subscribeScrollPositions({
     store: documentStore,
     write: (byTabId) => {
       const state = workspaceStore.getState()
-      const byPath: Record<string, EditorScrollPosition> = {}
+      const positions = new Map<string, ReopenScrollPosition>()
       for (const tab of state.workbenchPanels.editorTabs) {
         const scrollPosition = byTabId[tab.id]
         if (!scrollPosition) continue
 
-        byPath[tab.path] = scrollPosition
+        positions.set(tabContentKey(tab.content), {
+          content: tab.content,
+          position: { left: scrollPosition.left ?? 0, top: scrollPosition.top ?? 0 },
+        })
       }
-      state.setEditorScrollPositions(byPath)
+      state.setEditorScrollPositions(Array.from(positions.values()))
     },
   })
 }
@@ -371,19 +375,20 @@ function workspaceSlicesCacheValue(state: EditorWorkspaceStore): WorkspaceSlices
     (left, right) => right[1].lastActiveAt - left[1].lastActiveAt,
   )
   const slices = new Map<string, CachedWorkspaceSlice>(parked)
-  if (activeRootPath) {
+  if (activeRootPath !== null) {
     slices.set(activeRootPath, {
       editorHistory: state.editorHistory,
-      recentlyClosedEditorPaths: state.recentlyClosedEditorPaths,
-      scrollPositionByPath: state.scrollPositionByPath,
+      recentlyClosedTabs: state.recentlyClosedTabs,
+      reopenScrollPositions: state.reopenScrollPositions,
       workbenchPanels: state.workbenchPanels,
     })
   }
 
   return {
-    order: activeRootPath
-      ? [activeRootPath, ...parked.map((entry) => entry[0])]
-      : parked.map((entry) => entry[0]),
+    order:
+      activeRootPath !== null
+        ? [activeRootPath, ...parked.map((entry) => entry[0])]
+        : parked.map((entry) => entry[0]),
     slices,
   }
 }
@@ -457,28 +462,24 @@ function sameWorkspaceSlice(
   if (left === right) return true
   if (!left || !right) return false
   if (left.workbenchPanels !== right.workbenchPanels) return false
-  if (!readonlyArraysEqual(left.editorHistory, right.editorHistory)) return false
-  if (!readonlyArraysEqual(left.recentlyClosedEditorPaths, right.recentlyClosedEditorPaths)) {
+  if (!readonlyArraysEqual(left.editorHistory, right.editorHistory, sameTabContent)) return false
+  if (!readonlyArraysEqual(left.recentlyClosedTabs, right.recentlyClosedTabs, sameTabContent)) {
     return false
   }
 
-  return scrollPositionsEqual(left.scrollPositionByPath, right.scrollPositionByPath)
+  return scrollPositionsEqual(left.reopenScrollPositions, right.reopenScrollPositions)
 }
 
 function scrollPositionsEqual(
-  left: Readonly<Record<string, EditorScrollPosition>>,
-  right: Readonly<Record<string, EditorScrollPosition>>,
+  left: readonly ReopenScrollPosition[],
+  right: readonly ReopenScrollPosition[],
 ) {
-  const leftKeys = Object.keys(left)
-  if (leftKeys.length !== Object.keys(right).length) return false
-
-  for (const key of leftKeys) {
-    const leftPosition = left[key]
-    const rightPosition = right[key]
-    if (!rightPosition) return false
-    if (leftPosition.left !== rightPosition.left || leftPosition.top !== rightPosition.top) {
+  if (left.length !== right.length) return false
+  const rightByKey = new Map(right.map((entry) => [tabContentKey(entry.content), entry.position]))
+  for (const entry of left) {
+    const position = rightByKey.get(tabContentKey(entry.content))
+    if (!position || position.left !== entry.position.left || position.top !== entry.position.top)
       return false
-    }
   }
 
   return true
@@ -503,11 +504,15 @@ function mapsEqual<TValue>(
   return true
 }
 
-function readonlyArraysEqual<T>(left: readonly T[], right: readonly T[]) {
+function readonlyArraysEqual<T>(
+  left: readonly T[],
+  right: readonly T[],
+  equal: (left: T, right: T) => boolean = Object.is,
+) {
   if (left === right) return true
   if (left.length !== right.length) return false
 
-  return left.every((item, index) => Object.is(item, right[index]))
+  return left.every((item, index) => right[index] !== undefined && equal(item, right[index]))
 }
 
 function flushCacheSubscriptions(subscriptions: readonly CacheSubscription[]) {

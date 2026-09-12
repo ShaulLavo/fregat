@@ -5,7 +5,7 @@ import { useSettingsActions } from '@/features/settings/hooks/use-settings-actio
 import { useEnvironmentConnections } from '@/hooks/use-environment-connections'
 import { errorMessage } from '@/lib/error-message'
 import { createWideEventScope } from '@/lib/wide-event-scope'
-import { machineDraft, parseMachineDraft, type MachineDraft } from '@/utils/machine-form'
+import { machineDraft, parseMachineDraft, type MachineDraft } from '@/hooks/utils/machine-form'
 
 export type MachineFormOptions = {
   readonly name?: string

@@ -227,9 +227,15 @@ function addressRouteOptions(address: Address) {
     hash: serializeAddress(address).hash.slice(1),
   }
   if (!address.workspace) return { to: '/' as const, ...common }
-  if (address.environmentId)
-    return remoteAddressOptions(address, address.environmentId, address.workspace, common)
-  return localAddressOptions(address, address.workspace, common)
+  if (address.environmentId) {
+    return workspaceAddressOptions(
+      'remote',
+      address,
+      { environmentId: address.environmentId, workspace: address.workspace },
+      common,
+    )
+  }
+  return workspaceAddressOptions('local', address, { workspace: address.workspace }, common)
 }
 
 type CommonOptions = { search: RouteSearch; hash: string }
@@ -246,38 +252,50 @@ function editorForAddress(address: Address): EditorReference {
   })
 }
 
-function localAddressOptions(address: Address, workspace: string, common: CommonOptions) {
-  const params = { workspace }
-  if (!address.mode) return { to: '/~{$workspace}' as const, params, ...common }
-  if (address.mode === 'chat') return localChatOptions(address, params, common)
-  if (!address.document) return { to: '/~{$workspace}/workbench' as const, params, ...common }
+const PREFIX = { local: '/~{$workspace}', remote: '/@{$environmentId}/~{$workspace}' } as const
+
+type RouteOwner = {
+  local: { workspace: string }
+  remote: { workspace: string; environmentId: NonNullable<Address['environmentId']> }
+}
+
+function workspaceAddressOptions<K extends keyof RouteOwner>(
+  kind: K,
+  address: Address,
+  params: RouteOwner[K],
+  common: CommonOptions,
+) {
+  const prefix = PREFIX[kind]
+  if (!address.mode) return { to: `${prefix}` as const, params, ...common }
+  if (address.mode === 'chat') return chatOptions(kind, address, params, common)
+  if (!address.document) return { to: `${prefix}/workbench` as const, params, ...common }
   const editor = editorForAddress(address)
   switch (editor.kind) {
     case 'settings':
-      return { to: '/~{$workspace}/workbench/settings' as const, params, ...common }
+      return { to: `${prefix}/workbench/settings` as const, params, ...common }
     case 'search':
-      return { to: '/~{$workspace}/workbench/s' as const, params, ...common }
+      return { to: `${prefix}/workbench/s` as const, params, ...common }
     case 'file':
       return {
-        to: '/~{$workspace}/workbench/f/$' as const,
+        to: `${prefix}/workbench/f/$` as const,
         params: { ...params, _splat: editor.path },
         ...common,
       }
     case 'compare':
       return {
-        to: '/~{$workspace}/workbench/c/$' as const,
+        to: `${prefix}/workbench/c/$` as const,
         params: { ...params, _splat: editor.path },
         ...common,
       }
     case 'ref':
       return {
-        to: '/~{$workspace}/workbench/r/$ref/$' as const,
+        to: `${prefix}/workbench/r/$ref/$` as const,
         params: { ...params, ref: editor.ref, _splat: editor.path },
         ...common,
       }
     case 'snapshot':
       return {
-        to: '/~{$workspace}/workbench/d/$source/$revision/$' as const,
+        to: `${prefix}/workbench/d/$source/$revision/$` as const,
         params: {
           ...params,
           source: editor.source,
@@ -287,121 +305,39 @@ function localAddressOptions(address: Address, workspace: string, common: Common
         ...common,
       }
     case 'checkpoint':
-      return localCheckpointOptions(editor, params, common)
+      return checkpointOptions(kind, editor, params, common)
   }
 }
 
-function localChatOptions(address: Address, params: { workspace: string }, common: CommonOptions) {
+function chatOptions<K extends keyof RouteOwner>(
+  kind: K,
+  address: Address,
+  params: RouteOwner[K],
+  common: CommonOptions,
+) {
+  const prefix = PREFIX[kind]
   const chat = chatReferenceForToken(address.document)
-  if (!chat) return { to: '/~{$workspace}/chat' as const, params, ...common }
-  if (chat.kind === 'draft') return { to: '/~{$workspace}/chat/t/new' as const, params, ...common }
+  if (!chat) return { to: `${prefix}/chat` as const, params, ...common }
+  if (chat.kind === 'draft') return { to: `${prefix}/chat/t/new` as const, params, ...common }
   return {
-    to: '/~{$workspace}/chat/t/$sessionId' as const,
+    to: `${prefix}/chat/t/$sessionId` as const,
     params: { ...params, sessionId: chat.sessionId },
     ...common,
   }
 }
 
-function localCheckpointOptions(
+function checkpointOptions<K extends keyof RouteOwner>(
+  kind: K,
   editor: Extract<EditorReference, { kind: 'checkpoint' }>,
-  owner: { workspace: string },
+  owner: RouteOwner[K],
   common: CommonOptions,
 ) {
+  const prefix = PREFIX[kind]
   const params = { ...owner, sessionId: editor.sessionId, turns: editor.turnsToken }
   if (editor.path === null)
-    return { to: '/~{$workspace}/workbench/k/$sessionId/$turns' as const, params, ...common }
+    return { to: `${prefix}/workbench/k/$sessionId/$turns` as const, params, ...common }
   return {
-    to: '/~{$workspace}/workbench/k/$sessionId/$turns/$' as const,
-    params: { ...params, _splat: editor.path },
-    ...common,
-  }
-}
-
-function remoteAddressOptions(
-  address: Address,
-  environmentId: NonNullable<Address['environmentId']>,
-  workspace: string,
-  common: CommonOptions,
-) {
-  const params = { environmentId, workspace }
-  if (!address.mode) return { to: '/@{$environmentId}/~{$workspace}' as const, params, ...common }
-  if (address.mode === 'chat') return remoteChatOptions(address, params, common)
-  if (!address.document)
-    return { to: '/@{$environmentId}/~{$workspace}/workbench' as const, params, ...common }
-  const editor = editorForAddress(address)
-  switch (editor.kind) {
-    case 'settings':
-      return {
-        to: '/@{$environmentId}/~{$workspace}/workbench/settings' as const,
-        params,
-        ...common,
-      }
-    case 'search':
-      return { to: '/@{$environmentId}/~{$workspace}/workbench/s' as const, params, ...common }
-    case 'file':
-      return {
-        to: '/@{$environmentId}/~{$workspace}/workbench/f/$' as const,
-        params: { ...params, _splat: editor.path },
-        ...common,
-      }
-    case 'compare':
-      return {
-        to: '/@{$environmentId}/~{$workspace}/workbench/c/$' as const,
-        params: { ...params, _splat: editor.path },
-        ...common,
-      }
-    case 'ref':
-      return {
-        to: '/@{$environmentId}/~{$workspace}/workbench/r/$ref/$' as const,
-        params: { ...params, ref: editor.ref, _splat: editor.path },
-        ...common,
-      }
-    case 'snapshot':
-      return {
-        to: '/@{$environmentId}/~{$workspace}/workbench/d/$source/$revision/$' as const,
-        params: {
-          ...params,
-          source: editor.source,
-          revision: editor.revisionToken,
-          _splat: editor.path,
-        },
-        ...common,
-      }
-    case 'checkpoint':
-      return remoteCheckpointOptions(editor, params, common)
-  }
-}
-
-function remoteChatOptions(
-  address: Address,
-  params: { workspace: string; environmentId: NonNullable<Address['environmentId']> },
-  common: CommonOptions,
-) {
-  const chat = chatReferenceForToken(address.document)
-  if (!chat) return { to: '/@{$environmentId}/~{$workspace}/chat' as const, params, ...common }
-  if (chat.kind === 'draft')
-    return { to: '/@{$environmentId}/~{$workspace}/chat/t/new' as const, params, ...common }
-  return {
-    to: '/@{$environmentId}/~{$workspace}/chat/t/$sessionId' as const,
-    params: { ...params, sessionId: chat.sessionId },
-    ...common,
-  }
-}
-
-function remoteCheckpointOptions(
-  editor: Extract<EditorReference, { kind: 'checkpoint' }>,
-  owner: { workspace: string; environmentId: NonNullable<Address['environmentId']> },
-  common: CommonOptions,
-) {
-  const params = { ...owner, sessionId: editor.sessionId, turns: editor.turnsToken }
-  if (editor.path === null)
-    return {
-      to: '/@{$environmentId}/~{$workspace}/workbench/k/$sessionId/$turns' as const,
-      params,
-      ...common,
-    }
-  return {
-    to: '/@{$environmentId}/~{$workspace}/workbench/k/$sessionId/$turns/$' as const,
+    to: `${prefix}/workbench/k/$sessionId/$turns/$` as const,
     params: { ...params, _splat: editor.path },
     ...common,
   }

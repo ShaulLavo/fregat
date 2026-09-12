@@ -1,3 +1,4 @@
+import { filesystemPath } from '@/lib/documents/utils/identity'
 import type { TreeEntry, TreeResult } from '@/lib/file-system-types'
 import { isDirectoryEntry } from '@/lib/file-system-types'
 import { canonicalTreePath, toTreePath } from '@/lib/path-formatters'
@@ -363,7 +364,7 @@ function movedTreePath(path: string, move: TreePathMove) {
 }
 
 function moveTreeEntry(entry: TreeEntry, fromPath: string, toPath: string): TreeEntry {
-  const nextPath = movedWorkspacePath(entry.path, fromPath, toPath)
+  const nextPath = filesystemPath(movedWorkspacePath(entry.path, fromPath, toPath))
   const children = entry.children?.map((child) => moveTreeEntry(child, fromPath, toPath))
   if (!children && nextPath === entry.path) return entry
   if (!children) return { ...entry, path: nextPath }

@@ -1,3 +1,4 @@
+import { documentKey, settingsJsonDocument } from '@/lib/documents/utils/identity'
 import type {
   EditorPluginContext,
   EditorViewContribution,
@@ -14,7 +15,6 @@ import {
   type SettingsDiagnosticsSource,
 } from '@/features/settings/state/diagnostics-source'
 import { settingsEditorDiagnostics } from '@/features/settings/utils/diagnostics'
-import { settingsJsonDocumentId } from '@/features/settings/utils/json-document'
 
 import { expect, test } from '../../../../test/fixtures'
 
@@ -31,8 +31,8 @@ type DiagnosticsHost = {
   setDocument(documentId: string, text: string): void
 }
 
-const USER_ID = settingsJsonDocumentId('user')
-const WORKSPACE_ID = settingsJsonDocumentId('workspace')
+const USER_ID = documentKey(settingsJsonDocument('user'))
+const WORKSPACE_ID = documentKey(settingsJsonDocument('workspace'))
 
 test('renders diagnostics on the initial matching settings document', () => {
   const text = '{\n  "unknown.key": true\n}\n'

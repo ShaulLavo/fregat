@@ -1,6 +1,6 @@
 import { useState, type ReactElement } from 'react'
 
-import { MenuSurface } from '@/features/menus/components/surface'
+import { MenuSurface } from '@/keymap/menus/components/surface'
 import { useTitlebarMenu } from '@/features/workbench/hooks/use-titlebar-menu'
 
 /**

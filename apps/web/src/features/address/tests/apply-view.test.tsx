@@ -1,3 +1,5 @@
+import { filesystemPath, tabId as testTabId } from '@/lib/documents/utils/identity'
+import { testDocumentKey, testTabContents } from '../../../../test/factories/document-targets'
 import { mkdir } from 'node:fs/promises'
 import path from 'node:path'
 import { workspaceToken } from '@workspace/client-core/address/workspace'
@@ -30,38 +32,36 @@ test('boot adds tabs while explicit navigation orders addressed tabs and retains
       isCurrent: () => true,
     })
   expect((await apply('/f/a.ts?tabs=@~f/b.ts~f/c.ts', 'boot')).status).toBe('applied')
-  commands.openFileSurface('repo/dirty.ts')
+  commands.openFileSurface(filesystemPath('repo/dirty.ts'))
   const dirtyTab = editor.workspaceStore.getState().workbenchPanels.editorTabs.at(-1)
   if (!dirtyTab) return expect.unreachable('dirty tab was not opened')
-  editor.documentStore.getState().ensureEditorView(dirtyTab.id, {
+  editor.documentStore.getState().ensureEditorView(testTabId(dirtyTab.id), {
     content: 'unsaved',
-    path: dirtyTab.path,
+    path: filesystemPath('repo/dirty.ts'),
     size: 7,
     version: 'test',
     mtimeMs: 1,
   })
-  editor.documentStore.getState().setLiveEditorDocumentDirty(dirtyTab.path, true)
-  commands.openFileSurface('outside.ts')
+  editor.documentStore
+    .getState()
+    .setLiveEditorDocumentDirty(testDocumentKey(filesystemPath('repo/dirty.ts')), true)
+  commands.openFileSurface(filesystemPath('outside.ts'))
   await apply('/f/b.ts?tabs=f/c.ts~@~f/a.ts', 'boot')
-  expect(editor.workspaceStore.getState().openFilePaths).toEqual([
-    'repo/a.ts',
-    'repo/b.ts',
-    'repo/c.ts',
-    'repo/dirty.ts',
-    'outside.ts',
-  ])
+  expect(editor.workspaceStore.getState().openTabContents).toEqual(
+    testTabContents(['repo/a.ts', 'repo/b.ts', 'repo/c.ts', 'repo/dirty.ts', 'outside.ts']),
+  )
   await apply('/f/b.ts?tabs=f/c.ts~@~f/a.ts', 'navigate')
-  expect(editor.workspaceStore.getState().openFilePaths).toEqual([
-    'repo/c.ts',
-    'repo/b.ts',
-    'repo/a.ts',
-    'repo/dirty.ts',
-    'outside.ts',
-  ])
+  expect(editor.workspaceStore.getState().openTabContents).toEqual(
+    testTabContents(['repo/c.ts', 'repo/b.ts', 'repo/a.ts', 'repo/dirty.ts', 'outside.ts']),
+  )
   await apply('?tabs=-', 'navigate')
-  expect(editor.workspaceStore.getState().openFilePaths).toEqual(['repo/dirty.ts', 'outside.ts'])
-  expect(editor.workspaceStore.getState().selectedFilePath).toBeNull()
-  expect(editor.documentStore.getState().dirtyFilePaths.has('repo/dirty.ts')).toBe(true)
+  expect(editor.workspaceStore.getState().openTabContents).toEqual(
+    testTabContents(['repo/dirty.ts', 'outside.ts']),
+  )
+  expect(editor.workspaceStore.getState().selectedTabContent).toBeNull()
+  expect(
+    editor.documentStore.getState().dirtyDocumentKeys.has(testDocumentKey('repo/dirty.ts')),
+  ).toBe(true)
 })
 
 test('traversal preserves utility panels and filters while restoring document focus', async ({
@@ -211,5 +211,5 @@ test('superseding a root lookup prevents it from opening its workspace', async (
   release.resolve()
   expect((await pending).status).toBe('superseded')
   expect(editor.workspaceStore.getState().rootFolder).toBeNull()
-  expect(editor.workspaceStore.getState().openFilePaths).toEqual([])
+  expect(editor.workspaceStore.getState().openTabContents).toEqual(testTabContents([]))
 })

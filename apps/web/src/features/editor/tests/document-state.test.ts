@@ -1,4 +1,8 @@
-import { describe, expect, it, vi } from 'vitest'
+import { filesystemPath, tabId } from '@/lib/documents/utils/identity'
+import { testDocumentKey, testScrollPositions } from '../../../../test/factories/document-targets'
+import { describe, vi } from 'vitest'
+
+import { expect, test as it } from '../../../../test/fixtures'
 
 import { createEditorDocumentStore } from '@/features/editor/state/document-state'
 import type { FileResult } from '@/lib/file-system-types'
@@ -19,45 +23,49 @@ import {
 describe('editor document store state identity', () => {
   it('keeps unrelated slices referentially stable across scroll updates', () => {
     const store = createEditorDocumentStore()
-    store.getState().ensureEditorView('tab-1', fileResult('/repo/a.ts'))
-    store.getState().ensureEditorView('tab-2', fileResult('/repo/b.ts'))
+    store.getState().ensureEditorView(tabId('tab-1'), fileResult('/repo/a.ts'))
+    store.getState().ensureEditorView(tabId('tab-2'), fileResult('/repo/b.ts'))
     const before = store.getState()
 
-    store.getState().setEditorViewScrollPosition('tab-1', { left: 0, top: 120 })
+    store.getState().setEditorViewScrollPosition(tabId('tab-1'), { left: 0, top: 120 })
     const after = store.getState()
 
-    expect(after.scrollPositionByTabId['tab-1']).toEqual({ left: 0, top: 120 })
+    expect(after.scrollPositionByTabId[tabId('tab-1')]).toEqual({ left: 0, top: 120 })
     expect(after.documentContentRevisions).toBe(before.documentContentRevisions)
-    expect(after.dirtyFilePaths).toBe(before.dirtyFilePaths)
-    expect(after.liveDocumentsById).toBe(before.liveDocumentsById)
+    expect(after.dirtyDocumentKeys).toBe(before.dirtyDocumentKeys)
+    expect(after.liveDocumentsByKey).toBe(before.liveDocumentsByKey)
 
     // Only the scrolled tab's view projection is replaced; its stable fields
     // and the other tab's projection keep their identity.
-    expect(after.viewsByTabId['tab-1']).not.toBe(before.viewsByTabId['tab-1'])
-    expect(after.viewsByTabId['tab-1']?.view).toBe(before.viewsByTabId['tab-1']?.view)
-    expect(after.viewsByTabId['tab-2']).toBe(before.viewsByTabId['tab-2'])
+    expect(after.viewsByTabId[tabId('tab-1')]).not.toBe(before.viewsByTabId[tabId('tab-1')])
+    expect(after.viewsByTabId[tabId('tab-1')]?.view).toBe(before.viewsByTabId[tabId('tab-1')]?.view)
+    expect(after.viewsByTabId[tabId('tab-2')]).toBe(before.viewsByTabId[tabId('tab-2')])
   })
 
   it('keeps other document projections stable across text changes', () => {
     const store = createEditorDocumentStore()
-    store.getState().ensureEditorView('tab-1', fileResult('/repo/a.ts'))
-    store.getState().ensureEditorView('tab-2', fileResult('/repo/b.ts'))
+    store.getState().ensureEditorView(tabId('tab-1'), fileResult('/repo/a.ts'))
+    store.getState().ensureEditorView(tabId('tab-2'), fileResult('/repo/b.ts'))
     const before = store.getState()
 
-    const document = store.getState().getLiveEditorDocument('/repo/a.ts')!
+    const document = store.getState().getLiveEditorDocument(testDocumentKey('/repo/a.ts'))!
     createEditorBufferSession(document.buffer).applyText('!')
     const after = store.getState()
 
-    expect(after.liveDocumentsById).not.toBe(before.liveDocumentsById)
-    expect(after.liveDocumentsById['/repo/a.ts']).not.toBe(before.liveDocumentsById['/repo/a.ts'])
-    expect(after.liveDocumentsById['/repo/b.ts']).toBe(before.liveDocumentsById['/repo/b.ts'])
+    expect(after.liveDocumentsByKey).not.toBe(before.liveDocumentsByKey)
+    expect(after.liveDocumentsByKey[testDocumentKey('/repo/a.ts')]).not.toBe(
+      before.liveDocumentsByKey[testDocumentKey('/repo/a.ts')],
+    )
+    expect(after.liveDocumentsByKey[testDocumentKey('/repo/b.ts')]).toBe(
+      before.liveDocumentsByKey[testDocumentKey('/repo/b.ts')],
+    )
     expect(after.viewsByTabId).toBe(before.viewsByTabId)
   })
 
   it('records one dirty revision for one buffer transaction observed by two views', () => {
     const store = createEditorDocumentStore()
-    const first = store.getState().ensureEditorView('tab-1', fileResult('/repo/a.ts'))
-    store.getState().ensureEditorView('tab-2', fileResult('/repo/a.ts'))
+    const first = store.getState().ensureEditorView(tabId('tab-1'), fileResult('/repo/a.ts'))
+    store.getState().ensureEditorView(tabId('tab-2'), fileResult('/repo/a.ts'))
     const before = store.getState()
     let publications = 0
     const unsubscribe = store.subscribe(() => {
@@ -68,10 +76,52 @@ describe('editor document store state identity', () => {
 
     const after = store.getState()
     expect(after.dirtyContentRevision).toBe(before.dirtyContentRevision + 1)
-    expect(after.liveDocumentsById['/repo/a.ts']?.localRevision).toBe(first.buffer.getRevision())
-    expect(after.dirtyFilePaths.has('/repo/a.ts')).toBe(true)
+    expect(after.liveDocumentsByKey[testDocumentKey('/repo/a.ts')]?.localRevision).toBe(
+      first.buffer.getRevision(),
+    )
+    expect(after.dirtyDocumentKeys.has(testDocumentKey('/repo/a.ts'))).toBe(true)
     expect(publications).toBe(1)
     unsubscribe()
+  })
+
+  it('keeps duplicate tab views and scroll independent while sharing a renamed buffer', () => {
+    const store = createEditorDocumentStore()
+    const first = store.getState().ensureEditorView(tabId('tab-1'), fileResult('/repo/a.ts'))
+    const second = store.getState().ensureEditorView(tabId('tab-2'), fileResult('/repo/a.ts'))
+    store.getState().setEditorViewScrollPosition(tabId('tab-1'), { left: 3, top: 120 })
+    store.getState().setEditorViewScrollPosition(tabId('tab-2'), { left: 9, top: 480 })
+    createEditorBufferSession(first.buffer, first.view).applyText(' shared')
+
+    expect(second.buffer).toBe(first.buffer)
+    expect(second.view).not.toBe(first.view)
+    expect(second.buffer.materializeFullText()).toBe('contents of /repo/a.ts shared')
+    expect(first.view.getScrollPosition()).toEqual({ left: 3, top: 120 })
+    expect(second.view.getScrollPosition()).toEqual({ left: 9, top: 480 })
+
+    store
+      .getState()
+      .renameLiveEditorDocumentPath(
+        filesystemPath('/repo/a.ts'),
+        filesystemPath('/repo/renamed.ts'),
+      )
+
+    expect(store.getState().getLiveEditorDocument(testDocumentKey('/repo/a.ts'))).toBeNull()
+    expect(
+      store.getState().getLiveEditorDocument(testDocumentKey('/repo/renamed.ts'))?.buffer,
+    ).toBe(first.buffer)
+    expect(store.getState().getEditorView(tabId('tab-1'))).toMatchObject({
+      documentKey: testDocumentKey('/repo/renamed.ts'),
+      scrollPosition: { left: 3, top: 120 },
+      view: first.view,
+    })
+    expect(store.getState().getEditorView(tabId('tab-2'))).toMatchObject({
+      documentKey: testDocumentKey('/repo/renamed.ts'),
+      scrollPosition: { left: 9, top: 480 },
+      view: second.view,
+    })
+    expect(store.getState().dirtyDocumentKeys).toEqual(
+      new Set(['/repo/renamed.ts'].map((path) => testDocumentKey(path))),
+    )
   })
 
   it('records a logical synchronize revision without changing content dirty or sync state', () => {
@@ -91,11 +141,15 @@ describe('editor document store state identity', () => {
 
     expect(result.status).toBe('logical-only')
     const after = store.getState()
-    expect(after.liveDocumentsById['/repo/a.ts']?.localRevision).toBe(document.buffer.getRevision())
-    expect(after.liveDocumentsById['/repo/a.ts']?.contentRevision).toBe(document.contentRevision)
-    expect(after.liveDocumentsById['/repo/a.ts']?.sync).toBe(document.sync)
+    expect(after.liveDocumentsByKey[testDocumentKey('/repo/a.ts')]?.localRevision).toBe(
+      document.buffer.getRevision(),
+    )
+    expect(after.liveDocumentsByKey[testDocumentKey('/repo/a.ts')]?.contentRevision).toBe(
+      document.contentRevision,
+    )
+    expect(after.liveDocumentsByKey[testDocumentKey('/repo/a.ts')]?.sync).toBe(document.sync)
     expect(after.dirtyContentRevision).toBe(before.dirtyContentRevision)
-    expect(after.dirtyFilePaths).toBe(before.dirtyFilePaths)
+    expect(after.dirtyDocumentKeys).toBe(before.dirtyDocumentKeys)
   })
 
   it('commits two buffers synchronously with one final WDS publication', () => {
@@ -117,23 +171,25 @@ describe('editor document store state identity', () => {
 
     expect(bufferEvents).toEqual(['a', 'b'])
     expect(publications).toBe(1)
-    expect(store.getState().dirtyFilePaths).toEqual(new Set(['/repo/a.ts', '/repo/b.ts']))
+    expect(store.getState().dirtyDocumentKeys).toEqual(
+      new Set(['/repo/a.ts', '/repo/b.ts'].map((path) => testDocumentKey(path))),
+    )
     unsubscribe()
   })
 
   it('prepares an exact live target stamp and rejects it after buffer drift', () => {
     const store = createEditorDocumentStore()
     const document = store.getState().ensureLiveEditorDocument(fileResult('/repo/a.ts'))
-    const stamp = store.getState().prepareWorkspaceDocumentTarget(document.id)
+    const stamp = store.getState().prepareWorkspaceDocumentTarget(document.key)
 
     expect(stamp).toMatchObject({
       buffer: document.buffer,
       bufferRevision: document.buffer.getRevision(),
       contentRevision: document.contentRevision,
       dirty: false,
-      documentId: document.id,
+      documentKey: document.key,
       localRevision: document.localRevision,
-      path: document.path,
+      path: filesystemPath('/repo/a.ts'),
       snapshot: document.buffer.getSnapshot(),
       sync: document.sync,
     })
@@ -146,22 +202,28 @@ describe('editor document store state identity', () => {
 
   it('preserves a dirty buffer and views across exact-file rename and rollback', () => {
     const store = createEditorDocumentStore()
-    const view = store.getState().ensureEditorView('tab-1', fileResult('/repo/a.ts'))
+    const view = store.getState().ensureEditorView(tabId('tab-1'), fileResult('/repo/a.ts'))
     createEditorBufferSession(view.buffer, view.view).applyText('!')
-    const projection = store.getState().prepareWorkspaceDocumentRename('/repo/a.ts', '/repo/b.ts')
+    const projection = store
+      .getState()
+      .prepareWorkspaceDocumentRename(filesystemPath('/repo/a.ts'), filesystemPath('/repo/b.ts'))
 
     expect(projection).not.toBeNull()
     expect(store.getState().commitWorkspaceDocumentProjection(projection!)).toBe(true)
-    const renamed = store.getState().getLiveEditorDocument('/repo/b.ts')!
+    const renamed = store.getState().getLiveEditorDocument(testDocumentKey('/repo/b.ts'))!
     expect(renamed.buffer).toBe(view.buffer)
-    expect(store.getState().getEditorView('tab-1')?.view).toBe(view.view)
-    expect(store.getState().dirtyFilePaths).toEqual(new Set(['/repo/b.ts']))
+    expect(store.getState().getEditorView(tabId('tab-1'))?.view).toBe(view.view)
+    expect(store.getState().dirtyDocumentKeys).toEqual(
+      new Set(['/repo/b.ts'].map((path) => testDocumentKey(path))),
+    )
 
     expect(store.getState().rollbackWorkspaceDocumentProjection(projection!)).toBe(true)
-    const restored = store.getState().getLiveEditorDocument('/repo/a.ts')!
+    const restored = store.getState().getLiveEditorDocument(testDocumentKey('/repo/a.ts'))!
     expect(restored.buffer).toBe(view.buffer)
-    expect(store.getState().getEditorView('tab-1')?.view).toBe(view.view)
-    expect(store.getState().dirtyFilePaths).toEqual(new Set(['/repo/a.ts']))
+    expect(store.getState().getEditorView(tabId('tab-1'))?.view).toBe(view.view)
+    expect(store.getState().dirtyDocumentKeys).toEqual(
+      new Set(['/repo/a.ts'].map((path) => testDocumentKey(path))),
+    )
   })
 
   it('rejects a rename collision before changing either document', () => {
@@ -169,24 +231,34 @@ describe('editor document store state identity', () => {
     const first = store.getState().ensureLiveEditorDocument(fileResult('/repo/a.ts'))
     const second = store.getState().ensureLiveEditorDocument(fileResult('/repo/b.ts'))
 
-    expect(store.getState().prepareWorkspaceDocumentRename('/repo/a.ts', '/repo/b.ts')).toBeNull()
-    expect(store.getState().getLiveEditorDocument('/repo/a.ts')?.buffer).toBe(first.buffer)
-    expect(store.getState().getLiveEditorDocument('/repo/b.ts')?.buffer).toBe(second.buffer)
+    expect(
+      store
+        .getState()
+        .prepareWorkspaceDocumentRename(filesystemPath('/repo/a.ts'), filesystemPath('/repo/b.ts')),
+    ).toBeNull()
+    expect(store.getState().getLiveEditorDocument(testDocumentKey('/repo/a.ts'))?.buffer).toBe(
+      first.buffer,
+    )
+    expect(store.getState().getLiveEditorDocument(testDocumentKey('/repo/b.ts'))?.buffer).toBe(
+      second.buffer,
+    )
   })
 
   it('prepares and commits a clean open delete then restores it from a receipt', () => {
     const store = createEditorDocumentStore()
-    const view = store.getState().ensureEditorView('tab-1', fileResult('/repo/a.ts'))
-    const projection = store.getState().prepareWorkspaceDocumentDelete('/repo/a.ts')
+    const view = store.getState().ensureEditorView(tabId('tab-1'), fileResult('/repo/a.ts'))
+    const projection = store.getState().prepareWorkspaceDocumentDelete(filesystemPath('/repo/a.ts'))
 
     expect(projection).not.toBeNull()
     expect(store.getState().commitWorkspaceDocumentProjection(projection!)).toBe(true)
-    expect(store.getState().getLiveEditorDocument('/repo/a.ts')).toBeNull()
-    expect(store.getState().getEditorView('tab-1')).toBeNull()
+    expect(store.getState().getLiveEditorDocument(testDocumentKey('/repo/a.ts'))).toBeNull()
+    expect(store.getState().getEditorView(tabId('tab-1'))).toBeNull()
 
     expect(store.getState().rollbackWorkspaceDocumentProjection(projection!)).toBe(true)
-    expect(store.getState().getLiveEditorDocument('/repo/a.ts')?.buffer).toBe(view.buffer)
-    expect(store.getState().getEditorView('tab-1')?.view).toBe(view.view)
+    expect(store.getState().getLiveEditorDocument(testDocumentKey('/repo/a.ts'))?.buffer).toBe(
+      view.buffer,
+    )
+    expect(store.getState().getEditorView(tabId('tab-1'))?.view).toBe(view.view)
   })
 
   it('workspace undo returns an originally clean buffer to clean without changing sync metadata', () => {
@@ -201,10 +273,12 @@ describe('editor document store state identity', () => {
     )
 
     expect(reversed.status).toBe('reversed')
-    const after = store.getState().getLiveEditorDocument(document.id)!
+    const after = store.getState().getLiveEditorDocument(document.key)!
     expect(after.buffer.isDirty()).toBe(false)
     expect(after.sync).toBe(sync)
-    expect(store.getState().dirtyFilePaths.has(document.path)).toBe(false)
+    expect(
+      store.getState().dirtyDocumentKeys.has(testDocumentKey(filesystemPath('/repo/a.ts'))),
+    ).toBe(false)
     expect(after.localRevision).toBe(document.buffer.getRevision())
   })
 
@@ -222,7 +296,9 @@ describe('editor document store state identity', () => {
 
     expect(document.buffer.materializeFullText()).toBe(dirtyText)
     expect(document.buffer.isDirty()).toBe(true)
-    expect(store.getState().dirtyFilePaths.has(document.path)).toBe(true)
+    expect(
+      store.getState().dirtyDocumentKeys.has(testDocumentKey(filesystemPath('/repo/a.ts'))),
+    ).toBe(true)
 
     const redone = reverseDocumentTransaction(
       { buffer: document.buffer, sourceView: null },
@@ -230,17 +306,17 @@ describe('editor document store state identity', () => {
     )
     expect(redone.status).toBe('reversed')
     expect(document.buffer.materializeFullText().startsWith('A')).toBe(true)
-    expect(store.getState().getLiveEditorDocument(document.id)?.localRevision).toBe(
+    expect(store.getState().getLiveEditorDocument(document.key)?.localRevision).toBe(
       document.buffer.getRevision(),
     )
   })
 
   it('restores the seeded scroll position when a view is created', () => {
     const store = createEditorDocumentStore({
-      scrollPositionSeeds: { '/repo/a.ts': { left: 0, top: 480 } },
+      scrollPositionSeeds: testScrollPositions({ '/repo/a.ts': { left: 0, top: 480 } }),
     })
 
-    const view = store.getState().ensureEditorView('tab-1', fileResult('/repo/a.ts'))
+    const view = store.getState().ensureEditorView(tabId('tab-1'), fileResult('/repo/a.ts'))
 
     expect(view.scrollPosition).toEqual({ left: 0, top: 480 })
     expect(view.view.getScrollPosition()).toEqual({ left: 0, top: 480 })
@@ -248,11 +324,11 @@ describe('editor document store state identity', () => {
 
   it('reopens a closed tab at its last scroll position', () => {
     const store = createEditorDocumentStore()
-    store.getState().ensureEditorView('tab-1', fileResult('/repo/a.ts'))
-    store.getState().setEditorViewScrollPosition('tab-1', { left: 0, top: 240 })
-    store.getState().removeEditorView('tab-1')
+    store.getState().ensureEditorView(tabId('tab-1'), fileResult('/repo/a.ts'))
+    store.getState().setEditorViewScrollPosition(tabId('tab-1'), { left: 0, top: 240 })
+    store.getState().removeEditorView(tabId('tab-1'))
 
-    const reopened = store.getState().ensureEditorView('tab-2', fileResult('/repo/a.ts'))
+    const reopened = store.getState().ensureEditorView(tabId('tab-2'), fileResult('/repo/a.ts'))
 
     expect(reopened.scrollPosition).toEqual({ left: 0, top: 240 })
   })
@@ -262,18 +338,18 @@ describe('editor document store state identity', () => {
 
     const returned = store.getState().ensureLiveEditorDocument(fileResult('/repo/a.ts'))
 
-    expect(store.getState().getLiveEditorDocument('/repo/a.ts')).toBe(returned)
-    expect(store.getState().liveDocumentsById['/repo/a.ts']).toBe(returned)
+    expect(store.getState().getLiveEditorDocument(testDocumentKey('/repo/a.ts'))).toBe(returned)
+    expect(store.getState().liveDocumentsByKey[testDocumentKey('/repo/a.ts')]).toBe(returned)
   })
 
   it('hands back the same view object through both read paths', () => {
     const store = createEditorDocumentStore()
-    store.getState().ensureEditorView('tab-1', fileResult('/repo/a.ts'))
+    store.getState().ensureEditorView(tabId('tab-1'), fileResult('/repo/a.ts'))
 
-    const view = store.getState().getEditorView('tab-1')
+    const view = store.getState().getEditorView(tabId('tab-1'))
 
     expect(view).not.toBeNull()
-    expect(store.getState().viewsByTabId['tab-1']).toBe(view)
+    expect(store.getState().viewsByTabId[tabId('tab-1')]).toBe(view)
   })
 
   it('promotes an exact clean prepared buffer into the view', () => {
@@ -283,7 +359,7 @@ describe('editor document store state identity', () => {
     buffer.markClean()
     const preparedDocument = preparedDocumentLease()
 
-    const view = store.getState().ensureEditorView('tab-1', file, {
+    const view = store.getState().ensureEditorView(tabId('tab-1'), file, {
       buffer,
       file,
       fileVersion: file.version,
@@ -306,7 +382,7 @@ describe('editor document store state identity', () => {
     const preparedBuffer = createEditorTextBuffer(file.content)
     const preparedDocument = preparedDocumentLease()
 
-    const view = store.getState().ensureEditorView('tab-1', file, {
+    const view = store.getState().ensureEditorView(tabId('tab-1'), file, {
       buffer: preparedBuffer,
       file,
       fileVersion: file.version,
@@ -326,12 +402,12 @@ describe('editor document store state identity', () => {
     const document = store.getState().ensureLiveEditorDocument(fileResult('/repo/a.ts'))
     const session = createEditorBufferSession(document.buffer)
     session.applyText('!')
-    const saving = store.getState().getLiveEditorDocument(document.id)!
+    const saving = store.getState().getLiveEditorDocument(document.key)!
     const savedText = saving.buffer.materializeFullText()
 
     expect(
       store.getState().markLiveEditorDocumentSaved({
-        documentId: document.id,
+        documentKey: document.key,
         fileVersion: 'opaque-next',
         mtimeMs: 200,
         savedContentRevision: saving.contentRevision,
@@ -339,7 +415,7 @@ describe('editor document store state identity', () => {
       }),
     ).toBe(true)
 
-    expect(store.getState().getLiveEditorDocument(document.id)?.contentRevision).toBe(
+    expect(store.getState().getLiveEditorDocument(document.key)?.contentRevision).toBe(
       'f:opaque-next',
     )
   })
@@ -349,13 +425,13 @@ describe('editor document store state identity', () => {
     const document = store.getState().ensureLiveEditorDocument(fileResult('/repo/a.ts'))
     const session = createEditorBufferSession(document.buffer)
     session.applyText('first')
-    const saving = store.getState().getLiveEditorDocument(document.id)!
+    const saving = store.getState().getLiveEditorDocument(document.key)!
     const savedText = saving.buffer.materializeFullText()
     session.applyText('second')
 
     expect(
       store.getState().markLiveEditorDocumentSaved({
-        documentId: document.id,
+        documentKey: document.key,
         fileVersion: 'opaque-next',
         mtimeMs: 200,
         savedContentRevision: saving.contentRevision,
@@ -363,22 +439,24 @@ describe('editor document store state identity', () => {
       }),
     ).toBe(false)
 
-    const raced = store.getState().getLiveEditorDocument(document.id)!
+    const raced = store.getState().getLiveEditorDocument(document.key)!
     expect(raced.contentRevision).toMatch(/^e:/)
     expect(raced.sync).toMatchObject({ fileVersion: 'opaque-next' })
   })
 
   it('exposes one document object at the new path after a rename', () => {
     const store = createEditorDocumentStore()
-    store.getState().ensureEditorView('tab-1', fileResult('/repo/a.ts'))
+    store.getState().ensureEditorView(tabId('tab-1'), fileResult('/repo/a.ts'))
 
-    store.getState().renameLiveEditorDocumentPath('/repo/a.ts', '/repo/b.ts')
+    store
+      .getState()
+      .renameLiveEditorDocumentPath(filesystemPath('/repo/a.ts'), filesystemPath('/repo/b.ts'))
 
-    const renamed = store.getState().getLiveEditorDocument('/repo/b.ts')
-    expect(renamed?.path).toBe('/repo/b.ts')
-    expect(store.getState().liveDocumentsById['/repo/b.ts']).toBe(renamed)
-    expect(store.getState().getLiveEditorDocument('/repo/a.ts')).toBeNull()
-    expect(store.getState().hasLiveEditorDocument('/repo/a.ts')).toBe(false)
+    const renamed = store.getState().getLiveEditorDocument(testDocumentKey('/repo/b.ts'))
+    expect(renamed?.target).toEqual({ kind: 'file', resource: { path: '/repo/b.ts' } })
+    expect(store.getState().liveDocumentsByKey[testDocumentKey('/repo/b.ts')]).toBe(renamed)
+    expect(store.getState().getLiveEditorDocument(testDocumentKey('/repo/a.ts'))).toBeNull()
+    expect(store.getState().hasLiveEditorDocument(testDocumentKey('/repo/a.ts'))).toBe(false)
   })
 
   it('acquires path reservations all-or-none in canonical order and unwinds a busy set', () => {
@@ -387,8 +465,8 @@ describe('editor document store state identity', () => {
       .getState()
       .reserveWorkspaceDocumentPaths(
         [
-          store.getState().prepareWorkspaceDocumentPathReservation('/repo/b.ts'),
-          store.getState().prepareWorkspaceDocumentPathReservation('/repo/b.ts'),
+          store.getState().prepareWorkspaceDocumentPathReservation(filesystemPath('/repo/b.ts')),
+          store.getState().prepareWorkspaceDocumentPathReservation(filesystemPath('/repo/b.ts')),
         ],
         'first',
       )
@@ -400,7 +478,7 @@ describe('editor document store state identity', () => {
     expect(
       store.getState().reserveWorkspaceDocumentPaths(
         ['/repo/c.ts', '/repo/a.ts', '/repo/b.ts'].map((path) =>
-          store.getState().prepareWorkspaceDocumentPathReservation(path),
+          store.getState().prepareWorkspaceDocumentPathReservation(filesystemPath(path)),
         ),
         'second',
       ),
@@ -408,7 +486,7 @@ describe('editor document store state identity', () => {
 
     const noPartialReservation = store.getState().reserveWorkspaceDocumentPaths(
       ['/repo/a.ts', '/repo/c.ts'].map((path) =>
-        store.getState().prepareWorkspaceDocumentPathReservation(path),
+        store.getState().prepareWorkspaceDocumentPathReservation(filesystemPath(path)),
       ),
       'third',
     )
@@ -432,26 +510,34 @@ describe('editor document store state identity', () => {
     store.getState().ensureLiveEditorDocument(fileResult('/repo/a.ts'))
     const acquired = store.getState().reserveWorkspaceDocumentPaths(
       ['/repo/a.ts', '/repo/b.ts'].map((path) =>
-        store.getState().prepareWorkspaceDocumentPathReservation(path),
+        store.getState().prepareWorkspaceDocumentPathReservation(filesystemPath(path)),
       ),
       'workspace-edit',
     )
     if (acquired.status !== 'acquired') throw new RangeError('expected path reservation')
 
-    expect(() => store.getState().deleteLiveEditorDocument('/repo/a.ts')).toThrow(/reserved/)
+    expect(() => store.getState().deleteLiveEditorDocument(testDocumentKey('/repo/a.ts'))).toThrow(
+      /reserved/,
+    )
     expect(() => store.getState().ensureLiveEditorDocument(fileResult('/repo/b.ts'))).toThrow(
       /reserved/,
     )
-    expect(() => store.getState().renameLiveEditorDocumentPath('/repo/a.ts', '/repo/b.ts')).toThrow(
-      /reserved/,
-    )
+    expect(() =>
+      store
+        .getState()
+        .renameLiveEditorDocumentPath(filesystemPath('/repo/a.ts'), filesystemPath('/repo/b.ts')),
+    ).toThrow(/reserved/)
 
     const projection = store
       .getState()
-      .prepareWorkspaceDocumentRename('/repo/a.ts', '/repo/b.ts', acquired.reservation)
+      .prepareWorkspaceDocumentRename(
+        filesystemPath('/repo/a.ts'),
+        filesystemPath('/repo/b.ts'),
+        acquired.reservation,
+      )
     expect(projection).not.toBeNull()
     expect(store.getState().commitWorkspaceDocumentProjection(projection!)).toBe(true)
-    expect(store.getState().getLiveEditorDocument('/repo/b.ts')).not.toBeNull()
+    expect(store.getState().getLiveEditorDocument(testDocumentKey('/repo/b.ts'))).not.toBeNull()
     expect(store.getState().releaseWorkspaceDocumentPaths(acquired.reservation)).toEqual({
       status: 'released',
     })
@@ -469,7 +555,11 @@ describe('editor document store state identity', () => {
     const reservation = store
       .getState()
       .reserveWorkspaceDocumentPaths(
-        [store.getState().prepareWorkspaceDocumentPathReservation('/repo/unused.ts')],
+        [
+          store
+            .getState()
+            .prepareWorkspaceDocumentPathReservation(filesystemPath('/repo/unused.ts')),
+        ],
         'owner',
       )
     expect(store.getState().pathOwnershipRevision).toBe(1)
@@ -477,22 +567,28 @@ describe('editor document store state identity', () => {
     store.getState().releaseWorkspaceDocumentPaths(reservation.reservation)
     expect(store.getState().pathOwnershipRevision).toBe(1)
 
-    store.getState().renameLiveEditorDocumentPath('/repo/a.ts', '/repo/b.ts')
+    store
+      .getState()
+      .renameLiveEditorDocumentPath(filesystemPath('/repo/a.ts'), filesystemPath('/repo/b.ts'))
     expect(store.getState().pathOwnershipRevision).toBe(2)
-    store.getState().deleteLiveEditorDocument('/repo/b.ts')
+    store.getState().deleteLiveEditorDocument(testDocumentKey('/repo/b.ts'))
     expect(store.getState().pathOwnershipRevision).toBe(3)
   })
 
   it('rejects a stale path classification and releases an exact reservation idempotently', () => {
     const store = createEditorDocumentStore()
-    const stale = store.getState().prepareWorkspaceDocumentPathReservation('/repo/a.ts')
+    const stale = store
+      .getState()
+      .prepareWorkspaceDocumentPathReservation(filesystemPath('/repo/a.ts'))
     store.getState().ensureLiveEditorDocument(fileResult('/repo/a.ts'))
 
     expect(store.getState().reserveWorkspaceDocumentPaths([stale], 'stale')).toEqual({
       status: 'stale',
     })
 
-    const current = store.getState().prepareWorkspaceDocumentPathReservation('/repo/a.ts')
+    const current = store
+      .getState()
+      .prepareWorkspaceDocumentPathReservation(filesystemPath('/repo/a.ts'))
     const acquired = store.getState().reserveWorkspaceDocumentPaths([current], 'workspace-edit')
     if (acquired.status !== 'acquired') throw new RangeError('expected path reservation')
     expect(store.getState().releaseWorkspaceDocumentPaths(acquired.reservation)).toEqual({
@@ -508,7 +604,7 @@ describe('editor document store state identity', () => {
     const first = store.getState().ensureLiveEditorDocument(fileResult('/repo/a.ts'))
     const second = store.getState().ensureLiveEditorDocument(fileResult('/repo/b.ts'))
     const stamps = ['/repo/b.ts', '/repo/a.ts'].map((path) =>
-      store.getState().prepareWorkspaceDocumentTarget(path)!,
+      store.getState().prepareWorkspaceDocumentTarget(testDocumentKey(path))!,
     )
     const acquired = store
       .getState()
@@ -545,8 +641,8 @@ describe('editor document store state identity', () => {
       .getState()
       .acquireWorkspaceDocumentMutationLeases(
         [
-          store.getState().prepareWorkspaceDocumentTarget('/repo/a.ts')!,
-          store.getState().prepareWorkspaceDocumentTarget('/repo/b.ts')!,
+          store.getState().prepareWorkspaceDocumentTarget(testDocumentKey('/repo/a.ts'))!,
+          store.getState().prepareWorkspaceDocumentTarget(testDocumentKey('/repo/b.ts'))!,
         ],
         'workspace-edit',
       )
@@ -569,15 +665,17 @@ describe('editor document store state identity', () => {
     expect(
       store
         .getState()
-        .markWorkspaceDocumentRecoveryConflict(['/repo/b.ts', '/repo/a.ts'], 'partial-operation'),
+        .markWorkspaceDocumentRecoveryConflict(
+          [filesystemPath('/repo/b.ts'), filesystemPath('/repo/a.ts')],
+          'partial-operation',
+        ),
     ).toEqual({ conflictedPaths: ['/repo/a.ts'], status: 'acquired' })
 
-    const conflicted = store.getState().getLiveEditorDocument('/repo/a.ts')!
+    const conflicted = store.getState().getLiveEditorDocument(testDocumentKey('/repo/a.ts'))!
     expect(conflicted.sync).toEqual({
       affectedPaths: ['/repo/a.ts', '/repo/b.ts'],
       kind: 'recovery-conflict',
       operationId: 'partial-operation',
-      path: '/repo/a.ts',
     })
     createEditorBufferSession(conflicted.buffer).applyText(' blocked')
     conflicted.buffer.undo()
@@ -588,7 +686,7 @@ describe('editor document store state identity', () => {
     expect(store.getState().clearWorkspaceDocumentRecoveryConflict('partial-operation')).toEqual([
       '/repo/a.ts',
     ])
-    const restored = store.getState().getLiveEditorDocument('/repo/a.ts')!
+    const restored = store.getState().getLiveEditorDocument(testDocumentKey('/repo/a.ts'))!
     expect(restored.sync.kind).toBe('file')
     createEditorBufferSession(restored.buffer).applyText(' editable')
     expect(restored.buffer.materializeFullText()).toBe(`${beforeText} editable`)
@@ -610,8 +708,8 @@ describe('editor document store state identity', () => {
       .getState()
       .acquireWorkspaceDocumentMutationLeases(
         [
-          store.getState().prepareWorkspaceDocumentTarget('/repo/a.ts')!,
-          store.getState().prepareWorkspaceDocumentTarget('/repo/b.ts')!,
+          store.getState().prepareWorkspaceDocumentTarget(testDocumentKey('/repo/a.ts'))!,
+          store.getState().prepareWorkspaceDocumentTarget(testDocumentKey('/repo/b.ts'))!,
         ],
         'partial-operation',
       )
@@ -621,7 +719,7 @@ describe('editor document store state identity', () => {
       .getState()
       .prepareWorkspaceDocumentRecoveryConflictTransfer(
         acquired.leaseSet,
-        ['/repo/a.ts'],
+        [filesystemPath('/repo/a.ts')],
         'partial-operation',
       )
     expect(prepared.status).toBe('prepared')
@@ -635,7 +733,7 @@ describe('editor document store state identity', () => {
     expect(unaffectedLeaseStates).toEqual([true, false])
     expect(getDocumentMutationLeaseState(affected.buffer).isLeased).toBe(true)
     expect(getDocumentMutationLeaseState(unaffected.buffer).isLeased).toBe(false)
-    expect(store.getState().getLiveEditorDocument('/repo/a.ts')?.sync.kind).toBe(
+    expect(store.getState().getLiveEditorDocument(testDocumentKey('/repo/a.ts'))?.sync.kind).toBe(
       'recovery-conflict',
     )
     createEditorBufferSession(affected.buffer).applyText(' blocked')
@@ -643,7 +741,9 @@ describe('editor document store state identity', () => {
 
     store.getState().clearWorkspaceDocumentRecoveryConflict('partial-operation')
     expect(affectedLeaseStates).toEqual([true, false])
-    expect(store.getState().getLiveEditorDocument('/repo/a.ts')?.sync.kind).toBe('file')
+    expect(store.getState().getLiveEditorDocument(testDocumentKey('/repo/a.ts'))?.sync.kind).toBe(
+      'file',
+    )
   })
 })
 
@@ -651,7 +751,7 @@ function fileResult(path: string): FileResult {
   return {
     content: `contents of ${path}`,
     mtimeMs: 100,
-    path,
+    path: filesystemPath(path),
     size: 20,
     version: `test:${path}`,
   }

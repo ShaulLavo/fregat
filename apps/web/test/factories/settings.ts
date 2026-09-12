@@ -1,8 +1,12 @@
+import { documentKey, settingsJsonDocument } from '@/lib/documents/utils/identity'
 import {
   DEFAULT_SETTING_VALUES,
   type SettingsSnapshot,
   type SettingsValues,
+  type SettingsWriteTarget,
 } from '@workspace/contracts'
+import type { EditorDocumentStoreApi } from '@/features/editor/state/document-state'
+import { createClientInvariantError } from '@/lib/structured-errors'
 
 type SettingsSnapshotInput = {
   readonly epoch?: string
@@ -51,4 +55,26 @@ export function settingsSnapshot({
 
 function settingsFile(text: string, revision: string) {
   return { keyRanges: {}, parseErrors: [], revision, text }
+}
+
+export function settingsLayerFile(snapshot: SettingsSnapshot, target: SettingsWriteTarget) {
+  const file = snapshot.layers.find((layer) => layer.id === target)?.file
+  if (!file) throw createClientInvariantError(`Settings fixture has no ${target} file`)
+  return file
+}
+
+export function seedSettingsBuffer(
+  store: EditorDocumentStoreApi,
+  snapshot: SettingsSnapshot,
+  target: SettingsWriteTarget,
+  text: string,
+) {
+  const id = documentKey(settingsJsonDocument(target))
+  const file = settingsLayerFile(snapshot, target)
+  const document = store.getState().ensureSettingsDocument(settingsJsonDocument(target), {
+    content: text,
+    revision: file.revision,
+  })
+  store.getState().setLiveEditorDocumentDirty(id, true)
+  return document
 }

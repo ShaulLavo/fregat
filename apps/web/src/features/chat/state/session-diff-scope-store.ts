@@ -1,4 +1,4 @@
-import { pruneScopedRecord } from '@/lib/environments/utils/scoped-record'
+import { pruneScopedRecord } from '@/features/chat/utils/scoped-record'
 import { createEnvironmentRecordPersistence } from '@/lib/environments/state/record-persistence'
 import type { ScopedStorage } from '@/lib/environments/state/scoped-storage'
 import { scopedSessionKey, type ScopedSessionRef, type TurnId } from '@workspace/contracts'
@@ -64,12 +64,7 @@ export function hydrateSessionDiffScopeStoreFromStorage(storage: ScopedStorage) 
 }
 
 function persistSessionDiffScopes() {
-  try {
-    sessionDiffPersistence.persist(useSessionDiffScopeStore.getState().scopeBySessionKey)
-  } catch {
-    // A full or blocked store costs the user a pane that reopens on the branch
-    // diff. Nothing here is worth interrupting a click over.
-  }
+  sessionDiffPersistence.persist(useSessionDiffScopeStore.getState().scopeBySessionKey)
 }
 
 function withSessionDiffScope(

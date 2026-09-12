@@ -2,8 +2,8 @@ import type { FileTreeContextMenuItem, FileTreeContextMenuOpenContext } from '@w
 
 import type { TreeFsActions } from '@/features/workspace/hooks/use-fs-actions'
 import { useRowMenu } from '@/features/workspace/hooks/use-row-menu'
-import { MenuSurface } from '@/features/menus/components/surface'
-import { rectAnchor } from '@/features/menus/utils/virtual-anchor'
+import { MenuSurface } from '@/keymap/menus/components/surface'
+import { rectAnchor } from '@/keymap/menus/utils/virtual-anchor'
 import type { TreeModel } from '@/lib/tree-model'
 
 /**

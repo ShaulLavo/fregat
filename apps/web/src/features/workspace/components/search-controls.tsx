@@ -1,3 +1,4 @@
+import { filesystemPath } from '@/lib/documents/utils/identity'
 import { ArrowSquareOutIcon } from '@phosphor-icons/react'
 
 import { SearchSummary } from '@/features/workspace/components/search-summary'
@@ -71,7 +72,7 @@ export function SearchControls({
             title='Open search editor'
             type='button'
             variant='ghost'
-            onClick={() => openSearchEditor(rootPath)}
+            onClick={() => openSearchEditor(filesystemPath(rootPath))}
           >
             <ArrowSquareOutIcon className='size-4' />
           </Button>

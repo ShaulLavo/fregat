@@ -1,4 +1,4 @@
-import { useContextMenu } from '@/features/menus/hooks/use-context-menu'
+import { useContextMenu } from '@/keymap/menus/hooks/use-context-menu'
 import { colorForFileIcon, iconForEntry, type ResolvedFileIcon } from '@/lib/file-icons'
 import { basename, toTreePath } from '@/lib/path-formatters'
 import { cn } from '@workspace/ui/lib/utils'

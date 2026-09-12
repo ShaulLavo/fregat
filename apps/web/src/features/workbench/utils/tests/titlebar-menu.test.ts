@@ -1,4 +1,4 @@
-import type { MenuItem, MenuRadioGroupItem, MenuSubmenuItem } from '@/features/menus/utils/model'
+import type { MenuItem, MenuRadioGroupItem, MenuSubmenuItem } from '@/keymap/menus/utils/model'
 import type { ProjectMenuEntry } from '@/features/workbench/utils/project-menu-model'
 import { titlebarMenu, type TitlebarMenuContext } from '@/features/workbench/utils/titlebar-menu'
 import { expect, test } from '../../../../../test/fixtures'

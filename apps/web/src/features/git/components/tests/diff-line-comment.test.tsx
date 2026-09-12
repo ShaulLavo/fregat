@@ -1,3 +1,4 @@
+import { filesystemPath } from '@/lib/documents/utils/identity'
 import { execFileSync } from 'node:child_process'
 import { mkdir, writeFile } from 'node:fs/promises'
 import path from 'node:path'
@@ -13,12 +14,7 @@ import {
 import { TestEditorStateProvider as EditorStateProvider } from '../../../../../test/factories/editor-state-provider'
 import { fetchDiff } from '@/features/git/utils/api'
 import { DiffView } from '@/features/git/components/diff-view'
-import { parseDiffDocumentId, snapshotDiffDocumentId } from '@/features/git/utils/diff-document'
-import type {
-  DiffDocumentInfo,
-  SnapshotDiffDocumentInput,
-} from '@/features/git/utils/diff-document'
-import type { FileDiff } from '@/features/git/utils/types'
+import { snapshotComparison } from '../../../../../test/factories/git-diff'
 import { testDiffLanguageHost } from '../../../../../test/factories/diff-language-host'
 import { expect, test } from '../../../../../test/fixtures'
 import { renderWithProviders } from '../../../../../test/render'
@@ -43,7 +39,11 @@ test('a range dragged in the new pane reaches the composer addressed to the new 
   void client
   const { documentInfo } = await twoEditRepo(server.root)
   await renderDiffView(
-    <DiffView documentInfo={documentInfo} languageHost={testDiffLanguageHost} rootPath='repo' />,
+    <DiffView
+      comparison={documentInfo}
+      languageHost={testDiffLanguageHost}
+      rootPath={filesystemPath('repo')}
+    />,
   )
 
   await dragRows('new', 0, 2)
@@ -63,7 +63,11 @@ test('the same rows dragged in the old pane are addressed to the old side', asyn
   void client
   const { documentInfo } = await twoEditRepo(server.root)
   await renderDiffView(
-    <DiffView documentInfo={documentInfo} languageHost={testDiffLanguageHost} rootPath='repo' />,
+    <DiffView
+      comparison={documentInfo}
+      languageHost={testDiffLanguageHost}
+      rootPath={filesystemPath('repo')}
+    />,
   )
 
   // Row 1 of the old pane is the deletion; the new pane's row 1 is the addition.
@@ -86,7 +90,11 @@ test('a row still addresses its own line after the skipped range above it is exp
   void client
   const { documentInfo } = await twoEditRepo(server.root, { alsoEditLine35: true })
   await renderDiffView(
-    <DiffView documentInfo={documentInfo} languageHost={testDiffLanguageHost} rootPath='repo' />,
+    <DiffView
+      comparison={documentInfo}
+      languageHost={testDiffLanguageHost}
+      rootPath={filesystemPath('repo')}
+    />,
   )
   await waitFor(() => expect(paneRows('new').length).toBeGreaterThan(6))
 
@@ -110,7 +118,11 @@ test('dismissing a selection takes the offer back without attaching anything', a
   void client
   const { documentInfo } = await twoEditRepo(server.root)
   await renderDiffView(
-    <DiffView documentInfo={documentInfo} languageHost={testDiffLanguageHost} rootPath='repo' />,
+    <DiffView
+      comparison={documentInfo}
+      languageHost={testDiffLanguageHost}
+      rootPath={filesystemPath('repo')}
+    />,
   )
 
   await dragRows('new', 0, 2)
@@ -177,14 +189,7 @@ async function twoEditRepo(root: string, { alsoEditLine35 = false } = {}) {
   await writeFile(path.join(repo, 'lines.ts'), `${text}\n`)
   const diff = (await fetchDiff('repo/lines.ts', false))[0]!
 
-  return { documentInfo: snapshotDocument(diff), repo }
-}
-
-function snapshotDocument(diff: FileDiff): DiffDocumentInfo {
-  const info = parseDiffDocumentId(snapshotDiffDocumentId(diff as SnapshotDiffDocumentInput))
-  expect(info).not.toBeNull()
-
-  return info!
+  return { documentInfo: snapshotComparison(diff), repo }
 }
 
 function git(cwd: string, ...args: string[]) {

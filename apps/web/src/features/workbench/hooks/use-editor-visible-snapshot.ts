@@ -1,3 +1,4 @@
+import type { DocumentKey, FilesystemPath } from '@/lib/documents/utils/types'
 import type { EditorPlugin, EditorTextBuffer } from '@singapor/core'
 import { useEffect, useLayoutEffect, useMemo, useState } from 'react'
 
@@ -11,8 +12,8 @@ import { addLifecycleFlush } from '@/lib/lifecycle-flush'
 
 type SnapshotTarget = {
   readonly contentVersion: string | null
-  readonly path: string
-  readonly rootPath: string
+  readonly path: FilesystemPath
+  readonly rootPath: FilesystemPath
 }
 
 type SnapshotTheme = {
@@ -26,11 +27,11 @@ type SnapshotOptions = {
   readonly active: boolean
   readonly renderedDocument: {
     readonly buffer: EditorTextBuffer
-    readonly documentId: string
-    readonly path: string
-    readonly rootPath: string
+    readonly documentKey: DocumentKey
+    readonly path: FilesystemPath
+    readonly rootPath: FilesystemPath
   } | null
-  readonly selectedTarget: SnapshotTarget
+  readonly selectedTarget: SnapshotTarget | null
   readonly theme: SnapshotTheme
 }
 
@@ -41,22 +42,24 @@ export function useEditorVisibleSnapshot({
   selectedTarget,
   theme,
 }: SnapshotOptions) {
-  const { contentVersion, path, rootPath } = selectedTarget
+  const contentVersion = selectedTarget?.contentVersion ?? null
+  const path = selectedTarget?.path ?? null
+  const rootPath = selectedTarget?.rootPath ?? null
   const { appliedThemeId, committedThemeId, selectedThemeId } = theme
-  const documentKey = `${storage.environmentId}\u0000${rootPath}\u0000${path}`
-  const cacheKey = `${documentKey}\u0000${committedThemeId}`
+  const paintKey = selectedTarget ? `${storage.environmentId}\u0000${rootPath}\u0000${path}` : null
+  const cacheKey = `${paintKey}\u0000${committedThemeId}`
   const [cached, setCached] = useState(() => ({
     key: cacheKey,
-    record: readEditorVisibleSnapshotCache(storage, { path, rootPath, themeId: committedThemeId }),
+    record: selectedTarget
+      ? readEditorVisibleSnapshotCache(storage, { ...selectedTarget, themeId: committedThemeId })
+      : null,
   }))
   if (cached.key !== cacheKey) {
     setCached({
       key: cacheKey,
-      record: readEditorVisibleSnapshotCache(storage, {
-        path,
-        rootPath,
-        themeId: committedThemeId,
-      }),
+      record: selectedTarget
+        ? readEditorVisibleSnapshotCache(storage, { ...selectedTarget, themeId: committedThemeId })
+        : null,
     })
   }
 
@@ -75,19 +78,23 @@ export function useEditorVisibleSnapshot({
     [capture],
   )
   const buffer = renderedDocument?.buffer ?? null
-  const documentId = renderedDocument?.documentId ?? null
+  const key = renderedDocument?.documentKey ?? null
   const matchesTarget =
     renderedDocument === null ||
     (renderedDocument.path === path && renderedDocument.rootPath === rootPath)
   const themeReady = appliedThemeId === committedThemeId && selectedThemeId === committedThemeId
 
   useLayoutEffect(() => {
+    if (path === null || rootPath === null || paintKey === null) {
+      capture.setIdentity(null)
+      return
+    }
     capture.setIdentity({
       active: active && matchesTarget,
       buffer,
       contentVersion,
-      documentId,
-      documentKey,
+      key,
+      paintKey,
       path,
       rootPath,
       themeId: themeReady ? appliedThemeId : null,
@@ -99,8 +106,8 @@ export function useEditorVisibleSnapshot({
     buffer,
     capture,
     contentVersion,
-    documentId,
-    documentKey,
+    key,
+    paintKey,
     matchesTarget,
     path,
     rootPath,
@@ -108,7 +115,7 @@ export function useEditorVisibleSnapshot({
   ])
 
   useLayoutEffect(() => {
-    if (!buffer || !matchesTarget) return
+    if (!buffer || !matchesTarget || path === null || rootPath === null) return
     const discardDirty = () => {
       if (!buffer.isDirty()) return
       capture.cancel()
@@ -137,7 +144,7 @@ export function useEditorVisibleSnapshot({
     (contentVersion === null || record?.contentVersion === contentVersion)
   return {
     additionalPlugins,
-    documentKey,
+    paintKey,
     onCaptureSourceChange: capture.setSource,
     snapshot: eligible ? (record?.paint ?? null) : null,
   }

@@ -1,3 +1,4 @@
+import { filesystemPath } from '@/lib/documents/utils/identity'
 import {
   containerContentsLoaded,
   containerTreePath,
@@ -9,19 +10,19 @@ import {
 import { expect, test } from '../../../../../test/fixtures'
 
 test('joins the pane root with a tree path', () => {
-  expect(workspacePathForTreePath('repo', 'src/a.ts')).toBe('repo/src/a.ts')
+  expect(workspacePathForTreePath(filesystemPath('repo'), 'src/a.ts')).toBe('repo/src/a.ts')
 })
 
 test('tolerates trailing slashes on either half', () => {
-  expect(workspacePathForTreePath('repo/', 'src/lib/')).toBe('repo/src/lib')
+  expect(workspacePathForTreePath(filesystemPath('repo/'), 'src/lib/')).toBe('repo/src/lib')
 })
 
 test('a rootless pane keeps the tree path as-is', () => {
-  expect(workspacePathForTreePath('', 'src/a.ts')).toBe('src/a.ts')
+  expect(workspacePathForTreePath(filesystemPath(''), 'src/a.ts')).toBe('src/a.ts')
 })
 
 test('the pane root itself resolves to the root path', () => {
-  expect(workspacePathForTreePath('repo', '')).toBe('repo')
+  expect(workspacePathForTreePath(filesystemPath('repo'), '')).toBe('repo')
 })
 
 test('a directory row hosts new entries inside itself', () => {

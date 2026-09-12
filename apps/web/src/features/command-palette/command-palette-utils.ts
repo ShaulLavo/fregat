@@ -8,16 +8,13 @@ export {
   RECENTLY_USED_COMMANDS_HEADING,
   OTHER_COMMANDS_HEADING,
 } from '@workspace/client-core/commands/palette'
-import {
-  parseSearchBufferDocumentId,
-  searchBufferDocumentLabel,
-  searchBufferDocumentTitle,
-} from '@/features/search/utils/buffer-document'
+import { searchMatchEntry } from '@/lib/search-match-entry'
+import { comparisonDisplayPath, tabPalettePresentation } from '@/lib/documents/utils/labels'
+import { sameTabContent, tabContentKey } from '@/lib/documents/utils/tabs'
+import type { TabContent } from '@/lib/documents/utils/types'
 import { commandShortcut } from '@/keymap/utils/format-keys'
 import type { EditorWorkspaceStoreApi } from '@/features/editor/state/workspace-state'
 import { activeEditorTabForWorkbenchPanels } from '@/features/workbench/utils/panels'
-import { parseCompareSavedDocumentId } from '@/features/editor/utils/compare-saved-document'
-import { parseDiffDocumentId } from '@/features/git/utils/diff-document'
 import { isFileEntry } from '@/lib/file-system-types'
 import type { CommandInvocation, CommandOutcome } from '@/keymap/state/command-bus'
 import type { OpenWorkspaceRootResult } from '@/features/workspace/hooks/use-open-root'
@@ -28,7 +25,7 @@ import type {
 } from '@/lib/focus/state/service'
 import { matchesActiveSurface } from '@/lib/focus/utils/active-surface'
 import type { LoadState } from '@/lib/load-state'
-import { basename, displayPath, toTreePath } from '@/lib/path-formatters'
+import { toTreePath } from '@/lib/path-formatters'
 import type { TreeModel } from '@/lib/tree-model'
 import type { CommandSpec } from '@/keymap/command-registry'
 import type { PlatformCommandId, PlatformKeyBinding } from '@/keymap/types'
@@ -74,16 +71,7 @@ export function searchFilePaletteItems(
   rootPath: string,
 ): readonly FilePaletteItem[] {
   return matches.map((match) => ({
-    entry: {
-      birthtimeMs: match.birthtimeMs ?? 0,
-      mtimeMs: match.mtimeMs ?? 0,
-      name: basename(match.path),
-      path: match.path,
-      size: match.size ?? 0,
-      targetType: match.targetType,
-      type: match.type,
-      version: searchEntryVersion(match.mtimeMs ?? 0, match.size ?? 0),
-    },
+    entry: searchMatchEntry(match),
     pathLabel: toTreePath(match.path, rootPath),
   }))
 }
@@ -104,29 +92,15 @@ export function fileItemValue(item: FilePaletteItem) {
 }
 
 export function editorPaletteItems(
-  openFilePaths: readonly string[],
-  selectedFilePath: string | null,
+  contents: readonly TabContent[],
+  selected: TabContent | null,
 ): readonly EditorPaletteItem[] {
-  return openFilePaths.map((path) => editorPaletteItem(path, selectedFilePath))
-}
-
-function editorPaletteItem(path: string, selectedFilePath: string | null): EditorPaletteItem {
-  const searchBuffer = parseSearchBufferDocumentId(path)
-  if (searchBuffer) {
-    return {
-      active: path === selectedFilePath,
-      name: searchBufferDocumentLabel(),
-      path,
-      pathLabel: searchBufferDocumentTitle(searchBuffer.rootPath),
-    }
-  }
-
-  return {
-    active: path === selectedFilePath,
-    name: basename(path),
-    path,
-    pathLabel: displayPath(path),
-  }
+  return contents.map((content) => ({
+    active: selected !== null && sameTabContent(content, selected),
+    content,
+    key: tabContentKey(content),
+    ...tabPalettePresentation(content),
+  }))
 }
 
 function commandKeywords(spec: CommandSpec) {
@@ -311,9 +285,11 @@ export function activeEditorFocusDestination(
   if (!activeTab) return null
   const layout = workspaceState.uiMode
 
-  const diffPath =
-    parseCompareSavedDocumentId(activeTab.path) ?? parseDiffDocumentId(activeTab.path)?.path ?? null
-  const searchRoot = parseSearchBufferDocumentId(activeTab.path)?.rootPath ?? null
+  const document = activeTab.content.kind === 'document' ? activeTab.content.document : null
+  let diffPath: string | null = null
+  if (document?.kind === 'compare-saved') diffPath = document.file.path
+  if (document?.kind === 'git-diff') diffPath = comparisonDisplayPath(document.source)
+  const searchRoot = document?.kind === 'search' ? document.root : null
   const identity = { diffPath, layout, searchRoot, tabId: activeTab.id } as const
 
   return {
@@ -322,7 +298,7 @@ export function activeEditorFocusDestination(
       return (
         workspace.getState().uiMode === layout &&
         current?.id === activeTab.id &&
-        current.path === activeTab.path
+        sameTabContent(current.content, activeTab.content)
       )
     },
     kind: 'match',
@@ -352,10 +328,6 @@ export function symbolKindLabel(kind: number) {
 export function fileUriForPath(path: string) {
   const normalized = path.replace(/^\/+/, '')
   return `file:///${normalized.split('/').map(encodeURIComponent).join('/')}`
-}
-
-function searchEntryVersion(mtimeMs: number, size: number) {
-  return `search:${mtimeMs}:${size}`
 }
 
 function platformCommandPaletteItem(

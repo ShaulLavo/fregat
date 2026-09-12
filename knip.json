@@ -2,13 +2,54 @@
   "$schema": "https://unpkg.com/knip@6/schema.json",
   "ignoreWorkspaces": ["packages/editor-*", "../Editor/packages/*"],
   "ignoreDependencies": ["@lydell/node-pty", "@typescript/native-preview"],
-  "ignoreBinaries": ["src/index.ts"],
   "workspaces": {
     "apps/desktop": {
       "entry": ["src/bun/index.ts", "src/preload/index.ts", "electrobun.config.ts"]
     },
+    "apps/server": {
+      "entry": [
+        "src/index.ts",
+        "src/provider/claude-discovery-worker.ts",
+        "scripts/pty-benchmark.ts",
+        "scripts/pty-smoke.ts",
+        "scripts/workspace-search-benchmark.ts",
+        "test/openssh-scenario.ts",
+        "test/service-openssh-scenario.ts"
+      ],
+      "ignoreDependencies": ["vscode-langservers-extracted"]
+    },
+    "apps/web": {
+      "entry": [
+        "src/main.tsx",
+        "src/features/address/tests/navigation.types.ts",
+        "scripts/chat-scroll-proof.mjs",
+        "scripts/chat-scroll-proof-entry.mjs",
+        "scripts/chat-snapshot-benchmark.ts",
+        "scripts/file-tree-prepared-input-benchmark.ts",
+        "scripts/keymap-baseline.mjs",
+        "scripts/verify-workspace-navigation.mjs"
+      ],
+      "ignoreFiles": ["test/fixtures/workbench-file-server/repo/src/editor-tab-{a,b,c}.ts"],
+      "ignoreUnresolved": ["src/index.ts"]
+    },
+    "packages/contracts": {
+      "ignoreUnresolved": ["scripts/generate-settings-schema.ts"]
+    },
     "packages/tree": {
       "ignoreFiles": ["test/factories/tree-paths.ts"]
+    },
+    "scripts": {
+      "entry": [
+        "desktop-dev.ts",
+        "dev.ts",
+        "generate-settings-reference.ts",
+        "generate-settings-schema.ts",
+        "install-server.ts",
+        "prod.ts",
+        "tui.ts",
+        "web-layering.mjs",
+        "lint/web-boundaries.mjs"
+      ]
     }
   }
 }

@@ -16,7 +16,7 @@ import {
   type OrchestrationSessionShell,
   type SessionId,
 } from '@workspace/contracts'
-import { afterEach, beforeEach } from 'vitest'
+import { afterEach, beforeEach, vi } from 'vitest'
 import * as v from 'valibot'
 
 import { expect, test } from '../../../../../test/fixtures'
@@ -55,6 +55,7 @@ beforeEach(() => {
 })
 
 afterEach(() => {
+  vi.restoreAllMocks()
   useChatProjectionStore.getState().resetChatProjection()
   delete (globalThis as { localStorage?: Storage }).localStorage
 })
@@ -196,6 +197,27 @@ test('an empty projection is cacheable and restores to an empty shell', () => {
 
   expect(painted.projectIds).toEqual([])
   expect(painted.sessionIds).toEqual([])
+})
+
+test('a quota failure retries the shell without transcripts before discarding the cache', () => {
+  const store = useChatProjectionStore.getState()
+  store.syncShellSnapshot(FIXTURE_ENVIRONMENT_ID, shellSnapshot())
+  store.syncSessionDetailSnapshot(
+    FIXTURE_ENVIRONMENT_ID,
+    sessionDetailSnapshot(sessionShell(), [
+      chatMessage({ id: parseMessageId('quota-message'), text: 'cached question' }),
+    ]),
+  )
+  const write = vi.spyOn(localStorage, 'setItem')
+  write.mockImplementationOnce(() => {
+    throw new DOMException('Storage quota exceeded', 'QuotaExceededError')
+  })
+
+  expect(flushChatProjectionCache()).toBe(true)
+  expect(write).toHaveBeenCalledTimes(2)
+  const cached = readChatProjectionCache(testScopedStorage)
+  expect(cached?.slices[0]?.sessions).toHaveLength(1)
+  expect(cached?.slices[0]?.transcripts).toEqual([])
 })
 
 function sessionDetailSnapshot(

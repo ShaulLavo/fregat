@@ -4,7 +4,7 @@ import { useStore } from 'zustand'
 import type { EnvironmentPhase } from '@workspace/client-core/environments/utils/connection'
 import { Button } from '@workspace/ui/components/button'
 import { MachineErrorDetails } from '@/components/machine-error-details'
-import { MachinePhase } from '@/components/machine-phase'
+import { Phase } from '@/lib/environments/components/phase'
 import { useEnvironmentConnections } from '@/hooks/use-environment-connections'
 import {
   connectionNoticeDismissed,
@@ -53,7 +53,7 @@ export function MachineConnectionNotice({
 
   return (
     <div className='border-border bg-muted/40 flex min-w-0 items-center gap-1 rounded-md border px-2 py-1 text-xs'>
-      <MachinePhase phase={retrying ? 'connecting' : phase} label={label} />
+      <Phase phase={retrying ? 'connecting' : phase} label={label} />
       <span className='min-w-0 flex-1 truncate' role='status' title={label}>
         {label} · {connectionNoticeSummary(phase, details)}
       </span>

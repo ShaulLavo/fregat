@@ -7,7 +7,7 @@ import {
   sessionMenu,
   type SessionMenuContext,
 } from '@/features/chat-mode/utils/session-menu'
-import type { MenuActionItem, MenuItem } from '@/features/menus/utils/model'
+import type { MenuActionItem, MenuItem } from '@/keymap/menus/utils/model'
 import { expect, test } from '../../../../../test/fixtures'
 
 test('offers open and a new session in the same project first', () => {

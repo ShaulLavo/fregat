@@ -1,16 +1,18 @@
+import type { DocumentKey, FilesystemPath, TabId } from '@/lib/documents/utils/types'
+
 const DEFAULT_PROJECT_LIMIT = 3
 const DEFAULT_BYTE_BUDGET = 64 * 1024 * 1024
 
 export type RetainedWorkspaceSlice = {
-  readonly documentIds: readonly string[]
+  readonly documentKeys: readonly DocumentKey[]
   readonly lastActiveAt: number
-  readonly rootPath: string
-  readonly tabIds: readonly string[]
+  readonly rootPath: FilesystemPath
+  readonly tabIds: readonly TabId[]
 }
 
 export type DocumentRetention = {
-  readonly documentIds: ReadonlySet<string>
-  readonly tabIds: ReadonlySet<string>
+  readonly documentKeys: ReadonlySet<DocumentKey>
+  readonly tabIds: ReadonlySet<TabId>
 }
 
 /**
@@ -30,9 +32,9 @@ export function retentionForProjects({
   projectLimit = DEFAULT_PROJECT_LIMIT,
   slices,
 }: {
-  readonly activeRootPath: string | null
+  readonly activeRootPath: FilesystemPath | null
   readonly byteBudget?: number
-  readonly documentSizes?: ReadonlyMap<string, number>
+  readonly documentSizes?: ReadonlyMap<DocumentKey, number>
   readonly projectLimit?: number
   readonly slices: readonly RetainedWorkspaceSlice[]
 }): DocumentRetention {
@@ -45,7 +47,7 @@ export function retentionForProjects({
   })
 
   return {
-    documentIds: new Set(retained.flatMap((slice) => slice.documentIds)),
+    documentKeys: new Set(retained.flatMap((slice) => slice.documentKeys)),
     tabIds: new Set(retained.flatMap((slice) => slice.tabIds)),
   }
 }
@@ -57,9 +59,9 @@ function retainedSlices({
   projectLimit,
   slices,
 }: {
-  activeRootPath: string | null
+  activeRootPath: FilesystemPath | null
   byteBudget: number
-  documentSizes: ReadonlyMap<string, number> | undefined
+  documentSizes: ReadonlyMap<DocumentKey, number> | undefined
   projectLimit: number
   slices: readonly RetainedWorkspaceSlice[]
 }) {
@@ -77,11 +79,11 @@ function withinByteBudget(
   active: readonly RetainedWorkspaceSlice[],
   parked: readonly RetainedWorkspaceSlice[],
   byteBudget: number,
-  documentSizes: ReadonlyMap<string, number> | undefined,
+  documentSizes: ReadonlyMap<DocumentKey, number> | undefined,
 ) {
   if (!documentSizes) return parked
 
-  const counted = new Set<string>()
+  const counted = new Set<DocumentKey>()
   let total = 0
   for (const slice of active) total += sliceBytes(slice, documentSizes, counted)
 
@@ -100,15 +102,15 @@ function withinByteBudget(
 /** Shared documents are charged once — `counted` carries across slices deliberately. */
 function sliceBytes(
   slice: RetainedWorkspaceSlice,
-  documentSizes: ReadonlyMap<string, number>,
-  counted: Set<string>,
+  documentSizes: ReadonlyMap<DocumentKey, number>,
+  counted: Set<DocumentKey>,
 ) {
   let bytes = 0
-  for (const documentId of slice.documentIds) {
-    if (counted.has(documentId)) continue
+  for (const documentKey of slice.documentKeys) {
+    if (counted.has(documentKey)) continue
 
-    counted.add(documentId)
-    bytes += documentSizes.get(documentId) ?? 0
+    counted.add(documentKey)
+    bytes += documentSizes.get(documentKey) ?? 0
   }
 
   return bytes

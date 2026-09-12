@@ -1,5 +1,4 @@
 import type { EditorSyntaxLanguageId } from '@singapor/core'
-import { SETTINGS_JSON_DOCUMENT_PREFIX } from '@/features/settings/utils/json-document'
 
 /**
  * Language ids the app can hand to the editor. The js/ts/html/css/json/markdown
@@ -119,11 +118,6 @@ const LANGUAGE_BY_BASENAME: Record<string, EditorSyntaxLanguageId> = {
 }
 
 export function languageIdForFilePath(filePath: string): EditorSyntaxLanguageId | null {
-  // The raw settings buffer is JSON with no `.json` in its id, deliberately: an
-  // id that looks like a path would have the language server matcher try to
-  // resolve it and spawn a server against a document that is not on disk.
-  if (filePath.startsWith(SETTINGS_JSON_DOCUMENT_PREFIX)) return 'json'
-
   return (
     LANGUAGE_BY_BASENAME[basenameForFilePath(filePath)] ??
     LANGUAGE_BY_EXTENSION[extensionForFilePath(filePath)] ??

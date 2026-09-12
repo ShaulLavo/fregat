@@ -1,3 +1,5 @@
+import { filesystemPath } from '@/lib/documents/utils/identity'
+import { testTabContents } from './factories/document-targets'
 import { testScopedStorage } from './factories/scoped-storage'
 import { testWorkspaceAddress } from './factories/workspace-address'
 import type { WorkspaceAddress } from '@workspace/contracts'
@@ -20,7 +22,15 @@ import {
 import { createDefaultChatModePanels } from '@/features/chat-mode/utils/panels'
 import { createApplicationRuntime } from '@/state/application-runtime'
 import { addressedWorkspaceCache } from '@/features/address/utils/cache'
-import { readWorkspaceCache } from '@/features/workspace/state/cache'
+import {
+  readWorkspaceCache,
+  writeRootFolderCache,
+  writeWorkspaceIndexCache,
+  writeWorkspaceSliceCache,
+  writeUiModeCache,
+  writeWorkbenchLayoutCache,
+  writeChatModePanelsCache,
+} from '@/features/workspace/state/cache'
 import {
   useEditorWorkspaceStoreApi,
   type EditorWorkspaceStoreApi,
@@ -32,16 +42,8 @@ import {
 import { createDefaultWorkbenchLayout } from '@/features/workbench/utils/layout'
 import {
   createDefaultWorkbenchPanels,
-  openEditorPathInWorkbenchPanels,
+  openEditorContentInWorkbenchPanels,
 } from '@/features/workbench/utils/panels'
-import {
-  writeRootFolderCache,
-  writeWorkspaceIndexCache,
-  writeWorkspaceSliceCache,
-  writeUiModeCache,
-  writeWorkbenchLayoutCache,
-  writeChatModePanelsCache,
-} from '@/features/workspace/state/cache'
 
 import { renderApplication } from './render'
 
@@ -61,7 +63,10 @@ export function seedWorkspaceCache({
   readonly knownRoots?: readonly string[]
   readonly workspaceAddress?: WorkspaceAddress
 }) {
-  const panels = tabPaths.reduce(openEditorPathInWorkbenchPanels, createDefaultWorkbenchPanels())
+  const panels = testTabContents(tabPaths, rootPath).reduce(
+    openEditorContentInWorkbenchPanels,
+    createDefaultWorkbenchPanels(),
+  )
 
   writeRootFolderCache(testScopedStorage, {
     ...directoryEntry(rootPath),
@@ -70,8 +75,8 @@ export function seedWorkspaceCache({
   writeWorkspaceIndexCache(testScopedStorage, [rootPath, ...knownRoots])
   writeWorkspaceSliceCache(testScopedStorage, rootPath, {
     editorHistory: [],
-    recentlyClosedEditorPaths: [],
-    scrollPositionByPath: {},
+    recentlyClosedTabs: [],
+    reopenScrollPositions: [],
     workbenchPanels: panels,
   })
   writeUiModeCache('workbench')
@@ -86,7 +91,7 @@ function directoryEntry(rootPath: string) {
     birthtimeMs: 0,
     mtimeMs: 0,
     name: rootPath.split('/').filter(Boolean).at(-1) ?? '',
-    path: rootPath,
+    path: filesystemPath(rootPath),
     size: 0,
     type: 'directory' as const,
     version: '',
@@ -194,6 +199,6 @@ export async function pressBack(navigation: Navigation) {
   return waitForNavigation(navigation)
 }
 
-export function editorTabPaths(workspace: EditorWorkspaceStoreApi) {
-  return workspace.getState().workbenchPanels.editorTabs.map((tab) => tab.path)
+export function editorTabContents(workspace: EditorWorkspaceStoreApi) {
+  return workspace.getState().workbenchPanels.editorTabs.map((tab) => tab.content)
 }

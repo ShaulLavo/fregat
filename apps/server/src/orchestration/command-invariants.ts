@@ -14,7 +14,7 @@ export const orderKeyErrors = defineErrorCatalog('orchestration', {
     status: 400,
     message: ({ orderKey }: { orderKey: string }) => `Order key is malformed: ${orderKey}`,
     why: 'The list sorts by plain string comparison, so a key outside the a-z alphabet — or one ending in the minimum digit, which leaves no room to insert before it — silently corrupts the arranged order for every client.',
-    fix: 'Mint the key with orderKeyBetween or generateSpreadOrderKeys instead of hand-writing it.',
+    fix: 'Mint the key with orderKeyBetween instead of hand-writing it.',
   },
 })
 

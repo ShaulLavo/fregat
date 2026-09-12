@@ -1,10 +1,11 @@
-import type { ChangeRow, FileStatus } from '@/features/git/utils/types'
+import type { GitFileStatus } from '@workspace/contracts'
+import type { ChangeRow } from '@/features/git/utils/types'
 
 /**
  * One status entry can produce two rows: a file staged and then edited again
  * shows up under both headings, which is what the panel renders.
  */
-export function changeRows(files: readonly FileStatus[]) {
+export function changeRows(files: readonly GitFileStatus[]) {
   const staged: ChangeRow[] = []
   const worktree: ChangeRow[] = []
 
@@ -26,19 +27,19 @@ export function changeRows(files: readonly FileStatus[]) {
  * tree's row menu decides stage-vs-unstage from the same rule — two copies
  * would eventually disagree with the panel.
  */
-export function isStagedStatus(status: FileStatus['index']) {
+export function isStagedStatus(status: GitFileStatus['index']) {
   return status !== 'unmodified' && status !== 'untracked'
 }
 
-export function isWorktreeStatus(status: FileStatus['worktree']) {
+export function isWorktreeStatus(status: GitFileStatus['worktree']) {
   return status !== 'unmodified'
 }
 
-function sortedStatusFiles(files: readonly FileStatus[]) {
+function sortedStatusFiles(files: readonly GitFileStatus[]) {
   return files.toSorted(compareStatusPaths)
 }
 
-function compareStatusPaths(left: FileStatus, right: FileStatus) {
+function compareStatusPaths(left: GitFileStatus, right: GitFileStatus) {
   if (left.path < right.path) return -1
   if (left.path > right.path) return 1
 

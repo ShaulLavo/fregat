@@ -1,3 +1,4 @@
+import { filesystemPath } from '@/lib/documents/utils/identity'
 import type { FsEntry } from '@/lib/file-system-types'
 import { expect, test } from '../../../../../test/fixtures'
 
@@ -24,10 +25,10 @@ test('sorts names naturally while keeping directories first in both directions',
 
 test('uses names and paths as deterministic tie-breaks for value sorts', () => {
   const entries = [
-    entry('same', 'file', { path: 'b/same', size: 20 }),
+    entry('same', 'file', { path: filesystemPath('b/same'), size: 20 }),
     entry('zeta', 'file', { size: 10 }),
     entry('alpha', 'file', { size: 10 }),
-    entry('same', 'file', { path: 'a/same', size: 20 }),
+    entry('same', 'file', { path: filesystemPath('a/same'), size: 20 }),
   ]
 
   expect(
@@ -43,7 +44,7 @@ function entry(name: string, type: FsEntry['type'], overrides: Partial<FsEntry> 
     birthtimeMs: 0,
     mtimeMs: 0,
     name,
-    path: name,
+    path: filesystemPath(name),
     size: 0,
     type,
     version: 'test',
