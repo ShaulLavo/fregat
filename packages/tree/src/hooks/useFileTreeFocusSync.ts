@@ -1,4 +1,4 @@
-import { type RefObject, useCallback, useLayoutEffect, useRef } from 'react'
+import { type RefObject, useCallback, useEffectEvent, useLayoutEffect, useRef } from 'react'
 
 import type { FileTreeRowDom } from './useFileTreeRowDom'
 import type { FileTreeController } from '../utils/model/FileTreeController'
@@ -90,6 +90,8 @@ export function useFileTreeFocusSync(
   const previousFocusedPathRef = useRef<string | null>(null)
   const processedFocusRequestIdRef = useRef<number | null>(null)
   const processedScrollRequestIdRef = useRef(0)
+  const pendingScrollSettlementRef =
+    useRef<ReturnType<FileTreeController['getScrollRequest']>>(null)
   const restoreTreeFocusAfterSearchCloseRef = useRef(false)
   const restoreTreeFocusViewportOffsetRef = useRef<number | null>(null)
   const stickyKeyboardFocusRef = useRef<StickyKeyboardFocusMode>(NO_STICKY_KEYBOARD_FOCUS)
@@ -135,6 +137,60 @@ export function useFileTreeFocusSync(
     pointerFocusScrollPathRef.current = path
   }, [])
 
+  const applyScrollRequest = useEffectEvent(
+    (request: NonNullable<typeof scrollRequest>, behavior = request.behavior) => {
+      const scrollElement = getScroll()
+      const row = controller.getVisibleRows(request.visibleIndex, request.visibleIndex)[0]
+      if (!scrollElement || !row) return false
+      const topInset = stickyFolders
+        ? Math.max(
+            0,
+            Math.min(
+              row.ancestorPaths.length * itemHeight,
+              Math.max(0, resolvedViewportHeight - itemHeight),
+            ),
+          )
+        : stickyOverlayHeight
+      return scrollFocusedRowToOffset(
+        scrollElement,
+        request.visibleIndex,
+        itemHeight,
+        resolvedViewportHeight,
+        totalScrollableHeight,
+        request.offset,
+        topInset,
+        behavior,
+      )
+    },
+  )
+  const settleScrollRequest = useEffectEvent(() => {
+    const request = pendingScrollSettlementRef.current
+    pendingScrollSettlementRef.current = null
+    if (!request) return
+    const newerRequest = controller.getScrollRequest()
+    if (newerRequest && newerRequest.id !== request.id) return
+    if (applyScrollRequest(request, 'auto')) updateViewport.current()
+  })
+
+  useLayoutEffect(() => {
+    const scrollElement = getScroll()
+    if (!scrollElement) return
+    const cancel = () => {
+      pendingScrollSettlementRef.current = null
+    }
+    scrollElement.addEventListener('scroll', settleScrollRequest)
+    for (const event of ['wheel', 'pointerdown', 'touchstart', 'keydown']) {
+      scrollElement.addEventListener(event, cancel)
+    }
+    return () => {
+      cancel()
+      scrollElement.removeEventListener('scroll', settleScrollRequest)
+      for (const event of ['wheel', 'pointerdown', 'touchstart', 'keydown']) {
+        scrollElement.removeEventListener(event, cancel)
+      }
+    }
+  }, [controller, getScroll])
+
   useLayoutEffect(() => {
     const scrollElement = getScroll()
     const rootElement = getRoot()
@@ -173,31 +229,11 @@ export function useFileTreeFocusSync(
     let shouldUpdateViewportForScrollRequest = false
     if (scrollRequest != null && scrollRequest.id !== processedScrollRequestIdRef.current) {
       processedScrollRequestIdRef.current = scrollRequest.id
-      const scrollRequestIndex = scrollRequest.visibleIndex
-      const scrollRequestRow =
-        controller.getVisibleRows(scrollRequestIndex, scrollRequestIndex)[0] ?? null
-      if (scrollRequestRow != null) {
-        const scrollRequestTopInset = stickyFolders
-          ? Math.max(
-              0,
-              Math.min(
-                scrollRequestRow.ancestorPaths.length * itemHeight,
-                Math.max(0, resolvedViewportHeight - itemHeight),
-              ),
-            )
-          : stickyOverlayHeight
-        shouldSuppressDomFocusForScrollRequest = true
-        shouldUpdateViewportForScrollRequest = scrollFocusedRowToOffset(
-          scrollElement,
-          scrollRequestIndex,
-          itemHeight,
-          resolvedViewportHeight,
-          totalScrollableHeight,
-          scrollRequest.offset,
-          scrollRequestTopInset,
-          scrollRequest.behavior,
-        )
-      }
+      pendingScrollSettlementRef.current = null
+      shouldSuppressDomFocusForScrollRequest = true
+      shouldUpdateViewportForScrollRequest = applyScrollRequest(scrollRequest)
+      // Cancellation can still deliver one queued compositor scroll event.
+      if (!shouldUpdateViewportForScrollRequest) pendingScrollSettlementRef.current = scrollRequest
       controller.clearScrollRequest(scrollRequest.id)
     }
 

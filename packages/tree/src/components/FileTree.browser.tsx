@@ -199,6 +199,66 @@ describe('FileTree browser behavior', () => {
     ).toBeGreaterThanOrEqual(scrollElement.getBoundingClientRect().top)
   })
 
+  it('settles a late scroll event after cancelling a reveal already in view', async () => {
+    const { model: currentModel, shadowRoot } = await mountBrowserTree({
+      pathCount: 80,
+      stickyFolders: false,
+    })
+    const scrollElement = virtualScroll(shadowRoot)
+    await startSmoothReveal(currentModel, shadowRoot)
+
+    flushSync(() => {
+      currentModel.scrollToPath('src/features/a-0.ts', { behavior: 'smooth', focus: false })
+    })
+    // Chromium can deliver one queued compositor step after same-offset cancellation.
+    scrollElement.scrollTop = 24
+    await threeAnimationFrames()
+
+    expect(scrollElement.scrollTop).toBeLessThanOrEqual(20)
+    expect(
+      rowButton(shadowRoot, 'src/features/a-0.ts').getBoundingClientRect().top,
+    ).toBeGreaterThanOrEqual(scrollElement.getBoundingClientRect().top)
+  })
+
+  it('a cancelled reveal cannot overwrite a newer scroll request', async () => {
+    const { model: currentModel, shadowRoot } = await mountBrowserTree({
+      pathCount: 80,
+      stickyFolders: false,
+    })
+    const scrollElement = virtualScroll(shadowRoot)
+    await startSmoothReveal(currentModel, shadowRoot)
+
+    flushSync(() => {
+      currentModel.scrollToPath('src/features/a-0.ts', { behavior: 'smooth', focus: false })
+    })
+    flushSync(() => {
+      currentModel.scrollToPath('src/features/a-20.ts', { focus: false, offset: 'top' })
+    })
+    const requestedTop = scrollElement.scrollTop
+    await threeAnimationFrames()
+
+    expect(requestedTop).toBeGreaterThan(20)
+    expect(scrollElement.scrollTop).toBe(requestedTop)
+  })
+
+  it('a cancelled reveal yields to subsequent user scrolling', async () => {
+    const { model: currentModel, shadowRoot } = await mountBrowserTree({
+      pathCount: 80,
+      stickyFolders: false,
+    })
+    const scrollElement = virtualScroll(shadowRoot)
+    await startSmoothReveal(currentModel, shadowRoot)
+
+    flushSync(() => {
+      currentModel.scrollToPath('src/features/a-0.ts', { behavior: 'smooth', focus: false })
+    })
+    scrollElement.dispatchEvent(new WheelEvent('wheel', { bubbles: true, deltaY: 200 }))
+    scrollElement.scrollTop = 200
+    await threeAnimationFrames()
+
+    expect(scrollElement.scrollTop).toBe(200)
+  })
+
   it('settles controller scroll requests and opens search from a printable row key', async () => {
     const { model: currentModel, shadowRoot } = await mountBrowserTree()
     const directoryRow = rowButton(shadowRoot, 'src/features/')
@@ -463,15 +523,15 @@ function dispatchTreeKey(
   )
 }
 
-async function mountBrowserTree() {
+async function mountBrowserTree(options: { pathCount?: number; stickyFolders?: boolean } = {}) {
   const mountedModel = new FileTreeModel({
     gitStatus: [{ path: 'src/features/a-3.ts', status: 'modified' }],
     initialExpansion: 'open',
     initialVisibleRowCount: 6,
     itemHeight: 24,
-    paths: browserPaths(),
+    paths: browserPaths(options.pathCount),
     renaming: true,
-    stickyFolders: true,
+    stickyFolders: options.stickyFolders ?? true,
   })
   model = mountedModel
 
@@ -546,10 +606,10 @@ async function openSearch(
   return input as HTMLInputElement
 }
 
-function browserPaths() {
+function browserPaths(pathCount = 28) {
   const paths = ['src/', 'src/features/']
 
-  for (let index = 0; index < 28; index += 1) {
+  for (let index = 0; index < pathCount; index += 1) {
     paths.push(`src/features/a-${index}.ts`)
   }
 
@@ -599,4 +659,28 @@ function virtualScroll(shadowRoot: ShadowRoot) {
   if (!scrollElement) throw new Error('missing virtual scroll')
 
   return scrollElement
+}
+
+async function startSmoothReveal(currentModel: FileTreeModel, shadowRoot: ShadowRoot) {
+  currentModel.setDensity('compact', 20)
+  await expect
+    .poll(() => rowButton(shadowRoot, 'src/features/a-0.ts').getBoundingClientRect().height)
+    .toBe(20)
+  const scrollElement = virtualScroll(shadowRoot)
+  scrollElement.scrollTop = 10
+  await new Promise<void>((resolve) => requestAnimationFrame(() => resolve()))
+  flushSync(() => {
+    currentModel.scrollToPath('src/features/a-79.ts', {
+      behavior: 'smooth',
+      focus: false,
+      offset: 'top',
+    })
+  })
+  expect(scrollElement.scrollTop).toBe(10)
+}
+
+async function threeAnimationFrames() {
+  for (let frame = 0; frame < 3; frame++) {
+    await new Promise<void>((resolve) => requestAnimationFrame(() => resolve()))
+  }
 }
