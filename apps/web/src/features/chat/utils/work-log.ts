@@ -34,6 +34,7 @@ export type ChatWorkLogEntry = {
   lifecycle: ChatActivityLifecycle | null
   outcome: ChatActivityOutcome | null
   output: string | null
+  result?: string
   plan: ChatWorkLogPlan | null
   requestId: string | null
   sourceKind: string
@@ -69,6 +70,7 @@ const WORK_LOG_SCALAR_FIELDS = [
   'lifecycle',
   'outcome',
   'output',
+  'result',
   'requestId',
   'sourceKind',
   'status',
@@ -305,6 +307,7 @@ function derivedWorkLogEntry(activity: OrchestrationSessionActivity): DerivedCha
     lifecycle: presentation.lifecycle,
     outcome: presentation.outcome,
     output: presentation.output,
+    ...(presentation.result ? { result: presentation.result } : {}),
     plan: null,
     requestId: stringPayloadValue(activity.payload, 'requestId'),
     sourceKind: activity.kind,
@@ -419,6 +422,7 @@ function mergeWorkLogEntries(
     lifecycle,
     outcome: mergedOutcome(previous.outcome, next.outcome, lifecycle),
     output: next.output ?? previous.output,
+    result: next.result ?? previous.result,
     status: lifecycleStatus(lifecycle) ?? next.status ?? previous.status,
     title: mergedTitle(previous, next),
     tool: next.tool ?? previous.tool,

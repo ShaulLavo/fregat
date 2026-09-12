@@ -7,6 +7,7 @@ export function workRowSections(entry: ChatWorkLogEntry) {
     { label: 'Details', value: entry.detail },
     { label: 'Input', value: entry.input },
     { label: 'Command', value: entry.command },
+    { label: 'Result', value: entry.result },
     { label: 'Output', value: entry.output },
     { label: 'Changed files', value: entry.changedFiles.join('\n') },
   ].filter(

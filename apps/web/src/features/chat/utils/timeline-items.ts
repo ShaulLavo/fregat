@@ -362,9 +362,22 @@ function latestTurnWorkLogEntryCount(
   return entries.filter((entry) => entry.turnId === latestTurn.turnId).length
 }
 
+export function timelineRowSpacing(item: ChatTimelineItem) {
+  if (item.type === 'turn-fold' || item.type === 'working' || item.type === 'turn-status')
+    return 'pb-1.5'
+  if (item.type === 'activity-group' || item.type === 'live-activity') return 'pb-2'
+  if (item.type === 'message' && item.message.role === 'assistant' && !item.showAssistantCopyButton)
+    return 'pb-2'
+
+  return 'pb-4'
+}
+
 export function chatTimelineItemEstimate(item: ChatTimelineItem | undefined) {
   if (!item) return 64
-  if (item.type === 'activity-group') return Math.min(220, 36 + item.activities.length * 28)
+  if (item.type === 'activity-group') {
+    const visibleFailures = item.activities.filter(isWorkLogFailure).length
+    return 36 + visibleFailures * 28
+  }
   if (item.type === 'proposed-plan') return 160
   if (item.type === 'turn-fold') return 34
   if (item.type === 'working') return 36

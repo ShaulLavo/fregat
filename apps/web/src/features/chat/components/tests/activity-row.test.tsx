@@ -99,7 +99,7 @@ test('a failed tool call is distinguishable from a successful one', () => {
   )
 
   expect(screen.getByLabelText('Failed')).toBeInTheDocument()
-  expect(screen.getByText('Failed command')).toHaveClass('text-destructive')
+  expect(screen.getByText('Failed command')).not.toHaveClass('text-destructive')
 })
 
 test('expanding a row reveals its raw command, output and changed files', async () => {
@@ -159,4 +159,23 @@ test('a reasoning summary can be expanded to read the entire text', async () => 
   expect(screen.queryByLabelText('Reasoning')).not.toBeInTheDocument()
   await userEvent.click(screen.getByRole('button', { name: reasoning }))
   expect(screen.getByLabelText('Reasoning')).toHaveTextContent(reasoning)
+})
+
+test('historical commands show their actual invocation and an expandable process result', async () => {
+  resetExpansion()
+  renderWithProviders(
+    <ActivityRow
+      activity={entry({
+        command: 'rg missing src; true',
+        lifecycle: 'failed',
+        outcome: 'failed',
+        result: 'Exit code 0\nrg: missing: No such file or directory',
+      })}
+    />,
+  )
+  await userEvent.click(
+    screen.getByRole('button', { name: 'rg missing src; true, tool call failed' }),
+  )
+  expect(screen.getByLabelText('Result')).toHaveTextContent('Exit code 0')
+  expect(screen.getByLabelText('Result')).toHaveTextContent('No such file or directory')
 })
