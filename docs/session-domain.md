@@ -112,6 +112,6 @@ IDs remain rejected. [Address restoration tests](../apps/web/src/features/addres
 and the [vertical recovery test](../apps/web/src/features/chat/tests/session-domain-recovery.integration.test.tsx)
 cover this boundary.
 
-One live chat transport remains active at a time. Concurrent connections and scoped persistence
-belong to [Plan 078](../plans/078-federated-environments.md). Physical worktree creation, cleanup, and recovery use the
-[worktree lifecycle](worktree-lifecycle.md).
+Each connected environment retains its own live chat transport and scoped persistence through
+[federated environments](federated-environments.md). Physical worktree creation, cleanup, and
+recovery use the [worktree lifecycle](worktree-lifecycle.md).

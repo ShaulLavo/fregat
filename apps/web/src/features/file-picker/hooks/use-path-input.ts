@@ -1,9 +1,11 @@
 import { filesystemPath } from '@/lib/documents/utils/identity'
+import { clientForQueryClient } from '@/lib/environments/state/query-clients'
 import { errorMessage } from '@/lib/error-message'
 import type { ServerInfo } from '@/lib/file-system-types'
 import { isDirectoryEntry } from '@/lib/file-system-types'
 import { statPath } from '@/lib/file-server'
 import { useEffect, useEffectEvent, useRef, useState } from 'react'
+import { useQueryClient } from '@tanstack/react-query'
 
 import { absolutePickerPath, parsePickerPathInput } from '@workspace/client-core/files/path-input'
 
@@ -18,6 +20,7 @@ export function useFilePickerPathInput({
   onNavigate: (path: string, intentId: number) => void
   serverInfo: ServerInfo | null
 }) {
+  const client = clientForQueryClient(useQueryClient())
   const inputRef = useRef<HTMLInputElement>(null)
   const requestRef = useRef<AbortController | null>(null)
   const [draft, setDraft] = useState('')
@@ -76,7 +79,7 @@ export function useFilePickerPathInput({
     setError(null)
 
     try {
-      const entry = await statPath(filesystemPath(parsed.path), controller.signal)
+      const entry = await statPath(filesystemPath(parsed.path), controller.signal, client)
       if (!isDirectoryEntry(entry)) {
         setError('That path is not a folder.')
         return

@@ -48,6 +48,8 @@ export type NavigationStatus =
   | { readonly status: 'unavailable'; readonly href: string; readonly reason: string }
 
 type ApplicationReason = 'boot' | 'traverse' | 'navigate'
+type HistoryWriteMode = 'immediate' | 'continuous'
+type PendingHistory = { readonly owner: ApplicationRuntime; readonly identity: string }
 type AddressReconciliation = {
   readonly owner: EditorWorkspaceStoreApi
   readonly transform: (address: Address, rootPath: string | null) => Address
@@ -64,6 +66,7 @@ type Operation = {
   readonly generation: number
   readonly abort: AbortController
   readonly reason: ApplicationReason
+  readonly historyWriteMode: HistoryWriteMode
   readonly settle: (result: NavigationResult) => void
   readonly result: Promise<NavigationResult>
   href: string | null
@@ -111,6 +114,10 @@ export function createNavigationCoordinator(router: ApplicationRouter, initial: 
   let attachment = 0
   let observedIdentity = historyIdentity()
   let subscriptions: Array<() => void> = []
+  let pendingHistory: PendingHistory | null = null
+  let detachedHistory: PendingHistory | null = null
+  let historyTimer: ReturnType<typeof setTimeout> | null = null
+  let publication: { readonly href: string } | null = null
 
   function historyIdentity() {
     const state = router.history.location.state
@@ -122,13 +129,18 @@ export function createNavigationCoordinator(router: ApplicationRouter, initial: 
     for (const listener of listeners) listener()
   }
 
-  function begin(reason: ApplicationReason, href: string | null): Operation {
-    cancel()
+  function begin(
+    reason: ApplicationReason,
+    href: string | null,
+    historyWriteMode: HistoryWriteMode = 'immediate',
+  ): Operation {
+    cancel(historyWriteMode === 'continuous')
     const completion = Promise.withResolvers<NavigationResult>()
     const next: Operation = {
       generation: ++generation,
       abort: new AbortController(),
       reason,
+      historyWriteMode,
       href,
       complete: null,
       applying: false,
@@ -144,10 +156,55 @@ export function createNavigationCoordinator(router: ApplicationRouter, initial: 
     return next
   }
 
-  function cancel() {
+  function cancel(preserveHistory = false) {
+    if (!preserveHistory) cancelHistory()
     operation?.abort.abort()
     operation?.settle({ status: 'superseded' })
     operation = null
+  }
+
+  function cancelHistory() {
+    if (historyTimer !== null) clearTimeout(historyTimer)
+    historyTimer = null
+    pendingHistory = null
+    publication = null
+  }
+
+  function scheduleHistory(owner: ApplicationRuntime) {
+    pendingHistory = { owner, identity: historyIdentity() }
+    if (historyTimer !== null) return
+    // Share one cadence across edits; per-keystroke writes exhaust Safari's history quota.
+    historyTimer = setTimeout(() => void publishHistory(), 250)
+  }
+
+  async function publishHistory() {
+    historyTimer = null
+    const pending = pendingHistory
+    pendingHistory = null
+    if (!pending || stopped || pending.owner !== application) return
+    if (pending.identity !== historyIdentity()) return
+    const canonical = budgetAddress(captureAddress(pending.owner, accepted)).address
+    const href = buildAddressLocation(router, canonical).publicHref
+    if (href === router.history.location.href) return
+    const writing = { href }
+    publication = writing
+    try {
+      const navigation = navigateAddress(router, canonical, { replace: true })
+      router.history.flush()
+      await navigation
+    } catch (error) {
+      if (publication !== writing) return
+      const reason = errorMessage(error, 'The address could not be updated.')
+      log.error({ action: 'navigation.history', area: 'address', status: 'failed', reason })
+      publish({ status: 'unavailable', href, reason })
+    } finally {
+      if (publication === writing) publication = null
+    }
+  }
+
+  function flushHistory() {
+    if (historyTimer !== null) clearTimeout(historyTimer)
+    void publishHistory()
   }
 
   function isCurrent(op: Operation, owner = application) {
@@ -187,10 +244,13 @@ export function createNavigationCoordinator(router: ApplicationRouter, initial: 
 
   function finish(op: Operation, result: NavigationResult) {
     if (operation !== op) return
-    router.history.flush()
+    if (op.historyWriteMode === 'immediate') router.history.flush()
     op.settle(result)
     operation = null
-    const href = router.history.location.href
+    const href =
+      op.historyWriteMode === 'continuous' && result.status === 'applied'
+        ? buildAddressLocation(router, accepted).publicHref
+        : router.history.location.href
     if (result.status === 'superseded') return
     publish({ ...result, href })
     const budget = op.complete ? budgetAddress(payloadAddress(op.complete)) : null
@@ -200,6 +260,7 @@ export function createNavigationCoordinator(router: ApplicationRouter, initial: 
       status: result.status,
       generation: op.generation,
       reason: op.reason,
+      historyWriteMode: op.historyWriteMode,
       hrefLength: href.length,
       unavailableReason: result.status === 'unavailable' ? result.reason : undefined,
       omittedFields: budget?.omissions ?? [],
@@ -259,7 +320,10 @@ export function createNavigationCoordinator(router: ApplicationRouter, initial: 
     const complete = captureAddress(owner, accepted)
     const canonical = budgetAddress(complete).address
     const location = buildAddressLocation(router, canonical)
-    if (location.publicHref !== router.history.location.href) {
+    if (
+      op.historyWriteMode === 'immediate' &&
+      location.publicHref !== router.history.location.href
+    ) {
       op.href = location.publicHref
       op.historyIdentity = null
       op.writing = true
@@ -269,6 +333,7 @@ export function createNavigationCoordinator(router: ApplicationRouter, initial: 
     accepted = canonical
     bootIntentAvailable = false
     writeAddressCache(formatAddress(canonical))
+    if (op.historyWriteMode === 'continuous') scheduleHistory(owner)
     finish(op, { status: 'applied' })
   }
 
@@ -279,6 +344,10 @@ export function createNavigationCoordinator(router: ApplicationRouter, initial: 
     op.beforeApply = destination.beforeApply
     op.draftWorktreeId = destination.draftWorktreeId
     op.preserveTransient = destination.preserveTransient ?? false
+    if (op.historyWriteMode === 'continuous') {
+      await apply(op)
+      return
+    }
     const wire = budgetAddress(address).address
     op.href = buildAddressLocation(router, wire).publicHref
     op.historyIdentity = null
@@ -293,11 +362,12 @@ export function createNavigationCoordinator(router: ApplicationRouter, initial: 
 
   function request(
     prepare: (context: NavigationPreparation) => Destination | Promise<Destination>,
+    historyWriteMode: HistoryWriteMode = 'immediate',
   ): Promise<NavigationResult> {
     if (!application || stopped) return Promise.resolve({ status: 'superseded' })
     const owner = application
     const address = currentAddress()
-    const op = begin('navigate', null)
+    const op = begin('navigate', null, historyWriteMode)
     void prepareAndCommit(op, owner, address, prepare)
     return op.result
   }
@@ -397,6 +467,7 @@ export function createNavigationCoordinator(router: ApplicationRouter, initial: 
     const href = router.history.location.href
     observedIdentity = historyIdentity()
     const traversing = action.type === 'BACK' || action.type === 'FORWARD' || action.type === 'GO'
+    if (!traversing && publication?.href === href) return
     if (!traversing && operation?.writing && operation.href === href) {
       operation.historyIdentity = historyIdentity()
       operation.writing = false
@@ -414,10 +485,13 @@ export function createNavigationCoordinator(router: ApplicationRouter, initial: 
 
   function observe() {
     if (subscriptions.length) return
+    window.addEventListener('pagehide', flushHistory)
     subscriptions = [
+      () => window.removeEventListener('pagehide', flushHistory),
       router.history.subscribe(onHistory),
       router.subscribe('onBeforeNavigate', () => {
         const href = router.history.location.href
+        if (publication?.href === href) return
         if (!operation || (operation.href !== null && operation.href !== href))
           begin('navigate', href)
       }),
@@ -486,6 +560,12 @@ export function createNavigationCoordinator(router: ApplicationRouter, initial: 
       initial.unavailable === null &&
       status.status === 'applied',
     attach(owner: ApplicationRuntime) {
+      const retained = pendingHistory ?? detachedHistory
+      const resumed =
+        retained?.owner === owner && retained.identity === historyIdentity()
+          ? captureAddress(owner, accepted)
+          : null
+      detachedHistory = null
       if (historyIdentity() !== observedIdentity) bootIntentAvailable = false
       observedIdentity = historyIdentity()
       observe()
@@ -494,6 +574,10 @@ export function createNavigationCoordinator(router: ApplicationRouter, initial: 
       const currentAttachment = ++attachment
       const reason = bootIntentAvailable ? 'boot' : (operation?.reason ?? 'navigate')
       const op = begin(reason, router.history.location.href)
+      if (resumed) {
+        op.complete = payloadForAddress(resumed)
+        op.preserveTransient = true
+      }
       void router
         .load()
         .then(() => apply(op))
@@ -506,6 +590,7 @@ export function createNavigationCoordinator(router: ApplicationRouter, initial: 
         })
       return () => {
         if (application !== owner || attachment !== currentAttachment) return
+        detachedHistory = pendingHistory
         cancel()
         stopObserving()
         application = null
@@ -513,7 +598,7 @@ export function createNavigationCoordinator(router: ApplicationRouter, initial: 
     },
     transient(select: (owner: ApplicationRuntime) => void): Promise<NavigationResult> {
       if (!application) return Promise.resolve({ status: 'superseded' })
-      cancel()
+      cancel(true)
       select(application)
       publish({ status: 'applied', href: router.history.location.href })
       return Promise.resolve({ status: 'applied' })
@@ -524,6 +609,7 @@ export function createNavigationCoordinator(router: ApplicationRouter, initial: 
     },
     dispose() {
       stopped = true
+      detachedHistory = null
       cancel()
       stopObserving()
       application = null

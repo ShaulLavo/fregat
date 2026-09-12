@@ -18,14 +18,12 @@ export function MachineConnectionNotice({
   label,
   phase,
   error,
-  disabled,
   retry,
 }: {
   id: string
   label: string
   phase: EnvironmentPhase
   error: string | null
-  disabled: boolean
   retry: () => Promise<unknown>
 }) {
   const { notices } = useEnvironmentConnections()
@@ -58,13 +56,7 @@ export function MachineConnectionNotice({
         {label} · {connectionNoticeSummary(phase, details)}
       </span>
       {details ? <MachineErrorDetails label={label} error={details} /> : null}
-      <Button
-        size='xs'
-        variant='ghost'
-        disabled={disabled || pending}
-        title={disabled ? 'Reconnect from the desktop app' : undefined}
-        onClick={() => void retryConnection()}
-      >
+      <Button size='xs' variant='ghost' disabled={pending} onClick={() => void retryConnection()}>
         {phase === 'idle' ? 'Connect' : 'Retry'}
       </Button>
       <Button

@@ -7,6 +7,7 @@ import { chromium, firefox, webkit, expect } from 'playwright/test'
 import { createBenchmarkError } from './structured-errors.mjs'
 
 const options = parseOptions(process.argv.slice(2))
+const instanceId = randomUUID()
 const browsers = { chromium, firefox, webkit }
 const report = {
   startedAt: new Date().toISOString(),
@@ -17,17 +18,20 @@ const report = {
 }
 mkdirSync(options.outputDir, { recursive: true })
 let fixture = null
+let secondFixture = null
 
 try {
   report.prerequisites.server = await api('health')
   if (!options.historyOnly) {
     await verifyConfiguredApp()
     fixture = await createFixture(report.prerequisites.server)
+    if (options.secondMachine) secondFixture = await createSecondFixture()
   }
   for (const name of options.browsers) await verifyBrowser(name)
 } catch (error) {
   report.cases.push({ name: 'prerequisites', status: 'failed', error: error.message })
 } finally {
+  if (secondFixture) await cleanupSecondFixture(secondFixture)
   if (fixture) await cleanupFixture(fixture)
   report.finishedAt = new Date().toISOString()
   report.status = report.cases.some((entry) => entry.status === 'failed') ? 'failed' : 'passed'
@@ -45,6 +49,8 @@ function parseOptions(args) {
     historyOnly: false,
     caseFilter: null,
     webkitEndpoint: null,
+    secondMachine: null,
+    secondFixtureParent: null,
   }
   for (let index = 0; index < args.length; index++) {
     const [key, inline] = args[index].split('=', 2)
@@ -59,6 +65,8 @@ function parseOptions(args) {
     if (key === '--browsers') result.browsers = value.split(',')
     if (key === '--case') result.caseFilter = value
     if (key === '--webkit-endpoint') result.webkitEndpoint = value
+    if (key === '--second-machine') result.secondMachine = value
+    if (key === '--second-fixture-parent') result.secondFixtureParent = value
   }
   if (!result.appUrl || !result.serverUrl || !result.outputDir)
     throw createBenchmarkError(
@@ -67,6 +75,10 @@ function parseOptions(args) {
   result.outputDir = resolve(result.outputDir)
   if (!result.outputDir.startsWith('/work/tmp/'))
     throw createBenchmarkError('Verification output must be inside /work/tmp')
+  if (Boolean(result.secondMachine) !== Boolean(result.secondFixtureParent))
+    throw createBenchmarkError(
+      '--second-machine and --second-fixture-parent must be supplied together',
+    )
   result.appUrl = `${result.appUrl.replace(/\/+$/, '')}/`
   result.serverUrl = `${result.serverUrl.replace(/\/+$/, '')}/`
   return result
@@ -75,7 +87,11 @@ function parseOptions(args) {
 async function api(path, body) {
   const response = await fetch(new URL(path, options.serverUrl), {
     method: body ? 'POST' : 'GET',
-    headers: { Origin: new URL(options.appUrl).origin, 'Content-Type': 'application/json' },
+    headers: {
+      Origin: new URL(options.appUrl).origin,
+      'Content-Type': 'application/json',
+      'x-client-instance': instanceId,
+    },
     body: body ? JSON.stringify(body) : undefined,
   })
   if (!response.ok)
@@ -203,6 +219,47 @@ async function cleanupCommand(command) {
   }
 }
 
+async function createSecondFixture() {
+  const machinePath = `machines/${encodeURIComponent(options.secondMachine)}`
+  const connection = await api(`${machinePath}/connect`, {})
+  if (connection.phase !== 'live')
+    throw createBenchmarkError(`Second machine did not connect: ${connection.phase}`)
+  const endpoint = `${machinePath}/proxy/`
+  const health = await api(`${endpoint}health`)
+  expect(health.environmentId).not.toBe(report.prerequisites.server.environmentId)
+  const directory = join(options.secondFixtureParent, `navigation-proof-${randomUUID()}`)
+  const rootPath = relative(health.workspaceRoot, directory).split(sep).join('/')
+  if (rootPath.startsWith('..'))
+    throw createBenchmarkError('The second fixture must be inside its server workspace')
+  const record = { machinePath, endpoint, health, directory, rootPath }
+  secondFixture = record
+  await api(`${endpoint}fs/create-folder`, { path: rootPath, recursive: true })
+  await api(`${endpoint}fs/create-file`, {
+    path: `${rootPath}/remote.ts`,
+    content: "export const remote = 'second environment navigation proof';\n",
+  })
+  const workspace = await api(`${endpoint}fs/workspace-address`, { path: rootPath })
+  const settings = await api('settings')
+  record.label =
+    settings.values['environments.machines'][options.secondMachine].label ?? options.secondMachine
+  record.workspace = `${workspace.name}.${workspace.id}`
+  report.prerequisites.secondEnvironment = record
+  return record
+}
+
+async function cleanupSecondFixture(record) {
+  try {
+    await api(`${record.endpoint}fs/delete`, { path: record.rootPath, recursive: true })
+    report.cleanup.push({ directory: record.directory, status: 'removed' })
+  } catch (error) {
+    report.cases.push({ name: 'second fixture cleanup', status: 'failed', error: error.message })
+  } finally {
+    await api(`${record.machinePath}/disconnect`, {}).catch((error) => {
+      report.cases.push({ name: 'second machine cleanup', status: 'failed', error: error.message })
+    })
+  }
+}
+
 async function verifyBrowser(name) {
   const type = browsers[name]
   const endpoint = name === 'webkit' ? options.webkitEndpoint : null
@@ -272,6 +329,7 @@ async function verifyBrowser(name) {
     )
     await runCase(browser, name, 'rapid completed selections', rapidSelections)
     await runCase(browser, name, 'paused and sustained filter replacements', filterHistory)
+    await runCase(browser, name, 'reload before filter URL publication', earlyFilterReload, false)
     await runCase(
       browser,
       name,
@@ -306,13 +364,16 @@ async function verifyBrowser(name) {
       incidentalSidebarHistory,
     )
     await runCase(browser, name, 'immediate copy matches current view', copyCurrentView)
-    report.cases.push({
-      browser: name,
-      name: 'second configured environment',
-      status: 'unverified',
-      reason:
-        'No second existing configured environment supplied; in-process ownership proof is separate.',
-    })
+    if (secondFixture)
+      await runCase(browser, name, 'second configured environment', secondEnvironment, false)
+    else
+      report.cases.push({
+        browser: name,
+        name: 'second configured environment',
+        status: 'unverified',
+        reason:
+          'Supply --second-machine and --second-fixture-parent to verify a configured machine.',
+      })
   } finally {
     await browser.close()
   }
@@ -404,6 +465,94 @@ async function nativeHistoryControl({ page, entry }) {
   await page.waitForURL('**?step=B')
   entry.control.reachedB = page.url()
   await page.evaluate(() => window.navigationHistoryControl.destroy())
+}
+
+async function secondEnvironment({ page, record, entry }) {
+  await page.addInitScript((name) => {
+    localStorage.setItem('platform.environments.connected.v1', JSON.stringify([name]))
+  }, options.secondMachine)
+  await openInitial(page)
+  const remoteHref = new URL(
+    `@${secondFixture.health.environmentId}/~${secondFixture.workspace}/workbench/f/remote.ts?tabs=@`,
+    options.appUrl,
+  ).href
+  await page.goto(remoteHref)
+  await expectFile(page, 'remote.ts')
+  await dirtyCurrentFile(page, 'unsaved remote environment proof')
+  await record('remote B has an unsaved document')
+  await switchMachine(page, report.prerequisites.server.label)
+  await expectFile(page, 'a.ts')
+  await dirtyCurrentFile(page, 'unsaved primary environment proof')
+  await record('primary A has an independent unsaved document')
+  await switchMachine(page, secondFixture.label)
+  await expectRetainedFile(page, 'remote.ts', 'unsaved remote environment proof')
+  await expect(fileTab(page, 'a.ts')).toHaveCount(0)
+  await record('return to B retains its dirty buffer and isolates A tabs')
+  await page.goBack()
+  await expectRetainedFile(page, 'a.ts', 'unsaved primary environment proof')
+  await expect(fileTab(page, 'remote.ts')).toHaveCount(0)
+  await record('Back A retains its dirty buffer')
+  await page.goForward()
+  await expectRetainedFile(page, 'remote.ts', 'unsaved remote environment proof')
+  await record('Forward B remains available with its dirty buffer')
+  await switchMachine(page, report.prerequisites.server.label)
+  await expectRetainedFile(page, 'a.ts', 'unsaved primary environment proof')
+  await delayedEnvironmentApplication(page, record)
+  expect(entry.errors).toEqual([])
+}
+
+async function switchMachine(page, label) {
+  await palette(page, '> Switch machine', 'Switch machine')
+  const picker = page.getByRole('dialog', { name: 'Switch machine', exact: true })
+  await picker.getByRole('button').filter({ hasText: label }).click()
+  await expect(picker).toHaveCount(0)
+}
+
+async function dirtyCurrentFile(page, marker) {
+  const editor = page.locator('.editor-virtualized').first()
+  await editor.click()
+  await page.keyboard.press('Control+End')
+  await page.keyboard.insertText(`\n// ${marker}`)
+  await expect(editor).toContainText(marker)
+}
+
+async function expectRetainedFile(page, name, marker) {
+  await expectFile(page, name)
+  await expect(page.locator('.editor-virtualized').first()).toContainText(marker)
+}
+
+async function delayedEnvironmentApplication(page, record) {
+  const gate = Promise.withResolvers()
+  let observed = false
+  await page.route('**/fs/read?**', async (route) => {
+    if (!new URL(route.request().url()).searchParams.get('path')?.endsWith('/delayed.ts'))
+      return route.continue()
+    observed = true
+    await gate.promise
+    await route.continue().catch(() => {})
+  })
+  try {
+    await palette(page, 'delayed.ts', 'delayed.ts')
+    await expect.poll(() => observed).toBe(true)
+    await switchMachine(page, secondFixture.label)
+    await expectRetainedFile(page, 'remote.ts', 'unsaved remote environment proof')
+    gate.resolve()
+    await page.waitForTimeout(400)
+    await expectRetainedFile(page, 'remote.ts', 'unsaved remote environment proof')
+    await expect(fileTab(page, 'delayed.ts')).toHaveCount(0)
+    await record('late A file completion cannot replace the active B environment')
+    await page.goBack()
+    await expectFile(page, 'delayed.ts')
+    await page.goBack()
+    await expectRetainedFile(page, 'a.ts', 'unsaved primary environment proof')
+    await page.goForward()
+    await expectFile(page, 'delayed.ts')
+    await page.goForward()
+    await expectRetainedFile(page, 'remote.ts', 'unsaved remote environment proof')
+    await record('cross-environment Back and Forward survive the superseded A operation')
+  } finally {
+    gate.resolve()
+  }
 }
 
 async function verifyAppIdentity({ page, entry }) {
@@ -894,7 +1043,7 @@ async function rapidSelections({ page, record, entry }) {
   }
 }
 
-async function filterHistory({ page, record }) {
+async function filterHistory({ page, record, entry }) {
   await selectFile(page, 'b.ts')
   const initial = await historyPosition(page)
   await page.getByRole('button', { name: 'Search', exact: true }).click()
@@ -922,6 +1071,51 @@ async function filterHistory({ page, record }) {
   await expectFile(page, 'a.ts')
   await expect(logs).toHaveValue('x'.repeat(140))
   await record('Back skips log prefixes and preserves the current log filter')
+  expect(entry.errors).toEqual([])
+}
+
+async function earlyFilterReload({ page, record, entry }) {
+  await page.goto(address('/workbench/f/a.ts', '?tabs=@&side=logs&log.find=before-reload'))
+  await expectFile(page, 'a.ts')
+  const input = page.getByRole('textbox', { name: 'Search logs' })
+  await expect(input).toHaveValue('before-reload')
+  await input.evaluate((element) => {
+    element.addEventListener(
+      'input',
+      () => {
+        window.navigationProofInputAt = performance.now()
+      },
+      { once: true },
+    )
+  })
+  const query = `reload-proof-${randomUUID()}`
+  await input.fill(query)
+  const [, attempt] = await Promise.all([
+    page.waitForNavigation({ waitUntil: 'domcontentloaded' }),
+    page.evaluate(() => {
+      const attempt = {
+        href: location.href,
+        historyState: history.state,
+        savedAddress: localStorage.getItem('platform.address.v2'),
+        elapsedMs: performance.now() - window.navigationProofInputAt,
+      }
+      location.reload()
+      return attempt
+    }),
+  ])
+  entry.reloadAttempt = attempt
+  expect(attempt.elapsedMs).toBeLessThan(250)
+  expect(new URL(attempt.href).searchParams.get('log.find')).toBe('before-reload')
+  expect(attempt.savedAddress).toContain(query)
+  await expectFile(page, 'a.ts')
+  entry.reloadResult = await page.evaluate(() => ({
+    href: location.href,
+    historyState: history.state,
+  }))
+  await expect(input).toHaveValue(query)
+  await expect.poll(() => new URL(page.url()).searchParams.get('log.find')).toBe(query)
+  await record('real reload preserves the accepted filter before its scheduled URL write')
+  expect(entry.errors).toEqual([])
 }
 
 async function searchGlobFilters({ page, record }) {

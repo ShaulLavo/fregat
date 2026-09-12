@@ -53,6 +53,9 @@ try {
     new URL(`~${localFixture.workspace}/workbench/f/federation.txt?tabs=@`, options.appUrl).href,
   )
   await expectFile(localFixture)
+  report.browserAssets = await page
+    .locator('script[src]')
+    .evaluateAll((scripts) => scripts.map((script) => script.src))
   const documentLifetime = await page.evaluate(() => performance.timeOrigin)
   await machineAction('Connect machine')
   await palette(`sess ${localFixture.title}`, localFixture.title)
@@ -74,7 +77,10 @@ try {
   ).toBeVisible()
   await expect.poll(() => portOccupied(connection.localPort)).toBe(false)
   record('Disconnect marks the retained terminal unavailable and releases the SSH listener')
+  await machineAction('Connect machine')
   await palette(`sess ${remoteFixture.title}`, remoteFixture.title)
+  await expect(page.locator(`[title="${remoteFixture.title}"]`)).toBeVisible()
+  await machineAction('Disconnect machine')
   await expect(page.locator(`[title="${remoteFixture.title}"]`)).toContainText(
     'Cached · machine unavailable',
   )
@@ -85,7 +91,14 @@ try {
   await expect(notice.getByRole('button', { name: 'Connect', exact: true })).toBeEnabled()
   await notice.getByRole('button', { name: 'Connect', exact: true }).click()
   await expect
-    .poll(async () => (await api(remoteUrl, 'health')).environmentId)
+    .poll(
+      () =>
+        api(remoteUrl, 'health').then(
+          (health) => health.environmentId,
+          () => null,
+        ),
+      { timeout: 90_000 },
+    )
     .toBe(remote.environmentId)
   await selectFixture(localFixture)
   await expect(editor()).toContainText(`unsaved local ${runId}`)
@@ -197,13 +210,24 @@ async function registerFixture(base, rootPath, side) {
   )
   record.originalContent = content.content
   const address = await api(base, 'fs/workspace-address', { path: rootPath })
+  const baseline = await api(base, 'orchestration/shell-snapshot')
+  const registeredPath = baseline.worktrees.some((worktree) => worktree.path === address.path)
+  if (registeredPath)
+    throw createBenchmarkError(
+      `The ${side} fixture is already registered; supply a disposable unregistered checkout`,
+    )
   const registration = await dispatch(base, {
     type: 'project.create',
     workspaceRoot: rootPath,
     title: projectTitle,
     defaultModelSelection: null,
   })
-  record.projectId = registration.result?.projectId
+  const projectId = registration.result?.projectId
+  if (baseline.projects.some((project) => project.id === projectId))
+    throw createBenchmarkError(
+      `The ${side} fixture reused an existing project; it will not be deleted`,
+    )
+  record.projectId = projectId
   record.worktreeId = registration.result?.worktreeId
   if (!record.projectId || !record.worktreeId)
     throw createBenchmarkError('Fixture registration omitted identity')
@@ -266,21 +290,37 @@ async function verifyRail(local, remote) {
   const remoteRow = page.locator(`[title="${remote.title}"]`)
   await expect(localRow).toBeVisible()
   await expect(remoteRow).toBeVisible()
-  await expect(
-    page
-      .locator('[aria-roledescription="sortable project band"]')
-      .filter({ hasText: projectTitle }),
-  ).toHaveCount(1)
+  expect(local.projectId).toBe(remote.projectId)
+  const grouping = await page.evaluate(browserGroupedRows, {
+    local: local.title,
+    remote: remote.title,
+  })
+  expect(grouping).toEqual({ shared: true, headers: 1 })
   await page.getByRole('button', { name: 'Filter machines', exact: true }).click()
   await page.getByRole('menuitemradio').filter({ hasText: options.machineLabel }).click()
   await expect(remoteRow).toBeVisible()
   await expect(localRow).not.toBeVisible()
   await page.getByRole('button', { name: 'Filter machines', exact: true }).click()
-  await page.getByRole('menuitemradio', { name: 'All machines', exact: true }).click()
+  await page.getByRole('menuitemradio', { name: 'All machines', exact: true }).press('Enter')
   await expect(localRow).toBeVisible()
   record(
     'Both machine sessions share one repository group and the machine filter selects the owner',
   )
+}
+
+function browserGroupedRows({ local, remote }) {
+  const selector = '[aria-roledescription="sortable project band"]'
+  function groupFor(node) {
+    if (!node) return null
+    if (node.querySelector(selector)) return node
+    return groupFor(node.parentElement)
+  }
+  const localGroup = groupFor(document.querySelector(`[title="${local}"]`)?.parentElement)
+  const remoteGroup = groupFor(document.querySelector(`[title="${remote}"]`)?.parentElement)
+  return {
+    shared: localGroup !== null && localGroup === remoteGroup,
+    headers: localGroup?.querySelectorAll(selector).length,
+  }
 }
 
 async function appendText(value) {
@@ -325,10 +365,10 @@ async function verifyProjectPicker(fixture) {
 
 async function verifyBuffers(local, remote) {
   await selectFixture(local)
-  await expect(editor()).toContainText(local.originalContent.trim())
+  await expectOriginalLines(local)
   await appendText(`unsaved local ${runId}`)
   await selectFixture(remote)
-  await expect(editor()).toContainText(remote.originalContent.trim())
+  await expectOriginalLines(remote)
   await expect(editor()).not.toContainText(`unsaved local ${runId}`)
   await appendText(`saved remote ${runId}`)
   await page.keyboard.press('Control+s')
@@ -339,6 +379,13 @@ async function verifyBuffers(local, remote) {
   await selectFixture(local)
   await expect(editor()).toContainText(`unsaved local ${runId}`)
   record('A dirty buffer survives A → B → A and saving B changes only B')
+}
+
+async function expectOriginalLines(fixture) {
+  for (const line of fixture.originalContent.split('\n')) {
+    if (!line.trim()) continue
+    await expect(editor()).toContainText(line)
+  }
 }
 
 async function readFixture(fixture) {
@@ -360,7 +407,7 @@ async function verifyTerminal(fixture) {
     marker,
   })
   expect(result.reason).toBe('exit')
-  expect(result.output).toContain(marker)
+  expect(result.output).toMatch(new RegExp(`(?:^|\\r?\\n)${marker}(?:\\r?\\n|$)`))
   expect(result.output).toContain(fixture.rootPath)
   record(`Binary browser terminal on ${fixture.side} executes in its own checkout`, result)
 }
@@ -433,10 +480,10 @@ async function captureFailure() {
 
 async function cleanup() {
   if (remoteUrl) await cleanupAction('restore cleanup connection', connectMachine)
-  for (const fixture of report.fixtures.toReversed()) await cleanupFixture(fixture)
   if (page && connection)
     await cleanupAction('disconnect browser connection', () => machineAction('Disconnect machine'))
   if (browser) await cleanupAction('close isolated browser', () => browser.close())
+  for (const fixture of report.fixtures.toReversed()) await cleanupFixture(fixture)
   if (connection)
     await cleanupAction('disconnect script connection', () =>
       api(options.serverUrl, `machines/${options.machine}/disconnect`, {}),

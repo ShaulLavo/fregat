@@ -92,12 +92,18 @@ import type { SessionDiffScope } from '@/features/chat/utils/session-diff-scope-
 export function createNavigation(router: ApplicationRouter, initial: AddressIntent) {
   const coordinator = createNavigationCoordinator(router, initial)
   const openChat = createChatNavigation(coordinator)
-  const replaceFields = (fields: Partial<Address>) =>
-    coordinator.request(({ address }) => ({
-      address: { ...address, ...fields },
-      replace: true,
-      preserveTransient: true,
-    }))
+  const replaceFields = (
+    fields: Partial<Address>,
+    historyWriteMode: Parameters<typeof coordinator.request>[1] = 'immediate',
+  ) =>
+    coordinator.request(
+      ({ address }) => ({
+        address: { ...address, ...fields },
+        replace: true,
+        preserveTransient: true,
+      }),
+      historyWriteMode,
+    )
 
   function actions(application: ApplicationRuntime) {
     return editorActions(application.getSnapshot().editor)
@@ -124,6 +130,7 @@ export function createNavigation(router: ApplicationRouter, initial: AddressInte
     owner: EditorWorkspaceStoreApi | undefined,
     prepare: Parameters<typeof coordinator.request>[0],
     rootPath?: string,
+    historyWriteMode: Parameters<typeof coordinator.request>[1] = 'immediate',
   ) {
     const current = coordinator.getApplication()?.getSnapshot()
     if (
@@ -133,7 +140,7 @@ export function createNavigation(router: ApplicationRouter, initial: AddressInte
         current.editor.workspaceStore.getState().rootFolder?.path !== rootPath)
     )
       return Promise.resolve({ status: 'superseded' } satisfies NavigationResult)
-    return coordinator.request(prepare)
+    return coordinator.request(prepare, historyWriteMode)
   }
 
   function assertOwner(application: ApplicationRuntime, owner?: EditorWorkspaceStoreApi) {
@@ -579,6 +586,7 @@ export function createNavigation(router: ApplicationRouter, initial: AddressInte
           }
         },
         rootPath,
+        'continuous',
       )
     },
     selectSearchQueryHistory(direction: -1 | 1, owner: EditorWorkspaceStoreApi, rootPath?: string) {
@@ -628,10 +636,11 @@ export function createNavigation(router: ApplicationRouter, initial: AddressInte
           }
         },
         rootPath,
+        'continuous',
       )
     },
     setLogsFilters: (filters: LogsFilterState) =>
-      replaceFields({ logs: logsParamsFor(filters, defaultLogsFilterState()) }),
+      replaceFields({ logs: logsParamsFor(filters, defaultLogsFilterState()) }, 'continuous'),
     setSettingsCategory: (category: string | null) =>
       replaceFields({ settings: category ? settingsCategorySlug(category) : null }),
     setDiffScope(scope: SessionDiffScope, ref: ScopedSessionRef) {

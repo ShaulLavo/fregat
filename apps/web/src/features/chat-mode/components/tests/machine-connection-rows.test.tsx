@@ -54,6 +54,21 @@ test('active notices are concise and dismissal survives repeat updates and remou
   expect(screen.getByText('shaul-mac · Machine identity changed')).toBeVisible()
 })
 
+test('browser SSH notices allow reconnecting a retained machine', async () => {
+  const fixture = await createConnectionNoticeFixture()
+  onTestFinished(fixture.dispose)
+  fixture.update({
+    config: { kind: 'ssh', target: 'shaul-mac' },
+    phase: 'idle',
+    lastError: null,
+  })
+  fixture.selectRemote()
+  renderWithProviders(<MachineConnectionRows />, {
+    connections: fixture.connections,
+  })
+  expect(screen.getByRole('button', { name: 'Connect' })).toBeEnabled()
+})
+
 test('explicit retry re-arms a dismissed incident and runs the real connection command', async () => {
   let requests = 0
   let unavailable = false

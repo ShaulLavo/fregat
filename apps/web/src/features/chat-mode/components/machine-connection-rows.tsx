@@ -2,7 +2,6 @@ import { MachineConnectionNotice } from '@/features/chat-mode/components/machine
 import { useEnvironmentConnections } from '@/hooks/use-environment-connections'
 import { primaryServerOrigin } from '@/lib/client'
 import { useEnvironmentsStore } from '@/lib/environments/state/store'
-import { isDesktop } from '@/lib/platform/bridge'
 import { hasConnectionNotice } from '@/lib/environments/utils/availability'
 
 export function MachineConnectionRows() {
@@ -27,7 +26,6 @@ export function MachineConnectionRows() {
       label: machine.config.label ?? machine.name,
       phase: machine.phase,
       lastError: machine.lastError,
-      disabled: machine.config.kind === 'ssh' && !isDesktop(),
       retry: () => connections.retryMachine(machine.name),
     }))
   if (primary && hasConnectionNotice(primary))
@@ -36,7 +34,6 @@ export function MachineConnectionRows() {
       label: primary.label ?? primary.name,
       phase: primary.phase,
       lastError: primary.lastError,
-      disabled: false,
       retry: () => connections.retryPrimary(),
     })
   if (!machines.length) return null
@@ -49,7 +46,6 @@ export function MachineConnectionRows() {
           label={machine.label}
           phase={machine.phase}
           error={machine.lastError}
-          disabled={machine.disabled}
           retry={machine.retry}
         />
       ))}
