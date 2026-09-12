@@ -56,7 +56,7 @@ test('arrows navigate immediately from search and wrap in both directions', asyn
     })
     await frame.renderOnce()
     expect(frame.captureCharFrame()).toContain('1 setting')
-    expect(frame.captureCharFrame()).toContain('▶ Color theme')
+    expect(frame.captureCharFrame()).toContain(`▶ ${settingRowTitle('workbench.colorTheme')}`)
   } finally {
     session.dispose()
     frame.renderer.destroy()
@@ -177,7 +177,7 @@ test('shows cached settings while disconnected and Ctrl+R restores the live conn
     expect(frame.captureCharFrame()).toContain('Disconnected')
     expect(frame.captureCharFrame()).toContain('Your draft is retained. Reconnect to continue.')
     expect(frame.captureCharFrame()).toContain('Ctrl+R refresh')
-    expect(frame.captureCharFrame()).toContain('Color theme')
+    expect(frame.captureCharFrame()).toContain(settingRowTitle('workbench.colorTheme'))
     await act(async () => {
       frame.mockInput.pressKey('r', { ctrl: true })
       await expect

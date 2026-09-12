@@ -18,6 +18,12 @@ test('Files opens the selected project and navigates parents, history, and proje
     const path = frame.renderer.root.findDescendantById('file-picker-path')
     return path instanceof InputRenderable ? path.value : null
   }
+  const frameText = async () => {
+    await act(async () => {
+      await frame.renderOnce()
+    })
+    return frame.captureCharFrame()
+  }
   try {
     await act(async () => {
       frame.mockInput.pressKey('p', { ctrl: true })
@@ -25,7 +31,7 @@ test('Files opens the selected project and navigates parents, history, and proje
     await expect.poll(currentPath).toBe(`${server.root}/${rootPath}`)
     expect(frame.renderer.root.findDescendantById('file-view')?.width).toBe(132)
     expect(frame.renderer.root.findDescendantById('settings-search')).toBeUndefined()
-    expect(frame.captureCharFrame()).toContain('inside-project.txt')
+    await expect.poll(frameText).toContain('inside-project.txt')
     await expect.poll(() => frame.renderer.currentFocusedRenderable?.id).toBe('file-picker-filter')
 
     await act(async () => {
@@ -59,7 +65,7 @@ test('Files opens the selected project and navigates parents, history, and proje
       frame.mockInput.pressEnter()
     })
     await expect.poll(currentPath).toBe(`${server.root}/${rootPath}`)
-    expect(frame.captureCharFrame()).toContain('inside-project.txt')
+    await expect.poll(frameText).toContain('inside-project.txt')
     expect(frame.renderer.currentFocusedRenderable?.id).toBe('file-picker-filter')
   } finally {
     await navigation.cleanup()
