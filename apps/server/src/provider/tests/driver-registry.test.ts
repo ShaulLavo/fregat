@@ -29,6 +29,39 @@ afterEach(async () => {
 })
 
 describe('provider driver registry', () => {
+  it('lists import-capable instances with default or explicit enablement and excludes disabled instances', async () => {
+    const registry = new ProviderAdapterRegistry({
+      drivers: [
+        {
+          ...mockDriver,
+          create: async (input) => {
+            const handle = await mockDriver.create(input)
+            Object.assign(handle.adapter, {
+              discoverSessions: async () => [],
+              readSessionHistory: async () => [],
+            })
+            return handle
+          },
+        },
+      ],
+    })
+    registries.push(registry)
+    await registry.reconcile([
+      { driverKind: MOCK_DRIVER_KIND, providerInstanceId: WORK },
+      { driverKind: MOCK_DRIVER_KIND, providerInstanceId: PERSONAL, enabled: true },
+    ])
+    expect(registry.importSources().map((source) => source.providerInstanceId)).toEqual([
+      WORK,
+      PERSONAL,
+    ])
+
+    await registry.reconcile([
+      { driverKind: MOCK_DRIVER_KIND, providerInstanceId: WORK, enabled: false },
+      { driverKind: MOCK_DRIVER_KIND, providerInstanceId: PERSONAL, enabled: true },
+    ])
+    expect(registry.importSources().map((source) => source.providerInstanceId)).toEqual([PERSONAL])
+  })
+
   it('keeps two instances of one driver isolated', async () => {
     const home = await fixtureRoot()
     const registry = createRegistry()
