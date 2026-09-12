@@ -313,7 +313,9 @@ export class CodexChildAgents {
       child.tools.set(tool.itemId, tool)
       if (
         this.isCurrentTurn(child.agent.threadId, params) &&
-        (child.agent.status === 'running' || child.agent.status === 'waiting')
+        (child.agent.status === 'running' ||
+          child.agent.status === 'waiting' ||
+          child.agent.status === 'idle')
       )
         child.summary = tool.title
       this.emit(child, method, params, tool)
