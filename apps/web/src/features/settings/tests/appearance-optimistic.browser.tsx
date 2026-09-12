@@ -55,7 +55,7 @@ test('preview-to-pending handoff has no paint gap before final rejection', async
       </AppProviders>,
     )
   })
-  expect(controls).not.toBeNull()
+  await expect.poll(() => controls).not.toBeNull()
   if (!controls) return
 
   const captured: { current?: SettingsSubmission } = {}

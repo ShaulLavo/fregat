@@ -41,7 +41,7 @@ afterEach(() => {
 
 test('anchors the diagnostic React surface through edits and restores editor focus', async () => {
   mountHarness()
-  await expect.poll(() => runtime?.controller.getEditor()).not.toBeNull()
+  await expect.poll(() => runtime?.controller.getEditor()).toBeTruthy()
   const current = requiredRuntime()
   current.controller.commands.focus()
   await expect.poll(() => document.activeElement?.getAttribute('aria-label')).toBe('Editor input')

@@ -129,6 +129,8 @@ export function scrollFocusedRowToOffset(
     viewportHeight,
   })
   if (nextScrollTop == null) {
+    // A new target already in view must cancel an earlier smooth reveal.
+    applyScrollTop(scrollElement, scrollElement.scrollTop, 'auto')
     return false
   }
 

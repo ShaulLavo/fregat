@@ -14,6 +14,9 @@ import {
 } from '../providers/timeline-actions-context'
 import type { ChatTurnDiffSummary } from '@workspace/client-core/chat/types'
 import { MessageBubble } from './message-bubble'
+import { ChatTransportContext } from '@/features/chat/providers/transport-context'
+import { createChatTransport } from '@/features/chat/transport/create-chat-transport'
+import { activeServerOrigin } from '@/lib/client'
 
 // Token colours from Dark Plus, the default dark editor theme, which the app
 // loads as a real VS Code theme through shiki. What these assertions are for is
@@ -29,9 +32,11 @@ const EXPECTED_DARK_EDITOR_TYPE_COLOR = 'rgb(86, 156, 214)' // #569CD6
 
 let root: Root | null = null
 let queryClient: QueryClient
+let transport: ReturnType<typeof createChatTransport>
 
 beforeEach(() => {
   queryClient = createTestQueryClient()
+  transport = createChatTransport(activeServerOrigin())
   // Dark is what every colour assertion below is written against, and it is a
   // setting now rather than a prop — the mirror is where the app reads it.
   seedBootMirrorTheme('dark')
@@ -45,6 +50,7 @@ afterEach(() => {
 
   document.body.innerHTML = ''
   queryClient.clear()
+  transport.close()
   localStorage.clear()
 })
 
@@ -218,6 +224,7 @@ describe('MessageBubble browser rendering', () => {
       )
     })
 
+    await expect.poll(() => buttonByText('View diff')).not.toBeNull()
     viewDiffButton().click()
     await vi.waitFor(() => {
       expect(openCheckpointDiff).toHaveBeenCalledWith(assistantChangedFilesSummary, undefined)
@@ -283,6 +290,7 @@ describe('MessageBubble browser rendering', () => {
       )
     })
 
+    await vi.waitFor(() => expect(revertButton()).toBeVisible())
     revertButton().click()
     await vi.waitFor(() => {
       expect(revertToCheckpoint).toHaveBeenCalledWith(2)
@@ -296,7 +304,9 @@ function withChatTimelineActions(
 ) {
   return (
     <EditorStateProvider>
-      <ChatTimelineActionsContext value={actions}>{children}</ChatTimelineActionsContext>
+      <ChatTransportContext value={transport}>
+        <ChatTimelineActionsContext value={actions}>{children}</ChatTimelineActionsContext>
+      </ChatTransportContext>
     </EditorStateProvider>
   )
 }

@@ -12,6 +12,7 @@ import { flushSync } from 'react-dom'
 import { createRoot, type Root } from 'react-dom/client'
 import { afterEach, expect, test } from 'vitest'
 import { ForesightManager } from 'js.foresight'
+import { createBrowserWorkspace } from '../../../../test/factories/browser-workspace'
 
 import { TestEditorStateProvider as EditorStateProvider } from '../../../../test/factories/editor-state-provider'
 import { useEditorCommands } from '@/features/editor/hooks/use-editor-commands'
@@ -43,9 +44,9 @@ import type { PlatformCommandBus } from '@/keymap/providers/command-context'
 import { FocusService } from '@/lib/focus/state/service'
 import type { TreeEntry, TreeResult } from '@/lib/file-system-types'
 import { treeModel, type TreeModel } from '@/lib/tree-model'
-import { AppProviders, createTestQueryClient, seedBootMirrorTheme } from '../../../../test/render'
+import { AppProviders, seedBootMirrorTheme } from '../../../../test/render'
 
-const ROOT_PATH = '/repo'
+const ROOT_PATH = 'repo'
 const PREPARED_ROOT_PATH = 'repo'
 const DEEP_FILE_PATH = `${ROOT_PATH}/src/file-79.ts`
 const PREPARED_FILE_PATH = `${PREPARED_ROOT_PATH}/src/editor-tab-a.ts`
@@ -84,7 +85,7 @@ test(
   'a real Shadow DOM file row predicts and activates a prepared editor tab',
   { timeout: 30_000 },
   async () => {
-    mountTreePane(new FocusService(), createTestQueryClient(), {
+    await mountTreePane(new FocusService(), {
       editorMounted: true,
       model: preparedNavigatorModel(),
       rootPath: PREPARED_ROOT_PATH,
@@ -92,7 +93,6 @@ test(
     editorDiagnosticGlobal.__editorPerfTrace = { mark: () => undefined }
     const shadowRoot = await fileTreeShadowRoot()
     await expect.poll(treeRuntimeIsReady).toBe(true)
-    flushSync(() => requiredTreeWorkspaceStore().getState().switchWorkspace(preparedRootFolder()))
 
     const directoryRow = rowButton(shadowRoot, 'src/')
     expect(directoryRow).not.toBeNull()
@@ -140,13 +140,12 @@ test(
 
 test('the live navigator retains search, consumes requested focus, reveals, and creates at root', async () => {
   const focusService = new FocusService()
-  const queryClient = createTestQueryClient()
-  mountTreePane(focusService, queryClient, { treeMounted: false })
+  const fixture = await mountTreePane(focusService, { treeMounted: false })
   await expect.poll(() => treeCommandBus).not.toBeNull()
 
   const focusTicket = treeCommandBus!.dispatch('workspace.focusFileTree', invocation())
   expect(focusTicket.claimed).toBe(true)
-  renderTreePane(focusService, queryClient)
+  renderTreePane(focusService, fixture)
 
   const shadowRoot = await fileTreeShadowRoot()
   await expect.poll(() => activeTreePath(shadowRoot)).toBe('src/')
@@ -233,7 +232,7 @@ test('the live navigator retains search, consumes requested focus, reveals, and 
 
 test('a failed command-bus tree reveal rejects without changing focus ownership', async () => {
   const focusService = new FocusService()
-  mountTreePane(focusService, createTestQueryClient(), {
+  await mountTreePane(focusService, {
     commandSnapshot: { activeFilePath: UNLOADED_FILE_PATH },
   })
 
@@ -255,7 +254,7 @@ test('a failed command-bus tree reveal rejects without changing focus ownership'
 })
 
 test('selecting an editor tab expands and smoothly reveals its file without stealing focus', async () => {
-  mountTreePane()
+  await mountTreePane()
 
   const shadowRoot = await fileTreeShadowRoot()
   const scroller = treeScroller(shadowRoot)
@@ -266,7 +265,15 @@ test('selecting an editor tab expands and smoothly reveals its file without stea
 
   clickToolbarButton('Select shallow file')
   await expect.poll(() => selectedFilePathText()).toBe(SHALLOW_FILE_PATH)
-  await expect.poll(() => scroller.scrollTop).toBeLessThanOrEqual(20)
+  await expect
+    .poll(
+      () =>
+        scroller.scrollTop <= (rowButton(shadowRoot, 'src/')?.getBoundingClientRect().height ?? 0),
+    )
+    .toBe(true)
+  await expect
+    .poll(() => rowIsVisibleInScroller(rowButton(shadowRoot, 'src/file-0.ts'), scroller))
+    .toBe(true)
 
   const sourceDirectory = rowButton(shadowRoot, 'src/')
   expect(sourceDirectory).not.toBeNull()
@@ -296,9 +303,7 @@ test('selecting an editor tab expands and smoothly reveals its file without stea
 })
 
 test('live density changes preserve the compact and cozy tree geometry and typography', async () => {
-  const queryClient = createTestQueryClient()
-  setWorkbenchDensity(queryClient, 'compact')
-  mountTreePane(new FocusService(), queryClient)
+  const { queryClient } = await mountTreePane(new FocusService(), { density: 'compact' })
 
   const shadowRoot = await fileTreeShadowRoot()
   const treeHost = document.querySelector<HTMLElement>('file-tree-container')
@@ -448,10 +453,10 @@ function TreeRuntimeCapture() {
   return null
 }
 
-function mountTreePane(
+async function mountTreePane(
   focusService: FocusService = new FocusService(),
-  queryClient: QueryClient = createTestQueryClient(),
   options: {
+    readonly density?: SettingsValues['workbench.density']
     readonly commandSnapshot?: { readonly activeFilePath: string | null }
     readonly editorMounted?: boolean
     readonly model?: TreeModel
@@ -460,17 +465,21 @@ function mountTreePane(
   } = {},
 ) {
   seedBootMirrorTheme('dark')
+  const fixture = await createBrowserWorkspace(options.rootPath ?? ROOT_PATH)
+  if (options.density) setWorkbenchDensity(fixture.queryClient, options.density)
   const host = document.createElement('main')
   document.body.append(host)
   root = createRoot(host)
 
-  renderTreePane(focusService, queryClient, options)
+  renderTreePane(focusService, fixture, options)
+  return fixture
 }
 
 function renderTreePane(
   focusService: FocusService,
-  queryClient: QueryClient,
+  fixture: Awaited<ReturnType<typeof createBrowserWorkspace>>,
   options: {
+    readonly density?: SettingsValues['workbench.density']
     readonly commandSnapshot?: { readonly activeFilePath: string | null }
     readonly editorMounted?: boolean
     readonly model?: TreeModel
@@ -482,9 +491,11 @@ function renderTreePane(
   flushSync(() => {
     root?.render(
       <AppProviders
+        application={fixture.application}
+        navigation={fixture.navigation}
         command={{ rootPath, snapshot: options.commandSnapshot }}
         focusService={focusService}
-        queryClient={queryClient}
+        queryClient={fixture.queryClient}
       >
         <EditorStateProvider>
           <TreeCommandBusCapture />
@@ -525,18 +536,6 @@ function preparedNavigatorModel() {
   const model = treeModel(tree(PREPARED_ROOT_PATH, [sourceDirectory]), PREPARED_ROOT_PATH)
   model.loadedDirectoryPaths.add('src')
   return model
-}
-
-function preparedRootFolder() {
-  return {
-    birthtimeMs: 0,
-    mtimeMs: 0,
-    name: PREPARED_ROOT_PATH,
-    path: PREPARED_ROOT_PATH,
-    size: 0,
-    type: 'directory' as const,
-    version: 'tree-pane-browser-fixture',
-  }
 }
 
 function tree(path: string, entries: TreeEntry[]): TreeResult {
@@ -615,7 +614,10 @@ async function activateTreeRowAndCaptureFirstFrame(row: HTMLButtonElement) {
       resolve({
         rowCount: document.querySelectorAll('.editor-virtualized-row').length,
         selectedPath: selectedFilePathText(),
-        text: surface?.textContent ?? '',
+        text: Array.from(
+          surface?.querySelectorAll('.editor-virtualized-row') ?? [],
+          (row) => row.textContent ?? '',
+        ).join('\n'),
       })
     })
   })
