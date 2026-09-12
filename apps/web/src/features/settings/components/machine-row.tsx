@@ -1,6 +1,8 @@
 import { errorStringField, type MachineDefinition } from '@workspace/contracts'
 import { Button } from '@workspace/ui/components/button'
 import { MachinePhase } from '@/components/machine-phase'
+import { MachineErrorDetails } from '@/components/machine-error-details'
+import { connectionNoticeSummary } from '@/lib/environments/utils/connection-notice'
 import { useState } from 'react'
 
 import { MachineForm } from '@/components/machine-form'
@@ -68,9 +70,12 @@ export function MachineRow({
         {name} · {machine.kind === 'ssh' ? machine.target : machine.url}
       </p>
       {state?.lastError ? (
-        <p role='status' className='text-warning text-xs'>
-          {state.lastError}
-        </p>
+        <div className='flex items-center gap-1 text-xs'>
+          <span role='status' className='text-warning'>
+            {connectionNoticeSummary(phase, state.lastError)}
+          </span>
+          <MachineErrorDetails label={machine.label ?? name} error={state.lastError} />
+        </div>
       ) : null}
       {actionError ? (
         <p role='alert' className='text-destructive text-xs'>
