@@ -1,7 +1,10 @@
 import { environmentIdSchema, type EnvironmentId } from '@workspace/contracts'
 import * as v from 'valibot'
 
-export type StorageAccess = Pick<Storage, 'getItem' | 'setItem' | 'removeItem'> & {
+export type StorageWriteStatus = 'written' | 'unavailable' | 'storage-failed'
+
+export type StorageAccess = Pick<Storage, 'getItem' | 'removeItem'> & {
+  readonly setItem: (key: string, value: string) => StorageWriteStatus
   readonly keys: (prefix: string) => readonly string[]
 }
 
@@ -14,15 +17,40 @@ function browserStorage(): Storage | null {
 }
 
 export const globalChromeStorage: StorageAccess = {
-  getItem: (key) => browserStorage()?.getItem(key) ?? null,
-  setItem: (key, value) => browserStorage()?.setItem(key, value),
-  removeItem: (key) => browserStorage()?.removeItem(key),
+  getItem(key) {
+    try {
+      return browserStorage()?.getItem(key) ?? null
+    } catch {
+      return null
+    }
+  },
+  setItem(key, value) {
+    try {
+      const storage = browserStorage()
+      if (!storage) return 'unavailable'
+      storage.setItem(key, value)
+      return 'written'
+    } catch {
+      return 'storage-failed'
+    }
+  },
+  removeItem(key) {
+    try {
+      browserStorage()?.removeItem(key)
+    } catch {
+      return
+    }
+  },
   keys(prefix) {
-    const storage = browserStorage()
-    if (!storage) return []
-    return Array.from({ length: storage.length }, (_, index) => storage.key(index)).filter(
-      (key): key is string => key !== null && key.startsWith(prefix),
-    )
+    try {
+      const storage = browserStorage()
+      if (!storage) return []
+      return Array.from({ length: storage.length }, (_, index) => storage.key(index)).filter(
+        (key): key is string => key !== null && key.startsWith(prefix),
+      )
+    } catch {
+      return []
+    }
   },
 }
 
