@@ -215,6 +215,71 @@ describe('chat activity presentation', () => {
   })
 })
 
+it.each([
+  ['rg missing src', 1, '', 'neutral', 'No matches · Exit code 1'],
+  ['/bin/bash -lc "rg missing src"', 1, '', 'neutral', 'No matches · Exit code 1'],
+  ['cat file; rg missing src', 1, '', 'failed', 'Exit code 1'],
+  [
+    'rg missing absent',
+    2,
+    'rg: absent: No such file or directory',
+    'failed',
+    'Exit code 2\nrg: absent: No such file or directory',
+  ],
+  [
+    'rg missing absent; true',
+    0,
+    'rg: absent: No such file or directory',
+    'failed',
+    'Exit code 0\nrg: absent: No such file or directory',
+  ],
+])(
+  'reports the process result without guessing compound failures: %s',
+  (command, exitCode, aggregatedOutput, outcome, result) => {
+    expect(
+      chatActivityPresentation(
+        activity('tool.completed', 'tool', {
+          status: 'completed',
+          data: { command, exitCode, aggregatedOutput },
+        }),
+      ),
+    ).toMatchObject({ outcome, result })
+  },
+)
+
+it('detects diagnostics beyond the displayed output excerpt and exposes the failure reason', () => {
+  const output = 'successful output\n'.repeat(300) + 'rg: missing: No such file or directory'
+  const presentation = chatActivityPresentation(
+    activity('tool.completed', 'tool', {
+      data: { command: 'rg pattern missing; true', exitCode: 0, aggregatedOutput: output },
+    }),
+  )
+  expect(presentation).toMatchObject({
+    outcome: 'failed',
+    result: 'Exit code 0\nrg: missing: No such file or directory',
+  })
+  expect(presentation.output?.length).toBeLessThan(output.length)
+})
+
+it('retains stderr alongside stdout when the provider supplies separate streams', () => {
+  expect(
+    chatActivityPresentation(
+      activity('tool.completed', 'tool', {
+        data: {
+          command: 'cat missing',
+          exitCode: 1,
+          stdout: 'before',
+          stderr: 'cat: missing: No such file or directory',
+        },
+      }),
+    ),
+  ).toMatchObject({
+    outcome: 'failed',
+    output: 'before\ncat: missing: No such file or directory',
+    result: 'Exit code 1\ncat: missing: No such file or directory',
+  })
+})
+
 function activity(
   kind: string,
   tone: OrchestrationSessionActivity['tone'],

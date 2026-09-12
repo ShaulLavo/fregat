@@ -278,7 +278,7 @@ export function MessagesTimeline({
           >
             {virtualItems.map((virtualItem) => (
               <div
-                className='w-full py-1.5'
+                className='w-full'
                 data-index={virtualItem.index}
                 key={virtualItem.key}
                 ref={virtualizer.measureElement}

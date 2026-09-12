@@ -1,4 +1,5 @@
 import type { OrchestrationSessionActivity } from '@workspace/contracts'
+import { commandIsSingleSearch } from '@/features/chat/utils/command-label'
 
 export type ChatActivityIconKey =
   | 'approval'
@@ -35,6 +36,7 @@ export type ChatActivityPresentation = {
   lifecycle: ChatActivityLifecycle | null
   outcome: ChatActivityOutcome | null
   output: string | null
+  result?: string
   status: string | null
   title: string
   tool?: ChatActivityTool
@@ -80,6 +82,7 @@ export function chatActivityPresentation(
   ])
   const lifecycle = activityLifecycle(activity, payload, data, outcome)
   const tool = activityTool(activity, payload, data)
+  const result = activityResult(data, command, output)
 
   return {
     changedFiles: tool?.kind === 'read' ? [] : activityChangedFiles(data),
@@ -89,7 +92,8 @@ export function chatActivityPresentation(
     input: activityInput(data, command),
     lifecycle,
     outcome,
-    output,
+    output: output ? truncateText(output, MAX_OUTPUT_LENGTH) : null,
+    ...(result ? { result } : {}),
     status: activityStatus(activity, payload, lifecycle),
     title,
     ...(tool ? { tool } : {}),
@@ -307,6 +311,7 @@ function activityOutcome(
   if (activity.tone === 'error') return 'failed'
   if (data.is_error === true) return 'failed'
   if (recordPayload(data.result).isError === true || data.error) return 'failed'
+  if (isEmptySearch(data, activityCommand(data), texts.filter(Boolean).join('\n'))) return 'neutral'
   if (isFailedExitCode(data)) return 'failed'
 
   const status = normalizedLifecycle(stringValue(payload.status) ?? stringValue(data.status))
@@ -397,6 +402,31 @@ function isFailedExitCode(data: Record<string, unknown>) {
   return typeof exitCode === 'number' && exitCode !== 0
 }
 
+function isEmptySearch(
+  data: Record<string, unknown>,
+  command: string | null,
+  output: string | null,
+) {
+  if ((data.exitCode ?? data.exit_code) !== 1 || !command) return false
+  if (output && toolTextLooksLikeFailure(output)) return false
+
+  return commandIsSingleSearch(command)
+}
+
+function activityResult(
+  data: Record<string, unknown>,
+  command: string | null,
+  output: string | null,
+) {
+  const code = data.exitCode ?? data.exit_code
+  if (isEmptySearch(data, command, output)) return 'No matches · Exit code 1'
+  const diagnostic = output?.split('\n').find(toolTextLooksLikeFailure)
+  const exit = typeof code === 'number' ? `Exit code ${code}` : null
+  if (!diagnostic) return exit
+
+  return [exit, truncateText(diagnostic.trim(), 300)].filter(Boolean).join('\n')
+}
+
 function activityCommand(data: Record<string, unknown>) {
   const input = recordPayload(data.input)
   const rawInput = recordPayload(data.rawInput)
@@ -437,16 +467,20 @@ function activityOutput(data: Record<string, unknown>) {
     stringValue(data.aggregatedOutput) ??
     stringValue(data.aggregated_output) ??
     stringValue(data.output) ??
-    stringValue(data.stdout) ??
+    joinedOutput(data) ??
     toolResultText(data.content) ??
     toolResultText(result.content) ??
     stringValue(data.rawOutput) ??
     stringValue(rawOutput.content) ??
     stringValue(rawOutput.output) ??
-    [stringValue(rawOutput.stdout), stringValue(rawOutput.stderr)].filter(Boolean).join('\n')
+    joinedOutput(rawOutput)
   if (!output) return null
 
-  return truncateText(output, MAX_OUTPUT_LENGTH)
+  return output
+}
+
+function joinedOutput(data: Record<string, unknown>) {
+  return [stringValue(data.stdout), stringValue(data.stderr)].filter(Boolean).join('\n') || null
 }
 
 export function chatActivityHasFailure(activity: OrchestrationSessionActivity) {
