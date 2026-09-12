@@ -19,7 +19,13 @@ const slices = [
 ]
 
 test('keeps the active project plus the most recent others, trimming the oldest', () => {
-  const retention = retentionForProjects({ activeRootPath: '/repo/a', projectLimit: 3, slices })
+  const retention = retentionForProjects({
+    activeRootPath: '/repo/a',
+    byteBudget: Number.MAX_SAFE_INTEGER,
+    documentSizes: new Map(),
+    projectLimit: 3,
+    slices,
+  })
 
   expect([...retention.documentIds].toSorted()).toEqual([
     '/repo/a/one.ts',
@@ -30,7 +36,13 @@ test('keeps the active project plus the most recent others, trimming the oldest'
 })
 
 test('never trims the active project, however stale it is', () => {
-  const retention = retentionForProjects({ activeRootPath: '/repo/d', projectLimit: 2, slices })
+  const retention = retentionForProjects({
+    activeRootPath: '/repo/d',
+    byteBudget: Number.MAX_SAFE_INTEGER,
+    documentSizes: new Map(),
+    projectLimit: 2,
+    slices,
+  })
 
   expect(retention.documentIds.has('/repo/d/one.ts')).toBe(true)
   expect(retention.documentIds.size).toBe(2)
@@ -69,4 +81,70 @@ test('charges a document shared by nested roots only once', () => {
   // root, taking a document the active root still displays with it.
   expect(retention.documentIds.has(shared)).toBe(true)
   expect(retention.tabIds.size).toBe(2)
+})
+
+// The measure/commit split exists for this: measuring used to mark documents
+// charged as a side effect, so a slice that was then rejected still consumed
+// their size, and a later slice sharing them was charged nothing and admitted
+// over budget. The budget here is chosen so the two accountings disagree — at a
+// looser budget both keep the late slice and the test proves nothing.
+test('a rejected project does not pay for the documents a later project shares', () => {
+  const shared = '/repo/shared.ts'
+  const retention = retentionForProjects({
+    activeRootPath: '/repo/active',
+    byteBudget: 100,
+    documentSizes: new Map([
+      ['/repo/active/one.ts', 10],
+      ['/repo/big/one.ts', 100],
+      [shared, 100],
+    ]),
+    projectLimit: 3,
+    slices: [
+      slice('/repo/active', 400, ['/repo/active/one.ts']),
+      // Rejected: 10 + 100 + 100 overruns 100.
+      slice('/repo/big', 300, ['/repo/big/one.ts', shared]),
+      // Also rejected: `shared` is still uncharged, so this costs its full 100 on
+      // top of the active 10. Under the old accounting the rejected slice above
+      // had already marked it charged, so this measured 0 and was admitted.
+      slice('/repo/late', 200, [shared]),
+    ],
+  })
+
+  expect(retention.documentIds.has('/repo/active/one.ts')).toBe(true)
+  expect(retention.documentIds.has('/repo/big/one.ts')).toBe(false)
+  expect(retention.documentIds.has(shared)).toBe(false)
+})
+
+test('charges a document listed twice in one slice only once', () => {
+  const retention = retentionForProjects({
+    activeRootPath: '/repo/a',
+    byteBudget: 100,
+    documentSizes: new Map([['/repo/dup.ts', 100]]),
+    projectLimit: 3,
+    slices: [
+      slice('/repo/a', 200, ['/repo/a/one.ts']),
+      { ...slice('/repo/b', 100, ['/repo/dup.ts']), documentIds: ['/repo/dup.ts', '/repo/dup.ts'] },
+    ],
+  })
+
+  // Double-charging would make the slice cost 200 against a 100 budget and drop
+  // a document the tab still displays.
+  expect(retention.documentIds.has('/repo/dup.ts')).toBe(true)
+})
+
+test('retains the rootless active slice, which has no root path to match', () => {
+  const retention = retentionForProjects({
+    activeRootPath: null,
+    byteBudget: 10,
+    documentSizes: new Map([['settings:json:user', 1_000]]),
+    projectLimit: 3,
+    slices: [
+      slice('/repo/parked', 100, ['/repo/parked/one.ts']),
+      { ...slice('/repo/x', 200, ['settings:json:user']), rootPath: null },
+    ],
+  })
+
+  // The active slice is never trimmed, even over budget and even with no root:
+  // its documents are on screen.
+  expect(retention.documentIds.has('settings:json:user')).toBe(true)
 })

@@ -65,3 +65,17 @@ test('drops views whose tab is gone even when the document is kept', () => {
   expect(evictedTabIds.toSorted()).toEqual(['tab:clean', 'tab:dirty', 'tab:unsynced'])
   expect(service.hasLiveDocument('/repo/clean.ts')).toBe(true)
 })
+
+test('documentSizes reports every live document, including the unevictable ones', () => {
+  const service = serviceWithFourDocuments()
+
+  const sizes = service.documentSizes()
+
+  // An unevictable document still occupies memory. Reporting only evictables
+  // would make the retention budget a claim about a smaller number than the real
+  // footprint — the same class of defect the budget exists to prevent.
+  expect(sizes.get('/repo/clean.ts')).toBe('hello'.length)
+  expect(sizes.get('/repo/dirty.ts')).toBe('hello'.length)
+  expect(sizes.get('conflict:1')).toBe('conflict body'.length)
+  expect(sizes.size).toBe(4)
+})

@@ -350,6 +350,7 @@ function createTestEditor(
   overrides?: Partial<EditorCommands>,
 ): EditorCommands {
   const apply = createEditorApplyActions({
+    retainedTextBudget: () => Number.MAX_SAFE_INTEGER,
     activation: { activate: () => undefined, setRoot: () => undefined },
     documentStore,
     searchStore: createSearchBufferStore({ rootPath: workspaceStore.getState().rootFolder?.path }),

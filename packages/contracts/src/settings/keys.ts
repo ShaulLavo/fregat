@@ -254,6 +254,24 @@ export const SETTINGS_REGISTRY = {
     description: 'Blink the terminal cursor while the terminal has focus.',
     keywords: ['terminal', 'cursor', 'blink'],
   }),
+  'editor.retainedTextBudget': defineSetting({
+    // Clamped at 1 GiB: the value decides how much parked-project text the
+    // renderer keeps resident, and an unbounded one is a memory leak with a
+    // settings key in front of it. 0 retains only the active project.
+    schema: v.pipe(v.number(), v.integer(), v.minValue(0), v.maxValue(1_073_741_824)),
+    default: 67_108_864,
+    // Machine scope, following `lsp.idleTimeoutMs`: a per-box RAM tradeoff. A
+    // ceiling that is right on a workstation is wrong on a small laptop, and a
+    // workspace file ships inside a cloned repository, so this must not be
+    // window-scoped.
+    scope: 'machine',
+    widget: 'number',
+    category: 'Editor',
+    description:
+      'Text retained for parked projects when switching away from one, measured in UTF-16 code units across their open documents. The active project is never trimmed.',
+    visibility: 'advanced',
+    keywords: ['memory', 'retention', 'projects', 'budget', 'documents'],
+  }),
   'editor.minimap.enabled': defineSetting({
     schema: v.boolean(),
     default: true,

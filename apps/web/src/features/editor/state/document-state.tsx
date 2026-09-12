@@ -60,6 +60,8 @@ type EditorDocumentStoreActions = {
   ensureUnsyncedEditorDocument: (input: UnsyncedLiveEditorDocumentInput) => LiveEditorDocument
   forceReplaceLiveEditorDocument: (file: FileResult) => { wasDirty: boolean }
   getEditorView: (tabId: string) => EditorDocumentView | null
+  /** Retained text size per live document; the only input to the retention budget. */
+  editorDocumentSizes: () => ReadonlyMap<string, number>
   getLiveEditorDocument: (documentId: string) => LiveEditorDocument | null
   hasLiveEditorDocument: (documentId: string) => boolean
   markLiveEditorDocumentSaved: (input: {
@@ -215,6 +217,7 @@ export function createEditorDocumentStore(options: CreateEditorDocumentStoreOpti
           return { wasDirty: result.wasDirty }
         },
         getEditorView: (tabId) => service.getView(tabId),
+        editorDocumentSizes: () => service.documentSizes(),
         getLiveEditorDocument: (documentId) => service.getLiveDocument(documentId),
         hasLiveEditorDocument: (documentId) => service.hasLiveDocument(documentId),
         markLiveEditorDocumentSaved: (input) => {

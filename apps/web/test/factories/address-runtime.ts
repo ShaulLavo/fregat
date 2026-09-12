@@ -38,6 +38,7 @@ export async function createAddressTestRuntime(client: Client) {
   })
   const editor = application.getSnapshot().editor
   const commands = createEditorApplyActions({
+    retainedTextBudget: () => Number.MAX_SAFE_INTEGER,
     activation: editor.editorActivation,
     documentStore: editor.documentStore,
     searchStore: editor.searchBufferStore,

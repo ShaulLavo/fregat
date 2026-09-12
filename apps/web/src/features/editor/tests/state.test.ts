@@ -51,6 +51,7 @@ describe('editor workspace state', () => {
     const events: string[] = []
     workspaceStore.subscribe(() => events.push('published'))
     const commands = createEditorApplyActions({
+      retainedTextBudget: () => Number.MAX_SAFE_INTEGER,
       activation: {
         activate: (path) => events.push(`activated:${path}`),
         setRoot: () => undefined,
@@ -78,6 +79,7 @@ describe('editor workspace state', () => {
     createEditorBufferSession(document.buffer).applyText('dirty')
     const { owner } = fileOpenIntentService(documentStore)
     const commands = createEditorApplyActions({
+      retainedTextBudget: () => Number.MAX_SAFE_INTEGER,
       activation: createEditorActivation(owner.activation, documentStore, owner),
       documentStore,
       searchStore,
@@ -119,6 +121,7 @@ describe('editor workspace state', () => {
         preparedDocument,
       )
       const commands = createEditorApplyActions({
+        retainedTextBudget: () => Number.MAX_SAFE_INTEGER,
         activation: createEditorActivation(owner.activation, documentStore, owner),
         documentStore,
         searchStore,
@@ -373,6 +376,37 @@ describe('editor workspace state', () => {
       '/repo/src/a.ts',
     ])
   })
+
+  // The close path used to build its keep set from the closing workspace's panels
+  // alone, ignoring every parked project. Closing one tab therefore evicted
+  // another project's clean documents and disposed its views: switching back
+  // refetched them and lost their undo history.
+  it("closing a tab in one project keeps a parked project's clean documents", () => {
+    const parkedPath = '/repo/parked.ts'
+    const { commands, documentStore, workspaceStore } = editorHarness()
+
+    commands.openFileSurface(parkedPath)
+    const parkedTabId = workspaceStore.getState().workbenchPanels.activeEditorTabId!
+    documentStore.getState().ensureEditorView(parkedTabId, fileResult(parkedPath))
+
+    commands.switchRootFolder(pickedDirectory('/other'))
+    expect(workspaceStore.getState().parkedWorkspaces.has('/repo')).toBe(true)
+    expect(documentStore.getState().getLiveEditorDocument(parkedPath)).not.toBeNull()
+
+    const first = '/other/first.ts'
+    const second = '/other/second.ts'
+    commands.openFileSurface(first)
+    const firstTabId = workspaceStore.getState().workbenchPanels.activeEditorTabId!
+    documentStore.getState().ensureEditorView(firstTabId, fileResult(first))
+    commands.openFileSurface(second)
+    const secondTabId = workspaceStore.getState().workbenchPanels.activeEditorTabId!
+    documentStore.getState().ensureEditorView(secondTabId, fileResult(second))
+
+    commands.closeTab(secondTabId)
+
+    expect(documentStore.getState().getLiveEditorDocument(parkedPath)).not.toBeNull()
+    expect(documentStore.getState().getLiveEditorDocument(first)).not.toBeNull()
+  })
 })
 
 function editorHarness(slice: Partial<CachedWorkspaceSlice> = {}) {
@@ -381,6 +415,7 @@ function editorHarness(slice: Partial<CachedWorkspaceSlice> = {}) {
   const uiStore = createEditorUiStore()
   const workspaceStore = createEditorWorkspaceStore(cachedWorkspace(slice))
   const commands = createEditorApplyActions({
+    retainedTextBudget: () => Number.MAX_SAFE_INTEGER,
     activation: { activate: () => undefined, setRoot: () => undefined },
     documentStore,
     searchStore,

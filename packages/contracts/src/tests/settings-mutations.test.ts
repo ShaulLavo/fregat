@@ -40,7 +40,18 @@ const MODEL_B = modelRef('claude', 'sonnet')
 
 describe('settings mutation schemas', () => {
   it('covers every live scalar, including the committed post-plan additions', () => {
-    const scalarWidgets = new Set(['boolean', 'enum', 'font', 'multiline', 'number', 'string'])
+    // 'code-theme' belongs here: `editor.codeTheme.dark`/`.light` hold a plain
+    // theme-id string and are written through the scalar path by
+    // `color-theme-provider.tsx`, so excluding them would break the pickers.
+    const scalarWidgets = new Set([
+      'boolean',
+      'code-theme',
+      'enum',
+      'font',
+      'multiline',
+      'number',
+      'string',
+    ])
     const expected = SETTING_IDS.filter((id) => scalarWidgets.has(descriptorFor(id).widget))
 
     expect(SCALAR_SETTING_IDS).toEqual(expected)
