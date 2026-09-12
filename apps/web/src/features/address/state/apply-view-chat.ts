@@ -43,6 +43,7 @@ export function prepareAddressChat(
   environmentId: EnvironmentId,
   rootPath: string,
   draftWorktreeId?: WorktreeId,
+  preserveCurrentDraft = false,
 ): PreparedChat | { readonly kind: 'unavailable'; readonly reason: string } {
   if (!intent.mainChat && !intent.sidebarChat)
     return {
@@ -82,10 +83,32 @@ export function prepareAddressChat(
     kind: 'ready',
     rootPath: sessionWorktree?.path ?? rootPath,
     worktreeId: sessionWorktree?.id ?? addressed.id,
-    draftWorktreeId: main?.kind === 'draft' ? (draftWorktreeId ?? addressed.id) : null,
+    draftWorktreeId: resolveDraftWorktreeId(
+      main,
+      addressed.id,
+      draftWorktreeId,
+      preserveCurrentDraft,
+    ),
     main,
     sidebar,
   }
+}
+
+function resolveDraftWorktreeId(
+  selection: SidebarSelection | null,
+  addressedWorktreeId: WorktreeId,
+  requestedWorktreeId: WorktreeId | undefined,
+  preserveCurrentDraft: boolean,
+) {
+  if (selection?.kind !== 'draft') return null
+  if (requestedWorktreeId !== undefined) return requestedWorktreeId
+  if (!preserveCurrentDraft) return addressedWorktreeId
+
+  const current = useSessionSelectionStore.getState()
+  if (current.selection.kind !== 'draft') return addressedWorktreeId
+  if (current.selection.environmentId !== selection.environmentId) return addressedWorktreeId
+  if (current.selection.projectId !== selection.projectId) return addressedWorktreeId
+  return current.draftWorktreeId ?? addressedWorktreeId
 }
 
 function scopedSelection(

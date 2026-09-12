@@ -160,6 +160,10 @@ test('an active-session draft preserves its missing checkout identity while open
   expect(h.application.getSnapshot().editor.workspaceStore.getState().rootFolder?.path).toBe(
     (await h.worktree()).path,
   )
+  const draftGeneration = useSessionSelectionStore.getState().draftGeneration
+  expect(await getNavigation().setRail('archived')).toEqual({ status: 'applied' })
+  expect(useSessionSelectionStore.getState().draftWorktreeId).toBe(target.worktreeId)
+  expect(useSessionSelectionStore.getState().draftGeneration).toBe(draftGeneration)
 })
 
 test('new session uses the linked checkout of the session selected automatically by the stage', async ({

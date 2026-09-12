@@ -110,7 +110,14 @@ async function applyCurrentView(
     confirmedEnvironmentId(owner.origin)
     useChatProjectionStore.getState().syncShellSnapshot(environmentId, snapshot)
   }
-  const chat = prepareAddressChat(intent, environmentId, addressedRoot, options.draftWorktreeId)
+  const currentRootPath = owner.editor.workspaceStore.getState().rootFolder?.path
+  const chat = prepareAddressChat(
+    intent,
+    environmentId,
+    addressedRoot,
+    options.draftWorktreeId,
+    currentRootPath === addressedRoot,
+  )
   if (chat.kind === 'unavailable') return { status: 'unavailable', reason: chat.reason }
   if (chat.rootPath !== addressedRoot) trace.workspaceSource = 'session'
   options.reconcileResources?.(owner.editor.workspaceStore, chat.rootPath)
