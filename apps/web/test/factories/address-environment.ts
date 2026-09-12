@@ -7,7 +7,11 @@ import {
   setClient,
   type Client,
 } from '@/lib/client'
-import { queryClientFor } from '@/lib/environments/state/query-clients'
+import {
+  clientForQueryClient,
+  queryClientFor,
+  registerEnvironmentQueryClient,
+} from '@/lib/environments/state/query-clients'
 import { useEnvironmentsStore } from '@/lib/environments/state/store'
 
 export function scopeAddressEnvironment(
@@ -25,8 +29,12 @@ export function scopeAddressEnvironment(
     entries: { [origin]: { ...createEnvironmentEntry(origin, origin), environmentId } },
     connectionByOrigin: {},
   })
+  const queryClient = queryClientFor(origin)
+  const previousBoundClient = clientForQueryClient(queryClient)
+  registerEnvironmentQueryClient(queryClient, origin, client)
   return () => {
-    queryClientFor(origin).clear()
+    queryClient.clear()
+    registerEnvironmentQueryClient(queryClient, origin, previousBoundClient)
     setActiveServerOrigin(origin)
     setClient(previousClient)
     setActiveServerOrigin(previousOrigin)
