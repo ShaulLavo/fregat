@@ -1,11 +1,20 @@
 import { testScopedStorage } from '../../../../../test/factories/scoped-storage'
+import { memoryLocalStorage } from '../../../../../test/factories/local-storage'
+import { afterEach, beforeEach, vi } from 'vitest'
 import {
   MAX_PROMPT_STASH_ENTRIES,
   resetPromptStashStore,
   promptStashStoreFor,
   initializePromptStashStore,
+  createPromptStashStore,
 } from '@/features/chat/state/prompt-stash-store'
 import { expect, test } from '../../../../../test/fixtures'
+
+beforeEach(() => vi.stubGlobal('localStorage', memoryLocalStorage()))
+afterEach(() => {
+  vi.restoreAllMocks()
+  vi.unstubAllGlobals()
+})
 
 function stash() {
   return promptStashStoreFor(testScopedStorage.environmentId).getState()
@@ -67,4 +76,24 @@ test('deleting a stashed prompt drops it without handing it back', () => {
   stash().removeEntry(entry?.id ?? '')
 
   expect(stash().entries).toEqual([])
+})
+
+test('a quota failure leaves the prompt in the composer and the stash unchanged', () => {
+  const store = createPromptStashStore(testScopedStorage)
+  const previous = store.getState().stashPrompt('already saved')
+  vi.spyOn(localStorage, 'setItem').mockImplementation(() => {
+    throw new DOMException('Storage quota exceeded', 'QuotaExceededError')
+  })
+
+  expect(store.getState().stashPrompt('keep in composer')).toBeNull()
+  expect(store.getState().entries).toEqual([previous])
+  expect(createPromptStashStore(testScopedStorage).getState().entries).toEqual([previous])
+})
+
+test('an unavailable store cannot report a prompt as saved', () => {
+  vi.stubGlobal('localStorage', undefined)
+  const store = createPromptStashStore(testScopedStorage)
+
+  expect(store.getState().stashPrompt('keep in composer')).toBeNull()
+  expect(store.getState().entries).toEqual([])
 })

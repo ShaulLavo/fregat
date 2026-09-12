@@ -1,4 +1,5 @@
 import type { PlatformCommandId } from '@/keymap/types'
+import { globalChromeStorage } from '@/lib/environments/state/scoped-storage'
 
 const RECENT_COMMANDS_STORAGE_KEY = 'platform.command-palette.recent-commands.v1'
 const RECENT_COMMANDS_STORAGE_VERSION = 1
@@ -49,10 +50,8 @@ export function resetRecentCommandsStore() {
 }
 
 function readPersistedRecentCommandIds(): readonly PlatformCommandId[] {
-  if (typeof localStorage === 'undefined') return []
-
   try {
-    const raw = localStorage.getItem(RECENT_COMMANDS_STORAGE_KEY)
+    const raw = globalChromeStorage.getItem(RECENT_COMMANDS_STORAGE_KEY)
     if (!raw) return []
 
     const parsed: unknown = JSON.parse(raw)
@@ -69,14 +68,8 @@ function readPersistedRecentCommandIds(): readonly PlatformCommandId[] {
 }
 
 function persistRecentCommandIds(commandIds: readonly PlatformCommandId[]) {
-  if (typeof localStorage === 'undefined') return
-
-  try {
-    localStorage.setItem(
-      RECENT_COMMANDS_STORAGE_KEY,
-      JSON.stringify({ commandIds, version: RECENT_COMMANDS_STORAGE_VERSION }),
-    )
-  } catch {
-    // A full or unavailable store only costs the ordering on next reload.
-  }
+  globalChromeStorage.setItem(
+    RECENT_COMMANDS_STORAGE_KEY,
+    JSON.stringify({ commandIds, version: RECENT_COMMANDS_STORAGE_VERSION }),
+  )
 }
