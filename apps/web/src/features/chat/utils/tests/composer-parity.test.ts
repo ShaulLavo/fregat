@@ -38,6 +38,24 @@ test('file citations become readable links while literal code remains unchanged'
   )
 })
 
+test('citations respect Markdown boundaries and preserve exact source line targets', () => {
+  const citation = ':codex-file-citation{path="src/a.ts" line_range_start="42"}'
+  expect(codexFileCitationsMarkdown(citation)).toBe('[a.ts](src/a.ts#L42)')
+  for (const excluded of [
+    `\\${citation}`,
+    `[See ${citation}](https://example.com)`,
+    `[See ${citation}][ref]\n\n[ref]: https://example.com`,
+    `![${citation}](image.png)`,
+    `    ${citation}`,
+    `> \`\`\`text\n> ${citation}\n> \`\`\``,
+    `<span title='${citation}'>literal</span>`,
+  ])
+    expect(codexFileCitationsMarkdown(excluded)).toBe(excluded)
+  expect(codexFileCitationsMarkdown(`**Created ${citation}.**`)).toBe(
+    '**Created [a.ts](src/a.ts#L42).**',
+  )
+})
+
 test('the full serialized input is checked before sending', () => {
   expect(chatSubmissionValidation('a'.repeat(MAX_TURN_MESSAGE_CHARS), [])).toBeNull()
   expect(chatSubmissionValidation('a'.repeat(MAX_TURN_MESSAGE_CHARS + 1), [])).toContain(

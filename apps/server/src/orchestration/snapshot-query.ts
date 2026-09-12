@@ -65,17 +65,17 @@ export class OrchestrationSnapshotQuery {
     this.database = database
   }
 
-  sourceProposedPlan(source: { sessionId: string; planId: string }) {
+  latestProposedPlan(sessionId: string) {
     return (
       this.database
         .select()
         .from(projectionSessionProposedPlans)
-        .where(
-          and(
-            eq(projectionSessionProposedPlans.sessionId, source.sessionId),
-            eq(projectionSessionProposedPlans.planId, source.planId),
-          ),
+        .where(eq(projectionSessionProposedPlans.sessionId, sessionId))
+        .orderBy(
+          desc(projectionSessionProposedPlans.updatedAt),
+          desc(projectionSessionProposedPlans.planId),
         )
+        .limit(1)
         .get() ?? null
     )
   }

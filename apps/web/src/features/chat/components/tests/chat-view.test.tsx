@@ -1,3 +1,9 @@
+import { createClientError } from '@workspace/client-core/errors'
+import { providerListQueryOptions } from '@/features/chat/utils/provider-query'
+import {
+  resetChatInputDraftStore,
+  useChatInputDraftStore,
+} from '@/features/chat/state/chat-input-draft-store'
 import { act, fireEvent, waitFor } from '@testing-library/react'
 import { vi } from 'vitest'
 import {
@@ -20,6 +26,7 @@ import {
   chatMessage,
   session,
   sessionActivity,
+  providerSnapshot,
   shellSnapshot,
   TEST_ENVIRONMENT_ID,
 } from '../../../../../test/factories/chat'
@@ -239,6 +246,108 @@ test('a provider interrupt failure restores Stop and a retry waits for its own o
       environmentId: TEST_ENVIRONMENT_ID,
       sessionId: running.id,
     })
+    useChatProjectionStore.setState(previousProjection, true)
+  }
+})
+
+test('a rejected correction keeps its draft, and retry sends on the current turn and clears only after acceptance', async () => {
+  const previousProjection = useChatProjectionStore.getState()
+  resetChatInputDraftStore()
+  initializePromptStashStore(environmentScopedStorage(TEST_ENVIRONMENT_ID))
+  const running = session()
+  running.latestTurn = { ...running.latestTurn!, providerStartState: 'adopted' }
+  const target = {
+    environmentId: TEST_ENVIRONMENT_ID,
+    draftKey: running.id,
+    rootPath: '/repo/platform',
+  }
+  useChatInputDraftStore.getState().setPrompt(target, 'Use the existing files.')
+  let snapshot: OrchestrationSessionDetailSnapshot = {
+    checkpoints: [],
+    proposedPlans: [],
+    snapshotSequence: 1,
+    session: { ...running, deletedAt: null, deletion: null },
+  }
+  useChatProjectionStore.getState().syncShellSnapshot(
+    TEST_ENVIRONMENT_ID,
+    shellSnapshot({
+      projects: [running.project],
+      worktrees: [running.worktree],
+      sessions: [running],
+    }),
+  )
+  useChatProjectionStore.getState().syncSessionDetailSnapshot(TEST_ENVIRONMENT_ID, snapshot)
+  const commands: ClientOrchestrationCommand[] = []
+  const transport = unsupportedChatTransport({
+    close: () => {},
+    retainSessionDetail: () => () => {},
+    replayEvents: async () => ({ events: [] }),
+    sessionDetailSnapshot: async () => snapshot,
+    dispatchCommand: async (command) => {
+      commands.push(command)
+      if (commands.length === 1)
+        throw createClientError({
+          code: 'STEER_TURN_NOT_ACTIVE',
+          status: 409,
+          message: 'Your message was not sent.',
+          why: 'The active turn changed.',
+          fix: 'Send again.',
+        })
+      if (command.type === 'session.turn.steer')
+        snapshot = {
+          ...snapshot,
+          snapshotSequence: 2,
+          session: {
+            ...snapshot.session,
+            messages: [
+              chatMessage({
+                id: command.message.messageId,
+                turnId: command.turnId,
+                role: 'user',
+                text: command.message.text,
+              }),
+            ],
+          },
+        }
+      return { deduped: false, result: null, sequence: snapshot.snapshotSequence }
+    },
+  })
+  const disconnect = registerChatTransport(transport)
+  const height = vi.spyOn(HTMLElement.prototype, 'offsetHeight', 'get').mockReturnValue(600)
+  const view = renderCachedChatSelection(running.id)
+  view.queryClient.setQueryData(providerListQueryOptions().queryKey, {
+    providers: [providerSnapshot()],
+  })
+  try {
+    fireEvent.click(view.getByRole('button', { name: 'Open cached session' }))
+    await waitFor(() => expect(view.getByRole('button', { name: 'Send correction' })).toBeEnabled())
+    fireEvent.click(view.getByRole('button', { name: 'Send correction' }))
+    await waitFor(() => expect(view.getByText('Your message was not sent.')).toBeVisible())
+    expect(view.getByRole('textbox', { name: 'Message' })).toHaveTextContent(
+      'Use the existing files.',
+    )
+    expect(useChatInputDraftStore.getState().getDraft(target).prompt).toBe(
+      'Use the existing files.',
+    )
+    expect(view.getByRole('button', { name: 'Stop current turn' })).toBeEnabled()
+    fireEvent.click(view.getByRole('button', { name: 'Send correction' }))
+    await waitFor(() => expect(useChatInputDraftStore.getState().getDraft(target).prompt).toBe(''))
+    expect(commands).toHaveLength(2)
+    expect(
+      commands.every(
+        (command) =>
+          command.type === 'session.turn.steer' && command.turnId === running.latestTurn?.turnId,
+      ),
+    ).toBe(true)
+    await waitFor(() =>
+      expect(view.getByRole('textbox', { name: 'Message' })).toHaveTextContent(''),
+    )
+    await waitFor(() => expect(view.getByText('Use the existing files.')).toBeVisible())
+  } finally {
+    view.unmount()
+    disconnect()
+    height.mockRestore()
+    resetChatInputDraftStore()
     useChatProjectionStore.setState(previousProjection, true)
   }
 })

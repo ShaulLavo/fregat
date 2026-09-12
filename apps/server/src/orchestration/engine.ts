@@ -210,6 +210,7 @@ export class OrchestrationEngine {
   private async acceptPrepared(command: ClientOrchestrationCommand, fingerprint: string) {
     const existing = this.receipts.find(command.commandId)
     if (existing) return this.dispatchFromReceipt(existing, command.type, fingerprint)
+    this.requireSourceProposedPlan(command)
     const prepared = await this.prepare(command, fingerprint)
     const ingested = await ingestCommandAttachments(prepared, this.attachmentsDir)
     const result = await this.enqueue(ingested.command, ingested.attachmentIngest, fingerprint)
@@ -470,7 +471,7 @@ export class OrchestrationEngine {
     }
   }
 
-  private requireSourceProposedPlan(command: OrchestrationCommand) {
+  private requireSourceProposedPlan(command: OrchestrationCommand | ClientOrchestrationCommand) {
     if (command.type !== 'session.turn.start' || !command.sourceProposedPlan) return
     const target = command.bootstrap?.createSession?.worktreeTarget
     const targetWorktreeId = target?.kind === 'new' ? target.baseWorktreeId : target?.worktreeId
@@ -478,7 +479,7 @@ export class OrchestrationEngine {
       this.readModel,
       command.sourceProposedPlan,
       targetWorktreeId ?? this.readModel.sessions.get(command.sessionId)?.worktreeId,
-      this.snapshotQuery.sourceProposedPlan(command.sourceProposedPlan),
+      this.snapshotQuery.latestProposedPlan(command.sourceProposedPlan.sessionId),
     )
   }
 

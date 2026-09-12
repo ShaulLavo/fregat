@@ -125,6 +125,42 @@ describe('projection latest turn snapshots', () => {
     ).toHaveLength(0)
   })
 
+  it('rejects a superseded plan while leaving the newest plan actionable', async () => {
+    const engine = createEngine()
+    await dispatchProjectSession(engine)
+    await engine.dispatch(proposePlanCommand())
+    await engine.dispatch(
+      command({
+        type: 'session.proposed-plan.upsert',
+        commandId: 'newer-plan',
+        createdAt: '2026-05-24T00:01:00.000Z',
+        sessionId: 'd2b3ea2b-7e36-4549-b0d4-043c00904574',
+        proposedPlan: {
+          id: 'plan-2',
+          sessionId: 'd2b3ea2b-7e36-4549-b0d4-043c00904574',
+          turnId: null,
+          planMarkdown: 'Use the revised approach.',
+          createdAt: '2026-05-24T00:01:00.000Z',
+          updatedAt: '2026-05-24T00:01:00.000Z',
+        },
+      }),
+    )
+    const source = { sessionId: 'd2b3ea2b-7e36-4549-b0d4-043c00904574', planId: 'plan-1' }
+    await expect(
+      engine.dispatchClientCommand(
+        startTurnCommand({ commandId: 'old-plan', sourceProposedPlan: source }),
+      ),
+    ).rejects.toThrow('no actionable proposed plan')
+    expect((await engine.sessionDetailSnapshot(source.sessionId)).session.messages).toHaveLength(0)
+    await engine.dispatchClientCommand(
+      startTurnCommand({
+        commandId: 'current-plan',
+        sourceProposedPlan: { ...source, planId: 'plan-2' },
+      }),
+    )
+    expect((await latestTurn(engine))?.sourceProposedPlan?.planId).toBe('plan-2')
+  })
+
   it('keeps a correction on the active turn and rejects an obsolete target', async () => {
     const engine = createEngine()
     await dispatchProjectSession(engine)
