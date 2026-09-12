@@ -7,6 +7,7 @@ import {
   DEFAULT_PROVIDER_INSTANCE_ID,
   DEFAULT_RUNTIME_MODE,
   sessionIdSchema,
+  approvalRequestIdSchema,
   turnIdSchema,
   type ProviderInstanceId,
 } from '@workspace/contracts'
@@ -233,8 +234,36 @@ function assertTurnParams(message) {
   return true;
 }
 
+function sendChildEvents() {
+  const child = { threadId: 'child-thread-1', turnId: 'child-turn-1' };
+  const command = { id: 'child-command-1', type: 'commandExecution', command: 'rg absent missing', status: 'inProgress' };
+  send({ method: 'item/started', params: { ...child, item: command } });
+  send({ method: 'thread/status/changed', params: { ...child, status: { type: 'active', activeFlags: ['waitingOnApproval'] } } });
+  send({ method: 'item/started', params: { threadId: 'provider-thread-1', turnId: 'provider-turn-1', item: { id: 'spawn-1', type: 'subAgentActivity', agentThreadId: 'child-thread-1', agentPath: '/root/review', kind: 'started' } } });
+  send({ method: 'thread/started', params: { thread: { ...fakeSession(), id: child.threadId, source: { subAgent: { thread_spawn: { parent_thread_id: 'provider-thread-1', agent_nickname: 'Reviewer', agent_role: 'explorer' } } } } } });
+  send({ method: 'item/completed', params: { ...child, item: { ...command, status: 'failed', exitCode: 2, aggregatedOutput: 'rg: missing: No such file or directory' } } });
+  send({ method: 'thread/tokenUsage/updated', params: { ...child, tokenUsage: { total: { totalTokens: 123, inputTokens: 100, outputTokens: 23 } } } });
+  send({ method: 'thread/settings/updated', params: { ...child, threadSettings: { model: 'gpt-5.5', effort: 'high' } } });
+  send({ method: 'thread/compacted', params: child });
+  send({ method: 'item/agentMessage/delta', params: { ...child, itemId: 'child-message-1', delta: 'CHILD PRIVATE DELTA' } });
+  send({ method: 'item/reasoning/summaryTextDelta', params: { ...child, itemId: 'child-reasoning-1', delta: 'Child thinking', summaryIndex: 0 } });
+  send({ method: 'warning', params: { ...child, message: 'Child diagnostic remains observable' } });
+  send({ id: 801, method: 'item/commandExecution/requestApproval', params: { ...child, itemId: command.id, command: command.command } });
+  if (process.env.PLATFORM_FAKE_CODEX_MODE !== 'child-input-response') send({ method: 'serverRequest/resolved', params: { ...child, requestId: 801, decision: 'accept' } });
+  send({ id: 802, method: 'item/tool/requestUserInput', params: { ...child, itemId: 'question-1', questions: [{ id: 'choice', header: 'Choice', question: 'Pick one', options: [{ label: 'One', description: 'First' }] }] } });
+  if (process.env.PLATFORM_FAKE_CODEX_MODE !== 'child-input-response') send({ method: 'serverRequest/resolved', params: { ...child, requestId: 802 } });
+  send({ method: 'error', params: { ...child, willRetry: true, error: { message: 'Retrying child' } } });
+  send({ method: 'turn/completed', params: { threadId: child.threadId, turn: { id: child.turnId, status: 'completed', items: [] } } });
+  send({ method: 'item/completed', params: { ...child, item: { id: 'late-child-command', type: 'commandExecution', command: 'pwd', status: 'completed', exitCode: 0 } } });
+  send({ method: 'item/completed', params: { threadId: 'provider-thread-1', turnId: 'provider-turn-1', item: { id: 'self-activity', type: 'subAgentActivity', agentThreadId: 'provider-thread-1', agentPath: '/root', kind: 'interacted' } } });
+}
+
 function handle(message) {
   const mode = process.env.PLATFORM_FAKE_CODEX_MODE;
+  if (!message.method && (message.id === 801 || message.id === 802)) {
+    record({ event: 'server-response', ...message });
+    return;
+  }
   if (message.method === 'initialize') {
     send({
       id: message.id,
@@ -300,10 +329,18 @@ function handle(message) {
       process.stderr.write('2026-09-07T05:01:31Z ERROR codex_api::transport: failed to connect to websocket\\n');
       process.stderr.write('Authentication required: sign in again\\n');
     }
+    if (mode === 'child-agents' || mode === 'hold-native-turn') {
+      send({ method: 'turn/started', params: { threadId: 'child-thread-1', turn: { id: 'child-turn-1', status: 'inProgress', items: [] } } });
+    }
     send({
       method: 'turn/started',
       params: { threadId: 'provider-thread-1', turn: fakeTurn('inProgress') },
     });
+    if (mode === 'child-agents' || mode === 'child-input-response') sendChildEvents();
+    if (mode === 'hold-native-turn') {
+      send({ id: message.id, result: { turn: fakeTurn('inProgress') } });
+      return;
+    }
     if (mode === 'echo-mode-params') {
       const collaborationMode = message.params.collaborationMode ?? null;
       sendAgentMessageItemCompleted(
@@ -343,6 +380,10 @@ function handle(message) {
       });
       send({ id: message.id, result: { turn: fakeTurn('completed') } });
       return;
+    }
+    if (mode === 'root-status-and-failure') {
+      send({ method: 'thread/status/changed', params: { threadId: 'provider-thread-1', status: { type: 'idle' } } });
+      send({ method: 'item/completed', params: { threadId: 'provider-thread-1', turnId: 'provider-turn-1', item: { id: 'root-failed-command', type: 'commandExecution', command: 'rg missing', status: 'failed', exitCode: 2 } } });
     }
     if (mode === 'reasoning-events') {
       sendReasoningEvents();
@@ -452,8 +493,23 @@ function handle(message) {
     send({ id: message.id, result: { turn: fakeTurn('completed') } });
     return;
   }
+  if (message.method === 'turn/steer') {
+    record({ event: 'turn/steer', params: message.params });
+    send({ id: message.id, result: { turnId: 'provider-turn-1' } });
+    sendAgentMessageItemCompleted('steered-message', 'Corrected reply');
+    send({ method: 'turn/completed', params: { threadId: 'provider-thread-1', turn: fakeTurn('completed') } });
+    return;
+  }
   if (message.method === 'turn/interrupt') {
+    record({ event: 'turn/interrupt', params: message.params });
+    if (mode === 'hold-native-turn' && message.params.threadId === 'child-thread-1') {
+      fail(message.id, 'Child already ended');
+      return;
+    }
     send({ id: message.id, result: {} });
+    if (mode === 'hold-native-turn') {
+      send({ method: 'turn/completed', params: { threadId: 'provider-thread-1', turn: fakeTurn('interrupted') } });
+    }
     return;
   }
   if (message.method === 'skills/list') {
@@ -599,7 +655,15 @@ type FakeCodexContext = { readonly projectPath: string; readonly spawnLogPath: s
 type FakeCodexLogEntry = {
   readonly cwd?: string
   readonly cwds?: readonly string[] | null
-  readonly event: 'skills/list' | 'spawn' | 'turn/start' | 'thread/list' | 'thread/read'
+  readonly event:
+    | 'skills/list'
+    | 'spawn'
+    | 'turn/start'
+    | 'turn/steer'
+    | 'turn/interrupt'
+    | 'server-response'
+    | 'thread/list'
+    | 'thread/read'
 }
 
 type EchoedModeParams = {
@@ -1128,6 +1192,231 @@ describe('CodexProviderAdapter', () => {
         expect(snapshot.models[0]?.capabilities).toBeNull()
       },
       { mode: 'no-reasoning-efforts' },
+    )
+  })
+
+  it('keeps native child tools, lifecycle, tokens and pending requests under their owning parent turn', async () => {
+    await withFakeCodex(
+      async () => {
+        const adapter = new CodexProviderAdapter()
+        const events: ProviderRuntimeEvent[] = []
+        const input = providerTurnInput()
+        collectAdapterEvents(adapter, events)
+        await adapter.sendTurn(input)
+        await settleRuntimeEvents()
+        await adapter.stopAll()
+
+        const tasks = events.filter(
+          (event) => event.type === 'task.started' || event.type === 'task.progress',
+        )
+        expect(tasks.length).toBeGreaterThan(5)
+        expect(
+          tasks.every(
+            (event) => event.turnId === input.turnId && event.agent?.threadId === 'child-thread-1',
+          ),
+        ).toBe(true)
+        expect(tasks).toContainEqual(
+          expect.objectContaining({
+            type: 'task.progress',
+            payload: expect.objectContaining({
+              tool: expect.objectContaining({
+                itemId: 'child-command-1',
+                status: 'failed',
+                data: expect.objectContaining({ exitCode: 2 }),
+              }),
+            }),
+          }),
+        )
+        expect(tasks).toContainEqual(
+          expect.objectContaining({
+            agent: expect.objectContaining({
+              nickname: 'Reviewer',
+              role: 'explorer',
+              model: 'gpt-5.5',
+              effort: 'high',
+            }),
+            payload: expect.objectContaining({
+              usage: { totalTokens: 123, inputTokens: 100, outputTokens: 23 },
+            }),
+          }),
+        )
+        expect(tasks.at(-1)).toMatchObject({
+          agent: { status: 'idle' },
+          payload: { tool: { itemId: 'late-child-command' } },
+        })
+        expect(events.filter((event) => event.type === 'turn.started')).toHaveLength(1)
+        expect(events.filter((event) => event.type === 'turn.completed')).toMatchObject([
+          { turnId: input.turnId, payload: { state: 'completed' } },
+        ])
+        expect(events.filter((event) => event.type === 'conversation.token-usage.updated')).toEqual(
+          [],
+        )
+        expect(events.filter((event) => event.type === 'conversation.started')).toHaveLength(1)
+        expect(events.filter((event) => event.type === 'content.delta')).toMatchObject([
+          { turnId: input.turnId, payload: { delta: 'Hello from app-server' } },
+        ])
+        expect(events.some((event) => event.type === 'runtime.error')).toBe(false)
+        expect(events).toContainEqual(
+          expect.objectContaining({
+            type: 'runtime.warning',
+            agent: expect.objectContaining({ threadId: 'child-thread-1' }),
+            payload: expect.objectContaining({ message: 'Child diagnostic remains observable' }),
+          }),
+        )
+        const opened = events.find((event) => event.type === 'request.opened')
+        const resolved = events.find((event) => event.type === 'request.resolved')
+        expect(opened).toMatchObject({
+          turnId: input.turnId,
+          agent: { threadId: 'child-thread-1' },
+        })
+        expect(resolved).toMatchObject({
+          requestId: opened?.requestId,
+          turnId: input.turnId,
+          agent: { threadId: 'child-thread-1' },
+        })
+        const question = events.find((event) => event.type === 'user-input.requested')
+        expect(events.find((event) => event.type === 'user-input.resolved')).toMatchObject({
+          requestId: question?.requestId,
+          turnId: input.turnId,
+          agent: { threadId: 'child-thread-1' },
+        })
+      },
+      { mode: 'child-agents' },
+    )
+  })
+
+  it('preserves native root idle status and failed tool verdicts', async () => {
+    await withFakeCodex(
+      async () => {
+        const adapter = new CodexProviderAdapter()
+        const input = providerTurnInput()
+        const events: ProviderRuntimeEvent[] = []
+        collectAdapterEvents(adapter, events)
+        await adapter.sendTurn(input)
+        await settleRuntimeEvents()
+        await adapter.stopAll()
+        expect(events).toContainEqual(
+          expect.objectContaining({
+            type: 'conversation.state.changed',
+            payload: expect.objectContaining({ state: 'idle' }),
+          }),
+        )
+        expect(events).toContainEqual(
+          expect.objectContaining({
+            type: 'item.completed',
+            itemId: 'root-failed-command',
+            turnId: input.turnId,
+            payload: expect.objectContaining({ status: 'failed' }),
+          }),
+        )
+      },
+      { mode: 'root-status-and-failure' },
+    )
+  })
+
+  it('answers child approvals and questions using the original native request ids and Codex answer objects', async () => {
+    await withFakeCodex(
+      async ({ spawnLogPath }) => {
+        const adapter = new CodexProviderAdapter()
+        const input = providerTurnInput()
+        const responses: Promise<void>[] = []
+        adapter.subscribeEvents((event) => {
+          if (event.type === 'request.opened' && event.requestId)
+            responses.push(
+              adapter.respondApproval({
+                sessionId: input.sessionId,
+                requestId: v.parse(approvalRequestIdSchema, event.requestId),
+                decision: 'accept',
+              }),
+            )
+          if (event.type === 'user-input.requested' && event.requestId)
+            responses.push(
+              adapter.respondUserInput({
+                sessionId: input.sessionId,
+                requestId: v.parse(approvalRequestIdSchema, event.requestId),
+                answers: { choice: 'One', files: ['a.ts', 'b.ts'] },
+              }),
+            )
+        })
+        await adapter.sendTurn(input)
+        await Promise.all(responses)
+        await waitForFakeCodexEvent(spawnLogPath, 'server-response')
+        await adapter.stopAll()
+        const entries = await readFakeCodexLog(spawnLogPath)
+        expect(entries.filter((entry) => entry.event === 'server-response')).toMatchObject([
+          { id: 801, result: { decision: 'accept' } },
+          {
+            id: 802,
+            result: {
+              answers: { choice: { answers: ['One'] }, files: { answers: ['a.ts', 'b.ts'] } },
+            },
+          },
+        ])
+      },
+      { mode: 'child-input-response' },
+    )
+  })
+
+  it('steers only the current parent turn without creating a second turn', async () => {
+    await withFakeCodex(
+      async ({ spawnLogPath }) => {
+        const adapter = new CodexProviderAdapter()
+        const input = providerTurnInput()
+        const started = Promise.withResolvers<void>()
+        adapter.subscribeEvents((event) => {
+          if (event.type === 'turn.started') started.resolve()
+        })
+        const running = adapter.sendTurn(input)
+        await started.promise
+        await expect(
+          adapter.steerTurn({
+            ...input,
+            turnId: v.parse(turnIdSchema, 'wrong-turn'),
+            messageText: 'Wrong target',
+          }),
+        ).rejects.toThrow('requested turn')
+        await adapter.steerTurn({
+          ...input,
+          messageText: 'Focus on the second file',
+          attachments: [],
+        })
+        await running
+        await adapter.stopAll()
+        const requests = await readFakeCodexLog(spawnLogPath)
+        expect(requests.filter((entry) => entry.event === 'turn/start')).toHaveLength(1)
+        expect(requests.find((entry) => entry.event === 'turn/steer')).toMatchObject({
+          params: {
+            threadId: 'provider-thread-1',
+            expectedTurnId: 'provider-turn-1',
+            input: [{ type: 'text', text: 'Focus on the second file' }],
+          },
+        })
+      },
+      { mode: 'hold-native-turn' },
+    )
+  })
+
+  it('interrupts an unregistered live child and still reaches the parent when that child has ended', async () => {
+    await withFakeCodex(
+      async ({ spawnLogPath }) => {
+        const adapter = new CodexProviderAdapter()
+        const input = providerTurnInput()
+        const started = Promise.withResolvers<void>()
+        adapter.subscribeEvents((event) => {
+          if (event.type === 'turn.started') started.resolve()
+        })
+        const running = adapter.sendTurn(input)
+        await started.promise
+        await adapter.interruptTurn(input)
+        await running
+        await adapter.stopAll()
+        const requests = await readFakeCodexLog(spawnLogPath)
+        expect(requests.filter((entry) => entry.event === 'turn/interrupt')).toMatchObject([
+          { params: { threadId: 'child-thread-1', turnId: 'child-turn-1' } },
+          { params: { threadId: 'provider-thread-1', turnId: 'provider-turn-1' } },
+        ])
+      },
+      { mode: 'hold-native-turn' },
     )
   })
 
