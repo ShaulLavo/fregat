@@ -1210,6 +1210,9 @@ describe('CodexProviderAdapter', () => {
           (event) => event.type === 'task.started' || event.type === 'task.progress',
         )
         expect(tasks.length).toBeGreaterThan(5)
+        expect(tasks.map((event) => event.agent?.revision)).toEqual(
+          tasks.map((_, index) => index + 1),
+        )
         expect(
           tasks.every(
             (event) => event.turnId === input.turnId && event.agent?.threadId === 'child-thread-1',
