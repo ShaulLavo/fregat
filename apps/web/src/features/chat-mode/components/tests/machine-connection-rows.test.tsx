@@ -1,10 +1,9 @@
 import { act, screen, waitFor } from '@testing-library/react'
 import userEvent from '@testing-library/user-event'
 import { onTestFinished } from 'vitest'
-import { http, HttpResponse } from 'msw'
+import { createClientError } from '@workspace/client-core/errors'
 import { expect, test } from '../../../../../test/fixtures'
 import { renderWithProviders } from '../../../../../test/render'
-import { server as externalHttp } from '../../../../../test/msw/server'
 import {
   createConnectionNoticeFixture,
   MACHINE_SETUP_ERROR,
@@ -14,7 +13,7 @@ import { MachineConnectionRows } from '@/features/chat-mode/components/machine-c
 import { MachineRow } from '@/features/settings/components/machine-row'
 
 test('background failures stay in machine management, with diagnostics behind Details', async () => {
-  const fixture = createConnectionNoticeFixture()
+  const fixture = await createConnectionNoticeFixture()
   onTestFinished(fixture.dispose)
   const rail = renderWithProviders(<MachineConnectionRows />, { connections: fixture.connections })
   expect(rail.container).not.toHaveTextContent('shaul-mac')
@@ -36,7 +35,7 @@ test('background failures stay in machine management, with diagnostics behind De
 })
 
 test('active notices are concise and dismissal survives repeat updates and remounts', async () => {
-  const fixture = createConnectionNoticeFixture()
+  const fixture = await createConnectionNoticeFixture()
   onTestFinished(fixture.dispose)
   fixture.selectRemote()
   const rail = renderWithProviders(<MachineConnectionRows />, { connections: fixture.connections })
@@ -56,16 +55,22 @@ test('active notices are concise and dismissal survives repeat updates and remou
 })
 
 test('explicit retry re-arms a dismissed incident and runs the real connection command', async () => {
-  const fixture = createConnectionNoticeFixture()
+  let requests = 0
+  let unavailable = false
+  const fixture = await createConnectionNoticeFixture((request) => {
+    if (!unavailable || new URL(request.url).pathname !== '/health') return
+    requests += 1
+    throw createClientError({
+      message: 'Machine still unavailable.',
+      code: 'TEST_MACHINE_UNAVAILABLE',
+      status: 503,
+      why: 'The remote HTTP boundary is unavailable for this retry test.',
+      fix: 'Restore the test connection.',
+    })
+  })
   onTestFinished(fixture.dispose)
   fixture.selectRemote()
-  let requests = 0
-  externalHttp.use(
-    http.get(`${fixture.remote}/health`, () => {
-      requests += 1
-      return HttpResponse.json({ message: 'Machine still unavailable.' }, { status: 503 })
-    }),
-  )
+  unavailable = true
   fixture.connections.start()
   renderWithProviders(<MachineConnectionRows />, { connections: fixture.connections })
   await userEvent.click(screen.getByRole('button', { name: 'Dismiss shaul-mac connection notice' }))
