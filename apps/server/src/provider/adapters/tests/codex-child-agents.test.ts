@@ -42,6 +42,29 @@ function register(agents: CodexChildAgents, turnId = 'native-parent-1') {
 }
 
 describe('Codex child notification routing', () => {
+  it('orders latest state independently from retained tool row order and timestamp ties', () => {
+    const { agents, events } = fixture()
+    register(agents)
+    agents.handle('turn/started', { threadId: 'child', turn: { id: 'child-turn' } })
+    agents.handle('item/completed', {
+      threadId: 'child',
+      turnId: 'child-turn',
+      item: { id: 'command-1', type: 'commandExecution', command: 'pwd', status: 'completed' },
+    })
+    agents.handle('turn/completed', {
+      threadId: 'child',
+      turn: { id: 'child-turn', status: 'completed' },
+    })
+    const snapshots = events.map((event) => ({
+      ...event.agent,
+      updatedAt: '2026-09-12T12:00:00.000Z',
+    }))
+    expect(snapshots.map((agent) => agent.revision)).toEqual([1, 2, 3, 4])
+    expect(snapshots[2]).toMatchObject({ status: 'running', revision: 3 })
+    expect(snapshots[3]).toMatchObject({ status: 'idle', revision: 4 })
+    expect(agents.owner({ threadId: 'child' }).agent).toMatchObject({ status: 'idle', revision: 4 })
+  })
+
   it('emits canonical tool types while preserving native data', () => {
     const { agents, events } = fixture()
     register(agents)

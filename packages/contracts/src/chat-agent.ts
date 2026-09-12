@@ -3,6 +3,7 @@ import * as v from 'valibot'
 export const chatAgentSchema = v.object({
   threadId: v.string(),
   updatedAt: v.optional(v.string()),
+  revision: v.optional(v.pipe(v.number(), v.integer(), v.minValue(1))),
   parentThreadId: v.optional(v.string()),
   path: v.optional(v.string()),
   nickname: v.optional(v.string()),

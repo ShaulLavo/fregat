@@ -109,6 +109,7 @@ export class CodexChildAgents {
     }
     this.applyActivityStatus(child, params)
     child.agent.updatedAt = new Date().toISOString()
+    child.agent.revision = 1
     this.children.set(identity.threadId, child)
     this.options.emit({
       agent: { ...child.agent },
@@ -241,6 +242,7 @@ export class CodexChildAgents {
   }
 
   private emit(child: Child, method: string, params: unknown, tool?: ChatAgentTool) {
+    child.agent.revision = (child.agent.revision ?? 0) + 1
     child.agent.updatedAt = new Date().toISOString()
     this.options.emit({
       agent: { ...child.agent },
