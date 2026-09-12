@@ -94,12 +94,17 @@ export function requireProject(model: OrchestrationReadModel, projectId: string)
 
 export function requireActionableSourcePlan(
   model: OrchestrationReadModel,
-  source: { readonly sessionId: string },
+  source: { readonly sessionId: string; readonly planId: string },
   targetWorktreeId: string | undefined,
-  plan: { implementedAt: string | null } | null,
+  plan: { planId: string; implementedAt: string | null } | null,
 ) {
   const session = requireSessionNotDeleted(model, source.sessionId)
-  if (!plan || plan.implementedAt !== null || !session.hasActionableProposedPlan) {
+  if (
+    !plan ||
+    plan.planId !== source.planId ||
+    plan.implementedAt !== null ||
+    !session.hasActionableProposedPlan
+  ) {
     throw orchestrationErrors.SOURCE_PLAN_NOT_ACTIONABLE({ planSessionId: source.sessionId })
   }
   const sourceWorktree = model.worktrees.get(session.worktreeId)
