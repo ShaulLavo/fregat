@@ -54,7 +54,7 @@ export function AgentRow({ entry, groupId }: { entry: ChatAgentEntry; groupId: s
           <span className='text-muted-foreground truncate text-xs'>
             {entry.summary ?? lastTool?.title ?? entry.description ?? 'Agent started'}
           </span>
-          <span className='text-muted-foreground flex items-center gap-2 text-[11px] tabular-nums'>
+          <span className='text-muted-foreground text-2xs flex items-center gap-2 tabular-nums'>
             {entry.agent.model ? <span className='truncate'>{entry.agent.model}</span> : null}
             {working ? (
               <WorkingTimer startedAt={entry.startedAt} />
@@ -77,7 +77,7 @@ export function AgentRow({ entry, groupId }: { entry: ChatAgentEntry; groupId: s
           ) : null}
           {entry.agent.path ? (
             <p
-              className='text-muted-foreground truncate font-mono text-[11px]'
+              className='text-muted-foreground text-2xs truncate font-mono'
               title={entry.agent.path}
             >
               {entry.agent.path}
