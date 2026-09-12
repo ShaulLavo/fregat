@@ -5,6 +5,7 @@ import {
   useChatInputDraftStore,
 } from '@/features/chat/state/chat-input-draft-store'
 import { act, fireEvent, waitFor } from '@testing-library/react'
+import { useComposerInboxStore } from '@/features/chat/state/composer-inbox-store'
 import { vi } from 'vitest'
 import {
   eventIdSchema,
@@ -250,7 +251,7 @@ test('a provider interrupt failure restores Stop and a retry waits for its own o
   }
 })
 
-test('a rejected correction keeps its draft, and retry sends on the current turn and clears only after acceptance', async () => {
+test('correction retry consumes content while model and mode choices reach the next new turn', async () => {
   const previousProjection = useChatProjectionStore.getState()
   resetChatInputDraftStore()
   initializePromptStashStore(environmentScopedStorage(TEST_ENVIRONMENT_ID))
@@ -262,6 +263,25 @@ test('a rejected correction keeps its draft, and retry sends on the current turn
     rootPath: '/repo/platform',
   }
   useChatInputDraftStore.getState().setPrompt(target, 'Use the existing files.')
+  const nextModel = {
+    ...running.modelSelection,
+    model: 'next-turn-model',
+    options: { reasoningEffort: 'high' },
+  }
+  useChatInputDraftStore.getState().setModelSelection(target, nextModel)
+  useChatInputDraftStore.getState().setRuntimeMode(target, 'approval-required')
+  useChatInputDraftStore.getState().setInteractionMode(target, 'plan')
+  useChatInputDraftStore
+    .getState()
+    .addTerminalContexts(target, [
+      {
+        id: 'captured-error',
+        source: 'terminal-1',
+        lineStart: 1,
+        lineEnd: 1,
+        text: 'Missing file',
+      },
+    ])
   let snapshot: OrchestrationSessionDetailSnapshot = {
     checkpoints: [],
     proposedPlans: [],
@@ -329,6 +349,7 @@ test('a rejected correction keeps its draft, and retry sends on the current turn
     expect(useChatInputDraftStore.getState().getDraft(target).prompt).toBe(
       'Use the existing files.',
     )
+    expect(useChatInputDraftStore.getState().getDraft(target).terminalContexts).toHaveLength(1)
     expect(view.getByRole('button', { name: 'Stop current turn' })).toBeEnabled()
     fireEvent.click(view.getByRole('button', { name: 'Send correction' }))
     await waitFor(() => expect(useChatInputDraftStore.getState().getDraft(target).prompt).toBe(''))
@@ -343,6 +364,57 @@ test('a rejected correction keeps its draft, and retry sends on the current turn
       expect(view.getByRole('textbox', { name: 'Message' })).toHaveTextContent(''),
     )
     await waitFor(() => expect(view.getByText('Use the existing files.')).toBeVisible())
+    expect(useChatInputDraftStore.getState().getDraft(target)).toMatchObject({
+      prompt: '',
+      modelSelection: nextModel,
+      runtimeMode: 'approval-required',
+      interactionMode: 'plan',
+      terminalContexts: [],
+    })
+
+    snapshot = {
+      ...snapshot,
+      snapshotSequence: 3,
+      session: {
+        ...snapshot.session,
+        runtime: null,
+        latestTurn: { ...running.latestTurn, state: 'completed' },
+      },
+    }
+    act(() => {
+      useChatProjectionStore.getState().syncShellSnapshot(TEST_ENVIRONMENT_ID, {
+        ...shellSnapshot({
+          projects: [running.project],
+          worktrees: [running.worktree],
+          sessions: [{ ...running, ...snapshot.session }],
+        }),
+        snapshotSequence: snapshot.snapshotSequence,
+      })
+      useChatProjectionStore.getState().syncSessionDetailSnapshot(TEST_ENVIRONMENT_ID, snapshot)
+    })
+    act(() => useComposerInboxStore.getState().queueText('Now implement it.'))
+    await waitFor(() =>
+      expect(useChatInputDraftStore.getState().getDraft(target).prompt).toBe('Now implement it. '),
+    )
+    expect(view.getByRole('button', { name: 'Send message' })).toBeEnabled()
+    fireEvent.click(view.getByRole('button', { name: 'Send message' }))
+    await waitFor(() => expect(commands).toHaveLength(3))
+    expect(commands[2]).toMatchObject({
+      type: 'session.turn.start',
+      modelSelection: nextModel,
+      runtimeMode: 'approval-required',
+      interactionMode: 'plan',
+      message: { text: 'Now implement it.' },
+    })
+    await waitFor(() =>
+      expect(useChatInputDraftStore.getState().getDraft(target)).toMatchObject({
+        prompt: '',
+        modelSelection: null,
+        runtimeMode: null,
+        interactionMode: null,
+      }),
+    )
+    expect(view.getByRole('textbox', { name: 'Message' }).textContent).toBe('')
   } finally {
     view.unmount()
     disconnect()

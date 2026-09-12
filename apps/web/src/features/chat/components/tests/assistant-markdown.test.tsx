@@ -3,10 +3,39 @@ import path from 'node:path'
 import { screen, waitFor } from '@testing-library/react'
 import userEvent from '@testing-library/user-event'
 
-import { serializeRenderedMarkdownFragment } from '@/features/chat/utils/markdown-clipboard'
+import {
+  chatMarkdownClipboardPayload,
+  serializeRenderedMarkdownFragment,
+} from '@/features/chat/utils/markdown-clipboard'
 import { markdownHighlightCache } from '@/features/chat/state/markdown-highlight-cache'
 import { expect, test } from '../../../../../test/fixtures'
 import { createMarkdownWorkspace, renderMarkdown } from '../../../../../test/factories/markdown'
+
+test.each(['Result', ''])(
+  'selected Markdown images keep their source in plain and rich copy: %s',
+  (alt) => {
+    const text = `Before ![${alt}](https://example.com/result.png) after.`
+    const { container } = renderMarkdown(text)
+    const paragraph = container.querySelector('p')!
+    const range = document.createRange()
+    range.selectNodeContents(paragraph)
+    const selection = window.getSelection()!
+    selection.removeAllRanges()
+    selection.addRange(range)
+    try {
+      const payload = chatMarkdownClipboardPayload(selection)
+      expect(payload?.text).toBe(text)
+      const rich = document.createElement('div')
+      rich.innerHTML = payload?.html ?? ''
+      expect(rich.querySelector('img')?.getAttribute('src')).toBe('https://example.com/result.png')
+      expect(rich.querySelector('img')?.getAttribute('alt')).toBe(alt)
+      expect(rich.querySelector('button')).toBeNull()
+      expect(rich.textContent).toBe('Before  after.')
+    } finally {
+      selection.removeAllRanges()
+    }
+  },
+)
 
 test('an inline file reference opens the referenced file at its line', async ({
   client,

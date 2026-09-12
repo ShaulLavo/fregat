@@ -20,6 +20,7 @@ export function AssistantMarkdownImage({ src, alt = '', title }: ComponentProps<
     <>
       <Button
         aria-label={`Open ${name}`}
+        data-markdown-image='true'
         className='h-auto max-w-full overflow-hidden p-0'
         variant='ghost'
         type='button'
