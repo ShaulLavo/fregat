@@ -20,14 +20,14 @@ Each decision is stated once here and referenced by number below. The implemente
 re-decide at a call site; a call site that needs something the decisions do not cover is a
 missing token, and the fix is to add the token in the same pass.
 
-| #  | Decision                                                                                                                                                                                                                                                                                                    | Owner after this plan                                            |
-| -- | ----------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- | ---------------------------------------------------------------- |
-| D1 | **Corners.** One language, owned by primitives. Recommended: soft-small. Controls (button, input, select, chip) use the `md` step; floating surfaces (menu, popover, dialog, tooltip) use the `lg` step; list rows, bars, panes and tabs-in-bars are square. Bare `rounded` (fixed 4px, not on the scale) is banned. Call sites never set a radius. | `globals.css` radius tokens; each primitive                      |
-| D2 | **Bars.** One `--bar-height` token (with a compact value) for every horizontal bar: titlebar, pane headers, tab strips, bottom panel header, dialog headers and footers. One `--rail-width` equal to the bar height for vertical icon rails. Skeleton headers use the same token as the header they stand in for.                        | `globals.css`; a `PaneBar` primitive in `packages/ui`            |
-| D3 | **Density.** The existing `--density-*` variables are the only density system. The `compact:` Tailwind variant is removed from `apps/web`. If the app needs a density value the set lacks (row height, bar height, rail width), it is added to the set, not hand-written.                                                                        | `globals.css` `:root` and `:root[data-density='compact']`        |
-| D4 | **Dividers.** `border-border` is the divider. A second, lighter weight is allowed only as a named token `border-subtle`; opacity modifiers on `border-border` are banned.                                                                                                                                                                             | `globals.css`                                                    |
-| D5 | **Type.** Four UI sizes: `text-sm`, `text-xs`, `text-2xs` (11px) and `text-3xs` (10px), registered in the theme. Arbitrary `text-[Npx]` is banned. Bar titles are `text-xs font-medium`; section headings inside panes are `text-sm font-semibold`. Tabular numerals on every number that updates.                                                | `globals.css` `@theme`                                           |
-| D6 | **Fills and elevation.** Lists use `bg-row-hover` / `bg-row-selected`. Toggled controls (rail tabs, bottom tabs, mode toggle) use `bg-accent`. Button hover comes from the Button primitive and is never re-declared. Elevation has three levels: none for panes, `shadow-md` for menus and popovers, `shadow-xl` for modal dialogs.                | Primitives; documented in the styling section of `CLAUDE.md`     |
+| #   | Decision                                                                                                                                                                                                                                                                                                                                            | Owner after this plan                                        |
+| --- | --------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- | ------------------------------------------------------------ |
+| D1  | **Corners.** One language, owned by primitives. Recommended: soft-small. Controls (button, input, select, chip) use the `md` step; floating surfaces (menu, popover, dialog, tooltip) use the `lg` step; list rows, bars, panes and tabs-in-bars are square. Bare `rounded` (fixed 4px, not on the scale) is banned. Call sites never set a radius. | `globals.css` radius tokens; each primitive                  |
+| D2  | **Bars.** One `--bar-height` token (with a compact value) for every horizontal bar: titlebar, pane headers, tab strips, bottom panel header, dialog headers and footers. One `--rail-width` equal to the bar height for vertical icon rails. Skeleton headers use the same token as the header they stand in for.                                   | `globals.css`; a `PaneBar` primitive in `packages/ui`        |
+| D3  | **Density.** The existing `--density-*` variables are the only density system. The `compact:` Tailwind variant is removed from `apps/web`. If the app needs a density value the set lacks (row height, bar height, rail width), it is added to the set, not hand-written.                                                                           | `globals.css` `:root` and `:root[data-density='compact']`    |
+| D4  | **Dividers.** `border-border` is the divider. A second, lighter weight is allowed only as a named token `border-subtle`; opacity modifiers on `border-border` are banned.                                                                                                                                                                           | `globals.css`                                                |
+| D5  | **Type.** Four UI sizes: `text-sm`, `text-xs`, `text-2xs` (11px) and `text-3xs` (10px), registered in the theme. Arbitrary `text-[Npx]` is banned. Bar titles are `text-xs font-medium`; section headings inside panes are `text-sm font-semibold`. Tabular numerals on every number that updates.                                                  | `globals.css` `@theme`                                       |
+| D6  | **Fills and elevation.** Lists use `bg-row-hover` / `bg-row-selected`. Toggled controls (rail tabs, bottom tabs, mode toggle) use `bg-accent`. Button hover comes from the Button primitive and is never re-declared. Elevation has three levels: none for panes, `shadow-md` for menus and popovers, `shadow-xl` for modal dialogs.                | Primitives; documented in the styling section of `CLAUDE.md` |
 
 D1 is the only decision that changes the product's look rather than removing noise, so it is the
 one to confirm with the user before Phase 1 lands. The recommended default above is what the
@@ -62,42 +62,42 @@ grep -rnE -A6 '<Button' --include=*.tsx . | grep -oE "rounded(-[a-z]+)?\b" | wc 
 
 ### Baseline census
 
-| Measure                                                        | Baseline                                                         | Target |
-| -------------------------------------------------------------- | ---------------------------------------------------------------- | ------ |
-| Radius classes in `apps/web`                                   | `rounded-md` 97, `rounded-sm` 86, bare `rounded` 37, `rounded-lg` 26, `rounded-full` 16, `rounded-xl` 7, `rounded-2xl` 1, `rounded-[2px]` 1 | 0 outside the allow-list in Phase 4 |
-| Bare `rounded` files                                           | 21                                                               | 0      |
-| `<Button>` sites overriding radius                             | 38 of 211                                                        | 0      |
-| Primitives shipping `rounded-none`                             | button, input, textarea, select, dialog, tooltip, dropdown, context menu, accordion, alert, command, input-group, resizable | 0; each carries its D1 step |
-| `compact:` overrides in `apps/web`                             | 357                                                              | 0      |
-| `--density-*` consumers in `apps/web`                          | 0                                                                | every bar, row and control |
-| Distinct hard-coded bar heights                                | 44, 48, 40, 36, 32, 28 (see table below)                         | 1 token, 2 values |
-| `border-border/N` variants                                     | /50 1, /60 18, /70 13, /80 3                                     | 0      |
-| Arbitrary text sizes                                           | 11px 103, 10px 54, 13px 6, 12px 2, 9px 1, 7px 1, 6px 1           | 0      |
-| Shadow steps in use                                            | xs 1, sm 3, bare 6, lg 6, xl 5, 2xl 1                            | md and xl only, plus none |
-| Raw `<button>` outside primitives                              | 35 in 22 files                                                   | 0 without a comment naming why |
-| Row hover idioms                                               | `row-hover` 15, `accent` 8, `muted` 6, `background/N` 5          | `row-hover` only on rows |
-| Dead `--sidebar-*` tokens                                      | 8 defined, 1 consumer                                            | deleted |
+| Measure                               | Baseline                                                                                                                                    | Target                              |
+| ------------------------------------- | ------------------------------------------------------------------------------------------------------------------------------------------- | ----------------------------------- |
+| Radius classes in `apps/web`          | `rounded-md` 97, `rounded-sm` 86, bare `rounded` 37, `rounded-lg` 26, `rounded-full` 16, `rounded-xl` 7, `rounded-2xl` 1, `rounded-[2px]` 1 | 0 outside the allow-list in Phase 4 |
+| Bare `rounded` files                  | 21                                                                                                                                          | 0                                   |
+| `<Button>` sites overriding radius    | 38 of 211                                                                                                                                   | 0                                   |
+| Primitives shipping `rounded-none`    | button, input, textarea, select, dialog, tooltip, dropdown, context menu, accordion, alert, command, input-group, resizable                 | 0; each carries its D1 step         |
+| `compact:` overrides in `apps/web`    | 357                                                                                                                                         | 0                                   |
+| `--density-*` consumers in `apps/web` | 0                                                                                                                                           | every bar, row and control          |
+| Distinct hard-coded bar heights       | 44, 48, 40, 36, 32, 28 (see table below)                                                                                                    | 1 token, 2 values                   |
+| `border-border/N` variants            | /50 1, /60 18, /70 13, /80 3                                                                                                                | 0                                   |
+| Arbitrary text sizes                  | 11px 103, 10px 54, 13px 6, 12px 2, 9px 1, 7px 1, 6px 1                                                                                      | 0                                   |
+| Shadow steps in use                   | xs 1, sm 3, bare 6, lg 6, xl 5, 2xl 1                                                                                                       | md and xl only, plus none           |
+| Raw `<button>` outside primitives     | 35 in 22 files                                                                                                                              | 0 without a comment naming why      |
+| Row hover idioms                      | `row-hover` 15, `accent` 8, `muted` 6, `background/N` 5                                                                                     | `row-hover` only on rows            |
+| Dead `--sidebar-*` tokens             | 8 defined, 1 consumer                                                                                                                       | deleted                             |
 
 ### Bars at this baseline
 
 Values are cozy then compact. The served page defaults to `data-density="compact"`
 (`packages/contracts/src/settings/keys.ts:107`), so the compact column is what everyone sees.
 
-| Bar                                        | File                                                                       | Cozy | Compact |
-| ------------------------------------------ | -------------------------------------------------------------------------- | ---- | ------- |
-| Titlebar                                   | `components/app-titlebar.tsx:26`                                           | 44   | 40      |
-| Chat panel header                          | `features/chat/components/chat-panel-header.tsx:34`                        | 48   | 40      |
-| Chat-mode stage header                     | `features/chat-mode/components/stage-header.tsx:38`                        | 44   | 40      |
-| Tool pane header (Files, Search, Logs…)    | `features/workbench/components/tool-pane-header.tsx:63`                    | 40   | 36      |
-| Editor tab bar / tab                       | `features/workbench/components/editor-tab-bar.tsx:68`, `editor-tab-button.tsx` | 40 / 36 | 36 / 32 |
-| LSP references pane header                 | `features/editor/components/language-server-references-pane.tsx:73`       | 40   | 36      |
-| Git header                                 | `features/git/components/header.tsx:25`                                    | 36   | 32      |
-| Bottom panel header                        | `features/workbench/components/bottom-panel.tsx:27`                        | 36   | 32      |
-| File picker dialog header / footer         | `components/file-picker-dialog.tsx:458`, `:611`                            | 44 / 48 | 36 / 40 |
-| Git loading header (skeleton)              | `features/git/components/panel-loading.tsx:8`                              | 32   | 32      |
-| Tree loading header (skeleton)             | `features/workspace/components/tree-loading.tsx:7`                         | 28   | 28      |
-| Search results loading footer (skeleton)   | `features/search/components/results-loading.tsx:28`                        | 28   | 28      |
-| Sidebar icon rail width                    | `features/workbench/components/sidebar-panel.tsx:35`                       | 44   | 40      |
+| Bar                                      | File                                                                           | Cozy    | Compact |
+| ---------------------------------------- | ------------------------------------------------------------------------------ | ------- | ------- |
+| Titlebar                                 | `components/app-titlebar.tsx:26`                                               | 44      | 40      |
+| Chat panel header                        | `features/chat/components/chat-panel-header.tsx:34`                            | 48      | 40      |
+| Chat-mode stage header                   | `features/chat-mode/components/stage-header.tsx:38`                            | 44      | 40      |
+| Tool pane header (Files, Search, Logs…)  | `features/workbench/components/tool-pane-header.tsx:63`                        | 40      | 36      |
+| Editor tab bar / tab                     | `features/workbench/components/editor-tab-bar.tsx:68`, `editor-tab-button.tsx` | 40 / 36 | 36 / 32 |
+| LSP references pane header               | `features/editor/components/language-server-references-pane.tsx:73`            | 40      | 36      |
+| Git header                               | `features/git/components/header.tsx:25`                                        | 36      | 32      |
+| Bottom panel header                      | `features/workbench/components/bottom-panel.tsx:27`                            | 36      | 32      |
+| File picker dialog header / footer       | `components/file-picker-dialog.tsx:458`, `:611`                                | 44 / 48 | 36 / 40 |
+| Git loading header (skeleton)            | `features/git/components/panel-loading.tsx:8`                                  | 32      | 32      |
+| Tree loading header (skeleton)           | `features/workspace/components/tree-loading.tsx:7`                             | 28      | 28      |
+| Search results loading footer (skeleton) | `features/search/components/results-loading.tsx:28`                            | 28      | 28      |
+| Sidebar icon rail width                  | `features/workbench/components/sidebar-panel.tsx:35`                           | 44      | 40      |
 
 Two concrete defects fall out of this table. Switching the sidebar from Files to Git moves the
 header edge by 4px. The Files skeleton header is 28px and the real Files header is 36px, so the
@@ -188,13 +188,13 @@ Work file by file, top of the list first.
 
 Mapping rules, so two implementers make the same call:
 
-| Hand-written today                         | Becomes                                                      |
-| ------------------------------------------ | ------------------------------------------------------------ |
-| `h-7 compact:h-6`, `size-7 compact:size-6` | `size='icon-sm'` / `size='sm'` on Button; otherwise `h-(--density-control-height-sm)` |
-| `h-6 compact:h-5` on list rows             | `h-(--density-row-height)`                                   |
-| `px-3 compact:px-2`, `px-2 compact:px-1.5` | `px-(--density-control-padding-x)` or `px-(--density-row-padding-x)` |
-| `gap-2 compact:gap-1.5`, `gap-1.5 compact:gap-1` | `gap-(--density-control-gap)`                          |
-| `p-3 compact:p-2`, `py-2 compact:py-1.5`   | `p-(--density-section-padding)`, `py-(--density-section-gap)` |
+| Hand-written today                               | Becomes                                                                               |
+| ------------------------------------------------ | ------------------------------------------------------------------------------------- |
+| `h-7 compact:h-6`, `size-7 compact:size-6`       | `size='icon-sm'` / `size='sm'` on Button; otherwise `h-(--density-control-height-sm)` |
+| `h-6 compact:h-5` on list rows                   | `h-(--density-row-height)`                                                            |
+| `px-3 compact:px-2`, `px-2 compact:px-1.5`       | `px-(--density-control-padding-x)` or `px-(--density-row-padding-x)`                  |
+| `gap-2 compact:gap-1.5`, `gap-1.5 compact:gap-1` | `gap-(--density-control-gap)`                                                         |
+| `p-3 compact:p-2`, `py-2 compact:py-1.5`         | `p-(--density-section-padding)`, `py-(--density-section-gap)`                         |
 
 A value that fits none of these rows is a new density variable, added in `globals.css` in the
 same commit, not a new arbitrary pair.
