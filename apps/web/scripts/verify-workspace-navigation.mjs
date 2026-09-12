@@ -44,6 +44,7 @@ function parseOptions(args) {
     browsers: ['chromium', 'firefox', 'webkit'],
     historyOnly: false,
     caseFilter: null,
+    webkitEndpoint: null,
   }
   for (let index = 0; index < args.length; index++) {
     const [key, inline] = args[index].split('=', 2)
@@ -57,6 +58,7 @@ function parseOptions(args) {
     if (key === '--output-dir') result.outputDir = value
     if (key === '--browsers') result.browsers = value.split(',')
     if (key === '--case') result.caseFilter = value
+    if (key === '--webkit-endpoint') result.webkitEndpoint = value
   }
   if (!result.appUrl || !result.serverUrl || !result.outputDir)
     throw createBenchmarkError(
@@ -203,7 +205,8 @@ async function cleanupCommand(command) {
 
 async function verifyBrowser(name) {
   const type = browsers[name]
-  if (!type || !existsSync(type.executablePath())) {
+  const endpoint = name === 'webkit' ? options.webkitEndpoint : null
+  if (!type || (!endpoint && !existsSync(type.executablePath()))) {
     report.cases.push({
       browser: name,
       name: 'browser executable',
@@ -212,7 +215,7 @@ async function verifyBrowser(name) {
     })
     return
   }
-  const browser = await type.launch({ headless: true })
+  const browser = endpoint ? await type.connect(endpoint) : await type.launch({ headless: true })
   try {
     await runCase(browser, name, 'native history flush control', nativeHistoryControl, false)
     if (options.historyOnly) return
@@ -607,7 +610,7 @@ async function selectFile(page, name) {
 }
 
 async function palette(page, query, label) {
-  await page.keyboard.press(query.startsWith('>') ? 'Control+Shift+p' : 'Control+p')
+  await page.keyboard.press(query.startsWith('>') ? 'ControlOrMeta+Shift+p' : 'ControlOrMeta+p')
   await page.locator('[cmdk-input]').fill(query)
   await page.locator('[cmdk-item]').filter({ hasText: label }).first().click()
 }
@@ -862,12 +865,27 @@ async function archivedSelection({ page, record }) {
 }
 
 async function rapidSelections({ page, record, entry }) {
-  entry.completedIntervalsMs = []
-  for (const name of ['b.ts', 'c.ts', 'a.ts']) {
-    const started = performance.now()
-    await selectFile(page, name)
-    entry.completedIntervalsMs.push(performance.now() - started)
-  }
+  for (const name of ['b.ts', 'c.ts', 'a.ts']) await selectFile(page, name)
+  entry.completedIntervalsMs = await page.evaluate(async () => {
+    async function waitForSelection(tab, name) {
+      const deadline = performance.now() + 15_000
+      while (performance.now() < deadline) {
+        const selected = tab.getAttribute('aria-selected') === 'true'
+        const ready = tab.getAttribute('data-editor-tab-loading') !== 'true'
+        if (selected && ready && location.pathname.endsWith(`/f/${name}`)) return
+        await new Promise((resolve) => requestAnimationFrame(resolve))
+      }
+    }
+    const intervals = []
+    for (const name of ['b.ts', 'c.ts', 'a.ts']) {
+      const tab = document.querySelector(`[data-editor-tab-path$="/${name}"]`)
+      const started = performance.now()
+      tab.click()
+      await waitForSelection(tab, name)
+      intervals.push(performance.now() - started)
+    }
+    return intervals
+  })
   expect(entry.completedIntervalsMs.every((elapsed) => elapsed < 250)).toBe(true)
   for (const name of ['c.ts', 'b.ts', 'a.ts']) {
     await page.goBack()
@@ -1188,7 +1206,7 @@ async function copyCurrentView({ page, context, entry }) {
   await page.getByRole('button', { name: 'Search', exact: true }).click()
   await page.getByRole('searchbox', { name: 'Search workspace' }).fill('copy-current')
   await palette(page, '> Copy address', 'Copy address')
-  const copied = await page.evaluate(() => navigator.clipboard.readText())
+  const copied = await pasteCopiedAddress(page)
   expect(new URL(copied).pathname).toContain('/workbench/f/b.ts')
   expect(new URL(copied).searchParams.get('s.q')).toBe('copy-current')
   expect(new URL(copied).searchParams.has('editorPerfTrace')).toBe(false)
@@ -1199,4 +1217,21 @@ async function copyCurrentView({ page, context, entry }) {
     'copy-current',
   )
   entry.copiedHref = copied
+}
+
+async function pasteCopiedAddress(page) {
+  await page.evaluate(() => {
+    const field = document.createElement('textarea')
+    field.setAttribute('aria-label', 'Copied workspace address verification')
+    document.body.append(field)
+    field.focus()
+  })
+  const field = page.getByRole('textbox', { name: 'Copied workspace address verification' })
+  try {
+    await field.press('ControlOrMeta+v')
+    await expect(field).toHaveValue(new RegExp(`^${new URL(options.appUrl).origin}/`))
+    return await field.inputValue()
+  } finally {
+    await field.evaluate((element) => element.remove())
+  }
 }
