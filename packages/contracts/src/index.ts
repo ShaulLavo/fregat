@@ -710,3 +710,6 @@ export {
 } from './machines'
 
 export { jsonEqual } from './settings/json-equal'
+
+export { chatAgentSchema, chatAgentToolSchema } from './chat-agent'
+export type { ChatAgent, ChatAgentTool } from './chat-agent'
