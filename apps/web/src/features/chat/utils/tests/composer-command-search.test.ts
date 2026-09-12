@@ -89,3 +89,32 @@ test('a skill matches on its scope and its description', () => {
     'web-design',
   ])
 })
+
+test('long composer hits stay within their tier and field', () => {
+  const prefix = `rev${'x'.repeat(300)}`
+  const boundary = `${'x'.repeat(300)}-rev`
+  const includes = `${'x'.repeat(300)}rev`
+  const fuzzy = `r${'x'.repeat(300)}e${'x'.repeat(300)}v`
+  const commands = [
+    { name: 'alias-only', aliases: ['rev'] },
+    { name: fuzzy },
+    { name: includes },
+    { name: boundary },
+    { name: prefix },
+  ]
+  expect(names(searchComposerCommands(commands, 'rev'))).toEqual([
+    prefix,
+    boundary,
+    includes,
+    fuzzy,
+    'alias-only',
+  ])
+})
+
+test.each([':', '.'])('composer treats %s as a word boundary', (separator) => {
+  const boundary = `x${separator}rev`
+  expect(names(searchComposerCommands([{ name: 'aarev' }, { name: boundary }], 'rev'))).toEqual([
+    boundary,
+    'aarev',
+  ])
+})

@@ -1,4 +1,5 @@
 import type { WorkspaceSearchMatch } from '@workspace/contracts'
+import { updateStableHashCode } from '@workspace/client-core/address/path-hash'
 
 import type { WorkspaceSearchFileGroup } from '@/features/search/state/buffer-state'
 
@@ -37,7 +38,6 @@ export type SearchResultItemOptions = {
 
 const STABLE_HASH_CACHE_LIMIT = 4096
 const STABLE_HASH_OFFSET = 0x811c9dc5
-const STABLE_HASH_PRIME = 0x01000193
 const stableHashCache = new Map<string, string>()
 const searchMatchLocationHashCache = new WeakMap<WorkspaceSearchMatch, string>()
 
@@ -362,12 +362,6 @@ function updateStableHash(hash: number, value: number | string | null | undefine
   }
 
   return hash
-}
-
-function updateStableHashCode(hash: number, code: number) {
-  hash ^= code
-
-  return Math.imul(hash, STABLE_HASH_PRIME)
 }
 
 function stableHashResult(hash: number) {

@@ -1,4 +1,5 @@
 import type { TextSnapshot } from '@singapor/core'
+import { updateStableHashCode } from '@workspace/client-core/address/path-hash'
 
 export type TextSnapshotLineRange = {
   end: number
@@ -51,8 +52,7 @@ export function textSnapshotLineRange(
 function textHash(initialHash: number, text: string) {
   let hash = initialHash
   for (let index = 0; index < text.length; index += 1) {
-    hash ^= text.charCodeAt(index)
-    hash = Math.imul(hash, 0x01000193)
+    hash = updateStableHashCode(hash, text.charCodeAt(index))
   }
 
   return hash
