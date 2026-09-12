@@ -1,9 +1,9 @@
 import type { EntryTypeFilter } from './tree-entry'
 
-export type WorkspaceSearchSource = 'disk' | 'open-buffer'
+type WorkspaceSearchSource = 'disk' | 'open-buffer'
 export type WorkspaceSearchMatchMode = 'literal' | 'regex' | 'fuzzy'
 export type WorkspaceSearchProviderSource = 'fallback' | 'fd' | 'index' | 'rg'
-export type WorkspaceSearchIndexReadiness = 'cold' | 'building' | 'ready' | 'stale' | 'failed'
+type WorkspaceSearchIndexReadiness = 'cold' | 'building' | 'ready' | 'stale' | 'failed'
 export type WorkspaceSearchWarningCode =
   | 'content-tool-partial-failure'
   | 'file-limit-reached'

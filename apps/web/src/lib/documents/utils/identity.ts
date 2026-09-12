@@ -110,12 +110,3 @@ function comparisonIdentity(source: GitComparison): readonly unknown[] {
     }
   }
 }
-
-export function rekeyFileDocument(
-  document: DocumentRef,
-  from: FilesystemPath,
-  to: FilesystemPath,
-): DocumentRef {
-  if (document.kind !== 'file' || document.resource.path !== from) return document
-  return fileDocument(fileResource(to))
-}

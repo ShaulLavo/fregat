@@ -8,10 +8,10 @@ export type TabId = string & { readonly [identityBrand]: 'TabId' }
 export type ConflictId = string & { readonly [identityBrand]: 'ConflictId' }
 
 export type FileResource = { readonly path: FilesystemPath }
-export type GitFileReference = { readonly path: FilesystemPath; readonly ref: string }
+type GitFileReference = { readonly path: FilesystemPath; readonly ref: string }
 export type GitChangeStatus = GitFileStatus['index']
-export type GitChangeSource = 'staged' | 'worktree'
-export type ComparisonRevision = {
+type GitChangeSource = 'staged' | 'worktree'
+type ComparisonRevision = {
   readonly oldObjectId?: string
   readonly newObjectId?: string
   readonly oldPath?: FilesystemPath

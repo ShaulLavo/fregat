@@ -9,7 +9,7 @@ import type { OrchestrationProjectedSession, OrchestrationReadModel } from './re
  * (the pinned session block, the project list) so one malformed key is refused
  * the same way everywhere instead of being persisted and corrupting the sort.
  */
-export const orderKeyErrors = defineErrorCatalog('orchestration', {
+const orderKeyErrors = defineErrorCatalog('orchestration', {
   ORDER_KEY_INVALID: {
     status: 400,
     message: ({ orderKey }: { orderKey: string }) => `Order key is malformed: ${orderKey}`,
@@ -23,7 +23,7 @@ export const orderKeyErrors = defineErrorCatalog('orchestration', {
  * `orchestration` prefix with the aggregate-level catalog so the client keeps
  * one namespace to branch on.
  */
-export const sessionLifecycleErrors = defineErrorCatalog('orchestration', {
+const sessionLifecycleErrors = defineErrorCatalog('orchestration', {
   SESSION_BLOCKING_REQUEST: {
     status: 409,
     message: ({ commandType, sessionId }: { commandType: string; sessionId: string }) =>
@@ -152,16 +152,16 @@ export function requirePinned(session: OrchestrationProjectedSession) {
   throw sessionLifecycleErrors.SESSION_NOT_PINNED({ sessionId: session.id })
 }
 
-export function hasOpenBlockingRequest(session: OrchestrationProjectedSession) {
+function hasOpenBlockingRequest(session: OrchestrationProjectedSession) {
   return session.pendingApprovalCount + session.pendingUserInputCount > 0
 }
 
-export function hasQueuedTurnStart(session: OrchestrationProjectedSession) {
+function hasQueuedTurnStart(session: OrchestrationProjectedSession) {
   const state = session.latestTurn?.providerStartState
   return state === 'queued' || state === 'claimed' || state === 'adopted'
 }
 
-export function isSessionAlive(session: OrchestrationProjectedSession) {
+function isSessionAlive(session: OrchestrationProjectedSession) {
   const status = session.runtime?.status
   return status === 'starting' || status === 'running' || status === 'waiting'
 }

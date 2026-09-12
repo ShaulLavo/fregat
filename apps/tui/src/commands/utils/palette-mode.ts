@@ -12,7 +12,7 @@ import type { TerminalBinding } from '@/commands/utils/bindings'
 import { paletteOptions } from '@/commands/utils/palette'
 import { sessionAccessRows } from '@/commands/utils/session-access'
 
-export type PaletteAction =
+type PaletteAction =
   | { readonly kind: 'command'; readonly id: CommandId }
   | { readonly kind: 'files'; readonly query: string }
   | { readonly kind: 'app-colors'; readonly id: SettingsValues['workbench.palette'] }

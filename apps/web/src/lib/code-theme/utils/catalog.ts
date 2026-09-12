@@ -25,7 +25,7 @@ export type EditorThemeOption = {
  * entirely for tree-sitter's tokens to reach the screen. See
  * `editorSyntaxHighlightingSource`.
  */
-export const BUILTIN_EDITOR_THEMES = [
+const BUILTIN_EDITOR_THEMES = [
   {
     id: 'tree-sitter-dark',
     label: 'Native Dark',

@@ -1,10 +1,16 @@
 import { eq } from 'drizzle-orm'
 import * as v from 'valibot'
-import type { OrchestrationCommand, OrchestrationCommandReceipt } from './schemas'
-import { orchestrationCommandReceiptSchema } from './schemas'
+import {
+  type OrchestrationCommand,
+  type OrchestrationCommandReceipt,
+  orchestrationCommandReceiptSchema,
+  type ProjectRegistrationResult,
+  type ClientOrchestrationCommand,
+} from '@workspace/contracts'
+
 import { getDefaultPlatformDatabase } from '../db/client'
 import { isEvlogError } from '../observability'
-import type { ProjectRegistrationResult, ClientOrchestrationCommand } from '@workspace/contracts'
+
 import { commandFingerprint } from './utils/command-intent'
 import { sessionDomainErrors } from './structured-errors'
 import { orchestrationCommandReceipts, type OrchestrationCommandReceiptRow } from '../db/schema'

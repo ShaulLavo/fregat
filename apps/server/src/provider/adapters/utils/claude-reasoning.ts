@@ -24,7 +24,7 @@ import { modelOptionValue, type ModelOptions } from './model-options'
 /** The SDK's `Settings`, which the package does not export under that name. */
 type ClaudeSettings = Exclude<NonNullable<Options['settings']>, string>
 
-export type ClaudeEffortLevel = NonNullable<Options['effort']>
+type ClaudeEffortLevel = NonNullable<Options['effort']>
 
 export type ClaudeReasoning = {
   effort?: ClaudeEffortLevel

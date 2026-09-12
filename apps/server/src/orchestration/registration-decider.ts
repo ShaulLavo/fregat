@@ -97,7 +97,7 @@ export function decideWorktreeCommand(
   })
 }
 
-export function requireProviderOwnershipReleased(
+function requireProviderOwnershipReleased(
   model: OrchestrationReadModel,
   projectId: string,
   worktreeId?: string,

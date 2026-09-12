@@ -20,7 +20,7 @@ export type DiffFileSide = 'new' | 'old'
  * `code_actions.rs` while missing hover and go-to-definition. Both enumerated call sites by hand.
  * This type is the chokepoint neither of them had.
  */
-export type DiffPositionLookup =
+type DiffPositionLookup =
   /** A real line of one of the two texts, at this position in it. */
   | { readonly kind: 'file'; readonly side: DiffFileSide; readonly position: DiffFilePosition }
   /** Padding, a `Show N unmodified lines` label, or a row whose text the projection blanked. */

@@ -8,11 +8,11 @@ import {
 } from './orchestration-runtime'
 import { isoDateTimeSchema, trimmedNonEmptyStringSchema } from './chat-model'
 
-export const providerAuthStatusSchema = v.picklist(['authenticated', 'unauthenticated', 'unknown'])
-export const providerStatusSchema = v.picklist(['ready', 'warning', 'error', 'disabled'])
-export const providerAvailabilitySchema = v.picklist(['available', 'unavailable'])
+const providerAuthStatusSchema = v.picklist(['authenticated', 'unauthenticated', 'unknown'])
+const providerStatusSchema = v.picklist(['ready', 'warning', 'error', 'disabled'])
+const providerAvailabilitySchema = v.picklist(['available', 'unavailable'])
 
-export const providerAuthSchema = v.object({
+const providerAuthSchema = v.object({
   status: providerAuthStatusSchema,
   type: v.optional(trimmedNonEmptyStringSchema),
   label: v.optional(trimmedNonEmptyStringSchema),
@@ -31,7 +31,7 @@ export const providerSignInBodySchema = v.object({
   email: v.optional(trimmedNonEmptyStringSchema),
 })
 
-export const providerLoginStateSchema = v.picklist(['pending', 'succeeded', 'failed', 'cancelled'])
+const providerLoginStateSchema = v.picklist(['pending', 'succeeded', 'failed', 'cancelled'])
 
 /**
  * A single in-app sign-in run. `pending` means a browser window is open and the
@@ -62,7 +62,7 @@ export const providerAuthResultSchema = v.object({
  * a closed picklist would fail the whole snapshot and empty the model list.
  * `description` is the provider's own copy for the level, when it ships one.
  */
-export const modelReasoningEffortOptionSchema = v.object({
+const modelReasoningEffortOptionSchema = v.object({
   effort: reasoningEffortSchema,
   description: v.optional(v.string()),
 })
@@ -72,7 +72,7 @@ export const modelReasoningEffortOptionSchema = v.object({
  * model that advertises nothing still parses. Key names match what the Codex
  * adapter already emits from `model/list`.
  */
-export const providerModelCapabilitiesSchema = v.object({
+const providerModelCapabilitiesSchema = v.object({
   defaultReasoningEffort: v.optional(v.nullable(reasoningEffortSchema)),
   reasoningEfforts: v.optional(v.array(modelReasoningEffortOptionSchema)),
   supportsExtendedThinking: v.optional(v.boolean()),
@@ -86,7 +86,7 @@ export const providerModelSchema = v.object({
   capabilities: v.optional(v.nullable(providerModelCapabilitiesSchema), null),
 })
 
-export const providerTraitsSchema = v.object({
+const providerTraitsSchema = v.object({
   supportsApprovals: v.boolean(),
   supportsFullAccess: v.boolean(),
   supportsInterrupt: v.boolean(),
@@ -95,7 +95,7 @@ export const providerTraitsSchema = v.object({
   supportsUserInput: v.boolean(),
 })
 
-export const providerInstanceSettingsSchema = v.object({
+const providerInstanceSettingsSchema = v.object({
   providerInstanceId: providerInstanceIdSchema,
   driverKind: providerDriverKindSchema,
   displayLabel: trimmedNonEmptyStringSchema,
@@ -136,7 +136,7 @@ export const providerListResultSchema = v.object({
  * slash: the composer owns that character, and providers disagree about whether
  * it belongs to the name.
  */
-export const providerSlashCommandSchema = v.object({
+const providerSlashCommandSchema = v.object({
   name: trimmedNonEmptyStringSchema,
   description: v.optional(trimmedNonEmptyStringSchema),
   /** The provider's own copy for the argument it expects, e.g. `<file>`. */
@@ -151,7 +151,7 @@ export const providerSlashCommandSchema = v.object({
  * `enabled` is carried rather than filtered away because a disabled skill is
  * worth showing as unavailable instead of pretending it does not exist.
  */
-export const providerSkillSchema = v.object({
+const providerSkillSchema = v.object({
   name: trimmedNonEmptyStringSchema,
   description: v.optional(trimmedNonEmptyStringSchema),
   /** Directory the skill was loaded from, when the provider reports one. */
@@ -173,19 +173,15 @@ export const providerCommandCatalogSchema = v.object({
   supported: v.boolean(),
 })
 
-export type ProviderAuthStatus = v.InferOutput<typeof providerAuthStatusSchema>
 export type ProviderSignInMethod = v.InferOutput<typeof providerSignInMethodSchema>
-export type ProviderSignInBody = v.InferOutput<typeof providerSignInBodySchema>
 export type ProviderLoginState = v.InferOutput<typeof providerLoginStateSchema>
 export type ProviderLoginAttempt = v.InferOutput<typeof providerLoginAttemptSchema>
 export type ProviderAuthResult = v.InferOutput<typeof providerAuthResultSchema>
 export type ProviderStatus = v.InferOutput<typeof providerStatusSchema>
-export type ProviderAvailability = v.InferOutput<typeof providerAvailabilitySchema>
 export type ProviderAuth = v.InferOutput<typeof providerAuthSchema>
 export type ModelReasoningEffortOption = v.InferOutput<typeof modelReasoningEffortOptionSchema>
 export type ProviderModelCapabilities = v.InferOutput<typeof providerModelCapabilitiesSchema>
 export type ProviderModel = v.InferOutput<typeof providerModelSchema>
-export type ProviderTraits = v.InferOutput<typeof providerTraitsSchema>
 export type ProviderInstanceSettings = v.InferOutput<typeof providerInstanceSettingsSchema>
 export type ProviderSnapshot = v.InferOutput<typeof providerSnapshotSchema>
 export type ProviderListResult = v.InferOutput<typeof providerListResultSchema>

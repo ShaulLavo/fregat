@@ -87,7 +87,7 @@ type GitCommandOptions = {
   timeoutMs?: number
 }
 
-export type GitRunOptions = Pick<GitCommandOptions, 'allowFailure' | 'env'>
+type GitRunOptions = Pick<GitCommandOptions, 'allowFailure' | 'env'>
 
 /**
  * A git command runner already bound to one resolved repository root. It is the

@@ -2,7 +2,7 @@ import * as v from 'valibot'
 import { fileURLToPath } from 'node:url'
 import path from 'node:path'
 
-export const positionSchema = v.object({ line: v.number(), character: v.number() })
+const positionSchema = v.object({ line: v.number(), character: v.number() })
 const rangeSchema = v.object({ start: positionSchema, end: positionSchema })
 const diagnosticSchema = v.object({
   range: rangeSchema,
@@ -15,7 +15,7 @@ export const diagnosticsSchema = v.object({
   uri: v.string(),
   diagnostics: v.array(diagnosticSchema),
 })
-export type ViewerDiagnostic = v.InferOutput<typeof diagnosticSchema>
+type ViewerDiagnostic = v.InferOutput<typeof diagnosticSchema>
 export type ViewerDiagnostics = {
   readonly path: string
   readonly status: 'loading' | 'ready' | 'unavailable' | 'failed'

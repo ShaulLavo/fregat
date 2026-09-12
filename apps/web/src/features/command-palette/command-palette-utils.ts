@@ -17,7 +17,6 @@ import type { EditorWorkspaceStoreApi } from '@/features/editor/state/workspace-
 import { activeEditorTabForWorkbenchPanels } from '@/features/workbench/utils/panels'
 import { isFileEntry } from '@/lib/file-system-types'
 import type { CommandInvocation, CommandOutcome } from '@/keymap/state/command-bus'
-import type { OpenWorkspaceRootResult } from '@/features/workspace/hooks/use-open-root'
 import type {
   FocusDestination,
   FocusTargetToken,
@@ -271,10 +270,6 @@ export function paletteCommandSucceeded(outcome: CommandOutcome) {
 
 export function focusTransitionAcknowledged(outcome: FocusTransitionOutcome) {
   return outcome.status === 'acknowledged'
-}
-
-export function workspaceRootOpened(outcome: OpenWorkspaceRootResult) {
-  return outcome === 'already-open' || outcome === 'opened'
 }
 
 export function activeEditorFocusDestination(

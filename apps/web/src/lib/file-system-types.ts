@@ -85,10 +85,6 @@ export type FindMatch = Omit<WorkspaceSearchMatch, 'path'> & {
   searchScope?: SearchScope
 }
 
-export type RecentResult = {
-  entries: FsEntry[]
-}
-
 export type ServerInfo = {
   ok: boolean
   workspaceRoot: string

@@ -15,7 +15,7 @@ import {
 import { isVisibleChatActivity } from '@/features/chat/utils/activity-visibility'
 import { chatAgentActivity } from '@/features/chat/utils/agent-activity'
 
-export type ChatWorkLogTone = 'error' | 'info' | 'thinking' | 'tool'
+type ChatWorkLogTone = 'error' | 'info' | 'thinking' | 'tool'
 
 export type ChatWorkLogPlan = {
   completedCount: number
@@ -147,7 +147,7 @@ export function chatWorkLogEntryEquals(left: ChatWorkLogEntry, right: ChatWorkLo
   return chatWorkLogPlanEquals(left.plan, right.plan)
 }
 
-export function chatWorkLogPlanEquals(left: ChatWorkLogPlan | null, right: ChatWorkLogPlan | null) {
+function chatWorkLogPlanEquals(left: ChatWorkLogPlan | null, right: ChatWorkLogPlan | null) {
   if (left === right) return true
   if (!left || !right) return false
   if (left.completedCount !== right.completedCount) return false

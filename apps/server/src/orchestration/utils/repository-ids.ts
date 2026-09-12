@@ -2,8 +2,8 @@ import { createHash } from 'node:crypto'
 import * as v from 'valibot'
 import { projectIdSchema, worktreeIdSchema, type RepositoryIdentity } from '@workspace/contracts'
 
-export const PROJECT_ID_NAMESPACE = '9497149c-4cca-4c3e-8846-f6733d6fb85f'
-export const WORKTREE_ID_NAMESPACE = '53024065-1d42-4d11-b22f-5fbb93d10531'
+const PROJECT_ID_NAMESPACE = '9497149c-4cca-4c3e-8846-f6733d6fb85f'
+const WORKTREE_ID_NAMESPACE = '53024065-1d42-4d11-b22f-5fbb93d10531'
 
 export function repositoryKey(identity: RepositoryIdentity) {
   return createHash('sha256').update(`${identity.source}\0${identity.canonical}`).digest('hex')

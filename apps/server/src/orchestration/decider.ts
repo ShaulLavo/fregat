@@ -8,10 +8,11 @@ import {
   DEFAULT_INTERACTION_MODE,
   DEFAULT_RUNTIME_MODE,
   type OrchestrationCommand,
-} from './schemas'
+  approvalRequestIdSchema,
+  type OrchestrationEventMetadata,
+} from '@workspace/contracts'
 import * as v from 'valibot'
-import { approvalRequestIdSchema } from '@workspace/contracts'
-import type { OrchestrationEventMetadata } from '@workspace/contracts'
+
 import { orchestrationErrors } from '../observability'
 import { activityRequestId } from './pending-requests'
 import { event, one } from './event-factory'

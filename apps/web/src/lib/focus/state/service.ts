@@ -15,7 +15,6 @@ import type {
 } from '@workspace/client-core/commands/focus'
 export { focusTargetIdsEqual } from '@workspace/client-core/commands/focus'
 export type {
-  FocusLayout,
   FocusTargetId,
   FocusIntent,
   FocusTransitionOutcome,
@@ -29,14 +28,14 @@ import type { EditorCommandContext, EditorCommandId } from '@singapor/core'
 import type { FocusArea } from '@workspace/client-core/commands/focus'
 export type { FocusArea } from '@workspace/client-core/commands/focus'
 
-export type FocusEditorCapability = {
+type FocusEditorCapability = {
   readonly getInputElement?: () => HTMLElement | null
   readonly readKeymapContext?: () => EditorKeymapContext | null
   readonly dispatch: (command: EditorCommandId, context?: EditorCommandContext) => boolean
   readonly writable: boolean
 }
 
-export type FocusTargetCapabilities = {
+type FocusTargetCapabilities = {
   readonly editor?: FocusEditorCapability
   readonly overlay?: boolean
 }
@@ -54,7 +53,7 @@ export type ResolvedFocusTarget = FocusTargetSnapshot & {
   readonly invoke: (intent: FocusIntent) => boolean
 }
 
-export type FocusRequestedTransition = {
+type FocusRequestedTransition = {
   readonly attemptedTarget: FocusTargetSnapshot | null
   readonly intent: FocusIntent
   readonly token: FocusRequestToken
@@ -65,7 +64,7 @@ export type FocusTransitionResult = {
   readonly token: FocusRequestToken
 }
 
-export type FocusSnapshot = {
+type FocusSnapshot = {
   readonly currentOwner: FocusTargetSnapshot | null
   readonly lastCommandTarget: FocusTargetSnapshot | null
   readonly requested: FocusRequestedTransition | null

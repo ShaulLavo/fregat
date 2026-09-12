@@ -64,12 +64,12 @@ type EditorPerformanceTraceHandle = {
   stop(): void
 }
 
-export type EditorOpenSampleTarget = {
+type EditorOpenSampleTarget = {
   readonly path: string
   readonly rootPath: string
 }
 
-export type EditorOpenSampleResetRequest = EditorOpenSampleTarget & {
+type EditorOpenSampleResetRequest = EditorOpenSampleTarget & {
   readonly sampleId: string
 }
 

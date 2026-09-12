@@ -42,11 +42,11 @@ export type ProviderInstanceConfig = {
  * wrapping a global resource (a single desktop socket) rejects a second
  * instance with an explicit error instead of silently sharing state.
  */
-export type ProviderDriverCapabilities = ProviderAdapter['capabilities'] & {
+type ProviderDriverCapabilities = ProviderAdapter['capabilities'] & {
   multiInstance: boolean
 }
 
-export type ProviderDriverCreateInput<Config> = {
+type ProviderDriverCreateInput<Config> = {
   /** Settings-level binary override. Drivers that get their binary elsewhere ignore it. */
   binaryPath?: string
   config: Config
@@ -57,7 +57,7 @@ export type ProviderDriverCreateInput<Config> = {
   providerInstanceId: ProviderInstanceId
 }
 
-export type ProviderInstanceHandle = {
+type ProviderInstanceHandle = {
   adapter: ProviderAdapter
   /**
    * Releases everything the instance opened — child processes above all. Called

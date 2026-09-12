@@ -23,13 +23,6 @@ import { createRpcError } from '@/lib/structured-errors'
 const COMMAND_CATALOG_STALE_TIME_MS = 5 * 60_000
 const COMMAND_CATALOG_GC_TIME_MS = 30 * 60_000
 
-/** What a provider that cannot answer looks like — never null, so menus stay renderable. */
-export const EMPTY_PROVIDER_COMMAND_CATALOG = {
-  commands: [],
-  skills: [],
-  supported: false,
-} as const satisfies Omit<ProviderCommandCatalog, 'providerInstanceId'>
-
 export const providerCommandCatalogKeys = {
   all: ['providers', 'commands'] as const,
   catalog: (providerInstanceId: ProviderInstanceId, cwd: string | null) =>

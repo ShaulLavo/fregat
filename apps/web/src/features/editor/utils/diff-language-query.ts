@@ -17,7 +17,7 @@ export type DiffQueryTarget =
    */
   | { readonly kind: 'unavailable'; readonly reason: DiffQueryRefusal }
 
-export type DiffQueryRefusal = 'not-a-file-line' | 'side-not-open' | 'text-moved'
+type DiffQueryRefusal = 'not-a-file-line' | 'side-not-open' | 'text-moved'
 
 /**
  * Whether a side's document still holds the text this map was built from.

@@ -20,7 +20,7 @@ import { withSettingsWriteCoordinator } from './write-coordinator'
 const SECRET_FILE_MODE = 0o600
 const JOURNAL_VERSION = 1
 
-export type SettingsTransactionPhase = 'prepared' | 'settings-committed' | 'secrets-committed'
+type SettingsTransactionPhase = 'prepared' | 'settings-committed' | 'secrets-committed'
 
 export type SettingsTransactionBoundary =
   | 'settings-staged'

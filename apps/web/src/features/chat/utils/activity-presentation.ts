@@ -20,7 +20,7 @@ export type ChatActivityTool = {
   target: string
 }
 
-export type ChatActivityPlanStepStatus = 'completed' | 'inProgress' | 'pending'
+type ChatActivityPlanStepStatus = 'completed' | 'inProgress' | 'pending'
 
 export type ChatActivityPlanStep = {
   status: ChatActivityPlanStepStatus
@@ -142,7 +142,7 @@ export function chatActivityPlanSteps(
   return steps
 }
 
-export function toolTextLooksLikeFailure(text: string) {
+function toolTextLooksLikeFailure(text: string) {
   if (text.trim().length === 0) return false
 
   const lowered = text.toLowerCase()

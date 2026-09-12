@@ -33,20 +33,4 @@ export function rememberWorkbench(storage: KeyValueStorage, location: WorkbenchL
   const value = JSON.stringify(location)
   storage.setItem('workbench:last', value)
   storage.setItem(`workbench:location:${location.rootPath}`, value)
-  storage.setItem(
-    'workbench:roots',
-    JSON.stringify([...new Set([...rememberedRoots(storage), location.rootPath])]),
-  )
-}
-
-export function rememberedRoots(storage: KeyValueStorage): readonly string[] {
-  try {
-    const result = v.safeParse(
-      v.array(v.string()),
-      JSON.parse(storage.getItem('workbench:roots') ?? '[]'),
-    )
-    return result.success ? result.output : []
-  } catch {
-    return []
-  }
 }

@@ -20,7 +20,6 @@ export {
   editorReferenceSchema,
   tokenForChatReference,
   tokenForEditorReference,
-  type ChatReference,
   type EditorReference,
 } from '@workspace/client-core/address/references'
 
@@ -115,7 +114,7 @@ function unavailableReason(
   return null
 }
 
-export function validSearchParams(input: Address['search']): Address['search'] {
+function validSearchParams(input: Address['search']): Address['search'] {
   if (!input) return null
   const result: Record<string, string> = {}
   for (const key of ['q', 'in', 'x']) {
@@ -128,7 +127,7 @@ export function validSearchParams(input: Address['search']): Address['search'] {
   return Object.keys(result).length ? result : null
 }
 
-export function validLogParams(input: Address['logs']): Address['logs'] {
+function validLogParams(input: Address['logs']): Address['logs'] {
   if (!input) return null
   const result: Record<string, string> = {}
   for (const key of ['area', 'src', 'find']) {

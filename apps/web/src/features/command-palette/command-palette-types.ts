@@ -4,7 +4,7 @@ import type { Theme } from '@/features/settings/providers/theme-context'
 import type { TreeEntry } from '@/lib/file-system-types'
 import type { PlatformCommandId } from '@/keymap/types'
 
-export type CommandPaletteSelection = {
+type CommandPaletteSelection = {
   readonly command: PlatformCommandId
   readonly kind: 'platform'
 }

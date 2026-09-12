@@ -36,7 +36,7 @@ import {
 
 type LiveDocumentSyncState = 'idle' | 'saving' | 'conflict'
 
-export type SettingsDocumentSync =
+type SettingsDocumentSync =
   | {
       kind: 'settings'
       revision: string
@@ -145,7 +145,7 @@ export type ReleaseWorkspaceDocumentPathReservationResult = {
   readonly status: 'already-released' | 'released'
 }
 
-export type WorkspaceDocumentMutationLeaseEntry = {
+type WorkspaceDocumentMutationLeaseEntry = {
   readonly buffer: EditorTextBuffer
   readonly lease: DocumentMutationLease
   readonly path: FilesystemPath

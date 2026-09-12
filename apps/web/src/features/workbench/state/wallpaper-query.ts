@@ -19,7 +19,7 @@ const wallpaperQueryDefaults = {
   staleTime: WALLPAPER_QUERY_STALE_TIME_MS,
 } as const
 
-export const wallpaperQueryKeys = {
+const wallpaperQueryKeys = {
   all: ['wallpaper'] as const,
   info: () => [...wallpaperQueryKeys.all, 'info'] as const,
   media: () => [...wallpaperQueryKeys.all, 'media'] as const,

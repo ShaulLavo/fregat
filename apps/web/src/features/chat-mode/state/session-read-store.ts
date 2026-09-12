@@ -54,11 +54,6 @@ function flushSessionReadStorage() {
   sessionReadPersistence.persist(useSessionReadStore.getState().seenBySessionKey)
 }
 
-export function resetSessionReadStore() {
-  readPersist.cancel()
-  useSessionReadStore.setState({ seenBySessionKey: {} })
-}
-
 if (typeof window !== 'undefined' && typeof window.addEventListener === 'function') {
   window.addEventListener('beforeunload', () => {
     flushSessionReadStorage()

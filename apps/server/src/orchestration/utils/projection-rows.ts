@@ -94,7 +94,7 @@ export function activityFromRow(row: OrchestrationSessionActivityRow) {
   })
 }
 
-export function runtimeFromRow(row: ProjectionSessionRuntimeRow) {
+function runtimeFromRow(row: ProjectionSessionRuntimeRow) {
   return v.parse(sessionRuntimeStateSchema, row)
 }
 

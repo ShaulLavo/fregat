@@ -25,7 +25,7 @@
  * nothing — is indistinguishable by eye from a name that painted, and is how a
  * legend ends up two thirds on the floor while everything looks fine.
  */
-export type SemanticTokenUncoveredReason =
+type SemanticTokenUncoveredReason =
   /**
    * The grammar already paints this identically. A comma is a comma to
    * tree-sitter and to shiki; the server knows nothing about it that they do

@@ -2,8 +2,6 @@ import { parseArgs } from 'node:util'
 
 import { createTuiError } from '@/host/utils/structured-errors'
 
-export type TuiOptions = ReturnType<typeof readArguments>
-
 export function readArguments(args: string[], env: NodeJS.ProcessEnv = process.env) {
   const { values } = parseArgs({
     args,

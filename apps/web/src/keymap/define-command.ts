@@ -128,13 +128,6 @@ export type WorkspaceCommand<
   ) => Execution extends 'sync' ? ImmediateCommandDisposition : AsyncCommandStart
 }
 
-export type EditorCommand<Id extends string = string> = CommandBase<Id> & {
-  readonly execution: 'sync'
-  readonly target: 'editor'
-}
-
-export type PlatformCommand = EditorCommand | WorkspaceCommand
-
 export function defineCommand<
   const Id extends `workspace.${string}` | `environment.${string}` | `fileTree.${string}`,
   const Execution extends CommandExecution,

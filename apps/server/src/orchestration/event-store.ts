@@ -3,12 +3,11 @@ import * as v from 'valibot'
 import {
   ORCHESTRATION_REPLAY_MAX_EVENTS,
   orchestrationEventMetadataSchema,
-} from '@workspace/contracts'
-import {
   orchestrationEventSchema,
   type OrchestrationEvent,
   type OrchestrationReplayEventsInput,
-} from './schemas'
+} from '@workspace/contracts'
+
 import { getDefaultPlatformDatabase, type PlatformDatabase } from '../db/client'
 import { orchestrationEvents, type OrchestrationEventRow } from '../db/schema'
 import {
@@ -215,7 +214,7 @@ function nextStreamVersion(event: PendingOrchestrationEvent) {
   )`
 }
 
-export function rowToEvent(row: OrchestrationEventRow) {
+function rowToEvent(row: OrchestrationEventRow) {
   return v.parse(orchestrationEventSchema, {
     actorKind: row.actorKind,
     aggregateId: row.aggregateId,

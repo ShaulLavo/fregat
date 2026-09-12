@@ -70,7 +70,8 @@ function importVisitors(check) {
 function importValue(node) {
   const source = node.source ?? node.arguments?.[0] ?? node.moduleReference?.expression
   if (typeof source?.value === 'string') return source.value
-  return null
+  if (source?.type !== 'TemplateLiteral' || source.expressions.length > 0) return null
+  return source.quasis[0]?.value.cooked ?? null
 }
 
 function isProtected(location) {

@@ -3,12 +3,15 @@ import { eq } from 'drizzle-orm'
 import { drizzle } from 'drizzle-orm/bun-sqlite'
 import { afterEach, describe, expect, it } from 'vitest'
 import * as v from 'valibot'
-import { orderKeyBetween } from '@workspace/contracts'
+import {
+  orderKeyBetween,
+  orchestrationCommandSchema,
+  type OrchestrationCommand,
+} from '@workspace/contracts'
 import { migrateOrchestrationDatabase } from '../../db/migrations'
 import * as schema from '../../db/schema'
 import { projectionSessions } from '../../db/schema'
 import { OrchestrationEngine } from '../engine'
-import { orchestrationCommandSchema, type OrchestrationCommand } from '../schemas'
 
 const modelSelection = { model: 'gpt-5-codex', providerInstanceId: 'codex' }
 const fixtures: Array<{ close: () => void }> = []

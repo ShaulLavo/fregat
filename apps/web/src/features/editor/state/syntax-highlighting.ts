@@ -106,7 +106,7 @@ export function editorShikiHighlighterProvider(): EditorHighlighterProvider {
   return shikiHighlighterProvider
 }
 
-export function editorShikiWorkerOwner(): ShikiWorkerOwner {
+function editorShikiWorkerOwner(): ShikiWorkerOwner {
   if (shikiWorkerOwner) return shikiWorkerOwner
 
   shikiWorkerOwner = createShikiWorkerOwner()

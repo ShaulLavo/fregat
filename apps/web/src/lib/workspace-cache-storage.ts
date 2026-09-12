@@ -3,7 +3,7 @@ import {
   type StorageAccess,
   type StorageWriteStatus,
 } from '@/lib/environments/state/scoped-storage'
-import { reportError, toClientError } from '@/lib/client-error-taxonomy'
+import { reportClientError } from '@/lib/client-error-reporting'
 import * as v from 'valibot'
 
 // Local-only UI cache versions are dropped on mismatch, never migrated.
@@ -21,6 +21,8 @@ type WorkspaceCacheEntryOptions = {
   readonly maxSerializedBytes?: number
 }
 
+type CacheReadFailure = 'invalid-json' | 'schema' | 'oversized' | 'read-failed'
+
 export function workspaceCacheStorageKey(suffix: string) {
   return `${WORKSPACE_CACHE_STORAGE_PREFIX}.${suffix}`
 }
@@ -35,26 +37,32 @@ export function readWorkspaceCacheEntry<T>(
   fallback: T,
   options: WorkspaceCacheEntryOptions = {},
 ): T {
+  const storage = options.storage ?? globalChromeStorage
+  let serialized: string | null
   try {
-    const serialized = (options.storage ?? globalChromeStorage).getItem(key)
-    if (!serialized) return fallback
-    if (serializedEntryIsOversized(serialized, options.maxSerializedBytes)) {
-      removeWorkspaceCacheEntry(key, options.storage)
-      reportInvalidCacheEntry()
-      return fallback
-    }
-
-    const result = v.safeParse(schema, JSON.parse(serialized))
-    if (result.success) return result.output as T
-
-    removeWorkspaceCacheEntry(key, options.storage)
-    reportInvalidCacheEntry()
-    return fallback
-  } catch (error) {
-    removeWorkspaceCacheEntry(key, options.storage)
-    reportError(toClientError({ code: 'OPERATION_FAILED', error }))
-    return fallback
+    serialized = storage.getItem(key)
+  } catch {
+    return recoverCacheEntry({ key, reason: 'read-failed', storage, fallback })
   }
+  if (serialized === null) return fallback
+  if (serializedEntryIsOversized(serialized, options.maxSerializedBytes)) {
+    return recoverCacheEntry({ key, reason: 'oversized', storage, fallback })
+  }
+
+  let input: unknown
+  try {
+    input = JSON.parse(serialized)
+  } catch {
+    return recoverCacheEntry({ key, reason: 'invalid-json', storage, fallback })
+  }
+
+  try {
+    const result = v.safeParse(schema, input)
+    if (result.success) return result.output as T
+  } catch {
+    return recoverCacheEntry({ key, reason: 'schema', storage, fallback })
+  }
+  return recoverCacheEntry({ key, reason: 'schema', storage, fallback })
 }
 
 export function writeWorkspaceCacheEntry(
@@ -103,6 +111,26 @@ function serializedEntryIsOversized(serialized: string, maxSerializedBytes?: num
   return workspaceCacheSerializedBytes(serialized) > maxSerializedBytes
 }
 
-function reportInvalidCacheEntry() {
-  reportError(toClientError({ code: 'OPERATION_FAILED' }))
+function recoverCacheEntry<T>({
+  key,
+  reason,
+  storage,
+  fallback,
+}: {
+  readonly key: string
+  readonly reason: CacheReadFailure
+  readonly storage: StorageAccess
+  readonly fallback: T
+}): T {
+  if (reason !== 'read-failed') removeWorkspaceCacheEntry(key, storage)
+  reportClientError({
+    area: 'workspace-cache',
+    operation: 'cache.read',
+    message:
+      reason === 'read-failed'
+        ? 'Local cache could not be read.'
+        : 'Invalid local cache entry was discarded.',
+    context: { cacheKey: key, reason },
+  })
+  return fallback
 }

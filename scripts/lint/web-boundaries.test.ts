@@ -45,6 +45,21 @@ const probes: readonly Probe[] = [
     rules: ['lib-imports'],
   },
   {
+    file: 'apps/web/src/lib/dynamic-template.ts',
+    source: 'import(`@/features/example/value`)',
+    rules: ['lib-imports'],
+  },
+  {
+    file: 'apps/web/src/lib/require-template.ts',
+    source: 'require(`../features/example/value`)',
+    rules: ['lib-imports'],
+  },
+  {
+    file: 'apps/web/src/lib/shared-template.ts',
+    source: 'import(`@/lib/example/value`)',
+    rules: [],
+  },
+  {
     file: 'apps/web/src/lib/import-type.ts',
     source: "export type Value = import('@/features/example/value').Value",
     rules: ['lib-imports'],

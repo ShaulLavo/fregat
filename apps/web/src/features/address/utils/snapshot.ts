@@ -95,8 +95,8 @@ export function addressFromSnapshot(snapshot: AddressSnapshot): Address {
   return budgetAddress(completeAddressFromSnapshot(snapshot)).address
 }
 
-export const URL_BUDGET_BYTES = 4000
-export type AddressOmission = 'search' | 'logs' | 'tabs'
+const URL_BUDGET_BYTES = 4000
+type AddressOmission = 'search' | 'logs' | 'tabs'
 export type BudgetedAddress = {
   readonly address: Address
   readonly omissions: readonly AddressOmission[]

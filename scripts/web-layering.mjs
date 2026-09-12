@@ -1,9 +1,14 @@
 import fs from 'node:fs'
 import path from 'node:path'
+import { parseArgs } from 'node:util'
+import { parseSync, Visitor } from 'oxc-parser'
 
-const root = path.resolve(import.meta.dirname, '../apps/web/src')
+const { values, positionals } = parseArgs({
+  allowPositionals: true,
+  options: { root: { type: 'string', default: path.resolve(import.meta.dirname, '../apps/web') } },
+})
+const root = path.resolve(values.root, 'src')
 const testSuffix = /\.(?:test|spec|browser|test-d)\.[cm]?[jt]sx?$/
-const imports = /(?:\bfrom\s*|\bimport\s*(?:\(\s*)?|\brequire\s*\(\s*)['"]([^'"]+)['"]/g
 
 function sourceFiles(directory) {
   return fs.readdirSync(directory, { withFileTypes: true }).flatMap((entry) => {
@@ -30,16 +35,52 @@ function bucket(filename) {
   return parts[0]
 }
 
-const edges = sourceFiles(root).flatMap((filename) => {
+function isTest(filename) {
+  const relative = path.relative(values.root, filename).replaceAll('\\', '/')
+  return /(?:^|\/)(?:test|tests)\//.test(relative) || testSuffix.test(relative)
+}
+
+function importValue(node) {
+  const source = node.source ?? node.arguments?.[0] ?? node.moduleReference?.expression
+  if (typeof source?.value === 'string') return source.value
+  if (source?.type === 'TemplateLiteral' && source.expressions.length === 0)
+    return source.quasis[0].value.cooked
+  return null
+}
+
+function imports(source, filename) {
+  const specifiers = []
+  const add = (node) => {
+    const specifier = importValue(node)
+    if (specifier !== null) specifiers.push(specifier)
+  }
+  const visitor = new Visitor({
+    ImportDeclaration: add,
+    ExportNamedDeclaration: add,
+    ExportAllDeclaration: add,
+    ImportExpression: add,
+    TSImportType: add,
+    TSImportEqualsDeclaration: add,
+    CallExpression(node) {
+      if (node.callee.type === 'Identifier' && node.callee.name === 'require') add(node)
+    },
+  })
+  visitor.visit(parseSync(filename, source).program)
+  return specifiers
+}
+
+const testRoot = path.resolve(values.root, 'test')
+const files = sourceFiles(root).concat(fs.existsSync(testRoot) ? sourceFiles(testRoot) : [])
+const edges = files.flatMap((filename) => {
   const source = fs.readFileSync(filename, 'utf8')
-  return [...source.matchAll(imports)].map((match) => ({
+  return imports(source, filename).map((specifier) => ({
     filename,
-    target: resolveImport(match[1], filename),
-    test: testSuffix.test(filename),
+    target: resolveImport(specifier, filename),
+    test: isTest(filename),
   }))
 })
 
-const rows = process.argv.slice(2).map((specifier) => {
+const rows = positionals.map((specifier) => {
   const target = resolveImport(specifier, path.join(root, 'main.tsx'))
   const consumers = edges.filter(
     (edge) => edge.target === target && modulePath(edge.filename) !== target,

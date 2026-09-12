@@ -3,7 +3,7 @@ import { isoDateTimeSchema, nonNegativeIntegerSchema } from './chat-model'
 
 export const logDashboardLevelSchema = v.picklist(['debug', 'error', 'info', 'warn'])
 
-export const logDashboardFiltersSchema = v.object({
+const logDashboardFiltersSchema = v.object({
   areas: v.optional(v.array(v.string())),
   levels: v.optional(v.array(logDashboardLevelSchema)),
   search: v.optional(v.string()),
@@ -13,7 +13,7 @@ export const logDashboardFiltersSchema = v.object({
   until: v.optional(isoDateTimeSchema),
 })
 
-export const logEventSummarySchema = v.object({
+const logEventSummarySchema = v.object({
   action: v.nullable(v.string()),
   area: v.nullable(v.string()),
   durationMs: v.nullable(v.number()),
@@ -36,19 +36,19 @@ export const logEventSummarySchema = v.object({
   timestamp: isoDateTimeSchema,
 })
 
-export const logEventDetailSchema = v.object({
+const logEventDetailSchema = v.object({
   event: logEventSummarySchema,
   rawJson: v.record(v.string(), v.unknown()),
 })
 
-export const logEventDetailsByIdSchema = v.record(v.string(), logEventDetailSchema)
+const logEventDetailsByIdSchema = v.record(v.string(), logEventDetailSchema)
 
-export const logDashboardBreakdownItemSchema = v.object({
+const logDashboardBreakdownItemSchema = v.object({
   count: nonNegativeIntegerSchema,
   value: v.string(),
 })
 
-export const logDashboardTimelineBucketSchema = v.object({
+const logDashboardTimelineBucketSchema = v.object({
   end: isoDateTimeSchema,
   error: nonNegativeIntegerSchema,
   slow: nonNegativeIntegerSchema,

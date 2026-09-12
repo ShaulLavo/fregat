@@ -74,7 +74,7 @@ const DEFAULT_REBASE_ATTEMPTS = 8
 const DEFAULT_REBASE_BUDGET_MS = 2_000
 const storesBySecretsPath = new Map<string, Set<SettingsStore>>()
 
-export type SettingsWriteStageContext = {
+type SettingsWriteStageContext = {
   readonly attempt: number
   readonly id: string
   readonly kind: 'raw' | 'semantic'

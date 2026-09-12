@@ -17,7 +17,7 @@ import { getPlatformBridge } from '@/lib/platform/bridge'
  */
 export type ShellBackdrop = 'app' | 'compositor' | 'transparent'
 
-export const BACKDROP_ATTRIBUTE = 'data-backdrop'
+const BACKDROP_ATTRIBUTE = 'data-backdrop'
 
 export function applyBackdrop(backdrop: ShellBackdrop) {
   document.documentElement.setAttribute(BACKDROP_ATTRIBUTE, backdrop)

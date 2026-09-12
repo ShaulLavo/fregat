@@ -10,7 +10,7 @@ import type {
 } from './provider-session-directory'
 
 /** How long a session may sit doing nothing before its process is reclaimed. */
-export const IDLE_PROVIDER_SESSION_DEADLINE_MS = 30 * 60 * 1000
+const IDLE_PROVIDER_SESSION_DEADLINE_MS = 30 * 60 * 1000
 
 /**
  * The only status a reaper may touch. `running` and `waiting` are the agent

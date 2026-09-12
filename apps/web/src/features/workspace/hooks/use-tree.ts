@@ -149,14 +149,6 @@ export function useWorkspaceTreeState(rootFolder: PickedFsEntry | null) {
   return useWorkspaceTreeQuery(rootFolder?.path ?? null).treeState
 }
 
-export function useResetWorkspaceTreeLoad() {
-  const queryClient = useQueryClient()
-
-  return useCallback(() => {
-    queryClient.removeQueries({ queryKey: fileSystemKeys.trees() })
-  }, [queryClient])
-}
-
 function useWorkspaceTreeQuery(rootPath: string | null) {
   const workspaceStore = useEditorWorkspaceStoreApi()
   const resolvedRootPath = rootPath ?? ''
