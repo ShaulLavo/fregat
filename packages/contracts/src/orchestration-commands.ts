@@ -262,6 +262,14 @@ export const sessionTurnInterruptCommandSchema = v.object({
   turnId: v.optional(turnIdSchema),
 })
 
+export const sessionTurnSteerCommandSchema = v.object({
+  ...commandBaseSchema,
+  type: v.literal('session.turn.steer'),
+  sessionId: sessionIdSchema,
+  turnId: turnIdSchema,
+  message: sessionTurnStartCommandSchema.entries.message,
+})
+
 export const sessionRuntimeStopCommandSchema = v.object({
   ...commandBaseSchema,
   type: v.literal('session.runtime.stop'),
@@ -311,6 +319,7 @@ export const clientOrchestrationCommandSchema = v.variant('type', [
   sessionRuntimeModeSetCommandSchema,
   sessionInteractionModeSetCommandSchema,
   sessionTurnStartCommandSchema,
+  sessionTurnSteerCommandSchema,
   sessionTurnInterruptCommandSchema,
   sessionRuntimeStopCommandSchema,
   sessionApprovalRespondCommandSchema,
@@ -539,6 +548,7 @@ export const orchestrationCommandSchema = v.variant('type', [
   sessionRuntimeModeSetCommandSchema,
   sessionInteractionModeSetCommandSchema,
   sessionTurnInterruptCommandSchema,
+  sessionTurnSteerCommandSchema,
   sessionRuntimeStopCommandSchema,
   sessionApprovalRespondCommandSchema,
   sessionUserInputRespondCommandSchema,
@@ -594,6 +604,7 @@ export type SessionInteractionModeSetCommand = v.InferOutput<
   typeof sessionInteractionModeSetCommandSchema
 >
 export type SessionTurnStartCommand = v.InferOutput<typeof sessionTurnStartCommandSchema>
+export type SessionTurnSteerCommand = v.InferOutput<typeof sessionTurnSteerCommandSchema>
 export type SessionTurnInterruptCommand = v.InferOutput<typeof sessionTurnInterruptCommandSchema>
 export type SessionRuntimeStopCommand = v.InferOutput<typeof sessionRuntimeStopCommandSchema>
 export type SessionApprovalRespondCommand = v.InferOutput<

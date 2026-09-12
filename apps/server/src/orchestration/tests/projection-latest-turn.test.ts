@@ -7,6 +7,7 @@ const assistantStartedAt = '2026-05-24T00:02:00.000Z'
 const assistantCompletedAt = '2026-05-24T00:03:00.000Z'
 import {
   createDomainEngine,
+  fixtureWorktreeId,
   projectRegistrationCommand,
   sessionCreateCommand,
 } from './factories/engine'
@@ -103,6 +104,100 @@ describe('projection latest turn snapshots', () => {
     expectServerStamped(turn?.requestedAt, before)
     // The interrupt is a client command, so the server clock closes the turn.
     expectServerStamped(turn?.completedAt, turn?.requestedAt)
+  })
+
+  it('rejects a nonexistent plan ID even when its session has a plan ready', async () => {
+    const engine = createEngine()
+    await dispatchProjectSession(engine)
+    await engine.dispatch(proposePlanCommand())
+    await expect(
+      engine.dispatch(
+        startTurnCommand({
+          sourceProposedPlan: {
+            sessionId: 'd2b3ea2b-7e36-4549-b0d4-043c00904574',
+            planId: 'missing-plan',
+          },
+        }),
+      ),
+    ).rejects.toThrow('no actionable proposed plan')
+    expect(
+      (await engine.sessionDetailSnapshot('d2b3ea2b-7e36-4549-b0d4-043c00904574')).session.messages,
+    ).toHaveLength(0)
+  })
+
+  it('keeps a correction on the active turn and rejects an obsolete target', async () => {
+    const engine = createEngine()
+    await dispatchProjectSession(engine)
+    await engine.dispatch(startTurnCommand())
+    await providerStartStep(engine, 'claim')
+    await providerStartStep(engine, 'adopt')
+    await engine.dispatch(assistantDeltaCommand())
+    const before = await latestTurn(engine)
+    await engine.dispatch(
+      command({
+        commandId: 'correct-turn',
+        type: 'session.turn.steer',
+        sessionId: 'd2b3ea2b-7e36-4549-b0d4-043c00904574',
+        turnId: 'turn-1',
+        message: {
+          messageId: 'correction-message',
+          role: 'user',
+          text: 'Use the actual package path.',
+          attachments: [],
+        },
+      }),
+    )
+    expect(await latestTurn(engine)).toEqual(before)
+    const snapshot = await engine.sessionDetailSnapshot('d2b3ea2b-7e36-4549-b0d4-043c00904574')
+    expect(snapshot.session.messages.at(-1)).toMatchObject({
+      id: 'correction-message',
+      turnId: 'turn-1',
+      text: 'Use the actual package path.',
+    })
+    await expect(
+      engine.dispatch(
+        command({
+          commandId: 'obsolete-correction',
+          type: 'session.turn.steer',
+          sessionId: 'd2b3ea2b-7e36-4549-b0d4-043c00904574',
+          turnId: 'obsolete-turn',
+          message: {
+            messageId: 'obsolete-message',
+            role: 'user',
+            text: 'Do not send this',
+            attachments: [],
+          },
+        }),
+      ),
+    ).rejects.toThrow('Your message was not sent')
+  })
+
+  it('rejects a plan from another project before creating a user message', async () => {
+    const engine = createEngine()
+    await dispatchProjectSession(engine)
+    await engine.dispatch(proposePlanCommand())
+    await engine.dispatch(projectRegistrationCommand(2))
+    const targetId = 'd0000000-0000-4000-8000-000000000002'
+    await engine.dispatch(
+      command({
+        ...sessionCreateCommand(targetId, 'create-foreign-session'),
+        worktreeTarget: { kind: 'current', worktreeId: fixtureWorktreeId(2) },
+      }),
+    )
+    await expect(
+      engine.dispatch(
+        command({
+          ...startTurnCommand({
+            sourceProposedPlan: {
+              sessionId: 'd2b3ea2b-7e36-4549-b0d4-043c00904574',
+              planId: 'plan-1',
+            },
+          }),
+          sessionId: targetId,
+        }),
+      ),
+    ).rejects.toThrow('another project')
+    expect((await engine.sessionDetailSnapshot(targetId)).session.messages).toHaveLength(0)
   })
 
   it('keeps a late older-turn assistant message from replacing the latest turn', async () => {

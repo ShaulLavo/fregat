@@ -46,6 +46,29 @@ test('a web link is left to the markdown renderer, not turned into a file chip',
   expect(container.textContent).toContain('the docs')
 })
 
+test('a Codex output citation uses the existing file link action', async ({ client, server }) => {
+  const { application, editor } = await createMarkdownWorkspace(client, server)
+  const view = renderMarkdown(':codex-file-citation{path="src/foo.ts" purpose="output"}', {
+    application,
+  })
+  await userEvent.click(view.getByRole('link', { name: /src\/foo\.ts/u }))
+  await waitFor(() =>
+    expect(editor.workspaceStore.getState().selectedFilePath).toBe('repo/src/foo.ts'),
+  )
+})
+
+test('workspace markdown images use the filesystem route and have an explicit failure state', async ({
+  client,
+  server,
+}) => {
+  const { application } = await createMarkdownWorkspace(client, server)
+  const view = renderMarkdown('![Result](assets/result.png)', { application })
+  const image = view.getByAltText('Result')
+  expect(image.getAttribute('src')).toContain('/fs/blob?path=repo%2Fassets%2Fresult.png')
+  image.dispatchEvent(new Event('error'))
+  await waitFor(() => expect(view.getByText('Result · Image unavailable')).toBeVisible())
+})
+
 test('an over-indented list item renders as a list, not a code block', () => {
   const { container } = renderMarkdown('-       aligned bullet\n-       second bullet\n')
 

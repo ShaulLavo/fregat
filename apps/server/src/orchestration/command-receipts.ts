@@ -196,6 +196,7 @@ export function commandAggregate(command: ReceiptCommand) {
     case 'session.turn.diff.complete':
     case 'session.turn.interrupt':
     case 'session.turn.start':
+    case 'session.turn.steer':
     case 'session.unarchive':
     case 'session.unpin':
     case 'session.unsettle':

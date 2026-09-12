@@ -23,7 +23,6 @@ import { composerDropCarriesFiles, composerDropMentionPath } from '../utils/comp
 import {
   chatInputUploadAttachments,
   imageFilesFromTransfer,
-  stageChatInputImageFiles,
 } from '@/features/chat/utils/input-attachments'
 import {
   activeChatInputCommandItem,
@@ -36,6 +35,10 @@ import {
 import { useProjectEntrySearch } from '../hooks/use-project-entry-search'
 import { providerCommandCatalogQueryOptions } from '@/features/chat/utils/composer-skills'
 import { useComposerInbox } from '../hooks/use-composer-inbox'
+import { useImagePreparation } from '@/features/chat/hooks/use-image-preparation'
+import { useProviderDisplay } from '@/features/chat/hooks/use-provider-display'
+import { chatSubmissionValidation } from '@/features/chat/utils/submission-validation'
+import { OrbitLoader } from '@workspace/ui/components/orbit-loader'
 import { ChatModelPickerProvider } from '../providers/model-picker-provider'
 import type { TerminalContextSelection } from '@workspace/client-core/chat/terminal-context'
 import {
@@ -67,6 +70,7 @@ export type ChatInputSubmitPayload = {
 
 export function ChatInput({
   busy,
+  correctionDisabledReason = null,
   disabled,
   disabledReason = null,
   draftKey,
@@ -82,6 +86,7 @@ export function ChatInput({
   runtimeMode,
 }: {
   busy: boolean
+  correctionDisabledReason?: string | null
   disabled: boolean
   disabledReason?: string | null
   pendingAction?: ComposerPendingAction
@@ -112,7 +117,7 @@ export function ChatInput({
   )
   const images = useChatInputDraftStore(imagesSelector)
   const terminalContexts = useChatInputDraftStore(terminalContextsSelector)
-  const addImages = useChatInputDraftStore((store) => store.addImages)
+  const persistenceError = useChatInputDraftStore((store) => store.persistenceError)
   const clearStoredDraft = useChatInputDraftStore((store) => store.clearDraft)
   const removeImage = useChatInputDraftStore((store) => store.removeImage)
   const removeTerminalContext = useChatInputDraftStore((store) => store.removeTerminalContext)
@@ -140,7 +145,15 @@ export function ChatInput({
   const submitButtonRef = useRef<HTMLButtonElement | null>(null)
   const initialDraft = useMemo(() => readChatInputDraftPrompt(draftTarget), [draftTarget])
   const [activeCommandItemId, setActiveCommandItemId] = useState<string | null>(null)
-  const [attachmentError, setAttachmentError] = useState<string | null>(null)
+  const imagePreparation = useImagePreparation(draftTarget)
+  const { display: sessionProvider } = useProviderDisplay(sessionProviderInstanceId ?? undefined)
+  const busySendDisabledReason = busy
+    ? (correctionDisabledReason ??
+      (sessionProvider?.driverKind === 'codex'
+        ? null
+        : 'Wait for the current turn to finish before sending'))
+    : null
+  const [validationError, setValidationError] = useState<string | null>(null)
   const [dropTargetActive, setDropTargetActive] = useState(false)
   const [editorFocused, setEditorFocused] = useState(false)
   const [submitting, setSubmitting] = useState(false)
@@ -149,11 +162,15 @@ export function ChatInput({
   // chip attached is a legitimate turn, so it must not read as an empty draft.
   const hasStagedContent = images.length > 0 || terminalContexts.length > 0
   const composerDisabled = disabled || submitting
-  const submissionDisabled = disabledReason !== null || (!busy && pendingAction !== null)
+  const submissionDisabled =
+    disabledReason !== null ||
+    busySendDisabledReason !== null ||
+    imagePreparation.preparing ||
+    (!busy && pendingAction !== null)
   const sendDisabled =
     composerDisabled || submissionDisabled || (!hasStagedContent && !initialDraft.trim())
   const visiblePendingAction = submitting ? 'sending' : pendingAction
-  const statusLabel = attachmentError ?? error
+  const statusLabel = validationError ?? imagePreparation.error ?? persistenceError ?? error
   const projectEntries = useProjectEntrySearch({
     enabled: trigger?.kind === 'mention',
     query: trigger?.kind === 'mention' ? trigger.query : '',
@@ -214,22 +231,26 @@ export function ChatInput({
     editorRef.current = editor
     setEditorReady(editor !== null)
   }, [])
-  const clearDraft = useCallback(() => {
+  function clearDraft() {
     const editor = editorRef.current
     if (editor) clearChatInputEditor(editor)
 
     clearStoredDraft(draftTarget)
-    setAttachmentError(null)
+    imagePreparation.clearError()
+    setValidationError(null)
     setTrigger(null)
     if (submitButtonRef.current) submitButtonRef.current.disabled = true
-  }, [clearStoredDraft, draftTarget])
+  }
 
-  const handleSubmit = useCallback(async () => {
-    if (busy || disabled || submitting || submissionDisabled) return false
+  async function handleSubmit() {
+    if (disabled || submitting || submissionDisabled || imagePreparation.isPreparing()) return false
 
     const editor = editorRef.current
     const text = editor ? readChatInputText(editor).trim() : ''
     const draft = useChatInputDraftStore.getState().getDraft(draftTarget)
+    const validation = chatSubmissionValidation(text, draft.terminalContexts)
+    setValidationError(validation)
+    if (validation) return false
     const attachments = chatInputUploadAttachments(draft.images)
     if (!text && attachments.length === 0 && draft.terminalContexts.length === 0) return false
 
@@ -253,33 +274,9 @@ export function ChatInput({
     } finally {
       setSubmitting(false)
     }
-  }, [
-    busy,
-    clearDraft,
-    disabled,
-    draftTarget,
-    interactionMode,
-    modelSelection,
-    onSubmit,
-    runtimeMode,
-    submitting,
-    submissionDisabled,
-  ])
+  }
 
-  const handleImageFiles = useCallback(
-    (files: readonly File[]) => {
-      void stageChatInputImageFiles({
-        addImages,
-        draftTarget,
-        // Read live: staging is async, so a second batch dropped mid-compression
-        // must count what the first one already added or the cap slips.
-        existingImageCount: useChatInputDraftStore.getState().getDraft(draftTarget).images.length,
-        files,
-        onError: setAttachmentError,
-      })
-    },
-    [addImages, draftTarget],
-  )
+  const handleImageFiles = imagePreparation.prepare
   const handleRemoveImage = useCallback(
     (imageId: string) => {
       removeImage(draftTarget, imageId)
@@ -450,12 +447,22 @@ export function ChatInput({
                 disabled={composerDisabled}
                 onRemove={handleRemoveTerminalContext}
               />
+              {imagePreparation.preparing ? (
+                <div
+                  className='text-muted-foreground flex items-center gap-2 px-3 pb-2 text-xs'
+                  role='status'
+                >
+                  <OrbitLoader className='size-3.5' />
+                  Preparing images…
+                </div>
+              ) : null}
               <ChatInputAttachmentList
                 attachments={images}
                 disabled={composerDisabled}
                 onRemove={handleRemoveImage}
               />
               <ChatInputActions
+                correctionDisabledReason={busySendDisabledReason}
                 busy={busy}
                 disabled={composerDisabled}
                 disabledReason={disabledReason}

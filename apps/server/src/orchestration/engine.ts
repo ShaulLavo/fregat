@@ -16,6 +16,7 @@ import type { ChatAttachment, ChatAttachmentUpload } from '@workspace/contracts'
 import { defaultAttachmentsDir, writeAttachmentFromDataUrl } from '../attachments/store'
 import { migrateOrchestrationDatabase } from '../db/migrations'
 import { orchestrationErrors } from '../observability'
+import { requireActionableSourcePlan } from './command-invariants'
 import {
   clientOrchestrationCommandSchema,
   orchestrationCommandSchema,
@@ -450,6 +451,9 @@ export class OrchestrationEngine {
         throw sessionImportErrors.CONTINUED()
       }
       this.requireCommandRuntimeOwnership(command)
+      if (command.type === 'session.turn.steer')
+        this.providerService?.requireSteeringAvailable(command.sessionId)
+      this.requireSourceProposedPlan(command)
       const pendingEvents = decideOrchestrationCommand(command, this.readModel)
       recordChatPipelineInfo('chat.pipeline.command.decided', {
         ...summary,
@@ -464,6 +468,18 @@ export class OrchestrationEngine {
       this.recordDispatchFailure(command, summary, error, fingerprint)
       throw error
     }
+  }
+
+  private requireSourceProposedPlan(command: OrchestrationCommand) {
+    if (command.type !== 'session.turn.start' || !command.sourceProposedPlan) return
+    const target = command.bootstrap?.createSession?.worktreeTarget
+    const targetWorktreeId = target?.kind === 'new' ? target.baseWorktreeId : target?.worktreeId
+    requireActionableSourcePlan(
+      this.readModel,
+      command.sourceProposedPlan,
+      targetWorktreeId ?? this.readModel.sessions.get(command.sessionId)?.worktreeId,
+      this.snapshotQuery.sourceProposedPlan(command.sourceProposedPlan),
+    )
   }
 
   // Reconcile durable events before classifying a failed dispatch for its receipt.
@@ -1051,7 +1067,8 @@ async function ingestCommandAttachments(
   command: OrchestrationCommand,
   attachmentsDir: string,
 ): Promise<{ attachmentIngest?: CommandAttachmentIngest; command: OrchestrationCommand }> {
-  if (command.type !== 'session.turn.start') return { command }
+  if (command.type !== 'session.turn.start' && command.type !== 'session.turn.steer')
+    return { command }
   if (command.message.attachments.length === 0) return { command }
 
   const ingested = await persistTurnAttachments(command.message.attachments, attachmentsDir)

@@ -55,6 +55,11 @@ export type ProviderRuntimeStartInput = {
   sessionId: SessionId
 }
 
+export type ProviderTurnSteerInput = Pick<
+  ProviderTurnInput,
+  'sessionId' | 'turnId' | 'messageText' | 'attachments'
+>
+
 export type ProviderTurnControlInput = {
   sessionId: SessionId
   turnId?: TurnId
@@ -530,6 +535,7 @@ export type ProviderAdapter = {
   snapshot: () => Promise<ProviderSnapshot>
   startRuntime: (input: ProviderRuntimeStartInput) => Promise<ProviderAdapterRuntime>
   sendTurn: (input: ProviderTurnInput) => Promise<void>
+  steerTurn?: (input: ProviderTurnSteerInput) => Promise<void>
   subscribeEvents: (subscriber: (event: ProviderRuntimeEvent) => void) => () => void
   stopAll: () => Promise<void>
   stopRuntime: (input: { sessionId: SessionId }) => Promise<void>

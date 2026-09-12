@@ -230,6 +230,7 @@ export {
   projectMetaUpdateCommandSchema,
   sessionTurnBootstrapSchema,
   sessionTurnStartCommandSchema,
+  sessionTurnSteerCommandSchema,
   type ClientOrchestrationCommand,
   type InternalOrchestrationCommand,
   type OrchestrationCommand,
@@ -249,6 +250,7 @@ export {
   type SessionRuntimeStopCommand,
   type SessionTurnInterruptCommand,
   type SessionTurnStartCommand,
+  type SessionTurnSteerCommand,
   type SessionUnarchiveCommand,
   type SessionUserInputRespondCommand,
 } from './orchestration-commands'
@@ -624,6 +626,7 @@ export {
   sessionInteractionModeSetPayloadSchema,
   sessionMessageSentPayloadSchema,
   sessionTurnStartRequestedPayloadSchema,
+  sessionTurnSteerRequestedPayloadSchema,
   sessionTurnInterruptRequestedPayloadSchema,
   sessionRuntimeStopRequestedPayloadSchema,
   sessionRuntimeSetPayloadSchema,

@@ -46,6 +46,7 @@ import type {
   ProviderRuntimeStartInput,
   ProviderTurnControlInput,
   ProviderTurnInput,
+  ProviderTurnSteerInput,
   ProviderUserInputResponseInput,
   ProviderSessionDiscoveryInput,
   ProviderSessionHistoryInput,
@@ -306,6 +307,21 @@ export class ProviderService {
       })
       throw error
     }
+  }
+
+  requireSteeringAvailable(sessionId: SessionId) {
+    this.requireSdkOwnership(sessionId)
+    this.requireRunning()
+    const routed = this.routeSession(sessionId)
+    if (!routed?.adapter.steerTurn) throw sessionIdentityErrors.STEERING_UNAVAILABLE()
+    return routed
+  }
+
+  async steerTurn(input: ProviderTurnSteerInput) {
+    const routed = this.requireSteeringAvailable(input.sessionId)
+    const steer = routed.adapter.steerTurn
+    if (!steer) throw sessionIdentityErrors.STEERING_UNAVAILABLE()
+    await steer.call(routed.adapter, input)
   }
 
   /** Runs one provider turn on the shared adapters without creating a chat projection. */

@@ -1,6 +1,7 @@
 import { useActiveChatProjection } from '@/features/chat/hooks/use-active-projection'
 import type {
   ApprovalRequestId,
+  CommandId,
   OrchestrationSessionActivity,
   SessionApprovalRespondCommand,
   SessionId,
@@ -13,7 +14,8 @@ import {
   createApprovalRespondCommand,
   createUserInputRespondCommand,
 } from '@workspace/client-core/chat/commands'
-import { dispatchChatCommand } from '@/features/chat/utils/command-dispatch'
+import { dispatchChatCommand, replayAfterDispatch } from '@/features/chat/utils/command-dispatch'
+import { scheduleSessionProjectionSyncAfterDispatch } from '@/features/chat/utils/command-sync'
 import {
   ChatPendingRequestsContext,
   type ChatPendingRequests,
@@ -22,9 +24,12 @@ import {
 import { selectChatSessionById } from '@workspace/client-core/chat/selectors'
 import { derivePendingApprovals } from '@workspace/client-core/chat/pending-approvals'
 import { derivePendingUserInputs } from '@workspace/client-core/chat/pending-user-input'
+import { pendingRequestError } from '@/features/chat/utils/pending-request-error'
 
-type DispatchCommand = ChatTransport['dispatchCommand']
-type RequestResponses = ReadonlyMap<ApprovalRequestId, PendingRequestResponse>
+type RequestResponses = ReadonlyMap<
+  ApprovalRequestId,
+  { commandId: CommandId; response: PendingRequestResponse }
+>
 type SetResponses = (update: (current: RequestResponses) => RequestResponses) => void
 
 const NO_ACTIVITIES: readonly OrchestrationSessionActivity[] = []
@@ -35,12 +40,12 @@ const IDLE_RESPONSE: PendingRequestResponse = { kind: 'idle' }
 export function ChatPendingRequestsProvider({
   children,
   disabledReason = null,
-  dispatchCommand,
+  transport,
   sessionId,
 }: {
   readonly children: ReactNode
   readonly disabledReason?: string | null
-  readonly dispatchCommand: DispatchCommand
+  readonly transport: ChatTransport
   readonly sessionId: SessionId
 }) {
   const activities = useActiveChatProjection(
@@ -52,7 +57,12 @@ export function ChatPendingRequestsProvider({
   const value = useMemo<ChatPendingRequests>(
     () => ({
       disabledReason,
-      responseState: (requestId) => responses.get(requestId) ?? IDLE_RESPONSE,
+      responseState: (requestId) => {
+        const pending = responses.get(requestId)
+        if (!pending) return IDLE_RESPONSE
+        const failure = pendingRequestError(activities, pending.commandId)
+        return failure ? { kind: 'failed', message: failure } : pending.response
+      },
       pendingApprovals: derivePendingApprovals(activities),
       pendingUserInputs: derivePendingUserInputs(activities),
       respondToApproval: (requestId, decision) =>
@@ -63,9 +73,9 @@ export function ChatPendingRequestsProvider({
             sessionId,
           }),
           context: { decision },
-          dispatchCommand,
           requestId,
           setResponses,
+          transport,
         }),
       respondToUserInput: (requestId, answers) =>
         dispatchPendingRequestResponse({
@@ -76,12 +86,12 @@ export function ChatPendingRequestsProvider({
           }),
           // Count only: an answer can be a credential the provider asked for.
           context: { answerCount: Object.keys(answers).length },
-          dispatchCommand,
           requestId,
           setResponses,
+          transport,
         }),
     }),
-    [activities, disabledReason, dispatchCommand, responses, sessionId],
+    [activities, disabledReason, responses, sessionId, transport],
   )
 
   return <ChatPendingRequestsContext value={value}>{children}</ChatPendingRequestsContext>
@@ -90,27 +100,36 @@ export function ChatPendingRequestsProvider({
 async function dispatchPendingRequestResponse({
   command,
   context,
-  dispatchCommand,
   requestId,
   setResponses,
+  transport,
 }: {
   command: SessionApprovalRespondCommand | SessionUserInputRespondCommand
   context: Record<string, unknown>
-  dispatchCommand: DispatchCommand
   requestId: ApprovalRequestId
   setResponses: SetResponses
+  transport: ChatTransport
 }): Promise<boolean> {
-  setResponses((current) => withResponse(current, requestId, { kind: 'submitting' }))
+  setResponses((current) =>
+    withResponse(current, requestId, command.commandId, { kind: 'submitting' }),
+  )
   const outcome = await dispatchChatCommand({
     action: 'chat.pending_request.respond.summary',
     command,
     context: { ...context, requestId },
-    dispatchCommand,
+    dispatchCommand: transport.dispatchCommand,
+    onAccepted: (result) => {
+      scheduleSessionProjectionSyncAfterDispatch({
+        transport,
+        replayAfterSequence: replayAfterDispatch(command, result),
+        sessionId: command.sessionId,
+      })
+    },
   })
   const response: PendingRequestResponse = outcome.ok
     ? { kind: 'accepted' }
     : { kind: 'failed', message: outcome.message }
-  setResponses((current) => withResponse(current, requestId, response))
+  setResponses((current) => withResponse(current, requestId, command.commandId, response))
 
   return outcome.ok
 }
@@ -118,10 +137,11 @@ async function dispatchPendingRequestResponse({
 function withResponse(
   current: RequestResponses,
   requestId: ApprovalRequestId,
+  commandId: CommandId,
   response: PendingRequestResponse,
 ) {
   const next = new Map(current)
-  next.set(requestId, response)
+  next.set(requestId, { commandId, response })
 
   return next
 }
