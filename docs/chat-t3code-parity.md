@@ -1,0 +1,35 @@
+The latest chat is [the session-diff question from September 12 at 11:46](https://omarchy.mesh.shaulavo.dev/platform/~platform.TtmPUppXzd85vy1E/chat/t/2b3bf54c-030f-42a5-9189-3a9985805b05). I opened it in the running app, replayed its stored messages through the current source, and compared the implementation with the local `references/t3code` checkout. This baseline was captured before implementation. The follow-up comparison and fixes live on branch `chat-t3code-parity`.
+
+The main fault is child-agent attribution. The response spawned `/root/explain_diff`, named Locke. Its seven commands entered the parent chat with `turnId: null`. All seven match command IDs in the child's native Codex log. The parent ran six commands and one web search. Its two commentary messages and seven tools account for the nine steps behind "Worked for 1m 50s". The child's seven commands remain outside that fold, producing the separate "Ran 7 commands" group.
+
+The native logs also contain the child's start, completion, and interaction events. The projection has none of those agent events. [canonicalItemType](/work/projects/platform-chat-parity/apps/server/src/provider/adapters/codex.ts:3097) has no subagent case. [toolActivity](/work/projects/platform-chat-parity/apps/server/src/orchestration/provider-runtime-ingestion.ts:770) drops unsupported item types. Meanwhile, [handleGenericItemLifecycle](/work/projects/platform-chat-parity/apps/server/src/provider/adapters/codex.ts:1370) sends child tools under the parent session and looks up a canonical turn in a map that contains the parent's turns. The original provider turn and thread do not survive in the projected activity as usable child identity.
+
+T3code registers child threads, remembers their parent turn, and intercepts their notifications before ordinary parent processing. Child tools become `collabAgent/item` events carrying child identity, then task events. Its routing also prevents a child's lifecycle or token usage from being applied to the parent. See [child notification handling](/work/projects/platform-chat-parity/references/t3code/apps/server/src/provider/Layers/CodexSessionRuntime.ts:1578), [child item mapping](/work/projects/platform-chat-parity/references/t3code/apps/server/src/provider/Layers/CodexSessionRuntime.ts:1690), and [adapter task mapping](/work/projects/platform-chat-parity/references/t3code/apps/server/src/provider/Layers/CodexAdapter.ts:1045).
+
+The basic working timer and current-action row already follow the same arrangement as t3code. The information shown within that arrangement is weaker. Our command parser rejects compound shell syntax, so 11 of the 13 commands become "Ran command" or "Failed command". I ran t3code's actual `commandProgramName` against the same commands. It identifies an executable for all 13. For the four red rows it returns `rg`, `rg`, `nl`, and `rg`. This identifies the first meaningful executable, not necessarily the failing stage of a compound command. See [our parser](/work/projects/platform-chat-parity/apps/web/src/features/chat/utils/tool-label.ts:116), [t3code's parser](/work/projects/platform-chat-parity/references/t3code/packages/client-runtime/src/work-log/commandLabel.ts:1367), and [its live labels](/work/projects/platform-chat-parity/references/t3code/apps/web/src/components/chat/MessagesTimeline.logic.ts:65).
+
+The gap between the completion divider and the command group measures 20 pixels in both the running app and the source replay. The [timeline wrapper](/work/projects/platform-chat-parity/apps/web/src/features/chat/components/messages-timeline.tsx:281) adds 6 pixels on both sides of each row. The [divider](/work/projects/platform-chat-parity/apps/web/src/features/chat/components/message-completion-divider.tsx:25) adds another 8-pixel bottom margin. The next row therefore starts 20 pixels after the divider's border. T3code uses 6 pixels after fold rows and 8 after work rows, with no extra vertical margin on its divider. See [row spacing](/work/projects/platform-chat-parity/references/t3code/apps/web/src/components/chat/MessagesTimeline.tsx:1262) and [fold divider](/work/projects/platform-chat-parity/references/t3code/apps/web/src/components/chat/MessagesTimeline.tsx:1634). I reproduced this excess spacing, not a larger intermittent virtualization gap.
+
+All four red rows belong to the child agent. They represent different outcomes:
+
+| Time, local | Exit code | Actual result                                                                                                        |
+| ----------- | --------- | -------------------------------------------------------------------------------------------------------------------- |
+| 11:47:32    | 0         | `rg` searched nonexistent `apps/web/src/server`. A later command succeeded, so the shell exited zero.                |
+| 11:47:48    | 2         | Searches used nonexistent paths including `packages/client-core/src/navigation*` and `apps/web/src/lib/navigation*`. |
+| 11:47:58    | 1         | The final `rg` found no matches. Earlier file reads produced output.                                                 |
+| 11:48:14    | 0         | `rg` searched nonexistent `apps/server/src/worktree*`. The pipeline still exited zero.                               |
+
+Our [failure classifier](/work/projects/platform-chat-parity/apps/web/src/features/chat/utils/activity-presentation.ts:300) checks nonzero exit codes and error phrases in output. That explains two red rows whose shell exit code was zero. T3code uses [similar output heuristics](/work/projects/platform-chat-parity/references/t3code/packages/client-runtime/src/work-log/presentation.ts:376), so copying its classifier would not prevent these mistakes. The agent selected incorrect paths. The UI compounds the problem by giving every result the same label and displaying child errors without child context.
+
+Evidence is saved beside this report:
+
+- [Running app, collapsed](/work/tmp/platform-chat-review/last-chat-top.png)
+- [Running app, expanded](/work/tmp/platform-chat-review/last-chat-expanded.png)
+- [Source replay and measured rows](/work/tmp/platform-chat-review/before-replay.json)
+- [Native command IDs correlated with projected activities](/work/tmp/platform-chat-review/routing-evidence.json)
+- [Our labels compared with t3code's parser](/work/tmp/platform-chat-review/command-comparison.json)
+- [Replay script](/work/tmp/platform-chat-review/replay.mjs)
+
+Verification used the existing server and a browser replay of the actual session. It did not submit a new agent prompt or rerun the recorded shell commands. The replay rendered without application errors.
+
+The broader comparison covers provider and child-agent lifecycle, live feedback, transcript grouping and scroll behavior, command diagnostics, composer actions and drafts, approvals and questions, plans, attachments, markdown, history, and reconnect behavior. Findings and verification results will be recorded here as the implementation is completed.

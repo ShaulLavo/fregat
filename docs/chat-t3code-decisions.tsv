@@ -1,0 +1,3 @@
+ts	phase	decision	why	evidence	result
+2026-09-12T09:10:21Z	isolation	Created chat-t3code-parity worktree and separate runtime/presentation worktrees	Keep fixes isolated from main and independent workers from sharing files	/work/projects/platform-chat-parity; /work/projects/platform-chat-runtime; /work/projects/platform-chat-presentation	Baseline d4e0c5f9; cached dependencies installed
+2026-09-12T09:10:21Z	baseline	Recorded actual session and local t3code comparison	The same real event sequence must explain labels, child ownership and spacing	docs/chat-t3code-parity.md; /work/tmp/platform-chat-review/routing-evidence.json; /work/tmp/platform-chat-review/before-replay.json	13 commands correlated; 7 child commands unattributed; 20px gap reproduced
