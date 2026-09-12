@@ -1006,8 +1006,8 @@ class CodexAppServerSession {
     if (!message.method) return
 
     if (this.childAgents.handle(message.method, message.params)) return
-    if (await this.handleManualNotification(message.method, message.params)) return
 
+    // Awaiting the fallback first lets completed items overtake their preceding text deltas.
     switch (message.method) {
       case 'thread/started':
         this.handleSessionStartedNotification(
@@ -1029,6 +1029,8 @@ class CodexAppServerSession {
         this.handleErrorNotification(parseCodexServerNotification(message.method, message.params))
         return
     }
+
+    await this.handleManualNotification(message.method, message.params)
   }
 
   private handleSessionStartedNotification(

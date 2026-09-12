@@ -167,7 +167,7 @@ function sendAgentMessageItemCompleted(itemId, text) {
     params: {
       threadId: 'provider-thread-1',
       turnId: 'provider-turn-1',
-      completedAtMs: process.env.PLATFORM_FAKE_CODEX_MODE === 'native-projection' ? Date.now() : 1770000002000,
+      completedAtMs: process.env.PLATFORM_FAKE_CODEX_MODE?.startsWith('native-projection') ? Date.now() : 1770000002000,
       item: {
         id: itemId,
         type: 'agentMessage',
@@ -264,6 +264,7 @@ function sendChildEvents() {
 
 function handle(message) {
   const mode = process.env.PLATFORM_FAKE_CODEX_MODE;
+  const nativeProjection = mode === 'native-projection' || mode === 'native-projection-final-only';
   if (!message.method && (message.id === 801 || message.id === 802)) {
     record({ event: 'server-response', ...message });
     return;
@@ -333,15 +334,15 @@ function handle(message) {
       process.stderr.write('2026-09-07T05:01:31Z ERROR codex_api::transport: failed to connect to websocket\\n');
       process.stderr.write('Authentication required: sign in again\\n');
     }
-    if (mode === 'child-agents' || mode === 'native-projection' || mode === 'hold-native-turn') {
+    if (mode === 'child-agents' || nativeProjection || mode === 'hold-native-turn') {
       send({ method: 'turn/started', params: { threadId: 'child-thread-1', turn: { id: 'child-turn-1', status: 'inProgress', items: [] } } });
     }
     send({
       method: 'turn/started',
       params: { threadId: 'provider-thread-1', turn: fakeTurn('inProgress') },
     });
-    if (mode === 'child-agents' || mode === 'child-input-response' || mode === 'native-projection') sendChildEvents();
-    if (mode === 'native-projection') {
+    if (mode === 'child-agents' || mode === 'child-input-response' || nativeProjection) sendChildEvents();
+    if (nativeProjection) {
       send({ method: 'turn/completed', params: { threadId: 'child-thread-1', turn: { id: 'child-turn-1', status: 'completed', items: [] } } });
     }
     if (mode === 'hold-native-turn') {
@@ -483,6 +484,7 @@ function handle(message) {
       send({ id: message.id, result: { turn: fakeTurn('completed') } });
       return;
     }
+    if (mode !== 'native-projection-final-only') {
     send({
       method: 'item/agentMessage/delta',
       params: {
@@ -492,6 +494,7 @@ function handle(message) {
         delta: 'Hello from app-server',
       },
     });
+    }
     sendAgentMessageItemCompleted('item-1', 'Hello from app-server');
     send({
       method: 'turn/completed',
@@ -1202,69 +1205,92 @@ describe('CodexProviderAdapter', () => {
     )
   })
 
-  it('projects a native Codex child session for browser handoff', async ({ onTestFinished }) => {
-    await withFakeCodex(
-      async () => {
-        const adapter = new CodexProviderAdapter()
-        onTestFinished(() => adapter.stopAll())
-        const input = {
-          ...providerTurnInput(),
-          sessionId: v.parse(sessionIdSchema, SESSION_ID),
-          messageText: 'Review the workspace and report what you find.',
-        }
-        const projection = createNativeSessionProjection(input)
-        onTestFinished(projection.close)
-        const failures: unknown[] = []
-        adapter.subscribeEvents((event) => {
-          void projection.ingestion.ingest(event).catch((error) => failures.push(error))
-        })
-        await adapter.sendTurn(input)
-        await projection.ingestion.drain()
-        expect(failures).toEqual([])
-        const snapshot = projection.snapshot()
-        const payloadSchema = v.object({
-          agent: chatAgentSchema,
-          tool: v.optional(chatAgentToolSchema),
-        })
-        const progress = snapshot.session.activities.flatMap((activity, index) => {
-          if (activity.kind !== 'task.progress') return []
-          const parsed = v.safeParse(payloadSchema, activity.payload)
-          return parsed.success ? [{ index, ...parsed.output }] : []
-        })
-        const state = progress.find((row) => !row.tool)
-        const tools = progress.filter((row) => row.tool)
-        expect(tools.map((row) => row.tool?.itemType)).toEqual([
-          'command_execution',
-          'command_execution',
-        ])
-        expect(state).toMatchObject({ agent: { nickname: 'Reviewer', status: 'idle' } })
-        expect(state?.index).toBeLessThan(tools[0]?.index ?? 0)
-        expect(state?.agent.revision).toBeGreaterThan(tools[1]?.agent.revision ?? 0)
-        expect(tools[0]?.agent.status).toBe('waiting')
-        expect(snapshot.session.latestTurn?.state).toBe('completed')
-        expect(snapshot.session.messages.map((message) => message.role)).toEqual([
-          'user',
-          'assistant',
-        ])
-        const snapshotPath = process.env.PLATFORM_CHAT_PARITY_SNAPSHOT
-        if (!snapshotPath) return
-        await mkdir(path.dirname(snapshotPath), { recursive: true })
-        await writeFile(
-          snapshotPath,
-          JSON.stringify(
-            {
-              ...snapshot.session,
-              proposedPlans: snapshot.proposedPlans,
-              turnDiffSummaries: snapshot.checkpoints,
-            },
-            null,
-            2,
-          ),
-        )
-      },
-      { mode: 'native-projection' },
-    )
-  })
+  it.for([
+    { delivery: 'streaming', mode: 'native-projection' },
+    { delivery: 'buffered', mode: 'native-projection' },
+    { delivery: 'streaming', mode: 'native-projection-final-only' },
+  ] as const)(
+    'projects a native Codex child session for browser handoff ($delivery, $mode)',
+    async ({ delivery, mode }, { onTestFinished }) => {
+      await withFakeCodex(
+        async () => {
+          const adapter = new CodexProviderAdapter()
+          onTestFinished(() => adapter.stopAll())
+          const input = {
+            ...providerTurnInput(),
+            sessionId: v.parse(sessionIdSchema, SESSION_ID),
+            messageText: 'Review the workspace and report what you find.',
+          }
+          const projection = createNativeSessionProjection(input, delivery)
+          onTestFinished(projection.close)
+          const failures: unknown[] = []
+          const assistantEvents: string[] = []
+          adapter.subscribeEvents((event) => {
+            if (event.type === 'content.delta' && event.payload.streamKind === 'assistant_text')
+              assistantEvents.push(event.type)
+            if (event.type === 'item.completed' && event.payload.itemType === 'assistant_message')
+              assistantEvents.push(event.type)
+            void projection.ingestion.ingest(event).catch((error) => failures.push(error))
+          })
+          await adapter.sendTurn(input)
+          await projection.ingestion.drain()
+          expect(failures).toEqual([])
+          expect(assistantEvents).toEqual(
+            mode === 'native-projection-final-only'
+              ? ['item.completed']
+              : ['content.delta', 'item.completed'],
+          )
+          const snapshot = projection.snapshot()
+          const payloadSchema = v.object({
+            agent: chatAgentSchema,
+            tool: v.optional(chatAgentToolSchema),
+          })
+          const progress = snapshot.session.activities.flatMap((activity, index) => {
+            if (activity.kind !== 'task.progress') return []
+            const parsed = v.safeParse(payloadSchema, activity.payload)
+            return parsed.success ? [{ index, ...parsed.output }] : []
+          })
+          const state = progress.find((row) => !row.tool)
+          const tools = progress.filter((row) => row.tool)
+          expect(tools.map((row) => row.tool?.itemType)).toEqual([
+            'command_execution',
+            'command_execution',
+          ])
+          expect(state).toMatchObject({ agent: { nickname: 'Reviewer', status: 'idle' } })
+          expect(state?.index).toBeLessThan(tools[0]?.index ?? 0)
+          expect(state?.agent.revision).toBeGreaterThan(tools[1]?.agent.revision ?? 0)
+          expect(tools[0]?.agent.status).toBe('waiting')
+          expect(snapshot.session.latestTurn?.state).toBe('completed')
+          expect(snapshot.session.messages.map((message) => message.role)).toEqual([
+            'user',
+            'assistant',
+          ])
+          expect(
+            snapshot.session.messages.find((message) => message.role === 'assistant'),
+          ).toMatchObject({
+            text: 'Hello from app-server',
+            streaming: false,
+          })
+          const snapshotPath = process.env.PLATFORM_CHAT_PARITY_SNAPSHOT
+          if (!snapshotPath || delivery !== 'streaming' || mode !== 'native-projection') return
+          await mkdir(path.dirname(snapshotPath), { recursive: true })
+          await writeFile(
+            snapshotPath,
+            JSON.stringify(
+              {
+                ...snapshot.session,
+                proposedPlans: snapshot.proposedPlans,
+                turnDiffSummaries: snapshot.checkpoints,
+              },
+              null,
+              2,
+            ),
+          )
+        },
+        { mode },
+      )
+    },
+  )
 
   it('keeps native child tools, lifecycle, tokens and pending requests under their owning parent turn', async () => {
     await withFakeCodex(

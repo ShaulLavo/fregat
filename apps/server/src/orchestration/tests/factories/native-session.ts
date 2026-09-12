@@ -1,5 +1,8 @@
 import { decideOrchestrationCommand } from '../../decider'
-import { ProviderRuntimeIngestion } from '../../provider-runtime-ingestion'
+import {
+  ProviderRuntimeIngestion,
+  type AssistantDeliveryMode,
+} from '../../provider-runtime-ingestion'
 import type { ProviderTurnInput } from '../../../provider/types'
 import {
   applyIncrementally,
@@ -10,7 +13,10 @@ import {
   turnStartEvent,
 } from './projection'
 
-export function createNativeSessionProjection(input: ProviderTurnInput) {
+export function createNativeSessionProjection(
+  input: ProviderTurnInput,
+  assistantDeliveryMode: AssistantDeliveryMode = 'streaming',
+) {
   const projection = createProjectionFixture()
   const createdAt = new Date(Date.now() - 60_000).toISOString()
   const providerStart = {
@@ -40,7 +46,7 @@ export function createNativeSessionProjection(input: ProviderTurnInput) {
       projection.pipeline.applyEvents(events)
       model = projection.snapshots.refreshReadModel(model, events)
     },
-    { getReadModel: () => model },
+    { getReadModel: () => model, assistantDeliveryMode },
   )
   return {
     ingestion,
