@@ -1,4 +1,5 @@
-import { mkdir, mkdtemp, rm, writeFile } from 'node:fs/promises'
+import { tmpdir } from 'node:os'
+import { mkdtemp, rm, writeFile } from 'node:fs/promises'
 import path from 'node:path'
 import { worktreeIdSchema } from '@workspace/contracts'
 import * as v from 'valibot'
@@ -11,8 +12,7 @@ export const worktreeA = v.parse(worktreeIdSchema, '10000000-0000-4000-8000-0000
 export const worktreeB = v.parse(worktreeIdSchema, '10000000-0000-4000-8000-000000000002')
 
 export async function gitWorktreeFixture() {
-  await mkdir('/work/tmp', { recursive: true })
-  const root = await mkdtemp('/work/tmp/platform-git-worktree-')
+  const root = await mkdtemp(path.join(tmpdir(), 'platform-git-worktree-'))
   await runGit(root, ['init', '-b', 'main'])
   await runGit(root, ['config', 'user.email', 'test@example.com'])
   await runGit(root, ['config', 'user.name', 'Test User'])

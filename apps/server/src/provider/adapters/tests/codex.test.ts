@@ -1708,7 +1708,7 @@ describe('CodexProviderAdapter', () => {
   it('logs background Codex diagnostics without chat rows and preserves actionable stderr', async ({
     onTestFinished,
   }) => {
-    const logDir = await mkdtemp('/work/tmp/platform-codex-stderr-')
+    const logDir = await mkdtemp(path.join(tmpdir(), 'platform-codex-stderr-'))
     initializeObservability({
       NODE_ENV: 'production',
       OBSERVABILITY_CONSOLE: 'false',

@@ -1,5 +1,7 @@
+import path from 'node:path'
+import { tmpdir } from 'node:os'
 import type { AgentTerminalProcess } from '../terminal/agent-launch'
-import { mkdir, mkdtemp, rm } from 'node:fs/promises'
+import { mkdtemp, rm } from 'node:fs/promises'
 import { createInternalError } from '../observability/structured-errors'
 import { sessionIdentityErrors } from './structured-errors'
 
@@ -370,8 +372,7 @@ export class ProviderService {
 
     try {
       throwIfTextGenerationAborted(input.signal)
-      await mkdir('/work/tmp', { recursive: true })
-      isolatedCwd = await mkdtemp('/work/tmp/platform-provider-text-')
+      isolatedCwd = await mkdtemp(path.join(tmpdir(), 'platform-provider-text-'))
       startPromise = adapter.startRuntime({
         cwd: isolatedCwd,
         ephemeral: true,

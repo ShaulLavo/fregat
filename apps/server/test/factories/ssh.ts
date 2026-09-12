@@ -1,3 +1,4 @@
+import { tmpdir } from 'node:os'
 import { mkdir, mkdtemp, rm, symlink, writeFile } from 'node:fs/promises'
 import path from 'node:path'
 import { afterEach, test as base } from 'vitest'
@@ -224,8 +225,7 @@ function fakeProbe(options: { probeFails?: boolean; slowProbe?: boolean }) {
 export const test = base.extend<{ remoteRoot: string }>({
   remoteRoot: async ({ task }, provide) => {
     void task
-    await mkdir('/work/tmp', { recursive: true })
-    const directory = await mkdtemp('/work/tmp/platform-ssh-')
+    const directory = await mkdtemp(path.join(tmpdir(), 'platform-ssh-'))
     const root = path.resolve(import.meta.dirname, '../../../..')
     await mkdir(path.join(directory, 'packages/contracts/src'), { recursive: true })
     await symlink(
