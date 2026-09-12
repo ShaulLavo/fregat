@@ -8,12 +8,16 @@ import {
   DEFAULT_RUNTIME_MODE,
   sessionIdSchema,
   approvalRequestIdSchema,
+  chatAgentSchema,
+  chatAgentToolSchema,
   turnIdSchema,
   type ProviderInstanceId,
 } from '@workspace/contracts'
 import * as v from 'valibot'
 import { readFsLogs } from 'evlog/fs'
 import { CodexProviderAdapter } from '../codex'
+import { createNativeSessionProjection } from '../../../orchestration/tests/factories/native-session'
+import { SESSION_ID } from '../../../orchestration/tests/factories/projection'
 import { codexHistoryResponseSchema } from '../utils/codex-history'
 import type { ProviderRuntimeEvent, ProviderTurnInput } from '../../types'
 import {
@@ -163,7 +167,7 @@ function sendAgentMessageItemCompleted(itemId, text) {
     params: {
       threadId: 'provider-thread-1',
       turnId: 'provider-turn-1',
-      completedAtMs: 1770000002000,
+      completedAtMs: process.env.PLATFORM_FAKE_CODEX_MODE === 'native-projection' ? Date.now() : 1770000002000,
       item: {
         id: itemId,
         type: 'agentMessage',
@@ -329,14 +333,17 @@ function handle(message) {
       process.stderr.write('2026-09-07T05:01:31Z ERROR codex_api::transport: failed to connect to websocket\\n');
       process.stderr.write('Authentication required: sign in again\\n');
     }
-    if (mode === 'child-agents' || mode === 'hold-native-turn') {
+    if (mode === 'child-agents' || mode === 'native-projection' || mode === 'hold-native-turn') {
       send({ method: 'turn/started', params: { threadId: 'child-thread-1', turn: { id: 'child-turn-1', status: 'inProgress', items: [] } } });
     }
     send({
       method: 'turn/started',
       params: { threadId: 'provider-thread-1', turn: fakeTurn('inProgress') },
     });
-    if (mode === 'child-agents' || mode === 'child-input-response') sendChildEvents();
+    if (mode === 'child-agents' || mode === 'child-input-response' || mode === 'native-projection') sendChildEvents();
+    if (mode === 'native-projection') {
+      send({ method: 'turn/completed', params: { threadId: 'child-thread-1', turn: { id: 'child-turn-1', status: 'completed', items: [] } } });
+    }
     if (mode === 'hold-native-turn') {
       send({ id: message.id, result: { turn: fakeTurn('inProgress') } });
       return;
@@ -1192,6 +1199,70 @@ describe('CodexProviderAdapter', () => {
         expect(snapshot.models[0]?.capabilities).toBeNull()
       },
       { mode: 'no-reasoning-efforts' },
+    )
+  })
+
+  it('projects a native Codex child session for browser handoff', async ({ onTestFinished }) => {
+    await withFakeCodex(
+      async () => {
+        const adapter = new CodexProviderAdapter()
+        onTestFinished(() => adapter.stopAll())
+        const input = {
+          ...providerTurnInput(),
+          sessionId: v.parse(sessionIdSchema, SESSION_ID),
+          messageText: 'Review the workspace and report what you find.',
+        }
+        const projection = createNativeSessionProjection(input)
+        onTestFinished(projection.close)
+        const failures: unknown[] = []
+        adapter.subscribeEvents((event) => {
+          void projection.ingestion.ingest(event).catch((error) => failures.push(error))
+        })
+        await adapter.sendTurn(input)
+        await projection.ingestion.drain()
+        expect(failures).toEqual([])
+        const snapshot = projection.snapshot()
+        const payloadSchema = v.object({
+          agent: chatAgentSchema,
+          tool: v.optional(chatAgentToolSchema),
+        })
+        const progress = snapshot.session.activities.flatMap((activity, index) => {
+          if (activity.kind !== 'task.progress') return []
+          const parsed = v.safeParse(payloadSchema, activity.payload)
+          return parsed.success ? [{ index, ...parsed.output }] : []
+        })
+        const state = progress.find((row) => !row.tool)
+        const tools = progress.filter((row) => row.tool)
+        expect(tools.map((row) => row.tool?.itemType)).toEqual([
+          'command_execution',
+          'command_execution',
+        ])
+        expect(state).toMatchObject({ agent: { nickname: 'Reviewer', status: 'idle' } })
+        expect(state?.index).toBeLessThan(tools[0]?.index ?? 0)
+        expect(state?.agent.revision).toBeGreaterThan(tools[1]?.agent.revision ?? 0)
+        expect(tools[0]?.agent.status).toBe('waiting')
+        expect(snapshot.session.latestTurn?.state).toBe('completed')
+        expect(snapshot.session.messages.map((message) => message.role)).toEqual([
+          'user',
+          'assistant',
+        ])
+        const snapshotPath = process.env.PLATFORM_CHAT_PARITY_SNAPSHOT
+        if (!snapshotPath) return
+        await mkdir(path.dirname(snapshotPath), { recursive: true })
+        await writeFile(
+          snapshotPath,
+          JSON.stringify(
+            {
+              ...snapshot.session,
+              proposedPlans: snapshot.proposedPlans,
+              turnDiffSummaries: snapshot.checkpoints,
+            },
+            null,
+            2,
+          ),
+        )
+      },
+      { mode: 'native-projection' },
     )
   })
 
