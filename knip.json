@@ -15,7 +15,7 @@
         "test/service-openssh-scenario.ts",
         "src/fs/tests/contracts.test-d.ts"
       ],
-      "ignoreDependencies": ["vscode-langservers-extracted"]
+      "ignoreDependencies": ["eslint", "vscode-langservers-extracted"]
     },
     "apps/web": {
       "entry": [
@@ -26,7 +26,6 @@
         "scripts/chat-scroll-proof.mjs",
         "scripts/chat-scroll-proof-entry.mjs",
         "scripts/chat-snapshot-benchmark.ts",
-        "scripts/file-tree-prepared-input-benchmark.ts",
         "scripts/keymap-baseline.mjs",
         "scripts/verify-workspace-navigation.mjs",
         "test/factories/chat-proof-workspace.tsx"

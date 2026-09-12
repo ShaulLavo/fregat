@@ -1,4 +1,5 @@
 import { createChatNavigation } from '@/state/navigation-chat'
+import { retainedTextBudgetFromSettings } from '@/features/editor/utils/retained-text-budget'
 import { captureMainSession } from '@/state/navigation-capture'
 import {
   historyTargetAfterSessionRemoval,
@@ -104,6 +105,7 @@ export function createNavigation(router: ApplicationRouter, initial: AddressInte
 
   function editorActions(editor: EditorRuntime) {
     return createEditorApplyActions({
+      retainedTextBudget: retainedTextBudgetFromSettings,
       activation: editor.editorActivation,
       documentStore: editor.documentStore,
       searchStore: editor.searchBufferStore,

@@ -92,6 +92,45 @@ test('keeps replacement reads on the original machine when the selection changes
   }
 })
 
+// A run that fails mid-stream keeps the matches it delivered, so `'error'` must
+// not be replaceable.
+test('refuses to replace over the partial matches of a failed search', async ({ client }) => {
+  void client
+  const application = createTestApplicationRuntime()
+  const { editor } = application.getSnapshot()
+  const search = editor.searchBufferStore.getState()
+  search.prepareBuffer('')
+  search.setReplaceText('', 'pin')
+  const runId = search.startSearch({ path: '', query: 'needle', includeContent: true, limit: 20 })
+  search.appendEvent(runId, {
+    type: 'match',
+    match: {
+      path: 'first.ts',
+      kind: 'content',
+      type: 'file',
+      source: 'disk',
+      line: 1,
+      column: 1,
+      endColumn: 7,
+    },
+  })
+  search.failSearch(runId, 'Search stream ended without completing.')
+
+  expect(editor.searchBufferStore.getState().active?.status).toBe('error')
+
+  const view = renderWithProviders(
+    <TestEditorStateProvider>
+      <ReplaceControl rootPath='' />
+    </TestEditorStateProvider>,
+    { application },
+  )
+  try {
+    expect(await view.findByRole('button', { name: 'Replace all' })).toBeDisabled()
+  } finally {
+    view.unmount()
+  }
+})
+
 function ReplaceControl({ rootPath }: { readonly rootPath: string }) {
   const { canReplace, replaceAll } = useWorkspaceSearchReplace(rootPath)
   return (

@@ -14,7 +14,13 @@ import {
   tabContentKey,
   tabDocuments,
 } from '@/lib/documents/utils/tabs'
-import type { DocumentRef, FilesystemPath, TabContent, TabId } from '@/lib/documents/utils/types'
+import type {
+  DocumentKey,
+  DocumentRef,
+  FilesystemPath,
+  TabContent,
+  TabId,
+} from '@/lib/documents/utils/types'
 import type {
   EditorSnapZone,
   EditorSplitDirection,
@@ -99,12 +105,15 @@ export type EditorActivation = {
 export function createEditorApplyActions({
   activation,
   documentStore,
+  retainedTextBudget,
   searchStore,
   uiStore,
   workspaceStore,
 }: {
   activation: EditorActivation
   documentStore: EditorDocumentStoreApi
+  /** Injected so this module stays off `features/settings` and a test can pin it. */
+  retainedTextBudget: () => number
   searchStore: SearchBufferStoreApi
   uiStore: EditorUiStoreApi
   workspaceStore: EditorWorkspaceStoreApi
@@ -116,9 +125,10 @@ export function createEditorApplyActions({
       workspaceStore.getState().clearRootFolder()
       searchStore.getState().switchWorkspace(null)
     },
-    closeTab: (tabId) => closeTab(tabId, workspaceStore, documentStore, uiStore, activation),
+    closeTab: (tabId) =>
+      closeTab(tabId, workspaceStore, documentStore, uiStore, activation, retainedTextBudget),
     discardAndCloseTab: (tabId) =>
-      closeTab(tabId, workspaceStore, documentStore, uiStore, activation, {
+      closeTab(tabId, workspaceStore, documentStore, uiStore, activation, retainedTextBudget, {
         discard: true,
       }),
     discardLiveEditorDocument: (document) =>
@@ -154,6 +164,7 @@ export function createEditorApplyActions({
       switchRootFolder(rootFolder, {
         activation,
         documentStore,
+        retainedTextBudget,
         searchStore,
         uiStore,
         workspaceStore,
@@ -254,12 +265,14 @@ function switchRootFolder(
   {
     activation,
     documentStore,
+    retainedTextBudget,
     searchStore,
     uiStore,
     workspaceStore,
   }: {
     activation: EditorActivation
     documentStore: EditorDocumentStoreApi
+    retainedTextBudget: () => number
     searchStore: SearchBufferStoreApi
     uiStore: EditorUiStoreApi
     workspaceStore: EditorWorkspaceStoreApi
@@ -273,35 +286,74 @@ function switchRootFolder(
   activateRestoredWorkspace(rootFolder.path, workspaceStore.getState(), activation)
   workspaceStore.getState().switchWorkspace(rootFolder)
   searchStore.getState().switchWorkspace(rootFolder.path)
-  documentStore.getState().retainEditorDocuments(retentionForWorkspaces(workspaceStore.getState()))
+  const workspace = workspaceStore.getState()
+  const documentSizes = documentStore.getState().editorDocumentSizes()
+  const byteBudget = retainedTextBudget()
+  const evicted = documentStore
+    .getState()
+    .retainEditorDocuments(
+      editorRetention(
+        workspace,
+        workspace.workbenchPanels,
+        documentSizes,
+        byteBudget,
+        documentStore.getState().unevictableEditorDocumentKeys(),
+      ),
+    )
 
   log.info({
     action: 'workspace.root_switched',
     area: 'workspace',
-    parkedCount: workspaceStore.getState().parkedWorkspaces.size,
+    byteBudget,
+    documentSizeBeforeTrim: totalRetainedSize(documentSizes),
+    evictedDocumentCount: evicted.evictedDocumentKeys.length,
+    evictedTabCount: evicted.evictedTabIds.length,
+    parkedCount: workspace.parkedWorkspaces.size,
     path: rootFolder.path,
     previousPath: previousRootPath,
-    restoredTabCount: workspaceStore.getState().workbenchPanels.editorTabs.length,
+    restoredTabCount: workspace.workbenchPanels.editorTabs.length,
+    // Read after the trim: `documentSizes` is the pre-eviction snapshot.
+    retainedDocumentSize: totalRetainedSize(documentStore.getState().editorDocumentSizes()),
   })
 }
 
-function retentionForWorkspaces(workspace: EditorWorkspaceStore) {
+function totalRetainedSize(documentSizes: ReadonlyMap<DocumentKey, number>) {
+  let total = 0
+  for (const size of documentSizes.values()) total += size
+
+  return total
+}
+
+/**
+ * The keep set for both retention triggers: a project switch and a tab close.
+ *
+ * The active slice is built even when `rootPath` is null, or `clearRootFolder` and
+ * rootless surfaces would put every open document outside it. That rootless slice
+ * spends one of the `projectLimit` slots.
+ */
+function editorRetention(
+  workspace: EditorWorkspaceStore,
+  activePanels: WorkbenchPanels,
+  documentSizes: ReadonlyMap<DocumentKey, number>,
+  byteBudget: number,
+  unevictableDocumentKeys: ReadonlySet<DocumentKey>,
+) {
   const activeRootPath = workspace.rootFolder?.path ?? null
   const parked = Array.from(workspace.parkedWorkspaces, ([rootPath, entry]) =>
-    retainedSlice(rootPath, entry.workbenchPanels, entry.lastActiveAt),
+    retainedSlice(workspaceRoot(rootPath), entry.workbenchPanels, entry.lastActiveAt),
   )
 
   return retentionForProjects({
     activeRootPath,
-    slices:
-      activeRootPath !== null
-        ? [...parked, retainedSlice(activeRootPath, workspace.workbenchPanels, Date.now())]
-        : parked,
+    byteBudget,
+    documentSizes,
+    slices: [...parked, retainedSlice(activeRootPath, activePanels, Date.now())],
+    unevictableDocumentKeys,
   })
 }
 
 function retainedSlice(
-  rootPath: string,
+  rootPath: FilesystemPath | null,
   panels: WorkbenchPanels,
   lastActiveAt: number,
 ): RetainedWorkspaceSlice {
@@ -310,7 +362,7 @@ function retainedSlice(
       .flatMap(retainedTabDocuments)
       .map(documentKey),
     lastActiveAt,
-    rootPath: workspaceRoot(rootPath),
+    rootPath,
     tabIds: panels.editorTabs.map((tab) => tab.id),
   }
 }
@@ -321,6 +373,7 @@ function closeTab(
   documentStore: EditorDocumentStoreApi,
   uiStore: EditorUiStoreApi,
   activation: EditorActivation,
+  retainedTextBudget: () => number,
   options: { discard?: boolean } = {},
 ) {
   const workspace = workspaceStore.getState()
@@ -342,12 +395,34 @@ function closeTab(
 
   if (!options.discard || remainingCount > 0) {
     documentStore.getState().removeEditorView(tabId)
-    if (remainingCount === 0)
-      documentStore
+    if (remainingCount === 0) {
+      const documentSizes = documentStore.getState().editorDocumentSizes()
+      const byteBudget = retainedTextBudget()
+      const evicted = documentStore
         .getState()
         .retainEditorDocuments(
-          retentionForWorkspaces({ ...workspace, workbenchPanels: nextPanels }),
+          editorRetention(
+            workspace,
+            nextPanels,
+            documentSizes,
+            byteBudget,
+            documentStore.getState().unevictableEditorDocumentKeys(),
+          ),
         )
+      log.info({
+        // Named for retention, not the command: fires only when the closed path
+        // had no other tab, so `editor.command.*` would be uncountable.
+        action: 'editor.retention.close_tab',
+        area: 'editor',
+        byteBudget,
+        documentSizeBeforeTrim: totalRetainedSize(documentSizes),
+        evictedDocumentCount: evicted.evictedDocumentKeys.length,
+        evictedTabCount: evicted.evictedTabIds.length,
+        parkedCount: workspace.parkedWorkspaces.size,
+        path: content,
+        retainedDocumentSize: totalRetainedSize(documentStore.getState().editorDocumentSizes()),
+      })
+    }
   }
   updateUiForClosedContent(content, nextSelection.selectedTabContent, remainingCount, uiStore)
   activateWorkbenchSelection(nextPanels, activation)

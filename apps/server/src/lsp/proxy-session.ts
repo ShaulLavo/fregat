@@ -13,7 +13,13 @@ import type { ChildProcessWithoutNullStreams } from 'node:child_process'
 import type { LspServerHandle, LspServerMatch } from './registry'
 import { fileUriForPath } from './language'
 import { LspStdioMessageReader, writeLspStdioMessage } from './stdio-rpc'
-import { elapsedMs, limitText, recordProcessInfo, recordProcessWarning } from '../observability'
+import {
+  elapsedMs,
+  errorSummary,
+  limitText,
+  recordProcessInfo,
+  recordProcessWarning,
+} from '../observability'
 
 type JsonRpcId = number | string | null
 
@@ -350,7 +356,9 @@ class PooledLspProxySession {
     this.handle = handle
     this.process = handle.process
     this.rootPath = rootPath
-    this.reader = new LspStdioMessageReader((message) => this.handleServerMessage(message))
+    this.reader = new LspStdioMessageReader((message, byteLength) =>
+      this.handleServerMessage(message, byteLength),
+    )
     this.bindProcess()
   }
 
@@ -415,7 +423,9 @@ class PooledLspProxySession {
   }
 
   private bindProcess(): void {
-    this.process.stdout.on('data', (chunk) => this.reader.push(chunk))
+    // `index.ts` registers only `unhandledRejection`, so a synchronous throw here
+    // would take the whole server down with it.
+    this.process.stdout.on('data', (chunk) => this.pushServerBytes(chunk))
     this.process.stderr.on('data', (chunk) => this.logStderr(chunk))
     this.process.once('exit', (code, signal) => {
       this.exitCode = code
@@ -1103,8 +1113,10 @@ class PooledLspProxySession {
     return { connection, documents }
   }
 
-  private handleServerMessage(message: string): void {
-    this.serverBytes += Buffer.byteLength(message, 'utf8')
+  private handleServerMessage(message: string, byteLength: number): void {
+    // The reader already framed this body, so its length is known exactly and
+    // does not need re-measuring.
+    this.serverBytes += byteLength
     this.serverMessageCount += 1
     const parsed = parseJsonMessage(message)
     if (isJsonRpcRequest(parsed)) {
@@ -1364,6 +1376,23 @@ class PooledLspProxySession {
     this.idleTimer = null
   }
 
+  private pushServerBytes(chunk: Buffer): void {
+    try {
+      this.reader.push(chunk)
+    } catch (error) {
+      recordProcessWarning('lsp.framing_failed', {
+        area: 'lsp',
+        error: errorSummary(error),
+        serverId: this.match.server.id,
+        ...this.reader.stats,
+      })
+      // `dispose`, not `closeFromProcess`: the child is still alive. The latter is
+      // for a process that already exited, so it never kills one — and having
+      // already left the pool, nothing would reap it later either.
+      this.dispose('framing_error')
+    }
+  }
+
   private closeFromProcess(outcome: string): void {
     if (this.disposed) return
 
@@ -1441,6 +1470,7 @@ class PooledLspProxySession {
   }
 
   private recordSession(outcome: string): void {
+    const framing = this.reader.stats
     const initialized = this.initializeResult?.result
     const context = {
       activeConnectionCount: this.connections.size,
@@ -1455,6 +1485,12 @@ class PooledLspProxySession {
       outcome,
       rootPath: this.rootPath,
       serverBytes: this.serverBytes,
+      // `serverChunkCount` far above `serverMessageCount` with a large
+      // `serverMaxMessageBytes` is one body reassembled across many reads.
+      serverChunkCount: framing.chunkCount,
+      framingDiscardedBytes: framing.discardedBytes,
+      framingMalformedCount: framing.malformedCount,
+      serverMaxMessageBytes: framing.maxMessageBytes,
       serverHandledRequestCount: this.serverHandledRequestCount,
       serverId: this.match.server.id,
       serverInfo: isRecord(initialized) ? initialized.serverInfo : undefined,

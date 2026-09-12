@@ -57,6 +57,7 @@ describe('editor workspace state', () => {
     const events: string[] = []
     workspaceStore.subscribe(() => events.push('published'))
     const commands = createEditorApplyActions({
+      retainedTextBudget: () => Number.MAX_SAFE_INTEGER,
       activation: {
         activate: (content) =>
           events.push(
@@ -84,6 +85,7 @@ describe('editor workspace state', () => {
     createEditorBufferSession(document.buffer).applyText('dirty')
     const { owner } = fileOpenIntentService(documentStore)
     const commands = createEditorApplyActions({
+      retainedTextBudget: () => Number.MAX_SAFE_INTEGER,
       activation: createEditorActivation(owner.activation, documentStore, owner),
       documentStore,
       searchStore,
@@ -130,6 +132,7 @@ describe('editor workspace state', () => {
         preparedDocument,
       )
       const commands = createEditorApplyActions({
+        retainedTextBudget: () => Number.MAX_SAFE_INTEGER,
         activation: createEditorActivation(owner.activation, documentStore, owner),
         documentStore,
         searchStore,
@@ -445,14 +448,76 @@ describe('editor workspace state', () => {
       testTabContents(['/repo/src/b.ts', '/repo/src/c.ts', '/repo/src/a.ts']),
     )
   })
+
+  // A keep set built from the closing workspace's panels alone evicts every other
+  // project's clean documents.
+  test("closing a tab in one project keeps a parked project's clean documents", () => {
+    const parkedPath = '/repo/parked.ts'
+    const { commands, documentStore, workspaceStore } = editorHarness()
+
+    commands.openFileSurface(filesystemPath(parkedPath))
+    const parkedTabId = workspaceStore.getState().workbenchPanels.activeEditorTabId!
+    documentStore.getState().ensureEditorView(parkedTabId, fileResult(parkedPath))
+
+    commands.switchRootFolder(pickedDirectory('/other'))
+    expect(
+      documentStore.getState().getLiveEditorDocument(testDocumentKey(parkedPath)),
+    ).not.toBeNull()
+
+    const first = '/other/first.ts'
+    const second = '/other/second.ts'
+    commands.openFileSurface(filesystemPath(first))
+    const firstTabId = workspaceStore.getState().workbenchPanels.activeEditorTabId!
+    documentStore.getState().ensureEditorView(firstTabId, fileResult(first))
+    commands.openFileSurface(filesystemPath(second))
+    const secondTabId = workspaceStore.getState().workbenchPanels.activeEditorTabId!
+    documentStore.getState().ensureEditorView(secondTabId, fileResult(second))
+
+    commands.closeTab(secondTabId)
+
+    expect(
+      documentStore.getState().getLiveEditorDocument(testDocumentKey(parkedPath)),
+    ).not.toBeNull()
+    expect(documentStore.getState().getLiveEditorDocument(testDocumentKey(first))).not.toBeNull()
+  })
+
+  // Both directions matter: without the generous half, a caller handing over a
+  // non-binding budget again would pass.
+  test('evicts a parked project over the retained-text budget, and keeps it under one', () => {
+    const parkedPath = '/repo/parked.ts'
+
+    for (const [budget, evicted] of [
+      [500, true],
+      [1_073_741_824, false],
+    ] as const) {
+      const { commands, documentStore, workspaceStore } = editorHarness({}, () => budget)
+
+      commands.openFileSurface(filesystemPath(parkedPath))
+      const parkedTabId = workspaceStore.getState().workbenchPanels.activeEditorTabId!
+      documentStore
+        .getState()
+        .ensureEditorView(parkedTabId, fileResult(parkedPath, 'x'.repeat(1000)))
+
+      commands.switchRootFolder(pickedDirectory('/other'))
+
+      const retained = documentStore.getState().getLiveEditorDocument(testDocumentKey(parkedPath))
+      expect(retained === null).toBe(evicted)
+    }
+  })
 })
 
-function editorHarness(slice: Partial<CachedWorkspaceSlice> = {}) {
+function editorHarness(
+  slice: Partial<CachedWorkspaceSlice> = {},
+  // The registry maximum, not MAX_SAFE_INTEGER: no test should pin a budget the
+  // production path cannot produce.
+  retainedTextBudget: () => number = () => 1_073_741_824,
+) {
   const documentStore = createEditorDocumentStore()
   const searchStore = createSearchBufferStore()
   const uiStore = createEditorUiStore()
   const workspaceStore = createEditorWorkspaceStore(cachedWorkspace(slice))
   const commands = createEditorApplyActions({
+    retainedTextBudget,
     activation: { activate: () => undefined, setRoot: () => undefined },
     documentStore,
     searchStore,

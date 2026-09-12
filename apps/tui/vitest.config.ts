@@ -10,5 +10,7 @@ export default defineConfig({
     environment: 'node',
     include: ['src/**/*.test.{ts,tsx}'],
     testTimeout: 15_000,
+    // Real PTYs, sockets and spawned children; Vitest's 1s poll default is a CI flake.
+    expect: { poll: { timeout: 10_000 } },
   },
 })

@@ -976,6 +976,32 @@ describe('LspSessionPool ownership', () => {
     expect(fixture.secondSocket.closed).toBe(true)
   })
 
+  // A framing failure leaves the child running, so it has to go through the
+  // disposal path that kills one. `closeFromProcess` is for a process that already
+  // exited: it never kills, and it removes the session from the pool first, so
+  // `disposeAll` could not reap it afterwards either.
+  it('kills the backend when framing throws, and leaves nothing for disposeAll', async () => {
+    const fixture = await lspFixture()
+    await fixture.pool.acquire(fixture.firstSocket, fixture.match, '')
+
+    const allocUnsafe = vi.spyOn(Buffer, 'allocUnsafe').mockImplementationOnce(() => {
+      throw new RangeError('Array buffer allocation failed')
+    })
+    try {
+      fixture.process.stdout.write(encodeLspStdioMessage(JSON.stringify({ id: 99, result: null })))
+      await waitFor(() => fixture.kill.mock.calls.length > 0, 'framing failure to kill the backend')
+    } finally {
+      allocUnsafe.mockRestore()
+    }
+
+    expect(fixture.kill).toHaveBeenCalledTimes(1)
+    expect(fixture.pool.size).toBe(0)
+    expect(fixture.firstSocket.closed).toBe(true)
+
+    fixture.pool.disposeAll()
+    expect(fixture.kill).toHaveBeenCalledTimes(1)
+  })
+
   it('is idempotent — a second disposeAll kills nothing twice', async () => {
     const fixture = await lspFixture()
     await fixture.pool.acquire(fixture.firstSocket, fixture.match, '')

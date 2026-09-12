@@ -55,16 +55,13 @@
   },
   "devDependencies": {
     "@anthropic-ai/sdk": "^0.116.0",
-    "@eslint/js": "^10.0.1",
     "@types/bun": "1.3.14",
     "@types/node": "^25.9.6",
     "@types/subset-font": "^2.3.0",
     "@typescript/native-preview": "7.0.0-dev.20260707.2",
     "eslint": "^10.10.0",
-    "globals": "^17.12.0",
     "oxfmt": "0.64.0",
     "oxlint": "1.70.0",
-    "typescript-eslint": "^8.70.0",
     "vitest": "^4.1.11",
     "vscode-langservers-extracted": "4.10.0"
   }

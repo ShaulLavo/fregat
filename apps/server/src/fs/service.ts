@@ -812,21 +812,38 @@ async function* observedSearchEvents(
     },
   })
 
+  // Without `recorded`, the `finally` adds a second `fs.operations[]` entry to
+  // every completed and failed search — one wide event becomes two.
+  let recorded = false
+  const record = (outcome: SearchStreamOutcome, error?: unknown) => {
+    if (recorded) return
+    recorded = true
+    if (error !== undefined) {
+      recordRequestError(error, searchStreamSummary(options, startedAt, state, outcome))
+      recordStreamSummary({
+        ...searchStreamSummary(options, startedAt, state, outcome),
+        error: errorSummary(error),
+      })
+      return
+    }
+
+    recordStreamSummary(searchStreamSummary(options, startedAt, state, outcome))
+  }
+
   try {
     for await (const event of events) {
       updateSearchState(state, event)
       yield event
     }
+    record('ok')
   } catch (error) {
-    recordRequestError(error, searchStreamSummary(options, startedAt, state, 'error'))
-    recordStreamSummary({
-      ...searchStreamSummary(options, startedAt, state, 'error'),
-      error: errorSummary(error),
-    })
+    record('error', error)
     throw error
+  } finally {
+    // A client disconnect calls `events.return()`, resuming at the `yield` with
+    // neither an error nor a completion — so nothing above this records it.
+    record('aborted')
   }
-
-  recordStreamSummary(searchStreamSummary(options, startedAt, state, 'ok'))
 }
 
 async function* observedWatchEvents(
@@ -891,11 +908,14 @@ function updateWatchState(
   if (event.type === 'error') state.errorEventCount += 1
 }
 
+type SearchStreamOutcome = 'aborted' | 'error' | 'ok'
+
 function searchStreamSummary(
   options: FileSystemSearchOptions,
   startedAt: number,
   state: SearchStreamState,
-  status: 'error' | 'ok',
+  // 'aborted' is a terminal condition, not an absence of one.
+  status: SearchStreamOutcome,
 ) {
   return {
     area: 'fs',

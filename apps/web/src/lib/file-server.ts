@@ -229,6 +229,9 @@ export async function fetchQuickOpenFiles(
       path,
       queryLength: query.length,
       route: '/fs/search/events',
+      // Chromium surfaces mid-stream cancellation as a bare TypeError that no
+      // error-shape check can identify, so the signal is the only ground truth.
+      signal,
     },
     async () => {
       const result = await collectWorkspaceSearch(

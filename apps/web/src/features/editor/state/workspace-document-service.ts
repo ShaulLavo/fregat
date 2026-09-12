@@ -241,6 +241,46 @@ export class WorkspaceDocumentService {
   constructor(private readonly onStateChange: () => void = () => undefined) {}
 
   /**
+   * The documents `retain` keeps whatever the keep set says — dirty buffers,
+   * non-`file` syncs, and paths it cannot reach. Their text is unavoidable, so the
+   * retention budget has to charge it before admitting anything optional.
+   *
+   * Shares one predicate with `retain` deliberately: two copies would drift, and a
+   * budget that disagrees with the eviction it is meant to bound is the defect.
+   */
+  unevictableDocumentKeys(): ReadonlySet<DocumentKey> {
+    const keys = new Set<DocumentKey>()
+    for (const documentKey of this.liveDocumentsByKey.keys()) {
+      if (this.isUnevictableDocument(documentKey)) keys.add(documentKey)
+    }
+
+    return keys
+  }
+
+  private isUnevictableDocument(documentKey: DocumentKey): boolean {
+    const document = this.liveDocumentsByKey.get(documentKey)
+    if (!document) return false
+    if (this.isDirtyDocument(documentKey)) return true
+    if (document.sync.kind !== 'file') return true
+
+    const resource = filesystemResource(document.target)
+    return !resource || !this.pathsAvailable([resource.path], null)
+  }
+
+  /**
+   * Retained text size per live document. Every one, not only the evictable: an
+   * unevictable document still occupies memory. `length` is a retained field.
+   */
+  documentSizes(): ReadonlyMap<DocumentKey, number> {
+    const sizes = new Map<DocumentKey, number>()
+    for (const [documentKey, document] of this.liveDocumentsByKey) {
+      sizes.set(documentKey, document.buffer.getTextSnapshot().length)
+    }
+
+    return sizes
+  }
+
+  /**
    * The single eviction path. Drops every live document and view outside the keep
    * sets, and nothing else — dirty buffers and unsynced documents (conflict and
    * search buffers, which have no disk backing) are never evictable, so switching
@@ -258,12 +298,9 @@ export class WorkspaceDocumentService {
     tabIds: ReadonlySet<TabId>
   }): { evictedDocumentKeys: DocumentKey[]; evictedTabIds: TabId[] } {
     const evictedDocumentKeys: DocumentKey[] = []
-    for (const [documentKey, document] of this.liveDocumentsByKey) {
+    for (const documentKey of this.liveDocumentsByKey.keys()) {
       if (documentKeys.has(documentKey)) continue
-      if (this.isDirtyDocument(documentKey)) continue
-      if (document.sync.kind !== 'file') continue
-      const resource = filesystemResource(document.target)
-      if (!resource || !this.pathsAvailable([resource.path], null)) continue
+      if (this.isUnevictableDocument(documentKey)) continue
 
       this.deleteLiveDocument(documentKey)
       evictedDocumentKeys.push(documentKey)
