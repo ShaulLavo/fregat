@@ -304,6 +304,21 @@ of the duplication census lane, but it edits the same `apps/web` component files
 and 096 rename or restructure. Land it after 096 when both are in flight: rebasing class-string
 edits under a rename is cheap, the reverse is not.
 
+## Theme standardization
+
+Requested 2026-09-12. [Plan 104](plans/104-theme-standardization.md) is proposed; implementation
+has not started. One theme supplies app colors, code highlighting, terminal colors, and a wallpaper
+collection. First-party themes pair light and dark variants; imports can declare a single mode.
+Saved customization, reset, and portable import/export use one resolved appearance and the
+existing primary-server settings pipeline. [The research](docs/theme-standardization-reference.md)
+records the Omarchy reuse strategy and the T3 Code and CodexThemes-App comparisons.
+
+Plan 100's token and primitive foundation is implemented. Coordinate shared styles and controls
+with Plans 101–103; do not interleave edits to the same files. Plan 085 and Plan 104 share the boot
+mirror and first-paint path, so whichever lands second reuses the first's ownership. TUI readers
+must migrate with the shared settings cutover. This proposal does not reschedule other lanes or
+reopen the dropped Ghostty appearance inheritance work. Native Swift theme UI is outside scope.
+
 ## Verification boundaries
 
 - **Platform-only:** verify the narrow Platform tests/typechecks named by the active plan.

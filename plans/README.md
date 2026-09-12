@@ -35,6 +35,7 @@ a bare root `bun run verify`.
 | [101 — truncation and value recovery](101-truncation-recovery.md)               | **PROPOSED — DECISIONS D5 AND D7 NEED CONFIRMATION**          |
 | [102 — scroll and keyboard affordance](102-scroll-and-keyboard-affordance.md)   | **PROPOSED — DECISIONS D2 AND D7 NEED CONFIRMATION**          |
 | [103 — loading, empty and error states](103-loading-empty-error-states.md)      | **PROPOSED — DECISIONS D4 AND D6 NEED CONFIRMATION**          |
+| [104 — theme standardization](104-theme-standardization.md)                     | **PROPOSED — IMPLEMENTATION NOT STARTED**                     |
 | [094 — client-core web and TUI parity](094-client-core-web-tui-parity.md)       | **PROPOSED — DEPENDS ON 091; 096 COMPLETE**                   |
 | [095 — server plumbing](095-server-plumbing.md)                                 | **PROPOSED — IMPLEMENTATION NOT STARTED**                     |
 | [073 — Electrobun 2.x migration](073-electrobun-v2-migration.md)                | **PROPOSED — ROOT GO/NO-GO SCHEDULING**                       |
@@ -42,6 +43,13 @@ a bare root `bun run verify`.
 | [076 — watch-reload child reaping](076-watch-reload-child-reaping.md)           | **PROPOSED — ROOT GO/NO-GO SCHEDULING**                       |
 
 ## Dependency notes
+
+- Plan 104 replaces independent app palette and code-theme selections with complete themes,
+  saved customization, and wallpaper collections. It builds on Plan 100's implemented design
+  tokens, coordinates shared style edits with Plans 101–103, and shares boot ownership with
+  Plan 085. The [research reference](../docs/theme-standardization-reference.md) records pinned
+  Omarchy, T3 Code, and CodexThemes-App findings. TUI consumers migrate with shared settings;
+  native Swift theming and OS theme synchronization are outside this plan.
 
 - Plan 096 is complete and its executable plan is deleted. The
   [web layering reference](../docs/web-layering.md) records ownership decisions, review fixes,
