@@ -42,6 +42,7 @@ if (process.argv[2] !== 'app-server') {
 if (process.env.PLATFORM_FAKE_CODEX_MODE === 'delayed-exit') process.on('SIGTERM', () => setTimeout(() => process.exit(0), 100));
 
 let threadStartCount = 0;
+let turnStartCount = 0;
 let lastSessionStartParams = null;
 
 // One JSON line per app-server event a test needs to see from the outside: the
@@ -80,7 +81,7 @@ function fakeSession(turns = []) {
 
 function fakeTurn(status = 'completed', items = []) {
   return {
-    id: 'provider-turn-1',
+    id: 'provider-turn-' + Math.max(turnStartCount, 1),
     items,
     status,
   };
@@ -116,7 +117,7 @@ function sendReasoningEvents() {
     method: 'item/started',
     params: {
       threadId: 'provider-thread-1',
-      turnId: 'provider-turn-1',
+      turnId: fakeTurn().id,
       startedAtMs: 1770000000000,
       item: {
         id: 'reasoning-1',
@@ -130,7 +131,7 @@ function sendReasoningEvents() {
     method: 'item/reasoning/summaryPartAdded',
     params: {
       threadId: 'provider-thread-1',
-      turnId: 'provider-turn-1',
+      turnId: fakeTurn().id,
       itemId: 'reasoning-1',
       summaryIndex: 0,
     },
@@ -139,7 +140,7 @@ function sendReasoningEvents() {
     method: 'item/reasoning/summaryTextDelta',
     params: {
       threadId: 'provider-thread-1',
-      turnId: 'provider-turn-1',
+      turnId: fakeTurn().id,
       itemId: 'reasoning-1',
       delta: 'Inspecting the repo.',
       summaryIndex: 0,
@@ -149,7 +150,7 @@ function sendReasoningEvents() {
     method: 'item/completed',
     params: {
       threadId: 'provider-thread-1',
-      turnId: 'provider-turn-1',
+      turnId: fakeTurn().id,
       completedAtMs: 1770000001000,
       item: {
         id: 'reasoning-1',
@@ -166,7 +167,7 @@ function sendAgentMessageItemCompleted(itemId, text) {
     method: 'item/completed',
     params: {
       threadId: 'provider-thread-1',
-      turnId: 'provider-turn-1',
+      turnId: fakeTurn().id,
       completedAtMs: process.env.PLATFORM_FAKE_CODEX_MODE?.startsWith('native-projection') ? Date.now() : 1770000002000,
       item: {
         id: itemId,
@@ -243,7 +244,7 @@ function sendChildEvents() {
   const command = { id: 'child-command-1', type: 'commandExecution', command: 'rg absent missing', status: 'inProgress' };
   send({ method: 'item/started', params: { ...child, item: command } });
   send({ method: 'thread/status/changed', params: { ...child, status: { type: 'active', activeFlags: ['waitingOnApproval'] } } });
-  send({ method: 'item/started', params: { threadId: 'provider-thread-1', turnId: 'provider-turn-1', item: { id: 'spawn-1', type: 'subAgentActivity', agentThreadId: 'child-thread-1', agentPath: '/root/review', kind: 'started' } } });
+  send({ method: 'item/started', params: { threadId: 'provider-thread-1', turnId: fakeTurn().id, item: { id: 'spawn-1', type: 'subAgentActivity', agentThreadId: 'child-thread-1', agentPath: '/root/review', kind: 'started' } } });
   send({ method: 'thread/started', params: { thread: { ...fakeSession(), id: child.threadId, source: { subAgent: { thread_spawn: { parent_thread_id: 'provider-thread-1', agent_nickname: 'Reviewer', agent_role: 'explorer' } } } } } });
   send({ method: 'item/completed', params: { ...child, item: { ...command, status: 'failed', exitCode: 2, aggregatedOutput: 'rg: missing: No such file or directory' } } });
   send({ method: 'thread/tokenUsage/updated', params: { ...child, tokenUsage: { total: { totalTokens: 123, inputTokens: 100, outputTokens: 23 } } } });
@@ -259,12 +260,48 @@ function sendChildEvents() {
   send({ method: 'error', params: { ...child, willRetry: true, error: { message: 'Retrying child' } } });
   send({ method: 'turn/completed', params: { threadId: child.threadId, turn: { id: child.turnId, status: 'completed', items: [] } } });
   send({ method: 'item/completed', params: { ...child, item: { id: 'late-child-command', type: 'commandExecution', command: 'pwd', status: 'completed', exitCode: 0 } } });
-  send({ method: 'item/completed', params: { threadId: 'provider-thread-1', turnId: 'provider-turn-1', item: { id: 'self-activity', type: 'subAgentActivity', agentThreadId: 'provider-thread-1', agentPath: '/root', kind: 'interacted' } } });
+  send({ method: 'item/completed', params: { threadId: 'provider-thread-1', turnId: fakeTurn().id, item: { id: 'self-activity', type: 'subAgentActivity', agentThreadId: 'provider-thread-1', agentPath: '/root', kind: 'interacted' } } });
+}
+
+function sendOldTurnCompletion() {
+  send({ method: 'turn/completed', params: { threadId: 'provider-thread-1', turn: { ...fakeTurn('completed'), id: 'provider-turn-1' } } });
+}
+
+function handleSteerStopSequence(message) {
+  if (message.method === 'turn/start') {
+    record({ event: 'turn/start' });
+    turnStartCount += 1;
+    const turn = fakeTurn('inProgress');
+    if (turnStartCount === 1) {
+      send({ method: 'turn/started', params: { threadId: 'child-thread-1', turn: { id: 'child-turn-1', status: 'inProgress', items: [] } } });
+    }
+    if (turnStartCount > 1) sendOldTurnCompletion();
+    send({ method: 'turn/started', params: { threadId: 'provider-thread-1', turn } });
+    if (turnStartCount > 1) sendOldTurnCompletion();
+    send({ id: message.id, result: { turn } });
+    return true;
+  }
+  if (message.method === 'turn/steer') {
+    record({ event: 'turn/steer', params: message.params });
+    send({ id: message.id, result: { turnId: fakeTurn().id } });
+    return true;
+  }
+  if (message.method === 'turn/interrupt') {
+    record({ event: 'turn/interrupt', params: message.params });
+    send({ id: message.id, result: {} });
+    send({ method: 'turn/completed', params: {
+      threadId: message.params.threadId,
+      turn: { id: message.params.turnId, status: 'interrupted', items: [] },
+    } });
+    return true;
+  }
+  return false;
 }
 
 function handle(message) {
   const mode = process.env.PLATFORM_FAKE_CODEX_MODE;
   const nativeProjection = mode === 'native-projection' || mode === 'native-projection-final-only';
+  if (mode === 'steer-stop-late-completion' && handleSteerStopSequence(message)) return;
   if (!message.method && (message.id === 801 || message.id === 802)) {
     record({ event: 'server-response', ...message });
     return;
@@ -326,6 +363,7 @@ function handle(message) {
     return;
   }
   if (message.method === 'turn/start') {
+    turnStartCount += 1;
     record({ event: 'turn/start' });
     if (mode !== 'echo-mode-params' && !assertTurnParams(message)) return;
     if (mode === 'hold-turn-start') return;
@@ -391,7 +429,7 @@ function handle(message) {
     }
     if (mode === 'root-status-and-failure') {
       send({ method: 'thread/status/changed', params: { threadId: 'provider-thread-1', status: { type: 'idle' } } });
-      send({ method: 'item/completed', params: { threadId: 'provider-thread-1', turnId: 'provider-turn-1', item: { id: 'root-failed-command', type: 'commandExecution', command: 'rg missing', status: 'failed', exitCode: 2 } } });
+      send({ method: 'item/completed', params: { threadId: 'provider-thread-1', turnId: fakeTurn().id, item: { id: 'root-failed-command', type: 'commandExecution', command: 'rg missing', status: 'failed', exitCode: 2 } } });
     }
     if (mode === 'reasoning-events') {
       sendReasoningEvents();
@@ -401,7 +439,7 @@ function handle(message) {
         method: 'error',
         params: {
           threadId: 'provider-thread-1',
-          turnId: 'provider-turn-1',
+          turnId: fakeTurn().id,
           willRetry: true,
           error: { message: 'Connection interrupted. Retrying the request.' },
         },
@@ -412,7 +450,7 @@ function handle(message) {
         method: 'thread/tokenUsage/updated',
         params: {
           threadId: 'provider-thread-1',
-          turnId: 'provider-turn-1',
+          turnId: fakeTurn().id,
           tokenUsage: {
             last: {
               cachedInputTokens: 400,
@@ -438,7 +476,7 @@ function handle(message) {
         method: 'rawResponseItem/completed',
         params: {
           threadId: 'provider-thread-1',
-          turnId: 'provider-turn-1',
+          turnId: fakeTurn().id,
           item: { type: 'future_tool_call', id: 'raw-item-1' },
         },
       });
@@ -448,7 +486,7 @@ function handle(message) {
         method: 'item/agentMessage/delta',
         params: {
           threadId: 'provider-thread-1',
-          turnId: 'provider-turn-1',
+          turnId: fakeTurn().id,
           itemId: 'item-1',
           delta: 123,
         },
@@ -461,7 +499,7 @@ function handle(message) {
         method: 'item/agentMessage/delta',
         params: {
           threadId: 'provider-thread-1',
-          turnId: 'provider-turn-1',
+          turnId: fakeTurn().id,
           itemId: 'item-1',
           delta: 'First item',
         },
@@ -471,7 +509,7 @@ function handle(message) {
         method: 'item/agentMessage/delta',
         params: {
           threadId: 'provider-thread-1',
-          turnId: 'provider-turn-1',
+          turnId: fakeTurn().id,
           itemId: 'item-2',
           delta: 'Second item',
         },
@@ -489,7 +527,7 @@ function handle(message) {
       method: 'item/agentMessage/delta',
       params: {
         threadId: 'provider-thread-1',
-        turnId: 'provider-turn-1',
+        turnId: fakeTurn().id,
         itemId: 'item-1',
         delta: 'Hello from app-server',
       },
@@ -505,7 +543,7 @@ function handle(message) {
   }
   if (message.method === 'turn/steer') {
     record({ event: 'turn/steer', params: message.params });
-    send({ id: message.id, result: { turnId: 'provider-turn-1' } });
+    send({ id: message.id, result: { turnId: fakeTurn().id } });
     sendAgentMessageItemCompleted('steered-message', 'Corrected reply');
     send({ method: 'turn/completed', params: { threadId: 'provider-thread-1', turn: fakeTurn('completed') } });
     return;
@@ -1517,6 +1555,72 @@ describe('CodexProviderAdapter', () => {
         ])
       },
       { mode: 'hold-native-turn' },
+    )
+  })
+
+  it('keeps a later turn running after steering, Stop and delayed duplicate old completion', async ({
+    onTestFinished,
+  }) => {
+    await withFakeCodex(
+      async ({ spawnLogPath }) => {
+        const adapter = new CodexProviderAdapter()
+        onTestFinished(() => adapter.stopAll())
+        const events: ProviderRuntimeEvent[] = []
+        collectAdapterEvents(adapter, events)
+        const first = providerTurnInput()
+        const firstRun = adapter.sendTurn(first)
+        void firstRun.catch(() => {})
+        await expect
+          .poll(() => events.filter((event) => event.type === 'turn.started'))
+          .toHaveLength(1)
+        await adapter.steerTurn({ ...first, messageText: 'Focus on the second file' })
+        const firstRequests = await readFakeCodexLog(spawnLogPath)
+        expect(firstRequests.filter((entry) => entry.event === 'turn/start')).toHaveLength(1)
+        expect(firstRequests.find((entry) => entry.event === 'turn/steer')).toMatchObject({
+          params: { threadId: 'provider-thread-1', expectedTurnId: 'provider-turn-1' },
+        })
+        await adapter.interruptTurn(first)
+        await firstRun
+        const second = { ...first, turnId: v.parse(turnIdSchema, 'turn-2') }
+        const secondRun = adapter.sendTurn(second)
+        void secondRun.catch(() => {})
+        await expect
+          .poll(() => events.filter((event) => event.type === 'turn.started'))
+          .toMatchObject([
+            { turnId: first.turnId, providerRefs: { providerTurnId: 'provider-turn-1' } },
+            { turnId: second.turnId, providerRefs: { providerTurnId: 'provider-turn-2' } },
+          ])
+        await adapter.steerTurn({ ...second, messageText: 'Keep working on this turn' })
+        expect(
+          events.filter((event) => event.type === 'runtime.state.changed').at(-1),
+        ).toMatchObject({
+          turnId: second.turnId,
+          payload: { state: 'running' },
+        })
+        expect(events.filter((event) => event.type === 'turn.completed')).toMatchObject([
+          { turnId: first.turnId, payload: { state: 'interrupted' } },
+        ])
+        expect(events.filter((event) => event.type === 'assistant.complete')).toHaveLength(0)
+        await adapter.interruptTurn(second)
+        await secondRun
+        await adapter.stopAll()
+        const requests = await readFakeCodexLog(spawnLogPath)
+        expect(requests.filter((entry) => entry.event === 'turn/start')).toHaveLength(2)
+        expect(requests.filter((entry) => entry.event === 'turn/steer')).toMatchObject([
+          { params: { threadId: 'provider-thread-1', expectedTurnId: 'provider-turn-1' } },
+          { params: { threadId: 'provider-thread-1', expectedTurnId: 'provider-turn-2' } },
+        ])
+        expect(requests.filter((entry) => entry.event === 'turn/interrupt')).toMatchObject([
+          { params: { threadId: 'child-thread-1', turnId: 'child-turn-1' } },
+          { params: { threadId: 'provider-thread-1', turnId: 'provider-turn-1' } },
+          { params: { threadId: 'provider-thread-1', turnId: 'provider-turn-2' } },
+        ])
+        expect(events.filter((event) => event.type === 'turn.completed')).toMatchObject([
+          { turnId: first.turnId, payload: { state: 'interrupted' } },
+          { turnId: second.turnId, payload: { state: 'interrupted' } },
+        ])
+      },
+      { mode: 'steer-stop-late-completion' },
     )
   })
 

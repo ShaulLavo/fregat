@@ -1000,7 +1000,7 @@ class CodexAppServerSession {
   private attachNotificationTurn(params: unknown) {
     if (notificationThreadId(params) !== this.providerConversationMarker) return
     const providerTurnId = notificationTurnId(params)
-    if (!providerTurnId || this.canonicalTurnByProviderTurnId.has(providerTurnId)) return
+    if (!providerTurnId) return
     this.attachPendingTurn(providerTurnId)
   }
 
@@ -1902,6 +1902,7 @@ class CodexAppServerSession {
   }
 
   private attachPendingTurn(providerTurnId: string) {
+    if (this.canonicalTurnByProviderTurnId.has(providerTurnId)) return
     const turn = this.pendingTurn
     if (!turn) return
 
