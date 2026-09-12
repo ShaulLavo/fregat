@@ -407,15 +407,45 @@ describe('editor workspace state', () => {
     expect(documentStore.getState().getLiveEditorDocument(parkedPath)).not.toBeNull()
     expect(documentStore.getState().getLiveEditorDocument(first)).not.toBeNull()
   })
+
+  // The defect this fixes was a production caller that neutered the ceiling, so
+  // the pair matters: a binding budget must evict, and a generous one must not.
+  // Without the second half a regression that hands over a non-binding budget
+  // again would pass every test.
+  it('evicts a parked project over the retained-text budget, and keeps it under one', () => {
+    const parkedPath = '/repo/parked.ts'
+
+    for (const [budget, evicted] of [
+      [500, true],
+      [1_073_741_824, false],
+    ] as const) {
+      const { commands, documentStore, workspaceStore } = editorHarness({}, () => budget)
+
+      commands.openFileSurface(parkedPath)
+      const parkedTabId = workspaceStore.getState().workbenchPanels.activeEditorTabId!
+      documentStore
+        .getState()
+        .ensureEditorView(parkedTabId, fileResult(parkedPath, 'x'.repeat(1000)))
+
+      commands.switchRootFolder(pickedDirectory('/other'))
+
+      expect(documentStore.getState().getLiveEditorDocument(parkedPath) === null).toBe(evicted)
+    }
+  })
 })
 
-function editorHarness(slice: Partial<CachedWorkspaceSlice> = {}) {
+function editorHarness(
+  slice: Partial<CachedWorkspaceSlice> = {},
+  // The registry maximum, not MAX_SAFE_INTEGER: no test should pin a budget the
+  // production path cannot produce.
+  retainedTextBudget: () => number = () => 1_073_741_824,
+) {
   const documentStore = createEditorDocumentStore()
   const searchStore = createSearchBufferStore()
   const uiStore = createEditorUiStore()
   const workspaceStore = createEditorWorkspaceStore(cachedWorkspace(slice))
   const commands = createEditorApplyActions({
-    retainedTextBudget: () => Number.MAX_SAFE_INTEGER,
+    retainedTextBudget,
     activation: { activate: () => undefined, setRoot: () => undefined },
     documentStore,
     searchStore,

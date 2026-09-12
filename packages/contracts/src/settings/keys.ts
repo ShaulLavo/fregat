@@ -255,9 +255,8 @@ export const SETTINGS_REGISTRY = {
     keywords: ['terminal', 'cursor', 'blink'],
   }),
   'editor.retainedTextBudget': defineSetting({
-    // Clamped at 1 GiB: the value decides how much parked-project text the
-    // renderer keeps resident, and an unbounded one is a memory leak with a
-    // settings key in front of it. 0 retains only the active project.
+    // Clamped at 1 GiB: an unbounded value is a memory leak with a settings key
+    // in front of it. 0 retains only the active project, which is never trimmed.
     schema: v.pipe(v.number(), v.integer(), v.minValue(0), v.maxValue(1_073_741_824)),
     default: 67_108_864,
     // Machine scope, following `lsp.idleTimeoutMs`: a per-box RAM tradeoff. A
@@ -268,7 +267,7 @@ export const SETTINGS_REGISTRY = {
     widget: 'number',
     category: 'Editor',
     description:
-      'Text retained for parked projects when switching away from one, measured in UTF-16 code units across their open documents. The active project is never trimmed.',
+      'Total text the editor keeps resident across the active and parked projects, in UTF-16 code units, re-checked at a project switch and a tab close. The active project is charged first and is never trimmed, so a large one leaves less room for parked projects.',
     visibility: 'advanced',
     keywords: ['memory', 'retention', 'projects', 'budget', 'documents'],
   }),

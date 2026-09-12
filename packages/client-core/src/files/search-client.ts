@@ -50,11 +50,8 @@ export async function collectWorkspaceSearch(
     if (event.type === 'done') done = event
   }
 
-  // Every terminal field comes from the `done` event and none is defaulted. The
-  // old fallbacks (`done?.count ?? matches.length`, `done?.truncated ?? false`)
-  // are what made a partial stream look like a finished one. `streamWorkspaceSearch`
-  // throws when no `done` arrives, so this guard is belt-and-braces — it keeps the
-  // function correct on its own terms rather than on its producer's.
+  // No terminal field is defaulted: a defaulted `truncated: false` reads as a
+  // finished run. Belt-and-braces — the producer already throws without `done`.
   if (!done) throw clientErrors.SEARCH_INCOMPLETE({ matchCount: matches.length })
 
   return {
@@ -89,14 +86,12 @@ export async function* streamWorkspaceSearch(
 
     const parsed = workspaceSearchEventFromSse(event)
     if (parsed.type === 'match') matchCount += 1
-    terminated = parsed.type === 'done'
+    if (parsed.type === 'done') terminated = true
     yield parsed
   }
 
-  // A stream that simply ends is indistinguishable from a completed one unless
-  // the producer says so. Throwing rather than returning is what makes that
-  // unignorable: `for await` discards a generator's return value with no
-  // diagnostic, so every consumer's existing catch is the enforcement point.
+  // Throwing, not returning: `for await` discards a generator's return value with
+  // no diagnostic, so a consumer's catch is the only enforceable handoff.
   if (!terminated) throw clientErrors.SEARCH_INCOMPLETE({ matchCount })
 }
 

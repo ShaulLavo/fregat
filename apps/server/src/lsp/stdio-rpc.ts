@@ -9,10 +9,16 @@ const INITIAL_HEADER_CAPACITY = 256
 // a malformed frame rather than a leak.
 const MAX_HEADER_BYTES = 8 * 1024
 
-// A body no allocator can represent is unframeable by any implementation, so
-// rejecting it here is a correctness floor rather than a product limit. The
-// configurable per-server ceiling is separate work.
+// A frame larger than this is rejected as malformed. Not an allocator limit —
+// `buffer.constants.MAX_LENGTH` is larger — but a body no language server in this
+// registry produces; the configurable per-server ceiling is separate work.
 const MAX_BODY_BYTES = 2 ** 31 - 1
+
+// The header declares the body length; it does not get to reserve it. Allocating
+// `contentLength` up front let 30 bytes of stdout reserve 2 GiB, and the throw
+// when that allocation fails escapes `push` inside `stdout.on('data')`, which
+// nothing catches. Growth is geometric, so total copies stay linear.
+const INITIAL_BODY_CAPACITY = 64 * 1024
 
 export type LspStdioMessageHandler = (message: string, byteLength: number) => void
 
@@ -26,10 +32,10 @@ export type LspStdioFramingStats = {
 /**
  * Reads `Content-Length` framed messages from a child process's stdout.
  *
- * Each body is assembled exactly once, into a buffer sized from its own header:
- * chunks are copied straight to their final offset and never re-copied. The
- * previous implementation concatenated the whole pending message per chunk,
- * which is quadratic — a 4 MiB body arriving in 16 KiB reads copied 518 MiB.
+ * Each body is assembled once, into a buffer that grows as bytes arrive rather
+ * than being sized from the header. The previous implementation concatenated the
+ * whole pending message per chunk, which is quadratic: a 4 MiB body in 16 KiB
+ * reads would copy 522 MiB.
  *
  * The header region is contiguous by construction, so a separator split across
  * two chunks needs no resumable scan cursor: it is always findable in the
@@ -40,6 +46,7 @@ export class LspStdioMessageReader {
   private headerLength = 0
   private body: Buffer | null = null
   private bodyFilled = 0
+  private bodyLength = 0
   private chunkCount = 0
   private discardedBytes = 0
   private malformedCount = 0
@@ -102,7 +109,8 @@ export class LspStdioMessageReader {
     }
 
     this.discardHeader(0)
-    this.body = Buffer.allocUnsafe(contentLength)
+    this.bodyLength = contentLength
+    this.body = Buffer.allocUnsafe(Math.min(contentLength, INITIAL_BODY_CAPACITY))
     this.bodyFilled = 0
     this.flushCompleteBody()
     return consumed
@@ -119,25 +127,43 @@ export class LspStdioMessageReader {
   }
 
   private fillBody(bytes: Buffer, offset: number) {
-    const body = this.body
-    if (body === null) return offset
+    if (this.body === null) return offset
 
-    const take = Math.min(body.length - this.bodyFilled, bytes.length - offset)
-    bytes.copy(body, this.bodyFilled, offset, offset + take)
+    const take = Math.min(this.bodyLength - this.bodyFilled, bytes.length - offset)
+    this.growBody(this.bodyFilled + take)
+    bytes.copy(this.body, this.bodyFilled, offset, offset + take)
     this.bodyFilled += take
     this.flushCompleteBody()
     return offset + take
   }
 
-  /** Resets before handing the message out, so a reentrant `push` is safe. */
+  private growBody(needed: number) {
+    const body = this.body
+    if (body === null || needed <= body.length) return
+
+    let capacity = body.length
+    while (capacity < needed) capacity = Math.min(this.bodyLength, capacity * 2)
+
+    const grown = Buffer.allocUnsafe(capacity)
+    body.copy(grown, 0, 0, this.bodyFilled)
+    this.body = grown
+  }
+
+  /**
+   * Resets before the handout, so a throw from the handler cannot re-deliver this
+   * body. A `push` from inside the handler is unsupported: it would frame ahead
+   * of the outer chunk's remaining bytes.
+   */
   private flushCompleteBody() {
     const body = this.body
-    if (body === null || this.bodyFilled < body.length) return
+    if (body === null || this.bodyFilled < this.bodyLength) return
 
+    const length = this.bodyLength
     this.body = null
     this.bodyFilled = 0
-    this.maxMessageBytes = Math.max(this.maxMessageBytes, body.length)
-    this.onMessage(body.toString('utf8'), body.length)
+    this.bodyLength = 0
+    this.maxMessageBytes = Math.max(this.maxMessageBytes, length)
+    this.onMessage(body.toString('utf8', 0, length), length)
   }
 
   private appendHeader(bytes: Buffer, offset: number, length: number) {

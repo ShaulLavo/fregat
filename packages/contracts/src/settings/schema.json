@@ -76,7 +76,7 @@
     },
     "editor.retainedTextBudget": {
       "default": 67108864,
-      "description": "Text retained for parked projects when switching away from one, measured in UTF-16 code units across their open documents. The active project is never trimmed.",
+      "description": "Total text the editor keeps resident across the active and parked projects, in UTF-16 code units, re-checked at a project switch and a tab close. The active project is charged first and is never trimmed, so a large one leaves less room for parked projects.",
       "maximum": 1073741824,
       "minimum": 0,
       "type": "integer"

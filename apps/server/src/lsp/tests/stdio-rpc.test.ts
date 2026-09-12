@@ -111,9 +111,11 @@ describe('LSP stdio framing', () => {
     const small = encodeLspStdioMessage('{"id":9}')
     const large = encodeLspStdioMessage(`{"id":10,"v":"${'x'.repeat(4096)}"}`)
 
-    reader.push(small)
+    // Largest is not last: otherwise the assertion cannot tell `Math.max(...)`
+    // from `body.length`, and surviving later messages is the stat's whole point.
     reader.push(large.slice(0, 40))
     reader.push(large.slice(40))
+    reader.push(small)
 
     expect(reader.stats.chunkCount).toBe(3)
     expect(reader.stats.maxMessageBytes).toBe(

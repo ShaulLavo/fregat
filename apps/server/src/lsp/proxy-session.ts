@@ -13,7 +13,13 @@ import type { ChildProcessWithoutNullStreams } from 'node:child_process'
 import type { LspServerHandle, LspServerMatch } from './registry'
 import { fileUriForPath } from './language'
 import { LspStdioMessageReader, writeLspStdioMessage } from './stdio-rpc'
-import { elapsedMs, limitText, recordProcessInfo, recordProcessWarning } from '../observability'
+import {
+  elapsedMs,
+  errorSummary,
+  limitText,
+  recordProcessInfo,
+  recordProcessWarning,
+} from '../observability'
 
 type JsonRpcId = number | string | null
 
@@ -417,7 +423,9 @@ class PooledLspProxySession {
   }
 
   private bindProcess(): void {
-    this.process.stdout.on('data', (chunk) => this.reader.push(chunk))
+    // `index.ts` registers only `unhandledRejection`, so a synchronous throw here
+    // would take the whole server down with it.
+    this.process.stdout.on('data', (chunk) => this.pushServerBytes(chunk))
     this.process.stderr.on('data', (chunk) => this.logStderr(chunk))
     this.process.once('exit', (code, signal) => {
       this.exitCode = code
@@ -1368,6 +1376,20 @@ class PooledLspProxySession {
     this.idleTimer = null
   }
 
+  private pushServerBytes(chunk: Buffer): void {
+    try {
+      this.reader.push(chunk)
+    } catch (error) {
+      recordProcessWarning('lsp.framing_failed', {
+        area: 'lsp',
+        error: errorSummary(error),
+        serverId: this.match.server.id,
+        ...this.reader.stats,
+      })
+      this.closeFromProcess('framing_error')
+    }
+  }
+
   private closeFromProcess(outcome: string): void {
     if (this.disposed) return
 
@@ -1460,9 +1482,8 @@ class PooledLspProxySession {
       outcome,
       rootPath: this.rootPath,
       serverBytes: this.serverBytes,
-      // Framing cost: `serverBytes / serverChunkCount` is the mean read size,
-      // which is what makes a quadratic accumulator visible from a log line, and
-      // `serverMaxMessageBytes` names the response that paid for it.
+      // `serverChunkCount` far above `serverMessageCount` with a large
+      // `serverMaxMessageBytes` is one body reassembled across many reads.
       serverChunkCount: framing.chunkCount,
       framingDiscardedBytes: framing.discardedBytes,
       framingMalformedCount: framing.malformedCount,

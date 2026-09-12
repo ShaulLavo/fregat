@@ -23,17 +23,9 @@ export type DocumentRetention = {
  * (/repo and /repo/apps/web), so one absolute path can be referenced by two slices,
  * and computing per slice would drop a document the other slice still displays.
  *
- * `documentSizes` is required, and the only producer is the document store that
- * owns the documents. It used to be optional, which meant the single production
- * caller omitted it and `withinByteBudget` returned on its first line — the
- * declared ceiling was skipped entirely for the life of the feature. An API that
- * can be called without the input it needs is the defect; a required parameter
- * whose type only one place can produce is the fix.
- *
- * Sizes are UTF-16 code-unit counts taken from each retained snapshot in O(1).
- * That equals the byte count for ASCII and under-counts multi-byte UTF-8, so the
- * budget is a consistent measure of retained text rather than an exact heap
- * figure.
+ * `documentSizes` is required: only the document store can produce that map, so a
+ * caller cannot omit it. Sizes are UTF-16 code-unit counts read in O(1) —
+ * byte-exact for ASCII, an under-count for multi-byte UTF-8.
  */
 export function retentionForProjects({
   activeRootPath,
@@ -84,19 +76,15 @@ function retainedSlices({
   return [...active, ...withinByteBudget(active, parked, byteBudget, documentSizes)]
 }
 
-/** The active project is never trimmed; parked ones drop oldest-first until it fits. */
+/** The active project is never trimmed; parked slices are admitted newest-first, each skipped if it would not fit. */
 function withinByteBudget(
   active: readonly RetainedWorkspaceSlice[],
   parked: readonly RetainedWorkspaceSlice[],
   byteBudget: number,
   documentSizes: ReadonlyMap<string, number>,
 ) {
-  // Charged documents are committed in two places for two different reasons: the
-  // active slices always, because they are never trimmed, and a parked slice only
-  // once it is kept. Measuring used to commit as a side effect, so a slice that
-  // was then rejected still marked its documents charged and a later slice
-  // sharing them was charged nothing — undercounting, in the direction that
-  // retains too much.
+  // Measure without committing: a rejected slice must not charge documents that a
+  // later, kept slice shares. Active slices commit unconditionally — never trimmed.
   const charged = new Set<string>()
   let total = 0
   for (const slice of active) total += commitSliceSize(slice, documentSizes, charged)
@@ -104,7 +92,10 @@ function withinByteBudget(
   const kept: RetainedWorkspaceSlice[] = []
   for (const slice of parked) {
     const size = measureSliceSize(slice, documentSizes, charged)
-    if (total + size > byteBudget) continue
+    // A slice whose documents are all charged already cannot move `total`, so
+    // dropping it frees no text and only costs its view sessions. This is the
+    // nested-root case the union rule above exists for.
+    if (size > 0 && total + size > byteBudget) continue
 
     total += size
     kept.push(commitSlice(slice, charged))

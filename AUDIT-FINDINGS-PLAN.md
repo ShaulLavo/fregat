@@ -68,6 +68,79 @@ Two baseline failures fixed as prerequisites rather than worked around:
 
 Still open for a human: decisions 2, 3, 4, 6, 8, 9 and 10.
 
+## Errata — corrections to the four fix commits
+
+A review pass over `669afeac`, `3d1ea53e`, `7ac493a6` and `d1d94b0b` found 33 defects in them. The
+code fixes are in the follow-up commit; these are the claims those commit messages got wrong. The
+messages themselves are unamendable without a rebase, so this is the record.
+
+**One blocking regression shipped.** `3d1ea53e` deleted `eslint` from `apps/server`'s
+devDependencies on the premise that nothing invoked it. `apps/server/src/lsp/tests/eslint-server.test.ts`
+spawns the real `vscode-eslint-language-server` against a fixture created **inside** `apps/server`, and
+that server resolves the eslint library by walking up into `apps/server/node_modules`. Without it the
+server returns an empty diagnostic list with no error, so the test's `code: 'semi'` assertion fails.
+The message's "(37 tests pass)" counted that test — it passed only because
+`bun install --frozen-lockfile` had left an orphaned `eslint@10.10.0` on disk rather than pruning it.
+CI checks out fresh and would have gone red. `eslint` is restored to `apps/server` only, and the test
+now asserts resolvability up front so the next dependency sweep fails loudly instead of mysteriously.
+
+**`3d1ea53e`'s eslint-disable justification was wrong twice.** "Deleting them turns `bun run lint`
+red" holds for exactly one of the twelve comments (`messages-timeline.tsx:87`,
+`oxc-react-compiler/immutability`, configured `error`). Nine name warn-level rules, and every
+workspace `lint` is a bare `oxlint .` with no `--deny-warnings`, so deleting those nine exits 0. Four
+suppress nothing today. And `oxc-react-compiler/no-unused-directives` is about source
+`'use no memo'` directives, not eslint-disable comments — there is no safety net; the flag that would
+provide one is `--report-unused-disable-directives`, which nothing passes. Keeping the comments is
+still right; the stated reason was not.
+
+**`3d1ea53e` understated its own behaviour change.** The message says eslint LS adoption is lost
+"when `apps/server` is the workspace root". Adoption is not root-local: `serverIsAdopted` walks from a
+file's own directory up to the workspace root, and all five `eslint.config.js` files are gone, so
+adoption is lost for every JS/TS file in this repo at any workspace root — including the repo root.
+Because linter servers outrank typescript for diagnostics, code actions and formatting, oxlint now
+owns those three where eslint did.
+
+**`669afeac` quoted two different figures for one scenario.** 518 MiB in prose, 522.0 MiB in the
+table. 522.0 is correct and consistent with the other rows: it counts both the `Buffer.concat` output
+and the per-chunk `Buffer.from(chunk)` copy, and the old `push` performed both. The source comment now
+says 522, and marks the payload hypothetical — no 4 MiB LSP response appears in `logs/` (largest
+session total: 394,820 B). The plan's own arithmetic at the Unit 3 section was also short by one
+chunk, and its `toString('utf8')` reconciliation was false.
+
+**`669afeac`'s "512 B single chunk 2.7 ms → 1.3 ms" was mislabelled.** That pair is ~2,000 frames
+through one long-lived reader, not one frame; a single 512-byte frame costs three orders of magnitude
+less. The conclusion (no small-message regression) holds — re-measured at 1.06–1.33x on realistic
+shapes — but the row's unit was wrong.
+
+**`669afeac`'s "`serverBytes / serverChunkCount` is the mean read size" was wrong.** `serverBytes`
+sums message _body_ lengths only, excluding every frame's `Content-Length:` header and every
+discarded byte. The source comment now states the signature that those fields do support.
+
+**`7ac493a6`'s "each of the four consumers already had a correct catch" was wrong.** Two of the four
+call sites have no catch at all — `data-helpers.ts:142` and `DiskSearchProvider`'s bare `yield*`. The
+conclusion (no consumer needed a new catch) holds, because the handler lives one or two layers out,
+but the stated reason was the argument for throwing rather than typing the return, so it mattered. One
+consumer _did_ change: `workbench.ts` lost its loop-exit `publish({ kind: 'ready' })`.
+
+**`d1d94b0b`'s "pays no `localStorage` parse per tab close" was false.** The injected thunk called
+`readSettingsMirror()`, which does a `localStorage` read, a `JSON.parse` and a valibot pass over all
+31 mirrored keys, once per qualifying close. Injection relocated the cost by one call frame; it did
+not remove it. The thunk now reads one key through `readSettingBootValue`, and the comments claim only
+what is true: the injection keeps `apply-actions` off `features/settings` and lets a test pin the
+budget.
+
+**`d1d94b0b` left one behaviour change unmentioned.** The unconditionally-built active slice matches
+`slice.rootPath === activeRootPath` when both are `null`, so the rootless active slice now spends one
+of the three project slots and a rootless close retains two parked projects rather than three. Against
+the code that actually ran at `d0bbaa2b` the rootless close path retained none, so this is a property
+of the new code rather than a regression — but it was undisclosed. Now stated in `editorRetention`'s
+docblock.
+
+**Two claims the review upheld against my own doubt:** the differential fuzz result (re-run at 5x the
+sample size with harsher chunkings — still 0 regressions, every divergence the stranded-frame class
+where the new reader is correct), and the `lsp` log-line count (exactly 35,316, with none of the four
+new framing fields present).
+
 ## Verdicts at a glance
 
 | #   | Finding                                                 | Verdict                      | Owner                               | Effort                  |

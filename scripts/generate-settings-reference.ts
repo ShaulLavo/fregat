@@ -108,9 +108,23 @@ ${sections.join('\n\n')}
 const DEFAULT_TARGET = path.join(import.meta.dirname, '..', 'docs', 'settings-reference.md')
 
 function targetArgument(): string {
+  const inline = process.argv.find((argument) => argument.startsWith('--target='))
+  if (inline) return resolveTarget(inline.slice('--target='.length))
+
   const index = process.argv.indexOf('--target')
-  const target = index === -1 ? undefined : process.argv[index + 1]
-  return target ? path.resolve(target) : DEFAULT_TARGET
+  if (index === -1) return DEFAULT_TARGET
+
+  return resolveTarget(process.argv[index + 1])
+}
+
+/** A valueless `--target` used to fall through to the default and overwrite it. */
+function resolveTarget(value: string | undefined): string {
+  if (!value || value.startsWith('--')) {
+    console.error('--target requires a path')
+    process.exit(1)
+  }
+
+  return path.resolve(value)
 }
 
 function writeReference(target: string): void {
@@ -123,8 +137,12 @@ function writeReference(target: string): void {
 // comparison has to be on the rendered text because `SCOPE_NOTES` is
 // interpolated into prose, not just into the table.
 function checkReference(target: string): void {
-  const actual = existsSync(target) ? readFileSync(target, 'utf8') : ''
-  if (actual === body) return
+  if (!existsSync(target)) {
+    console.error(`settings reference is missing at ${target}`)
+    process.exitCode = 1
+    return
+  }
+  if (readFileSync(target, 'utf8') === body) return
 
   console.error('settings reference is stale: run bun run settings:reference')
   process.exitCode = 1

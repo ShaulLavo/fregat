@@ -91,12 +91,7 @@ export function createEditorApplyActions({
 }: {
   activation: EditorActivation
   documentStore: EditorDocumentStoreApi
-  /**
-   * Injected rather than read here, so this module does not reach into
-   * `features/settings` and does not pay a `localStorage` parse plus a valibot
-   * pass per tab close on the address-apply loop. It also lets a test pin the
-   * budget without a Storage shim.
-   */
+  /** Injected so this module stays off `features/settings` and a test can pin it. */
   retainedTextBudget: () => number
   searchStore: SearchBufferStoreApi
   uiStore: EditorUiStoreApi
@@ -272,18 +267,18 @@ function switchRootFolder(
   log.info({
     action: 'workspace.root_switched',
     area: 'workspace',
-    // Retention was entirely invisible: both call sites discarded the eviction
-    // report, so neither an eviction nor its absence left a trace. A user
-    // reporting "the editor is holding gigabytes" produced no corroborating
-    // event at all.
     byteBudget,
+    documentSizeBeforeTrim: totalRetainedSize(documentSizes),
     evictedDocumentCount: evicted.evictedDocumentIds.length,
     evictedTabCount: evicted.evictedTabIds.length,
     parkedCount: workspace.parkedWorkspaces.size,
     path: rootFolder.path,
     previousPath: previousRootPath,
     restoredTabCount: workspace.workbenchPanels.editorTabs.length,
-    retainedDocumentSize: totalRetainedSize(documentSizes),
+    // Read after the trim. `documentSizes` is the pre-eviction snapshot, so
+    // summing it here reported everything just evicted as still retained —
+    // worst exactly when the trim was biggest, and unusable next to `byteBudget`.
+    retainedDocumentSize: totalRetainedSize(documentStore.getState().editorDocumentSizes()),
   })
 }
 
@@ -295,17 +290,11 @@ function totalRetainedSize(documentSizes: ReadonlyMap<string, number>) {
 }
 
 /**
- * The keep set for both retention triggers — a project switch and a tab close.
+ * The keep set for both retention triggers: a project switch and a tab close.
  *
- * One builder, because the close path used to build its own from the closing
- * workspace's panels alone. That ignored every parked project, so closing a tab
- * in one project evicted another project's clean documents and disposed its view
- * sessions. Switching back then refetched them and lost their undo history.
- *
- * The active slice is built unconditionally. Gating it on a non-null root (as the
- * switch path did) yields a keep set of parked slices only when there is no root
- * folder, putting every open document outside it — reachable through
- * `clearRootFolder`, and rootless surfaces like the settings editor are openable.
+ * The active slice is built even when `rootPath` is null, or `clearRootFolder` and
+ * rootless surfaces like the settings editor would put every open document outside
+ * the keep set. That rootless slice does spend one of the `projectLimit` slots.
  */
 function editorRetention(
   workspace: EditorWorkspaceStore,
@@ -374,19 +363,23 @@ function closeTab(
       // set spans every project, not just this one — building it from the closing
       // workspace's panels alone is what evicted parked projects' documents.
       const documentSizes = documentStore.getState().editorDocumentSizes()
+      const byteBudget = retainedTextBudget()
       const evicted = documentStore
         .getState()
-        .retainEditorDocuments(
-          editorRetention(workspace, nextPanels, documentSizes, retainedTextBudget()),
-        )
+        .retainEditorDocuments(editorRetention(workspace, nextPanels, documentSizes, byteBudget))
       log.info({
-        action: 'editor.command.close_tab',
+        // Named for retention, not for the command: this fires only when the
+        // closed path had no other tab, so an `editor.command.*` name would be
+        // uncountable against actual closes.
+        action: 'editor.retention.close_tab',
         area: 'editor',
+        byteBudget,
+        documentSizeBeforeTrim: totalRetainedSize(documentSizes),
         evictedDocumentCount: evicted.evictedDocumentIds.length,
         evictedTabCount: evicted.evictedTabIds.length,
         parkedCount: workspace.parkedWorkspaces.size,
         path,
-        retainedDocumentSize: totalRetainedSize(documentSizes),
+        retainedDocumentSize: totalRetainedSize(documentStore.getState().editorDocumentSizes()),
       })
     }
   }

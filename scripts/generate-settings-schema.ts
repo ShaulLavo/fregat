@@ -135,9 +135,23 @@ async function checkSchema(target: string): Promise<void> {
 }
 
 function targetArgument(): string {
+  const inline = process.argv.find((argument) => argument.startsWith('--target='))
+  if (inline) return resolveTarget(inline.slice('--target='.length))
+
   const index = process.argv.indexOf('--target')
-  const target = index === -1 ? undefined : process.argv[index + 1]
-  return target ? path.resolve(target) : DEFAULT_TARGET
+  if (index === -1) return DEFAULT_TARGET
+
+  return resolveTarget(process.argv[index + 1])
+}
+
+/** A valueless `--target` used to fall through to the default and overwrite it. */
+function resolveTarget(value: string | undefined): string {
+  if (!value || value.startsWith('--')) {
+    console.error('--target requires a path')
+    process.exit(1)
+  }
+
+  return path.resolve(value)
 }
 
 const target = targetArgument()

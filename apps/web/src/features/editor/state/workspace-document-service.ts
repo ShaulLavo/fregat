@@ -248,15 +248,9 @@ export class WorkspaceDocumentService {
   /**
    * Retained text size per live document, for the retention budget.
    *
-   * Every live document is here, not only the evictable ones: an unevictable
-   * document (dirty, non-`file` sync, or path-unavailable) still occupies memory,
-   * and charging it zero would make the budget a statement about a number smaller
-   * than the real footprint. `getTextSnapshot().length` is a retained field read
-   * in O(1), so this allocates one map and nothing else.
-   *
-   * This is deliberately the only producer of the map `retentionForProjects`
-   * requires. The map can therefore only come from the store that owns the
-   * documents, so a caller cannot invent or omit one.
+   * Every live document, not only the evictable ones: an unevictable document
+   * still occupies memory. `getTextSnapshot().length` is a retained field, so this
+   * allocates one map and reads nothing.
    */
   documentSizes(): ReadonlyMap<string, number> {
     const sizes = new Map<string, number>()

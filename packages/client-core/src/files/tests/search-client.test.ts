@@ -89,7 +89,9 @@ describe('collectWorkspaceSearch', () => {
     const pending = collectWorkspaceSearch(QUERY, controller.signal, client)
     controller.abort()
 
-    await expect(pending).rejects.toThrow()
+    // Must name the mechanism: a bare `toThrow()` also passes when the stream
+    // merely ends without `done`, which is a different bug with a different fix.
+    await expect(pending).rejects.toMatchObject({ name: 'AbortError' })
   })
 
   it('rejects a done event whose payload is not an object instead of zeroing it', async () => {
