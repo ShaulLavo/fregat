@@ -1,5 +1,6 @@
 import type { ChatAgent, ChatAgentTool } from '@workspace/contracts'
 import { asRecord, stringField } from './records'
+import { canonicalItemType } from './codex-item-type'
 
 export function notificationThreadId(params: unknown) {
   const record = asRecord(params)
@@ -70,7 +71,7 @@ export function childTool(
   if (item.status === 'failed' || item.status === 'declined') status = item.status
   return {
     itemId,
-    itemType,
+    itemType: canonicalItemType(itemType),
     status,
     title:
       stringField(item, 'command') ??

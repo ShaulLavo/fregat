@@ -608,7 +608,7 @@ describe('provider runtime ingestion', () => {
           description: 'Reviewer',
           tool: {
             itemId,
-            itemType: 'commandExecution',
+            itemType: 'command_execution',
             status,
             title: 'rg missing',
             data: { exitCode: 2 },

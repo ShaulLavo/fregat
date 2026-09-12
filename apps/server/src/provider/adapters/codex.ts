@@ -66,6 +66,7 @@ import { normalizeWorkspaceCwd } from './utils/workspace-cwd'
 import { canonicalTurnId } from './utils/turn-ids'
 import { CodexChildAgents } from './state/codex-child-agents'
 import { codexUserInputAnswers } from './utils/codex-user-input'
+import { canonicalItemType } from './utils/codex-item-type'
 import { notificationThreadId, notificationTurnId } from './utils/codex-child-notifications'
 import {
   codexDiscoveredSession,
@@ -3277,31 +3278,6 @@ function runtimePlanStepStatus(value: string | null) {
   if (value === 'pending' || value === 'inProgress' || value === 'completed') return value
 
   return null
-}
-
-function canonicalItemType(value: string | null) {
-  switch (value) {
-    case 'agentMessage':
-      return 'assistant_message'
-    case 'commandExecution':
-      return 'command_execution'
-    case 'fileChange':
-      return 'file_change'
-    case 'mcpToolCall':
-      return 'mcp_tool_call'
-    case 'dynamicToolCall':
-      return 'dynamic_tool_call'
-    case 'webSearch':
-      return 'web_search'
-    case 'imageView':
-      return 'image_view'
-    case 'reasoning':
-      return 'reasoning'
-    case 'plan':
-      return 'plan'
-    default:
-      return 'unknown'
-  }
 }
 
 function itemLifecycleStatus(
