@@ -61,7 +61,7 @@ export default defineConfig({
     name: 'browser',
     globalSetup: ['./test/env/browser-file-server.ts'],
     include: ['src/**/*.browser.tsx'],
-    setupFiles: ['./test/env/jest-dom.ts'],
+    setupFiles: ['./test/env/browser.ts'],
     browser: {
       // Pin the runner origin so the file server's allowed-origins
       // list (built from this port) matches the real test origin.
