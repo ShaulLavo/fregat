@@ -1,55 +1,32 @@
-import type { VscodeThemeDefinition, VscodeThemeRegistration } from '@singapor/core/shiki'
 import { act, waitFor } from '@testing-library/react'
 import { createElement } from 'react'
 import { afterEach, vi } from 'vitest'
 
 import { expect, test } from '../../../../../test/fixtures'
-
-type PendingThemeLoad = {
-  readonly load: () => Promise<VscodeThemeRegistration>
-  readonly resolve: (registration: VscodeThemeRegistration) => void
-}
+import { deferredThemeModule } from '../../../../../test/factories/deferred-theme-module'
 
 let restoreClient: (() => void) | undefined
 
 afterEach(() => {
   restoreClient?.()
   restoreClient = undefined
-  vi.doUnmock('@workspace/client-core/themes/registration')
+  vi.doUnmock('@shikijs/themes/monokai')
+  vi.doUnmock('@shikijs/themes/dracula')
   vi.resetModules()
 })
 
 test('a late older theme load cannot overwrite the newer applied theme id', async ({ client }) => {
   expect(client).toBeDefined()
-  const pending = new Map<string, PendingThemeLoad>()
   vi.resetModules()
-  vi.doMock('@workspace/client-core/themes/registration', async () => {
-    const actual = await vi.importActual<
-      typeof import('@workspace/client-core/themes/registration')
-    >('@workspace/client-core/themes/registration')
-
-    return {
-      ...actual,
-      loadVscodeThemeRegistration: (definition: VscodeThemeDefinition | string) => {
-        const themeId = typeof definition === 'string' ? definition : definition.id
-        let resolve!: (registration: VscodeThemeRegistration) => void
-        const promise = new Promise<VscodeThemeRegistration>((next) => {
-          resolve = next
-        })
-        pending.set(themeId, {
-          load: () => actual.loadVscodeThemeRegistration(definition),
-          resolve,
-        })
-        return promise
-      },
-    }
-  })
+  const monokai = deferredThemeModule(() => vi.importActual('@shikijs/themes/monokai'))
+  const dracula = deferredThemeModule(() => vi.importActual('@shikijs/themes/dracula'))
+  vi.doMock('@shikijs/themes/monokai', monokai.load)
+  vi.doMock('@shikijs/themes/dracula', dracula.load)
 
   const store = await import('@/features/editor/state/color-theme-store')
-  const { getClient, setClient } = await import('@/lib/client')
-  const previousClient = getClient()
-  setClient(client)
-  restoreClient = () => setClient(previousClient)
+  const { activeServerOrigin } = await import('@/lib/client')
+  const { installTestEnvironment } = await import('../../../../../test/factories/client-binding')
+  restoreClient = await installTestEnvironment(activeServerOrigin(), client)
   const { useEditorColorTheme } = await import('@/features/editor/hooks/use-editor-color-theme')
   const { renderWithProviders, createTestQueryClient } = await import('../../../../../test/render')
   const { settingsKeys } = await import('@workspace/client-core/settings/query-keys')
@@ -78,30 +55,18 @@ test('a late older theme load cannot overwrite the newer applied theme id', asyn
     command: false,
     queryClient,
   })
-  await waitFor(() => expect(pending.has('monokai')).toBe(true))
+  await waitFor(() => expect(monokai.requested).toBe(true))
 
   act(() => selectTheme?.('dracula'))
-  await waitFor(() => expect(pending.has('dracula')).toBe(true))
-  await resolvePendingTheme(pending, 'dracula')
+  await waitFor(() => expect(dracula.requested).toBe(true))
+  await act(() => dracula.release())
   await waitFor(() => {
     expect(view.getByRole('status')).toHaveAttribute('data-applied-theme-id', 'dracula')
     expect(view.getByRole('status')).toHaveAttribute('data-selected-theme-id', 'dracula')
   })
 
-  await resolvePendingTheme(pending, 'monokai')
+  await act(() => monokai.release())
   await Promise.resolve()
 
   expect(view.getByRole('status')).toHaveAttribute('data-applied-theme-id', 'dracula')
 })
-
-async function resolvePendingTheme(
-  pending: ReadonlyMap<string, PendingThemeLoad>,
-  themeId: string,
-): Promise<void> {
-  const load = pending.get(themeId)
-  expect(load, `Missing deferred theme load: ${themeId}`).toBeDefined()
-  if (!load) return
-
-  const registration = await load.load()
-  await act(async () => load.resolve(registration))
-}

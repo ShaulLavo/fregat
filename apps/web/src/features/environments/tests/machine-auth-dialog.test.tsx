@@ -17,6 +17,9 @@ import { readConnectedMachines } from '@/state/connected-machines'
 import { createObservedInProcessClient } from '../../../../test/client'
 import { expect, test } from '../../../../test/fixtures'
 import { renderWithProviders } from '../../../../test/render'
+import { makeTestServer } from '../../../../test/server'
+import { createInProcessClient } from '../../../../test/client'
+import { installTestEnvironment } from '../../../../test/factories/client-binding'
 
 test('SSH authentication masks and clears the secret while submitting only to the primary backend', async ({
   server,
@@ -30,11 +33,17 @@ test('SSH authentication masks and clears the secret while submitting only to th
       requests.push(request.clone())
     }),
   )
-  setActiveServerOrigin('https://other-environment.example.test')
-  onTestFinished(() => {
+  const remote = await makeTestServer({ filesystemWatch: false })
+  const restoreEnvironment = await installTestEnvironment(
+    'https://other-environment.example.test',
+    createInProcessClient(remote),
+  )
+  onTestFinished(async () => {
+    restoreEnvironment()
     setActiveServerOrigin(primaryServerOrigin())
     setClient(primary)
     setActiveServerOrigin(origin)
+    await remote.cleanup()
   })
   const connections = createTestEnvironmentConnections()
   connections.authStore.setState({
