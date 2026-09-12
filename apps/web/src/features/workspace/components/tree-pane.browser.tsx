@@ -1,7 +1,7 @@
 import { tabFileResource } from '@/lib/documents/utils/capabilities'
 import { fileDocumentKey } from '@/lib/documents/utils/identity'
-import { testTabContent } from '../../../../test/factories/document-targets'
-import type { TabContent } from '@/lib/documents/utils/types'
+import { testDocumentRef } from '../../../../test/factories/document-targets'
+import type { DocumentRef } from '@/lib/documents/utils/types'
 import { filesystemPath } from '@/lib/documents/utils/identity'
 import '@workspace/ui/globals.css'
 import '@singapor/core/style.css'
@@ -238,7 +238,7 @@ test('the live navigator retains search, consumes requested focus, reveals, and 
 test('a failed command-bus tree reveal rejects without changing focus ownership', async () => {
   const focusService = new FocusService()
   await mountTreePane(focusService, {
-    commandSnapshot: { activeTabContent: testTabContent(UNLOADED_FILE_PATH) },
+    commandSnapshot: { activeDocument: testDocumentRef(UNLOADED_FILE_PATH) },
   })
 
   await fileTreeShadowRoot()
@@ -466,7 +466,7 @@ async function mountTreePane(
   focusService: FocusService = new FocusService(),
   options: {
     readonly density?: SettingsValues['workbench.density']
-    readonly commandSnapshot?: { readonly activeTabContent: TabContent | null }
+    readonly commandSnapshot?: { readonly activeDocument: DocumentRef | null }
     readonly editorMounted?: boolean
     readonly model?: TreeModel
     readonly rootPath?: string
@@ -489,7 +489,7 @@ function renderTreePane(
   fixture: Awaited<ReturnType<typeof createBrowserWorkspace>>,
   options: {
     readonly density?: SettingsValues['workbench.density']
-    readonly commandSnapshot?: { readonly activeTabContent: TabContent | null }
+    readonly commandSnapshot?: { readonly activeDocument: DocumentRef | null }
     readonly editorMounted?: boolean
     readonly model?: TreeModel
     readonly rootPath?: string
