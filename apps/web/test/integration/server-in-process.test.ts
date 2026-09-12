@@ -2,7 +2,13 @@ import { writeFile } from 'node:fs/promises'
 import path from 'node:path'
 import type { WorkspaceSearchProviderSource, WorkspaceSearchQuery } from '@workspace/contracts'
 import { fetchQuickOpenFiles } from '@/lib/file-server'
-import { collectWorkspaceSearch, type WorkspaceSearchResult } from '@/lib/workspace-search-client'
+import { filesystemPath } from '@/lib/documents/utils/identity'
+import { createClientInvariantError } from '@/lib/structured-errors'
+import {
+  collectWorkspaceSearch,
+  type WorkspaceSearchResult,
+} from '@workspace/client-core/files/search-client'
+import type { Client } from '@workspace/client-core/transport/client'
 import { expect, test } from '../fixtures'
 
 // Proves the phase-2 foundation: a real server, driven in-process through the
@@ -34,9 +40,9 @@ test('quick-open file search reuses the workspace search index', async ({ client
   })
 
   const query = quickOpenSearchQuery('command-palette')
-  const indexed = await waitForSearchProvider(query, 'index')
+  const indexed = await waitForSearchProvider({ client, query, source: 'index' })
   const matches = await fetchQuickOpenFiles({
-    path: '',
+    path: filesystemPath(''),
     query: query.query,
     signal: new AbortController().signal,
   })
@@ -72,20 +78,27 @@ function quickOpenSearchQuery(query: string): WorkspaceSearchQuery {
   }
 }
 
-async function waitForSearchProvider(
-  query: WorkspaceSearchQuery,
-  source: WorkspaceSearchProviderSource,
-) {
+async function waitForSearchProvider({
+  client,
+  query,
+  source,
+}: {
+  readonly client: Client
+  readonly query: WorkspaceSearchQuery
+  readonly source: WorkspaceSearchProviderSource
+}) {
   let latest: WorkspaceSearchResult | null = null
 
   for (let attempt = 0; attempt < 25; attempt += 1) {
-    latest = await collectWorkspaceSearch(query)
+    latest = await collectWorkspaceSearch(query, undefined, client)
     if (latest.measurement?.providerSources.includes(source)) return latest
 
     await wait(20)
   }
 
-  throw new Error(`Expected workspace search provider ${source}, got ${latestProviders(latest)}`)
+  throw createClientInvariantError(
+    `Expected workspace search provider ${source}, got ${latestProviders(latest)}`,
+  )
 }
 
 function latestProviders(result: WorkspaceSearchResult | null) {
