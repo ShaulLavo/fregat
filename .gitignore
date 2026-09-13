@@ -65,3 +65,6 @@ apps/web/src/**/surface-*.png
 # Emitted beside a web build by apps/web/scripts/bundle-stats-plugin.ts
 apps/web/bundle-stats.json
 apps/web/bundle-report.json
+
+# astro generates this on every build
+.astro/

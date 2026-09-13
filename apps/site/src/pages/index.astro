@@ -1,0 +1,157 @@
+---
+import { Image } from 'astro:assets'
+import workbench from '../assets/workbench.webp'
+import '../styles/global.css'
+
+const title = 'fregat'
+const description =
+  'an editor, a terminal, and your coding agents in one window. the editor is ours, the agents are yours.'
+---
+
+<!doctype html>
+<html lang="en">
+  <head>
+    <meta charset="utf-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1" />
+    <title>{title}</title>
+    <meta name="description" content={description} />
+    <meta property="og:title" content={title} />
+    <meta property="og:description" content={description} />
+    <meta property="og:image" content={new URL(workbench.src, Astro.site)} />
+    <link rel="icon" href={`${import.meta.env.BASE_URL}/favicon.svg`} type="image/svg+xml" />
+    <link rel="preconnect" href="https://fonts.googleapis.com" />
+    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
+    <link
+      rel="stylesheet"
+      href="https://fonts.googleapis.com/css2?family=Bricolage+Grotesque:opsz,wdth,wght@12..96,75..100,400..700&family=IBM+Plex+Mono:wght@400;500&display=swap"
+    />
+  </head>
+  <body>
+    <header class="wrap top">
+      <a class="wordmark" href={import.meta.env.BASE_URL}>fregat<small>Фрегат</small></a>
+      <nav>
+        <a href="https://github.com/ShaulLavo/fregat">github</a>
+      </nav>
+    </header>
+
+    <main>
+      <section class="wrap hero">
+        <h1><span>the editor is ours.</span> <span>the agents are yours.</span></h1>
+        <p>
+          an editor, a terminal, and your coding agents in one window. claude code and codex run on
+          the subscriptions you already have, inside an editor written from scratch.
+        </p>
+        <div class="actions">
+          <a class="button" href="https://github.com/ShaulLavo/fregat">get the source</a>
+          <span class="status">no releases yet. clone it and run it.</span>
+        </div>
+      </section>
+
+      <div class="wrap">
+        <figure class="shot">
+          <Image
+            src={workbench}
+            alt="the fregat workbench: a file tree, an editor pane with typescript open, and a terminal running bun dev, over a wallpaper"
+            loading="eager"
+            widths={[800, 1200, 2000]}
+            sizes="(min-width: 1200px) 1120px, 100vw"
+          />
+        </figure>
+      </div>
+
+      <section class="wrap section after-shot" aria-labelledby="parts-heading">
+        <h2 id="parts-heading">open a folder and this is what's in the window</h2>
+        <dl class="parts">
+          <div>
+            <dt>editor</dt>
+            <dd>
+              <a href="https://github.com/ShaulLavo/singapore">singapore</a>, written from scratch.
+              piece table storage, tree-sitter for syntax, language servers for the rest.
+            </dd>
+          </div>
+          <div>
+            <dt>terminal</dt>
+            <dd>
+              <a href="https://github.com/ShaulLavo/ghostty-webgpu">ghostty-webgpu</a>, real ghostty
+              compiled to wasm, in a pane next to the code.
+            </dd>
+          </div>
+          <div>
+            <dt>agents</dt>
+            <dd>
+              claude code and codex, side by side. each in its own session, each with its own
+              permission mode.
+            </dd>
+          </div>
+          <div>
+            <dt>git</dt>
+            <dd>status, diffs, branches and commits in the same window, watched live.</dd>
+          </div>
+          <div>
+            <dt>anywhere</dt>
+            <dd>
+              the server runs on your machine. the same workspace opens from a browser, the desktop
+              app, a terminal, or a phone over tailscale.
+            </dd>
+          </div>
+        </dl>
+      </section>
+
+      <section class="wrap section" aria-labelledby="agents-heading">
+        <h2 id="agents-heading">your agents, on your account</h2>
+        <div class="sessions" aria-hidden="true">
+          <div class="session">
+            <header><span>claude code</span><span>approval required</span></header>
+            <ol>
+              <li><b>&gt;</b> move the settings registry into contracts</li>
+              <li>reading packages/contracts/src/settings/keys.ts</li>
+              <li><i>edit</i> keys.ts, 3 changes. allow?</li>
+            </ol>
+          </div>
+          <div class="session">
+            <header><span>codex</span><span>full access</span></header>
+            <ol>
+              <li><b>&gt;</b> why does the tree typecheck fail on a clean checkout</li>
+              <li>running bun run --filter @workspace/tree typecheck</li>
+              <li><i>found</i> zustand declared, never installed</li>
+            </ol>
+          </div>
+        </div>
+        <p>
+          sign in from inside the app, against your own claude or openai account. no accounts here,
+          nothing proxied. run both at once. claude code takes full access, approval required, or
+          auto accept edits. codex runs full access.
+        </p>
+      </section>
+
+      <section class="wrap section" aria-labelledby="where-heading">
+        <h2 id="where-heading">where it stands</h2>
+        <p>
+          cursor is a fork of vs code. t3 code stops at the harness. fregat is the whole editor,
+          written from scratch, with the agents you already pay for running inside it.
+        </p>
+      </section>
+
+      <section class="wrap section" aria-labelledby="try-heading">
+        <h2 id="try-heading">try it</h2>
+        <ul class="prereqs">
+          <li><b>bun</b>, and at least one of</li>
+          <li><b>claude code</b>: <code>claude auth login</code>, or sign in from the app</li>
+          <li><b>codex</b>: install the cli, then <code>codex login</code></li>
+        </ul>
+        <pre><code>git clone https://github.com/ShaulLavo/fregat
+<span class="c"># singapore and ghostty-webgpu go beside it, linked. the readme has the steps</span>
+cd fregat
+bun install
+bun run dev
+<span class="c"># open the url it prints, pick a folder</span></code></pre>
+      </section>
+    </main>
+
+    <footer class="wrap foot">
+      <a href="https://github.com/ShaulLavo/fregat">fregat</a>
+      <a href="https://github.com/ShaulLavo/singapore">singapore</a>
+      <a href="https://github.com/ShaulLavo/ghostty-webgpu">ghostty-webgpu</a>
+    </footer>
+  </body>
+</html>
