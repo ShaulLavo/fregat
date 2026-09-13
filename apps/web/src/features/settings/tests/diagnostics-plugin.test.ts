@@ -16,6 +16,7 @@ import {
 } from '@/features/settings/state/diagnostics-source'
 import { settingsEditorDiagnostics } from '@/features/settings/utils/diagnostics'
 
+import { languageServerSnapshot } from '../../../../test/factories/language-server-snapshot'
 import { expect, test } from '../../../../test/fixtures'
 
 type HighlightCall = {
@@ -189,7 +190,7 @@ function diagnosticsHost(documentId: string, text: string): DiagnosticsHost {
 }
 
 function editorSnapshot(documentId: string, fullText: string): EditorViewSnapshot {
-  return { documentId, fullText } as EditorViewSnapshot
+  return languageServerSnapshot(documentId, 'json', fullText)
 }
 
 function userSource(file: SettingsLayerFile): SettingsDiagnosticsSource {

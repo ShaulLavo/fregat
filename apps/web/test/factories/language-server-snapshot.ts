@@ -4,16 +4,18 @@ import type { EditorViewSnapshot } from '@singapor/core/extensions'
 export function languageServerSnapshot(
   documentId: string,
   languageId: EditorViewSnapshot['languageId'] = 'typescript',
+  text = 'const value = 1',
 ): EditorViewSnapshot {
-  const buffer = createEditorTextBuffer('const value = 1')
+  const buffer = createEditorTextBuffer(text)
+  const lineStarts = lineStartsOf(text)
   const view = {
     documentId,
     languageId,
     fullText: buffer.materializeFullText(),
     textVersion: 0,
     initialHighlightStatus: 'plain' as const,
-    lineStarts: [0],
-    lineCount: 1,
+    lineStarts,
+    lineCount: lineStarts.length,
     tokens: [],
     brackets: [],
     selections: [],
@@ -49,4 +51,12 @@ export function languageServerSnapshot(
     toJSON: () => ({ ...view, kind: 'editor-view', schemaVersion: 1, theme: null }),
     toVisibleSnapshot: () => null,
   }
+}
+
+function lineStartsOf(text: string): number[] {
+  const starts = [0]
+  for (let index = text.indexOf('\n'); index !== -1; index = text.indexOf('\n', index + 1)) {
+    starts.push(index + 1)
+  }
+  return starts
 }

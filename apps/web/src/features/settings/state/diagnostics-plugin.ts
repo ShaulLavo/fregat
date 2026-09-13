@@ -5,7 +5,10 @@ import type {
   EditorViewContributionUpdateKind,
   EditorViewSnapshot,
 } from '@singapor/core'
-import { DiagnosticsPresenter } from '@singapor/lsp-plugin/diagnostics-presenter'
+import {
+  DiagnosticsPresenter,
+  viewDocumentSnapshot,
+} from '@singapor/lsp-plugin/diagnostics-presenter'
 
 import { documentKey, settingsJsonDocument } from '@/lib/documents/utils/identity'
 import { settingsEditorDiagnostics } from '@/features/settings/utils/diagnostics'
@@ -71,7 +74,7 @@ class SettingsDiagnosticsContribution implements EditorViewContribution {
     }
 
     this.presenter.render(
-      editor.fullText,
+      viewDocumentSnapshot(editor),
       settingsEditorDiagnostics(snapshot.target, snapshot.file, snapshot.diagnostics),
     )
   }
