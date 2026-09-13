@@ -4,7 +4,7 @@
   "private": true,
   "type": "module",
   "scripts": {
-    "dev": "bun ../../scripts/run-with-env.ts vite",
+    "dev": "bun run --parallel dev:vite dev:types",
     "build": "tsgo --build && bun --env-file=../../.env vite build",
     "bench:editor-open": "bun scripts/editor-open-benchmark.mjs",
     "bench:editor-open:calibrate": "bun scripts/calibrate-editor-open-benchmark.mjs",
@@ -29,7 +29,10 @@
     "test:watch": "bun --bun vitest --project node --project dom",
     "test:browser": "vitest run --config vitest.browser.config.ts",
     "typecheck": "tsgo --build",
-    "preview": "bun --env-file=../../.env vite preview"
+    "preview": "bun --env-file=../../.env vite preview",
+    "dev:vite": "bun ../../scripts/run-with-env.ts vite",
+    "dev:types": "bun ../../scripts/check-dev-types.ts --watch",
+    "typecheck:dev": "bun ../../scripts/check-dev-types.ts"
   },
   "dependencies": {
     "@dnd-kit/core": "^6.3.1",

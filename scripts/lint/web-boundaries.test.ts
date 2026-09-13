@@ -205,8 +205,8 @@ test('the configured CLI rejects shared imports of features at their source and 
     )
     const [exitCode, output, errors] = await Promise.all([
       process.exited,
-      new Response(process.stdout).text(),
-      new Response(process.stderr).text(),
+      Bun.readableStreamToText(process.stdout),
+      Bun.readableStreamToText(process.stderr),
     ])
     expect(errors).toBe('')
     expect(exitCode).toBe(1)

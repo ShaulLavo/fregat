@@ -15,7 +15,7 @@ env:
   # Keep the linked Editor API and Platform consumers on an exact revision.
   EDITOR_REF: 4580645f18e34a25aae7abf02e65bca3dda688cd
   # Same for the linked ghostty-webgpu checkout.
-  GHOSTTY_REF: 796d087851a036466bf49bbf0a4f0f037aed6da9
+  GHOSTTY_REF: 94ab02a02799b6897ffa6c766aecc7977418a89d
 
 jobs:
   quality:

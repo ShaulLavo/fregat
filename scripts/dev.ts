@@ -1,5 +1,4 @@
 import path from 'node:path'
-import { observabilityEnabledFromEnv } from '../packages/observability/src/env'
 import { observabilityEnvFromFile } from '../packages/observability/src/env-file'
 import {
   allowedOriginsForWebPort,
@@ -33,7 +32,6 @@ async function runDev() {
 
   const args = Bun.argv.slice(2)
   const command = [turbo, 'dev', ...args]
-  if (shouldSilenceDevOutput(args)) command.push('--output-logs=none')
 
   console.log(`[dev] Client: ${runtimeUrl(webHost, webPort)}`)
   const child = Bun.spawn({
@@ -56,12 +54,6 @@ function configureRuntime(webHost: string, webPort: number) {
     webHost,
     webPort,
   )
-}
-
-function shouldSilenceDevOutput(args: readonly string[]) {
-  if (observabilityEnabledFromEnv(env)) return false
-
-  return !args.some((arg) => arg.startsWith('--output-logs'))
 }
 
 function installSignalHandlers(child: ReturnType<typeof Bun.spawn>) {

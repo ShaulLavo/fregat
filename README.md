@@ -23,7 +23,7 @@ user-facing knobs are registry entries in `packages/contracts/src/settings/keys.
 
 ## the editor packages
 
-you need a sibling checkout of the editor repo at `../Editor` — there's no npm fallback right now, `@singapor/decode` isn't published. the root `overrides` map points every `@singapor/*` at it via bun's `link:` protocol (`"@singapor/core": "link:@singapor/core"`), backed by `bun link` global links. so: run `bun link` inside each `../Editor/packages/*` once, then `bun install` here, and local editor changes show up in typecheck, tests and the dev server. ci does the same thing by cloning `ShaulLavo/singapor` as a sibling and linking each package
+you need a sibling checkout of the editor repo at `../Editor` — there's no npm fallback right now, `@singapor/decode` isn't published. the root `overrides` map points every `@singapor/*` at it via bun's `link:` protocol (`"@singapor/core": "link:@singapor/core"`), backed by `bun link` global links. so: run `bun link` inside each `../Editor/packages/*` once, then `bun install` here, and the dev server can read the linked editor source. ci does the same thing by cloning `ShaulLavo/singapor` as a sibling and linking each package
 
 `ghostty-webgpu` is linked the same way: the root override is `"ghostty-webgpu": "link:ghostty-webgpu"`, backed by a `bun link` run once inside a sibling checkout at `../ghostty-webgpu`. the npm release lags that repo, so the checkout is the version we actually run. ci clones `ShaulLavo/ghostty-webgpu` as a sibling, builds it and links it
 
@@ -44,6 +44,18 @@ bun run dev
 `bun run verify` is the full gate: typecheck, lint, format:check, test. lint is oxlint, formatting is oxfmt. scope anything to one package with `bun --filter web test` or `bun --filter server typecheck`
 
 open the url dev prints and you should land on the workspace shell with the file tree and editor
+
+### editing the editor and Ghostty
+
+`bun run dev` and `bun run dev:web` serve both libraries from their linked TypeScript source. No separate demo server or JavaScript build watcher is needed. Startup prints every source package and its resolved directory. A missing source file stops startup instead of falling back to `dist`.
+
+Editing Platform UI uses its normal hot reload. Editing the editor or Ghostty reloads the page so mounted instances use the new code. Use the development URL printed by the launcher; the mesh production URL continues to serve built assets.
+
+The web dev task also watches source types. `bun run --cwd apps/web typecheck:dev` runs that check once. Vite and this check share the same source map, including nonliteral editor subpaths and Ghostty CSS. The generated config lives in `apps/web/node_modules/.tmp/tsconfig.dev.json`. The existing `typecheck` and production build still check package declarations; the source check leaves unused-symbol checks to each repository.
+
+Ghostty's `ghostty-vt.wasm` and `bridge.wasm` remain compiled assets. After changing their native inputs, run `bun run build:wasm` or `bun run build:bridge` in the Ghostty checkout. TypeScript and renderer edits need neither command. Restart development after changing a package's export map or relinking a checkout.
+
+Production still requires the linked packages' builds. Source development does not update their `dist` directories.
 
 optional lefthook hooks — oxfmt and oxlint over staged files, then a repo typecheck, on every commit:
 

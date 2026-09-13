@@ -24,7 +24,7 @@ test('census counts real imports and separates all test consumers', async () => 
   try {
     await writeSources(root, files)
     const child = Bun.spawn([process.execPath, script, '--root', root, '@/lib/target'])
-    const output = await new Response(child.stdout).text()
+    const output = await Bun.readableStreamToText(child.stdout)
     expect(await child.exited).toBe(0)
     expect(JSON.parse(output)).toEqual([
       {
