@@ -7,8 +7,11 @@ import { writeTextFile } from './write'
 export async function createFile(
   target: MutationTarget<'content'> | MutationTarget<'entry'>,
   body: Pick<CreateFileBody, 'content'>,
+  maxBytes: number,
 ) {
-  if (target.kind === 'content') return writeTextFile(target, { content: body.content ?? '' })
+  if (target.kind === 'content') {
+    return writeTextFile(target, { content: body.content ?? '' }, maxBytes)
+  }
   try {
     await writeFile(target.absolutePath, body.content ?? '', {
       encoding: 'utf8',

@@ -138,7 +138,14 @@ export function createFileBrowser(client: Client, storage: KeyValueStorage) {
     preview = controller
     publish({ ...state, preview: { kind: 'loading', path: entry.path } })
     try {
-      const file = await readFilePreview({ client, path: entry.path, signal: controller.signal })
+      // A glance pane in a terminal: raw control bytes would wreck the render, and nobody asked
+      // to open this file. Deliberate opens stay permissive and show whatever is there.
+      const file = await readFilePreview({
+        acceptTextOnly: true,
+        client,
+        path: entry.path,
+        signal: controller.signal,
+      })
       controller.signal.throwIfAborted()
       const location: FileLocation | null = state.paths
         ? {

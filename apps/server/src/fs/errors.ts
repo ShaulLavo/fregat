@@ -15,7 +15,8 @@ export type FsErrorCode =
   | 'NOT_A_FILE'
   | 'NOT_A_DIRECTORY'
   | 'FILE_TOO_LARGE'
-  | 'INVALID_TEXT_FILE'
+  | 'FILE_IS_BINARY'
+  | 'LOSSY_WRITE_BLOCKED'
   | 'WORKSPACE_EDIT_INVALID'
   | 'WORKSPACE_EDIT_STALE'
   | 'WORKSPACE_EDIT_BUSY'
@@ -50,7 +51,8 @@ const statusByCode: Record<FsErrorCode, number> = {
   NOT_A_FILE: 400,
   NOT_A_DIRECTORY: 400,
   FILE_TOO_LARGE: 413,
-  INVALID_TEXT_FILE: 415,
+  FILE_IS_BINARY: 415,
+  LOSSY_WRITE_BLOCKED: 409,
   WORKSPACE_EDIT_INVALID: 400,
   WORKSPACE_EDIT_STALE: 409,
   WORKSPACE_EDIT_BUSY: 409,
@@ -75,7 +77,8 @@ const messageByCode: Record<FsErrorCode, string> = {
   NOT_A_FILE: 'path is not a file',
   NOT_A_DIRECTORY: 'path is not a directory',
   FILE_TOO_LARGE: 'file is too large',
-  INVALID_TEXT_FILE: 'file is not valid UTF-8 text',
+  FILE_IS_BINARY: 'file seems to be binary and was not decoded as text',
+  LOSSY_WRITE_BLOCKED: 'refusing to overwrite a file whose bytes do not round-trip as UTF-8 text',
   WORKSPACE_EDIT_INVALID: 'workspace edit is invalid',
   WORKSPACE_EDIT_STALE: 'workspace edit state is stale',
   WORKSPACE_EDIT_BUSY: 'workspace is busy with another mutation',

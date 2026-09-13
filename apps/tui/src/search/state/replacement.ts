@@ -49,7 +49,9 @@ export async function prepareReplacement({
         'Replacement file is outside the selected workspace.',
         'Refresh search results before preparing the replacement.',
       )
-    const file = await readFilePreview({ client, path, signal })
+    // Replacing inside a file we could not decode cleanly would write back substitutions the
+    // search never matched against, so skip it up front rather than have the write refuse it.
+    const file = await readFilePreview({ acceptTextOnly: true, client, path, signal })
     const result = replacementText(file.content, capturedQuery, replacement)
     if (!result.count || result.content === file.content) continue
     count += result.count

@@ -46,6 +46,11 @@ export const pathQuerySchema = v.object({
   path: v.optional(pathSchema, ''),
 })
 
+export const readQuerySchema = v.object({
+  path: v.optional(pathSchema, ''),
+  acceptTextOnly: v.optional(booleanQueryValueSchema),
+})
+
 export const treeQuerySchema = v.object({
   path: v.optional(pathSchema, ''),
   depth: v.optional(depthQueryValueSchema, '1'),

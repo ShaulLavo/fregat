@@ -2,6 +2,7 @@ import { readFile, stat } from 'node:fs/promises'
 import { FsError, mapNodeError } from './errors'
 import { resolveExistingPath, type WorkspacePaths } from './path'
 import { assertFile } from './stat'
+import { decodeText, type TextEncodingLabel } from './text-encoding'
 import { fileVersion, textFileVersion } from './version'
 
 export type ReadFileResult = {
@@ -10,6 +11,9 @@ export type ReadFileResult = {
   mtimeMs: number
   size: number
   version: string
+  encoding: TextEncodingLabel
+  lossy: boolean
+  seemsBinary: boolean
 }
 
 export type BlobFileResult = {
@@ -20,10 +24,20 @@ export type BlobFileResult = {
   version: string
 }
 
+export type ReadTextFileOptions = {
+  /**
+   * Fail with `FILE_IS_BINARY` instead of decoding a file that looks binary. Off by default: the
+   * read boundary decodes whatever it is given, and callers that would rather skip binaries — an
+   * indexer, a diff generator — opt in. See `text-encoding.ts` for why the default is permissive.
+   */
+  readonly acceptTextOnly?: boolean
+}
+
 export async function readTextFile(
   paths: WorkspacePaths,
   input: string,
   maxBytes: number,
+  options: ReadTextFileOptions = {},
 ): Promise<ReadFileResult> {
   try {
     const target = await resolveExistingPath(paths, input)
@@ -31,35 +45,23 @@ export async function readTextFile(
     assertFile(stats)
     if (stats.size > maxBytes) throw new FsError('FILE_TOO_LARGE')
     const bytes = await readFile(target.absolutePath)
-    const content = decodeTextFile(bytes)
+    const decoded = decodeText(bytes)
+    if (decoded.seemsBinary && options.acceptTextOnly) throw new FsError('FILE_IS_BINARY')
 
     return {
       path: target.relativePath,
-      content,
+      content: decoded.content,
       mtimeMs: stats.mtimeMs,
       size: stats.size,
-      version: textFileVersion(content),
+      version: textFileVersion(decoded.content),
+      encoding: decoded.encoding,
+      lossy: decoded.lossy,
+      seemsBinary: decoded.seemsBinary,
     }
   } catch (error) {
     if (error instanceof FsError) throw error
     throw mapNodeError(error)
   }
-}
-
-const textDecoder = new TextDecoder('utf-8', { fatal: true, ignoreBOM: true })
-
-function decodeTextFile(bytes: Uint8Array) {
-  let content: string
-
-  try {
-    content = textDecoder.decode(bytes)
-  } catch (error) {
-    throw new FsError('INVALID_TEXT_FILE', undefined, error)
-  }
-
-  if (content.includes('\0')) throw new FsError('INVALID_TEXT_FILE')
-
-  return content
 }
 
 export async function getBlobFile(paths: WorkspacePaths, input: string): Promise<BlobFileResult> {

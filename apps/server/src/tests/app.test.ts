@@ -171,7 +171,7 @@ describe('fs rpc filesystem limits', () => {
     })
   })
 
-  it('rejects malformed UTF-8 with INVALID_TEXT_FILE instead of replacement characters', async () => {
+  it('serves malformed UTF-8 as replacement characters and marks the read lossy', async () => {
     const root = await fixtureRoot()
     await writeFile(path.join(root, 'malformed.txt'), new Uint8Array([0x66, 0x80, 0x6f]))
     const app = testApp(root)
@@ -181,11 +181,17 @@ describe('fs rpc filesystem limits', () => {
       }),
     )
 
-    expect(response.status).toBe(415)
-    expect(await errorCode(response)).toBe('INVALID_TEXT_FILE')
+    expect(response.status).toBe(200)
+    expect(await response.json()).toMatchObject({
+      content: 'f\uFFFDo',
+      encoding: 'utf8',
+      lossy: true,
+      seemsBinary: false,
+      size: 3,
+    })
   })
 
-  it('rejects a NUL-bearing file with INVALID_TEXT_FILE', async () => {
+  it('serves a NUL-bearing file as text and flags it as seeming binary', async () => {
     const root = await fixtureRoot()
     await writeFile(path.join(root, 'nul.txt'), 'left\0right')
     const app = testApp(root)
@@ -195,8 +201,98 @@ describe('fs rpc filesystem limits', () => {
       }),
     )
 
+    expect(response.status).toBe(200)
+    expect(await response.json()).toMatchObject({
+      content: 'left\0right',
+      // Valid UTF-8 throughout, so the bytes still round-trip even though it looks binary.
+      lossy: false,
+      seemsBinary: true,
+    })
+  })
+
+  it('refuses a binary-looking file only when the caller asks for text only', async () => {
+    const root = await fixtureRoot()
+    await writeFile(path.join(root, 'nul.txt'), 'left\0right')
+    const app = testApp(root)
+    const response = await app.handle(
+      new Request('http://local/fs/read?path=nul.txt&acceptTextOnly=true', {
+        headers: trustedOriginHeaders(),
+      }),
+    )
+
     expect(response.status).toBe(415)
-    expect(await errorCode(response)).toBe('INVALID_TEXT_FILE')
+    expect(await errorCode(response)).toBe('FILE_IS_BINARY')
+  })
+
+  it('decodes a UTF-16 file instead of refusing it, and marks it lossy', async () => {
+    const root = await fixtureRoot()
+    await writeFile(path.join(root, 'utf16.txt'), Buffer.from('\uFEFFhello', 'utf16le'))
+    const app = testApp(root)
+    const response = await app.handle(
+      new Request('http://local/fs/read?path=utf16.txt&acceptTextOnly=true', {
+        headers: trustedOriginHeaders(),
+      }),
+    )
+
+    expect(response.status).toBe(200)
+    expect(await response.json()).toMatchObject({
+      content: '\uFEFFhello',
+      encoding: 'utf16le',
+      // We only ever write UTF-8 back, so a UTF-16 source cannot round-trip through an edit.
+      lossy: true,
+      seemsBinary: false,
+    })
+  })
+
+  it('never fails a read of a readable regular file, whatever its bytes', async () => {
+    const root = await fixtureRoot()
+    const bytes = new Uint8Array(1024)
+    for (let index = 0; index < bytes.length; index += 1) bytes[index] = index % 256
+    await writeFile(path.join(root, 'random.bin'), bytes)
+    const app = testApp(root)
+    const response = await app.handle(
+      new Request('http://local/fs/read?path=random.bin', {
+        headers: trustedOriginHeaders(),
+      }),
+    )
+
+    expect(response.status).toBe(200)
+    expect(await response.json()).toMatchObject({ seemsBinary: true, size: 1024 })
+  })
+
+  it('refuses to overwrite a file whose bytes do not round-trip as UTF-8', async () => {
+    const root = await fixtureRoot()
+    await writeFile(path.join(root, 'malformed.txt'), new Uint8Array([0x66, 0x80, 0x6f]))
+    const app = testApp(root)
+    const response = await app.handle(
+      new Request('http://local/fs/write', {
+        body: JSON.stringify({ content: 'f\uFFFDo', path: 'malformed.txt' }),
+        headers: { ...trustedOriginHeaders(), 'content-type': 'application/json' },
+        method: 'POST',
+      }),
+    )
+
+    expect(response.status).toBe(409)
+    expect(await errorCode(response)).toBe('LOSSY_WRITE_BLOCKED')
+    expect(await readFile(path.join(root, 'malformed.txt'))).toEqual(
+      Buffer.from([0x66, 0x80, 0x6f]),
+    )
+  })
+
+  it('allows overwriting a NUL-bearing file, because those bytes do round-trip', async () => {
+    const root = await fixtureRoot()
+    await writeFile(path.join(root, 'nul.txt'), 'left\0right')
+    const app = testApp(root)
+    const response = await app.handle(
+      new Request('http://local/fs/write', {
+        body: JSON.stringify({ content: 'edited', path: 'nul.txt' }),
+        headers: { ...trustedOriginHeaders(), 'content-type': 'application/json' },
+        method: 'POST',
+      }),
+    )
+
+    expect(response.status).toBe(200)
+    expect(await readFile(path.join(root, 'nul.txt'), 'utf8')).toBe('edited')
   })
 
   it('reports home as the default browsing path while keeping root selectable', async () => {

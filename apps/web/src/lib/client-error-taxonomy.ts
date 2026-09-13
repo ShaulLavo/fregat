@@ -20,6 +20,8 @@ const messagesByCategory: Record<ErrorCategory, string> = {
   not_a_file: 'That path is a directory, not a file.',
   not_a_directory: 'That path is a file, not a directory.',
   too_large: 'The file is larger than the workspace size limit.',
+  binary_file: 'The file appears to be binary.',
+  lossy_write: 'Saving would rewrite bytes this file never showed you, so the write was refused.',
   invalid_path: 'The path is invalid or conflicts with an existing entry.',
   io_error: 'The file server could not complete the filesystem operation.',
   connectivity: 'Could not reach the server.',
@@ -39,7 +41,8 @@ type FsErrorCode =
   | 'NOT_A_FILE'
   | 'NOT_A_DIRECTORY'
   | 'FILE_TOO_LARGE'
-  | 'INVALID_TEXT_FILE'
+  | 'FILE_IS_BINARY'
+  | 'LOSSY_WRITE_BLOCKED'
   | 'OPERATION_FAILED'
   | 'WATCH_FAILED'
 
@@ -51,7 +54,8 @@ const categoryByFsErrorCode: Record<FsErrorCode, ErrorCategory> = {
   NOT_A_FILE: 'not_a_file',
   NOT_A_DIRECTORY: 'not_a_directory',
   FILE_TOO_LARGE: 'too_large',
-  INVALID_TEXT_FILE: 'invalid_path',
+  FILE_IS_BINARY: 'binary_file',
+  LOSSY_WRITE_BLOCKED: 'lossy_write',
   INVALID_PATH: 'invalid_path',
   ALREADY_EXISTS: 'invalid_path',
   FILE_CHANGED: 'invalid_path',
@@ -69,13 +73,6 @@ export function toClientError(input: unknown): ClientError {
   if (isConnectivityError(input)) return categorizedClientError('connectivity', input)
 
   const code = extractFsErrorCode(input)
-  if (code === 'INVALID_TEXT_FILE') {
-    return categorizedClientError(
-      categoryByFsErrorCode[code],
-      input,
-      'The file is not valid UTF-8 text.',
-    )
-  }
   if (code) return categorizedClientError(categoryByFsErrorCode[code], input)
 
   // Structured errors from any non-fs catalog — settings, orchestration — carry
@@ -119,6 +116,7 @@ const toastableCategories: ReadonlySet<ErrorCategory> = new Set<ErrorCategory>([
   'too_large',
   'invalid_path',
   'io_error',
+  'lossy_write',
 ])
 
 function shouldToastCategory(category: ErrorCategory): boolean {
@@ -131,6 +129,8 @@ const titleByCategory: Record<ErrorCategory, string> = {
   not_a_file: 'Not a file',
   not_a_directory: 'Not a folder',
   too_large: 'File too large',
+  binary_file: 'Binary file',
+  lossy_write: 'Save refused',
   invalid_path: 'Invalid path',
   io_error: 'Filesystem error',
   connectivity: 'Connection failed',

@@ -198,13 +198,28 @@ export async function fetchTree(path: FilesystemPath, signal: AbortSignal, clien
   }
 }
 
-export async function fetchFile(path: FilesystemPath, signal: AbortSignal, client: Client) {
+export type FetchFileOptions = {
+  /**
+   * Fail with a `binary_file` error instead of decoding a file that looks binary. Off by default:
+   * a read renders whatever it is given, and callers that would rather skip binaries opt in.
+   */
+  readonly acceptTextOnly?: boolean
+}
+
+export async function fetchFile(
+  path: FilesystemPath,
+  signal: AbortSignal,
+  client: Client,
+  options: FetchFileOptions = {},
+) {
   const startedAt = performance.now()
   const owner = clientLogContext(client)
   const queues = fileLogQueues(client)
 
   try {
-    const result = fileResultFromResponse(await readFilePreview({ client, path, signal }))
+    const result = fileResultFromResponse(
+      await readFilePreview({ acceptTextOnly: options.acceptTextOnly, client, path, signal }),
+    )
     queueReadSuccessLog(path, result, startedAt, owner, queues.read)
     return result
   } catch (error) {

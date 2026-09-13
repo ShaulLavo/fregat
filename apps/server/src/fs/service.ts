@@ -251,11 +251,11 @@ export class FileSystemService {
     )
   }
 
-  read(path: string) {
+  read(path: string, acceptTextOnly = false) {
     return observeRequestOperation(
-      { area: 'fs', operation: 'read', path },
-      () => readTextFile(this.paths, path, this.maxTextFileBytes),
-      (result) => ({ size: result.size }),
+      { area: 'fs', acceptTextOnly, operation: 'read', path },
+      () => readTextFile(this.paths, path, this.maxTextFileBytes, { acceptTextOnly }),
+      (result) => ({ lossy: result.lossy, seemsBinary: result.seemsBinary, size: result.size }),
     )
   }
 
@@ -304,7 +304,7 @@ export class FileSystemService {
     body: WriteBody,
     write: ReturnType<FileChangeHub['beginWrite']> | undefined,
   ) {
-    const path = await writeTextFile(target, body)
+    const path = await writeTextFile(target, body, this.maxTextFileBytes)
     const entry = {
       ...(await this.statEntry(path)),
       version: textFileVersion(body.content),
@@ -348,7 +348,7 @@ export class FileSystemService {
     const write = this.beginWriteEvents(target, body)
     try {
       const version = textFileVersion(body.content ?? '')
-      const path = await createFile(target, body)
+      const path = await createFile(target, body, this.maxTextFileBytes)
       const entry = { ...(await this.statEntry(path)), version }
       const event: WatchServerMessage = {
         type: 'created',

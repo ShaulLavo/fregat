@@ -1,4 +1,5 @@
 import { createClientInvariantError } from '@/lib/structured-errors'
+import { decodedAsText } from '@workspace/contracts'
 
 import type {
   LiveEditorDocument,
@@ -577,6 +578,7 @@ export class FileSyncService {
     this.queryClient.setQueryData<FileResult>(
       queryKey,
       fileResultFromResponse({
+        ...decodedAsText,
         content,
         mtimeMs: entry.mtimeMs,
         path: entry.path,
@@ -683,6 +685,7 @@ function fileResultForSavedDocument(
   entry: StatResult,
 ): FileResult {
   return {
+    ...decodedAsText,
     content,
     mtimeMs: entry.mtimeMs,
     path,

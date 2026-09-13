@@ -7,6 +7,7 @@ import {
   eventsQuerySchema,
   openWorkspaceRootBodySchema,
   pathQuerySchema,
+  readQuerySchema,
   recordRecentBodySchema,
   recentsQuerySchema,
   registerWorkspaceAddressBodySchema,
@@ -37,8 +38,8 @@ export function fsRoutes(fs: FileSystemService) {
       .get('/tree', ({ query }) => fs.tree(query.path, query.depth, query.entryType), {
         query: treeQuerySchema,
       })
-      .get('/read', ({ query }) => fs.read(query.path), {
-        query: pathQuerySchema,
+      .get('/read', ({ query }) => fs.read(query.path, query.acceptTextOnly), {
+        query: readQuerySchema,
       })
       .get('/blob', async ({ query }) => fileResponse(await fs.blob(query.path)), {
         query: pathQuerySchema,

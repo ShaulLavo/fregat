@@ -74,7 +74,7 @@ test('Escape clears a failed narrow preview without navigating away from Files',
 }) => {
   const navigation = await renderAgentNavigation(server, { width: 72 })
   const { frame, rootPath } = navigation
-  await writeFile(`${server.root}/${rootPath}/binary.txt`, new Uint8Array([0]))
+  await writeFile(`${server.root}/${rootPath}/binary.txt`, new Uint8Array([0, 0, 0xff]))
   try {
     await act(async () => frame.mockInput.pressKey('p', { ctrl: true }))
     await expectListedPath(frame, `${server.root}/${rootPath}`)
@@ -88,13 +88,13 @@ test('Escape clears a failed narrow preview without navigating away from Files',
           await frame.renderOnce()
           return frame.captureCharFrame()
         })
-        .toContain('file is not valid UTF-8 text')
+        .toContain('seems to be binary')
     })
     expect(frame.renderer.root.findDescendantById('file-picker-list')).toBeUndefined()
     await act(async () => frame.mockInput.pressKey('ESCAPE'))
     await expectListedPath(frame, `${server.root}/${rootPath}`)
     expect(frame.captureCharFrame()).toContain('binary.txt')
-    expect(frame.captureCharFrame()).not.toContain('file is not valid UTF-8 text')
+    expect(frame.captureCharFrame()).not.toContain('seems to be binary')
     expect(frame.renderer.currentFocusedRenderable?.id).toBe('file-picker-filter')
   } finally {
     await navigation.cleanup()

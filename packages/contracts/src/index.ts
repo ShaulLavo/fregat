@@ -11,7 +11,8 @@ export {
   type FileTreeResult,
   type TreeEntry,
 } from './tree-entry'
-export type { FileResult } from './file-result'
+export { decodedAsText } from './file-result'
+export type { FileResult, TextDecodeMetadata, TextEncodingLabel } from './file-result'
 export {
   WORKSPACE_ADDRESS_ID_LENGTH,
   workspaceAddressIdSchema,

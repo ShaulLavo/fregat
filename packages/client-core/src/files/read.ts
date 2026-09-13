@@ -31,8 +31,16 @@ export async function readDirectory({ client, path, signal }: ReadOptions) {
   return data
 }
 
-export async function readFilePreview({ client, path, signal }: ReadOptions) {
-  const { data, error } = await client.fs.read.get({ query: { path }, fetch: { signal } })
+export async function readFilePreview({
+  acceptTextOnly = false,
+  client,
+  path,
+  signal,
+}: ReadOptions & { readonly acceptTextOnly?: boolean }) {
+  const { data, error } = await client.fs.read.get({
+    query: { acceptTextOnly, path },
+    fetch: { signal },
+  })
   if (error) throw createRpcError(error)
   signal.throwIfAborted()
   return data

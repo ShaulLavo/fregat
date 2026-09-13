@@ -1,3 +1,4 @@
+import { decodedAsText } from '@workspace/contracts'
 import { filesystemPath } from '@/lib/documents/utils/identity'
 import { testDocumentKey } from '../../../../test/factories/document-targets'
 import { createFileSyncPorts } from '@/features/editor/utils/file-sync-ports'
@@ -439,6 +440,7 @@ function resultEntry(path: string, content: string, mtimeMs: number) {
 
 function file(path: string, content: string, mtimeMs: number): FileResult {
   return {
+    ...decodedAsText,
     content,
     mtimeMs,
     path: filesystemPath(path),

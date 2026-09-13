@@ -1,3 +1,4 @@
+import { decodedAsText } from '@workspace/contracts'
 import { FilesystemConflictToast } from '@/features/editor/components/filesystem-conflict-toast'
 import {
   conflictId,
@@ -275,6 +276,7 @@ function finishConflict(conflict: FilesystemConflict, context: WorkspaceConflict
 
 function remoteFileResult(conflict: FilesystemConflict): FileResult {
   return {
+    ...decodedAsText,
     content: conflict.remoteText ?? '',
     mtimeMs: conflict.remoteMtimeMs ?? Date.now(),
     path: conflict.remotePath,

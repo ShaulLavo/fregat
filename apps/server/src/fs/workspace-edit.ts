@@ -14,6 +14,7 @@ import type {
   WorkspacePersistenceOperation,
   WorkspaceResourcePrecondition,
 } from '@workspace/contracts'
+import { isByteExactText } from './text-encoding'
 import { FsError, nodeErrorCode } from './errors'
 import type { WorkspacePaths } from './path'
 import type { FileChangeHub } from './watch'
@@ -820,6 +821,9 @@ export class WorkspaceEditController {
       guards,
     )
     if (!current.exists) throw new FsError('WORKSPACE_EDIT_STALE')
+    // Same round-trip rule as `/fs/write`: an edit is computed against decoded text, so committing
+    // it over bytes that do not decode losslessly would write substitutions nobody reviewed.
+    if (!isByteExactText(current.bytes)) throw new FsError('LOSSY_WRITE_BLOCKED')
     const beforeName = `write-${operation.index}-before`
     const afterName = `write-${operation.index}-after`
     const after = Buffer.from(operation.text, 'utf8')

@@ -4,6 +4,8 @@ export type ErrorCategory =
   | 'not_a_file'
   | 'not_a_directory'
   | 'too_large'
+  | 'binary_file'
+  | 'lossy_write'
   | 'invalid_path'
   | 'io_error'
   | 'connectivity'

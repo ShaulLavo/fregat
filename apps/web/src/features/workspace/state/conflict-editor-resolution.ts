@@ -1,4 +1,5 @@
 import { parseMergeConflicts, type TextSnapshot } from '@singapor/core'
+import { decodedAsText } from '@workspace/contracts'
 import { Debouncer } from '@tanstack/react-pacer/debouncer'
 import type { QueryClient } from '@tanstack/react-query'
 import { toast } from 'sonner'
@@ -184,6 +185,7 @@ export class ConflictEditorResolutionCoordinator {
             client,
           )
     const file: FileResult = {
+      ...decodedAsText,
       path: conflict.remotePath,
       content: text,
       mtimeMs: receipt.mtimeMs,
