@@ -1,8 +1,8 @@
-# platform
+# fregat
 
 a local-first code editing workspace, all in one bun monorepo
 
-a vite react client talking to an elysia server that does the actual filesystem, git and lsp work, with a shared contracts package so both sides agree on the shapes. there's also an electrobun desktop shell that wraps the same client. the editor itself is the `@singapor/*` packages, developed in a sibling repo
+a vite react client talking to an elysia server that does the actual filesystem, git and lsp work, with a shared contracts package so both sides agree on the shapes. there's also an electrobun desktop shell that wraps the same client. the editor itself is Singapore, the `@singapor/*` packages, developed in a sibling repo
 
 ## what's where
 

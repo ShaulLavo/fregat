@@ -60,7 +60,7 @@ runs:
         git config --global user.email 'ci@example.com'
         git config --global user.name 'CI'
 
-    # `singapor` is the same repo a developer machine checks out as `Editor`;
+    # `singapore` is the same repo a developer machine checks out as `Editor`;
     # it was renamed, and the old URL survives only on GitHub's redirect.
     - name: Clone editor packages
       shell: bash

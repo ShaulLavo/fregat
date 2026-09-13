@@ -20,7 +20,7 @@ a benchmark harness and a number, not in a bigger constant.
 | `textFileVersion` ([`version.ts`](../apps/server/src/fs/version.ts))                           | SHA-256 over the whole decoded string on every read and every guarded write.                                                                        |
 | `assertByteExactTarget` ([`write.ts`](../apps/server/src/fs/write.ts))                         | Reads the target file on every write to prove the bytes round-trip. Deliberate, and currently bounded only by the same constant.                    |
 | Git diff paths ([`git/service.ts`](../apps/server/src/git/service.ts))                         | Reuses `maxTextFileBytes` for a different decision — output truncation — so one number governs two unrelated budgets.                               |
-| Singapor document                                                                              | Unmeasured. The editor's own ceiling is the one number nobody has.                                                                                  |
+| Singapore document                                                                             | Unmeasured. The editor's own ceiling is the one number nobody has.                                                                                  |
 
 ## The transport
 
@@ -53,7 +53,7 @@ want for text already exists in the same file, for images.
 | Keep JSON                                  | Status quo. Ceiling is the engine string limit minus the 2.1x factor.                                                                                                                                                                                                                                                           |
 | Metadata in headers, raw bytes in the body | The `/fs/blob` shape. Cheapest to build, precedented in the same file. Metadata degrades to strings — see below.                                                                                                                                                                                                                |
 | **Streamed body**                          | The strongest option and the best typed. Eden maps a handler's `ReadableStream<A>` or `Generator<A>` to an `AsyncGenerator<A>` on the client, so a `function*` yielding `Uint8Array` arrives as typed chunks under `for await`. Never materializes bytes and string together at either end, which is where the 2.1x comes from. |
-| Ranged reads                               | Only needed if the editor can open a document it does not yet hold in full. A Singapor question before it is a transport one.                                                                                                                                                                                                   |
+| Ranged reads                               | Only needed if the editor can open a document it does not yet hold in full. A Singapore question before it is a transport one.                                                                                                                                                                                                  |
 
 ### What sending bytes actually changes
 
@@ -109,10 +109,10 @@ way any other client capability would be. A single constant cannot be right for 
    practical limit at roughly half the engine limit before the client's own copy is counted. If the
    transport is fixed first, the engine ceiling may stop being the thing anyone hits.
 4. **Which transport shape**, given the table above? Streaming leads on both cost and typing; the
-   open question is whether Singapor and the write path can accept a document in chunks.
+   open question is whether Singapore and the write path can accept a document in chunks.
 5. **Does a large file need a different read path entirely?** Streaming, ranged reads, or a
    virtualized document that never holds the whole text — the `/fs/blob` precedent, applied to text.
-6. **What is Singapor's own ceiling**, and is it above or below the transport's?
+6. **What is Singapore's own ceiling**, and is it above or below the transport's?
 7. **Should the git-diff budget be separated** from the open-a-file budget? They are one constant
    today for no stated reason.
 8. **What does the user see at the ceiling?** Today it is `FILE_TOO_LARGE`. VS Code offers "Open
