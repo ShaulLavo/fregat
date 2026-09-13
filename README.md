@@ -1,10 +1,10 @@
 # fregat
 
-a vs code, cursor, t3 code kind of thing, on an editor written from scratch
+an editor, a terminal, and your coding agents in one window. the editor is ours, the agents are yours
 
 ![](docs/images/workbench.webp)
 
-the editor is [singapore](https://github.com/ShaulLavo/singapore), built from the ground up the way monaco and codemirror are, not a fork of either. around it a terminal, git, language servers, and claude code and codex running on the subscriptions you already have. like cursor, except you bring the provider. like t3 code, except it's the whole editor and not just the harness
+cursor is a fork of vs code and t3 code stops at the harness. the editor here is [singapore](https://github.com/ShaulLavo/singapore), written from scratch the way monaco and codemirror were. around it a terminal, git, language servers, and claude code and codex running on the subscriptions you already have
 
 sign in from inside the app. no accounts here, nothing proxied. run both agents at once, each in its own session with its own permission mode
 
@@ -30,7 +30,7 @@ open the url it prints, pick a folder
 
 ## what's in it
 
-- [singapore](https://github.com/ShaulLavo/singapore), the editor. same category as monaco or codemirror, written from scratch
+- [singapore](https://github.com/ShaulLavo/singapore), the editor
 - [ghostty-webgpu](https://github.com/ShaulLavo/ghostty-webgpu), the terminal. libghostty-vt in wasm, not xterm.js
 - an elysia server that owns files, git, watching, language servers and the agent processes
 - clients for web, electrobun desktop, native mac, and a tui
