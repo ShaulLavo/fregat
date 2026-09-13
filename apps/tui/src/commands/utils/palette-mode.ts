@@ -1,4 +1,4 @@
-import { SETTINGS_REGISTRY, type SettingsValues, type SessionId } from '@workspace/contracts'
+import { BUNDLED_PALETTES, type PaletteId, type SessionId } from '@workspace/contracts'
 import type { ChatOwnerSnapshot } from '@workspace/client-core/chat/owner'
 import type { CommandId } from '@workspace/client-core/commands/catalog'
 import {
@@ -15,7 +15,7 @@ import { sessionAccessRows } from '@/commands/utils/session-access'
 type PaletteAction =
   | { readonly kind: 'command'; readonly id: CommandId }
   | { readonly kind: 'files'; readonly query: string }
-  | { readonly kind: 'app-colors'; readonly id: SettingsValues['workbench.palette'] }
+  | { readonly kind: 'app-colors'; readonly id: PaletteId }
   | { readonly kind: 'session'; readonly sessionId: SessionId }
 
 type PaletteOption = {
@@ -60,7 +60,7 @@ export function paletteModeRows({
   readonly search: string
   readonly recents: readonly string[]
   readonly colorMode: keyof typeof colorCommands
-  readonly palette: SettingsValues['workbench.palette']
+  readonly palette: PaletteId
   readonly writable: boolean
   readonly chat: ChatOwnerSnapshot
 }): { readonly title: string; readonly empty: string; readonly options: PaletteOption[] } {
@@ -158,16 +158,16 @@ function commandRows(
 }
 
 function appColorRows(query: string, active: string, writable: boolean): PaletteOption[] {
-  return SETTINGS_REGISTRY['workbench.palette'].schema.options
-    .filter((id) => scopedPaletteFilter(id, query) > 0)
-    .map((id) => ({
-      name: `${id.charAt(0).toUpperCase()}${id.slice(1)}${id === active ? ' · active' : ''}`,
+  return BUNDLED_PALETTES.filter(({ id, name }) => scopedPaletteFilter(id, query, [name]) > 0).map(
+    ({ id, name }) => ({
+      name: `${name}${id === active ? ' · active' : ''}`,
       description: 'Interface colors',
       value: {
         action: { kind: 'app-colors', id },
         reason: writable ? null : 'Reconnect before changing app colors.',
       },
-    }))
+    }),
+  )
 }
 
 function unavailable(title: string) {

@@ -14,19 +14,17 @@
          colors mirror --background-solid there; changing them means changing
          both.
 
-         The default `graphite` palette is inline and `sage` arrives as
-         --boot-floor from the script below, rather than both being attribute
-         selectors: a [data-palette] rule would outrank
-         html[data-backdrop='transparent'] and paint an opaque floor over the
-         compositor's real blur. */
+         --background-solid is the selected palette's own floor once the script
+         below has restored its stylesheet; the literal is Graphite for a page
+         with no cached palette. */
       @layer boot {
         html {
           color-scheme: light;
-          background-color: var(--boot-floor, oklch(0.97 0.006 70));
+          background-color: var(--background-solid, oklch(0.97 0.006 70));
         }
         html.dark {
           color-scheme: dark;
-          background-color: var(--boot-floor, oklch(0.145 0.006 70));
+          background-color: var(--background-solid, oklch(0.145 0.006 70));
         }
         html[data-backdrop='transparent'] {
           background-color: transparent;
@@ -43,6 +41,7 @@
       ;(() => {
         let theme = 'system'
         let palette = 'graphite'
+        let paletteCss = null
         let density = 'compact'
         let wallpaperEnabled = true
         try {
@@ -51,7 +50,11 @@
           const storedTheme = mirror['workbench.colorTheme']
           const storedDensity = mirror['workbench.density']
           if (storedTheme === 'dark' || storedTheme === 'light') theme = storedTheme
-          if (mirror['workbench.palette'] === 'sage') palette = 'sage'
+          if (typeof mirror['workbench.palette'] === 'string') palette = mirror['workbench.palette']
+          // Written by lib/appearance/utils/palette-style.ts for the confirmed
+          // selection; a cache for another palette is simply not this one.
+          const cache = JSON.parse(localStorage.getItem('platform.palette-boot.v1') ?? 'null')
+          if (cache && cache.id === palette && typeof cache.css === 'string') paletteCss = cache.css
           if (storedDensity === 'compact' || storedDensity === 'cozy') density = storedDensity
           if (mirror['workbench.wallpaper.enabled'] === false) wallpaperEnabled = false
         } catch {
@@ -62,17 +65,16 @@
           (theme === 'system' && matchMedia('(prefers-color-scheme: dark)').matches)
         const root = document.documentElement
         root.classList.add(dark ? 'dark' : 'light')
-        // Set before globals.css loads, so the first frame it paints already
-        // matches the palette instead of flashing the default one.
-        root.setAttribute('data-palette', palette)
         root.setAttribute('data-density', density)
         preloadWallpaper(wallpaperEnabled)
-        if (palette !== 'sage') return
+        if (paletteCss === null) return
 
-        root.style.setProperty(
-          '--boot-floor',
-          dark ? 'oklch(0.17 0.01 260)' : 'oklch(0.98 0.003 90)',
-        )
+        // Before globals.css loads, so the first frame already carries the
+        // selected palette instead of flashing Graphite.
+        const style = document.createElement('style')
+        style.id = 'platform-palette'
+        style.textContent = paletteCss
+        document.head.append(style)
       })()
 
       function preloadWallpaper(enabled) {

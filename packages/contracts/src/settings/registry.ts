@@ -37,6 +37,7 @@ export type SettingWidget =
   | 'boolean'
   | 'font'
   | 'code-theme'
+  | 'palette'
   | 'number'
   | 'string'
   | 'multiline'
@@ -78,7 +79,9 @@ export type WidgetFor<TValue> = unknown extends TValue
 type ValueWidget<TValue> =
   | (TValue extends boolean ? 'boolean' : never)
   | (TValue extends number ? 'number' : never)
-  | (TValue extends string ? 'string' | 'multiline' | 'font' | 'enum' | 'code-theme' : never)
+  | (TValue extends string
+      ? 'string' | 'multiline' | 'font' | 'enum' | 'code-theme' | 'palette'
+      : never)
   | (TValue extends readonly unknown[] ? 'list' : never)
   | (TValue extends readonly ProviderInstanceConfig[] ? 'providers' : never)
   | (TValue extends readonly ModelRef[] ? 'models' : never)

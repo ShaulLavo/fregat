@@ -32,7 +32,6 @@ const appearance = (overrides: Partial<AppearanceValues> = {}): AppearanceValues
   'editor.tabSize': DEFAULT_SETTING_VALUES['editor.tabSize'],
   'workbench.colorTheme': DEFAULT_SETTING_VALUES['workbench.colorTheme'],
   'workbench.density': DEFAULT_SETTING_VALUES['workbench.density'],
-  'workbench.palette': DEFAULT_SETTING_VALUES['workbench.palette'],
   'workbench.surface.blur': DEFAULT_SETTING_VALUES['workbench.surface.blur'],
   'workbench.surface.contentOpacity': DEFAULT_SETTING_VALUES['workbench.surface.contentOpacity'],
   'workbench.surface.opacity': DEFAULT_SETTING_VALUES['workbench.surface.opacity'],
@@ -91,16 +90,6 @@ describe('applyAppearance', () => {
 
     applyAppearance(appearance({ 'workbench.wallpaper.enabled': true }), root, false)
     expect(attributes.has('data-wallpaper-hidden')).toBe(false)
-  })
-
-  it('writes the palette as an attribute value the CSS can select on', () => {
-    const { attributes, root } = fakeRoot()
-
-    applyAppearance(appearance({ 'workbench.palette': 'graphite' }), root, false)
-    expect(attributes.get('data-palette')).toBe('graphite')
-
-    applyAppearance(appearance({ 'workbench.palette': 'sage' }), root, false)
-    expect(attributes.get('data-palette')).toBe('sage')
   })
 
   it('writes interface density as an attribute value the CSS can select on', () => {

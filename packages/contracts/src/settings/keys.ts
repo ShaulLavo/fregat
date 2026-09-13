@@ -8,6 +8,8 @@ import {
   providerInstanceConfigsSchema,
   semanticTokenServerOverridesSchema,
 } from '../settings'
+import { DEFAULT_PALETTE_ID } from '../themes/bundled'
+import { paletteIdSchema } from '../themes/palette'
 import { defineSetting, type SettingDescriptor } from './registry'
 
 /**
@@ -53,16 +55,17 @@ export const SETTINGS_REGISTRY = {
     keywords: ['theme', 'dark', 'light', 'appearance', 'colour'],
   }),
   'workbench.palette': defineSetting({
-    // Orthogonal to workbench.colorTheme: the palette picks which set of colors
-    // a mode is built from, the theme picks which mode. Every combination is
-    // defined, so the two never have to agree.
-    schema: v.picklist(['sage', 'graphite'] as const),
-    default: 'graphite',
-    scope: 'window',
-    widget: 'enum',
+    // A palette id, bundled or from the user's library on the primary server.
+    // Application scope: a workspace file cannot name a palette that exists
+    // only on one machine. The mode is still workbench.colorTheme.
+    schema: paletteIdSchema,
+    default: DEFAULT_PALETTE_ID,
+    scope: 'application',
+    widget: 'palette',
     category: 'Appearance',
     title: 'App colors',
-    description: 'Colors for app backgrounds, text, borders, and accents. Choose Graphite or Sage.',
+    description:
+      'Colors for app backgrounds, text, borders, accents and the terminal. Pick a palette or make your own.',
     keywords: [
       'palette',
       'colour',
@@ -72,6 +75,7 @@ export const SETTINGS_REGISTRY = {
       'monochrome',
       'accent',
       'appearance',
+      'terminal',
     ],
   }),
   'editor.codeTheme.dark': defineSetting({

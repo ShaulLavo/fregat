@@ -2,8 +2,9 @@ import { parseColor } from '@opentui/core'
 import { setRendererCapabilities } from '@opentui/core/testing'
 import { act } from 'react'
 
-import palette from '@/theme/palette.json'
-import { resolveTheme } from '@/theme/utils/theme'
+import { bundledPalette } from '@workspace/contracts'
+
+import { paletteThemeColors, resolveTheme } from '@/theme/utils/theme'
 import { contrastRatio } from '@/theme/utils/colors'
 import { ThemePreview } from '../../../test/factories/theme-preview'
 import { terminalColors } from '../../../test/factories/terminal-colors'
@@ -14,7 +15,7 @@ test.each(['graphite', 'sage'] as const)(
   'generated %s modes keep foreground and selection contrast',
   (name) => {
     for (const mode of ['light', 'dark'] as const) {
-      const theme = resolveTheme(mode, 'dark', false, { palette: name })
+      const theme = resolveTheme(mode, 'dark', false, { palette: bundledPalette(name) })
       expect(contrastRatio(theme.foreground, theme.background)).toBeGreaterThan(7)
       expect(contrastRatio(theme.primaryForeground, theme.primary)).toBeGreaterThan(4.5)
     }
@@ -65,7 +66,8 @@ test('system colors repaint the real renderer from OSC palette changes while exp
       .captureSpans()
       .lines.flatMap((line) => line.spans)
       .find((span) => span.text.includes('Theme sample'))
-    expect(explicit?.fg.toInts()).toEqual(parseColor(palette.graphite.light.foreground).toInts())
+    const graphiteLight = paletteThemeColors(bundledPalette('graphite')!, 'light')
+    expect(explicit?.fg.toInts()).toEqual(parseColor(graphiteLight.foreground).toInts())
   } finally {
     await frame.cleanup()
   }

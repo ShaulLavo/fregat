@@ -46,6 +46,7 @@
         "dev.ts",
         "generate-settings-reference.ts",
         "generate-settings-schema.ts",
+        "themes/generate-palette-css.ts",
         "install-server.ts",
         "prod.ts",
         "tui.ts",

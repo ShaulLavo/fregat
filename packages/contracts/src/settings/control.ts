@@ -33,6 +33,7 @@ export type SettingControl =
   | { readonly widget: 'string' | 'multiline'; readonly value: string }
   | { readonly widget: 'font'; readonly value: string }
   | { readonly widget: 'code-theme'; readonly value: string }
+  | { readonly widget: 'palette'; readonly value: string }
   | { readonly widget: 'enum'; readonly value: string; readonly options: readonly string[] }
   | { readonly widget: 'record'; readonly value: Record<string, string | null> }
   | { readonly widget: 'keybindings' }
@@ -48,7 +49,7 @@ export function settingControl(id: SettingId, value: SettingValue<SettingId>): S
   if (widget === 'number') {
     return typeof value === 'number' ? { widget, value } : { widget: 'unsupported' }
   }
-  if (widget === 'font' || widget === 'code-theme') {
+  if (widget === 'font' || widget === 'code-theme' || widget === 'palette') {
     return typeof value === 'string' ? { widget, value } : { widget: 'unsupported' }
   }
   if (widget === 'string' || widget === 'multiline') {

@@ -1,11 +1,37 @@
 import { RGBA, type ColorInput, type TerminalColors } from '@opentui/core'
+import {
+  bundledPalette,
+  DEFAULT_PALETTE_ID,
+  paletteColorsFor,
+  toHex,
+  type Palette,
+} from '@workspace/contracts'
+import { flattenedAppColors } from '@workspace/client-core/themes/palette'
 
-import palette from '@/theme/palette.json'
 import type { TerminalColorMode } from '@/host/utils/capabilities'
 import { colorForTerminal } from '@/theme/utils/colors'
 import { systemTheme } from '@/theme/utils/system'
 
-export type ThemeColors = { readonly [Key in keyof typeof palette.graphite.dark]: ColorInput }
+const THEME_COLOR_KEYS = [
+  'background',
+  'card',
+  'popover',
+  'muted',
+  'accent',
+  'primary',
+  'primaryForeground',
+  'foreground',
+  'mutedForeground',
+  'border',
+  'destructive',
+  'info',
+  'success',
+  'warning',
+  'diffAdded',
+  'diffRemoved',
+] as const
+
+export type ThemeColors = { readonly [Key in (typeof THEME_COLOR_KEYS)[number]]: ColorInput }
 export type Theme = ThemeColors & {
   readonly reducedMotion: boolean
   readonly noColor: boolean
@@ -14,8 +40,35 @@ export type Theme = ThemeColors & {
   readonly terminalColors: TerminalColors | null
 }
 export type ThemePreferences = {
-  readonly palette?: 'graphite' | 'sage'
+  readonly palette?: Palette
   readonly reducedMotion?: boolean
+}
+
+// The test `bundled palettes parse` pins Graphite's presence.
+const GRAPHITE = bundledPalette(DEFAULT_PALETTE_ID)!
+
+/** The shared palette flattened to opaque hex: a terminal cell has no alpha. */
+export function paletteThemeColors(palette: Palette, mode: 'light' | 'dark'): ThemeColors {
+  const flat = flattenedAppColors(paletteColorsFor(palette, mode))
+
+  return {
+    background: toHex(flat.background),
+    card: toHex(flat.card),
+    popover: toHex(flat.popover),
+    muted: toHex(flat.muted),
+    accent: toHex(flat.accent),
+    primary: toHex(flat.primary),
+    primaryForeground: toHex(flat['primary-foreground']),
+    foreground: toHex(flat.foreground),
+    mutedForeground: toHex(flat['muted-foreground']),
+    border: toHex(flat.border),
+    destructive: toHex(flat.destructive),
+    info: toHex(flat.info),
+    success: toHex(flat.success),
+    warning: toHex(flat.warning),
+    diffAdded: toHex(flat.success),
+    diffRemoved: toHex(flat.destructive),
+  }
 }
 
 const plain: ThemeColors = {
@@ -51,7 +104,7 @@ export function resolveTheme(
   const terminalColors = options.colors ?? null
   if (noColor)
     return { ...plain, noColor, reducedMotion, appearance, terminalColors, colorMode: 'none' }
-  const fallback = palette[options.palette ?? 'graphite'][appearance]
+  const fallback = paletteThemeColors(options.palette ?? GRAPHITE, appearance)
   const colors = mode === 'system' ? systemTheme(options.colors ?? null, fallback) : fallback
   const colorMode = options.colorMode ?? 'truecolor'
   const convert = (color: ColorInput) => colorForTerminal(color, colorMode, options.colors)

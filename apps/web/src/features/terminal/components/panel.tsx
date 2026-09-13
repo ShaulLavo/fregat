@@ -28,7 +28,7 @@ import {
   type MouseEvent as ReactMouseEvent,
 } from 'react'
 
-import { useTheme } from '@/features/settings/hooks/use-theme'
+import { usePalette } from '@/lib/appearance/hooks/use-palette'
 import { useContextMenu } from '@/keymap/menus/hooks/use-context-menu'
 import { reportError, toClientError } from '@/lib/client-error-taxonomy'
 import { DEFAULT_MONO_FONT_STACK } from '@/lib/default-nerd-font'
@@ -43,7 +43,8 @@ import { useTerminalKeybindings } from '@/features/terminal/hooks/use-keybinding
 import { useTerminalLinks } from '@/features/terminal/hooks/use-links'
 import { sendTerminalClientMessage } from '@/features/terminal/utils/socket'
 import { readTerminalMenuTarget, type TerminalMenuTarget } from '@/features/terminal/utils/commands'
-import { readTerminalTheme } from '@/features/terminal/utils/theme'
+import { terminalThemeFor } from '@/features/terminal/utils/theme'
+import type { TerminalColors } from '@workspace/client-core/themes/palette'
 import { isFocusOutsideElement } from '@/features/terminal/utils/focus-target'
 import { useSettingValue } from '@/features/settings/hooks/use-setting-value'
 import { useUnavailableEnvironment } from '@/lib/environments/hooks/use-unavailable-environment'
@@ -103,7 +104,9 @@ export function TerminalPanel({
   const scrollbackLengthRef = useRef(0)
   const sendInputRef = useRef<TerminalInputSender | null>(null)
   const terminalRef = useRef<Terminal | null>(null)
-  const { resolvedTheme } = useTheme()
+  const { resolved: palette } = usePalette()
+  const terminalColors = palette.terminal
+  const paletteHash = palette.contentHash
   // Read as primitives, not an object: an object literal is a new value every
   // render, which would make the effect below run on every render and, worse,
   // tempt someone into making it a dependency of the mount effect.
@@ -162,7 +165,7 @@ export function TerminalPanel({
       // current settings rather than the ones the mount began with.
       applyTerminalAppearance(terminal, { cursorBlink, fontSize })
       applyTerminalCursorOptions(terminal, terminalCursorOptions(terminalFocused, cursorBlink))
-      applyTerminalTheme(terminal, hostRef.current)
+      applyTerminalTheme(terminal, terminalColors)
       registerTerminalLinks(terminal)
     },
   )
@@ -216,9 +219,12 @@ export function TerminalPanel({
     applyTerminalAppearance(terminalRef.current, { cursorBlink, fontSize })
   }, [cursorBlink, fontSize])
 
+  // Keyed on the content hash, not the mode: a dark-to-dark palette change
+  // repaints the ANSI table without a remount.
   useEffect(() => {
-    applyTerminalTheme(terminalRef.current, hostRef.current)
-  }, [resolvedTheme])
+    applyTerminalTheme(terminalRef.current, terminalColors)
+    // eslint-disable-next-line react-hooks/exhaustive-deps -- the hash is the colors' identity
+  }, [paletteHash])
 
   useEffect(() => {
     if (machineUnavailable) return
@@ -419,7 +425,7 @@ function mountTerminal({
     await terminal.open(host)
     if (cancelled || signal.aborted) return
 
-    applyTerminalTheme(terminal, host)
+    // The theme lands in onReady, which sees the palette current at handover.
     terminalDimensions = currentTerminalDimensions(terminal)
     // The socket is opened below, so the sender is deliberately late-bound:
     // a command queued before the connection lands must not be written into a
@@ -587,9 +593,9 @@ function applyTerminalCursorOptions(terminal: Terminal | null, options: Terminal
   terminal.setCursor({ blink: options.cursorBlink, style: options.cursorStyle })
 }
 
-function applyTerminalTheme(terminal: Terminal | null, root: HTMLElement | null) {
-  if (!terminal || !root) return
-  terminal.setTheme(readTerminalTheme(root, terminal.appearance.theme))
+function applyTerminalTheme(terminal: Terminal | null, colors: TerminalColors) {
+  if (!terminal) return
+  terminal.setTheme(terminalThemeFor(colors, terminal.appearance.theme))
 }
 
 function currentTerminalDimensions(terminal: Terminal) {

@@ -33,7 +33,8 @@ import {
 import { ScopeChip } from '@/features/command-palette/scope-chip'
 import { useHighlightedPaletteValue } from '@/features/command-palette/hooks/use-highlighted-palette-value'
 import { useRecentCommandIds } from '@/features/command-palette/hooks/use-recent-command-ids'
-import { appColorsFromItemValue } from '@/features/command-palette/utils/app-colors'
+import { paletteIdFromItemValue } from '@/features/command-palette/utils/app-colors'
+import { usePalette } from '@/lib/appearance/hooks/use-palette'
 import { isCommandVisibleInPalette } from '@/keymap/utils/palette-visibility'
 import {
   CommandPaletteActionsContext,
@@ -80,14 +81,8 @@ export function CommandPaletteContent() {
   const focus = useFocusService()
   const workspace = useEditorWorkspaceStoreApi()
   const { selectTheme } = useEditorColorTheme()
-  const {
-    clearAppColorsPreview,
-    clearThemePreview,
-    previewAppColors,
-    previewTheme,
-    resolvedTheme,
-    theme,
-  } = useTheme()
+  const { clearThemePreview, previewTheme, resolvedTheme, theme } = useTheme()
+  const { catalog, clearPalettePreview, previewPalette } = usePalette()
   const hasWorkspace = useEditorWorkspaceState((state) => Boolean(state.rootFolder))
   const rootFolder = useEditorWorkspaceState((state) => state.rootFolder)
   const openTabContents = useEditorWorkspaceState((state) => state.openTabContents)
@@ -152,16 +147,16 @@ export function CommandPaletteContent() {
   useEffect(() => {
     if (mode !== 'colorTheme') clearEditorThemePreview()
     if (mode !== 'colorMode') clearThemePreview()
-    if (mode !== 'appColors') clearAppColorsPreview()
-  }, [clearAppColorsPreview, clearThemePreview, mode])
+    if (mode !== 'appColors') clearPalettePreview()
+  }, [clearPalettePreview, clearThemePreview, mode])
 
   useEffect(
     () => () => {
       clearEditorThemePreview()
       clearThemePreview()
-      clearAppColorsPreview()
+      clearPalettePreview()
     },
-    [clearAppColorsPreview, clearThemePreview],
+    [clearPalettePreview, clearThemePreview],
   )
 
   function previewHighlightedColorTheme(value: string) {
@@ -179,8 +174,9 @@ export function CommandPaletteContent() {
     enabled: isColorPreviewMode(mode),
     onHighlight: (value) => {
       if (mode === 'appColors') {
-        const colors = appColorsFromItemValue(value)
-        if (colors) previewAppColors(colors)
+        const id = paletteIdFromItemValue(value)
+        const palette = catalog.find((candidate) => candidate.id === id)
+        if (palette) previewPalette(palette)
         return
       }
       if (mode === 'colorTheme') {

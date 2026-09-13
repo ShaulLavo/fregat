@@ -1,14 +1,15 @@
-import { SETTINGS_REGISTRY } from '@workspace/contracts'
-import { settingOptionTitle } from '@workspace/client-core/settings/humanize'
+import type { Palette, PaletteId } from '@workspace/contracts'
 
-export const appColorItems = SETTINGS_REGISTRY['workbench.palette'].schema.options.map(
-  (colors) => ({
-    colors,
-    label: settingOptionTitle('workbench.palette', colors),
-    value: `app-colors:${colors}`,
-  }),
-)
+const ITEM_PREFIX = 'app-colors:'
 
-export function appColorsFromItemValue(value: string) {
-  return appColorItems.find((item) => item.value === value)?.colors ?? null
+export function appColorItems(catalog: readonly Palette[]) {
+  return catalog.map((palette) => ({
+    id: palette.id,
+    label: palette.name,
+    value: `${ITEM_PREFIX}${palette.id}`,
+  }))
+}
+
+export function paletteIdFromItemValue(value: string): PaletteId | null {
+  return value.startsWith(ITEM_PREFIX) ? value.slice(ITEM_PREFIX.length) : null
 }

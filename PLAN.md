@@ -301,18 +301,26 @@ They preserve the implemented design tokens and extend the existing census and b
 
 ## Theme standardization
 
-Requested 2026-09-12. [Plan 104](plans/104-theme-standardization.md) is proposed; implementation
-has not started. One theme supplies app colors, code highlighting, terminal colors, and a wallpaper
-collection. First-party themes pair light and dark variants; imports can declare a single mode.
-Saved customization, reset, and portable import/export use one resolved appearance and the
-existing primary-server settings pipeline. [The research](docs/theme-standardization-reference.md)
+Requested 2026-09-12, split 2026-09-14. Plan 104 is retired and replaced by three plans that build
+the pieces before the bundle. [Plan 115](plans/115-palettes-as-data.md) moves palettes out of CSS
+into data: OKLCH canonical with hex at every boundary, sRGB only, paired or single-mode, a closed
+token set that now includes the terminal colors, a server library for user palettes, and an editor
+whose live preview writes variables to the root. [Plan 116](plans/116-wallpaper-library.md) gives
+wallpaper a content-addressed library, a per-mode source setting, explicit rendering in the
+compositor backdrop, and an importer seeded from `/usr/share/omarchy/themes`.
+[Plan 117](plans/117-themes.md) binds a palette, the existing syntax pair, wallpapers and material
+under one name with per-theme customization, a portable archive, and the composed Omarchy importer.
+
+Plan 115 is implemented and deployed as of 2026-09-14. Order: 116 is independent and may run now;
+117 needs both. Syntax selection is
+already done and is not touched. CSS-in-JS was considered and rejected: custom properties are the
+runtime, and Tailwind keeps resolving to tokens. [The research](docs/theme-standardization-reference.md)
 records the Omarchy reuse strategy and the T3 Code and CodexThemes-App comparisons.
 
-The [design-token foundation](docs/web-design-language.md) is implemented. Coordinate shared styles and controls
-with Plans 101–103; do not interleave edits to the same files. Plan 085 and Plan 104 share the boot
-mirror and first-paint path, so whichever lands second reuses the first's ownership. TUI readers
-must migrate with the shared settings cutover. This proposal does not reschedule other lanes or
-reopen the dropped Ghostty appearance inheritance work. Native Swift theme UI is outside scope.
+The [design-token foundation](docs/web-design-language.md) is implemented. Coordinate `globals.css`
+edits with Plans 101–103; do not interleave edits to the same files. Plan 085 and Plan 115 share the
+boot mirror and first-paint path, so whichever lands second reuses the first's ownership. TUI
+readers migrate with each shared-settings cutover. Native Swift theme UI is outside scope.
 
 ## First-load weight and markdown lane
 
@@ -346,7 +354,7 @@ document graph and search as its waiting consumers.
 CodeMirror 6 decorations and Lexical's decorator nodes, and gates Plan 108 Phase 2, any later
 Obsidian mode, and the question of whether the chat composer still needs Lexical.
 
-Coordinate shared editor and chat surfaces with Plans 101–104; do not interleave edits to the same
+Coordinate shared editor and chat surfaces with Plans 101–103 and 115; do not interleave edits to the same
 files. Plan 085 owns first paint and restoration, which this lane measures but does not change.
 Replacing React with a smaller reimplementation was considered and rejected: React is 60 KB of a
 2421 KB first load, so it is revisited only once it is the largest remaining line item.

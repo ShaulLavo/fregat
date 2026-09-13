@@ -86,7 +86,8 @@ test('light / dark mode and app colors commit the existing settings and restore 
   const state = session.getSnapshot()
   expect(state.kind).toBe('ready')
   if (state.kind !== 'ready') return
-  const initial = state.owner.submit('workspace', [
+  // The palette is application-scoped, so both land in the user file.
+  const initial = state.owner.submit('user', [
     { kind: 'set', key: 'workbench.colorTheme', value: 'dark' },
     { kind: 'set', key: 'workbench.palette', value: 'graphite' },
   ])
@@ -122,7 +123,7 @@ test('light / dark mode and app colors commit the existing settings and restore 
     await submitPaletteSearch(frame, 'colors sage')
     await expect.poll(() => state.owner.readSettingsMirror()['workbench.palette']).toBe('sage')
     expect(
-      state.owner.getSnapshot().snapshot.layers.find((layer) => layer.id === 'workspace')?.raw[
+      state.owner.getSnapshot().snapshot.layers.find((layer) => layer.id === 'user')?.raw[
         'workbench.palette'
       ],
     ).toBe('sage')

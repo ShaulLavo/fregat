@@ -711,3 +711,48 @@ export { jsonEqual } from './settings/json-equal'
 
 export { chatAgentSchema, chatAgentToolSchema } from './chat-agent'
 export type { ChatAgent, ChatAgentTool } from './chat-agent'
+export {
+  contrastRatio,
+  flatten,
+  normalizeColor,
+  oklch,
+  parseColor,
+  toCss,
+  toHex,
+  toRgb,
+  type Oklch,
+  type Rgb,
+} from './themes/color'
+export {
+  APP_COLOR_ROLES,
+  PALETTE_ID_PATTERN,
+  TERMINAL_ANSI_ROLES,
+  TERMINAL_COLOR_ROLES,
+  colorFieldSchema,
+  paletteColorsFor,
+  paletteColorsSchema,
+  paletteDocumentSchema,
+  paletteIdSchema,
+  paletteSupportsMode,
+  parsePalette,
+  serializePalette,
+  type AppColorRole,
+  type ColorMode,
+  type Palette,
+  type PaletteColors,
+  type PaletteColorsDocument,
+  type ParsedPalette,
+  type PaletteDocument,
+  type PaletteId,
+  type PaletteProvenance,
+  type PaletteVariants,
+  type TerminalColorRole,
+} from './themes/palette'
+export {
+  BUNDLED_PALETTES,
+  DEFAULT_PALETTE_ID,
+  GRAPHITE_PALETTE_DOCUMENT,
+  SAGE_PALETTE_DOCUMENT,
+  bundledPalette,
+  isBundledPaletteId,
+} from './themes/bundled'

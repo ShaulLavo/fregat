@@ -6,7 +6,7 @@ export function settingRowTitle(id: SettingId): string {
 }
 
 export function settingOptionTitle(id: SettingId, value: string): string {
-  if (id !== 'workbench.colorTheme' && id !== 'workbench.palette') return value
+  if (id !== 'workbench.colorTheme') return value
 
   return value.charAt(0).toUpperCase() + value.slice(1)
 }

@@ -3,13 +3,15 @@ import { parseColor } from '@opentui/core'
 
 import { Select } from '@/components/select'
 import { contrastRatio } from '@/theme/utils/colors'
-import { resolveTheme, type ThemePreferences } from '@/theme/utils/theme'
+import { bundledPalette } from '@workspace/contracts'
+
+import { resolveTheme } from '@/theme/utils/theme'
 import { test, expect } from '../../../test/fixtures'
 import { renderTui } from '../../../test/render'
 
 test.each<{
   mode: 'light' | 'dark'
-  palette: NonNullable<ThemePreferences['palette']>
+  palette: 'graphite' | 'sage'
   noColor: boolean
 }>([
   { mode: 'light', palette: 'graphite', noColor: false },
@@ -20,7 +22,7 @@ test.each<{
 ])(
   'focused list stays readable and wraps in $mode $palette, NO_COLOR=$noColor',
   async ({ mode, palette, noColor }) => {
-    const theme = resolveTheme(mode, 'dark', noColor, { palette })
+    const theme = resolveTheme(mode, 'dark', noColor, { palette: bundledPalette(palette) })
     const frame = await renderTui(
       <box backgroundColor={theme.background}>
         <Select

@@ -21,6 +21,10 @@ import {
   systemPrefersDark,
 } from '@/features/settings/providers/appearance-provider.tsx'
 import { applyAppearance } from '@/features/settings/utils/apply-appearance.ts'
+import {
+  applyPaletteStylesheet,
+  bootPaletteStylesheet,
+} from '@/lib/appearance/utils/palette-style.ts'
 import { initializeClientLogging, log } from '@/lib/client-logging.ts'
 import { loadNerdFont } from '@/lib/default-nerd-font.ts'
 import { isDesktop } from '@/lib/platform/bridge.ts'
@@ -37,6 +41,7 @@ applyBackdrop(resolveBackdrop())
 // in React's insertion phase before later layout effects run.
 const boot = bootAppearance()
 applyAppearance(boot, document.documentElement, systemPrefersDark())
+applyPaletteStylesheet(document, bootPaletteStylesheet(boot['workbench.palette']))
 const visualViewport = window.visualViewport
 log.info({
   action: 'app.bootstrap',

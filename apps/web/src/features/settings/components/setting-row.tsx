@@ -19,6 +19,7 @@ import { CodeThemeWidget } from '@/features/settings/components/widgets/code-the
 import { EnumWidget } from '@/features/settings/components/widgets/enum-widget'
 import { FontWidget } from '@/features/settings/components/widgets/font-widget'
 import { NumberWidget } from '@/features/settings/components/widgets/number-widget'
+import { PaletteWidget } from '@/features/settings/components/widgets/palette-widget'
 import { StringWidget } from '@/features/settings/components/widgets/string-widget'
 import { settingInspection } from '@/features/settings/hooks/use-setting-inspection'
 import { useSettingsActions } from '@/features/settings/hooks/use-settings-actions'
@@ -38,7 +39,7 @@ export function SettingRow({ id, snapshot }: { id: SettingId; snapshot: Settings
   // no scope makes a read-only key writable.
   const disabledReason = descriptor.readOnlyReason ?? inspection.disabledReason
   const value = snapshot.values[id]
-  const hasCodePreview = descriptor.widget === 'code-theme'
+  const hasCodePreview = descriptor.widget === 'code-theme' || descriptor.widget === 'palette'
 
   return (
     <div className='border-border flex flex-col gap-(--density-control-gap) border-b py-(--density-section-padding) last:border-b-0 @3xl/settings:flex-row @3xl/settings:items-start @3xl/settings:justify-between @3xl/settings:gap-6'>
@@ -162,6 +163,10 @@ function SettingControl({
 
   if (control.widget === 'code-theme') {
     return <CodeThemeWidget disabled={disabled} id={id} onChange={onChange} value={control.value} />
+  }
+
+  if (control.widget === 'palette') {
+    return <PaletteWidget disabled={disabled} id={id} value={control.value} />
   }
 
   if (control.widget === 'string' || control.widget === 'multiline') {

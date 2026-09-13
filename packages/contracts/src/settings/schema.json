@@ -630,8 +630,8 @@
     },
     "workbench.palette": {
       "default": "graphite",
-      "description": "Colors for app backgrounds, text, borders, and accents. Choose Graphite or Sage.",
-      "enum": ["graphite", "sage"],
+      "description": "Colors for app backgrounds, text, borders, accents and the terminal. Pick a palette or make your own.",
+      "pattern": "^[a-z0-9][a-z0-9-]{0,63}$",
       "type": "string"
     },
     "workbench.reduceMotion": {

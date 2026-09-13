@@ -43,6 +43,8 @@ import {
 } from './provider/provider-adapter-registry'
 import { providerRoutes } from './provider/routes'
 import { settingsRoutes } from './settings/routes'
+import { PaletteLibrary } from './themes/palette-library'
+import { themeRoutes } from './themes/routes'
 import { DEFAULT_PROVIDER_INSTANCES } from './provider/drivers/built-in'
 import { mergeProviderInstanceConfigs } from './provider/utils/instance-config-merge'
 import { SettingsStore, type SettingsStoreOptions } from './settings/store'
@@ -139,6 +141,10 @@ export function createApp(options: AppOptions) {
   // app was given — in tests that is the in-memory database, which is what
   // keeps a test run from writing into the developer's real settings.
   const settings = new SettingsStore({ ...options.settings, workspaceRoot: fs.paths.workspaceRoot })
+  const palettes = new PaletteLibrary({
+    directory: path.join(options.homeDirectory ?? homedir(), '.platform', 'palettes'),
+    settings,
+  })
   const providerAdapterRegistry: ProviderAdapterRegistry =
     options.orchestration?.providerAdapterRegistry ??
     createDefaultProviderAdapterRegistry(
@@ -308,6 +314,7 @@ export function createApp(options: AppOptions) {
     .use(fontRoutes(fonts))
     .use(wallpaperRoutes())
     .use(settingsRoutes(settings))
+    .use(themeRoutes(palettes))
     .use(
       gitRoutes(git, commitMessages, {
         resolveBaseCommit: (checkoutPath) => orchestration.worktreeBaseCommit(checkoutPath),

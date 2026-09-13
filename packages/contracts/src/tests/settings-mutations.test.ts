@@ -26,14 +26,14 @@ const _paletteSetIsScalar: ScalarSettingOperation = {
 }
 
 // @ts-expect-error the value is narrowed by the scalar setting key
-const _paletteRejectsDensity: ScalarSettingOperation = {
+const _densityRejectsPalette: ScalarSettingOperation = {
   kind: 'set',
-  key: 'workbench.palette',
-  value: 'cozy',
+  key: 'workbench.density',
+  value: 'sage',
 }
 
 void _paletteSetIsScalar
-void _paletteRejectsDensity
+void _densityRejectsPalette
 
 const MODEL_A = modelRef('codex', 'gpt-5')
 const MODEL_B = modelRef('claude', 'sonnet')

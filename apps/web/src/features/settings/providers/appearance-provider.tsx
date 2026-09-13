@@ -1,17 +1,23 @@
 import { useCallback, useEffect, useInsertionEffect, useState, type ReactNode } from 'react'
+import {
+  bundledPalette,
+  DEFAULT_PALETTE_ID,
+  type Palette,
+  type PaletteId,
+} from '@workspace/contracts'
+import { paletteStylesheet, resolvePalette } from '@workspace/client-core/themes/palette'
 
 import { loadNerdFont } from '@/lib/default-nerd-font'
 import { getPlatformBridge } from '@/lib/platform/bridge'
+import { PaletteContext } from '@/lib/appearance/providers/palette-context'
+import { applyPaletteStylesheet, writePaletteBootCache } from '@/lib/appearance/utils/palette-style'
 
+import { usePaletteCatalog } from '@/features/settings/hooks/use-palette-catalog'
 import { useSettingsActions } from '@/features/settings/hooks/use-settings-actions'
 import { useSettingsDocument } from '@/features/settings/hooks/use-settings-document'
 import { useSettingsProjection } from '@/features/settings/hooks/use-settings-projection'
 import { WorkbenchDensityBootContext } from '@/features/settings/providers/density-context'
-import {
-  ThemeContext,
-  type AppColors,
-  type Theme,
-} from '@/features/settings/providers/theme-context'
+import { ThemeContext, type Theme } from '@/features/settings/providers/theme-context'
 import type { SettingsSubmission } from '@workspace/client-core/settings/intent-store'
 import {
   applyAppearance,
@@ -22,12 +28,14 @@ import { readSettingsMirror, writeBootMirror } from '@/features/settings/utils/b
 
 const COLOR_SCHEME_QUERY = '(prefers-color-scheme: dark)'
 
-type AppearancePreview = {
+type Preview<T> = {
+  readonly value: T
   readonly handingOffTo: string | null
-} & (
-  | { readonly kind: 'mode'; readonly value: Theme }
-  | { readonly kind: 'colors'; readonly value: AppColors }
-)
+}
+
+// The test `bundled palettes parse` pins Graphite's presence; a missing default
+// here would be a build defect, not a runtime state.
+const GRAPHITE = bundledPalette(DEFAULT_PALETTE_ID)!
 
 /** Owns all projected appearance, confirmed boot state, and color-mode preview. */
 export function AppearanceProvider({
@@ -40,18 +48,24 @@ export function AppearanceProvider({
   const confirmedQuery = useSettingsDocument()
   const projection = useSettingsProjection()
   const { setColorTheme, setSetting } = useSettingsActions()
+  const catalog = usePaletteCatalog()
   const [bootValues] = useState(bootAppearance)
   const [prefersDark, setPrefersDark] = useState(() => systemPrefersDark())
-  const [preview, setPreview] = useState<AppearancePreview | null>(null)
+  const [modePreview, setModePreview] = useState<Preview<Theme> | null>(null)
+  const [palettePreview, setPalettePreview] = useState<Preview<Palette> | null>(null)
   const projectedValues = projection?.values
   const appearanceValues = projectedValues ?? bootValues
   const committedTheme = appearanceValues['workbench.colorTheme']
-  const committedColors = appearanceValues['workbench.palette']
-  const handoffObserved = projectionObservesHandoff(projection, preview?.handingOffTo)
-  const renderedTheme =
-    preview?.kind === 'mode' && !handoffObserved ? preview.value : committedTheme
-  const renderedColors =
-    preview?.kind === 'colors' && !handoffObserved ? preview.value : committedColors
+  const committedPaletteId = appearanceValues['workbench.palette']
+  const committedPalette = catalog.find((palette) => palette.id === committedPaletteId)
+  const modeHandoffObserved = projectionObservesHandoff(projection, modePreview?.handingOffTo)
+  const paletteHandoffObserved = projectionObservesHandoff(projection, palettePreview?.handingOffTo)
+  const renderedTheme = modePreview && !modeHandoffObserved ? modePreview.value : committedTheme
+  // Undefined while a user palette is still being looked up: the boot
+  // stylesheet stays on screen rather than flashing Graphite in between.
+  const renderedPalette =
+    palettePreview && !paletteHandoffObserved ? palettePreview.value : committedPalette
+  const resolvedMode = resolveColorTheme(renderedTheme, prefersDark)
 
   useEffect(() => {
     const query = window.matchMedia(COLOR_SCHEME_QUERY)
@@ -62,21 +76,29 @@ export function AppearanceProvider({
   }, [])
 
   useEffect(() => {
-    if (!handoffObserved || !preview?.handingOffTo) return
+    if (!modeHandoffObserved || !modePreview?.handingOffTo) return
 
-    clearMatchingHandoff(setPreview, preview.handingOffTo)
-  }, [handoffObserved, preview?.handingOffTo])
+    clearMatchingHandoff(setModePreview, modePreview.handingOffTo)
+  }, [modeHandoffObserved, modePreview?.handingOffTo])
 
-  const renderedValues = {
-    ...appearanceValues,
-    'workbench.colorTheme': renderedTheme,
-    'workbench.palette': renderedColors,
-  }
+  useEffect(() => {
+    if (!paletteHandoffObserved || !palettePreview?.handingOffTo) return
+
+    clearMatchingHandoff(setPalettePreview, palettePreview.handingOffTo)
+  }, [paletteHandoffObserved, palettePreview?.handingOffTo])
+
+  const renderedValues = { ...appearanceValues, 'workbench.colorTheme': renderedTheme }
   // Descendant layout effects measure density-dependent geometry, so the root
   // appearance must be current before those effects run.
   useInsertionEffect(() => {
     applyAppearance(renderedValues, globalThis.document.documentElement, prefersDark)
   }, [prefersDark, renderedValues])
+
+  useInsertionEffect(() => {
+    if (!renderedPalette) return
+
+    applyPaletteStylesheet(globalThis.document, paletteStylesheet(renderedPalette))
+  }, [renderedPalette])
 
   const confirmedValues = confirmedQuery.data?.values
   const confirmedFontFamily = confirmedValues?.['editor.fontFamily']
@@ -92,24 +114,33 @@ export function AppearanceProvider({
     writeBootMirror(confirmedValues)
   }, [confirmedValues])
 
+  const confirmedPaletteId = confirmedValues?.['workbench.palette']
+  useEffect(() => {
+    if (!confirmedPaletteId) return
+    const palette = catalog.find((candidate) => candidate.id === confirmedPaletteId)
+    if (!palette) return
+
+    writePaletteBootCache(palette.id, paletteStylesheet(palette))
+  }, [catalog, confirmedPaletteId])
+
   // Stable identity lets palette unmount cleanup clear hover exactly once.
   const clearThemePreview = useCallback(() => {
-    setPreview((current) => (current?.kind === 'mode' && !current.handingOffTo ? null : current))
+    setModePreview((current) => (current && !current.handingOffTo ? null : current))
   }, [])
 
   const previewTheme = useCallback((theme: Theme) => {
-    setPreview((current) =>
-      current?.handingOffTo ? current : { handingOffTo: null, kind: 'mode', value: theme },
+    setModePreview((current) =>
+      current?.handingOffTo ? current : { handingOffTo: null, value: theme },
     )
   }, [])
 
-  const clearAppColorsPreview = useCallback(() => {
-    setPreview((current) => (current?.kind === 'colors' && !current.handingOffTo ? null : current))
+  const clearPalettePreview = useCallback(() => {
+    setPalettePreview((current) => (current && !current.handingOffTo ? null : current))
   }, [])
 
-  const previewAppColors = useCallback((colors: AppColors) => {
-    setPreview((current) =>
-      current?.handingOffTo ? current : { handingOffTo: null, kind: 'colors', value: colors },
+  const previewPalette = useCallback((palette: Palette) => {
+    setPalettePreview((current) =>
+      current?.handingOffTo ? current : { handingOffTo: null, value: palette },
     )
   }, [])
 
@@ -120,22 +151,25 @@ export function AppearanceProvider({
       return submission
     }
 
-    setPreview({ handingOffTo: submission.mutationId, kind: 'mode', value: theme })
-    void submission.settled.then(() => clearMatchingHandoff(setPreview, submission.mutationId))
+    setModePreview({ handingOffTo: submission.mutationId, value: theme })
+    void submission.settled.then(() => clearMatchingHandoff(setModePreview, submission.mutationId))
     return submission
   }
 
-  const setAppColors = (colors: AppColors, initiator?: string): SettingsSubmission => {
-    if (colors === committedColors) {
-      clearAppColorsPreview()
+  const selectPalette = (id: PaletteId, initiator?: string): SettingsSubmission => {
+    if (id === committedPaletteId) {
+      clearPalettePreview()
       return { kind: 'noop' }
     }
 
-    const submission = setSetting('workbench.palette', colors, undefined, initiator)
+    const submission = setSetting('workbench.palette', id, undefined, initiator)
     if (submission.kind === 'noop') return submission
 
-    setPreview({ handingOffTo: submission.mutationId, kind: 'colors', value: colors })
-    void submission.settled.then(() => clearMatchingHandoff(setPreview, submission.mutationId))
+    const palette = catalog.find((candidate) => candidate.id === id)
+    if (palette) setPalettePreview({ handingOffTo: submission.mutationId, value: palette })
+    void submission.settled.then(() =>
+      clearMatchingHandoff(setPalettePreview, submission.mutationId),
+    )
     return submission
   }
 
@@ -143,25 +177,32 @@ export function AppearanceProvider({
     <WorkbenchDensityBootContext value={bootDensity}>
       <ThemeContext
         value={{
-          appColors: committedColors,
-          clearAppColorsPreview,
           clearThemePreview,
-          previewAppColors,
           previewTheme,
-          resolvedTheme: resolveColorTheme(renderedTheme, prefersDark),
+          resolvedTheme: resolvedMode,
           setTheme,
-          setAppColors,
           theme: committedTheme,
         }}
       >
-        {children}
+        <PaletteContext
+          value={{
+            paletteId: committedPaletteId,
+            catalog,
+            resolved: resolvePalette(renderedPalette ?? GRAPHITE, resolvedMode),
+            previewPalette,
+            clearPalettePreview,
+            selectPalette,
+          }}
+        >
+          {children}
+        </PaletteContext>
       </ThemeContext>
     </WorkbenchDensityBootContext>
   )
 }
 
-function clearMatchingHandoff(
-  setPreview: (updater: (current: AppearancePreview | null) => AppearancePreview | null) => void,
+function clearMatchingHandoff<T>(
+  setPreview: (updater: (current: Preview<T> | null) => Preview<T> | null) => void,
   mutationId: string,
 ) {
   setPreview((current) => (current?.handingOffTo === mutationId ? null : current))
@@ -186,6 +227,6 @@ export function systemPrefersDark(): boolean {
 }
 
 /** The values the pre-paint pass uses, before any query can have resolved. */
-export function bootAppearance(): AppearanceValues {
+export function bootAppearance(): AppearanceValues & { 'workbench.palette': PaletteId } {
   return readSettingsMirror()
 }

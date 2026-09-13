@@ -6,6 +6,7 @@ import { LoadingState } from '@/components/loading-state'
 import { Failure } from '@/connection/components/failure'
 import type { SettingsSession } from '@/connection/state/session'
 import { Foundation } from '@/components/foundation'
+import { usePaletteLibrary } from '@/theme/hooks/use-palette-library'
 import { useTheme } from '@/theme/hooks/use-theme'
 import { useSettingValue } from '@/settings/hooks/use-setting-value'
 import { HostActionsContext, type HostActions } from '@/host/providers/actions-context'
@@ -36,7 +37,8 @@ export function Application({
   const state = useSyncExternalStore(session.subscribe, session.getSnapshot)
   const owner = state.kind === 'ready' ? state.owner : null
   const mode = useSettingValue(owner, 'workbench.colorTheme')
-  const palette = useSettingValue(owner, 'workbench.palette')
+  const paletteId = useSettingValue(owner, 'workbench.palette')
+  const palette = usePaletteLibrary(state.kind === 'ready' ? state.client : null, paletteId)
   const reducedMotion = useSettingValue(owner, 'workbench.reduceMotion')
   const theme = useTheme(mode, noColor, { palette, reducedMotion })
   useKeyboard((event) => {

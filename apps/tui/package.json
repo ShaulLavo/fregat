@@ -5,14 +5,12 @@
   "type": "module",
   "scripts": {
     "start": "bun src/main.tsx",
-    "build": "bun run theme:check && tsgo --noEmit && bun build src/main.tsx --target bun --outdir dist --packages external",
+    "build": "tsgo --noEmit && bun build src/main.tsx --target bun --outdir dist --packages external",
     "typecheck": "tsgo --noEmit",
     "test": "bun --bun vitest run",
     "lint": "oxlint .",
     "format": "oxfmt --write .",
-    "format:check": "oxfmt --check .",
-    "theme:generate": "bun scripts/generate-palette.ts",
-    "theme:check": "bun scripts/generate-palette.ts --check"
+    "format:check": "oxfmt --check ."
   },
   "dependencies": {
     "@opentui/core": "catalog:",
@@ -35,7 +33,6 @@
     "@types/node": "^25.9.6",
     "@types/react": "^19.3.0",
     "@typescript/native-preview": "7.0.0-dev.20260707.2",
-    "lightningcss": "1.32.0",
     "oxfmt": "0.64.0",
     "oxlint": "1.70.0",
     "server": "workspace:*",

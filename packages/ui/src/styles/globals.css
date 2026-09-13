@@ -2,6 +2,9 @@
 @import 'tw-animate-css';
 @import './shadcn-tailwind.css';
 @import '@fontsource-variable/jetbrains-mono';
+/* The bundled Graphite palette, generated from data; the app's <style> for the
+   selected palette outranks it because that one is unlayered. */
+@import './palette.generated.css';
 
 @custom-variant dark (&:is(.dark *));
 @source '../../../../apps/**/*.{ts,tsx}';
@@ -173,39 +176,17 @@
   --content-opacity: 95%;
   --surface-blur: 9px;
   --surface-saturation: 160%;
-  /* The pane ground sits BELOW the card ground on purpose: the titlebar and the
-     editor well are --card, the sidebar and the shell are --background, and light
-     mode needs that gap for the same reason dark mode has one (0.145 against
-     0.205). Tone separates the panes; the workbench hairline only edges them. */
-  --background-solid: oklch(0.97 0.006 70);
+  /* Palette colors (--background-solid, --foreground, --primary, …) come from
+     palette.generated.css and the selected palette's <style>. The pane ground
+     sits BELOW the card ground on purpose: the titlebar and the editor well are
+     --card, the sidebar and the shell are --background. Tone separates the
+     panes; the workbench hairline only edges them. */
   --background: color-mix(in oklch, var(--background-solid) var(--surface-opacity), transparent);
-  --foreground: oklch(0.145 0.006 70);
-  --card-light-solid: oklch(1 0.006 70);
-  --card-dark-solid: oklch(0.205 0.006 70);
-  --card-solid: var(--card-light-solid);
   --card: color-mix(in oklch, var(--card-solid) var(--surface-opacity), transparent);
   --content-well: color-mix(in oklch, var(--card-solid) var(--content-opacity), transparent);
-  --card-foreground: oklch(0.145 0.006 70);
-  --popover-solid: oklch(1 0.006 70);
   --popover: var(--popover-solid);
-  --popover-foreground: oklch(0.145 0.006 70);
-  --primary: oklch(0.24 0.014 70);
-  --primary-foreground: oklch(0.985 0.006 70);
-  --secondary: oklch(0.94 0.006 70);
-  --secondary-foreground: oklch(0.205 0.006 70);
-  --muted-solid: oklch(0.94 0.006 70);
   --muted: color-mix(in oklch, var(--muted-solid) var(--surface-opacity), transparent);
-  --muted-foreground: oklch(0.52 0.006 70);
-  --accent-solid: oklch(0.94 0.006 70);
   --accent: color-mix(in oklch, var(--accent-solid) var(--surface-opacity), transparent);
-  --accent-foreground: oklch(0.205 0.006 70);
-  --destructive: oklch(0.55 0.17 18);
-  --info: oklch(0.55 0.17 230);
-  --info-foreground: oklch(0.985 0.006 70);
-  --success: oklch(0.55 0.17 165);
-  --success-foreground: oklch(0.985 0.006 70);
-  --warning: oklch(0.7 0.155 92);
-  --warning-foreground: oklch(0.205 0.006 70);
   /* One vocabulary for list-row interaction. These are OVERLAY TINTS, not
      surfaces: they are painted on top of a pane that has already resolved
      --surface-opacity, so they carry their own fixed alpha and are defined
@@ -225,8 +206,6 @@
      other status families (destructive 18, warning 92, success 165, info 230),
      so it never reads as a state the user has to act on. Same L/C register as
      info and success so a NEW badge sits beside them without shouting. */
-  --update: oklch(0.55 0.17 300);
-  --update-foreground: oklch(0.985 0.006 70);
   /* Diff colors alias the status tokens so they track theme changes automatically. */
   --diff-added: var(--success);
   --diff-removed: var(--destructive);
@@ -237,18 +216,10 @@
   /* OpenAI's mark is monochrome and follows the text color by design, so it
      aliases --foreground rather than pinning black. */
   --brand-openai: var(--foreground);
-  --border: oklch(0.88 0.006 70);
-  /* The lighter divider weight, derived once. Every palette block below
-     redefines --border on this same element (<html>), so this formula
-     re-resolves against whichever one wins; a copied literal would drift. */
+  /* The lighter divider weight, derived once. The palette redefines --border
+     on this same element (<html>), so this formula re-resolves against
+     whichever one wins; a copied literal would drift. */
   --border-subtle: color-mix(in oklch, var(--border) 55%, transparent);
-  --input: oklch(0.88 0.006 70);
-  --ring: oklch(0.62 0.006 70);
-  --chart-1: oklch(0.87 0.006 70);
-  --chart-2: oklch(0.556 0.006 70);
-  --chart-3: oklch(0.439 0.006 70);
-  --chart-4: oklch(0.371 0.006 70);
-  --chart-5: oklch(0.269 0.006 70);
   --radius: 0.625rem;
   --trees-file-icon-color-astro: #a631be;
   --trees-file-icon-color-babel: #d5a910;
@@ -311,35 +282,8 @@
   --editor-bracket-match-background: oklch(0.55 0.02 260 / 0.22);
   --editor-occurrence-highlight-background: oklch(0.55 0.02 260 / 0.15);
 
-  /* Terminal surface — light. The pane already paints the content well, so the
-     terminal section paints no background of its own (a second translucent
-     ground would stack and darken). */
-  /* Read by readTerminalTheme via getComputedStyle and fed to ghostty's color
-     parser, which cannot parse color-mix() — keep this a plain color. Transparent
-     so the canvas paints only glyphs and the pane's content well shows through;
-     an opaque value makes the terminal an opaque box that hides the pane. */
-  --terminal-canvas-background: rgba(0, 0, 0, 0);
-  --terminal-foreground: #3c3c3c;
-  --terminal-cursor: #1a1a1a;
-  --terminal-cursor-accent: #ffffff;
-  --terminal-selection: #cdd6e3;
-  --terminal-selection-foreground: #1a1a1a;
-  --terminal-ansi-black: #3c3c3c;
-  --terminal-ansi-red: #d1453b;
-  --terminal-ansi-green: #3f9a52;
-  --terminal-ansi-yellow: #b07d00;
-  --terminal-ansi-blue: #3b75d1;
-  --terminal-ansi-magenta: #9a4fb0;
-  --terminal-ansi-cyan: #2a8499;
-  --terminal-ansi-white: #b6b6b3;
-  --terminal-ansi-bright-black: #8a8a86;
-  --terminal-ansi-bright-red: #e0594f;
-  --terminal-ansi-bright-green: #54ab68;
-  --terminal-ansi-bright-yellow: #c79520;
-  --terminal-ansi-bright-blue: #5a8fe0;
-  --terminal-ansi-bright-magenta: #b06ac4;
-  --terminal-ansi-bright-cyan: #3f9fb5;
-  --terminal-ansi-bright-white: #2a2a2a;
+  /* Terminal colors are palette fields fed to ghostty as typed values; the
+     pane paints the content well, so the terminal paints no ground of its own. */
 }
 
 :root[data-density='compact'] {
@@ -397,51 +341,20 @@
 /* Again graphite: the same warm near-greyscale, inverted. */
 .dark {
   color-scheme: dark;
-  /* Only the -solid inputs are redefined here; the translucent formulas live
-     once in :root and re-resolve because .dark sits on <html> (the :root
-     element). Re-adding e.g. `--card: ...` here would override the formula
-     and make dark mode ignore --surface-opacity. */
-  --background-solid: oklch(0.145 0.006 70);
-  --foreground: oklch(0.985 0.006 70);
-  --card-solid: var(--card-dark-solid);
-  --card-foreground: oklch(0.985 0.006 70);
-  --popover-solid: oklch(0.205 0.006 70);
-  --popover-foreground: oklch(0.985 0.006 70);
-  --primary: oklch(0.92 0.012 70);
-  --primary-foreground: oklch(0.22 0.014 70);
-  --secondary: oklch(0.269 0.006 70);
-  --secondary-foreground: oklch(0.985 0.006 70);
-  --muted-solid: oklch(0.269 0.006 70);
-  --muted-foreground: oklch(0.708 0.006 70);
-  --accent-solid: oklch(0.269 0.006 70);
-  --accent-foreground: oklch(0.985 0.006 70);
-  --destructive: oklch(0.74 0.145 18);
-  --info: oklch(0.74 0.145 230);
-  --info-foreground: oklch(0.205 0.006 70);
-  --success: oklch(0.74 0.145 165);
-  --success-foreground: oklch(0.205 0.006 70);
-  --warning: oklch(0.82 0.14 92);
-  --warning-foreground: oklch(0.205 0.006 70);
+  /* Palette colors live in palette.generated.css and the selected palette's
+     <style>; only the translucent formulas and per-mode extras stay here.
+     Re-adding e.g. `--card: ...` would override the formula and make dark
+     mode ignore --surface-opacity. */
   /* Dark needs slightly more alpha for the same perceived step. These land the
      hovered row on roughly --card-solid (L 0.205) and the selected row on
      roughly --muted-solid (L 0.269), so rows sit in the existing dark ramp. */
   --row-hover: color-mix(in oklch, var(--foreground) 7%, transparent);
   --row-active: color-mix(in oklch, var(--foreground) 10%, transparent);
   --row-selected: color-mix(in oklch, var(--foreground) 14%, transparent);
-  --update: oklch(0.74 0.145 300);
-  --update-foreground: oklch(0.205 0.006 70);
   /* Same rust hue and chroma, lifted in lightness so the glyph keeps its
      presence on a dark popover — the lift --trees-file-icon-color-claude
      already makes, kept smaller because this is the real brand color. */
   --brand-anthropic: oklch(0.76 0.131 38.8);
-  --border: oklch(1 0 0 / 10%);
-  --input: oklch(1 0 0 / 15%);
-  --ring: oklch(0.556 0.006 70);
-  --chart-1: oklch(0.87 0.006 70);
-  --chart-2: oklch(0.556 0.006 70);
-  --chart-3: oklch(0.439 0.006 70);
-  --chart-4: oklch(0.371 0.006 70);
-  --chart-5: oklch(0.269 0.006 70);
   --trees-file-icon-color-astro: #d568ea;
   --trees-file-icon-color-babel: #ffd452;
   --trees-file-icon-color-bash: #5ecc71;
@@ -502,106 +415,6 @@
   --editor-inactive-selection: oklch(0.72 0.13 240 / 0.16);
   --editor-bracket-match-background: oklch(0.78 0.02 260 / 0.26);
   --editor-occurrence-highlight-background: oklch(0.78 0.02 260 / 0.18);
-
-  /* Terminal surface — dark */
-  --terminal-foreground: #d7dde5;
-  --terminal-cursor: #f4f7fb;
-  --terminal-cursor-accent: #0a0a0a;
-  --terminal-selection: #33455a;
-  --terminal-selection-foreground: #ffffff;
-  --terminal-ansi-black: #15181c;
-  --terminal-ansi-red: #ff5f57;
-  --terminal-ansi-green: #5fd38d;
-  --terminal-ansi-yellow: #f3c969;
-  --terminal-ansi-blue: #6aa8ff;
-  --terminal-ansi-magenta: #d28bff;
-  --terminal-ansi-cyan: #5fd7e5;
-  --terminal-ansi-white: #d7dde5;
-  --terminal-ansi-bright-black: #6d7682;
-  --terminal-ansi-bright-red: #ff8f87;
-  --terminal-ansi-bright-green: #89e8af;
-  --terminal-ansi-bright-yellow: #f7d98c;
-  --terminal-ansi-bright-blue: #93c1ff;
-  --terminal-ansi-bright-magenta: #e1b0ff;
-  --terminal-ansi-bright-cyan: #8ce8f0;
-  --terminal-ansi-bright-white: #ffffff;
-}
-
-/* workbench.palette === 'sage' — warm stone surfaces, cool ink and a sage
-   accent in light; deep slate and a muted teal in dark. Borrowed from ellie.
-   The background is deliberately off-white so white cards and popovers read as
-   raised against it, which the graphite base above does not do.
-
-   Attribute selectors because these have to outrank both `:root` and `.dark`,
-   which a class on the same element could not do. Both blocks list the same
-   token names on purpose — the light block outranks `.dark`, so any token it
-   set and the dark block did not would leak a light value into dark mode.
-
-   Only tokens that actually differ are here. The surface formulas, the file
-   icon colors, and the terminal, editor and search surfaces are shared by both
-   palettes and live once in `:root` / `.dark`. */
-html[data-palette='sage'] {
-  --background-solid: oklch(0.98 0.003 90);
-  --foreground: oklch(0.16 0.01 260);
-  --card-light-solid: oklch(1 0 0);
-  --card-dark-solid: oklch(0.21 0.01 260);
-  --card-solid: var(--card-light-solid);
-  --card-foreground: oklch(0.16 0.01 260);
-  --popover-solid: oklch(1 0 0);
-  --popover-foreground: oklch(0.16 0.01 260);
-  --primary: oklch(0.47 0.08 170);
-  --primary-foreground: oklch(0.98 0.005 170);
-  --secondary: oklch(0.95 0.005 90);
-  --secondary-foreground: oklch(0.22 0.01 260);
-  --muted-solid: oklch(0.95 0.005 90);
-  --muted-foreground: oklch(0.5 0.01 260);
-  --accent-solid: oklch(0.95 0.008 170);
-  --accent-foreground: oklch(0.22 0.01 260);
-  --info-foreground: oklch(0.98 0.003 90);
-  /* Green sits at 150, not 165: the sage --primary lives at 170 and a success
-     badge must not read as "the brand color". */
-  --success: oklch(0.55 0.17 150);
-  --success-foreground: oklch(0.98 0.003 90);
-  --warning-foreground: oklch(0.22 0.01 260);
-  --update-foreground: oklch(0.98 0.003 90);
-  --border: oklch(0.9 0.005 90);
-  --input: oklch(0.9 0.005 90);
-  --ring: oklch(0.47 0.08 170);
-  --chart-1: oklch(0.55 0.1 170);
-  --chart-2: oklch(0.6 0.12 250);
-  --chart-3: oklch(0.5 0.14 310);
-  --chart-4: oklch(0.7 0.12 90);
-  --chart-5: oklch(0.65 0.15 30);
-}
-
-.dark[data-palette='sage'] {
-  --background-solid: oklch(0.17 0.01 260);
-  --foreground: oklch(0.92 0.008 90);
-  --card-solid: var(--card-dark-solid);
-  --card-foreground: oklch(0.92 0.008 90);
-  --popover-solid: oklch(0.21 0.01 260);
-  --popover-foreground: oklch(0.92 0.008 90);
-  --primary: oklch(0.72 0.1 175);
-  --primary-foreground: oklch(0.17 0.03 175);
-  --secondary: oklch(0.24 0.008 260);
-  --secondary-foreground: oklch(0.92 0.008 90);
-  --muted-solid: oklch(0.24 0.008 260);
-  --muted-foreground: oklch(0.65 0.012 260);
-  --accent-solid: oklch(0.24 0.015 260);
-  --accent-foreground: oklch(0.92 0.008 90);
-  --info-foreground: oklch(0.17 0.02 260);
-  --success: oklch(0.74 0.145 150);
-  --success-foreground: oklch(0.17 0.02 260);
-  --warning-foreground: oklch(0.17 0.02 260);
-  --update-foreground: oklch(0.17 0.02 260);
-  --border: oklch(1 0 0 / 9%);
-  --input: oklch(1 0 0 / 12%);
-  --ring: oklch(0.72 0.1 175);
-  --chart-1: oklch(0.72 0.1 175);
-  --chart-2: oklch(0.68 0.12 250);
-  --chart-3: oklch(0.62 0.1 310);
-  --chart-4: oklch(0.78 0.12 90);
-  --chart-5: oklch(0.72 0.15 30);
 }
 
 /* Both shells give the editor and terminal a pane that already paints the

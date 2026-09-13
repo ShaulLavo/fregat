@@ -21,6 +21,7 @@ export type SessionState =
   | { readonly kind: 'failed'; readonly failure: ConnectionFailure }
   | {
       readonly kind: 'ready'
+      readonly client: Client
       readonly descriptor: HealthDescriptor
       readonly settings: SettingsSnapshot
       readonly owner: SettingsOwner
@@ -126,6 +127,7 @@ export function createSettingsSession(options: SessionOptions) {
       })
       publish({
         kind: 'ready',
+        client: options.client,
         descriptor,
         settings,
         owner,

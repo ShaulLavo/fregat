@@ -98,5 +98,15 @@
     "file": "apps/web/src/features/workbench/components/breadcrumb-picker-row.tsx",
     "class": "<button>",
     "reason": "Full-width list row. The Button primitive is a fixed-height, centred control that owns a radius and a hover fill, and a row is none of those things; it stays a raw element until a Row primitive exists. The full reasoning, including the specificity problem, is recorded under \"The Row primitive gap\" in docs/web-design-language.md#the-row-primitive-gap."
+  },
+  {
+    "file": "apps/web/src/features/settings/components/widgets/palette-card.tsx",
+    "class": "<button>",
+    "reason": "A gallery card with role='radio': a multi-line region holding a name, badges and two swatch strips. The Button primitive is a fixed-height, centred control with its own hover fill and radius; a card is none of those. Same gap as the Row primitive in docs/web-design-language.md#the-row-primitive-gap."
+  },
+  {
+    "file": "apps/web/src/features/settings/components/widgets/color-field.tsx",
+    "class": "<input>",
+    "reason": "type='color' is the native picker inside an InputGroup addon; the Input primitive is a text control and would restyle the swatch."
   }
 ]

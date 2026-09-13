@@ -19,7 +19,7 @@ test('app colors preview cancels without saving and selection updates the shared
   const application = createTestApplicationRuntime()
   const options = {
     application,
-    command: { paletteOpen: true, paletteSearch: 'colors ' },
+    command: { paletteOpen: true, paletteSearch: 'colors sage' },
     queryClient,
   }
   const first = renderWithProviders(
@@ -30,15 +30,13 @@ test('app colors preview cancels without saving and selection updates the shared
   )
   const user = userEvent.setup()
   await screen.findByPlaceholderText(/Select app colors/)
-  await waitFor(() => expect(document.documentElement).toHaveAttribute('data-palette', 'sage'))
+  await waitFor(() => expect(paletteStyle()).toContain(SAGE_LIGHT_BACKGROUND))
   expect(controlledClient.controller.settingsWriteCount).toBe(0)
 
   await user.keyboard('{Escape}')
   await waitFor(() => expect(screen.queryByPlaceholderText(/Select app colors/)).toBeNull())
-  expect(document.documentElement).toHaveAttribute(
-    'data-palette',
-    before.values['workbench.palette'],
-  )
+  expect(before.values['workbench.palette']).toBe('graphite')
+  expect(paletteStyle()).toContain(GRAPHITE_LIGHT_BACKGROUND)
   expect(controlledClient.controller.settingsWriteCount).toBe(0)
   first.unmount()
 
@@ -53,5 +51,13 @@ test('app colors preview cancels without saving and selection updates the shared
     expect((await fetchSettings(undefined, getClient())).values['workbench.palette']).toBe('sage'),
   )
   expect(controlledClient.controller.settingsWriteCount).toBe(1)
-  expect(document.documentElement).toHaveAttribute('data-palette', 'sage')
+  expect(paletteStyle()).toContain(SAGE_LIGHT_BACKGROUND)
 })
+
+const GRAPHITE_LIGHT_BACKGROUND = '--background-solid: oklch(0.97 0.006 70);'
+const SAGE_LIGHT_BACKGROUND = '--background-solid: oklch(0.98 0.003 90);'
+
+// The palette is a <style> carrying both modes, not an attribute.
+function paletteStyle() {
+  return document.getElementById('platform-palette')?.textContent ?? ''
+}
