@@ -3,7 +3,7 @@ description: Installs the toolchain, provisions the sibling @singapore-editor ed
 
 inputs:
   editor-ref:
-    description: Git ref of the ShaulLavo/singapor checkout the @singapore-editor/* links resolve to.
+    description: Git ref of the ShaulLavo/singapore checkout the @singapore-editor/* links resolve to.
     required: true
   ghostty-ref:
     description: Git ref of the ShaulLavo/ghostty-webgpu checkout the ghostty-webgpu link resolves to.
@@ -68,7 +68,7 @@ runs:
         EDITOR_REF: ${{ inputs.editor-ref }}
       run: |
         git init "$GITHUB_WORKSPACE/../Editor"
-        git -C "$GITHUB_WORKSPACE/../Editor" remote add origin https://github.com/ShaulLavo/singapor.git
+        git -C "$GITHUB_WORKSPACE/../Editor" remote add origin https://github.com/ShaulLavo/singapore.git
         git -C "$GITHUB_WORKSPACE/../Editor" fetch --depth 1 origin "$EDITOR_REF"
         git -C "$GITHUB_WORKSPACE/../Editor" checkout --detach FETCH_HEAD
 
