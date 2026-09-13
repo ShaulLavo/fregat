@@ -4,7 +4,7 @@ import { testDocumentRef } from '../../../../test/factories/document-targets'
 import type { DocumentRef } from '@/lib/documents/utils/types'
 import { filesystemPath } from '@/lib/documents/utils/identity'
 import '@workspace/ui/globals.css'
-import '@singapor/core/style.css'
+import '@singapore-editor/core/style.css'
 import type { QueryClient } from '@tanstack/react-query'
 import {
   DEFAULT_SETTING_VALUES,

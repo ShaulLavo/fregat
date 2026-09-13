@@ -1,4 +1,4 @@
-import type { EditorCommandId, EditorKeymapOptions } from '@singapor/core'
+import type { EditorCommandId, EditorKeymapOptions } from '@singapore-editor/core'
 import type { PlatformCommandId } from '@/keymap/types'
 
 export const HOSTED_EDITOR_KEYMAP = { enabled: false } satisfies EditorKeymapOptions

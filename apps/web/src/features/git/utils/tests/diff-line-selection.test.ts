@@ -1,4 +1,4 @@
-import { createDiffPlugin } from '@singapor/diff'
+import { createDiffPlugin } from '@singapore-editor/diff'
 
 import {
   diffLineAddress,

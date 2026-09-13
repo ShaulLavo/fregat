@@ -17,7 +17,7 @@ Platform:
 - `apps/server/src/git/*`
 - `apps/server/src/app.ts`
 - `apps/web/src/features/git/*`
-- `@singapor/diff/*`
+- `@singapore-editor/diff/*`
 
 Zed:
 
@@ -58,7 +58,7 @@ Status: implemented enough for a basic Git panel and diff review.
 - Rename and deletion diff snapshots.
 - Blob-backed snapshot diff documents, so an opened diff remains stable after
   the index or worktree changes.
-- Split/stacked diff display through `@singapor/diff`, drawn as real read-only
+- Split/stacked diff display through `@singapore-editor/diff`, drawn as real read-only
   editors carrying the package's diff plugin.
 - Inline changed-word highlighting in diff rows through `annotateInlineChanges`.
 - Line-range selection in an open diff, handed to the agent as a `@@` block.
@@ -154,7 +154,7 @@ Important current limits:
 | Restore and move to next hunk          | Yes | Missing  | Zed has `RestoreAndNext`.                                                 |
 | Stage/unstage selected ranges          | Yes | Missing  | VS Code also has this.                                                    |
 | Hunk navigation                        | Yes | Missing  | The package's navigation API had no caller and went with `DiffView`.      |
-| Expand skipped unchanged context       | Yes | Yes      | `@singapor/diff` supports expandable hunk separators.                     |
+| Expand skipped unchanged context       | Yes | Yes      | `@singapore-editor/diff` supports expandable hunk separators.                     |
 | Word diff highlighting                 | Yes | Partial  | Platform annotates inline changes, but lacks global/language settings.    |
 | Collapse untracked diff                | Yes | Missing  | Zed has a panel setting for this.                                         |
 | Branch diff against default/merge base | Yes | Missing  | Zed has `BranchDiff` and `DiffType::MergeBase`.                           |

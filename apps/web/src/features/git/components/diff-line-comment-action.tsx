@@ -1,5 +1,5 @@
 import { ChatCircleIcon, XIcon } from '@phosphor-icons/react'
-import type { DiffFile, DiffRegionStore, DiffRenderRow } from '@singapor/diff'
+import type { DiffFile, DiffRegionStore, DiffRenderRow } from '@singapore-editor/diff'
 import { Button } from '@workspace/ui/components/button'
 import { useEffect, useRef, useState, type RefObject } from 'react'
 

@@ -3,7 +3,7 @@ import { requireEdenData, parseEdenSseStream } from '@workspace/client-core/tran
 import { pullRequestMessage } from '@/git/utils/actions'
 import { readDiffFiles } from '@/git/state/diff'
 import type { GitStatusResult } from '@workspace/contracts'
-import type { DiffFile } from '@singapor/diff'
+import type { DiffFile } from '@singapore-editor/diff'
 import { connectionFailure } from '@/connection/utils/failure'
 import { createTuiError } from '@/host/utils/structured-errors'
 

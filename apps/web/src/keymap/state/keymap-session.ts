@@ -4,7 +4,7 @@ import {
   type KeymapRuntime,
   type KeymapSequenceEvent,
   type PendingChordLabel,
-} from '@singapor/core/keymap'
+} from '@singapore-editor/core/keymap'
 import { parseHotkey, rawHotkeyToParsedHotkey, detectPlatform } from '@tanstack/hotkeys'
 
 import type { PlatformCommandBus } from '@/keymap/providers/command-context'

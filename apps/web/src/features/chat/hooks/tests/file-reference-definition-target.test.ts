@@ -1,4 +1,4 @@
-import { documentUriToFileName } from '@singapor/lsp-plugin/paths'
+import { documentUriToFileName } from '@singapore-editor/lsp-plugin/paths'
 
 import { expect, test } from '../../../../../test/fixtures'
 import { fileReferenceDefinitionTarget } from '@/features/chat/hooks/use-open-file-reference'

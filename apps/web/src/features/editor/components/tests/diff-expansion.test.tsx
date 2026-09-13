@@ -1,8 +1,12 @@
 import { waitFor } from '@testing-library/react'
 import { StrictMode } from 'react'
 import userEvent from '@testing-library/user-event'
-import type { Editor } from '@singapor/core'
-import { createDiffRegionStore, createStackedProjection, createTextDiff } from '@singapor/diff'
+import type { Editor } from '@singapore-editor/core'
+import {
+  createDiffRegionStore,
+  createStackedProjection,
+  createTextDiff,
+} from '@singapore-editor/diff'
 import { vi } from 'vitest'
 
 import { DiffPane } from '@/features/editor/components/diff-pane'

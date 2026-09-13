@@ -32,7 +32,7 @@ import {
   type EditorViewSession,
   type PieceTableSnapshot,
   type EditorPreparedDocument,
-} from '@singapor/core'
+} from '@singapore-editor/core'
 
 type LiveDocumentSyncState = 'idle' | 'saving' | 'conflict'
 

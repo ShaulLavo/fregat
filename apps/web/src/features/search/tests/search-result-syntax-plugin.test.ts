@@ -8,7 +8,7 @@ import {
   type EditorSyntaxSessionOptions,
   type EditorToken,
   type PieceTableSnapshot,
-} from '@singapor/core'
+} from '@singapore-editor/core'
 import { describe, expect, it } from 'vitest'
 
 import { createSearchResultSyntaxProvider } from '@/features/search/utils/result-syntax-plugin'

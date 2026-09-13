@@ -9,13 +9,13 @@ import {
   type EditorPlugin,
   type EditorScrollPosition,
   type EditorSyntaxLanguageId,
-} from '@singapor/core'
-import { createEditorFindPlugin } from '@singapor/find'
-import { createFoldGutterPlugin, createLineGutterPlugin } from '@singapor/gutters'
-import { createMinimapPlugin } from '@singapor/minimap'
-import { createMarkdownPreviewPlugin } from '@singapor/markdown'
-import { createScopeLinesPlugin } from '@singapor/scope-lines'
-import { createTreeSitterSyntaxPlugin } from '@singapor/tree-sitter'
+} from '@singapore-editor/core'
+import { createEditorFindPlugin } from '@singapore-editor/find'
+import { createFoldGutterPlugin, createLineGutterPlugin } from '@singapore-editor/gutters'
+import { createMinimapPlugin } from '@singapore-editor/minimap'
+import { createMarkdownPreviewPlugin } from '@singapore-editor/markdown'
+import { createScopeLinesPlugin } from '@singapore-editor/scope-lines'
+import { createTreeSitterSyntaxPlugin } from '@singapore-editor/tree-sitter'
 import { subscribeActiveShikiTheme } from '@/features/editor/state/color-theme-store'
 import {
   editorShikiHighlighterProvider,
@@ -25,7 +25,7 @@ import {
 import { reportError, toClientError } from '@/lib/client-error-taxonomy'
 import { log } from '@/lib/client-logging'
 import { editorPerformanceFeatureDisabled } from '@/features/editor/state/performance-trace'
-import type { DecodeMode } from '@singapor/decode'
+import type { DecodeMode } from '@singapore-editor/decode'
 import { editorIndentationGuidesSupported } from '@/features/editor/utils/indentation-guides'
 import { FOLD_CHEVRON_ICON } from '@/features/editor/utils/fold-icon'
 
@@ -102,8 +102,8 @@ function activateDecodePlugin(
   let disposed = false
   let registration: EditorDisposable | null = null
   const load = async () => {
-    const plugin = await loadPlugin('@singapor/decode', () =>
-      import('@singapor/decode').then((module) => module.createDecodePlugin({ mode })),
+    const plugin = await loadPlugin('@singapore-editor/decode', () =>
+      import('@singapore-editor/decode').then((module) => module.createDecodePlugin({ mode })),
     )
     if (disposed || !plugin) return
     registration = activateLoadedEditorPlugin(plugin, context)

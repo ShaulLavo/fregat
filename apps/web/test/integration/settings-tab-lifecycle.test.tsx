@@ -5,7 +5,7 @@ import { mkdir } from 'node:fs/promises'
 import { join } from 'node:path'
 import type { SettingsSnapshot, SettingsWriteTarget } from '@workspace/contracts'
 import { settingsKeys } from '@workspace/client-core/settings/query-keys'
-import { createEditorBufferSession } from '@singapor/core'
+import { createEditorBufferSession } from '@singapore-editor/core'
 
 import { SettingsSyncService } from '@/features/settings/state/sync-service'
 import { selectSettingsScope } from '@/features/settings/state/scope-store'

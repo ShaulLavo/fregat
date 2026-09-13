@@ -2,12 +2,12 @@ import type { DocumentKey, TabId } from '@/lib/documents/utils/types'
 import { createContext } from 'react'
 
 import type { EditorStatusBarSource } from '@/features/editor/state/status-bar-source'
-import type { DocumentSessionChange, EditorScrollPosition } from '@singapor/core'
+import type { DocumentSessionChange, EditorScrollPosition } from '@singapore-editor/core'
 import type {
   LanguageServerDefinitionTarget,
   LanguageServerReferencesResult,
   OnApplyWorkspaceEdit,
-} from '@singapor/lsp-plugin'
+} from '@singapore-editor/lsp-plugin'
 
 export type EditorSurfaceActions = {
   readonly applyWorkspaceEdit: OnApplyWorkspaceEdit

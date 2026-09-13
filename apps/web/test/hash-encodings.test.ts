@@ -1,4 +1,4 @@
-import { createTextDiff } from '@singapor/diff'
+import { createTextDiff } from '@singapore-editor/diff'
 import {
   fnv1a32,
   stablePathHash,

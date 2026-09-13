@@ -1,4 +1,9 @@
-import { joinRenderLines, type DiffFile, type DiffPlugin, type DiffRenderRow } from '@singapor/diff'
+import {
+  joinRenderLines,
+  type DiffFile,
+  type DiffPlugin,
+  type DiffRenderRow,
+} from '@singapore-editor/diff'
 import { useLayoutEffect, useMemo, useState } from 'react'
 
 export type DiffRowsState = {

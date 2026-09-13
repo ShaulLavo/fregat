@@ -1,4 +1,4 @@
-import { EditorHost } from '@singapor/react'
+import { EditorHost } from '@singapore-editor/react'
 import {
   memo,
   type ComponentProps,

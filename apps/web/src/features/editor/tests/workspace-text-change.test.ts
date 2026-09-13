@@ -1,6 +1,6 @@
 import { readFile, writeFile } from 'node:fs/promises'
 import { join } from 'node:path'
-import { createEditorBufferSession } from '@singapor/core'
+import { createEditorBufferSession } from '@singapore-editor/core'
 import { expect, test } from '../../../../test/fixtures'
 import {
   createWorkspaceTextChanges,

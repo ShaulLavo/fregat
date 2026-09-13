@@ -2,15 +2,18 @@ import { lstat, mkdir, readFile, symlink, writeFile } from 'node:fs/promises'
 import path from 'node:path'
 import { pathToFileURL } from 'node:url'
 
-import { createDocumentLogicalRevisionScope, createEditorBufferSession } from '@singapor/core'
+import {
+  createDocumentLogicalRevisionScope,
+  createEditorBufferSession,
+} from '@singapore-editor/core'
 import type {
   ApplyWorkspaceEditRequest,
   WorkspaceTextDocumentProvenance,
-} from '@singapor/lsp-plugin'
+} from '@singapore-editor/lsp-plugin'
 import type {
   ParsedWorkspaceEdit,
   WorkspaceEditOperation,
-} from '@singapor/lsp-plugin/workspace-edit'
+} from '@singapore-editor/lsp-plugin/workspace-edit'
 import { createTestQueryClient } from '../render'
 import {
   nodeWorkspaceEditFileSystemDriver,

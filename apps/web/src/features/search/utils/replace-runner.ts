@@ -1,7 +1,7 @@
 import { filesystemPath } from '@/lib/documents/utils/identity'
 import type { TextChangeTarget, WorkspaceTextChanges } from '@/lib/workspace-edits/utils/types'
 import { workspaceSearchReplacePlan } from '@/features/search/utils/replace'
-import type { ApplyWorkspaceEditResult } from '@singapor/lsp-plugin'
+import type { ApplyWorkspaceEditResult } from '@singapore-editor/lsp-plugin'
 import type { WorkspaceSearchMatch, WorkspaceSearchQuery } from '@workspace/contracts'
 
 export type AppliedWorkspaceSearchReplaceResult = {

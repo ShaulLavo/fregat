@@ -1,4 +1,4 @@
-import type { EditorTheme, EditorSyntaxThemeColor } from '@singapor/core'
+import type { EditorTheme, EditorSyntaxThemeColor } from '@singapore-editor/core'
 
 type GuideColor = {
   readonly color: EditorSyntaxThemeColor

@@ -1,4 +1,4 @@
-import type { ReactEditorController } from '@singapor/react'
+import type { ReactEditorController } from '@singapore-editor/react'
 
 import type { FilesystemPath } from '@/lib/documents/utils/types'
 import { BreadcrumbsBar } from '@/features/workbench/components/breadcrumbs-bar'

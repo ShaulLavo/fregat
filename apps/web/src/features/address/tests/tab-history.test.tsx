@@ -8,7 +8,7 @@ import { fileResultFromResponse } from '@/lib/file-system-types'
 import { filesystemPath } from '@/lib/documents/utils/identity'
 import { mkdir, writeFile } from 'node:fs/promises'
 import path from 'node:path'
-import { createEditorBufferSession } from '@singapor/core'
+import { createEditorBufferSession } from '@singapore-editor/core'
 import { readFilePreview } from '@workspace/client-core/files/read'
 
 import { confirmedEnvironmentId } from '@/lib/environments/state/domain'

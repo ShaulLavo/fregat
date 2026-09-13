@@ -4,7 +4,7 @@ import { CaretRightIcon, FileCodeIcon, XIcon } from '@phosphor-icons/react'
 import type {
   LanguageServerDefinitionTarget,
   LanguageServerReferencesResult,
-} from '@singapor/lsp-plugin'
+} from '@singapore-editor/lsp-plugin'
 import type { CSSProperties } from 'react'
 import { useMemo, useState } from 'react'
 

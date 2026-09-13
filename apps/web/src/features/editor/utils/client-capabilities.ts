@@ -1,5 +1,5 @@
-import { semanticTokensClientCapability, SEMANTIC_TOKEN_TYPES } from '@singapor/lsp'
-import type { lsp } from '@singapor/lsp'
+import { semanticTokensClientCapability, SEMANTIC_TOKEN_TYPES } from '@singapore-editor/lsp'
+import type { lsp } from '@singapore-editor/lsp'
 
 import { semanticTokenProfileFor } from '@/features/editor/utils/semantic-token-servers'
 
@@ -97,4 +97,4 @@ export function clientCapabilitiesForServer(serverId: string): lsp.ClientCapabil
  * named here so the plugin passes it explicitly and a later refactor in the
  * editor package cannot change it silently.
  */
-export const LANGUAGE_SERVER_CLIENT_INFO = { name: '@singapor/lsp' } as const
+export const LANGUAGE_SERVER_CLIENT_INFO = { name: '@singapore-editor/lsp' } as const

@@ -1,5 +1,5 @@
-import type { ReactEditorController } from '@singapor/react'
-import { useEditorSelector } from '@singapor/react'
+import type { ReactEditorController } from '@singapore-editor/react'
+import { useEditorSelector } from '@singapore-editor/react'
 
 import type { EditorCursor } from '@/features/workbench/utils/breadcrumbs'
 

@@ -2,7 +2,7 @@ import type {
   LanguageServerDefinitionTarget,
   LanguageServerDiagnosticSummary,
   LanguageServerStatus,
-} from '@singapor/lsp-plugin'
+} from '@singapore-editor/lsp-plugin'
 import { EmptyState } from '@workspace/ui/components/empty-state'
 import { cn } from '@workspace/ui/lib/utils'
 import { useCallback, useRef } from 'react'

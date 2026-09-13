@@ -1,5 +1,5 @@
-import type { EditorTheme } from '@singapor/core'
-import { VSCODE_THEMES, type VscodeThemeDefinition } from '@singapor/core/shiki'
+import type { EditorTheme } from '@singapore-editor/core'
+import { VSCODE_THEMES, type VscodeThemeDefinition } from '@singapore-editor/core/shiki'
 
 export type EditorColorModeType = 'dark' | 'light'
 

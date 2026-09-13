@@ -3,7 +3,7 @@ import {
   defaultClientCapabilities,
   mergeClientCapabilities,
   semanticTokensClientCapability,
-} from '@singapor/lsp'
+} from '@singapore-editor/lsp'
 import { isRecord } from '@workspace/contracts'
 import { afterEach, describe, expect, it } from 'vitest'
 
@@ -167,7 +167,7 @@ function initializeParams(root: string) {
   )
   return {
     capabilities,
-    clientInfo: { name: '@singapor/lsp' },
+    clientInfo: { name: '@singapore-editor/lsp' },
     processId: process.pid,
     rootUri: fileUriForPath(root),
     workspaceFolders: [{ name: path.basename(root), uri: fileUriForPath(root) }],

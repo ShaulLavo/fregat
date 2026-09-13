@@ -1,4 +1,4 @@
-import { Editor, type EditorCommandId } from '@singapor/core'
+import { Editor, type EditorCommandId } from '@singapore-editor/core'
 import type { FocusService } from '@/lib/focus/state/service'
 
 export function createKeymapEditor(

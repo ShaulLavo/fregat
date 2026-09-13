@@ -9,12 +9,15 @@ import type {
   ApplyWorkspaceEditRequest,
   LanguageServerDocumentSyncController,
   WorkspaceTextDocumentProvenance,
-} from '@singapor/lsp-plugin'
+} from '@singapore-editor/lsp-plugin'
 import type {
   ParsedWorkspaceEdit,
   WorkspaceEditOperation,
-} from '@singapor/lsp-plugin/workspace-edit'
-import { createDocumentLogicalRevisionScope, createEditorBufferSession } from '@singapor/core'
+} from '@singapore-editor/lsp-plugin/workspace-edit'
+import {
+  createDocumentLogicalRevisionScope,
+  createEditorBufferSession,
+} from '@singapore-editor/core'
 import { QueryClient } from '@tanstack/react-query'
 import type {
   WorkspaceEditPrepareRequest,

@@ -2,7 +2,7 @@ import {
   LanguageServerDocumentSyncController,
   type ApplyWorkspaceEditResult,
   type OnApplyWorkspaceEdit,
-} from '@singapor/lsp-plugin'
+} from '@singapore-editor/lsp-plugin'
 import { createContext, use } from 'react'
 
 import type { WorkspaceEditService } from '@/features/editor/state/workspace-edit-service'

@@ -1,5 +1,5 @@
 import type { DocumentKey, FilesystemPath } from '@/lib/documents/utils/types'
-import type { EditorTextBuffer } from '@singapor/core'
+import type { EditorTextBuffer } from '@singapore-editor/core'
 
 import { log } from '@/lib/client-logging'
 import type { ScopedStorage } from '@/lib/environments/state/scoped-storage'

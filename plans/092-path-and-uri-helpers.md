@@ -66,7 +66,7 @@ Seven copies of one function, verified at this HEAD:
 
 All seven are the same two lines: strip leading slashes, split on `/`, `encodeURIComponent` each
 segment, prefix `file:///`. `apps/web/src/lib/diagnostic.ts:39` already delegates to
-`fileNameToDocumentUri` from `@singapor/lsp-plugin/paths`, and `diagnostic.ts:34` already uses that
+`fileNameToDocumentUri` from `@singapore-editor/lsp-plugin/paths`, and `diagnostic.ts:34` already uses that
 package's `documentUriToFileName` as the inverse.
 
 **Reconcile — backslash.** The seven copies percent-encode it: `a\b.ts` → `file:///a%5Cb.ts`. The
@@ -98,10 +98,10 @@ contracts is the only layer both `apps/server` and `apps/web` import. Copy the e
 into contracts rather than importing it: `packages/contracts/package.json` lists only `minimatch` and
 `valibot`, and it must stay that way.
 
-**Parity test placement.** The test that pins the copy to `@singapor/lsp-plugin` cannot live in
-contracts, because contracts must not take that dependency. `@singapor/lsp-plugin` is an `apps/web`
+**Parity test placement.** The test that pins the copy to `@singapore-editor/lsp-plugin` cannot live in
+contracts, because contracts must not take that dependency. `@singapore-editor/lsp-plugin` is an `apps/web`
 dependency (`apps/web/package.json:49`) and not a server one, so the parity test lives in
-`apps/web/src/lib/tests/` and imports both the contracts helper and `@singapor/lsp-plugin/paths`.
+`apps/web/src/lib/tests/` and imports both the contracts helper and `@singapore-editor/lsp-plugin/paths`.
 
 ## Split `parentPath` by behaviour family
 

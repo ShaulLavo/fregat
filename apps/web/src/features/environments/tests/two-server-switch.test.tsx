@@ -6,7 +6,7 @@ import { act, fireEvent, screen, waitFor } from '@testing-library/react'
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query'
 import { healthDescriptorSchema } from '@workspace/contracts'
 import * as v from 'valibot'
-import { createEditorBufferSession } from '@singapor/core'
+import { createEditorBufferSession } from '@singapore-editor/core'
 import { writeFile } from 'node:fs/promises'
 import { join } from 'node:path'
 

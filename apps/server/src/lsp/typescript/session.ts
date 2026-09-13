@@ -4,8 +4,8 @@ import path from 'node:path'
 import {
   tsDiagnosticMessageText,
   tsDiagnosticToLspDiagnostic,
-} from '@singapor/typescript-lsp/ts-diagnostics'
-import type { PublishDiagnosticsNotificationParams } from '@singapor/lsp/types'
+} from '@singapore-editor/typescript-lsp/ts-diagnostics'
+import type { PublishDiagnosticsNotificationParams } from '@singapore-editor/lsp/types'
 import { isRecord } from '@workspace/contracts'
 import ts from 'typescript-language-service'
 import type * as lsp from 'vscode-languageserver-protocol'

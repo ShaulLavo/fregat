@@ -5,7 +5,7 @@ import {
   createSplitProjection,
   createStackedProjection,
   createDiffRegionStore,
-} from '@singapor/diff'
+} from '@singapore-editor/diff'
 import { gitRows } from '@/git/utils/rows'
 import { createControlledInProcessTransport } from '../../../test/client'
 import { createEnvironmentClient } from '@workspace/client-core/transport/client'

@@ -1,7 +1,7 @@
 import { useQueryClient } from '@tanstack/react-query'
 import { originForQueryClient } from '@/lib/environments/state/query-clients'
-import type { EditorPlugin, EditorTheme } from '@singapor/core'
-import type { DiffFile, DiffRenderRow } from '@singapor/diff'
+import type { EditorPlugin, EditorTheme } from '@singapore-editor/core'
+import type { DiffFile, DiffRenderRow } from '@singapore-editor/diff'
 import { useEffect, useLayoutEffect, useMemo, useState } from 'react'
 
 import {
@@ -9,7 +9,7 @@ import {
   type DiffLanguageDocument,
   type DiffLanguageSession,
 } from '@/features/editor/state/diff-language-session'
-import { documentUriToFileName } from '@singapor/lsp-plugin/paths'
+import { documentUriToFileName } from '@singapore-editor/lsp-plugin/paths'
 
 import { useLanguageServerMatches } from '@/features/editor/hooks/use-language-server-matches'
 import { diffLanguageServerConnectionProvider } from '@/features/editor/state/language-server-connection-pool'

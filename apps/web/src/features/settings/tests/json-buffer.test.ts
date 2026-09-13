@@ -6,7 +6,7 @@ import {
   filesystemPath,
   settingsJsonDocument,
 } from '@/lib/documents/utils/identity'
-import { createEditorBufferSession } from '@singapor/core'
+import { createEditorBufferSession } from '@singapore-editor/core'
 
 import { createEditorDocumentStore } from '@/features/editor/state/document-state'
 

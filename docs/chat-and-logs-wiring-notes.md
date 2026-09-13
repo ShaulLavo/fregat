@@ -66,7 +66,7 @@ Remaining unused-file entries:
 
 Chat/logs-related static-analysis notes:
 
-- `@singapor/diff` is still reported as an unused dependency in `apps/web/package.json`.
+- `@singapore-editor/diff` is still reported as an unused dependency in `apps/web/package.json`.
 - `logsKeys` is still reported as an unused export from `apps/web/src/lib/query-keys.ts`, although the mounted logs files import and use it.
 
 ## Recommendation

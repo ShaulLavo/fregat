@@ -7,7 +7,7 @@ import type {
   EditorViewContributionContext,
   EditorViewContributionProvider,
   EditorViewSnapshot,
-} from '@singapor/core'
+} from '@singapore-editor/core'
 import { afterEach, vi } from 'vitest'
 
 import { useScrollPersistencePlugin } from '@/features/editor/hooks/use-scroll-persistence-plugin'

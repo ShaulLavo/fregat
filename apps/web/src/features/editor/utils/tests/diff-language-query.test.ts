@@ -1,4 +1,4 @@
-import { createSplitProjection, createTextDiff } from '@singapor/diff'
+import { createSplitProjection, createTextDiff } from '@singapore-editor/diff'
 import { describe, expect, it } from 'vitest'
 
 import { diffQueryTargetAt, type DiffSideState } from '@/features/editor/utils/diff-language-query'

@@ -110,8 +110,8 @@
   "dependencies": {
     "@elysia/eden": "^1.4.10",
     "@shikijs/themes": "4.4.3",
-    "@singapor/core": "0.1.2",
-    "@singapor/diff": "0.2.0",
+    "@singapore-editor/core": "0.1.2",
+    "@singapore-editor/diff": "0.2.0",
     "@tanstack/hotkeys": "^0.8.0",
     "@tanstack/query-core": "^5.102.8",
     "@workspace/contracts": "workspace:*",

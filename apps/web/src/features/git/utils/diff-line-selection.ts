@@ -3,7 +3,7 @@ import {
   createStackedProjection,
   type DiffFile,
   type DiffRenderRow,
-} from '@singapor/diff'
+} from '@singapore-editor/diff'
 
 /** Which pane a row was read from — the split view's two, or the stacked one. */
 export type DiffPaneSide = 'new' | 'old' | 'stacked'

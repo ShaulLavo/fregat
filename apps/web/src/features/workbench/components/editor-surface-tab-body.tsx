@@ -21,11 +21,11 @@ import {
 import { SettingsPage } from '@/features/settings/components/page'
 import { useSettingsJsonDocument } from '@/features/settings/hooks/use-settings-json-document'
 import { useSelectedFile } from '@/features/workspace/hooks/use-selected-file'
-import type { DocumentSessionChange } from '@singapor/core'
+import type { DocumentSessionChange } from '@singapore-editor/core'
 import type {
   LanguageServerDefinitionTarget,
   LanguageServerReferencesResult,
-} from '@singapor/lsp-plugin'
+} from '@singapore-editor/lsp-plugin'
 import { useFileOpenIntent } from '@/lib/file-open-intent/providers/context'
 
 export function EditorSurfaceTabBody({

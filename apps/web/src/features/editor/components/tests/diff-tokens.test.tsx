@@ -1,13 +1,17 @@
 import { waitFor } from '@testing-library/react'
 import { StrictMode } from 'react'
 import { vi } from 'vitest'
-import { Editor } from '@singapor/core'
+import { Editor } from '@singapore-editor/core'
 import {
   createEmptySyntaxResult,
   type EditorSyntaxSessionOptions,
   type EditorToken,
-} from '@singapor/core/syntax'
-import { createDiffRegionStore, createTextDiff, type DiffSyntaxBackend } from '@singapor/diff'
+} from '@singapore-editor/core/syntax'
+import {
+  createDiffRegionStore,
+  createTextDiff,
+  type DiffSyntaxBackend,
+} from '@singapore-editor/diff'
 
 import { DiffPane } from '@/features/editor/components/diff-pane'
 import { expect, test } from '../../../../../test/fixtures'

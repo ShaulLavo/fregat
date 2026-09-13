@@ -7,7 +7,7 @@ import {
 import { createClientInvariantError } from '@/lib/structured-errors'
 import { describe } from 'vitest'
 import { expect, test as it } from '../../../../test/fixtures'
-import { createEditorTextBuffer } from '@singapor/core'
+import { createEditorTextBuffer } from '@singapore-editor/core'
 import type { WorkspaceSearchEvent } from '@workspace/contracts'
 
 import type { LiveEditorDocument } from '@/features/editor/state/document-state'

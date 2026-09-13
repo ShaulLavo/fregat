@@ -1,4 +1,4 @@
-import { editorThemeToShikiTheme, type VscodeThemeRegistration } from '@singapor/core/shiki'
+import { editorThemeToShikiTheme, type VscodeThemeRegistration } from '@singapore-editor/core/shiki'
 import { loadVscodeThemeRegistration } from '@workspace/client-core/themes/registration'
 import { createClientError } from '@workspace/client-core/errors'
 import type { ThemeRegistration } from 'shiki/core'

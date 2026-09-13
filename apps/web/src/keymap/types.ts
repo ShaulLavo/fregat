@@ -1,5 +1,5 @@
-import type { KeyChord, EditorKeyCondition } from '@singapor/core/keymap'
-export type { KeyChord } from '@singapor/core/keymap'
+import type { KeyChord, EditorKeyCondition } from '@singapore-editor/core/keymap'
+export type { KeyChord } from '@singapore-editor/core/keymap'
 import type { environmentCommands } from '@/keymap/environment-commands'
 import type { FocusArea } from '@/lib/focus/state/service'
 import type { HotkeyMeta } from '@tanstack/hotkeys'

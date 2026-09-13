@@ -1,4 +1,4 @@
-import { offsetToLspPosition, type lsp } from '@singapor/lsp'
+import { offsetToLspPosition, type lsp } from '@singapore-editor/lsp'
 import type {
   SettingsDiagnostic,
   SettingsLayerFile,

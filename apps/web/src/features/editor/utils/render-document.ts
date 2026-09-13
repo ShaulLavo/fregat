@@ -3,7 +3,7 @@ import type {
   EditorScrollPosition,
   EditorTextBuffer,
   EditorViewSession,
-} from '@singapor/core'
+} from '@singapore-editor/core'
 import type { DocumentKey, DocumentRef } from '@/lib/documents/utils/types'
 
 export type EditorRenderDocument = {

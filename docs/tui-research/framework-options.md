@@ -165,7 +165,7 @@ What you would have to build to reach OpenTUI-core parity: cell grid + damage di
 
 **Diff rendering**
 
-- `DiffRenderable` (core) consumes unified diff text and renders unified or split with highlighting. Core depends on `diff@9.0.0` for parsing; OpenCode also uses `diff` 8.0.2 for revert computations (`OC/package.json:62`). The web app's `@singapor/diff` is editor-bound; the contract between the two is "a unified diff string", which the server can produce once.
+- `DiffRenderable` (core) consumes unified diff text and renders unified or split with highlighting. Core depends on `diff@9.0.0` for parsing; OpenCode also uses `diff` 8.0.2 for revert computations (`OC/package.json:62`). The web app's `@singapore-editor/diff` is editor-bound; the contract between the two is "a unified diff string", which the server can produce once.
 
 **Terminal capability detection**
 

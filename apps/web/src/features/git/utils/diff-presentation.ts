@@ -1,6 +1,6 @@
 import { comparisonDisplayPath } from '@/lib/documents/utils/labels'
 import type { GitFileDiff } from '@workspace/contracts'
-import type { DiffFile } from '@singapor/diff'
+import type { DiffFile } from '@singapore-editor/diff'
 
 import { toTreePath } from '@/lib/path-formatters'
 

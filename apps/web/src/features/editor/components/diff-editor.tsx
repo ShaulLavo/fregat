@@ -1,5 +1,5 @@
 import type { TabId } from '@/lib/documents/utils/types'
-import { createDiffRegionStore, type DiffFile, type DiffRegionStore } from '@singapor/diff'
+import { createDiffRegionStore, type DiffFile, type DiffRegionStore } from '@singapore-editor/diff'
 import {
   ResizableHandle,
   ResizablePanel,

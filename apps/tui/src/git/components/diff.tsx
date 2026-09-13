@@ -4,7 +4,7 @@ import {
   createSplitProjection,
   createStackedProjection,
   type DiffFile,
-} from '@singapor/diff'
+} from '@singapore-editor/diff'
 import type { SettingsOwner } from '@workspace/client-core/settings/owner'
 import { useSettingValue } from '@/settings/hooks/use-setting-value'
 import { toggleDiffPreference } from '@/git/state/diff'

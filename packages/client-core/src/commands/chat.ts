@@ -1,5 +1,5 @@
 import { defineMetadata } from './metadata'
-import type { KeyChord } from '@singapor/core/keymap'
+import type { KeyChord } from '@singapore-editor/core/keymap'
 
 function chat<const Id extends string>(id: Id, title: string, key?: KeyChord[0]) {
   const chord: KeyChord = ['Control+K', key ?? 'C']

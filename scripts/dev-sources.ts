@@ -17,7 +17,7 @@ const sourceExtensions = ['.ts', '.tsx', '.js', '/index.ts', '/index.tsx']
 export function readDevSources(webRoot: string): readonly DevPackage[] {
   const manifest = readManifest(path.join(webRoot, 'package.json'))
   const dependencies = objectField(manifest.dependencies, 'web dependencies')
-  const editors = Object.keys(dependencies).filter((name) => name.startsWith('@singapor/'))
+  const editors = Object.keys(dependencies).filter((name) => name.startsWith('@singapore-editor/'))
   if (editors.length === 0) throw createScriptError('No editor dependencies found in the web app.')
 
   return [...editors.map((name) => readEditorPackage(webRoot, name)), readGhosttyPackage(webRoot)]

@@ -31,7 +31,7 @@ export default defineConfig(({ command, isPreview }) => {
         exclude: [
           /\/node_modules\//,
           ...packages
-            .filter((pkg) => pkg.name !== '@singapor/react')
+            .filter((pkg) => pkg.name !== '@singapore-editor/react')
             .map((pkg) => new RegExp(`^${escapeRegExp(pkg.root)}/`)),
         ],
       }),
@@ -78,7 +78,7 @@ function devSourcePlugin(packages: readonly DevPackage[]): Plugin {
       const specifier = id.split('?')[0] ?? id
       const source = entries.get(specifier)
       if (source) return source + id.slice(specifier.length)
-      if (specifier.startsWith('@singapor/') || specifier.startsWith('ghostty-webgpu/')) {
+      if (specifier.startsWith('@singapore-editor/') || specifier.startsWith('ghostty-webgpu/')) {
         this.error(`No development source for ${id}. Add its source entry before importing it.`)
       }
       return null

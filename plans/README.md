@@ -157,7 +157,7 @@ a bare root `bun run verify`.
   `docs/` so they stay visible, and each ends in a decision record plus the executable plans it
   becomes. Plan 110 asks what belongs in a workspace index beyond today's file index in
   `apps/server/src/fs/workspace-index.ts`; its consumers are Shiki grammar prefetch, Plan 088's
-  semantic retrieval, Plan 108's document graph, and search. Plan 111 compares `@singapor`'s
+  semantic retrieval, Plan 108's document graph, and search. Plan 111 compares `@singapore-editor`'s
   inline-replacement layer against CodeMirror 6 decorations and Lexical's decorator nodes; it gates
   Plan 108 Phase 2, any later Obsidian mode, and the question of whether the chat composer still
   needs Lexical.

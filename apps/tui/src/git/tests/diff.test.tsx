@@ -1,6 +1,6 @@
 import { makeSettingsOwner } from '../../../test/factories/settings-owner'
 import { readSettings } from '@workspace/client-core/settings/read'
-import { createTextDiff } from '@singapor/diff'
+import { createTextDiff } from '@singapore-editor/diff'
 import { act } from 'react'
 import { CommandProvider } from '@/commands/providers/command-provider'
 import { DiffView } from '@/git/components/diff'

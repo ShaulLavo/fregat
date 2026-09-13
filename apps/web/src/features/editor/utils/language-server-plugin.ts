@@ -10,8 +10,8 @@ import type {
   LanguageServerSemanticTokensFactory,
   LspConnectionProvider,
   OnApplyWorkspaceEdit,
-} from '@singapor/lsp-plugin'
-import { createLanguageServerSetPlugin } from '@singapor/lsp-plugin/websocket'
+} from '@singapore-editor/lsp-plugin'
+import { createLanguageServerSetPlugin } from '@singapore-editor/lsp-plugin/websocket'
 import {
   LSP_FEATURE_IDS,
   LSP_SEMANTIC_TOKENS_REFRESH,

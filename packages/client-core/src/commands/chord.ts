@@ -7,7 +7,7 @@ import {
 } from '@tanstack/hotkeys'
 import { MAX_KEYBINDING_CHORD_STROKES } from '@workspace/contracts'
 
-import type { KeyChord } from '@singapor/core/keymap'
+import type { KeyChord } from '@singapore-editor/core/keymap'
 
 export type PlatformName = ReturnType<typeof detectPlatform>
 

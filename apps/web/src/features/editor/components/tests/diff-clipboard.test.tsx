@@ -1,12 +1,12 @@
 import { waitFor } from '@testing-library/react'
 import { StrictMode } from 'react'
-import type { Editor } from '@singapor/core'
+import type { Editor } from '@singapore-editor/core'
 import {
   createDiffRegionStore,
   createStackedProjection,
   createTextDiff,
   type DiffRenderRow,
-} from '@singapor/diff'
+} from '@singapore-editor/diff'
 
 import { DiffPane } from '@/features/editor/components/diff-pane'
 import { expect, test } from '../../../../../test/fixtures'

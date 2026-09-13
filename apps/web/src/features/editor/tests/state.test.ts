@@ -16,7 +16,7 @@ import {
   createEditorBufferSession,
   type EditorPreparedDocument,
   type EditorTextBuffer,
-} from '@singapor/core'
+} from '@singapore-editor/core'
 import { describe, vi } from 'vitest'
 import { expect, test } from '../../../../test/fixtures'
 import {

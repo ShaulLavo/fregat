@@ -4,7 +4,7 @@ import type { PlatformCommandBus } from '@/keymap/providers/command-context'
 import { createPlatformKeymapSession } from '@/keymap/state/keymap-session'
 import type { PlatformKeyBinding } from '@/keymap/types'
 import { appKeyBindingsForPane } from '@/keymap/utils/app-bindings'
-import type { PendingChordLabel } from '@singapor/core/keymap'
+import type { PendingChordLabel } from '@singapore-editor/core/keymap'
 import type { FocusArea, FocusService, FocusTargetToken } from '@/lib/focus/state/service'
 
 export function useAppKeymap({

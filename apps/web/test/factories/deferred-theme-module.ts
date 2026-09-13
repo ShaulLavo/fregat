@@ -1,4 +1,4 @@
-import type { VscodeThemeRegistration } from '@singapor/core/shiki'
+import type { VscodeThemeRegistration } from '@singapore-editor/core/shiki'
 
 type ThemeModule = { readonly default: VscodeThemeRegistration }
 

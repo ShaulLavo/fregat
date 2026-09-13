@@ -1,6 +1,6 @@
 /**
  * Only the part of `textDocument/hover` we read. Declared here rather than pulled from
- * `vscode-languageserver-protocol`: that is a dependency of `@singapor/lsp-plugin`, not of this
+ * `vscode-languageserver-protocol`: that is a dependency of `@singapore-editor/lsp-plugin`, not of this
  * app, and taking one on to name two fields is the worse trade.
  */
 export type HoverResponse = {

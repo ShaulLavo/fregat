@@ -1,15 +1,15 @@
 import type {
   LanguageServerConnectionContext,
   LanguageServerSemanticTokensDocument,
-} from '@singapor/lsp-plugin'
-import { decodeSemanticTokens } from '@singapor/lsp-plugin'
+} from '@singapore-editor/lsp-plugin'
+import { decodeSemanticTokens } from '@singapore-editor/lsp-plugin'
 import type {
   SemanticTokenDropReason,
   SemanticTokenLayer,
   SemanticTokenRangeRequest,
-} from '@singapor/core/extensions'
-import type { LspClient, LspDocument, lsp } from '@singapor/lsp'
-import { LspRequestCancelledError, offsetToLspPositionInSnapshot } from '@singapor/lsp'
+} from '@singapore-editor/core/extensions'
+import type { LspClient, LspDocument, lsp } from '@singapore-editor/lsp'
+import { LspRequestCancelledError, offsetToLspPositionInSnapshot } from '@singapore-editor/lsp'
 
 import { log } from '@/lib/client-logging'
 import { readSettingsMirror } from '@/features/settings/utils/boot-mirror'

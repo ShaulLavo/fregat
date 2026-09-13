@@ -1,5 +1,5 @@
 import type { TextChangeSource, WorkspaceTextChanges } from '@/lib/workspace-edits/utils/types'
-import type { DocumentTextSnapshot } from '@singapor/core/document'
+import type { DocumentTextSnapshot } from '@singapore-editor/core/document'
 import type { FilesystemPath } from '@/lib/documents/utils/types'
 
 export function checkSourceEvidence(

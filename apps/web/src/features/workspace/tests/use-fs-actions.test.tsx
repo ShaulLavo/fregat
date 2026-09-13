@@ -4,7 +4,7 @@ import { filesystemPath } from '@/lib/documents/utils/identity'
 import { act, renderHook, waitFor } from '@testing-library/react'
 import { FileTreeModel } from '@workspace/tree'
 import type { ReactNode } from 'react'
-import { createEditorBufferSession } from '@singapor/core'
+import { createEditorBufferSession } from '@singapore-editor/core'
 
 import { useEditorCommands } from '@/features/editor/hooks/use-editor-commands'
 import { useEditorRuntime } from '@/features/editor/hooks/use-runtime'

@@ -1,14 +1,14 @@
 import type { TabId } from '@/lib/documents/utils/types'
-import type { EditorTheme } from '@singapor/core'
+import type { EditorTheme } from '@singapore-editor/core'
 import {
   createDiffPlugin,
   type DiffFile,
   type DiffGutterSide,
   type DiffRegionStore,
   type DiffSyntaxBackend,
-} from '@singapor/diff'
-import { EditorHost, useEditor } from '@singapor/react'
-import type { Editor } from '@singapor/core'
+} from '@singapore-editor/diff'
+import { EditorHost, useEditor } from '@singapore-editor/react'
+import type { Editor } from '@singapore-editor/core'
 import { useLayoutEffect, useMemo } from 'react'
 
 import { useDiffLanguage } from '@/features/editor/hooks/use-diff-language'

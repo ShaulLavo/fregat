@@ -1,4 +1,4 @@
-import type { BrowserTextMetrics } from '@singapor/core'
+import type { BrowserTextMetrics } from '@singapore-editor/core'
 import type { CSSProperties } from 'react'
 
 export const FILE_ROW_ESTIMATE = 44

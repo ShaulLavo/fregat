@@ -1,5 +1,5 @@
-import { editorCommandMutates, type KeyChord } from '@singapor/core/keymap'
-import type { EditorCommandId } from '@singapor/core'
+import { editorCommandMutates, type KeyChord } from '@singapore-editor/core/keymap'
+import type { EditorCommandId } from '@singapore-editor/core'
 import type { FocusArea } from './focus'
 
 type CommandPlatformName = 'linux' | 'mac' | 'windows' | 'tui'

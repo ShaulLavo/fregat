@@ -2,7 +2,7 @@ import {
   VSCODE_THEMES,
   type ShikiLanguageMap,
   type ShikiWorkerLanguageRegistration,
-} from '@singapor/core/shiki'
+} from '@singapore-editor/core/shiki'
 
 import { createClientInvariantError } from '@/lib/structured-errors'
 

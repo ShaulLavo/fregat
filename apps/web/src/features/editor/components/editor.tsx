@@ -1,9 +1,9 @@
 import { HOSTED_EDITOR_KEYMAP } from '@/keymap/editor-keymap'
-import { useEditor } from '@singapor/react'
+import { useEditor } from '@singapore-editor/react'
 import type {
   LanguageServerDefinitionTarget,
   LanguageServerReferencesResult,
-} from '@singapor/lsp-plugin'
+} from '@singapore-editor/lsp-plugin'
 import { useEffect, useLayoutEffect, useMemo, useState } from 'react'
 import { OrbitLoader } from '@workspace/ui/components/orbit-loader'
 
@@ -39,7 +39,7 @@ import type {
   EditorInitialPaintEvent,
   EditorPlugin,
   EditorScrollPosition,
-} from '@singapor/core'
+} from '@singapore-editor/core'
 import { editorPreparedDocumentTags } from '@/features/editor/utils/prepared-document'
 import { useMountedEditorRegistry } from '@/features/editor/hooks/use-mounted-editor-registry'
 import type { SnapshotCaptureSource } from '@/lib/editor-visible-snapshot-cache'

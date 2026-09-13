@@ -1,6 +1,6 @@
 import { defineMetadata } from './metadata'
 import type { FocusArea } from './focus'
-import type { KeyChord } from '@singapor/core/keymap'
+import type { KeyChord } from '@singapore-editor/core/keymap'
 
 function workbench<const Id extends string>(
   id: Id,

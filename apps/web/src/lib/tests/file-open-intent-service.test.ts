@@ -9,7 +9,7 @@ import {
   createEditorTextBuffer,
   type EditorInitialPaintEvent,
   type EditorPreparedDocument,
-} from '@singapor/core'
+} from '@singapore-editor/core'
 import type { FileResult } from '@/lib/file-system-types'
 import { fileSnapshotQueryOptions } from '@/lib/file-snapshot-query-cache'
 import {

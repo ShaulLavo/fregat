@@ -6,7 +6,7 @@ import type {
   EditorViewContributionProvider,
   EditorViewSnapshot,
   VirtualizedTextHighlightStyle,
-} from '@singapor/core'
+} from '@singapore-editor/core'
 import type { SettingsLayerFile } from '@workspace/contracts'
 
 import { createSettingsDiagnosticsPlugin } from '@/features/settings/state/diagnostics-plugin'

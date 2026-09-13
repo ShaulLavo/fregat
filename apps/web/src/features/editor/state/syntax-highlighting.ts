@@ -1,17 +1,17 @@
-import type { EditorHighlighterProvider } from '@singapor/core'
+import type { EditorHighlighterProvider } from '@singapore-editor/core'
 import {
   createShikiHighlighterProvider,
   createShikiWorkerOwner,
   type ShikiWorkerOwner,
-} from '@singapor/core/shiki'
-import type { DiffSyntaxBackend } from '@singapor/diff'
+} from '@singapore-editor/core/shiki'
+import type { DiffSyntaxBackend } from '@singapore-editor/diff'
 import {
   createTreeSitterSyntaxProvider,
   createTreeSitterWorkerBackend,
   type TreeSitterBackend,
   type TreeSitterSyntaxProvider,
-} from '@singapor/tree-sitter'
-import { TREE_SITTER_LANGUAGE_CONTRIBUTIONS } from '@singapor/tree-sitter-languages'
+} from '@singapore-editor/tree-sitter'
+import { TREE_SITTER_LANGUAGE_CONTRIBUTIONS } from '@singapore-editor/tree-sitter-languages'
 
 import {
   activeEditorThemeUsesShiki,

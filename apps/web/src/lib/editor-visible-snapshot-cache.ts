@@ -1,4 +1,4 @@
-import type { Editor } from '@singapor/core'
+import type { Editor } from '@singapore-editor/core'
 import type { ScopedStorage } from '@/lib/environments/state/scoped-storage'
 import {
   readWorkspaceCacheEntry,

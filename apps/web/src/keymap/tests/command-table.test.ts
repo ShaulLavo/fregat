@@ -1,4 +1,4 @@
-import { editorCommandMutates } from '@singapor/core/keymap'
+import { editorCommandMutates } from '@singapore-editor/core/keymap'
 import { editorCommandIdFromPlatform } from '@/keymap/editor-keymap'
 import { describe } from 'vitest'
 import { expect, test as it } from '../../../test/fixtures'

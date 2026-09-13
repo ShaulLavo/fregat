@@ -6,12 +6,12 @@ import type {
   EditorViewContributionContext,
   EditorViewContributionUpdateKind,
   EditorViewSnapshot,
-} from '@singapor/core/extensions'
+} from '@singapore-editor/core/extensions'
 import type {
   LanguageServerDefinitionTarget,
   LanguageServerDiagnosticMarkerClaim,
   LanguageServerDiagnosticMarkerEvent,
-} from '@singapor/lsp-plugin'
+} from '@singapore-editor/lsp-plugin'
 
 import {
   copyDiagnosticPeekClientRect,

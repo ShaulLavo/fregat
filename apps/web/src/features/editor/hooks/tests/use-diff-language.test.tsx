@@ -1,21 +1,21 @@
 import { filesystemPath } from '@/lib/documents/utils/identity'
-import { createTextDiff } from '@singapor/diff'
+import { createTextDiff } from '@singapore-editor/diff'
 import type {
   LspManagedTransport,
   LspTransportHandler,
   LspWebSocketConstructor,
   LspWebSocketLike,
-} from '@singapor/lsp'
+} from '@singapore-editor/lsp'
 import type {
   LanguageServerLaneOptions,
   LspConnectionCallbacks,
   LspConnectionOptions,
-} from '@singapor/lsp-plugin'
+} from '@singapore-editor/lsp-plugin'
 import {
   acquireLanguageServerLane,
   type AcquiredLanguageServerLane,
-} from '@singapor/lsp-plugin/websocket'
-import type { ParsedWorkspaceEdit } from '@singapor/lsp-plugin/workspace-edit'
+} from '@singapore-editor/lsp-plugin/websocket'
+import type { ParsedWorkspaceEdit } from '@singapore-editor/lsp-plugin/workspace-edit'
 import { QueryClient } from '@tanstack/react-query'
 import { afterEach, vi } from 'vitest'
 

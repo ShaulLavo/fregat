@@ -10,7 +10,7 @@ import type {
 } from '@/keymap/define-command'
 import type { CommandBus, CommandInvocation } from '@/keymap/state/command-bus'
 import type { PlatformCommandId, PlatformKeyBinding } from '@/keymap/types'
-import type { PendingChordLabel } from '@singapor/core/keymap'
+import type { PendingChordLabel } from '@singapore-editor/core/keymap'
 import type { FocusTargetToken } from '@/lib/focus/state/service'
 
 export type PlatformCommandBus = CommandBus<

@@ -8,7 +8,7 @@ import {
   type EditorPreparedTagValue,
   type EditorScrollPosition,
   type EditorTextBuffer,
-} from '@singapor/core'
+} from '@singapore-editor/core'
 
 import type { FileResult } from '@/lib/file-system-types'
 import {

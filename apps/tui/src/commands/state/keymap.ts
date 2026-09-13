@@ -3,7 +3,7 @@ import {
   trieStep,
   type KeymapBinding,
   type KeymapNode,
-} from '@singapor/core/keymap'
+} from '@singapore-editor/core/keymap'
 import { parseHotkey } from '@tanstack/hotkeys'
 import { CHORD_TIMEOUT_MS, parsedChord } from '@workspace/client-core/commands/chord'
 

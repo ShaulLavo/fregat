@@ -1,5 +1,5 @@
 import type { GitFileStatus } from '@workspace/contracts'
-import type { DiffRenderRow } from '@singapor/diff'
+import type { DiffRenderRow } from '@singapore-editor/diff'
 import type { Theme } from '@/theme/utils/theme'
 
 export type GitRow = {

@@ -1,4 +1,4 @@
-import { LspConnectionPool, type LspConnectionPoolEvent } from '@singapor/lsp-plugin'
+import { LspConnectionPool, type LspConnectionPoolEvent } from '@singapore-editor/lsp-plugin'
 
 import { log } from '@/lib/client-logging'
 

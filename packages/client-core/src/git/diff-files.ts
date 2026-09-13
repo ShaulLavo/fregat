@@ -1,5 +1,5 @@
 import type { GitFileDiff } from '@workspace/contracts'
-import { createTextDiff, parseGitPatch, type DiffFile } from '@singapor/diff'
+import { createTextDiff, parseGitPatch, type DiffFile } from '@singapore-editor/diff'
 
 type LanguageResolver = (path: string) => string | null
 

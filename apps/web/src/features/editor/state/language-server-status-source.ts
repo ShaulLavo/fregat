@@ -2,7 +2,7 @@ import {
   summarizeDiagnostics,
   type LanguageServerDiagnosticSummary,
   type LanguageServerStatus,
-} from '@singapor/lsp-plugin'
+} from '@singapore-editor/lsp-plugin'
 
 export type EditorLanguageServerStatusSnapshot = {
   diagnostics: LanguageServerDiagnosticSummary | null

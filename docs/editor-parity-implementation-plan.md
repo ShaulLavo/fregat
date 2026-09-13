@@ -71,7 +71,7 @@ Effort letters from the matrix: S = days, M = 1–2 wk, L = 3–6 wk, XL = multi
 - ✅ **Passive occurrence/word highlight** — scans only the mounted rows the snapshot carries, so it never materializes the document; whole-word matching reuses `wordRangeAtOffset`.
 - ✅ **Signature help** — an LSP-plugin controller requests `textDocument/signatureHelp`, renders the shared tooltip surface, and cycles overloads.
 - ✅ **Document links** — http(s) URLs underlined, Cmd/Ctrl+click to open; viewport-scoped, narrow matching, keeps a `)` the address itself opened.
-- ✅ **Markdown live preview** — `@singapor/markdown` is registered in the platform plugin list for Markdown documents.
+- ✅ **Markdown live preview** — `@singapore-editor/markdown` is registered in the platform plugin list for Markdown documents.
 - ✅ **Compare with Saved** — a `compare-saved:` document kind diffing the live buffer against disk, both sides read live so the diff keeps updating as you type. In the editor context menu. _Revert file, compare-with-clipboard, and select-for-compare remain open; revert also needs the undo-history hazard resolved (see the text-menu note)._
 - ✅ **Open file at ref** — `git-ref:` document kind + "Open File at HEAD". Read-only by construction: the content lands in an _unsynced_ document, which the save path and the file-backed guards both refuse, because the editor has no read-only flag.
 - ✅ **AI commit message** — the sparkle action sends staged-first (working-tree fallback) diff context through an isolated turn on the shared provider runtime, prefers ChatGPT `gpt-5.6-luna` at low effort, falls back only to advertised cheap models, and fills the existing input without committing. Loading, failure, cancellation, stale results, and user edits are handled explicitly.

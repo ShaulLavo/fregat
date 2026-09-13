@@ -18,7 +18,7 @@ import {
   releaseDocumentMutationLease,
   reverseDocumentTransaction,
   subscribeDocumentMutationLeaseState,
-} from '@singapor/core'
+} from '@singapore-editor/core'
 
 describe('editor document store state identity', () => {
   it('keeps unrelated slices referentially stable across scroll updates', () => {

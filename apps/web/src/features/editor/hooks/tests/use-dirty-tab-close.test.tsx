@@ -9,7 +9,7 @@ import { documentTab, sameTabContent } from '@/lib/documents/utils/tabs'
 import { testDocumentKey, testTabContent } from '../../../../../test/factories/document-targets'
 import { act, fireEvent, render, renderHook, screen, waitFor } from '@testing-library/react'
 import { isValidElement, type ComponentProps, type ReactNode } from 'react'
-import { createEditorBufferSession } from '@singapor/core'
+import { createEditorBufferSession } from '@singapore-editor/core'
 
 import { UnsavedChangesDialog } from '@/features/editor/components/unsaved-changes-dialog'
 import {

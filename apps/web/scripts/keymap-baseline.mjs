@@ -7,7 +7,7 @@ import { normalizeRegisterableHotkey } from '@tanstack/hotkeys'
 import { activePlatformKeyBindings } from '@/keymap/active-bindings'
 import { defaultPlatformKeyBindings } from '@/keymap/default-bindings'
 import { editorCommands } from '@/keymap/editor-commands'
-import { buildKeymapTrie, trieStep } from '@singapor/core/keymap'
+import { buildKeymapTrie, trieStep } from '@singapore-editor/core/keymap'
 
 const { values } = parseArgs({
   args: process.argv.slice(2),
@@ -16,12 +16,12 @@ const { values } = parseArgs({
 const baseline = values.baseline ? JSON.parse(readFileSync(values.baseline, 'utf8')) : null
 const webRoot = resolve(dirname(fileURLToPath(import.meta.url)), '..')
 const editorPackage = resolve(
-  dirname(realpathSync(fileURLToPath(import.meta.resolve('@singapor/core')))),
+  dirname(realpathSync(fileURLToPath(import.meta.resolve('@singapore-editor/core')))),
   '..',
 )
 const editorRoot = resolve(editorPackage, '../..')
 const built = await import(
-  values.built ? pathToFileURL(resolve(values.built)).href : '@singapor/core/keymap'
+  values.built ? pathToFileURL(resolve(values.built)).href : '@singapore-editor/core/keymap'
 )
 const source = await import(pathToFileURL(resolve(editorPackage, 'src/public/keymap.ts')).href)
 const commandSource = await import(

@@ -1,5 +1,12 @@
-import type { EditorPlugin, EditorTheme, EditorViewContributionContext } from '@singapor/core'
-import { HOVER_REQUEST_DEBOUNCE_MS, createTooltipController } from '@singapor/lsp-plugin/tooltip'
+import type {
+  EditorPlugin,
+  EditorTheme,
+  EditorViewContributionContext,
+} from '@singapore-editor/core'
+import {
+  HOVER_REQUEST_DEBOUNCE_MS,
+  createTooltipController,
+} from '@singapore-editor/lsp-plugin/tooltip'
 
 import type { DiffQueryTarget } from '@/features/editor/utils/diff-language-query'
 import type { DiffFilePosition, DiffFileSide } from '@/features/editor/utils/diff-position-map'

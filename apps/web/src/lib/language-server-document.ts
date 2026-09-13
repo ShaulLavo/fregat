@@ -1,4 +1,4 @@
-import { fileNameToDocumentUri } from '@singapor/lsp-plugin/paths'
+import { fileNameToDocumentUri } from '@singapore-editor/lsp-plugin/paths'
 
 import { encodedViewTarget } from '@/lib/documents/utils/codec'
 import { documentKey } from '@/lib/documents/utils/identity'

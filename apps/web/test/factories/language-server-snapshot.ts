@@ -1,5 +1,5 @@
-import { createEditorTextBuffer } from '@singapor/core/document'
-import type { EditorViewSnapshot } from '@singapor/core/extensions'
+import { createEditorTextBuffer } from '@singapore-editor/core/document'
+import type { EditorViewSnapshot } from '@singapore-editor/core/extensions'
 
 export function languageServerSnapshot(
   documentId: string,

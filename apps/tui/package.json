@@ -17,9 +17,9 @@
   "dependencies": {
     "@opentui/core": "catalog:",
     "@opentui/react": "catalog:",
-    "@singapor/core": "0.1.2",
-    "@singapor/diff": "0.2.0",
-    "@singapor/lsp": "0.1.1",
+    "@singapore-editor/core": "0.1.2",
+    "@singapore-editor/diff": "0.2.0",
+    "@singapore-editor/lsp": "0.1.1",
     "@tanstack/hotkeys": "^0.8.0",
     "@workspace/client-core": "workspace:*",
     "@workspace/contracts": "workspace:*",

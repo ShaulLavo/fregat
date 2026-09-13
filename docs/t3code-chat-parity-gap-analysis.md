@@ -373,13 +373,13 @@ Two shapes worth recording, because both were arrived at by being wrong first:
   `take(accept)` leaves `pending`'s identity untouched when nothing is accepted, which is what breaks the cycle.
 
 **Still open in N2's neighbourhood:** the editor's "add selection to chat" has a seam to ride but no source — the app
-never holds an editor session, so nothing can read the current selection. `@singapor/core` exposes `getSelections()`
+never holds an editor session, so nothing can read the current selection. `@singapore-editor/core` exposes `getSelections()`
 on its document session; wiring that up is the prerequisite, not the composer side.
 
 **Still open**, and none of it is on the N0–N4 path:
 
 - The editor's "add selection to chat" has a seam to ride but no source — the app never holds an editor session, so
-  nothing can read the current selection. `@singapor/core` exposes `getSelections()` on its document session; wiring
+  nothing can read the current selection. `@singapore-editor/core` exposes `getSelections()` on its document session; wiring
   that up is the prerequisite, not the composer side.
 - Title regeneration.
 - The remote/PR half of the git status broadcast: upstream and PR state poll rather than being pushed. The polls are

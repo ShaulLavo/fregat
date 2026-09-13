@@ -11,14 +11,14 @@ import type {
   WorkspaceEditAnnotation,
   WorkspaceEditOperation,
   WorkspaceTextReplaySegmentInput,
-} from '@singapor/lsp-plugin/workspace-edit'
-import { prepareWorkspaceTextReplay } from '@singapor/lsp-plugin/workspace-edit'
+} from '@singapore-editor/lsp-plugin/workspace-edit'
+import { prepareWorkspaceTextReplay } from '@singapore-editor/lsp-plugin/workspace-edit'
 import {
   fileNameToDocumentUri,
   type ApplyWorkspaceEditRequest,
   type ApplyWorkspaceEditResult,
   type LanguageServerDocumentSyncController,
-} from '@singapor/lsp-plugin'
+} from '@singapore-editor/lsp-plugin'
 import {
   beginReverseDocumentTransactionSequence,
   commitPreparedDocumentTransactionSequenceSegment,
@@ -39,7 +39,7 @@ import {
   type DocumentTransactionReceipt,
   type DocumentTransactionSequenceReverseCursor,
   type EditorTextBuffer,
-} from '@singapor/core/document'
+} from '@singapore-editor/core/document'
 import type {
   WorkspaceEditResult,
   WorkspaceEditResultEntry,

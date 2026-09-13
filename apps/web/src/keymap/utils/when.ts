@@ -5,7 +5,7 @@ import {
   editorKeyConditionMatches,
   type EditorKeyCondition,
   type EditorKeymapContext,
-} from '@singapor/core/keymap'
+} from '@singapore-editor/core/keymap'
 
 export function editorBindingConditionsMatch(
   conditions: readonly EditorKeyCondition[] | undefined,

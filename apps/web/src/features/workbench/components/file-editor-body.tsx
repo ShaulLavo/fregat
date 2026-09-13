@@ -16,11 +16,11 @@ import { useEditorVisibleSnapshot } from '@/features/workbench/hooks/use-editor-
 import { useFileOpenIntent } from '@/lib/file-open-intent/providers/context'
 import type { FileResult } from '@/lib/file-system-types'
 import type { LoadState } from '@/lib/load-state'
-import type { EditorInitialPaintEvent } from '@singapor/core'
+import type { EditorInitialPaintEvent } from '@singapore-editor/core'
 import type {
   LanguageServerDefinitionTarget,
   LanguageServerReferencesResult,
-} from '@singapor/lsp-plugin'
+} from '@singapore-editor/lsp-plugin'
 
 export function FileEditorBody({
   active,

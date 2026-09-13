@@ -1,9 +1,9 @@
 name: Setup
-description: Installs the toolchain, provisions the sibling @singapor editor packages, and installs dependencies.
+description: Installs the toolchain, provisions the sibling @singapore-editor editor packages, and installs dependencies.
 
 inputs:
   editor-ref:
-    description: Git ref of the ShaulLavo/singapor checkout the @singapor/* links resolve to.
+    description: Git ref of the ShaulLavo/singapor checkout the @singapore-editor/* links resolve to.
     required: true
   ghostty-ref:
     description: Git ref of the ShaulLavo/ghostty-webgpu checkout the ghostty-webgpu link resolves to.
@@ -34,10 +34,10 @@ runs:
         restore-keys: |
           ${{ runner.os }}-bun-
 
-    # The @singapor/* packages are not installable from npm — @singapor/decode
+    # The @singapore-editor/* packages are not installable from npm — @singapore-editor/decode
     # has never been published, and the rest are consumed from source well past
     # their published 0.1.1. Root `overrides` redirects all of them to
-    # `link:@singapor/*`, which resolves through Bun's global link registry.
+    # `link:@singapore-editor/*`, which resolves through Bun's global link registry.
     # A developer machine populates that registry by hand; here we rebuild it
     # from a clone. The clone must land at the *sibling* path because the
     # tracked `packages/editor-*` symlinks point at `../../Editor/packages/*`.
@@ -72,7 +72,7 @@ runs:
         git -C "$GITHUB_WORKSPACE/../Editor" fetch --depth 1 origin "$EDITOR_REF"
         git -C "$GITHUB_WORKSPACE/../Editor" checkout --detach FETCH_HEAD
 
-    # Every @singapor package exports `./dist/*`, so an unbuilt checkout
+    # Every @singapore-editor package exports `./dist/*`, so an unbuilt checkout
     # resolves to nothing and typecheck fails with TS2307.
     - name: Build editor packages
       shell: bash

@@ -2,9 +2,9 @@ import {
   LanguageServerDocumentSyncController,
   summarizeDiagnostics,
   type LanguageServerSetPluginOptions,
-} from '@singapor/lsp-plugin'
+} from '@singapore-editor/lsp-plugin'
 import { beforeEach, describe, vi } from 'vitest'
-import { activeDocumentForSnapshot } from '@singapor/lsp-plugin/document-sync'
+import { activeDocumentForSnapshot } from '@singapore-editor/lsp-plugin/document-sync'
 
 import { createEditorLanguageServerStatusSource } from '@/features/editor/state/language-server-status-source'
 import {
@@ -21,7 +21,7 @@ const { createdServerSets } = vi.hoisted(() => ({
   createdServerSets: [] as LanguageServerSetPluginOptions[],
 }))
 
-vi.mock('@singapor/lsp-plugin/websocket', () => ({
+vi.mock('@singapore-editor/lsp-plugin/websocket', () => ({
   createLanguageServerSetPlugin: (options: LanguageServerSetPluginOptions) => {
     createdServerSets.push(options)
     return { activate: () => [], name: 'editor.language-server' }

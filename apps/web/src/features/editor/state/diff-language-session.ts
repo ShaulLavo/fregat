@@ -2,10 +2,10 @@ import {
   acquireLanguageServerLane,
   type AcquiredLanguageServerLane,
   type LanguageServerLaneOptions,
-} from '@singapor/lsp-plugin/websocket'
-import { LanguageServerSet } from '@singapor/lsp-plugin'
-import { arrayLspLineStarts, type LspWorkspaceDocumentAttachment } from '@singapor/lsp'
-import { createStringTextSnapshot } from '@singapor/core/document'
+} from '@singapore-editor/lsp-plugin/websocket'
+import { LanguageServerSet } from '@singapore-editor/lsp-plugin'
+import { arrayLspLineStarts, type LspWorkspaceDocumentAttachment } from '@singapore-editor/lsp'
+import { createStringTextSnapshot } from '@singapore-editor/core/document'
 
 import type { DiffFileSide } from '@/features/editor/utils/diff-position-map'
 import { clientErrors } from '@/lib/structured-errors'

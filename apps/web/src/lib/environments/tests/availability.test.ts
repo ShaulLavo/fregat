@@ -1,5 +1,5 @@
 import { filesystemPath } from '@/lib/documents/utils/identity'
-import { createEditorBufferSession } from '@singapor/core'
+import { createEditorBufferSession } from '@singapore-editor/core'
 import { QueryClient } from '@tanstack/react-query'
 import { healthDescriptorSchema } from '@workspace/contracts'
 import * as v from 'valibot'

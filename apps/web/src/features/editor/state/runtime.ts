@@ -10,7 +10,7 @@ import { useChatProjectionStore } from '@/features/chat/state/chat-projection-st
 import { createGitStore, type GitStoreApi } from '@/features/git/state/store'
 import { workspaceLocationId } from '@/features/workspace/utils/location'
 import type { ScopedStorage } from '@/lib/environments/state/scoped-storage'
-import { LanguageServerDocumentSyncController } from '@singapor/lsp-plugin'
+import { LanguageServerDocumentSyncController } from '@singapore-editor/lsp-plugin'
 import type { QueryClient } from '@tanstack/react-query'
 
 import type { WorkspaceEditHost } from '@/features/editor/providers/workspace-edit-context'

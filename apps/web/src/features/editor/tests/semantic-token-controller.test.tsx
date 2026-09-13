@@ -2,10 +2,10 @@ import type {
   SemanticTokenLayer,
   SemanticTokenPayload,
   SemanticTokenPushResult,
-} from '@singapor/core/extensions'
-import type { LanguageServerConnectionContext } from '@singapor/lsp-plugin'
-import { arrayLspLineStarts, LspRequestCancelledError, LspWorkspace } from '@singapor/lsp'
-import { createStringTextSnapshot } from '@singapor/core/document'
+} from '@singapore-editor/core/extensions'
+import type { LanguageServerConnectionContext } from '@singapore-editor/lsp-plugin'
+import { arrayLspLineStarts, LspRequestCancelledError, LspWorkspace } from '@singapore-editor/lsp'
+import { createStringTextSnapshot } from '@singapore-editor/core/document'
 import { afterEach, beforeEach, describe, vi } from 'vitest'
 import { test as it, expect } from '../../../../test/fixtures'
 import { fileDocumentKey, filesystemPath } from '@/lib/documents/utils/identity'

@@ -5,8 +5,8 @@ import type {
   EditorViewContributionContext,
   EditorViewContributionProvider,
   EditorViewSnapshot,
-} from '@singapor/core/extensions'
-import type { LanguageServerDiagnosticMarkerEvent } from '@singapor/lsp-plugin'
+} from '@singapore-editor/core/extensions'
+import type { LanguageServerDiagnosticMarkerEvent } from '@singapore-editor/lsp-plugin'
 import { describe } from 'vitest'
 
 import { createDiagnosticPeekSource } from '@/features/editor/state/diagnostic-peek-source'

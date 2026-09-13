@@ -1,4 +1,4 @@
-import type { VscodeThemeRegistration } from '@singapor/core/shiki'
+import type { VscodeThemeRegistration } from '@singapore-editor/core/shiki'
 
 import { fnv1a32 } from '@workspace/client-core/address/path-hash'
 

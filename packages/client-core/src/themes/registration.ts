@@ -1,4 +1,4 @@
-import type { VscodeThemeDefinition, VscodeThemeRegistration } from '@singapor/core/shiki'
+import type { VscodeThemeDefinition, VscodeThemeRegistration } from '@singapore-editor/core/shiki'
 
 import { createClientError } from '../errors'
 

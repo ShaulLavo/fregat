@@ -1,6 +1,6 @@
 import { fileDocumentKey } from '@/lib/documents/utils/identity'
 import type { FilesystemPath, TabId } from '@/lib/documents/utils/types'
-import { createTextDiff } from '@singapor/diff'
+import { createTextDiff } from '@singapore-editor/diff'
 import { LoadingState } from '@workspace/ui/components/loading-state'
 import { EmptyState } from '@workspace/ui/components/empty-state'
 import { useMemo } from 'react'

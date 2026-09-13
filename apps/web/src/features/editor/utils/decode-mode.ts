@@ -1,4 +1,4 @@
-import type { DecodeMode } from '@singapor/decode'
+import type { DecodeMode } from '@singapore-editor/decode'
 
 // File-open "writes itself" animation. Off by default; opt in per session with
 // `?decode=diffusion` (or `autoregressive` / `parallel` / `token`). `?decode=1`

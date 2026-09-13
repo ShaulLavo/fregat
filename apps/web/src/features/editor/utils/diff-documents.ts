@@ -1,4 +1,4 @@
-import type { DiffFile } from '@singapor/diff'
+import type { DiffFile } from '@singapore-editor/diff'
 import { fnv1a32 } from '@workspace/client-core/address/path-hash'
 
 import type { DiffLanguageDocument } from '@/features/editor/state/diff-language-session'

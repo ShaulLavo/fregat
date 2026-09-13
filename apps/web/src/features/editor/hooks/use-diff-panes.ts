@@ -1,5 +1,5 @@
-import type { Editor } from '@singapor/core'
-import type { DiffGutterSide } from '@singapor/diff'
+import type { Editor } from '@singapore-editor/core'
+import type { DiffGutterSide } from '@singapore-editor/diff'
 import { useCallback, useRef } from 'react'
 
 import type { DiffScrollPosition } from '@/features/editor/utils/diff-scroll-bridge'

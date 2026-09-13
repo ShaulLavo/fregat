@@ -1,4 +1,4 @@
-import { defaultEditorKeyBindings, vscodeEditorKeyBindings } from '@singapor/core/keymap'
+import { defaultEditorKeyBindings, vscodeEditorKeyBindings } from '@singapore-editor/core/keymap'
 import { detectPlatform } from '@tanstack/hotkeys'
 
 import { chordKeys } from '@workspace/client-core/commands/chord'

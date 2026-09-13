@@ -1,5 +1,5 @@
 import '@workspace/ui/globals.css'
-import '@singapor/core/style.css'
+import '@singapore-editor/core/style.css'
 import { createKeymapEditor } from '../../../test/factories/keymap-editor'
 import { defaultPlatformKeyBindings } from '@/keymap/default-bindings'
 import { useFocusService } from '@/lib/focus/hooks/use-service'

@@ -7,7 +7,7 @@ import type {
   LanguageServerDiagnosticMarkerClaim,
   LanguageServerDiagnosticMarkerEvent,
   LanguageServerReferencesResult,
-} from '@singapor/lsp-plugin'
+} from '@singapore-editor/lsp-plugin'
 import { useMemo } from 'react'
 
 import { useFileOpenIntent } from '@/lib/file-open-intent/providers/context'

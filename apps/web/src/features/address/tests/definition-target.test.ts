@@ -1,4 +1,4 @@
-import { documentUriToFileName } from '@singapor/lsp-plugin/paths'
+import { documentUriToFileName } from '@singapore-editor/lsp-plugin/paths'
 
 import { expect, test } from '../../../../test/fixtures'
 import { definitionTargetFor } from '@/features/address/utils/definition-target'

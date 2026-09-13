@@ -1,6 +1,6 @@
 import { mkdir, writeFile } from 'node:fs/promises'
 import { dirname, join } from 'node:path'
-import { createEditorBufferSession } from '@singapor/core'
+import { createEditorBufferSession } from '@singapore-editor/core'
 import { createEditorConflictStore } from '@/features/editor/state/conflict-state'
 import { createEditorDocumentStore } from '@/features/editor/state/document-state'
 import { FileSyncService } from '@/features/editor/state/file-sync-service'

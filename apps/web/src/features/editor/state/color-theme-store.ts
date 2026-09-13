@@ -1,11 +1,11 @@
-import type { EditorTheme } from '@singapor/core'
+import type { EditorTheme } from '@singapore-editor/core'
 import {
   editorThemeFromVscodeTheme,
   VSCODE_THEMES,
   type VscodeThemeDefinition,
   type VscodeThemeRegistration,
-} from '@singapor/core/shiki'
-import type { ShikiWorkerThemeRegistration } from '@singapor/core/shiki'
+} from '@singapore-editor/core/shiki'
+import type { ShikiWorkerThemeRegistration } from '@singapore-editor/core/shiki'
 import { Debouncer } from '@tanstack/react-pacer/debouncer'
 
 import {

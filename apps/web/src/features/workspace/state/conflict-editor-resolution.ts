@@ -1,4 +1,4 @@
-import { parseMergeConflicts, type TextSnapshot } from '@singapor/core'
+import { parseMergeConflicts, type TextSnapshot } from '@singapore-editor/core'
 import { decodedAsText } from '@workspace/contracts'
 import { Debouncer } from '@tanstack/react-pacer/debouncer'
 import type { QueryClient } from '@tanstack/react-query'

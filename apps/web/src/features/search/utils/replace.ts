@@ -1,6 +1,6 @@
 import { textSnapshotLineRange } from '@/features/editor/utils/text-snapshot'
-import type { TextEdit } from '@singapor/core'
-import type { TextSnapshot } from '@singapor/core'
+import type { TextEdit } from '@singapore-editor/core'
+import type { TextSnapshot } from '@singapore-editor/core'
 import type { WorkspaceSearchMatch, WorkspaceSearchQuery } from '@workspace/contracts'
 
 export type WorkspaceSearchReplacePlan = {

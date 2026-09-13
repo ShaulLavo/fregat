@@ -1,4 +1,4 @@
-import { createIncrementalTokenizer } from '@singapor/core/shiki'
+import { createIncrementalTokenizer } from '@singapore-editor/core/shiki'
 import { createBundledHighlighter } from 'shiki/core'
 import { bundledLanguages } from 'shiki/langs'
 import { bundledThemes } from 'shiki/themes'

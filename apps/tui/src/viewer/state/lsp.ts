@@ -1,7 +1,7 @@
 import { pathToFileURL } from 'node:url'
 import path from 'node:path'
 import * as v from 'valibot'
-import { LspClient, type LspTransportHandler } from '@singapor/lsp'
+import { LspClient, type LspTransportHandler } from '@singapore-editor/lsp'
 import { createRpcError } from '@workspace/client-core/transport/rpc-error'
 import { readServerPaths } from '@workspace/client-core/files/read'
 import { LSP_SERVER_EXITED } from '@workspace/contracts'

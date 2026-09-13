@@ -1,4 +1,4 @@
-import type { EditorTheme } from '@singapor/core'
+import type { EditorTheme } from '@singapore-editor/core'
 import { memo, useRef } from 'react'
 
 import { SEARCH_RESULT_FILE_EDITOR_POOL_HIDDEN_STYLE } from '@/features/search/utils/result-editor-constants'

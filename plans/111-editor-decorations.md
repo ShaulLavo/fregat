@@ -2,7 +2,7 @@
 
 Status: **research — no implementation scope yet.** Requested 2026-09-13.
 
-The editor already has a decoration primitive. `@singapor/core` exposes `registerInlineReplacementProvider` and `InlineReplacementSpec`, and [`@singapor/markdown`](../../Editor/packages/markdown/src/index.ts) uses it to hide fences, drop heading markers and collapse links while the buffer keeps holding source. That is the right shape. It is also inline-only, driven by generically-named Tree-sitter captures, and has never been compared against the two systems that solved this problem thoroughly.
+The editor already has a decoration primitive. `@singapore-editor/core` exposes `registerInlineReplacementProvider` and `InlineReplacementSpec`, and [`@singapore-editor/markdown`](../../Editor/packages/markdown/src/index.ts) uses it to hide fences, drop heading markers and collapse links while the buffer keeps holding source. That is the right shape. It is also inline-only, driven by generically-named Tree-sitter captures, and has never been compared against the two systems that solved this problem thoroughly.
 
 This plan does that comparison and then improves our layer. It is the gate for [Plan 108](108-markdown-modes.md) Phase 2, for an eventual Obsidian mode, and — less obviously but more valuably — for removing Lexical from the chat composer. [Root PLAN.md](../PLAN.md) owns scheduling.
 
@@ -17,7 +17,7 @@ Separately, the chat composer runs on Lexical for exactly one capability: `ChatI
 | Piece               | Current state                                                                                                                                                                                                                                                                                       |
 | ------------------- | --------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
 | Primitive           | `InlineReplacementSpec[]` returned from a registered provider. Inline ranges only.                                                                                                                                                                                                                  |
-| Source of structure | Tree-sitter highlight captures. `@singapor/markdown`'s own comment: the queries "name things generically — `punctuation.delimiter` covers both emphasis fences and link brackets", so constructs are recovered "by containment for emphasis and code spans, and by adjacency for links and images." |
+| Source of structure | Tree-sitter highlight captures. `@singapore-editor/markdown`'s own comment: the queries "name things generically — `punctuation.delimiter` covers both emphasis fences and link brackets", so constructs are recovered "by containment for emphasis and code spans, and by adjacency for links and images." |
 | Failure posture     | Anything not matching its expected shape is left as plain text, so malformed input renders as source rather than losing characters. A good default, and evidence the recovery is heuristic.                                                                                                         |
 | Missing             | Block-level replacement (a rendered table, image or fence). Widget lifecycle. Explicit atomic-range caret semantics. A composition story for two providers decorating overlapping ranges.                                                                                                           |
 | Consumers           | One: markdown preview.                                                                                                                                                                                                                                                                              |
@@ -36,9 +36,9 @@ Separately, the chat composer runs on Lexical for exactly one capability: `ChatI
 
 1. **Clone the references** into `/work/projects/references/` per the workspace layout rules: `codemirror/view` and `codemirror/state`, `facebook/lexical`, and the `obsidianmd/obsidian-api` typings. Read `Decoration`, `RangeSet`, `ViewPlugin`, `atomicRanges` and `blockWidget` in CM6, and `DecoratorNode`, `NodeKey` and the reconciler in Lexical.
 2. **Survey real plugins, not just the APIs.** CodeMirror's own markdown live-preview examples, and two or three third-party decoration-heavy plugins. The APIs describe what is possible; the plugins show which parts are actually usable.
-3. **Write the gap table.** Each capability, whether `@singapor` has it, what it would take, and which consumer wants it.
+3. **Write the gap table.** Each capability, whether `@singapore-editor` has it, what it would take, and which consumer wants it.
 4. **Answer the seven questions** in a decision table, including an honest verdict on question 5 with a measurement, not an estimate.
-5. **Propose the API.** A concrete decoration API for `@singapor/core`, with migration notes for the one existing consumer.
+5. **Propose the API.** A concrete decoration API for `@singapore-editor/core`, with migration notes for the one existing consumer.
 6. **Split into executable plans.** At minimum: the decoration layer itself, and the composer migration as its own multi-stage sequence.
 
 Completion: a gap table, a decision record, a proposed API, and the follow-up plans it becomes — including an explicit yes or no on question 7.
@@ -55,6 +55,6 @@ Completion: a gap table, a decision record, a proposed API, and the follow-up pl
 ## What this plan does not do
 
 - No implementation. It produces a gap table, a decision record, a proposed API and follow-up plans.
-- No change to `@singapor/markdown` or to the current preview behaviour.
+- No change to `@singapore-editor/markdown` or to the current preview behaviour.
 - No composer changes. Question 7 is answered here; acting on it is a separate plan.
 - No commitment to Obsidian mode. This plan establishes whether the foundation can support it, not whether we build it.

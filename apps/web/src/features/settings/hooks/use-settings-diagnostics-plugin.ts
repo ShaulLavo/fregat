@@ -1,4 +1,4 @@
-import type { EditorPlugin } from '@singapor/core'
+import type { EditorPlugin } from '@singapore-editor/core'
 import type {
   SettingsDiagnostic,
   SettingsLayerFile,

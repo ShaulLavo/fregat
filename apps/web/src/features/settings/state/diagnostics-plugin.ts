@@ -4,11 +4,11 @@ import type {
   EditorViewContributionContext,
   EditorViewContributionUpdateKind,
   EditorViewSnapshot,
-} from '@singapor/core'
+} from '@singapore-editor/core'
 import {
   DiagnosticsPresenter,
   viewDocumentSnapshot,
-} from '@singapor/lsp-plugin/diagnostics-presenter'
+} from '@singapore-editor/lsp-plugin/diagnostics-presenter'
 
 import { documentKey, settingsJsonDocument } from '@/lib/documents/utils/identity'
 import { settingsEditorDiagnostics } from '@/features/settings/utils/diagnostics'

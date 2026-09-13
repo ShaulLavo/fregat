@@ -79,24 +79,24 @@ Server work either option needs:
 
 ## 2. Editor-in-terminal
 
-### 2.1 What is separable in `@singapor/*` (read from `/work/projects/Editor`, symlinked as `packages/editor-*`)
+### 2.1 What is separable in `@singapore-editor/*` (read from `/work/projects/Editor`, symlinked as `packages/editor-*`)
 
 DOM-bound, not reusable:
 
 - `Editor` requires an `HTMLElement` and builds `VirtualizedTextView(container, ...)`, `EditorAnnouncer(container)`, `observeBrowserTextMetricsInvalidation` in its constructor (`/work/projects/Editor/packages/editor/src/editor/Editor.ts:424-464`). The architecture is explicit that browser layout is the text layout engine and the CSS Highlight API is the painter (`/work/projects/Editor/ARCHITECTURE.md` section 5.4, 5.11).
 - `EditorViewSnapshot` / `EditorVisibleSnapshotJSON` paint runs (`/work/projects/Editor/packages/editor/src/plugins.ts:320-380`) look like a cell-renderer feed but are _emitted by_ the DOM view; "secondary views" are the same `VirtualizedTextView` re-exported (`/work/projects/Editor/packages/editor/src/public/secondaryViews.ts:14-15`). No headless view exists.
-- `@singapor/react` / `@singapor/solid` are thin mount wrappers (`packages/react/src/index.ts:213-225` mounts into a div). `@singapor/gutters`, `find`, `minimap`, `scope-lines`, `panes`, `markdown` (preview plugin), `lsp-plugin` (completion/hover/diagnostic widgets: `packages/lsp-plugin/src/anchoredSurface.ts`, `renameWidget.ts`) are Editor plugins over DOM.
+- `@singapore-editor/react` / `@singapore-editor/solid` are thin mount wrappers (`packages/react/src/index.ts:213-225` mounts into a div). `@singapore-editor/gutters`, `find`, `minimap`, `scope-lines`, `panes`, `markdown` (preview plugin), `lsp-plugin` (completion/hover/diagnostic widgets: `packages/lsp-plugin/src/anchoredSurface.ts`, `renameWidget.ts`) are Editor plugins over DOM.
 
 DOM-free, reusable as models (grep for `document.`/`window.`/`HTMLElement` is empty for these):
 
-- `@singapor/core/document`: piece table, anchors, `createDocumentSession`, `createEditorTextBuffer`, `createEditorViewSession`, transaction prepare/commit/reverse, mutation leases (`/work/projects/Editor/packages/editor/src/index.ts:55-100`).
-- `@singapor/core/syntax`: `createEditorSyntaxSession`, `EditorToken`, `FoldRange`, `BracketInfo`, `treeSitterCapturesToEditorTokens` (`index.ts:148-172`; types in `src/syntax/session.ts:1-60`).
+- `@singapore-editor/core/document`: piece table, anchors, `createDocumentSession`, `createEditorTextBuffer`, `createEditorViewSession`, transaction prepare/commit/reverse, mutation leases (`/work/projects/Editor/packages/editor/src/index.ts:55-100`).
+- `@singapore-editor/core/syntax`: `createEditorSyntaxSession`, `EditorToken`, `FoldRange`, `BracketInfo`, `treeSitterCapturesToEditorTokens` (`index.ts:148-172`; types in `src/syntax/session.ts:1-60`).
 - `foldMap.ts` (anchor-backed folds), `displayTransforms.ts`, `history.ts`, `selections.ts`, `inlineMap.ts`, `editor/keymap` tables (`defaultEditorKeyBindings`, `editorKeymapLayers`, `index.ts:173-186`).
 - Shiki incremental tokenizer (`src/shiki/tokenizer.ts`, pure over `shiki/core`) and the shiki worker client (`src/shiki/workerClient.ts`, piece-table aware).
-- `@singapor/tree-sitter`: `web-tree-sitter` wasm; the only environment probe is `typeof Worker !== 'undefined'` (`/work/projects/Editor/packages/tree-sitter/src/treeSitter/workerClient.ts:127-130`) and it spawns `new Worker(new URL('./treeSitter.worker.ts', import.meta.url))` (`:346`). Bun has `Worker` and runs TS workers, so highlighting, folds and structural selection can run in the TUI process. Untested there.
-- `@singapor/lsp`: `LspClient`, `LspWorkspace`, `createWebSocketLspTransport` (`/work/projects/Editor/packages/lsp/src/index.ts:17-52`), `sideEffects: false`, only dependency `vscode-languageserver-protocol`. Pairs with our `/lsp` WS proxy.
+- `@singapore-editor/tree-sitter`: `web-tree-sitter` wasm; the only environment probe is `typeof Worker !== 'undefined'` (`/work/projects/Editor/packages/tree-sitter/src/treeSitter/workerClient.ts:127-130`) and it spawns `new Worker(new URL('./treeSitter.worker.ts', import.meta.url))` (`:346`). Bun has `Worker` and runs TS workers, so highlighting, folds and structural selection can run in the TUI process. Untested there.
+- `@singapore-editor/lsp`: `LspClient`, `LspWorkspace`, `createWebSocketLspTransport` (`/work/projects/Editor/packages/lsp/src/index.ts:17-52`), `sideEffects: false`, only dependency `vscode-languageserver-protocol`. Pairs with our `/lsp` WS proxy.
 
-Gotcha: package roots import CSS as a side effect (`packages/editor/src/editor.ts:1`, `packages/diff/src/index.ts:1`); a Bun TUI must import subpath entries (`@singapor/core/document`, `/syntax`) or the build needs a CSS no-op loader.
+Gotcha: package roots import CSS as a side effect (`packages/editor/src/editor.ts:1`, `packages/diff/src/index.ts:1`); a Bun TUI must import subpath entries (`@singapore-editor/core/document`, `/syntax`) or the build needs a CSS no-op loader.
 
 ### 2.2 What the references do
 
@@ -107,7 +107,7 @@ Gotcha: package roots import CSS as a side effect (`packages/editor/src/editor.t
 ### 2.3 Options and recommendation
 
 1. **`$EDITOR` handoff** (suspend/resume, 1.3 B mechanics). For remote environments the file must round-trip through `/fs/read` and workspace-edit prepare/commit (`/work/projects/platform/apps/server/src/fs/routes.ts:38, 101-104`) with the `snapshot` precondition (`/work/projects/platform/packages/contracts/src/workspace-edit.ts:1-11`) so a concurrent agent write is detected. Cheap and what both references chose.
-2. **Read-only viewer in cells**: OpenTUI `CodeRenderable` + `LineNumberRenderable` (tree-sitter highlight through OpenTUI's own parser worker, `renderables/Code.d.ts`), or our shiki tokenizer feeding styled spans. Jump-to-line from diagnostics, search results, chat file links. Diagnostics as a list/overlay via `@singapor/lsp` over `/lsp` - transport-agnostic, so "LSP client reuse" is yes for read-only features (diagnostics, hover on demand, go-to-definition as navigation).
+2. **Read-only viewer in cells**: OpenTUI `CodeRenderable` + `LineNumberRenderable` (tree-sitter highlight through OpenTUI's own parser worker, `renderables/Code.d.ts`), or our shiki tokenizer feeding styled spans. Jump-to-line from diagnostics, search results, chat file links. Diagnostics as a list/overlay via `@singapore-editor/lsp` over `/lsp` - transport-agnostic, so "LSP client reuse" is yes for read-only features (diagnostics, hover on demand, go-to-definition as navigation).
 3. **Real editor in cells**: use our document/syntax/fold/keymap models and write a cell `VirtualizedTextView` equivalent (input, selection, scroll, wrap, gutters, decorations). OpenTUI's `EditBuffer`/`EditorView` is tempting as the view, but it is a second source of truth (a Zig rope) - driving it by `setText` per change is O(n) per keystroke and loses anchors/undo parity. This is the honest "editor port" and is large; only do it if IDE mode inside the TUI is a stated goal.
 
 Recommend 1 + 2 for the first TUI. The product vision puts IDE mode behind the agent view; in the terminal the agent view plus viewer/diff plus `$EDITOR` handoff covers the ladder without a fourth editor implementation.
@@ -116,7 +116,7 @@ Recommend 1 + 2 for the first TUI. The product vision puts IDE mode behind the a
 
 ### 3.1 Ours
 
-`@singapor/diff` splits cleanly:
+`@singapore-editor/diff` splits cleanly:
 
 - Pure model: `createTextDiff` / `parseGitPatch` (`/work/projects/Editor/packages/diff/src/model.ts:1-9, 49-80`, over npm `diff`), `annotateInlineChanges` (`inline.ts`, `diffWordsWithSpace`), `createSplitProjection` / `createStackedProjection` (`projection.ts:29-95`) yielding `DiffRenderRow { type: context|addition|deletion|placeholder|hunk|empty, text, oldLineNumber, newLineNumber, inlineRanges, expandKey, skippedLines }` (`types.ts:75-87`); split rows are already aligned into equal-length `leftRows`/`rightRows`; `createDiffRegionStore` (expansion state, `regions.ts`). Imports are only `diff` and types (`grep ^import` over `src/*.ts`).
 - DOM-bound: `createDiffPlugin` (an Editor plugin, `editorDiffPlugin.ts`), `diffGutter.ts`, `liveProjection.ts` (injected editor rows). `diffSyntax.ts` builds piece-table snapshots for a highlighter provider and is usable headless with the shiki worker.
@@ -195,8 +195,8 @@ References do not have a settings page: opencode uses config files plus per-conc
 | Problem                 | Feasibility                                                            | Recommended                                                                                                           | Reusable from us                                                                                                     |
 | ----------------------- | ---------------------------------------------------------------------- | --------------------------------------------------------------------------------------------------------------------- | -------------------------------------------------------------------------------------------------------------------- |
 | Terminal-in-terminal    | High with OpenTUI `EmbeddedTerminal` (libghostty); passthrough trivial | Embedded pane + attach/zoom passthrough; fix exclusive attach and replay on the server; consider server-side emulator | `contracts/terminal.ts`, `TerminalService`, `ghostty-webgpu/src/core` if we paint ourselves                          |
-| Editor                  | Real editor is a large port; viewer + `$EDITOR` is cheap               | Viewer in cells + `$EDITOR` handoff via workspace-edit; LSP read-only overlay                                         | `@singapor/core/document`, `/syntax`, `foldMap`, keymap tables, tree-sitter worker, shiki tokenizer, `@singapor/lsp` |
-| Diff                    | High                                                                   | Our model + cell painter (split >= 120 cols); OpenTUI `<diff>` as fallback                                            | `@singapor/diff` model/projection/regions, `editorDiffFiles`                                                         |
+| Editor                  | Real editor is a large port; viewer + `$EDITOR` is cheap               | Viewer in cells + `$EDITOR` handoff via workspace-edit; LSP read-only overlay                                         | `@singapore-editor/core/document`, `/syntax`, `foldMap`, keymap tables, tree-sitter worker, shiki tokenizer, `@singapore-editor/lsp` |
+| Diff                    | High                                                                   | Our model + cell painter (split >= 120 cols); OpenTUI `<diff>` as fallback                                            | `@singapore-editor/diff` model/projection/regions, `editorDiffFiles`                                                         |
 | File tree / pickers     | High                                                                   | `FileTreeController` + manual window; one fuzzy dialog                                                                | `packages/tree` model, `fuzzyRank`, command specs, settings search                                                   |
 | Images                  | Medium (terminal-dependent)                                            | OpenTUI `Image` auto protocol + chip fallback + OS open                                                               | attachment contracts/routes                                                                                          |
 | Resize / virtualization | High                                                                   | crush-style windowed list with width-keyed height cache; our scroll reducer in rows                                   | `timeline-scroll-anchoring`, `timeline-items`, logs live cache                                                       |

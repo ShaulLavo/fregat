@@ -5,7 +5,7 @@ import {
   fileResource,
   documentKey,
 } from '@/lib/documents/utils/identity'
-import { createEditorTextBuffer, createEditorViewSession } from '@singapor/core'
+import { createEditorTextBuffer, createEditorViewSession } from '@singapore-editor/core'
 import { vi } from 'vitest'
 
 import type { EditorRenderDocument } from '@/features/editor/utils/render-document'

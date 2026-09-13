@@ -46,7 +46,11 @@ export default defineConfig({
     ),
   },
   optimizeDeps: {
-    exclude: ['@singapor/tree-sitter', '@singapor/tree-sitter-languages', 'ghostty-webgpu'],
+    exclude: [
+      '@singapore-editor/tree-sitter',
+      '@singapore-editor/tree-sitter-languages',
+      'ghostty-webgpu',
+    ],
     include: [
       '@phosphor-icons/react',
       '@tanstack/react-hotkeys',

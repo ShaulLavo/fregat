@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'vitest'
-import type { LanguageServerDefinitionTarget } from '@singapor/lsp-plugin'
+import type { LanguageServerDefinitionTarget } from '@singapore-editor/lsp-plugin'
 
 import { openWorkspaceSearchMatch } from '@/features/search/utils/open-match'
 

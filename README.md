@@ -2,7 +2,7 @@
 
 a local-first code editing workspace, all in one bun monorepo
 
-a vite react client talking to an elysia server that does the actual filesystem, git and lsp work, with a shared contracts package so both sides agree on the shapes. there's also an electrobun desktop shell that wraps the same client. the editor itself is Singapore, the `@singapor/*` packages, developed in a sibling repo
+a vite react client talking to an elysia server that does the actual filesystem, git and lsp work, with a shared contracts package so both sides agree on the shapes. there's also an electrobun desktop shell that wraps the same client. the editor itself is Singapore, the `@singapore-editor/*` packages, developed in a sibling repo
 
 ## what's where
 
@@ -23,7 +23,7 @@ user-facing knobs are registry entries in `packages/contracts/src/settings/keys.
 
 ## the editor packages
 
-you need a sibling checkout of the editor repo at `../Editor` — there's no npm fallback right now, `@singapor/decode` isn't published. the root `overrides` map points every `@singapor/*` at it via bun's `link:` protocol (`"@singapor/core": "link:@singapor/core"`), backed by `bun link` global links. so: run `bun link` inside each `../Editor/packages/*` once, then `bun install` here, and the dev server can read the linked editor source. ci does the same thing by cloning `ShaulLavo/singapor` as a sibling and linking each package
+you need a sibling checkout of the editor repo at `../Editor` — there's no npm fallback right now, `@singapore-editor/decode` isn't published. the root `overrides` map points every `@singapore-editor/*` at it via bun's `link:` protocol (`"@singapore-editor/core": "link:@singapore-editor/core"`), backed by `bun link` global links. so: run `bun link` inside each `../Editor/packages/*` once, then `bun install` here, and the dev server can read the linked editor source. ci does the same thing by cloning `ShaulLavo/singapor` as a sibling and linking each package
 
 `ghostty-webgpu` is linked the same way: the root override is `"ghostty-webgpu": "link:ghostty-webgpu"`, backed by a `bun link` run once inside a sibling checkout at `../ghostty-webgpu`. the npm release lags that repo, so the checkout is the version we actually run. ci clones `ShaulLavo/ghostty-webgpu` as a sibling, builds it and links it
 

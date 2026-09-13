@@ -1,4 +1,4 @@
-import type { EditorScrollPosition, EditorViewSnapshot } from '@singapor/core'
+import type { EditorScrollPosition, EditorViewSnapshot } from '@singapore-editor/core'
 
 export function scrollPositionFromSnapshot(
   snapshot: EditorViewSnapshot | null,

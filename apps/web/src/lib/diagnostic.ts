@@ -1,8 +1,8 @@
-import { documentUriToFileName, fileNameToDocumentUri } from '@singapor/lsp-plugin/paths'
+import { documentUriToFileName, fileNameToDocumentUri } from '@singapore-editor/lsp-plugin/paths'
 import type {
   LanguageServerDefinitionTarget,
   LanguageServerDiagnosticSummary,
-} from '@singapor/lsp-plugin'
+} from '@singapore-editor/lsp-plugin'
 
 type Diagnostic = LanguageServerDiagnosticSummary['diagnostics'][number]
 

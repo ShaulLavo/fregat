@@ -1,6 +1,6 @@
 import { HOSTED_EDITOR_KEYMAP } from '@/keymap/editor-keymap'
-import type { EditorPlugin, EditorTheme } from '@singapor/core'
-import { EditorHost, useEditor } from '@singapor/react'
+import type { EditorPlugin, EditorTheme } from '@singapore-editor/core'
+import { EditorHost, useEditor } from '@singapore-editor/react'
 import {
   memo,
   useCallback,

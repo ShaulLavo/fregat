@@ -5,14 +5,14 @@ import {
   createEditorRuntimeSessionId,
   Editor,
   type EditorLogEvent,
-} from '@singapor/core'
-import { createPieceTableSnapshot } from '@singapor/core/document'
-import { createShikiHighlighterPlugin, createShikiWorkerOwner } from '@singapor/core/shiki'
+} from '@singapore-editor/core'
+import { createPieceTableSnapshot } from '@singapore-editor/core/document'
+import { createShikiHighlighterPlugin, createShikiWorkerOwner } from '@singapore-editor/core/shiki'
 import {
   resolveTreeSitterLanguageContribution,
   TreeSitterWorkerClient,
-} from '@singapor/tree-sitter'
-import { TREE_SITTER_LANGUAGE_CONTRIBUTIONS } from '@singapor/tree-sitter-languages'
+} from '@singapore-editor/tree-sitter'
+import { TREE_SITTER_LANGUAGE_CONTRIBUTIONS } from '@singapore-editor/tree-sitter-languages'
 import { resolveEditorShikiThemeRegistration } from '@/features/editor/state/color-theme-store'
 import {
   EDITOR_SHIKI_LANGUAGE_MAP,

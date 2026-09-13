@@ -1,5 +1,5 @@
 import '@workspace/ui/globals.css'
-import { createDiffRegionStore, createTextDiff } from '@singapor/diff'
+import { createDiffRegionStore, createTextDiff } from '@singapore-editor/diff'
 import { StrictMode } from 'react'
 import { flushSync } from 'react-dom'
 import { createRoot, type Root } from 'react-dom/client'

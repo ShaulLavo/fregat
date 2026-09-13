@@ -1,4 +1,4 @@
-import type { DiffRenderRow } from '@singapor/diff'
+import type { DiffRenderRow } from '@singapore-editor/diff'
 
 export type DiffFilePosition = {
   /** Zero-based, as LSP counts. `DiffRenderRow.newLineNumber` is one-based. */

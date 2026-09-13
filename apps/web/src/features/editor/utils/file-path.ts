@@ -1,4 +1,4 @@
-import type { EditorSyntaxLanguageId } from '@singapor/core'
+import type { EditorSyntaxLanguageId } from '@singapore-editor/core'
 
 /**
  * Language ids the app can hand to the editor. The js/ts/html/css/json/markdown

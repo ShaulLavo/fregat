@@ -1,4 +1,4 @@
-import type { PendingChordLabel } from '@singapor/core/keymap'
+import type { PendingChordLabel } from '@singapore-editor/core/keymap'
 import { formatChord } from '@/keymap/utils/format-keys'
 
 export function PendingChordIndicator({ pending }: { readonly pending: PendingChordLabel | null }) {

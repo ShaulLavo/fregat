@@ -11,7 +11,7 @@ import {
 import type { FileResult, TreeEntry, WorkspaceEditPrepareRequest } from '@/lib/file-system-types'
 import { fileSystemKeys, gitKeys } from '@/lib/query-keys'
 import { treeModel } from '@/lib/tree-model'
-import { createEditorBufferSession } from '@singapor/core'
+import { createEditorBufferSession } from '@singapore-editor/core'
 import { QueryClient } from '@tanstack/react-query'
 import { describe } from 'vitest'
 import { expect, test as it } from '../../../../test/fixtures'

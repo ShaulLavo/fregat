@@ -75,7 +75,7 @@ Current behavior:
 - The surface builds file blocks, virtual rows, editor pool slots, editor documents, range decorations, line gutters, find plugins, and optional syntax plugins.
 - Pool slots keep hidden editor instances mounted.
 - When the same file receives more streamed matches, the file block/editor document can be recreated, which can reload syntax/search highlights for excerpts that were already rendered.
-- `SearchResultFileEditor` gives `EditorHost` a document revision based on generated excerpt text. When TS-heavy result text changes on every query or streamed append, `@singapor/react` treats it as a new document revision and calls `openDocument`, which tears down and recreates syntax/highlighter sessions.
+- `SearchResultFileEditor` gives `EditorHost` a document revision based on generated excerpt text. When TS-heavy result text changes on every query or streamed append, `@singapore-editor/react` treats it as a new document revision and calls `openDocument`, which tears down and recreates syntax/highlighter sessions.
 
 Trace evidence:
 
@@ -282,7 +282,7 @@ Owner write scope:
 
 Tasks:
 
-1. Confirm the reload path: `SearchResultFileEditor` changes `document.revision`, `@singapor/react` recomputes `documentKey`, then `syncDocument` calls `editor.openDocument`.
+1. Confirm the reload path: `SearchResultFileEditor` changes `document.revision`, `@singapore-editor/react` recomputes `documentKey`, then `syncDocument` calls `editor.openDocument`.
 2. Keep the same editor document/session alive when the path/language/document identity is unchanged and only the generated excerpt text changes.
 3. Prefer an incremental text update path that lets tree-sitter apply edits instead of disposing the syntax session.
 4. Keep document identity stable by file path and result mode; do not include match count or generated text hash in the identity.

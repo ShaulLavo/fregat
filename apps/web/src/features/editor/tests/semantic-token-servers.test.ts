@@ -1,4 +1,4 @@
-import { createSemanticTokenStyles } from '@singapor/core/syntax'
+import { createSemanticTokenStyles } from '@singapore-editor/core/syntax'
 import { describe } from 'vitest'
 import { test as it, expect } from '../../../../test/fixtures'
 import { SEMANTIC_TOKEN_LEGENDS } from '../../../../test/factories/semantic-token-legends'

@@ -6,7 +6,7 @@ import type {
   WorkspaceRoot,
 } from '@/lib/documents/utils/types'
 import type { CommandMetadata, CommandExecution } from '@workspace/client-core/commands/metadata'
-import type { EditorKeymapContext } from '@singapor/core/keymap'
+import type { EditorKeymapContext } from '@singapore-editor/core/keymap'
 import type { EditorSaveService } from '@/features/editor/state/save-service'
 import type { Icon } from '@phosphor-icons/react'
 import type { QueryClient } from '@tanstack/react-query'

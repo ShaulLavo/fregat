@@ -1,5 +1,5 @@
 import { filesystemResource } from '@/lib/documents/utils/capabilities'
-import type { ReactEditorController } from '@singapor/react'
+import type { ReactEditorController } from '@singapore-editor/react'
 import { useEffect, useRef } from 'react'
 
 import type { EditorRenderDocument } from '@/features/editor/utils/render-document'

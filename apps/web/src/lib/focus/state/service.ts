@@ -22,8 +22,8 @@ export type {
   FocusRequestToken,
   FocusTargetToken,
 } from '@workspace/client-core/commands/focus'
-import type { EditorKeymapContext } from '@singapor/core/keymap'
-import type { EditorCommandContext, EditorCommandId } from '@singapor/core'
+import type { EditorKeymapContext } from '@singapore-editor/core/keymap'
+import type { EditorCommandContext, EditorCommandId } from '@singapore-editor/core'
 
 import type { FocusArea } from '@workspace/client-core/commands/focus'
 export type { FocusArea } from '@workspace/client-core/commands/focus'

@@ -1,5 +1,5 @@
-import type { DocumentTextSnapshot, TextEdit } from '@singapor/core/document'
-import type { ApplyWorkspaceEditResult } from '@singapor/lsp-plugin'
+import type { DocumentTextSnapshot, TextEdit } from '@singapore-editor/core/document'
+import type { ApplyWorkspaceEditResult } from '@singapore-editor/lsp-plugin'
 import type { FilesystemPath } from '@/lib/documents/utils/types'
 
 declare const textChangeSourceBrand: unique symbol

@@ -3,7 +3,7 @@ import {
   createStackedProjection,
   createTextDiff,
   joinRenderLines,
-} from '@singapor/diff'
+} from '@singapore-editor/diff'
 import { describe, expect, it } from 'vitest'
 
 import {

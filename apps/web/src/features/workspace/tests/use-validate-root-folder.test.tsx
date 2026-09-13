@@ -3,7 +3,7 @@ import { testDocumentKey, testTabContent } from '../../../../test/factories/docu
 import { filesystemPath } from '@/lib/documents/utils/identity'
 import { waitFor } from '@testing-library/react'
 import { rm, symlink } from 'node:fs/promises'
-import { createEditorBufferSession } from '@singapor/core'
+import { createEditorBufferSession } from '@singapore-editor/core'
 import path from 'node:path'
 import { renderApplication } from '../../../../test/render'
 import { createAddressTestRuntime } from '../../../../test/factories/address-runtime'

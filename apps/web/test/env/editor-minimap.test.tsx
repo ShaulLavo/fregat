@@ -1,5 +1,5 @@
-import { Editor } from '@singapor/core'
-import { createMinimapPlugin } from '@singapor/minimap'
+import { Editor } from '@singapore-editor/core'
+import { createMinimapPlugin } from '@singapore-editor/minimap'
 import { onTestFinished, vi } from 'vitest'
 import { expect, test } from '../fixtures'
 import { stubHighlightApi } from './highlight-api'

@@ -1,4 +1,4 @@
-import type { LanguageServerDefinitionTarget } from '@singapor/lsp-plugin'
+import type { LanguageServerDefinitionTarget } from '@singapore-editor/lsp-plugin'
 import type { WorkspaceSearchMatch } from '@workspace/contracts'
 
 export function openWorkspaceSearchMatch(

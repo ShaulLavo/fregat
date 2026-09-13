@@ -1,4 +1,4 @@
-import type { EditorSyntaxLanguageId } from '@singapor/core'
+import type { EditorSyntaxLanguageId } from '@singapore-editor/core'
 
 const EXCLUDED_LANGUAGES = [
   'bibtex',

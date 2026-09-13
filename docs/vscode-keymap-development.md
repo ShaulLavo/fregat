@@ -29,7 +29,7 @@ paired revisions, verification results, and host limitations. The completed plan
 - `activePlatformKeyBindings()` applies pane priority before app filtering. A per-pane trie
   represents complete shortcuts and prefixes. A complete shortcut wins over a longer sequence
   with the same prefix.
-- `@singapor/core/keymap` owns matching, pending state, listeners, and the five-second timer.
+- `@singapore-editor/core/keymap` owns matching, pending state, listeners, and the five-second timer.
   Platform's `state/keymap-session.ts` connects that runtime to focus, command dispatch, and one
   wide log event per chord lifecycle.
 - Unarmed app shortcuts run in document bubble. A prefix installs document capture synchronously
@@ -90,7 +90,7 @@ command.
   `editor.action.moveSelectionToNextFindMatch`. The command registry includes every Editor command.
 
 Workspace defaults are in `keymap/workspace-commands.ts`. Editor defaults and platform restrictions
-come from `@singapor/core/keymap`, with Platform policy applied in `keymap/editor-keymap.ts`.
+come from `@singapore-editor/core/keymap`, with Platform policy applied in `keymap/editor-keymap.ts`.
 Browser-hostile desktop shortcuts remain explicit reservations where Platform cannot perform the desktop action.
 
 ## Remaining parity work

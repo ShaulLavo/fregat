@@ -125,7 +125,7 @@ Reconcile before merging:
 plus the basename table at `:116`), `apps/web/src/features/editor/utils/lsp-language-id.ts:33`, and
 `apps/tui/src/viewer/utils/language.ts:1,37` are one map written twice. Home:
 `packages/client-core/src/files/language.ts` with an exports entry — client-core already depends on
-`@singapor/core` for `EditorSyntaxLanguageId`, and so does `apps/tui`. Not contracts: it is not a
+`@singapore-editor/core` for `EditorSyntaxLanguageId`, and so does `apps/tui`. Not contracts: it is not a
 wire shape. Not `apps/web/src/lib`: the TUI cannot reach it.
 
 Reconcile before merging:

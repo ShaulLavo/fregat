@@ -1,4 +1,4 @@
-import type { EditorCursorLineHighlightOptions, EditorKeymapOptions } from '@singapor/core'
+import type { EditorCursorLineHighlightOptions, EditorKeymapOptions } from '@singapore-editor/core'
 
 /**
  * The editor options a diff cannot be built without. Each one is load-bearing rather than taste —

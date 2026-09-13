@@ -7,16 +7,20 @@ import { readDevSources, sourcePaths, writeDevTypeConfig } from './dev-sources'
 const sourceTest = test.extend<{ web: string }>({
   web: async ({ task }, provide) => {
     const root = fs.mkdtempSync(path.join(os.tmpdir(), `platform-dev-sources-${task.id}-`))
-    writeFile(root, 'package.json', JSON.stringify({ dependencies: { '@singapor/core': '*' } }))
     writeFile(
       root,
-      'node_modules/@singapor/core/package.json',
+      'package.json',
+      JSON.stringify({ dependencies: { '@singapore-editor/core': '*' } }),
+    )
+    writeFile(
+      root,
+      'node_modules/@singapore-editor/core/package.json',
       JSON.stringify({
         exports: { '.': { import: './dist/index.js' }, './document': './dist/public/document.js' },
       }),
     )
-    writeFile(root, 'node_modules/@singapor/core/src/index.ts')
-    writeFile(root, 'node_modules/@singapor/core/src/public/document.ts')
+    writeFile(root, 'node_modules/@singapore-editor/core/src/index.ts')
+    writeFile(root, 'node_modules/@singapore-editor/core/src/public/document.ts')
     writeFile(root, 'node_modules/ghostty-webgpu/package.json', '{}')
     for (const file of [
       'src/index.ts',
@@ -41,8 +45,8 @@ sourceTest(
   ({ web }) => {
     const packages = readDevSources(web)
     const paths = sourcePaths(packages)
-    expect(paths['@singapor/core/document']).toEqual([
-      path.join(web, 'node_modules/@singapor/core/src/public/document.ts'),
+    expect(paths['@singapore-editor/core/document']).toEqual([
+      path.join(web, 'node_modules/@singapore-editor/core/src/public/document.ts'),
     ])
     expect(paths['ghostty-webgpu/xterm.css']).toEqual([
       path.join(web, 'node_modules/ghostty-webgpu/src/xterm/css/xterm.css'),
@@ -60,9 +64,9 @@ sourceTest(
 )
 
 sourceTest('refuses a partial editor source checkout even when built exports exist', ({ web }) => {
-  fs.unlinkSync(path.join(web, 'node_modules/@singapor/core/src/public/document.ts'))
-  writeFile(web, 'node_modules/@singapor/core/dist/public/document.js')
-  expect(() => readDevSources(web)).toThrow('Missing source for @singapor/core/document')
+  fs.unlinkSync(path.join(web, 'node_modules/@singapore-editor/core/src/public/document.ts'))
+  writeFile(web, 'node_modules/@singapore-editor/core/dist/public/document.js')
+  expect(() => readDevSources(web)).toThrow('Missing source for @singapore-editor/core/document')
 })
 
 sourceTest('identifies a missing linked checkout and a missing generated asset', ({ web }) => {

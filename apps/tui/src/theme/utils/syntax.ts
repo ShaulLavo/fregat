@@ -1,4 +1,7 @@
-import { editorThemeFromVscodeTheme, type VscodeThemeRegistration } from '@singapor/core/shiki'
+import {
+  editorThemeFromVscodeTheme,
+  type VscodeThemeRegistration,
+} from '@singapore-editor/core/shiki'
 import {
   SyntaxStyle,
   type ThemeTokenStyle,

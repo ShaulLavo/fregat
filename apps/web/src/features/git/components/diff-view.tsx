@@ -1,6 +1,6 @@
 import { filesystemPath } from '@/lib/documents/utils/identity'
 import { languageIdForFilePath } from '@/features/editor/utils/file-path'
-import { createDiffRegionStore } from '@singapor/diff'
+import { createDiffRegionStore } from '@singapore-editor/diff'
 import { useMemo, useRef, useState } from 'react'
 
 import { DiffEditor } from '@/features/editor/components/diff-editor'

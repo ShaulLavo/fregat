@@ -1,6 +1,6 @@
 import { renderHook } from '@testing-library/react'
 import { vi } from 'vitest'
-import type { Editor } from '@singapor/core'
+import type { Editor } from '@singapore-editor/core'
 
 import { useDiffPanes } from '@/features/editor/hooks/use-diff-panes'
 import { expect, test } from '../../../../../test/fixtures'

@@ -6,7 +6,7 @@ import {
   type EditorSyntaxProvider,
   type EditorSyntaxLanguageId,
   type EditorTextBuffer,
-} from '@singapor/core'
+} from '@singapore-editor/core'
 
 import { languageIdForFilePath } from '@/features/editor/utils/file-path'
 import {

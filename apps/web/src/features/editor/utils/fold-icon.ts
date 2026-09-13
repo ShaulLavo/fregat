@@ -1,4 +1,4 @@
-import type { FoldGutterSvgIcon } from '@singapor/gutters'
+import type { FoldGutterSvgIcon } from '@singapore-editor/gutters'
 
 // Phosphor CaretDown, bold. Path data keeps the icon library off the editor boot path.
 export const FOLD_CHEVRON_ICON = {

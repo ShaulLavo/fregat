@@ -16,9 +16,9 @@ import { test as it, expect } from '../../../../test/fixtures'
 import { createClientInvariantError } from '@/lib/structured-errors'
 import { SEMANTIC_TOKEN_LEGENDS } from '../../../../test/factories/semantic-token-legends'
 
-import { createSemanticTokenStyles } from '@singapor/core/syntax'
-import { SEMANTIC_TOKEN_TYPES } from '@singapor/lsp'
-import { decodeSemanticTokens } from '@singapor/lsp-plugin'
+import { createSemanticTokenStyles } from '@singapore-editor/core/syntax'
+import { SEMANTIC_TOKEN_TYPES } from '@singapore-editor/lsp'
+import { decodeSemanticTokens } from '@singapore-editor/lsp-plugin'
 
 import { clientCapabilitiesForServer } from '@/features/editor/utils/client-capabilities'
 import { semanticTokenProfileFor } from '@/features/editor/utils/semantic-token-servers'
@@ -225,7 +225,7 @@ async function negotiate(launch: typeof spawnTypeScript, testCase: ServerCase): 
 
   const params = {
     capabilities: clientCapabilitiesForServer(testCase.serverId),
-    clientInfo: { name: '@singapor/lsp' },
+    clientInfo: { name: '@singapore-editor/lsp' },
     processId: process.pid,
     initializationOptions: handle.initializationOptions,
     rootUri: `file://${root}`,
@@ -378,7 +378,7 @@ async function tokenSession(
       method: 'initialize',
       params: {
         capabilities: clientCapabilitiesForServer('rust'),
-        clientInfo: { name: '@singapor/lsp' },
+        clientInfo: { name: '@singapore-editor/lsp' },
         processId: process.pid,
         rootUri: `file://${root}`,
         workspaceFolders: [{ name: 'probe', uri: `file://${root}` }],

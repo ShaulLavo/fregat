@@ -1,11 +1,11 @@
 import '@workspace/ui/globals.css'
-import '@singapor/core/style.css'
-import type { EditorTextAnchor } from '@singapor/core/extensions'
+import '@singapore-editor/core/style.css'
+import type { EditorTextAnchor } from '@singapore-editor/core/extensions'
 import type {
   LanguageServerDiagnosticMarkerClaim,
   LanguageServerDiagnosticMarkerEvent,
-} from '@singapor/lsp-plugin'
-import { useEditor } from '@singapor/react'
+} from '@singapore-editor/lsp-plugin'
+import { useEditor } from '@singapore-editor/react'
 import { StrictMode, useLayoutEffect, useMemo } from 'react'
 import { flushSync } from 'react-dom'
 import { createRoot, type Root } from 'react-dom/client'
