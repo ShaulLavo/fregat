@@ -3,11 +3,20 @@ import { TerminalList } from '@/features/workbench/components/terminal-list'
 import { useTerminalTabActions } from '@/features/workbench/hooks/use-terminal-tab-actions'
 import type { WorkbenchPanels } from '@/features/workbench/utils/panels'
 import { Button } from '@workspace/ui/components/button'
+import {
+  PersistedResizablePanelGroup,
+  ResizableHandle,
+  ResizablePanel,
+} from '@workspace/ui/components/resizable'
 import { EmptyState } from '@workspace/ui/components/empty-state'
 import { cn } from '@workspace/ui/lib/utils'
 
 // Hidden with `visibility`, not `display` or an unmount: a remount replays
 // scrollback, and a display:none host measures 0×0 so the grid comes back wrong.
+const TERMINAL_LIST_DEFAULT_SIZE = 176
+const TERMINAL_LIST_MIN_SIZE = 120
+const TERMINAL_LIST_MAX_SIZE = 400
+
 export function TerminalTabs({
   panels,
   rootPath,
@@ -30,8 +39,12 @@ export function TerminalTabs({
     )
 
   return (
-    <>
-      <div className='relative min-h-0 min-w-0 flex-1'>
+    <PersistedResizablePanelGroup
+      className='min-h-0 min-w-0'
+      id='workbench-terminals'
+      storageKey='workbench-terminals'
+    >
+      <ResizablePanel className='relative min-h-0 min-w-0' id='terminals' minSize={240}>
         {panels.terminalTabs.map((tab) => {
           const active = tab.id === panels.activeTerminalTabId
           return (
@@ -55,14 +68,25 @@ export function TerminalTabs({
             </div>
           )
         })}
-      </div>
+      </ResizablePanel>
       {panels.terminalTabs.length > 1 ? (
-        <TerminalList
-          activeTabId={panels.activeTerminalTabId}
-          rootPath={rootPath}
-          tabs={panels.terminalTabs}
-        />
+        <>
+          <ResizableHandle id='terminal-list-handle' withHandle />
+          <ResizablePanel
+            className='min-h-0 min-w-0 overflow-hidden'
+            defaultSize={TERMINAL_LIST_DEFAULT_SIZE}
+            id='terminal-list'
+            maxSize={TERMINAL_LIST_MAX_SIZE}
+            minSize={TERMINAL_LIST_MIN_SIZE}
+          >
+            <TerminalList
+              activeTabId={panels.activeTerminalTabId}
+              rootPath={rootPath}
+              tabs={panels.terminalTabs}
+            />
+          </ResizablePanel>
+        </>
       ) : null}
-    </>
+    </PersistedResizablePanelGroup>
   )
 }

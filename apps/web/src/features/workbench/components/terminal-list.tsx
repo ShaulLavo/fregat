@@ -67,7 +67,7 @@ export function TerminalList({
         <div
           aria-label='Open terminals'
           aria-orientation='vertical'
-          className='border-border bg-background flex w-40 shrink-0 flex-col overflow-y-auto border-l py-(--density-section-gap)'
+          className='border-border bg-background flex h-full flex-col overflow-y-auto border-l py-(--density-section-gap)'
           ref={listRef}
           role='tablist'
           onKeyDown={handleKeyDown}
