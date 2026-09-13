@@ -4,11 +4,11 @@ an editor, a terminal, and your coding agents in one window. the editor is ours,
 
 ![](docs/images/workbench.webp)
 
-cursor is a fork of vs code and t3 code stops at the harness. the editor here is [singapore](https://github.com/ShaulLavo/singapore), written from scratch the way monaco and codemirror were. around it a terminal, git, language servers, and claude code and codex running on the subscriptions you already have
+open a folder and you get the editor, a terminal, git and language servers in panes, with claude code and codex beside them. the agents run on the subscriptions you already have. sign in from inside the app, no accounts here, nothing proxied. run both at once, each in its own session with its own permission mode
 
-sign in from inside the app. no accounts here, nothing proxied. run both agents at once, each in its own session with its own permission mode
+cursor is a fork of vs code. t3 code stops at the harness. fregat is the whole editor, written from scratch
 
-the server does the filesystem, git and lsp work on your machine, so the same workspace opens from a browser, the desktop app, a terminal, or a phone over tailscale
+everything runs on your machine. the same workspace opens from a browser, the desktop app, a terminal, or a phone over tailscale
 
 no releases yet. clone it and run it
 
@@ -30,7 +30,7 @@ open the url it prints, pick a folder
 
 ## what's in it
 
-- [singapore](https://github.com/ShaulLavo/singapore), the editor
+- [singapore](https://github.com/ShaulLavo/singapore), the editor. written from scratch
 - [ghostty-webgpu](https://github.com/ShaulLavo/ghostty-webgpu), the terminal. libghostty-vt in wasm, not xterm.js
 - an elysia server that owns files, git, watching, language servers and the agent processes
 - clients for web, electrobun desktop, native mac, and a tui
