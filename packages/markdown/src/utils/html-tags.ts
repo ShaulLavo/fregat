@@ -1,20 +1,28 @@
-const TAG = /<(\/?)([A-Za-z][\w:-]*)(?:\s[^>]*?)?(\/?)>/g
+import { htmlVoidElements } from 'html-void-elements'
 
-const VOID_TAGS = new Set([
-  'area',
-  'base',
-  'br',
-  'col',
-  'embed',
-  'hr',
-  'img',
-  'input',
-  'link',
-  'meta',
-  'param',
-  'source',
-  'track',
-  'wbr',
+const TAG = /<(\/?)([A-Za-z][\w:-]*)(?:\s[^>]*?)?(\/?)>/g
+const COMMENT_OR_CDATA = /<!--[\s\S]*?(?:-->|$)|<!\[CDATA\[[\s\S]*?(?:\]\]>|$)/g
+
+const VOID_TAGS = new Set(htmlVoidElements)
+
+/** Elements the HTML parser closes on its own; a missing end tag pins nothing. */
+const OPTIONAL_END_TAGS = new Set([
+  'body',
+  'colgroup',
+  'dd',
+  'dt',
+  'head',
+  'html',
+  'li',
+  'optgroup',
+  'option',
+  'p',
+  'tbody',
+  'td',
+  'tfoot',
+  'th',
+  'thead',
+  'tr',
 ])
 
 /**
@@ -23,11 +31,11 @@ const VOID_TAGS = new Set([
  * `</details>` ten paragraphs later must reach the HTML parser together.
  */
 export function trackOpenHtmlTags(stack: string[], html: string): void {
-  for (const match of html.matchAll(TAG)) {
+  for (const match of html.replace(COMMENT_OR_CDATA, '').matchAll(TAG)) {
     const closing = match[1] === '/'
     const name = (match[2] ?? '').toLowerCase()
     const selfClosing = match[3] === '/'
-    if (VOID_TAGS.has(name) || selfClosing) continue
+    if (VOID_TAGS.has(name) || OPTIONAL_END_TAGS.has(name) || selfClosing) continue
     if (!closing) {
       stack.push(name)
       continue

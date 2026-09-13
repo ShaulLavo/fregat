@@ -2,13 +2,13 @@ import type { Root, RootContent } from 'mdast'
 import type { PluggableList } from 'unified'
 
 import {
+  endsInUnclosedFence,
   groupRootNodes,
-  markStreamingTail,
+  markIncompleteLinks,
   scanNodeFeatures,
   type MarkdownBlock,
   type NodeGroup,
 } from './blocks'
-import { endsInsideOpenFence } from './fence'
 import { healMarkdown } from './heal'
 import { countLines, shiftPositions } from './positions'
 import { createRemarkProcessor, type RemarkProcessor } from './processor'
@@ -32,6 +32,12 @@ type LastUpdate = {
   readonly text: string
 }
 
+type Tail = {
+  readonly fileValue: string
+  readonly nodes: RootContent[]
+  readonly start: number
+}
+
 /** Definitions and footnotes reach across the whole document, so no prefix is ever settled. */
 const LINK_DEFINITION = /^ {0,3}\[[^\]\n]*\]:/mu
 const FOOTNOTE = /\[\^[^\]\n]+\]/u
@@ -41,6 +47,10 @@ const FOOTNOTE = /\[\^[^\]\n]+\]/u
  * the last settled block, shifts the new nodes to absolute positions, and
  * settles everything but the final block. Settled blocks keep their nodes for
  * as long as the text still starts with their source.
+ *
+ * Healing happens after settling and only to the final block: the settled
+ * text is always the author's, so a block never goes stale when the stream
+ * ends and healing stops.
  */
 export function createMarkdownSession(options: MarkdownSessionOptions = {}): MarkdownSession {
   const processor = createRemarkProcessor(options.remarkPlugins)
@@ -62,30 +72,27 @@ export function createMarkdownSession(options: MarkdownSessionOptions = {}): Mar
     settled = reusableBlocks(settled, text)
     const prefix = settled.at(-1)
     const prefixEnd = prefix?.end ?? 0
-    const suffix = text.slice(prefixEnd)
-    if (!isIncrementallyParsable(suffix)) {
+    if (!isIncrementallyParsable(text.slice(prefixEnd))) {
       settled = []
-      return [parseWhole(processor, text, heal)]
+      return [wholeDocument(processor, text, heal)]
     }
 
-    const healed = heal ? healMarkdown(suffix) : suffix
-    const fileValue = prefixEnd === 0 ? healed : text.slice(0, prefixEnd) + healed
-    const children = parseSuffix(processor, healed, fileValue, prefixEnd, prefix?.endLine ?? 0)
-    const groups = groupRootNodes(children, prefixEnd, fileValue.length)
-    const settledCount = settledGroupCount(groups, text, healed, prefixEnd)
-    for (const group of groups.slice(0, settledCount)) {
+    const children = parseFrom(processor, text, prefixEnd, prefix?.endLine ?? 0)
+    const groups = groupRootNodes(children, prefixEnd, text.length)
+    for (const group of groups.slice(0, -1)) {
       settled.push(settledBlock(group, text, settled.at(-1)?.endLine ?? 0))
     }
-    const tailGroups = groups.slice(settledCount)
-    const tail = tailBlock(tailGroups, settled.at(-1)?.end ?? 0, fileValue)
+    const tailStart = settled.at(-1)?.end ?? prefixEnd
+    const tail: Tail = { fileValue: text, nodes: groups.at(-1)?.nodes ?? [], start: tailStart }
+    const tailLine = (prefix?.endLine ?? 0) + countLines(text.slice(prefixEnd, tailStart))
 
-    return [...settled, tail]
+    return [...settled, tailBlock(heal ? healedTail(processor, tail, tailLine) : tail, heal)]
   }
 }
 
 function isIncrementallyParsable(suffix: string): boolean {
   if (suffix.includes('\r')) return false
-  if (suffix.includes('\uFEFF')) return false
+  if (suffix.includes('﻿')) return false
   if (LINK_DEFINITION.test(suffix)) return false
 
   return !FOOTNOTE.test(suffix)
@@ -103,14 +110,14 @@ function reusableBlocks(blocks: MarkdownBlock[], text: string): MarkdownBlock[] 
   return blocks.slice(0, count)
 }
 
-function parseSuffix(
+/** Parses `fileValue` from `offset`, a line start, and reports absolute positions. */
+function parseFrom(
   processor: RemarkProcessor,
-  healed: string,
   fileValue: string,
   offset: number,
   lines: number,
 ): RootContent[] {
-  const root = processor.parse(healed)
+  const root = processor.parse(fileValue.slice(offset))
   if (offset > 0) shiftPositions(root, offset, lines)
 
   return transform(processor, root, fileValue).children
@@ -120,32 +127,26 @@ function transform(processor: RemarkProcessor, root: Root, fileValue: string): R
   return processor.runSync(root, fileValue)
 }
 
-function parseWhole(processor: RemarkProcessor, text: string, heal: boolean): MarkdownBlock {
-  const healed = heal ? healMarkdown(text) : text
-  const root = transform(processor, processor.parse(healed), healed)
+function wholeDocument(processor: RemarkProcessor, text: string, heal: boolean): MarkdownBlock {
+  const tail: Tail = { fileValue: text, nodes: parseFrom(processor, text, 0, 0), start: 0 }
 
-  return tailBlock([{ end: healed.length, nodes: root.children, start: 0 }], 0, healed)
+  return tailBlock(heal ? healedTail(processor, tail, 0) : tail, heal)
 }
 
 /**
- * Every group but the last is settled, unless healing rewrote text inside a
- * settled range: an escaped `~` or `>` is not in the source, and a block cached
- * from it would go stale the moment the stream ends and healing stops.
+ * Re-parses the tail with unfinished syntax closed. Text that stops inside a
+ * fence is left alone: the only place a closer could go is inside the code.
  */
-function settledGroupCount(
-  groups: NodeGroup[],
-  text: string,
-  healed: string,
-  prefixEnd: number,
-): number {
-  const count = groups.length - 1
-  if (count <= 0) return 0
+function healedTail(processor: RemarkProcessor, tail: Tail, line: number): Tail {
+  if (endsInUnclosedFence(tail.nodes, tail.fileValue)) return tail
 
-  const settledEnd = groups[count - 1]?.end ?? prefixEnd
-  const healedPrefix = healed.slice(0, settledEnd - prefixEnd)
-  if (!text.startsWith(healedPrefix, prefixEnd)) return 0
+  const source = tail.fileValue.slice(tail.start)
+  const healed = healMarkdown(source)
+  if (healed === source) return tail
 
-  return count
+  const fileValue = tail.fileValue.slice(0, tail.start) + healed
+
+  return { fileValue, nodes: parseFrom(processor, fileValue, tail.start, line), start: tail.start }
 }
 
 function settledBlock(group: NodeGroup, text: string, lineBefore: number): MarkdownBlock {
@@ -167,11 +168,9 @@ function settledBlock(group: NodeGroup, text: string, lineBefore: number): Markd
   }
 }
 
-function tailBlock(groups: NodeGroup[], start: number, fileValue: string): MarkdownBlock {
-  const nodes = groups.flatMap((group) => group.nodes)
-  markStreamingTail(nodes, fileValue)
+function tailBlock({ fileValue, nodes, start }: Tail, streaming: boolean): MarkdownBlock {
+  if (streaming) markIncompleteLinks(nodes)
   const features = scanNodeFeatures(nodes)
-  const source = fileValue.slice(start)
 
   return {
     end: fileValue.length,
@@ -181,9 +180,9 @@ function tailBlock(groups: NodeGroup[], start: number, fileValue: string): Markd
     key: start,
     lastNodeType: nodes.at(-1)?.type ?? null,
     nodes,
-    openFence: endsInsideOpenFence(source),
+    openFence: streaming && endsInUnclosedFence(nodes, fileValue),
     settled: false,
-    source,
+    source: fileValue.slice(start),
     start,
   }
 }

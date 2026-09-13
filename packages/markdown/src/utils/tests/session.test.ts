@@ -97,15 +97,11 @@ describe('incremental parsing', () => {
 })
 
 describe('the streaming tail', () => {
-  test('an open fence is flagged on its code node and on the block', () => {
+  test('an open fence is flagged on the block', () => {
     const session = createMarkdownSession()
     const [block] = session.update('```ts\nconst answer = 42\nconst other =', { heal: true })
 
     expect(block?.openFence).toBe(true)
-    expect(block?.nodes[0]).toMatchObject({
-      data: { hProperties: { dataIncomplete: 'true' } },
-      type: 'code',
-    })
   })
 
   test('a closed fence is not flagged', () => {
@@ -113,7 +109,6 @@ describe('the streaming tail', () => {
     const [block] = session.update('```ts\nconst answer = 42\n```\n', { heal: true })
 
     expect(block?.openFence).toBe(false)
-    expect(block?.nodes[0]?.data).toBeUndefined()
   })
 
   test('a link without a destination yet is marked, not dropped', () => {
@@ -146,13 +141,48 @@ describe('the streaming tail', () => {
     expect(blocks.at(-1)?.nodes[0]).toMatchObject({ type: 'code', value: 'code' })
   })
 
-  test('healing never rewrites a settled block', () => {
+  test('healing touches only the tail, so earlier blocks still settle', () => {
     const session = createMarkdownSession()
-    const streamed = session.update('range 20~25 here\n\nand **bo', { heal: true })
-    const settled = session.update('range 20~25 here\n\nand **bold**', { heal: false })
+    const streamed = session.update('range 20~25 here\n\nif a<b then swap\n\nand **bo', {
+      heal: true,
+    })
+    const settled = session.update('range 20~25 here\n\nif a<b then swap\n\nand **bold**', {
+      heal: false,
+    })
 
-    expect(nodesOf(settled)).toEqual(fullParse('range 20~25 here\n\nand **bold**'))
-    expect(streamed.every((block) => !block.settled)).toBe(true)
+    expect(streamed.map((block) => block.settled)).toEqual([true, true, false])
+    expect(nodesOf(settled)).toEqual(
+      fullParse('range 20~25 here\n\nif a<b then swap\n\nand **bold**'),
+    )
+    expect(settled[0]).toBe(streamed[0])
+    expect(settled[1]).toBe(streamed[1])
+  })
+
+  test('a fence inside a blockquote or list item is not healed into', () => {
+    const session = createMarkdownSession()
+    const quoted = session.update('> ~~~js\n> const label = obj.**name', { heal: true })
+    const listed = session.update('- a\n\n  ~~~ts\n  const x = obj.**name', { heal: true })
+
+    expect(quoted.at(-1)?.openFence).toBe(true)
+    expect(listed.at(-1)?.openFence).toBe(true)
+    expect(JSON.stringify(nodesOf(quoted))).not.toContain('name**')
+    expect(JSON.stringify(nodesOf(listed))).not.toContain('name**')
+  })
+
+  test('a finished message ending in an open fence is not marked as streaming', () => {
+    const session = createMarkdownSession()
+    const [block] = session.update('```ts\nconst truncated =', { heal: false })
+
+    expect(block?.openFence).toBe(false)
+  })
+
+  test('an HTML comment or a tag the parser closes itself does not pin later blocks', () => {
+    const session = createMarkdownSession()
+    const commented = session.update('<!-- <div> -->\n\none\n\ntwo\n\nthree', { heal: false })
+    const paragraphTag = session.update('<p>see below\n\none\n\ntwo\n\nthree', { heal: false })
+
+    expect(commented.map((block) => block.settled)).toEqual([true, true, true, false])
+    expect(paragraphTag.map((block) => block.settled)).toEqual([true, true, true, false])
   })
 
   test('turning healing off re-parses only the tail', () => {

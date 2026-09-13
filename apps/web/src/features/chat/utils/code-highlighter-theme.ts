@@ -32,10 +32,10 @@ export function createEditorCodeHighlighter({
 }: {
   readonly colorMode: CodeHighlighterColorMode
   readonly editorTheme: EditorTheme
-  readonly registration: ThemeRegistrationAny | null
+  readonly registration: ThemeRegistrationAny
   readonly themeKey: string
 }): CodeHighlighter {
-  const themes = highlighterThemesForEditorTheme(editorTheme, colorMode, registration ?? undefined)
+  const themes = highlighterThemesForEditorTheme(editorTheme, colorMode, registration)
   const highlighter = createShikiHighlighter({ themeKey, themes })
 
   return {

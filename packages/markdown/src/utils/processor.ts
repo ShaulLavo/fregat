@@ -7,6 +7,7 @@ import remarkParse from 'remark-parse'
 import { unified, type PluggableList, type Processor } from 'unified'
 
 import { remarkCjkAutolinkBoundaries } from './cjk-autolinks'
+import { remarkCodeMeta } from './code-meta'
 
 export type RemarkProcessor = Processor<Root, Root, Root, undefined, undefined>
 
@@ -23,5 +24,6 @@ export function createRemarkProcessor(remarkPlugins: PluggableList = []): Remark
     .use(remarkMath, { singleDollarTextMath: false })
     .use(remarkCjkFriendlyGfmStrikethrough)
     .use(remarkCjkAutolinkBoundaries)
+    .use(remarkCodeMeta)
     .use(remarkPlugins) as unknown as RemarkProcessor
 }

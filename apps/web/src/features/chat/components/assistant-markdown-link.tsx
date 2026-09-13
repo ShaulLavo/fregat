@@ -20,7 +20,7 @@ type AssistantMarkdownLinkProps = Omit<ComponentProps<'a'>, 'ref'> & { node?: un
 export function AssistantMarkdownLink({
   children,
   className,
-  href = '',
+  href,
   node,
   rel,
   target,
@@ -29,11 +29,17 @@ export function AssistantMarkdownLink({
   void node
 
   const contextMenu = useContextMenu()
-  const host = externalLinkHost(href)
+  const host = href === undefined ? null : externalLinkHost(href)
 
   function handleClick(event: MouseEvent<HTMLAnchorElement>) {
     if (event.defaultPrevented || event.button !== 0) return
     if (event.metaKey || event.ctrlKey || event.shiftKey || event.altKey) return
+    // A destination the sanitizer dropped, or a bare relative path nothing
+    // claimed, would navigate the app away from the transcript.
+    if (href === undefined || isRelativeDestination(href)) {
+      event.preventDefault()
+      return
+    }
 
     const fragmentTarget = findMarkdownFragmentTarget(event.currentTarget, href)
     if (!fragmentTarget) return
@@ -71,7 +77,7 @@ export function AssistantMarkdownLink({
     </a>
   )
 
-  if (!host) return anchor
+  if (!host || href === undefined) return anchor
 
   return (
     <>
@@ -88,4 +94,10 @@ export function AssistantMarkdownLink({
       ) : null}
     </>
   )
+}
+
+function isRelativeDestination(href: string) {
+  if (href.startsWith('#')) return false
+
+  return !/^[a-z][a-z0-9+.-]*:/iu.test(href)
 }

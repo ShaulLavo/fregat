@@ -1,4 +1,4 @@
-import type { Root as HastRoot } from 'hast'
+import type { Element, Root as HastRoot } from 'hast'
 import type { Root as MdastRoot } from 'mdast'
 import { toHast } from 'mdast-util-to-hast'
 import rehypeSanitize from 'rehype-sanitize'
@@ -33,7 +33,36 @@ export function createHastProcessor(extensions: HastExtensions): HastProcessor {
 /** mdast → hast for one block. Sanitization is not a caller choice. */
 export function blockToHast(block: MarkdownBlock, processor: HastProcessor): HastRoot {
   const root: MdastRoot = { type: 'root', children: [...block.nodes] }
-  const tree = toHast(root, { allowDangerousHtml: true }) as HastRoot
+  const tree = processor.runSync(toHast(root, { allowDangerousHtml: true }) as HastRoot)
+  // The hast root separates blocks with newline text nodes, which a
+  // `whitespace-pre-wrap` consumer would paint as blank lines.
+  tree.children = tree.children.filter(
+    (child) => !(child.type === 'text' && child.value.trim().length === 0),
+  )
+  // Set after sanitization so raw HTML in the document cannot forge it.
+  if (block.openFence) markLastFenceIncomplete(tree)
 
-  return processor.runSync(tree)
+  return tree
+}
+
+function markLastFenceIncomplete(tree: HastRoot) {
+  const code = lastFencedCode(tree)
+  if (code) code.properties.dataIncomplete = 'true'
+}
+
+function lastFencedCode(node: HastRoot | Element): Element | null {
+  for (let index = node.children.length - 1; index >= 0; index -= 1) {
+    const child = node.children[index]
+    if (child?.type !== 'element') continue
+    if (child.tagName === 'pre') return child.children.find(isCode) ?? null
+
+    const found = lastFencedCode(child)
+    if (found) return found
+  }
+
+  return null
+}
+
+function isCode(node: Element['children'][number]): node is Element {
+  return node.type === 'element' && node.tagName === 'code'
 }

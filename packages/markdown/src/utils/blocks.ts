@@ -28,6 +28,8 @@ export type MarkdownBlock = {
   readonly lastNodeType: string | null
 }
 
+const MAX_NODES_PER_OPEN_TAG = 32
+
 export type NodeGroup = {
   readonly nodes: RootContent[]
   readonly start: number
@@ -47,6 +49,8 @@ export function groupRootNodes(children: RootContent[], start: number, end: numb
 
   for (const node of children) {
     const lineStart = nodeLineStart(node)
+    // A tag nobody closes must not pin the rest of the document into one block.
+    if (current.length >= MAX_NODES_PER_OPEN_TAG) openTags.length = 0
     const canSplit = current.length > 0 && openTags.length === 0 && lineStart !== null
     if (canSplit && lineStart !== null) {
       groups.push({ nodes: current, start: currentStart, end: lineStart })
@@ -87,43 +91,48 @@ function scanNode(node: Nodes, found: { html: boolean; math: boolean }) {
 const INCOMPLETE_LINK_URL = 'streamdown:incomplete-link'
 
 /**
- * The tail is the only block the stream is still writing. A fence with no
- * closing line and a link with no destination yet are flagged as properties so
- * renderers can treat them as unfinished rather than broken.
+ * Whether the last fence in the tail runs to the end of the text without a
+ * closing line. Read off the parsed nodes so fences inside blockquotes and
+ * list items count too.
  */
-export function markStreamingTail(nodes: readonly RootContent[], text: string): void {
-  const contentEnd = text.trimEnd().length
-  for (const node of nodes) markNode(node, text, contentEnd)
+export function endsInUnclosedFence(nodes: readonly RootContent[], text: string): boolean {
+  const code = lastCode(nodes)
+  const start = code?.position?.start.offset
+  const end = code?.position?.end.offset
+  if (start === undefined || end === undefined) return false
+  if (end < text.trimEnd().length) return false
+
+  return isUnclosedFencedCode(text.slice(start, end))
 }
 
-function markNode(node: Nodes, text: string, contentEnd: number) {
-  if (node.type === 'code') {
-    markCode(node, text, contentEnd)
-    return
+function lastCode(nodes: readonly Nodes[]): Code | null {
+  for (let index = nodes.length - 1; index >= 0; index -= 1) {
+    const node = nodes[index]
+    if (!node) continue
+    if (node.type === 'code') return node
+    if (!('children' in node)) continue
+
+    const found = lastCode(node.children)
+    if (found) return found
   }
-  if (node.type === 'link') markLink(node)
+
+  return null
+}
+
+/** A link whose destination has not arrived is flagged so the renderer keeps it inert. */
+export function markIncompleteLinks(nodes: readonly RootContent[]): void {
+  for (const node of nodes) markLinks(node)
+}
+
+function markLinks(node: Nodes) {
+  if (node.type === 'link' && node.url === INCOMPLETE_LINK_URL) markIncomplete(node)
   if (!('children' in node)) return
 
-  for (const child of node.children) markNode(child, text, contentEnd)
+  for (const child of node.children) markLinks(child)
 }
 
-function markCode(node: Code, text: string, contentEnd: number) {
-  const start = node.position?.start.offset
-  const end = node.position?.end.offset
-  if (start === undefined || end === undefined || end < contentEnd) return
-  if (!isUnclosedFencedCode(text.slice(start, end))) return
-
-  markIncomplete(node)
-}
-
-function markLink(node: Link) {
-  if (node.url !== INCOMPLETE_LINK_URL) return
-
-  node.url = ''
-  markIncomplete(node)
-}
-
-function markIncomplete(node: Code | Link) {
+function markIncomplete(node: Link) {
   const data = node.data ?? {}
+  node.url = ''
   node.data = { ...data, hProperties: { ...data.hProperties, dataIncomplete: 'true' } }
 }

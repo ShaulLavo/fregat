@@ -50,6 +50,11 @@ export function createShikiHighlighter({
         core = highlighter
         return highlighter
       },
+      (error: unknown) => {
+        // The next fence tries again instead of inheriting a rejected promise.
+        ready = null
+        throw error
+      },
     )
     return ready
   }

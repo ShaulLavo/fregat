@@ -19,10 +19,8 @@ import { useOpenFileReference } from '../hooks/use-open-file-reference'
 import { MarkdownDiagramContext } from '../providers/markdown-diagram-context'
 import { MarkdownFileLinkContext } from '../providers/markdown-file-link-context'
 import { normalizeAgentMarkdown } from '@/features/chat/utils/agent-markdown'
-import {
-  createEditorCodeHighlighter,
-  editorThemeHighlightKey,
-} from '@/features/chat/utils/code-highlighter-theme'
+import { codeHighlighterForTheme } from '@/features/chat/state/code-highlighters'
+import { editorThemeHighlightKey } from '@/features/chat/utils/code-highlighter-theme'
 import { chatMarkdownClipboardPayload } from '@/features/chat/utils/markdown-clipboard'
 import { remarkFileLinkChips } from '@/features/chat/utils/markdown-file-link-chips'
 import { remarkWorkspaceImages } from '@/features/chat/utils/markdown-images'
@@ -55,20 +53,14 @@ export function AssistantMarkdown({
   const environment = useEnvironmentsStore((state) => state.entries[owner])
   const origin = serverEndpoint(environment?.origin ?? owner)
   const themeKey = editorThemeHighlightKey(editorTheme, colorMode, definition?.shikiName)
-  // One highlighter per palette: it owns the loaded grammars, so it must
-  // outlive renders and change only when the theme does.
-  const highlighter = useMemo(
-    () =>
-      registration
-        ? createEditorCodeHighlighter({
-            colorMode,
-            editorTheme,
-            registration: registration as ThemeRegistrationAny,
-            themeKey,
-          })
-        : null,
-    [colorMode, editorTheme, registration, themeKey],
-  )
+  const highlighter = registration
+    ? codeHighlighterForTheme({
+        colorMode,
+        editorTheme,
+        registration: registration as ThemeRegistrationAny,
+        themeKey,
+      })
+    : null
   const renderedText = normalizeAgentMarkdown(text)
   const mermaid = useMermaid(renderedText, streaming)
   const fileLinkActions = useMemo(

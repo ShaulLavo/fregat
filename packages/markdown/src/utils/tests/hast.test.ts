@@ -93,7 +93,7 @@ describe('decoration', () => {
     const [code] = elements(tree, 'code')
 
     expect(code?.properties.className).toEqual(['language-ts'])
-    expect(code?.data).toEqual({ meta: 'title="src/foo.ts"' })
+    expect(code?.properties.dataMeta).toBe('title="src/foo.ts"')
     expect(code?.properties.dataIncomplete).toBe('true')
   })
 
@@ -102,6 +102,29 @@ describe('decoration', () => {
 
     expect(link?.properties.href).toBeUndefined()
     expect(link?.properties.dataIncomplete).toBe('true')
+  })
+
+  test('the fence metastring survives the raw HTML stage', () => {
+    const [code] = elements(render('```ts title="a.ts"\nx\n```', withRaw), 'code')
+
+    expect(code?.properties.dataMeta).toBe('title="a.ts"')
+  })
+
+  test('raw HTML cannot forge the streaming marker on a fence', () => {
+    const [code] = elements(
+      render('<pre><code data-incomplete="true">a</code></pre>', withRaw),
+      'code',
+    )
+
+    expect(code?.properties.dataIncomplete).toBeUndefined()
+  })
+
+  test('footnote ids are prefixed once, so the jump link resolves', () => {
+    const tree = render('a[^x]\n\n[^x]: note')
+    const [ref] = elements(tree, 'a')
+    const target = String(ref?.properties.href).slice(1)
+
+    expect(elements(tree, 'li').some((item) => item.properties.id === target)).toBe(true)
   })
 
   test('block code is not given the inline code class', () => {

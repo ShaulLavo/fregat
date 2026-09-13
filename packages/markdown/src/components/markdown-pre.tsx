@@ -33,7 +33,7 @@ function fencedCode(pre: Element) {
   )
   if (!code) return null
 
-  const meta = code.data && 'meta' in code.data ? code.data.meta : undefined
+  const meta = code.properties.dataMeta
 
   return {
     incomplete: code.properties.dataIncomplete === 'true',

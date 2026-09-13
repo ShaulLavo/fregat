@@ -7,7 +7,9 @@ import { parseSync } from 'oxc-parser'
 const REPOSITORY = path.resolve(import.meta.dirname, '../..')
 // The app and the primitives it composes are one design surface; measuring only the app leaves
 // every class the primitives encode unmeasured.
-const DEFAULT_ROOTS = ['apps/web/src', 'packages/ui/src'].map((root) => path.join(REPOSITORY, root))
+const DEFAULT_ROOTS = ['apps/web/src', 'packages/markdown/src', 'packages/ui/src'].map((root) =>
+  path.join(REPOSITORY, root),
+)
 const UI_PACKAGE = 'packages/ui/src/'
 const DEFAULT_ALLOW = path.join(REPOSITORY, 'scripts/lint/web-design-allow.json')
 const LIST_CAP = 40
