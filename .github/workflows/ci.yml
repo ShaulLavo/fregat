@@ -13,7 +13,7 @@ concurrency:
 
 env:
   # Keep the linked Editor API and Platform consumers on an exact revision.
-  EDITOR_REF: 4b70a4a08ce69f2671e4557571ba83d0c701f271
+  EDITOR_REF: 67585811071b22289ed88c39e35b91d355c41c6a
   # Same for the linked ghostty-webgpu checkout.
   GHOSTTY_REF: 94ab02a02799b6897ffa6c766aecc7977418a89d
 

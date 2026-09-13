@@ -1,6 +1,6 @@
 # First-load weight: the instrument, mermaid, and the icon font
 
-Status: proposed, implementation not started. Requested 2026-09-13.
+Status: implemented 2026-09-13. `bun run --cwd apps/web bundle:report` is the instrument; first-load JS went from 2425 KB to 2281 KB gz (18 files to 2) and CSS from 43 KB to 31 KB, with no Phosphor font in the release and mermaid at zero first-load contribution.
 
 The production web build sends **2421 KB gzip of JavaScript before the first frame**, 2311 KB of it in a single chunk. Nothing in this repository reports that number, so every claim about what is inside that chunk — including the ones that motivated this plan — is a guess read off a file listing. This plan builds the instrument first, then lands the two boot-path removals that depend on no other decision.
 

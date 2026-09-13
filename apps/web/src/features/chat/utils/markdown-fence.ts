@@ -50,3 +50,10 @@ export function fenceIconFileName(title: string | null, language: string) {
 
   return `file.${EXTENSION_BY_LANGUAGE[normalized] ?? normalized}`
 }
+
+const MERMAID_FENCE = /^ {0,3}(?:`{3,}|~{3,}) *mermaid\b/mu
+
+/** Whether the text opens a mermaid fence — the cue to load the diagram plugin. */
+export function hasMermaidFence(text: string): boolean {
+  return MERMAID_FENCE.test(text)
+}

@@ -6,6 +6,7 @@
   "scripts": {
     "dev": "bun run --parallel dev:vite dev:types",
     "build": "tsgo --build && bun --env-file=../../.env vite build",
+    "bundle:report": "bun scripts/bundle-report.ts",
     "bench:editor-open": "bun scripts/editor-open-benchmark.mjs",
     "bench:editor-open:calibrate": "bun scripts/calibrate-editor-open-benchmark.mjs",
     "bench:editor-open:gate": "bun scripts/editor-open-benchmark.mjs --gate --browsers=chromium",

@@ -5,6 +5,7 @@ import { defineConfig, type Plugin } from 'vite'
 import { portFromEnv } from '../../scripts/runtime-network'
 import { readDevSources, reportDevSources, type DevPackage } from '../../scripts/dev-sources'
 import { consumeAppSave } from '../server/src/fs/app-save-marker'
+import { bundleStatsPlugin } from './scripts/bundle-stats-plugin'
 
 const workspaceRoot = path.resolve(__dirname, '../..')
 const devServerHost = process.env.WEB_HOST ?? '127.0.0.1'
@@ -35,6 +36,7 @@ export default defineConfig(({ command, isPreview }) => {
         ],
       }),
       tailwindcss(),
+      bundleStatsPlugin(),
     ],
     resolve: {
       alias: {

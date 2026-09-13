@@ -2,7 +2,6 @@ import { useEditorColorTheme } from '@/features/editor/hooks/use-editor-color-th
 import { cjk } from '@streamdown/cjk'
 import type { ThemeInput } from '@streamdown/code'
 import { math } from '@streamdown/math'
-import { mermaid } from '@streamdown/mermaid'
 import { cn } from '@workspace/ui/lib/utils'
 import { useQueryClient } from '@tanstack/react-query'
 import { originForQueryClient } from '@/lib/environments/state/query-clients'
@@ -13,6 +12,7 @@ import { AssistantMarkdownImage } from '@/features/chat/components/assistant-mar
 import { useMemo, type ClipboardEvent, type ComponentProps } from 'react'
 import { defaultRemarkPlugins, Streamdown, type Components } from 'streamdown'
 
+import { useMermaidPlugin } from '../hooks/use-mermaid-plugin'
 import { useOpenFileReference } from '../hooks/use-open-file-reference'
 import { normalizeAgentMarkdown } from '@/features/chat/utils/agent-markdown'
 import { chatMarkdownClipboardPayload } from '@/features/chat/utils/markdown-clipboard'
@@ -73,22 +73,27 @@ export function AssistantMarkdown({
     () => createStreamdownEditorCodePlugin(streamdownThemes, editorTheme),
     [editorTheme, streamdownThemes],
   )
+  const renderedText = useMemo(() => normalizeAgentMarkdown(text), [text])
+  const mermaidPlugin = useMermaidPlugin(renderedText, streaming)
   const streamdownPlugins = useMemo(
     () => ({
       cjk,
       code: codePlugin,
       math,
-      mermaid,
-      // Mermaid stays on Streamdown's diagram path; every other grammar renders
-      // through the chat's own cached, streaming-aware code block.
+      ...(mermaidPlugin ? { mermaid: mermaidPlugin } : {}),
+      // A settled mermaid fence takes Streamdown's diagram path once the plugin
+      // is in; every other grammar, and mermaid until then, renders through the
+      // chat's own cached, streaming-aware code block.
       renderers: [
         {
           component: AssistantMarkdownCodeBlock,
-          language: codePlugin.getSupportedLanguages().filter((language) => language !== 'mermaid'),
+          language: codePlugin
+            .getSupportedLanguages()
+            .filter((language) => language !== 'mermaid' || !mermaidPlugin),
         },
       ],
     }),
-    [codePlugin],
+    [codePlugin, mermaidPlugin],
   )
   const themeKey = streamdownEditorThemeKey(editorTheme, colorMode, definition?.shikiName)
   const highlighter = useMemo(
@@ -128,7 +133,6 @@ export function AssistantMarkdown({
     ],
     [rootPath, workspacePath, origin],
   )
-  const renderedText = useMemo(() => normalizeAgentMarkdown(text), [text])
 
   // Re-emit the rendered view as markdown so copying a selection keeps links,
   // emphasis, lists and fences instead of flattening to text.
