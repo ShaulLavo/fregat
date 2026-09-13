@@ -1,13 +1,6 @@
 /** @jsxImportSource react */
 
-// Rows live in ./FileTreeRow.tsx, drag/touch in ../hooks/useFileTreeDrag.ts, the
-// context menu in ../hooks/useFileTreeContextMenu.ts, sticky-keyboard focus in
-// ../utils/render/stickyFocusMode.ts, and rename in ./RenameInput.tsx. What is
-// left here is virtualization, keyboard navigation, and the focus/scroll
-// effects — keyboard nav is the next cluster to extract, and it depends on the
-// sticky-focus and context-menu seams above.
 import {
-  type CSSProperties,
   type JSX,
   type MouseEvent as ReactMouseEvent,
   useCallback,
@@ -18,22 +11,18 @@ import {
   useState,
 } from 'react'
 
-import { Icon } from './Icon'
+import { MenuTrigger } from './menu-trigger'
 import {
   FileTreeRow,
   type FileTreeRenderedRowMode,
   type FileTreeRenderRowFrame,
 } from './FileTreeRow'
-import { useFileTreeContextMenu } from '../hooks/useFileTreeContextMenu'
+import { useContextMenu } from '../hooks/use-context-menu'
 import { useFileTreeDrag } from '../hooks/useFileTreeDrag'
 import { useFileTreeFocusSync } from '../hooks/useFileTreeFocusSync'
 import { useFileTreeKeyboard } from '../hooks/useFileTreeKeyboard'
 import { type FileTreeRowDom, useFileTreeRowDom } from '../hooks/useFileTreeRowDom'
-import {
-  CONTEXT_MENU_SLOT_NAME,
-  CONTEXT_MENU_TRIGGER_TYPE,
-  HEADER_SLOT_NAME,
-} from '../utils/constants'
+import { HEADER_SLOT_NAME } from '../utils/constants'
 import { FileTreeController } from '../utils/model/FileTreeController'
 import type { FileTreeStickyRowCandidate, FileTreeViewProps } from '../utils/model/internalTypes'
 import {
@@ -274,7 +263,7 @@ export function FileTreeView({
   const markContextMenuActiveItem = useCallback((path: string): void => {
     setActiveItemPath((previousPath) => (previousPath === path ? previousPath : path))
   }, [])
-  const [scrollSettledRevision, setScrollSettledRevision] = useState(0)
+  const [, setScrollSettledRevision] = useState(0)
 
   // Trees that mount with an already-open search session (because a caller
   // passed `initialSearchQuery`) should not steal focus from sibling trees
@@ -991,8 +980,8 @@ export function FileTreeView({
     clearHoverPath,
     closeContextMenu,
     closeContextMenuRef,
-    contextHoverPath,
-    contextMenuAnchorTop,
+    triggerStore,
+    focusTriggerPath,
     contextMenuButtonTriggerEnabled,
     contextMenuButtonVisibility,
     contextMenuEnabled,
@@ -1008,29 +997,19 @@ export function FileTreeView({
     noteFocusInteraction,
     openContextMenuForRow,
     openMenuFromTrigger,
-    triggerButton,
-    triggerPath,
     triggerRef: contextMenuTriggerRef,
-  } = useFileTreeContextMenu({
+  } = useContextMenu({
     composition,
     controller,
     dom,
     claimDomFocus,
     focusedPath,
     focusedRowHasVisibleAnchor,
-    instanceId,
     isScrolling: isScrollingRef,
-    itemHeight,
     markActiveItem: markContextMenuActiveItem,
-    range,
-    resolvedViewportHeight,
-    scrollSettledRevision,
-    shouldSuppressContextMenu,
     slotHost,
     ownsDomFocus,
     preserveStickyAtScrollTop,
-    stickyRows,
-    visibleRows,
   })
   useLayoutEffect(() => {
     contextMenuScrollActionsRef.current.clearHoverPath = clearHoverPath
@@ -1142,43 +1121,6 @@ export function FileTreeView({
       ? getFileTreeFocusedRowDomId(instanceId, focusedPath, !focusedRowIsMounted)
       : undefined
   const visualFocusPath = contextMenuOpenPath ?? (isSearchOpen ? focusedPath : activeItemPath)
-  const visualContextHoverPath = contextMenuOpenPath ?? contextHoverPath
-  const triggerButtonVisible =
-    contextMenuEnabled &&
-    contextMenuButtonTriggerEnabled &&
-    !isPointerContextMenuOpen &&
-    !isRenaming &&
-    triggerButton != null &&
-    contextMenuAnchorTop != null &&
-    triggerPath != null
-  const contextMenuAnchorVisible = contextMenuEnabled && (triggerButtonVisible || isContextMenuOpen)
-  const pointerAnchorRect = contextMenuPointerAnchorRect
-  const rowAnchorTop =
-    pointerAnchorRect == null &&
-    triggerButton != null &&
-    contextMenuAnchorTop != null &&
-    (isContextMenuOpen || triggerButtonVisible)
-      ? contextMenuAnchorTop
-      : null
-  const contextMenuAnchorStyle: CSSProperties | undefined =
-    pointerAnchorRect != null
-      ? {
-          left: `${pointerAnchorRect.left}px`,
-          position: 'fixed',
-          right: 'auto',
-          top: `${pointerAnchorRect.top}px`,
-        }
-      : rowAnchorTop != null
-        ? {
-            top: `${rowAnchorTop}px`,
-          }
-        : undefined
-  const contextMenuTriggerStyle = isPointerContextMenuOpen
-    ? {
-        opacity: '0',
-      }
-    : undefined
-
   const handleRowClick = useCallback(
     (
       event: ReactMouseEvent<HTMLElement>,
@@ -1270,7 +1212,7 @@ export function FileTreeView({
   // for where each ref is registered, which is the invariant sticky reuse
   // depends on.
   const flowRowFrame: FileTreeRenderRowFrame = {
-    contextHoverPath: visualContextHoverPath,
+    contextMenuOpenPath,
     contextMenuButtonTriggerEnabled,
     contextMenuButtonVisibility,
     contextMenuEnabled,
@@ -1338,8 +1280,12 @@ export function FileTreeView({
       onDragOver={dragAndDropEnabled ? handleTreeDragOver : undefined}
       onDrop={dragAndDropEnabled ? handleTreeDrop : undefined}
       onKeyDown={onTreeKeyDown}
-      onPointerLeave={contextMenuEnabled ? handleTreePointerLeave : undefined}
-      onPointerOver={contextMenuEnabled ? handleTreePointerOver : undefined}
+      onPointerLeave={
+        contextMenuEnabled && contextMenuButtonTriggerEnabled ? handleTreePointerLeave : undefined
+      }
+      onPointerOver={
+        contextMenuEnabled && contextMenuButtonTriggerEnabled ? handleTreePointerOver : undefined
+      }
       role='tree'
       tabIndex={-1}
       style={{
@@ -1466,40 +1412,22 @@ export function FileTreeView({
         </div>
       </div>
       {contextMenuEnabled ? (
-        <div
-          ref={contextMenuAnchorRef}
-          data-type='context-menu-anchor'
-          data-visible={contextMenuAnchorVisible ? 'true' : 'false'}
-          style={contextMenuAnchorStyle}
-        >
-          <button
-            ref={contextMenuTriggerRef}
-            type='button'
-            data-type={CONTEXT_MENU_TRIGGER_TYPE}
-            aria-label='Options'
-            aria-haspopup='menu'
-            aria-expanded={isContextMenuOpen ? 'true' : 'false'}
-            data-visible={triggerButtonVisible ? 'true' : 'false'}
-            onMouseDown={(event) => {
-              event.preventDefault()
-            }}
-            onClick={(event) => {
-              event.preventDefault()
-              event.stopPropagation()
-              if (isContextMenuOpen) {
-                closeContextMenu()
-                return
-              }
-
-              openMenuFromTrigger()
-            }}
-            tabIndex={-1}
-            style={contextMenuTriggerStyle}
-          >
-            <Icon {...resolveIcon('file-tree-icon-ellipsis')} />
-          </button>
-          {isContextMenuOpen ? <slot name={CONTEXT_MENU_SLOT_NAME} /> : null}
-        </div>
+        <MenuTrigger
+          anchorRef={contextMenuAnchorRef}
+          triggerRef={contextMenuTriggerRef}
+          store={triggerStore}
+          dom={dom}
+          focusPath={focusTriggerPath}
+          openPath={contextMenuOpenPath}
+          pointerRect={contextMenuPointerAnchorRect}
+          isPointerMenu={isPointerContextMenuOpen}
+          isRenaming={isRenaming}
+          isScrolling={isScrollingRef}
+          buttonEnabled={contextMenuButtonTriggerEnabled}
+          icon={resolveIcon('file-tree-icon-ellipsis')}
+          closeMenu={closeContextMenu}
+          openMenu={openMenuFromTrigger}
+        />
       ) : null}
 
       {isContextMenuOpen ? (

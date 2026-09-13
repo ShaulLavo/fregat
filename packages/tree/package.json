@@ -20,7 +20,8 @@
     "test:browser": "vitest run --project browser"
   },
   "dependencies": {
-    "evlog": "catalog:"
+    "evlog": "catalog:",
+    "zustand": "^5.0.15"
   },
   "devDependencies": {
     "@types/bun": "1.3.14",

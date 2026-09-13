@@ -3,7 +3,11 @@ import { createRoot, type Root } from 'react-dom/client'
 import { flushSync } from 'react-dom'
 
 import { FileTree } from './FileTree'
-import type { FileTreeSearchBlurBehavior } from '../utils/model/publicTypes'
+import type {
+  FileTreeContextMenuItem,
+  FileTreeContextMenuOpenContext,
+  FileTreeSearchBlurBehavior,
+} from '../utils/model/publicTypes'
 import { FileTree as FileTreeModel } from '../utils/render/FileTree'
 
 let root: Root | null = null
@@ -18,6 +22,118 @@ afterEach(() => {
 })
 
 describe('FileTree browser behavior', () => {
+  it.each(['right-click', 'both'] as const)(
+    'does not render rows on hover in %s mode',
+    async (triggerMode) => {
+      const renderRowDecoration = vi.fn(() => null)
+      const renderMenu = vi.fn(
+        (item: FileTreeContextMenuItem, _context: FileTreeContextMenuOpenContext) => {
+          const menu = document.createElement('div')
+          menu.dataset.fileTreeContextMenuRoot = 'true'
+          menu.textContent = item.path
+          return menu
+        },
+      )
+      const { shadowRoot } = await mountBrowserTree({
+        composition: { contextMenu: { enabled: true, triggerMode, render: renderMenu } },
+        renderRowDecoration,
+      })
+      await settleBrowserFrames()
+      renderRowDecoration.mockClear()
+
+      for (const path of ['src/features/a-0.ts', 'src/features/a-1.ts', 'src/features/a-2.ts']) {
+        rowButton(shadowRoot, path).dispatchEvent(
+          new PointerEvent('pointerover', { bubbles: true }),
+        )
+        await settleBrowserFrames()
+        if (triggerMode === 'right-click') continue
+        const anchor = shadowRoot.querySelector<HTMLElement>('[data-type="context-menu-anchor"]')
+        expect(anchor?.getBoundingClientRect().top).toBeCloseTo(
+          rowButton(shadowRoot, path).getBoundingClientRect().top,
+          1,
+        )
+      }
+      expect(renderRowDecoration.mock.calls.length).toBe(0)
+
+      const trigger = shadowRoot.querySelector<HTMLButtonElement>(
+        '[data-type="context-menu-trigger"]',
+      )
+      expect(trigger?.dataset.visible).toBe(triggerMode === 'both' ? 'true' : 'false')
+      rowButton(shadowRoot, 'src/features/a-2.ts').dispatchEvent(
+        new PointerEvent('pointerout', { bubbles: true, relatedTarget: document.body }),
+      )
+      await settleBrowserFrames()
+      expect(
+        shadowRoot.querySelector<HTMLElement>('[data-type="context-menu-anchor"]')?.dataset.visible,
+      ).toBe('false')
+      expect(renderRowDecoration.mock.calls.length).toBe(0)
+      rowButton(shadowRoot, 'src/features/a-2.ts').dispatchEvent(
+        new PointerEvent('pointerover', { bubbles: true }),
+      )
+      await settleBrowserFrames()
+      if (triggerMode === 'both') {
+        trigger?.click()
+      } else {
+        rowButton(shadowRoot, 'src/features/a-2.ts').dispatchEvent(
+          new MouseEvent('contextmenu', { bubbles: true }),
+        )
+      }
+      await vi.waitFor(() => expect(renderMenu).toHaveBeenCalledTimes(1))
+      expect(renderMenu.mock.calls[0]?.[0].path).toBe('src/features/a-2.ts')
+      renderMenu.mock.calls[0]?.[1].close({ restoreFocus: false })
+      await settleBrowserFrames()
+      const keyboardRow = rowButton(shadowRoot, 'src/features/a-1.ts')
+      keyboardRow.focus()
+      keyboardRow.dispatchEvent(
+        new KeyboardEvent('keydown', { bubbles: true, key: 'F10', shiftKey: true }),
+      )
+      await vi.waitFor(() => expect(renderMenu).toHaveBeenCalledTimes(2))
+      expect(renderMenu.mock.calls[1]?.[0].path).toBe('src/features/a-1.ts')
+      expect(renderMenu.mock.calls[1]?.[1].anchorRect?.top).toBeCloseTo(
+        keyboardRow.getBoundingClientRect().top +
+          Number.parseFloat(getComputedStyle(trigger!).marginTop),
+        1,
+      )
+    },
+  )
+
+  it('positions the menu button on the hovered sticky row without rendering rows', async () => {
+    const renderRowDecoration = vi.fn(() => null)
+    const renderMenu = vi.fn((item: FileTreeContextMenuItem) => {
+      const menu = document.createElement('div')
+      menu.textContent = item.path
+      return menu
+    })
+    const { shadowRoot } = await mountBrowserTree({
+      composition: { contextMenu: { enabled: true, triggerMode: 'both', render: renderMenu } },
+      renderRowDecoration,
+    })
+    const scroll = virtualScroll(shadowRoot)
+    scroll.scrollTop = 120
+    scroll.dispatchEvent(new Event('scroll', { bubbles: true }))
+    await vi.waitFor(() =>
+      expect(virtualRoot(shadowRoot).hasAttribute('data-is-scrolling')).toBe(false),
+    )
+    await settleBrowserFrames()
+    renderRowDecoration.mockClear()
+    const stickyRow = shadowRoot.querySelector<HTMLElement>(
+      '[data-file-tree-sticky-path="src/features/"]',
+    )
+    expect(stickyRow).not.toBeNull()
+    stickyRow!.dispatchEvent(new PointerEvent('pointerover', { bubbles: true }))
+    await settleBrowserFrames()
+    const anchor = shadowRoot.querySelector<HTMLElement>('[data-type="context-menu-anchor"]')
+    expect(anchor?.getBoundingClientRect().top).toBeCloseTo(
+      stickyRow!.getBoundingClientRect().top,
+      1,
+    )
+    expect(renderRowDecoration.mock.calls.length).toBe(0)
+    shadowRoot.querySelector<HTMLButtonElement>('[data-type="context-menu-trigger"]')?.click()
+    await vi.waitFor(() => expect(renderMenu).toHaveBeenCalledTimes(1))
+    expect(renderMenu.mock.calls[0]?.[0].path).toBe('src/features/')
+    expect(scroll.scrollTop).toBe(120)
+  })
+
   it('renders rows, scrolls, keeps sticky rows, handles keyboard focus, and starts rename', async () => {
     const { model: currentModel, shadowRoot } = await mountBrowserTree()
     const firstRow = rowButton(shadowRoot, 'src/features/')
@@ -590,8 +706,20 @@ function dispatchTreeKey(
   )
 }
 
-async function mountBrowserTree(options: { pathCount?: number; stickyFolders?: boolean } = {}) {
+async function settleBrowserFrames() {
+  await new Promise(requestAnimationFrame)
+  await new Promise(requestAnimationFrame)
+}
+
+async function mountBrowserTree(
+  options: Pick<
+    ConstructorParameters<typeof FileTreeModel>[0],
+    'composition' | 'renderRowDecoration' | 'stickyFolders'
+  > & { pathCount?: number } = {},
+) {
   const mountedModel = new FileTreeModel({
+    composition: options.composition,
+    renderRowDecoration: options.renderRowDecoration,
     gitStatus: [{ path: 'src/features/a-3.ts', status: 'modified' }],
     initialExpansion: 'open',
     initialVisibleRowCount: 6,

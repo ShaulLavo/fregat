@@ -260,7 +260,7 @@ export interface FileTreeRenderRowFrame {
   readonly controller: FileTreeController
   readonly renameView: ReturnType<FileTreeController['getRenameView']>
   readonly visualFocusPath: string | null
-  readonly contextHoverPath: string | null
+  readonly contextMenuOpenPath: string | null
   readonly draggedPathSet: ReadonlySet<string> | null
   readonly dragAndDropEnabled: boolean
   readonly shouldSuppressContextMenu: () => boolean
@@ -332,7 +332,7 @@ export function FileTreeRow({ frame, options = {}, row }: FileTreeRowProps): JSX
     controller,
     renameView,
     visualFocusPath,
-    contextHoverPath,
+    contextMenuOpenPath,
     draggedPathSet,
     dragAndDropEnabled,
     shouldSuppressContextMenu,
@@ -421,7 +421,7 @@ export function FileTreeRow({ frame, options = {}, row }: FileTreeRowProps): JSX
     state: {
       containsGitChange,
       effectiveGitStatus,
-      isContextHovered: contextHoverPath === targetPath,
+      isContextHovered: contextMenuOpenPath === targetPath,
       isDragging: draggedPathSet?.has(targetPath) === true,
       isFocusRinged: row.isFocused && visualFocusPath === targetPath,
       isLoading: loadingPaths?.has(targetPath) === true,

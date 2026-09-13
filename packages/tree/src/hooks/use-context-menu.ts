@@ -3,15 +3,14 @@ import {
   type RefObject,
   useCallback,
   useLayoutEffect,
-  useMemo,
   useRef,
   useState,
 } from 'react'
 
+import { createMenuTriggerStore, type MenuTriggerStore } from '../state/menu-trigger'
 import type { FileTreeRowDom } from './useFileTreeRowDom'
 import { CONTEXT_MENU_SLOT_NAME, CONTEXT_MENU_TRIGGER_TYPE } from '../utils/constants'
 import type { FileTreeController } from '../utils/model/FileTreeController'
-import type { FileTreeLayoutStickyRow } from '../utils/model/layout'
 import type {
   FileTreeCompositionOptions,
   FileTreeContextMenuButtonVisibility,
@@ -25,7 +24,6 @@ import {
   createContextMenuItem,
   focusFirstMenuElement,
   getContextMenuAnchorButton,
-  getContextMenuAnchorTop,
   isEventInContextMenu,
   serializeAnchorRect,
 } from '../utils/render/contextMenuAnchor'
@@ -38,36 +36,28 @@ interface FileTreeContextMenuState {
   readonly source: 'button' | 'keyboard' | 'right-click'
 }
 
-export interface UseFileTreeContextMenuOptions {
+export interface ContextMenuOptions {
   readonly composition: FileTreeCompositionOptions | undefined
   readonly controller: FileTreeController
   readonly dom: FileTreeRowDom
   readonly slotHost: FileTreeSlotHost | undefined
-  readonly instanceId: string | undefined
-  readonly itemHeight: number
   readonly isScrolling: RefObject<boolean>
-  readonly scrollSettledRevision: number
-  readonly shouldSuppressContextMenu: () => boolean
   readonly focusedPath: string | null
   readonly focusedRowHasVisibleAnchor: boolean
   readonly claimDomFocus: () => void
   readonly ownsDomFocus: () => boolean
   readonly preserveStickyAtScrollTop: (path: string, scrollTop: number | null) => void
   readonly markActiveItem: (path: string) => void
-  readonly range: { readonly end: number; readonly start: number }
-  readonly resolvedViewportHeight: number
-  readonly stickyRows: readonly FileTreeLayoutStickyRow<FileTreeVisibleRow>[]
-  readonly visibleRows: readonly FileTreeVisibleRow[]
 }
 
-export interface FileTreeContextMenuHandlers {
+export interface ContextMenuHandlers {
   readonly anchorRef: RefObject<HTMLDivElement | null>
   readonly triggerRef: RefObject<HTMLButtonElement | null>
   readonly clearHoverPath: () => void
   readonly closeContextMenu: (restoreFocus?: boolean) => void
   readonly closeContextMenuRef: RefObject<(restoreFocus?: boolean) => void>
-  readonly contextHoverPath: string | null
-  readonly contextMenuAnchorTop: number | null
+  readonly triggerStore: MenuTriggerStore
+  readonly focusTriggerPath: string | null
   readonly contextMenuButtonTriggerEnabled: boolean
   readonly contextMenuButtonVisibility: FileTreeContextMenuButtonVisibility
   readonly contextMenuEnabled: boolean
@@ -89,17 +79,12 @@ export interface FileTreeContextMenuHandlers {
       source?: 'button' | 'keyboard' | 'right-click'
     },
   ) => void
-  readonly openMenuFromTrigger: () => void
-  readonly triggerButton: HTMLElement | null
-  readonly triggerPath: string | null
+  readonly openMenuFromTrigger: (path: string, button: HTMLElement) => void
 }
 
-export function useFileTreeContextMenu(
-  options: UseFileTreeContextMenuOptions,
-): FileTreeContextMenuHandlers {
+export function useContextMenu(options: ContextMenuOptions): ContextMenuHandlers {
   'use no memo'
-  // Context-menu callbacks must see same-render state through stable refs before layout effects;
-  // moving those assignments into effects would change open/close event timing.
+  // DOM focus is read during render and can change independently of React state.
   const {
     composition,
     claimDomFocus,
@@ -111,21 +96,12 @@ export function useFileTreeContextMenu(
     markActiveItem,
     ownsDomFocus,
     preserveStickyAtScrollTop,
-    range,
-    resolvedViewportHeight,
-    scrollSettledRevision,
     slotHost,
-    stickyRows,
-    visibleRows,
   } = options
   const { getRoot, getRowButtons, getScroll, getStickyRowButtons } = dom
   const anchorRef = useRef<HTMLDivElement | null>(null)
   const triggerRef = useRef<HTMLButtonElement | null>(null)
-  const [contextHoverPath, setContextHoverPath] = useState<string | null>(null)
-  const [contextMenuAnchorTop, setContextMenuAnchorTop] = useState<number | null>(null)
-  const [lastContextMenuInteraction, setLastContextMenuInteraction] = useState<
-    'focus' | 'pointer' | null
-  >(null)
+  const [triggerStore] = useState(createMenuTriggerStore)
   const [contextMenuState, setContextMenuState] = useState<FileTreeContextMenuState | null>(null)
   const contextMenuStateRef = useRef(contextMenuState)
   useLayoutEffect(() => {
@@ -195,13 +171,6 @@ export function useFileTreeContextMenu(
   useLayoutEffect(() => {
     closeContextMenuRef.current = closeContextMenu
   }, [closeContextMenu])
-  const updateTriggerPosition = useCallback(
-    (itemButton: HTMLElement | null): void => {
-      const nextTop = itemButton == null ? null : getContextMenuAnchorTop(getRoot(), itemButton)
-      setContextMenuAnchorTop((previousTop) => (previousTop === nextTop ? previousTop : nextTop))
-    },
-    [getRoot],
-  )
   const openContextMenuForRow = useCallback(
     (
       row: FileTreeVisibleRow,
@@ -227,7 +196,6 @@ export function useFileTreeContextMenu(
       // preservation relies on this remaining scroll-neutral so the canonical
       // offscreen row is not revealed before the layout effect restores focus.
       item.focus()
-      updateTriggerPosition(anchorButton)
       shouldRestoreContextMenuFocusRef.current = true
       setContextMenuState({
         anchorRect: openOptions?.anchorRect ?? null,
@@ -243,7 +211,6 @@ export function useFileTreeContextMenu(
       getTriggerAnchorButton,
       markActiveItem,
       preserveStickyAtScrollTop,
-      updateTriggerPosition,
     ],
   )
 
@@ -259,20 +226,9 @@ export function useFileTreeContextMenu(
     })
   }, [closeContextMenu, contextMenuEnabled, contextMenuState])
 
-  // Invoking the consumer's `render()` more than once per logical open swaps
-  // the returned DOM element, which detaches anything a parent page was about
-  // to interact with (Playwright clicks, inline rename input). The previous
-  // version keyed this effect on the whole `contextMenuState` object, which is
-  // a fresh reference on every `setState` call even when the path + source are
-  // unchanged — triggering a React cleanup → re-run cycle that clears and
-  // remounts the slot. Keying on a derived string makes the effect idempotent
-  // across incidental re-renders and only re-fires when the menu's logical
-  // identity actually changes.
-  const activeContextMenuKey = useMemo(
-    () =>
-      contextMenuState == null ? null : `${contextMenuState.path}::${contextMenuState.source}`,
-    [contextMenuState],
-  )
+  // Keep the mounted menu stable across incidental controller renders.
+  const activeContextMenuKey =
+    contextMenuState == null ? null : `${contextMenuState.path}::${contextMenuState.source}`
 
   useLayoutEffect(() => {
     if (activeContextMenuKey == null) {
@@ -382,32 +338,7 @@ export function useFileTreeContextMenu(
     contextMenuButtonTriggerEnabled && ownsDomFocus() && focusedRowHasVisibleAnchor
       ? focusedPath
       : null
-  const pointerTriggerPath = lastContextMenuInteraction === 'pointer' ? contextHoverPath : null
-  const triggerPath =
-    contextMenuState?.path ?? pointerTriggerPath ?? focusTriggerPath ?? contextHoverPath
   const isPointerContextMenuOpen = contextMenuState?.source === 'right-click'
-  const triggerButton = getTriggerAnchorButton(triggerPath)
-
-  useLayoutEffect(() => {
-    if (isScrolling.current && contextMenuState == null) {
-      return
-    }
-
-    queueMicrotask(() => {
-      updateTriggerPosition(getTriggerAnchorButton(triggerPath))
-    })
-  }, [
-    contextMenuState,
-    getTriggerAnchorButton,
-    range,
-    resolvedViewportHeight,
-    scrollSettledRevision,
-    stickyRows,
-    triggerPath,
-    updateTriggerPosition,
-    visibleRows,
-    isScrolling,
-  ])
 
   const handleTreePointerOver = useCallback(
     (event: ReactPointerEvent<HTMLDivElement>): void => {
@@ -437,33 +368,19 @@ export function useFileTreeContextMenu(
         nextPath = rowButton.dataset.itemPath ?? null
       }
 
-      if (nextPath != null) {
-        setLastContextMenuInteraction((previousMode) =>
-          previousMode === 'pointer' ? previousMode : 'pointer',
-        )
-      }
-      setContextHoverPath((previousPath) => (previousPath === nextPath ? previousPath : nextPath))
+      triggerStore.getState().hover(nextPath)
     },
-    [isScrolling],
+    [isScrolling, triggerStore],
   )
 
-  const handleTreePointerLeave = useCallback((): void => {
-    setContextHoverPath(null)
-  }, [])
-
-  const noteFocusInteraction = useCallback((): void => {
-    setLastContextMenuInteraction('focus')
-  }, [])
-
-  const clearHoverPath = useCallback((): void => {
-    setContextHoverPath((previousPath) => (previousPath == null ? previousPath : null))
-  }, [])
+  const clearHoverPath = () => triggerStore.getState().hover(null)
+  const noteFocusInteraction = triggerStore.getState().noteFocus
 
   const isContextMenuOpenNow = useCallback((): boolean => {
     return contextMenuStateRef.current != null
   }, [])
 
-  const openMenuFromTrigger = (): void => {
+  const openMenuFromTrigger = (triggerPath: string, triggerButton: HTMLElement): void => {
     if (isScrolling.current) {
       return
     }
@@ -472,16 +389,11 @@ export function useFileTreeContextMenu(
       return
     }
 
-    if (triggerPath == null || triggerButton == null) {
-      return
-    }
-
     const triggerItem = controller.getItem(triggerPath)
     if (triggerItem == null) {
       return
     }
 
-    updateTriggerPosition(triggerButton)
     shouldRestoreContextMenuFocusRef.current = true
     setContextMenuState({
       anchorRect: null,
@@ -501,8 +413,8 @@ export function useFileTreeContextMenu(
     clearHoverPath,
     closeContextMenu,
     closeContextMenuRef,
-    contextHoverPath,
-    contextMenuAnchorTop,
+    triggerStore,
+    focusTriggerPath,
     contextMenuButtonTriggerEnabled,
     contextMenuButtonVisibility,
     contextMenuEnabled,
@@ -510,7 +422,7 @@ export function useFileTreeContextMenu(
     contextMenuPointerAnchorRect: contextMenuState?.anchorRect ?? null,
     contextMenuRightClickEnabled,
     contextMenuTriggerMode,
-    handleTreePointerLeave,
+    handleTreePointerLeave: clearHoverPath,
     handleTreePointerOver,
     isContextMenuOpen: contextMenuState != null,
     isContextMenuOpenNow,
@@ -518,7 +430,5 @@ export function useFileTreeContextMenu(
     noteFocusInteraction,
     openContextMenuForRow,
     openMenuFromTrigger,
-    triggerButton,
-    triggerPath,
   }
 }
