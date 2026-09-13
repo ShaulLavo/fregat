@@ -1,6 +1,6 @@
 # fregat
 
-an editor, a terminal, and your coding agents in one window. the editor is ours, the agents are yours
+an editor, a terminal, and your coding agents in one window
 
 ![](docs/images/workbench.webp)
 

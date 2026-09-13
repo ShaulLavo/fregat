@@ -128,11 +128,8 @@ pre {
     'opsz' 96;
   line-height: 0.95;
   letter-spacing: -0.03em;
-}
-
-/* one sentence per line; the break is the meaning */
-.hero h1 span {
-  display: block;
+  max-width: 20ch;
+  text-wrap: balance;
 }
 
 .hero p {
