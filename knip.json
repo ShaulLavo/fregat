@@ -40,6 +40,8 @@
     },
     "scripts": {
       "entry": [
+        "deploy/mesh.ts",
+        "deploy/live-check.mjs",
         "desktop-dev.ts",
         "dev.ts",
         "generate-settings-reference.ts",

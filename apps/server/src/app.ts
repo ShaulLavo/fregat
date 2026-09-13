@@ -48,6 +48,7 @@ import { mergeProviderInstanceConfigs } from './provider/utils/instance-config-m
 import { SettingsStore, type SettingsStoreOptions } from './settings/store'
 import { TerminalService, type TerminalPtyFactory } from './terminal/service'
 import { wallpaperRoutes } from './wallpaper/routes'
+import { webRoutes, type WebOptions } from './web/routes'
 import { ProviderSessionDirectory } from './provider/provider-session-directory'
 import { ProviderService } from './provider/provider-service'
 import { MachineService, type MachineServiceOptions } from './machines/service'
@@ -88,6 +89,9 @@ export type AppOptions = FileSystemServiceOptions & {
    * because this repo deliberately keeps no healing code.
    */
   settings?: Omit<SettingsStoreOptions, 'workspaceRoot'>
+  /** The origin forwarded to remote machines as this app's web origin. */
+  webOrigin?: string
+  web?: WebOptions
 }
 
 const appOrchestration = new WeakMap<object, OrchestrationEngine>()
@@ -192,7 +196,7 @@ export function createApp(options: AppOptions) {
   const machines = new MachineService({
     ...options.machines,
     environmentId: identity.id,
-    webOrigin: auth.allowedOrigins[0] ?? 'http://localhost:3000',
+    webOrigin: options.webOrigin ?? auth.allowedOrigins[0] ?? 'http://localhost:3000',
     readMachines: () => settings.snapshot().values['environments.machines'],
   })
   settings.onChange(() => {
@@ -251,6 +255,11 @@ export function createApp(options: AppOptions) {
       }),
     )
     .onError(({ code, error, set }) => appErrorPayload(code, error, set))
+    // Public: the page, its files and the release descriptor load before any
+    // origin is known. Mounted before every parent hook: an Elysia plugin
+    // mounted after one parent `onBeforeHandle` inherits the parent's later
+    // hooks too, which would put the auth guard in front of index.html.
+    .use(webRoutes(options.web ?? {}))
     .onBeforeHandle(({ request }) => {
       recordClientInstance(request)
     })

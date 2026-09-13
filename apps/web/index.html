@@ -85,9 +85,13 @@
           : !/android/i.test(navigator.userAgent) && /linux|bsd/i.test(navigator.userAgent)
         if (desktopLinux) return
 
+        // Mirrors defaultServerUrl in src/lib/client.ts: an explicit development
+        // override, else the page's own base URL, which is where one server serves both.
         const configuredServer = '%VITE_SERVER_URL%'
+        const developmentServer = '%DEV%' === 'true' ? 'http://localhost:3001' : '%BASE_URL%'
         const server = new URL(
-          configuredServer.startsWith('%') ? 'http://localhost:3001' : configuredServer,
+          configuredServer.startsWith('%') ? developmentServer : configuredServer,
+          location.href,
         )
         const desktopStill = `${server.origin}${server.pathname.replace(/\/+$/, '')}/wallpaper/still`
         const preload = document.createElement('link')

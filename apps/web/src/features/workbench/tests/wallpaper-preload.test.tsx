@@ -15,12 +15,26 @@ afterEach(() => {
 
 test('HTML preloads the desktop wallpaper without fetching an unused fallback', () => {
   vi.stubGlobal('navigator', { userAgentData: { platform: 'macOS' }, userAgent: '' })
-  runBootScript()
+  runBootScript({ serverUrl: 'https://example.test/platform-api/?ignored=yes' })
 
   expect(preloadSources()).toEqual(['https://example.test/platform-api/wallpaper/still'])
   for (const link of document.querySelectorAll('link[rel="preload"][as="image"]')) {
     expect(link).toHaveAttribute('crossorigin', 'anonymous')
   }
+})
+
+test('a production page without an override preloads from its own base URL', () => {
+  vi.stubGlobal('navigator', { userAgentData: { platform: 'macOS' }, userAgent: '' })
+  runBootScript({ dev: false })
+
+  expect(preloadSources()).toEqual([`${location.origin}/platform/wallpaper/still`])
+})
+
+test('a development page without an override preloads from the dev server port', () => {
+  vi.stubGlobal('navigator', { userAgentData: { platform: 'macOS' }, userAgent: '' })
+  runBootScript({ dev: true })
+
+  expect(preloadSources()).toEqual(['http://localhost:3001/wallpaper/still'])
 })
 
 test.each([
@@ -40,7 +54,8 @@ test.each([
   },
 )
 
-function runBootScript() {
+// Vite leaves an unset %VITE_SERVER_URL% in place, which is the production case.
+function runBootScript({ serverUrl, dev = false }: { serverUrl?: string; dev?: boolean } = {}) {
   const html = readFileSync(join(import.meta.dirname, '../../../../index.html'), 'utf8')
   const script = html.match(/<script>([\s\S]*?)<\/script>/)?.[1]
   expect(script).toBeDefined()
@@ -48,7 +63,8 @@ function runBootScript() {
 
   const configured = script
     .replaceAll('%BASE_URL%', '/platform/')
-    .replaceAll('%VITE_SERVER_URL%', 'https://example.test/platform-api/?ignored=yes')
+    .replaceAll('%DEV%', String(dev))
+    .replaceAll('%VITE_SERVER_URL%', serverUrl ?? '%VITE_SERVER_URL%')
   new Function(configured)()
 }
 

@@ -23,6 +23,7 @@
   },
   "scripts": {
     "build": "bun scripts/prod.ts build",
+    "deploy": "bun scripts/deploy/mesh.ts",
     "dev": "bun --env-file=.env scripts/dev.ts",
     "dev:web": "bun --env-file=.env scripts/dev.ts --filter=!desktop",
     "dev:tui": "bun scripts/tui.ts",

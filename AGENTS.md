@@ -201,14 +201,14 @@ Interaction treatments are utilities, not strings to copy:
 
 - Every change ships to the mesh once it is done, so a production build is always available to look at. Treat the deploy as the last step of the task, not an extra.
 - The mesh is a plain local deployment. Mesh (`mesh serve`) publishes a port on this machine to the owner's Tailscale network, so the production build is reachable from their own devices at `https://omarchy.mesh.shaulavo.dev/platform`. Nothing is public. This is the deployment until a packaged release exists, and it may stay the deployment.
-- Two routes, two `systemd --user` services on omarchy:
-  - `/platform` → port 3300, `platform-web-prod.service`, a Vite preview of `/work/platform-production/current-web`. `current-web` is a symlink into `/work/platform-production/releases/<UTC stamp>-<commit>-<slug>/web`.
-  - `/platform-api` → port 3301, `platform-prod.service`, running `apps/server/dist/index.js` straight from this checkout.
-- Web deploy, from `apps/web`: `bunx tsgo --build`, then `VITE_SERVER_URL=https://omarchy.mesh.shaulavo.dev/platform-api NODE_ENV=production BUN_ENV=production bun --env-file=../../.env vite build --base /platform/ --outDir <release>/web`. Write `build-config.json` and `web-build.log` next to `web/` like the earlier releases. Check the candidate's `index.html` carries the `platform-api` server URL and `/platform/assets/` paths, then swap the symlink (`ln -sfn` + `mv -T`) and `systemctl --user restart platform-web-prod.service`.
-- Server deploy: `bun run --cwd apps/server build`, then `systemctl --user restart platform-prod.service`. Only when the server changed — a restart drops every live terminal and agent session.
+- One route, one `systemd --user` service, one process: `/platform` → port 3301, `platform-prod.service`, running `/work/platform-production/current/server/index.js`, which serves the API and the built web from `current/web`. `current` is a symlink into `/work/platform-production/releases/<UTC stamp>-<commit>-<slug>/`, and every release holds `web/`, `server/`, `build-config.json`, the build logs and the live check output.
+- Deploy with `bun run deploy` from the checkout. It builds the web, reuses the running server bundle, verifies the candidate (index.html paths, the wasm artifact, and a boot of the candidate server on a spare port), swaps `current`, and runs the headless live check through the mesh URL. No restart, so live terminal and agent sessions survive.
+- Server changes need `bun run deploy --server`, which also builds the server and restarts the unit. A restart drops every live terminal and agent session, so do not pass it for web-only work. `--slug=<name>` names the release (default: the branch), `--reason=<text>` is recorded, `--rollback` moves `current` back to the previous release.
+- The page derives its API address from its own URL, so the build carries no server URL. `VITE_SERVER_URL` is a development-only override.
+- `GET /platform/release` reports the served release name, commit and dirty-file count, plus the release the running server bundle came from. That is how "did it land" is answered.
+- The procedure lives in `scripts/deploy/`: `mesh.ts` (the command), `live-check.mjs` (the browser check, run by the command; a failure the previous release already had is reported but does not fail the deploy), and `systemd/platform-prod.service` (the unit template, rendered and installed by the command). The mesh route itself is set up once by hand: `mesh serve omarchy 3301 --at /platform --isolate`.
 - `ghostty-webgpu` is a `link:` to `/work/projects/ghostty-webgpu`. A change there needs `bun run build` in that repo before the web build picks it up.
-- Verify through the mesh URL, not localhost: the served `index.html` names the new asset, the asset contains the change, and the headless check from an earlier release (`verify-web.mjs live`) reports no page or console errors.
-- [Plan 105](plans/105-one-server-mesh-deployment.md) turns this into `bun run deploy` and one server behind one route. Until it lands, the steps above are the procedure.
+- A release's `server/node_modules` is a symlink to the checkout's `apps/server/node_modules`: the bundle resolves language servers and its external packages at runtime. Rolling back a release does not roll back a `bun install`.
 
 ## Testing
 

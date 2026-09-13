@@ -1,123 +1,51 @@
 import { existsSync } from 'node:fs'
 import path from 'node:path'
-import { allowedOriginsForWebPort, portFromEnv, runtimeUrl } from './runtime-network'
+import { portFromEnv, runtimeUrl } from './runtime-network'
 import { createScriptError } from './structured-errors'
 
 type Mode = 'all' | 'build' | 'start'
-type ChildProcess = ReturnType<typeof Bun.spawn>
-
-type ProdConfig = {
-  allowedOrigins: string
-  buildEnv: Record<string, string | undefined>
-  serverEnv: Record<string, string | undefined>
-  serverHost: string
-  serverPort: number
-  serverUrl: string
-  webEnv: Record<string, string | undefined>
-  webHost: string
-  webPort: number
-  webUrl: string
-}
 
 const root = path.resolve(import.meta.dirname, '..')
+const webRoot = path.join(root, 'apps/web/dist')
+const serverBundle = path.join(root, 'apps/server/dist/index.js')
+const productionEnv = { ...Bun.env, BUN_ENV: 'production', NODE_ENV: 'production' }
 
 try {
   await main()
 } catch (error) {
-  console.error(errorMessage(error))
+  console.error(error instanceof Error ? error.message : String(error))
   process.exit(1)
 }
 
 async function main() {
   const mode = parseMode(Bun.argv[2])
-  const config = readProdConfig()
-
-  if (mode === 'build') {
-    await buildProd(config)
-    return
-  }
-
-  if (mode === 'start') {
-    await startProd(config)
-    return
-  }
-
-  await buildProd(config)
-  await startProd(config)
+  if (mode !== 'start') await buildProd()
+  if (mode !== 'build') await startProd()
 }
 
-async function buildProd(config: ProdConfig) {
-  printBuildSummary(config)
-  const code = await runCommand('build', ['bun', 'run', 'turbo', 'build'], root, config.buildEnv)
+async function buildProd() {
+  console.log('[prod] Building production artifacts')
+  const code = await runCommand('build', ['bun', 'run', 'turbo', 'build'], productionEnv)
   if (code === 0) return
 
   process.exit(code)
 }
 
-async function startProd(config: ProdConfig) {
-  ensureBuildArtifact('server', 'apps/server/dist/index.js')
-  ensureBuildArtifact('client', 'apps/web/dist/index.html')
-  printStartSummary(config)
+// One server serves the page and the API; the page derives the API address from its own URL.
+async function startProd() {
+  ensureBuildArtifact('server', serverBundle)
+  ensureBuildArtifact('client', path.join(webRoot, 'index.html'))
+  const host = Bun.env.FS_HOST ?? Bun.env.HOST ?? '127.0.0.1'
+  const port = portFromEnv(Bun.env, 'PORT', 3001)
+  console.log(`[prod] Platform: ${runtimeUrl(host, port)}`)
 
-  const children = [
-    spawnProcess('server', ['bun', 'apps/server/dist/index.js'], root, config.serverEnv),
-    spawnProcess(
-      'client',
-      [
-        'bun',
-        'run',
-        '--cwd',
-        path.join(root, 'apps/web'),
-        'preview',
-        '--host',
-        config.webHost,
-        '--port',
-        String(config.webPort),
-        '--strictPort',
-      ],
-      root,
-      config.webEnv,
-    ),
-  ]
-
-  installSignalHandlers(children)
-  const exitCode = await Promise.race(children.map(waitForExit))
-  await stopProcesses(children)
-  process.exit(exitCode)
-}
-
-function readProdConfig(): ProdConfig {
-  const serverHost = Bun.env.FS_HOST ?? Bun.env.HOST ?? '127.0.0.1'
-  const webHost = Bun.env.WEB_HOST ?? '127.0.0.1'
-  const serverPort = portFromEnv(Bun.env, 'PORT', 3001)
-  const webPort = portFromEnv(Bun.env, 'WEB_PORT', 3000)
-  const serverUrl = Bun.env.VITE_SERVER_URL ?? runtimeUrl(serverHost, serverPort)
-  const webUrl = runtimeUrl(webHost, webPort)
-  const allowedOrigins = allowedOriginsForWebPort(Bun.env.SERVER_ALLOWED_ORIGINS, webHost, webPort)
-
-  const buildEnv = {
-    ...Bun.env,
-    BUN_ENV: 'production',
-    NODE_ENV: 'production',
-    VITE_SERVER_URL: serverUrl,
-  }
-
-  return {
-    allowedOrigins,
-    buildEnv,
-    serverEnv: {
-      ...buildEnv,
-      PORT: String(serverPort),
-      SERVER_ALLOWED_ORIGINS: allowedOrigins,
-    },
-    serverHost,
-    serverPort,
-    serverUrl,
-    webEnv: buildEnv,
-    webHost,
-    webPort,
-    webUrl,
-  }
+  const child = spawnProcess('server', ['bun', serverBundle], {
+    ...productionEnv,
+    PORT: String(port),
+    WEB_ROOT: webRoot,
+  })
+  installSignalHandlers(child)
+  process.exit(await child.exited)
 }
 
 function parseMode(value: string | undefined): Mode {
@@ -127,81 +55,33 @@ function parseMode(value: string | undefined): Mode {
   throw createScriptError(`Unknown production mode "${value}". Use build, start, or all.`)
 }
 
-function ensureBuildArtifact(label: string, relativePath: string) {
-  const artifactPath = path.join(root, relativePath)
+function ensureBuildArtifact(label: string, artifactPath: string) {
   if (existsSync(artifactPath)) return
 
   throw createScriptError(
-    `Missing ${label} production artifact at ${relativePath}. ` +
+    `Missing ${label} production artifact at ${path.relative(root, artifactPath)}. ` +
       'Run `bun run build` first, or use `bun run prod`.',
   )
 }
 
-function printBuildSummary(config: ProdConfig) {
-  console.log('[prod] Building production artifacts')
-  console.log(`[prod] Client API URL: ${config.serverUrl}`)
-}
-
-function printStartSummary(config: ProdConfig) {
-  console.log('[prod] Starting production app')
-  console.log(`[prod] Client: ${config.webUrl}`)
-  console.log(`[prod] Server: ${runtimeUrl(config.serverHost, config.serverPort)}`)
-  console.log(`[prod] Server allowed origins: ${config.allowedOrigins}`)
-}
-
-function spawnProcess(
-  name: string,
-  command: string[],
-  cwd: string,
-  env: Record<string, string | undefined>,
-) {
+function spawnProcess(name: string, command: string[], env: Record<string, string | undefined>) {
   console.log(`[prod] ${name}: ${command.join(' ')}`)
-  return Bun.spawn({
-    cmd: command,
-    cwd,
-    env,
-    stderr: 'inherit',
-    stdout: 'inherit',
-  })
+  return Bun.spawn({ cmd: command, cwd: root, env, stderr: 'inherit', stdout: 'inherit' })
 }
 
 async function runCommand(
   name: string,
   command: string[],
-  cwd: string,
   env: Record<string, string | undefined>,
 ) {
-  const child = spawnProcess(name, command, cwd, env)
-  return await child.exited
+  return await spawnProcess(name, command, env).exited
 }
 
-async function waitForExit(child: ChildProcess) {
-  return await child.exited
-}
-
-function installSignalHandlers(children: ChildProcess[]) {
-  let stopping = false
-  const stop = () => {
-    if (stopping) return
-
-    stopping = true
-    void stopProcesses(children)
+function installSignalHandlers(child: ReturnType<typeof Bun.spawn>) {
+  const stop = (signal: NodeJS.Signals) => {
+    child.kill(signal)
   }
 
-  process.on('SIGINT', stop)
-  process.on('SIGTERM', stop)
-}
-
-async function stopProcesses(children: ChildProcess[]) {
-  for (const child of children) {
-    child.kill()
-  }
-
-  await Promise.allSettled(children.map(waitForExit))
-}
-
-function errorMessage(error: unknown) {
-  if (error instanceof Error) return error.message
-
-  return String(error)
+  process.once('SIGINT', stop)
+  process.once('SIGTERM', stop)
 }

@@ -1,6 +1,6 @@
 # One server and a one-command mesh deployment
 
-Status: proposed, implementation not started. Requested 2026-09-12.
+Status: implemented 2026-09-13 (phases 1–3). Phase 4 stays open on the mesh side. Requested 2026-09-12.
 
 Every change ships to the mesh so a production build is always viewable from the owner's own devices ([AGENTS.md § Deployment](../AGENTS.md#deployment-the-mesh)). Today that deploy is a hand-run procedure that was reconstructed from old release directories and systemd unit files, and it takes two processes, two ports, two mesh routes, and a build-time API URL to serve one application. This plan makes the deploy one command and the served application one server.
 
@@ -31,6 +31,14 @@ It promotes the "One server owns the application" section of the [deployment des
 | D8 — the route prefix stays for now       | The app keeps being served under `/platform` on the per-host mesh name, so the build keeps `--base /platform/` and D2 must include the base path in the derived address. Removing the prefix depends on a mesh feature (Phase 4).                                                                                                                                                         |
 | D9 — mesh gets no deploy verb             | Mesh decision [D22](../../mesh/docs/plan/01-decisions.md) says serving is exposure, not deployment: no build, version, or promote step and never a `mesh deploy`. Release directories, the `current` swap, and health checks belong to this repository's deploy script. A mesh-side release primitive is rejected.                                                                        |
 | D10 — cross-origin isolation is preserved | The mesh route keeps `--isolate`. The proxy sets the isolation headers on the way back, so the server does not need to. A later direct-port or static path must send them itself.                                                                                                                                                                                                         |
+
+## Implementation notes (2026-09-13)
+
+- Phases 1–3 landed together as `bun run deploy` (`scripts/deploy/mesh.ts`), `apps/server/src/web/` (static contract, `GET /release`), and the origin-derived API address in `client.ts` and `index.html`. The default path is web-only with no restart; `--server` builds and restarts.
+- Elysia applies later parent hooks to a plugin mounted after any earlier parent hook, so the web routes are mounted before every `onBeforeHandle` in `app.ts` to stay in front of the auth guard.
+- The server bundle resolves language servers and its `--external` packages at runtime relative to its own path, so a release's `server/node_modules` symlinks to the checkout's `apps/server/node_modules`. Releases are frozen bundles, not frozen dependency trees.
+- The candidate check boots the candidate server on a spare port with throwaway state (`FS_METADATA_DB`, settings, logs) and reads `/release`, the page, its entry script, and a guarded `/health` before the swap.
+- The browser test through the packaged bundle described under verification boundaries was not written; the in-process route test (`apps/server/src/web/tests/routes.test.ts`) covers the static contract and the origin guard, and the live check covers the packaged page on every deploy.
 
 ## Phase 1 — the deploy command
 

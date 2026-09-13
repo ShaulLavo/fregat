@@ -1,6 +1,7 @@
 import { homedir } from 'node:os'
 import path from 'node:path'
 import { closeApp, createApp } from './app'
+import { DEFAULT_ALLOWED_ORIGINS } from './auth'
 import { getDefaultPlatformDatabase } from './db/client'
 import { readEnvironmentIdentity } from './db/environment-identity'
 import {
@@ -14,6 +15,7 @@ import {
 } from './observability'
 import { defaultSecretsFilePath, defaultSettingsFilePath } from './settings/paths'
 import { settingsPolicyFromEnv } from './settings/policy'
+import { releaseFileFor } from './web/release'
 
 const port = Number(Bun.env.PORT ?? 3001)
 const hostname = Bun.env.FS_HOST ?? Bun.env.HOST ?? '127.0.0.1'
@@ -22,7 +24,13 @@ const systemRoot = Bun.env.FS_SYSTEM_ROOT ?? path.parse(homeDirectory).root
 const configuredWorkspaceRoot = Bun.env.FS_WORKSPACE_ROOT
 const workspaceRoot = configuredWorkspaceRoot ?? systemRoot
 const watch = Bun.env.FS_WATCH !== 'false'
-const allowedOrigins = allowedOriginsFromEnv(Bun.env.SERVER_ALLOWED_ORIGINS)
+const webRoot = Bun.env.WEB_ROOT
+const configuredOrigins = allowedOriginsFromEnv(Bun.env.SERVER_ALLOWED_ORIGINS)
+// The server serves the page itself, so its own loopback address is a web origin.
+const allowedOrigins = unique([
+  ...(configuredOrigins ?? DEFAULT_ALLOWED_ORIGINS),
+  ...loopbackOrigins(hostname, port),
+])
 const maxTextFileBytes = numberFromEnv(Bun.env.FS_DEV_MAX_TEXT_FILE_BYTES)
 const treeConcurrency = numberFromEnv(Bun.env.FS_TREE_CONCURRENCY)
 let serverShutdown: Promise<void> | null = null
@@ -45,6 +53,8 @@ export const app = createApp({
   systemRoot,
   treeConcurrency,
   watch,
+  web: { root: webRoot, serverReleaseFile: releaseFileFor(import.meta.dirname) },
+  webOrigin: configuredOrigins?.[0] ?? loopbackOrigins(hostname, port)[0],
   workspaceRoot: configuredWorkspaceRoot,
 }).listen({ hostname, port }, (server) => {
   recordProcessInfo('server.start', {
@@ -53,6 +63,7 @@ export const app = createApp({
     hostname: server.hostname,
     port: server.port,
     systemRoot,
+    webRoot: webRoot ?? null,
     workspaceRoot,
   })
 })
@@ -133,6 +144,15 @@ function allowedOriginsFromEnv(value: string | undefined) {
     .map((origin) => origin.trim())
     .filter(Boolean)
   return origins.length > 0 ? origins : undefined
+}
+
+function loopbackOrigins(host: string, port: number) {
+  const hosts = host === '::1' ? ['[::1]'] : ['localhost', '127.0.0.1']
+  return hosts.map((name) => `http://${name}:${port}`)
+}
+
+function unique(values: readonly string[]) {
+  return Array.from(new Set(values))
 }
 
 function numberFromEnv(value: string | undefined) {
