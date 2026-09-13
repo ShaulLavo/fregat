@@ -8,7 +8,7 @@ import { TestEditorStateProvider } from '../../../../test/factories/editor-state
 import { AppProviders, createTestQueryClient, seedBootMirrorTheme } from '../../../../test/render'
 import { AssistantMarkdown } from '../components/assistant-markdown'
 import { ChatWorkspaceRootContext } from '../providers/workspace-root-context'
-import { loadedMermaidPlugin, setMermaidPluginLoader } from '../state/mermaid-plugin'
+import { loadedMermaid, setMermaidLoader } from '../state/mermaid'
 
 const DIAGRAM = 'A graph:\n\n```mermaid\ngraph TD\n  A[Start] --> B[End]\n```\n'
 
@@ -32,7 +32,7 @@ afterEach(() => {
   document.body.innerHTML = ''
   queryClient.clear()
   localStorage.clear()
-  setMermaidPluginLoader(null)
+  setMermaidLoader(null)
 })
 
 function renderDiagram(streaming: boolean) {
@@ -50,11 +50,11 @@ function renderDiagram(streaming: boolean) {
 }
 
 function mermaidCodeBlock() {
-  return document.querySelector('[data-streamdown="code-block"][data-language="mermaid"]')
+  return document.querySelector('[data-markdown="code-block"][data-language="mermaid"]')
 }
 
 function mermaidDiagram() {
-  return document.querySelector('[data-streamdown="mermaid-block"] svg')
+  return document.querySelector('[data-markdown="mermaid-block"] svg')
 }
 
 describe('mermaid fences', () => {
@@ -65,18 +65,18 @@ describe('mermaid fences', () => {
     // Give a wrongly-triggered load time to land before asserting it did not.
     await new Promise((resolve) => setTimeout(resolve, 200))
     expect(mermaidDiagram()).toBeNull()
-    expect(loadedMermaidPlugin()).toBeNull()
+    expect(loadedMermaid()).toBeNull()
 
     renderDiagram(false)
 
-    await vi.waitFor(() => expect(loadedMermaidPlugin()).not.toBeNull(), { timeout: 15_000 })
+    await vi.waitFor(() => expect(loadedMermaid()).not.toBeNull(), { timeout: 15_000 })
     await vi.waitFor(() => expect(mermaidDiagram()).not.toBeNull(), { timeout: 10_000 })
     expect(mermaidCodeBlock()).toBeNull()
-    expect(loadedMermaidPlugin()).not.toBeNull()
+    expect(loadedMermaid()).not.toBeNull()
   }, 30_000)
 
   it('keeps the code block when the plugin fails to load', async () => {
-    setMermaidPluginLoader(() => Promise.reject(new Error('offline')))
+    setMermaidLoader(() => Promise.reject(new Error('offline')))
 
     renderDiagram(false)
 
@@ -84,6 +84,6 @@ describe('mermaid fences', () => {
     await new Promise((resolve) => setTimeout(resolve, 200))
     expect(mermaidCodeBlock()).not.toBeNull()
     expect(mermaidDiagram()).toBeNull()
-    expect(loadedMermaidPlugin()).toBeNull()
+    expect(loadedMermaid()).toBeNull()
   })
 })

@@ -1,16 +1,13 @@
-import type { HighlightResult } from '@streamdown/code'
 import { use, useEffect, useState } from 'react'
+import type { TokensResult } from 'shiki/core'
 
-import { MarkdownCodeHighlighterContext } from '@/features/chat/providers/markdown-code-highlighter-context'
-import {
-  estimateHighlightBytes,
-  markdownHighlightCacheKey,
-} from '@/features/chat/utils/markdown-highlight'
-import { markdownHighlightCache } from '@/features/chat/state/markdown-highlight-cache'
+import { CodeHighlighterContext } from '../providers/code-highlighter-context'
+import { highlightCache } from '../state/highlight-cache'
+import { estimateHighlightBytes, highlightCacheKey } from '../utils/highlight'
 
 type HighlightState = {
   readonly key: string
-  readonly result: HighlightResult
+  readonly result: TokensResult
 }
 
 /**
@@ -26,29 +23,29 @@ export function useHighlightedCode({
   readonly cacheable: boolean
   readonly code: string
   readonly language: string
-}): HighlightResult | null {
-  const highlighter = use(MarkdownCodeHighlighterContext)
+}): TokensResult | null {
+  const highlighter = use(CodeHighlighterContext)
   const [highlighted, setHighlighted] = useState<HighlightState | null>(null)
   const key = highlighter
-    ? markdownHighlightCacheKey({ code, language, themeKey: highlighter.themeKey })
+    ? highlightCacheKey({ code, language, themeKey: highlighter.themeKey })
     : ''
-  const cached = cacheable && code.length > 0 ? markdownHighlightCache.get(key) : null
+  const cached = cacheable && code.length > 0 ? highlightCache.get(key) : null
 
   useEffect(() => {
     if (!highlighter) return
     if (code.length === 0) return
-    if (cacheable && markdownHighlightCache.get(key)) return
+    if (cacheable && highlightCache.get(key)) return
 
     let active = true
-    const accept = (result: HighlightResult) => {
-      if (cacheable) markdownHighlightCache.set(key, result, estimateHighlightBytes(result))
+    const accept = (result: TokensResult) => {
+      if (cacheable) highlightCache.set(key, result, estimateHighlightBytes(result))
       if (!active) return
 
       setHighlighted({ key, result })
     }
 
     // A loaded grammar answers synchronously and never calls back; an unloaded
-    // one returns null now and calls back once shiki has it.
+    // one returns null now and calls back once the grammar is in.
     const immediate = highlighter.highlight({ code, language }, accept)
     if (immediate) accept(immediate)
 

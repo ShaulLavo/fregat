@@ -18,7 +18,7 @@ export function AssistantMarkdownStrong({
   void node
 
   return (
-    <strong className={cn('font-semibold', className)} data-streamdown='strong' {...props}>
+    <strong className={cn('font-semibold', className)} data-markdown='strong' {...props}>
       {children}
     </strong>
   )

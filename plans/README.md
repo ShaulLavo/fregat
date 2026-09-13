@@ -33,9 +33,9 @@ a bare root `bun run verify`.
 | [103 — loading, empty and error states](103-loading-empty-error-states.md)      | **PROPOSED — DECISIONS D4 AND D6 NEED CONFIRMATION** |
 | [104 — theme standardization](104-theme-standardization.md)                     | **PROPOSED — IMPLEMENTATION NOT STARTED**            |
 | [105 — one server and mesh deployment](105-one-server-mesh-deployment.md)       | **PROPOSED — PHASE 1 READY TO IMPLEMENT**            |
-| [106 — first-load weight](106-boot-weight.md)                                   | **PROPOSED — NO DEPENDENCIES**                       |
-| [107 — a markdown package we own](107-workspace-markdown.md)                    | **PROPOSED — DEPENDS ON 106 FOR MEASUREMENT**        |
-| [108 — two markdown modes](108-markdown-modes.md)                               | **PROPOSED — PHASE 1 NEEDS 107; PHASE 2 NEEDS 111**  |
+| [106 — first-load weight](106-boot-weight.md)                                   | **IMPLEMENTED 2026-09-13**                           |
+| [107 — a markdown package we own](107-workspace-markdown.md)                    | **IMPLEMENTED 2026-09-13**                           |
+| [108 — two markdown modes](108-markdown-modes.md)                               | **PROPOSED — PHASE 1 READY; PHASE 2 NEEDS 111**      |
 | [109 — boot boundaries and gate](109-boot-boundaries.md)                        | **PROPOSED — DEPENDS ON 106; SCHEDULED AFTER 108**   |
 | [110 — workspace indexing](110-workspace-indexing.md)                           | **RESEARCH — NO IMPLEMENTATION SCOPE YET**           |
 | [111 — editor decorations](111-editor-decorations.md)                           | **RESEARCH — NO IMPLEMENTATION SCOPE YET**           |

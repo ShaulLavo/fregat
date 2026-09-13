@@ -1,5 +1,4 @@
-import type { HighlightResult } from '@streamdown/code'
-import { fnv1a32 } from '@workspace/client-core/address/path-hash'
+import type { TokensResult } from 'shiki/core'
 
 /** Rough per-token overhead: content string plus the style/attr objects around it. */
 const TOKEN_OVERHEAD_BYTES = 96
@@ -8,7 +7,7 @@ const TOKEN_OVERHEAD_BYTES = 96
  * The cache key never holds the code itself — a hash plus the length keeps keys
  * small while making a collision require both a hash match and an equal length.
  */
-export function markdownHighlightCacheKey({
+export function highlightCacheKey({
   code,
   language,
   themeKey,
@@ -17,10 +16,10 @@ export function markdownHighlightCacheKey({
   readonly language: string
   readonly themeKey: string
 }) {
-  return `${themeKey}:${language}:${code.length}:${(fnv1a32(code) >>> 0).toString(36)}`
+  return `${themeKey}:${language}:${code.length}:${fnv1a32(code).toString(36)}`
 }
 
-export function estimateHighlightBytes(result: HighlightResult) {
+export function estimateHighlightBytes(result: TokensResult) {
   let bytes = 0
   for (const line of result.tokens) {
     bytes += TOKEN_OVERHEAD_BYTES
@@ -43,4 +42,14 @@ export function completedCodePrefix(code: string) {
   if (lastNewline < 0) return { highlightable: '', trailing: code }
 
   return { highlightable: code.slice(0, lastNewline), trailing: code.slice(lastNewline + 1) }
+}
+
+function fnv1a32(value: string): number {
+  let hash = 0x811c9dc5
+  for (let index = 0; index < value.length; index += 1) {
+    hash ^= value.charCodeAt(index)
+    hash = Math.imul(hash, 0x01000193)
+  }
+
+  return hash >>> 0
 }

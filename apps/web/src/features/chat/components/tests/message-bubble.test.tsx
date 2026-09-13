@@ -26,7 +26,7 @@ test('a user message renders markdown instead of raw text', () => {
     }),
   )
 
-  expect(container.querySelector('[data-streamdown="code-block"]')).not.toBeNull()
+  expect(container.querySelector('[data-markdown="code-block"]')).not.toBeNull()
   expect(container.querySelector('ul')).not.toBeNull()
   expect(container.textContent).not.toContain('```')
 })

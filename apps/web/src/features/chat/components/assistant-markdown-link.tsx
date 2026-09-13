@@ -58,7 +58,7 @@ export function AssistantMarkdownLink({
         className,
       )}
       data-chat-link-host={host ?? undefined}
-      data-streamdown='link'
+      data-markdown='link'
       href={href}
       rel={host ? 'noopener noreferrer' : rel}
       target={host ? '_blank' : target}

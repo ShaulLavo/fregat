@@ -13,9 +13,8 @@ type MarkdownAstNode = {
 
 /**
  * `[foo](src/foo.ts)` is rewritten to the inline-code form of the same
- * reference so both syntaxes render through one chip. It has to happen in
- * remark: Streamdown hardens hrefs on the hast, which blanks bare relative
- * destinations and rewrites `./x` to `/x` before any component sees them.
+ * reference so both syntaxes render through one chip. It happens in remark so
+ * the destination is still the author's text, before sanitization touches it.
  */
 export function remarkFileLinkChips({ rootPath }: { rootPath: string | null }) {
   return (tree: MarkdownAstNode) => {

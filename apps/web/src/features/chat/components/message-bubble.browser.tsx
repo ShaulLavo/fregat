@@ -78,12 +78,12 @@ describe('MessageBubble browser rendering', () => {
     })
 
     await vi.waitFor(() => {
-      expect(streamdownCodeBlock()?.dataset.incomplete).toBe('true')
-      expect(streamdownCodeText()).toContain('<!doctype html>')
+      expect(markdownCodeBlock()?.dataset.incomplete).toBe('true')
+      expect(markdownCodeText()).toContain('<!doctype html>')
       // Completed lines are coloured immediately; only the half-typed trailing
       // line stays plain until its newline lands.
-      expect(streamdownTokenSpans().length).toBeGreaterThan(0)
-      expect(streamdownCodeText()).toContain('<html')
+      expect(markdownTokenSpans().length).toBeGreaterThan(0)
+      expect(markdownCodeText()).toContain('<html')
     })
   })
 
@@ -103,24 +103,24 @@ describe('MessageBubble browser rendering', () => {
 
     await vi.waitFor(
       () => {
-        const palette = streamdownCodePalette()
-        if (!palette) throw new Error('Streamdown code tokens did not render')
+        const palette = markdownCodePalette()
+        if (!palette) throw new Error('Markdown code tokens did not render')
 
-        expect(streamdownCodeLanguage()).toBe('html')
-        expect(streamdownCodeText()).toContain('<!doctype html>')
-        expect(streamdownCodeText()).toContain('--bg')
-        expect(streamdownCodeBlockStyle()?.backgroundColor).toBe('rgba(0, 0, 0, 0)')
-        expect(streamdownCodeBlockStyle()?.borderTopWidth).toBe('0px')
-        expect(streamdownCodeBlockBodyStyle()?.borderTopWidth).toBe('0px')
+        expect(markdownCodeLanguage()).toBe('html')
+        expect(markdownCodeText()).toContain('<!doctype html>')
+        expect(markdownCodeText()).toContain('--bg')
+        expect(markdownCodeBlockStyle()?.backgroundColor).toBe('rgba(0, 0, 0, 0)')
+        expect(markdownCodeBlockStyle()?.borderTopWidth).toBe('0px')
+        expect(markdownCodeBlockBodyStyle()?.borderTopWidth).toBe('0px')
         expect(palette.tokenCount).toBeGreaterThan(4)
         expect(palette.colors.size).toBeGreaterThan(2)
         expect(EXPECTED_DARK_EDITOR_COLORS.some((color) => palette.colors.has(color))).toBe(true)
-        expect(streamdownTokenColor((text) => text.trim() === 'head')).toBe(
+        expect(markdownTokenColor((text) => text.trim() === 'head')).toBe(
           EXPECTED_DARK_EDITOR_TYPE_COLOR,
         )
         // The custom property and its colon are separate tokens, so match the
         // property alone — no span ever holds `--bg:`.
-        expect(streamdownTokenColor((text) => text.trim() === '--bg')).toBe(
+        expect(markdownTokenColor((text) => text.trim() === '--bg')).toBe(
           EXPECTED_DARK_EDITOR_PROPERTY_COLOR,
         )
       },
@@ -424,26 +424,26 @@ const assistantChangedFilesSummary = {
   turnId: 'turn-browser',
 } as ChatTurnDiffSummary
 
-function streamdownCodeLanguage() {
+function markdownCodeLanguage() {
   return document
-    .querySelector('[data-streamdown="code-block-header"]')
+    .querySelector('[data-markdown="code-block-header"]')
     ?.textContent?.trim()
     .toLowerCase()
 }
 
-function streamdownCodeText() {
-  return document.querySelector('[data-streamdown="code-block-body"]')?.textContent ?? ''
+function markdownCodeText() {
+  return document.querySelector('[data-markdown="code-block-body"]')?.textContent ?? ''
 }
 
-function streamdownCodeBlockStyle() {
-  const codeBlock = streamdownCodeBlock()
+function markdownCodeBlockStyle() {
+  const codeBlock = markdownCodeBlock()
   if (!(codeBlock instanceof HTMLElement)) return null
 
   return getComputedStyle(codeBlock)
 }
 
-function streamdownCodeBlock() {
-  const codeBlock = document.querySelector('[data-streamdown="code-block"]')
+function markdownCodeBlock() {
+  const codeBlock = document.querySelector('[data-markdown="code-block"]')
   if (!(codeBlock instanceof HTMLElement)) return null
 
   return codeBlock
@@ -498,15 +498,15 @@ function revertButton() {
   return button
 }
 
-function streamdownCodeBlockBodyStyle() {
-  const codeBlockBody = document.querySelector('[data-streamdown="code-block-body"]')
+function markdownCodeBlockBodyStyle() {
+  const codeBlockBody = document.querySelector('[data-markdown="code-block-body"]')
   if (!(codeBlockBody instanceof HTMLElement)) return null
 
   return getComputedStyle(codeBlockBody)
 }
 
-function streamdownCodePalette() {
-  const tokenSpans = streamdownTokenSpans()
+function markdownCodePalette() {
+  const tokenSpans = markdownTokenSpans()
   if (tokenSpans.length === 0) return null
 
   const colors = new Set(tokenSpans.map((span) => getComputedStyle(span).color).filter(Boolean))
@@ -517,20 +517,21 @@ function streamdownCodePalette() {
   }
 }
 
-function streamdownTokenColor(predicate: (text: string) => boolean) {
-  const tokenSpan = streamdownTokenSpans().find((span) => predicate(span.textContent ?? ''))
+function markdownTokenColor(predicate: (text: string) => boolean) {
+  const tokenSpan = markdownTokenSpans().find((span) => predicate(span.textContent ?? ''))
   return tokenSpan ? getComputedStyle(tokenSpan).color : null
 }
 
-function streamdownTokenSpans() {
-  const codeBlock = document.querySelector('[data-streamdown="code-block-body"]')
+function markdownTokenSpans() {
+  const codeBlock = document.querySelector('[data-markdown="code-block-body"]')
   if (!(codeBlock instanceof HTMLElement)) return []
 
-  return Array.from(codeBlock.querySelectorAll('span')).filter(isStreamdownTokenSpan)
+  return Array.from(codeBlock.querySelectorAll('span')).filter(isTokenSpan)
 }
 
-function isStreamdownTokenSpan(element: Element): element is HTMLElement {
+function isTokenSpan(element: Element): element is HTMLElement {
   return (
-    element instanceof HTMLElement && element.style.getPropertyValue('--sdm-c').trim().length > 0
+    element instanceof HTMLElement &&
+    element.style.getPropertyValue('--code-token-color').trim().length > 0
   )
 }

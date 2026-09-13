@@ -1,6 +1,6 @@
 # A markdown package we own
 
-Status: proposed, implementation not started. Requested 2026-09-13.
+Status: implemented 2026-09-13. `@workspace/markdown` renders chat; streamdown and its four plugins are gone. First-load JS went from 2292 KB to 2120 KB gz, `shiki` resolves to 4.4.3 only, and duplicated chunk basenames fell from 123 to 3 (the remainder are mermaid's own d3 forks, all lazy). See [Outcome](#outcome).
 
 Chat markdown is rendered by [streamdown](https://github.com/vercel/streamdown), which brings a second complete Shiki installation one major behind the editor's, a lazy map of every grammar and theme Shiki ships, and an eagerly imported Mermaid. This plan replaces it with `@workspace/markdown`: one renderer we own, on our Shiki, serving chat today and the editor's markdown preview ([Plan 108](108-markdown-modes.md)) tomorrow.
 
@@ -89,3 +89,45 @@ Completion: one Shiki in the graph, zero duplicated grammar chunks, chat visuall
 - No new markdown _syntax_. GitHub alerts, wiki links and callouts are Plan 108's question, not this package's.
 - No composer changes. The Lexical question is downstream of Plan 111.
 - No editor-package changes. If LSP hover documentation should move onto this package, that is a follow-up once Phase 1 confirms it can.
+
+## Outcome
+
+Measured with `bun run --cwd apps/web bundle:report` on the same working tree before and after.
+
+| Measure                    | Before           | After                          |
+| -------------------------- | ---------------- | ------------------------------ |
+| First-load JS              | 2292 KB gz       | 2120 KB gz                     |
+| First-load CSS             | 31 KB gz         | 30 KB gz                       |
+| `shiki` in the graph       | 3.23.0 and 4.4.3 | 4.4.3                          |
+| Duplicated chunk basenames | 123              | 3 (mermaid's d3 forks)         |
+| `katex` on first load      | 80 KB gz         | 0, loads on the first `$$`     |
+| `parse5` on first load     | 34 KB gz         | 0, loads on the first raw HTML |
+| `streamdown` + `marked`    | 27 KB gz         | 0                              |
+
+Decisions recorded while implementing:
+
+- **D4 — depend on `remend`.** Apache-2.0, zero dependencies, 36 KB, published standalone, and the
+  edge cases it handles (list markers, escaped sequences, word-internal characters) are exactly the
+  ones a vendored copy would drift on. One behaviour it lacks is guarded in `healMarkdown`: remend
+  appends closers even when the text ends inside an open fence, so healing is skipped then.
+- **Settled blocks, not fence boundaries.** T3 settles only at a closed top-level fence followed by a
+  blank line. This package settles every root node but the last, grouped so that raw HTML left open
+  keeps the following nodes in one block, and bails to a whole-document parse when a definition or
+  footnote appears in the suffix, or a `\r`/BOM could straddle the split. Each settled block keeps its
+  transformed mdast and its rendered React element, so a streamed token costs one block's parse,
+  hast conversion and reconciliation. `session.test.ts` proves every prefix of the corpus parses the
+  same incrementally as from scratch, positions included.
+- **Raw HTML and math are deferred stages**, like mermaid. `rehype-raw` (parse5) and `rehype-katex`
+  load on the first document that contains raw HTML or math; until then raw HTML is dropped by the
+  sanitizer and math stays a code block. Math renders as MathML, so no KaTeX stylesheet ships —
+  streamdown never loaded one either, so `$$` output was already unstyled.
+- **Dropped with streamdown, deliberately:** the per-word fade-in (`animated`) — its keyframes lived
+  in `streamdown/styles.css`, which the app never imported, so it never ran; table copy/download/
+  fullscreen controls and the mermaid pan-zoom toolbar — chat had no tests or design for either.
+  Tables render in a scrolling wrapper; a diagram has a copy button.
+- **One highlighter, lazily built.** `createShikiHighlighter` is one `shiki/core` instance over the
+  full lazy `shiki/langs` map with the JavaScript regex engine, created on the first fence, one
+  grammar loaded per language. Themes are registration objects, so no bundled theme chunk is ever
+  requested.
+- **Second consumer.** LSP hover documentation still renders inside the editor packages; moving it
+  is a follow-up once Plan 108 has exercised the package from the editor side.

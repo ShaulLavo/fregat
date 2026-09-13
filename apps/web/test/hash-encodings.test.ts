@@ -4,7 +4,7 @@ import {
   stablePathHash,
   updateStableHashCode,
 } from '@workspace/client-core/address/path-hash'
-import { markdownHighlightCacheKey } from '@/features/chat/utils/markdown-highlight'
+import { highlightCacheKey } from '@workspace/markdown/utils/highlight'
 import { diffLanguageDocuments } from '@/features/editor/utils/diff-documents'
 import { contentRevisionForText } from '@/features/editor/utils/text-snapshot'
 import { shikiThemeContentHash } from '@/features/editor/utils/theme-content-hash'
@@ -24,9 +24,7 @@ test.each([
     expect(contentRevisionForText(value)).toBe(revision)
     expect(stablePathHash(value)).toBe(pathHash)
     expect(shikiThemeContentHash(value)).toBe(themeHash)
-    expect(markdownHighlightCacheKey({ code: value, language: 'ts', themeKey: 'dark' })).toBe(
-      highlightKey,
-    )
+    expect(highlightCacheKey({ code: value, language: 'ts', themeKey: 'dark' })).toBe(highlightKey)
   },
 )
 

@@ -1,6 +1,7 @@
 import { mkdir, writeFile } from 'node:fs/promises'
 import path from 'node:path'
 import { testTabContent } from '../../../../../test/factories/document-targets'
+import { highlightCache } from '@workspace/markdown/state/highlight-cache'
 import { screen, waitFor } from '@testing-library/react'
 import userEvent from '@testing-library/user-event'
 
@@ -8,7 +9,6 @@ import {
   chatMarkdownClipboardPayload,
   serializeRenderedMarkdownFragment,
 } from '@/features/chat/utils/markdown-clipboard'
-import { markdownHighlightCache } from '@/features/chat/state/markdown-highlight-cache'
 import { expect, test } from '../../../../../test/fixtures'
 import { createMarkdownWorkspace, renderMarkdown } from '../../../../../test/factories/markdown'
 
@@ -150,12 +150,12 @@ test('an over-indented list item renders as a list, not a code block', () => {
   const { container } = renderMarkdown('-       aligned bullet\n-       second bullet\n')
 
   expect(container.querySelector('ul')).not.toBeNull()
-  expect(container.querySelector('[data-streamdown="code-block"]')).toBeNull()
+  expect(container.querySelector('[data-markdown="code-block"]')).toBeNull()
   expect(container.textContent).toContain('aligned bullet')
 })
 
 test('a streaming code block is highlighted but never cached', async () => {
-  markdownHighlightCache.clear()
+  highlightCache.clear()
   const { container } = renderMarkdown('```ts\nconst answer = 42\nconst other =', {
     streaming: true,
   })
@@ -166,12 +166,12 @@ test('a streaming code block is highlighted but never cached', async () => {
     },
     { timeout: 5_000 },
   )
-  expect(markdownHighlightCache.size).toBe(0)
+  expect(highlightCache.size).toBe(0)
   expect(container.textContent).toContain('const other =')
 })
 
 test('a completed code block is highlighted and cached', async () => {
-  markdownHighlightCache.clear()
+  highlightCache.clear()
   const { container } = renderMarkdown('```ts\nconst answer = 42\n```')
 
   await waitFor(
@@ -180,14 +180,14 @@ test('a completed code block is highlighted and cached', async () => {
     },
     { timeout: 5_000 },
   )
-  expect(markdownHighlightCache.size).toBe(1)
-  expect(markdownHighlightCache.totalBytes).toBeGreaterThan(0)
+  expect(highlightCache.size).toBe(1)
+  expect(highlightCache.totalBytes).toBeGreaterThan(0)
 })
 
 test('a fenced block names its language and toggles wrapping on demand', async () => {
   const user = userEvent.setup()
   const { container, getByRole } = renderMarkdown('```ts\nconst answer = 42\n```')
-  const block = container.querySelector('[data-streamdown="code-block"]')
+  const block = container.querySelector('[data-markdown="code-block"]')
 
   expect(header(container)?.textContent).toContain('ts')
   expect(block).toHaveAttribute('data-wrap', 'false')
@@ -259,7 +259,7 @@ test('copying a rendered selection yields markdown, not flattened text', () => {
 })
 
 function header(container: HTMLElement) {
-  return container.querySelector('[data-streamdown="code-block-header"]')
+  return container.querySelector('[data-markdown="code-block-header"]')
 }
 
 /**
@@ -278,5 +278,5 @@ function recordScrollIntoView() {
 }
 
 function highlightTokens(container: HTMLElement) {
-  return container.querySelectorAll('[data-streamdown="code-block-body"] code span span')
+  return container.querySelectorAll('[data-markdown="code-block-body"] code span span')
 }

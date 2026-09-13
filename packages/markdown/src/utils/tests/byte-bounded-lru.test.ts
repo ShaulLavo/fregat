@@ -1,5 +1,6 @@
-import { ByteBoundedLru } from '@/features/chat/utils/byte-bounded-lru'
-import { expect, test } from '../../../../../test/fixtures'
+import { expect, test } from 'vitest'
+
+import { ByteBoundedLru } from '../byte-bounded-lru'
 
 test('entries are evicted once the byte budget is exceeded', () => {
   const cache = new ByteBoundedLru<string>(100, 1_000)

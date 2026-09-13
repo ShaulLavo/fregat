@@ -8,19 +8,17 @@ import {
 import { actionItem, section, type Menu } from '@/keymap/menus/utils/model'
 
 /**
- * Streamdown puts its own copy and download buttons on code and mermaid
- * blocks. Right-clicking inside one should leave that affordance — and the
- * browser's own menu over the code text — alone rather than replace it with
- * the message menu.
+ * Code and mermaid blocks carry their own copy actions. Right-clicking inside
+ * one should leave that affordance — and the browser's own menu over the code
+ * text — alone rather than replace it with the message menu.
  */
-const STREAMDOWN_OWN_MENU_SELECTOR =
-  '[data-streamdown="code-block"],[data-streamdown="mermaid-block"]'
+const BLOCK_OWN_MENU_SELECTOR = '[data-markdown="code-block"],[data-markdown="mermaid-block"]'
 
 export function allowsMessageContextMenu(target: EventTarget | null) {
   if (typeof Element === 'undefined') return true
   if (!(target instanceof Element)) return true
 
-  return target.closest(STREAMDOWN_OWN_MENU_SELECTOR) === null
+  return target.closest(BLOCK_OWN_MENU_SELECTOR) === null
 }
 
 export type ChatMessageMenuContext = {
