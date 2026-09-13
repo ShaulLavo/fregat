@@ -19,6 +19,8 @@ export function preferPortalDialogs(platform: string) {
       returns: FFIType.i32,
     },
   })
-  libc.symbols.setenv(Buffer.from('GTK_USE_PORTAL\0'), Buffer.from('1\0'), 0)
+  // Plain Uint8Arrays: `Buffer` is not a bun-types TypedArray under every @types/node.
+  const cstr = (value: string) => new TextEncoder().encode(`${value}\0`)
+  libc.symbols.setenv(cstr('GTK_USE_PORTAL'), cstr('1'), 0)
   libc.close()
 }
