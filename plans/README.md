@@ -33,6 +33,13 @@ a bare root `bun run verify`.
 | [103 — loading, empty and error states](103-loading-empty-error-states.md)      | **PROPOSED — DECISIONS D4 AND D6 NEED CONFIRMATION** |
 | [104 — theme standardization](104-theme-standardization.md)                     | **PROPOSED — IMPLEMENTATION NOT STARTED**            |
 | [105 — one server and mesh deployment](105-one-server-mesh-deployment.md)       | **PROPOSED — PHASE 1 READY TO IMPLEMENT**            |
+| [106 — first-load weight](106-boot-weight.md)                                   | **PROPOSED — NO DEPENDENCIES**                       |
+| [107 — a markdown package we own](107-workspace-markdown.md)                    | **PROPOSED — DEPENDS ON 106 FOR MEASUREMENT**        |
+| [108 — two markdown modes](108-markdown-modes.md)                               | **PROPOSED — PHASE 1 NEEDS 107; PHASE 2 NEEDS 111**  |
+| [109 — boot boundaries and gate](109-boot-boundaries.md)                        | **PROPOSED — DEPENDS ON 106; SCHEDULED AFTER 108**   |
+| [110 — workspace indexing](110-workspace-indexing.md)                           | **RESEARCH — NO IMPLEMENTATION SCOPE YET**           |
+| [111 — editor decorations](111-editor-decorations.md)                           | **RESEARCH — NO IMPLEMENTATION SCOPE YET**           |
+| [112 — the large-file ceiling](112-large-file-ceiling.md)                       | **RESEARCH — NO IMPLEMENTATION SCOPE YET**           |
 | [094 — client-core web and TUI parity](094-client-core-web-tui-parity.md)       | **PROPOSED — DEPENDS ON 091; 096 COMPLETE**          |
 | [095 — server plumbing](095-server-plumbing.md)                                 | **PROPOSED — IMPLEMENTATION NOT STARTED**            |
 | [073 — Electrobun 2.x migration](073-electrobun-v2-migration.md)                | **PROPOSED — ROOT GO/NO-GO SCHEDULING**              |
@@ -134,6 +141,25 @@ a bare root `bun run verify`.
   Platform owns `FileOpenIntentService`, claim-or-ensure activation before selection publication,
   the one-record visual-only snapshot cache, and the exact `editor-open-benchmark.mjs` gate. Cached
   rows are never document truth, and the typed bus and local UI share one activation transaction.
+
+- Plans 106 through 109 come from the first-load weight review at Platform base `00513340`. The
+  production build sends 2421 KB gzip of JavaScript before the first frame, 2311 KB of it in one
+  chunk, because the application declares almost no loading boundaries — not because of bundler
+  configuration. Plan 106 builds the measurement instrument and lands the two removals that depend
+  on nothing else. Plan 107 replaces streamdown with `@workspace/markdown`, which is what removes
+  the duplicate `shiki@3.23.0` installation that `@streamdown/code` drags in. Plan 108 gives
+  markdown a split view and finishes the live-preview experiment rather than deleting it. Plan 109
+  runs last, because 107 and 108 both move the number a gate would otherwise pin twice. Rolldown is
+  already in use; there is no bundler migration in any of them.
+
+- Plans 110 and 111 are research, not executable work. They sit in this inventory rather than under
+  `docs/` so they stay visible, and each ends in a decision record plus the executable plans it
+  becomes. Plan 110 asks what belongs in a workspace index beyond today's file index in
+  `apps/server/src/fs/workspace-index.ts`; its consumers are Shiki grammar prefetch, Plan 088's
+  semantic retrieval, Plan 108's document graph, and search. Plan 111 compares `@singapor`'s
+  inline-replacement layer against CodeMirror 6 decorations and Lexical's decorator nodes; it gates
+  Plan 108 Phase 2, any later Obsidian mode, and the question of whether the chat composer still
+  needs Lexical.
 
 ## Cleanup policy
 

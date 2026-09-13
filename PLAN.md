@@ -314,6 +314,43 @@ mirror and first-paint path, so whichever lands second reuses the first's owners
 must migrate with the shared settings cutover. This proposal does not reschedule other lanes or
 reopen the dropped Ghostty appearance inheritance work. Native Swift theme UI is outside scope.
 
+## First-load weight and markdown lane
+
+Requested 2026-09-13. Six plans from one review of the production web build. The deployed release
+sends **2421 KB gzip of JavaScript before the first frame**, 2311 KB of it in a single chunk. The
+cause is not bundler configuration — Rolldown is already in use and `apps/web/vite.config.ts` has no
+chunking options because the application declares almost no loading boundaries. Chunk boundaries
+come only from dynamic `import()` in source.
+
+Execution order is strict:
+
+1. [Plan 106](plans/106-boot-weight.md) builds the measurement instrument first, then defers Mermaid
+   off the boot path and replaces the full Phosphor icon font — imported by one line of
+   `packages/editor-find/src/style.css` for eleven glyphs — with inline path data. No dependencies.
+2. [Plan 107](plans/107-workspace-markdown.md) replaces streamdown with `@workspace/markdown`,
+   built on `unified` with termination healing and T3's incremental prefix parse. This is what
+   removes the second complete `shiki@3.23.0` installation that `@streamdown/code` hard-depends on,
+   and with it 123 duplicated grammar and theme chunks.
+3. [Plan 108](plans/108-markdown-modes.md) gives markdown a split view on that package and finishes
+   the existing live-preview experiment rather than deleting it. Phase 1 needs 107; Phase 2 is
+   blocked on 111.
+4. [Plan 109](plans/109-boot-boundaries.md) defines boot, decides where loading boundaries belong
+   from 106's attribution data, and pins a first-load gate. It runs last because 107 and 108 both
+   move the number.
+
+Two research plans feed the lane and are not executable as written:
+[Plan 110](plans/110-workspace-indexing.md) asks what belongs in a workspace index beyond the file
+index that already exists, with Shiki grammar prefetch, Plan 088's semantic retrieval, Plan 108's
+document graph and search as its waiting consumers.
+[Plan 111](plans/111-editor-decorations.md) compares `@singapor`'s inline-replacement layer against
+CodeMirror 6 decorations and Lexical's decorator nodes, and gates Plan 108 Phase 2, any later
+Obsidian mode, and the question of whether the chat composer still needs Lexical.
+
+Coordinate shared editor and chat surfaces with Plans 101–104; do not interleave edits to the same
+files. Plan 085 owns first paint and restoration, which this lane measures but does not change.
+Replacing React with a smaller reimplementation was considered and rejected: React is 60 KB of a
+2421 KB first load, so it is revisited only once it is the largest remaining line item.
+
 ## Verification boundaries
 
 - **Platform-only:** verify the narrow Platform tests/typechecks named by the active plan.
