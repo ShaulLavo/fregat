@@ -21,7 +21,11 @@ import {
 } from '../../../../../test/factories/chat'
 import { useChatProjectionStore, selectChatProjectionSlice } from '../chat-projection-store'
 import { selectChatSessionById } from '@workspace/client-core/chat/selectors'
-import { useChatOptimisticStore } from '../chat-optimistic-store'
+import {
+  chatMessageIntents,
+  createOptimisticMessagesForSessionSelector,
+  resetChatMessageIntents,
+} from '../chat-message-intents'
 
 const OTHER_ENVIRONMENT_ID = v.parse(environmentIdSchema, 'ce20f2c3-d736-407e-90ad-659f702b3565')
 
@@ -53,19 +57,28 @@ test('identical session and checkout IDs stay in their producing environment', (
   store.resetChatProjection()
 })
 
-test('an echoed optimistic message clears only its producing environment', () => {
-  const store = useChatOptimisticStore.getState()
+test('a pending message is scoped to its producing environment', () => {
+  resetChatMessageIntents()
   const message = chatMessage()
   const commandId = v.parse(commandIdSchema, 'collision-command')
-  store.addOptimisticMessage(TEST_ENVIRONMENT_ID, commandId, message)
-  store.addOptimisticMessage(OTHER_ENVIRONMENT_ID, commandId, message)
   const a = { environmentId: TEST_ENVIRONMENT_ID, sessionId: TEST_SESSION_ID }
   const b = { environmentId: OTHER_ENVIRONMENT_ID, sessionId: TEST_SESSION_ID }
-  store.clearResolvedOptimisticMessages(a, [message])
-  const state = useChatOptimisticStore.getState()
-  expect(state.messagesBySessionKey[scopedSessionKey(a)]).toBeUndefined()
-  expect(state.messagesBySessionKey[scopedSessionKey(b)]?.[message.id]).toBeDefined()
-  store.removeOptimisticMessage(b, message.id)
+  const placed = chatMessageIntents.submit({
+    environmentId: TEST_ENVIRONMENT_ID,
+    commandId,
+    message,
+  })
+  chatMessageIntents.submit({ environmentId: OTHER_ENVIRONMENT_ID, commandId, message })
+  const forA = createOptimisticMessagesForSessionSelector(a)
+  const forB = createOptimisticMessagesForSessionSelector(b)
+  expect(forA(chatMessageIntents.getState())).toHaveLength(1)
+  expect(forB(chatMessageIntents.getState())).toHaveLength(1)
+  chatMessageIntents.settleTransport(placed.intent.intentId)
+  chatMessageIntents.acknowledge(placed.intent.intentId)
+  expect(forA(chatMessageIntents.getState())).toHaveLength(0)
+  expect(forB(chatMessageIntents.getState())[0]?.id).toBe(message.id)
+  expect(scopedSessionKey(a)).not.toBe(scopedSessionKey(b))
+  resetChatMessageIntents()
 })
 
 test('inactive environment commands refresh their slice and terminal registration keeps its owner', async ({

@@ -11,6 +11,7 @@ import type { Client } from '../transport/client'
 import {
   activeSettingsIntentsFor,
   discardFailedSettingsIntent,
+  discardSettingsIntent,
   failSettingsIntent,
   retrySettingsIntent,
   settingsIntentStore,
@@ -119,7 +120,7 @@ export class SettingsOwner {
     if (this.controller.signal.aborted) return { kind: 'noop' }
     const { entry } = submitSettingsIntent(this.queryClient, target, operations, initiator)
     this.enqueue(entry)
-    return { kind: 'submitted', mutationId: entry.request.mutationId, settled: entry.settled }
+    return { kind: 'submitted', mutationId: entry.intentId, settled: entry.settled }
   }
 
   writeRaw = async (
@@ -149,7 +150,7 @@ export class SettingsOwner {
   retry = (mutationId: string) => {
     if (
       this.controller.signal.aborted ||
-      !this.state.failures.some((entry) => entry.request.mutationId === mutationId)
+      !this.state.failures.some((entry) => entry.intentId === mutationId)
     )
       return
     const entry = retrySettingsIntent(mutationId)
@@ -157,7 +158,7 @@ export class SettingsOwner {
   }
 
   discard = (mutationId: string) => {
-    if (!this.state.failures.some((entry) => entry.request.mutationId === mutationId)) return
+    if (!this.state.failures.some((entry) => entry.intentId === mutationId)) return
     discardFailedSettingsIntent(mutationId)
     if (this.controller.signal.aborted) this.publish()
   }
@@ -169,7 +170,7 @@ export class SettingsOwner {
     this.unsubscribeIntents()
     this.observer.destroy()
     for (const entry of activeSettingsIntentsFor(this.queryClient)) {
-      settingsIntentStore.getState().discard(entry.request.mutationId)
+      discardSettingsIntent(entry.intentId)
     }
     this.state = this.project()
     for (const listener of this.listeners) listener()
@@ -181,7 +182,7 @@ export class SettingsOwner {
     this.pause()
     this.admission.resetSettingsSnapshotAdmission(this.queryClient)
     this.listeners.clear()
-    for (const entry of this.state.failures) discardFailedSettingsIntent(entry.request.mutationId)
+    for (const entry of this.state.failures) discardFailedSettingsIntent(entry.intentId)
     this.queryClient.clear()
   }
 
@@ -194,7 +195,7 @@ export class SettingsOwner {
       ).length,
       failures: settingsIntentStore
         .getState()
-        .failed.filter((entry) => entry.owner === this.queryClient),
+        .failed.filter((entry) => entry.patch.owner === this.queryClient),
     }
   }
 
@@ -215,7 +216,7 @@ export class SettingsOwner {
       await this.apply(entry)
       this.recordWrite(entry, startedAt, 'acknowledged')
     } catch (error) {
-      if (!this.controller.signal.aborted) failSettingsIntent(entry.request.mutationId, error)
+      if (!this.controller.signal.aborted) failSettingsIntent(entry.intentId, error)
       this.recordWrite(
         entry,
         startedAt,
@@ -223,7 +224,7 @@ export class SettingsOwner {
         error,
       )
     } finally {
-      settleSettingsIntentTransport(entry.request.mutationId)
+      settleSettingsIntentTransport(entry.intentId)
     }
   }
 
@@ -244,7 +245,7 @@ export class SettingsOwner {
       try {
         return await writeSettings({
           client: this.options.client,
-          request: entry.request,
+          request: entry.patch.request,
           signal: this.controller.signal,
         })
       } catch (error) {
@@ -267,9 +268,9 @@ export class SettingsOwner {
       action: 'settings.write',
       area: 'settings',
       instanceId: this.options.instanceId,
-      mutationId: entry.request.mutationId,
-      target: entry.request.target,
-      operationCount: entry.request.operations.length,
+      mutationId: entry.intentId,
+      target: entry.patch.request.target,
+      operationCount: entry.patch.request.operations.length,
       durationMs: performance.now() - startedAt,
       outcome,
       errorCode: errorStringField(error, 'code'),

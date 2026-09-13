@@ -57,8 +57,8 @@ test('publishes semantic intent before three scoped transports can settle', asyn
   })
 
   const active = useSettingsIntentStore.getState().active
-  expect(active.map((entry) => entry.clientSequence)).toEqual([1, 2, 3])
-  expect(active.map((entry) => entry.request.operations[0])).toEqual([
+  expect(active.map((entry) => entry.sequence)).toEqual([1, 2, 3])
+  expect(active.map((entry) => entry.patch.request.operations[0])).toEqual([
     { key: 'workbench.colorTheme', kind: 'set', value: 'dark' },
     { key: 'workbench.colorTheme', kind: 'set', value: 'light' },
     { key: 'workbench.colorTheme', kind: 'set', value: 'system' },
@@ -162,7 +162,7 @@ test('exhausted retries remove only their intent and Retry reuses its mutation i
     captured.current = actions.result.current.setSetting('workbench.colorTheme', 'dark')
     unrelatedMutationId = submitSettingsIntent(queryClient, 'user', [
       { key: 'editor.fontSize', kind: 'set', value: 18 },
-    ]).entry.request.mutationId
+    ]).entry.intentId
   })
   const submission = captured.current
   expect(submission?.kind).toBe('submitted')
@@ -230,7 +230,7 @@ test('WRITE_CONTENDED does not retry and leaves unrelated projection active', as
     captured.current = actions.result.current.setSetting('workbench.colorTheme', 'dark')
     unrelatedMutationId = submitSettingsIntent(queryClient, 'user', [
       { key: 'editor.fontSize', kind: 'set', value: 18 },
-    ]).entry.request.mutationId
+    ]).entry.intentId
   })
   const submission = captured.current
   expect(submission?.kind).toBe('submitted')
@@ -244,7 +244,7 @@ test('WRITE_CONTENDED does not retry and leaves unrelated projection active', as
   expect(useSettingsIntentStore.getState().failed).toEqual([
     expect.objectContaining({
       error: expect.objectContaining({ code: 'settings.WRITE_CONTENDED' }),
-      request: expect.objectContaining({ mutationId: submission.mutationId }),
+      intentId: submission.mutationId,
       superseded: false,
     }),
   ])
@@ -282,11 +282,13 @@ test('an admitted SSE acknowledgement survives a later HTTP failure without Retr
   await controller.waitForSettingsWriteRequest(1)
   const entry = useSettingsIntentStore
     .getState()
-    .active.find((candidate) => candidate.request.mutationId === submission.mutationId)
+    .active.find((candidate) => candidate.intentId === submission.mutationId)
   expect(entry).toBeDefined()
   if (!entry) return
 
-  const bypassResponse = await createInProcessClient(server).settings.write.post(entry.request)
+  const bypassResponse = await createInProcessClient(server).settings.write.post(
+    entry.patch.request,
+  )
   expect(bypassResponse.error).toBeNull()
   expect(bypassResponse.data).toBeDefined()
   const result = bypassResponse.data
@@ -299,7 +301,7 @@ test('an admitted SSE acknowledgement survives a later HTTP failure without Retr
   })
   expect(useSettingsIntentStore.getState().active).toEqual([
     expect.objectContaining({
-      request: expect.objectContaining({ mutationId: submission.mutationId }),
+      intentId: submission.mutationId,
       status: 'acknowledged',
     }),
   ])
@@ -355,8 +357,8 @@ test('derives targets from the projected layers without crossing application sco
   })
 
   const active = useSettingsIntentStore.getState().active
-  expect(active.map((entry) => entry.request.target)).toEqual(['workspace', 'user', 'user'])
-  expect(active.map((entry) => entry.clientSequence)).toEqual([1, 2, 3])
+  expect(active.map((entry) => entry.patch.request.target)).toEqual(['workspace', 'user', 'user'])
+  expect(active.map((entry) => entry.sequence)).toEqual([1, 2, 3])
 
   const handles = submissions.filter(isSubmitted)
   expect(await Promise.all(handles.map((submission) => submission.settled))).toEqual([
@@ -395,17 +397,18 @@ test('a deterministic rejection exposes same-id Retry and explicit Discard', asy
   expect(submission.kind).toBe('submitted')
   if (submission.kind !== 'submitted') return
   const mutationId = submission.mutationId
-  expect(useSettingsIntentStore.getState().active[0]?.request.mutationId).toBe(mutationId)
+  expect(useSettingsIntentStore.getState().active[0]?.intentId).toBe(mutationId)
   expect(await submission.settled).toBe('failed')
   expect(useSettingsIntentStore.getState().active).toEqual([])
   expect(useSettingsIntentStore.getState().failed[0]).toMatchObject({
-    request: { mutationId, target: 'workspace' },
+    intentId: mutationId,
+    patch: { request: { target: 'workspace' } },
     superseded: false,
   })
 
   const retried = retrySettingsIntent(mutationId)
-  expect(retried?.request.mutationId).toBe(mutationId)
-  expect(retried?.clientSequence).toBe(2)
+  expect(retried?.intentId).toBe(mutationId)
+  expect(retried?.sequence).toBe(2)
   expect(
     projectSettings(
       await fetchSettings(undefined, getClient()),
@@ -441,8 +444,8 @@ function projectedValue(
   return projectSettings(confirmed, useSettingsIntentStore.getState().active).values[key]
 }
 
-function intentId(entry: { readonly request: { readonly mutationId: string } }) {
-  return entry.request.mutationId
+function intentId(entry: { readonly intentId: string }) {
+  return entry.intentId
 }
 
 function temporaryWriteFailure(attempt: string) {

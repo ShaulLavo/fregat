@@ -3,7 +3,7 @@ import { toast } from 'sonner'
 
 import { useChatTimelineActions } from '@/features/chat/hooks/use-chat-timeline-actions'
 import { canOpenCheckpointDiff } from '@/features/chat/utils/checkpoint-diff-query'
-import type { OptimisticChatMessage } from '@/features/chat/state/chat-optimistic-store'
+import type { OptimisticChatMessage } from '@/features/chat/state/chat-message-intents'
 import type { ChatTurnDiffSummary } from '@workspace/client-core/chat/types'
 import { extractTerminalContexts } from '@workspace/client-core/chat/terminal-context'
 import { chatMessageMenu } from '@/features/chat/utils/message-menu'

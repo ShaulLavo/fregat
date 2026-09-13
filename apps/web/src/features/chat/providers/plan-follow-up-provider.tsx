@@ -15,7 +15,7 @@ import {
   createTurnSubmission,
   type SourceProposedPlanReference,
 } from '@workspace/client-core/chat/commands'
-import { dispatchChatCommand, replayAfterDispatch } from '@/features/chat/utils/command-dispatch'
+import { replayAfterDispatch } from '@/features/chat/utils/command-dispatch'
 import { scheduleSessionProjectionSyncAfterDispatch } from '@/features/chat/utils/command-sync'
 import { chatInputUploadAttachments } from '@/features/chat/utils/input-attachments'
 import {
@@ -34,7 +34,7 @@ import {
   chatInputImagesPreparing,
   type ChatInputDraftTarget,
 } from '@/features/chat/state/chat-input-draft-store'
-import { useChatOptimisticStore } from '@/features/chat/state/chat-optimistic-store'
+import { placeChatMessage } from '@/features/chat/state/place-chat-message'
 import { selectChatSessionById } from '@workspace/client-core/chat/selectors'
 import { type ChatSession } from '@workspace/client-core/chat/types'
 import {
@@ -249,15 +249,13 @@ async function dispatchPlanTurn({
   /** The session the plan lives on, which is not always the one running the turn. */
   planSessionId: SessionId
 }): Promise<boolean> {
-  const outcome = await dispatchChatCommand({
+  const outcome = await placeChatMessage({
     action,
-    beforeDispatch: () =>
-      useChatOptimisticStore
-        .getState()
-        .addOptimisticMessage(transport.environmentId, command.commandId, optimisticMessage),
     command,
     context: { ...context, planSessionResynced: planSessionId !== command.sessionId },
     dispatchCommand: transport.dispatchCommand,
+    // Runs on a command the server accepted, so nothing here can roll the
+    // message back: the turn it answers is already running.
     onAccepted: (result) => {
       syncSessionsAfterPlanTurn({
         transport,
@@ -267,16 +265,11 @@ async function dispatchPlanTurn({
       })
       onAccepted()
     },
-    // Only the dispatch is guarded here. Anything after it runs on a command the
-    // server accepted, and rolling the message back then would erase a turn that
-    // is already running.
-    onFailed: () =>
-      useChatOptimisticStore
-        .getState()
-        .removeOptimisticMessage(
-          { environmentId: transport.environmentId, sessionId: optimisticMessage.sessionId },
-          optimisticMessage.id,
-        ),
+    placement: {
+      environmentId: transport.environmentId,
+      commandId: command.commandId,
+      message: optimisticMessage,
+    },
   })
 
   if (!outcome.ok) notifyChatCommandError(outcome.error, 'Could not send the plan follow-up')

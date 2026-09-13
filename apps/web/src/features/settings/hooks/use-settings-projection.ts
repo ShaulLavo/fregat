@@ -20,6 +20,6 @@ export function useSettingsProjection(owner?: QueryClient): SettingsProjection |
 
   return projectSettings(
     document.data,
-    active.filter((entry) => entry.owner === queryClient),
+    active.filter((entry) => entry.patch.owner === queryClient),
   )
 }

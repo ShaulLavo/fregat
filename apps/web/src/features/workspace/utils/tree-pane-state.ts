@@ -245,12 +245,9 @@ function syncTreePaths(
     return
   }
 
-  if (treePathChangesDriftedFromLiveTree(tree, changes)) {
-    resetTreePaths(tree, nextPaths, model, prepareInputForPaths)
-    return
-  }
-
-  const operations = treePathBatchOperations(changes)
+  // An inline rename or a drop has already moved its row, and a pending intent
+  // projects the same move; only the difference from the live tree is applied.
+  const operations = treePathBatchOperations(changesAgainstLiveTree(tree, changes))
   if (operations.length === 0) return
 
   tree.batch(operations)
@@ -305,20 +302,11 @@ function treePathBatchOperations(changes: TreePathChanges): readonly FileTreeBat
   return operations
 }
 
-function treePathChangesDriftedFromLiveTree(tree: FileTreeModel, changes: TreePathChanges) {
-  for (const path of changes.removed) {
-    if (treeHasPath(tree, path)) continue
-
-    return true
+function changesAgainstLiveTree(tree: FileTreeModel, changes: TreePathChanges): TreePathChanges {
+  return {
+    added: changes.added.filter((path) => !treeHasPath(tree, path)),
+    removed: changes.removed.filter((path) => treeHasPath(tree, path)),
   }
-
-  for (const path of changes.added) {
-    if (!treeHasPath(tree, path)) continue
-
-    return true
-  }
-
-  return false
 }
 
 function topLevelRemovedPaths(paths: readonly string[]) {

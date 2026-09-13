@@ -19,6 +19,13 @@
       "description": "Imported chats receive one-way updates from local history until you send their first message in Platform. New chats are only imported when you click Import.",
       "type": "boolean"
     },
+    "developer.simulatedLatencyMs": {
+      "default": 0,
+      "description": "Milliseconds added before every request to the server, to see how the app behaves on a slow link. Zero disables it.",
+      "maximum": 10000,
+      "minimum": 0,
+      "type": "integer"
+    },
     "editor.codeTheme.dark": {
       "default": "dark-plus",
       "description": "Colors for code in editors and chat code blocks when the app uses dark mode.",

@@ -13,7 +13,7 @@ import {
   reorderRailProject,
   reorderRailSession,
 } from '@/features/chat-mode/state/rail-order-commands'
-import { useRailOrderStore } from '@/features/chat-mode/state/rail-order-store'
+import { railOrderOverrides } from '@/features/chat-mode/state/rail-order-intents'
 import { createSessionArchiveCommand } from '@workspace/client-core/chat/commands'
 import { createProjectRegistrationCommand } from '@workspace/client-core/chat/registration'
 import { createRailHarness, renderRailHarness } from '../../../../../test/factories/rail-harness'
@@ -37,7 +37,7 @@ test('keyboard dragging places a real session and settles its scoped optimistic 
     ).not.toBeNull(),
   )
   expect(
-    useRailOrderStore.getState().sessionOrderKeys[
+    railOrderOverrides().sessionOrderKeys[
       scopedSessionKey({ environmentId: h.environmentId, sessionId: h.sessionIds[0]! })
     ],
   ).toBeUndefined()
@@ -73,7 +73,7 @@ test('archived sessions cannot acquire a new pin order through the rail', async 
   expect(
     (await h.refresh()).sessions.find((session) => session.id === h.sessionIds[0])?.pinOrderKey,
   ).toBeNull()
-  expect(useRailOrderStore.getState().sessionOrderKeys).toEqual({})
+  expect(railOrderOverrides().sessionOrderKeys).toEqual({})
 })
 test('a project reorder persists on its owning machine', async ({ client, server }) => {
   const h = await createRailHarness(client, server)
@@ -104,5 +104,5 @@ test('a project reorder persists on its owning machine', async ({ client, server
       (await h.refresh()).projects.find((project) => project.id === h.projectId)?.orderKey,
     ).not.toBeNull(),
   )
-  expect(useRailOrderStore.getState().projectOrderKeys[firstKey]).toBeUndefined()
+  expect(railOrderOverrides().projectOrderKeys[firstKey]).toBeUndefined()
 })

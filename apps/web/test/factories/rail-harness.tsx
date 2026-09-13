@@ -32,7 +32,7 @@ import {
   resetSessionSelectionStore,
   useSessionSelectionStore,
 } from '@/features/chat-mode/state/session-selection-store'
-import { resetRailOrderStore } from '@/features/chat-mode/state/rail-order-store'
+import { resetRailOrderIntents } from '@/features/chat-mode/state/rail-order-intents'
 import { useSessionRailStore } from '@/features/chat-mode/state/session-rail-store'
 import { useSessionMultiSelectStore } from '@/features/chat-mode/state/session-multi-select-store'
 import { useChatProjectionStore } from '@/features/chat/state/chat-projection-store'
@@ -130,7 +130,7 @@ export async function createRailHarness(
   const snapshot = await refresh()
   useWorktreeManagerStore.getState().closeManager()
   resetSessionSelectionStore()
-  resetRailOrderStore()
+  resetRailOrderIntents()
   useSessionMultiSelectStore.getState().clear()
   useSessionRailStore.setState({
     collapsedProjectIds: [],

@@ -6,7 +6,7 @@ import type {
   TurnId,
 } from '@workspace/contracts'
 
-import type { OptimisticChatMessage } from '@/features/chat/state/chat-optimistic-store'
+import type { OptimisticChatMessage } from '@/features/chat/state/chat-message-intents'
 import {
   chatAgentGroups,
   chatAgentGroupsEqual,

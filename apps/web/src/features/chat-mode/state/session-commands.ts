@@ -14,7 +14,7 @@ import {
   useChatProjectionStore,
   selectChatProjectionSlice,
 } from '@/features/chat/state/chat-projection-store'
-import { useRailOrderStore } from '@/features/chat-mode/state/rail-order-store'
+import { railOrderOverrides } from '@/features/chat-mode/state/rail-order-intents'
 import { useSessionMultiSelectStore } from '@/features/chat-mode/state/session-multi-select-store'
 import { useSessionRailStore } from '@/features/chat-mode/state/session-rail-store'
 import { useSessionReadStore } from '@/features/chat-mode/state/session-read-store'
@@ -119,7 +119,7 @@ function visibleSessions() {
   const rail = useSessionRailStore.getState()
   return sessionRailModel({
     environments: currentRailEnvironments(),
-    orderOverrides: useRailOrderStore.getState(),
+    orderOverrides: railOrderOverrides(),
     query: rail.query,
     scope: rail.scope,
     machineFilter: rail.machineFilter,

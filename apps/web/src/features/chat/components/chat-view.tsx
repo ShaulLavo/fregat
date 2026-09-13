@@ -22,13 +22,10 @@ import {
 } from '@workspace/client-core/chat/commands'
 import { dispatchChatCommand, replayAfterDispatch } from '@/features/chat/utils/command-dispatch'
 import { scheduleSessionProjectionSyncAfterDispatch } from '@/features/chat/utils/command-sync'
-import { optimisticMessageSummary } from '@/features/chat/utils/pipeline-logging'
 import { isChatSessionBusy } from '@workspace/client-core/chat/session-busy'
 import { createChatSessionSelector } from '@workspace/client-core/chat/selectors'
-import {
-  createOptimisticMessagesForSessionSelector,
-  useChatOptimisticStore,
-} from '../state/chat-optimistic-store'
+import { useOptimisticMessages } from '@/features/chat/hooks/use-optimistic-messages'
+import { placeChatMessage } from '@/features/chat/state/place-chat-message'
 import { type ChatSession } from '@workspace/client-core/chat/types'
 import { ChatTransportContext } from '@/features/chat/providers/transport-context'
 import { ChatInput, type ChatInputSubmitPayload } from './chat-input'
@@ -64,15 +61,6 @@ export function ChatView({
     () => createChatSessionSelector(activeSessionId),
     [activeSessionId],
   )
-  const optimisticMessagesSelector = useMemo(
-    () =>
-      createOptimisticMessagesForSessionSelector(
-        activeSessionId
-          ? { environmentId: transport.environmentId, sessionId: activeSessionId }
-          : null,
-      ),
-    [activeSessionId, transport.environmentId],
-  )
   // The same target ChatInput builds for itself, so a mode pick lands on the
   // draft the send path reads. Stable identity is required: it feeds the
   // composer modes context value.
@@ -81,7 +69,7 @@ export function ChatView({
     [transport.environmentId, activeSessionId, rootPath],
   )
   const session = useActiveChatProjection(sessionSelector)
-  const optimisticMessages = useChatOptimisticStore(optimisticMessagesSelector)
+  const optimisticMessages = useOptimisticMessages(transport.environmentId, activeSessionId)
   const [sendError, setSendError] = useState<string | null>(null)
   const [interruptCommand, setInterruptCommand] = useState<SessionTurnInterruptCommand | null>(null)
   const [revertingCheckpoint, setRevertingCheckpoint] = useState(false)
@@ -134,17 +122,6 @@ export function ChatView({
 
     return transport.retainSessionDetail(activeSessionId)
   }, [activeSessionId, transport])
-
-  useEffect(() => {
-    if (!session) return
-
-    useChatOptimisticStore
-      .getState()
-      .clearResolvedOptimisticMessages(
-        { environmentId: transport.environmentId, sessionId: session.id },
-        session.messages,
-      )
-  }, [session, transport.environmentId])
 
   if (!activeSessionId || !session) {
     return (
@@ -316,27 +293,8 @@ async function submitChatTurn({
   setSendError(null)
   setSending(true)
   try {
-    const outcome = await dispatchChatCommand({
+    const outcome = await placeChatMessage({
       action: 'chat.command.dispatch.summary',
-      beforeDispatch: (scope) => {
-        scope.increment('command.submitCount')
-        useChatOptimisticStore
-          .getState()
-          .addOptimisticMessage(
-            transport.environmentId,
-            submission.command.commandId,
-            submission.optimisticMessage,
-          )
-        scope.increment('command.optimisticAddedCount')
-        scope.set({
-          optimistic: optimisticMessageSummary({
-            commandId: submission.command.commandId,
-            messageId: submission.optimisticMessage.id,
-            textLength: text.length,
-            sessionId: session.id,
-          }),
-        })
-      },
       command: submission.command,
       context: {
         attachmentCount: attachments.length,
@@ -354,13 +312,11 @@ async function submitChatTurn({
           replayAfterSequence: replayAfterDispatch(submission.command, result),
           sessionId: session.id,
         }),
-      onFailed: () =>
-        useChatOptimisticStore
-          .getState()
-          .removeOptimisticMessage(
-            { environmentId: transport.environmentId, sessionId: session.id },
-            submission.optimisticMessage.id,
-          ),
+      placement: {
+        environmentId: transport.environmentId,
+        commandId: submission.command.commandId,
+        message: submission.optimisticMessage,
+      },
     })
     if (outcome.ok) return true
 

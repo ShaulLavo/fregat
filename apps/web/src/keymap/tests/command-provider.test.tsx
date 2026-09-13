@@ -100,12 +100,12 @@ test('consecutive toggles project landed settings intents before React renders',
 
   expect(first.claimed).toBe(true)
   expect(second.claimed).toBe(true)
-  expect(useSettingsIntentStore.getState().active.map((entry) => entry.request.operations)).toEqual(
-    [
-      [{ key: 'workbench.wallpaper.enabled', kind: 'set', value: false }],
-      [{ key: 'workbench.wallpaper.enabled', kind: 'set', value: true }],
-    ],
-  )
+  expect(
+    useSettingsIntentStore.getState().active.map((entry) => entry.patch.request.operations),
+  ).toEqual([
+    [{ key: 'workbench.wallpaper.enabled', kind: 'set', value: false }],
+    [{ key: 'workbench.wallpaper.enabled', kind: 'set', value: true }],
+  ])
 
   await controlledClient.controller.waitForSettingsWriteRequest(2)
   const requests =
@@ -139,12 +139,12 @@ test('consecutive toggles replay intents before the confirmed settings query lan
     second = capturedBus!.dispatch('workspace.toggleWallpaper', invocation())
   })
 
-  expect(useSettingsIntentStore.getState().active.map((entry) => entry.request.operations)).toEqual(
-    [
-      [{ key: 'workbench.wallpaper.enabled', kind: 'set', value: false }],
-      [{ key: 'workbench.wallpaper.enabled', kind: 'set', value: true }],
-    ],
-  )
+  expect(
+    useSettingsIntentStore.getState().active.map((entry) => entry.patch.request.operations),
+  ).toEqual([
+    [{ key: 'workbench.wallpaper.enabled', kind: 'set', value: false }],
+    [{ key: 'workbench.wallpaper.enabled', kind: 'set', value: true }],
+  ])
   await controlledClient.controller.waitForSettingsWriteRequest(2)
   await expect(first.completion).resolves.toEqual({ status: 'handled' })
   await expect(second.completion).resolves.toEqual({ status: 'handled' })
@@ -175,12 +175,12 @@ test('consecutive color-mode commands read intents before React renders', async 
 
   expect(first.claimed).toBe(true)
   expect(second.claimed).toBe(true)
-  expect(useSettingsIntentStore.getState().active.map((entry) => entry.request.operations)).toEqual(
-    [
-      [{ key: 'workbench.colorTheme', kind: 'set', value: firstTheme }],
-      [{ key: 'workbench.colorTheme', kind: 'set', value: confirmedTheme }],
-    ],
-  )
+  expect(
+    useSettingsIntentStore.getState().active.map((entry) => entry.patch.request.operations),
+  ).toEqual([
+    [{ key: 'workbench.colorTheme', kind: 'set', value: firstTheme }],
+    [{ key: 'workbench.colorTheme', kind: 'set', value: confirmedTheme }],
+  ])
 
   await controlledClient.controller.waitForSettingsWriteRequest(2)
   await expect(first.completion).resolves.toEqual({ status: 'handled' })

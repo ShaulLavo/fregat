@@ -1,6 +1,6 @@
 import type { OrchestrationLatestTurn, OrchestrationMessage, TurnId } from '@workspace/contracts'
 
-import type { OptimisticChatMessage } from '@/features/chat/state/chat-optimistic-store'
+import type { OptimisticChatMessage } from '@/features/chat/state/chat-message-intents'
 import { chatActiveResponseTurnIds } from '@/features/chat/utils/active-response'
 import { formatChatElapsed } from '@/features/chat/utils/formatters'
 

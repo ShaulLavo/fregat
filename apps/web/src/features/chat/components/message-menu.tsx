@@ -4,7 +4,7 @@ import { MenuSurface } from '@/keymap/menus/components/surface'
 import type { MenuAnchor } from '@/keymap/menus/utils/virtual-anchor'
 
 import { useMessageMenu } from '../hooks/use-message-menu'
-import type { OptimisticChatMessage } from '../state/chat-optimistic-store'
+import type { OptimisticChatMessage } from '../state/chat-message-intents'
 import type { ChatTurnDiffSummary } from '@workspace/client-core/chat/types'
 
 /**

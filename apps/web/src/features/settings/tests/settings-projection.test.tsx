@@ -50,12 +50,8 @@ test('replays pending intents in one strict process-wide order', () => {
   const projected = projectSettings(settingsSnapshot(), useSettingsIntentStore.getState().active)
 
   expect(projected.values['workbench.colorTheme']).toBe('system')
-  expect(projected.pendingMutationIds).toEqual([
-    first.request.mutationId,
-    second.request.mutationId,
-    third.request.mutationId,
-  ])
-  expect([first.clientSequence, second.clientSequence, third.clientSequence]).toEqual([1, 2, 3])
+  expect(projected.pendingMutationIds).toEqual([first.intentId, second.intentId, third.intentId])
+  expect([first.sequence, second.sequence, third.sequence]).toEqual([1, 2, 3])
   resetSettingsIntentStore()
 })
 
@@ -82,7 +78,7 @@ test('rebases pending semantic intent over a newer confirmed snapshot', () => {
   const projected = projectSettings(confirmed, useSettingsIntentStore.getState().active)
 
   expect(projected.values['workbench.colorTheme']).toBe('light')
-  expect(projected.pendingMutationIds).toEqual([pending.request.mutationId])
+  expect(projected.pendingMutationIds).toEqual([pending.intentId])
   expect(confirmed.values['workbench.colorTheme']).toBe('dark')
   resetSettingsIntentStore()
 })
@@ -97,11 +93,11 @@ test('acknowledgement removes only its matching optimistic projection', () => {
     { key: 'editor.fontSize', kind: 'set', value: 18 },
   ]).entry
 
-  acknowledgeSettingsIntent(first.request.mutationId)
+  acknowledgeSettingsIntent(first.intentId)
   const projected = projectSettings(settingsSnapshot(), useSettingsIntentStore.getState().active)
 
-  expect(projected.acknowledgedMutationIds).toEqual([first.request.mutationId])
-  expect(projected.pendingMutationIds).toEqual([second.request.mutationId])
+  expect(projected.acknowledgedMutationIds).toEqual([first.intentId])
+  expect(projected.pendingMutationIds).toEqual([second.intentId])
   expect(projected.values['workbench.colorTheme']).toBe('system')
   expect(projected.values['editor.fontSize']).toBe(18)
   resetSettingsIntentStore()
@@ -163,42 +159,35 @@ test('failure removes only its intent and later same-resource intent supersedes 
     { key: 'editor.fontSize', kind: 'set', value: 18 },
   ]).entry
 
-  failSettingsIntent(failedTheme.request.mutationId, { code: 'settings.WRITE_CONTENDED' })
-  failSettingsIntent(failedFont.request.mutationId, { code: 'transport.closed' })
+  failSettingsIntent(failedTheme.intentId, { code: 'settings.WRITE_CONTENDED' })
+  failSettingsIntent(failedFont.intentId, { code: 'transport.closed' })
   const winner = submitSettingsIntent(queryClient, 'user', [
     { key: 'workbench.colorTheme', kind: 'set', value: 'light' },
   ]).entry
 
   const failed = useSettingsIntentStore.getState().failed
-  expect(
-    failed.find((entry) => entry.request.mutationId === failedTheme.request.mutationId),
-  ).toMatchObject({
+  expect(failed.find((entry) => entry.intentId === failedTheme.intentId)).toMatchObject({
     superseded: true,
   })
-  expect(
-    failed.find((entry) => entry.request.mutationId === failedFont.request.mutationId),
-  ).toMatchObject({
+  expect(failed.find((entry) => entry.intentId === failedFont.intentId)).toMatchObject({
     superseded: false,
   })
-  expect(retrySettingsIntent(failedTheme.request.mutationId)).toBeNull()
+  expect(retrySettingsIntent(failedTheme.intentId)).toBeNull()
 
-  const retriedFont = retrySettingsIntent(failedFont.request.mutationId)
-  expect(retriedFont?.request.mutationId).toBe(failedFont.request.mutationId)
-  expect(retriedFont?.clientSequence).toBe(4)
+  const retriedFont = retrySettingsIntent(failedFont.intentId)
+  expect(retriedFont?.intentId).toBe(failedFont.intentId)
+  expect(retriedFont?.sequence).toBe(4)
   const projected = projectSettings(settingsSnapshot(), useSettingsIntentStore.getState().active)
   expect(projected.values['workbench.colorTheme']).toBe('light')
   expect(projected.values['editor.fontSize']).toBe(18)
-  expect(projected.pendingMutationIds).toEqual([
-    winner.request.mutationId,
-    failedFont.request.mutationId,
-  ])
+  expect(projected.pendingMutationIds).toEqual([winner.intentId, failedFont.intentId])
 
-  failSettingsIntent(failedFont.request.mutationId, { code: 'transport.closed' })
-  expect(discardFailedSettingsIntent(failedFont.request.mutationId)).toBe(true)
+  failSettingsIntent(failedFont.intentId, { code: 'transport.closed' })
+  expect(discardFailedSettingsIntent(failedFont.intentId)).toBe(true)
   expect(
     useSettingsIntentStore
       .getState()
-      .failed.some((entry) => entry.request.mutationId === failedFont.request.mutationId),
+      .failed.some((entry) => entry.intentId === failedFont.intentId),
   ).toBe(false)
   resetSettingsIntentStore()
 })
@@ -251,11 +240,11 @@ test('SSE acknowledgement filters its intent before newer SSE and late HTTP deli
 
   await admitSettingsEvent(queryClient, {
     changedSettingIds: ['workbench.colorTheme'],
-    originMutationId: intent.request.mutationId,
+    originMutationId: intent.intentId,
     snapshot: acknowledged,
   })
   expect(projectSettings(acknowledged, useSettingsIntentStore.getState().active)).toMatchObject({
-    acknowledgedMutationIds: [intent.request.mutationId],
+    acknowledgedMutationIds: [intent.intentId],
     pendingMutationIds: [],
   })
 
@@ -273,7 +262,7 @@ test('SSE acknowledgement filters its intent before newer SSE and late HTTP deli
     appliedVersion: acknowledged.serverVersion,
     changedSettingIds: ['workbench.colorTheme'],
     duplicate: false,
-    mutationId: intent.request.mutationId,
+    mutationId: intent.intentId,
     snapshot: acknowledged,
   })
 
@@ -375,10 +364,10 @@ test('provider invalidation waits for relevant acknowledgement and is not repeat
   })
   const sse = await admitSettingsEvent(queryClient, {
     changedSettingIds: ['providers.instances'],
-    originMutationId: intent.request.mutationId,
+    originMutationId: intent.intentId,
     snapshot: acknowledged,
   })
-  expect(sse.acknowledgedIntent?.request.mutationId).toBe(intent.request.mutationId)
+  expect(sse.acknowledgedIntent?.intentId).toBe(intent.intentId)
   expect(providerQueryIsInvalidated(queryClient)).toBe(true)
 
   resetProviderQuery(queryClient)
@@ -386,11 +375,11 @@ test('provider invalidation waits for relevant acknowledgement and is not repeat
     appliedVersion: acknowledged.serverVersion,
     changedSettingIds: ['providers.instances'],
     duplicate: false,
-    mutationId: intent.request.mutationId,
+    mutationId: intent.intentId,
     snapshot: acknowledged,
   })
   expect(equalHttp.admitted).toBe(false)
-  expect(equalHttp.acknowledgedIntent?.request.mutationId).toBe(intent.request.mutationId)
+  expect(equalHttp.acknowledgedIntent?.intentId).toBe(intent.intentId)
   expect(providerQueryIsInvalidated(queryClient)).toBe(false)
 
   resetProviderQuery(queryClient)
@@ -399,11 +388,11 @@ test('provider invalidation waits for relevant acknowledgement and is not repeat
     appliedVersion: older.serverVersion,
     changedSettingIds: ['providers.instances'],
     duplicate: false,
-    mutationId: intent.request.mutationId,
+    mutationId: intent.intentId,
     snapshot: older,
   })
   expect(olderHttp.admitted).toBe(false)
-  expect(olderHttp.acknowledgedIntent?.request.mutationId).toBe(intent.request.mutationId)
+  expect(olderHttp.acknowledgedIntent?.intentId).toBe(intent.intentId)
   expect(providerQueryIsInvalidated(queryClient)).toBe(false)
 
   resetSettingsSnapshotAdmission(queryClient)
@@ -432,7 +421,7 @@ test('unexpected-epoch provider recovery invalidates once after intent acknowled
       providerInstanceId,
     },
   ]).entry
-  const result = await saveSettings(intent.request, getClient())
+  const result = await saveSettings(intent.patch.request, getClient())
   const invalidateQueries = vi.spyOn(queryClient, 'invalidateQueries')
   const invalidationStatuses: Array<ReturnType<typeof settingsIntentStatus>> = []
   let providerWasInvalidated = false
@@ -441,7 +430,7 @@ test('unexpected-epoch provider recovery invalidates once after intent acknowled
 
     const invalidated = event.query.state.isInvalidated
     if (!providerWasInvalidated && invalidated) {
-      invalidationStatuses.push(settingsIntentStatus(intent.request.mutationId))
+      invalidationStatuses.push(settingsIntentStatus(intent.intentId))
     }
     providerWasInvalidated = invalidated
   })
@@ -451,7 +440,7 @@ test('unexpected-epoch provider recovery invalidates once after intent acknowled
     ([filters]) => filters?.queryKey?.[0] === providerQueryKeys.all[0],
   )
 
-  expect(admission.acknowledgedIntent?.request.mutationId).toBe(intent.request.mutationId)
+  expect(admission.acknowledgedIntent?.intentId).toBe(intent.intentId)
   expect(admission.snapshot?.serverVersion).toEqual(result.snapshot.serverVersion)
   expect(providerInvalidations).toHaveLength(1)
   expect(invalidationStatuses).toEqual(['acknowledged'])
@@ -546,7 +535,7 @@ test('unexpected epoch refetches confirmed state and keeps pending intent projec
 
   const retiredDelivery = await admitSettingsEvent(queryClient, {
     changedSettingIds: ['editor.fontSize'],
-    originMutationId: pending.request.mutationId,
+    originMutationId: pending.intentId,
     snapshot: retired,
   })
   expect(retiredDelivery.acknowledgedIntent).toBeNull()
@@ -577,7 +566,7 @@ test('failed epoch recovery keeps intent pending until active confirmed evidence
   const intent = submitSettingsIntent(queryClient, 'user', [
     { key: 'workbench.colorTheme', kind: 'set', value: 'dark' },
   ]).entry
-  const result = await saveSettings(intent.request, getClient())
+  const result = await saveSettings(intent.patch.request, getClient())
   controlledClient.controller.rejectNextSettingsRead({
     code: 'settings.READ_FAILED',
     message: 'Injected recovery failure',
@@ -593,7 +582,7 @@ test('failed epoch recovery keeps intent pending until active confirmed evidence
   await refreshConfirmedSettings(queryClient)
   const settled = await deferred.confirmation
   expect(settled.snapshot?.serverVersion.epoch).toBe(result.snapshot.serverVersion.epoch)
-  expect(settled.acknowledgedIntent?.request.mutationId).toBe(intent.request.mutationId)
+  expect(settled.acknowledgedIntent?.intentId).toBe(intent.intentId)
   expect(useSettingsIntentStore.getState().active[0]?.status).toBe('acknowledged')
 
   resetSettingsSnapshotAdmission(queryClient)

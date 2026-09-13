@@ -144,28 +144,28 @@ function emit(level: string, event: Record<string, unknown>) {
 }
 
 function settingsIntentWithPrivateValues(): ActiveSettingsIntent {
-  return {
-    owner: createTestQueryClient(),
-    clientSequence: 7,
-    enqueuedAt: 1,
-    initiator: 'settings.ui',
-    request: {
-      mutationId: 'mutation-private',
-      operations: [
-        { key: 'workbench.colorTheme', kind: 'set', value: 'light' },
-        {
-          createIfMissing: {
-            config: { privateConfig: 'private-config-value' },
-            driverKind: DEFAULT_PROVIDER_DRIVER_KIND,
-            environment: [{ name: 'PRIVATE_PROVIDER_TOKEN', value: '' }],
-          },
-          enabled: true,
-          kind: 'provider.setEnabled',
-          providerInstanceId: v.parse(providerInstanceIdSchema, 'codex-private'),
+  const request: ActiveSettingsIntent['patch']['request'] = {
+    mutationId: 'mutation-private',
+    operations: [
+      { key: 'workbench.colorTheme', kind: 'set', value: 'light' },
+      {
+        createIfMissing: {
+          config: { privateConfig: 'private-config-value' },
+          driverKind: DEFAULT_PROVIDER_DRIVER_KIND,
+          environment: [{ name: 'PRIVATE_PROVIDER_TOKEN', value: '' }],
         },
-      ],
-      target: 'user',
-    },
+        enabled: true,
+        kind: 'provider.setEnabled',
+        providerInstanceId: v.parse(providerInstanceIdSchema, 'codex-private'),
+      },
+    ],
+    target: 'user',
+  }
+  return {
+    intentId: request.mutationId,
+    sequence: 7,
+    patch: { owner: createTestQueryClient(), request, initiator: 'settings.ui' },
+    enqueuedAt: 1,
     resources: [],
     settled: Promise.resolve('failed'),
     status: 'pending',

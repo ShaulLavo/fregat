@@ -114,14 +114,13 @@ export function AppearanceProvider({
   }, [])
 
   const setTheme = (theme: Theme, initiator?: string): SettingsSubmission => {
-    const submission = setColorTheme(theme, committedTheme, initiator, (entry) => {
-      setPreview({ handingOffTo: entry.request.mutationId, kind: 'mode', value: theme })
-    })
+    const submission = setColorTheme(theme, committedTheme, initiator)
     if (submission.kind === 'noop') {
       clearThemePreview()
       return submission
     }
 
+    setPreview({ handingOffTo: submission.mutationId, kind: 'mode', value: theme })
     void submission.settled.then(() => clearMatchingHandoff(setPreview, submission.mutationId))
     return submission
   }

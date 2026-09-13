@@ -10,14 +10,12 @@ export function omitNullish<T extends object>(values: T): { [K in keyof T]?: Non
 }
 
 /*
- * No `omitKey` here on purpose. Three record-minus-one-key helpers remain in
+ * No `omitKey` here on purpose. Two record-minus-one-key helpers remain in
  * the app (`features/editor/state/workspace-document-service.ts`,
- * `features/editor/state/conflict-state.tsx`,
- * `features/chat-mode/state/rail-order-store.ts`) and they do not agree. The
- * first two return the *same object identity* when the key is absent; the
- * third always allocates, and it is not even a named helper — it is a
- * `delete next[key]` on a copy. Store subscribers depend on that identity.
- * Unifying them needs a test per call site, not a shared helper.
+ * `features/editor/state/conflict-state.tsx`). Both return the *same object
+ * identity* when the key is absent, and store subscribers depend on that.
+ * A third in the rail order store always allocated; plan 113 replaced that
+ * store with an intent queue. Unifying the two needs a test per call site.
  *
  * A fourth lived in the generic record widget until plan 042 deleted it.
  */

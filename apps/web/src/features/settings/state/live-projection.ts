@@ -29,10 +29,8 @@ function replayActiveColorTheme(
   fallback?: ColorTheme,
 ): ColorTheme | undefined {
   let theme = fallback
-  for (const entry of active.toSorted(
-    (left, right) => left.clientSequence - right.clientSequence,
-  )) {
-    for (const operation of entry.request.operations) {
+  for (const entry of active.toSorted((left, right) => left.sequence - right.sequence)) {
+    for (const operation of entry.patch.request.operations) {
       theme = colorThemeAfterOperation(theme, operation)
     }
   }

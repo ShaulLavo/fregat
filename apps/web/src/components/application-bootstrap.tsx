@@ -9,6 +9,7 @@ import { ActiveEnvironmentApplication } from '@/components/active-environment-ap
 import { LoadingState } from '@workspace/ui/components/loading-state'
 import { Button } from '@workspace/ui/components/button'
 import { SettingsOwnerProvider } from '@/features/settings/providers/owner-provider'
+import { SimulatedLatencyBridge } from '@/features/settings/components/simulated-latency-bridge'
 import { FocusProvider } from '@/lib/focus/providers/provider'
 import { CommandBusProvider } from '@/keymap/providers/bus-provider'
 import { ApplicationRuntimeProvider } from '@/providers/application-runtime-provider'
@@ -88,6 +89,7 @@ export function ApplicationBootstrap({
   return (
     <QueryClientProvider client={primaryQueryClient()}>
       <SettingsOwnerProvider queryClient={primaryQueryClient()}>
+        <SimulatedLatencyBridge />
         <ApplicationRuntimeProvider application={application}>
           <EnvironmentTransportsProvider connections={application.connections}>
             <FocusProvider>

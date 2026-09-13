@@ -72,7 +72,7 @@ test('rejected workspace execution settings roll back and remain discardable', a
     expect(owner.getSnapshot().projection.values['lsp.idleTimeoutMs']).toBe(previous)
     const failure = owner.getSnapshot().failures[0]
     expect(failure).toBeDefined()
-    if (failure) owner.discard(failure.request.mutationId)
+    if (failure) owner.discard(failure.intentId)
     expect(owner.getSnapshot().failures).toHaveLength(0)
   } finally {
     owner.dispose()

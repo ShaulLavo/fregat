@@ -33,7 +33,7 @@ import { useRailDragSensors } from '@/features/chat-mode/hooks/use-rail-drag-sen
 import { useSessionSearch } from '@/features/chat-mode/hooks/use-session-search'
 import { useChatRailOrder } from '@/features/chat-mode/providers/rail-order-context'
 import { useChatModeSession } from '@/features/chat-mode/providers/session-context'
-import { useRailOrderStore } from '@/features/chat-mode/state/rail-order-store'
+import { useRailOrderOverrides } from '@/features/chat-mode/hooks/use-rail-order-overrides'
 import {
   clearSessionMultiSelect,
   startScopedSessionDraft,
@@ -61,8 +61,7 @@ export function SessionRail() {
   const { activeSession, addProject, project, ready, transport } = useChatModeSession()
   const { reorderProject } = useChatRailOrder()
   const sensors = useRailDragSensors()
-  const projectOrderKeys = useRailOrderStore((state) => state.projectOrderKeys)
-  const sessionOrderKeys = useRailOrderStore((state) => state.sessionOrderKeys)
+  const orderOverrides = useRailOrderOverrides()
   const environments = useRailEnvironments()
   const seenBySessionKey = useSessionReadStore((state) => state.seenBySessionKey)
   const collapsedProjectIds = useSessionRailStore((state) => state.collapsedProjectIds)
@@ -87,7 +86,7 @@ export function SessionRail() {
         })
       : null,
     collapsedProjectIds,
-    orderOverrides: { projectOrderKeys, sessionOrderKeys },
+    orderOverrides,
     environments,
     query,
     scope,

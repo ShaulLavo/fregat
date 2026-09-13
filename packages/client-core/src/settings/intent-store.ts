@@ -6,12 +6,18 @@ import {
   type SettingsOperation,
   type SettingsWriteTarget,
 } from '@workspace/contracts'
-import { createStore } from 'zustand/vanilla'
 import type { QueryClient } from '@tanstack/query-core'
+
+import {
+  createIntentQueue,
+  type FailedIntent,
+  type Intent,
+  type IntentSettlement,
+} from '../optimistic/queue'
 
 const transportStartedAtByMutationId = new Map<string, number>()
 
-export type SettingsIntentSettlement = 'acknowledged' | 'discarded' | 'failed'
+export type SettingsIntentSettlement = IntentSettlement
 
 export type SettingsIntentHandle = {
   readonly kind: 'submitted'
@@ -22,31 +28,20 @@ export type SettingsIntentHandle = {
 export type SettingsNoop = { readonly kind: 'noop' }
 export type SettingsSubmission = SettingsIntentHandle | SettingsNoop
 
-export type ActiveSettingsIntent = {
+/**
+ * One settings write as the queue carries it. The owner is the query client
+ * whose confirmed document the write projects over; several environments can
+ * share the queue and each reads only its own.
+ */
+export type SettingsIntentPatch = {
   readonly owner: QueryClient
-  readonly clientSequence: number
-  readonly enqueuedAt: number
-  readonly initiator?: string
   readonly request: SettingsMutationRequest
-  readonly resources: readonly TargetedResourceKey[]
-  readonly settled: Promise<SettingsIntentSettlement>
-  readonly status: 'acknowledged' | 'pending'
-  readonly transportSettled: boolean
+  readonly initiator?: string
 }
 
-export type FailedSettingsIntent = {
-  readonly owner: QueryClient
-  readonly clientSequence: number
-  readonly error: unknown
-  readonly initiator?: string
-  readonly request: SettingsMutationRequest
-  readonly resources: readonly TargetedResourceKey[]
-  readonly superseded: boolean
-}
-
-type MutableActiveSettingsIntent = ActiveSettingsIntent & {
-  readonly resolveSettlement: (settlement: SettingsIntentSettlement) => void
-}
+/** The intent id is the mutation id, so the server's acknowledgement names it directly. */
+export type ActiveSettingsIntent = Intent<SettingsIntentPatch>
+export type FailedSettingsIntent = FailedIntent<SettingsIntentPatch>
 
 export type TargetedResourceKey = `${SettingsWriteTarget}/${SettingsMutationResourceKey}`
 
@@ -55,183 +50,91 @@ type SubmitSettingsIntentResult = {
   readonly supersededMutationIds: readonly string[]
 }
 
-type SettingsIntentState = {
-  readonly active: readonly MutableActiveSettingsIntent[]
-  readonly failed: readonly FailedSettingsIntent[]
-  readonly nextClientSequence: number
-  acknowledge: (mutationId: string) => ActiveSettingsIntent | null
-  discard: (mutationId: string) => boolean
-  discardFailed: (mutationId: string) => boolean
-  fail: (mutationId: string, error: unknown) => FailedSettingsIntent | null
-  retry: (mutationId: string) => ActiveSettingsIntent | null
-  settleTransport: (mutationId: string) => void
-  submit: (
-    owner: QueryClient,
-    target: SettingsWriteTarget,
-    operations: readonly SettingsOperation[],
-    initiator?: string,
-    beforePublish?: (entry: ActiveSettingsIntent) => void,
-  ) => SubmitSettingsIntentResult
-}
+// Supersession is per owner: a newer write on another environment's document
+// says nothing about this one. The owner id prefixes every resource key.
+const ownerIds = new WeakMap<QueryClient, string>()
+let nextOwnerId = 0
 
-export const settingsIntentStore = createStore<SettingsIntentState>()((set, get) => ({
-  active: [],
-  failed: [],
-  nextClientSequence: 0,
-  acknowledge: (mutationId) => {
-    const entry = activeIntent(mutationId, get().active)
-    if (!entry) return null
-    if (entry.status === 'acknowledged') return entry
-
-    set((state) => ({
-      active: acknowledgeActiveIntent(state.active, mutationId, entry.transportSettled),
-    }))
-    entry.resolveSettlement('acknowledged')
-
-    return { ...entry, status: 'acknowledged' }
+export const settingsIntentStore = createIntentQueue<SettingsIntentPatch>({
+  resourcesIntersect: (left, right) => {
+    const [leftOwner, leftResource] = splitOwnedResource(left)
+    const [rightOwner, rightResource] = splitOwnedResource(right)
+    if (leftOwner !== rightOwner) return false
+    return targetedResourceIntersects(leftResource, rightResource)
   },
-  discard: (mutationId) => {
-    const entry = activeIntent(mutationId, get().active)
-    if (!entry) return false
-
-    set((state) => ({
-      active: state.active.filter((candidate) => candidate.request.mutationId !== mutationId),
-    }))
-    entry.resolveSettlement('discarded')
-    transportStartedAtByMutationId.delete(mutationId)
-    return true
-  },
-  discardFailed: (mutationId) => {
-    const failed = get().failed
-    if (!failed.some((entry) => entry.request.mutationId === mutationId)) return false
-
-    set({ failed: failed.filter((entry) => entry.request.mutationId !== mutationId) })
-    return true
-  },
-  fail: (mutationId, error) => {
-    const active = get().active
-    const entry = activeIntent(mutationId, active)
-    if (!entry) return null
-    if (entry.status === 'acknowledged') return null
-
-    const failed: FailedSettingsIntent = {
-      owner: entry.owner,
-      clientSequence: entry.clientSequence,
-      error,
-      initiator: entry.initiator,
-      request: entry.request,
-      resources: entry.resources,
-      superseded: active.some(
-        (candidate) =>
-          candidate.owner === entry.owner &&
-          candidate.clientSequence > entry.clientSequence &&
-          targetedResourcesIntersect(candidate.resources, entry.resources),
-      ),
-    }
-    set((state) => ({
-      active: state.active.filter((candidate) => candidate.request.mutationId !== mutationId),
-      failed: [...state.failed, failed],
-    }))
-    entry.resolveSettlement('failed')
-
-    return failed
-  },
-  retry: (mutationId) => {
-    const failed = get().failed.find((entry) => entry.request.mutationId === mutationId)
-    if (!failed || failed.superseded) return null
-
-    const nextSequence = get().nextClientSequence + 1
-    const entry = activeEntry(failed.owner, failed.request, nextSequence, failed.initiator)
-    set((state) => ({
-      active: [...state.active, entry],
-      failed: state.failed.filter((candidate) => candidate.request.mutationId !== mutationId),
-      nextClientSequence: nextSequence,
-    }))
-
-    return entry
-  },
-  settleTransport: (mutationId) => {
-    set((state) => ({
-      active: state.active.flatMap((entry) => {
-        if (entry.request.mutationId !== mutationId) return [entry]
-        if (entry.status === 'acknowledged') return []
-
-        return [{ ...entry, transportSettled: true }]
-      }),
-    }))
-    transportStartedAtByMutationId.delete(mutationId)
-  },
-  submit: (owner, target, operations, initiator, beforePublish) => {
-    const state = get()
-    const nextSequence = state.nextClientSequence + 1
-    const request: SettingsMutationRequest = {
-      mutationId: globalThis.crypto.randomUUID(),
-      operations,
-      target,
-    }
-    const entry = activeEntry(owner, request, nextSequence, initiator)
-    const supersededMutationIds = supersededFailures(owner, entry.resources, state.failed)
-    beforePublish?.(entry)
-
-    set({
-      active: [...state.active, entry],
-      failed: state.failed.map((failed) => {
-        if (!supersededMutationIds.includes(failed.request.mutationId)) return failed
-
-        return { ...failed, superseded: true }
-      }),
-      nextClientSequence: nextSequence,
-    })
-
-    return { entry, supersededMutationIds }
-  },
-}))
+})
 
 export function submitSettingsIntent(
   owner: QueryClient,
   target: SettingsWriteTarget,
   operations: readonly SettingsOperation[],
   initiator?: string,
-  beforePublish?: (entry: ActiveSettingsIntent) => void,
 ): SubmitSettingsIntentResult {
-  return settingsIntentStore.getState().submit(owner, target, operations, initiator, beforePublish)
+  const request: SettingsMutationRequest = {
+    mutationId: globalThis.crypto.randomUUID(),
+    operations,
+    target,
+  }
+  const { intent, supersededIntentIds } = settingsIntentStore.submit(
+    { owner, request, initiator },
+    {
+      intentId: request.mutationId,
+      resources: targetedResources(target, operations).map(
+        (resource) => `${ownerIdFor(owner)}|${resource}`,
+      ),
+    },
+  )
+
+  return { entry: intent, supersededMutationIds: supersededIntentIds }
 }
 
 export function activeSettingsIntentsFor(owner: QueryClient): readonly ActiveSettingsIntent[] {
-  return settingsIntentStore.getState().active.filter((entry) => entry.owner === owner)
+  return settingsIntentStore.getState().active.filter((entry) => entry.patch.owner === owner)
+}
+
+export function failedSettingsIntentsFor(owner: QueryClient): readonly FailedSettingsIntent[] {
+  return settingsIntentStore.getState().failed.filter((entry) => entry.patch.owner === owner)
 }
 
 export function acknowledgeSettingsIntent(mutationId: string): ActiveSettingsIntent | null {
-  return settingsIntentStore.getState().acknowledge(mutationId)
+  return settingsIntentStore.acknowledge(mutationId)
 }
 
 export function failSettingsIntent(
   mutationId: string,
   error: unknown,
 ): FailedSettingsIntent | null {
-  return settingsIntentStore.getState().fail(mutationId, error)
+  const failed = settingsIntentStore.fail(mutationId, error)
+  if (failed) transportStartedAtByMutationId.delete(mutationId)
+  return failed
+}
+
+export function discardSettingsIntent(mutationId: string): boolean {
+  transportStartedAtByMutationId.delete(mutationId)
+  return settingsIntentStore.discard(mutationId)
 }
 
 export function discardFailedSettingsIntent(mutationId: string): boolean {
-  return settingsIntentStore.getState().discardFailed(mutationId)
+  return settingsIntentStore.discardFailed(mutationId)
 }
 
 export function retrySettingsIntent(mutationId: string): ActiveSettingsIntent | null {
-  return settingsIntentStore.getState().retry(mutationId)
+  return settingsIntentStore.retry(mutationId)
 }
 
 export function settleSettingsIntentTransport(mutationId: string) {
-  settingsIntentStore.getState().settleTransport(mutationId)
+  settingsIntentStore.settleTransport(mutationId)
+  transportStartedAtByMutationId.delete(mutationId)
 }
 
 export function settingsIntentStatus(
   mutationId: string,
 ): ActiveSettingsIntent['status'] | 'failed' | null {
   const state = settingsIntentStore.getState()
-  const active = activeIntent(mutationId, state.active)
+  const active = state.active.find((entry) => entry.intentId === mutationId)
   if (active) return active.status
 
-  return state.failed.some((entry) => entry.request.mutationId === mutationId) ? 'failed' : null
+  return state.failed.some((entry) => entry.intentId === mutationId) ? 'failed' : null
 }
 
 export function markSettingsIntentTransportStarted(mutationId: string, startedAt: number) {
@@ -247,52 +150,8 @@ export function settingsIntentTransportStartedAt(mutationId: string) {
 }
 
 export function resetSettingsIntentStore() {
-  const state = settingsIntentStore.getState()
-  for (const entry of state.active) entry.resolveSettlement('discarded')
-
-  settingsIntentStore.setState({ active: [], failed: [], nextClientSequence: 0 })
+  settingsIntentStore.reset()
   transportStartedAtByMutationId.clear()
-}
-
-function acknowledgeActiveIntent(
-  active: readonly MutableActiveSettingsIntent[],
-  mutationId: string,
-  transportSettled: boolean,
-) {
-  if (transportSettled) {
-    return active.filter((entry) => entry.request.mutationId !== mutationId)
-  }
-
-  return active.map((entry) => {
-    if (entry.request.mutationId !== mutationId) return entry
-
-    return { ...entry, status: 'acknowledged' as const }
-  })
-}
-
-function activeEntry(
-  owner: QueryClient,
-  request: SettingsMutationRequest,
-  clientSequence: number,
-  initiator?: string,
-): MutableActiveSettingsIntent {
-  let resolveSettlement: (settlement: SettingsIntentSettlement) => void = () => undefined
-  const settled = new Promise<SettingsIntentSettlement>((resolve) => {
-    resolveSettlement = resolve
-  })
-
-  return {
-    owner,
-    clientSequence,
-    enqueuedAt: now(),
-    initiator,
-    request,
-    resolveSettlement,
-    resources: targetedResources(request.target, request.operations),
-    settled,
-    status: 'pending',
-    transportSettled: false,
-  }
 }
 
 function targetedResources(
@@ -304,33 +163,19 @@ function targetedResources(
   )
 }
 
-function supersededFailures(
-  owner: QueryClient,
-  resources: readonly TargetedResourceKey[],
-  failed: readonly FailedSettingsIntent[],
-): string[] {
-  const superseded: string[] = []
-  for (const entry of failed) {
-    if (entry.owner !== owner) continue
-    if (entry.superseded) continue
-    if (!targetedResourcesIntersect(resources, entry.resources)) continue
-    superseded.push(entry.request.mutationId)
-  }
+function ownerIdFor(owner: QueryClient) {
+  const known = ownerIds.get(owner)
+  if (known !== undefined) return known
 
-  return superseded
+  nextOwnerId += 1
+  const id = String(nextOwnerId)
+  ownerIds.set(owner, id)
+  return id
 }
 
-function targetedResourcesIntersect(
-  left: readonly TargetedResourceKey[],
-  right: readonly TargetedResourceKey[],
-): boolean {
-  for (const leftResource of left) {
-    if (right.some((rightResource) => targetedResourceIntersects(leftResource, rightResource))) {
-      return true
-    }
-  }
-
-  return false
+function splitOwnedResource(resource: string): [string, TargetedResourceKey] {
+  const separator = resource.indexOf('|')
+  return [resource.slice(0, separator), resource.slice(separator + 1) as TargetedResourceKey]
 }
 
 function targetedResourceIntersects(left: TargetedResourceKey, right: TargetedResourceKey) {
@@ -343,15 +188,4 @@ function targetedResourceIntersects(left: TargetedResourceKey, right: TargetedRe
 
 function resourcePart(resource: TargetedResourceKey): SettingsMutationResourceKey {
   return resource.slice(resource.indexOf('/') + 1) as SettingsMutationResourceKey
-}
-
-function activeIntent(
-  mutationId: string,
-  active: readonly MutableActiveSettingsIntent[],
-): MutableActiveSettingsIntent | null {
-  return active.find((entry) => entry.request.mutationId === mutationId) ?? null
-}
-
-function now() {
-  return typeof performance === 'undefined' ? Date.now() : performance.now()
 }

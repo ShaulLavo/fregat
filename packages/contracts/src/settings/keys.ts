@@ -435,6 +435,20 @@ export const SETTINGS_REGISTRY = {
     visibility: 'advanced',
     keywords: ['logs', 'slow', 'threshold', 'performance'],
   }),
+  'developer.simulatedLatencyMs': defineSetting({
+    schema: v.pipe(v.number(), v.integer(), v.minValue(0), v.maxValue(10_000)),
+    default: 0,
+    // A delay is not a binary, a flag or a key, but it reaches every request,
+    // so it stays out of the workspace file all the same.
+    scope: 'application',
+    widget: 'number',
+    category: 'Developer',
+    title: 'Simulated network latency',
+    description:
+      'Milliseconds added before every request to the server, to see how the app behaves on a slow link. Zero disables it.',
+    visibility: 'advanced',
+    keywords: ['developer', 'latency', 'delay', 'slow', 'network', 'optimistic', 'pending'],
+  }),
   'window.transparency': defineSetting({
     // Who supplies the see-through, not how much of it there is.
     //

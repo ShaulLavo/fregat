@@ -206,7 +206,7 @@ export function SettingsBrowser({
         return state.failures.length ? null : 'There are no failed settings writes.'
       },
       run: () => {
-        for (const entry of state.failures) owner.retry(entry.request.mutationId)
+        for (const entry of state.failures) owner.retry(entry.intentId)
       },
     },
     'settings.discard': {
@@ -214,7 +214,7 @@ export function SettingsBrowser({
         settingsDisabled(context) ??
         (state.failures.length ? null : 'There are no failed settings writes.'),
       run: () => {
-        for (const entry of state.failures) owner.discard(entry.request.mutationId)
+        for (const entry of state.failures) owner.discard(entry.intentId)
       },
     },
   })

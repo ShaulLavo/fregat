@@ -71,21 +71,21 @@ export function useSettingsActions() {
       mutationKey: SETTINGS_MUTATION_KEY,
       onError: (error, entry) => {
         logSettingsMutationFailure(entry, error)
-        if (settingsIntentStatus(entry.request.mutationId) === 'acknowledged') return
+        if (settingsIntentStatus(entry.intentId) === 'acknowledged') return
 
-        const failed = failSettingsIntent(entry.request.mutationId, error)
+        const failed = failSettingsIntent(entry.intentId, error)
         if (!failed) return
         if (failed.superseded) return
 
         notifySaveError({
-          discard: () => discardFailedMutation(failed.request.mutationId),
+          discard: () => discardFailedMutation(failed.intentId),
           error,
-          mutationId: failed.request.mutationId,
-          retry: () => retryFailedIntent(failed.request.mutationId, transport.mutate),
+          mutationId: failed.intentId,
+          retry: () => retryFailedIntent(failed.intentId, transport.mutate),
         })
       },
       onSettled: (_result, _error, entry) => {
-        settleSettingsIntentTransport(entry.request.mutationId)
+        settleSettingsIntentTransport(entry.intentId)
       },
       onSuccess: async ({ result: initialResult, startedAt }, entry) => {
         let admitted
@@ -94,14 +94,14 @@ export function useSettingsActions() {
         } catch (error) {
           annotateSettingsTransportError(entry, startedAt, error)
           logSettingsMutationFailure(entry, error)
-          const failed = failSettingsIntent(entry.request.mutationId, error)
+          const failed = failSettingsIntent(entry.intentId, error)
           if (!failed || failed.superseded) return
 
           notifySaveError({
-            discard: () => discardFailedMutation(failed.request.mutationId),
+            discard: () => discardFailedMutation(failed.intentId),
             error,
-            mutationId: failed.request.mutationId,
-            retry: () => retryFailedIntent(failed.request.mutationId, transport.mutate),
+            mutationId: failed.intentId,
+            retry: () => retryFailedIntent(failed.intentId, transport.mutate),
           })
           return
         }
@@ -140,21 +140,19 @@ export function useSettingsActions() {
     target: SettingsWriteTarget,
     operations: readonly SettingsOperation[],
     initiator?: string,
-    beforePublish?: (entry: ActiveSettingsIntent) => void,
   ): SettingsSubmission => {
     const { entry, supersededMutationIds } = submitSettingsIntent(
       queryClient,
       target,
       operations,
       initiator,
-      beforePublish,
     )
     for (const mutationId of supersededMutationIds) dismissSaveError(mutationId)
     transport.mutate(entry)
 
     return {
       kind: 'submitted',
-      mutationId: entry.request.mutationId,
+      mutationId: entry.intentId,
       settled: entry.settled,
     }
   }
@@ -175,7 +173,6 @@ export function useSettingsActions() {
     theme: SettingsValues['workbench.colorTheme'],
     fallback: SettingsValues['workbench.colorTheme'],
     initiator?: string,
-    beforePublish?: (entry: ActiveSettingsIntent) => void,
   ): SettingsSubmission => {
     if (readLiveColorTheme(queryClient, fallback) === theme) return { kind: 'noop' }
 
@@ -184,7 +181,7 @@ export function useSettingsActions() {
       kind: 'set',
       value: theme,
     }
-    return submit(targetFor('workbench.colorTheme'), [operation], initiator, beforePublish)
+    return submit(targetFor('workbench.colorTheme'), [operation], initiator)
   }
 
   return {
@@ -229,9 +226,9 @@ function discardFailedMutation(mutationId: string) {
 }
 
 async function transportSettingsIntent(entry: ActiveSettingsIntent, client: Client) {
-  const startedAt = markSettingsIntentTransportStarted(entry.request.mutationId, settingsNow())
+  const startedAt = markSettingsIntentTransportStarted(entry.intentId, settingsNow())
   try {
-    const result = await saveSettings(entry.request, client)
+    const result = await saveSettings(entry.patch.request, client)
     return { result, startedAt }
   } catch (error) {
     annotateSettingsTransportError(entry, startedAt, error)
@@ -258,7 +255,7 @@ async function admitSuccessfulMutation(
 async function retrySettingsTransport(entry: ActiveSettingsIntent, client: Client) {
   for (let attempt = 0; attempt < 3; attempt += 1) {
     try {
-      return await saveSettings(entry.request, client)
+      return await saveSettings(entry.patch.request, client)
     } catch (error) {
       if (!shouldRetrySettingsTransport(attempt, error) || attempt === 2) throw error
 
@@ -297,8 +294,8 @@ function annotateSettingsTransportError(
 }
 
 function logSettingsMutationFailure(entry: ActiveSettingsIntent, error: unknown) {
-  const acknowledged = settingsIntentStatus(entry.request.mutationId) === 'acknowledged'
-  const startedAt = settingsIntentTransportStartedAt(entry.request.mutationId) ?? entry.enqueuedAt
+  const acknowledged = settingsIntentStatus(entry.intentId) === 'acknowledged'
+  const startedAt = settingsIntentTransportStartedAt(entry.intentId) ?? entry.enqueuedAt
   const metadata = clientErrorMetadata(error)
   const event = {
     action: 'settings.write',

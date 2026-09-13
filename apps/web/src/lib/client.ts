@@ -6,6 +6,7 @@ import {
 } from '@workspace/client-core/transport/client'
 
 import { clientInstanceId, instanceHeaderName } from '@/lib/instance-id'
+import { latencyFetcher } from '@/lib/simulated-latency'
 
 export type { Client }
 
@@ -55,6 +56,7 @@ export function environmentClientFor(origin: string): Client {
     createClient: (endpoint) =>
       createEnvironmentClient({
         origin: endpoint,
+        fetcher: latencyFetcher,
         headers: () => ({ [instanceHeaderName]: clientInstanceId() }),
       }),
   })

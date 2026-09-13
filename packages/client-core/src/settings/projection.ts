@@ -29,10 +29,10 @@ export function projectSettings(
   confirmed: SettingsSnapshot,
   active: readonly ActiveSettingsIntent[],
 ): SettingsProjection {
-  const ordered = active.toSorted((left, right) => left.clientSequence - right.clientSequence)
+  const ordered = active.toSorted((left, right) => left.sequence - right.sequence)
   const pending = ordered.filter((entry) => entry.status === 'pending')
   const acknowledgedMutationIds = ordered.flatMap((entry) =>
-    entry.status === 'acknowledged' ? [entry.request.mutationId] : [],
+    entry.status === 'acknowledged' ? [entry.intentId] : [],
   )
   if (pending.length === 0) {
     return {
@@ -51,7 +51,7 @@ export function projectSettings(
     acknowledgedMutationIds,
     diagnostics: resolution.diagnostics,
     layers,
-    pendingMutationIds: pending.map((entry) => entry.request.mutationId),
+    pendingMutationIds: pending.map((entry) => entry.intentId),
     values: maskProjectedProviderSecrets(resolution.values, confirmed.values),
   }
 }
@@ -75,9 +75,9 @@ function applyIntentToLayers(
   entry: ActiveSettingsIntent,
 ): SettingsProjectionLayer[] {
   return layers.map((layer) => {
-    if (layer.id !== entry.request.target) return layer
+    if (layer.id !== entry.patch.request.target) return layer
 
-    const reduction = applySettingsOperations(layer.raw, entry.request.operations)
+    const reduction = applySettingsOperations(layer.raw, entry.patch.request.operations)
     if (reduction.raw === layer.raw) return layer
 
     return { ...layer, present: true, raw: reduction.raw }

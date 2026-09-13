@@ -1,5 +1,6 @@
 import { environmentLogContext } from '@/lib/environments/state/log-context'
 import { serverEndpoint } from '@/lib/client'
+import { simulateLatency } from '@/lib/simulated-latency'
 import {
   OrchestrationRpcClient,
   type OrchestrationRpcClientOptions,
@@ -17,6 +18,7 @@ export type WebOrchestrationRpcClientOptions = Omit<
 export function createOrchestrationRpcClient(options: WebOrchestrationRpcClientOptions) {
   return new OrchestrationRpcClient({
     ...options,
+    beforeRequest: simulateLatency,
     createSocket: () => {
       const endpoint = new URL(`${serverEndpoint(options.origin)}/orchestration/rpc`)
       endpoint.protocol = endpoint.protocol === 'https:' ? 'wss:' : 'ws:'

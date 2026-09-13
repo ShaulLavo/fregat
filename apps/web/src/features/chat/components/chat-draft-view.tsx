@@ -1,8 +1,5 @@
 import {
-  type EnvironmentId,
-  type CommandId,
   type ModelSelection,
-  type OrchestrationMessage,
   type OrchestrationProjectShell,
   type SessionId,
   type OrchestrationWorktreeShell,
@@ -21,9 +18,8 @@ import { providerListQueryOptions } from '@/features/chat/utils/provider-query'
 import { resolveChatModelSelection } from '@workspace/client-core/chat/providers/selection'
 import { dispatchChatCommand, replayAfterDispatch } from '@/features/chat/utils/command-dispatch'
 import { scheduleSessionProjectionSyncAfterDispatch } from '@/features/chat/utils/command-sync'
-import { optimisticMessageSummary } from '@/features/chat/utils/pipeline-logging'
+import { placeChatMessage } from '@/features/chat/state/place-chat-message'
 import { ChatComposerModesProvider } from '../providers/composer-modes-provider'
-import { useChatOptimisticStore } from '../state/chat-optimistic-store'
 import type { ChatInputDraftTarget } from '../state/chat-input-draft-store'
 import { ChatInput, type ChatInputSubmitPayload } from './chat-input'
 import { ChatWelcomeView } from './chat-welcome-view'
@@ -117,25 +113,8 @@ export function ChatDraftView({
       terminalContexts,
       text,
     })
-    const outcome = await dispatchChatCommand({
+    const outcome = await placeChatMessage({
       action: 'chat.draft.dispatch.summary',
-      beforeDispatch: (scope) => {
-        scope.increment('command.submitCount')
-        addOptimisticMessage(
-          transport.environmentId,
-          submission.command.commandId,
-          submission.optimisticMessage,
-        )
-        scope.increment('command.optimisticAddedCount')
-        scope.set({
-          optimistic: optimisticMessageSummary({
-            commandId: submission.command.commandId,
-            messageId: submission.optimisticMessage.id,
-            textLength: submission.optimisticMessage.text.length,
-            sessionId: submission.optimisticMessage.sessionId,
-          }),
-        })
-      },
       command: submission.command,
       context: {
         attachmentCount: attachments.length,
@@ -154,8 +133,11 @@ export function ChatDraftView({
           replayAfterSequence: replayAfterDispatch(submission.command, result),
           sessionId: submission.command.sessionId,
         }),
-      onFailed: () =>
-        removeOptimisticMessage(transport.environmentId, submission.optimisticMessage),
+      placement: {
+        environmentId: transport.environmentId,
+        commandId: submission.command.commandId,
+        message: submission.optimisticMessage,
+      },
     })
     if (!outcome.ok) {
       setSendError(outcome.message)
@@ -202,18 +184,4 @@ export function ChatDraftView({
       </ChatComposerModesProvider>
     </section>
   )
-}
-
-function addOptimisticMessage(
-  environmentId: EnvironmentId,
-  commandId: CommandId,
-  message: OrchestrationMessage,
-) {
-  useChatOptimisticStore.getState().addOptimisticMessage(environmentId, commandId, message)
-}
-
-function removeOptimisticMessage(environmentId: EnvironmentId, message: OrchestrationMessage) {
-  useChatOptimisticStore
-    .getState()
-    .removeOptimisticMessage({ environmentId, sessionId: message.sessionId }, message.id)
 }

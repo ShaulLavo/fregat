@@ -50,14 +50,14 @@ test('pending settings, acknowledgements and supersession belong to one query cl
       snapshotB.values['editor.fontSize'],
     )
 
-    const resultB = await saveSettings(entry.request, secondClient)
+    const resultB = await saveSettings(entry.patch.request, secondClient)
     await admitSettingsMutationResult(second, resultB)
-    expect(settingsIntentStatus(entry.request.mutationId)).toBe('pending')
+    expect(settingsIntentStatus(entry.intentId)).toBe('pending')
 
-    failSettingsIntent(entry.request.mutationId, 'request failed on A')
+    failSettingsIntent(entry.intentId, 'request failed on A')
     submitSettingsIntent(second, 'user', [{ kind: 'set', key: 'editor.fontSize', value: 20 }])
     expect(useSettingsIntentStore.getState().failed[0]).toMatchObject({
-      owner: first,
+      patch: { owner: first },
       superseded: false,
     })
   } finally {

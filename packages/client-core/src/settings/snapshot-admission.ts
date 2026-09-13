@@ -292,7 +292,7 @@ export function createSettingsSnapshotAdmission(host: SettingsAdmissionHost) {
     recoveredProviderChange: boolean,
   ): AdmissionResult {
     const intent = intentSatisfiedBySnapshot(queryClient, update.originMutationId, confirmed)
-    const acknowledgement = acknowledgeIntent(queryClient, intent?.request.mutationId)
+    const acknowledgement = acknowledgeIntent(queryClient, intent?.intentId)
     invalidateProviderQueries(
       queryClient,
       recoveredProviderChange ||
@@ -316,15 +316,13 @@ export function createSettingsSnapshotAdmission(host: SettingsAdmissionHost) {
 
     const intent = settingsIntentStore
       .getState()
-      .active.find(
-        (entry) => entry.owner === queryClient && entry.request.mutationId === mutationId,
-      )
+      .active.find((entry) => entry.patch.owner === queryClient && entry.intentId === mutationId)
     if (!intent) return null
 
-    const layer = snapshot.layers.find((candidate) => candidate.id === intent.request.target)
+    const layer = snapshot.layers.find((candidate) => candidate.id === intent.patch.request.target)
     if (!layer) return null
 
-    const reduction = applySettingsOperations(layer.raw, intent.request.operations)
+    const reduction = applySettingsOperations(layer.raw, intent.patch.request.operations)
     return reduction.raw === layer.raw ? intent : null
   }
 
@@ -332,9 +330,7 @@ export function createSettingsSnapshotAdmission(host: SettingsAdmissionHost) {
     if (!mutationId) return { intent: null, newlyAcknowledged: null }
     const owned = settingsIntentStore
       .getState()
-      .active.some(
-        (entry) => entry.owner === queryClient && entry.request.mutationId === mutationId,
-      )
+      .active.some((entry) => entry.patch.owner === queryClient && entry.intentId === mutationId)
     if (!owned) return { intent: null, newlyAcknowledged: null }
 
     const wasPending = settingsIntentStatus(mutationId) === 'pending'
@@ -395,7 +391,7 @@ export function createSettingsSnapshotAdmission(host: SettingsAdmissionHost) {
     acknowledgedIntent: ActiveSettingsIntent | null,
   ) {
     if (
-      acknowledgedIntent?.request.operations.some(
+      acknowledgedIntent?.patch.request.operations.some(
         (operation) => operation.kind === 'provider.setEnabled',
       )
     ) {

@@ -11,7 +11,7 @@ import { treeModel } from '@/lib/tree-model'
 
 import { expect, test } from '../../../../test/fixtures'
 
-test('projects a file move only after reservation and reports its exact paths', async () => {
+test('renames only after reservation and reports its exact paths', async () => {
   const events: string[] = []
   const reported: Array<readonly string[] | 'all'> = []
   let declared: readonly string[] | 'all' | null = null
@@ -19,7 +19,6 @@ test('projects a file move only after reservation and reports its exact paths', 
 
   await runTreeDropMoveMutation(request, {
     model: fileTreeModel([file('/repo/a.ts')]),
-    project: () => events.push('project'),
     rename: async (from, to) => {
       events.push(`rename:${from}->${to}`)
     },
@@ -32,19 +31,17 @@ test('projects a file move only after reservation and reports its exact paths', 
   })
 
   expect(declared).toEqual(['/repo/a.ts', '/repo/nested/a.ts'])
-  expect(events).toEqual(['reserved', 'project', 'rename:/repo/a.ts->/repo/nested/a.ts'])
+  expect(events).toEqual(['reserved', 'rename:/repo/a.ts->/repo/nested/a.ts'])
   expect(reported).toEqual([['/repo/a.ts', '/repo/nested/a.ts']])
 })
 
-test('does not project when the authoritative reservation refuses the move', async () => {
+test('does not rename when the authoritative reservation refuses the move', async () => {
   const failure = new TypeError('busy')
-  const project = vi.fn()
   const rename = vi.fn(async () => undefined)
 
   await expect(
     runTreeDropMoveMutation(moveRequest([{ fromTreePath: 'a.ts', toTreePath: 'b.ts' }]), {
       model: fileTreeModel([file('/repo/a.ts')]),
-      project,
       rename,
       runWorkspaceMutation: async () => {
         throw failure
@@ -52,7 +49,6 @@ test('does not project when the authoritative reservation refuses the move', asy
     }),
   ).rejects.toBe(failure)
 
-  expect(project).not.toHaveBeenCalled()
   expect(rename).not.toHaveBeenCalled()
 })
 
@@ -66,7 +62,6 @@ test('uses all-path invalidation when any dragged source is a directory', async 
 
   await runTreeDropMoveMutation(request, {
     model: fileTreeModel([file('/repo/a.ts'), directory('/repo/folder')]),
-    project: () => undefined,
     rename: async () => undefined,
     runWorkspaceMutation: async (affectedPaths, operation) => {
       declared = affectedPaths
@@ -97,7 +92,6 @@ test('reports only completed renames when a later move fails', async () => {
   await expect(
     runTreeDropMoveMutation(request, {
       model: fileTreeModel([file('/repo/a.ts'), file('/repo/b.ts')]),
-      project: () => undefined,
       rename,
       runWorkspaceMutation: async (_affectedPaths, operation) =>
         operation((paths) => reported.push(paths)),

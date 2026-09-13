@@ -5,17 +5,17 @@ import { modelRefKey, type SettingId, type SettingsOperation } from '@workspace/
 import type { ActiveSettingsIntent } from '@workspace/client-core/settings/intent-store'
 
 export function settingsMutationLogContext(entry: ActiveSettingsIntent) {
-  const metadata = operationMetadata(entry.request.operations)
+  const metadata = operationMetadata(entry.patch.request.operations)
 
   return {
-    ...environmentLogContext(originForQueryClient(entry.owner)),
+    ...environmentLogContext(originForQueryClient(entry.patch.owner)),
     affectedIds: metadata.affectedIds,
-    clientSequence: entry.clientSequence,
-    initiator: entry.initiator,
-    mutationId: entry.request.mutationId,
-    operationKinds: entry.request.operations.map((operation) => operation.kind),
+    clientSequence: entry.sequence,
+    initiator: entry.patch.initiator,
+    mutationId: entry.intentId,
+    operationKinds: entry.patch.request.operations.map((operation) => operation.kind),
     settingIds: metadata.settingIds,
-    target: entry.request.target,
+    target: entry.patch.request.target,
   }
 }
 

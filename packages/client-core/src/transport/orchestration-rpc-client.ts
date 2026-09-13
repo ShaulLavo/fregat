@@ -68,6 +68,12 @@ export type OrchestrationRpcClientOptions = {
   readonly environments: ReturnType<typeof createEnvironmentsStore>
   readonly observation: RpcObservation
   readonly onDisconnect?: (error: unknown) => void
+  /**
+   * The host's latency dial, run before each request or subscription is sent.
+   * Returning nothing keeps the send synchronous up to the socket, which the
+   * transport tests depend on when the dial is off.
+   */
+  readonly beforeRequest?: () => Promise<void> | undefined
   heartbeatIntervalMs?: number
   heartbeatTimeoutMs?: number
   slowRequestMs?: number
@@ -233,6 +239,8 @@ export class OrchestrationRpcClient {
     message: OrchestrationWsRequest,
     resultSchema: TSchema,
   ): Promise<v.InferOutput<TSchema>> {
+    const delay = this.options.beforeRequest?.()
+    if (delay) await delay
     const socket = await this.connect()
 
     return new Promise<v.InferOutput<TSchema>>((resolve, reject) => {
@@ -410,6 +418,8 @@ export class OrchestrationRpcClient {
   }
 
   private async sendClientMessage(message: OrchestrationWsClientMessage) {
+    const delay = this.options.beforeRequest?.()
+    if (delay) await delay
     const socket = await this.connect()
 
     this.sendSocketMessage(socket, message)

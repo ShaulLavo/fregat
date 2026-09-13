@@ -4,7 +4,6 @@ import { filesystemPath } from '@/lib/documents/utils/identity'
 import { act, renderHook, waitFor } from '@testing-library/react'
 import { FileTreeModel } from '@workspace/tree'
 import type { ReactNode } from 'react'
-import { vi } from 'vitest'
 import { createEditorBufferSession } from '@singapor/core'
 
 import { useEditorCommands } from '@/features/editor/hooks/use-editor-commands'
@@ -16,6 +15,11 @@ import { createFileContent, ensureFolderPath, fetchFile, fetchTree } from '@/lib
 import type { TreeEntry } from '@/lib/file-system-types'
 import { createClientError } from '@workspace/client-core/errors'
 import { treeModel } from '@/lib/tree-model'
+import {
+  projectedTreeModel,
+  resetTreeIntents,
+  treeIntents,
+} from '@/features/workspace/state/tree-intents'
 
 import { expect, test } from '../../../../test/fixtures'
 import { AppProviders, createTestQueryClient } from '../../../../test/render'
@@ -211,7 +215,7 @@ test('invalidates all workspace-edit history for directory tree mutations', asyn
   harness.cleanUp()
 })
 
-test('keeps optimistic rollback when the authoritative mutation reservation rejects', async ({
+test('withdraws the projected rename when the authoritative mutation reservation rejects', async ({
   client,
 }) => {
   void client
@@ -226,7 +230,7 @@ test('keeps optimistic rollback when the authoritative mutation reservation reje
   const tabId = workspaceStore.getState().workbenchPanels.activeEditorTabId!
   const view = documentStore.getState().ensureEditorView(tabId, file)
   harness.tree.move('old.ts', 'new.ts')
-  const move = vi.spyOn(harness.tree, 'move')
+  const rootPath = filesystemPath('repo')
 
   act(() => {
     harness.result.current.completeRename({
@@ -236,7 +240,12 @@ test('keeps optimistic rollback when the authoritative mutation reservation reje
     })
   })
 
-  await waitFor(() => expect(move).toHaveBeenCalledWith('new.ts', 'old.ts'))
+  // The projection shows the rename until the reservation refuses it, then drops it.
+  await waitFor(() => expect(treeIntents.getState().active).toHaveLength(0))
+  expect(treeIntents.getState().failed).toHaveLength(0)
+  const projected = projectedTreeModel(harness.model, rootPath)
+  expect(projected).toBe(harness.model)
+  expect(projected.entriesByTreePath.has('new.ts')).toBe(false)
   expect(service.affectedPaths).toEqual([['repo/old.ts', 'repo/new.ts']])
   expect(workspaceStore.getState().selectedTabContent).toEqual(testTabContent('repo/old.ts'))
   expect(
@@ -250,6 +259,8 @@ test('keeps optimistic rollback when the authoritative mutation reservation reje
 })
 
 async function renderFsActions(rootPath: string, service = new RecordingWorkspaceEditService()) {
+  // The queue is global; an earlier test's unacknowledged intents must not leak in.
+  resetTreeIntents()
   const model = treeModel(
     await fetchTree(filesystemPath(rootPath), signal(), getClient()),
     rootPath,
@@ -282,6 +293,7 @@ async function renderFsActions(rootPath: string, service = new RecordingWorkspac
 
   return {
     ...hook,
+    model,
     queryClient,
     cleanUp: () => {
       hook.unmount()

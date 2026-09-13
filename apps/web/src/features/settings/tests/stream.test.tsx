@@ -178,7 +178,7 @@ test('refetches and reconnects a real SSE response without dropping projection',
     })
   })
   expect(stream.result.current?.values['workbench.colorTheme']).toBe('dark')
-  expect(stream.result.current?.pendingMutationIds).toEqual([pending.request.mutationId])
+  expect(stream.result.current?.pendingMutationIds).toEqual([pending.intentId])
 
   stream.unmount()
   resetSettingsSnapshotAdmission(queryClient)

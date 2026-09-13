@@ -22,7 +22,11 @@ import {
   useChatInputDraftStore,
   type ChatInputDraftTarget,
 } from '@/features/chat/state/chat-input-draft-store'
-import { useChatOptimisticStore } from '@/features/chat/state/chat-optimistic-store'
+import {
+  chatMessageIntents,
+  createOptimisticMessagesForSessionSelector,
+  resetChatMessageIntents,
+} from '@/features/chat/state/chat-message-intents'
 import { useChatProjectionStore } from '@/features/chat/state/chat-projection-store'
 import { unsupportedChatTransport } from '../../../../../test/factories/chat-transport'
 import { expect, test } from '../../../../../test/fixtures'
@@ -210,13 +214,7 @@ test('a host that cannot show the new session does not undo the accepted turn', 
   // will answer stays on screen and the projection still catches up.
   const command = dispatched[0]
   const splitSessionId = command?.type === 'session.turn.start' ? command.sessionId : SESSION_ID
-  expect(
-    Object.keys(
-      useChatOptimisticStore.getState().messagesBySessionKey[
-        `${FIXTURE_ENVIRONMENT_ID}:${splitSessionId}`
-      ] ?? {},
-    ),
-  ).toHaveLength(1)
+  expect(pendingMessagesFor(splitSessionId)).toHaveLength(1)
   await waitFor(() => {
     expect(snapshotRequests).toContain(splitSessionId)
   })
@@ -227,13 +225,7 @@ test('a rejected dispatch drops the optimistic message so the timeline stays hon
 
   await userEvent.click(screen.getByRole('button', { name: 'Implement' }))
 
-  expect(
-    Object.keys(
-      useChatOptimisticStore.getState().messagesBySessionKey[
-        `${FIXTURE_ENVIRONMENT_ID}:${SESSION_ID}`
-      ] ?? {},
-    ),
-  ).toHaveLength(0)
+  expect(pendingMessagesFor(SESSION_ID)).toHaveLength(0)
   expect(await screen.findByRole('button', { name: 'Implement' })).toBeEnabled()
 })
 
@@ -251,7 +243,7 @@ function renderBanner({
   plan?: Partial<OrchestrationProposedPlan>
 } = {}) {
   resetChatInputDraftStore()
-  useChatOptimisticStore.setState({ messagesBySessionKey: {} })
+  resetChatMessageIntents()
   useChatProjectionStore.getState().resetChatProjection()
 
   // The factory's default session is mid-turn, which is exactly the busy case.
@@ -348,4 +340,11 @@ function proposedPlan(
     updatedAt: '2026-05-28T00:00:02.000Z',
     ...overrides,
   } as OrchestrationProposedPlan
+}
+
+function pendingMessagesFor(sessionId: SessionId) {
+  return createOptimisticMessagesForSessionSelector({
+    environmentId: FIXTURE_ENVIRONMENT_ID,
+    sessionId,
+  })(chatMessageIntents.getState())
 }

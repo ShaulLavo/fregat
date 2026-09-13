@@ -14,7 +14,7 @@ import {
 } from '@workspace/contracts'
 import * as v from 'valibot'
 
-import type { OptimisticChatMessage } from '@/features/chat/state/chat-optimistic-store'
+import type { OptimisticChatMessage } from '@/features/chat/state/chat-message-intents'
 import type { ChatTurnDiffSummary } from '@workspace/client-core/chat/types'
 import { chatTimelineItems, type ChatTimelineItem } from '@/features/chat/utils/timeline-items'
 

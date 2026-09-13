@@ -40,6 +40,7 @@ a bare root `bun run verify`.
 | [110 — workspace indexing](110-workspace-indexing.md)                           | **RESEARCH — NO IMPLEMENTATION SCOPE YET**           |
 | [111 — editor decorations](111-editor-decorations.md)                           | **RESEARCH — NO IMPLEMENTATION SCOPE YET**           |
 | [112 — the large-file ceiling](112-large-file-ceiling.md)                       | **RESEARCH — NO IMPLEMENTATION SCOPE YET**           |
+| [113 — one optimistic primitive](113-optimistic-intents.md)                     | **PROPOSED — CORE AND RAIL MIGRATION IMPLEMENTED**   |
 | [094 — client-core web and TUI parity](094-client-core-web-tui-parity.md)       | **PROPOSED — DEPENDS ON 091; 096 COMPLETE**          |
 | [095 — server plumbing](095-server-plumbing.md)                                 | **PROPOSED — IMPLEMENTATION NOT STARTED**            |
 | [073 — Electrobun 2.x migration](073-electrobun-v2-migration.md)                | **PROPOSED — ROOT GO/NO-GO SCHEDULING**              |

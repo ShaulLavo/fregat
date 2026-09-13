@@ -14,7 +14,6 @@ import { EmptyState } from '@workspace/ui/components/empty-state'
 
 import { containerTreePath, workspacePathForTreePath } from '@/features/workspace/utils/entry-paths'
 import { fileTreeIndentGuideVariables } from '@/features/workspace/utils/indent-guide-style'
-import { invalidateTreeQueries } from '@/features/workspace/utils/invalidate-queries'
 import {
   loadExpandedDirectories,
   syncTreePaneState,
@@ -31,6 +30,8 @@ import { useWorkbenchDensity } from '@/features/settings/hooks/use-workbench-den
 import { useFileTreeMutationEvents } from '@/features/workspace/hooks/use-file-tree-mutation-events'
 import { useOptionalWorkspaceEditService } from '@/features/editor/providers/workspace-edit-context'
 import { useFsActions } from '@/features/workspace/hooks/use-fs-actions'
+import { useProjectedTreeModel } from '@/features/workspace/hooks/use-projected-tree-model'
+import { hasPendingTreeMove, runTreeIntent } from '@/features/workspace/state/tree-intents'
 import { useTreeSearchSession } from '@/features/workspace/hooks/use-tree-search-session'
 import { useEditorCommands } from '@/features/editor/hooks/use-editor-commands'
 import { useEditorWorkspaceState } from '@/features/editor/state/workspace-state'
@@ -50,13 +51,8 @@ import { canonicalTreePath } from '@/lib/path-formatters'
 import { fileSystemKeys } from '@/lib/query-keys'
 import { queryHasNoData } from '@/lib/query-state'
 import { useFocusTarget } from '@/lib/focus/hooks/use-target'
-import {
-  moveTreeModelPaths,
-  treePathForSelectedPath,
-  type TreePathMove,
-  type TreeModel,
-} from '@/lib/tree-model'
-import { useIsFetching, useMutation, useQueryClient } from '@tanstack/react-query'
+import { treePathForSelectedPath, type TreePathMove, type TreeModel } from '@/lib/tree-model'
+import { useIsFetching, useQueryClient } from '@tanstack/react-query'
 import {
   useEffectEvent,
   useEffect,
@@ -93,19 +89,21 @@ export const TreePane = memo(
     }
     if (state.status !== 'ready') return <EmptyState title='No files' />
 
-    return <ReadyTreePane gitStatus={gitStatus} model={state.data} rootPath={rootPath} />
+    return <ReadyTreePane confirmed={state.data} gitStatus={gitStatus} rootPath={rootPath} />
   },
 )
 
 function ReadyTreePane({
+  confirmed,
   gitStatus,
-  model,
   rootPath,
 }: {
+  confirmed: TreeModel
   gitStatus?: readonly GitStatusEntry[]
-  model: TreeModel
   rootPath: FilesystemPath
 }) {
+  // Confirmed entries plus this root's pending intents: what the rows should show.
+  const model = useProjectedTreeModel(confirmed, rootPath)
   const { editorTheme } = useEditorColorTheme()
   const workbenchDensity = useWorkbenchDensity()
   const selectedFilePath = useEditorWorkspaceState(
@@ -134,10 +132,6 @@ function ReadyTreePane({
   const modelRef = useRef(model)
   const selectedFilePathRef = useRef(selectedFilePath)
   const selectFileRef = useRef(selectFile)
-  const movePendingRef = useRef(false)
-  const moveProjectionReceiptsRef = useRef(
-    new WeakMap<TreeDropMoveRequest, TreeDropMoveProjectionReceipt>(),
-  )
   const pathsRef = useRef(model.paths)
   const selectionSyncRef = useRef<SelectionSyncState>({
     rootPath: null,
@@ -148,44 +142,35 @@ function ReadyTreePane({
   const previousGitStatusRef = useRef(initialGitStatus)
   const [initialPreparedInput] = useState(() => preparedTreeInputForPaths(model.paths))
   const icons = useMemo(() => fileTreeIconsForPaths(model.paths), [model.paths])
-  const moveMutation = useMutation({
-    mutationFn: (request: TreeDropMoveRequest, { client }) =>
-      runTreeDropMoveMutation(request, {
-        model: modelRef.current,
-        project: () => {
-          const receipt = projectTreeDropMove(queryClient, modelRef.current, request)
-          moveProjectionReceiptsRef.current.set(request, receipt)
-          pathsRef.current = receipt.nextModel.paths
-        },
-        rename: (from, to) =>
-          renamePath(filesystemPath(from), filesystemPath(to), clientForQueryClient(client)),
-        runWorkspaceMutation: workspaceEdits
-          ? (affectedPaths, operation) =>
-              workspaceEdits.runWorkspaceMutation(
-                affectedPaths === 'all' ? 'all' : affectedPaths.map(filesystemPath),
-                (report) =>
-                  operation((paths) => report(paths === 'all' ? 'all' : paths.map(filesystemPath))),
-              )
-          : null,
-      }),
-    onMutate: () => {
-      movePendingRef.current = true
-    },
-    onError: (error, request) => {
-      const receipt = moveProjectionReceiptsRef.current.get(request)
-      if (receipt) {
-        pathsRef.current = receipt.previousModel.paths
-        queryClient.setQueryData(fileSystemKeys.tree(receipt.rootPath), receipt.previousModel)
-        treeRef.current?.resetPaths(receipt.previousModel.paths)
-      }
-      reportError(toClientError(error))
-    },
-    onSettled: (_data, _error, request) => {
-      moveProjectionReceiptsRef.current.delete(request)
-      movePendingRef.current = false
-      invalidateTreeQueries(queryClient)
-    },
-  })
+  function moveDroppedPaths(moves: readonly TreePathMove[]) {
+    void runTreeIntent({
+      patch: { kind: 'move', rootPath, moves },
+      queryClient,
+      perform: () =>
+        runTreeDropMoveMutation(
+          { moves, rootPath },
+          {
+            model: modelRef.current,
+            rename: (from, to) =>
+              renamePath(
+                filesystemPath(from),
+                filesystemPath(to),
+                clientForQueryClient(queryClient),
+              ),
+            runWorkspaceMutation: workspaceEdits
+              ? (affectedPaths, operation) =>
+                  workspaceEdits.runWorkspaceMutation(
+                    affectedPaths === 'all' ? 'all' : affectedPaths.map(filesystemPath),
+                    (report) =>
+                      operation((paths) =>
+                        report(paths === 'all' ? 'all' : paths.map(filesystemPath)),
+                      ),
+                  )
+              : null,
+          },
+        ),
+    })
+  }
   const fsActions = useFsActions({ modelRef, rootPath, treeRef })
   const completeRenameRef = useRef(fsActions.completeRename)
   const loadExpandedDirectoriesForCurrentModel = useEffectEvent((currentTree: FileTreeModel) => {
@@ -218,7 +203,7 @@ function ReadyTreePane({
     dragAndDrop: {
       canDrag: (paths) =>
         fsActions.actions.mutationsEnabled &&
-        canDragTreePaths(modelRef.current, paths, movePendingRef.current),
+        canDragTreePaths(modelRef.current, paths, hasPendingTreeMove(rootPath)),
       canDrop: (context) =>
         fsActions.actions.mutationsEnabled && canDropTreePaths(modelRef.current, context),
       onDropComplete: (event) => {
@@ -226,7 +211,7 @@ function ReadyTreePane({
         const moves = treePathMovesForDrop(event)
         if (moves.length === 0) return
 
-        moveMutation.mutate({ moves, rootPath })
+        moveDroppedPaths(moves)
       },
       onDropError: (error) => {
         reportError(toClientError({ code: 'INVALID_PATH', error }))
@@ -498,12 +483,6 @@ export type TreeDropMoveRequest = {
   rootPath: FilesystemPath
 }
 
-type TreeDropMoveProjectionReceipt = {
-  nextModel: TreeModel
-  previousModel: TreeModel
-  rootPath: FilesystemPath
-}
-
 type ReportTreeDropAffectedPaths = (affectedPaths: readonly string[] | 'all') => void
 
 type RunTreeDropWorkspaceMutation = (
@@ -513,7 +492,6 @@ type RunTreeDropWorkspaceMutation = (
 
 export type TreeDropMoveMutationOptions = {
   model: TreeModel
-  project: () => void
   rename: (from: string, to: string) => Promise<unknown>
   runWorkspaceMutation: RunTreeDropWorkspaceMutation | null
 }
@@ -522,10 +500,8 @@ export async function runTreeDropMoveMutation(
   request: TreeDropMoveRequest,
   options: TreeDropMoveMutationOptions,
 ) {
-  const operation = (reportAffectedPaths?: ReportTreeDropAffectedPaths) => {
-    options.project()
-    return moveDroppedTreePaths(request, options.model, options.rename, reportAffectedPaths)
-  }
+  const operation = (reportAffectedPaths?: ReportTreeDropAffectedPaths) =>
+    moveDroppedTreePaths(request, options.model, options.rename, reportAffectedPaths)
   if (!options.runWorkspaceMutation) return operation()
 
   return options.runWorkspaceMutation(treeDropAffectedPaths(request, options.model), operation)
@@ -565,19 +541,6 @@ function treeDropMovesDirectory(moves: readonly TreePathMove[], model: TreeModel
 function treeDropMoveIsDirectory(move: TreePathMove, model: TreeModel) {
   const entry = model.entriesByTreePath.get(move.fromTreePath)
   return entry ? isDirectoryEntry(entry) : false
-}
-
-function projectTreeDropMove(
-  queryClient: ReturnType<typeof useQueryClient>,
-  fallbackModel: TreeModel,
-  request: TreeDropMoveRequest,
-): TreeDropMoveProjectionReceipt {
-  const rootTreeKey = fileSystemKeys.tree(request.rootPath)
-  const previousModel = queryClient.getQueryData<TreeModel>(rootTreeKey) ?? fallbackModel
-  const nextModel = moveTreeModelPaths(previousModel, request.rootPath, request.moves)
-  queryClient.setQueryData(rootTreeKey, nextModel)
-
-  return { nextModel, previousModel, rootPath: request.rootPath }
 }
 
 function canDragTreePaths(model: TreeModel, paths: readonly string[], movePending: boolean) {

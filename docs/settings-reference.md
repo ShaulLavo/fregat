@@ -44,6 +44,12 @@ stays safe to read, share and export.
 | `chat.defaultRuntimeMode`          | `"full-access"` | application | Permission posture a new session starts in.                                                                                                                  |
 | `chat.defaultInteractionMode`      | `"default"`     | application | Whether a new session starts in plan mode.                                                                                                                   |
 
+## Developer
+
+| Setting                        | Default | Scope       | What it does                                                                                                        |
+| ------------------------------ | ------- | ----------- | ------------------------------------------------------------------------------------------------------------------- |
+| `developer.simulatedLatencyMs` | `0`     | application | Milliseconds added before every request to the server, to see how the app behaves on a slow link. Zero disables it. |
+
 ## Editor
 
 | Setting                             | Default           | Scope   | What it does                                                                                                                                                                                                                                                     |
