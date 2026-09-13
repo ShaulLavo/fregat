@@ -23,6 +23,11 @@ coverage
 dist
 apps/desktop/build/
 
+# Hutch's generated Electrobun devkit projection (rebuilt by `electrobun prepare`)
+# and the scratch it leaves while a dev build runs
+apps/desktop/.hutch/
+apps/desktop/.cottontail-tmp/
+
 # Debug
 npm-debug.log*
 # Anchored: the structured log output lives at the repo root. Unanchored, this also

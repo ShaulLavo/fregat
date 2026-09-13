@@ -8,7 +8,7 @@
       "specifier": "./scripts/lint/web-boundaries.mjs"
     }
   ],
-  "ignorePatterns": ["apps/desktop/build/**"],
+  "ignorePatterns": ["apps/desktop/build/**", "apps/desktop/.hutch/**"],
   "rules": {
     "no-alert": "error",
     "react/rules-of-hooks": "error",

@@ -10,7 +10,15 @@
     "noUnusedLocals": true,
     "noUnusedParameters": true,
     "noFallthroughCasesInSwitch": true,
-    "noUncheckedSideEffectImports": true
+    "noUncheckedSideEffectImports": true,
+    // Electrobun 2 ships its SDK through the Hutch devkit projection, not npm.
+    // Its own tsconfig relies on `baseUrl`, which TypeScript 7 removed, so the
+    // aliases are spelled here instead of extending .hutch/devkit/tsconfig.json.
+    "paths": {
+      "electrobun": ["./.hutch/devkit/api/sdks/main/index.ts"],
+      "electrobun/main": ["./.hutch/devkit/api/sdks/main/index.ts"],
+      "electrobun/view": ["./.hutch/devkit/api/browser/index.ts"]
+    }
   },
-  "include": ["electrobun.config.ts", "src"]
+  "include": ["electrobun.config.ts", "vitest.config.ts", "src"]
 }

@@ -51,6 +51,20 @@ jobs:
       - name: Unused code
         run: bun run unused:check
 
+      # Electrobun 2 ships its SDK as a Hutch devkit projected into
+      # apps/desktop/.hutch, not through node_modules, so the desktop typecheck
+      # and tests resolve nothing until it exists. Keyed on the pinned release;
+      # the store is about 700 MB, so a cold prepare is a real download.
+      - name: Cache Hutch store
+        uses: actions/cache@v4
+        with:
+          path: ~/.hutch
+          key: ${{ runner.os }}-hutch-${{ hashFiles('apps/desktop/package.json') }}
+
+      - name: Prepare Electrobun devkit
+        working-directory: apps/desktop
+        run: node_modules/.bin/electrobun prepare
+
       - name: Typecheck
         run: bun run typecheck
 

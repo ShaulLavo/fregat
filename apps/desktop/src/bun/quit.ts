@@ -1,4 +1,4 @@
-import type Electrobun from 'electrobun/bun'
+import type Electrobun from 'electrobun/main'
 
 type BeforeQuitEvent = ReturnType<typeof Electrobun.events.events.app.beforeQuit>
 

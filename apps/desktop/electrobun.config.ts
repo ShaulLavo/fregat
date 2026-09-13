@@ -10,6 +10,9 @@ export default {
     exitOnLastWindowClosed: true,
   },
   build: {
+    // v2 defaults to Cottontail (JSC). The shell spawns apps/server on its own
+    // process.execPath, so the main process must stay Bun or bun:sqlite breaks.
+    mainProcess: 'bun',
     bun: {
       entrypoint: 'src/bun/index.ts',
     },

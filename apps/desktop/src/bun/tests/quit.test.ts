@@ -1,5 +1,5 @@
 import { expect, test } from 'vitest'
-import applicationEvents from '../../../node_modules/electrobun/dist/api/bun/events/ApplicationEvents'
+import applicationEvents from '../../../.hutch/devkit/api/sdks/main/events/ApplicationEvents'
 import { createQuitHandler } from '../quit'
 
 test('quit is cancelled synchronously until cleanup finishes, including repeated requests', async () => {

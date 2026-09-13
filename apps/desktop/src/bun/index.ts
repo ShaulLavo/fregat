@@ -3,7 +3,7 @@ import { createDesktopError } from './structured-errors'
 import { existsSync, readdirSync } from 'node:fs'
 import net from 'node:net'
 import path from 'node:path'
-import Electrobun, { BrowserView, BrowserWindow, Utils } from 'electrobun/bun'
+import Electrobun, { BrowserView, BrowserWindow, Utils } from 'electrobun/main'
 import type { SettingsValues } from '@workspace/contracts'
 import { applyEnvFileOverrides } from '@workspace/observability/env-file'
 import {
