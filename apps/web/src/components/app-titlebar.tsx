@@ -5,7 +5,7 @@ import { WorkspaceProjectMenu } from '@/components/workspace-project-menu'
 import { useEditorWorkspaceState } from '@/features/editor/state/workspace-state'
 import { TitlebarMenu } from '@/features/workbench/components/titlebar-menu'
 import { titlebarModel } from '@/features/workbench/utils/titlebar-model'
-import { isDesktop } from '@/lib/platform/bridge'
+import { isMacDesktop } from '@/lib/platform/bridge'
 import { NATIVE_WINDOW_DRAG_CLASS } from '@/lib/platform/window-drag'
 import { cn } from '@workspace/ui/lib/utils'
 
@@ -31,7 +31,7 @@ export function AppTitlebar() {
       <div
         className={cn(
           'flex min-w-0 items-center px-(--bar-padding-x)',
-          isDesktop() && 'pl-[4.75rem]',
+          isMacDesktop() && 'pl-[4.75rem]',
         )}
       >
         <WorkspaceProjectMenu workspaceTitle={model.workspaceTitle} />

@@ -27,9 +27,22 @@ export type ShellBackdrop = 'app' | 'compositor' | 'transparent'
 /** Straight off the registry, so a rename there cannot leave the shell reading a key nobody writes. */
 export type WindowTransparency = SettingsValues['window.transparency']
 
+/** The OS the shell window lives on, so the page can reserve macOS traffic lights and nothing else. */
+export type ShellPlatform = 'darwin' | 'linux' | 'win32'
+
+/**
+ * The desktop's light/dark preference, as the shell read it. `null` means the
+ * webview's own `prefers-color-scheme` is trustworthy and should be used.
+ * Linux needs this: Electrobun forces GTK onto X11, where no XSettings manager
+ * runs, so WebKitGTK answers "light" whatever the desktop is set to.
+ */
+export type ShellColorScheme = 'dark' | 'light' | null
+
 /** What the shell hands the web layer before its first module runs. */
 export type ShellHandoff = {
   readonly backdrop: ShellBackdrop
+  readonly platform: ShellPlatform
+  readonly colorScheme: ShellColorScheme
 }
 
 const HANDOFF_GLOBAL = '__platformShell'
@@ -56,14 +69,31 @@ export function handoffPrelude(handoff: ShellHandoff): string {
   return `globalThis.${HANDOFF_GLOBAL} = ${JSON.stringify(handoff)};\n`
 }
 
-/** Reads the prelude above. Falls back to the mode that is safe everywhere. */
+/** Reads the prelude above. Every field falls back to the value that is safe everywhere. */
 export function readShellHandoff(): ShellHandoff {
-  const handoff = (globalThis as Record<string, unknown>)[HANDOFF_GLOBAL]
-  const backdrop = (handoff as ShellHandoff | undefined)?.backdrop
+  const handoff = (globalThis as Record<string, unknown>)[HANDOFF_GLOBAL] as
+    | Partial<ShellHandoff>
+    | undefined
 
-  return { backdrop: isBackdrop(backdrop) ? backdrop : 'app' }
+  return {
+    backdrop: isBackdrop(handoff?.backdrop) ? handoff.backdrop : 'app',
+    platform: isPlatform(handoff?.platform) ? handoff.platform : 'linux',
+    colorScheme: isColorScheme(handoff?.colorScheme) ? handoff.colorScheme : null,
+  }
+}
+
+export function shellPlatform(platform: string): ShellPlatform {
+  return isPlatform(platform) ? platform : 'linux'
 }
 
 function isBackdrop(value: unknown): value is ShellBackdrop {
   return value === 'app' || value === 'compositor' || value === 'transparent'
+}
+
+function isPlatform(value: unknown): value is ShellPlatform {
+  return value === 'darwin' || value === 'linux' || value === 'win32'
+}
+
+function isColorScheme(value: unknown): value is Exclude<ShellColorScheme, null> {
+  return value === 'dark' || value === 'light'
 }

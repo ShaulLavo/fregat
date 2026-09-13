@@ -1,6 +1,7 @@
 import { useCallback, useEffect, useInsertionEffect, useState, type ReactNode } from 'react'
 
 import { loadNerdFont } from '@/lib/default-nerd-font'
+import { getPlatformBridge } from '@/lib/platform/bridge'
 
 import { useSettingsActions } from '@/features/settings/hooks/use-settings-actions'
 import { useSettingsDocument } from '@/features/settings/hooks/use-settings-document'
@@ -178,6 +179,10 @@ function projectionObservesHandoff(
 }
 
 export function systemPrefersDark(): boolean {
+  // The shell reports the desktop's preference where the webview cannot see it.
+  const reported = getPlatformBridge()?.colorScheme
+  if (reported) return reported === 'dark'
+
   return window.matchMedia(COLOR_SCHEME_QUERY).matches
 }
 

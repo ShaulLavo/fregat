@@ -17,8 +17,12 @@ const rpc = Electroview.defineRPC<DesktopRPC>({
 // the bun process wrote above this script: the web layer decides its floor and
 // its wallpaper from `backdrop` before it paints a single frame, so that answer
 // must not wait on — or be lost to — the RPC transport coming up.
+const handoff = readShellHandoff()
+
 window.platformBridge = {
-  backdrop: readShellHandoff().backdrop,
+  backdrop: handoff.backdrop,
+  platform: handoff.platform,
+  colorScheme: handoff.colorScheme,
   pickEntry: async (options) => {
     const client = electroview.rpc
     if (!client) throw createDesktopError('Electrobun RPC is unavailable')

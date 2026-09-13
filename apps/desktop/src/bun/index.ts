@@ -16,10 +16,13 @@ import type { PlatformPickOptions } from '../shared/bridge'
 import {
   handoffPrelude,
   shellBackdrop,
+  shellPlatform,
   windowTransparent,
   type ShellBackdrop,
   type WindowTransparency,
 } from '../shared/window'
+import { readSystemColorScheme } from './color-scheme'
+import { preferPortalDialogs } from './gtk-portal'
 import {
   flushDesktopObservability,
   initializeDesktopObservability,
@@ -39,6 +42,7 @@ const WEB_DIR = path.join(ROOT_DIR, 'apps/web')
 const MAIN_WINDOW_TITLE = 'Platform'
 const TRANSPARENCY_KEY = 'window.transparency' satisfies keyof SettingsValues
 const SHARED_DEV = Bun.env.PLATFORM_DESKTOP_SHARED_DEV === '1'
+const PLATFORM = shellPlatform(process.platform)
 const WEB_HOST = Bun.env.WEB_HOST ?? '127.0.0.1'
 const WEB_PORT = portFromEnv(Bun.env, 'WEB_PORT', 5173)
 const WEB_URL = runtimeUrl(WEB_HOST, WEB_PORT)
@@ -78,6 +82,7 @@ try {
 }
 
 async function startDesktop() {
+  preferPortalDialogs(PLATFORM)
   if (SHARED_DEV) {
     await startSharedDesktop()
     return
@@ -186,7 +191,8 @@ async function preloadScript(backdrop: ShellBackdrop) {
     return null
   }
 
-  return handoffPrelude({ backdrop }) + (await bundle.text())
+  const colorScheme = await readSystemColorScheme(PLATFORM)
+  return handoffPrelude({ backdrop, platform: PLATFORM, colorScheme }) + (await bundle.text())
 }
 
 async function resolveBackdrop(): Promise<ShellBackdrop> {

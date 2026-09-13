@@ -35,6 +35,8 @@ describe('resolveBackdrop', () => {
   it('reads the shell bridge when there is one', () => {
     window.platformBridge = {
       backdrop: 'transparent',
+      platform: 'darwin',
+      colorScheme: null,
       pickEntry: async () => [],
     }
 
