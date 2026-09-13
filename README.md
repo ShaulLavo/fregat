@@ -1,6 +1,6 @@
 # fregat
 
-an editor, a terminal, and your coding agents in one window
+an open cursor, built from scratch
 
 ![](docs/images/workbench.webp)
 
