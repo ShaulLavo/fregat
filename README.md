@@ -2,49 +2,41 @@
 
 a dev environment for the agents you already pay for
 
-![the workbench editing its own source](docs/images/workbench.webp)
+![](docs/images/workbench.webp)
 
-cursor gives you the whole environment and picks the model for you. t3 code lets you bring your own agents and stops at the harness. fregat is both halves. a real editor with real panes, a real terminal, git and language servers, and claude code and codex running inside it on the subscriptions you already have
+an editor, a terminal, git, language servers, and claude code and codex running inside it on your own subscriptions. like cursor, except you bring the provider. like t3 code, except it's the whole editor and not just the harness
 
-you sign in from inside the app, against your own account. nothing proxies through anyone's server, and there is no account to make here. run both agents at once if you want, each in its own session, each with its own permission mode. claude gets full access, approval required, or auto accept edits. codex runs full access
+sign in from inside the app. no accounts here, nothing proxied. run both agents at once, each in its own session with its own permission mode
 
-it is local-first. the server does the filesystem, git and lsp work on your machine, and the client is just a client, so the same workspace opens from a laptop, a browser tab, a terminal, or a phone over tailscale
+the server does the filesystem, git and lsp work on your machine, so the same workspace opens from a browser, the desktop app, a terminal, or a phone over tailscale
 
-## what are you selling me
-
-nothing. there is no product here, no pricing page, no waitlist. i wanted an editor that treats agents as a first-class pane instead of a chat box bolted to the side, and that does not make me rent a second subscription to use the first one
-
-so it is worth saying plainly what this is not, yet. no releases, no installer, no stable api. you clone it and run it
+no releases yet. clone it and run it
 
 ## try it
 
-you need [bun](https://bun.sh) and at least one agent
+needs [bun](https://bun.sh) and at least one of
 
-- claude code runs through the agent sdk. `claude auth login`, or start the sign-in from the app
-- codex spawns the `codex` binary, so install the [codex cli](https://developers.openai.com/codex/cli) and `codex login`
+- claude code. `claude auth login`, or sign in from the app
+- codex. install the [cli](https://developers.openai.com/codex/cli), `codex login`
 
 ```bash
 bun install
 bun run dev
 ```
 
-`dev` brings up web, server and desktop. `bun run dev:web` skips the desktop app, `bun run dev:tui` gives you the terminal client against the server already running. see the [tui guide](apps/tui/README.md) for that one
+open the url it prints, pick a folder
 
-open the url it prints, pick a folder, and you are in
+`bun run dev:web` skips the desktop app. `bun run dev:tui` is the terminal client, see the [tui guide](apps/tui/README.md)
 
-## what it's made of
+## what's in it
 
-none of the interesting parts are forks
-
-- [singapore](https://github.com/ShaulLavo/singapore) is the editor, written from scratch. piece table, css highlight api, tree-sitter and lsp as plugins. not a vs code fork
-- [ghostty-webgpu](https://github.com/ShaulLavo/ghostty-webgpu) is the terminal, real ghostty compiled to wasm and painted on a canvas. not xterm.js
-- the server is elysia, and it owns every side effect: files, git, watching, language servers, and the agent processes
-- four clients speak to it: web, an electrobun desktop shell, a native swift app on mac, and a tui
-
-both of those are sibling checkouts linked from source, so they are not vendored and not pinned to a release
+- [singapore](https://github.com/ShaulLavo/singapore), the editor. written from scratch, not a vs code fork
+- [ghostty-webgpu](https://github.com/ShaulLavo/ghostty-webgpu), the terminal. libghostty-vt in wasm, not xterm.js
+- an elysia server that owns files, git, watching, language servers and the agent processes
+- clients for web, electrobun desktop, native mac, and a tui
 
 ## more
 
-- [development](docs/development.md), the repo layout, the linked checkouts, the checks, and how deploys work
-- [filesystem boundaries](docs/filesystem-boundaries.md), what the editor can reach and what agents can reach, which are not the same thing
-- [settings reference](docs/settings-reference.md), every knob, generated from the registry
+- [development](docs/development.md), repo layout, linked checkouts, checks, deploys
+- [filesystem boundaries](docs/filesystem-boundaries.md), what the editor can reach vs what agents can
+- [settings reference](docs/settings-reference.md), generated from the registry
