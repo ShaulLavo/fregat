@@ -1,6 +1,10 @@
 import { RingLoader } from '@workspace/ui/components/ring-loader'
 import { errorMessage } from '@/lib/error-message'
 import { registerTerminalCheckout } from '@/features/terminal/state/register-checkout'
+import {
+  registerTerminalSession,
+  terminalSessionKey,
+} from '@/features/terminal/state/session-registry'
 import type { WorktreeId } from '@workspace/contracts'
 import { useQueryClient } from '@tanstack/react-query'
 import type { Client } from '@/lib/client'
@@ -77,10 +81,6 @@ function terminalCursorOptions(focused: boolean, cursorBlink: boolean): Terminal
   }
 }
 
-function terminalFocusIdentity(rootPath: string, sessionId: string) {
-  return `${rootPath}\u0000${sessionId}`
-}
-
 let ghosttyRuntimePromise: Promise<GhosttyRuntime> | null = null
 
 export function TerminalPanel({
@@ -88,6 +88,9 @@ export function TerminalPanel({
   className,
   rootPath,
   sessionId,
+  onExit,
+  onProcessChange,
+  onTitleChange,
   ...sectionProps
 }: TerminalPanelProps) {
   const unavailable = useUnavailableEnvironment()
@@ -110,7 +113,7 @@ export function TerminalPanel({
   const contextMenu = useContextMenu()
   const [menuTarget, setMenuTarget] = useState<TerminalMenuTarget | null>(null)
   const [socketConnected, setSocketConnected] = useState(false)
-  const focusIdentity = terminalFocusIdentity(rootPath, sessionId)
+  const focusIdentity = terminalSessionKey(rootPath, sessionId)
   const terminalMountIdentity = `${origin}\u0000${focusIdentity}\u0000${scrollback}`
   const [terminalFailure, setTerminalFailure] = useState<{
     identity: string
@@ -171,6 +174,15 @@ export function TerminalPanel({
   const handleTerminalScrollbackLengthChange = useEffectEvent((length: number) => {
     scrollbackLengthRef.current = length
   })
+  const handleTerminalExit = useEffectEvent((exitCode: number | null) => {
+    onExit?.(exitCode)
+  })
+  const handleTerminalProcessChange = useEffectEvent((process: string | null) => {
+    onProcessChange?.(process)
+  })
+  const handleTerminalTitleChange = useEffectEvent((title: string) => {
+    onTitleChange?.(title)
+  })
   const handleTerminalFocus = () => {
     applyTerminalCursorOptions(terminalRef.current, terminalCursorOptions(true, cursorBlink))
   }
@@ -222,6 +234,9 @@ export function TerminalPanel({
       scrollback,
       sessionId,
       onConnectedChange: handleTerminalConnectedChange,
+      onExit: handleTerminalExit,
+      onProcessChange: handleTerminalProcessChange,
+      onTitleChange: handleTerminalTitleChange,
       onFailed: (message) => setTerminalFailure({ identity: terminalMountIdentity, message }),
       onReady: handleTerminalReady,
       onScrollbackLengthChange: handleTerminalScrollbackLengthChange,
@@ -328,6 +343,9 @@ type TerminalPanelProps = ComponentPropsWithoutRef<'section'> & {
   active?: boolean
   rootPath: string
   sessionId: string
+  onExit?: (exitCode: number | null) => void
+  onProcessChange?: (process: string | null) => void
+  onTitleChange?: (title: string) => void
 }
 
 function mountTerminal({
@@ -339,9 +357,12 @@ function mountTerminal({
   scrollback,
   sessionId,
   onConnectedChange,
+  onExit,
   onFailed,
+  onProcessChange,
   onReady,
   onScrollbackLengthChange,
+  onTitleChange,
 }: {
   origin: string
   client: Client
@@ -351,17 +372,22 @@ function mountTerminal({
   scrollback: number
   sessionId: string
   onConnectedChange: (connected: boolean) => void
+  onExit: (exitCode: number | null) => void
   onFailed: (message: string) => void
+  onProcessChange: (process: string | null) => void
   onReady: (terminal: Terminal, sendInput: TerminalInputSender) => void
   onScrollbackLengthChange: (length: number) => void
+  onTitleChange: (title: string) => void
 }) {
   let cancelled = false
   let dataDisposable: GhosttyWebGpuTerminalSubscription | null = null
   let resizeDisposable: GhosttyWebGpuTerminalSubscription | null = null
   let scrollDisposable: GhosttyWebGpuTerminalSubscription | null = null
+  let titleDisposable: GhosttyWebGpuTerminalSubscription | null = null
   let socket: EdenServerSocket | null = null
   let terminal: Terminal | null = null
   let terminalDimensions: TerminalDimensions | null = null
+  let unregisterSession: (() => void) | null = null
   const inputEncoder = new TextEncoder()
 
   const open = async () => {
@@ -389,6 +415,7 @@ function mountTerminal({
     scrollDisposable = terminal.on('scroll', ({ scrollbackLength }) => {
       onScrollbackLengthChange(scrollbackLength)
     })
+    titleDisposable = terminal.on('title', (title) => onTitleChange(title))
     await terminal.open(host)
     if (cancelled || signal.aborted) return
 
@@ -406,9 +433,14 @@ function mountTerminal({
       getTerminalDimensions: () => terminalDimensions,
       isCancelled: () => cancelled,
       onConnectedChange,
+      onExit,
+      onProcessChange,
       worktreeId,
       sessionId,
       terminal,
+    })
+    unregisterSession = registerTerminalSession(terminalSessionKey(rootPath, sessionId), {
+      dispose: () => sendTerminalClientMessage(socket, { type: 'dispose' }),
     })
   }
 
@@ -421,9 +453,11 @@ function mountTerminal({
 
   return () => {
     cancelled = true
+    unregisterSession?.()
     dataDisposable?.dispose()
     resizeDisposable?.dispose()
     scrollDisposable?.dispose()
+    titleDisposable?.dispose()
     terminal?.dispose()
     closeTerminalSocket(socket)
     host.replaceChildren()
@@ -436,6 +470,8 @@ function openTerminalSocket({
   getTerminalDimensions,
   isCancelled,
   onConnectedChange,
+  onExit,
+  onProcessChange,
   worktreeId,
   sessionId,
   terminal,
@@ -445,6 +481,8 @@ function openTerminalSocket({
   getTerminalDimensions: () => TerminalDimensions | null
   isCancelled: () => boolean
   onConnectedChange: (connected: boolean) => void
+  onExit: (exitCode: number | null) => void
+  onProcessChange: (process: string | null) => void
   worktreeId: WorktreeId
   sessionId: string
   terminal: Terminal
@@ -471,10 +509,7 @@ function openTerminalSocket({
       return
     }
 
-    handleTerminalServerMessage({
-      message,
-      terminal,
-    })
+    handleTerminalServerMessage({ message, onExit, onProcessChange, terminal })
   })
 
   return socket
@@ -482,9 +517,13 @@ function openTerminalSocket({
 
 function handleTerminalServerMessage({
   message,
+  onExit,
+  onProcessChange,
   terminal,
 }: {
   message: Exclude<TerminalServerMessage, { type: 'ready' }>
+  onExit: (exitCode: number | null) => void
+  onProcessChange: (process: string | null) => void
   terminal: Terminal
 }) {
   if (message.type === 'output') {
@@ -494,6 +533,11 @@ function handleTerminalServerMessage({
   if (message.type === 'exit') {
     terminal.writeln('')
     terminal.writeln(exitDetail(message.exitCode))
+    onExit(message.exitCode)
+    return
+  }
+  if (message.type === 'process') {
+    onProcessChange(message.name)
     return
   }
 

@@ -6,16 +6,25 @@ import { testTabContent, testTabContents } from '../../../../../test/factories/d
 import {
   closeEditorContentInWorkbenchPanels,
   closeEditorTabInWorkbenchPanels,
+  closeTerminalTabInWorkbenchPanels,
   createDefaultWorkbenchPanels,
   normalizeWorkbenchPanels,
   openEditorContentInWorkbenchPanels,
+  openTerminalTabInWorkbenchPanels,
   renameEditorFileInWorkbenchPanels,
+  renameTerminalTabInWorkbenchPanels,
+  setTerminalTabProcessInWorkbenchPanels,
+  setTerminalTabShellTitleInWorkbenchPanels,
   reorderEditorTabInWorkbenchPanels,
+  reorderTerminalTabInWorkbenchPanels,
+  selectAdjacentTerminalTabInWorkbenchPanels,
   selectEditorTabInWorkbenchPanels,
+  selectTerminalTabInWorkbenchPanels,
   setWorkbenchBottomTab,
   setWorkbenchSidebarTab,
   type WorkbenchPanels,
 } from '@/features/workbench/utils/panels'
+import { terminalTabLabel } from '@/features/workbench/utils/terminal-tabs'
 
 describe('workbench panel-state model', () => {
   it('creates default panels', () => {
@@ -189,7 +198,10 @@ describe('workbench panel-state model', () => {
 
   it('preserves an unset selection even when editor tabs remain', () => {
     const panels = workbenchPanelsForPaths(['/repo/a.ts', '/repo/b.ts'])
-    const result = normalizeWorkbenchPanels({ ...panels, activeEditorTabId: null })
+    const result = normalizeWorkbenchPanels({
+      ...panels,
+      activeEditorTabId: null,
+    })
 
     expect(result.activeEditorTabId).toBeNull()
     expect(result.editorTabs).toHaveLength(2)
@@ -242,3 +254,126 @@ function editorTabIdAt(panels: WorkbenchPanels, index: number) {
 function editorTabContents(panels: WorkbenchPanels) {
   return panels.editorTabs.map((tab) => tab.content)
 }
+
+describe('workbench terminal tabs', () => {
+  it('starts with one terminal selected', () => {
+    const panels = createDefaultWorkbenchPanels()
+
+    expect(panels.terminalTabs).toEqual([
+      { id: 'terminal-1', name: null, process: null, shellTitle: null, title: 'Terminal 1' },
+    ])
+    expect(panels.activeTerminalTabId).toBe('terminal-1')
+  })
+
+  it('reuses the lowest free title but never an id, and selects the new tab', () => {
+    let panels = openTerminalTabInWorkbenchPanels(createDefaultWorkbenchPanels())
+    panels = openTerminalTabInWorkbenchPanels(panels)
+    panels = closeTerminalTabInWorkbenchPanels(panels, 'terminal-2')
+    panels = openTerminalTabInWorkbenchPanels(panels)
+
+    expect(panels.terminalTabs.map((tab) => [tab.id, tab.title])).toEqual([
+      ['terminal-1', 'Terminal 1'],
+      ['terminal-3', 'Terminal 3'],
+      ['terminal-4', 'Terminal 2'],
+    ])
+    expect(panels.activeTerminalTabId).toBe('terminal-4')
+    expect(panels.terminalTabSequence).toBe(4)
+  })
+
+  it('activates the neighbour after closing the active terminal', () => {
+    let panels = openTerminalTabInWorkbenchPanels(createDefaultWorkbenchPanels())
+    panels = openTerminalTabInWorkbenchPanels(panels)
+    panels = selectTerminalTabInWorkbenchPanels(panels, 'terminal-2')
+
+    const closedMiddle = closeTerminalTabInWorkbenchPanels(panels, 'terminal-2')
+    expect(closedMiddle.activeTerminalTabId).toBe('terminal-3')
+
+    const closedLast = closeTerminalTabInWorkbenchPanels(closedMiddle, 'terminal-3')
+    expect(closedLast.activeTerminalTabId).toBe('terminal-1')
+  })
+
+  it('keeps the selection when closing another terminal', () => {
+    const panels = openTerminalTabInWorkbenchPanels(createDefaultWorkbenchPanels())
+    const result = closeTerminalTabInWorkbenchPanels(panels, 'terminal-1')
+
+    expect(result.activeTerminalTabId).toBe('terminal-2')
+    expect(closeTerminalTabInWorkbenchPanels(panels, 'missing')).toBe(panels)
+  })
+
+  it('leaves no selection once the last terminal closes', () => {
+    const result = closeTerminalTabInWorkbenchPanels(createDefaultWorkbenchPanels(), 'terminal-1')
+
+    expect(result.terminalTabs).toEqual([])
+    expect(result.activeTerminalTabId).toBeNull()
+  })
+
+  it('cycles terminals in both directions and wraps', () => {
+    let panels = openTerminalTabInWorkbenchPanels(createDefaultWorkbenchPanels())
+    panels = openTerminalTabInWorkbenchPanels(panels)
+    panels = selectTerminalTabInWorkbenchPanels(panels, 'terminal-3')
+
+    expect(selectAdjacentTerminalTabInWorkbenchPanels(panels, 'next').activeTerminalTabId).toBe(
+      'terminal-1',
+    )
+    expect(selectAdjacentTerminalTabInWorkbenchPanels(panels, 'previous').activeTerminalTabId).toBe(
+      'terminal-2',
+    )
+    const single = createDefaultWorkbenchPanels()
+    expect(selectAdjacentTerminalTabInWorkbenchPanels(single, 'next')).toBe(single)
+  })
+
+  it('reorders terminals and keeps no-ops referentially stable', () => {
+    let panels = openTerminalTabInWorkbenchPanels(createDefaultWorkbenchPanels())
+    panels = openTerminalTabInWorkbenchPanels(panels)
+
+    expect(
+      reorderTerminalTabInWorkbenchPanels(panels, 'terminal-1', 2).terminalTabs.map(
+        (tab) => tab.id,
+      ),
+    ).toEqual(['terminal-2', 'terminal-3', 'terminal-1'])
+    expect(reorderTerminalTabInWorkbenchPanels(panels, 'terminal-1', 0)).toBe(panels)
+    expect(reorderTerminalTabInWorkbenchPanels(panels, 'missing', 1)).toBe(panels)
+  })
+
+  it('normalizes a stale active terminal id to the first tab', () => {
+    const panels = createDefaultWorkbenchPanels()
+
+    expect(
+      normalizeWorkbenchPanels({ ...panels, activeTerminalTabId: 'gone' }).activeTerminalTabId,
+    ).toBe('terminal-1')
+    expect(
+      normalizeWorkbenchPanels({
+        ...panels,
+        activeTerminalTabId: null,
+        terminalTabs: [],
+      }).activeTerminalTabId,
+    ).toBeNull()
+  })
+})
+
+describe('workbench terminal tab labels', () => {
+  it('prefers the rename, then the running command, then the shell title, then the number', () => {
+    let panels = createDefaultWorkbenchPanels()
+    const label = () => terminalTabLabel(panels.terminalTabs[0]!)
+
+    expect(label()).toBe('Terminal 1')
+    panels = setTerminalTabShellTitleInWorkbenchPanels(panels, 'terminal-1', ' ~/platform ')
+    expect(label()).toBe('~/platform')
+    panels = setTerminalTabProcessInWorkbenchPanels(panels, 'terminal-1', 'nvim')
+    expect(label()).toBe('nvim')
+    panels = renameTerminalTabInWorkbenchPanels(panels, 'terminal-1', '  build  ')
+    expect(label()).toBe('build')
+    panels = renameTerminalTabInWorkbenchPanels(panels, 'terminal-1', '')
+    expect(label()).toBe('nvim')
+    panels = setTerminalTabProcessInWorkbenchPanels(panels, 'terminal-1', null)
+    expect(label()).toBe('~/platform')
+  })
+
+  it('keeps unchanged and unknown updates referentially stable', () => {
+    const panels = createDefaultWorkbenchPanels()
+
+    expect(renameTerminalTabInWorkbenchPanels(panels, 'terminal-1', '   ')).toBe(panels)
+    expect(setTerminalTabProcessInWorkbenchPanels(panels, 'terminal-1', null)).toBe(panels)
+    expect(renameTerminalTabInWorkbenchPanels(panels, 'missing', 'x')).toBe(panels)
+  })
+})

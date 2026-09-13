@@ -415,6 +415,53 @@ describe('terminal service', () => {
     expect(pty.ptys[0]?.killed).toBe(true)
   })
 
+  it('reports the foreground process name while a viewer is attached', async () => {
+    const root = await fixtureRoot()
+    const pty = createFakePtyFactory()
+    const names = ['bash', 'bash', 'nvim', 'nvim']
+    let reads = 0
+    const service = testService(root, {
+      foregroundProcess: async () => names[Math.min(reads++, names.length - 1)] ?? null,
+      processPollMs: 1,
+      ptyFactory: pty.factory,
+    })
+    const routes = service.routes(auth())
+    const first = fakeSocket(root, '', 'terminal-1')
+
+    await routes.open(first)
+    await expect.poll(() => processNames(first.messages)).toEqual(['bash', 'nvim'])
+
+    const second = fakeSocket(root, '', 'terminal-1')
+    await routes.open(second)
+    expect(processNames(second.messages)).toEqual(['nvim'])
+
+    routes.close(first)
+    routes.close(second)
+    const readsAfterDetach = reads
+    await Bun.sleep(10)
+    expect(reads).toBe(readsAfterDetach)
+
+    await service.dispose()
+  })
+
+  it('kills a session by id without a socket', async () => {
+    const root = await fixtureRoot()
+    const pty = createFakePtyFactory()
+    const service = testService(root, { ptyFactory: pty.factory })
+    const routes = service.routes(auth())
+    const ws = fakeSocket(root, '', 'terminal-1')
+
+    await routes.open(ws)
+    routes.close(ws)
+    const worktreeId = v.parse(worktreeIdSchema, registrations.get(root))
+
+    expect(await service.kill({ terminalId: 'missing', worktreeId })).toEqual({ killed: false })
+    expect(await service.kill({ terminalId: 'terminal-1', worktreeId })).toEqual({ killed: true })
+    expect(pty.ptys[0]?.killed).toBe(true)
+
+    await service.dispose()
+  })
+
   it('persists request and claim before the PTY factory can spawn', async () => {
     const root = await fixtureRoot()
     const fixture = requiredFixture(root)
@@ -676,7 +723,9 @@ function testService(
     beforeWorktreeResolution?: Promise<void>
     detachTtlMs?: number
     env?: NodeJS.ProcessEnv
+    foregroundProcess?: (pid: number) => Promise<string | null>
     paths?: WorkspacePaths
+    processPollMs?: number
     ptyFactory?: TerminalPtyFactory
     lifecycle?: import('../lease').TerminalLeaseBoundary
   } = {},
@@ -712,6 +761,10 @@ async function fixtureRoot() {
 
 function auth() {
   return createAuthConfig({ allowedOrigins: [TRUSTED_ORIGIN] })
+}
+
+function processNames(messages: readonly TerminalServerMessage[]) {
+  return messages.flatMap((message) => (message.type === 'process' ? [message.name] : []))
 }
 
 function fakeSocket(

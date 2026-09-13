@@ -688,7 +688,9 @@ export {
 } from './orchestration-ws'
 
 export {
+  terminalKillInputSchema,
   terminalOpenInputSchema,
+  type TerminalKillInput,
   type TerminalOpenInput,
   normalizeTerminalCols,
   normalizeTerminalRows,

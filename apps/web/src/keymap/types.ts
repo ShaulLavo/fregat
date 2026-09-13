@@ -32,6 +32,7 @@ export type MenuSurfaceId =
   | 'chat.session'
   | 'editor.gutter'
   | 'editor.tab'
+  | 'terminal.tab'
   | 'editor.text'
   | 'files.empty'
   | 'files.row'

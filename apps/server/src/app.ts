@@ -1,6 +1,6 @@
 import { createInternalError } from './observability/structured-errors'
 import { cors } from '@elysiajs/cors'
-import type { HealthDescriptor } from '@workspace/contracts'
+import { terminalKillInputSchema, type HealthDescriptor } from '@workspace/contracts'
 import { homedir, hostname } from 'node:os'
 import path from 'node:path'
 import { Elysia } from 'elysia'
@@ -301,6 +301,7 @@ export function createApp(options: AppOptions) {
     )
     .ws('/lsp', lspRoutes(fs, auth, { pool: lspPool, settings: lspSettings }))
     .ws('/terminal', terminal.routes(auth))
+    .post('/terminal/kill', ({ body }) => terminal.kill(body), { body: terminalKillInputSchema })
     .use(providerRoutes(providerAdapterRegistry))
     .use(orchestrationRoutes(orchestration, checkpointDiff, sessionSearch))
     .use(attachmentRoutes({ attachmentsDir: options.orchestration?.attachmentsDir }))

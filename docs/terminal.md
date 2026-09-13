@@ -20,6 +20,34 @@ A rejected completion promise does not prove process exit. The service records
 Successful completion releases ownership only after the lease end transaction succeeds.
 Neither the package nor the service supervises a whole descendant process tree.
 
+## Tabs
+
+The workbench bottom panel holds one terminal per tab. Tabs live in the workspace's
+`WorkbenchPanels` next to the editor tabs (`terminalTabs`, `activeTerminalTabId`) and persist with
+the rest of the workspace slice, so a reload reattaches every still-live session. Ids are chosen by
+the client from a per-workspace sequence (`terminalTabSequence`), never by the server and never
+reused: the server keeps a killed session under its id until the PTY is gone, and a reused id would
+attach to that dying shell. Only the title reuses the lowest free "Terminal N". The id is the
+session id the PTY is keyed by, which is what lets a tab outlive the page.
+
+Open terminals are listed beside the active one, VS Code style, once there is more than one; the bottom bar keeps only the new and kill actions. Every tab stays mounted. Inactive ones are hidden with `visibility` rather than unmounted, so the
+emulator is not rebuilt and the host stays measurable while hidden. Only the active tab registers a
+focus target, takes commands from the palette's script inbox, and is matched by the focus commands.
+A tab's label is the user's rename, else the foreground command, else the title the shell set
+through OSC 0/2 (the emulator's `title` event), else `Terminal N`. The server polls the PTY's
+foreground process group once a second while a viewer is attached (`/proc` on Linux, `ps`
+elsewhere) and sends a `process` control message when it changes; the name is null while the shell
+itself is in the foreground. Only the rename persists.
+A tab's label is the user's rename, else the title the shell set through OSC 0/2 (the emulator's
+`title` event), else the foreground process name, else `Terminal N`. The server polls the PTY's
+foreground process group once a second while a viewer is attached (`/proc` on Linux, `ps`
+elsewhere) and sends a `process` control message when the name changes. Only the rename persists.
+A shell that exits with status 0 takes its tab with it; any other exit keeps the tab so the message can be read. Closing a tab sends `dispose` over that panel's socket before the unmount, so the shell ends at
+once instead of waiting out the detach timeout. With no panel mounted (the bottom panel closed, or
+Problems showing) the client posts `/terminal/kill` with the worktree and terminal id instead. Commands: `workspace.newTerminal` (`Mod+\``),
+`workspace.killTerminal`, `workspace.focusNextTerminal`and`workspace.focusPreviousTerminal`
+(`Mod+PageDown`/`Mod+PageUp` while a terminal is focused).
+
 ## Wire format
 
 The `/terminal` WebSocket uses binary frames for input and output. Text frames carry JSON

@@ -11,6 +11,10 @@ import type {
   TabContent,
   TabId,
 } from '@/lib/documents/utils/types'
+import {
+  createTerminalTabRecord,
+  type TerminalTabRecord,
+} from '@/features/workbench/utils/terminal-tabs'
 
 export type WorkbenchSidebarTab = 'chat' | 'files' | 'git' | 'logs' | 'search'
 export type WorkbenchBottomTab = 'terminal' | 'problems'
@@ -19,10 +23,16 @@ export type WorkbenchPanels = {
   readonly activeBottomTab: WorkbenchBottomTab
   readonly activeEditorTabId: TabId | null
   readonly activeSidebarTab: WorkbenchSidebarTab
+  readonly activeTerminalTabId: string | null
   readonly bottomPanelOpen: boolean
   readonly editorTabs: readonly EditorTabRecord[]
   readonly sidebarOpen: boolean
+  /** Last id number handed out; ids never repeat within a workspace. */
+  readonly terminalTabSequence: number
+  readonly terminalTabs: readonly TerminalTabRecord[]
 }
+
+export type TerminalTabDirection = 'next' | 'previous'
 
 export const SIDEBAR_MIN_SIZE = 220
 export const SIDEBAR_MAX_SIZE = 520
@@ -30,14 +40,127 @@ export const BOTTOM_MIN_SIZE = 140
 export const BOTTOM_MAX_SIZE = 480
 
 export function createDefaultWorkbenchPanels(): WorkbenchPanels {
+  const terminal = createTerminalTabRecord([], 1)
   return {
     activeBottomTab: 'terminal',
     activeEditorTabId: null,
     activeSidebarTab: 'files',
+    activeTerminalTabId: terminal.id,
     bottomPanelOpen: true,
     editorTabs: [],
     sidebarOpen: true,
+    terminalTabSequence: 1,
+    terminalTabs: [terminal],
   }
+}
+
+export function openTerminalTabInWorkbenchPanels(panels: WorkbenchPanels): WorkbenchPanels {
+  const terminalTabSequence = panels.terminalTabSequence + 1
+  const tab = createTerminalTabRecord(panels.terminalTabs, terminalTabSequence)
+  return {
+    ...panels,
+    activeTerminalTabId: tab.id,
+    terminalTabSequence,
+    terminalTabs: [...panels.terminalTabs, tab],
+  }
+}
+
+export function closeTerminalTabInWorkbenchPanels(
+  panels: WorkbenchPanels,
+  tabId: string,
+): WorkbenchPanels {
+  const index = panels.terminalTabs.findIndex((tab) => tab.id === tabId)
+  if (index < 0) return panels
+
+  const terminalTabs = panels.terminalTabs.filter((tab) => tab.id !== tabId)
+  return {
+    ...panels,
+    activeTerminalTabId: activeTerminalTabIdAfterClose(panels, terminalTabs, index, tabId),
+    terminalTabs,
+  }
+}
+
+export function renameTerminalTabInWorkbenchPanels(
+  panels: WorkbenchPanels,
+  tabId: string,
+  name: string,
+): WorkbenchPanels {
+  const trimmed = name.trim()
+  return patchTerminalTab(panels, tabId, {
+    name: trimmed.length === 0 ? null : trimmed,
+  })
+}
+
+export function setTerminalTabShellTitleInWorkbenchPanels(
+  panels: WorkbenchPanels,
+  tabId: string,
+  shellTitle: string,
+): WorkbenchPanels {
+  const trimmed = shellTitle.trim()
+  return patchTerminalTab(panels, tabId, {
+    shellTitle: trimmed.length === 0 ? null : trimmed,
+  })
+}
+
+export function setTerminalTabProcessInWorkbenchPanels(
+  panels: WorkbenchPanels,
+  tabId: string,
+  process: string | null,
+): WorkbenchPanels {
+  return patchTerminalTab(panels, tabId, { process })
+}
+
+function patchTerminalTab(
+  panels: WorkbenchPanels,
+  tabId: string,
+  patch: Partial<Pick<TerminalTabRecord, 'name' | 'process' | 'shellTitle'>>,
+): WorkbenchPanels {
+  const tab = terminalTabById(panels, tabId)
+  if (!tab) return panels
+  const next = { ...tab, ...patch }
+  if (next.name === tab.name && next.process === tab.process && next.shellTitle === tab.shellTitle)
+    return panels
+
+  return {
+    ...panels,
+    terminalTabs: panels.terminalTabs.map((item) => (item.id === tabId ? next : item)),
+  }
+}
+
+export function selectTerminalTabInWorkbenchPanels(
+  panels: WorkbenchPanels,
+  tabId: string,
+): WorkbenchPanels {
+  if (!terminalTabById(panels, tabId)) return panels
+  if (panels.activeTerminalTabId === tabId) return panels
+
+  return { ...panels, activeTerminalTabId: tabId }
+}
+
+export function selectAdjacentTerminalTabInWorkbenchPanels(
+  panels: WorkbenchPanels,
+  direction: TerminalTabDirection,
+): WorkbenchPanels {
+  const count = panels.terminalTabs.length
+  if (count < 2) return panels
+
+  const current = panels.terminalTabs.findIndex((tab) => tab.id === panels.activeTerminalTabId)
+  const step = direction === 'next' ? 1 : -1
+  const next = panels.terminalTabs[(current + step + count) % count]
+  if (!next) return panels
+
+  return selectTerminalTabInWorkbenchPanels(panels, next.id)
+}
+
+export function reorderTerminalTabInWorkbenchPanels(
+  panels: WorkbenchPanels,
+  tabId: string,
+  targetIndex: number,
+): WorkbenchPanels {
+  const terminalTabs = reorderedTabs(panels.terminalTabs, tabId, targetIndex)
+  if (terminalTabs === panels.terminalTabs) return panels
+
+  return { ...panels, terminalTabs }
 }
 
 export function activeEditorContentForWorkbenchPanels(panels: WorkbenchPanels) {
@@ -128,15 +251,9 @@ export function reorderEditorTabInWorkbenchPanels(
   tabId: TabId,
   targetIndex: number,
 ) {
-  const sourceIndex = panels.editorTabs.findIndex((tab) => tab.id === tabId)
-  if (sourceIndex < 0) return panels
-  if (sourceIndex === targetIndex) return panels
+  const editorTabs = reorderedTabs(panels.editorTabs, tabId, targetIndex)
+  if (editorTabs === panels.editorTabs) return panels
 
-  const editorTabs = [...panels.editorTabs]
-  const [tab] = editorTabs.splice(sourceIndex, 1)
-  if (!tab) return panels
-
-  editorTabs.splice(clampedInsertionIndex(targetIndex, editorTabs.length), 0, tab)
   return { ...panels, editorTabs }
 }
 
@@ -216,14 +333,40 @@ export function normalizeWorkbenchPanels(value: WorkbenchPanels): WorkbenchPanel
     activeBottomTab: value.activeBottomTab,
     activeEditorTabId: normalizedActiveTabId(value),
     activeSidebarTab: value.activeSidebarTab,
+    activeTerminalTabId: normalizedActiveTerminalTabId(value),
     bottomPanelOpen: value.bottomPanelOpen,
     editorTabs: value.editorTabs,
     sidebarOpen: value.sidebarOpen,
+    terminalTabSequence: value.terminalTabSequence,
+    terminalTabs: value.terminalTabs,
   }
 }
 
 function editorTabById(panels: WorkbenchPanels, tabId: TabId) {
   return panels.editorTabs.find((tab) => tab.id === tabId) ?? null
+}
+
+function terminalTabById(panels: WorkbenchPanels, tabId: string) {
+  return panels.terminalTabs.find((tab) => tab.id === tabId) ?? null
+}
+
+// Unlike editor tabs, falls back to the first tab: a terminal list has no "nothing open" state.
+function normalizedActiveTerminalTabId(panels: WorkbenchPanels) {
+  if (panels.activeTerminalTabId && terminalTabById(panels, panels.activeTerminalTabId))
+    return panels.activeTerminalTabId
+
+  return panels.terminalTabs[0]?.id ?? null
+}
+
+function activeTerminalTabIdAfterClose(
+  panels: WorkbenchPanels,
+  nextTabs: readonly TerminalTabRecord[],
+  closedIndex: number,
+  closedTabId: string,
+) {
+  if (panels.activeTerminalTabId !== closedTabId) return panels.activeTerminalTabId
+
+  return nextTabs[Math.min(closedIndex, nextTabs.length - 1)]?.id ?? null
 }
 
 function activeEditorTabIdAfterClose(
@@ -244,13 +387,33 @@ function activeEditorTabIdAfterPathClose(
   panels: WorkbenchPanels,
   nextTabs: readonly EditorTabRecord[],
 ) {
-  return activeEditorTabId(nextTabs, panels.activeEditorTabId, { fallbackToFirstWhenUnset: false })
+  return activeEditorTabId(nextTabs, panels.activeEditorTabId, {
+    fallbackToFirstWhenUnset: false,
+  })
 }
 
 function normalizedActiveTabId(panels: WorkbenchPanels) {
   return activeEditorTabId(panels.editorTabs, panels.activeEditorTabId, {
     fallbackToFirstWhenUnset: false,
   })
+}
+
+/** Returns the same array for a no-op so callers can keep the panels object referentially stable. */
+function reorderedTabs<Tab extends { readonly id: string }>(
+  tabs: readonly Tab[],
+  tabId: string,
+  targetIndex: number,
+): readonly Tab[] {
+  const sourceIndex = tabs.findIndex((tab) => tab.id === tabId)
+  if (sourceIndex < 0) return tabs
+  if (sourceIndex === targetIndex) return tabs
+
+  const next = [...tabs]
+  const [tab] = next.splice(sourceIndex, 1)
+  if (!tab) return tabs
+
+  next.splice(clampedInsertionIndex(targetIndex, next.length), 0, tab)
+  return next
 }
 
 function clampedInsertionIndex(index: number, length: number) {

@@ -143,7 +143,10 @@ const rootFolderSchema = v.nullable(
   ),
 )
 const cachedRootSchema = v.pipe(
-  v.object({ folder: rootFolderSchema, location: v.nullable(workspaceLocationSchema) }),
+  v.object({
+    folder: rootFolderSchema,
+    location: v.nullable(workspaceLocationSchema),
+  }),
   v.check((value) =>
     value.folder === null
       ? value.location === null
@@ -253,13 +256,21 @@ const mainLayoutSchema = v.strictObject({
   bottom: v.number(),
   editor: v.number(),
 })
+const terminalTabRecordSchema = v.strictObject({
+  id: v.pipe(v.string(), v.nonEmpty()),
+  name: v.nullable(v.pipe(v.string(), v.nonEmpty())),
+  title: v.pipe(v.string(), v.nonEmpty()),
+})
 const workbenchPanelsSchema = v.strictObject({
   activeBottomTab: bottomTabSchema,
   activeEditorTabId: v.nullable(tabIdSchema),
   activeSidebarTab: sidebarTabSchema,
+  activeTerminalTabId: v.nullable(v.string()),
   bottomPanelOpen: v.boolean(),
   editorTabs: v.array(editorTabRecordSchema),
   sidebarOpen: v.boolean(),
+  terminalTabSequence: v.pipe(v.number(), v.integer(), v.minValue(0)),
+  terminalTabs: v.pipe(v.array(terminalTabRecordSchema), v.readonly()),
 })
 const workbenchLayoutSchema = v.strictObject({
   mainLayout: mainLayoutSchema,
@@ -269,7 +280,10 @@ const workspaceSliceSchema = v.strictObject({
   editorHistory: v.array(storedTabContentSchema),
   recentlyClosedTabs: v.array(storedTabContentSchema),
   reopenScrollPositions: v.array(
-    v.strictObject({ content: storedTabContentSchema, position: scrollPositionSchema }),
+    v.strictObject({
+      content: storedTabContentSchema,
+      position: scrollPositionSchema,
+    }),
   ),
   workbenchPanels: workbenchPanelsSchema,
 })
@@ -349,7 +363,9 @@ export function readSessionSelectionCache(storage: ScopedStorage): SessionSelect
 }
 
 export function writeSessionSelectionCache(storage: ScopedStorage, selection: SessionSelection) {
-  writeCacheEntry(WORKSPACE_CACHE_STORAGE_KEYS.chatModeSelection, selection, { storage })
+  writeCacheEntry(WORKSPACE_CACHE_STORAGE_KEYS.chatModeSelection, selection, {
+    storage,
+  })
 }
 
 export function writeRootFolderCache(
@@ -393,7 +409,9 @@ export function writeSearchBufferCache(
     return
   }
 
-  writeCacheEntry(searchBufferStorageKey(rootPath, worktreeId), searchBuffer, { storage })
+  writeCacheEntry(searchBufferStorageKey(rootPath, worktreeId), searchBuffer, {
+    storage,
+  })
 }
 
 /**
@@ -416,7 +434,9 @@ export function writeWorkspaceIndexCache(
     removeCacheEntry(searchBufferStorageKey(location.rootPath, worktreeId), storage)
     removeEditorVisibleSnapshotCacheForRoot(storage, location.rootPath)
   }
-  writeCacheEntry(WORKSPACE_CACHE_STORAGE_KEYS.workspaceIndex, kept, { storage })
+  writeCacheEntry(WORKSPACE_CACHE_STORAGE_KEYS.workspaceIndex, kept, {
+    storage,
+  })
 }
 
 function workspaceStateFromCache(storage: ScopedStorage): CachedWorkspaceState {
@@ -555,6 +575,11 @@ function storedSliceForWorkspace(
         fallbackToFirstWhenUnset: true,
       }),
       editorTabs,
+      terminalTabs: slice.workbenchPanels.terminalTabs.map(({ id, name, title }) => ({
+        id,
+        name,
+        title,
+      })),
     },
   }
 }
@@ -581,6 +606,11 @@ function restoredSliceForWorkspace(
         fallbackToFirstWhenUnset: true,
       }),
       editorTabs,
+      terminalTabs: slice.workbenchPanels.terminalTabs.map((tab) => ({
+        ...tab,
+        process: null,
+        shellTitle: null,
+      })),
     }),
   }
 }

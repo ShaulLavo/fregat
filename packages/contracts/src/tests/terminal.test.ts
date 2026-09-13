@@ -82,6 +82,11 @@ describe('terminal protocol', () => {
       shell: '/bin/zsh',
       type: 'ready',
     })
+    expect(parseTerminalServerMessage({ type: 'process', name: 'nvim' })).toEqual({
+      name: 'nvim',
+      type: 'process',
+    })
+    expect(parseTerminalServerMessage({ type: 'process', name: 1 })).toBeNull()
     expect(parseTerminalServerMessage({ type: 'exit', exitCode: null })).toEqual({
       exitCode: null,
       type: 'exit',

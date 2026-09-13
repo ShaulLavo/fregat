@@ -10,6 +10,11 @@
     "reason": "Spreads dnd-kit drag attributes and listeners onto the element and needs role='tab'. The Button primitive offers neither."
   },
   {
+    "file": "apps/web/src/features/workbench/components/terminal-list-row.tsx",
+    "class": "<button>",
+    "reason": "Full-width list row that also spreads dnd-kit drag attributes and listeners and needs role='tab'. The Button primitive offers none of that; see \"The Row primitive gap\" in docs/web-design-language.md#the-row-primitive-gap."
+  },
+  {
     "file": "apps/web/src/features/chat/components/timeline-minimap.tsx",
     "class": "<button>",
     "reason": "An absolutely positioned minimap mark. Button's ghost hover would paint a block over the transcript and its active translate fights the mark's own -translate-y-1/2."

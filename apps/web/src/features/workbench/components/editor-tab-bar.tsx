@@ -1,19 +1,7 @@
-import {
-  closestCenter,
-  DndContext,
-  KeyboardSensor,
-  PointerSensor,
-  type DragEndEvent,
-  useSensor,
-  useSensors,
-} from '@dnd-kit/core'
+import { closestCenter, DndContext, type DragEndEvent } from '@dnd-kit/core'
 import { isEditorTabDirty } from '@/features/workspace/utils/tab-dirty'
 import { restrictToHorizontalAxis } from '@dnd-kit/modifiers'
-import {
-  horizontalListSortingStrategy,
-  SortableContext,
-  sortableKeyboardCoordinates,
-} from '@dnd-kit/sortable'
+import { horizontalListSortingStrategy, SortableContext } from '@dnd-kit/sortable'
 
 import type { DocumentKey, TabId } from '@/lib/documents/utils/types'
 import type { EditorTabModel } from '@/features/workspace/utils/tab-types'
@@ -22,8 +10,9 @@ import type { EditorTabCloseTarget } from '@/features/workspace/utils/tab-close-
 import { useEditorTabActions } from '@/features/editor/hooks/use-editor-tab-actions'
 import { SortableEditorTabButton } from '@/features/workbench/components/sortable-editor-tab-button'
 import { useActiveTabStripScroll } from '@/features/workbench/hooks/use-active-tab-strip-scroll'
+import { useTabStripSensors } from '@/features/workbench/hooks/use-tab-strip-sensors'
 import { BAR_TAB_FILLER_CLASS, BAR_TAB_STRIP_CLASS } from '@/features/workbench/utils/bar-tabs'
-import { editorTabReorderIntent } from '@/features/workbench/utils/editor-tab-dnd'
+import { tabReorderIntent } from '@/features/workbench/utils/tab-dnd'
 import { cn } from '@workspace/ui/lib/utils'
 
 const EDITOR_TAB_DND_MODIFIERS = [restrictToHorizontalAxis]
@@ -39,19 +28,10 @@ export function EditorTabBar({
   const { reorderTab } = useEditorTabActions()
   const closeTargets = editorTabCloseTargets(tabs, dirtyDocumentKeys)
   const stripRef = useActiveTabStripScroll(tabs.find((tab) => tab.active)?.id ?? null)
-  const sensors = useSensors(
-    useSensor(PointerSensor, {
-      activationConstraint: {
-        distance: 8,
-      },
-    }),
-    useSensor(KeyboardSensor, {
-      coordinateGetter: sortableKeyboardCoordinates,
-    }),
-  )
+  const sensors = useTabStripSensors()
 
   function handleDragEnd(event: DragEndEvent) {
-    const intent = editorTabReorderIntent(tabs, event.active.id, event.over?.id)
+    const intent = tabReorderIntent(tabs, event.active.id, event.over?.id)
     if (!intent) return
 
     reorderTab(intent.tabId, intent.targetIndex)

@@ -21,6 +21,13 @@ export const terminalOpenInputSchema = v.object({
 
 export type TerminalOpenInput = v.InferOutput<typeof terminalOpenInputSchema>
 
+export const terminalKillInputSchema = v.object({
+  worktreeId: worktreeIdSchema,
+  terminalId: v.pipe(v.string(), v.trim(), v.minLength(1)),
+})
+
+export type TerminalKillInput = v.InferOutput<typeof terminalKillInputSchema>
+
 export type TerminalClientMessage =
   | { type: 'input'; data: Uint8Array }
   | { type: 'resize'; cols: number; rows: number }
@@ -31,6 +38,7 @@ export type TerminalServerMessage =
   | { type: 'output'; data: Uint8Array }
   | { type: 'exit'; exitCode: number | null }
   | { type: 'error'; message: string }
+  | { type: 'process'; name: string | null }
 
 export function parseTerminalClientMessage(value: unknown): TerminalClientMessage | null {
   const bytes = terminalBytes(value)
@@ -51,6 +59,7 @@ export function parseTerminalServerMessage(value: unknown): TerminalServerMessag
   if (parsed.type === 'ready') return terminalReadyMessage(parsed)
   if (parsed.type === 'exit') return terminalExitMessage(parsed)
   if (parsed.type === 'error') return terminalErrorMessage(parsed)
+  if (parsed.type === 'process') return terminalProcessMessage(parsed)
 
   return null
 }
@@ -95,6 +104,12 @@ function terminalErrorMessage(value: Record<string, unknown>): TerminalServerMes
   if (typeof value.message !== 'string') return null
 
   return { type: 'error', message: value.message }
+}
+
+function terminalProcessMessage(value: Record<string, unknown>): TerminalServerMessage | null {
+  if (value.name !== null && typeof value.name !== 'string') return null
+
+  return { type: 'process', name: value.name }
 }
 
 function normalizeTerminalDimension(value: unknown, min: number, max: number) {

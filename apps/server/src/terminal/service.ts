@@ -5,6 +5,7 @@ import { TerminalModes } from './modes'
 import * as v from 'valibot'
 import {
   terminalOpenInputSchema,
+  type TerminalKillInput,
   type TerminalOpenInput,
   type WorktreeId,
 } from '@workspace/contracts'
@@ -21,12 +22,15 @@ import { authenticateWebSocketData, type AuthConfig } from '../auth'
 import { FsError, isFsError } from '../fs/errors'
 import type { WorkspacePaths } from '../fs/path'
 import { elapsedMs, limitText, recordProcessInfo, recordProcessWarning } from '../observability'
+import { readForegroundProcessName, type ForegroundProcessReader } from './foreground'
 
 export type TerminalPtyFactory = typeof spawnPty
 
 export type TerminalServiceOptions = {
   detachTtlMs?: number
   env?: NodeJS.ProcessEnv
+  foregroundProcess?: ForegroundProcessReader
+  processPollMs?: number
   paths: WorkspacePaths
   resolveWorktree: (worktreeId: WorktreeId) => Promise<string>
   lifecycle: TerminalLeaseBoundary
@@ -44,10 +48,13 @@ const DEFAULT_COLS = 80
 const DEFAULT_ROWS = 24
 const TERMINAL_REPLAY_BUFFER_BYTES = 256 * 1024
 const TERMINAL_DETACHED_TTL_MS = 10 * 60 * 1000
+const TERMINAL_PROCESS_POLL_MS = 1000
 
 export class TerminalService {
   private readonly detachTtlMs: number
   private readonly env: NodeJS.ProcessEnv
+  private readonly foregroundProcess: ForegroundProcessReader
+  private readonly processPollMs: number
   private readonly paths: WorkspacePaths
   private readonly resolveWorktree: TerminalServiceOptions['resolveWorktree']
   private readonly resolveAgentSession: AgentTerminalResolver | undefined
@@ -61,6 +68,8 @@ export class TerminalService {
   constructor({
     detachTtlMs = TERMINAL_DETACHED_TTL_MS,
     env = process.env,
+    foregroundProcess = readForegroundProcessName,
+    processPollMs = TERMINAL_PROCESS_POLL_MS,
     paths,
     resolveWorktree,
     lifecycle,
@@ -69,11 +78,22 @@ export class TerminalService {
   }: TerminalServiceOptions) {
     this.detachTtlMs = detachTtlMs
     this.env = env
+    this.foregroundProcess = foregroundProcess
+    this.processPollMs = processPollMs
     this.paths = paths
     this.resolveWorktree = resolveWorktree
     this.lifecycle = lifecycle
     this.resolveAgentSession = resolveAgentSession
     this.ptyFactory = ptyFactory
+  }
+
+  /** Ends a shell no panel is attached to; a mounted panel sends `dispose` over its own socket. */
+  async kill({ worktreeId, terminalId }: TerminalKillInput) {
+    const session = this.persistentSessions.get(terminalSessionKey(worktreeId, terminalId))
+    if (!session) return { killed: false }
+
+    await session.dispose({ kill: true })
+    return { killed: true }
   }
 
   routes(auth: AuthConfig) {
@@ -219,6 +239,8 @@ export class TerminalService {
       worktreeId,
       detachTtlMs: this.detachTtlMs,
       env: execution.env,
+      foregroundProcess: this.foregroundProcess,
+      processPollMs: this.processPollMs,
       command: execution.command,
       onDispose: () => this.persistentSessions.delete(sessionKey),
       ptyFactory: this.ptyFactory,
@@ -317,6 +339,8 @@ export class TerminalSession {
   private readonly cwd: string
   private readonly detachTtlMs: number
   private readonly env: NodeJS.ProcessEnv
+  private readonly foregroundProcess: ForegroundProcessReader
+  private readonly processPollMs: number
   private readonly command: readonly [string, ...string[]] | undefined
   private readonly onDispose: (session: TerminalSession) => void
   private readonly ptyFactory: TerminalPtyFactory
@@ -329,6 +353,8 @@ export class TerminalSession {
   private completion = Promise.resolve()
   private detachTimer: ReturnType<typeof setTimeout> | null = null
   private repaintTimer: ReturnType<typeof setTimeout> | null = null
+  private processTimer: ReturnType<typeof setTimeout> | null = null
+  private processName: string | null = null
   private disposed = false
   private finalizationFailed = false
   private errorMessage: string | null = null
@@ -353,6 +379,8 @@ export class TerminalSession {
     worktreeId,
     detachTtlMs,
     env,
+    foregroundProcess,
+    processPollMs,
     command,
     onDispose,
     ptyFactory,
@@ -366,6 +394,8 @@ export class TerminalSession {
     worktreeId: WorktreeId
     detachTtlMs: number
     env: NodeJS.ProcessEnv
+    foregroundProcess: ForegroundProcessReader
+    processPollMs: number
     command?: readonly [string, ...string[]]
     onDispose: (session: TerminalSession) => void
     ptyFactory: TerminalPtyFactory
@@ -379,6 +409,8 @@ export class TerminalSession {
     this.worktreeId = worktreeId
     this.detachTtlMs = detachTtlMs
     this.env = env
+    this.foregroundProcess = foregroundProcess
+    this.processPollMs = processPollMs
     this.command = command
     this.onDispose = onDispose
     this.ptyFactory = ptyFactory
@@ -403,6 +435,7 @@ export class TerminalSession {
       (error: unknown) => this.handlePtyFailure(error),
     )
     this.emitReady()
+    this.scheduleProcessPoll()
     return true
   }
 
@@ -422,12 +455,45 @@ export class TerminalSession {
     if (this.shell !== null)
       this.send(connection, { type: 'ready', cwd: this.cwd, shell: this.shell })
     for (const data of this.outputBufferChunks) this.send(connection, { type: 'output', data })
+    if (this.processName !== null)
+      this.send(connection, { type: 'process', name: this.processName })
     this.repaint()
+    this.scheduleProcessPoll()
   }
 
   detach(key: object) {
     if (!this.connections.delete(key) || this.connections.size > 0) return
+    this.cancelProcessPoll()
     this.startDetachTimer()
+  }
+
+  // Polled only while someone is watching: a detached shell has no title to keep fresh.
+  private scheduleProcessPoll() {
+    if (this.processTimer || !this.pty || this.connections.size === 0) return
+
+    this.processTimer = setTimeout(() => {
+      this.processTimer = null
+      void this.pollProcess()
+    }, this.processPollMs)
+    this.processTimer.unref?.()
+  }
+
+  private async pollProcess() {
+    const pty = this.pty
+    if (!pty || this.disposed || this.terminating) return
+
+    const name = await this.foregroundProcess(pty.pid)
+    if (this.pty !== pty || this.disposed) return
+    if (name !== this.processName) {
+      this.processName = name
+      this.emit({ type: 'process', name })
+    }
+    this.scheduleProcessPoll()
+  }
+
+  private cancelProcessPoll() {
+    if (this.processTimer) clearTimeout(this.processTimer)
+    this.processTimer = null
   }
 
   handleMessage(message: unknown) {

@@ -1,4 +1,4 @@
-import { clientForQueryClient } from '@/lib/environments/state/query-clients'
+import { clientForQueryClient, originForQueryClient } from '@/lib/environments/state/query-clients'
 import { workbenchCommandMetadata } from '@workspace/client-core/commands/workbench'
 import {
   workspaceCommandMetadata,
@@ -30,6 +30,7 @@ import {
   SquareHalfBottomIcon,
   SquaresFourIcon,
   SunIcon,
+  TerminalIcon,
   XIcon,
 } from '@phosphor-icons/react'
 import type { QueryClient } from '@tanstack/react-query'
@@ -57,11 +58,16 @@ import type { WorkspaceMutationReporter } from '@/features/editor/state/workspac
 import { nextEditorDiffViewMode } from '@/features/editor/utils/diff-view-mode'
 import {
   activeEditorTabForWorkbenchPanels,
+  openTerminalTabInWorkbenchPanels,
+  selectAdjacentTerminalTabInWorkbenchPanels,
   showWorkbenchBottomTab,
   showWorkbenchSidebarTab,
   toggleWorkbenchBottomTab,
   toggleWorkbenchSidebarTab,
+  type TerminalTabDirection,
+  type WorkbenchPanels,
 } from '@/features/workbench/utils/panels'
+import { killTerminalTab } from '@/features/workbench/state/kill-terminal-tab'
 import { fetchFile } from '@/lib/file-server'
 import { setFileSnapshotQueryData } from '@/lib/file-snapshot-query-cache'
 import type {
@@ -198,6 +204,32 @@ function focusIdStart(
   return focusStart(runtime, focusTargetById(id), intent, acknowledged)
 }
 
+// Matched by session id: every tab registers a target for the same root path.
+function focusActiveTerminalStart(
+  runtime: WorkspaceCommandRuntime,
+  rootPath: string,
+  panels: WorkbenchPanels,
+) {
+  const sessionId = panels.activeTerminalTabId
+  if (!sessionId) return handled
+
+  return focusIdInLayoutStart(runtime, { kind: 'terminal', rootPath, sessionId }, 'workbench')
+}
+
+function selectAdjacentTerminal(
+  { runtime, snapshot }: WorkspaceCommandHandlerContext,
+  direction: TerminalTabDirection,
+) {
+  const rootPath = snapshot.rootPath
+  if (!rootPath) return declined
+
+  const panels = selectAdjacentTerminalTabInWorkbenchPanels(snapshot.workbenchPanels, direction)
+  if (panels === snapshot.workbenchPanels) return declined
+
+  runtime.workspace.getState().setWorkbenchPanels(panels)
+  return focusActiveTerminalStart(runtime, rootPath, panels)
+}
+
 function focusIdInLayoutStart(
   runtime: WorkspaceCommandRuntime,
   id: FocusTargetId,
@@ -267,7 +299,11 @@ function focusActiveSurface(runtime: WorkspaceCommandRuntime): StartedCommand {
   }
   const activeTab = activeEditorTabForWorkbenchPanels(workspace.workbenchPanels)
   if (!activeTab) {
-    return focusStart(runtime, { isValid: () => false, kind: 'match', matches: () => false })
+    return focusStart(runtime, {
+      isValid: () => false,
+      kind: 'match',
+      matches: () => false,
+    })
   }
   const layout = workspace.uiMode
 
@@ -675,14 +711,7 @@ export const workspaceCommands = [
         getNavigation().setWorkbenchPanels(panels, runtime.workspace, 'workbench'),
         () => {
           if (!panels.bottomPanelOpen) return handled
-          return focusStart(runtime, {
-            isValid: () => runtime.workspace.getState().uiMode === 'workbench',
-            kind: 'match',
-            matches: (target) =>
-              target.id.kind === 'terminal' &&
-              target.id.rootPath === snapshot.rootPath &&
-              target.layout === 'workbench',
-          })
+          return focusActiveTerminalStart(runtime, rootPath, panels)
         },
       )
     },
@@ -840,23 +869,55 @@ export const workspaceCommands = [
       const rootPath = snapshot.rootPath
       if (!rootPath) return declined
 
+      const panels = showWorkbenchBottomTab(snapshot.workbenchPanels, 'terminal')
       return afterNavigation(
-        getNavigation().setWorkbenchPanels(
-          showWorkbenchBottomTab(snapshot.workbenchPanels, 'terminal'),
-          runtime.workspace,
-          'workbench',
-        ),
-        () =>
-          focusStart(runtime, {
-            isValid: () => runtime.workspace.getState().uiMode === 'workbench',
-            kind: 'match',
-            matches: (target) =>
-              target.id.kind === 'terminal' &&
-              target.id.rootPath === snapshot.rootPath &&
-              target.layout === 'workbench',
-          }),
+        getNavigation().setWorkbenchPanels(panels, runtime.workspace, 'workbench'),
+        () => focusActiveTerminalStart(runtime, rootPath, panels),
       )
     },
+  }),
+  defineCommand({
+    ...workspaceCommandMetadata['workspace.newTerminal'],
+    icon: TerminalIcon,
+    run: ({ runtime, snapshot }) => {
+      const rootPath = snapshot.rootPath
+      if (!rootPath) return declined
+
+      const panels = showWorkbenchBottomTab(
+        openTerminalTabInWorkbenchPanels(snapshot.workbenchPanels),
+        'terminal',
+      )
+      return afterNavigation(
+        getNavigation().setWorkbenchPanels(panels, runtime.workspace, 'workbench'),
+        () => focusActiveTerminalStart(runtime, rootPath, panels),
+      )
+    },
+  }),
+  defineCommand({
+    ...workspaceCommandMetadata['workspace.killTerminal'],
+    icon: XIcon,
+    run: ({ runtime, snapshot }) => {
+      const rootPath = snapshot.rootPath
+      const tabId = snapshot.workbenchPanels.activeTerminalTabId
+      if (!rootPath || !tabId) return declined
+
+      const queryClient = runtime.documents.queryClient
+      const server = {
+        client: clientForQueryClient(queryClient),
+        origin: originForQueryClient(queryClient),
+      }
+      const panels = killTerminalTab(snapshot.workbenchPanels, server, rootPath, tabId)
+      runtime.workspace.getState().setWorkbenchPanels(panels)
+      return focusActiveTerminalStart(runtime, rootPath, panels)
+    },
+  }),
+  defineCommand({
+    ...workspaceCommandMetadata['workspace.focusNextTerminal'],
+    run: (context) => selectAdjacentTerminal(context, 'next'),
+  }),
+  defineCommand({
+    ...workspaceCommandMetadata['workspace.focusPreviousTerminal'],
+    run: (context) => selectAdjacentTerminal(context, 'previous'),
   }),
   defineCommand({
     ...workspaceCommandMetadata['workspace.closeCurrentTab'],

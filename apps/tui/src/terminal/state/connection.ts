@@ -86,6 +86,7 @@ export function openTerminalConnection(
       return
     }
     if (message.type === 'exit') return publish({ kind: 'exited', exitCode: message.exitCode })
+    if (message.type === 'process') return
     fail(message.message)
   }
   function disconnected() {
