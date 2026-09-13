@@ -5,6 +5,10 @@ import { createScriptError } from './structured-errors'
 export type DevPackage = {
   readonly name: string
   readonly root: string
+  // The checkout the package lives in. Its source imports grammars and wasm
+  // from that checkout's own dependency store, outside the package root, and
+  // Vite serves an asset import it may not read as the raw file.
+  readonly checkout: string
   readonly entries: ReadonlyMap<string, string>
 }
 
@@ -80,7 +84,7 @@ function readEditorPackage(webRoot: string, name: string): DevPackage {
   }
   if (!entries.has(name)) throw createScriptError(`Missing source entry for ${name}.`)
 
-  return { name, root, entries }
+  return { name, root, checkout: checkoutRoot(root), entries }
 }
 
 function readGhosttyPackage(webRoot: string): DevPackage {
@@ -93,7 +97,18 @@ function readGhosttyPackage(webRoot: string): DevPackage {
     [`${name}/ghostty-vt.wasm`, requiredFile(root, 'ghostty-vt.wasm')],
     [`${name}/bridge.wasm`, requiredFile(root, 'bridge.wasm')],
   ])
-  return { name, root, entries }
+  return { name, root, checkout: checkoutRoot(root), entries }
+}
+
+function checkoutRoot(root: string): string {
+  let dir = root
+  while (!fs.existsSync(path.join(dir, '.git'))) {
+    const parent = path.dirname(dir)
+    if (parent === dir) return root
+    dir = parent
+  }
+
+  return dir
 }
 
 function editorSourcePath(root: string, target: string, id: string): string {

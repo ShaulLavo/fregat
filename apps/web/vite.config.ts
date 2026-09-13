@@ -46,7 +46,7 @@ export default defineConfig(({ command, isPreview }) => {
     },
     server: {
       fs: {
-        allow: [workspaceRoot, ...packages.map((pkg) => pkg.root)],
+        allow: [workspaceRoot, ...packages.map((pkg) => pkg.checkout)],
       },
       host: devServerHost,
       port: devServerPort,
