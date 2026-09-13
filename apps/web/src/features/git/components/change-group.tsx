@@ -49,25 +49,20 @@ export function ChangeGroup({
       onOpenChange={(nextOpen) => setSectionOpen(section, nextOpen)}
     >
       <div
-        className='group/group hover:bg-row-hover active:bg-row-active flex h-(--density-control-height-sm) w-full items-center px-(--density-row-padding-x) text-xs font-medium transition-colors'
+        className='group/group hover:bg-row-hover active:bg-row-active text-muted-foreground text-2xs flex h-(--density-control-height-sm) w-full items-center px-(--density-row-padding-x) font-medium tracking-wider uppercase transition-colors'
         onContextMenu={handleContextMenu}
         onKeyDown={handleHeaderKeyDown}
       >
-        <CollapsibleTrigger className='focus-ring flex min-w-0 flex-1 items-center gap-2 text-left outline-none'>
+        <CollapsibleTrigger className='focus-ring flex min-w-0 flex-1 items-center gap-1.5 text-left outline-none'>
           <CaretDownIcon
-            className={cn(
-              'size-3.5 shrink-0 text-muted-foreground transition-transform',
-              !open && '-rotate-90',
-            )}
+            className={cn('size-3 shrink-0 transition-transform', !open && '-rotate-90')}
           />
           <span className='min-w-0 flex-1 truncate'>{label}</span>
         </CollapsibleTrigger>
         <GroupActions rows={rows} section={section} />
-        <span className='bg-background text-muted-foreground text-2xs ml-1 flex h-(--density-chip-height) min-w-(--density-chip-height) items-center justify-center rounded-full border px-1.5 font-normal tabular-nums'>
-          {rows.length}
-        </span>
+        <span className='ml-1 tabular-nums'>{rows.length}</span>
       </div>
-      <CollapsibleContent className='ml-5 border-l'>
+      <CollapsibleContent className='pl-(--density-row-padding-x)'>
         {rows.map((row) => (
           <FileRow
             key={`${row.section}:${row.file.path}:${row.status}`}

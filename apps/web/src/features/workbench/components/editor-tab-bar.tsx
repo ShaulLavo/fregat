@@ -22,7 +22,9 @@ import type { EditorTabCloseTarget } from '@/features/workspace/utils/tab-close-
 import { useEditorTabActions } from '@/features/editor/hooks/use-editor-tab-actions'
 import { SortableEditorTabButton } from '@/features/workbench/components/sortable-editor-tab-button'
 import { useActiveTabStripScroll } from '@/features/workbench/hooks/use-active-tab-strip-scroll'
+import { BAR_TAB_FILLER_CLASS, BAR_TAB_STRIP_CLASS } from '@/features/workbench/utils/bar-tabs'
 import { editorTabReorderIntent } from '@/features/workbench/utils/editor-tab-dnd'
+import { cn } from '@workspace/ui/lib/utils'
 
 const EDITOR_TAB_DND_MODIFIERS = [restrictToHorizontalAxis]
 
@@ -65,7 +67,7 @@ export function EditorTabBar({
       <SortableContext items={tabs.map((tab) => tab.id)} strategy={horizontalListSortingStrategy}>
         <div
           aria-label='Editor tabs'
-          className='no-scrollbar border-border flex h-(--bar-height) shrink-0 items-end gap-(--density-control-gap) overflow-x-auto border-b px-(--bar-padding-x) pt-1'
+          className={cn(BAR_TAB_STRIP_CLASS, 'bg-background')}
           ref={stripRef}
           role='tablist'
         >
@@ -80,6 +82,7 @@ export function EditorTabBar({
               />
             )
           })}
+          <div aria-hidden='true' className={BAR_TAB_FILLER_CLASS} />
         </div>
       </SortableContext>
     </DndContext>

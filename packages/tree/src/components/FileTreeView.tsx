@@ -199,6 +199,7 @@ export function FileTreeView({
   searchBlurBehavior = 'close',
   searchEnabled = false,
   searchFakeFocus = false,
+  searchPlaceholder = 'Search…',
   slotHost,
   stickyFolders = false,
   initialViewportHeight = FILE_TREE_DEFAULT_VIEWPORT_HEIGHT,
@@ -1304,7 +1305,7 @@ export function FileTreeView({
             ref={searchInputRef}
             aria-activedescendant={activeDescendantId}
             aria-controls={treeDomId}
-            placeholder='Search…'
+            placeholder={searchPlaceholder}
             data-file-tree-search-input
             data-file-tree-search-input-fake-focus={fakeSearchFocusActive ? 'true' : undefined}
             value={searchValue}

@@ -1,3 +1,5 @@
+import type { LspMatch } from '@workspace/contracts'
+
 import { connectLanguageServerSocket, type EdenServerSocket } from '@/lib/server-sockets'
 import { clientErrors } from '@/lib/structured-errors'
 import type { Client } from '@/lib/client'
@@ -15,12 +17,32 @@ export type FlatDocumentSymbol = {
   selectionRange: DocumentSymbolRange
 }
 
-type DocumentSymbol = {
+export type DocumentSymbol = {
   children?: readonly DocumentSymbol[]
   kind: number
   name: string
   range: DocumentSymbolRange
   selectionRange: DocumentSymbolRange
+}
+
+export type DocumentSymbolsRequest = {
+  path: string
+  rootPath: string
+  /** The language server to ask; the socket route refuses to guess one. */
+  serverId: string
+  signal: AbortSignal
+  text?: string | null
+}
+
+// Ranks are ascending: lower wins.
+export function documentSymbolServerId(matches: readonly LspMatch[] | null): string | null {
+  if (!matches || matches.length === 0) return null
+
+  const navigating = matches
+    .filter((match) => match.features.navigation !== undefined)
+    .toSorted((left, right) => left.features.navigation! - right.features.navigation!)
+
+  return (navigating[0] ?? matches[0])!.serverId
 }
 
 type JsonRpcResponse = {
@@ -29,47 +51,25 @@ type JsonRpcResponse = {
   result?: unknown
 }
 
-export async function fetchDocumentSymbols(
-  {
-    path,
-    rootPath,
-    signal,
-    text,
-  }: {
-    path: string
-    rootPath: string
-    signal: AbortSignal
-    text?: string | null
-  },
+export async function fetchDocumentSymbolTree(
+  request: DocumentSymbolsRequest,
   client: Client,
-): Promise<readonly FlatDocumentSymbol[]> {
-  const symbols = await requestDocumentSymbols(
-    {
-      path,
-      rootPath,
-      signal,
-      text,
-    },
-    client,
-  ).catch((error: unknown) => {
-    if (signal?.aborted) throw error
+): Promise<readonly DocumentSymbol[]> {
+  return requestDocumentSymbols(request, client).catch((error: unknown) => {
+    if (request.signal?.aborted) throw error
     return []
   })
-  return flattenDocumentSymbols(symbols)
+}
+
+export async function fetchDocumentSymbols(
+  request: DocumentSymbolsRequest,
+  client: Client,
+): Promise<readonly FlatDocumentSymbol[]> {
+  return flattenDocumentSymbols(await fetchDocumentSymbolTree(request, client))
 }
 
 function requestDocumentSymbols(
-  {
-    path,
-    rootPath,
-    signal,
-    text,
-  }: {
-    path: string
-    rootPath: string
-    signal: AbortSignal
-    text?: string | null
-  },
+  { path, rootPath, serverId, signal, text }: DocumentSymbolsRequest,
   client: Client,
 ) {
   return new Promise<readonly DocumentSymbol[]>((resolve, reject) => {
@@ -78,7 +78,7 @@ function requestDocumentSymbols(
       return
     }
 
-    const socket = connectLanguageServerSocket({ path, rootPath }, client, signal)
+    const socket = connectLanguageServerSocket({ path, rootPath, serverId }, client, signal)
     const requestId = 1
     let settled = false
 
@@ -164,14 +164,69 @@ function flattenDocumentSymbols(
   ])
 }
 
+// Servers without hierarchical support answer the flat SymbolInformation list;
+// it is nested back by container name so a method still sits under its class.
 function documentSymbolsFromResult(result: unknown): readonly DocumentSymbol[] {
   if (!Array.isArray(result)) return []
 
-  return result.flatMap((value) => {
-    if (!isDocumentSymbol(value)) return []
+  const hierarchical = result.flatMap((value) => (isDocumentSymbol(value) ? [value] : []))
+  if (hierarchical.length > 0) return hierarchical
 
-    return [value]
-  })
+  return nestSymbolInformation(
+    result.flatMap((value) => (isSymbolInformation(value) ? [value] : [])),
+  )
+}
+
+type SymbolInformation = {
+  containerName?: string
+  kind: number
+  location: { range: DocumentSymbolRange }
+  name: string
+}
+
+function nestSymbolInformation(symbols: readonly SymbolInformation[]): DocumentSymbol[] {
+  const roots: DocumentSymbol[] = []
+  const nodes: { node: DocumentSymbol; children: DocumentSymbol[] }[] = []
+  for (const info of symbols) {
+    const children: DocumentSymbol[] = []
+    const node: DocumentSymbol = {
+      children,
+      kind: info.kind,
+      name: info.name,
+      range: info.location.range,
+      selectionRange: info.location.range,
+    }
+    const parent = info.containerName
+      ? nodes.findLast(
+          (entry) =>
+            entry.node.name === info.containerName && rangeContains(entry.node.range, node.range),
+        )
+      : undefined
+    ;(parent?.children ?? roots).push(node)
+    nodes.push({ children, node })
+  }
+
+  return roots
+}
+
+function rangeContains(outer: DocumentSymbolRange, inner: DocumentSymbolRange) {
+  const startsBefore =
+    outer.start.line < inner.start.line ||
+    (outer.start.line === inner.start.line && outer.start.character <= inner.start.character)
+  const endsAfter =
+    outer.end.line > inner.end.line ||
+    (outer.end.line === inner.end.line && outer.end.character >= inner.end.character)
+
+  return startsBefore && endsAfter
+}
+
+function isSymbolInformation(value: unknown): value is SymbolInformation {
+  if (!value || typeof value !== 'object') return false
+  if (!('name' in value) || typeof value.name !== 'string') return false
+  if (!('kind' in value) || typeof value.kind !== 'number') return false
+  if (!('location' in value) || !value.location || typeof value.location !== 'object') return false
+
+  return 'range' in value.location && isRange(value.location.range)
 }
 
 function isDocumentSymbol(value: unknown): value is DocumentSymbol {
@@ -207,7 +262,7 @@ function parseJsonRpcResponse(value: unknown): JsonRpcResponse | null {
   }
 }
 
-function fileUriForPath(path: string) {
+export function fileUriForPath(path: string) {
   const normalized = path.replace(/^\/+/, '')
   return `file:///${normalized.split('/').map(encodeURIComponent).join('/')}`
 }

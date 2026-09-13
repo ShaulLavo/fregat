@@ -20,7 +20,7 @@ import { createSemanticTokenStyles } from '@singapor/core/syntax'
 import { SEMANTIC_TOKEN_TYPES } from '@singapor/lsp'
 import { decodeSemanticTokens } from '@singapor/lsp-plugin'
 
-import { semanticTokensCapabilityForServer } from '@/features/editor/utils/semantic-token-capability'
+import { clientCapabilitiesForServer } from '@/features/editor/utils/client-capabilities'
 import { semanticTokenProfileFor } from '@/features/editor/utils/semantic-token-servers'
 
 // Probe installed optional servers and the application's bundled TypeScript runtime.
@@ -224,7 +224,7 @@ async function negotiate(launch: typeof spawnTypeScript, testCase: ServerCase): 
   })
 
   const params = {
-    capabilities: semanticTokensCapabilityForServer(testCase.serverId),
+    capabilities: clientCapabilitiesForServer(testCase.serverId),
     clientInfo: { name: '@singapor/lsp' },
     processId: process.pid,
     initializationOptions: handle.initializationOptions,
@@ -377,7 +377,7 @@ async function tokenSession(
       jsonrpc: '2.0',
       method: 'initialize',
       params: {
-        capabilities: semanticTokensCapabilityForServer('rust'),
+        capabilities: clientCapabilitiesForServer('rust'),
         clientInfo: { name: '@singapor/lsp' },
         processId: process.pid,
         rootUri: `file://${root}`,

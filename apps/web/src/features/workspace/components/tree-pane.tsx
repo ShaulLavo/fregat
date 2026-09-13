@@ -21,7 +21,6 @@ import {
 } from '@/features/workspace/utils/tree-pane-state'
 import { selectedFileEntryForTreeSelection } from '@/features/workspace/utils/tree-selection'
 import { DeleteEntryDialog } from '@/features/workspace/components/delete-entry-dialog'
-import { TreeToolbar } from '@/features/workspace/components/tree-toolbar'
 import { TreeLoading } from '@/features/workspace/components/tree-loading'
 import { useFileTreeActions } from '@/features/workspace/hooks/use-file-tree-actions'
 import { useFileTreeIntentPrefetch } from '@/features/workspace/hooks/use-file-tree-intent-prefetch'
@@ -32,7 +31,6 @@ import { useOptionalWorkspaceEditService } from '@/features/editor/providers/wor
 import { useFsActions } from '@/features/workspace/hooks/use-fs-actions'
 import { useProjectedTreeModel } from '@/features/workspace/hooks/use-projected-tree-model'
 import { hasPendingTreeMove, runTreeIntent } from '@/features/workspace/state/tree-intents'
-import { useTreeSearchSession } from '@/features/workspace/hooks/use-tree-search-session'
 import { useEditorCommands } from '@/features/editor/hooks/use-editor-commands'
 import { useEditorWorkspaceState } from '@/features/editor/state/workspace-state'
 import { tabFileResource } from '@/lib/documents/utils/capabilities'
@@ -124,8 +122,11 @@ function ReadyTreePane({
       ? canonicalTreePath(treePathForSelectedPath(rootPath, selectedDiskPath))
       : null
   const { selectFile } = useEditorCommands()
-  const { loadDirectory, publishVisibleItemCount: publishVisibleItemCountAction } =
-    useFileTreeActions()
+  const {
+    loadDirectory,
+    publishToolbar,
+    publishVisibleItemCount: publishVisibleItemCountAction,
+  } = useFileTreeActions()
   const queryClient = useQueryClient()
   const workspaceEdits = useOptionalWorkspaceEditService()
   const expandedDirectoryPathsRef = useRef<ReadonlySet<string> | undefined>(undefined)
@@ -173,6 +174,8 @@ function ReadyTreePane({
   }
   const fsActions = useFsActions({ modelRef, rootPath, treeRef })
   const completeRenameRef = useRef(fsActions.completeRename)
+  const createEntryRef = useRef(fsActions.actions.createEntry)
+  const revealActiveFileRef = useRef<() => boolean>(() => false)
   const loadExpandedDirectoriesForCurrentModel = useEffectEvent((currentTree: FileTreeModel) => {
     expandedDirectoryPathsRef.current = loadExpandedDirectories(
       currentTree,
@@ -200,6 +203,8 @@ function ReadyTreePane({
     preparedInput: initialPreparedInput,
     search: true,
     searchBlurBehavior: 'retain',
+    searchPlaceholder: 'Filter files',
+    stickyFolders: true,
     dragAndDrop: {
       canDrag: (paths) =>
         fsActions.actions.mutationsEnabled &&
@@ -237,8 +242,6 @@ function ReadyTreePane({
   useLayoutEffect(() => {
     tree.setLoadingPaths(loadingTreePath ? [loadingTreePath] : [])
   }, [loadingTreePath, tree])
-  const searchSession = useTreeSearchSession(tree)
-
   useFileTreeMutationEvents({ rootPath, tree })
 
   useFileTreeIntentPrefetch({
@@ -294,11 +297,25 @@ function ReadyTreePane({
   // callbacks read at call time.
   useLayoutEffect(() => {
     completeRenameRef.current = fsActions.completeRename
+    createEntryRef.current = fsActions.actions.createEntry
     modelRef.current = model
+    revealActiveFileRef.current = () => focusTreeForCommand(true)
     selectedFilePathRef.current = selectedFilePath
     selectFileRef.current = selectFile
     treeRef.current = tree
   })
+
+  const mutationsEnabled = fsActions.actions.mutationsEnabled
+  useLayoutEffect(() => {
+    publishToolbar({
+      createFile: () => createEntryRef.current('', false),
+      createFolder: () => createEntryRef.current('', true),
+      mutationsEnabled,
+      revealActiveFile: () => revealActiveFileRef.current(),
+    })
+
+    return () => publishToolbar(null)
+  }, [mutationsEnabled, publishToolbar])
 
   useEffect(() => {
     const selectionSync = selectionSyncPlan({
@@ -346,25 +363,6 @@ function ReadyTreePane({
       <FileTree
         aria-label='Folder tree'
         className='block h-full'
-        header={
-          <TreeToolbar
-            isSearchOpen={searchSession.isSearchOpen}
-            matchCount={searchSession.matchCount}
-            mutationsEnabled={fsActions.actions.mutationsEnabled}
-            query={searchSession.query}
-            onClearSearch={() => {
-              tree.setSearch('')
-              tree.openSearch()
-            }}
-            onCloseSearch={() => tree.closeSearch()}
-            onNewFile={() => fsActions.actions.createEntry('', false)}
-            onNewFolder={() => fsActions.actions.createEntry('', true)}
-            onNextMatch={() => tree.focusNextSearchMatch()}
-            onOpenSearch={() => tree.openSearch()}
-            onPreviousMatch={() => tree.focusPreviousSearchMatch()}
-            onRevealActiveFile={() => focusTreeForCommand(true)}
-          />
-        }
         model={tree}
         renderContextMenu={(item, menuContext) => (
           <TreeRowMenu
@@ -628,13 +626,10 @@ const treeStyle = {
   '--trees-status-renamed-override': 'var(--warning)',
   '--trees-status-deleted-override': 'var(--destructive)',
   '--trees-status-ignored-override': 'var(--muted-foreground)',
-  // Selection marks the current file and must stay legible when the tree is blurred
-  // (editor focused) and under transparent mode. Hover uses var(--accent), which scales
-  // with --surface-opacity and washes out; give selection a fixed alpha off accent-solid
-  // so it keeps a visible floor and a clear edge over hover, while still letting the
-  // wallpaper through rather than reading as a solid block.
-  '--trees-selected-bg-override': 'color-mix(in oklch, var(--accent-solid) 60%, transparent)',
+  '--trees-selected-bg-override': 'var(--row-selected)',
+  '--trees-item-margin-x-override': '0px',
   '--trees-border-color-override': 'var(--border)',
+  '--trees-indent-guide-bg-override': 'var(--border)',
   '--trees-fg-override': 'var(--foreground)',
   // The tree defines its own font variables inside the shadow root, so host
   // inheritance alone cannot reach the rows.
@@ -663,6 +658,52 @@ const treeUnsafeCss = `
 
   button[data-type='item'] {
     border-radius: 0;
+  }
+
+  button[data-type='item'][data-item-selected='true']::after {
+    content: '';
+    position: absolute;
+    left: 0;
+    top: 4px;
+    bottom: 4px;
+    width: 2px;
+    background: var(--foreground);
+    pointer-events: none;
+  }
+
+  /* The tree's own focus ring only while the tree actually has focus. The
+   * package paints it for its remembered focus row even when the editor owns
+   * the keyboard, which read as a second, stray selection. */
+  :host(:not(:focus-within)) button[data-type='item'][data-item-focused='true']::before {
+    outline-color: transparent;
+  }
+
+  [data-file-tree-search-container] {
+    align-items: center;
+    height: var(--bar-height);
+    margin: 0;
+    padding-inline: var(--bar-padding-x);
+    border-bottom: 1px solid var(--border);
+  }
+
+  [data-file-tree-search-input] {
+    height: var(--density-control-height-sm);
+    line-height: normal;
+    margin-block: 0;
+    padding-inline: var(--density-control-padding-x);
+    border-radius: var(--radius-md);
+    border-color: var(--input);
+    background-color: color-mix(in oklch, var(--input) 30%, transparent);
+    font-family: var(--font-ui);
+    font-size: var(--text-xs);
+  }
+
+  :host(:hover) [data-item-section='spacing-item'] {
+    border-left-color: var(--trees-indent-guide-current-bg);
+  }
+
+  [data-item-section='spacing-item'] {
+    border-left-color: var(--border);
   }
 
   button[data-item-loading='true'] [data-item-section='content'] {

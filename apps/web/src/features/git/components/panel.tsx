@@ -7,12 +7,10 @@ import { useIsFetching } from '@tanstack/react-query'
 import { useEditorWorkspaceState } from '@/features/editor/state/workspace-state'
 import { errorMessage } from '@/lib/file-server'
 import { useStatus } from '@/features/git/hooks'
-import { useGitState } from '@/features/git/state/store'
 
 import { changeRows } from '@/features/git/utils/change-rows'
 import { ChangeGroup } from '@/features/git/components/change-group'
 import { CommitControls } from '@/features/git/components/commit-controls'
-import { Header } from '@/features/git/components/header'
 import { PanelLoading } from '@/features/git/components/panel-loading'
 import { diffDocumentQueryKey } from '@/features/git/utils/diff-document-query'
 import { useFocusTarget } from '@/lib/focus/hooks/use-target'
@@ -35,7 +33,6 @@ function PanelContent({ className, rootPath }: ComponentProps<'section'> & { roo
   const repository = status.data?.repository ?? null
   const rows = useMemo(() => changeRows(files), [files])
   const hasLocalChanges = rows.staged.length > 0 || rows.worktree.length > 0
-  const panelOpen = useGitState((state) => state.panelOpen)
   const rootRef = useRef<HTMLElement | null>(null)
   const { ref: focusTargetRef } = useFocusTarget<HTMLElement>({
     area: 'git',
@@ -107,37 +104,34 @@ function PanelContent({ className, rootPath }: ComponentProps<'section'> & { roo
 
   return renderRoot(
     <>
-      <Header repository={repository} rootPath={rootPath} />
-      {panelOpen ? (
-        <>
-          <CommitControls
-            hasLocalChanges={hasLocalChanges}
-            repository={repository}
-            rootPath={rootPath}
+      <CommitControls
+        hasLocalChanges={hasLocalChanges}
+        repository={repository}
+        rootPath={rootPath}
+      />
+      <div className='app-scrollbar-thin min-h-0 flex-1 overflow-auto py-(--density-gap-tight)'>
+        <ChangeGroup
+          label='Staged'
+          loadingPath={loadingDiff?.source === 'staged' ? loadingDiff.path : null}
+          rootPath={rootPath}
+          rows={rows.staged}
+          section='staged'
+        />
+        <ChangeGroup
+          label='Changes'
+          loadingPath={loadingDiff?.source === 'worktree' ? loadingDiff.path : null}
+          rootPath={rootPath}
+          rows={rows.worktree}
+          section='worktree'
+        />
+        {!hasLocalChanges && (
+          <EmptyState
+            align='start'
+            className='px-(--density-row-padding-x) py-4'
+            title='Working tree clean'
           />
-          <div className='app-scrollbar-thin min-h-0 flex-1 overflow-auto pt-2'>
-            <ChangeGroup
-              label='Staged Changes'
-              loadingPath={loadingDiff?.source === 'staged' ? loadingDiff.path : null}
-              rootPath={rootPath}
-              rows={rows.staged}
-              section='staged'
-            />
-            <ChangeGroup
-              label='Changes'
-              loadingPath={loadingDiff?.source === 'worktree' ? loadingDiff.path : null}
-              rootPath={rootPath}
-              rows={rows.worktree}
-              section='worktree'
-            />
-            {!hasLocalChanges && (
-              <EmptyState align='start' className='px-7 py-4' title='Working tree clean' />
-            )}
-          </div>
-        </>
-      ) : (
-        <div aria-hidden='true' className='min-h-0 flex-1' />
-      )}
+        )}
+      </div>
     </>,
   )
 }

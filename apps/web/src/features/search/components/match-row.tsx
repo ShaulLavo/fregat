@@ -52,9 +52,10 @@ export const SearchMatchRow = memo(
     return (
       <div
         className={cn(
-          'group grid w-full min-w-0 grid-cols-[minmax(0,1fr)_auto] items-center gap-1.5 overflow-hidden px-2 py-1.5 text-left text-xs',
+          'group relative grid w-full min-w-0 grid-cols-[minmax(0,1fr)_auto] items-center gap-1.5 overflow-hidden px-2 py-1.5 text-left text-xs',
           compact && 'h-6 gap-1 px-1.5 py-0',
-          active && 'bg-row-selected',
+          active &&
+            'bg-row-selected before:absolute before:inset-y-0.5 before:left-0 before:w-0.5 before:bg-foreground',
           !active && 'hover:bg-row-hover',
           className,
         )}
@@ -152,9 +153,10 @@ export const SearchNameMatchRow = memo(
       // shape (radius, fixed height, hover fill) is exactly what rows must not have.
       <button
         className={cn(
-          'focus-ring grid w-full min-w-0 grid-cols-[16px_minmax(0,1fr)_auto] items-center gap-1.5 overflow-hidden px-2 py-1.5 text-left outline-none',
+          'focus-ring relative grid w-full min-w-0 grid-cols-[16px_minmax(0,1fr)_auto] items-center gap-1.5 overflow-hidden px-2 py-1.5 text-left outline-none',
           compact && 'h-6 grid-cols-[14px_minmax(0,1fr)_auto] gap-1 px-1.5 py-0',
-          active && 'bg-row-selected',
+          active &&
+            'bg-row-selected before:absolute before:inset-y-0.5 before:left-0 before:w-0.5 before:bg-foreground',
           !active && 'hover:bg-row-hover active:bg-row-active',
           className,
         )}

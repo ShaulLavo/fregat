@@ -48,5 +48,6 @@ export interface FileTreeViewProps extends Omit<FileTreeRenderOptions, 'initialV
   searchBlurBehavior?: FileTreeSearchBlurBehavior
   searchEnabled?: boolean
   searchFakeFocus?: boolean
+  searchPlaceholder?: string
   slotHost?: FileTreeSlotHost
 }

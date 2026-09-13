@@ -180,8 +180,7 @@
   /* The pane ground sits BELOW the card ground on purpose: the titlebar and the
      editor well are --card, the sidebar and the shell are --background, and light
      mode needs that gap for the same reason dark mode has one (0.145 against
-     0.205). With both at pure white the workbench was a single flat field, because
-     [data-workbench] also paints every border inside it transparent. */
+     0.205). Tone separates the panes; the workbench hairline only edges them. */
   --background-solid: oklch(0.97 0.006 70);
   --background: color-mix(in oklch, var(--background-solid) var(--surface-opacity), transparent);
   --foreground: oklch(0.145 0.006 70);
@@ -623,10 +622,13 @@ html[data-palette='sage'] {
 }
 
 [data-workbench] {
-  --border: transparent;
+  /* The workbench hairline: an 8% foreground line wherever bar tokens meet, so a
+     pane edge reads as an edge and not as a smudge between two tones. Derived
+     from --foreground rather than fixed white so it flips with the theme. */
+  --border: color-mix(in oklch, var(--foreground) 8%, transparent);
   /* Re-derive rather than inherit: a custom property is substituted on the element that declares
-     it, so the :root definition of --border-subtle already froze the visible grey before it got
-     here and would paint a line where --border deliberately paints none. */
+     it, so the :root definition of --border-subtle already froze the theme grey before it got
+     here and would paint the wrong weight inside the workbench. */
   --border-subtle: color-mix(in oklch, var(--border) 55%, transparent);
 }
 

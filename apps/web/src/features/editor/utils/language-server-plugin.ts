@@ -26,8 +26,8 @@ import { lspLanguageIdForPath } from '@/features/editor/utils/lsp-language-id'
 import { SemanticTokenController } from '@/features/editor/state/semantic-token-controller'
 import {
   LANGUAGE_SERVER_CLIENT_INFO,
-  semanticTokensCapabilityForServer,
-} from '@/features/editor/utils/semantic-token-capability'
+  clientCapabilitiesForServer,
+} from '@/features/editor/utils/client-capabilities'
 import { languageServerWebSocketConstructor } from '@/lib/server-sockets'
 import { environmentClientFor } from '@/lib/client'
 import { environmentActivitySignal } from '@/lib/environments/state/activity'
@@ -186,7 +186,7 @@ export function languageServerLaneOptions({
   return {
     id: match.serverId,
     features: match.features as LanguageServerFeatureRanks,
-    capabilities: semanticTokensCapabilityForServer(match.serverId),
+    capabilities: clientCapabilitiesForServer(match.serverId),
     clientInfo: LANGUAGE_SERVER_CLIENT_INFO,
     rootUri: fileUriForPath(match.root),
     connectionProvider,

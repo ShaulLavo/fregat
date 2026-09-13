@@ -43,6 +43,7 @@ import { TreePane } from '@/features/workspace/components/tree-pane'
 import {
   FileTreeActionsContext,
   type FileTreeActions,
+  type TreeToolbarActions,
 } from '@/features/workspace/providers/actions-context'
 import { useCommand } from '@/keymap/hooks/use-command'
 import type { PlatformCommandBus } from '@/keymap/providers/command-context'
@@ -58,9 +59,16 @@ const PREPARED_FILE_PATH = `${PREPARED_ROOT_PATH}/src/editor-tab-a.ts`
 const SHALLOW_FILE_PATH = `${ROOT_PATH}/src/file-0.ts`
 const UNLOADED_FILE_PATH = `${ROOT_PATH}/src/unloaded/deep.ts`
 
+// The identity row above the tree is not mounted here; the tree publishes its
+// actions and the test invokes them the way that row would.
+let treeToolbar: TreeToolbarActions | null = null
+
 const fileTreeActions: FileTreeActions = {
   loadDirectory: () => {},
   prefetchDirectory: () => {},
+  publishToolbar: (actions) => {
+    treeToolbar = actions
+  },
   publishVisibleItemCount: () => {},
 }
 
@@ -74,6 +82,7 @@ afterEach(async () => {
   flushSync(() => root?.unmount())
   root = null
   treeCommandBus = null
+  treeToolbar = null
   treeDocumentStore = null
   treeEditorCommands = null
   treeWorkspaceStore = null
@@ -156,42 +165,34 @@ test('the live navigator retains search, consumes requested focus, reveals, and 
   await expect.poll(() => activeTreePath(shadowRoot)).toBe('src/')
   await expect(focusTicket.completion).resolves.toEqual({ status: 'handled' })
 
-  clickToolbarButton('Filter files')
+  // The filter field is the tree's second header row, always on screen.
   const searchInput = searchField(shadowRoot)
+  searchInput.focus()
   await expect.poll(() => shadowRoot.activeElement).toBe(searchInput)
   typeSearch(searchInput, 'file-7')
-  await expect.poll(() => matchCountText()).toBe('11 matches')
+  await expect.poll(() => searchContainer(shadowRoot).dataset.open).toBe('true')
 
   clickToolbarButton('Outside tree')
   expect(searchInput.value).toBe('file-7')
   expect(searchContainer(shadowRoot).dataset.open).toBe('true')
 
+  searchInput.focus()
+  await expect.poll(() => searchInput.getAttribute('aria-activedescendant')).not.toBeNull()
   const firstMatch = searchInput.getAttribute('aria-activedescendant')
-  expect(firstMatch).not.toBeNull()
-  clickToolbarButton('Next file match')
+  searchInput.dispatchEvent(new KeyboardEvent('keydown', { bubbles: true, key: 'ArrowDown' }))
   await expect.poll(() => searchInput.getAttribute('aria-activedescendant')).not.toBe(firstMatch)
-  clickToolbarButton('Previous file match')
+  searchInput.dispatchEvent(new KeyboardEvent('keydown', { bubbles: true, key: 'ArrowUp' }))
   await expect.poll(() => searchInput.getAttribute('aria-activedescendant')).toBe(firstMatch)
 
-  clickToolbarButton('Clear file filter')
-  await expect.poll(() => searchInput.value).toBe('')
-  await expect.poll(() => shadowRoot.activeElement).toBe(searchInput)
-  expect(document.querySelector('output[aria-live="polite"]')).toBeNull()
-
-  clickToolbarButton('Close file filter')
-  await expect.poll(() => searchContainer(shadowRoot).dataset.open).toBe('false')
-  clickToolbarButton('Filter files')
-  await expect.poll(() => shadowRoot.activeElement).toBe(searchInput)
   searchInput.dispatchEvent(new KeyboardEvent('keydown', { bubbles: true, key: 'Escape' }))
   await expect.poll(() => searchContainer(shadowRoot).dataset.open).toBe('false')
 
-  clickToolbarButton('Filter files')
-  await expect.poll(() => shadowRoot.activeElement).toBe(searchInput)
+  searchInput.focus()
   typeSearch(searchInput, 'file-0')
-  await expect.poll(() => matchCountText()).toBe('1 match')
+  await expect.poll(() => searchContainer(shadowRoot).dataset.open).toBe('true')
   clickToolbarButton('Select deep file')
   await expect.poll(() => selectedFilePathText()).toBe(DEEP_FILE_PATH)
-  clickToolbarButton('Reveal active file in tree')
+  revealActiveFile()
   await expect.poll(() => searchContainer(shadowRoot).dataset.open).toBe('false')
   await expect.poll(() => activeTreePath(shadowRoot)).toBe('src/file-79.ts')
   expect(treeScroller(shadowRoot).scrollTop).toBeGreaterThan(0)
@@ -209,7 +210,7 @@ test('the live navigator retains search, consumes requested focus, reveals, and 
   await expect
     .poll(() => treeRow(shadowRoot, 'src/')?.dataset.itemContainsGitChange)
     .toBeUndefined()
-  clickToolbarButton('Reveal active file in tree')
+  revealActiveFile()
   await expect
     .poll(() => rowButton(shadowRoot, 'src/file-79.ts')?.dataset.itemGitStatus)
     .toBeUndefined()
@@ -217,17 +218,17 @@ test('the live navigator retains search, consumes requested focus, reveals, and 
 
   clickToolbarButton('Select unloaded file')
   await expect.poll(() => selectedFilePathText()).toBe(UNLOADED_FILE_PATH)
-  clickToolbarButton('Reveal active file in tree')
+  revealActiveFile()
   await expect.poll(() => activeTreePath(shadowRoot)).toBe('src/')
 
-  clickToolbarButton('New file at workspace root')
+  treeToolbar!.createFile()
   await expect.poll(() => renameField(shadowRoot)).toBeTruthy()
   const renameInput = renameField(shadowRoot)!
   expect(renameInput.value).toBe('untitled')
   renameInput.dispatchEvent(new KeyboardEvent('keydown', { bubbles: true, key: 'Escape' }))
   await expect.poll(() => renameField(shadowRoot)).toBeNull()
 
-  clickToolbarButton('New folder at workspace root')
+  treeToolbar!.createFolder()
   await expect.poll(() => renameField(shadowRoot)?.value).toBe('new folder')
   renameField(shadowRoot)?.dispatchEvent(
     new KeyboardEvent('keydown', { bubbles: true, key: 'Escape' }),
@@ -280,13 +281,13 @@ test('selecting an editor tab expands and smoothly reveals its file without stea
     .poll(() => rowIsVisibleInScroller(rowButton(shadowRoot, 'src/file-0.ts'), scroller))
     .toBe(true)
 
-  const sourceDirectory = rowButton(shadowRoot, 'src/')
+  // With sticky folders on, an ancestor scrolled past the top exists only as
+  // its sticky row, so the collapse has to go through whichever row is mounted.
+  const sourceDirectory = treeRow(shadowRoot, 'src/')
   expect(sourceDirectory).not.toBeNull()
   sourceDirectory!.focus()
   sourceDirectory!.dispatchEvent(new KeyboardEvent('keydown', { bubbles: true, key: 'ArrowLeft' }))
-  await expect
-    .poll(() => rowButton(shadowRoot, 'src/')?.getAttribute('aria-expanded'))
-    .toBe('false')
+  await expect.poll(() => treeRow(shadowRoot, 'src/')?.getAttribute('aria-expanded')).toBe('false')
 
   const requestedScrolls = observeScrollRequests(scroller)
   const selectDeepTabButton = toolbarButton('Select deep tab')
@@ -294,7 +295,11 @@ test('selecting an editor tab expands and smoothly reveals its file without stea
   selectDeepTabButton.click()
 
   await expect.poll(() => selectedFilePathText()).toBe(DEEP_FILE_PATH)
-  await expect.poll(() => rowButton(shadowRoot, 'src/')?.getAttribute('aria-expanded')).toBe('true')
+  // Expanded again: a child row is mounted. The directory row itself may be
+  // the sticky copy by now, which carries no expansion state of its own.
+  await expect
+    .poll(() => shadowRoot.querySelector('button[data-item-path^="src/file-"]'))
+    .not.toBeNull()
   await expect.poll(() => scroller.scrollTop).toBeGreaterThan(0)
   const smoothRequest = requestedScrolls.findLast((request) => request.behavior === 'smooth')
   expect(smoothRequest?.top).toBeTypeOf('number')
@@ -782,8 +787,9 @@ function typeSearch(input: HTMLInputElement, value: string) {
   input.dispatchEvent(new InputEvent('input', { bubbles: true, data: value }))
 }
 
-function matchCountText() {
-  return document.querySelector('output[aria-live="polite"]')?.textContent?.trim() ?? null
+function revealActiveFile() {
+  expect(treeToolbar).not.toBeNull()
+  treeToolbar!.revealActiveFile()
 }
 
 function selectedFilePathText() {

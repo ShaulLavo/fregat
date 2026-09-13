@@ -7,6 +7,7 @@ import {
   InputGroupButton,
   InputGroupInput,
 } from '@workspace/ui/components/input-group'
+import { PaneBar } from '@workspace/ui/components/pane-bar'
 import { Spinner } from '@workspace/ui/components/spinner'
 import { useId, type ChangeEvent, type KeyboardEvent } from 'react'
 
@@ -54,8 +55,8 @@ export function CommitControls({
 
   return (
     <>
-      <div className='shrink-0 px-(--density-row-padding-x) pt-(--density-section-gap)'>
-        <InputGroup className='bg-background'>
+      <PaneBar border='bottom'>
+        <InputGroup className='bg-background h-(--density-control-height-sm) min-w-0 flex-1'>
           <InputGroupInput
             aria-label='Commit message'
             aria-describedby={generation.error ? generationErrorId : undefined}
@@ -64,7 +65,7 @@ export function CommitControls({
             disabled={inputDisabled}
             onChange={handleMessageChange}
             onKeyDown={handleCommitKeyDown}
-            placeholder={`Commit Changes (⌘↵ on "${repository.branch ?? 'HEAD'}")`}
+            placeholder='Commit message'
             value={showSyncChanges ? '' : commit.message}
           />
           <InputGroupAddon align='inline-end'>
@@ -88,42 +89,47 @@ export function CommitControls({
             </InputGroupButton>
           </InputGroupAddon>
         </InputGroup>
-        {generation.error ? (
-          <p className='text-destructive mt-1 text-xs' id={generationErrorId} role='alert'>
-            {generation.error}
-          </p>
-        ) : null}
-      </div>
-      <div className='shrink-0 px-(--density-row-padding-x) pt-(--density-section-padding)'>
         {showSyncChanges ? (
           <Button
-            className='w-full text-sm tabular-nums'
+            className='shrink-0 tabular-nums'
             disabled={syncChanges.isPending}
             onClick={() => syncChanges.mutate()}
+            size='sm'
             type='button'
             variant='default'
           >
             {syncChanges.isPending ? (
               <Spinner aria-hidden='true' role='presentation' />
             ) : (
-              <ArrowsClockwiseIcon className='size-4' />
+              <ArrowsClockwiseIcon className='size-3.5' />
             )}
             {syncChangesLabel(repository)}
           </Button>
         ) : (
           <Button
-            className='w-full text-sm'
+            className='shrink-0'
             disabled={commit.isPending}
             onClick={commit.submit}
+            size='sm'
+            title={`Commit to ${repository.branch ?? 'HEAD'}`}
             type='button'
             variant='default'
           >
-            <CheckIcon className='size-4' />
+            <CheckIcon className='size-3.5' />
             Commit
-            <span className='text-primary-foreground/65'>⌘↵</span>
+            <span className='text-primary-foreground/65 text-3xs'>⌘↵</span>
           </Button>
         )}
-      </div>
+      </PaneBar>
+      {generation.error ? (
+        <p
+          className='text-destructive px-(--bar-padding-x) py-(--density-gap-tight) text-xs'
+          id={generationErrorId}
+          role='alert'
+        >
+          {generation.error}
+        </p>
+      ) : null}
       <CommitProgress rootPath={rootPath} />
     </>
   )

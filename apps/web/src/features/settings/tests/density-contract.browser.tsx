@@ -161,19 +161,26 @@ test('full-bleed popovers remain full-bleed in both densities', async () => {
   expect(boxSpacing(popover)).toEqual({ gap: 0, padding: 0 })
 })
 
-test('persistent app chrome changes compactly and leaves content text unchanged', () => {
+test('persistent app chrome changes compactly and leaves content text unchanged', async () => {
+  seedBootMirrorTheme('dark')
   mount(
     <TooltipProvider delay={0}>
-      <section data-testid='chat-header'>
-        <ChatPanelHeader
-          activeSessionId={null}
-          creating={false}
-          disabled={false}
-          sessions={[]}
-          onNewChat={() => undefined}
-          onSelectSession={() => undefined}
-        />
-      </section>
+      {/* The chat header is a pane identity row now, and its menu reads the
+          workspace store and navigation like every other pane header. */}
+      <AppProviders queryClient={createTestQueryClient()}>
+        <EditorStateProvider>
+          <section data-testid='chat-header'>
+            <ChatPanelHeader
+              activeSessionId={null}
+              creating={false}
+              disabled={false}
+              sessions={[]}
+              onNewChat={() => undefined}
+              onSelectSession={() => undefined}
+            />
+          </section>
+        </EditorStateProvider>
+      </AppProviders>
       <ChatInputSubmitButton
         disabledReason={null}
         pendingAction={null}
@@ -204,10 +211,8 @@ test('persistent app chrome changes compactly and leaves content text unchanged'
             source: 'all',
             timeRange: '1h',
           }}
-          refreshing={false}
           sources={[]}
           onFiltersChange={() => undefined}
-          onRefresh={() => undefined}
         />
       </section>
       <section data-testid='unchanged-banner'>
@@ -216,14 +221,21 @@ test('persistent app chrome changes compactly and leaves content text unchanged'
     </TooltipProvider>,
   )
 
-  const header = requiredElement<HTMLElement>('[data-testid="chat-header"] > header')
+  // The app providers hydrate asynchronously, so the header lands a tick later.
+  // Its context-menu trigger owns the slot attribute, so match the header's own.
+  const chatHeaderSelector = '[data-testid="chat-header"] [data-workbench-tool-pane-header]'
+  await expect.poll(() => document.querySelector(chatHeaderSelector)).not.toBeNull()
+  const header = requiredElement<HTMLElement>(chatHeaderSelector)
   const submit = buttonByLabel('Send message')
   const chatStatus = requiredElement<HTMLElement>('[data-testid="chat-panel-status"] > div')
   const chatStatusContent = chatStatus.firstElementChild as HTMLElement
   const loadEarlier = requiredElement<HTMLButtonElement>(
     '[data-testid="timeline-load-earlier"] button',
   )
-  const logsToolbar = requiredElement<HTMLElement>('[data-testid="logs-toolbar"] > div')
+  // The logs tool rows are bars now: one height, no hand-written padding.
+  const logsToolbar = requiredElement<HTMLElement>(
+    '[data-testid="logs-toolbar"] [data-slot="pane-bar"]',
+  )
   const timeRange = selectByLabel('Log time range')
   const banner = requiredElement<HTMLElement>('[data-testid="unchanged-banner"] [role="status"]')
   const headerFontSize = getComputedStyle(header.querySelector('div > div')!).fontSize
@@ -239,7 +251,7 @@ test('persistent app chrome changes compactly and leaves content text unchanged'
   expect(loadEarlier.getBoundingClientRect().height).toBe(24)
   expect(pixelValue(getComputedStyle(loadEarlier).paddingLeft)).toBe(8)
   expect(timeRange.getBoundingClientRect().height).toBe(24)
-  expect(pixelValue(getComputedStyle(logsToolbar).paddingTop)).toBe(4)
+  expect(logsToolbar.getBoundingClientRect().height).toBe(BAR_HEIGHT.compact)
   expect(pixelValue(getComputedStyle(banner).paddingTop)).toBe(4)
 
   setDensity('cozy')
@@ -251,7 +263,7 @@ test('persistent app chrome changes compactly and leaves content text unchanged'
   expect(loadEarlier.getBoundingClientRect().height).toBe(28)
   expect(pixelValue(getComputedStyle(loadEarlier).paddingLeft)).toBe(10)
   expect(timeRange.getBoundingClientRect().height).toBe(28)
-  expect(pixelValue(getComputedStyle(logsToolbar).paddingTop)).toBe(6)
+  expect(logsToolbar.getBoundingClientRect().height).toBe(BAR_HEIGHT.cozy)
   expect(pixelValue(getComputedStyle(banner).paddingTop)).toBe(6)
   expect(getComputedStyle(header.querySelector('div > div')!).fontSize).toBe(headerFontSize)
   expect(getComputedStyle(chatStatus).fontSize).toBe(statusFontSize)
@@ -328,7 +340,7 @@ test('custom composer, picker, search, and references chrome follows density', a
             />
           </section>
           <section data-testid='search-controls'>
-            <SearchControls rootPath='/repo' showOpenInEditorButton={false} />
+            <SearchControls rootPath='/repo' />
           </section>
           <section className='h-40' data-testid='references-pane'>
             <LanguageServerReferencesPane
@@ -356,7 +368,10 @@ test('custom composer, picker, search, and references chrome follows density', a
   )
   const commandItem = requiredElement<HTMLElement>('[data-chat-input-command-item-id]')
   const modelRail = requiredElement<HTMLElement>('[data-testid="model-rail"] > div')
-  const searchShell = requiredElement<HTMLElement>('[data-testid="search-controls"] > div')
+  // The sidebar search is a tool row: one bar, the query field inside it.
+  const searchShell = requiredElement<HTMLElement>(
+    '[data-testid="search-controls"] [data-slot="pane-bar"]',
+  )
   // The workspace search is an InputGroup now: the group carries the density
   // height and its addons reserve their own space, so there is no hand-written
   // padding on the input left to assert.
@@ -372,7 +387,7 @@ test('custom composer, picker, search, and references chrome follows density', a
   expect(pixelValue(getComputedStyle(attachmentStrip).paddingLeft)).toBe(8)
   expect(pixelValue(getComputedStyle(commandItem).paddingTop)).toBe(6)
   expect(modelRail.getBoundingClientRect().width).toBe(BAR_HEIGHT.compact)
-  expect(pixelValue(getComputedStyle(searchShell).paddingTop)).toBe(4)
+  expect(searchShell.getBoundingClientRect().height).toBe(BAR_HEIGHT.compact)
   expect(searchField.getBoundingClientRect().height).toBe(24)
   expect(referencesHeader.getBoundingClientRect().height).toBe(BAR_HEIGHT.compact)
 
@@ -382,7 +397,7 @@ test('custom composer, picker, search, and references chrome follows density', a
   expect(pixelValue(getComputedStyle(attachmentStrip).paddingLeft)).toBe(10)
   expect(pixelValue(getComputedStyle(commandItem).paddingTop)).toBe(8)
   expect(modelRail.getBoundingClientRect().width).toBe(BAR_HEIGHT.cozy)
-  expect(pixelValue(getComputedStyle(searchShell).paddingTop)).toBe(6)
+  expect(searchShell.getBoundingClientRect().height).toBe(BAR_HEIGHT.cozy)
   expect(searchField.getBoundingClientRect().height).toBe(28)
   expect(referencesHeader.getBoundingClientRect().height).toBe(BAR_HEIGHT.cozy)
 })

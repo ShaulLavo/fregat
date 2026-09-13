@@ -1,15 +1,4 @@
-import {
-  ChatCircleIcon,
-  FilesIcon,
-  GitBranchIcon,
-  MagnifyingGlassIcon,
-  MinusIcon,
-  PlusIcon,
-  ScrollIcon,
-  TerminalIcon,
-  WarningCircleIcon,
-  XIcon,
-} from '@phosphor-icons/react'
+import { MinusIcon, PlusIcon, XIcon } from '@phosphor-icons/react'
 
 import { Button } from '@workspace/ui/components/button'
 import { OrbitLoader } from '@workspace/ui/components/orbit-loader'
@@ -24,8 +13,10 @@ type ToolPaneHeaderOrientation = 'horizontal' | 'vertical'
 type ToolPaneHeaderTab = 'chat' | 'files' | 'git' | 'logs' | 'problems' | 'search' | 'terminal'
 
 export function ToolPaneHeader({
+  actions,
   className,
   collapsed = false,
+  detail: detailSlot,
   orientation = 'horizontal',
   rowActive = false,
   tab,
@@ -35,8 +26,10 @@ export function ToolPaneHeader({
   onCollapseToRow,
   onToggleCollapse,
 }: {
+  readonly actions?: ReactNode
   readonly className?: string
   readonly collapsed?: boolean
+  readonly detail?: ReactNode
   readonly orientation?: ToolPaneHeaderOrientation
   readonly rowActive?: boolean
   readonly tab?: ToolPaneHeaderTab
@@ -47,13 +40,15 @@ export function ToolPaneHeader({
   readonly onToggleCollapse?: () => void
 }) {
   const title = panelTabTitle(tab)
-  const detail =
+  const treeDetail =
     tab === 'files' && orientation === 'horizontal'
       ? treeHeaderDetail(treeState, visibleTreeItemCount ?? null)
       : null
+  const detail = orientation === 'horizontal' ? (detailSlot ?? treeDetail) : null
   const toggleLabel = collapsed ? `Expand ${title}` : `Collapse ${title}`
   const rowLabel = rowActive ? `Expand ${title}` : `Collapse ${title} to row`
-  const actionsVisible = Boolean(onClose || onToggleCollapse || onCollapseToRow)
+  const paneActions = orientation === 'horizontal' ? actions : null
+  const actionsVisible = Boolean(paneActions || onClose || onToggleCollapse || onCollapseToRow)
 
   const headerAttributes = {
     'data-workbench-tool-pane-header': '',
@@ -63,23 +58,24 @@ export function ToolPaneHeader({
 
   const headerChildren = (
     <>
-      {toolPaneHeaderIcon(tab)}
       <div
         className={cn(
-          'min-w-0 flex-1',
-          orientation === 'vertical' && 'flex min-h-0 w-full flex-col items-center',
+          'flex min-w-0 flex-1 items-center gap-(--density-control-gap)',
+          orientation === 'vertical' && 'min-h-0 w-full flex-col',
         )}
       >
         <div
           className={cn(
-            'truncate text-xs font-medium',
+            'shrink-0 truncate text-xs font-medium',
             orientation === 'vertical' && 'min-h-0 [writing-mode:vertical-rl]',
           )}
         >
           {title}
         </div>
         {detail ? (
-          <div className='text-muted-foreground text-2xs truncate tabular-nums'>{detail}</div>
+          <div className='text-muted-foreground text-2xs min-w-0 truncate tabular-nums'>
+            {detail}
+          </div>
         ) : null}
       </div>
       {actionsVisible ? (
@@ -90,6 +86,7 @@ export function ToolPaneHeader({
           )}
           data-workbench-drag-blocker=''
         >
+          {paneActions}
           {onCollapseToRow ? (
             <Button
               aria-label={rowLabel}
@@ -173,19 +170,6 @@ function panelTabTitle(tab: ToolPaneHeaderTab | undefined) {
   return 'Tool Pane'
 }
 
-function toolPaneHeaderIcon(tab: ToolPaneHeaderTab | undefined) {
-  const className = cn('text-muted-foreground size-4 shrink-0')
-  if (tab === 'chat') return <ChatCircleIcon className={className} />
-  if (tab === 'files') return <FilesIcon className={className} />
-  if (tab === 'git') return <GitBranchIcon className={className} />
-  if (tab === 'logs') return <ScrollIcon className={className} />
-  if (tab === 'problems') return <WarningCircleIcon className={className} />
-  if (tab === 'search') return <MagnifyingGlassIcon className={className} />
-  if (tab === 'terminal') return <TerminalIcon className={className} />
-
-  return null
-}
-
 function treeHeaderDetail(
   treeState: LoadState<TreeModel> | undefined,
   visibleTreeItemCount: number | null,
@@ -201,5 +185,5 @@ function treeHeaderDetail(
   if (treeState.status === 'error') return 'Unable to load files'
   if (visibleTreeItemCount === null) return null
 
-  return `${visibleTreeItemCount} items`
+  return visibleTreeItemCount
 }

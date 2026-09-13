@@ -7,6 +7,7 @@ import type { EditorTabModel } from '@/features/workspace/utils/tab-types'
 import { useEditorTabActions } from '@/features/editor/hooks/use-editor-tab-actions'
 import { EditorTabMenu } from '@/features/workbench/components/editor-tab-menu'
 import { TabTrailingSlot } from '@/features/workbench/components/tab-trailing-slot'
+import { barTabClassName } from '@/features/workbench/utils/bar-tabs'
 import { tabFileResource } from '@/lib/documents/utils/capabilities'
 import { tabContentKey } from '@/lib/documents/utils/tabs'
 import { fileIconStyle } from '@/lib/file-icon-style'
@@ -63,13 +64,12 @@ export function EditorTabButton({
       {...dragListeners}
       aria-busy={loading || undefined}
       aria-selected={tab.active}
-      className={cn(
-        // The tab sits on a 4px top inset inside the strip, so it is the bar height minus that inset.
-        'group/proof-tab focus-ring flex h-[calc(var(--bar-height)-0.25rem)] w-36 min-w-24 max-w-48 shrink-0 cursor-grab touch-none items-center gap-(--density-control-gap) rounded-t-md border px-(--density-row-padding-x) text-left text-xs outline-none transition-[color,background-color,border-color,box-shadow,opacity] active:cursor-grabbing',
-        tab.active
-          ? 'border-border bg-card-solid text-foreground'
-          : 'border-transparent text-muted-foreground hover:bg-accent hover:text-accent-foreground',
-        dragging && 'relative z-10 opacity-60',
+      className={barTabClassName(
+        tab.active,
+        cn(
+          'group/proof-tab focus-ring-inset max-w-48 min-w-0 cursor-grab touch-none text-left outline-none active:cursor-grabbing',
+          dragging && 'relative z-10 opacity-60',
+        ),
       )}
       data-editor-tab-id={tab.id}
       data-editor-tab-key={tabContentKey(tab.content)}

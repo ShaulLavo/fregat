@@ -668,8 +668,8 @@
       "type": "integer"
     },
     "workbench.tree.indentGuides": {
-      "default": "onHover",
-      "description": "When to show editor-coloured indentation guides in the file tree.",
+      "default": "always",
+      "description": "When to show indentation guides in the file tree. Guides take editor colours while the tree is hovered.",
       "enum": ["always", "none", "onHover"],
       "type": "string"
     },

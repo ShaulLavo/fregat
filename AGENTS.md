@@ -85,8 +85,8 @@ entry without a real reason is itself a violation.
 - **One density system.** The `--density-*` custom properties. Never hand-write a
   `compact:`-prefixed pair; the variant no longer exists.
 - **Dividers.** `border-border` between regions, `border-subtle` inside content. No opacity
-  modifier on either. Note that `[data-workbench]` sets `--border: transparent`, so borders inside
-  the workbench are deliberately invisible and separation there comes from surface tone.
+  modifier on either. Inside `[data-workbench]`, `--border` is the 8% foreground hairline, so a pane
+  edge, a rail and a bar all draw one line wherever the bar tokens meet.
 - **Four type sizes.** `text-sm`, `text-xs`, `text-2xs` (11px), `text-3xs` (10px). An arbitrary
   `text-[Npx]` is banned. A bar title is `text-xs font-medium`; a pane section heading is
   `text-sm font-semibold`.

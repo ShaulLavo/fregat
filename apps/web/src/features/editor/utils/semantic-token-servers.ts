@@ -9,7 +9,7 @@
  *
  * **Every row below was probed against the real binary** on this machine
  * (aarch64 macOS, 2026-08-21) by driving stdio with `Content-Length` framing and
- * the capability block `semanticTokensCapabilityForServer` builds. Nothing here
+ * the capability block `clientCapabilitiesForServer` builds. Nothing here
  * is a published legend copied out of a README. Re-probe rather than trust any of
  * it after a server upgrade — every fact below is a snapshot of one version, and
  * `semantic-token-conformance.test.ts` is what re-checks them (it spawns each

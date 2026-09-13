@@ -167,12 +167,13 @@ export const SETTINGS_REGISTRY = {
   }),
   'workbench.tree.indentGuides': defineSetting({
     schema: v.picklist(['none', 'onHover', 'always'] as const),
-    default: 'onHover',
+    default: 'always',
     scope: 'window',
     widget: 'enum',
     category: 'Appearance',
     title: 'File tree indent guides',
-    description: 'When to show editor-coloured indentation guides in the file tree.',
+    description:
+      'When to show indentation guides in the file tree. Guides take editor colours while the tree is hovered.',
     keywords: ['tree', 'files', 'folders', 'indent', 'guides', 'colour'],
   }),
   'editor.fontFamily': defineSetting({

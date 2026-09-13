@@ -4,7 +4,8 @@ import type { lsp } from '@singapor/lsp'
 import { semanticTokenProfileFor } from '@/features/editor/utils/semantic-token-servers'
 
 /**
- * The `textDocument.semanticTokens` block this app declares to one server.
+ * The client capabilities this app declares to one server: the
+ * `textDocument.semanticTokens` block plus hierarchical document symbols.
  *
  * **Its only input is the server id.** Not the document, not the root, not the
  * viewport, not a setting read at call time — and that signature is the
@@ -42,7 +43,7 @@ import { semanticTokenProfileFor } from '@/features/editor/utils/semantic-token-
  *   itself and forwards nothing, so the registration would never arrive and a
  *   working server would go silent.
  */
-export function semanticTokensCapabilityForServer(serverId: string): lsp.ClientCapabilities {
+export function clientCapabilitiesForServer(serverId: string): lsp.ClientCapabilities {
   const profile = semanticTokenProfileFor(serverId)
 
   const textDocument = semanticTokensClientCapability({
@@ -60,6 +61,11 @@ export function semanticTokensCapabilityForServer(serverId: string): lsp.ClientC
 
   return {
     ...textDocument,
+    textDocument: {
+      ...textDocument.textDocument,
+      // Without this `documentSymbol` answers flat, with name-only ranges.
+      documentSymbol: { hierarchicalDocumentSymbolSupport: true },
+    },
     workspace: {
       semanticTokens: {
         /**

@@ -4,7 +4,7 @@ import type { OrchestrationProjectScript, ScopedProjectRef } from '@workspace/co
 
 import type { GotoLineTarget } from '@/features/command-palette/goto-line-target'
 import type { SessionRailItem } from '@workspace/client-core/chat/rail/model'
-import type { FlatDocumentSymbol } from '@/features/command-palette/document-symbols'
+import type { FlatDocumentSymbol } from '@/lib/document-symbols'
 import type { PlatformCommandId } from '@/keymap/types'
 
 export type CommandPaletteActions = {

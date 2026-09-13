@@ -243,6 +243,7 @@ type FileTreeOptionSurface = FileTreeRenderOptions & {
   // focused state without stealing real focus from siblings.
   searchFakeFocus?: boolean
   searchBlurBehavior?: FileTreeSearchBlurBehavior
+  searchPlaceholder?: string
   unsafeCSS?: string
 }
 

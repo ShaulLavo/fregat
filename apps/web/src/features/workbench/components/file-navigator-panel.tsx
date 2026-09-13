@@ -8,6 +8,7 @@ import {
   type FileTreeActions,
 } from '@/features/workspace/providers/actions-context'
 import { FileNavigatorHeader } from '@/features/workbench/components/file-navigator-header'
+import { createTreeToolbarStore } from '@/features/workbench/utils/tree-toolbar-store'
 import { createVisibleTreeItemCountStore } from '@/features/workbench/utils/visible-tree-item-count-store'
 import { useWorkspaceTreeForRootPath } from '@/features/workspace/hooks/use-tree'
 
@@ -15,6 +16,7 @@ export function FileNavigatorPanel({ rootPath }: { readonly rootPath: Filesystem
   const { loadTreeDirectory, prefetchTreeDirectory, treeState } =
     useWorkspaceTreeForRootPath(rootPath)
   const [visibleTreeItemCountStore] = useState(() => createVisibleTreeItemCountStore())
+  const [treeToolbarStore] = useState(() => createTreeToolbarStore())
   // Measured: visible-count publication should update the header, not repaint FilesPane.
   const handleVisibleTreeItemCountChange = useCallback(
     (count: number) => visibleTreeItemCountStore.setCount(rootPath, count),
@@ -25,9 +27,10 @@ export function FileNavigatorPanel({ rootPath }: { readonly rootPath: Filesystem
     () => ({
       loadDirectory: loadTreeDirectory,
       prefetchDirectory: prefetchTreeDirectory,
+      publishToolbar: treeToolbarStore.publish,
       publishVisibleItemCount: handleVisibleTreeItemCountChange,
     }),
-    [handleVisibleTreeItemCountChange, loadTreeDirectory, prefetchTreeDirectory],
+    [handleVisibleTreeItemCountChange, loadTreeDirectory, prefetchTreeDirectory, treeToolbarStore],
   )
 
   return (
@@ -35,6 +38,7 @@ export function FileNavigatorPanel({ rootPath }: { readonly rootPath: Filesystem
       <FileNavigatorHeader
         rootPath={filesystemPath(rootPath)}
         treeState={treeState}
+        treeToolbarStore={treeToolbarStore}
         visibleTreeItemCountStore={visibleTreeItemCountStore}
       />
       <div className='min-h-0 min-w-0 flex-1 overflow-hidden'>

@@ -1,5 +1,7 @@
 import { useNavigation } from '@/hooks/use-navigation'
+import { ArrowClockwiseIcon } from '@phosphor-icons/react'
 import { useQueryClient } from '@tanstack/react-query'
+import { Button } from '@workspace/ui/components/button'
 import { memo, useCallback, useEffect, useMemo, useRef, useState } from 'react'
 
 import { logsKeys } from '@/features/logs/utils/query-keys'
@@ -12,6 +14,7 @@ import { LogsEventListContainer } from '@/features/logs/components/event-list-co
 import { LogsTimeline } from '@/features/logs/components/timeline'
 import { LogsToolbar } from '@/features/logs/components/toolbar'
 import { useLogsFilters } from '@/features/logs/state/filter-store'
+import { ToolPaneHeader } from '@/features/workbench/components/tool-pane-header'
 
 type LogsPanelProps = {
   active: boolean
@@ -72,13 +75,29 @@ export const LogsPanel = memo(({ active }: LogsPanelProps) => {
       ref={setRootRef}
       tabIndex={-1}
     >
+      <ToolPaneHeader
+        actions={
+          <Button
+            aria-label='Refresh logs'
+            className='text-muted-foreground'
+            disabled={summary.isFetching || optionSummary.isFetching}
+            size='icon-sm'
+            title='Refresh logs'
+            type='button'
+            variant='ghost'
+            onClick={handleRefresh}
+          >
+            <ArrowClockwiseIcon className='size-3.5' />
+          </Button>
+        }
+        detail={summary.data ? `${summary.data.total} events` : null}
+        tab='logs'
+      />
       <LogsToolbar
         areas={optionSummary.data?.areas ?? []}
         filters={filtersState}
-        refreshing={summary.isFetching || optionSummary.isFetching}
         sources={optionSummary.data?.sources ?? []}
         onFiltersChange={(filters) => void navigation.setLogsFilters(filters)}
-        onRefresh={handleRefresh}
       />
       <LogsTimeline summary={summary.data} />
       {summary.isError || events.isError ? (

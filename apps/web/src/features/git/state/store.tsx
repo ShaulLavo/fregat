@@ -8,7 +8,6 @@ import type { PanelSection } from '@/features/git/utils/types'
 type StoreState = {
   commitMessage: string
   commitMessageRevision: number
-  panelOpen: boolean
   sectionOpen: Record<PanelSection, boolean>
 }
 
@@ -16,7 +15,6 @@ type StoreActions = {
   applyGeneratedCommitMessage: (message: string, expectedRevision: number) => boolean
   resetCommitMessage: () => void
   setCommitMessage: (message: string) => void
-  setPanelOpen: (open: boolean) => void
   setSectionOpen: (section: PanelSection, open: boolean) => void
 }
 
@@ -54,14 +52,12 @@ export function createGitStore() {
     },
     commitMessage: '',
     commitMessageRevision: 0,
-    panelOpen: true,
     sectionOpen: {
       staged: true,
       worktree: true,
     },
     resetCommitMessage: () => set(nextCommitMessageState(get(), '')),
     setCommitMessage: (commitMessage) => set(nextCommitMessageState(get(), commitMessage)),
-    setPanelOpen: (panelOpen) => set({ panelOpen }),
     setSectionOpen: (section, open) =>
       set((state) => ({
         sectionOpen: {

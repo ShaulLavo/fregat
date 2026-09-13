@@ -44,5 +44,6 @@ test('the git panel loading state is not its empty state', async ({ client, serv
   // The settled panel must not reuse the loading affordance, and it must
   // actually have rendered - otherwise the assertion above passes on nothing.
   expect(screen.getByRole('status')).toHaveTextContent('Working tree clean')
-  expect(await screen.findByText('Changes')).toBeVisible()
+  // The tool row is the settled panel's own chrome; the identity row lives above it.
+  expect(await screen.findByRole('textbox', { name: 'Commit message' })).toBeVisible()
 })

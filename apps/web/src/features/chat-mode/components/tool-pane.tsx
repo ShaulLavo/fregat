@@ -17,6 +17,7 @@ import { TerminalPanel } from '@/features/terminal/components/panel'
 import { CodePanel } from '@/features/workbench/components/code-panel'
 import { DiagnosticsPanel } from '@/features/workbench/components/diagnostics-panel'
 import { FileNavigatorPanel } from '@/features/workbench/components/file-navigator-panel'
+import { GitPaneHeader } from '@/features/workbench/components/git-pane-header'
 import { ToolPaneHeader } from '@/features/workbench/components/tool-pane-header'
 import type { WorkbenchPanels } from '@/features/workbench/utils/panels'
 import type { ChatModeToolTab } from '@/features/chat-mode/utils/panels'
@@ -61,16 +62,7 @@ export function ToolPane({
   }
   if (tab === 'files') return <FileNavigatorPanel rootPath={filesystemPath(toolRoot)} />
   if (tab === 'git') return gitToolPane(toolRoot, diffScope)
-  if (tab === 'logs') {
-    return (
-      <section className='flex h-full min-h-0 min-w-0 flex-col overflow-hidden'>
-        <ToolPaneHeader tab='logs' />
-        <div className='min-h-0 min-w-0 flex-1 overflow-hidden'>
-          <LogsPanel active />
-        </div>
-      </section>
-    )
-  }
+  if (tab === 'logs') return <LogsPanel active />
   if (tab === 'problems') {
     return (
       <section className='flex h-full min-h-0 min-w-0 flex-col overflow-hidden'>
@@ -110,7 +102,7 @@ function gitToolPane(rootPath: string, diffScope: SessionDiffScopeState) {
 
   return (
     <section className='flex h-full min-h-0 min-w-0 flex-col overflow-hidden'>
-      <ToolPaneHeader tab='git' />
+      <GitPaneHeader rootPath={rootPath} />
       <PaneBar aria-label='Diff scope' border='bottom' role='group'>
         {scopeButton({
           active: scope.kind === 'working-tree',

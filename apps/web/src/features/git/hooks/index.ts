@@ -1,5 +1,4 @@
 export { useBranchRemoteState } from './use-branch-remote-state'
-export { useCommitAction } from './use-commit-action'
 export { useCreatePullRequestMutation } from './use-create-pull-request-mutation'
 export { usePullRequestState } from './use-pull-request-state'
 

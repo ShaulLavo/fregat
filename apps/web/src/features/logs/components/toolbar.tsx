@@ -1,9 +1,9 @@
 import type { LogDashboardBreakdownItem, LogDashboardLevel } from '@workspace/contracts'
-import { ArrowClockwiseIcon, MagnifyingGlassIcon } from '@phosphor-icons/react'
+import { MagnifyingGlassIcon } from '@phosphor-icons/react'
 
 import type { LogsFilterState, LogTimeRange } from '@/features/logs/utils/filter-params'
-import { Button } from '@workspace/ui/components/button'
 import { InputGroup, InputGroupAddon, InputGroupInput } from '@workspace/ui/components/input-group'
+import { PaneBar } from '@workspace/ui/components/pane-bar'
 import {
   Select,
   SelectContent,
@@ -16,10 +16,8 @@ import { logBreakdownOptionValues } from '@/features/logs/utils/toolbar-options'
 type LogsToolbarProps = {
   areas: readonly LogDashboardBreakdownItem[]
   filters: LogsFilterState
-  refreshing: boolean
   sources: readonly LogDashboardBreakdownItem[]
   onFiltersChange: (filters: LogsFilterState) => void
-  onRefresh: () => void
 }
 
 const timeRangeOptions: Array<{ label: string; value: LogTimeRange }> = [
@@ -38,20 +36,29 @@ const levelOptions: Array<{ label: string; value: LogDashboardLevel | 'all' }> =
   { label: 'Debug', value: 'debug' },
 ]
 
-export function LogsToolbar({
-  areas,
-  filters,
-  refreshing,
-  sources,
-  onFiltersChange,
-  onRefresh,
-}: LogsToolbarProps) {
+export function LogsToolbar({ areas, filters, sources, onFiltersChange }: LogsToolbarProps) {
   const sourceValues = logBreakdownOptionValues(sources, filters.source)
   const areaValues = logBreakdownOptionValues(areas, filters.area)
 
   return (
-    <div className='border-b p-(--density-control-gap)'>
-      <div className='flex items-center gap-1'>
+    <>
+      <PaneBar border='bottom'>
+        <InputGroup className='bg-background h-(--density-control-height-sm) min-w-0 flex-1'>
+          <InputGroupAddon align='inline-start'>
+            <MagnifyingGlassIcon className='size-3.5' />
+          </InputGroupAddon>
+          <InputGroupInput
+            aria-label='Search logs'
+            autoCapitalize='off'
+            autoComplete='off'
+            autoCorrect='off'
+            className='text-2xs h-full'
+            placeholder='Search logs'
+            spellCheck={false}
+            value={filters.search}
+            onChange={(event) => onFiltersChange({ ...filters, search: event.target.value })}
+          />
+        </InputGroup>
         <Select
           items={timeRangeOptions}
           value={filters.timeRange}
@@ -101,36 +108,8 @@ export function LogsToolbar({
             ))}
           </SelectContent>
         </Select>
-        <Button
-          aria-label='Refresh logs'
-          className='shrink-0'
-          disabled={refreshing}
-          size='icon-sm'
-          title='Refresh logs'
-          type='button'
-          variant='ghost'
-          onClick={onRefresh}
-        >
-          <ArrowClockwiseIcon className='size-4' />
-        </Button>
-      </div>
-      <InputGroup className='bg-background mt-(--density-section-gap) h-(--density-control-height-sm)'>
-        <InputGroupAddon align='inline-start'>
-          <MagnifyingGlassIcon className='size-3.5' />
-        </InputGroupAddon>
-        <InputGroupInput
-          aria-label='Search logs'
-          autoCapitalize='off'
-          autoComplete='off'
-          autoCorrect='off'
-          className='text-2xs h-full'
-          placeholder='Search logs'
-          spellCheck={false}
-          value={filters.search}
-          onChange={(event) => onFiltersChange({ ...filters, search: event.target.value })}
-        />
-      </InputGroup>
-      <div className='mt-(--density-section-gap) flex items-center gap-1'>
+      </PaneBar>
+      <PaneBar border='bottom'>
         <Select
           value={filters.source}
           onValueChange={(source) => {
@@ -177,7 +156,7 @@ export function LogsToolbar({
             ))}
           </SelectContent>
         </Select>
-      </div>
-    </div>
+      </PaneBar>
+    </>
   )
 }

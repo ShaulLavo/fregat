@@ -32,10 +32,7 @@ export function SidebarPanel({
   }
 
   return (
-    // The pane surface, not the card surface the titlebar uses: two card-toned
-    // slabs meeting at the corner read as one L-shaped block. The resizable
-    // handle is the divider, so this edge carries no border.
-    <aside className='bg-background backdrop-material flex h-full min-h-0 min-w-0 overflow-hidden'>
+    <aside className='bg-background backdrop-material border-border flex h-full min-h-0 min-w-0 overflow-hidden border-r'>
       <nav
         aria-label='Sidebar tabs'
         className='border-border flex w-(--rail-width) shrink-0 flex-col items-center gap-1 border-r p-1'

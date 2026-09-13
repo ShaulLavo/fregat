@@ -101,6 +101,7 @@ export class FileTree implements FileTreeMutationHandle, FileTreeSearchSessionHa
   readonly #searchBlurBehavior: FileTreeOptions['searchBlurBehavior']
   readonly #searchEnabled: boolean
   readonly #searchFakeFocus: boolean
+  readonly #searchPlaceholder: string | undefined
   readonly #slotHost = new FileTreeManagedSlotHost()
   #density: FileTreeDensityPreset
   readonly #viewOptions: Pick<
@@ -145,6 +146,7 @@ export class FileTree implements FileTreeMutationHandle, FileTreeSearchSessionHa
       search,
       searchBlurBehavior,
       searchFakeFocus,
+      searchPlaceholder,
       stickyFolders,
       unsafeCSS,
       initialVisibleRowCount,
@@ -161,6 +163,7 @@ export class FileTree implements FileTreeMutationHandle, FileTreeSearchSessionHa
     this.#searchBlurBehavior = searchBlurBehavior
     this.#searchEnabled = search === true
     this.#searchFakeFocus = searchFakeFocus === true
+    this.#searchPlaceholder = searchPlaceholder
     this.#density = resolveFileTreeDensity(density, itemHeight)
     this.#viewOptions = {
       itemHeight: this.#density.itemHeight,
@@ -481,6 +484,7 @@ export class FileTree implements FileTreeMutationHandle, FileTreeSearchSessionHa
       searchBlurBehavior: this.#searchBlurBehavior,
       searchEnabled: this.#searchEnabled,
       searchFakeFocus: this.#searchFakeFocus,
+      searchPlaceholder: this.#searchPlaceholder,
       slotHost: this.#slotHost,
       ...this.#getInitialViewOptions(),
     }
