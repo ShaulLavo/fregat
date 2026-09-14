@@ -685,7 +685,7 @@ pre .c {
   }
 
   .shot {
-    animation: fade 700ms var(--ease-out-strong) 150ms both;
+    animation: rise 700ms var(--ease-out-strong) 150ms both;
   }
 }
 
@@ -693,12 +693,6 @@ pre .c {
   from {
     opacity: 0;
     transform: translateY(8px);
-  }
-}
-
-@keyframes fade {
-  from {
-    opacity: 0;
   }
 }
 
