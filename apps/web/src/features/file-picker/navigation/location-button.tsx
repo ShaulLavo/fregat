@@ -29,6 +29,7 @@ export function LocationButton({
         !selected && SIDEBAR_NAV_BUTTON_IDLE_CLASS,
       )}
       onClick={() => jumpTo(location.path)}
+      title={location.path}
       type='button'
       variant='ghost'
     >

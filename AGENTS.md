@@ -140,6 +140,15 @@ Interaction treatments are utilities, not strings to copy:
 - Reduced motion is handled inside the primitives — they slow down rather than freeze, because a stopped spinner reads as a hung process. Do not add `motion-reduce:` classes at the call site.
 - Ellipsis is `…`, never `...`.
 
+## Truncation And Recovery
+
+- Truncation is correct in a one-line row, but the cut part must be recoverable. Any element carrying `truncate` or `line-clamp-N` whose content is a value the app did not author (a path, a branch, a session title, a model name, a machine label, a host, a code excerpt) carries a native `title` with the complete value. `scripts/lint/web-design-census.mjs` measures this as `truncationRecovery`.
+- The `title` goes on the element that spans the whole row: the row container, or the truncating block when that block is its own full-width row. Never on a `shrink-0` span inside a wider row, and never on the inner text cell of a row whose icon and status columns then recover nothing.
+- A title adds, it does not echo. Where the row knows more than it shows (the full path behind a basename, the file and line behind an excerpt, why a tab is read-only), the title says that. A title identical to the visible text is allowed only when the row has nothing to add.
+- Static app-authored labels ("Chat", "References", a column header) are exempt, and so is `packages/ui`: a primitive cannot know whether it renders a label or a value, so the consumer sets the title. Every exemption is an entry in `scripts/lint/web-design-allow.json` with a reason.
+- `title` and `Tooltip` split by job. `Tooltip` is for icon-only controls and for explanations that need styling and a delay. Native `title` recovers truncated text, where a portalled popup in a virtualized list is the wrong machinery. Do not convert a truncation site to `Tooltip`, and never put both on one control: the browser shows two. A control that already earns a `Tooltip` for an explanation may name its value there too; that is the one direction this runs.
+- No middle truncation. A row that must show a path renders the basename first and the directory second, muted, so a right cut eats the directory and leaves the name. `features/git/components/file-row.tsx` is the reference; `basename` and `parentPath` in `lib/path-formatters.ts` are the helpers.
+
 ## Settings
 
 - Every user-facing knob is a registry entry in `packages/contracts/src/settings/keys.ts`. Never a new `localStorage` key, never a new env var, never a hardcoded constant someone has to recompile to change.

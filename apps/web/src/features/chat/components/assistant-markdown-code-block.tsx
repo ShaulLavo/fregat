@@ -51,7 +51,8 @@ export function AssistantMarkdownCodeBlock({
         data-language={language}
         data-markdown='code-block-header'
       >
-        <span className='flex min-w-0 items-center gap-1.5 pl-1'>
+        {/* Not on the header: the toolbar beside it holds Tooltip controls (D4). */}
+        <span className='flex min-w-0 items-center gap-1.5 pl-1' title={title ?? undefined}>
           <span aria-hidden='true' className='size-3.5 shrink-0' style={fileIconStyle(icon)} />
           <span className={title ? 'truncate font-mono' : 'truncate font-mono lowercase'}>
             {title ?? language}

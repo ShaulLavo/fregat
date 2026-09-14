@@ -48,13 +48,17 @@ export function LiveActivityRow({
           aria-expanded={expanded}
           className='text-muted-foreground h-auto max-w-full justify-start gap-2 px-1 py-1 text-xs font-normal'
           data-scroll-anchor-ignore
+          title={activity.label}
           variant='ghost'
           onClick={() => toggle(historyId)}
         >
           {label}
         </Button>
       ) : (
-        <div className='text-muted-foreground flex min-h-7 items-center gap-2 px-1 py-1 text-xs'>
+        <div
+          className='text-muted-foreground flex min-h-7 items-center gap-2 px-1 py-1 text-xs'
+          title={activity.label}
+        >
           {label}
         </div>
       )}

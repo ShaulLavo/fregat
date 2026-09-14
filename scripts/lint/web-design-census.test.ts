@@ -353,3 +353,56 @@ test('is wired into the repository: a script entry and a place in the verify cha
   expect(manifest.scripts['design:census']).toContain('web-design-census.mjs --check')
   expect(manifest.scripts.verify).toContain('bun run design:census')
 })
+
+test('counts a truncating element unless it or an enclosing element carries a title', () => {
+  const own = census(
+    'export function Row({ path }: { readonly path: string }) {',
+    "  return <span title={path} className='truncate'>{path}</span>",
+    '}',
+  )
+  const ancestor = census(
+    'export function Row({ path }: { readonly path: string }) {',
+    '  return (',
+    "    <button type='button' title={path}>",
+    "      <span className='truncate'>{path}</span>",
+    '    </button>',
+    '  )',
+    '}',
+  )
+  const neither = census(
+    'export function Row({ path }: { readonly path: string }) {',
+    '  return (',
+    "    <div className='flex'>",
+    "      <span className='truncate'>{path}</span>",
+    "      <p className='line-clamp-3'>{path}</p>",
+    '    </div>',
+    '  )',
+    '}',
+  )
+
+  expect(values(own, 'truncationRecovery')).toEqual([])
+  expect(values(ancestor, 'truncationRecovery')).toEqual([])
+  expect(locations(neither, 'truncationRecovery')).toEqual([
+    'probe.tsx:4 truncate',
+    'probe.tsx:5 line-clamp-3',
+  ])
+})
+
+test('excuses a truncating element through the allow-list and skips the primitives package', () => {
+  const source = "export const Label = () => <span className='truncate'>Chat</span>"
+  const app = censusFile('apps/web/src/components/label.tsx', source)
+  const ui = censusFile('packages/ui/src/components/label.tsx', source)
+  const excused = gate(app, [
+    {
+      file: 'apps/web/src/components/label.tsx',
+      class: 'truncate',
+      reason: 'D3: an app-authored label that no real layout cuts',
+    },
+  ])
+
+  expect(values(app, 'truncationRecovery')).toEqual(['truncate'])
+  expect(values(ui, 'truncationRecovery')).toEqual(['truncate'])
+  expect(gate(app).offenders.truncationRecovery).toHaveLength(1)
+  expect(excused.offenders.truncationRecovery).toEqual([])
+  expect(gate(ui).offenders.truncationRecovery).toEqual([])
+})

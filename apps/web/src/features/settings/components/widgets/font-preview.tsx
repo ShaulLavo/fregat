@@ -39,7 +39,7 @@ export function FontPreview({ fontId }: { fontId: string }) {
   }, [family, fontId])
 
   return (
-    <span className='flex min-w-0 flex-col'>
+    <span className='flex min-w-0 flex-col' title={`${family} (${fontId})`}>
       <span className='text-muted-foreground truncate text-xs'>{fontId}</span>
       <span
         className='truncate text-sm'

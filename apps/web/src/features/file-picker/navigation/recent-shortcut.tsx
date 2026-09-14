@@ -25,6 +25,7 @@ export function RecentShortcut({ currentPath, entry }: { currentPath: string; en
         !selected && SIDEBAR_NAV_BUTTON_IDLE_CLASS,
       )}
       onClick={() => revealEntry(entry)}
+      title={entry.path}
       type='button'
       variant='ghost'
     >

@@ -20,6 +20,7 @@ export function SshHostOption({
       variant='ghost'
       className='h-auto min-h-8 w-full justify-start gap-2'
       aria-pressed={selected}
+      title={label === target ? undefined : target}
       onClick={() => onSelect(target)}
     >
       <TerminalIcon className='text-muted-foreground size-4 shrink-0' />

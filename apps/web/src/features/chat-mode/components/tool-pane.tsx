@@ -1,5 +1,6 @@
 import type { GitFileStatus } from '@workspace/contracts'
 import { filesystemPath } from '@/lib/documents/utils/identity'
+import { basename, parentPath } from '@/lib/path-formatters'
 import { Button } from '@workspace/ui/components/button'
 import { PaneBar } from '@workspace/ui/components/pane-bar'
 
@@ -178,19 +179,32 @@ function turnScopeBody({ openTurnFile, turnSummary }: SessionDiffScopeState) {
       <p className='text-muted-foreground text-2xs px-(--density-control-padding-x) pb-(--density-gap-tight) tabular-nums'>
         Turn {turnSummary.checkpointTurnCount} · {turnSummary.files.length} files
       </p>
-      {turnSummary.files.map((file) => (
-        // Raw button: a row owns the list fill, and Button's ghost variant
-        // re-declares it in dark mode at a specificity this cannot override.
-        <button
-          className='focus-ring-inset hover:bg-row-hover active:bg-row-active flex h-(--density-control-height-sm) w-full items-center justify-between gap-(--density-control-gap) px-(--density-row-padding-x) text-left text-xs outline-none select-none'
-          key={file.path}
-          type='button'
-          onClick={() => openTurnFile(file.path)}
-        >
-          <span className='min-w-0 truncate'>{file.path}</span>
-          <ChatDiffStatLabel additions={file.additions} deletions={file.deletions} />
-        </button>
-      ))}
+      {turnSummary.files.map((file) => turnFileRow(file, openTurnFile))}
     </div>
+  )
+}
+
+function turnFileRow(
+  file: NonNullable<SessionDiffScopeState['turnSummary']>['files'][number],
+  openTurnFile: SessionDiffScopeState['openTurnFile'],
+) {
+  const directory = parentPath(file.path)
+
+  return (
+    // Raw button: a row owns the list fill, and Button's ghost variant
+    // re-declares it in dark mode at a specificity this cannot override.
+    <button
+      className='focus-ring-inset hover:bg-row-hover active:bg-row-active flex h-(--density-control-height-sm) w-full items-center justify-between gap-(--density-control-gap) px-(--density-row-padding-x) text-left text-xs outline-none select-none'
+      key={file.path}
+      title={file.path}
+      type='button'
+      onClick={() => openTurnFile(file.path)}
+    >
+      <span className='min-w-0 truncate'>
+        <span className='text-foreground'>{basename(file.path)}</span>
+        {directory ? <span className='text-muted-foreground ml-2'>{directory}</span> : null}
+      </span>
+      <ChatDiffStatLabel additions={file.additions} deletions={file.deletions} />
+    </button>
   )
 }

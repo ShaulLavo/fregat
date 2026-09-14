@@ -47,6 +47,7 @@ function ScriptGroup({
         <CommandItem
           key={script.command}
           keywords={[script.command]}
+          title={script.command}
           value={script.command}
           onSelect={() => onSelect(script)}
         >

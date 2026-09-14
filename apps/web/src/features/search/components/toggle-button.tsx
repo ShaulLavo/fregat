@@ -31,7 +31,6 @@ export function SearchToggleButton({
               className,
             )}
             size='icon-xs'
-            title={label}
             type='button'
             variant='ghost'
             onClick={onClick}

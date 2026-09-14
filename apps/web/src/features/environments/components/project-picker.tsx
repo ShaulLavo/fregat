@@ -62,6 +62,7 @@ export function ProjectPicker({
             <Button
               key={machine.environmentId}
               className='justify-start gap-2'
+              title={`${machine.name} · ${machine.origin}`}
               variant='ghost'
               disabled={machine.phase !== 'live'}
               onClick={() => setSelected(machine)}

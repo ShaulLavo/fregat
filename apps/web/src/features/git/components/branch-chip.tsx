@@ -7,10 +7,15 @@ export function BranchChip({ rootPath }: { readonly rootPath: string }) {
   if (!repository) return null
 
   const label = aheadBehindLabel(repository)
+  const branch = repository.branch ?? 'HEAD'
+  const commit = repository.commit ? ` @ ${repository.commit.slice(0, 7)}` : ''
 
   return (
-    <span className='bg-muted text-muted-foreground text-2xs flex h-(--density-chip-height) min-w-0 items-center gap-1.5 rounded-full px-2 font-mono'>
-      <span className='text-foreground min-w-0 truncate'>{repository.branch ?? 'HEAD'}</span>
+    <span
+      className='bg-muted text-muted-foreground text-2xs flex h-(--density-chip-height) min-w-0 items-center gap-1.5 rounded-full px-2 font-mono'
+      title={`${branch}${commit}`}
+    >
+      <span className='text-foreground min-w-0 truncate'>{branch}</span>
       {label ? <span className='shrink-0 tabular-nums'>{label}</span> : null}
     </span>
   )

@@ -65,7 +65,7 @@ export function SelectedSummary({
   }
 
   return (
-    <div className='flex min-w-0 items-center gap-2 text-xs'>
+    <div className='flex min-w-0 items-center gap-2 text-xs' title={entry.path}>
       <EntryIcon className='size-4' entry={entry} iconMode={iconMode} selected={false} />
       <span className='truncate font-medium'>{entry.name}</span>
     </div>
@@ -82,7 +82,7 @@ function EntryPreviewDetails({
   return (
     <div className='flex min-h-0 flex-1 flex-col items-center text-center'>
       <EntryPreviewTile entry={entry} iconMode={iconMode} selected={false} size='lg' />
-      <div className='mt-(--density-section-gap) w-full min-w-0'>
+      <div className='mt-(--density-section-gap) w-full min-w-0' title={entry.path}>
         <div className='truncate text-xs font-medium'>{entry.name}</div>
       </div>
       <div className='mt-(--density-section-gap)'>

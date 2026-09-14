@@ -15,21 +15,17 @@ export function HighlightedPreview({
 }) {
   const highlight = range ? previewRangeHighlight(preview, range) : previewHighlight(preview, query)
   if (!highlight) {
-    return (
-      <span className='block max-w-full overflow-hidden text-ellipsis whitespace-nowrap'>
-        {preview}
-      </span>
-    )
+    return <span className='block max-w-full truncate'>{preview}</span>
   }
 
   if (replacementText !== undefined) {
     return (
-      <span className='block max-w-full overflow-hidden text-ellipsis whitespace-nowrap'>
+      <span className='block max-w-full truncate'>
         {highlight.before}
-        <mark className='bg-diff-removed/15 text-diff-removed decoration-diff-removed/70 inline-block max-w-full overflow-hidden rounded-md px-0.5 align-bottom text-ellipsis whitespace-nowrap line-through'>
+        <mark className='bg-diff-removed/15 text-diff-removed decoration-diff-removed/70 inline-block max-w-full truncate rounded-md px-0.5 align-bottom line-through'>
           {highlight.match}
         </mark>
-        <mark className='bg-diff-added/15 text-diff-added ml-0.5 inline-block max-w-full overflow-hidden rounded-md px-0.5 align-bottom text-ellipsis whitespace-nowrap'>
+        <mark className='bg-diff-added/15 text-diff-added ml-0.5 inline-block max-w-full truncate rounded-md px-0.5 align-bottom'>
           {replacementText}
         </mark>
         {highlight.after}
@@ -38,11 +34,11 @@ export function HighlightedPreview({
   }
 
   return (
-    <span className='block max-w-full overflow-hidden text-ellipsis whitespace-nowrap'>
+    <span className='block max-w-full truncate'>
       {highlight.before}
       <mark
         className={cn(
-          'text-foreground inline-block max-w-full overflow-hidden rounded-md px-0.5 align-bottom text-ellipsis whitespace-nowrap',
+          'text-foreground inline-block max-w-full truncate rounded-md px-0.5 align-bottom',
           // Same tokens the editor-backed result tabs paint with, so a match
           // looks the same in the sidebar and in a result tab — including the
           // forced-colors mapping, where every background collapses to the

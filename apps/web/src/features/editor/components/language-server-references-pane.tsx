@@ -15,7 +15,7 @@ import {
 } from '@/features/editor/state/document-state'
 import { textLineAt } from '@/features/editor/utils/position'
 import { compareSearchPaths } from '@/features/search/utils/sort'
-import { basename, toTreePath } from '@/lib/path-formatters'
+import { basename, parentPath, toTreePath } from '@/lib/path-formatters'
 import { colorForFileIcon, iconForEntry, type ResolvedFileIcon } from '@/lib/file-icons'
 import { Button } from '@workspace/ui/components/button'
 import { EmptyState } from '@workspace/ui/components/empty-state'
@@ -148,6 +148,7 @@ function ReferenceGroupHeader({
   return (
     <button
       className='focus-ring hover:bg-row-hover active:bg-row-active grid h-(--density-control-height-sm) w-full grid-cols-[14px_14px_minmax(0,1fr)_auto] items-center gap-(--density-control-gap) px-(--density-row-padding-x) text-left text-xs outline-none'
+      title={group.path}
       type='button'
       onClick={() => onToggle(group.path)}
     >
@@ -191,6 +192,7 @@ function ReferenceRow({
   return (
     <button
       className='group focus-ring hover:bg-row-hover active:bg-row-active grid h-(--density-row-height) w-full grid-cols-[38px_minmax(0,1fr)] items-center gap-2 px-(--density-row-padding-x) pl-7 text-left text-xs outline-none'
+      title={`${target.path}:${line}`}
       type='button'
       onClick={() => onOpenReference(target)}
       onFocus={() => onPreviewReference(target)}
@@ -315,11 +317,4 @@ function fileIconStyle(icon: ResolvedFileIcon): CSSProperties {
     mask,
     WebkitMask: mask,
   }
-}
-
-function parentPath(path: string) {
-  const index = path.lastIndexOf('/')
-  if (index < 0) return ''
-
-  return path.slice(0, index)
 }

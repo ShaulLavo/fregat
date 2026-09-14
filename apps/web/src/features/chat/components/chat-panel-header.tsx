@@ -74,6 +74,7 @@ export function ChatPanelHeader({
                     session.id === activeSessionId && 'bg-row-selected',
                   )}
                   key={session.id}
+                  title={`${session.title} — ${chatSessionPreview(session)}`}
                   onClick={() => onSelectSession(session.id)}
                 >
                   <span className='truncate font-medium'>

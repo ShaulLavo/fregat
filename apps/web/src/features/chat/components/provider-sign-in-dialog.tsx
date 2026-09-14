@@ -90,7 +90,10 @@ export function ProviderSignInDialog({
         </DialogHeader>
 
         {signIn.isAuthenticated ? (
-          <div className='border-success/30 bg-success/10 text-success flex items-center gap-(--density-control-gap) border px-(--density-control-padding-x) py-(--density-section-gap) text-xs'>
+          <div
+            className='border-success/30 bg-success/10 text-success flex items-center gap-(--density-control-gap) border px-(--density-control-padding-x) py-(--density-section-gap) text-xs'
+            title={accountLabel ?? undefined}
+          >
             <CheckCircleIcon className='size-3.5 shrink-0' />
             <span className='min-w-0 flex-1 truncate'>
               {accountLabel ?? `${providerLabel} is signed in.`}
@@ -163,7 +166,7 @@ export function ProviderSignInDialog({
           <p className='text-muted-foreground text-2xs'>
             No browser tab? Run this in a terminal instead:
           </p>
-          <div className='flex items-center gap-(--density-control-gap)'>
+          <div className='flex items-center gap-(--density-control-gap)' title={command}>
             <code className='text-foreground min-w-0 flex-1 truncate font-mono text-xs'>
               {command}
             </code>

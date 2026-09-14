@@ -63,7 +63,6 @@ export const ChatInputSubmitButton = forwardRef<HTMLButtonElement, ChatInputSubm
                 }
                 ref={ref}
                 size='icon-sm'
-                title={label}
                 type='button'
                 onClick={handleClick}
               />

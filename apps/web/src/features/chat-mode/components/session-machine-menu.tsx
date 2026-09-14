@@ -30,6 +30,7 @@ export function SessionMachineMenu() {
             size='sm'
             variant='ghost'
             className='text-muted-foreground text-2xs min-w-0 gap-1 px-1'
+            title={machine ? `${machine.name} · ${machine.origin}` : undefined}
           >
             <span className='truncate'>{title}</span>
             <CaretUpDownIcon className='size-3 shrink-0' />
@@ -45,6 +46,7 @@ export function SessionMachineMenu() {
           {machines.map((machine) => (
             <DropdownMenuRadioItem
               key={machine.environmentId}
+              title={`${machine.name} · ${machine.origin}`}
               value={machine.environmentId}
               onClick={() => select(machine.environmentId)}
             >

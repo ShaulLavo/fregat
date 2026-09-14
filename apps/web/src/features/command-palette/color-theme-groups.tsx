@@ -31,6 +31,7 @@ export function ColorThemeGroups() {
         <CommandItem
           key={theme.id}
           keywords={[theme.label, theme.id, theme.type, theme.source]}
+          title={`${theme.id} (${theme.source})`}
           value={colorThemeItemValue(theme.id)}
           onSelect={() => selectColorTheme(theme.id)}
         >

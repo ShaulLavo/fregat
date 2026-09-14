@@ -1,4 +1,5 @@
 import { cn } from '@workspace/ui/lib/utils'
+import type { ReactNode } from 'react'
 
 /**
  * One palette row's text: label first, muted description filling the rest of the
@@ -8,17 +9,21 @@ import { cn } from '@workspace/ui/lib/utils'
  * `CommandItem`'s flex row.
  */
 export function RowLabel({
+  badge,
   description,
   descriptionClassName,
   label,
 }: {
-  readonly description?: string
+  /** A chip that sits between the label and the description. */
+  readonly badge?: ReactNode
+  readonly description?: ReactNode
   readonly descriptionClassName?: string
   readonly label: string
 }) {
   return (
     <>
       <span className='max-w-[55%] shrink-0 truncate font-medium'>{label}</span>
+      {badge}
       {description ? (
         <span
           className={cn(

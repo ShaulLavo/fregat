@@ -65,6 +65,9 @@ export function WorkspaceProjectMenu({ workspaceTitle }: { readonly workspaceTit
     void openWorkspaceRoot(nextRootPath)
   }
 
+  const machineSuffix = machine ? ` · ${machine.name}` : ''
+  const menuTitle = rootPath ? `${rootPath}${machineSuffix}` : undefined
+
   return (
     <DropdownMenu open={open} onOpenChange={setOpen}>
       <DropdownMenuTrigger
@@ -79,6 +82,7 @@ export function WorkspaceProjectMenu({ workspaceTitle }: { readonly workspaceTit
             type='button'
           />
         }
+        title={menuTitle}
       >
         <FolderOpenIcon className='text-muted-foreground size-4 shrink-0' weight='duotone' />
         <span className='truncate text-xs font-medium'>{workspaceTitle}</span>
@@ -102,6 +106,7 @@ export function WorkspaceProjectMenu({ workspaceTitle }: { readonly workspaceTit
           {entries.map((entry) => (
             <DropdownMenuRadioItem
               key={entry.rootPath}
+              title={entry.rootPath}
               value={entry.rootPath}
               onClick={() => handleSelect(entry.rootPath)}
             >

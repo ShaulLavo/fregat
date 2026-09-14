@@ -38,7 +38,6 @@ export function ChatInputAttachmentList({
             aria-label={`Open ${attachment.name}`}
             className='size-9 shrink-0 overflow-hidden'
             size='icon'
-            title={attachment.name}
             type='button'
             variant='ghost'
             onClick={() => setOpenIndex(index)}
@@ -50,7 +49,8 @@ export function ChatInputAttachmentList({
               src={attachment.previewUrl}
             />
           </Button>
-          <span className='min-w-0 flex-1 text-xs'>
+          {/* Not on the chip: its remove button is a Tooltip control (D4). */}
+          <span className='min-w-0 flex-1 text-xs' title={attachment.name}>
             <span className='block truncate font-medium'>{attachment.name}</span>
             <span className='text-muted-foreground block tabular-nums'>
               {formatSize(attachment.sizeBytes)}
@@ -64,7 +64,6 @@ export function ChatInputAttachmentList({
                   className='text-muted-foreground'
                   disabled={disabled}
                   size='icon-xs'
-                  title='Remove attachment'
                   type='button'
                   variant='ghost'
                   onClick={() => onRemove(attachment.id)}

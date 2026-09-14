@@ -83,6 +83,7 @@ export const LogsEventRow = memo(
               role='button'
               style={collapsedRowStyle}
               tabIndex={0}
+              title={`${formatLogPrimary(event)} — ${formatLogSecondary(event)}`}
               onClick={handleRowClick}
               onKeyDown={handleRowKeyDown}
               onPointerDown={handleRowPointerDown}

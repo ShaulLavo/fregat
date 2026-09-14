@@ -65,6 +65,15 @@ export const TARGETS = {
     gates: 'an opacity modifier on bg-row-hover / bg-row-selected, whose alpha is the design',
   },
   paletteLeaks: { title: 'raw palette colours', limit: 0, listed: true },
+  truncationRecovery: {
+    title: 'truncation with no title on the row',
+    limit: 0,
+    listed: true,
+    allowListed: true,
+    // A primitive cannot know whether the string it renders is a label or a value; the consumer
+    // that knows sets the title.
+    skipUnder: [UI_PACKAGE],
+  },
 }
 
 /** Measures read back out of the radius histogram rather than collected in a bucket of their own. */
@@ -103,6 +112,7 @@ const ARBITRARY_TEXT = /^text-\[(?:length:)?\d*\.?\d+[a-z%]*\]$/i
 const ROW_FILL_OPACITY = /^(?:hover:)?bg-row-(?:hover|selected)\/\d+$/
 const DIVIDER_OPACITY = /^border(?:-(?:[trbl]|x|y|s|e))?-border\/\d+$/
 const HEIGHT_TOKEN = /^h-(?:\d+(?:\.\d+)?|px|\[[^\]]*\]|\([^)]*\))$/
+const TRUNCATION = /^(?:truncate|line-clamp-\d+)$/
 const SOURCE_FILE = /\.tsx?$/
 const TEST_FILE = /(?:^|\/)tests?\/|\.(?:test|browser|test-d)\.tsx?$/
 
@@ -282,7 +292,21 @@ function collect(node, ancestors, strings, elements) {
     start: node.start,
     elementName: element === null ? null : jsxName(element.name),
     elementKey: element === null ? null : `e${element.start}`,
+    // A truncating class recovers through a title on its own element or on any element that
+    // encloses it in this file. What a parent component renders around it is out of view here.
+    titled: element !== null && (hasTitle(element) || enclosingElements(ancestors).some(hasTitle)),
   })
+}
+
+function hasTitle(opening) {
+  return opening.attributes.some(
+    (attribute) => attribute.type === 'JSXAttribute' && attribute.name?.name === 'title',
+  )
+}
+
+// The stack holds the JSXElement of every enclosing tag; its opening element carries the props.
+function enclosingElements(ancestors) {
+  return ancestors.filter((node) => node.type === 'JSXElement').map((node) => node.openingElement)
 }
 
 function stringValue(node) {
@@ -372,6 +396,7 @@ function recordToken(census, file, entry, token, lineOf, group) {
   if (DIVIDER_OPACITY.test(token.base)) census.hits.dividerOpacity.push(hit)
   if (ARBITRARY_TEXT.test(token.base)) census.hits.arbitraryText.push(hit)
   if (PALETTE_CLASS.test(token.base)) census.hits.paletteLeaks.push(hit)
+  if (TRUNCATION.test(token.base) && !entry.titled) census.hits.truncationRecovery.push(hit)
   recordHoverFill(census, token, hit)
   recordShadow(census, token, hit)
   recordRadius(census, entry, token, hit)
@@ -518,6 +543,7 @@ export function evaluate(census, allowEntries = []) {
     rawButtons: gate('rawButtons', census.hits.rawButtons),
     hoverFills: gate('hoverFills', rowFillOpacityHits(census)),
     paletteLeaks: gate('paletteLeaks', census.hits.paletteLeaks),
+    truncationRecovery: gate('truncationRecovery', census.hits.truncationRecovery),
   }
   const failures = Object.entries(offenders)
     .filter(([, hits]) => hits.length > 0)

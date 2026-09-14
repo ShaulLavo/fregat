@@ -63,6 +63,7 @@ export function ToolPaneHeader({
           'flex min-w-0 flex-1 items-center gap-(--density-control-gap)',
           orientation === 'vertical' && 'min-h-0 w-full flex-col',
         )}
+        title={typeof detail === 'string' ? detail : undefined}
       >
         <div
           className={cn(

@@ -36,6 +36,7 @@ export function CodeThemeWidget({
               variant='ghost'
             />
           }
+          title={value}
         >
           <span className='truncate font-medium'>{selected?.label ?? `Unavailable: ${value}`}</span>
           <span className='text-muted-foreground flex shrink-0 items-center gap-2 font-normal'>

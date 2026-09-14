@@ -47,6 +47,7 @@ export function CodeThemePicker({
               className='min-h-9 gap-2'
               keywords={[theme.label, theme.id, theme.subtitle]}
               onSelect={() => onSelect(theme.id)}
+              title={theme.id}
               value={theme.id}
             >
               <span className='flex min-w-0 flex-col gap-0.5'>
@@ -64,7 +65,10 @@ export function CodeThemePicker({
         <div className='border-border min-w-0 border-t sm:border-t-0 sm:border-l'>
           {highlighted ? (
             <>
-              <div className='flex h-(--bar-height) items-center justify-between gap-(--density-control-gap) px-(--bar-padding-x) text-xs'>
+              <div
+                className='flex h-(--bar-height) items-center justify-between gap-(--density-control-gap) px-(--bar-padding-x) text-xs'
+                title={highlighted.id}
+              >
                 <span className='truncate font-medium'>{highlighted.label}</span>
                 <span className='text-muted-foreground text-3xs'>Preview</span>
               </div>

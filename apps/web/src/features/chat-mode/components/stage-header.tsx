@@ -14,6 +14,7 @@ import { SessionRename } from '@/features/chat-mode/components/session-rename'
 import { StageSessionMenu } from '@/features/chat-mode/components/stage-session-menu'
 import { useChatModeSession } from '@/features/chat-mode/providers/session-context'
 import { useSessionRailStore } from '@/features/chat-mode/state/session-rail-store'
+import { stageTitle } from '@/features/chat-mode/utils/stage-title'
 import type { SessionRailItem } from '@workspace/client-core/chat/rail/model'
 import { PaneBar } from '@workspace/ui/components/pane-bar'
 import { cn } from '@workspace/ui/lib/utils'
@@ -37,7 +38,12 @@ export function StageHeader({
 
   return (
     <PaneBar as='header' border='bottom'>
-      <nav aria-label='Session' className='flex min-w-0 flex-1 items-center gap-1.5 text-xs'>
+      {/* No title while renaming: it would hover over the input the user is typing in. */}
+      <nav
+        aria-label='Session'
+        className='flex min-w-0 flex-1 items-center gap-1.5 text-xs'
+        title={editing ? undefined : stageTitle(projectTitle, session)}
+      >
         {projectTitle ? (
           <>
             <span className='text-muted-foreground max-w-[9rem] shrink-0 truncate'>

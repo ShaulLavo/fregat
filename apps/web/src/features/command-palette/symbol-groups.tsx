@@ -7,6 +7,7 @@ import { useCommandPaletteActions } from '@/features/command-palette/hooks/use-c
 import {
   symbolDescription,
   symbolKindLabel,
+  symbolRowTitle,
 } from '@/features/command-palette/command-palette-utils'
 import { RowLabel } from '@/features/command-palette/row-label'
 
@@ -36,6 +37,7 @@ export function SymbolGroups({ isPending, items }: SymbolGroupsProps) {
         <CommandItem
           key={`${item.name}:${item.selectionRange.start.line}:${index}`}
           keywords={[item.name, item.containerName ?? '', symbolKindLabel(item.kind)]}
+          title={symbolRowTitle(item)}
           value={`symbol:${item.name}:${index}`}
           onSelect={() => selectSymbol(item)}
         >

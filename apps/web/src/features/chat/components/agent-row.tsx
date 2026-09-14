@@ -22,6 +22,10 @@ export function AgentRow({ entry, groupId }: { entry: ChatAgentEntry; groupId: s
   const working = chatAgentIsWorking(entry.agent)
   const lastTool = entry.activities.at(-1)
   const toolCount = chatAgentToolCount(entry)
+  const summary = entry.summary ?? lastTool?.title ?? entry.description ?? 'Agent started'
+  const rowTitle = [chatAgentName(entry.agent), entry.agent.model, summary]
+    .filter(Boolean)
+    .join(' · ')
 
   return (
     <section
@@ -31,6 +35,7 @@ export function AgentRow({ entry, groupId }: { entry: ChatAgentEntry; groupId: s
       <Button
         aria-expanded={expanded}
         className='h-auto w-full items-start justify-start gap-2 px-2 py-1.5 text-left font-normal'
+        title={rowTitle}
         variant='ghost'
         onClick={() => toggle(id)}
       >
@@ -51,9 +56,7 @@ export function AgentRow({ entry, groupId }: { entry: ChatAgentEntry; groupId: s
             </span>
             {working ? <OrbitLoader aria-hidden='true' className='size-3 shrink-0' /> : null}
           </span>
-          <span className='text-muted-foreground truncate text-xs'>
-            {entry.summary ?? lastTool?.title ?? entry.description ?? 'Agent started'}
-          </span>
+          <span className='text-muted-foreground truncate text-xs'>{summary}</span>
           <span className='text-muted-foreground text-2xs flex items-center gap-2 tabular-nums'>
             {entry.agent.model ? <span className='truncate'>{entry.agent.model}</span> : null}
             {working ? (

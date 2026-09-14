@@ -59,15 +59,17 @@ export function MachineRow({
       </div>
     )
 
+  const detail = `${name} · ${machine.kind === 'ssh' ? machine.target : machine.url}`
+
   return (
     <div className='border-border flex flex-col gap-2 rounded-lg border p-3'>
-      <div className='flex items-center gap-2'>
+      <div className='flex items-center gap-2' title={detail}>
         <Phase label={machine.label ?? name} phase={phase} />
         <span className='min-w-0 flex-1 truncate text-sm font-medium'>{machine.label ?? name}</span>
         <span className='text-muted-foreground text-xs'>{phase}</span>
       </div>
-      <p className='text-muted-foreground truncate font-mono text-xs'>
-        {name} · {machine.kind === 'ssh' ? machine.target : machine.url}
+      <p className='text-muted-foreground truncate font-mono text-xs' title={detail}>
+        {detail}
       </p>
       {/* Always mounted: the reconnect loop clears and restores lastError on
           every retry, and a line that comes and goes shifts the whole page. */}

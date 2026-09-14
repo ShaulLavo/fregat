@@ -26,6 +26,7 @@ export function PromptStashMenu({
           <li className='group/stash flex min-w-0 items-center gap-1' key={entry.id}>
             <Button
               className='h-auto min-w-0 flex-1 justify-start gap-(--density-control-gap) py-(--density-gap-tight) text-left text-xs font-normal'
+              title={entry.prompt}
               type='button'
               variant='ghost'
               onClick={() => onRestore(entry)}

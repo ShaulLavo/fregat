@@ -108,5 +108,125 @@
     "file": "apps/web/src/features/settings/components/widgets/color-field.tsx",
     "class": "<input>",
     "reason": "type='color' is the native picker inside an InputGroup addon; the Input primitive is a text control and would restyle the swatch."
+  },
+  {
+    "file": "apps/web/src/features/chat/components/activity-group-row.tsx",
+    "class": "truncate",
+    "reason": "D3: the group summary (\"3 commands, 2 edits\") is a sentence the app composes, not a value."
+  },
+  {
+    "file": "apps/web/src/features/chat/components/agents-row.tsx",
+    "class": "truncate",
+    "reason": "D3: an app-composed count (\"2 of 3 agents working\")."
+  },
+  {
+    "file": "apps/web/src/features/chat/components/assistant-changed-files-section.tsx",
+    "class": "truncate",
+    "reason": "D3: \"N changed files\" is app-authored. The file-name row further down carries title={file.path} on its Button."
+  },
+  {
+    "file": "apps/web/src/features/chat/components/assistant-changed-files-tree.tsx",
+    "class": "truncate",
+    "reason": "Already recovered: the file node's content is a fragment rendered inside renderFileNode's <button title={node.path}>, which the census cannot see from a different function."
+  },
+  {
+    "file": "apps/web/src/features/chat/components/assistant-markdown-mermaid.tsx",
+    "class": "truncate",
+    "reason": "D3: the literal word \"mermaid\"."
+  },
+  {
+    "file": "apps/web/src/features/chat/components/chat-panel-status.tsx",
+    "class": "truncate",
+    "reason": "D3: the slow-request line is an app-authored sentence; the error line passes its message to StatusLine's title."
+  },
+  {
+    "file": "apps/web/src/features/chat/components/live-activity-row.tsx",
+    "class": "truncate",
+    "reason": "Already recovered: the label fragment is built above the JSX and both containers it renders into carry title={activity.label}."
+  },
+  {
+    "file": "apps/web/src/features/chat/components/message-completion-divider.tsx",
+    "class": "truncate",
+    "reason": "D3: \"Worked for …\" is app-authored."
+  },
+  {
+    "file": "apps/web/src/features/chat/components/model-picker-sign-in-item.tsx",
+    "class": "truncate",
+    "reason": "D3: two app-authored sentences (\"Sign in to X\", \"Opens a browser tab through the X CLI.\")."
+  },
+  {
+    "file": "apps/web/src/features/chat/components/model-picker-trigger.tsx",
+    "class": "truncate",
+    "reason": "Already recovered: the control already earns a Tooltip for provider status, and that tooltip names the model label too (D4, the one allowed direction). No title beside a Tooltip."
+  },
+  {
+    "file": "apps/web/src/features/chat-mode/components/session-bulk-bar.tsx",
+    "class": "truncate",
+    "reason": "D3: \"N selected\"."
+  },
+  {
+    "file": "apps/web/src/features/chat-mode/components/session-rail.tsx",
+    "class": "truncate",
+    "reason": "D3: \"New session\"."
+  },
+  {
+    "file": "apps/web/src/features/command-palette/goto-line-groups.tsx",
+    "class": "truncate",
+    "reason": "D3: an app-authored hint sentence."
+  },
+  {
+    "file": "apps/web/src/features/command-palette/row-label.tsx",
+    "class": "truncate",
+    "reason": "Already recovered: RowLabel renders a fragment inside CommandItem, and every palette row that carries a value puts its title on the CommandItem (D6). The rows that do not are app-authored labels (view, color mode, goto-line, command)."
+  },
+  {
+    "file": "apps/web/src/features/editor/components/language-server-references-pane.tsx",
+    "class": "truncate",
+    "reason": "D3: the pane heading \"References\". The group header and reference rows in this file carry their own titles."
+  },
+  {
+    "file": "apps/web/src/features/file-picker/list.tsx",
+    "class": "truncate",
+    "reason": "D3: SortableColumnHeader labels and the kind/modified columns are app-authored; the option row carries title={entry.path}."
+  },
+  {
+    "file": "apps/web/src/features/git/components/change-group.tsx",
+    "class": "truncate",
+    "reason": "D3: a section label (\"Staged Changes\")."
+  },
+  {
+    "file": "apps/web/src/features/git/components/unchanged-diff-banner.tsx",
+    "class": "truncate",
+    "reason": "D3: an app-authored notice."
+  },
+  {
+    "file": "apps/web/src/features/logs/components/timeline-metric.tsx",
+    "class": "truncate",
+    "reason": "D3: a count and its app-authored label."
+  },
+  {
+    "file": "apps/web/src/features/search/components/file-group.tsx",
+    "class": "truncate",
+    "reason": "Already recovered: SearchFileGroupTitle renders inside the header div that carries title={group.path}."
+  },
+  {
+    "file": "apps/web/src/features/search/components/highlight.tsx",
+    "class": "truncate",
+    "reason": "Search excerpt: the complete value is an entire source line, sometimes thousands of characters, which a native tooltip is the wrong container for. The row's purpose is to open the file."
+  },
+  {
+    "file": "apps/web/src/features/search/components/match-row.tsx",
+    "class": "truncate",
+    "reason": "Search excerpt: the complete value is an entire source line, sometimes thousands of characters, which a native tooltip is the wrong container for. The row's purpose is to open the file."
+  },
+  {
+    "file": "apps/web/src/features/settings/components/widgets/color-field.tsx",
+    "class": "truncate",
+    "reason": "D3: a field label."
+  },
+  {
+    "file": "apps/web/src/features/workbench/components/editor-tab-button.tsx",
+    "class": "truncate",
+    "reason": "Already recovered: editorTabTitle renders inside the tab <button>, which carries the enriched title (the plan's reference implementation)."
   }
 ]

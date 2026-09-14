@@ -21,7 +21,7 @@ export function ChatPanelStatus({
   // the thing the user needs told.
   if (message) {
     return (
-      <StatusLine tone='destructive'>
+      <StatusLine title={message} tone='destructive'>
         <WarningCircleIcon className='size-3.5 shrink-0' />
         <span className='truncate'>{message}</span>
       </StatusLine>
@@ -45,13 +45,16 @@ export function ChatPanelStatus({
 
 function StatusLine({
   children,
+  title,
   tone,
 }: {
   readonly children: ReactNode
+  readonly title?: string
   readonly tone: 'destructive' | 'warning'
 }) {
   return (
     <div
+      title={title}
       className={
         tone === 'destructive'
           ? 'text-destructive text-2xs border-t px-(--density-control-padding-x) py-(--density-section-gap)'

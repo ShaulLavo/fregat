@@ -6,6 +6,7 @@ import { iconForEntry } from '@/lib/file-icons'
 import type { FilePaletteItem } from '@/features/command-palette/command-palette-types'
 import { fileItemValue } from '@/features/command-palette/command-palette-utils'
 import { useCommandPaletteActions } from '@/features/command-palette/hooks/use-command-palette-actions'
+import { RowLabel } from '@/features/command-palette/row-label'
 
 type FilePaletteRowProps = {
   readonly item: FilePaletteItem
@@ -18,14 +19,12 @@ export function FilePaletteRow({ item }: FilePaletteRowProps) {
   return (
     <CommandItem
       keywords={[item.entry.name, item.entry.path, item.pathLabel]}
+      title={item.entry.path}
       value={fileItemValue(item)}
       onSelect={() => selectFile(item.entry.path)}
     >
       <span aria-hidden='true' className='size-4' style={fileIconStyle(icon)} />
-      <span className='max-w-[55%] shrink-0 truncate font-medium'>{item.entry.name}</span>
-      <span className='text-muted-foreground text-2xs min-w-0 flex-1 truncate'>
-        {item.pathLabel}
-      </span>
+      <RowLabel label={item.entry.name} description={item.pathLabel} />
     </CommandItem>
   )
 }

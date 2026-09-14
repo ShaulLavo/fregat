@@ -202,6 +202,31 @@ export function sessionPaletteKeywords(session: {
   return [session.title, session.projectTitle, session.branch ?? '']
 }
 
+/** What the row cannot show: where the session lives and on which machine. */
+export function sessionRowTitle(session: {
+  readonly branch: string | null
+  readonly machineLabel: string | null
+  readonly projectTitle: string
+  readonly title: string
+  readonly worktreePath: string
+}) {
+  const where = session.branch
+    ? `${session.projectTitle} › ${session.branch} (${session.worktreePath})`
+    : `${session.projectTitle} (${session.worktreePath})`
+  const machine = session.machineLabel ? ` on ${session.machineLabel}` : ''
+
+  return `${session.title} — ${where}${machine}`
+}
+
+export function sessionProjectRowTitle(project: {
+  readonly qualifier: string | null
+  readonly workspaceRoot: string
+}) {
+  if (!project.qualifier) return project.workspaceRoot
+
+  return `${project.workspaceRoot} (${project.qualifier})`
+}
+
 export function sessionItemValue(sessionId: string) {
   return `session:${sessionId}`
 }
@@ -299,6 +324,15 @@ export function activeEditorFocusDestination(
     kind: 'match',
     matches: (target) => matchesActiveSurface(target, identity),
   }
+}
+
+/** The symbol's kind and container, for the row title; the row itself shows only the kind. */
+export function symbolRowTitle(symbol: {
+  readonly containerName: string | null
+  readonly kind: number
+  readonly name: string
+}) {
+  return `${symbol.name}: ${symbolDescription(symbol)}`
 }
 
 export function symbolDescription(symbol: { containerName: string | null; kind: number }) {

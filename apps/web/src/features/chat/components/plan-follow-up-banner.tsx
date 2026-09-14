@@ -43,7 +43,10 @@ export function PlanFollowUpBanner({
       className='border-border shrink-0 border-t px-(--density-control-padding-x) pt-(--density-control-padding-x)'
       role='status'
     >
-      <div className='border-info/25 bg-info/10 mx-auto flex w-full max-w-3xl flex-wrap items-center gap-(--density-control-gap) rounded-lg border px-(--density-control-padding-x) py-(--density-section-gap)'>
+      <div
+        className='border-info/25 bg-info/10 mx-auto flex w-full max-w-3xl flex-wrap items-center gap-(--density-control-gap) rounded-lg border px-(--density-control-padding-x) py-(--density-section-gap)'
+        title={proposedPlanTitle(plan.planMarkdown)}
+      >
         <Badge className='border-info/40 text-info uppercase' variant='outline'>
           Plan ready
         </Badge>

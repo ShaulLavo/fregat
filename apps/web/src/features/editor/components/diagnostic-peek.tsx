@@ -112,6 +112,7 @@ export function DiagnosticPeek({ model, onClose, onOpenTarget, tabId }: Diagnost
               <Button
                 className='h-auto w-full justify-start px-2 py-1.5 text-left'
                 key={`${information.target.uri}:${information.line}:${information.column}:${index}`}
+                title={`${information.target.path}:${information.line}:${information.column} — ${information.label}`}
                 variant='ghost'
                 onClick={() => openRelated(information.target)}
               >

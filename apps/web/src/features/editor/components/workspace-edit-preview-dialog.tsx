@@ -118,7 +118,11 @@ export function WorkspaceEditPreviewDialog() {
             ) : (
               <ol className='grid gap-2'>
                 {preview.rows.map((row) => (
-                  <li className='bg-card rounded-lg border p-3' key={`${row.index}:${row.path}`}>
+                  <li
+                    className='bg-card rounded-lg border p-3'
+                    key={`${row.index}:${row.path}`}
+                    title={resourcePathLabel(row)}
+                  >
                     <div className='flex min-w-0 items-center gap-2 text-xs'>
                       {rowIcon(row)}
                       <span className='truncate font-medium'>{operationLabel(row)}</span>

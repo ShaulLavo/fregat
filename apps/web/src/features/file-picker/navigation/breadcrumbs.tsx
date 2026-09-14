@@ -22,6 +22,7 @@ export function Breadcrumbs({ currentPath }: { currentPath: string }) {
             )}
             onClick={() => navigateTo(crumb.path)}
             size='sm'
+            title={crumb.path || '/'}
             type='button'
             variant='ghost'
           >

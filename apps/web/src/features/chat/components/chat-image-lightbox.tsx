@@ -42,7 +42,9 @@ export function ChatImageLightbox({
         className='max-w-[min(92vw,72rem)] sm:max-w-[min(92vw,72rem)]'
         onKeyDown={handleKeyDown}
       >
-        <DialogTitle className='truncate pr-8 text-xs'>{image.name}</DialogTitle>
+        <DialogTitle className='truncate pr-8 text-xs' title={image.name}>
+          {image.name}
+        </DialogTitle>
         <img
           alt={image.name}
           className='max-h-[78vh] w-full object-contain'

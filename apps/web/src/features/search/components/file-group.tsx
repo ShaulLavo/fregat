@@ -39,6 +39,7 @@ export const SearchFileGroupHeader = memo(
           !active && 'hover:bg-row-hover active:bg-row-active',
           className,
         )}
+        title={group.path}
       >
         {/* Raw button: it fills the row's grid cell, and Button's control shape
             (radius, fixed height, hover fill) is what a row must not have. */}

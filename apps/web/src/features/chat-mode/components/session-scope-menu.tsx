@@ -10,6 +10,7 @@ import {
   DropdownMenuRadioItem,
   DropdownMenuTrigger,
 } from '@workspace/ui/components/dropdown-menu'
+import { sessionProjectRowTitle } from '@/features/command-palette/command-palette-utils'
 
 const ALL_PROJECTS_VALUE = ''
 
@@ -24,6 +25,9 @@ export function SessionScopeMenu({
   readonly scopeTitle: string
   readonly onSelectScope: (scope: SessionRailScope) => void
 }) {
+  const scoped = projects.find((project) => project.id === scope)
+  const scopeDetail = scoped ? sessionProjectRowTitle(scoped) : scopeTitle
+
   return (
     <DropdownMenu>
       <DropdownMenuTrigger
@@ -31,6 +35,7 @@ export function SessionScopeMenu({
           <Button
             className='text-muted-foreground hover:text-foreground text-2xs max-w-full min-w-0 justify-start gap-1 px-1.5 font-medium'
             size='sm'
+            title={scopeDetail}
             type='button'
             variant='ghost'
           >
@@ -49,6 +54,7 @@ export function SessionScopeMenu({
           {projects.map((project) => (
             <DropdownMenuRadioItem
               key={project.id}
+              title={sessionProjectRowTitle(project)}
               value={project.id}
               onClick={() => onSelectScope(project.id)}
             >

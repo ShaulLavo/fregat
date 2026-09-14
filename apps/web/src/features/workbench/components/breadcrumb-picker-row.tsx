@@ -41,6 +41,7 @@ export function BreadcrumbPickerRow({
       role='treeitem'
       style={{ paddingLeft: `calc(var(--density-row-padding-x) + ${depth} * 1rem)` }}
       tabIndex={-1}
+      title={path}
       type='button'
       onClick={onActivate}
     >

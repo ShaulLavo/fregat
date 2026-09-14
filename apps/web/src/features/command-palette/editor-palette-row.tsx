@@ -5,6 +5,8 @@ import { iconForEntry } from '@/lib/file-icons'
 
 import type { EditorPaletteItem } from '@/features/command-palette/command-palette-types'
 import { useCommandPaletteActions } from '@/features/command-palette/hooks/use-command-palette-actions'
+import { RowLabel } from '@/features/command-palette/row-label'
+import { tabTitle } from '@/lib/documents/utils/labels'
 
 type EditorPaletteRowProps = {
   readonly item: EditorPaletteItem
@@ -17,14 +19,12 @@ export function EditorPaletteRow({ item }: EditorPaletteRowProps) {
   return (
     <CommandItem
       keywords={[item.name, item.pathLabel]}
+      title={tabTitle(item.content)}
       value={`editor:${item.key}`}
       onSelect={() => selectContent(item.content)}
     >
       <span aria-hidden='true' className='size-4' style={fileIconStyle(icon)} />
-      <span className='max-w-[55%] shrink-0 truncate font-medium'>{item.name}</span>
-      <span className='text-muted-foreground text-2xs min-w-0 flex-1 truncate'>
-        {item.pathLabel}
-      </span>
+      <RowLabel label={item.name} description={item.pathLabel} />
       {item.active && <CommandShortcut>active</CommandShortcut>}
     </CommandItem>
   )

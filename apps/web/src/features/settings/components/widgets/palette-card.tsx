@@ -50,6 +50,7 @@ export function PaletteCard({
           if (event.currentTarget.matches(':focus-visible')) onPreview()
         }}
         role='radio'
+        title={`${palette.name} (${palette.id})`}
         type='button'
       >
         <span className='flex items-center gap-2 pr-7'>

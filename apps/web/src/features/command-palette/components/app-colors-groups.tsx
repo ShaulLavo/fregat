@@ -16,6 +16,7 @@ export function AppColorsGroups() {
         <CommandItem
           key={item.value}
           keywords={[item.label, item.id]}
+          title={item.id}
           value={item.value}
           onSelect={() => {
             selectPalette(item.id, 'workspace.selectAppColors')

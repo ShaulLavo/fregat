@@ -75,7 +75,10 @@ export function UnsavedChangesDialog({
           <DialogDescription>{description}</DialogDescription>
         </DialogHeader>
         {resource ? (
-          <div className='bg-muted/30 text-muted-foreground truncate rounded-lg border px-(--density-control-padding-x) py-(--density-section-gap) text-xs'>
+          <div
+            className='bg-muted/30 text-muted-foreground truncate rounded-lg border px-(--density-control-padding-x) py-(--density-section-gap) text-xs'
+            title={resource.path}
+          >
             {resource.path}
           </div>
         ) : null}

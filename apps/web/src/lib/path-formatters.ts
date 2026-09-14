@@ -15,6 +15,21 @@ export function basename(path: string) {
   return parts.at(-1) ?? 'Root'
 }
 
+/**
+ * The directory a path sits in, or `''` for a bare name. `'/a/b'` gives `'/a'`.
+ *
+ * `features/file-picker/model.ts` has a `parentPath` with the same signature
+ * that is NOT this one: it splits on `filter(Boolean)` and rejoins, so it drops
+ * the leading slash (`'/a/b'` gives `'a'`) and collapses repeated separators.
+ * Leave it there.
+ */
+export function parentPath(path: string) {
+  const index = path.lastIndexOf('/')
+  if (index < 0) return ''
+
+  return path.slice(0, index)
+}
+
 export function displayPath(path: string) {
   if (!path) return '/'
 

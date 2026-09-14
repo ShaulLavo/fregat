@@ -14,6 +14,7 @@ import type { EditorStatusBarSource } from '@/features/editor/state/status-bar-s
 import { useEditorUiState, useEditorUiStoreApi } from '@/features/editor/state/ui-state'
 import { DiagnosticsLoading } from '@/features/workbench/components/diagnostics-loading'
 import { useFocusTarget } from '@/lib/focus/hooks/use-target'
+import { basename, parentPath } from '@/lib/path-formatters'
 import {
   diagnosticMessageText,
   diagnosticSeverityLabel,
@@ -96,10 +97,14 @@ function renderDiagnosticsStatus({
   if (!diagnostics || diagnostics.counts.total === 0) {
     return renderDiagnosticsState(status)
   }
+  const directory = parentPath(source.filePath)
 
   return (
     <div className='min-h-0 flex-1 overflow-auto p-3 text-xs'>
-      <div className='text-muted-foreground mb-3 truncate'>{source.filePath}</div>
+      <div className='text-muted-foreground mb-3 truncate' title={source.filePath}>
+        <span className='text-foreground'>{basename(source.filePath)}</span>
+        {directory ? <span className='ml-2'>{directory}</span> : null}
+      </div>
       <div className='grid grid-cols-4 gap-2'>
         {renderDiagnosticCount({ label: 'Errors', severity: 1, value: diagnostics.counts.error })}
         {renderDiagnosticCount({

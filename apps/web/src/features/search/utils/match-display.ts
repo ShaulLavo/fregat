@@ -12,7 +12,7 @@ export type SearchMatchDisplayOptions = {
 const DEFAULT_SEARCH_DISPLAY_LENGTH = 96
 const DEFAULT_SEARCH_LEADING_CONTEXT = 24
 const MIN_SEARCH_DISPLAY_LENGTH = 16
-const SEARCH_ELLIPSIS = '...'
+const SEARCH_ELLIPSIS = '…'
 
 export function searchMatchDisplay(
   match: WorkspaceSearchMatch,

@@ -1,6 +1,6 @@
 # Recover what truncation hides
 
-Status: proposed, implementation not started. Requested 2026-09-12.
+Status: implemented 2026-09-14. Requested 2026-09-12. The `app-titlebar.tsx` row in Phase 5 was obsolete by then: the titlebar no longer renders a document title, so no model field was added.
 
 `apps/web` truncates 147 elements. Most of them carry a value the app did not author — a path, a
 branch, a session title, a model name, a machine label, a host, a code excerpt — and in 78 of them

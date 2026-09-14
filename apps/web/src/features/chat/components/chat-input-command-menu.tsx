@@ -98,6 +98,7 @@ export function ChatInputCommandMenu({
                     data-chat-input-command-item-id={item.id}
                     key={item.id}
                     role='option'
+                    title={`${item.label} — ${item.description}`}
                     type='button'
                     onClick={() => onSelect(item)}
                     onMouseDown={(event) => event.preventDefault()}

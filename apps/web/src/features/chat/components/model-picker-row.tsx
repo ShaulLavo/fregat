@@ -39,6 +39,8 @@ export function ModelPickerRow({
       )}
       data-checked={selected}
       disabled={disabled}
+      // A blocked row is wrapped in the Tooltip below, and a native title beside it would show twice.
+      title={disabled ? undefined : `${option.label} · ${option.providerLabel}`}
       value={option.key}
       onSelect={() => onSelect(option)}
     >

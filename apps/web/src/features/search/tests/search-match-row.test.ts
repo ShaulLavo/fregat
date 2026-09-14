@@ -35,7 +35,7 @@ describe('search match row display text', () => {
     )
 
     expect(display.text).toContain('needle')
-    expect(display.range).toEqual({ end: 33, start: 27 })
+    expect(display.range).toEqual({ end: 31, start: 25 })
   })
 
   it('keeps content ranges visible in narrow result panes', () => {

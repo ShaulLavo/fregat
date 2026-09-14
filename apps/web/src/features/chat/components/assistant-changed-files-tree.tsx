@@ -117,6 +117,7 @@ function renderDirectoryNode({
         className='group hover:bg-row-hover flex w-full items-center gap-1.5 py-1 pr-2 text-left'
         data-scroll-anchor-ignore
         style={treeNodeStyle(depth)}
+        title={node.path}
         type='button'
         onClick={() => toggleDirectory(node.path)}
       >

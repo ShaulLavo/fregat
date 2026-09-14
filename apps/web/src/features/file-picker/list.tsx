@@ -461,6 +461,7 @@ function FileRow({
       onClick={handleClick}
       onDoubleClick={handleDoubleClick}
       role='option'
+      title={entry.path}
     >
       <div className='flex min-w-0 items-center gap-2'>
         <EntryIcon

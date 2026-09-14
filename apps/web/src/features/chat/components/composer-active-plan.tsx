@@ -25,6 +25,7 @@ export function ComposerActivePlan({
             variant='ghost'
           />
         }
+        title={plan.currentStep ?? undefined}
       >
         <CaretRightIcon
           aria-hidden='true'
