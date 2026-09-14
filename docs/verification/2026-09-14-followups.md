@@ -134,3 +134,15 @@ The earlier row memo boundary left `EditorBreadcrumbs` subscribed to raw documen
 - Two real-buffer hook tests, web typecheck and lint pass in `/work/tmp/fregat-evidence/breadcrumb-revision-20260914/`. Tests verify no renders during a burst, one settled publication, document switching and immediate timer cancellation on unmount.
 
 An initial after run at `/work/tmp/fregat-evidence/20260914T133624Z-renders-editor-type-burst/` captured no component updates and was discarded. The tool now fails an empty capture. It also saves cumulative counts per scenario step so setup cannot be mistaken for caret-driven work. The verification skill documents the new caret-only scenario.
+
+## Dev restart and terminal click investigation
+
+The user authorized restarting the dev server. Its desktop launcher owned both API and web processes, so that dev process group was restarted. The authenticated-origin palettes request now returns 200. Browser doctor evidence is `/work/tmp/fregat-evidence/20260914T134351Z-look-run/`; screenshot inspected, no failed responses. Process and route evidence is `/work/tmp/fregat-evidence/dev-restart-20260914/`. Production was outside the restarted process group.
+
+The user clarified that clicking inside the already-focused editor, not arrow movement or changing panes, appears to rerender the terminal. Added `editor-focus-clicks` with cumulative checkpoints for repeated clicks, a drag control and real pane focus transitions.
+
+- Dev click evidence: `/work/tmp/fregat-evidence/20260914T134504Z-renders-editor-focus-clicks/`. TerminalPanel remains 7 renders before/after 20 clicks; BottomPanel remains 12. Screenshot inspected.
+- Production click evidence: `/work/tmp/fregat-evidence/20260914T134631Z-renders-editor-focus-clicks/`. The served function `cbr` is TerminalPanel, confirmed against its sessionId props and terminal settings code, saved in `terminal-function.txt`. It remains 7→7 on 20 editor clicks and dragging, then increments to 8/9 on real terminal/editor focus transitions. `terminal-counts.json` records the mapping. Screenshot inspected.
+- A broader production run clicking across different lines: `/work/tmp/fregat-evidence/20260914T135112Z-renders-editor-focus-clicks/`. TerminalPanel remains 7→7, BottomPanel 10→10 and TerminalTabs 1→1 across editor clicks. Screenshot inspected.
+
+The reported terminal issue is not reproduced in these fresh sessions. No speculative terminal/focus code change was made. The user's measurement method and loaded browser state remain to be matched. The production build at the time included breadcrumb commit 11a71118; an already-open tab needs a reload to load a newer build.

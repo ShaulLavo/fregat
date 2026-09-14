@@ -15,12 +15,14 @@ import { editorFastScroll } from './editor-fast-scroll'
 import { editorLargePaste } from './editor-large-paste'
 import { editorTypeBurst } from './editor-type-burst'
 import { editorCaretBurst } from './editor-caret-burst'
+import { editorFocusClicks } from './editor-focus-clicks'
 
 export const scenarios: readonly Scenario[] = [
   editorLargePaste,
   editorFastScroll,
   editorTypeBurst,
   editorCaretBurst,
+  editorFocusClicks,
 ]
 
 export function scenarioNamed(name: string): Scenario {

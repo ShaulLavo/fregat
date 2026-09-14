@@ -4,6 +4,7 @@ import type { Page } from 'playwright'
 export const selectors = {
   editorInput: (page: Page) => page.getByRole('textbox', { name: 'Editor input' }),
   editorSurface: (page: Page) => page.locator('.editor-virtualized-viewport'),
+  terminalSurface: (page: Page) => page.getByRole('region', { name: 'Terminal', exact: true }),
   paletteInput: (page: Page) => page.locator('[data-slot="command-input"]').first(),
   windowToolbar: (page: Page) => page.getByLabel('Window toolbar', { exact: true }),
   editorTab: (page: Page, path: string) => page.locator(`[data-editor-tab-path="${path}"]`),
