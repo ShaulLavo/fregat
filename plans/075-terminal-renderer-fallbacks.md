@@ -1,5 +1,7 @@
 # Plan 075: A renderer fallback ladder for the terminal
 
+//TODO i'm pretty sure this is note true and `ghostty-webgpu` has all the fallbacks in the world
+
 > **Executor instructions**: Read this plan completely, then read Platform `AGENTS.md`, root
 > `PLAN.md`, and the `ghostty-webgpu` repo's own conventions. This plan spans two repositories and
 > the package change is not shippable on its own. Do not commit, push, create a branch, publish, or

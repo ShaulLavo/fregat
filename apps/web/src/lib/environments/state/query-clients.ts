@@ -59,7 +59,7 @@ export function registerEnvironmentQueryClient(
   // that resolve through this registry rather than through `getClient()`.
   if (owner.client !== client) owners.set(queryClient, { client, origin })
 }
-
+//TODO clientForQueryClient and originForQueryClient are confusing just call and destructure ownerForQueryClient everywhere
 export function clientForQueryClient(queryClient: QueryClient): Client {
   return ownerForQueryClient(queryClient).client
 }
