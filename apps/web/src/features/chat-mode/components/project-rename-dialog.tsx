@@ -7,14 +7,22 @@ import {
   DialogTitle,
 } from '@workspace/ui/components/dialog'
 import { Input } from '@workspace/ui/components/input'
+import { useMutation } from '@tanstack/react-query'
 import { useState } from 'react'
 
 import { createProjectMetaCommand } from '@workspace/client-core/chat/commands'
 import { dispatchChatCommand } from '@/features/chat/utils/command-dispatch'
 import { notifyChatCommandError } from '@/features/chat/notify-command-error'
 import { dispatchCommandForEnvironment } from '@/features/chat/state/active-transports'
-import { scopedProjectKey } from '@workspace/contracts'
+import { scopedProjectKey, type EnvironmentId, type ProjectId } from '@workspace/contracts'
 import { useProjectRenameRequestStore } from '@/features/chat-mode/state/project-rename-request-store'
+import { chatModeMutationKeys } from '@/features/chat-mode/utils/mutation-keys'
+
+type RenameVariables = {
+  readonly environmentId: EnvironmentId
+  readonly projectId: ProjectId
+  readonly title: string
+}
 
 /**
  * Renaming a project was impossible: the server accepted `title` and nothing
@@ -28,7 +36,23 @@ export function ProjectRenameDialog() {
   // that project's name rather than the previous one's edited text.
   const [title, setTitle] = useState('')
   const [editingId, setEditingId] = useState<string | null>(null)
-  const [saving, setSaving] = useState(false)
+  // Closing on dispatch rather than on the result told the user the rename
+  // landed; the old name then came back on the next projection sync with no
+  // explanation.
+  const rename = useMutation({
+    mutationFn: async ({ projectId, environmentId, title }: RenameVariables) => {
+      const outcome = await dispatchChatCommand({
+        action: 'chat.project.rename',
+        command: createProjectMetaCommand({ projectId, title }),
+        dispatchCommand: (command) => dispatchCommandForEnvironment(environmentId, command),
+      })
+      if (!outcome.ok) throw outcome.error
+      return outcome.result
+    },
+    mutationKey: chatModeMutationKeys.projectRename(),
+    onError: (error) => notifyChatCommandError(error, 'Could not rename the project'),
+    onSuccess: () => dismissRename(),
+  })
   if (request && editingId !== scopedProjectKey(request.ref)) {
     setEditingId(scopedProjectKey(request.ref))
     setTitle(request.title)
@@ -37,29 +61,13 @@ export function ProjectRenameDialog() {
   const trimmed = title.trim()
   const canSave = trimmed.length > 0 && trimmed !== request?.title
 
-  async function save() {
-    if (!request || !canSave || saving) return
-
-    setSaving(true)
-    try {
-      const outcome = await dispatchChatCommand({
-        action: 'chat.project.rename',
-        command: createProjectMetaCommand({ projectId: request.ref.projectId, title: trimmed }),
-        dispatchCommand: (command) =>
-          dispatchCommandForEnvironment(request.ref.environmentId, command),
-      })
-      if (!outcome.ok) {
-        // Closing on dispatch rather than on the result told the user the rename
-        // landed; the old name then came back on the next projection sync with no
-        // explanation.
-        notifyChatCommandError(outcome.error, 'Could not rename the project')
-        return
-      }
-
-      dismissRename()
-    } finally {
-      setSaving(false)
-    }
+  function save() {
+    if (!request || !canSave || rename.isPending) return
+    rename.mutate({
+      environmentId: request.ref.environmentId,
+      projectId: request.ref.projectId,
+      title: trimmed,
+    })
   }
 
   return (
@@ -82,7 +90,7 @@ export function ProjectRenameDialog() {
             if (event.key !== 'Enter') return
 
             event.preventDefault()
-            void save()
+            save()
           }}
           spellCheck={false}
           value={title}
@@ -91,7 +99,7 @@ export function ProjectRenameDialog() {
           <Button onClick={() => dismissRename()} type='button' variant='outline'>
             Cancel
           </Button>
-          <Button disabled={!canSave || saving} onClick={() => void save()} type='button'>
+          <Button disabled={!canSave || rename.isPending} onClick={save} type='button'>
             Rename
           </Button>
         </DialogFooter>

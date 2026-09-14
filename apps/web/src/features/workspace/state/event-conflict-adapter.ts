@@ -23,7 +23,8 @@ import type {
   LiveEditorDocument,
   UnsyncedLiveEditorDocumentInput,
 } from '@/features/editor/state/document-state'
-import { reportError, toClientError } from '@/lib/client-error-taxonomy'
+import { conflictResolutionMutationOptions } from '@/features/workspace/utils/conflict-resolution-mutation'
+import { runMutation } from '@/lib/mutations/run'
 import { setFileSnapshotQueryData } from '@/lib/file-snapshot-query-cache'
 import { createFileContent, ensureFolderPath, writeFileContent } from '@/lib/file-server'
 import type { FileResult } from '@/lib/file-system-types'
@@ -142,6 +143,7 @@ function notifyFilesystemConflict(conflict: FilesystemConflict, context: Workspa
         onOpenDiff: () => openConflictDiff(next.id, context),
         onOverrideLocal: () => void resolveConflict(next.id, 'local', context),
         onOverrideRemote: () => void resolveConflict(next.id, 'remote', context),
+        queryClient: context.queryClient,
       }),
     { dismissible: false, duration: Infinity },
   )
@@ -172,7 +174,11 @@ function openConflictDiff(id: string, context: WorkspaceConflictContext) {
   const conflict = context.conflictStore.getState().conflicts[id]
   if (!conflict) return
 
-  const target = { kind: 'conflict', conflictId: conflictId(id) } as const
+  const target = {
+    kind: 'conflict',
+    conflictId: conflictId(id),
+    path: conflict.remotePath,
+  } as const
   const key = documentKey(target)
   ensureConflictEditorDocument(target, conflict, context)
   context.conflictStore.getState().updateConflict(id, { diffDocumentKey: key })
@@ -189,21 +195,29 @@ function ensureConflictEditorDocument(
   context.ensureUnsyncedEditorDocument({ content, target })
 }
 
-async function resolveConflict(
+function resolveConflict(
   id: string,
   resolution: 'local' | 'remote',
+  context: WorkspaceConflictContext,
+): Promise<void> {
+  return runMutation(
+    context.queryClient,
+    conflictResolutionMutationOptions(id, (source) => applyResolvedConflict(id, source, context)),
+    resolution,
+  ).catch(() => undefined)
+}
+
+async function applyResolvedConflict(
+  id: string,
+  resolution: 'editor' | 'local' | 'remote',
   context: WorkspaceConflictContext,
 ) {
   const conflict = context.conflictStore.getState().conflicts[id]
   if (!conflict) return
 
-  try {
-    if (resolution === 'local') await applyLocalConflict(conflict, context)
-    if (resolution === 'remote') await applyRemoteConflict(conflict, context)
-    finishConflict(conflict, context)
-  } catch (error) {
-    reportError(toClientError(error))
-  }
+  if (resolution === 'local') await applyLocalConflict(conflict, context)
+  if (resolution === 'remote') await applyRemoteConflict(conflict, context)
+  finishConflict(conflict, context)
 }
 
 async function applyLocalConflict(conflict: FilesystemConflict, context: WorkspaceConflictContext) {
@@ -267,7 +281,11 @@ function discardResolvedEditorFile(path: FilesystemPath, context: WorkspaceConfl
 
 function finishConflict(conflict: FilesystemConflict, context: WorkspaceConflictContext) {
   if (conflict.diffDocumentKey) {
-    context.discardLiveEditorDocument({ kind: 'conflict', conflictId: conflictId(conflict.id) })
+    context.discardLiveEditorDocument({
+      kind: 'conflict',
+      conflictId: conflictId(conflict.id),
+      path: conflict.remotePath,
+    })
   }
   if (conflict.toastId) toast.dismiss(conflict.toastId)
 

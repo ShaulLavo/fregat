@@ -8,6 +8,7 @@ import { useState } from 'react'
 import { MachineForm } from '@/components/machine-form'
 import { useSettingsActions } from '@/features/settings/hooks/use-settings-actions'
 import { useEnvironmentConnections } from '@/hooks/use-environment-connections'
+import { useWorkingMachines } from '@/lib/environments/hooks/use-working-machines'
 
 export function MachineRow({
   name,
@@ -24,11 +25,10 @@ export function MachineRow({
   const pending = phase === 'launching' || phase === 'connecting' || phase === 'reconnecting'
   const connected = phase === 'live' || pending
   const [editing, setEditing] = useState(false)
-  const [working, setWorking] = useState(false)
+  const working = useWorkingMachines().has(name)
   const [actionError, setActionError] = useState<string | null>(null)
   const { removeMachine } = useSettingsActions()
   const run = async (action: () => Promise<unknown>) => {
-    setWorking(true)
     setActionError(null)
     try {
       await action()
@@ -36,8 +36,6 @@ export function MachineRow({
       setActionError(
         errorStringField(error, 'message') ?? 'The machine action failed. Retry the connection.',
       )
-    } finally {
-      setWorking(false)
     }
   }
   const remove = async () => {

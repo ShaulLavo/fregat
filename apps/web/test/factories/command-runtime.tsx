@@ -296,8 +296,10 @@ function createRuntime(
         ? owner.saveService
         : new EditorSaveService(
             store,
+            queryClient,
             new FileSyncService(store, queryClient),
             new SettingsSyncService(store, queryClient),
+            null,
           ),
     ...overrides?.documents,
   }

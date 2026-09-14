@@ -52,9 +52,7 @@ import {
 } from '@/lib/documents/utils/capabilities'
 import { documentTab, sameTabContent } from '@/lib/documents/utils/tabs'
 import type { DocumentRef } from '@/lib/documents/utils/types'
-import { dirtySavableEditorDocuments, filePathsForDocumentKeys } from '@/features/editor/utils/save'
 import type { EditorDocumentStoreApi } from '@/features/editor/state/document-state'
-import type { WorkspaceMutationReporter } from '@/features/editor/state/workspace-edit-service'
 import { nextEditorDiffViewMode } from '@/features/editor/utils/diff-view-mode'
 import {
   activeEditorTabForWorkbenchPanels,
@@ -591,35 +589,13 @@ export const workspaceCommands = [
     run: ({ runtime, snapshot }) => {
       const document = snapshot.activeDocument
       if (!document || saveCapability(document).kind === 'none') return declined
-      const key = documentKey(document)
-      const state = runtime.documents.store.getState()
-      const save = () => runtime.documents.save.save(key)
-      const dirty = dirtySavableEditorDocuments(state).some((live) => live.key === key)
-      return operationStart(
-        dirty
-          ? runtime.workspaceEdits.runWorkspaceMutation(
-              filePathsForDocumentKeys(state, [key]),
-              save,
-            )
-          : save(),
-      )
+      return operationStart(runtime.documents.save.save(documentKey(document)))
     },
   }),
   defineCommand({
     ...workspaceCommandMetadata['workspace.saveAllFiles'],
     icon: FloppyDiskBackIcon,
-    run: ({ runtime }) => {
-      const state = runtime.documents.store.getState()
-      const keys = dirtySavableEditorDocuments(state).map((document) => document.key)
-      const affectedPaths = filePathsForDocumentKeys(state, keys)
-      const save = (reportAffectedPaths?: WorkspaceMutationReporter) =>
-        runtime.documents.save.saveAll((key) =>
-          reportAffectedPaths?.(filePathsForDocumentKeys(state, [key])),
-        )
-      const operation =
-        keys.length > 0 ? runtime.workspaceEdits.runWorkspaceMutation(affectedPaths, save) : save()
-      return resolvedOperationStart(operation)
-    },
+    run: ({ runtime }) => resolvedOperationStart(runtime.documents.save.saveAll()),
   }),
   defineCommand({
     ...workspaceCommandMetadata['workspace.compareWithSaved'],

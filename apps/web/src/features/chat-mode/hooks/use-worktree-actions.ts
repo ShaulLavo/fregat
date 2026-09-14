@@ -1,8 +1,7 @@
 import { type ClientOrchestrationCommand, type ScopedWorktreeRef } from '@workspace/contracts'
+import { useMutation } from '@tanstack/react-query'
 import { useState } from 'react'
 import { dispatchCommandForEnvironment } from '@/features/chat/state/active-transports'
-import { useChatProjectionStore } from '@/features/chat/state/chat-projection-store'
-import { fetchOrchestrationShellSnapshotHttp } from '@/features/chat/transport/orchestration-http-snapshots'
 import { dispatchChatCommand } from '@/features/chat/utils/command-dispatch'
 import {
   worktreeActionCommand,
@@ -10,64 +9,58 @@ import {
   type WorktreeAction,
   type WorktreeConfirmation,
 } from '@workspace/client-core/chat/worktrees/commands'
-import { environmentClientFor } from '@/lib/client'
-import { confirmedEnvironmentOrigin } from '@/lib/environments/state/domain'
+import { settleShellSnapshot } from '@/features/chat-mode/state/settle-shell-snapshot'
 import { worktreeConfirmationPreview } from '@/features/chat-mode/transport/worktree-preview'
+import { chatModeMutationKeys, chatWorktreeScope } from '@/features/chat-mode/utils/mutation-keys'
 import { errorMessage } from '@/lib/error-message'
 
 export function useWorktreeActions(ref: ScopedWorktreeRef) {
-  const [pending, setPending] = useState(false)
-  const [error, setError] = useState<string | null>(null)
   const [confirmation, setConfirmation] = useState<WorktreeConfirmation | null>(null)
+  const command = useMutation({
+    mutationFn: async (command: ClientOrchestrationCommand) => {
+      const result = await dispatchChatCommand({
+        action: command.type,
+        command,
+        dispatchCommand: (command) => dispatchCommandForEnvironment(ref.environmentId, command),
+      })
+      await settleShellSnapshot(ref.environmentId)
+      if (!result.ok) throw result.error
+      return result.result
+    },
+    mutationKey: chatModeMutationKeys.worktree(ref.worktreeId),
+    scope: { id: chatWorktreeScope(ref.worktreeId) },
+  })
+  const preview = useMutation({
+    mutationFn: (kind: 'force' | 'missing') => worktreeConfirmationPreview(ref, kind),
+    mutationKey: chatModeMutationKeys.worktreePreview(ref.worktreeId),
+    onSuccess: setConfirmation,
+  })
 
-  async function refresh() {
-    const client = environmentClientFor(confirmedEnvironmentOrigin(ref.environmentId))
-    const snapshot = await fetchOrchestrationShellSnapshotHttp(client)
-    useChatProjectionStore.getState().syncShellSnapshot(ref.environmentId, snapshot)
-  }
-
-  async function dispatch(command: ClientOrchestrationCommand) {
-    setPending(true)
-    setError(null)
-    const result = await dispatchChatCommand({
-      action: command.type,
-      command,
-      dispatchCommand: (command) => dispatchCommandForEnvironment(ref.environmentId, command),
-    })
-    if (!result.ok) setError(result.message)
-    try {
-      await refresh()
-    } catch (error) {
-      setError(errorMessage(error, 'Could not refresh worktrees.'))
-    }
-    setPending(false)
-    return result.ok
-  }
-
-  async function preview(kind: 'force' | 'missing') {
-    setPending(true)
-    setError(null)
-    try {
-      setConfirmation(await worktreeConfirmationPreview(ref, kind))
-    } catch (error) {
-      setError(errorMessage(error, 'Could not prepare confirmation.'))
-    } finally {
-      setPending(false)
-    }
+  function run(action: ClientOrchestrationCommand) {
+    return command.mutateAsync(action).then(
+      () => true,
+      () => false,
+    )
   }
 
   return {
-    pending,
-    error,
+    pending: command.isPending || preview.isPending,
+    error: rowError(command.error, preview.error),
     confirmation,
     dismissConfirmation: () => setConfirmation(null),
     requestRelease: () => setConfirmation({ kind: 'release' }),
-    preview,
-    run: (action: WorktreeAction) => dispatch(worktreeActionCommand(action, ref.worktreeId)),
+    preview: (kind: 'force' | 'missing') => preview.mutateAsync(kind).catch(() => undefined),
+    run: (action: WorktreeAction) => run(worktreeActionCommand(action, ref.worktreeId)),
     async confirm() {
       if (!confirmation) return
-      const accepted = await dispatch(confirmedWorktreeCommand(ref.worktreeId, confirmation))
+      const accepted = await run(confirmedWorktreeCommand(ref.worktreeId, confirmation))
       if (accepted) setConfirmation(null)
     },
   }
+}
+
+function rowError(commandError: unknown, previewError: unknown) {
+  if (commandError) return errorMessage(commandError, 'The worktree action failed.')
+  if (previewError) return errorMessage(previewError, 'Could not prepare confirmation.')
+  return null
 }

@@ -3,11 +3,11 @@ import type { QueryClient } from '@tanstack/react-query'
 import type { WorkspaceRootEntry } from '@workspace/contracts'
 import type { Navigation } from '@/state/navigation'
 import type { EditorWorkspaceStoreApi } from '@/features/editor/state/workspace-state'
-import type { Client } from '@/lib/client'
-import { clientForQueryClient, originForQueryClient } from '@/lib/environments/state/query-clients'
+import { originForQueryClient } from '@/lib/environments/state/query-clients'
 import { environmentActivitySignal } from '@/lib/environments/state/activity'
 import { confirmedEnvironmentId } from '@/lib/environments/state/domain'
-import { openWorkspaceRootPath } from '@/lib/file-server'
+import { runMutation } from '@/lib/mutations/run'
+import { openWorkspaceRootMutationOptions } from '@/features/workspace/utils/open-root-mutation'
 import { claimWorkspaceOpenGeneration } from '@/features/workspace/state/open-generation'
 import { toClientError, type ErrorCategory } from '@/lib/client-error-taxonomy'
 import { log } from '@/lib/client-logging'
@@ -69,7 +69,7 @@ export function watchRootValidation({
       signal,
       invalidateWhenStillCurrent,
       confirmWhenStillCurrent,
-      clientForQueryClient(queryClient),
+      queryClient,
     )
   }
   const unsubscribe = navigation.subscribe(validateWhenOwned)
@@ -85,14 +85,13 @@ async function validateRootPath(
   signal: AbortSignal,
   invalidate: (reason: string) => void,
   confirm: (entry: WorkspaceRootEntry) => void,
-  client: Client,
+  queryClient: QueryClient,
 ) {
   try {
-    const result = await openWorkspaceRootPath(
-      filesystemPath(path),
-      claimWorkspaceOpenGeneration(),
-      signal,
-      client,
+    const result = await runMutation(
+      queryClient,
+      openWorkspaceRootMutationOptions(filesystemPath(path)),
+      { generation: claimWorkspaceOpenGeneration(), signal },
     )
     if (result.status === 'opened' && result.entry) confirm(result.entry)
   } catch (error) {

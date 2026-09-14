@@ -2,6 +2,9 @@ import type { ClientOrchestrationCommand, OrchestrationDispatchResult } from '@w
 import { runIntent } from '@workspace/client-core/optimistic/run'
 
 import { log } from '@/lib/client-logging'
+import { confirmedEnvironmentOrigin } from '@/lib/environments/state/domain'
+import { queryClientFor } from '@/lib/environments/state/query-clients'
+import { runMutation } from '@/lib/mutations/run'
 import {
   dispatchChatCommand,
   type ChatCommandDispatchOutcome,
@@ -54,7 +57,7 @@ export function placeChatMessage({
   })
 
   return new Promise((resolve) => {
-    void runIntent(chatMessageIntents, placement, {
+    const intent = runIntent(chatMessageIntents, placement, {
       resources: [chatMessageResource(placement)],
       perform: async () => {
         const outcome = await dispatchChatCommand({
@@ -86,5 +89,10 @@ export function placeChatMessage({
           ...event,
         }),
     })
+    void runMutation(
+      queryClientFor(confirmedEnvironmentOrigin(environmentId)),
+      { mutationFn: () => intent, mutationKey: ['chat', 'message', message.id] },
+      undefined,
+    )
   })
 }

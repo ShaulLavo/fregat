@@ -14,7 +14,9 @@ import { log } from '@/lib/client-logging'
 import { watchIntentHolds } from '@/lib/optimistic/hold-diagnostics'
 import { fileSystemKeys } from '@/lib/query-keys'
 import type { TreeModel } from '@/lib/tree-model'
+import { runMutation } from '@/lib/mutations/run'
 import { invalidateTreeQueries } from '@/features/workspace/utils/invalidate-queries'
+import { workspaceMutationKeys } from '@/features/workspace/utils/mutation-keys'
 import {
   applyTreePatch,
   treePatchConfirmed,
@@ -83,18 +85,26 @@ export async function runTreeIntent<TResult>({
   /** Extra fields for the wide event, resolved after the transport so late values land. */
   readonly context?: () => Record<string, unknown>
 }): Promise<IntentOutcome<TResult>> {
-  const outcome = await runIntent(treeIntents, patch, {
-    resources: treePatchResources(patch),
-    perform: async () => {
-      try {
-        return await perform()
-      } finally {
-        invalidateTreeQueries(queryClient)
-      }
+  const outcome = await runMutation(
+    queryClient,
+    {
+      mutationFn: () =>
+        runIntent(treeIntents, patch, {
+          resources: treePatchResources(patch),
+          perform: async () => {
+            try {
+              return await perform()
+            } finally {
+              invalidateTreeQueries(queryClient)
+            }
+          },
+          until: confirmedTreeAcknowledgement(queryClient, patch),
+          record: (event) => recordTreeIntent(patch, event, context?.()),
+        }),
+      mutationKey: workspaceMutationKeys.tree(patch.kind, patch.rootPath),
     },
-    until: confirmedTreeAcknowledgement(queryClient, patch),
-    record: (event) => recordTreeIntent(patch, event, context?.()),
-  })
+    undefined,
+  )
   settleTreeOutcome(outcome)
   return outcome
 }

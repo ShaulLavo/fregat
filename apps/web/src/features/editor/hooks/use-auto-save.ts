@@ -3,9 +3,7 @@ import { useEditorRuntime } from '@/features/editor/hooks/use-runtime'
 import { useEffect } from 'react'
 
 import type { DocumentKey } from '@/lib/documents/utils/types'
-import { filePathsForDocumentKeys, isDirtyLiveEditorDocument } from '@/features/editor/utils/save'
-import { useOptionalWorkspaceEditService } from '@/features/editor/providers/workspace-edit-context'
-import type { WorkspaceMutationReporter } from '@/features/editor/state/workspace-edit-service'
+import { isDirtyLiveEditorDocument } from '@/features/editor/utils/save'
 import { useEditorDocumentStoreApi } from '@/features/editor/state/document-state'
 import { useSettingValue } from '@/features/settings/hooks/use-setting-value'
 
@@ -26,7 +24,6 @@ export function useAutoSave() {
   const delay = useSettingValue('files.autoSaveDelay')
   const documentStore = useEditorDocumentStoreApi()
   const { saveService } = useEditorRuntime()
-  const workspaceEdits = useOptionalWorkspaceEditService()
 
   useEffect(() => {
     if (mode === 'off') return
@@ -43,17 +40,7 @@ export function useAutoSave() {
       }
 
       if (keys.length === 0) return
-      const save = (reportAffectedPaths?: WorkspaceMutationReporter) =>
-        saveService.saveMany(keys, (key) =>
-          reportAffectedPaths?.(filePathsForDocumentKeys(state, [key])),
-        )
-      if (!workspaceEdits) {
-        void save().catch(() => undefined)
-        return
-      }
-      void workspaceEdits
-        .runWorkspaceMutation(filePathsForDocumentKeys(state, keys), save)
-        .catch(() => undefined)
+      void saveService.saveMany(keys).catch(() => undefined)
     }
 
     if (mode !== 'afterDelay') {
@@ -79,5 +66,5 @@ export function useAutoSave() {
       // user already made.
       pending.flush()
     }
-  }, [delay, documentStore, mode, saveService, workspaceEdits])
+  }, [delay, documentStore, mode, saveService])
 }

@@ -15,8 +15,10 @@ import {
   DialogTitle,
 } from '@workspace/ui/components/dialog'
 
+import { useIsMutating } from '@tanstack/react-query'
 import { useProjectActions } from '@/features/chat-mode/hooks/use-project-actions'
 import { useProjectDeleteRequestStore } from '@/features/chat-mode/state/project-delete-request-store'
+import { chatModeMutationKeys } from '@/features/chat-mode/utils/mutation-keys'
 import { projectDeletePrompt } from '@/features/chat-mode/utils/project-delete-prompt'
 
 /**
@@ -25,7 +27,7 @@ import { projectDeletePrompt } from '@/features/chat-mode/utils/project-delete-p
  */
 export function ProjectDeleteDialog() {
   const request = useProjectDeleteRequestStore((state) => state.request)
-  const pending = useProjectDeleteRequestStore((state) => state.pending)
+  const pending = useIsMutating({ mutationKey: chatModeMutationKeys.projectDelete() }) > 0
   const error = useProjectDeleteRequestStore((state) => state.error)
   const actions = useProjectActions()
   const managedCount = useChatProjectionStore((state) => {

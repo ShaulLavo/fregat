@@ -67,7 +67,8 @@ export function useSettingsActions() {
   const projection = useSettingsProjection()
   const transport = useMutation(
     {
-      mutationFn: (entry: ActiveSettingsIntent) => transportSettingsIntent(entry, client),
+      mutationFn: (entry: ActiveSettingsIntent) =>
+        transportAndAdmitSettingsIntent(queryClient, entry, client),
       mutationKey: SETTINGS_MUTATION_KEY,
       onError: (error, entry) => {
         logSettingsMutationFailure(entry, error)
@@ -87,26 +88,7 @@ export function useSettingsActions() {
       onSettled: (_result, _error, entry) => {
         settleSettingsIntentTransport(entry.intentId)
       },
-      onSuccess: async ({ result: initialResult, startedAt }, entry) => {
-        let admitted
-        try {
-          admitted = await admitSuccessfulMutation(queryClient, entry, initialResult)
-        } catch (error) {
-          annotateSettingsTransportError(entry, startedAt, error)
-          logSettingsMutationFailure(entry, error)
-          const failed = failSettingsIntent(entry.intentId, error)
-          if (!failed || failed.superseded) return
-
-          notifySaveError({
-            discard: () => discardFailedMutation(failed.intentId),
-            error,
-            mutationId: failed.intentId,
-            retry: () => retryFailedIntent(failed.intentId, transport.mutate),
-          })
-          return
-        }
-
-        const { admission, result } = admitted
+      onSuccess: ({ admission, result, startedAt }, entry) => {
         log.info({
           action: 'settings.write',
           appliedEpoch: result.appliedVersion.epoch,
@@ -225,47 +207,26 @@ function discardFailedMutation(mutationId: string) {
   dismissSaveError(mutationId)
 }
 
-async function transportSettingsIntent(entry: ActiveSettingsIntent, client: Client) {
+async function transportAndAdmitSettingsIntent(
+  queryClient: QueryClient,
+  entry: ActiveSettingsIntent,
+  client: Client,
+) {
   const startedAt = markSettingsIntentTransportStarted(entry.intentId, settingsNow())
   try {
-    const result = await saveSettings(entry.patch.request, client)
-    return { result, startedAt }
+    let result = await saveSettings(entry.patch.request, client)
+    for (let attempt = 0; attempt < 3; attempt += 1) {
+      const admission = await awaitSettingsAdmission(queryClient, result)
+      if (!settingsResultRequiresActiveEpochRetry(result, admission)) {
+        return { admission, result, startedAt }
+      }
+      result = await saveSettings(entry.patch.request, client)
+    }
+    throw createClientInvariantError('Settings mutation could not establish an active epoch')
   } catch (error) {
     annotateSettingsTransportError(entry, startedAt, error)
     throw error
   }
-}
-
-async function admitSuccessfulMutation(
-  queryClient: QueryClient,
-  entry: ActiveSettingsIntent,
-  initialResult: Awaited<ReturnType<typeof saveSettings>>,
-) {
-  let result = initialResult
-  for (let attempt = 0; attempt < 3; attempt += 1) {
-    const admission = await awaitSettingsAdmission(queryClient, result)
-    if (!settingsResultRequiresActiveEpochRetry(result, admission)) return { admission, result }
-
-    result = await retrySettingsTransport(entry, clientForQueryClient(queryClient))
-  }
-
-  throw createClientInvariantError('Settings mutation could not establish an active epoch')
-}
-
-async function retrySettingsTransport(entry: ActiveSettingsIntent, client: Client) {
-  for (let attempt = 0; attempt < 3; attempt += 1) {
-    try {
-      return await saveSettings(entry.patch.request, client)
-    } catch (error) {
-      if (!shouldRetrySettingsTransport(attempt, error) || attempt === 2) throw error
-
-      await new Promise<void>((resolve) =>
-        globalThis.setTimeout(resolve, settingsRetryDelay(attempt)),
-      )
-    }
-  }
-
-  throw createClientInvariantError('Settings mutation retry ended without a result')
 }
 
 async function awaitSettingsAdmission(

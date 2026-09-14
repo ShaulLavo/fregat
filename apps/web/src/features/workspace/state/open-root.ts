@@ -6,13 +6,14 @@ import type { EditorApplyActions } from '@/features/editor/state/apply-actions'
 import type { EditorWorkspaceStoreApi } from '@/features/editor/state/workspace-state'
 import type { WorkspaceEditService } from '@/features/editor/state/workspace-edit-service'
 import { environmentActivitySignal } from '@/lib/environments/state/activity'
-import { clientForQueryClient, originForQueryClient } from '@/lib/environments/state/query-clients'
+import { originForQueryClient } from '@/lib/environments/state/query-clients'
 import { workspacePathLeaf } from '@workspace/client-core/files/path'
 import { reportError, toClientError } from '@/lib/client-error-taxonomy'
 import { log } from '@/lib/client-logging'
-import { openWorkspaceRootPath, recordRecentEntry } from '@/lib/file-server'
-import { filePickerKeys, fileSystemKeys } from '@/lib/query-keys'
-import { recentFolderKeys } from '@/lib/recent-folders-query'
+import { fileSystemKeys } from '@/lib/query-keys'
+import { runMutation } from '@/lib/mutations/run'
+import { recordRecentMutationOptions } from '@/lib/record-recent-mutation'
+import { openWorkspaceRootMutationOptions } from '@/features/workspace/utils/open-root-mutation'
 import {
   activateWorkspaceRoot,
   isActiveWorkspaceRoot,
@@ -39,7 +40,6 @@ export async function openWorkspaceRootForOwner(
     ...(options.signal ? [options.signal] : []),
   ])
   if (activity.aborted || options.isCurrent?.() === false) return 'superseded'
-  const client = clientForQueryClient(queryClient)
   const reservation = workspaceEdits?.acquireRootSwitchReservation() ?? null
   if (workspaceEdits && !reservation) return 'failed'
   const generation = claimWorkspaceOpenGeneration()
@@ -47,11 +47,10 @@ export async function openWorkspaceRootForOwner(
 
   try {
     confirmedEnvironmentId(origin)
-    const result = await openWorkspaceRootPath(
-      filesystemPath(workspaceRoot),
-      generation,
-      activity,
-      client,
+    const result = await runMutation(
+      queryClient,
+      openWorkspaceRootMutationOptions(filesystemPath(workspaceRoot)),
+      { generation, signal: activity },
     )
     // A later request already claimed the app; landing now would drag it back.
     if (
@@ -102,13 +101,12 @@ export async function openWorkspaceRootForOwner(
 /** Trails the open: a lost recency stamp is a worse menu, never a failed switch. */
 async function recordRootAsRecent(queryClient: QueryClient, workspaceRoot: FilesystemPath) {
   try {
-    await recordRecentEntry(workspaceRoot, clientForQueryClient(queryClient))
+    await runMutation(
+      queryClient,
+      recordRecentMutationOptions(queryClient, workspaceRoot),
+      undefined,
+    )
   } catch {
     // Swallowed, not silent: the fs.record_recent wide event carries the failure.
-    return
   }
-
-  // Both the titlebar menu and the picker sidebar read this list.
-  await queryClient.invalidateQueries({ queryKey: recentFolderKeys.all })
-  await queryClient.invalidateQueries({ queryKey: filePickerKeys.recents() })
 }

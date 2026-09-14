@@ -7,7 +7,11 @@ import {
 import { activeServerOrigin, getClient, setActiveServerOrigin, setClient } from '@/lib/client'
 import { useEnvironmentsStore } from '@/lib/environments/state/store'
 import { dispatchCommandForEnvironment } from '@/features/chat/state/active-transports'
-import { registerTerminalCheckout } from '@/features/terminal/state/register-checkout'
+import {
+  fetchTerminalCheckout,
+  terminalCheckoutQueryOptions,
+} from '@/features/terminal/state/register-checkout'
+import { queryClientFor } from '@/lib/environments/state/query-clients'
 import { environmentIdSchema, commandIdSchema, scopedSessionKey } from '@workspace/contracts'
 import * as v from 'valibot'
 import { expect, test } from '../../../../../test/fixtures'
@@ -127,17 +131,14 @@ test('inactive environment commands refresh their slice and terminal registratio
     expect(slice.sessionById[TEST_SESSION_ID]?.title).toBe('After')
     expect(slice.worktreeById[worktreeId]?.path).toBe('')
     expect(activeServerOrigin()).toBe('http://other-active.test')
-    const signal = new AbortController().signal
-    expect(await registerTerminalCheckout({ client, origin, rootPath: '', signal })).toBe(
-      worktreeId,
-    )
+    expect(await fetchTerminalCheckout(queryClientFor(origin), '')).toBe(worktreeId)
     expect(() =>
       useEnvironmentsStore
         .getState()
         .recordDescriptor(origin, { ...descriptor, environmentId: OTHER_ENVIRONMENT_ID }),
     ).toThrow()
     await expect(
-      registerTerminalCheckout({ client, origin, rootPath: '', signal }),
+      queryClientFor(origin).fetchQuery({ ...terminalCheckoutQueryOptions(''), staleTime: 0 }),
     ).rejects.toMatchObject({ code: 'ENVIRONMENT_IDENTITY_DRIFT' })
   } finally {
     useEnvironmentsStore.setState(previousEnvironments, true)

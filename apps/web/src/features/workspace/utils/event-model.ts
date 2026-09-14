@@ -1,10 +1,10 @@
 import type { TreeEntry } from '@workspace/contracts'
 
 export type WorkspaceFilesystemEvent =
-  | { type: 'created'; path: string; entry?: TreeEntry }
-  | { type: 'changed'; path: string; entry?: TreeEntry }
+  | { type: 'created'; path: string; entry?: TreeEntry; version?: string }
+  | { type: 'changed'; path: string; entry?: TreeEntry; version?: string }
   | { type: 'deleted'; path: string }
-  | { type: 'renamed'; path: string; oldPath: string; entry?: TreeEntry }
+  | { type: 'renamed'; path: string; oldPath: string; entry?: TreeEntry; version?: string }
 
 export type WorkspaceOpenFileSnapshot = {
   // Open tabs without live documents should not trigger content reads.
@@ -21,9 +21,16 @@ export type WorkspaceTreeOperation =
 export type WorkspaceOpenFileOperation =
   | { type: 'deleted-conflict'; path: string }
   | { type: 'discard-open-file'; path: string }
-  | { type: 'refresh-open-file'; path: string }
+  | WorkspaceOpenFileRefresh
   | { type: 'rename-open-file'; from: string; to: string }
   | { type: 'renamed-conflict'; localPath: string; remotePath: string }
+
+export type WorkspaceOpenFileRefresh = {
+  type: 'refresh-open-file'
+  path: string
+  reason: 'changed' | 'ready'
+  version?: string
+}
 
 export type WorkspaceFetchedOpenFileOperation =
   | { type: 'changed-conflict'; path: string }
@@ -62,7 +69,7 @@ export function planWorkspaceReady({
 }): WorkspaceEventPlan {
   return {
     openFileOperations: openFiles.flatMap((file) =>
-      shouldRefreshReadyOpenFile(file) ? [{ type: 'refresh-open-file', path: file.path }] : [],
+      shouldRefreshReadyOpenFile(file) ? [readyOpenFileRefresh(file.path)] : [],
     ),
     shouldInvalidateGitState: true,
     treeOperations: [{ type: 'refresh-ready-root-tree', path: rootPath }],
@@ -142,11 +149,47 @@ function planOpenFileOperations(
     recreatedPaths,
     rootPath,
   )
+  const versions = reportedVersionsByPath(events)
   for (const path of refreshPaths) {
-    operations.push({ type: 'refresh-open-file', path })
+    operations.push(changedOpenFileRefresh(path, versions.get(path)))
   }
 
   return operations
+}
+
+function readyOpenFileRefresh(path: string): WorkspaceOpenFileRefresh {
+  return { path, reason: 'ready', type: 'refresh-open-file' }
+}
+
+function changedOpenFileRefresh(
+  path: string,
+  version: string | undefined,
+): WorkspaceOpenFileRefresh {
+  if (version === undefined) return { path, reason: 'changed', type: 'refresh-open-file' }
+  return { path, reason: 'changed', type: 'refresh-open-file', version }
+}
+
+function reportedVersionsByPath(events: readonly WorkspaceFilesystemEvent[]) {
+  const versions = new Map<string, string>()
+  for (const event of events) {
+    if (event.type === 'deleted' || event.version === undefined) {
+      versions.delete(event.path)
+      continue
+    }
+    versions.set(event.path, event.version)
+  }
+  return versions
+}
+
+// A fresh snapshot can still predate the change; trusting it compares the
+// buffer against the previous save and reports a phantom conflict.
+export function mayTrustCachedSnapshot(
+  refresh: WorkspaceOpenFileRefresh,
+  cachedVersion: string | undefined,
+): boolean {
+  if (refresh.reason === 'ready') return true
+  if (refresh.version === undefined) return false
+  return cachedVersion === refresh.version
 }
 
 function planDeletedOpenFileOperations(

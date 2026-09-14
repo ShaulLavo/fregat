@@ -21,16 +21,11 @@ import { EditorDocumentStateContext } from '@/features/editor/state/document-sta
 import { EditorRuntimeContext } from '@/features/editor/providers/runtime-context'
 import { createTestEditorRuntime } from '../../../../test/factories/editor-runtime'
 import { useAutoSave } from '@/features/editor/hooks/use-auto-save'
-import { WorkspaceEditServiceContext } from '@/features/editor/providers/workspace-edit-context'
-import type { WorkspaceEditService } from '@/features/editor/state/workspace-edit-service'
 import { settingsKeys } from '@workspace/client-core/settings/query-keys'
 import type { FileResult } from '@/lib/file-system-types'
 import { fetchFile } from '@/lib/file-server'
 
-function harness(
-  overrides: Partial<SettingsValues>,
-  workspaceEdits: WorkspaceEditService | null = null,
-) {
+function harness(overrides: Partial<SettingsValues>) {
   const queryClient = new QueryClient({ defaultOptions: { queries: { retry: false } } })
   queryClient.setQueryData(settingsKeys.document(), {
     diagnostics: [],
@@ -46,13 +41,9 @@ function harness(
       QueryClientProvider,
       { client: queryClient },
       createElement(
-        WorkspaceEditServiceContext,
-        { value: workspaceEdits },
-        createElement(
-          EditorRuntimeContext,
-          { value: runtime },
-          createElement(EditorDocumentStateContext, { value: documentStore }, children),
-        ),
+        EditorRuntimeContext,
+        { value: runtime },
+        createElement(EditorDocumentStateContext, { value: documentStore }, children),
       ),
     )
 
@@ -115,15 +106,10 @@ test('listens for blur when saving on focus change', async ({ client }) => {
 
 test('skips a focus-change save when the workspace mutation gate is closed', async ({ client }) => {
   expect(client).toBeDefined()
-  const runWorkspaceMutation = vi.fn(
-    async (_affectedPaths: readonly string[] | 'all', _operation: () => Promise<unknown>) => {
-      throw { code: 'workspace-edit-busy' }
-    },
-  )
-  const workspaceEdits = {
-    runWorkspaceMutation,
-  } as unknown as WorkspaceEditService
-  const { documentStore, wrapper } = harness({ 'files.autoSave': 'onWindowChange' }, workspaceEdits)
+  const { documentStore, runtime, wrapper } = harness({ 'files.autoSave': 'onWindowChange' })
+  const runWorkspaceMutation = vi
+    .spyOn(runtime.workspaceEditService, 'runWorkspaceMutation')
+    .mockRejectedValue({ code: 'workspace-edit-busy' })
   documentStore.getState().ensureLiveEditorDocument(fileResult('src/dirty.ts'))
   documentStore.getState().setLiveEditorDocumentDirty(testDocumentKey('src/dirty.ts'), true)
   renderHook(() => useAutoSave(), { wrapper })
@@ -159,7 +145,7 @@ test.for(['afterDelay', 'onWindowChange'] as const)(
     const recovery = documentStore.getState().ensureLiveEditorDocument(recoveryFile)
     const unsyncedTargets: readonly UnsyncedDocumentRef[] = [
       { kind: 'git-ref', source: { path, ref: 'HEAD' } },
-      { kind: 'conflict', conflictId: conflictId('autosave-conflict') },
+      { kind: 'conflict', conflictId: conflictId('autosave-conflict'), path },
     ]
     for (const target of unsyncedTargets) {
       const member = documentStore

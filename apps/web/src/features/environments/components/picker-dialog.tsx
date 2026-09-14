@@ -5,6 +5,7 @@ import { Dialog, DialogContent, DialogHeader, DialogTitle } from '@workspace/ui/
 import { Spinner } from '@workspace/ui/components/spinner'
 import { FormDialog } from '@/features/environments/components/form-dialog'
 import { useEnvironmentConnections } from '@/hooks/use-environment-connections'
+import { useWorkingMachines } from '@/lib/environments/hooks/use-working-machines'
 import { useEnvironmentsStore } from '@/lib/environments/state/store'
 import { errorMessage } from '@/lib/error-message'
 
@@ -20,7 +21,7 @@ export function PickerDialog({
   const entries = useEnvironmentsStore((state) => state.entries)
   const [error, setError] = useState<string | null>(null)
   const [adding, setAdding] = useState(mode === 'connect' && connections.machines.length === 0)
-  const [working, setWorking] = useState<string | null>(null)
+  const working = useWorkingMachines()
   const title = {
     switch: 'Switch machine',
     connect: 'Connect machine',
@@ -34,7 +35,6 @@ export function PickerDialog({
   const showForm = connecting && (adding || connections.machines.length === 0)
   async function choose(name: string) {
     setError(null)
-    setWorking(name)
     try {
       if (connecting) {
         const result = await connections.connectMachine(name)
@@ -51,8 +51,6 @@ export function PickerDialog({
       onClose()
     } catch (cause) {
       setError(errorMessage(cause, 'The machine action failed.'))
-    } finally {
-      setWorking(null)
     }
   }
   if (showForm)
@@ -93,16 +91,16 @@ export function PickerDialog({
             key={machine.name}
             variant='ghost'
             className='justify-between'
-            disabled={working !== null}
+            disabled={working.size > 0}
             onClick={() => void choose(machine.name)}
           >
             <span>{machine.config.label ?? machine.name}</span>
-            {working === machine.name ? <Spinner /> : null}
+            {working.has(machine.name) ? <Spinner /> : null}
             <span className='text-muted-foreground'>{machine.phase}</span>
           </Button>
         ))}
         {connecting ? (
-          <Button variant='secondary' disabled={working !== null} onClick={() => setAdding(true)}>
+          <Button variant='secondary' disabled={working.size > 0} onClick={() => setAdding(true)}>
             Add machine
           </Button>
         ) : null}

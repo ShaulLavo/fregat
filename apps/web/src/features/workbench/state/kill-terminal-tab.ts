@@ -17,7 +17,7 @@ export function killTerminalTab(
   tabId: string,
 ) {
   if (!disposeTerminalSession(terminalSessionKey(rootPath, tabId)))
-    killTerminalSession({ ...server, rootPath, terminalId: tabId })
+    killTerminalSession({ origin: server.origin, rootPath, terminalId: tabId })
 
   return closeTerminalTabInWorkbenchPanels(panels, tabId)
 }

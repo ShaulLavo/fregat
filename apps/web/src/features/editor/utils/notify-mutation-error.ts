@@ -1,6 +1,6 @@
 import { createMutationErrorNotifier } from '@/lib/mutations/notify-error'
 
 export const notifyMutationError = createMutationErrorNotifier({
-  area: 'git',
-  title: 'Git command failed',
+  area: 'editor',
+  title: 'Save failed',
 })

@@ -20,7 +20,6 @@ import type {
 } from '@/features/editor/state/workspace-document-service'
 import type { WorkspaceEditRoot } from '@/features/editor/state/workspace-edit-service'
 import { textSnapshotEqualsText } from '@/features/editor/utils/text-snapshot'
-import { reportError, toClientError } from '@/lib/client-error-taxonomy'
 import { observeClientOperation } from '@/lib/client-logging'
 import type { Client } from '@/lib/client'
 import { clientLogContext } from '@/lib/environments/state/log-context'
@@ -28,6 +27,8 @@ import { setFileSnapshotQueryData } from '@/lib/file-snapshot-query-cache'
 import { createFileContent, ensureFolderPath, writeFileContent } from '@/lib/file-server'
 import type { FileResult } from '@/lib/file-system-types'
 import { fileSystemKeys } from '@/lib/query-keys'
+import { runMutation } from '@/lib/mutations/run'
+import { conflictResolutionMutationOptions } from '@/features/workspace/utils/conflict-resolution-mutation'
 
 type ConflictTarget = Extract<DocumentRef, { kind: 'conflict' }>
 type ResolutionContext = {
@@ -145,14 +146,20 @@ export class ConflictEditorResolutionCoordinator {
           sourceRevision: capture.revision,
           writeId,
         },
-        () => this.persist(capture, writeId),
+        () =>
+          runMutation(
+            this.context.queryClient,
+            conflictResolutionMutationOptions(capture.conflict.id, () =>
+              this.persist(capture, writeId),
+            ),
+            'editor',
+          ),
         (outcome) => ({ outcome }),
       )
       retry = outcome === 'retry'
       if (outcome === 'unresolved')
         toast.warning('The conflict changed while saving. Review the remaining conflict.')
-    } catch (error) {
-      reportError(toClientError(error))
+    } catch {
     } finally {
       this.resolving.delete(key)
       const waiting = this.waiting.get(key)

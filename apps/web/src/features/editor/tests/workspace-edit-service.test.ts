@@ -728,8 +728,10 @@ test.describe('WorkspaceEditService', () => {
     await expect(
       new EditorSaveService(
         harness.store,
+        createTestQueryClient(),
         harness.fileSync,
         new SettingsSyncService(harness.store, createTestQueryClient()),
+        null,
       ).save(testDocumentKey('/repo/before.ts')),
     ).resolves.toBe(false)
     expect(harness.service.canSwitchRoot()).toBe(false)

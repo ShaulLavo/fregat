@@ -211,7 +211,8 @@ export class FileSyncService {
     const path = document.target.resource.path
     const text = document.buffer.materializeFullText()
     const savedContentRevision = document.contentRevision
-    const writeId = createWriteId()
+    // Issued, not random, so the watcher echo of this write classifies as ours.
+    const writeId = this.issueWriteId()
     const entry = await this.ports.writeFileContent(path, text, {
       baseVersion: sync.fileVersion,
       expectedMtimeMs: sync.mtimeMs,

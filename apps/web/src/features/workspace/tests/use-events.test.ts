@@ -4,6 +4,7 @@ import { shouldRefreshReadyRootTree } from '@/features/workspace/hooks/use-event
 import {
   affectedDirectoryPaths,
   affectedOpenFileRefreshPaths,
+  mayTrustCachedSnapshot,
   planFetchedOpenFileRefresh,
   planWorkspaceFilesystemEvents,
   planWorkspaceReady,
@@ -103,7 +104,7 @@ describe('planWorkspaceFilesystemEvents', () => {
     })
 
     expect(plan).toEqual({
-      openFileOperations: [{ path: 'repo/a.ts', type: 'refresh-open-file' }],
+      openFileOperations: [{ path: 'repo/a.ts', reason: 'changed', type: 'refresh-open-file' }],
       shouldInvalidateGitState: true,
       treeOperations: [{ entries: [entry], type: 'patch-changed-tree-entries' }],
     })
@@ -135,7 +136,9 @@ describe('planWorkspaceFilesystemEvents', () => {
       rootPath,
     })
 
-    expect(plan.openFileOperations).toEqual([{ path: 'repo/a.ts', type: 'refresh-open-file' }])
+    expect(plan.openFileOperations).toEqual([
+      { path: 'repo/a.ts', reason: 'changed', type: 'refresh-open-file' },
+    ])
   })
 
   it('plans rename and conflict operations for renamed open files', () => {
@@ -223,6 +226,31 @@ describe('workspace transaction event reconciliation', () => {
     expect(plan.treeOperations).toEqual([{ path: 'repo', type: 'refresh-tree-directory' }])
   })
 
+  it('treats the editor save echo as own regardless of origin', () => {
+    const plan = planWorkspaceEditAwareEventBatch(
+      [{ origin: 'editor', path: 'repo/a.ts', type: 'changed', writeId: 'operation-1' }],
+      openFiles,
+      'repo',
+      isOwnEvent,
+    )
+
+    expect(plan.openFileOperations).toEqual([])
+    expect(plan.shouldInvalidateGitState).toBe(true)
+  })
+
+  it('carries the reported disk version into an external change refresh', () => {
+    const plan = planWorkspaceEditAwareEventBatch(
+      [{ path: 'repo/a.ts', type: 'changed', version: 'sha256:v2', writeId: 'other' }],
+      openFiles,
+      'repo',
+      isOwnEvent,
+    )
+
+    expect(plan.openFileOperations).toEqual([
+      { path: 'repo/a.ts', reason: 'changed', type: 'refresh-open-file', version: 'sha256:v2' },
+    ])
+  })
+
   it('reconciles a later genuine external event by identity rather than timing', () => {
     const plan = planWorkspaceEditAwareEventBatch(
       [
@@ -238,7 +266,35 @@ describe('workspace transaction event reconciliation', () => {
       isOwnEvent,
     )
 
-    expect(plan.openFileOperations).toEqual([{ path: 'repo/a.ts', type: 'refresh-open-file' }])
+    expect(plan.openFileOperations).toEqual([
+      { path: 'repo/a.ts', reason: 'changed', type: 'refresh-open-file' },
+    ])
+  })
+})
+
+describe('mayTrustCachedSnapshot', () => {
+  it('lets a ready refresh reuse a fresh snapshot', () => {
+    expect(
+      mayTrustCachedSnapshot({ path: 'a', reason: 'ready', type: 'refresh-open-file' }, 'v1'),
+    ).toBe(true)
+  })
+
+  it('reads disk for a change whose version the snapshot does not hold', () => {
+    const refresh = {
+      path: 'a',
+      reason: 'changed',
+      type: 'refresh-open-file',
+      version: 'v2',
+    } as const
+    expect(mayTrustCachedSnapshot(refresh, 'v1')).toBe(false)
+    expect(mayTrustCachedSnapshot(refresh, undefined)).toBe(false)
+    expect(mayTrustCachedSnapshot(refresh, 'v2')).toBe(true)
+  })
+
+  it('reads disk for a change with no reported version', () => {
+    expect(
+      mayTrustCachedSnapshot({ path: 'a', reason: 'changed', type: 'refresh-open-file' }, 'v1'),
+    ).toBe(false)
   })
 })
 
@@ -254,7 +310,7 @@ describe('planWorkspaceReady', () => {
     })
 
     expect(plan).toEqual({
-      openFileOperations: [{ path: 'repo/a.ts', type: 'refresh-open-file' }],
+      openFileOperations: [{ path: 'repo/a.ts', reason: 'ready', type: 'refresh-open-file' }],
       shouldInvalidateGitState: true,
       treeOperations: [{ path: 'repo', type: 'refresh-ready-root-tree' }],
     })
@@ -387,7 +443,9 @@ describe('conflict resolution event reconciliation', () => {
       'repo',
       isOwnEvent,
     )
-    expect(plan.openFileOperations).toEqual([{ type: 'refresh-open-file', path: 'repo/a.ts' }])
+    expect(plan.openFileOperations).toEqual([
+      { path: 'repo/a.ts', reason: 'changed', type: 'refresh-open-file' },
+    ])
   })
 
   it('preserves an external change batched with an owned resolution event', () => {

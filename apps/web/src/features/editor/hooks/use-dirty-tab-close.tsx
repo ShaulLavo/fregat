@@ -4,20 +4,11 @@ import type { EditorSaveService } from '@/features/editor/state/save-service'
 
 import { UnsavedChangesDialog } from '@/features/editor/components/unsaved-changes-dialog'
 import { useWorkspaceMutationAllowed } from '@/features/editor/hooks/use-workspace-mutation-allowed'
-import { useOptionalWorkspaceEditService } from '@/features/editor/providers/workspace-edit-context'
-import type {
-  WorkspaceEditService,
-  WorkspaceMutationReporter,
-} from '@/features/editor/state/workspace-edit-service'
 import { documentKey } from '@/lib/documents/utils/identity'
 import { documentSourcePath } from '@/lib/documents/utils/capabilities'
 import { sameTabContent, tabContentKey, tabDocuments } from '@/lib/documents/utils/tabs'
 import type { EditorTabRecord, TabContent, TabId } from '@/lib/documents/utils/types'
-import {
-  filePathsForDocumentKeys,
-  isDirtyLiveEditorDocument,
-  isSavableEditorDocument,
-} from '@/features/editor/utils/save'
+import { isDirtyLiveEditorDocument, isSavableEditorDocument } from '@/features/editor/utils/save'
 import { useEditorCommands } from '@/features/editor/hooks/use-editor-commands'
 import { useEditorDocumentStoreApi } from '@/features/editor/state/document-state'
 import { useEditorWorkspaceStoreApi } from '@/features/editor/state/workspace-state'
@@ -77,7 +68,6 @@ export function useDirtyTabCloseRequest() {
   const focus = useFocusService()
   const documentStore = useEditorDocumentStoreApi()
   const workspaceStore = useEditorWorkspaceStoreApi()
-  const workspaceEdits = useOptionalWorkspaceEditService()
   const mutationsEnabled = useWorkspaceMutationAllowed()
   const { saveService } = useEditorRuntime()
   const { closeTabs, discardAndCloseTabs } = useEditorCommands()
@@ -262,7 +252,6 @@ export function useDirtyTabCloseRequest() {
       saveService,
       setSaveError,
       setSaving,
-      workspaceEdits,
       workspaceStore,
     })
   }, [
@@ -273,7 +262,6 @@ export function useDirtyTabCloseRequest() {
     saveService,
     saving,
     mutationsEnabled,
-    workspaceEdits,
     workspaceStore,
   ])
 
@@ -374,16 +362,7 @@ async function saveAndClosePendingTab(pendingClose: PendingClose, context: SaveA
     const documentKeys = tabDocuments(pendingClose.content)
       .map(documentKey)
       .filter((id) => isDirtyLiveEditorDocument(state, id))
-    const saveDocuments = (reportAffectedPaths?: WorkspaceMutationReporter) =>
-      context.saveService.saveMany(documentKeys, (key) =>
-        reportAffectedPaths?.(filePathsForDocumentKeys(state, [key])),
-      )
-    const results = context.workspaceEdits
-      ? await context.workspaceEdits.runWorkspaceMutation(
-          filePathsForDocumentKeys(state, documentKeys),
-          saveDocuments,
-        )
-      : await saveDocuments()
+    const results = await context.saveService.saveMany(documentKeys)
     if (results.some((saved) => !saved)) {
       context.setSaveError('This tab could not be saved.')
       return
@@ -407,7 +386,6 @@ type SaveAndCloseContext = {
   saveService: EditorSaveService
   setSaveError: (error: string | null) => void
   setSaving: (saving: boolean) => void
-  workspaceEdits: WorkspaceEditService | null
   workspaceStore: ReturnType<typeof useEditorWorkspaceStoreApi>
 }
 

@@ -1,19 +1,15 @@
-import { filePickerKeys } from '@/lib/query-keys'
 import { useMutation, useQueryClient } from '@tanstack/react-query'
 
-import { clientForQueryClient } from '@/lib/environments/state/query-clients'
 import type { PickedFsEntry } from '@/lib/file-system-types'
-
-import { recordRecent } from '@/features/file-picker/data-helpers'
+import { runMutation } from '@/lib/mutations/run'
+import { recordRecentMutationOptions } from '@/lib/record-recent-mutation'
 
 export function useRecordRecentMutation() {
   const queryClient = useQueryClient()
 
   return useMutation({
-    mutationFn: (entry: PickedFsEntry, { client }) =>
-      recordRecent(entry, clientForQueryClient(client)),
-    onSuccess: () => {
-      void queryClient.invalidateQueries({ queryKey: filePickerKeys.recents() })
-    },
+    mutationFn: (entry: PickedFsEntry) =>
+      runMutation(queryClient, recordRecentMutationOptions(queryClient, entry.path), undefined),
+    mutationKey: ['file-picker', 'record-recent'],
   })
 }

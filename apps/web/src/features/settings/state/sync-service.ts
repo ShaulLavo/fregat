@@ -12,6 +12,11 @@ import type {
   LiveEditorDocument,
 } from '@/features/editor/state/document-state'
 import { clientInstanceId } from '@/lib/instance-id'
+import { runMutation } from '@/lib/mutations/run'
+import {
+  SETTINGS_RAW_SAVE_SCOPE,
+  settingsMutationKeys,
+} from '@/features/settings/utils/mutation-keys'
 import { createClientInvariantError } from '@/lib/structured-errors'
 import type { Client } from '@/lib/client'
 import { clientForQueryClient, originForQueryClient } from '@/lib/environments/state/query-clients'
@@ -39,9 +44,25 @@ export class SettingsSyncService {
     this.client = clientForQueryClient(queryClient)
   }
 
-  async save(document: LiveEditorDocument): Promise<boolean> {
+  save(document: LiveEditorDocument): Promise<boolean> {
     if (document.sync.kind !== 'settings' || document.target.kind !== 'settings-json') {
       throw createClientInvariantError(`Cannot save ${document.key} as settings text`)
+    }
+    return runMutation(
+      this.queryClient,
+      {
+        mutationFn: (document: LiveEditorDocument) => this.observedSave(document),
+        mutationKey: settingsMutationKeys.rawSave(document.key),
+        scope: { id: SETTINGS_RAW_SAVE_SCOPE },
+      },
+      document,
+    )
+  }
+
+  private observedSave(captured: LiveEditorDocument): Promise<boolean> {
+    const document = this.documentStore.getState().getLiveEditorDocument(captured.key) ?? captured
+    if (document.sync.kind !== 'settings' || document.target.kind !== 'settings-json') {
+      return Promise.resolve(false)
     }
     const priorSyncState = document.sync.state
     return observeClientOperation(

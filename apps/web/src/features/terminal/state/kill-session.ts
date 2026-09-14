@@ -1,26 +1,37 @@
-import type { Client } from '@/lib/client'
 import { environmentActivitySignal } from '@/lib/environments/state/activity'
-import { reportError, toClientError } from '@/lib/client-error-taxonomy'
-import { registerTerminalCheckout } from '@/features/terminal/state/register-checkout'
+import { clientForQueryClient, queryClientFor } from '@/lib/environments/state/query-clients'
+import { runMutation } from '@/lib/mutations/run'
+import { fetchTerminalCheckout } from '@/features/terminal/state/register-checkout'
+import { terminalKillScope, terminalMutationKeys } from '@/features/terminal/utils/keys'
+import { notifyMutationError } from '@/features/terminal/utils/notify-mutation-error'
 
 // For a tab with no mounted panel: the shell would otherwise run until the detach timeout.
 export function killTerminalSession({
-  client,
   origin,
   rootPath,
   terminalId,
 }: {
-  client: Client
   origin: string
   rootPath: string
   terminalId: string
 }) {
   const signal = environmentActivitySignal(origin)
-  void registerTerminalCheckout({ client, origin, rootPath, signal })
-    .then((worktreeId) => client.terminal.kill.post({ terminalId, worktreeId }))
-    .catch((error: unknown) => {
-      if (signal.aborted) return
-
-      reportError(toClientError(error))
-    })
+  void runMutation(
+    queryClientFor(origin),
+    {
+      mutationFn: async (_variables: void, { client }) => {
+        const worktreeId = await fetchTerminalCheckout(client, rootPath)
+        await clientForQueryClient(client).terminal.kill.post(
+          { terminalId, worktreeId },
+          { fetch: { signal } },
+        )
+      },
+      mutationKey: terminalMutationKeys.kill(terminalId),
+      onError: (error) => {
+        if (!signal.aborted) notifyMutationError(error)
+      },
+      scope: { id: terminalKillScope(terminalId) },
+    },
+    undefined,
+  ).catch(() => undefined)
 }

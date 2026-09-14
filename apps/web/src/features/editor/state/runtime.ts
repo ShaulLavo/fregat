@@ -112,8 +112,10 @@ export function createEditorRuntime({
   }
   const saveService = new EditorSaveService(
     documentStore,
+    queryClient,
     fileSync,
     new SettingsSyncService(documentStore, queryClient),
+    workspaceEditService,
   )
   const editorOpenBenchmarkControl = createEditorOpenBenchmarkControl({
     storage,

@@ -28,7 +28,12 @@ import { registerChatTransport, transportFor } from '@/features/chat/state/activ
 import { subscribeChatShell } from '@/features/chat/state/shell-subscription'
 import { primaryServerOrigin, replaceEnvironmentEndpoint, serverEndpoint } from '@/lib/client'
 import { useEnvironmentsStore } from '@/lib/environments/state/store'
-import { queryClientFor } from '@/lib/environments/state/query-clients'
+import { primaryQueryClient, queryClientFor } from '@/lib/environments/state/query-clients'
+import {
+  environmentMutationKeys,
+  type MachineMutationAction,
+} from '@/lib/environments/utils/mutation-keys'
+import { runMutation } from '@/lib/mutations/run'
 import { environmentScopedStorage } from '@/lib/environments/state/scoped-storage'
 import { readEnvironmentDescriptor } from '@/lib/environments/utils/descriptor'
 import { createClientInvariantError } from '@/lib/structured-errors'
@@ -189,12 +194,40 @@ export function createEnvironmentConnections({
     if (state.phase !== 'live') throw sshConnectionError(state)
     return state
   }
+  function runMachineMutation<T>(
+    action: MachineMutationAction,
+    name: string,
+    work: () => Promise<T>,
+  ) {
+    return runMutation(
+      primaryQueryClient(),
+      {
+        mutationFn: work,
+        mutationKey: environmentMutationKeys.machine(action, name),
+      },
+      undefined,
+    )
+  }
+
   function connectMachine(name: string): Promise<ConnectionResult> {
     if (!started) return Promise.resolve('cancelled')
     const pending = pendingConnections.get(name)
     if (pending) return pending
     cancelledAuthentication.delete(name)
-    return trackConnection(name, performConnection(name))
+    const abort = new AbortController()
+    attempts.set(name, abort)
+    let begun: ConnectedMachine | ConnectionResult
+    try {
+      begun = beginConnection(name, abort)
+    } catch (error) {
+      return Promise.reject(error)
+    }
+    if (typeof begun === 'string') return Promise.resolve(begun)
+    const machine = begun
+    return trackConnection(
+      name,
+      runMachineMutation('connect', name, () => performConnection(name, machine, abort)),
+    )
   }
 
   function trackConnection(name: string, work: Promise<ConnectionResult>) {
@@ -205,16 +238,26 @@ export function createEnvironmentConnections({
     return pending
   }
 
-  async function performConnection(name: string): Promise<ConnectionResult> {
+  function beginConnection(
+    name: string,
+    abort: AbortController,
+  ): ConnectedMachine | ConnectionResult {
+    if (abort.signal.aborted) return 'cancelled'
     const machine = machineFor(name)
     desired.add(name)
     writeConnectedMachines(desired)
     restoreCachedConnections()
     if (machine.phase === 'live' && machine.environmentId && connections.has(machine.environmentId))
       return 'connected'
-    const abort = new AbortController()
-    attempts.set(name, abort)
     phase(name, machine.config.kind === 'ssh' ? 'launching' : 'connecting')
+    return machine
+  }
+
+  async function performConnection(
+    name: string,
+    machine: ConnectedMachine,
+    abort: AbortController,
+  ): Promise<ConnectionResult> {
     const event = createWideEventScope({
       action: 'environment.connect',
       area: 'environments',
@@ -304,20 +347,27 @@ export function createEnvironmentConnections({
   function replaceMachineConfiguration(machine: ConnectedMachine): Promise<ConnectionResult> {
     if (!started || !desired.has(machine.name)) return Promise.resolve('cancelled')
     attempts.get(machine.name)?.abort()
-    return trackConnection(machine.name, replaceConfiguration(machine))
-  }
-
-  async function replaceConfiguration(machine: ConnectedMachine): Promise<ConnectionResult> {
     const abort = new AbortController()
     attempts.set(machine.name, abort)
     recovery?.forget(machine.name)
     phase(machine.name, 'reconnecting')
     releaseConnection(machine)
+    return trackConnection(
+      machine.name,
+      runMachineMutation('connect', machine.name, () => replaceConfiguration(machine, abort)),
+    )
+  }
+
+  async function replaceConfiguration(
+    machine: ConnectedMachine,
+    abort: AbortController,
+  ): Promise<ConnectionResult> {
     try {
       if (machine.config.kind === 'ssh') await disconnectSshMachine(machine.name)
       if (abort.signal.aborted || !started || !desired.has(machine.name)) return 'cancelled'
-      attempts.delete(machine.name)
-      return await performConnection(machine.name)
+      const begun = beginConnection(machine.name, abort)
+      if (typeof begun === 'string') return begun
+      return await performConnection(machine.name, begun, abort)
     } catch (error) {
       if (abort.signal.aborted) return 'cancelled'
       phase(machine.name, 'offline', errorMessage(error, `Cannot reconnect ${machine.name}.`))
@@ -341,12 +391,15 @@ export function createEnvironmentConnections({
     if (machine.origin && !hasAnotherOwner(machine))
       useEnvironmentsStore.getState().setPhase(machine.origin, 'offline')
     update(name, { phase: 'idle', lastError: null })
-    try {
-      if (machine.config.kind === 'ssh') await disconnectSshMachine(name)
-    } catch (error) {
-      if (!desired.has(name)) phase(name, 'offline', errorMessage(error, `Could not stop ${name}.`))
-      throw error
-    }
+    await runMachineMutation('disconnect', name, async () => {
+      try {
+        if (machine.config.kind === 'ssh') await disconnectSshMachine(name)
+      } catch (error) {
+        if (!desired.has(name))
+          phase(name, 'offline', errorMessage(error, `Could not stop ${name}.`))
+        throw error
+      }
+    })
   }
   function cancelMachine(name: string) {
     const prompt = authStore.getState().prompt
@@ -528,7 +581,9 @@ export function createEnvironmentConnections({
     authResponse = abort
     authStore.setState({ pending: true, error: null })
     try {
-      await answerMachineAuth(prompt, response, abort.signal)
+      await runMachineMutation('auth', prompt.name, () =>
+        answerMachineAuth(prompt, response, abort.signal),
+      )
       if (authStore.getState().prompt?.id !== prompt.id) return
       authStore.setState({ prompt: null, pending: false, error: null })
     } catch {

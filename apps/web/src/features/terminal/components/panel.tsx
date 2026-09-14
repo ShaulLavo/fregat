@@ -1,6 +1,6 @@
 import { RingLoader } from '@workspace/ui/components/ring-loader'
 import { errorMessage } from '@/lib/error-message'
-import { registerTerminalCheckout } from '@/features/terminal/state/register-checkout'
+import { fetchTerminalCheckout } from '@/features/terminal/state/register-checkout'
 import {
   registerTerminalSession,
   terminalSessionKey,
@@ -8,7 +8,11 @@ import {
 import type { WorktreeId } from '@workspace/contracts'
 import { useQueryClient } from '@tanstack/react-query'
 import type { Client } from '@/lib/client'
-import { clientForQueryClient, originForQueryClient } from '@/lib/environments/state/query-clients'
+import {
+  clientForQueryClient,
+  originForQueryClient,
+  queryClientFor,
+} from '@/lib/environments/state/query-clients'
 import { environmentActivitySignal } from '@/lib/environments/state/activity'
 import { parseTerminalServerMessage, type TerminalServerMessage } from '@workspace/contracts'
 import { cn } from '@workspace/ui/lib/utils'
@@ -399,7 +403,7 @@ function mountTerminal({
   const open = async () => {
     const [runtime, worktreeId] = await Promise.all([
       initializeGhostty(),
-      registerTerminalCheckout({ client, origin, rootPath, signal }),
+      fetchTerminalCheckout(queryClientFor(origin), rootPath),
     ])
     if (cancelled || signal.aborted) return
 

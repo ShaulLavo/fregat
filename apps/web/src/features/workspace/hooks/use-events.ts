@@ -39,14 +39,17 @@ import { parseEdenSseStream } from '@workspace/client-core/transport/eden'
 import { toTreePath } from '@/lib/path-formatters'
 import { clientErrors } from '@/lib/structured-errors'
 import { createWideEventScope } from '@/lib/wide-event-scope'
+import { editorMutationKeys } from '@/features/editor/utils/mutation-keys'
 import type { WideEventScope } from '@workspace/observability/scope'
 import {
+  mayTrustCachedSnapshot,
   parentPath,
   planFetchedOpenFileRefresh,
   planWorkspaceReady,
   type WorkspaceEventPlan,
   type WorkspaceFetchedOpenFileOperation,
   type WorkspaceOpenFileOperation,
+  type WorkspaceOpenFileRefresh,
   type WorkspaceOpenFileSnapshot,
   type WorkspaceTreeOperation,
 } from '@/features/workspace/utils/event-model'
@@ -58,7 +61,7 @@ import {
   type WorkspaceConflictContext,
 } from '@/features/workspace/state/event-conflict-adapter'
 import { patchTreeEntryMetadata, replaceDirectoryLoad, type TreeModel } from '@/lib/tree-model'
-import { useQueryClient } from '@tanstack/react-query'
+import { useQueryClient, type QueryClient } from '@tanstack/react-query'
 import { useEffect, useEffectEvent } from 'react'
 import { toast } from 'sonner'
 import type { TreeEntry, WatchServerMessage } from '@workspace/contracts'
@@ -678,8 +681,8 @@ async function applyOpenFileOperation({
     conflictContext,
     dirtyDocumentKeys,
     forceReplaceLiveEditorDocument,
-    path: operation.path,
     queryClient,
+    refresh: operation,
     signal,
   })
 }
@@ -688,17 +691,18 @@ async function applyRefreshOpenFileOperation({
   conflictContext,
   dirtyDocumentKeys,
   forceReplaceLiveEditorDocument,
-  path,
   queryClient,
+  refresh,
   signal,
 }: {
   conflictContext: WorkspaceConflictContext
   dirtyDocumentKeys: ReadonlySet<DocumentKey>
   forceReplaceLiveEditorDocument: (file: FileResult) => { wasDirty: boolean }
-  path: string
   queryClient: ReturnType<typeof useQueryClient>
+  refresh: WorkspaceOpenFileRefresh
   signal: AbortSignal
 }) {
+  const path = refresh.path
   // Existing live documents can race the selected file's useQuery on workspace
   // load (and StrictMode can deliver two ready events); fetchQuery on the same
   // key joins any in-flight fetch instead of reading the same file again. A
@@ -709,7 +713,10 @@ async function applyRefreshOpenFileOperation({
   // it. Teardown therefore lets an in-flight read finish in the background
   // (and warm the cache); it only stops new work and result application.
   if (signal.aborted) return
+  await settlePendingSaves(queryClient, fileDocumentKey(filesystemPath(path)), signal)
+  if (signal.aborted) return
 
+  const cached = queryClient.getQueryData<FileResult>(fileSystemKeys.fileSnapshot(path))
   const file = await queryClient.fetchQuery({
     ...fileSnapshotQueryOptions(filesystemPath(path), {
       fetcher: (path, signal) =>
@@ -717,6 +724,7 @@ async function applyRefreshOpenFileOperation({
     }),
     // fetchFileWithRetry retries internally; query-level retry would stack.
     retry: false,
+    ...(mayTrustCachedSnapshot(refresh, cached?.version) ? {} : { staleTime: 0 }),
   })
   if (signal.aborted) return
 
@@ -775,6 +783,28 @@ async function applyRenamedConflictOperation(
     filesystemPath(remotePath),
     context,
   )
+}
+
+function pendingSaves(queryClient: QueryClient, key: DocumentKey) {
+  return queryClient
+    .getMutationCache()
+    .findAll({ mutationKey: editorMutationKeys.save(key), status: 'pending' })
+}
+
+function settlePendingSaves(queryClient: QueryClient, key: DocumentKey, signal: AbortSignal) {
+  if (pendingSaves(queryClient, key).length === 0) return Promise.resolve()
+
+  return new Promise<void>((resolve) => {
+    const finish = () => {
+      unsubscribe()
+      signal.removeEventListener('abort', finish)
+      resolve()
+    }
+    const unsubscribe = queryClient.getMutationCache().subscribe(() => {
+      if (pendingSaves(queryClient, key).length === 0) finish()
+    })
+    signal.addEventListener('abort', finish)
+  })
 }
 
 function liveDocumentText(path: string, context: WorkspaceConflictContext) {

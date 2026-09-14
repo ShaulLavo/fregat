@@ -16,9 +16,7 @@ export function planWorkspaceEditAwareEventBatch(
   rootPath: string,
   isOwnWorkspaceEditEvent: (writeId: string) => boolean,
 ): WorkspaceEventPlan {
-  const externalEvents = events.filter(
-    (event) => !isMatchingWorkspaceEditEvent(event, isOwnWorkspaceEditEvent),
-  )
+  const externalEvents = events.filter((event) => !isOwnEvent(event, isOwnWorkspaceEditEvent))
   if (externalEvents.length === events.length) {
     return planWorkspaceFilesystemEvents({ events, openFiles, rootPath })
   }
@@ -36,12 +34,10 @@ export function planWorkspaceEditAwareEventBatch(
   }
 }
 
-function isMatchingWorkspaceEditEvent(
+function isOwnEvent(
   event: WorkspaceEditAwareFilesystemEvent,
   isOwnWorkspaceEditEvent: (writeId: string) => boolean,
 ): boolean {
-  if (event.origin !== 'workspace-edit' && event.origin !== 'conflict-editor-resolution')
-    return false
   if (!event.writeId) return false
   return isOwnWorkspaceEditEvent(event.writeId)
 }

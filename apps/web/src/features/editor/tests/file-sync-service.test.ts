@@ -25,15 +25,17 @@ describe('FileSyncService', () => {
     createEditorBufferSession(document.buffer).applyText('!')
     const writes: Array<{ content: string; options: Parameters<FileSyncWriteFileContent>[2] }> = []
 
-    await new FileSyncService(store, queryClient, {
+    const service = new FileSyncService(store, queryClient, {
       readFileContent: async () => file('unused', '', 0),
       writeFileContent: async (path, content, options) => {
         writes.push({ content, options })
         return entry(path, content, 200)
       },
-    }).save(store.getState().getLiveEditorDocument(document.key)!)
+    })
+    await service.save(store.getState().getLiveEditorDocument(document.key)!)
 
     const saved = store.getState().getLiveEditorDocument(document.key)!
+    expect(service.isOwnWriteEvent(writes[0]!.options!.writeId!)).toBe(true)
     expect(writes).toEqual([
       {
         content: 'old!',

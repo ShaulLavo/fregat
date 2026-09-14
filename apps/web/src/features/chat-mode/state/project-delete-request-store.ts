@@ -15,20 +15,16 @@ export type ProjectDeleteRequest = {
  */
 type ProjectDeleteRequestStore = {
   readonly request: ProjectDeleteRequest | null
-  readonly pending: boolean
   readonly error: string | null
-  readonly beginDelete: () => void
   readonly failDelete: (error: string) => void
   readonly dismissDelete: () => void
   readonly requestDelete: (request: ProjectDeleteRequest) => void
 }
 
 export const useProjectDeleteRequestStore = create<ProjectDeleteRequestStore>()((set) => ({
-  pending: false,
   error: null,
-  beginDelete: () => set({ pending: true, error: null }),
-  failDelete: (error) => set({ pending: false, error }),
-  dismissDelete: () => set({ request: null, error: null, pending: false }),
+  failDelete: (error) => set({ error }),
+  dismissDelete: () => set({ request: null, error: null }),
   request: null,
-  requestDelete: (request) => set({ request, error: null, pending: false }),
+  requestDelete: (request) => set({ request, error: null }),
 }))

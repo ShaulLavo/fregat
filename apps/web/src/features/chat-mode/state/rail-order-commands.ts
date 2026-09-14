@@ -22,6 +22,10 @@ import {
 import { railReorderIntent } from '@workspace/client-core/chat/rail/reorder'
 import { sessionRailModel } from '@workspace/client-core/chat/rail/model'
 import { log } from '@/lib/client-logging'
+import { confirmedEnvironmentOrigin } from '@/lib/environments/state/domain'
+import { queryClientFor } from '@/lib/environments/state/query-clients'
+import { runMutation } from '@/lib/mutations/run'
+import { chatModeMutationKeys } from '@/features/chat-mode/utils/mutation-keys'
 
 type Drop = { readonly activeId: string; readonly overId: string | null }
 
@@ -109,27 +113,35 @@ function placeRailRow(
     satisfied: () => projectedOrderKey(useChatProjectionStore.getState()) === placement.orderKey,
   }
 
-  return runIntent(railOrderIntents, placement, {
-    resources: [railPlacementResource(placement)],
-    perform: async () => {
-      const outcome = await dispatchChatCommand({
-        action: 'chat.rail.reorder',
-        command,
-        dispatchCommand: (dispatched) =>
-          dispatchCommandForEnvironment(placement.ref.environmentId, dispatched),
-      })
-      if (!outcome.ok) throw outcome.error
-      return outcome.result
+  return runMutation(
+    queryClientFor(confirmedEnvironmentOrigin(placement.ref.environmentId)),
+    {
+      mutationFn: () =>
+        runIntent(railOrderIntents, placement, {
+          resources: [railPlacementResource(placement)],
+          perform: async () => {
+            const outcome = await dispatchChatCommand({
+              action: 'chat.rail.reorder',
+              command,
+              dispatchCommand: (dispatched) =>
+                dispatchCommandForEnvironment(placement.ref.environmentId, dispatched),
+            })
+            if (!outcome.ok) throw outcome.error
+            return outcome.result
+          },
+          until,
+          record: (event) =>
+            log[event.outcome === 'acknowledged' ? 'debug' : 'warn']({
+              action: 'chat.rail.reorder.intent',
+              area: 'chat-rail',
+              kind: placement.kind,
+              ...event,
+            }),
+        }),
+      mutationKey: chatModeMutationKeys.railOrder(placement.ref.environmentId),
     },
-    until,
-    record: (event) =>
-      log[event.outcome === 'acknowledged' ? 'debug' : 'warn']({
-        action: 'chat.rail.reorder.intent',
-        area: 'chat-rail',
-        kind: placement.kind,
-        ...event,
-      }),
-  })
+    undefined,
+  )
 }
 
 function railOrderModel() {
