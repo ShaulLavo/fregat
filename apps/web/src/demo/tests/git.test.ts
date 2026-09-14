@@ -1,6 +1,7 @@
 import { expect, test } from '../../../test/fixtures'
 import { DemoWorkspace } from '../state/workspace'
 import { demoGitRequest } from '../transport/git'
+import { DEMO_TIME } from '../seed'
 
 function request(workspace: DemoWorkspace, path: string, body?: unknown) {
   const url = new URL(path, 'https://fregat-demo.invalid')
@@ -66,4 +67,45 @@ test('unsupported Git operations fail explicitly without changing the workspace'
     request(workspace, '/git/apply-patch', { patch: '', path: '/garden' }),
   ).rejects.toMatchObject({ status: 501 })
   expect(workspace.gitStatus().files).toHaveLength(1)
+})
+
+test('history uses epoch milliseconds and canonical branch references', async () => {
+  const workspace = await DemoWorkspace.create()
+  const seeded = await (await request(workspace, '/git/history', {})).json()
+  expect(seeded.commits[0].timestamp).toBe(Date.parse(DEMO_TIME))
+  expect(seeded.refs).toEqual([
+    { name: 'refs/heads/main', kind: 'branch', commitId: seeded.commits[0].id },
+  ])
+
+  await request(workspace, '/git/stage', { paths: ['notes/autumn.md'] })
+  const before = Date.now()
+  await request(workspace, '/git/commit', { message: 'Mulch the garden' })
+  const committed = await (await request(workspace, '/git/history', {})).json()
+  expect(committed.commits[0].timestamp).toBeGreaterThanOrEqual(before)
+  expect(committed.commits[0].timestamp).toBeLessThanOrEqual(Date.now())
+  expect(committed.next).toBeNull()
+})
+
+test('history filters messages, authors and commit IDs within the selected reference', async () => {
+  const workspace = await DemoWorkspace.create()
+  await request(workspace, '/git/stage', { paths: ['notes/autumn.md'] })
+  await request(workspace, '/git/commit', { message: 'Mulch the garden' })
+  const newest = workspace.history[0]!
+  for (const search of ['MULCH', 'YOU@EXAMPLE.INVALID', newest.id.slice(0, 8)]) {
+    const page = await (
+      await request(workspace, '/git/history', { search, ref: 'refs/heads/main' })
+    ).json()
+    expect(page.commits.map((commit: { id: string }) => commit.id)).toEqual([newest.id])
+  }
+  const missing = await (
+    await request(workspace, '/git/history', { search: 'absent-commit' })
+  ).json()
+  expect(missing.commits).toEqual([])
+  const other = await (await request(workspace, '/git/history', { ref: 'refs/heads/other' })).json()
+  expect(other.commits).toEqual([])
+  const current = await (await request(workspace, '/git/history', { ref: 'HEAD' })).json()
+  expect(current.commits).toHaveLength(2)
+  await expect(
+    request(workspace, '/git/history', { cursor: { tips: [newest.id], skip: -1 } }),
+  ).rejects.toThrow()
 })

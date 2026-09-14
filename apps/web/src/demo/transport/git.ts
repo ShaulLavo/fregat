@@ -1,5 +1,5 @@
 import * as v from 'valibot'
-import type { GitFileDiff } from '@workspace/contracts'
+import type { GitFileDiff, GitHistoryPage } from '@workspace/contracts'
 import { DEMO_ROOT } from '../seed'
 import { DemoWorkspace, demoError } from '../state/workspace'
 import { fileDiff } from '../utils/git-diff'
@@ -107,17 +107,7 @@ async function post(url: URL, body: unknown, workspace: DemoWorkspace): Promise<
       )
     }
     case '/git/history':
-      return json({
-        commits: workspace.history,
-        refs: [
-          {
-            name: workspace.repository().branch,
-            kind: 'branch',
-            commitId: workspace.repository().commit,
-          },
-        ],
-        next: null,
-      })
+      return json(historyPage(body, workspace))
     case '/git/checkout': {
       const { branch } = v.parse(v.object({ branch: v.string() }), body)
       if (branch !== workspace.repository().branch)
@@ -126,6 +116,41 @@ async function post(url: URL, body: unknown, workspace: DemoWorkspace): Promise<
     }
     default:
       throw unsupported(url)
+  }
+}
+
+function historyPage(body: unknown, workspace: DemoWorkspace): GitHistoryPage {
+  const { search, ref } = v.parse(
+    v.object({
+      search: v.optional(v.pipe(v.string(), v.trim(), v.maxLength(1024)), ''),
+      ref: v.optional(v.string(), 'all'),
+      cursor: v.optional(
+        v.object({
+          tips: v.pipe(
+            v.array(v.pipe(v.string(), v.regex(/^(?:[0-9a-f]{40}|[0-9a-f]{64})$/i))),
+            v.minLength(1),
+          ),
+          skip: v.pipe(v.number(), v.integer(), v.minValue(0)),
+        }),
+      ),
+    }),
+    body,
+  )
+  const branch = `refs/heads/${workspace.worktree.branch}`
+  const selected = ref === 'all' || ref === 'HEAD' || ref === branch
+  const needle = search.toLowerCase()
+  const commits = selected
+    ? workspace.history.filter((commit) =>
+        [commit.subject, commit.author, commit.authorEmail, commit.id].some((value) =>
+          value.toLowerCase().includes(needle),
+        ),
+      )
+    : []
+  const head = workspace.history[0]
+  return {
+    commits,
+    refs: head ? [{ name: branch, kind: 'branch', commitId: head.id }] : [],
+    next: null,
   }
 }
 

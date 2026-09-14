@@ -4,6 +4,7 @@ import type {
   FileTreeEntry,
   GitFileDiff,
   GitFileStatus,
+  GitHistoryCommit,
   GitRepositoryInfo,
   OrchestrationSession,
   SettingsSnapshot,
@@ -41,21 +42,14 @@ export class DemoWorkspace {
   readonly sessions = new Map<string, OrchestrationSession>()
   readonly listeners = new Set<(event: DemoChange) => void>()
   readonly updates = new Set<() => void>()
-  readonly history: {
-    id: string
-    parents: readonly string[]
-    subject: string
-    author: string
-    authorEmail: string
-    timestamp: number
-  }[] = [
+  readonly history: GitHistoryCommit[] = [
     {
       id: this.worktree.headCommit!,
       parents: [],
       subject: 'Plant a small seasonal garden',
       author: 'Garden demo',
       authorEmail: 'garden@example.invalid',
-      timestamp: Date.parse(DEMO_TIME) / 1000,
+      timestamp: Date.parse(DEMO_TIME),
     },
   ]
   settings: SettingsSnapshot = seedSettings()
@@ -249,7 +243,7 @@ export class DemoWorkspace {
       subject: message,
       author: 'You',
       authorEmail: 'you@example.invalid',
-      timestamp: Date.now() / 1000,
+      timestamp: Date.now(),
     })
     this.revisions.set(id, new Map(this.index))
     this.head.clear()

@@ -1,5 +1,6 @@
 import type { Scenario } from './index'
 import { selectors } from '../selectors'
+import { createScriptError } from '../../structured-errors'
 
 export const demoAgentGit: Scenario = {
   name: 'demo-agent-git',
@@ -26,6 +27,22 @@ export const demoAgentGit: Scenario = {
       { timeout: 15_000 },
     )
     await step('committed')
+    await selectors.graphButton(page).click()
+    await selectors.historyRows(page).first().waitFor({ timeout: 15_000 })
+    await selectors.historyRows(page).first().click()
+    await selectors.historyFiles(page).first().waitFor({ timeout: 15_000 })
+    await step('commit-history')
+    const searched = page.waitForResponse(
+      (response) =>
+        response.url().endsWith('/git/history') &&
+        response.request().postDataJSON()?.search === 'Prepare the garden for autumn',
+    )
+    await selectors.historySearch(page).fill('Prepare the garden for autumn')
+    await searched
+    await selectors.historyRows(page).first().waitFor()
+    await step('history-search')
+    if ((await selectors.historyRows(page).count()) !== 1)
+      throw createScriptError('Demo history search did not filter to the matching commit.')
     await selectors.sidebarTab(page, 'Chat').click()
     await selectors.chatMessage(page).click()
     await step('composer')
