@@ -36,7 +36,7 @@ export function Dialog({
   const dismissHint =
     dismissKeys === 'unassigned' ? 'Dismiss unassigned' : `${dismissKeys} ${dismissLabel}`
   useCommandHandlers({ 'workspace.dismiss': { run: onClose } })
-  return createPortal(
+  const portal = createPortal(
     <box
       position='absolute'
       width='100%'
@@ -70,4 +70,6 @@ export function Dialog({
     renderer.root,
     null,
   )
+  // OpenTUI exposes the reconciler portal type; the fragment supplies the JSX boundary.
+  return <>{portal}</>
 }
