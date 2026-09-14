@@ -218,7 +218,7 @@ Interaction treatments are utilities, not strings to copy:
 
 ## Verification
 
-- The `verify-platform` skill (`.agents/skills/verify-platform/`) is how a change is proven in the running app. Its CLI is `bun run agent:browser` with the verbs `look`, `scenario`, `trace`, `renders` and `caches`, and `bun run logs` reads the structured log. Evidence lands in `/work/tmp/platform-evidence/<run>/` with a `summary.md` short enough to read whole.
+- The `verify-fregat` skill (`.agents/skills/verify-fregat/`) is how a change is proven in the running app. Its CLI is `bun run agent:browser` with the verbs `look`, `scenario`, `trace`, `renders` and `caches`, and `bun run logs` reads the structured log. Evidence lands in `/work/tmp/fregat-evidence/<run>/` with a `summary.md` short enough to read whole.
 - A UI change is not done until you have run `look` (or a scenario) on the changed surface, read the screenshot back, and named the evidence directory in your report. "It typechecks" and "the test passes" do not stand in for looking.
 - A performance claim cites `trace <scenario>` before and after, with `--compare`. A "fewer renders" claim cites `renders <scenario>` before and after. A claim about a query or mutation not settling cites `caches`.
 - Reproduce a reported bug on the same surface before fixing it, and re-run the same drive after. Hand the reproduction to the user only when the CLI cannot reach the surface, and say why.

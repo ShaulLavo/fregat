@@ -83,35 +83,35 @@ const rules: readonly Rule[] = [
   [/After a Cursor restart:/g, 'After a session restart:'],
   [
     /`control-cli` \(CLIs and TUIs\) and `control-ui` \(browser \/ Electron \/ web UIs\)/g,
-    'the project verification skill (`verify-platform` here)',
+    'the project verification skill (`verify-fregat` here)',
   ],
   [
-    /`cursor-team-kit` publishes the project verification skill \(`verify-platform` here\)/g,
-    'the project publishes it as `verify-platform`',
+    /`cursor-team-kit` publishes the project verification skill \(`verify-fregat` here\)/g,
+    'the project publishes it as `verify-fregat`',
   ],
   [
     /\(`control-cli` or `control-ui` from `cursor-team-kit` as the change demands\)/g,
-    '(the `verify-platform` skill)',
+    '(the `verify-fregat` skill)',
   ],
   [
     /`control-ui` or `control-cli` runtime verification \(from `cursor-team-kit`\)/g,
-    '`verify-platform` runtime verification',
+    '`verify-fregat` runtime verification',
   ],
-  [/the `control-ui` skill from the `cursor-team-kit` plugin/g, 'the `verify-platform` skill'],
-  [/the `control-cli` skill from the `cursor-team-kit` plugin/g, 'the `verify-platform` skill'],
-  [/via the matching control skill/g, 'via the `verify-platform` skill'],
-  [/via the control skill/g, 'via the `verify-platform` skill'],
-  [/the matching control skill/g, 'the `verify-platform` skill'],
+  [/the `control-ui` skill from the `cursor-team-kit` plugin/g, 'the `verify-fregat` skill'],
+  [/the `control-cli` skill from the `cursor-team-kit` plugin/g, 'the `verify-fregat` skill'],
+  [/via the matching control skill/g, 'via the `verify-fregat` skill'],
+  [/via the control skill/g, 'via the `verify-fregat` skill'],
+  [/the matching control skill/g, 'the `verify-fregat` skill'],
   [
-    /on the matching surface via the `verify-platform` skill/g,
-    'on the real surface via the `verify-platform` skill',
+    /on the matching surface via the `verify-fregat` skill/g,
+    'on the real surface via the `verify-fregat` skill',
   ],
   [/using your configured [a-z-]+ model \(default `[^`]+`\)/g, 'on a strong code model'],
   [/\(defaults? `[^`]+`(?:, `[^`]+`)*\)/g, ''],
-  [/the project publishes it as `verify-platform`\. /g, ''],
+  [/the project publishes it as `verify-fregat`\. /g, ''],
   [
-    /Shipping UI \/ IDE \/ CLI → the `verify-platform` skill\. /g,
-    'Shipping UI / IDE / CLI → the `verify-platform` skill. ',
+    /Shipping UI \/ IDE \/ CLI → the `verify-fregat` skill\. /g,
+    'Shipping UI / IDE / CLI → the `verify-fregat` skill. ',
   ],
   [/`\.cursor\/worktrees\/myrepo\/x`/g, '`.claude/worktrees/myrepo/x`'],
   [
@@ -206,7 +206,7 @@ const lineRules: readonly Rule[] = [
   ],
   [
     /^- \*\*Worker \/ verifier\.\*\* Always `environment: "cloud"` unless the task needs this machine:[^\n]*$/m,
-    '- **Worker / verifier.** `isolation: "remote"` unless the task needs this machine: `verify-platform` runtime verification, reading local transcripts under `~/.claude/projects/<slug>/`, local IDE state, auth that exists only here. Remote agents cannot read the local store, so their briefs inline what they need or point at repo paths. Prefer fewer, broader workers; one writer per worktree or branch (principle-separate-before-serializing-shared-state). Run a unit\'s verifier on a different model from its worker when the environment offers one.',
+    '- **Worker / verifier.** `isolation: "remote"` unless the task needs this machine: `verify-fregat` runtime verification, reading local transcripts under `~/.claude/projects/<slug>/`, local IDE state, auth that exists only here. Remote agents cannot read the local store, so their briefs inline what they need or point at repo paths. Prefer fewer, broader workers; one writer per worktree or branch (principle-separate-before-serializing-shared-state). Run a unit\'s verifier on a different model from its worker when the environment offers one.',
   ],
   [
     /so a completion flood cannot wipe AskQuestion state/g,
@@ -233,7 +233,7 @@ const lineRules: readonly Rule[] = [
   ],
   [
     /each a Cursor cloud agent, each exercising the real surface \(`control-ui` or `control-cli` from `cursor-team-kit` as the change demands\)/g,
-    'each in its own worktree, each exercising the real surface through the `verify-platform` skill',
+    'each in its own worktree, each exercising the real surface through the `verify-fregat` skill',
   ],
   [
     /^4\. \*\*Arm merge-when-ready through Graphite, and pass `--always`\.\*\*[^\n]*\n   ```bash\n   gt submit[^\n]*\n   ```/m,

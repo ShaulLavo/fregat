@@ -16,7 +16,7 @@ type QueryClientOwner = {
 
 const queryClients = new Map<string, QueryClient>()
 const owners = new WeakMap<QueryClient, QueryClientOwner>()
-if (import.meta.env.DEV) Object.assign(globalThis, { __platformQueryClients: queryClients })
+if (import.meta.env.DEV) Object.assign(globalThis, { __fregatQueryClients: queryClients })
 
 export function primaryQueryClient(): QueryClient {
   return queryClientFor(primaryServerOrigin())

@@ -1,9 +1,9 @@
 ---
-name: verify-platform
-description: Drive the Platform web app the way a user does and capture evidence — screenshots, console and network problems, log windows, Chrome traces, per-component render counts, and query-cache dumps. Use before calling any UI, performance, or render change done, for "verify this in the browser", "look at it", "trace it", "count renders", or "what is in the query cache".
+name: verify-fregat
+description: Drive the fregat web app the way a user does and capture evidence — screenshots, console and network problems, log windows, Chrome traces, per-component render counts, and query-cache dumps. Use before calling any UI, performance, or render change done, for "verify this in the browser", "look at it", "trace it", "count renders", or "what is in the query cache".
 ---
 
-# Verify Platform
+# Verify fregat
 
 The app is a Vite web client (`apps/web`) over a Bun server (`apps/server`). One CLI drives it: `bun run agent:browser`. Every verb writes an evidence directory and prints a summary short enough to read in one screen. The raw artifacts are for the human who disagrees with the summary.
 
@@ -39,7 +39,7 @@ The scenarios land on a workspace by registering a root-relative folder (`--work
 
 ## Evidence
 
-`/work/tmp/platform-evidence/<stamp>-<verb>-<label>/` holds `summary.md`, the screenshots, `observed.json` (page errors, console, failed requests, sockets), `logs.txt` (warn and error events written during the run) and the verb's artifact: `trace.json` for Chrome's Performance panel, `renders.json`, `caches.json`.
+`/work/tmp/fregat-evidence/<stamp>-<verb>-<label>/` holds `summary.md`, the screenshots, `observed.json` (page errors, console, failed requests, sockets), `logs.txt` (warn and error events written during the run) and the verb's artifact: `trace.json` for Chrome's Performance panel, `renders.json`, `caches.json`.
 
 Proof standards: exercise the real user path, not a setter. Capture the action and the resulting state, not just the final screen. Check side effects where they land: the file on disk, the log line, the cache entry. A claim about performance cites a `trace` summary before and after on the same scenario. A claim about fewer renders cites `renders` before and after. Read the screenshot back with the Read tool; a screenshot nobody looked at is not evidence.
 
