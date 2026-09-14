@@ -23,162 +23,175 @@ const demoUrl = import.meta.env.DEV
     <meta property="og:title" content={title} />
     <meta property="og:description" content={description} />
     <meta property="og:image" content={new URL(workbench.src, Astro.site)} />
+    <meta name="color-scheme" content="dark" />
     <link rel="icon" href={`${import.meta.env.BASE_URL}/favicon.svg`} type="image/svg+xml" />
     <link rel="preconnect" href="https://fonts.googleapis.com" />
     <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
     <link
       rel="stylesheet"
-      href="https://fonts.googleapis.com/css2?family=Cuprum:wght@400;700&family=Golos+Text:wght@400;500&family=PT+Mono&display=swap"
+      href="https://fonts.googleapis.com/css2?family=JetBrains+Mono:wght@400;500;600&display=swap"
     />
   </head>
   <body>
-    <div class="sheet">
-      <header class="wrap top">
-        <a class="wordmark" href={import.meta.env.BASE_URL}>
-          <svg viewBox="0 0 32 32" aria-hidden="true">
-            <g fill="none" stroke="currentColor" stroke-width="2">
-              <circle cx="26" cy="16" r="5" />
-              <circle cx="21" cy="24.7" r="5" />
-              <circle cx="11" cy="24.7" r="5" />
-              <circle cx="6" cy="16" r="5" />
-              <circle cx="11" cy="7.3" r="5" />
-              <circle cx="21" cy="7.3" r="5" />
-            </g>
-          </svg>
-          fregat<small>Фрегат</small>
-        </a>
-        <nav>
-          <a href="#parts-heading">what's inside</a>
-          <a href="#name-heading">the name</a>
-          <a href="#try-heading">try it</a>
-          <a class="button small" href="https://github.com/ShaulLavo/fregat">github</a>
-        </nav>
-      </header>
+    <header class="top">
+      <a class="wordmark" href={import.meta.env.BASE_URL}>
+        <svg viewBox="0 0 32 32" aria-hidden="true">
+          <g fill="none" stroke="currentColor" stroke-width="2">
+            <circle cx="26" cy="16" r="5" />
+            <circle cx="21" cy="24.7" r="5" />
+            <circle cx="11" cy="24.7" r="5" />
+            <circle cx="6" cy="16" r="5" />
+            <circle cx="11" cy="7.3" r="5" />
+            <circle cx="21" cy="7.3" r="5" />
+          </g>
+        </svg>
+        fregat<small>Фрегат</small>
+      </a>
+      <nav>
+        <a href="#parts">what's inside</a>
+        <a href="#agents">agents</a>
+        <a href="#name">the name</a>
+        <a href="#try">try it</a>
+        <a class="button small" href="https://github.com/ShaulLavo/fregat">github</a>
+      </nav>
+    </header>
 
-      <main>
-        <section class="hero" aria-labelledby="hero-heading">
-          <div class="wrap hero-copy">
-            <h1 id="hero-heading">an open cursor, built from scratch</h1>
-            <p>claude code and codex inside, on the subscriptions you already have.</p>
-            <div class="actions">
-              <a class="button" href="https://github.com/ShaulLavo/fregat">get the source</a>
-              <a class="button ghost" href="#try-heading">run it locally</a>
-              <span class="status">no releases yet</span>
+    <main>
+      <section class="hero" aria-labelledby="hero-heading">
+        <div class="hero-copy">
+          <h1 id="hero-heading">an open cursor, built from scratch</h1>
+          <p>claude code and codex inside, on the subscriptions you already have.</p>
+          <div class="actions">
+            <a class="button" href="https://github.com/ShaulLavo/fregat">get the source</a>
+            <a class="button ghost" href="#try">run it locally</a>
+            <span class="status">no releases yet</span>
+          </div>
+        </div>
+        <figure class="shot">
+          <div class="product-stage">
+            <Image
+              class="wallpaper"
+              src={wallpaper}
+              alt=""
+              loading="eager"
+              width={1600}
+              widths={[800, 1600, 2400]}
+              sizes="(min-width: 1440px) 1440px, 100vw"
+              quality={85}
+            />
+            <div class="workbench" id="demo-frame" aria-busy="true" data-demo-url={demoUrl}>
+              <iframe
+                id="workbench-demo"
+                title="Interactive fregat demo with simulated files, terminal and agents"
+                width="1360"
+                height="840"
+                allow="fullscreen"
+              ></iframe>
             </div>
           </div>
-          <figure class="shot">
-            <div class="product-stage">
-              <Image
-                class="wallpaper"
-                src={wallpaper}
-                alt=""
-                loading="eager"
-                width={1600}
-                widths={[800, 1600, 2400]}
-                sizes="(min-width: 1440px) 1440px, 100vw"
-                quality={85}
-              />
-              <div class="workbench" id="demo-frame" aria-busy="true" data-demo-url={demoUrl}>
-                <iframe
-                  id="workbench-demo"
-                  title="Interactive fregat demo with simulated files, terminal and agents"
-                  width="1360"
-                  height="840"
-                  allow="fullscreen"
-                ></iframe>
-              </div>
+          <figcaption class="statusbar">
+            <span>interactive demo. simulated workspace, terminal and agents</span>
+            <div class="demo-actions">
+              <span id="demo-status" role="status">loading demo…</span>
+              <button type="button" id="demo-reset" aria-controls="workbench-demo">reset</button>
+              <a href={demoUrl} target="_blank" rel="noopener">open full size</a>
+              <a href={wallpaper.src}>wallpaper</a>
             </div>
-            <figcaption>
-              <span>interactive demo · simulated workspace, terminal and agents</span>
-              <div class="demo-actions">
-                <span id="demo-status" role="status">loading demo…</span>
-                <button type="button" id="demo-reset" aria-controls="workbench-demo">reset demo</button>
-                <a href={demoUrl} target="_blank" rel="noopener">open full size ↗</a>
-                <a href={wallpaper.src}>wallpaper</a>
-              </div>
-            </figcaption>
-          </figure>
-        </section>
+          </figcaption>
+        </figure>
+      </section>
 
-        <section class="wrap section" aria-labelledby="parts-heading">
-          <h2 id="parts-heading">open a folder and this is what's in the window</h2>
-          <dl class="parts">
-            <div>
-              <dt>editor</dt>
-              <dd>
-                <a href="https://github.com/ShaulLavo/singapore">singapore</a>, written from
-                scratch. piece table storage, tree-sitter for syntax, language servers for the rest.
-              </dd>
-            </div>
-            <div>
-              <dt>terminal</dt>
-              <dd>
-                <a href="https://github.com/ShaulLavo/ghostty-webgpu">ghostty-webgpu</a>, real
-                ghostty compiled to wasm, in a pane next to the code.
-              </dd>
-            </div>
-            <div>
-              <dt>agents</dt>
-              <dd>
-                claude code and codex, side by side. each in its own session, each with its own
-                permission mode.
-              </dd>
-            </div>
-            <div>
-              <dt>git</dt>
-              <dd>status, diffs, branches and commits in the same window, watched live.</dd>
-            </div>
-            <div>
-              <dt>anywhere</dt>
-              <dd>
-                the server runs on your machine. the same workspace opens from a browser, the
-                desktop app, a terminal, or a phone over tailscale.
-              </dd>
-            </div>
-          </dl>
-        </section>
-
-        <section class="wrap section" aria-labelledby="agents-heading">
-          <h2 id="agents-heading">your agents, on your account</h2>
-          <div class="sessions" aria-hidden="true">
-            <div class="session">
-              <header><span>claude code</span><span>approval required</span></header>
-              <ol>
-                <li><b>&gt;</b> move the settings registry into contracts</li>
-                <li>reading packages/contracts/src/settings/keys.ts</li>
-                <li><i>edit</i> keys.ts, 3 changes. allow?</li>
-              </ol>
-            </div>
-            <div class="session">
-              <header><span>codex</span><span>full access</span></header>
-              <ol>
-                <li><b>&gt;</b> why does the tree typecheck fail on a clean checkout</li>
-                <li>running bun run --filter @workspace/tree typecheck</li>
-                <li><i>found</i> zustand declared, never installed</li>
-              </ol>
-            </div>
+      <div class="wrap panes">
+        <section class="pane" id="parts" aria-labelledby="parts-heading">
+          <div class="bar"><span>what's inside</span><span class="count">5</span></div>
+          <div class="pane-body">
+            <h2 id="parts-heading">open a folder and this is what's in the window</h2>
+            <dl class="parts">
+              <div>
+                <dt>editor</dt>
+                <dd>
+                  <a href="https://github.com/ShaulLavo/singapore">singapore</a>, written from
+                  scratch. piece table storage, tree-sitter for syntax, language servers for the
+                  rest.
+                </dd>
+              </div>
+              <div>
+                <dt>terminal</dt>
+                <dd>
+                  <a href="https://github.com/ShaulLavo/ghostty-webgpu">ghostty-webgpu</a>, real
+                  ghostty compiled to wasm, in a pane next to the code.
+                </dd>
+              </div>
+              <div>
+                <dt>agents</dt>
+                <dd>
+                  claude code and codex, side by side. each in its own session, each with its own
+                  permission mode.
+                </dd>
+              </div>
+              <div>
+                <dt>git</dt>
+                <dd>status, diffs, branches and commits in the same window, watched live.</dd>
+              </div>
+              <div>
+                <dt>anywhere</dt>
+                <dd>
+                  the server runs on your machine. the same workspace opens from a browser, the
+                  desktop app, a terminal, or a phone over tailscale.
+                </dd>
+              </div>
+            </dl>
           </div>
-          <p>
-            sign in from inside the app, against your own claude or openai account. no accounts
-            here, nothing proxied. run both at once. claude code takes full access, approval
-            required, or auto accept edits. codex runs full access.
-          </p>
         </section>
 
-        <section class="wrap section" aria-labelledby="where-heading">
-          <h2 id="where-heading">why not fork vs code</h2>
-          <p>
-            a fork inherits vs code's editor, its extension model and its release cadence. fregat
-            owns all three, so an agent is a pane the same way the terminal is, not a panel added
-            to someone else's shell. t3 code has the same idea about agents and stops at the
-            harness.
-          </p>
+        <section class="pane" id="agents" aria-labelledby="agents-heading">
+          <div class="bar"><span>agents</span><span class="count">2</span></div>
+          <div class="pane-body">
+            <h2 id="agents-heading">your agents, on your account</h2>
+            <div class="sessions" aria-hidden="true">
+              <div class="session">
+                <div class="bar"><span>claude code</span><span class="mode">approval required</span></div>
+                <ol>
+                  <li><b>&gt;</b> move the settings registry into contracts</li>
+                  <li>reading packages/contracts/src/settings/keys.ts</li>
+                  <li><i>edit</i> keys.ts, 3 changes. allow?</li>
+                </ol>
+              </div>
+              <div class="session">
+                <div class="bar"><span>codex</span><span class="mode">full access</span></div>
+                <ol>
+                  <li><b>&gt;</b> why does the tree typecheck fail on a clean checkout</li>
+                  <li>running bun run --filter @workspace/tree typecheck</li>
+                  <li><i>found</i> zustand declared, never installed</li>
+                </ol>
+              </div>
+            </div>
+            <p>
+              sign in from inside the app, against your own claude or openai account. no accounts
+              here, nothing proxied. run both at once. claude code takes full access, approval
+              required, or auto accept edits. codex runs full access.
+            </p>
+          </div>
         </section>
 
-        <section class="wrap section" aria-labelledby="name-heading">
-          <h2 id="name-heading">why fregat</h2>
-          <div class="name">
+        <section class="pane" id="why" aria-labelledby="where-heading">
+          <div class="bar"><span>why not fork vs code</span></div>
+          <div class="pane-body">
+            <h2 id="where-heading">a fork inherits the shell. fregat owns it.</h2>
+            <p>
+              a fork inherits vs code's editor, its extension model and its release cadence. fregat
+              owns all three, so an agent is a pane the same way the terminal is, not a panel added
+              to someone else's shell. t3 code has the same idea about agents and stops at the
+              harness.
+            </p>
+          </div>
+        </section>
+
+        <section class="pane" id="name" aria-labelledby="name-heading">
+          <div class="bar"><span>the name</span><span class="mode">фрегат</span></div>
+          <div class="pane-body name">
             <div>
+              <h2 id="name-heading">why fregat</h2>
               <p>
                 фрегат is the upper stage that rides on top of a soyuz. the rocket gets it out of
                 the atmosphere, then it flies the rest on its own: its own engine, its own
@@ -193,68 +206,74 @@ const demoUrl = import.meta.env.DEV
               </p>
             </div>
             <div class="aside">
-            <figure class="drawing">
-              <Drawing />
-              <figcaption>
-                <b>fig. 2</b> the stage from above (a) and from the side (b). six tanks in a ring,
-                one engine, dimensions in millimetres.
-              </figcaption>
-            </figure>
-            <dl class="spec">
-              <div><dt>built by</dt><dd>npo lavochkin, khimki</dd></div>
-              <div><dt>first flight</dt><dd>february 2000</dd></div>
-              <div><dt>tanks</dt><dd>6, in a ring</dd></div>
-              <div><dt>engine</dt><dd>s5.92, 19.85 kn</dd></div>
-              <div><dt>restarts</dt><dd>up to 7</dd></div>
-              <div><dt>diameter</dt><dd>3 440 mm</dd></div>
-              <div><dt>height</dt><dd>1 875 mm</dd></div>
-              <div><dt>payloads flown</dt><dd>300 and counting</dd></div>
-            </dl>
+              <figure class="drawing">
+                <Drawing />
+                <figcaption>
+                  <b>fig. 1</b> the stage from above (a) and from the side (b). six tanks in a
+                  ring, one engine, dimensions in millimetres.
+                </figcaption>
+              </figure>
+              <dl class="spec">
+                <div><dt>built by</dt><dd>npo lavochkin, khimki</dd></div>
+                <div><dt>first flight</dt><dd>february 2000</dd></div>
+                <div><dt>tanks</dt><dd>6, in a ring</dd></div>
+                <div><dt>engine</dt><dd>s5.92, 19.85 kn</dd></div>
+                <div><dt>restarts</dt><dd>up to 7</dd></div>
+                <div><dt>diameter</dt><dd>3 440 mm</dd></div>
+                <div><dt>height</dt><dd>1 875 mm</dd></div>
+                <div><dt>payloads flown</dt><dd>300 and counting</dd></div>
+              </dl>
             </div>
           </div>
         </section>
 
-        <section class="wrap section" aria-labelledby="try-heading">
-          <h2 id="try-heading">try it</h2>
-          <ul class="prereqs">
-            <li><b>bun</b>, and at least one of</li>
-            <li><b>claude code</b>: <code>claude auth login</code>, or sign in from the app</li>
-            <li><b>codex</b>: install the cli, then <code>codex login</code></li>
-          </ul>
-          <pre><code>git clone https://github.com/ShaulLavo/fregat
+        <section class="pane" id="try" aria-labelledby="try-heading">
+          <div class="bar"><span>try it</span></div>
+          <div class="pane-body">
+            <h2 id="try-heading">clone it and run it</h2>
+            <ul class="prereqs">
+              <li><b>bun</b>, and at least one of</li>
+              <li><b>claude code</b>: <code>claude auth login</code>, or sign in from the app</li>
+              <li><b>codex</b>: install the cli, then <code>codex login</code></li>
+            </ul>
+            <div class="terminal">
+              <div class="bar"><span>terminal</span><span class="mode">bash</span></div>
+              <pre><code>git clone https://github.com/ShaulLavo/fregat
 <span class="c"># singapore and ghostty-webgpu go beside it, linked. the readme has the steps</span>
 cd fregat
 bun install
 bun run dev
 <span class="c"># open the url it prints, pick a folder</span></code></pre>
+            </div>
+          </div>
         </section>
-      </main>
+      </div>
+    </main>
 
-      <footer class="wrap foot">
-        <dl class="block">
-          <div>
-            <dt>name</dt>
-            <dd><a href="https://github.com/ShaulLavo/fregat">fregat</a></dd>
-          </div>
-          <div>
-            <dt>editor</dt>
-            <dd><a href="https://github.com/ShaulLavo/singapore">singapore</a></dd>
-          </div>
-          <div>
-            <dt>terminal</dt>
-            <dd><a href="https://github.com/ShaulLavo/ghostty-webgpu">ghostty-webgpu</a></dd>
-          </div>
-          <div>
-            <dt>revision</dt>
-            <dd>0.0.1, no releases</dd>
-          </div>
-          <div>
-            <dt>made by</dt>
-            <dd>shaul lavochkin</dd>
-          </div>
-        </dl>
-      </footer>
-    </div>
+    <footer class="foot">
+      <dl class="block">
+        <div>
+          <dt>name</dt>
+          <dd><a href="https://github.com/ShaulLavo/fregat">fregat</a></dd>
+        </div>
+        <div>
+          <dt>editor</dt>
+          <dd><a href="https://github.com/ShaulLavo/singapore">singapore</a></dd>
+        </div>
+        <div>
+          <dt>terminal</dt>
+          <dd><a href="https://github.com/ShaulLavo/ghostty-webgpu">ghostty-webgpu</a></dd>
+        </div>
+        <div>
+          <dt>revision</dt>
+          <dd>0.0.1, no releases</dd>
+        </div>
+        <div>
+          <dt>made by</dt>
+          <dd>shaul lavochkin</dd>
+        </div>
+      </dl>
+    </footer>
   </body>
 </html>
 
