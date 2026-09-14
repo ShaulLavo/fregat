@@ -9,6 +9,7 @@ export type Scenario = {
   readonly name: string
   readonly description: string
   readonly run: (page: Page, context: ScenarioContext) => Promise<void>
+  readonly inspect?: (page: Page) => Promise<unknown>
 }
 
 import { editorFastScroll } from './editor-fast-scroll'
@@ -17,6 +18,7 @@ import { editorTypeBurst } from './editor-type-burst'
 import { editorCaretBurst } from './editor-caret-burst'
 import { editorFocusClicks } from './editor-focus-clicks'
 import { editorProduct } from './editor-product'
+import { treeStickyScroll } from './tree-sticky-scroll'
 
 export const scenarios: readonly Scenario[] = [
   editorLargePaste,
@@ -25,6 +27,7 @@ export const scenarios: readonly Scenario[] = [
   editorCaretBurst,
   editorFocusClicks,
   editorProduct,
+  treeStickyScroll,
 ]
 
 export function scenarioNamed(name: string): Scenario {

@@ -1062,6 +1062,8 @@ export function FileTreeView({
 
   const windowHeight = layoutSnapshot.window.height
   const windowOffsetTop = layoutSnapshot.window.offsetTop
+  const windowClipTop =
+    stickyOverlayHeight > 0 ? Math.max(0, layoutSnapshot.projected.paneTop - windowOffsetTop) : 0
   // The virtualized window is usually taller than the viewport once overscan
   // is included, so a negative sticky inset lets the overscanned slice hang
   // above and below the scroll container without pinning the element during
@@ -1339,6 +1341,10 @@ export function FileTreeView({
                   options={{
                     mode: 'sticky',
                     style: {
+                      clipPath:
+                        entry.top < index * itemHeight
+                          ? `inset(${index * itemHeight - entry.top}px 0 0)`
+                          : undefined,
                       left: '0',
                       position: 'absolute',
                       right: '0',
@@ -1364,6 +1370,7 @@ export function FileTreeView({
           <div
             data-file-tree-virtualized-sticky='true'
             style={{
+              clipPath: windowClipTop > 0 ? `inset(${windowClipTop}px 0 0)` : undefined,
               height: `${windowHeight}px`,
               top: `${windowStickyTopInset}px`,
               bottom: `${windowStickyBottomInset}px`,

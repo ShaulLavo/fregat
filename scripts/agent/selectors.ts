@@ -2,6 +2,7 @@ import type { Page } from 'playwright'
 
 // Stable handles the app already exposes. Add here, never inline a selector in a scenario.
 export const selectors = {
+  folderTree: (page: Page) => page.getByLabel('Folder tree', { exact: true }),
   editorInput: (page: Page) => page.getByRole('textbox', { name: 'Editor input' }),
   editorSurface: (page: Page) => page.locator('.editor-virtualized-viewport'),
   terminalSurface: (page: Page) => page.getByRole('region', { name: 'Terminal', exact: true }),

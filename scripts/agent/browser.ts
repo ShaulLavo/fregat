@@ -174,12 +174,15 @@ async function runScenario(scenario: Scenario, options: Options) {
     const step = async (label: string) => {
       const file = `${String(steps.length + 1).padStart(2, '0')}-${label}.png`
       await page.screenshot({ path: evidence.file(file) })
+      if (scenario.inspect)
+        await evidence.json(file.replace('.png', '.json'), await scenario.inspect(page))
       steps.push(file)
     }
     const started = performance.now()
     let failure: string | null = null
     try {
       await scenario.run(page, { file: options.file, step })
+      if (scenario.inspect) await evidence.json('inspection.json', await scenario.inspect(page))
     } catch (error) {
       failure = error instanceof Error ? error.message : String(error)
       await page.screenshot({ path: evidence.file('failure.png') }).catch(() => undefined)

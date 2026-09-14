@@ -1,8 +1,10 @@
 import type { Scenario } from './index'
+import { inspectTreeOcclusion } from '../tree-occlusion'
 import { chords, focusEditor, openFileByName, selectors } from '../selectors'
 
 export const editorProduct: Scenario = {
   name: 'editor-product',
+  inspect: inspectTreeOcclusion,
   description: 'Open real workbench source files for a high-resolution product capture.',
   async run(page, { file, step }) {
     await openFileByName(page, 'code-panel.tsx')

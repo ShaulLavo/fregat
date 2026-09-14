@@ -76,10 +76,11 @@ export async function routeProductWallpaper(page: Page, path: string, evidence: 
 }
 
 async function overrideSettings(route: Route) {
+  const headers = await route.request().allHeaders()
   const response = await route.fetch({
     headers: {
-      ...(await route.request().allHeaders()),
-      origin: new URL(route.request().url()).origin,
+      ...headers,
+      origin: headers.origin ?? new URL(route.request().url()).origin,
     },
   })
   const snapshot: unknown = await response.json().catch(() => null)
