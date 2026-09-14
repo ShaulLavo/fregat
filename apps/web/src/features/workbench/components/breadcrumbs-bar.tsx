@@ -1,4 +1,5 @@
-import { useState, type KeyboardEvent } from 'react'
+import { memo, useState, type KeyboardEvent } from 'react'
+import type { ReactEditorController } from '@singapore-editor/react'
 
 import { Breadcrumb, BreadcrumbList } from '@workspace/ui/components/breadcrumb'
 
@@ -7,34 +8,29 @@ import { BreadcrumbFolderPicker } from '@/features/workbench/components/breadcru
 import { BreadcrumbItem } from '@/features/workbench/components/breadcrumb-item'
 import { BreadcrumbSymbolPicker } from '@/features/workbench/components/breadcrumb-symbol-picker'
 import { SymbolKindIcon } from '@/features/workbench/components/symbol-kind-icon'
-import { useDocumentSymbolTree } from '@/features/workbench/hooks/use-document-symbol-tree'
-import {
-  breadcrumbPathItems,
-  symbolChainAtCursor,
-  symbolRowKey,
-  type EditorCursor,
-} from '@/features/workbench/utils/breadcrumbs'
+import { breadcrumbPathItems, symbolRowKey } from '@/features/workbench/utils/breadcrumbs'
 import { filesystemPath } from '@/lib/documents/utils/identity'
 import type { FilesystemPath } from '@/lib/documents/utils/types'
 import { fileUriForPath, type DocumentSymbol } from '@/lib/document-symbols'
 import { fileIconStyle } from '@/lib/file-icon-style'
 import { iconForEntry } from '@/lib/file-icons'
 
-export function BreadcrumbsBar({
-  cursor,
+// Cursor and document revisions leave this row unchanged until its symbol path or tree changes.
+export const BreadcrumbsBar = memo(function BreadcrumbsBar({
+  controller,
+  symbols,
+  symbolChain,
   filePath,
   rootPath,
-  onFocusEditor,
 }: {
-  readonly cursor: EditorCursor | null
+  readonly controller: ReactEditorController | null
+  readonly symbols: readonly DocumentSymbol[]
+  readonly symbolChain: readonly DocumentSymbol[]
   readonly filePath: FilesystemPath
   readonly rootPath: FilesystemPath
-  readonly onFocusEditor?: () => void
 }) {
   const { openDefinition, openFileSurface } = useEditorCommands()
-  const symbols = useDocumentSymbolTree(rootPath, filePath)
   const pathItems = breadcrumbPathItems(rootPath, filePath)
-  const symbolChain = symbolChainAtCursor(symbols, cursor)
   const [openKey, setOpenKey] = useState<string | null>(null)
 
   function handleKeyDown(event: KeyboardEvent<HTMLElement>) {
@@ -62,7 +58,7 @@ export function BreadcrumbsBar({
       path: filePath,
       range: symbol.selectionRange,
       uri: fileUriForPath(filePath),
-    }).then(() => onFocusEditor?.())
+    }).then(() => controller?.commands.focus())
   }
 
   return (
@@ -123,4 +119,4 @@ export function BreadcrumbsBar({
       </BreadcrumbList>
     </Breadcrumb>
   )
-}
+})

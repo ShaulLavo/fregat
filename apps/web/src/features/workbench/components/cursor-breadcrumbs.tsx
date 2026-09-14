@@ -2,25 +2,29 @@ import type { ReactEditorController } from '@singapore-editor/react'
 
 import type { FilesystemPath } from '@/lib/documents/utils/types'
 import { BreadcrumbsBar } from '@/features/workbench/components/breadcrumbs-bar'
-import { useEditorCursor } from '@/features/workbench/hooks/use-editor-cursor'
+import { useEditorSymbolChain } from '@/features/workbench/hooks/use-editor-symbol-chain'
+import type { DocumentSymbol } from '@/lib/document-symbols'
 
 export function CursorBreadcrumbs({
   controller,
+  symbols,
   filePath,
   rootPath,
 }: {
   readonly controller: ReactEditorController
+  readonly symbols: readonly DocumentSymbol[]
   readonly filePath: FilesystemPath
   readonly rootPath: FilesystemPath
 }) {
-  const cursor = useEditorCursor(controller)
+  const symbolChain = useEditorSymbolChain(controller, symbols)
 
   return (
     <BreadcrumbsBar
-      cursor={cursor}
+      controller={controller}
+      symbols={symbols}
+      symbolChain={symbolChain}
       filePath={filePath}
       rootPath={rootPath}
-      onFocusEditor={() => controller.commands.focus()}
     />
   )
 }

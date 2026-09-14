@@ -12,6 +12,15 @@ export type BreadcrumbPathItem = {
 
 export type EditorCursor = { readonly row: number; readonly column: number }
 
+export const EMPTY_SYMBOL_CHAIN: readonly DocumentSymbol[] = []
+
+export function symbolChainsEqual(
+  current: readonly DocumentSymbol[],
+  next: readonly DocumentSymbol[],
+): boolean {
+  return current.length === next.length && current.every((symbol, index) => symbol === next[index])
+}
+
 export function breadcrumbPathItems(rootPath: string, filePath: string): BreadcrumbPathItem[] {
   const segments = toTreePath(filePath, rootPath).split('/').filter(Boolean)
   const items: BreadcrumbPathItem[] = []

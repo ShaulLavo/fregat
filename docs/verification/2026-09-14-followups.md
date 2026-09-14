@@ -28,3 +28,29 @@ The same `bun run agent:browser renders editor-type-burst` measured preview **27
 - After renders: `/work/tmp/platform-evidence/20260914T125607Z-renders-editor-type-burst/`.
 - Before screenshots, inspected: `/work/tmp/platform-evidence/20260914T125230Z-scenario-editor-type-burst/`.
 - After screenshot, inspected: `/work/tmp/platform-evidence/20260914T125653Z-scenario-editor-type-burst/02-typed.png`.
+
+## 3. Breadcrumb row
+
+Cursor coordinates and pre-debounce document revisions both caused the breadcrumb row to rebuild every icon, picker and popover callback.
+
+`EditorBreadcrumbs` now owns the symbol query. The cursor hook selects the enclosing symbol chain using symbol identity, and one memo boundary protects `BreadcrumbsBar`. The row receives the stable editor controller for focus. Refreshed symbols still update navigation targets and picker contents.
+
+The same render command measured:
+
+| Component      | Before | After |
+| -------------- | -----: | ----: |
+| BreadcrumbsBar |    291 |     1 |
+| BreadcrumbItem |  4,074 |    14 |
+| PopoverTrigger |  4,074 |    14 |
+| FloatingTree   |  2,050 |    20 |
+
+FloatingTree's reported render duration fell from 233.1ms to 2.9ms. The tool currently records React actualDuration, so this is subtree render duration, not exclusive self time.
+
+- Before renders: `/work/tmp/platform-evidence/20260914T125607Z-renders-editor-type-burst/`.
+- After renders: `/work/tmp/platform-evidence/20260914T125945Z-renders-editor-type-burst/`.
+- Original baseline trace: `/work/tmp/platform-evidence/20260914T125712Z-trace-editor-type-burst/`.
+- First after trace: `/work/tmp/platform-evidence/20260914T125959Z-trace-editor-type-burst/`. This was slower overall, with different language-server state. It is retained rather than treated as a speedup.
+- Repeated baseline with the breadcrumb patch temporarily reversed: `/work/tmp/platform-evidence/20260914T130047Z-trace-editor-type-burst/`.
+- Restored fix, `trace editor-type-burst --compare` against that baseline: `/work/tmp/platform-evidence/20260914T130133Z-trace-editor-type-burst/`. Scripting 5,404.4 → 3,452.2ms, tasks over 16ms 218 → 127, tasks over 50ms 13 → 7. This is one consecutive pair on the shared dev server, not an isolated benchmark.
+- Focused checks: `item3-checks.txt` in the original baseline trace directory. Eight tests pass, including scope crossings and refreshed navigation targets, plus web typecheck and lint.
+- Before screenshot: `/work/tmp/platform-evidence/20260914T125653Z-scenario-editor-type-burst/02-typed.png`. After screenshot: `/work/tmp/platform-evidence/20260914T130202Z-scenario-editor-type-burst/02-typed.png`. Both inspected.

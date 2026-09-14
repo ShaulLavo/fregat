@@ -1,9 +1,11 @@
-import { describe, expect, test } from 'vitest'
+import { describe } from 'vitest'
+import { expect, test } from '../../../../test/fixtures'
 
 import {
   breadcrumbPathItems,
   sortPickerEntries,
   symbolChainAtCursor,
+  symbolChainsEqual,
 } from '@/features/workbench/utils/breadcrumbs'
 import type { DocumentSymbol } from '@/lib/document-symbols'
 import type { TreeEntry } from '@/lib/file-system-types'
@@ -67,6 +69,33 @@ describe('symbolChainAtCursor', () => {
     const chain = symbolChainAtCursor(outline, { column: 2, row: 8 })
 
     expect(chain.map((item) => item.name)).toEqual(['Widget', 'render'])
+  })
+
+  test('cursor moves inside one scope keep the chain equal, crossing scopes changes it', () => {
+    const insideRender = symbolChainAtCursor(outline, { column: 2, row: 8 })
+
+    expect(
+      symbolChainsEqual(insideRender, symbolChainAtCursor(outline, { column: 5, row: 9 })),
+    ).toBe(true)
+    expect(
+      symbolChainsEqual(insideRender, symbolChainAtCursor(outline, { column: 2, row: 13 })),
+    ).toBe(false)
+    expect(
+      symbolChainsEqual(insideRender, symbolChainAtCursor(outline, { column: 0, row: 16 })),
+    ).toBe(false)
+  })
+
+  test('a refreshed symbol with the same label replaces its navigation target', () => {
+    const previous = symbol('render', 6, 10)
+    const refreshed = symbol('render', 7, 11)
+    const cursor = { column: 2, row: 8 }
+
+    expect(
+      symbolChainsEqual(
+        symbolChainAtCursor([previous], cursor),
+        symbolChainAtCursor([refreshed], cursor),
+      ),
+    ).toBe(false)
   })
 
   test('stops at the deepest symbol that still contains the caret', () => {
