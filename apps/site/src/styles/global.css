@@ -1,13 +1,13 @@
 :root {
-  /* soyuz paint, fregat foil, drafting ink */
-  --paint: #dde2d8;
-  --paint-deep: #cdd3c7;
-  --ink: #171c19;
-  --muted: #535d56;
-  --foil: #c08a1e;
-  --foil-wash: rgba(192, 138, 30, 0.22);
-  --line: rgba(23, 28, 25, 0.16);
-  --line-strong: rgba(23, 28, 25, 0.42);
+  /* drafting film in the dark, soyuz grey-green ink, fregat foil */
+  --paint: #0f1311;
+  --paint-deep: #161b18;
+  --ink: #dde2d8;
+  --muted: #8d978f;
+  --foil: #d9a441;
+  --foil-wash: rgba(217, 164, 65, 0.16);
+  --line: rgba(221, 226, 216, 0.1);
+  --line-strong: rgba(221, 226, 216, 0.28);
 
   --display: 'Cuprum', 'Arial Narrow', 'Helvetica Neue', sans-serif;
   --text: 'Golos Text', 'Helvetica Neue', Arial, sans-serif;
@@ -20,7 +20,7 @@
   --ease-out: cubic-bezier(0.23, 1, 0.32, 1);
   --ease-in-out: cubic-bezier(0.77, 0, 0.175, 1);
 
-  color-scheme: light;
+  color-scheme: dark;
 }
 
 *,
@@ -98,8 +98,21 @@ pre {
   display: flex;
   align-items: center;
   justify-content: space-between;
-  padding-block: 1.1rem;
+  gap: 1rem;
+  padding-block: 1rem;
   border-bottom: 1px solid var(--line);
+}
+
+.top nav {
+  display: flex;
+  align-items: center;
+  gap: 1.5rem;
+}
+
+@media (max-width: 719px) {
+  .top nav a:not(.button) {
+    display: none;
+  }
 }
 
 .wordmark {
@@ -124,14 +137,14 @@ pre {
   font-size: 0.85em;
 }
 
-.top nav a {
+.top nav a:not(.button) {
   color: var(--muted);
   text-decoration: none;
   transition: color 160ms ease;
 }
 
 @media (hover: hover) and (pointer: fine) {
-  .top nav a:hover {
+  .top nav a:not(.button):hover {
     color: var(--ink);
   }
 }
@@ -139,34 +152,100 @@ pre {
 /* hero */
 
 .hero {
-  display: grid;
-  grid-template-columns: 1fr;
-  gap: 2.5rem var(--gutter);
-  align-items: center;
-  padding-block: clamp(2.5rem, 6vw, 5rem) clamp(2rem, 5vw, 4rem);
+  position: relative;
+  overflow: hidden;
+  padding-top: clamp(4rem, 10vw, 8rem);
+  border-bottom: 1px solid var(--line);
 }
 
-@media (min-width: 900px) {
-  .hero {
-    grid-template-columns: minmax(0, 7fr) minmax(0, 5fr);
-  }
+/* graph-paper ruling, fading out below the copy */
+.hero::before {
+  content: '';
+  position: absolute;
+  inset: 0;
+  pointer-events: none;
+  background-image:
+    linear-gradient(var(--line) 1px, transparent 1px),
+    linear-gradient(90deg, var(--line) 1px, transparent 1px);
+  background-size: 48px 48px;
+  background-position: center top;
+  -webkit-mask-image: linear-gradient(to bottom, #000, transparent 60%);
+  mask-image: linear-gradient(to bottom, #000, transparent 60%);
+}
+
+.backdrop {
+  position: absolute;
+  inset: 0;
+  display: flex;
+  justify-content: center;
+  pointer-events: none;
+  -webkit-mask-image: linear-gradient(to bottom, #000 30%, transparent 62%);
+  mask-image: linear-gradient(to bottom, #000 30%, transparent 62%);
+}
+
+.backdrop svg {
+  width: min(120vw, 1100px);
+  height: auto;
+  margin-top: calc(clamp(4rem, 10vw, 8rem) - 14vw);
+  flex: none;
+}
+
+.backdrop .stroke {
+  fill: none;
+  stroke: var(--ink);
+  stroke-opacity: 0.16;
+  stroke-width: 1;
+  vector-effect: non-scaling-stroke;
+}
+
+.backdrop .thin,
+.backdrop .dim {
+  stroke-width: 0.6;
+}
+
+.backdrop .hidden {
+  stroke-dasharray: 6 5;
+}
+
+.backdrop .centre {
+  stroke-dasharray: 18 5 3 5;
+}
+
+.backdrop .tank {
+  fill: var(--foil);
+  fill-opacity: 0.06;
+}
+
+.backdrop text {
+  font-family: var(--display);
+  font-size: 15px;
+  fill: var(--ink);
+  fill-opacity: 0.35;
+}
+
+.hero-copy {
+  position: relative;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  text-align: center;
 }
 
 .hero h1 {
   margin: 0;
   font-family: var(--display);
-  font-size: clamp(3rem, 9vw, 7.5rem);
+  font-size: clamp(3rem, 8vw, 6.5rem);
   font-weight: 700;
-  line-height: 0.92;
+  line-height: 0.95;
   letter-spacing: -0.015em;
-  max-width: 11ch;
+  max-width: 14ch;
   text-wrap: balance;
 }
 
 .hero p {
-  margin: 1.75rem 0 0;
-  max-width: 46ch;
-  font-size: clamp(1.05rem, 1.5vw, 1.2rem);
+  margin: 1.5rem 0 0;
+  max-width: 48ch;
+  font-size: clamp(1.05rem, 1.5vw, 1.25rem);
   color: var(--muted);
   text-wrap: pretty;
 }
@@ -174,20 +253,22 @@ pre {
 .hero .actions {
   display: flex;
   flex-wrap: wrap;
+  justify-content: center;
   align-items: center;
-  gap: 1.25rem;
+  gap: 0.75rem;
   margin-top: 2rem;
 }
 
 .button {
   display: inline-block;
-  padding: 0.7rem 1.15rem;
+  padding: 0.75rem 1.25rem;
   background: var(--ink);
   color: var(--paint);
+  border: 1px solid var(--ink);
   border-radius: 3px;
   font-family: var(--display);
   font-weight: 700;
-  font-size: 1.1rem;
+  font-size: 1.15rem;
   line-height: 1.2;
   text-decoration: none;
   transition: transform 160ms var(--ease-out);
@@ -197,23 +278,28 @@ pre {
   transform: scale(0.97);
 }
 
-.status {
+.button.ghost {
+  background: transparent;
+  color: var(--ink);
+  border-color: var(--line-strong);
+}
+
+.button.small {
+  padding: 0.45rem 0.85rem;
+  font-size: 1rem;
+}
+
+.hero .status {
+  margin-top: 1rem;
   color: var(--muted);
+  font-size: 0.95rem;
 }
 
 /* the drawing */
 
 .drawing {
-  margin: 0;
-  justify-self: center;
-  width: min(100%, 460px);
-}
-
-@media (min-width: 900px) {
-  .drawing {
-    justify-self: end;
-    width: 100%;
-  }
+  margin: 0 0 1.5rem;
+  width: min(100%, 420px);
 }
 
 .drawing svg {
@@ -278,10 +364,8 @@ pre {
 /* the shot */
 
 .shot {
-  margin: 0;
-  border-top: 1px solid var(--line);
-  border-bottom: 1px solid var(--line);
-  padding-block: clamp(1.5rem, 3vw, 2.5rem);
+  position: relative;
+  margin: clamp(3rem, 6vw, 5rem) 0 0;
 }
 
 .shot img {
@@ -289,10 +373,15 @@ pre {
   width: 100%;
   height: auto;
   border: 1px solid var(--line-strong);
+  border-radius: 6px 6px 0 0;
+  -webkit-mask-image: linear-gradient(to bottom, #000 78%, transparent 100%);
+  mask-image: linear-gradient(to bottom, #000 78%, transparent 100%);
 }
 
 .shot figcaption {
-  margin-top: 0.9rem;
+  position: absolute;
+  left: 0;
+  bottom: 0.5rem;
   color: var(--muted);
   font-size: 0.9rem;
 }
@@ -314,6 +403,10 @@ pre {
 
 .section + .section {
   border-top: 1px solid var(--line);
+}
+
+.wrap.section:first-of-type {
+  padding-top: clamp(1rem, 3vw, 2rem);
 }
 
 .section h2 {
@@ -394,9 +487,12 @@ pre {
   margin-top: 1rem;
 }
 
+.aside {
+  align-self: start;
+}
+
 .spec {
   margin: 0;
-  align-self: start;
   border-top: 1px solid var(--line-strong);
 }
 
@@ -570,7 +666,8 @@ pre .c {
 @media (prefers-reduced-motion: no-preference) {
   .hero h1,
   .hero p,
-  .hero .actions {
+  .hero .actions,
+  .hero .status {
     animation: rise 600ms var(--ease-out) both;
   }
 
@@ -580,6 +677,14 @@ pre .c {
 
   .hero .actions {
     animation-delay: 120ms;
+  }
+
+  .hero .status {
+    animation-delay: 160ms;
+  }
+
+  .shot img {
+    animation: reveal 900ms var(--ease-out) 200ms both;
   }
 
   .drawing .stroke {
@@ -629,6 +734,13 @@ pre .c {
 @keyframes appear {
   to {
     opacity: 1;
+  }
+}
+
+@keyframes reveal {
+  from {
+    opacity: 0;
+    transform: translateY(16px);
   }
 }
 

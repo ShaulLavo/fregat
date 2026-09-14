@@ -1,6 +1,7 @@
 ---
 import { Image } from 'astro:assets'
 import Drawing from '../components/Drawing.astro'
+import Backdrop from '../components/Backdrop.astro'
 import workbench from '../assets/workbench.webp'
 import '../styles/global.css'
 
@@ -44,48 +45,44 @@ const description =
           fregat<small>Фрегат</small>
         </a>
         <nav>
-          <a href="https://github.com/ShaulLavo/fregat">github</a>
+          <a href="#parts-heading">what's inside</a>
+          <a href="#name-heading">the name</a>
+          <a href="#try-heading">try it</a>
+          <a class="button small" href="https://github.com/ShaulLavo/fregat">github</a>
         </nav>
       </header>
 
       <main>
-        <section class="wrap hero">
-          <div>
+        <section class="hero">
+          <div class="backdrop"><Backdrop /></div>
+          <div class="wrap hero-copy">
             <h1>an open cursor, built from scratch</h1>
             <p>
               a code editor with claude code and codex inside, on the subscriptions you already
-              have. nothing here is forked from vs code. the editor, the terminal and the shell are
-              written from the ground up.
+              have. nothing here is forked from vs code.
             </p>
             <div class="actions">
               <a class="button" href="https://github.com/ShaulLavo/fregat">get the source</a>
-              <span class="status">no releases yet. clone it and run it.</span>
+              <a class="button ghost" href="#try-heading">run it locally</a>
             </div>
+            <span class="status">no releases yet. clone it and run it.</span>
           </div>
-          <figure class="drawing">
-            <Drawing />
-            <figcaption>
-              <b>fig. 1</b> the fregat upper stage, from above (a) and from the side (b). six
-              tanks in a ring, one engine, dimensions in millimetres.
-            </figcaption>
-          </figure>
+          <div class="wrap">
+            <figure class="shot">
+              <Image
+                src={workbench}
+                alt="the fregat workbench: a file tree, an editor pane with typescript open, and a terminal running bun dev, over a wallpaper"
+                loading="eager"
+                widths={[800, 1200, 2000]}
+                sizes="(min-width: 1200px) 1120px, 100vw"
+              />
+              <figcaption>
+                <b>fig. 1</b> the workbench. a file tree, the editor, a terminal, and an agent,
+                each a pane.
+              </figcaption>
+            </figure>
+          </div>
         </section>
-
-        <div class="wrap">
-          <figure class="shot">
-            <Image
-              src={workbench}
-              alt="the fregat workbench: a file tree, an editor pane with typescript open, and a terminal running bun dev, over a wallpaper"
-              loading="eager"
-              widths={[800, 1200, 2000]}
-              sizes="(min-width: 1200px) 1120px, 100vw"
-            />
-            <figcaption>
-              <b>fig. 2</b> the workbench. a file tree, the editor, a terminal, and an agent, each a
-              pane.
-            </figcaption>
-          </figure>
-        </div>
 
         <section class="wrap section" aria-labelledby="parts-heading">
           <h2 id="parts-heading">open a folder and this is what's in the window</h2>
@@ -179,6 +176,14 @@ const description =
                 comes from.
               </p>
             </div>
+            <div class="aside">
+            <figure class="drawing">
+              <Drawing />
+              <figcaption>
+                <b>fig. 2</b> the stage from above (a) and from the side (b). six tanks in a ring,
+                one engine, dimensions in millimetres.
+              </figcaption>
+            </figure>
             <dl class="spec">
               <div><dt>built by</dt><dd>npo lavochkin, khimki</dd></div>
               <div><dt>first flight</dt><dd>february 2000</dd></div>
@@ -189,6 +194,7 @@ const description =
               <div><dt>height</dt><dd>1 875 mm</dd></div>
               <div><dt>payloads flown</dt><dd>300 and counting</dd></div>
             </dl>
+            </div>
           </div>
         </section>
 
