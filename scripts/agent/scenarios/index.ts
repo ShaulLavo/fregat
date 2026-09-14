@@ -23,11 +23,13 @@ import { treeStickyScroll } from './tree-sticky-scroll'
 import { demoWorkspace } from './demo-workspace'
 import { demoAgentGit } from './demo-agent-git'
 import { demoReset } from './demo-reset'
+import { demoFontLoad } from './demo-font-load'
 
 export const scenarios: readonly Scenario[] = [
   demoWorkspace,
   demoAgentGit,
   demoReset,
+  demoFontLoad,
   editorLargePaste,
   editorFastScroll,
   editorTypeBurst,
