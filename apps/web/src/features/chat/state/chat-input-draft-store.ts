@@ -198,6 +198,16 @@ export const useChatInputDraftStore = create<ChatInputDraftStore>((set, get) => 
   },
 }))
 
+export function selectChatInputDraftHasContent(
+  state: ChatInputDraftStore,
+  target: ChatInputDraftTarget,
+) {
+  const draft = chatInputDraftForTarget(state, target)
+  return (
+    draft.prompt.trim().length > 0 || draft.images.length > 0 || draft.terminalContexts.length > 0
+  )
+}
+
 export function selectChatInputDraftImages(
   state: ChatInputDraftStore,
   target: ChatInputDraftTarget,

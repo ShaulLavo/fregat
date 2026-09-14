@@ -92,14 +92,10 @@ function renderComposer(initialText: string) {
         }}
       />
       <ChatInputEditor
-        busy={false}
         disabled={false}
         draftKey='mention-node-test'
-        hasStagedContent={false}
         placeholder='Message'
         rootPath='/tmp/mention-node-test'
-        sendButtonRef={{ current: null }}
-        submitting={false}
         trigger={null}
         onCommandMenuCommit={() => false}
         onCommandMenuMove={() => false}

@@ -1,3 +1,4 @@
+import { TEST_ENVIRONMENT_ID } from '../../../../test/factories/chat'
 import { LexicalComposer } from '@lexical/react/LexicalComposer'
 import type { ProviderInstanceId } from '@workspace/contracts'
 import '@workspace/ui/globals.css'
@@ -182,6 +183,11 @@ test('persistent app chrome changes compactly and leaves content text unchanged'
         </EditorStateProvider>
       </AppProviders>
       <ChatInputSubmitButton
+        draftTarget={{
+          environmentId: TEST_ENVIRONMENT_ID,
+          draftKey: 'density-contract',
+          rootPath: '/repo',
+        }}
         disabledReason={null}
         pendingAction={null}
         busy={false}
@@ -300,14 +306,10 @@ test('custom composer, picker, search, and references chrome follows density', a
             }}
           >
             <ChatInputEditor
-              busy={false}
               disabled={false}
               draftKey='density-contract'
-              hasStagedContent={false}
               placeholder='Message'
               rootPath='/repo'
-              sendButtonRef={createRef<HTMLButtonElement>()}
-              submitting={false}
               trigger={null}
               onCommandMenuCommit={() => false}
               onCommandMenuMove={() => false}

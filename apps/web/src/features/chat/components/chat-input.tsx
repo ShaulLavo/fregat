@@ -143,7 +143,6 @@ export function ChatInput({
     },
     editorReady,
   )
-  const submitButtonRef = useRef<HTMLButtonElement | null>(null)
   const initialDraft = useMemo(() => readChatInputDraftPrompt(draftTarget), [draftTarget])
   const [activeCommandItemId, setActiveCommandItemId] = useState<string | null>(null)
   const imagePreparation = useImagePreparation(draftTarget)
@@ -158,17 +157,12 @@ export function ChatInput({
   const [dropTargetActive, setDropTargetActive] = useState(false)
   const [submitting, setSubmitting] = useState(false)
   const [trigger, setTrigger] = useState<ChatInputTrigger | null>(null)
-  // Captured terminal output is content in its own right: "look at this" with a
-  // chip attached is a legitimate turn, so it must not read as an empty draft.
-  const hasStagedContent = images.length > 0 || terminalContexts.length > 0
   const composerDisabled = disabled || submitting
   const submissionDisabled =
     disabledReason !== null ||
     busySendDisabledReason !== null ||
     imagePreparation.preparing ||
     (!busy && pendingAction !== null)
-  const sendDisabled =
-    composerDisabled || submissionDisabled || (!hasStagedContent && !initialDraft.trim())
   const visiblePendingAction = submitting ? 'sending' : pendingAction
   const statusLabel = validationError ?? imagePreparation.error ?? persistenceError ?? error
   const projectEntries = useProjectEntrySearch({
@@ -235,7 +229,6 @@ export function ChatInput({
     imagePreparation.clearError()
     setValidationError(null)
     setTrigger(null)
-    if (submitButtonRef.current) submitButtonRef.current.disabled = true
   }
 
   async function handleSubmit() {
@@ -421,15 +414,10 @@ export function ChatInput({
               onDrop={handleComposerDrop}
             >
               <ChatInputEditor
-                busy={busy}
                 disabled={composerDisabled}
                 draftKey={draftKey}
-                hasStagedContent={hasStagedContent}
                 placeholder='Use @ to mention, / for commands.'
                 rootPath={rootPath}
-                sendButtonRef={submitButtonRef}
-                submitting={submitting}
-                submissionDisabled={submissionDisabled}
                 trigger={trigger}
                 onCommandMenuCommit={handleCommandMenuCommit}
                 onCommandMenuMove={handleCommandMenuMove}
@@ -466,8 +454,7 @@ export function ChatInput({
                 draftTarget={draftTarget}
                 interactionMode={interactionMode}
                 runtimeMode={runtimeMode}
-                sendButtonRef={submitButtonRef}
-                sendDisabled={sendDisabled}
+                sendDisabled={submissionDisabled}
                 statusLabel={statusLabel}
                 onSelectImageFiles={handleImageFiles}
                 onStop={onStop}

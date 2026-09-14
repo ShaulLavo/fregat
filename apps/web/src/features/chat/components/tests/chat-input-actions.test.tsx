@@ -7,7 +7,6 @@ import { screen } from '@testing-library/react'
 import userEvent from '@testing-library/user-event'
 import { DEFAULT_PROVIDER_INSTANCE_ID, providerInstanceIdSchema } from '@workspace/contracts'
 import { providerModel, providerSnapshot } from '../../../../../test/factories/chat'
-import { createRef } from 'react'
 import * as v from 'valibot'
 import { afterEach, beforeEach } from 'vitest'
 
@@ -166,7 +165,6 @@ function renderActions({ existingSession = false } = {}) {
               draftTarget={draftTarget}
               interactionMode='default'
               runtimeMode='full-access'
-              sendButtonRef={createRef<HTMLButtonElement>()}
               sendDisabled={false}
               statusLabel='Working'
               onSelectImageFiles={() => {}}

@@ -1,6 +1,6 @@
 import { useActiveChatProjection } from '@/features/chat/hooks/use-active-projection'
 import type { InteractionMode, RuntimeMode, SessionId } from '@workspace/contracts'
-import { useRef, type RefObject } from 'react'
+import { useRef } from 'react'
 
 import { useElementWidth } from '@/features/workspace/hooks/use-element-width'
 import { contextUsageForActivities } from '@workspace/client-core/chat/context-usage'
@@ -36,7 +36,6 @@ export function ChatInputActions({
   onSubmit,
   pendingAction = null,
   runtimeMode,
-  sendButtonRef,
   sendDisabled,
   statusLabel,
 }: {
@@ -51,7 +50,6 @@ export function ChatInputActions({
   onStop: () => void
   onSubmit: () => Promise<boolean>
   runtimeMode: RuntimeMode
-  sendButtonRef: RefObject<HTMLButtonElement | null>
   sendDisabled: boolean
   statusLabel: string | null
 }) {
@@ -106,7 +104,7 @@ export function ChatInputActions({
             disabled={disabled}
             disabledReason={disabledReason}
             pendingAction={pendingAction}
-            ref={sendButtonRef}
+            draftTarget={draftTarget}
             sendDisabled={sendDisabled}
             onStop={onStop}
             onSubmit={onSubmit}

@@ -5,7 +5,7 @@ import { HistoryPlugin } from '@lexical/react/LexicalHistoryPlugin'
 import { PlainTextPlugin } from '@lexical/react/LexicalPlainTextPlugin'
 import { collectComposerMentions } from '@workspace/contracts'
 import type { LexicalEditor } from 'lexical'
-import { useCallback, type ClipboardEvent, type RefObject } from 'react'
+import { useCallback, type ClipboardEvent } from 'react'
 
 import { imageFilesFromClipboard } from '@/features/chat/utils/input-attachments'
 import { insertChatInputText } from '@/features/chat/utils/input-editor-actions'
@@ -18,10 +18,8 @@ import { ChatInputSurroundPlugin } from './chat-input-surround-plugin'
 import { ChatInputHistoryPlugin } from '@/features/chat/components/chat-input-history-plugin'
 
 export function ChatInputEditor({
-  busy,
   disabled,
   draftKey,
-  hasStagedContent,
   onCommandMenuCommit,
   onCommandMenuMove,
   onEditorReady,
@@ -30,15 +28,10 @@ export function ChatInputEditor({
   onTriggerChange,
   placeholder,
   rootPath,
-  sendButtonRef,
-  submitting,
-  submissionDisabled = false,
   trigger,
 }: {
-  busy: boolean
   disabled: boolean
   draftKey: string
-  hasStagedContent: boolean
   onCommandMenuCommit: () => boolean
   onCommandMenuMove: (offset: number) => boolean
   onEditorReady: (editor: LexicalEditor | null) => void
@@ -47,9 +40,6 @@ export function ChatInputEditor({
   onTriggerChange: (trigger: ChatInputTrigger | null) => void
   placeholder: string
   rootPath: string
-  sendButtonRef: RefObject<HTMLButtonElement | null>
-  submitting: boolean
-  submissionDisabled?: boolean
   trigger: ChatInputTrigger | null
 }) {
   const [editor] = useLexicalComposerContext()
@@ -98,14 +88,9 @@ export function ChatInputEditor({
         }
       />
       <ChatInputDraftPlugin
-        busy={busy}
         disabled={disabled}
         draftKey={draftKey}
-        hasStagedContent={hasStagedContent}
         rootPath={rootPath}
-        sendButtonRef={sendButtonRef}
-        submitting={submitting}
-        submissionDisabled={submissionDisabled}
         onEditorReady={onEditorReady}
         onTriggerChange={onTriggerChange}
       />
