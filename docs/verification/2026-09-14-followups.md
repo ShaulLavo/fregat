@@ -120,3 +120,17 @@ The verification skill now explains sampled versus wall duration, source-map evi
 Final combined typing proof: `/work/tmp/fregat-evidence/20260914T132358Z-renders-editor-type-burst/`. Both closed dialogs remain absent (zero renders); BreadcrumbsBar renders once, BreadcrumbItem and PopoverTrigger 14 times each, FloatingTree 20 times. All five tree components have zero parent-driven renders. `page.png` was inspected and the log window contains no LSP warning. The palettes 404 remains pending the user's dev-server restart.
 
 The evidence root was renamed from `platform-evidence` to `fregat-evidence` during this work; links above point to the moved artifacts. Historical summaries inside those directories retain their original printed paths.
+
+## Breadcrumb subscription follow-up
+
+The earlier row memo boundary left `EditorBreadcrumbs` subscribed to raw document revisions. `useDebouncedValue` delayed the symbol request only after React had rendered for each edit. The new `useSymbolRevision` subscribes directly to the store and publishes the settled revision to React after 600ms of quiet. File/store changes reset immediately and cleanup cancels pending callbacks. The existing revision-keyed query and live-buffer read remain unchanged.
+
+- Typing before: `/work/tmp/fregat-evidence/20260914T133201Z-renders-editor-type-burst/`. EditorBreadcrumbs 275 renders, 273 without DOM change.
+- Typing after: `/work/tmp/fregat-evidence/20260914T133722Z-renders-editor-type-burst/`. EditorBreadcrumbs 2 renders, 0 without DOM change. Screenshot inspected.
+- Caret-only before: `/work/tmp/fregat-evidence/20260914T133335Z-renders-editor-caret-burst/`.
+- Caret-only after: `/work/tmp/fregat-evidence/20260914T133901Z-renders-editor-caret-burst/`. Both inspected screenshots show the first line. Subtracting ready from moved in `render-steps.json` shows zero additional renders for every breadcrumb component across 300 arrow moves, both before and after. The remaining bug was edit-driven, not arrow-key-driven.
+- Trace baseline: `/work/tmp/fregat-evidence/20260914T133404Z-trace-editor-type-burst/`.
+- Trace comparison: `/work/tmp/fregat-evidence/20260914T133752Z-trace-editor-type-burst/`. Both screenshots inspected. Scripting 3754.2→3492.3ms, but tasks over 16ms 133→137 and the shared log window contains connectivity failures. This pair does not establish an overall latency improvement. The render reduction is the measured result.
+- Two real-buffer hook tests, web typecheck and lint pass in `/work/tmp/fregat-evidence/breadcrumb-revision-20260914/`. Tests verify no renders during a burst, one settled publication, document switching and immediate timer cancellation on unmount.
+
+An initial after run at `/work/tmp/fregat-evidence/20260914T133624Z-renders-editor-type-burst/` captured no component updates and was discarded. The tool now fails an empty capture. It also saves cumulative counts per scenario step so setup cannot be mistaken for caret-driven work. The verification skill documents the new caret-only scenario.

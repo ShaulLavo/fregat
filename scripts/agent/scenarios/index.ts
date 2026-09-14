@@ -14,8 +14,14 @@ export type Scenario = {
 import { editorFastScroll } from './editor-fast-scroll'
 import { editorLargePaste } from './editor-large-paste'
 import { editorTypeBurst } from './editor-type-burst'
+import { editorCaretBurst } from './editor-caret-burst'
 
-export const scenarios: readonly Scenario[] = [editorLargePaste, editorFastScroll, editorTypeBurst]
+export const scenarios: readonly Scenario[] = [
+  editorLargePaste,
+  editorFastScroll,
+  editorTypeBurst,
+  editorCaretBurst,
+]
 
 export function scenarioNamed(name: string): Scenario {
   const scenario = scenarios.find((entry) => entry.name === name)

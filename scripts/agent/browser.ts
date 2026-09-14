@@ -245,9 +245,20 @@ async function countRenders(scenario: Scenario, options: Options) {
     await page.evaluate(() =>
       (globalThis as { __agentRenders?: { reset(): void } }).__agentRenders?.reset(),
     )
+    const checkpoints: { label: string; rows: unknown }[] = []
     let failure: string | null = null
     try {
-      await scenario.run(page, { file: options.file, step: async () => undefined })
+      await scenario.run(page, {
+        file: options.file,
+        step: async (label) => {
+          const rows = await page.evaluate(
+            () =>
+              (globalThis as { __agentRenders?: { report(): unknown } }).__agentRenders?.report() ??
+              [],
+          )
+          checkpoints.push({ label, rows })
+        },
+      })
     } catch (error) {
       failure = error instanceof Error ? error.message : String(error)
     }
@@ -256,12 +267,17 @@ async function countRenders(scenario: Scenario, options: Options) {
       () =>
         (globalThis as { __agentRenders?: { report(): unknown } }).__agentRenders?.report() ?? [],
     )) as RenderRow[]
+    if (rows.length === 0) {
+      failure ??=
+        'No component updates were captured. Check render instrumentation and page reloads.'
+    }
     await page.screenshot({ path: evidence.file('page.png'), fullPage: false })
     rows.sort(
       (a, b) =>
         b.noDomChange - a.noDomChange || b.parentDriven - a.parentDriven || b.renders - a.renders,
     )
     await evidence.json('renders.json', rows)
+    await evidence.json('render-steps.json', checkpoints)
     const total = rows.reduce((sum, row) => sum + row.renders, 0)
     const wasted = rows.reduce((sum, row) => sum + row.parentDriven, 0)
     const silent = rows.reduce((sum, row) => sum + row.noDomChange, 0)
@@ -286,6 +302,7 @@ async function countRenders(scenario: Scenario, options: Options) {
         ),
       '',
       `full table: ${evidence.file('renders.json')}`,
+      `cumulative step counts: ${evidence.file('render-steps.json')}`,
       `problems: ${problems.length === 0 ? 'none' : ''}`,
       ...problems.map((p) => `- ${p}`),
     ]

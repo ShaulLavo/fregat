@@ -1,10 +1,7 @@
 import { useQuery } from '@tanstack/react-query'
-import { useDebouncedValue } from '@tanstack/react-pacer/debouncer'
 
-import {
-  useEditorDocumentState,
-  useEditorDocumentStoreApi,
-} from '@/features/editor/state/document-state'
+import { useEditorDocumentStoreApi } from '@/features/editor/state/document-state'
+import { useSymbolRevision } from '@/features/workbench/hooks/use-symbol-revision'
 import { useLanguageServerMatches } from '@/features/editor/hooks/use-language-server-matches'
 import { clientForQueryClient } from '@/lib/environments/state/query-clients'
 import {
@@ -17,18 +14,11 @@ import type { FilesystemPath } from '@/lib/documents/utils/types'
 import { documentSymbolKeys } from '@/lib/query-keys'
 
 const EMPTY_SYMBOLS: readonly DocumentSymbol[] = []
-// A request opens a language server socket; one per keystroke is too many.
-const SYMBOL_REFRESH_DEBOUNCE_MS = 600
 
 export function useDocumentSymbolTree(rootPath: FilesystemPath, filePath: FilesystemPath | null) {
   const documentStore = useEditorDocumentStoreApi()
   const key = filePath ? fileDocumentKey(filePath) : null
-  const contentRevision = useEditorDocumentState((state) =>
-    key ? (state.documentContentRevisions[key] ?? null) : null,
-  )
-  const [settledRevision] = useDebouncedValue(contentRevision, {
-    wait: SYMBOL_REFRESH_DEBOUNCE_MS,
-  })
+  const settledRevision = useSymbolRevision(documentStore, key)
   const matches = useLanguageServerMatches(rootPath, filePath ?? '', filePath !== null)
   const serverId = documentSymbolServerId(matches)
   const query = useQuery({
