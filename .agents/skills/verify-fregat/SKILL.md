@@ -39,15 +39,17 @@ The scenarios land on a workspace by registering a root-relative folder (`--work
 
 ## Landing page and product assets
 
-Use the same tool for `apps/site`; it serves built files through Playwright routes, without starting a server:
+Use the same tool for `apps/site`. Its build includes the real app demo. The existing Vite server serves the built site at `/fregat/`:
 
 ```bash
 bun run --cwd apps/site site:build
-bun run agent:browser look --static-dir apps/site/dist --width 1440 --height 1000 --selector main
-bun run agent:browser look --static-dir apps/site/dist --width 390 --height 844
+bun run agent:browser look --site --headed --url http://localhost:5173/fregat/ --width 1440 --height 1200
+bun run agent:browser look --site --headed --url http://localhost:5173/fregat/ --width 390 --height 844
 ```
 
-Read both screenshots. `layout.json` records viewport, document width, image dimensions and positions; verify every image loaded and the document fits. `--scale 2` captures at twice the CSS resolution. Landing readiness checks the main element, fonts and images instead of app API routes.
+Read both screenshots. `layout.json` records viewport, document width, image and iframe dimensions and positions. Landing readiness waits for the embedded app, so a screenshot fallback cannot pass as a working demo. `--static-dir` remains useful for documents without service workers; use real HTTP through the existing Vite server for this demo.
+
+Run `scenario demo-workspace` and `scenario demo-agent-git` against `/fregat/demo/index.html`, and `scenario demo-reset` against `/fregat/`. These use the actual app UI. `inspection.json` retains mock requests, unhandled operations and client log batches. The mock's logs are the relevant logs here; demo scenarios do not read the unrelated development server log window. `observed.json` includes service-worker responses, native socket connections and console source locations. Inspect failures as well as successful steps.
 
 Every run records its actual browser and GPU in `browser-renderer.json`. Use `--headed` for product assets and inspect that record; the headless shell can use software rendering.
 

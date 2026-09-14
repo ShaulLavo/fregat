@@ -19,6 +19,7 @@
     },
     "apps/web": {
       "entry": [
+        "src/demo-entry.ts",
         "src/features/address/tests/navigation.types.ts",
         "scripts/chat-parity-proof.mjs",
         "scripts/chat-review-proof.mjs",
@@ -40,6 +41,9 @@
     },
     "scripts": {
       "entry": [
+        "agent/browser.ts",
+        "agent/injected/renders.ts",
+        "agent/logs.ts",
         "deploy/mesh.ts",
         "deploy/live-check.mjs",
         "desktop-dev.ts",

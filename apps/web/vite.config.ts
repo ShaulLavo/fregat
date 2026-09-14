@@ -6,15 +6,21 @@ import { portFromEnv } from '../../scripts/runtime-network'
 import { readDevSources, reportDevSources, type DevPackage } from '../../scripts/dev-sources'
 import { consumeAppSave } from '../server/src/fs/app-save-marker'
 import { bundleStatsPlugin } from './scripts/bundle-stats-plugin'
+import { demoPreviewPlugin } from './scripts/demo-preview-plugin'
 
 const workspaceRoot = path.resolve(__dirname, '../..')
 const devServerHost = process.env.WEB_HOST ?? '127.0.0.1'
 const devServerPort = portFromEnv(process.env, 'WEB_PORT', 5173)
 
-export default defineConfig(({ command, isPreview }) => {
+export default defineConfig(({ command, isPreview, mode }) => {
   const packages = command === 'serve' && !isPreview ? readDevSources(__dirname) : []
   return {
+    build:
+      mode === 'demo'
+        ? { rollupOptions: { input: path.resolve(__dirname, 'demo.html') } }
+        : undefined,
     define: {
+      ...(mode === 'demo' ? { 'import.meta.env.VITE_SERVER_URL': 'undefined' } : {}),
       'import.meta.env.OBSERVABILITY_ENABLED': JSON.stringify(
         process.env.OBSERVABILITY_ENABLED ?? '',
       ),
@@ -24,6 +30,7 @@ export default defineConfig(({ command, isPreview }) => {
       exclude: ['@shikijs/themes', 'ghostty-webgpu', ...packages.map((pkg) => pkg.name)],
     },
     plugins: [
+      demoPreviewPlugin(__dirname),
       devSourcePlugin(packages),
       platformSelfSaveHmrPlugin(),
       react({

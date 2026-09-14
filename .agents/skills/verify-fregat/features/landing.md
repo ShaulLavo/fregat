@@ -1,6 +1,19 @@
 # Landing page and product assets
 
-The Astro site in `apps/site` publishes at `https://shaullavo.github.io/fregat/` through `.github/workflows/site.yml` when `main` changes. Its preview is a photograph of the real app state, not a recreated interface.
+The Astro site in `apps/site` publishes at `https://shaullavo.github.io/fregat/` through `.github/workflows/site.yml`. Its hero embeds the real app with a browser-only simulated workspace. The original product screenshot remains the loading fallback and social image.
+
+## Drive the interactive demo
+
+```bash
+bun run --cwd apps/site site:build
+bun run agent:browser scenario demo-workspace --headed --url http://localhost:5173/fregat/demo/index.html
+bun run agent:browser scenario demo-agent-git --headed --url http://localhost:5173/fregat/demo/index.html
+bun run agent:browser scenario demo-reset --headed --url http://localhost:5173/fregat/ --width 1440 --height 1200
+```
+
+The existing Vite server serves the built files. Use the production build for interaction checks because a development reload resets the in-memory workspace. The first scenario proves an editor save appears in search and terminal output. The second stages and commits a change, then submits an agent prompt. The third edits through the iframe and uses the page's reset control to restore the seed.
+
+Read the screenshots and `inspection.json`. Every backend response should come from the demo origin, with no unhandled request and no native backend WebSocket. Client log batches retain caught React errors, which may not appear as page errors. Keep unsupported operations explicit; a successful response without the corresponding state change is a broken simulation.
 
 ## Capture the editor
 
@@ -17,17 +30,17 @@ The wallpaper is the user's temporary choice from [dharmx/walls](https://github.
 
 `product-composition.json` records the shared scene: 1600×1000 with a 1360×840 editor frame at (120, 80). The site mirrors that frame at left 7.5%, top 8%, width 85%, height 84%. Both image layers use the same centered cover crop. Keep these dimensions together when changing the composition.
 
-Copy the final screenshot into `apps/site/src/assets/workbench.webp` using lossless format conversion. Preserve the original screenshot in its evidence directory. At scale 2 the asset is 2720×1680. Serve this screenshot directly as lossless WebP; do not recompress its text or offer a lower-resolution candidate. Link the image to the full-resolution asset so small-screen visitors can inspect it.
+Copy the final screenshot into `apps/site/src/assets/workbench.webp` using lossless format conversion. Preserve the original screenshot in its evidence directory. At scale 2 the asset is 2720×1680. Keep the fallback lossless; the full-size link opens the interactive app.
 
 ## Verify the page
 
 ```bash
 bun run --cwd apps/site site:build
-bun run agent:browser look --static-dir apps/site/dist --width 1440 --height 1000 --selector main
-bun run agent:browser look --static-dir apps/site/dist --width 390 --height 844
+bun run agent:browser look --site --headed --url http://localhost:5173/fregat/ --width 1440 --height 1200
+bun run agent:browser look --site --headed --url http://localhost:5173/fregat/ --width 390 --height 844
 ```
 
-Read desktop, full-main and mobile screenshots. Check `layout.json`: both images have natural dimensions, document width equals viewport width, and the product appears above the fold. Inspect the wallpaper continuity at all four frame edges. Follow the full-resolution image and the page navigation links. The static route serves only real files inside the selected build directory and starts no server.
+Read desktop and mobile screenshots. Check `layout.json`: images loaded, the iframe is ready, document width equals viewport width, and the product appears above the fold. Inspect the wallpaper continuity at all four frame edges. Follow the full-size demo and page navigation links.
 
 After publishing, run `bun run agent:browser look --site --url https://shaullavo.github.io/fregat/`. This checks document readiness and image loading on the live site without expecting workbench API routes.
 

@@ -8,6 +8,9 @@ import '../styles/global.css'
 const title = 'fregat'
 const description =
   'an open cursor, built from scratch. a code editor with claude code and codex inside, on the subscriptions you already have. nothing forked from vs code.'
+const demoUrl = import.meta.env.DEV
+  ? 'http://localhost:5173/demo.html'
+  : `${import.meta.env.BASE_URL.replace(/\/$/, '')}/demo/index.html`
 ---
 
 <!doctype html>
@@ -75,20 +78,33 @@ const description =
                 sizes="(min-width: 1440px) 1440px, 100vw"
                 quality={85}
               />
-              <a class="workbench" href={workbench.src} aria-label="view the fregat workbench at full size">
+              <div class="workbench" id="demo-frame" aria-busy="true" data-demo-url={demoUrl}>
                 <img
+                  class="demo-preview"
                   src={workbench.src}
-                  alt="the real fregat workbench with four source tabs, TypeScript code and a terminal running the web typecheck, over the garden wallpaper"
+                  alt="fregat workbench preview while the interactive demo loads"
                   loading="eager"
                   fetchpriority="high"
                   width={workbench.width}
                   height={workbench.height}
                 />
-              </a>
+                <iframe
+                  id="workbench-demo"
+                  title="Interactive fregat demo with simulated files, terminal and agents"
+                  width="1360"
+                  height="840"
+                  allow="fullscreen"
+                ></iframe>
+              </div>
             </div>
             <figcaption>
-              <span>your code, your terminal, your agents. one workspace.</span>
-              <a href="https://github.com/dharmx/walls/blob/main/painting/a_painting_of_a_garden_with_a_house_and_trees.jpeg">wallpaper</a>
+              <span>interactive demo · simulated workspace, terminal and agents</span>
+              <div class="demo-actions">
+                <span id="demo-status" role="status">loading demo…</span>
+                <button type="button" id="demo-reset" aria-controls="workbench-demo">reset demo</button>
+                <a href={demoUrl} target="_blank" rel="noopener">open full size ↗</a>
+                <a href="https://github.com/dharmx/walls/blob/main/painting/a_painting_of_a_garden_with_a_house_and_trees.jpeg">wallpaper</a>
+              </div>
             </figcaption>
           </figure>
         </section>
@@ -250,3 +266,43 @@ bun run dev
     </div>
   </body>
 </html>
+
+<script>
+  function setupDemo() {
+    const frame = document.querySelector<HTMLElement>('#demo-frame')
+    const iframe = document.querySelector<HTMLIFrameElement>('#workbench-demo')
+    const reset = document.querySelector<HTMLButtonElement>('#demo-reset')
+    const status = document.querySelector<HTMLElement>('#demo-status')
+    if (!frame || !iframe || !reset || !status || !frame.dataset.demoUrl) return
+
+    const demoUrl = new URL(frame.dataset.demoUrl, window.location.href)
+    demoUrl.searchParams.set('parentOrigin', window.location.origin)
+    demoUrl.searchParams.set('parentOrigin', window.location.origin)
+    const resize = new ResizeObserver(([entry]) => {
+      if (entry) frame.style.setProperty('--demo-scale', String(entry.contentRect.width / 1360))
+    })
+    resize.observe(frame)
+    frame.style.setProperty('--demo-scale', String(frame.clientWidth / 1360))
+
+    window.addEventListener('message', (event: MessageEvent<unknown>) => {
+      if (event.source !== iframe.contentWindow || event.origin !== demoUrl.origin) return
+      const message = event.data
+      if (!message || typeof message !== 'object' || !('type' in message)) return
+      if (message.type === 'fregat-demo-error') {
+        status.textContent = "the demo couldn't load. try reset."
+        return
+      }
+      if (message.type !== 'fregat-demo-ready') return
+      frame.setAttribute('aria-busy', 'false')
+      status.textContent = 'ready to explore'
+    })
+    reset.addEventListener('click', () => {
+      frame.setAttribute('aria-busy', 'true')
+      status.textContent = 'resetting demo…'
+      iframe.src = demoUrl.href
+    })
+    iframe.src = demoUrl.href
+  }
+
+  setupDemo()
+</script>

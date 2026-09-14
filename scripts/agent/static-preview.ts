@@ -3,6 +3,7 @@ import { resolve, sep } from 'node:path'
 import type { Page } from 'playwright'
 
 import { createScriptError } from '../structured-errors'
+import { selectors } from './selectors'
 
 export const STATIC_PREVIEW_URL = 'http://fregat-preview.test/fregat/'
 
@@ -42,6 +43,8 @@ export async function openStaticPreview(page: Page, url = STATIC_PREVIEW_URL) {
     await page.evaluate('document.fonts.ready')
     await page.waitForTimeout(500)
     await page.evaluate('Promise.all(Array.from(document.images, image => image.decode()))')
+    if (await selectors.demoFrame(page).count())
+      await selectors.demoReady(page).waitFor({ timeout: 60_000 })
     return true
   } catch {
     return false
@@ -52,6 +55,12 @@ export async function staticPreviewLayout(page: Page) {
   return page.evaluate(`({
     viewport: { width: innerWidth, height: innerHeight },
     scrollWidth: document.documentElement.scrollWidth,
+    frames: Array.from(document.querySelectorAll('iframe'), frame => ({
+      title: frame.title,
+      source: frame.src,
+      bounds: frame.getBoundingClientRect().toJSON(),
+      busy: frame.parentElement?.getAttribute('aria-busy')
+    })),
     images: Array.from(document.images, image => ({
       alt: image.alt,
       source: image.currentSrc,

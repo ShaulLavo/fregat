@@ -4,11 +4,19 @@ export type Observed = {
   errors: string[]
   consoleErrors: string[]
   consoleWarnings: string[]
+  consoleDetails: {
+    level: string
+    text: string
+    url: string
+    lineNumber: number
+    columnNumber: number
+  }[]
   failedResponses: { url: string; status: number; type: string }[]
   failedRequests: { url: string; error: string | undefined }[]
   loopbackRequests: string[]
   assets: Set<string>
   apiResponses: { url: string; status: number }[]
+  serviceWorkerResponses: { url: string; status: number; type: string }[]
   sockets: { url: string; receivedFrames: number; errors: string[] }[]
 }
 

@@ -5,17 +5,25 @@ export function attachObserver(page, base) {
     errors: [],
     consoleErrors: [],
     consoleWarnings: [],
+    consoleDetails: [],
     failedResponses: [],
     failedRequests: [],
     loopbackRequests: [],
     assets: new Set(),
     apiResponses: [],
+    serviceWorkerResponses: [],
     sockets: [],
   }
   page.on('pageerror', (error) => observed.errors.push(error.message))
   page.on('console', (message) => {
     if (message.type() === 'error') observed.consoleErrors.push(message.text())
     if (message.type() === 'warning') observed.consoleWarnings.push(message.text())
+    if (message.type() === 'error' || message.type() === 'warning')
+      observed.consoleDetails.push({
+        level: message.type(),
+        text: message.text(),
+        ...message.location(),
+      })
   })
   page.on('requestfailed', (request) =>
     observed.failedRequests.push({ url: request.url(), error: request.failure()?.errorText }),
@@ -26,6 +34,8 @@ export function attachObserver(page, base) {
   })
   page.on('response', (response) => {
     const type = response.request().resourceType()
+    if (response.fromServiceWorker())
+      observed.serviceWorkerResponses.push({ url: response.url(), status: response.status(), type })
     if (response.status() >= 400)
       observed.failedResponses.push({ url: response.url(), status: response.status(), type })
     if (response.ok() && ['script', 'stylesheet'].includes(type))

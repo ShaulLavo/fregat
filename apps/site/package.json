@@ -4,7 +4,7 @@
   "type": "module",
   "scripts": {
     "site:dev": "astro dev",
-    "site:build": "astro build",
+    "site:build": "bun ../../scripts/build-site.ts",
     "site:preview": "astro preview",
     "typecheck": "astro check"
   },

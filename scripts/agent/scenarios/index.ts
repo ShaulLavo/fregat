@@ -6,6 +6,7 @@ export type ScenarioContext = {
 }
 
 export type Scenario = {
+  readonly surface?: 'site' | 'demo'
   readonly name: string
   readonly description: string
   readonly run: (page: Page, context: ScenarioContext) => Promise<void>
@@ -19,8 +20,14 @@ import { editorCaretBurst } from './editor-caret-burst'
 import { editorFocusClicks } from './editor-focus-clicks'
 import { editorProduct } from './editor-product'
 import { treeStickyScroll } from './tree-sticky-scroll'
+import { demoWorkspace } from './demo-workspace'
+import { demoAgentGit } from './demo-agent-git'
+import { demoReset } from './demo-reset'
 
 export const scenarios: readonly Scenario[] = [
+  demoWorkspace,
+  demoAgentGit,
+  demoReset,
   editorLargePaste,
   editorFastScroll,
   editorTypeBurst,

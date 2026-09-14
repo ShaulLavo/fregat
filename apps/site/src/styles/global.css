@@ -215,7 +215,7 @@ pre {
   object-position: center;
 }
 
-/* These bounds match the wallpaper crop used by the real workbench capture. */
+/* The demo and garden share this 1600 × 1000 composition. */
 .workbench {
   position: absolute;
   left: 7.5%;
@@ -235,6 +235,25 @@ pre {
   height: 100%;
 }
 
+.workbench iframe {
+  position: absolute;
+  top: 0;
+  left: 0;
+  width: 1360px;
+  height: 840px;
+  border: 0;
+  transform: scale(var(--demo-scale, 1));
+  transform-origin: top left;
+}
+
+.workbench[aria-busy='true'] iframe {
+  visibility: hidden;
+}
+
+.workbench[aria-busy='false'] .demo-preview {
+  visibility: hidden;
+}
+
 .shot figcaption {
   display: flex;
   justify-content: space-between;
@@ -242,6 +261,29 @@ pre {
   padding: 12px 4px 0;
   color: var(--muted);
   font-size: 0.75rem;
+}
+
+.demo-actions {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: baseline;
+  gap: 0.5rem 1rem;
+}
+
+.demo-actions button {
+  padding: 0;
+  border: 0;
+  background: transparent;
+  color: inherit;
+  font: inherit;
+  text-decoration: underline;
+  text-decoration-color: var(--line-strong);
+  text-underline-offset: 0.2em;
+  cursor: pointer;
+}
+
+.demo-actions button:hover {
+  text-decoration-color: currentColor;
 }
 
 .section {

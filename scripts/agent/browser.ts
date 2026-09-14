@@ -163,10 +163,24 @@ async function look(options: Options) {
 
 async function runScenario(scenario: Scenario, options: Options) {
   const evidence = await createEvidence('scenario', scenario.name)
-  return withPage(options, evidence, async (page, observed) => {
-    const ready = await open(page, await workspaceUrl(page, options))
+  const capture = { ...options, site: Boolean(scenario.surface) }
+  return withPage(capture, evidence, async (page, observed) => {
+    const ready =
+      scenario.surface === 'site'
+        ? await openStaticPreview(page, options.url)
+        : await open(page, await workspaceUrl(page, options))
     if (!ready) {
-      await writeSummary(evidence, [`# scenario ${scenario.name}`, '', 'app never became ready'])
+      await page.screenshot({ path: evidence.file('failure.png') })
+      if (scenario.inspect) await evidence.json('inspection.json', await scenario.inspect(page))
+      const problems = observedProblems(observed, { loopback: !isLoopback(options.url) })
+      await evidence.json('observed.json', { problems, ...serializable(observed) })
+      await writeSummary(evidence, [
+        `# scenario ${scenario.name}`,
+        '',
+        'app never became ready',
+        `screenshot: ${evidence.file('failure.png')}`,
+        ...problems.map((problem) => `- ${problem}`),
+      ])
       return 1
     }
     if (options.productWallpaper) await alignProductWallpaper(page, evidence)
@@ -186,6 +200,8 @@ async function runScenario(scenario: Scenario, options: Options) {
     } catch (error) {
       failure = error instanceof Error ? error.message : String(error)
       await page.screenshot({ path: evidence.file('failure.png') }).catch(() => undefined)
+      if (scenario.inspect)
+        await evidence.json('inspection.json', await scenario.inspect(page)).catch(() => undefined)
     }
     const durationMs = Math.round(performance.now() - started)
     const problems = observedProblems(observed, { loopback: !isLoopback(options.url) })

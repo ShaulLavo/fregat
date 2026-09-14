@@ -5,6 +5,14 @@ on:
     branches: [main]
     paths:
       - apps/site/**
+      - apps/web/**
+      - packages/**
+      - scripts/build-site.ts
+      - scripts/dev-sources.ts
+      - scripts/runtime-network.ts
+      - .github/actions/setup/**
+      - package.json
+      - bun.lock
       - .github/workflows/site.yml
   workflow_dispatch:
 
@@ -22,19 +30,13 @@ jobs:
     runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@v4
-      - uses: oven-sh/setup-bun@v2
-      # The site has no dependency on the rest of the workspace, and the
-      # workspace root cannot install without the linked editor and terminal
-      # checkouts. Build it as a standalone package instead.
-      - name: Build outside the workspace
-        run: |
-          cp -r apps/site /tmp/site
-          cd /tmp/site
-          bun install
-          bun run site:build
+      - uses: ./.github/actions/setup
+      - name: Build landing page and interactive app
+        working-directory: apps/site
+        run: bun run site:build
       - uses: actions/upload-pages-artifact@v3
         with:
-          path: /tmp/site/dist
+          path: apps/site/dist
 
   deploy:
     needs: build

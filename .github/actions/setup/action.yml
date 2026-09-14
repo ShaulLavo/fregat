@@ -4,10 +4,10 @@ description: Installs the toolchain, provisions the sibling @singapore-editor ed
 inputs:
   editor-ref:
     description: Git ref of the ShaulLavo/singapore checkout the @singapore-editor/* links resolve to.
-    required: true
+    default: b0bd4b67d73b885bece7fe6bb381bfa7c5f2fd2e
   ghostty-ref:
     description: Git ref of the ShaulLavo/ghostty-webgpu checkout the ghostty-webgpu link resolves to.
-    required: true
+    default: 94ab02a02799b6897ffa6c766aecc7977418a89d
 
 runs:
   using: composite

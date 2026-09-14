@@ -7,10 +7,13 @@ import {
 
 import { clientInstanceId, instanceHeaderName } from '@/lib/instance-id'
 import { latencyFetcher } from '@/lib/simulated-latency'
+import { applicationHost } from '@/lib/application-host'
 
 export type { Client }
 
-const primaryOrigin = canonicalServerOrigin(import.meta.env.VITE_SERVER_URL ?? defaultServerUrl())
+const primaryOrigin = canonicalServerOrigin(
+  applicationHost()?.apiOrigin ?? import.meta.env.VITE_SERVER_URL ?? defaultServerUrl(),
+)
 let selectedOrigin = primaryOrigin
 const endpoints = new Map<string, string>()
 const clients = new Map<string, Client>()

@@ -31,10 +31,11 @@ import { isDesktop } from '@/lib/platform/bridge.ts'
 import { applyBackdrop, resolveBackdrop } from '@/lib/platform/backdrop.ts'
 import { installEditorPerformanceTraceFromUrl } from '@/features/editor/state/performance-trace.ts'
 import { reportReactError } from '@/lib/react-error-reporting.ts'
+import { applicationHost } from '@/lib/application-host'
 
 installEditorPerformanceTraceFromUrl()
 initializeClientLogging()
-applyBackdrop(resolveBackdrop())
+applyBackdrop(applicationHost()?.backdrop ?? resolveBackdrop())
 // Before `createRoot`, deliberately. The mirrored appearance is initial
 // document state: descendants construct geometry and read computed styles on
 // their first render. `AppearanceProvider` corrects it from the server snapshot
@@ -66,9 +67,9 @@ log.info({
 void loadNerdFont(boot['editor.fontFamily'])
 
 // Preserve explicit fields before Router normalizes defaults; boot merges them with the cache.
-const initialHref = selectInitialAddress(window.location.href)
+const initialHref = applicationHost()?.initialAddress ?? selectInitialAddress(window.location.href)
 const initialIntent = parseAddressIntent(initialHref)
-const routerHistory = createBrowserHistory()
+const routerHistory = applicationHost()?.history ?? createBrowserHistory()
 const initialBrowserHref = browserAddressHref(initialHref)
 if (routerHistory.location.href !== initialBrowserHref) routerHistory.replace(initialBrowserHref)
 routerHistory.flush()
