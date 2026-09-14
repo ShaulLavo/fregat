@@ -46,13 +46,15 @@ test('view identities escape the punctuation a URI cannot carry raw', () => {
   expect(documentLabel(compared)).toBe('c#d?e.ts (working tree)')
 })
 
-test('conflict targets carry only the record identity and use explicit presentation facts', () => {
-  const document = { kind: 'conflict', conflictId: conflictId('conflict/1:changed') } as const
+test('conflict targets are keyed by the record identity and presented by their path', () => {
+  const document = {
+    kind: 'conflict',
+    conflictId: conflictId('conflict/1:changed'),
+    path: filesystemPath('/repo/src/app.ts'),
+  } as const
   expect(encodedViewTarget(document)).toBe('conflict-diff:conflict%2F1%3Achanged')
-  expect(documentLabel(document, { conflictPath: '/repo/src/app.ts' })).toBe('app.ts')
-  expect(documentTitle(document, { conflictPath: '/repo/src/app.ts' })).toBe(
-    '/repo/src/app.ts conflict editor',
-  )
+  expect(documentLabel(document)).toBe('app.ts')
+  expect(documentTitle(document)).toBe('/repo/src/app.ts: Current Changes ↔ Incoming Changes')
 })
 
 test('comparison requests retain snapshot revisions and the checkpoint query adapter', () => {
@@ -90,8 +92,8 @@ test('palette fallback labels stay separate from tab-strip presentation', () => 
     pathLabel: '/settings:',
   })
   expect(tabPalettePresentation(testTabContent(documentTargets.conflict))).toEqual({
-    name: 'conflict-diff:conflict-1',
-    pathLabel: '/conflict-diff:conflict-1',
+    name: 'a.ts',
+    pathLabel: '//repo/src/a.ts',
   })
   expect(tabPalettePresentation(testTabContent(documentTargets.relativeFile))).toEqual({
     name: 'a.ts',

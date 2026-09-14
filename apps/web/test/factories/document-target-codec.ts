@@ -103,7 +103,10 @@ function decodeReference(value: string): DecodedDocumentTarget {
   if (!result.success || result.output.path.includes('\0')) return invalidTarget()
   return tabResult({
     kind: 'git-ref',
-    source: { path: filesystemPath(result.output.path), ref: result.output.ref },
+    source: {
+      path: filesystemPath(result.output.path),
+      ref: result.output.ref,
+    },
   })
 }
 
@@ -169,8 +172,18 @@ function decodeSimple(
   if (decoded === null || decoded.includes('\0')) return invalidTarget()
   if (kind === 'search') return tabResult({ kind: 'search', root: filesystemPath(decoded) })
   if (decoded.length === 0) return invalidTarget()
-  if (kind === 'conflict') return tabResult({ kind: 'conflict', conflictId: conflictId(decoded) })
-  return tabResult({ kind: 'compare-saved', file: fileResource(filesystemPath(decoded)) })
+  // The token names only the record; the file it reconciles is fixed for these fixtures.
+  if (kind === 'conflict') {
+    return tabResult({
+      kind: 'conflict',
+      conflictId: conflictId(decoded),
+      path: filesystemPath('/repo/src/a.ts'),
+    })
+  }
+  return tabResult({
+    kind: 'compare-saved',
+    file: fileResource(filesystemPath(decoded)),
+  })
 }
 
 function textPayload(value: string): string | null {

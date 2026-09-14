@@ -132,6 +132,7 @@ export function FileEditorBody({
           onTextChange={currentActions?.handleTextChange}
           onOpenDefinition={currentActions?.openDefinition}
           onOpenReferences={currentActions?.openReferences}
+          onCompareMergeConflict={currentActions?.compareMergeConflict ?? undefined}
         />
         {fileState.status === 'error' ? (
           <div

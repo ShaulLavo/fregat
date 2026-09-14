@@ -12,6 +12,8 @@ import type {
 export type EditorSurfaceActions = {
   readonly applyWorkspaceEdit: OnApplyWorkspaceEdit
   readonly closeReferences: () => void
+  /** Null when the tab is not a conflict editor over a file that still exists on disk. */
+  readonly compareMergeConflict: (() => void) | null
   readonly openDefinition: (target: LanguageServerDefinitionTarget) => void | boolean
   readonly openReferences: (result: LanguageServerReferencesResult) => void | boolean
   readonly previewReference: (target: LanguageServerDefinitionTarget) => void

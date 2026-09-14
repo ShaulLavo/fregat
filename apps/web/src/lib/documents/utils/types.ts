@@ -1,7 +1,9 @@
 import type { GitFileStatus, SessionId, SettingsWriteTarget } from '@workspace/contracts'
 
 declare const identityBrand: unique symbol
-export type FilesystemPath = string & { readonly [identityBrand]: 'FilesystemPath' }
+export type FilesystemPath = string & {
+  readonly [identityBrand]: 'FilesystemPath'
+}
 export type WorkspaceRoot = FilesystemPath
 export type DocumentKey = string & { readonly [identityBrand]: 'DocumentKey' }
 export type TabId = string & { readonly [identityBrand]: 'TabId' }
@@ -29,11 +31,17 @@ export type GitComparison =
       readonly path: FilesystemPath
       readonly source?: GitChangeSource
     })
-  | (CheckpointRange & { readonly kind: 'checkpoint-file'; readonly file: FileResource })
+  | (CheckpointRange & {
+      readonly kind: 'checkpoint-file'
+      readonly file: FileResource
+    })
   | (CheckpointRange & { readonly kind: 'checkpoint-session' })
   | (CheckpointRange & { readonly kind: 'checkpoint-turn' })
 
-export type FileDocumentRef = { readonly kind: 'file'; readonly resource: FileResource }
+export type FileDocumentRef = {
+  readonly kind: 'file'
+  readonly resource: FileResource
+}
 export type SettingsDocumentRef = {
   readonly kind: 'settings-json'
   readonly target: SettingsWriteTarget
@@ -42,14 +50,22 @@ export type UnsyncedDocumentRef =
   | { readonly kind: 'git-ref'; readonly source: GitFileReference }
   | { readonly kind: 'git-diff'; readonly source: GitComparison }
   | { readonly kind: 'compare-saved'; readonly file: FileResource }
-  | { readonly kind: 'conflict'; readonly conflictId: ConflictId }
+  /** `path` is where the resolution lands: it names the tab and picks the language. */
+  | {
+      readonly kind: 'conflict'
+      readonly conflictId: ConflictId
+      readonly path: FilesystemPath
+    }
   | { readonly kind: 'search'; readonly root: WorkspaceRoot }
 export type DocumentRef = FileDocumentRef | SettingsDocumentRef | UnsyncedDocumentRef
 export type StandaloneDocumentRef = Exclude<DocumentRef, SettingsDocumentRef>
 export type TabContent =
   | { readonly kind: 'document'; readonly document: StandaloneDocumentRef }
   | { readonly kind: 'settings' }
-export type EditorTabRecord = { readonly id: TabId; readonly content: TabContent }
+export type EditorTabRecord = {
+  readonly id: TabId
+  readonly content: TabContent
+}
 export type SettingsSelection =
   | { readonly kind: 'form' }
   | { readonly kind: 'json'; readonly target: SettingsWriteTarget }

@@ -128,8 +128,9 @@ export function checkIdentityBoundaries(
   )
   // @ts-expect-error Internal settings buffers cannot be standalone tabs.
   documentTab(settingsJsonDocument('user'))
+  const fileTarget = fileDocument(fileResource(path))
   // @ts-expect-error File targets cannot be constructed with unsynced destinations.
-  documents.ensureUnsyncedDocument({ target: fileDocument(fileResource(path)), content: '' })
+  documents.ensureUnsyncedDocument({ target: fileTarget, content: '' })
   // @ts-expect-error Settings construction takes a settings target, not a file.
   documents.ensureSettingsDocument(fileDocument(fileResource(path)), {
     content: '',

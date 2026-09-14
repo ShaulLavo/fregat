@@ -49,10 +49,16 @@ const PLATFORM_SEARCH_RESULT_EDITOR_LOGGING_PLUGIN = createEditorLoggingPlugin(
  * documents because registering it at all makes the editor ask tree-sitter for raw captures, and
  * that query is pure waste on a file shiki is already painting.
  */
+export type CriticalEditorCorePluginOptions = {
+  /** Backs the "Compare Changes" lens on a merge conflict; absent hides it. */
+  readonly compareMergeConflict?: () => void
+}
+
 export function createCriticalEditorCorePlugins(
   languageId: EditorSyntaxLanguageId | null,
   indentationGuidesEnabled: boolean,
   minimapEnabled: boolean,
+  options: CriticalEditorCorePluginOptions = {},
 ): readonly EditorPlugin[] {
   const includeGuides =
     indentationGuidesEnabled &&
@@ -70,12 +76,14 @@ export function createCriticalEditorCorePlugins(
       ? [createMinimapPlugin()]
       : []),
     createEditorFindPlugin(),
-    createMergeConflictPlugin(),
+    createMergeConflictPlugin({ compare: options.compareMergeConflict }),
     createBracketMatchPlugin({
       style: { backgroundColor: 'var(--editor-bracket-match-background)' },
     }),
     createOccurrenceHighlightPlugin({
-      style: { backgroundColor: 'var(--editor-occurrence-highlight-background)' },
+      style: {
+        backgroundColor: 'var(--editor-occurrence-highlight-background)',
+      },
     }),
     createDocumentLinkPlugin(),
     ...(includeGuides ? [createScopeLinesPlugin()] : []),
@@ -136,7 +144,11 @@ function activateLoadedEditorPlugin(
     return disposableFromActivationResult(plugin.activate(context))
   } catch (error) {
     reportError(
-      toClientError({ code: 'OPERATION_FAILED', name: plugin.name ?? 'editor-plugin', error }),
+      toClientError({
+        code: 'OPERATION_FAILED',
+        name: plugin.name ?? 'editor-plugin',
+        error,
+      }),
     )
     return null
   }
@@ -171,7 +183,9 @@ function createEditorSyntaxHighlightingPlugins(): readonly EditorPlugin[] {
   return [
     // Tree-sitter stays for structure (folds/brackets); its token output is
     // suppressed automatically once the shiki highlighter session exists.
-    createTreeSitterSyntaxPlugin(treeSitter, { name: 'platform.tree-sitter-syntax' }),
+    createTreeSitterSyntaxPlugin(treeSitter, {
+      name: 'platform.tree-sitter-syntax',
+    }),
     createEditorShikiHighlighterPlugin(),
   ]
 }

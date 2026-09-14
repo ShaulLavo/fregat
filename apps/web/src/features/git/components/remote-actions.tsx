@@ -6,7 +6,7 @@ import {
   usePushRemoteMutation,
   useStatus,
 } from '@/features/git/hooks'
-import { ToolbarButton } from '@/features/git/components/toolbar-button'
+import { ToolbarButton } from '@/components/toolbar-button'
 
 export function RemoteActions({ rootPath }: { readonly rootPath: string }) {
   const status = useStatus(rootPath)

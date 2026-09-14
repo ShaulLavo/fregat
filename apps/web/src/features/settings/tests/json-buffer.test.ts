@@ -15,9 +15,10 @@ import { expect, test } from '../../../../test/fixtures'
 const ID = documentKey(settingsJsonDocument('user'))
 
 function seed(store: ReturnType<typeof createEditorDocumentStore>, text: string, revision: string) {
-  store
-    .getState()
-    .ensureSettingsDocument(settingsJsonDocument('user'), { content: text, revision: revision })
+  store.getState().ensureSettingsDocument(settingsJsonDocument('user'), {
+    content: text,
+    revision: revision,
+  })
 }
 
 /**
@@ -69,14 +70,20 @@ test('a dirty buffer keeps what was typed rather than being replaced', () => {
     store.getState().reconcileSettingsDocument(ID, '{ "editor.fontSize": 21 }\n', 'rev-2'),
   ).toBe(false)
   expect(store.getState().getLiveEditorDocument(ID)?.buffer.materializeFullText()).toContain('!')
-  expect(store.getState().getLiveEditorDocument(ID)?.sync).toMatchObject({ revision: 'rev-1' })
+  expect(store.getState().getLiveEditorDocument(ID)?.sync).toMatchObject({
+    revision: 'rev-1',
+  })
 })
 
 // The guard is on the sync kind, not the id shape: nothing else may be silently
 // replaced by a settings snapshot.
 test('only a settings-synced document can be reconciled', () => {
   const store = createEditorDocumentStore()
-  const target = { kind: 'conflict', conflictId: conflictId('1') } as const
+  const target = {
+    kind: 'conflict',
+    conflictId: conflictId('1'),
+    path: filesystemPath('/repo/a.ts'),
+  } as const
   const key = documentKey(target)
   store.getState().ensureUnsyncedEditorDocument({ content: 'conflict text', target })
 

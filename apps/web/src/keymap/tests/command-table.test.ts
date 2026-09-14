@@ -113,6 +113,13 @@ const TEXT_EDIT_COMMAND_IDS = [
   'editor.redo',
   'editor.replaceOne',
   'editor.replaceAll',
+  'editor.merge-conflict.accept.current',
+  'editor.merge-conflict.accept.incoming',
+  'editor.merge-conflict.accept.both',
+  'editor.merge-conflict.accept.selection',
+  'editor.merge-conflict.accept.all-current',
+  'editor.merge-conflict.accept.all-incoming',
+  'editor.merge-conflict.accept.all-both',
   'editor.deleteWordLeft',
   'editor.deleteWordRight',
   'editor.editor.action.deleteLines',
@@ -265,7 +272,10 @@ describe('command table', () => {
       const mutates = editorId !== null && editorCommandMutates(editorId)
       expect(command.undoCategory).toBe(mutates ? 'text-edit' : 'view-only')
       const when = mutates ? ['editorTarget', 'editorWritable'] : ['editorTarget']
-      expect({ id: command.id, when: command.when }).toEqual({ id: command.id, when })
+      expect({ id: command.id, when: command.when }).toEqual({
+        id: command.id,
+        when,
+      })
     }
   })
 

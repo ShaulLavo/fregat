@@ -566,16 +566,16 @@
       "type": "string"
     },
     "search.maxResultFiles": {
-      "default": 100,
+      "default": 20000,
       "description": "How many files a workspace search returns matches from.",
-      "maximum": 200,
+      "maximum": 20000,
       "minimum": 1,
       "type": "integer"
     },
     "search.maxResults": {
-      "default": 200,
+      "default": 20000,
       "description": "How many matches a workspace search returns.",
-      "maximum": 200,
+      "maximum": 20000,
       "minimum": 1,
       "type": "integer"
     },

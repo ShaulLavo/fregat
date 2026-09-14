@@ -8,7 +8,7 @@ import { gitStatusSymbol, type GitSymbolSource } from '@/features/git/utils/stat
 
 import { iconForEntry } from '@/lib/file-icons'
 import { basename } from '@/lib/path-formatters'
-import { documentSourcePath } from '@/lib/documents/utils/capabilities'
+import { documentSourcePath, tabFileResource } from '@/lib/documents/utils/capabilities'
 import {
   comparisonShortHash,
   tabCopyPath,
@@ -50,8 +50,7 @@ export function editorTabModel({
     content.kind === 'document' && content.document.kind === 'git-diff'
       ? comparisonShortHash(content.document.source)
       : ''
-  const facts = { conflictPath: conflictForTab(content, conflicts)?.remotePath }
-  const copyPath = tabCopyPath(content, facts)
+  const copyPath = tabCopyPath(content)
 
   return {
     active: tab.id === selectedTabId,
@@ -62,9 +61,10 @@ export function editorTabModel({
     diffStatus,
     diffSuffix: tabDiffSuffix(diffHash, diffStatus?.label),
     id: tab.id,
-    icon: iconForEntry({ name: tabIconName(content, facts), type: 'file' }),
-    name: tabLabel(content, facts),
-    title: tabTitle(content, facts),
+    icon: iconForEntry({ name: tabIconName(content), type: 'file' }),
+    mergeConflicts: tabMergeConflicts(content, gitFiles, rootPath),
+    name: tabLabel(content),
+    title: tabTitle(content),
   }
 }
 
@@ -84,6 +84,20 @@ function normalizedCopyPath(path: string) {
   if (path === '/') return path
 
   return path.replace(/\/+$/u, '')
+}
+
+function tabMergeConflicts(
+  content: TabContent,
+  files: readonly GitFileStatus[],
+  rootPath: string,
+): boolean {
+  if (content.kind !== 'document') return false
+  if (content.document.kind === 'conflict') return true
+  const path = tabFileResource(content)?.path
+  if (!path) return false
+  return files.some(
+    (file) => file.status === 'conflicted' && pathSetsOverlap([path], statusPaths(file), rootPath),
+  )
 }
 
 type TabDiffChange = {

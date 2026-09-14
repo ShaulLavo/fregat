@@ -3,9 +3,7 @@ import { documentSourcePath } from '@/lib/documents/utils/capabilities'
 import { encodedViewTarget, encodedSettingsTab } from '@/lib/documents/utils/codec'
 import type { DocumentRef, GitComparison, TabContent } from '@/lib/documents/utils/types'
 
-export type PresentationFacts = { readonly conflictPath?: string | null }
-
-export function documentLabel(document: DocumentRef, facts: PresentationFacts = {}): string {
+export function documentLabel(document: DocumentRef): string {
   switch (document.kind) {
     case 'file':
       return basename(document.resource.path)
@@ -18,7 +16,7 @@ export function documentLabel(document: DocumentRef, facts: PresentationFacts = 
     case 'compare-saved':
       return `${basename(document.file.path)} (working tree)`
     case 'conflict':
-      return facts.conflictPath ? basename(facts.conflictPath) : 'Conflict'
+      return basename(document.path)
     case 'search':
       return 'Search'
     default: {
@@ -28,11 +26,11 @@ export function documentLabel(document: DocumentRef, facts: PresentationFacts = 
   }
 }
 
-export function tabLabel(content: TabContent, facts: PresentationFacts = {}): string {
-  return content.kind === 'settings' ? 'settings.json' : documentLabel(content.document, facts)
+export function tabLabel(content: TabContent): string {
+  return content.kind === 'settings' ? 'settings.json' : documentLabel(content.document)
 }
 
-export function documentTitle(document: DocumentRef, facts: PresentationFacts = {}): string {
+export function documentTitle(document: DocumentRef): string {
   switch (document.kind) {
     case 'file':
       return displayPath(document.resource.path)
@@ -45,9 +43,7 @@ export function documentTitle(document: DocumentRef, facts: PresentationFacts = 
     case 'compare-saved':
       return `${displayPath(document.file.path)} — working tree vs saved`
     case 'conflict':
-      return facts.conflictPath
-        ? `${displayResourcePath(facts.conflictPath)} conflict editor`
-        : 'Filesystem conflict editor'
+      return `${displayResourcePath(document.path)}: Current Changes ↔ Incoming Changes`
     case 'search':
       return `${displayResourcePath(document.root)} search results`
     default: {
@@ -57,27 +53,23 @@ export function documentTitle(document: DocumentRef, facts: PresentationFacts = 
   }
 }
 
-export function tabTitle(content: TabContent, facts: PresentationFacts = {}): string {
+export function tabTitle(content: TabContent): string {
   return content.kind === 'settings'
     ? displayPath(encodedSettingsTab())
-    : documentTitle(content.document, facts)
+    : documentTitle(content.document)
 }
 
-export function tabCopyPath(content: TabContent, facts: PresentationFacts = {}): string {
+export function tabCopyPath(content: TabContent): string {
   if (content.kind === 'settings') return encodedSettingsTab()
   const document = content.document
-  if (document.kind === 'conflict') return facts.conflictPath ?? encodedViewTarget(document)
   if (document.kind === 'git-diff') return comparisonDisplayPath(document.source)
   return documentSourcePath(document) ?? ''
 }
 
-export function tabIconName(content: TabContent, facts: PresentationFacts = {}): string {
+export function tabIconName(content: TabContent): string {
   if (content.kind === 'settings') return 'settings.json'
-  const document = content.document
-  if (document.kind === 'search') return 'search.txt'
-  if (document.kind === 'conflict')
-    return facts.conflictPath ? basename(facts.conflictPath) : 'conflict.txt'
-  return basename(tabCopyPath(content, facts))
+  if (content.document.kind === 'search') return 'search.txt'
+  return basename(tabCopyPath(content))
 }
 
 export function comparisonDisplayPath(source: GitComparison): string {
@@ -145,7 +137,10 @@ function displayResourcePath(value: string): string {
 }
 
 // The palette historically shows encoded view names; tab-strip titles have different fallbacks.
-export function tabPalettePresentation(content: TabContent): { name: string; pathLabel: string } {
+export function tabPalettePresentation(content: TabContent): {
+  name: string
+  pathLabel: string
+} {
   if (content.kind === 'settings') {
     const display = encodedSettingsTab()
     return { name: basename(display), pathLabel: displayPath(display) }
@@ -154,6 +149,12 @@ export function tabPalettePresentation(content: TabContent): { name: string; pat
   if (document.kind === 'search') {
     return { name: 'Search', pathLabel: documentTitle(document) }
   }
-  const display = document.kind === 'file' ? document.resource.path : encodedViewTarget(document)
+  const display = paletteDisplayPath(document)
   return { name: basename(display), pathLabel: displayPath(display) }
+}
+
+function paletteDisplayPath(document: Exclude<DocumentRef, { kind: 'search' }>): string {
+  if (document.kind === 'file') return document.resource.path
+  if (document.kind === 'conflict') return document.path
+  return encodedViewTarget(document)
 }

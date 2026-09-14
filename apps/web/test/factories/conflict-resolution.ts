@@ -44,7 +44,11 @@ export async function createConflictResolutionFixture(
   const conflictStore = createEditorConflictStore()
   const queryClient = createTestQueryClient()
   registerEnvironmentQueryClient(queryClient, originForQueryClient(queryClient), transport.client)
-  const target = { kind: 'conflict', conflictId: conflictId('resolution-test') } as const
+  const target = {
+    kind: 'conflict',
+    conflictId: conflictId('resolution-test'),
+    path,
+  } as const
   const key = documentKey(target)
   const destination = documentStore.getState().ensureLiveEditorDocument(remote)
   const resolution = documentStore
@@ -113,7 +117,10 @@ export async function watchConflictResolutionEvents(
   const controller = new AbortController()
   const ready = Promise.withResolvers<void>()
   const events: FilesystemEvent[] = []
-  const scope = createWideEventScope({ action: 'test.conflict-events', area: 'fs' })
+  const scope = createWideEventScope({
+    action: 'test.conflict-events',
+    area: 'fs',
+  })
   let gitInvalidations = 0
   const streaming = streamWorkspaceEvents(
     fixture.transport.client,

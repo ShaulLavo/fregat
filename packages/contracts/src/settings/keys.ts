@@ -350,25 +350,25 @@ export const SETTINGS_REGISTRY = {
     keywords: ['search', 'word', 'boundary'],
   }),
   'search.maxResults': defineSetting({
-    schema: v.pipe(v.number(), v.integer(), v.minValue(1), v.maxValue(200)),
-    default: 200,
+    schema: v.pipe(v.number(), v.integer(), v.minValue(1), v.maxValue(20000)),
+    default: 20000,
     scope: 'window',
     widget: 'number',
     category: 'Search',
-    // The route caps this at 200 and rejects rather than clamps, so the schema
+    // The route caps this at 20000 and rejects rather than clamps, so the schema
     // has to agree or a legal-looking setting produces a failed request.
     description: 'How many matches a workspace search returns.',
     keywords: ['search', 'results', 'limit'],
   }),
   'search.maxResultFiles': defineSetting({
-    schema: v.pipe(v.number(), v.integer(), v.minValue(1), v.maxValue(200)),
-    default: 100,
+    schema: v.pipe(v.number(), v.integer(), v.minValue(1), v.maxValue(20000)),
+    default: 20000,
     scope: 'window',
     widget: 'number',
     category: 'Search',
     // Separate from `search.maxResults`: one pathological file can hold every
     // match in the budget, so bounding matches alone still yields a one-file
-    // result set. The route caps this at 200 for the same reason as the match
+    // result set. The route caps this at 20000 for the same reason as the match
     // limit.
     description: 'How many files a workspace search returns matches from.',
     visibility: 'advanced',

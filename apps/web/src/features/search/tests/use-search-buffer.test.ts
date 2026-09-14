@@ -303,6 +303,34 @@ describe('workspace search dirty buffer overlay', () => {
     ])
   })
 
+  it('keeps overlay matches as disk results once the buffer is saved', async () => {
+    const store = createSearchBufferStore()
+    const query = workspaceSearchQuery('repo', 'needle')
+    const initialRunId = store.getState().startSearch(query)
+
+    store
+      .getState()
+      .appendEvents(initialRunId, [
+        matchEvent('open-buffer', 'repo/src/saved.ts'),
+        matchEvent('disk', 'repo/src/other.ts'),
+      ])
+    store.getState().appendEvent(initialRunId, doneEvent(2))
+    const before = store.getState().active?.matches
+
+    const provider = clientOnlyWorkspaceSearchProvider(store.getState().active, [], query)
+    expect(provider).not.toBeNull()
+
+    const settleRunId = store.getState().startSearch(query)
+    await runSearch(provider!, query, settleRunId, store, new AbortController().signal)
+
+    expect(store.getState().active?.matches).toMatchObject([
+      { path: 'repo/src/saved.ts', source: 'disk' },
+      { path: 'repo/src/other.ts', source: 'disk' },
+    ])
+    expect(store.getState().active?.matches).toHaveLength(before?.length ?? -1)
+    expect(clientOnlyWorkspaceSearchProvider(store.getState().active, [], query)).toBeNull()
+  })
+
   it('does not create a client-only overlay without ready matching disk results', () => {
     const store = createSearchBufferStore()
     const query = workspaceSearchQuery('repo', 'needle')

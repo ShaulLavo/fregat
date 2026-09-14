@@ -1,4 +1,4 @@
-import { useEffect, useRef } from 'react'
+import { useEffect } from 'react'
 
 import {
   useEditorDocumentStoreApi,
@@ -14,7 +14,6 @@ import { useSearchBufferStoreApi } from '@/features/search/state/buffer-state'
 import { useDebouncedValue } from '@tanstack/react-pacer/debouncer'
 
 import { clientOnlyWorkspaceSearchProvider, runSearch } from '@/features/search/utils/buffer-runner'
-import { searchResultsNeedDiskRefresh } from '@/features/search/utils/dirty-overlay-refresh'
 
 const DIRTY_BUFFER_DEBOUNCE_MS = 220
 
@@ -40,11 +39,6 @@ export function useRunDirtySearchBufferOverlay(
   const [debouncedDirtyRevisionKey] = useDebouncedValue(dirtyRevisionKey, {
     wait: DIRTY_BUFFER_DEBOUNCE_MS,
   })
-  // Which paths the displayed results are currently overlaid with. Not state:
-  // nothing renders from it, and writing it must not schedule a render inside
-  // the effect that reads it.
-  const overlaidPathsRef = useRef<ReadonlySet<string>>(new Set())
-
   useEffect(() => {
     if (!query) return
 
@@ -62,15 +56,6 @@ export function useRunDirtySearchBufferOverlay(
       documentState.dirtyDocumentKeys,
       rootPath,
     )
-    const dirtyPaths = new Set(dirtyDocuments.map((document) => document.path))
-    const overlaidPaths = overlaidPathsRef.current
-    overlaidPathsRef.current = dirtyPaths
-
-    if (searchResultsNeedDiskRefresh(overlaidPaths, dirtyPaths)) {
-      store.getState().requestSearchRefresh(rootPath)
-      return
-    }
-
     const provider = clientOnlyWorkspaceSearchProvider(
       store.getState().active,
       dirtyDocuments,

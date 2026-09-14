@@ -19,6 +19,8 @@ export type EditorTabModel = {
   diffStatus: StatusPresentation | null
   diffSuffix: string
   icon: ResolvedFileIcon
+  /** The conflict editor, or a file git reports as conflicted: the title shows conflict navigation. */
+  mergeConflicts: boolean
   id: TabId
   name: string
   content: TabContent

@@ -8,6 +8,7 @@ import type { EditorTabModel } from '@/features/workspace/utils/tab-types'
 import { useEditorDocumentState } from '@/features/editor/state/document-state'
 import type { EditorTabCloseTarget } from '@/features/workspace/utils/tab-close-targets'
 import { useEditorTabActions } from '@/features/editor/hooks/use-editor-tab-actions'
+import { MergeConflictNavigation } from '@/features/workbench/components/merge-conflict-navigation'
 import { SortableEditorTabButton } from '@/features/workbench/components/sortable-editor-tab-button'
 import { useActiveTabStripScroll } from '@/features/workbench/hooks/use-active-tab-strip-scroll'
 import { useTabStripSensors } from '@/features/workbench/hooks/use-tab-strip-sensors'
@@ -27,7 +28,8 @@ export function EditorTabBar({
   const dirtyDocumentKeys = useEditorDocumentState((state) => state.dirtyDocumentKeys)
   const { reorderTab } = useEditorTabActions()
   const closeTargets = editorTabCloseTargets(tabs, dirtyDocumentKeys)
-  const stripRef = useActiveTabStripScroll(tabs.find((tab) => tab.active)?.id ?? null)
+  const activeTab = tabs.find((tab) => tab.active) ?? null
+  const stripRef = useActiveTabStripScroll(activeTab?.id ?? null)
   const sensors = useTabStripSensors()
 
   function handleDragEnd(event: DragEndEvent) {
@@ -63,6 +65,7 @@ export function EditorTabBar({
             )
           })}
           <div aria-hidden='true' className={BAR_TAB_FILLER_CLASS} />
+          {activeTab?.mergeConflicts ? <MergeConflictNavigation /> : null}
         </div>
       </SortableContext>
     </DndContext>

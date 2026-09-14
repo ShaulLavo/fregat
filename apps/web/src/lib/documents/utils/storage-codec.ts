@@ -54,8 +54,14 @@ const comparisonSchema = v.pipe(
       kind: v.literal('checkpoint-file'),
       file: resourceSchema,
     }),
-    v.strictObject({ ...checkpointEntries, kind: v.literal('checkpoint-session') }),
-    v.strictObject({ ...checkpointEntries, kind: v.literal('checkpoint-turn') }),
+    v.strictObject({
+      ...checkpointEntries,
+      kind: v.literal('checkpoint-session'),
+    }),
+    v.strictObject({
+      ...checkpointEntries,
+      kind: v.literal('checkpoint-turn'),
+    }),
   ]),
   v.check((source) =>
     source.kind === 'snapshot'
@@ -75,12 +81,16 @@ const storedDocumentSchema = v.variant('kind', [
   v.strictObject({
     kind: v.literal('conflict'),
     conflictId: v.pipe(nonemptySchema, v.transform(conflictId)),
+    path: pathSchema,
   }),
 ])
 
 export const storedTabContentSchema = v.variant('kind', [
   v.strictObject({ kind: v.literal('settings') }),
-  v.strictObject({ kind: v.literal('document'), document: storedDocumentSchema }),
+  v.strictObject({
+    kind: v.literal('document'),
+    document: storedDocumentSchema,
+  }),
 ])
 
 export type StoredTabContent = v.InferOutput<typeof storedTabContentSchema>

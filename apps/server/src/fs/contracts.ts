@@ -7,7 +7,9 @@ import * as v from 'valibot'
 
 export const pathSchema = v.pipe(v.string(), v.maxLength(4096))
 const depthQueryValueSchema = integerQueryValueSchema('1', 10)
-const limitQueryValueSchema = integerQueryValueSchema('50', 200)
+// 20000 matches VS Code's default result cap. Truncation is where a parallel
+// ripgrep run stops being deterministic, so the cap is high enough to be rare.
+const limitQueryValueSchema = integerQueryValueSchema('50', 20000)
 const recentLimitQueryValueSchema = integerQueryValueSchema('20', 50)
 const entryTypeQueryValueSchema = v.union([
   v.literal('file'),

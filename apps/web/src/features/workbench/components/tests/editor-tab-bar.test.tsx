@@ -151,6 +151,7 @@ function editorTab({
     diffSource: null,
     diffStatus: null,
     diffSuffix: '',
+    mergeConflicts: false,
     icon: { name: 'typescript', src: '' },
     id: tabId(id),
     name,

@@ -6,6 +6,7 @@ import type { SessionId } from '@workspace/contracts'
 import { createEditorTabRecord, documentTab } from '@/lib/documents/utils/tabs'
 import {
   conflictId,
+  fileDocument,
   fileResource,
   filesystemPath,
   tabId,
@@ -31,7 +32,15 @@ test.each(DOCUMENT_TARGET_CASES)(
         selectedTabId: id,
         tab: { id, content: testTabContent(path, rootPath) },
       }),
-    ).toMatchObject({ active: true, id, name, title, copyPath, copyRelativePath, diffSource })
+    ).toMatchObject({
+      active: true,
+      id,
+      name,
+      title,
+      copyPath,
+      copyRelativePath,
+      diffSource,
+    })
   },
 )
 
@@ -44,7 +53,10 @@ test('a snapshot diff tab points at the file it compares', () => {
 })
 
 test('a diff of a file deleted in the worktree has nothing left on disk', () => {
-  expect(model(snapshot('deleted')).diffSource).toEqual({ onDisk: false, path: FILE })
+  expect(model(snapshot('deleted')).diffSource).toEqual({
+    onDisk: false,
+    path: FILE,
+  })
 })
 
 test('live status wins over the status baked into the document target', () => {
@@ -92,10 +104,20 @@ test('turn and session checkpoint diffs span many files, so they target none', (
 })
 
 test('a conflict diff targets the file on disk it is reconciling', () => {
-  const conflicts: EditorTabConflictMap = { 'conflict-1': { remotePath: FILE } }
+  const conflicts: EditorTabConflictMap = {
+    'conflict-1': { remotePath: FILE },
+  }
   expect(
-    model(documentTab({ kind: 'conflict', conflictId: conflictId('conflict-1') }), { conflicts })
-      .diffSource,
+    model(
+      documentTab({
+        kind: 'conflict',
+        conflictId: conflictId('conflict-1'),
+        path: FILE,
+      }),
+      {
+        conflicts,
+      },
+    ).diffSource,
   ).toEqual({ onDisk: true, path: FILE })
 })
 
@@ -111,7 +133,10 @@ function model(
   {
     conflicts = {},
     gitFiles = [],
-  }: { conflicts?: EditorTabConflictMap; gitFiles?: readonly GitFileStatus[] } = {},
+  }: {
+    conflicts?: EditorTabConflictMap
+    gitFiles?: readonly GitFileStatus[]
+  } = {},
 ) {
   return editorTabModel({
     conflicts,
@@ -121,3 +146,17 @@ function model(
     tab: createEditorTabRecord(content),
   })
 }
+
+test('conflict navigation shows for the conflict editor and for git-conflicted files', () => {
+  const conflicts: EditorTabConflictMap = { 'conflict-1': { remotePath: FILE } }
+  const conflictTab = model(
+    documentTab({ kind: 'conflict', conflictId: conflictId('conflict-1'), path: FILE }),
+    { conflicts },
+  )
+  expect(conflictTab.mergeConflicts).toBe(true)
+  expect(model(documentTab(fileDocument(fileResource(FILE)))).mergeConflicts).toBe(false)
+  const conflicted = model(documentTab(fileDocument(fileResource(FILE))), {
+    gitFiles: [{ path: FILE, index: 'unmodified', status: 'conflicted', worktree: 'unmodified' }],
+  })
+  expect(conflicted.mergeConflicts).toBe(true)
+})

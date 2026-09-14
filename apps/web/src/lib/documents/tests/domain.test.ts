@@ -34,7 +34,10 @@ test('document identity includes kind and does not interpret explicitly construc
   const settings = settingsJsonDocument('user')
   expect(documentKey(file)).not.toBe(documentKey(settings))
   expect(filesystemResource(file)?.path).toBe('settings-json:user')
-  expect(saveCapability(file)).toEqual({ kind: 'file', resource: { path: 'settings-json:user' } })
+  expect(saveCapability(file)).toEqual({
+    kind: 'file',
+    resource: { path: 'settings-json:user' },
+  })
   expect(documentKey(fileDocument(resource))).toBe(documentKey(fileDocument({ ...resource })))
 })
 
@@ -69,10 +72,18 @@ test('every unsavable document remains distinct from a filesystem destination', 
     { kind: 'git-ref', source: { path: resource.path, ref: 'HEAD' } },
     {
       kind: 'git-diff',
-      source: { kind: 'snapshot', path: resource.path, newObjectId: 'b'.repeat(40) },
+      source: {
+        kind: 'snapshot',
+        path: resource.path,
+        newObjectId: 'b'.repeat(40),
+      },
     },
     { kind: 'compare-saved', file: resource },
-    { kind: 'conflict', conflictId: conflictId('missing') },
+    {
+      kind: 'conflict',
+      conflictId: conflictId('missing'),
+      path: resource.path,
+    },
     { kind: 'search', root },
   ]
   for (const document of documents) {
@@ -85,13 +96,22 @@ for (const kind of ['checkpoint-session', 'checkpoint-turn'] as const) {
   test(`${kind} admission uses workspace ownership and no fabricated file`, () => {
     const document = {
       kind: 'git-diff',
-      source: { kind, owner: root, sessionId: TEST_SESSION_ID, fromTurnCount: 0, toTurnCount: 2 },
+      source: {
+        kind,
+        owner: root,
+        sessionId: TEST_SESSION_ID,
+        fromTurnCount: 0,
+        toTurnCount: 2,
+      },
     } as const
     const content = documentTab(document)
     expect(durableTab(content, root)).toBe(true)
     expect(durableTab(content, filesystemPath('/other'))).toBe(false)
     expect(durableTab(content, filesystemPath('/repo/nested'))).toBe(false)
-    expect(backingResource(document)).toEqual({ kind: 'git-diff', source: document.source })
+    expect(backingResource(document)).toEqual({
+      kind: 'git-diff',
+      source: document.source,
+    })
     expect('path' in document.source).toBe(false)
   })
 }
@@ -121,8 +141,11 @@ test('tab presentation uses typed content and preserves existing file path forma
   expect(tabTitle(content)).toBe('//repo/src/a.ts')
   expect(sameTabContent(content, documentTab(fileDocument({ ...resource })))).toBe(true)
   expect(sameTabContent(content, settingsTab())).toBe(false)
-  const conflict = documentTab({ kind: 'conflict', conflictId: conflictId('missing') })
-  expect(tabLabel(conflict)).toBe('Conflict')
-  expect(tabTitle(conflict)).toBe('Filesystem conflict editor')
-  expect(tabLabel(conflict, { conflictPath: resource.path })).toBe('a.ts')
+  const conflict = documentTab({
+    kind: 'conflict',
+    conflictId: conflictId('missing'),
+    path: resource.path,
+  })
+  expect(tabLabel(conflict)).toBe('a.ts')
+  expect(tabTitle(conflict)).toBe('/repo/src/a.ts: Current Changes ↔ Incoming Changes')
 })

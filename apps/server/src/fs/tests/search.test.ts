@@ -856,7 +856,9 @@ describe('workspace disk search provider', () => {
     )
 
     const events = await collectEvents(
-      findInWorkspaceStream(paths, options, undefined, { workspaceIndex: staleIndex }),
+      findInWorkspaceStream(paths, options, undefined, {
+        workspaceIndex: staleIndex,
+      }),
     )
     const done = doneEvent(events)
 
@@ -958,7 +960,9 @@ describe('workspace disk search provider', () => {
 
     expect(index.status().readiness).toBe('building')
     const events = await collectEvents(
-      findInWorkspaceStream(paths, options, undefined, { workspaceIndex: index }),
+      findInWorkspaceStream(paths, options, undefined, {
+        workspaceIndex: index,
+      }),
     )
     await rebuild
 
@@ -1158,7 +1162,9 @@ describe('workspace disk search provider', () => {
 
     const index = await buildWorkspaceIndex(paths, TEST_INDEX_OPTIONS)
     const indexedEvents = await collectEvents(
-      findInWorkspaceStream(paths, options, undefined, { workspaceIndex: index }),
+      findInWorkspaceStream(paths, options, undefined, {
+        workspaceIndex: index,
+      }),
     )
 
     expect(doneEvent(indexedEvents)?.measurement?.providerSources).toContain('index')

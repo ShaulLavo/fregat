@@ -64,6 +64,8 @@ type EditorProps = {
   definitionTarget?: LanguageServerDefinitionTarget | null
   onOpenDefinition?: (target: LanguageServerDefinitionTarget) => void | boolean
   onOpenReferences?: (result: LanguageServerReferencesResult) => void | boolean
+  /** Opens the side-by-side view behind a merge conflict's "Compare Changes". */
+  onCompareMergeConflict?: () => void
   onInitialPaint?: (event: EditorInitialPaintEvent) => void
   onScrollPositionChange?: (key: DocumentKey, scrollPosition: EditorScrollPosition) => void
   onStatusSourceChange?: (source: EditorStatusBarSource) => void
@@ -85,6 +87,7 @@ export function Editor({
   tabId,
   onOpenDefinition,
   onOpenReferences,
+  onCompareMergeConflict,
   onInitialPaint,
   onScrollPositionChange,
   onStatusSourceChange,
@@ -151,11 +154,19 @@ export function Editor({
       syntaxHighlightingEnabled,
     ],
   )
-  // Plugin identity controls native registration lifetime.
+  // Plugin identity controls native registration lifetime; the host keeps this callback stable
+  // per conflict, so it rebuilds the plugins only when the conflict behind the tab changes.
   const criticalEditorCorePlugins = useMemo(
     () =>
-      createCriticalEditorCorePlugins(documentLanguageId, indentationGuidesEnabled, minimapEnabled),
-    [documentLanguageId, indentationGuidesEnabled, minimapEnabled],
+      createCriticalEditorCorePlugins(
+        documentLanguageId,
+        indentationGuidesEnabled,
+        minimapEnabled,
+        {
+          compareMergeConflict: onCompareMergeConflict,
+        },
+      ),
+    [documentLanguageId, indentationGuidesEnabled, minimapEnabled, onCompareMergeConflict],
   )
   const decodePlugin = useMemo(() => createDecodePluginLoader(decodeMode), [decodeMode])
   const plugins = useMemo(

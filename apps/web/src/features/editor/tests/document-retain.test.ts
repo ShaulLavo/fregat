@@ -33,7 +33,11 @@ function serviceWithFourDocuments() {
   service.setDirty(testDocumentKey('/repo/dirty.ts'), true)
   service.ensureUnsyncedDocument({
     content: 'conflict body',
-    target: { kind: 'conflict', conflictId: conflictId('1') },
+    target: {
+      kind: 'conflict',
+      conflictId: conflictId('1'),
+      path: filesystemPath('/repo/dirty.ts'),
+    },
   })
   service.ensureViewForDocument(tabId('tab:unsynced'), testDocumentKey('conflict-diff:1'))
 
@@ -88,11 +92,21 @@ test('drops views whose tab is gone even when the document is kept', () => {
 })
 
 test.for([
-  { kind: 'git-ref', source: { path: filesystemPath('/repo/a.ts'), ref: 'HEAD' } } as const,
-  { kind: 'conflict', conflictId: conflictId('pending-conflict') } as const,
+  {
+    kind: 'git-ref',
+    source: { path: filesystemPath('/repo/a.ts'), ref: 'HEAD' },
+  } as const,
+  {
+    kind: 'conflict',
+    conflictId: conflictId('pending-conflict'),
+    path: filesystemPath('/repo/a.ts'),
+  } as const,
 ])('retains the editable unsavable buffer $kind after its final view is removed', (target) => {
   const service = new WorkspaceDocumentService()
-  const document = service.ensureUnsyncedDocument({ content: 'original', target })
+  const document = service.ensureUnsyncedDocument({
+    content: 'original',
+    target,
+  })
   const view = service.ensureViewForDocument(tabId('tab-unsynced'), document.key)
   createEditorBufferSession(document.buffer, view.view).applyText(' edited')
 

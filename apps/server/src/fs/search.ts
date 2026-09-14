@@ -291,7 +291,12 @@ async function* searchWorkspaceWithDiskTools(
 }
 
 function createSearchState(): SearchState {
-  return { count: 0, fileLimitReached: false, paths: new Set(), truncated: false }
+  return {
+    count: 0,
+    fileLimitReached: false,
+    paths: new Set(),
+    truncated: false,
+  }
 }
 
 function admitSearchMatch(state: SearchState, match: FindMatch, options: FindOptions) {
@@ -426,7 +431,9 @@ async function* searchWithTools(
     return
   }
 
-  recordRequestContext({ search: { provider: searchProviderLabel(pathIndexProvider, needsFd) } })
+  recordRequestContext({
+    search: { provider: searchProviderLabel(pathIndexProvider, needsFd) },
+  })
   if (pathIndexProvider) {
     yield* measureProvider(context, 'index', pathIndexProvider.searchNames(context))
   } else if (searchNames) {
@@ -821,6 +828,9 @@ function rgArgs(context: FindContext, contentIndexFilter?: ContentIndexFilter | 
 }
 
 export function contentSearchRgArgs(input: ContentSearchRgArgsInput) {
+  // No `--sort`: it would make rg single-threaded. The first `limit` matches are
+  // then whatever files the parallel walk finished first, which is why the cap
+  // is high enough that truncation is rare.
   const args = [
     '--json',
     '--follow',

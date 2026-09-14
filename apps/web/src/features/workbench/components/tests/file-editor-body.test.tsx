@@ -97,6 +97,7 @@ function editorActions(
   return {
     applyWorkspaceEdit: vi.fn(),
     closeReferences: vi.fn(),
+    compareMergeConflict: null,
     handleTextChange: vi.fn(),
     openDefinition: vi.fn(),
     openReferences: vi.fn(),

@@ -17,7 +17,8 @@ import { log } from '@/lib/client-logging'
 import { streamWorkspaceSearch } from '@workspace/client-core/files/search-client'
 import { compareSearchPaths } from '@/features/search/utils/sort'
 
-const MAX_DISK_SEARCH_LIMIT = 200
+// Mirrors the route's cap on `limit`.
+const MAX_DISK_SEARCH_LIMIT = 20000
 
 export type SearchProvider = {
   search(query: WorkspaceSearchQuery, signal?: AbortSignal): AsyncIterable<WorkspaceSearchEvent>

@@ -133,7 +133,10 @@ type DocumentTargetCase = {
   readonly title: string
   readonly copyPath: string
   readonly copyRelativePath: string
-  readonly diffSource: { readonly onDisk: boolean; readonly path: string } | null
+  readonly diffSource: {
+    readonly onDisk: boolean
+    readonly path: string
+  } | null
   readonly token: string | null
 }
 
@@ -179,10 +182,10 @@ export const DOCUMENT_TARGET_CASES: readonly DocumentTargetCase[] = [
     rootPath: '/repo',
     path: documentTargets.conflict,
     filePath: null,
-    name: 'Conflict',
-    title: 'Filesystem conflict editor',
-    copyPath: 'conflict-diff:conflict-1',
-    copyRelativePath: 'conflict-diff:conflict-1',
+    name: 'a.ts',
+    title: '/repo/src/a.ts: Current Changes ↔ Incoming Changes',
+    copyPath: '/repo/src/a.ts',
+    copyRelativePath: 'src/a.ts',
     diffSource: null,
     token: null,
   },

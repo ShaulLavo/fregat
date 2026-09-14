@@ -250,12 +250,26 @@ export function clientOnlyWorkspaceSearchProvider(
   documents: readonly OpenBufferSearchDocument[],
   query: WorkspaceSearchQuery,
 ): SearchProvider | null {
-  if (documents.length === 0) return null
   if (!snapshot) return null
   if (snapshot.status !== 'ready') return null
   if (!sameWorkspaceSearchQuery(snapshot.resultsSearchQuery, query)) return null
+  if (documents.length === 0 && !hasOpenBufferMatch(snapshot.matches)) return null
 
   return new ClientOnlyWorkspaceSearchProvider(snapshot.matches, documents)
+}
+
+function hasOpenBufferMatch(matches: readonly WorkspaceSearchMatch[]) {
+  return matches.some((match) => match.source === 'open-buffer')
+}
+
+// A buffer that was overlaid and then saved keeps its overlay matches: they are
+// what was written to disk. Re-running ripgrep for it would replace every
+// truncated result set with a different one, which read as the search changing
+// on every save. Only the `unsaved` provenance is dropped.
+function settledMatch(match: WorkspaceSearchMatch): WorkspaceSearchMatch {
+  if (match.source !== 'open-buffer') return match
+
+  return { ...match, source: 'disk' }
 }
 
 class ClientOnlyWorkspaceSearchProvider implements SearchProvider {
@@ -288,7 +302,7 @@ class ClientOnlyWorkspaceSearchProvider implements SearchProvider {
       }
 
       count += 1
-      yield { match, type: 'match' }
+      yield { match: settledMatch(match), type: 'match' }
     }
 
     if (!truncated) {

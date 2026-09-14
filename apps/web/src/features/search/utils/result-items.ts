@@ -325,9 +325,9 @@ function searchMatchLocationHash(match: WorkspaceSearchMatch) {
 
 function hashSearchMatchLocation(match: WorkspaceSearchMatch) {
   let hash = STABLE_HASH_OFFSET
+  // Source is provenance, not location: the same line keeps its id when a
+  // buffer goes dirty and again when it is saved, so selection survives both.
   hash = updateStableHash(hash, match.kind)
-  hash = updateStableHashCode(hash, 0)
-  hash = updateStableHash(hash, match.source)
   hash = updateStableHashCode(hash, 0)
   hash = updateStableHash(hash, match.type)
   hash = updateStableHashCode(hash, 0)

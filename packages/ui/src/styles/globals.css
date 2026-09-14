@@ -281,6 +281,17 @@
   --editor-inactive-selection: oklch(0.72 0.13 240 / 0.18);
   --editor-bracket-match-background: oklch(0.55 0.02 260 / 0.22);
   --editor-occurrence-highlight-background: oklch(0.55 0.02 260 / 0.15);
+  /* Inline merge conflicts. VS Code's merge.* colors, which it keeps identical in light and dark:
+     the marker line at full strength, the block it opens at 40% of that. */
+  --editor-merge-current-header-background: oklch(0.76 0.13 175 / 0.5);
+  --editor-merge-current-content-background: oklch(0.76 0.13 175 / 0.2);
+  --editor-merge-incoming-header-background: oklch(0.7 0.15 250 / 0.5);
+  --editor-merge-incoming-content-background: oklch(0.7 0.15 250 / 0.2);
+  --editor-merge-common-header-background: oklch(0.47 0 0 / 0.4);
+  --editor-merge-common-content-background: oklch(0.47 0 0 / 0.16);
+  --editor-merge-description-foreground: var(--muted-foreground);
+  --editor-merge-lens-foreground: var(--muted-foreground);
+  --editor-merge-lens-active-foreground: var(--foreground);
 
   /* Terminal colors are palette fields fed to ghostty as typed values; the
      pane paints the content well, so the terminal paints no ground of its own. */

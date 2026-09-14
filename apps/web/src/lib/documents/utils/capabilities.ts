@@ -74,6 +74,8 @@ export function documentSourcePath(document: DocumentRef): FilesystemPath | null
       return document.source.path
     case 'compare-saved':
       return document.file.path
+    case 'conflict':
+      return document.path
     case 'search':
       return document.root
     case 'git-diff': {
@@ -83,7 +85,6 @@ export function documentSourcePath(document: DocumentRef): FilesystemPath | null
       return null
     }
     case 'settings-json':
-    case 'conflict':
       return null
     default: {
       const exhaustive: never = document

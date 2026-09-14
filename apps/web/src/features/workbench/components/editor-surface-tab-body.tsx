@@ -1,5 +1,6 @@
-import { documentKey } from '@/lib/documents/utils/identity'
+import { documentKey, fileResource } from '@/lib/documents/utils/identity'
 import { filesystemResource } from '@/lib/documents/utils/capabilities'
+import { documentTab } from '@/lib/documents/utils/tabs'
 import type { DocumentKey, FilesystemPath, TabContent, TabId } from '@/lib/documents/utils/types'
 import { useCallback, useEffect, useLayoutEffect, useMemo } from 'react'
 
@@ -10,6 +11,7 @@ import {
 import { useConflictEditorResolution } from '@/features/workspace/hooks/use-conflict-editor-resolution'
 import { SearchPane } from '@/features/workspace/components/search-pane'
 import { useEditorCommands } from '@/features/editor/hooks/use-editor-commands'
+import { useEditorConflictState } from '@/features/editor/state/conflict-state'
 import { useEditorDocumentState } from '@/features/editor/state/document-state'
 import { useWorkspaceEditHost } from '@/features/editor/providers/workspace-edit-context'
 import { useEditorUiState, useEditorUiStoreApi } from '@/features/editor/state/ui-state'
@@ -107,7 +109,13 @@ export function EditorSurfaceTabBody({
   const clearStatusBarSource = useEditorUiState((state) => state.clearStatusBarSource)
   const setStatusBarSource = useEditorUiState((state) => state.setStatusBarSource)
   const uiStore = useEditorUiStoreApi()
-  const { openDefinition } = useEditorCommands()
+  const { openDefinition, selectContent } = useEditorCommands()
+  // Only a file that is still on disk has a saved side to compare the buffer against.
+  const comparableConflictPath = useEditorConflictState((state) => {
+    if (!selectedConflict) return null
+    const conflict = state.conflicts[selectedConflict.conflictId]
+    return conflict?.eventType === 'changed' ? conflict.localPath : null
+  })
   const applyWorkspaceEdit = useWorkspaceEditHost()
   const resolveConflictEditorDocument = useConflictEditorResolution()
   const selectedFile = readyFile(fileState)
@@ -170,6 +178,15 @@ export function EditorSurfaceTabBody({
     () => ({
       applyWorkspaceEdit,
       closeReferences: handleCloseReferences,
+      compareMergeConflict: comparableConflictPath
+        ? () =>
+            selectContent(
+              documentTab({
+                kind: 'compare-saved',
+                file: fileResource(comparableConflictPath),
+              }),
+            )
+        : null,
       openDefinition: (target) => {
         void openDefinition(target)
       },
@@ -181,11 +198,13 @@ export function EditorSurfaceTabBody({
     }),
     [
       applyWorkspaceEdit,
+      comparableConflictPath,
       handleCloseReferences,
       handleEditorTextChange,
       handleOpenReferences,
       handlePreviewDefinition,
       openDefinition,
+      selectContent,
       setEditorViewScrollPosition,
       setStatusBarSource,
       tabId,

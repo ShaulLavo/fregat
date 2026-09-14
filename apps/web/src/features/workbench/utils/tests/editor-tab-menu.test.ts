@@ -153,6 +153,7 @@ function tabModel(id: string): EditorTabModel {
     diffSource: null,
     diffStatus: null,
     diffSuffix: '',
+    mergeConflicts: false,
     icon: iconForEntry({ name: `${id}.ts`, type: 'file' }),
     id: tabId(id),
     name: `${id}.ts`,
