@@ -277,7 +277,6 @@ code {
   position: relative;
   aspect-ratio: 1600 / 1000;
   overflow: hidden;
-  border: 1px solid var(--border);
   border-radius: var(--radius);
   background: var(--card);
 }
