@@ -312,6 +312,7 @@ function createRuntime(
     ...overrides?.files,
   }
   const settings: WorkspaceCommandRuntime['settings'] = {
+    nextWallpaper: async () => false,
     setDiffViewMode: noopSettingsSubmission,
     setTheme: noopSettingsSubmission,
     setWallpaperEnabled: noopSettingsSubmission,

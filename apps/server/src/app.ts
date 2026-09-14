@@ -1,3 +1,5 @@
+import { WallpaperLibrary } from './themes/wallpapers/library'
+import { wallpaperLibraryRoutes } from './themes/wallpapers/routes'
 import { createInternalError } from './observability/structured-errors'
 import { cors } from '@elysiajs/cors'
 import { terminalKillInputSchema, type HealthDescriptor } from '@workspace/contracts'
@@ -141,6 +143,10 @@ export function createApp(options: AppOptions) {
   // app was given — in tests that is the in-memory database, which is what
   // keeps a test run from writing into the developer's real settings.
   const settings = new SettingsStore({ ...options.settings, workspaceRoot: fs.paths.workspaceRoot })
+  const wallpapers = new WallpaperLibrary({
+    directory: path.join(options.homeDirectory ?? homedir(), '.platform', 'wallpapers'),
+    settings,
+  })
   const palettes = new PaletteLibrary({
     directory: path.join(options.homeDirectory ?? homedir(), '.platform', 'palettes'),
     settings,
@@ -315,6 +321,7 @@ export function createApp(options: AppOptions) {
     .use(wallpaperRoutes())
     .use(settingsRoutes(settings))
     .use(themeRoutes(palettes))
+    .use(wallpaperLibraryRoutes(wallpapers))
     .use(
       gitRoutes(git, commitMessages, {
         resolveBaseCommit: (checkoutPath) => orchestration.worktreeBaseCommit(checkoutPath),

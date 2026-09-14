@@ -47,7 +47,13 @@ test.each([
   ({ platform, enabled, backdrop }) => {
     vi.stubGlobal('navigator', { userAgentData: { platform }, userAgent: '' })
     Object.defineProperty(window, 'platformBridge', { configurable: true, value: { backdrop } })
-    writeBootMirror({ ...DEFAULT_SETTING_VALUES, 'workbench.wallpaper.enabled': enabled })
+    writeBootMirror({
+      ...DEFAULT_SETTING_VALUES,
+      'workbench.wallpaper': {
+        light: { kind: enabled ? 'desktop' : 'none' },
+        dark: { kind: enabled ? 'desktop' : 'none' },
+      },
+    })
     runBootScript()
 
     expect(preloadSources()).toEqual([])

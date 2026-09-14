@@ -1,3 +1,4 @@
+import { WallpaperWidget } from '@/features/settings/components/widgets/wallpaper-widget'
 import {
   descriptorFor,
   SCALAR_SETTING_IDS,
@@ -39,7 +40,10 @@ export function SettingRow({ id, snapshot }: { id: SettingId; snapshot: Settings
   // no scope makes a read-only key writable.
   const disabledReason = descriptor.readOnlyReason ?? inspection.disabledReason
   const value = snapshot.values[id]
-  const hasCodePreview = descriptor.widget === 'code-theme' || descriptor.widget === 'palette'
+  const hasCodePreview =
+    descriptor.widget === 'code-theme' ||
+    descriptor.widget === 'palette' ||
+    descriptor.widget === 'wallpaper'
 
   return (
     <div className='border-border flex flex-col gap-(--density-control-gap) border-b py-(--density-section-padding) last:border-b-0 @3xl/settings:flex-row @3xl/settings:items-start @3xl/settings:justify-between @3xl/settings:gap-6'>
@@ -164,6 +168,9 @@ function SettingControl({
   if (control.widget === 'code-theme') {
     return <CodeThemeWidget disabled={disabled} id={id} onChange={onChange} value={control.value} />
   }
+
+  if (control.widget === 'wallpaper')
+    return <WallpaperWidget disabled={disabled} value={control.value} onChange={onChange} />
 
   if (control.widget === 'palette') {
     return <PaletteWidget disabled={disabled} id={id} value={control.value} />

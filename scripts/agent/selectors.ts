@@ -4,6 +4,19 @@ export const wallpaperLayerSelector = '[data-workbench] img[data-workbench-wallp
 
 // Stable handles the app already exposes. Add here, never inline a selector in a scenario.
 export const selectors = {
+  colorModeOption: (page: Page, mode: string) => page.locator(`[data-value="color-mode:${mode}"]`),
+  settingsSearch: (page: Page) => page.getByRole('textbox', { name: 'Search settings' }),
+  wallpaperPicker: (page: Page) => page.getByLabel('Wallpaper picker', { exact: true }),
+  wallpaperMode: (page: Page, mode: string) =>
+    page
+      .getByRole('group', { name: 'Wallpaper mode', exact: true })
+      .getByRole('button', { name: mode, exact: true }),
+  wallpaperCards: (page: Page) =>
+    page.getByRole('button', { name: /^Select .+/ }).filter({ has: page.locator('img') }),
+  wallpaperNone: (page: Page) => page.getByRole('button', { name: 'None', exact: true }),
+  wallpaperStill: (page: Page) => page.locator(wallpaperStillSelector),
+  commandOption: (page: Page, name: string) => page.getByRole('option', { name, exact: false }),
+
   sidebarTab: (page: Page, name: 'Files' | 'Git' | 'Search' | 'Chat') =>
     page
       .getByRole('navigation', { name: 'Sidebar tabs' })
@@ -90,3 +103,5 @@ export async function openFileByName(page: Page, name: string) {
   await page.keyboard.press('Enter')
   await selectors.editorInput(page).first().waitFor({ timeout: 15_000 })
 }
+
+export const wallpaperStillSelector = '[data-workbench-wallpaper-layer="still"]'

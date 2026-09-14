@@ -103,16 +103,40 @@ test('consecutive toggles project landed settings intents before React renders',
   expect(
     useSettingsIntentStore.getState().active.map((entry) => entry.patch.request.operations),
   ).toEqual([
-    [{ key: 'workbench.wallpaper.enabled', kind: 'set', value: false }],
-    [{ key: 'workbench.wallpaper.enabled', kind: 'set', value: true }],
+    [
+      {
+        key: 'workbench.wallpaper',
+        kind: 'set',
+        value: { light: { kind: 'desktop' }, dark: { kind: 'none' } },
+      },
+    ],
+    [
+      {
+        key: 'workbench.wallpaper',
+        kind: 'set',
+        value: { light: { kind: 'desktop' }, dark: { kind: 'desktop' } },
+      },
+    ],
   ])
 
   await controlledClient.controller.waitForSettingsWriteRequest(2)
   const requests =
     (await controlledClient.controller.settingsWriteRequests()) as SettingsMutationRequest[]
   expect(requests.map((request) => request.operations)).toEqual([
-    [{ key: 'workbench.wallpaper.enabled', kind: 'set', value: false }],
-    [{ key: 'workbench.wallpaper.enabled', kind: 'set', value: true }],
+    [
+      {
+        key: 'workbench.wallpaper',
+        kind: 'set',
+        value: { light: { kind: 'desktop' }, dark: { kind: 'none' } },
+      },
+    ],
+    [
+      {
+        key: 'workbench.wallpaper',
+        kind: 'set',
+        value: { light: { kind: 'desktop' }, dark: { kind: 'desktop' } },
+      },
+    ],
   ])
   await expect(first.completion).resolves.toEqual({ status: 'handled' })
   await expect(second.completion).resolves.toEqual({ status: 'handled' })
@@ -142,8 +166,20 @@ test('consecutive toggles replay intents before the confirmed settings query lan
   expect(
     useSettingsIntentStore.getState().active.map((entry) => entry.patch.request.operations),
   ).toEqual([
-    [{ key: 'workbench.wallpaper.enabled', kind: 'set', value: false }],
-    [{ key: 'workbench.wallpaper.enabled', kind: 'set', value: true }],
+    [
+      {
+        key: 'workbench.wallpaper',
+        kind: 'set',
+        value: { light: { kind: 'desktop' }, dark: { kind: 'none' } },
+      },
+    ],
+    [
+      {
+        key: 'workbench.wallpaper',
+        kind: 'set',
+        value: { light: { kind: 'desktop' }, dark: { kind: 'desktop' } },
+      },
+    ],
   ])
   await controlledClient.controller.waitForSettingsWriteRequest(2)
   await expect(first.completion).resolves.toEqual({ status: 'handled' })
@@ -194,8 +230,8 @@ test('consecutive color-mode commands read intents before React renders', async 
 test.for([
   {
     command: 'workspace.toggleWallpaper',
-    key: 'workbench.wallpaper.enabled',
-    toggled: false,
+    key: 'workbench.wallpaper',
+    toggled: { light: { kind: 'desktop' }, dark: { kind: 'none' } },
   },
   {
     command: 'workspace.toggleDiffViewMode',
@@ -227,13 +263,15 @@ test.for([
         const ticket = capturedBus!.dispatch(command, invocation())
         await expect(ticket.completion).resolves.toEqual({ status: 'handled' })
       })
-      expect((await fetchSettings(undefined, client)).values[key]).toBe(toggled)
+      expect((await fetchSettings(undefined, client)).values[key]).toEqual(toggled)
 
       await act(async () => {
         const ticket = capturedBus!.dispatch(command, invocation())
         await expect(ticket.completion).resolves.toEqual({ status: 'handled' })
       })
-      expect((await fetchSettings(undefined, client)).values[key]).toBe(primaryBefore.values[key])
+      expect((await fetchSettings(undefined, client)).values[key]).toEqual(
+        primaryBefore.values[key],
+      )
       expect((await fetchSettings(undefined, remoteClient)).values).toEqual(remoteBefore.values)
     } finally {
       view?.unmount()

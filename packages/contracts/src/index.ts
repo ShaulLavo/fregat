@@ -762,3 +762,15 @@ export {
   bundledPalette,
   isBundledPaletteId,
 } from './themes/bundled'
+
+export {
+  assetIdSchema,
+  wallpaperSourceSchema,
+  wallpaperSelectionSchema,
+  wallpaperAssetSchema,
+  wallpaperIndexSchema,
+  type AssetId,
+  type WallpaperSource,
+  type WallpaperSelection,
+  type WallpaperAsset,
+} from './themes/wallpaper'

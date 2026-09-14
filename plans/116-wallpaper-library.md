@@ -1,14 +1,14 @@
 # A wallpaper library and picker
 
-Status: proposed, implementation not started. Requested 2026-09-14. Second of three plans split out of the retired Plan 104; independent of [Plan 115](115-palettes-as-data.md) and consumed by [Plan 117](117-themes.md).
+Status: implemented and deployed. Browser verification passed; native shell smoke checks remain unverified. Requested 2026-09-14. Second of three plans split out of the retired Plan 104; independent of [Plan 115](115-palettes-as-data.md) and consumed by [Plan 117](117-themes.md).
 
-Wallpaper today is a boolean over whatever the desktop happens to show. This plan gives the app its own wallpaper library, a picker with per-mode selection, explicit image rendering on every platform, and an importer that seeds the library from the Omarchy themes installed on the server host.
+Wallpaper previously used a boolean over whatever the desktop happened to show. This plan gives the app its own wallpaper library, a picker with per-mode selection, explicit image rendering on every platform, and an importer that seeds the library from the Omarchy themes installed on the server host.
 
-## What exists today
+## Starting point
 
 | Piece     | Current state                                                                                                                                                                                                                                                                                                                  |
 | --------- | ------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------ |
-| Setting   | `workbench.wallpaper.enabled`, a boolean. `applyAppearance` writes `data-wallpaper-hidden` from it, and `globals.css` keys the popover vibrancy layer off that attribute.                                                                                                                                                      |
+| Setting   | the retired wallpaper boolean, a boolean. `applyAppearance` writes `data-wallpaper-hidden` from it, and `globals.css` keys the popover vibrancy layer off that attribute.                                                                                                                                                      |
 | Source    | One: the desktop. [`service.ts`](../apps/server/src/wallpaper/service.ts) resolves the compositor's current image, on Linux through `~/.local/state/omarchy/current/background`, on macOS through the desktop database. Routes serve `/wallpaper`, `/wallpaper/still`, `/wallpaper/info`.                                      |
 | Rendering | [`Wallpaper`](../apps/web/src/features/workbench/components/wallpaper.tsx) mounts [`WebWallpaper`](../apps/web/src/features/workbench/components/web-wallpaper.tsx) only when [`documentBackdrop()`](../apps/web/src/lib/platform/backdrop.ts) is `app`. On a Linux desktop the backdrop is `compositor`, so nothing is drawn. |
 | Fallback  | A bundled `workbench/wallpaper.jpg` under `apps/web/public`, shown until the desktop still loads or when it fails.                                                                                                                                                                                                             |
@@ -56,6 +56,17 @@ Wallpaper today is a boolean over whatever the desktop happens to show. This pla
 | Import            | Importing `/usr/share/omarchy/themes` twice yields the same asset set with provenance recorded and every asset marked unverified.                                            |
 | Reduced motion    | Unchanged for the Desktop video path.                                                                                                                                        |
 | Floating surfaces | No media inside dialogs, menus, popovers, tooltips, or editor panels.                                                                                                        |
-| Inventory         | No `workbench.wallpaper.enabled` anywhere. `bun run settings:reference` regenerated.                                                                                         |
+| Inventory         | No references to the retired boolean key. `bun run settings:reference` regenerated.                                                                                          |
 
 Enrich the wallpaper request events with source kind and asset id, never a path or bytes. Greenfield rules apply: the boolean key goes in the same pass.
+
+## Implementation evidence
+
+- The library stores one atomic JSON index entry per hash, beside the original still and a WebP thumbnail. Sharp decodes the full input before a write, with a 20 MiB byte limit, 16384 pixel side limit, 40 megapixel limit and 10 second processing timeout. Animated PNG and WebP are rejected.
+- Library images render through a separate `LibraryWallpaper` component. Changing the asset remounts its thumbnail and decoded-image state. The Desktop component and video lifecycle are unchanged.
+- The primary settings owner runs the picker mutations. Deletion refreshes confirmed settings and invalidates the library before resolving. The existing toggle acts on the current mode; `wallpaper.next` cycles the library.
+- Imported 91 unique assets from 22 Omarchy themes twice with identical IDs. All provenance remains unverified. Local bytes live at `/work/platform-data/wallpapers`, linked from `~/.platform/wallpapers`. The committed [mapping](../docs/research/omarchy-wallpapers.json) contains no images.
+- Selected Catppuccin Latte `1-color-fade.png` for light mode and Tokyo Night `3-sunset-lake.png` for dark mode. These are local settings, not bundled defaults.
+- 72 focused tests passed across contracts, settings, library routes, command behavior, Desktop preload and wallpaper rendering. Web, server and scripts typechecks, changed-file lint, design census and generated settings checks passed.
+- Browser evidence: `/work/tmp/fregat-evidence/20260914T182219Z-scenario-wallpaper-library/`. Screenshots cover keyboard selection, cycling and switching the workbench between light and dark. No request failures or error logs. Screenshot capture reports software GPU warnings.
+- The dev API still predates the new route and returns 404. It was not restarted. Live browser verification used the mesh production build. App/compositor/transparent rendering policies passed component tests; actual native shell windows were not driven.

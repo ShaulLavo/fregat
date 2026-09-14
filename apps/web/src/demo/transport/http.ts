@@ -139,6 +139,8 @@ async function get(
           (layer) => layer.id === (url.searchParams.get('target') ?? 'user'),
         )?.file,
       )
+    case '/themes/wallpapers':
+      return json({ assets: [], omarchyAvailable: false })
     case '/themes/palettes':
       return json({ palettes: [] })
     case '/providers':

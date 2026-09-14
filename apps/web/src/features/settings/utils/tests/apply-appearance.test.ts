@@ -37,7 +37,7 @@ const appearance = (overrides: Partial<AppearanceValues> = {}): AppearanceValues
   'workbench.surface.opacity': DEFAULT_SETTING_VALUES['workbench.surface.opacity'],
   'workbench.surface.saturation': DEFAULT_SETTING_VALUES['workbench.surface.saturation'],
   'workbench.tree.indentGuides': DEFAULT_SETTING_VALUES['workbench.tree.indentGuides'],
-  'workbench.wallpaper.enabled': DEFAULT_SETTING_VALUES['workbench.wallpaper.enabled'],
+  'workbench.wallpaper': DEFAULT_SETTING_VALUES['workbench.wallpaper'],
   ...overrides,
 })
 
@@ -85,10 +85,20 @@ describe('applyAppearance', () => {
   it('toggles the wallpaper attribute both ways', () => {
     const { attributes, root } = fakeRoot()
 
-    applyAppearance(appearance({ 'workbench.wallpaper.enabled': false }), root, false)
+    applyAppearance(
+      appearance({ 'workbench.wallpaper': { light: { kind: 'none' }, dark: { kind: 'none' } } }),
+      root,
+      false,
+    )
     expect(attributes.has('data-wallpaper-hidden')).toBe(true)
 
-    applyAppearance(appearance({ 'workbench.wallpaper.enabled': true }), root, false)
+    applyAppearance(
+      appearance({
+        'workbench.wallpaper': { light: { kind: 'desktop' }, dark: { kind: 'desktop' } },
+      }),
+      root,
+      false,
+    )
     expect(attributes.has('data-wallpaper-hidden')).toBe(false)
   })
 

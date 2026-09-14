@@ -1,3 +1,4 @@
+import { wallpaperSelectionSchema, type WallpaperSelection } from '../themes/wallpaper'
 import * as v from 'valibot'
 import { isRecord } from '../is-record'
 import { providerInstanceConfigsSchema, type ProviderInstanceConfig } from '../settings'
@@ -28,6 +29,7 @@ const recordControlSchema = v.record(v.string(), v.nullable(v.string()))
  * control that silently coerces.
  */
 export type SettingControl =
+  | { readonly widget: 'wallpaper'; readonly value: WallpaperSelection }
   | { readonly widget: 'boolean'; readonly value: boolean }
   | { readonly widget: 'number'; readonly value: number }
   | { readonly widget: 'string' | 'multiline'; readonly value: string }
@@ -45,6 +47,10 @@ export type SettingControl =
 export function settingControl(id: SettingId, value: SettingValue<SettingId>): SettingControl {
   const { schema, widget } = descriptorFor(id)
 
+  if (widget === 'wallpaper') {
+    const parsed = v.safeParse(wallpaperSelectionSchema, value)
+    return parsed.success ? { widget, value: parsed.output } : { widget: 'unsupported' }
+  }
   if (widget === 'boolean') return { widget, value: value === true }
   if (widget === 'number') {
     return typeof value === 'number' ? { widget, value } : { widget: 'unsupported' }

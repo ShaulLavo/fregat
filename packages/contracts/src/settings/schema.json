@@ -673,10 +673,90 @@
       "enum": ["always", "none", "onHover"],
       "type": "string"
     },
-    "workbench.wallpaper.enabled": {
-      "default": true,
-      "description": "Show the desktop wallpaper behind the workbench.",
-      "type": "boolean"
+    "workbench.wallpaper": {
+      "default": {
+        "dark": {
+          "kind": "desktop"
+        },
+        "light": {
+          "kind": "desktop"
+        }
+      },
+      "description": "Choose a desktop or library wallpaper separately for light and dark mode.",
+      "properties": {
+        "dark": {
+          "oneOf": [
+            {
+              "properties": {
+                "asset": {
+                  "pattern": "^[a-f0-9]{64}$",
+                  "type": "string"
+                },
+                "kind": {
+                  "const": "library"
+                }
+              },
+              "required": ["asset", "kind"],
+              "type": "object"
+            },
+            {
+              "properties": {
+                "kind": {
+                  "const": "desktop"
+                }
+              },
+              "required": ["kind"],
+              "type": "object"
+            },
+            {
+              "properties": {
+                "kind": {
+                  "const": "none"
+                }
+              },
+              "required": ["kind"],
+              "type": "object"
+            }
+          ]
+        },
+        "light": {
+          "oneOf": [
+            {
+              "properties": {
+                "asset": {
+                  "pattern": "^[a-f0-9]{64}$",
+                  "type": "string"
+                },
+                "kind": {
+                  "const": "library"
+                }
+              },
+              "required": ["asset", "kind"],
+              "type": "object"
+            },
+            {
+              "properties": {
+                "kind": {
+                  "const": "desktop"
+                }
+              },
+              "required": ["kind"],
+              "type": "object"
+            },
+            {
+              "properties": {
+                "kind": {
+                  "const": "none"
+                }
+              },
+              "required": ["kind"],
+              "type": "object"
+            }
+          ]
+        }
+      },
+      "required": ["dark", "light"],
+      "type": "object"
     }
   },
   "type": "object"

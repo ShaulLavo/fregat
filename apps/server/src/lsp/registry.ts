@@ -217,6 +217,7 @@ const lspServers: readonly LspServerDefinition[] = withBuiltInFeatures([
   },
   {
     id: 'css-ls',
+    // TODO: Add Tailwind CSS language support so directives like @custom-variant are recognized.
     extensions: ['.css'],
     root: async (_filePath, workspaceRoot) => workspaceRoot,
     spawn: (root) =>

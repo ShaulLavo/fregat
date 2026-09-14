@@ -21,20 +21,20 @@ stays safe to read, share and export.
 
 ## Appearance
 
-| Setting                            | Default        | Scope       | What it does                                                                                            |
-| ---------------------------------- | -------------- | ----------- | ------------------------------------------------------------------------------------------------------- |
-| `workbench.colorTheme`             | `"system"`     | window      | Light or dark, or follow the operating system.                                                          |
-| `workbench.palette`                | `"graphite"`   | application | Colors for app backgrounds, text, borders, accents and the terminal. Pick a palette or make your own.   |
-| `editor.codeTheme.dark`            | `"dark-plus"`  | window      | Colors for code in editors and chat code blocks when the app uses dark mode.                            |
-| `editor.codeTheme.light`           | `"light-plus"` | window      | Colors for code in editors and chat code blocks when the app uses light mode.                           |
-| `workbench.reduceMotion`           | `false`        | window      | Slow terminal loading indicators while keeping progress visible.                                        |
-| `workbench.density`                | `"compact"`    | window      | Use tighter compact spacing or roomier cozy spacing throughout the app.                                 |
-| `workbench.surface.opacity`        | `80`           | window      | How opaque panels and sidebars are over the wallpaper. 100 turns the glass material off.                |
-| `workbench.surface.contentOpacity` | `95`           | window      | How opaque the editor and terminal background is.                                                       |
-| `workbench.surface.blur`           | `9`            | window      | Backdrop blur radius, in pixels, behind translucent surfaces.                                           |
-| `workbench.surface.saturation`     | `160`          | window      | Backdrop saturation, as a percentage, behind translucent surfaces.                                      |
-| `workbench.wallpaper.enabled`      | `true`         | window      | Show the desktop wallpaper behind the workbench.                                                        |
-| `workbench.tree.indentGuides`      | `"always"`     | window      | When to show indentation guides in the file tree. Guides take editor colours while the tree is hovered. |
+| Setting                            | Default                                                  | Scope       | What it does                                                                                            |
+| ---------------------------------- | -------------------------------------------------------- | ----------- | ------------------------------------------------------------------------------------------------------- |
+| `workbench.colorTheme`             | `"system"`                                               | window      | Light or dark, or follow the operating system.                                                          |
+| `workbench.palette`                | `"graphite"`                                             | application | Colors for app backgrounds, text, borders, accents and the terminal. Pick a palette or make your own.   |
+| `editor.codeTheme.dark`            | `"dark-plus"`                                            | window      | Colors for code in editors and chat code blocks when the app uses dark mode.                            |
+| `editor.codeTheme.light`           | `"light-plus"`                                           | window      | Colors for code in editors and chat code blocks when the app uses light mode.                           |
+| `workbench.reduceMotion`           | `false`                                                  | window      | Slow terminal loading indicators while keeping progress visible.                                        |
+| `workbench.density`                | `"compact"`                                              | window      | Use tighter compact spacing or roomier cozy spacing throughout the app.                                 |
+| `workbench.surface.opacity`        | `80`                                                     | window      | How opaque panels and sidebars are over the wallpaper. 100 turns the glass material off.                |
+| `workbench.surface.contentOpacity` | `95`                                                     | window      | How opaque the editor and terminal background is.                                                       |
+| `workbench.surface.blur`           | `9`                                                      | window      | Backdrop blur radius, in pixels, behind translucent surfaces.                                           |
+| `workbench.surface.saturation`     | `160`                                                    | window      | Backdrop saturation, as a percentage, behind translucent surfaces.                                      |
+| `workbench.wallpaper`              | `{"light":{"kind":"desktop"},"dark":{"kind":"desktop"}}` | application | Choose a desktop or library wallpaper separately for light and dark mode.                               |
+| `workbench.tree.indentGuides`      | `"always"`                                               | window      | When to show indentation guides in the file tree. Guides take editor colours while the tree is hovered. |
 
 ## Chat
 

@@ -1,3 +1,4 @@
+import { wallpaperLibrary } from './wallpaper-library'
 import type { Page } from 'playwright'
 
 export type ScenarioContext = {
@@ -29,6 +30,7 @@ import { demoThemeStartup } from './demo-theme-startup'
 import { demoWallpaperStartup } from './demo-wallpaper-startup'
 
 export const scenarios: readonly Scenario[] = [
+  wallpaperLibrary,
   demoWorkspace,
   demoAgentGit,
   demoReset,

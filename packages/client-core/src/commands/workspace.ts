@@ -639,6 +639,16 @@ export const workspaceCommandMetadata = {
     when: [],
     title: 'Follow system light / dark mode',
   }),
+  'wallpaper.next': defineMetadata({
+    category: 'Appearance',
+    description: 'Select the next library wallpaper for the current color mode.',
+    id: 'wallpaper.next',
+    execution: 'async',
+    target: 'workspace',
+    undoCategory: 'workspace-operation',
+    when: [],
+    title: 'Next wallpaper',
+  }),
   'workspace.toggleWallpaper': defineMetadata({
     category: 'Appearance',
     description: 'Show or hide the background image or video.',

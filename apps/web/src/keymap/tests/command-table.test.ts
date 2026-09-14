@@ -106,6 +106,7 @@ const ASYNC_COMMAND_IDS = [
   'workspace.setLightTheme',
   'workspace.setSystemTheme',
   'workspace.toggleWallpaper',
+  'wallpaper.next',
 ] as const satisfies readonly PlatformCommandId[]
 
 const TEXT_EDIT_COMMAND_IDS = [
@@ -173,6 +174,7 @@ const WORKSPACE_OPERATION_COMMAND_IDS = [
   'workspace.setLightTheme',
   'workspace.setSystemTheme',
   'workspace.toggleWallpaper',
+  'wallpaper.next',
   'workspace.newSession',
 ] as const satisfies readonly PlatformCommandId[]
 

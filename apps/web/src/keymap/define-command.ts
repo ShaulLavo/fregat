@@ -60,6 +60,7 @@ export type WorkspaceCommandRuntime = {
   }
   readonly focus: FocusService
   readonly settings: {
+    readonly nextWallpaper: () => Promise<boolean>
     readonly readSnapshot: () => {
       readonly diffViewMode: EditorDiffViewMode
       readonly wallpaperEnabled: boolean
@@ -129,7 +130,11 @@ export type WorkspaceCommand<
 }
 
 export function defineCommand<
-  const Id extends `workspace.${string}` | `environment.${string}` | `fileTree.${string}`,
+  const Id extends
+    | `wallpaper.${string}`
+    | `workspace.${string}`
+    | `environment.${string}`
+    | `fileTree.${string}`,
   const Execution extends CommandExecution,
 >(command: WorkspaceCommand<Id, Execution>): WorkspaceCommand<Id, Execution> {
   return command

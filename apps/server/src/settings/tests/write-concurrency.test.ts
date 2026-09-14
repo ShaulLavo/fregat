@@ -86,7 +86,11 @@ describe('semantic write coordination', () => {
       { key: 'workbench.surface.contentOpacity', kind: 'set', value: 87 },
       { key: 'workbench.surface.blur', kind: 'set', value: 20 },
       { key: 'workbench.surface.saturation', kind: 'set', value: 200 },
-      { key: 'workbench.wallpaper.enabled', kind: 'set', value: false },
+      {
+        key: 'workbench.wallpaper',
+        kind: 'set',
+        value: { light: { kind: 'none' }, dark: { kind: 'none' } },
+      },
       { key: 'workbench.tree.indentGuides', kind: 'set', value: 'always' },
       { key: 'editor.fontFamily', kind: 'set', value: 'FiraCode' },
       { key: 'editor.fontSize', kind: 'set', value: 18 },

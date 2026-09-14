@@ -989,6 +989,11 @@ export const workspaceCommands = [
       settingStart(runtime.settings.setTheme('system', 'workspace.setSystemTheme')),
   }),
   defineCommand({
+    ...workspaceCommandMetadata['wallpaper.next'],
+    icon: ImageIcon,
+    run: ({ runtime }) => operationStart(runtime.settings.nextWallpaper()),
+  }),
+  defineCommand({
     ...workspaceCommandMetadata['workspace.toggleWallpaper'],
     icon: ImageIcon,
     run: ({ runtime, snapshot }) => {

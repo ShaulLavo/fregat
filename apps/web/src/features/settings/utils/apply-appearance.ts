@@ -16,7 +16,7 @@ export type AppearanceValues = Pick<
   | 'workbench.surface.opacity'
   | 'workbench.surface.saturation'
   | 'workbench.tree.indentGuides'
-  | 'workbench.wallpaper.enabled'
+  | 'workbench.wallpaper'
 >
 
 type Root = Pick<HTMLElement, 'classList' | 'style' | 'setAttribute' | 'removeAttribute'>
@@ -74,7 +74,7 @@ export function applyAppearance(values: AppearanceValues, root: Root, prefersDar
   // wallpaper off `html[data-wallpaper-hidden]`, and the wallpaper component
   // unmounts the media on the same signal — CSS-hiding it leaves a 2560×1440
   // video decoding forever.
-  if (values['workbench.wallpaper.enabled']) {
+  if (values['workbench.wallpaper'][resolved].kind !== 'none') {
     root.removeAttribute('data-wallpaper-hidden')
 
     return

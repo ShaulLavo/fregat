@@ -24,11 +24,11 @@ describe('isSettingAvailable', () => {
   })
 
   it('leaves every other row alone', () => {
+    expect(isSettingAvailable('workbench.wallpaper', { backdrop: 'app', isShell: false })).toBe(
+      true,
+    )
     expect(
-      isSettingAvailable('workbench.wallpaper.enabled', { backdrop: 'app', isShell: false }),
-    ).toBe(true)
-    expect(
-      isSettingAvailable('workbench.wallpaper.enabled', { backdrop: 'compositor', isShell: true }),
+      isSettingAvailable('workbench.wallpaper', { backdrop: 'compositor', isShell: true }),
     ).toBe(true)
   })
 })

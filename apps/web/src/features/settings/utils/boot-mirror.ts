@@ -62,7 +62,7 @@ const MIRRORED_KEYS = [
   'workbench.surface.opacity',
   'workbench.surface.saturation',
   'workbench.tree.indentGuides',
-  'workbench.wallpaper.enabled',
+  'workbench.wallpaper',
 ] as const satisfies readonly (keyof SettingsValues)[]
 
 /**

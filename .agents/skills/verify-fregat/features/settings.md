@@ -12,7 +12,7 @@ The settings command, or an address URL with a settings category.
 
 ## Driving it with agent:browser
 
-No scenario yet. Change a value in the pane, then read `~/.platform` settings on disk and `caches` for `['settings','document']`. The raw editor save is the `['settings','raw-save', ...]` mutation.
+`scenario wallpaper-library` opens the picker, selects per-mode images with keyboard focus, and runs Next wallpaper. Change a value in the pane, then read `~/.platform` settings on disk and `caches` for `['settings','document']`. The raw editor save is the `['settings','raw-save', ...]` mutation.
 
 ## Gotchas
 

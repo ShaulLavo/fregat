@@ -18,7 +18,7 @@
         let palette = 'graphite'
         let paletteCss = null
         let density = 'compact'
-        let wallpaperEnabled = true
+        let wallpaper = { light: { kind: 'desktop' }, dark: { kind: 'desktop' } }
         try {
           const raw = localStorage.getItem('platform.settings-boot-mirror.v1')
           const mirror = raw ? JSON.parse(raw) : {}
@@ -31,7 +31,7 @@
           const cache = JSON.parse(localStorage.getItem('platform.palette-boot.v1') ?? 'null')
           if (cache && cache.id === palette && typeof cache.css === 'string') paletteCss = cache.css
           if (storedDensity === 'compact' || storedDensity === 'cozy') density = storedDensity
-          if (mirror['workbench.wallpaper.enabled'] === false) wallpaperEnabled = false
+          if (mirror['workbench.wallpaper']) wallpaper = mirror['workbench.wallpaper']
         } catch {
           // An unreadable mirror costs a system-theme boot floor, nothing more.
         }
@@ -41,7 +41,9 @@
         const root = document.documentElement
         root.classList.add(dark ? 'dark' : 'light')
         root.setAttribute('data-density', density)
-        preloadWallpaper(wallpaperEnabled)
+        const source = wallpaper[dark ? 'dark' : 'light']
+        if (source?.kind === 'none') root.setAttribute('data-wallpaper-hidden', '')
+        preloadWallpaper(source?.kind === 'desktop')
         if (paletteCss === null) return
 
         // Before globals.css loads, so the first frame already carries the

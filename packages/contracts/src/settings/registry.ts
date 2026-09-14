@@ -1,3 +1,4 @@
+import type { WallpaperSelection } from '../themes/wallpaper'
 import * as v from 'valibot'
 import { isRecord } from '../is-record'
 import type { ModelRef, ProviderInstanceConfig } from '../settings'
@@ -38,6 +39,7 @@ export type SettingWidget =
   | 'font'
   | 'code-theme'
   | 'palette'
+  | 'wallpaper'
   | 'number'
   | 'string'
   | 'multiline'
@@ -77,6 +79,7 @@ export type WidgetFor<TValue> = unknown extends TValue
   : 'complex' | ValueWidget<TValue>
 
 type ValueWidget<TValue> =
+  | (TValue extends WallpaperSelection ? 'wallpaper' : never)
   | (TValue extends boolean ? 'boolean' : never)
   | (TValue extends number ? 'number' : never)
   | (TValue extends string

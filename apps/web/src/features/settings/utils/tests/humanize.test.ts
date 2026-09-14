@@ -10,7 +10,7 @@ describe('humanizeSettingId', () => {
   it('keeps the qualifier a generic leaf needs to mean anything', () => {
     // "Enabled" on its own says nothing, and generic leaves are the ones that
     // repeat across namespaces.
-    expect(humanizeSettingId('workbench.wallpaper.enabled')).toBe('Wallpaper enabled')
+    expect(humanizeSettingId('workbench.wallpaper')).toBe('Wallpaper')
     expect(humanizeSettingId('workbench.surface.opacity')).toBe('Surface opacity')
   })
 

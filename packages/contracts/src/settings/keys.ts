@@ -1,3 +1,4 @@
+import { wallpaperSelectionSchema } from '../themes/wallpaper'
 import * as v from 'valibot'
 import { machinesSchema } from '../machines'
 import {
@@ -160,13 +161,13 @@ export const SETTINGS_REGISTRY = {
     visibility: 'advanced',
     keywords: ['saturation', 'glass', 'material', 'vibrancy'],
   }),
-  'workbench.wallpaper.enabled': defineSetting({
-    schema: v.boolean(),
-    default: true,
-    scope: 'window',
-    widget: 'boolean',
+  'workbench.wallpaper': defineSetting({
+    schema: wallpaperSelectionSchema,
+    default: { light: { kind: 'desktop' }, dark: { kind: 'desktop' } },
+    scope: 'application',
+    widget: 'wallpaper',
     category: 'Appearance',
-    description: 'Show the desktop wallpaper behind the workbench.',
+    description: 'Choose a desktop or library wallpaper separately for light and dark mode.',
     keywords: ['wallpaper', 'background', 'desktop'],
   }),
   'workbench.tree.indentGuides': defineSetting({

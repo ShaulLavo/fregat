@@ -170,7 +170,7 @@ export function seedSettings(): SettingsSnapshot {
     'workbench.palette': 'graphite',
     'editor.codeTheme.dark': 'rose-pine',
     'workbench.density': 'compact' as const,
-    'workbench.wallpaper.enabled': true,
+    'workbench.wallpaper': { light: { kind: 'desktop' }, dark: { kind: 'desktop' } } as const,
     'workbench.surface.opacity': 80,
     'workbench.surface.contentOpacity': 95,
     'workbench.surface.blur': 0,

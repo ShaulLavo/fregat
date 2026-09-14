@@ -6,7 +6,7 @@ import type { Evidence } from './evidence'
 import { selectors } from './selectors'
 
 const PRODUCT_SETTINGS = {
-  'workbench.wallpaper.enabled': true,
+  'workbench.wallpaper': { light: { kind: 'desktop' }, dark: { kind: 'desktop' } },
   'workbench.surface.opacity': 82,
   'workbench.surface.contentOpacity': 88,
 }
