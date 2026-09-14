@@ -1,26 +1,28 @@
-type TraceEvent = {
-  readonly args?: Record<string, unknown>
-  readonly cat?: string
-  readonly dur?: number
-  readonly name: string
-  readonly ph: string
-  readonly pid: number
-  readonly tid: number
-  readonly ts: number
-}
+import {
+  attributeSamples,
+  decodeMainThreadSamples,
+  type SampleInterval,
+  type SampledFrame,
+} from './trace-profile'
+import { sourceResolver, type CapturedSourceMap, type OriginalFrame } from './trace-source-maps'
+import { mainThread, readTrace, traceRecord, type TraceEvent } from './trace-types'
 
 export type TraceSummary = {
   readonly durationMs: number
   readonly longTasks: readonly LongTask[]
+  readonly phaseTasks: readonly LongTask[]
   readonly marks: readonly string[]
   readonly split: Readonly<Record<Bucket, number>>
   readonly tasksOver16ms: number
   readonly tasksOver50ms: number
+  readonly worstTaskMs: number
 }
 
 type LongTask = {
   readonly durationMs: number
   readonly frames: readonly string[]
+  readonly sampledFrames: readonly (SampledFrame & { readonly original: OriginalFrame | null })[]
+  readonly phase: string | null
   readonly startMs: number
 }
 
@@ -49,14 +51,22 @@ const BUCKETS: Readonly<Record<string, Bucket>> = {
   UpdateLayer: 'paint',
 }
 
-export function summarizeTrace(raw: string): TraceSummary {
-  const parsed = JSON.parse(raw) as { traceEvents?: TraceEvent[] } | TraceEvent[]
-  const events = Array.isArray(parsed) ? parsed : (parsed.traceEvents ?? [])
+export function summarizeTrace(
+  raw: string,
+  sources: readonly CapturedSourceMap[] = [],
+): TraceSummary {
+  const events = readTrace(raw)
   const main = mainThread(events)
-  const onMain = events.filter((e) => e.pid === main.pid && e.tid === main.tid && e.ph === 'X')
+  const onMain = events
+    .filter((e) => e.pid === main.pid && e.tid === main.tid && e.ph === 'X')
+    .sort((a, b) => a.ts - b.ts)
   const tasks = onMain.filter((e) => e.name === 'RunTask' && (e.dur ?? 0) > 0)
-  const first = Math.min(...onMain.map((e) => e.ts))
-  const last = Math.max(...onMain.map((e) => e.ts + (e.dur ?? 0)))
+  const first = onMain[0]?.ts ?? 0
+  const last = onMain.reduce((end, event) => Math.max(end, event.ts + event.dur), first)
+  const samples = decodeMainThreadSamples(events, main)
+  const resolve = sourceResolver(sources)
+  const describe = (task: TraceEvent, phase: string | null = null) =>
+    describeTask(task, { first, phase, samples, siblings: onMain, resolve })
   const split: Record<Bucket, number> = { scripting: 0, layout: 0, paint: 0, other: 0 }
   for (const event of onMain) {
     const bucket = BUCKETS[event.name]
@@ -66,20 +76,21 @@ export function summarizeTrace(raw: string): TraceSummary {
   const longTasks = tasks
     .filter((task) => (task.dur ?? 0) >= 50_000)
     .sort((a, b) => (b.dur ?? 0) - (a.dur ?? 0))
-    .slice(0, 10)
-    .map((task) => ({
-      durationMs: round((task.dur ?? 0) / 1000),
-      frames: topFrames(task, onMain),
-      startMs: round((task.ts - first) / 1000),
-    }))
+    .slice(0, 5)
+    .map((task) => describe(task))
+  const phaseTasks = worstPhaseTasks(
+    events.filter((event) => event.pid === main.pid && event.tid === main.tid),
+    tasks,
+  ).map(({ task, phase }) => describe(task, phase))
   const marks = events
-    .filter((e) => e.cat?.includes('blink.user_timing') && e.ph === 'R')
+    .filter(isTimingMark)
     .map((e) => e.name)
     .filter((name, index, all) => all.indexOf(name) === index)
     .slice(0, 40)
   return {
     durationMs: round((last - first) / 1000),
     longTasks,
+    phaseTasks,
     marks,
     split: {
       scripting: round(split.scripting),
@@ -89,6 +100,7 @@ export function summarizeTrace(raw: string): TraceSummary {
     },
     tasksOver16ms: tasks.filter((t) => (t.dur ?? 0) >= 16_000).length,
     tasksOver50ms: tasks.filter((t) => (t.dur ?? 0) >= 50_000).length,
+    worstTaskMs: round(tasks.reduce((duration, task) => Math.max(duration, task.dur), 0) / 1000),
   }
 }
 
@@ -98,11 +110,21 @@ export function formatTraceSummary(summary: TraceSummary): string[] {
     `main thread: scripting ${summary.split.scripting}ms, layout ${summary.split.layout}ms, paint ${summary.split.paint}ms`,
     `tasks over 16ms: ${summary.tasksOver16ms}, over 50ms: ${summary.tasksOver50ms}`,
   ]
-  if (summary.longTasks.length > 0) {
-    lines.push('', '| start | task | top frames |', '| --- | --- | --- |')
-    for (const task of summary.longTasks) {
+  const table = new Map(summary.longTasks.map((task) => [task.startMs, task]))
+  for (const task of summary.phaseTasks) table.set(task.startMs, task)
+  if (table.size > 0) {
+    lines.push(
+      '',
+      'Samples attribute elapsed intervals to the deepest application frame on each stack, including its callees. They are estimates, not measured function self time. Task duration is wall time.',
+      '',
+      '| phase | start | task wall | sampled application frames / fallback |',
+      '| --- | --- | --- | --- |',
+    )
+    for (const task of [...table.values()].sort((a, b) => a.startMs - b.startMs)) {
+      const frames =
+        task.sampledFrames.length > 0 ? task.sampledFrames.map(formatSampledFrame) : task.frames
       lines.push(
-        `| ${task.startMs}ms | ${task.durationMs}ms | ${task.frames.join(' · ') || '(no attributed frames)'} |`,
+        `| ${task.phase ?? 'long task'} | ${task.startMs}ms | ${task.durationMs}ms | ${frames.join(' · ') || '(no attributed frames)'} |`,
       )
     }
   }
@@ -122,26 +144,69 @@ export function compareTraceSummaries(before: TraceSummary, after: TraceSummary)
     row('paint ms', before.split.paint, after.split.paint),
     row('tasks over 16ms', before.tasksOver16ms, after.tasksOver16ms),
     row('tasks over 50ms', before.tasksOver50ms, after.tasksOver50ms),
-    row('worst task ms', before.longTasks[0]?.durationMs ?? 0, after.longTasks[0]?.durationMs ?? 0),
+    row('worst task ms', before.worstTaskMs, after.worstTaskMs),
   ]
 }
 
-function mainThread(events: readonly TraceEvent[]) {
-  const named = events.find(
-    (e) =>
-      e.name === 'thread_name' &&
-      (e.args as { name?: string } | undefined)?.name === 'CrRendererMain',
-  )
-  if (named) return { pid: named.pid, tid: named.tid }
-  const counts = new Map<string, number>()
-  for (const e of events) {
-    if (e.name !== 'RunTask') continue
-    const key = `${e.pid}:${e.tid}`
-    counts.set(key, (counts.get(key) ?? 0) + 1)
+function describeTask(
+  task: TraceEvent,
+  context: {
+    readonly first: number
+    readonly phase: string | null
+    readonly samples: readonly SampleInterval[]
+    readonly siblings: readonly TraceEvent[]
+    readonly resolve: ReturnType<typeof sourceResolver>
+  },
+): LongTask {
+  const sampledFrames = attributeSamples(task, context.samples).map((frame) => ({
+    ...frame,
+    sampledMs: round(frame.sampledMs),
+    original: context.resolve(frame.generated),
+  }))
+  return {
+    durationMs: round(task.dur / 1000),
+    frames: sampledFrames.length === 0 ? topFrames(task, context.siblings) : [],
+    sampledFrames,
+    phase: context.phase,
+    startMs: round((task.ts - context.first) / 1000),
   }
-  const [best] = [...counts.entries()].sort((a, b) => b[1] - a[1])[0] ?? ['0:0']
-  const [pid, tid] = best.split(':').map(Number)
-  return { pid: pid ?? 0, tid: tid ?? 0 }
+}
+
+function worstPhaseTasks(events: readonly TraceEvent[], tasks: readonly TraceEvent[]) {
+  const marks = events
+    .filter(
+      (event) =>
+        isTimingMark(event) &&
+        (event.name.startsWith('fregat:step:') || event.name === 'fregat:scenario:start'),
+    )
+    .sort((a, b) => a.ts - b.ts)
+  return marks.flatMap((mark, index) => {
+    const previous = marks[index - 1]
+    if (!previous || !mark.name.startsWith('fregat:step:')) return []
+    const task = tasks
+      .filter((task) => task.ts >= previous.ts && task.ts < mark.ts)
+      .sort((a, b) => b.dur - a.dur)[0]
+    return task ? [{ task, phase: mark.name.slice('fregat:step:'.length) }] : []
+  })
+}
+
+function isTimingMark(event: TraceEvent): boolean {
+  return event.cat.includes('blink.user_timing') && (event.ph === 'R' || event.ph === 'I')
+}
+
+function formatSampledFrame(frame: LongTask['sampledFrames'][number]): string {
+  const location = frame.original
+  const name = location?.functionName ?? frame.generated.functionName
+  const source = (location?.source ?? frame.generated.url)
+    .replace(/^https?:\/\/[^/]+/, '')
+    .split('?')[0]
+  const line = location?.line ?? frame.generated.line + 1
+  const column = location?.column ?? frame.generated.column + 1
+  const mapping = location ? '' : ' [generated]'
+  return `${name} ${source}:${line}:${column}${mapping} ${frame.sampledMs}ms sampled`.replaceAll(
+    '|',
+    '\\|',
+  )
 }
 
 // Self time: the event's duration minus its direct children on the same thread.
@@ -165,14 +230,14 @@ function topFrames(task: TraceEvent, siblings: readonly TraceEvent[]) {
     .sort((a, b) => (b.dur ?? 0) - (a.dur ?? 0))
     .slice(0, 3)
   return calls.map((call) => {
-    const data = (call.args as { data?: Record<string, unknown> } | undefined)?.data ?? {}
+    const data = traceRecord(call.args.data)
     const name = String(data.functionName || '(anonymous)')
     const url = String(data.url ?? '')
       .split('/')
       .slice(-2)
       .join('/')
     const line = data.lineNumber !== undefined ? `:${data.lineNumber}` : ''
-    return `${name} ${url}${line} ${round((call.dur ?? 0) / 1000)}ms`.trim()
+    return `${name} ${url}${line} ${round((call.dur ?? 0) / 1000)}ms FunctionCall wall (no application samples)`.trim()
   })
 }
 

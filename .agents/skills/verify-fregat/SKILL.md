@@ -41,9 +41,15 @@ The scenarios land on a workspace by registering a root-relative folder (`--work
 
 `/work/tmp/fregat-evidence/<stamp>-<verb>-<label>/` holds `summary.md`, the screenshots, `observed.json` (page errors, console, failed requests, sockets), `logs.txt` (warn and error events written during the run) and the verb's artifact: `trace.json` for Chrome's Performance panel, `renders.json`, `caches.json`.
 
-Proof standards: exercise the real user path, not a setter. Capture the action and the resulting state, not just the final screen. Check side effects where they land: the file on disk, the log line, the cache entry. A claim about performance cites a `trace` summary before and after on the same scenario. A claim about fewer renders cites `renders` before and after. Read the screenshot back with the Read tool; a screenshot nobody looked at is not evidence.
+Proof standards: exercise the real user path, not a setter. Capture the action and the resulting state, not just the final screen. Check side effects where they land: the file on disk, the log line, the cache entry. A claim about performance cites a `trace` summary before and after on the same scenario. A claim about fewer renders cites `renders` before and after. Read the screenshot back with the image-viewing tool; a screenshot nobody looked at is not evidence.
 
-Known noise on the dev server today: a `/themes/palettes` 404 when the running server predates that route, TypeScript language-server socket closes, and WebGL "GPU stall" warnings. Report them, do not chase them unless they are the task.
+Trace tables use `ProfileChunk` samples to name the deepest application function on each sampled stack, including its callees. These are interval estimates, not function self time. Each row reports task wall time separately. Scenario markers identify the worst task during each step, including steps whose tasks stay below 50ms. Compare the same scenario with `--compare` against a recorded baseline; shared-server timings can vary with language-server state and background work.
+
+`trace-sources.json` records captured source maps or an explicit unavailability reason. The corresponding generated scripts and maps stay beside the trace, so a later source edit cannot silently change its attribution. A mapped frame names the original source, function and one-based line/column; `[generated]` means mapping was unavailable. Use `readTraceSources` with `summarizeTrace` for offline analysis.
+
+`renders` counts completed component renders, including scenario setup. Its timing is React `actualDuration` (subtree render duration), not exclusive self time. A component absent from `renders.json` rendered zero times in that measured window. The screenshot is taken after measurement; use `scenario` when you need screenshots at each action.
+
+A `/themes/palettes` 404 can mean the dev process predates the route. Confirm the route and process start time, then report that a restart is needed; never restart it yourself. WebGL "GPU stall" warnings can come from screenshot capture. TypeScript language-server exits are failures to investigate, not expected noise: inspect the exact log window printed by the command. CLI summaries can omit stderr fields; read the structured event or capture a standalone process replay when the retained tail omits the cause.
 
 ## Cleanup
 

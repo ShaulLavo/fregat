@@ -48,7 +48,7 @@
     "settings:schema:check": "bun scripts/generate-settings-schema.ts --check",
     "themes:palette-css": "bun scripts/themes/generate-palette-css.ts",
     "themes:palette-css:check": "bun scripts/themes/generate-palette-css.ts --check",
-    "test:scripts": "bun --bun vitest run scripts/dev-sources.test.ts scripts/runtime-network.test.ts scripts/web-layering.test.ts scripts/lint/web-boundaries.test.ts scripts/lint/web-design-census.test.ts --environment node",
+    "test:scripts": "bun --bun vitest run scripts/agent/trace-summary.test.ts scripts/dev-sources.test.ts scripts/runtime-network.test.ts scripts/web-layering.test.ts scripts/lint/web-boundaries.test.ts scripts/lint/web-design-census.test.ts --environment node",
     "verify": "bun run typecheck && bun run lint && bun run design:census && bun run format:check && bun run generated:check && bun run unused:check && bun run test",
     "dupes": "jscpd apps packages",
     "dupes:report": "jscpd apps packages --reporters html,console --output ./jscpd-report",

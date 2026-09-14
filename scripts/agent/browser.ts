@@ -9,6 +9,7 @@ import { attachObserver, observedProblems, serializable } from './observe.mjs'
 import { scenarioNamed, scenarios, type Scenario } from './scenarios/index'
 import { waitForApp } from './selectors'
 import { compareTraceSummaries, formatTraceSummary, summarizeTrace } from './trace-summary'
+import { captureTraceSources } from './trace-source-maps'
 
 const DEFAULT_URL = `http://localhost:${process.env.WEB_PORT ?? '5173'}/`
 const DEFAULT_FILE = 'use-events.ts'
@@ -32,7 +33,7 @@ Options
   --doctor     exit non-zero when the app is not healthy
   --compare    an earlier trace evidence directory to diff against
 
-Evidence lands under /work/tmp/platform-evidence/<stamp>-<verb>-<label>/.`
+Evidence lands under /work/tmp/fregat-evidence/<stamp>-<verb>-<label>/.`
 
 type Options = {
   readonly compare: string | undefined
@@ -173,29 +174,43 @@ async function traceScenario(scenario: Scenario, options: Options) {
     }
     const tracePath = evidence.file('trace.json')
     await browser.startTracing(page, { categories: TRACE_CATEGORIES, path: tracePath })
+    await page.evaluate(() => performance.mark('fregat:scenario:start'))
     let failure: string | null = null
     try {
-      await scenario.run(page, { file: options.file, step: async () => undefined })
+      await scenario.run(page, {
+        file: options.file,
+        step: async (label) => {
+          await page.evaluate((name) => performance.mark(`fregat:step:${name}`), label)
+        },
+      })
     } catch (error) {
       failure = error instanceof Error ? error.message : String(error)
     }
     await browser.stopTracing()
-    const summary = summarizeTrace(await Bun.file(tracePath).text())
+    await page.screenshot({ path: evidence.file('page.png'), fullPage: false })
+    const raw = await Bun.file(tracePath).text()
+    const generated = summarizeTrace(raw)
+    const frames = [...generated.longTasks, ...generated.phaseTasks].flatMap((task) =>
+      task.sampledFrames.map((frame) => frame.generated),
+    )
+    const sources = await captureTraceSources(page, evidence, frames)
+    const summary = summarizeTrace(raw, sources)
     await evidence.json('trace-summary.json', summary)
     const problems = observedProblems(observed, { loopback: !isLoopback(options.url) })
+    await evidence.json('observed.json', { problems, ...serializable(observed) })
     const lines = [
       `# trace ${scenario.name}`,
       '',
       scenario.description,
       `result: ${failure ? `failed: ${failure}` : 'completed'}`,
       `trace: ${tracePath} (open in Chrome's Performance panel)`,
+      `screenshot: ${evidence.file('page.png')}`,
+      `source maps: ${evidence.file('trace-sources.json')} (reload with readTraceSources for offline summarization)`,
       '',
       ...formatTraceSummary(summary),
     ]
     if (options.compare) {
-      const before = JSON.parse(
-        await Bun.file(`${options.compare}/trace-summary.json`).text(),
-      ) as ReturnType<typeof summarizeTrace>
+      const before = summarizeTrace(await Bun.file(`${options.compare}/trace.json`).text())
       lines.push('', `compared with ${options.compare}`, ...compareTraceSummaries(before, summary))
     }
     lines.push(
@@ -241,6 +256,7 @@ async function countRenders(scenario: Scenario, options: Options) {
       () =>
         (globalThis as { __agentRenders?: { report(): unknown } }).__agentRenders?.report() ?? [],
     )) as RenderRow[]
+    await page.screenshot({ path: evidence.file('page.png'), fullPage: false })
     rows.sort(
       (a, b) =>
         b.noDomChange - a.noDomChange || b.parentDriven - a.parentDriven || b.renders - a.renders,
@@ -250,14 +266,17 @@ async function countRenders(scenario: Scenario, options: Options) {
     const wasted = rows.reduce((sum, row) => sum + row.parentDriven, 0)
     const silent = rows.reduce((sum, row) => sum + row.noDomChange, 0)
     const problems = observedProblems(observed, { loopback: !isLoopback(options.url) })
+    await evidence.json('observed.json', { problems, ...serializable(observed) })
     const lines = [
       `# renders ${scenario.name}`,
       '',
       scenario.description,
       `result: ${failure ? `failed: ${failure}` : 'completed'}`,
+      `screenshot: ${evidence.file('page.png')}`,
       `components: ${rows.length}, renders: ${total}, no DOM change: ${silent}, parent-driven (nothing of their own changed): ${wasted}`,
+      'Times are React actualDuration for component subtrees, not component self time; nested rows overlap.',
       '',
-      '| component | renders | no DOM change | parent-driven | ms | what changed |',
+      '| component | renders | no DOM change | parent-driven | subtree ms | what changed |',
       '| --- | --- | --- | --- | --- | --- |',
       ...rows
         .slice(0, 25)
@@ -354,8 +373,8 @@ function readCaches() {
     getQueryCache(): { getAll(): AnyQuery[] }
     getMutationCache(): { getAll(): AnyMutation[] }
   }
-  const clients = (globalThis as { __platformQueryClients?: Map<string, AnyClient> })
-    .__platformQueryClients
+  const clients = (globalThis as { __fregatQueryClients?: Map<string, AnyClient> })
+    .__fregatQueryClients
   if (!clients) return []
   const compact = (value: unknown) => {
     const text = JSON.stringify(value) ?? String(value)
