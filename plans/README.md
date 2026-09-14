@@ -34,6 +34,8 @@ a bare root `bun run verify`.
 | [115 — palettes as data](115-palettes-as-data.md)                               | **IMPLEMENTED 2026-09-14**                            |
 | [116 — wallpaper library and picker](116-wallpaper-library.md)                  | **PROPOSED — READY TO IMPLEMENT; INDEPENDENT OF 115** |
 | [117 — themes as bundles](117-themes.md)                                        | **PROPOSED — DEPENDS ON 115 AND 116**                 |
+| [118 — async effects through TanStack](118-async-effects-through-tanstack.md)   | **IMPLEMENTED 2026-09-14**                            |
+| [119 — agent verification tooling](119-agent-verification-tooling.md)           | **IMPLEMENTED 2026-09-14**                            |
 | [105 — one server and mesh deployment](105-one-server-mesh-deployment.md)       | **PROPOSED — PHASE 1 READY TO IMPLEMENT**             |
 | [106 — first-load weight](106-boot-weight.md)                                   | **IMPLEMENTED 2026-09-13**                            |
 | [107 — a markdown package we own](107-workspace-markdown.md)                    | **IMPLEMENTED 2026-09-13**                            |

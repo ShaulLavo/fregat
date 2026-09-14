@@ -1,0 +1,504 @@
+#!/usr/bin/env bun
+import { existsSync } from 'node:fs'
+import { parseArgs } from 'node:util'
+import { chromium, type Browser, type Page } from 'playwright'
+
+import { createEvidence, type Evidence } from './evidence'
+import { formatLogEvent, readLogs } from './logs'
+import { attachObserver, observedProblems, serializable } from './observe.mjs'
+import { scenarioNamed, scenarios, type Scenario } from './scenarios/index'
+import { waitForApp } from './selectors'
+import { compareTraceSummaries, formatTraceSummary, summarizeTrace } from './trace-summary'
+
+const DEFAULT_URL = `http://localhost:${process.env.WEB_PORT ?? '5173'}/`
+const DEFAULT_FILE = 'use-events.ts'
+const DEFAULT_WORKSPACE = 'work/projects/platform'
+const HELP = `bun run agent:browser <verb> [options]
+
+Verbs
+  look [--url U] [--selector S] [--doctor]   open, wait for ready, screenshot, report errors
+  scenario <name> [--url U] [--file F]        drive a named scenario with a screenshot per step
+  trace <name> [--compare DIR]                record a Chrome trace around a scenario and summarise it
+  renders <name>                              count component renders during a scenario (bippy)
+  caches [--url U]                            dump every query and mutation in the page's query clients
+  list                                        print the scenario names
+
+Options
+  --url        page to open (default: the dev server, ${DEFAULT_URL})
+  --file       file name a scenario opens through the command palette (default: ${DEFAULT_FILE})
+  --workspace  root-relative folder to open when the URL names no workspace (default: ${DEFAULT_WORKSPACE})
+  --selector   CSS selector to screenshot in addition to the page
+  --headed     show the browser
+  --doctor     exit non-zero when the app is not healthy
+  --compare    an earlier trace evidence directory to diff against
+
+Evidence lands under /work/tmp/platform-evidence/<stamp>-<verb>-<label>/.`
+
+type Options = {
+  readonly compare: string | undefined
+  readonly doctor: boolean
+  readonly file: string
+  readonly headed: boolean
+  readonly selector: string | undefined
+  readonly url: string
+  readonly workspace: string
+}
+
+async function main() {
+  const { positionals, values } = parseArgs({
+    allowPositionals: true,
+    options: {
+      compare: { type: 'string' },
+      doctor: { type: 'boolean', default: false },
+      file: { type: 'string', default: DEFAULT_FILE },
+      headed: { type: 'boolean', default: false },
+      selector: { type: 'string' },
+      url: { type: 'string', default: DEFAULT_URL },
+      workspace: { type: 'string', default: DEFAULT_WORKSPACE },
+    },
+  })
+  const [verb, name] = positionals
+  const options: Options = {
+    compare: values.compare,
+    doctor: values.doctor,
+    file: values.file,
+    headed: values.headed,
+    selector: values.selector,
+    url: values.url,
+    workspace: values.workspace,
+  }
+  if (verb === 'look') return look(options)
+  if (verb === 'scenario' && name) return runScenario(scenarioNamed(name), options)
+  if (verb === 'trace' && name) return traceScenario(scenarioNamed(name), options)
+  if (verb === 'renders' && name) return countRenders(scenarioNamed(name), options)
+  if (verb === 'caches') return dumpCaches(options)
+  if (verb === 'list') {
+    for (const scenario of scenarios) console.log(`${scenario.name}\t${scenario.description}`)
+    return 0
+  }
+  console.log(HELP)
+  return verb ? 1 : 0
+}
+
+async function look(options: Options) {
+  const evidence = await createEvidence('look', new URL(options.url).pathname)
+  return withPage(options, evidence, async (page, observed) => {
+    const ready = await open(page, options.url)
+    await page.screenshot({ path: evidence.file('page.png'), fullPage: false })
+    if (options.selector) {
+      await page
+        .locator(options.selector)
+        .first()
+        .screenshot({ path: evidence.file('selector.png') })
+    }
+    const health = await doctor(page, options.url, ready)
+    const problems = observedProblems(observed, { loopback: !isLoopback(options.url) })
+    await evidence.json('observed.json', { health, problems, ...serializable(observed) })
+    const lines = [
+      `# look ${options.url}`,
+      '',
+      `screenshot: ${evidence.file('page.png')}`,
+      `ready: ${ready ? 'yes' : 'no'}`,
+      `health: ${health.ok ? 'ok' : health.reasons.join('; ')}`,
+      `problems: ${problems.length === 0 ? 'none' : ''}`,
+      ...problems.map((problem) => `- ${problem}`),
+    ]
+    await writeSummary(evidence, lines)
+    return options.doctor && !health.ok ? 1 : 0
+  })
+}
+
+async function runScenario(scenario: Scenario, options: Options) {
+  const evidence = await createEvidence('scenario', scenario.name)
+  return withPage(options, evidence, async (page, observed) => {
+    const ready = await open(page, await workspaceUrl(page, options))
+    if (!ready) {
+      await writeSummary(evidence, [`# scenario ${scenario.name}`, '', 'app never became ready'])
+      return 1
+    }
+    const steps: string[] = []
+    const step = async (label: string) => {
+      const file = `${String(steps.length + 1).padStart(2, '0')}-${label}.png`
+      await page.screenshot({ path: evidence.file(file) })
+      steps.push(file)
+    }
+    const started = performance.now()
+    let failure: string | null = null
+    try {
+      await scenario.run(page, { file: options.file, step })
+    } catch (error) {
+      failure = error instanceof Error ? error.message : String(error)
+      await page.screenshot({ path: evidence.file('failure.png') }).catch(() => undefined)
+    }
+    const durationMs = Math.round(performance.now() - started)
+    const problems = observedProblems(observed, { loopback: !isLoopback(options.url) })
+    await evidence.json('observed.json', {
+      durationMs,
+      failure,
+      problems,
+      steps,
+      ...serializable(observed),
+    })
+    const lines = [
+      `# scenario ${scenario.name}`,
+      '',
+      scenario.description,
+      `duration: ${durationMs}ms`,
+      `result: ${failure ? `failed: ${failure}` : 'completed'}`,
+      `steps: ${steps.map((file) => evidence.file(file)).join(', ')}`,
+      `problems: ${problems.length === 0 ? 'none' : ''}`,
+      ...problems.map((problem) => `- ${problem}`),
+    ]
+    await writeSummary(evidence, lines)
+    return failure ? 1 : 0
+  })
+}
+
+const TRACE_CATEGORIES = [
+  'devtools.timeline',
+  'disabled-by-default-devtools.timeline',
+  'disabled-by-default-devtools.timeline.frame',
+  'blink.user_timing',
+  'v8.execute',
+  'disabled-by-default-v8.cpu_profiler',
+]
+
+async function traceScenario(scenario: Scenario, options: Options) {
+  const evidence = await createEvidence('trace', scenario.name)
+  return withPage(options, evidence, async (page, observed, browser) => {
+    const ready = await open(page, await workspaceUrl(page, options))
+    if (!ready) {
+      await writeSummary(evidence, [`# trace ${scenario.name}`, '', 'app never became ready'])
+      return 1
+    }
+    const tracePath = evidence.file('trace.json')
+    await browser.startTracing(page, { categories: TRACE_CATEGORIES, path: tracePath })
+    let failure: string | null = null
+    try {
+      await scenario.run(page, { file: options.file, step: async () => undefined })
+    } catch (error) {
+      failure = error instanceof Error ? error.message : String(error)
+    }
+    await browser.stopTracing()
+    const summary = summarizeTrace(await Bun.file(tracePath).text())
+    await evidence.json('trace-summary.json', summary)
+    const problems = observedProblems(observed, { loopback: !isLoopback(options.url) })
+    const lines = [
+      `# trace ${scenario.name}`,
+      '',
+      scenario.description,
+      `result: ${failure ? `failed: ${failure}` : 'completed'}`,
+      `trace: ${tracePath} (open in Chrome's Performance panel)`,
+      '',
+      ...formatTraceSummary(summary),
+    ]
+    if (options.compare) {
+      const before = JSON.parse(
+        await Bun.file(`${options.compare}/trace-summary.json`).text(),
+      ) as ReturnType<typeof summarizeTrace>
+      lines.push('', `compared with ${options.compare}`, ...compareTraceSummaries(before, summary))
+    }
+    lines.push(
+      '',
+      `problems: ${problems.length === 0 ? 'none' : ''}`,
+      ...problems.map((p) => `- ${p}`),
+    )
+    await writeSummary(evidence, lines)
+    return failure ? 1 : 0
+  })
+}
+
+type RenderRow = {
+  readonly changes: readonly string[]
+  readonly component: string
+  readonly noDomChange: number
+  readonly parentDriven: number
+  readonly renders: number
+  readonly timeMs: number
+}
+
+async function countRenders(scenario: Scenario, options: Options) {
+  const evidence = await createEvidence('renders', scenario.name)
+  const injected = await bundleInjected('renders.ts')
+  return withPage(options, evidence, async (page, observed) => {
+    await page.addInitScript({ content: injected })
+    const ready = await open(page, await workspaceUrl(page, options))
+    if (!ready) {
+      await writeSummary(evidence, [`# renders ${scenario.name}`, '', 'app never became ready'])
+      return 1
+    }
+    await page.evaluate(() =>
+      (globalThis as { __agentRenders?: { reset(): void } }).__agentRenders?.reset(),
+    )
+    let failure: string | null = null
+    try {
+      await scenario.run(page, { file: options.file, step: async () => undefined })
+    } catch (error) {
+      failure = error instanceof Error ? error.message : String(error)
+    }
+    await page.waitForTimeout(500)
+    const rows = (await page.evaluate(
+      () =>
+        (globalThis as { __agentRenders?: { report(): unknown } }).__agentRenders?.report() ?? [],
+    )) as RenderRow[]
+    rows.sort(
+      (a, b) =>
+        b.noDomChange - a.noDomChange || b.parentDriven - a.parentDriven || b.renders - a.renders,
+    )
+    await evidence.json('renders.json', rows)
+    const total = rows.reduce((sum, row) => sum + row.renders, 0)
+    const wasted = rows.reduce((sum, row) => sum + row.parentDriven, 0)
+    const silent = rows.reduce((sum, row) => sum + row.noDomChange, 0)
+    const problems = observedProblems(observed, { loopback: !isLoopback(options.url) })
+    const lines = [
+      `# renders ${scenario.name}`,
+      '',
+      scenario.description,
+      `result: ${failure ? `failed: ${failure}` : 'completed'}`,
+      `components: ${rows.length}, renders: ${total}, no DOM change: ${silent}, parent-driven (nothing of their own changed): ${wasted}`,
+      '',
+      '| component | renders | no DOM change | parent-driven | ms | what changed |',
+      '| --- | --- | --- | --- | --- | --- |',
+      ...rows
+        .slice(0, 25)
+        .map(
+          (row) =>
+            `| ${row.component} | ${row.renders} | ${row.noDomChange} | ${row.parentDriven} | ${row.timeMs} | ${row.changes.join(', ') || '-'} |`,
+        ),
+      '',
+      `full table: ${evidence.file('renders.json')}`,
+      `problems: ${problems.length === 0 ? 'none' : ''}`,
+      ...problems.map((p) => `- ${p}`),
+    ]
+    await writeSummary(evidence, lines)
+    return failure ? 1 : 0
+  })
+}
+
+type CacheDump = readonly {
+  readonly origin: string
+  readonly queries: readonly {
+    readonly key: string
+    readonly status: string
+    readonly fetchStatus: string
+    readonly stale: boolean
+    readonly observers: number
+    readonly updatedAgoMs: number | null
+  }[]
+  readonly mutations: readonly {
+    readonly key: string
+    readonly status: string
+    readonly scope: string | null
+    readonly variables: string
+  }[]
+}[]
+
+async function dumpCaches(options: Options) {
+  const evidence = await createEvidence('caches', new URL(options.url).pathname)
+  return withPage(options, evidence, async (page) => {
+    const ready = await open(page, await workspaceUrl(page, options))
+    if (!ready) {
+      await writeSummary(evidence, ['# caches', '', 'app never became ready'])
+      return 1
+    }
+    await page.waitForTimeout(2_000)
+    const dump = (await page.evaluate(readCaches)) as CacheDump
+    await evidence.json('caches.json', dump)
+    const lines = ['# caches', '']
+    for (const client of dump) {
+      lines.push(
+        `## ${client.origin}`,
+        '',
+        `queries: ${client.queries.length}, mutations: ${client.mutations.length}`,
+        '',
+      )
+      lines.push(
+        '| query | status | fetch | stale | observers | updated |',
+        '| --- | --- | --- | --- | --- | --- |',
+      )
+      for (const query of client.queries.slice(0, 60)) {
+        const ago =
+          query.updatedAgoMs === null ? '-' : `${Math.round(query.updatedAgoMs / 1000)}s ago`
+        lines.push(
+          `| ${query.key} | ${query.status} | ${query.fetchStatus} | ${query.stale ? 'yes' : 'no'} | ${query.observers} | ${ago} |`,
+        )
+      }
+      if (client.mutations.length > 0) {
+        lines.push('', '| mutation | status | scope | variables |', '| --- | --- | --- | --- |')
+        for (const mutation of client.mutations.slice(0, 40)) {
+          lines.push(
+            `| ${mutation.key} | ${mutation.status} | ${mutation.scope ?? '-'} | ${mutation.variables} |`,
+          )
+        }
+      }
+      lines.push('')
+    }
+    lines.push(`full dump: ${evidence.file('caches.json')}`)
+    await writeSummary(evidence, lines)
+    return 0
+  })
+}
+
+function readCaches() {
+  type AnyQuery = {
+    queryKey: unknown
+    state: { status: string; fetchStatus: string; dataUpdatedAt: number }
+    isStale(): boolean
+    getObserversCount(): number
+  }
+  type AnyMutation = {
+    options: { mutationKey?: unknown; scope?: { id: string } }
+    state: { status: string; variables: unknown }
+  }
+  type AnyClient = {
+    getQueryCache(): { getAll(): AnyQuery[] }
+    getMutationCache(): { getAll(): AnyMutation[] }
+  }
+  const clients = (globalThis as { __platformQueryClients?: Map<string, AnyClient> })
+    .__platformQueryClients
+  if (!clients) return []
+  const compact = (value: unknown) => {
+    const text = JSON.stringify(value) ?? String(value)
+    return text.length > 80 ? `${text.slice(0, 77)}…` : text
+  }
+  return [...clients.entries()].map(([origin, client]) => ({
+    origin,
+    queries: client
+      .getQueryCache()
+      .getAll()
+      .map((query) => ({
+        key: compact(query.queryKey),
+        status: query.state.status,
+        fetchStatus: query.state.fetchStatus,
+        stale: query.isStale(),
+        observers: query.getObserversCount(),
+        updatedAgoMs: query.state.dataUpdatedAt ? Date.now() - query.state.dataUpdatedAt : null,
+      })),
+    mutations: client
+      .getMutationCache()
+      .getAll()
+      .map((mutation) => ({
+        key: compact(mutation.options.mutationKey ?? null),
+        status: mutation.state.status,
+        scope: mutation.options.scope?.id ?? null,
+        variables: compact(mutation.state.variables),
+      })),
+  }))
+}
+
+async function bundleInjected(name: string) {
+  const entry = new URL(`./injected/${name}`, import.meta.url).pathname
+  const built = await Bun.build({
+    define: { 'process.env.NODE_ENV': '"development"' },
+    entrypoints: [entry],
+    format: 'iife',
+    minify: false,
+    target: 'browser',
+  })
+  if (!built.success) throw new Error(built.logs.map((log) => log.message).join('\n'))
+  const output = built.outputs[0]
+  if (!output) throw new Error(`no output for ${name}`)
+  return output.text()
+}
+
+async function withPage(
+  options: Options,
+  evidence: Evidence,
+  body: (
+    page: Page,
+    observed: ReturnType<typeof attachObserver>,
+    browser: Browser,
+  ) => Promise<number>,
+) {
+  const browser = await launch(options.headed)
+  const context = await browser.newContext({
+    permissions: ['clipboard-read', 'clipboard-write'],
+    viewport: { width: 1440, height: 1000 },
+  })
+  const page = await context.newPage()
+  const observed = attachObserver(page, apiBase(options.url))
+  try {
+    const code = await body(page, observed, browser)
+    await appendLogs(evidence)
+    console.log(await Bun.file(evidence.file('summary.md')).text())
+    return code
+  } finally {
+    await browser.close()
+  }
+}
+
+// A fresh browser context has no workspace. Register the folder and land on its address.
+async function workspaceUrl(page: Page, options: Options) {
+  const parsed = new URL(options.url)
+  if (parsed.pathname !== '/' && !parsed.pathname.endsWith('/platform/')) return options.url
+  const response = await page.request.post(`${apiBase(options.url)}fs/workspace-address`, {
+    data: { path: options.workspace },
+    headers: { Origin: parsed.origin },
+  })
+  if (!response.ok())
+    throw new Error(`workspace-address failed: ${response.status()} ${await response.text()}`)
+  const { id, name } = (await response.json()) as { id: string; name: string }
+  const token = encodeURIComponent(`${name}.${id}`).replaceAll('~', '%7E')
+  return `${options.url.replace(/\/$/, '')}/~${token}/workbench`
+}
+
+async function open(page: Page, url: string) {
+  await page.goto(url, { waitUntil: 'domcontentloaded' })
+  try {
+    await waitForApp(page)
+    await page.waitForTimeout(1_500)
+    return true
+  } catch {
+    return false
+  }
+}
+
+async function doctor(page: Page, url: string, ready: boolean) {
+  const reasons: string[] = []
+  if (!ready) reasons.push('window toolbar never rendered')
+  const release = await page.request.get(`${apiBase(url)}release`).catch(() => null)
+  if (!release?.ok()) reasons.push('release route did not answer')
+  const errors = await page.locator('[role="alert"]').count()
+  if (errors > 0) reasons.push(`${errors} alert(s) on screen`)
+  return { ok: reasons.length === 0, reasons }
+}
+
+function isLoopback(url: string) {
+  return /^(localhost|127\.0\.0\.1)$/.test(new URL(url).hostname)
+}
+
+function apiBase(url: string) {
+  const parsed = new URL(url)
+  if (parsed.port === '5173' || parsed.port === (process.env.WEB_PORT ?? '5173')) {
+    return `http://localhost:${process.env.PORT ?? '3001'}/`
+  }
+  return `${parsed.origin}${parsed.pathname.replace(/\/[^/]*$/, '/')}`
+}
+
+async function appendLogs(evidence: Evidence) {
+  const events = await readLogs({ level: 'warn', since: evidence.startedAt })
+  await evidence.write('logs.txt', events.map(formatLogEvent).join('\n'))
+  const summary = evidence.file('summary.md')
+  const existing = await Bun.file(summary).text()
+  const window = `${evidence.startedAt.toISOString()}..now`
+  const lines = [
+    '',
+    `logs (warn+, ${window}): ${events.length === 0 ? 'none' : `${events.length}, see logs.txt`}`,
+    `full window: bun run logs --since ${evidence.startedAt.toISOString()}`,
+  ]
+  await Bun.write(summary, `${existing}${lines.join('\n')}\n`)
+}
+
+async function writeSummary(evidence: Evidence, lines: readonly string[]) {
+  await evidence.write('summary.md', `${lines.join('\n')}\n`)
+}
+
+function launch(headed: boolean): Promise<Browser> {
+  const cache = '/work/cache/ms-playwright'
+  if (!process.env.PLAYWRIGHT_BROWSERS_PATH && existsSync(cache)) {
+    process.env.PLAYWRIGHT_BROWSERS_PATH = cache
+  }
+  return chromium.launch({ headless: !headed })
+}
+
+process.exitCode = await main()

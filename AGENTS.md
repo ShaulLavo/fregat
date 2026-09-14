@@ -158,6 +158,16 @@ Interaction treatments are utilities, not strings to copy:
 - Secrets never enter the settings document. They go to the secret store, which is why the raw JSON view, export and the settings file itself are safe to read.
 - Regenerate `docs/settings-reference.md` with `bun run settings:reference` after changing the registry.
 
+## Async Effects Go Through TanStack
+
+- Every effect that reaches the server or writes state another consumer reads is a TanStack mutation: `useMutation` in React, the same `mutationOptions` executed through `runMutation` in `lib/mutations/run.ts` outside it, which is a `MutationObserver` over the same client. Command handlers, services in `state/`, toast buttons and dialogs are not exempt. A bare `await client.x.y.post()` or `await writeFileContent()` behind a `useState` flag is the thing this rule bans.
+- Every mutation carries a `mutationKey` from the feature's `mutation-keys.ts`. That key is how the rest of the app sees the effect: in-flight state is `useIsMutating` / `useMutationState`, never a local `pending` or `saving` boolean, and a `Button` shows `Spinner` from that.
+- A mutation settles the cache before it resolves. `setQueryData` with the response when the server returned the new state, `invalidateQueries` on the keys it could have changed otherwise. "It will arrive over the socket" is not settlement; taint the query anyway. The cost of a redundant refetch is nothing, the cost of a stale snapshot is a phantom conflict.
+- Two calls of the same mutation while one is in flight never throw "busy". Give them a `scope: { id }` so TanStack runs them serially, and let the second observe the first's result before it decides whether it still has work. VS Code's save sequentializer is the model: join an identical request, queue at most one follow-up.
+- A read is a query even when the transport is a POST. Session search and root validation are reads; they get `queryOptions`, a `queryKey` and a `staleTime`, not an ad-hoc abort controller.
+- Retries live in the mutation's `retry` / `retryDelay`, not in a loop written inside `onSuccess`. A retry the mutation cache cannot see is a retry devtools, `isPending` and the wide event cannot see either.
+- Exceptions exist and each one carries a comment saying why: streaming transports (terminal input, orchestration WebSocket frames), and intent queues that already serialize by resource (`runIntent`, `runTreeIntent`, the workspace-edit lifecycle behind `runWorkspaceMutation`). Those still settle the cache when they finish.
+
 ## Greenfield, No Backward Compatibility
 
 - This project is greenfield and not live: no releases, no external users, no data anyone needs migrated.
@@ -205,6 +215,15 @@ Interaction treatments are utilities, not strings to copy:
 ## Dev Server
 
 - A dev server is always running. Never spin up your own server to test or verify changes — reuse the running one.
+
+## Verification
+
+- The `verify-platform` skill (`.agents/skills/verify-platform/`) is how a change is proven in the running app. Its CLI is `bun run agent:browser` with the verbs `look`, `scenario`, `trace`, `renders` and `caches`, and `bun run logs` reads the structured log. Evidence lands in `/work/tmp/platform-evidence/<run>/` with a `summary.md` short enough to read whole.
+- A UI change is not done until you have run `look` (or a scenario) on the changed surface, read the screenshot back, and named the evidence directory in your report. "It typechecks" and "the test passes" do not stand in for looking.
+- A performance claim cites `trace <scenario>` before and after, with `--compare`. A "fewer renders" claim cites `renders <scenario>` before and after. A claim about a query or mutation not settling cites `caches`.
+- Reproduce a reported bug on the same surface before fixing it, and re-run the same drive after. Hand the reproduction to the user only when the CLI cannot reach the surface, and say why.
+- When you touch a surface with no scenario, add one under `scripts/agent/scenarios/` and a line in the feature map. Selectors go in `scripts/agent/selectors.ts`, never inline.
+- The dev server is the target. The CLI never starts one; if it is down, say so.
 
 ## Deployment: The Mesh
 

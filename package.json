@@ -25,6 +25,8 @@
   "scripts": {
     "build": "bun scripts/prod.ts build",
     "deploy": "bun scripts/deploy/mesh.ts",
+    "agent:browser": "bun scripts/agent/browser.ts",
+    "logs": "bun scripts/agent/logs.ts",
     "dev": "bun --env-file=.env scripts/dev.ts",
     "dev:web": "bun --env-file=.env scripts/dev.ts --filter=!desktop",
     "dev:tui": "bun scripts/tui.ts",
@@ -58,6 +60,7 @@
   },
   "devDependencies": {
     "@typescript/native-preview": "7.0.0-dev.20260707.2",
+    "bippy": "^0.7.3",
     "evlog": "catalog:",
     "jscpd": "^5.2.0",
     "knip": "^6.35.1",

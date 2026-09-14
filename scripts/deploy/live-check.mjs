@@ -5,6 +5,7 @@ import { parseArgs } from 'node:util'
 import { resolve } from 'node:path'
 import { fileURLToPath } from 'node:url'
 import { chromium } from 'playwright'
+import { attachObserver, observedProblems, serializable } from '../agent/observe.mjs'
 
 const origin = 'https://omarchy.mesh.shaulavo.dev'
 const base = `${origin}/platform/`
@@ -27,43 +28,7 @@ const page = await browser.newPage({
   userAgent:
     'Mozilla/5.0 (Macintosh; Intel Mac OS X 10_15_7) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/149.0.0.0 Safari/537.36',
 })
-const observed = {
-  errors: [],
-  consoleErrors: [],
-  consoleWarnings: [],
-  failedResponses: [],
-  failedRequests: [],
-  loopbackRequests: [],
-  assets: new Set(),
-  apiResponses: [],
-  sockets: [],
-}
-page.on('pageerror', (error) => observed.errors.push(error.message))
-page.on('console', (message) => {
-  if (message.type() === 'error') observed.consoleErrors.push(message.text())
-  if (message.type() === 'warning') observed.consoleWarnings.push(message.text())
-})
-page.on('requestfailed', (request) =>
-  observed.failedRequests.push({ url: request.url(), error: request.failure()?.errorText }),
-)
-page.on('request', (request) => {
-  if (/^https?:\/\/(127\.0\.0\.1|localhost)(:|\/)/.test(request.url()))
-    observed.loopbackRequests.push(request.url())
-})
-page.on('response', (response) => {
-  const type = response.request().resourceType()
-  if (response.status() >= 400)
-    observed.failedResponses.push({ url: response.url(), status: response.status(), type })
-  if (response.ok() && ['script', 'stylesheet'].includes(type)) observed.assets.add(response.url())
-  if (response.url().startsWith(base) && ['fetch', 'xhr'].includes(type))
-    observed.apiResponses.push({ url: response.url(), status: response.status() })
-})
-page.on('websocket', (socket) => {
-  const item = { url: socket.url(), receivedFrames: 0, errors: [] }
-  observed.sockets.push(item)
-  socket.on('framereceived', () => item.receivedFrames++)
-  socket.on('socketerror', (error) => item.errors.push(error))
-})
+const observed = attachObserver(page, base)
 
 const report = { release: values.release, target: values.target, failures: [], preexisting: [] }
 try {
@@ -118,20 +83,9 @@ process.exit(fresh.length === 0 ? 0 : 1)
 
 function failures({ served, rendered, publicFavicon, observed }) {
   const found = []
-  const list = (label, items) =>
-    items.length > 0 && found.push(`${label}: ${JSON.stringify(items)}`)
   if (values.release && served.release !== values.release)
     found.push(`served release is ${served.release}, expected ${values.release}`)
-  list('page errors', observed.errors)
-  list('console errors', observed.consoleErrors)
-  list('console warnings', observed.consoleWarnings)
-  list('loopback requests', observed.loopbackRequests)
-  list('failed responses', observed.failedResponses)
-  // A request the page itself cancelled (a beacon cut off by navigation) is not a server failure.
-  list(
-    'failed requests',
-    observed.failedRequests.filter((item) => item.error !== 'net::ERR_ABORTED'),
-  )
+  found.push(...observedProblems(observed))
   if (!rendered.crossOriginIsolated) found.push('page is not cross-origin isolated')
   if (!(publicFavicon.width > 0)) found.push('public favicon did not load')
   if (rendered.wallpaperPreloads.length !== 1)
@@ -153,10 +107,6 @@ async function baselineFailures(file) {
   } catch {
     return []
   }
-}
-
-function serializable(state) {
-  return { ...state, assets: [...state.assets], loadedAssets: state.assets.size }
 }
 
 async function loadImage(source) {
