@@ -225,6 +225,12 @@ code {
 
 /* hero */
 
+/* the load animations translate hero children; if scroll anchoring picks
+   one while the browser restores scroll on reload, the page lands 8px down */
+.hero {
+  overflow-anchor: none;
+}
+
 .hero-copy {
   padding: clamp(2.5rem, 6vw, 4.5rem) var(--gutter) clamp(1.5rem, 3vw, 2.25rem);
   text-align: center;
@@ -679,7 +685,7 @@ pre .c {
   }
 
   .shot {
-    animation: rise 700ms var(--ease-out-strong) 150ms both;
+    animation: fade 700ms var(--ease-out-strong) 150ms both;
   }
 }
 
@@ -687,6 +693,12 @@ pre .c {
   from {
     opacity: 0;
     transform: translateY(8px);
+  }
+}
+
+@keyframes fade {
+  from {
+    opacity: 0;
   }
 }
 
