@@ -31,3 +31,18 @@ Chat submission now passes at `/work/tmp/fregat-evidence/20260914T160932Z-scenar
 The loading/social image now matches the interactive scene. It is a headed Chromium capture from `/work/tmp/fregat-evidence/20260914T161135Z-look-fregat-1440x1200/selector.png`, exported as lossless WebP at 3555×2196. Decoded pixels match exactly.
 
 Clean CI dependencies were built independently. The old Editor revision still published the previous package names; the shared setup pin now uses pushed revision `b0bd4b6`. Ghostty remains at `94ab02a`. Logs: `/work/tmp/fregat-ci-editor-build.log` and `/work/tmp/fregat-ci-ghostty-build.log`. The required merge-conflict implementation is committed and pushed with that dependency. Nine demo backend tests, targeted lint and the design census pass in the isolated Platform checkout. Final publishing evidence follows below.
+
+## Final committed-source verification
+
+The feature is committed as `62db0266`, with all root workspace typechecks passing in the pre-commit hook against the exact pinned dependencies. Log: `/work/tmp/fregat-demo-commit.log`. The independent site build passed at `/work/tmp/fregat-demo-final-build.log`. GitHub Pages build and deployment passed: https://github.com/ShaulLavo/fregat/actions/runs/34868505493.
+
+Final headed Chromium runs on that artifact:
+
+- `/work/tmp/fregat-evidence/20260914T162546Z-scenario-demo-workspace/`: save, search and terminal readback; read `03-searched.png` and `04-terminal.png`.
+- `/work/tmp/fregat-evidence/20260914T162613Z-scenario-demo-agent-git/`: stage, commit and chat; read `05-agent-reply.png`.
+- `/work/tmp/fregat-evidence/20260914T162637Z-scenario-demo-reset/`: reset restored seed content but `03-reset.png` exposed premature readiness while the wallpaper and terminal were loading.
+- `/work/tmp/fregat-evidence/20260914T162843Z-scenario-demo-reset/`: same drive after requiring the loaded wallpaper, loaded fonts and completed terminal initialization. Read `03-reset.png`; the restored app has its wallpaper and terminal output before the page reports ready.
+
+All these runs report no browser problems, unhandled mock requests or warning/error client log events.
+
+Mesh web deployment is `/work/platform-production/releases/20260914T162625Z-62db0266-interactive-demo-workspace/`. It includes the current workspace's existing Git UI changes and reuses the running server. The live check passed. Headed doctor evidence: `/work/tmp/fregat-evidence/20260914T162659Z-look-platform-1440x1000/`; read `page.png`.

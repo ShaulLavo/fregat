@@ -277,7 +277,6 @@ bun run dev
 
     const demoUrl = new URL(frame.dataset.demoUrl, window.location.href)
     demoUrl.searchParams.set('parentOrigin', window.location.origin)
-    demoUrl.searchParams.set('parentOrigin', window.location.origin)
     const resize = new ResizeObserver(([entry]) => {
       if (entry) frame.style.setProperty('--demo-scale', String(entry.contentRect.width / 1360))
     })

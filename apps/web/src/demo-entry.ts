@@ -26,16 +26,35 @@ async function start(): Promise<void> {
 function observeReady(): void {
   const observer = new MutationObserver(check)
   const timeout = window.setTimeout(() => {
-    observer.disconnect()
+    stopObserving()
     showFailure('The demo did not finish loading. Reload to try again.')
   }, 30_000)
-  observer.observe(document.body, { childList: true, subtree: true })
+  observer.observe(document.body, {
+    childList: true,
+    subtree: true,
+    attributes: true,
+    attributeFilter: ['data-workbench-wallpaper-layer'],
+  })
+  document.addEventListener('load', check, true)
+  document.fonts.addEventListener('loadingdone', check)
   check()
+
+  function stopObserving(): void {
+    observer.disconnect()
+    document.removeEventListener('load', check, true)
+    document.fonts.removeEventListener('loadingdone', check)
+  }
 
   function check(): void {
     if (!document.querySelector('[aria-label="Editor input"]')) return
     if (!document.querySelector('[aria-label="Terminal"] canvas')) return
-    observer.disconnect()
+    if (document.querySelector('[aria-label="Opening terminal"]')) return
+    if (document.fonts.status !== 'loaded') return
+    const wallpaper = document.querySelector<HTMLImageElement>(
+      'img[data-workbench-wallpaper-layer="still"]',
+    )
+    if (!wallpaper?.complete || wallpaper.naturalWidth === 0) return
+    stopObserving()
     window.clearTimeout(timeout)
     alignEmbeddedDemoWallpaper()
     parent.postMessage({ type: 'fregat-demo-ready' }, parentOrigin)
