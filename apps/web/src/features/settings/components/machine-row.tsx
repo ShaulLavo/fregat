@@ -69,14 +69,18 @@ export function MachineRow({
       <p className='text-muted-foreground truncate font-mono text-xs'>
         {name} · {machine.kind === 'ssh' ? machine.target : machine.url}
       </p>
-      {state?.lastError ? (
-        <div className='flex items-center gap-1 text-xs'>
+      {/* Always mounted: the reconnect loop clears and restores lastError on
+          every retry, and a line that comes and goes shifts the whole page. */}
+      <div className='flex h-6 items-center gap-1 text-xs'>
+        {phase !== 'idle' && phase !== 'live' ? (
           <span role='status' className='text-warning'>
-            {connectionNoticeSummary(phase, state.lastError)}
+            {connectionNoticeSummary(phase, state?.lastError ?? null)}
           </span>
+        ) : null}
+        {state?.lastError ? (
           <MachineErrorDetails label={machine.label ?? name} error={state.lastError} />
-        </div>
-      ) : null}
+        ) : null}
+      </div>
       {actionError ? (
         <p role='alert' className='text-destructive text-xs'>
           {actionError}

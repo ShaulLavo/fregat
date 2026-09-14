@@ -10,19 +10,24 @@ export function Phase({
   readonly label: string
 }) {
   if (phase === 'launching' || phase === 'connecting' || phase === 'reconnecting') {
-    return <OrbitLoader className='size-3' label={`${label} ${phase}`} />
+    return <OrbitLoader className='size-3 shrink-0' label={`${label} ${phase}`} />
   }
+  // Same box as the loader, so swapping between them does not nudge the label.
   return (
     <span
       role='status'
       aria-label={`${label} ${phase}`}
-      className={cn(
-        'size-2 shrink-0 rounded-full',
-        phase === 'live' && 'bg-success',
-        phase === 'idle' && 'bg-muted-foreground',
-        phase === 'offline' && 'bg-warning',
-        (phase === 'blocked' || phase === 'identity-drift') && 'bg-destructive',
-      )}
-    />
+      className='flex size-3 shrink-0 items-center justify-center'
+    >
+      <span
+        className={cn(
+          'size-2 rounded-full',
+          phase === 'live' && 'bg-success',
+          phase === 'idle' && 'bg-muted-foreground',
+          phase === 'offline' && 'bg-warning',
+          (phase === 'blocked' || phase === 'identity-drift') && 'bg-destructive',
+        )}
+      />
+    </span>
   )
 }
