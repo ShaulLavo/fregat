@@ -7,6 +7,7 @@ import { readDevSources, reportDevSources, type DevPackage } from '../../scripts
 import { consumeAppSave } from '../server/src/fs/app-save-marker'
 import { bundleStatsPlugin } from './scripts/bundle-stats-plugin'
 import { demoPreviewPlugin } from './scripts/demo-preview-plugin'
+import { bootAppearancePlugin } from './scripts/boot-appearance-plugin'
 
 const workspaceRoot = path.resolve(__dirname, '../..')
 const devServerHost = process.env.WEB_HOST ?? '127.0.0.1'
@@ -30,6 +31,7 @@ export default defineConfig(({ command, isPreview, mode }) => {
       exclude: ['@shikijs/themes', 'ghostty-webgpu', ...packages.map((pkg) => pkg.name)],
     },
     plugins: [
+      bootAppearancePlugin(__dirname),
       demoPreviewPlugin(__dirname),
       devSourcePlugin(packages),
       platformSelfSaveHmrPlugin(),

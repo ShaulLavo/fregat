@@ -5,32 +5,7 @@
     <link rel="icon" type="image/svg+xml" href="%BASE_URL%vscode-icons/code.svg" />
     <meta name="viewport" content="width=device-width, initial-scale=1.0" />
     <title>vite-monorepo</title>
-    <style>
-      /* Boot floor: painted before any module loads, so the module waterfall
-         shows the theme's background instead of UA white. Declared as the
-         first (lowest-priority) layer so the token rules in
-         packages/ui/src/styles/globals.css win the moment they load —
-         including the transparent floor a see-through shell window needs. The
-         colors mirror --background-solid there; changing them means changing
-         both.
-
-         --background-solid is the selected palette's own floor once the script
-         below has restored its stylesheet; the literal is Graphite for a page
-         with no cached palette. */
-      @layer boot {
-        html {
-          color-scheme: light;
-          background-color: var(--background-solid, oklch(0.97 0.006 70));
-        }
-        html.dark {
-          color-scheme: dark;
-          background-color: var(--background-solid, oklch(0.145 0.006 70));
-        }
-        html[data-backdrop='transparent'] {
-          background-color: transparent;
-        }
-      }
-    </style>
+    <!-- boot-appearance -->
     <script>
       // Pre-paint theme class and palette for the boot floor above. Reads the
       // settings boot mirror (written by features/settings/utils/boot-mirror.ts,

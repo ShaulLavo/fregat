@@ -167,10 +167,14 @@ export function seedSettings(): SettingsSnapshot {
   const values = {
     ...DEFAULT_SETTING_VALUES,
     'workbench.colorTheme': 'dark' as const,
+    'workbench.palette': 'graphite',
+    'editor.codeTheme.dark': 'rose-pine',
+    'workbench.density': 'compact' as const,
     'workbench.wallpaper.enabled': true,
-    'workbench.surface.opacity': 78,
-    'workbench.surface.contentOpacity': 82,
+    'workbench.surface.opacity': 80,
+    'workbench.surface.contentOpacity': 95,
     'workbench.surface.blur': 0,
+    'workbench.surface.saturation': 80,
   }
   return {
     values,

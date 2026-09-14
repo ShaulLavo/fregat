@@ -21,12 +21,12 @@ Read the screenshots and `inspection.json`. Every backend response should come f
 bun run agent:browser scenario editor-product --headed \
   --url https://omarchy.mesh.shaulavo.dev/platform/ \
   --file plugins.ts --width 1360 --height 840 --scale 2 \
-  --product-wallpaper apps/site/src/assets/garden.jpeg
+  --product-wallpaper apps/site/src/assets/eyes-wide.jpg
 ```
 
 The scenario opens code-panel.tsx, syntax-highlighting.ts, save-service.ts and plugins.ts, frames the core plugin setup, and runs `bun run --filter web typecheck`. Inspect both step screenshots for a completed command and readable code. `product-terminals.json` records the capture-owned terminal IDs and cleanup results. A command failure is real output to investigate, never text to replace in an image.
 
-The wallpaper is the user's temporary choice from [dharmx/walls](https://github.com/dharmx/walls/blob/main/painting/a_painting_of_a_garden_with_a_house_and_trees.jpeg). `product-wallpaper.json` records the source and browser-only appearance overrides. The tool emulates Windows so Linux compositor wallpaper policy does not suppress the app's wallpaper layer.
+The current demo copies the owner's local appearance: Rosé Pine syntax, Graphite, compact density, and the Omarchy `1-eyes-wide.jpg` wallpaper, stored as `apps/site/src/assets/eyes-wide.jpg`. The old garden wallpaper and social screenshot remain historical assets. `product-wallpaper.json` records the source and browser-only appearance overrides. The tool emulates Windows so Linux compositor wallpaper policy does not suppress the app's wallpaper layer.
 
 `product-composition.json` records the shared scene: 1600×1000 with a 1360×840 editor frame at (120, 80). The site mirrors that frame at left 7.5%, top 8%, width 85%, height 84%. Both image layers use the same centered cover crop. Keep these dimensions together when changing the composition.
 
@@ -47,3 +47,9 @@ After publishing, run `bun run agent:browser look --site --url https://shaullavo
 For product assets, use `--headed`. `browser-renderer.json` records the actual browser and GPU through CDP, independent of the appearance-only user-agent override. On this machine the headless shell uses SwiftShader software rendering; the headed browser uses the NVIDIA GPU. Do not infer the rendering engine from the spoofed platform string.
 
 Run `scenario demo-startup --headed --url http://localhost:5173/fregat/` for startup changes. It captures the initial iframe and the ready app, and fails if the iframe starts hidden or a screenshot preview is present.
+
+Run `scenario demo-theme-startup --headed --url http://localhost:5173/fregat/ --width 1440 --height 1200` for pre-paint theme changes. It emulates a light OS, delays the demo entry module, and captures theme/class/background transitions from the first animation frame through readiness. Read both screenshots and `inspection.json`; a ready-only screenshot cannot prove the absence of a startup flash.
+
+The HTML entries share inline `boot.css` through the Vite boot-appearance plugin. The demo starts dark and seeds its isolated settings mirror before importing the real app. It must remain visible during loading.
+
+Theme startup evidence (2026-09-14): before `/work/tmp/fregat-evidence/20260914T170954Z-scenario-demo-theme-startup/` recorded unresolved → light → dark; after `/work/tmp/fregat-evidence/20260914T171539Z-scenario-demo-theme-startup/` recorded only dark, with no browser problems. Both ready screenshots were inspected; the after capture also shows the local appearance experiment.

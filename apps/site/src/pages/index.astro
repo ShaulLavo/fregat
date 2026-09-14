@@ -1,7 +1,7 @@
 ---
 import { Image } from 'astro:assets'
 import Drawing from '../components/Drawing.astro'
-import garden from '../assets/garden.jpeg'
+import wallpaper from '../assets/eyes-wide.jpg'
 import workbench from '../assets/workbench.webp'
 import '../styles/global.css'
 
@@ -69,8 +69,8 @@ const demoUrl = import.meta.env.DEV
           <figure class="shot">
             <div class="product-stage">
               <Image
-                class="garden"
-                src={garden}
+                class="wallpaper"
+                src={wallpaper}
                 alt=""
                 loading="eager"
                 width={1600}
@@ -94,7 +94,7 @@ const demoUrl = import.meta.env.DEV
                 <span id="demo-status" role="status">loading demo…</span>
                 <button type="button" id="demo-reset" aria-controls="workbench-demo">reset demo</button>
                 <a href={demoUrl} target="_blank" rel="noopener">open full size ↗</a>
-                <a href="https://github.com/dharmx/walls/blob/main/painting/a_painting_of_a_garden_with_a_house_and_trees.jpeg">wallpaper</a>
+                <a href={wallpaper.src}>wallpaper</a>
               </div>
             </figcaption>
           </figure>

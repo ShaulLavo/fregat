@@ -207,7 +207,7 @@ pre {
   background: var(--paint-deep);
 }
 
-.garden {
+.wallpaper {
   display: block;
   width: 100%;
   height: 100%;
@@ -215,7 +215,7 @@ pre {
   object-position: center;
 }
 
-/* The demo and garden share this 1600 × 1000 composition. */
+/* The demo and wallpaper share this 1600 × 1000 composition. */
 .workbench {
   position: absolute;
   left: 7.5%;

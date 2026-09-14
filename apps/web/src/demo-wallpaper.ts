@@ -5,7 +5,7 @@ export function alignEmbeddedDemoWallpaper(): void {
 
   const style = document.createElement('style')
   const align = () => {
-    // The landing frame occupies 85% × 84% of the shared garden scene.
+    // The landing frame occupies 85% × 84% of the shared wallpaper scene.
     const width = window.innerWidth / 0.85
     const height = window.innerHeight / 0.84
     const left = (window.innerWidth - width) / 2

@@ -2,7 +2,8 @@ import { http, bypass } from 'msw'
 import { workspaceToken } from '@workspace/client-core/address/workspace'
 import { setupWorker } from 'msw/browser'
 import { emptyAddress, formatAddress } from '@workspace/client-core/address/grammar'
-import gardenUrl from '../../../site/src/assets/garden.jpeg?url'
+import { writeBootMirror } from '@/features/settings/utils/boot-mirror'
+import wallpaperUrl from '../../../site/src/assets/eyes-wide.jpg?url'
 import { DEMO_ADDRESS, seedSession } from './seed'
 import { DemoWorkspace } from './state/workspace'
 import { DemoOrchestration } from './state/orchestration'
@@ -18,11 +19,12 @@ export async function startDemoBackend({
   apiOrigin: string
 }) {
   const workspace = await DemoWorkspace.create()
+  writeBootMirror(workspace.settings.values)
   const orchestration = new DemoOrchestration(workspace)
   const diagnostics: DemoDiagnostics = { requests: [], unhandled: [], logs: [] }
   const socketFrames: DemoSocketFrame[] = []
   const assets = {
-    wallpaper: new URL(gardenUrl, location.href).href,
+    wallpaper: new URL(wallpaperUrl, location.href).href,
     font: new URL('demo-assets/fonts/JetBrainsMonoNerdFont-Regular.ttf', assetBase).href,
   }
   const worker = setupWorker(

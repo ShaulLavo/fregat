@@ -1,0 +1,15 @@
+/* Inlined before modules; the boot layer yields to the app's theme layers.
+   Fallbacks mirror Graphite's --background-solid values in globals.css. */
+@layer boot {
+  html {
+    color-scheme: light;
+    background-color: var(--background-solid, oklch(0.97 0.006 70));
+  }
+  html.dark {
+    color-scheme: dark;
+    background-color: var(--background-solid, oklch(0.145 0.006 70));
+  }
+  html[data-backdrop='transparent'] {
+    background-color: transparent;
+  }
+}
