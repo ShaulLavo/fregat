@@ -1,7 +1,7 @@
 ---
 import { Image } from 'astro:assets'
 import Drawing from '../components/Drawing.astro'
-import Backdrop from '../components/Backdrop.astro'
+import garden from '../assets/garden.jpeg'
 import workbench from '../assets/workbench.webp'
 import '../styles/global.css'
 
@@ -53,35 +53,45 @@ const description =
       </header>
 
       <main>
-        <section class="hero">
-          <div class="backdrop"><Backdrop /></div>
+        <section class="hero" aria-labelledby="hero-heading">
           <div class="wrap hero-copy">
-            <h1>an open cursor, built from scratch</h1>
-            <p>
-              a code editor with claude code and codex inside, on the subscriptions you already
-              have. nothing here is forked from vs code.
-            </p>
+            <h1 id="hero-heading">an open cursor, built from scratch</h1>
+            <p>claude code and codex inside, on the subscriptions you already have.</p>
             <div class="actions">
               <a class="button" href="https://github.com/ShaulLavo/fregat">get the source</a>
               <a class="button ghost" href="#try-heading">run it locally</a>
+              <span class="status">no releases yet</span>
             </div>
-            <span class="status">no releases yet. clone it and run it.</span>
           </div>
-          <div class="wrap">
-            <figure class="shot">
+          <figure class="shot">
+            <div class="product-stage">
               <Image
-                src={workbench}
-                alt="the fregat workbench: a file tree, an editor pane with typescript open, and a terminal running bun dev, over a wallpaper"
+                class="garden"
+                src={garden}
+                alt=""
                 loading="eager"
-                widths={[800, 1200, 2000]}
-                sizes="(min-width: 1200px) 1120px, 100vw"
+                width={1600}
+                widths={[800, 1600, 2400]}
+                sizes="(min-width: 1440px) 1440px, 100vw"
+                quality={85}
               />
-              <figcaption>
-                <b>fig. 1</b> the workbench. a file tree, the editor, a terminal, and an agent,
-                each a pane.
-              </figcaption>
-            </figure>
-          </div>
+              <a class="workbench" href={workbench.src} aria-label="view the fregat workbench at full size">
+                <Image
+                  src={workbench}
+                  alt="the real fregat workbench with four source tabs, TypeScript code and a terminal running the web typecheck, over the garden wallpaper"
+                  loading="eager"
+                  fetchpriority="high"
+                  widths={[1360, 2720]}
+                  sizes="(min-width: 1440px) 1224px, 85vw"
+                  quality={95}
+                />
+              </a>
+            </div>
+            <figcaption>
+              <span>your code, your terminal, your agents. one workspace.</span>
+              <a href="https://github.com/dharmx/walls/blob/main/painting/a_painting_of_a_garden_with_a_house_and_trees.jpeg">wallpaper</a>
+            </figcaption>
+          </figure>
         </section>
 
         <section class="wrap section" aria-labelledby="parts-heading">
@@ -233,12 +243,8 @@ bun run dev
             <dd>0.0.1, no releases</dd>
           </div>
           <div>
-            <dt>drawn by</dt>
+            <dt>made by</dt>
             <dd>shaul lavochkin</dd>
-          </div>
-          <div>
-            <dt>sheet</dt>
-            <dd>1 of 1</dd>
           </div>
         </dl>
       </footer>

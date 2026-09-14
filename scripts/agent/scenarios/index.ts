@@ -16,6 +16,7 @@ import { editorLargePaste } from './editor-large-paste'
 import { editorTypeBurst } from './editor-type-burst'
 import { editorCaretBurst } from './editor-caret-burst'
 import { editorFocusClicks } from './editor-focus-clicks'
+import { editorProduct } from './editor-product'
 
 export const scenarios: readonly Scenario[] = [
   editorLargePaste,
@@ -23,6 +24,7 @@ export const scenarios: readonly Scenario[] = [
   editorTypeBurst,
   editorCaretBurst,
   editorFocusClicks,
+  editorProduct,
 ]
 
 export function scenarioNamed(name: string): Scenario {

@@ -10,7 +10,19 @@ import { scenarioNamed, scenarios, type Scenario } from './scenarios/index'
 import { waitForApp } from './selectors'
 import { compareTraceSummaries, formatTraceSummary, summarizeTrace } from './trace-summary'
 import { captureTraceSources } from './trace-source-maps'
+import { captureSize, type CaptureSize } from './capture-options'
+import {
+  openStaticPreview,
+  routeStaticPreview,
+  staticPreviewLayout,
+  STATIC_PREVIEW_URL,
+} from './static-preview'
+import { alignProductWallpaper, routeProductWallpaper } from './product-wallpaper'
+import { createScriptError } from '../structured-errors'
+import { isolateProductTerminals } from './product-terminal'
 
+const PRODUCT_USER_AGENT =
+  'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/145.0.0.0 Safari/537.36'
 const DEFAULT_URL = `http://localhost:${process.env.WEB_PORT ?? '5173'}/`
 const DEFAULT_FILE = 'use-events.ts'
 const DEFAULT_WORKSPACE = 'work/projects/platform'
@@ -32,10 +44,20 @@ Options
   --headed     show the browser
   --doctor     exit non-zero when the app is not healthy
   --compare    an earlier trace evidence directory to diff against
+  --site       check a landing page document instead of app readiness (look)
+  --static-dir serve built assets through browser routes for look, without a server
+  --width      viewport width, 320–4096 CSS pixels (look/scenario)
+  --height     viewport height, 240–4096 CSS pixels (look/scenario)
+  --scale      device pixel ratio, 1–3 (look/scenario)
+  --product-wallpaper image override for a real product scenario capture
 
 Evidence lands under /work/tmp/fregat-evidence/<stamp>-<verb>-<label>/.`
 
-type Options = {
+type Options = CaptureSize & {
+  readonly site: boolean
+  readonly productCapture: boolean
+  readonly staticDir: string | undefined
+  readonly productWallpaper: string | undefined
   readonly compare: string | undefined
   readonly doctor: boolean
   readonly file: string
@@ -50,6 +72,12 @@ async function main() {
     allowPositionals: true,
     options: {
       compare: { type: 'string' },
+      'static-dir': { type: 'string' },
+      site: { type: 'boolean', default: false },
+      'product-wallpaper': { type: 'string' },
+      width: { type: 'string' },
+      height: { type: 'string' },
+      scale: { type: 'string' },
       doctor: { type: 'boolean', default: false },
       file: { type: 'string', default: DEFAULT_FILE },
       headed: { type: 'boolean', default: false },
@@ -59,13 +87,28 @@ async function main() {
     },
   })
   const [verb, name] = positionals
+  if (values.site && (verb !== 'look' || values.doctor))
+    throw createScriptError('--site is only supported by look without --doctor.')
+  if (values['static-dir'] && (verb !== 'look' || values.doctor))
+    throw createScriptError('--static-dir is only supported by look without --doctor.')
+  if (values['product-wallpaper'] && verb !== 'scenario')
+    throw createScriptError('--product-wallpaper is only supported by scenario.')
+  if ((values.width || values.height || values.scale) && verb !== 'look' && verb !== 'scenario')
+    throw createScriptError(
+      '--width, --height and --scale are only supported by look and scenario.',
+    )
   const options: Options = {
+    ...captureSize(values),
+    site: values.site || Boolean(values['static-dir']),
+    productCapture: name === 'editor-product' || Boolean(values['product-wallpaper']),
+    staticDir: values['static-dir'],
+    productWallpaper: values['product-wallpaper'],
     compare: values.compare,
     doctor: values.doctor,
     file: values.file,
     headed: values.headed,
     selector: values.selector,
-    url: values.url,
+    url: values['static-dir'] ? STATIC_PREVIEW_URL : values.url,
     workspace: values.workspace,
   }
   if (verb === 'look') return look(options)
@@ -82,9 +125,15 @@ async function main() {
 }
 
 async function look(options: Options) {
-  const evidence = await createEvidence('look', new URL(options.url).pathname)
+  const evidence = await createEvidence(
+    'look',
+    `${new URL(options.url).pathname}-${options.width}x${options.height}`,
+  )
   return withPage(options, evidence, async (page, observed) => {
-    const ready = await open(page, options.url)
+    const ready = options.site
+      ? await openStaticPreview(page, options.url)
+      : await open(page, options.url)
+    if (options.site) await evidence.json('layout.json', await staticPreviewLayout(page))
     await page.screenshot({ path: evidence.file('page.png'), fullPage: false })
     if (options.selector) {
       await page
@@ -92,7 +141,9 @@ async function look(options: Options) {
         .first()
         .screenshot({ path: evidence.file('selector.png') })
     }
-    const health = await doctor(page, options.url, ready)
+    const health = options.site
+      ? { ok: ready, reasons: ready ? [] : ['main, fonts or images did not become ready'] }
+      : await doctor(page, options.url, ready)
     const problems = observedProblems(observed, { loopback: !isLoopback(options.url) })
     await evidence.json('observed.json', { health, problems, ...serializable(observed) })
     const lines = [
@@ -105,7 +156,7 @@ async function look(options: Options) {
       ...problems.map((problem) => `- ${problem}`),
     ]
     await writeSummary(evidence, lines)
-    return options.doctor && !health.ok ? 1 : 0
+    return (options.doctor || options.site) && !health.ok ? 1 : 0
   })
 }
 
@@ -117,6 +168,7 @@ async function runScenario(scenario: Scenario, options: Options) {
       await writeSummary(evidence, [`# scenario ${scenario.name}`, '', 'app never became ready'])
       return 1
     }
+    if (options.productWallpaper) await alignProductWallpaper(page, evidence)
     const steps: string[] = []
     const step = async (label: string) => {
       const file = `${String(steps.length + 1).padStart(2, '0')}-${label}.png`
@@ -449,17 +501,57 @@ async function withPage(
   const browser = await launch(options.headed)
   const context = await browser.newContext({
     permissions: ['clipboard-read', 'clipboard-write'],
-    viewport: { width: 1440, height: 1000 },
+    viewport: { width: options.width, height: options.height },
+    deviceScaleFactor: options.scale,
+    ...(options.productWallpaper ? { userAgent: PRODUCT_USER_AGENT } : {}),
   })
   const page = await context.newPage()
   const observed = attachObserver(page, apiBase(options.url))
+  let saveWallpaper: (() => Promise<string>) | undefined
+  let disposeTerminals: (() => Promise<string>) | undefined
   try {
+    if (options.productCapture) disposeTerminals = await isolateProductTerminals(page, evidence)
+    const staticDirectory = options.staticDir
+      ? await routeStaticPreview(page, options.staticDir)
+      : null
+    if (options.productWallpaper)
+      saveWallpaper = await routeProductWallpaper(page, options.productWallpaper, evidence)
+    await evidence.json('capture-options.json', {
+      url: options.url,
+      viewport: { width: options.width, height: options.height },
+      deviceScaleFactor: options.scale,
+      screenshotPixels: {
+        width: options.width * options.scale,
+        height: options.height * options.scale,
+      },
+      staticDirectory,
+      productWallpaper: options.productWallpaper ?? null,
+      userAgentOverride: options.productWallpaper ? PRODUCT_USER_AGENT : null,
+    })
     const code = await body(page, observed, browser)
-    await appendLogs(evidence)
+    if (!options.site) await appendLogs(evidence)
     console.log(await Bun.file(evidence.file('summary.md')).text())
     return code
   } finally {
-    await browser.close()
+    await closeCapture(page, browser, saveWallpaper, disposeTerminals)
+  }
+}
+
+async function closeCapture(
+  page: Page,
+  browser: Browser,
+  saveWallpaper?: () => Promise<string>,
+  disposeTerminals?: () => Promise<string>,
+) {
+  try {
+    await saveWallpaper?.()
+  } finally {
+    try {
+      await page.close()
+      await disposeTerminals?.()
+    } finally {
+      await browser.close()
+    }
   }
 }
 

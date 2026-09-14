@@ -37,6 +37,20 @@ Scenarios live in `scripts/agent/scenarios/`. They open a file through the comma
 
 The scenarios land on a workspace by registering a root-relative folder (`--workspace`, default `work/projects/platform`) and opening its address URL. A fresh browser context has no workspace otherwise.
 
+## Landing page and product assets
+
+Use the same tool for `apps/site`; it serves built files through Playwright routes, without starting a server:
+
+```bash
+bun run --cwd apps/site site:build
+bun run agent:browser look --static-dir apps/site/dist --width 1440 --height 1000 --selector main
+bun run agent:browser look --static-dir apps/site/dist --width 390 --height 844
+```
+
+Read both screenshots. `layout.json` records viewport, document width, image dimensions and positions; verify every image loaded and the document fits. `--scale 2` captures at twice the CSS resolution. Landing readiness checks the main element, fonts and images instead of app API routes.
+
+For a real editor hero capture, see [landing.md](features/landing.md). The `editor-product` scenario opens four source tabs and runs the web typecheck in a capture-owned terminal. Its terminal IDs are isolated from existing sessions and cleaned up after the page closes; inspect `product-terminals.json` to confirm cleanup. Wallpaper overrides affect only the fresh browser context. Never type promotional commands into an existing user's terminal.
+
 ## Evidence
 
 `/work/tmp/fregat-evidence/<stamp>-<verb>-<label>/` holds `summary.md`, the screenshots, `observed.json` (page errors, console, failed requests, sockets), `logs.txt` (warn and error events written during the run) and the verb's artifact: `trace.json` for Chrome's Performance panel, `renders.json`, `caches.json`.
