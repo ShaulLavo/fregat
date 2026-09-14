@@ -1,5 +1,7 @@
 import type { Page } from 'playwright'
 
+export const wallpaperLayerSelector = '[data-workbench] img[data-workbench-wallpaper-layer="still"]'
+
 // Stable handles the app already exposes. Add here, never inline a selector in a scenario.
 export const selectors = {
   sidebarTab: (page: Page, name: 'Files' | 'Git' | 'Search' | 'Chat') =>

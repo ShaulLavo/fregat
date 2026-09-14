@@ -26,6 +26,7 @@ import { demoAgentGit } from './demo-agent-git'
 import { demoReset } from './demo-reset'
 import { demoStartup } from './demo-startup'
 import { demoThemeStartup } from './demo-theme-startup'
+import { demoWallpaperStartup } from './demo-wallpaper-startup'
 
 export const scenarios: readonly Scenario[] = [
   demoWorkspace,
@@ -33,6 +34,7 @@ export const scenarios: readonly Scenario[] = [
   demoReset,
   demoStartup,
   demoThemeStartup,
+  demoWallpaperStartup,
   gitHistory,
   editorLargePaste,
   editorFastScroll,
