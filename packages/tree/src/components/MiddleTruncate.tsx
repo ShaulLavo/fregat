@@ -1,6 +1,6 @@
 /** @jsxImportSource react */
 
-import type { JSX, ReactNode } from 'react'
+import { memo, type JSX, type ReactNode } from 'react'
 
 import { Fruncate } from './Fruncate'
 import type { OverflowTextProps } from './OverflowText'
@@ -34,7 +34,8 @@ export type MiddleTruncateProps = Omit<OverflowTextProps, 'mode' | 'children'> &
       | OverflowTextSplit
   }
 
-export function MiddleTruncate({
+// Unchanged row names should not repeat splitting or render both segments.
+export const MiddleTruncate = memo(function MiddleTruncate({
   children,
   contents,
   priority = 'end',
@@ -117,4 +118,4 @@ export function MiddleTruncate({
       </div>
     </div>
   )
-}
+})

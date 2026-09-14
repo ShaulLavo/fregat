@@ -54,3 +54,23 @@ FloatingTree's reported render duration fell from 233.1ms to 2.9ms. The tool cur
 - Restored fix, `trace editor-type-burst --compare` against that baseline: `/work/tmp/platform-evidence/20260914T130133Z-trace-editor-type-burst/`. Scripting 5,404.4 → 3,452.2ms, tasks over 16ms 218 → 127, tasks over 50ms 13 → 7. This is one consecutive pair on the shared dev server, not an isolated benchmark.
 - Focused checks: `item3-checks.txt` in the original baseline trace directory. Eight tests pass, including scope crossings and refreshed navigation targets, plus web typecheck and lint.
 - Before screenshot: `/work/tmp/platform-evidence/20260914T125653Z-scenario-editor-type-burst/02-typed.png`. After screenshot: `/work/tmp/platform-evidence/20260914T130202Z-scenario-editor-type-burst/02-typed.png`. Both inspected.
+
+## 4. Tree icons and truncation
+
+Row updates recreated visual children even when their value props stayed equal. `Icon` and `MiddleTruncate` now use shallow memoization. `Truncate` and `Fruncate` also memoize because a changed filename can retain either segment. `OverflowText` relies on those parent boundaries and has no redundant memo. Whole rows retain their selection, focus and expansion updates.
+
+The same render command removed all **1,102 parent-driven renders** among the five components:
+
+| Component      | Before renders | After renders | Parent-driven before → after |
+| -------------- | -------------: | ------------: | ---------------------------: |
+| Icon           |            380 |           138 |                      242 → 0 |
+| MiddleTruncate |            350 |           168 |                      182 → 0 |
+| Truncate       |            283 |           137 |                      146 → 0 |
+| Fruncate       |            322 |           129 |                      193 → 0 |
+| OverflowText   |            605 |           266 |                      339 → 0 |
+
+- Before: `/work/tmp/platform-evidence/20260914T125945Z-renders-editor-type-burst/`.
+- After: `/work/tmp/platform-evidence/20260914T130416Z-renders-editor-type-burst/`.
+- Before screenshot: `/work/tmp/platform-evidence/20260914T130202Z-scenario-editor-type-burst/02-typed.png`.
+- After screenshot: `/work/tmp/platform-evidence/20260914T130451Z-scenario-editor-type-burst/02-typed.png`. Both inspected.
+- Existing icon configuration update test and tree typecheck pass. Output: `item4-checks.txt` in the before directory.

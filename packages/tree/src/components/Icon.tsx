@@ -1,5 +1,5 @@
 /** @jsxImportSource react */
-import type { JSX } from 'react'
+import { memo, type JSX } from 'react'
 
 const DEFAULT_WIDTH = 16
 const DEFAULT_HEIGHT = 16
@@ -9,7 +9,8 @@ const ICON_SIZE_OVERRIDES: Record<
   { width: number; height: number; viewBox?: string } | undefined
 > = {}
 
-export function Icon({
+// Tree row updates often leave every icon value unchanged.
+export const Icon = memo(function Icon({
   name,
   remappedFrom,
   token,
@@ -54,4 +55,4 @@ export function Icon({
       <use href={href} />
     </svg>
   )
-}
+})
