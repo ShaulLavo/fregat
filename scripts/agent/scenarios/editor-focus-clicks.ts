@@ -13,7 +13,8 @@ export const editorFocusClicks: Scenario = {
     await step('ready')
     for (let index = 0; index < 20; index++) {
       await editor.click({ position: { x: 90 + (index % 3) * 35, y: 12 + (index % 10) * 24 } })
-      await page.waitForTimeout(50)
+      // Let debounced LSP selection requests settle before the next click cancels them.
+      await page.waitForTimeout(750)
     }
     await step('clicked')
     await editor.hover({ position: { x: 100, y: 12 } })

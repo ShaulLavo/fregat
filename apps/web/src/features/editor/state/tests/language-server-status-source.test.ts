@@ -46,6 +46,28 @@ test('takes aggregate metadata from the first non-empty diagnostic batch', () =>
   expect(messages(source)).toEqual(['current'])
 })
 
+test('successful requests do not republish an already usable server', () => {
+  const source = createEditorLanguageServerStatusSource()
+  source.setServers(['primary'])
+  source.setServerStatus('primary', 'ready')
+  source.setServerDiagnostics('primary', summary('problem'))
+  const snapshot = source.getSnapshot()
+  let publications = 0
+  const unsubscribe = source.subscribe(() => publications++)
+
+  for (let index = 0; index < 20; index++) source.setServerInteractiveReady('primary')
+
+  expect(source.getSnapshot()).toBe(snapshot)
+  expect(publications).toBe(0)
+
+  source.setServerStatus('primary', 'loading')
+  source.setServerStatus('primary', 'ready')
+  expect(source.getSnapshot().status).toBe('loading')
+  source.setServerInteractiveReady('primary')
+  expect(source.getSnapshot().status).toBe('ready')
+  unsubscribe()
+})
+
 function summary(message: string, uri = 'file:///test.ts', version = 1) {
   return summarizeDiagnostics(uri, version, [
     {

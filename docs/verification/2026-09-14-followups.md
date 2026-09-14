@@ -146,3 +146,20 @@ The user clarified that clicking inside the already-focused editor, not arrow mo
 - A broader production run clicking across different lines: `/work/tmp/fregat-evidence/20260914T135112Z-renders-editor-focus-clicks/`. TerminalPanel remains 7→7, BottomPanel 10→10 and TerminalTabs 1→1 across editor clicks. Screenshot inspected.
 
 The reported terminal issue is not reproduced in these fresh sessions. No speculative terminal/focus code change was made. The user's measurement method and loaded browser state remain to be matched. The production build at the time included breadcrumb commit 11a71118; an already-open tab needs a reload to load a newer build.
+
+## Bottom panel click fix
+
+The user identified the Terminal/Problems container as the flashing component. The earlier fast-click probe was a false negative. Its 50ms spacing continually cancelled the editor's 150ms document-highlight debounce. With 750ms between clicks, the same scenario reproduces 60 extra BottomPanel renders across 20 clicks and none on dragging.
+
+Collapsed caret selections schedule document highlights; noncollapsed drag selections skip them. Successful LSP requests call `onInteractiveReady` even after readiness was established. The app status source rebuilt its aggregate diagnostics each time, defeating its reference comparison. BottomPanel subscribed to that entire snapshot solely for the Problems count.
+
+Readiness now returns without publishing when the lane is already usable. Loading/error transitions still reset usability, so reconnect readiness continues to publish. The numeric subscription lives in `ProblemCount`; BottomPanel no longer subscribes to editor status. This applies Fix Root Causes at the producer and the smallest-state rule at the consumer, without memoization.
+
+- Before `renders editor-focus-clicks`: `/work/tmp/fregat-evidence/20260914T140035Z-renders-editor-focus-clicks/`. BottomPanel ready 9, clicked 69, dragged 69.
+- After the same command: `/work/tmp/fregat-evidence/20260914T140247Z-renders-editor-focus-clicks/`. BottomPanel remains 1, ProblemCount remains 2, and TerminalPanel remains 7 across all 20 clicks and dragging. Setup counts are excluded by subtracting checkpoints. Both screenshots inspected; the Problems badge displays 1.
+- Trace baseline: `/work/tmp/fregat-evidence/20260914T140131Z-trace-editor-focus-clicks/`.
+- Trace with `--compare`: `/work/tmp/fregat-evidence/20260914T140337Z-trace-editor-focus-clicks/`. Both screenshots inspected. Scripting 973.9→1003.5ms and long tasks remain 4. This pair establishes no overall latency improvement; the claim is removal of redundant panel renders.
+- The new source regression fails before and passes after, alongside the three existing tests. Outputs are `status-test-before.txt` and `status-test-after.txt` in the before render directory. It checks unchanged snapshot identity, zero publications, and readiness after reconnect.
+- Root typecheck passes; `typecheck.txt` is in the after render directory. Neither browser log window contains LSP warnings.
+
+The verification scenario now retains the 750ms pause. The feature map explains why request settlement matters and distinguishes the containing BottomPanel from its terminal children.

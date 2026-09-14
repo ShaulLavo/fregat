@@ -61,7 +61,7 @@ export function createEditorLanguageServerStatusSource(): EditorLanguageServerSt
     },
     setServerInteractiveReady: (serverId) => {
       const state = servers.get(serverId)
-      if (!state) return
+      if (!state || state.usable) return
 
       servers.set(serverId, { ...state, usable: true })
       publish()
