@@ -1,9 +1,10 @@
 import { createMemoryHistory } from '@tanstack/react-router'
 import { configureApplicationHost } from '@/lib/application-host'
 import { isolateDemoStorage } from './demo-storage'
-import { alignEmbeddedDemoWallpaper } from './demo-wallpaper'
+import './demo-wallpaper.css'
 
 const parentOrigin = demoParentOrigin()
+if (window.parent !== window) document.documentElement.dataset.demoEmbedded = ''
 isolateDemoStorage()
 void start().catch(showFailure)
 
@@ -56,7 +57,6 @@ function observeReady(): void {
     if (!wallpaper?.complete || wallpaper.naturalWidth === 0) return
     stopObserving()
     window.clearTimeout(timeout)
-    alignEmbeddedDemoWallpaper()
     parent.postMessage({ type: 'fregat-demo-ready' }, parentOrigin)
   }
 }

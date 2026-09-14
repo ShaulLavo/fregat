@@ -1,0 +1,11 @@
+/* The landing frame occupies 85% × 84% of the shared wallpaper scene.
+   The workbench starts one titlebar below the iframe's top edge. */
+html[data-demo-embedded] [data-workbench] img[data-workbench-wallpaper-layer] {
+  width: calc(100vw / 0.85);
+  height: calc(100vh / 0.84);
+  max-width: none;
+  inset: auto;
+  left: calc((100vw - 100vw / 0.85) / 2);
+  top: calc((100vh - 100vh / 0.84) / 2 - var(--bar-height));
+  object-fit: cover;
+}

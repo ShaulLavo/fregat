@@ -53,3 +53,9 @@ Run `scenario demo-theme-startup --headed --url http://localhost:5173/fregat/ --
 The HTML entries share inline `boot.css` through the Vite boot-appearance plugin. The demo starts dark and seeds its isolated settings mirror before importing the real app. It must remain visible during loading.
 
 Theme startup evidence (2026-09-14): before `/work/tmp/fregat-evidence/20260914T170954Z-scenario-demo-theme-startup/` recorded unresolved → light → dark; after `/work/tmp/fregat-evidence/20260914T171539Z-scenario-demo-theme-startup/` recorded only dark, with no browser problems. Both ready screenshots were inspected; the after capture also shows the local appearance experiment.
+
+Run `scenario demo-wallpaper-startup --headed --url http://localhost:5173/fregat/ --width 1440 --height 1200` for wallpaper startup changes. It records the bounds of every visible wallpaper geometry from first load through readiness. Every sample must already match the shared scene, within one CSS pixel. Read `01-first-wallpaper.png`, `02-ready.png`, and `inspection.json`.
+
+The embedded crop lives in `apps/web/src/demo-wallpaper.css`, loaded before the app renders. Viewport units and `--bar-height` keep the crop aligned without measuring after readiness. The standalone demo keeps normal wallpaper sizing.
+
+Crop evidence (2026-09-14): before `/work/tmp/fregat-evidence/20260914T172317Z-scenario-demo-wallpaper-startup/` changed from 1360×804 at (0, 36) to 1600×1000 at (−120, −80); after `/work/tmp/fregat-evidence/20260914T172551Z-scenario-demo-wallpaper-startup/` stayed at the final crop from the first sample. Both runs had no browser problems and both screenshots were inspected. Standalone check `/work/tmp/fregat-evidence/20260914T172551Z-look-fregat-demo-index-html-1360x840/` passed and its screenshot was inspected.
