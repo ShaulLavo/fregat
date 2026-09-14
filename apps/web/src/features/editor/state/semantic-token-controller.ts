@@ -16,7 +16,7 @@ import { readSettingsMirror } from '@/features/settings/utils/boot-mirror'
 import {
   semanticTokenProfileFor,
   type SemanticTokenServerProfile,
-} from '@/features/editor/utils/semantic-token-servers'
+} from '@/lib/semantic-token-servers'
 
 /**
  * Trailing debounce for a demand caused by an edit.

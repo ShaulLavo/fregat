@@ -20,8 +20,8 @@ import { createSemanticTokenStyles } from '@singapore-editor/core/syntax'
 import { SEMANTIC_TOKEN_TYPES } from '@singapore-editor/lsp'
 import { decodeSemanticTokens } from '@singapore-editor/lsp-plugin'
 
-import { clientCapabilitiesForServer } from '@/features/editor/utils/client-capabilities'
-import { semanticTokenProfileFor } from '@/features/editor/utils/semantic-token-servers'
+import { clientCapabilitiesForServer } from '@/lib/language-server-capabilities'
+import { semanticTokenProfileFor } from '@/lib/semantic-token-servers'
 
 // Probe installed optional servers and the application's bundled TypeScript runtime.
 // Exact recorded legends make additions, removals, and reordered indices fail.

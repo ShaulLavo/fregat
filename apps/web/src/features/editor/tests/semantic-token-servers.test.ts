@@ -3,10 +3,7 @@ import { describe } from 'vitest'
 import { test as it, expect } from '../../../../test/fixtures'
 import { SEMANTIC_TOKEN_LEGENDS } from '../../../../test/factories/semantic-token-legends'
 
-import {
-  SEMANTIC_TOKEN_SERVER_IDS,
-  semanticTokenProfileFor,
-} from '@/features/editor/utils/semantic-token-servers'
+import { SEMANTIC_TOKEN_SERVER_IDS, semanticTokenProfileFor } from '@/lib/semantic-token-servers'
 
 /**
  * Coverage, not vibes.

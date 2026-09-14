@@ -26,8 +26,9 @@ import { lspLanguageIdForPath } from '@/features/editor/utils/lsp-language-id'
 import { SemanticTokenController } from '@/features/editor/state/semantic-token-controller'
 import {
   LANGUAGE_SERVER_CLIENT_INFO,
+  LANGUAGE_SERVER_REQUEST_TIMEOUT_MS,
   clientCapabilitiesForServer,
-} from '@/features/editor/utils/client-capabilities'
+} from '@/lib/language-server-capabilities'
 import { languageServerWebSocketConstructor } from '@/lib/server-sockets'
 import { environmentClientFor } from '@/lib/client'
 import { environmentActivitySignal } from '@/lib/environments/state/activity'
@@ -188,6 +189,7 @@ export function languageServerLaneOptions({
     features: match.features as LanguageServerFeatureRanks,
     capabilities: clientCapabilitiesForServer(match.serverId),
     clientInfo: LANGUAGE_SERVER_CLIENT_INFO,
+    timeoutMs: LANGUAGE_SERVER_REQUEST_TIMEOUT_MS,
     rootUri: fileUriForPath(match.root),
     connectionProvider,
     onApplyWorkspaceEdit,

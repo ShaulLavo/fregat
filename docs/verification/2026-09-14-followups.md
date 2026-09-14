@@ -84,3 +84,18 @@ The user was told the dev server needs a restart. No restart or route change was
 - Before browser evidence: `/work/tmp/platform-evidence/20260914T125103Z-look-run/`.
 - After browser evidence: `/work/tmp/platform-evidence/20260914T130606Z-look-run/`. Both screenshots inspected.
 - Listener, process start, route source and commit evidence: `/work/tmp/platform-evidence/palettes-20260914/`.
+
+## 6. TypeScript language-server exit 2
+
+The symbol-query socket sent `textDocument/documentSymbol` without an initialization handshake. It could reach the pooled TypeScript backend after another client's `initialize` response but before `initialized`. TypeScript 7.0.2 then panicked in `project.(*Session).getSnapshot` with a nil session and exited 2.
+
+A standalone replay reproduces that exact stack and exit code. Sending `initialized` first returns 112 symbols and leaves the process alive, even without `didOpen`. This rules out unopened files as the cause.
+
+The symbol query now uses the existing `LspClient`, awaits its complete handshake, and then requests symbols. Editor and symbol clients share capability, client-info and timeout configuration. Those shared modules moved to `lib/` with all callers updated. Failures now produce a structured `lsp.document_symbols` warning instead of disappearing into an empty result.
+
+- Before exact browser scenario and inspected screenshot: `/work/tmp/platform-evidence/20260914T130651Z-scenario-editor-type-burst/`. `logs.txt` records exit 2 at 13:06:55.184Z.
+- After same scenario and inspected screenshot: `/work/tmp/platform-evidence/20260914T131112Z-scenario-editor-type-burst/`. `lsp-warnings.txt` is empty for the printed log window.
+- Full panic, raw browser events, replay scripts and successful controls: `/work/tmp/platform-evidence/lsp-20260914/`.
+- Two protocol tests pass, covering initialization ordering, the pooled contract, and cancellation. `protocol-tests.txt` and `typecheck.txt` are in that directory.
+
+No dev-server restart was required. The server log's 1,000-character stderr tail omitted the panic header; the standalone replay captured it in full without changing the running server.

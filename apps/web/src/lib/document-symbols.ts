@@ -1,8 +1,19 @@
+import {
+  LspClient,
+  composeWorkspaceEditClientCapabilities,
+  type LspTransportHandler,
+} from '@singapore-editor/lsp'
 import type { LspMatch } from '@workspace/contracts'
 
 import { connectLanguageServerSocket, type EdenServerSocket } from '@/lib/server-sockets'
 import { clientErrors } from '@/lib/structured-errors'
 import type { Client } from '@/lib/client'
+import { log } from '@/lib/client-logging'
+import {
+  clientCapabilitiesForServer,
+  LANGUAGE_SERVER_CLIENT_INFO,
+  LANGUAGE_SERVER_REQUEST_TIMEOUT_MS,
+} from '@/lib/language-server-capabilities'
 
 type DocumentSymbolRange = {
   start: { line: number; character: number }
@@ -45,18 +56,24 @@ export function documentSymbolServerId(matches: readonly LspMatch[] | null): str
   return (navigating[0] ?? matches[0])!.serverId
 }
 
-type JsonRpcResponse = {
-  error?: { message?: string }
-  id?: number | string | null
-  result?: unknown
-}
-
 export async function fetchDocumentSymbolTree(
   request: DocumentSymbolsRequest,
   client: Client,
+  connectSocket = connectLanguageServerSocket,
 ): Promise<readonly DocumentSymbol[]> {
-  return requestDocumentSymbols(request, client).catch((error: unknown) => {
-    if (request.signal?.aborted) throw error
+  return requestDocumentSymbols(request, client, connectSocket).catch((error: unknown) => {
+    if (request.signal.aborted) throw error
+    log.warn({
+      action: 'lsp.document_symbols',
+      area: 'lsp',
+      outcome: 'failed',
+      path: request.path,
+      rootPath: request.rootPath,
+      serverId: request.serverId,
+      error: clientErrors.DOCUMENT_SYMBOL_FAILED({
+        cause: error instanceof Error ? error : undefined,
+      }),
+    })
     return []
   })
 }
@@ -71,6 +88,7 @@ export async function fetchDocumentSymbols(
 function requestDocumentSymbols(
   { path, rootPath, serverId, signal, text }: DocumentSymbolsRequest,
   client: Client,
+  connectSocket: typeof connectLanguageServerSocket,
 ) {
   return new Promise<readonly DocumentSymbol[]>((resolve, reject) => {
     if (signal?.aborted) {
@@ -78,8 +96,17 @@ function requestDocumentSymbols(
       return
     }
 
-    const socket = connectLanguageServerSocket({ path, rootPath, serverId }, client, signal)
-    const requestId = 1
+    const socket = connectSocket({ path, rootPath, serverId }, client, signal)
+    const languageClient = new LspClient({
+      rootUri: fileUriForPath(rootPath),
+      clientInfo: LANGUAGE_SERVER_CLIENT_INFO,
+      timeoutMs: LANGUAGE_SERVER_REQUEST_TIMEOUT_MS,
+      capabilities: composeWorkspaceEditClientCapabilities(
+        clientCapabilitiesForServer(serverId),
+        true,
+      ),
+    })
+    const handlers = new Set<LspTransportHandler>()
     let settled = false
 
     const finish = (callback: () => void) => {
@@ -87,39 +114,22 @@ function requestDocumentSymbols(
 
       settled = true
       signal?.removeEventListener('abort', abort)
+      languageClient.disconnect()
       socket.close()
       callback()
     }
     const abort = () => finish(() => reject(clientErrors.DOCUMENT_SYMBOL_ABORTED()))
 
     signal?.addEventListener('abort', abort, { once: true })
+    const succeed = (result: unknown) => finish(() => resolve(documentSymbolsFromResult(result)))
+    const fail = (error: unknown) => finish(() => reject(error))
     socket.addEventListener('open', () => {
-      sendOpenDocument(socket, path, text)
-      socket.send(
-        JSON.stringify({
-          id: requestId,
-          jsonrpc: '2.0',
-          method: 'textDocument/documentSymbol',
-          params: { textDocument: { uri: fileUriForPath(path) } },
-        }),
+      void readConnectedSymbols(languageClient, socket, handlers, { path, text, signal }).then(
+        succeed,
+        fail,
       )
     })
-    socket.addEventListener('message', (event) => {
-      const response = parseJsonRpcResponse((event as MessageEvent).data)
-      if (!response || response.id !== requestId) return
-      if (response.error) {
-        finish(() =>
-          reject(
-            clientErrors.DOCUMENT_SYMBOL_FAILED({
-              message: response.error?.message ?? undefined,
-            }),
-          ),
-        )
-        return
-      }
-
-      finish(() => resolve(documentSymbolsFromResult(response.result)))
-    })
+    socket.addEventListener('message', (event) => dispatchSocketMessage(handlers, event))
     socket.addEventListener('error', () =>
       finish(() => reject(clientErrors.DOCUMENT_SYMBOL_SOCKET_FAILED())),
     )
@@ -127,6 +137,39 @@ function requestDocumentSymbols(
       finish(() => reject(clientErrors.DOCUMENT_SYMBOL_SOCKET_CLOSED())),
     )
   })
+}
+
+function dispatchSocketMessage(handlers: ReadonlySet<LspTransportHandler>, event: Event) {
+  if (!(event instanceof MessageEvent)) return
+  const data: unknown = event.data
+  if (typeof data !== 'string') return
+  for (const handler of handlers) handler(data)
+}
+
+async function readConnectedSymbols(
+  languageClient: LspClient,
+  socket: EdenServerSocket,
+  handlers: Set<LspTransportHandler>,
+  { path, text, signal }: Pick<DocumentSymbolsRequest, 'path' | 'text' | 'signal'>,
+) {
+  await languageClient.connect({
+    send: (message) => socket.send(message),
+    subscribe: (handler) => {
+      handlers.add(handler)
+    },
+    unsubscribe: (handler) => {
+      handlers.delete(handler)
+    },
+  })
+  signal.throwIfAborted()
+  sendOpenDocument(socket, path, text)
+  return languageClient.request(
+    'textDocument/documentSymbol',
+    {
+      textDocument: { uri: fileUriForPath(path) },
+    },
+    { signal },
+  )
 }
 
 function sendOpenDocument(socket: EdenServerSocket, path: string, text: string | null | undefined) {
@@ -249,17 +292,6 @@ function isPosition(value: unknown) {
   if (!value || typeof value !== 'object') return false
   if (!('line' in value) || typeof value.line !== 'number') return false
   return 'character' in value && typeof value.character === 'number'
-}
-
-function parseJsonRpcResponse(value: unknown): JsonRpcResponse | null {
-  try {
-    const parsed = typeof value === 'string' ? (JSON.parse(value) as unknown) : value
-    if (!parsed || typeof parsed !== 'object') return null
-
-    return parsed as JsonRpcResponse
-  } catch {
-    return null
-  }
 }
 
 export function fileUriForPath(path: string) {

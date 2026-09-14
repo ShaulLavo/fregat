@@ -1,7 +1,7 @@
 import { semanticTokensClientCapability, SEMANTIC_TOKEN_TYPES } from '@singapore-editor/lsp'
 import type { lsp } from '@singapore-editor/lsp'
 
-import { semanticTokenProfileFor } from '@/features/editor/utils/semantic-token-servers'
+import { semanticTokenProfileFor } from '@/lib/semantic-token-servers'
 
 /**
  * The client capabilities this app declares to one server: the
@@ -98,3 +98,5 @@ export function clientCapabilitiesForServer(serverId: string): lsp.ClientCapabil
  * editor package cannot change it silently.
  */
 export const LANGUAGE_SERVER_CLIENT_INFO = { name: '@singapore-editor/lsp' } as const
+
+export const LANGUAGE_SERVER_REQUEST_TIMEOUT_MS = 15_000
