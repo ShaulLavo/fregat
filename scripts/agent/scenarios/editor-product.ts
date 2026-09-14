@@ -1,13 +1,13 @@
 import type { Scenario } from './index'
-import { focusEditor, openFileByName, selectors } from '../selectors'
+import { chords, focusEditor, openFileByName, selectors } from '../selectors'
 
 export const editorProduct: Scenario = {
   name: 'editor-product',
   description: 'Open real workbench source files for a high-resolution product capture.',
   async run(page, { file, step }) {
     await openFileByName(page, 'code-panel.tsx')
-    await openFileByName(page, 'bar-tabs.ts')
-    await openFileByName(page, 'use-symbol-revision.ts')
+    await openFileByName(page, 'syntax-highlighting.ts')
+    await openFileByName(page, 'save-service.ts')
     await openFileByName(page, file)
     await selectors
       .terminalSurface(page)
@@ -19,6 +19,11 @@ export const editorProduct: Scenario = {
     await step('terminal-command')
     await focusEditor(page)
     await page.keyboard.press('Control+Home')
+    if (file === 'plugins.ts') {
+      await page.keyboard.press(chords.commandPalette)
+      await selectors.paletteInput(page).fill(':67')
+      await page.keyboard.press('Enter')
+    }
     await page.waitForTimeout(1500)
     await selectors.windowToolbar(page).hover()
     await step('editor')

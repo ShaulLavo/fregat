@@ -20,6 +20,7 @@ import {
 import { alignProductWallpaper, routeProductWallpaper } from './product-wallpaper'
 import { createScriptError } from '../structured-errors'
 import { isolateProductTerminals } from './product-terminal'
+import { captureBrowserRenderer } from './browser-renderer'
 
 const PRODUCT_USER_AGENT =
   'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/145.0.0.0 Safari/537.36'
@@ -79,7 +80,7 @@ async function main() {
       height: { type: 'string' },
       scale: { type: 'string' },
       doctor: { type: 'boolean', default: false },
-      file: { type: 'string', default: DEFAULT_FILE },
+      file: { type: 'string' },
       headed: { type: 'boolean', default: false },
       selector: { type: 'string' },
       url: { type: 'string', default: DEFAULT_URL },
@@ -105,7 +106,7 @@ async function main() {
     productWallpaper: values['product-wallpaper'],
     compare: values.compare,
     doctor: values.doctor,
-    file: values.file,
+    file: values.file ?? (name === 'editor-product' ? 'plugins.ts' : DEFAULT_FILE),
     headed: values.headed,
     selector: values.selector,
     url: values['static-dir'] ? STATIC_PREVIEW_URL : values.url,
@@ -510,6 +511,7 @@ async function withPage(
   let saveWallpaper: (() => Promise<string>) | undefined
   let disposeTerminals: (() => Promise<string>) | undefined
   try {
+    await captureBrowserRenderer(browser, evidence, options.headed)
     if (options.productCapture) disposeTerminals = await isolateProductTerminals(page, evidence)
     const staticDirectory = options.staticDir
       ? await routeStaticPreview(page, options.staticDir)

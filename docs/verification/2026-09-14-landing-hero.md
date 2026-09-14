@@ -17,3 +17,17 @@ Evidence, all inspected:
 Both final static previews report ready and no browser problems. Their layout records show loaded images and no document overflow at 1440px and 390px. The product scenario has no warn/error server logs; its console warnings are adapter availability and screenshot GPU readback stalls. Astro check, scripts typecheck and targeted lint pass. The final commit's pre-commit hook runs the root typecheck.
 
 The capture recipe and page verification steps live in `.agents/skills/verify-fregat/features/landing.md`. Publishing uses the existing GitHub Pages site workflow, independent of the app's mesh deployment.
+
+## Headed capture follow-up
+
+The first capture used Playwright's Chromium headless shell. A fresh controlled pair records the actual browser and GPU through CDP: headless uses `HeadlessChrome/153.0.8010.12` with SwiftShader; headed uses `Chrome/153.0.8010.12` with the NVIDIA GeForce RTX 3060 Ti and GPU compositing enabled. The appearance-only Windows user-agent override never selected the rendering engine.
+
+The replacement is a headed capture of `createCriticalEditorCorePlugins` in `plugins.ts`, with code-panel.tsx, syntax-highlighting.ts and save-service.ts open alongside it. The real terminal shows a successful web typecheck. The page now serves the original 2720×1680 lossless WebP directly, removing the lower-resolution, lossy image candidates. `layout.json` confirms that intrinsic size in the rendered page.
+
+- Headless comparison: `/work/tmp/fregat-evidence/20260914T150601Z-scenario-editor-product/`.
+- Headed comparison, same framing: `/work/tmp/fregat-evidence/20260914T150627Z-scenario-editor-product/`.
+- Final headed capture, framed from the function declaration: `/work/tmp/fregat-evidence/20260914T150818Z-scenario-editor-product/`.
+- Headed desktop preview: `/work/tmp/fregat-evidence/20260914T150858Z-look-fregat-1440x1000/`.
+- Headed mobile preview: `/work/tmp/fregat-evidence/20260914T150911Z-look-fregat-390x844/`.
+
+All listed screenshots were inspected. The headed runs report no browser problems or warn/error server logs. Capture-owned terminal cleanup succeeds. The build passes; root typecheck runs in the commit hook. Renderer metadata is now captured by every verification run, and the skill recipe explicitly selects headed mode for product assets.

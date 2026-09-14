@@ -76,14 +76,13 @@ const description =
                 quality={85}
               />
               <a class="workbench" href={workbench.src} aria-label="view the fregat workbench at full size">
-                <Image
-                  src={workbench}
+                <img
+                  src={workbench.src}
                   alt="the real fregat workbench with four source tabs, TypeScript code and a terminal running the web typecheck, over the garden wallpaper"
                   loading="eager"
                   fetchpriority="high"
-                  widths={[1360, 2720]}
-                  sizes="(min-width: 1440px) 1224px, 85vw"
-                  quality={95}
+                  width={workbench.width}
+                  height={workbench.height}
                 />
               </a>
             </div>

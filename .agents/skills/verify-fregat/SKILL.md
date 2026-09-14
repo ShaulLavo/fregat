@@ -49,6 +49,8 @@ bun run agent:browser look --static-dir apps/site/dist --width 390 --height 844
 
 Read both screenshots. `layout.json` records viewport, document width, image dimensions and positions; verify every image loaded and the document fits. `--scale 2` captures at twice the CSS resolution. Landing readiness checks the main element, fonts and images instead of app API routes.
 
+Every run records its actual browser and GPU in `browser-renderer.json`. Use `--headed` for product assets and inspect that record; the headless shell can use software rendering.
+
 For a real editor hero capture, see [landing.md](features/landing.md). The `editor-product` scenario opens four source tabs and runs the web typecheck in a capture-owned terminal. Its terminal IDs are isolated from existing sessions and cleaned up after the page closes; inspect `product-terminals.json` to confirm cleanup. Wallpaper overrides affect only the fresh browser context. Never type promotional commands into an existing user's terminal.
 
 ## Evidence
