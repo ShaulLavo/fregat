@@ -74,3 +74,13 @@ The same render command removed all **1,102 parent-driven renders** among the fi
 - Before screenshot: `/work/tmp/platform-evidence/20260914T130202Z-scenario-editor-type-burst/02-typed.png`.
 - After screenshot: `/work/tmp/platform-evidence/20260914T130451Z-scenario-editor-type-burst/02-typed.png`. Both inspected.
 - Existing icon configuration update test and tree typecheck pass. Output: `item4-checks.txt` in the before directory.
+
+## 5. Palettes route on the dev server
+
+This is stale running code. `apps/server/src/themes/routes.ts` defines `GET /themes/palettes`, and `createApp` registers it. Port 3001 belongs to PID 1157399, started September 13 at 17:47:11 local time. The route landed in `1e456e82` on September 14 at 01:14:28 local time.
+
+The user was told the dev server needs a restart. No restart or route change was made. The after check still returns 404, as expected until that restart.
+
+- Before browser evidence: `/work/tmp/platform-evidence/20260914T125103Z-look-run/`.
+- After browser evidence: `/work/tmp/platform-evidence/20260914T130606Z-look-run/`. Both screenshots inspected.
+- Listener, process start, route source and commit evidence: `/work/tmp/platform-evidence/palettes-20260914/`.
