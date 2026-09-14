@@ -15,12 +15,32 @@ import {
   workspaceRoot,
 } from '@/lib/documents/utils/identity'
 import { documentTab } from '@/lib/documents/utils/tabs'
+import { encodeTabContent, decodeTabContent } from '@/lib/documents/utils/storage-codec'
 import type { TabContent } from '@/lib/documents/utils/types'
 import { emptyAddress, formatAddress, parseAddress } from '@workspace/client-core/address/grammar'
 
 const ROOT = '/repo'
 const OLD_OID = 'a'.repeat(40)
 const NEW_OID = 'b'.repeat(40)
+
+test('historical diffs keep their immutable source and blob pair through URL reload', () => {
+  const content = documentTab({
+    kind: 'git-diff',
+    source: {
+      kind: 'snapshot',
+      source: 'historical',
+      path: filesystemPath('/repo/new.ts'),
+      oldPath: filesystemPath('/repo/old.ts'),
+      oldObjectId: OLD_OID,
+      newObjectId: NEW_OID,
+      status: 'renamed',
+    },
+  })
+  expect(throughUrl(ROOT, content)).toEqual(content)
+  expect(
+    decodeTabContent(encodeTabContent(content, workspaceRoot(ROOT)), workspaceRoot(ROOT)),
+  ).toEqual(content)
+})
 
 test.each(DOCUMENT_TARGET_CASES)(
   'preserves the full URL route for $kind',

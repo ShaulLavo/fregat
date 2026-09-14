@@ -229,12 +229,6 @@ pre {
     0 0 0 1px rgb(255 255 255 / 25%);
 }
 
-.workbench img {
-  display: block;
-  width: 100%;
-  height: 100%;
-}
-
 .workbench iframe {
   position: absolute;
   top: 0;
@@ -244,14 +238,6 @@ pre {
   border: 0;
   transform: scale(var(--demo-scale, 1));
   transform-origin: top left;
-}
-
-.workbench[aria-busy='true'] iframe {
-  visibility: hidden;
-}
-
-.workbench[aria-busy='false'] .demo-preview {
-  visibility: hidden;
 }
 
 .shot figcaption {

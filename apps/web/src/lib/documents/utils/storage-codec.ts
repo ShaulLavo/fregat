@@ -47,7 +47,7 @@ const comparisonSchema = v.pipe(
       ...revisionEntries,
       kind: v.literal('snapshot'),
       path: pathSchema,
-      source: v.optional(v.picklist(['staged', 'worktree'])),
+      source: v.optional(v.picklist(['staged', 'worktree', 'historical'])),
     }),
     v.strictObject({
       ...checkpointEntries,

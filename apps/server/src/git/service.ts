@@ -87,7 +87,7 @@ type GitCommandOptions = {
   timeoutMs?: number
 }
 
-type GitRunOptions = Pick<GitCommandOptions, 'allowFailure' | 'env'>
+type GitRunOptions = Pick<GitCommandOptions, 'allowFailure' | 'env' | 'input'>
 
 /**
  * A git command runner already bound to one resolved repository root. It is the
@@ -136,6 +136,7 @@ const READ_ONLY_GIT_ACTIONS = new Set([
   'check-ref-format',
   'merge-base',
   'diff',
+  'diff-tree',
   'for-each-ref',
   'hash-object',
   'log',

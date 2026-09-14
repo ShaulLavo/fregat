@@ -1,7 +1,7 @@
 import { mkdir, writeFile } from 'node:fs/promises'
 import { join } from 'node:path'
 
-export const EVIDENCE_ROOT = process.env.PLATFORM_EVIDENCE_ROOT ?? '/work/tmp/platform-evidence'
+export const EVIDENCE_ROOT = process.env.FREGAT_EVIDENCE_ROOT ?? '/work/tmp/fregat-evidence'
 
 export type Evidence = {
   readonly dir: string

@@ -12,7 +12,7 @@ export type ConflictId = string & { readonly [identityBrand]: 'ConflictId' }
 export type FileResource = { readonly path: FilesystemPath }
 type GitFileReference = { readonly path: FilesystemPath; readonly ref: string }
 export type GitChangeStatus = GitFileStatus['index']
-type GitChangeSource = 'staged' | 'worktree'
+type GitChangeSource = 'staged' | 'worktree' | 'historical'
 type ComparisonRevision = {
   readonly oldObjectId?: string
   readonly newObjectId?: string

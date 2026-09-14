@@ -17,6 +17,41 @@ export const gitDiffQuerySchema = v.object({
 
 const gitObjectIdSchema = v.pipe(v.string(), v.regex(/^(?:[0-9a-f]{40}|[0-9a-f]{64})$/i))
 
+export const gitHistoryBodySchema = v.object({
+  path: v.optional(pathSchema, ''),
+  search: v.optional(
+    v.pipe(
+      v.string(),
+      v.trim(),
+      v.maxLength(1024),
+      v.check((value) => !value.includes('\0') && !value.includes('\r') && !value.includes('\n')),
+    ),
+    '',
+  ),
+  ref: v.optional(
+    v.pipe(
+      v.string(),
+      v.maxLength(1024),
+      v.regex(/^(?:all|HEAD|refs\/(?:heads|remotes|tags)\/[^\s\0]+)$/),
+    ),
+    'all',
+  ),
+  cursor: v.optional(
+    v.object({
+      tips: v.pipe(v.array(gitObjectIdSchema), v.minLength(1), v.maxLength(20000)),
+      skip: v.pipe(v.number(), v.integer(), v.minValue(0), v.maxValue(100000000)),
+    }),
+  ),
+})
+
+export const gitHistoryCommitQuerySchema = v.object({
+  path: v.optional(pathSchema, ''),
+  commit: gitObjectIdSchema,
+})
+
+export type GitHistoryBody = v.InferOutput<typeof gitHistoryBodySchema>
+export type GitHistoryCommitQuery = v.InferOutput<typeof gitHistoryCommitQuerySchema>
+
 /**
  * Refs reach git as argv, so a leading dash would be read as a flag and a space
  * would split into two arguments. The allowed shape is git's own ref grammar

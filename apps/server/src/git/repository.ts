@@ -2,14 +2,24 @@ import { lstat } from 'node:fs/promises'
 import path from 'node:path'
 
 export async function gitCwdForPath(absolutePath: string) {
-  try {
-    const stat = await lstat(absolutePath)
-    if (stat.isDirectory()) return absolutePath
-  } catch {
-    return path.dirname(absolutePath)
+  let candidate = absolutePath
+  while (true) {
+    const stat = await lstat(candidate).catch(missingPath)
+    if (stat?.isDirectory()) return candidate
+    const parent = path.dirname(candidate)
+    if (parent === candidate) return candidate
+    candidate = parent
   }
+}
 
-  return path.dirname(absolutePath)
+function missingPath(error: unknown) {
+  if (
+    error instanceof Error &&
+    'code' in error &&
+    (error.code === 'ENOENT' || error.code === 'ENOTDIR')
+  )
+    return null
+  throw error
 }
 
 export function lexicalRepositoryRoot(cwd: string, prefix: string) {

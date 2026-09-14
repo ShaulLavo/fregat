@@ -47,7 +47,7 @@ bun run agent:browser look --site --headed --url http://localhost:5173/fregat/ -
 bun run agent:browser look --site --headed --url http://localhost:5173/fregat/ --width 390 --height 844
 ```
 
-Read both screenshots. `layout.json` records viewport, document width, image and iframe dimensions and positions. Landing readiness waits for the embedded app, so a screenshot fallback cannot pass as a working demo. `--static-dir` remains useful for documents without service workers; use real HTTP through the existing Vite server for this demo.
+Read both screenshots. `layout.json` records viewport, document width, image and iframe dimensions and positions. Final screenshots wait for the embedded app. The `demo-startup` scenario separately checks that the iframe is visible during loading and no screenshot preview replaces it. `--static-dir` remains useful for documents without service workers; use real HTTP through the existing Vite server for this demo.
 
 Run `scenario demo-workspace` and `scenario demo-agent-git` against `/fregat/demo/index.html`, and `scenario demo-reset` against `/fregat/`. These use the actual app UI. `inspection.json` retains mock requests, unhandled operations and client log batches. The mock's logs are the relevant logs here; demo scenarios do not read the unrelated development server log window. `observed.json` includes service-worker responses, native socket connections and console source locations. Inspect failures as well as successful steps.
 

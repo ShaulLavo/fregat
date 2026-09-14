@@ -360,6 +360,21 @@ describe('workspace cache', () => {
     let panels = workbenchPanelsForPaths(['/repo/src/a.ts', '/repo/src/b.ts'], '/repo/src/b.ts')
     panels = setWorkbenchSidebarTab(panels, 'git')
     panels = setWorkbenchBottomTab(panels, 'problems')
+    panels = {
+      ...panels,
+      activeGitTab: 'graph',
+      gitCommitDetailsOpen: false,
+      gitChangesOpen: { staged: false, worktree: false },
+      gitHistory: {
+        refName: 'refs/heads/topic',
+        search: 'an older commit',
+        selected: '1234567890123456789012345678901234567890',
+        expanded: true,
+        pageCount: 3,
+        scrollTop: 780,
+        detailsScrollTop: 120,
+      },
+    }
 
     writeWorkspaceSliceCache(testScopedStorage, '/repo', {
       ...emptyWorkspaceSlice(),
@@ -369,6 +384,10 @@ describe('workspace cache', () => {
     expect(cachedSlice('/repo')).toMatchObject({
       workbenchPanels: {
         activeBottomTab: 'problems',
+        activeGitTab: 'graph',
+        gitCommitDetailsOpen: false,
+        gitChangesOpen: panels.gitChangesOpen,
+        gitHistory: panels.gitHistory,
         activeSidebarTab: 'git',
       },
     })

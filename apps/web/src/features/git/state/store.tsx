@@ -3,19 +3,16 @@ import { useStore } from 'zustand'
 import { createStore, type StoreApi as ZustandStoreApi } from 'zustand/vanilla'
 
 import { clientErrors } from '@/lib/structured-errors'
-import type { PanelSection } from '@/features/git/utils/types'
 
 type StoreState = {
   commitMessage: string
   commitMessageRevision: number
-  sectionOpen: Record<PanelSection, boolean>
 }
 
 type StoreActions = {
   applyGeneratedCommitMessage: (message: string, expectedRevision: number) => boolean
   resetCommitMessage: () => void
   setCommitMessage: (message: string) => void
-  setSectionOpen: (section: PanelSection, open: boolean) => void
 }
 
 export type GitStore = StoreState & StoreActions
@@ -52,19 +49,8 @@ export function createGitStore() {
     },
     commitMessage: '',
     commitMessageRevision: 0,
-    sectionOpen: {
-      staged: true,
-      worktree: true,
-    },
     resetCommitMessage: () => set(nextCommitMessageState(get(), '')),
     setCommitMessage: (commitMessage) => set(nextCommitMessageState(get(), commitMessage)),
-    setSectionOpen: (section, open) =>
-      set((state) => ({
-        sectionOpen: {
-          ...state.sectionOpen,
-          [section]: open,
-        },
-      })),
   }))
 }
 

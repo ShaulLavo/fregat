@@ -16,6 +16,7 @@ export type Scenario = {
 import { editorFastScroll } from './editor-fast-scroll'
 import { editorLargePaste } from './editor-large-paste'
 import { editorTypeBurst } from './editor-type-burst'
+import { gitHistory } from './git-history'
 import { editorCaretBurst } from './editor-caret-burst'
 import { editorFocusClicks } from './editor-focus-clicks'
 import { editorProduct } from './editor-product'
@@ -23,13 +24,14 @@ import { treeStickyScroll } from './tree-sticky-scroll'
 import { demoWorkspace } from './demo-workspace'
 import { demoAgentGit } from './demo-agent-git'
 import { demoReset } from './demo-reset'
-import { demoFontLoad } from './demo-font-load'
+import { demoStartup } from './demo-startup'
 
 export const scenarios: readonly Scenario[] = [
   demoWorkspace,
   demoAgentGit,
   demoReset,
-  demoFontLoad,
+  demoStartup,
+  gitHistory,
   editorLargePaste,
   editorFastScroll,
   editorTypeBurst,

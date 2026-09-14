@@ -20,6 +20,11 @@
   --color-chart-3: var(--chart-3);
   --color-chart-2: var(--chart-2);
   --color-chart-1: var(--chart-1);
+  --color-git-graph-1: var(--git-graph-1);
+  --color-git-graph-2: var(--git-graph-2);
+  --color-git-graph-3: var(--git-graph-3);
+  --color-git-graph-4: var(--git-graph-4);
+  --color-git-graph-5: var(--git-graph-5);
   --color-ring: var(--ring);
   --color-input: var(--input);
   --color-border: var(--border);
@@ -112,6 +117,11 @@
    `sage` branch overrides it wholesale further down. */
 :root {
   color-scheme: light;
+  --git-graph-1: var(--info);
+  --git-graph-2: var(--success);
+  --git-graph-3: var(--warning);
+  --git-graph-4: var(--destructive);
+  --git-graph-5: var(--foreground);
 
   /* Every horizontal bar — titlebar, pane and dialog headers, tab strips — is
      --bar-height, and the vertical icon rail is exactly that wide so it lines
@@ -352,6 +362,11 @@
 /* Again graphite: the same warm near-greyscale, inverted. */
 .dark {
   color-scheme: dark;
+  --git-graph-1: var(--info);
+  --git-graph-2: var(--success);
+  --git-graph-3: var(--warning);
+  --git-graph-4: var(--destructive);
+  --git-graph-5: var(--foreground);
   /* Palette colors live in palette.generated.css and the selected palette's
      <style>; only the translucent formulas and per-mode extras stay here.
      Re-adding e.g. `--card: ...` would override the formula and make dark

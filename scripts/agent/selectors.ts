@@ -6,6 +6,7 @@ export const selectors = {
     page
       .getByRole('navigation', { name: 'Sidebar tabs' })
       .getByRole('button', { name, exact: true }),
+  demoPreview: (page: Page) => page.locator('#demo-frame .demo-preview'),
   demoFrame: (page: Page) => page.locator('#demo-frame'),
   demoReady: (page: Page) => page.locator('#demo-frame[aria-busy="false"]'),
   demoReset: (page: Page) => page.getByRole('button', { name: 'reset demo', exact: true }),
@@ -29,6 +30,31 @@ export const selectors = {
   paletteInput: (page: Page) => page.locator('[data-slot="command-input"]').first(),
   windowToolbar: (page: Page) => page.getByLabel('Window toolbar', { exact: true }),
   editorTab: (page: Page, path: string) => page.locator(`[data-editor-tab-path="${path}"]`),
+  gitPanel: (page: Page) => page.getByRole('region', { name: 'Git panel' }),
+  focusGitCommand: (page: Page) => page.getByRole('option', { name: /Focus Git/ }),
+  graphButton: (page: Page) => page.getByRole('button', { name: 'Graph', exact: true }),
+  changesToggle: (page: Page) => page.getByRole('button', { name: 'Changes', exact: true }),
+  worktreeFiles: (page: Page) => page.locator('[data-git-file]:not([data-history-file])'),
+  historyList: (page: Page) => page.getByRole('listbox', { name: 'Commit history' }),
+  historyRows: (page: Page) => page.locator('[data-history-commit]'),
+  historyCircles: (page: Page) => page.locator('[data-history-commit] svg circle'),
+  historyFiles: (page: Page) => page.locator('[data-history-file]'),
+  historyDetails: (page: Page) => page.getByRole('region', { name: 'Commit details' }),
+  historyInformation: (page: Page) =>
+    page.getByRole('button', { name: 'Commit information', exact: true }),
+  historyCopyMessage: (page: Page) =>
+    page.getByRole('button', { name: 'Copy message', exact: true }),
+  historySearch: (page: Page) => page.getByRole('textbox', { name: 'Search commit history' }),
+  historyClearSearch: (page: Page) => page.getByRole('button', { name: 'Clear history search' }),
+  historyExpand: (page: Page) => page.getByRole('button', { name: 'Expand commit graph' }),
+  historyDialog: (page: Page) => page.getByRole('dialog', { name: 'Commit graph' }),
+  historyCurrent: (page: Page) => page.getByRole('button', { name: 'Go to current commit' }),
+  historyLoadMore: (page: Page) => page.getByRole('button', { name: 'Load more', exact: true }),
+  historyLoadedCount: (page: Page, count: number) =>
+    page.getByText(new RegExp(`^${count} commits`), { exact: false }),
+  historyReference: (page: Page) => page.getByRole('combobox', { name: 'History reference' }),
+  historyAllRefs: (page: Page) =>
+    page.getByRole('option', { name: 'All branches & tags', exact: true }),
 }
 
 export const chords = {
@@ -37,6 +63,15 @@ export const chords = {
 
 export async function waitForApp(page: Page, timeoutMs = 45_000) {
   await selectors.windowToolbar(page).waitFor({ timeout: timeoutMs })
+}
+
+export async function openGitPanel(page: Page) {
+  await page.keyboard.press(chords.commandPalette)
+  const input = selectors.paletteInput(page)
+  await input.waitFor({ timeout: 5_000 })
+  await input.fill('>Focus Git')
+  await selectors.focusGitCommand(page).first().click()
+  await selectors.gitPanel(page).waitFor({ timeout: 15_000 })
 }
 
 export async function focusEditor(page: Page) {

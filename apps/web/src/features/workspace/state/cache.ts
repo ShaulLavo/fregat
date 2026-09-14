@@ -8,6 +8,7 @@ import {
   type WorktreeIdsByRootPath,
 } from '@/features/workspace/utils/location'
 import { type ScopedStorage } from '@/lib/environments/state/scoped-storage'
+import { createDefaultGitHistoryView, gitHistoryViewSchema } from '@/lib/git-history-view'
 import type { PickedFsEntry } from '@/lib/file-system-types'
 import {
   createDefaultChatModePanels,
@@ -264,10 +265,17 @@ const terminalTabRecordSchema = v.strictObject({
 const workbenchPanelsSchema = v.strictObject({
   activeBottomTab: bottomTabSchema,
   activeEditorTabId: v.nullable(tabIdSchema),
+  activeGitTab: v.optional(v.picklist(['changes', 'graph']), 'changes'),
   activeSidebarTab: sidebarTabSchema,
   activeTerminalTabId: v.nullable(v.string()),
   bottomPanelOpen: v.boolean(),
   editorTabs: v.array(editorTabRecordSchema),
+  gitCommitDetailsOpen: v.optional(v.boolean(), true),
+  gitHistory: v.optional(gitHistoryViewSchema, createDefaultGitHistoryView),
+  gitChangesOpen: v.optional(v.object({ staged: v.boolean(), worktree: v.boolean() }), () => ({
+    staged: true,
+    worktree: true,
+  })),
   sidebarOpen: v.boolean(),
   terminalTabSequence: v.pipe(v.number(), v.integer(), v.minValue(0)),
   terminalTabs: v.pipe(v.array(terminalTabRecordSchema), v.readonly()),

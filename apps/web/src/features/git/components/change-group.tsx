@@ -9,9 +9,10 @@ import type { KeyboardEvent, MouseEvent } from 'react'
 
 import { useContextMenu } from '@/keymap/menus/hooks/use-context-menu'
 
-import { useGitState } from '@/features/git/state/store'
+import { useEditorWorkspaceState } from '@/features/editor/state/workspace-state'
+import { useNavigation } from '@/hooks/use-navigation'
 import type { ChangeRow, PanelSection } from '@/features/git/utils/types'
-import { FileRow } from './file-row'
+import { ChangeFileRow } from '@/features/git/components/change-file-row'
 import { GroupActions } from './group-actions'
 import { GroupMenu } from './group-menu'
 
@@ -28,8 +29,9 @@ export function ChangeGroup({
   rows: readonly ChangeRow[]
   section: PanelSection
 }) {
-  const open = useGitState((state) => state.sectionOpen[section])
-  const setSectionOpen = useGitState((state) => state.setSectionOpen)
+  const panels = useEditorWorkspaceState((state) => state.workbenchPanels)
+  const open = panels.gitChangesOpen[section]
+  const navigation = useNavigation()
   const contextMenu = useContextMenu()
 
   function handleContextMenu(event: MouseEvent<HTMLDivElement>) {
@@ -46,7 +48,12 @@ export function ChangeGroup({
     <Collapsible
       className='pb-(--density-gap-tight)'
       open={open}
-      onOpenChange={(nextOpen) => setSectionOpen(section, nextOpen)}
+      onOpenChange={(nextOpen) => {
+        void navigation.setWorkbenchPanels({
+          ...panels,
+          gitChangesOpen: { ...panels.gitChangesOpen, [section]: nextOpen },
+        })
+      }}
     >
       <div
         className='group/group hover:bg-row-hover active:bg-row-active text-muted-foreground text-2xs flex h-(--density-control-height-sm) w-full items-center px-(--density-row-padding-x) font-medium tracking-wider uppercase transition-colors'
@@ -64,7 +71,7 @@ export function ChangeGroup({
       </div>
       <CollapsibleContent className='pl-(--density-row-padding-x)'>
         {rows.map((row) => (
-          <FileRow
+          <ChangeFileRow
             key={`${row.section}:${row.file.path}:${row.status}`}
             loading={row.file.path === loadingPath}
             rootPath={rootPath}

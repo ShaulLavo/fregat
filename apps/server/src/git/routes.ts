@@ -13,11 +13,14 @@ import {
   gitPathBodySchema,
   gitPathQuerySchema,
   gitPathsBodySchema,
+  gitHistoryBodySchema,
+  gitHistoryCommitQuerySchema,
 } from './contracts'
 import type { CommitMessageGenerator } from './commit-message-generator'
 import { sseResponse, toSse } from '../sse'
 import type { GitService } from './service'
 import { GitWorktreeService } from './worktrees'
+import { GitHistory } from './history'
 
 export function gitRoutes(
   git: GitService,
@@ -28,9 +31,14 @@ export function gitRoutes(
   } = {},
 ) {
   const worktrees = new GitWorktreeService(git)
+  const history = new GitHistory(git)
 
   return new Elysia({ name: 'git-routes' }).group('/git', (app) =>
     app
+      .post('/history', ({ body }) => history.page(body), { body: gitHistoryBodySchema })
+      .get('/history/commit', ({ query }) => history.commit(query), {
+        query: gitHistoryCommitQuerySchema,
+      })
       .get('/repo', ({ query }) => git.repo(query.path), {
         query: gitPathQuerySchema,
       })

@@ -79,15 +79,6 @@ const demoUrl = import.meta.env.DEV
                 quality={85}
               />
               <div class="workbench" id="demo-frame" aria-busy="true" data-demo-url={demoUrl}>
-                <img
-                  class="demo-preview"
-                  src={workbench.src}
-                  alt="fregat workbench preview while the interactive demo loads"
-                  loading="eager"
-                  fetchpriority="high"
-                  width={workbench.width}
-                  height={workbench.height}
-                />
                 <iframe
                   id="workbench-demo"
                   title="Interactive fregat demo with simulated files, terminal and agents"

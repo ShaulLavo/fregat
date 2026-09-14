@@ -71,6 +71,43 @@ export type GitBranchesResult = {
   branches: GitBranch[]
 }
 
+export type GitHistoryCommit = {
+  id: string
+  parents: readonly string[]
+  subject: string
+  author: string
+  authorEmail: string
+  timestamp: number
+}
+
+export type GitHistoryRef = {
+  name: string
+  kind: 'branch' | 'remote' | 'tag' | 'head'
+  commitId: string
+}
+
+export type GitHistoryCursor = { tips: string[]; skip: number }
+
+export type GitHistoryPage = {
+  commits: readonly GitHistoryCommit[]
+  refs: readonly GitHistoryRef[]
+  next: GitHistoryCursor | null
+}
+
+export type GitCommitFile = {
+  path: string
+  oldPath?: string
+  status: 'added' | 'deleted' | 'modified' | 'renamed'
+  oldObjectId?: string
+  newObjectId?: string
+  kind: 'file' | 'submodule'
+}
+
+export type GitCommitDetails = GitHistoryCommit & {
+  message: string
+  files: readonly GitCommitFile[]
+}
+
 export type GitCommitResult =
   | {
       kind: 'committed'

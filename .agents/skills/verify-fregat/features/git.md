@@ -12,8 +12,12 @@ The Git side panel. Diff opens as an editor tab.
 
 ## Driving it with agent:browser
 
-No scenario yet. Every git action is a `useMutation` with a key under `['git', 'mutation', ...]`; `caches` lists them with status while they run. A proof reads `git status --porcelain` in the workspace after the action.
+`bun run agent:browser scenario git-history` checks Changes collapse/reopen across refresh, Graph tab restoration, the selected commit, disclosure state, full-history search filtering and search restoration. It also measures commit-dot width and height in the sidebar and expanded graph, expands the graph, loads older commits, restores pages and scroll after refresh, searches an older commit by hash, clears search, restores a branch filter, and opens/reloads a historical file diff. Use a repository with commits that change files; 200+ commits exercises pagination and older-commit search.
+
+Every git action is a `useMutation` with a key under `['git', 'mutation', ...]`; `caches` lists them with status while they run. History POST is a read through an infinite query. A mutation proof reads `git status --porcelain` in the workspace after the action.
 
 ## Gotchas
 
 Commit runs hooks; a hook rejection is an expected outcome, not a transport fault. Stage and unstage are not optimistic on purpose.
+
+Graph roots exclude `refs/platform/*`. A browsing session pins tips and ref labels until refresh. Merge file lists compare the first parent. History ends at shallow-clone boundaries. Search matches messages and authors case-insensitively as literal text, or a unique commit-ID prefix, across the full selected history. Filtered results omit ancestry lines. Branch/search selection, commit preview, expanded view, pages, scroll positions, and disclosure choices persist with the workspace. Historical diff URLs carry the explicit `historical` source and immutable blob IDs.

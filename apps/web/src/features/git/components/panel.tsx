@@ -1,8 +1,13 @@
 import type { GitFileStatus } from '@workspace/contracts'
 import { EmptyState } from '@workspace/ui/components/empty-state'
 import { cn } from '@workspace/ui/lib/utils'
-import { memo, useCallback, useMemo, useRef, type ComponentProps, type ReactNode } from 'react'
+import { Activity, useCallback, useMemo, useRef, type ComponentProps, type ReactNode } from 'react'
 import { useIsFetching } from '@tanstack/react-query'
+import { Button } from '@workspace/ui/components/button'
+import { PaneBar } from '@workspace/ui/components/pane-bar'
+import { GitBranchIcon, GitDiffIcon } from '@phosphor-icons/react'
+import { History } from '@/features/git/components/history'
+import { useNavigation } from '@/hooks/use-navigation'
 
 import { useEditorWorkspaceState } from '@/features/editor/state/workspace-state'
 import { errorMessage } from '@/lib/file-server'
@@ -21,13 +26,14 @@ const DISABLED_DIFF_QUERY = ['git', 'diffs', 'disabled'] as const
 
 const EMPTY_FILES: readonly GitFileStatus[] = []
 
-export const Panel = memo(
-  ({ className, rootPath }: ComponentProps<'section'> & { rootPath: string }) => {
-    return <PanelContent className={className} rootPath={rootPath} />
-  },
-)
+export function Panel({ className, rootPath }: ComponentProps<'section'> & { rootPath: string }) {
+  const navigation = useNavigation()
+  const panels = useEditorWorkspaceState((state) => state.workbenchPanels)
+  const view = panels.activeGitTab
 
-function PanelContent({ className, rootPath }: ComponentProps<'section'> & { rootPath: string }) {
+  function setView(activeGitTab: typeof view) {
+    void navigation.setWorkbenchPanels({ ...panels, activeGitTab })
+  }
   const status = useStatus(rootPath)
   const files = status.data?.files ?? EMPTY_FILES
   const repository = status.data?.repository ?? null
@@ -72,6 +78,7 @@ function PanelContent({ className, rootPath }: ComponentProps<'section'> & { roo
   function renderRoot(children: ReactNode) {
     return (
       <section
+        aria-label='Git panel'
         className={cn('flex h-full min-h-0 flex-col text-foreground', className)}
         ref={setRootRef}
         tabIndex={-1}
@@ -104,34 +111,61 @@ function PanelContent({ className, rootPath }: ComponentProps<'section'> & { roo
 
   return renderRoot(
     <>
-      <CommitControls
-        hasLocalChanges={hasLocalChanges}
-        repository={repository}
-        rootPath={rootPath}
-      />
-      <div className='app-scrollbar-thin min-h-0 flex-1 overflow-auto py-(--density-gap-tight)'>
-        <ChangeGroup
-          label='Staged'
-          loadingPath={loadingDiff?.source === 'staged' ? loadingDiff.path : null}
+      <PaneBar border='bottom'>
+        <Button
+          size='sm'
+          variant='ghost'
+          aria-pressed={view === 'changes'}
+          className='aria-pressed:bg-accent'
+          onClick={() => setView('changes')}
+        >
+          <GitDiffIcon />
+          Changes<span className='text-muted-foreground text-2xs tabular-nums'>{files.length}</span>
+        </Button>
+        <Button
+          size='sm'
+          variant='ghost'
+          aria-pressed={view === 'graph'}
+          className='aria-pressed:bg-accent'
+          onClick={() => setView('graph')}
+        >
+          <GitBranchIcon />
+          Graph
+        </Button>
+      </PaneBar>
+      <Activity mode={view === 'graph' ? 'visible' : 'hidden'}>
+        <History key={rootPath} rootPath={rootPath} />
+      </Activity>
+      <Activity mode={view === 'changes' ? 'visible' : 'hidden'}>
+        <CommitControls
+          hasLocalChanges={hasLocalChanges}
+          repository={repository}
           rootPath={rootPath}
-          rows={rows.staged}
-          section='staged'
         />
-        <ChangeGroup
-          label='Changes'
-          loadingPath={loadingDiff?.source === 'worktree' ? loadingDiff.path : null}
-          rootPath={rootPath}
-          rows={rows.worktree}
-          section='worktree'
-        />
-        {!hasLocalChanges && (
-          <EmptyState
-            align='start'
-            className='px-(--density-row-padding-x) py-4'
-            title='Working tree clean'
+        <div className='app-scrollbar-thin min-h-0 flex-1 overflow-auto py-(--density-gap-tight)'>
+          <ChangeGroup
+            label='Staged'
+            loadingPath={loadingDiff?.source === 'staged' ? loadingDiff.path : null}
+            rootPath={rootPath}
+            rows={rows.staged}
+            section='staged'
           />
-        )}
-      </div>
+          <ChangeGroup
+            label='Changes'
+            loadingPath={loadingDiff?.source === 'worktree' ? loadingDiff.path : null}
+            rootPath={rootPath}
+            rows={rows.worktree}
+            section='worktree'
+          />
+          {!hasLocalChanges && (
+            <EmptyState
+              align='start'
+              className='px-(--density-row-padding-x) py-4'
+              title='Working tree clean'
+            />
+          )}
+        </div>
+      </Activity>
     </>,
   )
 }

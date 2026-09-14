@@ -1,6 +1,6 @@
 # Landing page and product assets
 
-The Astro site in `apps/site` publishes at `https://shaullavo.github.io/fregat/` through `.github/workflows/site.yml`. Its hero embeds the real app with a browser-only simulated workspace. The original product screenshot remains the loading fallback and social image.
+The Astro site in `apps/site` publishes at `https://shaullavo.github.io/fregat/` through `.github/workflows/site.yml`. Its hero embeds the real app with a browser-only simulated workspace. The product screenshot is used only for social previews. The real app stays visible while it loads, with no screenshot handoff.
 
 ## Drive the interactive demo
 
@@ -30,7 +30,7 @@ The wallpaper is the user's temporary choice from [dharmx/walls](https://github.
 
 `product-composition.json` records the shared scene: 1600×1000 with a 1360×840 editor frame at (120, 80). The site mirrors that frame at left 7.5%, top 8%, width 85%, height 84%. Both image layers use the same centered cover crop. Keep these dimensions together when changing the composition.
 
-Copy the final screenshot into `apps/site/src/assets/workbench.webp` using lossless format conversion. Preserve the original screenshot in its evidence directory. At scale 2 the asset is 2720×1680. Keep the fallback lossless; the full-size link opens the interactive app.
+Copy the final screenshot into `apps/site/src/assets/workbench.webp` using lossless format conversion. Preserve the original screenshot in its evidence directory. At scale 2 the asset is 2720×1680. Keep the social image lossless; the full-size link opens the interactive app.
 
 ## Verify the page
 
@@ -45,3 +45,5 @@ Read desktop and mobile screenshots. Check `layout.json`: images loaded, the ifr
 After publishing, run `bun run agent:browser look --site --url https://shaullavo.github.io/fregat/`. This checks document readiness and image loading on the live site without expecting workbench API routes.
 
 For product assets, use `--headed`. `browser-renderer.json` records the actual browser and GPU through CDP, independent of the appearance-only user-agent override. On this machine the headless shell uses SwiftShader software rendering; the headed browser uses the NVIDIA GPU. Do not infer the rendering engine from the spoofed platform string.
+
+Run `scenario demo-startup --headed --url http://localhost:5173/fregat/` for startup changes. It captures the initial iframe and the ready app, and fails if the iframe starts hidden or a screenshot preview is present.

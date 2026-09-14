@@ -1,4 +1,5 @@
 import { activeEditorTabId } from '@/lib/documents/utils/active-tab'
+import { createDefaultGitHistoryView, type GitHistoryView } from '@/lib/git-history-view'
 import {
   createEditorTabRecord,
   rekeyTabFile,
@@ -22,10 +23,14 @@ export type WorkbenchBottomTab = 'terminal' | 'problems'
 export type WorkbenchPanels = {
   readonly activeBottomTab: WorkbenchBottomTab
   readonly activeEditorTabId: TabId | null
+  readonly activeGitTab: 'changes' | 'graph'
   readonly activeSidebarTab: WorkbenchSidebarTab
   readonly activeTerminalTabId: string | null
   readonly bottomPanelOpen: boolean
   readonly editorTabs: readonly EditorTabRecord[]
+  readonly gitCommitDetailsOpen: boolean
+  readonly gitHistory: GitHistoryView
+  readonly gitChangesOpen: { readonly staged: boolean; readonly worktree: boolean }
   readonly sidebarOpen: boolean
   /** Last id number handed out; ids never repeat within a workspace. */
   readonly terminalTabSequence: number
@@ -44,10 +49,14 @@ export function createDefaultWorkbenchPanels(): WorkbenchPanels {
   return {
     activeBottomTab: 'terminal',
     activeEditorTabId: null,
+    activeGitTab: 'changes',
     activeSidebarTab: 'files',
     activeTerminalTabId: terminal.id,
     bottomPanelOpen: true,
     editorTabs: [],
+    gitCommitDetailsOpen: true,
+    gitHistory: createDefaultGitHistoryView(),
+    gitChangesOpen: { staged: true, worktree: true },
     sidebarOpen: true,
     terminalTabSequence: 1,
     terminalTabs: [terminal],
@@ -332,10 +341,14 @@ export function normalizeWorkbenchPanels(value: WorkbenchPanels): WorkbenchPanel
   return {
     activeBottomTab: value.activeBottomTab,
     activeEditorTabId: normalizedActiveTabId(value),
+    activeGitTab: value.activeGitTab,
     activeSidebarTab: value.activeSidebarTab,
     activeTerminalTabId: normalizedActiveTerminalTabId(value),
     bottomPanelOpen: value.bottomPanelOpen,
     editorTabs: value.editorTabs,
+    gitCommitDetailsOpen: value.gitCommitDetailsOpen,
+    gitHistory: value.gitHistory,
+    gitChangesOpen: value.gitChangesOpen,
     sidebarOpen: value.sidebarOpen,
     terminalTabSequence: value.terminalTabSequence,
     terminalTabs: value.terminalTabs,

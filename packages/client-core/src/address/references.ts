@@ -8,7 +8,7 @@ export type EditorReference =
   | { readonly kind: 'ref'; readonly ref: string; readonly path: string }
   | {
       readonly kind: 'snapshot'
-      readonly source: 'worktree' | 'staged' | 'branch'
+      readonly source: 'worktree' | 'staged' | 'branch' | 'historical'
       readonly revisionToken: string
       readonly path: string
     }
@@ -90,7 +90,13 @@ function refReference(segments: readonly string[]): EditorReference | null {
 
 function snapshotReference(segments: readonly string[]): EditorReference | null {
   const [source, revisionToken] = segments
-  if (source !== 'worktree' && source !== 'staged' && source !== 'branch') return null
+  if (
+    source !== 'worktree' &&
+    source !== 'staged' &&
+    source !== 'branch' &&
+    source !== 'historical'
+  )
+    return null
   if (!revisionToken || !validRevision(revisionToken)) return null
   const path = decodePath('', segments.slice(2))
   return path
@@ -168,7 +174,7 @@ export const editorReferenceSchema = v.pipe(
     v.object({ kind: v.literal('ref'), ref: v.string(), path: v.string() }),
     v.object({
       kind: v.literal('snapshot'),
-      source: v.picklist(['worktree', 'staged', 'branch']),
+      source: v.picklist(['worktree', 'staged', 'branch', 'historical']),
       revisionToken: v.string(),
       path: v.string(),
     }),

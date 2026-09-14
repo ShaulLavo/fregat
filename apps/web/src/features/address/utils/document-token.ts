@@ -210,8 +210,8 @@ function snapshotDiffContent(rootPath: string, segments: readonly string[]): Par
   const source = segments[0]
   if (source === 'branch')
     return { kind: 'unavailable', reason: 'branch diffs are not rendered yet' }
-  if (source !== 'staged' && source !== 'worktree')
-    return { kind: 'rejected', reason: 'diff source must be worktree, staged or branch' }
+  if (source !== 'staged' && source !== 'worktree' && source !== 'historical')
+    return { kind: 'rejected', reason: 'diff source must be worktree, staged or historical' }
   const revision = parseRevisionSegment(segments[1] ?? '')
   if (!revision) return { kind: 'rejected', reason: 'diff names no usable git object' }
 
@@ -238,12 +238,12 @@ function snapshotDiffContent(rootPath: string, segments: readonly string[]): Par
 function snapshotStatus(
   status: string | undefined,
   oldObjectId: string | undefined,
-  source: 'staged' | 'worktree',
+  source: 'staged' | 'worktree' | 'historical',
 ): GitChangeStatus {
   const parsed = gitStatusOrUndefined(status)
   if (parsed !== undefined) return parsed
   if (oldObjectId) return 'modified'
-  return source === 'staged' ? 'added' : 'untracked'
+  return source === 'worktree' ? 'untracked' : 'added'
 }
 
 function checkpointDiffContent(rootPath: string, segments: readonly string[]): ParsedDocumentToken {
