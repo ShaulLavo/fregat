@@ -1,5 +1,6 @@
 ---
 import { Image } from 'astro:assets'
+import Drawing from '../components/Drawing.astro'
 import workbench from '../assets/workbench.webp'
 import '../styles/global.css'
 
@@ -23,137 +24,218 @@ const description =
     <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
     <link
       rel="stylesheet"
-      href="https://fonts.googleapis.com/css2?family=Bricolage+Grotesque:opsz,wdth,wght@12..96,75..100,400..700&family=IBM+Plex+Mono:wght@400;500&display=swap"
+      href="https://fonts.googleapis.com/css2?family=Cuprum:wght@400;700&family=Golos+Text:wght@400;500&family=PT+Mono&display=swap"
     />
   </head>
   <body>
-    <header class="wrap top">
-      <a class="wordmark" href={import.meta.env.BASE_URL}>fregat<small>Фрегат</small></a>
-      <nav>
-        <a href="https://github.com/ShaulLavo/fregat">github</a>
-      </nav>
-    </header>
+    <div class="sheet">
+      <header class="wrap top">
+        <a class="wordmark" href={import.meta.env.BASE_URL}>
+          <svg viewBox="0 0 32 32" aria-hidden="true">
+            <g fill="none" stroke="currentColor" stroke-width="2">
+              <circle cx="26" cy="16" r="5" />
+              <circle cx="21" cy="24.7" r="5" />
+              <circle cx="11" cy="24.7" r="5" />
+              <circle cx="6" cy="16" r="5" />
+              <circle cx="11" cy="7.3" r="5" />
+              <circle cx="21" cy="7.3" r="5" />
+            </g>
+          </svg>
+          fregat<small>Фрегат</small>
+        </a>
+        <nav>
+          <a href="https://github.com/ShaulLavo/fregat">github</a>
+        </nav>
+      </header>
 
-    <main>
-      <section class="wrap hero">
-        <h1>an open cursor, built from scratch</h1>
-        <p>
-          a code editor with claude code and codex inside, on the subscriptions you already have.
-          nothing here is forked from vs code. the editor, the terminal and the shell are written
-          from the ground up.
-        </p>
-        <div class="actions">
-          <a class="button" href="https://github.com/ShaulLavo/fregat">get the source</a>
-          <span class="status">no releases yet. clone it and run it.</span>
+      <main>
+        <section class="wrap hero">
+          <div>
+            <h1>an open cursor, built from scratch</h1>
+            <p>
+              a code editor with claude code and codex inside, on the subscriptions you already
+              have. nothing here is forked from vs code. the editor, the terminal and the shell are
+              written from the ground up.
+            </p>
+            <div class="actions">
+              <a class="button" href="https://github.com/ShaulLavo/fregat">get the source</a>
+              <span class="status">no releases yet. clone it and run it.</span>
+            </div>
+          </div>
+          <figure class="drawing">
+            <Drawing />
+            <figcaption>
+              <b>fig. 1</b> the fregat upper stage, from above (a) and from the side (b). six
+              tanks in a ring, one engine, dimensions in millimetres.
+            </figcaption>
+          </figure>
+        </section>
+
+        <div class="wrap">
+          <figure class="shot">
+            <Image
+              src={workbench}
+              alt="the fregat workbench: a file tree, an editor pane with typescript open, and a terminal running bun dev, over a wallpaper"
+              loading="eager"
+              widths={[800, 1200, 2000]}
+              sizes="(min-width: 1200px) 1120px, 100vw"
+            />
+            <figcaption>
+              <b>fig. 2</b> the workbench. a file tree, the editor, a terminal, and an agent, each a
+              pane.
+            </figcaption>
+          </figure>
         </div>
-      </section>
 
-      <div class="wrap">
-        <figure class="shot">
-          <Image
-            src={workbench}
-            alt="the fregat workbench: a file tree, an editor pane with typescript open, and a terminal running bun dev, over a wallpaper"
-            loading="eager"
-            widths={[800, 1200, 2000]}
-            sizes="(min-width: 1200px) 1120px, 100vw"
-          />
-        </figure>
-      </div>
+        <section class="wrap section" aria-labelledby="parts-heading">
+          <h2 id="parts-heading">open a folder and this is what's in the window</h2>
+          <dl class="parts">
+            <div>
+              <dt>editor</dt>
+              <dd>
+                <a href="https://github.com/ShaulLavo/singapore">singapore</a>, written from
+                scratch. piece table storage, tree-sitter for syntax, language servers for the rest.
+              </dd>
+            </div>
+            <div>
+              <dt>terminal</dt>
+              <dd>
+                <a href="https://github.com/ShaulLavo/ghostty-webgpu">ghostty-webgpu</a>, real
+                ghostty compiled to wasm, in a pane next to the code.
+              </dd>
+            </div>
+            <div>
+              <dt>agents</dt>
+              <dd>
+                claude code and codex, side by side. each in its own session, each with its own
+                permission mode.
+              </dd>
+            </div>
+            <div>
+              <dt>git</dt>
+              <dd>status, diffs, branches and commits in the same window, watched live.</dd>
+            </div>
+            <div>
+              <dt>anywhere</dt>
+              <dd>
+                the server runs on your machine. the same workspace opens from a browser, the
+                desktop app, a terminal, or a phone over tailscale.
+              </dd>
+            </div>
+          </dl>
+        </section>
 
-      <section class="wrap section after-shot" aria-labelledby="parts-heading">
-        <h2 id="parts-heading">open a folder and this is what's in the window</h2>
-        <dl class="parts">
-          <div>
-            <dt>editor</dt>
-            <dd>
-              <a href="https://github.com/ShaulLavo/singapore">singapore</a>, written from scratch.
-              piece table storage, tree-sitter for syntax, language servers for the rest.
-            </dd>
+        <section class="wrap section" aria-labelledby="agents-heading">
+          <h2 id="agents-heading">your agents, on your account</h2>
+          <div class="sessions" aria-hidden="true">
+            <div class="session">
+              <header><span>claude code</span><span>approval required</span></header>
+              <ol>
+                <li><b>&gt;</b> move the settings registry into contracts</li>
+                <li>reading packages/contracts/src/settings/keys.ts</li>
+                <li><i>edit</i> keys.ts, 3 changes. allow?</li>
+              </ol>
+            </div>
+            <div class="session">
+              <header><span>codex</span><span>full access</span></header>
+              <ol>
+                <li><b>&gt;</b> why does the tree typecheck fail on a clean checkout</li>
+                <li>running bun run --filter @workspace/tree typecheck</li>
+                <li><i>found</i> zustand declared, never installed</li>
+              </ol>
+            </div>
           </div>
-          <div>
-            <dt>terminal</dt>
-            <dd>
-              <a href="https://github.com/ShaulLavo/ghostty-webgpu">ghostty-webgpu</a>, real ghostty
-              compiled to wasm, in a pane next to the code.
-            </dd>
-          </div>
-          <div>
-            <dt>agents</dt>
-            <dd>
-              claude code and codex, side by side. each in its own session, each with its own
-              permission mode.
-            </dd>
-          </div>
-          <div>
-            <dt>git</dt>
-            <dd>status, diffs, branches and commits in the same window, watched live.</dd>
-          </div>
-          <div>
-            <dt>anywhere</dt>
-            <dd>
-              the server runs on your machine. the same workspace opens from a browser, the desktop
-              app, a terminal, or a phone over tailscale.
-            </dd>
-          </div>
-        </dl>
-      </section>
+          <p>
+            sign in from inside the app, against your own claude or openai account. no accounts
+            here, nothing proxied. run both at once. claude code takes full access, approval
+            required, or auto accept edits. codex runs full access.
+          </p>
+        </section>
 
-      <section class="wrap section" aria-labelledby="agents-heading">
-        <h2 id="agents-heading">your agents, on your account</h2>
-        <div class="sessions" aria-hidden="true">
-          <div class="session">
-            <header><span>claude code</span><span>approval required</span></header>
-            <ol>
-              <li><b>&gt;</b> move the settings registry into contracts</li>
-              <li>reading packages/contracts/src/settings/keys.ts</li>
-              <li><i>edit</i> keys.ts, 3 changes. allow?</li>
-            </ol>
-          </div>
-          <div class="session">
-            <header><span>codex</span><span>full access</span></header>
-            <ol>
-              <li><b>&gt;</b> why does the tree typecheck fail on a clean checkout</li>
-              <li>running bun run --filter @workspace/tree typecheck</li>
-              <li><i>found</i> zustand declared, never installed</li>
-            </ol>
-          </div>
-        </div>
-        <p>
-          sign in from inside the app, against your own claude or openai account. no accounts here,
-          nothing proxied. run both at once. claude code takes full access, approval required, or
-          auto accept edits. codex runs full access.
-        </p>
-      </section>
+        <section class="wrap section" aria-labelledby="where-heading">
+          <h2 id="where-heading">why not fork vs code</h2>
+          <p>
+            a fork inherits vs code's editor, its extension model and its release cadence. fregat
+            owns all three, so an agent is a pane the same way the terminal is, not a panel added
+            to someone else's shell. t3 code has the same idea about agents and stops at the
+            harness.
+          </p>
+        </section>
 
-      <section class="wrap section" aria-labelledby="where-heading">
-        <h2 id="where-heading">why not fork vs code</h2>
-        <p>
-          a fork inherits vs code's editor, its extension model and its release cadence. fregat
-          owns all three, so an agent is a pane the same way the terminal is, not a panel added to
-          someone else's shell. t3 code has the same idea about agents and stops at the harness.
-        </p>
-      </section>
+        <section class="wrap section" aria-labelledby="name-heading">
+          <h2 id="name-heading">why fregat</h2>
+          <div class="name">
+            <div>
+              <p>
+                фрегат is the upper stage that rides on top of a soyuz. the rocket gets it out of
+                the atmosphere, then it flies the rest on its own: its own engine, its own
+                guidance, restarting as many times as the orbit needs, dropping each payload where
+                it belongs. it has done that for more than three hundred of them.
+              </p>
+              <p>
+                that is the shape of this editor. the machine underneath is yours, the agents are
+                yours, and the stage in between is small, autonomous and built to be restarted.
+                the stage comes from the lavochkin bureau, which is also where the author's name
+                comes from.
+              </p>
+            </div>
+            <dl class="spec">
+              <div><dt>built by</dt><dd>npo lavochkin, khimki</dd></div>
+              <div><dt>first flight</dt><dd>february 2000</dd></div>
+              <div><dt>tanks</dt><dd>6, in a ring</dd></div>
+              <div><dt>engine</dt><dd>s5.92, 19.85 kn</dd></div>
+              <div><dt>restarts</dt><dd>up to 7</dd></div>
+              <div><dt>diameter</dt><dd>3 440 mm</dd></div>
+              <div><dt>height</dt><dd>1 875 mm</dd></div>
+              <div><dt>payloads flown</dt><dd>300 and counting</dd></div>
+            </dl>
+          </div>
+        </section>
 
-      <section class="wrap section" aria-labelledby="try-heading">
-        <h2 id="try-heading">try it</h2>
-        <ul class="prereqs">
-          <li><b>bun</b>, and at least one of</li>
-          <li><b>claude code</b>: <code>claude auth login</code>, or sign in from the app</li>
-          <li><b>codex</b>: install the cli, then <code>codex login</code></li>
-        </ul>
-        <pre><code>git clone https://github.com/ShaulLavo/fregat
+        <section class="wrap section" aria-labelledby="try-heading">
+          <h2 id="try-heading">try it</h2>
+          <ul class="prereqs">
+            <li><b>bun</b>, and at least one of</li>
+            <li><b>claude code</b>: <code>claude auth login</code>, or sign in from the app</li>
+            <li><b>codex</b>: install the cli, then <code>codex login</code></li>
+          </ul>
+          <pre><code>git clone https://github.com/ShaulLavo/fregat
 <span class="c"># singapore and ghostty-webgpu go beside it, linked. the readme has the steps</span>
 cd fregat
 bun install
 bun run dev
 <span class="c"># open the url it prints, pick a folder</span></code></pre>
-      </section>
-    </main>
+        </section>
+      </main>
 
-    <footer class="wrap foot">
-      <a href="https://github.com/ShaulLavo/fregat">fregat</a>
-      <a href="https://github.com/ShaulLavo/singapore">singapore</a>
-      <a href="https://github.com/ShaulLavo/ghostty-webgpu">ghostty-webgpu</a>
-    </footer>
+      <footer class="wrap foot">
+        <dl class="block">
+          <div>
+            <dt>name</dt>
+            <dd><a href="https://github.com/ShaulLavo/fregat">fregat</a></dd>
+          </div>
+          <div>
+            <dt>editor</dt>
+            <dd><a href="https://github.com/ShaulLavo/singapore">singapore</a></dd>
+          </div>
+          <div>
+            <dt>terminal</dt>
+            <dd><a href="https://github.com/ShaulLavo/ghostty-webgpu">ghostty-webgpu</a></dd>
+          </div>
+          <div>
+            <dt>revision</dt>
+            <dd>0.0.1, no releases</dd>
+          </div>
+          <div>
+            <dt>drawn by</dt>
+            <dd>shaul lavochkin</dd>
+          </div>
+          <div>
+            <dt>sheet</dt>
+            <dd>1 of 1</dd>
+          </div>
+        </dl>
+      </footer>
+    </div>
   </body>
 </html>
