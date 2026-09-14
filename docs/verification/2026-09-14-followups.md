@@ -15,3 +15,16 @@ Evidence directory: `/work/tmp/platform-evidence/typecheck-20260914/`.
 - `c08c530e-tui.txt`: old source with its frozen lockfile, passes.
 - `after-root.txt`: root typecheck, passes.
 - `dialog-test.txt`: existing TUI dialog prompt test, passes.
+
+## 2. Closed workspace-edit dialogs
+
+Every document revision invalidated workspace history and published a fresh service snapshot. Both dialogs subscribed to the full snapshot. Preview also subscribed to focus state to maintain a ref.
+
+The hook now selects the existing snapshot only while its dialog is visible, and `null` while closed. Focus tracking updates the restoration ref through an effect subscription. History notifications remain available to command consumers.
+
+The same `bun run agent:browser renders editor-type-burst` measured preview **278 → 0** and recovery **273 → 0** renders. The existing dialog tests pass all 12 cases, including preparing, cancellation, focus restoration and recovery.
+
+- Before renders: `/work/tmp/platform-evidence/20260914T125141Z-renders-editor-type-burst/`.
+- After renders: `/work/tmp/platform-evidence/20260914T125607Z-renders-editor-type-burst/`.
+- Before screenshots, inspected: `/work/tmp/platform-evidence/20260914T125230Z-scenario-editor-type-burst/`.
+- After screenshot, inspected: `/work/tmp/platform-evidence/20260914T125653Z-scenario-editor-type-burst/02-typed.png`.

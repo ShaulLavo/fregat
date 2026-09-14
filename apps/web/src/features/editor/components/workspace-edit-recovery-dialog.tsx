@@ -18,15 +18,16 @@ import { useState } from 'react'
 
 import { useWorkspaceEditState } from '@/features/editor/hooks/use-workspace-edit-state'
 import { useWorkspaceEditService } from '@/features/editor/providers/workspace-edit-context'
+import { selectWorkspaceEditRecovery } from '@/features/editor/utils/workspace-edit-dialog-state'
 
 export function WorkspaceEditRecoveryDialog() {
   const service = useWorkspaceEditService()
-  const state = useWorkspaceEditState()
+  const state = useWorkspaceEditState(selectWorkspaceEditRecovery)
   const [confirmDiscard, setConfirmDiscard] = useState(false)
-  const recovery = state.recovery
-  const busy = state.phase === 'recovering' || state.phase === 'releasing-recovery'
-  const conflict = state.phase === 'released' && recovery !== null
-  const open = recovery !== null && (state.phase === 'recovery-required' || busy || conflict)
+  const recovery = state?.recovery ?? null
+  const busy = state?.phase === 'recovering' || state?.phase === 'releasing-recovery'
+  const conflict = state?.phase === 'released' && recovery !== null
+  const open = state !== null
 
   const discard = async () => {
     if (!recovery) return

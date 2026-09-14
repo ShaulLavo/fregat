@@ -24,28 +24,36 @@ import { useLayoutEffect, useRef } from 'react'
 import { useWorkspaceEditState } from '@/features/editor/hooks/use-workspace-edit-state'
 import { useWorkspaceEditService } from '@/features/editor/providers/workspace-edit-context'
 import type { WorkspaceEditPreviewRow } from '@/features/editor/state/workspace-edit-service'
+import { selectWorkspaceEditPreview } from '@/features/editor/utils/workspace-edit-dialog-state'
 import { useFocusService } from '@/lib/focus/hooks/use-service'
-import { useFocusSnapshot } from '@/lib/focus/hooks/use-snapshot'
 import type { FocusTargetToken } from '@/lib/focus/state/service'
 
 export function WorkspaceEditPreviewDialog() {
   const service = useWorkspaceEditService()
-  const state = useWorkspaceEditState()
+  const state = useWorkspaceEditState(selectWorkspaceEditPreview)
   const focusService = useFocusService()
-  const focus = useFocusSnapshot()
   const restoreTarget = useRef<FocusTargetToken | null>(null)
   const wasOpen = useRef(false)
-  const preparing = state.phase === 'preparing'
-  const awaiting = state.phase === 'awaiting-confirmation'
-  const processing = state.phase === 'committing' || state.phase === 'finalizing'
-  const stale = state.phase === 'stale'
-  const open = preparing || awaiting || processing || stale
-  const preview = state.preview
+  const preparing = state?.phase === 'preparing'
+  const awaiting = state?.phase === 'awaiting-confirmation'
+  const processing = state?.phase === 'committing' || state?.phase === 'finalizing'
+  const stale = state?.phase === 'stale'
+  const open = state !== null
+  const preview = state?.preview
 
   useLayoutEffect(() => {
-    if (open || !focus.currentOwner || focus.currentOwner.capabilities.overlay) return
-    restoreTarget.current = focus.currentOwner.token
-  }, [focus.currentOwner, open])
+    if (open) return
+    const captureRestoreTarget = () => {
+      const { currentOwner } = focusService.getSnapshot()
+      if (!currentOwner || currentOwner.capabilities.overlay) return
+      restoreTarget.current = currentOwner.token
+    }
+    captureRestoreTarget()
+    const unsubscribe = focusService.subscribe(captureRestoreTarget)
+    return () => {
+      unsubscribe()
+    }
+  }, [focusService, open])
 
   useLayoutEffect(() => {
     const closed = wasOpen.current && !open
