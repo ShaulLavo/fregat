@@ -1,9 +1,10 @@
+import { FileTypeIcon } from '@/components/file-type-icon'
 import { CaretRightIcon, FolderIcon, FolderOpenIcon } from '@phosphor-icons/react'
 import { cn } from '@workspace/ui/lib/utils'
 import { useCallback, useMemo, useState } from 'react'
 import type { CSSProperties, ReactNode } from 'react'
 
-import { colorForFileIcon, iconForEntry, type ResolvedFileIcon } from '@/lib/file-icons'
+import { iconForEntry } from '@/lib/file-icons'
 
 import {
   buildChatTurnDiffTree,
@@ -167,7 +168,7 @@ function renderFileNode({ depth, node, onOpenFileDiff }: RenderTreeNodeOptions):
   const content = (
     <>
       <span aria-hidden='true' className='size-3.5 shrink-0' />
-      <span aria-hidden='true' className='size-3.5 shrink-0' style={fileIconStyle(icon)} />
+      <FileTypeIcon className='size-3.5 shrink-0' icon={icon} />
       <span className='text-muted-foreground/80 group-hover:text-foreground/90 text-2xs truncate font-mono'>
         {node.name}
       </span>
@@ -225,15 +226,5 @@ function collectDirectoryPaths(nodes: readonly ChatTurnDiffTreeNode[]) {
 function treeNodeStyle(depth: number): CSSProperties {
   return {
     paddingLeft: `${8 + depth * 14}px`,
-  }
-}
-
-function fileIconStyle(icon: ResolvedFileIcon): CSSProperties {
-  const mask = `url(${icon.src}) center / contain no-repeat`
-
-  return {
-    backgroundColor: colorForFileIcon(icon),
-    mask,
-    WebkitMask: mask,
   }
 }

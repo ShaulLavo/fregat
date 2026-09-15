@@ -1,3 +1,4 @@
+import { FileTypeIcon } from '@/components/file-type-icon'
 import { CaretRightIcon } from '@phosphor-icons/react'
 import { memo, useCallback, useMemo } from 'react'
 
@@ -5,7 +6,7 @@ import { useSearchResultActions } from '@/features/search/hooks/use-result-actio
 import { Button } from '@workspace/ui/components/button'
 import { cn } from '@workspace/ui/lib/utils'
 
-import { fileIconStyle, fileName, matchNoun } from '@/features/search/utils/result-editor'
+import { fileName, matchNoun } from '@/features/search/utils/result-editor'
 import type { SearchResultFileBlock } from '@/features/search/utils/result-view-model'
 import { iconForEntry } from '@/lib/file-icons'
 
@@ -53,7 +54,7 @@ export const SearchResultFileHeader = memo(
           className='grid min-w-0 grid-cols-[16px_minmax(0,1fr)] items-center gap-1.5 text-left'
           title={file.path}
         >
-          <span aria-hidden='true' className='size-4' style={fileIconStyle(icon)} />
+          <FileTypeIcon className='size-4' icon={icon} />
           <span className='min-w-0'>
             <span className='block truncate text-xs font-medium'>{name}</span>
             <span className='text-muted-foreground text-2xs block truncate'>{file.pathLabel}</span>

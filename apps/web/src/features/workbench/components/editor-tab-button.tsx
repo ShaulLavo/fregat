@@ -1,3 +1,4 @@
+import { FileTypeIcon } from '@/components/file-type-icon'
 import type { DraggableAttributes, DraggableSyntheticListeners } from '@dnd-kit/core'
 import { useCallback, type CSSProperties, type Ref } from 'react'
 
@@ -10,7 +11,6 @@ import { TabTrailingSlot } from '@/features/workbench/components/tab-trailing-sl
 import { barTabClassName } from '@/features/workbench/utils/bar-tabs'
 import { tabFileResource } from '@/lib/documents/utils/capabilities'
 import { tabContentKey } from '@/lib/documents/utils/tabs'
-import { fileIconStyle } from '@/lib/file-icon-style'
 import { Shimmer } from '@workspace/ui/components/shimmer'
 import { cn } from '@workspace/ui/lib/utils'
 import { LockSimpleIcon } from '@phosphor-icons/react'
@@ -88,11 +88,7 @@ export function EditorTabButton({
       type='button'
       onClick={handleSelectTab}
     >
-      <span
-        aria-hidden='true'
-        className='size-3.5 shrink-0 object-contain'
-        style={fileIconStyle(tab.icon)}
-      />
+      <FileTypeIcon className='size-3.5 shrink-0 object-contain' icon={tab.icon} />
       {editorTabTitle(tab, loading)}
       {unavailable ? (
         <LockSimpleIcon aria-label='Read only' className='text-warning size-3 shrink-0' />

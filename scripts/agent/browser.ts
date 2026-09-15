@@ -277,7 +277,7 @@ async function traceScenario(scenario: Scenario, options: Options) {
       `result: ${failure ? `failed: ${failure}` : 'completed'}`,
       `trace: ${tracePath} (open in Chrome's Performance panel)`,
       `screenshot: ${evidence.file('page.png')}`,
-      `source maps: ${evidence.file('trace-sources.json')} (reload with readTraceSources for offline summarization)`,
+      `source maps: ${evidence.file('trace-sources.json')}`,
       '',
       ...formatTraceSummary(summary),
     ]

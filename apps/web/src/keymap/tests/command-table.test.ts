@@ -45,6 +45,7 @@ const ASYNC_COMMAND_IDS = [
   'workspace.runProjectScript',
   'workspace.switchSession',
   'workspace.goToLine',
+  'workspace.showUnicodeSettings',
   'workspace.showFontSettings',
   'workspace.showTransparencySettings',
   'fileTree.newFile',

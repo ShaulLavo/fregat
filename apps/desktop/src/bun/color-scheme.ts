@@ -36,7 +36,7 @@ export async function readSystemColorScheme(platform: ShellPlatform): Promise<Sh
   }
 }
 
-export function parsePortalColorScheme(output: string): ShellColorScheme {
+function parsePortalColorScheme(output: string): ShellColorScheme {
   const match = /uint32 (\d+)/u.exec(output)
   if (match?.[1] === '1') return 'dark'
   if (match?.[1] === '2') return 'light'

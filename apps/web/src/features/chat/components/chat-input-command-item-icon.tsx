@@ -1,6 +1,6 @@
+import { FileTypeIcon } from '@/components/file-type-icon'
 import { SparkleIcon, TerminalWindowIcon } from '@phosphor-icons/react'
 
-import { fileIconStyle } from '@/lib/file-icon-style'
 import { iconForEntry } from '@/lib/file-icons'
 
 import type { ChatInputCommandItem } from '@/features/chat/utils/input-logic'
@@ -15,5 +15,5 @@ export function ChatInputCommandItemIcon({ item }: { item: ChatInputCommandItem 
 
   const icon = iconForEntry({ name: item.label, type: item.entryType })
 
-  return <span aria-hidden='true' className='size-4 shrink-0' style={fileIconStyle(icon)} />
+  return <FileTypeIcon className='size-4 shrink-0' icon={icon} />
 }

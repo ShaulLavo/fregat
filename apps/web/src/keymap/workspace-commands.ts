@@ -453,6 +453,14 @@ export const workspaceCommands = [
       ),
   }),
   defineCommand({
+    ...workspaceCommandMetadata['workspace.showUnicodeSettings'],
+    icon: GearSixIcon,
+    run: ({ invocation, runtime }) =>
+      transitionStart(
+        runtime.shell.showSettings(invocation.origin as FocusTargetToken | null, 'unicode'),
+      ),
+  }),
+  defineCommand({
     ...workspaceCommandMetadata['workspace.showFontSettings'],
     icon: GearSixIcon,
     run: ({ invocation, runtime }) =>

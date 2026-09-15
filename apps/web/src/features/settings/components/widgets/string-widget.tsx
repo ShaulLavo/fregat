@@ -14,19 +14,21 @@ export function StringWidget({
   id,
   onCommit,
   value,
+  verbatim = false,
 }: {
   disabled?: boolean
   id: string
   onCommit: (next: string) => void
   value: string
+  verbatim?: boolean
 }) {
   const [draft, setDraft] = useState<string | null>(null)
   const inputValue = draft ?? value
   const cancelled = useRef(false)
 
   const commit = () => {
-    const next = inputValue.trim()
-    if (next === '' || next === value) {
+    const next = verbatim ? inputValue : inputValue.trim()
+    if ((!verbatim && next === '') || next === value) {
       setDraft(null)
 
       return

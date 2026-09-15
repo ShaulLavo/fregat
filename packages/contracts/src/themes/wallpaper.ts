@@ -13,7 +13,7 @@ export const wallpaperSelectionSchema = v.object({
   dark: wallpaperSourceSchema,
 })
 export type WallpaperSelection = v.InferOutput<typeof wallpaperSelectionSchema>
-export const wallpaperProvenanceSchema = v.variant('kind', [
+const wallpaperProvenanceSchema = v.variant('kind', [
   v.object({ kind: v.literal('upload') }),
   v.object({ kind: v.literal('omarchy'), theme: v.string(), path: v.string() }),
 ])

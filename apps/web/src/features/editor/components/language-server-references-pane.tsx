@@ -1,11 +1,11 @@
+import { FileTypeIcon } from '@/components/file-type-icon'
 import { fileDocumentKey, filesystemPath } from '@/lib/documents/utils/identity'
 import type { DocumentKey } from '@/lib/documents/utils/types'
-import { CaretRightIcon, FileCodeIcon, XIcon } from '@phosphor-icons/react'
+import { CaretRightIcon, XIcon } from '@phosphor-icons/react'
 import type {
   LanguageServerDefinitionTarget,
   LanguageServerReferencesResult,
 } from '@singapore-editor/lsp-plugin'
-import type { CSSProperties } from 'react'
 import { useMemo, useState } from 'react'
 
 import {
@@ -16,7 +16,7 @@ import {
 import { textLineAt } from '@/features/editor/utils/position'
 import { compareSearchPaths } from '@/features/search/utils/sort'
 import { basename, parentPath, toTreePath } from '@/lib/path-formatters'
-import { colorForFileIcon, iconForEntry, type ResolvedFileIcon } from '@/lib/file-icons'
+import { iconForEntry } from '@/lib/file-icons'
 import { Button } from '@workspace/ui/components/button'
 import { EmptyState } from '@workspace/ui/components/empty-state'
 import { PaneBar } from '@workspace/ui/components/pane-bar'
@@ -158,9 +158,7 @@ function ReferenceGroupHeader({
           !collapsed && 'rotate-90',
         )}
       />
-      <span aria-hidden='true' className='size-3.5' style={fileIconStyle(icon)}>
-        <FileCodeIcon className='size-3.5' />
-      </span>
+      <FileTypeIcon className='size-3.5' icon={icon} />
       <span className='flex min-w-0 items-center gap-1.5 overflow-hidden whitespace-nowrap'>
         <span className='max-w-[55%] min-w-0 shrink-0 truncate font-medium'>{group.name}</span>
         <span className='text-muted-foreground text-2xs min-w-0 flex-1 truncate'>
@@ -307,14 +305,4 @@ function toggledPathSet(paths: ReadonlySet<string>, path: string) {
 
   next.add(path)
   return next
-}
-
-function fileIconStyle(icon: ResolvedFileIcon): CSSProperties {
-  const mask = `url(${icon.src}) center / contain no-repeat`
-
-  return {
-    backgroundColor: colorForFileIcon(icon),
-    mask,
-    WebkitMask: mask,
-  }
 }

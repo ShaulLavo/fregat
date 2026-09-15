@@ -3,7 +3,7 @@ import type {
   LiveEditorDocument,
 } from '@/features/editor/state/document-state'
 import { saveCapability } from '@/lib/documents/utils/capabilities'
-import type { DocumentKey, FilesystemPath } from '@/lib/documents/utils/types'
+import type { DocumentKey } from '@/lib/documents/utils/types'
 
 export function isSavableEditorDocument(document: LiveEditorDocument) {
   const capability = saveCapability(document.target)
@@ -28,14 +28,4 @@ export function isDirtyLiveEditorDocument(
   return (
     state.dirtyDocumentKeys.has(key) || state.liveDocumentsByKey[key]?.buffer.isDirty() === true
   )
-}
-
-export function filePathsForDocumentKeys(
-  state: Pick<EditorDocumentStore, 'liveDocumentsByKey'>,
-  keys: readonly DocumentKey[],
-): readonly FilesystemPath[] {
-  return keys.flatMap((key) => {
-    const document = state.liveDocumentsByKey[key]
-    return document?.target.kind === 'file' ? [document.target.resource.path] : []
-  })
 }

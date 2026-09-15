@@ -1,10 +1,10 @@
+import { FileTypeIcon } from '@/components/file-type-icon'
 import { CaretRightIcon } from '@phosphor-icons/react'
 import { memo } from 'react'
-import type { CSSProperties } from 'react'
 
 import type { WorkspaceSearchFileGroup } from '@/features/search/state/buffer-state'
 import { SearchNumber } from '@/features/search/components/number'
-import { colorForFileIcon, iconForEntry, type ResolvedFileIcon } from '@/lib/file-icons'
+import { iconForEntry } from '@/lib/file-icons'
 import { Button } from '@workspace/ui/components/button'
 import { cn } from '@workspace/ui/lib/utils'
 
@@ -59,11 +59,7 @@ export const SearchFileGroupHeader = memo(
               !group.collapsed && 'rotate-90',
             )}
           />
-          <span
-            aria-hidden='true'
-            className={cn('size-4', compact && 'size-3.5')}
-            style={fileIconStyle(icon)}
-          />
+          <FileTypeIcon className={cn('size-4', compact && 'size-3.5')} icon={icon} />
           <SearchFileGroupTitle compact={compact} group={group} />
         </button>
         <span
@@ -118,14 +114,4 @@ function SearchFileGroupTitle({
       <span className='text-muted-foreground text-2xs block truncate'>{group.pathLabel}</span>
     </span>
   )
-}
-
-function fileIconStyle(icon: ResolvedFileIcon): CSSProperties {
-  const mask = `url(${icon.src}) center / contain no-repeat`
-
-  return {
-    backgroundColor: colorForFileIcon(icon),
-    mask,
-    WebkitMask: mask,
-  }
 }

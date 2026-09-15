@@ -1,5 +1,3 @@
-import { readFile } from 'node:fs/promises'
-import { join } from 'node:path'
 import { originalPositionFor, TraceMap } from '@jridgewell/trace-mapping'
 import type { Page } from 'playwright'
 
@@ -160,21 +158,4 @@ export function sourceResolver(sources: readonly CapturedSourceMap[]) {
       column: original.column + 1,
     }
   }
-}
-
-export async function readTraceSources(directory: string): Promise<readonly CapturedSourceMap[]> {
-  const raw: unknown = JSON.parse(await readFile(join(directory, 'trace-sources.json'), 'utf8'))
-  if (!Array.isArray(raw)) throw createScriptError('Trace source manifest is not an array.')
-  const sources: CapturedSourceMap[] = []
-  for (const item of raw) {
-    const entry = traceRecord(item)
-    if (entry.status !== 'captured') continue
-    sources.push({
-      scriptId: String(entry.scriptId),
-      url: String(entry.url),
-      mapUrl: String(entry.mapUrl),
-      map: await readFile(join(directory, String(entry.mapFile)), 'utf8'),
-    })
-  }
-  return sources
 }

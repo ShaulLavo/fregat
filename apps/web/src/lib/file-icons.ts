@@ -1,7 +1,7 @@
 import { getBuiltInFileIconColor } from '@workspace/tree'
 import type { FileTreeIconConfig, RemappedIcon } from '@workspace/tree'
 
-import { VSCODE_ICON_SYMBOLS } from './vscode-icon-symbols'
+import { VSCODE_ICON_GLYPHS } from '@/lib/vscode-icon-glyphs'
 
 export type FileIconEntry = {
   name: string
@@ -114,10 +114,8 @@ type IconRule = {
 
 export type ResolvedFileIcon = {
   name: VscodeIconName
-  src: string
 }
 
-const ICON_BASE_PATH = `${import.meta.env.BASE_URL}vscode-icons`
 const TREE_ICON_SYMBOL_PREFIX = 'app-vscode-icon-'
 const DEFAULT_FILE_ICON_TOKEN = 'default'
 
@@ -469,7 +467,6 @@ function setIconMapValue(
 function iconResult(name: VscodeIconName): ResolvedFileIcon {
   return {
     name,
-    src: iconSrc(name),
   }
 }
 
@@ -616,7 +613,8 @@ function vscodeIconSpriteSheet() {
 }
 
 function vscodeIconSymbol(name: VscodeIconName) {
-  return VSCODE_ICON_SYMBOLS[name]
+  const glyph = VSCODE_ICON_GLYPHS[name]
+  return `<symbol id="${treeIconSymbolName(name)}" viewBox="${glyph.viewBox}">${glyph.paths}</symbol>`
 }
 
 function treeIconReference(name: VscodeIconName): RemappedIcon {
@@ -628,10 +626,6 @@ function treeIconReference(name: VscodeIconName): RemappedIcon {
 
 function treeIconSymbolName(name: VscodeIconName) {
   return `${TREE_ICON_SYMBOL_PREFIX}${name}`
-}
-
-function iconSrc(name: VscodeIconName) {
-  return `${ICON_BASE_PATH}/${name}.svg`
 }
 
 function basenameForIconPath(path: string) {

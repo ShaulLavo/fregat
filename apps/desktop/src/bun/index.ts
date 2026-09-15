@@ -165,7 +165,8 @@ async function openMainWindow() {
     preload: await preloadScript(backdrop),
     rpc,
     // Full-size app content with native macOS controls over our own toolbar.
-    trafficLightOffset: { x: 0, y: 9 },
+    // Electrobun 2 applies the full offset; 6pt centers the controls in our 40px bar.
+    trafficLightOffset: { x: 0, y: 6 },
     titleBarStyle: 'hiddenInset',
     transparent: windowTransparent(backdrop),
     url: WEB_URL,

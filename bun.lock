@@ -3,7 +3,7 @@
   "configVersion": 1,
   "workspaces": {
     "": {
-      "name": "vite-monorepo",
+      "name": "fregat",
       "devDependencies": {
         "@typescript/native-preview": "7.0.0-dev.20260707.2",
         "bippy": "^0.7.3",
@@ -141,6 +141,7 @@
         "@singapore-editor/lsp-plugin": "0.1.1",
         "@singapore-editor/markdown": "0.1.0",
         "@singapore-editor/minimap": "0.1.1",
+        "@singapore-editor/plugin-ui": "0.1.0",
         "@singapore-editor/react": "0.1.1",
         "@singapore-editor/scope-lines": "0.1.1",
         "@singapore-editor/tree-sitter": "0.1.1",
@@ -406,6 +407,7 @@
     "@singapore-editor/markdown": "link:@singapore-editor/markdown",
     "@singapore-editor/minimap": "link:@singapore-editor/minimap",
     "@singapore-editor/panes": "link:@singapore-editor/panes",
+    "@singapore-editor/plugin-ui": "link:@singapore-editor/plugin-ui",
     "@singapore-editor/react": "link:@singapore-editor/react",
     "@singapore-editor/scope-lines": "link:@singapore-editor/scope-lines",
     "@singapore-editor/tree-sitter": "link:@singapore-editor/tree-sitter",
@@ -1178,6 +1180,8 @@
     "@singapore-editor/markdown": ["@singapore-editor/markdown@link:@singapore-editor/markdown", {}],
 
     "@singapore-editor/minimap": ["@singapore-editor/minimap@link:@singapore-editor/minimap", {}],
+
+    "@singapore-editor/plugin-ui": ["@singapore-editor/plugin-ui@link:@singapore-editor/plugin-ui", {}],
 
     "@singapore-editor/react": ["@singapore-editor/react@link:@singapore-editor/react", {}],
 

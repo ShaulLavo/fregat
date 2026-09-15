@@ -84,6 +84,7 @@
     "@singapore-editor/markdown": "link:@singapore-editor/markdown",
     "@singapore-editor/minimap": "link:@singapore-editor/minimap",
     "@singapore-editor/panes": "link:@singapore-editor/panes",
+    "@singapore-editor/plugin-ui": "link:@singapore-editor/plugin-ui",
     "@singapore-editor/react": "link:@singapore-editor/react",
     "@singapore-editor/scope-lines": "link:@singapore-editor/scope-lines",
     "@singapore-editor/tree-sitter": "link:@singapore-editor/tree-sitter",

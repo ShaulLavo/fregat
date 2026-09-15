@@ -19,6 +19,7 @@
     },
     "apps/web": {
       "entry": [
+        "boot.css",
         "src/demo-entry.ts",
         "src/features/address/tests/navigation.types.ts",
         "scripts/chat-parity-proof.mjs",
@@ -55,7 +56,10 @@
         "prod.ts",
         "tui.ts",
         "web-layering.mjs",
-        "lint/web-boundaries.mjs"
+        "lint/web-boundaries.mjs",
+        "skills/port-pstack.ts",
+        "themes/import-omarchy-palette.ts",
+        "themes/import-omarchy-wallpapers.ts"
       ]
     },
     ".": {

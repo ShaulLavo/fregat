@@ -100,6 +100,21 @@
       "minimum": 1,
       "type": "integer"
     },
+    "editor.unicodeHighlight.allowedCharacters": {
+      "default": "",
+      "description": "Characters allowed without Unicode highlighting. Paste the characters here, for example an en dash.",
+      "type": "string"
+    },
+    "editor.unicodeHighlight.ambiguousCharacters": {
+      "default": true,
+      "description": "Highlight Unicode characters that resemble other characters. Hover a highlight for an explanation.",
+      "type": "boolean"
+    },
+    "editor.unicodeHighlight.invisibleCharacters": {
+      "default": true,
+      "description": "Highlight invisible Unicode characters. Hover a highlight for its code point.",
+      "type": "boolean"
+    },
     "environments.machines": {
       "additionalProperties": {
         "oneOf": [

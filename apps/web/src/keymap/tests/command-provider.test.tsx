@@ -49,6 +49,7 @@ test.afterEach(() => {
 })
 
 test.each([
+  ['workspace.showUnicodeSettings', 'unicode'],
   ['workspace.showFontSettings', 'font'],
   ['workspace.showTransparencySettings', 'workbench.surface'],
 ] as const)('%s opens the settings controls matching its search', async (command, query) => {

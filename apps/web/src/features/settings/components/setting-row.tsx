@@ -177,7 +177,15 @@ function SettingControl({
   }
 
   if (control.widget === 'string' || control.widget === 'multiline') {
-    return <StringWidget disabled={disabled} id={id} onCommit={onChange} value={control.value} />
+    return (
+      <StringWidget
+        disabled={disabled}
+        id={id}
+        onCommit={onChange}
+        value={control.value}
+        verbatim={id === 'editor.unicodeHighlight.allowedCharacters'}
+      />
+    )
   }
 
   if (control.widget === 'enum') {

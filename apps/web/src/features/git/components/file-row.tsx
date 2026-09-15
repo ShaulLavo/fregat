@@ -1,7 +1,8 @@
+import { FileTypeIcon } from '@/components/file-type-icon'
 import type { KeyboardEvent, MouseEventHandler, ReactNode } from 'react'
 import { Shimmer } from '@workspace/ui/components/shimmer'
 import { cn } from '@workspace/ui/lib/utils'
-import { colorForFileIcon, iconForEntry } from '@/lib/file-icons'
+import { iconForEntry } from '@/lib/file-icons'
 import { basename, parentPath, toTreePath } from '@/lib/path-formatters'
 import type { StatusPresentation } from '@/features/git/utils/types'
 
@@ -34,7 +35,6 @@ export function FileRow({
   const name = basename(relativePath)
   const directory = parentPath(relativePath)
   const icon = iconForEntry({ name, type: 'file' })
-  const mask = `url(${icon.src}) center / contain no-repeat`
   const title = `${oldPath ? `${toTreePath(oldPath, rootPath)} → ` : ''}${relativePath}${disabledReason ? ` · ${disabledReason}` : ''}`
   const label = (
     <>
@@ -74,11 +74,7 @@ export function FileRow({
       onContextMenu={onContextMenu}
       onKeyDown={handleKeyDown}
     >
-      <span
-        aria-hidden='true'
-        className='size-4 shrink-0 justify-self-center'
-        style={{ backgroundColor: colorForFileIcon(icon), mask, WebkitMask: mask }}
-      />
+      <FileTypeIcon className='size-4 shrink-0 justify-self-center' icon={icon} />
       <div className='min-w-0 truncate text-left' title={title}>
         {loading ? <Shimmer>{label}</Shimmer> : label}
       </div>

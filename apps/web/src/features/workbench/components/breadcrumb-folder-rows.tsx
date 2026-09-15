@@ -1,3 +1,4 @@
+import { FileTypeIcon } from '@/components/file-type-icon'
 import { useQuery } from '@tanstack/react-query'
 import { EmptyState } from '@workspace/ui/components/empty-state'
 import { LoadingState } from '@workspace/ui/components/loading-state'
@@ -8,7 +9,6 @@ import { sortPickerEntries } from '@/features/workbench/utils/breadcrumbs'
 import { filesystemPath } from '@/lib/documents/utils/identity'
 import type { FilesystemPath } from '@/lib/documents/utils/types'
 import { clientForQueryClient } from '@/lib/environments/state/query-clients'
-import { fileIconStyle } from '@/lib/file-icon-style'
 import { iconForEntry } from '@/lib/file-icons'
 import { fetchTree } from '@/lib/file-server'
 import { isDirectoryEntry } from '@/lib/file-system-types'
@@ -66,9 +66,7 @@ export function BreadcrumbFolderRows({
               depth={depth}
               expandable={directory}
               expanded={isExpanded}
-              icon={
-                <span aria-hidden='true' className='size-4 shrink-0' style={fileIconStyle(icon)} />
-              }
+              icon={<FileTypeIcon className='size-4 shrink-0' icon={icon} />}
               label={entry.name}
               path={entry.path}
               selected={entry.path === selectedPath}

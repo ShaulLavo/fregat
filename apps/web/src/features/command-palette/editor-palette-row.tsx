@@ -1,6 +1,6 @@
+import { FileTypeIcon } from '@/components/file-type-icon'
 import { CommandItem, CommandShortcut } from '@workspace/ui/components/command'
 
-import { fileIconStyle } from '@/lib/file-icon-style'
 import { iconForEntry } from '@/lib/file-icons'
 
 import type { EditorPaletteItem } from '@/features/command-palette/command-palette-types'
@@ -23,7 +23,7 @@ export function EditorPaletteRow({ item }: EditorPaletteRowProps) {
       value={`editor:${item.key}`}
       onSelect={() => selectContent(item.content)}
     >
-      <span aria-hidden='true' className='size-4' style={fileIconStyle(icon)} />
+      <FileTypeIcon className='size-4' icon={icon} />
       <RowLabel label={item.name} description={item.pathLabel} />
       {item.active && <CommandShortcut>active</CommandShortcut>}
     </CommandItem>

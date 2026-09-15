@@ -3,7 +3,7 @@ import path from 'node:path'
 import { gzipSync } from 'node:zlib'
 import type { Plugin } from 'vite'
 
-export type BundleStatsModule = {
+type BundleStatsModule = {
   readonly id: string
   readonly renderedLength: number
 }
@@ -20,7 +20,7 @@ export type BundleStatsChunk = {
   readonly modules: readonly BundleStatsModule[]
 }
 
-export type BundleStatsAsset = {
+type BundleStatsAsset = {
   readonly fileName: string
   readonly size: number
   readonly gzipSize: number

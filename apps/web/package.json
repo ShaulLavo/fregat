@@ -54,6 +54,7 @@
     "@singapore-editor/lsp-plugin": "0.1.1",
     "@singapore-editor/markdown": "0.1.0",
     "@singapore-editor/minimap": "0.1.1",
+    "@singapore-editor/plugin-ui": "0.1.0",
     "@singapore-editor/react": "0.1.1",
     "@singapore-editor/scope-lines": "0.1.1",
     "@singapore-editor/tree-sitter": "0.1.1",

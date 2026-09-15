@@ -1,7 +1,10 @@
+import { editorLspHover } from './editor-lsp-hover'
+import { editorMarkdownPunctuation } from './editor-markdown-punctuation'
 import { wallpaperLibrary } from './wallpaper-library'
+import { fileIcons } from './file-icons'
 import type { Page } from 'playwright'
 
-export type ScenarioContext = {
+type ScenarioContext = {
   readonly file: string
   readonly step: (label: string) => Promise<void>
 }
@@ -30,6 +33,9 @@ import { demoThemeStartup } from './demo-theme-startup'
 import { demoWallpaperStartup } from './demo-wallpaper-startup'
 
 export const scenarios: readonly Scenario[] = [
+  editorLspHover,
+  editorMarkdownPunctuation,
+  fileIcons,
   wallpaperLibrary,
   demoWorkspace,
   demoAgentGit,

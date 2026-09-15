@@ -1,3 +1,4 @@
+import { useUnicodeHighlights } from '@/features/editor/hooks/use-unicode-highlights'
 import type { TabId } from '@/lib/documents/utils/types'
 import type { EditorTheme } from '@singapore-editor/core'
 import {
@@ -73,17 +74,20 @@ export function DiffPane({
     [regions, side, syntaxBackend, syntaxHighlight],
   )
   const { rows, text, tokensRevision } = useDiffRows(plugin, file)
-  const hoverPlugin = useDiffLanguage(file, rows, theme, languageServer)
+  const diffLanguagePlugin = useDiffLanguage(file, rows, theme, languageServer)
+  const unicodeHighlights = useUnicodeHighlights()
   const plugins = useMemo(
     () =>
       [
         plugin,
+        unicodeHighlights.plugin,
         onScroll ? createDiffScrollBridgePlugin((position) => onScroll(side, position)) : null,
-        hoverPlugin,
+        diffLanguagePlugin,
       ].filter((entry) => entry !== null),
-    [hoverPlugin, onScroll, plugin, side],
+    [diffLanguagePlugin, onScroll, plugin, side, unicodeHighlights.plugin],
   )
   const controller = useEditor({
+    suspiciousCharacters: unicodeHighlights.options,
     cursorLineHighlight: DIFF_CURSOR_LINE_HIGHLIGHT,
     // No `document`: the React wrapper pushes text through `openDocument`, which takes no scroll
     // position from us and therefore lands back at the top — so every expansion toggle, and every

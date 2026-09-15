@@ -1,3 +1,4 @@
+import { useUnicodeHighlights } from '@/features/editor/hooks/use-unicode-highlights'
 import { HOSTED_EDITOR_KEYMAP } from '@/keymap/editor-keymap'
 import { useEditor } from '@singapore-editor/react'
 import type {
@@ -169,9 +170,11 @@ export function Editor({
     [documentLanguageId, indentationGuidesEnabled, minimapEnabled, onCompareMergeConflict],
   )
   const decodePlugin = useMemo(() => createDecodePluginLoader(decodeMode), [decodeMode])
+  const unicodeHighlights = useUnicodeHighlights()
   const plugins = useMemo(
     () => [
       ...criticalEditorCorePlugins,
+      unicodeHighlights.plugin,
       diagnosticPeek.plugin,
       languageServer,
       decodePlugin,
@@ -180,6 +183,7 @@ export function Editor({
     ],
     [
       additionalPlugins,
+      unicodeHighlights.plugin,
       criticalEditorCorePlugins,
       diagnosticPeek.plugin,
       languageServer,
@@ -223,6 +227,7 @@ export function Editor({
     onPresentationChange: (state) => setProvisional(state === 'provisional'),
     plugins,
     rowPositioning,
+    suspiciousCharacters: unicodeHighlights.options,
     theme: editorTheme,
   })
   useLayoutEffect(() => {

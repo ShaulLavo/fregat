@@ -873,9 +873,9 @@
   background: var(--workbench-editor-minimap-background);
 }
 
-/* The plugin paints an inline background, so the solid popup color needs priority. */
-.editor-lsp-plugin-hover,
-.editor-lsp-plugin-completion {
+/* Every floating editor surface (hover, completion, signature, rename) carries this attribute.
+   The plugin paints an inline background, so the solid popup color needs priority. */
+[data-editor-popup] {
   background: var(--popover-solid) !important;
 }
 

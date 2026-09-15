@@ -1,4 +1,5 @@
 import { iconForEntry } from '@/lib/file-icons'
+import { FileTypeIcon } from '@/components/file-type-icon'
 import type { FsEntry } from '@/lib/file-system-types'
 import { isDirectoryEntry, isFileEntry } from '@/lib/file-system-types'
 import { FileDashedIcon, FileIcon, FolderIcon, FolderOpenIcon } from '@phosphor-icons/react'
@@ -65,15 +66,7 @@ export function EntryIcon({
 
   const icon = iconForEntry(entry, { open: openFolder })
 
-  return (
-    <img
-      alt=''
-      aria-hidden='true'
-      className={cn('shrink-0 object-contain', className)}
-      draggable={false}
-      src={icon.src}
-    />
-  )
+  return <FileTypeIcon className={cn('shrink-0 object-contain', className)} icon={icon} />
 }
 
 export function KindBadge({ entry }: { entry: FsEntry }) {

@@ -6,7 +6,7 @@ import { recordRecentEntry } from '@/lib/file-server'
 import { filePickerKeys } from '@/lib/query-keys'
 import { recentFolderKeys } from '@/lib/recent-folders-query'
 
-export const recentMutationKeys = {
+const recentMutationKeys = {
   record: (path: FilesystemPath) => ['recents', 'record', path] as const,
 }
 

@@ -1,3 +1,4 @@
+import { FileTypeIcon } from '@/components/file-type-icon'
 import { ArrowUDownLeftIcon } from '@phosphor-icons/react'
 import { HighlightedCode } from '@workspace/markdown/components/highlighted-code'
 import type { MarkdownCodeBlockProps } from '@workspace/markdown/providers/render-context'
@@ -5,7 +6,6 @@ import { Button } from '@workspace/ui/components/button'
 import { Tooltip, TooltipContent, TooltipTrigger } from '@workspace/ui/components/tooltip'
 import { use, useState } from 'react'
 
-import { fileIconStyle } from '@/lib/file-icon-style'
 import { iconForEntry } from '@/lib/file-icons'
 
 import { MarkdownDiagramContext } from '@/features/chat/providers/markdown-diagram-context'
@@ -53,7 +53,7 @@ export function AssistantMarkdownCodeBlock({
       >
         {/* Not on the header: the toolbar beside it holds Tooltip controls (D4). */}
         <span className='flex min-w-0 items-center gap-1.5 pl-1' title={title ?? undefined}>
-          <span aria-hidden='true' className='size-3.5 shrink-0' style={fileIconStyle(icon)} />
+          <FileTypeIcon className='size-3.5 shrink-0' icon={icon} />
           <span className={title ? 'truncate font-mono' : 'truncate font-mono lowercase'}>
             {title ?? language}
           </span>

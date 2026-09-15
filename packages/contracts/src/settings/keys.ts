@@ -275,6 +275,35 @@ export const SETTINGS_REGISTRY = {
     visibility: 'advanced',
     keywords: ['memory', 'retention', 'projects', 'budget', 'documents'],
   }),
+  'editor.unicodeHighlight.ambiguousCharacters': defineSetting({
+    schema: v.boolean(),
+    default: true,
+    scope: 'window',
+    widget: 'boolean',
+    category: 'Editor',
+    description:
+      'Highlight Unicode characters that resemble other characters. Hover a highlight for an explanation.',
+    keywords: ['unicode', 'ambiguous', 'confusable', 'characters'],
+  }),
+  'editor.unicodeHighlight.invisibleCharacters': defineSetting({
+    schema: v.boolean(),
+    default: true,
+    scope: 'window',
+    widget: 'boolean',
+    category: 'Editor',
+    description: 'Highlight invisible Unicode characters. Hover a highlight for its code point.',
+    keywords: ['unicode', 'invisible', 'characters'],
+  }),
+  'editor.unicodeHighlight.allowedCharacters': defineSetting({
+    schema: v.string(),
+    default: '',
+    scope: 'window',
+    widget: 'string',
+    category: 'Editor',
+    description:
+      'Characters allowed without Unicode highlighting. Paste the characters here, for example an en dash.',
+    keywords: ['unicode', 'allowed', 'exclude', 'characters'],
+  }),
   'editor.minimap.enabled': defineSetting({
     schema: v.boolean(),
     default: true,

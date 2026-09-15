@@ -106,6 +106,16 @@ export const workspaceCommandMetadata = {
     title: 'Switch session',
     keepsPaletteOpen: true,
   }),
+  'workspace.showUnicodeSettings': defineMetadata({
+    category: 'Editor',
+    description: 'Configure Unicode character highlighting and exclusions.',
+    id: 'workspace.showUnicodeSettings',
+    execution: 'async',
+    target: 'workspace',
+    undoCategory: 'view-only',
+    when: [],
+    title: 'Open Unicode highlight settings',
+  }),
   'workspace.showFontSettings': defineMetadata({
     category: 'Appearance',
     description: 'Change the editor and terminal font.',

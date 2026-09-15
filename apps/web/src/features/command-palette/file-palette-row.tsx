@@ -1,6 +1,6 @@
+import { FileTypeIcon } from '@/components/file-type-icon'
 import { CommandItem } from '@workspace/ui/components/command'
 
-import { fileIconStyle } from '@/lib/file-icon-style'
 import { iconForEntry } from '@/lib/file-icons'
 
 import type { FilePaletteItem } from '@/features/command-palette/command-palette-types'
@@ -23,7 +23,7 @@ export function FilePaletteRow({ item }: FilePaletteRowProps) {
       value={fileItemValue(item)}
       onSelect={() => selectFile(item.entry.path)}
     >
-      <span aria-hidden='true' className='size-4' style={fileIconStyle(icon)} />
+      <FileTypeIcon className='size-4' icon={icon} />
       <RowLabel label={item.entry.name} description={item.pathLabel} />
     </CommandItem>
   )

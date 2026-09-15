@@ -377,3 +377,28 @@ test('settings JSON exposes its nested editor as the sole active surface', async
     selectSettingsView('form')
   }
 })
+
+test('Unicode settings preserve allowed characters and can clear them', async ({ client }) => {
+  selectSettingsSearch('unicode')
+  renderWithProviders(<SettingsPage />)
+  const input = await screen.findByRole('textbox', { name: 'Unicode highlight allowed characters' })
+  await userEvent.type(input, '–\u00a0{Enter}')
+  await waitFor(async () => {
+    const snapshot = await fetchSettings(undefined, client)
+    expect(snapshot.values['editor.unicodeHighlight.allowedCharacters']).toBe('–\u00a0')
+  })
+  await userEvent.clear(input)
+  await userEvent.type(input, '{Enter}')
+  await waitFor(async () => {
+    const snapshot = await fetchSettings(undefined, client)
+    expect(snapshot.values['editor.unicodeHighlight.allowedCharacters']).toBe('')
+  })
+  await userEvent.click(
+    screen.getByRole('switch', { name: 'Unicode highlight ambiguous characters' }),
+  )
+  await waitFor(async () => {
+    const snapshot = await fetchSettings(undefined, client)
+    expect(snapshot.values['editor.unicodeHighlight.ambiguousCharacters']).toBe(false)
+    expect(snapshot.values['editor.unicodeHighlight.invisibleCharacters']).toBe(true)
+  })
+})

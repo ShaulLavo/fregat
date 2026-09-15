@@ -16,7 +16,6 @@ import type {
   SearchResultVirtualListMetrics,
   SearchResultVirtualListViewport,
 } from '@/features/search/utils/result-virtual-list'
-import { colorForFileIcon, type ResolvedFileIcon } from '@/lib/file-icons'
 import { cn } from '@workspace/ui/lib/utils'
 
 import {
@@ -372,16 +371,6 @@ export function matchNoun(count: number) {
 
 export function fileName(path: string) {
   return path.split('/').at(-1) || path
-}
-
-export function fileIconStyle(icon: ResolvedFileIcon): CSSProperties {
-  const mask = `url(${icon.src}) center / contain no-repeat`
-
-  return {
-    backgroundColor: colorForFileIcon(icon),
-    mask,
-    WebkitMask: mask,
-  }
 }
 
 function decimalDigitCount(value: number) {

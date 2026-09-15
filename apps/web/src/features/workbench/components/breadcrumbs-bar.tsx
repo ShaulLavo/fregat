@@ -1,3 +1,4 @@
+import { FileTypeIcon } from '@/components/file-type-icon'
 import { memo, useState, type KeyboardEvent } from 'react'
 import type { ReactEditorController } from '@singapore-editor/react'
 
@@ -12,7 +13,6 @@ import { breadcrumbPathItems, symbolRowKey } from '@/features/workbench/utils/br
 import { filesystemPath } from '@/lib/documents/utils/identity'
 import type { FilesystemPath } from '@/lib/documents/utils/types'
 import { fileUriForPath, type DocumentSymbol } from '@/lib/document-symbols'
-import { fileIconStyle } from '@/lib/file-icon-style'
 import { iconForEntry } from '@/lib/file-icons'
 
 // Cursor and document revisions leave this row unchanged until its symbol path or tree changes.
@@ -76,13 +76,7 @@ export const BreadcrumbsBar = memo(function BreadcrumbsBar({
           return (
             <BreadcrumbItem
               first={index === 0}
-              icon={
-                <span
-                  aria-hidden='true'
-                  className='size-3.5 shrink-0'
-                  style={fileIconStyle(icon)}
-                />
-              }
+              icon={<FileTypeIcon className='size-3.5 shrink-0' icon={icon} />}
               key={item.path}
               label={item.name}
               open={openKey === item.path}

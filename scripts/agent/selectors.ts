@@ -1,9 +1,22 @@
 import type { Page } from 'playwright'
 
+export const fileIconSelector = '[data-file-icon], [style*="vscode-icons/"]'
 export const wallpaperLayerSelector = '[data-workbench] img[data-workbench-wallpaper-layer="still"]'
 
 // Stable handles the app already exposes. Add here, never inline a selector in a scenario.
 export const selectors = {
+  editorHover: (page: Page) => page.locator('.editor-plugin-hover:not([hidden])'),
+  unicodeAdjustSettings: (page: Page) =>
+    page.getByRole('button', { name: 'Adjust settings', exact: true }),
+  diffAmbiguousCharacters: (page: Page) =>
+    page.locator('.editor-diff-pane [data-editor-hidden-character="ambiguous"]'),
+  diffInvisibleCharacters: (page: Page) =>
+    page.locator('.editor-diff-pane [data-editor-hidden-character="invisible"]'),
+  editorAmbiguousCharacters: (page: Page) =>
+    page.locator('[data-editor-hidden-character="ambiguous"]'),
+  editorInvisibleCharacters: (page: Page) =>
+    page.locator('[data-editor-hidden-character="invisible"]'),
+  fileIconElements: (page: Page) => page.locator(fileIconSelector),
   colorModeOption: (page: Page, mode: string) => page.locator(`[data-value="color-mode:${mode}"]`),
   settingsSearch: (page: Page) => page.getByRole('textbox', { name: 'Search settings' }),
   wallpaperPicker: (page: Page) => page.getByLabel('Wallpaper picker', { exact: true }),
