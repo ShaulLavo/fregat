@@ -39,7 +39,7 @@
     "server:install": "bun scripts/install-server.ts",
     "format": "bun run --filter '*' format",
     "format:check": "bun run --filter '*' format:check",
-    "typecheck": "bun run --sequential --filter '*' typecheck",
+    "typecheck": "bun scripts/check-linked-sources.ts && bun run --sequential --filter '*' typecheck",
     "test": "bun run test:scripts && bun run --filter '*' test",
     "generated:check": "bun run settings:schema:check && bun run settings:reference:check && bun run themes:palette-css:check && bun run --cwd apps/server codex-protocol:check",
     "settings:reference": "bun scripts/generate-settings-reference.ts",
