@@ -10,6 +10,8 @@ const labels: Readonly<Record<SettingsDiagnostic['kind'], string>> = {
   'invalid-value': 'invalid value',
   'scope-not-allowed': 'not allowed in this scope',
   'unknown-key': 'unknown setting',
+  migrated: 'moved to a new setting',
+  'removed-key': 'no longer a setting',
 }
 
 export type SettingsIssue = {

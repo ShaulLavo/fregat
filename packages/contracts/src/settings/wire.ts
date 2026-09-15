@@ -16,7 +16,13 @@ export const settingsServerVersionSchema = v.strictObject({
 })
 
 const settingsDiagnosticSchema = v.object({
-  kind: v.picklist(['unknown-key', 'scope-not-allowed', 'invalid-value'] as const),
+  kind: v.picklist([
+    'unknown-key',
+    'scope-not-allowed',
+    'invalid-value',
+    'migrated',
+    'removed-key',
+  ] as const),
   id: v.string(),
   layer: settingsLayerIdSchema,
   detail: v.optional(v.string()),

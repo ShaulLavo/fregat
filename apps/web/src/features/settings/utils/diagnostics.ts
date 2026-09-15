@@ -14,7 +14,25 @@ const DIAGNOSTIC_LABELS: Record<SettingsDiagnostic['kind'], string> = {
   'invalid-value': 'invalid value',
   'scope-not-allowed': 'not allowed in this scope',
   'unknown-key': 'unknown setting',
+  migrated: 'moved to a new setting',
+  'removed-key': 'no longer a setting',
 }
+
+/**
+ * A migrated key is not a mistake the user made, so it does not get a warning
+ * squiggle in their file. The value is applied; the line is just stale.
+ */
+const INFORMATION = 3
+
+const SEVERITIES = {
+  'invalid-value': WARNING,
+  'scope-not-allowed': WARNING,
+  'unknown-key': WARNING,
+  migrated: INFORMATION,
+  'removed-key': INFORMATION,
+  // `satisfies`, not an annotation: a `Record<…, number>` widens these to
+  // `number` and stops satisfying `lsp.DiagnosticSeverity`.
+} satisfies Record<SettingsDiagnostic['kind'], lsp.DiagnosticSeverity>
 
 export function settingsEditorDiagnostics(
   target: SettingsWriteTarget,
@@ -56,7 +74,7 @@ function settingsValueDiagnostic(
     code: diagnostic.kind,
     message: `${diagnostic.id} — ${DIAGNOSTIC_LABELS[diagnostic.kind]}${detail}`,
     range: lspRange(text, range),
-    severity: WARNING,
+    severity: SEVERITIES[diagnostic.kind],
     source: 'settings',
   }
 }

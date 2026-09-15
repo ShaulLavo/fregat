@@ -421,6 +421,15 @@ export {
   type SettingsLayerId,
 } from './settings/resolve'
 export {
+  migrateSetting,
+  migrationFor,
+  migrationProblems,
+  SETTING_MIGRATIONS,
+  type MigrationOutcome,
+  type MigrationProblem,
+  type SettingMigration,
+} from './settings/migrations'
+export {
   applySettingsOperations,
   nonSecretProviderSeedSchema,
   SCALAR_SETTING_IDS,

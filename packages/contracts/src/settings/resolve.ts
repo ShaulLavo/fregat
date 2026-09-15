@@ -2,6 +2,7 @@ import * as v from 'valibot'
 import { isRecord } from '../is-record'
 import { jsonEqual } from './json-equal'
 import { SETTINGS_REGISTRY, type SettingId, type SettingsValues } from './keys'
+import { migrateSetting } from './migrations'
 import type {
   RegistryValues,
   SettingDescriptor,
@@ -57,7 +58,21 @@ export function layerAllowsScope(layer: SettingsLayerId, scope: SettingScope): b
   return SCOPES_BY_LAYER[layer].includes(scope)
 }
 
-type SettingsDiagnosticKind = 'unknown-key' | 'scope-not-allowed' | 'invalid-value'
+/**
+ * Tiered by blast radius, because these are not one problem.
+ *
+ * `unknown-key` is the quiet one: a key this build does not have is usually a
+ * file written by a newer build, and `accept` deliberately leaves it in `raw` so
+ * it round-trips. `migrated` and `removed-key` are keys we retired ourselves —
+ * ours to explain rather than the user's to debug. Folding all of them into one
+ * banner is what let a rename read as a config typo.
+ */
+type SettingsDiagnosticKind =
+  | 'unknown-key'
+  | 'scope-not-allowed'
+  | 'invalid-value'
+  | 'migrated'
+  | 'removed-key'
 
 /**
  * Something a layer held that did not become a value. Never thrown: one bad key
@@ -222,7 +237,7 @@ function collectLayer(
   contributions: Map<string, Contribution[]>,
   diagnostics: SettingsDiagnostic[],
 ) {
-  for (const [id, rawValue] of Object.entries(layer.raw)) {
+  for (const [id, rawValue] of migratedEntries(layer, diagnostics)) {
     const acceptance = accept(registry, layer, id, rawValue)
     if (!acceptance.ok) {
       diagnostics.push(acceptance.diagnostic)
@@ -237,6 +252,66 @@ function collectLayer(
 
     contributions.set(id, [{ layer: layer.id, value: acceptance.value }])
   }
+}
+
+/**
+ * This layer's keys, with retired ids resolved to where their value lives today.
+ *
+ * Runs before `accept` so a migrated value meets the new key's schema and scope
+ * rules like any other — a rename does not get to bypass the workspace scope
+ * boundary just because the old id predates it.
+ *
+ * Read-time only. `layer.raw` is untouched, which keeps the file byte-identical
+ * until the user next writes it and keeps an older build able to read its own
+ * key back. Rewriting settings.json to chase a rename would be a destructive
+ * answer to a problem that has a non-destructive one.
+ */
+function migratedEntries(
+  layer: SettingsLayer,
+  diagnostics: SettingsDiagnostic[],
+): [string, unknown][] {
+  const raw = Object.entries(layer.raw)
+  // Seeded with what the file already says, so an explicit value for the new id
+  // wins over one recovered from the old id no matter which order they appear
+  // in. The migrated value is a fossil of a question the user has since
+  // answered directly.
+  const taken = new Set(raw.map(([id]) => id))
+  const entries: [string, unknown][] = []
+
+  for (const [id, value] of raw) {
+    const outcome = migrateSetting(id, value)
+
+    if (outcome.kind === 'none') {
+      entries.push([id, value])
+      continue
+    }
+
+    if (outcome.kind === 'removed') {
+      diagnostics.push({ kind: 'removed-key', id, layer: layer.id, detail: outcome.reason })
+      continue
+    }
+
+    if (taken.has(outcome.id)) {
+      diagnostics.push({
+        kind: 'migrated',
+        id,
+        layer: layer.id,
+        detail: `${outcome.reason} ${outcome.id} is already set, so this older key is ignored.`,
+      })
+      continue
+    }
+
+    taken.add(outcome.id)
+    diagnostics.push({
+      kind: 'migrated',
+      id,
+      layer: layer.id,
+      detail: `${outcome.reason} Your value now applies to ${outcome.id}.`,
+    })
+    entries.push([outcome.id, outcome.value])
+  }
+
+  return entries
 }
 
 /**

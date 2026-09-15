@@ -40,18 +40,20 @@ const MODEL_B = modelRef('claude', 'sonnet')
 
 describe('settings mutation schemas', () => {
   it('covers every live scalar, including the committed post-plan additions', () => {
-    // 'code-theme' holds a theme-id string and is written through the scalar path
-    // by `color-theme-provider.tsx`, so excluding it breaks the pickers.
-    const scalarWidgets = new Set([
-      'boolean',
-      'code-theme',
-      'enum',
-      'font',
-      'multiline',
-      'number',
-      'string',
-    ])
-    const expected = SETTING_IDS.filter((id) => scalarWidgets.has(descriptorFor(id).widget))
+    // Named by what makes a key NOT scalar: it has a bespoke mutation operation
+    // because one `set` cannot express an edit to it. Every other widget writes
+    // its whole value at once, whatever shape that value has — `code-theme` is a
+    // theme-id string, `palette` a palette id, `wallpaper` a per-mode object, and
+    // all three go through the scalar path.
+    //
+    // Listed as the complement on purpose. An allowlist of scalar widgets has to
+    // be edited every time a widget is added, and it silently went stale twice:
+    // this assertion and the `arrayContaining` below it had been contradicting
+    // each other since `workbench.palette` stopped being an enum. Adding a widget
+    // that genuinely needs its own operations is the rare case, and the one worth
+    // stopping on.
+    const bespokeWidgets = new Set(['complex', 'keybindings', 'machines', 'models', 'providers'])
+    const expected = SETTING_IDS.filter((id) => !bespokeWidgets.has(descriptorFor(id).widget))
 
     expect(SCALAR_SETTING_IDS).toEqual(expected)
     expect(SCALAR_SETTING_IDS).toEqual(
