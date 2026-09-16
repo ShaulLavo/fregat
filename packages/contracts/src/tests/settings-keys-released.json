@@ -71,6 +71,7 @@
     "workbench.surface.saturation",
     "workbench.tree.indentGuides",
     "workbench.wallpaper",
-    "workbench.wallpaper.enabled"
+    "workbench.wallpaper.enabled",
+    "editor.history.retainedStates"
   ]
 }
