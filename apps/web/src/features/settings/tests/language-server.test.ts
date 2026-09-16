@@ -29,11 +29,15 @@ test('sends the complete generated association only to JSON LS', () => {
   expect(Object.keys(notifications)).toEqual(['json-ls'])
   expect(association).toEqual({
     uri: 'platform://schemas/settings',
-    fileMatch: ['settings-json:user', 'settings-json:workspace'],
+    fileMatch: ['settings-json:user', 'settings-json:workspace', 'settings-json:default'],
     schema: SETTINGS_JSON_SCHEMA,
   })
   expect(association?.schema).toBe(SETTINGS_JSON_SCHEMA)
-  expect(association?.fileMatch).toEqual(['settings-json:user', 'settings-json:workspace'])
+  expect(association?.fileMatch).toEqual([
+    'settings-json:user',
+    'settings-json:workspace',
+    'settings-json:default',
+  ])
 })
 
 test.each(['user', 'workspace'] as const)(

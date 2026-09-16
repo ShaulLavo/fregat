@@ -683,7 +683,7 @@ export const workspaceCommandMetadata = {
   }),
   'wallpaper.next': defineMetadata({
     category: 'Appearance',
-    description: 'Select the next library wallpaper for the current color mode.',
+    description: 'Select the next library wallpaper for light or dark mode.',
     id: 'wallpaper.next',
     execution: 'async',
     target: 'workspace',

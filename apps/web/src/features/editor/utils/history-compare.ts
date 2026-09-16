@@ -5,7 +5,7 @@ import { createTextDiff, type DiffFile } from '@singapore-editor/diff'
 import { materializePieceTableFullText } from '@singapore-editor/textbuffer'
 
 // Past this a full-text diff stops being a quick preview; the pane says so instead.
-export const MAX_HISTORY_COMPARE_LENGTH = 2 * 1024 * 1024
+const MAX_HISTORY_COMPARE_LENGTH = 2 * 1024 * 1024
 
 export type HistoryComparisonResult = DiffFile | 'too-large'
 

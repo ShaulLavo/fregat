@@ -8,13 +8,16 @@ import { expect, test } from '../../../../../test/fixtures'
 test('project menu scopes and collapses the repository group', async ({ client, server }) => {
   const h = await createRailHarness(client, server)
   renderRailHarness(h)
-  await userEvent.pointer({
-    keys: '[MouseRight]',
-    target: screen.getByTitle(h.context.worktree!.path),
-  })
+  // The scope menu trigger carries the same path title once scoped; the group header is the
+  // expanded one, since the group stays open until this test collapses it.
+  const groupHeader = () =>
+    screen
+      .getAllByTitle(h.context.worktree!.path)
+      .find((element) => element.getAttribute('aria-expanded') === 'true')!
+  await userEvent.pointer({ keys: '[MouseRight]', target: groupHeader() })
   await userEvent.click(await screen.findByRole('menuitem', { name: 'Show Only This Project' }))
   expect(useSessionRailStore.getState().scope).toBe(h.projectId)
-  await userEvent.click(screen.getByTitle(h.context.worktree!.path))
+  await userEvent.click(groupHeader())
   expect(useSessionRailStore.getState().collapsedProjectIds).toEqual([h.projectId])
   expect(screen.getByTitle('First')).toBeVisible()
   expect(screen.queryByTitle('Second')).toBeNull()

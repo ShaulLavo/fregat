@@ -21,7 +21,7 @@ export function historyStateSummary(node: EditorHistoryGraphNode): string {
   return `${label} ${delta > 0 ? '+' : ''}${delta}`
 }
 
-export function historyStateDelta(node: EditorHistoryGraphNode): number {
+function historyStateDelta(node: EditorHistoryGraphNode): number {
   const edits = node.transaction?.edits ?? []
   return edits.reduce((total, edit) => total + edit.text.length - (edit.to - edit.from), 0)
 }

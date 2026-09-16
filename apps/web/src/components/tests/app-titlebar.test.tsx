@@ -29,7 +29,8 @@ test('renders app-owned window chrome as the only native drag region', () => {
   expect(toolbar).toHaveClass(NATIVE_WINDOW_DRAG_CLASS)
   expect(toolbar).toHaveStyle({ gridTemplateColumns: '24% minmax(0, 1fr) auto' })
   expect(screen.getByText('repo')).toBeVisible()
-  expect(screen.getByText('app.tsx')).toBeVisible()
+  // The document title moved to the editor breadcrumbs; the titlebar names only the workspace.
+  expect(screen.queryByText('app.tsx')).toBeNull()
 })
 
 function TitlebarTestProvider({
