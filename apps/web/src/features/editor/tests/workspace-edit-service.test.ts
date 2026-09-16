@@ -509,10 +509,26 @@ test.describe('WorkspaceEditService', () => {
 
     // The watcher echo of the write: the tree query refetches and replaces the projected data.
     harness.queryClient.setQueryData<TreeModel>(treeKey, emptyTreeModel())
+    const unopenedKey = fileSystemKeys.fileSnapshot('/repo/unopened.ts')
+    const cachedUnopened = () =>
+      harness.queryClient.getQueryData<FileResult>(unopenedKey)?.content ?? null
 
+    // Disk follows the server through every transition; the cache must follow disk each time,
+    // not only on the transition that discarded the projection.
+    addDiskFile(harness, '/repo/unopened.ts', 'unopened', 81)
     await expect(harness.service.undo()).resolves.toBe(true)
     expect(live.buffer.materializeFullText()).toBe('live')
+    expect(cachedUnopened()).toBe('unopened')
     expect(harness.service.getSnapshot()).toMatchObject({ canRedo: true, canUndo: false })
+
+    addDiskFile(harness, '/repo/unopened.ts', 'Unopened', 82)
+    await expect(harness.service.redo()).resolves.toBe(true)
+    expect(live.buffer.materializeFullText()).toBe('Live')
+    expect(cachedUnopened()).toBe('Unopened')
+
+    addDiskFile(harness, '/repo/unopened.ts', 'unopened', 83)
+    await expect(harness.service.undo()).resolves.toBe(true)
+    expect(cachedUnopened()).toBe('unopened')
   })
 
   const rejectionCases: readonly RejectionCase[] = [

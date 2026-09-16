@@ -10,21 +10,29 @@ import { useId, type KeyboardEvent } from 'react'
 const COLUMN_WIDTH = 14
 const LANE_HEIGHT = 24
 const EDGE_PADDING = 12
+// A hollow ring has no fill to click; the disc underneath is the pointer target.
+const HIT_RADIUS = 7
 
 export function HistoryGraphStrip({
   graph,
   focusedId,
   selectedIds,
+  barrierFocused,
+  barrierLabel,
   now,
   onFocus,
+  onFocusBarrier,
   onKeyDown,
   onToggleSelect,
 }: {
   graph: EditorHistoryGraph
   focusedId: HistoryNodeId | null
   selectedIds: readonly HistoryNodeId[]
+  barrierFocused: boolean
+  barrierLabel: string
   now: number
   onFocus: (id: HistoryNodeId) => void
+  onFocusBarrier: () => void
   onKeyDown: (event: KeyboardEvent<SVGSVGElement>) => void
   onToggleSelect: (id: HistoryNodeId) => void
 }) {
@@ -45,7 +53,12 @@ export function HistoryGraphStrip({
       },
     ]),
   )
-  const focusedDom = focusedId === null ? undefined : nodeDomId(idPrefix, focusedId)
+  const barrierDom = `${idPrefix}history-barrier`
+  const focusedDom = barrierFocused
+    ? barrierDom
+    : focusedId === null
+      ? undefined
+      : nodeDomId(idPrefix, focusedId)
 
   return (
     <svg
@@ -59,17 +72,37 @@ export function HistoryGraphStrip({
       onKeyDown={onKeyDown}
     >
       {graph.barrier ? (
-        <circle
-          className='text-muted-foreground'
-          cx={EDGE_PADDING}
-          cy={LANE_HEIGHT / 2}
-          fill='none'
-          r={3.5}
-          stroke='currentColor'
-          strokeWidth='1.5'
+        <g
+          aria-label={barrierLabel}
+          aria-selected={false}
+          className='cursor-pointer'
+          id={barrierDom}
+          role='option'
+          onClick={onFocusBarrier}
         >
-          <title>{`Earlier history is behind workspace edit ${graph.barrier.groupId}`}</title>
-        </circle>
+          <title>{barrierLabel}</title>
+          <circle cx={EDGE_PADDING} cy={LANE_HEIGHT / 2} fill='transparent' r={HIT_RADIUS} />
+          {barrierFocused ? (
+            <circle
+              className='text-foreground'
+              cx={EDGE_PADDING}
+              cy={LANE_HEIGHT / 2}
+              fill='none'
+              r={6.5}
+              stroke='currentColor'
+              strokeWidth='1.5'
+            />
+          ) : null}
+          <circle
+            className='text-muted-foreground'
+            cx={EDGE_PADDING}
+            cy={LANE_HEIGHT / 2}
+            fill='none'
+            r={3.5}
+            stroke='currentColor'
+            strokeWidth='1.5'
+          />
+        </g>
       ) : null}
       {graph.barrier && positions.size > 0 ? (
         <path
@@ -115,6 +148,7 @@ export function HistoryGraphStrip({
             }}
           >
             <title>{historyStateLabel(node, now)}</title>
+            <circle cx={at.x} cy={at.y} fill='transparent' r={HIT_RADIUS} />
             {focused || selected ? (
               <circle
                 className={selected ? 'text-info' : 'text-foreground'}

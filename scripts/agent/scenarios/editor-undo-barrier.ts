@@ -38,7 +38,31 @@ export const editorUndoBarrier: Scenario = {
     // Sonner's enter animation: wait until the toast rests before the screenshot.
     await page.waitForTimeout(400)
     await step('barrier')
-    await selectors.toastAction(page, BARRIER_TOAST, 'Undo workspace edit').click()
+
+    // The other route: the History tab shows the barrier as a state, and undoes the group.
+    await runPaletteCommand(page, 'Show history')
+    await selectors.historyStates(page).waitFor({ timeout: 10_000 })
+    await selectors
+      .historyStates(page)
+      .getByRole('option', { name: /Workspace edit/ })
+      .click()
+    await page.getByText('Earlier history is behind a workspace edit.').waitFor({ timeout: 10_000 })
+    await step('barrier-state')
+    // The toast offers the same action; the pane's own button is the one under test.
+    await selectors
+      .historyPane(page)
+      .getByRole('button', { name: 'Undo workspace edit', exact: true })
+      .click()
+    // The barrier leaves the graph once the group is undone; the path is reserved until then.
+    await selectors
+      .historyStates(page)
+      .getByRole('option', { name: /Workspace edit/ })
+      .waitFor({ state: 'detached', timeout: 10_000 })
+    await page.waitForTimeout(500)
+    await selectors
+      .editorTabNamed(page, /^a\.ts$/)
+      .first()
+      .click()
     await page.getByText('renameMe').first().waitFor({ timeout: 8000 })
     await step('restored')
   },

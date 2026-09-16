@@ -74,6 +74,9 @@ query projection a refetch had replaced ("Workspace query projection is stale") 
 superseded projection now reconciles the affected queries from disk instead, and the forward seal
 does the same. Both paths log `workspace_edit.reverse` and `workspace_edit.history_evicted`.
 Scenario `editor-undo-barrier` (workspace `work/tmp/plan121-undo`) is the browser proof.
+Review follow-up (2026-09-17): a persisted group with no projection left reconciles the cache
+from disk on every later transition, not only the one that discarded it, and the regression test
+walks undo → redo → undo asserting cached file contents.
 
 ## Unit 1 — E017 in Editor
 
@@ -155,6 +158,11 @@ a second selection, Up/Down follow the tree, Enter restores, Escape clears then 
 file's tab through the surface action `showFile`. The viewer is owned by the subscription in
 `use-history-viewer.ts` because the React Compiler caches method reads and StrictMode disposes
 effects; the snapshot carries the viewer for that reason. The Editor gained `clearHistory()`.
+Review follow-up (2026-09-17): the barrier is a state of its own in the strip, reachable by Left
+from the root, whose body names the group's files and carries an "Undo workspace edit" action
+(`WorkspaceEditService.historyBarrierGroup`), disabled with the reason when later groups must go
+first. An explicit pick acknowledges a pruning notice, so a valid state previews again. Every
+node has a transparent hit disc so a hollow ring is clickable at its centre.
 
 ## Unit 4 — commands, keys, settings
 

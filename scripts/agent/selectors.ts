@@ -33,6 +33,7 @@ export const selectors = {
   wallpaperStill: (page: Page) => page.locator(wallpaperStillSelector),
   commandOption: (page: Page, name: string) => page.getByRole('option', { name, exact: false }),
   renameInput: (page: Page) => page.getByRole('textbox', { name: 'New name', exact: true }),
+  historyPane: (page: Page) => page.locator('[data-history-pane]'),
   historyStates: (page: Page) => page.getByRole('listbox', { name: 'History states', exact: true }),
   historyState: (page: Page, index: number) =>
     page

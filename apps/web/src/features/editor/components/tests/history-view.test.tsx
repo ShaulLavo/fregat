@@ -1,5 +1,10 @@
 import { filesystemPath, tabId } from '@/lib/documents/utils/identity'
-import { createEditorBufferSession, type EditorTextBuffer } from '@singapore-editor/core'
+import {
+  commitPreparedDocumentTransaction,
+  createEditorBufferSession,
+  prepareDocumentTransaction,
+  type EditorTextBuffer,
+} from '@singapore-editor/core'
 import { screen, waitFor } from '@testing-library/react'
 import userEvent from '@testing-library/user-event'
 
@@ -55,6 +60,25 @@ test('clears history after confirmation and leaves the text alone', async () => 
   await waitFor(() => expect(screen.getAllByRole('option')).toHaveLength(1))
   expect(buffer.materializeFullText()).toBe('alphaonetwo\nbeta\n')
   expect(buffer.canUndo()).toBe(false)
+})
+
+test('the barrier before a workspace edit is a state of its own', async () => {
+  stubEditorViewport()
+  const user = userEvent.setup()
+  const rendered = await renderHistory({ edits: ['one'] })
+  const buffer = requireBuffer(rendered.buffer)
+  const committed = commitPreparedDocumentTransaction(
+    { buffer, sourceView: null },
+    prepareDocumentTransaction(buffer, [{ from: 0, to: 1, text: 'A' }], 2, null),
+    { history: { groupId: 'rename', kind: 'external-barrier' } },
+  )
+  expect(committed.status).toBe('committed')
+
+  const barrier = await screen.findByRole('option', { name: /Workspace edit/ })
+  await user.click(barrier)
+  expect(await screen.findByText('Earlier history is behind a workspace edit.')).toBeInTheDocument()
+  expect(screen.getByRole('button', { name: 'Restore' })).toBeDisabled()
+  expect(screen.queryByRole('button', { name: 'Undo workspace edit' })).not.toBeInTheDocument()
 })
 
 async function renderHistory({ edits }: { edits: readonly string[] | null }) {

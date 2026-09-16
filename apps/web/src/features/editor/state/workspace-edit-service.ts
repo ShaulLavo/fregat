@@ -132,6 +132,15 @@ export type WorkspaceEditRecovery = {
   readonly unrecoveredPaths: readonly FilesystemPath[]
 }
 
+/** The newest undoable workspace group that still holds a buffer's earlier editor history. */
+export type HistoryBarrierGroup = {
+  readonly operationId: string
+  readonly affectedPaths: readonly FilesystemPath[]
+  /** Only the newest group can be undone; later groups must go first. */
+  readonly laterGroupCount: number
+  readonly undoable: boolean
+}
+
 export type WorkspaceEditServiceSnapshot = {
   readonly canCancel: boolean
   readonly canRedo: boolean
@@ -346,6 +355,7 @@ export class WorkspaceEditService {
     new WeakSet<WorkspaceMutationReservation>()
   private snapshot: WorkspaceEditServiceSnapshot = IDLE_SNAPSHOT
   private readonly undoStack: WorkspaceEditGroup[] = []
+  private readonly barrierGroups = new WeakMap<EditorTextBuffer, HistoryBarrierGroup>()
   private serverEpoch: string | null
   private readonly unsubscribeDocumentContentRevisions: () => void
   private readonly unsubscribeServerEpoch: () => void
@@ -632,6 +642,35 @@ export class WorkspaceEditService {
   /** Whether an undoable workspace group still holds this buffer's earlier editor history. */
   hasHistoryBarrier(buffer: EditorTextBuffer): boolean {
     return this.undoStack.some((group) => groupHoldsBarrier(group, buffer))
+  }
+
+  // Memoized per buffer so a store snapshot read returns the same object while nothing moved.
+  historyBarrierGroup(buffer: EditorTextBuffer): HistoryBarrierGroup | null {
+    const index = this.undoStack.findLastIndex((group) => groupHoldsBarrier(group, buffer))
+    if (index === -1) {
+      this.barrierGroups.delete(buffer)
+      return null
+    }
+    const group = this.undoStack[index]!
+    const laterGroupCount = this.undoStack.length - 1 - index
+    const undoable = laterGroupCount === 0 && this.historyCommandsAvailable()
+    const cached = this.barrierGroups.get(buffer)
+    if (
+      cached &&
+      cached.operationId === group.operationId &&
+      cached.laterGroupCount === laterGroupCount &&
+      cached.undoable === undoable
+    ) {
+      return cached
+    }
+    const next: HistoryBarrierGroup = {
+      affectedPaths: group.affectedPaths,
+      laterGroupCount,
+      operationId: group.operationId,
+      undoable,
+    }
+    this.barrierGroups.set(buffer, next)
+    return next
   }
 
   resetForRoot(): void {
@@ -1256,7 +1295,6 @@ export class WorkspaceEditService {
     let localReversed = false
     let projection: WorkspaceMutationProjectionReceipt | null = null
     const rootPath = group.projection?.rootPath ?? this.options.getRoot()?.path ?? null
-    let superseded = false
     try {
       // A refetch since the edit landed replaced the projected cache entries with disk truth. That
       // supersedes the projection, it does not conflict with it: the server's version guards
@@ -1266,7 +1304,6 @@ export class WorkspaceEditService {
         !this.options.fileSync.isWorkspaceMutationProjectionCurrent(group.projection)
       ) {
         group.projection = null
-        superseded = true
       }
       locks = acquireGroupLocks(this.options.documentStore, group)
       if (provisional) {
@@ -1293,10 +1330,7 @@ export class WorkspaceEditService {
           provisional,
           workspaceProjectionEntries(group.projection.rootPath, provisional),
         )
-        if (!projection) {
-          group.projection = null
-          superseded = true
-        }
+        if (!projection) group.projection = null
       }
       if (provisional) {
         provisional = await this.options.fileSync.finalizeWorkspaceMutation(provisional)
@@ -1307,13 +1341,15 @@ export class WorkspaceEditService {
         ) {
           projection = null
           group.projection = null
-          superseded = true
         }
       }
       group.server = provisional
       group.projection = projection ?? group.projection
-      if (superseded && rootPath)
+      // A persisted group with no projection left, discarded now or on an earlier transition,
+      // settles the cache from disk: nothing else will.
+      if (provisional && !group.projection && rootPath) {
         await this.reconcileProjectionSafely(rootPath, group.affectedPaths)
+      }
       source.pop()
       const destination = direction === 'undo' ? this.redoStack : this.undoStack
       destination.push(group)
@@ -1358,7 +1394,7 @@ export class WorkspaceEditService {
         locks = null
         return false
       }
-      if ((group.projection || superseded) && rootPath) {
+      if ((group.projection || provisional) && rootPath) {
         await this.reconcileProjectionSafely(rootPath, group.affectedPaths)
       }
       await this.invalidateHistoryDependencyChain(source, group.affectedPaths)

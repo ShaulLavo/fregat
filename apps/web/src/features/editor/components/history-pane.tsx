@@ -13,12 +13,15 @@ import { EmptyState } from '@workspace/ui/components/empty-state'
 import { LoadingState } from '@workspace/ui/components/loading-state'
 import { PaneBar } from '@workspace/ui/components/pane-bar'
 import { Spinner } from '@workspace/ui/components/spinner'
-import { useEffect, useMemo, useState, type KeyboardEvent } from 'react'
+import { useEffect, useMemo, useState, useSyncExternalStore, type KeyboardEvent } from 'react'
 
 import { DiffEditor } from '@/features/editor/components/diff-editor'
 import { HistoryClearDialog } from '@/features/editor/components/history-clear-dialog'
 import { HistoryGraphStrip } from '@/features/editor/components/history-graph-strip'
 import { useHistoryViewer } from '@/features/editor/hooks/use-history-viewer'
+import { useOptionalWorkspaceEditService } from '@/features/editor/providers/workspace-edit-context'
+import type { HistoryBarrierGroup } from '@/features/editor/state/workspace-edit-service'
+import { basename } from '@/lib/path-formatters'
 import {
   historyClearMutationOptions,
   historyRestoreMutationOptions,
@@ -38,6 +41,9 @@ import { editorMutationKeys } from '@/features/editor/utils/mutation-keys'
 import { useSettingValue } from '@/features/settings/hooks/use-setting-value'
 
 const CLOCK_TICK_MS = 30_000
+const MAX_LISTED_FILES = 6
+
+const noSubscription = () => () => undefined
 
 export function HistoryPane({
   buffer,
@@ -62,7 +68,17 @@ export function HistoryPane({
   const restoring =
     useIsMutating({ mutationKey: editorMutationKeys.historyRestore(documentKey) }) > 0
   const [clearOpen, setClearOpen] = useState(false)
+  const [barrierFocused, setBarrierFocused] = useState(false)
   const now = useClock()
+  const workspaceEdits = useOptionalWorkspaceEditService()
+  const barrierGroup = useSyncExternalStore(
+    workspaceEdits ? workspaceEdits.subscribe : noSubscription,
+    () => workspaceEdits?.historyBarrierGroup(buffer) ?? null,
+  )
+  const undoingWorkspaceEdit = useSyncExternalStore(
+    workspaceEdits ? workspaceEdits.subscribe : noSubscription,
+    () => workspaceEdits?.getSnapshot().phase === 'undoing',
+  )
 
   const graph = state?.graph ?? null
   const focused = state && viewer && state.focusedId !== null ? viewer.node(state.focusedId) : null
@@ -80,35 +96,74 @@ export function HistoryPane({
 
   if (!viewer || !state || !graph) return null
 
-  const canRestore = focused !== null && !focused.isCurrent && !restoring
+  const barrier = graph.barrier
+  const barrierActive = barrierFocused && barrier !== null
+  const barrierLabel = barrierAriaLabel(barrierGroup)
+  const canRestore = focused !== null && !focused.isCurrent && !restoring && !barrierActive
   const twoSelected = state.selectedIds.length === 2
+
+  function focusNode(id: HistoryNodeId) {
+    setBarrierFocused(false)
+    viewer?.focus(id)
+  }
+
+  function undoBarrierGroup() {
+    if (!workspaceEdits || !barrierGroup?.undoable) return
+    void workspaceEdits.undo()
+  }
 
   function handleKeyDown(event: KeyboardEvent<SVGSVGElement>) {
     if (!viewer || !state) return
+    if (
+      barrierActive &&
+      barrierKeyAction(event, undoBarrierGroup, () => setBarrierFocused(false))
+    ) {
+      event.preventDefault()
+      return
+    }
     const handled = historyKeyAction(event, viewer, {
       restore: () => {
         if (canRestore && focused) restore.mutate(focused.id)
       },
       leave: () => onLeave?.(),
+      // Left from the root reaches the barrier, the state before the workspace edit.
+      reachBarrier: () => {
+        if (!barrier) return false
+        setBarrierFocused(true)
+        return true
+      },
     })
     if (handled) event.preventDefault()
   }
 
   return (
-    <div className='flex h-full min-h-0 flex-col'>
+    <div className='flex h-full min-h-0 flex-col' data-history-pane={documentKey}>
       <div className='border-border overflow-x-auto border-b px-(--bar-padding-x) py-1'>
         <HistoryGraphStrip
+          barrierFocused={barrierActive}
+          barrierLabel={barrierLabel}
           focusedId={state.focusedId}
           graph={graph}
           now={now}
           selectedIds={state.selectedIds}
-          onFocus={(id) => viewer.focus(id)}
+          onFocus={focusNode}
+          onFocusBarrier={() => setBarrierFocused(true)}
           onKeyDown={handleKeyDown}
-          onToggleSelect={(id) => viewer.toggleSelection(id)}
+          onToggleSelect={(id) => {
+            setBarrierFocused(false)
+            viewer.toggleSelection(id)
+          }}
         />
       </div>
       <PaneBar border='bottom' className='justify-between gap-(--density-control-gap)'>
-        {focused ? (
+        {barrierActive ? (
+          <div className='flex min-w-0 flex-1 items-center gap-(--density-control-gap) text-xs'>
+            <span className='shrink-0 font-medium'>Workspace edit</span>
+            <span className='text-muted-foreground shrink-0 tabular-nums'>
+              {affectedFilesLabel(barrierGroup)}
+            </span>
+          </div>
+        ) : focused ? (
           <HistoryStateRow node={focused} now={now} />
         ) : (
           <span className='text-muted-foreground text-xs'>No state focused</span>
@@ -136,7 +191,13 @@ export function HistoryPane({
         </div>
       </PaneBar>
       <div className='min-h-0 flex-1'>
-        {twoSelected ? (
+        {barrierActive ? (
+          <BarrierBody
+            group={barrierGroup}
+            undoing={undoingWorkspaceEdit}
+            onUndo={workspaceEdits ? undoBarrierGroup : null}
+          />
+        ) : twoSelected ? (
           <ComparisonBody comparison={state.comparison} mode={mode} tabId={tabId} />
         ) : (
           <FocusedBody
@@ -175,6 +236,71 @@ function HistoryStateRow({ node, now }: { node: EditorHistoryGraphNode; now: num
       {excerpt ? <span className='text-muted-foreground truncate font-mono'>{excerpt}</span> : null}
     </div>
   )
+}
+
+function BarrierBody({
+  group,
+  undoing,
+  onUndo,
+}: {
+  group: HistoryBarrierGroup | null
+  undoing: boolean
+  onUndo: (() => void) | null
+}) {
+  const hint = barrierHint(group)
+  const action =
+    onUndo && group ? (
+      <Button disabled={!group.undoable || undoing} size='sm' type='button' onClick={onUndo}>
+        {undoing ? <Spinner /> : <ArrowCounterClockwiseIcon data-icon='inline-start' />}
+        Undo workspace edit
+      </Button>
+    ) : null
+  return (
+    <EmptyState
+      action={action}
+      className='h-full'
+      hint={hint}
+      title='Earlier history is behind a workspace edit.'
+    />
+  )
+}
+
+function barrierHint(group: HistoryBarrierGroup | null): string {
+  if (!group) return 'Undoing that edit restores it; the undo also touches its other files.'
+  const files = group.affectedPaths.slice(0, MAX_LISTED_FILES).map((path) => basename(path))
+  const more = group.affectedPaths.length - files.length
+  const listed = more > 0 ? `${files.join(', ')} and ${more} more` : files.join(', ')
+  if (group.laterGroupCount > 0) {
+    return `It changed ${listed}. Undo the ${group.laterGroupCount} later workspace edits first.`
+  }
+  if (!group.undoable) return `It changed ${listed}. Workspace undo is busy right now.`
+  return `It changed ${listed}. Undoing it restores every one of them.`
+}
+
+function affectedFilesLabel(group: HistoryBarrierGroup | null): string {
+  if (!group) return ''
+  return group.affectedPaths.length === 1 ? '1 file' : `${group.affectedPaths.length} files`
+}
+
+function barrierAriaLabel(group: HistoryBarrierGroup | null): string {
+  const base = 'Workspace edit, earlier history behind it'
+  return group ? `${base}, ${affectedFilesLabel(group)}` : base
+}
+
+function barrierKeyAction(
+  event: KeyboardEvent<SVGSVGElement>,
+  undo: () => void,
+  leave: () => void,
+): boolean {
+  if (event.key === 'Enter') {
+    undo()
+    return true
+  }
+  if (event.key === 'ArrowRight' || event.key === 'Escape') {
+    leave()
+    return true
+  }
+  return event.key === 'ArrowLeft'
 }
 
 function ComparisonBody({
@@ -275,7 +401,7 @@ function useClock(): number {
 function historyKeyAction(
   event: KeyboardEvent<SVGSVGElement>,
   viewer: HistoryViewer<HistoryComparisonResult>,
-  actions: { restore: () => void; leave: () => void },
+  actions: { restore: () => void; leave: () => void; reachBarrier: () => boolean },
 ): boolean {
   const before = viewer.getState().focusedId
   const extend = (moved: boolean) => {
@@ -288,7 +414,7 @@ function historyKeyAction(
   }
   switch (event.key) {
     case 'ArrowLeft':
-      return extend(viewer.focusPrevious())
+      return extend(viewer.focusPrevious()) || actions.reachBarrier()
     case 'ArrowRight':
       return extend(viewer.focusNext())
     case 'ArrowUp':
