@@ -9,6 +9,7 @@ import { SearchReplaceToggleButton } from '@/features/search/components/replace-
 import { SearchSummary } from '@/features/search/components/summary'
 import { useSearchBufferInputs } from '@/features/search/hooks/use-buffer-inputs'
 import { useWorkspaceSearchReplace } from '@/features/search/hooks/use-replace'
+import { useOwnedText } from '@/hooks/use-owned-text'
 
 export function SearchControls({
   compact = true,
@@ -33,6 +34,7 @@ export function SearchControls({
     setSearchOptions,
   } = useSearchBufferInputs(rootPath)
   const replace = useWorkspaceSearchReplace(rootPath, replaceVisible)
+  const [queryText, changeQuery] = useOwnedText(query, setQuery)
 
   const queryField = (
     <SearchHistoryInput
@@ -50,10 +52,10 @@ export function SearchControls({
       size='sm'
       startAddon={<MagnifyingGlassIcon aria-hidden='true' className='size-3.5' />}
       type='search'
-      value={query}
+      value={queryText}
       onSelectNextHistory={selectNextQuery}
       onSelectPreviousHistory={selectPreviousQuery}
-      onValueChange={setQuery}
+      onValueChange={changeQuery}
     />
   )
   const replaceToggle = (

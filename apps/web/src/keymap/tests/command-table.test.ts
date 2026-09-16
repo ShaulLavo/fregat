@@ -41,6 +41,9 @@ const TEXT_MENU_EDITOR_COMMANDS = [
 ] as const
 
 const ASYNC_COMMAND_IDS = [
+  'workspace.showHistory',
+  'workspace.historyBack',
+  'workspace.historyForward',
   'workspace.selectAppColors',
   'workspace.runProjectScript',
   'workspace.switchSession',
@@ -111,6 +114,8 @@ const ASYNC_COMMAND_IDS = [
 ] as const satisfies readonly PlatformCommandId[]
 
 const TEXT_EDIT_COMMAND_IDS = [
+  'workspace.historyBack',
+  'workspace.historyForward',
   'editor.undo',
   'editor.redo',
   'editor.replaceOne',
@@ -183,6 +188,9 @@ const FILE_BACKED_COMMAND_IDS = [
   'workspace.goToLine',
   'workspace.gotoSymbol',
   'workspace.compareWithSaved',
+  'workspace.showHistory',
+  'workspace.historyBack',
+  'workspace.historyForward',
   'workspace.openFileAtHead',
   'workspace.revertFile',
   'workspace.revealActiveFileInTree',

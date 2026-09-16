@@ -5,6 +5,7 @@ import { useEditorRuntime } from '@/features/editor/hooks/use-runtime'
 import { WarningCircleIcon } from '@phosphor-icons/react'
 
 import { CompareSavedView } from '@/features/editor/components/compare-saved-view'
+import { HistoryView } from '@/features/editor/components/history-view'
 import { Editor } from '@/features/editor/components/editor'
 import { useEditorColorTheme } from '@/features/editor/hooks/use-editor-color-theme'
 import { OrbitLoader } from '@workspace/ui/components/orbit-loader'
@@ -50,6 +51,7 @@ export function FileEditorBody({
   const { service: fileOpenIntent } = useFileOpenIntent()
   const comparison = target.kind === 'git-diff' ? target.source : null
   const comparePath = target.kind === 'compare-saved' ? target.file.path : null
+  const historyPath = target.kind === 'history' ? target.file.path : null
   const resource = filesystemResource(target)
   const key = documentKey(target)
   const editorDocument = liveDocument?.key === key ? liveDocument : null
@@ -84,6 +86,12 @@ export function FileEditorBody({
   if (comparison) {
     return (
       <DiffView comparison={comparison} languageHost={actions} rootPath={rootPath} tabId={tabId} />
+    )
+  }
+
+  if (historyPath) {
+    return (
+      <HistoryView path={historyPath} tabId={tabId} onLeave={() => actions.showFile(historyPath)} />
     )
   }
 

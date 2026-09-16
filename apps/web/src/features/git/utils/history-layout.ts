@@ -79,11 +79,3 @@ export function historyEdgePath(edge: HistoryEdge) {
   const middle = (fromY + toY) / 2
   return `M ${fromX} ${fromY} C ${fromX} ${middle}, ${toX} ${middle}, ${toX} ${toY}`
 }
-
-export const historyLaneColors = [
-  'text-git-graph-1',
-  'text-git-graph-2',
-  'text-git-graph-3',
-  'text-git-graph-4',
-  'text-git-graph-5',
-] as const

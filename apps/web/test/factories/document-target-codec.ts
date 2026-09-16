@@ -26,6 +26,7 @@ const PREFIXES = [
   'git-ref:',
   'git-diff:',
   'compare-saved:',
+  'history:',
   'conflict-diff:',
   'search-buffer:',
 ] as const
@@ -85,6 +86,7 @@ export function decodeDocumentTarget(value: unknown, owner: WorkspaceRoot): Deco
   if (value.startsWith('git-ref:')) return decodeReference(value)
   if (value.startsWith('git-diff:')) return decodeComparison(value, owner)
   if (value.startsWith('compare-saved:')) return decodeSimple(value, 'compare-saved')
+  if (value.startsWith('history:')) return decodeSimple(value, 'history')
   if (value.startsWith('conflict-diff:')) return decodeSimple(value, 'conflict')
   if (value.startsWith('search-buffer:')) return decodeSimple(value, 'search')
   if (PREFIXES.some((prefix) => value.startsWith(prefix))) return invalidTarget()
@@ -166,7 +168,7 @@ function decodeCheckpoint(encoded: string, owner: WorkspaceRoot): DecodedDocumen
 
 function decodeSimple(
   value: string,
-  kind: 'compare-saved' | 'conflict' | 'search',
+  kind: 'compare-saved' | 'conflict' | 'history' | 'search',
 ): DecodedDocumentTarget {
   const decoded = textPayload(value.slice(value.indexOf(':') + 1))
   if (decoded === null || decoded.includes('\0')) return invalidTarget()
@@ -180,10 +182,7 @@ function decodeSimple(
       path: filesystemPath('/repo/src/a.ts'),
     })
   }
-  return tabResult({
-    kind: 'compare-saved',
-    file: fileResource(filesystemPath(decoded)),
-  })
+  return tabResult({ kind, file: fileResource(filesystemPath(decoded)) })
 }
 
 function textPayload(value: string): string | null {

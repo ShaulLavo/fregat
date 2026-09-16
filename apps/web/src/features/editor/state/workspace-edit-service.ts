@@ -24,7 +24,6 @@ import {
   commitPreparedDocumentTransactionSequenceSegment,
   completePreparedDocumentTransactionSequence,
   completeReverseDocumentTransactionSequence,
-  createEditorTextBuffer,
   createDocumentLogicalRevisionScope,
   offsetToPoint,
   documentTextRoundTripStatus,
@@ -74,6 +73,8 @@ import {
 import { normalizeWorkspaceRoot } from '@workspace/client-core/files/path'
 import { toClientError } from '@/lib/client-error-taxonomy'
 import { createClientError } from '@workspace/client-core/errors'
+import { log } from '@/lib/client-logging'
+import { createHistoryBuffer } from '@/features/editor/state/history-buffer'
 import { createClientInvariantError } from '@/lib/structured-errors'
 
 type WorkspacePersistenceOperation = WorkspaceEditPrepareRequest['operations'][number]
@@ -129,6 +130,15 @@ export type WorkspaceEditRecovery = {
   readonly generation: number
   readonly operationId: string
   readonly unrecoveredPaths: readonly FilesystemPath[]
+}
+
+/** The newest undoable workspace group that still holds a buffer's earlier editor history. */
+export type HistoryBarrierGroup = {
+  readonly operationId: string
+  readonly affectedPaths: readonly FilesystemPath[]
+  /** Only the newest group can be undone; later groups must go first. */
+  readonly laterGroupCount: number
+  readonly undoable: boolean
 }
 
 export type WorkspaceEditServiceSnapshot = {
@@ -345,6 +355,7 @@ export class WorkspaceEditService {
     new WeakSet<WorkspaceMutationReservation>()
   private snapshot: WorkspaceEditServiceSnapshot = IDLE_SNAPSHOT
   private readonly undoStack: WorkspaceEditGroup[] = []
+  private readonly barrierGroups = new WeakMap<EditorTextBuffer, HistoryBarrierGroup>()
   private serverEpoch: string | null
   private readonly unsubscribeDocumentContentRevisions: () => void
   private readonly unsubscribeServerEpoch: () => void
@@ -626,6 +637,40 @@ export class WorkspaceEditService {
 
   canRedoWorkspaceEdit(): boolean {
     return this.redoStack.length > 0 && this.historyCommandsAvailable()
+  }
+
+  /** Whether an undoable workspace group still holds this buffer's earlier editor history. */
+  hasHistoryBarrier(buffer: EditorTextBuffer): boolean {
+    return this.undoStack.some((group) => groupHoldsBarrier(group, buffer))
+  }
+
+  // Memoized per buffer so a store snapshot read returns the same object while nothing moved.
+  historyBarrierGroup(buffer: EditorTextBuffer): HistoryBarrierGroup | null {
+    const index = this.undoStack.findLastIndex((group) => groupHoldsBarrier(group, buffer))
+    if (index === -1) {
+      this.barrierGroups.delete(buffer)
+      return null
+    }
+    const group = this.undoStack[index]!
+    const laterGroupCount = this.undoStack.length - 1 - index
+    const undoable = laterGroupCount === 0 && this.historyCommandsAvailable()
+    const cached = this.barrierGroups.get(buffer)
+    if (
+      cached &&
+      cached.operationId === group.operationId &&
+      cached.laterGroupCount === laterGroupCount &&
+      cached.undoable === undoable
+    ) {
+      return cached
+    }
+    const next: HistoryBarrierGroup = {
+      affectedPaths: group.affectedPaths,
+      laterGroupCount,
+      operationId: group.operationId,
+      undoable,
+    }
+    this.barrierGroups.set(buffer, next)
+    return next
   }
 
   resetForRoot(): void {
@@ -1095,7 +1140,9 @@ export class WorkspaceEditService {
         server &&
         !this.options.fileSync.sealWorkspaceMutationProjection(local.projection, server)
       ) {
-        throw workspaceEditError('snapshot-drift', 'Workspace query projection became stale')
+        // The server has finalized; a refetch merely superseded the projection. Reconcile, keep going.
+        local.projection = null
+        await this.reconcileProjectionSafely(prepared.root.path, prepared.affectedPaths)
       }
       sealLocalReceipts(local, locks)
       await this.recordHistory(prepared, local, server)
@@ -1223,6 +1270,15 @@ export class WorkspaceEditService {
     }
     this.undoStack.push(...retained)
     this.publish({})
+    if (discarded.length > 0) {
+      log.info({
+        action: 'workspace_edit.history_evicted',
+        area: 'workspace-edit',
+        discardedOperationIds: discarded.map((group) => group.operationId),
+        invalidatedPaths: paths === 'all' ? 'all' : paths,
+        retainedCount: retained.length,
+      })
+    }
     await Promise.all(discarded.map((group) => this.releaseGroup(group)))
   }
 
@@ -1238,12 +1294,16 @@ export class WorkspaceEditService {
     let provisional = group.server
     let localReversed = false
     let projection: WorkspaceMutationProjectionReceipt | null = null
+    const rootPath = group.projection?.rootPath ?? this.options.getRoot()?.path ?? null
     try {
+      // A refetch since the edit landed replaced the projected cache entries with disk truth. That
+      // supersedes the projection, it does not conflict with it: the server's version guards
+      // decide conflicts. Reconcile from disk afterwards instead of reversing the projection.
       if (
         group.projection &&
         !this.options.fileSync.isWorkspaceMutationProjectionCurrent(group.projection)
       ) {
-        throw workspaceEditError('workspace-edit-stale', 'Workspace query projection is stale')
+        group.projection = null
       }
       locks = acquireGroupLocks(this.options.documentStore, group)
       if (provisional) {
@@ -1270,9 +1330,7 @@ export class WorkspaceEditService {
           provisional,
           workspaceProjectionEntries(group.projection.rootPath, provisional),
         )
-        if (!projection) {
-          throw workspaceEditError('workspace-edit-stale', 'Workspace query projection is stale')
-        }
+        if (!projection) group.projection = null
       }
       if (provisional) {
         provisional = await this.options.fileSync.finalizeWorkspaceMutation(provisional)
@@ -1281,17 +1339,40 @@ export class WorkspaceEditService {
           projection &&
           !this.options.fileSync.sealWorkspaceMutationProjection(projection, provisional)
         ) {
-          throw workspaceEditError('workspace-edit-stale', 'Workspace query projection is stale')
+          projection = null
+          group.projection = null
         }
       }
       group.server = provisional
       group.projection = projection ?? group.projection
+      // A persisted group with no projection left, discarded now or on an earlier transition,
+      // settles the cache from disk: nothing else will.
+      if (provisional && !group.projection && rootPath) {
+        await this.reconcileProjectionSafely(rootPath, group.affectedPaths)
+      }
       source.pop()
       const destination = direction === 'undo' ? this.redoStack : this.undoStack
       destination.push(group)
       this.publish({ phase: direction === 'undo' ? 'applied' : 'applied' })
+      log.info({
+        action: 'workspace_edit.reverse',
+        area: 'workspace-edit',
+        direction,
+        operationId: group.operationId,
+        outcome: 'applied',
+      })
       return true
-    } catch {
+    } catch (error) {
+      log.warn({
+        action: 'workspace_edit.reverse',
+        area: 'workspace-edit',
+        direction,
+        error,
+        localReversed,
+        operationId: group.operationId,
+        outcome: 'stale',
+        serverState: provisional?.state ?? null,
+      })
       if (projection) this.options.fileSync.rollbackWorkspaceMutationProjection(projection)
       if (localReversed && locks) {
         const opposite = direction === 'undo' ? 'redo' : 'undo'
@@ -1313,8 +1394,8 @@ export class WorkspaceEditService {
         locks = null
         return false
       }
-      if (group.projection) {
-        await this.reconcileProjectionSafely(group.projection.rootPath, group.affectedPaths)
+      if ((group.projection || provisional) && rootPath) {
+        await this.reconcileProjectionSafely(rootPath, group.affectedPaths)
       }
       await this.invalidateHistoryDependencyChain(source, group.affectedPaths)
       this.publish({
@@ -1981,7 +2062,7 @@ class TextChangeSources implements TextChangePreparation {
     const snapshot = await this.options.fileSync.readWorkspaceSnapshot(path, this.signal)
     this.assertOpen()
     assertSafeRoundTrip(snapshot)
-    const buffer = createEditorTextBuffer(snapshot.text)
+    const buffer = createHistoryBuffer(snapshot.text)
     const source = issueTextSource(path, buffer)
     const evidence: SourceEvidence = { kind: 'disk', buffer, pathRequest, snapshot, source }
     assertSourceCurrent(this.options, evidence)
@@ -2480,7 +2561,7 @@ function operationAnnotationIds(operation: WorkspaceEditOperation): readonly str
 }
 
 function transientTarget(path: FilesystemPath, text: string): PreparedTarget {
-  const buffer = createEditorTextBuffer(text)
+  const buffer = createHistoryBuffer(text)
   buffer.markClean()
   return {
     buffer,
@@ -3005,6 +3086,14 @@ function sealLocalReceipts(local: LocalCommit, locks: HeldWorkspaceLocks): void 
     const sealed = sealDocumentTransactionReceipt(documentCommitTarget(target, locks), receipt)
     local.receipts.set(target, sealed.receipt)
   }
+}
+
+function groupHoldsBarrier(group: WorkspaceEditGroup, buffer: EditorTextBuffer): boolean {
+  for (const [target, receipt] of group.receipts) {
+    if (target.buffer !== buffer) continue
+    if (receipt.history.kind === 'external-barrier') return true
+  }
+  return false
 }
 
 function releaseLocalReceipts(local: LocalCommit): void {

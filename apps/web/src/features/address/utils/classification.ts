@@ -61,6 +61,16 @@ export const STATE_CLASSIFICATIONS: Readonly<Record<string, ClassifiedState>> = 
     storageKey: CACHE_KEYS.chatModeSelection,
     why: 't/<id> | t/new | absent — key retired once the address restores it',
   },
+  navigationPending: {
+    classification: 'ephemeral',
+    storageKey: 'platform.navigation.pending',
+    why: 'a take-once inbox for the navigation a reload interrupted; replaying it from a link would loop',
+  },
+  paletteBoot: {
+    classification: 'preference',
+    storageKey: 'platform.palette-boot.v1',
+    why: 'the palette CSS cached for first paint, derived from the palette preference',
+  },
   chatProjection: {
     classification: 'ephemeral',
     storageKey: 'platform.chat-projection',

@@ -1,8 +1,5 @@
-import {
-  historyEdgePath,
-  historyLaneColors,
-  type HistoryRow,
-} from '@/features/git/utils/history-layout'
+import { historyEdgePath, type HistoryRow } from '@/features/git/utils/history-layout'
+import { historyLaneColors } from '@/lib/history-lane-colors'
 
 export function HistoryGraph({
   row,

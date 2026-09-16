@@ -4,6 +4,7 @@ import { useId } from 'react'
 import type { SearchBufferOptionPatch } from '@/features/search/state/buffer-state'
 import type { WorkspaceSearchQueryOptions } from '@/features/search/utils/buffer-query'
 import { Input } from '@workspace/ui/components/input'
+import { useOwnedText } from '@/hooks/use-owned-text'
 
 type SearchFilterFieldsProps = {
   options: WorkspaceSearchQueryOptions
@@ -14,12 +15,19 @@ export function SearchFilterFields({ options, onOptionsChange }: SearchFilterFie
   const includeId = useId()
   const excludeId = useId()
 
+  const [includeText, changeInclude] = useOwnedText(options.includeGlobText, (includeGlobText) =>
+    onOptionsChange({ includeGlobText }),
+  )
+  const [excludeText, changeExclude] = useOwnedText(options.excludeGlobText, (excludeGlobText) =>
+    onOptionsChange({ excludeGlobText }),
+  )
+
   function handleIncludeChange(event: ChangeEvent<HTMLInputElement>) {
-    onOptionsChange({ includeGlobText: event.target.value })
+    changeInclude(event.target.value)
   }
 
   function handleExcludeChange(event: ChangeEvent<HTMLInputElement>) {
-    onOptionsChange({ excludeGlobText: event.target.value })
+    changeExclude(event.target.value)
   }
 
   if (!options.filtersVisible) return null
@@ -38,7 +46,7 @@ export function SearchFilterFields({ options, onOptionsChange }: SearchFilterFie
           id={includeId}
           placeholder='src/**/*.ts'
           spellCheck={false}
-          value={options.includeGlobText}
+          value={includeText}
           onChange={handleIncludeChange}
         />
       </div>
@@ -54,7 +62,7 @@ export function SearchFilterFields({ options, onOptionsChange }: SearchFilterFie
           id={excludeId}
           placeholder='**/dist/**'
           spellCheck={false}
-          value={options.excludeGlobText}
+          value={excludeText}
           onChange={handleExcludeChange}
         />
       </div>

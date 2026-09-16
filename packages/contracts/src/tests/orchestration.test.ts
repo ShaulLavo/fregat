@@ -769,6 +769,6 @@ describe('session lifecycle contracts', () => {
       (option) => option.entries.method.literal,
     )
 
-    expect([...methods].sort()).toEqual(Object.keys(ORCHESTRATION_WS_RESULTS).sort())
+    expect(methods.toSorted()).toEqual(Object.keys(ORCHESTRATION_WS_RESULTS).sort())
   })
 })

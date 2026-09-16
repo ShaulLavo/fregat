@@ -77,6 +77,7 @@ const storedDocumentSchema = v.variant('kind', [
   }),
   v.strictObject({ kind: v.literal('git-diff'), source: comparisonSchema }),
   v.strictObject({ kind: v.literal('compare-saved'), file: resourceSchema }),
+  v.strictObject({ kind: v.literal('history'), file: resourceSchema }),
   v.strictObject({ kind: v.literal('search'), root: pathSchema }),
   v.strictObject({
     kind: v.literal('conflict'),

@@ -70,7 +70,7 @@ export function sameTabContent(left: TabContent, right: TabContent): boolean {
 export function retainedTabDocuments(content: TabContent): readonly DocumentRef[] {
   if (content.kind === 'settings') return SETTINGS_MEMBERS
   const document = content.document
-  if (document.kind !== 'compare-saved') return [document]
+  if (document.kind !== 'compare-saved' && document.kind !== 'history') return [document]
   return [document, fileDocument(document.file)]
 }
 

@@ -99,6 +99,7 @@ function editorActions(
     closeReferences: vi.fn(),
     compareMergeConflict: null,
     handleTextChange: vi.fn(),
+    showFile: vi.fn(),
     openDefinition: vi.fn(),
     openReferences: vi.fn(),
     previewReference: vi.fn(),

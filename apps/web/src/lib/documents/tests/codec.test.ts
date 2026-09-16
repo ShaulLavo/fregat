@@ -40,10 +40,13 @@ test('view identities escape the punctuation a URI cannot carry raw', () => {
     kind: 'compare-saved',
     file: { path: filesystemPath('src/a b/c#d?e.ts') },
   } as const
+  const history = { kind: 'history', file: { path: filesystemPath('src/a b/c#d?e.ts') } } as const
   expect(encodedViewTarget(reference)).not.toMatch(/[\s#?]/)
   expect(encodedViewTarget(compared)).not.toMatch(/[\s#?]/)
+  expect(encodedViewTarget(history)).not.toMatch(/[\s#?]/)
   expect(documentLabel(reference)).toBe('a:b.ts (refs/heads/feat:x)')
   expect(documentLabel(compared)).toBe('c#d?e.ts (working tree)')
+  expect(documentLabel(history)).toBe('c#d?e.ts (history)')
 })
 
 test('conflict targets are keyed by the record identity and presented by their path', () => {

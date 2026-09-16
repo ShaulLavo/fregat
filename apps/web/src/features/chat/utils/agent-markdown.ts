@@ -49,7 +49,7 @@ const CODE_FENCE_LANGUAGE_REPAIRS: readonly LanguageRepair[] = [
 
 const SORTED_LANGUAGE_REPAIRS = CODE_FENCE_LANGUAGE_REPAIRS.map((repair) => ({
   ...repair,
-  aliases: [...repair.aliases].sort((first, second) => second.length - first.length),
+  aliases: repair.aliases.toSorted((first, second) => second.length - first.length),
 }))
 
 export function normalizeAgentMarkdown(markdown: string) {

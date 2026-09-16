@@ -12,7 +12,7 @@ The Search side panel, or the address URL search parameters (`s.*`).
 
 ## Driving it with agent:browser
 
-No scenario yet. Add `search-replace-bulk`: open the search panel, type a query that hits many files, run replace, then read two changed files from disk.
+`search-input-undo` types into the query and replace fields and presses Ctrl+Z in each; the step labels carry the remaining value. No replace scenario yet. Add `search-replace-bulk`: open the search panel, type a query that hits many files, run replace, then read two changed files from disk.
 
 ## Gotchas
 

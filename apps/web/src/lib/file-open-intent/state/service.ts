@@ -159,6 +159,7 @@ export type FileOpenIntentServiceOwner = {
 }
 
 export type FileOpenIntentServiceOwnerDependencies = {
+  readonly createBuffer?: (text: string) => EditorTextBuffer
   readonly createEvent?: FileOpenIntentEventFactory
   readonly getLiveDocument: (path: FilesystemPath) => FileOpenIntentLiveDocument | null
   readonly getRetainedScrollPosition: (path: FilesystemPath) => EditorScrollPosition | null
@@ -287,6 +288,7 @@ class FileOpenIntentOwner implements FileOpenIntentServiceOwner {
       dependencies.prefetchRelated,
       dependencies.runtime,
       dependencies.createEvent,
+      dependencies.createBuffer,
     )
     this.service = {
       claimLive: (path) => (this.canConsume() ? this.state.claimLive(path) : null),
@@ -485,6 +487,7 @@ class FileOpenIntentServiceState {
     ) => Promise<unknown> | void,
     private readonly runtime: FileOpenIntentRuntime = defaultFileOpenIntentRuntime,
     private readonly createEvent: FileOpenIntentEventFactory = createWideEventScope,
+    private readonly createBuffer: (text: string) => EditorTextBuffer = createEditorTextBuffer,
   ) {
     this.environment = preparer.environment
   }
@@ -979,7 +982,7 @@ class FileOpenIntentServiceState {
       }
 
       const bufferStartedAt = this.runtime.now()
-      const buffer = createCleanBuffer(file)
+      const buffer = createCleanBuffer(file, this.createBuffer)
       event.set({ stages: { buffer: { durationMs: this.runtime.now() - bufferStartedAt } } })
       const documentStartedAt = this.runtime.now()
       const structuralRange = this.structuralRange(file.path, buffer)
@@ -1946,9 +1949,12 @@ function isRecord(value: unknown): value is Record<string, unknown> {
   return typeof value === 'object' && value !== null && !Array.isArray(value)
 }
 
-function createCleanBuffer(file: FileResult): EditorTextBuffer {
+function createCleanBuffer(
+  file: FileResult,
+  createBuffer: (text: string) => EditorTextBuffer,
+): EditorTextBuffer {
   markEditorOpenBenchmark('editor.file_open.buffer_built', file.path)
-  const buffer = createEditorTextBuffer(file.content)
+  const buffer = createBuffer(file.content)
   buffer.markClean()
   return buffer
 }

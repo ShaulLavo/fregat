@@ -124,6 +124,28 @@ describe('editor document store state identity', () => {
     )
   })
 
+  it('keeps the buffer and its undo history when only the file version changes', () => {
+    const store = createEditorDocumentStore()
+    const file = fileResult('/repo/a.ts')
+    const view = store.getState().ensureEditorView(tabId('tab-1'), file)
+    createEditorBufferSession(view.buffer).applyText('!')
+    view.buffer.markClean()
+    expect(view.buffer.canUndo()).toBe(true)
+
+    const touched = { ...file, content: view.buffer.materializeFullText(), version: 'touched' }
+    const next = store.getState().ensureLiveEditorDocument(touched)
+
+    expect(next.buffer).toBe(view.buffer)
+    expect(next.buffer.canUndo()).toBe(true)
+    expect(next.sync).toMatchObject({ fileVersion: 'touched', kind: 'file' })
+    expect(store.getState().getEditorView(tabId('tab-1'))?.view).toBe(view.view)
+
+    const rewritten = { ...touched, content: 'rewritten', version: 'rewritten' }
+    const replaced = store.getState().ensureLiveEditorDocument(rewritten)
+    expect(replaced.buffer).not.toBe(view.buffer)
+    expect(replaced.buffer.canUndo()).toBe(false)
+  })
+
   it('records a logical synchronize revision without changing content dirty or sync state', () => {
     const store = createEditorDocumentStore()
     const document = store.getState().ensureLiveEditorDocument(fileResult('/repo/a.ts'))

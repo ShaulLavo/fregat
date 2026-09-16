@@ -12,6 +12,7 @@ import {
   SelectValue,
 } from '@workspace/ui/components/select'
 import { logBreakdownOptionValues } from '@/features/logs/utils/toolbar-options'
+import { useOwnedText } from '@/hooks/use-owned-text'
 
 type LogsToolbarProps = {
   areas: readonly LogDashboardBreakdownItem[]
@@ -39,6 +40,9 @@ const levelOptions: Array<{ label: string; value: LogDashboardLevel | 'all' }> =
 export function LogsToolbar({ areas, filters, sources, onFiltersChange }: LogsToolbarProps) {
   const sourceValues = logBreakdownOptionValues(sources, filters.source)
   const areaValues = logBreakdownOptionValues(areas, filters.area)
+  const [searchText, changeSearch] = useOwnedText(filters.search, (search) =>
+    onFiltersChange({ ...filters, search }),
+  )
 
   return (
     <>
@@ -55,8 +59,8 @@ export function LogsToolbar({ areas, filters, sources, onFiltersChange }: LogsTo
             className='text-2xs h-full'
             placeholder='Search logs'
             spellCheck={false}
-            value={filters.search}
-            onChange={(event) => onFiltersChange({ ...filters, search: event.target.value })}
+            value={searchText}
+            onChange={(event) => changeSearch(event.target.value)}
           />
         </InputGroup>
         <Select

@@ -71,6 +71,11 @@ export function workbenchChildren<
     path: 'c/$',
     params: { parse: (params) => v.parse(fileParams, params), stringify: (params) => params },
   })
+  const history = createRoute({
+    getParentRoute: () => parent,
+    path: 'h/$',
+    params: { parse: (params) => v.parse(fileParams, params), stringify: (params) => params },
+  })
   const ref = createRoute({
     getParentRoute: () => parent,
     path: 'r/$ref/$',
@@ -97,5 +102,15 @@ export function workbenchChildren<
       stringify: (params) => params,
     },
   })
-  return [settings, search, file, compare, ref, snapshot, checkpoint, checkpointFile] as const
+  return [
+    settings,
+    search,
+    file,
+    compare,
+    history,
+    ref,
+    snapshot,
+    checkpoint,
+    checkpointFile,
+  ] as const
 }

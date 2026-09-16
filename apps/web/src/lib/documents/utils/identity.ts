@@ -81,6 +81,7 @@ function identityParts(document: DocumentRef): readonly unknown[] {
     case 'git-diff':
       return [document.kind, ...comparisonIdentity(document.source)]
     case 'compare-saved':
+    case 'history':
       return [document.kind, document.file.path]
     case 'conflict':
       return [document.kind, document.conflictId]

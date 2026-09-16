@@ -22,6 +22,7 @@ import {
 } from '@workspace/ui/components/input-group'
 import { ToolbarButton } from '@/components/toolbar-button'
 import { historyRefLabel } from '@/features/git/utils/history-presentation'
+import { useOwnedText } from '@/hooks/use-owned-text'
 
 export function HistoryToolbar({
   refs,
@@ -44,6 +45,7 @@ export function HistoryToolbar({
   onRefresh: () => void
   onExpand: () => void
 }) {
+  const [searchText, changeSearch] = useOwnedText(search, onSearchChange)
   const choices = [
     { value: 'all', label: 'All branches & tags' },
     { value: 'HEAD', label: 'Current branch' },
@@ -102,8 +104,8 @@ export function HistoryToolbar({
             placeholder='Search commit history…'
             title='Search messages, authors, and commit IDs in the full selected history'
             maxLength={1024}
-            value={search}
-            onChange={(event) => onSearchChange(event.target.value)}
+            value={searchText}
+            onChange={(event) => changeSearch(event.target.value)}
           />
           {search ? (
             <InputGroupAddon align='inline-end'>

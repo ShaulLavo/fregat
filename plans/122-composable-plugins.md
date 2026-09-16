@@ -45,15 +45,15 @@ configuration syntax, and loading strategy remain design work.
 
 ## Current foundations and gaps
 
-| Source | Existing seam and implication |
-| --- | --- |
-| [Fregat editor assembly](../apps/web/src/features/editor/components/editor.tsx) | Combines built-ins and `additionalPlugins` and passes them to `useEditor`. Extend this integration rather than create another embedded editor. |
-| [Fregat built-ins](../apps/web/src/features/editor/utils/plugins.ts) | Assembles feature-specific factories. This is a migration target, not the desired public authoring contract. |
-| [Singapore plugin contracts and host][sg-plugins] | Already provides lifecycle, disposables, contribution contexts, single-owner capabilities, and multi-provider language features. Reuse useful internals while simplifying the public layer. |
-| [Singapore React adapter][sg-react] | Synchronizes plugin configuration through `editor.setPlugins`. Preserve stable definition identity and live attachment without recreating document state. |
-| [Singapore view contributions][sg-views] | The viewport lane checks a dedicated subscriber set before constructing its payload. General updates construct a snapshot and visit all view contributions. This is an optimization candidate, not a measured latency diagnosis. |
-| [Singapore command IDs][sg-commands] and [Fregat keymap adapter](../apps/web/src/keymap/editor-keymap.ts) | Editor IDs are a closed union; Fregat disables the standalone editor keymap. Custom commands need typed IDs and integration with Fregat's existing command/focus routing. |
-| [Plan 099](099-document-contributions.md) | Owns canonical buffer publication and shared document synchronization. It remains proposed. Reuse its owner and progress contracts; do not add a second document bus or worker-sync layer. |
+| Source                                                                                                    | Existing seam and implication                                                                                                                                                                                                    |
+| --------------------------------------------------------------------------------------------------------- | -------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| [Fregat editor assembly](../apps/web/src/features/editor/components/editor.tsx)                           | Combines built-ins and `additionalPlugins` and passes them to `useEditor`. Extend this integration rather than create another embedded editor.                                                                                   |
+| [Fregat built-ins](../apps/web/src/features/editor/utils/plugins.ts)                                      | Assembles feature-specific factories. This is a migration target, not the desired public authoring contract.                                                                                                                     |
+| [Singapore plugin contracts and host][sg-plugins]                                                         | Already provides lifecycle, disposables, contribution contexts, single-owner capabilities, and multi-provider language features. Reuse useful internals while simplifying the public layer.                                      |
+| [Singapore React adapter][sg-react]                                                                       | Synchronizes plugin configuration through `editor.setPlugins`. Preserve stable definition identity and live attachment without recreating document state.                                                                        |
+| [Singapore view contributions][sg-views]                                                                  | The viewport lane checks a dedicated subscriber set before constructing its payload. General updates construct a snapshot and visit all view contributions. This is an optimization candidate, not a measured latency diagnosis. |
+| [Singapore command IDs][sg-commands] and [Fregat keymap adapter](../apps/web/src/keymap/editor-keymap.ts) | Editor IDs are a closed union; Fregat disables the standalone editor keymap. Custom commands need typed IDs and integration with Fregat's existing command/focus routing.                                                        |
+| [Plan 099](099-document-contributions.md)                                                                 | Owns canonical buffer publication and shared document synchronization. It remains proposed. Reuse its owner and progress contracts; do not add a second document bus or worker-sync layer.                                       |
 
 No rewrite of the text buffer, document identity, transaction model, rendering engine, or
 application command bus is authorized by this plan. Preserve their contracts while making
@@ -65,13 +65,13 @@ Use primary documentation and source, pin the versions used in experiments, and 
 actual implementation behind each claimed behavior. The following are starting references,
 not a completed comparative benchmark:
 
-| Reference | What to study and what not to assume |
-| --- | --- |
-| [CodeMirror configuration][cm-config] | Composition, nested extension values, precedence, and partial reconfiguration. Learn how the consumer installs one bundle without wiring its internals. |
-| [CodeMirror facets and state][cm-state] | Library-defined channels, combination rules, explicit computed dependencies, and equality. Distinguish avoided computation from graph traversal or bookkeeping that still runs. |
-| [CodeMirror view plugins][cm-view] | Per-view instances, update/destruction, decoration integration, and DOM read/write phases. Its general view-update callback is not proof that notification fan-out is selective. |
-| [Monaco editor API][monaco-editor] | Direct editor operations, distinct content/selection/scroll events, actions, widgets, and decoration ownership. Inspect editor, model, and global registration lifetimes separately. |
-| [Monaco completion registration][monaco-completion] | Typed provider registration with disposal. Learn ergonomics and scope without copying a feature-specific registration API for every possible extension. |
+| Reference                                           | What to study and what not to assume                                                                                                                                                 |
+| --------------------------------------------------- | ------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------ |
+| [CodeMirror configuration][cm-config]               | Composition, nested extension values, precedence, and partial reconfiguration. Learn how the consumer installs one bundle without wiring its internals.                              |
+| [CodeMirror facets and state][cm-state]             | Library-defined channels, combination rules, explicit computed dependencies, and equality. Distinguish avoided computation from graph traversal or bookkeeping that still runs.      |
+| [CodeMirror view plugins][cm-view]                  | Per-view instances, update/destruction, decoration integration, and DOM read/write phases. Its general view-update callback is not proof that notification fan-out is selective.     |
+| [Monaco editor API][monaco-editor]                  | Direct editor operations, distinct content/selection/scroll events, actions, widgets, and decoration ownership. Inspect editor, model, and global registration lifetimes separately. |
+| [Monaco completion registration][monaco-completion] | Typed provider registration with disposal. Learn ergonomics and scope without copying a feature-specific registration API for every possible extension.                              |
 
 Implement the same small experiments against candidate Singapore APIs: a named command,
 a selection-driven decoration, and bounded modal input. Add the shared-channel and backend
@@ -94,11 +94,7 @@ newly implemented exports or an approved final signature:
 ```ts
 export const annotations = createPlugin({
   name: 'acme.annotations',
-  extensions: [
-    annotationState,
-    annotationGutter,
-    annotationCommands,
-  ],
+  extensions: [annotationState, annotationGutter, annotationCommands],
 })
 ```
 
@@ -175,13 +171,13 @@ attribute actual work rather than describing full-power execution as preemptible
 
 ## Ownership across Singapore and Fregat
 
-| Lifetime | Owner and required behavior |
-| --- | --- |
-| Package definition | Immutable reusable description; loader owns module/version identity. |
-| Workspace backend | Fregat owns activation per confirmed environment/workspace, shared services, and managed child processes. Opening another editor must not spawn another backend service unnecessarily. |
-| Document | Existing buffer owner retains canonical text/history/revisions and shared analysis. Retained documents do not disappear merely because a view closes. Coordinate with Plan 099. |
-| Editor view | Singapore owns per-view state, cursor/input mode, DOM, viewport, and decorations. Two splits must not accidentally share view state. |
-| Client application | Fregat owns menus, panels, settings integration, focused-target command routing, and supported client surfaces. |
+| Lifetime           | Owner and required behavior                                                                                                                                                            |
+| ------------------ | -------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| Package definition | Immutable reusable description; loader owns module/version identity.                                                                                                                   |
+| Workspace backend  | Fregat owns activation per confirmed environment/workspace, shared services, and managed child processes. Opening another editor must not spawn another backend service unnecessarily. |
+| Document           | Existing buffer owner retains canonical text/history/revisions and shared analysis. Retained documents do not disappear merely because a view closes. Coordinate with Plan 099.        |
+| Editor view        | Singapore owns per-view state, cursor/input mode, DOM, viewport, and decorations. Two splits must not accidentally share view state.                                                   |
+| Client application | Fregat owns menus, panels, settings integration, focused-target command routing, and supported client surfaces.                                                                        |
 
 The editor-facing definition must work in standalone Singapore and through Fregat without a
 second author-written wrapper. Fregat supplies loading, service bindings, and attachment to
@@ -237,13 +233,13 @@ integration adapters; [Plan 087](087-stateless-mcp.md) retains MCP ownership.
 
 ## Required proof plugins
 
-| Proof | What must be demonstrated |
-| --- | --- |
-| Alignment command | Namespaced command, keybinding/palette routing, multicursor batch edit, and one undo. No subscriptions or payload generation while unused. |
-| Annotation ecosystem | One package defines a typed annotation channel; two independent plugins contribute. Shared analysis feeds a gutter and view decoration without new core annotation APIs or duplicate analysis. |
-| Modal input | Normal/insert/operator-pending behavior, native insert-mode delegation, composition, focus changes, readonly views, and teardown in two splits. No competing global DOM listeners. |
-| Backend formatter | One package uses a native subprocess on the owning workspace machine, formats the current dirty buffer, and applies version-checked edits through normal transactions. Prove delayed results, cancellation, and environment switching. |
-| First-party migration | Migrate a representative command, view feature, and shared analysis consumer through the selected contract. Remove their superseded registration path in the same migration unit. |
+| Proof                 | What must be demonstrated                                                                                                                                                                                                              |
+| --------------------- | -------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| Alignment command     | Namespaced command, keybinding/palette routing, multicursor batch edit, and one undo. No subscriptions or payload generation while unused.                                                                                             |
+| Annotation ecosystem  | One package defines a typed annotation channel; two independent plugins contribute. Shared analysis feeds a gutter and view decoration without new core annotation APIs or duplicate analysis.                                         |
+| Modal input           | Normal/insert/operator-pending behavior, native insert-mode delegation, composition, focus changes, readonly views, and teardown in two splits. No competing global DOM listeners.                                                     |
+| Backend formatter     | One package uses a native subprocess on the owning workspace machine, formats the current dirty buffer, and applies version-checked edits through normal transactions. Prove delayed results, cancellation, and environment switching. |
+| First-party migration | Migrate a representative command, view feature, and shared analysis consumer through the selected contract. Remove their superseded registration path in the same migration unit.                                                      |
 
 The small examples must not grow into five bespoke plugin architectures. Record every additional
 primitive each example requires; add one only for a demonstrated missing composition capability.
@@ -305,17 +301,17 @@ features still maintain an alternate public authoring model without an explicit 
 
 ### Deterministic routing and correctness gates
 
-| Scenario | Required result |
-| --- | --- |
-| Pure scroll with selection-only pieces installed | Zero selection callbacks/selectors and zero selection-specific payload creation. |
-| No subscribers for a custom channel | No channel-specific snapshot, full-text materialization, serialization, worker message, or polling task. |
-| Unused command-only plugin | Handler is called only on invocation; no per-edit update callback is installed on its behalf. |
-| Shared derived input is unchanged | Downstream recomputation/notifications stop according to the declared equality contract. |
-| One operation changes several inputs | Observers see coherent committed state; duplicate dependencies do not schedule duplicate work in a phase. |
-| Same document in two views | Shared compatible analysis runs once per demanded revision; view state remains independent. |
-| Disable/reload or dependency removal | No orphaned managed commands, listeners, decorations, tasks, or child processes; shared dependencies survive remaining owners. |
-| Stale backend/worker result | Rejected after a document revision, environment, or plugin-generation mismatch; cancellation is not the only guard. |
-| Activation failure and disposal races | Explicit error/recovery state; no partial replacement disguised as success or mutation of another owner's state. |
+| Scenario                                         | Required result                                                                                                                |
+| ------------------------------------------------ | ------------------------------------------------------------------------------------------------------------------------------ |
+| Pure scroll with selection-only pieces installed | Zero selection callbacks/selectors and zero selection-specific payload creation.                                               |
+| No subscribers for a custom channel              | No channel-specific snapshot, full-text materialization, serialization, worker message, or polling task.                       |
+| Unused command-only plugin                       | Handler is called only on invocation; no per-edit update callback is installed on its behalf.                                  |
+| Shared derived input is unchanged                | Downstream recomputation/notifications stop according to the declared equality contract.                                       |
+| One operation changes several inputs             | Observers see coherent committed state; duplicate dependencies do not schedule duplicate work in a phase.                      |
+| Same document in two views                       | Shared compatible analysis runs once per demanded revision; view state remains independent.                                    |
+| Disable/reload or dependency removal             | No orphaned managed commands, listeners, decorations, tasks, or child processes; shared dependencies survive remaining owners. |
+| Stale backend/worker result                      | Rejected after a document revision, environment, or plugin-generation mismatch; cancellation is not the only guard.            |
+| Activation failure and disposal races            | Explicit error/recovery state; no partial replacement disguised as success or mutation of another owner's state.               |
 
 ### Measured performance gates
 

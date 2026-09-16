@@ -45,6 +45,9 @@ import {
 } from '@/features/chat-mode/state/session-commands'
 import { setChatModeSessionRailOpen, showChatModeToolTab } from '@/features/chat-mode/utils/panels'
 import { documentKey } from '@/lib/documents/utils/identity'
+import { runMutation } from '@/lib/mutations/run'
+import { historyRestoreMutationOptions } from '@/features/editor/state/history-mutations'
+import { adjacentHistoryState } from '@/features/editor/utils/history-navigation'
 import {
   documentSourcePath,
   filesystemResource,
@@ -278,6 +281,27 @@ function settingStart(
     }),
     status: 'started',
   }
+}
+
+// The chronological history commands: one state either way in sequence order, whatever branch.
+function stepHistory(
+  { runtime, snapshot }: WorkspaceCommandHandlerContext,
+  step: -1 | 1,
+): StartedCommand | typeof declined {
+  const document = snapshot.activeDocument
+  if (!document) return declined
+  const live = runtime.documents.store.getState().getLiveEditorDocument(documentKey(document))
+  if (!live) return declined
+  const target = adjacentHistoryState(live.buffer.getHistoryGraph(), step)
+  if (target === null) return declined
+
+  return operationStart(
+    runMutation(
+      runtime.documents.queryClient,
+      historyRestoreMutationOptions(live.key, live.buffer),
+      target,
+    ),
+  )
 }
 
 function focusActiveSurface(runtime: WorkspaceCommandRuntime): StartedCommand {
@@ -616,6 +640,27 @@ export const workspaceCommands = [
         () => focusActiveSurface(runtime),
       )
     },
+  }),
+  defineCommand({
+    ...workspaceCommandMetadata['workspace.showHistory'],
+    icon: ClockCounterClockwiseIcon,
+    run: ({ runtime, snapshot }) => {
+      const resource = filesystemResource(snapshot.activeDocument)
+      if (!resource) return declined
+
+      // No editor focus target to chase: the pane owns its own keyboard surface.
+      return navigationStart(
+        runtime.editor.openTabContent(documentTab({ kind: 'history', file: resource })),
+      )
+    },
+  }),
+  defineCommand({
+    ...workspaceCommandMetadata['workspace.historyBack'],
+    run: (context) => stepHistory(context, -1),
+  }),
+  defineCommand({
+    ...workspaceCommandMetadata['workspace.historyForward'],
+    run: (context) => stepHistory(context, 1),
   }),
   defineCommand({
     ...workspaceCommandMetadata['workspace.openFileAtHead'],

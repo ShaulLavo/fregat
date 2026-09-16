@@ -55,6 +55,7 @@ export type UnsyncedDocumentRef =
   | { readonly kind: 'git-ref'; readonly source: GitFileReference }
   | { readonly kind: 'git-diff'; readonly source: GitComparison }
   | { readonly kind: 'compare-saved'; readonly file: FileResource }
+  | { readonly kind: 'history'; readonly file: FileResource }
   /** `path` is where the resolution lands: it names the tab and picks the language. */
   | {
       readonly kind: 'conflict'

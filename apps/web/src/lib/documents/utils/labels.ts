@@ -15,6 +15,8 @@ export function documentLabel(document: DocumentRef): string {
       return comparisonLabel(document.source)
     case 'compare-saved':
       return `${basename(document.file.path)} (working tree)`
+    case 'history':
+      return `${basename(document.file.path)} (history)`
     case 'conflict':
       return basename(document.path)
     case 'search':
@@ -42,6 +44,8 @@ export function documentTitle(document: DocumentRef): string {
       return comparisonTitle(document.source)
     case 'compare-saved':
       return `${displayPath(document.file.path)} — working tree vs saved`
+    case 'history':
+      return `${displayPath(document.file.path)} — history`
     case 'conflict':
       return `${displayResourcePath(document.path)}: Current Changes ↔ Incoming Changes`
     case 'search':

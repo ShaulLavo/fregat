@@ -78,7 +78,7 @@ function stripRemotePrefix(ref: string | null, remoteNames: readonly string[]) {
 
   // Longest first: a repository with remotes `up` and `upstream` must not have
   // `upstream/main` shortened to `stream/main`.
-  for (const remote of [...remoteNames].sort((left, right) => right.length - left.length)) {
+  for (const remote of remoteNames.toSorted((left, right) => right.length - left.length)) {
     const prefix = `${remote}/`
     if (ref.startsWith(prefix)) return ref.slice(prefix.length) || null
   }

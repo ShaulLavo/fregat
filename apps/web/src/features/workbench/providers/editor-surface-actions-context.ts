@@ -1,4 +1,4 @@
-import type { DocumentKey, TabId } from '@/lib/documents/utils/types'
+import type { DocumentKey, FilesystemPath, TabId } from '@/lib/documents/utils/types'
 import { createContext } from 'react'
 
 import type { EditorStatusBarSource } from '@/features/editor/state/status-bar-source'
@@ -20,6 +20,8 @@ export type EditorSurfaceActions = {
   readonly handleTextChange: (tabId: TabId, key: DocumentKey, change: DocumentSessionChange) => void
   readonly setScrollPosition: (scrollPosition: EditorScrollPosition) => void
   readonly setStatusSource: (source: EditorStatusBarSource | null) => void
+  /** Selects the file's own editor tab, opening it if needed. */
+  readonly showFile: (path: FilesystemPath) => void
 }
 
 export const EditorSurfaceActionsContext = createContext<EditorSurfaceActions | null>(null)

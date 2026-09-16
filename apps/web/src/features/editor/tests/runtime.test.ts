@@ -33,6 +33,7 @@ test.for([
   { kind: 'git-ref', source: { path: preparationPath, ref: 'HEAD' } },
   { kind: 'git-diff', source: { kind: 'snapshot', path: preparationPath } },
   { kind: 'compare-saved', file: { path: preparationPath } },
+  { kind: 'history', file: { path: preparationPath } },
 ] satisfies readonly StandaloneDocumentRef[])(
   'prepares the working file while a $kind tab is selected',
   async (target, { server, client }) => {

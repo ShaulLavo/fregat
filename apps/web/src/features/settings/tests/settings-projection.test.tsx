@@ -206,9 +206,8 @@ test('replays each intent only into its target layer across confirmed roots', ()
 
   const userOnly = projectSettings(confirmed, useSettingsIntentStore.getState().active)
   expect(userOnly.values['workbench.colorTheme']).toBe('light')
-  expect(userOnly.layers.find((layer) => layer.id === 'user')?.raw).toEqual({
-    'workbench.colorTheme': 'system',
-  })
+  // `system` is the registry default, and a value written back to its default is pruned.
+  expect(userOnly.layers.find((layer) => layer.id === 'user')?.raw).toEqual({})
   expect(userOnly.layers.find((layer) => layer.id === 'workspace')?.raw).toEqual({
     'workbench.colorTheme': 'light',
   })

@@ -32,6 +32,26 @@ export const selectors = {
   wallpaperNone: (page: Page) => page.getByRole('button', { name: 'None', exact: true }),
   wallpaperStill: (page: Page) => page.locator(wallpaperStillSelector),
   commandOption: (page: Page, name: string) => page.getByRole('option', { name, exact: false }),
+  renameInput: (page: Page) => page.getByRole('textbox', { name: 'New name', exact: true }),
+  historyPane: (page: Page) => page.locator('[data-history-pane]'),
+  historyStates: (page: Page) => page.getByRole('listbox', { name: 'History states', exact: true }),
+  historyState: (page: Page, index: number) =>
+    page
+      .getByRole('listbox', { name: 'History states', exact: true })
+      .getByRole('option')
+      .nth(index),
+  historyRestore: (page: Page) => page.getByRole('button', { name: 'Restore', exact: true }),
+  diffRows: (page: Page) => page.locator('.editor-diff-pane [data-editor-virtual-row]'),
+  editorRows: (page: Page) => page.locator('.editor-virtualized-row'),
+  editorTabNamed: (page: Page, label: RegExp) =>
+    page.locator('[data-editor-tab-path]').filter({ hasText: label }),
+  workspaceEditApplyAll: (page: Page) =>
+    page.getByRole('button', { name: 'Apply all', exact: true }),
+  toast: (page: Page, title: string) => page.locator('[data-sonner-toast]', { hasText: title }),
+  toastAction: (page: Page, title: string, label: string) =>
+    page
+      .locator('[data-sonner-toast]', { hasText: title })
+      .getByRole('button', { name: label, exact: true }),
 
   sidebarTab: (page: Page, name: 'Files' | 'Git' | 'Search' | 'Chat') =>
     page
@@ -46,6 +66,9 @@ export const selectors = {
   demoIframe: (page: Page) => page.locator('#workbench-demo'),
   workspaceSearch: (page: Page) =>
     page.getByRole('searchbox', { name: 'Search workspace', exact: true }),
+  replaceBox: (page: Page) =>
+    page.getByRole('textbox', { name: 'Replace in workspace', exact: true }),
+  replaceToggle: (page: Page) => page.getByRole('button', { name: 'Replace', exact: true }),
   searchResults: (page: Page) => page.getByRole('region', { name: 'Search results', exact: true }),
   chatMessage: (page: Page) => page.getByRole('textbox', { name: 'Message', exact: true }),
   chatSend: (page: Page) => page.getByRole('button', { name: 'Send message', exact: true }),
@@ -121,3 +144,22 @@ export async function openFileByName(page: Page, name: string) {
 }
 
 export const wallpaperStillSelector = '[data-workbench-wallpaper-layer="still"]'
+
+/** For a fresh workspace, where the terminal holds focus and the palette chord does not land. */
+export async function openFileFromTree(page: Page, name: string) {
+  await waitForApp(page)
+  await selectors
+    .folderTree(page)
+    .getByRole('treeitem', { name })
+    .first()
+    .click({ timeout: 15_000 })
+  await selectors.editorInput(page).first().waitFor({ timeout: 15_000 })
+}
+
+export async function runPaletteCommand(page: Page, title: string) {
+  await page.keyboard.press(chords.commandPalette)
+  const input = selectors.paletteInput(page)
+  await input.waitFor({ timeout: 5_000 })
+  await input.fill(`>${title}`)
+  await selectors.commandOption(page, title).first().click({ timeout: 5_000 })
+}

@@ -56,14 +56,14 @@ test('keeps search location separators, missing fields, and duplicate suffixes i
   const duplicateGroup = { ...group, count: 2, matches: [...group.matches, ...group.matches] }
   expect(searchResultItems([duplicateGroup]).map((item) => item.id)).toEqual([
     'search-result-group-wffmwi',
-    'search-result-match-wffmwi-1h6r4uw',
-    'search-result-match-wffmwi-1h6r4uw-1',
+    'search-result-match-wffmwi-1qopqh3',
+    'search-result-match-wffmwi-1qopqh3-1',
   ])
   const nameGroup = searchResultGroup({
     count: 0,
     matches: [{ kind: 'name', source: 'disk', type: 'file', targetType: 'file', path: group.path }],
   })
   expect(searchResultItems([nameGroup]).map((item) => item.id)).toEqual([
-    'search-result-name-wffmwi-th6ydm',
+    'search-result-name-wffmwi-g3x4ax',
   ])
 })

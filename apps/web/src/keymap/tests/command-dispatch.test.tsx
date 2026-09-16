@@ -290,6 +290,7 @@ test.each([
           workspaceEdits: {
             canMutateWorkspace: () => true,
             getSnapshot: idleWorkspaceEditSnapshot,
+            hasHistoryBarrier: () => false,
             redo,
             runWorkspaceMutation: runTestWorkspaceMutation,
             undo,
@@ -319,6 +320,7 @@ test('workspace history commands are disabled while the coordinator has no avail
         workspaceEdits: {
           canMutateWorkspace: () => true,
           getSnapshot: idleWorkspaceEditSnapshot,
+          hasHistoryBarrier: () => false,
           redo: async () => false,
           runWorkspaceMutation: runTestWorkspaceMutation,
           undo,
