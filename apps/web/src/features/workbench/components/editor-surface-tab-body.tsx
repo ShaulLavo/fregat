@@ -74,7 +74,12 @@ export function EditorSurfaceTabBody({
   const selectedDocumentEditability = useEditorDocumentState((state) => {
     if (!selectedViewDocumentKey) return 'editable'
     const document = state.liveDocumentsByKey[selectedViewDocumentKey]
-    return document?.sync.kind === 'recovery-conflict' ? 'readonly' : 'editable'
+    if (document?.sync.kind === 'recovery-conflict') return 'readonly'
+    // The defaults document is generated from the registry; nothing could receive an edit.
+    if (document?.target.kind === 'settings-json' && document.target.target === 'default') {
+      return 'readonly'
+    }
+    return 'editable'
   })
   const selectedLiveDocument = useMemo(
     () =>

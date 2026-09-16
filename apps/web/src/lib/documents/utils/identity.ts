@@ -1,5 +1,5 @@
 import * as v from 'valibot'
-import type { SettingsWriteTarget } from '@workspace/contracts'
+import type { SettingsViewTarget } from '@workspace/contracts'
 import type {
   ConflictId,
   DocumentKey,
@@ -35,7 +35,7 @@ export function fileDocument(resource: FileResource): FileDocumentRef {
   return { kind: 'file', resource }
 }
 
-export function settingsJsonDocument(target: SettingsWriteTarget): SettingsDocumentRef {
+export function settingsJsonDocument(target: SettingsViewTarget): SettingsDocumentRef {
   return { kind: 'settings-json', target }
 }
 

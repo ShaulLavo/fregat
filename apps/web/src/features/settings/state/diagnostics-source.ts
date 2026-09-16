@@ -1,13 +1,13 @@
 import type {
   SettingsDiagnostic,
   SettingsLayerFile,
-  SettingsWriteTarget,
+  SettingsViewTarget,
 } from '@workspace/contracts'
 
 export type SettingsDiagnosticsSnapshot = {
   readonly diagnostics: readonly SettingsDiagnostic[]
   readonly file: SettingsLayerFile | null
-  readonly target: SettingsWriteTarget
+  readonly target: SettingsViewTarget
 }
 
 export type SettingsDiagnosticsSource = {

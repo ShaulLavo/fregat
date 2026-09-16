@@ -9,6 +9,12 @@ const settingsLayerIdSchema = v.picklist(SETTINGS_LAYER_ORDER)
 /** A layer a client may write to. Policy is read-only by definition. */
 export const settingsWriteTargetSchema = v.picklist(['user', 'workspace'] as const)
 
+/**
+ * A layer a client may open as a document. `default` is the registry rendered
+ * as text: it has no file, so it is viewable but never a write target.
+ */
+const settingsViewTargetSchema = v.picklist(['user', 'workspace', 'default'] as const)
+
 /** Ordered only within one server process lifetime. */
 export const settingsServerVersionSchema = v.strictObject({
   epoch: v.pipe(v.string(), v.trim(), v.minLength(1), v.maxLength(200)),
@@ -96,4 +102,5 @@ export type SettingsParseError = v.InferOutput<typeof settingsParseErrorSchema>
 export type SettingsServerVersion = v.InferOutput<typeof settingsServerVersionSchema>
 export type SettingsTextRange = v.InferOutput<typeof settingsTextRangeSchema>
 export type SettingsSnapshot = v.InferOutput<typeof settingsSnapshotSchema>
+export type SettingsViewTarget = v.InferOutput<typeof settingsViewTargetSchema>
 export type SettingsWriteTarget = v.InferOutput<typeof settingsWriteTargetSchema>

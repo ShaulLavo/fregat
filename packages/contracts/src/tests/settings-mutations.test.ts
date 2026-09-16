@@ -264,6 +264,29 @@ describe('settings operation reducer', () => {
     expect(result.touchedSettingIds).toEqual(['editor.fontSize'])
   })
 
+  it('prunes a scalar written back to its registry default', () => {
+    const raw = { 'editor.fontSize': 18, 'future.setting': true }
+    const result = applyIdempotently(raw, {
+      kind: 'set',
+      key: 'editor.fontSize',
+      value: DEFAULT_SETTING_VALUES['editor.fontSize'],
+    })
+
+    expect(result.raw).toEqual({ 'future.setting': true })
+    expect(result.touchedSettingIds).toEqual(['editor.fontSize'])
+  })
+
+  it('does not write a scalar that is already at its default', () => {
+    const raw = { 'future.setting': true }
+    const result = applyIdempotently(raw, {
+      kind: 'set',
+      key: 'editor.fontSize',
+      value: DEFAULT_SETTING_VALUES['editor.fontSize'],
+    })
+
+    expect(result.raw).toBe(raw)
+  })
+
   it('resets an atomic key batch and preserves everything else', () => {
     const raw = {
       'editor.fontSize': 18,

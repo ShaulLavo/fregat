@@ -1,4 +1,9 @@
-import type { GitFileStatus, SessionId, SettingsWriteTarget } from '@workspace/contracts'
+import type {
+  GitFileStatus,
+  SessionId,
+  SettingsViewTarget,
+  SettingsWriteTarget,
+} from '@workspace/contracts'
 
 declare const identityBrand: unique symbol
 export type FilesystemPath = string & {
@@ -44,7 +49,7 @@ export type FileDocumentRef = {
 }
 export type SettingsDocumentRef = {
   readonly kind: 'settings-json'
-  readonly target: SettingsWriteTarget
+  readonly target: SettingsViewTarget
 }
 export type UnsyncedDocumentRef =
   | { readonly kind: 'git-ref'; readonly source: GitFileReference }
@@ -68,14 +73,14 @@ export type EditorTabRecord = {
 }
 export type SettingsSelection =
   | { readonly kind: 'form' }
-  | { readonly kind: 'json'; readonly target: SettingsWriteTarget }
+  | { readonly kind: 'json'; readonly target: SettingsViewTarget }
 export type SaveCapability =
   | { readonly kind: 'none' }
   | { readonly kind: 'file'; readonly resource: FileResource }
   | { readonly kind: 'settings'; readonly target: SettingsWriteTarget }
 export type BackingResource =
   | { readonly kind: 'file'; readonly resource: FileResource }
-  | { readonly kind: 'settings'; readonly target: SettingsWriteTarget }
+  | { readonly kind: 'settings'; readonly target: SettingsViewTarget }
   | { readonly kind: 'git-ref'; readonly source: GitFileReference }
   | { readonly kind: 'git-diff'; readonly source: GitComparison }
   | { readonly kind: 'conflict'; readonly conflictId: ConflictId }

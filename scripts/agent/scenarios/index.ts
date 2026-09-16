@@ -1,6 +1,7 @@
 import { editorLspHover } from './editor-lsp-hover'
 import { editorMarkdownPunctuation } from './editor-markdown-punctuation'
 import { wallpaperLibrary } from './wallpaper-library'
+import { settingsDefaults } from './settings-defaults'
 import { fileIcons } from './file-icons'
 import type { Page } from 'playwright'
 
@@ -37,6 +38,7 @@ export const scenarios: readonly Scenario[] = [
   editorMarkdownPunctuation,
   fileIcons,
   wallpaperLibrary,
+  settingsDefaults,
   demoWorkspace,
   demoAgentGit,
   demoReset,

@@ -2,6 +2,8 @@ import { lstat, mkdir, mkdtemp, readFile, readdir, rm, symlink, writeFile } from
 import { tmpdir } from 'node:os'
 import path from 'node:path'
 import {
+  DEFAULT_SETTING_VALUES,
+  jsonEqual,
   providerDriverKindSchema,
   providerInstanceIdSchema,
   type ModelRef,
@@ -115,10 +117,12 @@ describe('semantic write coordination', () => {
       ),
     )
 
+    // A value equal to its registry default is pruned rather than written.
     const raw = userRaw(store)
     for (const operation of operations) {
       if (operation.kind !== 'set') continue
-      expect(raw[operation.key]).toEqual(operation.value)
+      const isDefault = jsonEqual(operation.value, DEFAULT_SETTING_VALUES[operation.key])
+      expect(raw[operation.key], operation.key).toEqual(isDefault ? undefined : operation.value)
     }
   })
 

@@ -4,7 +4,7 @@ import {
   type SettingsSnapshot,
   type SettingsWriteTarget,
 } from '@workspace/contracts'
-import type { DocumentKey } from '@/lib/documents/utils/types'
+import type { DocumentKey, SettingsDocumentRef } from '@/lib/documents/utils/types'
 import type { QueryClient } from '@tanstack/react-query'
 
 import type {
@@ -45,7 +45,7 @@ export class SettingsSyncService {
   }
 
   save(document: LiveEditorDocument): Promise<boolean> {
-    if (document.sync.kind !== 'settings' || document.target.kind !== 'settings-json') {
+    if (!isWritableSettingsDocument(document)) {
       throw createClientInvariantError(`Cannot save ${document.key} as settings text`)
     }
     return runMutation(
@@ -61,9 +61,7 @@ export class SettingsSyncService {
 
   private observedSave(captured: LiveEditorDocument): Promise<boolean> {
     const document = this.documentStore.getState().getLiveEditorDocument(captured.key) ?? captured
-    if (document.sync.kind !== 'settings' || document.target.kind !== 'settings-json') {
-      return Promise.resolve(false)
-    }
+    if (!isWritableSettingsDocument(document)) return Promise.resolve(false)
     const priorSyncState = document.sync.state
     return observeClientOperation(
       {
@@ -95,7 +93,7 @@ export class SettingsSyncService {
   }
 
   async overwrite(document: LiveEditorDocument): Promise<void> {
-    if (document.sync.kind !== 'settings' || document.target.kind !== 'settings-json') {
+    if (!isWritableSettingsDocument(document)) {
       throw createClientInvariantError(`Cannot overwrite ${document.key} as settings text`)
     }
     if (document.sync.state !== 'conflict') return
@@ -108,7 +106,7 @@ export class SettingsSyncService {
     document: LiveEditorDocument,
     allowMatchingConflictCompletion: boolean,
   ): Promise<boolean> {
-    if (document.sync.kind !== 'settings' || document.target.kind !== 'settings-json') return false
+    if (!isWritableSettingsDocument(document)) return false
     assertEnvironmentWritable(originForQueryClient(this.queryClient))
 
     const sync = document.sync
@@ -259,6 +257,20 @@ export class SettingsSyncService {
       })
       .catch(() => undefined)
   }
+}
+
+type WritableSettingsDocument = LiveEditorDocument & {
+  readonly sync: Extract<LiveEditorDocument['sync'], { readonly kind: 'settings' }>
+  readonly target: SettingsDocumentRef & { readonly target: SettingsWriteTarget }
+}
+
+/** The defaults document is settings text too, but the registry has no file to write. */
+function isWritableSettingsDocument(
+  document: LiveEditorDocument,
+): document is WritableSettingsDocument {
+  if (document.sync.kind !== 'settings' || document.target.kind !== 'settings-json') return false
+
+  return document.target.target !== 'default'
 }
 
 function rawWriteId() {

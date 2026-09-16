@@ -1,4 +1,4 @@
-# Plan 121: Composable, full-power plugins with selective execution
+# Plan 122: Composable, full-power plugins with selective execution
 
 Status: proposed; research and API design first; implementation has not started.
 Requested: 2026-09-16. Owners: Fregat and Singapore.

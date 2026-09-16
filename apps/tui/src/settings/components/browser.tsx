@@ -14,6 +14,7 @@ import { Details } from '@/settings/components/details'
 import { Diagnostics } from '@/settings/components/diagnostics'
 import { SettingsEditor } from '@/settings/components/editor'
 import { KeybindingEditor } from '@/settings/components/keybinding-editor'
+import { DefaultsViewer } from '@/settings/components/defaults-viewer'
 import { RawSettingsEditor } from '@/settings/components/raw-editor'
 import { useHostActions } from '@/host/hooks/use-host-actions'
 import { commandShortcut } from '@/commands/utils/bindings'
@@ -58,7 +59,7 @@ export function SettingsBrowser({
   const [selected, setSelected] = useState(0)
   const [focus, setFocus] = useState<SettingsFocus>('search')
   const [target, setTarget] = useState<SettingsWriteTarget>('user')
-  const [editing, setEditing] = useState<SettingId | 'choose' | 'raw' | null>(null)
+  const [editing, setEditing] = useState<SettingId | 'choose' | 'raw' | 'defaults' | null>(null)
   const host = useHostActions()
   useEffect(() => {
     setQuery(initialQuery)
@@ -171,6 +172,15 @@ export function SettingsBrowser({
       run: ({ origin }) => {
         returnFocus.current = origin
         setEditing('raw')
+        onDialogChange?.(true)
+      },
+    },
+    'settings.viewDefaults': {
+      disabledReason: (context) =>
+        settingsDisabled(context) ?? (!host.editText ? 'Editor is unavailable.' : null),
+      run: ({ origin }) => {
+        returnFocus.current = origin
+        setEditing('defaults')
         onDialogChange?.(true)
       },
     },
@@ -358,12 +368,16 @@ export function SettingsBrowser({
           onClose={closeEditor}
         />
       )}
+      {editing === 'defaults' && host.editText && (
+        <DefaultsViewer editText={host.editText} theme={theme} onClose={closeEditor} />
+      )}
       {editing === 'keybindings.overrides' && (
         <KeybindingEditor owner={owner} theme={theme} onClose={closeEditor} />
       )}
       {editing &&
         editing !== 'choose' &&
         editing !== 'raw' &&
+        editing !== 'defaults' &&
         editing !== 'keybindings.overrides' && (
           <SettingsEditor
             id={editing}

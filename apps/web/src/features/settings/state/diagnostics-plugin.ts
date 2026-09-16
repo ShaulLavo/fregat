@@ -64,7 +64,8 @@ class SettingsDiagnosticsContribution implements EditorViewContribution {
   private render(editor: EditorViewSnapshot): void {
     const snapshot = this.source.getSnapshot()
     const documentId = documentKey(settingsJsonDocument(snapshot.target))
-    if (!snapshot.file || editor.documentId !== documentId) {
+    // The defaults document is generated, so nothing in it can be a diagnostic.
+    if (snapshot.target === 'default' || !snapshot.file || editor.documentId !== documentId) {
       this.presenter.clear()
       return
     }

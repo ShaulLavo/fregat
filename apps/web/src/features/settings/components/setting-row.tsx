@@ -25,13 +25,13 @@ import { StringWidget } from '@/features/settings/components/widgets/string-widg
 import { settingInspection } from '@/features/settings/hooks/use-setting-inspection'
 import { useSettingsActions } from '@/features/settings/hooks/use-settings-actions'
 import type { SettingsProjection } from '@/features/settings/hooks/use-settings-projection'
-import { useSettingsScope } from '@/features/settings/state/scope-store'
+import { useSettingsScope, writableSettingsScope } from '@/features/settings/state/scope-store'
 import { settingRowTitle } from '@workspace/client-core/settings/humanize'
 import { cn } from '@workspace/ui/lib/utils'
 
 export function SettingRow({ id, snapshot }: { id: SettingId; snapshot: SettingsProjection }) {
   const descriptor = descriptorFor(id)
-  const scope = useSettingsScope()
+  const scope = writableSettingsScope(useSettingsScope())
   const { setSetting } = useSettingsActions()
   const inspection = settingInspection(id, snapshot, scope)
   const { alsoModifiedIn, isModified, overriddenBy } = inspection

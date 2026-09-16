@@ -1,6 +1,8 @@
+import type { SettingsViewTarget, SettingsWriteTarget } from '@workspace/contracts'
 import { useSyncExternalStore } from 'react'
 
-export type SettingsScope = 'user' | 'workspace'
+/** The tab on screen. `default` is the generated registry document, read-only. */
+export type SettingsScope = SettingsViewTarget
 
 /**
  * Which scope the page is editing.
@@ -26,6 +28,11 @@ export function selectSettingsScope(next: SettingsScope) {
 
 export function useSettingsScope(): SettingsScope {
   return useSyncExternalStore(subscribe, settingsScope, settingsScope)
+}
+
+/** The layer a write from this page goes to. The defaults tab writes nothing, so it falls back to user. */
+export function writableSettingsScope(scope: SettingsScope): SettingsWriteTarget {
+  return scope === 'default' ? 'user' : scope
 }
 
 function subscribe(listener: () => void) {

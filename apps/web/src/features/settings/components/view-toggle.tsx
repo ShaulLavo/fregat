@@ -2,6 +2,7 @@ import { CodeIcon, SlidersHorizontalIcon } from '@phosphor-icons/react'
 import { Button } from '@workspace/ui/components/button'
 import { Tooltip, TooltipContent, TooltipTrigger } from '@workspace/ui/components/tooltip'
 
+import { selectSettingsScope, settingsScope } from '../state/scope-store'
 import { selectSettingsView, useSettingsView } from '../state/view-store'
 
 /**
@@ -24,7 +25,7 @@ export function ViewToggle() {
         active={view === 'form'}
         icon={<SlidersHorizontalIcon aria-hidden />}
         label='Settings'
-        onSelect={() => selectSettingsView('form')}
+        onSelect={showForm}
       />
       <ViewButton
         active={view === 'json'}
@@ -34,6 +35,12 @@ export function ViewToggle() {
       />
     </div>
   )
+}
+
+// The defaults tab has no form, so asking for one means leaving that tab.
+function showForm() {
+  if (settingsScope() === 'default') selectSettingsScope('user')
+  selectSettingsView('form')
 }
 
 function ViewButton({
