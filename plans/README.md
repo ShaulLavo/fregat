@@ -37,6 +37,7 @@ a bare root `bun run verify`.
 | [118 — async effects through TanStack](118-async-effects-through-tanstack.md)   | **IMPLEMENTED 2026-09-14**                            |
 | [119 — agent verification tooling](119-agent-verification-tooling.md)           | **IMPLEMENTED 2026-09-14**                            |
 | [120 — a readable defaults layer](120-default-settings-view.md)                 | **PROPOSED — SMALL; NO REFACTOR REQUIRED**            |
+| [121 - composable full-power plugins](121-composable-plugins.md)               | **PROPOSED - RESEARCH AND PERFORMANCE GATES FIRST**   |
 | [105 — one server and mesh deployment](105-one-server-mesh-deployment.md)       | **PROPOSED — PHASE 1 READY TO IMPLEMENT**             |
 | [106 — first-load weight](106-boot-weight.md)                                   | **IMPLEMENTED 2026-09-13**                            |
 | [107 — a markdown package we own](107-workspace-markdown.md)                    | **IMPLEMENTED 2026-09-13**                            |
@@ -53,6 +54,13 @@ a bare root `bun run verify`.
 | [076 — watch-reload child reaping](076-watch-reload-child-reaping.md)           | **PROPOSED — ROOT GO/NO-GO SCHEDULING**               |
 
 ## Dependency notes
+
+- Plan 121 records the single `createPlugin` entrypoint, composable third-party extension points,
+  full-power isomorphic execution, and selective notification requirements. CodeMirror/Monaco
+  comparison and calibrated controls precede API selection. It coordinates Singapore E025-E028,
+  reuses Plan 099's document-publication ownership, and shares decoration research with Plan 111.
+  Its phases do not reorder existing lanes; production scheduling remains in root `PLAN.md`.
+  This planning change does not modify the Singapore repository or implement the plugin runtime.
 
 - Plans 115, 116 and 117 replace the retired Plan 104. The pieces come first: Plan 115 moves
   palettes out of `globals.css` into OKLCH data with a resolver, a server library and an editor
@@ -119,13 +127,13 @@ a bare root `bun run verify`.
 
 - The sole command/focus runtime is landed in `keymap/table.ts`, `keymap/state/command-bus.ts`,
   `keymap/providers/command-provider.tsx`, and `lib/focus/`. Settings commands use the semantic
-  submission returned by `use-settings-actions.ts` and await `settled`; do not restore persistent
+  submission returned by `use-settings-actions.ts` and await its `settled` result; do not restore persistent
   preview dispatch, duplicate settings error reporting, or a second mutation path.
 - Plan 077 is complete and its executable plan is deleted. Canonical runtime origins own HTTP
   clients, QueryClients, and retained editor runtimes; the identity/protocol gate checks the server
   before editor consumers mount. Switching preserves unsaved buffers and routes pending work to
   its original owner. Query consumers remount under one outer command bus that captures the active
-  runtime. Chat transports close explicitly and WebSocket auth refusal uses `1008`. Focused tests
+  runtime. Chat transports close explicitly, and WebSocket auth refusal uses `1008`. Focused tests
   and the two-server A → B → A browser workflow pass.
   [Federation](../docs/federated-environments.md) replaces the dev-only loopback switch and scopes
   browser persistence by confirmed environment identity.
@@ -150,8 +158,8 @@ a bare root `bun run verify`.
   the one-record visual-only snapshot cache, and the exact `editor-open-benchmark.mjs` gate. Cached
   rows are never document truth, and the typed bus and local UI share one activation transaction.
 
-- Plans 106 through 109 come from the first-load weight review at Platform base `00513340`. The
-  production build sends 2421 KB gzip of JavaScript before the first frame, 2311 KB of it in one
+- Plans 106 through 109 come from the first-load weight review at Platform base `00513340`.
+  The production build sends 2421 KB gzip of JavaScript before the first frame, 2311 KB of it in one
   chunk, because the application declares almost no loading boundaries — not because of bundler
   configuration. Plan 106 builds the measurement instrument and lands the two removals that depend
   on nothing else. Plan 107 replaces streamdown with `@workspace/markdown`, which is what removes
