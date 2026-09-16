@@ -3,6 +3,7 @@ import { editorMarkdownPunctuation } from './editor-markdown-punctuation'
 import { wallpaperLibrary } from './wallpaper-library'
 import { settingsDefaults } from './settings-defaults'
 import { fileIcons } from './file-icons'
+import { searchInputUndo } from './search-input-undo'
 import type { Page } from 'playwright'
 
 type ScenarioContext = {
@@ -21,6 +22,8 @@ export type Scenario = {
 import { editorFastScroll } from './editor-fast-scroll'
 import { editorLargePaste } from './editor-large-paste'
 import { editorTypeBurst } from './editor-type-burst'
+import { editorUndoBarrier } from './editor-undo-barrier'
+import { editorUndoBranch } from './editor-undo-branch'
 import { gitHistory } from './git-history'
 import { editorCaretBurst } from './editor-caret-burst'
 import { editorFocusClicks } from './editor-focus-clicks'
@@ -37,6 +40,7 @@ export const scenarios: readonly Scenario[] = [
   editorLspHover,
   editorMarkdownPunctuation,
   fileIcons,
+  searchInputUndo,
   wallpaperLibrary,
   settingsDefaults,
   demoWorkspace,
@@ -49,6 +53,8 @@ export const scenarios: readonly Scenario[] = [
   editorLargePaste,
   editorFastScroll,
   editorTypeBurst,
+  editorUndoBarrier,
+  editorUndoBranch,
   editorCaretBurst,
   editorFocusClicks,
   editorProduct,

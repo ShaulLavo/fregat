@@ -334,6 +334,7 @@ function createRuntime(
   }
   const workspaceEdits: WorkspaceCommandRuntime['workspaceEdits'] = overrides?.workspaceEdits ?? {
     canMutateWorkspace: () => true,
+    hasHistoryBarrier: () => false,
     getSnapshot: () =>
       ({ canRedo: false, canUndo: false }) as ReturnType<
         WorkspaceCommandRuntime['workspaceEdits']['getSnapshot']

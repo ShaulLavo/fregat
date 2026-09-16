@@ -19,6 +19,7 @@ import type {
   WorkspaceCommandSnapshot,
 } from '@/keymap/define-command'
 import { editorCommandIdFromPlatform } from '@/keymap/editor-keymap'
+import { notifyUndoBarrier } from '@/keymap/state/undo-barrier'
 import type {
   CommandDefinition,
   CommandInvocation,
@@ -117,6 +118,7 @@ export function dispatchEditor(
   const capability = context.target.focusTarget.capabilities.editor
   if (!capability) return false
 
+  if (editorId === 'undo') notifyUndoBarrier(context.runtime, context.target.focusTarget.id)
   return capability.dispatch(editorId, {
     event: context.invocation.event as KeyboardEvent | undefined,
   })

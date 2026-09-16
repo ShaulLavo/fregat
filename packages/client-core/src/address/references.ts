@@ -4,7 +4,7 @@ import { decodePath, decodeSegment, encodePath, encodeSegment } from './path-tok
 
 export type EditorReference =
   | { readonly kind: 'settings' | 'search' }
-  | { readonly kind: 'file' | 'compare'; readonly path: string }
+  | { readonly kind: 'file' | 'compare' | 'history'; readonly path: string }
   | { readonly kind: 'ref'; readonly ref: string; readonly path: string }
   | {
       readonly kind: 'snapshot'
@@ -51,15 +51,17 @@ export function editorReferenceForToken(token: string | null): EditorReference |
   if (token === 's') return { kind: 'search' }
   if (!token) return null
   const [kind, ...segments] = token.split('/')
-  if (kind === 'f' || kind === 'c') {
+  if (kind === 'f' || kind === 'c' || kind === 'h') {
     const path = decodePath('', segments)
-    return path ? { kind: kind === 'f' ? 'file' : 'compare', path } : null
+    return path ? { kind: PATH_REFERENCE_KINDS[kind], path } : null
   }
   if (kind === 'r') return refReference(segments)
   if (kind === 'd') return snapshotReference(segments)
   if (kind === 'k') return checkpointReference(segments)
   return null
 }
+
+const PATH_REFERENCE_KINDS = { c: 'compare', f: 'file', h: 'history' } as const
 
 export function tokenForEditorReference(reference: EditorReference): string {
   switch (reference.kind) {
@@ -71,6 +73,8 @@ export function tokenForEditorReference(reference: EditorReference): string {
       return `f/${encodePath(reference.path)}`
     case 'compare':
       return `c/${encodePath(reference.path)}`
+    case 'history':
+      return `h/${encodePath(reference.path)}`
     case 'ref':
       return `r/${encodeSegment(reference.ref)}/${encodePath(reference.path)}`
     case 'snapshot':
@@ -171,6 +175,7 @@ export const editorReferenceSchema = v.pipe(
     v.object({ kind: v.literal('search') }),
     v.object({ kind: v.literal('file'), path: v.string() }),
     v.object({ kind: v.literal('compare'), path: v.string() }),
+    v.object({ kind: v.literal('history'), path: v.string() }),
     v.object({ kind: v.literal('ref'), ref: v.string(), path: v.string() }),
     v.object({
       kind: v.literal('snapshot'),

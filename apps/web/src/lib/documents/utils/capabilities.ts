@@ -20,6 +20,7 @@ export function saveCapability(document: DocumentRef): SaveCapability {
     case 'git-ref':
     case 'git-diff':
     case 'compare-saved':
+    case 'history':
     case 'conflict':
     case 'search':
       return { kind: 'none' }
@@ -41,6 +42,7 @@ export function backingResource(document: DocumentRef): BackingResource {
     case 'git-diff':
       return { kind: 'git-diff', source: document.source }
     case 'compare-saved':
+    case 'history':
       return { kind: 'file', resource: document.file }
     case 'conflict':
       return { kind: 'conflict', conflictId: document.conflictId }
@@ -75,6 +77,7 @@ export function documentSourcePath(document: DocumentRef): FilesystemPath | null
     case 'git-ref':
       return document.source.path
     case 'compare-saved':
+    case 'history':
       return document.file.path
     case 'conflict':
       return document.path
@@ -108,6 +111,7 @@ export function durableTab(content: TabContent, root: WorkspaceRoot): boolean {
     case 'git-ref':
       return isPathInWorkspace(document.source.path, root)
     case 'compare-saved':
+    case 'history':
       return isPathInWorkspace(document.file.path, root)
     case 'git-diff': {
       const source = document.source

@@ -55,6 +55,8 @@ export function documentTokenForContent(
       ])
     case 'compare-saved':
       return relativeToken('c', rootPath, document.file.path)
+    case 'history':
+      return relativeToken('h', rootPath, document.file.path)
     case 'conflict':
       return { kind: 'unaddressable', reason: 'conflict documents are not addressable' }
     default: {
@@ -84,6 +86,7 @@ export function contentForDocumentToken(
     }
   if (kind === 'f') return fileContent(rootPath, segments.slice(1))
   if (kind === 'c') return compareSavedContent(rootPath, segments.slice(1))
+  if (kind === 'h') return historyContent(rootPath, segments.slice(1))
   if (kind === 'r') return refContent(rootPath, segments.slice(1))
   if (kind === 'd') return snapshotDiffContent(rootPath, segments.slice(1))
   if (kind === 'k') return checkpointDiffContent(rootPath, segments.slice(1))
@@ -193,6 +196,15 @@ function compareSavedContent(rootPath: string, segments: readonly string[]): Par
   return {
     kind: 'content',
     content: documentTab({ kind: 'compare-saved', file: fileResource(filesystemPath(path)) }),
+  }
+}
+
+function historyContent(rootPath: string, segments: readonly string[]): ParsedDocumentToken {
+  const path = decodePath(rootPath, segments)
+  if (!path) return { kind: 'rejected', reason: 'history token names no path' }
+  return {
+    kind: 'content',
+    content: documentTab({ kind: 'history', file: fileResource(filesystemPath(path)) }),
   }
 }
 

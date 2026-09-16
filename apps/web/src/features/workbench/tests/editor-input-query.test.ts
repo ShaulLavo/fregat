@@ -21,6 +21,9 @@ test('maps editor inputs to the query that must resolve before they can draw', (
   expect(
     editorInputQueryKey(documentTab({ kind: 'compare-saved', file: fileResource(filePath) })),
   ).toEqual(fileSystemKeys.fileSnapshot(filePath))
+  expect(
+    editorInputQueryKey(documentTab({ kind: 'history', file: fileResource(filePath) })),
+  ).toEqual(fileSystemKeys.fileSnapshot(filePath))
   expect(editorInputQueryKey(documentTab(snapshotDocument(diff)!))).toEqual(
     blobDiffQueryKey({
       newObjectId: diff.newObjectId,

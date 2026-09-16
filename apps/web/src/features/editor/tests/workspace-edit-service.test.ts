@@ -47,6 +47,8 @@ import {
 } from '@/features/editor/state/workspace-edit-service'
 import { createClientInvariantError } from '@/lib/structured-errors'
 import { filesystemResource } from '@/lib/documents/utils/capabilities'
+import { fileSystemKeys } from '@/lib/query-keys'
+import type { TreeModel } from '@/lib/tree-model'
 import type { DocumentRef } from '@/lib/documents/utils/types'
 import type { FileResult, TreeEntry } from '@/lib/file-system-types'
 import { expect, test } from '../../../../test/fixtures'
@@ -465,18 +467,52 @@ test.describe('WorkspaceEditService', () => {
     expect(second.buffer.materializeFullText()).toBe('Second')
     expect(first.buffer.canUndo()).toBe(false)
     expect(second.buffer.canUndo()).toBe(false)
+    expect(harness.service.hasHistoryBarrier(first.buffer)).toBe(true)
+    expect(harness.service.hasHistoryBarrier(second.buffer)).toBe(true)
     expect(harness.service.getSnapshot()).toMatchObject({ canRedo: false, canUndo: true })
     expect(harness.transport.prepares).toEqual([])
 
     await expect(harness.service.undo()).resolves.toBe(true)
     expect(first.buffer.materializeFullText()).toBe('first')
     expect(second.buffer.materializeFullText()).toBe('second')
+    expect(harness.service.hasHistoryBarrier(first.buffer)).toBe(false)
     expect(harness.service.getSnapshot()).toMatchObject({ canRedo: true, canUndo: false })
 
     await expect(harness.service.redo()).resolves.toBe(true)
     expect(first.buffer.materializeFullText()).toBe('First')
     expect(second.buffer.materializeFullText()).toBe('Second')
     expect(harness.service.getSnapshot()).toMatchObject({ canRedo: false, canUndo: true })
+  })
+
+  test('undoes a group after a refetch superseded its query projection', async () => {
+    const harness = createHarness()
+    const live = addLiveDocument(harness, '/repo/live.ts', 'live')
+    addDiskFile(harness, '/repo/unopened.ts', 'unopened', 80)
+    const treeKey = fileSystemKeys.tree(ROOT)
+    harness.queryClient.setQueryData<TreeModel>(treeKey, emptyTreeModel())
+    const liveUri = fileUri(live.target)
+    const provenance = currentProvenance(live.buffer.getTextSnapshot(), liveUri, 5)
+    const pending = harness.service.onApplyWorkspaceEdit(
+      request(
+        [
+          textOperation(liveUri, null, 0, 1, 'L'),
+          textOperation(fileUri('/repo/unopened.ts'), null, 0, 1, 'U'),
+        ],
+        { documents: [provenance], originUri: liveUri },
+      ),
+    )
+    await waitForPhase(harness.service, 'awaiting-confirmation')
+    harness.service.confirmPreview(harness.service.getSnapshot().preview!.operationId)
+    await expect(pending).resolves.toEqual({ status: 'applied' })
+    expect(harness.transport.prepares).toHaveLength(1)
+    expect(live.buffer.materializeFullText()).toBe('Live')
+
+    // The watcher echo of the write: the tree query refetches and replaces the projected data.
+    harness.queryClient.setQueryData<TreeModel>(treeKey, emptyTreeModel())
+
+    await expect(harness.service.undo()).resolves.toBe(true)
+    expect(live.buffer.materializeFullText()).toBe('live')
+    expect(harness.service.getSnapshot()).toMatchObject({ canRedo: true, canUndo: false })
   })
 
   const rejectionCases: readonly RejectionCase[] = [
@@ -1328,7 +1364,8 @@ function createHarness(options: HarnessOptions = {}) {
   > = []
   const operationEvents: CapturedWorkspaceOperationEvent[] = []
   let onUriTransition: () => void = () => undefined
-  const fileSync = new FileSyncService(store, new QueryClient(), {
+  const queryClient = new QueryClient()
+  const fileSync = new FileSyncService(store, queryClient, {
     readFileContent: async (path, signal) => {
       await options.beforeRead?.()
       signal.throwIfAborted()
@@ -1373,6 +1410,7 @@ function createHarness(options: HarnessOptions = {}) {
     files,
     inspections,
     operationEvents,
+    queryClient,
     service,
     store,
     transport,
@@ -1743,6 +1781,16 @@ function requestAffectedPaths(request: WorkspaceEditPrepareRequest): readonly st
     paths.add(operation.path)
   }
   return Array.from(paths).sort()
+}
+
+function emptyTreeModel(): TreeModel {
+  return {
+    entriesByTreePath: new Map(),
+    errorByDirectoryPath: new Map(),
+    loadedDirectoryPaths: new Set(),
+    loadingDirectoryPaths: new Set(),
+    paths: [],
+  }
 }
 
 function workspaceResult(

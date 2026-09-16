@@ -1,4 +1,4 @@
-import { documentKey, fileResource } from '@/lib/documents/utils/identity'
+import { documentKey, fileDocument, fileResource } from '@/lib/documents/utils/identity'
 import { filesystemResource } from '@/lib/documents/utils/capabilities'
 import { documentTab } from '@/lib/documents/utils/tabs'
 import type { DocumentKey, FilesystemPath, TabContent, TabId } from '@/lib/documents/utils/types'
@@ -200,6 +200,7 @@ export function EditorSurfaceTabBody({
       handleTextChange: handleEditorTextChange,
       setScrollPosition: (scrollPosition) => setEditorViewScrollPosition(tabId, scrollPosition),
       setStatusSource: setStatusBarSource,
+      showFile: (path) => selectContent(documentTab(fileDocument(fileResource(path)))),
     }),
     [
       applyWorkspaceEdit,

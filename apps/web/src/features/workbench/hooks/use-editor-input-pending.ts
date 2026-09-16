@@ -18,7 +18,9 @@ export function editorInputQueryKey(content: TabContent | null | undefined): Que
   if (content?.kind !== 'document') return null
   const target = content.document
   if (target.kind === 'git-diff') return diffDocumentQueryKey(target.source)
-  if (target.kind === 'compare-saved') return fileSystemKeys.fileSnapshot(target.file.path)
+  if (target.kind === 'compare-saved' || target.kind === 'history') {
+    return fileSystemKeys.fileSnapshot(target.file.path)
+  }
   if (target.kind === 'file') return fileSystemKeys.fileSnapshot(target.resource.path)
   return null
 }

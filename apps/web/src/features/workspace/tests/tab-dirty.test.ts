@@ -38,10 +38,11 @@ describe('the documents behind a tab', () => {
     ])
   })
 
-  it('owns exactly both scope buffers for the settings tab', () => {
+  it('owns exactly the three scope buffers for the settings tab', () => {
     expect(tabDocuments(settingsTab())).toEqual([
       settingsJsonDocument('user'),
       settingsJsonDocument('workspace'),
+      settingsJsonDocument('default'),
     ])
   })
 })

@@ -46,6 +46,7 @@ test('settings tab membership is fixed while active Save follows explicit UI sel
   expect(tabDocuments(content)).toEqual([
     { kind: 'settings-json', target: 'user' },
     { kind: 'settings-json', target: 'workspace' },
+    { kind: 'settings-json', target: 'default' },
   ])
   expect(activeTabDocument(content, { kind: 'form' })).toBeNull()
   expect(activeTabDocument(content, { kind: 'json', target: 'workspace' })).toEqual({
@@ -55,6 +56,15 @@ test('settings tab membership is fixed while active Save follows explicit UI sel
   expect(activeTabDocument(content, { kind: 'json', target: 'user' })).toBe(
     tabDocuments(content)[0],
   )
+})
+
+test('a history tab retains its file without owning it', () => {
+  const history = { kind: 'history', file: resource } as const
+  const content = documentTab(history)
+  expect(retainedTabDocuments(content)).toEqual([history, fileDocument(resource)])
+  expect(backingResource(history)).toEqual({ kind: 'file', resource })
+  expect(filesystemResource(history)).toBeNull()
+  expect(saveCapability(history)).toEqual({ kind: 'none' })
 })
 
 test('comparison backing retention does not grant close or save ownership of its file', () => {
@@ -79,6 +89,7 @@ test('every unsavable document remains distinct from a filesystem destination', 
       },
     },
     { kind: 'compare-saved', file: resource },
+    { kind: 'history', file: resource },
     {
       kind: 'conflict',
       conflictId: conflictId('missing'),

@@ -287,6 +287,12 @@ function workspaceAddressOptions<K extends keyof RouteOwner>(
         params: { ...params, _splat: editor.path },
         ...common,
       }
+    case 'history':
+      return {
+        to: `${prefix}/workbench/h/$` as const,
+        params: { ...params, _splat: editor.path },
+        ...common,
+      }
     case 'ref':
       return {
         to: `${prefix}/workbench/r/$ref/$` as const,

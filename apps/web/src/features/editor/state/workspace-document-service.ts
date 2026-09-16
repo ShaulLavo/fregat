@@ -1,3 +1,4 @@
+import { createHistoryBuffer } from '@/features/editor/state/history-buffer'
 import { createClientInvariantError } from '@/lib/structured-errors'
 
 import {
@@ -21,7 +22,6 @@ import type {
 
 import type { FileResult } from '@/lib/file-system-types'
 import {
-  createEditorTextBuffer,
   createEditorViewSession,
   acquireDocumentMutationLease,
   releaseDocumentMutationLease,
@@ -367,11 +367,14 @@ export class WorkspaceDocumentService {
       return existing
     }
 
-    const record = this.createFileDocument(file, cleanClaim)
+    // A touched file with the same bytes keeps its buffer, so the undo history survives.
+    const record = existing
+      ? this.replacementDocument(file, existing, cleanClaim)
+      : this.createFileDocument(file, cleanClaim)
     this.setLiveDocument(record)
     this.setContentRevision(record.key, record.contentRevision)
     this.deleteDirtyKey(record.key)
-    this.rebindViewsForDocument(record.key)
+    if (record.buffer !== existing?.buffer) this.rebindViewsForDocument(record.key)
     return record
   }
 
@@ -406,7 +409,7 @@ export class WorkspaceDocumentService {
     const key = documentKey(target)
     const existing = this.liveDocumentsByKey.get(key)
     if (existing) return existing
-    const buffer = createEditorTextBuffer(snapshot.content)
+    const buffer = createHistoryBuffer(snapshot.content)
     buffer.markClean()
     const record: LiveEditorDocument = {
       buffer,
@@ -479,7 +482,7 @@ export class WorkspaceDocumentService {
     this.setLiveDocument(record)
     this.setContentRevision(record.key, record.contentRevision)
     this.deleteDirtyKey(record.key)
-    this.rebindViewsForDocument(record.key)
+    if (record.buffer !== existing?.buffer) this.rebindViewsForDocument(record.key)
     return { changed: true, wasDirty }
   }
 
@@ -907,7 +910,7 @@ export class WorkspaceDocumentService {
     if (document.sync.confirmedText === null || document.sync.revision === null) return false
 
     const { confirmedText, revision } = document.sync
-    const buffer = createEditorTextBuffer(confirmedText)
+    const buffer = createHistoryBuffer(confirmedText)
     buffer.markClean()
     const contentRevision = contentRevisionForText(confirmedText)
     this.setLiveDocument({
@@ -938,7 +941,7 @@ export class WorkspaceDocumentService {
     if (document.sync.kind === 'file') return false
     if (textSnapshotEqualsText(document.buffer.getTextSnapshot(), text)) return false
 
-    const buffer = createEditorTextBuffer(text)
+    const buffer = createHistoryBuffer(text)
     buffer.markClean()
     const contentRevision = contentRevisionForText(text)
     this.setLiveDocument({
@@ -981,7 +984,7 @@ export class WorkspaceDocumentService {
     }
     if (document.buffer.isDirty()) return false
 
-    const buffer = createEditorTextBuffer(text)
+    const buffer = createHistoryBuffer(text)
     buffer.markClean()
     const contentRevision = contentRevisionForText(text)
     this.setLiveDocument({
@@ -1146,7 +1149,7 @@ export class WorkspaceDocumentService {
     claim: Extract<PreparedFileOpenClaim, { readonly kind: 'clean' }> | null = null,
   ): LiveEditorDocument {
     if (!claim) markEditorOpenBenchmark('editor.file_open.buffer_built', file.path)
-    const buffer = claim?.buffer ?? createEditorTextBuffer(file.content)
+    const buffer = claim?.buffer ?? createHistoryBuffer(file.content)
     const target = fileDocument({ path: file.path })
     buffer.markClean()
 
@@ -1166,7 +1169,7 @@ export class WorkspaceDocumentService {
   }
 
   private createUnsyncedDocument(input: UnsyncedLiveEditorDocumentInput): LiveEditorDocument {
-    const buffer = createEditorTextBuffer(input.content)
+    const buffer = createHistoryBuffer(input.content)
     buffer.markClean()
 
     return {
@@ -1182,10 +1185,11 @@ export class WorkspaceDocumentService {
   private replacementDocument(
     file: FileResult,
     existing: LiveEditorDocument | undefined,
+    claim: Extract<PreparedFileOpenClaim, { readonly kind: 'clean' }> | null = null,
   ): LiveEditorDocument {
-    if (!existing) return this.createFileDocument(file)
+    if (!existing) return this.createFileDocument(file, claim)
     if (!textSnapshotEqualsText(existing.buffer.getTextSnapshot(), file.content)) {
-      return this.createFileDocument(file)
+      return this.createFileDocument(file, claim)
     }
 
     existing.buffer.markClean()

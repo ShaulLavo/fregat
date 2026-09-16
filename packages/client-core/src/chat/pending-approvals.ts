@@ -81,7 +81,7 @@ export function derivePendingApprovals(
 export function orderedSessionActivities(
   activities: readonly OrchestrationSessionActivity[],
 ): OrchestrationSessionActivity[] {
-  return [...activities].sort(compareActivityOrder)
+  return activities.toSorted(compareActivityOrder)
 }
 
 function compareActivityOrder(

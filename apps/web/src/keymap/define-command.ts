@@ -91,7 +91,12 @@ export type WorkspaceCommandRuntime = {
   readonly workspace: EditorWorkspaceStoreApi
   readonly workspaceEdits: Pick<
     WorkspaceEditService,
-    'canMutateWorkspace' | 'getSnapshot' | 'redo' | 'runWorkspaceMutation' | 'undo'
+    | 'canMutateWorkspace'
+    | 'getSnapshot'
+    | 'hasHistoryBarrier'
+    | 'redo'
+    | 'runWorkspaceMutation'
+    | 'undo'
   >
 }
 

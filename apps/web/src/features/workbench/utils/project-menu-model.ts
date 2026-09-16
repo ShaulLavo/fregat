@@ -71,7 +71,7 @@ function activityFirst<TProject extends { readonly updatedAt: string }>(
 ) {
   // Parsed rather than compared as text: the stamps may carry a UTC offset,
   // and those do not sort lexicographically.
-  return [...projects].sort(
+  return projects.toSorted(
     (left, right) => Date.parse(right.updatedAt) - Date.parse(left.updatedAt),
   )
 }

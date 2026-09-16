@@ -92,8 +92,8 @@ describe('palette documents', () => {
     for (const palette of BUNDLED_PALETTES) {
       expect(palette.source).toBe('bundled')
       const colors = paletteColorsFor(palette, 'dark')
-      expect(Object.keys(colors.app).sort()).toEqual([...APP_COLOR_ROLES].sort())
-      expect(Object.keys(colors.terminal).sort()).toEqual([...TERMINAL_COLOR_ROLES].sort())
+      expect(Object.keys(colors.app).sort()).toEqual(APP_COLOR_ROLES.toSorted())
+      expect(Object.keys(colors.terminal).sort()).toEqual(TERMINAL_COLOR_ROLES.toSorted())
     }
   })
 

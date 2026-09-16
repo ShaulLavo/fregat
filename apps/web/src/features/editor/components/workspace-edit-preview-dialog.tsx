@@ -161,7 +161,7 @@ export function WorkspaceEditPreviewDialog() {
                 Open buffers remain unsaved. Unopened files and resource operations are written.
               </p>
               {preview.undoCategory === 'workspace' ? (
-                <p>Undo this group with the separate workspace undo command.</p>
+                <p>Undo this group with Undo workspace edit, or from the file's History tab.</p>
               ) : null}
             </div>
           </div>

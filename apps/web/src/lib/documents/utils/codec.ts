@@ -15,6 +15,8 @@ export function encodedViewTarget(
       return `conflict-diff:${encodeURIComponent(document.conflictId)}`
     case 'compare-saved':
       return `compare-saved:${encodeURIComponent(document.file.path)}`
+    case 'history':
+      return `history:${encodeURIComponent(document.file.path)}`
     case 'search':
       return `search-buffer:${encodeURIComponent(document.root)}`
     case 'git-ref':

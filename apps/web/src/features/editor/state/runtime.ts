@@ -32,6 +32,7 @@ import { createSearchBufferStore } from '@/features/search/state/buffer-state'
 import { SettingsSyncService } from '@/features/settings/state/sync-service'
 import type { CachedWorkspaceState } from '@/features/workspace/state/cache'
 import { log } from '@/lib/client-logging'
+import { createHistoryBuffer } from '@/features/editor/state/history-buffer'
 import { createFileOpenIntentServiceOwner } from '@/lib/file-open-intent/state/service'
 
 export type EditorRuntime = ReturnType<typeof createEditorRuntime>
@@ -73,6 +74,7 @@ export function createEditorRuntime({
   const uiStore = createEditorUiStore()
   const mountedEditors = new MountedEditorRegistry()
   const fileOpenIntentOwner = createFileOpenIntentServiceOwner({
+    createBuffer: createHistoryBuffer,
     getLiveDocument: (path) =>
       documentStore.getState().getLiveEditorDocument(fileDocumentKey(path)),
     getRetainedScrollPosition: (path) =>

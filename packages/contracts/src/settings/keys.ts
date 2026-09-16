@@ -224,6 +224,16 @@ export const SETTINGS_REGISTRY = {
     description: 'Rendered width of a tab character, in spaces.',
     keywords: ['tab', 'indent', 'width', 'spaces'],
   }),
+  'editor.history.retainedStates': defineSetting({
+    schema: v.pipe(v.number(), v.integer(), v.minValue(10), v.maxValue(5000)),
+    default: 200,
+    scope: 'application',
+    widget: 'number',
+    category: 'Editor',
+    description:
+      'Earlier states kept per open file, across every undo branch. The least recently visited go first when the budget is exceeded.',
+    keywords: ['undo', 'history', 'branches', 'retained', 'memory'],
+  }),
   'editor.diff.viewMode': defineSetting({
     schema: v.picklist(['split', 'stacked'] as const),
     default: 'stacked',

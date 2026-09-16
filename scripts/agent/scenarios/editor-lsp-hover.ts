@@ -27,6 +27,7 @@ export const editorLspHover: Scenario = {
     const combined = await selectors.editorHover(page).innerText()
     match(combined, /U\+0430/, 'the ambiguous character is explained')
     match(combined, /never (used|read)/, 'the diagnostic sits in the same tooltip')
+    match(combined, /\(6133\)/, 'the diagnostic names its source and code')
     strictEqual(await selectors.editorHover(page).count(), 1, 'one hover, not one per plugin')
     await step('combined')
     await page.keyboard.press('Escape')

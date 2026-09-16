@@ -17,40 +17,40 @@ a bare root `bun run verify`.
 
 ## Executable plan inventory
 
-| Plan                                                                            | State                                                     |
-| ------------------------------------------------------------------------------- | --------------------------------------------------------- |
-| [071 — syntax highlight retry](071-syntax-highlight-retry.md)                   | **PROPOSED — ROOT GO/NO-GO SCHEDULING**                   |
-| [080 — Platform and VS Code keybinding modes](080-platform-keybinding-modes.md) | **PROPOSED — INTERACTION RULES CONFIRMED**                |
-| [085 — instant workspace reload](085-instant-workspace-reload.md)               | **PROPOSED — IMPLEMENTATION NOT STARTED**                 |
-| [087 — stateless MCP support](087-stateless-mcp.md)                             | **PROPOSED — IMPLEMENTATION NOT STARTED**                 |
-| [088 — native code intelligence](088-native-code-intelligence.md)               | **PROPOSED — DEPENDS ON 087**                             |
-| [091 — error and timing helpers](091-error-and-timing-helpers.md)               | **PROPOSED — DEFECT FIXES IMPLEMENTED**                   |
-| [092 — path and URI helpers](092-path-and-uri-helpers.md)                       | **PROPOSED — DEFECT FIXES IMPLEMENTED**                   |
-| [093 — web React and store ceremony](093-web-react-and-store-ceremony.md)       | **PROPOSED — DEPENDS ON 091**                             |
-| [099 — document contribution runtime](099-document-contributions.md)            | **PROPOSED — BASELINE AND PUBLICATION FIRST**             |
-| [101 — truncation and value recovery](101-truncation-recovery.md)               | **PROPOSED — DECISIONS D5 AND D7 NEED CONFIRMATION**      |
-| [102 — scroll and keyboard affordance](102-scroll-and-keyboard-affordance.md)   | **PROPOSED — DECISIONS D2 AND D7 NEED CONFIRMATION**      |
-| [103 — loading, empty and error states](103-loading-empty-error-states.md)      | **PROPOSED — DECISIONS D4 AND D6 NEED CONFIRMATION**      |
-| [115 — palettes as data](115-palettes-as-data.md)                               | **IMPLEMENTED 2026-09-14**                                |
-| [116 — wallpaper library and picker](116-wallpaper-library.md)                  | **IMPLEMENTED 2026-09-14**                                |
-| [117 — themes as bundles](117-themes.md)                                        | **PROPOSED — DEPENDS ON 115 AND 116**                     |
-| [118 — async effects through TanStack](118-async-effects-through-tanstack.md)   | **IMPLEMENTED 2026-09-14**                                |
-| [119 — agent verification tooling](119-agent-verification-tooling.md)           | **IMPLEMENTED 2026-09-14**                                |
-| [121 — undo as a graph](121-undo-graph.md)                                      | **PROPOSED — D1, D4, D6 NEED CONFIRMATION; UNIT 0 READY** |
-| [105 — one server and mesh deployment](105-one-server-mesh-deployment.md)       | **IMPLEMENTED 2026-09-13; PHASE 4 OPEN**                  |
-| [106 — first-load weight](106-boot-weight.md)                                   | **IMPLEMENTED 2026-09-13**                                |
-| [107 — a markdown package we own](107-workspace-markdown.md)                    | **IMPLEMENTED 2026-09-13**                                |
-| [108 — two markdown modes](108-markdown-modes.md)                               | **PROPOSED — PHASE 1 READY; PHASE 2 NEEDS 111**           |
-| [109 — boot boundaries and gate](109-boot-boundaries.md)                        | **PROPOSED — DEPENDS ON 106; SCHEDULED AFTER 108**        |
-| [110 — workspace indexing](110-workspace-indexing.md)                           | **RESEARCH — NO IMPLEMENTATION SCOPE YET**                |
-| [111 — editor decorations](111-editor-decorations.md)                           | **RESEARCH — NO IMPLEMENTATION SCOPE YET**                |
-| [112 — the large-file ceiling](112-large-file-ceiling.md)                       | **RESEARCH — NO IMPLEMENTATION SCOPE YET**                |
-| [113 — one optimistic primitive](113-optimistic-intents.md)                     | **PROPOSED — CORE AND RAIL MIGRATION IMPLEMENTED**        |
-| [094 — client-core web and TUI parity](094-client-core-web-tui-parity.md)       | **PROPOSED — DEPENDS ON 091; 096 COMPLETE**               |
-| [095 — server plumbing](095-server-plumbing.md)                                 | **PROPOSED — IMPLEMENTATION NOT STARTED**                 |
-| [073 — Electrobun 2.x migration](073-electrobun-v2-migration.md)                | **PROPOSED — ROOT GO/NO-GO SCHEDULING**                   |
-| [075 — terminal renderer fallbacks](075-terminal-renderer-fallbacks.md)         | **PROPOSED — BLOCKED ON TIER DECISION**                   |
-| [076 — watch-reload child reaping](076-watch-reload-child-reaping.md)           | **PROPOSED — ROOT GO/NO-GO SCHEDULING**                   |
+| Plan                                                                            | State                                                |
+| ------------------------------------------------------------------------------- | ---------------------------------------------------- |
+| [071 — syntax highlight retry](071-syntax-highlight-retry.md)                   | **PROPOSED — ROOT GO/NO-GO SCHEDULING**              |
+| [080 — Platform and VS Code keybinding modes](080-platform-keybinding-modes.md) | **PROPOSED — INTERACTION RULES CONFIRMED**           |
+| [085 — instant workspace reload](085-instant-workspace-reload.md)               | **PROPOSED — IMPLEMENTATION NOT STARTED**            |
+| [087 — stateless MCP support](087-stateless-mcp.md)                             | **PROPOSED — IMPLEMENTATION NOT STARTED**            |
+| [088 — native code intelligence](088-native-code-intelligence.md)               | **PROPOSED — DEPENDS ON 087**                        |
+| [091 — error and timing helpers](091-error-and-timing-helpers.md)               | **PROPOSED — DEFECT FIXES IMPLEMENTED**              |
+| [092 — path and URI helpers](092-path-and-uri-helpers.md)                       | **PROPOSED — DEFECT FIXES IMPLEMENTED**              |
+| [093 — web React and store ceremony](093-web-react-and-store-ceremony.md)       | **PROPOSED — DEPENDS ON 091**                        |
+| [099 — document contribution runtime](099-document-contributions.md)            | **PROPOSED — BASELINE AND PUBLICATION FIRST**        |
+| [101 — truncation and value recovery](101-truncation-recovery.md)               | **PROPOSED — DECISIONS D5 AND D7 NEED CONFIRMATION** |
+| [102 — scroll and keyboard affordance](102-scroll-and-keyboard-affordance.md)   | **PROPOSED — DECISIONS D2 AND D7 NEED CONFIRMATION** |
+| [103 — loading, empty and error states](103-loading-empty-error-states.md)      | **PROPOSED — DECISIONS D4 AND D6 NEED CONFIRMATION** |
+| [115 — palettes as data](115-palettes-as-data.md)                               | **IMPLEMENTED 2026-09-14**                           |
+| [116 — wallpaper library and picker](116-wallpaper-library.md)                  | **IMPLEMENTED 2026-09-14**                           |
+| [117 — themes as bundles](117-themes.md)                                        | **PROPOSED — DEPENDS ON 115 AND 116**                |
+| [118 — async effects through TanStack](118-async-effects-through-tanstack.md)   | **IMPLEMENTED 2026-09-14**                           |
+| [119 — agent verification tooling](119-agent-verification-tooling.md)           | **IMPLEMENTED 2026-09-14**                           |
+| [121 — undo as a graph](121-undo-graph.md)                                      | **IMPLEMENTED 2026-09-16**                           |
+| [105 — one server and mesh deployment](105-one-server-mesh-deployment.md)       | **IMPLEMENTED 2026-09-13; PHASE 4 OPEN**             |
+| [106 — first-load weight](106-boot-weight.md)                                   | **IMPLEMENTED 2026-09-13**                           |
+| [107 — a markdown package we own](107-workspace-markdown.md)                    | **IMPLEMENTED 2026-09-13**                           |
+| [108 — two markdown modes](108-markdown-modes.md)                               | **PROPOSED — PHASE 1 READY; PHASE 2 NEEDS 111**      |
+| [109 — boot boundaries and gate](109-boot-boundaries.md)                        | **PROPOSED — DEPENDS ON 106; SCHEDULED AFTER 108**   |
+| [110 — workspace indexing](110-workspace-indexing.md)                           | **RESEARCH — NO IMPLEMENTATION SCOPE YET**           |
+| [111 — editor decorations](111-editor-decorations.md)                           | **RESEARCH — NO IMPLEMENTATION SCOPE YET**           |
+| [112 — the large-file ceiling](112-large-file-ceiling.md)                       | **RESEARCH — NO IMPLEMENTATION SCOPE YET**           |
+| [113 — one optimistic primitive](113-optimistic-intents.md)                     | **PROPOSED — CORE AND RAIL MIGRATION IMPLEMENTED**   |
+| [094 — client-core web and TUI parity](094-client-core-web-tui-parity.md)       | **PROPOSED — DEPENDS ON 091; 096 COMPLETE**          |
+| [095 — server plumbing](095-server-plumbing.md)                                 | **PROPOSED — IMPLEMENTATION NOT STARTED**            |
+| [073 — Electrobun 2.x migration](073-electrobun-v2-migration.md)                | **PROPOSED — ROOT GO/NO-GO SCHEDULING**              |
+| [075 — terminal renderer fallbacks](075-terminal-renderer-fallbacks.md)         | **PROPOSED — BLOCKED ON TIER DECISION**              |
+| [076 — watch-reload child reaping](076-watch-reload-child-reaping.md)           | **PROPOSED — ROOT GO/NO-GO SCHEDULING**              |
 
 ## Dependency notes
 

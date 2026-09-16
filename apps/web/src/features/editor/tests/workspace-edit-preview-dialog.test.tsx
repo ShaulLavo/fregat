@@ -66,7 +66,9 @@ test('shows ordered diffs and dirty open unopened and resource labels', () => {
   expect(dialog).toHaveTextContent(
     'Open buffers remain unsaved. Unopened files and resource operations are written.',
   )
-  expect(dialog).toHaveTextContent('Undo this group with the separate workspace undo command.')
+  expect(dialog).toHaveTextContent(
+    "Undo this group with Undo workspace edit, or from the file's History tab.",
+  )
 })
 
 test('groups and confirms needsConfirmation annotations', () => {

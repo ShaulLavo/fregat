@@ -39,6 +39,7 @@ const MIRRORED_KEYS = [
   'editor.guides.indentation',
   'editor.minimap.enabled',
   'editor.retainedTextBudget',
+  'editor.history.retainedStates',
   'editor.syntaxHighlighting.enabled',
   'editor.tabSize',
   'logs.defaultTimeRange',
