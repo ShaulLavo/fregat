@@ -127,13 +127,13 @@ a bare root `bun run verify`.
 
 - The sole command/focus runtime is landed in `keymap/table.ts`, `keymap/state/command-bus.ts`,
   `keymap/providers/command-provider.tsx`, and `lib/focus/`. Settings commands use the semantic
-  submission returned by `use-settings-actions.ts` and await its `settled` result; do not restore persistent
+  submission returned by `use-settings-actions.ts` and await `settled`; do not restore persistent
   preview dispatch, duplicate settings error reporting, or a second mutation path.
 - Plan 077 is complete and its executable plan is deleted. Canonical runtime origins own HTTP
   clients, QueryClients, and retained editor runtimes; the identity/protocol gate checks the server
   before editor consumers mount. Switching preserves unsaved buffers and routes pending work to
   its original owner. Query consumers remount under one outer command bus that captures the active
-  runtime. Chat transports close explicitly, and WebSocket auth refusal uses `1008`. Focused tests
+  runtime. Chat transports close explicitly and WebSocket auth refusal uses `1008`. Focused tests
   and the two-server A → B → A browser workflow pass.
   [Federation](../docs/federated-environments.md) replaces the dev-only loopback switch and scopes
   browser persistence by confirmed environment identity.
@@ -158,8 +158,8 @@ a bare root `bun run verify`.
   the one-record visual-only snapshot cache, and the exact `editor-open-benchmark.mjs` gate. Cached
   rows are never document truth, and the typed bus and local UI share one activation transaction.
 
-- Plans 106 through 109 come from the first-load weight review at Platform base `00513340`.
-  The production build sends 2421 KB gzip of JavaScript before the first frame, 2311 KB of it in one
+- Plans 106 through 109 come from the first-load weight review at Platform base `00513340`. The
+  production build sends 2421 KB gzip of JavaScript before the first frame, 2311 KB of it in one
   chunk, because the application declares almost no loading boundaries — not because of bundler
   configuration. Plan 106 builds the measurement instrument and lands the two removals that depend
   on nothing else. Plan 107 replaces streamdown with `@workspace/markdown`, which is what removes
