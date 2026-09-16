@@ -87,6 +87,7 @@
     "@singapore-editor/plugin-ui": "link:@singapore-editor/plugin-ui",
     "@singapore-editor/react": "link:@singapore-editor/react",
     "@singapore-editor/scope-lines": "link:@singapore-editor/scope-lines",
+    "@singapore-editor/textbuffer": "link:@singapore-editor/textbuffer",
     "@singapore-editor/tree-sitter": "link:@singapore-editor/tree-sitter",
     "@singapore-editor/tree-sitter-languages": "link:@singapore-editor/tree-sitter-languages",
     "@singapore-editor/typescript-lsp": "link:@singapore-editor/typescript-lsp",

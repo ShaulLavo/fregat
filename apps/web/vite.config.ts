@@ -3,7 +3,12 @@ import tailwindcss from '@tailwindcss/vite'
 import react from '@vitejs/plugin-react'
 import { defineConfig, type Plugin } from 'vite'
 import { portFromEnv } from '../../scripts/runtime-network'
-import { readDevSources, reportDevSources, type DevPackage } from '../../scripts/dev-sources'
+import {
+  readDevSources,
+  reportDevSources,
+  resolveDevSource,
+  type DevPackage,
+} from '../../scripts/dev-sources'
 import { consumeAppSave } from '../server/src/fs/app-save-marker'
 import { bundleStatsPlugin } from './scripts/bundle-stats-plugin'
 import { demoPreviewPlugin } from './scripts/demo-preview-plugin'
@@ -85,7 +90,7 @@ function devSourcePlugin(packages: readonly DevPackage[]): Plugin {
     },
     resolveId(id) {
       const specifier = id.split('?')[0] ?? id
-      const source = entries.get(specifier)
+      const source = resolveDevSource(entries, specifier)
       if (source) return source + id.slice(specifier.length)
       if (specifier.startsWith('@singapore-editor/') || specifier.startsWith('ghostty-webgpu/')) {
         this.error(`No development source for ${id}. Add its source entry before importing it.`)

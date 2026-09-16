@@ -23,6 +23,25 @@ export function readDevSources(webRoot: string): readonly DevPackage[] {
   return [...editors.map((name) => readEditorPackage(webRoot, name)), readGhosttyPackage(webRoot)]
 }
 
+// Exact entries first; a pattern entry (`@x/internal/*` → `<root>/src/*`)
+// resolves the remainder against the source extensions at request time.
+export function resolveDevSource(
+  entries: ReadonlyMap<string, string>,
+  specifier: string,
+): string | null {
+  const exact = entries.get(specifier)
+  if (exact) return exact
+
+  for (const [id, base] of entries) {
+    if (!id.endsWith('/*') || !specifier.startsWith(id.slice(0, -1))) continue
+    const stem = base.slice(0, -1) + specifier.slice(id.length - 1)
+    const file = sourceExtensions.map((extension) => stem + extension).find(fs.existsSync)
+    if (file) return fs.realpathSync(file)
+  }
+
+  return null
+}
+
 export function sourcePaths(packages: readonly DevPackage[]): Record<string, string[]> {
   return Object.fromEntries(
     packages.flatMap((pkg) => [...pkg.entries].map(([id, file]) => [id, [file]])),
@@ -80,6 +99,10 @@ function readEditorPackage(webRoot: string, name: string): DevPackage {
   for (const [subpath, value] of Object.entries(exports)) {
     const target = exportTarget(value, name)
     const id = subpath === '.' ? name : `${name}${subpath.slice(1)}`
+    if (subpath.endsWith('/*')) {
+      entries.set(id, editorSourcePattern(root, target, id))
+      continue
+    }
     entries.set(id, editorSourcePath(root, target, id))
   }
   if (!entries.has(name)) throw createScriptError(`Missing source entry for ${name}.`)
@@ -128,6 +151,15 @@ function editorSourcePath(root: string, target: string, id: string): string {
     )
 
   return fs.realpathSync(file)
+}
+
+// `./dist/*.js` becomes `<root>/src/*`; tsconfig paths and resolveDevSource
+// both substitute the remainder.
+function editorSourcePattern(root: string, target: string, id: string): string {
+  if (!target.startsWith('./dist/') || !target.endsWith('/*.js'))
+    throw createScriptError(`Cannot resolve ${id} to a source pattern from ${target}.`)
+
+  return path.join(root, target.replace('./dist/', './src/').slice(0, -3))
 }
 
 function requiredFile(root: string, relative: string): string {

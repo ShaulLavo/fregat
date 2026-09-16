@@ -144,6 +144,7 @@
         "@singapore-editor/plugin-ui": "0.1.0",
         "@singapore-editor/react": "0.1.1",
         "@singapore-editor/scope-lines": "0.1.1",
+        "@singapore-editor/textbuffer": "0.1.0",
         "@singapore-editor/tree-sitter": "0.1.1",
         "@singapore-editor/tree-sitter-languages": "0.1.1",
         "@tanstack/hotkeys": "^0.8.0",
@@ -410,6 +411,7 @@
     "@singapore-editor/plugin-ui": "link:@singapore-editor/plugin-ui",
     "@singapore-editor/react": "link:@singapore-editor/react",
     "@singapore-editor/scope-lines": "link:@singapore-editor/scope-lines",
+    "@singapore-editor/textbuffer": "link:@singapore-editor/textbuffer",
     "@singapore-editor/tree-sitter": "link:@singapore-editor/tree-sitter",
     "@singapore-editor/tree-sitter-languages": "link:@singapore-editor/tree-sitter-languages",
     "@singapore-editor/typescript-lsp": "link:@singapore-editor/typescript-lsp",
@@ -1186,6 +1188,8 @@
     "@singapore-editor/react": ["@singapore-editor/react@link:@singapore-editor/react", {}],
 
     "@singapore-editor/scope-lines": ["@singapore-editor/scope-lines@link:@singapore-editor/scope-lines", {}],
+
+    "@singapore-editor/textbuffer": ["@singapore-editor/textbuffer@link:@singapore-editor/textbuffer", {}],
 
     "@singapore-editor/tree-sitter": ["@singapore-editor/tree-sitter@link:@singapore-editor/tree-sitter", {}],
 
