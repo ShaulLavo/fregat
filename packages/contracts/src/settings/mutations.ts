@@ -342,17 +342,23 @@ function applySettingsOperation(
   if (operation.kind === 'keybinding.remove') return removeKeybinding(raw, operation.command)
   if (operation.kind === 'model.setHidden') return setModelHidden(raw, operation)
   if (operation.kind === 'model.setOrder') {
-    return replaceOrResetDefault(raw, 'models.order', operation.order)
+    return replaceSetting(raw, 'models.order', operation.order)
   }
 
   return setProviderEnabled(raw, operation)
 }
 
+/**
+ * A value equal to the registry default is removed rather than written. The
+ * file holds only what the user chose, so toggling a setting on and off leaves
+ * no trace, and a default the next build changes is not pinned by accident.
+ */
 function replaceSetting(
   raw: Readonly<Record<string, unknown>>,
   key: SettingId,
   value: unknown,
 ): Readonly<Record<string, unknown>> {
+  if (jsonEqual(value, descriptorFor(key).default)) return resetSettings(raw, [key])
   if (Object.hasOwn(raw, key) && jsonEqual(raw[key], value)) return raw
 
   return { ...raw, [key]: value }
@@ -404,7 +410,7 @@ function removeMachine(
   if (!Object.hasOwn(current, name)) return raw
   const next = { ...current }
   delete next[name]
-  return replaceOrResetDefault(raw, 'environments.machines', next)
+  return replaceSetting(raw, 'environments.machines', next)
 }
 
 function removeKeybinding(
@@ -417,7 +423,7 @@ function removeKeybinding(
   const next = { ...current }
   delete next[command]
 
-  return replaceOrResetDefault(raw, 'keybindings.overrides', next)
+  return replaceSetting(raw, 'keybindings.overrides', next)
 }
 
 function setModelHidden(
@@ -432,7 +438,7 @@ function setModelHidden(
     ? [...current, operation.ref]
     : current.filter((entry) => !matchesModelRef(entry, operation.ref))
 
-  return replaceOrResetDefault(raw, 'models.hidden', next)
+  return replaceSetting(raw, 'models.hidden', next)
 }
 
 function setProviderEnabled(
@@ -470,16 +476,6 @@ function appendProviderSeed(
   }
 
   return replaceSetting(raw, 'providers.instances', [...current, instance])
-}
-
-function replaceOrResetDefault(
-  raw: Readonly<Record<string, unknown>>,
-  key: 'environments.machines' | 'keybindings.overrides' | 'models.hidden' | 'models.order',
-  value: Readonly<Record<string, unknown>> | readonly unknown[],
-): Readonly<Record<string, unknown>> {
-  if (!jsonEqual(value, descriptorFor(key).default)) return replaceSetting(raw, key, value)
-
-  return resetSettings(raw, [key])
 }
 
 function recordSetting(

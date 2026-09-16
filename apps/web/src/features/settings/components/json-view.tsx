@@ -2,6 +2,7 @@ import { Editor } from '@/features/editor/components/editor'
 import type { EditorRenderDocument } from '@/features/editor/utils/render-document'
 import type { SettingsDiagnostic, SettingsLayerFile } from '@workspace/contracts'
 
+import { DefaultsBanner } from '@/features/settings/components/defaults-banner'
 import { JsonLoading } from '@/features/settings/components/json-loading'
 import { RawConflictBanner } from '@/features/settings/components/raw-conflict-banner'
 import { useSettingsDiagnosticsPlugin } from '@/features/settings/hooks/use-settings-diagnostics-plugin'
@@ -43,7 +44,11 @@ export function SettingsJsonView({
 
   return (
     <div className='flex h-full min-h-0 flex-col'>
-      <RawConflictBanner documentKey={documentKey(settingsJsonDocument(scope))} />
+      {scope === 'default' ? (
+        <DefaultsBanner />
+      ) : (
+        <RawConflictBanner documentKey={documentKey(settingsJsonDocument(scope))} />
+      )}
       <div className='min-h-0 flex-1'>
         <Editor
           active

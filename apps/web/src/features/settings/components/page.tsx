@@ -26,7 +26,7 @@ import { useSettingsDocument } from '@/features/settings/hooks/use-settings-docu
 import { useSettingsProjection } from '@/features/settings/hooks/use-settings-projection'
 import { useSettingsOwner } from '@/features/settings/hooks/use-settings-owner'
 import { SettingsOwnerProvider } from '@/features/settings/providers/owner-provider'
-import { useSettingsScope } from '@/features/settings/state/scope-store'
+import { useSettingsScope, writableSettingsScope } from '@/features/settings/state/scope-store'
 import { useSettingsView } from '@/features/settings/state/view-store'
 import { isSettingAvailable } from '@/features/settings/utils/availability'
 import { matchingSettingIds } from '@workspace/client-core/settings/search'
@@ -53,13 +53,14 @@ export function SettingsPage({
 } = {}) {
   const navigation = useNavigation()
   const view = useSettingsView()
-  const showJson = view === 'json' && tabId !== undefined
+  const scope = useSettingsScope()
+  // The defaults tab is a document only: there is no form for values nobody set.
+  const showJson = (view === 'json' || scope === 'default') && tabId !== undefined
   const editorOwner = useQueryClient()
   const settingsOwner = useSettingsOwner()
   const document = useSettingsDocument(showJson ? editorOwner : undefined)
   const projection = useSettingsProjection(showJson ? editorOwner : undefined)
   const { isSaving } = useSettingsActions()
-  const scope = useSettingsScope()
   const editorHasWorkspace = useHasWorkspace()
   const hasWorkspace =
     showJson || editorOwner === settingsOwner
@@ -131,10 +132,10 @@ export function SettingsPage({
             key={showJson ? 'editor' : 'global'}
             queryClient={showJson ? editorOwner : settingsOwner}
           >
-            <PageActions scope={scope} />
+            <PageActions scope={writableSettingsScope(scope)} />
           </SettingsOwnerProvider>
         </div>
-        <ScopeTabs hasWorkspace={hasWorkspace} />
+        <ScopeTabs hasDefaults={tabId !== undefined} hasWorkspace={hasWorkspace} />
         {showJson ? null : (
           <InputGroup className='@max-3xl/settings:order-3 @max-3xl/settings:col-span-full'>
             <InputGroupAddon align='inline-start'>

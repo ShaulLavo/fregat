@@ -36,6 +36,16 @@ export const settingsCommandMetadata = {
     undoCategory: 'view-only',
     when: [],
   }),
+  'settings.viewDefaults': defineMetadata({
+    id: 'settings.viewDefaults',
+    title: 'View default settings',
+    description: 'Open every setting with its default value as a read-only document.',
+    category: 'Settings',
+    execution: 'async',
+    target: 'workspace',
+    undoCategory: 'view-only',
+    when: [],
+  }),
   'settings.nextScope': setting(
     'settings.nextScope',
     'Change settings scope',

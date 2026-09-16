@@ -8,10 +8,10 @@ import {
   type SettingInspection as SettingInspectionResult,
   type SettingScope,
   type SettingsLayerId,
+  type SettingsWriteTarget,
 } from '@workspace/contracts'
 
 import type { SettingsProjection } from '@/features/settings/hooks/use-settings-projection'
-import type { SettingsScope } from '@/features/settings/state/scope-store'
 
 export type SettingInspection = {
   /**
@@ -50,7 +50,7 @@ export type SettingInspection = {
 export function settingInspection(
   id: SettingId,
   snapshot: SettingsProjection,
-  scope: SettingsScope,
+  scope: SettingsWriteTarget,
 ): SettingInspection {
   const descriptor = descriptorFor(id)
   // Across every key the row writes, not just its own: the row is what carries
@@ -93,7 +93,7 @@ function effectiveLayerAbove(
 /** The winning layer, when it sits above the one being edited. */
 function overridingLayer(
   effectiveLayer: SettingInspectionResult['effectiveLayer'],
-  scope: SettingsScope,
+  scope: SettingsWriteTarget,
 ): SettingsLayerId | null {
   if (effectiveLayer === 'default') return null
 
@@ -102,7 +102,10 @@ function overridingLayer(
   return rank(effectiveLayer) > rank(scope) ? effectiveLayer : null
 }
 
-function writeBlockedReason(settingScope: SettingScope, target: SettingsScope): string | null {
+function writeBlockedReason(
+  settingScope: SettingScope,
+  target: SettingsWriteTarget,
+): string | null {
   if (layerAllowsScope(target, settingScope)) return null
 
   // The scope rule, stated where the user meets it. Workspace settings ship

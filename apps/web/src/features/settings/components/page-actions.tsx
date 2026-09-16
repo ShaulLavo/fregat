@@ -1,4 +1,5 @@
 import { DotsThreeIcon } from '@phosphor-icons/react'
+import type { SettingsWriteTarget } from '@workspace/contracts'
 import { Button } from '@workspace/ui/components/button'
 import {
   DropdownMenu,
@@ -9,7 +10,6 @@ import {
 } from '@workspace/ui/components/dropdown-menu'
 
 import { useSettingsActions } from '../hooks/use-settings-actions'
-import type { SettingsScope } from '../state/scope-store'
 import { selectSettingsView } from '../state/view-store'
 
 /**
@@ -21,7 +21,7 @@ import { selectSettingsView } from '../state/view-store'
  * key rather than writing defaults in, which is the same rule per-row reset
  * follows and what keeps defaults coming from the running build.
  */
-export function PageActions({ scope }: { scope: SettingsScope }) {
+export function PageActions({ scope }: { scope: SettingsWriteTarget }) {
   const { resetAll } = useSettingsActions()
 
   return (

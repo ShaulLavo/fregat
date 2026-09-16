@@ -2,7 +2,7 @@ import type { EditorPlugin } from '@singapore-editor/core'
 import type {
   SettingsDiagnostic,
   SettingsLayerFile,
-  SettingsWriteTarget,
+  SettingsViewTarget,
 } from '@workspace/contracts'
 import { useLayoutEffect, useState } from 'react'
 
@@ -16,7 +16,7 @@ export function useSettingsDiagnosticsPlugin({
 }: {
   readonly diagnostics: readonly SettingsDiagnostic[]
   readonly file: SettingsLayerFile | null
-  readonly target: SettingsWriteTarget
+  readonly target: SettingsViewTarget
 }): readonly EditorPlugin[] {
   // The editor owns plugin identity; the source is the settings-owned mutable edge.
   const [source] = useState(() => createSettingsDiagnosticsSource({ diagnostics, file, target }))

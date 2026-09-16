@@ -19,6 +19,9 @@ export const selectors = {
   fileIconElements: (page: Page) => page.locator(fileIconSelector),
   colorModeOption: (page: Page, mode: string) => page.locator(`[data-value="color-mode:${mode}"]`),
   settingsSearch: (page: Page) => page.getByRole('textbox', { name: 'Search settings' }),
+  settingsScopeTab: (page: Page, name: 'User' | 'Workspace' | 'Defaults') =>
+    page.getByRole('tab', { name, exact: true }),
+  settingsDefaultsBanner: (page: Page) => page.getByText('Defaults are read-only', { exact: true }),
   wallpaperPicker: (page: Page) => page.getByLabel('Wallpaper picker', { exact: true }),
   wallpaperMode: (page: Page, mode: string) =>
     page

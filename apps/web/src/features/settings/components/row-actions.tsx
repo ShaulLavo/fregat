@@ -10,7 +10,7 @@ import {
 } from '@workspace/ui/components/dropdown-menu'
 
 import { useSettingsActions } from '../hooks/use-settings-actions'
-import { useSettingsScope } from '../state/scope-store'
+import { useSettingsScope, writableSettingsScope } from '../state/scope-store'
 import { selectSettingsView } from '../state/view-store'
 
 /**
@@ -29,7 +29,7 @@ export function RowActions({
   isModified: boolean
   value: unknown
 }) {
-  const scope = useSettingsScope()
+  const scope = writableSettingsScope(useSettingsScope())
   const { resetSetting } = useSettingsActions()
 
   return (

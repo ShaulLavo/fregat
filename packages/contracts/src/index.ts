@@ -409,6 +409,10 @@ export {
 } from './settings/schema'
 export { settingControl, type SettingControl } from './settings/control'
 export {
+  DEFAULT_SETTINGS_DOCUMENT_REVISION,
+  defaultSettingsDocument,
+} from './settings/defaults-document'
+export {
   deriveWriteTarget,
   inspectSetting,
   layerAllowsScope,
@@ -470,6 +474,7 @@ export {
   type SettingsServerVersion,
   type SettingsSnapshot,
   type SettingsTextRange,
+  type SettingsViewTarget,
   type SettingsWriteTarget,
 } from './settings/wire'
 export {

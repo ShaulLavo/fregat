@@ -14,6 +14,8 @@ export function saveCapability(document: DocumentRef): SaveCapability {
     case 'file':
       return { kind: 'file', resource: document.resource }
     case 'settings-json':
+      // The defaults document is the registry rendered; there is no file behind it.
+      if (document.target === 'default') return { kind: 'none' }
       return { kind: 'settings', target: document.target }
     case 'git-ref':
     case 'git-diff':

@@ -16,7 +16,11 @@ import type {
 } from '@/lib/documents/utils/types'
 
 const SETTINGS_TAB: TabContent = { kind: 'settings' }
-const SETTINGS_MEMBERS = [settingsJsonDocument('user'), settingsJsonDocument('workspace')] as const
+const SETTINGS_MEMBERS = [
+  settingsJsonDocument('user'),
+  settingsJsonDocument('workspace'),
+  settingsJsonDocument('default'),
+] as const
 
 export function documentTab(document: StandaloneDocumentRef): TabContent {
   return { kind: 'document', document }
@@ -49,7 +53,7 @@ export function activeTabDocument(
 ): DocumentRef | null {
   if (content.kind === 'document') return content.document
   if (selection.kind === 'form') return null
-  return SETTINGS_MEMBERS[selection.target === 'user' ? 0 : 1]
+  return SETTINGS_MEMBERS.find((member) => member.target === selection.target) ?? null
 }
 
 export function tabContentKey(content: TabContent): string {
