@@ -69,6 +69,13 @@
       "description": "Draw indentation guides (scope lines).",
       "type": "boolean"
     },
+    "editor.history.retainedStates": {
+      "default": 200,
+      "description": "Earlier states kept per open file, across every undo branch. The least recently visited go first when the budget is exceeded.",
+      "maximum": 5000,
+      "minimum": 10,
+      "type": "integer"
+    },
     "editor.lineHeight": {
       "default": 24,
       "description": "Editor row height in pixels.",
