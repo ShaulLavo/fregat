@@ -37,6 +37,7 @@ a bare root `bun run verify`.
 | [118 — async effects through TanStack](118-async-effects-through-tanstack.md)   | **IMPLEMENTED 2026-09-14**                           |
 | [119 — agent verification tooling](119-agent-verification-tooling.md)           | **IMPLEMENTED 2026-09-14**                           |
 | [121 — undo as a graph](121-undo-graph.md)                                      | **IMPLEMENTED 2026-09-16**                           |
+| [122 - composable full-power plugins](122-composable-plugins.md)                | **PROPOSED - RESEARCH AND PERFORMANCE GATES FIRST**  |
 | [105 — one server and mesh deployment](105-one-server-mesh-deployment.md)       | **IMPLEMENTED 2026-09-13; PHASE 4 OPEN**             |
 | [106 — first-load weight](106-boot-weight.md)                                   | **IMPLEMENTED 2026-09-13**                           |
 | [107 — a markdown package we own](107-workspace-markdown.md)                    | **IMPLEMENTED 2026-09-13**                           |
@@ -53,6 +54,13 @@ a bare root `bun run verify`.
 | [076 — watch-reload child reaping](076-watch-reload-child-reaping.md)           | **PROPOSED — ROOT GO/NO-GO SCHEDULING**              |
 
 ## Dependency notes
+
+- Plan 122 records the single `createPlugin` entrypoint, composable third-party extension points,
+  full-power isomorphic execution, and selective notification requirements. CodeMirror/Monaco
+  comparison and calibrated controls precede API selection. It coordinates Singapore E025-E028,
+  reuses Plan 099's document-publication ownership, and shares decoration research with Plan 111.
+  Its phases do not reorder existing lanes; production scheduling remains in root `PLAN.md`.
+  This planning change does not modify the Singapore repository or implement the plugin runtime.
 
 - Plans 115, 116 and 117 replace the retired Plan 104. The pieces come first: Plan 115 moves
   palettes out of `globals.css` into OKLCH data with a resolver, a server library and an editor
@@ -92,7 +100,7 @@ a bare root `bun run verify`.
   those tests. Plans 091, 092, 093, and 094 consolidate error and timing helpers, path and URI helpers,
   web React and store ceremony, and runtime-neutral web/TUI logic. Plan 095 consolidates server
   plumbing, and Plan 096 settles web layering. Plan 096 settles the shared Git contract and web Git
-  API files before Plan 094's co-pass over them.
+  API files before 094's co-pass over them.
 
 - [Workspace navigation](../docs/workspace-navigation.md) uses TanStack Router as its sole browser
   history owner, preserving local workspace IDs, URL tabs, unsaved documents, and environment
