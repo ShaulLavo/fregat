@@ -4,6 +4,8 @@ import { wallpaperLibrary } from './wallpaper-library'
 import { settingsDefaults } from './settings-defaults'
 import { fileIcons } from './file-icons'
 import { searchInputUndo } from './search-input-undo'
+import { quickOpenNewFile } from './quick-open-new-file'
+import { quickOpenLinkedFile } from './quick-open-linked-file'
 import type { Page } from 'playwright'
 
 type ScenarioContext = {
@@ -41,6 +43,8 @@ export const scenarios: readonly Scenario[] = [
   editorMarkdownPunctuation,
   fileIcons,
   searchInputUndo,
+  quickOpenNewFile,
+  quickOpenLinkedFile,
   wallpaperLibrary,
   settingsDefaults,
   demoWorkspace,

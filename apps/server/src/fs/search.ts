@@ -1,4 +1,4 @@
-import { stat } from 'node:fs/promises'
+import { realpath, stat } from 'node:fs/promises'
 import path from 'node:path'
 
 import {
@@ -136,20 +136,22 @@ export class DiskWorkspaceSearchProvider implements SearchProvider {
 
 class PathIndexSearchProvider {
   private index: WorkspaceIndex
+  private paths: WorkspacePaths
 
-  constructor(index: WorkspaceIndex) {
+  constructor(index: WorkspaceIndex, paths: WorkspacePaths) {
     this.index = index
+    this.paths = paths
   }
 
-  static ready(index: WorkspaceIndex | undefined, context: FindContext) {
+  static ready(index: WorkspaceIndex | undefined, paths: WorkspacePaths, context: FindContext) {
     if (!index) return null
     if (index.status().readiness !== 'ready') return null
     if (!workspaceIndexMatchesContextRoot(index, context)) return null
 
-    return new PathIndexSearchProvider(index)
+    return new PathIndexSearchProvider(index, paths)
   }
 
-  async *searchNames(context: FindContext): AsyncGenerator<FindMatch> {
+  async *searchNames(context: FindContext, signal?: AbortSignal): AsyncGenerator<FindMatch> {
     const entriesByPath = this.index.entryMap()
     const ranker = createNameCandidateRanker(context, nameRankCapacity(context.options.limit))
     const emittedPaths = new Set<string>()
@@ -161,7 +163,14 @@ class PathIndexSearchProvider {
       addNameCandidate(ranker, relativePath)
     }
 
+    const linkedDirectories = await outboundLinkedDirectories(context, entriesByPath)
+    recordRequestContext({ search: { linkedDirectoryCount: linkedDirectories.length } })
+    for await (const relativePath of linkedNameCandidates(context, linkedDirectories, signal)) {
+      addNameCandidate(ranker, relativePath)
+    }
+
     yield* takeRankedIndexNameMatches(
+      this.paths,
       context,
       ranker,
       emittedPaths,
@@ -416,7 +425,7 @@ async function* searchWithTools(
   const workspaceIndex = workspaceIndexForQuery(context.options, providerOptions.workspaceIndex)
   const pathIndexProvider =
     searchNames && canUsePathIndexForQuery(context.options)
-      ? PathIndexSearchProvider.ready(workspaceIndex, context)
+      ? PathIndexSearchProvider.ready(workspaceIndex, paths, context)
       : null
   const contentIndexFilter = searchContent
     ? ContentIndexFilter.ready(workspaceIndex, context)
@@ -435,7 +444,7 @@ async function* searchWithTools(
     search: { provider: searchProviderLabel(pathIndexProvider, needsFd) },
   })
   if (pathIndexProvider) {
-    yield* measureProvider(context, 'index', pathIndexProvider.searchNames(context))
+    yield* measureProvider(context, 'index', pathIndexProvider.searchNames(context, signal))
   } else if (searchNames) {
     yield* measureProvider(context, 'fd', searchNamesWithFd(paths, context, signal, runtime))
   }
@@ -615,6 +624,64 @@ async function* searchNamesWithFd(
   }
 }
 
+// The index scan stops at a symlinked directory, and the watcher cannot see past one either,
+// so links that leave the workspace are walked per query. Links back inside are already indexed.
+async function outboundLinkedDirectories(
+  context: FindContext,
+  entriesByPath: ReadonlyMap<string, ReadonlyWorkspaceIndexEntry>,
+) {
+  const workspaceRoot = await realpath(context.root.absolutePath)
+  const linked: string[] = []
+
+  for (const entry of entriesByPath.values()) {
+    if (!isLinkedDirectoryCandidate(context, entry)) continue
+    if (!(await linkLeavesRoot(context, entry.path, workspaceRoot))) continue
+
+    linked.push(entry.path)
+  }
+
+  return linked
+}
+
+function isLinkedDirectoryCandidate(context: FindContext, entry: ReadonlyWorkspaceIndexEntry) {
+  if (entry.type !== 'symlink') return false
+  if (entry.targetType !== 'directory') return false
+  if (!indexEntryIsSearchCandidate(entry)) return false
+
+  return !isIgnoredSearchPath(context, resultPath(context.root.relativePath, entry.path))
+}
+
+async function linkLeavesRoot(context: FindContext, entryPath: string, workspaceRoot: string) {
+  try {
+    const target = await realpath(path.join(context.root.absolutePath, entryPath))
+    const fromRoot = path.relative(workspaceRoot, target)
+    if (path.isAbsolute(fromRoot)) return true
+    if (fromRoot !== '..' && !fromRoot.startsWith(`..${path.sep}`)) return false
+
+    // A link to an ancestor would walk the workspace again through itself.
+    return !workspaceRoot.startsWith(`${target}${path.sep}`)
+  } catch {
+    return false
+  }
+}
+
+async function* linkedNameCandidates(
+  context: FindContext,
+  linkedDirectories: readonly string[],
+  signal: AbortSignal | undefined,
+): AsyncGenerator<string> {
+  if (linkedDirectories.length === 0) return
+  if (!(await canUseSearchTools({ content: false, names: true }))) return
+
+  for await (const line of runToolLines('fd', fdArgs(context, linkedDirectories), signal, [0])) {
+    const relativePath = resultPath(context.root.relativePath, line)
+    if (!indexEntryMatchesDepth(context, relativePath)) continue
+    if (!nameCandidateMatchesContext(context, relativePath)) continue
+
+    yield relativePath
+  }
+}
+
 function nameCandidateMatchesContext(context: FindContext, relativePath: string) {
   if (isIgnoredSearchPath(context, relativePath)) return false
   if (!context.matcher.pathMatches(globMatchPath(context, relativePath))) return false
@@ -706,6 +773,7 @@ async function* takeRankedNameMatches(
 }
 
 async function* takeRankedIndexNameMatches(
+  paths: WorkspacePaths,
   context: FindContext,
   ranker: NameCandidateRanker,
   emittedPaths: Set<string>,
@@ -715,7 +783,13 @@ async function* takeRankedIndexNameMatches(
   let count = 0
 
   while (count < limit) {
-    const match = takeRankedIndexNameMatch(context, ranker, emittedPaths, entriesByPath)
+    const match = await takeRankedIndexNameMatch(
+      paths,
+      context,
+      ranker,
+      emittedPaths,
+      entriesByPath,
+    )
     if (!match) return
 
     count += 1
@@ -723,7 +797,8 @@ async function* takeRankedIndexNameMatches(
   }
 }
 
-function takeRankedIndexNameMatch(
+async function takeRankedIndexNameMatch(
+  paths: WorkspacePaths,
   context: FindContext,
   ranker: NameCandidateRanker,
   emittedPaths: Set<string>,
@@ -737,10 +812,11 @@ function takeRankedIndexNameMatch(
     const indexPath = globMatchPath(context, relativePath)
     if (!indexPath) continue
 
+    // No entry means the candidate came from a linked directory, so it is read from disk.
     const entry = entriesByPath.get(indexPath)
-    if (!entry) continue
-
-    const match = nameMatchFromIndexEntry(entry, relativePath, context)
+    const match = entry
+      ? nameMatchFromIndexEntry(entry, relativePath, context)
+      : await nameMatchFromPath(paths, relativePath, context)
     if (!match) continue
 
     emittedPaths.add(match.path)
@@ -788,7 +864,7 @@ async function* searchContentWithRg(
   }
 }
 
-function fdArgs(context: FindContext) {
+function fdArgs(context: FindContext, searchPaths: readonly string[] = []) {
   const args = [
     '--base-directory',
     context.root.absolutePath,
@@ -812,6 +888,7 @@ function fdArgs(context: FindContext) {
     args.push('--max-depth', String(context.options.maxDepth))
 
   for (const ignored of defaultIgnoredNames) args.push('--exclude', ignored)
+  for (const searchPath of searchPaths) args.push('--search-path', searchPath)
 
   // fd reads a pattern starting with `-` as a flag unless `--` comes first.
   if (searchMatchMode(context.options) !== 'fuzzy') args.push('--', context.query)

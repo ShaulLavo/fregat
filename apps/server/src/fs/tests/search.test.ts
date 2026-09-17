@@ -804,6 +804,45 @@ describe('workspace disk search provider', () => {
     expect(done?.measurement?.statCallCount).toBe(1)
   })
 
+  it('finds names behind a symlinked directory the index does not scan, including new ones', async () => {
+    const root = await fixtureRoot()
+    const workspaceRoot = path.join(root, 'workspace')
+    const linkedRoot = path.join(root, 'linked-package')
+    await mkdir(path.join(workspaceRoot, 'packages'), { recursive: true })
+    await mkdir(path.join(linkedRoot, 'src'), { recursive: true })
+    await writeFile(path.join(workspaceRoot, 'needle-local.ts'), '')
+    await writeFile(path.join(linkedRoot, 'src', 'needle-linked.ts'), '')
+    await symlink(linkedRoot, path.join(workspaceRoot, 'packages', 'linked'))
+    await symlink('.', path.join(workspaceRoot, 'loop'))
+    const paths = createWorkspacePaths(workspaceRoot)
+    const index = await buildWorkspaceIndex(paths, TEST_INDEX_OPTIONS)
+    await writeFile(path.join(linkedRoot, 'src', 'needle-created-later.ts'), '')
+
+    const events = await collectEvents(
+      findInWorkspaceStream(
+        paths,
+        {
+          entryType: 'file',
+          includeContent: false,
+          limit: 20,
+          matchMode: 'fuzzy',
+          maxContentBytes: 1_000_000,
+          path: '',
+          query: 'needle',
+        },
+        undefined,
+        { workspaceIndex: index },
+      ),
+    )
+
+    expect(nameMatchPaths(events).toSorted()).toEqual([
+      'needle-local.ts',
+      'packages/linked/src/needle-created-later.ts',
+      'packages/linked/src/needle-linked.ts',
+    ])
+    expect(doneEvent(events)?.measurement?.providerSources).toEqual(['index'])
+  })
+
   it('uses an index scoped below the filesystem root and returns filesystem-relative paths', async () => {
     const root = await fixtureRoot()
     const workspaceRoot = path.join(root, 'workspace')

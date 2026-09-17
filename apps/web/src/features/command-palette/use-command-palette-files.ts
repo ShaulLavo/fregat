@@ -45,8 +45,10 @@ export function useCommandPaletteFiles({
         },
         clientForQueryClient(client),
       ),
+    // Never cached: a remembered miss would hide a file created since the last search.
+    gcTime: 0,
     queryKey: fileSystemKeys.quickOpenFiles(rootPath ?? '', fileQuery),
-    staleTime: 5_000,
+    staleTime: 0,
   })
   const searchedFileItems = searchFilePaletteItems(fileSearchQuery.data ?? [], rootPath ?? '')
   const visibleFileItems = fileSearchEnabled ? searchedFileItems : baseFileItems
