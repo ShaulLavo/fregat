@@ -1921,3 +1921,20 @@ anyone using `bench:editor-open:gate` locally to recalibrate.
    plan number 099 is taken.
 8. Plan 091's anchors into `provider-command-reactor.ts` have already drifted: it cites 841/845/849;
    HEAD has 844 and 848.
+9. Two TUI tests flake on CI and main shares both; neither is in this branch's area.
+   - `src/terminal/tests/agent-context.test.tsx:31` — `getSelectedText()` is `''` because
+     `TerminalView` overlays the connecting loader at `position='absolute' left={0} top={0}
+zIndex={1}`, the exact cell the drag starts on, so the mouse never reaches the terminal.
+     Reproduced against a bare `EmbeddedTerminalRenderable`: same drag, empty selection with an
+     absolute zIndex-1 box over the origin, the row's text without it. Fixed in `d0d2ad88` by
+     waiting for the ready footer first.
+   - `src/host/tests/job-control.test.ts` → `test/processes/job-control.py:88` — **still open.**
+     The harness matches markers against the raw PTY byte stream, and OpenTUI's renderer splits a
+     single text run at cells it considers unchanged. CI's own failure trace shows the footer
+     `F2 save · Esc cancel` emitted as `\x1b[29;5H…F2 save ·` + `\x1b[29;15H…Esc cancel` — one
+     `<text>` node, two runs, split at the unchanged space. A local trace dump of the same harness
+     has the title as one contiguous run (`\x1b[4;5H…\x1b[1mEdit settings.json`), so contiguity
+     depends on what the previous frame left under those cells, which is async workbench content.
+     Every multi-word marker in that file is therefore a coin flip. A sound fix needs the harness to
+     match a screen model rather than the stream; a whitespace-tolerant matcher would paper over it
+     at the cost of weakening the assertion. Left for the TUI owner rather than weakened here.
