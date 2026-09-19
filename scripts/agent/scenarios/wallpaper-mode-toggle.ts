@@ -12,9 +12,8 @@ async function command(page: Page, title: string) {
     await selectors.colorModeOption(page, title === 'Light mode' ? 'light' : 'dark').click()
     await selectors.paletteInput(page).waitFor({ state: 'hidden' })
     return
-  } else {
-    await selectors.paletteInput(page).fill(`>${title}`)
   }
+  await selectors.paletteInput(page).fill(`>${title}`)
   await selectors.commandOption(page, title).click()
   await selectors.paletteInput(page).waitFor({ state: 'hidden' })
 }
