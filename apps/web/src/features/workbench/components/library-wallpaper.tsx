@@ -39,7 +39,7 @@ export function LibraryWallpaper({
           className={cn(classes, !ready && 'opacity-0')}
           data-workbench-wallpaper={ready ? '' : undefined}
           data-workbench-wallpaper-layer={ready ? 'still' : 'pending-still'}
-          src={libraryImageUrl(asset, 'asset')}
+          src={libraryImageUrl(asset, 'display')}
           decoding='async'
           onError={() => setFullFailed(true)}
           onLoad={(event) => {

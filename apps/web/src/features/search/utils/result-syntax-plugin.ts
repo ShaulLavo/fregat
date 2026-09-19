@@ -10,7 +10,9 @@ import {
   type EditorSyntaxSession,
   type EditorSyntaxSessionOptions,
   type EditorToken,
+  type EditorTokenInput,
   type PieceTableSnapshot,
+  toEditorTokenStore,
 } from '@singapore-editor/core'
 
 import { SEARCH_RESULT_FILE_DOCUMENT_ID_PREFIX } from '@/features/search/utils/result-editor'
@@ -93,7 +95,7 @@ class SearchResultSyntaxSession implements EditorSyntaxSession {
     return this.result
   }
 
-  public getTokens(): readonly EditorToken[] {
+  public getTokens(): EditorTokenInput {
     return this.result.tokens
   }
 
@@ -155,7 +157,8 @@ class SearchResultSyntaxSession implements EditorSyntaxSession {
     const snapshot = createPieceTableSnapshot(line.text)
     try {
       const result = await session.refresh(snapshot, line.text)
-      return offsetEditorTokens(result.tokens, line.start)
+      // One result line's tokens, so unpacking them costs the line, not a document.
+      return offsetEditorTokens(toEditorTokenStore(result.tokens).toTokens(), line.start)
     } finally {
       session.dispose()
     }

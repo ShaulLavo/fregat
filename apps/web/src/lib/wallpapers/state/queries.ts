@@ -17,6 +17,6 @@ export function wallpaperLibraryOptions() {
   })
 }
 
-export function libraryImageUrl(id: AssetId, kind: 'asset' | 'thumbnail') {
+export function libraryImageUrl(id: AssetId, kind: 'display' | 'thumbnail') {
   return `${serverEndpoint(primaryServerOrigin()).replace(/\/+$/u, '')}/themes/wallpapers/${id}/${kind}`
 }

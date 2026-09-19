@@ -130,6 +130,8 @@ export function paletteModeRows({
       return unavailable('Symbols')
     case 'gotoLine':
       return unavailable('Go to line')
+    case 'wallpaper':
+      return unavailable('Wallpapers')
   }
 }
 

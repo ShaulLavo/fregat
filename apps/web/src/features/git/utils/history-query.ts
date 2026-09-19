@@ -17,6 +17,13 @@ export const historyKeys = {
     [...gitKeys.all, 'history-commit', path, commit] as const,
 }
 
+function sameHistorySource(key: readonly unknown[] | undefined, path: string, ref: string) {
+  if (!key) return false
+  const searchIndex = key.length - 1
+
+  return key[searchIndex - 2] === path && key[searchIndex - 1] === ref
+}
+
 export function historyQueryOptions(path: string, ref: string, search: string) {
   return infiniteQueryOptions({
     queryKey: historyKeys.page(path, ref, search),
@@ -49,6 +56,9 @@ export function historyQueryOptions(path: string, ref: string, search: string) {
       )
     },
     getNextPageParam: (page) => page.next,
+    // Typing in the search keeps the last rows up; another repository or ref never lends its rows.
+    placeholderData: (previous, previousQuery) =>
+      sameHistorySource(previousQuery?.queryKey, path, ref) ? previous : undefined,
     staleTime: 30_000,
   })
 }

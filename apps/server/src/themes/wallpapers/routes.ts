@@ -2,7 +2,13 @@ import { stat } from 'node:fs/promises'
 import path from 'node:path'
 import { Elysia, t } from 'elysia'
 import { observeRequestOperation } from '../../observability'
-import { OMARCHY_THEMES_DIRECTORY, parseAssetId, type WallpaperLibrary } from './library'
+import { wallpaperErrors } from './structured-errors'
+import {
+  displayName,
+  OMARCHY_THEMES_DIRECTORY,
+  parseAssetId,
+  type WallpaperLibrary,
+} from './library'
 
 export function wallpaperLibraryRoutes(library: WallpaperLibrary) {
   return new Elysia({ name: 'wallpaper-library' }).group('/themes/wallpapers', (app) =>
@@ -38,8 +44,9 @@ export function wallpaperLibraryRoutes(library: WallpaperLibrary) {
           ),
         { body: t.Object({ path: t.Optional(t.String()) }) },
       )
-      .get('/:id/asset', ({ params }) => media(library, params.id, false))
-      .get('/:id/thumbnail', ({ params }) => media(library, params.id, true))
+      .get('/:id/asset', ({ params }) => media(library, params.id, 'asset'))
+      .get('/:id/display', ({ params }) => media(library, params.id, 'display'))
+      .get('/:id/thumbnail', ({ params }) => media(library, params.id, 'thumbnail'))
       .post('/:id/delete', ({ params }) =>
         observeRequestOperation(
           {
@@ -54,24 +61,24 @@ export function wallpaperLibraryRoutes(library: WallpaperLibrary) {
   )
 }
 
-function media(library: WallpaperLibrary, input: string, thumbnail: boolean) {
+type MediaKind = 'asset' | 'display' | 'thumbnail'
+
+function media(library: WallpaperLibrary, input: string, kind: MediaKind) {
   const id = parseAssetId(input)
   return observeRequestOperation(
-    {
-      area: 'wallpaper',
-      operation: thumbnail ? 'library.thumbnail' : 'library.asset',
-      sourceKind: 'library',
-      assetId: id,
-    },
+    { area: 'wallpaper', operation: `library.${kind}`, sourceKind: 'library', assetId: id },
     async () => {
       const asset = await library.read(id)
-      const file = path.join(
-        library.directory,
-        thumbnail ? `${id}.thumb.webp` : `${id}.${asset.extension}`,
-      )
-      return new Response(Bun.file(file), {
+      const names = {
+        asset: `${id}.${asset.extension}`,
+        display: displayName(id),
+        thumbnail: asset.thumbnail,
+      }
+      const file = Bun.file(path.join(library.directory, names[kind]))
+      if (!(await file.exists())) throw wallpaperErrors.NOT_FOUND()
+      return new Response(file, {
         headers: {
-          'content-type': thumbnail ? 'image/webp' : asset.contentType,
+          'content-type': kind === 'asset' ? asset.contentType : 'image/webp',
           'cache-control': 'public, max-age=31536000, immutable',
         },
       })

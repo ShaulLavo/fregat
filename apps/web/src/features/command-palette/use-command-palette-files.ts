@@ -5,7 +5,7 @@ import type { LoadState } from '@/lib/load-state'
 import { fetchQuickOpenFiles } from '@/lib/file-server'
 import { fileSystemKeys } from '@/lib/query-keys'
 import type { TreeModel } from '@/lib/tree-model'
-import { useQuery } from '@tanstack/react-query'
+import { keepPreviousData, useQuery } from '@tanstack/react-query'
 import { useLayoutEffect, useState } from 'react'
 
 import type { QuickAccessMode } from '@/features/command-palette/command-palette-types'
@@ -45,11 +45,19 @@ export function useCommandPaletteFiles({
         },
         clientForQueryClient(client),
       ),
+    // Never cached: a remembered miss would hide a file created since the last search.
+    gcTime: 0,
+    // The last rows stay up until the new ones land, so typing never blanks the list.
+    placeholderData: keepPreviousData,
     queryKey: fileSystemKeys.quickOpenFiles(rootPath ?? '', fileQuery),
-    staleTime: 5_000,
+    staleTime: 0,
   })
   const searchedFileItems = searchFilePaletteItems(fileSearchQuery.data ?? [], rootPath ?? '')
-  const visibleFileItems = fileSearchEnabled ? searchedFileItems : baseFileItems
+  const fileSearchHasRows = fileSearchEnabled && fileSearchQuery.data !== undefined
+  const visibleFileItems = fileSearchHasRows ? searchedFileItems : baseFileItems
+  // Unsettled means the rows on screen answer an older query, so "no matches" is not yet a verdict.
+  const fileSearchUnsettled =
+    fileSearchEnabled && (fileSearchQuery.isPending || fileSearchQuery.isPlaceholderData)
   const selectedCommandValue =
     mode === 'files' ? selectedFileCommandValue(selectedFileItemValue, visibleFileItems) : undefined
 
@@ -62,6 +70,7 @@ export function useCommandPaletteFiles({
   return {
     fileQuery,
     fileSearchQuery,
+    fileSearchUnsettled,
     selectedCommandValue,
     setSelectedFileItemValue,
     visibleFileItems,

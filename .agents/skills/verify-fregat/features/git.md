@@ -21,3 +21,5 @@ Every git action is a `useMutation` with a key under `['git', 'mutation', ...]`;
 Commit runs hooks; a hook rejection is an expected outcome, not a transport fault. Stage and unstage are not optimistic on purpose.
 
 Graph roots exclude `refs/platform/*`. A browsing session pins tips and ref labels until refresh. Merge file lists compare the first parent. History ends at shallow-clone boundaries. Search matches messages and authors case-insensitively as literal text, or a unique commit-ID prefix, across the full selected history. Filtered results omit ancestry lines. Branch/search selection, commit preview, expanded view, pages, scroll positions, and disclosure choices persist with the workspace. Historical diff URLs carry the explicit `historical` source and immutable blob IDs.
+
+`git-history-search-no-flicker` types a commit search one key at a time and samples every frame. The step label must read `blank-frames-0`: the previous rows stay up until the new ones arrive, and the footer loader is the only sign of the wait.

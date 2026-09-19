@@ -1,7 +1,16 @@
+import { DotsThreeIcon, TrashIcon } from '@phosphor-icons/react'
 import type { WallpaperAsset } from '@workspace/contracts'
 import { Button } from '@workspace/ui/components/button'
+import {
+  DropdownMenu,
+  DropdownMenuContent,
+  DropdownMenuItem,
+  DropdownMenuTrigger,
+} from '@workspace/ui/components/dropdown-menu'
 import { Spinner } from '@workspace/ui/components/spinner'
+import { WallpaperChoice } from '@/features/settings/components/widgets/wallpaper-choice'
 import { libraryImageUrl } from '@/lib/wallpapers/state/queries'
+import { wallpaperDisplayName, wallpaperTitle } from '@/lib/wallpapers/utils/groups'
 
 export function WallpaperCard({
   asset,
@@ -16,40 +25,51 @@ export function WallpaperCard({
   readonly disabled: boolean
   readonly deleting: boolean
   readonly onSelect: () => void
-  readonly onDelete: () => void
+  // Absent on imported assets: the next import restores them, so delete would be a lie.
+  readonly onDelete?: () => void
 }) {
+  const name = wallpaperDisplayName(asset)
   return (
-    <div className='flex min-w-0 flex-col gap-1'>
-      <Button
-        variant='outline'
-        className='aria-pressed:bg-accent h-auto flex-col overflow-hidden p-1'
-        aria-label={`Select ${asset.name}`}
-        aria-pressed={selected}
-        title={asset.name}
+    <div className='group/wallpaper relative min-w-0'>
+      <WallpaperChoice
+        label={name}
+        title={wallpaperTitle(asset)}
+        ariaLabel={`Select ${asset.name}`}
+        selected={selected}
         disabled={disabled}
-        onClick={onSelect}
+        onSelect={onSelect}
       >
         <img
           crossOrigin='anonymous'
           src={libraryImageUrl(asset.id, 'thumbnail')}
           alt=''
-          className='aspect-video w-full rounded-md object-cover'
+          className='bg-muted aspect-video w-full rounded-md object-cover'
           loading='lazy'
         />
-        <span className='w-full truncate text-xs'>{asset.name}</span>
-        <span className='text-muted-foreground text-2xs tabular-nums'>
-          {asset.width} × {asset.height}
-        </span>
-      </Button>
-      <Button
-        size='sm'
-        variant='ghost'
-        disabled={disabled || deleting}
-        aria-label={`Delete ${asset.name}`}
-        onClick={onDelete}
-      >
-        {deleting ? <Spinner /> : null}Delete
-      </Button>
+      </WallpaperChoice>
+      {onDelete ? (
+        <DropdownMenu>
+          <DropdownMenuTrigger
+            render={
+              <Button
+                size='icon-sm'
+                variant='secondary'
+                className='absolute top-2 left-2 opacity-0 group-focus-within/wallpaper:opacity-100 group-hover/wallpaper:opacity-100 aria-expanded:opacity-100'
+                aria-label={`Actions for ${asset.name}`}
+                disabled={disabled || deleting}
+              />
+            }
+          >
+            {deleting ? <Spinner /> : <DotsThreeIcon weight='bold' />}
+          </DropdownMenuTrigger>
+          <DropdownMenuContent align='start'>
+            <DropdownMenuItem variant='destructive' onClick={onDelete}>
+              <TrashIcon />
+              Delete
+            </DropdownMenuItem>
+          </DropdownMenuContent>
+        </DropdownMenu>
+      ) : null}
     </div>
   )
 }

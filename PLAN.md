@@ -311,8 +311,10 @@ compositor backdrop, and an importer seeded from `/usr/share/omarchy/themes`.
 [Plan 117](plans/117-themes.md) binds a palette, the existing syntax pair, wallpapers and material
 under one name with per-theme customization, a portable archive, and the composed Omarchy importer.
 
-Plan 115 is implemented and deployed as of 2026-09-14. Order: 116 is independent and may run now;
-117 needs both. Syntax selection is
+Plans 115 and 116 are implemented and deployed as of 2026-09-14, and
+[Plan 123](plans/123-wallpaper-picker.md) replaced 116's picker on 2026-09-17: a dialog with uploads,
+theme sections and a previewing palette scope, plus a display rendition. 117 is unblocked and binds
+that picker. Syntax selection is
 already done and is not touched. CSS-in-JS was considered and rejected: custom properties are the
 runtime, and Tailwind keeps resolving to tokens. [The research](docs/theme-standardization-reference.md)
 records the Omarchy reuse strategy and the T3 Code and CodexThemes-App comparisons.

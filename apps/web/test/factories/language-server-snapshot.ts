@@ -1,4 +1,5 @@
 import { createEditorTextBuffer } from '@singapore-editor/core/document'
+import { EditorTokenStore } from '@singapore-editor/core'
 import type { EditorViewSnapshot } from '@singapore-editor/core/extensions'
 
 export function languageServerSnapshot(
@@ -16,7 +17,7 @@ export function languageServerSnapshot(
     initialHighlightStatus: 'plain' as const,
     lineStarts,
     lineCount: lineStarts.length,
-    tokens: [],
+    tokens: EditorTokenStore.empty(),
     brackets: [],
     selections: [],
     metrics: { rowHeight: 20, characterWidth: 8 },
@@ -48,7 +49,13 @@ export function languageServerSnapshot(
     documentSyncPoint: buffer.getDocumentSyncPoint(),
     changesSinceDocumentSyncPoint: (point, scope) =>
       buffer.changesSinceDocumentSyncPoint(point, scope),
-    toJSON: () => ({ ...view, kind: 'editor-view', schemaVersion: 1, theme: null }),
+    toJSON: () => ({
+      ...view,
+      kind: 'editor-view',
+      schemaVersion: 1,
+      theme: null,
+      tokens: { starts: [], ends: [], styleIds: [], styles: [] },
+    }),
     toVisibleSnapshot: () => null,
   }
 }

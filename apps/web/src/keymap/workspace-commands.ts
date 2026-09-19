@@ -450,6 +450,17 @@ export const workspaceCommands = [
       ),
   }),
   defineCommand({
+    ...workspaceCommandMetadata['workspace.selectWallpaper'],
+    icon: ImageIcon,
+    run: ({ invocation, runtime }) =>
+      transitionStart(
+        runtime.shell.showCommandPalette(
+          'wallpaper ',
+          invocation.origin as FocusTargetToken | null,
+        ),
+      ),
+  }),
+  defineCommand({
     ...workspaceCommandMetadata['workspace.runProjectScript'],
     icon: PlayIcon,
     run: ({ invocation, runtime }) =>

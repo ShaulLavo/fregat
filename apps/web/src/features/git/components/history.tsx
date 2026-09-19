@@ -38,13 +38,13 @@ export function History({ rootPath }: { rootPath: string }) {
   const commits = history.data?.pages.flatMap((page) => page.commits) ?? []
   const refs = history.data?.pages[0]?.refs ?? []
   const labels = historyRefLabels(refs)
-  const rows = settledSearch ? layoutHistoryMatches(commits) : layoutHistory(commits)
+  const rows = history.shownSearch ? layoutHistoryMatches(commits) : layoutHistory(commits)
   const loadedPages = history.data?.pages.length ?? 0
 
   useEffect(() => {
-    if (searching || loadedPages <= view.pageCount) return
+    if (searching || history.isPlaceholderData || loadedPages <= view.pageCount) return
     void updateView({ pageCount: loadedPages })
-  }, [loadedPages, searching, view.pageCount, updateView])
+  }, [loadedPages, searching, history.isPlaceholderData, view.pageCount, updateView])
 
   function selectCommit(selected: string | null) {
     setRevealRevision((revision) => revision + 1)
@@ -114,7 +114,7 @@ export function History({ rootPath }: { rootPath: string }) {
           </div>
         ) : null}
         <div className='flex min-h-0 min-w-0 flex-1 flex-col'>
-          {history.isPending || searching || history.isRestoring ? (
+          {history.isPending || history.isRestoring ? (
             <LoadingState label='Loading commit history' className='space-y-3 p-3'>
               <div className='skeleton-sweep h-3 w-3/4 rounded-md' />
               <div className='skeleton-sweep h-3 w-1/2 rounded-md' />
@@ -139,20 +139,20 @@ export function History({ rootPath }: { rootPath: string }) {
               </Button>
             </div>
           ) : null}
-          {!history.isPending && !searching && !history.isError && rows.length === 0 ? (
+          {!history.isPending && !history.isError && rows.length === 0 ? (
             <EmptyState
               className='flex-1'
-              title={search ? 'No matching commits' : 'No commits yet'}
+              title={history.shownSearch ? 'No matching commits' : 'No commits yet'}
               description={
-                search
+                history.shownSearch
                   ? 'Try another search or choose All branches & tags.'
                   : 'Commits will appear here after the first commit.'
               }
             />
           ) : null}
-          {rows.length > 0 && !searching && !history.isRestoring ? (
+          {rows.length > 0 && !history.isRestoring ? (
             <HistoryList
-              key={`${refName}:${settledSearch}`}
+              key={`${refName}:${history.shownSearch}`}
               revealRevision={revealRevision}
               rows={rows}
               refs={labels}
@@ -167,7 +167,7 @@ export function History({ rootPath }: { rootPath: string }) {
           ) : null}
           <PaneBar border='top'>
             <span className='text-muted-foreground text-2xs min-w-0 flex-1 tabular-nums'>
-              {historyCountLabel(commits.length, settledSearch)}
+              {historyCountLabel(commits.length, history.shownSearch)}
               {!history.hasNextPage && commits.length > 0 ? ' · All results loaded' : ''}
             </span>
             {history.isFetching ? <OrbitLoader className='size-3' /> : null}
@@ -175,7 +175,7 @@ export function History({ rootPath }: { rootPath: string }) {
               <Button
                 size='sm'
                 variant='ghost'
-                disabled={history.isFetching || searching}
+                disabled={history.isFetching || searching || history.isPlaceholderData}
                 onClick={() => {
                   void history.fetchNextPage()
                 }}
