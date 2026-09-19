@@ -4,10 +4,7 @@ import { useEffect } from 'react'
 
 import { useCommandPaletteActions } from '@/features/command-palette/hooks/use-command-palette-actions'
 import { useEditorColorTheme } from '@/features/editor/hooks/use-editor-color-theme'
-import {
-  prepareEditorThemeSwitching,
-  preloadVscodeThemeRegistrations,
-} from '@/features/editor/state/color-theme-store'
+import { preloadVscodeThemeRegistrations } from '@/features/editor/state/color-theme-store'
 import { editorThemeOptions } from '@/lib/code-theme/utils/catalog'
 import { colorThemeItemValue } from '@/features/command-palette/command-palette-utils'
 import { RowLabel } from '@/features/command-palette/row-label'
@@ -16,12 +13,7 @@ export function ColorThemeGroups() {
   const { selectColorTheme } = useCommandPaletteActions()
   const { committedThemeId, colorMode } = useEditorColorTheme()
 
-  // Opening this list is the moment switching themes stops being hypothetical,
-  // so both warmups start here rather than at document open: the registrations
-  // every preview hands the worker, and the worker-side highlighter that makes a
-  // swap a re-tokenize instead of a rebuild.
   useEffect(() => {
-    prepareEditorThemeSwitching()
     void preloadVscodeThemeRegistrations()
   }, [])
 

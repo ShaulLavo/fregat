@@ -19,11 +19,8 @@ export function createOrchestrationRpcClient(options: WebOrchestrationRpcClientO
   return new OrchestrationRpcClient({
     ...options,
     beforeRequest: simulateLatency,
-    createSocket: () => {
-      const endpoint = new URL(`${serverEndpoint(options.origin)}/orchestration/rpc`)
-      endpoint.protocol = endpoint.protocol === 'https:' ? 'wss:' : 'ws:'
-      return (options.createSocket ?? ((address) => new WebSocket(address)))(endpoint.toString())
-    },
+    createSocket: options.createSocket ?? ((address) => new WebSocket(address)),
+    resolveEndpoint: serverEndpoint,
     environments: useEnvironmentsStore,
     observation: {
       observeOperation: (event, operation, summarize) =>

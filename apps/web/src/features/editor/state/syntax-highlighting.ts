@@ -16,7 +16,7 @@ import { TREE_SITTER_LANGUAGE_CONTRIBUTIONS } from '@singapore-editor/tree-sitte
 import {
   activeEditorThemeUsesShiki,
   activeShikiThemeId,
-  editorThemeSwitchingPrepared,
+  subscribeActiveShikiTheme,
   getResolvedShikiThemeContentHash,
   resolveEditorShikiThemeRegistration,
 } from '@/features/editor/state/color-theme-store'
@@ -24,14 +24,11 @@ import { editorPerformanceFeatureDisabled } from '@/features/editor/state/perfor
 import {
   EDITOR_SHIKI_LANGUAGE_MAP,
   EDITOR_SHIKI_PRELOAD_LANGUAGES,
-  EDITOR_SHIKI_PRELOAD_THEMES,
   resolveShikiLanguageRegistrations,
 } from '@/features/editor/utils/shiki-languages'
 import { isBuiltinEditorThemeId } from '@/lib/code-theme/utils/catalog'
 import { readSettingsMirror } from '@/features/settings/utils/boot-mirror'
 import { log } from '@/lib/client-logging'
-
-const NO_PRELOADED_THEMES: readonly string[] = []
 
 let treeSitterSyntaxProvider: TreeSitterSyntaxProvider | null = null
 let treeSitterSyntaxBackend: TreeSitterBackend | null = null
@@ -44,7 +41,6 @@ export type EditorDiffSyntaxConfiguration = {
   readonly backend: DiffSyntaxBackend
   readonly enabled: boolean
   readonly source: EditorSyntaxHighlightingSource
-  readonly themeRegistrationName: string | null
 }
 
 /** The single policy used by regular documents and diffs. */
@@ -61,16 +57,13 @@ export function editorSyntaxHighlightingSource(
 }
 
 export function editorDiffSyntaxConfiguration(
-  selectedThemeId: string,
-  themeRegistrationName: string | null = null,
+  source: EditorSyntaxHighlightingSource,
 ): EditorDiffSyntaxConfiguration {
-  const source = editorSyntaxHighlightingSource(selectedThemeId)
   if (source === 'disabled') {
     return {
       backend: { kind: 'tree-sitter', provider: null },
       enabled: false,
       source,
-      themeRegistrationName,
     }
   }
   if (source === 'shiki') {
@@ -78,7 +71,6 @@ export function editorDiffSyntaxConfiguration(
       backend: { kind: 'highlighter', provider: editorShikiHighlighterProvider() },
       enabled: true,
       source,
-      themeRegistrationName,
     }
   }
 
@@ -86,7 +78,6 @@ export function editorDiffSyntaxConfiguration(
     backend: { kind: 'tree-sitter', provider: editorTreeSitterSyntaxProvider() },
     enabled: true,
     source,
-    themeRegistrationName,
   }
 }
 
@@ -96,8 +87,7 @@ export function editorShikiHighlighterProvider(): EditorHighlighterProvider {
   shikiHighlighterProvider = createShikiHighlighterProvider({
     languages: EDITOR_SHIKI_LANGUAGE_MAP,
     preloadLanguages: EDITOR_SHIKI_PRELOAD_LANGUAGES,
-    preloadThemes: () =>
-      editorThemeSwitchingPrepared() ? EDITOR_SHIKI_PRELOAD_THEMES : NO_PRELOADED_THEMES,
+    onThemeChanged: subscribeActiveShikiTheme,
     resolveLanguage: resolveShikiLanguageRegistrations,
     resolveTheme: resolveEditorShikiThemeRegistration,
     theme: resolveShikiThemeForSession,

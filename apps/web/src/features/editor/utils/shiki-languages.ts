@@ -1,5 +1,4 @@
 import {
-  VSCODE_THEMES,
   type ShikiLanguageMap,
   type ShikiWorkerLanguageRegistration,
 } from '@singapore-editor/core/shiki'
@@ -92,11 +91,6 @@ export function resolveShikiLanguageRegistrations(
 
   return loader().then((module) => module.default)
 }
-
-// A prepared theme picker warms every registration before hover preview begins.
-export const EDITOR_SHIKI_PRELOAD_THEMES: readonly string[] = VSCODE_THEMES.map(
-  (theme) => theme.shikiName,
-)
 
 // Preload after first paint so later documents can add grammars without an import wait.
 export const EDITOR_SHIKI_PRELOAD_LANGUAGES: readonly string[] = [

@@ -80,6 +80,20 @@ describe('web routes', () => {
     })
   })
 
+  it('does not shadow the machine proxy with the static catch-all', async () => {
+    const app = await webApp()
+    // The proxy's own guard answers 401; the web handler would have answered 404.
+    const http = await app.handle(new Request('http://local/machines/mac/proxy/orchestration/rpc'))
+    expect(http.status).toBe(401)
+
+    const upgrade = await app.handle(
+      new Request('http://local/machines/mac/proxy/orchestration/rpc', {
+        headers: { connection: 'Upgrade', upgrade: 'websocket' },
+      }),
+    )
+    expect(upgrade.status).toBe(401)
+  })
+
   it('refuses a web root that does not exist', async () => {
     const root = await fixtureRoot()
     expect(() =>

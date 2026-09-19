@@ -65,6 +65,11 @@ type RpcSubscription = {
 
 export type OrchestrationRpcClientOptions = {
   readonly createSocket: (url: string) => OrchestrationSocket
+  /**
+   * Maps the environment origin to the address the socket really opens (a
+   * machine proxy, say). Resolved here so the connection log names that address.
+   */
+  readonly resolveEndpoint?: (origin: string) => string
   readonly environments: ReturnType<typeof createEnvironmentsStore>
   readonly observation: RpcObservation
   readonly onDisconnect?: (error: unknown) => void
@@ -349,7 +354,8 @@ export class OrchestrationRpcClient {
     if (open) return open
     if (this.opening) return this.opening
 
-    const url = orchestrationRpcUrl(this.options.origin)
+    const { origin, resolveEndpoint } = this.options
+    const url = orchestrationRpcUrl(resolveEndpoint?.(origin) ?? origin)
     const socket = this.options.createSocket(url)
     this.socket = socket
     this.socketError = null
@@ -357,6 +363,7 @@ export class OrchestrationRpcClient {
     this.socketScope = this.options.observation.createScope({
       action: 'orchestration.ws.connection.summary',
       area: 'orchestration',
+      origin,
       url,
     })
     this.opening = this.openSocketConnection(socket)
@@ -696,8 +703,10 @@ export class OrchestrationRpcClient {
   }
 }
 
+// Appended, not resolved against the root: an origin may carry a base path
+// (`/platform`, a machine proxy prefix) that the socket must keep.
 function orchestrationRpcUrl(origin: string) {
-  const url = new URL('/orchestration/rpc', origin)
+  const url = new URL(`${origin.replace(/\/+$/u, '')}/orchestration/rpc`)
   url.protocol = url.protocol === 'https:' ? 'wss:' : 'ws:'
 
   return url.toString()

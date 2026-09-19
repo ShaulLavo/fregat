@@ -190,10 +190,7 @@ function createEditorSyntaxHighlightingPlugins(): readonly EditorPlugin[] {
   ]
 }
 
-/**
- * Registers the same Shiki provider instance that diff panes use. Re-registering on a theme change
- * reloads open editor sessions while the provider keeps its shared worker and language cache.
- */
+/** Only changing syntax engines replaces the provider; theme changes stay inside its sessions. */
 function createEditorShikiHighlighterPlugin(): EditorPlugin {
   return {
     name: 'platform.shiki-highlighter',
@@ -201,9 +198,12 @@ function createEditorShikiHighlighterPlugin(): EditorPlugin {
       let registration: EditorDisposable | null = null
 
       const syncRegistration = () => {
+        const enabled = editorSyntaxHighlightingSource() === 'shiki'
+        if (enabled === (registration !== null)) return
+
         registration?.dispose()
         registration = null
-        if (editorSyntaxHighlightingSource() !== 'shiki') return
+        if (!enabled) return
 
         registration = context.registerHighlighter(editorShikiHighlighterProvider())
       }

@@ -22,27 +22,39 @@ type MachineProxyOptions = {
   readonly fetcher?: MachineProxyFetcher
 }
 
-export function createMachineProxyRoutes({ auth, resolve, fetcher = fetch }: MachineProxyOptions) {
-  return new Elysia({ name: 'machine-proxy' }).onBeforeHandle(authGuard(auth)).all(
-    '/machines/:name/proxy/*',
-    async ({ request, params, server }) => {
-      const machine = await resolve(params.name)
-      const target = machineProxyTarget(machine.origin, request, params['*'])
-      const headers = machineProxyHeaders(request, machine.webOrigin)
-      const websocket = request.headers.get('upgrade')?.toLowerCase() === 'websocket'
-      recordRequestContext({
-        area: 'machines',
-        machineName: params.name,
-        operation: 'proxy',
-        transport: websocket ? 'websocket' : 'http',
-      })
-      if (!websocket) return forwardMachineRequest(request, target, headers, fetcher)
+// Registered per method, not with `.all()`: Elysia resolves a method's own routes
+// before ALL routes, so a GET (and every WS upgrade) would otherwise land in the
+// web bundle's `GET /*` catch-all and 404 in production.
+const PROXY_METHODS = ['GET', 'HEAD', 'POST', 'PUT', 'PATCH', 'DELETE', 'OPTIONS'] as const
 
-      target.protocol = 'ws:'
-      // Elysia's .ws() parses JSON before custom parsers. Raw Bun hooks preserve every frame.
-      const data = createMachineProxySocket(target, headers, params.name)
-      if (!server?.upgrade(request, { data })) throw createMachineProxyError()
-    },
-    { parse: 'none' },
-  )
+export function createMachineProxyRoutes({ auth, resolve, fetcher = fetch }: MachineProxyOptions) {
+  const routes = new Elysia({ name: 'machine-proxy' }).onBeforeHandle(authGuard(auth))
+  const handler = async ({ request, params, server }: MachineProxyContext) => {
+    const machine = await resolve(params.name)
+    const target = machineProxyTarget(machine.origin, request, params['*'])
+    const headers = machineProxyHeaders(request, machine.webOrigin)
+    const websocket = request.headers.get('upgrade')?.toLowerCase() === 'websocket'
+    recordRequestContext({
+      area: 'machines',
+      machineName: params.name,
+      operation: 'proxy',
+      transport: websocket ? 'websocket' : 'http',
+    })
+    if (!websocket) return forwardMachineRequest(request, target, headers, fetcher)
+
+    target.protocol = 'ws:'
+    // Elysia's .ws() parses JSON before custom parsers. Raw Bun hooks preserve every frame.
+    const data = createMachineProxySocket(target, headers, params.name)
+    if (!server?.upgrade(request, { data })) throw createMachineProxyError()
+  }
+  for (const method of PROXY_METHODS) {
+    routes.route(method, '/machines/:name/proxy/*', handler, { parse: 'none' })
+  }
+  return routes
+}
+
+type MachineProxyContext = {
+  readonly request: Request
+  readonly params: { readonly name: string; readonly '*': string }
+  readonly server: { upgrade(request: Request, options: { data: unknown }): boolean } | null
 }

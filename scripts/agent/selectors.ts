@@ -5,6 +5,8 @@ export const wallpaperLayerSelector = '[data-workbench] img[data-workbench-wallp
 
 // Stable handles the app already exposes. Add here, never inline a selector in a scenario.
 export const selectors = {
+  codeThemeOptions: (page: Page) => page.locator('[data-value^="color-theme:"]'),
+  codeThemeOption: (page: Page, id: string) => page.locator(`[data-value="color-theme:${id}"]`),
   wallpaperAsset: (page: Page, id: string) =>
     page.locator(`${wallpaperStillSelector}[src*="${id}"]`),
   themeGallery: (page: Page) => page.getByLabel('Theme bundles', { exact: true }),

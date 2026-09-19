@@ -1,4 +1,5 @@
 import { pageLifecycle } from './page-lifecycle'
+import { editorThemePreview } from './editor-theme-preview'
 import { themeBundles } from './theme-bundles'
 import { themeGallery } from './theme-gallery'
 import { wallpaperModeToggle } from './wallpaper-mode-toggle'
@@ -30,6 +31,7 @@ export type Scenario = {
 }
 
 import { editorFastScroll } from './editor-fast-scroll'
+import { editorRowHeightAudit } from './editor-row-height-audit'
 import { editorLargePaste } from './editor-large-paste'
 import { editorTypeBurst } from './editor-type-burst'
 import { editorUndoBarrier } from './editor-undo-barrier'
@@ -47,6 +49,7 @@ import { demoThemeStartup } from './demo-theme-startup'
 import { demoWallpaperStartup } from './demo-wallpaper-startup'
 
 export const scenarios: readonly Scenario[] = [
+  editorThemePreview,
   themeGallery,
   pageLifecycle,
   themeBundles,
@@ -72,6 +75,7 @@ export const scenarios: readonly Scenario[] = [
   gitHistory,
   editorLargePaste,
   editorFastScroll,
+  editorRowHeightAudit,
   editorTypeBurst,
   editorUndoBarrier,
   editorUndoBranch,

@@ -220,29 +220,6 @@ test('a hover-preview overlays the selection without persisting', () => {
   expect(getSelectedEditorThemeId('dark')).toBe('monokai')
 })
 
-test('a peak-sized theme scrub produces one active Shiki notification', async () => {
-  syncEditorThemeSelection('dark', 'monokai')
-  await loadEditorThemeForSelection('dark')
-  syncEditorThemeSelection('dark', 'dracula')
-  await loadEditorThemeForSelection('dark')
-
-  const listener = vi.fn()
-  subscribeActiveShikiTheme(listener)
-
-  for (let index = 0; index < 303; index += 1) {
-    previewEditorTheme('dark', index % 2 === 0 ? 'monokai' : 'dracula')
-  }
-
-  // The selection follows the pointer immediately, so badges stay honest...
-  expect(getSelectedEditorThemeId('dark')).toBe('monokai')
-  // ...but the historical 303-event peak has not reached the highlighter.
-  expect(listener).not.toHaveBeenCalled()
-
-  await vi.waitFor(() => {
-    expect(listener).toHaveBeenCalledTimes(1)
-  })
-})
-
 test('active Shiki subscribers ignore an inactive color-mode selection', () => {
   const listener = vi.fn()
   subscribeActiveShikiTheme(listener)

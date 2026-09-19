@@ -16,6 +16,8 @@ Open the command palette (`Control+Shift+P`), type a file name, press Enter. Or 
 
 ## Gotchas
 
+`trace editor-theme-preview --file syntax-highlighting.ts` previews three code themes twice and cancels. Compare traces for worker session restarts and inspect the scenario's screenshots for the editor behind the picker. It restores the committed theme without writing settings.
+
 Click `.editor-virtualized-viewport`, not the hidden textarea; the viewport intercepts pointer events. The typing scenario leaves the buffer dirty; it undoes but does not save. A conflict toast appears if another process writes the open file during the run.
 
 `renders editor-caret-burst` isolates 300 arrow-key moves without changing text. Compare the `ready` and `moved` snapshots in `render-steps.json`; setup renders are not caret-driven renders. Use `renders editor-type-burst` separately for document-change subscriptions. Each step snapshot is cumulative.
@@ -23,6 +25,8 @@ Click `.editor-virtualized-viewport`, not the hidden textarea; the viewport inte
 `renders editor-focus-clicks` clicks within the already-focused editor, then compares dragging and actual terminal/editor focus transitions. Compare ready to clicked for repeated-click claims; terminal-focused and editor-refocused are controls, not part of that count. Production names are minified; confirm the component in the served bundle before attributing its counts.
 
 The click scenario waits 750ms between clicks so debounced document highlights, code actions and hover requests can finish. Faster clicks cancel those requests and can hide subscription bugs. Inspect `BottomPanel` (the Terminal/Problems container) separately from `TerminalPanel` and `TerminalTabs`; React Scan can outline the whole container when only that parent renders.
+
+`scenario editor-row-height-audit` opens `--file`, then forces `--editor-row-height: 0px` on the editor and opens `README.md`. Every initial text paint logs `editor.layout.rows_audited` (debug) with the row pitch, painted height, line-height and the CSS vars on the editor and the root; a disagreement logs `editor.layout.row_height_mismatch` (warn) with the same fields. The client batches logs about once a minute, so the run's `logs.txt` is usually empty: read `bun run logs --action editor.layout.row_height_mismatch` a minute after the run. A rows-stacked or text-clipped editor without that warn is a gap in the audit itself.
 
 `scenario editor-lsp-hover --file main.tsx` inserts a `const`, hovers its name, checks the language server tooltip names it, then inserts a name with a Cyrillic letter and checks that its diagnostic and its character warning share one tooltip. Undoes both edits.
 

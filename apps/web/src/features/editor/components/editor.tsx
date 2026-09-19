@@ -22,6 +22,7 @@ import { useCommitMessageEditorFocus } from '@/features/editor/hooks/use-commit-
 import { useEditorColorTheme } from '@/features/editor/hooks/use-editor-color-theme'
 import { useSettingValue } from '@/features/settings/hooks/use-setting-value'
 import { useScrollPersistencePlugin } from '@/features/editor/hooks/use-scroll-persistence-plugin'
+import { useRowHeightAudit } from '@/features/editor/hooks/use-row-height-audit'
 import {
   capOverscrollTop,
   scrollPositionFromSnapshot,
@@ -206,6 +207,7 @@ export function Editor({
         : null,
     [documentLanguageId, liveDocument, preparedTags],
   )
+  const scheduleRowHeightAudit = useRowHeightAudit(filePath)
   const rowPositioning = editorPerformanceLayoutVariant() === 'absolute-rows' ? 'top' : 'transform'
   const controller = useEditor({
     cursorLineHighlight: {
@@ -223,7 +225,10 @@ export function Editor({
 
       onTextChange?.(tabId, key, change)
     },
-    onInitialPaint,
+    onInitialPaint: (event) => {
+      onInitialPaint?.(event)
+      if (event.phase === 'text') scheduleRowHeightAudit(controller)
+    },
     onPresentationChange: (state) => setProvisional(state === 'provisional'),
     plugins,
     rowPositioning,

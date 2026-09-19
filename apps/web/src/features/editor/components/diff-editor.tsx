@@ -10,7 +10,10 @@ import { useMemo, useState } from 'react'
 import { DiffPane } from '@/features/editor/components/diff-pane'
 import { useDiffPanes } from '@/features/editor/hooks/use-diff-panes'
 import { useEditorColorTheme } from '@/features/editor/hooks/use-editor-color-theme'
-import { editorDiffSyntaxConfiguration } from '@/features/editor/state/syntax-highlighting'
+import {
+  editorDiffSyntaxConfiguration,
+  editorSyntaxHighlightingSource,
+} from '@/features/editor/state/syntax-highlighting'
 import type { DiffLanguageServerContext } from '@/features/editor/utils/diff-language-context'
 import type { EditorDiffViewMode } from '@/features/editor/utils/diff-view-mode'
 
@@ -34,12 +37,10 @@ export function DiffEditor({
   regions?: DiffRegionStore
   tabId?: TabId
 }) {
-  const { editorTheme, registration, shikiTheme } = useEditorColorTheme()
-  // Theme selection and its async Shiki registration landing both require new per-file sessions.
-  const syntax = useMemo(
-    () => editorDiffSyntaxConfiguration(shikiTheme, registration?.name ?? null),
-    [registration, shikiTheme],
-  )
+  const { editorTheme, shikiTheme } = useEditorColorTheme()
+  const source = editorSyntaxHighlightingSource(shikiTheme)
+  // Stable backend identity preserves diff sessions when only their colors change.
+  const syntax = useMemo(() => editorDiffSyntaxConfiguration(source), [source])
   // Split is two plugin instances, and a separator row is one region shown twice. Without a shared
   // store a gutter click would expand one pane and leave the other where it was, misaligning every
   // row below — the one property split mode exists to hold.

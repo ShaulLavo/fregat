@@ -38,6 +38,7 @@ a bare root `bun run verify`.
 | [119 — agent verification tooling](119-agent-verification-tooling.md)           | **IMPLEMENTED 2026-09-14**                           |
 | [121 — undo as a graph](121-undo-graph.md)                                      | **IMPLEMENTED 2026-09-16**                           |
 | [123 — a wallpaper picker worth using](123-wallpaper-picker.md)                 | **IMPLEMENTED 2026-09-17**                           |
+| [124 — the theme studio](124-theme-studio.md)                                   | **PROPOSED — REPLACES 117'S SURFACE; DATA STAYS**    |
 | [122 - composable full-power plugins](122-composable-plugins.md)                | **PROPOSED - RESEARCH AND PERFORMANCE GATES FIRST**  |
 | [105 — one server and mesh deployment](105-one-server-mesh-deployment.md)       | **IMPLEMENTED 2026-09-13; PHASE 4 OPEN**             |
 | [106 — first-load weight](106-boot-weight.md)                                   | **IMPLEMENTED 2026-09-13**                           |

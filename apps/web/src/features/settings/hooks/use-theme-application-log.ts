@@ -22,6 +22,10 @@ export function useThemeApplicationLog(
     values['workbench.surface.contentOpacity'],
     values['workbench.surface.blur'],
     values['workbench.surface.saturation'],
+    values['editor.fontFamily'],
+    values['editor.fontSize'],
+    values['editor.lineHeight'],
+    values['editor.tabSize'],
   ])
   useEffect(() => {
     if (!theme || previewing || last.current === signature) return
@@ -35,6 +39,13 @@ export function useThemeApplicationLog(
       paletteId: values['workbench.palette'],
       codeTheme: values[mode === 'light' ? 'editor.codeTheme.light' : 'editor.codeTheme.dark'],
       wallpaper: values['workbench.wallpaper'],
+      // The row geometry every editor inherits; a stacked or drifting editor starts here.
+      typography: {
+        fontFamily: values['editor.fontFamily'],
+        fontSize: values['editor.fontSize'],
+        lineHeight: values['editor.lineHeight'],
+        tabSize: values['editor.tabSize'],
+      },
       durationMs: duration.current,
     })
   }, [theme, values, mode, previewing, duration, signature])

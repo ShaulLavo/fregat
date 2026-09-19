@@ -4,6 +4,7 @@ import {
   disposeEditorShikiWorkerOwner,
   disposeEditorTreeSitterSyntaxProvider,
   editorDiffSyntaxConfiguration,
+  editorSyntaxHighlightingSource,
   editorShikiHighlighterProvider,
   editorTreeSitterSyntaxProvider,
 } from '@/features/editor/state/syntax-highlighting'
@@ -15,7 +16,7 @@ afterAll(async () => {
 })
 
 test('diffs receive the same Shiki provider used by regular editors', () => {
-  const configuration = editorDiffSyntaxConfiguration('dark-plus')
+  const configuration = editorDiffSyntaxConfiguration(editorSyntaxHighlightingSource('dark-plus'))
 
   expect(configuration.source).toBe('shiki')
   expect(configuration.backend.kind).toBe('highlighter')
@@ -25,7 +26,9 @@ test('diffs receive the same Shiki provider used by regular editors', () => {
 })
 
 test('diffs receive the same tree-sitter provider used by regular editors', () => {
-  const configuration = editorDiffSyntaxConfiguration('tree-sitter-dark')
+  const configuration = editorDiffSyntaxConfiguration(
+    editorSyntaxHighlightingSource('tree-sitter-dark'),
+  )
 
   expect(configuration.source).toBe('tree-sitter')
   expect(configuration.backend.kind).toBe('tree-sitter')
