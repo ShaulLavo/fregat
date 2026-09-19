@@ -56,6 +56,7 @@ test('review: charges protected dirty text before retaining clean parked text', 
     activeRootPath: filesystemPath('/active'),
     byteBudget: 1000,
     documentSizes: service.documentSizes(),
+    unevictableDocumentKeys: service.unevictableDocumentKeys(),
     slices: [
       { rootPath: filesystemPath('/active'), lastActiveAt: 3, documentKeys: [], tabIds: [] },
       {

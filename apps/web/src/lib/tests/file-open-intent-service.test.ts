@@ -932,7 +932,6 @@ describe('file open intent service', () => {
       preparation: {
         documentConfigurationTag: [],
         estimatedBytes: 1,
-        fallbackReady: Promise.resolve(true),
         providerConfiguration: {
           highlighter: { configurationTag: ['test-stage', 0], generation: 0 },
         },
