@@ -1,11 +1,15 @@
 import { editorLspHover } from './editor-lsp-hover'
 import { editorMarkdownPunctuation } from './editor-markdown-punctuation'
 import { wallpaperLibrary } from './wallpaper-library'
+import { wallpaperPalette } from './wallpaper-palette'
 import { settingsDefaults } from './settings-defaults'
 import { fileIcons } from './file-icons'
 import { searchInputUndo } from './search-input-undo'
 import { quickOpenNewFile } from './quick-open-new-file'
 import { quickOpenLinkedFile } from './quick-open-linked-file'
+import { quickOpenNoFlicker } from './quick-open-no-flicker'
+import { gitHistorySearchNoFlicker } from './git-history-search-no-flicker'
+import { logsSearchNoFlicker } from './logs-search-no-flicker'
 import type { Page } from 'playwright'
 
 type ScenarioContext = {
@@ -45,7 +49,11 @@ export const scenarios: readonly Scenario[] = [
   searchInputUndo,
   quickOpenNewFile,
   quickOpenLinkedFile,
+  quickOpenNoFlicker,
+  gitHistorySearchNoFlicker,
+  logsSearchNoFlicker,
   wallpaperLibrary,
+  wallpaperPalette,
   settingsDefaults,
   demoWorkspace,
   demoAgentGit,

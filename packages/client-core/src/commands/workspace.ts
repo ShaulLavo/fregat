@@ -681,6 +681,17 @@ export const workspaceCommandMetadata = {
     when: [],
     title: 'Follow system light / dark mode',
   }),
+  'workspace.selectWallpaper': defineMetadata({
+    category: 'Appearance',
+    description: 'Choose the wallpaper for the current light or dark mode, previewing as you go.',
+    id: 'workspace.selectWallpaper',
+    execution: 'async',
+    target: 'workspace',
+    undoCategory: 'view-only',
+    when: [],
+    title: 'Choose wallpaper',
+    keepsPaletteOpen: true,
+  }),
   'wallpaper.next': defineMetadata({
     category: 'Appearance',
     description: 'Select the next library wallpaper for light or dark mode.',

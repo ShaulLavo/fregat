@@ -1,4 +1,4 @@
-import { mkdir, readdir, readFile, writeFile } from 'node:fs/promises'
+import { mkdir, readdir, readFile, rm, writeFile } from 'node:fs/promises'
 import path from 'node:path'
 import { test, expect } from '../../../../test/fixtures'
 import { SettingsStore } from '../../../../../server/src/settings/store'
@@ -33,6 +33,55 @@ test('uploads, deduplicates and serves a decoded still and generated thumbnail',
   expect(Buffer.from(await image.arrayBuffer())).toEqual(bytes)
   const thumbnail = await readFile(path.join(server.root, '.platform/wallpapers', asset.thumbnail))
   expect(thumbnail.subarray(8, 12).toString()).toBe('WEBP')
+  const display = await server.app.handle(
+    new Request(`http://localhost/themes/wallpapers/${asset.id}/display`, {
+      headers: { origin: server.origin },
+    }),
+  )
+  expect(display.headers.get('content-type')).toBe('image/webp')
+  expect(
+    Buffer.from(await display.arrayBuffer())
+      .subarray(8, 12)
+      .toString(),
+  ).toBe('WEBP')
+})
+
+test('a repeat install writes the display rendition an older entry lacks', async ({
+  client,
+  server,
+}) => {
+  const file = () => new File([wallpaperPng()], 'one.png')
+  const asset = (await client.themes.wallpapers.post({ file: file() })).data!
+  const display = path.join(server.root, '.platform/wallpapers', `${asset.id}.display.webp`)
+  await rm(display)
+  await client.themes.wallpapers.post({ file: file() })
+  expect((await readFile(display)).subarray(8, 12).toString()).toBe('WEBP')
+})
+
+test('an import skips a file it cannot decode and keeps the rest', async ({ client, server }) => {
+  const backgrounds = path.join(server.root, 'seed/day/backgrounds')
+  await mkdir(backgrounds, { recursive: true })
+  await writeFile(path.join(backgrounds, 'broken.png'), 'not an image')
+  await writeFile(path.join(backgrounds, 'still.png'), wallpaperPng())
+  const imported = await client.themes.wallpapers['import-directory'].post({
+    path: path.join(server.root, 'seed'),
+  })
+  expect(imported.data?.themes.day).toHaveLength(1)
+  expect(imported.data?.skipped).toEqual([
+    { path: path.join(backgrounds, 'broken.png'), code: 'wallpapers.INVALID' },
+  ])
+})
+
+test('the listing sees an index entry written by another process', async ({ client, server }) => {
+  const asset = (await client.themes.wallpapers.post({ file: new File([wallpaperPng()], 'a.png') }))
+    .data!
+  expect((await client.themes.wallpapers.get()).data?.assets).toHaveLength(1)
+  const other = 'f'.repeat(64)
+  await writeFile(
+    path.join(server.root, '.platform/wallpapers', `${other}.json`),
+    JSON.stringify({ ...asset, id: other, name: 'b.png', thumbnail: `${other}.thumb.webp` }),
+  )
+  expect((await client.themes.wallpapers.get()).data?.assets).toHaveLength(2)
 })
 
 test('rejects invalid, oversized and over-dimension images before writing files', async ({
@@ -100,9 +149,7 @@ test('a rejected fallback keeps the image on disk', async ({ server }) => {
     ],
   })
   // A real unwritable document boundary, without replacing the settings writer.
-  await import('node:fs/promises').then(({ rm }) =>
-    rm(path.join(server.root, 'rejected-settings.json')),
-  )
+  await rm(path.join(server.root, 'rejected-settings.json'))
   await mkdir(path.join(server.root, 'rejected-settings.json'))
   await expect(library.delete(asset.id)).rejects.toBeDefined()
   expect(await readFile(path.join(directory, `${asset.id}.png`))).toEqual(wallpaperPng())

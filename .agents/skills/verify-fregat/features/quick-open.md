@@ -19,3 +19,5 @@ Cmd/Ctrl+P, or the command palette with no `>` prefix.
 ## Gotchas
 
 The index never scans a symlinked directory and the watcher cannot see into one, so links that leave the workspace are walked with `fd` on every query and ranked together with the index entries. Results are never cached on the client. The server answers from an in-memory index in about 10ms, and a remembered miss hides a file created since. The list empties between keystrokes on purpose: Enter on the previous query's rows would open the wrong file.
+
+`quick-open-no-flicker` types a file name one key at a time and samples every frame. The step label must read `blank-frames-0`; any other count means the list blanked or flashed "No matching files" between keystrokes.

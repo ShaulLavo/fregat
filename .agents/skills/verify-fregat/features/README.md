@@ -12,6 +12,7 @@ One file per user-facing surface. Each answers: what it is, how a user reaches i
 | Chat                            | [chat.md](chat.md)             |
 | Terminal                        | [terminal.md](terminal.md)     |
 | Git                             | [git.md](git.md)               |
+| Logs                            | [logs.md](logs.md)             |
 | Settings                        | [settings.md](settings.md)     |
 | Address URL                     | [address.md](address.md)       |
 | Landing page and product assets | [landing.md](landing.md)       |

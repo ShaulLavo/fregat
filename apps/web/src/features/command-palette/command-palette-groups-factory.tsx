@@ -2,6 +2,7 @@ import type { Theme } from '@/features/settings/providers/theme-context'
 import type { FlatDocumentSymbol } from '@/lib/document-symbols'
 import { GotoLineGroups } from '@/features/command-palette/goto-line-groups'
 import { AppColorsGroups } from '@/features/command-palette/components/app-colors-groups'
+import { WallpaperGroups } from '@/features/command-palette/components/wallpaper-groups'
 
 import { ColorModeGroups } from '@/features/command-palette/color-mode-groups'
 import { ColorThemeGroups } from '@/features/command-palette/color-theme-groups'
@@ -66,6 +67,10 @@ export function CommandPaletteGroupsFactory({
 
   if (mode === 'appColors') {
     return <AppColorsGroups />
+  }
+
+  if (mode === 'wallpaper') {
+    return <WallpaperGroups />
   }
 
   if (mode === 'colorTheme') {

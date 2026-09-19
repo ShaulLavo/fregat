@@ -1,4 +1,4 @@
-import sharp from 'sharp'
+import sharp, { type Sharp } from 'sharp'
 import { wallpaperErrors } from './structured-errors'
 
 export const MAX_WALLPAPER_BYTES = 20 * 1024 * 1024
@@ -17,18 +17,37 @@ export async function decodeWallpaper(bytes: Uint8Array) {
     if (format !== 'jpeg' && format !== 'png' && format !== 'webp') throw wallpaperErrors.INVALID()
     // Decode the full image before committing even when a thumbnail could skip corrupt rows.
     await image.clone().raw().toBuffer()
-    const thumbnail = await image
-      .autoOrient()
-      .resize({ width: 480, height: 300, fit: 'inside', withoutEnlargement: true })
-      .webp({ quality: 75 })
-      .toBuffer()
+    const derived = await deriveWallpaper(image)
     const extension: 'jpg' | 'png' | 'webp' = format === 'jpeg' ? 'jpg' : format
     const contentType: 'image/jpeg' | 'image/png' | 'image/webp' =
       format === 'jpeg' ? 'image/jpeg' : (`image/${format}` as const)
-    return { width, height, extension, contentType, thumbnail }
+    return { width, height, extension, contentType, ...derived }
   } catch {
     throw wallpaperErrors.INVALID()
   }
+}
+
+// The workbench never needs more than a window's worth of pixels; the original stays for export.
+async function deriveWallpaper(image: Sharp) {
+  const [thumbnail, display] = await Promise.all([
+    image
+      .clone()
+      .autoOrient()
+      .resize({ width: 480, height: 300, fit: 'inside', withoutEnlargement: true })
+      .webp({ quality: 75 })
+      .toBuffer(),
+    image
+      .clone()
+      .autoOrient()
+      .resize({ width: 2560, height: 2560, fit: 'inside', withoutEnlargement: true })
+      .webp({ quality: 85, smartSubsample: true })
+      .toBuffer(),
+  ])
+  return { thumbnail, display }
+}
+
+export function deriveStoredWallpaper(bytes: Uint8Array) {
+  return deriveWallpaper(sharp(bytes, { limitInputPixels: 40_000_000 }).timeout({ seconds: 10 }))
 }
 
 function isAnimatedPng(bytes: Uint8Array): boolean {

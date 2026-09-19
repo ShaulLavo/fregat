@@ -17,6 +17,7 @@ export type QuickAccessMode =
   | 'sessions'
   | 'symbols'
   | 'views'
+  | 'wallpaper'
 const SCRIPT_PREFIX = 'run '
 const SESSION_PREFIX = 'sess '
 
@@ -152,6 +153,7 @@ function compareRankedCommandItems<Item extends PaletteRankItem>(
 export function quickAccessMode(search: string): QuickAccessMode {
   if (search.startsWith('colors ')) return 'appColors'
   if (search.startsWith('view ')) return 'views'
+  if (search.startsWith('wallpaper ')) return 'wallpaper'
   if (search.startsWith('color ')) return 'colorMode'
   if (search.startsWith('theme ')) return 'colorTheme'
   if (search.startsWith('edt ')) return 'editors'

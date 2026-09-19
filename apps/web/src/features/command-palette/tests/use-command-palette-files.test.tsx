@@ -8,7 +8,7 @@ import { useCommandPaletteFiles } from '@/features/command-palette/use-command-p
 import type { LoadState } from '@/lib/load-state'
 import type { TreeModel } from '@/lib/tree-model'
 
-test('does not show stale quick-open file results after the query changes', async ({ client }) => {
+test('keeps the previous quick-open rows up until the new query answers', async ({ client }) => {
   await client.fs['create-folder'].post({ path: 'repo', recursive: true })
   await client.fs['create-file'].post({ path: 'repo/rendering.ts' })
   await client.fs['create-file'].post({ path: 'repo/default-bindings.ts' })
@@ -33,11 +33,13 @@ test('does not show stale quick-open file results after the query changes', asyn
 
   rerender({ query: 'binding' })
 
-  expect(filePaths(result.current.visibleFileItems)).toEqual([])
+  expect(filePaths(result.current.visibleFileItems)).toEqual(['repo/rendering.ts'])
+  expect(result.current.fileSearchUnsettled).toBe(true)
 
   await waitFor(() =>
     expect(filePaths(result.current.visibleFileItems)).toEqual(['repo/default-bindings.ts']),
   )
+  expect(result.current.fileSearchUnsettled).toBe(false)
   queryClient.clear()
 })
 

@@ -45,6 +45,7 @@ const ASYNC_COMMAND_IDS = [
   'workspace.historyBack',
   'workspace.historyForward',
   'workspace.selectAppColors',
+  'workspace.selectWallpaper',
   'workspace.runProjectScript',
   'workspace.switchSession',
   'workspace.goToLine',

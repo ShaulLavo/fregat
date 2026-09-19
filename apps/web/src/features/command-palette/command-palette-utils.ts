@@ -114,7 +114,9 @@ function commandKeywords(spec: CommandSpec) {
 }
 
 export function isColorPreviewMode(mode: QuickAccessMode): boolean {
-  return mode === 'colorMode' || mode === 'colorTheme' || mode === 'appColors'
+  return (
+    mode === 'colorMode' || mode === 'colorTheme' || mode === 'appColors' || mode === 'wallpaper'
+  )
 }
 
 /**
@@ -149,6 +151,7 @@ export function paletteScopeForPrefix(prefix: string): QuickAccessMode | null {
 
 export function scopeLabelForMode(mode: QuickAccessMode) {
   if (mode === 'appColors') return 'App colors'
+  if (mode === 'wallpaper') return 'Wallpaper'
   if (mode === 'views') return 'View'
   if (mode === 'colorMode') return 'Light / dark mode'
   if (mode === 'colorTheme') return 'Code theme'
@@ -163,6 +166,7 @@ export function scopeLabelForMode(mode: QuickAccessMode) {
 
 export function emptyLabelForMode(mode: QuickAccessMode) {
   if (mode === 'appColors') return 'No matching app colors'
+  if (mode === 'wallpaper') return 'No matching wallpapers'
   if (mode === 'commands') return 'No matching commands'
   if (mode === 'views') return 'No matching views'
   if (mode === 'colorMode') return 'No matching light / dark modes'
@@ -176,6 +180,7 @@ export function emptyLabelForMode(mode: QuickAccessMode) {
 
 export function placeholderForMode(mode: QuickAccessMode) {
   if (mode === 'appColors') return 'Select app colors (up/down keys to preview)…'
+  if (mode === 'wallpaper') return 'Select a wallpaper (up/down keys to preview)…'
   if (mode === 'commands') return 'Search commands…'
   if (mode === 'views') return 'Search views…'
   // Both preview live on the highlighted row, so say what the arrow keys do.

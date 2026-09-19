@@ -34,6 +34,8 @@ import { ScopeChip } from '@/features/command-palette/scope-chip'
 import { useHighlightedPaletteValue } from '@/features/command-palette/hooks/use-highlighted-palette-value'
 import { useRecentCommandIds } from '@/features/command-palette/hooks/use-recent-command-ids'
 import { paletteIdFromItemValue } from '@/features/command-palette/utils/app-colors'
+import { wallpaperSourceFromItemValue } from '@/features/command-palette/utils/wallpapers'
+import { useWallpaperPreviewStore } from '@/lib/wallpapers/state/preview-store'
 import { usePalette } from '@/lib/appearance/hooks/use-palette'
 import { isCommandVisibleInPalette } from '@/keymap/utils/palette-visibility'
 import {
@@ -83,6 +85,8 @@ export function CommandPaletteContent() {
   const { selectTheme } = useEditorColorTheme()
   const { clearThemePreview, previewTheme, resolvedTheme, theme } = useTheme()
   const { catalog, clearPalettePreview, previewPalette } = usePalette()
+  const previewWallpaper = useWallpaperPreviewStore((state) => state.preview)
+  const clearWallpaperPreview = useWallpaperPreviewStore((state) => state.clear)
   const hasWorkspace = useEditorWorkspaceState((state) => Boolean(state.rootFolder))
   const rootFolder = useEditorWorkspaceState((state) => state.rootFolder)
   const openTabContents = useEditorWorkspaceState((state) => state.openTabContents)
@@ -96,6 +100,7 @@ export function CommandPaletteContent() {
   const {
     fileQuery,
     fileSearchQuery,
+    fileSearchUnsettled,
     selectedCommandValue,
     setSelectedFileItemValue,
     visibleFileItems,
@@ -148,15 +153,17 @@ export function CommandPaletteContent() {
     if (mode !== 'colorTheme') clearEditorThemePreview()
     if (mode !== 'colorMode') clearThemePreview()
     if (mode !== 'appColors') clearPalettePreview()
-  }, [clearPalettePreview, clearThemePreview, mode])
+    if (mode !== 'wallpaper') clearWallpaperPreview()
+  }, [clearWallpaperPreview, clearPalettePreview, clearThemePreview, mode])
 
   useEffect(
     () => () => {
       clearEditorThemePreview()
       clearThemePreview()
       clearPalettePreview()
+      clearWallpaperPreview()
     },
-    [clearPalettePreview, clearThemePreview],
+    [clearWallpaperPreview, clearPalettePreview, clearThemePreview],
   )
 
   function previewHighlightedColorTheme(value: string) {
@@ -173,6 +180,11 @@ export function CommandPaletteContent() {
   const highlightedListRef = useHighlightedPaletteValue({
     enabled: isColorPreviewMode(mode),
     onHighlight: (value) => {
+      if (mode === 'wallpaper') {
+        const source = wallpaperSourceFromItemValue(value)
+        if (source) previewWallpaper(source)
+        return
+      }
       if (mode === 'appColors') {
         const id = paletteIdFromItemValue(value)
         const palette = catalog.find((candidate) => candidate.id === id)
@@ -360,7 +372,7 @@ export function CommandPaletteContent() {
         }
         ref={highlightedListRef}
       >
-        <CommandEmpty>{emptyLabelForMode(mode)}</CommandEmpty>
+        {!fileSearchUnsettled && <CommandEmpty>{emptyLabelForMode(mode)}</CommandEmpty>}
         <CommandPaletteActionsContext value={actions}>
           <CommandPaletteGroupsFactory
             commandGroups={groups}

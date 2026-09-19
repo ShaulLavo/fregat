@@ -24,7 +24,7 @@ try {
     directory: path.join(homedir(), '.platform/wallpapers'),
     settings,
   })
-  const mapping = await library.importDirectory(values.directory)
+  const { themes: mapping, skipped } = await library.importDirectory(values.directory)
   const file = path.resolve(values.output)
   await Bun.write(
     file,
@@ -33,6 +33,7 @@ try {
   process.stdout.write(
     `Imported ${new Set(Object.values(mapping).flat()).size} assets. Mapping: ${file}\n`,
   )
+  for (const item of skipped) process.stdout.write(`Skipped ${item.path} (${item.code})\n`)
 } finally {
   settings.close()
 }

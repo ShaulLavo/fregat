@@ -22,14 +22,29 @@ export const selectors = {
   settingsScopeTab: (page: Page, name: 'User' | 'Workspace' | 'Defaults') =>
     page.getByRole('tab', { name, exact: true }),
   settingsDefaultsBanner: (page: Page) => page.getByText('Defaults are read-only', { exact: true }),
-  wallpaperPicker: (page: Page) => page.getByLabel('Wallpaper picker', { exact: true }),
+  wallpaperTile: (page: Page, mode: 'Light' | 'Dark') =>
+    page.getByRole('button', { name: `Choose ${mode.toLowerCase()} wallpaper`, exact: true }),
+  wallpaperPicker: (page: Page) => page.getByRole('dialog', { name: 'Wallpaper', exact: true }),
   wallpaperMode: (page: Page, mode: string) =>
     page
       .getByRole('group', { name: 'Wallpaper mode', exact: true })
       .getByRole('button', { name: mode, exact: true }),
   wallpaperCards: (page: Page) =>
     page.getByRole('button', { name: /^Select .+/ }).filter({ has: page.locator('img') }),
-  wallpaperNone: (page: Page) => page.getByRole('button', { name: 'None', exact: true }),
+  wallpaperCard: (page: Page, name: string) =>
+    page.getByRole('button', { name: `Select ${name}`, exact: true }),
+  // Section buttons only: the mode switch in the bar is pressed too.
+  wallpaperSelectedChoice: (page: Page) =>
+    page.getByRole('dialog').locator('section button[aria-pressed="true"]'),
+  wallpaperChoice: (page: Page, label: string) =>
+    page.getByRole('dialog').locator('section').getByRole('button', { name: label, exact: true }),
+  wallpaperFilter: (page: Page) => page.getByRole('textbox', { name: 'Filter wallpapers' }),
+  wallpaperUploadInput: (page: Page) => page.getByLabel('Upload wallpapers', { exact: true }),
+  wallpaperActions: (page: Page, name: string) =>
+    page.getByRole('button', { name: `Actions for ${name}`, exact: true }),
+  wallpaperPaletteOption: (page: Page, name: string) =>
+    page.locator('[cmdk-item][data-value^="wallpaper:"]').filter({ hasText: name }),
+  menuItem: (page: Page, name: string) => page.getByRole('menuitem', { name, exact: true }),
   wallpaperStill: (page: Page) => page.locator(wallpaperStillSelector),
   commandOption: (page: Page, name: string) => page.getByRole('option', { name, exact: false }),
   renameInput: (page: Page) => page.getByRole('textbox', { name: 'New name', exact: true }),
@@ -81,6 +96,7 @@ export const selectors = {
   editorInput: (page: Page) => page.getByRole('textbox', { name: 'Editor input' }),
   editorSurface: (page: Page) => page.locator('.editor-virtualized-viewport'),
   terminalSurface: (page: Page) => page.getByRole('region', { name: 'Terminal', exact: true }),
+  paletteRowSelector: '[data-slot="command-list"] [role="option"]',
   paletteInput: (page: Page) => page.locator('[data-slot="command-input"]').first(),
   windowToolbar: (page: Page) => page.getByLabel('Window toolbar', { exact: true }),
   editorTab: (page: Page, path: string) => page.locator(`[data-editor-tab-path="${path}"]`),
@@ -90,6 +106,11 @@ export const selectors = {
   changesToggle: (page: Page) => page.getByRole('button', { name: 'Changes', exact: true }),
   worktreeFiles: (page: Page) => page.locator('[data-git-file]:not([data-history-file])'),
   historyList: (page: Page) => page.getByRole('listbox', { name: 'Commit history' }),
+  historyRowSelector: '[data-history-commit]',
+  logRowSelector: '[data-log-row-summary]',
+  logRows: (page: Page) => page.locator('[data-log-row-summary]'),
+  logsSearch: (page: Page) => page.getByRole('textbox', { name: 'Search logs' }),
+  logsTab: (page: Page) => page.getByRole('button', { name: 'Logs', exact: true }),
   historyRows: (page: Page) => page.locator('[data-history-commit]'),
   historyCircles: (page: Page) => page.locator('[data-history-commit] svg circle'),
   historyFiles: (page: Page) => page.locator('[data-history-file]'),
