@@ -1,3 +1,8 @@
+import tokyoNight from './packs/tokyo-night.json'
+import rosePine from './packs/rose-pine.json'
+import catppuccin from './packs/catppuccin.json'
+import catppuccinLatte from './packs/catppuccin-latte.json'
+import gruvbox from './packs/gruvbox.json'
 import { parsePalette, type Palette, type PaletteDocument } from './palette'
 
 /**
@@ -71,9 +76,9 @@ const graphiteLight = {
   accent: 'oklch(0.94 0.006 70)',
   'accent-foreground': 'oklch(0.205 0.006 70)',
   destructive: 'oklch(0.55 0.17 18)',
-  info: 'oklch(0.55 0.17 230)',
+  info: 'oklch(0.54 0.17 230)',
   'info-foreground': 'oklch(0.985 0.006 70)',
-  success: 'oklch(0.55 0.17 165)',
+  success: 'oklch(0.54 0.17 165)',
   'success-foreground': 'oklch(0.985 0.006 70)',
   warning: 'oklch(0.7 0.155 92)',
   'warning-foreground': 'oklch(0.205 0.006 70)',
@@ -161,7 +166,7 @@ export const SAGE_PALETTE_DOCUMENT = {
         accent: 'oklch(0.95 0.008 170)',
         'accent-foreground': 'oklch(0.22 0.01 260)',
         'info-foreground': 'oklch(0.98 0.003 90)',
-        success: 'oklch(0.55 0.17 150)',
+        success: 'oklch(0.53 0.17 150)',
         'success-foreground': 'oklch(0.98 0.003 90)',
         'warning-foreground': 'oklch(0.22 0.01 260)',
         'update-foreground': 'oklch(0.98 0.003 90)',
@@ -214,9 +219,14 @@ export const SAGE_PALETTE_DOCUMENT = {
 
 export const DEFAULT_PALETTE_ID = 'graphite'
 
-const BUNDLED_PALETTE_DOCUMENTS: readonly PaletteDocument[] = [
+const BUNDLED_PALETTE_DOCUMENTS: readonly unknown[] = [
   GRAPHITE_PALETTE_DOCUMENT,
   SAGE_PALETTE_DOCUMENT,
+  tokyoNight,
+  rosePine,
+  catppuccin,
+  catppuccinLatte,
+  gruvbox,
 ]
 
 // A bundled document that fails its own schema is a build defect the test

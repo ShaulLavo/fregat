@@ -38,10 +38,11 @@ export function SettingsEditor({
   readonly onClose: () => void
 }) {
   const [base] = useState(snapshot)
+  const [mode] = useState(theme.appearance)
   const lifetime = useEditorLifetime(onClose)
   const { height } = useTerminalDimensions()
   const short = height < 20
-  const [draft, setDraft] = useState(() => settingDraft(id, base, target))
+  const [draft, setDraft] = useState(() => settingDraft(id, base, target, mode))
   const draftRef = useRef(draft)
   const changeDraft = (value: string) => {
     draftRef.current = value
@@ -77,6 +78,7 @@ export function SettingsEditor({
         target,
         owner,
         signal: lifetime.signal,
+        mode,
       })
       if (lifetime.signal.aborted) return
       if (outcome !== 'acknowledged') {

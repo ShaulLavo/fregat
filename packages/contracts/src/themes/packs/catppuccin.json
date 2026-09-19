@@ -1,0 +1,73 @@
+{
+  "schemaVersion": 1,
+  "id": "omarchy-catppuccin",
+  "name": "Catppuccin",
+  "variants": {
+    "kind": "single",
+    "mode": "dark",
+    "colors": {
+      "app": {
+        "background": "#1e1e2e",
+        "foreground": "#cdd6f4",
+        "card": "#313244",
+        "card-foreground": "#cdd6f4",
+        "popover": "#313244",
+        "popover-foreground": "#cdd6f4",
+        "primary": "#89b4fa",
+        "primary-foreground": "#101019",
+        "secondary": "#45475a",
+        "secondary-foreground": "#cdd6f4",
+        "muted": "#313244",
+        "muted-foreground": "oklch(0.63195 0.0345 277.1)",
+        "accent": "#45475a",
+        "accent-foreground": "#cdd6f4",
+        "destructive": "#f38ba8",
+        "info": "#89b4fa",
+        "info-foreground": "#101019",
+        "success": "#a6e3a1",
+        "success-foreground": "#101019",
+        "warning": "#f9e2af",
+        "warning-foreground": "#101019",
+        "update": "#f5c2e7",
+        "update-foreground": "#101019",
+        "border": "#585b70",
+        "input": "#585b70",
+        "ring": "#89b4fa",
+        "chart-1": "#89b4fa",
+        "chart-2": "#89b4fa",
+        "chart-3": "#f5c2e7",
+        "chart-4": "#f9e2af",
+        "chart-5": "#f6b6ab"
+      },
+      "terminal": {
+        "foreground": "#cdd6f4",
+        "cursor": "#cdd6f4",
+        "cursor-accent": "#1e1e2e",
+        "selection": "#45475a",
+        "selection-foreground": "#cdd6f4",
+        "black": "#101019",
+        "red": "#f38ba8",
+        "green": "#a6e3a1",
+        "yellow": "#f9e2af",
+        "blue": "#89b4fa",
+        "magenta": "#f5c2e7",
+        "cyan": "#94e2d5",
+        "white": "#cdd6f4",
+        "bright-black": "#6c7086",
+        "bright-red": "#f38ba8",
+        "bright-green": "#a6e3a1",
+        "bright-yellow": "#f9e2af",
+        "bright-blue": "#89b4fa",
+        "bright-magenta": "#f5c2e7",
+        "bright-cyan": "#94e2d5",
+        "bright-white": "#cdd6f4"
+      }
+    }
+  },
+  "provenance": {
+    "kind": "omarchy",
+    "repository": "https://github.com/omacom/omarchy",
+    "commit": "omarchy-4.0.0.alpha",
+    "theme": "catppuccin"
+  }
+}

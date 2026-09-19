@@ -330,3 +330,36 @@ function deferred<T>() {
 
   return { promise, resolve }
 }
+
+test('restoring a suspended page reconnects settings and catches up with writes while away', async ({
+  controlledClient,
+}) => {
+  const { controller } = controlledClient
+  const queryClient = createTestQueryClient()
+  queryClient.setQueryData(settingsKeys.document(), await fetchSettings(undefined, getClient()))
+  const stream = renderHook(() => useSettingsStream(), { wrapper: wrapper(queryClient) })
+  try {
+    await controller.waitForSettingsStreamRequest(1)
+    window.dispatchEvent(new Event('pagehide'))
+    await saveSettings(
+      {
+        mutationId: 'write-while-page-suspended',
+        target: 'user',
+        operations: [{ kind: 'set', key: 'editor.fontSize', value: 22 }],
+      },
+      getClient(),
+    )
+    expect(controller.settingsStreamRequestCount).toBe(1)
+    window.dispatchEvent(new Event('pageshow'))
+    await controller.waitForSettingsStreamRequest(2)
+    await waitFor(() =>
+      expect(queryClient.getQueryData(settingsKeys.document())).toMatchObject({
+        values: { 'editor.fontSize': 22 },
+      }),
+    )
+  } finally {
+    stream.unmount()
+    resetSettingsSnapshotAdmission(queryClient)
+    queryClient.clear()
+  }
+})

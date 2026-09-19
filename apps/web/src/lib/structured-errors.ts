@@ -91,9 +91,11 @@ export const clientErrors = defineErrorCatalog('client', {
   },
   WATCH_FAILED: {
     status: 502,
-    message: ({ status }: { status: number | string }) =>
-      `File watcher failed with status ${status}`,
-    why: 'The file watcher endpoint returned an error response.',
+    message: ({ status }: { status: number | string | undefined }) =>
+      status === undefined
+        ? 'File watcher connection failed before receiving a response.'
+        : `File watcher failed with status ${status}`,
+    why: 'The file watcher subscription could not be opened.',
     fix: 'Retry the watcher subscription and inspect server logs if it keeps failing.',
   },
 })

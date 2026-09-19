@@ -3,7 +3,7 @@ import { addressedWorkspaceCache, panelsForAddress } from '@/features/address/ut
 import type { AddressIntent } from '@/features/address/utils/intent'
 import { readWorkspaceCache } from '@/features/workspace/state/cache'
 import { getSelectedEditorThemeId } from '@/features/editor/state/color-theme-store'
-import { systemPrefersDark } from '@/features/settings/providers/appearance-provider'
+import { systemColorMode } from '@/features/settings/state/system-color-mode'
 import { readSettingsMirror } from '@/features/settings/utils/boot-mirror'
 import { environmentScopedStorage } from '@/lib/environments/state/scoped-storage'
 import { primaryQueryClient } from '@/lib/environments/state/query-clients'
@@ -36,7 +36,7 @@ export function createBootRuntime(
     preparation: {
       appliedThemeContentHash: null,
       appliedThemeId: null,
-      selectedThemeId: getSelectedEditorThemeId(systemPrefersDark() ? 'dark' : 'light'),
+      selectedThemeId: getSelectedEditorThemeId(systemColorMode()),
       syntaxHighlightingEnabled: readSettingsMirror()['editor.syntaxHighlighting.enabled'],
     },
   })

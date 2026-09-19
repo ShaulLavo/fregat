@@ -1,4 +1,16 @@
-import { useCallback, useEffect, useInsertionEffect, useState, type ReactNode } from 'react'
+import { useSystemColorMode } from '@/features/settings/hooks/use-system-color-mode'
+import { useThemeApplicationLog } from '@/features/settings/hooks/use-theme-application-log'
+import {
+  DEFAULT_SETTING_VALUES,
+  resolveThemeSettings,
+  type ThemeBundle,
+  type ColorMode,
+} from '@workspace/contracts'
+import {
+  AppearancePreviewContext,
+  BundlePreviewContext,
+} from '@/features/settings/providers/appearance-preview-context'
+import { useCallback, useEffect, useInsertionEffect, useRef, useState, type ReactNode } from 'react'
 import {
   bundledPalette,
   DEFAULT_PALETTE_ID,
@@ -8,7 +20,6 @@ import {
 import { paletteStylesheet, resolvePalette } from '@workspace/client-core/themes/palette'
 
 import { loadNerdFont } from '@/lib/default-nerd-font'
-import { getPlatformBridge } from '@/lib/platform/bridge'
 import { PaletteContext } from '@/lib/appearance/providers/palette-context'
 import { applyPaletteStylesheet, writePaletteBootCache } from '@/lib/appearance/utils/palette-style'
 
@@ -25,8 +36,6 @@ import {
   type AppearanceValues,
 } from '@/features/settings/utils/apply-appearance'
 import { readSettingsMirror, writeBootMirror } from '@/features/settings/utils/boot-mirror'
-
-const COLOR_SCHEME_QUERY = '(prefers-color-scheme: dark)'
 
 type Preview<T> = {
   readonly value: T
@@ -49,31 +58,40 @@ export function AppearanceProvider({
   const projection = useSettingsProjection()
   const { setColorTheme, setSetting } = useSettingsActions()
   const catalog = usePaletteCatalog()
-  const [bootValues] = useState(bootAppearance)
-  const [prefersDark, setPrefersDark] = useState(() => systemPrefersDark())
+  const [bootValues] = useState(readSettingsMirror)
+  const prefersDark = useSystemColorMode() === 'dark'
+  const [bundlePreview, setBundlePreview] = useState<{
+    theme: ThemeBundle
+    mode?: ColorMode
+  } | null>(null)
   const [modePreview, setModePreview] = useState<Preview<Theme> | null>(null)
   const [palettePreview, setPalettePreview] = useState<Preview<Palette> | null>(null)
   const projectedValues = projection?.values
-  const appearanceValues = projectedValues ?? bootValues
-  const committedTheme = appearanceValues['workbench.colorTheme']
+  const baseValues = projectedValues ?? { ...DEFAULT_SETTING_VALUES, ...bootValues }
+  const requestedMode =
+    bundlePreview?.mode ?? modePreview?.value ?? baseValues['workbench.colorTheme']
+  const appearanceValues = resolveThemeSettings(
+    {
+      ...baseValues,
+      'workbench.colorTheme': requestedMode,
+      'workbench.theme': bundlePreview?.theme ?? baseValues['workbench.theme'],
+    },
+    prefersDark ? 'dark' : 'light',
+    projection?.layers,
+  )
+  const committedTheme = baseValues['workbench.colorTheme']
   const committedPaletteId = appearanceValues['workbench.palette']
   const committedPalette = catalog.find((palette) => palette.id === committedPaletteId)
   const modeHandoffObserved = projectionObservesHandoff(projection, modePreview?.handingOffTo)
   const paletteHandoffObserved = projectionObservesHandoff(projection, palettePreview?.handingOffTo)
-  const renderedTheme = modePreview && !modeHandoffObserved ? modePreview.value : committedTheme
+  const renderedTheme =
+    bundlePreview?.mode ??
+    (modePreview && !modeHandoffObserved ? modePreview.value : committedTheme)
   // Undefined while a user palette is still being looked up: the boot
   // stylesheet stays on screen rather than flashing Graphite in between.
   const renderedPalette =
     palettePreview && !paletteHandoffObserved ? palettePreview.value : committedPalette
   const resolvedMode = resolveColorTheme(renderedTheme, prefersDark)
-
-  useEffect(() => {
-    const query = window.matchMedia(COLOR_SCHEME_QUERY)
-    const onChange = (event: MediaQueryListEvent) => setPrefersDark(event.matches)
-    query.addEventListener('change', onChange)
-
-    return () => query.removeEventListener('change', onChange)
-  }, [])
 
   useEffect(() => {
     if (!modeHandoffObserved || !modePreview?.handingOffTo) return
@@ -88,10 +106,19 @@ export function AppearanceProvider({
   }, [paletteHandoffObserved, palettePreview?.handingOffTo])
 
   const renderedValues = { ...appearanceValues, 'workbench.colorTheme': renderedTheme }
+  const applicationDuration = useRef(0)
+  useThemeApplicationLog(
+    renderedValues,
+    resolvedMode,
+    Boolean(bundlePreview || modePreview || palettePreview),
+    applicationDuration,
+  )
   // Descendant layout effects measure density-dependent geometry, so the root
   // appearance must be current before those effects run.
   useInsertionEffect(() => {
+    const started = performance.now()
     applyAppearance(renderedValues, globalThis.document.documentElement, prefersDark)
+    applicationDuration.current = performance.now() - started
   }, [prefersDark, renderedValues])
 
   useInsertionEffect(() => {
@@ -111,17 +138,37 @@ export function AppearanceProvider({
   useEffect(() => {
     if (!confirmedValues) return
 
-    writeBootMirror(confirmedValues)
-  }, [confirmedValues])
+    writeBootMirror(confirmedValues, confirmedQuery.data?.layers)
+  }, [confirmedValues, confirmedQuery.data?.layers])
 
-  const confirmedPaletteId = confirmedValues?.['workbench.palette']
+  const confirmedAppearance = confirmedValues
+    ? resolveThemeSettings(
+        confirmedValues,
+        prefersDark ? 'dark' : 'light',
+        confirmedQuery.data?.layers,
+      )
+    : null
+  const confirmedPaletteId = confirmedAppearance?.['workbench.palette']
   useEffect(() => {
     if (!confirmedPaletteId) return
     const palette = catalog.find((candidate) => candidate.id === confirmedPaletteId)
     if (!palette) return
 
-    writePaletteBootCache(palette.id, paletteStylesheet(palette))
-  }, [catalog, confirmedPaletteId])
+    if (!confirmedValues) return
+    const lightId = resolveThemeSettings(
+      { ...confirmedValues, 'workbench.colorTheme': 'light' },
+      'light',
+      confirmedQuery.data?.layers,
+    )['workbench.palette']
+    const darkId = resolveThemeSettings(
+      { ...confirmedValues, 'workbench.colorTheme': 'dark' },
+      'dark',
+      confirmedQuery.data?.layers,
+    )['workbench.palette']
+    const light = catalog.find((entry) => entry.id === lightId) ?? palette
+    const dark = catalog.find((entry) => entry.id === darkId) ?? palette
+    writePaletteBootCache([light.id, dark.id], paletteStylesheet(light, dark))
+  }, [catalog, confirmedPaletteId, confirmedValues, confirmedQuery.data?.layers])
 
   // Stable identity lets palette unmount cleanup clear hover exactly once.
   const clearThemePreview = useCallback(() => {
@@ -173,31 +220,42 @@ export function AppearanceProvider({
     return submission
   }
 
+  // Cleanup uses stable identities so moving focus between cards cannot clear a newer preview.
+  const previewBundle = useCallback(
+    (bundle: ThemeBundle, mode?: ColorMode) => setBundlePreview({ theme: bundle, mode }),
+    [],
+  )
+  const clearBundlePreview = useCallback(() => setBundlePreview(null), [])
+
   return (
-    <WorkbenchDensityBootContext value={bootDensity}>
-      <ThemeContext
-        value={{
-          clearThemePreview,
-          previewTheme,
-          resolvedTheme: resolvedMode,
-          setTheme,
-          theme: committedTheme,
-        }}
-      >
-        <PaletteContext
-          value={{
-            paletteId: committedPaletteId,
-            catalog,
-            resolved: resolvePalette(renderedPalette ?? GRAPHITE, resolvedMode),
-            previewPalette,
-            clearPalettePreview,
-            selectPalette,
-          }}
-        >
-          {children}
-        </PaletteContext>
-      </ThemeContext>
-    </WorkbenchDensityBootContext>
+    <BundlePreviewContext value={{ preview: previewBundle, clear: clearBundlePreview }}>
+      <AppearancePreviewContext value={renderedValues}>
+        <WorkbenchDensityBootContext value={bootDensity}>
+          <ThemeContext
+            value={{
+              clearThemePreview,
+              previewTheme,
+              resolvedTheme: resolvedMode,
+              setTheme,
+              theme: committedTheme,
+            }}
+          >
+            <PaletteContext
+              value={{
+                paletteId: committedPaletteId,
+                catalog,
+                resolved: resolvePalette(renderedPalette ?? GRAPHITE, resolvedMode),
+                previewPalette,
+                clearPalettePreview,
+                selectPalette,
+              }}
+            >
+              {children}
+            </PaletteContext>
+          </ThemeContext>
+        </WorkbenchDensityBootContext>
+      </AppearancePreviewContext>
+    </BundlePreviewContext>
   )
 }
 
@@ -216,17 +274,4 @@ function projectionObservesHandoff(
   if (projection.pendingMutationIds.includes(mutationId)) return true
 
   return projection.acknowledgedMutationIds.includes(mutationId)
-}
-
-export function systemPrefersDark(): boolean {
-  // The shell reports the desktop's preference where the webview cannot see it.
-  const reported = getPlatformBridge()?.colorScheme
-  if (reported) return reported === 'dark'
-
-  return window.matchMedia(COLOR_SCHEME_QUERY).matches
-}
-
-/** The values the pre-paint pass uses, before any query can have resolved. */
-export function bootAppearance(): AppearanceValues & { 'workbench.palette': PaletteId } {
-  return readSettingsMirror()
 }

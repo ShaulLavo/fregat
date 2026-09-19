@@ -1,3 +1,4 @@
+import { ThemeWidget } from '@/features/settings/components/widgets/theme-widget'
 import { WallpaperWidget } from '@/features/settings/components/widgets/wallpaper-widget'
 import {
   descriptorFor,
@@ -46,7 +47,12 @@ export function SettingRow({ id, snapshot }: { id: SettingId; snapshot: Settings
     descriptor.widget === 'wallpaper'
 
   return (
-    <div className='border-border flex flex-col gap-(--density-control-gap) border-b py-(--density-section-padding) last:border-b-0 @3xl/settings:flex-row @3xl/settings:items-start @3xl/settings:justify-between @3xl/settings:gap-6'>
+    <div
+      className={cn(
+        'border-border flex flex-col gap-(--density-control-gap) border-b py-(--density-section-padding) last:border-b-0 @3xl/settings:items-start @3xl/settings:justify-between @3xl/settings:gap-6',
+        descriptor.widget !== 'theme' && '@3xl/settings:flex-row',
+      )}
+    >
       <div className='flex min-w-0 flex-col gap-1 @max-3xl/settings:wrap-anywhere'>
         <div className='flex flex-wrap items-center gap-2'>
           {/* A border, not a coloured dot: it reads in both themes without a
@@ -96,6 +102,7 @@ export function SettingRow({ id, snapshot }: { id: SettingId; snapshot: Settings
       <div
         className={cn(
           'flex max-w-full min-w-0 shrink-0 items-center gap-1 @max-3xl/settings:w-full',
+          descriptor.widget === 'theme' && 'w-full',
           hasCodePreview && 'items-start @3xl/settings:w-1/2 @3xl/settings:max-w-xl',
         )}
       >
@@ -131,6 +138,7 @@ function SettingControl({
 }) {
   const control = settingControl(id, value)
 
+  if (control.widget === 'theme') return <ThemeWidget disabled={disabled} />
   if (control.widget === 'boolean') {
     return <BooleanWidget checked={control.value} disabled={disabled} id={id} onChange={onChange} />
   }

@@ -109,11 +109,15 @@ export function CommandPalette({
     }
     setPending(true)
     try {
-      const saved = await setThemePreference(owner, {
-        kind: 'set',
-        key: 'workbench.palette',
-        value: action.id,
-      })
+      const saved = await setThemePreference(
+        owner,
+        {
+          kind: 'set',
+          key: 'workbench.palette',
+          value: action.id,
+        },
+        theme.appearance,
+      )
       if (saved && active.current) onClose()
     } catch (error) {
       if (active.current) setReason(connectionFailure(error).message)

@@ -1,3 +1,5 @@
+import { resolveThemeSettings } from '@workspace/contracts'
+import { systemColorMode } from '@/features/settings/state/system-color-mode'
 import type { QueryClient } from '@tanstack/react-query'
 import type { SettingsOperation, SettingsSnapshot, SettingsValues } from '@workspace/contracts'
 
@@ -14,7 +16,13 @@ export function readLiveSettingsProjection(queryClient: QueryClient, fallback?: 
   const confirmed = queryClient.getQueryData<SettingsSnapshot>(settingsKeys.document()) ?? fallback
   if (!confirmed) return undefined
 
-  return projectSettings(confirmed, activeSettingsIntentsFor(queryClient))
+  const projected = projectSettings(confirmed, activeSettingsIntentsFor(queryClient))
+  if (!projected.values['workbench.theme']) return projected
+
+  return {
+    ...projected,
+    values: resolveThemeSettings(projected.values, systemColorMode(), projected.layers),
+  }
 }
 
 export function readLiveColorTheme(queryClient: QueryClient, fallback?: ColorTheme) {

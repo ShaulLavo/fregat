@@ -1,3 +1,5 @@
+import { resolveThemeSettings, jsonEqual } from '@workspace/contracts'
+import { systemColorMode } from '@/features/settings/state/system-color-mode'
 import {
   descriptorFor,
   inspectSetting,
@@ -61,12 +63,22 @@ export function settingInspection(
     inspections.flatMap((inspection) => inspection.layers.map((layer) => layer.layer)),
   )
 
+  const defaults = resolveThemeSettings(
+    { ...snapshot.values, 'workbench.theme.customizations': {} },
+    systemColorMode(),
+    snapshot.layers,
+  )
+  const themeModified =
+    scope === 'user' &&
+    Boolean(snapshot.values['workbench.theme']) &&
+    !jsonEqual(snapshot.values[id], defaults[id])
+
   return {
     // Ordered by the layer table rather than by which key happened to be read
     // first, so the sentence the row prints is stable across renders.
     alsoModifiedIn: SETTINGS_LAYER_ORDER.filter((layer) => layer !== scope && setLayers.has(layer)),
     disabledReason: writeBlockedReason(descriptor.scope, scope),
-    isModified: setLayers.has(scope),
+    isModified: setLayers.has(scope) || themeModified,
     overriddenBy: overridingLayer(effectiveLayerAbove(inspections), scope),
   }
 }

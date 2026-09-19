@@ -13,7 +13,19 @@ export async function preserveAppearance(page: Page) {
   ok(user && typeof user === 'object' && 'raw' in user)
   const raw = user.raw
   ok(raw && typeof raw === 'object')
-  const keys = ['workbench.wallpaper', 'workbench.colorTheme']
+  const keys = [
+    'workbench.wallpaper',
+    'workbench.colorTheme',
+    'workbench.theme',
+    'workbench.theme.customizations',
+    'workbench.palette',
+    'editor.codeTheme.light',
+    'editor.codeTheme.dark',
+    'workbench.surface.opacity',
+    'workbench.surface.contentOpacity',
+    'workbench.surface.blur',
+    'workbench.surface.saturation',
+  ]
   const operations = keys.map((key) => {
     const entry = Object.entries(raw).find(([name]) => name === key)
     return entry ? { kind: 'set', key, value: entry[1] } : { kind: 'reset', keys: [key] }

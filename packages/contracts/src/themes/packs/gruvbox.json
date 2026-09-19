@@ -1,0 +1,73 @@
+{
+  "schemaVersion": 1,
+  "id": "omarchy-gruvbox",
+  "name": "Gruvbox",
+  "variants": {
+    "kind": "single",
+    "mode": "dark",
+    "colors": {
+      "app": {
+        "background": "#282828",
+        "foreground": "#d4be98",
+        "card": "#3c3836",
+        "card-foreground": "#d4be98",
+        "popover": "#3c3836",
+        "popover-foreground": "#d4be98",
+        "primary": "#7daea3",
+        "primary-foreground": "#161616",
+        "secondary": "#504945",
+        "secondary-foreground": "#d4be98",
+        "muted": "#3c3836",
+        "muted-foreground": "oklch(0.65454 0.0234 62.57)",
+        "accent": "#504945",
+        "accent-foreground": "#d4be98",
+        "destructive": "#ea6962",
+        "info": "#7daea3",
+        "info-foreground": "#161616",
+        "success": "#a9b665",
+        "success-foreground": "#161616",
+        "warning": "#d8a657",
+        "warning-foreground": "#161616",
+        "update": "#d3869b",
+        "update-foreground": "#161616",
+        "border": "#665c54",
+        "input": "#665c54",
+        "ring": "#7daea3",
+        "chart-1": "#7daea3",
+        "chart-2": "#7daea3",
+        "chart-3": "#d3869b",
+        "chart-4": "#d8a657",
+        "chart-5": "#e1875c"
+      },
+      "terminal": {
+        "foreground": "#d4be98",
+        "cursor": "#d4be98",
+        "cursor-accent": "#282828",
+        "selection": "#504945",
+        "selection-foreground": "#d4be98",
+        "black": "#161616",
+        "red": "#ea6962",
+        "green": "#a9b665",
+        "yellow": "#d8a657",
+        "blue": "#7daea3",
+        "magenta": "#d3869b",
+        "cyan": "#89b482",
+        "white": "#d4be98",
+        "bright-black": "#7c6f64",
+        "bright-red": "#ea6962",
+        "bright-green": "#a9b665",
+        "bright-yellow": "#d8a657",
+        "bright-blue": "#7daea3",
+        "bright-magenta": "#d3869b",
+        "bright-cyan": "#89b482",
+        "bright-white": "#d4be98"
+      }
+    }
+  },
+  "provenance": {
+    "kind": "omarchy",
+    "repository": "https://github.com/omacom/omarchy",
+    "commit": "omarchy-4.0.0.alpha",
+    "theme": "gruvbox"
+  }
+}

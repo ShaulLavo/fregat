@@ -1,3 +1,4 @@
+import { themeBundleSchema, themeCustomizationsSchema } from '../themes/bundle'
 import { wallpaperSelectionSchema } from '../themes/wallpaper'
 import * as v from 'valibot'
 import { machinesSchema } from '../machines'
@@ -54,6 +55,35 @@ export const SETTINGS_REGISTRY = {
     title: 'Light / dark mode',
     description: 'Light or dark, or follow the operating system.',
     keywords: ['theme', 'dark', 'light', 'appearance', 'colour'],
+  }),
+  'workbench.theme': defineSetting({
+    schema: v.nullable(themeBundleSchema),
+    default: null,
+    scope: 'application',
+    widget: 'theme',
+    category: 'Appearance',
+    title: 'Theme bundles',
+    description:
+      'A light and dark version of your app colors, code colors, wallpaper and material.',
+    keywords: ['theme', 'bundle', 'light', 'dark', 'wallpaper'],
+  }),
+  'workbench.theme.customizations': defineSetting({
+    schema: themeCustomizationsSchema,
+    default: {},
+    scope: 'application',
+    widget: 'complex',
+    category: 'Appearance',
+    visibility: 'internal',
+    description: 'Part overrides saved separately for each theme bundle and mode.',
+  }),
+  'tui.theme.colors': defineSetting({
+    schema: v.picklist(['theme', 'terminal']),
+    default: 'theme',
+    scope: 'application',
+    widget: 'enum',
+    category: 'Appearance',
+    title: 'Terminal app colors',
+    description: 'Use the selected theme bundle or the terminal host colors in the TUI.',
   }),
   'workbench.palette': defineSetting({
     // A palette id, bundled or from the user's library on the primary server.

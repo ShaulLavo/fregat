@@ -1,3 +1,4 @@
+import { startPageSubscription } from '@/lib/state/page-subscription'
 import { entryFromResponse } from '@/lib/file-system-types'
 import type { PickedFsEntry } from '@/lib/file-system-types'
 import {
@@ -169,65 +170,67 @@ export function useWorkspaceEvents(rootFolder: PickedFsEntry | null) {
   useEffect(() => {
     if (!rootPath) return
 
-    const controller = new AbortController()
-    const gitInvalidation = new Throttler(() => invalidateGitState(queryClient), {
-      wait: GIT_INVALIDATION_THROTTLE_MS,
-    })
-    const eventsScope = createWideEventScope({
-      action: 'workspace.events.summary',
-      area: 'workspace-events',
-      path: rootPath,
-    })
-    const churn = createDirectoryChurn()
-    const queue = createEventQueue((events) => {
-      churn.record(events.flatMap((event) => filesystemEventDirectories(event, rootPath)))
-      applyEvents(events, controller.signal, rootPath, eventsScope, gitInvalidation.maybeExecute)
-    })
-    eventsScope.increment('subscription.subscribeCount')
+    return startPageSubscription(() => {
+      const controller = new AbortController()
+      const gitInvalidation = new Throttler(() => invalidateGitState(queryClient), {
+        wait: GIT_INVALIDATION_THROTTLE_MS,
+      })
+      const eventsScope = createWideEventScope({
+        action: 'workspace.events.summary',
+        area: 'workspace-events',
+        path: rootPath,
+      })
+      const churn = createDirectoryChurn()
+      const queue = createEventQueue((events) => {
+        churn.record(events.flatMap((event) => filesystemEventDirectories(event, rootPath)))
+        applyEvents(events, controller.signal, rootPath, eventsScope, gitInvalidation.maybeExecute)
+      })
+      eventsScope.increment('subscription.subscribeCount')
 
-    void streamWorkspaceEvents(
-      clientForQueryClient(queryClient),
-      rootPath,
-      controller.signal,
-      (message) => {
-        if (message.type === 'ready') {
-          eventsScope.increment('subscription.readyCount')
-          applyReady(controller.signal, rootPath, eventsScope, gitInvalidation.maybeExecute)
-          return
-        }
-        if (message.type === 'error') {
-          eventsScope.increment('subscription.errorCount')
-          eventsScope.warn(message.message, {
-            code: message.code,
-          })
-          reportError(toClientError(message))
-          return
-        }
-        if (
-          message.type === 'subscribed' ||
-          message.type === 'unsubscribed' ||
-          message.type === 'pong'
-        ) {
-          return
-        }
+      void streamWorkspaceEvents(
+        clientForQueryClient(queryClient),
+        rootPath,
+        controller.signal,
+        (message) => {
+          if (message.type === 'ready') {
+            eventsScope.increment('subscription.readyCount')
+            applyReady(controller.signal, rootPath, eventsScope, gitInvalidation.maybeExecute)
+            return
+          }
+          if (message.type === 'error') {
+            eventsScope.increment('subscription.errorCount')
+            eventsScope.warn(message.message, {
+              code: message.code,
+            })
+            reportError(toClientError(message))
+            return
+          }
+          if (
+            message.type === 'subscribed' ||
+            message.type === 'unsubscribed' ||
+            message.type === 'pong'
+          ) {
+            return
+          }
 
-        queue.push(message)
-      },
-    ).catch((error: unknown) => {
-      if (controller.signal.aborted) return
+          queue.push(message)
+        },
+      ).catch((error: unknown) => {
+        if (controller.signal.aborted) return
 
-      eventsScope.warn('Workspace event stream failed.', { error })
-      reportError(toClientError(error))
+        eventsScope.warn('Workspace event stream failed.', { error })
+        reportError(toClientError(error))
+      })
+
+      return () => {
+        controller.abort()
+        gitInvalidation.cancel()
+        queue.clear()
+        eventsScope.increment('subscription.unsubscribeCount')
+        recordEventChurn(eventsScope, churn)
+        endWorkspaceEventsScope(eventsScope)
+      }
     })
-
-    return () => {
-      controller.abort()
-      gitInvalidation.cancel()
-      queue.clear()
-      eventsScope.increment('subscription.unsubscribeCount')
-      recordEventChurn(eventsScope, churn)
-      endWorkspaceEventsScope(eventsScope)
-    }
   }, [queryClient, rootPath])
 
   useEffect(() => {
@@ -874,6 +877,7 @@ export async function streamWorkspaceEvents(
     query: { path: rootPath },
     fetch: { signal },
   })
+  signal.throwIfAborted()
   if (response.error) throw clientErrors.WATCH_FAILED({ status: response.status })
   if (!response.data) throw clientErrors.EDEN_STREAM_MISSING({ label: 'File watcher' })
 

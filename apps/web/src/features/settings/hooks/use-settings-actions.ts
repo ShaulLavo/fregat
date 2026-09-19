@@ -1,5 +1,14 @@
+import * as v from 'valibot'
+import {
+  themePartPatch,
+  resolveThemeSettings,
+  type ThemeBundle,
+  type ThemeId,
+} from '@workspace/contracts'
+import { systemColorMode } from '@/features/settings/state/system-color-mode'
 import {
   SETTING_IDS,
+  settingsOperationSchema,
   deriveWriteTarget,
   descriptorFor,
   errorNumberField,
@@ -31,7 +40,10 @@ import {
   type ActiveSettingsIntent,
   type SettingsSubmission,
 } from '@workspace/client-core/settings/intent-store'
-import { readLiveColorTheme } from '@/features/settings/state/live-projection'
+import {
+  readLiveColorTheme,
+  readLiveSettingsProjection,
+} from '@/features/settings/state/live-projection'
 import { saveSettings } from '@/features/settings/utils/api'
 import { settingsMutationLogContext } from '@/features/settings/utils/mutation-observability'
 import {
@@ -148,7 +160,15 @@ export function useSettingsActions() {
     initiator?: string,
   ): SettingsSubmission => {
     const operation = { kind: 'set', key, value } as SettingsOperation
-    return submit(target, [operation], initiator)
+    const current = readLiveSettingsProjection(queryClient) ?? projection
+    const theme = current?.values['workbench.theme']
+    const patch = operation.kind === 'set' ? themePartPatch(operation) : null
+    if (!theme || !patch || target !== 'user') return submit(target, [operation], initiator)
+    const preference = current.values['workbench.colorTheme']
+    let mode = preference === 'system' ? systemColorMode() : preference
+    if (key === 'editor.codeTheme.light') mode = 'light'
+    if (key === 'editor.codeTheme.dark') mode = 'dark'
+    return submit('user', [{ kind: 'theme.customize', id: theme.id, mode, patch }], initiator)
   }
 
   const setColorTheme = (
@@ -168,6 +188,14 @@ export function useSettingsActions() {
 
   return {
     isSaving: pendingTransports.length > 0,
+    selectBundle: (theme: ThemeBundle) =>
+      submit(
+        'user',
+        [{ kind: 'set', key: 'workbench.theme', value: theme }],
+        'settings.theme.select',
+      ),
+    resetBundle: (id: ThemeId) =>
+      submit('user', [{ kind: 'theme.reset', id }], 'settings.theme.defaults'),
     setMachine: (name: string, machine: MachineDefinition) =>
       submit('user', [{ kind: 'machine.set', name, machine }]),
     removeMachine: (name: string) => submit('user', [{ kind: 'machine.remove', name }]),
@@ -181,8 +209,23 @@ export function useSettingsActions() {
     },
     resetKeybinding: (command: PlatformCommandId) =>
       submit(targetFor('keybindings.overrides'), [{ kind: 'keybinding.remove', command }]),
-    resetSetting: (key: SettingId, target: SettingsWriteTarget = 'user') =>
-      submit(target, [{ kind: 'reset', keys: settingRowIds(key) }]),
+    resetSetting: (key: SettingId, target: SettingsWriteTarget = 'user') => {
+      const theme = projection?.values['workbench.theme']
+      if (!theme || target !== 'user')
+        return submit(target, [{ kind: 'reset', keys: settingRowIds(key) }])
+      const defaults = resolveThemeSettings(
+        { ...projection.values, 'workbench.theme.customizations': {} },
+        systemColorMode(),
+      )
+      const parsed = v.safeParse(settingsOperationSchema, {
+        kind: 'set',
+        key,
+        value: defaults[key],
+      })
+      if (!parsed.success || parsed.output.kind !== 'set' || !themePartPatch(parsed.output))
+        return submit(target, [{ kind: 'reset', keys: settingRowIds(key) }])
+      return setSetting(parsed.output.key, parsed.output.value, target)
+    },
     setColorTheme,
     setKeybinding: (command: PlatformCommandId, keys: string | null) =>
       submit(targetFor('keybindings.overrides'), [{ command, keys, kind: 'keybinding.set' }]),

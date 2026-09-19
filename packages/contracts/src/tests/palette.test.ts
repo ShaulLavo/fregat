@@ -87,8 +87,16 @@ describe('parseColor', () => {
 })
 
 describe('palette documents', () => {
-  it('parses both bundled palettes', () => {
-    expect(BUNDLED_PALETTES.map((palette) => palette.id)).toEqual(['graphite', 'sage'])
+  it('parses the foundation and curated bundled palettes', () => {
+    expect(BUNDLED_PALETTES.map((palette) => palette.id)).toEqual([
+      'graphite',
+      'sage',
+      'omarchy-tokyo-night',
+      'omarchy-rose-pine',
+      'omarchy-catppuccin',
+      'omarchy-catppuccin-latte',
+      'omarchy-gruvbox',
+    ])
     for (const palette of BUNDLED_PALETTES) {
       expect(palette.source).toBe('bundled')
       const colors = paletteColorsFor(palette, 'dark')

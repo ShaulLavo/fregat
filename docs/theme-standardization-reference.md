@@ -1,6 +1,6 @@
 # Theme standardization research
 
-Research date: 2026-09-12. Platform baseline: `a01bf78f63cb94b4985a925d2c8d9de66294230f` plus the existing working tree. The proposed work is in [Plan 115](../plans/115-palettes-as-data.md), [Plan 116](../plans/116-wallpaper-library.md), and [Plan 117](../plans/117-themes.md), which replaced Plan 104 on 2026-09-14.
+Research date: 2026-09-12. Platform baseline: `a01bf78f63cb94b4985a925d2c8d9de66294230f` plus the existing working tree. The proposed work is in [Plan 115](../plans/115-palettes-as-data.md), [Plan 116](../plans/116-wallpaper-library.md), and [Plan 117](theme-bundles.md), which replaced Plan 104 on 2026-09-14.
 
 The product direction is a named theme that supplies a complete appearance. Its colors, code highlighting, terminal colors, and wallpaper collection belong together. Light and dark are variants of that appearance. Customization starts from the selected theme and remains available without making every user assemble those parts.
 

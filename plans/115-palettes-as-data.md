@@ -1,6 +1,6 @@
 # Palettes as data
 
-Status: **implemented 2026-09-14 — units 1 through 5 landed, the browser gate passed against the mesh, and release `plan-115-editor-mode` is live.** Requested 2026-09-14. First of three plans split out of the retired Plan 104; [Plan 116](116-wallpaper-library.md) and [Plan 117](117-themes.md) follow. See [Outcome](#outcome).
+Status: **implemented 2026-09-14 — units 1 through 5 landed, the browser gate passed against the mesh, and release `plan-115-editor-mode` is live.** Requested 2026-09-14. First of three plans split out of the retired Plan 104; [Plan 116](116-wallpaper-library.md) and [Plan 117](../docs/theme-bundles.md) follow. See [Outcome](#outcome).
 
 A palette is the set of app colors and terminal colors for one mode. Today it is two hand-authored CSS blocks per palette and a two-value picklist. That shape has a ceiling of exactly two palettes, and "create your own" is impossible. This plan moves the palette into data with a schema, a resolver, and an editor, so that a third palette is a JSON file, a user palette is a saved record, and the whole app repaints while a hue slider is dragged.
 

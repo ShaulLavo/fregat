@@ -23,6 +23,12 @@ describe('applyPaletteStylesheet', () => {
 })
 
 describe('bootPaletteStylesheet', () => {
+  it('restores both palette identities from a confirmed bundle stylesheet', () => {
+    writePaletteBootCache(['light-palette', 'dark-palette'], ':root { --paired: 1; }')
+    expect(bootPaletteStylesheet('light-palette')).toBe(':root { --paired: 1; }')
+    expect(bootPaletteStylesheet('dark-palette')).toBe(':root { --paired: 1; }')
+  })
+
   it('resolves a bundled palette without a cache and Graphite to the stylesheet default', () => {
     localStorage.clear()
     expect(bootPaletteStylesheet('graphite')).toBeNull()
@@ -32,7 +38,7 @@ describe('bootPaletteStylesheet', () => {
   it('serves a user palette only from a cache written for that id', () => {
     localStorage.clear()
     expect(bootPaletteStylesheet('mine')).toBeNull()
-    writePaletteBootCache('mine', ':root { --mine: 1; }')
+    writePaletteBootCache(['mine'], ':root { --mine: 1; }')
     expect(bootPaletteStylesheet('mine')).toBe(':root { --mine: 1; }')
     expect(bootPaletteStylesheet('other')).toBeNull()
     localStorage.setItem('platform.palette-boot.v1', '{not json')

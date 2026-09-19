@@ -15,7 +15,7 @@ export function usePaletteLibrary(): readonly Palette[] {
         const documents = response.data?.palettes ?? []
 
         return documents.flatMap((document) => {
-          const parsed = parsePalette(document, 'user')
+          const parsed = parsePalette(document, document.source)
 
           return parsed.success ? [parsed.palette] : []
         })

@@ -7,7 +7,7 @@ export function useUnsavedWorkGuard(hasUnsavedDocuments: () => boolean) {
       event.preventDefault()
     }
 
-    window.addEventListener('beforeunload', warnBeforeUnload)
-    return () => window.removeEventListener('beforeunload', warnBeforeUnload)
+    window.addEventListener('beforeunload', warnBeforeUnload, { capture: true })
+    return () => window.removeEventListener('beforeunload', warnBeforeUnload, { capture: true })
   }, [hasUnsavedDocuments])
 }

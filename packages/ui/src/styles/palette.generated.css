@@ -16,9 +16,9 @@
     --accent-solid: oklch(0.94 0.006 70);
     --accent-foreground: oklch(0.205 0.006 70);
     --destructive: oklch(0.55 0.17 18);
-    --info: oklch(0.55 0.1096 230);
+    --info: oklch(0.54 0.1076 230);
     --info-foreground: oklch(0.985 0.006 70);
-    --success: oklch(0.55 0.1156 165);
+    --success: oklch(0.54 0.1136 165);
     --success-foreground: oklch(0.985 0.006 70);
     --warning: oklch(0.7 0.1432 92);
     --warning-foreground: oklch(0.205 0.006 70);

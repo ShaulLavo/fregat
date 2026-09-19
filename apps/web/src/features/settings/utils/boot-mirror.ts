@@ -1,5 +1,8 @@
 import {
   descriptorFor,
+  resolveThemeSettings,
+  variantFromSettings,
+  type SettingsLayer,
   DEFAULT_SETTING_VALUES,
   type SettingId,
   type SettingsValues,
@@ -55,6 +58,8 @@ const MIRRORED_KEYS = [
   'search.maxResultFiles',
   'search.quickOpenLimit',
   'search.wholeWord',
+  'workbench.theme',
+  'workbench.theme.customizations',
   'workbench.palette',
   'workbench.colorTheme',
   'workbench.density',
@@ -88,7 +93,12 @@ export function readSettingsMirror(): MirroredValues {
     values[key] = validValue(key, stored[key])
   }
 
-  return values as MirroredValues
+  return resolveThemeSettings(
+    values as MirroredValues,
+    typeof window !== 'undefined' && window.matchMedia('(prefers-color-scheme: dark)').matches
+      ? 'dark'
+      : 'light',
+  )
 }
 
 /** One cached startup value until the confirmed settings document arrives. */
@@ -99,7 +109,27 @@ export function readSettingBootValue<K extends SettingId>(key: K): SettingsValue
 }
 
 /** Called only with a snapshot the server sent. */
-export function writeBootMirror(values: SettingsValues) {
+export function writeBootMirror(values: SettingsValues, layers: readonly SettingsLayer[] = []) {
+  const theme = values['workbench.theme']
+  if (theme)
+    values = {
+      ...values,
+      'workbench.theme.customizations': {},
+      'workbench.theme': {
+        ...theme,
+        variants: {
+          light: variantFromSettings(
+            resolveThemeSettings({ ...values, 'workbench.colorTheme': 'light' }, 'light', layers),
+            'light',
+          ),
+          dark: variantFromSettings(
+            resolveThemeSettings({ ...values, 'workbench.colorTheme': 'dark' }, 'dark', layers),
+            'dark',
+          ),
+        },
+      },
+    }
+
   const mirrored: Record<string, unknown> = {}
   for (const key of MIRRORED_KEYS) mirrored[key] = values[key]
 

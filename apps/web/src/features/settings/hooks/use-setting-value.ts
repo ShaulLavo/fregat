@@ -1,3 +1,5 @@
+import { useContext } from 'react'
+import { AppearancePreviewContext } from '@/features/settings/providers/appearance-preview-context'
 import type { SettingId, SettingsValues } from '@workspace/contracts'
 
 import { useSettingsProjection } from '@/features/settings/hooks/use-settings-projection'
@@ -10,7 +12,8 @@ import { readSettingBootValue } from '@/features/settings/utils/boot-mirror'
  * index the raw document or know the query key.
  */
 export function useSettingValue<K extends SettingId>(key: K): SettingsValues[K] {
+  const preview = useContext(AppearancePreviewContext)
   const projection = useSettingsProjection()
 
-  return projection?.values[key] ?? readSettingBootValue(key)
+  return preview?.[key] ?? projection?.values[key] ?? readSettingBootValue(key)
 }

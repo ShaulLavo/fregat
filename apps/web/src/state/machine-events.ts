@@ -1,9 +1,14 @@
+import { startPageSubscription } from '@/lib/state/page-subscription'
 import type { MachineEvent } from '@workspace/contracts'
 import { subscribeMachineEvents } from '@/lib/environments/machine-client'
 import { createEnvironmentRecovery } from '@/state/environment-recovery'
 import { createWideEventScope } from '@/lib/wide-event-scope'
 
 export function startMachineEvents(receive: (event: MachineEvent) => void) {
+  return startPageSubscription(() => subscribeMachineEventUpdates(receive))
+}
+
+function subscribeMachineEventUpdates(receive: (event: MachineEvent) => void) {
   let subscription: AbortController | null = null
   let stopped = false
   const recovery = createEnvironmentRecovery(subscribe)

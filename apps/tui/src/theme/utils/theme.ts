@@ -40,6 +40,7 @@ export type Theme = ThemeColors & {
   readonly terminalColors: TerminalColors | null
 }
 export type ThemePreferences = {
+  readonly hostColors?: boolean
   readonly palette?: Palette
   readonly reducedMotion?: boolean
 }
@@ -105,7 +106,7 @@ export function resolveTheme(
   if (noColor)
     return { ...plain, noColor, reducedMotion, appearance, terminalColors, colorMode: 'none' }
   const fallback = paletteThemeColors(options.palette ?? GRAPHITE, appearance)
-  const colors = mode === 'system' ? systemTheme(options.colors ?? null, fallback) : fallback
+  const colors = options.hostColors ? systemTheme(options.colors ?? null, fallback) : fallback
   const colorMode = options.colorMode ?? 'truecolor'
   const convert = (color: ColorInput) => colorForTerminal(color, colorMode, options.colors)
   return {

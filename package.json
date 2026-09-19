@@ -56,7 +56,8 @@
     "unused:files": "knip --files --no-config-hints",
     "unused:check": "knip",
     "hooks:install": "lefthook install",
-    "hooks:pre-commit": "lefthook run pre-commit"
+    "hooks:pre-commit": "lefthook run pre-commit",
+    "themes:import-omarchy": "bun scripts/themes/import-omarchy-theme.ts"
   },
   "devDependencies": {
     "@typescript/native-preview": "7.0.0-dev.20260707.2",

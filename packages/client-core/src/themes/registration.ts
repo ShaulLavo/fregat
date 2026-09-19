@@ -1,3 +1,4 @@
+import type { SYNTAX_THEME_MODES } from '@workspace/contracts'
 import type { VscodeThemeDefinition, VscodeThemeRegistration } from '@singapore-editor/core/shiki'
 
 import { createClientError } from '../errors'
@@ -8,7 +9,7 @@ type VscodeThemeModule = {
 
 type VscodeThemeLoader = () => Promise<VscodeThemeModule>
 
-const VSCODE_THEME_LOADERS: Readonly<Record<string, VscodeThemeLoader>> = {
+const VSCODE_THEME_LOADERS = {
   andromeeda: () => import('@shikijs/themes/andromeeda'),
   'aurora-x': () => import('@shikijs/themes/aurora-x'),
   'ayu-dark': () => import('@shikijs/themes/ayu-dark'),
@@ -74,13 +75,14 @@ const VSCODE_THEME_LOADERS: Readonly<Record<string, VscodeThemeLoader>> = {
   'vitesse-black': () => import('@shikijs/themes/vitesse-black'),
   'vitesse-dark': () => import('@shikijs/themes/vitesse-dark'),
   'vitesse-light': () => import('@shikijs/themes/vitesse-light'),
-}
+} satisfies Record<keyof typeof SYNTAX_THEME_MODES, VscodeThemeLoader>
 
 export function loadVscodeThemeRegistration(
   theme: VscodeThemeDefinition | string,
 ): Promise<VscodeThemeRegistration> {
   const shikiName = typeof theme === 'string' ? theme : theme.shikiName
-  const loader = VSCODE_THEME_LOADERS[shikiName]
+  const loaders: Readonly<Record<string, VscodeThemeLoader>> = VSCODE_THEME_LOADERS
+  const loader = loaders[shikiName]
   if (!loader) {
     throw createClientError({
       code: 'UNKNOWN_SYNTAX_THEME',

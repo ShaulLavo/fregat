@@ -76,9 +76,9 @@ export function resolvePalette(palette: Palette, mode: ColorMode): ResolvedPalet
  * element. `:root.dark` rather than `.dark` so it outranks the generated
  * `@layer palette` defaults and any unlayered `.dark` rule alike.
  */
-export function paletteStylesheet(palette: Palette): string {
+export function paletteStylesheet(palette: Palette, darkPalette: Palette = palette): string {
   const light = resolvePalette(palette, 'light')
-  const dark = resolvePalette(palette, 'dark')
+  const dark = resolvePalette(darkPalette, 'dark')
 
   return `${block(':root', light.cssVariables)}\n${block(':root.dark', dark.cssVariables)}\n`
 }

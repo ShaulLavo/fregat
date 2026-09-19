@@ -74,7 +74,7 @@ function media(library: WallpaperLibrary, input: string, kind: MediaKind) {
         display: displayName(id),
         thumbnail: asset.thumbnail,
       }
-      const file = Bun.file(path.join(library.directory, names[kind]))
+      const file = Bun.file(path.join(await library.assetDirectory(id), names[kind]))
       if (!(await file.exists())) throw wallpaperErrors.NOT_FOUND()
       return new Response(file, {
         headers: {

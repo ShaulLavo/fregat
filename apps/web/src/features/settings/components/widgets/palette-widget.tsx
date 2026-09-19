@@ -1,5 +1,7 @@
+import { useSettingValue } from '@/features/settings/hooks/use-setting-value'
+import { useTheme } from '@/features/settings/hooks/use-theme'
 import { PlusIcon, UploadSimpleIcon } from '@phosphor-icons/react'
-import type { Palette } from '@workspace/contracts'
+import { paletteSupportsMode, type Palette } from '@workspace/contracts'
 import { Button } from '@workspace/ui/components/button'
 import { useState } from 'react'
 import { toast } from 'sonner'
@@ -34,6 +36,11 @@ export function PaletteWidget({
   const [editor, setEditor] = useState<PaletteEditorTarget | null>(null)
   const [copySource, setCopySource] = useState<Palette | null>(null)
   const [importOpen, setImportOpen] = useState(false)
+  const bundle = useSettingValue('workbench.theme')
+  const { resolvedTheme } = useTheme()
+  const choices = bundle
+    ? catalog.filter((palette) => paletteSupportsMode(palette, resolvedTheme))
+    : catalog
   const taken = catalog.map((palette) => palette.id)
   const current = catalog.find((palette) => palette.id === value)
 
@@ -70,7 +77,7 @@ export function PaletteWidget({
         className='grid grid-cols-[repeat(auto-fill,minmax(14rem,1fr))] gap-2'
         role='radiogroup'
       >
-        {catalog.map((palette) => (
+        {choices.map((palette) => (
           <PaletteCard
             disabled={disabled}
             key={palette.id}

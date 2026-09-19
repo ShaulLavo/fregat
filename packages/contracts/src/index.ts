@@ -788,3 +788,9 @@ export {
   type WallpaperSelection,
   type WallpaperAsset,
 } from './themes/wallpaper'
+
+export * from './themes/bundle'
+export * from './themes/bundle-settings'
+export * from './themes/archive'
+export * from './themes/bundles'
+export { SYNTAX_THEME_MODES } from './themes/syntax-modes'

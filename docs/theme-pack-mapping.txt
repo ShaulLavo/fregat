@@ -1,0 +1,44 @@
+tokyo-night: dark, 6 fallbacks
+  primary-foreground ← darker_background (contrast pick, 7.6:1)
+  muted-foreground lightness adjusted to meet 4.5:1
+  info-foreground ← darker_background (contrast pick, 7.6:1)
+  success-foreground ← darker_background (contrast pick, 10.5:1)
+  warning-foreground ← darker_background (contrast pick, 9.6:1)
+  update-foreground ← darker_background (contrast pick, 7.1:1)
+wrote packages/contracts/src/themes/packs/tokyo-night.json
+
+rose-pine: light, 6 fallbacks
+  primary-foreground ← #000000 (4.5:1 accessibility correction)
+  muted-foreground lightness adjusted to meet 4.5:1
+  info-foreground ← #000000 (4.5:1 accessibility correction)
+  success-foreground ← background (contrast pick, 5.6:1)
+  warning-foreground ← #000000 (4.5:1 accessibility correction)
+  update-foreground ← #000000 (4.5:1 accessibility correction)
+wrote packages/contracts/src/themes/packs/rose-pine.json
+
+catppuccin: dark, 6 fallbacks
+  primary-foreground ← darker_background (contrast pick, 9.0:1)
+  muted-foreground lightness adjusted to meet 4.5:1
+  info-foreground ← darker_background (contrast pick, 9.0:1)
+  success-foreground ← darker_background (contrast pick, 12.7:1)
+  warning-foreground ← darker_background (contrast pick, 14.9:1)
+  update-foreground ← darker_background (contrast pick, 12.4:1)
+wrote packages/contracts/src/themes/packs/catppuccin.json
+
+catppuccin-latte: light, 6 fallbacks
+  primary-foreground ← #ffffff (4.5:1 accessibility correction)
+  muted-foreground lightness adjusted to meet 4.5:1
+  info-foreground ← #ffffff (4.5:1 accessibility correction)
+  success-foreground ← #000000 (4.5:1 accessibility correction)
+  warning-foreground ← #000000 (4.5:1 accessibility correction)
+  update-foreground ← #000000 (4.5:1 accessibility correction)
+wrote packages/contracts/src/themes/packs/catppuccin-latte.json
+
+gruvbox: dark, 6 fallbacks
+  primary-foreground ← darker_background (contrast pick, 7.3:1)
+  muted-foreground lightness adjusted to meet 4.5:1
+  info-foreground ← darker_background (contrast pick, 7.3:1)
+  success-foreground ← darker_background (contrast pick, 8.2:1)
+  warning-foreground ← darker_background (contrast pick, 8.2:1)
+  update-foreground ← darker_background (contrast pick, 6.6:1)
+wrote packages/contracts/src/themes/packs/gruvbox.json

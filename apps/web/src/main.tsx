@@ -1,3 +1,5 @@
+import { systemColorMode } from '@/features/settings/state/system-color-mode'
+import { readSettingsMirror } from '@/features/settings/utils/boot-mirror'
 import { ApplicationBootstrap } from '@/components/application-bootstrap'
 import { StrictMode } from 'react'
 import { createRoot } from 'react-dom/client'
@@ -16,10 +18,7 @@ import { createApplicationRouter } from '@/state/router'
 import { createNavigation } from '@/state/navigation'
 import { NavigationProvider } from '@/providers/navigation-provider'
 import { LoggingErrorBoundary } from '@/components/logging-error-boundary.tsx'
-import {
-  bootAppearance,
-  systemPrefersDark,
-} from '@/features/settings/providers/appearance-provider.tsx'
+import {} from '@/features/settings/providers/appearance-provider.tsx'
 import { applyAppearance } from '@/features/settings/utils/apply-appearance.ts'
 import {
   applyPaletteStylesheet,
@@ -40,8 +39,8 @@ applyBackdrop(applicationHost()?.backdrop ?? resolveBackdrop())
 // document state: descendants construct geometry and read computed styles on
 // their first render. `AppearanceProvider` corrects it from the server snapshot
 // in React's insertion phase before later layout effects run.
-const boot = bootAppearance()
-applyAppearance(boot, document.documentElement, systemPrefersDark())
+const boot = readSettingsMirror()
+applyAppearance(boot, document.documentElement, systemColorMode() === 'dark')
 applyPaletteStylesheet(document, bootPaletteStylesheet(boot['workbench.palette']))
 const visualViewport = window.visualViewport
 log.info({

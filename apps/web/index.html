@@ -26,12 +26,28 @@
           const storedDensity = mirror['workbench.density']
           if (storedTheme === 'dark' || storedTheme === 'light') theme = storedTheme
           if (typeof mirror['workbench.palette'] === 'string') palette = mirror['workbench.palette']
+          let mode = theme
+          if (mode === 'system')
+            mode = matchMedia('(prefers-color-scheme: dark)').matches ? 'dark' : 'light'
+          const bundle = mirror['workbench.theme']
+          const variant = bundle?.variants?.[mode]
+          const custom = mirror['workbench.theme.customizations']?.[bundle?.id]?.[mode]
+          if (variant) {
+            palette = custom?.palette ?? variant.palette
+            wallpaper = custom?.wallpaper ?? variant.wallpaper
+          }
           // Written by lib/appearance/utils/palette-style.ts for the confirmed
           // selection; a cache for another palette is simply not this one.
           const cache = JSON.parse(localStorage.getItem('platform.palette-boot.v1') ?? 'null')
-          if (cache && cache.id === palette && typeof cache.css === 'string') paletteCss = cache.css
+          if (
+            cache &&
+            Array.isArray(cache.ids) &&
+            cache.ids.includes(palette) &&
+            typeof cache.css === 'string'
+          )
+            paletteCss = cache.css
           if (storedDensity === 'compact' || storedDensity === 'cozy') density = storedDensity
-          if (mirror['workbench.wallpaper']) wallpaper = mirror['workbench.wallpaper']
+          if (!variant && mirror['workbench.wallpaper']) wallpaper = mirror['workbench.wallpaper']
         } catch {
           // An unreadable mirror costs a system-theme boot floor, nothing more.
         }

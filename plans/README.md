@@ -33,7 +33,7 @@ a bare root `bun run verify`.
 | [103 — loading, empty and error states](103-loading-empty-error-states.md)      | **PROPOSED — DECISIONS D4 AND D6 NEED CONFIRMATION** |
 | [115 — palettes as data](115-palettes-as-data.md)                               | **IMPLEMENTED 2026-09-14**                           |
 | [116 — wallpaper library and picker](116-wallpaper-library.md)                  | **IMPLEMENTED 2026-09-14**                           |
-| [117 — themes as bundles](117-themes.md)                                        | **PROPOSED — DEPENDS ON 115 AND 116**                |
+| [117 — themes as bundles](../docs/theme-bundles.md)                             | **IMPLEMENTED — 2026-09-19**                         |
 | [118 — async effects through TanStack](118-async-effects-through-tanstack.md)   | **IMPLEMENTED 2026-09-14**                           |
 | [119 — agent verification tooling](119-agent-verification-tooling.md)           | **IMPLEMENTED 2026-09-14**                           |
 | [121 — undo as a graph](121-undo-graph.md)                                      | **IMPLEMENTED 2026-09-16**                           |
@@ -67,8 +67,9 @@ a bare root `bun run verify`.
   palettes out of `globals.css` into OKLCH data with a resolver, a server library and an editor
   that repaints the app while dragging; Plan 116 gives wallpaper its own content-addressed library,
   per-mode picker and explicit rendering on Linux, seeded from the Omarchy themes on the host.
-  Plan 117 then binds a palette, the existing syntax pair, wallpapers and material under one name,
-  with per-theme customization and a portable archive. 115 and 116 touch different files and can
+  Plan 117 now binds light and dark variants under one name, each with its own palette, syntax
+  colors, wallpaper and material, with per-variant customization and a portable archive. Switching
+  bundles or modes applies the destination variant’s wallpaper. 115 and 116 touch different files and can
   run concurrently. The [research reference](../docs/theme-standardization-reference.md) records
   the pinned Omarchy, T3 Code, and CodexThemes-App findings. Plan 085 shares the boot mirror with
   115; whichever lands second reuses the first's boot ownership.

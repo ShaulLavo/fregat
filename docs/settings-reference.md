@@ -24,6 +24,9 @@ stays safe to read, share and export.
 | Setting                            | Default                                        | Scope       | What it does                                                                                            |
 | ---------------------------------- | ---------------------------------------------- | ----------- | ------------------------------------------------------------------------------------------------------- |
 | `workbench.colorTheme`             | `"system"`                                     | window      | Light or dark, or follow the operating system.                                                          |
+| `workbench.theme`                  | `null`                                         | application | A light and dark version of your app colors, code colors, wallpaper and material.                       |
+| `workbench.theme.customizations`   | `{}`                                           | application | Part overrides saved separately for each theme bundle and mode.                                         |
+| `tui.theme.colors`                 | `"theme"`                                      | application | Use the selected theme bundle or the terminal host colors in the TUI.                                   |
 | `workbench.palette`                | `"graphite"`                                   | application | Colors for app backgrounds, text, borders, accents and the terminal. Pick a palette or make your own.   |
 | `editor.codeTheme.dark`            | `"dark-plus"`                                  | window      | Colors for code in editors and chat code blocks when the app uses dark mode.                            |
 | `editor.codeTheme.light`           | `"light-plus"`                                 | window      | Colors for code in editors and chat code blocks when the app uses light mode.                           |

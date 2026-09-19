@@ -1,5 +1,9 @@
 import {
   descriptorFor,
+  resolveThemeSettings,
+  THEME_PART_KEYS,
+  themePartPatch,
+  type ColorMode,
   layerAllowsScope,
   settingsOperationSchema,
   type SettingId,
@@ -29,7 +33,16 @@ export function settingDraft(
   id: SettingId,
   snapshot: SettingsSnapshot,
   target: SettingsWriteTarget,
+  mode: ColorMode = 'dark',
 ) {
+  if (
+    target === 'user' &&
+    snapshot.values['workbench.theme'] &&
+    THEME_PART_KEYS.some((key) => key === id)
+  ) {
+    const values = resolveThemeSettings(snapshot.values, mode, snapshot.layers)
+    return JSON.stringify(values[id], null, 2)
+  }
   const layer = snapshot.layers.find((entry) => entry.id === target)
   const value =
     id === 'providers.instances' ? snapshot.values[id] : (layer?.raw[id] ?? snapshot.values[id])
@@ -50,6 +63,7 @@ function settingOperations(
   value: unknown,
   snapshot: SettingsSnapshot,
   target: SettingsWriteTarget,
+  mode: ColorMode,
 ): readonly SettingsOperation[] | null {
   const current = snapshot.layers.find((entry) => entry.id === target)?.raw[id]
   if (id === 'lsp.servers' || id === 'lsp.languageServers' || id === 'lsp.semanticTokens.servers')
@@ -59,7 +73,13 @@ function settingOperations(
   if (id === 'models.order') return [operation({ kind: 'model.setOrder', order: value })]
   if (id === 'models.hidden') return hiddenModelOperations(current, value)
   if (id === 'providers.instances') return providerOperations(value, snapshot)
-  return [operation({ kind: 'set', key: id, value })]
+  const scalar = operation({ kind: 'set', key: id, value })
+  const theme = snapshot.values['workbench.theme']
+  const patch = scalar.kind === 'set' ? themePartPatch(scalar) : null
+  if (!theme || !patch || target !== 'user') return [scalar]
+  if (id === 'editor.codeTheme.light') mode = 'light'
+  if (id === 'editor.codeTheme.dark') mode = 'dark'
+  return [{ kind: 'theme.customize', id: theme.id, mode, patch }]
 }
 
 export async function saveSettingDraft({
@@ -69,17 +89,19 @@ export async function saveSettingDraft({
   target,
   owner,
   signal,
+  mode = 'dark',
 }: {
   readonly id: SettingId
   readonly draft: string
   readonly snapshot: SettingsSnapshot
   readonly target: SettingsWriteTarget
   readonly owner: SettingsOwner
+  readonly mode?: ColorMode
   readonly signal?: AbortSignal
 }) {
   signal?.throwIfAborted()
   const value = parseSettingDraft(id, draft)
-  const operations = settingOperations(id, value, snapshot, target)
+  const operations = settingOperations(id, value, snapshot, target, mode)
   if (operations) {
     if (operations.length === 0) return 'acknowledged'
     const result = owner.submit(target, operations, 'tui.settings')

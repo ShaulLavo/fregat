@@ -1,3 +1,10 @@
+import {
+  themeCustomizeOperationSchema,
+  themeResetOperationSchema,
+  themeCustomizationsSchema,
+  type ThemeCustomizeOperation,
+  type ThemeResetOperation,
+} from '../themes/bundle'
 import * as v from 'valibot'
 
 import { providerInstanceIdSchema, type ProviderInstanceId } from '../chat-ids'
@@ -110,6 +117,8 @@ export type SetProviderEnabledOperation = {
 }
 
 export type SettingsOperation =
+  | ThemeCustomizeOperation
+  | ThemeResetOperation
   | ScalarSettingOperation
   | ResetSettingsOperation
   | SetKeybindingOperation
@@ -194,6 +203,8 @@ export const nonSecretProviderSeedSchema: v.GenericSchema<unknown, NonSecretProv
 
 export const settingsOperationSchema = v.union([
   ...scalarSettingOperationSchemas,
+  themeCustomizeOperationSchema,
+  themeResetOperationSchema,
   v.strictObject({ kind: v.literal('reset'), keys: uniqueSettingIdsSchema }),
   v.strictObject({
     kind: v.literal('machine.set'),
@@ -299,6 +310,18 @@ export function applySettingsOperations(
 export function settingsOperationResourceKeys(
   operation: SettingsOperation,
 ): readonly SettingsMutationResourceKey[] {
+  if (operation.kind === 'theme.reset')
+    return [memberResourceKey('workbench.theme.customizations', operation.id)]
+  if (operation.kind === 'theme.customize') {
+    const base: SettingsMutationResourceKey = `${memberResourceKey('workbench.theme.customizations', operation.id)}/${operation.mode}`
+    return Object.keys(operation.patch).flatMap((key) =>
+      key === 'material'
+        ? Object.keys(operation.patch.material ?? {}).map(
+            (field): SettingsMutationResourceKey => `${base}/material/${field}`,
+          )
+        : [`${base}/${key}` as SettingsMutationResourceKey],
+    )
+  }
   if (operation.kind === 'set') return [settingResourceKey(operation.key)]
   if (operation.kind === 'reset') return operation.keys.map(settingResourceKey)
   if (operation.kind === 'machine.set' || operation.kind === 'machine.remove') {
@@ -334,6 +357,8 @@ function applySettingsOperation(
   raw: Readonly<Record<string, unknown>>,
   operation: SettingsOperation,
 ): Readonly<Record<string, unknown>> {
+  if (operation.kind === 'theme.customize' || operation.kind === 'theme.reset')
+    return applyThemeOperation(raw, operation)
   if (operation.kind === 'set') return replaceSetting(raw, operation.key, operation.value)
   if (operation.kind === 'reset') return resetSettings(raw, operation.keys)
   if (operation.kind === 'machine.set') return setMachine(raw, operation)
@@ -522,6 +547,8 @@ function appendTouchedSettingIds(target: SettingId[], operation: SettingsOperati
 }
 
 function touchedSettingIds(operation: SettingsOperation): readonly SettingId[] {
+  if (operation.kind === 'theme.customize' || operation.kind === 'theme.reset')
+    return ['workbench.theme.customizations']
   if (operation.kind === 'set') return [operation.key]
   if (operation.kind === 'reset') return operation.keys
   if (operation.kind === 'machine.set' || operation.kind === 'machine.remove') {
@@ -575,4 +602,29 @@ function memberResourceKey(id: SettingId, member: string): SettingsMutationResou
 
 function modelResourceId(ref: ModelRef): string {
   return `${ref.providerInstanceId.length}:${ref.providerInstanceId}${ref.model.length}:${ref.model}`
+}
+
+function applyThemeOperation(
+  raw: Readonly<Record<string, unknown>>,
+  operation: ThemeCustomizeOperation | ThemeResetOperation,
+) {
+  const parsed = v.safeParse(themeCustomizationsSchema, raw['workbench.theme.customizations'] ?? {})
+  const customizations = parsed.success ? { ...parsed.output } : {}
+  if (operation.kind === 'theme.reset') {
+    delete customizations[operation.id]
+    return replaceSetting(raw, 'workbench.theme.customizations', customizations)
+  }
+  const theme = customizations[operation.id] ?? {}
+  const current = theme[operation.mode] ?? {}
+  customizations[operation.id] = {
+    ...theme,
+    [operation.mode]: {
+      ...current,
+      ...operation.patch,
+      ...(operation.patch.material
+        ? { material: { ...current.material, ...operation.patch.material } }
+        : {}),
+    },
+  }
+  return replaceSetting(raw, 'workbench.theme.customizations', customizations)
 }

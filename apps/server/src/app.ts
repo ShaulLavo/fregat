@@ -1,3 +1,5 @@
+import { BundleLibrary } from './themes/bundle-library'
+import { bundleRoutes } from './themes/bundle-routes'
 import { WallpaperLibrary } from './themes/wallpapers/library'
 import { wallpaperLibraryRoutes } from './themes/wallpapers/routes'
 import { createInternalError } from './observability/structured-errors'
@@ -151,6 +153,16 @@ export function createApp(options: AppOptions) {
     directory: path.join(options.homeDirectory ?? homedir(), '.platform', 'palettes'),
     settings,
   })
+  const bundles = new BundleLibrary({
+    directory: path.join(options.homeDirectory ?? homedir(), '.platform', 'themes'),
+    palettes,
+    wallpapers,
+    settings,
+  })
+  palettes.assertUnused = (id) => bundles.assertPartUnused('palette', id)
+  wallpapers.assertUnused = (id) => bundles.assertPartUnused('wallpaper', id)
+  palettes.archiveDirectories = () => bundles.directories()
+  wallpapers.archiveDirectories = () => bundles.directories()
   const providerAdapterRegistry: ProviderAdapterRegistry =
     options.orchestration?.providerAdapterRegistry ??
     createDefaultProviderAdapterRegistry(
@@ -321,6 +333,7 @@ export function createApp(options: AppOptions) {
     .use(wallpaperRoutes())
     .use(settingsRoutes(settings))
     .use(themeRoutes(palettes))
+    .use(bundleRoutes(bundles))
     .use(wallpaperLibraryRoutes(wallpapers))
     .use(
       gitRoutes(git, commitMessages, {

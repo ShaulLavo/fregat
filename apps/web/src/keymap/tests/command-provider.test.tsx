@@ -1,3 +1,4 @@
+import { BUNDLED_THEMES, resolveThemeSettings } from '@workspace/contracts'
 import { wallpaperPng } from '../../../test/factories/wallpaper'
 import { getClient } from '@/lib/client'
 import { filesystemPath } from '@/lib/documents/utils/identity'
@@ -375,4 +376,42 @@ test('wallpaper toggles preserve the chosen image across color modes and remount
     source,
   })
   remounted.unmount()
+})
+
+test('bundle wallpaper toggle retains the active variant image', async ({ client }) => {
+  const asset = (
+    await client.themes.wallpapers.post({ file: new File([wallpaperPng()], 'bundle.png') })
+  ).data!
+  const source = { kind: 'library', asset: asset.id } as const
+  const base = BUNDLED_THEMES[0]!
+  const bundle = {
+    ...base,
+    variants: {
+      ...base.variants,
+      light: { ...base.variants.light, wallpaper: { enabled: true, source } },
+    },
+  }
+  await client.settings.write.post({
+    mutationId: 'bundle-wallpaper-toggle',
+    target: 'user',
+    operations: [
+      { kind: 'set', key: 'workbench.theme', value: bundle },
+      { kind: 'set', key: 'workbench.colorTheme', value: 'light' },
+    ],
+  })
+  const queryClient = createTestQueryClient()
+  queryClient.setQueryData(settingsKeys.document(), await fetchSettings(undefined, getClient()))
+  const view = renderCommandProvider(queryClient)
+  await waitFor(() => expect(capturedBus).not.toBeNull())
+  for (const enabled of [false, true]) {
+    await act(async () => {
+      await capturedBus!.dispatch('workspace.toggleWallpaper', invocation()).completion
+    })
+    const snapshot = await fetchSettings(undefined, getClient())
+    expect(resolveThemeSettings(snapshot.values, 'light')['workbench.wallpaper']).toEqual({
+      enabled,
+      source,
+    })
+  }
+  view.unmount()
 })

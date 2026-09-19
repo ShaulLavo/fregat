@@ -1,0 +1,73 @@
+{
+  "schemaVersion": 1,
+  "id": "omarchy-tokyo-night",
+  "name": "Tokyo Night",
+  "variants": {
+    "kind": "single",
+    "mode": "dark",
+    "colors": {
+      "app": {
+        "background": "#1a1b26",
+        "foreground": "#a9b1d6",
+        "card": "#24283b",
+        "card-foreground": "#a9b1d6",
+        "popover": "#24283b",
+        "popover-foreground": "#a9b1d6",
+        "primary": "#7aa2f7",
+        "primary-foreground": "#0e0e14",
+        "secondary": "#292e42",
+        "secondary-foreground": "#c0caf5",
+        "muted": "#24283b",
+        "muted-foreground": "oklch(0.617495 0.0682 274.37)",
+        "accent": "#292e42",
+        "accent-foreground": "#c0caf5",
+        "destructive": "#f7768e",
+        "info": "#7aa2f7",
+        "info-foreground": "#0e0e14",
+        "success": "#9ece6a",
+        "success-foreground": "#0e0e14",
+        "warning": "#e0af68",
+        "warning-foreground": "#0e0e14",
+        "update": "#ad8ee6",
+        "update-foreground": "#0e0e14",
+        "border": "#414868",
+        "input": "#414868",
+        "ring": "#7aa2f7",
+        "chart-1": "#7aa2f7",
+        "chart-2": "#7aa2f7",
+        "chart-3": "#ad8ee6",
+        "chart-4": "#e0af68",
+        "chart-5": "#eb927b"
+      },
+      "terminal": {
+        "foreground": "#a9b1d6",
+        "cursor": "#a9b1d6",
+        "cursor-accent": "#1a1b26",
+        "selection": "#292e42",
+        "selection-foreground": "#c0caf5",
+        "black": "#0e0e14",
+        "red": "#f7768e",
+        "green": "#9ece6a",
+        "yellow": "#e0af68",
+        "blue": "#7aa2f7",
+        "magenta": "#ad8ee6",
+        "cyan": "#449dab",
+        "white": "#a9b1d6",
+        "bright-black": "#565f89",
+        "bright-red": "#ff7a93",
+        "bright-green": "#b9f27c",
+        "bright-yellow": "#ff9e64",
+        "bright-blue": "#7da6ff",
+        "bright-magenta": "#bb9af7",
+        "bright-cyan": "#0db9d7",
+        "bright-white": "#c0caf5"
+      }
+    }
+  },
+  "provenance": {
+    "kind": "omarchy",
+    "repository": "https://github.com/omacom/omarchy",
+    "commit": "omarchy-4.0.0.alpha",
+    "theme": "tokyo-night"
+  }
+}

@@ -632,6 +632,12 @@
       "minimum": 0,
       "type": "integer"
     },
+    "tui.theme.colors": {
+      "default": "theme",
+      "description": "Use the selected theme bundle or the terminal host colors in the TUI.",
+      "enum": ["terminal", "theme"],
+      "type": "string"
+    },
     "window.transparency": {
       "default": "compositor",
       "description": "Where the see-through comes from: the window manager blending an opaque window, or a per-pixel transparent window (which costs a full-surface CPU copy per frame).",
@@ -688,6 +694,370 @@
       "maximum": 400,
       "minimum": 0,
       "type": "integer"
+    },
+    "workbench.theme": {
+      "anyOf": [
+        {
+          "additionalProperties": false,
+          "properties": {
+            "id": {
+              "pattern": "^[a-z0-9][a-z0-9-]{0,63}$",
+              "type": "string"
+            },
+            "name": {
+              "maxLength": 80,
+              "minLength": 1,
+              "type": "string"
+            },
+            "revision": {
+              "maxLength": 64,
+              "minLength": 1,
+              "type": "string"
+            },
+            "schemaVersion": {
+              "const": 1
+            },
+            "source": {
+              "enum": ["bundled", "user"],
+              "type": "string"
+            },
+            "variants": {
+              "additionalProperties": false,
+              "properties": {
+                "dark": {
+                  "additionalProperties": false,
+                  "properties": {
+                    "codeTheme": {
+                      "type": "string"
+                    },
+                    "material": {
+                      "additionalProperties": false,
+                      "properties": {
+                        "blur": {
+                          "maximum": 40,
+                          "minimum": 0,
+                          "type": "integer"
+                        },
+                        "contentOpacity": {
+                          "maximum": 100,
+                          "minimum": 0,
+                          "type": "integer"
+                        },
+                        "opacity": {
+                          "maximum": 100,
+                          "minimum": 0,
+                          "type": "integer"
+                        },
+                        "saturation": {
+                          "maximum": 400,
+                          "minimum": 0,
+                          "type": "integer"
+                        }
+                      },
+                      "required": ["blur", "contentOpacity", "opacity", "saturation"],
+                      "type": "object"
+                    },
+                    "palette": {
+                      "pattern": "^[a-z0-9][a-z0-9-]{0,63}$",
+                      "type": "string"
+                    },
+                    "wallpaper": {
+                      "properties": {
+                        "enabled": {
+                          "type": "boolean"
+                        },
+                        "source": {
+                          "oneOf": [
+                            {
+                              "properties": {
+                                "asset": {
+                                  "pattern": "^[a-f0-9]{64}$",
+                                  "type": "string"
+                                },
+                                "kind": {
+                                  "const": "library"
+                                }
+                              },
+                              "required": ["asset", "kind"],
+                              "type": "object"
+                            },
+                            {
+                              "properties": {
+                                "kind": {
+                                  "const": "desktop"
+                                }
+                              },
+                              "required": ["kind"],
+                              "type": "object"
+                            }
+                          ]
+                        }
+                      },
+                      "required": ["enabled", "source"],
+                      "type": "object"
+                    }
+                  },
+                  "required": ["codeTheme", "material", "palette", "wallpaper"],
+                  "type": "object"
+                },
+                "light": {
+                  "additionalProperties": false,
+                  "properties": {
+                    "codeTheme": {
+                      "type": "string"
+                    },
+                    "material": {
+                      "additionalProperties": false,
+                      "properties": {
+                        "blur": {
+                          "maximum": 40,
+                          "minimum": 0,
+                          "type": "integer"
+                        },
+                        "contentOpacity": {
+                          "maximum": 100,
+                          "minimum": 0,
+                          "type": "integer"
+                        },
+                        "opacity": {
+                          "maximum": 100,
+                          "minimum": 0,
+                          "type": "integer"
+                        },
+                        "saturation": {
+                          "maximum": 400,
+                          "minimum": 0,
+                          "type": "integer"
+                        }
+                      },
+                      "required": ["blur", "contentOpacity", "opacity", "saturation"],
+                      "type": "object"
+                    },
+                    "palette": {
+                      "pattern": "^[a-z0-9][a-z0-9-]{0,63}$",
+                      "type": "string"
+                    },
+                    "wallpaper": {
+                      "properties": {
+                        "enabled": {
+                          "type": "boolean"
+                        },
+                        "source": {
+                          "oneOf": [
+                            {
+                              "properties": {
+                                "asset": {
+                                  "pattern": "^[a-f0-9]{64}$",
+                                  "type": "string"
+                                },
+                                "kind": {
+                                  "const": "library"
+                                }
+                              },
+                              "required": ["asset", "kind"],
+                              "type": "object"
+                            },
+                            {
+                              "properties": {
+                                "kind": {
+                                  "const": "desktop"
+                                }
+                              },
+                              "required": ["kind"],
+                              "type": "object"
+                            }
+                          ]
+                        }
+                      },
+                      "required": ["enabled", "source"],
+                      "type": "object"
+                    }
+                  },
+                  "required": ["codeTheme", "material", "palette", "wallpaper"],
+                  "type": "object"
+                }
+              },
+              "required": ["dark", "light"],
+              "type": "object"
+            }
+          },
+          "required": ["id", "name", "revision", "schemaVersion", "source", "variants"],
+          "type": "object"
+        },
+        {
+          "type": "null"
+        }
+      ],
+      "default": null,
+      "description": "A light and dark version of your app colors, code colors, wallpaper and material."
+    },
+    "workbench.theme.customizations": {
+      "additionalProperties": {
+        "additionalProperties": false,
+        "properties": {
+          "dark": {
+            "additionalProperties": false,
+            "properties": {
+              "codeTheme": {
+                "type": "string"
+              },
+              "material": {
+                "additionalProperties": false,
+                "properties": {
+                  "blur": {
+                    "maximum": 40,
+                    "minimum": 0,
+                    "type": "integer"
+                  },
+                  "contentOpacity": {
+                    "maximum": 100,
+                    "minimum": 0,
+                    "type": "integer"
+                  },
+                  "opacity": {
+                    "maximum": 100,
+                    "minimum": 0,
+                    "type": "integer"
+                  },
+                  "saturation": {
+                    "maximum": 400,
+                    "minimum": 0,
+                    "type": "integer"
+                  }
+                },
+                "required": [],
+                "type": "object"
+              },
+              "palette": {
+                "pattern": "^[a-z0-9][a-z0-9-]{0,63}$",
+                "type": "string"
+              },
+              "wallpaper": {
+                "properties": {
+                  "enabled": {
+                    "type": "boolean"
+                  },
+                  "source": {
+                    "oneOf": [
+                      {
+                        "properties": {
+                          "asset": {
+                            "pattern": "^[a-f0-9]{64}$",
+                            "type": "string"
+                          },
+                          "kind": {
+                            "const": "library"
+                          }
+                        },
+                        "required": ["asset", "kind"],
+                        "type": "object"
+                      },
+                      {
+                        "properties": {
+                          "kind": {
+                            "const": "desktop"
+                          }
+                        },
+                        "required": ["kind"],
+                        "type": "object"
+                      }
+                    ]
+                  }
+                },
+                "required": ["enabled", "source"],
+                "type": "object"
+              }
+            },
+            "required": [],
+            "type": "object"
+          },
+          "light": {
+            "additionalProperties": false,
+            "properties": {
+              "codeTheme": {
+                "type": "string"
+              },
+              "material": {
+                "additionalProperties": false,
+                "properties": {
+                  "blur": {
+                    "maximum": 40,
+                    "minimum": 0,
+                    "type": "integer"
+                  },
+                  "contentOpacity": {
+                    "maximum": 100,
+                    "minimum": 0,
+                    "type": "integer"
+                  },
+                  "opacity": {
+                    "maximum": 100,
+                    "minimum": 0,
+                    "type": "integer"
+                  },
+                  "saturation": {
+                    "maximum": 400,
+                    "minimum": 0,
+                    "type": "integer"
+                  }
+                },
+                "required": [],
+                "type": "object"
+              },
+              "palette": {
+                "pattern": "^[a-z0-9][a-z0-9-]{0,63}$",
+                "type": "string"
+              },
+              "wallpaper": {
+                "properties": {
+                  "enabled": {
+                    "type": "boolean"
+                  },
+                  "source": {
+                    "oneOf": [
+                      {
+                        "properties": {
+                          "asset": {
+                            "pattern": "^[a-f0-9]{64}$",
+                            "type": "string"
+                          },
+                          "kind": {
+                            "const": "library"
+                          }
+                        },
+                        "required": ["asset", "kind"],
+                        "type": "object"
+                      },
+                      {
+                        "properties": {
+                          "kind": {
+                            "const": "desktop"
+                          }
+                        },
+                        "required": ["kind"],
+                        "type": "object"
+                      }
+                    ]
+                  }
+                },
+                "required": ["enabled", "source"],
+                "type": "object"
+              }
+            },
+            "required": [],
+            "type": "object"
+          }
+        },
+        "required": [],
+        "type": "object"
+      },
+      "default": {},
+      "description": "Part overrides saved separately for each theme bundle and mode.",
+      "propertyNames": {
+        "pattern": "^[a-z0-9][a-z0-9-]{0,63}$",
+        "type": "string"
+      },
+      "type": "object"
     },
     "workbench.tree.indentGuides": {
       "default": "always",

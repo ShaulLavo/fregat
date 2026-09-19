@@ -1,0 +1,73 @@
+{
+  "schemaVersion": 1,
+  "id": "omarchy-rose-pine",
+  "name": "Rose Pine",
+  "variants": {
+    "kind": "single",
+    "mode": "light",
+    "colors": {
+      "app": {
+        "background": "#faf4ed",
+        "foreground": "#575279",
+        "card": "#f2e9e1",
+        "card-foreground": "#575279",
+        "popover": "#f2e9e1",
+        "popover-foreground": "#575279",
+        "primary": "#56949f",
+        "primary-foreground": "#000000",
+        "secondary": "#dfdad9",
+        "secondary-foreground": "#575279",
+        "muted": "#f2e9e1",
+        "muted-foreground": "oklch(0.54518 0.0268 298.37)",
+        "accent": "#dfdad9",
+        "accent-foreground": "#575279",
+        "destructive": "#b4637a",
+        "info": "#56949f",
+        "info-foreground": "#000000",
+        "success": "#286983",
+        "success-foreground": "#faf4ed",
+        "warning": "#ea9d34",
+        "warning-foreground": "#000000",
+        "update": "#907aa9",
+        "update-foreground": "#000000",
+        "border": "#cecacd",
+        "input": "#cecacd",
+        "ring": "#56949f",
+        "chart-1": "#56949f",
+        "chart-2": "#56949f",
+        "chart-3": "#907aa9",
+        "chart-4": "#ea9d34",
+        "chart-5": "#cf8057"
+      },
+      "terminal": {
+        "foreground": "#575279",
+        "cursor": "#575279",
+        "cursor-accent": "#faf4ed",
+        "selection": "#dfdad9",
+        "selection-foreground": "#575279",
+        "black": "#e1dbd5",
+        "red": "#b4637a",
+        "green": "#286983",
+        "yellow": "#ea9d34",
+        "blue": "#56949f",
+        "magenta": "#907aa9",
+        "cyan": "#d7827e",
+        "white": "#575279",
+        "bright-black": "#9893a5",
+        "bright-red": "#b4637a",
+        "bright-green": "#286983",
+        "bright-yellow": "#ea9d34",
+        "bright-blue": "#56949f",
+        "bright-magenta": "#907aa9",
+        "bright-cyan": "#d7827e",
+        "bright-white": "#575279"
+      }
+    }
+  },
+  "provenance": {
+    "kind": "omarchy",
+    "repository": "https://github.com/omacom/omarchy",
+    "commit": "omarchy-4.0.0.alpha",
+    "theme": "rose-pine"
+  }
+}

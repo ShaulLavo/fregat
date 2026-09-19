@@ -5,6 +5,21 @@ export const wallpaperLayerSelector = '[data-workbench] img[data-workbench-wallp
 
 // Stable handles the app already exposes. Add here, never inline a selector in a scenario.
 export const selectors = {
+  wallpaperAsset: (page: Page, id: string) =>
+    page.locator(`${wallpaperStillSelector}[src*="${id}"]`),
+  themeGallery: (page: Page) => page.getByLabel('Theme bundles', { exact: true }),
+  themeCard: (page: Page, id: string) =>
+    page.locator(`[data-theme-bundle="${id}"]`).getByRole('button'),
+  paletteActions: (page: Page, name: string) =>
+    page.getByRole('button', { name: `${name} actions`, exact: true }),
+  paletteMenuAction: (page: Page, name: string) =>
+    page.getByRole('menuitem', { name, exact: true }),
+  themeAction: (page: Page, name: string) => page.getByRole('button', { name, exact: true }),
+  themeEditor: (page: Page) => page.getByRole('dialog', { name: 'Create a theme bundle' }),
+  themeName: (page: Page) => page.getByRole('textbox', { name: 'Name', exact: true }),
+  themeEditorPalette: (page: Page, mode: string) => page.locator(`#theme-palette-${mode}`),
+  themeRoot: (page: Page) => page.locator('html'),
+
   editorHover: (page: Page) => page.locator('.editor-plugin-hover:not([hidden])'),
   unicodeAdjustSettings: (page: Page) =>
     page.getByRole('button', { name: 'Adjust settings', exact: true }),

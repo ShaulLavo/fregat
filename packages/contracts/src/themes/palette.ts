@@ -141,7 +141,7 @@ export type PaletteProvenance = v.InferOutput<typeof paletteProvenanceSchema>
 
 /** A parsed palette: the document with OKLCH values and its origin. */
 export type Palette = v.InferOutput<typeof paletteDocumentSchema> &
-  Readonly<{ source: 'bundled' | 'user' }>
+  Readonly<{ source: 'bundled' | 'user' | 'theme' }>
 
 export type ParsedPalette =
   | { readonly success: true; readonly palette: Palette }

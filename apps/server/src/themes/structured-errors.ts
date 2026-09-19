@@ -2,6 +2,12 @@ import { defineErrorCatalog } from 'evlog'
 
 /** Palette library failures the settings page has to tell apart. */
 export const themeErrors = defineErrorCatalog('themes', {
+  BUNDLE_INVALID: {
+    status: 400,
+    message: ({ detail }: { detail: string }) => `Theme bundle: ${detail}`,
+    why: 'The bundle could not be validated or published; incomplete imports stay outside the library.',
+    fix: 'Check the parts, choose an unused theme id, and import a complete Platform theme archive.',
+  },
   PALETTE_INVALID: {
     status: 400,
     message: ({ detail }: { detail: string }) => `Palette is not valid: ${detail}`,

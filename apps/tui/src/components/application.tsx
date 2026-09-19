@@ -39,8 +39,9 @@ export function Application({
   const mode = useSettingValue(owner, 'workbench.colorTheme')
   const paletteId = useSettingValue(owner, 'workbench.palette')
   const palette = usePaletteLibrary(state.kind === 'ready' ? state.client : null, paletteId)
+  const hostColors = useSettingValue(owner, 'tui.theme.colors') === 'terminal'
   const reducedMotion = useSettingValue(owner, 'workbench.reduceMotion')
-  const theme = useTheme(mode, noColor, { palette, reducedMotion })
+  const theme = useTheme(mode, noColor, { palette, reducedMotion, hostColors })
   useKeyboard((event) => {
     if (state.kind === 'ready') return
     if (event.ctrl && event.name === 'c') {

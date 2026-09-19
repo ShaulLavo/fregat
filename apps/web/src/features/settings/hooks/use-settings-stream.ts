@@ -1,3 +1,4 @@
+import { startPageSubscription } from '@/lib/state/page-subscription'
 import { useEffect } from 'react'
 import type { QueryClient } from '@tanstack/react-query'
 import {
@@ -13,9 +14,11 @@ import { settingsSnapshotAdmission } from '@/features/settings/state/snapshot-ad
 export function useSettingsStream() {
   const queryClient = useSettingsOwner()
   useEffect(() => {
-    const controller = new AbortController()
-    void superviseSettingsStream(queryClient, controller.signal)
-    return () => controller.abort()
+    return startPageSubscription(() => {
+      const controller = new AbortController()
+      void superviseSettingsStream(queryClient, controller.signal)
+      return () => controller.abort()
+    })
   }, [queryClient])
 }
 

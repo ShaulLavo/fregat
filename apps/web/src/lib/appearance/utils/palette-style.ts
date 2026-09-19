@@ -36,23 +36,24 @@ export function applyPaletteStylesheet(document: StyleHost, css: string | null) 
  * boot cache was written for that same id. Otherwise the CSS default paints.
  */
 export function bootPaletteStylesheet(id: string): string | null {
+  const cached = readPaletteBootCache()
+  if (cached?.ids.includes(id)) return cached.css
   const bundled = bundledPalette(id)
   if (bundled) return id === DEFAULT_PALETTE_ID ? null : paletteStylesheet(bundled)
 
-  const cached = readPaletteBootCache()
-  return cached?.id === id ? cached.css : null
+  return null
 }
 
 /** Called only with the stylesheet of a confirmed selection, never a preview. */
-export function writePaletteBootCache(id: string, css: string) {
+export function writePaletteBootCache(ids: readonly string[], css: string) {
   try {
-    localStorage.setItem(PALETTE_BOOT_KEY, JSON.stringify({ id, css }))
+    localStorage.setItem(PALETTE_BOOT_KEY, JSON.stringify({ ids, css }))
   } catch {
     // A full or unavailable localStorage costs a themed first paint, nothing more.
   }
 }
 
-function readPaletteBootCache(): { readonly id: string; readonly css: string } | null {
+function readPaletteBootCache(): { readonly ids: readonly string[]; readonly css: string } | null {
   try {
     const raw = localStorage.getItem(PALETTE_BOOT_KEY)
     if (!raw) return null
@@ -60,10 +61,15 @@ function readPaletteBootCache(): { readonly id: string; readonly css: string } |
     const parsed: unknown = JSON.parse(raw)
     if (!parsed || typeof parsed !== 'object') return null
 
-    const { id, css } = parsed as { id?: unknown; css?: unknown }
-    if (typeof id !== 'string' || typeof css !== 'string') return null
+    const { ids, css } = parsed as { ids?: unknown; css?: unknown }
+    if (
+      !Array.isArray(ids) ||
+      !ids.every((id): id is string => typeof id === 'string') ||
+      typeof css !== 'string'
+    )
+      return null
 
-    return { id, css }
+    return { ids, css }
   } catch {
     return null
   }

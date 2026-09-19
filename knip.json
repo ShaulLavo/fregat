@@ -61,7 +61,8 @@
         "themes/import-omarchy-palette.ts",
         "themes/import-omarchy-wallpapers.ts",
         "check-linked-sources.ts",
-        "generate-unicode-confusables.mjs"
+        "generate-unicode-confusables.mjs",
+        "themes/import-omarchy-theme.ts"
       ]
     },
     ".": {

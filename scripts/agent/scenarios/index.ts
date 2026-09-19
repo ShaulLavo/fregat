@@ -1,3 +1,6 @@
+import { pageLifecycle } from './page-lifecycle'
+import { themeBundles } from './theme-bundles'
+import { themeGallery } from './theme-gallery'
 import { wallpaperModeToggle } from './wallpaper-mode-toggle'
 import { editorLspHover } from './editor-lsp-hover'
 import { editorMarkdownPunctuation } from './editor-markdown-punctuation'
@@ -44,6 +47,9 @@ import { demoThemeStartup } from './demo-theme-startup'
 import { demoWallpaperStartup } from './demo-wallpaper-startup'
 
 export const scenarios: readonly Scenario[] = [
+  themeGallery,
+  pageLifecycle,
+  themeBundles,
   editorLspHover,
   editorMarkdownPunctuation,
   fileIcons,

@@ -29,6 +29,7 @@ const recordControlSchema = v.record(v.string(), v.nullable(v.string()))
  * control that silently coerces.
  */
 export type SettingControl =
+  | { readonly widget: 'theme' }
   | { readonly widget: 'wallpaper'; readonly value: WallpaperSelection }
   | { readonly widget: 'boolean'; readonly value: boolean }
   | { readonly widget: 'number'; readonly value: number }
@@ -47,6 +48,7 @@ export type SettingControl =
 export function settingControl(id: SettingId, value: SettingValue<SettingId>): SettingControl {
   const { schema, widget } = descriptorFor(id)
 
+  if (widget === 'theme') return { widget }
   if (widget === 'wallpaper') {
     const parsed = v.safeParse(wallpaperSelectionSchema, value)
     return parsed.success ? { widget, value: parsed.output } : { widget: 'unsupported' }

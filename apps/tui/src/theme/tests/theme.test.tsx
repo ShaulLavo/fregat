@@ -43,8 +43,12 @@ test('NO_COLOR uses terminal defaults for surfaces and semantic text', () => {
   expect(theme.colorMode).toBe('none')
 })
 
-test('system colors repaint the real renderer from OSC palette changes while explicit modes retain UI tokens', async () => {
-  const frame = await renderTui(<ThemePreview />, { width: 30, height: 4, useThread: false })
+test('terminal-host colors repaint from OSC palette changes and theme colors remain an explicit choice', async () => {
+  const frame = await renderTui(<ThemePreview hostColors />, {
+    width: 30,
+    height: 4,
+    useThread: false,
+  })
   try {
     await act(async () => {
       setRendererCapabilities(frame.renderer, { rgb: true, ansi256: true })

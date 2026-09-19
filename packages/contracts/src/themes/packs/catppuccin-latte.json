@@ -1,0 +1,73 @@
+{
+  "schemaVersion": 1,
+  "id": "omarchy-catppuccin-latte",
+  "name": "Catppuccin Latte",
+  "variants": {
+    "kind": "single",
+    "mode": "light",
+    "colors": {
+      "app": {
+        "background": "#eff1f5",
+        "foreground": "#4c4f69",
+        "card": "#dce0e8",
+        "card-foreground": "#4c4f69",
+        "popover": "#dce0e8",
+        "popover-foreground": "#4c4f69",
+        "primary": "#1e66f5",
+        "primary-foreground": "#ffffff",
+        "secondary": "#ccd0da",
+        "secondary-foreground": "#4c4f69",
+        "muted": "#dce0e8",
+        "muted-foreground": "oklch(0.53077 0.0237 274.6)",
+        "accent": "#ccd0da",
+        "accent-foreground": "#4c4f69",
+        "destructive": "#d20f39",
+        "info": "#1e66f5",
+        "info-foreground": "#ffffff",
+        "success": "#40a02b",
+        "success-foreground": "#000000",
+        "warning": "#df8e1d",
+        "warning-foreground": "#000000",
+        "update": "#ea76cb",
+        "update-foreground": "#000000",
+        "border": "#acb0be",
+        "input": "#acb0be",
+        "ring": "#1e66f5",
+        "chart-1": "#1e66f5",
+        "chart-2": "#1e66f5",
+        "chart-3": "#ea76cb",
+        "chart-4": "#df8e1d",
+        "chart-5": "#d84e2b"
+      },
+      "terminal": {
+        "foreground": "#4c4f69",
+        "cursor": "#4c4f69",
+        "cursor-accent": "#eff1f5",
+        "selection": "#ccd0da",
+        "selection-foreground": "#4c4f69",
+        "black": "#d7d8dc",
+        "red": "#d20f39",
+        "green": "#40a02b",
+        "yellow": "#df8e1d",
+        "blue": "#1e66f5",
+        "magenta": "#ea76cb",
+        "cyan": "#179299",
+        "white": "#4c4f69",
+        "bright-black": "#9ca0b0",
+        "bright-red": "#d20f39",
+        "bright-green": "#40a02b",
+        "bright-yellow": "#df8e1d",
+        "bright-blue": "#1e66f5",
+        "bright-magenta": "#ea76cb",
+        "bright-cyan": "#179299",
+        "bright-white": "#4c4f69"
+      }
+    }
+  },
+  "provenance": {
+    "kind": "omarchy",
+    "repository": "https://github.com/omacom/omarchy",
+    "commit": "omarchy-4.0.0.alpha",
+    "theme": "catppuccin-latte"
+  }
+}

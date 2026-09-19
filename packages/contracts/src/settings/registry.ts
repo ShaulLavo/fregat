@@ -39,6 +39,7 @@ export type SettingWidget =
   | 'font'
   | 'code-theme'
   | 'palette'
+  | 'theme'
   | 'wallpaper'
   | 'number'
   | 'string'
@@ -79,6 +80,7 @@ export type WidgetFor<TValue> = unknown extends TValue
   : 'complex' | ValueWidget<TValue>
 
 type ValueWidget<TValue> =
+  | (TValue extends import('../themes/bundle').ThemeBundle | null ? 'theme' : never)
   | (TValue extends WallpaperSelection ? 'wallpaper' : never)
   | (TValue extends boolean ? 'boolean' : never)
   | (TValue extends number ? 'number' : never)

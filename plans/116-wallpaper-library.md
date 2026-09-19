@@ -1,6 +1,6 @@
 # A wallpaper library and picker
 
-Status: implemented and deployed. Browser verification passed; native shell smoke checks remain unverified. Requested 2026-09-14. Second of three plans split out of the retired Plan 104; independent of [Plan 115](115-palettes-as-data.md) and consumed by [Plan 117](117-themes.md).
+Status: implemented and deployed. Browser verification passed; native shell smoke checks remain unverified. Requested 2026-09-14. Second of three plans split out of the retired Plan 104; independent of [Plan 115](115-palettes-as-data.md) and consumed by [Plan 117](../docs/theme-bundles.md).
 
 Wallpaper previously used a boolean over whatever the desktop happened to show. This plan gives the app its own wallpaper library, a picker with per-mode selection, explicit image rendering on every platform, and an importer that seeds the library from the Omarchy themes installed on the server host.
 

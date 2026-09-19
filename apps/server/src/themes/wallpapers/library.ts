@@ -1,3 +1,4 @@
+import { archivePartFiles, readArchivePart } from '../archive-parts'
 import { createHash, randomUUID } from 'node:crypto'
 import { mkdir, readdir, readFile, rename, rm, stat, writeFile } from 'node:fs/promises'
 import path from 'node:path'
@@ -18,6 +19,18 @@ type SkippedFile = { readonly path: string; readonly code: string }
 const SKIPPABLE_CODES: ReadonlySet<string> = new Set(['wallpapers.INVALID', 'wallpapers.TOO_LARGE'])
 
 export class WallpaperLibrary {
+  assertUnused: (id: string) => Promise<void> = async () => {}
+  archiveDirectories: () => Promise<string[]> = async () => []
+
+  async assetDirectory(id: AssetId): Promise<string> {
+    if (await Bun.file(path.join(this.directory, `${id}.json`)).exists()) return this.directory
+    for (const directory of await this.archiveDirectories()) {
+      const folder = path.join(directory, 'wallpapers')
+      if (await Bun.file(path.join(folder, `${id}.json`)).exists()) return folder
+    }
+    throw wallpaperErrors.NOT_FOUND()
+  }
+
   readonly directory: string
   readonly #settings: Pick<SettingsStore, 'snapshot' | 'write'>
   #pending: Promise<unknown> = Promise.resolve()
@@ -30,6 +43,18 @@ export class WallpaperLibrary {
   }
 
   async list(): Promise<WallpaperAsset[]> {
+    const local = await this.localAssets()
+    const imported = await Promise.all(
+      (await archivePartFiles(await this.archiveDirectories(), 'wallpapers')).map(async (file) =>
+        v.parse(wallpaperAssetSchema, JSON.parse(await readFile(file, 'utf8'))),
+      ),
+    )
+    return [...new Map([...imported, ...local].map((asset) => [asset.id, asset])).values()].sort(
+      (a, b) => a.name.localeCompare(b.name),
+    )
+  }
+
+  private async localAssets(): Promise<WallpaperAsset[]> {
     await mkdir(this.directory, { recursive: true })
     const { mtimeMs } = await stat(this.directory)
     if (this.#listing?.mtimeMs === mtimeMs) return this.#listing.assets
@@ -51,8 +76,10 @@ export class WallpaperLibrary {
 
   async read(id: AssetId): Promise<WallpaperAsset> {
     const asset = await this.#readIndex(id)
-    if (!asset) throw wallpaperErrors.NOT_FOUND()
-    return asset
+    if (asset) return asset
+    const imported = await readArchivePart(await this.archiveDirectories(), 'wallpapers', id)
+    if (imported) return v.parse(wallpaperAssetSchema, imported)
+    throw wallpaperErrors.NOT_FOUND()
   }
 
   upload(file: File) {
@@ -76,6 +103,7 @@ export class WallpaperLibrary {
 
   delete(id: AssetId) {
     return this.#serialize(async () => {
+      await this.assertUnused(id)
       const asset = await this.read(id)
       const selection = this.#settings.snapshot().values['workbench.wallpaper']
       if (selection.source.kind === 'library' && selection.source.asset === id) {

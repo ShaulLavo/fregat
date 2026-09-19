@@ -1,17 +1,36 @@
 import { createClientError } from '@workspace/client-core/errors'
 import type { SettingsOwner } from '@workspace/client-core/settings/owner'
-import { deriveWriteTarget, type SettingsOperation } from '@workspace/contracts'
+import {
+  deriveWriteTarget,
+  themePartPatch,
+  resolveThemeSettings,
+  type ColorMode,
+  type SettingsOperation,
+} from '@workspace/contracts'
 
 type ThemeOperation = Extract<
   SettingsOperation,
   { readonly kind: 'set'; readonly key: 'workbench.palette' | 'workbench.colorTheme' }
 >
 
-export async function setThemePreference(owner: SettingsOwner, operation: ThemeOperation) {
+export async function setThemePreference(
+  owner: SettingsOwner,
+  operation: ThemeOperation,
+  mode: ColorMode = 'dark',
+) {
   const projection = owner.getSnapshot().projection
-  if (projection.values[operation.key] === operation.value) return true
+  if (
+    resolveThemeSettings(projection.values, mode, projection.layers)[operation.key] ===
+    operation.value
+  )
+    return true
   const target = deriveWriteTarget(operation.key, projection.layers)
-  const submission = owner.submit(target, [operation], 'tui.color-theme')
+  const theme = projection.values['workbench.theme']
+  const patch = themePartPatch(operation)
+  let change: SettingsOperation = operation
+  if (theme && patch && target === 'user')
+    change = { kind: 'theme.customize', id: theme.id, mode, patch }
+  const submission = owner.submit(target, [change], 'tui.color-theme')
   if (submission.kind === 'noop') return false
   const outcome = await submission.settled
   if (outcome === 'acknowledged') return true

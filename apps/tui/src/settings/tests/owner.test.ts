@@ -1,3 +1,5 @@
+import { BUNDLED_THEMES } from '@workspace/contracts'
+import { settingDraft } from '@/settings/utils/edit'
 import { createEnvironmentClient } from '@workspace/client-core/transport/client'
 import { writeSettings, writeSettingsText } from '@workspace/client-core/settings/write'
 
@@ -237,5 +239,33 @@ test('an RPC drop pauses settings before a replacement endpoint can update cache
   } finally {
     session.dispose()
     await replacement.cleanup()
+  }
+})
+
+test('theme part drafts use the chosen variant', async ({ client }) => {
+  const owner = await makeSettingsOwner(client)
+  try {
+    const bundle = BUNDLED_THEMES[1]!
+    const saved = owner.submit('user', [
+      { kind: 'set', key: 'workbench.theme', value: bundle },
+      { kind: 'set', key: 'workbench.colorTheme', value: 'system' },
+      {
+        kind: 'theme.customize',
+        id: bundle.id,
+        mode: 'light',
+        patch: { material: { opacity: 37 } },
+      },
+    ])
+    if (saved.kind === 'submitted') await saved.settled
+    const snapshot = owner.getSnapshot().snapshot
+    expect(settingDraft('workbench.surface.opacity', snapshot, 'user', 'light')).toBe('37')
+    expect(settingDraft('workbench.palette', snapshot, 'user', 'light')).toBe(
+      JSON.stringify(bundle.variants.light.palette),
+    )
+    expect(settingDraft('workbench.surface.opacity', snapshot, 'user', 'dark')).toBe(
+      String(bundle.variants.dark.material.opacity),
+    )
+  } finally {
+    owner.dispose()
   }
 })

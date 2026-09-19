@@ -1,3 +1,4 @@
+import { archivePartFiles, readArchivePart } from './archive-parts'
 import { mkdir, readdir, readFile, rename, rm, writeFile } from 'node:fs/promises'
 import path from 'node:path'
 import {
@@ -27,6 +28,8 @@ export type PaletteLibraryOptions = {
  * library refuses their ids so the two sources cannot shadow each other.
  */
 export class PaletteLibrary {
+  assertUnused: (id: string) => Promise<void> = async () => {}
+  archiveDirectories: () => Promise<string[]> = async () => []
   readonly #directory: string
   readonly #settings: PaletteLibraryOptions['settings']
 
@@ -35,26 +38,42 @@ export class PaletteLibrary {
     this.#settings = options.settings
   }
 
-  async list(): Promise<PaletteDocument[]> {
+  async list(): Promise<(PaletteDocument & { source: 'theme' | 'user' })[]> {
     const names = await this.#fileNames()
     const documents = await Promise.all(names.map((name) => this.#readFile(name)))
     const palettes = documents.filter((document) => document !== null)
     recordRequestContext({ palettes: { files: names.length, valid: palettes.length } })
 
-    return palettes.sort((a, b) => a.name.localeCompare(b.name))
+    const imported = await Promise.all(
+      (await archivePartFiles(await this.archiveDirectories(), 'palettes')).map(async (file) =>
+        normalize(JSON.parse(await readFile(file, 'utf8'))),
+      ),
+    )
+    return [
+      ...new Map(
+        [
+          ...imported.map((palette) => ({ ...palette, source: 'theme' as const })),
+          ...palettes.map((palette) => ({ ...palette, source: 'user' as const })),
+        ].map((palette) => [palette.id, palette]),
+      ).values(),
+    ].sort((a, b) => a.name.localeCompare(b.name))
   }
 
   async read(id: PaletteId): Promise<PaletteDocument> {
     const document = await this.#readFile(this.#fileName(id))
-    if (!document) throw themeErrors.PALETTE_NOT_FOUND({ id })
-
-    return document
+    if (document) return document
+    const imported = await readArchivePart(await this.archiveDirectories(), 'palettes', id)
+    if (imported) return normalize(imported)
+    throw themeErrors.PALETTE_NOT_FOUND({ id })
   }
 
   async create(input: unknown): Promise<PaletteDocument> {
     const document = normalize(input)
     if (isBundledPaletteId(document.id)) throw themeErrors.PALETTE_BUNDLED({ id: document.id })
-    if (await this.#readFile(this.#fileName(document.id))) {
+    if (
+      (await this.#readFile(this.#fileName(document.id))) ||
+      (await readArchivePart(await this.archiveDirectories(), 'palettes', document.id))
+    ) {
       throw themeErrors.PALETTE_EXISTS({ id: document.id })
     }
 
@@ -78,6 +97,7 @@ export class PaletteLibrary {
    * pointing at nothing.
    */
   async delete(id: PaletteId): Promise<void> {
+    await this.assertUnused(id)
     if (isBundledPaletteId(id)) throw themeErrors.PALETTE_BUNDLED({ id })
     if (!(await this.#readFile(this.#fileName(id)))) throw themeErrors.PALETTE_NOT_FOUND({ id })
 

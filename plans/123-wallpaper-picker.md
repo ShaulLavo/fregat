@@ -1,6 +1,6 @@
 # A wallpaper picker worth using
 
-Status: implemented and deployed 2026-09-17. Requested 2026-09-17. Follows [Plan 116](116-wallpaper-library.md) and runs before [Plan 117](117-themes.md), which binds wallpapers into a theme and would inherit this picker as it stands.
+Status: implemented and deployed 2026-09-17. Requested 2026-09-17. Follows [Plan 116](116-wallpaper-library.md) and runs before [Plan 117](../docs/theme-bundles.md), which binds wallpapers into a theme and would inherit this picker as it stands.
 
 Plan 116 landed the library, the per-mode setting and the rendering. The picker it shipped is a thumbnail grid inside the right-hand column of one settings row. After three days the library holds 91 Omarchy imports and zero uploads, because the upload control is a bare native file input nobody recognized as one.
 
