@@ -43,17 +43,14 @@ export const wallpaperModeToggle: Scenario = {
         .wallpaperStill(page)
         .getAttribute('src', { timeout: 3000 })
         .catch(() => null)
-      await page.keyboard.press(chords.commandPalette)
-      await selectors.paletteInput(page).fill('>Choose wallpaper')
-      await selectors.commandOption(page, 'Choose wallpaper').click()
-      await selectors.wallpaperLibraryOption(page).first().click()
-      await selectors.paletteInput(page).waitFor({ state: 'hidden' })
+      strictEqual(restored, original, 'Toggle wallpaper must restore the selected image')
       await command(page, 'Dark mode')
-      await page.keyboard.press(chords.commandPalette)
-      await selectors.paletteInput(page).fill('>Choose wallpaper')
-      await selectors.commandOption(page, 'Choose wallpaper').click()
-      await selectors.wallpaperLibraryOption(page).first().click()
-      await selectors.paletteInput(page).waitFor({ state: 'hidden' })
+      await step('dark-same-image')
+      strictEqual(
+        await selectors.wallpaperStill(page).getAttribute('src'),
+        original,
+        'Changing color mode must preserve the selected image without reselecting it',
+      )
       await command(page, 'Toggle wallpaper')
       await step('dark-disabled')
       await command(page, 'Light mode')
@@ -66,9 +63,16 @@ export const wallpaperModeToggle: Scenario = {
       console.log(
         JSON.stringify({ original, restored, visibleAfterModeSwitch: visible, afterReload }),
       )
-      strictEqual(restored, original, 'Toggle wallpaper must restore the selected image')
       strictEqual(visible, 0, 'Switching color mode must keep wallpaper disabled')
       strictEqual(afterReload, 0, 'Reload must keep wallpaper disabled')
+      await command(page, 'Toggle wallpaper')
+      await selectors.wallpaperStill(page).waitFor()
+      await step('reload-restores-selection')
+      strictEqual(
+        await selectors.wallpaperStill(page).getAttribute('src'),
+        original,
+        'Re-enabling after reload must restore the selected image',
+      )
     } finally {
       await restore()
     }

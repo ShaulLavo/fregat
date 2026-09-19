@@ -1,4 +1,4 @@
-import { act, waitFor } from '@testing-library/react'
+import { act, fireEvent, waitFor } from '@testing-library/react'
 import { test, expect } from '../../../../test/fixtures'
 import { wallpaperPng } from '../../../../test/factories/wallpaper'
 import { createTestQueryClient, renderWithProviders } from '../../../../test/render'
@@ -34,6 +34,8 @@ test.for(['app', 'compositor', 'transparent'] as const)(
         backdrop === 'transparent' ? 0 : 2,
       ),
     )
+    for (const image of view.container.querySelectorAll('img')) fireEvent.error(image)
+    expect(view.container.querySelector('img')).toBeNull()
     view.unmount()
     document.documentElement.removeAttribute('data-backdrop')
   },
