@@ -18,7 +18,7 @@
         let palette = 'graphite'
         let paletteCss = null
         let density = 'compact'
-        let wallpaper = { light: { kind: 'desktop' }, dark: { kind: 'desktop' } }
+        let wallpaper = { enabled: true, source: { kind: 'desktop' } }
         try {
           const raw = localStorage.getItem('platform.settings-boot-mirror.v1')
           const mirror = raw ? JSON.parse(raw) : {}
@@ -41,8 +41,8 @@
         const root = document.documentElement
         root.classList.add(dark ? 'dark' : 'light')
         root.setAttribute('data-density', density)
-        const source = wallpaper[dark ? 'dark' : 'light']
-        if (source?.kind === 'none') root.setAttribute('data-wallpaper-hidden', '')
+        const source = wallpaper.enabled ? wallpaper.source : null
+        if (!wallpaper.enabled) root.setAttribute('data-wallpaper-hidden', '')
         preloadWallpaper(source?.kind === 'desktop')
         if (paletteCss === null) return
 

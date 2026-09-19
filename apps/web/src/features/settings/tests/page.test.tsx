@@ -37,7 +37,7 @@ test.beforeEach(() => {
 
 // The wallpaper row is a summary; its choices live in the picker it opens.
 async function openDarkWallpaperPicker() {
-  await userEvent.click(await screen.findByRole('button', { name: 'Choose dark wallpaper' }))
+  await userEvent.click(await screen.findByRole('button', { name: 'Choose wallpaper' }))
   return screen.findByRole('button', { name: 'None' })
 }
 
@@ -54,7 +54,7 @@ test('renders a row per user-visible setting and writes a toggle through', async
   // reached the settings file, not that a switch flipped locally.
   await waitFor(async () => {
     const snapshot = await fetchSettings(undefined, getClient())
-    expect(snapshot.values['workbench.wallpaper'].dark.kind).toBe('none')
+    expect(snapshot.values['workbench.wallpaper'].enabled).toBe(false)
   })
 })
 
@@ -74,7 +74,7 @@ test('offers a reset once a value differs from its default', async ({ client }) 
   // is what keeps the default coming from the running build.
   await waitFor(async () => {
     const snapshot = await fetchSettings(undefined, getClient())
-    expect(snapshot.values['workbench.wallpaper'].dark.kind).toBe('desktop')
+    expect(snapshot.values['workbench.wallpaper'].source.kind).toBe('desktop')
     expect(snapshot.layers.find((layer) => layer.id === 'user')?.raw).not.toHaveProperty(
       'workbench.wallpaper',
     )
@@ -288,7 +288,7 @@ test('every registered widget resolves a real control, not the JSON escape hatch
   renderWithProviders(<SettingsPage />)
 
   // A row has to be on screen before the absence of the hint means anything.
-  await screen.findByRole('button', { name: 'Choose dark wallpaper' })
+  await screen.findByRole('button', { name: 'Choose wallpaper' })
 
   // The hint is the dispatch's fallback for `list`, `complex` and a value whose
   // shape does not match its widget — none of which any registered key
@@ -300,7 +300,7 @@ test('Escape from a row returns focus to the search box', async ({ client }) => 
   expect(client).toBeDefined()
   renderWithProviders(<SettingsPage />)
 
-  const wallpaper = await screen.findByRole('button', { name: 'Choose dark wallpaper' })
+  const wallpaper = await screen.findByRole('button', { name: 'Choose wallpaper' })
   wallpaper.focus()
   expect(document.activeElement).toBe(wallpaper)
 
@@ -316,7 +316,7 @@ test('every visible row is reachable and operable from the keyboard', async ({ c
   renderWithProviders(<SettingsPage />)
 
   await userEvent.type(await screen.findByLabelText('Search settings'), 'wallpaper')
-  const tile = await screen.findByRole('button', { name: 'Choose dark wallpaper' })
+  const tile = await screen.findByRole('button', { name: 'Choose wallpaper' })
   tile.focus()
   await userEvent.keyboard(' ')
   const wallpaper = await screen.findByRole('button', { name: 'None' })
@@ -326,7 +326,7 @@ test('every visible row is reachable and operable from the keyboard', async ({ c
 
   await waitFor(async () => {
     const snapshot = await fetchSettings(undefined, getClient())
-    expect(snapshot.values['workbench.wallpaper'].dark.kind).toBe('none')
+    expect(snapshot.values['workbench.wallpaper'].enabled).toBe(false)
   })
 })
 

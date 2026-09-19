@@ -2,6 +2,8 @@
 
 Status: proposed, implementation not started. Requested 2026-09-14. Third of three plans split out of the retired Plan 104. Depends on [Plan 115](115-palettes-as-data.md) and [Plan 116](116-wallpaper-library.md).
 
+Current wallpaper behavior (2026-09-19): `workbench.wallpaper` holds one `{ enabled, source }` choice, independent of color mode. Theme-specific light/dark defaults belong to this plan; they must not erase a manual wallpaper selection or turn visibility back on. Reconcile the selection mutation below with that contract before implementation.
+
 A theme is a palette, a syntax pair, a wallpaper per mode, and material values, under one name. Once Plans 115 and 116 exist, a theme is a small record that references pieces that already have identities, pickers, and libraries. Picking a theme finishes the job in one click, and every part stays individually adjustable afterwards.
 
 The product decisions from Plan 104 that survive the split are restated here so the retired plan is not needed. Its research is still the [reference](../docs/theme-standardization-reference.md).

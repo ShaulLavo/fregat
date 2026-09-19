@@ -1,11 +1,4 @@
-import {
-  DesktopIcon,
-  MagnifyingGlassIcon,
-  MoonIcon,
-  ProhibitIcon,
-  SunIcon,
-  XIcon,
-} from '@phosphor-icons/react'
+import { DesktopIcon, MagnifyingGlassIcon, ProhibitIcon, XIcon } from '@phosphor-icons/react'
 import { useIsMutating, useQuery } from '@tanstack/react-query'
 import type { WallpaperAsset, WallpaperSelection, WallpaperSource } from '@workspace/contracts'
 import { Button } from '@workspace/ui/components/button'
@@ -37,18 +30,14 @@ import { errorMessage } from '@/lib/error-message'
 import { wallpaperLibraryOptions } from '@/lib/wallpapers/state/queries'
 import { wallpaperSections } from '@/lib/wallpapers/utils/groups'
 
-export type WallpaperMode = 'light' | 'dark'
-const MODES: readonly WallpaperMode[] = ['light', 'dark']
-const MODE_LABELS = { light: 'Light', dark: 'Dark' } as const
+import { selectWallpaper, visibleWallpaper } from '@/lib/wallpapers/utils/selection'
 
 export function WallpaperPickerDialog({
-  initialMode,
   disabled,
   value,
   onChange,
   onClose,
 }: {
-  readonly initialMode: WallpaperMode
   readonly disabled: boolean
   readonly value: WallpaperSelection
   readonly onChange: (value: WallpaperSelection) => void
@@ -58,11 +47,10 @@ export function WallpaperPickerDialog({
   const library = useQuery(wallpaperLibraryOptions(), owner)
   const actions = useWallpaperActions()
   const uploading = useIsMutating({ mutationKey: wallpaperMutationKeys.upload }, owner) > 0
-  const [mode, setMode] = useState(initialMode)
   const [search, setSearch] = useState('')
   const [dragging, setDragging] = useState(false)
-  const selection = value[mode]
-  const select = (source: WallpaperSource) => onChange({ ...value, [mode]: source })
+  const selection = visibleWallpaper(value)
+  const select = (source: WallpaperSource) => onChange(selectWallpaper(value, source))
   const uploadFiles = useWallpaperUpload((asset) => select({ kind: 'library', asset: asset.id }))
   const sections = wallpaperSections(library.data?.assets ?? [], search)
   const filtering = search.trim().length > 0
@@ -145,25 +133,10 @@ export function WallpaperPickerDialog({
       >
         <DialogHeader className='sr-only'>
           <DialogTitle>Wallpaper</DialogTitle>
-          <DialogDescription>{`Choose the ${mode} mode wallpaper.`}</DialogDescription>
+          <DialogDescription>{`Choose a wallpaper for your workspace.`}</DialogDescription>
         </DialogHeader>
         <PaneBar border='bottom'>
           <span className='text-xs font-medium'>Wallpaper</span>
-          <div className='flex shrink-0 gap-0.5' role='group' aria-label='Wallpaper mode'>
-            {MODES.map((candidate) => (
-              <Button
-                key={candidate}
-                size='sm'
-                variant='ghost'
-                className='text-muted-foreground aria-pressed:bg-accent aria-pressed:text-foreground'
-                aria-pressed={mode === candidate}
-                onClick={() => setMode(candidate)}
-              >
-                {candidate === 'light' ? <SunIcon /> : <MoonIcon />}
-                {MODE_LABELS[candidate]}
-              </Button>
-            ))}
-          </div>
           <InputGroup className='ml-auto h-(--density-control-height-sm) w-52 shrink-0 max-sm:w-32'>
             <InputGroupAddon align='inline-start'>
               <MagnifyingGlassIcon aria-hidden='true' className='size-3.5' />

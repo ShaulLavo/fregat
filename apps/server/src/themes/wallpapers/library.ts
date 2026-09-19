@@ -78,13 +78,17 @@ export class WallpaperLibrary {
     return this.#serialize(async () => {
       const asset = await this.read(id)
       const selection = this.#settings.snapshot().values['workbench.wallpaper']
-      const light = releaseSource(selection.light, id)
-      const dark = releaseSource(selection.dark, id)
-      if (light !== selection.light || dark !== selection.dark) {
+      if (selection.source.kind === 'library' && selection.source.asset === id) {
         await this.#settings.write({
           mutationId: `wallpaper-delete:${randomUUID()}`,
           target: 'user',
-          operations: [{ key: 'workbench.wallpaper', kind: 'set', value: { light, dark } }],
+          operations: [
+            {
+              key: 'workbench.wallpaper',
+              kind: 'set',
+              value: { enabled: false, source: { kind: 'desktop' } },
+            },
+          ],
         })
       }
       this.#listing = null
@@ -198,11 +202,6 @@ export class WallpaperLibrary {
     this.#pending = result.catch(() => undefined)
     return result
   }
-}
-
-function releaseSource(source: import('@workspace/contracts').WallpaperSource, id: AssetId) {
-  if (source.kind === 'library' && source.asset === id) return { kind: 'none' } as const
-  return source
 }
 
 export function displayName(id: AssetId) {

@@ -9,8 +9,11 @@ export const wallpaperSourceSchema = v.variant('kind', [
 ])
 export type WallpaperSource = v.InferOutput<typeof wallpaperSourceSchema>
 export const wallpaperSelectionSchema = v.object({
-  light: wallpaperSourceSchema,
-  dark: wallpaperSourceSchema,
+  enabled: v.boolean(),
+  source: v.variant('kind', [
+    v.object({ kind: v.literal('desktop') }),
+    v.object({ kind: v.literal('library'), asset: assetIdSchema }),
+  ]),
 })
 export type WallpaperSelection = v.InferOutput<typeof wallpaperSelectionSchema>
 const wallpaperProvenanceSchema = v.variant('kind', [

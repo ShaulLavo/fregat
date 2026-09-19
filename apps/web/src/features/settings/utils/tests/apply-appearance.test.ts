@@ -86,7 +86,7 @@ describe('applyAppearance', () => {
     const { attributes, root } = fakeRoot()
 
     applyAppearance(
-      appearance({ 'workbench.wallpaper': { light: { kind: 'none' }, dark: { kind: 'none' } } }),
+      appearance({ 'workbench.wallpaper': { enabled: false, source: { kind: 'desktop' } } }),
       root,
       false,
     )
@@ -94,7 +94,7 @@ describe('applyAppearance', () => {
 
     applyAppearance(
       appearance({
-        'workbench.wallpaper': { light: { kind: 'desktop' }, dark: { kind: 'desktop' } },
+        'workbench.wallpaper': { enabled: true, source: { kind: 'desktop' } },
       }),
       root,
       false,

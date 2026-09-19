@@ -102,7 +102,9 @@ test('rejects invalid, oversized and over-dimension images before writing files'
   expect(await readdir(path.join(server.root, '.platform/wallpapers'))).toEqual([])
 })
 
-test('clears both selected modes before deleting the asset', async ({ client }) => {
+test('disables wallpaper and releases the selected asset before deleting it', async ({
+  client,
+}) => {
   const uploaded = await client.themes.wallpapers.post({
     file: new File([wallpaperPng()], 'selected.png'),
   })
@@ -114,7 +116,7 @@ test('clears both selected modes before deleting the asset', async ({ client }) 
       {
         kind: 'set',
         key: 'workbench.wallpaper',
-        value: { light: { kind: 'library', asset: id }, dark: { kind: 'library', asset: id } },
+        value: { enabled: true, source: { kind: 'library', asset: id } },
       },
     ],
   })
@@ -122,8 +124,8 @@ test('clears both selected modes before deleting the asset', async ({ client }) 
   const removed = await client.themes.wallpapers({ id }).delete.post()
   expect(removed.error).toBeNull()
   expect(removed.data?.settings.values['workbench.wallpaper']).toEqual({
-    light: { kind: 'none' },
-    dark: { kind: 'none' },
+    enabled: false,
+    source: { kind: 'desktop' },
   })
   expect((await client.themes.wallpapers.get()).data?.assets).toEqual([])
 })
@@ -144,7 +146,7 @@ test('a rejected fallback keeps the image on disk', async ({ server }) => {
       {
         kind: 'set',
         key: 'workbench.wallpaper',
-        value: { light: { kind: 'library', asset: asset.id }, dark: { kind: 'desktop' } },
+        value: { enabled: true, source: { kind: 'library', asset: asset.id } },
       },
     ],
   })

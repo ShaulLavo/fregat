@@ -83,14 +83,12 @@ export const SETTING_MIGRATIONS: readonly SettingMigration[] = [
     kind: 'renamed',
     from: 'workbench.wallpaper.enabled',
     to: 'workbench.wallpaper',
-    reason: 'The wallpaper is now chosen per theme, so the switch became a selection.',
-    // `false` has to survive as an explicit "none" in both themes. Dropping it
-    // and letting the new default apply is exactly the silent reversal this
-    // table exists to prevent.
+    reason: 'The wallpaper setting stores visibility and the selected image.',
+    // Preserve the old switch alongside the default source.
     migrate: (value) =>
       value === false
-        ? { light: { kind: 'none' }, dark: { kind: 'none' } }
-        : { light: { kind: 'desktop' }, dark: { kind: 'desktop' } },
+        ? { enabled: false, source: { kind: 'desktop' } }
+        : { enabled: true, source: { kind: 'desktop' } },
     samples: [true, false],
   },
 ]

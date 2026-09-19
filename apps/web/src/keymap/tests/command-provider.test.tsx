@@ -1,3 +1,4 @@
+import { wallpaperPng } from '../../../test/factories/wallpaper'
 import { getClient } from '@/lib/client'
 import { filesystemPath } from '@/lib/documents/utils/identity'
 import { selectSettingsSearch } from '@/features/settings/state/search-store'
@@ -108,14 +109,14 @@ test('consecutive toggles project landed settings intents before React renders',
       {
         key: 'workbench.wallpaper',
         kind: 'set',
-        value: { light: { kind: 'desktop' }, dark: { kind: 'none' } },
+        value: { enabled: false, source: { kind: 'desktop' } },
       },
     ],
     [
       {
         key: 'workbench.wallpaper',
         kind: 'set',
-        value: { light: { kind: 'desktop' }, dark: { kind: 'desktop' } },
+        value: { enabled: true, source: { kind: 'desktop' } },
       },
     ],
   ])
@@ -128,14 +129,14 @@ test('consecutive toggles project landed settings intents before React renders',
       {
         key: 'workbench.wallpaper',
         kind: 'set',
-        value: { light: { kind: 'desktop' }, dark: { kind: 'none' } },
+        value: { enabled: false, source: { kind: 'desktop' } },
       },
     ],
     [
       {
         key: 'workbench.wallpaper',
         kind: 'set',
-        value: { light: { kind: 'desktop' }, dark: { kind: 'desktop' } },
+        value: { enabled: true, source: { kind: 'desktop' } },
       },
     ],
   ])
@@ -171,14 +172,14 @@ test('consecutive toggles replay intents before the confirmed settings query lan
       {
         key: 'workbench.wallpaper',
         kind: 'set',
-        value: { light: { kind: 'desktop' }, dark: { kind: 'none' } },
+        value: { enabled: false, source: { kind: 'desktop' } },
       },
     ],
     [
       {
         key: 'workbench.wallpaper',
         kind: 'set',
-        value: { light: { kind: 'desktop' }, dark: { kind: 'desktop' } },
+        value: { enabled: true, source: { kind: 'desktop' } },
       },
     ],
   ])
@@ -232,7 +233,7 @@ test.for([
   {
     command: 'workspace.toggleWallpaper',
     key: 'workbench.wallpaper',
-    toggled: { light: { kind: 'desktop' }, dark: { kind: 'none' } },
+    toggled: { enabled: false, source: { kind: 'desktop' } },
   },
   {
     command: 'workspace.toggleDiffViewMode',
@@ -331,3 +332,47 @@ function rejectCloseTab() {
 function rejectCloseTabs() {
   return { reason: 'not-found', status: 'rejected' } as const
 }
+
+test('wallpaper toggles preserve the chosen image across color modes and remounts', async ({
+  client,
+}) => {
+  const asset = (
+    await client.themes.wallpapers.post({ file: new File([wallpaperPng()], 'retained.png') })
+  ).data!
+  const source = { kind: 'library', asset: asset.id } as const
+  await client.settings.write.post({
+    mutationId: 'selected-wallpaper',
+    target: 'user',
+    operations: [{ kind: 'set', key: 'workbench.wallpaper', value: { enabled: true, source } }],
+  })
+  const queryClient = createTestQueryClient()
+  queryClient.setQueryData(settingsKeys.document(), await fetchSettings(undefined, getClient()))
+  const view = renderCommandProvider(queryClient)
+  await waitFor(() => expect(capturedBus).not.toBeNull())
+  for (const command of [
+    'workspace.toggleWallpaper',
+    'workspace.setLightTheme',
+    'workspace.setDarkTheme',
+  ] as const) {
+    await act(async () => {
+      await capturedBus!.dispatch(command, invocation()).completion
+    })
+    expect((await fetchSettings(undefined, getClient())).values['workbench.wallpaper']).toEqual({
+      enabled: false,
+      source,
+    })
+  }
+  view.unmount()
+  resetSettingsSnapshotAdmission(queryClient)
+  queryClient.clear()
+  queryClient.setQueryData(settingsKeys.document(), await fetchSettings(undefined, getClient()))
+  const remounted = renderCommandProvider(queryClient)
+  await act(async () => {
+    await capturedBus!.dispatch('workspace.toggleWallpaper', invocation()).completion
+  })
+  expect((await fetchSettings(undefined, getClient())).values['workbench.wallpaper']).toEqual({
+    enabled: true,
+    source,
+  })
+  remounted.unmount()
+})

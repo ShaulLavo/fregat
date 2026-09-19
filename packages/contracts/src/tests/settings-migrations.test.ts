@@ -153,8 +153,8 @@ describe('resolving a settings file written by an older build', () => {
     ])
 
     expect(resolution.values['workbench.wallpaper']).toEqual({
-      light: { kind: 'none' },
-      dark: { kind: 'none' },
+      enabled: false,
+      source: { kind: 'desktop' },
     })
   })
 
@@ -174,14 +174,14 @@ describe('resolving a settings file written by an older build', () => {
         id: 'user',
         raw: {
           'workbench.wallpaper.enabled': false,
-          'workbench.wallpaper': { light: { kind: 'desktop' }, dark: { kind: 'desktop' } },
+          'workbench.wallpaper': { enabled: true, source: { kind: 'desktop' } },
         },
       },
     ])
 
     expect(resolution.values['workbench.wallpaper']).toEqual({
-      light: { kind: 'desktop' },
-      dark: { kind: 'desktop' },
+      enabled: true,
+      source: { kind: 'desktop' },
     })
   })
 

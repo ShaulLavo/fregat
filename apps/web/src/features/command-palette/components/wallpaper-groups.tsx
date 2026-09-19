@@ -9,7 +9,7 @@ import { wallpaperItemValue } from '@/features/command-palette/utils/wallpapers'
 import { useSettingValue } from '@/features/settings/hooks/use-setting-value'
 import { useSettingsActions } from '@/features/settings/hooks/use-settings-actions'
 import { useSettingsOwner } from '@/features/settings/hooks/use-settings-owner'
-import { useTheme } from '@/features/settings/hooks/use-theme'
+import { selectWallpaper, visibleWallpaper } from '@/lib/wallpapers/utils/selection'
 import { useCommand } from '@/keymap/hooks/use-command'
 import { libraryImageUrl } from '@/lib/wallpapers/state/queries'
 import { wallpaperLibraryOptions } from '@/lib/wallpapers/state/queries'
@@ -28,16 +28,15 @@ function isActive(current: WallpaperSource, source: WallpaperSource) {
 export function WallpaperGroups() {
   const library = useQuery(wallpaperLibraryOptions(), useSettingsOwner())
   const selection = useSettingValue('workbench.wallpaper')
-  const { resolvedTheme } = useTheme()
   const { setSetting } = useSettingsActions()
   const { closePalette } = useCommand()
-  const current = selection[resolvedTheme]
+  const current = visibleWallpaper(selection)
   const sections = wallpaperSections(library.data?.assets ?? [])
 
   function choose(source: WallpaperSource) {
     setSetting(
       'workbench.wallpaper',
-      { ...selection, [resolvedTheme]: source },
+      selectWallpaper(selection, source),
       undefined,
       'workspace.selectWallpaper',
     )
@@ -69,7 +68,7 @@ export function WallpaperGroups() {
 
   return (
     <>
-      <CommandGroup heading={`${resolvedTheme === 'dark' ? 'Dark' : 'Light'} mode wallpaper`}>
+      <CommandGroup heading='Wallpaper'>
         <CommandItem
           keywords={['none', 'off', 'plain']}
           value={wallpaperItemValue({ kind: 'none' })}

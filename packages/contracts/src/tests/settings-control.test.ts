@@ -13,13 +13,10 @@ describe('settingControl', () => {
   it('narrows a scalar to the control that renders it', () => {
     expect(settingControl('editor.fontSize', 13)).toEqual({ widget: 'number', value: 13 })
     expect(
-      settingControl('workbench.wallpaper', {
-        light: { kind: 'desktop' },
-        dark: { kind: 'desktop' },
-      }),
+      settingControl('workbench.wallpaper', { enabled: true, source: { kind: 'desktop' } }),
     ).toEqual({
       widget: 'wallpaper',
-      value: { light: { kind: 'desktop' }, dark: { kind: 'desktop' } },
+      value: { enabled: true, source: { kind: 'desktop' } },
     })
     expect(settingControl('editor.fontFamily', 'JetBrainsMono')).toEqual({
       widget: 'font',

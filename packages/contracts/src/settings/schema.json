@@ -697,51 +697,17 @@
     },
     "workbench.wallpaper": {
       "default": {
-        "dark": {
-          "kind": "desktop"
-        },
-        "light": {
+        "enabled": true,
+        "source": {
           "kind": "desktop"
         }
       },
-      "description": "Choose a desktop or library wallpaper separately for light and dark mode.",
+      "description": "Choose a wallpaper and turn it on or off without losing the selection.",
       "properties": {
-        "dark": {
-          "oneOf": [
-            {
-              "properties": {
-                "asset": {
-                  "pattern": "^[a-f0-9]{64}$",
-                  "type": "string"
-                },
-                "kind": {
-                  "const": "library"
-                }
-              },
-              "required": ["asset", "kind"],
-              "type": "object"
-            },
-            {
-              "properties": {
-                "kind": {
-                  "const": "desktop"
-                }
-              },
-              "required": ["kind"],
-              "type": "object"
-            },
-            {
-              "properties": {
-                "kind": {
-                  "const": "none"
-                }
-              },
-              "required": ["kind"],
-              "type": "object"
-            }
-          ]
+        "enabled": {
+          "type": "boolean"
         },
-        "light": {
+        "source": {
           "oneOf": [
             {
               "properties": {
@@ -760,15 +726,6 @@
               "properties": {
                 "kind": {
                   "const": "desktop"
-                }
-              },
-              "required": ["kind"],
-              "type": "object"
-            },
-            {
-              "properties": {
-                "kind": {
-                  "const": "none"
                 }
               },
               "required": ["kind"],
@@ -777,7 +734,7 @@
           ]
         }
       },
-      "required": ["dark", "light"],
+      "required": ["enabled", "source"],
       "type": "object"
     }
   },

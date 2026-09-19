@@ -103,7 +103,7 @@ export function CommandProvider({ children }: { readonly children: ReactNode }) 
   const theme = useTheme()
   const diffViewMode = useSettingValue('editor.diff.viewMode')
   const wallpaperSelection = useSettingValue('workbench.wallpaper')
-  const wallpaperEnabled = wallpaperSelection[theme.resolvedTheme].kind !== 'none'
+  const wallpaperEnabled = wallpaperSelection.enabled
   const overrides = useSettingValue('keybindings.overrides')
   const preset = useSettingValue('keybindings.preset')
   const [paletteOpen, setPaletteOpenState] = useState(false)
@@ -239,12 +239,11 @@ export function CommandProvider({ children }: { readonly children: ReactNode }) 
       nextWallpaper: async () => {
         const library = await settingsOwner.fetchQuery(wallpaperLibraryOptions())
         if (!library.assets.length) return false
-        const mode = document.documentElement.classList.contains('dark') ? 'dark' : 'light'
         const selection = readCommandSettingsSnapshot(
           settingsOwner,
           snapshotSettingsRef.current,
         ).wallpaperSelection
-        const current = selection[mode]
+        const current = selection.source
         const index =
           current.kind === 'library'
             ? library.assets.findIndex((asset) => asset.id === current.asset)
@@ -252,7 +251,7 @@ export function CommandProvider({ children }: { readonly children: ReactNode }) 
         const asset = library.assets[(index + 1) % library.assets.length]!
         const submission = adaptersRef.current.setWallpaperEnabled(
           'workbench.wallpaper',
-          { ...selection, [mode]: { kind: 'library', asset: asset.id } },
+          { enabled: true, source: { kind: 'library', asset: asset.id } },
           'user',
           'wallpaper.next',
         )
@@ -264,9 +263,7 @@ export function CommandProvider({ children }: { readonly children: ReactNode }) 
           {
             ...readCommandSettingsSnapshot(settingsOwner, snapshotSettingsRef.current)
               .wallpaperSelection,
-            [document.documentElement.classList.contains('dark') ? 'dark' : 'light']: {
-              kind: enabled ? 'desktop' : 'none',
-            },
+            enabled,
           },
           undefined,
           initiator,
@@ -421,10 +418,7 @@ function readCommandSettingsSnapshot(
   return {
     diffViewMode: projection.values['editor.diff.viewMode'],
     wallpaperSelection: projection.values['workbench.wallpaper'],
-    wallpaperEnabled:
-      projection.values['workbench.wallpaper'][
-        document.documentElement.classList.contains('dark') ? 'dark' : 'light'
-      ].kind !== 'none',
+    wallpaperEnabled: projection.values['workbench.wallpaper'].enabled,
   }
 }
 

@@ -1,3 +1,4 @@
+import { wallpaperModeToggle } from './wallpaper-mode-toggle'
 import { editorLspHover } from './editor-lsp-hover'
 import { editorMarkdownPunctuation } from './editor-markdown-punctuation'
 import { wallpaperLibrary } from './wallpaper-library'
@@ -52,6 +53,7 @@ export const scenarios: readonly Scenario[] = [
   quickOpenNoFlicker,
   gitHistorySearchNoFlicker,
   logsSearchNoFlicker,
+  wallpaperModeToggle,
   wallpaperLibrary,
   wallpaperPalette,
   settingsDefaults,

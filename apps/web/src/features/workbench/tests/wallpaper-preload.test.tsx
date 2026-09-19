@@ -50,8 +50,8 @@ test.each([
     writeBootMirror({
       ...DEFAULT_SETTING_VALUES,
       'workbench.wallpaper': {
-        light: { kind: enabled ? 'desktop' : 'none' },
-        dark: { kind: enabled ? 'desktop' : 'none' },
+        enabled,
+        source: { kind: 'desktop' },
       },
     })
     runBootScript()

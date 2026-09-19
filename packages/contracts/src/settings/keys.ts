@@ -163,11 +163,11 @@ export const SETTINGS_REGISTRY = {
   }),
   'workbench.wallpaper': defineSetting({
     schema: wallpaperSelectionSchema,
-    default: { light: { kind: 'desktop' }, dark: { kind: 'desktop' } },
+    default: { enabled: true, source: { kind: 'desktop' } },
     scope: 'application',
     widget: 'wallpaper',
     category: 'Appearance',
-    description: 'Choose a desktop or library wallpaper separately for light and dark mode.',
+    description: 'Choose a wallpaper and turn it on or off without losing the selection.',
     keywords: ['wallpaper', 'background', 'desktop'],
   }),
   'workbench.tree.indentGuides': defineSetting({

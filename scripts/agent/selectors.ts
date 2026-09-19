@@ -22,18 +22,13 @@ export const selectors = {
   settingsScopeTab: (page: Page, name: 'User' | 'Workspace' | 'Defaults') =>
     page.getByRole('tab', { name, exact: true }),
   settingsDefaultsBanner: (page: Page) => page.getByText('Defaults are read-only', { exact: true }),
-  wallpaperTile: (page: Page, mode: 'Light' | 'Dark') =>
-    page.getByRole('button', { name: `Choose ${mode.toLowerCase()} wallpaper`, exact: true }),
+  wallpaperTile: (page: Page) =>
+    page.getByRole('button', { name: 'Choose wallpaper', exact: true }),
   wallpaperPicker: (page: Page) => page.getByRole('dialog', { name: 'Wallpaper', exact: true }),
-  wallpaperMode: (page: Page, mode: string) =>
-    page
-      .getByRole('group', { name: 'Wallpaper mode', exact: true })
-      .getByRole('button', { name: mode, exact: true }),
   wallpaperCards: (page: Page) =>
     page.getByRole('button', { name: /^Select .+/ }).filter({ has: page.locator('img') }),
   wallpaperCard: (page: Page, name: string) =>
     page.getByRole('button', { name: `Select ${name}`, exact: true }),
-  // Section buttons only: the mode switch in the bar is pressed too.
   wallpaperSelectedChoice: (page: Page) =>
     page.getByRole('dialog').locator('section button[aria-pressed="true"]'),
   wallpaperChoice: (page: Page, label: string) =>
@@ -45,6 +40,9 @@ export const selectors = {
   wallpaperPaletteOption: (page: Page, name: string) =>
     page.locator('[cmdk-item][data-value^="wallpaper:"]').filter({ hasText: name }),
   menuItem: (page: Page, name: string) => page.getByRole('menuitem', { name, exact: true }),
+  wallpaperLibraryOption: (page: Page) =>
+    page.locator('[cmdk-item][data-value^="wallpaper:"]').filter({ has: page.locator('img') }),
+  wallpaperMedia: (page: Page) => page.locator('[data-workbench-wallpaper-layer]'),
   wallpaperStill: (page: Page) => page.locator(wallpaperStillSelector),
   commandOption: (page: Page, name: string) => page.getByRole('option', { name, exact: false }),
   renameInput: (page: Page) => page.getByRole('textbox', { name: 'New name', exact: true }),

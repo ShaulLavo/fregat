@@ -54,10 +54,11 @@ test('the highlighted wallpaper previews, Escape drops it unsaved, and a pick is
   )
   await user.click(await screen.findByText('x'))
   await waitFor(async () => {
-    const { light, dark } = (await fetchSettings(undefined, getClient())).values[
+    const { enabled, source } = (await fetchSettings(undefined, getClient())).values[
       'workbench.wallpaper'
     ]
-    expect([light, dark]).toContainEqual({ kind: 'library', asset: asset.id })
+    expect(enabled).toBe(true)
+    expect(source).toEqual({ kind: 'library', asset: asset.id })
   })
   expect(controlledClient.controller.settingsWriteCount).toBe(1)
 })

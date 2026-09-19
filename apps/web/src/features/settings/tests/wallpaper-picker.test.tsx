@@ -23,21 +23,21 @@ test.beforeEach(() => {
   selectSettingsCategory(null)
 })
 
-async function openPicker(mode: 'light' | 'dark') {
+async function openPicker() {
   renderWithProviders(
     <>
       <SettingsPage />
       <ThemeAwareToaster />
     </>,
   )
-  await userEvent.click(await screen.findByRole('button', { name: `Choose ${mode} wallpaper` }))
+  await userEvent.click(await screen.findByRole('button', { name: 'Choose wallpaper' }))
   return screen.findByRole('dialog')
 }
 
 test('several uploads land under Your uploads and the last one becomes the selection', async ({
   client,
 }) => {
-  const dialog = await openPicker('light')
+  const dialog = await openPicker()
   const files = [
     new File([wallpaperPng()], 'first.png', { type: 'image/png' }),
     new File([secondWallpaperPng()], 'second.png', { type: 'image/png' }),
@@ -51,7 +51,7 @@ test('several uploads land under Your uploads and the last one becomes the selec
   const assets = (await client.themes.wallpapers.get()).data!.assets
   await waitFor(async () => {
     const snapshot = await fetchSettings(undefined, getClient())
-    expect(snapshot.values['workbench.wallpaper'].light).toEqual({
+    expect(snapshot.values['workbench.wallpaper'].source).toEqual({
       kind: 'library',
       asset: assets.find((asset) => asset.name === 'second.png')!.id,
     })
@@ -59,7 +59,7 @@ test('several uploads land under Your uploads and the last one becomes the selec
 })
 
 test('a file that is not an image is refused and the selection stays', async ({ client }) => {
-  const dialog = await openPicker('dark')
+  const dialog = await openPicker()
   const input = within(dialog).getByLabelText('Upload wallpapers')
   await userEvent.upload(input, new File(['nope'], 'broken.png', { type: 'image/png' }))
 
@@ -81,7 +81,7 @@ test('delete is offered on an upload and not on an imported background', async (
   await client.themes.wallpapers['import-directory'].post({ path: path.join(server.root, 'seed') })
   await client.themes.wallpapers.post({ file: new File([wallpaperPng()], 'mine.png') })
 
-  const dialog = within(await openPicker('dark'))
+  const dialog = within(await openPicker())
   const imported = within(await dialog.findByRole('region', { name: 'Night' }))
   expect(
     await imported.findByRole('button', { name: 'Select night · 1-lake.png' }),

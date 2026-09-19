@@ -91,7 +91,7 @@ describe('semantic write coordination', () => {
       {
         key: 'workbench.wallpaper',
         kind: 'set',
-        value: { light: { kind: 'none' }, dark: { kind: 'none' } },
+        value: { enabled: false, source: { kind: 'desktop' } },
       },
       { key: 'workbench.tree.indentGuides', kind: 'set', value: 'always' },
       { key: 'editor.fontFamily', kind: 'set', value: 'FiraCode' },
