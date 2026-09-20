@@ -6,6 +6,15 @@ Keep built-in palettes on Tree-sitter. Extend the existing native provider to as
 
 The target is complete accounting for Shiki's catalog, followed by the largest verified native subset. Literal coverage of every language remains an open research task. Shiki distributes TextMate grammars; those are not interchangeable with Tree-sitter parsers and queries. [Shiki language catalog](https://shiki.style/languages), [Tree-sitter highlighting model](https://tree-sitter.github.io/tree-sitter/3-syntax-highlighting.html).
 
+## Current priorities
+
+Generic SQL and MDX are admitted as partial coverage, including lazy Markdown fences. MDX's
+inline grammar and scanner repairs now pass node-range, expected-category and incremental worker
+checks. See the [implementation notes](native-syntax-implementation.md) and
+[MDX and SQL investigation](native-syntax-mdx-sql.md). Vue, SCSS, GraphQL and Swift remain
+implementation candidates. Ruby locals and Kotlin predicate work are deferred. None of these
+six languages is externally blocked. Broader MDX semantics remain explicit partial-coverage gaps.
+
 ## Preserve the native path
 
 Opening `Component.astro` with a built-in palette must load the Astro grammar and required embedded languages into the existing Tree-sitter provider. The same trees serve structural features and highlighting. Switching built-in palettes recolors existing token categories without reparsing.
@@ -78,7 +87,7 @@ Generation reads pinned inputs. Updating upstream revisions is a separate, expli
 
 Platform generates a comparison report against its installed Shiki version. Editor's reusable catalog does not depend on Shiki at runtime. The report records one row per canonical Shiki ID, with aliases as metadata. Account separately for Shiki's plain-text and ANSI special modes; neither is a missing parser grammar. [Shiki special languages](https://shiki.style/languages#special-languages).
 
-Every row has a state: verified, partial, candidate, or blocked. A partial or blocked row includes the missing behavior, evidence, and next action. A filename match or successful WASM build alone is never verified language support. Track highlighting, injections, detection, and folds separately so partial support cannot inflate the headline count.
+Every row has a state: verified, partial, candidate, or blocked. Candidates include actionable builds, query adaptation, grammar fixes and runtime work. Reserve blocked for an external dependency or decision that prevents progress. A partial or blocked row includes the missing behavior, evidence, and next action. A filename match or successful WASM build alone is never verified language support. Track highlighting, injections, detection, and folds separately so partial support cannot inflate the headline count.
 
 ### Admit queries only when their semantics work
 

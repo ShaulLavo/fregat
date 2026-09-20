@@ -9,7 +9,7 @@ export function editorNativeCoverage(palette: 'light' | 'dark'): Scenario {
     ...benchmark,
     name: `editor-native-coverage-${palette}`,
     description:
-      'Inspect native Astro or Markdown injections in a built-in palette, edit syntax, undo and redo without starting Shiki.',
+      'Inspect native MDX, SQL, Astro or Markdown injections in a built-in palette, edit syntax, undo and redo without starting Shiki.',
     async run(page, context) {
       await benchmark.run(page, context)
       await focusEditor(page)

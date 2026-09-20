@@ -3,9 +3,9 @@
   "canonicalCount": 242,
   "counts": {
     "verified": 0,
-    "partial": 22,
-    "candidate": 212,
-    "blocked": 8
+    "partial": 24,
+    "candidate": 218,
+    "blocked": 0
   },
   "specialModes": [
     {
@@ -956,7 +956,7 @@
     {
       "id": "graphql",
       "aliases": ["gql"],
-      "state": "blocked",
+      "state": "candidate",
       "source": {
         "git": "https://github.com/bkegley/tree-sitter-graphql",
         "rev": "5e66e961eee421786bdda8495ed1db045e06b5fe"
@@ -1346,7 +1346,7 @@
     {
       "id": "kotlin",
       "aliases": ["kt", "kts"],
-      "state": "blocked",
+      "state": "candidate",
       "source": {
         "git": "https://github.com/fwcd/tree-sitter-kotlin",
         "rev": "f66d2908542e93c0204c6c241f794afe4e9cd5d1"
@@ -1543,16 +1543,17 @@
     {
       "id": "mdx",
       "aliases": [],
-      "state": "blocked",
-      "source": {
-        "git": "https://github.com/tree-sitter-grammars/tree-sitter-markdown",
-        "rev": "f969cd3ae3f9fbd4e43205431d0ae286014c05b5",
-        "subpath": "tree-sitter-markdown"
+      "nativeId": "mdx",
+      "state": "partial",
+      "capabilities": {
+        "highlighting": "partial",
+        "injections": "partial",
+        "detection": "verified",
+        "folds": "none"
       },
-      "evidence": "helix markdown grammar mapping",
-      "gap": "Markdown cannot parse MDX JSX and ESM as equivalent syntax.",
-      "nextAction": "Find and admit a dedicated MDX grammar and injections.",
-      "capabilities": null
+      "evidence": "Editor: test/admission.test.ts; test/native-coverage.browser.test.ts",
+      "gap": "Inline JSX, expressions, Markdown and lazy fences pass; frontmatter, cross-expression emphasis, JavaScript injections, builtin-name specialization and folds remain unsupported.",
+      "nextAction": "Broaden expected-category and edit fixtures; verify remaining embedded languages and structural capabilities."
     },
     {
       "id": "mermaid",
@@ -2160,7 +2161,7 @@
     {
       "id": "ruby",
       "aliases": ["rb"],
-      "state": "blocked",
+      "state": "candidate",
       "source": {
         "git": "https://github.com/tree-sitter/tree-sitter-ruby",
         "rev": "ad907a69da0c8a4f7a943a7fe012712208da6dee"
@@ -2234,7 +2235,7 @@
     {
       "id": "scss",
       "aliases": [],
-      "state": "blocked",
+      "state": "candidate",
       "source": {
         "git": "https://github.com/serenadeai/tree-sitter-scss",
         "rev": "c478c6868648eff49eb04a4df90d703dc45b312a"
@@ -2358,15 +2359,17 @@
     {
       "id": "sql",
       "aliases": [],
-      "state": "blocked",
-      "source": {
-        "git": "https://github.com/DerekStride/tree-sitter-sql",
-        "rev": "851e9cb257ba7c66cc8c14214a31c44d2f1e954e"
+      "nativeId": "sql",
+      "state": "partial",
+      "capabilities": {
+        "highlighting": "partial",
+        "injections": "none",
+        "detection": "verified",
+        "folds": "none"
       },
-      "evidence": "tree-sitter-sql@0.1.0",
-      "gap": "Dialect parity is not established by this generic SQL grammar.",
-      "nextAction": "Select dialect-specific grammars and validate each canonical Shiki SQL language.",
-      "capabilities": null
+      "evidence": "Editor: test/admission.test.ts; test/native-coverage.browser.test.ts",
+      "gap": "Generic SQL categories and fence edits pass; dialect parity, PL/SQL, folds and uppercase exponent literals remain unverified.",
+      "nextAction": "Broaden expected-category and edit fixtures; verify remaining embedded languages and structural capabilities."
     },
     {
       "id": "ssh-config",
@@ -2426,7 +2429,7 @@
     {
       "id": "swift",
       "aliases": [],
-      "state": "blocked",
+      "state": "candidate",
       "source": {
         "git": "https://github.com/alex-pinkus/tree-sitter-swift",
         "rev": "7b7909f2f6b9414be0958275f4c8e5d69c3bca43"
@@ -2715,7 +2718,7 @@
     {
       "id": "vue",
       "aliases": [],
-      "state": "blocked",
+      "state": "candidate",
       "source": {
         "git": "https://github.com/ikatyang/tree-sitter-vue",
         "rev": "91fe2754796cd8fba5f229505a23fa08f3546c06"

@@ -683,7 +683,7 @@
       "nextAction": "Pin sources, build WASM, check predicates and captures, and add language fixtures."
     },
     "graphql": {
-      "state": "blocked",
+      "state": "candidate",
       "source": {
         "git": "https://github.com/bkegley/tree-sitter-graphql",
         "rev": "5e66e961eee421786bdda8495ed1db045e06b5fe"
@@ -967,7 +967,7 @@
       "nextAction": "Pin sources, build WASM, check predicates and captures, and add language fixtures."
     },
     "kotlin": {
-      "state": "blocked",
+      "state": "candidate",
       "source": {
         "git": "https://github.com/fwcd/tree-sitter-kotlin",
         "rev": "f66d2908542e93c0204c6c241f794afe4e9cd5d1"
@@ -1113,15 +1113,14 @@
       "nextAction": "Check the Tree-sitter parser registry and verify a matching grammar repository."
     },
     "mdx": {
-      "state": "blocked",
+      "state": "candidate",
       "source": {
-        "git": "https://github.com/tree-sitter-grammars/tree-sitter-markdown",
-        "rev": "f969cd3ae3f9fbd4e43205431d0ae286014c05b5",
-        "subpath": "tree-sitter-markdown"
+        "git": "https://github.com/srazzak/tree-sitter-mdx",
+        "rev": "3aa29e8de1bf0213948a04fe953039b6ab73777b"
       },
-      "evidence": "helix markdown grammar mapping",
-      "gap": "Markdown cannot parse MDX JSX and ESM as equivalent syntax.",
-      "nextAction": "Find and admit a dedicated MDX grammar and injections."
+      "evidence": "Pinned parser and scanner repair; Editor test/mdx.test.ts and test/native-coverage.browser.test.ts; docs/native-syntax-implementation.md",
+      "gap": "Admitted as partial: frontmatter, cross-expression emphasis, JavaScript injections, builtin-name specialization and folds remain unsupported.",
+      "nextAction": "Broaden MDX fixtures before adding frontmatter, cross-expression emphasis or JavaScript injection semantics."
     },
     "mermaid": {
       "state": "candidate",
@@ -1571,7 +1570,7 @@
       "nextAction": "Pin sources, build WASM, check predicates and captures, and add language fixtures."
     },
     "ruby": {
-      "state": "blocked",
+      "state": "candidate",
       "source": {
         "git": "https://github.com/tree-sitter/tree-sitter-ruby",
         "rev": "ad907a69da0c8a4f7a943a7fe012712208da6dee"
@@ -1625,7 +1624,7 @@
       "nextAction": "Pin sources, build WASM, check predicates and captures, and add language fixtures."
     },
     "scss": {
-      "state": "blocked",
+      "state": "candidate",
       "source": {
         "git": "https://github.com/serenadeai/tree-sitter-scss",
         "rev": "c478c6868648eff49eb04a4df90d703dc45b312a"
@@ -1714,14 +1713,14 @@
       "nextAction": "Check the Tree-sitter parser registry and verify a matching grammar repository."
     },
     "sql": {
-      "state": "blocked",
+      "state": "candidate",
       "source": {
         "git": "https://github.com/DerekStride/tree-sitter-sql",
-        "rev": "851e9cb257ba7c66cc8c14214a31c44d2f1e954e"
+        "rev": "97614d051eebfd3bc5d97c0bdb5a1638719ca811"
       },
-      "evidence": "tree-sitter-sql@0.1.0",
-      "gap": "Dialect parity is not established by this generic SQL grammar.",
-      "nextAction": "Select dialect-specific grammars and validate each canonical Shiki SQL language."
+      "evidence": "@derekstride/tree-sitter-sql 0.3.11 source inspection; docs/native-syntax-mdx-sql.md",
+      "gap": "General SQL parser and highlight queries exist. Numeric predicates need regex adaptation; WASM and runtime fixtures remain.",
+      "nextAction": "Admit generic SQL with SELECT/JOIN/CTE/DDL/edit fixtures and explicit dialect gaps. Evaluate PL/SQL separately; full dialect parity is not a prerequisite."
     },
     "ssh-config": {
       "state": "candidate",
@@ -1763,7 +1762,7 @@
       "nextAction": "Pin sources, build WASM, check predicates and captures, and add language fixtures."
     },
     "swift": {
-      "state": "blocked",
+      "state": "candidate",
       "source": {
         "git": "https://github.com/alex-pinkus/tree-sitter-swift",
         "rev": "7b7909f2f6b9414be0958275f4c8e5d69c3bca43"
@@ -1976,7 +1975,7 @@
       "nextAction": "Check the Tree-sitter parser registry and verify a matching grammar repository."
     },
     "vue": {
-      "state": "blocked",
+      "state": "candidate",
       "source": {
         "git": "https://github.com/ikatyang/tree-sitter-vue",
         "rev": "91fe2754796cd8fba5f229505a23fa08f3546c06"
