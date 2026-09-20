@@ -44,6 +44,7 @@ import { chatModelPicker } from './chat-model-picker'
 import { wallpaperIconHints } from './wallpaper-icon-hints'
 import { terminalBackground } from './terminal-background'
 import { bottomPanelPersistence } from './bottom-panel-persistence'
+import { gitOpenAllDiffsSpam } from './git-open-all-diffs-spam'
 import { gitStageSettles } from './git-stage-settles'
 import { commandPaletteTypeBurst } from './command-palette-type-burst'
 import { chatFollowUp } from './chat-follow-up'
@@ -190,6 +191,7 @@ export const scenarios: readonly Scenario[] = [
   editorExternalEdit,
   terminalBackground,
   bottomPanelPersistence,
+  gitOpenAllDiffsSpam,
   gitStageSettles,
   commandPaletteTypeBurst,
   editorThemePreview,

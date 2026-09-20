@@ -35,3 +35,5 @@ Graph roots exclude `refs/platform/*`. A browsing session pins tips and ref labe
 `scenario git-stage-settles` builds a throwaway repository under `/work/tmp`, stages and unstages one file through the row buttons, and counts `/git/status` requests between the Stage click and the row appearing under Staged. The count must be zero: stage, unstage and discard settle the status query from the write's own response. A rapid Stage → Unstage burst must leave the panel matching `git status --porcelain`. It never drives the dev workspace, where Stage would stage real work.
 
 `git-commit-slow-hook` commits through a `pre-commit` hook that prints once and then stays silent for 35 seconds. It takes about 45 seconds and proves two things: hook-running git commands get the 15 minute limit rather than the 30 second local one, and the commit stream's reader skips the server's 15 second heartbeats.
+
+`scenario git-open-all-diffs-spam` clicks Open all diffs eight times in a row on a six-file fixture. No error banner may appear and all six diff tabs must open: a superseded navigation must not abort the diff fetch the next one joined.

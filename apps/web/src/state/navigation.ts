@@ -653,16 +653,12 @@ export function createNavigation(
     openChat,
     openWorkspace,
     openDiff({ owner, row }: { readonly owner: EditorWorkspaceStoreApi; readonly row: ChangeRow }) {
-      return ownedRequest(owner, async ({ application, address, signal }) => {
+      return ownedRequest(owner, async ({ application, address }) => {
         const staged = row.section === 'staged'
+        // Query signal only: a fetch shared by key must not die with one caller's navigation.
         const diffs = await application.getSnapshot().queryClient.fetchQuery({
-          queryFn: ({ signal: querySignal, client }) =>
-            fetchDiff(
-              row.file.path,
-              staged,
-              AbortSignal.any([signal, querySignal]),
-              clientForQueryClient(client),
-            ),
+          queryFn: ({ signal, client }) =>
+            fetchDiff(row.file.path, staged, signal, clientForQueryClient(client)),
           queryKey: gitKeys.diff(row.file.path, staged),
           staleTime: 1000,
         })
@@ -709,18 +705,14 @@ export function createNavigation(
       readonly path: FilesystemPath
       readonly ref: string
     }) {
-      return ownedRequest(owner, async ({ application, address, signal, isCurrent }) => {
+      return ownedRequest(owner, async ({ application, address, isCurrent }) => {
         const runtime = application.getSnapshot()
+        // Query signal only: a fetch shared by key must not die with one caller's navigation.
         const file = await runtime.queryClient.fetchQuery({
           queryKey: gitKeys.file(path, ref),
           staleTime: Infinity,
-          queryFn: ({ signal: querySignal, client }) =>
-            fetchGitFile(
-              path,
-              ref,
-              AbortSignal.any([signal, querySignal]),
-              clientForQueryClient(client),
-            ),
+          queryFn: ({ signal, client }) =>
+            fetchGitFile(path, ref, signal, clientForQueryClient(client)),
         })
         const document = { kind: 'git-ref', source: { path, ref } } as const
         const next = addressWithContent(

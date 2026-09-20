@@ -517,13 +517,18 @@ export const selectors = {
   paletteDialog: (page: Page) => page.getByRole('dialog', { name: 'Command Palette', exact: true }),
   windowToolbar: (page: Page) => page.getByLabel('Window toolbar', { exact: true }),
   editorTab: (page: Page, path: string) => page.locator(`[data-editor-tab-path="${path}"]`),
+  editorTabs: (page: Page) => page.locator('[data-editor-tab-id]'),
   gitPanel: (page: Page) => page.getByRole('region', { name: 'Git panel' }),
   gitChangeRow: (page: Page, name: string) =>
     page.getByRole('region', { name: 'Git panel' }).getByText(name, { exact: true }),
-  gitRowAction: (page: Page, label: 'Stage file' | 'Unstage file' | 'Discard file') =>
+  gitRowAction: (
+    page: Page,
+    label: 'Stage file' | 'Unstage file' | 'Discard file' | 'Open all diffs',
+  ) =>
     page
       .getByRole('region', { name: 'Git panel' })
       .getByRole('button', { name: label, exact: true }),
+  unexpectedError: (page: Page) => page.getByText('Something unexpected went wrong.'),
   focusGitCommand: (page: Page) => page.getByRole('option', { name: /Focus Git/ }),
   graphButton: (page: Page) => page.getByRole('button', { name: 'Graph', exact: true }),
   changesToggle: (page: Page) => page.getByRole('button', { name: 'Changes', exact: true }),
