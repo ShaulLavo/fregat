@@ -1,6 +1,7 @@
 import { BrainIcon, CaretUpDownIcon } from '@phosphor-icons/react'
 import type { ModelSelection } from '@workspace/contracts'
 import { Button } from '@workspace/ui/components/button'
+import { Tooltip, TooltipContent, TooltipTrigger } from '@workspace/ui/components/tooltip'
 import {
   DropdownMenu,
   DropdownMenuContent,
@@ -63,23 +64,30 @@ export function ModelOptionsMenu({
 
   return (
     <DropdownMenu>
-      <DropdownMenuTrigger
-        render={
-          <Button
-            aria-label='Model options'
-            className='text-muted-foreground hover:text-foreground min-w-0 gap-1 text-xs font-normal'
-            disabled={disabled}
-            size='sm'
-            title={`Model options: ${summary}`}
-            type='button'
-            variant='ghost'
-          >
-            <BrainIcon className='size-(--icon-size-sm) shrink-0 opacity-70' />
-            {compact ? null : <span className='truncate'>{summary}</span>}
-            <CaretUpDownIcon className='size-(--icon-size-sm) shrink-0 opacity-60' />
-          </Button>
-        }
-      />
+      <Tooltip>
+        <TooltipTrigger
+          render={
+            <DropdownMenuTrigger
+              render={
+                <Button
+                  aria-label='Model options'
+                  className='text-muted-foreground min-w-0 gap-1 text-xs font-normal'
+                  disabled={disabled}
+                  focusableWhenDisabled
+                  size='sm'
+                  type='button'
+                  variant='ghost'
+                >
+                  <BrainIcon className='size-(--icon-size-sm) shrink-0 opacity-70' />
+                  {compact ? null : <span className='truncate'>{summary}</span>}
+                  <CaretUpDownIcon className='size-(--icon-size-sm) shrink-0 opacity-60' />
+                </Button>
+              }
+            />
+          }
+        />
+        <TooltipContent>Model options: {summary}</TooltipContent>
+      </Tooltip>
       <DropdownMenuContent align='start' className='w-64 p-1' side='top'>
         {descriptors.map((descriptor, index) => (
           <DropdownMenuRadioGroup

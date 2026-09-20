@@ -9,7 +9,7 @@ export function EditorDragPreview({
 }) {
   return (
     <div
-      className='bg-popover-solid text-popover-foreground border-border flex h-(--bar-height) max-w-64 items-center gap-2 border px-(--bar-padding-x) text-xs shadow-md'
+      className='bg-popover-solid text-popover-foreground ring-foreground/10 flex h-(--bar-height) max-w-64 items-center gap-2 px-(--bar-padding-x) text-xs shadow-md ring-1'
       title={title}
     >
       {copy ? (

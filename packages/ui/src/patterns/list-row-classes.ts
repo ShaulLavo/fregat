@@ -15,3 +15,11 @@ export function listRowClassName({
     className,
   )
 }
+
+/**
+ * Releases a row's fixed token height for the rare row that stacks two lines.
+ * Without it the second line paints on top of the first, because the row height
+ * is a hard `h-`, not a `min-h-`.
+ */
+export const stackedListRowClassName =
+  'h-auto min-h-(--density-row-height) py-(--density-row-padding-y)'

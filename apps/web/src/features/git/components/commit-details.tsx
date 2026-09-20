@@ -69,7 +69,7 @@ export function CommitDetails({
         void navigation.setWorkbenchPanels({ ...panels, gitCommitDetailsOpen })
       }}
     >
-      <PaneBar border='bottom'>
+      <PaneBar>
         <CollapsibleTrigger
           aria-label='Commit information'
           className='focus-ring flex min-w-0 flex-1 items-center gap-1.5 text-left font-mono text-xs outline-none'
@@ -126,7 +126,7 @@ export function CommitDetails({
             void updateView({ detailsScrollTop: event.currentTarget.scrollTop })
           }}
         >
-          <CollapsibleContent className='border-subtle space-y-2 border-b p-3'>
+          <CollapsibleContent className='space-y-2 p-3'>
             <p className='text-sm font-semibold wrap-anywhere'>{details.data.subject}</p>
             <p className='text-muted-foreground text-xs wrap-anywhere'>
               {details.data.author}{' '}
@@ -161,7 +161,7 @@ export function CommitDetails({
               Copy message
             </Button>
           </CollapsibleContent>
-          <PaneBar border='bottom'>
+          <PaneBar>
             <span className='text-xs font-medium'>Changed files</span>
             <span className='text-muted-foreground text-2xs tabular-nums'>
               {details.data.files.length}

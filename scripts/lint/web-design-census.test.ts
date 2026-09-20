@@ -52,7 +52,7 @@ test('finds a bare rounded built across the lines of a cn() call', () => {
   )
 
   expect(locations(subject, 'radius')).toEqual(['probe.tsx:8 rounded'])
-  expect(values(subject, 'dividerOpacity')).toEqual([])
+  expect(values(subject, 'hairlines')).toEqual(['border-border'])
   expect(gate(subject).offenders.bareRadius).toHaveLength(1)
 })
 
@@ -93,13 +93,19 @@ test('counts compact: utilities and leaves the plain utility alone', () => {
   expect(values(subject, 'compactVariant')).toEqual(['compact:px-2'])
 })
 
-test('counts border-border/N but not border-border', () => {
+test('counts every hairline but not a transparent sizing border', () => {
   const subject = census(
     "export const a = 'border-b border-border/60'",
-    "export const b = 'border-border'",
+    "export const b = 'border-subtle divide-x'",
+    "export const c = 'border border-transparent aria-invalid:border-destructive'",
   )
 
-  expect(values(subject, 'dividerOpacity')).toEqual(['border-border/60'])
+  expect(values(subject, 'hairlines')).toEqual([
+    'border-b',
+    'border-border/60',
+    'border-subtle',
+    'divide-x',
+  ])
 })
 
 test('counts an arbitrary text size but not a registered step', () => {
@@ -223,7 +229,10 @@ test('reports the line of every hit in a multi-line file', () => {
 
   expect(locations(subject, 'barHeights')).toEqual(['probe.tsx:4 h-9'])
   expect(locations(subject, 'arbitraryText')).toEqual(['probe.tsx:7 text-[10px]'])
-  expect(locations(subject, 'dividerOpacity')).toEqual(['probe.tsx:7 border-border/70'])
+  expect(locations(subject, 'hairlines')).toEqual([
+    'probe.tsx:4 border-b',
+    'probe.tsx:7 border-border/70',
+  ])
   expect(locations(subject, 'radius')).toEqual(['probe.tsx:8 rounded'])
   expect(locations(subject, 'shadow')).toEqual(['probe.tsx:9 shadow-lg'])
 })
@@ -473,9 +482,10 @@ test('icon-only controls require a Tooltip and reject a native title beside it',
   expect(values(subject, 'iconOnlyHint')).toEqual([
     'icon-only title',
     'missing Tooltip',
+    'missing Tooltip',
     'icon-only title',
   ])
-  expect(gate(subject).offenders.iconOnlyHint).toHaveLength(3)
+  expect(gate(subject).offenders.iconOnlyHint).toHaveLength(4)
 })
 
 test('icon-only controls recognize conditional icons and TooltipTrigger render props', () => {
@@ -497,4 +507,66 @@ test('icon-only controls inherit children from primitive trigger render composit
     `export const Controls = () => <><DropdownMenuTrigger render={<Button title='History' />}><ClockIcon /></DropdownMenuTrigger><Tooltip><TooltipTrigger render={<DropdownMenuTrigger render={<Button aria-label='History' />} />}><ClockIcon /></TooltipTrigger><TooltipContent>History</TooltipContent></Tooltip><DropdownMenuTrigger render={<Button />}><ClockIcon />History</DropdownMenuTrigger></>`,
   )
   expect(values(subject, 'iconOnlyHint')).toEqual(['icon-only title'])
+})
+
+test('icon sizes require tooltips for wrappers with dynamic or self-closing children', () => {
+  const subject = census(
+    `export const Controls = () => <><Button size='icon-xs' title={label}>{children}</Button><Button size='icon-sm' aria-label='Close' /><Button size='sm'>{children}</Button></>`,
+  )
+  expect(values(subject, 'iconOnlyHint')).toEqual(['icon-only title', 'missing Tooltip'])
+})
+
+test('input group buttons and bare primitive triggers require tooltips', () => {
+  const subject = census(
+    `export const Controls = () => <><InputGroupButton aria-label='Clear'><XIcon /></InputGroupButton><PopoverTrigger aria-label='Options'><DotsIcon /></PopoverTrigger><DropdownMenuTrigger render={<Button><DotsIcon /></Button>} /><Tooltip><TooltipTrigger render={<InputGroupButton size='icon-xs' />}><XIcon /></TooltipTrigger></Tooltip><PopoverTrigger>Options</PopoverTrigger></>`,
+  )
+  expect(values(subject, 'iconOnlyHint')).toEqual([
+    'missing Tooltip',
+    'missing Tooltip',
+    'missing Tooltip',
+  ])
+})
+
+test('screen-reader labels do not exempt icon controls from a visible tooltip', () => {
+  const subject = census(
+    `export const Controls = () => <><Button><XIcon /><span className='sr-only'>Close</span></Button><DialogClose render={<Button size='icon-sm' />}><XIcon /><span className='sr-only'>Close</span></DialogClose><Button><XIcon /><span>Close</span></Button></>`,
+  )
+  expect(values(subject, 'iconOnlyHint')).toEqual(['missing Tooltip', 'missing Tooltip'])
+})
+
+test('icons include SVGs, image controls, loading states and conditional compact labels', () => {
+  const subject = census(
+    `export const Controls = () => <><Button><svg /></Button><Button><img alt='' /></Button><Button>{pending ? <Spinner /> : <CheckIcon />}</Button><Button><svg />{compact ? null : <span>{label}</span>}</Button><Button><Spinner />Saving</Button><Button><svg />{label}</Button></>`,
+  )
+  expect(values(subject, 'iconOnlyHint')).toEqual([
+    'missing Tooltip',
+    'missing Tooltip',
+    'missing Tooltip',
+    'missing Tooltip',
+  ])
+})
+
+test('icon links and role buttons require tooltips', () => {
+  const subject = census(
+    `export const Controls = () => <><a href='/help'><HelpIcon /></a><div role='button'><PlayIcon /></div><div><PlayIcon /></div><a href='/help'><HelpIcon />Help</a></>`,
+  )
+  expect(values(subject, 'iconOnlyHint')).toEqual(['missing Tooltip', 'missing Tooltip'])
+})
+
+test('a Tooltip root and controls inside TooltipContent are not tooltip triggers', () => {
+  const subject = census(
+    `export const Controls = () => <><Tooltip><Button aria-label='Add'><AddIcon /></Button></Tooltip><Tooltip><TooltipTrigger render={<Button size='icon-sm' />} /><TooltipContent><Button><CopyIcon /></Button></TooltipContent></Tooltip></>`,
+  )
+  expect(values(subject, 'iconOnlyHint')).toEqual(['missing Tooltip', 'missing Tooltip'])
+})
+
+test('disabled icon tooltip controls remain hoverable and keyboard focusable', () => {
+  const subject = census(
+    `export const Controls = () => <><Tooltip><TooltipTrigger render={<Button disabled size='icon-sm' />} /></Tooltip><Tooltip><TooltipTrigger render={<InputGroupButton disabled={pending}><XIcon /></InputGroupButton>} /></Tooltip><Tooltip><TooltipTrigger render={<Button disabled focusableWhenDisabled={false}><XIcon /></Button>} /></Tooltip><Tooltip><TooltipTrigger render={<Button disabled focusableWhenDisabled size='icon-sm' />} /></Tooltip><Tooltip><TooltipTrigger render={<Button disabled={false}><XIcon /></Button>} /></Tooltip><Tooltip><TooltipTrigger disabled render={<Button size='icon-sm' />} /></Tooltip><Tooltip><TooltipTrigger render={<Button disabled>Save</Button>} /></Tooltip></>`,
+  )
+  expect(values(subject, 'iconOnlyHint')).toEqual([
+    'disabled Tooltip trigger needs focusableWhenDisabled',
+    'disabled Tooltip trigger needs focusableWhenDisabled',
+    'disabled Tooltip trigger needs focusableWhenDisabled',
+  ])
 })

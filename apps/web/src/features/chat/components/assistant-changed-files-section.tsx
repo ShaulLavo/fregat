@@ -67,7 +67,7 @@ export function AssistantChangedFilesSection({ summary }: { summary: ChatTurnDif
 
   return (
     <section
-      className='border-border bg-card/45 mt-2 rounded-lg border p-2.5'
+      className='bg-card/45 mt-2 rounded-lg p-2.5'
       data-changed-files-state={expanded ? 'expanded' : 'preview'}
     >
       <div className='flex items-center justify-between gap-2'>

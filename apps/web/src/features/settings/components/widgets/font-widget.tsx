@@ -54,6 +54,7 @@ export function FontWidget({
                   <Button
                     aria-label='Browse Nerd Fonts'
                     disabled={disabled}
+                    focusableWhenDisabled
                     size='icon-sm'
                     variant='ghost'
                   >

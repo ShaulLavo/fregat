@@ -96,12 +96,7 @@ export function History({ rootPath }: { rootPath: string }) {
       />
       <div className={cn('flex min-h-0 flex-1', expanded ? 'flex-row' : 'flex-col')}>
         {selected ? (
-          <div
-            className={cn(
-              'min-h-0 shrink-0 border-border',
-              expanded ? 'order-last w-80 border-l' : 'h-1/2 border-b',
-            )}
-          >
+          <div className={cn('min-h-0 shrink-0', expanded ? 'order-last w-80' : 'h-1/2')}>
             <CommitDetails
               key={selected}
               rootPath={rootPath}
@@ -165,7 +160,7 @@ export function History({ rootPath }: { rootPath: string }) {
               }}
             />
           ) : null}
-          <PaneBar border='top'>
+          <PaneBar>
             <span className='text-muted-foreground text-2xs min-w-0 flex-1 tabular-nums'>
               {historyCountLabel(commits.length, history.shownSearch)}
               {!history.hasNextPage && commits.length > 0 ? ' · All results loaded' : ''}
@@ -193,7 +188,7 @@ export function History({ rootPath }: { rootPath: string }) {
   return (
     <Dialog open={expanded} onOpenChange={setExpanded}>
       <DialogContent className='flex h-[85dvh] w-[94vw] max-w-none flex-col gap-0 overflow-hidden p-0 sm:max-w-none'>
-        <PaneBar border='bottom'>
+        <PaneBar>
           <GitBranchIcon className='size-(--icon-size)' />
           <DialogTitle className='text-xs font-medium'>Commit graph</DialogTitle>
         </PaneBar>

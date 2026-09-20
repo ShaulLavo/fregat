@@ -28,10 +28,7 @@ export function AgentRow({ entry, groupId }: { entry: ChatAgentEntry; groupId: s
     .join(' · ')
 
   return (
-    <section
-      className='border-border min-w-0 border-b py-2'
-      data-agent-thread-id={entry.agent.threadId}
-    >
+    <section className='min-w-0 py-2' data-agent-thread-id={entry.agent.threadId}>
       <Button
         aria-expanded={expanded}
         className='h-auto w-full items-start justify-start gap-2 px-2 py-1.5 text-left font-normal'
@@ -77,7 +74,7 @@ export function AgentRow({ entry, groupId }: { entry: ChatAgentEntry; groupId: s
         </span>
       </Button>
       {expanded ? (
-        <div className='border-border ml-3 min-w-0 space-y-2 border-l py-2 pl-3'>
+        <div className='ml-3 min-w-0 space-y-2 py-2 pl-3'>
           {entry.description ? (
             <p className='text-muted-foreground text-xs whitespace-pre-wrap'>{entry.description}</p>
           ) : null}

@@ -40,11 +40,11 @@ export function PlanFollowUpBanner({
   return (
     <div
       aria-label='Plan ready'
-      className='border-border shrink-0 border-t px-(--density-control-padding-x) pt-(--density-control-padding-x)'
+      className='shrink-0 px-(--density-control-padding-x) pt-(--density-control-padding-x)'
       role='status'
     >
       <div
-        className='border-info/25 bg-info/10 mx-auto flex w-full max-w-3xl flex-wrap items-center gap-(--density-control-gap) rounded-lg border px-(--density-control-padding-x) py-(--density-section-gap)'
+        className='bg-info/10 mx-auto flex w-full max-w-3xl flex-wrap items-center gap-(--density-control-gap) rounded-lg px-(--density-control-padding-x) py-(--density-section-gap)'
         title={proposedPlanTitle(plan.planMarkdown)}
       >
         <Badge className='border-info/40 text-info uppercase' variant='outline'>

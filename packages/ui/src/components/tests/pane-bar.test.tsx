@@ -20,21 +20,6 @@ describe('PaneBar', () => {
     expect(bar(<PaneBar as='footer' />).tagName).toBe('FOOTER')
   })
 
-  it('puts the border on the requested edge and on no edge by default', () => {
-    const bottom = classesOf(bar(<PaneBar border='bottom' />))
-    expect(bottom).toContain('border-b')
-    expect(bottom).toContain('border-border')
-
-    const top = classesOf(bar(<PaneBar border='top' />))
-    expect(top).toContain('border-t')
-    expect(top).toContain('border-border')
-
-    const plain = classesOf(bar(<PaneBar />))
-    expect(plain).not.toContain('border-b')
-    expect(plain).not.toContain('border-t')
-    expect(plain).not.toContain('border-border')
-  })
-
   it('merges className with the base classes', () => {
     const classes = classesOf(bar(<PaneBar className='justify-between' />))
 

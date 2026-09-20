@@ -9,7 +9,7 @@ export function WorkingRow({
   startedAt: string
 }) {
   return (
-    <div className='border-subtle text-muted-foreground border-b px-1 pt-1 pb-2 text-xs tabular-nums'>
+    <div className='text-muted-foreground px-1 pt-1 pb-2 text-xs tabular-nums'>
       {latestTurn.sourceProposedPlan ? 'Working from plan for ' : 'Working for '}
       <WorkingTimer startedAt={startedAt} />
     </div>

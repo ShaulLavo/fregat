@@ -31,7 +31,7 @@ export function SidebarPanel({
   }
 
   return (
-    <aside className='bg-background backdrop-material border-border flex h-full min-h-0 min-w-0 overflow-hidden border-r'>
+    <aside className='bg-background backdrop-material flex h-full min-h-0 min-w-0 overflow-hidden'>
       <WorkspaceRail label='Sidebar tabs' side='left'>
         <ToggleIconButton
           active={panels.activeSidebarTab === 'files'}

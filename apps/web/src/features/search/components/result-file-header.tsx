@@ -42,6 +42,7 @@ export const SearchResultFileHeader = memo(
                 aria-label={file.collapsed ? 'Expand file results' : 'Collapse file results'}
                 className='text-muted-foreground'
                 disabled={file.excerpts.length === 0}
+                focusableWhenDisabled
                 size='icon-xs'
                 tabIndex={-1}
                 type='button'

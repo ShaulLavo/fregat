@@ -22,7 +22,7 @@ Expand a session's **Changed files** section. `scenario chat-changed-files` insp
 
 `scenario workbench-list-focus` walks the titlebar, files, git changes, logs, terminal tabs and session rail. It enters and exits each list with Tab, asserts no extra row stops, and checks arrow navigation and session group collapse/expand. The file tree retains its existing single roving row in its shadow root. Terminal processes opened by this scenario are isolated and removed at the end.
 
-`scenario file-picker` checks virtual row positions, typeahead-ready focus and End navigation in the folder picker. `scenario search-results` searches the workspace and checks result selection and file-group collapse. `scenario terminal-tabs` checks navigation, rename and keyboard reordering. `scenario session-rail` opens existing conversations without sending messages, then picks up a row with Space, moves it with an arrow and cancels with Escape. Cancellation must preserve the saved order and return focus to the list.
+`scenario file-picker` checks virtual row positions, typeahead-ready focus and End navigation in the folder picker. `scenario file-picker-navigation` checks Backspace/Left from empty folders and page navigation across grouped search headings. `scenario git-history-scroll` leaves and reopens scrolled history without selecting a commit. `scenario search-results` searches the workspace and checks result selection and file-group collapse. `scenario terminal-tabs` checks navigation, rename, keyboard reordering, and pointer activation returning focus to terminal input. `scenario session-rail` opens existing conversations without sending messages, then picks up a row with Space, moves it with an arrow and cancels with Escape. Cancellation must preserve the saved order and return focus to the list.
 
 `scenario git-changes` checks selection and the keyboard context menu. `scenario git-graph-keyboard` walks commit history and opens a historical file. `scenario logs-panel` checks cursor movement and event expansion; it filters filesystem events because older server builds can emit identical chat events with colliding log IDs.
 
@@ -31,3 +31,5 @@ Expand a session's **Changed files** section. `scenario chat-changed-files` insp
 ## Icon hints
 
 `scenario pattern-hints` hovers the workbench chat actions, opens conversation history and palette-card actions, and closes the wallpaper picker through its hinted close button. It does not create a session, change a palette, or select a wallpaper. The menu screenshots prove that composing TooltipTrigger with a second Base UI trigger preserves both actions.
+
+`scenario icon-hints` checks shared Git toolbar actions, history search clearing, dialog closing, and Search actions. It checks native titles do not duplicate tooltips, opens and closes the history dialog, and verifies disabled Search actions retain their appearance and expose hints through hover and keyboard focus.

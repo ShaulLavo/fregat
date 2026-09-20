@@ -49,11 +49,20 @@ Deleting an imported bundle is refused while another bundle uses its embedded pa
 
 Graphite and Sage have paired palettes. Catppuccin uses the installed Mocha and Latte mappings.
 The installed Tokyo Night and Gruvbox sources provide dark palettes, and Rosé Pine provides a light
-palette. Their opposite versions use Graphite app colors and the specified syntax theme. All twelve
+palette. Their opposite versions use upstream Tokyo Night Day, Gruvbox Light and Rosé Pine Main
+palettes with the matching syntax theme. All twelve
 bundled variants pass the existing palette editor’s 4.5:1 text-pair readout. Mapping corrections and
 source versions are recorded in [theme-pack-mapping.txt](theme-pack-mapping.txt).
 
-Bundled packs use solid backgrounds because installed artwork has no reviewed redistribution grant.
+The twelve paired wallpapers ship with the server under `src/themes/wallpapers/assets/`. Their
+original bytes retain the hashes in `BUNDLED_WALLPAPERS`; the server build validates every hash and
+copies the images to `dist/assets/`. A fresh host needs no Omarchy installation or network download.
+Startup populates the library in the background, and a requested built-in image is installed before
+its read resolves. Export and New from current therefore work before background seeding finishes.
+Missing or damaged packaged bytes fail with `wallpapers.BUNDLED_INVALID`. Updating this artwork
+requires a server build and deployment. Artwork provenance remains Omarchy and redistribution
+remains marked unverified.
+
 Import from Omarchy composes the palette mapper, matching syntax registration and local artwork;
 the import retains an unverified-artwork notice and its mapping report. The script produces the same
 portable archive as the settings action:

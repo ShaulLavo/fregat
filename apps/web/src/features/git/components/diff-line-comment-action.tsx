@@ -97,7 +97,7 @@ export function DiffLineCommentAction({
 
   return (
     <div className='pointer-events-none absolute inset-x-0 bottom-0 flex justify-center p-(--density-section-padding)'>
-      <div className='bg-popover-solid border-border pointer-events-auto flex items-center gap-1 rounded-lg border p-(--density-gap-tight) shadow-md'>
+      <div className='bg-popover-solid ring-foreground/10 pointer-events-auto flex items-center gap-1 rounded-lg p-(--density-gap-tight) shadow-md ring-1'>
         <span className='text-muted-foreground px-(--density-control-padding-x-tight) text-xs tabular-nums'>
           {diffLineAddressLabel(address)}
         </span>

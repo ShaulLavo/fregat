@@ -38,7 +38,7 @@ export function ProposedPlanCard({ plan }: { plan: OrchestrationProposedPlan }) 
   const exportMarkdown = proposedPlanExportMarkdown(plan.planMarkdown)
 
   return (
-    <article className='border-border bg-card/70 rounded-lg border p-4 text-sm sm:p-5'>
+    <article className='bg-card/70 rounded-lg p-4 text-sm sm:p-5'>
       <div className='flex min-w-0 flex-wrap items-center justify-between gap-3'>
         <div className='flex min-w-0 items-center gap-2' title={title}>
           <Badge variant='secondary'>Plan</Badge>

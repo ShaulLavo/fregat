@@ -9,15 +9,9 @@ import { cn } from '@workspace/ui/lib/utils'
 
 import type { ChatWorkLogPlan } from '@/features/chat/utils/work-log'
 
-export function ComposerActivePlan({
-  plan,
-  separated,
-}: {
-  plan: ChatWorkLogPlan
-  separated: boolean
-}) {
+export function ComposerActivePlan({ plan }: { plan: ChatWorkLogPlan }) {
   return (
-    <Collapsible className={cn('group/plan', separated && 'border-subtle border-t')}>
+    <Collapsible className='group/plan'>
       <CollapsibleTrigger
         render={
           <Button
@@ -57,8 +51,8 @@ export function ComposerActivePlan({
                 <span
                   aria-label={step.status === 'inProgress' ? 'In progress' : 'Pending'}
                   className={cn(
-                    'border-border mt-1.5 size-2 shrink-0 rounded-full border',
-                    step.status === 'inProgress' && 'border-info bg-info',
+                    'bg-muted mt-1.5 size-2 shrink-0 rounded-full',
+                    step.status === 'inProgress' && 'bg-info',
                   )}
                 />
               ) : null}

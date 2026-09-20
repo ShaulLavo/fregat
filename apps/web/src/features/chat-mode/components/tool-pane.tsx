@@ -104,7 +104,7 @@ function gitToolPane(rootPath: string, diffScope: SessionDiffScopeState) {
       bodyClassName='overflow-hidden'
       header={<GitPaneHeader rootPath={rootPath} />}
       subheader={
-        <PaneBar aria-label='Diff scope' border='bottom' role='group'>
+        <PaneBar aria-label='Diff scope' role='group'>
           {scopeButton({
             active: scope.kind === 'working-tree',
             label: 'Working tree',

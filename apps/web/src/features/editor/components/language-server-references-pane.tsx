@@ -98,7 +98,7 @@ export function LanguageServerReferencesPane({
       title='References'
       detail={references.targets.length.toLocaleString()}
       aria-label='References'
-      className='border-border h-full border-l'
+      className='h-full'
       bodyClassName='py-1'
       bodyProps={
         groups.length > 0

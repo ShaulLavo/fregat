@@ -26,6 +26,7 @@ export function RowActionButton({
             aria-label={label}
             className='text-muted-foreground'
             disabled={disabled}
+            focusableWhenDisabled
             onClick={handleClick}
             size='icon-sm'
             tabIndex={-1}

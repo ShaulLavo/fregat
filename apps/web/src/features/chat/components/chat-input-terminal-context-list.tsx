@@ -35,6 +35,7 @@ export function ChatInputTerminalContextList({
                   aria-label={`Remove ${formatTerminalContextLabel(context)}`}
                   className='text-muted-foreground'
                   disabled={disabled}
+                  focusableWhenDisabled
                   size='icon-xs'
                   type='button'
                   variant='ghost'

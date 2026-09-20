@@ -141,3 +141,30 @@ it('remeasures virtual rows when compact density changes the token', async () =>
   await expect.poll(() => list.scrollTop).toBe(800)
   expect(mounted.container.querySelectorAll('[data-slot="list-row"]').length).toBeLessThan(40)
 })
+
+it('restores scroll independently of the pinned active row and reveals later selection changes', async () => {
+  const items = Array.from({ length: 100 }, (_, index) => index)
+  const list = (activeIndex: number) => (
+    <VirtualList
+      className='h-60'
+      activeIndex={activeIndex}
+      initialOffset={960}
+      items={items}
+      getKey={(item) => item}
+      renderRow={(item) => (
+        <ListRow role='option' id={`restored-row-${item}`}>
+          Row {item}
+        </ListRow>
+      )}
+    />
+  )
+  const mounted = mount(list(0))
+  cleanups.push(mounted.unmount)
+  const scroll = mounted.container.querySelector<HTMLElement>('[data-slot="virtual-list"]')!
+  await expect.poll(() => scroll.scrollTop).toBe(960)
+  expect(document.getElementById('restored-row-0')).not.toBeNull()
+
+  mounted.render(list(99))
+  await expect.poll(() => scroll.scrollTop).toBe(2160)
+  expect(document.getElementById('restored-row-99')).not.toBeNull()
+})

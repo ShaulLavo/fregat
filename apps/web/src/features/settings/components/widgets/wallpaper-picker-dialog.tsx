@@ -119,7 +119,7 @@ export function WallpaperPickerDialog({
       }}
     >
       <DialogContent
-        className='flex h-[min(760px,calc(100svh-2rem))] w-[min(1080px,calc(100vw-1.5rem))] max-w-none flex-col gap-0 overflow-hidden border p-0 text-sm sm:max-w-none'
+        className='flex h-[min(760px,calc(100svh-2rem))] w-[min(1080px,calc(100vw-1.5rem))] max-w-none flex-col gap-0 overflow-hidden p-0 text-sm sm:max-w-none'
         showCloseButton={false}
         onDragOver={(event) => {
           event.preventDefault()
@@ -136,7 +136,7 @@ export function WallpaperPickerDialog({
           <DialogTitle>Wallpaper</DialogTitle>
           <DialogDescription>{`Choose a wallpaper for your workspace.`}</DialogDescription>
         </DialogHeader>
-        <PaneBar border='bottom'>
+        <PaneBar>
           <span className='text-xs font-medium'>Wallpaper</span>
           <InputGroup className='ml-auto h-(--density-control-height-sm) w-52 shrink-0 max-sm:w-32'>
             <InputGroupAddon align='inline-start'>
@@ -232,7 +232,7 @@ export function WallpaperPickerDialog({
           ))}
           {nothingMatches ? <EmptyState title='No wallpapers match' description={search} /> : null}
         </div>
-        <p className='border-border text-muted-foreground flex h-(--bar-height) shrink-0 items-center border-t px-(--bar-padding-x) text-xs'>
+        <p className='text-muted-foreground flex h-(--bar-height) shrink-0 items-center px-(--bar-padding-x) text-xs'>
           {WALLPAPER_LIMITS_HINT}
         </p>
       </DialogContent>

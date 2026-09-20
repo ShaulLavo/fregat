@@ -86,9 +86,9 @@ function CommandInput({
     // this bottom border is the only thing that can show focus.
     <div
       data-slot='command-input-wrapper'
-      className='focus-within:border-ring border-b pb-0 transition-colors'
+      className='focus-within:border-ring border-b border-transparent pb-0 transition-colors'
     >
-      <InputGroup className='border-input/30 bg-input/30 h-(--density-command-input-height) border-none shadow-none! *:data-[slot=input-group-addon]:pl-(--density-command-input-padding-x)!'>
+      <InputGroup className='bg-input/30 h-(--density-command-input-height) border-none shadow-none! *:data-[slot=input-group-addon]:pl-(--density-command-input-padding-x)!'>
         <CommandPrimitive.Input
           data-slot='command-input'
           className={cn(
@@ -155,7 +155,7 @@ function CommandSeparator({
   return (
     <CommandPrimitive.Separator
       data-slot='command-separator'
-      className={cn('-mx-1 h-px bg-border', className)}
+      className={cn('-mx-1 h-px', className)}
       {...props}
     />
   )

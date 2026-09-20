@@ -44,6 +44,7 @@ export function ChatInputSubmitButton({
               <Button
                 aria-label='Stop current turn'
                 disabled={disabledReason !== null || pendingAction === 'stopping'}
+                focusableWhenDisabled
                 size='icon-sm'
                 type='button'
                 variant='outline'
@@ -61,7 +62,7 @@ export function ChatInputSubmitButton({
           render={
             <Button
               aria-label={label}
-              className='disabled:bg-muted disabled:text-muted-foreground disabled:opacity-100'
+              className='aria-disabled:bg-muted aria-disabled:text-muted-foreground aria-disabled:opacity-100'
               disabled={
                 action.kind === 'pending' ||
                 disabled ||
@@ -70,6 +71,7 @@ export function ChatInputSubmitButton({
                 disabledReason !== null ||
                 correctionDisabledReason !== null
               }
+              focusableWhenDisabled
               size='icon-sm'
               type='button'
               onClick={handleClick}

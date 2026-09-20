@@ -1,4 +1,6 @@
-import { describe, expect, it } from 'vitest'
+import { describe } from 'vitest'
+
+import { expect, test as it } from '../../../../test/fixtures'
 
 import {
   EXCERPT_EDITOR_LINE_HEIGHT,
@@ -19,10 +21,14 @@ import {
   searchResultFileEditorStyle,
   searchResultFileEditorVisibleLineCount,
   searchResultFileDocumentVisibleLines,
+  searchResultVirtualRowInputs,
+  searchResultVirtualRowScrollTarget,
 } from '@/features/search/utils/result-editor'
+import { createSearchResultVirtualListMetrics } from '@/features/search/utils/result-virtual-list'
 import type {
   SearchResultFileBlock,
   SearchResultFileDocument,
+  SearchResultVirtualRow,
 } from '@/features/search/utils/result-view-model'
 
 describe('search result editor utils', () => {
@@ -53,6 +59,31 @@ describe('search result editor utils', () => {
     expect(searchResultFileEditorRowHeight(file)).toBe(
       Number(style.height) + FILE_RESULTS_ROW_VERTICAL_PADDING,
     )
+  })
+
+  it.each([20, 24])('aligns result blocks with measured %ipx headers', (headerHeight) => {
+    const file = fileWithExcerptCount(3)
+    const rows: SearchResultVirtualRow[] = [
+      { type: 'file', file },
+      { type: 'file-results', file },
+      { type: 'file', file: { ...file, id: 'file:next' } },
+    ]
+    const metrics = createSearchResultVirtualListMetrics(
+      searchResultVirtualRowInputs(rows, headerHeight),
+    )
+    const bodyHeight = editorHeightForLineCount(3) + FILE_RESULTS_ROW_VERTICAL_PADDING
+
+    expect(metrics.items.map(({ size, start }) => ({ size, start }))).toEqual([
+      { size: headerHeight, start: 0 },
+      { size: bodyHeight, start: headerHeight },
+      { size: headerHeight, start: headerHeight + bodyHeight },
+    ])
+  })
+
+  it('uses the measured list item height when revealing a file header', () => {
+    const file = fileWithExcerptCount(3)
+
+    expect(searchResultVirtualRowScrollTarget({ type: 'file', file }, file.id)).toBeNull()
   })
 
   it('caps sidecar rows to the same visible line count as the editor body', () => {
@@ -89,18 +120,31 @@ describe('search result editor utils', () => {
     })
   })
 
-  it('fully renders small file result editors ahead of the viewport', () => {
+  it.each([
+    { start: 2_000, top: 0 },
+    { start: 0, top: 3_000 },
+  ])('does not mount small editors outside the excerpt region: %j', ({ start, top }) => {
+    const window = searchResultFileEditorLineWindow({
+      lineCount: 2,
+      viewport: { height: 600, top },
+      virtualItem: { index: 0, key: 'file-results', size: 100, start },
+    })
+
+    expect(window).toEqual({ end: 0, offsetY: 0, start: 0 })
+  })
+
+  it('keeps the full small document when it intersects the excerpt region', () => {
     const window = searchResultFileEditorLineWindow({
       lineCount: SEARCH_RESULT_FILE_EDITOR_FULL_RENDER_LINE_LIMIT,
       viewport: {
-        height: 100,
-        top: 50_000,
+        height: 600,
+        top: 0,
       },
       virtualItem: {
         index: 0,
         key: 'file-results',
         size: 100,
-        start: 0,
+        start: 1_000,
       },
     })
 
@@ -109,6 +153,26 @@ describe('search result editor utils', () => {
       offsetY: 0,
       start: 0,
     })
+  })
+
+  it('does not mount a small editor until its first line enters the excerpt region', () => {
+    const viewportHeight = 600
+    const contentOffset = SEARCH_RESULT_VIRTUAL_ROW_OFFSET + FILE_RESULTS_ROW_VERTICAL_PADDING / 2
+    const virtualItem = {
+      index: 0,
+      key: 'file-results',
+      size: 100,
+      start: viewportHeight + SEARCH_RESULT_FILE_EDITOR_LINE_OVERSCAN - contentOffset,
+    }
+    const options = { lineCount: 2, viewport: { height: viewportHeight, top: 0 }, virtualItem }
+
+    expect(searchResultFileEditorLineWindow(options)).toEqual({ end: 0, offsetY: 0, start: 0 })
+    expect(
+      searchResultFileEditorLineWindow({
+        ...options,
+        virtualItem: { ...virtualItem, start: virtualItem.start - 1 },
+      }),
+    ).toEqual({ end: 2, offsetY: 0, start: 0 })
   })
 
   it('keeps line windows inside the static preview line cap', () => {

@@ -51,7 +51,7 @@ export function MachineConnectionNotice({
   }
 
   return (
-    <div className='border-border bg-muted/40 flex min-w-0 items-center gap-1 rounded-lg border px-2 py-1 text-xs'>
+    <div className='bg-muted/40 flex min-w-0 items-center gap-1 rounded-lg px-2 py-1 text-xs'>
       <Phase phase={retrying ? 'connecting' : phase} label={label} />
       <span className='min-w-0 flex-1 truncate' role='status' title={label}>
         {label} · {connectionNoticeSummary(phase, details)}

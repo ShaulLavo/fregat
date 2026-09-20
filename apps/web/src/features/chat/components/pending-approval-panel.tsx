@@ -17,7 +17,7 @@ export function PendingApprovalPanel() {
     >
       <section
         aria-label={approvalTitle(approval.requestKind)}
-        className='border-border bg-card mx-auto flex max-w-3xl flex-col gap-(--density-control-gap) rounded-lg border p-(--density-section-padding)'
+        className='bg-card mx-auto flex max-w-3xl flex-col gap-(--density-control-gap) rounded-lg p-(--density-section-padding)'
       >
         <div className='flex min-w-0 items-center gap-2'>
           <WarningCircleIcon

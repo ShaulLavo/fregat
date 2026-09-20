@@ -67,7 +67,7 @@ export function LiveActivityRow({
       )}
       {expanded && expandable ? (
         <div
-          className='border-border ml-2 max-h-[min(18rem,50dvh)] overflow-auto border-l pl-2'
+          className='ml-2 max-h-[min(18rem,50dvh)] overflow-auto pl-2'
           aria-label='Tool calls'
           role='region'
           tabIndex={0}

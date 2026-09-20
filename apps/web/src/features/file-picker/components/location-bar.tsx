@@ -49,7 +49,7 @@ export function LocationBar({
 
   if (!isEditing) {
     return (
-      <div className='border-input bg-background flex min-w-0 items-center gap-1 rounded-md border px-1 py-0.5'>
+      <div className='bg-background flex min-w-0 items-center gap-1 rounded-md px-1 py-0.5'>
         <Breadcrumbs currentPath={currentPath} />
         <IconTooltip label='Go to folder (⌘⇧G)'>
           <Button
@@ -96,6 +96,7 @@ export function LocationBar({
               aria-busy={isPending}
               aria-label='Open folder path'
               disabled={isPending}
+              focusableWhenDisabled
               size='icon-sm'
               type='submit'
               variant='secondary'

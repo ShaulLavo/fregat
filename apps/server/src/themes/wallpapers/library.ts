@@ -5,14 +5,17 @@ import path from 'node:path'
 import {
   assetIdSchema,
   BUNDLED_WALLPAPERS,
+  bundledWallpaperFor,
   wallpaperAssetSchema,
   type AssetId,
+  type BundledWallpaper,
   type WallpaperAsset,
 } from '@workspace/contracts'
 import * as v from 'valibot'
 import type { SettingsStore } from '../../settings/store'
 import { decodeWallpaper, deriveStoredWallpaper, MAX_WALLPAPER_BYTES } from './decode'
 import { wallpaperErrors } from './structured-errors'
+import { readBundledWallpaper } from './bundled'
 
 export const OMARCHY_THEMES_DIRECTORY = '/usr/share/omarchy/themes'
 type Provenance = WallpaperAsset['provenance'][number]
@@ -29,6 +32,10 @@ export class WallpaperLibrary {
       const folder = path.join(directory, 'wallpapers')
       if (await Bun.file(path.join(folder, `${id}.json`)).exists()) return folder
     }
+    if (bundledWallpaperFor(id)) {
+      await this.read(id)
+      return this.directory
+    }
     throw wallpaperErrors.NOT_FOUND()
   }
 
@@ -44,6 +51,7 @@ export class WallpaperLibrary {
   }
 
   async list(): Promise<WallpaperAsset[]> {
+    await this.#pending
     const local = await this.localAssets()
     const imported = await Promise.all(
       (await archivePartFiles(await this.archiveDirectories(), 'wallpapers')).map(async (file) =>
@@ -80,6 +88,8 @@ export class WallpaperLibrary {
     if (asset) return asset
     const imported = await readArchivePart(await this.archiveDirectories(), 'wallpapers', id)
     if (imported) return v.parse(wallpaperAssetSchema, imported)
+    const bundled = bundledWallpaperFor(id)
+    if (bundled) return this.#serialize(() => this.#installBundled(bundled))
     throw wallpaperErrors.NOT_FOUND()
   }
 
@@ -102,40 +112,21 @@ export class WallpaperLibrary {
     })
   }
 
-  // Only the files the bundled themes reference, so a fresh machine shows their
-  // wallpaper without a full import. A file whose bytes no longer hash to the
-  // bundled id is reported rather than installed: it would never satisfy the reference.
-  seed(directory: string) {
+  seed() {
     return this.#serialize(async () => {
       const seeded: AssetId[] = []
-      const missing: string[] = []
-      const mismatched: string[] = []
       for (const wallpaper of Object.values(BUNDLED_WALLPAPERS)) {
         if (await this.#readIndex(wallpaper.asset)) continue
-        const source = path.join(directory, wallpaper.theme, 'backgrounds', wallpaper.file)
-        const bytes = await readFile(source).catch(() => null)
-        if (!bytes) {
-          missing.push(source)
-          continue
-        }
-        if (createHash('sha256').update(bytes).digest('hex') !== wallpaper.asset) {
-          mismatched.push(source)
-          continue
-        }
-        const name = `${wallpaper.theme} · ${wallpaper.file}`
-        const asset = await this.#install(bytes, name, {
-          kind: 'omarchy',
-          theme: wallpaper.theme,
-          path: source,
-        })
+        const asset = await this.#installBundled(wallpaper)
         seeded.push(asset.id)
       }
-      return { seeded, missing, mismatched }
+      return { seeded }
     })
   }
 
   delete(id: AssetId) {
     return this.#serialize(async () => {
+      if (bundledWallpaperFor(id)) throw wallpaperErrors.BUNDLED()
       await this.assertUnused(id)
       const asset = await this.read(id)
       const selection = this.#settings.snapshot().values['workbench.wallpaper']
@@ -160,6 +151,15 @@ export class WallpaperLibrary {
         ),
       )
       return { deleted: id, settings: this.#settings.snapshot() }
+    })
+  }
+
+  async #installBundled(wallpaper: BundledWallpaper) {
+    const { bytes, file } = await readBundledWallpaper(wallpaper)
+    return this.#install(bytes, `${wallpaper.theme} · ${wallpaper.file}`, {
+      kind: 'omarchy',
+      theme: wallpaper.theme,
+      path: file,
     })
   }
 

@@ -147,17 +147,14 @@ export function compareSearchEntries(query: string) {
 
 export function tileTone(entry: FsEntry, selected: boolean) {
   if (isDirectoryEntry(entry)) {
-    return cn(
-      'border-warning/20 bg-warning/10 text-warning',
-      selected && 'border-warning/40 bg-warning/15',
-    )
+    return cn('bg-warning/10 text-warning', selected && 'bg-warning/15')
   }
 
   if (isFileEntry(entry)) {
-    return cn('border-info/20 bg-info/10 text-info', selected && 'border-info/40 bg-info/15')
+    return cn('bg-info/10 text-info', selected && 'bg-info/15')
   }
 
-  return 'border-border bg-muted/30 text-muted-foreground'
+  return 'bg-muted/30 text-muted-foreground'
 }
 
 export function kindLabel(entry: FsEntry) {

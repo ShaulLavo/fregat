@@ -19,7 +19,7 @@ export function EditorGroupDropOverlay({ groupId }: { readonly groupId: GroupId 
       {visible && preview ? (
         <div
           className={cn(
-            'border-info bg-info/15 absolute flex items-center justify-center border',
+            'bg-info/15 absolute flex items-center justify-center',
             edge === 'left' && 'inset-y-0 left-0 w-1/2',
             edge === 'right' && 'inset-y-0 right-0 w-1/2',
             edge === 'top' && 'inset-x-0 top-0 h-1/2',

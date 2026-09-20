@@ -99,6 +99,7 @@ export function VirtualList<T>({
   })
   const rows = virtualizer.getVirtualItems()
   const previousHeight = useRef(rowHeight)
+  const previousActiveIndex = useRef(activeIndex)
   const startIndex = rows[0]?.index ?? -1
   const endIndex = rows.at(-1)?.index ?? -1
 
@@ -123,9 +124,12 @@ export function VirtualList<T>({
   }, [rowHeight, virtualizer, densitySized, measureItems])
 
   useLayoutEffect(() => {
+    const changed = previousActiveIndex.current !== activeIndex
+    previousActiveIndex.current = activeIndex
     if (activeIndex === undefined || activeIndex < 0) return
+    if (!changed && initialOffset !== undefined) return
     virtualizer.scrollToIndex(activeIndex, { align: 'auto' })
-  }, [activeIndex, virtualizer])
+  }, [activeIndex, initialOffset, virtualizer])
 
   useLayoutEffect(() => {
     onItemsRendered?.({ startIndex, endIndex })

@@ -85,6 +85,34 @@ describe('useListbox', () => {
     expect(list.querySelector('[aria-selected="true"]')?.textContent).toContain('Alpha')
   })
 
+  it.each([
+    ['Home', 'ArrowDown', 'Alpha'],
+    ['PageUp', 'End', 'Alpha'],
+    ['PageDown', 'Home', 'Delta'],
+  ])('moves %s to the enabled boundary when a section occupies the edge', (key, start, label) => {
+    const { list } = renderListbox({
+      items: [{ id: 'heading', disabled: true }, ...items, { id: 'footer', disabled: true }],
+      pageSize: 20,
+    })
+    press(list, start)
+    press(list, key)
+    expect(list.querySelector('[aria-selected="true"]')?.textContent).toContain(label)
+  })
+
+  it('preserves restored scroll until focus or a later cursor change requests a reveal', () => {
+    const reveal = vi.fn()
+    const mounted = mount(<Listbox revealOnMount={false} scrollToIndex={reveal} />)
+    cleanups.push(mounted.unmount)
+    const list = mounted.container.querySelector<HTMLElement>('[role="listbox"]')!
+    expect(reveal).not.toHaveBeenCalled()
+    expect(document.getElementById(list.getAttribute('aria-activedescendant')!)).not.toBeNull()
+
+    act(() => list.focus())
+    expect(reveal).toHaveBeenLastCalledWith(0)
+    press(list, 'End')
+    expect(reveal).toHaveBeenLastCalledWith(3)
+  })
+
   it('separates selection from commit and leaves modifier chords alone', () => {
     const onCommit = vi.fn()
     const onSelect = vi.fn()

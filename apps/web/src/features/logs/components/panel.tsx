@@ -79,6 +79,7 @@ export function LogsPanel({ active }: LogsPanelProps) {
                         aria-label='Refresh logs'
                         className='text-muted-foreground'
                         disabled={summary.isFetching || optionSummary.isFetching}
+                        focusableWhenDisabled
                         size='icon-sm'
                         type='button'
                         variant='ghost'

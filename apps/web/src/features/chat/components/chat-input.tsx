@@ -376,7 +376,7 @@ export function ChatInput({
   }
 
   return (
-    <div className='border-border shrink-0 border-t px-(--density-control-padding-x) py-(--density-section-gap)'>
+    <div className='shrink-0 px-(--density-control-padding-x) py-(--density-section-gap)'>
       <ChatModelPickerProvider
         draftTarget={draftTarget}
         sessionProviderInstanceId={sessionProviderInstanceId}
@@ -405,7 +405,7 @@ export function ChatInput({
                 nothing at all. */}
             <div
               className={cn(
-                'focus-ring-within border-border bg-background relative overflow-hidden rounded-lg border',
+                'focus-ring-within border-transparent bg-background relative overflow-hidden rounded-lg border',
                 // Tint rather than restate: the utility owns the border colour under
                 // :focus-within, so a bare border-primary would lose to it mid-drag.
                 dropTargetActive && 'border-primary [--focus-ring-color:var(--primary)]',

@@ -50,7 +50,7 @@ export function WorkspaceEditRecoveryDialog() {
         }}
       >
         <DialogContent
-          className='w-[min(520px,calc(100vw-2rem))] max-w-none border sm:max-w-none'
+          className='w-[min(520px,calc(100vw-2rem))] max-w-none sm:max-w-none'
           finalFocus={false}
           showCloseButton={false}
         >
@@ -66,7 +66,7 @@ export function WorkspaceEditRecoveryDialog() {
           </DialogHeader>
 
           {conflict ? (
-            <div className='border-warning/30 bg-warning/10 rounded-lg border p-3'>
+            <div className='bg-warning/10 rounded-lg p-3'>
               <div className='text-warning mb-2 flex items-center gap-2 text-xs font-medium'>
                 <WarningOctagonIcon className='size-(--icon-size)' />
                 Workspace state is unknown
@@ -82,7 +82,7 @@ export function WorkspaceEditRecoveryDialog() {
               </ul>
             </div>
           ) : (
-            <div className='border-destructive/30 bg-destructive/10 rounded-lg border p-3'>
+            <div className='bg-destructive/10 rounded-lg p-3'>
               <div className='text-destructive mb-2 flex items-center gap-2 text-xs font-medium'>
                 <WarningOctagonIcon className='size-(--icon-size)' />
                 <span className='tabular-nums'>
@@ -141,7 +141,7 @@ export function WorkspaceEditRecoveryDialog() {
 
       <Dialog open={confirmDiscard} onOpenChange={setConfirmDiscard}>
         <DialogContent
-          className='w-[min(480px,calc(100vw-2rem))] max-w-none border sm:max-w-none'
+          className='w-[min(480px,calc(100vw-2rem))] max-w-none sm:max-w-none'
           showCloseButton={false}
         >
           <DialogHeader>
@@ -151,7 +151,7 @@ export function WorkspaceEditRecoveryDialog() {
               the workspace was restored.
             </DialogDescription>
           </DialogHeader>
-          <ul className='bg-muted text-2xs grid max-h-40 gap-1 overflow-auto rounded-lg border p-3 font-mono'>
+          <ul className='bg-muted text-2xs grid max-h-40 gap-1 overflow-auto rounded-lg p-3 font-mono'>
             {recovery?.unrecoveredPaths.map((path) => (
               <li key={path}>{path}</li>
             ))}

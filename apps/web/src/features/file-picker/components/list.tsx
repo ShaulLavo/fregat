@@ -1,4 +1,4 @@
-import { useId, useRef, type RefObject } from 'react'
+import { useId, useRef, type KeyboardEvent, type RefObject } from 'react'
 import { ArrowClockwiseIcon, FolderOpenIcon, WarningCircleIcon } from '@phosphor-icons/react'
 import { Button } from '@workspace/ui/components/button'
 import { EmptyState } from '@workspace/ui/components/empty-state'
@@ -78,11 +78,6 @@ export function FileList({
     scrollToIndex: (index) => virtualRef.current?.scrollToIndex(index, { align: 'auto' }),
     onActiveKeyDown(event, id) {
       if (event.altKey || event.ctrlKey || event.metaKey || event.shiftKey) return
-      if (event.key === 'ArrowLeft' || event.key === 'Backspace') {
-        event.preventDefault()
-        onGoParent()
-        return
-      }
       const row = rows.find((row) => row.key === id)
       if (event.key !== 'ArrowRight' || row?.kind !== 'entry' || !isDirectoryEntry(row.entry))
         return
@@ -95,10 +90,21 @@ export function FileList({
   const showEmpty = !showLoading && !showError && entries.length === 0
   const showStatus = showLoading || showError || showEmpty
 
+  function handleKeyDown(event: KeyboardEvent<HTMLDivElement>) {
+    list.containerProps.onKeyDown(event)
+    if (event.defaultPrevented || event.nativeEvent.isComposing || isBusy) return
+    if (event.target !== event.currentTarget) return
+    if (event.altKey || event.ctrlKey || event.metaKey || event.shiftKey) return
+    if (event.key !== 'ArrowLeft' && event.key !== 'Backspace') return
+    event.preventDefault()
+    onGoParent()
+  }
+
   return (
     <div className='relative min-h-0 overflow-hidden'>
       <VirtualList
         {...list.containerProps}
+        onKeyDown={handleKeyDown}
         activeIndex={list.activeIndex}
         scrollRef={containerRef}
         handleRef={virtualRef}

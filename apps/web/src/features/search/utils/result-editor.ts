@@ -22,7 +22,6 @@ import {
   EXCERPT_EDITOR_LINE_HEIGHT,
   FILE_RESULTS_EDITOR_MIN_HEIGHT,
   FILE_RESULTS_ROW_VERTICAL_PADDING,
-  FILE_ROW_ESTIMATE,
   SEARCH_RESULT_FILE_EDITOR_FULL_RENDER_LINE_LIMIT,
   SEARCH_RESULT_FILE_EDITOR_LINE_OVERSCAN,
   SEARCH_RESULT_FILE_EDITOR_ROW_GAP,
@@ -69,15 +68,6 @@ export function scrollActiveSearchResultIntoView({
   if (currentActiveIndex < 0) return
 
   scrollToIndexRef.current(currentActiveIndex, activeScrollTargetRef.current)
-}
-
-export function resetSearchResultScroll(
-  ref: RefObject<HTMLDivElement | null>,
-  scrollToOffset: (offset: number) => void,
-) {
-  if (ref.current) ref.current.scrollTop = 0
-
-  scrollToOffset(0)
 }
 
 export function searchResultFileRangeDecorations(
@@ -133,12 +123,7 @@ export function searchResultVirtualRowScrollTarget(
   activeResultId: SearchResultId | null,
 ): SearchResultVirtualRowScrollTarget | null {
   if (!row) return null
-  if (row.type === 'file') {
-    return {
-      offset: 0,
-      size: FILE_ROW_ESTIMATE,
-    }
-  }
+  if (row.type === 'file') return null
   if (!activeResultId) return null
 
   const index = row.file.excerpts.findIndex((excerpt) => excerpt.id === activeResultId)
@@ -157,8 +142,11 @@ function searchResultFileExcerptOffset(index: number) {
   return FILE_RESULTS_ROW_VERTICAL_PADDING / 2 + Math.max(0, visibleIndex) * rowStep
 }
 
-function searchResultVirtualRowEstimate(row: SearchResultVirtualRow | undefined) {
-  if (row?.type === 'file') return FILE_ROW_ESTIMATE
+function searchResultVirtualRowEstimate(
+  row: SearchResultVirtualRow | undefined,
+  headerHeight: number,
+) {
+  if (row?.type === 'file') return headerHeight
   if (row?.type === 'file-results') return searchResultFileEditorRowHeight(row.file)
 
   return FILE_RESULTS_EDITOR_MIN_HEIGHT
@@ -206,10 +194,13 @@ export function searchResultVirtualRowStyle(
   }
 }
 
-export function searchResultVirtualRowInputs(rows: readonly SearchResultVirtualRow[]) {
+export function searchResultVirtualRowInputs(
+  rows: readonly SearchResultVirtualRow[],
+  headerHeight: number,
+) {
   return rows.map((row, index) => ({
     key: searchResultVirtualRowKey(row, index),
-    size: searchResultVirtualRowEstimate(row),
+    size: searchResultVirtualRowEstimate(row, headerHeight),
   }))
 }
 
@@ -415,10 +406,6 @@ export function searchResultFileEditorLineWindow({
 }): SearchResultFileEditorLineWindow {
   const visibleLineCount = searchResultFileEditorVisibleLineCount(lineCount)
   if (visibleLineCount === 0) return { end: 0, offsetY: 0, start: 0 }
-  if (visibleLineCount <= SEARCH_RESULT_FILE_EDITOR_FULL_RENDER_LINE_LIMIT) {
-    return { end: visibleLineCount, offsetY: 0, start: 0 }
-  }
-
   const rowStride = EXCERPT_EDITOR_LINE_HEIGHT + SEARCH_RESULT_FILE_EDITOR_ROW_GAP
   const contentTop =
     virtualItem.start + SEARCH_RESULT_VIRTUAL_ROW_OFFSET + FILE_RESULTS_ROW_VERTICAL_PADDING / 2
@@ -427,6 +414,9 @@ export function searchResultFileEditorLineWindow({
   const start = Math.max(0, Math.floor(startY / rowStride))
   const end = Math.min(visibleLineCount, Math.ceil(endY / rowStride))
   if (end <= start) return { end: 0, offsetY: 0, start: 0 }
+  if (visibleLineCount <= SEARCH_RESULT_FILE_EDITOR_FULL_RENDER_LINE_LIMIT) {
+    return { end: visibleLineCount, offsetY: 0, start: 0 }
+  }
 
   return {
     end,

@@ -7,6 +7,7 @@ import {
   XIcon,
 } from '@phosphor-icons/react'
 import { PaneBar } from '@workspace/ui/components/pane-bar'
+import { Tooltip, TooltipContent, TooltipTrigger } from '@workspace/ui/components/tooltip'
 import {
   Select,
   SelectTrigger,
@@ -58,7 +59,7 @@ export function HistoryToolbar({
   ]
   return (
     <>
-      <PaneBar border='bottom'>
+      <PaneBar>
         <Select
           value={refName}
           onValueChange={(value) => {
@@ -94,7 +95,7 @@ export function HistoryToolbar({
           </ToolbarButton>
         ) : null}
       </PaneBar>
-      <PaneBar border='bottom'>
+      <PaneBar>
         <InputGroup className='h-(--density-control-height-sm) min-w-0 flex-1'>
           <InputGroupAddon>
             <MagnifyingGlassIcon />
@@ -109,13 +110,20 @@ export function HistoryToolbar({
           />
           {search ? (
             <InputGroupAddon align='inline-end'>
-              <InputGroupButton
-                aria-label='Clear history search'
-                size='icon-xs'
-                onClick={() => onSearchChange('')}
-              >
-                <XIcon />
-              </InputGroupButton>
+              <Tooltip>
+                <TooltipTrigger
+                  render={
+                    <InputGroupButton
+                      aria-label='Clear history search'
+                      size='icon-xs'
+                      onClick={() => onSearchChange('')}
+                    >
+                      <XIcon />
+                    </InputGroupButton>
+                  }
+                />
+                <TooltipContent>Clear history search</TooltipContent>
+              </Tooltip>
             </InputGroupAddon>
           ) : null}
         </InputGroup>

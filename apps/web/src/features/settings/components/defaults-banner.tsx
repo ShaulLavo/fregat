@@ -9,7 +9,7 @@ import { selectSettingsScope } from '../state/scope-store'
  */
 export function DefaultsBanner() {
   return (
-    <div className='border-border bg-muted m-(--density-section-padding) flex shrink-0 flex-wrap items-center justify-between gap-2 rounded-lg border p-(--density-section-padding)'>
+    <div className='bg-muted m-(--density-section-padding) flex shrink-0 flex-wrap items-center justify-between gap-2 rounded-lg p-(--density-section-padding)'>
       <div className='flex min-w-0 items-start gap-2'>
         <InfoIcon className='text-info mt-0.5 size-(--icon-size) shrink-0' weight='fill' />
         <div className='min-w-0'>

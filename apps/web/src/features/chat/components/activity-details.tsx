@@ -4,7 +4,7 @@ import { ActivityDetailSection } from '@/features/chat/components/activity-detai
 
 export function ActivityDetails({ activity }: { activity: ChatWorkLogEntry }) {
   return (
-    <div className='border-border ml-4 space-y-2 border-l py-2 pl-3'>
+    <div className='ml-4 space-y-2 py-2 pl-3'>
       {workRowSections(activity).map(({ label, value }) => (
         <ActivityDetailSection activityId={activity.id} key={label} label={label} value={value} />
       ))}

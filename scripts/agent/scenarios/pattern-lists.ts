@@ -1,4 +1,5 @@
 import { strictEqual, ok } from 'node:assert/strict'
+import type { Page } from 'playwright'
 import type { Scenario } from './index'
 import { openGitPanel, runPaletteCommand, selectors } from '../selectors'
 
@@ -286,7 +287,23 @@ export const terminalTabs: Scenario = {
       true,
       'Dropping returns focus to the terminal list',
     )
+    await page.keyboard.press('Enter')
+    await expectTerminalFocus(page)
+    await step('terminal-keyboard-activated')
+    await list.focus()
+    await selectors.terminalRows(page).first().click()
+    await step('terminal-tab-clicked')
+    await expectTerminalFocus(page)
+    await step('terminal-input-focused')
   },
+}
+
+async function expectTerminalFocus(page: Page) {
+  await page.waitForFunction(
+    (element) => element?.contains(element.ownerDocument.activeElement),
+    await selectors.terminalSurface(page).elementHandle(),
+    { timeout: 5000 },
+  )
 }
 
 export const gitGraphKeyboard: Scenario = {

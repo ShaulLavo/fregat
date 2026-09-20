@@ -34,10 +34,7 @@ export function PaletteCard({
 
   return (
     <div
-      className={cn(
-        'border-border bg-card relative flex flex-col rounded-lg border',
-        selected && 'ring-ring ring-1',
-      )}
+      className={cn('bg-card relative flex flex-col rounded-lg', selected && 'ring-ring ring-1')}
       data-palette-card={palette.id}
     >
       <button

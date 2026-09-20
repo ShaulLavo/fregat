@@ -18,7 +18,7 @@ export function PlacesSidebar({
   const locations = sidebarLocationsFor(homePath)
 
   return (
-    <aside className='bg-muted/25 hidden min-h-0 border-r p-(--density-section-gap) lg:block'>
+    <aside className='bg-muted/25 hidden min-h-0 p-(--density-section-gap) lg:block'>
       <div className='text-muted-foreground text-2xs mb-1 px-(--density-row-padding-x) py-1 font-medium tracking-normal uppercase'>
         Locations
       </div>

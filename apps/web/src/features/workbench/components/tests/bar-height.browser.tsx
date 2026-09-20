@@ -24,7 +24,7 @@ afterEach(() => {
 test('the bar token resolves to one height per density', () => {
   mount(
     <section data-testid='reference'>
-      <PaneBar border='bottom'>reference</PaneBar>
+      <PaneBar>reference</PaneBar>
     </section>,
   )
 
@@ -39,7 +39,7 @@ test('a skeleton bar is the same height as a real bar', async () => {
   mount(
     <>
       <section data-testid='reference'>
-        <PaneBar border='bottom'>reference</PaneBar>
+        <PaneBar>reference</PaneBar>
       </section>
       <section data-testid='tree-skeleton'>
         <TreeLoading />
@@ -64,7 +64,7 @@ test('a skeleton bar is the same height as a real bar', async () => {
 test('a bar keeps its height when its content would wrap', () => {
   mount(
     <section data-testid='reference'>
-      <PaneBar border='bottom'>
+      <PaneBar>
         <span>
           A very long pane title that would wrap if the bar let it
           <br />

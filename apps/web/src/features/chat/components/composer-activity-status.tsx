@@ -40,7 +40,7 @@ export function ComposerActivityStatus({
 
   return (
     <div className='shrink-0 px-(--density-control-padding-x) pt-2' data-composer-activity>
-      <div className='border-border bg-card mx-auto max-w-3xl overflow-hidden rounded-lg border'>
+      <div className='bg-card mx-auto max-w-3xl overflow-hidden rounded-lg'>
         {label ? (
           <div className='flex min-w-0 items-center gap-2 px-2 py-1.5'>
             {active ? (
@@ -67,7 +67,7 @@ export function ComposerActivityStatus({
         {connection.kind !== 'live' && connection.detail ? (
           <p className='text-muted-foreground text-2xs px-2 pb-2'>{connection.detail}</p>
         ) : null}
-        {plan ? <ComposerActivePlan plan={plan} separated={label !== null} /> : null}
+        {plan ? <ComposerActivePlan plan={plan} /> : null}
       </div>
     </div>
   )

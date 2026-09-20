@@ -36,6 +36,10 @@ Split views: `scenario editor-split-drag` checks edge previews, modifier changes
 
 `trace editor-theme-preview --file syntax-highlighting.ts` previews three code themes twice and cancels. Compare traces for worker session restarts and inspect the scenario's screenshots for the editor behind the picker. It restores the committed theme without writing settings.
 
+`trace editor-syntax-native --file large.ts --workspace work/tmp/fregat-evidence/syntax-benchmark-fixtures` and `trace editor-syntax-shiki` run the same opening, 20 single-character edits, and scrolling with Native Dark or GitHub Dark. Pass the native evidence directory to Shiki's `--compare`. Use disposable TypeScript copies in that workspace; the scenarios disable auto-save in the browser context and never save. `inspection.json` includes worker round trips, Tree-sitter's internal timings, first text/highlight paint marks, and phase boundaries. Compare the first edit separately from later edits because Shiki loads grammars in the background. Repeat with `scenario` to check timings without Chrome's CPU profiler. Both paths must actually paint multiple syntax colors, and Shiki must retain a Tree-sitter worker.
+
+`scenario editor-syntax-shiki-settled` adds two seconds before editing to separate background startup work from the first edit. Syntax scenarios isolate and clean up their terminal sessions.
+
 Click `.editor-virtualized-viewport`, not the hidden textarea; the viewport intercepts pointer events. The typing scenario leaves the buffer dirty; it undoes but does not save. A conflict toast appears if another process writes the open file during the run.
 
 `renders editor-caret-burst` isolates 300 arrow-key moves without changing text. Compare the `ready` and `moved` snapshots in `render-steps.json`; setup renders are not caret-driven renders. Use `renders editor-type-burst` separately for document-change subscriptions. Each step snapshot is cumulative.

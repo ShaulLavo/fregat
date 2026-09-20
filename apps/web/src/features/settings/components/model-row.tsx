@@ -25,7 +25,7 @@ export function ModelRow({
 
   return (
     <div
-      className='border-border flex items-center gap-2 border-b px-(--density-control-padding-x) py-(--density-section-gap) last:border-b-0'
+      className='flex items-center gap-2 px-(--density-control-padding-x) py-(--density-section-gap)'
       title={`${row.label} · ${row.providerLabel} (${row.key})`}
     >
       <div className='flex min-w-0 flex-1 flex-col'>
@@ -44,6 +44,7 @@ export function ModelRow({
               <Button
                 aria-label={`Move ${row.label} up`}
                 disabled={!canMoveUp}
+                focusableWhenDisabled
                 onClick={() => moveModel(row.ref, -1, displayed)}
                 size='icon-sm'
                 variant='ghost'
@@ -60,6 +61,7 @@ export function ModelRow({
               <Button
                 aria-label={`Move ${row.label} down`}
                 disabled={!canMoveDown}
+                focusableWhenDisabled
                 onClick={() => moveModel(row.ref, 1, displayed)}
                 size='icon-sm'
                 variant='ghost'

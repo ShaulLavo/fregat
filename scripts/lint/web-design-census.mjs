@@ -42,7 +42,7 @@ export const TARGETS = {
   compactVariant: { title: "'compact:' utilities", limit: 0 },
   densityVars: { title: 'density variables', histogram: true, histogramOnly: true },
   barHeights: { title: 'bar heights', allowed: [BAR_HEIGHT], histogram: true },
-  dividerOpacity: { title: 'border-border/N dividers', limit: 0, listed: true },
+  hairlines: { title: 'hairline borders', limit: 0, listed: true },
   arbitraryText: { title: 'arbitrary text sizes', limit: 0, histogram: true, listed: true },
   shadow: {
     title: 'elevation steps',
@@ -117,7 +117,11 @@ const ARBITRARY_TEXT = /^text-\[(?:length:)?\d*\.?\d+[a-z%]*\]$/i
 // The row fills carry their own alpha (see the row tokens in globals.css), so an opacity modifier
 // on one always fights the design rather than expressing it.
 const ROW_FILL_OPACITY = /^(?:hover:)?bg-row-(?:hover|selected)\/\d+$/
-const DIVIDER_OPACITY = /^border(?:-(?:[trbl]|x|y|s|e))?-border\/\d+$/
+// Surfaces separate by tone, never by a line. A `border` class survives only as a sizing base for
+// a state color (`border border-transparent … aria-invalid:border-destructive`).
+const HAIRLINE =
+  /^(?:border(?:-(?:[trbl]|x|y|s|e))?(?:-(?:border|subtle)(?:\/\d+)?)?|divide-(?:x|y))$/
+const HAIRLINE_BASE = /\bborder-transparent\b/
 const HEIGHT_TOKEN = /^h-(?:\d+(?:\.\d+)?|px|\[[^\]]*\]|\([^)]*\))$/
 const TRUNCATION = /^(?:truncate|line-clamp-\d+)$/
 const SOURCE_FILE = /\.tsx?$/
@@ -418,33 +422,68 @@ function newlinesBefore(value, index) {
 function recordElement(census, file, element, lineAt) {
   const hit = { file, line: lineAt(element.start), value: `<${element.name}>` }
   if (element.name === 'button') census.hits.rawButtons.push(hit)
-  if (element.name !== 'button' && element.name !== 'Button') return
+  if (!isControl(element)) return
   const ownChildren = element.children.filter(isVisibleChild)
   const children =
     ownChildren.length > 0 ? ownChildren : element.renderedChildren.filter(isVisibleChild)
-  if (children.length === 0 || !children.every(isIconChild)) return
-  const trigger = element.ancestors.some((opening) => jsxName(opening.name) === 'TooltipTrigger')
-  const tooltip = element.ancestors.some((opening) => jsxName(opening.name)?.endsWith('Tooltip'))
-  if (
-    !hasTitle(element.opening) &&
-    (trigger || (tooltip && hasAttribute(element.opening, 'aria-label')))
+  const iconSize = /^icon(?:-|$)/.test(attributeValue(element.opening, 'size') ?? '')
+  if (!iconSize && (children.length === 0 || !children.every(isIconChild))) return
+  const problem = iconHintProblem(element)
+  if (problem !== null) census.hits.iconOnlyHint.push({ ...hit, value: problem })
+}
+
+function iconHintProblem(element) {
+  if (hasTitle(element.opening)) return 'icon-only title'
+  if (!hasTooltipTrigger(element)) return 'missing Tooltip'
+  if (!['Button', 'InputGroupButton'].includes(element.name)) return null
+  if (!booleanAttribute(element.opening, 'disabled')) return null
+  if (booleanAttribute(element.opening, 'focusableWhenDisabled')) return null
+  return 'disabled Tooltip trigger needs focusableWhenDisabled'
+}
+
+function booleanAttribute(opening, name) {
+  const attribute = opening.attributes.find(
+    (entry) => entry.type === 'JSXAttribute' && entry.name?.name === name,
   )
-    return
-  census.hits.iconOnlyHint.push({
-    ...hit,
-    value: hasTitle(element.opening) ? 'icon-only title' : 'missing Tooltip',
-  })
+  if (!attribute) return false
+  return attribute.value?.expression?.value !== false
+}
+
+function isControl(element) {
+  if (['button', 'Button', 'InputGroupButton', 'a', 'Link'].includes(element.name)) return true
+  if (attributeValue(element.opening, 'role') === 'button') return true
+  if (hasAttribute(element.opening, 'render')) return false
+  return /^(?:DropdownMenu|Popover|Dialog|Collapsible|Select|Accordion)(?:Trigger|Close)$/.test(
+    element.name,
+  )
+}
+
+function hasTooltipTrigger(element) {
+  for (const opening of element.ancestors.toReversed()) {
+    const name = jsxName(opening.name)
+    if (name === 'TooltipContent') return false
+    if (name === 'TooltipTrigger' || name === 'IconTooltip') return true
+  }
+  return false
 }
 
 function isVisibleChild(child) {
   if (child.type === 'JSXText') return child.value.trim() !== ''
+  if (child.type === 'JSXElement') return !isHiddenElement(child.openingElement)
   return child.type !== 'JSXExpressionContainer' || child.expression.type !== 'JSXEmptyExpression'
+}
+
+function isHiddenElement(opening) {
+  const classes = attributeValue(opening, 'className')?.split(/\s+/) ?? []
+  return classes.includes('sr-only') || classes.includes('hidden')
 }
 
 function isIconChild(child) {
   if (child.type === 'JSXElement') {
     const name = jsxName(child.openingElement.name)
+    if (isHiddenElement(child.openingElement)) return true
     if (name?.endsWith('Icon')) return true
+    if (['svg', 'img', 'Spinner', 'OrbitLoader', 'RingLoader'].includes(name)) return true
     if (name !== 'span' && name !== 'div') return false
     const children = child.children.filter(isVisibleChild)
     return children.length > 0 && children.every(isIconChild)
@@ -454,8 +493,9 @@ function isIconChild(child) {
     return children.length > 0 && children.every(isIconChild)
   }
   if (child.type === 'JSXExpressionContainer') return isIconChild(child.expression)
+  if (child.type === 'Literal') return child.value === null || typeof child.value === 'boolean'
   if (child.type === 'ConditionalExpression')
-    return isIconChild(child.consequent) && isIconChild(child.alternate)
+    return isIconChild(child.consequent) || isIconChild(child.alternate)
   if (child.type === 'LogicalExpression') return isIconChild(child.right)
   return false
 }
@@ -504,7 +544,7 @@ function recordToken(census, file, entry, token, lineOf, group) {
   if (token.variants.length === 0) recordBarShape(group, hit, token.base)
   if (token.variants.includes('compact'))
     census.hits.compactVariant.push({ ...hit, value: token.raw })
-  if (DIVIDER_OPACITY.test(token.base)) census.hits.dividerOpacity.push(hit)
+  if (HAIRLINE.test(token.base) && !HAIRLINE_BASE.test(entry.value)) census.hits.hairlines.push(hit)
   if (ARBITRARY_TEXT.test(token.base)) census.hits.arbitraryText.push(hit)
   if (PALETTE_CLASS.test(token.base)) census.hits.paletteLeaks.push(hit)
   if (TRUNCATION.test(token.base) && !entry.titled) census.hits.truncationRecovery.push(hit)
@@ -674,7 +714,7 @@ export function evaluate(census, allowEntries = []) {
     buttonRadius: gate('buttonRadius', census.hits.buttonRadius),
     compactVariant: gate('compactVariant', census.hits.compactVariant),
     barHeights: gate('barHeights', offTarget(census.hits.barHeights, TARGETS.barHeights.allowed)),
-    dividerOpacity: gate('dividerOpacity', census.hits.dividerOpacity),
+    hairlines: gate('hairlines', census.hits.hairlines),
     arbitraryText: gate('arbitraryText', census.hits.arbitraryText),
     shadow: gate('shadow', offTarget(census.hits.shadow, TARGETS.shadow.allowed)),
     rawButtons: gate('rawButtons', census.hits.rawButtons),

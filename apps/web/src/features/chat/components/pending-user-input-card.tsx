@@ -70,7 +70,7 @@ export function PendingUserInputCard({ pending }: { readonly pending: PendingUse
       className='shrink-0 px-(--density-control-padding-x) pb-(--density-section-gap)'
       role='region'
     >
-      <div className='border-warning/30 bg-warning/10 mx-auto flex max-w-3xl flex-col gap-(--density-control-gap) rounded-lg border p-(--density-section-padding)'>
+      <div className='bg-warning/10 mx-auto flex max-w-3xl flex-col gap-(--density-control-gap) rounded-lg p-(--density-section-padding)'>
         <div className='flex flex-wrap items-center gap-(--density-control-gap)'>
           <QuestionIcon aria-hidden='true' className='text-warning size-(--icon-size)' />
           <span className='text-warning text-2xs font-semibold tracking-widest uppercase'>

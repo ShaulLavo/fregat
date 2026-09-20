@@ -46,11 +46,7 @@ export function ActivityGroupRow({ activities }: { activities: readonly ChatWork
         </Button>
       ) : null}
       <div
-        className={
-          expanded
-            ? 'border-border ml-2 max-h-[min(18rem,50dvh)] overflow-auto border-l pl-2'
-            : undefined
-        }
+        className={expanded ? 'ml-2 max-h-[min(18rem,50dvh)] overflow-auto pl-2' : undefined}
         aria-label={expanded ? 'Tool calls' : undefined}
         role={expanded ? 'region' : undefined}
         tabIndex={expanded ? 0 : undefined}

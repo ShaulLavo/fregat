@@ -8,6 +8,7 @@ import {
   DropdownMenuTrigger,
 } from '@workspace/ui/components/dropdown-menu'
 import { Spinner } from '@workspace/ui/components/spinner'
+import { Tooltip, TooltipContent, TooltipTrigger } from '@workspace/ui/components/tooltip'
 import { WallpaperChoice } from '@/features/settings/components/widgets/wallpaper-choice'
 import { libraryImageUrl } from '@/lib/wallpapers/state/queries'
 import { wallpaperDisplayName, wallpaperTitle } from '@/lib/wallpapers/utils/groups'
@@ -49,19 +50,27 @@ export function WallpaperCard({
       </WallpaperChoice>
       {onDelete ? (
         <DropdownMenu>
-          <DropdownMenuTrigger
-            render={
-              <Button
-                size='icon-sm'
-                variant='secondary'
-                className='absolute top-2 left-2 opacity-0 group-focus-within/wallpaper:opacity-100 group-hover/wallpaper:opacity-100 aria-expanded:opacity-100'
-                aria-label={`Actions for ${asset.name}`}
-                disabled={disabled || deleting}
-              />
-            }
-          >
-            {deleting ? <Spinner /> : <DotsThreeIcon weight='bold' />}
-          </DropdownMenuTrigger>
+          <Tooltip>
+            <TooltipTrigger
+              render={
+                <DropdownMenuTrigger
+                  render={
+                    <Button
+                      size='icon-sm'
+                      variant='secondary'
+                      className='absolute top-2 left-2 opacity-0 group-focus-within/wallpaper:opacity-100 group-hover/wallpaper:opacity-100 aria-expanded:opacity-100'
+                      aria-label={`Actions for ${asset.name}`}
+                      disabled={disabled || deleting}
+                      focusableWhenDisabled
+                    />
+                  }
+                />
+              }
+            >
+              {deleting ? <Spinner /> : <DotsThreeIcon weight='bold' />}
+            </TooltipTrigger>
+            <TooltipContent>Actions for {asset.name}</TooltipContent>
+          </Tooltip>
           <DropdownMenuContent align='start'>
             <DropdownMenuItem variant='destructive' onClick={onDelete}>
               <TrashIcon />

@@ -46,7 +46,7 @@ export function LogsToolbar({ areas, filters, sources, onFiltersChange }: LogsTo
 
   return (
     <>
-      <PaneBar border='bottom'>
+      <PaneBar>
         <InputGroup className='bg-background h-(--density-control-height-sm) min-w-0 flex-1'>
           <InputGroupAddon align='inline-start'>
             <MagnifyingGlassIcon className='size-(--icon-size-sm)' />
@@ -113,7 +113,7 @@ export function LogsToolbar({ areas, filters, sources, onFiltersChange }: LogsTo
           </SelectContent>
         </Select>
       </PaneBar>
-      <PaneBar border='bottom'>
+      <PaneBar>
         <Select
           value={filters.source}
           onValueChange={(source) => {

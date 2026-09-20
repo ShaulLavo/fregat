@@ -30,7 +30,7 @@ export function WorktreeManagerRow({
   const eligibility = worktree.cleanupEligibility
   const eligible = eligibility.reason === 'eligible'
   return (
-    <li className='border-border flex flex-col gap-2 border-b py-3 last:border-0'>
+    <li className='flex flex-col gap-2 py-3'>
       <div className='flex min-w-0 items-center gap-2'>
         <WorktreeChip worktree={worktree} repositoryKind={project.repositoryKind} />
         {actions.pending ? <Spinner /> : null}

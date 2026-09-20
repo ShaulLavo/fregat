@@ -45,6 +45,7 @@ export function FileNavigatorHeader({
                   aria-label='New file at workspace root'
                   className='text-muted-foreground'
                   disabled={!mutationsEnabled}
+                  focusableWhenDisabled
                   size='icon-sm'
                   type='button'
                   variant='ghost'
@@ -63,6 +64,7 @@ export function FileNavigatorHeader({
                   aria-label='New folder at workspace root'
                   className='text-muted-foreground'
                   disabled={!mutationsEnabled}
+                  focusableWhenDisabled
                   size='icon-sm'
                   type='button'
                   variant='ghost'
@@ -81,6 +83,7 @@ export function FileNavigatorHeader({
                   aria-label='Reveal active file in tree'
                   className='text-muted-foreground'
                   disabled={!toolbar}
+                  focusableWhenDisabled
                   size='icon-sm'
                   type='button'
                   variant='ghost'

@@ -61,9 +61,9 @@ export function SettingsDialog({
         ref={setRootRef}
         tabIndex={-1}
       >
-        <DialogHeader className='border-border border-b p-(--density-section-padding) max-sm:shrink-0 max-sm:pr-14'>
+        <DialogHeader className='p-(--density-section-padding) max-sm:shrink-0 max-sm:pr-14'>
           <DialogTitle className='flex items-center gap-(--density-control-gap)'>
-            <span className='border-info/20 bg-info/10 text-info flex size-(--density-control-height-sm) items-center justify-center rounded-md border'>
+            <span className='bg-info/10 text-info flex size-(--density-control-height-sm) items-center justify-center rounded-md'>
               <GearSixIcon weight='duotone' />
             </span>
             Settings

@@ -54,7 +54,7 @@ export function MoveTabToGroupDialog() {
       }}
     >
       <DialogContent ref={ref} finalFocus={false} className='gap-0 p-0'>
-        <DialogHeader className='border-border h-(--bar-height) justify-center border-b px-(--bar-padding-x)'>
+        <DialogHeader className='h-(--bar-height) justify-center px-(--bar-padding-x)'>
           <DialogTitle>Move tab to group</DialogTitle>
           <DialogDescription className='sr-only'>
             Choose a destination for {tab ? tabLabel(tab.content) : 'the tab'}.

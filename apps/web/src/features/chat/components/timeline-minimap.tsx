@@ -1,3 +1,4 @@
+import { Tooltip, TooltipContent, TooltipTrigger } from '@workspace/ui/components/tooltip'
 import { cn } from '@workspace/ui/lib/utils'
 import { useRef, useState, type KeyboardEvent } from 'react'
 
@@ -70,25 +71,33 @@ export function TimelineMinimap({
         {marks.map((mark, index) => (
           // Raw button: Button's ghost hover would paint a block over the transcript,
           // and its active translate would fight this mark's own -translate-y-1/2.
-          <button
-            aria-current={mark.id === activeMarkId ? 'true' : undefined}
-            aria-label={`Jump to turn ${mark.ordinal} of ${marks.length}`}
-            className='focus-ring pointer-events-auto absolute right-0 flex h-3 w-full -translate-y-1/2 items-center justify-end focus-visible:outline-none'
-            data-turn={index}
-            key={mark.id}
-            style={{ top: `${mark.startFraction * 100}%` }}
-            tabIndex={mark.id === rovingMarkId ? 0 : -1}
-            type='button'
-            onClick={() => onSelect(mark)}
-            onFocus={() => setFocusedMarkId(mark.id)}
-          >
-            <span
-              className={cn(
-                'bg-muted-foreground/50 h-px w-2 rounded-full transition-[width,height]',
-                mark.id === activeMarkId && 'bg-foreground h-0.5 w-full',
-              )}
-            />
-          </button>
+          <Tooltip key={mark.id}>
+            <TooltipTrigger
+              render={
+                <button
+                  aria-current={mark.id === activeMarkId ? 'true' : undefined}
+                  aria-label={`Jump to turn ${mark.ordinal} of ${marks.length}`}
+                  className='focus-ring pointer-events-auto absolute right-0 flex h-3 w-full -translate-y-1/2 items-center justify-end focus-visible:outline-none'
+                  data-turn={index}
+                  style={{ top: `${mark.startFraction * 100}%` }}
+                  tabIndex={mark.id === rovingMarkId ? 0 : -1}
+                  type='button'
+                  onClick={() => onSelect(mark)}
+                  onFocus={() => setFocusedMarkId(mark.id)}
+                />
+              }
+            >
+              <span
+                className={cn(
+                  'bg-muted-foreground/50 h-px w-2 rounded-full transition-[width,height]',
+                  mark.id === activeMarkId && 'bg-foreground h-0.5 w-full',
+                )}
+              />
+            </TooltipTrigger>
+            <TooltipContent side='left'>
+              Jump to turn {mark.ordinal} of {marks.length}
+            </TooltipContent>
+          </Tooltip>
         ))}
       </div>
     </nav>

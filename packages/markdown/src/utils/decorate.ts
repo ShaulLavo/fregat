@@ -16,25 +16,23 @@ export const MARKDOWN_CLASS_NAMES: Readonly<Record<string, string>> = {
   h4: 'mt-6 mb-2 font-semibold text-lg',
   h5: 'mt-6 mb-2 font-semibold text-base',
   h6: 'mt-6 mb-2 font-semibold text-sm',
-  hr: 'my-6 border-border',
+  hr: 'my-6 h-px border-0 bg-muted',
   img: 'my-4 max-w-full rounded-lg',
   li: 'py-1 [&>p]:inline',
   ol: 'list-inside list-decimal whitespace-normal [li_&]:pl-6',
-  pre: 'my-4 overflow-x-auto rounded-md border border-border bg-background p-4 text-sm',
+  pre: 'my-4 overflow-x-auto rounded-md bg-background p-4 text-sm',
   strong: 'font-semibold',
   sub: 'text-sm',
   sup: 'text-sm',
-  table: 'w-full divide-y divide-border',
-  tbody: 'divide-y divide-border',
+  table: 'w-full',
+  tbody: '[&>tr:nth-child(even)]:bg-muted/40',
   td: 'px-4 py-2 text-sm',
   th: 'whitespace-nowrap px-4 py-2 text-left font-semibold text-sm',
   thead: 'bg-muted/80',
-  tr: 'border-border',
   ul: 'list-inside list-disc whitespace-normal [li_&]:pl-6',
 }
 
-const TABLE_WRAPPER_CLASS_NAME =
-  'my-4 overflow-x-auto rounded-md border border-border bg-background'
+const TABLE_WRAPPER_CLASS_NAME = 'my-4 overflow-x-auto rounded-md bg-background'
 
 export function rehypeDecorate() {
   return (tree: Root) => {

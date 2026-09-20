@@ -40,6 +40,7 @@ export type SearchResultVirtualWindowScheduler = {
 }
 
 type SearchResultVirtualWindowStoreOptions = {
+  readonly initialViewport?: SearchResultVirtualListViewport
   readonly metrics: SearchResultVirtualListMetrics
   readonly onChange?: SearchResultVirtualWindowChangeHandler | null
   readonly scheduler?: SearchResultVirtualWindowScheduler
@@ -67,11 +68,13 @@ export class SearchResultVirtualWindowStore {
   private window: SearchResultVirtualWindow
 
   public constructor({
+    initialViewport = INITIAL_SEARCH_RESULT_VIRTUAL_WINDOW_VIEWPORT,
     metrics,
     onChange = null,
     scheduler = defaultSearchResultVirtualWindowScheduler(),
   }: SearchResultVirtualWindowStoreOptions) {
     this.metrics = metrics
+    this.viewport = initialViewport
     this.onChange = onChange
     this.scheduler = scheduler
     this.window = this.nextWindow()

@@ -170,7 +170,7 @@ test('a provider interrupt failure restores Stop and a retry waits for its own o
     fireEvent.click(view.getByRole('button', { name: 'Open cached session' }))
     fireEvent.click(view.getByRole('button', { name: 'Stop current turn' }))
     await waitFor(() => expect(dispatched).toHaveLength(1))
-    expect(view.getByRole('button', { name: 'Stopping…' })).toBeDisabled()
+    expect(view.getByRole('button', { name: 'Stopping…' })).toHaveAttribute('aria-disabled', 'true')
 
     const failed = sessionActivity({
       id: v.parse(eventIdSchema, 'current-stop-failed'),
@@ -197,7 +197,7 @@ test('a provider interrupt failure restores Stop and a retry waits for its own o
 
     fireEvent.click(view.getByRole('button', { name: 'Stop current turn' }))
     await waitFor(() => expect(dispatched).toHaveLength(2))
-    expect(view.getByRole('button', { name: 'Stopping…' })).toBeDisabled()
+    expect(view.getByRole('button', { name: 'Stopping…' })).toHaveAttribute('aria-disabled', 'true')
     const sessionRef = { environmentId: TEST_ENVIRONMENT_ID, sessionId: running.id }
     act(() =>
       useSessionDetailSyncStore.getState().setSessionDetailSync(sessionRef, {
@@ -216,7 +216,7 @@ test('a provider interrupt failure restores Stop and a retry waits for its own o
         status: 'live',
       })
     })
-    expect(view.getByRole('button', { name: 'Stopping…' })).toBeDisabled()
+    expect(view.getByRole('button', { name: 'Stopping…' })).toHaveAttribute('aria-disabled', 'true')
 
     snapshot = {
       ...snapshot,

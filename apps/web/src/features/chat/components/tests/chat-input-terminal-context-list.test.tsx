@@ -11,11 +11,13 @@ function staged(id: string, text: string): ChatInputTerminalContext {
 }
 
 test('nothing captured renders no strip at all', () => {
-  const { container } = renderWithProviders(
-    <ChatInputTerminalContextList contexts={[]} disabled={false} onRemove={() => undefined} />,
+  renderWithProviders(
+    <div data-testid='context-list'>
+      <ChatInputTerminalContextList contexts={[]} disabled={false} onRemove={() => undefined} />
+    </div>,
   )
 
-  expect(container.firstChild).toBeNull()
+  expect(screen.getByTestId('context-list')).toBeEmptyDOMElement()
 })
 
 test('a staged capture shows which terminal and which lines it came from', () => {
@@ -57,5 +59,8 @@ test('a disabled composer cannot drop its captures', () => {
     />,
   )
 
-  expect(screen.getByRole('button', { name: 'Remove terminal-1 lines 810-812' })).toBeDisabled()
+  expect(screen.getByRole('button', { name: 'Remove terminal-1 lines 810-812' })).toHaveAttribute(
+    'aria-disabled',
+    'true',
+  )
 })

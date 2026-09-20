@@ -47,7 +47,7 @@ export function MachineRow({
   }
   if (editing)
     return (
-      <div className='border-border rounded-lg border p-4'>
+      <div className='bg-muted rounded-lg p-4'>
         <MachineForm
           name={name}
           machine={machine}
@@ -60,7 +60,7 @@ export function MachineRow({
   const detail = `${name} · ${machine.kind === 'ssh' ? machine.target : machine.url}`
 
   return (
-    <div className='border-border flex flex-col gap-2 rounded-lg border p-3'>
+    <div className='bg-muted flex flex-col gap-2 rounded-lg p-3'>
       <div className='flex items-center gap-2' title={detail}>
         <Phase label={machine.label ?? name} phase={phase} />
         <span className='min-w-0 flex-1 truncate text-sm font-medium'>{machine.label ?? name}</span>

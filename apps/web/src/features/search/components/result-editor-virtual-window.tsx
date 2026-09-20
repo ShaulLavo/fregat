@@ -11,6 +11,7 @@ import { SearchResultFileEditorPoolSlot } from '@/features/search/components/res
 import { SearchResultFileHeaderRow } from '@/features/search/components/result-file-header-row'
 import type { SearchResultId } from '@/features/search/utils/result-items'
 import type { SearchResultVirtualRow } from '@/features/search/utils/result-view-model'
+import type { SearchResultVirtualListViewport } from '@/features/search/utils/result-virtual-list'
 import { useSearchResultEditorVirtualizer } from '@/features/search/hooks/use-result-editor-virtualizer'
 import { useSearchResultFileEditorPoolEntries } from '@/features/search/hooks/use-result-file-editor-pool-entries'
 
@@ -18,6 +19,7 @@ type SearchResultEditorVirtualWindowProps = {
   readonly activeResultId: SearchResultId | null
   readonly canReplace?: boolean
   readonly editorTheme: EditorTheme
+  readonly initialViewport: SearchResultVirtualListViewport
 
   readonly parentRef: RefObject<HTMLDivElement | null>
   readonly prewarmEditorPool: boolean
@@ -33,6 +35,7 @@ export const SearchResultEditorVirtualWindow = memo(
     activeResultId,
     canReplace,
     editorTheme,
+    initialViewport,
 
     parentRef,
     prewarmEditorPool,
@@ -48,7 +51,7 @@ export const SearchResultEditorVirtualWindow = memo(
       scrollToOffset,
       totalSize: virtualTotalSize,
       viewport,
-    } = useSearchResultEditorVirtualizer(rows, parentRef)
+    } = useSearchResultEditorVirtualizer(rows, parentRef, 'raf', initialViewport)
     scrollToIndexRef.current = scrollToIndex
     scrollToOffsetRef.current = scrollToOffset
 

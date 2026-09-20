@@ -136,7 +136,12 @@ test.for([
       expect(queryClient.getQueryState(queryKey)?.status).toBe('pending')
       expect(queryClient.getQueryData(queryKey)).toBeUndefined()
       const trigger = screen.queryByRole('button', { name: 'Model options' })
-      if (hasCapabilities) expect(trigger).toHaveAttribute('title', 'Model options: Max · On')
+      if (hasCapabilities) {
+        const control = screen.getByRole('button', { name: 'Model options' })
+        expect(control).not.toHaveAttribute('title')
+        await userEvent.hover(control)
+        expect(await screen.findByText('Model options: Max · On')).toBeVisible()
+      }
       if (!hasCapabilities) expect(trigger).toBeNull()
       if (hasCapabilities && !compact) expect(trigger).toHaveTextContent('Max · On')
 

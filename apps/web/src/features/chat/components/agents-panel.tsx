@@ -30,7 +30,7 @@ export function AgentsPanel({
       }}
     >
       <DialogContent className='flex flex-col gap-0' overlayClassName='hidden' side='right'>
-        <DialogHeader className='border-border border-b pb-4'>
+        <DialogHeader className='pb-4'>
           <DialogTitle>Agents</DialogTitle>
           <DialogDescription>
             {group ? chatAgentGroupLabel(group) : 'Agent activity'}

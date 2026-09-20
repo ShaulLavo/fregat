@@ -82,7 +82,7 @@ export function ChatModeLayout({
             <ResizableHandle id='tools-handle' withHandle />
             <ResizablePanel
               className={cn(
-                'border-border min-h-0 min-w-0 overflow-hidden border-l',
+                'min-h-0 min-w-0 overflow-hidden',
                 // Editor and terminal paint their own content wells.
                 panels.activeToolTab !== 'editor' &&
                   panels.activeToolTab !== 'terminal' &&

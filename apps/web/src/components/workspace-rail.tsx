@@ -20,8 +20,8 @@ export function WorkspaceRail({
     <nav
       aria-label={label}
       className={cn(
-        'border-border flex w-(--rail-width) shrink-0 flex-col items-center gap-1 p-1',
-        side === 'left' ? 'border-r' : 'bg-card backdrop-material border-l',
+        'flex w-(--rail-width) shrink-0 flex-col items-center gap-1 p-1',
+        side === 'right' && 'bg-card backdrop-material',
       )}
     >
       {children}

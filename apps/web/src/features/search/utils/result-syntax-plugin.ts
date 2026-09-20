@@ -1,7 +1,6 @@
 import {
   createDocumentTextSnapshot,
   createEmptySyntaxResult,
-  createPieceTableSnapshot,
   type DocumentSessionChange,
   type EditorPlugin,
   type EditorSyntaxLanguageId,
@@ -12,10 +11,14 @@ import {
   type EditorToken,
   type EditorTokenInput,
   type PieceTableSnapshot,
-  toEditorTokenStore,
 } from '@singapore-editor/core'
 
 import { SEARCH_RESULT_FILE_DOCUMENT_ID_PREFIX } from '@/features/search/utils/result-editor'
+import {
+  searchResultSyntaxCache,
+  type SearchResultSyntaxCache,
+  type SearchResultSyntaxLease,
+} from '@/features/search/state/result-syntax-cache'
 
 type SearchResultSyntaxLine = {
   readonly end: number
@@ -36,11 +39,12 @@ export function createSearchResultSyntaxHighlightingPlugin(
 export function createSearchResultSyntaxProvider(
   syntaxProvider: EditorSyntaxProvider,
 ): EditorSyntaxProvider {
+  const cache = searchResultSyntaxCache(syntaxProvider)
   return {
     createSession: (options) => {
       if (!searchResultSyntaxSessionOptions(options)) return null
 
-      return new SearchResultSyntaxSession(syntaxProvider, options)
+      return new SearchResultSyntaxSession(cache, options)
     },
   }
 }
@@ -55,19 +59,20 @@ function searchResultSyntaxSessionOptions(
 
 class SearchResultSyntaxSession implements EditorSyntaxSession {
   public readonly foldingSupport = 'unsupported'
-  private readonly syntaxProvider: EditorSyntaxProvider
+  private readonly cache: SearchResultSyntaxCache
   private readonly options: EditorSyntaxSessionOptions & {
     readonly languageId: EditorSyntaxLanguageId
   }
   private disposed = false
   private result: EditorSyntaxResult
   private snapshotVersion = 0
+  private pendingLine: SearchResultSyntaxLease | null = null
 
   public constructor(
-    syntaxProvider: EditorSyntaxProvider,
+    cache: SearchResultSyntaxCache,
     options: EditorSyntaxSessionOptions & { readonly languageId: EditorSyntaxLanguageId },
   ) {
-    this.syntaxProvider = syntaxProvider
+    this.cache = cache
     this.options = options
     this.result = this.createResult([], options.snapshot, 0)
   }
@@ -105,9 +110,11 @@ class SearchResultSyntaxSession implements EditorSyntaxSession {
 
   public dispose(): void {
     this.disposed = true
+    this.cancelPendingLine()
   }
 
   private nextSnapshotVersion(): number {
+    this.cancelPendingLine()
     this.snapshotVersion += 1
     return this.snapshotVersion
   }
@@ -126,41 +133,33 @@ class SearchResultSyntaxSession implements EditorSyntaxSession {
     if (linesToParse.length === 0) return []
 
     const tokens: EditorToken[] = []
-    for (const line of linesToParse) tokens.push(...(await this.parseLine(line, snapshotVersion)))
+    for (const line of linesToParse) {
+      if (!this.canApplySnapshotVersion(snapshotVersion)) break
+
+      tokens.push(...(await this.parseLine(line, snapshotVersion)))
+    }
     return tokens
   }
 
-  private createLineSyntaxSession(
-    line: SearchResultSyntaxLine,
-    snapshotVersion: number,
-  ): EditorSyntaxSession | null {
-    const snapshot = createPieceTableSnapshot('')
-    return this.syntaxProvider.createSession({
-      documentId: `${this.options.documentId}:excerpt:${snapshotVersion}:${line.start}`,
-      languageId: this.options.languageId,
-      includeCaptures: this.options.includeCaptures,
-      includeHighlights: this.options.includeHighlights,
-      syntaxMode: 'full',
-      fullText: '',
-      snapshot,
-      textSnapshot: createDocumentTextSnapshot(snapshot, ''),
-    })
+  private cancelPendingLine(): void {
+    this.pendingLine?.release()
+    this.pendingLine = null
   }
 
   private async parseLine(
     line: SearchResultSyntaxLine,
     snapshotVersion: number,
   ): Promise<readonly EditorToken[]> {
-    const session = this.createLineSyntaxSession(line, snapshotVersion)
-    if (!session) return []
-
-    const snapshot = createPieceTableSnapshot(line.text)
+    const lease = this.cache.acquire({ ...this.options, text: line.text })
+    this.pendingLine = lease
     try {
-      const result = await session.refresh(snapshot, line.text)
-      // One result line's tokens, so unpacking them costs the line, not a document.
-      return offsetEditorTokens(toEditorTokenStore(result.tokens).toTokens(), line.start)
+      return offsetEditorTokens(await lease.result, line.start)
+    } catch (error) {
+      if (!this.canApplySnapshotVersion(snapshotVersion)) return []
+      throw error
     } finally {
-      session.dispose()
+      lease.release()
+      if (this.pendingLine === lease) this.pendingLine = null
     }
   }
 

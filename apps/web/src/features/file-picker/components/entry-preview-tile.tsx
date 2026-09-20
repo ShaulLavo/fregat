@@ -25,7 +25,7 @@ export function EntryPreviewTile({
   return (
     <span
       className={cn(
-        'relative flex shrink-0 items-center justify-center rounded-md border',
+        'relative flex shrink-0 items-center justify-center rounded-md',
         large ? 'size-24' : 'size-7',
         tileTone(entry, selected),
       )}
@@ -37,7 +37,7 @@ export function EntryPreviewTile({
         selected={selected}
       />
       {large && extension && (
-        <span className='bg-background/90 text-muted-foreground ring-border text-3xs absolute right-1.5 bottom-1.5 rounded-md px-1 py-0.5 font-medium uppercase ring-1'>
+        <span className='bg-background/90 text-muted-foreground text-3xs absolute right-1.5 bottom-1.5 rounded-md px-1 py-0.5 font-medium uppercase'>
           {extension}
         </span>
       )}

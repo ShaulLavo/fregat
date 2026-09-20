@@ -4,10 +4,7 @@ import {
   CaretDownIcon,
   CaretUpIcon,
 } from '@phosphor-icons/react'
-import { Button } from '@workspace/ui/components/button'
-import { cn } from '@workspace/ui/lib/utils'
-import type { ReactNode } from 'react'
-
+import { SummaryButton } from '@/features/search/components/summary-button'
 import { useSearchSummaryModel } from '@/features/search/hooks/use-summary-model'
 import { useSearchBufferState } from '@/features/search/state/buffer-state'
 
@@ -59,34 +56,5 @@ export function SearchSummaryActions({
         <CaretDownIcon className='size-(--icon-size-sm)' />
       </SummaryButton>
     </>
-  )
-}
-
-function SummaryButton({
-  children,
-  className,
-  disabled,
-  label,
-  onClick,
-}: {
-  children: ReactNode
-  className?: string
-  disabled: boolean
-  label: string
-  onClick: () => void
-}) {
-  return (
-    <Button
-      aria-label={label}
-      className={cn('text-muted-foreground hover:text-foreground', className)}
-      disabled={disabled}
-      size='icon-sm'
-      title={label}
-      type='button'
-      variant='ghost'
-      onClick={onClick}
-    >
-      {children}
-    </Button>
   )
 }

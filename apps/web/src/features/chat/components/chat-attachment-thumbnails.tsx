@@ -4,6 +4,7 @@ import { serverEndpoint } from '@/lib/client'
 import { useEnvironmentsStore } from '@/lib/environments/state/store'
 import type { ChatAttachment } from '@workspace/contracts'
 import { Button } from '@workspace/ui/components/button'
+import { Tooltip, TooltipContent, TooltipTrigger } from '@workspace/ui/components/tooltip'
 import { cn } from '@workspace/ui/lib/utils'
 import { useState } from 'react'
 
@@ -34,29 +35,34 @@ export function ChatAttachmentThumbnails({
   return (
     <div className={cn('flex flex-wrap gap-1.5', className)} data-chat-attachments='true'>
       {images.map((image, index) => (
-        <Button
-          aria-label={`Open ${image.name}`}
-          className='size-16 shrink-0 overflow-hidden'
-          data-scroll-anchor-ignore
-          key={image.id}
-          size='icon'
-          title={image.name}
-          type='button'
-          variant='outline'
-          onClick={() => setOpenIndex(index)}
-        >
-          <img
-            alt=''
-            className='size-full object-cover'
-            crossOrigin='anonymous'
-            draggable={false}
-            src={image.src}
-          />
-        </Button>
+        <Tooltip key={image.id}>
+          <TooltipTrigger
+            render={
+              <Button
+                aria-label={`Open ${image.name}`}
+                className='size-16 shrink-0 overflow-hidden'
+                data-scroll-anchor-ignore
+                size='icon'
+                type='button'
+                variant='outline'
+                onClick={() => setOpenIndex(index)}
+              />
+            }
+          >
+            <img
+              alt=''
+              className='size-full object-cover'
+              crossOrigin='anonymous'
+              draggable={false}
+              src={image.src}
+            />
+          </TooltipTrigger>
+          <TooltipContent>Open {image.name}</TooltipContent>
+        </Tooltip>
       ))}
       {unrenderable.map((attachment) => (
         <span
-          className='border-border text-muted-foreground text-3xs rounded-md border px-1.5 py-0.5'
+          className='bg-muted text-muted-foreground text-3xs rounded-md px-1.5 py-0.5'
           key={attachment.id}
           title='This image type was not stored, so it cannot be shown.'
         >

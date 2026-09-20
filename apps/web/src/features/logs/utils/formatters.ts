@@ -36,11 +36,11 @@ export function formatLogSecondary(event: LogEventSummary) {
 }
 
 export function logLevelClass(level: LogDashboardLevel) {
-  if (level === 'error') return 'border-destructive/50 bg-destructive/10 text-destructive'
-  if (level === 'warn') return 'border-warning/50 bg-warning/10 text-warning'
-  if (level === 'debug') return 'border-info/40 bg-info/10 text-info'
+  if (level === 'error') return 'bg-destructive/10 text-destructive'
+  if (level === 'warn') return 'bg-warning/10 text-warning'
+  if (level === 'debug') return 'bg-info/10 text-info'
 
-  return 'border-success/35 bg-success/10 text-success'
+  return 'bg-success/10 text-success'
 }
 
 export function logLevelDotClass(level: LogDashboardLevel) {

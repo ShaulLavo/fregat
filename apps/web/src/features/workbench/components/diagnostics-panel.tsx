@@ -116,10 +116,7 @@ function renderDiagnosticCount({
   readonly value: number
 }) {
   return (
-    <div
-      className={cn('rounded-lg border px-2 py-1', diagnosticTileClass(severity, value))}
-      key={label}
-    >
+    <div className={cn('rounded-lg px-2 py-1', diagnosticTileClass(severity, value))} key={label}>
       <div className='text-muted-foreground'>{label}</div>
       <div className={cn('font-medium tabular-nums', diagnosticValueClass(severity, value))}>
         {value}
@@ -153,10 +150,10 @@ function diagnosticValueClass(severity: number, value: number) {
 }
 
 function diagnosticTileClass(severity: number, value: number) {
-  if (value === 0) return 'border-border'
-  if (severity === 1) return 'border-destructive/30 bg-destructive/10'
-  if (severity === 2) return 'border-warning/30 bg-warning/10'
-  if (severity === 3) return 'border-info/30 bg-info/10'
+  if (value === 0) return 'bg-muted'
+  if (severity === 1) return 'bg-destructive/10'
+  if (severity === 2) return 'bg-warning/10'
+  if (severity === 3) return 'bg-info/10'
 
-  return 'border-border'
+  return 'bg-muted'
 }

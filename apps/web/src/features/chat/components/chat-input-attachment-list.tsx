@@ -31,24 +31,31 @@ export function ChatInputAttachmentList({
     >
       {attachments.map((attachment, index) => (
         <div
-          className='border-subtle bg-muted/35 flex max-w-48 shrink-0 items-center gap-2 rounded-md border p-1 pr-1.5'
+          className='bg-muted/35 flex max-w-48 shrink-0 items-center gap-2 rounded-md p-1 pr-1.5'
           key={attachment.id}
         >
-          <Button
-            aria-label={`Open ${attachment.name}`}
-            className='size-9 shrink-0 overflow-hidden'
-            size='icon'
-            type='button'
-            variant='ghost'
-            onClick={() => setOpenIndex(index)}
-          >
-            <img
-              alt=''
-              className='size-full object-cover'
-              draggable={false}
-              src={attachment.previewUrl}
-            />
-          </Button>
+          <Tooltip>
+            <TooltipTrigger
+              render={
+                <Button
+                  aria-label={`Open ${attachment.name}`}
+                  className='size-9 shrink-0 overflow-hidden'
+                  size='icon'
+                  type='button'
+                  variant='ghost'
+                  onClick={() => setOpenIndex(index)}
+                />
+              }
+            >
+              <img
+                alt=''
+                className='size-full object-cover'
+                draggable={false}
+                src={attachment.previewUrl}
+              />
+            </TooltipTrigger>
+            <TooltipContent>Open {attachment.name}</TooltipContent>
+          </Tooltip>
           {/* Not on the chip: its remove button is a Tooltip control (D4). */}
           <span className='min-w-0 flex-1 text-xs' title={attachment.name}>
             <span className='block truncate font-medium'>{attachment.name}</span>
@@ -63,6 +70,7 @@ export function ChatInputAttachmentList({
                   aria-label={`Remove ${attachment.name}`}
                   className='text-muted-foreground'
                   disabled={disabled}
+                  focusableWhenDisabled
                   size='icon-xs'
                   type='button'
                   variant='ghost'

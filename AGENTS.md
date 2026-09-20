@@ -97,9 +97,11 @@ entry without a real reason is itself a violation.
   that changes height when data arrives is the bug this rule exists to prevent.
 - **One density system.** The `--density-*` custom properties. Never hand-write a
   `compact:`-prefixed pair; the variant no longer exists.
-- **Dividers.** `border-border` between regions, `border-subtle` inside content. No opacity
-  modifier on either. Inside `[data-workbench]`, `--border` is the 8% foreground hairline, so a pane
-  edge, a rail and a bar all draw one line wherever the bar tokens meet.
+- **No dividers.** Surfaces separate by tone, never by a line: a sidebar is `bg-card` beside a
+  `bg-background` well, a chip is a `bg-muted` fill, a callout is a status tint. `border-border`,
+  `border-subtle`, `divide-*` and any edge border are banned (`hairlines` in the census); a bare
+  `border` survives only as `border border-transparent`, the sizing base for a state color such as
+  `aria-invalid:border-destructive`. Floating surfaces keep their `ring-1 ring-foreground/10`.
 - **Four type sizes.** `text-sm`, `text-xs`, `text-2xs` (11px), `text-3xs` (10px). An arbitrary
   `text-[Npx]` is banned. A bar title is `text-xs font-medium`; a pane section heading is
   `text-sm font-semibold`.

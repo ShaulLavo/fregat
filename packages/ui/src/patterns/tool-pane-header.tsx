@@ -65,7 +65,7 @@ export function ToolPaneHeader({
         {...props}
         data-slot='tool-pane-header'
         className={cn(
-          'flex h-full w-(--rail-width) shrink-0 flex-col items-center gap-1 border-r border-border px-1 py-1 text-foreground',
+          'flex h-full w-(--rail-width) shrink-0 flex-col items-center gap-1 px-1 py-1 text-foreground',
           className,
         )}
       >
@@ -78,7 +78,6 @@ export function ToolPaneHeader({
     <PaneBar
       {...props}
       as='header'
-      border='bottom'
       data-slot='tool-pane-header'
       className={cn('text-foreground', className)}
     >

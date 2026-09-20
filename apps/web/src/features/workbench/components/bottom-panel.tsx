@@ -33,11 +33,11 @@ export function BottomPanel({
 
   return (
     <ToolPane
-      className='border-border h-full min-w-0 overflow-hidden border-t'
+      className='h-full min-w-0 overflow-hidden'
       header={null}
       bodyClassName='flex overflow-hidden bg-content-well'
       subheader={
-        <PaneBar border='bottom' className={cn(BAR_TAB_STRIP_CLASS, 'bg-background px-0')}>
+        <PaneBar className={cn(BAR_TAB_STRIP_CLASS, 'bg-background px-0')}>
           <div
             aria-label='Bottom panel tabs'
             className='flex shrink-0 items-stretch'

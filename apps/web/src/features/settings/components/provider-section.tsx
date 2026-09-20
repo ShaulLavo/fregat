@@ -26,7 +26,7 @@ export function ProviderSection({ saved }: { saved: readonly ProviderInstanceCon
   if (instances.length === 0) return <EmptyRow>No providers are available.</EmptyRow>
 
   return (
-    <div className='border-border flex w-96 max-w-full min-w-0 flex-col rounded-lg border @max-3xl/settings:w-full'>
+    <div className='bg-muted flex w-96 max-w-full min-w-0 flex-col rounded-lg @max-3xl/settings:w-full'>
       {instances.map((instance) => (
         <ProviderRow key={instance.providerInstanceId} instance={instance} />
       ))}

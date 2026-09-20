@@ -42,6 +42,7 @@ export function ChatPanelHeader({
                   aria-label='New chat'
                   className='text-muted-foreground'
                   disabled={disabled || creating}
+                  focusableWhenDisabled
                   size='icon-sm'
                   type='button'
                   variant='ghost'
@@ -69,6 +70,7 @@ export function ChatPanelHeader({
                         aria-label='Conversation history'
                         className='text-muted-foreground'
                         disabled={historyDisabled}
+                        focusableWhenDisabled
                         size='icon-sm'
                         type='button'
                         variant='ghost'

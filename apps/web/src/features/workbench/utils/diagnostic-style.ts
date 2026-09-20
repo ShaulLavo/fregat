@@ -3,5 +3,5 @@ export function diagnosticRuleClass(severity: number | undefined) {
   if (severity === 2) return 'border-l-warning'
   if (severity === 3) return 'border-l-info'
 
-  return 'border-l-border'
+  return 'border-l-transparent'
 }

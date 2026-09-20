@@ -194,7 +194,7 @@ export function SessionRail() {
 
   return (
     <aside
-      className='bg-card backdrop-material border-border flex h-full min-h-0 min-w-0 flex-col overflow-hidden border-r'
+      className='bg-card backdrop-material flex h-full min-h-0 min-w-0 flex-col overflow-hidden'
       onKeyDown={handleKeyDown}
     >
       <div className='flex shrink-0 items-center gap-1 px-2 pt-(--density-section-gap)'>
@@ -217,6 +217,7 @@ export function SessionRail() {
                 size='icon-sm'
                 variant='ghost'
                 disabled={!model.projects.length}
+                focusableWhenDisabled
                 onClick={() => {
                   const target =
                     model.projects.find((item) => item.id === project?.id) ?? model.projects[0]
@@ -300,14 +301,21 @@ export function SessionRail() {
           />
           {query ? (
             <InputGroupAddon align='inline-end'>
-              <InputGroupButton
-                aria-label='Clear search'
-                className='text-muted-foreground hover:text-foreground'
-                size='icon-xs'
-                onClick={() => setQuery('')}
-              >
-                <XIcon className='size-(--icon-size-sm)' />
-              </InputGroupButton>
+              <Tooltip>
+                <TooltipTrigger
+                  render={
+                    <InputGroupButton
+                      aria-label='Clear search'
+                      className='text-muted-foreground hover:text-foreground'
+                      size='icon-xs'
+                      onClick={() => setQuery('')}
+                    />
+                  }
+                >
+                  <XIcon className='size-(--icon-size-sm)' />
+                </TooltipTrigger>
+                <TooltipContent>Clear search</TooltipContent>
+              </Tooltip>
             </InputGroupAddon>
           ) : null}
         </InputGroup>
@@ -348,7 +356,7 @@ export function SessionRail() {
                 session row — made a project drag a page-sized slab. */}
               <DragOverlay dropAnimation={null}>
                 {draggingGroup ? (
-                  <div className='bg-popover border-border pointer-events-none rounded-lg border shadow-md'>
+                  <div className='bg-popover pointer-events-none rounded-lg shadow-md'>
                     <SessionGroupHeader group={draggingGroup} />
                   </div>
                 ) : null}

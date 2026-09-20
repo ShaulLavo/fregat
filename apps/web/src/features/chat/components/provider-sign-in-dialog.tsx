@@ -84,7 +84,7 @@ export function ProviderSignInDialog({
 
   return (
     <Dialog open={open} onOpenChange={handleOpenChange}>
-      <DialogContent className='flex w-[min(460px,calc(100vw-2rem))] max-w-none flex-col border sm:max-w-none'>
+      <DialogContent className='flex w-[min(460px,calc(100vw-2rem))] max-w-none flex-col sm:max-w-none'>
         <DialogHeader>
           <DialogTitle>{phaseCopy.title}</DialogTitle>
           <DialogDescription>{phaseCopy.description}</DialogDescription>
@@ -92,7 +92,7 @@ export function ProviderSignInDialog({
 
         {signIn.isAuthenticated ? (
           <div
-            className='border-success/30 bg-success/10 text-success flex items-center gap-(--density-control-gap) border px-(--density-control-padding-x) py-(--density-section-gap) text-xs'
+            className='bg-success/10 text-success flex items-center gap-(--density-control-gap) px-(--density-control-padding-x) py-(--density-section-gap) text-xs'
             title={accountLabel ?? undefined}
           >
             <CheckCircleIcon className='size-(--icon-size-sm) shrink-0' />
@@ -103,7 +103,7 @@ export function ProviderSignInDialog({
         ) : null}
 
         {busy ? (
-          <div className='border-border bg-muted flex items-start gap-(--density-control-gap) border px-(--density-control-padding-x) py-(--density-section-gap) text-xs'>
+          <div className='bg-muted flex items-start gap-(--density-control-gap) px-(--density-control-padding-x) py-(--density-section-gap) text-xs'>
             <Spinner className='text-muted-foreground mt-0.5' />
             <div className='min-w-0 flex-1'>
               <p className='text-foreground font-medium'>
@@ -145,7 +145,7 @@ export function ProviderSignInDialog({
 
         {signIn.statusError ? (
           <div
-            className='border-warning/30 bg-warning/10 text-warning flex items-start gap-(--density-control-gap) border px-(--density-control-padding-x) py-(--density-section-gap) text-xs'
+            className='bg-warning/10 text-warning flex items-start gap-(--density-control-gap) px-(--density-control-padding-x) py-(--density-section-gap) text-xs'
             role='status'
           >
             <WarningCircleIcon className='mt-0.5 size-(--icon-size-sm) shrink-0' />
@@ -155,7 +155,7 @@ export function ProviderSignInDialog({
 
         {signIn.attemptError ? (
           <div
-            className='border-destructive/30 bg-destructive/10 text-destructive flex items-start gap-(--density-control-gap) border px-(--density-control-padding-x) py-(--density-section-gap) text-xs'
+            className='bg-destructive/10 text-destructive flex items-start gap-(--density-control-gap) px-(--density-control-padding-x) py-(--density-section-gap) text-xs'
             role='alert'
           >
             <WarningCircleIcon className='mt-0.5 size-(--icon-size-sm) shrink-0' />
@@ -163,7 +163,7 @@ export function ProviderSignInDialog({
           </div>
         ) : null}
 
-        <div className='border-border flex flex-col gap-(--density-control-gap) border px-(--density-control-padding-x) py-(--density-section-gap)'>
+        <div className='bg-muted flex flex-col gap-(--density-control-gap) px-(--density-control-padding-x) py-(--density-section-gap)'>
           <p className='text-muted-foreground text-2xs'>
             No browser tab? Run this in a terminal instead:
           </p>

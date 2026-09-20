@@ -24,7 +24,7 @@ export function CodeThemeWidget({
   const selected = themes.find((theme) => theme.id === value)
 
   return (
-    <div className='border-border w-full min-w-0 overflow-hidden rounded-lg border'>
+    <div className='bg-muted w-full min-w-0 overflow-hidden rounded-lg'>
       <Popover open={open} onOpenChange={setOpen}>
         <PopoverTrigger
           disabled={disabled}
@@ -60,7 +60,7 @@ export function CodeThemeWidget({
           />
         </PopoverContent>
       </Popover>
-      <CodeThemePreview className='border-border border-t' themeId={value} />
+      <CodeThemePreview themeId={value} />
     </div>
   )
 }

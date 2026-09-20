@@ -1,6 +1,7 @@
 import { Badge } from '@workspace/ui/components/badge'
 import { CommandItem } from '@workspace/ui/components/command'
 import { Tooltip, TooltipContent, TooltipTrigger } from '@workspace/ui/components/tooltip'
+import { stackedListRowClassName } from '@workspace/ui/patterns/list-row-classes'
 import { cn } from '@workspace/ui/lib/utils'
 
 import { ProviderGlyph } from '@/features/chat/components/provider-glyph'
@@ -31,6 +32,7 @@ export function ModelPickerRow({
   const row = (
     <CommandItem
       className={cn(
+        stackedListRowClassName,
         !disabled && 'cursor-pointer',
         // A natively inert row swallows hover, and the tooltip below is the only
         // place a blocked model says why it is blocked.
@@ -48,7 +50,7 @@ export function ModelPickerRow({
         <span className='flex min-w-0 items-center gap-1.5'>
           <span className='min-w-0 truncate text-xs leading-snug font-medium'>{option.label}</span>
           {isNewProviderModel(option) ? (
-            <span className='border-update/35 bg-update/15 text-update text-3xs shrink-0 rounded-md border px-0.5 py-px leading-none font-bold tracking-wide uppercase'>
+            <span className='bg-update/15 text-update text-3xs shrink-0 rounded-md px-0.5 py-px leading-none font-bold tracking-wide uppercase'>
               New
             </span>
           ) : null}

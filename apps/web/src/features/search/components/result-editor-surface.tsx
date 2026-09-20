@@ -11,6 +11,7 @@ import {
 import { useEditorColorTheme } from '@/features/editor/hooks/use-editor-color-theme'
 import type { WorkspaceSearchFileGroup } from '@/features/search/state/buffer-state'
 import { useSearchResultActions } from '@/features/search/hooks/use-result-actions'
+import { useSearchResultScrollPosition } from '@/features/search/hooks/use-result-scroll-position'
 import {
   SearchResultActionsContext,
   type SearchResultActions,
@@ -18,7 +19,6 @@ import {
 import { handleSearchResultSurfaceKeyDown } from '@/features/search/utils/result-editor-keyboard'
 import type { SearchResultEditorScrollToIndex } from '@/features/search/utils/result-editor-types'
 import {
-  resetSearchResultScroll,
   scrollActiveSearchResultIntoView,
   searchResultVirtualRowIndex,
   searchResultVirtualRowScrollTarget,
@@ -42,6 +42,7 @@ type SearchResultEditorSurfaceProps = {
   prewarmEditorPool?: boolean
   replaceVisible: boolean
   resultsQuery: string
+  rootPath: string
 }
 
 const noopScrollToIndex: SearchResultEditorScrollToIndex = () => {}
@@ -57,6 +58,7 @@ export const SearchResultEditorSurface = memo(
     prewarmEditorPool = true,
     replaceVisible,
     resultsQuery,
+    rootPath,
   }: SearchResultEditorSurfaceProps) => {
     const actions = useSearchResultActions()
     const treeId = useId()
@@ -79,7 +81,7 @@ export const SearchResultEditorSurface = memo(
       [activeResultId, activeRow],
     )
     const suppressNextActiveRevealRef = useRef(false)
-    const previousDisplayedResultsQueryRef = useRef<string | null>(null)
+    const previousActiveResultIdRef = useRef(activeResultId)
     const activeIndexRef = useRef(activeIndex)
     const activeScrollTargetRef = useRef(activeScrollTarget)
     const scrollToIndexRef = useRef<SearchResultEditorScrollToIndex>(noopScrollToIndex)
@@ -109,6 +111,8 @@ export const SearchResultEditorSurface = memo(
     }, [activeIndex, activeScrollTarget])
 
     useLayoutEffect(() => {
+      if (previousActiveResultIdRef.current === activeResultId) return
+      previousActiveResultIdRef.current = activeResultId
       if (!activeResultId) return
       if (suppressNextActiveRevealRef.current) {
         suppressNextActiveRevealRef.current = false
@@ -122,18 +126,12 @@ export const SearchResultEditorSurface = memo(
       })
     }, [activeResultId])
 
-    useLayoutEffect(() => {
-      if (displayedResultsQuery === null) return
-      if (previousDisplayedResultsQueryRef.current === displayedResultsQuery) return
-
-      previousDisplayedResultsQueryRef.current = displayedResultsQuery
-      resetSearchResultScroll(parentRef, scrollToOffsetRef.current)
-      const frame = window.requestAnimationFrame(() =>
-        resetSearchResultScroll(parentRef, scrollToOffsetRef.current),
-      )
-
-      return () => window.cancelAnimationFrame(frame)
-    }, [displayedResultsQuery])
+    const initialViewport = useSearchResultScrollPosition({
+      displayedResultsQuery,
+      parentRef,
+      rootPath,
+      scrollToOffsetRef,
+    })
 
     function handleKeyDown(event: KeyboardEvent<HTMLDivElement>) {
       handleSearchResultSurfaceKeyDown({
@@ -164,6 +162,7 @@ export const SearchResultEditorSurface = memo(
             activeResultId={activeResultId}
             canReplace={canReplace}
             editorTheme={editorTheme}
+            initialViewport={initialViewport}
             parentRef={parentRef}
             prewarmEditorPool={prewarmEditorPool}
             replaceVisible={replaceVisible}

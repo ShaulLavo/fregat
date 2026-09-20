@@ -8,7 +8,7 @@ export function ImportSection() {
   const sources = useImportSources()
 
   return (
-    <div className='border-border mb-3 flex flex-col gap-3 rounded-lg border p-3'>
+    <div className='bg-muted mb-3 flex flex-col gap-3 rounded-lg p-3'>
       <div className='space-y-1'>
         <h3 className='text-foreground text-sm font-medium'>Import existing chats</h3>
         <p className='text-muted-foreground text-xs'>

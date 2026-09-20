@@ -7,8 +7,8 @@ type ToastThemeStyle = CSSProperties & Record<`--${string}`, string>
 
 const toastThemeStyle = {
   '--normal-bg': 'var(--popover-solid)',
-  '--normal-border': 'var(--border)',
-  '--normal-border-hover': 'var(--border)',
+  '--normal-border': 'transparent',
+  '--normal-border-hover': 'transparent',
   '--normal-bg-hover': 'var(--muted-solid)',
   '--normal-text': 'var(--popover-foreground)',
   // The lg step (D1: a toast is a floating surface). Spelled `--radius` because

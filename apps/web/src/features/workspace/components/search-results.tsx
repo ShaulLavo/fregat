@@ -99,6 +99,7 @@ export function SearchResults({
           groups={groups}
           replaceVisible={Boolean(replaceVisible)}
           resultsQuery={resultsQuery}
+          rootPath={rootPath}
         />
       </SearchResultActionsContext>
     )

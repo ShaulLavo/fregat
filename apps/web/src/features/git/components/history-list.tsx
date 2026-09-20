@@ -41,6 +41,7 @@ export function HistoryList({
     onCommit: onSelect,
     containerRef: scrollRef,
     scrollToIndex,
+    revealOnMount: false,
   })
 
   useEffect(() => {

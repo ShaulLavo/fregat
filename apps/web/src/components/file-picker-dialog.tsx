@@ -396,7 +396,7 @@ export function FilePickerDialog({
   return (
     <Dialog onOpenChange={onOpenChange} open={open}>
       <DialogContent
-        className='bg-popover-solid flex h-[min(760px,calc(100svh-2rem))] w-[min(1080px,calc(100vw-1.5rem))] max-w-none flex-col gap-0 overflow-hidden border p-0 text-sm sm:max-w-none'
+        className='bg-popover-solid flex h-[min(760px,calc(100svh-2rem))] w-[min(1080px,calc(100vw-1.5rem))] max-w-none flex-col gap-0 overflow-hidden p-0 text-sm sm:max-w-none'
         onKeyDownCapture={handleDialogKeyDownCapture}
         showCloseButton={false}
       >
@@ -409,7 +409,7 @@ export function FilePickerDialog({
             <DialogDescription>{`Browsing ${displayPath(session.currentPath)}.`}</DialogDescription>
           </DialogHeader>
 
-          <PaneBar border='bottom'>
+          <PaneBar>
             <div
               aria-label='Folder history'
               className='flex shrink-0 items-center gap-0.5'
@@ -419,6 +419,7 @@ export function FilePickerDialog({
                 <Button
                   aria-label='Back'
                   disabled={!session.canGoBack}
+                  focusableWhenDisabled
                   onClick={goBack}
                   size='icon-sm'
                   type='button'
@@ -431,6 +432,7 @@ export function FilePickerDialog({
                 <Button
                   aria-label='Forward'
                   disabled={!session.canGoForward}
+                  focusableWhenDisabled
                   onClick={goForward}
                   size='icon-sm'
                   type='button'
@@ -444,6 +446,7 @@ export function FilePickerDialog({
                   aria-keyshortcuts='Meta+ArrowUp'
                   aria-label='Up one folder'
                   disabled={!session.canGoUp}
+                  focusableWhenDisabled
                   onClick={() => navigateTo(pickerParentPath(session.currentPath))}
                   size='icon-sm'
                   type='button'
@@ -511,6 +514,7 @@ export function FilePickerDialog({
                   aria-label={showHidden ? 'Hide hidden files' : 'Show hidden files'}
                   aria-pressed={showHidden}
                   disabled={hiddenSettingDisabled}
+                  focusableWhenDisabled
                   onClick={toggleHiddenFiles}
                   size='icon-sm'
                   type='button'
@@ -522,7 +526,7 @@ export function FilePickerDialog({
             </div>
           </PaneBar>
 
-          <div className='border-border border-b px-(--bar-padding-x) lg:hidden'>
+          <div className='px-(--bar-padding-x) lg:hidden'>
             <MobileLocations
               currentPath={session.currentPath}
               homePath={homePath}
@@ -536,7 +540,7 @@ export function FilePickerDialog({
               homePath={homePath}
               recentState={recentState}
             />
-            <div className='border-border bg-background grid min-h-0 grid-rows-[auto_minmax(0,1fr)] lg:border-x'>
+            <div className='bg-background grid min-h-0 grid-rows-[auto_minmax(0,1fr)]'>
               <ListHeader
                 isLoading={loadState.status === 'loading' || listInteractionPending}
                 isSearching={isSearching}
@@ -578,7 +582,7 @@ export function FilePickerDialog({
             />
           </div>
 
-          <DialogFooter className='border-border flex h-(--bar-height) shrink-0 flex-row items-center justify-between gap-(--density-control-gap) border-t px-(--bar-padding-x) sm:justify-between'>
+          <DialogFooter className='flex h-(--bar-height) shrink-0 flex-row items-center justify-between gap-(--density-control-gap) px-(--bar-padding-x) sm:justify-between'>
             <SelectedSummary entry={selectedPickable} iconMode={displayedIconMode} mode={mode} />
             <div className='flex shrink-0 gap-1.5'>
               <Button onClick={() => onOpenChange(false)} size='sm' type='button' variant='ghost'>

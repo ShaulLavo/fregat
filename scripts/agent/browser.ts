@@ -106,6 +106,7 @@ async function main() {
       name === 'terminal-tabs' ||
       name === 'workbench-list-focus' ||
       name === 'editor-external-edit' ||
+      Boolean(name?.startsWith('editor-syntax-')) ||
       Boolean(name?.startsWith('editor-split-')) ||
       Boolean(values['product-wallpaper']),
     staticDir: values['static-dir'],
@@ -265,6 +266,8 @@ async function traceScenario(scenario: Scenario, options: Options) {
       failure = error instanceof Error ? error.message : String(error)
     }
     await browser.stopTracing()
+    if (scenario.inspect)
+      await evidence.json('inspection.json', await scenario.inspect(page)).catch(() => undefined)
     await page.screenshot({ path: evidence.file('page.png'), fullPage: false })
     const raw = await Bun.file(tracePath).text()
     const generated = summarizeTrace(raw)

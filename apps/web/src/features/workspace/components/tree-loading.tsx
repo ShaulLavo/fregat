@@ -5,7 +5,7 @@ export function TreeLoading() {
   return (
     <LoadingState className='h-full overflow-hidden' label='Loading folder'>
       <div aria-hidden='true' className='h-full overflow-hidden'>
-        <PaneBar border='bottom'>
+        <PaneBar>
           <div className='skeleton-sweep h-(--density-control-height-sm) w-full rounded-md' />
         </PaneBar>
         <div className='py-(--density-control-gap)'>

@@ -11,7 +11,7 @@ export function ProviderRow({ instance }: { instance: ProviderInstanceConfig }) 
 
   return (
     <div
-      className='border-border flex items-center gap-(--density-control-gap) border-b px-(--density-control-padding-x) py-(--density-section-gap) last:border-b-0'
+      className='flex items-center gap-(--density-control-gap) px-(--density-control-padding-x) py-(--density-section-gap)'
       title={`${instance.providerInstanceId} · ${binary}`}
     >
       <div className='flex min-w-0 flex-1 flex-col'>

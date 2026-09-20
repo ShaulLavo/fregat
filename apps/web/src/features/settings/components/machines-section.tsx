@@ -18,7 +18,7 @@ export function MachinesSection({ disabled }: { readonly disabled: boolean }) {
         <MachineRow key={name} name={name} machine={machine} disabled={disabled} />
       ))}
       {adding && !disabled ? (
-        <div className='border-border rounded-lg border p-4'>
+        <div className='bg-muted rounded-lg p-4'>
           <MachineForm
             intent='connect'
             onCancel={() => setAdding(false)}

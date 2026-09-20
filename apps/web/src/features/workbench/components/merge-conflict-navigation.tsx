@@ -10,7 +10,7 @@ export function MergeConflictNavigation() {
   const { bus } = useCommand()
 
   return (
-    <div className='border-border flex items-center gap-(--density-control-gap) self-stretch border-b px-(--bar-padding-x)'>
+    <div className='flex items-center gap-(--density-control-gap) self-stretch px-(--bar-padding-x)'>
       <ToolbarButton
         label='Previous conflict'
         onClick={() => bus.dispatch('editor.merge-conflict.previous', { source: SOURCE })}

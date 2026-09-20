@@ -39,7 +39,7 @@ export function AssistantMarkdownFileLink({
   return (
     <a
       className={cn(
-        'border-border bg-muted text-foreground hover:bg-accent hover:text-accent-foreground inline-flex max-w-full min-w-0 cursor-pointer items-baseline gap-1 rounded-md border px-1 align-baseline font-mono text-[0.9em] transition-colors',
+        'bg-muted text-foreground hover:bg-accent hover:text-accent-foreground inline-flex max-w-full min-w-0 cursor-pointer items-baseline gap-1 rounded-md px-1 align-baseline font-mono text-[0.9em] transition-colors',
         className,
       )}
       data-chat-file-link={reference.path}

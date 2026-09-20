@@ -5,6 +5,7 @@ import { Dialog as DialogPrimitive } from '@base-ui/react/dialog'
 
 import { cn } from '@workspace/ui/lib/utils'
 import { Button } from '@workspace/ui/components/button'
+import { Tooltip, TooltipContent, TooltipTrigger } from '@workspace/ui/components/tooltip'
 import { XIcon } from '@phosphor-icons/react'
 
 function Dialog({ ...props }: DialogPrimitive.Root.Props) {
@@ -71,13 +72,26 @@ function DialogContent({
       >
         {children}
         {showCloseButton && (
-          <DialogPrimitive.Close
-            data-slot='dialog-close'
-            render={<Button variant='ghost' className='absolute top-2 right-2' size='icon-sm' />}
-          >
-            <XIcon />
-            <span className='sr-only'>Close</span>
-          </DialogPrimitive.Close>
+          <Tooltip>
+            <TooltipTrigger
+              render={
+                <DialogPrimitive.Close
+                  data-slot='dialog-close'
+                  render={
+                    <Button
+                      aria-label='Close'
+                      variant='ghost'
+                      className='absolute top-2 right-2'
+                      size='icon-sm'
+                    />
+                  }
+                />
+              }
+            >
+              <XIcon />
+            </TooltipTrigger>
+            <TooltipContent>Close</TooltipContent>
+          </Tooltip>
         )}
       </DialogPrimitive.Popup>
     </DialogPortal>

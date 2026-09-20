@@ -38,8 +38,9 @@ export function ModelPickerTrigger({
             render={
               <Button
                 aria-label='Provider and model'
-                className='text-muted-foreground hover:text-foreground max-w-44 min-w-0 truncate'
+                className='text-muted-foreground max-w-44 min-w-0 truncate'
                 disabled={disabled}
+                focusableWhenDisabled
                 size='sm'
                 type='button'
                 variant='ghost'

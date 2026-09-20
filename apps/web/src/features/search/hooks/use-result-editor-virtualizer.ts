@@ -1,5 +1,6 @@
 import { useCallback, useEffect, useLayoutEffect, useMemo, useState, type RefObject } from 'react'
 import { flushSync } from 'react-dom'
+import { useRowHeight } from '@workspace/ui/patterns/use-row-height'
 
 import type {
   SearchResultEditorScrollToIndex,
@@ -10,7 +11,10 @@ import {
   searchResultVirtualViewportHeight,
 } from '@/features/search/utils/result-editor'
 import type { SearchResultVirtualRow } from '@/features/search/utils/result-view-model'
-import { createSearchResultVirtualListMetrics } from '@/features/search/utils/result-virtual-list'
+import {
+  createSearchResultVirtualListMetrics,
+  type SearchResultVirtualListViewport,
+} from '@/features/search/utils/result-virtual-list'
 import {
   SearchResultVirtualWindowStore,
   type SearchResultVirtualWindow,
@@ -22,10 +26,15 @@ export function useSearchResultEditorVirtualizer(
   rows: readonly SearchResultVirtualRow[],
   parentRef: RefObject<HTMLDivElement | null>,
   scrollSyncMode: SearchResultScrollSyncMode = 'raf',
+  initialViewport?: SearchResultVirtualListViewport,
 ): SearchResultEditorVirtualizer {
-  const itemInputs = useMemo(() => searchResultVirtualRowInputs(rows), [rows])
+  const headerHeight = useRowHeight(parentRef)
+  const itemInputs = useMemo(
+    () => searchResultVirtualRowInputs(rows, headerHeight),
+    [headerHeight, rows],
+  )
   const metrics = useMemo(() => createSearchResultVirtualListMetrics(itemInputs), [itemInputs])
-  const [store] = useState(() => new SearchResultVirtualWindowStore({ metrics }))
+  const [store] = useState(() => new SearchResultVirtualWindowStore({ metrics, initialViewport }))
   const [windowState, setWindowState] = useState<SearchResultVirtualWindow>(() => store.getWindow())
 
   useLayoutEffect(() => {
@@ -85,6 +94,7 @@ export function useSearchResultEditorVirtualizer(
       const element = parentRef.current
       if (!element) return
 
+      store.setViewportHeight(element.clientHeight)
       const top = store.scrollTopForOffset(offset)
       element.scrollTop = top
       store.setScrollTop(top, {

@@ -1,5 +1,6 @@
 import { useState, type ComponentProps } from 'react'
 import { Button } from '@workspace/ui/components/button'
+import { Tooltip, TooltipContent, TooltipTrigger } from '@workspace/ui/components/tooltip'
 import { ChatImageLightbox } from '@/features/chat/components/chat-image-lightbox'
 import { chatImageCrossOrigin } from '@/features/chat/utils/attachment-image'
 
@@ -18,24 +19,33 @@ export function AssistantMarkdownImage({ src, alt = '', title }: ComponentProps<
 
   return (
     <>
-      <Button
-        aria-label={`Open ${name}`}
-        data-markdown-image='true'
-        className='h-auto max-w-full overflow-hidden p-0'
-        variant='ghost'
-        type='button'
-        onClick={() => setOpenIndex(0)}
-      >
-        <img
-          alt={alt}
-          className='max-h-[30rem] max-w-full object-contain'
-          crossOrigin={chatImageCrossOrigin(source)}
-          loading='lazy'
-          onError={() => setFailedSource(source)}
-          src={source}
-          title={title}
-        />
-      </Button>
+      <Tooltip>
+        <TooltipTrigger
+          render={
+            <Button
+              aria-label={`Open ${name}`}
+              data-markdown-image='true'
+              className='h-auto max-w-full overflow-hidden p-0'
+              variant='ghost'
+              type='button'
+              onClick={() => setOpenIndex(0)}
+            />
+          }
+        >
+          <img
+            alt={alt}
+            className='max-h-[30rem] max-w-full object-contain'
+            crossOrigin={chatImageCrossOrigin(source)}
+            loading='lazy'
+            onError={() => setFailedSource(source)}
+            src={source}
+          />
+        </TooltipTrigger>
+        <TooltipContent>
+          Open {name}
+          {title && title !== name ? ` · ${title}` : ''}
+        </TooltipContent>
+      </Tooltip>
       <ChatImageLightbox
         images={[
           {

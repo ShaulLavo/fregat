@@ -59,7 +59,7 @@ export function DiagnosticList({
         const rowProps = list.rowProps(row.id)
         return (
           <div
-            className={cn('border border-l-2', diagnosticRuleClass(row.diagnostic.severity))}
+            className={cn('border-l-2', diagnosticRuleClass(row.diagnostic.severity))}
             key={row.id}
           >
             <ListRow

@@ -40,7 +40,7 @@ export function FilesystemConflictToast({
   const busy = pending !== undefined
   return (
     <div
-      className='bg-popover-solid text-popover-foreground border-border w-[380px] max-w-[calc(100vw-2rem)] rounded-lg border p-(--density-section-padding) shadow-md'
+      className='bg-popover-solid text-popover-foreground ring-foreground/10 w-[380px] max-w-[calc(100vw-2rem)] rounded-lg p-(--density-section-padding) shadow-md ring-1'
       role='alertdialog'
       aria-label={conflictTitle(conflict)}
     >

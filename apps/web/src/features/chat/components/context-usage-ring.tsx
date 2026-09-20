@@ -1,5 +1,6 @@
 import { Button } from '@workspace/ui/components/button'
 import { Popover, PopoverContent, PopoverTrigger } from '@workspace/ui/components/popover'
+import { Tooltip, TooltipContent, TooltipTrigger } from '@workspace/ui/components/tooltip'
 import { cn } from '@workspace/ui/lib/utils'
 
 import {
@@ -17,9 +18,7 @@ const CIRCUMFERENCE = 2 * Math.PI * RADIUS
  * a percentage rather than vanishing, because "no window reported" and "no
  * usage yet" are different states and hiding both told the user neither.
  *
- * The breakdown is a popover, not a `title`: the tooltip took a second to
- * appear, could not be reached from the keyboard, and rendered its lines as one
- * unstyled blob.
+ * The popover holds the breakdown; the tooltip names the compact gauge.
  */
 export function ContextUsageRing({
   compact = false,
@@ -34,49 +33,56 @@ export function ContextUsageRing({
 
   return (
     <Popover>
-      <PopoverTrigger
-        render={
-          <Button
-            aria-label={contextUsageLabel(usage, percent)}
-            className={cn(
-              'h-auto cursor-pointer gap-1.5 px-1 py-0.5 font-normal',
-              toneClass(usage.ratio),
-            )}
-            size='sm'
-            type='button'
-            variant='ghost'
-          >
-            <svg
-              aria-hidden
-              className='size-4 shrink-0 -rotate-90'
-              fill='none'
-              viewBox='0 0 18 18'
-              xmlns='http://www.w3.org/2000/svg'
-            >
-              <circle
-                className='text-border'
-                cx='9'
-                cy='9'
-                r={RADIUS}
-                stroke='currentColor'
-                strokeWidth='2'
-              />
-              {usage.ratio === null ? null : (
-                <circle
-                  cx='9'
-                  cy='9'
-                  r={RADIUS}
-                  stroke='currentColor'
-                  strokeDasharray={`${CIRCUMFERENCE * usage.ratio} ${CIRCUMFERENCE}`}
-                  strokeLinecap='round'
-                  strokeWidth='2'
-                />
-              )}
-            </svg>
-            {compact ? null : <span className='text-2xs tabular-nums'>{readout}</span>}
-          </Button>
-        }
-      />
+      <Tooltip>
+        <TooltipTrigger
+          render={
+            <PopoverTrigger
+              render={
+                <Button
+                  aria-label={contextUsageLabel(usage, percent)}
+                  className={cn(
+                    'h-auto cursor-pointer gap-1.5 px-1 py-0.5 font-normal',
+                    toneClass(usage.ratio),
+                  )}
+                  size='sm'
+                  type='button'
+                  variant='ghost'
+                >
+                  <svg
+                    aria-hidden
+                    className='size-4 shrink-0 -rotate-90'
+                    fill='none'
+                    viewBox='0 0 18 18'
+                    xmlns='http://www.w3.org/2000/svg'
+                  >
+                    <circle
+                      className='text-border'
+                      cx='9'
+                      cy='9'
+                      r={RADIUS}
+                      stroke='currentColor'
+                      strokeWidth='2'
+                    />
+                    {usage.ratio === null ? null : (
+                      <circle
+                        cx='9'
+                        cy='9'
+                        r={RADIUS}
+                        stroke='currentColor'
+                        strokeDasharray={`${CIRCUMFERENCE * usage.ratio} ${CIRCUMFERENCE}`}
+                        strokeLinecap='round'
+                        strokeWidth='2'
+                      />
+                    )}
+                  </svg>
+                  {compact ? null : <span className='text-2xs tabular-nums'>{readout}</span>}
+                </Button>
+              }
+            />
+          }
+        />
+        <TooltipContent>{contextUsageLabel(usage, percent)}</TooltipContent>
+      </Tooltip>
       <PopoverContent align='end' className='w-64 text-xs' side='top'>
         <div className='flex items-baseline justify-between gap-3'>
           <span className='text-muted-foreground font-medium'>Context window</span>

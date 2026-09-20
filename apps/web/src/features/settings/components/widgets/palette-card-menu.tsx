@@ -36,6 +36,7 @@ export function PaletteCardMenu({
                 <Button
                   aria-label={`${palette.name} actions`}
                   disabled={disabled}
+                  focusableWhenDisabled
                   size='icon-xs'
                   variant='ghost'
                 />

@@ -77,8 +77,8 @@ export type AppOptions = FileSystemServiceOptions & {
   }
   fonts?: FontService
   themes?: {
-    /** Theme directory whose backgrounds seed the wallpapers the bundled themes reference. */
-    seedWallpapersFrom?: string
+    /** Populate the wallpaper picker from packaged artwork during startup. */
+    seedWallpapers?: boolean
   }
   orchestration?: {
     attachmentsDir?: string
@@ -169,19 +169,17 @@ export function createApp(options: AppOptions) {
   wallpapers.assertUnused = (id) => bundles.assertPartUnused('wallpaper', id)
   palettes.archiveDirectories = () => bundles.directories()
   wallpapers.archiveDirectories = () => bundles.directories()
-  const seedDirectory = options.themes?.seedWallpapersFrom
-  if (seedDirectory) {
+  if (options.themes?.seedWallpapers) {
     runDetached(
       async () => {
         const started = performance.now()
-        const result = await wallpapers.seed(seedDirectory)
+        const result = await wallpapers.seed()
         recordProcessInfo('wallpapers.seed', {
-          directory: seedDirectory,
           durationMs: Math.round(performance.now() - started),
           ...result,
         })
       },
-      { area: 'wallpaper', operation: 'library.seed', directory: seedDirectory },
+      { area: 'wallpaper', operation: 'library.seed' },
     )
   }
   const providerAdapterRegistry: ProviderAdapterRegistry =

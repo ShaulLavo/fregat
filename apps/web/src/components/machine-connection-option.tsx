@@ -23,7 +23,7 @@ export function MachineConnectionOption({
         selected && 'border-primary/50 bg-accent',
       )}
     >
-      <span className='border-border text-muted-foreground flex size-8 shrink-0 items-center justify-center rounded-md border'>
+      <span className='bg-muted text-muted-foreground flex size-8 shrink-0 items-center justify-center rounded-md'>
         <Icon className='size-(--icon-size)' />
       </span>
       <span className='min-w-0'>

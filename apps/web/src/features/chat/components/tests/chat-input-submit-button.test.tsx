@@ -46,16 +46,19 @@ test('an empty draft enables a working Send once, without rerendering for furthe
     </Profiler>,
   )
   const button = screen.getByRole('button', { name: 'Send message' })
-  expect(button).toBeDisabled()
+  expect(button).toHaveAttribute('aria-disabled', 'true')
+  await userEvent.click(button)
+  await userEvent.keyboard('{Enter}')
+  expect(sent).not.toHaveBeenCalled()
   act(() => useChatInputDraftStore.getState().setPrompt(draftTarget, 'H'))
-  expect(button).toBeEnabled()
+  expect(button).not.toHaveAttribute('aria-disabled', 'true')
   const contentCommits = commits
   act(() => useChatInputDraftStore.getState().setPrompt(draftTarget, 'How does the garden work?'))
   expect(commits).toBe(contentCommits)
   await userEvent.click(button)
   expect(sent).toHaveBeenCalledOnce()
   act(() => useChatInputDraftStore.getState().clearDraft(draftTarget))
-  expect(button).toBeDisabled()
+  expect(button).toHaveAttribute('aria-disabled', 'true')
 })
 
 test('sending replaces the arrow with a disabled progress control', () => {
@@ -73,7 +76,7 @@ test('sending replaces the arrow with a disabled progress control', () => {
   )
 
   const button = screen.getByRole('button', { name: 'Sending…' })
-  expect(button).toBeDisabled()
+  expect(button).toHaveAttribute('aria-disabled', 'true')
   expect(button.querySelector('.animate-spin')).not.toBeNull()
 })
 
@@ -110,7 +113,7 @@ test('stopping stays disabled instead of inviting a second stop', () => {
     />,
   )
 
-  expect(screen.getByRole('button', { name: 'Stopping…' })).toBeDisabled()
+  expect(screen.getByRole('button', { name: 'Stopping…' })).toHaveAttribute('aria-disabled', 'true')
 })
 
 test('an unavailable connection explains why stop is disabled', () => {
@@ -127,7 +130,10 @@ test('an unavailable connection explains why stop is disabled', () => {
     />,
   )
 
-  expect(screen.getByRole('button', { name: 'Reconnecting chat…' })).toBeDisabled()
+  expect(screen.getByRole('button', { name: 'Reconnecting chat…' })).toHaveAttribute(
+    'aria-disabled',
+    'true',
+  )
 })
 
 test('a running turn can receive a correction while Stop remains available', async () => {
@@ -148,5 +154,8 @@ test('a running turn can receive a correction while Stop remains available', asy
   await userEvent.click(screen.getByRole('button', { name: 'Send correction' }))
   expect(sent).toHaveBeenCalledOnce()
   expect(stop).not.toHaveBeenCalled()
-  expect(screen.getByRole('button', { name: 'Stop current turn' })).toBeEnabled()
+  expect(screen.getByRole('button', { name: 'Stop current turn' })).not.toHaveAttribute(
+    'aria-disabled',
+    'true',
+  )
 })

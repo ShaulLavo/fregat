@@ -69,8 +69,8 @@ function DiagnosticGroup({
     <div
       className={
         tone === 'warning'
-          ? 'border-warning/30 bg-warning/10 rounded-lg border p-(--density-section-padding)'
-          : 'border-info/30 bg-info/10 rounded-lg border p-(--density-section-padding)'
+          ? 'bg-warning/10 rounded-lg p-(--density-section-padding)'
+          : 'bg-info/10 rounded-lg p-(--density-section-padding)'
       }
     >
       <p

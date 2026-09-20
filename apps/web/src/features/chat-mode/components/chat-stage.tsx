@@ -91,7 +91,7 @@ export function ChatStage() {
         />
       </div>
       {error ? (
-        <p className='text-destructive border-border text-2xs shrink-0 border-t px-(--density-section-padding) py-(--density-section-gap)'>
+        <p className='text-destructive text-2xs shrink-0 px-(--density-section-padding) py-(--density-section-gap)'>
           {error}
         </p>
       ) : null}

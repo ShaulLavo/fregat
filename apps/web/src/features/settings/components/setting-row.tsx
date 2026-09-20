@@ -49,7 +49,7 @@ export function SettingRow({ id, snapshot }: { id: SettingId; snapshot: Settings
   return (
     <div
       className={cn(
-        'border-border flex flex-col gap-(--density-control-gap) border-b py-(--density-section-padding) last:border-b-0 @3xl/settings:items-start @3xl/settings:justify-between @3xl/settings:gap-6',
+        'flex flex-col gap-(--density-control-gap) py-(--density-section-padding) @3xl/settings:items-start @3xl/settings:justify-between @3xl/settings:gap-6',
         descriptor.widget !== 'theme' && '@3xl/settings:flex-row',
       )}
     >
@@ -76,7 +76,7 @@ export function SettingRow({ id, snapshot }: { id: SettingId; snapshot: Settings
             </code>
           ))}
           {descriptor.requiresRestart ? (
-            <span className='border-warning/30 bg-warning/10 text-warning text-3xs rounded-md border px-1'>
+            <span className='bg-warning/10 text-warning text-3xs rounded-md px-1'>
               Restart required
             </span>
           ) : null}

@@ -80,7 +80,7 @@ export function SearchControls({
 
   if (compact) {
     return (
-      <div className='border-b'>
+      <div>
         <PaneBar>
           {queryField}
           {replaceToggle}
@@ -94,7 +94,7 @@ export function SearchControls({
   }
 
   return (
-    <div className='border-b p-(--density-control-gap)'>
+    <div className='p-(--density-control-gap)'>
       <div className='flex items-center gap-1'>
         {queryField}
         {replaceToggle}

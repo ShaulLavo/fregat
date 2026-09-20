@@ -13,7 +13,7 @@ export function ImportSourceRow({ source }: { source: ImportSource }) {
   const name = importSourceName(source.driverKind)
 
   return (
-    <div className='border-border flex flex-col gap-2 border-t py-3'>
+    <div className='flex flex-col gap-2 py-3'>
       <div className='flex flex-wrap items-center justify-between gap-3'>
         <span className='text-foreground text-sm'>{source.label}</span>
         <Button

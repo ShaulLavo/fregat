@@ -20,7 +20,7 @@ export function AppTitlebar() {
       aria-label='Window toolbar'
       className={cn(
         NATIVE_WINDOW_DRAG_CLASS,
-        'bg-card backdrop-material border-border grid h-(--bar-height) shrink-0 select-none border-b',
+        'bg-card backdrop-material grid h-(--bar-height) shrink-0 select-none',
       )}
       data-native-window-drag-region=''
       style={{ gridTemplateColumns: model.gridTemplateColumns }}

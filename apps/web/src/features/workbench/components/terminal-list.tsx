@@ -73,7 +73,7 @@ export function TerminalList({
           {...list.containerProps}
           aria-label='Open terminals'
           aria-orientation='vertical'
-          className='focus-ring-inset border-border bg-background flex h-full flex-col overflow-y-auto border-l py-(--density-section-gap)'
+          className='focus-ring-inset bg-background flex h-full flex-col overflow-y-auto py-(--density-section-gap)'
         >
           {tabs.map((tab) => (
             <TerminalListRow
@@ -81,6 +81,7 @@ export function TerminalList({
               rowProps={list.rowProps(tab.id)}
               key={tab.id}
               tab={tab}
+              onActivate={activateTab}
               onClose={closeTab}
               onRename={renameTab}
             />

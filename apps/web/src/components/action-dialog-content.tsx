@@ -33,10 +33,7 @@ export function ActionDialogContent({
   return (
     <DialogContent
       {...props}
-      className={cn(
-        'w-[min(420px,calc(100vw-2rem))] max-w-none border text-sm sm:max-w-none',
-        className,
-      )}
+      className={cn('w-[min(420px,calc(100vw-2rem))] max-w-none text-sm sm:max-w-none', className)}
       showCloseButton={false}
     >
       <DialogHeader>
@@ -45,7 +42,7 @@ export function ActionDialogContent({
       </DialogHeader>
       {path !== undefined ? (
         <div
-          className='bg-muted/30 text-muted-foreground truncate rounded-lg border px-(--density-control-padding-x) py-(--density-section-gap) text-xs'
+          className='bg-muted/30 text-muted-foreground truncate rounded-lg px-(--density-control-padding-x) py-(--density-section-gap) text-xs'
           title={path}
         >
           {path}
@@ -53,7 +50,7 @@ export function ActionDialogContent({
       ) : null}
       {error ? (
         <div
-          className='border-destructive/25 bg-destructive/10 text-destructive flex items-start gap-(--density-control-gap) rounded-lg border px-(--density-control-padding-x) py-(--density-section-gap) text-xs'
+          className='bg-destructive/10 text-destructive flex items-start gap-(--density-control-gap) rounded-lg px-(--density-control-padding-x) py-(--density-section-gap) text-xs'
           role='alert'
         >
           <WarningCircleIcon className='mt-0.5 size-(--icon-size-sm) shrink-0' />

@@ -23,8 +23,8 @@ export function ThemeCard({
   onSelect: () => void
 }) {
   return (
-    <div className='border-border overflow-hidden border' data-theme-bundle={theme.id}>
-      <div className='divide-border grid grid-cols-2 divide-x'>
+    <div className='bg-muted overflow-hidden' data-theme-bundle={theme.id}>
+      <div className='grid grid-cols-2'>
         <ThemeVariantPreview variant={theme.variants.light} mode='light' palettes={palettes} />
         <ThemeVariantPreview variant={theme.variants.dark} mode='dark' palettes={palettes} />
       </div>

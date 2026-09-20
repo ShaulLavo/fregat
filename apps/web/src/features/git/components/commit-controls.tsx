@@ -9,6 +9,7 @@ import {
 } from '@workspace/ui/components/input-group'
 import { PaneBar } from '@workspace/ui/components/pane-bar'
 import { Spinner } from '@workspace/ui/components/spinner'
+import { Tooltip, TooltipContent, TooltipTrigger } from '@workspace/ui/components/tooltip'
 import { useId, type ChangeEvent, type KeyboardEvent } from 'react'
 
 import { useCommitAction } from '@/features/git/hooks/use-commit-action'
@@ -55,7 +56,7 @@ export function CommitControls({
 
   return (
     <>
-      <PaneBar border='bottom'>
+      <PaneBar>
         <InputGroup className='bg-background h-(--density-control-height-sm) min-w-0 flex-1'>
           <InputGroupInput
             aria-label='Commit message'
@@ -74,19 +75,27 @@ export function CommitControls({
                 {generationStatus}
               </span>
             ) : null}
-            <InputGroupButton
-              aria-busy={generation.isPending}
-              aria-label={generationLabel}
-              disabled={generation.isCancelling || (inputDisabled && !generation.isPending)}
-              onClick={generation.generateOrCancel}
-              size='icon-xs'
-            >
-              {generation.isPending ? (
-                <Spinner aria-hidden='true' role='presentation' />
-              ) : (
-                <SparkleIcon aria-hidden='true' />
-              )}
-            </InputGroupButton>
+            <Tooltip>
+              <TooltipTrigger
+                render={
+                  <InputGroupButton
+                    aria-busy={generation.isPending}
+                    aria-label={generationLabel}
+                    disabled={generation.isCancelling || (inputDisabled && !generation.isPending)}
+                    focusableWhenDisabled
+                    onClick={generation.generateOrCancel}
+                    size='icon-xs'
+                  >
+                    {generation.isPending ? (
+                      <Spinner aria-hidden='true' role='presentation' />
+                    ) : (
+                      <SparkleIcon aria-hidden='true' />
+                    )}
+                  </InputGroupButton>
+                }
+              />
+              <TooltipContent>{generationLabel}</TooltipContent>
+            </Tooltip>
           </InputGroupAddon>
         </InputGroup>
         {showSyncChanges ? (

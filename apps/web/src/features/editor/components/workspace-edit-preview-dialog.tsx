@@ -74,7 +74,7 @@ export function WorkspaceEditPreviewDialog() {
   return (
     <Dialog open={open} onOpenChange={(nextOpen) => !nextOpen && close()}>
       <DialogContent
-        className='max-h-[min(760px,calc(100vh-2rem))] w-[min(760px,calc(100vw-2rem))] max-w-none overflow-hidden border sm:max-w-none'
+        className='max-h-[min(760px,calc(100vh-2rem))] w-[min(760px,calc(100vw-2rem))] max-w-none overflow-hidden sm:max-w-none'
         finalFocus={false}
         showCloseButton={false}
       >
@@ -103,7 +103,7 @@ export function WorkspaceEditPreviewDialog() {
             </div>
 
             {preview.annotations.length > 0 ? (
-              <div className='border-warning/30 bg-warning/10 mb-3 grid gap-1 rounded-lg border p-3'>
+              <div className='bg-warning/10 mb-3 grid gap-1 rounded-lg p-3'>
                 {preview.annotations.map((annotation) => (
                   <div className='flex items-start gap-2 text-xs' key={annotation.id}>
                     <WarningCircleIcon className='text-warning mt-0.5 size-(--icon-size-sm) shrink-0' />
@@ -127,7 +127,7 @@ export function WorkspaceEditPreviewDialog() {
               <ol className='grid gap-2'>
                 {preview.rows.map((row) => (
                   <li
-                    className='bg-card rounded-lg border p-3'
+                    className='bg-card rounded-lg p-3'
                     key={`${row.index}:${row.path}`}
                     title={resourcePathLabel(row)}
                   >
@@ -142,11 +142,11 @@ export function WorkspaceEditPreviewDialog() {
                       {resourcePathLabel(row)}
                     </div>
                     {row.beforeText !== undefined && row.afterText !== undefined ? (
-                      <div className='text-2xs mt-2 grid max-h-52 grid-cols-2 overflow-auto rounded-lg border font-mono leading-relaxed'>
+                      <div className='text-2xs mt-2 grid max-h-52 grid-cols-2 overflow-auto rounded-lg font-mono leading-relaxed'>
                         <pre className='bg-diff-removed/10 text-diff-removed min-w-0 overflow-visible p-2 whitespace-pre-wrap'>
                           {row.beforeText}
                         </pre>
-                        <pre className='bg-diff-added/10 text-diff-added min-w-0 overflow-visible border-l p-2 whitespace-pre-wrap'>
+                        <pre className='bg-diff-added/10 text-diff-added min-w-0 overflow-visible p-2 whitespace-pre-wrap'>
                           {row.afterText}
                         </pre>
                       </div>
@@ -168,7 +168,7 @@ export function WorkspaceEditPreviewDialog() {
         ) : null}
 
         {stale ? (
-          <div className='border-warning/30 bg-warning/10 text-warning flex items-start gap-2 rounded-lg border p-3 text-xs'>
+          <div className='bg-warning/10 text-warning flex items-start gap-2 rounded-lg p-3 text-xs'>
             <WarningCircleIcon className='mt-0.5 size-(--icon-size-sm) shrink-0' />
             <span>{state.message ?? 'This preview is stale. Request the edit again.'}</span>
           </div>

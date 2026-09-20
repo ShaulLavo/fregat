@@ -57,8 +57,8 @@ function StatusLine({
       title={title}
       className={
         tone === 'destructive'
-          ? 'text-destructive text-2xs border-t px-(--density-control-padding-x) py-(--density-section-gap)'
-          : 'text-warning text-2xs border-t px-(--density-control-padding-x) py-(--density-section-gap)'
+          ? 'text-destructive text-2xs px-(--density-control-padding-x) py-(--density-section-gap)'
+          : 'text-warning text-2xs px-(--density-control-padding-x) py-(--density-section-gap)'
       }
     >
       <div className='flex min-w-0 items-center gap-(--density-control-gap)'>{children}</div>

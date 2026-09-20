@@ -178,6 +178,7 @@
      --bar-height, and the vertical icon rail is exactly that wide so it lines
      up with the header beside it. */
   --bar-height: 2.5rem;
+  --touch-target-size: 2.5rem;
   --bar-padding-x: 0.75rem;
   --rail-width: var(--bar-height);
 
@@ -511,17 +512,6 @@
   --workbench-editor-minimap-canvas-background-opacity: 0;
 }
 
-[data-workbench] {
-  /* The workbench hairline: an 8% foreground line wherever bar tokens meet, so a
-     pane edge reads as an edge and not as a smudge between two tones. Derived
-     from --foreground rather than fixed white so it flips with the theme. */
-  --border: color-mix(in oklch, var(--foreground) 8%, transparent);
-  /* Re-derive rather than inherit: a custom property is substituted on the element that declares
-     it, so the :root definition of --border-subtle already froze the theme grey before it got
-     here and would paint the wrong weight inside the workbench. */
-  --border-subtle: color-mix(in oklch, var(--border) 55%, transparent);
-}
-
 @media (forced-colors: active) {
   :root {
     --search-result-match-background: Highlight;
@@ -585,7 +575,7 @@
 /* Press feedback: the control takes a 1px step down under the pointer. Not when
    it owns a popup — the menu is anchored to the trigger and would travel with it. */
 @utility pressable {
-  @apply transition-[color,background-color,border-color,box-shadow] active:not-aria-[haspopup]:translate-y-px;
+  @apply transition-[color,background-color,border-color,box-shadow] active:not-disabled:not-aria-disabled:not-aria-[haspopup]:translate-y-px;
   transition-duration: var(--duration-color);
 }
 

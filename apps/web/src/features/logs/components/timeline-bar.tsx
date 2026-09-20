@@ -15,11 +15,11 @@ export function LogsTimelineBar({ bucket, maxTotal }: LogsTimelineBarProps) {
     <div className='flex min-w-[3px] flex-1 items-end' title={timelineTitle(bucket)}>
       <div
         className={cn(
-          'w-full border-t transition-colors',
-          tone === 'error' && 'border-destructive bg-destructive/45',
-          tone === 'warn' && 'border-warning bg-warning/45',
-          tone === 'slow' && 'border-info bg-info/45',
-          tone === 'ok' && 'border-success/70 bg-success/30',
+          'w-full transition-colors',
+          tone === 'error' && 'bg-destructive/45',
+          tone === 'warn' && 'bg-warning/45',
+          tone === 'slow' && 'bg-info/45',
+          tone === 'ok' && 'bg-success/30',
         )}
         style={{ height }}
       />

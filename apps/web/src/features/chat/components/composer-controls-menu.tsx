@@ -107,7 +107,7 @@ export function ComposerControlsMenu({
             {/* Plan mode changes what a send does, so it is called out on the
                 composer itself rather than only inside the menu. */}
             {planActive ? (
-              <span className='border-info/40 text-info text-3xs shrink-0 rounded-md border px-1 leading-4 font-medium'>
+              <span className='bg-info/10 text-info text-3xs shrink-0 rounded-md px-1 leading-4 font-medium'>
                 Plan
               </span>
             ) : null}

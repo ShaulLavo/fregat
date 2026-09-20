@@ -3,9 +3,23 @@ import type { Locator, Page } from 'playwright'
 export const fileIconSelector = '[data-file-icon], [style*="vscode-icons/"]'
 export const wallpaperLayerSelector = '[data-workbench] img[data-workbench-wallpaper-layer="still"]'
 export const diffPaneSelector = '.editor-diff-pane'
+export const searchEditorSelector = '[aria-label="Search result editor"]'
+export const searchEditorFileRowSelector = '[role="treeitem"][aria-level="1"]'
+export const selectedEditorFileTabSelector = '[data-editor-tab-path][aria-selected="true"]'
+export const searchEditorGeometrySelectors = {
+  header: searchEditorFileRowSelector,
+  row: '[data-index]',
+  listRow: '[data-slot="list-row"]',
+  excerpt: '.editor-virtualized-row',
+  result: '[role="treeitem"][aria-level="2"]',
+  editor: '.search-result-file-editor-host',
+}
 
 // Stable handles the app already exposes. Add here, never inline a selector in a scenario.
 export const selectors = {
+  imageLightbox: (page: Page, name: string) => page.getByRole('dialog', { name, exact: true }),
+  iconHintControl: (scope: Page | Locator, name: string) =>
+    scope.getByRole('button', { name, exact: true }),
   chatHeaderNew: (page: Page) => page.getByRole('button', { name: 'New chat', exact: true }),
   chatHeaderHistory: (page: Page) =>
     page.getByRole('button', { name: 'Conversation history', exact: true }),
@@ -20,6 +34,11 @@ export const selectors = {
       .getByRole('dialog', { name: 'Wallpaper', exact: true })
       .getByRole('button', { name: 'Close', exact: true }),
   popupMenu: (page: Page) => page.getByRole('menu'),
+  modelPickerTrigger: (page: Page) =>
+    page.getByRole('button', { name: 'Provider and model', exact: true }),
+  modelPickerPanel: (page: Page) =>
+    page.getByRole('dialog').filter({ has: page.getByLabel('Models') }),
+  modelPickerSearch: (page: Page) => page.getByPlaceholder('Search models'),
   listTabStops: (list: Locator) =>
     list.locator(
       '[tabindex="0"], button:not([tabindex="-1"]), input:not([tabindex="-1"]), select:not([tabindex="-1"]), a[href]:not([tabindex="-1"])',
@@ -66,6 +85,15 @@ export const selectors = {
   pickerList: (page: Page) => page.getByRole('listbox', { name: 'Folders and files', exact: true }),
   pickerOptions: (page: Page) =>
     page.getByRole('listbox', { name: 'Folders and files', exact: true }).getByRole('option'),
+  pickerGoToFolder: (page: Page) => page.getByRole('button', { name: 'Go to folder', exact: true }),
+  pickerFolderPath: (page: Page) => page.getByRole('textbox', { name: 'Folder path', exact: true }),
+  pickerSearch: (page: Page) =>
+    page.getByRole('textbox', { name: 'Search files and folders', exact: true }),
+  pickerEmpty: (page: Page) => page.getByText('Nothing here', { exact: true }),
+  pickerCurrentFolderHeading: (page: Page) =>
+    page
+      .getByRole('listbox', { name: 'Folders and files', exact: true })
+      .getByText('Current folder', { exact: true }),
   searchResultTree: (page: Page) => page.getByRole('tree', { name: 'Search results', exact: true }),
   activeResultReplace: (page: Page) =>
     page
@@ -189,6 +217,11 @@ export const selectors = {
   settingsFontFamily: (page: Page) =>
     page.getByRole('textbox', { name: 'Font family', exact: true }),
   settingsSearch: (page: Page) => page.getByRole('textbox', { name: 'Search settings' }),
+  settingsHeader: (page: Page) => page.locator('[data-settings-header]'),
+  settingsDensity: (page: Page) =>
+    page.getByRole('combobox', { name: 'Interface density', exact: true }),
+  settingsDensityOption: (page: Page, density: 'compact' | 'cozy') =>
+    page.getByRole('option', { name: density, exact: true }),
   settingsScopeTab: (page: Page, name: 'User' | 'Workspace' | 'Defaults') =>
     page.getByRole('tab', { name, exact: true }),
   settingsDefaultsBanner: (page: Page) => page.getByText('Defaults are read-only', { exact: true }),
@@ -267,6 +300,31 @@ export const selectors = {
   demoIframe: (page: Page) => page.locator('#workbench-demo'),
   workspaceSearch: (page: Page) =>
     page.getByRole('searchbox', { name: 'Search workspace', exact: true }),
+  openSearchEditor: (page: Page) =>
+    page.getByRole('button', { name: 'Open search editor', exact: true }),
+  searchEditor: (page: Page) => page.locator(searchEditorSelector),
+  searchEditorTab: (page: Page) => page.getByRole('tab', { name: /^Search(?:\s|$)/ }),
+  searchEditorHeaderToggle: (page: Page, expanded: boolean) =>
+    page
+      .locator(searchEditorSelector)
+      .locator(searchEditorFileRowSelector)
+      .first()
+      .getByRole('button', {
+        name: expanded ? 'Collapse file results' : 'Expand file results',
+        exact: true,
+      }),
+  searchEditorHosts: (page: Page) =>
+    page.locator(searchEditorSelector).locator('.search-result-file-editor-host'),
+  searchEditorRows: (page: Page) =>
+    page.locator(searchEditorSelector).locator('.editor-virtualized-row'),
+  searchEditorVisibleRows: (page: Page) =>
+    page.locator(searchEditorSelector).locator('.editor-virtualized-row:visible'),
+  editorHighlightStyles: (page: Page) =>
+    page.locator('head style').filter({ hasText: '::highlight(' }),
+  searchSummary: (page: Page) =>
+    page
+      .locator('span[title]')
+      .filter({ hasText: /(?:matches|shown, limit reached) in [\d,]+ files/ }),
   replaceBox: (page: Page) =>
     page.getByRole('textbox', { name: 'Replace in workspace', exact: true }),
   replaceToggle: (page: Page) => page.getByRole('button', { name: 'Replace', exact: true }),
@@ -287,7 +345,8 @@ export const selectors = {
     page.getByLabel('Folder tree', { exact: true }).locator('[role="treeitem"][tabindex="0"]'),
   editorInput: (page: Page) => page.getByRole('textbox', { name: 'Editor input' }),
   editorSurface: (page: Page) => page.locator('.editor-virtualized-viewport'),
-  terminalSurface: (page: Page) => page.getByRole('region', { name: 'Terminal', exact: true }),
+  terminalSurface: (page: Page) =>
+    page.locator('[data-slot="tool-pane"][aria-label="Terminal"]:visible'),
   paletteRowSelector: '[data-slot="command-list"] [role="option"]',
   paletteInput: (page: Page) => page.locator('[data-slot="command-input"]').first(),
   selectedPaletteOption: (page: Page) => page.locator('[cmdk-item][data-selected="true"]'),

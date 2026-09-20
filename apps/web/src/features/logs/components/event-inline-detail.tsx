@@ -27,7 +27,7 @@ export function LogsEventInlineDetail({ detail, event }: LogsEventInlineDetailPr
         <LogsDetailField label='path' value={visibleEvent.path ?? 'none'} />
       </div>
       {detail ? (
-        <pre className='bg-background/70 text-3xs mt-2 max-h-52 overflow-auto border p-2 font-mono leading-4 break-words whitespace-pre-wrap'>
+        <pre className='bg-background/70 text-3xs mt-2 max-h-52 overflow-auto p-2 font-mono leading-4 break-words whitespace-pre-wrap'>
           {JSON.stringify(detail.rawJson, null, 2)}
         </pre>
       ) : (

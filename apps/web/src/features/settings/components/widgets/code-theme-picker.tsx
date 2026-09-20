@@ -62,7 +62,7 @@ export function CodeThemePicker({
             </CommandItem>
           ))}
         </CommandList>
-        <div className='border-border min-w-0 border-t sm:border-t-0 sm:border-l'>
+        <div className='min-w-0'>
           {highlighted ? (
             <>
               <div
@@ -81,7 +81,7 @@ export function CodeThemePicker({
           )}
         </div>
       </div>
-      <p className='text-muted-foreground border-border text-2xs border-t px-3 py-2'>
+      <p className='text-muted-foreground text-2xs px-3 py-2'>
         Arrow keys to preview · Enter to use theme · Esc to cancel
       </p>
     </Command>

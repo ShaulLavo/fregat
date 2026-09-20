@@ -17,6 +17,12 @@ import {
 } from './pattern-lists'
 import { chatTimelinePattern } from './chat-timeline-pattern'
 import { settingsFontInput } from './settings-font-input'
+import { settingsResponsive } from './settings-responsive'
+import { filePickerNavigation, gitHistoryScroll } from './list-regressions'
+import { iconHints } from './icon-hints'
+import { chatIconHints } from './chat-icon-hints'
+import { chatModelPicker } from './chat-model-picker'
+import { wallpaperIconHints } from './wallpaper-icon-hints'
 import { terminalBackground } from './terminal-background'
 import { chatFollowUp } from './chat-follow-up'
 import { chatDiffSyntax } from './chat-diff-syntax'
@@ -33,6 +39,7 @@ import { editorSplitHistoryState } from './editor-split-history-state'
 import { pageLifecycle } from './page-lifecycle'
 import { editorExternalEdit } from './editor-external-edit'
 import { editorThemePreview } from './editor-theme-preview'
+import { editorSyntaxBenchmark } from './editor-syntax-benchmark'
 import { themeBundles } from './theme-bundles'
 import { bundleWallpapers } from './bundle-wallpapers'
 import { themeGallery } from './theme-gallery'
@@ -46,6 +53,9 @@ import { settingsDefaults } from './settings-defaults'
 import { sidebarSettingsButton } from './sidebar-settings-button'
 import { fileIcons } from './file-icons'
 import { searchInputUndo } from './search-input-undo'
+import { visualSearchPerformance } from './visual-search-performance'
+import { visualSearchHeaders } from './visual-search-headers'
+import { visualSearchScrollContent } from './visual-search-scroll-content'
 import { quickOpenNewFile } from './quick-open-new-file'
 import { quickOpenLinkedFile } from './quick-open-linked-file'
 import { quickOpenNoFlicker } from './quick-open-no-flicker'
@@ -92,11 +102,18 @@ export const scenarios: readonly Scenario[] = [
   environmentsDialog,
   chatChangedFiles,
   patternHints,
+  iconHints,
+  chatIconHints,
+  chatModelPicker,
+  wallpaperIconHints,
   gitChanges,
   logsPanel,
   sessionRail,
   filesTree,
   filePicker,
+  filePickerNavigation,
+  gitHistoryScroll,
+  settingsResponsive,
   searchResults,
   terminalTabs,
   gitGraphKeyboard,
@@ -116,6 +133,9 @@ export const scenarios: readonly Scenario[] = [
   editorExternalEdit,
   terminalBackground,
   editorThemePreview,
+  editorSyntaxBenchmark('native'),
+  editorSyntaxBenchmark('shiki'),
+  editorSyntaxBenchmark('shiki', true),
   themeGallery,
   colorModePreview,
   pageLifecycle,
@@ -125,6 +145,9 @@ export const scenarios: readonly Scenario[] = [
   editorMarkdownPunctuation,
   fileIcons,
   searchInputUndo,
+  visualSearchPerformance,
+  visualSearchHeaders,
+  visualSearchScrollContent,
   quickOpenNewFile,
   quickOpenLinkedFile,
   quickOpenNoFlicker,

@@ -29,7 +29,7 @@ export function KeybindingRow({
 
   return (
     <div
-      className='border-border flex items-center gap-2 border-b px-(--density-control-padding-x) py-(--density-section-gap) last:border-b-0 @max-3xl/settings:grid @max-3xl/settings:grid-cols-[minmax(0,1fr)_auto_auto]'
+      className='flex items-center gap-2 px-(--density-control-padding-x) py-(--density-section-gap) @max-3xl/settings:grid @max-3xl/settings:grid-cols-[minmax(0,1fr)_auto_auto]'
       title={rowTitle}
     >
       <div className='flex min-w-0 flex-1 flex-col @max-3xl/settings:col-span-full'>
@@ -69,6 +69,7 @@ export function KeybindingRow({
             <Button
               aria-label={`Unbind ${title}`}
               disabled={binding.keys === null}
+              focusableWhenDisabled
               onClick={() => setKeybinding(binding.command, null)}
               size='icon-sm'
               variant='ghost'
@@ -85,6 +86,7 @@ export function KeybindingRow({
             <Button
               aria-label={`Reset ${title}`}
               disabled={binding.source !== 'user'}
+              focusableWhenDisabled
               onClick={() => resetKeybinding(binding.command)}
               size='icon-sm'
               variant='ghost'

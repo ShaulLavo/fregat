@@ -21,7 +21,7 @@ export function ListHeader({
     <div
       aria-label='File list sorting'
       className={cn(
-        'h-(--bar-height) border-border text-muted-foreground grid items-center gap-(--density-control-gap) border-b px-(--density-control-padding-x) text-2xs font-medium tracking-normal uppercase',
+        'h-(--bar-height) text-muted-foreground grid items-center gap-(--density-control-gap) px-(--density-control-padding-x) text-2xs font-medium tracking-normal uppercase',
         fileListGridClass(mode),
       )}
       role='group'

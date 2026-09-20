@@ -24,7 +24,7 @@ export function ScopeTabs({
   const scope = useSettingsScope()
 
   return (
-    <div className='flex min-w-0 items-center gap-1 @max-3xl/settings:order-1' role='tablist'>
+    <div className='flex min-w-0 items-center gap-1' role='tablist'>
       <ScopeTab active={scope === 'user'} label='User' scope='user' />
       <ScopeTab
         active={scope === 'workspace'}

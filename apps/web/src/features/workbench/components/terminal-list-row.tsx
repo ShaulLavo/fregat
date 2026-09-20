@@ -18,12 +18,14 @@ export function TerminalListRow({
   active,
   rowProps,
   tab,
+  onActivate,
   onClose,
   onRename,
 }: {
   readonly rowProps: ReturnType<ReturnType<typeof useListbox>['rowProps']>
   readonly active: boolean
   readonly tab: TerminalTabRecord
+  readonly onActivate: (tabId: string) => void
   readonly onClose: (tabId: string) => void
   readonly onRename: (tabId: string, name: string) => void
 }) {
@@ -123,7 +125,10 @@ export function TerminalListRow({
       title={label}
       type='button'
       onAuxClick={handleAuxClick}
-      onClick={rowProps.onClick}
+      onClick={(event) => {
+        rowProps.onClick(event)
+        onActivate(tab.id)
+      }}
       onDoubleClick={() => setEditing(true)}
       onKeyDown={handleKeyDown}
     >

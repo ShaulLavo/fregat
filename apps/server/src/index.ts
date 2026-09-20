@@ -6,7 +6,6 @@ import { closeApp, createApp } from './app'
 import { DEFAULT_ALLOWED_ORIGINS } from './auth'
 import { getDefaultPlatformDatabase } from './db/client'
 import { readEnvironmentIdentity } from './db/environment-identity'
-import { OMARCHY_THEMES_DIRECTORY } from './themes/wallpapers/library'
 import {
   errorSummary,
   flushObservability,
@@ -54,7 +53,7 @@ export const app = createApp({
     watch: Bun.env.FS_WATCH !== 'false',
   },
   systemRoot,
-  themes: { seedWallpapersFrom: OMARCHY_THEMES_DIRECTORY },
+  themes: { seedWallpapers: true },
   treeConcurrency,
   watch,
   web: { root: webRoot, serverReleaseFile: releaseFileFor(import.meta.dirname) },

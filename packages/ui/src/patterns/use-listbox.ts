@@ -5,6 +5,7 @@ import {
   useId,
   useLayoutEffect,
   useRef,
+  type FocusEvent,
   type KeyboardEvent,
   type MouseEvent,
   type RefObject,
@@ -30,6 +31,7 @@ export type UseListboxOptions<Id extends string> = {
   pageSize?: number
   typeahead?: boolean
   scrollToIndex?: (index: number) => void
+  revealOnMount?: boolean
   containerRef?: RefObject<HTMLDivElement | null>
   onActiveKeyDown?: (event: KeyboardEvent<HTMLDivElement>, id: Id) => void
 }
@@ -46,6 +48,7 @@ export function useListbox<Id extends string>({
   pageSize,
   typeahead = false,
   scrollToIndex,
+  revealOnMount = true,
   containerRef,
   onActiveKeyDown,
 }: UseListboxOptions<Id>) {
@@ -60,23 +63,28 @@ export function useListbox<Id extends string>({
   const activeIndex = items.findIndex((item) => item.id === activeId && !item.disabled)
   const cursorIndex = activeIndex < 0 ? enabledListboxIndex(items, 0, 1) : activeIndex
   const cursor = items[cursorIndex]
+  const previousCursor = useRef({ index: cursorIndex, id: cursor?.id })
 
   function rowId(id: Id) {
     return `${prefix}-${id}`
   }
 
-  const revealCursor = useEffectEvent(() => {
+  function revealCursor() {
     if (cursorIndex < 0 || !cursor) return
     if (scrollToIndex) {
       scrollToIndex(cursorIndex)
       return
     }
     document.getElementById(`${prefix}-${cursor.id}`)?.scrollIntoView?.({ block: 'nearest' })
-  })
+  }
+  const revealCurrentCursor = useEffectEvent(revealCursor)
 
   useEffect(() => {
-    revealCursor()
-  }, [cursorIndex, cursor?.id, prefix])
+    const previous = previousCursor.current
+    previousCursor.current = { index: cursorIndex, id: cursor?.id }
+    if (!revealOnMount && previous.index === cursorIndex && previous.id === cursor?.id) return
+    revealCurrentCursor()
+  }, [cursorIndex, cursor?.id, prefix, revealOnMount])
 
   function moveTo(index: number) {
     const item = items[index]
@@ -119,8 +127,13 @@ export function useListbox<Id extends string>({
     if (action.kind === 'none') return handleTypeahead(event)
     event.preventDefault()
     if (action.kind === 'move') {
-      const direction = action.index < cursorIndex || event.key === 'End' ? -1 : 1
-      moveTo(enabledListboxIndex(items, action.index, direction))
+      let direction: 1 | -1 = action.index < cursorIndex || event.key === 'End' ? -1 : 1
+      if (event.key === 'Home') direction = 1
+      let index = enabledListboxIndex(items, action.index, direction)
+      if (index < 0 && (event.key === 'PageUp' || event.key === 'PageDown')) {
+        index = enabledListboxIndex(items, action.index, direction === 1 ? -1 : 1)
+      }
+      moveTo(index)
       return
     }
     if (!cursor) return
@@ -176,7 +189,8 @@ export function useListbox<Id extends string>({
       className: 'focus-ring-inset',
       'aria-activedescendant': cursor ? rowId(cursor.id) : undefined,
       onKeyDown,
-      onFocus: () => {
+      onFocus: (event: FocusEvent<HTMLDivElement>) => {
+        if (!revealOnMount && event.target === event.currentTarget) revealCursor()
         if (activeIndex < 0 && cursor) onActiveChange(cursor.id)
       },
     },

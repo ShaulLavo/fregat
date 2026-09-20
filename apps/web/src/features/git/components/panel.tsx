@@ -85,7 +85,7 @@ export function Panel({ className, rootPath }: ComponentProps<'section'> & { roo
           <EmptyState align='start' className='min-h-0 flex-1' title='No Git repository' />
         }
         header={
-          <PaneBar border='bottom'>
+          <PaneBar>
             <Button
               size='sm'
               variant='ghost'

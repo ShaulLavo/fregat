@@ -56,6 +56,7 @@ export function ChatInputAttachButton({
               aria-label='Attach images'
               className='text-muted-foreground'
               disabled={disabled}
+              focusableWhenDisabled
               size='icon-sm'
               type='button'
               variant='ghost'

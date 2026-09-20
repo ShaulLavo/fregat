@@ -76,7 +76,7 @@ export const LogsEventRow = memo(function LogsEventRow({
           ) : null}
           <span
             className={cn(
-              'rounded-md border px-1 font-mono text-3xs uppercase',
+              'rounded-md px-1 font-mono text-3xs uppercase',
               logLevelClass(event.level),
             )}
           >
@@ -86,7 +86,7 @@ export const LogsEventRow = memo(function LogsEventRow({
         </span>
       </ListRow>
       {expanded ? (
-        <div className='border-subtle border-b px-(--density-row-padding-x) py-2'>
+        <div className='px-(--density-row-padding-x) py-2'>
           <LogsEventInlineDetail detail={detail} event={event} />
         </div>
       ) : null}

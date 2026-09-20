@@ -95,6 +95,11 @@
     "reason": "D3: \"Worked for …\" is app-authored."
   },
   {
+    "file": "apps/web/src/features/chat/components/model-options-menu.tsx",
+    "class": "truncate",
+    "reason": "Already recovered: the compact model-options control earns a Tooltip that includes the complete option summary. A native title would duplicate that tooltip (D4)."
+  },
+  {
     "file": "apps/web/src/features/chat/components/model-picker-sign-in-item.tsx",
     "class": "truncate",
     "reason": "D3: two app-authored sentences (\"Sign in to X\", \"Opens a browser tab through the X CLI.\")."

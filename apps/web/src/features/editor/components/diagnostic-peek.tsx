@@ -80,7 +80,7 @@ export function DiagnosticPeek({ model, onClose, onOpenTarget, tabId }: Diagnost
       <div
         aria-label={`${model.severity} diagnostic`}
         className={cn(
-          'bg-popover-solid pointer-events-auto absolute max-h-[calc(100%-1rem)] w-96 max-w-[calc(100%-1rem)] overflow-y-auto rounded-lg border border-border p-3 text-sm shadow-md',
+          'bg-popover-solid pointer-events-auto absolute max-h-[calc(100%-1rem)] w-96 max-w-[calc(100%-1rem)] overflow-y-auto rounded-lg p-3 text-sm shadow-md ring-1 ring-foreground/10',
           !placement && 'invisible',
         )}
         data-diagnostic-peek=''
@@ -115,7 +115,7 @@ export function DiagnosticPeek({ model, onClose, onOpenTarget, tabId }: Diagnost
           </div>
         ) : null}
         {model.relatedInformation.length > 0 ? (
-          <div className='border-border mt-3 border-t pt-2'>
+          <div className='mt-3 pt-2'>
             {model.relatedInformation.map((information, index) => (
               <Button
                 className='h-auto w-full justify-start px-2 py-1.5 text-left'

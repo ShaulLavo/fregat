@@ -16,7 +16,7 @@ export function SessionBulkBar() {
   const actions = useSessionActions()
 
   return (
-    <PaneBar aria-label='Selected sessions' border='top' role='toolbar'>
+    <PaneBar aria-label='Selected sessions' role='toolbar'>
       <span className='text-muted-foreground text-2xs min-w-0 flex-1 truncate tabular-nums'>
         {refs.length} selected
       </span>

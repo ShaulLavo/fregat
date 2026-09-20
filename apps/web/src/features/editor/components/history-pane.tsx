@@ -175,7 +175,7 @@ export function HistoryPane({
       ref={focusRef}
       subheader={
         <>
-          <div className='border-border overflow-x-auto border-b px-(--bar-padding-x) py-1'>
+          <div className='overflow-x-auto px-(--bar-padding-x) py-1'>
             <HistoryGraphStrip
               barrierFocused={barrierActive}
               barrierLabel={barrierLabel}
@@ -192,7 +192,7 @@ export function HistoryPane({
               }}
             />
           </div>
-          <PaneBar border='bottom' className='justify-between gap-(--density-control-gap)'>
+          <PaneBar className='justify-between gap-(--density-control-gap)'>
             {barrierActive ? (
               <div className='flex min-w-0 flex-1 items-center gap-(--density-control-gap) text-xs'>
                 <span className='shrink-0 font-medium'>Workspace edit</span>

@@ -41,7 +41,10 @@ test('records and resets a command omitted by the default preset', async ({ clie
 
   const recorderName = 'Record a shortcut for editor.editor.action.rename'
   const recorder = screen.getByRole('button', { name: recorderName })
-  expect(screen.getByRole('button', { name: 'Unbind Rename symbol' })).toBeDisabled()
+  expect(screen.getByRole('button', { name: 'Unbind Rename symbol' })).toHaveAttribute(
+    'aria-disabled',
+    'true',
+  )
   await userEvent.click(recorder)
   fireEvent.keyDown(recorder, { key: 'F2' })
 
@@ -58,7 +61,10 @@ test('records and resets a command omitted by the default preset', async ({ clie
     )
   })
   expect(screen.getByRole('button', { name: recorderName })).toBeDefined()
-  expect(screen.getByRole('button', { name: 'Unbind Rename symbol' })).toBeDisabled()
+  expect(screen.getByRole('button', { name: 'Unbind Rename symbol' })).toHaveAttribute(
+    'aria-disabled',
+    'true',
+  )
 })
 
 test('says so when nothing matches', async ({ client }) => {
@@ -77,7 +83,10 @@ test('an untouched row offers nothing to undo', async ({ client }) => {
   expect(client).toBeDefined()
   renderWithProviders(<KeybindingSection />)
 
-  expect(await screen.findByRole('button', { name: 'Reset Save' })).toBeDisabled()
+  expect(await screen.findByRole('button', { name: 'Reset Save' })).toHaveAttribute(
+    'aria-disabled',
+    'true',
+  )
   expect(screen.queryByText('Custom')).toBeNull()
 })
 

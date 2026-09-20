@@ -49,7 +49,6 @@ const PANEL_CLASS =
  * padding no matter which stylesheet order Tailwind emits.
  */
 const SEARCH_FIELD_CLASS = [
-  '[&_[data-slot=command-input-wrapper]]:border-subtle',
   '[&_[data-slot=command-input-wrapper]]:pb-(--density-popover-padding)',
   '[&_[data-slot=input-group]]:h-6.5',
   '[&_[data-slot=input-group]]:bg-transparent',
@@ -140,11 +139,7 @@ export function ModelPicker({
             onSelect={setRailProviderInstanceId}
           />
         ) : null}
-        <Command
-          className={cn('min-w-0 flex-1', activeGroup && 'border-border border-l')}
-          label='Models'
-          shouldFilter={false}
-        >
+        <Command className='min-w-0 flex-1' label='Models' shouldFilter={false}>
           <div
             className={cn(
               'px-(--density-row-padding-x) pt-(--density-section-gap)',

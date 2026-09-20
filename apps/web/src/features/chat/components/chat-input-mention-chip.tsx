@@ -10,7 +10,7 @@ import { basename } from '@/lib/path-formatters'
 export function ChatInputMentionChip({ path }: { readonly path: string }) {
   return (
     <span
-      className='border-border bg-muted text-foreground inline-flex max-w-full items-baseline gap-1 rounded-md border px-1 align-baseline font-mono text-[0.9em] leading-tight select-none'
+      className='bg-muted text-foreground inline-flex max-w-full items-baseline gap-1 rounded-md px-1 align-baseline font-mono text-[0.9em] leading-tight select-none'
       contentEditable={false}
       data-chat-input-mention={path}
       spellCheck={false}

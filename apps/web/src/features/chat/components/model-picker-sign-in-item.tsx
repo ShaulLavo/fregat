@@ -1,5 +1,7 @@
 import { SignInIcon } from '@phosphor-icons/react'
 import { CommandItem } from '@workspace/ui/components/command'
+import { stackedListRowClassName } from '@workspace/ui/patterns/list-row-classes'
+import { cn } from '@workspace/ui/lib/utils'
 
 import type { ProviderSignInTarget } from '@workspace/client-core/chat/providers/auth'
 
@@ -17,7 +19,7 @@ export function ModelPickerSignInItem({
 }) {
   return (
     <CommandItem
-      className='cursor-pointer'
+      className={cn(stackedListRowClassName, 'cursor-pointer')}
       value={`sign-in:${target.providerInstanceId}`}
       onSelect={() => onSelect(target)}
     >

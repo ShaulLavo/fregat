@@ -50,7 +50,7 @@ for (const theme of ['light', 'dark'] as const) {
 function Shell() {
   return (
     <div className='bg-background text-foreground flex h-svh flex-col overflow-hidden'>
-      <PaneBar as='header' border='bottom' className='bg-card backdrop-material'>
+      <PaneBar as='header' className='bg-card backdrop-material'>
         <span className='text-xs font-medium'>platform</span>
         <span className='text-muted-foreground text-2xs'>editor.tsx</span>
         <div className='ml-auto flex items-center gap-(--density-gap-tight)'>
@@ -72,7 +72,7 @@ function Shell() {
         </aside>
 
         <section className='bg-content-well flex min-h-0 min-w-0 flex-1 flex-col overflow-hidden'>
-          <PaneBar border='bottom'>
+          <PaneBar>
             <span className='text-xs font-medium'>editor.tsx</span>
             <Badge className='ml-auto'>3</Badge>
           </PaneBar>
@@ -92,7 +92,7 @@ function Shell() {
             </div>
             <Alert>A boxed callout, on the callout radius step.</Alert>
             <div className='border-border overflow-hidden border'>
-              <PaneBar border='bottom'>
+              <PaneBar>
                 <span className='text-xs font-medium'>Rows</span>
               </PaneBar>
               <div className='hover:bg-row-hover flex h-(--density-row-height) items-center px-(--density-row-padding-x) text-xs'>

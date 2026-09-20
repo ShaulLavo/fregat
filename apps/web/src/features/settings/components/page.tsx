@@ -1,5 +1,4 @@
 import { ToolPane } from '@workspace/ui/patterns/tool-pane'
-import { PaneBar } from '@workspace/ui/components/pane-bar'
 import { workspaceRoot } from '@/lib/documents/utils/identity'
 import type { TabId, WorkspaceRoot } from '@/lib/documents/utils/types'
 import { useNavigation } from '@/hooks/use-navigation'
@@ -16,6 +15,7 @@ import { DiagnosticsBanner } from '@/features/settings/components/diagnostics-ba
 import { ImportSection } from '@/features/settings/components/import-section'
 import { MalformedBanner } from '@/features/settings/components/malformed-banner'
 import { PageActions } from '@/features/settings/components/page-actions'
+import { PageHeader } from '@/features/settings/components/page-header'
 import { PageLoading } from '@/features/settings/components/page-loading'
 import { ScopeTabs } from '@/features/settings/components/scope-tabs'
 import { SettingsJsonView } from '@/features/settings/components/json-view'
@@ -121,27 +121,26 @@ export function SettingsPage({
 
   return (
     <ToolPane
-      title='Settings'
       className='@container/settings h-full min-w-0'
       bodyClassName='flex flex-col overflow-hidden'
       ref={setRootRef}
       tabIndex={-1}
-      actions={
-        <div className='flex items-center justify-end gap-1 @max-3xl/settings:order-2'>
-          {tabId ? <ViewToggle /> : null}
-          <SettingsOwnerProvider
-            key={showJson ? 'editor' : 'global'}
-            queryClient={showJson ? editorOwner : settingsOwner}
-          >
-            <PageActions scope={writableSettingsScope(scope)} />
-          </SettingsOwnerProvider>
-        </div>
-      }
-      subheader={
-        <>
-          <PaneBar border='bottom'>
-            <ScopeTabs hasDefaults={tabId !== undefined} hasWorkspace={hasWorkspace} />
-            {showJson ? null : (
+      header={
+        <PageHeader
+          actions={
+            <div className='flex items-center justify-end gap-1'>
+              {tabId ? <ViewToggle /> : null}
+              <SettingsOwnerProvider
+                key={showJson ? 'editor' : 'global'}
+                queryClient={showJson ? editorOwner : settingsOwner}
+              >
+                <PageActions scope={writableSettingsScope(scope)} />
+              </SettingsOwnerProvider>
+            </div>
+          }
+          scope={<ScopeTabs hasDefaults={tabId !== undefined} hasWorkspace={hasWorkspace} />}
+          search={
+            showJson ? null : (
               <InputGroup className='min-w-0 flex-1'>
                 <InputGroupAddon align='inline-start'>
                   <MagnifyingGlassIcon aria-hidden />
@@ -159,17 +158,11 @@ export function SettingsPage({
                   value={query}
                 />
               </InputGroup>
-            )}
-          </PaneBar>
-          {showJson ? null : (
-            <PaneBar border='bottom'>
-              <div
-                className={
-                  showJson
-                    ? 'hidden'
-                    : 'flex flex-wrap items-center gap-2 @max-3xl/settings:order-4 @max-3xl/settings:col-span-full'
-                }
-              >
+            )
+          }
+          summary={
+            showJson ? null : (
+              <div className='flex flex-wrap items-center gap-2'>
                 {/* `visible` is already query-filtered, so "of N" only says something while a
               category narrows the list further; otherwise it printed the same number twice. */}
                 <p className='text-muted-foreground text-xs tabular-nums'>
@@ -195,9 +188,9 @@ export function SettingsPage({
                   </Button>
                 ) : null}
               </div>
-            </PaneBar>
-          )}
-        </>
+            )
+          }
+        />
       }
     >
       {/* Escape returns to the search box from anywhere in the list, so a

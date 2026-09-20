@@ -22,7 +22,7 @@ export function WorktreeChip({
       data-worktree-id={worktree.id}
       title={`${label} · ${lifecycle}`}
       className={cn(
-        'inline-flex min-w-0 items-center gap-1 overflow-hidden rounded-md border border-border px-1.5 py-0.5 text-2xs leading-4 whitespace-nowrap',
+        'inline-flex min-w-0 items-center gap-1 overflow-hidden rounded-md bg-muted px-1.5 py-0.5 text-2xs leading-4 whitespace-nowrap',
         pending && 'text-info',
         failed && 'text-destructive',
         state === 'cleanup-blocked' && 'text-warning',

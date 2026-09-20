@@ -1,6 +1,19 @@
 import { defineErrorCatalog } from 'evlog'
 
 export const wallpaperErrors = defineErrorCatalog('wallpapers', {
+  BUNDLED_INVALID: {
+    status: 500,
+    message: ({ assetId }: { assetId: string }) =>
+      `Bundled wallpaper ${assetId} is missing or damaged.`,
+    why: 'The server package does not contain the expected wallpaper bytes.',
+    fix: 'Rebuild and deploy the server with its wallpaper assets.',
+  },
+  BUNDLED: {
+    status: 400,
+    message: 'Bundled wallpapers cannot be deleted.',
+    why: 'Built-in themes reference this artwork.',
+    fix: 'Select another wallpaper or turn the wallpaper off.',
+  },
   INVALID: {
     status: 400,
     message: 'Wallpaper must be a valid JPEG, PNG or WebP still within the image limits.',

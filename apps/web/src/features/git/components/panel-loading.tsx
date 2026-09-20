@@ -6,7 +6,7 @@ export function PanelLoading({ className }: { className?: string }) {
   return (
     <LoadingState className={cn('flex h-full min-h-0 flex-col', className)} label='Loading Git'>
       <div aria-hidden='true' className='flex min-h-0 flex-1 flex-col'>
-        <PaneBar border='bottom'>
+        <PaneBar>
           <div className='skeleton-sweep h-(--density-control-height-sm) flex-1 rounded-md' />
           <div className='skeleton-sweep h-(--density-control-height-sm) w-16 rounded-md' />
         </PaneBar>

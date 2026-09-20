@@ -195,7 +195,10 @@ test('finishes cancellation before allowing a fresh generation request', async (
         screen.getByRole('button', { name: 'Cancel commit message generation' }),
       )
 
-      expect(screen.getByRole('button', { name: 'Cancelling commit message…' })).toBeDisabled()
+      expect(screen.getByRole('button', { name: 'Cancelling commit message…' })).toHaveAttribute(
+        'aria-disabled',
+        'true',
+      )
       await waitFor(() => expect(adapter.interruptedSessions.length).toBeGreaterThanOrEqual(1))
 
       gate.resolve()

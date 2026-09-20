@@ -73,7 +73,7 @@ export function ProjectRenameDialog() {
   return (
     <Dialog onOpenChange={(open) => open || dismissRename()} open={request !== null}>
       <DialogContent
-        className='w-[min(420px,calc(100vw-2rem))] max-w-none border text-sm sm:max-w-none'
+        className='w-[min(420px,calc(100vw-2rem))] max-w-none text-sm sm:max-w-none'
         showCloseButton={false}
       >
         <DialogHeader>
