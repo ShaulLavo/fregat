@@ -30,6 +30,8 @@ Split views: `scenario editor-split-drag` checks edge previews, modifier changes
 
 `scenario editor-split-history-state` creates a workspace edit through Search Replace All, selects its history barrier, and moves that history tab into a group already displaying another history tab. The barrier selection must survive without collapsing the source group.
 
+`scenario editor-diagnostics-lifecycle` repeatedly opens/closes a file, opts into URL tracing, exceeds the diagnostic retention bound, stops collection, and reloads without tracing. `trace --no-console` omits console listeners as a capture-overhead control; `observed.json` records upload requests, bytes, event counts and client IDs.
+
 ## Gotchas
 
 `scenario editor-external-edit` creates a disposable workspace with a folder linked outside the project. It removes a line on disk, atomically replaces the open file, retargets the symlink, replaces its target directory, and verifies that subsequent edits still arrive. An external write while another tab opens and closes must preserve unsaved text and offer a conflict. The project filesystem subscription count must stay unchanged across both tab operations. Fixture files are cleaned up afterward; screenshots and `inspection.json` retain the evidence.

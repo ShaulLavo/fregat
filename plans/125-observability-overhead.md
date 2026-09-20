@@ -1,6 +1,11 @@
 # Plan 125: Reduce logging and measurement overhead without losing failure evidence
 
-Status: proposed, implementation not started. Requested 2026-09-20.
+Status: implementation deployed and production checks passed 2026-09-20.
+Development baseline and live mock-provider streaming evidence remain pending. Requested 2026-09-20.
+
+Implementation: [observability admission and retention](../docs/observability-overhead.md).
+Evidence: `/work/tmp/fregat-evidence/plan125-20260920/`. Keep this plan until its remaining
+evidence gates are satisfied; do not read the original checklist below as an updated completion ledger.
 Planned against Platform `9a7d77d2`, with unrelated working changes present.
 Priority: P1. Effort: M. Risk: medium, because filtering can hide failures.
 

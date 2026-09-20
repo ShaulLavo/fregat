@@ -46,10 +46,8 @@ export function createCoalescedLogQueue({
       return
     }
 
-    clearTimeout(item.timeoutId)
     item.count += 1
     item.event = merge ? merge(item.event, event) : event
-    item.timeoutId = setTimeout(() => flush(key), delayMs)
   }
 
   function flushAll() {

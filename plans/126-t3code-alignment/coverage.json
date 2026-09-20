@@ -1,0 +1,208 @@
+{
+  "warning": "Domain ownership is complete; semantic/runtime coverage is not. A module assignment does not mean every exported operation was audited.",
+  "contracts": {
+    "packages/contracts/src/agentSessions.ts": {
+      "findings": ["RUNTIME-02"],
+      "review_state": "domain-assigned; symbol-by-symbol behavioral replay still required"
+    },
+    "packages/contracts/src/assets.ts": {
+      "findings": ["INTERACTION-02"],
+      "review_state": "domain-assigned; symbol-by-symbol behavioral replay still required"
+    },
+    "packages/contracts/src/assistantCitations.ts": {
+      "findings": ["INTERACTION-09"],
+      "review_state": "domain-assigned; symbol-by-symbol behavioral replay still required"
+    },
+    "packages/contracts/src/auth.ts": {
+      "findings": ["EXT-08"],
+      "review_state": "domain-assigned; symbol-by-symbol behavioral replay still required"
+    },
+    "packages/contracts/src/background.ts": {
+      "findings": ["EXT-10", "RUNTIME-07"],
+      "review_state": "domain-assigned; symbol-by-symbol behavioral replay still required"
+    },
+    "packages/contracts/src/baseSchemas.ts": {
+      "findings": ["EXT-11"],
+      "review_state": "domain-assigned; symbol-by-symbol behavioral replay still required"
+    },
+    "packages/contracts/src/browserImport.ts": {
+      "findings": ["EXT-07"],
+      "review_state": "domain-assigned; symbol-by-symbol behavioral replay still required"
+    },
+    "packages/contracts/src/browserProfile.ts": {
+      "findings": ["EXT-07"],
+      "review_state": "domain-assigned; symbol-by-symbol behavioral replay still required"
+    },
+    "packages/contracts/src/composerContext.ts": {
+      "findings": ["INTERACTION-09"],
+      "review_state": "domain-assigned; symbol-by-symbol behavioral replay still required"
+    },
+    "packages/contracts/src/composerContextClipboard.ts": {
+      "findings": ["INTERACTION-09"],
+      "review_state": "domain-assigned; symbol-by-symbol behavioral replay still required"
+    },
+    "packages/contracts/src/desktopAppActivation.ts": {
+      "findings": ["EXT-09"],
+      "review_state": "domain-assigned; symbol-by-symbol behavioral replay still required"
+    },
+    "packages/contracts/src/desktopBootstrap.ts": {
+      "findings": ["EXT-09"],
+      "review_state": "domain-assigned; symbol-by-symbol behavioral replay still required"
+    },
+    "packages/contracts/src/device.ts": {
+      "findings": ["EXT-07"],
+      "review_state": "domain-assigned; symbol-by-symbol behavioral replay still required"
+    },
+    "packages/contracts/src/editor.ts": {
+      "findings": ["EXT-09"],
+      "review_state": "domain-assigned; symbol-by-symbol behavioral replay still required"
+    },
+    "packages/contracts/src/environment.ts": {
+      "findings": ["EXT-08", "LIFE-09"],
+      "review_state": "domain-assigned; symbol-by-symbol behavioral replay still required"
+    },
+    "packages/contracts/src/environmentHttp.ts": {
+      "findings": ["EXT-08"],
+      "review_state": "domain-assigned; symbol-by-symbol behavioral replay still required"
+    },
+    "packages/contracts/src/filesystem.ts": {
+      "findings": ["EXT-11"],
+      "review_state": "domain-assigned; symbol-by-symbol behavioral replay still required"
+    },
+    "packages/contracts/src/git.ts": {
+      "findings": ["EXT-02", "RUNTIME-01", "EXT-13"],
+      "review_state": "domain-assigned; symbol-by-symbol behavioral replay still required"
+    },
+    "packages/contracts/src/ipc.ts": {
+      "findings": ["EXT-09"],
+      "review_state": "domain-assigned; symbol-by-symbol behavioral replay still required"
+    },
+    "packages/contracts/src/keybindings.ts": {
+      "findings": ["INTERACTION-11", "EXT-11"],
+      "review_state": "domain-assigned; symbol-by-symbol behavioral replay still required"
+    },
+    "packages/contracts/src/model.ts": {
+      "findings": ["RUNTIME-06"],
+      "review_state": "domain-assigned; symbol-by-symbol behavioral replay still required"
+    },
+    "packages/contracts/src/orchestration.ts": {
+      "findings": [
+        "LIFE-01",
+        "LIFE-02",
+        "LIFE-03",
+        "LIFE-04",
+        "LIFE-05",
+        "LIFE-06",
+        "LIFE-07",
+        "LIFE-08",
+        "LIFE-09",
+        "LIFE-10",
+        "LIFE-11",
+        "LIFE-12",
+        "RUNTIME-01",
+        "RUNTIME-04"
+      ],
+      "review_state": "domain-assigned; symbol-by-symbol behavioral replay still required"
+    },
+    "packages/contracts/src/preview.ts": {
+      "findings": ["EXT-07"],
+      "review_state": "domain-assigned; symbol-by-symbol behavioral replay still required"
+    },
+    "packages/contracts/src/previewAutomation.ts": {
+      "findings": ["EXT-07"],
+      "review_state": "domain-assigned; symbol-by-symbol behavioral replay still required"
+    },
+    "packages/contracts/src/project.ts": {
+      "findings": ["EXT-03", "EXT-04"],
+      "review_state": "domain-assigned; symbol-by-symbol behavioral replay still required"
+    },
+    "packages/contracts/src/projectClone.ts": {
+      "findings": ["EXT-03"],
+      "review_state": "domain-assigned; symbol-by-symbol behavioral replay still required"
+    },
+    "packages/contracts/src/provider.ts": {
+      "findings": ["RUNTIME-02", "RUNTIME-06"],
+      "review_state": "domain-assigned; symbol-by-symbol behavioral replay still required"
+    },
+    "packages/contracts/src/providerInstance.ts": {
+      "findings": ["RUNTIME-02", "RUNTIME-08"],
+      "review_state": "domain-assigned; symbol-by-symbol behavioral replay still required"
+    },
+    "packages/contracts/src/providerRuntime.ts": {
+      "findings": ["RUNTIME-03", "RUNTIME-05", "RUNTIME-07", "RUNTIME-09", "RUNTIME-11"],
+      "review_state": "domain-assigned; symbol-by-symbol behavioral replay still required"
+    },
+    "packages/contracts/src/providerSetup.ts": {
+      "findings": ["RUNTIME-10"],
+      "review_state": "domain-assigned; symbol-by-symbol behavioral replay still required"
+    },
+    "packages/contracts/src/providerUsageLimits.ts": {
+      "findings": ["RUNTIME-08"],
+      "review_state": "domain-assigned; symbol-by-symbol behavioral replay still required"
+    },
+    "packages/contracts/src/pullRequest.ts": {
+      "findings": ["EXT-02", "EXT-13"],
+      "review_state": "domain-assigned; symbol-by-symbol behavioral replay still required"
+    },
+    "packages/contracts/src/relay.ts": {
+      "findings": ["EXT-08"],
+      "review_state": "domain-assigned; symbol-by-symbol behavioral replay still required"
+    },
+    "packages/contracts/src/relayClient.ts": {
+      "findings": ["EXT-08"],
+      "review_state": "domain-assigned; symbol-by-symbol behavioral replay still required"
+    },
+    "packages/contracts/src/remoteAccess.ts": {
+      "findings": ["EXT-08"],
+      "review_state": "domain-assigned; symbol-by-symbol behavioral replay still required"
+    },
+    "packages/contracts/src/resourceTelemetry.ts": {
+      "findings": ["EXT-10"],
+      "review_state": "domain-assigned; symbol-by-symbol behavioral replay still required"
+    },
+    "packages/contracts/src/review.ts": {
+      "findings": ["EXT-02", "INTERACTION-09"],
+      "review_state": "domain-assigned; symbol-by-symbol behavioral replay still required"
+    },
+    "packages/contracts/src/rpc.ts": {
+      "findings": ["EXT-11"],
+      "review_state": "domain-assigned; symbol-by-symbol behavioral replay still required"
+    },
+    "packages/contracts/src/server.ts": {
+      "findings": ["RUNTIME-10", "EXT-09", "EXT-10"],
+      "review_state": "domain-assigned; symbol-by-symbol behavioral replay still required"
+    },
+    "packages/contracts/src/settings.ts": {
+      "findings": ["EXT-11", "LIFE-06", "RUNTIME-09", "INTERACTION-11", "EXT-12"],
+      "review_state": "domain-assigned; symbol-by-symbol behavioral replay still required"
+    },
+    "packages/contracts/src/sourceControl.ts": {
+      "findings": ["EXT-01", "EXT-03", "EXT-13"],
+      "review_state": "domain-assigned; symbol-by-symbol behavioral replay still required"
+    },
+    "packages/contracts/src/t3ProjectFile.ts": {
+      "findings": ["EXT-04"],
+      "review_state": "domain-assigned; symbol-by-symbol behavioral replay still required"
+    },
+    "packages/contracts/src/terminal.ts": {
+      "findings": ["EXT-05"],
+      "review_state": "domain-assigned; symbol-by-symbol behavioral replay still required"
+    },
+    "packages/contracts/src/usage.ts": {
+      "findings": ["RUNTIME-08", "EXT-10"],
+      "review_state": "domain-assigned; symbol-by-symbol behavioral replay still required"
+    },
+    "packages/contracts/src/usageLimitSourceId.ts": {
+      "findings": ["RUNTIME-08"],
+      "review_state": "domain-assigned; symbol-by-symbol behavioral replay still required"
+    },
+    "packages/contracts/src/vcs.ts": {
+      "findings": ["EXT-01", "EXT-02"],
+      "review_state": "domain-assigned; symbol-by-symbol behavioral replay still required"
+    },
+    "packages/contracts/src/worktreeSetup.ts": {
+      "findings": ["EXT-04", "EXT-12"],
+      "review_state": "domain-assigned; symbol-by-symbol behavioral replay still required"
+    }
+  }
+}

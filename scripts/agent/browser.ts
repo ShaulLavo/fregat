@@ -42,6 +42,7 @@ Options
   --file       file name a scenario opens through the command palette (default: ${DEFAULT_FILE})
   --workspace  root-relative folder to open when the URL names no workspace (default: ${DEFAULT_WORKSPACE})
   --selector   CSS selector to screenshot in addition to the page
+  --no-console omit console listeners for a capture-overhead control
   --headed     show the browser
   --doctor     exit non-zero when the app is not healthy
   --compare    an earlier trace evidence directory to diff against
@@ -55,6 +56,7 @@ Options
 Evidence lands under /work/tmp/fregat-evidence/<stamp>-<verb>-<label>/.`
 
 type Options = CaptureSize & {
+  readonly consoleCapture: boolean
   readonly site: boolean
   readonly productCapture: boolean
   readonly staticDir: string | undefined
@@ -73,6 +75,7 @@ async function main() {
     allowPositionals: true,
     options: {
       compare: { type: 'string' },
+      'no-console': { type: 'boolean', default: false },
       'static-dir': { type: 'string' },
       site: { type: 'boolean', default: false },
       'product-wallpaper': { type: 'string' },
@@ -100,6 +103,7 @@ async function main() {
     )
   const options: Options = {
     ...captureSize(values),
+    consoleCapture: !values['no-console'],
     site: values.site || Boolean(values['static-dir']),
     productCapture:
       name === 'editor-product' ||
@@ -535,7 +539,9 @@ async function withPage(
     ...(options.productWallpaper ? { userAgent: PRODUCT_USER_AGENT } : {}),
   })
   const page = await context.newPage()
-  const observed = attachObserver(page, apiBase(options.url))
+  const observed = attachObserver(page, apiBase(options.url), {
+    consoleCapture: options.consoleCapture,
+  })
   let saveWallpaper: (() => Promise<string>) | undefined
   let disposeTerminals: (() => Promise<string>) | undefined
   try {
@@ -548,6 +554,7 @@ async function withPage(
       saveWallpaper = await routeProductWallpaper(page, options.productWallpaper, evidence)
     await evidence.json('capture-options.json', {
       url: options.url,
+      consoleCapture: options.consoleCapture,
       viewport: { width: options.width, height: options.height },
       deviceScaleFactor: options.scale,
       screenshotPixels: {

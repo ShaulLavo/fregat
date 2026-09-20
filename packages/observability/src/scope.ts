@@ -1,7 +1,7 @@
 import { isRecord } from '@workspace/utils/objects'
 import { createRequestLogger, type RequestLogger } from 'evlog'
 
-import { sanitizeRecord } from './sanitize'
+import { limitDiagnosticString, sanitizeRecord } from './sanitize'
 
 export type WideEventBase = {
   readonly action: string
@@ -40,9 +40,11 @@ const noopScope: WideEventScope = {
 export function createWideEventScope({
   enabled,
   base,
+  onFailure,
 }: {
   readonly enabled: boolean
   readonly base: WideEventBase
+  readonly onFailure?: (level: 'warn' | 'error', context: Record<string, unknown>) => void
 }): WideEventScope {
   if (!enabled) return noopScope
 
@@ -50,17 +52,22 @@ export function createWideEventScope({
   try {
     logger = createRequestLogger()
     logger.set(sanitizeRecord(base))
+    boundScopeCollections(logger.getContext())
   } catch {
     return noopScope
   }
 
   let ended = false
+  let warningCount = 0
 
   return {
     set(context) {
       if (ended || !logger) return
 
-      guard(() => logger?.set(sanitizeRecord(context)))
+      guard(() => {
+        logger?.set(sanitizeRecord(context))
+        boundScopeCollections(logger?.getContext())
+      })
     },
     increment(path, by = 1) {
       if (ended || !logger) return
@@ -78,12 +85,22 @@ export function createWideEventScope({
     warn(message, context) {
       if (ended || !logger) return
 
-      guard(() => logger?.warn(message, context ? sanitizeRecord(context) : undefined))
+      guard(() => {
+        warningCount += 1
+        logger?.warn(limitDiagnosticString(message), context ? sanitizeRecord(context) : undefined)
+        logger?.set({ warningCount })
+        boundScopeCollections(logger?.getContext())
+        onFailure?.('warn', logger?.getContext() ?? {})
+      })
     },
     error(error, context) {
       if (ended || !logger) return
 
-      guard(() => logger?.error(toError(error), context ? sanitizeRecord(context) : undefined))
+      guard(() => {
+        logger?.error(toError(error), context ? sanitizeRecord(context) : undefined)
+        boundScopeCollections(logger?.getContext())
+        onFailure?.('error', logger?.getContext() ?? {})
+      })
     },
     getContext() {
       if (!logger) return {}
@@ -132,4 +149,21 @@ function numberAtPath(context: Record<string, unknown> | undefined, path: string
   }
 
   return typeof current === 'number' && Number.isFinite(current) ? current : 0
+}
+
+// evlog returns a shallow context snapshot; its nested collections remain scope-owned.
+function boundScopeCollections(value: unknown, seen = new WeakSet<object>()): void {
+  if (value === null || typeof value !== 'object' || seen.has(value)) return
+  seen.add(value)
+  if (Array.isArray(value)) {
+    if (value.length > 25) value.splice(0, value.length - 25)
+    for (const item of value) boundScopeCollections(item, seen)
+    return
+  }
+  if (!isRecord(value)) return
+  for (const [key, item] of Object.entries(value)) {
+    // evlog's error cause/data can still reference application-owned objects.
+    if (key === 'error') continue
+    boundScopeCollections(item, seen)
+  }
 }

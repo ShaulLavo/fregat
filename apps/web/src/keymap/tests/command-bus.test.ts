@@ -439,6 +439,7 @@ function commandBusHarness(definition: TestDefinition, overrides: HarnessOverrid
   const createEvent = (base: Record<string, unknown>): CommandEventScope => {
     createdEvents.push(base)
     return {
+      warn: vi.fn(),
       end: (context) => endedEvents.push({ ...base, ...context }),
       error: (_error, context) => {
         if (!context) return

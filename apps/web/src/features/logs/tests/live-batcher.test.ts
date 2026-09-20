@@ -1,4 +1,5 @@
-import { describe, expect, it } from 'vitest'
+import { describe } from 'vitest'
+import { expect, test as it } from '../../../../test/fixtures'
 import type { LogEventSummary } from '@workspace/contracts'
 
 import { createLiveEventBatcher } from '@/features/logs/state/live-batcher'
@@ -72,3 +73,14 @@ function event(id: string): LogEventSummary {
     timestamp: '2026-05-25T10:00:00.000Z',
   }
 }
+
+it('flushes at the count bound when the browser delays its timer', () => {
+  const batches: number[] = []
+  const batcher = createLiveEventBatcher<number>(
+    (events) => batches.push(events.length),
+    () => () => {},
+  )
+  for (let index = 0; index < 1500; index++) batcher.push(index)
+  expect(batches).toEqual([500, 500, 500])
+  batcher.cancel()
+})

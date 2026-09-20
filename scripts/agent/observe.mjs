@@ -1,7 +1,9 @@
 // One definition of "what the page reported": page errors, console, network, sockets.
 // Shared by the deploy live check (node) and the agent browser CLI (bun).
-export function attachObserver(page, base) {
+export function attachObserver(page, base, { consoleCapture = true } = {}) {
   const observed = {
+    consoleCapture,
+    logUploads: { requests: 0, bytes: 0, events: 0, instances: [] },
     errors: [],
     consoleErrors: [],
     consoleWarnings: [],
@@ -15,20 +17,22 @@ export function attachObserver(page, base) {
     sockets: [],
   }
   page.on('pageerror', (error) => observed.errors.push(error.message))
-  page.on('console', (message) => {
-    if (message.type() === 'error') observed.consoleErrors.push(message.text())
-    if (message.type() === 'warning') observed.consoleWarnings.push(message.text())
-    if (message.type() === 'error' || message.type() === 'warning')
-      observed.consoleDetails.push({
-        level: message.type(),
-        text: message.text(),
-        ...message.location(),
-      })
-  })
+  if (consoleCapture)
+    page.on('console', (message) => {
+      if (message.type() === 'error') observed.consoleErrors.push(message.text())
+      if (message.type() === 'warning') observed.consoleWarnings.push(message.text())
+      if (message.type() === 'error' || message.type() === 'warning')
+        observed.consoleDetails.push({
+          level: message.type(),
+          text: message.text(),
+          ...message.location(),
+        })
+    })
   page.on('requestfailed', (request) =>
     observed.failedRequests.push({ url: request.url(), error: request.failure()?.errorText }),
   )
   page.on('request', (request) => {
+    recordLogUpload(request, observed.logUploads)
     if (/^https?:\/\/(127\.0\.0\.1|localhost)(:|\/)/.test(request.url()))
       observed.loopbackRequests.push(request.url())
   })
@@ -75,4 +79,19 @@ export function observedProblems(observed, { loopback = true } = {}) {
     observed.failedRequests.filter((item) => item.error !== 'net::ERR_ABORTED'),
   )
   return found
+}
+
+function recordLogUpload(request, uploads) {
+  const url = new URL(request.url())
+  if (!url.pathname.endsWith('/_log/ingest')) return
+  uploads.requests += 1
+  uploads.bytes += request.postDataBuffer()?.length ?? 0
+  const instance = url.searchParams.get('instance')
+  if (instance && !uploads.instances.includes(instance)) uploads.instances.push(instance)
+  try {
+    const payload = request.postDataJSON()
+    uploads.events += Array.isArray(payload) ? payload.length : 1
+  } catch {
+    // Failed or truncated uploads still contribute their request and byte counts.
+  }
 }

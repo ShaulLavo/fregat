@@ -9,6 +9,7 @@ export function createLiveEventBatcher<TItem>(
   let cancelFlush: CancelLiveEventFlush | null = null
 
   function flush() {
+    cancelFlush?.()
     cancelFlush = null
     const nextEvents = events
     events = []
@@ -25,6 +26,10 @@ export function createLiveEventBatcher<TItem>(
     },
     push(event: TItem) {
       events.push(event)
+      if (events.length >= 500) {
+        flush()
+        return
+      }
       if (cancelFlush) return
 
       cancelFlush = scheduleFlush(flush)

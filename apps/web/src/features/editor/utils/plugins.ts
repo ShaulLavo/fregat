@@ -30,15 +30,11 @@ import { editorIndentationGuidesSupported } from '@/features/editor/utils/indent
 import { FOLD_CHEVRON_ICON } from '@/features/editor/utils/fold-icon'
 
 const editorScrollPositionsByInstanceId = new Map<string, EditorScrollPosition>()
-const ignoredEditorInfoActions = new Set([
-  'editor.plugins.gutters.changed',
-  'editor.syntax.document_started',
-])
-const PLATFORM_EDITOR_CONSOLE_LOGGING_PLUGIN = createEditorLoggingPlugin(logEditorEventToConsole, {
+const PLATFORM_EDITOR_LOGGING_PLUGIN = createEditorLoggingPlugin(logEditorEvent, {
   name: 'platform.editor-logging',
 })
 const PLATFORM_SEARCH_RESULT_EDITOR_LOGGING_PLUGIN = createEditorLoggingPlugin(
-  logSearchResultEditorEventToConsole,
+  logSearchResultEditorEvent,
   {
     name: 'platform.search-result-editor-logging',
   },
@@ -235,14 +231,14 @@ async function loadPlugin(
 }
 
 export function createPlatformEditorLoggingPlugin(): EditorPlugin {
-  return PLATFORM_EDITOR_CONSOLE_LOGGING_PLUGIN
+  return PLATFORM_EDITOR_LOGGING_PLUGIN
 }
 
 export function createPlatformSearchResultEditorLoggingPlugin(): EditorPlugin {
   return PLATFORM_SEARCH_RESULT_EDITOR_LOGGING_PLUGIN
 }
 
-function logEditorEventToConsole(event: EditorLogEvent): void {
+function logEditorEvent(event: EditorLogEvent): void {
   cacheEditorScrollPosition(event)
   if (event.action === 'editor.viewport.changed') return
   if (!shouldLogEditorEvent(event)) {
@@ -250,19 +246,16 @@ function logEditorEventToConsole(event: EditorLogEvent): void {
     return
   }
 
-  log[editorLogLevel(event)]({
+  log[editorLogLevel(event)](() => ({
     ...editorEventScrollContext(event),
     ...event,
     area: 'editor',
-    level: editorLogPayloadLevel(event),
-  })
+    level: editorLogLevel(event),
+  }))
   forgetEditorScrollPosition(event)
 }
 
 function shouldLogEditorEvent(event: EditorLogEvent): boolean {
-  if (editorLogLevel(event) !== 'info') return true
-  if (ignoredEditorInfoActions.has(event.action)) return false
-
   return !isShortEmptyEditorLifecycleSummary(event)
 }
 
@@ -278,15 +271,11 @@ function isShortEmptyEditorLifecycleSummary(event: EditorLogEvent): boolean {
 function editorLogLevel(event: EditorLogEvent) {
   if (event.level === 'warn' || event.level === 'error') return event.level
 
-  return 'info'
+  if (event.action === 'editor.lifecycle.summary') return 'info'
+  return 'debug'
 }
 
-function editorLogPayloadLevel(event: EditorLogEvent) {
-  if (event.action === 'editor.syntax.reloaded') return 'debug'
-  return event.level
-}
-
-function logSearchResultEditorEventToConsole(event: EditorLogEvent): void {
+function logSearchResultEditorEvent(event: EditorLogEvent): void {
   if (event.level !== 'warn' && event.level !== 'error') return
 
   log[event.level]({

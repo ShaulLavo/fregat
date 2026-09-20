@@ -1,7 +1,7 @@
 import type { DocumentKey, FilesystemPath } from '@/lib/documents/utils/types'
 import type { EditorTextBuffer } from '@singapore-editor/core'
 
-import { log } from '@/lib/client-logging'
+import { clientLogEnabled, log } from '@/lib/client-logging'
 import type { ScopedStorage } from '@/lib/environments/state/scoped-storage'
 import {
   removeEditorVisibleSnapshotCacheForPath,
@@ -70,7 +70,7 @@ function persistSnapshot(
     return
   }
 
-  const started = performance.now()
+  const started = clientLogEnabled('debug') ? performance.now() : null
   const capture = source()
   if (!capture || capture.documentKey !== identity.paintKey) return
   if (capture.documentId !== identity.key || capture.buffer !== buffer) return
@@ -84,10 +84,13 @@ function persistSnapshot(
     paint: capture.paint,
     themeId,
   })
-  performance.measure('editor.visible_snapshot.capture', {
-    start: started,
-    detail: { outcome: result.status, serializedBytes: result.serializedBytes },
-  })
+  if (started !== null) {
+    performance.clearMeasures('editor.visible_snapshot.capture')
+    performance.measure('editor.visible_snapshot.capture', {
+      start: started,
+      detail: { outcome: result.status, serializedBytes: result.serializedBytes },
+    })
+  }
   if (result.status !== 'invalid') return
   log.warn({
     area: 'editor',

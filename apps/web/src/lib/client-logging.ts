@@ -1,7 +1,7 @@
 import { isAbortError } from '@/lib/abort-error'
 import { elapsedMs } from '@workspace/utils/timing'
 import { limitDiagnosticString, sanitizeRecord } from '@workspace/observability/sanitize'
-import { initLogger, log as evlog, type LogLevel } from 'evlog'
+import { initLogger, isLevelEnabled, log as evlog, type DrainContext, type LogLevel } from 'evlog'
 import { createHttpLogDrain } from 'evlog/http'
 import { errorNumberField, errorStringField } from '@workspace/contracts'
 import { observabilityEnabledFromEnv } from '@workspace/observability/env'
@@ -20,7 +20,7 @@ export type ClientLogEvent = {
   readonly [key: string]: unknown
 }
 
-type ClientLogInput = Record<string, unknown>
+type ClientLogInput = Record<string, unknown> | (() => Record<string, unknown>)
 type ClientLogMethod = {
   (event: ClientLogInput): void
   (tag: string, message: string): void
@@ -30,6 +30,7 @@ type ClientLogApi = Record<ClientLogLevel, ClientLogMethod>
 const serviceName = 'platform-web'
 const ingestPath = '/_log/ingest'
 let initialized = false
+let policy: ReturnType<typeof resolveClientLogPolicy> | null = null
 let clientEventSequence = 0
 
 export const log: ClientLogApi = {
@@ -43,7 +44,19 @@ export function initializeClientLogging() {
   if (initialized) return
 
   initialized = true
+  policy = resolveClientLogPolicy()
+  if (!policy.enabled) {
+    initLogger({ enabled: false })
+    return
+  }
+
   const drain = createHttpLogDrain({
+    pipeline: {
+      maxBufferSize: 1000,
+      onDropped: (events) => {
+        console.warn(`[logging] Dropped ${events.length} events from the bounded delivery queue.`)
+      },
+    },
     drain: {
       credentials: 'omit',
       endpoint: logIngestEndpoint(),
@@ -51,16 +64,19 @@ export function initializeClientLogging() {
   })
 
   initLogger({
-    drain,
-    enabled: clientLoggingEnabled(),
+    drain: (context) => {
+      writeClientConsole(context)
+      drain({ ...context, event: withClientEventId(context.event) })
+    },
+    enabled: true,
     env: {
       environment: import.meta.env.MODE,
       service: serviceName,
     },
-    minLevel: clientLogMinLevel(),
-    pretty: import.meta.env.DEV,
+    minLevel: policy.minLevel,
+    pretty: false,
     redact: true,
-    silent: !import.meta.env.DEV,
+    silent: true,
     stringify: true,
   })
 }
@@ -76,12 +92,12 @@ export async function observeClientOperation<T>(
 
   try {
     const result = await operation()
-    log.info({
+    log.info(() => ({
       ...baseEvent,
       durationMs: elapsedMs(startedAt),
       outcome: 'ok',
       ...summarize?.(result),
-    })
+    }))
     return result
   } catch (error) {
     annotateClientError(error, {
@@ -118,16 +134,17 @@ function createClientLogMethod(level: ClientLogLevel): ClientLogMethod {
 }
 
 function emitClientLog(level: ClientLogLevel, event: ClientLogInput): void {
-  if (!clientLoggingEnabled()) return
+  if (!clientLogEnabled(level)) return
 
   try {
-    evlog[level](safeClientEvent(withClientEventId(event)))
+    const fields = typeof event === 'function' ? event() : event
+    evlog[level](safeClientEvent(withClientEventId({ ...fields, level })))
   } catch {
     // Logging must never affect user-facing app flows.
   }
 }
 
-function withClientEventId(event: ClientLogInput) {
+function withClientEventId<T extends Record<string, unknown>>(event: T) {
   if (typeof event.eventId === 'string' && event.eventId.length > 0) return event
 
   clientEventSequence += 1
@@ -147,17 +164,33 @@ function logIngestEndpoint() {
 }
 
 export function clientLoggingEnabled() {
-  return observabilityEnabledFromEnv({
-    NODE_ENV: import.meta.env.MODE,
-    OBSERVABILITY_ENABLED: import.meta.env.OBSERVABILITY_ENABLED,
-  })
+  return (policy ?? resolveClientLogPolicy()).enabled
 }
 
-function clientLogMinLevel(): ClientLogLevel {
-  const level = import.meta.env.VITE_CLIENT_LOG_LEVEL
-  if (level === 'debug' || level === 'error' || level === 'info' || level === 'warn') return level
+export function clientLogEnabled(level: ClientLogLevel): boolean {
+  const current = policy ?? resolveClientLogPolicy()
+  return current.enabled && isLevelEnabled(level, current.minLevel)
+}
 
-  return import.meta.env.DEV ? 'debug' : 'info'
+function resolveClientLogPolicy() {
+  const level = import.meta.env.VITE_CLIENT_LOG_LEVEL
+  const minLevel = level === 'debug' || level === 'error' || level === 'warn' ? level : 'info'
+  return {
+    enabled: observabilityEnabledFromEnv({
+      NODE_ENV: import.meta.env.MODE,
+      OBSERVABILITY_ENABLED: import.meta.env.OBSERVABILITY_ENABLED,
+    }),
+    minLevel,
+  } satisfies { enabled: boolean; minLevel: ClientLogLevel }
+}
+
+function writeClientConsole({ event }: DrainContext) {
+  if (!import.meta.env.DEV) return
+  if (event.level === 'warn' || event.level === 'error') {
+    console[event.level](event)
+    return
+  }
+  if (clientLogEnabled('debug')) console.debug(event)
 }
 
 function safeClientEvent(event: Record<string, unknown>) {

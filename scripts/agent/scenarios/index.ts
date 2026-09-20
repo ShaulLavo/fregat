@@ -77,6 +77,7 @@ export type Scenario = {
   readonly inspect?: (page: Page) => Promise<unknown>
 }
 
+import { editorDiagnosticsLifecycle } from './editor-diagnostics-lifecycle'
 import { editorFastScroll } from './editor-fast-scroll'
 import { editorRowHeightAudit } from './editor-row-height-audit'
 import { editorLargePaste } from './editor-large-paste'
@@ -171,6 +172,7 @@ export const scenarios: readonly Scenario[] = [
   gitHistory,
   editorLargePaste,
   editorFastScroll,
+  editorDiagnosticsLifecycle,
   editorRowHeightAudit,
   editorTypeBurst,
   editorUndoBarrier,

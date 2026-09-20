@@ -12,7 +12,8 @@ import {
   type OrchestrationSessionDetailSnapshot,
   type OrchestrationSessionStreamItem,
 } from '@workspace/contracts'
-import { Debouncer } from '@tanstack/react-pacer/debouncer'
+import { Throttler } from '@tanstack/react-pacer/throttler'
+import { clientLogEnabled } from '@/lib/client-logging'
 import { create } from 'zustand'
 
 import {
@@ -65,7 +66,8 @@ export type ChatProjectionStore = ChatProjectionState & ChatProjectionActions
 const CHAT_PROJECTION_LOG_FLUSH_MS = 250
 
 let projectionLogScope: ChatPipelineScope | null = null
-const projectionLogFlush = new Debouncer(flushProjectionLogScope, {
+const projectionLogFlush = new Throttler(flushProjectionLogScope, {
+  leading: false,
   wait: CHAT_PROJECTION_LOG_FLUSH_MS,
 })
 
@@ -114,31 +116,31 @@ function updateSlice(
 export const useChatProjectionStore = create<ChatProjectionStore>((set) => ({
   ...createInitialChatProjectionState(),
   applyOrchestrationEvent: (environmentId, event) => {
-    recordProjectionMutation('applyEvent', { environmentId, ...chatEventSummary(event) })
+    recordProjectionMutation('applyEvent', () => ({ environmentId, ...chatEventSummary(event) }))
     set((state) =>
       updateSlice(state, environmentId, (slice) => applyChatProjectionEvents(slice, [event])),
     )
   },
   applyOrchestrationEvents: (environmentId, events) => {
-    recordProjectionMutation('applyEvents', { environmentId, eventCount: events.length })
+    recordProjectionMutation('applyEvents', () => ({ environmentId, eventCount: events.length }))
     set((state) =>
       updateSlice(state, environmentId, (slice) => applyChatProjectionEvents(slice, events)),
     )
   },
   applyShellStreamItem: (environmentId, item) => {
-    recordProjectionMutation('applyShellStreamItem', {
+    recordProjectionMutation('applyShellStreamItem', () => ({
       environmentId,
       ...chatStreamItemSummary(item),
-    })
+    }))
     set((state) =>
       updateSlice(state, environmentId, (slice) => applyChatProjectionShellStreamItem(slice, item)),
     )
   },
   applySessionStreamItem: (environmentId, item) => {
-    recordProjectionMutation('applySessionStreamItem', {
+    recordProjectionMutation('applySessionStreamItem', () => ({
       environmentId,
       ...chatStreamItemSummary(item),
-    })
+    }))
     set((state) =>
       updateSlice(state, environmentId, (slice) =>
         applyChatProjectionSessionStreamItem(slice, item),
@@ -146,10 +148,10 @@ export const useChatProjectionStore = create<ChatProjectionStore>((set) => ({
     )
   },
   prependSessionDetailPage: (environmentId, page) => {
-    recordProjectionMutation('prependSessionDetailPage', {
+    recordProjectionMutation('prependSessionDetailPage', () => ({
       environmentId,
       sessionId: page.sessionId,
-    })
+    }))
     set((state) =>
       updateSlice(state, environmentId, (slice) =>
         prependChatProjectionSessionDetailPage(slice, page),
@@ -163,10 +165,10 @@ export const useChatProjectionStore = create<ChatProjectionStore>((set) => ({
     }),
   resetChatProjection: () => set(createInitialChatProjectionState()),
   syncShellSnapshot: (environmentId, snapshot) => {
-    recordProjectionMutation('syncShellSnapshot', {
+    recordProjectionMutation('syncShellSnapshot', () => ({
       environmentId,
       snapshotSequence: snapshot.snapshotSequence,
-    })
+    }))
     set((state) =>
       updateSlice(state, environmentId, (slice) =>
         syncChatProjectionShellSnapshot(slice, snapshot),
@@ -174,10 +176,10 @@ export const useChatProjectionStore = create<ChatProjectionStore>((set) => ({
     )
   },
   syncSessionDetailSnapshot: (environmentId, snapshot) => {
-    recordProjectionMutation('syncSessionDetailSnapshot', {
+    recordProjectionMutation('syncSessionDetailSnapshot', () => ({
       environmentId,
       ...chatSessionSnapshotSummary(snapshot),
-    })
+    }))
     set((state) =>
       updateSlice(state, environmentId, (slice) =>
         syncChatProjectionSessionDetailSnapshot(slice, snapshot),
@@ -186,7 +188,8 @@ export const useChatProjectionStore = create<ChatProjectionStore>((set) => ({
   },
 }))
 
-function recordProjectionMutation(kind: string, context: Record<string, unknown> = {}) {
+function recordProjectionMutation(kind: string, context: () => Record<string, unknown>) {
+  if (!clientLogEnabled('debug')) return
   const scope = currentProjectionLogScope()
   scope.increment('projection.mutationCount')
   scope.increment(`projection.${kind}Count`)
@@ -194,7 +197,7 @@ function recordProjectionMutation(kind: string, context: Record<string, unknown>
     projection: {
       latest: {
         kind,
-        ...context,
+        ...context(),
       },
     },
   })

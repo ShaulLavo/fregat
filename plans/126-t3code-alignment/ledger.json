@@ -1,0 +1,485 @@
+{
+  "warning": "Open implementation groups, not proof of runtime parity. Overlapping UI/server groups share one delivery unit.",
+  "findings": [
+    {
+      "id": "EXT-11",
+      "title": "Install a conformance gate that catches a deliberate wrong test",
+      "report": "adjacent.md",
+      "wave": "0",
+      "status": "open",
+      "evidence_level": "source-reviewed",
+      "acceptance": "adjacent.md, EXT-11, Acceptance / verification",
+      "execution_evidence": []
+    },
+    {
+      "id": "EXT-13",
+      "wave": "1",
+      "status": "open",
+      "evidence_level": "source-reviewed",
+      "acceptance": "adjacent.md, EXT-13, Acceptance / verification",
+      "execution_evidence": [],
+      "report": "adjacent.md",
+      "title": "Preserve failed pull-request lookup as failure"
+    },
+    {
+      "id": "INTERACTION-05",
+      "title": "Restore the rewound user message into the composer",
+      "report": "interaction.md",
+      "wave": "1",
+      "status": "open",
+      "evidence_level": "source-reviewed",
+      "acceptance": "interaction.md, INTERACTION-05, Acceptance / verification",
+      "execution_evidence": []
+    },
+    {
+      "id": "LIFE-01",
+      "title": "P0: Enforce archive before every active-list classification",
+      "report": "lifecycle.md",
+      "wave": "1",
+      "status": "open",
+      "evidence_level": "source-reviewed",
+      "acceptance": "lifecycle.md, LIFE-01, Acceptance / verification",
+      "execution_evidence": []
+    },
+    {
+      "id": "LIFE-02",
+      "title": "P0: Align archive eligibility and remove automatic unarchive",
+      "report": "lifecycle.md",
+      "wave": "1",
+      "status": "open",
+      "evidence_level": "source-reviewed",
+      "acceptance": "lifecycle.md, LIFE-02, Acceptance / verification",
+      "execution_evidence": []
+    },
+    {
+      "id": "RUNTIME-01",
+      "title": "Validate rewind before touching files, and separate conversation rewind",
+      "report": "runtime.md",
+      "wave": "1",
+      "status": "open",
+      "evidence_level": "source-reviewed",
+      "acceptance": "runtime.md, RUNTIME-01, Acceptance / verification",
+      "execution_evidence": []
+    },
+    {
+      "id": "RUNTIME-03",
+      "title": "Route the supported MCP app-access elicitation forms",
+      "report": "runtime.md",
+      "wave": "1",
+      "status": "open",
+      "evidence_level": "source-reviewed",
+      "acceptance": "runtime.md, RUNTIME-03, Acceptance / verification",
+      "execution_evidence": []
+    },
+    {
+      "id": "RUNTIME-04",
+      "title": "Bound retained live delivery and recover from overflow",
+      "report": "runtime.md",
+      "wave": "1",
+      "status": "open",
+      "evidence_level": "source-reviewed",
+      "acceptance": "runtime.md, RUNTIME-04, Acceptance / verification",
+      "execution_evidence": []
+    },
+    {
+      "id": "RUNTIME-11",
+      "title": "Return the native permission-approval response shape",
+      "report": "runtime.md",
+      "wave": "1",
+      "status": "open",
+      "evidence_level": "source-reviewed",
+      "acceptance": "runtime.md, RUNTIME-11, Acceptance / verification",
+      "execution_evidence": []
+    },
+    {
+      "id": "EXT-06",
+      "title": "Add input/completion notifications and sound behavior",
+      "report": "adjacent.md",
+      "wave": "2",
+      "status": "open",
+      "evidence_level": "source-reviewed",
+      "acceptance": "adjacent.md, EXT-06, Acceptance / verification",
+      "execution_evidence": []
+    },
+    {
+      "id": "LIFE-03",
+      "title": "P1: Restore lifecycle shelves and separate attention from placement",
+      "report": "lifecycle.md",
+      "wave": "2",
+      "status": "open",
+      "evidence_level": "source-reviewed",
+      "acceptance": "lifecycle.md, LIFE-03, Acceptance / verification",
+      "execution_evidence": []
+    },
+    {
+      "id": "LIFE-04",
+      "title": "P1: Align settle and snooze transitions, including provider release",
+      "report": "lifecycle.md",
+      "wave": "2",
+      "status": "open",
+      "evidence_level": "source-reviewed",
+      "acceptance": "lifecycle.md, LIFE-04, Acceptance / verification",
+      "execution_evidence": []
+    },
+    {
+      "id": "LIFE-05",
+      "title": "P1: Separate active ordering from pinning and implement shelf drag transitions",
+      "report": "lifecycle.md",
+      "wave": "2",
+      "status": "open",
+      "evidence_level": "source-reviewed",
+      "acceptance": "lifecycle.md, LIFE-05, Acceptance / verification",
+      "execution_evidence": []
+    },
+    {
+      "id": "LIFE-07",
+      "title": "P1: Match unread defaults, manual unread, and wake state",
+      "report": "lifecycle.md",
+      "wave": "2",
+      "status": "open",
+      "evidence_level": "source-reviewed",
+      "acceptance": "lifecycle.md, LIFE-07, Acceptance / verification",
+      "execution_evidence": []
+    },
+    {
+      "id": "LIFE-08",
+      "title": "P1: Search messages on every connected environment represented in the rail",
+      "report": "lifecycle.md",
+      "wave": "2",
+      "status": "open",
+      "evidence_level": "source-reviewed",
+      "acceptance": "lifecycle.md, LIFE-08, Acceptance / verification",
+      "execution_evidence": []
+    },
+    {
+      "id": "LIFE-09",
+      "title": "P1: Preserve project group membership and configurable grouping",
+      "report": "lifecycle.md",
+      "wave": "2",
+      "status": "open",
+      "evidence_level": "source-reviewed",
+      "acceptance": "lifecycle.md, LIFE-09, Acceptance / verification",
+      "execution_evidence": []
+    },
+    {
+      "id": "LIFE-10",
+      "title": "P1: Match navigation after archive/delete and retain failed bulk-delete selections",
+      "report": "lifecycle.md",
+      "wave": "2",
+      "status": "open",
+      "evidence_level": "source-reviewed",
+      "acceptance": "lifecycle.md, LIFE-10, Acceptance / verification",
+      "execution_evidence": []
+    },
+    {
+      "id": "LIFE-11",
+      "title": "P2: Implement generated title lifecycle and regeneration actions",
+      "report": "lifecycle.md",
+      "wave": "2",
+      "status": "open",
+      "evidence_level": "source-reviewed",
+      "acceptance": "lifecycle.md, LIFE-11, Acceptance / verification",
+      "execution_evidence": []
+    },
+    {
+      "id": "LIFE-12",
+      "title": "P2: Complete row affordances, draft recovery, and delete-worktree flow",
+      "report": "lifecycle.md",
+      "wave": "2",
+      "status": "open",
+      "evidence_level": "source-reviewed",
+      "acceptance": "lifecycle.md, LIFE-12, Acceptance / verification",
+      "execution_evidence": []
+    },
+    {
+      "id": "INTERACTION-01",
+      "title": "Match queued follow-ups and the default send behavior",
+      "report": "interaction.md",
+      "wave": "3",
+      "status": "open",
+      "evidence_level": "source-reviewed",
+      "acceptance": "interaction.md, INTERACTION-01, Acceptance / verification",
+      "execution_evidence": []
+    },
+    {
+      "id": "INTERACTION-02",
+      "title": "Carry general files and recover staged attachments",
+      "report": "interaction.md",
+      "wave": "3",
+      "status": "open",
+      "evidence_level": "source-reviewed",
+      "acceptance": "interaction.md, INTERACTION-02, Acceptance / verification",
+      "execution_evidence": []
+    },
+    {
+      "id": "INTERACTION-03",
+      "title": "Stash the complete composed message",
+      "report": "interaction.md",
+      "wave": "3",
+      "status": "open",
+      "evidence_level": "source-reviewed",
+      "acceptance": "interaction.md, INTERACTION-03, Acceptance / verification",
+      "execution_evidence": []
+    },
+    {
+      "id": "INTERACTION-04",
+      "title": "Complete pending-question interactions",
+      "report": "interaction.md",
+      "wave": "3",
+      "status": "open",
+      "evidence_level": "source-reviewed",
+      "acceptance": "interaction.md, INTERACTION-04, Acceptance / verification",
+      "execution_evidence": []
+    },
+    {
+      "id": "INTERACTION-09",
+      "title": "Preserve source context from review, browser annotations, and assistant citations",
+      "report": "interaction.md",
+      "wave": "3",
+      "status": "open",
+      "evidence_level": "source-reviewed",
+      "acceptance": "interaction.md, INTERACTION-09, Acceptance / verification",
+      "execution_evidence": []
+    },
+    {
+      "id": "INTERACTION-10",
+      "title": "Render and reuse artifact templates",
+      "report": "interaction.md",
+      "wave": "3",
+      "status": "open",
+      "evidence_level": "source-reviewed",
+      "acceptance": "interaction.md, INTERACTION-10, Acceptance / verification",
+      "execution_evidence": []
+    },
+    {
+      "id": "INTERACTION-11",
+      "title": "Match composition and keyboard preferences",
+      "report": "interaction.md",
+      "wave": "3",
+      "status": "open",
+      "evidence_level": "source-reviewed",
+      "acceptance": "interaction.md, INTERACTION-11, Acceptance / verification",
+      "execution_evidence": []
+    },
+    {
+      "id": "INTERACTION-06",
+      "title": "Expose explicit context compaction without consuming the draft",
+      "report": "interaction.md",
+      "wave": "4",
+      "status": "open",
+      "evidence_level": "source-reviewed",
+      "acceptance": "interaction.md, INTERACTION-06, Acceptance / verification",
+      "execution_evidence": []
+    },
+    {
+      "id": "INTERACTION-07",
+      "title": "Show provider quota limits separately from context occupancy",
+      "report": "interaction.md",
+      "wave": "4",
+      "status": "open",
+      "evidence_level": "source-reviewed",
+      "acceptance": "interaction.md, INTERACTION-07, Acceptance / verification",
+      "execution_evidence": []
+    },
+    {
+      "id": "INTERACTION-08",
+      "title": "Support one draft sent to multiple selected models",
+      "report": "interaction.md",
+      "wave": "4",
+      "status": "open",
+      "evidence_level": "source-reviewed",
+      "acceptance": "interaction.md, INTERACTION-08, Acceptance / verification",
+      "execution_evidence": []
+    },
+    {
+      "id": "INTERACTION-12",
+      "title": "Show workflow phases and scripts in agent inspection",
+      "report": "interaction.md",
+      "wave": "4",
+      "status": "open",
+      "evidence_level": "source-reviewed",
+      "acceptance": "interaction.md, INTERACTION-12, Acceptance / verification",
+      "execution_evidence": []
+    },
+    {
+      "id": "RUNTIME-02",
+      "title": "Add the four missing production provider drivers",
+      "report": "runtime.md",
+      "wave": "4",
+      "status": "open",
+      "evidence_level": "source-reviewed",
+      "acceptance": "runtime.md, RUNTIME-02, Acceptance / verification",
+      "execution_evidence": []
+    },
+    {
+      "id": "RUNTIME-05",
+      "title": "Implement manual compaction with ordered follow-up handling",
+      "report": "runtime.md",
+      "wave": "4",
+      "status": "open",
+      "evidence_level": "source-reviewed",
+      "acceptance": "runtime.md, RUNTIME-05, Acceptance / verification",
+      "execution_evidence": []
+    },
+    {
+      "id": "RUNTIME-06",
+      "title": "Preserve advertised model option descriptors and service tiers",
+      "report": "runtime.md",
+      "wave": "4",
+      "status": "open",
+      "evidence_level": "source-reviewed",
+      "acceptance": "runtime.md, RUNTIME-06, Acceptance / verification",
+      "execution_evidence": []
+    },
+    {
+      "id": "RUNTIME-07",
+      "title": "Make idle cleanup aware of background work and periodic",
+      "report": "runtime.md",
+      "wave": "4",
+      "status": "open",
+      "evidence_level": "source-reviewed",
+      "acceptance": "runtime.md, RUNTIME-07, Acceptance / verification",
+      "execution_evidence": []
+    },
+    {
+      "id": "RUNTIME-08",
+      "title": "Publish account usage limits and wire reset-credit redemption",
+      "report": "runtime.md",
+      "wave": "4",
+      "status": "open",
+      "evidence_level": "source-reviewed",
+      "acceptance": "runtime.md, RUNTIME-08, Acceptance / verification",
+      "execution_evidence": []
+    },
+    {
+      "id": "RUNTIME-09",
+      "title": "Match response delivery modes and paragraph default",
+      "report": "runtime.md",
+      "wave": "4",
+      "status": "open",
+      "evidence_level": "source-reviewed",
+      "acceptance": "runtime.md, RUNTIME-09, Acceptance / verification",
+      "execution_evidence": []
+    },
+    {
+      "id": "RUNTIME-10",
+      "title": "Expose capability-driven provider update operations",
+      "report": "runtime.md",
+      "wave": "4",
+      "status": "open",
+      "evidence_level": "source-reviewed",
+      "acceptance": "runtime.md, RUNTIME-10, Acceptance / verification",
+      "execution_evidence": []
+    },
+    {
+      "id": "EXT-01",
+      "title": "Match source-control provider capabilities",
+      "report": "adjacent.md",
+      "wave": "5",
+      "status": "open",
+      "evidence_level": "source-reviewed",
+      "acceptance": "adjacent.md, EXT-01, Acceptance / verification",
+      "execution_evidence": []
+    },
+    {
+      "id": "EXT-02",
+      "title": "Complete the pull-request workflow and session linkage",
+      "report": "adjacent.md",
+      "wave": "5",
+      "status": "open",
+      "evidence_level": "source-reviewed",
+      "acceptance": "adjacent.md, EXT-02, Acceptance / verification",
+      "execution_evidence": []
+    },
+    {
+      "id": "EXT-03",
+      "title": "Add clone and repository publication workflows",
+      "report": "adjacent.md",
+      "wave": "5",
+      "status": "open",
+      "evidence_level": "source-reviewed",
+      "acceptance": "adjacent.md, EXT-03, Acceptance / verification",
+      "execution_evidence": []
+    },
+    {
+      "id": "EXT-04",
+      "title": "Match project configuration and worktree setup scripts",
+      "report": "adjacent.md",
+      "wave": "5",
+      "status": "open",
+      "evidence_level": "source-reviewed",
+      "acceptance": "adjacent.md, EXT-04, Acceptance / verification",
+      "execution_evidence": []
+    },
+    {
+      "id": "EXT-05",
+      "title": "Match terminal history, restart and attachment semantics",
+      "report": "adjacent.md",
+      "wave": "5",
+      "status": "open",
+      "evidence_level": "source-reviewed",
+      "acceptance": "adjacent.md, EXT-05, Acceptance / verification",
+      "execution_evidence": []
+    },
+    {
+      "id": "EXT-10",
+      "title": "Match background policy and runtime management capabilities",
+      "report": "adjacent.md",
+      "wave": "5",
+      "status": "open",
+      "evidence_level": "source-reviewed",
+      "acceptance": "adjacent.md, EXT-10, Acceptance / verification",
+      "execution_evidence": []
+    },
+    {
+      "id": "EXT-12",
+      "wave": "5",
+      "status": "open",
+      "evidence_level": "source-reviewed",
+      "acceptance": "adjacent.md, EXT-12, Acceptance / verification",
+      "execution_evidence": [],
+      "report": "adjacent.md",
+      "title": "Port automatic worktree and storage cleanup policy"
+    },
+    {
+      "id": "LIFE-06",
+      "title": "P1: Add server-owned automatic settlement",
+      "report": "lifecycle.md",
+      "wave": "5",
+      "status": "open",
+      "evidence_level": "source-reviewed",
+      "acceptance": "lifecycle.md, LIFE-06, Acceptance / verification",
+      "execution_evidence": []
+    },
+    {
+      "id": "EXT-07",
+      "title": "Add the integrated browser preview and device workflows",
+      "report": "adjacent.md",
+      "wave": "6",
+      "status": "open",
+      "evidence_level": "source-reviewed",
+      "acceptance": "adjacent.md, EXT-07, Acceptance / verification",
+      "execution_evidence": []
+    },
+    {
+      "id": "EXT-08",
+      "title": "Align remote pairing, access management and relay capabilities",
+      "report": "adjacent.md",
+      "wave": "6",
+      "status": "open",
+      "evidence_level": "source-reviewed",
+      "acceptance": "adjacent.md, EXT-08, Acceptance / verification",
+      "execution_evidence": []
+    },
+    {
+      "id": "EXT-09",
+      "title": "Cover desktop/mobile and distribution instead of silently exempting them",
+      "report": "adjacent.md",
+      "wave": "6",
+      "status": "open",
+      "evidence_level": "source-reviewed",
+      "acceptance": "adjacent.md, EXT-09, Acceptance / verification",
+      "execution_evidence": []
+    }
+  ]
+}

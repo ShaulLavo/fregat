@@ -51,10 +51,13 @@ describe('createWideEventScope', () => {
 
     scope.warn('slow stream', { slow: true })
     scope.error(createError({ message: 'closed', status: 502 }), { code: 'CLOSED' })
+    expect(emittedEvents).toHaveLength(2)
+    expect(emittedEvents[0]?.scopeId).toBe(emittedEvents[1]?.scopeId)
     scope.end()
 
-    expect(emittedEvents).toHaveLength(1)
-    expect(emittedEvents[0]).toMatchObject({
+    expect(emittedEvents).toHaveLength(3)
+    expect(emittedEvents[1]).toMatchObject({ checkpoint: 'failure', level: 'error' })
+    expect(emittedEvents[2]).toMatchObject({
       code: 'CLOSED',
       slow: true,
       level: 'error',

@@ -86,3 +86,35 @@ test('sanitizes nested payloads while retaining path and stack diagnostics', () 
     message: 'x'.repeat(2000),
   })
 })
+
+test('long-lived scopes retain the latest bounded collections and all warning counts', () => {
+  const scope = createWideEventScope({ enabled: true, base: { action: 'stream', area: 'test' } })
+  for (let index = 0; index < 1000; index++) {
+    scope.set({ stream: { samples: [index] } })
+    scope.warn(`warning ${index}`)
+    scope.increment('items')
+  }
+  expect(scope.getContext()).toMatchObject({
+    items: 1000,
+    warningCount: 1000,
+    stream: { samples: Array.from({ length: 25 }, (_, index) => 975 + index) },
+  })
+  expect(scope.getContext().requestLogs).toHaveLength(25)
+  scope.error(createError({ message: 'late failure', status: 502 }))
+  scope.end()
+  expect(emittedEvents).toHaveLength(1)
+  expect(emittedEvents[0]).toMatchObject({ level: 'error', warningCount: 1000, items: 1000 })
+})
+
+test('bounding diagnostics never mutates application-owned error causes', () => {
+  const values = Array.from({ length: 50 }, (_, index) => index)
+  const failure = createError({ message: 'failed' })
+  failure.cause = { values }
+  const scope = createWideEventScope({ enabled: true, base: { action: 'stream', area: 'test' } })
+  scope.error(failure)
+  scope.set({ samples: values })
+  expect(values).toHaveLength(50)
+  expect(scope.getContext().samples).toHaveLength(25)
+  scope.end()
+  expect(values).toHaveLength(50)
+})

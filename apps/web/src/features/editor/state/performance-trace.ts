@@ -1,3 +1,5 @@
+import { clientLoggingEnabled } from '@/lib/client-logging'
+import { createTraceBuffer } from '@/features/editor/utils/trace-buffer'
 import { roundMs as round } from '@workspace/utils/timing'
 import { createClientInvariantError } from '@/lib/structured-errors'
 
@@ -125,8 +127,9 @@ export function registerEditorOpenBenchmarkControl(
 }
 
 export function installEditorPerformanceTraceFromUrl(): void {
-  if (typeof window === 'undefined') return
+  if (typeof window === 'undefined' || !clientLoggingEnabled()) return
 
+  editorPerformanceTraceGlobal().__editorPerfTrace?.stop()
   installDisabledFeatureStyles(editorPerformanceDisabledFeatures())
   if (!editorPerformanceTraceEnabled(window.location.search)) return
 
@@ -157,13 +160,13 @@ function createEditorPerformanceTrace(): {
   let stopped = false
   let frame = 0
   let lastFrameTime = performance.now()
-  let traceEvents: EditorPerformanceTraceEvent[] = []
-  let frameDurations: number[] = []
+  const traceEvents = createTraceBuffer<EditorPerformanceTraceEvent>(MAX_TRACE_EVENTS)
+  let frames = emptyFrameStats()
   let startedAt = performance.now()
   const eventCounts = new Map<string, number>()
   const targetCounts = new Map<string, number>()
   const recordLongTask = (entry: PerformanceEntry) => {
-    traceEvents = boundedAppend(traceEvents, longTaskTraceEvent(entry))
+    if (!stopped) traceEvents.push(longTaskTraceEvent(entry))
   }
   const observer = createLongTaskObserver(recordLongTask)
 
@@ -172,7 +175,7 @@ function createEditorPerformanceTrace(): {
     record: (diagnostic) => {
       if (stopped) return
 
-      traceEvents = boundedAppend(traceEvents, {
+      traceEvents.push({
         at: performance.now(),
         diagnostic,
         kind: 'diagnostic',
@@ -195,10 +198,21 @@ function createEditorPerformanceTrace(): {
 
     const duration = now - lastFrameTime
     lastFrameTime = now
-    frameDurations.push(duration)
+    frames.count += 1
+    frames.totalMs += duration
+    frames.maxMs = Math.max(frames.maxMs, duration)
+    if (duration >= SLOW_FRAME_MS) frames.slowFrames += 1
+    if (duration >= LONG_FRAME_MS) frames.longFrames += 1
     frame = requestAnimationFrame(tick)
   }
   frame = requestAnimationFrame(tick)
+  const onVisibilityChange = () => {
+    cancelAnimationFrame(frame)
+    if (stopped || document.hidden) return
+    lastFrameTime = performance.now()
+    frame = requestAnimationFrame(tick)
+  }
+  document.addEventListener('visibilitychange', onVisibilityChange)
 
   const handle: EditorPerformanceTraceHandle = {
     beginEditorOpenSample: (request) => {
@@ -226,8 +240,8 @@ function createEditorPerformanceTrace(): {
     report: () => createReport(),
     reset: () => {
       observer?.takeRecords()
-      traceEvents = []
-      frameDurations = []
+      traceEvents.clear()
+      frames = emptyFrameStats()
       eventCounts.clear()
       targetCounts.clear()
       startedAt = performance.now()
@@ -239,6 +253,7 @@ function createEditorPerformanceTrace(): {
 
       stopped = true
       sink.enabled = false
+      document.removeEventListener('visibilitychange', onVisibilityChange)
       cancelAnimationFrame(frame)
       window.removeEventListener('scroll', recordInputEvent, { capture: true })
       window.removeEventListener('wheel', recordInputEvent, { capture: true })
@@ -249,15 +264,21 @@ function createEditorPerformanceTrace(): {
   function createReport(): EditorPerformanceTraceReport {
     for (const entry of observer?.takeRecords() ?? []) recordLongTask(entry)
 
-    const currentTraceEvents = traceEvents.filter(
-      (event) => event.kind !== 'long-task' || event.at + event.durationMs >= startedAt,
-    )
+    const currentTraceEvents = traceEvents
+      .values()
+      .filter((event) => event.kind !== 'long-task' || event.at + event.durationMs >= startedAt)
     return {
       disabledFeatures: Array.from(editorPerformanceDisabledFeatures()),
       dom: editorPerformanceDomSnapshot(document),
       durationMs: performance.now() - startedAt,
       events: Object.fromEntries(eventCounts),
-      frameStats: frameStats(frameDurations),
+      frameStats: {
+        count: frames.count,
+        longFrames: frames.longFrames,
+        maxMs: round(frames.maxMs),
+        meanMs: round(frames.totalMs / Math.max(1, frames.count)),
+        slowFrames: frames.slowFrames,
+      },
       layoutVariant: editorPerformanceLayoutVariant(),
       topDiagnostics: summarizeDiagnostics(currentTraceEvents),
       topTargets: summarizeTargets(targetCounts),
@@ -344,25 +365,8 @@ function summarizeTargets(
     .slice(0, 20)
 }
 
-function frameStats(durations: readonly number[]): Readonly<Record<string, number>> {
-  if (durations.length === 0) {
-    return {
-      count: 0,
-      longFrames: 0,
-      maxMs: 0,
-      meanMs: 0,
-      slowFrames: 0,
-    }
-  }
-
-  const total = durations.reduce((sum, duration) => sum + duration, 0)
-  return {
-    count: durations.length,
-    longFrames: durations.filter((duration) => duration >= LONG_FRAME_MS).length,
-    maxMs: round(Math.max(...durations)),
-    meanMs: round(total / durations.length),
-    slowFrames: durations.filter((duration) => duration >= SLOW_FRAME_MS).length,
-  }
+function emptyFrameStats() {
+  return { count: 0, totalMs: 0, maxMs: 0, longFrames: 0, slowFrames: 0 }
 }
 
 export function editorPerformanceDomSnapshot(document: Document): Readonly<Record<string, number>> {
@@ -424,12 +428,8 @@ function targetLabel(target: EventTarget | null): string {
 }
 
 function increment(map: Map<string, number>, key: string): void {
-  map.set(key, (map.get(key) ?? 0) + 1)
-}
-
-function boundedAppend<T>(items: readonly T[], item: T): T[] {
-  if (items.length < MAX_TRACE_EVENTS) return [...items, item]
-  return items.slice(1).concat(item)
+  const retainedKey = map.has(key) || map.size < 100 ? key : 'other'
+  map.set(retainedKey, (map.get(retainedKey) ?? 0) + 1)
 }
 
 function downloadJson(report: EditorPerformanceTraceReport): void {

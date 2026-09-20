@@ -44,6 +44,7 @@ type EmittedClientEvent = {
 beforeEach(() => {
   emittedEvents.length = 0
   vi.stubEnv('OBSERVABILITY_ENABLED', 'true')
+  vi.stubEnv('VITE_CLIENT_LOG_LEVEL', 'debug')
 })
 
 afterEach(() => {
@@ -110,6 +111,7 @@ test('emits mutation metadata without values and redacts raw or path diagnostics
   expect(emittedEvents).toEqual([
     {
       event: {
+        level: 'warn',
         absolutePath: '[redacted]',
         action: 'settings.write',
         affectedIds: ['codex-private'],

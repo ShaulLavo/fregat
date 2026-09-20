@@ -46,3 +46,22 @@ function pathsFromEvent(event: Record<string, unknown>) {
   const path = event.path
   return typeof path === 'string' ? [path] : []
 }
+
+test('continuous traffic cannot postpone the first flush', () => {
+  vi.useFakeTimers()
+  try {
+    const emit = vi.fn()
+    const queue = createCoalescedLogQueue({ delayMs: 100, emit })
+    queue.queue('stream', { value: 1 })
+    vi.advanceTimersByTime(60)
+    queue.queue('stream', { value: 2 })
+    vi.advanceTimersByTime(40)
+    expect(emit).toHaveBeenCalledExactlyOnceWith({ value: 2, coalescedCount: 2 })
+    queue.queue('stream', { value: 3 })
+    queue.flushAll()
+    vi.advanceTimersByTime(100)
+    expect(emit).toHaveBeenCalledTimes(2)
+  } finally {
+    vi.useRealTimers()
+  }
+})

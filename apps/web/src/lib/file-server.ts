@@ -20,7 +20,7 @@ import type {
 } from '@/lib/file-system-types'
 import { clientErrorMessage } from '@/lib/client-error-taxonomy'
 import { annotateClientError } from '@/lib/client-error-context'
-import { log, observeClientOperation } from '@/lib/client-logging'
+import { clientLogEnabled, log, observeClientOperation } from '@/lib/client-logging'
 import { createCoalescedLogQueue } from '@/lib/coalesced-log'
 import { omitNullish } from '@/lib/objects'
 import { createRpcError } from '@/lib/structured-errors'
@@ -639,6 +639,7 @@ function queueTreeSuccessLog(
   owner: FileLogOwner,
   queue: ReturnType<typeof createCoalescedLogQueue>,
 ) {
+  if (!clientLogEnabled('info')) return
   queue.queue('fs.tree', {
     ...owner,
     action: 'fs.tree',
@@ -657,6 +658,7 @@ function queueReadSuccessLog(
   owner: FileLogOwner,
   queue: ReturnType<typeof createCoalescedLogQueue>,
 ) {
+  if (!clientLogEnabled('info')) return
   queue.queue(`fs.read:${path}`, {
     ...owner,
     action: 'fs.read',

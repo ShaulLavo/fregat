@@ -3,6 +3,7 @@ import {
   reportError as defaultReportError,
   toClientError as defaultToClientError,
 } from '@/lib/client-error-taxonomy'
+import { createCommandEvent } from '@/keymap/state/command-event'
 import { createWideEventScope } from '@/lib/wide-event-scope'
 import type {
   CommandExecution,
@@ -168,6 +169,7 @@ export type CommandInspection<
   | DisabledCommandInspection<Id, Runtime, Snapshot, Target, Invocation>
 
 export type CommandEventScope = {
+  readonly warn: (message: string, context?: Record<string, unknown>) => void
   readonly end: (context?: Record<string, unknown>) => void
   readonly error: (error: unknown, context?: Record<string, unknown>) => void
 }
@@ -312,7 +314,12 @@ export class CommandBus<
       return this.#failedInspectionTicket(id, invocation, startedAt, error)
     }
 
-    const scope = this.#createEvent(commandEventBase(id, invocation, inspection))
+    const quietSuccess =
+      inspection.entry?.target === 'editor' && invocation.source.kind === 'keybinding'
+    const scope = this.#createEvent(
+      () => commandEventBase(id, invocation, inspection),
+      quietSuccess,
+    )
     if (inspection.status === 'disabled') {
       const outcome = { reason: inspection.reason, status: 'disabled' } as const
       return this.#immediateTicket(false, scope, startedAt, outcome)
@@ -371,7 +378,7 @@ export class CommandBus<
     startedAt: number | null,
     error: unknown,
   ) {
-    const scope = this.#createEvent(unknownCommandEventBase(id, invocation))
+    const scope = this.#createEvent(() => unknownCommandEventBase(id, invocation))
     return this.#immediateTicket(false, scope, startedAt, this.#busFailure(error))
   }
 
@@ -436,10 +443,13 @@ export class CommandBus<
     }
   }
 
-  #createEvent(base: Parameters<CommandEventFactory>[0]): CommandEventScope {
+  #createEvent(
+    base: () => Parameters<CommandEventFactory>[0],
+    quietSuccess = false,
+  ): CommandEventScope {
     const create = this.#options.createEvent ?? createWideEventScope
     try {
-      return create(base)
+      return createCommandEvent(base, create, quietSuccess)
     } catch {
       return noopCommandEventScope
     }
@@ -563,6 +573,7 @@ function safely(action: () => void) {
 }
 
 const noopCommandEventScope: CommandEventScope = {
+  warn: () => undefined,
   end: () => undefined,
   error: () => undefined,
 }

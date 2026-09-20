@@ -19,7 +19,8 @@ a bare root `bun run verify`.
 
 | Plan                                                                            | State                                                |
 | ------------------------------------------------------------------------------- | ---------------------------------------------------- |
-| [125 — observability overhead](125-observability-overhead.md)                   | **PROPOSED — BASELINE AND CENSUS FIRST**             |
+| [126 — T3 Code behavioral alignment](126-t3code-alignment.md)                   | **PLANNED — TWO AUDIT PASSES; IMPLEMENTATION OPEN**  |
+| [125 — observability overhead](125-observability-overhead.md)                   | **IMPLEMENTED — DEV/STREAMING EVIDENCE PENDING**     |
 | [071 — syntax highlight retry](071-syntax-highlight-retry.md)                   | **PROPOSED — ROOT GO/NO-GO SCHEDULING**              |
 | [080 — Platform and VS Code keybinding modes](080-platform-keybinding-modes.md) | **PROPOSED — INTERACTION RULES CONFIRMED**           |
 | [085 — instant workspace reload](085-instant-workspace-reload.md)               | **PROPOSED — IMPLEMENTATION NOT STARTED**            |
@@ -57,6 +58,14 @@ a bare root `bun run verify`.
 | [076 — watch-reload child reaping](076-watch-reload-child-reaping.md)           | **PROPOSED — ROOT GO/NO-GO SCHEDULING**              |
 
 ## Dependency notes
+
+- Plan 126 pins T3 Code and records 48 alignment groups after two source-audit passes and
+  independent cross-review. Its first delivery units cover archive semantics, safe rewind,
+  native approval replies, bounded delivery and PR lookup failures. The reports, acceptance
+  cases, contract census and open finding ledger live beside the master plan. Reconcile shared
+  client-core work with 094, keyboard behavior with 080, native capabilities with 087/088,
+  verification tooling with 119 and background telemetry with 125. This is an execution plan;
+  application implementation has not started. Root `PLAN.md` remains the roadmap owner.
 
 - Plan 125 reduces logging and measurement overhead while preserving failure evidence. It covers
   producer admission, client/server delivery, bounded measurement lifetime and the log viewer.
