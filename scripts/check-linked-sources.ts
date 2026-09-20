@@ -19,9 +19,10 @@ import { readDevSources, type DevPackage } from './dev-sources'
  * 2026-09-15 it cost a debugging cycle — ten `EditorCommandId` errors for
  * commands that were sitting in the sibling's `src` the whole time.
  *
- * Comparing mtimes rather than rebuilding automatically: building another
- * checkout as a side effect of typechecking this one is a surprise, and the
- * command to run is short enough to hand over.
+ * So it rebuilds the stale package in its own checkout before typecheck runs.
+ * `dist` is a build artifact, not a reviewed file — regenerating it is the
+ * only way to make the check honest, since typecheck and `vite build` both
+ * read it. A sibling whose source does not compile fails here instead.
  */
 const SKIP = new Set(['ghostty-webgpu'])
 
@@ -75,6 +76,40 @@ function staleness(pkg: DevPackage, deadline: number): Stale | null {
   }
 }
 
+type Group = {
+  readonly checkout: string
+  readonly names: readonly string[]
+}
+
+// One build per checkout, not per package: a sibling's own filter resolves the
+// build order between them, and two builds in one checkout would race.
+function groupByCheckout(entries: readonly Stale[]): readonly Group[] {
+  const byCheckout = new Map<string, string[]>()
+  for (const entry of entries) {
+    const names = byCheckout.get(entry.checkout)
+    if (names === undefined) {
+      byCheckout.set(entry.checkout, [entry.name])
+      continue
+    }
+
+    names.push(entry.name)
+  }
+
+  return [...byCheckout].map(([checkout, names]) => ({ checkout, names }))
+}
+
+async function rebuild(group: Group): Promise<number> {
+  const filters = group.names.flatMap((name) => ['--filter', name])
+  const child = Bun.spawn({
+    cmd: ['bun', 'run', ...filters, 'build'],
+    cwd: group.checkout,
+    stdout: 'inherit',
+    stderr: 'inherit',
+  })
+
+  return await child.exited
+}
+
 // A typecheck that hangs on a filesystem walk is worse than one that misses a
 // stale package, so the walk gets a budget and gives up rather than blocking.
 const deadline = Date.now() + 5_000
@@ -86,21 +121,20 @@ const stale = packages
 
 if (stale.length === 0) process.exit(0)
 
-const checkouts = [...new Set(stale.map((entry) => entry.checkout))]
-const names = stale.map((entry) => entry.name)
-
 console.error(
   [
     `${stale.length} linked package${stale.length === 1 ? ' has' : 's have'} source newer than dist.`,
-    'Typecheck reads dist, so it would check a stale build:',
+    'Typecheck reads dist, so rebuilding first:',
     '',
     ...stale.map((entry) => `  ${entry.name} — ${entry.newestSource}`),
     '',
-    'Rebuild, then run typecheck again:',
-    ...checkouts.map(
-      (checkout) => `  cd ${checkout} && bun run --filter '${names.join("' --filter '")}' build`,
-    ),
-    '',
   ].join('\n'),
 )
-process.exit(1)
+
+for (const group of groupByCheckout(stale)) {
+  const code = await rebuild(group)
+  if (code === 0) continue
+
+  console.error(`\nRebuild failed in ${group.checkout}. Fix it, then run typecheck again.`)
+  process.exit(code)
+}
