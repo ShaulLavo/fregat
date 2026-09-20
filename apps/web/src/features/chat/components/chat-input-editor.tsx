@@ -82,7 +82,7 @@ export function ChatInputEditor({
         }
         ErrorBoundary={LexicalErrorBoundary}
         placeholder={
-          <div className='text-muted-foreground/65 pointer-events-none absolute inset-x-(--density-section-padding) top-(--density-section-padding) text-sm leading-6'>
+          <div className='text-muted-foreground pointer-events-none absolute inset-x-(--density-section-padding) top-(--density-section-padding) text-sm leading-6'>
             {placeholder}
           </div>
         }

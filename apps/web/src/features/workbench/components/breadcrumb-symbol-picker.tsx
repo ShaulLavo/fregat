@@ -1,8 +1,12 @@
 import { EmptyState } from '@workspace/ui/components/empty-state'
-import { useEffect, useRef, useState, type KeyboardEvent } from 'react'
+import { useListbox } from '@workspace/ui/patterns/use-listbox'
+import { useEffect, useState } from 'react'
 
 import { BreadcrumbSymbolRows } from '@/features/workbench/components/breadcrumb-symbol-rows'
-import { handlePickerKey } from '@/features/workbench/utils/breadcrumb-picker-keys'
+import {
+  symbolPickerRows,
+  togglePickerBranch,
+} from '@/features/workbench/utils/breadcrumb-picker-rows'
 import { symbolRowKey } from '@/features/workbench/utils/breadcrumbs'
 import type { DocumentSymbol } from '@/lib/document-symbols'
 
@@ -15,57 +19,43 @@ export function BreadcrumbSymbolPicker({
   readonly symbols: readonly DocumentSymbol[]
   readonly onPick: (symbol: DocumentSymbol) => void
 }) {
-  const containerRef = useRef<HTMLDivElement | null>(null)
-  const selectedKey = chain.at(-1) ? symbolRowKey(chain.at(-1)!) : null
+  const selected = chain.at(-1)
+  const [activeId, setActiveId] = useState<string | null>(selected ? symbolRowKey(selected) : null)
   const [expanded, setExpanded] = useState<ReadonlySet<string>>(
     () => new Set(chain.slice(0, -1).map(symbolRowKey)),
   )
-
-  function toggle(key: string) {
-    setExpanded((current) => {
-      const next = new Set(current)
-      if (next.has(key)) next.delete(key)
-      else next.add(key)
-
-      return next
-    })
+  const rows = symbolPickerRows(symbols, expanded)
+  function toggle(id: string) {
+    setExpanded((current) => togglePickerBranch(current, id))
   }
-
+  function activate(id: string) {
+    const row = rows.find((row) => row.id === id)
+    if (row) onPick(row.symbol)
+  }
+  const list = useListbox({
+    role: 'tree',
+    items: rows,
+    activeId,
+    onActiveChange: setActiveId,
+    onCommit: activate,
+    onCollapse: toggle,
+    onExpand: toggle,
+  })
+  const ref = list.containerProps.ref
   useEffect(() => {
-    const container = containerRef.current
-    if (!container || !selectedKey) return
-
-    const row = container.querySelector<HTMLElement>(
-      `[data-breadcrumb-row][data-breadcrumb-path="${CSS.escape(selectedKey)}"]`,
-    )
-    if (!row) return
-
-    row.focus({ preventScroll: true })
-    row.scrollIntoView({ block: 'center' })
-  }, [selectedKey])
-
-  function handleKeyDown(event: KeyboardEvent<HTMLDivElement>) {
-    if (handlePickerKey(event.key, event.currentTarget, toggle)) event.preventDefault()
-  }
-
-  if (symbols.length === 0) {
-    return <EmptyState align='start' className='px-3 py-2' title='No symbols' />
-  }
-
+    ref.current?.focus({ preventScroll: true })
+  }, [ref])
+  if (symbols.length === 0) return <EmptyState align='start' title='No symbols' />
   return (
     <div
+      {...list.containerProps}
       aria-label='Symbols'
-      className='app-scrollbar-thin max-h-[inherit] overflow-y-auto py-(--density-gap-tight)'
-      ref={containerRef}
-      role='tree'
-      onKeyDown={handleKeyDown}
+      className='app-scrollbar-thin focus-ring-inset max-h-[inherit] overflow-y-auto py-(--density-gap-tight)'
     >
       <BreadcrumbSymbolRows
-        depth={0}
-        expanded={expanded}
-        selectedKey={selectedKey}
-        symbols={symbols}
-        onPick={onPick}
+        rows={rows}
+        rowProps={list.rowProps}
+        onPick={activate}
         onToggle={toggle}
       />
     </div>

@@ -83,7 +83,11 @@ function searchWarningNotice(warnings: readonly WorkspaceSearchWarningEvent[]) {
   return {
     content: (
       <span className='text-warning ml-1 inline-flex items-center gap-1 align-bottom'>
-        <WarningCircleIcon aria-hidden='true' className='size-3.5 shrink-0' weight='duotone' />
+        <WarningCircleIcon
+          aria-hidden='true'
+          className='size-(--icon-size-sm) shrink-0'
+          weight='duotone'
+        />
         {warning.message}
       </span>
     ),

@@ -24,7 +24,7 @@ export function SearchPendingOrEmpty({
       <EmptyState
         className={className}
         description={warning.message}
-        icon={<WarningCircleIcon className='size-5' weight='duotone' />}
+        icon={<WarningCircleIcon className='size-(--icon-size)' weight='duotone' />}
         title='No matches'
         tone='warning'
       />
@@ -35,7 +35,7 @@ export function SearchPendingOrEmpty({
     <EmptyState
       className={className}
       description='Try a different query.'
-      icon={<MagnifyingGlassIcon className='size-5' />}
+      icon={<MagnifyingGlassIcon className='size-(--icon-size)' />}
       title='No matches'
     />
   )

@@ -104,11 +104,62 @@
      after the user already decided. Exit is therefore faster. */
   --duration-enter: 140ms;
   --duration-exit: 100ms;
+  --duration-color: var(--duration-exit);
   /* Tailwind reads both of these for every bare `transition-*` utility, so a call
      site that does not name a duration or a curve still gets the system rather
      than Tailwind's 150ms cubic-bezier(0.4,0,0.2,1). Never hand-write either. */
   --default-transition-duration: var(--duration-exit);
   --default-transition-timing-function: var(--ease-out-strong);
+}
+
+/* The root snapshot owns theme fades; local hover colors must already be settled. */
+:root:active-view-transition-type(color-mode) {
+  --duration-color: 0s;
+}
+
+:root:active-view-transition-type(color-mode)::view-transition-group(*),
+:root:active-view-transition-type(color-mode)::view-transition-old(*),
+:root:active-view-transition-type(color-mode)::view-transition-new(*) {
+  animation-duration: var(--duration-enter);
+  animation-timing-function: var(--ease-out-strong);
+}
+
+:root:active-view-transition-type(color-mode)::view-transition {
+  pointer-events: none;
+}
+
+/* Portals paint above the app, so their snapshots must stay above its snapshot too. */
+:root:active-view-transition-type(color-mode)
+  :is(
+    [data-slot='dialog-overlay'],
+    [data-slot='dialog-content'],
+    [data-slot='alert-dialog-overlay'],
+    [data-slot='alert-dialog-content'],
+    [data-slot='popover-content'],
+    [data-slot='dropdown-menu-content'],
+    [data-slot='dropdown-menu-sub-content'],
+    [data-slot='context-menu-content'],
+    [data-slot='context-menu-sub-content'],
+    [data-slot='select-content'],
+    [data-slot='tooltip-content'],
+    [data-sonner-toaster]
+  ) {
+  view-transition-name: match-element;
+  view-transition-class: floating-surface;
+}
+
+:root:active-view-transition-type(color-mode)::view-transition-group(.floating-surface) {
+  z-index: 1;
+}
+
+@media (prefers-reduced-motion: reduce) {
+  :root {
+    --duration-color: 0s;
+  }
+}
+
+@utility transition-colors {
+  transition-duration: var(--duration-color);
 }
 
 /* Warm near-greyscale: surfaces, ink and accents all sit on hue 70 at chroma
@@ -132,6 +183,8 @@
 
   /* Density changes chrome and controls. Cozy also restores the tree's
      pre-compaction typography through its shadow host. */
+  --icon-size: 1rem;
+  --icon-size-sm: 0.875rem;
   --density-control-height: 2rem;
   --density-control-height-sm: 1.75rem;
   --density-control-height-lg: 2.25rem;
@@ -310,6 +363,8 @@
 :root[data-density='compact'] {
   --bar-height: 2.25rem;
   --bar-padding-x: 0.5rem;
+  --icon-size: 0.875rem;
+  --icon-size-sm: 0.75rem;
   --density-control-height: 1.75rem;
   --density-control-height-sm: 1.5rem;
   --density-control-height-lg: 2rem;
@@ -489,6 +544,7 @@
    a bare ring-* class cannot, because the utility owns the box-shadow. */
 @utility focus-ring {
   @apply transition-[color,background-color,border-color,box-shadow];
+  transition-duration: var(--duration-color);
 
   /* :focus-visible, so a control that was clicked does not glow. */
   &:focus-visible {
@@ -505,6 +561,7 @@
    :focus-visible: the caret has to be findable however the field was reached. */
 @utility focus-ring-within {
   @apply transition-[color,background-color,border-color,box-shadow];
+  transition-duration: var(--duration-color);
 
   &:has(:is(input, textarea, [contenteditable='true']):focus) {
     border-color: var(--focus-ring-color, var(--ring));
@@ -516,6 +573,7 @@
    whose outset halo would be clipped by the pane they fill. */
 @utility focus-ring-inset {
   @apply transition-[color,background-color,border-color,box-shadow];
+  transition-duration: var(--duration-color);
 
   &:focus-visible {
     border-color: var(--focus-ring-color, var(--ring));
@@ -528,6 +586,7 @@
    it owns a popup — the menu is anchored to the trigger and would travel with it. */
 @utility pressable {
   @apply transition-[color,background-color,border-color,box-shadow] active:not-aria-[haspopup]:translate-y-px;
+  transition-duration: var(--duration-color);
 }
 
 /* A skeleton bar. The tint is the floor; the sweep is what says "incoming".

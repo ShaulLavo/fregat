@@ -53,7 +53,7 @@ export function CodeThemePreview({
               <span className='flex min-w-max pr-4' key={lineIndex}>
                 <span
                   aria-hidden='true'
-                  className='w-10 shrink-0 pr-3 text-right tabular-nums opacity-40 select-none'
+                  className='text-muted-foreground text-2xs w-10 shrink-0 pr-3 text-right tabular-nums select-none'
                 >
                   {lineIndex + 1}
                 </span>

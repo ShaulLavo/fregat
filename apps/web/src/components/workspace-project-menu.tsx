@@ -84,7 +84,10 @@ export function WorkspaceProjectMenu({ workspaceTitle }: { readonly workspaceTit
         }
         title={menuTitle}
       >
-        <FolderOpenIcon className='text-muted-foreground size-4 shrink-0' weight='duotone' />
+        <FolderOpenIcon
+          className='text-muted-foreground size-(--icon-size) shrink-0'
+          weight='duotone'
+        />
         <span className='truncate text-xs font-medium'>{workspaceTitle}</span>
         {machine ? (
           <span className='text-muted-foreground text-3xs flex min-w-0 items-center gap-1'>
@@ -92,7 +95,7 @@ export function WorkspaceProjectMenu({ workspaceTitle }: { readonly workspaceTit
             <span className='truncate'>{machine.label ?? machine.name}</span>
           </span>
         ) : null}
-        <CaretDownIcon className='text-muted-foreground size-3 shrink-0' />
+        <CaretDownIcon className='text-muted-foreground size-(--icon-size-sm) shrink-0' />
       </DropdownMenuTrigger>
       <DropdownMenuContent align='start' className='max-h-[60vh] w-64 overflow-y-auto p-1'>
         <DropdownMenuRadioGroup value={rootPath ?? ''}>
@@ -113,7 +116,7 @@ export function WorkspaceProjectMenu({ workspaceTitle }: { readonly workspaceTit
               <span className='flex min-w-0 flex-1 items-baseline gap-1.5'>
                 <span className='truncate'>{entry.title}</span>
                 {entry.qualifier ? (
-                  <span className='text-muted-foreground/70 text-2xs shrink-0 truncate'>
+                  <span className='text-muted-foreground text-2xs shrink-0 truncate'>
                     {entry.qualifier}
                   </span>
                 ) : null}
@@ -123,7 +126,7 @@ export function WorkspaceProjectMenu({ workspaceTitle }: { readonly workspaceTit
         </DropdownMenuRadioGroup>
         <DropdownMenuSeparator />
         <DropdownMenuItem onClick={openPicker}>
-          <FolderPlusIcon className='size-4' />
+          <FolderPlusIcon className='size-(--icon-size)' />
           Open folder…
         </DropdownMenuItem>
         <DropdownMenuItem
@@ -133,7 +136,7 @@ export function WorkspaceProjectMenu({ workspaceTitle }: { readonly workspaceTit
             })
           }}
         >
-          <PlugsConnectedIcon className='size-4' />
+          <PlugsConnectedIcon className='size-(--icon-size)' />
           Connect machine…
         </DropdownMenuItem>
       </DropdownMenuContent>

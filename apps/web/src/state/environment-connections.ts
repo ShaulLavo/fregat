@@ -1,3 +1,4 @@
+import { environmentQueryKeys } from '@/features/environments/utils/query-keys'
 import {
   flushChatProjectionCache,
   hydrateEnvironmentChatCache,
@@ -157,7 +158,7 @@ export function createEnvironmentConnections({
     if (connections.has(environmentId) && !replace) return owner
     stopConnection(environmentId)
     replaceEnvironmentEndpoint(owner, origin)
-    queryClientFor(owner).setQueryData(['environment-descriptor'], descriptor)
+    queryClientFor(owner).setQueryData(environmentQueryKeys.descriptor, descriptor)
     initializeEnvironmentPersistence(environmentScopedStorage(environmentId))
     const transport = createTransport(owner)
     const unregister = registerChatTransport(transport)

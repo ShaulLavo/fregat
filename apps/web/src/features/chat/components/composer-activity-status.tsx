@@ -47,7 +47,10 @@ export function ComposerActivityStatus({
               <OrbitLoader aria-hidden='true' className='text-muted-foreground size-3.5 shrink-0' />
             ) : null}
             {disconnected || waiting ? (
-              <WarningCircleIcon aria-hidden='true' className='text-warning size-3.5 shrink-0' />
+              <WarningCircleIcon
+                aria-hidden='true'
+                className='text-warning size-(--icon-size-sm) shrink-0'
+              />
             ) : null}
             <span
               className={cn(

@@ -25,6 +25,12 @@ test.each(['summary', 'events', 'both'])(
     expect(queries.some((query) => query.queryKey[1] === 'summary')).toBe(true)
 
     act(() => {
+      if (failedQuery === 'summary') {
+        queryClient.setQueriesData(
+          { queryKey: [...logsKeys.all, 'events'] },
+          { detailsById: {}, events: [], nextCursor: null, total: 0 },
+        )
+      }
       for (const query of queries) {
         if (failedQuery !== 'both' && query.queryKey[1] !== failedQuery) continue
         query.setState({ error: createError('Logs unavailable'), status: 'error' })

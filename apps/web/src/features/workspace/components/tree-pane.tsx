@@ -1,3 +1,4 @@
+import { disabledFileQueryKey } from '@/features/workspace/utils/query-keys'
 import { clientForQueryClient } from '@/lib/environments/state/query-clients'
 import type {
   FileTreeDropContext,
@@ -25,7 +26,7 @@ import { TreeLoading } from '@/features/workspace/components/tree-loading'
 import { useFileTreeActions } from '@/features/workspace/hooks/use-file-tree-actions'
 import { useFileTreeIntentPrefetch } from '@/features/workspace/hooks/use-file-tree-intent-prefetch'
 import { useEditorColorTheme } from '@/features/editor/hooks/use-editor-color-theme'
-import { useWorkbenchDensity } from '@/features/settings/hooks/use-workbench-density'
+import { useRowHeight } from '@workspace/ui/patterns/use-row-height'
 import { useFileTreeMutationEvents } from '@/features/workspace/hooks/use-file-tree-mutation-events'
 import { useOptionalWorkspaceEditService } from '@/features/editor/providers/workspace-edit-context'
 import { useFsActions } from '@/features/workspace/hooks/use-fs-actions'
@@ -61,8 +62,6 @@ import {
   useState,
   type CSSProperties,
 } from 'react'
-
-const DISABLED_FILE_QUERY = ['file-system', 'file-snapshots', 'disabled'] as const
 
 export const TreePane = memo(
   ({
@@ -103,14 +102,14 @@ function ReadyTreePane({
   // Confirmed entries plus this root's pending intents: what the rows should show.
   const model = useProjectedTreeModel(confirmed, rootPath)
   const { editorTheme } = useEditorColorTheme()
-  const workbenchDensity = useWorkbenchDensity()
+  const rowHeight = useRowHeight()
   const selectedFilePath = useEditorWorkspaceState(
     (store) => tabFileResource(store.selectedTabContent)?.path ?? null,
   )
   const selectedDiskPath = selectedFilePath
   const selectedFileQueryKey = selectedDiskPath
     ? fileSystemKeys.fileSnapshot(selectedDiskPath)
-    : DISABLED_FILE_QUERY
+    : disabledFileQueryKey
   const selectedFilePending =
     useIsFetching({
       exact: true,
@@ -194,7 +193,7 @@ function ReadyTreePane({
     : undefined
   const { model: tree } = useFileTree({
     density: 'compact',
-    itemHeight: workbenchDensity === 'compact' ? 20 : 24,
+    itemHeight: rowHeight,
     flattenEmptyDirectories: true,
     gitStatus: initialGitStatus,
     icons,
@@ -614,7 +613,7 @@ function treePathBasename(treePath: string) {
 }
 
 const treeStyle = {
-  '--trees-bg-muted-override': 'var(--accent)',
+  '--trees-bg-muted-override': 'var(--row-hover)',
   '--trees-bg-override': 'transparent',
   // The tree package's built-in accent (#009fff) and git palette are raw hexes that
   // bypass the theme; point every override at tokens so selection and git status

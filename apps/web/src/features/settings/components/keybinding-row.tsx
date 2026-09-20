@@ -1,3 +1,4 @@
+import { Tooltip, TooltipContent, TooltipTrigger } from '@workspace/ui/components/tooltip'
 import { ArrowCounterClockwiseIcon, ProhibitIcon } from '@phosphor-icons/react'
 import { Badge } from '@workspace/ui/components/badge'
 import { Button } from '@workspace/ui/components/button'
@@ -62,24 +63,38 @@ export function KeybindingRow({
       {/* Unbind and Reset are different documents: `null` is "this command has
           no shortcut", an absent key is "use the default". One button cannot
           say both. */}
-      <Button
-        aria-label={`Unbind ${title}`}
-        disabled={binding.keys === null}
-        onClick={() => setKeybinding(binding.command, null)}
-        size='icon-sm'
-        variant='ghost'
-      >
-        <ProhibitIcon />
-      </Button>
-      <Button
-        aria-label={`Reset ${title}`}
-        disabled={binding.source !== 'user'}
-        onClick={() => resetKeybinding(binding.command)}
-        size='icon-sm'
-        variant='ghost'
-      >
-        <ArrowCounterClockwiseIcon />
-      </Button>
+      <Tooltip>
+        <TooltipTrigger
+          render={
+            <Button
+              aria-label={`Unbind ${title}`}
+              disabled={binding.keys === null}
+              onClick={() => setKeybinding(binding.command, null)}
+              size='icon-sm'
+              variant='ghost'
+            >
+              <ProhibitIcon />
+            </Button>
+          }
+        />
+        <TooltipContent>{`Unbind ${title}`}</TooltipContent>
+      </Tooltip>
+      <Tooltip>
+        <TooltipTrigger
+          render={
+            <Button
+              aria-label={`Reset ${title}`}
+              disabled={binding.source !== 'user'}
+              onClick={() => resetKeybinding(binding.command)}
+              size='icon-sm'
+              variant='ghost'
+            >
+              <ArrowCounterClockwiseIcon />
+            </Button>
+          }
+        />
+        <TooltipContent>{`Reset ${title}`}</TooltipContent>
+      </Tooltip>
     </div>
   )
 }

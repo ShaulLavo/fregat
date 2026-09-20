@@ -13,9 +13,9 @@ export function EditorDragPreview({
       title={title}
     >
       {copy ? (
-        <CopyIcon className='size-3.5 shrink-0' />
+        <CopyIcon className='size-(--icon-size-sm) shrink-0' />
       ) : (
-        <FileIcon className='size-3.5 shrink-0' />
+        <FileIcon className='size-(--icon-size-sm) shrink-0' />
       )}
       <span className='truncate'>{title}</span>
       {copy ? <span className='text-muted-foreground'>Copy</span> : null}

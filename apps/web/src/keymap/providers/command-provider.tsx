@@ -11,8 +11,8 @@ import { DEFAULT_SETTING_VALUES, type SettingsSnapshot } from '@workspace/contra
 
 import { AppKeymapController } from '@/app-keymap-controller'
 import { CommandPalette } from '@/components/command-palette'
-import type { PaletteScope } from '@/features/command-palette/command-palette-types'
-import { paletteScopeForPrefix } from '@/features/command-palette/command-palette-utils'
+import type { PaletteScope } from '@/features/command-palette/utils/types'
+import { paletteScopeForPrefix } from '@/features/command-palette/utils/query'
 import { useEditorTabActions } from '@/features/editor/hooks/use-editor-tab-actions'
 import { useEditorCommands } from '@/features/editor/hooks/use-editor-commands'
 import { useEditorDocumentStoreApi } from '@/features/editor/state/document-state'

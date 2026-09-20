@@ -1,3 +1,4 @@
+import { Tooltip, TooltipContent, TooltipTrigger } from '@workspace/ui/components/tooltip'
 import {
   CheckCircleIcon,
   CheckIcon,
@@ -94,7 +95,7 @@ export function ProviderSignInDialog({
             className='border-success/30 bg-success/10 text-success flex items-center gap-(--density-control-gap) border px-(--density-control-padding-x) py-(--density-section-gap) text-xs'
             title={accountLabel ?? undefined}
           >
-            <CheckCircleIcon className='size-3.5 shrink-0' />
+            <CheckCircleIcon className='size-(--icon-size-sm) shrink-0' />
             <span className='min-w-0 flex-1 truncate'>
               {accountLabel ?? `${providerLabel} is signed in.`}
             </span>
@@ -147,7 +148,7 @@ export function ProviderSignInDialog({
             className='border-warning/30 bg-warning/10 text-warning flex items-start gap-(--density-control-gap) border px-(--density-control-padding-x) py-(--density-section-gap) text-xs'
             role='status'
           >
-            <WarningCircleIcon className='mt-0.5 size-3.5 shrink-0' />
+            <WarningCircleIcon className='mt-0.5 size-(--icon-size-sm) shrink-0' />
             <span className='min-w-0 flex-1 break-words'>{signIn.statusError}</span>
           </div>
         ) : null}
@@ -157,7 +158,7 @@ export function ProviderSignInDialog({
             className='border-destructive/30 bg-destructive/10 text-destructive flex items-start gap-(--density-control-gap) border px-(--density-control-padding-x) py-(--density-section-gap) text-xs'
             role='alert'
           >
-            <WarningCircleIcon className='mt-0.5 size-3.5 shrink-0' />
+            <WarningCircleIcon className='mt-0.5 size-(--icon-size-sm) shrink-0' />
             <span className='min-w-0 flex-1 break-words'>{signIn.attemptError}</span>
           </div>
         ) : null}
@@ -170,15 +171,24 @@ export function ProviderSignInDialog({
             <code className='text-foreground min-w-0 flex-1 truncate font-mono text-xs'>
               {command}
             </code>
-            <Button
-              aria-label={copied ? 'Sign-in command copied' : 'Copy sign-in command'}
-              onClick={() => void copyCommand(command, () => setCopied(true))}
-              size='icon-xs'
-              type='button'
-              variant='outline'
-            >
-              {copied ? <CheckIcon /> : <CopyIcon />}
-            </Button>
+            <Tooltip>
+              <TooltipTrigger
+                render={
+                  <Button
+                    aria-label={copied ? 'Sign-in command copied' : 'Copy sign-in command'}
+                    onClick={() => void copyCommand(command, () => setCopied(true))}
+                    size='icon-xs'
+                    type='button'
+                    variant='outline'
+                  >
+                    {copied ? <CheckIcon /> : <CopyIcon />}
+                  </Button>
+                }
+              />
+              <TooltipContent>
+                {copied ? 'Sign-in command copied' : 'Copy sign-in command'}
+              </TooltipContent>
+            </Tooltip>
           </div>
         </div>
 

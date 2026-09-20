@@ -19,7 +19,7 @@ export function StageNotice({
 }) {
   return (
     <div className='flex min-h-0 flex-1 flex-col items-center justify-center gap-3 px-6 text-center'>
-      {failed ? <WarningCircleIcon className='text-destructive size-6' /> : null}
+      {failed ? <WarningCircleIcon className='text-destructive size-(--icon-size)' /> : null}
       <div className='flex flex-col gap-1'>
         <h2 className='text-foreground text-sm font-medium'>{title}</h2>
         <p className='text-muted-foreground max-w-sm text-xs break-words'>{detail}</p>

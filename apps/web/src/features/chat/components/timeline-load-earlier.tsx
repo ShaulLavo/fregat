@@ -29,7 +29,7 @@ export function TimelineLoadEarlier({
         {pending ? (
           <Spinner className='size-3.5' />
         ) : (
-          <ArrowUpIcon aria-hidden='true' className='size-3.5' />
+          <ArrowUpIcon aria-hidden='true' className='size-(--icon-size-sm)' />
         )}
         {loadEarlierLabel(error, pending)}
       </Button>

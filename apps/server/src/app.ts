@@ -31,6 +31,7 @@ import {
   isEvlogError,
   observabilityRoutes,
   recordClientInstance,
+  recordProcessInfo,
   recordRequestContext,
   recordRequestError,
   runDetached,
@@ -75,6 +76,10 @@ export type AppOptions = FileSystemServiceOptions & {
     detachTtlMs?: number
   }
   fonts?: FontService
+  themes?: {
+    /** Theme directory whose backgrounds seed the wallpapers the bundled themes reference. */
+    seedWallpapersFrom?: string
+  }
   orchestration?: {
     attachmentsDir?: string
     database?: OrchestrationDatabase
@@ -164,6 +169,21 @@ export function createApp(options: AppOptions) {
   wallpapers.assertUnused = (id) => bundles.assertPartUnused('wallpaper', id)
   palettes.archiveDirectories = () => bundles.directories()
   wallpapers.archiveDirectories = () => bundles.directories()
+  const seedDirectory = options.themes?.seedWallpapersFrom
+  if (seedDirectory) {
+    runDetached(
+      async () => {
+        const started = performance.now()
+        const result = await wallpapers.seed(seedDirectory)
+        recordProcessInfo('wallpapers.seed', {
+          directory: seedDirectory,
+          durationMs: Math.round(performance.now() - started),
+          ...result,
+        })
+      },
+      { area: 'wallpaper', operation: 'library.seed', directory: seedDirectory },
+    )
+  }
   const providerAdapterRegistry: ProviderAdapterRegistry =
     options.orchestration?.providerAdapterRegistry ??
     createDefaultProviderAdapterRegistry(

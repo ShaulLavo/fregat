@@ -1,20 +1,13 @@
 import type { QueryClient } from '@tanstack/react-query'
 import { clientForQueryClient } from '@/lib/environments/state/query-clients'
-import type { SettingsValues } from '@workspace/contracts'
+import {
+  editorQueryKeys,
+  type LanguageServerMatchConfigurationSnapshot,
+} from '@/features/editor/utils/query-keys'
 import { languageServerMatches } from '@/features/editor/utils/language-server-plugin'
 import { createRpcError } from '@/lib/structured-errors'
 
 const LANGUAGE_SERVER_MATCH_STALE_MS = 30_000
-
-type LanguageServerMatchConfiguration = Pick<
-  SettingsValues,
-  'lsp.experimental.tyForPython' | 'lsp.languageServers' | 'lsp.servers'
->
-
-export type LanguageServerMatchConfigurationSnapshot = {
-  readonly configuration: LanguageServerMatchConfiguration
-  readonly generation: number
-}
 
 export function languageServerMatchQueryOptions(
   rootPath: string,
@@ -37,13 +30,7 @@ export function languageServerMatchQueryOptions(
 
       return languageServerMatches(response.data)
     },
-    queryKey: [
-      'language-server-matches',
-      rootPath,
-      matchPath,
-      snapshot.generation,
-      snapshot.configuration,
-    ] as const,
+    queryKey: editorQueryKeys.languageServerMatches(rootPath, matchPath, snapshot),
     staleTime: LANGUAGE_SERVER_MATCH_STALE_MS,
   }
 }

@@ -1,7 +1,16 @@
-import { FileTypeIcon } from '@/components/file-type-icon'
+import { useListbox } from '@workspace/ui/patterns/use-listbox'
+import { ReferenceGroupRow } from '@/features/editor/components/reference-group-row'
+import { ReferenceRow } from '@/features/editor/components/reference-row'
+import {
+  referenceGroups,
+  referenceDocumentsRevisionKey,
+  referenceDocumentsByPath,
+  referenceListRows,
+  toggledPathSet,
+} from '@/features/editor/utils/language-server-references'
+import { Tooltip, TooltipContent, TooltipTrigger } from '@workspace/ui/components/tooltip'
 import { fileDocumentKey, filesystemPath } from '@/lib/documents/utils/identity'
-import type { DocumentKey } from '@/lib/documents/utils/types'
-import { CaretRightIcon, XIcon } from '@phosphor-icons/react'
+import { XIcon } from '@phosphor-icons/react'
 import type {
   LanguageServerDefinitionTarget,
   LanguageServerReferencesResult,
@@ -11,16 +20,10 @@ import { useMemo, useState } from 'react'
 import {
   useEditorDocumentState,
   useEditorDocumentStoreApi,
-  type LiveEditorDocument,
 } from '@/features/editor/state/document-state'
-import { textLineAt } from '@/features/editor/utils/position'
-import { compareSearchPaths } from '@/features/search/utils/sort'
-import { basename, parentPath, toTreePath } from '@/lib/path-formatters'
-import { iconForEntry } from '@/lib/file-icons'
 import { Button } from '@workspace/ui/components/button'
 import { EmptyState } from '@workspace/ui/components/empty-state'
-import { PaneBar } from '@workspace/ui/components/pane-bar'
-import { cn } from '@workspace/ui/lib/utils'
+import { ToolPane } from '@workspace/ui/patterns/tool-pane'
 
 type LanguageServerReferencesPaneProps = {
   readonly references: LanguageServerReferencesResult
@@ -28,13 +31,6 @@ type LanguageServerReferencesPaneProps = {
   onClose(): void
   onOpenReference(target: LanguageServerDefinitionTarget): void | boolean
   onPreviewReference(target: LanguageServerDefinitionTarget): void
-}
-
-type ReferenceGroup = {
-  readonly name: string
-  readonly path: string
-  readonly pathLabel: string
-  readonly targets: readonly LanguageServerDefinitionTarget[]
 }
 
 export function LanguageServerReferencesPane({
@@ -75,234 +71,90 @@ export function LanguageServerReferencesPane({
     setCollapsedPaths((current) => toggledPathSet(current, path))
   }
 
+  const [activeId, setActiveId] = useState<string | null>(null)
+  const rows = referenceListRows(groups, collapsedPaths)
+  function activate(id: string) {
+    const row = rows.find((row) => row.id === id)
+    if (row?.kind === 'group') return handleToggle(row.group.path)
+    if (row?.kind === 'target') onOpenReference(row.target)
+  }
+  function preview(id: string) {
+    setActiveId(id)
+    const row = rows.find((row) => row.id === id)
+    if (row?.kind === 'target') onPreviewReference(row.target)
+  }
+  const list = useListbox({
+    role: 'tree',
+    items: rows,
+    activeId,
+    onActiveChange: preview,
+    onCommit: activate,
+    onCollapse: activate,
+    onExpand: activate,
+  })
+
   return (
-    <aside
+    <ToolPane
+      title='References'
+      detail={references.targets.length.toLocaleString()}
       aria-label='References'
-      className='grid h-full min-h-0 grid-rows-[auto_minmax(0,1fr)] border-l'
-    >
-      <PaneBar border='bottom' className='justify-between'>
-        <div className='flex min-w-0 items-center gap-(--density-control-gap)'>
-          <span className='truncate text-xs font-medium'>References</span>
-          <span className='bg-muted/70 text-muted-foreground text-3xs rounded-md px-1.5 leading-4 tabular-nums'>
-            {references.targets.length.toLocaleString()}
-          </span>
-        </div>
-        <Button
-          aria-label='Close references'
-          className='text-muted-foreground shrink-0'
-          size='icon-sm'
-          title='Close references'
-          type='button'
-          variant='ghost'
-          onClick={onClose}
-        >
-          <XIcon className='size-4' />
-        </Button>
-      </PaneBar>
-      <div className='min-h-0 overflow-y-auto py-1'>
-        {groups.length === 0 ? (
-          <EmptyState
-            align='start'
-            className='px-(--density-control-padding-x) py-(--density-section-padding)'
-            title='No references found'
+      className='border-border h-full border-l'
+      bodyClassName='py-1'
+      bodyProps={
+        groups.length > 0
+          ? { ...list.containerProps, 'aria-label': 'Reference results' }
+          : undefined
+      }
+      actions={
+        <Tooltip>
+          <TooltipTrigger
+            render={
+              <Button
+                aria-label='Close references'
+                className='text-muted-foreground shrink-0'
+                size='icon-sm'
+                type='button'
+                variant='ghost'
+                onClick={onClose}
+              >
+                <XIcon className='size-(--icon-size)' />
+              </Button>
+            }
           />
-        ) : (
-          groups.map((group) => {
-            const collapsed = collapsedPaths.has(group.path)
-
-            return (
-              <div key={group.path}>
-                <ReferenceGroupHeader collapsed={collapsed} group={group} onToggle={handleToggle} />
-                {collapsed
-                  ? null
-                  : group.targets.map((target, index) => (
-                      <ReferenceRow
-                        document={documents[target.path]}
-                        key={`${target.uri}:${target.range.start.line}:${target.range.start.character}:${index}`}
-                        target={target}
-                        onOpenReference={onOpenReference}
-                        onPreviewReference={onPreviewReference}
-                      />
-                    ))}
-              </div>
-            )
-          })
-        )}
-      </div>
-    </aside>
-  )
-}
-
-function ReferenceGroupHeader({
-  collapsed,
-  group,
-  onToggle,
-}: {
-  readonly collapsed: boolean
-  readonly group: ReferenceGroup
-  onToggle(path: string): void
-}) {
-  const icon = iconForEntry({ name: group.name, type: 'file' })
-
-  // Raw element: Button centres its content and owns a radius and hover fill a full-width row cannot take.
-  return (
-    <button
-      className='focus-ring hover:bg-row-hover active:bg-row-active grid h-(--density-control-height-sm) w-full grid-cols-[14px_14px_minmax(0,1fr)_auto] items-center gap-(--density-control-gap) px-(--density-row-padding-x) text-left text-xs outline-none'
-      title={group.path}
-      type='button'
-      onClick={() => onToggle(group.path)}
+          <TooltipContent>{'Close references'}</TooltipContent>
+        </Tooltip>
+      }
     >
-      <CaretRightIcon
-        className={cn(
-          'size-3 text-muted-foreground transition-transform',
-          !collapsed && 'rotate-90',
-        )}
-      />
-      <FileTypeIcon className='size-3.5' icon={icon} />
-      <span className='flex min-w-0 items-center gap-1.5 overflow-hidden whitespace-nowrap'>
-        <span className='max-w-[55%] min-w-0 shrink-0 truncate font-medium'>{group.name}</span>
-        <span className='text-muted-foreground text-2xs min-w-0 flex-1 truncate'>
-          {group.pathLabel}
-        </span>
-      </span>
-      <span className='bg-muted/50 text-muted-foreground text-3xs rounded-md px-1 leading-4 tabular-nums'>
-        {group.targets.length}
-      </span>
-    </button>
+      {groups.length === 0 ? (
+        <EmptyState
+          align='start'
+          className='px-(--density-control-padding-x) py-(--density-section-padding)'
+          title='No references found'
+        />
+      ) : (
+        <>
+          {rows.map((row) =>
+            row.kind === 'group' ? (
+              <ReferenceGroupRow
+                key={row.id}
+                rowProps={list.rowProps(row.id)}
+                collapsed={!row.expanded}
+                group={row.group}
+                onToggle={handleToggle}
+              />
+            ) : (
+              <ReferenceRow
+                key={row.id}
+                rowProps={list.rowProps(row.id)}
+                document={documents[row.target.path]}
+                target={row.target}
+                onOpenReference={onOpenReference}
+                onPreviewReference={onPreviewReference}
+              />
+            ),
+          )}
+        </>
+      )}
+    </ToolPane>
   )
-}
-
-function ReferenceRow({
-  document,
-  target,
-  onOpenReference,
-  onPreviewReference,
-}: {
-  readonly document: LiveEditorDocument | undefined
-  readonly target: LanguageServerDefinitionTarget
-  onOpenReference(target: LanguageServerDefinitionTarget): void | boolean
-  onPreviewReference(target: LanguageServerDefinitionTarget): void
-}) {
-  const line = target.range.start.line + 1
-  const preview = referencePreview(document, target)
-
-  // Raw element: Button centres its content and owns a radius and hover fill a full-width row cannot take.
-  return (
-    <button
-      className='group focus-ring hover:bg-row-hover active:bg-row-active grid h-(--density-row-height) w-full grid-cols-[38px_minmax(0,1fr)] items-center gap-2 px-(--density-row-padding-x) pl-7 text-left text-xs outline-none'
-      title={`${target.path}:${line}`}
-      type='button'
-      onClick={() => onOpenReference(target)}
-      onFocus={() => onPreviewReference(target)}
-      onMouseEnter={() => onPreviewReference(target)}
-    >
-      <span className='text-muted-foreground text-2xs text-right tabular-nums'>{line}</span>
-      <span className='text-muted-foreground group-hover:text-foreground text-2xs min-w-0 truncate font-mono'>
-        {preview}
-      </span>
-    </button>
-  )
-}
-
-function referenceGroups(
-  targets: readonly LanguageServerDefinitionTarget[],
-  rootPath: string,
-): readonly ReferenceGroup[] {
-  const byPath = new Map<string, LanguageServerDefinitionTarget[]>()
-  for (const target of targets) {
-    const existing = byPath.get(target.path) ?? []
-    existing.push(target)
-    byPath.set(target.path, existing)
-  }
-
-  return Array.from(byPath.entries())
-    .toSorted(([left], [right]) => compareSearchPaths(left, right))
-    .map(([path, pathTargets]) => ({
-      name: basename(path),
-      path,
-      pathLabel: referencePathLabel(path, rootPath),
-      targets: pathTargets.toSorted(compareTargets),
-    }))
-}
-
-function compareTargets(
-  left: LanguageServerDefinitionTarget,
-  right: LanguageServerDefinitionTarget,
-) {
-  return (
-    left.range.start.line - right.range.start.line ||
-    left.range.start.character - right.range.start.character
-  )
-}
-
-function referencePathLabel(path: string, rootPath: string) {
-  const parent = parentPath(path)
-  if (!parent) return ''
-
-  return toTreePath(parent, rootPath)
-}
-
-function referencePreview(
-  document: LiveEditorDocument | undefined,
-  target: LanguageServerDefinitionTarget,
-) {
-  const line = document
-    ? textLineAt(document.buffer.getTextSnapshot(), target.range.start.line)
-    : null
-  const trimmed = line?.trim()
-  if (trimmed) return trimmed
-  if (line !== null) return '(blank line)'
-
-  return `Line ${target.range.start.line + 1}, column ${target.range.start.character + 1}`
-}
-
-function referenceDocumentsRevisionKey(
-  documents: Readonly<Record<DocumentKey, LiveEditorDocument>>,
-  targets: readonly { readonly path: string; readonly key: DocumentKey }[],
-) {
-  let key = ''
-  const seen = new Set<string>()
-
-  for (const target of targets) {
-    if (seen.has(target.path)) continue
-
-    seen.add(target.path)
-    const document = documents[target.key]
-    key += `${target.path}\u0000${document?.contentRevision ?? ''}\u0000${referenceDocumentSnapshotRevision(document)}\u0001`
-  }
-
-  return key
-}
-
-function referenceDocumentSnapshotRevision(document: LiveEditorDocument | undefined) {
-  if (!document) return ''
-  if (document.sync.kind === 'file') return document.sync.mtimeMs.toString()
-
-  return document.localRevision.toString()
-}
-
-function referenceDocumentsByPath(
-  documents: Readonly<Record<DocumentKey, LiveEditorDocument>>,
-  targets: readonly { readonly path: string; readonly key: DocumentKey }[],
-) {
-  const result: Record<string, LiveEditorDocument | undefined> = {}
-
-  for (const target of targets) {
-    if (target.path in result) continue
-
-    result[target.path] = documents[target.key]
-  }
-
-  return result
-}
-
-function toggledPathSet(paths: ReadonlySet<string>, path: string) {
-  const next = new Set(paths)
-  if (next.has(path)) {
-    next.delete(path)
-    return next
-  }
-
-  next.add(path)
-  return next
 }

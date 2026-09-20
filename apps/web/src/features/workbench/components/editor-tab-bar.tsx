@@ -11,7 +11,7 @@ import { EditorTabInsertion } from '@/features/workbench/components/editor-tab-i
 import { MergeConflictNavigation } from '@/features/workbench/components/merge-conflict-navigation'
 import { SortableEditorTabButton } from '@/features/workbench/components/sortable-editor-tab-button'
 import { useActiveTabStripScroll } from '@/features/workbench/hooks/use-active-tab-strip-scroll'
-import { BAR_TAB_FILLER_CLASS, BAR_TAB_STRIP_CLASS } from '@/features/workbench/utils/bar-tabs'
+import { BAR_TAB_FILLER_CLASS, BAR_TAB_STRIP_CLASS } from '@workspace/ui/patterns/bar-tabs'
 import { cn } from '@workspace/ui/lib/utils'
 
 export function EditorTabBar({

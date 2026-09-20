@@ -32,7 +32,6 @@ export function ChatProviderSignInProvider({ children }: { readonly children: Re
           providerLabel={target.providerLabel}
           onOpenChange={(open) => {
             if (open) return
-
             setTarget(null)
           }}
         />

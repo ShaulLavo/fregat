@@ -1,3 +1,5 @@
+import { Tooltip, TooltipContent, TooltipTrigger } from '@workspace/ui/components/tooltip'
+import { ListRow } from '@workspace/ui/patterns/list-row'
 import { FileTypeIcon } from '@/components/file-type-icon'
 import { CaretRightIcon } from '@phosphor-icons/react'
 import { memo, useCallback, useMemo } from 'react'
@@ -27,38 +29,43 @@ export const SearchResultFileHeader = memo(
     const handleToggle = useCallback(() => toggleGroup(file.path), [file.path, toggleGroup])
 
     return (
-      <div
-        className={cn(
-          'grid w-full grid-cols-[auto_minmax(0,1fr)_auto_auto] items-center gap-1.5 border-l border-transparent px-2 py-1.5 text-left',
-          active && 'bg-row-selected',
-          !active && 'hover:bg-row-hover',
-        )}
+      <ListRow
+        role='presentation'
+        selected={active}
+        title={file.path}
+        className='grid w-full grid-cols-[auto_minmax(0,1fr)_auto_auto] text-left'
       >
-        <Button
-          aria-label={file.collapsed ? 'Expand file results' : 'Collapse file results'}
-          className='text-muted-foreground'
-          disabled={file.excerpts.length === 0}
-          size='icon-xs'
-          tabIndex={-1}
-          type='button'
-          variant='ghost'
-          onClick={handleToggle}
-        >
-          <CaretRightIcon
-            className={cn(
-              'size-3.5 transition-transform',
-              !file.collapsed && file.excerpts.length > 0 && 'rotate-90',
-            )}
+        <Tooltip>
+          <TooltipTrigger
+            render={
+              <Button
+                aria-label={file.collapsed ? 'Expand file results' : 'Collapse file results'}
+                className='text-muted-foreground'
+                disabled={file.excerpts.length === 0}
+                size='icon-xs'
+                tabIndex={-1}
+                type='button'
+                variant='ghost'
+                onClick={handleToggle}
+              >
+                <CaretRightIcon
+                  className={cn(
+                    'size-(--icon-size-sm) transition-transform',
+                    !file.collapsed && file.excerpts.length > 0 && 'rotate-90',
+                  )}
+                />
+              </Button>
+            }
           />
-        </Button>
-        <div
-          className='grid min-w-0 grid-cols-[16px_minmax(0,1fr)] items-center gap-1.5 text-left'
-          title={file.path}
-        >
-          <FileTypeIcon className='size-4' icon={icon} />
-          <span className='min-w-0'>
-            <span className='block truncate text-xs font-medium'>{name}</span>
-            <span className='text-muted-foreground text-2xs block truncate'>{file.pathLabel}</span>
+          <TooltipContent>
+            {file.collapsed ? 'Expand file results' : 'Collapse file results'}
+          </TooltipContent>
+        </Tooltip>
+        <div className='grid min-w-0 grid-cols-[16px_minmax(0,1fr)] items-center gap-1.5 text-left'>
+          <FileTypeIcon className='size-(--icon-size)' icon={icon} />
+          <span className='min-w-0 truncate'>
+            <span className='text-xs font-medium'>{name}</span>
+            <span className='text-muted-foreground text-2xs ml-2'>{file.pathLabel}</span>
           </span>
         </div>
         <span className='bg-muted/55 text-muted-foreground text-3xs rounded-md px-1.5 leading-4 tabular-nums'>
@@ -77,7 +84,7 @@ export const SearchResultFileHeader = memo(
             Replace
           </Button>
         ) : null}
-      </div>
+      </ListRow>
     )
   },
 )

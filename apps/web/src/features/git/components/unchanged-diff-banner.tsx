@@ -11,7 +11,7 @@ export function UnchangedDiffBanner({ message }: { message: string }) {
       className='text-muted-foreground border-border flex shrink-0 items-center gap-(--density-control-gap) border-b px-(--density-control-padding-x) py-(--density-control-gap) text-xs'
       role='status'
     >
-      <ArrowsLeftRightIcon aria-hidden='true' className='size-3.5 shrink-0' />
+      <ArrowsLeftRightIcon aria-hidden='true' className='size-(--icon-size-sm) shrink-0' />
       <span className='truncate'>{message}</span>
     </div>
   )

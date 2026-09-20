@@ -1,3 +1,5 @@
+import { ListRow } from '@workspace/ui/patterns/list-row'
+import type { useListbox } from '@workspace/ui/patterns/use-listbox'
 import { CaretRightIcon } from '@phosphor-icons/react'
 import { cn } from '@workspace/ui/lib/utils'
 import type { ReactNode } from 'react'
@@ -9,7 +11,7 @@ export function BreadcrumbPickerRow({
   icon,
   label,
   path,
-  selected,
+  rowProps,
   trailing,
   onActivate,
   onToggle,
@@ -20,19 +22,17 @@ export function BreadcrumbPickerRow({
   readonly icon: ReactNode
   readonly label: string
   readonly path: string
-  readonly selected: boolean
+  readonly rowProps: ReturnType<ReturnType<typeof useListbox>['rowProps']>
   readonly trailing?: ReactNode
   readonly onActivate: () => void
   readonly onToggle: () => void
 }) {
   return (
-    <button
+    <ListRow
+      {...rowProps}
+      as='button'
       aria-expanded={expandable ? expanded : undefined}
-      aria-selected={selected}
-      className={cn(
-        'focus-ring-inset hover:bg-row-hover active:bg-row-active flex h-(--density-row-height) w-full items-center gap-1.5 pr-(--density-row-padding-x) text-left text-xs outline-none',
-        selected && 'bg-row-selected',
-      )}
+      className='w-full gap-1.5 text-left'
       data-breadcrumb-depth={depth}
       data-breadcrumb-expandable={expandable ? '' : undefined}
       data-breadcrumb-expanded={expanded ? '' : undefined}
@@ -40,17 +40,19 @@ export function BreadcrumbPickerRow({
       data-breadcrumb-row=''
       role='treeitem'
       style={{ paddingLeft: `calc(var(--density-row-padding-x) + ${depth} * 1rem)` }}
-      tabIndex={-1}
       title={path}
       type='button'
-      onClick={onActivate}
+      onClick={(event) => {
+        rowProps.onClick(event)
+        onActivate()
+      }}
     >
       <span className='flex size-3.5 shrink-0 items-center justify-center'>
         {expandable ? (
           <CaretRightIcon
             aria-hidden='true'
             className={cn(
-              'text-muted-foreground size-3 transition-transform',
+              'text-muted-foreground size-(--icon-size-sm) transition-transform',
               expanded && 'rotate-90',
             )}
             onClick={(event) => {
@@ -63,6 +65,6 @@ export function BreadcrumbPickerRow({
       {icon}
       <span className='min-w-0 flex-1 truncate'>{label}</span>
       {trailing}
-    </button>
+    </ListRow>
   )
 }

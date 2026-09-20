@@ -62,3 +62,38 @@ feature, folder, or utility directory.
 `apps/web/src/lib/` is a real high-fan-in core (`client`, `file-system-types`),
 not a home for feature code. Pure code belongs in the feature's own `utils/`.
 Plan 043 states the membership rule for `lib/` itself.
+
+## Feature imports
+
+Features are leaves. A feature imports its own files, workspace packages, or the app's shared
+`lib/`, `components/`, `hooks/`, and `keymap/` layers. It does not introduce an import from another
+feature. `platform-boundaries/feature-imports` resolves static, dynamic, type-only, re-export,
+and `require` imports through the real Oxlint rule.
+
+Existing imports are listed by exact source feature, target feature, and module in
+[`web-feature-allow.json`](../scripts/lint/web-feature-allow.json). Every entry explains whether
+the module belongs in `lib/` or contracts, whether its importer owns composition, or whether the
+two features form one domain. Missing modules and unused entries fail the check. Moving a module
+and draining its entries happen together.
+
+## Shared patterns and keys
+
+`packages/ui/src/patterns/` owns domain-free rows, list keyboard behavior, virtualization, and
+pane shells. App-specific menus and commands compose those patterns in the app. A shared pattern
+does not import a feature or read an app store.
+
+Each feature that reads server state owns `utils/query-keys.ts`. Each feature that writes state
+owns `utils/mutation-keys.ts`. A key group stays in `lib/` only when at least two outside consumers
+need it, using the same consumer count as every other shared module. A feature using only shared
+key groups does not create aliases: file-picker consumes its shared keys alongside the recent-entry
+mutation used by workspace. Search streams its results and owns no TanStack query keys, so it has
+no empty query-key module.
+
+Feature roots contain kind directories. Navigation components belong in `components/`, navigation
+hooks in `hooks/`, and a search cache in `state/`. Test files live in `tests/`, including browser
+tests. Imports name exact files; moving a file updates its exports and callers in the same pass.
+
+Shared helpers preserve behavior. A filesystem parent clamped to a root is different from a
+display-path parent. A basename with an empty-path fallback is different from one that returns an
+empty string. Consolidation includes tests of those call-site behaviors; matching signatures alone
+do not justify merging functions.

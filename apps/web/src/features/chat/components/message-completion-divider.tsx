@@ -33,7 +33,10 @@ export function MessageCompletionDivider({
         >
           <CaretRightIcon
             aria-hidden='true'
-            className={cn('size-3 shrink-0 transition-transform', expanded && 'rotate-90')}
+            className={cn(
+              'size-(--icon-size-sm) shrink-0 transition-transform',
+              expanded && 'rotate-90',
+            )}
           />
           <span className='truncate'>{label}</span>
         </Button>

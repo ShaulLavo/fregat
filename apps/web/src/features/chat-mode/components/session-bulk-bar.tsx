@@ -1,3 +1,4 @@
+import { Tooltip, TooltipContent, TooltipTrigger } from '@workspace/ui/components/tooltip'
 import { ArchiveIcon, TrashIcon, XIcon } from '@phosphor-icons/react'
 
 import { useSessionActions } from '@/features/chat-mode/hooks/use-session-actions'
@@ -26,7 +27,7 @@ export function SessionBulkBar() {
         variant='ghost'
         onClick={() => actions.archiveSessions(refs)}
       >
-        <ArchiveIcon className='size-3.5' />
+        <ArchiveIcon className='size-(--icon-size-sm)' />
         Archive
       </Button>
       <Button
@@ -36,20 +37,26 @@ export function SessionBulkBar() {
         variant='ghost'
         onClick={() => actions.deleteSessions(refs)}
       >
-        <TrashIcon className='size-3.5' />
+        <TrashIcon className='size-(--icon-size-sm)' />
         Delete
       </Button>
-      <Button
-        aria-label='Clear selection'
-        className='text-muted-foreground hover:text-foreground shrink-0'
-        size='icon-sm'
-        title='Clear selection'
-        type='button'
-        variant='ghost'
-        onClick={clearSessionMultiSelect}
-      >
-        <XIcon className='size-3.5' />
-      </Button>
+      <Tooltip>
+        <TooltipTrigger
+          render={
+            <Button
+              aria-label='Clear selection'
+              className='text-muted-foreground hover:text-foreground shrink-0'
+              size='icon-sm'
+              type='button'
+              variant='ghost'
+              onClick={clearSessionMultiSelect}
+            >
+              <XIcon className='size-(--icon-size-sm)' />
+            </Button>
+          }
+        />{' '}
+        <TooltipContent>{'Clear selection'}</TooltipContent>
+      </Tooltip>
     </PaneBar>
   )
 }

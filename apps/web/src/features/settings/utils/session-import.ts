@@ -2,8 +2,6 @@ import type { ProviderInstanceId } from '@workspace/contracts'
 import type { Client } from '@/lib/client'
 import { createRpcError } from '@/lib/structured-errors'
 
-export const importSourcesQueryKey = ['settings', 'session-import', 'sources'] as const
-
 export async function fetchImportSources(client: Client, signal?: AbortSignal) {
   const { data, error } = await client.orchestration['session-import'].get({ fetch: { signal } })
   if (error || !data) throw createRpcError(error)

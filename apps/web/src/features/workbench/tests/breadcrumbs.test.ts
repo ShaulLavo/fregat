@@ -7,6 +7,11 @@ import {
   symbolChainAtCursor,
   symbolChainsEqual,
 } from '@/features/workbench/utils/breadcrumbs'
+import {
+  folderPickerRows,
+  symbolPickerRows,
+} from '@/features/workbench/utils/breadcrumb-picker-rows'
+import { symbolRowKey } from '@/features/workbench/utils/breadcrumbs'
 import type { DocumentSymbol } from '@/lib/document-symbols'
 import type { TreeEntry } from '@/lib/file-system-types'
 import { filesystemPath } from '@/lib/documents/utils/identity'
@@ -126,4 +131,42 @@ test('the picker lists folders before files, each in natural order', () => {
     'file10.ts',
     'zeta.ts',
   ])
+})
+
+test('folder picker keeps pending descendants on their parent and emits loaded children in tree order', () => {
+  const directory = entry('folder', 'directory')
+  const child = { ...entry('child.ts', 'file'), path: filesystemPath('/repo/folder/child.ts') }
+  const listings = new Map([
+    ['/repo', { entries: [entry('z.ts', 'file'), directory], pending: false, failed: false }],
+  ])
+  const expanded = new Set([directory.path])
+  const pending = folderPickerRows('/repo', listings, expanded)
+  expect(pending.map((row) => [row.id, row.depth, row.pending])).toEqual([
+    ['/repo/folder', 0, true],
+    ['/repo/z.ts', 0, false],
+  ])
+  listings.set('/repo/folder', { entries: [child], pending: false, failed: false })
+  expect(
+    folderPickerRows('/repo', listings, expanded).map((row) => [row.id, row.parentId, row.depth]),
+  ).toEqual([
+    ['/repo/folder', undefined, 0],
+    ['/repo/folder/child.ts', '/repo/folder', 1],
+    ['/repo/z.ts', undefined, 0],
+  ])
+  expect(folderPickerRows('/repo', listings, new Set()).map((row) => row.id)).toEqual([
+    '/repo/folder',
+    '/repo/z.ts',
+  ])
+})
+
+test('symbol picker emits only visible descendants with parents for left-arrow navigation', () => {
+  const child = symbol('inside', 1, 2)
+  const parent = symbol('outer', 0, 3, [child])
+  const rows = symbolPickerRows([parent, symbol('later', 4, 5)], new Set([symbolRowKey(parent)]))
+  expect(rows.map((row) => [row.label, row.parentId, row.depth])).toEqual([
+    ['outer', undefined, 0],
+    ['inside', symbolRowKey(parent), 1],
+    ['later', undefined, 0],
+  ])
+  expect(symbolPickerRows([parent], new Set()).map((row) => row.label)).toEqual(['outer'])
 })

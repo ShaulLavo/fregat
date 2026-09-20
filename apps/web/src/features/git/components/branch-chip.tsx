@@ -1,4 +1,4 @@
-import { useStatus } from '@/features/git/hooks'
+import { useStatus } from '@/features/git/hooks/use-status'
 import { aheadBehindLabel } from '@/features/git/utils/repository'
 
 export function BranchChip({ rootPath }: { readonly rootPath: string }) {

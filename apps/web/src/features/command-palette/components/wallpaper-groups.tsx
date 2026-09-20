@@ -4,7 +4,7 @@ import type { WallpaperAsset, WallpaperSource } from '@workspace/contracts'
 import { CommandGroup, CommandItem, CommandShortcut } from '@workspace/ui/components/command'
 import { LoadingState } from '@workspace/ui/components/loading-state'
 
-import { RowLabel } from '@/features/command-palette/row-label'
+import { RowLabel } from '@/features/command-palette/components/row-label'
 import { wallpaperItemValue } from '@/features/command-palette/utils/wallpapers'
 import { useSettingValue } from '@/features/settings/hooks/use-setting-value'
 import { useSettingsActions } from '@/features/settings/hooks/use-settings-actions'

@@ -19,17 +19,50 @@ The delivered bar sizes preserve the dominant existing 36/40 px geometry while b
 onto the same tokens. The original proposal's 32/36 px values were superseded during implementation.
 Light-mode pane separation and the shared focus treatment were completed in `706d1d79`.
 
-## The Row primitive gap
+## Rows and lists
 
-Eight list-row or provider-selection consumers retain raw buttons. `Button` centers content and
-owns a control height, radius, and hover fill. Full-width rows are left-aligned, square, often
-arranged in columns, and sized through the row density token. The provider rail uses a tile. Both
-need their own selected and hover fill contract.
+[`ListRow`](../packages/ui/src/patterns/list-row.tsx) owns a square row at
+`--density-row-height`, with `--density-row-padding-x` and `text-xs`. Hover uses `bg-row-hover`,
+press uses `bg-row-active`, and `aria-selected` uses `bg-row-selected`. The secondary cell stays
+muted when selected. Rows have no animation or individual focus ring.
 
-The ghost Button's hover selectors can outrank a row's hover or selected fill. Adding another
-call-site selector would preserve that conflict. These consumers therefore use raw buttons until
-a shared Row primitive provides the row contract. That primitive is a separate proposal; its
-absence does not leave the design-language implementation incomplete.
+`data-marked` adds an inset `ring-ring/40` outline for multiselection, independently of selection.
+Disabled rows carry `aria-disabled`, keep their native title, and receive no hover or press paint.
+The two-line session row keeps its explicit automatic height and density padding.
+
+[`useListbox`](../packages/ui/src/patterns/use-listbox.ts) keeps focus on the container with
+`aria-activedescendant`. Rows have `tabIndex=-1`. Up/Down, Home/End, and PageUp/PageDown move without
+wrapping or visiting disabled rows. Tree lists expand, collapse, and visit parents or children.
+Enter commits; Space may select separately. Modifier chords and nested controls retain their own
+handlers. Typeahead is opt-in. The container carries `focus-ring-inset`.
+
+[`VirtualList`](../packages/ui/src/patterns/virtual-list.tsx) reads row height from the density
+token and observes its computed size. It overscans twelve rows, reveals the active row at the
+nearest edge, and preserves the viewed row when density changes. Measured flow layout lets an
+expanded log or variable-height chat message move following content immediately. Editor line
+windowing remains specialized. The file tree keeps its shadow-root keyboard and windowing model;
+the app bridges its hover and height to the same row tokens.
+
+## Pane shells and hints
+
+[`ToolPane`](../packages/ui/src/patterns/tool-pane.tsx) supplies the header and body layout.
+`ToolPaneHeader` composes `PaneBar` with a `text-xs font-medium` title, optional muted detail,
+and trailing actions. There is no leading title icon. Additional control rows use `PaneBar` through
+the subheader slot. Bodies have no default padding and carry `focus-ring-inset`.
+
+The shell chooses pending, error, empty, then content. Feature skeletons use `LoadingState` and
+resolved empty states use `EmptyState`. A terminal keeps its host mounted during initialization,
+with its waiting or error overlay inside a headerless shell, because initialization needs that DOM
+host. App header menus and collapse actions stay in the app adapter.
+
+Icons use `--icon-size` on controls and headings and `--icon-size-sm` inside rows and running text.
+Their cozy sizes are 16 and 14 px; compact sizes are 14 and 12 px. Text has two colors,
+`text-foreground` and `text-muted-foreground`. A quieter label uses `text-2xs`, not color alpha.
+Whole-control disabled opacity and fully hidden row actions are deliberate exceptions.
+
+Icon-only controls have a `Tooltip` on the bottom side with the provider's delay. Moving between
+tooltips under that provider opens the next tooltip immediately. Native `title` recovers a
+truncated value and never duplicates a tooltip. Updating counts and times use `tabular-nums`.
 
 [`web-design-allow.json`](../scripts/lint/web-design-allow.json) records each exception with its
 reason. Other exceptions cover sortable document tabs, minimap marks, keyboard-selected command
@@ -41,8 +74,9 @@ broad directory exclusion.
 
 [`web-design-census.mjs`](../scripts/lint/web-design-census.mjs) parses class expressions with
 `oxc-parser`, including multiline expressions and TypeScript class-string owners. It validates
-radius, density variants, bar heights, dividers, type sizes, elevation, buttons, row fills, and
-palette leaks. Invalid allow-list entries and parse failures fail the gate.
+radius, density variants, bar heights, dividers, type sizes, elevation, buttons, row fills,
+icon size tokens, text alpha, icon-only hints, and palette leaks. Invalid allow-list entries and
+parse failures fail the gate.
 
 `bun run design:census` runs the current repository check. Root `verify` and CI include it.
 [`web-design-census.test.ts`](../scripts/lint/web-design-census.test.ts) covers extraction and
@@ -142,3 +176,6 @@ receipt, and `live-check.json` so the verification can be tied to the served fil
 The completed plan file is deleted. Its dependent plans and census exception links now point to
 this reference. Verification restored the original `/work/projects/platform` index root and
 removed the disposable workspace, project and session. No provider turn ran.
+
+The native window titlebar keeps its semantic `<header>` and runtime grid for desktop drag regions.
+It uses `--bar-height` and `--bar-padding-x`; pane headers compose `ToolPaneHeader`/`PaneBar`.

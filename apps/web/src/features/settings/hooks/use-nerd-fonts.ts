@@ -1,3 +1,4 @@
+import { settingsQueryKeys } from '@/features/settings/utils/query-keys'
 import { useQuery } from '@tanstack/react-query'
 import { useSettingsOwner } from '@/features/settings/hooks/use-settings-owner'
 
@@ -19,7 +20,7 @@ export function useNerdFonts() {
 
         return Object.keys(response.data ?? {}).sort((a, b) => a.localeCompare(b))
       },
-      queryKey: ['fonts', 'nerd-fonts'],
+      queryKey: settingsQueryKeys.nerdFonts,
       // The catalogue is a release manifest; it does not move while the app is open.
       staleTime: Number.POSITIVE_INFINITY,
     },

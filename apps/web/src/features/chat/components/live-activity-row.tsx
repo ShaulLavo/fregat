@@ -27,7 +27,7 @@ export function LiveActivityRow({
       {activity.active ? (
         <OrbitLoader aria-hidden='true' className='size-3.5 shrink-0' />
       ) : (
-        <HandPalmIcon aria-hidden='true' className='size-3.5 shrink-0' />
+        <HandPalmIcon aria-hidden='true' className='size-(--icon-size-sm) shrink-0' />
       )}
       <span className='min-w-0 truncate' role='status'>
         {activity.label}
@@ -35,7 +35,10 @@ export function LiveActivityRow({
       {expandable ? (
         <CaretRightIcon
           aria-hidden='true'
-          className={cn('size-3 shrink-0 transition-transform', expanded && 'rotate-90')}
+          className={cn(
+            'size-(--icon-size-sm) shrink-0 transition-transform',
+            expanded && 'rotate-90',
+          )}
         />
       ) : null}
     </>

@@ -88,7 +88,6 @@ export function ProjectRenameDialog() {
           onChange={(event) => setTitle(event.target.value)}
           onKeyDown={(event) => {
             if (event.key !== 'Enter') return
-
             event.preventDefault()
             save()
           }}

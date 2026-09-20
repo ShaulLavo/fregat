@@ -1,0 +1,73 @@
+{
+  "schemaVersion": 1,
+  "id": "upstream-gruvbox-light",
+  "name": "Gruvbox Light",
+  "variants": {
+    "kind": "single",
+    "mode": "light",
+    "colors": {
+      "app": {
+        "background": "#fbf1c7",
+        "foreground": "#654735",
+        "card": "#f9f5d7",
+        "card-foreground": "#654735",
+        "popover": "#f9f5d7",
+        "popover-foreground": "#654735",
+        "primary": "#45707a",
+        "primary-foreground": "#fbf1c7",
+        "secondary": "#eee0b7",
+        "secondary-foreground": "#4f3829",
+        "muted": "#f9f5d7",
+        "muted-foreground": "oklch(0.53235 0.0286 67.26)",
+        "accent": "#eee0b7",
+        "accent-foreground": "#4f3829",
+        "destructive": "#c14a4a",
+        "info": "#45707a",
+        "info-foreground": "#fbf1c7",
+        "success": "#6c782e",
+        "success-foreground": "#ffffff",
+        "warning": "#b47109",
+        "warning-foreground": "#000000",
+        "update": "#945e80",
+        "update-foreground": "#ffffff",
+        "border": "#e2cca9",
+        "input": "#e2cca9",
+        "ring": "#45707a",
+        "chart-1": "#45707a",
+        "chart-2": "#45707a",
+        "chart-3": "#945e80",
+        "chart-4": "#b47109",
+        "chart-5": "#c35e0a"
+      },
+      "terminal": {
+        "foreground": "#654735",
+        "cursor": "#654735",
+        "cursor-accent": "#fbf1c7",
+        "selection": "#eee0b7",
+        "selection-foreground": "#4f3829",
+        "black": "#ebdbb2",
+        "red": "#c14a4a",
+        "green": "#6c782e",
+        "yellow": "#b47109",
+        "blue": "#45707a",
+        "magenta": "#945e80",
+        "cyan": "#4c7a5d",
+        "white": "#654735",
+        "bright-black": "#928374",
+        "bright-red": "#c14a4a",
+        "bright-green": "#6c782e",
+        "bright-yellow": "#b47109",
+        "bright-blue": "#45707a",
+        "bright-magenta": "#945e80",
+        "bright-cyan": "#4c7a5d",
+        "bright-white": "#4f3829"
+      }
+    }
+  },
+  "provenance": {
+    "kind": "upstream",
+    "repository": "https://github.com/sainnhe/gruvbox-material",
+    "commit": "main",
+    "theme": "gruvbox-light"
+  }
+}

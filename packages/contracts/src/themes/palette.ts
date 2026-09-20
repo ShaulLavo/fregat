@@ -117,8 +117,9 @@ const paletteVariantsSchema = v.variant('kind', [
   }),
 ])
 
+// `upstream` is a theme's own published palette, mapped by hand where Omarchy ships no variant.
 const paletteProvenanceSchema = v.object({
-  kind: v.literal('omarchy'),
+  kind: v.picklist(['omarchy', 'upstream']),
   repository: v.string(),
   commit: v.string(),
   theme: v.string(),

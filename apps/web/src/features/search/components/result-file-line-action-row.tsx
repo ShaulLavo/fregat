@@ -1,3 +1,4 @@
+import { Tooltip, TooltipContent, TooltipTrigger } from '@workspace/ui/components/tooltip'
 import { ArrowSquareOutIcon } from '@phosphor-icons/react'
 import { memo, useCallback, useEffect, useRef, type MouseEvent, type RefObject } from 'react'
 
@@ -66,17 +67,23 @@ export const SearchResultFileLineActionRow = memo(
         className='group/search-result-line-action-row flex items-center justify-end gap-0.5'
         ref={rowRef}
       >
-        <Button
-          aria-label={openLabel}
-          className={searchResultLineActionClassName()}
-          size='icon-xs'
-          title={openLabel}
-          type='button'
-          variant='ghost'
-          onClick={handleOpenClick}
-        >
-          <ArrowSquareOutIcon className='size-3.5' />
-        </Button>
+        <Tooltip>
+          <TooltipTrigger
+            render={
+              <Button
+                aria-label={openLabel}
+                className={searchResultLineActionClassName()}
+                size='icon-xs'
+                type='button'
+                variant='ghost'
+                onClick={handleOpenClick}
+              >
+                <ArrowSquareOutIcon className='size-(--icon-size-sm)' />
+              </Button>
+            }
+          />
+          <TooltipContent>{openLabel}</TooltipContent>
+        </Tooltip>
         {replaceVisible ? (
           <Button
             className={cn('h-5 px-1.5 text-3xs', searchResultLineActionClassName())}

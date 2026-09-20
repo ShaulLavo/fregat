@@ -111,7 +111,6 @@ export function SettingRow({ id, snapshot }: { id: SettingId; snapshot: Settings
           id={id}
           onChange={(next) => {
             if (!SCALAR_SETTING_IDS.includes(id as ScalarSettingId)) return
-
             setSetting(id as ScalarSettingId, next as SettingsValues[ScalarSettingId], scope)
           }}
           value={value}

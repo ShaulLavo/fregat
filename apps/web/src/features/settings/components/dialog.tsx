@@ -56,7 +56,7 @@ export function SettingsDialog({
   return (
     <Dialog open={open} onOpenChange={onOpenChange}>
       <DialogContent
-        className='flex h-dvh w-full max-w-none flex-col gap-0 overflow-hidden p-0 pt-[env(safe-area-inset-top)] pb-[env(safe-area-inset-bottom)] sm:h-[min(720px,calc(100svh-4rem))] sm:w-[min(880px,calc(100vw-3rem))] sm:max-w-none sm:py-0 max-sm:[&>[data-slot=dialog-close]]:top-[max(0.5rem,env(safe-area-inset-top))] max-sm:[&>[data-slot=dialog-close]]:size-10'
+        className='flex h-dvh w-full max-w-none flex-col gap-0 overflow-hidden p-0 pt-[env(safe-area-inset-top)] pb-[env(safe-area-inset-bottom)] sm:h-[min(720px,calc(100svh-4rem))] sm:w-[min(880px,calc(100vw-3rem))] sm:max-w-none sm:py-0 max-sm:[&>[data-slot=dialog-close]]:top-[max(0.5rem,env(safe-area-inset-top))] max-sm:[&>[data-slot=dialog-close]]:size-(--icon-size)'
         finalFocus={false}
         ref={setRootRef}
         tabIndex={-1}

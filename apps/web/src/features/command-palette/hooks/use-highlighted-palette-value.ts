@@ -1,4 +1,4 @@
-import { isHighlightNavigationKey } from '@/features/command-palette/command-palette-utils'
+import { isHighlightNavigationKey } from '@/features/command-palette/utils/query'
 import { useEffect, useRef, useState } from 'react'
 
 /**

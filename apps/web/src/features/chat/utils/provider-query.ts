@@ -1,3 +1,4 @@
+import { providerQueryKeys } from '@/lib/query-keys'
 import { queryOptions } from '@tanstack/react-query'
 import type { ProviderListResult } from '@workspace/contracts'
 
@@ -7,11 +8,6 @@ import { createRpcError } from '@/lib/structured-errors'
 
 const PROVIDER_LIST_STALE_TIME_MS = 60_000
 const PROVIDER_LIST_GC_TIME_MS = 30 * 60_000
-
-export const providerQueryKeys = {
-  all: ['providers'] as const,
-  list: () => [...providerQueryKeys.all, 'list'] as const,
-}
 
 export function providerListQueryOptions() {
   return queryOptions({

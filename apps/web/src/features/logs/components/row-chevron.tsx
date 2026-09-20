@@ -11,7 +11,7 @@ export function LogsRowChevron({ expanded }: LogsRowChevronProps) {
     <CaretDownIcon
       aria-hidden='true'
       className={cn(
-        'text-muted-foreground size-3.5 shrink-0 transition-transform',
+        'text-muted-foreground size-(--icon-size-sm) shrink-0 transition-transform',
         expanded && 'rotate-180',
       )}
     />

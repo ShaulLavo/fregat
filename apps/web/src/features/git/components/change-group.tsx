@@ -1,3 +1,7 @@
+import { useGitState } from '@/features/git/state/store'
+import { use } from 'react'
+import { ChangesContext } from '@/features/git/providers/changes-context'
+import { listRowClassName } from '@workspace/ui/patterns/list-row-classes'
 import { CaretDownIcon } from '@phosphor-icons/react'
 import {
   Collapsible,
@@ -33,6 +37,16 @@ export function ChangeGroup({
   const open = panels.gitChangesOpen[section]
   const navigation = useNavigation()
   const contextMenu = useContextMenu()
+  const selectChange = useGitState((state) => state.selectChange)
+  const listbox = use(ChangesContext)
+  const selected = useGitState((state) => state.activeChangeId === section)
+  const rowProps = listbox
+    ? {
+        ...listbox.rowBindings(section),
+        'aria-selected': selected,
+        'data-active': selected || undefined,
+      }
+    : undefined
 
   function handleContextMenu(event: MouseEvent<HTMLDivElement>) {
     contextMenu.openAtEvent(event, event.currentTarget)
@@ -56,13 +70,30 @@ export function ChangeGroup({
       }}
     >
       <div
-        className='group/group hover:bg-row-hover active:bg-row-active text-muted-foreground text-2xs flex h-(--density-control-height-sm) w-full items-center px-(--density-row-padding-x) font-medium tracking-wider uppercase transition-colors'
+        {...rowProps}
+        role='treeitem'
+        aria-level={1}
+        aria-expanded={open}
+        className={listRowClassName({
+          className:
+            'group/group text-muted-foreground text-2xs h-(--density-control-height-sm) w-full font-medium tracking-wider uppercase',
+        })}
         onContextMenu={handleContextMenu}
         onKeyDown={handleHeaderKeyDown}
       >
-        <CollapsibleTrigger className='focus-ring flex min-w-0 flex-1 items-center gap-1.5 text-left outline-none'>
+        <CollapsibleTrigger
+          tabIndex={-1}
+          onClick={() => {
+            listbox?.focus()
+            selectChange(section)
+          }}
+          className='flex min-w-0 flex-1 items-center gap-1.5 text-left outline-none'
+        >
           <CaretDownIcon
-            className={cn('size-3 shrink-0 transition-transform', !open && '-rotate-90')}
+            className={cn(
+              'size-(--icon-size-sm) shrink-0 transition-transform',
+              !open && '-rotate-90',
+            )}
           />
           <span className='min-w-0 flex-1 truncate'>{label}</span>
         </CollapsibleTrigger>

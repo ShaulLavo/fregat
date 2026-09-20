@@ -6,6 +6,7 @@ import {
   GRAPHITE_PALETTE_DOCUMENT,
   themeBundleSchema,
   wallpaperAssetSchema,
+  type WallpaperSelection,
 } from '../../../packages/contracts/src/index'
 import { wallpaperPng, secondWallpaperPng } from '../../../apps/web/test/factories/wallpaper'
 import { preserveAppearance } from '../preserve-settings'
@@ -19,8 +20,13 @@ async function mode(page: Page, value: 'light' | 'dark' | 'system') {
   await selectors.colorModeOption(page, value).click()
   await selectors.paletteInput(page).waitFor({ state: 'hidden' })
 }
-async function wallpaper(page: Page, id: string) {
+async function wallpaper(page: Page, selection: string | WallpaperSelection) {
+  const id = typeof selection === 'string' ? selection : libraryAsset(selection)
   await selectors.wallpaperAsset(page, id).waitFor()
+}
+function libraryAsset(selection: WallpaperSelection) {
+  ok(selection.enabled && selection.source.kind === 'library', 'Bundle names a library wallpaper')
+  return selection.source.asset
 }
 
 export const themeBundles: Scenario = {
@@ -117,7 +123,7 @@ export const themeBundles: Scenario = {
       await selectors.settingsSearch(page).fill('Theme bundles')
       await page.keyboard.press('Tab')
       await selectors.themeCard(page, 'sage').focus()
-      await selectors.wallpaperStill(page).waitFor({ state: 'detached' })
+      await wallpaper(page, library.find((theme) => theme.id === 'sage')!.variants.dark.wallpaper)
       await step('preview-sage')
       await page.keyboard.press('Escape')
       await wallpaper(page, assets[1]!.id)

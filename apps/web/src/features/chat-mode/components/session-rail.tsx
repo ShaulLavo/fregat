@@ -1,3 +1,8 @@
+import { Tooltip, TooltipContent, TooltipTrigger } from '@workspace/ui/components/tooltip'
+import { forwardActiveRowKey } from '@/lib/list-keyboard'
+import { useListbox } from '@workspace/ui/patterns/use-listbox'
+import { SessionListContext } from '@/features/chat-mode/providers/list-context'
+import { activateSessionRow } from '@/features/chat-mode/state/session-commands'
 import { useNavigation } from '@/hooks/use-navigation'
 import { useWorktreeManagerStore } from '@/features/chat-mode/state/worktree-manager-store'
 import { scopedSessionKey } from '@workspace/contracts'
@@ -19,7 +24,8 @@ import {
   PlusIcon,
   XIcon,
 } from '@phosphor-icons/react'
-import { useState, type KeyboardEvent } from 'react'
+import { useLayoutEffect, useMemo, useState, type KeyboardEvent } from 'react'
+import { createStore } from 'zustand/vanilla'
 
 import { SessionRailEmpty } from '@/features/chat-mode/components/session-rail-empty'
 
@@ -77,24 +83,84 @@ export function SessionRail() {
   useSessionSearch()
   const searchMatches = useSessionSearchStore((state) => state.matchBySessionKey)
   const searching = useSessionSearchStore((state) => state.searching)
-  const model = sessionRailModel({
-    activeProjectId: project?.id ?? null,
-    activeSessionKey: activeSession.sessionId
-      ? scopedSessionKey({
-          environmentId: transport.environmentId,
-          sessionId: activeSession.sessionId,
-        })
-      : null,
-    collapsedProjectIds,
-    orderOverrides,
-    environments,
-    query,
-    scope,
-    machineFilter,
-    searchMatches,
-    seenBySessionKey,
-    view,
+  const activeSessionKey = activeSession.sessionId
+    ? scopedSessionKey({
+        environmentId: transport.environmentId,
+        sessionId: activeSession.sessionId,
+      })
+    : null
+  const activeProjectId = project?.id ?? null
+  // Keep model items stable across cursor updates; rebuilding them wakes every row.
+  const model = useMemo(
+    () =>
+      sessionRailModel({
+        activeProjectId,
+        activeSessionKey,
+        collapsedProjectIds,
+        orderOverrides,
+        environments,
+        query,
+        scope,
+        machineFilter,
+        searchMatches,
+        seenBySessionKey,
+        view,
+      }),
+    [
+      activeProjectId,
+      activeSessionKey,
+      collapsedProjectIds,
+      orderOverrides,
+      environments,
+      query,
+      scope,
+      machineFilter,
+      searchMatches,
+      seenBySessionKey,
+      view,
+    ],
+  )
+  const [cursor, setCursor] = useState<{ owner: string | null; id: string } | null>(null)
+  const [selection] = useState(() => createStore<string | null>(() => null))
+  const visibleSessions = model.groups.flatMap((group) => group.sessions)
+  function selectSession(id: string) {
+    setCursor({ owner: activeSessionKey, id })
+    const session = visibleSessions.find((item) => item.key === id)
+    if (session) void activateSessionRow(session, 'open')
+  }
+  function commitRow(id: string) {
+    const group = model.groups.find((item) => item.key === id)
+    if (!group) return selectSession(id)
+    useSessionRailStore.getState().toggleProjectCollapsed(group.project.id)
+  }
+  const list = useListbox({
+    role: 'listbox',
+    items: model.groups.flatMap((group) => [
+      { id: group.key, label: group.project.title },
+      ...group.sessions.map((session) => ({ id: session.key, label: session.title })),
+    ]),
+    activeId: cursor?.owner === activeSessionKey ? cursor.id : activeSessionKey,
+    onActiveChange: selectSession,
+    onCommit: commitRow,
+    onActiveKeyDown(event, id) {
+      const group = model.groups.find((item) => item.key === id)
+      if (group && (event.key === 'ArrowLeft' || event.key === 'ArrowRight')) {
+        event.preventDefault()
+        if ((event.key === 'ArrowLeft') !== group.collapsed) commitRow(id)
+        return
+      }
+      if (
+        event.key === ' ' ||
+        event.key === 'ContextMenu' ||
+        (event.shiftKey && event.key === 'F10')
+      )
+        forwardActiveRowKey(event)
+    },
   })
+
+  const focusList = list.focus
+  useLayoutEffect(() => selection.setState(list.activeId, true), [list.activeId, selection])
+  const listContext = { rowBindings: list.rowBindings, focusList, selection }
 
   function toggleView() {
     void navigation.setRail(view === 'archived' ? 'active' : 'archived')
@@ -104,8 +170,13 @@ export function SessionRail() {
     setDraggingProjectId(String(event.active.id))
   }
 
-  function handleProjectDragEnd(event: DragEndEvent) {
+  function handleProjectDragCancel(event: DragEndEvent) {
     setDraggingProjectId(null)
+    if (event.activatorEvent instanceof globalThis.KeyboardEvent) focusList()
+  }
+
+  function handleProjectDragEnd(event: DragEndEvent) {
+    handleProjectDragCancel(event)
     reorderProject(String(event.active.id), event.over ? String(event.over.id) : null)
   }
 
@@ -135,34 +206,46 @@ export function SessionRail() {
           variant='ghost'
           onClick={startScopedSessionDraft}
         >
-          <PlusIcon className='size-4 shrink-0' weight='bold' />
+          <PlusIcon className='size-(--icon-size) shrink-0' weight='bold' />
           <span className='truncate'>New session</span>
         </Button>
-        <Button
-          aria-label='Manage worktrees'
-          title='Manage worktrees'
-          size='icon-sm'
-          variant='ghost'
-          disabled={!model.projects.length}
-          onClick={() => {
-            const target =
-              model.projects.find((item) => item.id === project?.id) ?? model.projects[0]
-            if (target) useWorktreeManagerStore.getState().openManager(target.ref)
-          }}
-        >
-          <GitForkIcon className='size-4' />
-        </Button>
-        <Button
-          aria-label='Add project'
-          className='text-muted-foreground hover:text-foreground shrink-0'
-          size='icon-sm'
-          title='Add project'
-          type='button'
-          variant='ghost'
-          onClick={addProject}
-        >
-          <FolderPlusIcon className='size-4' />
-        </Button>
+        <Tooltip>
+          <TooltipTrigger
+            render={
+              <Button
+                aria-label='Manage worktrees'
+                size='icon-sm'
+                variant='ghost'
+                disabled={!model.projects.length}
+                onClick={() => {
+                  const target =
+                    model.projects.find((item) => item.id === project?.id) ?? model.projects[0]
+                  if (target) useWorktreeManagerStore.getState().openManager(target.ref)
+                }}
+              >
+                <GitForkIcon className='size-(--icon-size)' />
+              </Button>
+            }
+          />{' '}
+          <TooltipContent>{'Manage worktrees'}</TooltipContent>
+        </Tooltip>
+        <Tooltip>
+          <TooltipTrigger
+            render={
+              <Button
+                aria-label='Add project'
+                className='text-muted-foreground hover:text-foreground shrink-0'
+                size='icon-sm'
+                type='button'
+                variant='ghost'
+                onClick={addProject}
+              >
+                <FolderPlusIcon className='size-(--icon-size)' />
+              </Button>
+            }
+          />{' '}
+          <TooltipContent>{'Add project'}</TooltipContent>
+        </Tooltip>
       </div>
       <div className='flex shrink-0 items-center gap-1 px-2 pt-(--density-gap-tight)'>
         <SessionScopeMenu
@@ -172,29 +255,35 @@ export function SessionRail() {
           onSelectScope={setScope}
         />
         <SessionMachineMenu />
-        <Button
-          aria-label='Archived sessions'
-          aria-pressed={view === 'archived'}
-          className={cn(
-            'text-muted-foreground hover:text-foreground ml-auto shrink-0',
-            view === 'archived' && 'bg-accent text-accent-foreground',
-          )}
-          size='icon-sm'
-          title={`Archived sessions (${model.archivedCount})`}
-          type='button'
-          variant='ghost'
-          onClick={toggleView}
-        >
-          <ArchiveIcon className='size-3.5' />
-        </Button>
-        <span className='text-muted-foreground/60 text-2xs shrink-0 tabular-nums'>
+        <Tooltip>
+          <TooltipTrigger
+            render={
+              <Button
+                aria-label='Archived sessions'
+                aria-pressed={view === 'archived'}
+                className={cn(
+                  'text-muted-foreground hover:text-foreground ml-auto shrink-0',
+                  view === 'archived' && 'bg-accent text-accent-foreground',
+                )}
+                size='icon-sm'
+                type='button'
+                variant='ghost'
+                onClick={toggleView}
+              >
+                <ArchiveIcon className='size-(--icon-size-sm)' />
+              </Button>
+            }
+          />{' '}
+          <TooltipContent>{`Archived sessions (${model.archivedCount})`}</TooltipContent>
+        </Tooltip>
+        <span className='text-muted-foreground text-2xs shrink-0 tabular-nums'>
           {model.scopedCount}
         </span>
       </div>
       <div className='shrink-0 px-2 py-(--density-section-gap)'>
         <InputGroup className='h-(--density-control-height-sm)'>
           <InputGroupAddon align='inline-start'>
-            <MagnifyingGlassIcon aria-hidden='true' className='size-3.5' />
+            <MagnifyingGlassIcon aria-hidden='true' className='size-(--icon-size-sm)' />
           </InputGroupAddon>
           <InputGroupInput
             aria-label='Search sessions'
@@ -217,64 +306,60 @@ export function SessionRail() {
                 size='icon-xs'
                 onClick={() => setQuery('')}
               >
-                <XIcon className='size-3' />
+                <XIcon className='size-(--icon-size-sm)' />
               </InputGroupButton>
             </InputGroupAddon>
           ) : null}
         </InputGroup>
       </div>
       <MachineConnectionRows />
-      <div className='min-h-0 flex-1 overflow-y-auto'>
-        <div className='flex flex-col gap-(--density-control-gap) px-1 pb-(--density-section-padding)'>
-          <DndContext
-            collisionDetection={closestCenter}
-            modifiers={RAIL_DND_MODIFIERS}
-            sensors={sensors}
-            onDragCancel={() => setDraggingProjectId(null)}
-            onDragEnd={handleProjectDragEnd}
-            onDragStart={handleProjectDragStart}
-          >
-            <SortableContext
-              items={model.groups.map((group) => group.key)}
-              strategy={verticalListSortingStrategy}
+      <SessionListContext value={listContext}>
+        <div
+          {...list.containerProps}
+          aria-label='Sessions'
+          className='focus-ring-inset min-h-0 flex-1 overflow-y-auto'
+        >
+          <div className='flex flex-col gap-(--density-control-gap) px-1 pb-(--density-section-padding)'>
+            <DndContext
+              accessibility={{ restoreFocus: false }}
+              collisionDetection={closestCenter}
+              modifiers={RAIL_DND_MODIFIERS}
+              sensors={sensors}
+              onDragCancel={handleProjectDragCancel}
+              onDragEnd={handleProjectDragEnd}
+              onDragStart={handleProjectDragStart}
             >
-              {model.sections.map((section) => (
-                <section key={section.state} aria-label={section.title}>
-                  <h2 className='text-muted-foreground text-2xs px-2 py-1 font-medium'>
-                    {section.title}
-                  </h2>
-                  {section.groups.map((group) => (
-                    <SessionGroup
-                      activeSessionKey={
-                        activeSession.sessionId
-                          ? scopedSessionKey({
-                              environmentId: transport.environmentId,
-                              sessionId: activeSession.sessionId,
-                            })
-                          : null
-                      }
-                      group={group}
-                      key={group.key}
-                    />
-                  ))}
-                </section>
-              ))}
-            </SortableContext>
-            {/* Only the header travels. Lifting the whole band — header plus every
+              <SortableContext
+                items={model.groups.map((group) => group.key)}
+                strategy={verticalListSortingStrategy}
+              >
+                {model.sections.map((section) => (
+                  <section key={section.state} aria-label={section.title}>
+                    <h2 className='text-muted-foreground text-2xs flex h-(--density-control-height-sm) items-center px-(--density-row-padding-x) font-medium tracking-wider uppercase'>
+                      {section.title}
+                    </h2>
+                    {section.groups.map((group) => (
+                      <SessionGroup group={group} key={group.key} />
+                    ))}
+                  </section>
+                ))}
+              </SortableContext>
+              {/* Only the header travels. Lifting the whole band — header plus every
                 session row — made a project drag a page-sized slab. */}
-            <DragOverlay dropAnimation={null}>
-              {draggingGroup ? (
-                <div className='bg-popover border-border pointer-events-none rounded-lg border shadow-md'>
-                  <SessionGroupHeader group={draggingGroup} />
-                </div>
-              ) : null}
-            </DragOverlay>
-          </DndContext>
-          {model.sessions.length === 0 ? (
-            <SessionRailEmpty query={query} ready={ready} searching={searching} view={view} />
-          ) : null}
+              <DragOverlay dropAnimation={null}>
+                {draggingGroup ? (
+                  <div className='bg-popover border-border pointer-events-none rounded-lg border shadow-md'>
+                    <SessionGroupHeader group={draggingGroup} />
+                  </div>
+                ) : null}
+              </DragOverlay>
+            </DndContext>
+            {model.sessions.length === 0 ? (
+              <SessionRailEmpty query={query} ready={ready} searching={searching} view={view} />
+            ) : null}
+          </div>
         </div>
-      </div>
+      </SessionListContext>
       {isSessionBulkSelection(markedSessionIds) ? <SessionBulkBar /> : null}
     </aside>
   )

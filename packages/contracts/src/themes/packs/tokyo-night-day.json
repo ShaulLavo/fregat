@@ -1,0 +1,73 @@
+{
+  "schemaVersion": 1,
+  "id": "upstream-tokyo-night-day",
+  "name": "Tokyo Night Day",
+  "variants": {
+    "kind": "single",
+    "mode": "light",
+    "colors": {
+      "app": {
+        "background": "#e1e2e7",
+        "foreground": "#343b58",
+        "card": "#e9e9ed",
+        "card-foreground": "#343b58",
+        "popover": "#e9e9ed",
+        "popover-foreground": "#343b58",
+        "primary": "#2e7de9",
+        "primary-foreground": "#000000",
+        "secondary": "#b7c1e3",
+        "secondary-foreground": "#343b58",
+        "muted": "#e9e9ed",
+        "muted-foreground": "oklch(0.50395 0.062 275.95)",
+        "accent": "#b7c1e3",
+        "accent-foreground": "#343b58",
+        "destructive": "#f52a65",
+        "info": "#2e7de9",
+        "info-foreground": "#000000",
+        "success": "#587539",
+        "success-foreground": "#ffffff",
+        "warning": "#8c6c3e",
+        "warning-foreground": "#ffffff",
+        "update": "#9854f1",
+        "update-foreground": "#000000",
+        "border": "#a8aecb",
+        "input": "#a8aecb",
+        "ring": "#2e7de9",
+        "chart-1": "#2e7de9",
+        "chart-2": "#2e7de9",
+        "chart-3": "#9854f1",
+        "chart-4": "#8c6c3e",
+        "chart-5": "#b15c00"
+      },
+      "terminal": {
+        "foreground": "#343b58",
+        "cursor": "#343b58",
+        "cursor-accent": "#e1e2e7",
+        "selection": "#b7c1e3",
+        "selection-foreground": "#343b58",
+        "black": "#c4c8da",
+        "red": "#f52a65",
+        "green": "#587539",
+        "yellow": "#8c6c3e",
+        "blue": "#2e7de9",
+        "magenta": "#9854f1",
+        "cyan": "#007197",
+        "white": "#343b58",
+        "bright-black": "#848cb5",
+        "bright-red": "#ff4774",
+        "bright-green": "#5c8524",
+        "bright-yellow": "#a27629",
+        "bright-blue": "#358aff",
+        "bright-magenta": "#a463ff",
+        "bright-cyan": "#007ea8",
+        "bright-white": "#343b58"
+      }
+    }
+  },
+  "provenance": {
+    "kind": "upstream",
+    "repository": "https://github.com/folke/tokyonight.nvim",
+    "commit": "main",
+    "theme": "tokyo-night-day"
+  }
+}

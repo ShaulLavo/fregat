@@ -1,3 +1,4 @@
+import { settingsMutationKeys } from '@/features/settings/utils/mutation-keys'
 import { useMutation } from '@tanstack/react-query'
 import type { ProviderInstanceId } from '@workspace/contracts'
 import { useSettingsOwner } from '@/features/settings/hooks/use-settings-owner'
@@ -8,7 +9,7 @@ export function useImportSessions(providerInstanceId: ProviderInstanceId) {
   const owner = useSettingsOwner()
   return useMutation(
     {
-      mutationKey: ['settings', 'session-import', providerInstanceId],
+      mutationKey: settingsMutationKeys.importSessions(providerInstanceId),
       mutationFn: () => importSessions(clientForQueryClient(owner), providerInstanceId),
       retry: false,
     },

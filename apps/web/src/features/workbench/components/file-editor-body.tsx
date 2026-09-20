@@ -131,7 +131,6 @@ export function FileEditorBody({
             currentActions
               ? (changedKey, scrollPosition, reopenScrollPosition) => {
                   if (changedKey !== key) return
-
                   currentActions.setScrollPosition(scrollPosition, reopenScrollPosition)
                 }
               : undefined
@@ -147,7 +146,7 @@ export function FileEditorBody({
             role='status'
             className='bg-background text-muted-foreground absolute inset-x-0 bottom-0 flex items-center gap-2 px-3 py-2 text-xs'
           >
-            <WarningCircleIcon className='size-4 shrink-0' />
+            <WarningCircleIcon className='size-(--icon-size) shrink-0' />
             {fileState.message}
           </div>
         ) : null}

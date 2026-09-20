@@ -11,7 +11,7 @@ import { vi } from 'vitest'
 import { expect, test } from '../../../../test/fixtures'
 import { settingsSnapshot } from '../../../../test/factories/settings'
 import { createTestQueryClient } from '../../../../test/render'
-import { providerQueryKeys } from '@/features/chat/utils/provider-query'
+import { providerQueryKeys } from '@/lib/query-keys'
 import { useSettingsIntentStore } from '@/features/settings/state/intent-store'
 import {
   acknowledgeSettingsIntent,

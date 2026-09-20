@@ -41,7 +41,10 @@ export function AgentRow({ entry, groupId }: { entry: ChatAgentEntry; groupId: s
       >
         <CaretRightIcon
           aria-hidden='true'
-          className={cn('mt-0.5 size-3.5 shrink-0 transition-transform', expanded && 'rotate-90')}
+          className={cn(
+            'mt-0.5 size-(--icon-size-sm) shrink-0 transition-transform',
+            expanded && 'rotate-90',
+          )}
         />
         <span className='flex min-w-0 flex-1 flex-col gap-1'>
           <span className='flex min-w-0 items-center gap-2 text-xs'>

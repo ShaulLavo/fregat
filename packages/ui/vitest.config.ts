@@ -9,6 +9,7 @@ export default defineConfig({
     dedupe: ['react', 'react-dom'],
   },
   test: {
+    name: 'dom',
     environment: 'happy-dom',
     include: ['src/**/*.test.{ts,tsx}'],
     setupFiles: ['./test/env/dom.ts'],

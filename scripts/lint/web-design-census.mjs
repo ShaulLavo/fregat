@@ -59,11 +59,18 @@ export const TARGETS = {
   hoverFills: {
     title: 'hover fills',
     histogram: true,
-    // Mostly reported, not gated: the script cannot tell a list row, which owes `bg-row-hover`,
-    // from a chip or a toggled control, which does not. One slice is unambiguous and does gate.
     histogramOnly: true,
-    gates: 'an opacity modifier on bg-row-hover / bg-row-selected, whose alpha is the design',
+    gates: 'rows use bg-row-hover; row fills never add an opacity modifier',
+    listed: true,
   },
+  iconSize: {
+    title: 'icon sizes',
+    allowed: ['size-(--icon-size)', 'size-(--icon-size-sm)'],
+    histogram: true,
+    listed: true,
+  },
+  textAlpha: { title: 'text alpha', limit: 0, listed: true },
+  iconOnlyHint: { title: 'icon-only controls without a Tooltip', limit: 0, listed: true },
   paletteLeaks: { title: 'raw palette colours', limit: 0, listed: true },
   truncationRecovery: {
     title: 'truncation with no title on the row',
@@ -283,7 +290,14 @@ function scan(program) {
 
 function collect(node, ancestors, strings, elements) {
   if (node.type === 'JSXOpeningElement')
-    elements.push({ name: jsxName(node.name), start: node.start })
+    elements.push({
+      name: jsxName(node.name),
+      start: node.start,
+      opening: node,
+      children: enclosingElement(ancestors)?.children ?? [],
+      renderedChildren: renderOwnerChildren(ancestors),
+      ancestors: enclosingElements(ancestors),
+    })
   const value = stringValue(node)
   if (value === null) return
   const element = nearestElement(ancestors)
@@ -292,16 +306,70 @@ function collect(node, ancestors, strings, elements) {
     start: node.start,
     elementName: element === null ? null : jsxName(element.name),
     elementKey: element === null ? null : `e${element.start}`,
+    attributeName: nearestAttribute(ancestors)?.name?.name,
+    row: element !== null && isRowElement(element),
+    text: element !== null && elementHasText(enclosingElement(ancestors)),
+    disabled:
+      element !== null &&
+      (hasAttribute(element, 'disabled') || hasAttribute(element, 'aria-disabled')),
     // A truncating class recovers through a title on its own element or on any element that
     // encloses it in this file. What a parent component renders around it is out of view here.
     titled: element !== null && (hasTitle(element) || enclosingElements(ancestors).some(hasTitle)),
   })
 }
 
-function hasTitle(opening) {
+function hasAttribute(opening, name) {
   return opening.attributes.some(
-    (attribute) => attribute.type === 'JSXAttribute' && attribute.name?.name === 'title',
+    (attribute) => attribute.type === 'JSXAttribute' && attribute.name?.name === name,
   )
+}
+
+function hasTitle(opening) {
+  return hasAttribute(opening, 'title')
+}
+
+function attributeValue(opening, name) {
+  const attribute = opening.attributes.find(
+    (entry) => entry.type === 'JSXAttribute' && entry.name?.name === name,
+  )
+  return stringValue(attribute?.value?.expression ?? attribute?.value ?? {})
+}
+
+function isRowElement(opening) {
+  return (
+    jsxName(opening.name) === 'ListRow' ||
+    ['option', 'treeitem', 'row', 'tab'].includes(attributeValue(opening, 'role'))
+  )
+}
+
+function enclosingElement(ancestors) {
+  return ancestors.findLast((node) => node.type === 'JSXElement')
+}
+
+function renderOwnerChildren(ancestors) {
+  for (let index = ancestors.length - 1; index >= 0; index -= 1) {
+    const ancestor = ancestors[index]
+    if (ancestor.type !== 'JSXAttribute' || ancestor.name?.name !== 'render') continue
+    const owner = enclosingElement(ancestors.slice(0, index))
+    if (owner?.children.some(isVisibleChild)) return owner.children
+  }
+  return []
+}
+
+function nearestAttribute(ancestors) {
+  return ancestors.findLast((node) => node.type === 'JSXAttribute')
+}
+
+function childHasText(child) {
+  if (child.type === 'JSXText') return child.value.trim() !== ''
+  if (child.type === 'JSXExpressionContainer') return child.expression.type !== 'JSXEmptyExpression'
+  if (child.type !== 'JSXElement') return false
+  if (jsxName(child.openingElement.name)?.endsWith('Icon')) return false
+  return child.children.some(childHasText)
+}
+
+function elementHasText(element) {
+  return element?.children.some(childHasText) ?? false
 }
 
 // The stack holds the JSXElement of every enclosing tag; its opening element carries the props.
@@ -316,7 +384,10 @@ function stringValue(node) {
 }
 
 function jsxName(name) {
-  return name?.type === 'JSXIdentifier' ? name.name : null
+  if (name?.type === 'JSXIdentifier') return name.name
+  if (name?.type === 'JSXMemberExpression')
+    return `${jsxName(name.object)}.${jsxName(name.property)}`
+  return null
 }
 
 function nearestElement(ancestors) {
@@ -345,8 +416,48 @@ function newlinesBefore(value, index) {
 }
 
 function recordElement(census, file, element, lineAt) {
-  if (element.name !== 'button') return
-  census.hits.rawButtons.push({ file, line: lineAt(element.start), value: '<button>' })
+  const hit = { file, line: lineAt(element.start), value: `<${element.name}>` }
+  if (element.name === 'button') census.hits.rawButtons.push(hit)
+  if (element.name !== 'button' && element.name !== 'Button') return
+  const ownChildren = element.children.filter(isVisibleChild)
+  const children =
+    ownChildren.length > 0 ? ownChildren : element.renderedChildren.filter(isVisibleChild)
+  if (children.length === 0 || !children.every(isIconChild)) return
+  const trigger = element.ancestors.some((opening) => jsxName(opening.name) === 'TooltipTrigger')
+  const tooltip = element.ancestors.some((opening) => jsxName(opening.name)?.endsWith('Tooltip'))
+  if (
+    !hasTitle(element.opening) &&
+    (trigger || (tooltip && hasAttribute(element.opening, 'aria-label')))
+  )
+    return
+  census.hits.iconOnlyHint.push({
+    ...hit,
+    value: hasTitle(element.opening) ? 'icon-only title' : 'missing Tooltip',
+  })
+}
+
+function isVisibleChild(child) {
+  if (child.type === 'JSXText') return child.value.trim() !== ''
+  return child.type !== 'JSXExpressionContainer' || child.expression.type !== 'JSXEmptyExpression'
+}
+
+function isIconChild(child) {
+  if (child.type === 'JSXElement') {
+    const name = jsxName(child.openingElement.name)
+    if (name?.endsWith('Icon')) return true
+    if (name !== 'span' && name !== 'div') return false
+    const children = child.children.filter(isVisibleChild)
+    return children.length > 0 && children.every(isIconChild)
+  }
+  if (child.type === 'JSXFragment') {
+    const children = child.children.filter(isVisibleChild)
+    return children.length > 0 && children.every(isIconChild)
+  }
+  if (child.type === 'JSXExpressionContainer') return isIconChild(child.expression)
+  if (child.type === 'ConditionalExpression')
+    return isIconChild(child.consequent) && isIconChild(child.alternate)
+  if (child.type === 'LogicalExpression') return isIconChild(child.right)
+  return false
 }
 
 function lineOfEntry(entry, lineAt) {
@@ -397,7 +508,8 @@ function recordToken(census, file, entry, token, lineOf, group) {
   if (ARBITRARY_TEXT.test(token.base)) census.hits.arbitraryText.push(hit)
   if (PALETTE_CLASS.test(token.base)) census.hits.paletteLeaks.push(hit)
   if (TRUNCATION.test(token.base) && !entry.titled) census.hits.truncationRecovery.push(hit)
-  recordHoverFill(census, token, hit)
+  recordPatternTokens(census, entry, token, hit)
+  recordHoverFill(census, file, entry, token, hit)
   recordShadow(census, token, hit)
   recordRadius(census, entry, token, hit)
 }
@@ -409,11 +521,34 @@ function recordBarShape(group, hit, base) {
 
 // A hovered fill of any kind is histogram material; a row token wearing an opacity modifier is
 // recorded whatever variant it carries, because that is the slice this measure gates.
-function recordHoverFill(census, token, hit) {
+function recordHoverFill(census, file, entry, token, hit) {
   const hovers = token.variants.includes('hover')
   const fill = hovers && token.base.startsWith('bg-')
   if (!fill && !ROW_FILL_OPACITY.test(token.base)) return
-  census.hits.hoverFills.push({ ...hit, value: hovers ? `hover:${token.base}` : token.base })
+  census.hits.hoverFills.push({
+    ...hit,
+    value: hovers ? `hover:${token.base}` : token.base,
+    row: entry.row || file.endsWith('-row.tsx'),
+  })
+}
+
+function recordPatternTokens(census, entry, token, hit) {
+  if (
+    entry.elementName?.endsWith('Icon') &&
+    entry.attributeName === 'className' &&
+    token.base.startsWith('size-')
+  )
+    census.hits.iconSize.push(hit)
+  if (/^text-(?:muted-)?foreground\//.test(token.base)) census.hits.textAlpha.push(hit)
+  const opacity = /^opacity-(\d+)$/.exec(token.base)?.[1]
+  if (!entry.text || opacity === undefined || opacity === '0' || opacity === '100') return
+  const disabled =
+    entry.disabled ||
+    token.variants.some((variant) =>
+      ['disabled', 'aria-disabled', 'data-disabled'].includes(variant),
+    )
+  if (opacity === '50' && disabled) return
+  census.hits.textAlpha.push(hit)
 }
 
 function recordShadow(census, token, hit) {
@@ -505,7 +640,9 @@ function nullRadiusHits(census) {
 }
 
 function rowFillOpacityHits(census) {
-  return census.hits.hoverFills.filter((hit) => ROW_FILL_OPACITY.test(hit.value))
+  return census.hits.hoverFills.filter(
+    (hit) => ROW_FILL_OPACITY.test(hit.value) || (hit.row && hit.value !== 'hover:bg-row-hover'),
+  )
 }
 
 /** Drops the hits a measure cannot judge in the root they came from. */
@@ -542,6 +679,9 @@ export function evaluate(census, allowEntries = []) {
     shadow: gate('shadow', offTarget(census.hits.shadow, TARGETS.shadow.allowed)),
     rawButtons: gate('rawButtons', census.hits.rawButtons),
     hoverFills: gate('hoverFills', rowFillOpacityHits(census)),
+    iconSize: gate('iconSize', offTarget(census.hits.iconSize, TARGETS.iconSize.allowed)),
+    textAlpha: gate('textAlpha', census.hits.textAlpha),
+    iconOnlyHint: gate('iconOnlyHint', census.hits.iconOnlyHint),
     paletteLeaks: gate('paletteLeaks', census.hits.paletteLeaks),
     truncationRecovery: gate('truncationRecovery', census.hits.truncationRecovery),
   }

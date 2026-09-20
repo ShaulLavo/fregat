@@ -45,7 +45,7 @@ export function FilesystemConflictToast({
       aria-label={conflictTitle(conflict)}
     >
       <div className='flex items-start gap-(--density-control-gap)'>
-        <WarningIcon className='text-warning mt-0.5 size-4 shrink-0' weight='fill' />
+        <WarningIcon className='text-warning mt-0.5 size-(--icon-size) shrink-0' weight='fill' />
         <div className='min-w-0 flex-1'>
           <div className='truncate text-sm font-medium' title={displayPath(conflict.remotePath)}>
             {conflictTitle(conflict)}

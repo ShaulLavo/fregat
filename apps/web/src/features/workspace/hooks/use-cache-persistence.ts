@@ -1,3 +1,4 @@
+import { scrollPositionsEqual } from '@/lib/scroll-positions'
 import { captureEditorScrollPositions } from '@/features/editor/state/scroll-persistence'
 import { useEditorRuntime } from '@/features/editor/hooks/use-runtime'
 import type { ScopedStorage } from '@/lib/environments/state/scoped-storage'
@@ -450,20 +451,16 @@ function sameWorkspaceSlice(
     return false
   }
 
-  return scrollPositionsEqual(left.reopenScrollPositions, right.reopenScrollPositions)
-}
-
-function scrollPositionsEqual(
-  left: readonly ReopenScrollPosition[],
-  right: readonly ReopenScrollPosition[],
-) {
-  return readonlyArraysEqual(left, right, sameScrollPosition)
+  return readonlyArraysEqual(
+    left.reopenScrollPositions,
+    right.reopenScrollPositions,
+    sameScrollPosition,
+  )
 }
 
 // Order matters: readers of this list take the first entry that matches a tab.
 function sameScrollPosition(left: ReopenScrollPosition, right: ReopenScrollPosition) {
-  if (left.position.left !== right.position.left) return false
-  if (left.position.top !== right.position.top) return false
+  if (!scrollPositionsEqual(left.position, right.position)) return false
   return sameTabContent(left.content, right.content)
 }
 

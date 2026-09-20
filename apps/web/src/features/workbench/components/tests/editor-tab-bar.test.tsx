@@ -34,9 +34,9 @@ test('only the active tab carries a background fill, and inactive tabs react to 
 
   // The active tab lifts to the well colour so it reads as part of the editor.
   expect(editorTabElement(container, 'tab-a')).toHaveClass('bg-content-well')
-  expect(editorTabElement(container, 'tab-a')).not.toHaveClass('hover:bg-accent')
+  expect(editorTabElement(container, 'tab-a')).not.toHaveClass('hover:bg-row-hover')
   expect(editorTabElement(container, 'tab-b')).not.toHaveClass('bg-content-well')
-  expect(editorTabElement(container, 'tab-b')).toHaveClass('hover:bg-accent')
+  expect(editorTabElement(container, 'tab-b')).toHaveClass('hover:bg-row-hover')
 })
 
 test('shimmers the filename of the editor input being resolved', () => {

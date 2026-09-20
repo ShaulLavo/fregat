@@ -1,3 +1,4 @@
+import { Tooltip, TooltipContent, TooltipTrigger } from '@workspace/ui/components/tooltip'
 import { XIcon } from '@phosphor-icons/react'
 import { useState } from 'react'
 import { useStore } from 'zustand'
@@ -59,14 +60,21 @@ export function MachineConnectionNotice({
       <Button size='xs' variant='ghost' disabled={pending} onClick={() => void retryConnection()}>
         {phase === 'idle' ? 'Connect' : 'Retry'}
       </Button>
-      <Button
-        size='icon-xs'
-        variant='ghost'
-        aria-label={`Dismiss ${label} connection notice`}
-        onClick={() => notices.dismiss(id, error)}
-      >
-        <XIcon className='size-3' />
-      </Button>
+      <Tooltip>
+        <TooltipTrigger
+          render={
+            <Button
+              size='icon-xs'
+              variant='ghost'
+              aria-label={`Dismiss ${label} connection notice`}
+              onClick={() => notices.dismiss(id, error)}
+            >
+              <XIcon className='size-(--icon-size-sm)' />
+            </Button>
+          }
+        />
+        <TooltipContent>{`Dismiss ${label} connection notice`}</TooltipContent>
+      </Tooltip>
     </div>
   )
 }

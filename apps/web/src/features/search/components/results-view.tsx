@@ -1,42 +1,24 @@
-import { useElementWidth } from '@/hooks/use-element-width'
-import { searchResultDomId } from '@/features/search/utils/result-dom-id'
-import { handleSearchResultKeyDown } from '@/features/search/utils/result-sidebar-keyboard'
+import { useLayoutEffect, useRef, type KeyboardEvent } from 'react'
 import type { WorkspaceSearchQuery } from '@workspace/contracts'
-import { useVirtualizer } from '@tanstack/react-virtual'
+import { VirtualList, type VirtualListHandle } from '@workspace/ui/patterns/virtual-list'
+import { useListbox } from '@workspace/ui/patterns/use-listbox'
+import { WarningCircleIcon } from '@phosphor-icons/react'
+import { EmptyState } from '@workspace/ui/components/empty-state'
+import { cn } from '@workspace/ui/lib/utils'
+import { useSearchResultActions } from '@/features/search/hooks/use-result-actions'
+import { useSearchPreviewMaxLength } from '@/features/search/hooks/use-preview-max-length'
 import {
-  memo,
-  useLayoutEffect,
-  useId,
-  useMemo,
-  useRef,
-  type MouseEvent,
-  type RefObject,
-} from 'react'
-
-import { SearchFileGroupHeader } from '@/features/search/components/file-group'
+  searchResultItems,
+  searchResultItemById,
+  type SearchResultId,
+} from '@/features/search/utils/result-items'
 import type {
   SearchBufferStatus,
   WorkspaceSearchFileGroup,
 } from '@/features/search/state/buffer-state'
-import { SearchMatchRow, SearchNameMatchRow } from '@/features/search/components/match-row'
-import { useSearchResultActions } from '@/features/search/hooks/use-result-actions'
-import {
-  searchResultItemById,
-  searchResultItems,
-  type SearchResultItem,
-  type SearchResultId,
-} from '@/features/search/utils/result-items'
 import { SearchIdleState } from '@/features/search/components/idle-state'
 import { SearchPendingOrEmpty } from '@/features/search/components/pending-or-empty'
-import { WarningCircleIcon } from '@phosphor-icons/react'
-import { EmptyState } from '@workspace/ui/components/empty-state'
-import { cn } from '@workspace/ui/lib/utils'
-
-const SEARCH_PREVIEW_MAX_CHARACTERS = 96
-const SEARCH_PREVIEW_MIN_CHARACTERS = 16
-const SEARCH_RESULT_CHARACTER_WIDTH = 7
-const SEARCH_RESULT_ROW_CHROME_WIDTH = 84
-const SEARCH_RESULT_REPLACE_WIDTH = 62
+import { SearchResultRow } from '@/features/search/components/result-row'
 
 export function SearchResultsView({
   activeResultId,
@@ -63,53 +45,64 @@ export function SearchResultsView({
   resultsSearchQuery: WorkspaceSearchQuery | null
   status: SearchBufferStatus
 }) {
-  const treeId = useId()
-  const parentRef = useRef<HTMLDivElement | null>(null)
-  const displayedResultsQuery = resultsSearchQuery?.query ?? null
-  const previousDisplayedResultsQueryRef = useRef<string | null>(null)
+  const parentRef = useRef<HTMLDivElement>(null)
+  const virtualRef = useRef<VirtualListHandle>(null)
   const { openMatch, selectResult, toggleGroup } = useSearchResultActions()
   const previewMaxLength = useSearchPreviewMaxLength(parentRef, replaceVisible)
-  const items = useMemo(() => searchResultItems(groups), [groups])
-  const activeItem = useMemo(
-    () => searchResultItemById(items, activeResultId),
-    [activeResultId, items],
-  )
-  // eslint-disable-next-line react-hooks/incompatible-library -- TanStack Virtual is the search results virtualization layer.
-  const virtualizer = useVirtualizer({
-    count: items.length,
-    estimateSize: (index) => searchResultItemEstimate(items[index], compact),
-    getItemKey: (index) => `${compact ? 'compact' : 'default'}:${items[index]?.id ?? index}`,
-    getScrollElement: () => parentRef.current,
-    overscan: 12,
+  const items = searchResultItems(groups)
+  function toggle(id: string) {
+    const item = searchResultItemById(items, id)
+    if (item?.type === 'group') toggleGroup(item.group.path)
+  }
+  const list = useListbox({
+    role: 'tree',
+    containerRef: parentRef,
+    items: items.map((item) => ({
+      id: item.id,
+      parentId: item.type === 'match' ? item.groupId : undefined,
+      hasChildren: item.type === 'group',
+      expanded: item.type === 'group' ? !item.group.collapsed : undefined,
+    })),
+    activeId: activeResultId,
+    onActiveChange: selectResult,
+    onCommit(id) {
+      const item = searchResultItemById(items, id)
+      if (!item) return
+      if (item.type === 'group') {
+        toggleGroup(item.group.path)
+        return
+      }
+      openMatch(item.match)
+    },
+    onSelect: selectResult,
+    onCollapse: toggle,
+    onExpand: toggle,
+    onActiveKeyDown(event) {
+      if (event.key !== 'F2' || event.altKey || event.ctrlKey || event.metaKey || event.shiftKey)
+        return
+      const id = event.currentTarget.getAttribute('aria-activedescendant')
+      const row = id ? document.getElementById(id) : null
+      const action = row?.querySelector<HTMLButtonElement>(
+        '[data-row-action="replace"]:not(:disabled)',
+      )
+      if (!action) return
+      event.preventDefault()
+      action.focus()
+    },
+    scrollToIndex: (index) => virtualRef.current?.scrollToIndex(index, { align: 'auto' }),
   })
-  const activeIndex = activeItem ? items.indexOf(activeItem) : -1
-  const activeIndexRef = useRef(activeIndex)
-  const virtualizerRef = useRef(virtualizer)
-
+  function handleKeyDown(event: KeyboardEvent<HTMLDivElement>) {
+    if (event.key === 'Escape' && event.target !== event.currentTarget) {
+      event.preventDefault()
+      event.currentTarget.focus()
+      return
+    }
+    list.containerProps.onKeyDown(event)
+  }
+  const displayedQuery = resultsSearchQuery?.query
   useLayoutEffect(() => {
-    activeIndexRef.current = activeIndex
-    virtualizerRef.current = virtualizer
-  }, [activeIndex, virtualizer])
-
-  useLayoutEffect(() => {
-    if (!activeResultId) return
-
-    scrollActiveSearchResultIntoView(activeIndexRef, virtualizerRef)
-  }, [activeResultId])
-
-  useLayoutEffect(() => {
-    if (displayedResultsQuery === null) return
-    if (previousDisplayedResultsQueryRef.current === displayedResultsQuery) return
-
-    previousDisplayedResultsQueryRef.current = displayedResultsQuery
-    resetSearchResultScroll(parentRef, virtualizer)
-    const frame = window.requestAnimationFrame(() =>
-      resetSearchResultScroll(parentRef, virtualizer),
-    )
-
-    return () => window.cancelAnimationFrame(frame)
-  }, [displayedResultsQuery, virtualizer])
-
+    virtualRef.current?.scrollToOffset(0)
+  }, [displayedQuery])
   if (status === 'idle') {
     return <SearchIdleState className={className} />
   }
@@ -118,7 +111,7 @@ export function SearchResultsView({
       <EmptyState
         className={className}
         description={error ?? 'Search failed.'}
-        icon={<WarningCircleIcon className='size-6' weight='duotone' />}
+        icon={<WarningCircleIcon className='size-(--icon-size)' weight='duotone' />}
         title='Search failed'
         tone='error'
       />
@@ -129,212 +122,37 @@ export function SearchResultsView({
   }
 
   return (
-    <div
+    <VirtualList
+      {...list.containerProps}
+      onKeyDown={handleKeyDown}
+      activeIndex={list.activeIndex}
+      scrollRef={parentRef}
+      handleRef={virtualRef}
+      aria-label='Search results'
       className={cn(
-        'app-scrollbar-thin h-full min-h-0 overflow-x-hidden overflow-y-auto',
+        'focus-ring-inset app-scrollbar-thin h-full min-h-0 overflow-x-hidden',
         className,
       )}
-      ref={parentRef}
-      role='tree'
-      tabIndex={0}
-      aria-activedescendant={activeItem ? searchResultDomId(treeId, activeItem.id) : undefined}
-      aria-label='Search results'
-      onKeyDown={(event) =>
-        handleSearchResultKeyDown({
-          activeResultId,
-          event,
-          items,
-          onOpenMatch: openMatch,
-          onSelectResult: selectResult,
-          onToggleGroup: toggleGroup,
-        })
-      }
-    >
-      <div
-        className='relative [overflow-anchor:none]'
-        style={{
-          height: virtualizer.getTotalSize() + resultListPadding(compact) * 2,
-        }}
-      >
-        {virtualizer.getVirtualItems().map((virtualItem) => {
-          const item = items[virtualItem.index]
-          if (!item) return null
-
-          return (
-            <div
-              className={cn('absolute right-1.5 left-1.5', compact && 'right-1 left-1')}
-              id={searchResultDomId(treeId, item.id)}
-              key={item.id}
-              role='treeitem'
-              style={{
-                height: virtualItem.size,
-                transform: `translateY(${virtualItem.start + resultListPadding(compact)}px)`,
-              }}
-              aria-expanded={item.type === 'group' ? !item.group.collapsed : undefined}
-              aria-level={item.level}
-              aria-selected={item.id === activeResultId}
-              onMouseDown={(event) => {
-                if (mouseDownStartedInSearchResultControl(event)) return
-
-                selectResult(item.id)
-              }}
-            >
-              <SearchResultRow
-                item={item}
-                active={item.id === activeResultId}
-                canReplace={canReplace}
-                compact={compact}
-                previewMaxLength={previewMaxLength}
-                query={query}
-                replaceQuery={resultsSearchQuery}
-                replaceText={replaceText}
-                replaceVisible={replaceVisible}
-              />
-            </div>
-          )
-        })}
-      </div>
-    </div>
-  )
-}
-
-function resetSearchResultScroll(
-  ref: RefObject<HTMLDivElement | null>,
-  virtualizer: ReturnType<typeof useVirtualizer<HTMLDivElement, Element>>,
-) {
-  if (ref.current) ref.current.scrollTop = 0
-
-  virtualizer.scrollToOffset(0)
-}
-
-function scrollActiveSearchResultIntoView(
-  activeIndexRef: RefObject<number>,
-  virtualizerRef: RefObject<ReturnType<typeof useVirtualizer<HTMLDivElement, Element>>>,
-) {
-  const currentActiveIndex = activeIndexRef.current
-  if (currentActiveIndex < 0) return
-
-  virtualizerRef.current.scrollToIndex(currentActiveIndex, { align: 'auto' })
-}
-
-const SearchResultRow = memo(
-  ({
-    active,
-    item,
-    canReplace,
-    compact,
-    previewMaxLength,
-    query,
-    replaceQuery,
-    replaceText,
-    replaceVisible,
-  }: {
-    active: boolean
-    item: SearchResultItem
-    canReplace?: boolean
-    compact?: boolean
-    previewMaxLength?: number
-    query: string
-    replaceQuery: WorkspaceSearchQuery | null
-    replaceText: string
-    replaceVisible?: boolean
-  }) => {
-    const { openMatch, replaceGroup, replaceMatch, selectResult, toggleGroup } =
-      useSearchResultActions()
-
-    if (item.type === 'group') {
-      return (
-        <SearchFileGroupHeader
-          active={active}
+      items={items}
+      getKey={(item) => item.id}
+      renderRow={(item) => (
+        <SearchResultRow
+          item={item}
+          active={item.id === activeResultId}
+          rowProps={{
+            ...list.rowProps(item.id),
+            'aria-level': item.level,
+            'aria-expanded': item.type === 'group' ? !item.group.collapsed : undefined,
+          }}
           canReplace={canReplace}
           compact={compact}
-          group={item.group}
-          replaceVisible={replaceVisible}
-          onReplace={replaceGroup}
-          onToggle={() => {
-            selectResult(item.id)
-            toggleGroup(item.group.path)
-          }}
-        />
-      )
-    }
-    if (item.type === 'name') {
-      return (
-        <SearchNameMatchRow
-          active={active}
-          compact={compact}
-          match={item.match}
           previewMaxLength={previewMaxLength}
           query={query}
-          onOpenMatch={() => {
-            selectResult(item.id)
-            openMatch(item.match)
-          }}
-        />
-      )
-    }
-
-    return (
-      <div className={cn('ml-4 border-l', compact && 'ml-3')}>
-        <SearchMatchRow
-          active={active}
-          canReplace={canReplace}
-          compact={compact}
-          match={item.match}
-          previewMaxLength={previewMaxLength}
-          replaceQuery={replaceQuery}
+          replaceQuery={resultsSearchQuery}
           replaceText={replaceText}
           replaceVisible={replaceVisible}
-          query={query}
-          onOpenMatch={() => {
-            selectResult(item.id)
-            openMatch(item.match)
-          }}
-          onReplaceMatch={replaceMatch}
         />
-      </div>
-    )
-  },
-)
-
-function searchResultItemEstimate(
-  item: SearchResultItem | undefined,
-  compact: boolean | undefined,
-) {
-  if (item?.type === 'group') return compact ? 24 : 44
-
-  return compact ? 24 : 30
-}
-
-function resultListPadding(compact: boolean | undefined) {
-  return compact ? 4 : 6
-}
-
-function mouseDownStartedInSearchResultControl(event: MouseEvent<HTMLElement>) {
-  const target = event.target
-  if (!(target instanceof Element)) return false
-
-  return Boolean(target.closest('button'))
-}
-
-function useSearchPreviewMaxLength(
-  ref: RefObject<HTMLDivElement | null>,
-  replaceVisible: boolean | undefined,
-) {
-  const width = useElementWidth(ref)
-
-  return useMemo(() => searchPreviewMaxLength(width, replaceVisible), [replaceVisible, width])
-}
-
-function searchPreviewMaxLength(width: number | null, replaceVisible: boolean | undefined) {
-  if (width === null) return undefined
-
-  const replaceWidth = replaceVisible ? SEARCH_RESULT_REPLACE_WIDTH : 0
-  const availableWidth = width - SEARCH_RESULT_ROW_CHROME_WIDTH - replaceWidth
-  const visibleCharacters = Math.floor(availableWidth / SEARCH_RESULT_CHARACTER_WIDTH)
-
-  return Math.min(
-    SEARCH_PREVIEW_MAX_CHARACTERS,
-    Math.max(SEARCH_PREVIEW_MIN_CHARACTERS, visibleCharacters),
+      )}
+    />
   )
 }

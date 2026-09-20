@@ -83,7 +83,7 @@ export function MachineForm(props: MachineFormOptions) {
               />
             }
           >
-            <CaretRightIcon className='size-3 group-data-panel-open:rotate-90' />
+            <CaretRightIcon className='size-(--icon-size-sm) group-data-panel-open:rotate-90' />
             Options
           </CollapsibleTrigger>
           <CollapsibleContent className='grid gap-4 pt-3 sm:grid-cols-2'>
@@ -145,7 +145,7 @@ export function MachineForm(props: MachineFormOptions) {
       ) : null}
       <div className='flex flex-col gap-2'>
         <Button type='submit' variant='outline' className='w-full' disabled={saving}>
-          {saving ? <Spinner /> : <PlugsConnectedIcon className='size-3.5' />}
+          {saving ? <Spinner /> : <PlugsConnectedIcon className='size-(--icon-size-sm)' />}
           {submitLabel}
         </Button>
         <Button type='button' variant='ghost' onClick={cancel}>

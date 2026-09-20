@@ -1,12 +1,12 @@
+import { ToolPane as PaneShell } from '@workspace/ui/patterns/tool-pane'
 import type { GitFileStatus } from '@workspace/contracts'
 import { filesystemPath } from '@/lib/documents/utils/identity'
-import { basename, parentPath } from '@/lib/path-formatters'
 import { Button } from '@workspace/ui/components/button'
 import { PaneBar } from '@workspace/ui/components/pane-bar'
 
 import { SearchPane } from '@/features/workspace/components/search-pane'
 import type { EditorTabConflictMap } from '@/features/workspace/utils/tab-types'
-import { ChatDiffStatLabel } from '@/features/chat/components/chat-diff-stat-label'
+import { TurnFiles } from '@/features/chat-mode/components/turn-files'
 import { CheckpointLoading } from '@/features/chat-mode/components/checkpoint-loading'
 import { useSessionTerminalId } from '@/features/chat-mode/hooks/use-session-terminal-id'
 import { useSessionToolRoot } from '@/features/chat-mode/hooks/use-session-tool-root'
@@ -19,7 +19,7 @@ import { CodePanel } from '@/features/workbench/components/code-panel'
 import { DiagnosticsPanel } from '@/features/workbench/components/diagnostics-panel'
 import { FileNavigatorPanel } from '@/features/workbench/components/file-navigator-panel'
 import { GitPaneHeader } from '@/features/workbench/components/git-pane-header'
-import { ToolPaneHeader } from '@/features/workbench/components/tool-pane-header'
+import { ToolPaneHeader } from '@/components/tool-pane-header'
 import type { WorkbenchPanels } from '@/features/workbench/utils/panels'
 import type { ChatModeToolTab } from '@/features/chat-mode/utils/panels'
 
@@ -66,12 +66,13 @@ export function ToolPane({
   if (tab === 'logs') return <LogsPanel active />
   if (tab === 'problems') {
     return (
-      <section className='flex h-full min-h-0 min-w-0 flex-col overflow-hidden'>
-        <ToolPaneHeader tab='problems' />
-        <div className='min-h-0 min-w-0 flex-1 overflow-hidden'>
-          <DiagnosticsPanel />
-        </div>
-      </section>
+      <PaneShell
+        className='h-full min-w-0 overflow-hidden'
+        bodyClassName='overflow-hidden'
+        header={<ToolPaneHeader tab='problems' />}
+      >
+        <DiagnosticsPanel />
+      </PaneShell>
     )
   }
   if (tab === 'search') {
@@ -79,17 +80,13 @@ export function ToolPane({
   }
 
   return (
-    <section className='bg-content-well flex h-full min-h-0 min-w-0 flex-col overflow-hidden'>
-      <ToolPaneHeader tab='terminal' />
-      <div className='min-h-0 min-w-0 flex-1 overflow-hidden'>
-        <TerminalPanel
-          active
-          className='h-full'
-          rootPath={toolRoot}
-          sessionId={terminalSessionId}
-        />
-      </div>
-    </section>
+    <PaneShell
+      className='h-full min-w-0 overflow-hidden'
+      bodyClassName='bg-content-well overflow-hidden'
+      header={<ToolPaneHeader tab='terminal' />}
+    >
+      <TerminalPanel active className='h-full' rootPath={toolRoot} sessionId={terminalSessionId} />
+    </PaneShell>
   )
 }
 
@@ -102,35 +99,37 @@ function gitToolPane(rootPath: string, diffScope: SessionDiffScopeState) {
   const { latestTurnId, scope, selectTurnScope, selectWorkingTreeScope } = diffScope
 
   return (
-    <section className='flex h-full min-h-0 min-w-0 flex-col overflow-hidden'>
-      <GitPaneHeader rootPath={rootPath} />
-      <PaneBar aria-label='Diff scope' border='bottom' role='group'>
-        {scopeButton({
-          active: scope.kind === 'working-tree',
-          label: 'Working tree',
-          onSelect: selectWorkingTreeScope,
-        })}
-        {scopeButton({
-          active: scope.kind === 'turn',
-          // A session that has not produced a checkpoint has no turn to show, and
-          // an inert button is worse than one that says so.
-          disabled: !latestTurnId,
-          label: 'Turn',
-          onSelect: () => {
-            if (!latestTurnId) return
-
-            selectTurnScope(latestTurnId)
-          },
-        })}
-      </PaneBar>
-      <div className='min-h-0 min-w-0 flex-1 overflow-hidden'>
-        {scope.kind === 'turn' ? (
-          turnScopeBody(diffScope)
-        ) : (
-          <GitPanel rootPath={filesystemPath(rootPath)} />
-        )}
-      </div>
-    </section>
+    <PaneShell
+      className='h-full min-w-0 overflow-hidden'
+      bodyClassName='overflow-hidden'
+      header={<GitPaneHeader rootPath={rootPath} />}
+      subheader={
+        <PaneBar aria-label='Diff scope' border='bottom' role='group'>
+          {scopeButton({
+            active: scope.kind === 'working-tree',
+            label: 'Working tree',
+            onSelect: selectWorkingTreeScope,
+          })}
+          {scopeButton({
+            active: scope.kind === 'turn',
+            // A session that has not produced a checkpoint has no turn to show, and
+            // an inert button is worse than one that says so.
+            disabled: !latestTurnId,
+            label: 'Turn',
+            onSelect: () => {
+              if (!latestTurnId) return
+              selectTurnScope(latestTurnId)
+            },
+          })}
+        </PaneBar>
+      }
+    >
+      {scope.kind === 'turn' ? (
+        turnScopeBody(diffScope)
+      ) : (
+        <GitPanel rootPath={filesystemPath(rootPath)} />
+      )}
+    </PaneShell>
   )
 }
 
@@ -174,37 +173,5 @@ function turnScopeBody({ openTurnFile, turnSummary }: SessionDiffScopeState) {
     )
   }
 
-  return (
-    <div className='app-scrollbar-thin h-full min-h-0 overflow-auto py-(--density-gap-tight)'>
-      <p className='text-muted-foreground text-2xs px-(--density-control-padding-x) pb-(--density-gap-tight) tabular-nums'>
-        Turn {turnSummary.checkpointTurnCount} · {turnSummary.files.length} files
-      </p>
-      {turnSummary.files.map((file) => turnFileRow(file, openTurnFile))}
-    </div>
-  )
-}
-
-function turnFileRow(
-  file: NonNullable<SessionDiffScopeState['turnSummary']>['files'][number],
-  openTurnFile: SessionDiffScopeState['openTurnFile'],
-) {
-  const directory = parentPath(file.path)
-
-  return (
-    // Raw button: a row owns the list fill, and Button's ghost variant
-    // re-declares it in dark mode at a specificity this cannot override.
-    <button
-      className='focus-ring-inset hover:bg-row-hover active:bg-row-active flex h-(--density-control-height-sm) w-full items-center justify-between gap-(--density-control-gap) px-(--density-row-padding-x) text-left text-xs outline-none select-none'
-      key={file.path}
-      title={file.path}
-      type='button'
-      onClick={() => openTurnFile(file.path)}
-    >
-      <span className='min-w-0 truncate'>
-        <span className='text-foreground'>{basename(file.path)}</span>
-        {directory ? <span className='text-muted-foreground ml-2'>{directory}</span> : null}
-      </span>
-      <ChatDiffStatLabel additions={file.additions} deletions={file.deletions} />
-    </button>
-  )
+  return <TurnFiles summary={turnSummary} onOpenFile={openTurnFile} />
 }

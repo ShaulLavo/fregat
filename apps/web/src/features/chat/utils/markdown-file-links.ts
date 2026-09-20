@@ -1,3 +1,5 @@
+import { workspaceRelativePath } from '@/lib/workspace-relative-path'
+import { looksLikeHostname } from '@/lib/hostname'
 import { pathLeaf as basename } from '@/lib/path-formatters'
 /**
  * Turns the file references agents write in prose — `src/foo.ts:42`,
@@ -41,29 +43,6 @@ const FILE_ROOT_PREFIXES = [
   '/workspaces/',
 ] as const
 
-// Allowlist, not public-suffix detection: treating every dotted first segment as
-// a host would swallow real paths like `conf.d/app.conf`. Extensions that double
-// as filename suffixes (`sh`, `md`, `ts`, `rs`) are deliberately absent.
-const HOSTNAME_TLDS = new Set([
-  'ai',
-  'app',
-  'biz',
-  'cloud',
-  'co',
-  'com',
-  'dev',
-  'edu',
-  'gov',
-  'info',
-  'io',
-  'me',
-  'net',
-  'org',
-  'site',
-  'tech',
-  'xyz',
-])
-
 export function resolveMarkdownLinkFileReference(
   href: string | undefined,
   rootPath: string | null,
@@ -98,7 +77,7 @@ export function resolveInlineCodeFileReference(
   const positioned = position.line !== null
   if (!positioned && !candidate.includes('/')) return null
   if (!looksLikePath(position.bare)) return null
-  if (looksLikeHostname(position.bare.split('/')[0] ?? position.bare, positioned)) return null
+  if (isHostnameReference(position.bare.split('/')[0] ?? position.bare, positioned)) return null
   if (!positioned && !FILE_EXTENSION.test(basename(position.bare))) return null
 
   return fileReference(position, rootPath)
@@ -151,16 +130,6 @@ function referenceLabel(
   return `${relative}:${line}:${column}`
 }
 
-export function workspaceRelativePath(path: string, rootPath: string | null) {
-  if (rootPath === null) return null
-
-  const root = rootPath.replace(/\/+$/u, '')
-  if (root.length === 0) return path.startsWith('/') ? null : path
-  if (!path.startsWith(`${root}/`)) return null
-
-  return path.slice(root.length + 1)
-}
-
 /** Relative references only resolve once we know which project the chat is in. */
 function absolutePath(path: string, rootPath: string | null) {
   if (path.startsWith('/')) return normalizeSegments(path)
@@ -195,15 +164,12 @@ function looksLikePath(bare: string) {
 }
 
 /** `127.0.0.1`, `example.com/x`, `1.2.3` — hosts and versions, not files. */
-function looksLikeHostname(segment: string, positioned: boolean) {
+function isHostnameReference(segment: string, positioned: boolean) {
   if (segment.startsWith('.')) return false
   if (NUMERIC_DOTTED.test(segment)) return true
   if (positioned) return false
 
-  const labels = segment.toLowerCase().split('.')
-  if (labels.length < 2) return false
-
-  return HOSTNAME_TLDS.has(labels[labels.length - 1] ?? '')
+  return looksLikeHostname(segment)
 }
 
 function hasExternalScheme(path: string) {

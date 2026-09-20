@@ -1,3 +1,4 @@
+import { parentPath } from '@/lib/path-formatters'
 import { startWorkspaceEventStreams } from '@/features/workspace/state/event-streams'
 import { startPageSubscription } from '@/lib/state/page-subscription'
 import { entryFromResponse } from '@/lib/file-system-types'
@@ -43,7 +44,6 @@ import { editorMutationKeys } from '@/features/editor/utils/mutation-keys'
 import type { WideEventScope } from '@workspace/observability/scope'
 import {
   mayTrustCachedSnapshot,
-  parentPath,
   planFetchedOpenFileRefresh,
   planWorkspaceReady,
   type WorkspaceEventPlan,
@@ -67,8 +67,6 @@ import { toast } from 'sonner'
 import type { TreeEntry, WatchServerMessage } from '@workspace/contracts'
 import { useWorkspaceEditEventClassifier } from '@/features/editor/providers/workspace-edit-context'
 import { planWorkspaceEditAwareEventBatch } from '@/features/workspace/utils/workspace-edit-events'
-
-export type { WatchServerMessage }
 
 export type FilesystemEvent = Extract<
   WatchServerMessage,

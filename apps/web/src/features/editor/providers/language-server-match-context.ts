@@ -1,6 +1,6 @@
 import { createContext, use } from 'react'
 
-import type { LanguageServerMatchConfigurationSnapshot } from '@/features/editor/utils/language-server-match-query'
+import type { LanguageServerMatchConfigurationSnapshot } from '@/features/editor/utils/query-keys'
 import { clientErrors } from '@/lib/structured-errors'
 
 export const LanguageServerMatchConfigurationContext = createContext<

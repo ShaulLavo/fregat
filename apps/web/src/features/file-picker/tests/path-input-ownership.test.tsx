@@ -4,7 +4,7 @@ import path from 'node:path'
 import { useRef } from 'react'
 
 import { useFilePickerPathInput } from '@/features/file-picker/hooks/use-path-input'
-import { useFilePickerSession } from '@/features/file-picker/state'
+import { useFilePickerSession } from '@/features/file-picker/state/picker'
 import { activeServerOrigin, getClient, setActiveServerOrigin, setClient } from '@/lib/client'
 import { fetchServerInfo } from '@/lib/file-server'
 import { createInProcessClient, createObservedInProcessClient } from '../../../../test/client'

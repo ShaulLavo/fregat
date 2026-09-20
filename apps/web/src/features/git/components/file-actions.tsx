@@ -1,7 +1,9 @@
 import { ActionCluster } from '@/features/git/components/action-cluster'
 import { ArrowBendUpLeftIcon, MinusIcon, PlusIcon } from '@phosphor-icons/react'
 
-import { useDiscardPathMutation, useStagePathMutation, useUnstagePathMutation } from '../hooks'
+import { useDiscardPathMutation } from '@/features/git/hooks/use-discard-path-mutation'
+import { useStagePathMutation } from '@/features/git/hooks/use-stage-path-mutation'
+import { useUnstagePathMutation } from '@/features/git/hooks/use-unstage-path-mutation'
 import type { PanelSection } from '@/features/git/utils/types'
 import { RowActionButton } from './row-action-button'
 

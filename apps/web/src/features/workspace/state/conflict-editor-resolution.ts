@@ -1,10 +1,11 @@
+import { parentFilesystemPath } from '@/lib/path-formatters'
 import { parseMergeConflicts, type TextSnapshot } from '@singapore-editor/core'
 import { decodedAsText } from '@workspace/contracts'
 import { Debouncer } from '@tanstack/react-pacer/debouncer'
 import type { QueryClient } from '@tanstack/react-query'
 import { toast } from 'sonner'
 
-import { documentKey, fileDocumentKey, filesystemPath } from '@/lib/documents/utils/identity'
+import { documentKey, fileDocumentKey } from '@/lib/documents/utils/identity'
 import type { DocumentKey, DocumentRef, FilesystemPath } from '@/lib/documents/utils/types'
 import type {
   EditorConflictStoreApi,
@@ -174,7 +175,7 @@ export class ConflictEditorResolutionCoordinator {
     const { conflict, text } = capture
     const { client } = this.context
     if (conflict.eventType === 'deleted') {
-      await ensureFolderPath(parentPath(conflict.remotePath), client)
+      await ensureFolderPath(parentFilesystemPath(conflict.remotePath), client)
       if (!this.isCurrent(capture)) return 'stale'
     }
     const identity = { origin: 'conflict-editor-resolution', writeId }
@@ -303,9 +304,4 @@ export class ConflictEditorResolutionCoordinator {
 
 function retryEventType(conflict: FilesystemConflict): FilesystemConflict['eventType'] {
   return conflict.eventType === 'deleted' ? 'changed' : conflict.eventType
-}
-
-function parentPath(path: FilesystemPath): FilesystemPath {
-  const index = path.lastIndexOf('/')
-  return filesystemPath(index < 0 ? '' : path.slice(0, index))
 }

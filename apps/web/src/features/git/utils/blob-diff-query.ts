@@ -4,7 +4,20 @@ import type { Client } from '@/lib/client'
 import { observeClientOperation } from '@/lib/client-logging'
 import { unwrapEdenResponse } from '@/lib/eden-events'
 import { gitKeys } from '@/lib/query-keys'
+import type { UseQueryOptions } from '@tanstack/react-query'
+import { clientForQueryClient } from '@/lib/environments/state/query-clients'
 import type { BlobDiffRequest } from '@/features/git/utils/types'
+
+export function blobDiffQueryOptions(
+  query: BlobDiffRequest,
+): UseQueryOptions<readonly GitFileDiff[]> {
+  return {
+    queryKey: blobDiffQueryKey(query),
+    queryFn: ({ signal, client }) => fetchBlobDiff(query, signal, clientForQueryClient(client)),
+    retry: false,
+    staleTime: Infinity,
+  }
+}
 
 export function blobDiffQueryKey(query: BlobDiffRequest) {
   return gitKeys.blobDiff({

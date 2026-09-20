@@ -28,7 +28,7 @@ function DialogOverlay({ className, ...props }: DialogPrimitive.Backdrop.Props) 
     <DialogPrimitive.Backdrop
       data-slot='dialog-overlay'
       className={cn(
-        'fixed inset-0 isolate z-50 bg-black/10 ease-out-strong data-open:duration-(--duration-enter) data-closed:duration-(--duration-exit) supports-backdrop-filter:backdrop-blur-xs data-open:animate-in data-open:fade-in-0 data-closed:animate-out data-closed:fade-out-0',
+        'fixed inset-0 isolate z-50 bg-black/10 ease-out-strong data-open:animation-duration-(--duration-enter) data-closed:animation-duration-(--duration-exit) supports-backdrop-filter:backdrop-blur-xs data-open:animate-in data-open:fade-in-0 data-closed:animate-out data-closed:fade-out-0',
         className,
       )}
       {...props}
@@ -63,7 +63,7 @@ function DialogContent({
       <DialogPrimitive.Popup
         data-slot='dialog-content'
         className={cn(
-          'fixed z-50 grid w-full gap-(--density-dialog-gap) p-(--density-dialog-padding) bg-popover-solid text-xs/relaxed text-popover-foreground shadow-xl ring-1 ring-foreground/10 ease-out-strong data-open:duration-(--duration-enter) data-closed:duration-(--duration-exit) outline-none data-open:animate-in data-open:fade-in-0 data-closed:animate-out data-closed:fade-out-0',
+          'fixed z-50 grid w-full gap-(--density-dialog-gap) p-(--density-dialog-padding) bg-popover-solid text-xs/relaxed text-popover-foreground shadow-xl ring-1 ring-foreground/10 ease-out-strong data-open:animation-duration-(--duration-enter) data-closed:animation-duration-(--duration-exit) outline-none data-open:animate-in data-open:fade-in-0 data-closed:animate-out data-closed:fade-out-0',
           sideClasses[side],
           className,
         )}

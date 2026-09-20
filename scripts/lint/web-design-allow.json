@@ -1,8 +1,8 @@
 [
   {
-    "file": "apps/web/src/features/chat/components/messages-timeline.tsx",
+    "file": "apps/web/src/features/chat/components/timeline-viewport.tsx",
     "class": "rounded-full",
-    "reason": "D1 rule 2: the jump-to-latest control is a circle, so it overrides the Button primitive's control radius. The only circular button in the app."
+    "reason": "The jump-to-latest control is a circle, so it overrides the Button primitive's control radius."
   },
   {
     "file": "apps/web/src/features/workbench/components/editor-tab-button.tsx",
@@ -10,44 +10,9 @@
     "reason": "Spreads dnd-kit drag attributes and listeners onto the element and needs role='tab'. The Button primitive offers neither."
   },
   {
-    "file": "apps/web/src/features/workbench/components/terminal-list-row.tsx",
-    "class": "<button>",
-    "reason": "Full-width list row that also spreads dnd-kit drag attributes and listeners and needs role='tab'. The Button primitive offers none of that; see \"The Row primitive gap\" in docs/web-design-language.md#the-row-primitive-gap."
-  },
-  {
     "file": "apps/web/src/features/chat/components/timeline-minimap.tsx",
     "class": "<button>",
     "reason": "An absolutely positioned minimap mark. Button's ghost hover would paint a block over the transcript and its active translate fights the mark's own -translate-y-1/2."
-  },
-  {
-    "file": "apps/web/src/features/chat/components/chat-input-command-menu.tsx",
-    "class": "<button>",
-    "reason": "role='option' whose highlight follows keyboard state via aria-selected, and which deliberately neutralises hover. On a Button that would mean re-declaring hover on the primitive, which D6 bans."
-  },
-  {
-    "file": "apps/web/src/features/chat/components/assistant-changed-files-tree.tsx",
-    "class": "<button>",
-    "reason": "Full-width list row. The Button primitive is a fixed-height, centred control that owns a radius and a hover fill, and a row is none of those things; it stays a raw element until a Row primitive exists. The full reasoning, including the specificity problem, is recorded under \"The Row primitive gap\" in docs/web-design-language.md#the-row-primitive-gap."
-  },
-  {
-    "file": "apps/web/src/features/editor/components/language-server-references-pane.tsx",
-    "class": "<button>",
-    "reason": "Full-width list row. The Button primitive is a fixed-height, centred control that owns a radius and a hover fill, and a row is none of those things; it stays a raw element until a Row primitive exists. The full reasoning, including the specificity problem, is recorded under \"The Row primitive gap\" in docs/web-design-language.md#the-row-primitive-gap."
-  },
-  {
-    "file": "apps/web/src/features/search/components/file-group.tsx",
-    "class": "<button>",
-    "reason": "Full-width list row. The Button primitive is a fixed-height, centred control that owns a radius and a hover fill, and a row is none of those things; it stays a raw element until a Row primitive exists. The full reasoning, including the specificity problem, is recorded under \"The Row primitive gap\" in docs/web-design-language.md#the-row-primitive-gap."
-  },
-  {
-    "file": "apps/web/src/features/search/components/match-row.tsx",
-    "class": "<button>",
-    "reason": "Full-width list row. The Button primitive is a fixed-height, centred control that owns a radius and a hover fill, and a row is none of those things; it stays a raw element until a Row primitive exists. The full reasoning, including the specificity problem, is recorded under \"The Row primitive gap\" in docs/web-design-language.md#the-row-primitive-gap."
-  },
-  {
-    "file": "apps/web/src/features/workbench/components/diagnostics-panel.tsx",
-    "class": "<button>",
-    "reason": "Full-width two-line list row. The Button primitive is a fixed-height, centred control that owns a radius and a hover fill, and a row is none of those things; it stays a raw element until a Row primitive exists. The full reasoning, including the specificity problem, is recorded under \"The Row primitive gap\" in docs/web-design-language.md#the-row-primitive-gap."
   },
   {
     "file": "packages/ui/src/components/input-group.tsx",
@@ -77,17 +42,7 @@
   {
     "file": "apps/web/src/features/chat/components/model-picker-rail-item.tsx",
     "class": "<button>",
-    "reason": "Full-width list row. The Button primitive is a fixed-height, centred control that owns a radius and a hover fill, and a row is none of those things; it stays a raw element until a Row primitive exists. Converted from a ghost Button because the primitive's hover:bg-muted outranks bg-row-selected on specificity, so the row vocabulary could never win while it stayed a Button. The full reasoning, including the specificity problem, is recorded under \"The Row primitive gap\" in docs/web-design-language.md#the-row-primitive-gap."
-  },
-  {
-    "file": "apps/web/src/features/chat-mode/components/session-row.tsx",
-    "class": "<button>",
-    "reason": "Full-width list row. The Button primitive is a fixed-height, centred control that owns a radius and a hover fill, and a row is none of those things; it stays a raw element until a Row primitive exists. Converted from a ghost Button because the primitive's hover:bg-muted outranks bg-row-selected on specificity, so the row vocabulary could never win while it stayed a Button. The full reasoning, including the specificity problem, is recorded under \"The Row primitive gap\" in docs/web-design-language.md#the-row-primitive-gap."
-  },
-  {
-    "file": "apps/web/src/features/chat-mode/components/tool-pane.tsx",
-    "class": "<button>",
-    "reason": "Full-width list row. The Button primitive is a fixed-height, centred control that owns a radius and a hover fill, and a row is none of those things; it stays a raw element until a Row primitive exists. Converted from a ghost Button because the primitive's hover:bg-muted outranks bg-row-selected on specificity, so the row vocabulary could never win while it stayed a Button. The full reasoning, including the specificity problem, is recorded under \"The Row primitive gap\" in docs/web-design-language.md#the-row-primitive-gap."
+    "reason": "Square provider selector uses shared listRowClassName paint with its own aspect ratio. It is a control, so a ListRow height would distort the provider rail."
   },
   {
     "file": "apps/web/src/features/workbench/components/bottom-panel.tsx",
@@ -95,14 +50,9 @@
     "reason": "A tab inside a bar: square, full bar height, lifted to the well colour when active. The Button primitive owns a radius, a fixed height and its own hover fill, none of which a bar tab may have; it shares its classes with the editor tab, which is allow-listed for the same shape."
   },
   {
-    "file": "apps/web/src/features/workbench/components/breadcrumb-picker-row.tsx",
-    "class": "<button>",
-    "reason": "Full-width list row. The Button primitive is a fixed-height, centred control that owns a radius and a hover fill, and a row is none of those things; it stays a raw element until a Row primitive exists. The full reasoning, including the specificity problem, is recorded under \"The Row primitive gap\" in docs/web-design-language.md#the-row-primitive-gap."
-  },
-  {
     "file": "apps/web/src/features/settings/components/widgets/palette-card.tsx",
     "class": "<button>",
-    "reason": "A gallery card with role='radio': a multi-line region holding a name, badges and two swatch strips. The Button primitive is a fixed-height, centred control with its own hover fill and radius; a card is none of those. Same gap as the Row primitive in docs/web-design-language.md#the-row-primitive-gap."
+    "reason": "A gallery card with role='radio': a multi-line region holding a name, badges and two swatch strips. The Button primitive is a fixed-height, centred control with its own hover fill and radius; a card is none of those. ListRow owns a single line at row height, so this gallery card retains its multiline radio control."
   },
   {
     "file": "apps/web/src/features/settings/components/widgets/color-field.tsx",
@@ -123,11 +73,6 @@
     "file": "apps/web/src/features/chat/components/assistant-changed-files-section.tsx",
     "class": "truncate",
     "reason": "D3: \"N changed files\" is app-authored. The file-name row further down carries title={file.path} on its Button."
-  },
-  {
-    "file": "apps/web/src/features/chat/components/assistant-changed-files-tree.tsx",
-    "class": "truncate",
-    "reason": "Already recovered: the file node's content is a fragment rendered inside renderFileNode's <button title={node.path}>, which the census cannot see from a different function."
   },
   {
     "file": "apps/web/src/features/chat/components/assistant-markdown-mermaid.tsx",
@@ -170,24 +115,19 @@
     "reason": "D3: \"New session\"."
   },
   {
-    "file": "apps/web/src/features/command-palette/goto-line-groups.tsx",
+    "file": "apps/web/src/features/command-palette/components/goto-line-groups.tsx",
     "class": "truncate",
     "reason": "D3: an app-authored hint sentence."
   },
   {
-    "file": "apps/web/src/features/command-palette/row-label.tsx",
+    "file": "apps/web/src/features/command-palette/components/row-label.tsx",
     "class": "truncate",
     "reason": "Already recovered: RowLabel renders a fragment inside CommandItem, and every palette row that carries a value puts its title on the CommandItem (D6). The rows that do not are app-authored labels (view, color mode, goto-line, command)."
   },
   {
-    "file": "apps/web/src/features/editor/components/language-server-references-pane.tsx",
+    "file": "apps/web/src/features/file-picker/components/sortable-column-header.tsx",
     "class": "truncate",
-    "reason": "D3: the pane heading \"References\". The group header and reference rows in this file carry their own titles."
-  },
-  {
-    "file": "apps/web/src/features/file-picker/list.tsx",
-    "class": "truncate",
-    "reason": "D3: SortableColumnHeader labels and the kind/modified columns are app-authored; the option row carries title={entry.path}."
+    "reason": "Column headers are app-authored labels; file option values carry their complete path on the row."
   },
   {
     "file": "apps/web/src/features/git/components/change-group.tsx",
@@ -205,17 +145,7 @@
     "reason": "D3: a count and its app-authored label."
   },
   {
-    "file": "apps/web/src/features/search/components/file-group.tsx",
-    "class": "truncate",
-    "reason": "Already recovered: SearchFileGroupTitle renders inside the header div that carries title={group.path}."
-  },
-  {
     "file": "apps/web/src/features/search/components/highlight.tsx",
-    "class": "truncate",
-    "reason": "Search excerpt: the complete value is an entire source line, sometimes thousands of characters, which a native tooltip is the wrong container for. The row's purpose is to open the file."
-  },
-  {
-    "file": "apps/web/src/features/search/components/match-row.tsx",
     "class": "truncate",
     "reason": "Search excerpt: the complete value is an entire source line, sometimes thousands of characters, which a native tooltip is the wrong container for. The row's purpose is to open the file."
   },

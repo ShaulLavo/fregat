@@ -1,3 +1,4 @@
+import { chatMutationKeys } from '@/features/chat/utils/mutation-keys'
 import type { ClientOrchestrationCommand, OrchestrationDispatchResult } from '@workspace/contracts'
 import { runIntent } from '@workspace/client-core/optimistic/run'
 
@@ -91,7 +92,7 @@ export function placeChatMessage({
     })
     void runMutation(
       queryClientFor(confirmedEnvironmentOrigin(environmentId)),
-      { mutationFn: () => intent, mutationKey: ['chat', 'message', message.id] },
+      { mutationFn: () => intent, mutationKey: chatMutationKeys.message(message.id) },
       undefined,
     )
   })

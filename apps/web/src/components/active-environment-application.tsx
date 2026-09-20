@@ -27,7 +27,7 @@ export function ActiveEnvironmentApplication({
         <LanguageServerMatchProvider>
           <AppearanceProvider bootDensity={bootDensity}>
             <EditorColorThemeProvider>
-              <TooltipProvider delay={600}>
+              <TooltipProvider>
                 <EditorStateProvider runtime={active.editor}>{children}</EditorStateProvider>
                 <ThemeAwareToaster />
               </TooltipProvider>

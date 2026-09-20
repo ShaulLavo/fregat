@@ -1,3 +1,4 @@
+import { Tooltip, TooltipContent, TooltipTrigger } from '@workspace/ui/components/tooltip'
 import { DotsThreeIcon } from '@phosphor-icons/react'
 import type { Palette } from '@workspace/contracts'
 import { Button } from '@workspace/ui/components/button'
@@ -27,18 +28,25 @@ export function PaletteCardMenu({
 
   return (
     <DropdownMenu>
-      <DropdownMenuTrigger
-        render={
-          <Button
-            aria-label={`${palette.name} actions`}
-            disabled={disabled}
-            size='icon-xs'
-            variant='ghost'
-          />
-        }
-      >
-        <DotsThreeIcon weight='bold' />
-      </DropdownMenuTrigger>
+      <Tooltip>
+        <TooltipTrigger
+          render={
+            <DropdownMenuTrigger
+              render={
+                <Button
+                  aria-label={`${palette.name} actions`}
+                  disabled={disabled}
+                  size='icon-xs'
+                  variant='ghost'
+                />
+              }
+            />
+          }
+        >
+          <DotsThreeIcon weight='bold' />
+        </TooltipTrigger>
+        <TooltipContent>{palette.name} actions</TooltipContent>
+      </Tooltip>
       <DropdownMenuContent align='end'>
         {editable ? <DropdownMenuItem onClick={onEdit}>Customize…</DropdownMenuItem> : null}
         <DropdownMenuItem onClick={onCopy}>

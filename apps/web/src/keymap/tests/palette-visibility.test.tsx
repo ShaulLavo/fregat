@@ -1,4 +1,4 @@
-import { commandPaletteItems } from '@/features/command-palette/command-palette-utils'
+import { commandPaletteItems } from '@/features/command-palette/utils/query'
 import { platformCommandSpecs } from '@/keymap/command-registry'
 import { platformCommands } from '@/keymap/table'
 import { isCommandVisibleInPalette } from '@/keymap/utils/palette-visibility'

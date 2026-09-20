@@ -1,3 +1,4 @@
+import { Tooltip, TooltipContent, TooltipTrigger } from '@workspace/ui/components/tooltip'
 import { DotsThreeIcon } from '@phosphor-icons/react'
 import type { SettingsWriteTarget } from '@workspace/contracts'
 import { Button } from '@workspace/ui/components/button'
@@ -26,13 +27,20 @@ export function PageActions({ scope }: { scope: SettingsWriteTarget }) {
 
   return (
     <DropdownMenu>
-      <DropdownMenuTrigger
-        render={
-          <Button aria-label='Settings actions' size='icon-sm' variant='ghost'>
-            <DotsThreeIcon />
-          </Button>
-        }
-      />
+      <Tooltip>
+        <DropdownMenuTrigger
+          render={
+            <TooltipTrigger
+              render={
+                <Button aria-label='Settings actions' size='icon-sm' variant='ghost'>
+                  <DotsThreeIcon />
+                </Button>
+              }
+            />
+          }
+        />
+        <TooltipContent>{'Settings actions'}</TooltipContent>
+      </Tooltip>
       <DropdownMenuContent align='end' className='w-60'>
         <DropdownMenuItem onClick={() => selectSettingsView('json')}>
           Open settings.json

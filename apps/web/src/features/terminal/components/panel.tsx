@@ -1,3 +1,4 @@
+import { ToolPane } from '@workspace/ui/patterns/tool-pane'
 import { RingLoader } from '@workspace/ui/components/ring-loader'
 import { errorMessage } from '@/lib/error-message'
 import { fetchTerminalCheckout } from '@/features/terminal/state/register-checkout'
@@ -311,7 +312,9 @@ export function TerminalPanel({
     )
 
   return (
-    <section
+    <ToolPane
+      header={null}
+      bodyClassName='relative flex min-h-0 min-w-0 flex-col overflow-hidden'
       aria-label='Terminal'
       {...sectionProps}
       className={cn('relative flex min-h-0 min-w-0 flex-col overflow-hidden', className)}
@@ -345,7 +348,7 @@ export function TerminalPanel({
           target={menuTarget}
         />
       ) : null}
-    </section>
+    </ToolPane>
   )
 }
 

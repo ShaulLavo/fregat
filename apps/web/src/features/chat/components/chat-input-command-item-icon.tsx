@@ -7,13 +7,13 @@ import type { ChatInputCommandItem } from '@/features/chat/utils/input-logic'
 
 export function ChatInputCommandItemIcon({ item }: { item: ChatInputCommandItem }) {
   if (item.type === 'skill') {
-    return <SparkleIcon className='text-muted-foreground/80 size-4 shrink-0' />
+    return <SparkleIcon className='text-muted-foreground size-(--icon-size) shrink-0' />
   }
   if (item.type === 'slash-command' || item.type === 'provider-command') {
-    return <TerminalWindowIcon className='text-muted-foreground/80 size-4 shrink-0' />
+    return <TerminalWindowIcon className='text-muted-foreground size-(--icon-size) shrink-0' />
   }
 
   const icon = iconForEntry({ name: item.label, type: item.entryType })
 
-  return <FileTypeIcon className='size-4 shrink-0' icon={icon} />
+  return <FileTypeIcon className='size-(--icon-size) shrink-0' icon={icon} />
 }

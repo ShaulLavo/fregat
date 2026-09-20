@@ -55,3 +55,8 @@ export const documentSymbolKeys = {
   document: (rootPath: string, path: string, contentRevision: string) =>
     [...documentSymbolKeys.all, rootPath, path, contentRevision] as const,
 }
+
+export const providerQueryKeys = {
+  all: ['providers'] as const,
+  list: () => [...providerQueryKeys.all, 'list'] as const,
+}

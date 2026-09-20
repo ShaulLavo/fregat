@@ -4,7 +4,7 @@ import { queryOptions, type QueryClient } from '@tanstack/react-query'
 import * as v from 'valibot'
 import { clientForQueryClient, originForQueryClient } from '@/lib/environments/state/query-clients'
 import { unwrapEdenResponse } from '@/lib/eden-events'
-import { terminalQueryKeys } from '@/features/terminal/utils/keys'
+import { terminalQueryKeys } from '@/features/terminal/utils/query-keys'
 import {
   createProjectRegistrationCommand,
   projectRegistrationResult,

@@ -2,8 +2,8 @@ import { render, screen } from '@testing-library/react'
 import { vi } from 'vitest'
 
 import { expect, test } from '../../../../test/fixtures'
-import { ColorModeGroups } from '@/features/command-palette/color-mode-groups'
-import { colorModeItemForValue } from '@/features/command-palette/command-palette-utils'
+import { ColorModeGroups } from '@/features/command-palette/components/color-mode-groups'
+import { colorModeItemForValue } from '@/features/command-palette/utils/query'
 import {
   CommandPaletteActionsContext,
   type CommandPaletteActions,

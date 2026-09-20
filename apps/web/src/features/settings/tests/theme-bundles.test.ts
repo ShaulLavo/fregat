@@ -73,10 +73,15 @@ test('switches every part by mode and retains concurrent customizations by varia
   expect(light['workbench.surface.opacity']).toBe(80)
   await select(BUNDLED_THEMES[1]!)
   values = (await client.settings.get()).data!.values
-  expect(resolveThemeSettings(values, 'light')['workbench.wallpaper'].enabled).toBe(false)
+  expect(resolveThemeSettings(values, 'light')['workbench.wallpaper']).toEqual(
+    BUNDLED_THEMES[1]!.variants.light.wallpaper,
+  )
   await select(theme)
   values = (await client.settings.get()).data!.values
-  expect(resolveThemeSettings(values, 'light')['workbench.wallpaper'].enabled).toBe(true)
+  expect(resolveThemeSettings(values, 'light')['workbench.wallpaper']).toEqual({
+    enabled: true,
+    source: { kind: 'desktop' },
+  })
   const reset = await client.settings.write.post({
     mutationId: 'theme-reset',
     target: 'user',

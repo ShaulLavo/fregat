@@ -425,7 +425,7 @@ function isSearchResultNameItem(item: SearchResultItem): item is SearchResultNam
   return item.type === 'name'
 }
 
-function searchResultSelectableIds(rows: readonly SearchResultVirtualRow[]) {
+export function searchResultSelectableIds(rows: readonly SearchResultVirtualRow[]) {
   const ids: SearchResultId[] = []
   for (const row of rows) {
     if (row.type === 'file') {

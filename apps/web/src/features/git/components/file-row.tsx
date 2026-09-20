@@ -1,3 +1,5 @@
+import { ListRow } from '@workspace/ui/patterns/list-row'
+import type { useListbox } from '@workspace/ui/patterns/use-listbox'
 import { FileTypeIcon } from '@/components/file-type-icon'
 import type { KeyboardEvent, MouseEventHandler, ReactNode } from 'react'
 import { Shimmer } from '@workspace/ui/components/shimmer'
@@ -16,6 +18,7 @@ export function FileRow({
   historical = false,
   actions,
   onOpen,
+  rowProps,
   onContextMenu,
   onMenuKey,
 }: {
@@ -27,6 +30,7 @@ export function FileRow({
   disabledReason?: string
   historical?: boolean
   actions?: ReactNode
+  rowProps?: ReturnType<ReturnType<typeof useListbox<string>>['rowProps']>
   onOpen: () => void
   onContextMenu?: MouseEventHandler<HTMLDivElement>
   onMenuKey?: (event: KeyboardEvent<HTMLDivElement>) => boolean
@@ -35,7 +39,7 @@ export function FileRow({
   const name = basename(relativePath)
   const directory = parentPath(relativePath)
   const icon = iconForEntry({ name, type: 'file' })
-  const title = `${oldPath ? `${toTreePath(oldPath, rootPath)} → ` : ''}${relativePath}${disabledReason ? ` · ${disabledReason}` : ''}`
+  const title = `${oldPath ? `${toTreePath(oldPath, rootPath)} → ` : ''}${relativePath} · ${status.title}${disabledReason ? ` · ${disabledReason}` : ''}`
   const label = (
     <>
       <span className={cn('font-medium', !loading && 'text-foreground')}>{name}</span>
@@ -60,22 +64,26 @@ export function FileRow({
   }
 
   return (
-    <div
+    <ListRow
+      {...rowProps}
+      role='treeitem'
+      aria-level={historical ? 1 : 2}
       aria-busy={loading || undefined}
       aria-disabled={Boolean(disabledReason) || undefined}
-      className='group/row focus-ring hover:bg-row-hover active:bg-row-active grid h-(--density-row-height) cursor-pointer grid-cols-[22px_minmax(0,1fr)_auto_28px] items-center px-(--density-row-padding-x) text-xs leading-4 outline-none'
+      className='grid cursor-pointer grid-cols-[22px_minmax(0,1fr)_auto_28px] gap-0 leading-4'
       data-git-file={path}
       data-git-file-loading={loading || undefined}
       data-history-file={historical ? path : undefined}
       title={title}
-      role='button'
-      tabIndex={0}
-      onClick={handleOpen}
+      onClick={(event) => {
+        rowProps?.onClick(event)
+        handleOpen()
+      }}
       onContextMenu={onContextMenu}
       onKeyDown={handleKeyDown}
     >
-      <FileTypeIcon className='size-4 shrink-0 justify-self-center' icon={icon} />
-      <div className='min-w-0 truncate text-left' title={title}>
+      <FileTypeIcon className='size-(--icon-size-sm) shrink-0 justify-self-center' icon={icon} />
+      <div className='min-w-0 truncate text-left'>
         {loading ? <Shimmer>{label}</Shimmer> : label}
       </div>
       <div>{actions}</div>
@@ -84,10 +92,9 @@ export function FileRow({
           'flex h-(--density-row-height) items-center justify-self-end pb-px text-xs font-semibold leading-none',
           status.className,
         )}
-        title={status.title}
       >
         {status.label}
       </span>
-    </div>
+    </ListRow>
   )
 }

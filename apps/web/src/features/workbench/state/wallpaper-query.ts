@@ -1,3 +1,4 @@
+import { wallpaperQueryKeys } from '@/features/workbench/utils/query-keys'
 import { queryOptions } from '@tanstack/react-query'
 
 import { wallpaperMediaKind, type WallpaperMediaKind } from '@/features/workbench/utils/wallpaper'
@@ -18,12 +19,6 @@ const wallpaperQueryDefaults = {
   retry: false,
   staleTime: WALLPAPER_QUERY_STALE_TIME_MS,
 } as const
-
-const wallpaperQueryKeys = {
-  all: ['wallpaper'] as const,
-  info: () => [...wallpaperQueryKeys.all, 'info'] as const,
-  media: () => [...wallpaperQueryKeys.all, 'media'] as const,
-}
 
 export function wallpaperInfoQueryOptions({ enabled }: { enabled: boolean }) {
   return queryOptions({

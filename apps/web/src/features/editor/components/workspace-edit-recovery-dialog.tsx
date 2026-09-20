@@ -68,7 +68,7 @@ export function WorkspaceEditRecoveryDialog() {
           {conflict ? (
             <div className='border-warning/30 bg-warning/10 rounded-lg border p-3'>
               <div className='text-warning mb-2 flex items-center gap-2 text-xs font-medium'>
-                <WarningOctagonIcon className='size-4' />
+                <WarningOctagonIcon className='size-(--icon-size)' />
                 Workspace state is unknown
               </div>
               <p className='text-muted-foreground mb-2 text-xs'>
@@ -84,7 +84,7 @@ export function WorkspaceEditRecoveryDialog() {
           ) : (
             <div className='border-destructive/30 bg-destructive/10 rounded-lg border p-3'>
               <div className='text-destructive mb-2 flex items-center gap-2 text-xs font-medium'>
-                <WarningOctagonIcon className='size-4' />
+                <WarningOctagonIcon className='size-(--icon-size)' />
                 <span className='tabular-nums'>
                   {recovery?.unrecoveredPaths.length ?? 0} unrecovered{' '}
                   {recovery?.unrecoveredPaths.length === 1 ? 'path' : 'paths'}

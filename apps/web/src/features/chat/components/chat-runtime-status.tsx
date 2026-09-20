@@ -1,3 +1,4 @@
+import { Tooltip, TooltipContent, TooltipTrigger } from '@workspace/ui/components/tooltip'
 import { useQuery } from '@tanstack/react-query'
 import { Alert, AlertAction, AlertDescription, AlertTitle } from '@workspace/ui/components/alert'
 import { Button } from '@workspace/ui/components/button'
@@ -101,7 +102,7 @@ function RuntimeAlert({
       className={runtimeAlertClass(alert.tone)}
       variant={alert.tone === 'error' ? 'destructive' : 'default'}
     >
-      <WarningCircleIcon className='size-4' />
+      <WarningCircleIcon className='size-(--icon-size)' />
       <AlertTitle>{alert.title}</AlertTitle>
       {alert.detail ? (
         <AlertDescription className='line-clamp-3 tabular-nums' title={alert.detail}>
@@ -116,15 +117,22 @@ function RuntimeAlert({
             </Button>
           ) : null}
           {alert.dismissKey ? (
-            <Button
-              aria-label={`Dismiss ${alert.title}`}
-              onClick={() => onDismiss(alert)}
-              size='icon-sm'
-              type='button'
-              variant='ghost'
-            >
-              <XIcon className='size-3.5' />
-            </Button>
+            <Tooltip>
+              <TooltipTrigger
+                render={
+                  <Button
+                    aria-label={`Dismiss ${alert.title}`}
+                    onClick={() => onDismiss(alert)}
+                    size='icon-sm'
+                    type='button'
+                    variant='ghost'
+                  >
+                    <XIcon className='size-(--icon-size-sm)' />
+                  </Button>
+                }
+              />
+              <TooltipContent>{`Dismiss ${alert.title}`}</TooltipContent>
+            </Tooltip>
           ) : null}
         </AlertAction>
       ) : null}

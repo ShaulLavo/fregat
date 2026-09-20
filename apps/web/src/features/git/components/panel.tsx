@@ -1,7 +1,8 @@
+import { disabledDiffQueryKey } from '@/features/git/utils/query-keys'
 import type { GitFileStatus } from '@workspace/contracts'
 import { EmptyState } from '@workspace/ui/components/empty-state'
 import { cn } from '@workspace/ui/lib/utils'
-import { Activity, useMemo, type ComponentProps, type ReactNode } from 'react'
+import { Activity, useMemo, type ComponentProps } from 'react'
 import { useIsFetching } from '@tanstack/react-query'
 import { Button } from '@workspace/ui/components/button'
 import { PaneBar } from '@workspace/ui/components/pane-bar'
@@ -11,18 +12,17 @@ import { useNavigation } from '@/hooks/use-navigation'
 
 import { useEditorWorkspaceState } from '@/features/editor/state/workspace-state'
 import { errorMessage } from '@/lib/file-server'
-import { useStatus } from '@/features/git/hooks'
+import { useStatus } from '@/features/git/hooks/use-status'
 
 import { changeRows } from '@/features/git/utils/change-rows'
-import { ChangeGroup } from '@/features/git/components/change-group'
+import { ChangesList } from '@/features/git/components/changes-list'
+import { ToolPane } from '@workspace/ui/patterns/tool-pane'
 import { CommitControls } from '@/features/git/components/commit-controls'
 import { PanelLoading } from '@/features/git/components/panel-loading'
 import { diffDocumentQueryKey } from '@/features/git/utils/diff-document-query'
 import { FocusablePanel } from '@/components/focusable-panel'
 import { queryHasNoData } from '@/lib/query-state'
 import { StaleNotice } from '@/lib/environments/components/stale-notice'
-
-const DISABLED_DIFF_QUERY = ['git', 'diffs', 'disabled'] as const
 
 const EMPTY_FILES: readonly GitFileStatus[] = []
 
@@ -47,7 +47,7 @@ export function Panel({ className, rootPath }: ComponentProps<'section'> & { roo
       : null
   const selectedDiffQueryKey = selectedDiff
     ? diffDocumentQueryKey(selectedDiff)
-    : DISABLED_DIFF_QUERY
+    : disabledDiffQueryKey
   const selectedDiffPending =
     useIsFetching({
       exact: true,
@@ -56,97 +56,80 @@ export function Panel({ className, rootPath }: ComponentProps<'section'> & { roo
     }) > 0
   const loadingDiff = selectedDiffPending && selectedDiff?.kind === 'snapshot' ? selectedDiff : null
 
-  function renderRoot(children: ReactNode) {
-    return (
-      <FocusablePanel
-        area='git'
-        target={{ kind: 'git', rootPath }}
-        aria-label='Git panel'
-        className={cn('flex h-full min-h-0 flex-col text-foreground', className)}
+  return (
+    <FocusablePanel
+      area='git'
+      target={{ kind: 'git', rootPath }}
+      aria-label='Git panel'
+      className={cn('flex h-full min-h-0 flex-col text-foreground', className)}
+    >
+      <StaleNotice />
+      <ToolPane
+        bodyClassName='flex flex-col overflow-hidden'
+        state={{
+          pending: status.isPending,
+          error: status.isError && !status.data,
+          empty: !repository,
+        }}
+        loading={<PanelLoading />}
+        errorState={
+          <EmptyState
+            align='start'
+            className='min-h-0 flex-1'
+            description={errorMessage(status.error)}
+            title='Git is unavailable'
+            tone='error'
+          />
+        }
+        emptyState={
+          <EmptyState align='start' className='min-h-0 flex-1' title='No Git repository' />
+        }
+        header={
+          <PaneBar border='bottom'>
+            <Button
+              size='sm'
+              variant='ghost'
+              aria-pressed={view === 'changes'}
+              className='aria-pressed:bg-accent'
+              onClick={() => setView('changes')}
+            >
+              <GitDiffIcon />
+              Changes
+              <span className='text-muted-foreground text-2xs tabular-nums'>{files.length}</span>
+            </Button>
+            <Button
+              size='sm'
+              variant='ghost'
+              aria-pressed={view === 'graph'}
+              className='aria-pressed:bg-accent'
+              onClick={() => setView('graph')}
+            >
+              <GitBranchIcon />
+              Graph
+            </Button>
+          </PaneBar>
+        }
       >
-        <StaleNotice />
-        {children}
-      </FocusablePanel>
-    )
-  }
-
-  if (status.isPending) {
-    return renderRoot(<PanelLoading />)
-  }
-  if (status.isError && !status.data) {
-    return renderRoot(
-      <EmptyState
-        align='start'
-        className='min-h-0 flex-1'
-        description={errorMessage(status.error)}
-        title='Git is unavailable'
-        tone='error'
-      />,
-    )
-  }
-  if (!repository) {
-    return renderRoot(
-      <EmptyState align='start' className='min-h-0 flex-1' title='No Git repository' />,
-    )
-  }
-
-  return renderRoot(
-    <>
-      <PaneBar border='bottom'>
-        <Button
-          size='sm'
-          variant='ghost'
-          aria-pressed={view === 'changes'}
-          className='aria-pressed:bg-accent'
-          onClick={() => setView('changes')}
-        >
-          <GitDiffIcon />
-          Changes<span className='text-muted-foreground text-2xs tabular-nums'>{files.length}</span>
-        </Button>
-        <Button
-          size='sm'
-          variant='ghost'
-          aria-pressed={view === 'graph'}
-          className='aria-pressed:bg-accent'
-          onClick={() => setView('graph')}
-        >
-          <GitBranchIcon />
-          Graph
-        </Button>
-      </PaneBar>
-      <Activity mode={view === 'graph' ? 'visible' : 'hidden'}>
-        <History key={rootPath} rootPath={rootPath} />
-      </Activity>
-      <Activity mode={view === 'changes' ? 'visible' : 'hidden'}>
-        <CommitControls
-          hasLocalChanges={hasLocalChanges}
-          repository={repository}
-          rootPath={rootPath}
-        />
-        <div className='app-scrollbar-thin min-h-0 flex-1 overflow-auto py-(--density-gap-tight)'>
-          <ChangeGroup
-            label='Staged'
-            loadingPath={loadingDiff?.source === 'staged' ? loadingDiff.path : null}
-            rootPath={rootPath}
-            rows={rows.staged}
-            section='staged'
-          />
-          <ChangeGroup
-            label='Changes'
-            loadingPath={loadingDiff?.source === 'worktree' ? loadingDiff.path : null}
-            rootPath={rootPath}
-            rows={rows.worktree}
-            section='worktree'
-          />
-          {!hasLocalChanges && (
-            <EmptyState
-              align='start'
-              className='px-(--density-row-padding-x) py-4'
-              title='Working tree clean'
+        <Activity mode={view === 'graph' ? 'visible' : 'hidden'}>
+          <History key={rootPath} rootPath={rootPath} />
+        </Activity>
+        <Activity mode={view === 'changes' ? 'visible' : 'hidden'}>
+          {repository ? (
+            <CommitControls
+              hasLocalChanges={hasLocalChanges}
+              repository={repository}
+              rootPath={rootPath}
             />
-          )}
-        </div>
-      </Activity>
-    </>,
+          ) : null}
+          <ChangesList
+            rootPath={rootPath}
+            staged={rows.staged}
+            worktree={rows.worktree}
+            loadingPath={loadingDiff?.path}
+            loadingSection={loadingDiff?.source}
+          />
+        </Activity>
+      </ToolPane>
+    </FocusablePanel>
   )
 }

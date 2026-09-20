@@ -33,7 +33,7 @@ export function WallpaperChoice({
       <span className='truncate px-1 text-left text-xs'>{label}</span>
       {selected ? (
         <span className='bg-primary text-primary-foreground absolute top-2 right-2 flex size-4 items-center justify-center rounded-full'>
-          <CheckIcon aria-hidden='true' className='size-3' weight='bold' />
+          <CheckIcon aria-hidden='true' className='size-(--icon-size-sm)' weight='bold' />
         </span>
       ) : null}
     </Button>

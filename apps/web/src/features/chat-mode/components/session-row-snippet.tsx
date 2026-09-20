@@ -17,7 +17,7 @@ export function SessionRowSnippet({ sessionKey }: { readonly sessionKey: string 
   if (!match) return null
 
   return (
-    <span className='text-2xs flex min-w-0 items-center gap-1.5 pl-[14px] leading-4 opacity-60'>
+    <span className='text-muted-foreground text-2xs flex min-w-0 items-center gap-1.5 pl-[14px] leading-4'>
       <span className='shrink-0'>{match.source === 'user' ? 'You' : 'Agent'}</span>
       <span className='min-w-0 flex-1'>
         {match.snippet ? (

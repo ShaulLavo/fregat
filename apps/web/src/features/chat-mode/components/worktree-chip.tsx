@@ -28,7 +28,11 @@ export function WorktreeChip({
         state === 'cleanup-blocked' && 'text-warning',
       )}
     >
-      {pending ? <OrbitLoader label={lifecycle} /> : <GitBranchIcon className='size-3 shrink-0' />}
+      {pending ? (
+        <OrbitLoader label={lifecycle} />
+      ) : (
+        <GitBranchIcon className='size-(--icon-size-sm) shrink-0' />
+      )}
       <span className='truncate'>{label}</span>
       {state !== 'ready' ? <span className='truncate'>{lifecycle}</span> : null}
       {worktree.ownership === 'protected' ? (

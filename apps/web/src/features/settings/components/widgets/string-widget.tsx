@@ -55,10 +55,8 @@ export function StringWidget({
         if (cancelled.current) {
           cancelled.current = false
           setDraft(null)
-
           return
         }
-
         commit()
         setDraft(null)
       }}
@@ -70,11 +68,9 @@ export function StringWidget({
         if (event.key === 'Escape') {
           cancelled.current = true
           event.currentTarget.blur()
-
           return
         }
         if (event.key !== 'Enter') return
-
         commit()
       }}
       spellCheck={false}

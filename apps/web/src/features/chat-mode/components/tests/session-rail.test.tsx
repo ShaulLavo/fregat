@@ -77,7 +77,10 @@ test('the archive browser unarchives through the owner and returns the session t
   await harness.refresh()
   renderRailHarness(harness)
   expect(screen.queryByTitle('First')).toBeNull()
-  expect(screen.getByTitle('Archived sessions (1)')).toHaveAttribute('aria-pressed', 'false')
+  expect(screen.getByRole('button', { name: 'Archived sessions' })).toHaveAttribute(
+    'aria-pressed',
+    'false',
+  )
   await userEvent.click(screen.getByRole('button', { name: 'Archived sessions' }))
   expect(screen.getByTitle('First')).toBeVisible()
   expect(screen.queryByTitle('Second')).toBeNull()
@@ -90,7 +93,10 @@ test('the archive browser unarchives through the owner and returns the session t
     ).toBeNull(),
   )
   expect(screen.getByText('No archived sessions.')).toBeVisible()
-  expect(screen.getByTitle('Archived sessions (0)')).toHaveAttribute('aria-pressed', 'true')
+  expect(screen.getByRole('button', { name: 'Archived sessions' })).toHaveAttribute(
+    'aria-pressed',
+    'true',
+  )
   await userEvent.click(screen.getByRole('button', { name: 'Archived sessions' }))
   expect(screen.getByTitle('First')).toBeVisible()
   expect(screen.getByTitle('Second')).toBeVisible()
@@ -167,7 +173,7 @@ test('archive search filters filed sessions without exposing matching active ses
   expect(screen.queryByTitle('Active match')).toBeNull()
   await userEvent.click(screen.getByRole('button', { name: 'Clear search' }))
   expect(screen.getByTitle('Other filed')).toBeVisible()
-  expect(screen.getByTitle('Archived sessions (2)')).toBeVisible()
+  expect(screen.getByRole('button', { name: 'Archived sessions' })).toBeVisible()
 })
 
 test('a collapsed project preserves the staged session and restores its hidden sibling', async ({
@@ -176,7 +182,7 @@ test('a collapsed project preserves the staged session and restores its hidden s
 }) => {
   const harness = await createRailHarness(client, server)
   renderRailHarness(harness)
-  const project = screen.getByRole('button', { name: /Rail project/ })
+  const project = screen.getByRole('option', { name: /Rail project/ })
   await userEvent.click(project)
   expect(project).toHaveAttribute('aria-expanded', 'false')
   expect(screen.getByTitle('First')).toBeVisible()

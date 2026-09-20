@@ -1,3 +1,4 @@
+import { environmentQueryKeys } from '@/features/environments/utils/query-keys'
 import { parseAddressIntent } from '@/features/address/utils/intent'
 import { healthDescriptorSchema, DEFAULT_SETTING_VALUES } from '@workspace/contracts'
 import * as v from 'valibot'
@@ -92,7 +93,9 @@ test('cached primary and remote slices paint before sockets, and cached protocol
     expect(() => createBootRuntime(descriptorB, parseAddressIntent('/'), true)).toThrow(
       'cached machine identity conflicts',
     )
-    expect(primaryQueryClient().getQueryData(['environment-descriptor'])).toEqual(oldDescriptor)
+    expect(primaryQueryClient().getQueryData(environmentQueryKeys.descriptor)).toEqual(
+      oldDescriptor,
+    )
     expect(useEnvironmentsStore.getState().entries[primary]?.environmentId).toBe(
       descriptorA.environmentId,
     )

@@ -1,3 +1,4 @@
+import { SETTINGS_MUTATION_KEY } from '@/features/settings/utils/mutation-keys'
 import { nowMs } from '@workspace/utils/timing'
 import * as v from 'valibot'
 import {
@@ -69,7 +70,6 @@ import { clientForQueryClient } from '@/lib/environments/state/query-clients'
 import { useSettingsProjection } from '@/features/settings/hooks/use-settings-projection'
 import { withMovedModel } from '@/features/settings/utils/patch'
 
-const SETTINGS_MUTATION_KEY = ['settings', 'mutation'] as const
 const SETTINGS_MUTATION_SCOPE = 'settings-document'
 
 /** Semantic settings actions shared by commands and settings controls. */

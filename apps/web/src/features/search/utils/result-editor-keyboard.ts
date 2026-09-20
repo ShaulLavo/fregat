@@ -1,16 +1,11 @@
-import {
-  searchResultTreeKeyDown,
-  type SearchResultKeyEvent,
-} from '@/features/search/utils/result-tree-keyboard'
+import { listboxKeyAction } from '@workspace/ui/patterns/listbox-keys'
 import type { SearchResultId } from '@/features/search/utils/result-items'
 import {
   firstSearchResultExcerptId,
-  firstSearchResultVirtualRowId,
-  lastSearchResultVirtualRowId,
+  searchResultSelectableIds,
   parentSearchResultFileId,
   searchResultOpenTargetForId,
   searchResultVirtualRowById,
-  searchResultVirtualRowIdByOffset,
   type SearchResultFileBlock,
   type SearchResultOpenTarget,
   type SearchResultVirtualRow,
@@ -27,7 +22,10 @@ export function handleSearchResultSurfaceKeyDown({
 }: {
   activeResultId: SearchResultId | null
   blocks: readonly SearchResultFileBlock[]
-  event: SearchResultKeyEvent
+  event: Pick<
+    KeyboardEvent,
+    'key' | 'metaKey' | 'ctrlKey' | 'altKey' | 'shiftKey' | 'preventDefault'
+  >
   onOpenTarget: (target: SearchResultOpenTarget) => void
   onSelectResult: (id: SearchResultId | null) => void
   onToggleGroup: (path: string) => void
@@ -35,22 +33,33 @@ export function handleSearchResultSurfaceKeyDown({
 }) {
   const active = searchResultVirtualRowById(rows, activeResultId)
   const group = active?.type === 'file' ? active.file : null
-  searchResultTreeKeyDown({
-    event,
-    onSelectResult,
-    onToggleGroup,
-    navigator: {
-      group,
-      idByOffset: (offset) => searchResultVirtualRowIdByOffset({ activeResultId, offset, rows }),
-      firstId: () => firstSearchResultVirtualRowId(rows),
-      lastId: () => lastSearchResultVirtualRowId(rows),
-      childId: () => (group ? (firstSearchResultExcerptId(rows, group.id) ?? group.id) : null),
-      parentId: () => parentSearchResultFileId(rows, activeResultId),
-      canCollapse: group !== null && group.excerpts.length > 0,
-      commit: () => {
-        const target = searchResultOpenTargetForId(blocks, activeResultId)
-        if (target) onOpenTarget(target)
-      },
+  const ids = searchResultSelectableIds(rows)
+  const action = listboxKeyAction({
+    key: event.key,
+    modifiers: {
+      metaKey: event.metaKey,
+      ctrlKey: event.ctrlKey,
+      altKey: event.altKey,
+      shiftKey: event.shiftKey,
     },
+    role: 'tree',
+    count: ids.length,
+    activeIndex: ids.indexOf(activeResultId ?? ''),
+    pageSize: 10,
+    canCollapse: group !== null && group.excerpts.length > 0,
+    isCollapsed: group?.collapsed,
   })
+  if (action.kind === 'none') return
+  event.preventDefault()
+  if (action.kind === 'move') onSelectResult(ids[action.index] ?? null)
+  if (action.kind === 'child' && group)
+    onSelectResult(firstSearchResultExcerptId(rows, group.id) ?? group.id)
+  if (action.kind === 'parent') {
+    const parent = parentSearchResultFileId(rows, activeResultId)
+    if (parent) onSelectResult(parent)
+  }
+  if ((action.kind === 'collapse' || action.kind === 'expand') && group) onToggleGroup(group.path)
+  if (action.kind !== 'commit') return
+  const target = searchResultOpenTargetForId(blocks, activeResultId)
+  if (target) onOpenTarget(target)
 }

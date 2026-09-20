@@ -1,3 +1,4 @@
+import { parentFilesystemPath } from '@/lib/path-formatters'
 import { decodedAsText } from '@workspace/contracts'
 import { FilesystemConflictToast } from '@/features/editor/components/filesystem-conflict-toast'
 import {
@@ -241,7 +242,7 @@ async function applyLocalConflict(conflict: FilesystemConflict, context: Workspa
 }
 
 async function restoreDeletedLocalConflict(conflict: FilesystemConflict, client: Client) {
-  await ensureFolderPath(parentPath(conflict.remotePath, filesystemPath('')), client)
+  await ensureFolderPath(parentFilesystemPath(conflict.remotePath, filesystemPath('')), client)
   await createFileContent(conflict.remotePath, conflict.localText, client)
 }
 
@@ -327,13 +328,4 @@ function moveFileQueryData(queryClient: QueryClient, from: FilesystemPath, to: F
   if (!file) return
 
   setFileSnapshotQueryData(queryClient, { ...file, path: to })
-}
-
-function parentPath(path: FilesystemPath, rootPath: FilesystemPath) {
-  if (path === rootPath) return rootPath
-
-  const index = path.lastIndexOf('/')
-  if (index < 0) return rootPath
-
-  return filesystemPath(path.slice(0, index))
 }

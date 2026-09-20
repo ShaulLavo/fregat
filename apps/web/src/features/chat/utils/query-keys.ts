@@ -1,0 +1,21 @@
+import type { ProviderInstanceId } from '@workspace/contracts'
+
+export const providerAuthKeys = {
+  all: ['providers', 'auth'] as const,
+  attempt: (providerInstanceId: ProviderInstanceId, attemptId: string) =>
+    [...providerAuthKeys.all, providerInstanceId, 'attempt', attemptId] as const,
+  status: (providerInstanceId: ProviderInstanceId) =>
+    [...providerAuthKeys.all, providerInstanceId] as const,
+}
+
+export const providerCommandCatalogKeys = {
+  all: ['providers', 'commands'] as const,
+  catalog: (providerInstanceId: ProviderInstanceId, cwd: string | null) =>
+    [...providerCommandCatalogKeys.all, providerInstanceId, cwd ?? 'no-cwd'] as const,
+}
+
+export const projectEntryQueryKeys = {
+  all: ['chat-project-entries'] as const,
+  search: (rootPath: string, query: string, limit: number) =>
+    [...projectEntryQueryKeys.all, rootPath, query, limit] as const,
+}

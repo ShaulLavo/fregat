@@ -31,7 +31,7 @@ export function TerminalContextChip({
       data-terminal-context-source={selection.source}
       title={selection.text}
     >
-      <TerminalWindowIcon aria-hidden='true' className='size-3.5 shrink-0' />
+      <TerminalWindowIcon aria-hidden='true' className='size-(--icon-size-sm) shrink-0' />
       <span className='shrink-0'>{selection.source}</span>
       <span className='text-muted-foreground shrink-0 tabular-nums'>
         {formatTerminalContextRange(selection)}

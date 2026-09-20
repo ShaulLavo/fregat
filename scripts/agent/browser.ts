@@ -103,6 +103,8 @@ async function main() {
     site: values.site || Boolean(values['static-dir']),
     productCapture:
       name === 'editor-product' ||
+      name === 'terminal-tabs' ||
+      name === 'workbench-list-focus' ||
       name === 'editor-external-edit' ||
       Boolean(name?.startsWith('editor-split-')) ||
       Boolean(values['product-wallpaper']),

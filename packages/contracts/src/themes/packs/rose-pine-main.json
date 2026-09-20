@@ -1,0 +1,73 @@
+{
+  "schemaVersion": 1,
+  "id": "upstream-rose-pine-main",
+  "name": "Rosé Pine Main",
+  "variants": {
+    "kind": "single",
+    "mode": "dark",
+    "colors": {
+      "app": {
+        "background": "#191724",
+        "foreground": "#e0def4",
+        "card": "#1f1d2e",
+        "card-foreground": "#e0def4",
+        "popover": "#1f1d2e",
+        "popover-foreground": "#e0def4",
+        "primary": "#9ccfd8",
+        "primary-foreground": "#12101a",
+        "secondary": "#403d52",
+        "secondary-foreground": "#e0def4",
+        "muted": "#1f1d2e",
+        "muted-foreground": "oklch(0.6124 0.0435 291.41)",
+        "accent": "#403d52",
+        "accent-foreground": "#e0def4",
+        "destructive": "#eb6f92",
+        "info": "#9ccfd8",
+        "info-foreground": "#12101a",
+        "success": "#31748f",
+        "success-foreground": "#ffffff",
+        "warning": "#f6c177",
+        "warning-foreground": "#12101a",
+        "update": "#c4a7e7",
+        "update-foreground": "#12101a",
+        "border": "#524f67",
+        "input": "#524f67",
+        "ring": "#9ccfd8",
+        "chart-1": "#9ccfd8",
+        "chart-2": "#9ccfd8",
+        "chart-3": "#c4a7e7",
+        "chart-4": "#f6c177",
+        "chart-5": "#ebbcba"
+      },
+      "terminal": {
+        "foreground": "#e0def4",
+        "cursor": "#e0def4",
+        "cursor-accent": "#191724",
+        "selection": "#403d52",
+        "selection-foreground": "#e0def4",
+        "black": "#12101a",
+        "red": "#eb6f92",
+        "green": "#31748f",
+        "yellow": "#f6c177",
+        "blue": "#9ccfd8",
+        "magenta": "#c4a7e7",
+        "cyan": "#ebbcba",
+        "white": "#e0def4",
+        "bright-black": "#6e6a86",
+        "bright-red": "#eb6f92",
+        "bright-green": "#31748f",
+        "bright-yellow": "#f6c177",
+        "bright-blue": "#9ccfd8",
+        "bright-magenta": "#c4a7e7",
+        "bright-cyan": "#ebbcba",
+        "bright-white": "#e0def4"
+      }
+    }
+  },
+  "provenance": {
+    "kind": "upstream",
+    "repository": "https://github.com/rose-pine/rose-pine-theme",
+    "commit": "main",
+    "theme": "rose-pine"
+  }
+}

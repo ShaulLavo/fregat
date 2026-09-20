@@ -1,7 +1,7 @@
 import type { FsEntry } from '@/lib/file-system-types'
 import { isDirectoryEntry } from '@/lib/file-system-types'
 
-import type { FilePickerMode } from '@/features/file-picker/model'
+import type { FilePickerMode } from '@/features/file-picker/utils/model'
 
 export function fileListAvailabilityLabel(entry: FsEntry, mode: FilePickerMode, pickable: boolean) {
   if (pickable) return null

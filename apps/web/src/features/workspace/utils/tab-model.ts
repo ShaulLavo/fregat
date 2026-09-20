@@ -28,10 +28,6 @@ import type {
 
 export const EMPTY_GIT_FILES: readonly GitFileStatus[] = []
 
-export type EditorSplitDirection = 'horizontal' | 'vertical'
-export type EditorSnapZone = 'bottom' | 'center' | 'left' | 'right' | 'top'
-export type EditorSplitScope = 'pane' | 'root'
-
 export function editorTabModel({
   conflicts,
   gitFiles,

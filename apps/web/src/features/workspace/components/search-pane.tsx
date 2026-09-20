@@ -1,3 +1,5 @@
+import { Tooltip, TooltipContent, TooltipTrigger } from '@workspace/ui/components/tooltip'
+import { ToolPane } from '@workspace/ui/patterns/tool-pane'
 import { filesystemPath } from '@/lib/documents/utils/identity'
 import { ArrowSquareOutIcon } from '@phosphor-icons/react'
 import { Button } from '@workspace/ui/components/button'
@@ -6,7 +8,7 @@ import { memo, useCallback, useRef } from 'react'
 import { useEditorCommands } from '@/features/editor/hooks/use-editor-commands'
 import { SearchSummaryActions } from '@/features/search/components/summary-actions'
 import { SearchSummaryText } from '@/features/search/components/summary-text'
-import { ToolPaneHeader } from '@/features/workbench/components/tool-pane-header'
+import { ToolPaneHeader } from '@/components/tool-pane-header'
 import { SearchControls } from '@/features/workspace/components/search-controls'
 import { SearchResults } from '@/features/workspace/components/search-results'
 import { useFocusTarget } from '@/lib/focus/hooks/use-target'
@@ -48,37 +50,44 @@ export const SearchPane = memo(
     )
 
     return (
-      <section
-        className='grid h-full min-h-0 min-w-0 grid-rows-[auto_auto_minmax(0,1fr)] overflow-hidden'
+      <ToolPane
+        className='h-full min-w-0 overflow-hidden'
+        bodyClassName='flex flex-col overflow-hidden'
         ref={setRootRef}
+        header={
+          compact ? (
+            <ToolPaneHeader
+              actions={
+                <>
+                  <SearchSummaryActions rootPath={rootPath} />
+                  <Tooltip>
+                    <TooltipTrigger
+                      render={
+                        <Button
+                          aria-label='Open search editor'
+                          className='text-muted-foreground hover:text-foreground'
+                          size='icon-sm'
+                          type='button'
+                          variant='ghost'
+                          onClick={() => openSearchEditor(filesystemPath(rootPath))}
+                        >
+                          <ArrowSquareOutIcon className='size-(--icon-size-sm)' />
+                        </Button>
+                      }
+                    />
+                    <TooltipContent>{'Open search editor'}</TooltipContent>
+                  </Tooltip>
+                </>
+              }
+              detail={<SearchSummaryText rootPath={rootPath} />}
+              tab='search'
+            />
+          ) : null
+        }
+        subheader={<SearchControls compact={compact} rootPath={rootPath} />}
       >
-        {compact ? (
-          <ToolPaneHeader
-            actions={
-              <>
-                <SearchSummaryActions rootPath={rootPath} />
-                <Button
-                  aria-label='Open search editor'
-                  className='text-muted-foreground hover:text-foreground'
-                  size='icon-sm'
-                  title='Open search editor'
-                  type='button'
-                  variant='ghost'
-                  onClick={() => openSearchEditor(filesystemPath(rootPath))}
-                >
-                  <ArrowSquareOutIcon className='size-3.5' />
-                </Button>
-              </>
-            }
-            detail={<SearchSummaryText rootPath={rootPath} />}
-            tab='search'
-          />
-        ) : (
-          <div />
-        )}
-        <SearchControls compact={compact} rootPath={rootPath} />
         <SearchResults compact={compact} rootPath={rootPath} />
-      </section>
+      </ToolPane>
     )
   },
 )

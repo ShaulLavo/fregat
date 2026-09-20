@@ -41,7 +41,7 @@ export function CodeThemeWidget({
           <span className='truncate font-medium'>{selected?.label ?? `Unavailable: ${value}`}</span>
           <span className='text-muted-foreground flex shrink-0 items-center gap-2 font-normal'>
             Change theme
-            <CaretDownIcon className='size-3.5' />
+            <CaretDownIcon className='size-(--icon-size-sm)' />
           </span>
         </PopoverTrigger>
         <PopoverContent

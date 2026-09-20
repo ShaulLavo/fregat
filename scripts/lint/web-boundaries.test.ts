@@ -14,6 +14,43 @@ type Probe = {
 }
 
 const probes: readonly Probe[] = [
+  ...[
+    "import { value } from '@/features/beta/value'; export { value }",
+    "import { value } from '../beta/value'; export { value }",
+    "import type { Value } from '@/features/beta/value'; export type Result = Value",
+    "export { value } from '@/features/beta/value'",
+    "export * from '@/features/beta/value'",
+    "import('@/features/beta/value')",
+    'import(`@/features/beta/value`)',
+    "require('@/features/beta/value')",
+    'require(`@/features/beta/value`)',
+    "import value = require('@/features/beta/value'); export { value }",
+  ].map((source, index) => ({
+    file: `apps/web/src/features/alpha/probe-${index}.ts`,
+    source,
+    rules: ['feature-imports'],
+  })),
+  {
+    file: 'apps/web/src/features/alpha/import-type.ts',
+    source: "export type Value = import('@/features/beta/value').Value",
+    rules: ['feature-imports'],
+    column: 21,
+  },
+  {
+    file: 'apps/web/src/features/alpha/own.ts',
+    source: "export { value } from '@/features/alpha/value'",
+    rules: [],
+  },
+  {
+    file: 'apps/web/src/features/alpha/shared.ts',
+    source: "export { value } from '@/lib/example/value'",
+    rules: [],
+  },
+  {
+    file: 'apps/web/src/features/alpha/example.test.ts',
+    source: "export { value } from '@/features/beta/value'",
+    rules: [],
+  },
   {
     file: 'apps/web/src/lib/alias.ts',
     source: "import { value } from '@/features/example/value'; export { value }",
@@ -219,16 +256,30 @@ test('the configured CLI rejects shared imports of features at their source and 
   }
 })
 
-async function installFixture(fixture: string): Promise<void> {
+async function installFixture(fixture: string, sources: readonly Probe[] = probes): Promise<void> {
   await mkdir(join(fixture, 'scripts/lint'), { recursive: true })
   await copyFile(join(REPOSITORY, '.oxlintrc.json'), join(fixture, '.oxlintrc.json'))
   await copyFile(
     join(REPOSITORY, 'scripts/lint/web-boundaries.mjs'),
     join(fixture, 'scripts/lint/web-boundaries.mjs'),
   )
+  await copyFile(
+    join(REPOSITORY, 'scripts/lint/web-boundary-imports.mjs'),
+    join(fixture, 'scripts/lint/web-boundary-imports.mjs'),
+  )
+  await copyFile(
+    join(REPOSITORY, 'scripts/lint/web-feature-imports.mjs'),
+    join(fixture, 'scripts/lint/web-feature-imports.mjs'),
+  )
+  await writeFile(join(fixture, 'scripts/lint/web-feature-allow.json'), '[]\n')
+  await symlink(
+    join(REPOSITORY, 'scripts/node_modules'),
+    join(fixture, 'scripts/node_modules'),
+    'dir',
+  )
   await symlink(join(REPOSITORY, 'node_modules'), join(fixture, 'node_modules'), 'dir')
   await Promise.all(
-    probes.map(async (probe) => {
+    sources.map(async (probe) => {
       const file = join(fixture, probe.file)
       await mkdir(dirname(file), { recursive: true })
       await writeFile(file, `${probe.source}\n`)
@@ -295,4 +346,147 @@ function assertProbe(probe: Probe, diagnostics: readonly Diagnostic[]): void {
     expect(entry.line, probe.file).toBe(1)
     expect(entry.column, probe.file).toBe(probe.column ?? 1)
   }
+}
+
+const allowance = {
+  from: 'alpha',
+  to: 'beta',
+  module: 'features/beta/value.ts',
+  reason:
+    'shared → lib: The value parser is used by both features and will move together with its callers.',
+}
+
+const allowanceProbes = [
+  {
+    name: 'an exact allowance passes',
+    entry: allowance,
+    imported: true,
+    target: true,
+    expected: null,
+  },
+  {
+    name: 'an unused allowance fails',
+    entry: allowance,
+    imported: false,
+    target: true,
+    expected: 'stale allow-list entry',
+  },
+  {
+    name: 'a missing target fails',
+    entry: allowance,
+    imported: true,
+    target: false,
+    expected: 'missing exact module',
+  },
+  {
+    name: 'a missing reason fails',
+    entry: { ...allowance, reason: '' },
+    imported: true,
+    target: true,
+    expected: 'missing reason',
+  },
+  {
+    name: 'a category without an explanation fails',
+    entry: { ...allowance, reason: 'owner' },
+    imported: true,
+    target: true,
+    expected: 'missing reason',
+  },
+  {
+    name: 'a test import cannot keep an allowance alive',
+    entry: allowance,
+    imported: false,
+    target: true,
+    testOnly: true,
+    expected: 'stale allow-list entry',
+  },
+  {
+    name: 'an allowance cannot grant a whole feature edge',
+    entry: allowance,
+    imported: true,
+    target: true,
+    otherModule: true,
+    expected: 'not allow-listed',
+  },
+] satisfies readonly {
+  name: string
+  entry: typeof allowance
+  imported: boolean
+  target: boolean
+  expected: string | null
+  testOnly?: boolean
+  otherModule?: boolean
+}[]
+
+test.each(allowanceProbes)('feature allowance: $name', async (probe) => {
+  const fixture = await mkdtemp(join(tmpdir(), 'platform-feature-boundaries-'))
+  try {
+    const sources = featureAllowanceSources(probe)
+    await installFixture(fixture, sources)
+    await writeFile(
+      join(fixture, 'scripts/lint/web-feature-allow.json'),
+      JSON.stringify([probe.entry]),
+    )
+    const result = await lintFixture(
+      fixture,
+      sources.map((source) => source.file),
+    )
+    expect(result.errors).toBe('')
+    expect(result.exitCode).toBe(probe.expected ? 1 : 0)
+    if (probe.expected) expect(result.output).toContain(probe.expected)
+  } finally {
+    await rm(fixture, { force: true, recursive: true })
+  }
+})
+
+function featureAllowanceSources(probe: (typeof allowanceProbes)[number]): readonly Probe[] {
+  const sources: Probe[] = [
+    {
+      file: 'apps/web/src/features/alpha/consumer.ts',
+      source: probe.imported
+        ? "export { value } from '@/features/beta/value'"
+        : 'export const control = 1',
+      rules: [],
+    },
+  ]
+  if (probe.target)
+    sources.push({
+      file: 'apps/web/src/features/beta/value.ts',
+      source: 'export const value = 1',
+      rules: [],
+    })
+  if ('testOnly' in probe)
+    sources.push({
+      file: 'apps/web/src/features/alpha/consumer.test.ts',
+      source: "export { value } from '@/features/beta/value'",
+      rules: [],
+    })
+  if ('otherModule' in probe)
+    sources.push({
+      file: 'apps/web/src/features/alpha/fresh.ts',
+      source: "export { other } from '@/features/beta/other'",
+      rules: [],
+    })
+  return sources
+}
+
+async function lintFixture(fixture: string, files: readonly string[]) {
+  const process = Bun.spawn(
+    [
+      Bun.which('bun') ?? 'bun',
+      join(REPOSITORY, 'node_modules/oxlint/bin/oxlint'),
+      '--config',
+      join(fixture, '.oxlintrc.json'),
+      '--format',
+      'json',
+      ...files,
+    ],
+    { cwd: fixture, stderr: 'pipe', stdout: 'pipe' },
+  )
+  const [exitCode, output, errors] = await Promise.all([
+    process.exited,
+    Bun.readableStreamToText(process.stdout),
+    Bun.readableStreamToText(process.stderr),
+  ])
+  return { exitCode, output, errors }
 }

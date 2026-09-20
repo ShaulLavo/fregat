@@ -1,4 +1,5 @@
 import { ToggleIconButton } from '@/components/toggle-icon-button'
+import { WorkspaceRail } from '@/components/workspace-rail'
 import type { FilesystemPath } from '@/lib/documents/utils/types'
 import { useNavigation } from '@/hooks/use-navigation'
 import {
@@ -31,41 +32,43 @@ export function SidebarPanel({
 
   return (
     <aside className='bg-background backdrop-material border-border flex h-full min-h-0 min-w-0 overflow-hidden border-r'>
-      <nav
-        aria-label='Sidebar tabs'
-        className='border-border flex w-(--rail-width) shrink-0 flex-col items-center gap-1 border-r p-1'
-      >
+      <WorkspaceRail label='Sidebar tabs' side='left'>
         <ToggleIconButton
           active={panels.activeSidebarTab === 'files'}
-          icon={<FilesIcon className='size-4' />}
+          icon={<FilesIcon className='size-(--icon-size)' />}
           label={'Files'}
+          tooltipSide='right'
           onClick={() => selectTab('files')}
         />
         <ToggleIconButton
           active={panels.activeSidebarTab === 'git'}
-          icon={<GitBranchIcon className='size-4' />}
+          icon={<GitBranchIcon className='size-(--icon-size)' />}
           label={'Git'}
+          tooltipSide='right'
           onClick={() => selectTab('git')}
         />
         <ToggleIconButton
           active={panels.activeSidebarTab === 'search'}
-          icon={<MagnifyingGlassIcon className='size-4' />}
+          icon={<MagnifyingGlassIcon className='size-(--icon-size)' />}
           label={'Search'}
+          tooltipSide='right'
           onClick={() => selectTab('search')}
         />
         <ToggleIconButton
           active={panels.activeSidebarTab === 'logs'}
-          icon={<ScrollIcon className='size-4' />}
+          icon={<ScrollIcon className='size-(--icon-size)' />}
           label={'Logs'}
+          tooltipSide='right'
           onClick={() => selectTab('logs')}
         />
         <ToggleIconButton
           active={panels.activeSidebarTab === 'chat'}
-          icon={<ChatCircleIcon className='size-4' />}
+          icon={<ChatCircleIcon className='size-(--icon-size)' />}
           label={'Chat'}
+          tooltipSide='right'
           onClick={() => selectTab('chat')}
         />
-      </nav>
+      </WorkspaceRail>
       <div className='min-h-0 min-w-0 flex-1 overflow-hidden'>
         {renderSidebarPanel({
           rootPath,

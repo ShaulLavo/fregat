@@ -1,4 +1,6 @@
-import { ArrowSquareOutIcon, FileTextIcon } from '@phosphor-icons/react'
+import { Tooltip, TooltipContent, TooltipTrigger } from '@workspace/ui/components/tooltip'
+import { ListRow, type ListRowProps } from '@workspace/ui/patterns/list-row'
+import { ArrowSquareOutIcon } from '@phosphor-icons/react'
 import type { WorkspaceSearchMatch, WorkspaceSearchQuery } from '@workspace/contracts'
 import { memo } from 'react'
 
@@ -8,9 +10,16 @@ import { workspaceSearchReplacementPreview } from '@/features/search/utils/repla
 import { Button } from '@workspace/ui/components/button'
 import { cn } from '@workspace/ui/lib/utils'
 
+import {
+  searchMatchLocation,
+  searchMatchOpenLabel,
+  matchPreviewMaxLength,
+} from '@/features/search/utils/row-labels'
+
 export const SearchMatchRow = memo(
   ({
     active,
+    rowProps,
     className,
     canReplace,
     compact,
@@ -23,6 +32,7 @@ export const SearchMatchRow = memo(
     onOpenMatch,
     onReplaceMatch,
   }: {
+    rowProps?: Omit<ListRowProps, 'ref' | 'as'>
     active?: boolean
     className?: string
     canReplace?: boolean
@@ -50,13 +60,14 @@ export const SearchMatchRow = memo(
         : null
 
     return (
-      <div
+      <ListRow
+        {...rowProps}
+        role='treeitem'
+        selected={active}
+        title={`${match.path}:${match.line ?? 1}:${match.column ?? 1} · ${display.text}`}
         className={cn(
-          'group relative grid w-full min-w-0 grid-cols-[minmax(0,1fr)_auto] items-center gap-1.5 overflow-hidden px-2 py-1.5 text-left text-xs',
-          compact && 'h-6 gap-1 px-1.5 py-0',
-          active &&
-            'bg-row-selected before:absolute before:inset-y-0.5 before:left-0 before:w-0.5 before:bg-foreground',
-          !active && 'hover:bg-row-hover',
+          'group relative grid w-full min-w-0 grid-cols-[minmax(0,1fr)_auto] items-center gap-1.5 overflow-hidden text-left text-xs',
+          compact && 'gap-1',
           className,
         )}
       >
@@ -92,27 +103,37 @@ export const SearchMatchRow = memo(
           </span>
         </div>
         <div className='flex h-full shrink-0 items-center gap-0.5'>
-          <Button
-            aria-label={searchMatchOpenLabel(match)}
-            className={cn(
-              'pointer-events-none opacity-0 transition-opacity group-focus-within:pointer-events-auto group-focus-within:opacity-100 group-hover:pointer-events-auto group-hover:opacity-100',
-              compact && 'size-5',
-              active && 'pointer-events-auto opacity-100',
-            )}
-            size='icon-xs'
-            title={searchMatchOpenLabel(match)}
-            type='button'
-            variant='ghost'
-            onClick={() => onOpenMatch(match)}
-          >
-            <ArrowSquareOutIcon className='size-3.5' />
-          </Button>
+          <Tooltip>
+            <TooltipTrigger
+              render={
+                <Button
+                  aria-label={searchMatchOpenLabel(match)}
+                  className={cn(
+                    'pointer-events-none opacity-0 transition-opacity group-focus-within:pointer-events-auto group-focus-within:opacity-100 group-hover:pointer-events-auto group-hover:opacity-100',
+                    compact && 'size-5',
+                    active && 'pointer-events-auto opacity-100',
+                  )}
+                  size='icon-xs'
+                  tabIndex={-1}
+                  type='button'
+                  variant='ghost'
+                  onClick={() => onOpenMatch(match)}
+                >
+                  <ArrowSquareOutIcon className='size-(--icon-size-sm)' />
+                </Button>
+              }
+            />
+            <TooltipContent>{searchMatchOpenLabel(match)}</TooltipContent>
+          </Tooltip>
           {replaceVisible ? (
             <Button
               className={cn('px-1.5 text-3xs', compact && 'h-5 px-1')}
               disabled={!canReplace}
+              data-row-action='replace'
+              aria-keyshortcuts='F2'
               size='xs'
-              title='Replace this match'
+              tabIndex={-1}
+              title='Replace this match (F2)'
               type='button'
               variant='ghost'
               onClick={() => onReplaceMatch?.(match)}
@@ -121,83 +142,7 @@ export const SearchMatchRow = memo(
             </Button>
           ) : null}
         </div>
-      </div>
+      </ListRow>
     )
   },
 )
-
-export const SearchNameMatchRow = memo(
-  ({
-    active,
-    className,
-    compact,
-    match,
-    previewMaxLength,
-    query,
-    onOpenMatch,
-  }: {
-    active?: boolean
-    className?: string
-    compact?: boolean
-    match: WorkspaceSearchMatch
-    previewMaxLength?: number
-    query: string
-    onOpenMatch: (match: WorkspaceSearchMatch) => void
-  }) => {
-    const display = searchMatchDisplay(match, query, {
-      maxLength: previewMaxLength,
-    })
-
-    return (
-      // Raw button: the whole list row is the hit target, and Button's control
-      // shape (radius, fixed height, hover fill) is exactly what rows must not have.
-      <button
-        className={cn(
-          'focus-ring relative grid w-full min-w-0 grid-cols-[16px_minmax(0,1fr)_auto] items-center gap-1.5 overflow-hidden px-2 py-1.5 text-left outline-none',
-          compact && 'h-6 grid-cols-[14px_minmax(0,1fr)_auto] gap-1 px-1.5 py-0',
-          active &&
-            'bg-row-selected before:absolute before:inset-y-0.5 before:left-0 before:w-0.5 before:bg-foreground',
-          !active && 'hover:bg-row-hover active:bg-row-active',
-          className,
-        )}
-        tabIndex={-1}
-        type='button'
-        onClick={() => onOpenMatch(match)}
-      >
-        <FileTextIcon className={cn('size-3.5 text-muted-foreground', compact && 'size-3')} />
-        <span className='block min-w-0 truncate text-xs'>
-          <HighlightedPreview preview={display.text} query={query} range={display.range} />
-        </span>
-        <span
-          className={cn(
-            'rounded-md bg-muted/50 px-1.5 text-3xs leading-4 text-muted-foreground',
-            compact && 'px-1',
-          )}
-        >
-          name
-        </span>
-      </button>
-    )
-  },
-)
-
-function searchMatchLocation(match: WorkspaceSearchMatch) {
-  if (match.kind === 'name') return 'name'
-  if (match.line === undefined) return 'match'
-
-  return String(match.line)
-}
-
-function searchMatchOpenLabel(match: WorkspaceSearchMatch) {
-  if (typeof match.line !== 'number') return 'Open result'
-  if (typeof match.column !== 'number') return `Open result at line ${match.line}`
-
-  return `Open result at line ${match.line}, column ${match.column}`
-}
-
-function matchPreviewMaxLength(match: WorkspaceSearchMatch, previewMaxLength: number | undefined) {
-  if (match.source !== 'open-buffer') return previewMaxLength
-  if (previewMaxLength === undefined) return undefined
-
-  return Math.max(12, previewMaxLength - 8)
-}

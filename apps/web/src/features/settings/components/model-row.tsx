@@ -1,3 +1,4 @@
+import { Tooltip, TooltipContent, TooltipTrigger } from '@workspace/ui/components/tooltip'
 import { CaretDownIcon, CaretUpIcon } from '@phosphor-icons/react'
 import { Button } from '@workspace/ui/components/button'
 import { Switch } from '@workspace/ui/components/switch'
@@ -37,24 +38,38 @@ export function ModelRow({
           containers is worse than two clicks — especially for a list where
           moving one model to the top is the whole use case. */}
       <div className='flex items-center'>
-        <Button
-          aria-label={`Move ${row.label} up`}
-          disabled={!canMoveUp}
-          onClick={() => moveModel(row.ref, -1, displayed)}
-          size='icon-sm'
-          variant='ghost'
-        >
-          <CaretUpIcon />
-        </Button>
-        <Button
-          aria-label={`Move ${row.label} down`}
-          disabled={!canMoveDown}
-          onClick={() => moveModel(row.ref, 1, displayed)}
-          size='icon-sm'
-          variant='ghost'
-        >
-          <CaretDownIcon />
-        </Button>
+        <Tooltip>
+          <TooltipTrigger
+            render={
+              <Button
+                aria-label={`Move ${row.label} up`}
+                disabled={!canMoveUp}
+                onClick={() => moveModel(row.ref, -1, displayed)}
+                size='icon-sm'
+                variant='ghost'
+              >
+                <CaretUpIcon />
+              </Button>
+            }
+          />
+          <TooltipContent>{`Move ${row.label} up`}</TooltipContent>
+        </Tooltip>
+        <Tooltip>
+          <TooltipTrigger
+            render={
+              <Button
+                aria-label={`Move ${row.label} down`}
+                disabled={!canMoveDown}
+                onClick={() => moveModel(row.ref, 1, displayed)}
+                size='icon-sm'
+                variant='ghost'
+              >
+                <CaretDownIcon />
+              </Button>
+            }
+          />
+          <TooltipContent>{`Move ${row.label} down`}</TooltipContent>
+        </Tooltip>
       </div>
 
       {/* On means visible, always. The stored key is a denylist, but a switch

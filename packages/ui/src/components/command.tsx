@@ -4,6 +4,7 @@ import * as React from 'react'
 import { Command as CommandPrimitive } from 'cmdk'
 
 import { cn } from '@workspace/ui/lib/utils'
+import { listRowClassName } from '@workspace/ui/patterns/list-row-classes'
 import {
   Dialog,
   DialogContent,
@@ -30,6 +31,7 @@ function CommandDialog({
   children,
   className,
   commandProps,
+  commandKey,
   contentRef,
   finalFocus,
   overlayClassName,
@@ -40,6 +42,7 @@ function CommandDialog({
   description?: string
   className?: string
   commandProps?: Omit<React.ComponentProps<typeof CommandPrimitive>, 'children'>
+  commandKey?: React.Key
   contentRef?: React.Ref<HTMLDivElement>
   finalFocus?: React.ComponentProps<typeof DialogContent>['finalFocus']
   overlayClassName?: string
@@ -65,7 +68,9 @@ function CommandDialog({
         ref={contentRef}
         showCloseButton={showCloseButton}
       >
-        <Command {...commandProps}>{children}</Command>
+        <Command key={commandKey} {...commandProps}>
+          {children}
+        </Command>
       </DialogContent>
     </Dialog>
   )
@@ -81,7 +86,7 @@ function CommandInput({
     // this bottom border is the only thing that can show focus.
     <div
       data-slot='command-input-wrapper'
-      className='focus-within:border-ring border-b pb-0 transition-[border-color]'
+      className='focus-within:border-ring border-b pb-0 transition-colors'
     >
       <InputGroup className='border-input/30 bg-input/30 h-(--density-command-input-height) border-none shadow-none! *:data-[slot=input-group-addon]:pl-(--density-command-input-padding-x)!'>
         <CommandPrimitive.Input
@@ -93,7 +98,7 @@ function CommandInput({
           {...props}
         />
         <InputGroupAddon>
-          <MagnifyingGlassIcon className='size-4 shrink-0 opacity-50' />
+          <MagnifyingGlassIcon className='size-(--icon-size) shrink-0 opacity-50' />
           {scope}
         </InputGroupAddon>
       </InputGroup>
@@ -135,7 +140,7 @@ function CommandGroup({
     <CommandPrimitive.Group
       data-slot='command-group'
       className={cn(
-        'overflow-hidden text-foreground **:[[cmdk-group-heading]]:px-(--density-command-heading-padding-x) **:[[cmdk-group-heading]]:pt-(--density-command-heading-padding-top) **:[[cmdk-group-heading]]:pb-1 **:[[cmdk-group-heading]]:text-2xs **:[[cmdk-group-heading]]:font-medium **:[[cmdk-group-heading]]:tracking-wide **:[[cmdk-group-heading]]:text-muted-foreground/70 **:[[cmdk-group-heading]]:uppercase',
+        'overflow-hidden text-foreground **:[[cmdk-group-heading]]:px-(--density-command-heading-padding-x) **:[[cmdk-group-heading]]:pt-(--density-command-heading-padding-top) **:[[cmdk-group-heading]]:pb-1 **:[[cmdk-group-heading]]:text-2xs **:[[cmdk-group-heading]]:font-medium **:[[cmdk-group-heading]]:tracking-wide **:[[cmdk-group-heading]]:text-muted-foreground **:[[cmdk-group-heading]]:uppercase',
         className,
       )}
       {...props}
@@ -164,10 +169,12 @@ function CommandItem({
   return (
     <CommandPrimitive.Item
       data-slot='command-item'
-      className={cn(
-        "group/command-item relative flex cursor-default items-center gap-(--density-command-item-gap) rounded-md px-(--density-command-item-padding-x) py-(--density-command-item-padding-y) text-xs outline-hidden select-none data-[disabled=true]:pointer-events-none data-[disabled=true]:opacity-50 data-selected:bg-row-selected data-selected:text-foreground [&_svg]:pointer-events-none [&_svg]:shrink-0 [&_svg:not([class*='size-'])]:size-4 data-selected:*:[svg]:text-foreground",
-        className,
-      )}
+      className={listRowClassName({
+        className: cn(
+          "group/command-item cursor-default [&_svg]:pointer-events-none [&_svg]:shrink-0 [&_svg:not([class*='size-'])]:size-(--icon-size-sm)",
+          className,
+        ),
+      })}
       {...props}
     >
       {children}

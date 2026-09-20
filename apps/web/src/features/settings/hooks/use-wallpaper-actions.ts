@@ -5,7 +5,7 @@ import { refreshConfirmedSettings } from '@/features/settings/state/snapshot-adm
 import { clientForQueryClient } from '@/lib/environments/state/query-clients'
 import { createRpcError } from '@/lib/structured-errors'
 import { wallpaperLibraryKey } from '@/lib/wallpapers/state/queries'
-import { wallpaperMutationKeys } from '@/features/settings/utils/wallpaper-mutation-keys'
+import { wallpaperMutationKeys } from '@/features/settings/utils/mutation-keys'
 
 export function useWallpaperActions() {
   const owner = useSettingsOwner()

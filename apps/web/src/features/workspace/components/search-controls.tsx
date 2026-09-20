@@ -50,7 +50,7 @@ export function SearchControls({
       }
       label='Search'
       size='sm'
-      startAddon={<MagnifyingGlassIcon aria-hidden='true' className='size-3.5' />}
+      startAddon={<MagnifyingGlassIcon aria-hidden='true' className='size-(--icon-size-sm)' />}
       type='search'
       value={queryText}
       onSelectNextHistory={selectNextQuery}

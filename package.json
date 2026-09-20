@@ -50,7 +50,7 @@
     "themes:palette-css": "bun scripts/themes/generate-palette-css.ts",
     "themes:palette-css:check": "bun scripts/themes/generate-palette-css.ts --check",
     "test:scripts": "bun --bun vitest run scripts/agent/trace-summary.test.ts scripts/dev-sources.test.ts scripts/runtime-network.test.ts scripts/web-layering.test.ts scripts/lint/web-boundaries.test.ts scripts/lint/web-design-census.test.ts scripts/lint/duplicate-functions.test.mjs --environment node",
-    "verify": "bun run typecheck && bun run lint && bun run design:census && bun run format:check && bun run generated:check && bun run unused:check && bun run test",
+    "verify": "bun run typecheck && bun run lint && bun run boundaries:check && bun run design:census && bun run format:check && bun run generated:check && bun run unused:check && bun run test",
     "dupes": "jscpd apps packages scripts --threshold 0",
     "dupes:report": "jscpd apps packages scripts --reporters html,console --output ./jscpd-report",
     "unused:exports": "knip --exports --no-config-hints",
@@ -59,7 +59,8 @@
     "hooks:install": "lefthook install",
     "hooks:pre-commit": "lefthook run pre-commit",
     "themes:import-omarchy": "bun scripts/themes/import-omarchy-theme.ts",
-    "dupes:functions": "bun scripts/lint/duplicate-functions.mjs"
+    "dupes:functions": "bun scripts/lint/duplicate-functions.mjs",
+    "boundaries:check": "oxlint --config .oxlintrc.json apps/web/src"
   },
   "devDependencies": {
     "@typescript/native-preview": "7.0.0-dev.20260707.2",

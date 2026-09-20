@@ -4,7 +4,7 @@ import { act, renderHook, waitFor } from '@testing-library/react'
 import type { ReactNode } from 'react'
 
 import { expect, test } from '../../../../test/fixtures'
-import { useServerInfoForOpen } from '@/features/file-picker/use-server-info-for-open'
+import { useServerInfoForOpen } from '@/features/file-picker/hooks/use-server-info-for-open'
 import { filePickerKeys } from '@/lib/query-keys'
 
 test('refreshes the existing server-info query', async ({ client: _client }) => {

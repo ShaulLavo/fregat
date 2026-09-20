@@ -25,7 +25,7 @@ export function WallpaperSourceCard({
       disabled={disabled}
       onSelect={onSelect}
     >
-      <span className='bg-muted text-muted-foreground flex aspect-video w-full items-center justify-center rounded-md [&_svg]:size-6'>
+      <span className='bg-muted text-muted-foreground flex aspect-video w-full items-center justify-center rounded-md [&_svg]:size-(--icon-size)'>
         {icon}
       </span>
     </WallpaperChoice>

@@ -1,3 +1,4 @@
+import { scrollPositionsEqual } from '@/lib/scroll-positions'
 import { markEditorOpenBenchmark } from '@/lib/editor-open-benchmark-mark'
 import { createHistoryBuffer } from '@/features/editor/state/history-buffer'
 import { createClientInvariantError } from '@/lib/structured-errors'
@@ -1502,15 +1503,6 @@ function comparePaths(left: string, right: string): number {
   if (left < right) return -1
   if (left > right) return 1
   return 0
-}
-
-function scrollPositionsEqual(
-  current: EditorScrollPosition | undefined,
-  next: EditorScrollPosition,
-) {
-  if (!current) return false
-
-  return current.left === next.left && current.top === next.top
 }
 
 function fileSyncVersion(document: LiveEditorDocument | undefined) {

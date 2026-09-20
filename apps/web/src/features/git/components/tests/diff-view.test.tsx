@@ -1,5 +1,6 @@
 import { getClient } from '@/lib/client'
-import { filesystemPath } from '@/lib/documents/utils/identity'
+import { fileResource, filesystemPath } from '@/lib/documents/utils/identity'
+import type { GitComparison } from '@/lib/documents/utils/types'
 import { execFileSync } from 'node:child_process'
 import { mkdir, writeFile } from 'node:fs/promises'
 import path from 'node:path'
@@ -11,19 +12,56 @@ import { TestEditorStateProvider as EditorStateProvider } from '../../../../../t
 import { fetchDiff } from '@/features/git/utils/api'
 import { fetchBlobDiff } from '@/features/git/utils/blob-diff-query'
 import { DiffView } from '@/features/git/components/diff-view'
+import { useDiffDocumentDiffs } from '@/features/git/hooks/use-diff-document-diffs'
+import { diffDocumentQueryKey } from '@/features/git/utils/diff-document-query'
 import { snapshotComparison } from '../../../../../test/factories/git-diff'
 import { editorDiffFiles } from '@workspace/client-core/git/diff-files'
 import { testDiffLanguageHost } from '../../../../../test/factories/diff-language-host'
 import { gitFileDiff } from '../../../../../test/factories/git-diff'
 import { expect, test } from '../../../../../test/fixtures'
-import { renderWithProviders } from '../../../../../test/render'
+import {
+  createTestQueryClient,
+  renderHookWithProviders,
+  renderWithProviders,
+} from '../../../../../test/render'
+import { TEST_SESSION_ID } from '../../../../../test/factories/chat'
 
-// Real git, real repository, real routes. Rendering belongs to the editor's
-// virtualized diff view, which draws to a canvas and cannot be asserted in
-// happy-dom — so what is checked here is the model we hand it, plus the
-// non-renderable cases the pane still answers for itself.
+// Real Git and routes verify historical text; the browser scenario checks painted syntax.
 
 const FORTY_LINES = Array.from({ length: 40 }, (_, index) => `line ${index + 1}`).join('\n')
+
+for (const kind of ['checkpoint-file', 'checkpoint-turn', 'checkpoint-session'] as const) {
+  test(`${kind} loads complete saved blobs from a cached checkpoint patch`, async ({
+    client,
+    server,
+  }) => {
+    const repo = await initRepo(server.root)
+    await writeFile(path.join(repo, 'lines.ts'), twoEditFile())
+    const patches = await fetchDiff('repo/lines.ts', false, undefined, client)
+    const source = {
+      owner: filesystemPath('repo'),
+      sessionId: TEST_SESSION_ID,
+      fromTurnCount: 0,
+      toTurnCount: 1,
+    }
+    const comparison: GitComparison =
+      kind === 'checkpoint-file'
+        ? { ...source, kind, file: fileResource(filesystemPath('repo/lines.ts')) }
+        : { ...source, kind }
+    const queryClient = createTestQueryClient()
+    queryClient.setQueryData(diffDocumentQueryKey(comparison), patches)
+    await writeFile(path.join(repo, 'lines.ts'), 'unrelated working copy\n')
+
+    const { result } = renderHookWithProviders(() => useDiffDocumentDiffs(comparison), {
+      queryClient,
+    })
+    await waitFor(() => expect(result.current.pending).toBe(false))
+    expect(result.current.failure).toBeNull()
+    expect(result.current.diffs[0]?.oldText).toBe(`${FORTY_LINES}\n`)
+    expect(result.current.diffs[0]?.newText).toBe(twoEditFile())
+    expect(editorDiffFiles(result.current.diffs)[0]?.isPartial).toBe(false)
+  })
+}
 
 test('a two-edit file maps to one diff carrying both changes and the whole file', async ({
   client,
@@ -61,10 +99,7 @@ test('whole-file text produces an expandable, fully-typed model', async ({ clien
   expect(file?.languageId).toBe('typescript')
 })
 
-test('keeps the diff editor mounted with an empty model while the blob resolves', async ({
-  client,
-  server,
-}) => {
+test('shows a comparison loader while the blob resolves', async ({ client, server }) => {
   void client
   const repo = await initRepo(server.root)
   await writeFile(path.join(repo, 'lines.ts'), twoEditFile())
@@ -78,11 +113,7 @@ test('keeps the diff editor mounted with an empty model while the blob resolves'
     />,
   )
 
-  expect(container.querySelector('.editor-diff-pane')).not.toBeNull()
-  expect(container.querySelector<HTMLTextAreaElement>('[aria-label="Editor input"]')?.value).toBe(
-    '',
-  )
-  expect(screen.queryByRole('status', { name: 'Loading diff' })).not.toBeInTheDocument()
+  expect(screen.getByRole('status', { name: 'Loading comparison' })).toBeInTheDocument()
 
   await waitFor(() => {
     expect(container.querySelector('[aria-busy="true"]')).toBeNull()

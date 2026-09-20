@@ -30,7 +30,11 @@ export function WallpaperUploadTile({
         disabled={disabled || uploading}
         onClick={() => input.current?.click()}
       >
-        {uploading ? <Spinner /> : <UploadSimpleIcon aria-hidden='true' className='size-5' />}
+        {uploading ? (
+          <Spinner />
+        ) : (
+          <UploadSimpleIcon aria-hidden='true' className='size-(--icon-size)' />
+        )}
         <span className='text-foreground'>{dragging ? 'Drop to add' : 'Add images'}</span>
         <span className='text-2xs'>Drop, paste or browse</span>
       </Button>

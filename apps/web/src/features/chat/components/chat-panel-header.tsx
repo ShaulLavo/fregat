@@ -1,6 +1,6 @@
+import { Tooltip, TooltipContent, TooltipTrigger } from '@workspace/ui/components/tooltip'
 import type { SessionId } from '@workspace/contracts'
 import { Button } from '@workspace/ui/components/button'
-import { cn } from '@workspace/ui/lib/utils'
 import {
   DropdownMenu,
   DropdownMenuContent,
@@ -10,7 +10,7 @@ import {
 import { ChatCircleIcon, ClockCounterClockwiseIcon, PlusIcon } from '@phosphor-icons/react'
 
 import { chatSessionPreview, formatChatDateLabel } from '@/features/chat/utils/formatters'
-import { ToolPaneHeader } from '@/features/workbench/components/tool-pane-header'
+import { ToolPaneHeader } from '@/components/tool-pane-header'
 import type { ChatSessionListProjection } from '@workspace/client-core/chat/selectors'
 
 export function ChatPanelHeader({
@@ -35,44 +35,57 @@ export function ChatPanelHeader({
     <ToolPaneHeader
       actions={
         <>
-          <Button
-            aria-label='New chat'
-            className='text-muted-foreground'
-            disabled={disabled || creating}
-            size='icon-sm'
-            title='New chat'
-            type='button'
-            variant='ghost'
-            onClick={onNewChat}
-          >
-            <span className='relative flex size-4 items-center justify-center'>
-              <ChatCircleIcon className='size-4' />
-              <PlusIcon className='absolute -right-0.5 -bottom-0.5 size-2.5' weight='bold' />
-            </span>
-          </Button>
-          <DropdownMenu>
-            <DropdownMenuTrigger
+          <Tooltip>
+            <TooltipTrigger
               render={
                 <Button
-                  aria-label='Conversation history'
+                  aria-label='New chat'
                   className='text-muted-foreground'
-                  disabled={historyDisabled}
+                  disabled={disabled || creating}
                   size='icon-sm'
-                  title='Conversation history'
                   type='button'
                   variant='ghost'
-                />
+                  onClick={onNewChat}
+                >
+                  <span className='relative flex size-4 items-center justify-center'>
+                    <ChatCircleIcon className='size-(--icon-size)' />
+                    <PlusIcon
+                      className='absolute -right-0.5 -bottom-0.5 size-(--icon-size-sm)'
+                      weight='bold'
+                    />
+                  </span>
+                </Button>
               }
-            >
-              <ClockCounterClockwiseIcon className='size-4' />
-            </DropdownMenuTrigger>
+            />
+            <TooltipContent>New chat</TooltipContent>
+          </Tooltip>
+          <DropdownMenu>
+            <Tooltip>
+              <TooltipTrigger
+                render={
+                  <DropdownMenuTrigger
+                    render={
+                      <Button
+                        aria-label='Conversation history'
+                        className='text-muted-foreground'
+                        disabled={historyDisabled}
+                        size='icon-sm'
+                        type='button'
+                        variant='ghost'
+                      />
+                    }
+                  />
+                }
+              >
+                <ClockCounterClockwiseIcon className='size-(--icon-size)' />
+              </TooltipTrigger>
+              <TooltipContent>Conversation history</TooltipContent>
+            </Tooltip>
             <DropdownMenuContent align='end' className='w-72 p-1'>
               {sessions.map((session) => (
                 <DropdownMenuItem
-                  className={cn(
-                    'grid grid-cols-[1fr_auto] gap-y-0.5',
-                    session.id === activeSessionId && 'bg-row-selected',
-                  )}
+                  className='grid grid-cols-[1fr_auto] gap-y-0.5'
+                  data-selected={session.id === activeSessionId || undefined}
                   key={session.id}
                   title={`${session.title} — ${chatSessionPreview(session)}`}
                   onClick={() => onSelectSession(session.id)}

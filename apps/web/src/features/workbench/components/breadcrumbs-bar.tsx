@@ -35,12 +35,13 @@ export const BreadcrumbsBar = memo(function BreadcrumbsBar({
   const [openKey, setOpenKey] = useState<string | null>(null)
 
   function handleKeyDown(event: KeyboardEvent<HTMLElement>) {
-    if (event.key !== 'ArrowLeft' && event.key !== 'ArrowRight') return
+    if (event.defaultPrevented || (event.key !== 'ArrowLeft' && event.key !== 'ArrowRight')) return
 
     const crumbs = Array.from(
       event.currentTarget.querySelectorAll<HTMLElement>('[data-breadcrumb-item]'),
     )
     const index = crumbs.indexOf(document.activeElement as HTMLElement)
+    if (index < 0) return
     const next = crumbs[index + (event.key === 'ArrowRight' ? 1 : -1)]
     if (!next) return
 
@@ -77,7 +78,7 @@ export const BreadcrumbsBar = memo(function BreadcrumbsBar({
           return (
             <BreadcrumbItem
               first={index === 0}
-              icon={<FileTypeIcon className='size-3.5 shrink-0' icon={icon} />}
+              icon={<FileTypeIcon className='size-(--icon-size-sm) shrink-0' icon={icon} />}
               key={item.path}
               label={item.name}
               open={openKey === item.path}
@@ -97,7 +98,9 @@ export const BreadcrumbsBar = memo(function BreadcrumbsBar({
           return (
             <BreadcrumbItem
               first={false}
-              icon={<SymbolKindIcon className='size-3.5 shrink-0' kind={symbol.kind} />}
+              icon={
+                <SymbolKindIcon className='size-(--icon-size-sm) shrink-0' kind={symbol.kind} />
+              }
               key={key}
               label={symbol.name}
               open={openKey === key}

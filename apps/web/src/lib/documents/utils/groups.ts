@@ -54,7 +54,7 @@ export function activeEditorTab(groups: EditorGroups): EditorTabRecord | null {
   return group.tabs.find((tab) => tab.id === group.selectedTabId) ?? null
 }
 
-export function canCopyTabContent(content: TabContent): boolean {
+function canCopyTabContent(content: TabContent): boolean {
   return content.kind === 'document' && content.document.kind !== 'search'
 }
 

@@ -1,3 +1,4 @@
+import { Tooltip, TooltipContent, TooltipTrigger } from '@workspace/ui/components/tooltip'
 import { Button } from '@workspace/ui/components/button'
 import type { MouseEvent, ReactNode } from 'react'
 
@@ -18,17 +19,24 @@ export function RowActionButton({
   }
 
   return (
-    <Button
-      aria-label={label}
-      className='text-muted-foreground hover:text-foreground'
-      disabled={disabled}
-      onClick={handleClick}
-      size='icon-xs'
-      title={label}
-      type='button'
-      variant='ghost'
-    >
-      {children}
-    </Button>
+    <Tooltip>
+      <TooltipTrigger
+        render={
+          <Button
+            aria-label={label}
+            className='text-muted-foreground'
+            disabled={disabled}
+            onClick={handleClick}
+            size='icon-sm'
+            tabIndex={-1}
+            type='button'
+            variant='ghost'
+          >
+            {children}
+          </Button>
+        }
+      />
+      <TooltipContent side='bottom'>{label}</TooltipContent>
+    </Tooltip>
   )
 }

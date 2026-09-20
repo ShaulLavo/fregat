@@ -1,3 +1,4 @@
+import { Tooltip, TooltipContent, TooltipTrigger } from '@workspace/ui/components/tooltip'
 import type { OrchestrationProposedPlan } from '@workspace/contracts'
 import { Badge } from '@workspace/ui/components/badge'
 import { Button } from '@workspace/ui/components/button'
@@ -49,17 +50,29 @@ export function ProposedPlanCard({ plan }: { plan: OrchestrationProposedPlan }) 
           <p className='text-foreground truncate text-sm font-medium'>{title}</p>
         </div>
         <div className='flex shrink-0 items-center gap-2'>
-          <span className='text-muted-foreground/50 text-3xs tabular-nums'>
+          <span className='text-muted-foreground text-2xs text-3xs tabular-nums'>
             {formatChatTimestamp(plan.updatedAt)}
           </span>
           <DropdownMenu>
-            <DropdownMenuTrigger
-              render={
-                <Button aria-label='Plan actions' size='icon-xs' type='button' variant='outline'>
-                  <DotsThreeIcon aria-hidden='true' className='size-3.5' />
-                </Button>
-              }
-            />
+            <Tooltip>
+              <DropdownMenuTrigger
+                render={
+                  <TooltipTrigger
+                    render={
+                      <Button
+                        aria-label='Plan actions'
+                        size='icon-xs'
+                        type='button'
+                        variant='outline'
+                      >
+                        <DotsThreeIcon aria-hidden='true' className='size-(--icon-size-sm)' />
+                      </Button>
+                    }
+                  />
+                }
+              />
+              <TooltipContent>{'Plan actions'}</TooltipContent>
+            </Tooltip>
             <DropdownMenuContent align='end'>
               <DropdownMenuItem onClick={() => void copyPlanMarkdown(exportMarkdown)}>
                 Copy to clipboard
@@ -95,7 +108,7 @@ export function ProposedPlanCard({ plan }: { plan: OrchestrationProposedPlan }) 
               variant='outline'
               onClick={() => setExpanded((value) => !value)}
             >
-              <ExpandIcon className='size-3.5' />
+              <ExpandIcon className='size-(--icon-size-sm)' />
               {expanded ? 'Collapse plan' : 'Expand plan'}
             </Button>
           </div>

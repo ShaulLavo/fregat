@@ -1,3 +1,4 @@
+import { ToolPane } from '@workspace/ui/patterns/tool-pane'
 import { emptySubscription } from '@workspace/utils/subscriptions'
 import type { DocumentKey, FilesystemPath, TabId } from '@/lib/documents/utils/types'
 import { ArrowCounterClockwiseIcon } from '@phosphor-icons/react'
@@ -166,59 +167,69 @@ export function HistoryPane({
   }
 
   return (
-    <div className='flex h-full min-h-0 flex-col' data-history-pane={documentKey} ref={focusRef}>
-      <div className='border-border overflow-x-auto border-b px-(--bar-padding-x) py-1'>
-        <HistoryGraphStrip
-          barrierFocused={barrierActive}
-          barrierLabel={barrierLabel}
-          focusedId={state.focusedId}
-          graph={graph}
-          now={now}
-          selectedIds={state.selectedIds}
-          onFocus={focusNode}
-          onFocusBarrier={() => setBarrierFocused(true)}
-          onKeyDown={handleKeyDown}
-          onToggleSelect={(id) => {
-            setBarrierFocused(false)
-            viewer.toggleSelection(id)
-          }}
-        />
-      </div>
-      <PaneBar border='bottom' className='justify-between gap-(--density-control-gap)'>
-        {barrierActive ? (
-          <div className='flex min-w-0 flex-1 items-center gap-(--density-control-gap) text-xs'>
-            <span className='shrink-0 font-medium'>Workspace edit</span>
-            <span className='text-muted-foreground shrink-0 tabular-nums'>
-              {affectedFilesLabel(barrierGroup)}
-            </span>
+    <ToolPane
+      className='h-full'
+      header={null}
+      bodyClassName='flex flex-col overflow-hidden'
+      data-history-pane={documentKey}
+      ref={focusRef}
+      subheader={
+        <>
+          <div className='border-border overflow-x-auto border-b px-(--bar-padding-x) py-1'>
+            <HistoryGraphStrip
+              barrierFocused={barrierActive}
+              barrierLabel={barrierLabel}
+              focusedId={state.focusedId}
+              graph={graph}
+              now={now}
+              selectedIds={state.selectedIds}
+              onFocus={focusNode}
+              onFocusBarrier={() => setBarrierFocused(true)}
+              onKeyDown={handleKeyDown}
+              onToggleSelect={(id) => {
+                setBarrierFocused(false)
+                viewer.toggleSelection(id)
+              }}
+            />
           </div>
-        ) : focused ? (
-          <HistoryStateRow node={focused} now={now} />
-        ) : (
-          <span className='text-muted-foreground text-xs'>No state focused</span>
-        )}
-        <div className='flex shrink-0 items-center gap-(--density-control-gap)'>
-          <Button
-            disabled={!canRestore}
-            size='sm'
-            type='button'
-            variant='outline'
-            onClick={() => focused && restore.mutate(focused.id)}
-          >
-            {restoring ? <Spinner /> : <ArrowCounterClockwiseIcon data-icon='inline-start' />}
-            Restore
-          </Button>
-          <Button
-            disabled={graph.nodes.length < 2}
-            size='sm'
-            type='button'
-            variant='ghost'
-            onClick={() => setClearOpen(true)}
-          >
-            Clear history
-          </Button>
-        </div>
-      </PaneBar>
+          <PaneBar border='bottom' className='justify-between gap-(--density-control-gap)'>
+            {barrierActive ? (
+              <div className='flex min-w-0 flex-1 items-center gap-(--density-control-gap) text-xs'>
+                <span className='shrink-0 font-medium'>Workspace edit</span>
+                <span className='text-muted-foreground shrink-0 tabular-nums'>
+                  {affectedFilesLabel(barrierGroup)}
+                </span>
+              </div>
+            ) : focused ? (
+              <HistoryStateRow node={focused} now={now} />
+            ) : (
+              <span className='text-muted-foreground text-xs'>No state focused</span>
+            )}
+            <div className='flex shrink-0 items-center gap-(--density-control-gap)'>
+              <Button
+                disabled={!canRestore}
+                size='sm'
+                type='button'
+                variant='outline'
+                onClick={() => focused && restore.mutate(focused.id)}
+              >
+                {restoring ? <Spinner /> : <ArrowCounterClockwiseIcon data-icon='inline-start' />}
+                Restore
+              </Button>
+              <Button
+                disabled={graph.nodes.length < 2}
+                size='sm'
+                type='button'
+                variant='ghost'
+                onClick={() => setClearOpen(true)}
+              >
+                Clear history
+              </Button>
+            </div>
+          </PaneBar>
+        </>
+      }
+    >
       <div className='min-h-0 flex-1'>
         {barrierActive ? (
           <BarrierBody
@@ -245,7 +256,7 @@ export function HistoryPane({
         onConfirm={() => clear.mutate(undefined, { onSettled: () => setClearOpen(false) })}
         onOpenChange={setClearOpen}
       />
-    </div>
+    </ToolPane>
   )
 }
 

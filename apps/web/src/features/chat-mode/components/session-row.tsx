@@ -1,3 +1,5 @@
+import { ListRow } from '@workspace/ui/patterns/list-row'
+import { useSessionListRow } from '@/features/chat-mode/hooks/use-session-list-row'
 import { SessionAttentionIndicator } from '@/features/chat-mode/components/session-attention-indicator'
 import { MachineChip } from '@/features/chat-mode/components/machine-chip'
 import { scopedSessionKey } from '@workspace/contracts'
@@ -17,16 +19,11 @@ import { sessionClickIntent } from '@workspace/client-core/chat/rail/multi-selec
 import type { SessionRailItem } from '@workspace/client-core/chat/rail/model'
 import { cn } from '@workspace/ui/lib/utils'
 
-export function SessionRow({
-  active,
-  session,
-}: {
-  readonly active: boolean
-  readonly session: SessionRailItem
-}) {
+export function SessionRow({ session }: { readonly session: SessionRailItem }) {
   // Subscribed rather than read in render: an in-render `Date.now()` is frozen
   // by the React Compiler's memo scope, which would leave every idle row's
   // label stuck at whatever it said when the row mounted.
+  const { rowProps, active } = useSessionListRow(session.key)
   const nowMs = useCoarseNow()
   const renaming = useSessionRailStore((state) => state.renaming)
   const marked = useSessionMultiSelectStore((state) =>
@@ -52,30 +49,33 @@ export function SessionRow({
     <SessionMenu
       session={session}
       trigger={
-        // Raw button: a row owns the list fill, and Button's ghost variant
-        // re-declares it in dark mode at a specificity this cannot override.
-        <button
+        <ListRow
+          as='button'
           {...attributes}
           {...listeners}
-          aria-current={active ? 'true' : undefined}
+          {...rowProps}
+          role='option'
+          selected={active}
+          data-active={active || undefined}
+          data-dragging={isDragging || undefined}
+          marked={marked}
           className={cn(
-            'group/session focus-ring-inset flex w-full shrink-0 touch-none flex-col items-start justify-start gap-(--density-gap-tight) px-(--density-row-padding-x) py-(--density-row-padding-y) text-left text-xs outline-none select-none',
-            'text-muted-foreground',
-            !active && !marked && 'hover:bg-row-hover active:bg-row-active hover:text-foreground',
-            active && 'bg-row-selected text-foreground',
-            // A marked row is not the row on the stage, so it gets a ring rather than
-            // the fill — the two states have to be readable at the same time.
-            marked && !active && 'ring-ring/40 text-foreground ring-1',
-            marked && active && 'ring-ring/60 ring-1',
-            isDragging && 'relative z-10 opacity-60',
+            'group/session h-auto w-full shrink-0 touch-none flex-col items-start justify-start gap-(--density-gap-tight) py-(--density-row-padding-y) text-left select-none',
+            isDragging && 'relative z-10',
           )}
-          data-marked={marked ? 'true' : undefined}
           ref={setNodeRef}
           // Measured drag offsets: nothing but the drag itself knows these values.
           style={{ transform: CSS.Transform.toString(transform), transition }}
           title={session.title}
           type='button'
-          onClick={(event) => activateSessionRow(session, sessionClickIntent(event))}
+          onClick={(event) => {
+            const intent = sessionClickIntent(event)
+            if (intent === 'open' && rowProps) {
+              rowProps.onClick(event)
+              return
+            }
+            void activateSessionRow(session, intent)
+          }}
         >
           <span className='flex w-full min-w-0 items-center gap-2'>
             <SessionAttentionIndicator status={session.status} />
@@ -95,7 +95,7 @@ export function SessionRow({
                 title='Finished since you last opened it'
               />
             ) : null}
-            <span className='text-3xs shrink-0 tabular-nums opacity-50'>
+            <span className='text-muted-foreground text-3xs shrink-0 tabular-nums'>
               {formatChatRelativeTime(session.activityAt, nowMs)}
             </span>
           </span>
@@ -113,7 +113,7 @@ export function SessionRow({
             <span className='text-destructive text-2xs pl-[14px]'>Error</span>
           ) : null}
           <SessionRowSnippet sessionKey={session.key} />
-        </button>
+        </ListRow>
       }
     />
   )

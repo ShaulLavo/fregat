@@ -1,3 +1,4 @@
+import { Tooltip, TooltipContent, TooltipTrigger } from '@workspace/ui/components/tooltip'
 import { CaretLeftIcon, CaretRightIcon } from '@phosphor-icons/react'
 import { Button } from '@workspace/ui/components/button'
 import { Dialog, DialogContent, DialogTitle } from '@workspace/ui/components/dialog'
@@ -58,27 +59,41 @@ export function ChatImageLightbox({
           ) : null}
           {images.length > 1 ? (
             <span className='flex items-center gap-(--density-control-gap)'>
-              <Button
-                aria-label='Previous image'
-                size='icon-xs'
-                type='button'
-                variant='ghost'
-                onClick={() => step(-1)}
-              >
-                <CaretLeftIcon className='size-3.5' />
-              </Button>
+              <Tooltip>
+                <TooltipTrigger
+                  render={
+                    <Button
+                      aria-label='Previous image'
+                      size='icon-xs'
+                      type='button'
+                      variant='ghost'
+                      onClick={() => step(-1)}
+                    >
+                      <CaretLeftIcon className='size-(--icon-size-sm)' />
+                    </Button>
+                  }
+                />
+                <TooltipContent>{'Previous image'}</TooltipContent>
+              </Tooltip>
               <span className='tabular-nums'>
                 {index + 1} / {images.length}
               </span>
-              <Button
-                aria-label='Next image'
-                size='icon-xs'
-                type='button'
-                variant='ghost'
-                onClick={() => step(1)}
-              >
-                <CaretRightIcon className='size-3.5' />
-              </Button>
+              <Tooltip>
+                <TooltipTrigger
+                  render={
+                    <Button
+                      aria-label='Next image'
+                      size='icon-xs'
+                      type='button'
+                      variant='ghost'
+                      onClick={() => step(1)}
+                    >
+                      <CaretRightIcon className='size-(--icon-size-sm)' />
+                    </Button>
+                  }
+                />
+                <TooltipContent>{'Next image'}</TooltipContent>
+              </Tooltip>
             </span>
           ) : null}
         </div>

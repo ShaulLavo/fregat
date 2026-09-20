@@ -16,7 +16,10 @@ function Spinner({ className, ...props }: SpinnerProps) {
     <SpinnerIcon
       role='status'
       aria-label='Loading'
-      className={cn('size-4 animate-spin motion-reduce:[animation-duration:2s]', className)}
+      className={cn(
+        'size-(--icon-size) animate-spin motion-reduce:[animation-duration:2s]',
+        className,
+      )}
       {...props}
     />
   )

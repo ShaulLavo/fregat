@@ -10,7 +10,7 @@ import {
   DropdownMenuRadioItem,
   DropdownMenuTrigger,
 } from '@workspace/ui/components/dropdown-menu'
-import { sessionProjectRowTitle } from '@/features/command-palette/command-palette-utils'
+import { sessionProjectRowTitle } from '@/features/command-palette/utils/query'
 
 const ALL_PROJECTS_VALUE = ''
 
@@ -40,7 +40,7 @@ export function SessionScopeMenu({
             variant='ghost'
           >
             <span className='truncate'>{scopeTitle}</span>
-            <CaretUpDownIcon className='size-3 shrink-0 opacity-60' />
+            <CaretUpDownIcon className='size-(--icon-size-sm) shrink-0 opacity-60' />
           </Button>
         }
       />
@@ -61,7 +61,7 @@ export function SessionScopeMenu({
               <span className='flex min-w-0 flex-1 items-baseline gap-1.5'>
                 <span className='truncate'>{project.title}</span>
                 {project.qualifier ? (
-                  <span className='text-muted-foreground/70 text-2xs shrink-0 truncate'>
+                  <span className='text-muted-foreground text-2xs shrink-0 truncate'>
                     {project.qualifier}
                   </span>
                 ) : null}

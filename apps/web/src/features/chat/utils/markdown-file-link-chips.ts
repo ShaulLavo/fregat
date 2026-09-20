@@ -1,6 +1,6 @@
+import { workspaceRelativePath } from '@/lib/workspace-relative-path'
 import {
   resolveMarkdownLinkFileReference,
-  workspaceRelativePath,
   type MarkdownFileReference,
 } from '@/features/chat/utils/markdown-file-links'
 

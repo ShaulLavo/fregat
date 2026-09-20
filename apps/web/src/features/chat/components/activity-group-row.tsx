@@ -37,7 +37,10 @@ export function ActivityGroupRow({ activities }: { activities: readonly ChatWork
         >
           <CaretRightIcon
             aria-hidden='true'
-            className={cn('size-3 shrink-0 transition-transform', expanded && 'rotate-90')}
+            className={cn(
+              'size-(--icon-size-sm) shrink-0 transition-transform',
+              expanded && 'rotate-90',
+            )}
           />
           <span className='truncate'>{summary}</span>
         </Button>

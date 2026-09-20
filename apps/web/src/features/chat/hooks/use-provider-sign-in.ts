@@ -1,3 +1,4 @@
+import { chatMutationKeys } from '@/features/chat/utils/mutation-keys'
 import { useMutation, useQuery, useQueryClient, type QueryClient } from '@tanstack/react-query'
 import type {
   ProviderAuth,
@@ -14,12 +15,12 @@ import {
 } from '@workspace/client-core/chat/providers/auth'
 import {
   cancelProviderLoginAttempt,
-  providerAuthKeys,
   providerAuthQueryOptions,
   providerLoginAttemptQueryOptions,
   signOutProvider,
   startProviderLogin,
 } from '@/features/chat/utils/provider-auth-query'
+import { providerAuthKeys } from '@/features/chat/utils/query-keys'
 import { providerListQueryOptions } from '@/features/chat/utils/provider-query'
 import { clientForQueryClient } from '@/lib/environments/state/query-clients'
 import { errorMessage } from '@/lib/error-message'
@@ -86,14 +87,17 @@ export function useProviderSignIn({
   const attemptQuery = useQuery(providerLoginAttemptQueryOptions(providerInstanceId, attemptId))
 
   const startMutation = useMutation({
+    mutationKey: chatMutationKeys.providerSignIn(providerInstanceId),
     mutationFn: (next: ProviderSignInMethod) =>
       startProviderLogin(providerInstanceId, next, client),
     onSuccess: (attempt) => setAttemptId(attempt.attemptId),
   })
   const cancelMutation = useMutation({
+    mutationKey: chatMutationKeys.providerCancelSignIn(providerInstanceId),
     mutationFn: (id: string) => cancelProviderLoginAttempt(providerInstanceId, id, client),
   })
   const signOutMutation = useMutation({
+    mutationKey: chatMutationKeys.providerSignOut(providerInstanceId),
     mutationFn: () => signOutProvider(providerInstanceId, client),
     onSuccess: () => invalidateProviderAuth(queryClient, providerInstanceId),
   })

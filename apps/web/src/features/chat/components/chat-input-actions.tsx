@@ -1,3 +1,4 @@
+import { EMPTY_ACTIVITIES } from '@/lib/empty-activities'
 import { useActiveChatProjection } from '@/features/chat/hooks/use-active-projection'
 import type { InteractionMode, RuntimeMode, SessionId } from '@workspace/contracts'
 import { useRef } from 'react'
@@ -21,8 +22,6 @@ import type { ComposerPendingAction } from '@/features/chat/utils/composer-state
  * layout is decided by the measured row rather than by a viewport breakpoint.
  */
 const COMPACT_ACTIONS_WIDTH = 380
-
-const EMPTY_ACTIVITIES: readonly [] = []
 
 export function ChatInputActions({
   busy,

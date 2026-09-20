@@ -23,5 +23,5 @@ const icons = {
 
 export function ActivityIcon({ icon }: { icon: ChatActivityIconKey }) {
   const Icon = icons[icon]
-  return <Icon aria-hidden='true' className='size-3.5 shrink-0' />
+  return <Icon aria-hidden='true' className='size-(--icon-size-sm) shrink-0' />
 }

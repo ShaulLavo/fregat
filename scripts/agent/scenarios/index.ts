@@ -1,6 +1,25 @@
+import {
+  breadcrumbPicker,
+  lspReferences,
+  environmentsDialog,
+  chatChangedFiles,
+  patternHints,
+} from './pattern-extras'
+import {
+  gitChanges,
+  logsPanel,
+  sessionRail,
+  filesTree,
+  filePicker,
+  searchResults,
+  terminalTabs,
+  gitGraphKeyboard,
+} from './pattern-lists'
+import { chatTimelinePattern } from './chat-timeline-pattern'
 import { settingsFontInput } from './settings-font-input'
 import { terminalBackground } from './terminal-background'
 import { chatFollowUp } from './chat-follow-up'
+import { chatDiffSyntax } from './chat-diff-syntax'
 import { editorSplitDrag } from './editor-split-drag'
 import { editorSplitActions } from './editor-split-actions'
 import { editorSplitContent } from './editor-split-content'
@@ -15,13 +34,16 @@ import { pageLifecycle } from './page-lifecycle'
 import { editorExternalEdit } from './editor-external-edit'
 import { editorThemePreview } from './editor-theme-preview'
 import { themeBundles } from './theme-bundles'
+import { bundleWallpapers } from './bundle-wallpapers'
 import { themeGallery } from './theme-gallery'
+import { colorModePreview } from './color-mode-preview'
 import { wallpaperModeToggle } from './wallpaper-mode-toggle'
 import { editorLspHover } from './editor-lsp-hover'
 import { editorMarkdownPunctuation } from './editor-markdown-punctuation'
 import { wallpaperLibrary } from './wallpaper-library'
 import { wallpaperPalette } from './wallpaper-palette'
 import { settingsDefaults } from './settings-defaults'
+import { sidebarSettingsButton } from './sidebar-settings-button'
 import { fileIcons } from './file-icons'
 import { searchInputUndo } from './search-input-undo'
 import { quickOpenNewFile } from './quick-open-new-file'
@@ -64,7 +86,23 @@ import { demoThemeStartup } from './demo-theme-startup'
 import { demoWallpaperStartup } from './demo-wallpaper-startup'
 
 export const scenarios: readonly Scenario[] = [
+  workbenchListFocus,
+  breadcrumbPicker,
+  lspReferences,
+  environmentsDialog,
+  chatChangedFiles,
+  patternHints,
+  gitChanges,
+  logsPanel,
+  sessionRail,
+  filesTree,
+  filePicker,
+  searchResults,
+  terminalTabs,
+  gitGraphKeyboard,
+  chatTimelinePattern,
   chatFollowUp,
+  chatDiffSyntax,
   editorSplitDrag,
   editorSplitActions,
   editorSplitContent,
@@ -79,8 +117,10 @@ export const scenarios: readonly Scenario[] = [
   terminalBackground,
   editorThemePreview,
   themeGallery,
+  colorModePreview,
   pageLifecycle,
   themeBundles,
+  bundleWallpapers,
   editorLspHover,
   editorMarkdownPunctuation,
   fileIcons,
@@ -94,6 +134,7 @@ export const scenarios: readonly Scenario[] = [
   wallpaperLibrary,
   wallpaperPalette,
   settingsDefaults,
+  sidebarSettingsButton,
   settingsFontInput,
   demoWorkspace,
   demoAgentGit,
@@ -121,3 +162,4 @@ export function scenarioNamed(name: string): Scenario {
   const names = scenarios.map((entry) => entry.name).join(', ')
   throw new Error(`Unknown scenario "${name}". Known: ${names}`)
 }
+import { workbenchListFocus } from './workbench-list-focus'

@@ -8,7 +8,7 @@ import type {
   ProviderInstanceId,
   RuntimeMode,
 } from '@workspace/contracts'
-import type { LexicalEditor } from 'lexical'
+import { $setSelection, type LexicalEditor } from 'lexical'
 import { useCallback, useEffect, useMemo, useRef, useState, type DragEvent } from 'react'
 import { cn } from '@workspace/ui/lib/utils'
 
@@ -192,7 +192,9 @@ export function ChatInput({
   const initialConfig = useMemo<InitialConfigType>(
     () => ({
       editorState: () => {
+        // Restoring a draft must not take focus from the session list.
         $setChatInputText(initialDraft)
+        $setSelection(null)
       },
       namespace: `platform-chat-input:${inputKey}`,
       nodes: CHAT_INPUT_EDITOR_NODES,

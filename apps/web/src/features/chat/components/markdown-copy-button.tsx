@@ -55,7 +55,11 @@ export function MarkdownCopyButton({
           />
         }
       >
-        {copied ? <CheckIcon className='size-3' /> : <CopyIcon className='size-3' />}
+        {copied ? (
+          <CheckIcon className='size-(--icon-size-sm)' />
+        ) : (
+          <CopyIcon className='size-(--icon-size-sm)' />
+        )}
       </TooltipTrigger>
       <TooltipContent>{label}</TooltipContent>
     </Tooltip>

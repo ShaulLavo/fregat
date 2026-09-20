@@ -20,7 +20,10 @@ export function PendingApprovalPanel() {
         className='border-border bg-card mx-auto flex max-w-3xl flex-col gap-(--density-control-gap) rounded-lg border p-(--density-section-padding)'
       >
         <div className='flex min-w-0 items-center gap-2'>
-          <WarningCircleIcon aria-hidden='true' className='text-warning size-3.5 shrink-0' />
+          <WarningCircleIcon
+            aria-hidden='true'
+            className='text-warning size-(--icon-size-sm) shrink-0'
+          />
           <span className='text-foreground flex-1 text-xs font-medium'>
             {approvalTitle(approval.requestKind)}
           </span>
@@ -32,7 +35,7 @@ export function PendingApprovalPanel() {
         </div>
         <pre
           aria-label={detailLabel(approval.requestKind)}
-          className='focus-ring text-foreground/85 text-2xs max-h-20 overflow-auto rounded-md font-mono leading-relaxed whitespace-pre outline-none'
+          className='focus-ring text-foreground text-2xs max-h-20 overflow-auto rounded-md font-mono leading-relaxed whitespace-pre outline-none'
           tabIndex={0}
         >
           {approval.detail || approvalTitle(approval.requestKind)}

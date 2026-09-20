@@ -22,7 +22,7 @@ export function ChatPanelStatus({
   if (message) {
     return (
       <StatusLine title={message} tone='destructive'>
-        <WarningCircleIcon className='size-3.5 shrink-0' />
+        <WarningCircleIcon className='size-(--icon-size-sm) shrink-0' />
         <span className='truncate'>{message}</span>
       </StatusLine>
     )
@@ -34,7 +34,7 @@ export function ChatPanelStatus({
   // seconds, and the user has no way to tell whether to wait.
   return (
     <StatusLine tone='warning'>
-      <HourglassMediumIcon className='size-3.5 shrink-0' />
+      <HourglassMediumIcon className='size-(--icon-size-sm) shrink-0' />
       <span className='truncate'>
         Waiting on the server (<span className='tabular-nums'>{slowRequestCount}</span>{' '}
         {slowRequestCount === 1 ? 'request' : 'requests'})

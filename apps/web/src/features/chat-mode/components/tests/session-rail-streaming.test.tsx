@@ -10,7 +10,7 @@ import { orchestrationForApp } from 'server/testing'
 import { useChatProjectionStore } from '@/features/chat/state/chat-projection-store'
 import { useSessionSearchStore } from '@/features/chat-mode/state/session-search-store'
 import { useChatShellSubscription } from '@/features/chat/hooks/use-chat-shell-subscription'
-import { useCommandPaletteSessions } from '@/features/command-palette/use-command-palette-sessions'
+import { useSessions } from '@/features/command-palette/hooks/use-sessions'
 import { createRailHarness, renderRailHarness } from '../../../../../test/factories/rail-harness'
 import { expect, test } from '../../../../../test/fixtures'
 
@@ -44,7 +44,7 @@ test('real detail stream deltas update the transcript without rendering the rail
   })
   const palette = renderHook(() => {
     paletteRenders += 1
-    return useCommandPaletteSessions()
+    return useSessions()
   })
   const append = async (index: number) => {
     let sequence = 0

@@ -1,13 +1,11 @@
 import { ActionCluster } from '@/features/git/components/action-cluster'
 import { ArrowBendUpLeftIcon, FilePlusIcon, MinusIcon, PlusIcon } from '@phosphor-icons/react'
 
-import {
-  useDiscardPathsMutation,
-  useDiscardStagedPathsMutation,
-  useOpenDiffDocument,
-  useStagePathsMutation,
-  useUnstagePathsMutation,
-} from '../hooks'
+import { useDiscardPathsMutation } from '@/features/git/hooks/use-discard-paths-mutation'
+import { useDiscardStagedPathsMutation } from '@/features/git/hooks/use-discard-staged-paths-mutation'
+import { useOpenDiffDocument } from '@/features/git/hooks/use-open-diff-document'
+import { useStagePathsMutation } from '@/features/git/hooks/use-stage-paths-mutation'
+import { useUnstagePathsMutation } from '@/features/git/hooks/use-unstage-paths-mutation'
 import type { ChangeRow, PanelSection } from '@/features/git/utils/types'
 import { RowActionButton } from './row-action-button'
 

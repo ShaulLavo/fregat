@@ -1,3 +1,4 @@
+import { projectEntryQueryKeys } from '@/features/chat/utils/query-keys'
 import type { EntryTypeFilter, WorkspaceSearchMatch } from '@workspace/contracts'
 import { queryOptions } from '@tanstack/react-query'
 
@@ -28,12 +29,6 @@ type ProjectEntrySearchItem = {
   label: string
   path: string
   type: EntryTypeFilter
-}
-
-const projectEntryQueryKeys = {
-  all: ['chat-project-entries'] as const,
-  search: (rootPath: string, query: string, limit: number) =>
-    [...projectEntryQueryKeys.all, rootPath, query, limit] as const,
 }
 
 type ProjectEntrySearchQueryKey = ReturnType<typeof projectEntryQueryKeys.search>

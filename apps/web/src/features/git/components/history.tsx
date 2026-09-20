@@ -18,7 +18,7 @@ import { OrbitLoader } from '@workspace/ui/components/orbit-loader'
 import { cn } from '@workspace/ui/lib/utils'
 import { useHistory } from '@/features/git/hooks/use-history'
 import { useOpenHistoricalDiff } from '@/features/git/hooks/use-open-historical-diff'
-import { historyKeys } from '@/features/git/utils/history-query'
+import { historyKeys } from '@/features/git/utils/query-keys'
 import { layoutHistory, layoutHistoryMatches } from '@/features/git/utils/history-layout'
 import { historyCountLabel, historyRefLabels } from '@/features/git/utils/history-presentation'
 import { HistoryToolbar } from '@/features/git/components/history-toolbar'
@@ -194,7 +194,7 @@ export function History({ rootPath }: { rootPath: string }) {
     <Dialog open={expanded} onOpenChange={setExpanded}>
       <DialogContent className='flex h-[85dvh] w-[94vw] max-w-none flex-col gap-0 overflow-hidden p-0 sm:max-w-none'>
         <PaneBar border='bottom'>
-          <GitBranchIcon className='size-4' />
+          <GitBranchIcon className='size-(--icon-size)' />
           <DialogTitle className='text-xs font-medium'>Commit graph</DialogTitle>
         </PaneBar>
         <DialogDescription className='sr-only'>

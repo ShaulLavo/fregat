@@ -1,8 +1,10 @@
+import { wallpaperLibraryKey } from '@/lib/wallpapers/state/queries'
 import { useMutation } from '@tanstack/react-query'
 import type { ThemeDocument, ThemeId } from '@workspace/contracts'
 import { refreshConfirmedSettings } from '@/features/settings/state/snapshot-admission'
 import { useSettingsOwner } from '@/features/settings/hooks/use-settings-owner'
-import { bundleMutationKeys, bundleQueryKey } from '@/features/settings/utils/bundle-keys'
+import { bundleMutationKeys } from '@/features/settings/utils/mutation-keys'
+import { bundleQueryKey, paletteLibraryQueryKey } from '@/features/settings/utils/query-keys'
 import { clientForQueryClient } from '@/lib/environments/state/query-clients'
 import { createRpcError } from '@/lib/structured-errors'
 
@@ -12,8 +14,8 @@ export function useBundleActions() {
   const settle = async () => {
     await Promise.all([
       owner.invalidateQueries({ queryKey: bundleQueryKey }),
-      owner.invalidateQueries({ queryKey: ['themes', 'palettes'] }),
-      owner.invalidateQueries({ queryKey: ['themes', 'wallpapers'] }),
+      owner.invalidateQueries({ queryKey: paletteLibraryQueryKey }),
+      owner.invalidateQueries({ queryKey: wallpaperLibraryKey }),
     ])
   }
   const create = useMutation(

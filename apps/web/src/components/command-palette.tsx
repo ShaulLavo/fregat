@@ -1,4 +1,4 @@
-import { CommandPaletteContent } from '@/features/command-palette/content'
+import { CommandPaletteContent } from '@/features/command-palette/components/content'
 import { useCommand } from '@/keymap/hooks/use-command'
 
 export function CommandPalette() {

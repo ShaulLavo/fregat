@@ -63,7 +63,7 @@ export function ChatInputAttachButton({
             />
           }
         >
-          <PaperclipIcon className='size-3.5' />
+          <PaperclipIcon className='size-(--icon-size-sm)' />
         </TooltipTrigger>
         <TooltipContent>Attach images</TooltipContent>
       </Tooltip>

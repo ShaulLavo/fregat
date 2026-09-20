@@ -29,7 +29,7 @@ export function ComposerActivePlan({
       >
         <CaretRightIcon
           aria-hidden='true'
-          className='size-3 shrink-0 group-data-[open]/plan:rotate-90'
+          className='size-(--icon-size-sm) shrink-0 group-data-[open]/plan:rotate-90'
         />
         <span className='shrink-0 tabular-nums' aria-label='Plan progress'>
           {plan.completedCount}/{plan.steps.length}
@@ -48,7 +48,10 @@ export function ComposerActivePlan({
           {plan.steps.map((step, index) => (
             <li className='text-2xs flex items-start gap-2 leading-5' key={`${index}:${step.step}`}>
               {step.status === 'completed' ? (
-                <CheckIcon aria-label='Completed' className='text-success mt-1 size-3 shrink-0' />
+                <CheckIcon
+                  aria-label='Completed'
+                  className='text-success mt-1 size-(--icon-size-sm) shrink-0'
+                />
               ) : null}
               {step.status !== 'completed' ? (
                 <span

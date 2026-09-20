@@ -1,3 +1,5 @@
+import { ListRow } from '@workspace/ui/patterns/list-row'
+import type { useListbox } from '@workspace/ui/patterns/use-listbox'
 import { useSortable } from '@dnd-kit/sortable'
 import { CSS } from '@dnd-kit/utilities'
 import { TerminalIcon } from '@phosphor-icons/react'
@@ -14,16 +16,16 @@ const MIDDLE_MOUSE_BUTTON = 1
 
 export function TerminalListRow({
   active,
+  rowProps,
   tab,
   onClose,
   onRename,
-  onSelect,
 }: {
+  readonly rowProps: ReturnType<ReturnType<typeof useListbox>['rowProps']>
   readonly active: boolean
   readonly tab: TerminalTabRecord
   readonly onClose: (tabId: string) => void
   readonly onRename: (tabId: string, name: string) => void
-  readonly onSelect: (tabId: string) => void
 }) {
   const [editing, setEditing] = useState(false)
   const label = terminalTabLabel(tab)
@@ -48,7 +50,7 @@ export function TerminalListRow({
     if (editing || !restoreFocusRef.current) return
 
     restoreFocusRef.current = false
-    buttonRef.current?.focus()
+    buttonRef.current?.closest<HTMLElement>('[role=tablist]')?.focus()
   }, [editing])
 
   // Other keys still reach dnd-kit so Space picks the row up for keyboard reordering.
@@ -80,7 +82,7 @@ export function TerminalListRow({
   }
 
   const rowClassName = cn(
-    'flex h-(--density-control-height-sm) w-full min-w-0 items-center gap-(--density-control-gap) px-(--density-row-padding-x) text-xs',
+    'flex h-(--density-row-height) w-full min-w-0 items-center gap-(--density-control-gap) px-(--density-row-padding-x) text-xs',
     active ? 'bg-row-selected text-foreground' : 'text-muted-foreground',
   )
 
@@ -88,7 +90,7 @@ export function TerminalListRow({
   if (editing)
     return (
       <div className={rowClassName} data-terminal-tab-id={tab.id} ref={setNodeRef}>
-        <TerminalIcon className='size-3.5 shrink-0' />
+        <TerminalIcon className='size-(--icon-size-sm) shrink-0' />
         <TerminalListRowEditor
           initialTitle={tab.name ?? label}
           onCancel={stopEditing}
@@ -97,19 +99,20 @@ export function TerminalListRow({
       </div>
     )
 
-  // Raw <button>: a full-width list row that also spreads dnd-kit drag listeners.
   const trigger = (
-    <button
+    <ListRow
+      as='button'
       {...attributes}
       {...listeners}
-      aria-selected={active}
+      {...rowProps}
+      selected={active}
       className={cn(
         rowClassName,
-        'group/proof-tab focus-ring-inset cursor-grab touch-none text-left outline-none select-none active:cursor-grabbing',
-        !active && 'hover:bg-row-hover hover:text-foreground active:bg-row-active',
-        isDragging && 'relative z-10 opacity-60',
+        'group/proof-tab cursor-grab touch-none text-left outline-none select-none active:cursor-grabbing',
+        isDragging && 'relative z-10',
       )}
       data-terminal-tab-id={tab.id}
+      data-dragging={isDragging || undefined}
       draggable={false}
       ref={(node) => {
         buttonRef.current = node
@@ -120,11 +123,11 @@ export function TerminalListRow({
       title={label}
       type='button'
       onAuxClick={handleAuxClick}
-      onClick={() => onSelect(tab.id)}
+      onClick={rowProps.onClick}
       onDoubleClick={() => setEditing(true)}
       onKeyDown={handleKeyDown}
     >
-      <TerminalIcon className='size-3.5 shrink-0' />
+      <TerminalIcon className='size-(--icon-size-sm) shrink-0' />
       <span className='min-w-0 flex-1 truncate'>{label}</span>
       <TabTrailingSlot
         active={active}
@@ -133,7 +136,7 @@ export function TerminalListRow({
         title={label}
         onClose={() => onClose(tab.id)}
       />
-    </button>
+    </ListRow>
   )
 
   return <MenuSurface className='w-44' menu={menu} surface='terminal.tab' trigger={trigger} />

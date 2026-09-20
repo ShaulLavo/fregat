@@ -1,3 +1,4 @@
+import { workspaceRelativePath } from '@/lib/workspace-relative-path'
 import { fileDocumentKey, filesystemPath } from '@/lib/documents/utils/identity'
 import type {
   TextChangePreparation,
@@ -1915,7 +1916,7 @@ class WorkspaceEditPreparationBuilder {
   }
 
   private async assertSupportedPath(path: FilesystemPath): Promise<void> {
-    const relative = workspaceRelativePath(this.root.path, path)
+    const relative = workspaceEditRelativePath(this.root.path, path)
     if (!relative || relative === '.') {
       throw workspaceEditError('unsupported-target', 'Workspace root is not a file target')
     }
@@ -2412,12 +2413,12 @@ function transactionGuard(afterOperation: number): WorkspaceResourcePrecondition
 }
 
 function requiredRelativePath(rootPath: FilesystemPath, path: FilesystemPath): FilesystemPath {
-  const relative = workspaceRelativePath(rootPath, path)
+  const relative = workspaceEditRelativePath(rootPath, path)
   if (relative && relative !== '.') return relative
   throw workspaceEditError('outside-workspace', 'Workspace edit target is outside the workspace')
 }
 
-function workspaceRelativePath(
+function workspaceEditRelativePath(
   rootPath: FilesystemPath,
   path: FilesystemPath,
 ): FilesystemPath | null {
@@ -2432,8 +2433,8 @@ function workspaceRelativePath(
     return filesystemPath(target || '.')
   }
   if (target === root) return filesystemPath('.')
-  if (!target.startsWith(`${root}/`)) return null
-  return filesystemPath(target.slice(root.length + 1))
+  const relative = workspaceRelativePath(target, root)
+  return relative === null ? null : filesystemPath(relative)
 }
 
 function workspaceDocumentPath(
@@ -2654,7 +2655,7 @@ function workspacePathFromFileUri(uri: string, root: WorkspaceEditRoot): Filesys
     throw workspaceEditError('unsupported-uri', 'Workspace file URI has an invalid path')
   }
   const path = filesystemPath(decodedPath)
-  const relative = workspaceRelativePath(workspaceEditUriPath(root), path)
+  const relative = workspaceEditRelativePath(workspaceEditUriPath(root), path)
   if (!relative) {
     throw workspaceEditError('outside-workspace', 'Workspace edit target is outside the workspace')
   }

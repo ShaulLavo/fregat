@@ -1,3 +1,4 @@
+import { environmentQueryKeys } from '@/features/environments/utils/query-keys'
 import { useQuery } from '@tanstack/react-query'
 import type { ReactNode } from 'react'
 import { Button } from '@workspace/ui/components/button'
@@ -23,7 +24,7 @@ export function ConnectionGate({
   )
   const connection = useEnvironmentsStore((state) => selectServerConnection(state, origin))
   const query = useQuery({
-    queryKey: ['environment-descriptor'],
+    queryKey: environmentQueryKeys.descriptor,
     networkMode: 'always',
     queryFn: ({ client, signal }) =>
       readEnvironmentDescriptor(originForQueryClient(client), signal, clientForQueryClient(client)),

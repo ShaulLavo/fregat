@@ -1,8 +1,8 @@
 import type { GroupAxis, GroupEdge, GroupNode } from '@/lib/documents/utils/group-types'
 
-export const GROUP_MIN_WIDTH = 240
-export const GROUP_MIN_HEIGHT = 160
-export const GROUP_DIVIDER_SIZE = 4
+const GROUP_MIN_WIDTH = 240
+const GROUP_MIN_HEIGHT = 160
+const GROUP_DIVIDER_SIZE = 4
 
 export type GroupSize = { readonly width: number; readonly height: number }
 

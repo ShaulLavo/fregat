@@ -4,9 +4,9 @@ import { act, renderHook, waitFor } from '@testing-library/react'
 import type { ReactNode } from 'react'
 
 import { expect, test } from '../../../../test/fixtures'
-import type { EntriesLoadState } from '@/features/file-picker/model'
-import { useDirectoryLoad } from '@/features/file-picker/use-directory-load'
-import { useRecentEntries } from '@/features/file-picker/use-recent-entries'
+import type { EntriesLoadState } from '@/features/file-picker/utils/model'
+import { useDirectoryLoad } from '@/features/file-picker/hooks/use-directory-load'
+import { useRecentEntries } from '@/features/file-picker/hooks/use-recent-entries'
 import type { ServerInfo } from '@/lib/file-system-types'
 import { filePickerKeys } from '@/lib/query-keys'
 

@@ -26,7 +26,7 @@ export function SearchModeButtons({
         label='Match case'
         onClick={() => onOptionsChange({ caseSensitive: !options.caseSensitive })}
       >
-        <TextAaIcon className='size-3.5' />
+        <TextAaIcon className='size-(--icon-size-sm)' />
       </SearchToggleButton>
       <SearchToggleButton
         active={options.wholeWord}
@@ -34,7 +34,7 @@ export function SearchModeButtons({
         label='Match whole word'
         onClick={() => onOptionsChange({ wholeWord: !options.wholeWord })}
       >
-        <TextTIcon className='size-3.5' />
+        <TextTIcon className='size-(--icon-size-sm)' />
       </SearchToggleButton>
       <SearchToggleButton
         active={options.matchMode === 'regex'}
@@ -46,7 +46,7 @@ export function SearchModeButtons({
           })
         }
       >
-        <AsteriskIcon className='size-3.5' />
+        <AsteriskIcon className='size-(--icon-size-sm)' />
       </SearchToggleButton>
       <SearchToggleButton
         active={options.filtersVisible}
@@ -54,7 +54,7 @@ export function SearchModeButtons({
         label='Include and exclude files'
         onClick={() => onOptionsChange({ filtersVisible: !options.filtersVisible })}
       >
-        <FunnelSimpleIcon className='size-3.5' />
+        <FunnelSimpleIcon className='size-(--icon-size-sm)' />
       </SearchToggleButton>
     </div>
   )

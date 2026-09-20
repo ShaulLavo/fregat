@@ -1,6 +1,6 @@
 import { screen } from '@testing-library/react'
 
-import { ToolPaneHeader } from '@/features/workbench/components/tool-pane-header'
+import { ToolPaneHeader } from '@/components/tool-pane-header'
 import { chatModeToolTabLabel } from '@/features/chat-mode/utils/panels'
 import {
   createEditorWorkspaceStore,

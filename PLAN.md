@@ -299,6 +299,12 @@ containment and keyboard chips, and
 `CLAUDE.md` already decided. Each names the decisions that need confirmation before implementation.
 They preserve the implemented design tokens and extend the existing census and browser verifier.
 
+The [shared pattern layer](docs/pattern-layer.md) now supplies rows, list focus, virtualization
+and pane shells from `packages/ui`. The boundary lint freezes feature imports, and the design
+census gates icon sizes, text alpha, row hover and icon-only hints. File picker and command palette
+follow the common feature layout, and query keys follow their consumers. Plans 101, 102 and 103
+build on these patterns; 103's loading states mount inside the shared shell.
+
 ## Theme standardization
 
 Requested 2026-09-12, split 2026-09-14. Plan 104 is retired and replaced by three plans that build

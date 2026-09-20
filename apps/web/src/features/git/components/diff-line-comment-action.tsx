@@ -1,3 +1,4 @@
+import { Tooltip, TooltipContent, TooltipTrigger } from '@workspace/ui/components/tooltip'
 import { ChatCircleIcon, XIcon } from '@phosphor-icons/react'
 import type { DiffFile, DiffRegionStore, DiffRenderRow } from '@singapore-editor/diff'
 import { Button } from '@workspace/ui/components/button'
@@ -104,14 +105,21 @@ export function DiffLineCommentAction({
           <ChatCircleIcon data-icon='inline-start' />
           Ask the agent about these lines
         </Button>
-        <Button
-          aria-label='Dismiss line selection'
-          onClick={() => setAddress(null)}
-          size='icon-sm'
-          variant='ghost'
-        >
-          <XIcon />
-        </Button>
+        <Tooltip>
+          <TooltipTrigger
+            render={
+              <Button
+                aria-label='Dismiss line selection'
+                onClick={() => setAddress(null)}
+                size='icon-sm'
+                variant='ghost'
+              >
+                <XIcon />
+              </Button>
+            }
+          />
+          <TooltipContent>{'Dismiss line selection'}</TooltipContent>
+        </Tooltip>
       </div>
     </div>
   )

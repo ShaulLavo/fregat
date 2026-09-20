@@ -1,3 +1,4 @@
+import { parentPath } from '@/lib/path-formatters'
 import type { TreeEntry } from '@workspace/contracts'
 
 export type WorkspaceFilesystemEvent =
@@ -328,15 +329,6 @@ function isLikelyTemporarySavePath(path: string) {
   if (name.endsWith('.part')) return true
 
   return false
-}
-
-export function parentPath(path: string, rootPath: string) {
-  if (path === rootPath) return rootPath
-
-  const index = path.lastIndexOf('/')
-  if (index < 0) return rootPath
-
-  return path.slice(0, index)
 }
 
 function isWithinAnyPath(path: string, parents: ReadonlySet<string>) {

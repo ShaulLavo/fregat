@@ -35,39 +35,39 @@ import {
 
 import { useDirectoryTransition } from '@/features/file-picker/hooks/use-directory-transition'
 import { useFilePickerPathInput } from '@/features/file-picker/hooks/use-path-input'
-import { IconTooltip } from '@/features/file-picker/icon-tooltip'
-import { FileList, ListHeader, type FileListKeyboardContext } from '@/features/file-picker/list'
+import { IconTooltip } from '@/features/file-picker/components/icon-tooltip'
+import { FileList } from '@/features/file-picker/components/list'
+import { ListHeader } from '@/features/file-picker/components/list-header'
 import {
   ROOT_PATH,
   currentPickableEntry,
   displayPath,
   entryByOffset,
   loadStateEntries,
-  parentPath,
+  pickerParentPath,
   pickerCopy,
   toPickedEntry,
   type EntriesLoadState,
   type FilePickerIconMode,
   type FilePickerMode,
-} from '@/features/file-picker/model'
-import { NewFolderPopover } from '@/features/file-picker/new-folder-popover'
-import { LocationBar } from '@/features/file-picker/navigation/location-bar'
-import { MobileLocations } from '@/features/file-picker/navigation/mobile-locations'
-import { PlacesSidebar } from '@/features/file-picker/navigation/places-sidebar'
-import { PreviewPane, SelectedSummary } from '@/features/file-picker/preview'
+} from '@/features/file-picker/utils/model'
+import { NewFolderPopover } from '@/features/file-picker/components/new-folder-popover'
+import { LocationBar } from '@/features/file-picker/components/location-bar'
+import { MobileLocations } from '@/features/file-picker/components/mobile-locations'
+import { PlacesSidebar } from '@/features/file-picker/components/places-sidebar'
+import { PreviewPane, SelectedSummary } from '@/features/file-picker/components/preview'
 import {
   FilePickerSessionActionsContext,
   type FilePickerSessionActions,
 } from '@/features/file-picker/providers/session-actions-context'
-import { useFilePickerSession } from '@/features/file-picker/state'
-import { useDirectoryLoad } from '@/features/file-picker/use-directory-load'
-import { useRecentEntries } from '@/features/file-picker/use-recent-entries'
-import { useRecordRecentMutation } from '@/features/file-picker/use-record-recent-mutation'
-import { useServerInfoForOpen } from '@/features/file-picker/use-server-info-for-open'
+import { useFilePickerSession } from '@/features/file-picker/state/picker'
+import { useDirectoryLoad } from '@/features/file-picker/hooks/use-directory-load'
+import { useRecentEntries } from '@/features/file-picker/hooks/use-recent-entries'
+import { useRecordRecentMutation } from '@/features/file-picker/hooks/use-record-recent-mutation'
+import { useServerInfoForOpen } from '@/features/file-picker/hooks/use-server-info-for-open'
 import {
   isGoToFolderShortcut,
   isGoUpShortcut,
-  isPrintablePickerKey,
   isToggleHiddenShortcut,
 } from '@/features/file-picker/utils/keyboard'
 import {
@@ -159,7 +159,7 @@ export function FilePickerDialog({
   )
   const revealEntry = useCallback(
     (entry: FsEntry) => {
-      const path = isDirectoryEntry(entry) ? entry.path : parentPath(entry.path)
+      const path = isDirectoryEntry(entry) ? entry.path : pickerParentPath(entry.path)
       const intentId = beginDirectoryIntent()
       void loadDirectory(path, intentId).then((loaded) => {
         if (!loaded) return
@@ -263,30 +263,6 @@ export function FilePickerDialog({
     if (event.key === 'ArrowUp') return focusListFromSearch(event, -1)
   }
 
-  function handleListKeyDown(
-    event: KeyboardEvent<HTMLDivElement>,
-    context: FileListKeyboardContext,
-  ) {
-    if (isPrintablePickerKey(event)) {
-      forwardPrintableKeyToSearch(event)
-      return
-    }
-    if (listInteractionPending) {
-      event.preventDefault()
-      return
-    }
-    if (isGoUpShortcut(event)) return leaveDirectory(event)
-    if (event.key === 'ArrowDown') return selectByOffset(event, 1)
-    if (event.key === 'ArrowUp') return selectByOffset(event, -1)
-    if (event.key === 'Home') return selectBoundary(event, 'first')
-    if (event.key === 'End') return selectBoundary(event, 'last')
-    if (event.key === 'PageDown') return selectByOffset(event, context.pageSize)
-    if (event.key === 'PageUp') return selectByOffset(event, -context.pageSize)
-    if (event.key === 'Enter') return commitFromKeyboard(event)
-    if (event.key === 'ArrowRight') return enterDirectory(event)
-    if (event.key === 'ArrowLeft' || event.key === 'Backspace') return leaveDirectory(event)
-  }
-
   function handleDialogKeyDownCapture(event: KeyboardEvent<HTMLDivElement>) {
     if (isGoToFolderShortcut(event)) {
       event.preventDefault()
@@ -337,14 +313,6 @@ export function FilePickerDialog({
     session.setSelectedEntry(nextEntry)
   }
 
-  function selectBoundary(event: KeyboardEvent<HTMLElement>, edge: 'first' | 'last') {
-    event.preventDefault()
-    const nextEntry = edge === 'first' ? entries[0] : entries.at(-1)
-    if (!nextEntry) return
-
-    session.setSelectedEntry(nextEntry)
-  }
-
   function commitFromKeyboard(event: KeyboardEvent<HTMLElement>) {
     if (listInteractionPending) {
       event.preventDefault()
@@ -365,26 +333,11 @@ export function FilePickerDialog({
     commitPick(candidatePickable)
   }
 
-  function enterDirectory(event: KeyboardEvent<HTMLElement>) {
-    if (!selectedEntry || !isDirectoryEntry(selectedEntry)) return
-
-    event.preventDefault()
-    navigateTo(selectedEntry.path)
-  }
-
   function leaveDirectory(event: KeyboardEvent<HTMLElement>) {
     if (!session.canGoUp) return
 
     event.preventDefault()
-    navigateTo(parentPath(session.currentPath))
-  }
-
-  function forwardPrintableKeyToSearch(event: KeyboardEvent<HTMLElement>) {
-    event.preventDefault()
-    if (!session.query.trim()) setSort(null)
-    session.setSelectedEntry(null)
-    session.setQuery(`${session.query}${event.key}`)
-    searchInputRef.current?.focus()
+    navigateTo(pickerParentPath(session.currentPath))
   }
 
   function handleEntryDoubleClick(entry: FsEntry) {
@@ -491,7 +444,7 @@ export function FilePickerDialog({
                   aria-keyshortcuts='Meta+ArrowUp'
                   aria-label='Up one folder'
                   disabled={!session.canGoUp}
-                  onClick={() => navigateTo(parentPath(session.currentPath))}
+                  onClick={() => navigateTo(pickerParentPath(session.currentPath))}
                   size='icon-sm'
                   type='button'
                   variant='ghost'
@@ -515,7 +468,7 @@ export function FilePickerDialog({
             />
             <InputGroup className='h-(--density-control-height-sm) w-52 shrink-0 max-sm:w-32'>
               <InputGroupAddon align='inline-start'>
-                <MagnifyingGlassIcon aria-hidden='true' className='size-3.5' />
+                <MagnifyingGlassIcon aria-hidden='true' className='size-(--icon-size-sm)' />
               </InputGroupAddon>
               <InputGroupInput
                 ref={searchInputRef}
@@ -602,7 +555,17 @@ export function FilePickerDialog({
                 mode={mode}
                 onDirectoryIntent={preloadDirectory}
                 onEntryDoubleClick={handleEntryDoubleClick}
-                onKeyDown={handleListKeyDown}
+                onCommitEntry={(entry) => {
+                  if (isDirectoryEntry(entry) && mode === 'file') {
+                    navigateTo(entry.path)
+                    return
+                  }
+                  const pickable = toPickedEntry(entry, mode, accept)
+                  if (pickable) commitPick(pickable)
+                }}
+                onGoParent={() => {
+                  if (session.canGoUp) navigateTo(pickerParentPath(session.currentPath))
+                }}
                 onRetry={refresh}
                 selectedPath={selectedEntry?.path ?? null}
               />

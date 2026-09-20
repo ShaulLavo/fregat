@@ -8,7 +8,7 @@ import { QueryClientProvider } from '@tanstack/react-query'
 import * as v from 'valibot'
 
 import { expect, test } from '../../../../test/fixtures'
-import { providerQueryKeys } from '@/features/chat/utils/provider-query'
+import { providerQueryKeys } from '@/lib/query-keys'
 import { useSettingsProjection } from '@/features/settings/hooks/use-settings-projection'
 import {
   superviseSettingsStream,

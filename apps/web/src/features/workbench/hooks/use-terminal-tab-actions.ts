@@ -6,11 +6,9 @@ import {
   openTerminalTabInWorkbenchPanels,
   renameTerminalTabInWorkbenchPanels,
   reorderTerminalTabInWorkbenchPanels,
-  selectAdjacentTerminalTabInWorkbenchPanels,
   selectTerminalTabInWorkbenchPanels,
   setTerminalTabProcessInWorkbenchPanels,
   setTerminalTabShellTitleInWorkbenchPanels,
-  type TerminalTabDirection,
   type WorkbenchPanels,
 } from '@/features/workbench/utils/panels'
 import { useFocusService } from '@/lib/focus/hooks/use-service'
@@ -66,13 +64,10 @@ export function useTerminalTabActions(rootPath: string) {
     reorderTab: (tabId: string, targetIndex: number) => {
       update((current) => reorderTerminalTabInWorkbenchPanels(current, tabId, targetIndex))
     },
-    selectAdjacentTab: (direction: TerminalTabDirection) => {
-      const panels = update((current) =>
-        selectAdjacentTerminalTabInWorkbenchPanels(current, direction),
-      )
-      return panels.activeTerminalTabId
-    },
     selectTab: (tabId: string) => {
+      update((current) => selectTerminalTabInWorkbenchPanels(current, tabId))
+    },
+    activateTab: (tabId: string) => {
       update((current) => selectTerminalTabInWorkbenchPanels(current, tabId))
       focusTerminal(tabId)
     },

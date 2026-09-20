@@ -1,16 +1,10 @@
 import type { ProviderInstanceId } from '@workspace/contracts'
 import { Tooltip, TooltipContent, TooltipTrigger } from '@workspace/ui/components/tooltip'
-import { cn } from '@workspace/ui/lib/utils'
+import { listRowClassName } from '@workspace/ui/patterns/list-row-classes'
 
 import { ProviderGlyph } from '@/features/chat/components/provider-glyph'
 import type { ProviderModelOptionGroup } from '@workspace/client-core/chat/providers/models'
 
-/**
- * One provider button in the rail, with the active marker riding its right edge.
- * Raw button rather than a ghost Button: the rail is already `bg-muted`, so the
- * ghost hover fill is invisible here and outranks anything the call site sets.
- * The row tints are mixed from `foreground`, so they read on any surface.
- */
 export function ModelPickerRailItem({
   active,
   group,
@@ -33,11 +27,11 @@ export function ModelPickerRailItem({
             <button
               aria-disabled={blocked}
               aria-label={group.displayLabel}
-              className={cn(
-                'focus-ring flex aspect-square w-full items-center justify-center rounded-md border border-transparent bg-clip-padding outline-none select-none',
-                !blocked && 'hover:bg-row-hover active:bg-row-active',
-                blocked && 'cursor-not-allowed opacity-50',
-              )}
+              className={listRowClassName({
+                interactive: !blocked,
+                className:
+                  'focus-ring aspect-square h-auto w-full justify-center rounded-md border border-transparent bg-clip-padding px-0 aria-disabled:cursor-not-allowed',
+              })}
               type='button'
               onClick={blocked ? undefined : () => onSelect(group.providerInstanceId)}
             >
@@ -49,7 +43,7 @@ export function ModelPickerRailItem({
             </button>
           }
         />
-        <TooltipContent align='center' className='max-w-64 leading-snug text-balance' side='left'>
+        <TooltipContent align='center' className='max-w-64 leading-snug text-balance'>
           {disabledReason?.message ?? group.displayLabel}
         </TooltipContent>
       </Tooltip>

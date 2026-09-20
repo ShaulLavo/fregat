@@ -5,8 +5,8 @@ import { vi } from 'vitest'
 
 import { expect, test } from '../../../../test/fixtures'
 import { renderWithProviders } from '../../../../test/render'
-import { ColorThemeGroups } from '@/features/command-palette/color-theme-groups'
-import { colorThemeIdFromItemValue } from '@/features/command-palette/command-palette-utils'
+import { ColorThemeGroups } from '@/features/command-palette/components/color-theme-groups'
+import { colorThemeIdFromItemValue } from '@/features/command-palette/utils/query'
 import {
   CommandPaletteActionsContext,
   type CommandPaletteActions,

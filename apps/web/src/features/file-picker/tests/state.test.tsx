@@ -2,7 +2,7 @@ import { filesystemPath } from '@/lib/documents/utils/identity'
 import { act, renderHook } from '@testing-library/react'
 
 import { expect, test } from '../../../../test/fixtures'
-import { useFilePickerSession } from '@/features/file-picker/state'
+import { useFilePickerSession } from '@/features/file-picker/state/picker'
 import type { FsEntry, ServerInfo } from '@/lib/file-system-types'
 
 test('moves backward and forward through visited paths', () => {

@@ -5,11 +5,13 @@ import { createStore, type StoreApi as ZustandStoreApi } from 'zustand/vanilla'
 import { clientErrors } from '@/lib/structured-errors'
 
 type StoreState = {
+  activeChangeId: string | null
   commitMessage: string
   commitMessageRevision: number
 }
 
 type StoreActions = {
+  selectChange: (id: string) => void
   applyGeneratedCommitMessage: (message: string, expectedRevision: number) => boolean
   resetCommitMessage: () => void
   setCommitMessage: (message: string) => void
@@ -47,6 +49,8 @@ export function createGitStore() {
       set(nextCommitMessageState(state, commitMessage))
       return true
     },
+    activeChangeId: null,
+    selectChange: (activeChangeId) => set({ activeChangeId }),
     commitMessage: '',
     commitMessageRevision: 0,
     resetCommitMessage: () => set(nextCommitMessageState(get(), '')),

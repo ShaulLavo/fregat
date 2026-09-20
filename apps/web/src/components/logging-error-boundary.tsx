@@ -71,7 +71,7 @@ export class LoggingErrorBoundary extends Component<
             <DialogHeader className='gap-(--density-control-gap)'>
               <div className='flex items-start gap-(--density-section-gap)'>
                 <div className='border-destructive/30 bg-destructive/10 text-destructive mt-0.5 flex size-(--density-control-height) shrink-0 items-center justify-center border'>
-                  <WarningCircleIcon className='size-4' weight='fill' />
+                  <WarningCircleIcon className='size-(--icon-size)' weight='fill' />
                 </div>
                 <div className='min-w-0 space-y-1'>
                   <DialogTitle>Application error</DialogTitle>

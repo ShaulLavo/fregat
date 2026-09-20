@@ -1,3 +1,4 @@
+import { environmentQueryKeys } from '@/features/environments/utils/query-keys'
 import type { HealthDescriptor } from '@workspace/contracts'
 import { addressedWorkspaceCache, panelsForAddress } from '@/features/address/utils/cache'
 import type { AddressIntent } from '@/features/address/utils/intent'
@@ -26,7 +27,7 @@ export function createBootRuntime(
     )
   if (!cached) useEnvironmentsStore.getState().recordDescriptor(primaryServerOrigin(), descriptor)
   if (cached) useEnvironmentsStore.getState().setPhase(primaryServerOrigin(), 'offline')
-  primaryQueryClient().setQueryData(['environment-descriptor'], descriptor)
+  primaryQueryClient().setQueryData(environmentQueryKeys.descriptor, descriptor)
   const address = intent.address
   const application = createApplicationRuntime({
     workspaceCache: addressedWorkspaceCache(

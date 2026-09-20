@@ -1,8 +1,7 @@
 import type { WorkspaceSearchFileGroup } from '@/features/search/state/buffer-state'
 import { handleSearchResultSurfaceKeyDown } from '@/features/search/utils/result-editor-keyboard'
 import { searchResultItems } from '@/features/search/utils/result-items'
-import { handleSearchResultKeyDown } from '@/features/search/utils/result-sidebar-keyboard'
-import type { SearchResultKeyEvent } from '@/features/search/utils/result-tree-keyboard'
+type SearchResultKeyEvent = Parameters<typeof handleSearchResultSurfaceKeyDown>[0]['event']
 import {
   searchResultFileBlocks,
   searchResultVirtualRows,
@@ -54,7 +53,6 @@ export function searchResultKeyEvent(
 }
 
 export function searchKeyboardHarness(
-  kind: 'sidebar' | 'editor',
   groups: readonly WorkspaceSearchFileGroup[] = [searchResultGroup()],
 ) {
   const items = searchResultItems(groups)
@@ -73,19 +71,6 @@ export function searchKeyboardHarness(
     rows,
     actions,
     press(event: SearchResultKeyEvent, activeResultId: string | null) {
-      if (kind === 'sidebar') {
-        handleSearchResultKeyDown({
-          activeResultId,
-          event,
-          items,
-          onSelectResult,
-          onToggleGroup,
-          onOpenMatch: (match) => {
-            actions.push(['open', match])
-          },
-        })
-        return
-      }
       handleSearchResultSurfaceKeyDown({
         activeResultId,
         event,

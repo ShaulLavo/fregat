@@ -96,6 +96,9 @@ describe('palette documents', () => {
       'omarchy-catppuccin',
       'omarchy-catppuccin-latte',
       'omarchy-gruvbox',
+      'upstream-gruvbox-light',
+      'upstream-rose-pine-main',
+      'upstream-tokyo-night-day',
     ])
     for (const palette of BUNDLED_PALETTES) {
       expect(palette.source).toBe('bundled')

@@ -1,7 +1,9 @@
-import { describe, expect, test } from 'vitest'
+import { describe } from 'vitest'
+import { expect, test } from '../../../test/fixtures'
 
-import { parentPath as filePickerParentPath } from '@/features/file-picker/model'
-import { parentPath } from '@/lib/path-formatters'
+import { pickerParentPath as filePickerParentPath } from '@/features/file-picker/utils/model'
+import { parentPath, parentFilesystemPath } from '@/lib/path-formatters'
+import { filesystemPath } from '@/lib/documents/utils/identity'
 
 describe('parentPath', () => {
   test('is empty for a file at the repository root', () => {
@@ -23,4 +25,23 @@ describe('parentPath', () => {
     expect(parentPath('a//b')).toBe('a/')
     expect(filePickerParentPath('a//b')).toBe('a')
   })
+})
+
+test('filesystem event parents clamp the watched root and bare paths', () => {
+  expect(parentPath('/repo', '/repo')).toBe('/repo')
+  expect(parentPath('README.md', '/repo')).toBe('/repo')
+  expect(parentPath('/repo/src/index.ts', '/repo')).toBe('/repo/src')
+  expect(parentFilesystemPath(filesystemPath('/repo'), filesystemPath('/repo'))).toBe('/repo')
+  expect(parentFilesystemPath(filesystemPath('README.md'), filesystemPath('/repo'))).toBe('/repo')
+})
+
+test('conflict folder creation preserves an empty parent for a bare file', () => {
+  expect(parentFilesystemPath(filesystemPath('README.md'))).toBe('')
+  expect(parentFilesystemPath(filesystemPath('/repo/src/index.ts'))).toBe('/repo/src')
+})
+
+test('picker navigation preserves its root-relative separator normalization', () => {
+  expect(filePickerParentPath('/a//b/')).toBe('a')
+  expect(filePickerParentPath('/')).toBe('')
+  expect(filePickerParentPath('README.md')).toBe('')
 })

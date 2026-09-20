@@ -1,22 +1,21 @@
+import { filesystemPath } from '@/lib/documents/utils/identity'
+import type { FilesystemPath } from '@/lib/documents/utils/types'
+
 // Display labels fall back to 'Root'; pathLeaf below preserves an empty leaf.
 export function basename(path: string) {
   const parts = path.split('/').filter(Boolean)
   return parts.at(-1) ?? 'Root'
 }
 
-/**
- * The directory a path sits in, or `''` for a bare name. `'/a/b'` gives `'/a'`.
- *
- * `features/file-picker/model.ts` has a `parentPath` with the same signature
- * that is NOT this one: it splits on `filter(Boolean)` and rejoins, so it drops
- * the leading slash (`'/a/b'` gives `'a'`) and collapses repeated separators.
- * Leave it there.
- */
-export function parentPath(path: string) {
+// The root clamp keeps filesystem event invalidation inside the watched directory.
+export function parentPath(path: string, rootPath = '') {
+  if (path === rootPath) return rootPath
   const index = path.lastIndexOf('/')
-  if (index < 0) return ''
+  return index < 0 ? rootPath : path.slice(0, index)
+}
 
-  return path.slice(0, index)
+export function parentFilesystemPath(path: FilesystemPath, rootPath?: FilesystemPath) {
+  return filesystemPath(parentPath(path, rootPath))
 }
 
 export function displayPath(path: string) {

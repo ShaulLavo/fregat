@@ -1,7 +1,7 @@
 import { ok, strictEqual } from 'node:assert/strict'
 import type { Page } from 'playwright'
 
-export async function preserveAppearance(page: Page) {
+export async function preserveAppearance(page: Page, onlyKeys?: readonly string[]) {
   const url = new URL(page.url())
   const base = url.pathname.startsWith('/platform/')
     ? `${url.origin}/platform/`
@@ -26,7 +26,7 @@ export async function preserveAppearance(page: Page) {
     'workbench.surface.blur',
     'workbench.surface.saturation',
   ]
-  const operations = keys.map((key) => {
+  const operations = (onlyKeys ?? keys).map((key) => {
     const entry = Object.entries(raw).find(([name]) => name === key)
     return entry ? { kind: 'set', key, value: entry[1] } : { kind: 'reset', keys: [key] }
   })

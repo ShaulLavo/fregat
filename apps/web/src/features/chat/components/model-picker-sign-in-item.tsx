@@ -21,12 +21,12 @@ export function ModelPickerSignInItem({
       value={`sign-in:${target.providerInstanceId}`}
       onSelect={() => onSelect(target)}
     >
-      <SignInIcon className='text-muted-foreground size-3 shrink-0' />
+      <SignInIcon className='text-muted-foreground size-(--icon-size-sm) shrink-0' />
       <span className='min-w-0 flex-1 text-left'>
         <span className='block truncate text-xs leading-snug font-medium'>
           Sign in to {target.providerLabel}
         </span>
-        <span className='text-muted-foreground/70 mt-(--density-gap-tight) block truncate text-xs leading-snug font-normal'>
+        <span className='text-muted-foreground mt-(--density-gap-tight) block truncate text-xs leading-snug font-normal'>
           Opens a browser tab through the {target.providerLabel} CLI.
         </span>
       </span>

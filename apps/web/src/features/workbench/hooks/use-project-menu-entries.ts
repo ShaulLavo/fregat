@@ -1,3 +1,4 @@
+import { projectMenuQueryKeys } from '@/features/workbench/utils/query-keys'
 import { useQueries } from '@tanstack/react-query'
 import { registerWorkspaceAddress } from '@workspace/client-core/files/workspace-address'
 import { projectMenuModel } from '@/features/workbench/utils/project-menu-model'
@@ -13,7 +14,7 @@ export function useProjectMenuEntries({
   const resolved = useQueries({
     queries: candidates.map((entry) => ({
       enabled,
-      queryKey: ['project-menu', 'canonical-root', entry.rootPath],
+      queryKey: projectMenuQueryKeys.canonicalRoot(entry.rootPath),
       queryFn: ({ signal, client }) =>
         registerWorkspaceAddress({
           client: clientForQueryClient(client),

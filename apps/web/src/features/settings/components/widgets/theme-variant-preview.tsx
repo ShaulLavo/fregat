@@ -35,8 +35,13 @@ export function ThemeVariantPreview({
             className='absolute inset-0 size-full object-cover'
           />
         ) : null}
-        <span className='bg-popover-solid text-foreground text-2xs relative rounded-md px-1.5 py-0.5'>
+        {/* The palette name is what tells a Graphite stand-in from a real dark version. */}
+        <span
+          className='bg-popover-solid text-foreground text-2xs relative max-w-full truncate rounded-md px-1.5 py-0.5'
+          title={palette ? `${palette.name} ${mode}` : undefined}
+        >
           {mode === 'light' ? 'Light' : 'Dark'}
+          {palette ? ` · ${palette.name}` : null}
         </span>
       </div>
       {palette ? (

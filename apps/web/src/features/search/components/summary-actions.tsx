@@ -32,7 +32,7 @@ export function SearchSummaryActions({
         label='Expand all search results'
         onClick={expandAllGroups}
       >
-        <ArrowsOutLineVerticalIcon className='size-3.5' />
+        <ArrowsOutLineVerticalIcon className='size-(--icon-size-sm)' />
       </SummaryButton>
       <SummaryButton
         className={buttonClassName}
@@ -40,7 +40,7 @@ export function SearchSummaryActions({
         label='Collapse all search results'
         onClick={collapseAllGroups}
       >
-        <ArrowsInLineVerticalIcon className='size-3.5' />
+        <ArrowsInLineVerticalIcon className='size-(--icon-size-sm)' />
       </SummaryButton>
       <SummaryButton
         className={buttonClassName}
@@ -48,7 +48,7 @@ export function SearchSummaryActions({
         label='Previous match'
         onClick={selectPreviousMatch}
       >
-        <CaretUpIcon className='size-3.5' />
+        <CaretUpIcon className='size-(--icon-size-sm)' />
       </SummaryButton>
       <SummaryButton
         className={buttonClassName}
@@ -56,7 +56,7 @@ export function SearchSummaryActions({
         label='Next match'
         onClick={selectNextMatch}
       >
-        <CaretDownIcon className='size-3.5' />
+        <CaretDownIcon className='size-(--icon-size-sm)' />
       </SummaryButton>
     </>
   )

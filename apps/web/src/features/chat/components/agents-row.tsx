@@ -22,10 +22,10 @@ export function AgentsRow({ group }: { group: ChatAgentGroup }) {
       {working ? (
         <OrbitLoader aria-hidden='true' className='size-3.5 shrink-0' />
       ) : (
-        <UsersThreeIcon aria-hidden='true' className='size-3.5 shrink-0' />
+        <UsersThreeIcon aria-hidden='true' className='size-(--icon-size-sm) shrink-0' />
       )}
       <span className='truncate'>{chatAgentGroupLabel(group)}</span>
-      <CaretRightIcon aria-hidden='true' className='size-3 shrink-0' />
+      <CaretRightIcon aria-hidden='true' className='size-(--icon-size-sm) shrink-0' />
     </Button>
   )
 }

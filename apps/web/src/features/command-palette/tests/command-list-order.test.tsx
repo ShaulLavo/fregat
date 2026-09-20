@@ -3,13 +3,13 @@ import { Command, CommandInput, CommandList } from '@workspace/ui/components/com
 import { expect, test } from '../../../../test/fixtures'
 import { render } from '@testing-library/react'
 
-import { CommandGroups } from '@/features/command-palette/command-groups'
+import { CommandGroups } from '@/features/command-palette/components/command-groups'
 import {
   commandPaletteItems,
   groupedCommandItems,
   paletteOwnsItemOrder,
   quickAccessFilter,
-} from '@/features/command-palette/command-palette-utils'
+} from '@/features/command-palette/utils/query'
 import {
   CommandPaletteActionsContext,
   type CommandPaletteActions,

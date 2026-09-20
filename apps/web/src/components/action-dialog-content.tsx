@@ -56,7 +56,7 @@ export function ActionDialogContent({
           className='border-destructive/25 bg-destructive/10 text-destructive flex items-start gap-(--density-control-gap) rounded-lg border px-(--density-control-padding-x) py-(--density-section-gap) text-xs'
           role='alert'
         >
-          <WarningCircleIcon className='mt-0.5 size-3.5 shrink-0' />
+          <WarningCircleIcon className='mt-0.5 size-(--icon-size-sm) shrink-0' />
           <span>{error}</span>
         </div>
       ) : null}

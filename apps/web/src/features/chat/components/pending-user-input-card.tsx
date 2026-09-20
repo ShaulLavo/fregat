@@ -72,7 +72,7 @@ export function PendingUserInputCard({ pending }: { readonly pending: PendingUse
     >
       <div className='border-warning/30 bg-warning/10 mx-auto flex max-w-3xl flex-col gap-(--density-control-gap) rounded-lg border p-(--density-section-padding)'>
         <div className='flex flex-wrap items-center gap-(--density-control-gap)'>
-          <QuestionIcon aria-hidden='true' className='text-warning size-4' />
+          <QuestionIcon aria-hidden='true' className='text-warning size-(--icon-size)' />
           <span className='text-warning text-2xs font-semibold tracking-widest uppercase'>
             {question.header ?? 'Input needed'}
           </span>
@@ -115,7 +115,7 @@ export function PendingUserInputCard({ pending }: { readonly pending: PendingUse
                   ) : null}
                 </span>
                 {picked.includes(option.value) ? (
-                  <CheckIcon aria-hidden='true' className='size-3.5' />
+                  <CheckIcon aria-hidden='true' className='size-(--icon-size-sm)' />
                 ) : null}
               </Button>
             ))}

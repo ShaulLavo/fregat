@@ -36,6 +36,9 @@ jobs:
       - name: Lint
         run: bun run lint
 
+      - name: Feature boundaries
+        run: bun run boundaries:check
+
       - name: Design language census
         run: bun run design:census
 

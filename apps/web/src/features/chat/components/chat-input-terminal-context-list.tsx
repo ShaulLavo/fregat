@@ -1,3 +1,4 @@
+import { Tooltip, TooltipContent, TooltipTrigger } from '@workspace/ui/components/tooltip'
 import { XIcon } from '@phosphor-icons/react'
 import { Button } from '@workspace/ui/components/button'
 
@@ -27,17 +28,24 @@ export function ChatInputTerminalContextList({
       {contexts.map((context) => (
         <span className='inline-flex min-w-0 items-center gap-0.5' key={context.id}>
           <TerminalContextChip className='min-w-0' selection={context} />
-          <Button
-            aria-label={`Remove ${formatTerminalContextLabel(context)}`}
-            className='text-muted-foreground'
-            disabled={disabled}
-            size='icon-xs'
-            type='button'
-            variant='ghost'
-            onClick={() => onRemove(context.id)}
-          >
-            <XIcon className='size-3.5' />
-          </Button>
+          <Tooltip>
+            <TooltipTrigger
+              render={
+                <Button
+                  aria-label={`Remove ${formatTerminalContextLabel(context)}`}
+                  className='text-muted-foreground'
+                  disabled={disabled}
+                  size='icon-xs'
+                  type='button'
+                  variant='ghost'
+                  onClick={() => onRemove(context.id)}
+                >
+                  <XIcon className='size-(--icon-size-sm)' />
+                </Button>
+              }
+            />
+            <TooltipContent>{`Remove ${formatTerminalContextLabel(context)}`}</TooltipContent>
+          </Tooltip>
         </span>
       ))}
     </div>

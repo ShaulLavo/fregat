@@ -1,6 +1,6 @@
 import type { FilesystemPath } from '@/lib/documents/utils/types'
 import { TreePane } from '@/features/workspace/components/tree-pane'
-import { useStatus } from '@/features/git/hooks'
+import { useStatus } from '@/features/git/hooks/use-status'
 import { statusEntriesForTree } from '@/features/git/utils/status-entries-for-tree'
 import type { LoadState } from '@/lib/load-state'
 import type { TreeModel } from '@/lib/tree-model'

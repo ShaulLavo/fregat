@@ -1,3 +1,4 @@
+import { Tooltip, TooltipContent, TooltipTrigger } from '@workspace/ui/components/tooltip'
 import { DesktopIcon, MagnifyingGlassIcon, ProhibitIcon, XIcon } from '@phosphor-icons/react'
 import { useIsMutating, useQuery } from '@tanstack/react-query'
 import type { WallpaperAsset, WallpaperSelection, WallpaperSource } from '@workspace/contracts'
@@ -24,7 +25,7 @@ import { WallpaperUploadTile } from '@/features/settings/components/widgets/wall
 import { useSettingsOwner } from '@/features/settings/hooks/use-settings-owner'
 import { useWallpaperActions } from '@/features/settings/hooks/use-wallpaper-actions'
 import { useWallpaperUpload } from '@/features/settings/hooks/use-wallpaper-upload'
-import { wallpaperMutationKeys } from '@/features/settings/utils/wallpaper-mutation-keys'
+import { wallpaperMutationKeys } from '@/features/settings/utils/mutation-keys'
 import { WALLPAPER_LIMITS_HINT } from '@/features/settings/utils/wallpaper-upload'
 import { errorMessage } from '@/lib/error-message'
 import { wallpaperLibraryOptions } from '@/lib/wallpapers/state/queries'
@@ -139,7 +140,7 @@ export function WallpaperPickerDialog({
           <span className='text-xs font-medium'>Wallpaper</span>
           <InputGroup className='ml-auto h-(--density-control-height-sm) w-52 shrink-0 max-sm:w-32'>
             <InputGroupAddon align='inline-start'>
-              <MagnifyingGlassIcon aria-hidden='true' className='size-3.5' />
+              <MagnifyingGlassIcon aria-hidden='true' className='size-(--icon-size-sm)' />
             </InputGroupAddon>
             <InputGroupInput
               aria-label='Filter wallpapers'
@@ -164,9 +165,18 @@ export function WallpaperPickerDialog({
               Import Omarchy
             </Button>
           ) : null}
-          <DialogClose render={<Button aria-label='Close' size='icon-sm' variant='ghost' />}>
-            <XIcon />
-          </DialogClose>
+          <Tooltip>
+            <TooltipTrigger
+              render={
+                <DialogClose
+                  render={<Button aria-label='Close' size='icon-sm' variant='ghost' />}
+                />
+              }
+            >
+              <XIcon />
+            </TooltipTrigger>
+            <TooltipContent>Close</TooltipContent>
+          </Tooltip>
         </PaneBar>
         <div
           className='focus-ring-inset flex min-h-0 flex-1 flex-col gap-4 overflow-y-auto p-(--density-dialog-padding)'

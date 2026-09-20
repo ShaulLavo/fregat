@@ -1,9 +1,10 @@
 import { createHash } from 'node:crypto'
-import { readdir, readFile, stat } from 'node:fs/promises'
+import { readFile, stat } from 'node:fs/promises'
 import path from 'node:path'
 import * as v from 'valibot'
 import {
   BUNDLED_THEMES,
+  bundledWallpaperFor,
   themeArchiveSchema,
   themeIdSchema,
   type ThemeArchive,
@@ -26,11 +27,17 @@ export async function omarchyBundleArchive(input: unknown) {
   const palettes: ThemeArchive['palettes'] = []
   const wallpapers: ThemeArchive['wallpapers'] = []
   const variant = async (part: ThemeVariant, mode: 'light' | 'dark'): Promise<ThemeVariant> => {
+    const artwork = await pairedWallpaper(part)
+    if (artwork) wallpapers.push(artwork)
+    // Hashed from the bytes read now, so an Omarchy update still yields a consistent archive.
+    const wallpaper: ThemeVariant['wallpaper'] = artwork
+      ? { enabled: true, source: { kind: 'library', asset: artwork.id } }
+      : { enabled: false, source: { kind: 'desktop' } }
     if (!part.palette.startsWith('omarchy-')) {
       report.push(
-        `${mode}: Graphite app colors; ${part.codeTheme} syntax. No installed Omarchy palette for this mode.`,
+        `${mode}: bundled ${part.palette} app colors; ${part.codeTheme} syntax. No installed Omarchy palette for this mode.`,
       )
-      return part
+      return { ...part, wallpaper }
     }
     const sourceName = part.palette.slice('omarchy-'.length)
     const directory = path.join(OMARCHY_THEMES_DIRECTORY, sourceName)
@@ -52,14 +59,7 @@ export async function omarchyBundleArchive(input: unknown) {
     })
     palettes.push(mapped.document)
     report.push(...mapped.report.map((line) => `${mode}: ${line}`))
-    const artwork = await firstWallpaper(directory)
-    if (!artwork) return { ...part, palette: mapped.document.id }
-    wallpapers.push(artwork)
-    return {
-      ...part,
-      palette: mapped.document.id,
-      wallpaper: { enabled: true, source: { kind: 'library', asset: artwork.id } },
-    }
+    return { ...part, palette: mapped.document.id, wallpaper }
   }
   const light = await variant(base.variants.light, 'light')
   const dark = await variant(base.variants.dark, 'dark')
@@ -79,17 +79,20 @@ export async function omarchyBundleArchive(input: unknown) {
   return { archive, report }
 }
 
-async function firstWallpaper(
-  directory: string,
+// The bundled variant already names its Omarchy wallpaper; the archive just carries the bytes.
+async function pairedWallpaper(
+  part: ThemeVariant,
 ): Promise<ThemeArchive['wallpapers'][number] | null> {
-  const folder = path.join(directory, 'backgrounds')
-  const files = await readdir(folder, { withFileTypes: true }).catch(() => [])
-  const image = files
-    .filter((file) => file.isFile() && /\.(png|jpe?g|webp)$/iu.test(file.name))
-    .sort((a, b) => a.name.localeCompare(b.name))[0]
-  if (!image) return null
-  const file = path.join(folder, image.name)
-  if ((await stat(file)).size > MAX_WALLPAPER_BYTES)
+  if (part.wallpaper.source.kind !== 'library') return null
+  const paired = bundledWallpaperFor(part.wallpaper.source.asset)
+  if (!paired) return null
+  const file = path.join(OMARCHY_THEMES_DIRECTORY, paired.theme, 'backgrounds', paired.file)
+  const size = await stat(file).then(
+    (entry) => entry.size,
+    () => null,
+  )
+  if (size === null) return null
+  if (size > MAX_WALLPAPER_BYTES)
     throw themeErrors.BUNDLE_INVALID({ detail: 'Omarchy wallpaper exceeds 20 MiB' })
   const bytes = await readFile(file)
   return {
@@ -97,7 +100,7 @@ async function firstWallpaper(
       themeArchiveSchema.entries.wallpapers.item.entries.id,
       createHash('sha256').update(bytes).digest('hex'),
     ),
-    name: image.name,
+    name: paired.file,
     base64: bytes.toString('base64'),
   }
 }

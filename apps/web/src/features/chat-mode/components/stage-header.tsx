@@ -16,7 +16,7 @@ import { useChatModeSession } from '@/features/chat-mode/providers/session-conte
 import { useSessionRailStore } from '@/features/chat-mode/state/session-rail-store'
 import { stageTitle } from '@/features/chat-mode/utils/stage-title'
 import type { SessionRailItem } from '@workspace/client-core/chat/rail/model'
-import { PaneBar } from '@workspace/ui/components/pane-bar'
+import { ToolPaneHeader } from '@workspace/ui/patterns/tool-pane-header'
 import { cn } from '@workspace/ui/lib/utils'
 
 export function StageHeader({
@@ -37,7 +37,33 @@ export function StageHeader({
     scopedSessionKey(renaming.ref) === session?.key
 
   return (
-    <PaneBar as='header' border='bottom'>
+    <ToolPaneHeader
+      actions={
+        <>
+          {session?.branch && session.worktree.lifecycle.state === 'ready' ? (
+            <BranchActions
+              pullRequestTitle={session.title}
+              // The session's worktree is its own checkout with its own HEAD, so the
+              // project root would push whatever branch the main tree happens to be on.
+              rootPath={session.worktreePath ?? rootPath}
+            />
+          ) : null}
+          {session && session.status !== 'settled' ? (
+            <span
+              className={cn(
+                'flex shrink-0 items-center gap-1.5 text-2xs',
+                sessionStatusTextClass(session.status),
+              )}
+            >
+              <SessionAttentionIndicator status={session.status} />
+              {sessionStatusLabel(session.status)}
+            </span>
+          ) : null}
+          {contextUsage ? <ContextUsageRing usage={contextUsage} /> : null}
+          {session ? <StageSessionMenu session={session} /> : null}
+        </>
+      }
+    >
       {/* No title while renaming: it would hover over the input the user is typing in. */}
       <nav
         aria-label='Session'
@@ -49,13 +75,13 @@ export function StageHeader({
             <span className='text-muted-foreground max-w-[9rem] shrink-0 truncate'>
               {projectTitle}
             </span>
-            <CaretRightIcon className='text-muted-foreground/50 size-3 shrink-0' />
+            <CaretRightIcon className='text-muted-foreground size-(--icon-size-sm) shrink-0' />
           </>
         ) : null}
         {session ? (
           <>
             <WorktreeChip worktree={session.worktree} repositoryKind={session.repositoryKind} />
-            <CaretRightIcon className='text-muted-foreground/50 size-3 shrink-0' />
+            <CaretRightIcon className='text-muted-foreground size-(--icon-size-sm) shrink-0' />
           </>
         ) : null}
         {session && editing ? (
@@ -67,27 +93,6 @@ export function StageHeader({
           <h1 className='min-w-0 flex-1 truncate font-medium'>{session?.title ?? 'New session'}</h1>
         )}
       </nav>
-      {session?.branch && session.worktree.lifecycle.state === 'ready' ? (
-        <BranchActions
-          pullRequestTitle={session.title}
-          // The session's worktree is its own checkout with its own HEAD, so the
-          // project root would push whatever branch the main tree happens to be on.
-          rootPath={session.worktreePath ?? rootPath}
-        />
-      ) : null}
-      {session && session.status !== 'settled' ? (
-        <span
-          className={cn(
-            'flex shrink-0 items-center gap-1.5 text-2xs',
-            sessionStatusTextClass(session.status),
-          )}
-        >
-          <SessionAttentionIndicator status={session.status} />
-          {sessionStatusLabel(session.status)}
-        </span>
-      ) : null}
-      {contextUsage ? <ContextUsageRing usage={contextUsage} /> : null}
-      {session ? <StageSessionMenu session={session} /> : null}
-    </PaneBar>
+    </ToolPaneHeader>
   )
 }

@@ -102,7 +102,7 @@ export function ComposerControlsMenu({
             type='button'
             variant='ghost'
           >
-            <SlidersHorizontalIcon className='size-3.5 shrink-0 opacity-70' />
+            <SlidersHorizontalIcon className='size-(--icon-size-sm) shrink-0 opacity-70' />
             <span className='truncate'>{optionLabel(RUNTIME_MODE_OPTIONS, activeRuntimeMode)}</span>
             {/* Plan mode changes what a send does, so it is called out on the
                 composer itself rather than only inside the menu. */}
@@ -111,7 +111,7 @@ export function ComposerControlsMenu({
                 Plan
               </span>
             ) : null}
-            <CaretUpDownIcon className='size-3 shrink-0 opacity-60' />
+            <CaretUpDownIcon className='size-(--icon-size-sm) shrink-0 opacity-60' />
           </Button>
         }
       />

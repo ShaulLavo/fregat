@@ -1,0 +1,1430 @@
+[
+  {
+    "from": "address",
+    "to": "chat-mode",
+    "module": "features/chat-mode/state/session-rail-store.ts",
+    "reason": "owner: URL restoration coordinates feature state; this module supplies useSessionRailStore."
+  },
+  {
+    "from": "address",
+    "to": "chat-mode",
+    "module": "features/chat-mode/state/session-selection-store.ts",
+    "reason": "owner: URL restoration coordinates feature state; this module supplies useSessionSelectionStore."
+  },
+  {
+    "from": "address",
+    "to": "chat-mode",
+    "module": "features/chat-mode/utils/active-session.ts",
+    "reason": "owner: URL restoration coordinates feature state; this module supplies SessionSelection."
+  },
+  {
+    "from": "address",
+    "to": "chat-mode",
+    "module": "features/chat-mode/utils/panels.ts",
+    "reason": "owner: URL restoration coordinates feature state; this module supplies createDefaultChatModePanels, isChatModeToolTab, showChatModeToolTab."
+  },
+  {
+    "from": "address",
+    "to": "chat",
+    "module": "features/chat/state/chat-projection-store.ts",
+    "reason": "owner: URL restoration coordinates feature state; this module supplies selectChatProjectionSlice, useChatProjectionStore."
+  },
+  {
+    "from": "address",
+    "to": "chat",
+    "module": "features/chat/state/session-diff-scope-store.ts",
+    "reason": "owner: URL restoration coordinates feature state; this module supplies useSessionDiffScopeStore."
+  },
+  {
+    "from": "address",
+    "to": "chat",
+    "module": "features/chat/state/sidebar-selection-store.ts",
+    "reason": "owner: URL restoration coordinates feature state; this module supplies useSidebarSelectionStore, type SidebarSelection."
+  },
+  {
+    "from": "address",
+    "to": "chat",
+    "module": "features/chat/transport/orchestration-http-snapshots.ts",
+    "reason": "owner: URL restoration coordinates feature state; this module supplies fetchOrchestrationShellSnapshotHttp."
+  },
+  {
+    "from": "address",
+    "to": "chat",
+    "module": "features/chat/utils/session-diff-scope-storage.ts",
+    "reason": "owner: URL restoration coordinates feature state; this module supplies DEFAULT_SESSION_DIFF_SCOPE."
+  },
+  {
+    "from": "address",
+    "to": "editor",
+    "module": "features/editor/state/apply-actions.ts",
+    "reason": "owner: URL restoration coordinates feature state; this module supplies EditorApplyActions."
+  },
+  {
+    "from": "address",
+    "to": "editor",
+    "module": "features/editor/state/document-state.tsx",
+    "reason": "owner: URL restoration coordinates feature state; this module supplies EditorDocumentStoreApi."
+  },
+  {
+    "from": "address",
+    "to": "editor",
+    "module": "features/editor/state/ui-state.tsx",
+    "reason": "owner: URL restoration coordinates feature state; this module supplies EditorUiStoreApi."
+  },
+  {
+    "from": "address",
+    "to": "editor",
+    "module": "features/editor/state/workspace-state.tsx",
+    "reason": "owner: URL restoration coordinates feature state; this module supplies EditorWorkspaceStoreApi."
+  },
+  {
+    "from": "address",
+    "to": "editor",
+    "module": "features/editor/utils/retained-text-budget.ts",
+    "reason": "owner: URL restoration coordinates feature state; this module supplies retainedTextBudgetFromSettings."
+  },
+  {
+    "from": "address",
+    "to": "logs",
+    "module": "features/logs/state/filter-store.ts",
+    "reason": "owner: URL restoration coordinates feature state; this module supplies resetLogsFilters, setLogsFilters."
+  },
+  {
+    "from": "address",
+    "to": "logs",
+    "module": "features/logs/utils/filter-params.ts",
+    "reason": "owner: URL restoration coordinates feature state; this module supplies defaultLogsFilterState."
+  },
+  {
+    "from": "address",
+    "to": "search",
+    "module": "features/search/state/buffer-state.tsx",
+    "reason": "owner: URL restoration coordinates feature state; this module supplies SearchBufferStoreApi."
+  },
+  {
+    "from": "address",
+    "to": "settings",
+    "module": "features/settings/state/category-store.ts",
+    "reason": "owner: URL restoration coordinates feature state; this module supplies selectSettingsCategory."
+  },
+  {
+    "from": "address",
+    "to": "workbench",
+    "module": "features/workbench/utils/panels.ts",
+    "reason": "owner: URL restoration coordinates feature state; this module supplies activeEditorTabForWorkbenchPanels, editorTabRecordsForWorkbenchPanels."
+  },
+  {
+    "from": "address",
+    "to": "workspace",
+    "module": "features/workspace/state/active-project.ts",
+    "reason": "owner: URL restoration coordinates feature state; this module supplies activateWorkspaceRoot."
+  },
+  {
+    "from": "address",
+    "to": "workspace",
+    "module": "features/workspace/state/cache.ts",
+    "reason": "owner: URL restoration coordinates feature state; this module supplies CachedWorkspaceState."
+  },
+  {
+    "from": "address",
+    "to": "workspace",
+    "module": "features/workspace/utils/tab-dirty.ts",
+    "reason": "owner: URL restoration coordinates feature state; this module supplies isEditorTabDirty."
+  },
+  {
+    "from": "chat-mode",
+    "to": "chat",
+    "module": "features/chat/components/chat-diff-stat-label.tsx",
+    "reason": "couple: Chat mode and chat share one session lifecycle through ChatDiffStatLabel; merge their ownership in a later pass."
+  },
+  {
+    "from": "chat-mode",
+    "to": "chat",
+    "module": "features/chat/components/chat-draft-view.tsx",
+    "reason": "couple: Chat mode and chat share one session lifecycle through ChatDraftView; merge their ownership in a later pass."
+  },
+  {
+    "from": "chat-mode",
+    "to": "chat",
+    "module": "features/chat/components/chat-view.tsx",
+    "reason": "couple: Chat mode and chat share one session lifecycle through ChatView; merge their ownership in a later pass."
+  },
+  {
+    "from": "chat-mode",
+    "to": "chat",
+    "module": "features/chat/components/context-usage-ring.tsx",
+    "reason": "couple: Chat mode and chat share one session lifecycle through ContextUsageRing; merge their ownership in a later pass."
+  },
+  {
+    "from": "chat-mode",
+    "to": "chat",
+    "module": "features/chat/hooks/use-active-projection.ts",
+    "reason": "couple: Chat mode and chat share one session lifecycle through useActiveChatProjection; merge their ownership in a later pass."
+  },
+  {
+    "from": "chat-mode",
+    "to": "chat",
+    "module": "features/chat/hooks/use-chat-transport.ts",
+    "reason": "couple: Chat mode and chat share one session lifecycle through useChatTransport; merge their ownership in a later pass."
+  },
+  {
+    "from": "chat-mode",
+    "to": "chat",
+    "module": "features/chat/hooks/use-coarse-now.ts",
+    "reason": "couple: Chat mode and chat share one session lifecycle through useCoarseNow; merge their ownership in a later pass."
+  },
+  {
+    "from": "chat-mode",
+    "to": "chat",
+    "module": "features/chat/hooks/use-session-diff-scope.ts",
+    "reason": "couple: Chat mode and chat share one session lifecycle through useSessionDiffScope; merge their ownership in a later pass."
+  },
+  {
+    "from": "chat-mode",
+    "to": "chat",
+    "module": "features/chat/hooks/use-workspace-chat-project.ts",
+    "reason": "couple: Chat mode and chat share one session lifecycle through useWorkspaceChatProject; merge their ownership in a later pass."
+  },
+  {
+    "from": "chat-mode",
+    "to": "chat",
+    "module": "features/chat/notify-command-error.ts",
+    "reason": "couple: Chat mode and chat share one session lifecycle through notifyChatCommandError; merge their ownership in a later pass."
+  },
+  {
+    "from": "chat-mode",
+    "to": "chat",
+    "module": "features/chat/providers/transport-provider.tsx",
+    "reason": "couple: Chat mode and chat share one session lifecycle through ChatTransportProvider; merge their ownership in a later pass."
+  },
+  {
+    "from": "chat-mode",
+    "to": "chat",
+    "module": "features/chat/state/active-projection.ts",
+    "reason": "couple: Chat mode and chat share one session lifecycle through activeChatProjection; merge their ownership in a later pass."
+  },
+  {
+    "from": "chat-mode",
+    "to": "chat",
+    "module": "features/chat/state/active-transports.ts",
+    "reason": "couple: Chat mode and chat share one session lifecycle through dispatchCommandForEnvironment; merge their ownership in a later pass."
+  },
+  {
+    "from": "chat-mode",
+    "to": "chat",
+    "module": "features/chat/state/chat-projection-store.ts",
+    "reason": "couple: Chat mode and chat share one session lifecycle through selectChatProjectionSlice, useChatProjectionStore; merge their ownership in a later pass."
+  },
+  {
+    "from": "chat-mode",
+    "to": "chat",
+    "module": "features/chat/transport/chat-transport.ts",
+    "reason": "couple: Chat mode and chat share one session lifecycle through ChatTransport; merge their ownership in a later pass."
+  },
+  {
+    "from": "chat-mode",
+    "to": "chat",
+    "module": "features/chat/transport/orchestration-http-snapshots.ts",
+    "reason": "couple: Chat mode and chat share one session lifecycle through fetchOrchestrationShellSnapshotHttp; merge their ownership in a later pass."
+  },
+  {
+    "from": "chat-mode",
+    "to": "chat",
+    "module": "features/chat/utils/command-dispatch.ts",
+    "reason": "couple: Chat mode and chat share one session lifecycle through dispatchChatCommand; merge their ownership in a later pass."
+  },
+  {
+    "from": "chat-mode",
+    "to": "chat",
+    "module": "features/chat/utils/formatters.ts",
+    "reason": "couple: Chat mode and chat share one session lifecycle through formatChatRelativeTime; merge their ownership in a later pass."
+  },
+  {
+    "from": "chat-mode",
+    "to": "command-palette",
+    "module": "features/command-palette/utils/query.ts",
+    "reason": "shared → lib: sessionProjectRowTitle is reused by chat-mode outside command-palette; move this shared behavior with its consumers."
+  },
+  {
+    "from": "chat-mode",
+    "to": "editor",
+    "module": "features/editor/state/conflict-state.tsx",
+    "reason": "couple: chat-mode and editor coordinate the same document or session state through useEditorConflictState; separate that ownership before draining this edge."
+  },
+  {
+    "from": "chat-mode",
+    "to": "editor",
+    "module": "features/editor/state/workspace-state.tsx",
+    "reason": "couple: chat-mode and editor coordinate the same document or session state through useEditorWorkspaceState, useEditorWorkspaceStoreApi; separate that ownership before draining this edge."
+  },
+  {
+    "from": "chat-mode",
+    "to": "git",
+    "module": "features/git/components/branch-actions.tsx",
+    "reason": "owner: The chat mode tool area composes this pane through BranchActions."
+  },
+  {
+    "from": "chat-mode",
+    "to": "git",
+    "module": "features/git/components/panel.tsx",
+    "reason": "owner: The chat mode tool area composes this pane through Panel as GitPanel."
+  },
+  {
+    "from": "chat-mode",
+    "to": "git",
+    "module": "features/git/hooks/use-status.ts",
+    "reason": "shared → lib: useStatus is reused by chat-mode outside git; move this shared behavior with its consumers."
+  },
+  {
+    "from": "chat-mode",
+    "to": "logs",
+    "module": "features/logs/components/panel.tsx",
+    "reason": "owner: The chat mode tool area composes this pane through LogsPanel."
+  },
+  {
+    "from": "chat-mode",
+    "to": "search",
+    "module": "features/search/components/highlight.tsx",
+    "reason": "owner: The chat mode tool area composes this pane through HighlightedPreview."
+  },
+  {
+    "from": "chat-mode",
+    "to": "terminal",
+    "module": "features/terminal/components/panel.tsx",
+    "reason": "owner: The chat mode tool area composes this pane through TerminalPanel."
+  },
+  {
+    "from": "chat-mode",
+    "to": "workbench",
+    "module": "features/workbench/components/code-panel.tsx",
+    "reason": "owner: The chat mode tool area composes this pane through CodePanel."
+  },
+  {
+    "from": "chat-mode",
+    "to": "workbench",
+    "module": "features/workbench/components/diagnostics-panel.tsx",
+    "reason": "owner: The chat mode tool area composes this pane through DiagnosticsPanel."
+  },
+  {
+    "from": "chat-mode",
+    "to": "workbench",
+    "module": "features/workbench/components/file-navigator-panel.tsx",
+    "reason": "owner: The chat mode tool area composes this pane through FileNavigatorPanel."
+  },
+  {
+    "from": "chat-mode",
+    "to": "workbench",
+    "module": "features/workbench/components/git-pane-header.tsx",
+    "reason": "owner: The chat mode tool area composes this pane through GitPaneHeader."
+  },
+  {
+    "from": "chat-mode",
+    "to": "workbench",
+    "module": "features/workbench/components/wallpaper.tsx",
+    "reason": "owner: The chat mode tool area composes this pane through Wallpaper."
+  },
+  {
+    "from": "chat-mode",
+    "to": "workbench",
+    "module": "features/workbench/utils/panels.ts",
+    "reason": "shared → lib: WorkbenchPanels is reused by chat-mode outside workbench; move this shared behavior with its consumers."
+  },
+  {
+    "from": "chat-mode",
+    "to": "workspace",
+    "module": "features/workspace/components/search-pane.tsx",
+    "reason": "owner: The chat mode tool area composes this pane through SearchPane."
+  },
+  {
+    "from": "chat-mode",
+    "to": "workspace",
+    "module": "features/workspace/state/active-project.ts",
+    "reason": "couple: chat-mode and workspace coordinate the same document or session state through useActiveProjectStore; separate that ownership before draining this edge."
+  },
+  {
+    "from": "chat-mode",
+    "to": "workspace",
+    "module": "features/workspace/state/cache.ts",
+    "reason": "couple: chat-mode and workspace coordinate the same document or session state through readSessionSelectionCache, writeSessionSelectionCache; separate that ownership before draining this edge."
+  },
+  {
+    "from": "chat-mode",
+    "to": "workspace",
+    "module": "features/workspace/utils/tab-model.ts",
+    "reason": "shared → lib: EMPTY_GIT_FILES is reused by chat-mode outside workspace; move this shared behavior with its consumers."
+  },
+  {
+    "from": "chat-mode",
+    "to": "workspace",
+    "module": "features/workspace/utils/tab-types.ts",
+    "reason": "shared → lib: EditorTabConflictMap is reused by chat-mode outside workspace; move this shared behavior with its consumers."
+  },
+  {
+    "from": "chat",
+    "to": "chat-mode",
+    "module": "features/chat-mode/providers/session-context.ts",
+    "reason": "couple: Chat mode and chat share one session lifecycle through useChatModeSession; merge their ownership in a later pass."
+  },
+  {
+    "from": "chat",
+    "to": "editor",
+    "module": "features/editor/hooks/use-editor-color-theme.ts",
+    "reason": "shared → lib: useEditorColorTheme is reused by chat outside editor; move this shared behavior with its consumers."
+  },
+  {
+    "from": "chat",
+    "to": "editor",
+    "module": "features/editor/hooks/use-editor-commands.ts",
+    "reason": "shared → lib: useEditorCommands is reused by chat outside editor; move this shared behavior with its consumers."
+  },
+  {
+    "from": "chat",
+    "to": "editor",
+    "module": "features/editor/state/workspace-state.tsx",
+    "reason": "couple: chat and editor coordinate the same document or session state through useEditorWorkspaceStoreApi; separate that ownership before draining this edge."
+  },
+  {
+    "from": "chat",
+    "to": "settings",
+    "module": "features/settings/hooks/use-setting-value.ts",
+    "reason": "shared → lib: useSettingValue exposes application settings outside the settings UI and belongs in the shared settings layer."
+  },
+  {
+    "from": "command-palette",
+    "to": "chat-mode",
+    "module": "features/chat-mode/components/session-attention-indicator.tsx",
+    "reason": "owner: The palette assembles commands and search results across features; this module supplies SessionAttentionIndicator."
+  },
+  {
+    "from": "command-palette",
+    "to": "chat-mode",
+    "module": "features/chat-mode/hooks/use-rail-environments.ts",
+    "reason": "owner: The palette assembles commands and search results across features; this module supplies useRailEnvironments."
+  },
+  {
+    "from": "command-palette",
+    "to": "chat-mode",
+    "module": "features/chat-mode/hooks/use-save-project-script.ts",
+    "reason": "owner: The palette assembles commands and search results across features; this module supplies useSaveProjectScript."
+  },
+  {
+    "from": "command-palette",
+    "to": "chat-mode",
+    "module": "features/chat-mode/state/session-commands.ts",
+    "reason": "owner: The palette assembles commands and search results across features; this module supplies openSessionRow, startSessionDraft."
+  },
+  {
+    "from": "command-palette",
+    "to": "chat-mode",
+    "module": "features/chat-mode/state/session-read-store.ts",
+    "reason": "owner: The palette assembles commands and search results across features; this module supplies useSessionReadStore."
+  },
+  {
+    "from": "command-palette",
+    "to": "chat-mode",
+    "module": "features/chat-mode/utils/project-scripts.ts",
+    "reason": "owner: The palette assembles commands and search results across features; this module supplies ProjectScriptSuggestion."
+  },
+  {
+    "from": "command-palette",
+    "to": "chat",
+    "module": "features/chat/hooks/use-active-projection.ts",
+    "reason": "owner: The palette assembles commands and search results across features; this module supplies useActiveChatProjection."
+  },
+  {
+    "from": "command-palette",
+    "to": "chat",
+    "module": "features/chat/hooks/use-coarse-now.ts",
+    "reason": "owner: The palette assembles commands and search results across features; this module supplies useCoarseNow."
+  },
+  {
+    "from": "command-palette",
+    "to": "chat",
+    "module": "features/chat/utils/formatters.ts",
+    "reason": "owner: The palette assembles commands and search results across features; this module supplies formatChatRelativeTime."
+  },
+  {
+    "from": "command-palette",
+    "to": "editor",
+    "module": "features/editor/hooks/use-editor-color-theme.ts",
+    "reason": "owner: The palette assembles commands and search results across features; this module supplies useEditorColorTheme."
+  },
+  {
+    "from": "command-palette",
+    "to": "editor",
+    "module": "features/editor/hooks/use-editor-commands.ts",
+    "reason": "owner: The palette assembles commands and search results across features; this module supplies useEditorCommands."
+  },
+  {
+    "from": "command-palette",
+    "to": "editor",
+    "module": "features/editor/hooks/use-language-server-matches.ts",
+    "reason": "owner: The palette assembles commands and search results across features; this module supplies useLanguageServerMatches."
+  },
+  {
+    "from": "command-palette",
+    "to": "editor",
+    "module": "features/editor/state/color-theme-store.ts",
+    "reason": "owner: The palette assembles commands and search results across features; this module supplies preloadVscodeThemeRegistrations."
+  },
+  {
+    "from": "command-palette",
+    "to": "editor",
+    "module": "features/editor/state/document-state.tsx",
+    "reason": "owner: The palette assembles commands and search results across features; this module supplies useEditorDocumentState, useEditorDocumentStoreApi."
+  },
+  {
+    "from": "command-palette",
+    "to": "editor",
+    "module": "features/editor/state/workspace-state.tsx",
+    "reason": "owner: The palette assembles commands and search results across features; this module supplies EditorWorkspaceStoreApi."
+  },
+  {
+    "from": "command-palette",
+    "to": "settings",
+    "module": "features/settings/hooks/use-setting-value.ts",
+    "reason": "owner: The palette assembles commands and search results across features; this module supplies useSettingValue."
+  },
+  {
+    "from": "command-palette",
+    "to": "settings",
+    "module": "features/settings/hooks/use-settings-actions.ts",
+    "reason": "owner: The palette assembles commands and search results across features; this module supplies useSettingsActions."
+  },
+  {
+    "from": "command-palette",
+    "to": "settings",
+    "module": "features/settings/hooks/use-settings-owner.ts",
+    "reason": "owner: The palette assembles commands and search results across features; this module supplies useSettingsOwner."
+  },
+  {
+    "from": "command-palette",
+    "to": "settings",
+    "module": "features/settings/hooks/use-theme.ts",
+    "reason": "owner: The palette assembles commands and search results across features; this module supplies useTheme."
+  },
+  {
+    "from": "command-palette",
+    "to": "settings",
+    "module": "features/settings/providers/theme-context.ts",
+    "reason": "owner: The palette assembles commands and search results across features; this module supplies Theme."
+  },
+  {
+    "from": "command-palette",
+    "to": "terminal",
+    "module": "features/terminal/state/command-inbox-store.ts",
+    "reason": "owner: The palette assembles commands and search results across features; this module supplies useTerminalCommandInboxStore."
+  },
+  {
+    "from": "command-palette",
+    "to": "workbench",
+    "module": "features/workbench/utils/panels.ts",
+    "reason": "owner: The palette assembles commands and search results across features; this module supplies activeEditorTabForWorkbenchPanels."
+  },
+  {
+    "from": "command-palette",
+    "to": "workspace",
+    "module": "features/workspace/hooks/use-tree.ts",
+    "reason": "owner: The palette assembles commands and search results across features; this module supplies useWorkspaceTreeState."
+  },
+  {
+    "from": "editor",
+    "to": "chat-mode",
+    "module": "features/chat-mode/utils/panels.ts",
+    "reason": "shared → lib: ChatModePanels is reused by editor outside chat-mode; move this shared behavior with its consumers."
+  },
+  {
+    "from": "editor",
+    "to": "chat",
+    "module": "features/chat/state/chat-projection-store.ts",
+    "reason": "couple: editor and chat coordinate the same document or session state through useChatProjectionStore; separate that ownership before draining this edge."
+  },
+  {
+    "from": "editor",
+    "to": "git",
+    "module": "features/git/state/store.tsx",
+    "reason": "couple: editor and git coordinate the same document or session state through createGitStore, type GitStoreApi; separate that ownership before draining this edge."
+  },
+  {
+    "from": "editor",
+    "to": "search",
+    "module": "features/search/state/buffer-state.tsx",
+    "reason": "couple: editor and search coordinate the same document or session state through SearchBufferStateContext; separate that ownership before draining this edge."
+  },
+  {
+    "from": "editor",
+    "to": "search",
+    "module": "features/search/utils/sort.ts",
+    "reason": "shared → lib: compareSearchPaths is reused by editor outside search; move this shared behavior with its consumers."
+  },
+  {
+    "from": "editor",
+    "to": "settings",
+    "module": "features/settings/hooks/use-setting-value.ts",
+    "reason": "shared → lib: useSettingValue exposes application settings outside the settings UI and belongs in the shared settings layer."
+  },
+  {
+    "from": "editor",
+    "to": "settings",
+    "module": "features/settings/hooks/use-settings-actions.ts",
+    "reason": "shared → lib: useSettingsActions exposes application settings outside the settings UI and belongs in the shared settings layer."
+  },
+  {
+    "from": "editor",
+    "to": "settings",
+    "module": "features/settings/hooks/use-theme.ts",
+    "reason": "shared → lib: useTheme exposes application settings outside the settings UI and belongs in the shared settings layer."
+  },
+  {
+    "from": "editor",
+    "to": "settings",
+    "module": "features/settings/state/sync-service.ts",
+    "reason": "shared → lib: SettingsSyncService exposes application settings outside the settings UI and belongs in the shared settings layer."
+  },
+  {
+    "from": "editor",
+    "to": "settings",
+    "module": "features/settings/utils/boot-mirror.ts",
+    "reason": "shared → lib: readSettingsMirror exposes application settings outside the settings UI and belongs in the shared settings layer."
+  },
+  {
+    "from": "editor",
+    "to": "workbench",
+    "module": "features/workbench/utils/layout.ts",
+    "reason": "shared → lib: WorkbenchLayout is reused by editor outside workbench; move this shared behavior with its consumers."
+  },
+  {
+    "from": "editor",
+    "to": "workbench",
+    "module": "features/workbench/utils/panels.ts",
+    "reason": "shared → lib: activeEditorTabForWorkbenchPanels, editorContentCountsForWorkbenchPanels, editorTabRecordsForWorkbenchPanels, type WorkbenchPanels is reused by editor outside workbench; move this shared behavior with its consumers."
+  },
+  {
+    "from": "editor",
+    "to": "workspace",
+    "module": "features/workspace/hooks/use-selected-file.ts",
+    "reason": "shared → lib: useSelectedFile is reused by editor outside workspace; move this shared behavior with its consumers."
+  },
+  {
+    "from": "editor",
+    "to": "workspace",
+    "module": "features/workspace/state/cache.ts",
+    "reason": "couple: editor and workspace coordinate the same document or session state through CachedWorkspaceState; separate that ownership before draining this edge."
+  },
+  {
+    "from": "editor",
+    "to": "workspace",
+    "module": "features/workspace/utils/conflict-resolution-mutation.ts",
+    "reason": "shared → lib: ConflictResolutionSource is reused by editor outside workspace; move this shared behavior with its consumers."
+  },
+  {
+    "from": "editor",
+    "to": "workspace",
+    "module": "features/workspace/utils/location.ts",
+    "reason": "shared → lib: workspaceLocationId is reused by editor outside workspace; move this shared behavior with its consumers."
+  },
+  {
+    "from": "editor",
+    "to": "workspace",
+    "module": "features/workspace/utils/mutation-keys.ts",
+    "reason": "shared → lib: workspaceMutationKeys is reused by editor outside workspace; move this shared behavior with its consumers."
+  },
+  {
+    "from": "file-picker",
+    "to": "settings",
+    "module": "features/settings/utils/boot-mirror.ts",
+    "reason": "shared → lib: readSettingsMirror exposes application settings outside the settings UI and belongs in the shared settings layer."
+  },
+  {
+    "from": "git",
+    "to": "chat",
+    "module": "features/chat/hooks/use-attach-to-composer.ts",
+    "reason": "shared → lib: useAttachToComposer is reused by git outside chat; move this shared behavior with its consumers."
+  },
+  {
+    "from": "git",
+    "to": "chat",
+    "module": "features/chat/utils/checkpoint-diff-query.ts",
+    "reason": "shared → lib: checkpointDiffRetry, checkpointDiffRetryDelay, fetchCheckpointDiff is reused by git outside chat; move this shared behavior with its consumers."
+  },
+  {
+    "from": "git",
+    "to": "editor",
+    "module": "features/editor/components/diff-editor.tsx",
+    "reason": "shared → lib: DiffEditor is rendered by both git and editor; extract the shared presentation from its feature owner."
+  },
+  {
+    "from": "git",
+    "to": "editor",
+    "module": "features/editor/components/tab-placeholder.tsx",
+    "reason": "shared → lib: EditorTabPlaceholder is rendered by both git and editor; extract the shared presentation from its feature owner."
+  },
+  {
+    "from": "git",
+    "to": "editor",
+    "module": "features/editor/hooks/use-diff-language-context.ts",
+    "reason": "shared → lib: useDiffLanguageContext is reused by git outside editor; move this shared behavior with its consumers."
+  },
+  {
+    "from": "git",
+    "to": "editor",
+    "module": "features/editor/hooks/use-editor-commands.ts",
+    "reason": "shared → lib: useEditorCommands is reused by git outside editor; move this shared behavior with its consumers."
+  },
+  {
+    "from": "git",
+    "to": "editor",
+    "module": "features/editor/hooks/use-runtime.ts",
+    "reason": "shared → lib: useEditorRuntime is reused by git outside editor; move this shared behavior with its consumers."
+  },
+  {
+    "from": "git",
+    "to": "editor",
+    "module": "features/editor/hooks/use-tab-presentation.ts",
+    "reason": "shared → lib: useTabPresentation is reused by git outside editor; move this shared behavior with its consumers."
+  },
+  {
+    "from": "git",
+    "to": "editor",
+    "module": "features/editor/state/workspace-state.tsx",
+    "reason": "couple: git and editor coordinate the same document or session state through useEditorWorkspaceState; separate that ownership before draining this edge."
+  },
+  {
+    "from": "git",
+    "to": "editor",
+    "module": "features/editor/utils/diff-language-context.ts",
+    "reason": "shared → lib: DiffLanguageHost is reused by git outside editor; move this shared behavior with its consumers."
+  },
+  {
+    "from": "git",
+    "to": "editor",
+    "module": "features/editor/utils/file-path.ts",
+    "reason": "shared → lib: languageIdForFilePath is reused by git outside editor; move this shared behavior with its consumers."
+  },
+  {
+    "from": "git",
+    "to": "settings",
+    "module": "features/settings/hooks/use-setting-value.ts",
+    "reason": "shared → lib: useSettingValue exposes application settings outside the settings UI and belongs in the shared settings layer."
+  },
+  {
+    "from": "logs",
+    "to": "settings",
+    "module": "features/settings/utils/boot-mirror.ts",
+    "reason": "shared → lib: readSettingsMirror exposes application settings outside the settings UI and belongs in the shared settings layer."
+  },
+  {
+    "from": "search",
+    "to": "editor",
+    "module": "features/editor/hooks/use-editor-color-theme.ts",
+    "reason": "shared → lib: useEditorColorTheme is reused by search outside editor; move this shared behavior with its consumers."
+  },
+  {
+    "from": "search",
+    "to": "editor",
+    "module": "features/editor/state/document-state.tsx",
+    "reason": "couple: search and editor coordinate the same document or session state through useEditorDocumentStoreApi; separate that ownership before draining this edge."
+  },
+  {
+    "from": "search",
+    "to": "editor",
+    "module": "features/editor/state/syntax-highlighting.ts",
+    "reason": "couple: search and editor coordinate the same document or session state through editorTreeSitterSyntaxProvider; separate that ownership before draining this edge."
+  },
+  {
+    "from": "search",
+    "to": "editor",
+    "module": "features/editor/state/workspace-state.tsx",
+    "reason": "couple: search and editor coordinate the same document or session state through useEditorWorkspaceStoreApi; separate that ownership before draining this edge."
+  },
+  {
+    "from": "search",
+    "to": "editor",
+    "module": "features/editor/utils/file-path.ts",
+    "reason": "shared → lib: languageIdForFilePath is reused by search outside editor; move this shared behavior with its consumers."
+  },
+  {
+    "from": "search",
+    "to": "editor",
+    "module": "features/editor/utils/plugins.ts",
+    "reason": "shared → lib: createPlatformSearchResultEditorLoggingPlugin is reused by search outside editor; move this shared behavior with its consumers."
+  },
+  {
+    "from": "search",
+    "to": "editor",
+    "module": "features/editor/utils/text-snapshot.ts",
+    "reason": "shared → lib: textSnapshotLineRange is reused by search outside editor; move this shared behavior with its consumers."
+  },
+  {
+    "from": "search",
+    "to": "settings",
+    "module": "features/settings/utils/boot-mirror.ts",
+    "reason": "shared → lib: readSettingsMirror exposes application settings outside the settings UI and belongs in the shared settings layer."
+  },
+  {
+    "from": "search",
+    "to": "workspace",
+    "module": "features/workspace/state/cache.ts",
+    "reason": "couple: search and workspace coordinate the same document or session state through CachedSearchBufferState; separate that ownership before draining this edge."
+  },
+  {
+    "from": "settings",
+    "to": "chat",
+    "module": "features/chat/utils/provider-query.ts",
+    "reason": "shared → lib: providerListQueryOptions is reused by settings outside chat; move this shared behavior with its consumers."
+  },
+  {
+    "from": "settings",
+    "to": "editor",
+    "module": "features/editor/components/editor.tsx",
+    "reason": "shared → lib: Editor is rendered by both settings and editor; extract the shared presentation from its feature owner."
+  },
+  {
+    "from": "settings",
+    "to": "editor",
+    "module": "features/editor/state/document-state.tsx",
+    "reason": "couple: settings and editor coordinate the same document or session state through useEditorDocumentState, useEditorDocumentStoreApi; separate that ownership before draining this edge."
+  },
+  {
+    "from": "settings",
+    "to": "editor",
+    "module": "features/editor/state/workspace-state.tsx",
+    "reason": "couple: settings and editor coordinate the same document or session state through EditorWorkspaceStateContext, type EditorWorkspaceStore, type EditorWorkspaceStoreApi; separate that ownership before draining this edge."
+  },
+  {
+    "from": "settings",
+    "to": "editor",
+    "module": "features/editor/utils/language-server-plugin.ts",
+    "reason": "shared → lib: LanguageServerDocumentTarget is reused by settings outside editor; move this shared behavior with its consumers."
+  },
+  {
+    "from": "settings",
+    "to": "editor",
+    "module": "features/editor/utils/render-document.ts",
+    "reason": "shared → lib: EditorRenderDocument is reused by settings outside editor; move this shared behavior with its consumers."
+  },
+  {
+    "from": "terminal",
+    "to": "chat",
+    "module": "features/chat/hooks/use-attach-to-composer.ts",
+    "reason": "shared → lib: useAttachToComposer is reused by terminal outside chat; move this shared behavior with its consumers."
+  },
+  {
+    "from": "terminal",
+    "to": "chat",
+    "module": "features/chat/hooks/use-open-file-reference.ts",
+    "reason": "shared → lib: useOpenFileReference is reused by terminal outside chat; move this shared behavior with its consumers."
+  },
+  {
+    "from": "terminal",
+    "to": "chat",
+    "module": "features/chat/utils/markdown-file-links.ts",
+    "reason": "shared → lib: resolveInlineCodeFileReference, type MarkdownFileReference is reused by terminal outside chat; move this shared behavior with its consumers."
+  },
+  {
+    "from": "terminal",
+    "to": "settings",
+    "module": "features/settings/hooks/use-setting-value.ts",
+    "reason": "shared → lib: useSettingValue exposes application settings outside the settings UI and belongs in the shared settings layer."
+  },
+  {
+    "from": "workbench",
+    "to": "chat-mode",
+    "module": "features/chat-mode/utils/panels.ts",
+    "reason": "owner: The workbench composes feature panes and their commands; this module supplies isChatModeToolTab, showChatModeToolTab, toggleChatModeToolTab."
+  },
+  {
+    "from": "workbench",
+    "to": "chat",
+    "module": "features/chat/components/chat-side-panel.tsx",
+    "reason": "owner: The workbench composes feature panes and their commands; this module supplies ChatSidePanel."
+  },
+  {
+    "from": "workbench",
+    "to": "chat",
+    "module": "features/chat/hooks/use-active-projection.ts",
+    "reason": "owner: The workbench composes feature panes and their commands; this module supplies useActiveChatProjection."
+  },
+  {
+    "from": "workbench",
+    "to": "chat",
+    "module": "features/chat/utils/project-qualifiers.ts",
+    "reason": "owner: The workbench composes feature panes and their commands; this module supplies projectQualifiers."
+  },
+  {
+    "from": "workbench",
+    "to": "editor",
+    "module": "features/editor/components/compare-saved-view.tsx",
+    "reason": "owner: The workbench composes feature panes and their commands; this module supplies CompareSavedView."
+  },
+  {
+    "from": "workbench",
+    "to": "editor",
+    "module": "features/editor/components/editor.tsx",
+    "reason": "owner: The workbench composes feature panes and their commands; this module supplies Editor."
+  },
+  {
+    "from": "workbench",
+    "to": "editor",
+    "module": "features/editor/components/history-view.tsx",
+    "reason": "owner: The workbench composes feature panes and their commands; this module supplies HistoryView."
+  },
+  {
+    "from": "workbench",
+    "to": "editor",
+    "module": "features/editor/components/language-server-references-pane.tsx",
+    "reason": "owner: The workbench composes feature panes and their commands; this module supplies LanguageServerReferencesPane."
+  },
+  {
+    "from": "workbench",
+    "to": "editor",
+    "module": "features/editor/hooks/use-editor-color-theme.ts",
+    "reason": "owner: The workbench composes feature panes and their commands; this module supplies useEditorColorTheme."
+  },
+  {
+    "from": "workbench",
+    "to": "editor",
+    "module": "features/editor/hooks/use-editor-commands.ts",
+    "reason": "owner: The workbench composes feature panes and their commands; this module supplies useEditorCommands."
+  },
+  {
+    "from": "workbench",
+    "to": "editor",
+    "module": "features/editor/hooks/use-editor-group-actions.ts",
+    "reason": "owner: The workbench composes feature panes and their commands; this module supplies useEditorGroupActions."
+  },
+  {
+    "from": "workbench",
+    "to": "editor",
+    "module": "features/editor/hooks/use-editor-language-server-status.ts",
+    "reason": "owner: The workbench composes feature panes and their commands; this module supplies useEditorLanguageServerStatus."
+  },
+  {
+    "from": "workbench",
+    "to": "editor",
+    "module": "features/editor/hooks/use-editor-tab-actions.ts",
+    "reason": "owner: The workbench composes feature panes and their commands; this module supplies useEditorTabActions."
+  },
+  {
+    "from": "workbench",
+    "to": "editor",
+    "module": "features/editor/hooks/use-language-server-matches.ts",
+    "reason": "owner: The workbench composes feature panes and their commands; this module supplies useLanguageServerMatches."
+  },
+  {
+    "from": "workbench",
+    "to": "editor",
+    "module": "features/editor/hooks/use-runtime.ts",
+    "reason": "owner: The workbench composes feature panes and their commands; this module supplies useEditorRuntime."
+  },
+  {
+    "from": "workbench",
+    "to": "editor",
+    "module": "features/editor/providers/workspace-edit-context.ts",
+    "reason": "owner: The workbench composes feature panes and their commands; this module supplies useWorkspaceEditHost."
+  },
+  {
+    "from": "workbench",
+    "to": "editor",
+    "module": "features/editor/state/conflict-state.tsx",
+    "reason": "owner: The workbench composes feature panes and their commands; this module supplies useEditorConflictState."
+  },
+  {
+    "from": "workbench",
+    "to": "editor",
+    "module": "features/editor/state/document-state.tsx",
+    "reason": "owner: The workbench composes feature panes and their commands; this module supplies useEditorDocumentState."
+  },
+  {
+    "from": "workbench",
+    "to": "editor",
+    "module": "features/editor/state/language-server-status-source.ts",
+    "reason": "owner: The workbench composes feature panes and their commands; this module supplies createEditorLanguageServerStatusSource."
+  },
+  {
+    "from": "workbench",
+    "to": "editor",
+    "module": "features/editor/state/status-bar-source.ts",
+    "reason": "owner: The workbench composes feature panes and their commands; this module supplies EditorStatusBarSource."
+  },
+  {
+    "from": "workbench",
+    "to": "editor",
+    "module": "features/editor/state/ui-state.tsx",
+    "reason": "owner: The workbench composes feature panes and their commands; this module supplies useEditorUiState, useEditorUiStoreApi."
+  },
+  {
+    "from": "workbench",
+    "to": "editor",
+    "module": "features/editor/state/workspace-state.tsx",
+    "reason": "owner: The workbench composes feature panes and their commands; this module supplies useEditorWorkspaceStoreApi."
+  },
+  {
+    "from": "workbench",
+    "to": "editor",
+    "module": "features/editor/utils/render-document.ts",
+    "reason": "owner: The workbench composes feature panes and their commands; this module supplies EditorRenderDocument."
+  },
+  {
+    "from": "workbench",
+    "to": "git",
+    "module": "features/git/components/branch-chip.tsx",
+    "reason": "owner: The workbench composes feature panes and their commands; this module supplies BranchChip."
+  },
+  {
+    "from": "workbench",
+    "to": "git",
+    "module": "features/git/components/diff-view.tsx",
+    "reason": "owner: The workbench composes feature panes and their commands; this module supplies DiffView."
+  },
+  {
+    "from": "workbench",
+    "to": "git",
+    "module": "features/git/components/panel.tsx",
+    "reason": "owner: The workbench composes feature panes and their commands; this module supplies Panel as GitPanel."
+  },
+  {
+    "from": "workbench",
+    "to": "git",
+    "module": "features/git/components/remote-actions.tsx",
+    "reason": "owner: The workbench composes feature panes and their commands; this module supplies RemoteActions."
+  },
+  {
+    "from": "workbench",
+    "to": "git",
+    "module": "features/git/hooks/use-status.ts",
+    "reason": "owner: The workbench composes feature panes and their commands; this module supplies useStatus."
+  },
+  {
+    "from": "workbench",
+    "to": "git",
+    "module": "features/git/utils/diff-document-query.ts",
+    "reason": "owner: The workbench composes feature panes and their commands; this module supplies diffDocumentQueryKey."
+  },
+  {
+    "from": "workbench",
+    "to": "logs",
+    "module": "features/logs/components/panel.tsx",
+    "reason": "owner: The workbench composes feature panes and their commands; this module supplies LogsPanel."
+  },
+  {
+    "from": "workbench",
+    "to": "settings",
+    "module": "features/settings/components/page.tsx",
+    "reason": "owner: The workbench composes feature panes and their commands; this module supplies SettingsPage."
+  },
+  {
+    "from": "workbench",
+    "to": "settings",
+    "module": "features/settings/hooks/use-setting-value.ts",
+    "reason": "owner: The workbench composes feature panes and their commands; this module supplies useSettingValue."
+  },
+  {
+    "from": "workbench",
+    "to": "settings",
+    "module": "features/settings/hooks/use-settings-json-document.ts",
+    "reason": "owner: The workbench composes feature panes and their commands; this module supplies useSettingsJsonDocument."
+  },
+  {
+    "from": "workbench",
+    "to": "settings",
+    "module": "features/settings/hooks/use-theme.ts",
+    "reason": "owner: The workbench composes feature panes and their commands; this module supplies useTheme."
+  },
+  {
+    "from": "workbench",
+    "to": "settings",
+    "module": "features/settings/providers/theme-context.ts",
+    "reason": "owner: The workbench composes feature panes and their commands; this module supplies Theme."
+  },
+  {
+    "from": "workbench",
+    "to": "terminal",
+    "module": "features/terminal/components/panel.tsx",
+    "reason": "owner: The workbench composes feature panes and their commands; this module supplies TerminalPanel."
+  },
+  {
+    "from": "workbench",
+    "to": "terminal",
+    "module": "features/terminal/state/kill-session.ts",
+    "reason": "owner: The workbench composes feature panes and their commands; this module supplies killTerminalSession."
+  },
+  {
+    "from": "workbench",
+    "to": "terminal",
+    "module": "features/terminal/state/session-registry.ts",
+    "reason": "owner: The workbench composes feature panes and their commands; this module supplies disposeTerminalSession, terminalSessionKey."
+  },
+  {
+    "from": "workbench",
+    "to": "workspace",
+    "module": "features/workspace/components/files-pane.tsx",
+    "reason": "owner: The workbench composes feature panes and their commands; this module supplies FilesPane."
+  },
+  {
+    "from": "workbench",
+    "to": "workspace",
+    "module": "features/workspace/components/search-pane.tsx",
+    "reason": "owner: The workbench composes feature panes and their commands; this module supplies SearchPane."
+  },
+  {
+    "from": "workbench",
+    "to": "workspace",
+    "module": "features/workspace/hooks/use-conflict-editor-resolution.ts",
+    "reason": "owner: The workbench composes feature panes and their commands; this module supplies useConflictEditorResolution."
+  },
+  {
+    "from": "workbench",
+    "to": "workspace",
+    "module": "features/workspace/hooks/use-open-root.ts",
+    "reason": "owner: The workbench composes feature panes and their commands; this module supplies useOpenWorkspaceRoot."
+  },
+  {
+    "from": "workbench",
+    "to": "workspace",
+    "module": "features/workspace/hooks/use-selected-file.ts",
+    "reason": "owner: The workbench composes feature panes and their commands; this module supplies useSelectedFile."
+  },
+  {
+    "from": "workbench",
+    "to": "workspace",
+    "module": "features/workspace/hooks/use-tab-intent-prefetch.ts",
+    "reason": "owner: The workbench composes feature panes and their commands; this module supplies useEditorTabIntentPrefetch."
+  },
+  {
+    "from": "workbench",
+    "to": "workspace",
+    "module": "features/workspace/hooks/use-tree.ts",
+    "reason": "owner: The workbench composes feature panes and their commands; this module supplies useWorkspaceTreeForRootPath."
+  },
+  {
+    "from": "workbench",
+    "to": "workspace",
+    "module": "features/workspace/providers/actions-context.ts",
+    "reason": "owner: The workbench composes feature panes and their commands; this module supplies FileTreeActionsContext, type FileTreeActions."
+  },
+  {
+    "from": "workbench",
+    "to": "workspace",
+    "module": "features/workspace/utils/editor-render-document.ts",
+    "reason": "owner: The workbench composes feature panes and their commands; this module supplies joinedEditorRenderDocument, readyFile."
+  },
+  {
+    "from": "workbench",
+    "to": "workspace",
+    "module": "features/workspace/utils/tab-close-targets.ts",
+    "reason": "owner: The workbench composes feature panes and their commands; this module supplies EditorTabCloseTarget."
+  },
+  {
+    "from": "workbench",
+    "to": "workspace",
+    "module": "features/workspace/utils/tab-dirty.ts",
+    "reason": "owner: The workbench composes feature panes and their commands; this module supplies isEditorTabDirty."
+  },
+  {
+    "from": "workbench",
+    "to": "workspace",
+    "module": "features/workspace/utils/tab-model.ts",
+    "reason": "owner: The workbench composes feature panes and their commands; this module supplies EMPTY_GIT_FILES."
+  },
+  {
+    "from": "workbench",
+    "to": "workspace",
+    "module": "features/workspace/utils/tab-types.ts",
+    "reason": "owner: The workbench composes feature panes and their commands; this module supplies EditorTabConflictMap."
+  },
+  {
+    "from": "workspace",
+    "to": "chat-mode",
+    "module": "features/chat-mode/components/surface-view.tsx",
+    "reason": "owner: Workspace selects the chat mode surface as one of its root layouts."
+  },
+  {
+    "from": "workspace",
+    "to": "chat-mode",
+    "module": "features/chat-mode/utils/active-session.ts",
+    "reason": "shared → lib: SessionSelection is reused by workspace outside chat-mode; move this shared behavior with its consumers."
+  },
+  {
+    "from": "workspace",
+    "to": "chat-mode",
+    "module": "features/chat-mode/utils/panels.ts",
+    "reason": "shared → lib: createDefaultChatModePanels, isChatModeToolTab, type ChatModePanels, type ChatModeToolTab is reused by workspace outside chat-mode; move this shared behavior with its consumers."
+  },
+  {
+    "from": "workspace",
+    "to": "editor",
+    "module": "features/editor/components/filesystem-conflict-toast.tsx",
+    "reason": "shared → lib: FilesystemConflictToast is rendered by both workspace and editor; extract the shared presentation from its feature owner."
+  },
+  {
+    "from": "workspace",
+    "to": "editor",
+    "module": "features/editor/hooks/use-editor-color-theme.ts",
+    "reason": "shared → lib: useEditorColorTheme is reused by workspace outside editor; move this shared behavior with its consumers."
+  },
+  {
+    "from": "workspace",
+    "to": "editor",
+    "module": "features/editor/hooks/use-editor-commands.ts",
+    "reason": "shared → lib: useEditorCommands is reused by workspace outside editor; move this shared behavior with its consumers."
+  },
+  {
+    "from": "workspace",
+    "to": "editor",
+    "module": "features/editor/hooks/use-runtime.ts",
+    "reason": "shared → lib: useEditorRuntime is reused by workspace outside editor; move this shared behavior with its consumers."
+  },
+  {
+    "from": "workspace",
+    "to": "editor",
+    "module": "features/editor/hooks/use-workspace-mutation-allowed.ts",
+    "reason": "shared → lib: useWorkspaceMutationAllowed is reused by workspace outside editor; move this shared behavior with its consumers."
+  },
+  {
+    "from": "workspace",
+    "to": "editor",
+    "module": "features/editor/providers/workspace-edit-context.ts",
+    "reason": "couple: workspace and editor coordinate the same document or session state through useOptionalWorkspaceEditService; separate that ownership before draining this edge."
+  },
+  {
+    "from": "workspace",
+    "to": "editor",
+    "module": "features/editor/state/apply-actions.ts",
+    "reason": "couple: workspace and editor coordinate the same document or session state through EditorApplyActions; separate that ownership before draining this edge."
+  },
+  {
+    "from": "workspace",
+    "to": "editor",
+    "module": "features/editor/state/conflict-state.tsx",
+    "reason": "couple: workspace and editor coordinate the same document or session state through useEditorConflictStoreApi, type EditorConflictStoreApi; separate that ownership before draining this edge."
+  },
+  {
+    "from": "workspace",
+    "to": "editor",
+    "module": "features/editor/state/document-state.tsx",
+    "reason": "couple: workspace and editor coordinate the same document or session state through type EditorDocumentStoreApi, useEditorDocumentStoreApi; separate that ownership before draining this edge."
+  },
+  {
+    "from": "workspace",
+    "to": "editor",
+    "module": "features/editor/state/scroll-persistence.ts",
+    "reason": "couple: workspace and editor coordinate the same document or session state through captureEditorScrollPositions; separate that ownership before draining this edge."
+  },
+  {
+    "from": "workspace",
+    "to": "editor",
+    "module": "features/editor/state/workspace-document-service.ts",
+    "reason": "couple: workspace and editor coordinate the same document or session state through WorkspaceDocumentTargetStamp, WorkspaceDocumentPathReservationRequest; separate that ownership before draining this edge."
+  },
+  {
+    "from": "workspace",
+    "to": "editor",
+    "module": "features/editor/state/workspace-edit-service.ts",
+    "reason": "couple: workspace and editor coordinate the same document or session state through WorkspaceEditRoot; separate that ownership before draining this edge."
+  },
+  {
+    "from": "workspace",
+    "to": "editor",
+    "module": "features/editor/state/workspace-state.tsx",
+    "reason": "couple: workspace and editor coordinate the same document or session state through useEditorWorkspaceState; separate that ownership before draining this edge."
+  },
+  {
+    "from": "workspace",
+    "to": "editor",
+    "module": "features/editor/utils/mutation-keys.ts",
+    "reason": "shared → lib: editorMutationKeys is reused by workspace outside editor; move this shared behavior with its consumers."
+  },
+  {
+    "from": "workspace",
+    "to": "editor",
+    "module": "features/editor/utils/render-document.ts",
+    "reason": "shared → lib: EditorRenderDocument is reused by workspace outside editor; move this shared behavior with its consumers."
+  },
+  {
+    "from": "workspace",
+    "to": "editor",
+    "module": "features/editor/utils/text-snapshot.ts",
+    "reason": "shared → lib: textSnapshotEqualsText is reused by workspace outside editor; move this shared behavior with its consumers."
+  },
+  {
+    "from": "workspace",
+    "to": "git",
+    "module": "features/git/hooks/use-status.ts",
+    "reason": "shared → lib: useStatus is reused by workspace outside git; move this shared behavior with its consumers."
+  },
+  {
+    "from": "workspace",
+    "to": "git",
+    "module": "features/git/hooks/use-discard-paths-mutation.ts",
+    "reason": "shared → lib: useDiscardPathsMutation is reused by workspace outside git; move this shared behavior with its consumers."
+  },
+  {
+    "from": "workspace",
+    "to": "git",
+    "module": "features/git/hooks/use-stage-paths-mutation.ts",
+    "reason": "shared → lib: useStagePathsMutation is reused by workspace outside git; move this shared behavior with its consumers."
+  },
+  {
+    "from": "workspace",
+    "to": "git",
+    "module": "features/git/hooks/use-unstage-paths-mutation.ts",
+    "reason": "shared → lib: useUnstagePathsMutation is reused by workspace outside git; move this shared behavior with its consumers."
+  },
+  {
+    "from": "workspace",
+    "to": "git",
+    "module": "features/git/providers/store-provider.tsx",
+    "reason": "couple: workspace and git coordinate the same document or session state through GitStoreProvider; separate that ownership before draining this edge."
+  },
+  {
+    "from": "workspace",
+    "to": "git",
+    "module": "features/git/utils/status-entries-for-tree.ts",
+    "reason": "shared → lib: statusEntriesForTree is reused by workspace outside git; move this shared behavior with its consumers."
+  },
+  {
+    "from": "workspace",
+    "to": "git",
+    "module": "features/git/utils/status-symbols.ts",
+    "reason": "shared → lib: gitStatusSymbol, type GitSymbolSource is reused by workspace outside git; move this shared behavior with its consumers."
+  },
+  {
+    "from": "workspace",
+    "to": "git",
+    "module": "features/git/utils/types.ts",
+    "reason": "shared → lib: StatusPresentation is reused by workspace outside git; move this shared behavior with its consumers."
+  },
+  {
+    "from": "workspace",
+    "to": "search",
+    "module": "features/search/components/buffer-status.tsx",
+    "reason": "owner: Workspace search composes the search controls, results and execution through SearchBufferStatus."
+  },
+  {
+    "from": "workspace",
+    "to": "search",
+    "module": "features/search/components/filter-fields.tsx",
+    "reason": "owner: Workspace search composes the search controls, results and execution through SearchFilterFields."
+  },
+  {
+    "from": "workspace",
+    "to": "search",
+    "module": "features/search/components/history-input.tsx",
+    "reason": "owner: Workspace search composes the search controls, results and execution through SearchHistoryInput."
+  },
+  {
+    "from": "workspace",
+    "to": "search",
+    "module": "features/search/components/mode-buttons.tsx",
+    "reason": "owner: Workspace search composes the search controls, results and execution through SearchModeButtons."
+  },
+  {
+    "from": "workspace",
+    "to": "search",
+    "module": "features/search/components/replace-fields.tsx",
+    "reason": "owner: Workspace search composes the search controls, results and execution through SearchReplaceFields."
+  },
+  {
+    "from": "workspace",
+    "to": "search",
+    "module": "features/search/components/replace-toggle-button.tsx",
+    "reason": "owner: Workspace search composes the search controls, results and execution through SearchReplaceToggleButton."
+  },
+  {
+    "from": "workspace",
+    "to": "search",
+    "module": "features/search/components/result-editor-surface.tsx",
+    "reason": "owner: Workspace search composes the search controls, results and execution through SearchResultEditorSurface."
+  },
+  {
+    "from": "workspace",
+    "to": "search",
+    "module": "features/search/components/results-view.tsx",
+    "reason": "owner: Workspace search composes the search controls, results and execution through SearchResultsView."
+  },
+  {
+    "from": "workspace",
+    "to": "search",
+    "module": "features/search/components/summary-actions.tsx",
+    "reason": "owner: Workspace search composes the search controls, results and execution through SearchSummaryActions."
+  },
+  {
+    "from": "workspace",
+    "to": "search",
+    "module": "features/search/components/summary-text.tsx",
+    "reason": "owner: Workspace search composes the search controls, results and execution through SearchSummaryText."
+  },
+  {
+    "from": "workspace",
+    "to": "search",
+    "module": "features/search/components/summary.tsx",
+    "reason": "owner: Workspace search composes the search controls, results and execution through SearchSummary."
+  },
+  {
+    "from": "workspace",
+    "to": "search",
+    "module": "features/search/hooks/use-buffer-inputs.ts",
+    "reason": "owner: Workspace search composes the search controls, results and execution through useSearchBufferInputs."
+  },
+  {
+    "from": "workspace",
+    "to": "search",
+    "module": "features/search/hooks/use-buffer-results.ts",
+    "reason": "owner: Workspace search composes the search controls, results and execution through useSearchBufferResults."
+  },
+  {
+    "from": "workspace",
+    "to": "search",
+    "module": "features/search/hooks/use-buffer-runtime.ts",
+    "reason": "owner: Workspace search composes the search controls, results and execution through useSearchBufferRuntime."
+  },
+  {
+    "from": "workspace",
+    "to": "search",
+    "module": "features/search/hooks/use-replace.ts",
+    "reason": "owner: Workspace search composes the search controls, results and execution through useWorkspaceSearchReplace."
+  },
+  {
+    "from": "workspace",
+    "to": "search",
+    "module": "features/search/providers/result-actions-context.ts",
+    "reason": "owner: Workspace search composes the search controls, results and execution through SearchResultActionsContext, type SearchResultActions."
+  },
+  {
+    "from": "workspace",
+    "to": "search",
+    "module": "features/search/state/buffer-state.tsx",
+    "reason": "owner: Workspace search composes the search controls, results and execution through useSearchBufferState, type WorkspaceSearchFileGroup."
+  },
+  {
+    "from": "workspace",
+    "to": "search",
+    "module": "features/search/utils/open-match.ts",
+    "reason": "owner: Workspace search composes the search controls, results and execution through openWorkspaceSearchMatch."
+  },
+  {
+    "from": "workspace",
+    "to": "search",
+    "module": "features/search/utils/result-view-model.ts",
+    "reason": "owner: Workspace search composes the search controls, results and execution through SearchResultOpenTarget."
+  },
+  {
+    "from": "workspace",
+    "to": "workbench",
+    "module": "features/workbench/components/editor-surface-layout-view.tsx",
+    "reason": "shared → lib: EditorSurfaceLayoutView is rendered by both workspace and workbench; extract the shared presentation from its feature owner."
+  },
+  {
+    "from": "workspace",
+    "to": "workbench",
+    "module": "features/workbench/utils/layout.ts",
+    "reason": "shared → lib: createDefaultWorkbenchLayout, normalizeWorkbenchLayout, type WorkbenchLayout is reused by workspace outside workbench; move this shared behavior with its consumers."
+  },
+  {
+    "from": "workspace",
+    "to": "workbench",
+    "module": "features/workbench/utils/panels.ts",
+    "reason": "shared → lib: createDefaultWorkbenchPanels, normalizeWorkbenchPanels, type WorkbenchPanels is reused by workspace outside workbench; move this shared behavior with its consumers."
+  }
+]

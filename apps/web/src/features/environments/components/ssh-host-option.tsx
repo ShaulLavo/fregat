@@ -1,5 +1,6 @@
 import { CheckIcon, TerminalIcon } from '@phosphor-icons/react'
-import { Button } from '@workspace/ui/components/button'
+import { ListRow } from '@workspace/ui/patterns/list-row'
+import type { useListbox } from '@workspace/ui/patterns/use-listbox'
 
 export function SshHostOption({
   target,
@@ -7,7 +8,9 @@ export function SshHostOption({
   selected,
   offline = false,
   onSelect,
+  rowProps,
 }: {
+  readonly rowProps: ReturnType<ReturnType<typeof useListbox>['rowProps']>
   readonly target: string
   readonly label?: string
   readonly selected: boolean
@@ -15,23 +18,26 @@ export function SshHostOption({
   readonly onSelect: (target: string) => void
 }) {
   return (
-    <Button
-      type='button'
-      variant='ghost'
-      className='h-auto min-h-8 w-full justify-start gap-2'
-      aria-pressed={selected}
-      title={label === target ? undefined : target}
-      onClick={() => onSelect(target)}
+    <ListRow
+      {...rowProps}
+      as='button'
+      role='option'
+      className='w-full gap-2'
+      title={label === target ? target : `${label} (${target})`}
+      onClick={(event) => {
+        rowProps.onClick(event)
+        onSelect(target)
+      }}
     >
-      <TerminalIcon className='text-muted-foreground size-4 shrink-0' />
-      <span className='min-w-0 flex-1 text-left'>
+      <TerminalIcon className='text-muted-foreground size-(--icon-size-sm) shrink-0' />
+      <span className='flex min-w-0 flex-1 items-center gap-2 text-left'>
         <span className='block truncate font-mono'>{label}</span>
         {label !== target ? (
-          <span className='text-muted-foreground block truncate font-mono text-xs'>{target}</span>
+          <span className='text-muted-foreground text-2xs truncate font-mono'>{target}</span>
         ) : null}
       </span>
       {offline ? <span className='text-muted-foreground text-xs'>Offline</span> : null}
-      {selected ? <CheckIcon className='size-4 shrink-0' /> : null}
-    </Button>
+      {selected ? <CheckIcon className='size-(--icon-size-sm) shrink-0' /> : null}
+    </ListRow>
   )
 }

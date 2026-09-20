@@ -54,7 +54,7 @@ export function ModelPickerTrigger({
               />
             ) : null}
             <span className='min-w-0 truncate'>{modelLabel}</span>
-            <CaretDownIcon className='size-3 shrink-0' />
+            <CaretDownIcon className='size-(--icon-size-sm) shrink-0' />
             <span
               aria-label={statusLabel}
               className={cn(

@@ -1,6 +1,5 @@
 import type {
   LanguageServerDefinitionTarget,
-  LanguageServerDiagnosticSummary,
   LanguageServerStatus,
 } from '@singapore-editor/lsp-plugin'
 import { EmptyState } from '@workspace/ui/components/empty-state'
@@ -16,12 +15,7 @@ import { activeEditorTab } from '@/lib/documents/utils/groups'
 import { DiagnosticsLoading } from '@/features/workbench/components/diagnostics-loading'
 import { FocusablePanel } from '@/components/focusable-panel'
 import { basename, parentPath } from '@/lib/path-formatters'
-import {
-  diagnosticMessageText,
-  diagnosticSeverityLabel,
-  diagnosticTarget,
-  fileUriForPath,
-} from '@/lib/diagnostic'
+import { DiagnosticList } from '@/features/workbench/components/diagnostic-list'
 
 const idleLanguageServerStatusSource = createEditorLanguageServerStatusSource()
 
@@ -102,12 +96,12 @@ function renderDiagnosticsStatus({
         })}
         {renderDiagnosticCount({ label: 'Hints', severity: 4, value: diagnostics.counts.hint })}
       </div>
-      {renderDiagnosticList({
-        diagnostics,
-        onOpenDiagnostic,
-        onPreviewDiagnostic,
-        path: source.filePath,
-      })}
+      <DiagnosticList
+        diagnostics={diagnostics}
+        onOpenDiagnostic={onOpenDiagnostic}
+        onPreviewDiagnostic={onPreviewDiagnostic}
+        path={source.filePath}
+      />
     </div>
   )
 }
@@ -131,49 +125,6 @@ function renderDiagnosticCount({
         {value}
       </div>
     </div>
-  )
-}
-
-function renderDiagnosticList({
-  diagnostics,
-  path,
-  onOpenDiagnostic,
-  onPreviewDiagnostic,
-}: {
-  readonly diagnostics: LanguageServerDiagnosticSummary
-  readonly path: string
-  onOpenDiagnostic(target: LanguageServerDefinitionTarget): void | boolean
-  onPreviewDiagnostic(target: LanguageServerDefinitionTarget): void
-}) {
-  if (diagnostics.diagnostics.length === 0) return null
-
-  return (
-    <ol className='mt-3 space-y-2'>
-      {diagnostics.diagnostics.map((diagnostic, index) => {
-        const target = diagnosticTarget(path, diagnostics.uri ?? fileUriForPath(path), diagnostic)
-
-        return (
-          <li
-            className={cn('border border-l-2', diagnosticRuleClass(diagnostic.severity))}
-            key={diagnosticKey(diagnostic, index)}
-          >
-            {/* Raw <button>: a full-width, two-line row; Button is a fixed-height centered control. */}
-            <button
-              className='focus-ring hover:bg-row-hover active:bg-row-active block w-full px-2 py-2 text-left outline-none'
-              type='button'
-              onClick={() => onOpenDiagnostic(target)}
-              onFocus={() => onPreviewDiagnostic(target)}
-              onMouseEnter={() => onPreviewDiagnostic(target)}
-            >
-              <div className='text-muted-foreground text-2xs'>
-                {diagnosticSeverityLabel(diagnostic.severity)}
-              </div>
-              <div className='text-foreground'>{diagnosticMessageText(diagnostic.message)}</div>
-            </button>
-          </li>
-        )
-      })}
-    </ol>
   )
 }
 
@@ -208,19 +159,4 @@ function diagnosticTileClass(severity: number, value: number) {
   if (severity === 3) return 'border-info/30 bg-info/10'
 
   return 'border-border'
-}
-
-function diagnosticRuleClass(severity: number | undefined) {
-  if (severity === 1) return 'border-l-destructive'
-  if (severity === 2) return 'border-l-warning'
-  if (severity === 3) return 'border-l-info'
-
-  return 'border-l-border'
-}
-
-function diagnosticKey(
-  diagnostic: LanguageServerDiagnosticSummary['diagnostics'][number],
-  index: number,
-) {
-  return `${diagnosticMessageText(diagnostic.message)}:${index}`
 }

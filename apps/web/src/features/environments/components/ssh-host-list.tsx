@@ -1,3 +1,5 @@
+import { useState } from 'react'
+import { useListbox } from '@workspace/ui/patterns/use-listbox'
 import { Button } from '@workspace/ui/components/button'
 import { EmptyState } from '@workspace/ui/components/empty-state'
 import { LoadingState } from '@workspace/ui/components/loading-state'
@@ -13,6 +15,17 @@ export function SshHostList({
   readonly onSelect: (target: string) => void
 }) {
   const query = useSshHosts()
+  const hosts = query.data ?? []
+  const search = value.trim().toLowerCase()
+  const matching = hosts.filter((host) => host.toLowerCase().includes(search))
+  const [activeId, setActiveId] = useState<string | null>(null)
+  const list = useListbox({
+    role: 'listbox',
+    items: matching.map((host) => ({ id: host, label: host })),
+    activeId: activeId ?? value,
+    onActiveChange: setActiveId,
+    onCommit: onSelect,
+  })
   if (query.isPending)
     return (
       <LoadingState label='Loading SSH hosts' className='space-y-2 p-3'>
@@ -40,9 +53,6 @@ export function SshHostList({
         }
       />
     )
-  const hosts = query.data
-  const search = value.trim().toLowerCase()
-  const matching = hosts.filter((host) => host.toLowerCase().includes(search))
   if (hosts.length === 0)
     return (
       <EmptyState
@@ -61,9 +71,19 @@ export function SshHostList({
     )
 
   return (
-    <div className='max-h-48 overflow-y-auto p-1'>
+    <div
+      {...list.containerProps}
+      aria-label='SSH hosts'
+      className='focus-ring-inset max-h-48 overflow-y-auto'
+    >
       {matching.map((host) => (
-        <SshHostOption key={host} target={host} selected={host === value} onSelect={onSelect} />
+        <SshHostOption
+          key={host}
+          rowProps={list.rowProps(host)}
+          target={host}
+          selected={host === value}
+          onSelect={onSelect}
+        />
       ))}
     </div>
   )

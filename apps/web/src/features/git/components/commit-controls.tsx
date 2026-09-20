@@ -101,7 +101,7 @@ export function CommitControls({
             {syncChanges.isPending ? (
               <Spinner aria-hidden='true' role='presentation' />
             ) : (
-              <ArrowsClockwiseIcon className='size-3.5' />
+              <ArrowsClockwiseIcon className='size-(--icon-size-sm)' />
             )}
             {syncChangesLabel(repository)}
           </Button>
@@ -115,7 +115,7 @@ export function CommitControls({
             type='button'
             variant='default'
           >
-            <CheckIcon className='size-3.5' />
+            <CheckIcon className='size-(--icon-size-sm)' />
             Commit
             <span className='text-primary-foreground/65 text-3xs'>⌘↵</span>
           </Button>

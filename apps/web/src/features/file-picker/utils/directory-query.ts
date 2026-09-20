@@ -1,5 +1,8 @@
-import { loadDirectoryData, type DirectoryLoadData } from '@/features/file-picker/data-helpers'
-import type { FilePickerMode } from '@/features/file-picker/model'
+import {
+  loadDirectoryData,
+  type DirectoryLoadData,
+} from '@/features/file-picker/utils/data-helpers'
+import type { FilePickerMode } from '@/features/file-picker/utils/model'
 import type { FsEntry } from '@/lib/file-system-types'
 import { filePickerKeys } from '@/lib/query-keys'
 import { queryOptions, type QueryClient, type QueryKey } from '@tanstack/react-query'

@@ -1,5 +1,5 @@
 import { Popover, PopoverContent, PopoverTrigger } from '@workspace/ui/components/popover'
-import { cn } from '@workspace/ui/lib/utils'
+import { ListRow } from '@workspace/ui/patterns/list-row'
 import { useLayoutEffect, useMemo, useRef } from 'react'
 
 import {
@@ -82,19 +82,15 @@ export function ChatInputCommandMenu({
               <div key={group.id}>
                 {groupIndex > 0 ? <div className='bg-border my-0.5 h-px' /> : null}
                 {group.label ? (
-                  <div className='text-muted-foreground/55 text-3xs px-(--density-command-heading-padding-x) pt-(--density-command-heading-padding-top) pb-1 font-semibold tracking-[0.08em] uppercase'>
+                  <div className='text-muted-foreground text-2xs text-3xs px-(--density-command-heading-padding-x) pt-(--density-command-heading-padding-top) pb-1 font-semibold tracking-[0.08em] uppercase'>
                     {group.label}
                   </div>
                 ) : null}
                 {group.items.map((item) => (
-                  // A listbox option, not a button: the highlight is keyboard state
-                  // on aria-selected, and hovering moves that state instead of painting.
-                  <button
-                    aria-selected={activeItemId === item.id}
-                    className={cn(
-                      'hover:bg-transparent hover:text-inherit data-[highlighted=true]:bg-transparent data-[highlighted=true]:text-inherit flex w-full min-w-0 cursor-pointer items-center gap-(--density-control-gap) px-(--density-row-padding-x) py-(--density-command-item-padding-y) text-left text-xs select-none',
-                      activeItemId === item.id && 'bg-accent! text-accent-foreground!',
-                    )}
+                  <ListRow
+                    as='button'
+                    selected={activeItemId === item.id}
+                    className='w-full min-w-0 cursor-pointer gap-(--density-control-gap) text-left select-none'
                     data-chat-input-command-item-id={item.id}
                     key={item.id}
                     role='option'
@@ -109,11 +105,11 @@ export function ChatInputCommandMenu({
                     <ChatInputCommandItemIcon item={item} />
                     <span className='flex min-w-0 flex-1 items-center gap-2'>
                       <span className='shrink-0 font-medium'>{item.label}</span>
-                      <span className='text-muted-foreground/70 min-w-0 flex-1 truncate text-xs'>
+                      <span className='text-muted-foreground min-w-0 flex-1 truncate text-xs'>
                         {item.description}
                       </span>
                     </span>
-                  </button>
+                  </ListRow>
                 ))}
               </div>
             ))}
@@ -121,14 +117,14 @@ export function ChatInputCommandMenu({
         ) : (
           <div className='px-(--density-command-item-padding-x) py-(--density-command-item-padding-y)'>
             {triggerKind === 'slash-command' ? (
-              <div className='text-muted-foreground/55 text-3xs pb-1 font-semibold tracking-[0.08em] uppercase'>
+              <div className='text-muted-foreground text-2xs text-3xs pb-1 font-semibold tracking-[0.08em] uppercase'>
                 Built-in
               </div>
             ) : null}
             {isLoading ? (
               <CommandMenuLoading label={chatInputCommandMenuLoadingLabel(triggerKind)} />
             ) : (
-              <p className='text-muted-foreground/70 text-xs'>{emptyLabel}</p>
+              <p className='text-muted-foreground text-xs'>{emptyLabel}</p>
             )}
           </div>
         )}

@@ -53,7 +53,7 @@ export function AssistantMarkdownCodeBlock({
       >
         {/* Not on the header: the toolbar beside it holds Tooltip controls (D4). */}
         <span className='flex min-w-0 items-center gap-1.5 pl-1' title={title ?? undefined}>
-          <FileTypeIcon className='size-3.5 shrink-0' icon={icon} />
+          <FileTypeIcon className='size-(--icon-size-sm) shrink-0' icon={icon} />
           <span className={title ? 'truncate font-mono' : 'truncate font-mono lowercase'}>
             {title ?? language}
           </span>
@@ -73,7 +73,7 @@ export function AssistantMarkdownCodeBlock({
                 />
               }
             >
-              <ArrowUDownLeftIcon className='size-3' />
+              <ArrowUDownLeftIcon className='size-(--icon-size-sm)' />
             </TooltipTrigger>
             <TooltipContent>{wrapLabel}</TooltipContent>
           </Tooltip>

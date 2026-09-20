@@ -53,7 +53,7 @@ export function TimelineMinimap({
   return (
     <nav
       aria-label='Turns'
-      className='pointer-events-none absolute top-2 right-2 bottom-12 z-10 w-4 opacity-70 transition-opacity focus-within:opacity-100 hover:opacity-100'
+      className='text-muted-foreground text-2xs pointer-events-none absolute top-2 right-2 bottom-12 z-10 w-4 transition-opacity focus-within:opacity-100 hover:opacity-100'
       onKeyDown={handleKeyDown}
     >
       <div className='relative h-full w-full' ref={railRef}>
@@ -84,7 +84,7 @@ export function TimelineMinimap({
           >
             <span
               className={cn(
-                'bg-muted-foreground/50 h-px w-2 rounded-full transition-[width,height,background-color]',
+                'bg-muted-foreground/50 h-px w-2 rounded-full transition-[width,height]',
                 mark.id === activeMarkId && 'bg-foreground h-0.5 w-full',
               )}
             />

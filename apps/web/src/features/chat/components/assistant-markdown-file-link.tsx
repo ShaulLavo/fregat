@@ -48,7 +48,7 @@ export function AssistantMarkdownFileLink({
       title={referenceTitle(reference)}
       onClick={handleClick}
     >
-      <FileCodeIcon aria-hidden='true' className='size-3 shrink-0 self-center' />
+      <FileCodeIcon aria-hidden='true' className='size-(--icon-size-sm) shrink-0 self-center' />
       <span className='truncate'>{label}</span>
     </a>
   )

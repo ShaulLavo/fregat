@@ -4,7 +4,6 @@ import type { ProviderInstanceId } from '@workspace/contracts'
 import { useSettingValue } from '@/features/settings/hooks/use-setting-value'
 import { Command, CommandEmpty, CommandInput, CommandList } from '@workspace/ui/components/command'
 import { Popover, PopoverContent } from '@workspace/ui/components/popover'
-import { TooltipProvider } from '@workspace/ui/components/tooltip'
 import { cn } from '@workspace/ui/lib/utils'
 import { useState } from 'react'
 
@@ -134,55 +133,53 @@ export function ModelPicker({
     <Popover open={open} onOpenChange={handleOpenChange}>
       <ModelPickerTrigger busy={busy} disabled={disabled} />
       <PopoverContent align='start' className={PANEL_CLASS} side='top'>
-        <TooltipProvider delay={0}>
-          {activeGroup ? (
-            <ModelPickerRail
-              activeProviderInstanceId={activeGroup.providerInstanceId}
-              groups={groups}
-              onSelect={setRailProviderInstanceId}
-            />
-          ) : null}
-          <Command
-            className={cn('min-w-0 flex-1', activeGroup && 'border-border border-l')}
-            label='Models'
-            shouldFilter={false}
+        {activeGroup ? (
+          <ModelPickerRail
+            activeProviderInstanceId={activeGroup.providerInstanceId}
+            groups={groups}
+            onSelect={setRailProviderInstanceId}
+          />
+        ) : null}
+        <Command
+          className={cn('min-w-0 flex-1', activeGroup && 'border-border border-l')}
+          label='Models'
+          shouldFilter={false}
+        >
+          <div
+            className={cn(
+              'px-(--density-row-padding-x) pt-(--density-section-gap)',
+              SEARCH_FIELD_CLASS,
+            )}
           >
-            <div
-              className={cn(
-                'px-(--density-row-padding-x) pt-(--density-section-gap)',
-                SEARCH_FIELD_CLASS,
-              )}
-            >
-              <CommandInput
-                className='h-6.5'
-                placeholder='Search models'
-                value={query}
-                onValueChange={setQuery}
-              />
-            </div>
-            <div className='relative min-h-0 flex-1 overflow-hidden'>
-              <CommandList className='h-full max-h-full p-(--density-row-padding-y)'>
-                {providersQuery.isPending ? <ModelsLoading /> : null}
-                {emptyLabel ? (
-                  <CommandEmpty className='text-muted-foreground text-xs leading-snug font-normal'>
-                    {emptyLabel}
-                  </CommandEmpty>
-                ) : null}
-                {list.signInTarget ? (
-                  <ModelPickerSignInItem target={list.signInTarget} onSelect={handleSignIn} />
-                ) : null}
-                {list.options.map((option) => (
-                  <ModelPickerRow
-                    key={option.key}
-                    option={option}
-                    selected={option.key === selectedKey}
-                    onSelect={handleSelect}
-                  />
-                ))}
-              </CommandList>
-            </div>
-          </Command>
-        </TooltipProvider>
+            <CommandInput
+              className='h-6.5'
+              placeholder='Search models'
+              value={query}
+              onValueChange={setQuery}
+            />
+          </div>
+          <div className='relative min-h-0 flex-1 overflow-hidden'>
+            <CommandList className='h-full max-h-full p-(--density-row-padding-y)'>
+              {providersQuery.isPending ? <ModelsLoading /> : null}
+              {emptyLabel ? (
+                <CommandEmpty className='text-muted-foreground text-xs leading-snug font-normal'>
+                  {emptyLabel}
+                </CommandEmpty>
+              ) : null}
+              {list.signInTarget ? (
+                <ModelPickerSignInItem target={list.signInTarget} onSelect={handleSignIn} />
+              ) : null}
+              {list.options.map((option) => (
+                <ModelPickerRow
+                  key={option.key}
+                  option={option}
+                  selected={option.key === selectedKey}
+                  onSelect={handleSelect}
+                />
+              ))}
+            </CommandList>
+          </div>
+        </Command>
       </PopoverContent>
     </Popover>
   )

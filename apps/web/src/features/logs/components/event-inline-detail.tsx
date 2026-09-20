@@ -32,7 +32,7 @@ export function LogsEventInlineDetail({ detail, event }: LogsEventInlineDetailPr
         </pre>
       ) : (
         <div className='text-destructive mt-2 flex items-center gap-2 text-xs'>
-          <WarningCircleIcon className='size-4 shrink-0' />
+          <WarningCircleIcon className='size-(--icon-size) shrink-0' />
           Raw JSON is unavailable for this live row until history refreshes.
         </div>
       )}

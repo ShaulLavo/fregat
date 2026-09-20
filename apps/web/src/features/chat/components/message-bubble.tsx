@@ -1,3 +1,4 @@
+import { Tooltip, TooltipContent, TooltipTrigger } from '@workspace/ui/components/tooltip'
 import type { OrchestrationMessage } from '@workspace/contracts'
 import { ArrowCounterClockwiseIcon } from '@phosphor-icons/react'
 import { Button } from '@workspace/ui/components/button'
@@ -102,7 +103,7 @@ export function MessageBubble({
         className={cn(
           'group/message flex w-full min-w-0',
           user ? 'justify-end' : 'justify-start',
-          optimistic && 'opacity-70',
+          optimistic && 'text-muted-foreground text-2xs',
         )}
       >
         <article
@@ -150,19 +151,28 @@ export function MessageBubble({
             >
               <span className='size-5 shrink-0'>
                 {canRevertCheckpoint ? (
-                  <Button
-                    aria-label='Revert to checkpoint before this turn'
-                    className='size-5'
-                    data-scroll-anchor-ignore
-                    disabled={checkpointRevertPending}
-                    size='icon-sm'
-                    title='Revert to checkpoint before this turn'
-                    type='button'
-                    variant='ghost'
-                    onClick={handleRevertClick}
-                  >
-                    <ArrowCounterClockwiseIcon aria-hidden='true' className='size-3.5' />
-                  </Button>
+                  <Tooltip>
+                    <TooltipTrigger
+                      render={
+                        <Button
+                          aria-label='Revert to checkpoint before this turn'
+                          className='size-5'
+                          data-scroll-anchor-ignore
+                          disabled={checkpointRevertPending}
+                          size='icon-sm'
+                          type='button'
+                          variant='ghost'
+                          onClick={handleRevertClick}
+                        >
+                          <ArrowCounterClockwiseIcon
+                            aria-hidden='true'
+                            className='size-(--icon-size-sm)'
+                          />
+                        </Button>
+                      }
+                    />{' '}
+                    <TooltipContent>{'Revert to checkpoint before this turn'}</TooltipContent>
+                  </Tooltip>
                 ) : null}
               </span>
               <span>{messageTimestampLabel(message, optimistic)}</span>

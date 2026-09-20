@@ -51,7 +51,10 @@ export function RawConflictBanner({ documentKey }: { readonly documentKey: Docum
   return (
     <div className='border-warning/30 bg-warning/10 m-(--density-section-padding) flex shrink-0 flex-col gap-(--density-control-gap) rounded-lg border p-(--density-section-padding)'>
       <div className='flex items-start gap-2'>
-        <WarningCircleIcon className='text-warning mt-0.5 size-4 shrink-0' weight='fill' />
+        <WarningCircleIcon
+          className='text-warning mt-0.5 size-(--icon-size) shrink-0'
+          weight='fill'
+        />
         <div className='min-w-0 flex-1'>
           <p className='text-foreground text-sm font-medium'>settings.json changed elsewhere</p>
           <p className='text-muted-foreground text-xs'>

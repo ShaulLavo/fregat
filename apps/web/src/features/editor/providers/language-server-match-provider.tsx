@@ -3,7 +3,7 @@ import { useQueryClient, type QueryClient } from '@tanstack/react-query'
 
 import { LanguageServerMatchConfigurationContext } from '@/features/editor/providers/language-server-match-context'
 import { useSettingValue } from '@/features/settings/hooks/use-setting-value'
-import type { LanguageServerMatchConfigurationSnapshot } from '@/features/editor/utils/language-server-match-query'
+import type { LanguageServerMatchConfigurationSnapshot } from '@/features/editor/utils/query-keys'
 
 const configurationStateByQueryClient = new WeakMap<QueryClient, LanguageServerMatchProviderState>()
 

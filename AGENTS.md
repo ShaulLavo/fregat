@@ -2,6 +2,11 @@
 
 ## Code Organization
 
+- Features are leaves: import shared code from `@workspace/*`, `@/lib/*`, `@/components/*`, `@/hooks/*`, or `@/keymap/*`; never add a feature-to-feature import. Existing exact modules are frozen in `scripts/lint/web-feature-allow.json` with reasons.
+- Domain-free UI patterns live in `packages/ui/src/patterns/`; app-specific header menus and actions stay in the app composition layer.
+- Each reading feature owns `utils/query-keys.ts`, and each writing feature owns `utils/mutation-keys.ts`; shared key groups stay in `lib/` only while the two-consumer rule holds.
+- Feature roots contain kind directories only. Shared helpers move with their callers, and different path or hostname behavior needs a call-site test before consolidation.
+
 - Group by feature, then by kind:
   - `components/` — React render components only (`.tsx`)
   - `hooks/` — `use-*` hooks
@@ -45,6 +50,14 @@
 - Avoid manual React memoization. Do not add `memo`, `useMemo`, or `useCallback` for ordinary render values or callbacks. Use them only for measured performance issues, required stable identity, or correctness. Add a short reason when you do.
 
 ## Styling
+
+- Rows are `ListRow`: token height, square corners, `aria-selected` selection, `data-marked` inset ring, and immediate hover/press paint. Disabled rows keep title recovery and are skipped by navigation.
+- Lists focus through `useListbox`: one container tab stop, `aria-activedescendant`, no wrapping, and modifier chords reserved for the keymap. Typeahead is opt-in; the shadow-root file tree retains its own keyboard model.
+- Row windowing uses `VirtualList`, which measures `--density-row-height`; variable message and expanded-log bodies use measured flow layout. Editor line windowing keeps its specialized virtualizer.
+- Panes compose `ToolPane` and its `ToolPaneHeader`: `PaneBar` headers, pending before error before empty, and a body focus ring. A terminal's host stays mounted while its loading overlay is visible.
+- Icons have two density tokens: `size-(--icon-size)` on controls and headings, `size-(--icon-size-sm)` in rows and text. Never choose a numeric icon size at a call site.
+- Text has two colors, `text-foreground` and `text-muted-foreground`; use `text-2xs` for a quieter size, never alpha. Disabled controls may use whole-control `opacity-50`.
+- Icon-only controls carry a `Tooltip`; `title` recovers truncated values and never duplicates a tooltip. Tooltip delays belong to the shared provider.
 
 - Style with Tailwind classes and the `@workspace/ui` primitives. Do not write raw CSS or inline `style` props except for values that must be computed at runtime (dynamic positions, measured sizes).
 - Use theme tokens only. Color classes must resolve to a token: `bg-background`, `text-foreground`, `text-muted-foreground`, `bg-primary`, `bg-card`, `border-border`, etc.

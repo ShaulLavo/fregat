@@ -3,12 +3,12 @@ import userEvent from '@testing-library/user-event'
 import type { ReactNode } from 'react'
 import { vi } from 'vitest'
 
-import { quickAccessMode, quickAccessQuery } from '@/features/command-palette/command-palette-utils'
+import { quickAccessMode, quickAccessQuery } from '@/features/command-palette/utils/query'
 import {
   CommandPaletteActionsContext,
   type CommandPaletteActions,
 } from '@/features/command-palette/providers/actions-context'
-import { ScriptGroups } from '@/features/command-palette/script-groups'
+import { ScriptGroups } from '@/features/command-palette/components/script-groups'
 import type { ProjectScriptSuggestion } from '@/features/chat-mode/utils/project-scripts'
 import { Command, CommandList } from '@workspace/ui/components/command'
 import { expect, test } from '../../../../test/fixtures'

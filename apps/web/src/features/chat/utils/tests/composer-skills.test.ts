@@ -11,9 +11,9 @@ import {
   composerSkillLabel,
   composerSkillReplacement,
   fetchProviderCommandCatalog,
-  providerCommandCatalogKeys,
   providerCommandCatalogQueryOptions,
 } from '@/features/chat/utils/composer-skills'
+import { providerCommandCatalogKeys } from '@/features/chat/utils/query-keys'
 
 /**
  * Driven through the real client against the real server. The point is the

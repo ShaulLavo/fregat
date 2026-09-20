@@ -61,7 +61,7 @@ export function ModelPickerRow({
             displayLabel={option.providerLabel}
             driverKind={option.driverKind}
           />
-          <span className='text-muted-foreground/70 truncate text-xs leading-snug font-normal'>
+          <span className='text-muted-foreground truncate text-xs leading-snug font-normal'>
             {disabledReason?.label ?? option.providerLabel}
           </span>
         </span>
@@ -69,7 +69,7 @@ export function ModelPickerRow({
       <span className='flex shrink-0 items-center gap-1'>
         {badges.map((badge) => (
           <Badge
-            className='text-muted-foreground/80 text-3xs h-4 min-w-0 px-1.5 font-medium'
+            className='text-muted-foreground text-3xs h-4 min-w-0 px-1.5 font-medium'
             key={badge.key}
             title={badge.title}
             variant='outline'
@@ -92,7 +92,7 @@ export function ModelPickerRow({
   return (
     <Tooltip>
       <TooltipTrigger render={row} />
-      <TooltipContent align='center' className='max-w-64 leading-snug text-balance' side='left'>
+      <TooltipContent align='center' className='max-w-64 leading-snug text-balance'>
         {disabledReason.message}
       </TooltipContent>
     </Tooltip>

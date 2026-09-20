@@ -1,3 +1,4 @@
+import { Tooltip, TooltipContent, TooltipTrigger } from '@workspace/ui/components/tooltip'
 import { CaretDownIcon } from '@phosphor-icons/react'
 import { Button } from '@workspace/ui/components/button'
 import {
@@ -45,18 +46,25 @@ export function FontWidget({
       />
 
       <DropdownMenu>
-        <DropdownMenuTrigger
-          render={
-            <Button
-              aria-label='Browse Nerd Fonts'
-              disabled={disabled}
-              size='icon-sm'
-              variant='ghost'
-            >
-              <CaretDownIcon />
-            </Button>
-          }
-        />
+        <Tooltip>
+          <DropdownMenuTrigger
+            render={
+              <TooltipTrigger
+                render={
+                  <Button
+                    aria-label='Browse Nerd Fonts'
+                    disabled={disabled}
+                    size='icon-sm'
+                    variant='ghost'
+                  >
+                    <CaretDownIcon />
+                  </Button>
+                }
+              />
+            }
+          />
+          <TooltipContent>{'Browse Nerd Fonts'}</TooltipContent>
+        </Tooltip>
         <DropdownMenuContent align='end' className='max-h-96 w-72 overflow-y-auto'>
           {fonts.data?.map((font) => (
             <DropdownMenuItem key={font} onClick={() => onChange(font)}>

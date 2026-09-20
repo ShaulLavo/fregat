@@ -1,21 +1,14 @@
+import { historyKeys } from '@/features/git/utils/query-keys'
 import {
   infiniteQueryOptions,
   queryOptions,
   type QueryFunctionContext,
 } from '@tanstack/react-query'
 import type { GitHistoryCursor } from '@workspace/contracts'
-import { gitKeys } from '@/lib/query-keys'
 import { clientForQueryClient } from '@/lib/environments/state/query-clients'
 import { clientLogContext } from '@/lib/environments/state/log-context'
 import { observeClientOperation } from '@/lib/client-logging'
 import { unwrapEdenResponse } from '@/lib/eden-events'
-
-export const historyKeys = {
-  page: (path: string, ref: string, search: string) =>
-    [...gitKeys.all, 'history', path, ref, search] as const,
-  commit: (path: string, commit: string) =>
-    [...gitKeys.all, 'history-commit', path, commit] as const,
-}
 
 function sameHistorySource(key: readonly unknown[] | undefined, path: string, ref: string) {
   if (!key) return false

@@ -1,3 +1,4 @@
+import { EMPTY_ACTIVITIES } from '@/lib/empty-activities'
 import { useApplicationRuntime } from '@/hooks/use-application-runtime'
 import { confirmedEnvironmentOrigin } from '@/lib/environments/state/domain'
 import { useNavigation } from '@/hooks/use-navigation'
@@ -16,8 +17,6 @@ import { useSessionSelectionStore } from '@/features/chat-mode/state/session-sel
 import { isDraftFor } from '@/features/chat-mode/utils/active-session'
 import { sessionRailItem } from '@workspace/client-core/chat/rail/model'
 import { sessionCompletedAt } from '@workspace/client-core/chat/rail/unread'
-
-const EMPTY_ACTIVITIES: readonly [] = []
 
 export function ChatStage() {
   const navigation = useNavigation()

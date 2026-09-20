@@ -83,11 +83,11 @@ export function AssistantChangedFilesSection({ summary }: { summary: ChatTurnDif
           <CaretRightIcon
             aria-hidden='true'
             className={cn(
-              'text-muted-foreground/70 size-3.5 shrink-0 transition-transform',
+              'text-muted-foreground size-(--icon-size-sm) shrink-0 transition-transform',
               expanded && 'rotate-90',
             )}
           />
-          <span className='text-muted-foreground/65 text-3xs truncate tracking-[0.12em] uppercase'>
+          <span className='text-muted-foreground text-3xs truncate tracking-[0.12em] uppercase'>
             <span className='tabular-nums'>{files.length}</span>
             {files.length === 1 ? ' changed file' : ' changed files'}
           </span>
@@ -112,7 +112,7 @@ export function AssistantChangedFilesSection({ summary }: { summary: ChatTurnDif
               View diff
             </Button>
           ) : (
-            <span className='text-muted-foreground/55 text-3xs'>
+            <span className='text-muted-foreground text-2xs text-3xs'>
               {checkpointStatusLabel(summary.status)}
             </span>
           )}
@@ -156,7 +156,7 @@ export function AssistantChangedFilesSection({ summary }: { summary: ChatTurnDif
             {summarizeChangedFileScopes(files).map((scope, index) => (
               <span className='inline-flex items-center gap-1' key={scope.label}>
                 {index > 0 ? <span aria-hidden='true'>·</span> : null}
-                <span className='text-foreground/75 font-mono'>{scope.label}</span>
+                <span className='text-foreground font-mono'>{scope.label}</span>
                 <span className='tabular-nums'>{scope.fileCount}</span>
                 <span>{scope.fileCount === 1 ? 'file' : 'files'}</span>
               </span>

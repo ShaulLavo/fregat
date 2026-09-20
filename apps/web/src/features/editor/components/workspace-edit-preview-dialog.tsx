@@ -106,7 +106,7 @@ export function WorkspaceEditPreviewDialog() {
               <div className='border-warning/30 bg-warning/10 mb-3 grid gap-1 rounded-lg border p-3'>
                 {preview.annotations.map((annotation) => (
                   <div className='flex items-start gap-2 text-xs' key={annotation.id}>
-                    <WarningCircleIcon className='text-warning mt-0.5 size-3.5 shrink-0' />
+                    <WarningCircleIcon className='text-warning mt-0.5 size-(--icon-size-sm) shrink-0' />
                     <span>
                       <span className='font-medium'>{annotation.label}</span>
                       {annotation.description ? ` — ${annotation.description}` : ''}
@@ -169,7 +169,7 @@ export function WorkspaceEditPreviewDialog() {
 
         {stale ? (
           <div className='border-warning/30 bg-warning/10 text-warning flex items-start gap-2 rounded-lg border p-3 text-xs'>
-            <WarningCircleIcon className='mt-0.5 size-3.5 shrink-0' />
+            <WarningCircleIcon className='mt-0.5 size-(--icon-size-sm) shrink-0' />
             <span>{state.message ?? 'This preview is stale. Request the edit again.'}</span>
           </div>
         ) : null}
@@ -221,8 +221,11 @@ function resourcePathLabel(row: WorkspaceEditPreviewRow): string {
 }
 
 function rowIcon(row: WorkspaceEditPreviewRow) {
-  if (row.kind === 'create') return <FilePlusIcon className='text-success size-4 shrink-0' />
-  if (row.kind === 'delete') return <FileDashedIcon className='text-destructive size-4 shrink-0' />
-  if (row.kind === 'rename') return <FolderSimpleIcon className='text-info size-4 shrink-0' />
-  return <FileTextIcon className='text-foreground size-4 shrink-0' />
+  if (row.kind === 'create')
+    return <FilePlusIcon className='text-success size-(--icon-size) shrink-0' />
+  if (row.kind === 'delete')
+    return <FileDashedIcon className='text-destructive size-(--icon-size) shrink-0' />
+  if (row.kind === 'rename')
+    return <FolderSimpleIcon className='text-info size-(--icon-size) shrink-0' />
+  return <FileTextIcon className='text-foreground size-(--icon-size) shrink-0' />
 }

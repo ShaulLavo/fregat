@@ -7,7 +7,7 @@ import {
   pickerFolderPath,
   recordRecent,
   visiblePickerEntries,
-} from '@/features/file-picker/data-helpers'
+} from '@/features/file-picker/utils/data-helpers'
 import type { FsEntry } from '@/lib/file-system-types'
 
 import { expect, test } from '../../../../test/fixtures'

@@ -40,7 +40,10 @@ export function AssistantMessageCopyButton({
         render={
           <Button
             aria-label={copied ? 'Copied response' : 'Copy response'}
-            className={cn('border-subtle bg-background/35 text-muted-foreground/45', className)}
+            className={cn(
+              'border-subtle bg-background/35 text-muted-foreground text-2xs',
+              className,
+            )}
             size='icon-xs'
             type='button'
             variant='outline'
@@ -48,7 +51,11 @@ export function AssistantMessageCopyButton({
           />
         }
       >
-        {copied ? <CheckIcon className='size-3' /> : <CopyIcon className='size-3' />}
+        {copied ? (
+          <CheckIcon className='size-(--icon-size-sm)' />
+        ) : (
+          <CopyIcon className='size-(--icon-size-sm)' />
+        )}
       </TooltipTrigger>
       <TooltipContent>Copy to clipboard</TooltipContent>
     </Tooltip>

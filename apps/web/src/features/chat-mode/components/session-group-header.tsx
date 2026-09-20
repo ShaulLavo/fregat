@@ -1,4 +1,5 @@
-import { Button } from '@workspace/ui/components/button'
+import { ListRow } from '@workspace/ui/patterns/list-row'
+import { useSessionListRow } from '@/features/chat-mode/hooks/use-session-list-row'
 import { SessionAttentionIndicator } from '@/features/chat-mode/components/session-attention-indicator'
 import type { DraggableAttributes, DraggableSyntheticListeners } from '@dnd-kit/core'
 import { CaretDownIcon, CaretRightIcon } from '@phosphor-icons/react'
@@ -10,38 +11,49 @@ import type { SessionRailGroup } from '@workspace/client-core/chat/rail/model'
 export function SessionGroupHeader({
   dragAttributes,
   dragListeners,
+  dragging = false,
   group,
 }: {
   readonly dragAttributes?: DraggableAttributes
   readonly dragListeners?: DraggableSyntheticListeners
+  readonly dragging?: boolean
   readonly group: SessionRailGroup
 }) {
   const toggleProjectCollapsed = useSessionRailStore((state) => state.toggleProjectCollapsed)
   const { project } = group
+  const { rowProps, active } = useSessionListRow(group.key)
 
   return (
     <ProjectMenu
       group={group}
       trigger={
-        <Button
-          variant='ghost'
+        <ListRow
+          as='button'
           {...dragAttributes}
           {...dragListeners}
+          {...rowProps}
+          role='option'
+          selected={active}
+          data-active={active || undefined}
+          data-dragging={dragging || undefined}
           aria-expanded={!group.collapsed}
-          className='text-muted-foreground hover:text-foreground text-2xs flex h-auto w-full touch-none items-center justify-start gap-(--density-control-gap) px-(--density-row-padding-x) py-1 text-left font-medium'
+          className='text-muted-foreground text-2xs w-full touch-none gap-(--density-control-gap) text-left font-medium'
           title={project.workspaceRoot}
           type='button'
-          onClick={() => toggleProjectCollapsed(project.id)}
+          onClick={(event) => {
+            rowProps?.onClick(event)
+            toggleProjectCollapsed(project.id)
+          }}
         >
           {group.collapsed ? (
-            <CaretRightIcon className='size-3 shrink-0 opacity-60' />
+            <CaretRightIcon className='size-(--icon-size-sm) shrink-0 opacity-60' />
           ) : (
-            <CaretDownIcon className='size-3 shrink-0 opacity-60' />
+            <CaretDownIcon className='size-(--icon-size-sm) shrink-0 opacity-60' />
           )}
           <SessionAttentionIndicator status={project.status} />
           <span className='min-w-0 flex-1 truncate'>{project.title}</span>
           {project.qualifier ? (
-            <span className='text-muted-foreground/60 h-auto max-w-[40%] shrink-0 justify-start truncate font-normal'>
+            <span className='text-muted-foreground text-2xs h-auto max-w-[40%] shrink-0 justify-start truncate font-normal'>
               {project.qualifier}
             </span>
           ) : null}
@@ -50,10 +62,10 @@ export function SessionGroupHeader({
               {project.unreadCount}
             </span>
           ) : null}
-          <span className='text-muted-foreground/60 h-auto shrink-0 justify-start tabular-nums'>
+          <span className='text-muted-foreground text-2xs h-auto shrink-0 justify-start tabular-nums'>
             {project.sessionCount}
           </span>
-        </Button>
+        </ListRow>
       }
     />
   )

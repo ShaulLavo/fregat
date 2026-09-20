@@ -1,3 +1,5 @@
+import { ToolPane } from '@workspace/ui/patterns/tool-pane'
+import { PaneBar } from '@workspace/ui/components/pane-bar'
 import { workspaceRoot } from '@/lib/documents/utils/identity'
 import type { TabId, WorkspaceRoot } from '@/lib/documents/utils/types'
 import { useNavigation } from '@/hooks/use-navigation'
@@ -118,16 +120,13 @@ export function SettingsPage({
     : [...categories]
 
   return (
-    // Narrow container is the touch layout: 40px controls, and 16px inputs because
-    // anything smaller makes mobile Safari zoom the page on focus.
-    <div
-      className='@container/settings flex h-full min-h-0 min-w-0 flex-col'
+    <ToolPane
+      title='Settings'
+      className='@container/settings h-full min-w-0'
+      bodyClassName='flex flex-col overflow-hidden'
       ref={setRootRef}
       tabIndex={-1}
-    >
-      <header className='border-border flex shrink-0 flex-col gap-(--density-control-gap) border-b px-(--density-section-padding) pt-2 pb-(--density-section-padding) @max-3xl/settings:grid @max-3xl/settings:grid-cols-[minmax(0,1fr)_auto] @max-3xl/settings:[&_[data-slot=button]]:min-h-10 @max-3xl/settings:[&_[data-slot=input-group]]:h-10 @max-3xl/settings:[&_input]:h-10 @max-3xl/settings:[&_input]:text-base'>
-        {/* The tab's own action strip, above the scope tabs: these act on the tab,
-            the row below picks which file the tab is showing. */}
+      actions={
         <div className='flex items-center justify-end gap-1 @max-3xl/settings:order-2'>
           {tabId ? <ViewToggle /> : null}
           <SettingsOwnerProvider
@@ -137,60 +136,70 @@ export function SettingsPage({
             <PageActions scope={writableSettingsScope(scope)} />
           </SettingsOwnerProvider>
         </div>
-        <ScopeTabs hasDefaults={tabId !== undefined} hasWorkspace={hasWorkspace} />
-        {showJson ? null : (
-          <InputGroup className='@max-3xl/settings:order-3 @max-3xl/settings:col-span-full'>
-            <InputGroupAddon align='inline-start'>
-              <MagnifyingGlassIcon aria-hidden />
-            </InputGroupAddon>
-            <InputGroupInput
-              aria-label='Search settings'
-              autoCapitalize='off'
-              autoComplete='off'
-              autoCorrect='off'
-              autoFocus={active}
-              ref={searchRef}
-              onChange={(event) => setQuery(event.currentTarget.value)}
-              placeholder='Search settings'
-              spellCheck={false}
-              value={query}
-            />
-          </InputGroup>
-        )}
-        <div
-          className={
-            showJson
-              ? 'hidden'
-              : 'flex flex-wrap items-center gap-2 @max-3xl/settings:order-4 @max-3xl/settings:col-span-full'
-          }
-        >
-          {/* `visible` is already query-filtered, so "of N" only says something while a
+      }
+      subheader={
+        <>
+          <PaneBar border='bottom'>
+            <ScopeTabs hasDefaults={tabId !== undefined} hasWorkspace={hasWorkspace} />
+            {showJson ? null : (
+              <InputGroup className='min-w-0 flex-1'>
+                <InputGroupAddon align='inline-start'>
+                  <MagnifyingGlassIcon aria-hidden />
+                </InputGroupAddon>
+                <InputGroupInput
+                  aria-label='Search settings'
+                  autoCapitalize='off'
+                  autoComplete='off'
+                  autoCorrect='off'
+                  autoFocus={active}
+                  ref={searchRef}
+                  onChange={(event) => setQuery(event.currentTarget.value)}
+                  placeholder='Search settings'
+                  spellCheck={false}
+                  value={query}
+                />
+              </InputGroup>
+            )}
+          </PaneBar>
+          {showJson ? null : (
+            <PaneBar border='bottom'>
+              <div
+                className={
+                  showJson
+                    ? 'hidden'
+                    : 'flex flex-wrap items-center gap-2 @max-3xl/settings:order-4 @max-3xl/settings:col-span-full'
+                }
+              >
+                {/* `visible` is already query-filtered, so "of N" only says something while a
               category narrows the list further; otherwise it printed the same number twice. */}
-          <p className='text-muted-foreground text-xs tabular-nums'>
-            {selectedCategory ? `${shownCount(shown)} of ` : ''}
-            {visible.length} {visible.length === 1 ? 'setting' : 'settings'}
-          </p>
-          {isSaving ? (
-            <span className='text-muted-foreground flex items-center gap-1 text-xs'>
-              <OrbitLoader className='size-3' label='Saving settings' />
-              Saving
-            </span>
-          ) : null}
-          {/* Clear a category supplied by an incoming address. */}
-          {selectedCategory ? (
-            <Button
-              aria-label={`Show all settings, not just ${selectedCategory}`}
-              onClick={() => void navigation.setSettingsCategory(null)}
-              size='sm'
-              variant='secondary'
-            >
-              {selectedCategory}
-              <XIcon aria-hidden />
-            </Button>
-          ) : null}
-        </div>
-      </header>
-
+                <p className='text-muted-foreground text-xs tabular-nums'>
+                  {selectedCategory ? `${shownCount(shown)} of ` : ''}
+                  {visible.length} {visible.length === 1 ? 'setting' : 'settings'}
+                </p>
+                {isSaving ? (
+                  <span className='text-muted-foreground flex items-center gap-1 text-xs'>
+                    <OrbitLoader className='size-3' label='Saving settings' />
+                    Saving
+                  </span>
+                ) : null}
+                {/* Clear a category supplied by an incoming address. */}
+                {selectedCategory ? (
+                  <Button
+                    aria-label={`Show all settings, not just ${selectedCategory}`}
+                    onClick={() => void navigation.setSettingsCategory(null)}
+                    size='sm'
+                    variant='secondary'
+                  >
+                    {selectedCategory}
+                    <XIcon aria-hidden />
+                  </Button>
+                ) : null}
+              </div>
+            </PaneBar>
+          )}
+        </>
+      }
+    >
       {/* Escape returns to the search box from anywhere in the list, so a
           keyboard user is never more than one key from starting over. Captured
           on the container rather than per row — every control below would
@@ -221,7 +230,6 @@ export function SettingsPage({
             // Not while a control is mid-interaction: a recorder is capturing, and
             // a text field treats Escape as "discard my edit".
             if (event.defaultPrevented) return
-
             searchRef.current?.focus()
           }}
         >
@@ -242,7 +250,7 @@ export function SettingsPage({
           )}
         </div>
       )}
-    </div>
+    </ToolPane>
   )
 }
 

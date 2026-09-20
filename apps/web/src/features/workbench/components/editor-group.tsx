@@ -76,7 +76,7 @@ export function EditorGroup({
           <EmptyState
             className='h-full'
             hint='Open a file to start editing.'
-            icon={<FileDashedIcon className='size-8' />}
+            icon={<FileDashedIcon className='size-(--icon-size)' />}
             title='No file selected'
           />
         )}

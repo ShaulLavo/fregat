@@ -1,3 +1,4 @@
+import { providerCommandCatalogKeys } from '@/features/chat/utils/query-keys'
 import { queryOptions } from '@tanstack/react-query'
 import type {
   ProviderCommandCatalog,
@@ -22,12 +23,6 @@ import { createRpcError } from '@/lib/structured-errors'
  */
 const COMMAND_CATALOG_STALE_TIME_MS = 5 * 60_000
 const COMMAND_CATALOG_GC_TIME_MS = 30 * 60_000
-
-export const providerCommandCatalogKeys = {
-  all: ['providers', 'commands'] as const,
-  catalog: (providerInstanceId: ProviderInstanceId, cwd: string | null) =>
-    [...providerCommandCatalogKeys.all, providerInstanceId, cwd ?? 'no-cwd'] as const,
-}
 
 export async function fetchProviderCommandCatalog(
   providerInstanceId: ProviderInstanceId,

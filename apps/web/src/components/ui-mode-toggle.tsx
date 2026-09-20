@@ -1,3 +1,4 @@
+import { Tooltip, TooltipContent, TooltipTrigger } from '@workspace/ui/components/tooltip'
 import { ToggleIconButton } from '@/components/toggle-icon-button'
 import { useNavigation } from '@/hooks/use-navigation'
 import { ChatCircleIcon, SidebarSimpleIcon, SquaresFourIcon } from '@phosphor-icons/react'
@@ -23,29 +24,35 @@ export function UiModeToggle() {
   return (
     <div className={cn(NATIVE_WINDOW_NO_DRAG_CLASS, 'flex shrink-0 items-center gap-1')}>
       {uiMode === 'chat' ? (
-        <Button
-          aria-label='Toggle sessions'
-          aria-pressed={chatModePanels.sessionRailOpen}
-          className='text-muted-foreground'
-          size='icon-sm'
-          title='Toggle sessions'
-          type='button'
-          variant='ghost'
-          onClick={toggleSessionRail}
-        >
-          <SidebarSimpleIcon className='size-4' />
-        </Button>
+        <Tooltip>
+          <TooltipTrigger
+            render={
+              <Button
+                aria-label='Toggle sessions'
+                aria-pressed={chatModePanels.sessionRailOpen}
+                className='text-muted-foreground'
+                size='icon-sm'
+                type='button'
+                variant='ghost'
+                onClick={toggleSessionRail}
+              >
+                <SidebarSimpleIcon className='size-(--icon-size)' />
+              </Button>
+            }
+          />{' '}
+          <TooltipContent>{'Toggle sessions'}</TooltipContent>
+        </Tooltip>
       ) : null}
       <div className='flex items-center gap-(--density-gap-tight)'>
         <ToggleIconButton
           active={uiMode === 'workbench'}
-          icon={<SquaresFourIcon className='size-3.5' />}
+          icon={<SquaresFourIcon className='size-(--icon-size-sm)' />}
           label={`${workspaceUiModeLabel('workbench')} mode`}
           onClick={() => void navigation.setMode('workbench')}
         />
         <ToggleIconButton
           active={uiMode === 'chat'}
-          icon={<ChatCircleIcon className='size-3.5' />}
+          icon={<ChatCircleIcon className='size-(--icon-size-sm)' />}
           label={`${workspaceUiModeLabel('chat')} mode`}
           onClick={() => void navigation.setMode('chat')}
         />

@@ -1,10 +1,7 @@
-import { describe, expect, it } from 'vitest'
+import { describe } from 'vitest'
+import { expect, test as it } from '../../../../test/fixtures'
 
-import {
-  logRowPointerStart,
-  shouldToggleLogRow,
-  shouldToggleLogRowKey,
-} from '@/features/logs/utils/row-interactions'
+import { logRowPointerStart, shouldToggleLogRow } from '@/features/logs/utils/row-interactions'
 
 describe('log row interactions', () => {
   it('toggles for a normal click even without a pointer start event', () => {
@@ -21,12 +18,6 @@ describe('log row interactions', () => {
     const pointerStart = logRowPointerStart(pointerEvent(10, 12))
 
     expect(shouldToggleLogRow(pointerEvent(16, 12), pointerStart)).toBe(false)
-  })
-
-  it('supports keyboard toggles', () => {
-    expect(shouldToggleLogRowKey('Enter')).toBe(true)
-    expect(shouldToggleLogRowKey(' ')).toBe(true)
-    expect(shouldToggleLogRowKey('Escape')).toBe(false)
   })
 })
 

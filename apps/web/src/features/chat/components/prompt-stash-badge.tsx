@@ -34,7 +34,7 @@ export function PromptStashBadge({
             type='button'
             variant='ghost'
           >
-            <BookmarkSimpleIcon className='size-3.5 shrink-0' />
+            <BookmarkSimpleIcon className='size-(--icon-size-sm) shrink-0' />
             <span className='tabular-nums'>{entries.length}</span>
           </Button>
         }

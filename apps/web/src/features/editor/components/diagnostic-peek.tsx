@@ -1,3 +1,4 @@
+import { Tooltip, TooltipContent, TooltipTrigger } from '@workspace/ui/components/tooltip'
 import { Button } from '@workspace/ui/components/button'
 import { cn } from '@workspace/ui/lib/utils'
 import { XIcon } from '@phosphor-icons/react'
@@ -92,14 +93,21 @@ export function DiagnosticPeek({ model, onClose, onOpenTarget, tabId }: Diagnost
             <div className='text-muted-foreground text-xs'>{model.severity}</div>
             <div className='text-foreground mt-1 whitespace-pre-wrap'>{model.message}</div>
           </div>
-          <Button
-            aria-label='Close diagnostic'
-            size='icon-sm'
-            variant='ghost'
-            onClick={() => onClose(true)}
-          >
-            <XIcon aria-hidden='true' />
-          </Button>
+          <Tooltip>
+            <TooltipTrigger
+              render={
+                <Button
+                  aria-label='Close diagnostic'
+                  size='icon-sm'
+                  variant='ghost'
+                  onClick={() => onClose(true)}
+                >
+                  <XIcon aria-hidden='true' />
+                </Button>
+              }
+            />
+            <TooltipContent>{'Close diagnostic'}</TooltipContent>
+          </Tooltip>
         </div>
         {model.source || model.code ? (
           <div className='text-muted-foreground mt-2 text-xs'>

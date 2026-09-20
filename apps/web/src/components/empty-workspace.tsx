@@ -10,7 +10,7 @@ export function EmptyWorkspace({ onChooseFolder }: { onChooseFolder: () => void 
       <Wallpaper />
       <div className='bg-card backdrop-material relative z-10 flex w-full max-w-sm flex-col items-center gap-4 rounded-lg border p-6 text-center'>
         <span className='bg-muted flex size-11 items-center justify-center rounded-md border'>
-          <FolderOpenIcon className='size-5' weight='duotone' />
+          <FolderOpenIcon className='size-(--icon-size)' weight='duotone' />
         </span>
         <div>
           <h2 className='text-sm font-medium'>Open a folder</h2>

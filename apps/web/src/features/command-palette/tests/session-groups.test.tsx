@@ -8,15 +8,12 @@ import type { ReactNode } from 'react'
 import * as v from 'valibot'
 import { vi } from 'vitest'
 
-import {
-  quickAccessFilter,
-  quickAccessMode,
-} from '@/features/command-palette/command-palette-utils'
+import { quickAccessFilter, quickAccessMode } from '@/features/command-palette/utils/query'
 import {
   CommandPaletteActionsContext,
   type CommandPaletteActions,
 } from '@/features/command-palette/providers/actions-context'
-import { SessionGroups } from '@/features/command-palette/session-groups'
+import { SessionGroups } from '@/features/command-palette/components/session-groups'
 import type { SessionRailItem, SessionRailProject } from '@workspace/client-core/chat/rail/model'
 import { Command, CommandInput, CommandList } from '@workspace/ui/components/command'
 import { expect, test } from '../../../../test/fixtures'

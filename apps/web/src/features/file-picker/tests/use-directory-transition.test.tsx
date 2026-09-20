@@ -4,7 +4,7 @@ import { act, renderHook } from '@testing-library/react'
 import { useState, type ReactNode } from 'react'
 
 import { expect, test } from '../../../../test/fixtures'
-import type { DirectoryLoadData } from '@/features/file-picker/data-helpers'
+import type { DirectoryLoadData } from '@/features/file-picker/utils/data-helpers'
 import { useDirectoryTransition } from '@/features/file-picker/hooks/use-directory-transition'
 import { filePickerKeys } from '@/lib/query-keys'
 

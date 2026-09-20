@@ -16,7 +16,7 @@ export function ChatInputMentionChip({ path }: { readonly path: string }) {
       spellCheck={false}
       title={path}
     >
-      <FileCodeIcon aria-hidden='true' className='size-3 shrink-0 self-center' />
+      <FileCodeIcon aria-hidden='true' className='size-(--icon-size-sm) shrink-0 self-center' />
       <span className='truncate'>{basename(path)}</span>
     </span>
   )

@@ -406,3 +406,95 @@ test('excuses a truncating element through the allow-list and skips the primitiv
   expect(excused.offenders.truncationRecovery).toEqual([])
   expect(gate(ui).offenders.truncationRecovery).toEqual([])
 })
+
+test('icon size accepts the two density tokens and rejects literal sizes on icons', () => {
+  const subject = census(
+    "export const Icons = () => <><AddIcon className='size-4' /><ChevronIcon className={cn('size-(--icon-size)', active && 'size-3')} /><Icons.CheckIcon className='size-(--icon-size-sm)' /><div className='size-8' /></>",
+  )
+  expect(values(subject, 'iconSize')).toEqual([
+    'size-4',
+    'size-(--icon-size)',
+    'size-3',
+    'size-(--icon-size-sm)',
+  ])
+  expect(gate(subject).offenders.iconSize.map((hit) => hit.value)).toEqual(['size-4', 'size-3'])
+})
+
+test('icon size inspects className instead of unrelated strings passed to an icon', () => {
+  const subject = census("export const Icon = () => <AddIcon aria-label='size-4' title='size-3' />")
+  expect(values(subject, 'iconSize')).toEqual([])
+})
+
+test('text alpha rejects color modifiers and fades on elements containing text', () => {
+  const subject = census(
+    "export const Text = () => <><span className='text-foreground/75'>Value</span><div className='opacity-60'><span>{label}</span></div><span className='opacity-0'>Hidden</span><span className='opacity-100'>Shown</span><i className='opacity-35'><AddIcon /></i></>",
+    "export const muted = 'text-muted-foreground/50'",
+  )
+  expect(values(subject, 'textAlpha')).toEqual([
+    'text-foreground/75',
+    'opacity-60',
+    'text-muted-foreground/50',
+  ])
+  expect(gate(subject).offenders.textAlpha).toHaveLength(3)
+})
+
+test('disabled text controls may fade to 50 percent without introducing a third text color', () => {
+  const subject = census(
+    "export const Controls = () => <><Button disabled={pending} className='opacity-50'>Save</Button><Button aria-disabled={pending} className='opacity-50'>Open</Button><Button className='disabled:opacity-50'>Close</Button><Button disabled className='opacity-60 text-muted-foreground/50'>Bad</Button></>",
+  )
+  expect(values(subject, 'textAlpha')).toEqual(['opacity-60', 'text-muted-foreground/50'])
+})
+
+test('row hover gates ListRow and row roles while preserving the general hover histogram', () => {
+  const subject = census(
+    "export const Rows = () => <><ListRow className='hover:bg-accent' /><div role='option' className='hover:bg-muted' /><div role='treeitem' className='hover:bg-row-hover' /><Button className='hover:bg-accent'>Action</Button></>",
+  )
+  expect(values(subject, 'hoverFills')).toEqual([
+    'hover:bg-accent',
+    'hover:bg-muted',
+    'hover:bg-row-hover',
+    'hover:bg-accent',
+  ])
+  expect(gate(subject).offenders.hoverFills.map((hit) => hit.value)).toEqual([
+    'hover:bg-accent',
+    'hover:bg-muted',
+  ])
+  const rowFile = censusFile(
+    'apps/web/src/features/probe/components/item-row.tsx',
+    "export const classes = 'hover:bg-accent'",
+  )
+  expect(gate(rowFile).offenders.hoverFills).toHaveLength(1)
+})
+
+test('icon-only controls require a Tooltip and reject a native title beside it', () => {
+  const subject = census(
+    "export const Controls = () => <><Button title='Add'><AddIcon /></Button><button aria-label='Close'><CloseIcon /></button><Tooltip><TooltipTrigger><Button><PlusIcon /></Button></TooltipTrigger></Tooltip><Tooltip><Button aria-label='Open'><OpenIcon /></Button></Tooltip><Tooltip><TooltipTrigger><Button title='Duplicate'><CopyIcon /></Button></TooltipTrigger></Tooltip><Button><Icon />Label</Button></>",
+  )
+  expect(values(subject, 'iconOnlyHint')).toEqual([
+    'icon-only title',
+    'missing Tooltip',
+    'icon-only title',
+  ])
+  expect(gate(subject).offenders.iconOnlyHint).toHaveLength(3)
+})
+
+test('icon-only controls recognize conditional icons and TooltipTrigger render props', () => {
+  const subject = census(
+    'export const Controls = () => <><Button>{open ? <MinusIcon /> : <PlusIcon />}</Button><Tooltip><TooltipTrigger render={<Button><PlusIcon /></Button>} /></Tooltip><IconTooltip label="Add"><Button aria-label="Add"><AddIcon /></Button></IconTooltip></>',
+  )
+  expect(values(subject, 'iconOnlyHint')).toEqual(['missing Tooltip'])
+})
+
+test('icon-only controls include nested icon compositions but exclude visible labels', () => {
+  const subject = census(
+    `export const Controls = () => <><Button title='New chat'><span><ChatIcon /><PlusIcon /></span></Button><Button><span><ChatIcon />Chat</span></Button><Button><CustomContent /></Button></>`,
+  )
+  expect(values(subject, 'iconOnlyHint')).toEqual(['icon-only title'])
+})
+
+test('icon-only controls inherit children from primitive trigger render composition', () => {
+  const subject = census(
+    `export const Controls = () => <><DropdownMenuTrigger render={<Button title='History' />}><ClockIcon /></DropdownMenuTrigger><Tooltip><TooltipTrigger render={<DropdownMenuTrigger render={<Button aria-label='History' />} />}><ClockIcon /></TooltipTrigger><TooltipContent>History</TooltipContent></Tooltip><DropdownMenuTrigger render={<Button />}><ClockIcon />History</DropdownMenuTrigger></>`,
+  )
+  expect(values(subject, 'iconOnlyHint')).toEqual(['icon-only title'])
+})

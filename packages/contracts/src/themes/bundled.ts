@@ -3,6 +3,9 @@ import rosePine from './packs/rose-pine.json'
 import catppuccin from './packs/catppuccin.json'
 import catppuccinLatte from './packs/catppuccin-latte.json'
 import gruvbox from './packs/gruvbox.json'
+import gruvboxLight from './packs/gruvbox-light.json'
+import rosePineMain from './packs/rose-pine-main.json'
+import tokyoNightDay from './packs/tokyo-night-day.json'
 import { parsePalette, type Palette, type PaletteDocument } from './palette'
 
 /**
@@ -227,6 +230,9 @@ const BUNDLED_PALETTE_DOCUMENTS: readonly unknown[] = [
   catppuccin,
   catppuccinLatte,
   gruvbox,
+  gruvboxLight,
+  rosePineMain,
+  tokyoNightDay,
 ]
 
 // A bundled document that fails its own schema is a build defect the test

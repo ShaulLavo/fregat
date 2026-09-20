@@ -13,8 +13,8 @@ import type { ApplicationRuntime } from '@/state/application-runtime'
 import type { Navigation } from '@/state/navigation'
 
 import { createDefaultChatModePanels } from '@/features/chat-mode/utils/panels'
-import type { PaletteScope } from '@/features/command-palette/command-palette-types'
-import { paletteScopeForPrefix } from '@/features/command-palette/command-palette-utils'
+import type { PaletteScope } from '@/features/command-palette/utils/types'
+import { paletteScopeForPrefix } from '@/features/command-palette/utils/query'
 import type { EditorCommands } from '@/features/editor/state/commands'
 import { createEditorApplyActions } from '@/features/editor/state/apply-actions'
 import {

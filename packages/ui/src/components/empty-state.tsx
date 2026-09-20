@@ -62,7 +62,10 @@ function EmptyState({
         )}
       >
         {icon && iconPosition === 'stacked' ? (
-          <span aria-hidden='true' className={cn('[&>svg]:size-6', emptyStateIconTone[tone])}>
+          <span
+            aria-hidden='true'
+            className={cn('[&>svg]:size-(--icon-size)', emptyStateIconTone[tone])}
+          >
             {icon}
           </span>
         ) : null}
@@ -70,7 +73,7 @@ function EmptyState({
           {icon && iconPosition === 'inline' ? (
             <span
               aria-hidden='true'
-              className={cn('shrink-0 [&>svg]:size-4', emptyStateIconTone[tone])}
+              className={cn('shrink-0 [&>svg]:size-(--icon-size)', emptyStateIconTone[tone])}
             >
               {icon}
             </span>
@@ -81,7 +84,7 @@ function EmptyState({
           <span className='text-muted-foreground text-2xs max-w-64'>{description}</span>
         ) : null}
         {hint ? (
-          <span className='text-muted-foreground/70 text-2xs flex items-center gap-2'>{hint}</span>
+          <span className='text-muted-foreground text-2xs flex items-center gap-2'>{hint}</span>
         ) : null}
         {action ? <span className='mt-1'>{action}</span> : null}
       </div>

@@ -145,8 +145,22 @@ export function DiffPane({
 
   // A parse landing later changes the tokens without changing a row.
   useLayoutEffect(() => {
-    controller.getEditor()?.setTokens(plugin.getTokens())
-  }, [controller, plugin, tokensRevision])
+    const tokens = plugin.getTokens()
+    controller.getEditor()?.setTokens(tokens)
+    log.debug({
+      action: 'editor.diff.syntax',
+      area: 'editor',
+      path: file?.path,
+      languageId: file?.languageId,
+      side,
+      backend: syntaxBackend.kind,
+      enabled: syntaxHighlight,
+      tokenCount: tokens.length,
+      oldLineCount: file?.oldLines.length,
+      newLineCount: file?.newLines.length,
+      partial: file?.isPartial,
+    })
+  }, [controller, file, plugin, side, syntaxBackend, syntaxHighlight, tokensRevision])
 
   useLayoutEffect(() => {
     if (!onRegisterEditor) return

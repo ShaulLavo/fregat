@@ -12,7 +12,7 @@ import {
   searchEntryType,
   streamPickerSearchEntries,
   type WorkspaceSearchStream,
-} from '@/features/file-picker/picker-search'
+} from '@/features/file-picker/state/search'
 
 describe('appendSearchMatch', () => {
   it('keeps only the first name match per path and tags it with the scope', () => {

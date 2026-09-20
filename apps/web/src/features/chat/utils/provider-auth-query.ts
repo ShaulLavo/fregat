@@ -1,3 +1,4 @@
+import { providerAuthKeys } from '@/features/chat/utils/query-keys'
 import { queryOptions } from '@tanstack/react-query'
 import type { ProviderInstanceId, ProviderSignInMethod } from '@workspace/contracts'
 
@@ -7,14 +8,6 @@ import { createRpcError } from '@/lib/structured-errors'
 
 const AUTH_STATUS_STALE_TIME_MS = 15_000
 const LOGIN_POLL_INTERVAL_MS = 1_000
-
-export const providerAuthKeys = {
-  all: ['providers', 'auth'] as const,
-  attempt: (providerInstanceId: ProviderInstanceId, attemptId: string) =>
-    [...providerAuthKeys.all, providerInstanceId, 'attempt', attemptId] as const,
-  status: (providerInstanceId: ProviderInstanceId) =>
-    [...providerAuthKeys.all, providerInstanceId] as const,
-}
 
 function unwrap<Data>(response: { data: Data | null; error: unknown }): Data {
   if (response.error) throw createRpcError(response.error)

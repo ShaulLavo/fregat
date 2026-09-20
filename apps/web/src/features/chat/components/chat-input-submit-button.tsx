@@ -38,24 +38,30 @@ export function ChatInputSubmitButton({
   return (
     <>
       {busy ? (
-        <Button
-          aria-label='Stop current turn'
-          title='Stop current turn'
-          disabled={disabledReason !== null || pendingAction === 'stopping'}
-          size='icon-sm'
-          type='button'
-          variant='outline'
-          onClick={onStop}
-        >
-          <StopIcon aria-hidden='true' className='size-4' weight='fill' />
-        </Button>
+        <Tooltip>
+          <TooltipTrigger
+            render={
+              <Button
+                aria-label='Stop current turn'
+                disabled={disabledReason !== null || pendingAction === 'stopping'}
+                size='icon-sm'
+                type='button'
+                variant='outline'
+                onClick={onStop}
+              >
+                <StopIcon aria-hidden='true' className='size-(--icon-size)' weight='fill' />
+              </Button>
+            }
+          />{' '}
+          <TooltipContent>{'Stop current turn'}</TooltipContent>
+        </Tooltip>
       ) : null}
       <Tooltip>
         <TooltipTrigger
           render={
             <Button
               aria-label={label}
-              className='disabled:bg-muted disabled:text-muted-foreground/50 disabled:opacity-100'
+              className='disabled:bg-muted disabled:text-muted-foreground disabled:opacity-100'
               disabled={
                 action.kind === 'pending' ||
                 disabled ||
@@ -72,9 +78,11 @@ export function ChatInputSubmitButton({
         >
           {action.kind === 'pending' ? <Spinner aria-hidden='true' className='size-4' /> : null}
           {action.kind === 'stop' ? (
-            <StopIcon aria-hidden='true' className='size-4' weight='fill' />
+            <StopIcon aria-hidden='true' className='size-(--icon-size)' weight='fill' />
           ) : null}
-          {action.kind === 'send' ? <ArrowUpIcon aria-hidden='true' className='size-4' /> : null}
+          {action.kind === 'send' ? (
+            <ArrowUpIcon aria-hidden='true' className='size-(--icon-size)' />
+          ) : null}
         </TooltipTrigger>
         <TooltipContent>{label}</TooltipContent>
       </Tooltip>

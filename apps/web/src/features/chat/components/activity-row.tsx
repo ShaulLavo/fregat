@@ -31,14 +31,19 @@ export function ActivityRow({ activity }: { activity: ChatWorkLogEntry }) {
       >
         {label}
       </span>
-      {failed ? <XIcon aria-label='Failed' className='text-destructive size-3.5' /> : null}
+      {failed ? (
+        <XIcon aria-label='Failed' className='text-destructive size-(--icon-size-sm)' />
+      ) : null}
       {!failed && activity.outcome === 'succeeded' ? (
-        <CheckIcon aria-label='Succeeded' className='text-success size-3.5' />
+        <CheckIcon aria-label='Succeeded' className='text-success size-(--icon-size-sm)' />
       ) : null}
       {expandable ? (
         <CaretRightIcon
           aria-hidden='true'
-          className={cn('size-3 shrink-0 transition-transform', expanded && 'rotate-90')}
+          className={cn(
+            'size-(--icon-size-sm) shrink-0 transition-transform',
+            expanded && 'rotate-90',
+          )}
         />
       ) : null}
     </>

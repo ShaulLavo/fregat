@@ -1,82 +1,61 @@
-import { useVirtualizer } from '@tanstack/react-virtual'
 import type { LogEventDetailsById, LogEventSummary } from '@workspace/contracts'
-import { EmptyState } from '@workspace/ui/components/empty-state'
-import { LoadingState } from '@workspace/ui/components/loading-state'
-import { useRef } from 'react'
+import { useCallback, useRef, useState } from 'react'
+import { VirtualList, type VirtualListHandle } from '@workspace/ui/patterns/virtual-list'
+import { useListbox } from '@workspace/ui/patterns/use-listbox'
 
-import { logRowCollapsedHeightPx } from '@/features/logs/utils/row-layout'
 import { LogsEventRow } from '@/features/logs/components/event-row'
-
-type LogsEventListProps = {
-  detailsById: LogEventDetailsById
-  events: readonly LogEventSummary[]
-  inspectedEventId: string | null
-  pending: boolean
-  onInspectEvent: (eventId: string | null) => void
-}
 
 export function LogsEventList({
   detailsById,
   events,
   inspectedEventId,
   onInspectEvent,
-  pending,
-}: LogsEventListProps) {
-  const parentRef = useRef<HTMLDivElement | null>(null)
-  // eslint-disable-next-line react-hooks/incompatible-library -- TanStack Virtual is the logs row virtualization layer.
-  const virtualizer = useVirtualizer({
-    count: events.length,
-    estimateSize: () => logRowCollapsedHeightPx,
-    getItemKey: (index) => events[index]?.id ?? index,
-    getScrollElement: () => parentRef.current,
-    measureElement:
-      typeof ResizeObserver === 'undefined'
-        ? undefined
-        : (element) => element.getBoundingClientRect().height,
-    overscan: 12,
+}: {
+  detailsById: LogEventDetailsById
+  events: readonly LogEventSummary[]
+  inspectedEventId: string | null
+  onInspectEvent: (eventId: string | null) => void
+}) {
+  const scrollRef = useRef<HTMLDivElement>(null)
+  const virtualList = useRef<VirtualListHandle>(null)
+  const [activeId, setActiveId] = useState<string | null>(null)
+  // Expanding a detail must not restart the cursor's scroll effect.
+  const scrollToIndex = useCallback((index: number) => {
+    virtualList.current?.scrollToIndex(index, { align: 'auto' })
+  }, [])
+  const listbox = useListbox({
+    role: 'listbox',
+    items: events.map((event) => ({ id: event.id })),
+    activeId,
+    onActiveChange: setActiveId,
+    onSelect: setActiveId,
+    onCommit: (id) => onInspectEvent(inspectedEventId === id ? null : id),
+    containerRef: scrollRef,
+    scrollToIndex,
   })
-  // Read once here rather than as `ref={virtualizer.measureElement}` inside the row
-  // loop. The React Compiler reads a member expression in a `ref` position as accessing
-  // a ref value during render and fails the lint gate on it. Safe to hoist: virtual-core
-  // assigns `measureElement` as an instance arrow function in its constructor, so it
-  // carries its own binding and does not need the receiver.
-  const measureElement = virtualizer.measureElement
-
-  if (pending) {
-    return (
-      <LoadingState className='flex min-h-0 flex-1 flex-col gap-3 p-6' label='Loading logs'>
-        <div className='skeleton-sweep h-4 w-3/4 rounded-md' />
-        <div className='skeleton-sweep h-4 w-1/2 rounded-md' />
-        <div className='skeleton-sweep h-4 w-2/3 rounded-md' />
-      </LoadingState>
-    )
-  }
-
-  if (events.length === 0) {
-    return <EmptyState className='flex-1 px-6' title='No logs match the current filters.' />
-  }
 
   return (
-    <div className='app-scrollbar-thin min-h-0 flex-1 overflow-auto' ref={parentRef}>
-      <div className='relative w-full' style={{ height: virtualizer.getTotalSize() }}>
-        {virtualizer.getVirtualItems().map((virtualRow) => {
-          const event = events[virtualRow.index]
-          if (!event) return null
-
-          return (
-            <LogsEventRow
-              detail={detailsById[event.id] ?? null}
-              event={event}
-              expanded={inspectedEventId === event.id}
-              index={virtualRow.index}
-              key={event.id}
-              ref={measureElement}
-              start={virtualRow.start}
-              onInspectEvent={onInspectEvent}
-            />
-          )
-        })}
-      </div>
-    </div>
+    <VirtualList
+      {...listbox.containerProps}
+      aria-label='Log events'
+      scrollRef={scrollRef}
+      handleRef={virtualList}
+      activeIndex={listbox.activeIndex}
+      className='app-scrollbar-thin focus-ring-inset min-h-0 flex-1 overflow-auto'
+      items={events}
+      getKey={(event) => event.id}
+      layout='flow'
+      measureItems
+      renderRow={(event) => (
+        <LogsEventRow
+          detail={detailsById[event.id] ?? null}
+          event={event}
+          expanded={inspectedEventId === event.id}
+          rowBindings={listbox.rowBindings}
+          selected={listbox.activeId === event.id}
+          onInspectEvent={onInspectEvent}
+        />
+      )}
+    />
   )
 }

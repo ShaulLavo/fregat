@@ -1,8 +1,8 @@
 import { QueryClient, QueryObserver } from '@tanstack/react-query'
 import { createError } from 'evlog'
 
-import type { DirectoryLoadData } from '@/features/file-picker/data-helpers'
-import { directoryLoadState, entriesLoadState } from '@/features/file-picker/load-state'
+import type { DirectoryLoadData } from '@/features/file-picker/utils/data-helpers'
+import { directoryLoadState, entriesLoadState } from '@/features/file-picker/utils/load-state'
 import type { FsEntry } from '@/lib/file-system-types'
 import { expect, test } from '../../../../test/fixtures'
 

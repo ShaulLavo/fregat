@@ -1,3 +1,7 @@
+import { use } from 'react'
+import { useGitState } from '@/features/git/state/store'
+import { ChangesContext } from '@/features/git/providers/changes-context'
+import { changeRowId } from '@/features/git/utils/change-row-id'
 import { useContextMenu } from '@/keymap/menus/hooks/use-context-menu'
 import { useOpenDiffDocument } from '@/features/git/hooks/use-open-diff-document'
 import { gitStatusSymbol } from '@/features/git/utils/status-symbols'
@@ -17,10 +21,21 @@ export function ChangeFileRow({
 }) {
   const { opening, openDiff } = useOpenDiffDocument()
   const contextMenu = useContextMenu()
+  const listbox = use(ChangesContext)
+  const id = changeRowId(row)
+  const selected = useGitState((state) => state.activeChangeId === id)
+  const rowProps = listbox
+    ? {
+        ...listbox.rowBindings(id),
+        'aria-selected': selected,
+        'data-active': selected || undefined,
+      }
+    : undefined
 
   return (
     <>
       <FileRow
+        rowProps={rowProps}
         path={row.file.path}
         oldPath={row.file.oldPath}
         rootPath={rootPath}

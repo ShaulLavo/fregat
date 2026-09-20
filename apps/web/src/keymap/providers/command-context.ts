@@ -1,7 +1,7 @@
 import type { WorkspaceRoot } from '@/lib/documents/utils/types'
 import { createContext } from 'react'
 
-import type { PaletteScope } from '@/features/command-palette/command-palette-types'
+import type { PaletteScope } from '@/features/command-palette/utils/types'
 import type { OpenWorkspaceRootResult } from '@/features/workspace/hooks/use-open-root'
 import type {
   PlatformCommandTarget,

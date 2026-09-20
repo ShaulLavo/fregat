@@ -2,7 +2,7 @@ import type { FilesystemPath, TabContent } from '@/lib/documents/utils/types'
 import { createContext } from 'react'
 import type { OrchestrationProjectScript, ScopedProjectRef } from '@workspace/contracts'
 
-import type { GotoLineTarget } from '@/features/command-palette/goto-line-target'
+import type { GotoLineTarget } from '@/features/command-palette/utils/goto-line-target'
 import type { SessionRailItem } from '@workspace/client-core/chat/rail/model'
 import type { FlatDocumentSymbol } from '@/lib/document-symbols'
 import type { PlatformCommandId } from '@/keymap/types'

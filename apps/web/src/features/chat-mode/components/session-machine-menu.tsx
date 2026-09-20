@@ -33,7 +33,7 @@ export function SessionMachineMenu() {
             title={machine ? `${machine.name} · ${machine.origin}` : undefined}
           >
             <span className='truncate'>{title}</span>
-            <CaretUpDownIcon className='size-3 shrink-0' />
+            <CaretUpDownIcon className='size-(--icon-size-sm) shrink-0' />
           </Button>
         }
       />

@@ -31,7 +31,8 @@
     "oxc-react-compiler/no-unused-directives": "error",
     "platform-boundaries/lib-imports": "error",
     "platform-boundaries/document-dependencies": "error",
-    "platform-boundaries/document-codecs": "error"
+    "platform-boundaries/document-codecs": "error",
+    "platform-boundaries/feature-imports": "error"
   },
   "overrides": [
     {
@@ -45,11 +46,11 @@
         "apps/web/src/features/chat/utils/checkpoint-diff-query.ts",
         "apps/web/src/features/chat/utils/composer-skills.ts",
         "apps/web/src/features/chat/utils/provider-auth-query.ts",
-        "apps/web/src/features/file-picker/data-helpers.ts",
-        "apps/web/src/features/file-picker/picker-search.ts",
+        "apps/web/src/features/file-picker/utils/data-helpers.ts",
+        "apps/web/src/features/file-picker/state/search.ts",
         "apps/web/src/features/search/utils/providers.ts",
         "apps/web/src/features/search/utils/buffer-runner.ts",
-        "apps/web/src/features/command-palette/document-symbols.ts",
+        "apps/web/src/lib/document-symbols.ts",
         "apps/web/src/features/editor/utils/language-server-plugin.ts",
         "apps/web/src/features/editor/state/language-server-connection-pool.ts"
       ],

@@ -63,7 +63,7 @@ export function PlanFollowUpBanner({
             variant='outline'
             onClick={() => void implementInNewSession()}
           >
-            <ArrowSquareOutIcon className='size-3.5' />
+            <ArrowSquareOutIcon className='size-(--icon-size-sm)' />
             New session
           </Button>
         )}
@@ -74,7 +74,11 @@ export function PlanFollowUpBanner({
           type='button'
           onClick={() => void submitFollowUp()}
         >
-          {submitting ? <Spinner className='size-3.5' /> : <ActionIcon className='size-3.5' />}
+          {submitting ? (
+            <Spinner className='size-3.5' />
+          ) : (
+            <ActionIcon className='size-(--icon-size-sm)' />
+          )}
           {refining ? 'Refine' : 'Implement'}
         </Button>
       </div>

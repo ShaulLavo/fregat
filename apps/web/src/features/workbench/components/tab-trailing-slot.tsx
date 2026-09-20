@@ -1,3 +1,4 @@
+import { Tooltip, TooltipContent, TooltipTrigger } from '@workspace/ui/components/tooltip'
 import { XIcon } from '@phosphor-icons/react'
 
 import { Button } from '@workspace/ui/components/button'
@@ -25,22 +26,30 @@ export function TabTrailingSlot({
     >
       {/* Non-native button: the tab trigger around this slot is already a
           <button>, and nested <button> tags are invalid HTML. */}
-      <Button
-        aria-label={`Close ${title}`}
-        className={cn('size-5', closeButtonVisibilityClassName({ active, dirty }))}
-        draggable={false}
-        nativeButton={false}
-        render={<span />}
-        size='icon-xs'
-        variant='ghost'
-        onClick={(event) => {
-          event.stopPropagation()
-          onClose()
-        }}
-        onPointerDown={(event) => event.stopPropagation()}
-      >
-        <XIcon className='size-3' />
-      </Button>
+      <Tooltip>
+        <TooltipTrigger
+          render={
+            <Button
+              aria-label={`Close ${title}`}
+              className={cn('size-5', closeButtonVisibilityClassName({ active, dirty }))}
+              draggable={false}
+              nativeButton={false}
+              render={<span />}
+              size='icon-xs'
+              tabIndex={-1}
+              variant='ghost'
+              onClick={(event) => {
+                event.stopPropagation()
+                onClose()
+              }}
+              onPointerDown={(event) => event.stopPropagation()}
+            >
+              <XIcon className='size-(--icon-size-sm)' />
+            </Button>
+          }
+        />
+        <TooltipContent>{`Close ${title}`}</TooltipContent>
+      </Tooltip>
       {dirty ? (
         <span
           aria-hidden='true'

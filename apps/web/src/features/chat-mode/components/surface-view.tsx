@@ -7,7 +7,7 @@ import {
   useEditorWorkspaceState,
   useEditorWorkspaceStoreApi,
 } from '@/features/editor/state/workspace-state'
-import { useStatus } from '@/features/git/hooks'
+import { useStatus } from '@/features/git/hooks/use-status'
 
 export function ChatModeSurfaceView({ rootPath }: { readonly rootPath: string }) {
   const conflicts = useEditorConflictState((state) => state.conflicts)

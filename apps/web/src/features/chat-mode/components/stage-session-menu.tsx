@@ -1,3 +1,4 @@
+import { Tooltip, TooltipContent, TooltipTrigger } from '@workspace/ui/components/tooltip'
 import { DotsThreeIcon } from '@phosphor-icons/react'
 import { useState } from 'react'
 
@@ -18,18 +19,27 @@ export function StageSessionMenu({ session }: { readonly session: SessionRailIte
 
   return (
     <>
-      <Button
-        aria-label='Session actions'
-        className='text-muted-foreground hover:text-foreground shrink-0'
-        size='icon-sm'
-        type='button'
-        variant='ghost'
-        onClick={(event) =>
-          setAnchor(rectAnchor(event.currentTarget.getBoundingClientRect(), event.currentTarget))
-        }
-      >
-        <DotsThreeIcon className='size-4' weight='bold' />
-      </Button>
+      <Tooltip>
+        <TooltipTrigger
+          render={
+            <Button
+              aria-label='Session actions'
+              className='text-muted-foreground hover:text-foreground shrink-0'
+              size='icon-sm'
+              type='button'
+              variant='ghost'
+              onClick={(event) =>
+                setAnchor(
+                  rectAnchor(event.currentTarget.getBoundingClientRect(), event.currentTarget),
+                )
+              }
+            >
+              <DotsThreeIcon className='size-(--icon-size)' weight='bold' />
+            </Button>
+          }
+        />
+        <TooltipContent>{'Session actions'}</TooltipContent>
+      </Tooltip>
       <MenuSurface
         anchor={anchor}
         className='w-56'
@@ -38,7 +48,6 @@ export function StageSessionMenu({ session }: { readonly session: SessionRailIte
         surface='chat.session'
         onOpenChange={(open) => {
           if (open) return
-
           setAnchor(null)
         }}
       />

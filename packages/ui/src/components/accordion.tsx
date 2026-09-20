@@ -29,7 +29,7 @@ function AccordionTrigger({ className, children, ...props }: AccordionPrimitive.
       <AccordionPrimitive.Trigger
         data-slot='accordion-trigger'
         className={cn(
-          'focus-ring group/accordion-trigger relative flex flex-1 items-start justify-between border border-transparent py-(--density-accordion-padding-y) text-left text-xs font-medium outline-none hover:underline aria-disabled:pointer-events-none aria-disabled:opacity-50 **:data-[slot=accordion-trigger-icon]:ml-auto **:data-[slot=accordion-trigger-icon]:size-4 **:data-[slot=accordion-trigger-icon]:text-muted-foreground',
+          'focus-ring group/accordion-trigger relative flex flex-1 items-start justify-between border border-transparent py-(--density-accordion-padding-y) text-left text-xs font-medium outline-none hover:underline aria-disabled:pointer-events-none aria-disabled:opacity-50 **:data-[slot=accordion-trigger-icon]:ml-auto **:data-[slot=accordion-trigger-icon]:size-(--icon-size) **:data-[slot=accordion-trigger-icon]:text-muted-foreground',
           className,
         )}
         {...props}

@@ -30,7 +30,7 @@ export function composerDropMentionPath(
   if (composerDropCarriesFiles(transfer)) return null
   if (!transfer.types.includes('text/plain')) return null
 
-  return workspaceRelativePath(transfer.getData('text/plain'), rootPath)
+  return droppedWorkspacePath(transfer.getData('text/plain'), rootPath)
 }
 
 /**
@@ -38,7 +38,7 @@ export function composerDropMentionPath(
  * one line, becomes a mention. A dragged sentence that happens to look
  * path-shaped stays text, which is what the editor would have done with it.
  */
-function workspaceRelativePath(value: string, rootPath: string): string | null {
+function droppedWorkspacePath(value: string, rootPath: string): string | null {
   const candidate = value.trim()
   if (candidate.length === 0) return null
   if (candidate.includes('\n')) return null

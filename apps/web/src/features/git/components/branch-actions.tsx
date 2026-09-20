@@ -5,7 +5,9 @@ import type {
   GitPullRequestState,
 } from '@workspace/contracts'
 
-import { useBranchRemoteState, useCreatePullRequestMutation, usePullRequestState } from '../hooks'
+import { useBranchRemoteState } from '@/features/git/hooks/use-branch-remote-state'
+import { useCreatePullRequestMutation } from '@/features/git/hooks/use-create-pull-request-mutation'
+import { usePullRequestState } from '@/features/git/hooks/use-pull-request-state'
 import { usePushRemoteMutation } from '../hooks/use-push-remote-mutation'
 import { Button, buttonVariants } from '@workspace/ui/components/button'
 import { cn } from '@workspace/ui/lib/utils'
@@ -43,7 +45,7 @@ export function BranchActions({
           variant='ghost'
           onClick={() => push.mutate()}
         >
-          <UploadSimpleIcon className='size-3' />
+          <UploadSimpleIcon className='size-(--icon-size-sm)' />
           {pushLabel(state)}
         </Button>
       ) : null}
@@ -60,9 +62,9 @@ export function BranchActions({
           rel='noreferrer'
           target='_blank'
         >
-          <GitPullRequestIcon className='size-3' />
+          <GitPullRequestIcon className='size-(--icon-size-sm)' />
           <span className='tabular-nums'>#{pullRequestState.pullRequest.number}</span>
-          <ArrowSquareOutIcon className='size-3 opacity-60' />
+          <ArrowSquareOutIcon className='size-(--icon-size-sm) opacity-60' />
         </a>
       ) : null}
       {canCreatePullRequest(state, pullRequestState) ? (
@@ -74,7 +76,7 @@ export function BranchActions({
           variant='ghost'
           onClick={() => createPullRequest.mutate({ title: pullRequestTitle })}
         >
-          <GitPullRequestIcon className='size-3' />
+          <GitPullRequestIcon className='size-(--icon-size-sm)' />
           Pull request
         </Button>
       ) : null}

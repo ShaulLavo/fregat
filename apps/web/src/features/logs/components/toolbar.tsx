@@ -49,7 +49,7 @@ export function LogsToolbar({ areas, filters, sources, onFiltersChange }: LogsTo
       <PaneBar border='bottom'>
         <InputGroup className='bg-background h-(--density-control-height-sm) min-w-0 flex-1'>
           <InputGroupAddon align='inline-start'>
-            <MagnifyingGlassIcon className='size-3.5' />
+            <MagnifyingGlassIcon className='size-(--icon-size-sm)' />
           </InputGroupAddon>
           <InputGroupInput
             aria-label='Search logs'

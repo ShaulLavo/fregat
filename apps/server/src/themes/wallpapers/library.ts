@@ -4,6 +4,7 @@ import { mkdir, readdir, readFile, rename, rm, stat, writeFile } from 'node:fs/p
 import path from 'node:path'
 import {
   assetIdSchema,
+  BUNDLED_WALLPAPERS,
   wallpaperAssetSchema,
   type AssetId,
   type WallpaperAsset,
@@ -98,6 +99,38 @@ export class WallpaperLibrary {
         themes[theme.name] = await this.#importTheme(directory, theme.name, skipped)
       }
       return { themes, skipped }
+    })
+  }
+
+  // Only the files the bundled themes reference, so a fresh machine shows their
+  // wallpaper without a full import. A file whose bytes no longer hash to the
+  // bundled id is reported rather than installed: it would never satisfy the reference.
+  seed(directory: string) {
+    return this.#serialize(async () => {
+      const seeded: AssetId[] = []
+      const missing: string[] = []
+      const mismatched: string[] = []
+      for (const wallpaper of Object.values(BUNDLED_WALLPAPERS)) {
+        if (await this.#readIndex(wallpaper.asset)) continue
+        const source = path.join(directory, wallpaper.theme, 'backgrounds', wallpaper.file)
+        const bytes = await readFile(source).catch(() => null)
+        if (!bytes) {
+          missing.push(source)
+          continue
+        }
+        if (createHash('sha256').update(bytes).digest('hex') !== wallpaper.asset) {
+          mismatched.push(source)
+          continue
+        }
+        const name = `${wallpaper.theme} · ${wallpaper.file}`
+        const asset = await this.#install(bytes, name, {
+          kind: 'omarchy',
+          theme: wallpaper.theme,
+          path: source,
+        })
+        seeded.push(asset.id)
+      }
+      return { seeded, missing, mismatched }
     })
   }
 

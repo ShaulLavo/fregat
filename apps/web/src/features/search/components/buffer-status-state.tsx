@@ -23,7 +23,7 @@ export function SearchBufferStatusState({
     return (
       <EmptyState
         description={error ?? 'Search failed.'}
-        icon={<WarningCircleIcon className='size-6' weight='duotone' />}
+        icon={<WarningCircleIcon className='size-(--icon-size)' weight='duotone' />}
         title='Search failed'
         tone='error'
       />

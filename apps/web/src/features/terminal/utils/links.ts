@@ -1,3 +1,4 @@
+import { looksLikeHostname } from '@/lib/hostname'
 import { pathLeaf as basename } from '@/lib/path-formatters'
 import {
   resolveInlineCodeFileReference,
@@ -104,30 +105,6 @@ const URL_SCHEME = /^[A-Za-z][A-Za-z\d+.-]*:\/\//u
 const MAX_CANDIDATE_LENGTH = 1024
 
 const MAX_CODEPOINT = 0x10_ffff
-
-// Allowlist rather than public-suffix detection, and terminal-owned: the shared
-// resolver drops its hostname check as soon as a `:number` suffix is present,
-// which is fine for prose but turns every `serving example.com:8080` into a
-// file at line 8080. Extensions that double as filename suffixes are absent.
-const HOSTNAME_TLDS = new Set([
-  'ai',
-  'app',
-  'biz',
-  'cloud',
-  'co',
-  'com',
-  'dev',
-  'edu',
-  'gov',
-  'info',
-  'io',
-  'me',
-  'net',
-  'org',
-  'site',
-  'tech',
-  'xyz',
-])
 
 /**
  * Every file reference on the logical line that `row` belongs to.
@@ -350,18 +327,6 @@ function isPathShaped(candidate: string) {
   if (looksLikeHostname(bare)) return false
 
   return !hasNumericExtension(basename(bare))
-}
-
-/** `example.com:8080`, `example.dev/guide.ts:3` — a host, whatever trails it. */
-function looksLikeHostname(bare: string) {
-  if (bare.startsWith('/')) return false
-
-  const slash = bare.indexOf('/')
-  const host = slash < 0 ? bare : bare.slice(0, slash)
-  const labels = host.toLowerCase().split('.')
-  if (labels.length < 2) return false
-
-  return HOSTNAME_TLDS.has(labels[labels.length - 1] ?? '')
 }
 
 /**

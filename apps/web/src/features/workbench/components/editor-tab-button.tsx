@@ -1,3 +1,4 @@
+import { assignRef } from '@workspace/ui/lib/assign-ref'
 import { FileTypeIcon } from '@/components/file-type-icon'
 import type { DraggableAttributes, DraggableSyntheticListeners } from '@dnd-kit/core'
 import { useCallback, type CSSProperties, type Ref } from 'react'
@@ -8,7 +9,7 @@ import type { EditorTabModel } from '@/features/workspace/utils/tab-types'
 import { useEditorTabActions } from '@/features/editor/hooks/use-editor-tab-actions'
 import { EditorTabMenu } from '@/features/workbench/components/editor-tab-menu'
 import { TabTrailingSlot } from '@/features/workbench/components/tab-trailing-slot'
-import { barTabClassName } from '@/features/workbench/utils/bar-tabs'
+import { barTabClassName } from '@workspace/ui/patterns/bar-tabs'
 import { tabFileResource } from '@/lib/documents/utils/capabilities'
 import { tabContentKey } from '@/lib/documents/utils/tabs'
 import { Shimmer } from '@workspace/ui/components/shimmer'
@@ -68,7 +69,7 @@ export function EditorTabButton({
         tab.active,
         cn(
           'group/proof-tab focus-ring-inset max-w-48 min-w-0 cursor-grab touch-none text-left outline-none active:cursor-grabbing',
-          dragging && 'relative z-10 opacity-60',
+          dragging && 'relative z-10 text-muted-foreground text-2xs',
         ),
       )}
       data-editor-tab-id={tab.id}
@@ -88,10 +89,13 @@ export function EditorTabButton({
       type='button'
       onClick={handleSelectTab}
     >
-      <FileTypeIcon className='size-3.5 shrink-0 object-contain' icon={tab.icon} />
+      <FileTypeIcon className='size-(--icon-size-sm) shrink-0 object-contain' icon={tab.icon} />
       {editorTabTitle(tab, loading)}
       {unavailable ? (
-        <LockSimpleIcon aria-label='Read only' className='text-warning size-3 shrink-0' />
+        <LockSimpleIcon
+          aria-label='Read only'
+          className='text-warning size-(--icon-size-sm) shrink-0'
+        />
       ) : null}
       <TabTrailingSlot
         active={tab.active}
@@ -104,16 +108,6 @@ export function EditorTabButton({
   )
 
   return <EditorTabMenu closeTargets={closeTargets} tab={tab} trigger={trigger} />
-}
-
-function assignRef<TElement>(ref: Ref<TElement> | undefined, node: TElement | null) {
-  if (!ref) return
-  if (typeof ref === 'function') {
-    ref(node)
-    return
-  }
-
-  ref.current = node
 }
 
 function editorTabTitle(tab: EditorTabModel, loading: boolean) {

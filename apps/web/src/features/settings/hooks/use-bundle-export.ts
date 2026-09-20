@@ -1,3 +1,4 @@
+import { settingsQueryKeys } from '@/features/settings/utils/query-keys'
 import { queryOptions } from '@tanstack/react-query'
 import type { ThemeId } from '@workspace/contracts'
 import { useSettingsOwner } from '@/features/settings/hooks/use-settings-owner'
@@ -9,7 +10,7 @@ export function useBundleExport() {
   return async (id: ThemeId) => {
     const archive = await owner.fetchQuery(
       queryOptions({
-        queryKey: ['themes', 'bundles', id, 'export'],
+        queryKey: settingsQueryKeys.bundleExport(id),
         staleTime: 0,
         queryFn: async () => {
           const response = await clientForQueryClient(owner).themes.bundles({ id }).export.get()

@@ -289,32 +289,33 @@ function transcript() {
   return screen.getByRole('log', { name: 'Messages' })
 }
 
-/**
- * Where a virtualized row's top sits relative to the viewport top, in pixels.
- * Rows stack in flow inside one translated window, so a row's content offset is
- * the window's translation plus the rows rendered above it — every row is
- * `ROW_HEIGHT` tall here.
- */
+// happy-dom has no layout, so reconstruct the shared flow window from its spacers.
 function rowOffsetInViewport(index: number) {
   const row = transcript().querySelector(`[data-index="${index}"]`)
   if (!(row instanceof HTMLElement)) return null
-
-  const window = row.parentElement
-  if (!window) return null
-
-  const translated = /translateY\((-?[\d.]+)px\)/.exec(window.style.transform)
-  if (!translated?.[1]) return null
-
-  const rowsAbove = [...window.children].indexOf(row)
-
-  return Number.parseFloat(translated[1]) + rowsAbove * ROW_HEIGHT - transcript().scrollTop
+  const content = row.parentElement
+  if (!content) return null
+  let offset = Number.parseFloat(content.style.paddingTop) || 0
+  for (const sibling of content.children) {
+    if (!(sibling instanceof HTMLElement)) continue
+    offset += Number.parseFloat(sibling.style.marginTop) || 0
+    if (sibling === row) return offset - transcript().scrollTop
+    offset += ROW_HEIGHT
+  }
+  return null
 }
 
 function virtualContentHeight(element: Element) {
   const content = element.firstElementChild
   if (!(content instanceof HTMLElement)) return 0
-
-  return Number.parseFloat(content.style.height) || 0
+  let height =
+    (Number.parseFloat(content.style.paddingTop) || 0) +
+    (Number.parseFloat(content.style.paddingBottom) || 0)
+  for (const row of content.children) {
+    if (!(row instanceof HTMLElement)) continue
+    height += ROW_HEIGHT + (Number.parseFloat(row.style.marginTop) || 0)
+  }
+  return height
 }
 
 function conversation(count: number) {

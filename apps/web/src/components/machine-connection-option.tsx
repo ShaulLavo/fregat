@@ -24,7 +24,7 @@ export function MachineConnectionOption({
       )}
     >
       <span className='border-border text-muted-foreground flex size-8 shrink-0 items-center justify-center rounded-md border'>
-        <Icon className='size-4' />
+        <Icon className='size-(--icon-size)' />
       </span>
       <span className='min-w-0'>
         <span className='text-foreground block text-sm font-medium'>

@@ -1,13 +1,15 @@
 import { closestCenter, DndContext, type DragEndEvent } from '@dnd-kit/core'
 import { restrictToVerticalAxis } from '@dnd-kit/modifiers'
 import { SortableContext, verticalListSortingStrategy } from '@dnd-kit/sortable'
-import { useEffect, useRef, type KeyboardEvent } from 'react'
+import { forwardActiveRowKey } from '@/lib/list-keyboard'
+import { useListbox } from '@workspace/ui/patterns/use-listbox'
 
 import { TerminalListRow } from '@/features/workbench/components/terminal-list-row'
 import { useTabStripSensors } from '@/features/workbench/hooks/use-tab-strip-sensors'
 import { useTerminalTabActions } from '@/features/workbench/hooks/use-terminal-tab-actions'
 import { tabReorderIntent } from '@/features/workbench/utils/tab-dnd'
 import type { TerminalTabRecord } from '@/features/workbench/utils/terminal-tabs'
+import { log } from '@/lib/client-logging'
 
 const TERMINAL_LIST_DND_MODIFIERS = [restrictToVerticalAxis]
 
@@ -20,37 +22,38 @@ export function TerminalList({
   readonly rootPath: string
   readonly tabs: readonly TerminalTabRecord[]
 }) {
-  const { closeTab, renameTab, reorderTab, selectAdjacentTab, selectTab } =
+  const { closeTab, renameTab, reorderTab, selectTab, activateTab } =
     useTerminalTabActions(rootPath)
-  const listRef = useRef<HTMLDivElement>(null)
   const sensors = useTabStripSensors()
 
-  useEffect(() => {
-    if (!activeTabId) return
+  const list = useListbox({
+    role: 'tablist',
+    items: tabs.map((tab) => ({ id: tab.id })),
+    activeId: activeTabId,
+    onActiveChange: selectTab,
+    onCommit: activateTab,
+    onActiveKeyDown(event) {
+      if (
+        ['F2', 'Delete', ' ', 'ContextMenu'].includes(event.key) ||
+        (event.shiftKey && event.key === 'F10')
+      )
+        forwardActiveRowKey(event)
+    },
+  })
 
-    rowElement(listRef.current, activeTabId)?.scrollIntoView({
-      block: 'nearest',
+  function finishDrag(event: DragEndEvent, cancelled: boolean) {
+    const intent = cancelled ? null : tabReorderIntent(tabs, event.active.id, event.over?.id)
+    log.info({
+      area: 'terminal',
+      action: 'tabs.reorder',
+      tabId: event.active.id,
+      overId: event.over?.id ?? null,
+      input: event.activatorEvent.type,
+      cancelled,
+      changed: intent !== null,
+      targetIndex: intent?.targetIndex,
     })
-  }, [activeTabId])
-
-  function handleKeyDown(event: KeyboardEvent<HTMLDivElement>) {
-    if (event.key !== 'ArrowDown' && event.key !== 'ArrowUp') return
-    // A picked-up row (Space) is being moved by the keyboard sensor, not walked.
-    if (isPickedUpRow(event.target)) return
-
-    event.preventDefault()
-    const next = selectAdjacentTabForKey(event.key)
-    if (!next) return
-
-    rowElement(listRef.current, next)?.focus()
-  }
-
-  function selectAdjacentTabForKey(key: 'ArrowDown' | 'ArrowUp') {
-    return selectAdjacentTab(key === 'ArrowDown' ? 'next' : 'previous')
-  }
-
-  function handleDragEnd(event: DragEndEvent) {
-    const intent = tabReorderIntent(tabs, event.active.id, event.over?.id)
+    if (event.activatorEvent instanceof KeyboardEvent) list.containerProps.ref.current?.focus()
     if (!intent) return
 
     reorderTab(intent.tabId, intent.targetIndex)
@@ -61,37 +64,29 @@ export function TerminalList({
       collisionDetection={closestCenter}
       modifiers={TERMINAL_LIST_DND_MODIFIERS}
       sensors={sensors}
-      onDragEnd={handleDragEnd}
+      accessibility={{ restoreFocus: false }}
+      onDragEnd={(event) => finishDrag(event, false)}
+      onDragCancel={(event) => finishDrag(event, true)}
     >
       <SortableContext items={tabs.map((tab) => tab.id)} strategy={verticalListSortingStrategy}>
         <div
+          {...list.containerProps}
           aria-label='Open terminals'
           aria-orientation='vertical'
-          className='border-border bg-background flex h-full flex-col overflow-y-auto border-l py-(--density-section-gap)'
-          ref={listRef}
-          role='tablist'
-          onKeyDown={handleKeyDown}
+          className='focus-ring-inset border-border bg-background flex h-full flex-col overflow-y-auto border-l py-(--density-section-gap)'
         >
           {tabs.map((tab) => (
             <TerminalListRow
               active={tab.id === activeTabId}
+              rowProps={list.rowProps(tab.id)}
               key={tab.id}
               tab={tab}
               onClose={closeTab}
               onRename={renameTab}
-              onSelect={selectTab}
             />
           ))}
         </div>
       </SortableContext>
     </DndContext>
   )
-}
-
-function rowElement(list: HTMLElement | null, tabId: string) {
-  return list?.querySelector<HTMLElement>(`[data-terminal-tab-id="${CSS.escape(tabId)}"]`) ?? null
-}
-
-function isPickedUpRow(target: EventTarget) {
-  return target instanceof HTMLElement && target.getAttribute('aria-pressed') === 'true'
 }

@@ -1,3 +1,4 @@
+import { useListbox } from '@workspace/ui/patterns/use-listbox'
 import { CaretDownIcon, CopyIcon, XIcon } from '@phosphor-icons/react'
 import {
   Collapsible,
@@ -6,7 +7,7 @@ import {
 } from '@workspace/ui/components/collapsible'
 import { cn } from '@workspace/ui/lib/utils'
 import { useNavigation } from '@/hooks/use-navigation'
-import { useRef, useLayoutEffect } from 'react'
+import { useRef, useLayoutEffect, useState } from 'react'
 import { useHistoryView } from '@/features/git/hooks/use-history-view'
 import { useEditorWorkspaceState } from '@/features/editor/state/workspace-state'
 import type { GitCommitFile } from '@workspace/contracts'
@@ -40,6 +41,21 @@ export function CommitDetails({
   const { view, updateView } = useHistoryView()
   const scrollRef = useRef<HTMLDivElement>(null)
   const initialScrollTop = useRef(view.detailsScrollTop)
+  const [activePath, setActivePath] = useState<string | null>(null)
+  const fileList = useListbox({
+    role: 'tree',
+    items: (details.data?.files ?? []).map((file) => ({
+      id: file.path,
+      disabled: file.kind === 'submodule',
+    })),
+    activeId: activePath,
+    onActiveChange: setActivePath,
+    onSelect: setActivePath,
+    onCommit: (path) => {
+      const file = details.data?.files.find((file) => file.path === path)
+      if (file) onOpen(file)
+    },
+  })
   const loadedCommit = details.data?.id
   useLayoutEffect(() => {
     if (loadedCommit && scrollRef.current) scrollRef.current.scrollTop = initialScrollTop.current
@@ -60,7 +76,10 @@ export function CommitDetails({
           title={commit}
         >
           <CaretDownIcon
-            className={cn('size-3 shrink-0 transition-transform', !open && '-rotate-90')}
+            className={cn(
+              'size-(--icon-size-sm) shrink-0 transition-transform',
+              !open && '-rotate-90',
+            )}
           />
           {commit.slice(0, 10)}
         </CollapsibleTrigger>
@@ -148,18 +167,23 @@ export function CommitDetails({
               {details.data.files.length}
             </span>
           </PaneBar>
-          {details.data.files.map((file) => (
-            <FileRow
-              key={file.path}
-              path={file.path}
-              oldPath={file.oldPath}
-              rootPath={rootPath}
-              status={gitStatusSymbol(file.status, 'historical')}
-              historical
-              disabledReason={file.kind === 'submodule' ? 'Submodule reference changed' : undefined}
-              onOpen={() => onOpen(file)}
-            />
-          ))}
+          <div {...fileList.containerProps} aria-label='Commit files'>
+            {details.data.files.map((file) => (
+              <FileRow
+                key={file.path}
+                rowProps={fileList.rowProps(file.path)}
+                path={file.path}
+                oldPath={file.oldPath}
+                rootPath={rootPath}
+                status={gitStatusSymbol(file.status, 'historical')}
+                historical
+                disabledReason={
+                  file.kind === 'submodule' ? 'Submodule reference changed' : undefined
+                }
+                onOpen={() => onOpen(file)}
+              />
+            ))}
+          </div>
           {details.data.files.length === 0 ? (
             <EmptyState title='No file changes' className='p-3' />
           ) : null}

@@ -1,3 +1,4 @@
+import { sessionSearchQueryKeys } from '@/features/chat-mode/utils/query-keys'
 import {
   ORCHESTRATION_SESSION_SEARCH_DEFAULT_LIMIT,
   ORCHESTRATION_SESSION_SEARCH_MIN_QUERY_LENGTH,
@@ -22,11 +23,6 @@ export const SESSION_SEARCH_DEBOUNCE_MS = 220
 
 const SESSION_SEARCH_STALE_TIME_MS = 30_000
 const EMPTY_SESSION_SEARCH: OrchestrationSearchSessionsResult = { matches: [] }
-
-const sessionSearchQueryKeys = {
-  all: ['chat-session-search'] as const,
-  search: (query: string, limit: number) => [...sessionSearchQueryKeys.all, query, limit] as const,
-}
 
 type SessionSearchQueryKey = ReturnType<typeof sessionSearchQueryKeys.search>
 

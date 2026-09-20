@@ -74,9 +74,9 @@ export function ModelOptionsMenu({
             type='button'
             variant='ghost'
           >
-            <BrainIcon className='size-3.5 shrink-0 opacity-70' />
+            <BrainIcon className='size-(--icon-size-sm) shrink-0 opacity-70' />
             {compact ? null : <span className='truncate'>{summary}</span>}
-            <CaretUpDownIcon className='size-3 shrink-0 opacity-60' />
+            <CaretUpDownIcon className='size-(--icon-size-sm) shrink-0 opacity-60' />
           </Button>
         }
       />

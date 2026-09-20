@@ -1,10 +1,10 @@
 import { describe, expect, it } from 'vitest'
 
-import { quickAccessMode, quickAccessQuery } from '@/features/command-palette/command-palette-utils'
+import { quickAccessMode, quickAccessQuery } from '@/features/command-palette/utils/query'
 import {
   gotoLineTargetLabel,
   parseGotoLineTarget,
-} from '@/features/command-palette/goto-line-target'
+} from '@/features/command-palette/utils/goto-line-target'
 
 describe('parseGotoLineTarget', () => {
   it('reads a bare line number, defaulting the column', () => {

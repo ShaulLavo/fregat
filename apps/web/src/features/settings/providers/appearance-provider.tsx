@@ -1,4 +1,5 @@
 import { useSystemColorMode } from '@/features/settings/hooks/use-system-color-mode'
+import { useTransitionedColorMode } from '@/features/settings/hooks/use-transitioned-color-mode'
 import { useThemeApplicationLog } from '@/features/settings/hooks/use-theme-application-log'
 import {
   DEFAULT_SETTING_VALUES,
@@ -10,7 +11,15 @@ import {
   AppearancePreviewContext,
   BundlePreviewContext,
 } from '@/features/settings/providers/appearance-preview-context'
-import { useCallback, useEffect, useInsertionEffect, useRef, useState, type ReactNode } from 'react'
+import {
+  ViewTransition,
+  useCallback,
+  useEffect,
+  useInsertionEffect,
+  useRef,
+  useState,
+  type ReactNode,
+} from 'react'
 import {
   bundledPalette,
   DEFAULT_PALETTE_ID,
@@ -68,30 +77,28 @@ export function AppearanceProvider({
   const [palettePreview, setPalettePreview] = useState<Preview<Palette> | null>(null)
   const projectedValues = projection?.values
   const baseValues = projectedValues ?? { ...DEFAULT_SETTING_VALUES, ...bootValues }
+  const committedTheme = baseValues['workbench.colorTheme']
+  const modeHandoffObserved = projectionObservesHandoff(projection, modePreview?.handingOffTo)
   const requestedMode =
-    bundlePreview?.mode ?? modePreview?.value ?? baseValues['workbench.colorTheme']
+    bundlePreview?.mode ??
+    (modePreview && !modeHandoffObserved ? modePreview.value : committedTheme)
+  const resolvedMode = useTransitionedColorMode(resolveColorTheme(requestedMode, prefersDark))
   const appearanceValues = resolveThemeSettings(
     {
       ...baseValues,
-      'workbench.colorTheme': requestedMode,
+      'workbench.colorTheme': resolvedMode,
       'workbench.theme': bundlePreview?.theme ?? baseValues['workbench.theme'],
     },
     prefersDark ? 'dark' : 'light',
     projection?.layers,
   )
-  const committedTheme = baseValues['workbench.colorTheme']
   const committedPaletteId = appearanceValues['workbench.palette']
   const committedPalette = catalog.find((palette) => palette.id === committedPaletteId)
-  const modeHandoffObserved = projectionObservesHandoff(projection, modePreview?.handingOffTo)
   const paletteHandoffObserved = projectionObservesHandoff(projection, palettePreview?.handingOffTo)
-  const renderedTheme =
-    bundlePreview?.mode ??
-    (modePreview && !modeHandoffObserved ? modePreview.value : committedTheme)
   // Undefined while a user palette is still being looked up: the boot
   // stylesheet stays on screen rather than flashing Graphite in between.
   const renderedPalette =
     palettePreview && !paletteHandoffObserved ? palettePreview.value : committedPalette
-  const resolvedMode = resolveColorTheme(renderedTheme, prefersDark)
 
   useEffect(() => {
     if (!modeHandoffObserved || !modePreview?.handingOffTo) return
@@ -105,7 +112,7 @@ export function AppearanceProvider({
     clearMatchingHandoff(setPalettePreview, palettePreview.handingOffTo)
   }, [paletteHandoffObserved, palettePreview?.handingOffTo])
 
-  const renderedValues = { ...appearanceValues, 'workbench.colorTheme': renderedTheme }
+  const renderedValues = { ...appearanceValues, 'workbench.colorTheme': requestedMode }
   const applicationDuration = useRef(0)
   useThemeApplicationLog(
     renderedValues,
@@ -117,9 +124,9 @@ export function AppearanceProvider({
   // appearance must be current before those effects run.
   useInsertionEffect(() => {
     const started = performance.now()
-    applyAppearance(renderedValues, globalThis.document.documentElement, prefersDark)
+    applyAppearance(appearanceValues, globalThis.document.documentElement, prefersDark)
     applicationDuration.current = performance.now() - started
-  }, [prefersDark, renderedValues])
+  }, [prefersDark, appearanceValues])
 
   useInsertionEffect(() => {
     if (!renderedPalette) return
@@ -250,7 +257,14 @@ export function AppearanceProvider({
                 selectPalette,
               }}
             >
-              {children}
+              <ViewTransition
+                default='none'
+                update={{ 'color-mode': 'color-mode', default: 'none' }}
+              >
+                <div className='size-full' data-color-mode={resolvedMode}>
+                  {children}
+                </div>
+              </ViewTransition>
             </PaletteContext>
           </ThemeContext>
         </WorkbenchDensityBootContext>

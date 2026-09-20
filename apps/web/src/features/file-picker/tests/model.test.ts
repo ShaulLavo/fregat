@@ -1,7 +1,7 @@
 import { filesystemPath } from '@/lib/documents/utils/identity'
 import { expect, test } from '../../../../test/fixtures'
 
-import { entryByOffset } from '@/features/file-picker/model'
+import { entryByOffset } from '@/features/file-picker/utils/model'
 import type { FsEntry } from '@/lib/file-system-types'
 
 const entries = Array.from({ length: 20 }, (_, index) => entry(index))

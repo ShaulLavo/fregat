@@ -4,7 +4,7 @@ import { useQueryClient } from '@tanstack/react-query'
 import { useCallback, useEffect, useLayoutEffect, useRef } from 'react'
 import { toast } from 'sonner'
 
-import type { FilePickerMode } from '@/features/file-picker/model'
+import type { FilePickerMode } from '@/features/file-picker/utils/model'
 
 export function useDirectoryTransition({
   currentPath,

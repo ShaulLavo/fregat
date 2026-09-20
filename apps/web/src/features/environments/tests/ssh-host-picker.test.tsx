@@ -28,12 +28,12 @@ test('lists and filters SSH aliases, then saves the selected target', async ({
     'Host Build.Box backup\n  HostName 100.70.1.2\nHost * !excluded\n  User shaul\n',
   )
   renderWithProviders(<MachineForm onCancel={() => {}} onSaved={() => {}} />)
-  expect(await screen.findByRole('button', { name: 'Build.Box' })).toBeVisible()
-  expect(screen.getByRole('button', { name: 'backup' })).toBeVisible()
-  expect(screen.queryByRole('button', { name: '*' })).toBeNull()
+  expect(await screen.findByRole('option', { name: 'Build.Box' })).toBeVisible()
+  expect(screen.getByRole('option', { name: 'backup' })).toBeVisible()
+  expect(screen.queryByRole('option', { name: '*' })).toBeNull()
   await userEvent.type(screen.getByLabelText('SSH target'), 'build')
-  expect(screen.queryByRole('button', { name: 'backup' })).toBeNull()
-  await userEvent.click(screen.getByRole('button', { name: 'Build.Box' }))
+  expect(screen.queryByRole('option', { name: 'backup' })).toBeNull()
+  await userEvent.click(screen.getByRole('option', { name: 'Build.Box' }))
   expect(screen.getByLabelText('SSH target')).toHaveValue('Build.Box')
   await userEvent.click(screen.getByRole('button', { name: 'Add machine' }))
   await waitFor(async () =>
@@ -69,19 +69,19 @@ test('failed discovery is distinct from an empty config and can be retried', asy
   await rm(config, { recursive: true })
   await writeSshConfig(server.root, 'Host repaired\n')
   await userEvent.click(screen.getByRole('button', { name: 'Retry' }))
-  expect(await screen.findByRole('button', { name: 'repaired' })).toBeVisible()
+  expect(await screen.findByRole('option', { name: 'repaired' })).toBeVisible()
 })
 
 test('reopening the form refreshes edited SSH config', async ({ server, client }) => {
   void client
   await writeSshConfig(server.root, 'Host before\n')
   const first = renderWithProviders(<MachineForm onCancel={() => {}} onSaved={() => {}} />)
-  await screen.findByRole('button', { name: 'before' })
+  await screen.findByRole('option', { name: 'before' })
   first.unmount()
   await writeSshConfig(server.root, 'Host after\n')
   renderWithProviders(<MachineForm onCancel={() => {}} onSaved={() => {}} />)
-  expect(await screen.findByRole('button', { name: 'after' })).toBeVisible()
-  expect(screen.queryByRole('button', { name: 'before' })).toBeNull()
+  expect(await screen.findByRole('option', { name: 'after' })).toBeVisible()
+  expect(screen.queryByRole('option', { name: 'before' })).toBeNull()
 })
 
 test('uses the primary machine SSH config while another machine is active', async ({ server }) => {
@@ -92,8 +92,8 @@ test('uses the primary machine SSH config while another machine is active', asyn
   renderWithProviders(<MachineForm onCancel={() => {}} onSaved={() => {}} />, {
     connections: h.connections,
   })
-  expect(await screen.findByRole('button', { name: 'primary-host' })).toBeVisible()
-  expect(screen.queryByRole('button', { name: 'remote-host' })).toBeNull()
+  expect(await screen.findByRole('option', { name: 'primary-host' })).toBeVisible()
+  expect(screen.queryByRole('option', { name: 'remote-host' })).toBeNull()
 })
 
 test('disables SSH Retry while a retained discovery result is being refetched', async ({
@@ -112,7 +112,7 @@ test('disables SSH Retry while a retained discovery result is being refetched', 
   onTestFinished(installTestClient(observed))
   const config = await writeSshConfig(server.root, 'Host original\n')
   renderWithProviders(<SshHostList value='' onSelect={() => {}} />)
-  await screen.findByRole('button', { name: 'original' })
+  await screen.findByRole('option', { name: 'original' })
   await rm(config)
   await mkdir(config)
   await act(() =>
@@ -129,5 +129,27 @@ test('disables SSH Retry while a retained discovery result is being refetched', 
   await userEvent.click(retry)
   expect(requests).toBe(3)
   await act(async () => pending.resolve())
-  expect(await screen.findByRole('button', { name: 'repaired' })).toBeVisible()
+  expect(await screen.findByRole('option', { name: 'repaired' })).toBeVisible()
+})
+
+test('SSH options share one tab stop and arrow selection commits only on Enter', async ({
+  server,
+  client,
+}) => {
+  void client
+  await writeSshConfig(server.root, 'Host alpha bravo\n')
+  const selected: string[] = []
+  renderWithProviders(<SshHostList value='' onSelect={(target) => selected.push(target)} />)
+  const alpha = await screen.findByRole('option', { name: 'alpha' })
+  const bravo = screen.getByRole('option', { name: 'bravo' })
+  const list = screen.getByRole('listbox', { name: 'SSH hosts' })
+  expect(alpha).toHaveAttribute('tabindex', '-1')
+  expect(bravo).toHaveAttribute('tabindex', '-1')
+  await userEvent.click(list)
+  await userEvent.keyboard('{ArrowDown}')
+  expect(list).toHaveFocus()
+  expect(bravo).toHaveAttribute('aria-selected', 'true')
+  expect(selected).toEqual([])
+  await userEvent.keyboard('{Enter}')
+  expect(selected).toEqual(['bravo'])
 })
