@@ -32,7 +32,7 @@ export const gitHistoryBodySchema = v.object({
     v.pipe(
       v.string(),
       v.maxLength(1024),
-      v.regex(/^(?:all|HEAD|refs\/(?:heads|remotes|tags)\/[^\s\0]+)$/),
+      v.regex(/^(?:all|HEAD|refs\/(?:heads|remotes|tags)\/[^\s\p{Cc}]+)$/u),
     ),
     'all',
   ),
