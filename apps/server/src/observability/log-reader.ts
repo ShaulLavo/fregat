@@ -1,3 +1,4 @@
+import { roundMs } from '@workspace/utils/timing'
 import { createHash } from 'node:crypto'
 import type {
   LogDashboardBreakdownItem,
@@ -10,7 +11,8 @@ import type {
   LogEventSummary,
   LogLiveStreamItem,
 } from '@workspace/contracts'
-import { errorStringField, isRecord } from '@workspace/contracts'
+import { errorStringField } from '@workspace/contracts'
+import { isRecord } from '@workspace/utils/objects'
 import type { LogLevel, WideEvent } from 'evlog'
 import { readFsLogs, tailFsLogs } from 'evlog/fs'
 
@@ -507,10 +509,6 @@ function stringField(value: unknown) {
 
 function numberField(value: unknown) {
   return typeof value === 'number' && Number.isFinite(value) ? value : null
-}
-
-function roundMs(value: number) {
-  return Math.round(value * 100) / 100
 }
 
 function stableStringify(value: unknown): string {

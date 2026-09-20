@@ -25,7 +25,9 @@ import {
   type DiffScrollPosition,
 } from '@/features/editor/utils/diff-scroll-bridge'
 import { log } from '@/lib/client-logging'
-import { useFocusTarget } from '@/lib/focus/hooks/use-target'
+import { useEditorFocusTarget } from '@/lib/focus/hooks/use-editor-target'
+import { createDiffPresentationBinding } from '@/features/editor/state/diff-presentation'
+import type { DiffPanePresentation } from '@/features/editor/state/tab-presentation'
 
 /**
  * One side of a diff: a real read-only `Editor` holding a synthetic buffer of the projected rows,
@@ -39,6 +41,7 @@ import { useFocusTarget } from '@/lib/focus/hooks/use-target'
 export function DiffPane({
   file,
   languageServer = null,
+  presentation,
   regions,
   side,
   syntaxBackend,
@@ -52,6 +55,7 @@ export function DiffPane({
   file: DiffFile | null
   /** Present only where a language server may safely be asked about this diff; see `useDiffLanguage`. */
   languageServer?: DiffLanguageServerContext | null
+  presentation?: DiffPanePresentation
   regions: DiffRegionStore
   side: DiffGutterSide
   syntaxBackend: DiffSyntaxBackend
@@ -76,6 +80,11 @@ export function DiffPane({
   const { rows, text, tokensRevision } = useDiffRows(plugin, file)
   const diffLanguagePlugin = useDiffLanguage(file, rows, theme, languageServer)
   const unicodeHighlights = useUnicodeHighlights()
+  // A plugin instance owns its registered view context for the lifetime of this pane.
+  const persistence = useMemo(
+    () => (presentation ? createDiffPresentationBinding(presentation) : null),
+    [presentation],
+  )
   const plugins = useMemo(
     () =>
       [
@@ -83,8 +92,9 @@ export function DiffPane({
         unicodeHighlights.plugin,
         onScroll ? createDiffScrollBridgePlugin((position) => onScroll(side, position)) : null,
         diffLanguagePlugin,
-      ].filter((entry) => entry !== null),
-    [diffLanguagePlugin, onScroll, plugin, side, unicodeHighlights.plugin],
+        persistence?.plugin,
+      ].filter((entry) => entry !== null && entry !== undefined),
+    [diffLanguagePlugin, onScroll, persistence, plugin, side, unicodeHighlights.plugin],
   )
   const controller = useEditor({
     suspiciousCharacters: unicodeHighlights.options,
@@ -107,28 +117,16 @@ export function DiffPane({
     // `'none'`, which short-circuits before `domSelection.addRange` and leaves copy depending
     // entirely on the hidden textarea; copying a diff selection is the point here.
   })
-  const focusTarget = useFocusTarget<HTMLDivElement>({
-    area: 'editor',
-    capabilities: {
-      editor: {
-        dispatch: controller.commands.dispatchCommand,
-        getInputElement: () => controller.getEditor()?.getInputElement() ?? null,
-        readKeymapContext: () => controller.getEditor()?.getKeymapContext() ?? null,
-        writable: false,
-      },
-    },
+  useLayoutEffect(() => () => persistence?.detach(), [persistence])
+  const focusTarget = useEditorFocusTarget({
+    controller,
+    writable: false,
     id: {
       key: file?.path ?? '',
       kind: 'editor',
       side,
       surface: 'diff',
       tabId,
-    },
-    onIntent: (intent) => {
-      if (intent !== 'focus') return false
-
-      controller.commands.focus()
-      return true
     },
   })
 
@@ -142,7 +140,8 @@ export function DiffPane({
 
     editor.setText(text, { documentMode: 'static', languageId: null })
     editor.setTokens(plugin.getTokens())
-  }, [controller, plugin, text])
+    if (file && rows === plugin.getRows()) persistence?.restore(editor)
+  }, [controller, file, persistence, plugin, rows, text])
 
   // A parse landing later changes the tokens without changing a row.
   useLayoutEffect(() => {

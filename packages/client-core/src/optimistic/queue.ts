@@ -1,3 +1,4 @@
+import { nowMs } from '@workspace/utils/timing'
 import { createStore } from 'zustand/vanilla'
 
 export type IntentStatus = 'acknowledged' | 'pending'
@@ -115,7 +116,7 @@ export function createIntentQueue<TPatch>(options: IntentQueueOptions = {}): Int
       patch,
       resources,
       status: 'pending',
-      enqueuedAt: now(),
+      enqueuedAt: nowMs(),
       transportSettled: false,
       settled,
       resolveSettlement,
@@ -240,8 +241,4 @@ export function pendingIntents<TPatch>(active: readonly Intent<TPatch>[]): Inten
   return active
     .filter((intent) => intent.status === 'pending')
     .toSorted((left, right) => left.sequence - right.sequence)
-}
-
-function now() {
-  return typeof performance === 'undefined' ? Date.now() : performance.now()
 }

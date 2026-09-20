@@ -1,6 +1,6 @@
 # Editor split views implementation plan
 
-Status: planned. The user agreed to the interaction below on 2026-09-19. Implementation has not started.
+Status: implemented and deployed on 2026-09-19. See [verification and browser evidence](verification/2026-09-19-editor-splits.md). The user agreed to the interaction below on 2026-09-19.
 
 Grounding: checkout `04af161c`, including the working tree inspected that day. Several editor, theme, and browser-scenario files already contain unrelated changes. Preserve that work during implementation.
 
@@ -242,6 +242,8 @@ Use disposable files in a verification-owned workspace. Drive real commands and 
 | `editor-split-focus`   | Alternate pane focus. Exercise Save, Find, completion, definition, references, close, numbered group focus, and palette return. Check the actual saved file and status owner.                                              |
 | `editor-split-restore` | Resize a nested layout, switch workspaces, and reload. Verify tab order, active group, selected tabs, and independent scroll positions. Include same-document selections with an unchanged URL.                            |
 | `editor-split-content` | Move file, reference, diff, saved comparison, history, conflict, Settings, and Search tabs. Verify copied file-based views and disabled copy actions for singleton tools.                                                  |
+
+Implementation note: the final scenarios consolidate focus and restore checks into `editor-split-actions`, `editor-split-state`, and `editor-split-drag`. Separate `editor-split-folds` and `editor-split-blur` scenarios cover remounts and sensor cancellation. The verification record lists the assertions actually driven.
 
 Extend focused tests for address navigation and resource reconciliation, workspace-cache parsing and persistence, document views, dirty close, and tab menus. Each test should cover a plausible loss of identity, content, focus, or placement. Use the real app fixtures and server where those tests need server state.
 

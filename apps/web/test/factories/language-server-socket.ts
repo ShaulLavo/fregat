@@ -1,4 +1,4 @@
-import { isRecord } from '@workspace/contracts'
+import { isRecord } from '@workspace/utils/objects'
 
 import type { EdenServerSocket } from '@/lib/server-sockets'
 

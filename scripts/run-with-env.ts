@@ -1,3 +1,5 @@
+import { installSignalHandlers } from './process-signals'
+import { errorMessage } from '../packages/contracts/src/error-fields'
 import { existsSync } from 'node:fs'
 import path from 'node:path'
 import { observabilityEnabledFromEnv } from '../packages/observability/src/env'
@@ -67,19 +69,4 @@ function resolveCommand(command: string) {
   if (existsSync(rootBin)) return rootBin
 
   return command
-}
-
-function installSignalHandlers(child: ReturnType<typeof Bun.spawn>) {
-  const stop = (signal: NodeJS.Signals) => {
-    child.kill(signal)
-  }
-
-  process.once('SIGINT', stop)
-  process.once('SIGTERM', stop)
-}
-
-function errorMessage(error: unknown) {
-  if (error instanceof Error) return error.message
-
-  return String(error)
 }

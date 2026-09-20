@@ -1,3 +1,4 @@
+import { createSubscriptions } from '@workspace/utils/subscriptions'
 import { useChatProjectionStore } from '@/features/chat/state/chat-projection-store'
 import {
   orchestrationDispatchResultSchema,
@@ -13,28 +14,22 @@ import type { ChatTransport } from '@/features/chat/transport/chat-transport'
 import { resetSessionEarlierPageStore } from '@/features/chat/state/session-earlier-page-store'
 
 const activeTransports = new Map<EnvironmentId, ChatTransport>()
-const listeners = new Set<() => void>()
+const subscriptions = createSubscriptions()
+export const subscribeTransports = subscriptions.subscribe
 
 export function transportFor(environmentId: EnvironmentId) {
   return activeTransports.get(environmentId) ?? null
-}
-
-export function subscribeTransports(listener: () => void) {
-  listeners.add(listener)
-  return () => {
-    listeners.delete(listener)
-  }
 }
 
 export function registerChatTransport(transport: ChatTransport) {
   const held = activeTransports.get(transport.environmentId)
   if (held && held !== transport) held.close()
   activeTransports.set(transport.environmentId, transport)
-  for (const listener of listeners) listener()
+  subscriptions.notify()
   return () => {
     if (activeTransports.get(transport.environmentId) !== transport) return
     transport.close()
-    for (const listener of listeners) listener()
+    subscriptions.notify()
   }
 }
 
@@ -42,7 +37,7 @@ export function closeChatTransports() {
   for (const transport of activeTransports.values()) transport.close()
   activeTransports.clear()
   resetSessionEarlierPageStore()
-  for (const listener of listeners) listener()
+  subscriptions.notify()
 }
 
 export async function dispatchCommandForEnvironment(

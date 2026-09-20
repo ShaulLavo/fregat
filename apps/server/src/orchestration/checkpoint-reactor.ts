@@ -1,3 +1,4 @@
+import { elapsedMs } from '@workspace/utils/timing'
 import { resolveSessionOwner } from './session-owner'
 import {
   commandIdSchema,
@@ -333,8 +334,4 @@ function checkpointTimestamp(event: OrchestrationEvent) {
 
 function checkpointCommandId(eventId: string) {
   return v.parse(commandIdSchema, `checkpoint:${eventId}:turn-diff-complete`)
-}
-
-function elapsedMs(startedAt: number) {
-  return Math.round((performance.now() - startedAt) * 100) / 100
 }

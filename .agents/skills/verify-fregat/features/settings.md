@@ -16,6 +16,8 @@ The settings command, or an address URL with a settings category.
 
 `scenario theme-gallery` inspects the gallery and the light/dark creation form. `scenario theme-bundles` proves distinct wallpapers per mode, scoped customization, reload, system-mode changes, Escape preview restoration, creation, export/import through the UI, and copy-only actions for embedded palettes. It restores the original settings and removes only its own fixtures. The standalone wallpaper-mode scenario assumes no theme bundle is selected.
 
+`scenario settings-font-input` types a font draft and cancels with Escape, checking that the shared string editor restores the saved font family.
+
 ## Gotchas
 
 Scope is a security boundary: a window-scoped value never reaches execution. Secrets never appear in the settings document.

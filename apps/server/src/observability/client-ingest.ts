@@ -1,5 +1,7 @@
+import { limitDiagnosticString as limitString } from '@workspace/observability/sanitize'
 import { createHash } from 'node:crypto'
-import { errorNumberField, errorStringField, isRecord } from '@workspace/contracts'
+import { errorNumberField, errorStringField } from '@workspace/contracts'
+import { isRecord } from '@workspace/utils/objects'
 import { log, type LogLevel } from 'evlog'
 
 import { observabilityConfig } from './runtime'
@@ -275,12 +277,6 @@ function sanitizeRecord(
 
 function sanitizePrimitive(value: unknown) {
   return typeof value === 'string' ? limitString(value) : value
-}
-
-function limitString(value: string) {
-  if (value.length <= maxStringLength) return value
-
-  return value.slice(0, maxStringLength)
 }
 
 function stringField(value: unknown) {

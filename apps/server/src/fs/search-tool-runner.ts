@@ -1,8 +1,9 @@
+import { elapsedMs } from '@workspace/utils/timing'
 import { spawn } from 'node:child_process'
 
 import { FsError } from './errors'
 import { collectDecodedStreamTail, readLines } from './search-line-decoder'
-import { elapsedMs, limitText, recordRequestContext, recordRequestWarning } from '../observability'
+import { limitText, recordRequestContext, recordRequestWarning } from '../observability'
 
 type SearchToolRequirements = {
   content: boolean

@@ -1,3 +1,5 @@
+import { isWorktreeStatus } from '@/lib/git-status'
+import { isStagedStatus } from '@/lib/git-status'
 import type { GitFileStatus } from '@workspace/contracts'
 import type {
   EditorTabConflictMap,
@@ -175,14 +177,6 @@ function statusForSymbolSource(file: GitFileStatus, source: GitSymbolSource) {
   if (source === 'worktree') return file.worktree
 
   return file.status
-}
-
-function isStagedStatus(status: GitFileStatus['index']) {
-  return status !== 'unmodified' && status !== 'untracked'
-}
-
-function isWorktreeStatus(status: GitFileStatus['worktree']) {
-  return status !== 'unmodified'
 }
 
 function diffStatusPaths(diff: GitComparison) {

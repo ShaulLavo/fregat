@@ -1,3 +1,9 @@
+import { selectEditorGroupTab } from '@/lib/documents/utils/groups'
+import { groupLeaf, groupTree, groupBranch } from '../../../../../test/factories/editor-groups'
+import {
+  editorTabRecordsForWorkbenchPanels,
+  activeEditorTabForWorkbenchPanels,
+} from '@/features/workbench/utils/panels'
 import { decodeTabContent } from '@/lib/documents/utils/storage-codec'
 import { TEST_SESSION_ID } from '../../../../../test/factories/chat'
 import { filesystemPath, tabId, workspaceRoot } from '@/lib/documents/utils/identity'
@@ -85,6 +91,7 @@ describe('workspace cache', () => {
       const contents = [...admitted, ...rejected]
       writeRootFolderCache(testScopedStorage, pickedDirectory(rootPath))
       writeWorkspaceSliceCache(testScopedStorage, rootPath, {
+        viewScrollPositions: [],
         editorHistory: contents,
         recentlyClosedTabs: contents,
         reopenScrollPositions: contents.map((content) => ({
@@ -96,7 +103,9 @@ describe('workspace cache', () => {
       const restored = readWorkspaceCache(testScopedStorage).workspaces[rootPath]
       expect(restored?.editorHistory).toEqual(admitted)
       expect(restored?.recentlyClosedTabs).toEqual(admitted)
-      expect(restored?.workbenchPanels.editorTabs.map((tab) => tab.content)).toEqual(admitted)
+      expect(
+        editorTabRecordsForWorkbenchPanels(restored!.workbenchPanels).map((tab) => tab.content),
+      ).toEqual(admitted)
       expect(restored?.reopenScrollPositions).toEqual(
         admitted.map((content) => ({ content, position: { left: 4, top: 80 } })),
       )
@@ -123,6 +132,7 @@ describe('workspace cache', () => {
       const rootPath = '/repo/nested'
       const content = testTabContent(path, rootPath)
       const slice: CachedWorkspaceSlice = {
+        viewScrollPositions: [],
         editorHistory: [content],
         recentlyClosedTabs: [content],
         reopenScrollPositions: [{ content, position: { left: 4, top: 80 } }],
@@ -133,34 +143,47 @@ describe('workspace cache', () => {
       expect(readWorkspaceCache(testScopedStorage).workspaces[rootPath]).toEqual(slice)
       writeWorkspaceSliceCache(testScopedStorage, '/other', slice)
       writeWorkspaceIndexCache(testScopedStorage, [rootPath, '/other'])
-      expect(readWorkspaceCache(testScopedStorage).workspaces['/other']).toEqual(
-        emptyWorkspaceSlice(),
-      )
+      expect(readWorkspaceCache(testScopedStorage).workspaces['/other']).toMatchObject({
+        editorHistory: [],
+        recentlyClosedTabs: [],
+        reopenScrollPositions: [],
+        viewScrollPositions: [],
+        workbenchPanels: {
+          editorGroups: { root: { kind: 'group', tabs: [], selectedTabId: null } },
+        },
+      })
     },
   )
 
-  it('promotes the first restored editor tab when the selection was unset', () => {
+  it('preserves an explicitly empty editor selection', () => {
+    const panels = workbenchPanelsForPaths(['/repo/a.ts', '/repo/b.ts'], null)
     const slice = {
       ...emptyWorkspaceSlice(),
       workbenchPanels: {
-        ...workbenchPanelsForPaths(['/repo/a.ts', '/repo/b.ts'], null),
-        activeEditorTabId: null,
+        ...panels,
+        editorGroups: selectEditorGroupTab(
+          panels.editorGroups,
+          panels.editorGroups.activeGroupId,
+          null,
+        ),
       },
     }
     writeRootFolderCache(testScopedStorage, pickedDirectory('/repo'))
     writeWorkspaceSliceCache(testScopedStorage, '/repo', slice)
 
     const restored = readWorkspaceCache(testScopedStorage).workspaces['/repo']
-    expect(restored?.workbenchPanels.editorTabs).toHaveLength(2)
-    expect(restored?.workbenchPanels.activeEditorTabId).toBe(
-      restored?.workbenchPanels.editorTabs[0]?.id,
-    )
+    expect(editorTabRecordsForWorkbenchPanels(restored!.workbenchPanels)).toHaveLength(2)
+    expect(activeEditorTabForWorkbenchPanels(restored!.workbenchPanels)).toBeNull()
   })
 
-  it('keeps duplicate tab IDs and selection while projecting scroll per content', () => {
+  it('keeps duplicate content in separate groups with independent view scroll', () => {
     const file = testTabContent(documentTargets.file)
     const comparison = testTabContent(documentTargets.savedComparison)
     const slice: CachedWorkspaceSlice = {
+      viewScrollPositions: [
+        { tabId: tabId('duplicate-1'), position: { left: 0, top: 120 } },
+        { tabId: tabId('duplicate-2'), position: { left: 40, top: 900 } },
+      ],
       editorHistory: [file, settingsTab()],
       recentlyClosedTabs: [comparison],
       reopenScrollPositions: [
@@ -169,11 +192,13 @@ describe('workspace cache', () => {
       ],
       workbenchPanels: {
         ...createDefaultWorkbenchPanels(),
-        activeEditorTabId: tabId('duplicate-2'),
-        editorTabs: [
-          { id: tabId('duplicate-1'), content: file },
-          { id: tabId('duplicate-2'), content: file },
-        ],
+        editorGroups: groupTree(
+          groupBranch('split', 'horizontal', [
+            { node: groupLeaf('left', [{ id: tabId('duplicate-1'), content: file }]), size: 35 },
+            { node: groupLeaf('right', [{ id: tabId('duplicate-2'), content: file }]), size: 65 },
+          ]),
+          'right',
+        ),
       },
     }
     writeRootFolderCache(testScopedStorage, pickedDirectory('/repo'))
@@ -191,6 +216,27 @@ describe('workspace cache', () => {
         { kind: 'document', document: { kind: 'compare-saved', file: { path: '/repo/src/a.ts' } } },
       ],
     })
+  })
+
+  it('discards a cached layout with duplicate group identities', () => {
+    const first = { id: tabId('a'), content: testTabContent('/repo/a.ts') }
+    const second = { id: tabId('b'), content: testTabContent('/repo/b.ts') }
+    const panels = createDefaultWorkbenchPanels()
+    const editorGroups = groupTree(
+      groupBranch('root', 'horizontal', [
+        { node: groupLeaf('duplicate', [first]), size: 50 },
+        { node: groupLeaf('duplicate', [second]), size: 50 },
+      ]),
+      'duplicate',
+    )
+    writeRootFolderCache(testScopedStorage, pickedDirectory('/repo'))
+    writeWorkspaceSliceCache(testScopedStorage, '/repo', {
+      ...emptyWorkspaceSlice(),
+      workbenchPanels: { ...panels, editorGroups },
+    })
+    const restored = readWorkspaceCache(testScopedStorage).workspaces['/repo']!
+    expect(editorTabRecordsForWorkbenchPanels(restored.workbenchPanels)).toEqual([])
+    expect(testScopedStorage.getItem(workspaceSliceStorageKey('/repo'))).toBeNull()
   })
 
   it('persists every durable editor tab through the same ordered collection and selection', () => {
@@ -259,6 +305,7 @@ describe('workspace cache', () => {
     const comparison = testTabContent(documentTargets.snapshot)
     writeRootFolderCache(testScopedStorage, pickedDirectory('/repo'))
     const slice: CachedWorkspaceSlice = {
+      viewScrollPositions: [],
       editorHistory: [comparison, file],
       recentlyClosedTabs: [file],
       reopenScrollPositions: [],
@@ -268,30 +315,34 @@ describe('workspace cache', () => {
     expect(readWorkspaceCache(testScopedStorage).workspaces['/repo']).toEqual(slice)
     expect(cachedSlice('/repo')).toMatchObject({
       workbenchPanels: {
-        editorTabs: [
-          {
-            content: {
-              kind: 'document',
-              document: { kind: 'file', relativePath: 'src/readme.md' },
-            },
-          },
-          {
-            content: {
-              kind: 'document',
-              document: {
-                kind: 'git-diff',
-                source: {
-                  kind: 'snapshot',
-                  path: '/repo/src/a.ts',
-                  oldPath: '/repo/src/old.ts',
-                  oldObjectId: DOCUMENT_OLD_OBJECT_ID,
-                  newObjectId: DOCUMENT_NEW_OBJECT_ID,
-                  status: 'renamed',
+        editorGroups: {
+          root: {
+            tabs: [
+              {
+                content: {
+                  kind: 'document',
+                  document: { kind: 'file', relativePath: 'src/readme.md' },
                 },
               },
-            },
+              {
+                content: {
+                  kind: 'document',
+                  document: {
+                    kind: 'git-diff',
+                    source: {
+                      kind: 'snapshot',
+                      path: '/repo/src/a.ts',
+                      oldPath: '/repo/src/old.ts',
+                      oldObjectId: DOCUMENT_OLD_OBJECT_ID,
+                      newObjectId: DOCUMENT_NEW_OBJECT_ID,
+                      status: 'renamed',
+                    },
+                  },
+                },
+              },
+            ],
           },
-        ],
+        },
       },
     })
   })
@@ -301,6 +352,7 @@ describe('workspace cache', () => {
     const file = testTabContent('/other/src/a.ts')
     writeRootFolderCache(testScopedStorage, pickedDirectory('/other'))
     writeWorkspaceSliceCache(testScopedStorage, '/other', {
+      viewScrollPositions: [],
       editorHistory: [foreign],
       recentlyClosedTabs: [foreign],
       reopenScrollPositions: [{ content: foreign, position: { left: 0, top: 40 } }],
@@ -310,15 +362,18 @@ describe('workspace cache', () => {
     expect(restored.editorHistory).toEqual([])
     expect(restored.recentlyClosedTabs).toEqual([])
     expect(restored.reopenScrollPositions).toEqual([])
-    expect(restored.workbenchPanels.editorTabs.map((tab) => tab.content)).toEqual([file])
-    expect(restored.workbenchPanels.activeEditorTabId).toBe(
-      restored.workbenchPanels.editorTabs[0]?.id,
+    expect(
+      editorTabRecordsForWorkbenchPanels(restored.workbenchPanels).map((tab) => tab.content),
+    ).toEqual([file])
+    expect(activeEditorTabForWorkbenchPanels(restored.workbenchPanels)?.id ?? null).toBe(
+      editorTabRecordsForWorkbenchPanels(restored.workbenchPanels)[0]?.id,
     )
   })
 
   it('restores a written slice and its workspace identity unchanged', () => {
     const contents = [testTabContent('/repo/src/a.ts'), testTabContent('/repo/src/b.ts')]
     const slice: CachedWorkspaceSlice = {
+      viewScrollPositions: [],
       editorHistory: contents,
       recentlyClosedTabs: [testTabContent('/repo/src/closed.ts')],
       reopenScrollPositions: testScrollPositions({ '/repo/src/a.ts': { left: 8, top: 320 } }),
@@ -409,7 +464,9 @@ describe('workspace cache', () => {
 
     expect(cached.workspaceOrder).toEqual(['/repo', '/other'])
     expect(
-      cached.workspaces['/other']?.workbenchPanels.editorTabs.map((tab) => tab.content),
+      editorTabRecordsForWorkbenchPanels(cached.workspaces['/other']?.workbenchPanels).map(
+        (tab) => tab.content,
+      ),
     ).toEqual([testTabContent('/other/src/b.ts')])
   })
 

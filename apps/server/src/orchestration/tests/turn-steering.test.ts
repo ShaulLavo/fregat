@@ -3,6 +3,29 @@ import { FIXTURE_SESSION_ID, sessionFrom } from '../../../test/factories/orchest
 import { correctionCommand, pendingSteerableTurn } from '../../../test/factories/provider-steering'
 import { createInternalError } from '../../observability/structured-errors'
 
+test('completed commentary keeps the provider turn open for a follow-up', async () => {
+  const { fixture, corrections, release } = await pendingSteerableTurn()
+  await fixture.command({
+    type: 'session.message.assistant.complete',
+    commandId: 'commentary-complete',
+    sessionId: FIXTURE_SESSION_ID,
+    turnId: 'turn-1',
+    messageId: 'commentary-message',
+    text: 'I will check the files now.',
+    completedAt: new Date().toISOString(),
+  })
+  expect((await sessionFrom(fixture)).latestTurn).toMatchObject({
+    state: 'running',
+    completedAt: null,
+    providerStartState: 'adopted',
+  })
+  await fixture.engine.dispatchClientCommand(correctionCommand())
+  await expect.poll(() => corrections.length).toBe(1)
+  release()
+  await fixture.engine.providerRuntimeIdle()
+  expect((await sessionFrom(fixture)).latestTurn).toMatchObject({ state: 'completed' })
+})
+
 test('a correction reaches the active provider turn once without starting another parent turn', async () => {
   const { fixture, adapter, corrections, release } = await pendingSteerableTurn()
   const before = (await sessionFrom(fixture)).latestTurn

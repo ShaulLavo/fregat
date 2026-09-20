@@ -1,4 +1,5 @@
-import { isRecord, REDACTED_SETTINGS_VALUE } from '@workspace/contracts'
+import { REDACTED_SETTINGS_VALUE } from '@workspace/contracts'
+import { isRecord } from '@workspace/utils/objects'
 import { parseSettingsDocument, readSettingsFile, readSettingsFileSync } from './json-document'
 
 /**

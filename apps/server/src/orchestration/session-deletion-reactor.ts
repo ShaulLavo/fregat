@@ -1,3 +1,4 @@
+import { errorMessage } from '@workspace/contracts'
 import { eq } from 'drizzle-orm'
 import * as v from 'valibot'
 import {
@@ -162,8 +163,4 @@ function cleanupComplete(state: SessionDeletionState) {
     (state.providerStop === 'completed' || state.providerStop === 'no-binding') &&
     state.blobCleanup === 'completed'
   )
-}
-
-function errorMessage(error: unknown) {
-  return error instanceof Error ? error.message : String(error)
 }

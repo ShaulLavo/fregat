@@ -171,7 +171,7 @@ function advancePastEmptyMatch(regex: RegExp, line: string) {
   regex.lastIndex = current + (codePoint && codePoint > 0xffff ? 2 : 1)
 }
 
-function isWholeWordMatch(text: string, start: number, end: number, wholeWord?: boolean) {
+export function isWholeWordMatch(text: string, start: number, end: number, wholeWord?: boolean) {
   if (!wholeWord) return true
 
   return isWordBoundary(text, start, 'left') && isWordBoundary(text, end, 'right')

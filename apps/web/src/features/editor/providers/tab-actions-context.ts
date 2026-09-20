@@ -6,10 +6,6 @@ import type { RequestCloseTab, RequestCloseTabs } from '@/features/editor/hooks/
 export type EditorTabActions = {
   readonly requestCloseTab: RequestCloseTab
   readonly requestCloseTabs: RequestCloseTabs
-  readonly reorderTab: (
-    tabId: TabId,
-    targetIndex: number,
-  ) => Promise<import('@/state/navigation-coordinator').NavigationResult>
   readonly selectTab: (tabId: TabId) => void
 }
 

@@ -1,3 +1,4 @@
+import { activeEditorTab as selectedGroupTab, allEditorTabs } from '@/lib/documents/utils/groups'
 import { getClient } from '@/lib/client'
 import { testDocumentKey, testTabContent } from '../../../../test/factories/document-targets'
 import { filesystemPath } from '@/lib/documents/utils/identity'
@@ -100,7 +101,7 @@ test('late invalidation survives same-workspace navigation and preserves the dir
       status: 'applied',
     })
     const editor = application.getSnapshot().editor
-    const tabId = store.getState().workbenchPanels.activeEditorTabId
+    const tabId = selectedGroupTab(store.getState().workbenchPanels.editorGroups)?.id ?? null
     if (!tabId) return expect.unreachable('the editor tab is missing')
     const view = editor.documentStore.getState().ensureEditorView(tabId, file)
     createEditorBufferSession(view.buffer, view.view).applyText('unsaved\n')
@@ -110,12 +111,11 @@ test('late invalidation survives same-workspace navigation and preserves the dir
     await waitFor(() => expect(store.getState().rootFolder).toBeNull())
     expect(navigation.getSnapshot().status).toBe('unavailable')
     expect(readAddressCache()).toContain('/~-/')
-    expect(
-      store
-        .getState()
-        .parkedWorkspaces.get('repo')
-        ?.workbenchPanels.editorTabs.map((tab) => tab.content),
-    ).toEqual([testTabContent('repo/a.ts')])
+    const parked = store.getState().parkedWorkspaces.get('repo')
+    if (!parked) return expect.unreachable('the removed workspace was not parked')
+    expect(allEditorTabs(parked.workbenchPanels.editorGroups).map((tab) => tab.content)).toEqual([
+      testTabContent('repo/a.ts'),
+    ])
     expect(
       editor.documentStore.getState().getLiveEditorDocument(testDocumentKey('repo/a.ts'))?.buffer,
     ).toBe(view.buffer)

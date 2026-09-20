@@ -1,3 +1,4 @@
+import { createSubscriptions } from '@workspace/utils/subscriptions'
 import { useSyncExternalStore } from 'react'
 
 /**
@@ -8,31 +9,20 @@ import { useSyncExternalStore } from 'react'
  * you glanced at another file would feel broken.
  */
 let category: string | null = null
-const listeners = new Set<() => void>()
-
-function settingsCategory() {
-  return category
-}
+const subscriptions = createSubscriptions()
+const subscribe = subscriptions.subscribe
 
 export function selectSettingsCategory(next: string | null) {
   if (next === category) return
 
   category = next
-  for (const listener of listeners) listener()
+  subscriptions.notify()
 }
 
 export function readSettingsCategory() {
   return category
 }
 
-function subscribe(listener: () => void) {
-  listeners.add(listener)
-
-  return () => {
-    listeners.delete(listener)
-  }
-}
-
 export function useSettingsCategory() {
-  return useSyncExternalStore(subscribe, settingsCategory, settingsCategory)
+  return useSyncExternalStore(subscribe, readSettingsCategory, readSettingsCategory)
 }

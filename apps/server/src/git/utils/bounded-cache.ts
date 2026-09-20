@@ -1,3 +1,9 @@
+import {
+  purgeExpiredEntries,
+  readFreshEntry,
+  trimEntriesToCapacity,
+} from '../../utils/cache-entries'
+
 /**
  * The git service's cache primitive: string-keyed, capacity-bounded, TTL-bounded,
  * and single-flight. Every entry holds the in-flight promise rather than the
@@ -35,17 +41,12 @@ export class BoundedTtlCache<Value> {
   }
 
   get size() {
-    this.purgeExpired()
+    purgeExpiredEntries(this.entries, this.now)
     return this.entries.size
   }
 
   read(key: string) {
-    const entry = this.entries.get(key)
-    if (!entry) return undefined
-    if (!this.isExpired(entry)) return entry.value
-
-    this.entries.delete(key)
-    return undefined
+    return readFreshEntry(this.entries, key, this.now)?.value
   }
 
   load(key: string, loader: () => Promise<Value>): Promise<Value> {
@@ -77,10 +78,10 @@ export class BoundedTtlCache<Value> {
   }
 
   private write(key: string, value: Promise<Value>) {
-    this.purgeExpired()
+    purgeExpiredEntries(this.entries, this.now)
     this.entries.delete(key)
     this.entries.set(key, { expiresAt: null, value })
-    this.trimToCapacity()
+    trimEntriesToCapacity(this.entries, this.capacity)
   }
 
   private stamp(key: string, pending: Promise<Value>, value: Value) {
@@ -100,29 +101,5 @@ export class BoundedTtlCache<Value> {
     if (typeof this.ttlMs === 'number') return this.ttlMs
 
     return this.ttlMs(value)
-  }
-
-  private purgeExpired() {
-    for (const [key, entry] of this.entries) {
-      if (!this.isExpired(entry)) continue
-
-      this.entries.delete(key)
-    }
-  }
-
-  /** Insertion-ordered `Map`, so the oldest write is the first key out. */
-  private trimToCapacity() {
-    while (this.entries.size > this.capacity) {
-      const key = this.entries.keys().next().value
-      if (key === undefined) return
-
-      this.entries.delete(key)
-    }
-  }
-
-  private isExpired(entry: CacheEntry<Value>) {
-    if (entry.expiresAt === null) return false
-
-    return entry.expiresAt <= this.now()
   }
 }

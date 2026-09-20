@@ -1,8 +1,9 @@
+import { elapsedMs } from '@workspace/utils/timing'
 import type { EnvironmentId, SessionId } from '@workspace/contracts'
 
 import type { ChatTransport } from '@/features/chat/transport/chat-transport'
 import { useChatProjectionStore } from '@/features/chat/state/chat-projection-store'
-import { elapsedMs } from '@/features/chat/utils/elapsed-ms'
+
 import {
   chatSessionSnapshotSummary,
   createChatPipelineScope,

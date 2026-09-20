@@ -5,6 +5,7 @@ import {
 import type { CachedWorkspaceSlice } from '@/features/workspace/state/cache'
 import {
   closeEditorContentInWorkbenchPanels,
+  editorTabRecordsForWorkbenchPanels,
   renameEditorFileInWorkbenchPanels,
 } from '@/features/workbench/utils/panels'
 import { documentTab, rekeyTabFile, sameTabContent } from '@/lib/documents/utils/tabs'
@@ -27,7 +28,15 @@ export function updateWorkspaceDocument(
   const content = changedContent(change)
   if (content === null || !sliceContainsContent(slice, content)) return slice
   if (change.kind === 'remove') {
+    const removedIds = new Set(
+      editorTabRecordsForWorkbenchPanels(slice.workbenchPanels)
+        .filter((tab) => sameTabContent(tab.content, content))
+        .map((tab) => tab.id),
+    )
     return {
+      viewScrollPositions: slice.viewScrollPositions.filter(
+        (entry) => !removedIds.has(entry.tabId),
+      ),
       workbenchPanels: closeEditorContentInWorkbenchPanels(slice.workbenchPanels, content),
       editorHistory: editorHistoryForClosedContent(slice.editorHistory, content),
       recentlyClosedTabs: editorHistoryForClosedContent(slice.recentlyClosedTabs, content),
@@ -37,6 +46,7 @@ export function updateWorkspaceDocument(
     }
   }
   return {
+    viewScrollPositions: slice.viewScrollPositions,
     workbenchPanels: renameEditorFileInWorkbenchPanels(
       slice.workbenchPanels,
       change.from,
@@ -80,7 +90,9 @@ function changedContent(change: WorkspaceDocumentChange): TabContent | null {
 
 function sliceContainsContent(slice: CachedWorkspaceSlice, content: TabContent) {
   return (
-    slice.workbenchPanels.editorTabs.some((tab) => sameTabContent(tab.content, content)) ||
+    editorTabRecordsForWorkbenchPanels(slice.workbenchPanels).some((tab) =>
+      sameTabContent(tab.content, content),
+    ) ||
     slice.editorHistory.some((entry) => sameTabContent(entry, content)) ||
     slice.recentlyClosedTabs.some((entry) => sameTabContent(entry, content)) ||
     slice.reopenScrollPositions.some((entry) => sameTabContent(entry.content, content))

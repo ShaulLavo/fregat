@@ -1,3 +1,4 @@
+import { pathSegments as normalizePathSegments } from '@/features/chat/utils/path-segments'
 import type { ChatTurnDiffSummary } from '@workspace/client-core/chat/types'
 
 export type ChatTurnDiffFile = ChatTurnDiffSummary['files'][number]
@@ -177,13 +178,6 @@ function readStat(file: ChatTurnDiffFile): ChatTurnDiffStat | null {
     additions: file.additions,
     deletions: file.deletions,
   }
-}
-
-function normalizePathSegments(pathValue: string) {
-  return pathValue
-    .replaceAll('\\', '/')
-    .split('/')
-    .filter((segment) => segment.length > 0)
 }
 
 function compareByName(left: { name: string }, right: { name: string }) {

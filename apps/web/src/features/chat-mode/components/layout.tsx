@@ -83,10 +83,10 @@ export function ChatModeLayout({
             <ResizablePanel
               className={cn(
                 'border-border min-h-0 min-w-0 overflow-hidden border-l',
-                // The editor tab paints its own content well; every other tool
-                // pane needs the pane material. Painting both stacks two card
-                // layers and the well loses its wallpaper ghost.
-                panels.activeToolTab !== 'editor' && 'bg-card backdrop-material',
+                // Editor and terminal paint their own content wells.
+                panels.activeToolTab !== 'editor' &&
+                  panels.activeToolTab !== 'terminal' &&
+                  'bg-card backdrop-material',
               )}
               defaultSize={TOOL_PANE_DEFAULT_SIZE}
               id='tools'

@@ -2,7 +2,7 @@ import { useActiveChatProjection } from '@/features/chat/hooks/use-active-projec
 import type { InteractionMode, RuntimeMode, SessionId } from '@workspace/contracts'
 import { useRef } from 'react'
 
-import { useElementWidth } from '@/features/workspace/hooks/use-element-width'
+import { useElementWidth } from '@/hooks/use-element-width'
 import { contextUsageForActivities } from '@workspace/client-core/chat/context-usage'
 import { selectChatSessionById } from '@workspace/client-core/chat/selectors'
 import type { ChatInputDraftTarget } from '@/features/chat/state/chat-input-draft-store'

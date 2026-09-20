@@ -149,3 +149,24 @@ test('a save does not mark clean over text typed while it was in flight', () => 
   ).toBe(false)
   expect(store.getState().getLiveEditorDocument(ID)?.buffer.materializeFullText()).toContain('!')
 })
+
+test('reloading a conflict resets text and revision together and clears dirty state', () => {
+  const store = createEditorDocumentStore()
+  seed(store, 'initial', 'rev-1')
+  const initial = store.getState().getLiveEditorDocument(ID)
+  expect(initial).not.toBeNull()
+  if (!initial) return
+  createEditorBufferSession(initial.buffer).applyText('local')
+  store.getState().markSettingsDocumentConflict(ID, 'confirmed', 'rev-2')
+
+  expect(store.getState().reloadSettingsDocument(ID)).toBe(true)
+
+  const reloaded = store.getState().getLiveEditorDocument(ID)
+  expect(reloaded?.buffer.materializeFullText()).toBe('confirmed')
+  expect(reloaded?.buffer.isDirty()).toBe(false)
+  expect(reloaded?.sync).toEqual({ kind: 'settings', revision: 'rev-2', state: 'idle' })
+  expect(reloaded?.contentRevision).not.toBe(initial.contentRevision)
+  expect(reloaded?.localRevision).toBe(reloaded?.buffer.getRevision())
+  expect(store.getState().dirtyDocumentKeys.has(ID)).toBe(false)
+  expect(store.getState().reloadSettingsDocument(ID)).toBe(false)
+})

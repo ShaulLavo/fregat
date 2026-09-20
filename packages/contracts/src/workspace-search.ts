@@ -1,6 +1,6 @@
+import * as v from 'valibot'
 import type { EntryTypeFilter } from './tree-entry'
 
-type WorkspaceSearchSource = 'disk' | 'open-buffer'
 export type WorkspaceSearchMatchMode = 'literal' | 'regex' | 'fuzzy'
 export type WorkspaceSearchProviderSource = 'fallback' | 'fd' | 'index' | 'rg'
 type WorkspaceSearchIndexReadiness = 'cold' | 'building' | 'ready' | 'stale' | 'failed'
@@ -35,21 +35,30 @@ export type WorkspaceSearchQuery = {
   wholeWord?: boolean
 }
 
-export type WorkspaceSearchMatch = {
-  birthtimeMs?: number
-  column?: number
-  endColumn?: number
-  kind: 'name' | 'content'
-  line?: number
-  mtimeMs?: number
-  path: string
-  preview?: string
-  previewStartColumn?: number
-  size?: number
-  source: WorkspaceSearchSource
-  targetType?: EntryTypeFilter
-  type: EntryTypeFilter
-}
+export const entryTypeSchema = v.union([
+  v.literal('file'),
+  v.literal('directory'),
+  v.literal('symlink'),
+  v.literal('other'),
+])
+
+export const workspaceSearchMatchSchema = v.object({
+  birthtimeMs: v.optional(v.number()),
+  column: v.optional(v.number()),
+  endColumn: v.optional(v.number()),
+  kind: v.union([v.literal('name'), v.literal('content')]),
+  line: v.optional(v.number()),
+  mtimeMs: v.optional(v.number()),
+  path: v.string(),
+  preview: v.optional(v.string()),
+  previewStartColumn: v.optional(v.number()),
+  size: v.optional(v.number()),
+  source: v.union([v.literal('disk'), v.literal('open-buffer')]),
+  targetType: v.optional(entryTypeSchema),
+  type: entryTypeSchema,
+})
+
+export type WorkspaceSearchMatch = v.InferOutput<typeof workspaceSearchMatchSchema>
 
 export type WorkspaceSearchProviderMeasurement = {
   durationMs: number

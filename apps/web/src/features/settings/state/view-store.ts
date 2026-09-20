@@ -1,3 +1,4 @@
+import { createSubscriptions } from '@workspace/utils/subscriptions'
 import { useSyncExternalStore } from 'react'
 
 export type SettingsView = 'form' | 'json'
@@ -12,7 +13,8 @@ export type SettingsView = 'form' | 'json'
  * is the broken one you opened the JSON view to fix.
  */
 let view: SettingsView = 'form'
-const listeners = new Set<() => void>()
+const subscriptions = createSubscriptions()
+const subscribe = subscriptions.subscribe
 
 export function settingsView(): SettingsView {
   return view
@@ -22,15 +24,9 @@ export function selectSettingsView(next: SettingsView) {
   if (next === view) return
 
   view = next
-  for (const listener of listeners) listener()
+  subscriptions.notify()
 }
 
 export function useSettingsView(): SettingsView {
   return useSyncExternalStore(subscribe, settingsView, settingsView)
-}
-
-function subscribe(listener: () => void) {
-  listeners.add(listener)
-
-  return () => listeners.delete(listener)
 }

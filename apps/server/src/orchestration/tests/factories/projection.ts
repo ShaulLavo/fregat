@@ -1,6 +1,6 @@
 import { Database } from 'bun:sqlite'
 import { drizzle } from 'drizzle-orm/bun-sqlite'
-import { migrateOrchestrationDatabase } from '../../../db/migrations'
+import { migratePlatformDatabase as migrateOrchestrationDatabase } from '../../../db/migrations'
 import * as schema from '../../../db/schema'
 import { OrchestrationEventStore, type PendingOrchestrationEvent } from '../../event-store'
 import { OrchestrationProjectionPipeline } from '../../projection-pipeline'

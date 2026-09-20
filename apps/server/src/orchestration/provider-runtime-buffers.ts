@@ -1,3 +1,4 @@
+import { purgeExpiredEntries, readFreshEntry, trimEntriesToCapacity } from '../utils/cache-entries'
 import { messageIdSchema, type MessageId, type SessionId, type TurnId } from '@workspace/contracts'
 import * as v from 'valibot'
 
@@ -37,18 +38,13 @@ export class BoundedTtlCache<Key, Value> {
 
   get(key: Key) {
     // Expiry is lazy per key; sweeping the whole cache made every streaming read O(n).
-    const entry = this.entries.get(key)
-    if (!entry) return undefined
-    if (!this.isExpired(entry)) return entry.value
-
-    this.entries.delete(key)
-    return undefined
+    return readFreshEntry(this.entries, key, this.now)?.value
   }
 
   set(key: Key, value: Value) {
     this.entries.delete(key)
     this.entries.set(key, { expiresAt: this.now() + this.ttlMs, value })
-    this.trimToCapacity()
+    trimEntriesToCapacity(this.entries, this.capacity)
   }
 
   delete(key: Key) {
@@ -60,27 +56,8 @@ export class BoundedTtlCache<Key, Value> {
   }
 
   keys() {
-    this.purgeExpired()
+    purgeExpiredEntries(this.entries, this.now)
     return Array.from(this.entries.keys())
-  }
-
-  private purgeExpired() {
-    for (const [key, entry] of this.entries) {
-      if (!this.isExpired(entry)) continue
-      this.entries.delete(key)
-    }
-  }
-
-  private trimToCapacity() {
-    while (this.entries.size > this.capacity) {
-      const key = this.entries.keys().next().value
-      if (key === undefined) return
-      this.entries.delete(key)
-    }
-  }
-
-  private isExpired(entry: CacheEntry<Value>) {
-    return entry.expiresAt <= this.now()
   }
 }
 

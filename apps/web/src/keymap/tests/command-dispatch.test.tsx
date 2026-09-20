@@ -74,8 +74,10 @@ test.each([
 test.for([
   ['fileTree.newFile', 'create-file'],
   ['fileTree.newFolder', 'create-folder'],
+  ['workspace.focusFileTree', 'focus'],
+  ['workspace.findInFileTree', 'open-search'],
 ] as const)(
-  '%s opens Files and delegates creation to its focus owner',
+  '%s opens Files and delegates its intent to the focus owner',
   async ([id, intent], { client, server }) => {
     const focus = trackedFocusService()
     const workspace = await navigationWorkspace(client, server)

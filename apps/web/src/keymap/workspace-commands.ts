@@ -11,6 +11,7 @@ import {
   CardsIcon,
   ChatCircleIcon,
   FilePlusIcon,
+  FilesIcon,
   FolderPlusIcon,
   PlayIcon,
   ClockCounterClockwiseIcon,
@@ -89,6 +90,9 @@ import {
 } from '@/lib/focus/state/service'
 import { matchesActiveSurface } from '@/lib/focus/utils/active-surface'
 import { toggledWorkspaceUiMode } from '@/lib/ui-mode'
+import { allEditorGroups, activeEditorGroup } from '@/lib/documents/utils/groups'
+import type { GroupEdge } from '@/lib/documents/utils/group-types'
+import { canSplitEditorGroup } from '@/lib/documents/state/group-geometry'
 
 import {
   defineCommand,
@@ -152,6 +156,30 @@ function operationStart(operation: Promise<boolean>): StartedCommand {
 
 function navigationStart(operation: Promise<NavigationResult>): StartedCommand {
   return afterNavigation(operation, () => handled)
+}
+
+function splitActiveEditor(runtime: WorkspaceCommandRuntime, edge: GroupEdge) {
+  const panels = runtime.workspace.getState().workbenchPanels
+  const group = activeEditorGroup(panels.editorGroups)
+  const tab = activeEditorTabForWorkbenchPanels(panels)
+  if (!tab || tab.content.kind !== 'document' || tab.content.document.kind === 'search')
+    return declined
+  if (!canSplitEditorGroup(group.id, edge)) return declined
+  return afterNavigation(
+    runtime.editor.placeTab({
+      tabId: tab.id,
+      mode: 'copy',
+      target: { kind: 'edge', groupId: group.id, edge },
+    }),
+    () => focusActiveSurface(runtime),
+  )
+}
+
+function focusEditorGroup(runtime: WorkspaceCommandRuntime, index: number) {
+  const groups = runtime.workspace.getState().workbenchPanels.editorGroups
+  const group = allEditorGroups(groups)[index]
+  if (!group) return declined
+  return afterNavigation(runtime.editor.setActiveGroup(group.id), () => focusActiveSurface(runtime))
 }
 
 function afterNavigation(
@@ -229,6 +257,22 @@ function selectAdjacentTerminal(
 
   runtime.workspace.getState().setWorkbenchPanels(panels)
   return focusActiveTerminalStart(runtime, rootPath, panels)
+}
+
+function focusFileTree(
+  { runtime, snapshot }: WorkspaceCommandHandlerContext,
+  intent: FocusIntent = 'focus',
+) {
+  const rootPath = snapshot.rootPath
+  if (!rootPath) return declined
+  return afterNavigation(
+    getNavigation().setWorkbenchPanels(
+      showWorkbenchSidebarTab(snapshot.workbenchPanels, 'files'),
+      runtime.workspace,
+      'workbench',
+    ),
+    () => focusIdInLayoutStart(runtime, { kind: 'file-tree', rootPath }, 'workbench', intent),
+  )
 }
 
 function focusIdInLayoutStart(
@@ -519,50 +563,14 @@ export const workspaceCommands = [
     undoCategory: 'file-operation',
     when: ['workspaceOpen', 'workspaceMutable'],
     icon: FilePlusIcon,
-    run: ({ runtime, snapshot }) => {
-      const rootPath = snapshot.rootPath
-      if (!rootPath) return declined
-
-      return afterNavigation(
-        getNavigation().setWorkbenchPanels(
-          showWorkbenchSidebarTab(snapshot.workbenchPanels, 'files'),
-          runtime.workspace,
-          'workbench',
-        ),
-        () =>
-          focusIdInLayoutStart(
-            runtime,
-            { kind: 'file-tree', rootPath },
-            'workbench',
-            'create-file',
-          ),
-      )
-    },
+    run: (context) => focusFileTree(context, 'create-file'),
   }),
   defineCommand({
     ...workbenchCommandMetadata['fileTree.newFolder'],
     undoCategory: 'file-operation',
     when: ['workspaceOpen', 'workspaceMutable'],
     icon: FolderPlusIcon,
-    run: ({ runtime, snapshot }) => {
-      const rootPath = snapshot.rootPath
-      if (!rootPath) return declined
-
-      return afterNavigation(
-        getNavigation().setWorkbenchPanels(
-          showWorkbenchSidebarTab(snapshot.workbenchPanels, 'files'),
-          runtime.workspace,
-          'workbench',
-        ),
-        () =>
-          focusIdInLayoutStart(
-            runtime,
-            { kind: 'file-tree', rootPath },
-            'workbench',
-            'create-folder',
-          ),
-      )
-    },
+    run: (context) => focusFileTree(context, 'create-folder'),
   }),
   defineCommand({
     ...workspaceCommandMetadata['workspace.showSettings'],
@@ -757,19 +765,40 @@ export const workspaceCommands = [
     },
   }),
   defineCommand({
+    ...workspaceCommandMetadata['workspace.splitEditorRight'],
+    icon: FilesIcon,
+    run: ({ runtime }) => splitActiveEditor(runtime, 'right'),
+  }),
+  defineCommand({
+    ...workspaceCommandMetadata['workspace.splitEditorDown'],
+    icon: FilesIcon,
+    run: ({ runtime }) => splitActiveEditor(runtime, 'bottom'),
+  }),
+  defineCommand({
+    ...workspaceCommandMetadata['workspace.moveTabToGroup'],
+    icon: FilesIcon,
+    run: ({ runtime }) => {
+      const panels = runtime.workspace.getState().workbenchPanels
+      const tab = activeEditorTabForWorkbenchPanels(panels)
+      if (!tab || allEditorGroups(panels.editorGroups).length < 2) return declined
+      runtime.editor.requestMoveTab(tab.id)
+      return handled
+    },
+  }),
+  defineCommand({
     ...workspaceCommandMetadata['workspace.focusFirstEditorGroup'],
     icon: CrosshairIcon,
-    run: ({ runtime }) => focusActiveSurface(runtime),
+    run: ({ runtime }) => focusEditorGroup(runtime, 0),
   }),
   defineCommand({
     ...workspaceCommandMetadata['workspace.focusSecondEditorGroup'],
     icon: CrosshairIcon,
-    run: ({ runtime }) => focusActiveSurface(runtime),
+    run: ({ runtime }) => focusEditorGroup(runtime, 1),
   }),
   defineCommand({
     ...workspaceCommandMetadata['workspace.focusThirdEditorGroup'],
     icon: CrosshairIcon,
-    run: ({ runtime }) => focusActiveSurface(runtime),
+    run: ({ runtime }) => focusEditorGroup(runtime, 2),
   }),
   defineCommand({
     ...workspaceCommandMetadata['workspace.focusEditor'],
@@ -779,65 +808,19 @@ export const workspaceCommands = [
   defineCommand({
     ...workspaceCommandMetadata['workspace.focusFileTree'],
     icon: CrosshairIcon,
-    run: ({ runtime, snapshot }) => {
-      const rootPath = snapshot.rootPath
-      if (!rootPath) return declined
-
-      return afterNavigation(
-        getNavigation().setWorkbenchPanels(
-          showWorkbenchSidebarTab(snapshot.workbenchPanels, 'files'),
-          runtime.workspace,
-          'workbench',
-        ),
-        () => focusIdInLayoutStart(runtime, { kind: 'file-tree', rootPath }, 'workbench'),
-      )
-    },
+    run: (context) => focusFileTree(context, 'focus'),
   }),
   defineCommand({
     ...workspaceCommandMetadata['workspace.findInFileTree'],
     icon: FileMagnifyingGlassIcon,
-    run: ({ runtime, snapshot }) => {
-      const rootPath = snapshot.rootPath
-      if (!rootPath) return declined
-
-      return afterNavigation(
-        getNavigation().setWorkbenchPanels(
-          showWorkbenchSidebarTab(snapshot.workbenchPanels, 'files'),
-          runtime.workspace,
-          'workbench',
-        ),
-        () =>
-          focusIdInLayoutStart(
-            runtime,
-            { kind: 'file-tree', rootPath },
-            'workbench',
-            'open-search',
-          ),
-      )
-    },
+    run: (context) => focusFileTree(context, 'open-search'),
   }),
   defineCommand({
     ...workspaceCommandMetadata['workspace.revealActiveFileInTree'],
     icon: CrosshairIcon,
-    run: ({ runtime, snapshot }) => {
-      if (!filesystemResource(snapshot.activeDocument)) return declined
-      const rootPath = snapshot.rootPath
-      if (!rootPath) return declined
-
-      return afterNavigation(
-        getNavigation().setWorkbenchPanels(
-          showWorkbenchSidebarTab(snapshot.workbenchPanels, 'files'),
-          runtime.workspace,
-          'workbench',
-        ),
-        () =>
-          focusIdInLayoutStart(
-            runtime,
-            { kind: 'file-tree', rootPath },
-            'workbench',
-            'reveal-active',
-          ),
-      )
+    run: (context) => {
+      if (!filesystemResource(context.snapshot.activeDocument)) return declined
+      return focusFileTree(context, 'reveal-active')
     },
   }),
   defineCommand({

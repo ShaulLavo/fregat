@@ -1,6 +1,10 @@
+import { lineStartOffset } from '@workspace/utils/strings'
+import { samePath } from '../../../utils/path'
+import { normalizeNativePath } from '../../../utils/path'
+import { isInsidePath } from '../../../utils/path'
 import path from 'node:path'
 
-import { isRecord } from '@workspace/contracts'
+import { isRecord } from '@workspace/utils/objects'
 import ts from 'typescript-language-service'
 import type * as lsp from 'vscode-languageserver-protocol'
 
@@ -112,29 +116,9 @@ export function strictRangeFromTextSpan(text: string, span: ts.TextSpan): lsp.Ra
 }
 
 export function lspPositionToOffset(text: string, position: lsp.Position): number {
-  let line = 0
-  let lineStart = 0
-
-  for (let index = 0; index < text.length; index += 1) {
-    if (line >= position.line) break
-    if (text[index] !== '\n') continue
-    line += 1
-    lineStart = index + 1
-  }
-
-  if (line < position.line) return text.length
+  const lineStart = lineStartOffset(text, position.line)
+  if (lineStart === null) return text.length
   return clampOffset(lineStart + position.character, text)
-}
-
-export function normalizeNativePath(input: string): string {
-  return path.resolve(input).split(path.sep).join('/')
-}
-
-export function isInsidePath(root: string, candidate: string): boolean {
-  const relative = path.relative(root, candidate)
-  if (relative === '') return true
-  if (relative === '..' || relative.startsWith(`..${path.sep}`)) return false
-  return !path.isAbsolute(relative)
 }
 
 function canReadFile(ctx: SessionContext, fileName: string): boolean {
@@ -207,10 +191,33 @@ function clampOffset(offset: number, text: string): number {
   return Math.min(text.length, Math.max(0, offset))
 }
 
-function samePath(left: string, right: string): boolean {
-  return normalizeNativePath(left) === normalizeNativePath(right)
-}
-
 function typeScriptLibDirectory(): string {
   return normalizeNativePath(path.dirname(ts.getDefaultLibFilePath({})))
+}
+
+export function locationForTextSpan(
+  ctx: SessionContext,
+  fileName: string,
+  span: ts.TextSpan,
+): readonly lsp.Location[] {
+  const normalized = normalizeNativePath(fileName)
+  if (!isInsidePath(ctx.root, normalized)) return []
+
+  const text = documentText(ctx, normalized)
+  if (text === null) return []
+
+  return [
+    {
+      uri: documentUriForFileName(ctx, normalized),
+      range: rangeFromTextSpan(text, span),
+    },
+  ]
+}
+
+export function textDocumentIdentifier(params: unknown): lsp.TextDocumentIdentifier | null {
+  if (!isRecord(params)) return null
+  if (!isRecord(params.textDocument)) return null
+  return typeof params.textDocument.uri === 'string'
+    ? ({ uri: params.textDocument.uri } satisfies lsp.TextDocumentIdentifier)
+    : null
 }

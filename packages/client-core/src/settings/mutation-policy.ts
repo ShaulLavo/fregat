@@ -56,18 +56,6 @@ export function settingsRetryDelay(attempt: number) {
   return Math.min(250 * 2 ** attempt, 1_000)
 }
 
-export function settingsDurationSince(startedAt: number) {
-  return settingsDurationBetween(startedAt, settingsNow())
-}
-
-export function settingsDurationBetween(startedAt: number, endedAt: number) {
-  return Math.round((endedAt - startedAt) * 100) / 100
-}
-
-export function settingsNow() {
-  return typeof performance === 'undefined' ? Date.now() : performance.now()
-}
-
 function versionIsNewer(
   current: { readonly epoch: string; readonly sequence: number },
   applied: { readonly epoch: string; readonly sequence: number },

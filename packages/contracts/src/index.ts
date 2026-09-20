@@ -98,7 +98,6 @@ export {
 } from './fuzzy-rank'
 export type { ErrorCategory } from './error-category'
 export { errorNumberField, errorStringField, type ErrorStringFieldOptions } from './error-fields'
-export { isRecord } from './is-record'
 export type {
   WorkspaceEditEventPublication,
   WorkspaceEditPartialAcknowledgement,
@@ -794,3 +793,25 @@ export * from './themes/bundle-settings'
 export * from './themes/archive'
 export * from './themes/bundles'
 export { SYNTAX_THEME_MODES } from './themes/syntax-modes'
+
+export { errorMessage } from './error-fields'
+
+export { clampComposerCursor } from './composer-tokens'
+
+export { isProviderTurnFailureActivity } from './provider-activity'
+
+export { isWholeWordMatch } from './workspace-search-match'
+
+export { queryPieces } from './fuzzy-rank'
+
+export { orchestrationReplaySummary } from './orchestration-replay-summary'
+
+export { errorSummary } from './error-fields'
+
+export { planStepStatus } from './plan-step-status'
+
+export { nodeErrorCode } from './error-fields'
+
+export { chatCommandSummary } from './command-summary'
+
+export { entryTypeSchema, workspaceSearchMatchSchema } from './workspace-search'

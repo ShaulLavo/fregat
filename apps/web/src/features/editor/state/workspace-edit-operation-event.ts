@@ -1,3 +1,4 @@
+import { nowMs } from '@workspace/utils/timing'
 import { createWideEventScope } from '@/lib/wide-event-scope'
 import type { WideEventScope } from '@workspace/observability/scope'
 
@@ -42,7 +43,7 @@ export class WorkspaceEditOperationEvent {
   private readonly startedAt: number | null
 
   constructor(options: WorkspaceEditOperationEventOptions) {
-    this.now = options.now ?? defaultNow
+    this.now = options.now ?? nowMs
     this.startedAt = this.readClock()
     this.phaseStartedAt = this.startedAt
     const createScope = options.createScope ?? createWideEventScope
@@ -101,10 +102,6 @@ export class WorkspaceEditOperationEvent {
     const duration = elapsed(this.phaseStartedAt, finishedAt)
     this.phaseDurationsMs[phase] = (this.phaseDurationsMs[phase] ?? 0) + duration
   }
-}
-
-function defaultNow(): number {
-  return performance.now()
 }
 
 function elapsed(startedAt: number | null, finishedAt: number | null): number {

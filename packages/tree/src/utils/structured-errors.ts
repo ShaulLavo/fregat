@@ -1,8 +1,5 @@
-import { createError, defineErrorCatalog, type ErrorOptions } from 'evlog'
-
-type TreeStructuredErrorOptions = Omit<ErrorOptions, 'cause'> & {
-  cause?: unknown
-}
+import { createStructuredError as createTreeStructuredError } from '@workspace/observability/errors'
+import { defineErrorCatalog } from 'evlog'
 
 const treeErrors = defineErrorCatalog('tree', {
   INVARIANT_ERROR: {
@@ -21,15 +18,5 @@ export function createTreeError(message: string, cause?: unknown) {
     message,
     status: treeErrors.INVARIANT_ERROR.status,
     why: treeErrors.INVARIANT_ERROR.why,
-  })
-}
-
-function createTreeStructuredError(options: TreeStructuredErrorOptions) {
-  const { cause, ...rest } = options
-
-  return createError({
-    ...rest,
-    ...(cause instanceof Error ? { cause } : {}),
-    ...(cause === undefined || cause instanceof Error ? {} : { internal: { cause } }),
   })
 }

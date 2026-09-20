@@ -1,3 +1,4 @@
+import { cloneTreeModel as cloneModel } from '@/lib/tree-model'
 import { filesystemPath } from '@/lib/documents/utils/identity'
 import type { FilesystemPath } from '@/lib/documents/utils/types'
 import type { TreeEntry } from '@/lib/file-system-types'
@@ -188,14 +189,4 @@ function syntheticEntry(
 
 function isSelfOrChild(path: string, directoryPath: string) {
   return path === directoryPath || path.startsWith(`${directoryPath}/`)
-}
-
-function cloneModel(model: TreeModel): TreeModel {
-  return {
-    paths: Array.from(model.paths),
-    entriesByTreePath: new Map(model.entriesByTreePath),
-    errorByDirectoryPath: new Map(model.errorByDirectoryPath),
-    loadedDirectoryPaths: new Set(model.loadedDirectoryPaths),
-    loadingDirectoryPaths: new Set(model.loadingDirectoryPaths),
-  }
 }

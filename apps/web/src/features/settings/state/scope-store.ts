@@ -1,3 +1,4 @@
+import { createSubscriptions } from '@workspace/utils/subscriptions'
 import type { SettingsViewTarget, SettingsWriteTarget } from '@workspace/contracts'
 import { useSyncExternalStore } from 'react'
 
@@ -13,7 +14,8 @@ export type SettingsScope = SettingsViewTarget
  * would be more machinery than the problem needs.
  */
 let scope: SettingsScope = 'user'
-const listeners = new Set<() => void>()
+const subscriptions = createSubscriptions()
+const subscribe = subscriptions.subscribe
 
 export function settingsScope(): SettingsScope {
   return scope
@@ -23,7 +25,7 @@ export function selectSettingsScope(next: SettingsScope) {
   if (next === scope) return
 
   scope = next
-  for (const listener of listeners) listener()
+  subscriptions.notify()
 }
 
 export function useSettingsScope(): SettingsScope {
@@ -33,10 +35,4 @@ export function useSettingsScope(): SettingsScope {
 /** The layer a write from this page goes to. The defaults tab writes nothing, so it falls back to user. */
 export function writableSettingsScope(scope: SettingsScope): SettingsWriteTarget {
   return scope === 'default' ? 'user' : scope
-}
-
-function subscribe(listener: () => void) {
-  listeners.add(listener)
-
-  return () => listeners.delete(listener)
 }

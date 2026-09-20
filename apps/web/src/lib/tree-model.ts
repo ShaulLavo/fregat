@@ -239,7 +239,7 @@ function directoryTreePathForResult(path: string, rootPath: string) {
   return canonicalTreePath(toTreePath(path, rootPath))
 }
 
-function cloneTreeModel(model: TreeModel): TreeModel {
+export function cloneTreeModel(model: TreeModel): TreeModel {
   return {
     paths: Array.from(model.paths),
     entriesByTreePath: new Map(model.entriesByTreePath),

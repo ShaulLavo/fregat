@@ -1,11 +1,13 @@
-import { useMemo, type ReactNode } from 'react'
+import type { ReactNode } from 'react'
 
 import type { RequestCloseTab, RequestCloseTabs } from '@/features/editor/hooks/use-dirty-tab-close'
 import {
   EditorTabActionsContext,
   type EditorTabActions,
 } from '@/features/editor/providers/tab-actions-context'
-import { useEditorCommands } from '@/features/editor/hooks/use-editor-commands'
+import { useEditorGroupActions } from '@/features/editor/hooks/use-editor-group-actions'
+import { useEditorWorkspaceStoreApi } from '@/features/editor/state/workspace-state'
+import { groupForTab } from '@/lib/documents/utils/groups'
 
 export function EditorTabActionsProvider({
   children,
@@ -16,17 +18,16 @@ export function EditorTabActionsProvider({
   readonly requestCloseTab: RequestCloseTab
   readonly requestCloseTabs: RequestCloseTabs
 }) {
-  const commands = useEditorCommands()
-  // Keep the context value stable so app chrome renders do not invalidate every tab button.
-  const value = useMemo<EditorTabActions>(
-    () => ({
-      requestCloseTab,
-      requestCloseTabs,
-      reorderTab: (tabId, targetIndex) => commands.reorderTab('main', tabId, targetIndex),
-      selectTab: (tabId) => commands.selectTab('main', tabId),
-    }),
-    [commands, requestCloseTab, requestCloseTabs],
-  )
+  const commands = useEditorGroupActions()
+  const workspace = useEditorWorkspaceStoreApi()
+  const value: EditorTabActions = {
+    requestCloseTab,
+    requestCloseTabs,
+    selectTab: (tabId) => {
+      const group = groupForTab(workspace.getState().workbenchPanels.editorGroups, tabId)
+      if (group) void commands.selectTab({ groupId: group.id, tabId })
+    },
+  }
 
   return <EditorTabActionsContext value={value}>{children}</EditorTabActionsContext>
 }

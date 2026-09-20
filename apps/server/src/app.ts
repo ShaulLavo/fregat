@@ -1,3 +1,4 @@
+import { errorMessage } from '@workspace/contracts'
 import { BundleLibrary } from './themes/bundle-library'
 import { bundleRoutes } from './themes/bundle-routes'
 import { WallpaperLibrary } from './themes/wallpapers/library'
@@ -450,10 +451,4 @@ function responseErrorPayload(error: { code?: string; message: string; statusCod
       message: error.message,
     },
   }
-}
-
-function errorMessage(error: unknown) {
-  if (error instanceof Error) return error.message
-
-  return String(error)
 }

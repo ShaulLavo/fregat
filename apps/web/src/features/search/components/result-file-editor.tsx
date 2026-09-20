@@ -45,7 +45,7 @@ import {
   type SearchResultFileBlock,
   type SearchResultFileDocumentLine,
 } from '@/features/search/utils/result-view-model'
-import { useFocusTarget } from '@/lib/focus/hooks/use-target'
+import { useEditorFocusTarget } from '@/lib/focus/hooks/use-editor-target'
 
 type SearchResultFileEditorProps = {
   activeResultId: SearchResultId | null
@@ -114,26 +114,13 @@ export const SearchResultFileEditor = memo(
       textMetrics: SEARCH_RESULT_FILE_EDITOR_TEXT_METRICS,
       theme: editorTheme,
     })
-    const focusTarget = useFocusTarget<HTMLDivElement>({
-      area: 'editor',
-      capabilities: {
-        editor: {
-          dispatch: controller.commands.dispatchCommand,
-          getInputElement: () => controller.getEditor()?.getInputElement() ?? null,
-          readKeymapContext: () => controller.getEditor()?.getKeymapContext() ?? null,
-          writable: false,
-        },
-      },
+    const focusTarget = useEditorFocusTarget({
+      controller,
+      writable: false,
       id: {
         key: document.documentId,
         kind: 'editor',
         surface: 'search-result',
-      },
-      onIntent: (intent) => {
-        if (intent !== 'focus') return false
-
-        controller.commands.focus()
-        return true
       },
     })
     const pendingActivationFrameRef = useRef<number | null>(null)

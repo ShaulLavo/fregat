@@ -1,9 +1,10 @@
-import { chatCommandSummary } from '@workspace/client-core/transport/utils/logging'
+import { elapsedMs } from '@workspace/utils/timing'
+import { chatCommandSummary } from '@workspace/contracts'
 import type { ClientOrchestrationCommand, OrchestrationDispatchResult } from '@workspace/contracts'
 
 import { errorMessage } from '@/lib/error-message'
 import type { ChatTransport } from '@/features/chat/transport/chat-transport'
-import { elapsedMs } from '@/features/chat/utils/elapsed-ms'
+
 import {
   createChatPipelineScope,
   type ChatPipelineScope,

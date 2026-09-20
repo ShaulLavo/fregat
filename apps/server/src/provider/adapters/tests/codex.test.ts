@@ -333,6 +333,18 @@ function handle(message) {
     });
     return;
   }
+  if (message.method === 'thread/resume') {
+    record({ event: 'thread/resume', params: message.params });
+    send({ id: message.id, result: {
+      cwd: '/Users/shaul/Desktop/platform', model: 'gpt-5.5',
+      approvalPolicy: 'never', approvalsReviewer: 'user',
+      modelProvider: 'openai', sandbox: { type: 'dangerFullAccess' },
+      thread: mode === 'malformed-thread-resume' ? {} : fakeSession([
+        fakeTurn('completed', [{ id: 'historical-item', type: 'unfamiliarHistoricalItem' }]),
+      ]),
+    } });
+    return;
+  }
   if (message.method === 'thread/start') {
     threadStartCount += 1;
     lastSessionStartParams = message.params;
@@ -712,6 +724,7 @@ type FakeCodexLogEntry = {
     | 'server-response'
     | 'thread/list'
     | 'thread/read'
+    | 'thread/resume'
 }
 
 type EchoedModeParams = {
@@ -1855,6 +1868,45 @@ describe('CodexProviderAdapter', () => {
         )
       },
       { mode: 'malformed-thread-start' },
+    )
+  })
+
+  it('resumes using metadata even when Codex returns unfamiliar historical items', async () => {
+    await withFakeCodex(async ({ spawnLogPath }) => {
+      const adapter = new CodexProviderAdapter()
+      try {
+        await adapter.startRuntime({
+          ...providerTurnInput(),
+          providerResumeCursor: 'provider-thread-1',
+        })
+        await adapter.sendTurn(providerTurnInput())
+        const records = await readFakeCodexLog(spawnLogPath)
+        expect(records).toContainEqual({
+          event: 'thread/resume',
+          params: expect.objectContaining({ threadId: 'provider-thread-1', excludeTurns: true }),
+        })
+      } finally {
+        await adapter.stopAll()
+      }
+    })
+  })
+
+  it('rejects resume metadata without a thread identity', async () => {
+    await withFakeCodex(
+      async () => {
+        const adapter = new CodexProviderAdapter()
+        try {
+          await expect(
+            adapter.startRuntime({
+              ...providerTurnInput(),
+              providerResumeCursor: 'provider-thread-1',
+            }),
+          ).rejects.toThrow('Invalid key: Expected "id"')
+        } finally {
+          await adapter.stopAll()
+        }
+      },
+      { mode: 'malformed-thread-resume' },
     )
   })
 

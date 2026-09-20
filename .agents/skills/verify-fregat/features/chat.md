@@ -12,7 +12,7 @@ The chat mode button in the window toolbar, or an address URL with `/chat/`.
 
 ## Driving it with agent:browser
 
-No scenario yet. `caches` shows the chat-mode mutations by key while an action is in flight. A session action's settlement is the projection push; `bun run logs --area chat` shows the command wide event.
+`scenario chat-follow-up` creates a verification session with the selected provider, sends a correction after commentary while a shell command runs, then closes only that session's runtime through the command API and resumes it with another message. It uses real provider tokens and leaves its transcript for inspection. `caches` shows chat mutations while an action is in flight; `bun run logs --area chat` shows the command wide event.
 
 ## Gotchas
 

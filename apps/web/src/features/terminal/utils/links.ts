@@ -1,3 +1,4 @@
+import { pathLeaf as basename } from '@/lib/path-formatters'
 import {
   resolveInlineCodeFileReference,
   type MarkdownFileReference,
@@ -399,10 +400,6 @@ function withoutNumericSuffix(candidate: string) {
   if (/\D/u.test(digits)) return candidate
 
   return candidate.slice(0, colon)
-}
-
-function basename(path: string) {
-  return path.slice(path.lastIndexOf('/') + 1)
 }
 
 function linkRange(line: WrappedTerminalLine, match: TerminalPathMatch): TerminalLinkRange {

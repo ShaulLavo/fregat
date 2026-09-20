@@ -1,7 +1,10 @@
+import { virtualEnvironmentPaths } from './environment'
+import { exists } from './environment'
+import { firstExistingPath } from './environment'
 import { DEFAULT_SETTING_VALUES } from '@workspace/contracts'
 import { createHash } from 'node:crypto'
 import { accessSync, constants } from 'node:fs'
-import { access, chmod, mkdir, readdir, rm, writeFile } from 'node:fs/promises'
+import { chmod, mkdir, readdir, rm, writeFile } from 'node:fs/promises'
 import { homedir } from 'node:os'
 import path from 'node:path'
 import { spawn, type ChildProcessWithoutNullStreams } from 'node:child_process'
@@ -801,33 +804,8 @@ function existsSyncExecutable(candidate: string) {
   }
 }
 
-async function firstExistingPath(candidates: readonly string[]) {
-  for (const candidate of candidates) {
-    if (!(await exists(candidate))) continue
-
-    return candidate
-  }
-
-  return null
-}
-
 async function existingPath(candidate: string) {
   return (await exists(candidate)) ? candidate : null
-}
-
-async function exists(candidate: string) {
-  try {
-    await access(candidate)
-    return true
-  } catch {
-    return false
-  }
-}
-
-function virtualEnvironmentPaths(root: string) {
-  return [process.env.VIRTUAL_ENV, path.join(root, '.venv'), path.join(root, 'venv')].filter(
-    (item): item is string => Boolean(item),
-  )
 }
 
 function executableName(command: string) {

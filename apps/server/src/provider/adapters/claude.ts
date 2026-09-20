@@ -37,7 +37,8 @@ import {
   recordChatPipelineInfo,
   recordChatPipelineWarning,
 } from '../../orchestration/orchestration-logging'
-import { ProviderRuntimeEventStream } from '../provider-runtime-event-stream'
+import { RuntimeAdapter } from './state/runtime-adapter'
+import { SessionContext } from './state/session-context'
 import { sessionIdentityErrors } from '../structured-errors'
 import {
   discoverClaudeSessions,
@@ -52,7 +53,6 @@ import type {
   ProviderCommandCatalogInput,
   ProviderCommandCatalogResult,
   ProviderRuntimeEvent,
-  ProviderRuntimeEventPayload,
   ProviderRuntimeStartInput,
   ProviderSessionDiscoveryInput,
   ProviderSessionHistoryInput,
@@ -61,7 +61,7 @@ import type {
   ProviderUserInputResponseInput,
 } from '../types'
 import { activeProviderTurn, type ActiveProviderTurn } from './utils/active-turn'
-import { providerErrorMessage } from './utils/adapters'
+import { errorMessage as providerErrorMessage } from '@workspace/contracts'
 import {
   ClaudeAuthRunner,
   type ClaudeAuthState,
@@ -163,7 +163,10 @@ type ClaudeRuntimeEventPayload<Type extends ProviderRuntimeEvent['type']> = Extr
   { payload: unknown; type: Type }
 >['payload']
 
-export class ClaudeProviderAdapter implements ProviderAdapter {
+export class ClaudeProviderAdapter
+  extends RuntimeAdapter<ClaudeAgentSession>
+  implements ProviderAdapter
+{
   readonly operationTimeoutMs = 30_000
   readonly adapterKey: ProviderInstanceId
   readonly capabilities = CLAUDE_ADAPTER_CAPABILITIES
@@ -174,8 +177,6 @@ export class ClaudeProviderAdapter implements ProviderAdapter {
   private readonly discoveryRunner: ClaudeDiscoveryRunner | undefined
   private readonly historyRunner: ClaudeHistoryRunner | undefined
   private readonly env: NodeJS.ProcessEnv
-  private readonly events = new ProviderRuntimeEventStream()
-  private readonly sessions = new Map<SessionId, ClaudeAgentSession>()
   private readonly settings: ProviderInstanceSettings
 
   /**
@@ -187,6 +188,7 @@ export class ClaudeProviderAdapter implements ProviderAdapter {
    * un-injected `signIn` would open a real browser window.
    */
   constructor(options: ClaudeAdapterOptions = {}) {
+    super('Claude', 'session')
     this.adapterKey =
       options.providerInstanceId ?? DEFAULT_CLAUDE_PROVIDER_SETTINGS.providerInstanceId
     this.attachmentsDir = options.attachmentsDir ?? defaultAttachmentsDir()
@@ -331,15 +333,6 @@ export class ClaudeProviderAdapter implements ProviderAdapter {
     throw createInternalError('Claude rollbackSession is not supported.')
   }
 
-  subscribeEvents(subscriber: (event: ProviderRuntimeEvent) => void) {
-    return this.events.subscribe(subscriber)
-  }
-
-  async startRuntime(input: ProviderRuntimeStartInput) {
-    const session = await this.ensureRuntimeSession(input)
-    return session.snapshot()
-  }
-
   async sendTurn(input: ProviderTurnInput) {
     recordChatPipelineInfo('chat.pipeline.claude_adapter.start_turn.start', {
       ...providerTurnSummary(input),
@@ -375,20 +368,7 @@ export class ClaudeProviderAdapter implements ProviderAdapter {
     for (const sessionId of this.sessions.keys()) await this.stopRuntime({ sessionId })
   }
 
-  async respondApproval(input: ProviderApprovalResponseInput) {
-    await this.requireSession(input.sessionId, 'approval/respond').respondApproval(input)
-  }
-
-  /**
-   * The SDK's analog of codex's `item/tool/requestUserInput` is the
-   * `AskUserQuestion` tool arriving through `canUseTool`, so the answer travels
-   * back as that tool's permission result rather than as its own control reply.
-   */
-  async respondUserInput(input: ProviderUserInputResponseInput) {
-    await this.requireSession(input.sessionId, 'user-input/respond').respondUserInput(input)
-  }
-
-  private async ensureRuntimeSession(input: ProviderRuntimeStartInput) {
+  protected async ensureRuntimeSession(input: ProviderRuntimeStartInput) {
     const existing = this.sessions.get(input.sessionId)
     const cwd = normalizeWorkspaceCwd(input.cwd)
     const model = claudeModelId({
@@ -481,35 +461,18 @@ export class ClaudeProviderAdapter implements ProviderAdapter {
 
     return session
   }
-
-  private requireSession(sessionId: SessionId, operation: string) {
-    const session = this.sessions.get(sessionId)
-    if (session?.isActive()) return session
-
-    throw createInternalError(
-      `Claude ${operation} requires an active session for session ${sessionId}.`,
-    )
-  }
 }
 
-class ClaudeAgentSession {
+class ClaudeAgentSession extends SessionContext {
   private readonly abortController = new AbortController()
   private readonly attachmentsDir: string
-  private readonly cwd: string
-  private readonly emit: (event: ProviderRuntimeEventPayload) => void
-  private readonly ephemeral: boolean
   private readonly inFlightTools = new Map<string, InFlightClaudeTool>()
   private readonly interactionMode: InteractionMode
-  private readonly model: string
   private readonly pendingApprovals = new Map<ApprovalRequestId, PendingClaudeApproval>()
   private readonly pendingUserInputs = new Map<ApprovalRequestId, PendingClaudeUserInput>()
   private readonly prompt = new ClaudePromptQueue()
-  private readonly providerInstanceId: ProviderTurnInput['providerInstanceId']
   private readonly reasoning: ClaudeReasoning
   private readonly reasoningKey: string
-  private readonly runtimeMode: RuntimeMode
-  private readonly runtimeEpoch: string
-  private readonly sessionId: SessionId
   private providerConversationMarker: string | null = null
   private activeProviderTurnId: string | null = null
   private activeTurn: ActiveProviderTurn | null = null
@@ -532,18 +495,11 @@ class ClaudeAgentSession {
     runtimeEpoch: string
     sessionId: SessionId
   }) {
+    super(input)
     this.attachmentsDir = input.attachmentsDir
-    this.cwd = input.cwd
-    this.emit = (event) => input.emit({ ...event, runtimeEpoch: input.runtimeEpoch })
-    this.runtimeEpoch = input.runtimeEpoch
-    this.ephemeral = input.ephemeral
     this.interactionMode = input.interactionMode
-    this.model = input.model
-    this.providerInstanceId = input.providerInstanceId
     this.reasoning = input.reasoning
     this.reasoningKey = claudeReasoningKey(input.reasoning)
-    this.runtimeMode = input.runtimeMode
-    this.sessionId = input.sessionId
   }
 
   // Streaming input withholds init until the first prompt; adopt the caller's UUID before it.
@@ -762,13 +718,7 @@ class ClaudeAgentSession {
         requestType: claudeApprovalRequestType(pending.toolName),
         resolution: { decision: input.decision },
       },
-      provider: DEFAULT_CLAUDE_PROVIDER_SETTINGS.driverKind,
-      providerInstanceId: this.providerInstanceId,
-      providerBindingHandle: this.providerBindingHandle(),
-      requestId: input.requestId,
-      runtimeMode: this.runtimeMode,
-      sessionId: this.sessionId,
-      ...(this.activeTurn ? { turnId: this.activeTurn.canonicalTurnId } : {}),
+      ...this.requestResolutionContext(input.requestId),
       type: 'request.resolved',
     })
   }
@@ -1685,15 +1635,21 @@ class ClaudeAgentSession {
       createdAt: new Date().toISOString(),
       eventId: runtimeEventId('claude-user-input-resolved'),
       payload: { answers: input.answers },
+      ...this.requestResolutionContext(input.requestId),
+      type: 'user-input.resolved',
+    })
+  }
+
+  private requestResolutionContext(requestId: ApprovalRequestId) {
+    return {
       provider: DEFAULT_CLAUDE_PROVIDER_SETTINGS.driverKind,
       providerInstanceId: this.providerInstanceId,
       providerBindingHandle: this.providerBindingHandle(),
-      requestId: input.requestId,
+      requestId,
       runtimeMode: this.runtimeMode,
       sessionId: this.sessionId,
       ...(this.activeTurn ? { turnId: this.activeTurn.canonicalTurnId } : {}),
-      type: 'user-input.resolved',
-    })
+    }
   }
 
   private abortUserInput(requestId: ApprovalRequestId) {

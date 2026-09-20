@@ -1,4 +1,4 @@
-import type { FilesystemPath } from '@/lib/documents/utils/types'
+import type { FilesystemPath, TabId } from '@/lib/documents/utils/types'
 
 import { useEditorUiState } from '@/features/editor/state/ui-state'
 import { BreadcrumbsBar } from '@/features/workbench/components/breadcrumbs-bar'
@@ -9,13 +9,15 @@ import { EMPTY_SYMBOL_CHAIN } from '@/features/workbench/utils/breadcrumbs'
 export function EditorBreadcrumbs({
   filePath,
   rootPath,
+  tabId,
 }: {
   readonly filePath: FilesystemPath
   readonly rootPath: FilesystemPath
+  readonly tabId: TabId
 }) {
   const symbols = useDocumentSymbolTree(rootPath, filePath)
-  const statusBarSource = useEditorUiState((state) => state.statusBarSource)
-  if (statusBarSource?.filePath !== filePath) {
+  const controller = useEditorUiState((state) => state.controllersByTabId.get(tabId) ?? null)
+  if (!controller) {
     return (
       <BreadcrumbsBar
         controller={null}
@@ -29,7 +31,7 @@ export function EditorBreadcrumbs({
 
   return (
     <CursorBreadcrumbs
-      controller={statusBarSource.controller}
+      controller={controller}
       symbols={symbols}
       filePath={filePath}
       rootPath={rootPath}

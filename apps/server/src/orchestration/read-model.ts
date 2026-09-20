@@ -1,3 +1,4 @@
+import { planStepStatus } from '@workspace/contracts'
 import type {
   TerminalLease,
   MessageId,
@@ -213,13 +214,6 @@ function planSteps(payload: unknown): readonly PlanStep[] {
   }
 
   return steps
-}
-
-function planStepStatus(value: unknown): PlanStepStatus {
-  if (value === 'completed') return 'completed'
-  if (value === 'inProgress') return 'inProgress'
-
-  return 'pending'
 }
 
 function payloadRecord(value: unknown) {

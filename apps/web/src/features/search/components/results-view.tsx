@@ -1,3 +1,5 @@
+import { useElementWidth } from '@/hooks/use-element-width'
+import { searchResultDomId } from '@/features/search/utils/result-dom-id'
 import { handleSearchResultKeyDown } from '@/features/search/utils/result-sidebar-keyboard'
 import type { WorkspaceSearchQuery } from '@workspace/contracts'
 import { useVirtualizer } from '@tanstack/react-virtual'
@@ -7,7 +9,6 @@ import {
   useId,
   useMemo,
   useRef,
-  useState,
   type MouseEvent,
   type RefObject,
 } from 'react'
@@ -325,46 +326,6 @@ function useSearchPreviewMaxLength(
   return useMemo(() => searchPreviewMaxLength(width, replaceVisible), [replaceVisible, width])
 }
 
-export function useElementWidth<TElement extends HTMLElement>(ref: RefObject<TElement | null>) {
-  const [width, setWidth] = useState<number | null>(null)
-
-  useLayoutEffect(() => {
-    let disposed = false
-    let observer: ResizeObserver | null = null
-    let retryFrame = 0
-
-    function updateWidth(element: TElement) {
-      setWidth(element.clientWidth)
-    }
-
-    function attachObserver() {
-      if (disposed) return
-
-      const element = ref.current
-      if (!element) {
-        retryFrame = requestAnimationFrame(attachObserver)
-        return
-      }
-
-      updateWidth(element)
-      if (!('ResizeObserver' in window)) return
-
-      observer = new ResizeObserver(() => updateWidth(element))
-      observer.observe(element)
-    }
-
-    attachObserver()
-
-    return () => {
-      disposed = true
-      observer?.disconnect()
-      cancelAnimationFrame(retryFrame)
-    }
-  }, [ref])
-
-  return width
-}
-
 function searchPreviewMaxLength(width: number | null, replaceVisible: boolean | undefined) {
   if (width === null) return undefined
 
@@ -376,8 +337,4 @@ function searchPreviewMaxLength(width: number | null, replaceVisible: boolean | 
     SEARCH_PREVIEW_MAX_CHARACTERS,
     Math.max(SEARCH_PREVIEW_MIN_CHARACTERS, visibleCharacters),
   )
-}
-
-function searchResultDomId(treeId: string, itemId: string) {
-  return `${treeId}-${itemId}`
 }

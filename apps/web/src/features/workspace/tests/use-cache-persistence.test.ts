@@ -1,3 +1,10 @@
+import {
+  groupLeaf,
+  groupTree,
+  groupBranch,
+  groupTab,
+} from '../../../../test/factories/editor-groups'
+import { editorTabRecordsForWorkbenchPanels } from '@/features/workbench/utils/panels'
 import { filesystemPath, tabId } from '@/lib/documents/utils/identity'
 import {
   testTabContents,
@@ -144,7 +151,11 @@ describe('workspace cache persistence', () => {
     expect(writeKeys(writes)).toEqual(['workspaceSlice'])
     expect(lastCacheWrite(writes, 'workspaceSlice')).toMatchObject({
       rootPath: '/repo',
-      slice: { workbenchPanels: { editorTabs: [{ content: testTabContent('/repo/src/a.ts') }] } },
+      slice: {
+        workbenchPanels: {
+          editorGroups: { root: { tabs: [{ content: testTabContent('/repo/src/a.ts') }] } },
+        },
+      },
     })
 
     unsubscribe()
@@ -226,7 +237,7 @@ describe('workspace cache persistence', () => {
     vi.runAllTimers()
     writes.length = 0
 
-    const tab = workspaceStore.getState().workbenchPanels.editorTabs[0]
+    const tab = editorTabRecordsForWorkbenchPanels(workspaceStore.getState().workbenchPanels)[0]
     expect(tab).toBeTruthy()
     documentStore.getState().ensureEditorView(tabId(tab!.id), fileResult('/repo/src/a.ts'))
     documentStore.getState().setEditorViewScrollPosition(tabId(tab!.id), { left: 0, top: 240 })
@@ -237,6 +248,54 @@ describe('workspace cache persistence', () => {
       }),
     )
     unsubscribe()
+  })
+  it('flushes each view before workspace switching and restores each scroll independently', () => {
+    const { documentStore, workspaceStore, writes, unsubscribe } = harness()
+    const first = groupTab('view-first', '/repo/src/a.ts')
+    const second = groupTab('view-second', '/repo/src/a.ts')
+    const state = workspaceStore.getState()
+    state.setWorkbenchPanels({
+      ...state.workbenchPanels,
+      editorGroups: groupTree(
+        groupBranch('split', 'horizontal', [
+          { node: groupLeaf('left', [first]), size: 50 },
+          { node: groupLeaf('right', [second]), size: 50 },
+        ]),
+        'right',
+      ),
+    })
+    documentStore.getState().ensureEditorView(first.id, fileResult('/repo/src/a.ts'))
+    documentStore.getState().ensureEditorView(second.id, fileResult('/repo/src/a.ts'))
+    documentStore
+      .getState()
+      .setEditorViewScrollPosition(first.id, { left: 10, top: 140 }, { left: 10, top: 100 })
+    documentStore
+      .getState()
+      .setEditorViewScrollPosition(second.id, { left: 0, top: 820 }, { left: 0, top: 700 })
+    workspaceStore.getState().switchWorkspace(pickedDirectory('/other'))
+    unsubscribe()
+    const slice = writes.findLast(
+      (write) => write.key === 'workspaceSlice' && write.rootPath === '/repo',
+    )
+    if (!slice || slice.key !== 'workspaceSlice')
+      return expect.unreachable('Outgoing workspace was not persisted')
+    expect(slice.slice.reopenScrollPositions).toEqual([
+      { content: first.content, position: { left: 0, top: 700 } },
+    ])
+    expect(slice.slice.viewScrollPositions).toEqual([
+      { tabId: first.id, position: { left: 10, top: 140 } },
+      { tabId: second.id, position: { left: 0, top: 820 } },
+    ])
+    const restored = createEditorDocumentStore({
+      scrollPositionSeeds: slice.slice.reopenScrollPositions,
+      viewScrollPositionSeeds: slice.slice.viewScrollPositions,
+    })
+    expect(
+      restored.getState().ensureEditorView(first.id, fileResult('/repo/src/a.ts')).scrollPosition,
+    ).toEqual({ left: 10, top: 140 })
+    expect(
+      restored.getState().ensureEditorView(second.id, fileResult('/repo/src/a.ts')).scrollPosition,
+    ).toEqual({ left: 0, top: 820 })
   })
 })
 
@@ -267,6 +326,7 @@ function cachedWorkspace(): CachedWorkspaceState {
     workspaceOrder: ['/repo'],
     workspaces: {
       '/repo': {
+        viewScrollPositions: [],
         editorHistory: testTabContents([]),
         recentlyClosedTabs: testTabContents([]),
         reopenScrollPositions: testScrollPositions({}),

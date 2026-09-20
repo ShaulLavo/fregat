@@ -41,6 +41,8 @@ const TEXT_MENU_EDITOR_COMMANDS = [
 ] as const
 
 const ASYNC_COMMAND_IDS = [
+  'workspace.splitEditorRight',
+  'workspace.splitEditorDown',
   'workspace.showHistory',
   'workspace.historyBack',
   'workspace.historyForward',
@@ -198,6 +200,9 @@ const FILE_BACKED_COMMAND_IDS = [
 ] as const satisfies readonly PlatformCommandId[]
 
 const TAB_OPEN_COMMAND_IDS = [
+  'workspace.splitEditorRight',
+  'workspace.splitEditorDown',
+  'workspace.moveTabToGroup',
   'workspace.quickOpenPreviousEditor',
   'workspace.focusFirstEditorGroup',
   'workspace.focusSecondEditorGroup',

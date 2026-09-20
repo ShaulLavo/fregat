@@ -20,7 +20,7 @@ import {
 import type { App } from '../../app'
 import { closeTestApps, createTestApp } from '../../../test/server'
 import * as schema from '../../db/schema'
-import { migrateOrchestrationDatabase } from '../../db/migrations'
+import { migratePlatformDatabase as migrateOrchestrationDatabase } from '../../db/migrations'
 import { DEFAULT_MAX_TEXT_FILE_BYTES } from '../../fs/limits'
 import { createWorkspacePaths } from '../../fs/path'
 import { GitService } from '../../git/service'

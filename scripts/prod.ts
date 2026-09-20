@@ -1,3 +1,4 @@
+import { installSignalHandlers } from './process-signals'
 import { existsSync } from 'node:fs'
 import path from 'node:path'
 import { portFromEnv, runtimeUrl } from './runtime-network'
@@ -75,13 +76,4 @@ async function runCommand(
   env: Record<string, string | undefined>,
 ) {
   return await spawnProcess(name, command, env).exited
-}
-
-function installSignalHandlers(child: ReturnType<typeof Bun.spawn>) {
-  const stop = (signal: NodeJS.Signals) => {
-    child.kill(signal)
-  }
-
-  process.once('SIGINT', stop)
-  process.once('SIGTERM', stop)
 }

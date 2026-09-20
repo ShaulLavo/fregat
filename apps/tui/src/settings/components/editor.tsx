@@ -13,7 +13,7 @@ import { Dialog } from '@/components/dialog'
 import { Prompt } from '@/components/prompt'
 import { TextPrompt } from '@/components/text-prompt'
 import { Select } from '@/components/select'
-import { Spinner } from '@/components/spinner'
+import { SaveFeedback } from '@/settings/components/save-feedback'
 import { useCommands } from '@/commands/hooks/use-commands'
 import { useCommandFocus } from '@/commands/hooks/use-command-focus'
 import { useCommandHandlers } from '@/commands/hooks/use-command-handlers'
@@ -164,13 +164,7 @@ export function SettingsEditor({
           language={widget === 'multiline' ? undefined : 'json'}
         />
       )}
-      {failure && <text fg={theme.destructive}>{failure}</text>}
-      {pending && (
-        <box flexDirection='row' gap={1}>
-          <Spinner theme={theme} />
-          <text fg={theme.mutedForeground}>Saving…</text>
-        </box>
-      )}
+      <SaveFeedback failure={failure} pending={pending} theme={theme} label='Saving…' />
     </Dialog>
   )
 }

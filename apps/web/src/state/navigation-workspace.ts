@@ -17,7 +17,10 @@ import {
 import { useSessionDiffScopeStore } from '@/features/chat/state/session-diff-scope-store'
 import { readPersistedSessionDiffScopes } from '@/features/chat/utils/session-diff-scope-storage'
 import { fetchOrchestrationShellSnapshotHttp } from '@/features/chat/transport/orchestration-http-snapshots'
-import { activeEditorTabForWorkbenchPanels } from '@/features/workbench/utils/panels'
+import {
+  activeEditorTabForWorkbenchPanels,
+  editorOpenContentsForWorkbenchPanels,
+} from '@/features/workbench/utils/panels'
 import { readSessionSelectionCache, readWorkspaceCache } from '@/features/workspace/state/cache'
 import { confirmedEnvironmentId, confirmedEnvironmentOrigin } from '@/lib/environments/state/domain'
 import { environmentScopedStorage } from '@/lib/environments/state/scoped-storage'
@@ -76,7 +79,7 @@ export async function workspaceAddressFor(
     mode,
     passthrough: previous.passthrough,
     activeTabContent: panels ? (activeEditorTabForWorkbenchPanels(panels)?.content ?? null) : null,
-    editorTabContents: panels?.editorTabs.map((tab) => tab.content) ?? [],
+    editorTabContents: panels ? editorOpenContentsForWorkbenchPanels(panels) : [],
     sidebarTab: panels?.activeSidebarTab ?? null,
     bottomTab: panels?.activeBottomTab ?? null,
     toolTab: state?.chatModePanels.activeToolTab ?? cache.chatModePanels.activeToolTab,

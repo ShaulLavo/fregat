@@ -1,3 +1,5 @@
+import { allEditorTabs, selectEditorGroupTab } from '@/lib/documents/utils/groups'
+import { groupBranch, groupLeaf, groupTree } from '../../../../../test/factories/editor-groups'
 import { testScopedStorage } from '../../../../../test/factories/scoped-storage'
 // @vitest-environment happy-dom
 
@@ -30,8 +32,7 @@ describe('editor-open benchmark control', () => {
     workspaceStore.getState().switchWorkspace(rootFolder())
     workspaceStore.getState().setWorkbenchPanels({
       ...createDefaultWorkbenchPanels(),
-      activeEditorTabId: inert.id,
-      editorTabs: [inert],
+      editorGroups: groupTree(groupLeaf('benchmark', [inert]), 'benchmark'),
     })
     const sample = benchmarkSample({
       path: filesystemPath(path),
@@ -49,14 +50,19 @@ describe('editor-open benchmark control', () => {
       workspaceStore,
     })
     control.begin({ path, rootPath: '/repo', sampleId: 'shared-target' })
-    const first = workspaceStore
-      .getState()
-      .workbenchPanels.editorTabs.find((tab) => sameTabContent(tab.content, testTabContent(path)))!
+    const first = allEditorTabs(workspaceStore.getState().workbenchPanels.editorGroups).find(
+      (tab) => sameTabContent(tab.content, testTabContent(path)),
+    )!
     const second = createEditorTabRecord(testTabContent(path))
     workspaceStore.getState().setWorkbenchPanels({
       ...workspaceStore.getState().workbenchPanels,
-      activeEditorTabId: first.id,
-      editorTabs: [inert, first, second],
+      editorGroups: groupTree(
+        groupBranch('benchmark-split', 'horizontal', [
+          { node: groupLeaf('benchmark', [inert, first], first.id), size: 50 },
+          { node: groupLeaf('secondary', [second]), size: 50 },
+        ]),
+        'benchmark',
+      ),
     })
 
     await expect(
@@ -65,7 +71,11 @@ describe('editor-open benchmark control', () => {
 
     expect(sample.quarantine).toHaveBeenCalledOnce()
     expect(sample.release).not.toHaveBeenCalled()
-    expect(workspaceStore.getState().workbenchPanels.editorTabs).toEqual([inert, first, second])
+    expect(allEditorTabs(workspaceStore.getState().workbenchPanels.editorGroups)).toEqual([
+      inert,
+      first,
+      second,
+    ])
   })
 
   test('waits for the next task and frame before requiring the target editor to unmount', async () => {
@@ -75,8 +85,7 @@ describe('editor-open benchmark control', () => {
     workspaceStore.getState().switchWorkspace(rootFolder())
     workspaceStore.getState().setWorkbenchPanels({
       ...createDefaultWorkbenchPanels(),
-      activeEditorTabId: inert.id,
-      editorTabs: [inert],
+      editorGroups: groupTree(groupLeaf('benchmark', [inert]), 'benchmark'),
     })
     const mountedEditors = new MountedEditorRegistry()
     const sample = benchmarkSample({
@@ -95,12 +104,16 @@ describe('editor-open benchmark control', () => {
       workspaceStore,
     })
     control.begin({ path, rootPath: '/repo', sampleId: 'async-unmount' })
-    const target = workspaceStore
-      .getState()
-      .workbenchPanels.editorTabs.find((tab) => sameTabContent(tab.content, testTabContent(path)))!
+    const target = allEditorTabs(workspaceStore.getState().workbenchPanels.editorGroups).find(
+      (tab) => sameTabContent(tab.content, testTabContent(path)),
+    )!
     workspaceStore.getState().setWorkbenchPanels({
       ...workspaceStore.getState().workbenchPanels,
-      activeEditorTabId: target.id,
+      editorGroups: selectEditorGroupTab(
+        workspaceStore.getState().workbenchPanels.editorGroups,
+        workspaceStore.getState().workbenchPanels.editorGroups.activeGroupId,
+        target.id,
+      ),
     })
     const unregisterTarget = mountedEditors.register(filesystemPath(path))
 
@@ -110,7 +123,7 @@ describe('editor-open benchmark control', () => {
       control.reset({ path, rootPath: '/repo', sampleId: 'async-unmount' }),
     ).resolves.toMatchObject({ quiescent: true })
     expect(sample.release).toHaveBeenCalledOnce()
-    expect(workspaceStore.getState().workbenchPanels.editorTabs).toEqual([inert])
+    expect(allEditorTabs(workspaceStore.getState().workbenchPanels.editorGroups)).toEqual([inert])
   })
 
   test('rejects a reset target that does not match the immutable sample target', async () => {
@@ -246,12 +259,16 @@ describe('editor-open benchmark control', () => {
       workspaceStore,
     })
     control.begin({ path, rootPath, sampleId: 'query-order' })
-    const target = workspaceStore
-      .getState()
-      .workbenchPanels.editorTabs.find((tab) => sameTabContent(tab.content, testTabContent(path)))!
+    const target = allEditorTabs(workspaceStore.getState().workbenchPanels.editorGroups).find(
+      (tab) => sameTabContent(tab.content, testTabContent(path)),
+    )!
     workspaceStore.getState().setWorkbenchPanels({
       ...workspaceStore.getState().workbenchPanels,
-      activeEditorTabId: target.id,
+      editorGroups: selectEditorGroupTab(
+        workspaceStore.getState().workbenchPanels.editorGroups,
+        workspaceStore.getState().workbenchPanels.editorGroups.activeGroupId,
+        target.id,
+      ),
     })
     const file = fileResult(path)
     documentStore.getState().ensureEditorView(target.id, file)
@@ -342,8 +359,7 @@ function workspaceWithInertTab() {
   workspaceStore.getState().switchWorkspace(rootFolder())
   workspaceStore.getState().setWorkbenchPanels({
     ...createDefaultWorkbenchPanels(),
-    activeEditorTabId: inert.id,
-    editorTabs: [inert],
+    editorGroups: groupTree(groupLeaf('benchmark', [inert]), 'benchmark'),
   })
   return workspaceStore
 }

@@ -1,3 +1,4 @@
+import { pathSegments } from '@/features/chat/utils/path-segments'
 import {
   summarizeChatTurnDiffStats,
   type ChatTurnDiffFile,
@@ -134,11 +135,4 @@ function changedFileScope(pathValue: string): string {
   if (segments.length > 1) return segments[0] ?? 'root'
 
   return 'root'
-}
-
-function pathSegments(pathValue: string): string[] {
-  return pathValue
-    .replaceAll('\\', '/')
-    .split('/')
-    .filter((segment) => segment.length > 0)
 }

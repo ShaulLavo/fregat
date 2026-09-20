@@ -1,6 +1,7 @@
+import { elapsedMs } from '@workspace/utils/timing'
 import { refreshAllWorktreePolicies } from '../orchestration/worktree-projection'
 import { eq, sql } from 'drizzle-orm'
-import { elapsedMs } from '../observability/logging'
+
 import { recordProcessInfo } from '../observability/runtime'
 import { createStructuredError } from '../observability/structured-errors'
 import { getDefaultPlatformDatabase, type PlatformDatabase } from './client'
@@ -74,16 +75,6 @@ export function migratePlatformDatabase(
   }
   reportApplied(applied, startedAt)
   return applied
-}
-
-export function migrateMetadataDatabase(database: PlatformDatabase = getDefaultPlatformDatabase()) {
-  return migratePlatformDatabase(database)
-}
-
-export function migrateOrchestrationDatabase(
-  database: PlatformDatabase = getDefaultPlatformDatabase(),
-) {
-  return migratePlatformDatabase(database)
 }
 
 function applyMigration(database: PlatformDatabase, migration: Migration) {

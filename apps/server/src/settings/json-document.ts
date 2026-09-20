@@ -12,7 +12,7 @@ import {
   type Node as JsonNode,
   type ParseError,
 } from 'jsonc-parser'
-import { isRecord } from '@workspace/contracts'
+import { isRecord } from '@workspace/utils/objects'
 import { textFileVersion } from '../fs/version'
 
 /**

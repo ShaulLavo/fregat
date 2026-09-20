@@ -1,3 +1,4 @@
+import { supersededNavigation } from '@/state/navigation-result'
 import { editorDocumentToken } from '@workspace/client-core/address/grammar'
 import type { ChatReference } from '@workspace/client-core/address/references'
 import {
@@ -26,7 +27,7 @@ import { confirmedEnvironmentId, confirmedEnvironmentOrigin } from '@/lib/enviro
 import { clientForQueryClient, queryClientFor } from '@/lib/environments/state/query-clients'
 import { createClientInvariantError } from '@/lib/structured-errors'
 import type { ApplicationRuntime } from '@/state/application-runtime'
-import type { createNavigationCoordinator, NavigationResult } from '@/state/navigation-coordinator'
+import type { createNavigationCoordinator } from '@/state/navigation-coordinator'
 import { workspaceAddressFor } from '@/state/navigation-workspace'
 import { fetchOrchestrationShellSnapshotHttp } from '@/features/chat/transport/orchestration-http-snapshots'
 
@@ -183,8 +184,4 @@ function sameDraft(environmentId: EnvironmentId, projectId: ProjectId) {
     selection.environmentId === environmentId &&
     selection.projectId === projectId
   )
-}
-
-function supersededNavigation(): Promise<NavigationResult> {
-  return Promise.resolve({ status: 'superseded' })
 }

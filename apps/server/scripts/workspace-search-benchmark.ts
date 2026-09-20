@@ -1,3 +1,5 @@
+import { errorMessage } from '@workspace/contracts'
+import { elapsedMs, roundMs } from '@workspace/utils/timing'
 import path from 'node:path'
 
 import type {
@@ -368,18 +370,4 @@ function average(values: readonly number[]) {
 
   const total = values.reduce((sum, value) => sum + value, 0)
   return roundMs(total / values.length)
-}
-
-function elapsedMs(startedAt: number) {
-  return roundMs(performance.now() - startedAt)
-}
-
-function roundMs(value: number) {
-  return Math.round(value * 100) / 100
-}
-
-function errorMessage(error: unknown) {
-  if (error instanceof Error) return error.message
-
-  return String(error)
 }

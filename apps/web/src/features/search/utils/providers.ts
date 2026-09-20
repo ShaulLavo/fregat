@@ -1,8 +1,9 @@
+import { errorSummary as searchErrorSummary } from '@workspace/contracts'
+import { matchesWorkspaceRoot as isPathInWorkspace } from '@/lib/path-formatters'
+import { elapsedMs } from '@workspace/utils/timing'
 import type { Client } from '@/lib/client'
 import {
   createWorkspaceSearchMatcher,
-  errorNumberField,
-  errorStringField,
   type WorkspaceSearchMatcher,
   type WorkspaceSearchTextMatch,
   type WorkspaceSearchDoneEvent,
@@ -231,26 +232,6 @@ function searchLogContext(query: WorkspaceSearchQuery, startedAt: number) {
   }
 }
 
-function searchErrorSummary(error: unknown) {
-  if (error instanceof Error) {
-    return {
-      code: errorStringField(error, 'code'),
-      message: error.message,
-      name: error.name,
-      status: errorNumberField(error, 'statusCode') ?? errorNumberField(error, 'status'),
-    }
-  }
-
-  return {
-    message: String(error),
-    name: typeof error,
-  }
-}
-
-function elapsedMs(startedAt: number) {
-  return Math.round((performance.now() - startedAt) * 100) / 100
-}
-
 function shouldStopCompositeSearch(
   query: WorkspaceSearchQuery,
   state: CompositeSearchState,
@@ -409,13 +390,6 @@ function canSearchOpenBuffer(
   if (!matcher.pathMatches(globMatchPath(query.path, document.path))) return false
 
   return true
-}
-
-function isPathInWorkspace(path: string, rootPath: string) {
-  if (!rootPath) return true
-  if (path === rootPath) return true
-
-  return path.startsWith(`${rootPath}/`)
 }
 
 function globMatchPath(rootPath: string, path: string) {

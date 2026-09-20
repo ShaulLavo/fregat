@@ -2,7 +2,9 @@ import {
   compareHistoryStates,
   type HistoryComparisonResult,
 } from '@/features/editor/utils/history-compare'
-import type { FilesystemPath } from '@/lib/documents/utils/types'
+import type { FilesystemPath, TabId } from '@/lib/documents/utils/types'
+import { useTabPresentation } from '@/features/editor/hooks/use-tab-presentation'
+import type { HistoryPresentation } from '@/features/editor/state/tab-presentation'
 import {
   createHistoryViewer,
   type EditorTextBuffer,
@@ -31,9 +33,14 @@ const EMPTY_SOURCE: ViewerSource = {
 export function useHistoryViewer(
   buffer: EditorTextBuffer | null,
   path: FilesystemPath,
+  tabId?: TabId,
 ): HistoryViewerSnapshot | null {
+  const { history } = useTabPresentation(tabId)
   // Stable identity: the source owns the viewer and its buffer subscription.
-  const source = useMemo(() => (buffer ? viewerSource(buffer, path) : EMPTY_SOURCE), [buffer, path])
+  const source = useMemo(
+    () => (buffer ? viewerSource(buffer, path, history) : EMPTY_SOURCE),
+    [buffer, history, path],
+  )
   return useSyncExternalStore(source.subscribe, source.getSnapshot)
 }
 
@@ -41,12 +48,19 @@ export function useHistoryViewer(
 // mount-unmount-mount rehearsal cannot dispose the one the component keeps. The
 // snapshot carries the viewer too: a method read the compiler could cache would
 // otherwise hand back the pre-subscription null for good.
-function viewerSource(buffer: EditorTextBuffer, path: FilesystemPath): ViewerSource {
+function viewerSource(
+  buffer: EditorTextBuffer,
+  path: FilesystemPath,
+  presentation: HistoryPresentation,
+): ViewerSource {
   let viewer: Viewer | null = null
   let snapshot: HistoryViewerSnapshot | null = null
   let subscribers = 0
   const refresh = () => {
     snapshot = viewer ? { viewer, state: viewer.getState() } : null
+    if (!snapshot) return
+    presentation.focusedId = snapshot.state.focusedId
+    presentation.selectedIds = snapshot.state.selectedIds
   }
   return {
     subscribe(listener) {
@@ -55,6 +69,8 @@ function viewerSource(buffer: EditorTextBuffer, path: FilesystemPath): ViewerSou
         viewer = createHistoryViewer<HistoryComparisonResult>(buffer, {
           compare: async (left, right) => compareHistoryStates(left, right, path),
         })
+        if (presentation.focusedId !== null) viewer.focus(presentation.focusedId)
+        for (const id of presentation.selectedIds) viewer.toggleSelection(id)
         refresh()
       }
       const unsubscribe = viewer.subscribe(() => {

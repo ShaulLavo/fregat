@@ -2,7 +2,7 @@ import { mkdir, mkdtemp, readFile, realpath, rm, symlink, writeFile } from 'node
 import { tmpdir } from 'node:os'
 import path from 'node:path'
 import { fileURLToPath } from 'node:url'
-import { isRecord } from '@workspace/contracts'
+import { isRecord } from '@workspace/utils/objects'
 
 import { createInternalError } from '../../src/observability/structured-errors'
 

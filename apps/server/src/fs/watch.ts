@@ -2,7 +2,13 @@ import parcelWatcher from '@parcel/watcher'
 import { createHash } from 'node:crypto'
 import { createReadStream, watch } from 'node:fs'
 import path from 'node:path'
-import { errorSummary, recordRequestWarning, runDetached } from '../observability'
+import {
+  errorSummary,
+  recordRequestContext,
+  recordRequestWarning,
+  runDetached,
+} from '../observability'
+import { OpenFileWatches } from './open-file-watches'
 import { FsError } from './errors'
 import {
   defaultIgnoredNames,
@@ -23,7 +29,7 @@ type WatchRelease = () => void | Promise<void>
 type RenameWatchServerMessage = Extract<WatchServerMessage, { type: 'renamed' }>
 type WatcherEntry = {
   refCount: number
-  release: WatchRelease
+  release: Promise<WatchRelease>
 }
 type WakeSlot = {
   current: (() => void) | null
@@ -76,6 +82,7 @@ export type WatchOptions = {
 
 export type WatchStreamOptions = {
   includeIgnored?: boolean
+  files?: readonly string[]
 }
 
 export class FileChangeHub {
@@ -83,6 +90,7 @@ export class FileChangeHub {
   private readonly listeners = new Set<Listener>()
   private readonly nativeWatchers = new Map<string, WatcherEntry>()
   private readonly paths: WorkspacePaths
+  private readonly openFiles: OpenFileWatches
   private readonly rawListeners = new Set<Listener>()
   private readonly transactionBarriers = new Map<string, TransactionBarrier>()
   private readonly transactionResultMarkers = new Map<string, TransactionResultMarker>()
@@ -95,6 +103,16 @@ export class FileChangeHub {
     this.backend = options.backend ?? 'auto'
     this.paths = paths
     this.watchEnabled = options.enabled
+    this.openFiles = new OpenFileWatches(
+      paths,
+      (alias) =>
+        runDetached(() => this.emitNativeEvent(alias, (entry) => (entry ? 'changed' : 'deleted')), {
+          area: 'fs',
+          operation: 'watch_open_file',
+          path: alias,
+        }),
+      (error, alias) => this.emit(watchError(error, alias)),
+    )
   }
 
   emit(event: WatchServerMessage) {
@@ -132,13 +150,17 @@ export class FileChangeHub {
 
   stream(inputs: string[], signal?: AbortSignal, options: WatchStreamOptions = {}) {
     const subscribed = subscribedPaths(this.paths, inputs)
-    const listeners = options.includeIgnored ? this.rawListeners : this.listeners
-    return this.createStream(subscribed, signal, listeners)
+    const files = new Set(
+      (options.files ?? []).map((input) => this.paths.resolve(input).relativePath),
+    )
+    const listeners = options.includeIgnored || files.size > 0 ? this.rawListeners : this.listeners
+    return this.createStream(subscribed, signal, listeners, files, options.includeIgnored ?? false)
   }
 
   info() {
     return {
       nativeWatcherCount: this.nativeWatchers.size,
+      openFileWatcherCount: this.openFiles.size,
       watchEnabled: this.watchEnabled,
     }
   }
@@ -236,7 +258,10 @@ export class FileChangeHub {
   }
 
   async close() {
-    const releases = Array.from(this.nativeWatchers.values()).map((entry) => entry.release)
+    this.openFiles.close()
+    const releases = await Promise.all(
+      Array.from(this.nativeWatchers.values()).map((entry) => entry.release),
+    )
     this.nativeWatchers.clear()
     this.listeners.clear()
     this.rawListeners.clear()
@@ -321,11 +346,13 @@ export class FileChangeHub {
     const existing = this.nativeWatchers.get(relativeRoot)
     if (existing) {
       existing.refCount += 1
+      await existing.release
       return () => this.releaseWatcher(relativeRoot)
     }
 
-    const release = await this.createWatcher(relativeRoot)
+    const release = this.createWatcher(relativeRoot)
     this.nativeWatchers.set(relativeRoot, { refCount: 1, release })
+    await release
 
     return () => this.releaseWatcher(relativeRoot)
   }
@@ -338,7 +365,7 @@ export class FileChangeHub {
     if (entry.refCount > 0) return
 
     this.nativeWatchers.delete(relativeRoot)
-    await releaseWatcher(entry.release)
+    await releaseWatcher(await entry.release)
   }
 
   private async createWatcher(relativeRoot: string): Promise<WatchRelease> {
@@ -433,14 +460,17 @@ export class FileChangeHub {
     subscribed: Set<string>,
     signal: AbortSignal | undefined,
     listeners: Set<Listener>,
+    files: Set<string>,
+    includeIgnored: boolean,
   ) {
     const queue: WatchServerMessage[] = [{ type: 'ready', root: '' }]
     const wake: WakeSlot = { current: null }
 
     const listener = (event: WatchServerMessage) => {
-      if (!shouldDeliver(event, subscribed)) return
+      const visible = streamEvent(event, files, includeIgnored)
+      if (!visible || !deliverWatchEvent(visible, subscribed, files)) return
 
-      queue.push(event)
+      queue.push(visible)
       wake.current?.()
     }
 
@@ -450,13 +480,31 @@ export class FileChangeHub {
     signal?.addEventListener('abort', abort)
 
     try {
-      releases = await Promise.all(Array.from(subscribed).map((input) => this.retainWatcher(input)))
+      for (const input of subscribed) releases.push(await this.retainWatcher(input))
+      if (this.watchEnabled) {
+        for (const file of files) releases.push(await this.retainOpenFile(file, subscribed))
+      }
+      recordRequestContext({ watch: { openFiles: [...files], ...this.info() } })
 
       yield* drainWatchQueue(queue, signal, wake)
     } finally {
       await releaseWatchers(releases)
       listeners.delete(listener)
       signal?.removeEventListener('abort', abort)
+    }
+  }
+
+  private async retainOpenFile(file: string, roots: Set<string>): Promise<WatchRelease> {
+    try {
+      return await this.openFiles.retain(file, [...roots])
+    } catch (error) {
+      recordRequestWarning('fs.watch.open_file_failed', {
+        area: 'fs',
+        path: file,
+        error: errorSummary(error),
+      })
+      this.emit(watchError(error, file))
+      return noop
     }
   }
 
@@ -625,6 +673,24 @@ function shouldDeliver(event: WatchServerMessage, subscribed: Set<string>) {
   if (event.type === 'renamed') return isSubscribedPath(event.oldPath, subscribed)
 
   return false
+}
+
+function deliverWatchEvent(event: WatchServerMessage, roots: Set<string>, files: Set<string>) {
+  if (!isFilesystemEvent(event)) return true
+  if (files.has(event.path)) return true
+  if (event.type === 'renamed' && files.has(event.oldPath)) return true
+  return shouldDeliver(event, roots)
+}
+
+function streamEvent(event: WatchServerMessage, files: Set<string>, includeIgnored: boolean) {
+  if (includeIgnored || !isFilesystemEvent(event)) return event
+  const visible = !isIgnoredPath(event.path) || files.has(event.path)
+  if (event.type !== 'renamed') return visible ? event : null
+  const oldVisible = !isIgnoredPath(event.oldPath) || files.has(event.oldPath)
+  if (visible && oldVisible) return event
+  if (visible) return renamedCreateEvent(event)
+  if (oldVisible) return renamedDeleteEvent(event)
+  return null
 }
 
 function isSubscribedPath(relativePath: string, subscribed: Set<string>) {

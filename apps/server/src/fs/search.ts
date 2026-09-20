@@ -1,3 +1,4 @@
+import { workspaceIndexForSearch as workspaceIndexForQuery } from './search-shared'
 import { realpath, stat } from 'node:fs/promises'
 import path from 'node:path'
 
@@ -564,12 +565,6 @@ function canUsePathIndexForQuery(options: FindOptions) {
   if (options.useWorkspaceIndex === false) return false
 
   return searchMatchMode(options) !== 'regex'
-}
-
-function workspaceIndexForQuery(options: FindOptions, index: WorkspaceIndex | undefined) {
-  if (options.useWorkspaceIndex === false) return undefined
-
-  return index
 }
 
 function workspaceIndexMatchesContextRoot(index: WorkspaceIndex, context: FindContext) {

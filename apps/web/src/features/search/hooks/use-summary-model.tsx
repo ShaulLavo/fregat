@@ -1,3 +1,4 @@
+import { matchNoun } from '@/features/search/utils/match-noun'
 import type { ReactNode } from 'react'
 import { WarningCircleIcon } from '@phosphor-icons/react'
 import type { WorkspaceSearchWarningEvent } from '@workspace/contracts'
@@ -170,10 +171,6 @@ function searchResultCount(snapshot: SearchBufferSnapshot) {
     ),
     title: `${titleMatches} in ${fileTitle} ${fileNoun(fileCount)}`,
   }
-}
-
-function matchNoun(count: number) {
-  return count === 1 ? 'match' : 'matches'
 }
 
 function fileNoun(count: number) {

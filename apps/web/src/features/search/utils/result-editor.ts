@@ -354,19 +354,11 @@ export function searchResultLineActionClassName() {
   )
 }
 
-export function searchResultDomId(treeId: string, itemId: string) {
-  return `${treeId}-${itemId}`
-}
-
 export function searchResultFileContainsId(file: SearchResultFileBlock, id: SearchResultId | null) {
   if (!id) return false
   if (file.id === id) return true
 
   return file.excerpts.some((excerpt) => excerpt.id === id)
-}
-
-export function matchNoun(count: number) {
-  return count === 1 ? 'match' : 'matches'
 }
 
 export function fileName(path: string) {

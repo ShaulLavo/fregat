@@ -11,7 +11,7 @@ import {
 } from 'node:fs'
 import { link, mkdir, open, readFile, rename, rm, stat } from 'node:fs/promises'
 import path from 'node:path'
-import { isRecord } from '@workspace/contracts'
+import { isRecord } from '@workspace/utils/objects'
 import { textFileVersion } from '../fs/version'
 import { fsyncDirectory } from './json-document'
 import { settingsErrors } from './structured-errors'

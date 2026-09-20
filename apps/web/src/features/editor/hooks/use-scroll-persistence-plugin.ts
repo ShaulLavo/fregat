@@ -8,12 +8,16 @@ import { editorPerformanceFeatureDisabled } from '@/features/editor/state/perfor
 
 type UseScrollPersistencePluginOptions = {
   document: Pick<EditorRenderDocument, 'key'>
-  onScrollPositionChange?: (key: DocumentKey, scrollPosition: EditorScrollPosition) => void
+  onScrollPositionChange?: (
+    key: DocumentKey,
+    scrollPosition: EditorScrollPosition,
+    reopenScrollPosition?: EditorScrollPosition,
+  ) => void
 }
 
 type ScrollPersistenceState = {
   key: DocumentKey
-  onChange?: (key: DocumentKey, scrollPosition: EditorScrollPosition) => void
+  onChange?: UseScrollPersistencePluginOptions['onScrollPositionChange']
 }
 
 type PendingScrollPosition = {
@@ -21,6 +25,7 @@ type PendingScrollPosition = {
   onChange: ScrollPersistenceState['onChange']
   key: DocumentKey
   top: number
+  reopenTop: number
 }
 
 export function useScrollPersistencePlugin({
@@ -68,6 +73,7 @@ function createScrollPositionPersister(stateRef: RefObject<ScrollPersistenceStat
   let lastKey: DocumentKey | null = null
   let lastLeft = -1
   let lastTop = -1
+  let lastReopenTop = -1
   let pending: PendingScrollPosition | null = null
   let frame: number | null = null
 
@@ -76,14 +82,24 @@ function createScrollPositionPersister(stateRef: RefObject<ScrollPersistenceStat
     const next = pending
     pending = null
     if (!next) return
-    if (next.key === lastKey && next.left === lastLeft && next.top === lastTop) {
+    if (
+      next.key === lastKey &&
+      next.left === lastLeft &&
+      next.top === lastTop &&
+      next.reopenTop === lastReopenTop
+    ) {
       return
     }
 
     lastKey = next.key
     lastLeft = next.left
     lastTop = next.top
-    next.onChange?.(next.key, { left: next.left, top: next.top })
+    lastReopenTop = next.reopenTop
+    next.onChange?.(
+      next.key,
+      { left: next.left, top: next.top },
+      { left: next.left, top: next.reopenTop },
+    )
   }
 
   return {
@@ -95,10 +111,17 @@ function createScrollPositionPersister(stateRef: RefObject<ScrollPersistenceStat
         left: snapshot.viewport.scrollLeft,
         onChange: state.onChange,
         key: state.key,
-        top: capOverscrollTop(snapshot.viewport.scrollTop, snapshot),
+        top: snapshot.viewport.scrollTop,
+        reopenTop: capOverscrollTop(snapshot.viewport.scrollTop, snapshot),
       }
       if (frame !== null) return
-      if (pending.key === lastKey && pending.left === lastLeft && pending.top === lastTop) return
+      if (
+        pending.key === lastKey &&
+        pending.left === lastLeft &&
+        pending.top === lastTop &&
+        pending.reopenTop === lastReopenTop
+      )
+        return
 
       frame = requestAnimationFrame(flush)
     },

@@ -1,5 +1,4 @@
 import { useLayoutEffect, useState, type RefObject } from 'react'
-
 export function useElementWidth<TElement extends HTMLElement>(ref: RefObject<TElement | null>) {
   const [width, setWidth] = useState<number | null>(null)
 

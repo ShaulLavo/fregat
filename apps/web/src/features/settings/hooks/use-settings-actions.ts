@@ -1,3 +1,4 @@
+import { nowMs } from '@workspace/utils/timing'
 import * as v from 'valibot'
 import {
   themePartPatch,
@@ -47,15 +48,14 @@ import {
 import { saveSettings } from '@/features/settings/utils/api'
 import { settingsMutationLogContext } from '@/features/settings/utils/mutation-observability'
 import {
-  settingsDurationBetween,
-  settingsDurationSince,
   settingsMutationFailureOutcome,
   settingsMutationSuccessOutcome,
-  settingsNow,
   settingsResultRequiresActiveEpochRetry,
   settingsRetryDelay,
   shouldRetrySettingsTransport,
 } from '@workspace/client-core/settings/mutation-policy'
+import { elapsedMs } from '@workspace/utils/timing'
+import { durationBetweenMs } from '@workspace/utils/timing'
 import { dismissSaveError, notifySaveError } from '@/features/settings/utils/notify-save-error'
 import { providerEnabledOperation } from '@/features/settings/utils/operations'
 import { admitSettingsMutationResult } from '@/features/settings/state/snapshot-admission'
@@ -107,11 +107,11 @@ export function useSettingsActions() {
           appliedSequence: result.appliedVersion.sequence,
           area: 'settings',
           clientInstanceId: clientInstanceId(),
-          durationMs: settingsDurationSince(startedAt),
+          durationMs: elapsedMs(startedAt),
           duplicate: result.duplicate,
           ...settingsMutationLogContext(entry),
           outcome: settingsMutationSuccessOutcome(result, admission.snapshot),
-          queueWaitMs: settingsDurationBetween(entry.enqueuedAt, startedAt),
+          queueWaitMs: durationBetweenMs(entry.enqueuedAt, startedAt),
           snapshotEpoch: admission.snapshot?.serverVersion.epoch,
           snapshotSequence: admission.snapshot?.serverVersion.sequence,
         })
@@ -255,7 +255,7 @@ async function transportAndAdmitSettingsIntent(
   entry: ActiveSettingsIntent,
   client: Client,
 ) {
-  const startedAt = markSettingsIntentTransportStarted(entry.intentId, settingsNow())
+  const startedAt = markSettingsIntentTransportStarted(entry.intentId, nowMs())
   try {
     let result = await saveSettings(entry.patch.request, client)
     for (let attempt = 0; attempt < 3; attempt += 1) {
@@ -291,7 +291,7 @@ function annotateSettingsTransportError(
     context: {
       ...settingsMutationLogContext(entry),
       clientInstanceId: clientInstanceId(),
-      queueWaitMs: settingsDurationBetween(entry.enqueuedAt, startedAt),
+      queueWaitMs: durationBetweenMs(entry.enqueuedAt, startedAt),
     },
     operation: 'settings.write',
   })
@@ -305,7 +305,7 @@ function logSettingsMutationFailure(entry: ActiveSettingsIntent, error: unknown)
     action: 'settings.write',
     area: 'settings',
     clientInstanceId: clientInstanceId(),
-    durationMs: settingsDurationSince(startedAt),
+    durationMs: elapsedMs(startedAt),
     errorCode: errorStringField(error, 'code'),
     errorStatus: errorNumberField(error, 'status') ?? errorNumberField(error, 'statusCode'),
     ...settingsMutationLogContext(entry),

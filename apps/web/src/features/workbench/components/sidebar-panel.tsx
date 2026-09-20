@@ -1,3 +1,4 @@
+import { ToggleIconButton } from '@/components/toggle-icon-button'
 import type { FilesystemPath } from '@/lib/documents/utils/types'
 import { useNavigation } from '@/hooks/use-navigation'
 import {
@@ -7,7 +8,6 @@ import {
   MagnifyingGlassIcon,
   ScrollIcon,
 } from '@phosphor-icons/react'
-import type { ReactNode } from 'react'
 
 import { SearchPane } from '@/features/workspace/components/search-pane'
 import { ChatSidePanel } from '@/features/chat/components/chat-side-panel'
@@ -15,8 +15,6 @@ import { LogsPanel } from '@/features/logs/components/panel'
 import { FileNavigatorPanel } from '@/features/workbench/components/file-navigator-panel'
 import { GitChangesPanel } from '@/features/workbench/components/git-changes-panel'
 import { type WorkbenchPanels, type WorkbenchSidebarTab } from '@/features/workbench/utils/panels'
-import { Button } from '@workspace/ui/components/button'
-import { cn } from '@workspace/ui/lib/utils'
 
 export function SidebarPanel({
   panels,
@@ -37,36 +35,36 @@ export function SidebarPanel({
         aria-label='Sidebar tabs'
         className='border-border flex w-(--rail-width) shrink-0 flex-col items-center gap-1 border-r p-1'
       >
-        {sidebarTabButton({
-          active: panels.activeSidebarTab === 'files',
-          icon: <FilesIcon className='size-4' />,
-          label: 'Files',
-          onClick: () => selectTab('files'),
-        })}
-        {sidebarTabButton({
-          active: panels.activeSidebarTab === 'git',
-          icon: <GitBranchIcon className='size-4' />,
-          label: 'Git',
-          onClick: () => selectTab('git'),
-        })}
-        {sidebarTabButton({
-          active: panels.activeSidebarTab === 'search',
-          icon: <MagnifyingGlassIcon className='size-4' />,
-          label: 'Search',
-          onClick: () => selectTab('search'),
-        })}
-        {sidebarTabButton({
-          active: panels.activeSidebarTab === 'logs',
-          icon: <ScrollIcon className='size-4' />,
-          label: 'Logs',
-          onClick: () => selectTab('logs'),
-        })}
-        {sidebarTabButton({
-          active: panels.activeSidebarTab === 'chat',
-          icon: <ChatCircleIcon className='size-4' />,
-          label: 'Chat',
-          onClick: () => selectTab('chat'),
-        })}
+        <ToggleIconButton
+          active={panels.activeSidebarTab === 'files'}
+          icon={<FilesIcon className='size-4' />}
+          label={'Files'}
+          onClick={() => selectTab('files')}
+        />
+        <ToggleIconButton
+          active={panels.activeSidebarTab === 'git'}
+          icon={<GitBranchIcon className='size-4' />}
+          label={'Git'}
+          onClick={() => selectTab('git')}
+        />
+        <ToggleIconButton
+          active={panels.activeSidebarTab === 'search'}
+          icon={<MagnifyingGlassIcon className='size-4' />}
+          label={'Search'}
+          onClick={() => selectTab('search')}
+        />
+        <ToggleIconButton
+          active={panels.activeSidebarTab === 'logs'}
+          icon={<ScrollIcon className='size-4' />}
+          label={'Logs'}
+          onClick={() => selectTab('logs')}
+        />
+        <ToggleIconButton
+          active={panels.activeSidebarTab === 'chat'}
+          icon={<ChatCircleIcon className='size-4' />}
+          label={'Chat'}
+          onClick={() => selectTab('chat')}
+        />
       </nav>
       <div className='min-h-0 min-w-0 flex-1 overflow-hidden'>
         {renderSidebarPanel({
@@ -75,33 +73,6 @@ export function SidebarPanel({
         })}
       </div>
     </aside>
-  )
-}
-
-function sidebarTabButton({
-  active,
-  icon,
-  label,
-  onClick,
-}: {
-  readonly active: boolean
-  readonly icon: ReactNode
-  readonly label: string
-  readonly onClick: () => void
-}) {
-  return (
-    <Button
-      aria-label={label}
-      aria-pressed={active}
-      className={cn('text-muted-foreground', active && 'bg-accent text-accent-foreground')}
-      size='icon-sm'
-      title={label}
-      type='button'
-      variant='ghost'
-      onClick={onClick}
-    >
-      {icon}
-    </Button>
   )
 }
 

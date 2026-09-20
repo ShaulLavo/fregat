@@ -1,3 +1,4 @@
+import { fileUriForPath } from '@/lib/file-uri'
 import type {
   LanguageServerDefinitionTarget,
   LanguageServerDiagnosticMarkerClaim,
@@ -327,11 +328,6 @@ function languageServerRoute(rootPath: string, matchPath: string, serverId: stri
   url.searchParams.set('path', matchPath)
   url.searchParams.set('server', serverId)
   return url
-}
-
-function fileUriForPath(path: string) {
-  const normalized = path.replace(/^\/+/, '')
-  return `file:///${normalized.split('/').map(encodeURIComponent).join('/')}`
 }
 
 export function languageServerMatches(value: unknown): readonly LanguageServerMatch[] {

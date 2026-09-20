@@ -38,6 +38,7 @@ type ApplyOptions = {
   readonly reason: AddressApplyReason
   readonly isCurrent: () => boolean
   readonly signal?: AbortSignal
+  readonly commitEditorState?: (owner: EditorWorkspaceStoreApi) => boolean
   readonly preserveTransient?: boolean
   readonly draftWorktreeId?: WorktreeId
   readonly reconcileResources?: (owner: EditorWorkspaceStoreApi, rootPath: string | null) => void
@@ -135,7 +136,7 @@ async function applyCurrentView(
   if (!current()) return superseded()
   if (chat.worktreeId)
     owner.editor.workspaceStore.getState().bindWorktrees([{ id: chat.worktreeId, path: rootPath }])
-  applyOwnedView(options, owner, rootPath, trace)
+  if (!applyOwnedView(options, owner, rootPath, trace)) return superseded()
   applyAddressChat(intent, chat, reason)
   return { status: 'applied', reason }
 }
@@ -205,7 +206,7 @@ function applyFolderless(
     }).clearRootFolder()
     activateWorkspaceRoot(null)
   }
-  applyOwnedView(options, owner, null, trace)
+  if (!applyOwnedView(options, owner, null, trace)) return superseded()
   applyAddressChat(options.address, null, options.reason)
   return { status: 'applied', reason: options.reason }
 }
@@ -225,17 +226,19 @@ function applyOwnedView(
     uiStore: editor.uiStore,
     workspaceStore: editor.workspaceStore,
   })
-  trace.rejectedTabs = applyAddressEditors({
-    address: options.address.address,
-    commands,
-    documentStore: editor.documentStore,
-    workspaceStore: editor.workspaceStore,
-    uiStore: editor.uiStore,
-    rootPath,
-    reason: options.reason,
-    preserveTransient: options.preserveTransient ?? false,
-    complete: options.address.source === 'command',
-  })
+  if (options.commitEditorState && !options.commitEditorState(editor.workspaceStore)) return false
+  if (!options.commitEditorState)
+    trace.rejectedTabs = applyAddressEditors({
+      address: options.address.address,
+      commands,
+      documentStore: editor.documentStore,
+      workspaceStore: editor.workspaceStore,
+      uiStore: editor.uiStore,
+      rootPath,
+      reason: options.reason,
+      preserveTransient: options.preserveTransient ?? false,
+      complete: options.address.source === 'command',
+    })
   applyAddressFields({
     address: options.address.address,
     workspaceStore: editor.workspaceStore,
@@ -243,6 +246,7 @@ function applyOwnedView(
     rootPath,
     reason: options.reason,
   })
+  return true
 }
 
 function superseded(): AddressApplyResult {

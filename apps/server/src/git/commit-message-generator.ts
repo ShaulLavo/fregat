@@ -1,3 +1,4 @@
+import { isPresent } from '@workspace/utils/objects'
 import type { ModelSelection, ProviderModel, ProviderSnapshot } from '@workspace/contracts'
 
 import { observeRequestOperation, recordRequestWarning } from '../observability'
@@ -209,8 +210,4 @@ function joinPatches(diffs: Awaited<ReturnType<GitService['diff']>>) {
 
 function throwIfCancelled(signal: AbortSignal | undefined) {
   if (signal?.aborted) throw gitCommitMessageErrors.COMMIT_MESSAGE_CANCELLED()
-}
-
-function isPresent<T>(value: T | null | undefined): value is T {
-  return value !== null && value !== undefined
 }

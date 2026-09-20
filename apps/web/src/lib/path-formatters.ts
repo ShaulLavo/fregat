@@ -1,15 +1,4 @@
-/**
- * Last path segment, falling back to `'Root'` for an empty or `/`-only path.
- *
- * Five other `basename`-shaped helpers exist in this app and they are NOT
- * copies — do not merge them into this one. They differ in ways this signature
- * cannot express: `features/editor/utils/file-path.ts` lowercases (it feeds
- * extension lookup), `lib/file-icons.ts` falls back to the whole path,
- * `components/utils/picked-path.ts` normalises Windows separators, and
- * `features/terminal/utils/links.ts` + `features/chat/utils/markdown-file-links.ts`
- * return `''` rather than `'Root'`. Every one of them is `(string) => string`,
- * so a wrong swap typechecks and ships.
- */
+// Display labels fall back to 'Root'; pathLeaf below preserves an empty leaf.
 export function basename(path: string) {
   const parts = path.split('/').filter(Boolean)
   return parts.at(-1) ?? 'Root'
@@ -55,4 +44,16 @@ export function toTreePath(path: string, rootPath: string) {
 
 export function canonicalTreePath(path: string) {
   return path.replace(/\/+$/u, '')
+}
+
+// An empty filter matches every path; this is not a filesystem containment check.
+export function matchesWorkspaceRoot(path: string, rootPath: string) {
+  if (!rootPath) return true
+  if (path === rootPath) return true
+
+  return path.startsWith(`${rootPath}/`)
+}
+
+export function pathLeaf(path: string) {
+  return path.slice(path.lastIndexOf('/') + 1)
 }

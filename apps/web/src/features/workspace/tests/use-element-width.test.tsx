@@ -3,7 +3,7 @@ import { screen, waitFor } from '@testing-library/react'
 import { useEffect, useRef, useState } from 'react'
 import { afterEach, beforeEach, describe, expect, it } from 'vitest'
 
-import { useElementWidth } from '@/features/workspace/hooks/use-element-width'
+import { useElementWidth } from '@/hooks/use-element-width'
 import { renderWithProviders } from '../../../../test/render'
 
 const clientWidthDescriptor = Object.getOwnPropertyDescriptor(HTMLElement.prototype, 'clientWidth')

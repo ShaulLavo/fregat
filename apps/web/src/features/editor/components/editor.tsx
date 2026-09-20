@@ -35,7 +35,7 @@ import { documentKey } from '@/lib/documents/utils/identity'
 import { languageServerDocument } from '@/lib/language-server-document'
 import { documentSourcePath, filesystemResource } from '@/lib/documents/utils/capabilities'
 import type { DocumentKey, DocumentRef, FilesystemPath, TabId } from '@/lib/documents/utils/types'
-import { useFocusTarget } from '@/lib/focus/hooks/use-target'
+import { useEditorFocusTarget } from '@/lib/focus/hooks/use-editor-target'
 import type {
   DocumentSessionChange,
   EditorInitialPaintEvent,
@@ -44,6 +44,7 @@ import type {
 } from '@singapore-editor/core'
 import { editorPreparedDocumentTags } from '@/features/editor/utils/prepared-document'
 import { useMountedEditorRegistry } from '@/features/editor/hooks/use-mounted-editor-registry'
+import { useRegisterEditorController } from '@/features/editor/hooks/use-register-editor-controller'
 import type { SnapshotCaptureSource } from '@/lib/editor-visible-snapshot-cache'
 import { effectiveDecodeMode } from '@/features/editor/utils/decode-mode'
 import { useUnavailableEnvironment } from '@/lib/environments/hooks/use-unavailable-environment'
@@ -69,7 +70,11 @@ type EditorProps = {
   /** Opens the side-by-side view behind a merge conflict's "Compare Changes". */
   onCompareMergeConflict?: () => void
   onInitialPaint?: (event: EditorInitialPaintEvent) => void
-  onScrollPositionChange?: (key: DocumentKey, scrollPosition: EditorScrollPosition) => void
+  onScrollPositionChange?: (
+    key: DocumentKey,
+    scrollPosition: EditorScrollPosition,
+    reopenScrollPosition?: EditorScrollPosition,
+  ) => void
   onStatusSourceChange?: (source: EditorStatusBarSource) => void
   onTextChange?: (tabId: TabId, key: DocumentKey, change: DocumentSessionChange) => void
 }
@@ -117,7 +122,6 @@ export function Editor({
   const { languageServer, languageServerStatusSource } = useLanguageServerPlugin({
     document: languageServerDocument(currentTarget),
     enabled:
-      active &&
       liveDocument !== null &&
       unavailable === null &&
       (resource !== null || languageServerTarget !== undefined),
@@ -243,32 +247,20 @@ export function Editor({
     return () => onCaptureSourceChange?.(null)
   }, [controller, decodeMode, onCaptureSourceChange])
   const mountedPath = liveDocument ? resource?.path : undefined
+  useRegisterEditorController(tabId, liveDocument ? controller : null)
   useLayoutEffect(
     () => (mountedPath ? mountedEditors.register(mountedPath) : undefined),
     [mountedPath, mountedEditors],
   )
   const settingsSurface = currentTarget.kind === 'settings-json'
-  const focusTarget = useFocusTarget<HTMLDivElement>({
-    area: 'editor',
-    capabilities: {
-      editor: {
-        dispatch: controller.commands.dispatchCommand,
-        getInputElement: () => controller.getEditor()?.getInputElement() ?? null,
-        readKeymapContext: () => controller.getEditor()?.getKeymapContext() ?? null,
-        writable: editability === 'editable',
-      },
-    },
+  const focusTarget = useEditorFocusTarget({
+    controller,
+    writable: editability === 'editable',
     id: {
       key,
       kind: 'editor',
       surface: settingsSurface ? 'settings' : 'document',
       tabId,
-    },
-    onIntent: (intent) => {
-      if (intent !== 'focus') return false
-
-      controller.commands.focus()
-      return true
     },
   })
   const selection = useMemo(
@@ -297,7 +289,7 @@ export function Editor({
         controller.getEditor()?.getScrollPosition() ?? scrollPositionFromSnapshot(snapshot)
       if (!scrollPosition) return
 
-      onScrollPositionChange?.(key, {
+      onScrollPositionChange?.(key, scrollPosition, {
         left: scrollPosition.left,
         top:
           scrollPosition.top === undefined
@@ -325,7 +317,7 @@ export function Editor({
       active={active && focusTarget.focused}
       controller={controller}
       onRequestCloseOverlay={diagnosticPeek.snapshot ? diagnosticPeek.close : undefined}
-      targetRef={active ? focusTarget.ref : undefined}
+      targetRef={focusTarget.ref}
     >
       {provisional && liveDocument ? (
         <div className='bg-background text-muted-foreground absolute inset-x-0 bottom-0 flex items-center gap-2 px-3 py-2 text-xs'>

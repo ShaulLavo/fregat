@@ -1,3 +1,6 @@
+import { syncPath } from './sync-path'
+import { sameItems as sameStrings } from '@workspace/utils/collections'
+import { toPosix as toPortablePath } from './path'
 import { createHash, randomUUID } from 'node:crypto'
 import path from 'node:path'
 import type {
@@ -15,7 +18,8 @@ import type {
   WorkspaceResourcePrecondition,
 } from '@workspace/contracts'
 import { isByteExactText } from './text-encoding'
-import { FsError, nodeErrorCode } from './errors'
+import { FsError } from './errors'
+import { nodeErrorCode } from '@workspace/contracts'
 import type { WorkspacePaths } from './path'
 import type { FileChangeHub } from './watch'
 import { recordRequestContext, runDetached } from '../observability'
@@ -1403,32 +1407,19 @@ export class WorkspaceEditController {
     executed: readonly WorkspaceEditRecoveryStep[],
     transitionId: string,
   ): Promise<CompensationResult> {
-    const program = executed.toReversed().map(invertRecoveryStep)
-
-    for (let index = 0; index < program.length; index += 1) {
-      const current = program[index]!
-      try {
-        const guards = await this.intentGuards(manifest, current.step, current.direction)
-        await this.assertIntentGuards(manifest, guards.before)
-        await this.applyStep(manifest, current.step, current.direction)
-        await this.assertIntentGuards(manifest, guards.after)
-        await this.journal.append(manifest.operationId, {
-          stepIndex: executed.length - index - 1,
-          transitionId,
-          type: 'compensated',
-        })
-      } catch {
-        return { ok: false, remaining: program.slice(index) }
-      }
-    }
-
-    return { ok: true }
+    return this.executeRecoveryProgram(
+      manifest,
+      executed.toReversed().map(invertRecoveryStep),
+      transitionId,
+      true,
+    )
   }
 
   private async executeRecoveryProgram(
     manifest: WorkspaceEditJournalManifest,
     program: readonly WorkspaceEditRecoveryStep[],
     transitionId: string,
+    reverseStepIndexes = false,
   ) {
     for (let index = 0; index < program.length; index += 1) {
       const current = program[index]!
@@ -1438,7 +1429,7 @@ export class WorkspaceEditController {
         await this.applyStep(manifest, current.step, current.direction)
         await this.assertIntentGuards(manifest, guards.after)
         await this.journal.append(manifest.operationId, {
-          stepIndex: index,
+          stepIndex: reverseStepIndexes ? program.length - index - 1 : index,
           transitionId,
           type: 'compensated',
         })
@@ -1660,14 +1651,14 @@ export class WorkspaceEditController {
   private async createEmptyPath(manifest: WorkspaceEditJournalManifest, relativePath: string) {
     const target = this.workspaceTarget(manifest, relativePath)
     await this.driver.writeFile(target, new Uint8Array(), { flag: 'wx', mode: 0o600 })
-    await this.fsyncFile(target)
-    await this.fsyncDirectory(path.dirname(target))
+    await syncPath(this.driver, target)
+    await syncPath(this.driver, path.dirname(target))
   }
 
   private async removeWorkspacePath(manifest: WorkspaceEditJournalManifest, relativePath: string) {
     const target = this.workspaceTarget(manifest, relativePath)
     await this.driver.rm(target, { force: false, recursive: false })
-    await this.fsyncDirectory(path.dirname(target))
+    await syncPath(this.driver, path.dirname(target))
   }
 
   private async applyWrite(
@@ -1697,15 +1688,15 @@ export class WorkspaceEditController {
     try {
       await this.driver.writeFile(temporary, bytes, { flag: 'wx', mode })
       await this.driver.chmod(temporary, mode)
-      await this.fsyncFile(temporary)
+      await syncPath(this.driver, temporary)
       await this.driver.rename(temporary, target)
       replaced = true
       if (direction === 'reverse') {
         const beforeTime = new Date(step.beforeMtimeMs)
         await this.driver.utimes(target, beforeTime, beforeTime)
-        await this.fsyncFile(target)
+        await syncPath(this.driver, target)
       }
-      await this.fsyncDirectory(path.dirname(target))
+      await syncPath(this.driver, path.dirname(target))
     } finally {
       if (!replaced) await this.driver.rm(temporary, { force: true, recursive: false })
     }
@@ -2119,15 +2110,7 @@ export class WorkspaceEditController {
     }
     const execution = await this.executeProgram(manifest, steps, direction, randomUUID())
     if (!execution.ok) {
-      const recoveryProgram = execution.remaining.map((step) => ({ direction, step }))
-      const partial = advanceManifest(manifest, 'partial', this.clock(), {
-        recoveryGuards: await this.snapshotRecoveryGuards(manifest),
-        recoveryProgram,
-        recoveryTarget: target as WorkspaceEditRecoveryTarget,
-        unrecoveredPaths: recoveryPaths(recoveryProgram),
-      })
-      await this.journal.persist(partial)
-      this.slots.set(partial.operationId, { cancelled: false, manifest: partial })
+      await this.persistStartupRecoveryPartial(manifest, direction, execution.remaining, target)
       return
     }
 
@@ -2163,26 +2146,8 @@ export class WorkspaceEditController {
     this.slots.set(partial.operationId, { cancelled: false, manifest: partial })
   }
 
-  private async fsyncFile(target: string) {
-    const handle = await this.driver.open(target, 'r')
-    try {
-      await handle.sync()
-    } finally {
-      await handle.close()
-    }
-  }
-
-  private async fsyncDirectory(target: string) {
-    const handle = await this.driver.open(target, 'r')
-    try {
-      await handle.sync()
-    } finally {
-      await handle.close()
-    }
-  }
-
   private async fsyncDirectories(...targets: string[]) {
-    for (const target of new Set(targets)) await this.fsyncDirectory(target)
+    for (const target of new Set(targets)) await syncPath(this.driver, target)
   }
 }
 
@@ -2659,15 +2624,6 @@ function pathsOverlap(left: string, right: string) {
 function joinRelative(prefix: string, relativePath: string) {
   if (!prefix) return relativePath
   return `${prefix}/${relativePath}`
-}
-
-function toPortablePath(input: string) {
-  return input.split(path.sep).join('/')
-}
-
-function sameStrings(left: readonly string[], right: readonly string[]) {
-  if (left.length !== right.length) return false
-  return left.every((value, index) => value === right[index])
 }
 
 class AsyncKeyedMutex {

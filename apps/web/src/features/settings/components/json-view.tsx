@@ -19,6 +19,7 @@ import { SETTINGS_LANGUAGE_SERVER_TARGET } from '@/features/settings/utils/langu
  * a second derivation would have to build a fresh object inside a store selector.
  */
 export function SettingsJsonView({
+  active,
   diagnostics,
 
   file,
@@ -27,6 +28,7 @@ export function SettingsJsonView({
   scope,
   tabId,
 }: {
+  active: boolean
   diagnostics: readonly SettingsDiagnostic[]
 
   file: SettingsLayerFile | null
@@ -51,7 +53,7 @@ export function SettingsJsonView({
       )}
       <div className='min-h-0 flex-1'>
         <Editor
-          active
+          active={active}
           additionalPlugins={diagnosticsPlugins}
           document={liveDocument}
           target={liveDocument.target}

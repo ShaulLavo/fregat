@@ -5,15 +5,16 @@ import type {
 } from '@singapore-editor/lsp-plugin'
 import { EmptyState } from '@workspace/ui/components/empty-state'
 import { cn } from '@workspace/ui/lib/utils'
-import { useCallback, useRef } from 'react'
 
 import { useEditorLanguageServerStatus } from '@/features/editor/hooks/use-editor-language-server-status'
 import { useEditorCommands } from '@/features/editor/hooks/use-editor-commands'
 import { createEditorLanguageServerStatusSource } from '@/features/editor/state/language-server-status-source'
 import type { EditorStatusBarSource } from '@/features/editor/state/status-bar-source'
 import { useEditorUiState, useEditorUiStoreApi } from '@/features/editor/state/ui-state'
+import { useEditorWorkspaceStoreApi } from '@/features/editor/state/workspace-state'
+import { activeEditorTab } from '@/lib/documents/utils/groups'
 import { DiagnosticsLoading } from '@/features/workbench/components/diagnostics-loading'
-import { useFocusTarget } from '@/lib/focus/hooks/use-target'
+import { FocusablePanel } from '@/components/focusable-panel'
 import { basename, parentPath } from '@/lib/path-formatters'
 import {
   diagnosticMessageText,
@@ -25,42 +26,24 @@ import {
 const idleLanguageServerStatusSource = createEditorLanguageServerStatusSource()
 
 export function DiagnosticsPanel() {
-  const rootRef = useRef<HTMLElement | null>(null)
-  const { ref: focusTargetRef } = useFocusTarget<HTMLElement>({
-    area: 'problems',
-    id: { kind: 'problems' },
-    onIntent: (intent) => {
-      if (intent !== 'focus') return false
-      if (!rootRef.current) return false
-
-      rootRef.current.focus()
-      return true
-    },
-  })
-  // Stable identity keeps the target registration mounted across renders.
-  const setRootRef = useCallback(
-    (element: HTMLElement | null) => {
-      rootRef.current = element
-      focusTargetRef(element)
-    },
-    [focusTargetRef],
-  )
   const statusBarSource = useEditorUiState((state) => state.statusBarSource)
   const commands = useEditorCommands()
   const uiStore = useEditorUiStoreApi()
+  const workspaceStore = useEditorWorkspaceStoreApi()
   const languageServerStatus = useEditorLanguageServerStatus(
     statusBarSource?.languageServerStatusSource ?? idleLanguageServerStatusSource,
   )
 
   function previewDiagnostic(target: LanguageServerDefinitionTarget) {
-    uiStore.getState().setDefinitionTarget(target)
+    const tab = activeEditorTab(workspaceStore.getState().workbenchPanels.editorGroups)
+    if (tab) uiStore.getState().setDefinitionTarget(target, tab.id)
   }
 
   return (
-    <section
+    <FocusablePanel
+      area='problems'
+      target={{ kind: 'problems' }}
       className='flex h-full min-h-0 min-w-0 flex-col overflow-hidden'
-      ref={setRootRef}
-      tabIndex={-1}
     >
       {statusBarSource ? (
         renderDiagnosticsStatus({
@@ -78,7 +61,7 @@ export function DiagnosticsPanel() {
           title='No active editor'
         />
       )}
-    </section>
+    </FocusablePanel>
   )
 }
 

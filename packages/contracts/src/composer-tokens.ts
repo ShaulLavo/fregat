@@ -204,7 +204,7 @@ function isComposerTokenBoundary(char: string | undefined) {
   return char === undefined || char === ' ' || char === '\n' || char === '\r' || char === '\t'
 }
 
-function clampComposerCursor(text: string, cursorInput: number) {
+export function clampComposerCursor(text: string, cursorInput: number) {
   if (!Number.isFinite(cursorInput)) return text.length
 
   return Math.max(0, Math.min(text.length, Math.floor(cursorInput)))

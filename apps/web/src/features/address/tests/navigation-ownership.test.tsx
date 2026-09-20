@@ -1,3 +1,4 @@
+import { editorTabRecordsForWorkbenchPanels } from '@/features/workbench/utils/panels'
 import {
   testContentMatches,
   testTabContents,
@@ -166,9 +167,9 @@ test('closing the addressed editor selects its conflict successor without reopen
   const conflict = 'conflict-diff:close-successor'
   await navigation.openContent({ owner: harness.workspace, content: testTabContent(conflict) })
   await navigation.openFile({ owner: harness.workspace, path: filesystemPath('repo/a.ts') })
-  const tab = harness.workspace
-    .getState()
-    .workbenchPanels.editorTabs.find((item) => testContentMatches(item.content, 'repo/a.ts'))
+  const tab = editorTabRecordsForWorkbenchPanels(harness.workspace.getState().workbenchPanels).find(
+    (item) => testContentMatches(item.content, 'repo/a.ts'),
+  )
   if (!tab) return expect.unreachable('addressed tab is missing')
   expect(
     (await navigation.editorCommands(harness.workspace).closeTab(testTabId(tab.id))).status,

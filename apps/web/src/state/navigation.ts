@@ -1,3 +1,5 @@
+import { supersededNavigation } from '@/state/navigation-result'
+import { captureEditorScrollPositions } from '@/features/editor/state/scroll-persistence'
 import { createChatNavigation } from '@/state/navigation-chat'
 import { retainedTextBudgetFromSettings } from '@/features/editor/utils/retained-text-budget'
 import { captureMainSession } from '@/state/navigation-capture'
@@ -9,7 +11,12 @@ import { useSidebarSelectionStore } from '@/features/chat/state/sidebar-selectio
 import { scopedMainSelection, workspaceAddressFor } from '@/state/navigation-workspace'
 import { fetchDiff, fetchGitFile } from '@/features/git/utils/api'
 import { snapshotDocument } from '@/lib/documents/utils/comparisons'
-import { fileDocument, fileResource, filesystemPath } from '@/lib/documents/utils/identity'
+import {
+  createTabId,
+  fileDocument,
+  fileResource,
+  filesystemPath,
+} from '@/lib/documents/utils/identity'
 import { documentTab, settingsTab } from '@/lib/documents/utils/tabs'
 import type { DocumentRef, FilesystemPath, TabContent, TabId } from '@/lib/documents/utils/types'
 import type { ChangeRow } from '@/features/git/utils/types'
@@ -56,12 +63,12 @@ import {
 import type { EditorWorkspaceStoreApi } from '@/features/editor/state/workspace-state'
 import {
   createEditorApplyActions,
-  type EditorApplyActions,
+  activateWorkbenchSelection,
 } from '@/features/editor/state/apply-actions'
 import {
   activeEditorTabForWorkbenchPanels,
   closeEditorTabInWorkbenchPanels,
-  reorderEditorTabInWorkbenchPanels,
+  editorOpenContentsForWorkbenchPanels,
   type WorkbenchPanels,
   type WorkbenchSidebarTab,
   type WorkbenchBottomTab,
@@ -72,6 +79,7 @@ import {
   type ChatModeToolTab,
 } from '@/features/chat-mode/utils/panels'
 import {
+  editorHistoryForSelection,
   previousOpenTabContent,
   recentlyClosedTabsForReopen,
 } from '@/features/editor/utils/tab-history'
@@ -89,7 +97,37 @@ import type { ApplicationRuntime } from '@/state/application-runtime'
 import { diffScopeParam } from '@/features/address/utils/diff-scope'
 import type { SessionDiffScope } from '@/features/chat/utils/session-diff-scope-storage'
 
-export function createNavigation(router: ApplicationRouter, initial: AddressIntent) {
+import {
+  createGroupId,
+  createSplitId,
+  type EditorGroups,
+  type GroupId,
+  type GroupResize,
+  type TabPlacement,
+  type TabPlacementResult,
+} from '@/lib/documents/utils/group-types'
+import {
+  allEditorTabs,
+  groupById,
+  groupForTab,
+  placeTabInGroups,
+  resizeEditorGroups,
+  selectEditorGroup,
+  selectEditorGroupTab,
+} from '@/lib/documents/utils/groups'
+import {
+  placementMutationOptions,
+  resizeMutationOptions,
+} from '@/features/editor/state/group-mutations'
+import { runMutation } from '@/lib/mutations/run'
+
+export function createNavigation(
+  router: ApplicationRouter,
+  initial: AddressIntent,
+  options: {
+    readonly canPlaceTab?: (placement: TabPlacement, groups: EditorGroups) => boolean
+  } = {},
+) {
   const coordinator = createNavigationCoordinator(router, initial)
   const openChat = createChatNavigation(coordinator)
   const replaceFields = (
@@ -281,8 +319,8 @@ export function createNavigation(router: ApplicationRouter, initial: AddressInte
         ? { ...address, mode, document: editorDocumentToken(address), editor: null }
         : address
       const next = addressForPanels(base, panels, rootPath, address.focus)
-      const tabs = panels.editorTabs.flatMap((tab) => {
-        const token = documentTokenForContent(rootPath, tab.content)
+      const tabs = editorOpenContentsForWorkbenchPanels(panels).flatMap((content) => {
+        const token = documentTokenForContent(rootPath, content)
         return token.kind === 'token' ? [token.token] : []
       })
       return {
@@ -291,7 +329,19 @@ export function createNavigation(router: ApplicationRouter, initial: AddressInte
           next.mode === address.mode && editorDocumentToken(next) === editorDocumentToken(address),
         historyTarget: historyTargetForEditorChange(address, next),
         preserveTransient: true,
-        beforeApply: () => editor.workspaceStore.getState().setWorkbenchPanels(panels),
+        editorOwner: { workspace: editor.workspaceStore, rootPath },
+        commitEditorState: (currentOwner) => {
+          if (
+            currentOwner !== editor.workspaceStore ||
+            currentOwner.getState().rootFolder?.path !== (rootPath ?? undefined)
+          )
+            return false
+          currentOwner.getState().setWorkbenchPanels({
+            ...panels,
+            editorGroups: currentOwner.getState().workbenchPanels.editorGroups,
+          })
+          return true
+        },
       }
     })
   }
@@ -304,8 +354,8 @@ export function createNavigation(router: ApplicationRouter, initial: AddressInte
       const workspace = owner.getState()
       const panels = tabIds.reduce(closeEditorTabInWorkbenchPanels, workspace.workbenchPanels)
       const next = addressForPanels(address, panels, workspace.rootFolder?.path ?? null)
-      const tabs = panels.editorTabs.flatMap((tab) => {
-        const token = documentTokenForContent(workspace.rootFolder?.path ?? null, tab.content)
+      const tabs = editorOpenContentsForWorkbenchPanels(panels).flatMap((content) => {
+        const token = documentTokenForContent(workspace.rootFolder?.path ?? null, content)
         return token.kind === 'token' ? [token.token] : []
       })
       return {
@@ -313,15 +363,151 @@ export function createNavigation(router: ApplicationRouter, initial: AddressInte
         replace: editorDocumentToken(next) === editorDocumentToken(address),
         historyTarget: historyTargetForEditorChange(address, next),
         preserveTransient: true,
-        beforeApply: () => {
+        editorOwner: { workspace: owner, rootPath: workspace.rootFolder?.path ?? null },
+        commitEditorState: (currentOwner) => {
+          if (
+            currentOwner !== owner ||
+            currentOwner.getState().rootFolder?.path !== workspace.rootFolder?.path
+          )
+            return false
           const apply = actions(application)
           for (const tabId of tabIds) {
             if (discard) apply.discardAndCloseTab(tabId)
             if (!discard) apply.closeTab(tabId)
           }
+          return true
         },
       }
     })
+  }
+
+  const mutationScopes = new WeakMap<EditorWorkspaceStoreApi, string>()
+
+  function groupMutationScope(owner: EditorWorkspaceStoreApi) {
+    let scope = mutationScopes.get(owner)
+    if (!scope) {
+      scope = `editor.groups.${crypto.randomUUID()}`
+      mutationScopes.set(owner, scope)
+    }
+    return `${scope}.${owner.getState().rootFolder?.path ?? ''}`
+  }
+
+  function publishGroups(editor: EditorRuntime, editorGroups: EditorGroups) {
+    const state = editor.workspaceStore.getState()
+    if (editorGroups === state.workbenchPanels.editorGroups) return
+    const panels = { ...state.workbenchPanels, editorGroups }
+    editor.workspaceStore.getState().setWorkbenchPanels(panels)
+    activateWorkbenchSelection(panels, editor.editorActivation)
+    const selected = editor.workspaceStore.getState().selectedTabContent
+    editor.workspaceStore.setState({
+      editorHistory: editorHistoryForSelection(state.editorHistory, selected),
+    })
+  }
+
+  function editGroups(
+    owner: EditorWorkspaceStoreApi,
+    transform: (
+      groups: EditorGroups,
+      editor: EditorRuntime,
+      committing: boolean,
+    ) => EditorGroups | null,
+  ): Promise<NavigationResult> {
+    const rootPath = owner.getState().rootFolder?.path
+    return ownedRequest(
+      owner,
+      ({ application, address }) => {
+        const editor = application.getSnapshot().editor
+        const nextGroups = transform(owner.getState().workbenchPanels.editorGroups, editor, false)
+        if (!nextGroups)
+          return {
+            address,
+            replace: true,
+            editorOwner: { workspace: owner, rootPath: rootPath ?? null },
+            commitEditorState: () => false,
+          }
+        const panels = { ...owner.getState().workbenchPanels, editorGroups: nextGroups }
+        const next = addressForPanels(address, panels, rootPath ?? null)
+        let committed = false
+        return {
+          address: {
+            ...next,
+            tabs: editorOpenContentsForWorkbenchPanels(panels).flatMap((content) => {
+              const token = documentTokenForContent(rootPath ?? null, content)
+              return token.kind === 'token' ? [token.token] : []
+            }),
+          },
+          replace: editorDocumentToken(next) === editorDocumentToken(address),
+          historyTarget: historyTargetForEditorChange(address, next),
+          preserveTransient: true,
+          editorOwner: { workspace: owner, rootPath: rootPath ?? null },
+          commitEditorState: (currentOwner) => {
+            if (currentOwner !== owner || owner.getState().rootFolder?.path !== rootPath)
+              return false
+            if (committed) return true
+            const current = transform(owner.getState().workbenchPanels.editorGroups, editor, true)
+            if (!current) return false
+            publishGroups(editor, current)
+            const workspace = owner.getState()
+            editor.uiStore
+              .getState()
+              .retainTabPresentation(
+                new Set(
+                  [
+                    ...allEditorTabs(current),
+                    ...Array.from(workspace.parkedWorkspaces.values()).flatMap((slice) =>
+                      allEditorTabs(slice.workbenchPanels.editorGroups),
+                    ),
+                  ].map((tab) => tab.id),
+                ),
+              )
+            captureEditorScrollPositions(owner, editor.documentStore)
+            committed = true
+            return true
+          },
+        }
+      },
+      rootPath,
+    )
+  }
+
+  function placeTab(owner: EditorWorkspaceStoreApi, placement: TabPlacement) {
+    const sourceGroup = groupForTab(
+      owner.getState().workbenchPanels.editorGroups,
+      placement.tabId,
+    )?.id
+    const ids = { groupId: createGroupId(), splitId: createSplitId(), tabId: createTabId() }
+    return editGroups(owner, (groups, editor, committing) => {
+      if (groupForTab(groups, placement.tabId)?.id !== sourceGroup) return null
+      if (options.canPlaceTab && !options.canPlaceTab(placement, groups)) return null
+      const result = placeTabInGroups(groups, placement, ids)
+      if (result.status === 'unchanged') return groups
+      if (result.status !== 'applied') return null
+      if (committing) commitPlacementViews(editor, result)
+      return result.groups
+    })
+  }
+
+  function commitPlacementViews(
+    editor: EditorRuntime,
+    placement: Extract<TabPlacementResult, { status: 'applied' }>,
+  ) {
+    const owner = editor.workspaceStore
+    captureEditorScrollPositions(owner, editor.documentStore)
+    if (placement.copiedFromTabId) {
+      const workspace = owner.getState()
+      const sourcePosition = workspace.viewScrollPositions.find(
+        (entry) => entry.tabId === placement.copiedFromTabId,
+      )
+      if (sourcePosition)
+        workspace.setViewScrollPositions([
+          ...workspace.viewScrollPositions,
+          { tabId: placement.tabId, position: sourcePosition.position },
+        ])
+      editor.documentStore.getState().copyEditorView(placement.copiedFromTabId, placement.tabId)
+      editor.uiStore.getState().copyTabPresentation(placement.copiedFromTabId, placement.tabId)
+    }
+    for (const tabId of placement.removedTabIds)
+      editor.documentStore.getState().removeEditorView(tabId)
   }
 
   function editorCommands(owner: EditorWorkspaceStoreApi) {
@@ -362,21 +548,54 @@ export function createNavigation(router: ApplicationRouter, initial: AddressInte
         openContent({ owner, content: documentTab({ kind: 'search', root: rootPath }) }),
       openSettingsEditor: (category?: string | null) =>
         openContent({ owner, content: settingsTab(), settingsCategory: category }),
-      selectTab: (_paneId: string, tabId: TabId) => {
-        const tab = owner.getState().workbenchPanels.editorTabs.find((item) => item.id === tabId)
-        return tab
-          ? openContent({ owner, content: tab.content })
-          : Promise.resolve({ status: 'superseded' } satisfies NavigationResult)
+      selectTab: ({ groupId, tabId }: { groupId: GroupId; tabId: TabId }) =>
+        editGroups(owner, (groups) =>
+          groupForTab(groups, tabId)?.id === groupId
+            ? selectEditorGroupTab(groups, groupId, tabId)
+            : null,
+        ),
+      setActiveGroup: (groupId: GroupId) => {
+        const editor = coordinator.getApplication()?.getSnapshot().editor
+        if (!editor || editor.workspaceStore !== owner) return supersededNavigation()
+        const panels = owner.getState().workbenchPanels
+        if (!groupById(panels.editorGroups, groupId)) return supersededNavigation()
+        const editorGroups = selectEditorGroup(panels.editorGroups, groupId)
+        if (editorGroups === panels.editorGroups)
+          return Promise.resolve({ status: 'applied' } satisfies NavigationResult)
+        publishGroups(editor, editorGroups)
+        return editGroups(owner, (current) => current)
+      },
+      placeTab: (placement: TabPlacement) => {
+        const editor = coordinator.getApplication()?.getSnapshot().editor
+        if (!editor || editor.workspaceStore !== owner) return supersededNavigation()
+        const scope = groupMutationScope(owner)
+        return runMutation(
+          editor.queryClient,
+          placementMutationOptions(scope, (request) => placeTab(owner, request)),
+          placement,
+        )
+      },
+      resizeEditorSplit: (request: GroupResize) => {
+        const editor = coordinator.getApplication()?.getSnapshot().editor
+        if (!editor || editor.workspaceStore !== owner) return supersededNavigation()
+        return runMutation(
+          editor.queryClient,
+          resizeMutationOptions(groupMutationScope(owner), (resize) =>
+            editGroups(owner, (groups) => resizeEditorGroups(groups, resize)),
+          ),
+          request,
+        )
+      },
+      requestMoveTab: (tabId: TabId) => {
+        const editor = coordinator.getApplication()?.getSnapshot().editor
+        if (editor?.workspaceStore !== owner) return
+        if (groupForTab(owner.getState().workbenchPanels.editorGroups, tabId))
+          editor.uiStore.getState().setMoveTabId(tabId)
       },
       closeTab: (tabId: TabId) => closeTabs([tabId], owner),
       closeTabs: (tabIds: readonly TabId[]) => closeTabs(tabIds, owner),
       discardAndCloseTabs: (tabIds: readonly TabId[]) => closeTabs(tabIds, owner, true),
       discardAndCloseTab: (tabId: TabId) => closeTabs([tabId], owner, true),
-      reorderTab: (_paneId: string, tabId: TabId, targetIndex: number) =>
-        setWorkbenchPanels(
-          reorderEditorTabInWorkbenchPanels(owner.getState().workbenchPanels, tabId, targetIndex),
-          owner,
-        ),
       selectPreviousEditor: () => {
         const state = owner.getState()
         const content = previousOpenTabContent(
@@ -417,10 +636,6 @@ export function createNavigation(router: ApplicationRouter, initial: AddressInte
         )
         return { wasDirty, settled }
       },
-      moveTabToPane: (..._args: Parameters<EditorApplyActions['moveTabToPane']>) => false,
-      moveTabToSplit: (..._args: Parameters<EditorApplyActions['moveTabToSplit']>) => false,
-      splitTab: (..._args: Parameters<EditorApplyActions['splitTab']>) => false,
-      setActivePane: (..._args: Parameters<EditorApplyActions['setActivePane']>): void => undefined,
     }
   }
 
@@ -772,8 +987,4 @@ export type Navigation = ReturnType<typeof createNavigation>
 function categoryForAddress(category: string | null | undefined, current: string | null) {
   if (category === undefined) return current
   return category ? settingsCategorySlug(category) : null
-}
-
-function supersededNavigation(): Promise<NavigationResult> {
-  return Promise.resolve({ status: 'superseded' })
 }

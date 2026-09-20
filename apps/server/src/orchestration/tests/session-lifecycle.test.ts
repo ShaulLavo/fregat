@@ -8,7 +8,7 @@ import {
   orchestrationCommandSchema,
   type OrchestrationCommand,
 } from '@workspace/contracts'
-import { migrateOrchestrationDatabase } from '../../db/migrations'
+import { migratePlatformDatabase as migrateOrchestrationDatabase } from '../../db/migrations'
 import * as schema from '../../db/schema'
 import { projectionSessions } from '../../db/schema'
 import { OrchestrationEngine } from '../engine'

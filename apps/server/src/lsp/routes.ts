@@ -1,4 +1,6 @@
-import { isRecord, LSP_SERVER_EXITED, type LspNegotiatedSemanticTokens } from '@workspace/contracts'
+import { adaptWebSocket } from '../utils/websocket'
+import { LSP_SERVER_EXITED, type LspNegotiatedSemanticTokens } from '@workspace/contracts'
+import { isRecord } from '@workspace/utils/objects'
 import * as v from 'valibot'
 
 import { authenticateWebSocketData, type AuthConfig } from '../auth'
@@ -352,25 +354,14 @@ type LspWebSocket = {
 }
 
 function websocketObject(value: unknown): LspWebSocket | null {
-  if (!isRecord(value)) return null
-  if (typeof value.send !== 'function') return null
-
-  const close = value.close
-  const send = value.send
+  const socket = adaptWebSocket(value)
+  if (!socket) return null
   return {
-    close: (code, reason) =>
-      typeof close === 'function' ? close.call(value, code, reason) : undefined,
-    data: value.data,
-    key: websocketKey(value),
-    path: queryValue(value.data, 'path') ?? '',
-    root: queryValue(value.data, 'root') ?? '',
-    send: (message) => send.call(value, message),
-    serverId: queryValue(value.data, 'server'),
+    ...socket,
+    path: queryValue(socket.data, 'path') ?? '',
+    root: queryValue(socket.data, 'root') ?? '',
+    serverId: queryValue(socket.data, 'server'),
   }
-}
-
-function websocketKey(value: Record<string, unknown>): object {
-  return isRecord(value.raw) ? value.raw : value
 }
 
 function queryValue(data: unknown, key: string) {

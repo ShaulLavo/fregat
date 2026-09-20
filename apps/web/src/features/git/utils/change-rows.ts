@@ -1,3 +1,5 @@
+import { isWorktreeStatus } from '@/lib/git-status'
+import { isStagedStatus } from '@/lib/git-status'
 import type { GitFileStatus } from '@workspace/contracts'
 import type { ChangeRow } from '@/features/git/utils/types'
 
@@ -27,13 +29,6 @@ export function changeRows(files: readonly GitFileStatus[]) {
  * tree's row menu decides stage-vs-unstage from the same rule — two copies
  * would eventually disagree with the panel.
  */
-export function isStagedStatus(status: GitFileStatus['index']) {
-  return status !== 'unmodified' && status !== 'untracked'
-}
-
-export function isWorktreeStatus(status: GitFileStatus['worktree']) {
-  return status !== 'unmodified'
-}
 
 function sortedStatusFiles(files: readonly GitFileStatus[]) {
   return files.toSorted(compareStatusPaths)

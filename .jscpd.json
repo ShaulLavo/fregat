@@ -1,6 +1,5 @@
 {
-  "$schema": "https://raw.githubusercontent.com/kucherenko/jscpd/master/packages/jscpd/schema.json",
-  "format": ["tsx", "ts"],
+  "format": ["tsx", "typescript"],
   "minLines": 6,
   "minTokens": 60,
   "reporters": ["console"],

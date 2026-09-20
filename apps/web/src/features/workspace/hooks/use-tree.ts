@@ -1,3 +1,4 @@
+import { matchesWorkspaceRoot as isPathInWorkspace } from '@/lib/path-formatters'
 import { tabFileResource } from '@/lib/documents/utils/capabilities'
 import { filesystemPath } from '@/lib/documents/utils/identity'
 import type { Client } from '@/lib/client'
@@ -237,13 +238,6 @@ async function fetchOptionalTree(path: string, signal: AbortSignal, client: Clie
 
     return null
   }
-}
-
-function isPathInWorkspace(path: string, rootPath: string) {
-  if (!rootPath) return true
-  if (path === rootPath) return true
-
-  return path.startsWith(`${rootPath}/`)
 }
 
 function isTreeResult(result: TreeResult | null): result is TreeResult {

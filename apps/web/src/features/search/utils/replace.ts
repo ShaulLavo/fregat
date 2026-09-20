@@ -1,3 +1,4 @@
+import { isWholeWordMatch } from '@workspace/contracts'
 import { textSnapshotLineRange } from '@/features/editor/utils/text-snapshot'
 import type { TextEdit } from '@singapore-editor/core'
 import type { TextSnapshot } from '@singapore-editor/core'
@@ -386,47 +387,6 @@ function compareEditsAscending(left: TextEdit, right: TextEdit) {
 
 function compareEditsDescending(left: TextEdit, right: TextEdit) {
   return right.from - left.from || right.to - left.to
-}
-
-function isWholeWordMatch(text: string, start: number, end: number, wholeWord?: boolean) {
-  if (!wholeWord) return true
-
-  return isWordBoundary(text, start, 'left') && isWordBoundary(text, end, 'right')
-}
-
-function isWordBoundary(text: string, offset: number, side: 'left' | 'right') {
-  if (side === 'left') return !isWordCodePointBefore(text, offset)
-
-  return !isWordCodePointAt(text, offset)
-}
-
-function isWordCodePointBefore(text: string, offset: number) {
-  if (offset <= 0) return false
-
-  const start = previousCodePointStart(text, offset)
-  return start !== null && isWordCodePointAt(text, start)
-}
-
-function previousCodePointStart(text: string, offset: number) {
-  if (offset <= 0) return null
-
-  const previous = offset - 1
-  const codeUnit = text.charCodeAt(previous)
-  const beforePrevious = previous - 1
-  if (codeUnit < 0xdc00 || codeUnit > 0xdfff) return previous
-  if (beforePrevious < 0) return previous
-
-  const previousCodeUnit = text.charCodeAt(beforePrevious)
-  if (previousCodeUnit < 0xd800 || previousCodeUnit > 0xdbff) return previous
-
-  return beforePrevious
-}
-
-function isWordCodePointAt(text: string, offset: number) {
-  const codePoint = text.codePointAt(offset)
-  if (codePoint === undefined) return false
-
-  return /^[\p{L}\p{N}_]$/u.test(String.fromCodePoint(codePoint))
 }
 
 function isDigit(value: string) {

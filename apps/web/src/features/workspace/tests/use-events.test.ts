@@ -273,10 +273,10 @@ describe('workspace transaction event reconciliation', () => {
 })
 
 describe('mayTrustCachedSnapshot', () => {
-  it('lets a ready refresh reuse a fresh snapshot', () => {
+  it('rereads disk after watch registration even when the snapshot is fresh', () => {
     expect(
       mayTrustCachedSnapshot({ path: 'a', reason: 'ready', type: 'refresh-open-file' }, 'v1'),
-    ).toBe(true)
+    ).toBe(false)
   })
 
   it('reads disk for a change whose version the snapshot does not hold', () => {

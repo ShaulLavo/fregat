@@ -14,7 +14,23 @@ Open the command palette (`Control+Shift+P`), type a file name, press Enter. Or 
 
 `scenario editor-type-burst`, `scenario editor-large-paste`, `scenario editor-fast-scroll`, `scenario editor-caret-burst`. These open `--file` (default `use-events.ts`) through the palette. For a save, press `Control+s` in a scenario and check the file on disk plus `bun run logs --action fs.write`.
 
+Split views: `scenario editor-split-drag` checks edge previews, modifier changes, shared editing/undo, nested layouts, resize/reload, cancellation and duplicate collapse. `scenario editor-split-actions` checks keyboard reorder, moves, tab-strip insertion, menu size limits, numbered focus and independent scroll restore. `scenario editor-split-state` uses a disposable committed workspace to check Find and Save in the focused pane, closing one dirty copy, and the final-view save prompt. Split scenarios isolate their terminal sessions and clean them up.
+
+`scenario editor-split-content` creates and removes its own committed scratch workspace. It moves Settings and Search between groups, checks their split commands stay disabled, and copies HEAD references, history, and saved comparisons in empty and populated states. It checks read-only editing and focus in the destination group without writing repository files.
+
+`scenario editor-split-folds` copies a collapsed structural fold, unfolds one occurrence, then nests, collapses, and moves groups. It checks both fold states and stable tab IDs across actual editor remounts in a committed scratch workspace, without changing repository files.
+
+`scenario editor-split-blur` transfers focus to another document during a drag while the page stays visible. It releases the pointer there, verifies the next drag still splits, and checks that window blur also cancels keyboard dragging.
+
+`scenario editor-split-targets` checks that unchanged center, strip, and equivalent edge drops show no destination. It also checks insertion after tab-strip auto-scroll and clipped tabs overlapping a neighboring pane's strip.
+
+`scenario editor-split-order` keeps different tab orders in two groups while opening another file and reloading. `scenario editor-split-breadcrumbs` checks that each pane retains its own cursor scope for the same file and for different files.
+
+`scenario editor-split-history-state` creates a workspace edit through Search Replace All, selects its history barrier, and moves that history tab into a group already displaying another history tab. The barrier selection must survive without collapsing the source group.
+
 ## Gotchas
+
+`scenario editor-external-edit` creates a disposable workspace with a folder linked outside the project. It removes a line on disk, atomically replaces the open file, retargets the symlink, replaces its target directory, and verifies that subsequent edits still arrive. An external write must preserve unsaved text and offer a conflict. Fixture files are cleaned up afterward; screenshots and `inspection.json` retain the evidence.
 
 `trace editor-theme-preview --file syntax-highlighting.ts` previews three code themes twice and cancels. Compare traces for worker session restarts and inspect the scenario's screenshots for the editor behind the picker. It restores the committed theme without writing settings.
 

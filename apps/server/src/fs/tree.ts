@@ -1,3 +1,4 @@
+import { joinRelative } from './search-shared'
 import { readdir, stat } from 'node:fs/promises'
 import path from 'node:path'
 import {
@@ -9,13 +10,7 @@ import {
   type FileTreeResult,
 } from '@workspace/contracts'
 import { FsError, mapNodeError } from './errors'
-import {
-  isIgnoredPath,
-  resolveExistingPath,
-  treeIgnoredNames,
-  toPosix,
-  type WorkspacePaths,
-} from './path'
+import { isIgnoredPath, resolveExistingPath, treeIgnoredNames, type WorkspacePaths } from './path'
 import { assertDirectory, statPath } from './stat'
 
 export type TreeReadOptions = {
@@ -148,11 +143,6 @@ function createTaskLimiter(concurrency: number): TaskLimiter {
       queue.shift()?.()
     }
   }
-}
-
-function joinRelative(parent: string, child: string) {
-  if (!parent) return child
-  return toPosix(path.join(parent, child))
 }
 
 function compareTreeEntries(a: FileTreeEntry, b: FileTreeEntry) {

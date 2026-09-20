@@ -1,3 +1,4 @@
+import { isRecord } from '@workspace/utils/objects'
 import type {
   EntryTypeFilter,
   WorkspaceSearchDoneEvent,
@@ -326,8 +327,4 @@ function propertyNumber(data: Record<string, unknown>, key: string) {
 
 function propertyString(data: Record<string, unknown>, key: string) {
   return typeof data[key] === 'string' ? data[key] : ''
-}
-
-function isRecord(value: unknown): value is Record<string, unknown> {
-  return typeof value === 'object' && value !== null && !Array.isArray(value)
 }

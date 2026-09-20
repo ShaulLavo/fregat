@@ -1,4 +1,4 @@
-import type { ReactElement } from 'react'
+import { useState, type ReactElement } from 'react'
 
 import type { EditorTabCloseTarget } from '@/features/workspace/utils/tab-close-targets'
 import type { EditorTabModel } from '@/features/workspace/utils/tab-types'
@@ -14,7 +14,17 @@ export function EditorTabMenu({
   readonly tab: EditorTabModel
   readonly trigger: ReactElement
 }) {
-  const menu = useEditorTabMenu(tab, closeTargets)
+  const [open, setOpen] = useState(false)
+  const menu = useEditorTabMenu(tab, closeTargets, open)
 
-  return <MenuSurface className='w-52' menu={menu} surface='editor.tab' trigger={trigger} />
+  return (
+    <MenuSurface
+      className='w-52'
+      menu={menu}
+      open={open}
+      onOpenChange={setOpen}
+      surface='editor.tab'
+      trigger={trigger}
+    />
+  )
 }

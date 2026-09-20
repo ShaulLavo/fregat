@@ -11,6 +11,7 @@ import type {
   DocumentKey,
   FilesystemPath,
   ReopenScrollPosition,
+  EditorViewScrollPosition,
   SettingsDocumentRef,
   TabId,
 } from '@/lib/documents/utils/types'
@@ -45,6 +46,7 @@ type DeleteLiveEditorDocumentResult = {
 
 type CreateEditorDocumentStoreOptions = {
   scrollPositionSeeds?: readonly ReopenScrollPosition[]
+  viewScrollPositionSeeds?: readonly EditorViewScrollPosition[]
 }
 
 type EditorDocumentStoreActions = {
@@ -149,12 +151,18 @@ type EditorDocumentStoreActions = {
   runWorkspaceDocumentBatch: <T>(run: () => T) => T
   /** Replaces the scroll-restore seeds (e.g. after a workspace switch). Not reactive. */
   seedEditorScrollPositions: (entries: readonly ReopenScrollPosition[]) => void
+  seedEditorViewScrollPositions: (entries: readonly EditorViewScrollPosition[]) => void
+  copyEditorView: (from: TabId, to: TabId) => void
   /** The single eviction path: everything outside the keep sets is dropped. */
   retainEditorDocuments: (keep: DocumentRetention) => {
     evictedDocumentKeys: DocumentKey[]
     evictedTabIds: TabId[]
   }
-  setEditorViewScrollPosition: (tabId: TabId, scrollPosition: EditorScrollPosition) => void
+  setEditorViewScrollPosition: (
+    tabId: TabId,
+    scrollPosition: EditorScrollPosition,
+    reopenScrollPosition?: EditorScrollPosition,
+  ) => void
   setLiveEditorDocumentDirty: (documentKey: DocumentKey, dirty: boolean) => void
 }
 
@@ -197,6 +205,8 @@ export function createEditorDocumentStore(options: CreateEditorDocumentStoreOpti
       const publish = () => publication.request()
       service = new WorkspaceDocumentService(publish)
       if (options.scrollPositionSeeds) service.seedScrollPositions(options.scrollPositionSeeds)
+      if (options.viewScrollPositionSeeds)
+        service.seedViewScrollPositions(options.viewScrollPositionSeeds)
 
       return {
         ...service.state(),
@@ -333,14 +343,19 @@ export function createEditorDocumentStore(options: CreateEditorDocumentStoreOpti
           publish()
           return result
         },
-        setEditorViewScrollPosition: (tabId, scrollPosition) => {
-          const changed = service.setViewScrollPosition(tabId, scrollPosition)
+        setEditorViewScrollPosition: (tabId, scrollPosition, reopenScrollPosition) => {
+          const changed = service.setViewScrollPosition(tabId, scrollPosition, reopenScrollPosition)
           // Runs at scroll rate; service.state() keeps unchanged slices
           // referentially stable, so this notify only re-renders subscribers of
           // the scroll position itself.
           if (changed) publish()
         },
         seedEditorScrollPositions: (byPath) => service.seedScrollPositions(byPath),
+        seedEditorViewScrollPositions: (entries) => service.seedViewScrollPositions(entries),
+        copyEditorView: (from, to) => {
+          service.copyView(from, to)
+          publish()
+        },
         setLiveEditorDocumentDirty: (documentKey, dirty) => {
           service.setDirty(documentKey, dirty)
           publish()

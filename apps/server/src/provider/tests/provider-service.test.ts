@@ -14,7 +14,7 @@ import {
   turnIdSchema,
   worktreeIdSchema,
 } from '@workspace/contracts'
-import { migrateOrchestrationDatabase } from '../../db/migrations'
+import { migratePlatformDatabase as migrateOrchestrationDatabase } from '../../db/migrations'
 import * as schema from '../../db/schema'
 import { WorktreeExecutionGate } from '../../orchestration/worktree-execution-gate'
 import { MockProviderAdapter } from '../adapters/mock'

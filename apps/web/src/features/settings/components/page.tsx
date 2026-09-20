@@ -43,10 +43,12 @@ import { useFocusTarget } from '@/lib/focus/hooks/use-target'
  * real editor bound to this tab — not because the form needs them.
  */
 export function SettingsPage({
+  active = true,
   liveDocument = null,
   rootPath = workspaceRoot(''),
   tabId,
 }: {
+  active?: boolean
   liveDocument?: EditorRenderDocument | null
   rootPath?: WorkspaceRoot
   tabId?: TabId
@@ -146,7 +148,7 @@ export function SettingsPage({
               autoCapitalize='off'
               autoComplete='off'
               autoCorrect='off'
-              autoFocus
+              autoFocus={active}
               ref={searchRef}
               onChange={(event) => setQuery(event.currentTarget.value)}
               placeholder='Search settings'
@@ -201,6 +203,7 @@ export function SettingsPage({
           </div>
           <div className='min-h-0 flex-1'>
             <SettingsJsonView
+              active={active}
               diagnostics={document.data.diagnostics}
               file={selectedFile}
               liveDocument={liveDocument}

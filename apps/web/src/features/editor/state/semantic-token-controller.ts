@@ -1,3 +1,4 @@
+import { isObject as isProviderObject } from '@workspace/utils/objects'
 import type {
   LanguageServerConnectionContext,
   LanguageServerSemanticTokensDocument,
@@ -769,9 +770,6 @@ function utf8Length(text: string): number {
 }
 
 /** The protocol spells an offered sub-capability as `true` or as an options object. */
-function isProviderObject(value: unknown): boolean {
-  return typeof value === 'object' && value !== null
-}
 
 /** The editor's client rejects a timed-out request with a plain `Error`. */
 function isTimeout(error: unknown): boolean {

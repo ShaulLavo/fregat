@@ -1,8 +1,9 @@
+import { captureEditorScrollPositions } from '@/features/editor/state/scroll-persistence'
 import { useEditorRuntime } from '@/features/editor/hooks/use-runtime'
 import type { ScopedStorage } from '@/lib/environments/state/scoped-storage'
 import { Debouncer } from '@tanstack/react-pacer/debouncer'
 import { useEffect } from 'react'
-import { sameTabContent, tabContentKey } from '@/lib/documents/utils/tabs'
+import { sameTabContent } from '@/lib/documents/utils/tabs'
 import type { ReopenScrollPosition } from '@/lib/documents/utils/types'
 
 import {
@@ -217,7 +218,7 @@ function workspaceCacheSubscriptions({
     // Before the slice subscription in flush order: a pagehide flush pushes the
     // latest scroll positions into the workspace store first, so the slice flush
     // right after writes them out.
-    subscribeScrollPositions({ debounceMs, documentStore, workspaceStore }),
+    subscribeScrollPositions({ documentStore, workspaceStore }),
     subscribeWorkspaceSlices({ cacheWriters, debounceMs, workspaceStore }),
     subscribeSearchBuffers({ cacheWriters, debounceMs, searchStore }),
     subscribeCacheEntry({
@@ -247,32 +248,12 @@ function persistCheckoutOwnership(
 
 // Flush document scroll positions into the workspace slice before writing its cache.
 function subscribeScrollPositions({
-  debounceMs,
   documentStore,
   workspaceStore,
-}: Pick<
-  WorkspaceCacheSubscriptionOptions,
-  'debounceMs' | 'documentStore' | 'workspaceStore'
->): CacheSubscription {
-  return subscribeCacheEntry({
-    debounceMs,
-    select: (state) => state.scrollPositionByTabId,
-    store: documentStore,
-    write: (byTabId) => {
-      const state = workspaceStore.getState()
-      const positions = new Map<string, ReopenScrollPosition>()
-      for (const tab of state.workbenchPanels.editorTabs) {
-        const scrollPosition = byTabId[tab.id]
-        if (!scrollPosition) continue
-
-        positions.set(tabContentKey(tab.content), {
-          content: tab.content,
-          position: { left: scrollPosition.left ?? 0, top: scrollPosition.top ?? 0 },
-        })
-      }
-      state.setEditorScrollPositions(Array.from(positions.values()))
-    },
-  })
+}: Pick<WorkspaceCacheSubscriptionOptions, 'documentStore' | 'workspaceStore'>): CacheSubscription {
+  const capture = () => captureEditorScrollPositions(workspaceStore, documentStore)
+  const unsubscribe = documentStore.subscribe((state) => state.viewsByTabId, capture)
+  return { flush: capture, unsubscribe }
 }
 
 function subscribeCacheEntry<TState, TValue>({
@@ -380,6 +361,7 @@ function workspaceSlicesCacheValue(state: EditorWorkspaceStore): WorkspaceSlices
       editorHistory: state.editorHistory,
       recentlyClosedTabs: state.recentlyClosedTabs,
       reopenScrollPositions: state.reopenScrollPositions,
+      viewScrollPositions: state.viewScrollPositions,
       workbenchPanels: state.workbenchPanels,
     })
   }
@@ -462,6 +444,7 @@ function sameWorkspaceSlice(
   if (left === right) return true
   if (!left || !right) return false
   if (left.workbenchPanels !== right.workbenchPanels) return false
+  if (left.viewScrollPositions !== right.viewScrollPositions) return false
   if (!readonlyArraysEqual(left.editorHistory, right.editorHistory, sameTabContent)) return false
   if (!readonlyArraysEqual(left.recentlyClosedTabs, right.recentlyClosedTabs, sameTabContent)) {
     return false

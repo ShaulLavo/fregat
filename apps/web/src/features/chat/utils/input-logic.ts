@@ -1,3 +1,4 @@
+import { clampComposerCursor as clampCursor } from '@workspace/contracts'
 import {
   activeComposerMention,
   serializeComposerMention,
@@ -438,12 +439,6 @@ function slashCommandTrigger(text: string, cursor: number): ChatInputTrigger | n
     rangeStart: lineStart,
     text: linePrefix,
   }
-}
-
-function clampCursor(text: string, cursorInput: number) {
-  if (!Number.isFinite(cursorInput)) return text.length
-
-  return Math.max(0, Math.min(text.length, Math.floor(cursorInput)))
 }
 
 function isSensitiveMentionPath(path: string) {

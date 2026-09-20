@@ -1,9 +1,12 @@
 import { describe } from 'vitest'
 import { test as it, expect } from '../../../../../test/fixtures'
 import { filesystemPath, tabId } from '@/lib/documents/utils/identity'
+import { activeEditorGroup, selectEditorGroupTab } from '@/lib/documents/utils/groups'
 import { testTabContent, testTabContents } from '../../../../../test/factories/document-targets'
 
 import {
+  activeEditorTabForWorkbenchPanels,
+  editorTabRecordsForWorkbenchPanels,
   closeEditorContentInWorkbenchPanels,
   closeEditorTabInWorkbenchPanels,
   closeTerminalTabInWorkbenchPanels,
@@ -15,7 +18,6 @@ import {
   renameTerminalTabInWorkbenchPanels,
   setTerminalTabProcessInWorkbenchPanels,
   setTerminalTabShellTitleInWorkbenchPanels,
-  reorderEditorTabInWorkbenchPanels,
   reorderTerminalTabInWorkbenchPanels,
   selectAdjacentTerminalTabInWorkbenchPanels,
   selectEditorTabInWorkbenchPanels,
@@ -30,9 +32,8 @@ describe('workbench panel-state model', () => {
   it('creates default panels', () => {
     expect(createDefaultWorkbenchPanels()).toMatchObject({
       activeBottomTab: 'terminal',
-      activeEditorTabId: null,
       activeSidebarTab: 'files',
-      editorTabs: [],
+      editorGroups: { root: { kind: 'group', tabs: [], selectedTabId: null } },
     })
   })
 
@@ -42,17 +43,21 @@ describe('workbench panel-state model', () => {
       testTabContent('/repo/a.ts'),
     )
 
-    expect(panels.editorTabs).toHaveLength(1)
-    expect(panels.editorTabs[0]?.content).toEqual(testTabContent('/repo/a.ts'))
-    expect(panels.activeEditorTabId).toBe(panels.editorTabs[0]?.id)
+    expect(editorTabRecordsForWorkbenchPanels(panels)).toHaveLength(1)
+    expect(editorTabRecordsForWorkbenchPanels(panels)[0]?.content).toEqual(
+      testTabContent('/repo/a.ts'),
+    )
+    expect(activeEditorTabForWorkbenchPanels(panels)?.id ?? null).toBe(
+      editorTabRecordsForWorkbenchPanels(panels)[0]?.id,
+    )
   })
 
   it('selects an already-open path without adding a tab', () => {
     let panels = workbenchPanelsForPaths(['/repo/a.ts', '/repo/b.ts'])
     panels = openEditorContentInWorkbenchPanels(panels, testTabContent('/repo/a.ts'))
 
-    expect(panels.editorTabs).toHaveLength(2)
-    expect(panels.activeEditorTabId).toBe(editorTabIdAt(panels, 0))
+    expect(editorTabRecordsForWorkbenchPanels(panels)).toHaveLength(2)
+    expect(activeEditorTabForWorkbenchPanels(panels)?.id ?? null).toBe(editorTabIdAt(panels, 0))
   })
 
   it('keeps select operations inert when the tab is absent or already active', () => {
@@ -69,29 +74,7 @@ describe('workbench panel-state model', () => {
     const result = selectEditorTabInWorkbenchPanels(panels, firstTabId)
 
     expect(result).not.toBe(panels)
-    expect(result.activeEditorTabId).toBe(firstTabId)
-  })
-
-  it('reorders editor tabs and clamps insertion indexes', () => {
-    const panels = workbenchPanelsForPaths(['/repo/a.ts', '/repo/b.ts', '/repo/c.ts'])
-    const firstTabId = editorTabIdAt(panels, 0)
-    const movedToMiddle = reorderEditorTabInWorkbenchPanels(panels, firstTabId, 2)
-    const movedToEnd = reorderEditorTabInWorkbenchPanels(panels, firstTabId, 99)
-
-    expect(editorTabContents(movedToMiddle)).toEqual(
-      testTabContents(['/repo/b.ts', '/repo/c.ts', '/repo/a.ts']),
-    )
-    expect(editorTabContents(movedToEnd)).toEqual(
-      testTabContents(['/repo/b.ts', '/repo/c.ts', '/repo/a.ts']),
-    )
-  })
-
-  it('keeps no-op reorder operations referentially stable', () => {
-    const panels = workbenchPanelsForPaths(['/repo/a.ts', '/repo/b.ts'])
-    const secondTabId = editorTabIdAt(panels, 1)
-
-    expect(reorderEditorTabInWorkbenchPanels(panels, secondTabId, 1)).toBe(panels)
-    expect(reorderEditorTabInWorkbenchPanels(panels, tabId('missing-tab'), 1)).toBe(panels)
+    expect(activeEditorTabForWorkbenchPanels(result)?.id ?? null).toBe(firstTabId)
   })
 
   it('renames matching editor paths', () => {
@@ -125,7 +108,7 @@ describe('workbench panel-state model', () => {
     const result = closeEditorTabInWorkbenchPanels(panels, middleTabId)
 
     expect(editorTabContents(result)).toEqual(testTabContents(['/repo/a.ts', '/repo/c.ts']))
-    expect(result.activeEditorTabId).toBe(lastTabId)
+    expect(activeEditorTabForWorkbenchPanels(result)?.id ?? null).toBe(lastTabId)
   })
 
   it('activates the new last tab after closing the active last tab', () => {
@@ -135,7 +118,7 @@ describe('workbench panel-state model', () => {
     const result = closeEditorTabInWorkbenchPanels(panels, activeLastTabId)
 
     expect(editorTabContents(result)).toEqual(testTabContents(['/repo/a.ts', '/repo/b.ts']))
-    expect(result.activeEditorTabId).toBe(previousTabId)
+    expect(activeEditorTabForWorkbenchPanels(result)?.id ?? null).toBe(previousTabId)
   })
 
   it('clears the active editor tab after closing the only tab', () => {
@@ -143,8 +126,8 @@ describe('workbench panel-state model', () => {
     const tabId = editorTabIdAt(panels, 0)
     const result = closeEditorTabInWorkbenchPanels(panels, tabId)
 
-    expect(result.editorTabs).toEqual([])
-    expect(result.activeEditorTabId).toBeNull()
+    expect(editorTabRecordsForWorkbenchPanels(result)).toEqual([])
+    expect(activeEditorTabForWorkbenchPanels(result)?.id ?? null).toBeNull()
   })
 
   it('preserves the active editor tab after closing a non-active tab', () => {
@@ -154,7 +137,7 @@ describe('workbench panel-state model', () => {
     const result = closeEditorTabInWorkbenchPanels(panels, firstTabId)
 
     expect(editorTabContents(result)).toEqual(testTabContents(['/repo/b.ts', '/repo/c.ts']))
-    expect(result.activeEditorTabId).toBe(activeTabId)
+    expect(activeEditorTabForWorkbenchPanels(result)?.id ?? null).toBe(activeTabId)
   })
 
   it('keeps absent close-tab operations referentially stable', () => {
@@ -171,8 +154,8 @@ describe('workbench panel-state model', () => {
     )
     const result = closeEditorContentInWorkbenchPanels(panels, testTabContent('/repo/a.ts'))
 
-    expect(result.editorTabs).toEqual([])
-    expect(result.activeEditorTabId).toBeNull()
+    expect(editorTabRecordsForWorkbenchPanels(result)).toEqual([])
+    expect(activeEditorTabForWorkbenchPanels(result)?.id ?? null).toBeNull()
   })
 
   it('keeps absent close-path operations referentially stable', () => {
@@ -200,11 +183,15 @@ describe('workbench panel-state model', () => {
     const panels = workbenchPanelsForPaths(['/repo/a.ts', '/repo/b.ts'])
     const result = normalizeWorkbenchPanels({
       ...panels,
-      activeEditorTabId: null,
+      editorGroups: selectEditorGroupTab(
+        panels.editorGroups,
+        panels.editorGroups.activeGroupId,
+        null,
+      ),
     })
 
-    expect(result.activeEditorTabId).toBeNull()
-    expect(result.editorTabs).toHaveLength(2)
+    expect(activeEditorTabForWorkbenchPanels(result)?.id ?? null).toBeNull()
+    expect(editorTabRecordsForWorkbenchPanels(result)).toHaveLength(2)
   })
 
   it('normalizes a stale active editor id', () => {
@@ -212,19 +199,26 @@ describe('workbench panel-state model', () => {
     const firstTabId = editorTabIdAt(panels, 0)
     const result = normalizeWorkbenchPanels({
       ...panels,
-      activeEditorTabId: tabId('missing-tab'),
+      editorGroups: {
+        ...panels.editorGroups,
+        root: { ...activeEditorGroup(panels.editorGroups), selectedTabId: tabId('missing-tab') },
+      },
     })
 
-    expect(result.activeEditorTabId).toBe(firstTabId)
+    expect(activeEditorTabForWorkbenchPanels(result)?.id ?? null).toBe(firstTabId)
   })
 
   it('normalizes stale active editor ids to null when no tabs exist', () => {
+    const panels = createDefaultWorkbenchPanels()
     const result = normalizeWorkbenchPanels({
       ...createDefaultWorkbenchPanels(),
-      activeEditorTabId: tabId('missing-tab'),
+      editorGroups: {
+        ...panels.editorGroups,
+        root: { ...activeEditorGroup(panels.editorGroups), selectedTabId: tabId('missing-tab') },
+      },
     })
 
-    expect(result.activeEditorTabId).toBeNull()
+    expect(activeEditorTabForWorkbenchPanels(result)?.id ?? null).toBeNull()
   })
 
   it('preserves valid active editor ids while normalizing panels', () => {
@@ -232,7 +226,7 @@ describe('workbench panel-state model', () => {
     const activeTabId = editorTabIdAt(panels, 1)
     const result = normalizeWorkbenchPanels(panels)
 
-    expect(result.activeEditorTabId).toBe(activeTabId)
+    expect(activeEditorTabForWorkbenchPanels(result)?.id ?? null).toBe(activeTabId)
   })
 })
 
@@ -245,14 +239,14 @@ function workbenchPanelsForPaths(paths: readonly string[]) {
 }
 
 function editorTabIdAt(panels: WorkbenchPanels, index: number) {
-  const id = panels.editorTabs[index]?.id
+  const id = editorTabRecordsForWorkbenchPanels(panels)[index]?.id
   expect(id).toEqual(expect.any(String))
 
   return id ?? expect.unreachable('Expected an editor tab')
 }
 
 function editorTabContents(panels: WorkbenchPanels) {
-  return panels.editorTabs.map((tab) => tab.content)
+  return editorTabRecordsForWorkbenchPanels(panels).map((tab) => tab.content)
 }
 
 describe('workbench terminal tabs', () => {

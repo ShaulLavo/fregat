@@ -1,3 +1,5 @@
+import { processExists } from './process-exists'
+import { shellQuote } from '../src/utils/shell'
 import { strict as assert } from 'node:assert'
 import { existsSync } from 'node:fs'
 import { mkdir, mkdtemp, readFile, rm } from 'node:fs/promises'
@@ -71,19 +73,6 @@ async function waitUntil(label: string, predicate: () => boolean | Promise<boole
     await Bun.sleep(5)
   }
   throw smokeError(`Timed out waiting for ${label}.`)
-}
-
-function shellQuote(value: string) {
-  return `'${value.replaceAll("'", "'\\''")}'`
-}
-
-function processExists(pid: number) {
-  try {
-    process.kill(pid, 0)
-    return true
-  } catch {
-    return false
-  }
 }
 
 function socketFor(id: string, capture: TerminalCapture) {

@@ -1,3 +1,4 @@
+import { activeEditorTabForWorkbenchPanels } from '@/features/workbench/utils/panels'
 import { clientLogContext } from '@/lib/environments/state/log-context'
 import { clientForQueryClient } from '@/lib/environments/state/query-clients'
 import { fileDocumentKey, filesystemPath } from '@/lib/documents/utils/identity'
@@ -66,6 +67,7 @@ export function createEditorRuntime({
   bindWorktrees()
   const documentStore = createEditorDocumentStore({
     scrollPositionSeeds: workspaceStore.getState().reopenScrollPositions,
+    viewScrollPositionSeeds: workspaceStore.getState().viewScrollPositions,
   })
   const searchBufferStore = createSearchBufferStore({
     cachedByRootPath: workspaceCache.searchBuffers,
@@ -160,6 +162,10 @@ export function createEditorRuntime({
       },
     ),
     workspaceStore.subscribe(
+      (state) => state.viewScrollPositions,
+      (positions) => documentStore.getState().seedEditorViewScrollPositions(positions),
+    ),
+    workspaceStore.subscribe(
       (state) => state.reopenScrollPositions,
       (positions) => documentStore.getState().seedEditorScrollPositions(positions),
     ),
@@ -233,6 +239,18 @@ function retainedScrollPosition(
   workspaceStore: ReturnType<typeof createEditorWorkspaceStore>,
 ) {
   const documents = documentStore.getState()
+  const workspace = workspaceStore.getState()
+  const selected = activeEditorTabForWorkbenchPanels(workspace.workbenchPanels)
+  if (
+    selected?.content.kind === 'document' &&
+    selected.content.document.kind === 'file' &&
+    selected.content.document.resource.path === path
+  ) {
+    const exact =
+      documents.scrollPositionByTabId[selected.id] ??
+      workspace.viewScrollPositions.find((entry) => entry.tabId === selected.id)?.position
+    if (exact) return exact
+  }
   const document = Object.values(documents.liveDocumentsByKey).find(
     (candidate) => candidate.target.kind === 'file' && candidate.target.resource.path === path,
   )

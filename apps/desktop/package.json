@@ -17,6 +17,7 @@
   "dependencies": {
     "@workspace/contracts": "workspace:*",
     "@workspace/observability": "workspace:*",
+    "@workspace/utils": "workspace:*",
     "evlog": "catalog:"
   },
   "devDependencies": {

@@ -1,5 +1,6 @@
+import { writeReport as saveReport } from './write-report.mjs'
 import { randomUUID } from 'node:crypto'
-import { mkdirSync, writeFileSync } from 'node:fs'
+import { mkdirSync } from 'node:fs'
 import { createConnection } from 'node:net'
 import { join, resolve } from 'node:path'
 import { chromium, expect } from 'playwright/test'
@@ -123,7 +124,7 @@ try {
   await cleanup()
   report.finishedAt = new Date().toISOString()
   report.status = report.checks.some((check) => check.status === 'failed') ? 'failed' : 'passed'
-  saveReport()
+  saveReport(report, options.outputDir)
   process.stdout.write(`${report.status}: ${join(options.outputDir, 'results.json')}\n`)
   if (report.status === 'failed') process.exitCode = 1
 }
@@ -478,12 +479,8 @@ function portOccupied(port) {
 
 function record(name, evidence = {}) {
   report.checks.push({ name, status: 'passed', ...evidence })
-  saveReport()
+  saveReport(report, options.outputDir)
   process.stdout.write(`passed: ${name}\n`)
-}
-
-function saveReport() {
-  writeFileSync(join(options.outputDir, 'results.json'), JSON.stringify(report, null, 2))
 }
 
 async function captureFailure() {

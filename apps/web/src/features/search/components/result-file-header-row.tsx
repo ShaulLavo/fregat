@@ -2,11 +2,11 @@ import { memo, useCallback } from 'react'
 
 import { useSearchResultActions } from '@/features/search/hooks/use-result-actions'
 import {
-  searchResultDomId,
   searchResultFileContainsId,
   searchResultVirtualRowExpanded,
   searchResultVirtualRowStyle,
 } from '@/features/search/utils/result-editor'
+import { searchResultDomId } from '@/features/search/utils/result-dom-id'
 import { SearchResultFileHeader } from '@/features/search/components/result-file-header'
 import type { SearchResultId } from '@/features/search/utils/result-items'
 import {

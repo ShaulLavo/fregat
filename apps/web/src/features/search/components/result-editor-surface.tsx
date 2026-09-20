@@ -20,10 +20,10 @@ import type { SearchResultEditorScrollToIndex } from '@/features/search/utils/re
 import {
   resetSearchResultScroll,
   scrollActiveSearchResultIntoView,
-  searchResultDomId,
   searchResultVirtualRowIndex,
   searchResultVirtualRowScrollTarget,
 } from '@/features/search/utils/result-editor'
+import { searchResultDomId } from '@/features/search/utils/result-dom-id'
 import { SearchResultEditorVirtualWindow } from '@/features/search/components/result-editor-virtual-window'
 import type { SearchResultId } from '@/features/search/utils/result-items'
 import {

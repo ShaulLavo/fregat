@@ -16,12 +16,8 @@ import { afterEach, describe, expect, it } from 'vitest'
 import { createMetadataDatabase, type MetadataDatabaseHandle } from '../client'
 import { readEnvironmentIdentity } from '../environment-identity'
 import { environmentIdentity } from '../schema'
-import {
-  migrateOrchestrationDatabase,
-  migratePlatformDatabase,
-  platformMigrations,
-  type Migration,
-} from '../migrations'
+import { migratePlatformDatabase, platformMigrations, type Migration } from '../migrations'
+import { migratePlatformDatabase as migrateOrchestrationDatabase } from '../migrations'
 
 const expectedTables = [
   'schema_migrations',

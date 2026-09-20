@@ -1,3 +1,5 @@
+import { isAbortError } from '@/lib/abort-error'
+import { elapsedMs, roundMs } from '@workspace/utils/timing'
 import { filesystemPath } from '@/lib/documents/utils/identity'
 import type { FilesystemPath } from '@/lib/documents/utils/types'
 import {
@@ -759,13 +761,6 @@ function operationErrorSummary(error: unknown) {
   }
 }
 
-function isAbortError(error: unknown) {
-  if (error instanceof DOMException) return error.name === 'AbortError'
-  if (error instanceof Error) return error.name === 'AbortError'
-
-  return false
-}
-
 function totalDurationMs(event: Record<string, unknown>) {
   return numberField(event, 'totalDurationMs', durationMs(event))
 }
@@ -790,12 +785,4 @@ function numberField(event: Record<string, unknown>, key: string, fallback = 0) 
 function stringField(event: Record<string, unknown>, key: string) {
   const value = event[key]
   return typeof value === 'string' ? value : null
-}
-
-function elapsedMs(startedAt: number) {
-  return roundMs(performance.now() - startedAt)
-}
-
-function roundMs(value: number) {
-  return Math.round(value * 100) / 100
 }

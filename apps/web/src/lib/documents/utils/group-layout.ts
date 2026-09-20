@@ -30,8 +30,12 @@ export function minimumGroupSize(node: GroupNode): GroupSize {
 
 export function canSplitGroup(bounds: GroupSize, edge: GroupEdge): boolean {
   if (groupSplitAxis(edge) === 'horizontal') {
-    return bounds.width >= GROUP_MIN_WIDTH * 2 + GROUP_DIVIDER_SIZE && bounds.height >= GROUP_MIN_HEIGHT
+    return (
+      bounds.width >= GROUP_MIN_WIDTH * 2 + GROUP_DIVIDER_SIZE && bounds.height >= GROUP_MIN_HEIGHT
+    )
   }
 
-  return bounds.height >= GROUP_MIN_HEIGHT * 2 + GROUP_DIVIDER_SIZE && bounds.width >= GROUP_MIN_WIDTH
+  return (
+    bounds.height >= GROUP_MIN_HEIGHT * 2 + GROUP_DIVIDER_SIZE && bounds.width >= GROUP_MIN_WIDTH
+  )
 }

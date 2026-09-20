@@ -1,9 +1,9 @@
 import {
-  isRecord,
   parseTerminalServerMessage,
   type TerminalOpenInput,
   type TerminalServerMessage,
 } from '@workspace/contracts'
+import { isRecord } from '@workspace/utils/objects'
 import { expect } from 'vitest'
 import type { App } from '../src/app'
 

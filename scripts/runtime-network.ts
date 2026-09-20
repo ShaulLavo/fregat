@@ -1,3 +1,4 @@
+import { unique } from '@workspace/utils/collections'
 import net from 'node:net'
 
 import { TUI_CLIENT_ORIGIN } from '../packages/contracts/src/client-origins'
@@ -87,10 +88,6 @@ function originsFromEnv(value: string | undefined) {
     .split(',')
     .map((origin) => origin.trim())
     .filter(Boolean)
-}
-
-function unique(values: readonly string[]) {
-  return Array.from(new Set(values))
 }
 
 function urlHost(host: string) {

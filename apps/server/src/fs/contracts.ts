@@ -1,4 +1,8 @@
 import {
+  entryTypeSchema as entryTypeQueryValueSchema,
+  workspaceSearchMatchSchema as sharedSearchMatchSchema,
+} from '@workspace/contracts'
+import {
   workspaceAddressIdSchema,
   workspaceSearchGlobPatterns,
   type WorkspaceResourcePrecondition,
@@ -11,12 +15,7 @@ const depthQueryValueSchema = integerQueryValueSchema('1', 10)
 // ripgrep run stops being deterministic, so the cap is high enough to be rare.
 const limitQueryValueSchema = integerQueryValueSchema('50', 20000)
 const recentLimitQueryValueSchema = integerQueryValueSchema('20', 50)
-const entryTypeQueryValueSchema = v.union([
-  v.literal('file'),
-  v.literal('directory'),
-  v.literal('symlink'),
-  v.literal('other'),
-])
+
 export const booleanQueryValueSchema = v.pipe(
   v.union([v.literal('true'), v.literal('false'), v.literal('1'), v.literal('0')]),
   v.transform((value) => value === 'true' || value === '1'),
@@ -77,7 +76,6 @@ export const searchQuerySchema = v.object({
   wholeWord: v.optional(booleanQueryValueSchema, 'false'),
 })
 
-const workspaceSearchSourceSchema = v.union([v.literal('disk'), v.literal('open-buffer')])
 const workspaceSearchProviderSourceSchema = v.union([
   v.literal('fallback'),
   v.literal('fd'),
@@ -102,19 +100,8 @@ const workspaceSearchIndexFallbackReasonSchema = v.union([
 ])
 
 export const workspaceSearchMatchSchema = v.object({
-  birthtimeMs: v.optional(v.number()),
-  column: v.optional(v.number()),
-  endColumn: v.optional(v.number()),
-  kind: v.union([v.literal('name'), v.literal('content')]),
-  line: v.optional(v.number()),
-  mtimeMs: v.optional(v.number()),
+  ...sharedSearchMatchSchema.entries,
   path: pathSchema,
-  preview: v.optional(v.string()),
-  previewStartColumn: v.optional(v.number()),
-  size: v.optional(v.number()),
-  source: workspaceSearchSourceSchema,
-  targetType: v.optional(entryTypeQueryValueSchema),
-  type: entryTypeQueryValueSchema,
 })
 
 const workspaceSearchProviderMeasurementSchema = v.object({
@@ -176,6 +163,7 @@ export const workspaceSearchEventSchema = v.variant('type', [
 ])
 
 export const eventsQuerySchema = v.object({
+  files: v.optional(v.union([pathSchema, v.pipe(v.array(pathSchema), v.readonly())])),
   path: v.optional(pathSchema),
   paths: v.optional(v.union([v.string(), v.array(pathSchema)])),
 })

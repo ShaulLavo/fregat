@@ -1,3 +1,4 @@
+import { stopPropagation as stopToolPaneHeaderPointerDown } from '@workspace/utils/events'
 import { MinusIcon, PlusIcon, XIcon } from '@phosphor-icons/react'
 
 import { Button } from '@workspace/ui/components/button'
@@ -7,7 +8,7 @@ import { cn } from '@workspace/ui/lib/utils'
 import { PaneHeaderMenu } from '@/features/workbench/components/pane-header-menu'
 import type { LoadState } from '@/lib/load-state'
 import type { TreeModel } from '@/lib/tree-model'
-import type { PointerEvent, ReactNode } from 'react'
+import type { ReactNode } from 'react'
 
 type ToolPaneHeaderOrientation = 'horizontal' | 'vertical'
 type ToolPaneHeaderTab = 'chat' | 'files' | 'git' | 'logs' | 'problems' | 'search' | 'terminal'
@@ -153,10 +154,6 @@ export function ToolPaneHeader({
     )
 
   return <PaneHeaderMenu title={title} trigger={header} />
-}
-
-function stopToolPaneHeaderPointerDown(event: PointerEvent<HTMLButtonElement>) {
-  event.stopPropagation()
 }
 
 function panelTabTitle(tab: ToolPaneHeaderTab | undefined) {

@@ -1,3 +1,4 @@
+import { markEditorOpenBenchmark } from '@/lib/editor-open-benchmark-mark'
 import { createHistoryBuffer } from '@/features/editor/state/history-buffer'
 import { createClientInvariantError } from '@/lib/structured-errors'
 
@@ -15,6 +16,7 @@ import type {
   DocumentRef,
   FilesystemPath,
   ReopenScrollPosition,
+  EditorViewScrollPosition,
   SettingsDocumentRef,
   TabId,
   UnsyncedDocumentRef,
@@ -76,6 +78,7 @@ export type LiveEditorDocument = {
 }
 
 export type EditorDocumentView = {
+  readonly reopenScrollPosition?: EditorScrollPosition
   readonly documentKey: DocumentKey
   readonly preparedDocument: EditorPreparedDocument | null
   readonly scrollPosition?: EditorScrollPosition
@@ -235,6 +238,7 @@ export class WorkspaceDocumentService {
    * Read when a view is created, so a reopened file (or a refreshed app)
    * lands where it was; updated on every scroll write.
    */
+  private readonly viewScrollPositionSeeds = new Map<TabId, EditorScrollPosition>()
   private readonly scrollPositionSeeds = new Map<DocumentKey, EditorScrollPosition>()
   private cachedState: WorkspaceDocumentServiceState | null = null
 
@@ -443,10 +447,14 @@ export class WorkspaceDocumentService {
       return this.viewDocumentProjection(existing)
     }
 
-    const scrollPosition = existing?.scrollPosition ?? this.scrollPositionSeeds.get(document.key)
+    const scrollPosition =
+      existing?.scrollPosition ??
+      this.viewScrollPositionSeeds.get(tabId) ??
+      this.scrollPositionSeeds.get(document.key)
     const view = createEditorViewSession(document.buffer, `tab:${tabId}`)
     view.setScrollPosition(scrollPosition)
     const nextView: EditorDocumentView = {
+      reopenScrollPosition: this.scrollPositionSeeds.get(document.key) ?? scrollPosition,
       documentKey: document.key,
       preparedDocument: preparedDocumentForClaim(document, claim),
       scrollPosition,
@@ -910,20 +918,11 @@ export class WorkspaceDocumentService {
     if (document.sync.confirmedText === null || document.sync.revision === null) return false
 
     const { confirmedText, revision } = document.sync
-    const buffer = createHistoryBuffer(confirmedText)
-    buffer.markClean()
-    const contentRevision = contentRevisionForText(confirmedText)
-    this.setLiveDocument({
-      ...document,
-      buffer,
-      contentRevision,
-      localRevision: buffer.getRevision(),
-      sync: { kind: 'settings', revision, state: 'idle' },
+    return this.resetDocumentText(document, confirmedText, {
+      kind: 'settings',
+      revision,
+      state: 'idle',
     })
-    this.setContentRevision(documentKey, contentRevision)
-    this.deleteDirtyKey(document.key)
-    this.rebindViewsForDocument(documentKey)
-    return true
   }
 
   /**
@@ -941,22 +940,7 @@ export class WorkspaceDocumentService {
     if (document.sync.kind === 'file') return false
     if (textSnapshotEqualsText(document.buffer.getTextSnapshot(), text)) return false
 
-    const buffer = createHistoryBuffer(text)
-    buffer.markClean()
-    const contentRevision = contentRevisionForText(text)
-    this.setLiveDocument({
-      ...document,
-      buffer,
-      contentRevision,
-      localRevision: buffer.getRevision(),
-    })
-    // The map mirrors the record; every other writer keeps them together, and a
-    // consumer that reads the map to decide whether the text moved would
-    // otherwise never notice this one.
-    this.setContentRevision(documentKey, contentRevision)
-    this.deleteDirtyKey(document.key)
-    this.rebindViewsForDocument(documentKey)
-    return true
+    return this.resetDocumentText(document, text)
   }
 
   /**
@@ -984,6 +968,14 @@ export class WorkspaceDocumentService {
     }
     if (document.buffer.isDirty()) return false
 
+    return this.resetDocumentText(document, text, { kind: 'settings', revision, state: 'idle' })
+  }
+
+  private resetDocumentText(
+    document: LiveEditorDocument,
+    text: string,
+    sync = document.sync,
+  ): boolean {
     const buffer = createHistoryBuffer(text)
     buffer.markClean()
     const contentRevision = contentRevisionForText(text)
@@ -992,11 +984,11 @@ export class WorkspaceDocumentService {
       buffer,
       contentRevision,
       localRevision: buffer.getRevision(),
-      sync: { kind: 'settings', revision, state: 'idle' },
+      sync,
     })
-    this.setContentRevision(documentKey, contentRevision)
+    this.setContentRevision(document.key, contentRevision)
     this.deleteDirtyKey(document.key)
-    this.rebindViewsForDocument(documentKey)
+    this.rebindViewsForDocument(document.key)
     return true
   }
 
@@ -1082,15 +1074,38 @@ export class WorkspaceDocumentService {
     this.deleteDirtyKey(documentKey)
   }
 
-  setViewScrollPosition(tabId: TabId, scrollPosition: EditorScrollPosition): boolean {
+  setViewScrollPosition(
+    tabId: TabId,
+    scrollPosition: EditorScrollPosition,
+    reopenScrollPosition: EditorScrollPosition = scrollPosition,
+  ): boolean {
     const view = this.viewsByTabId.get(tabId)
     if (!view) return false
-    if (scrollPositionsEqual(view.scrollPosition, scrollPosition)) return false
+    if (
+      scrollPositionsEqual(view.scrollPosition, scrollPosition) &&
+      scrollPositionsEqual(view.reopenScrollPosition, reopenScrollPosition)
+    )
+      return false
 
-    this.viewsByTabId.set(tabId, { ...view, scrollPosition })
-    this.scrollPositionSeeds.set(view.documentKey, scrollPosition)
+    this.viewsByTabId.set(tabId, { ...view, scrollPosition, reopenScrollPosition })
+    this.scrollPositionSeeds.set(view.documentKey, reopenScrollPosition)
     view.view.setScrollPosition(scrollPosition)
     return true
+  }
+
+  seedViewScrollPositions(entries: readonly EditorViewScrollPosition[]): void {
+    this.viewScrollPositionSeeds.clear()
+    for (const entry of entries) this.viewScrollPositionSeeds.set(entry.tabId, entry.position)
+  }
+
+  copyView(from: TabId, to: TabId): void {
+    const source = this.viewsByTabId.get(from)
+    if (!source || this.viewsByTabId.has(to)) return
+    const destination = this.ensureViewForDocument(to, source.documentKey)
+    destination.view.acceptBufferSelections(source.view.getSelections())
+    destination.view.setFoldState(source.view.getFoldState())
+    const position = source.view.getScrollPosition() ?? source.scrollPosition
+    if (position) this.setViewScrollPosition(to, position, source.reopenScrollPosition ?? position)
   }
 
   seedScrollPositions(entries: readonly ReopenScrollPosition[]): void {
@@ -1419,13 +1434,6 @@ export class WorkspaceDocumentService {
     }
     this.deleteDirtyKey(document.key)
   }
-}
-
-function markEditorOpenBenchmark(name: string, path: FilesystemPath): void {
-  const traceGlobal = globalThis as typeof globalThis & { readonly __editorPerfTrace?: unknown }
-  if (!traceGlobal.__editorPerfTrace) return
-
-  globalThis.performance?.mark(name, { detail: { path } })
 }
 
 function editedContentRevision(revision: number) {

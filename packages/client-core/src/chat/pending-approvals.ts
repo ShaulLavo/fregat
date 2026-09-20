@@ -1,3 +1,4 @@
+import { nonEmptyText } from '@workspace/utils/strings'
 import {
   approvalRequestIdSchema,
   type ApprovalRequestId,
@@ -131,10 +132,4 @@ function approvalKind(
 
 function isApprovalKind(value: string | null | undefined): value is PendingApprovalKind {
   return value === 'command' || value === 'file-change' || value === 'file-read'
-}
-
-function nonEmptyText(value: string | null | undefined) {
-  const text = value?.trim()
-
-  return text ? text : null
 }

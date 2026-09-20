@@ -241,3 +241,38 @@ export function percentile(values, fraction) {
 export function round(value) {
   return Math.round(value * 100) / 100
 }
+
+export function defaultBrowsers(gate) {
+  if (gate) return ['chromium']
+
+  return ['chromium', 'webkit', 'firefox']
+}
+
+export function diagnostic(report, name) {
+  return (
+    report.topDiagnostics.find((item) => item.name === name) ?? {
+      count: 0,
+      maxMs: 0,
+      meanMs: 0,
+      totalMs: 0,
+    }
+  )
+}
+
+export async function runBrowserTrial(browserName, trial, workspace, runTrialInBrowser) {
+  const browser = await browserTypes[browserName].launch(launchOptions(browserName))
+  try {
+    return await runTrialInBrowser(browser, browserName, trial, workspace)
+  } finally {
+    await browser.close().catch(() => {})
+  }
+}
+
+export function gateFailures(results, gateThresholds, thresholdFailures) {
+  return Object.entries(results).flatMap(([browserName, summary]) => {
+    const thresholds = gateThresholds[browserName]
+    if (!thresholds) return []
+
+    return thresholdFailures(browserName, summary, thresholds)
+  })
+}

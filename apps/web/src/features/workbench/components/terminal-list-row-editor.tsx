@@ -1,4 +1,5 @@
-import { useRef, useState, type KeyboardEvent, type SyntheticEvent } from 'react'
+import { stopPropagation as stop } from '@workspace/utils/events'
+import { useRef, useState, type KeyboardEvent } from 'react'
 
 import { Input } from '@workspace/ui/components/input'
 
@@ -51,8 +52,4 @@ export function TerminalListRowEditor({
       onPointerDown={stop}
     />
   )
-}
-
-function stop(event: SyntheticEvent) {
-  event.stopPropagation()
 }

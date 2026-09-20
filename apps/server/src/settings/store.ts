@@ -6,7 +6,6 @@ import {
   descriptorFor,
   errorNumberField,
   errorStringField,
-  isRecord,
   isSettingId,
   layerAllowsScope,
   resolveSettings,
@@ -25,6 +24,7 @@ import {
   type SettingsValues,
   type SettingsWriteTarget,
 } from '@workspace/contracts'
+import { isRecord } from '@workspace/utils/objects'
 import * as v from 'valibot'
 import { errorSummary, recordRequestContext, recordRequestWarning } from '../observability'
 import {

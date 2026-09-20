@@ -1,4 +1,16 @@
-import { activeEditorTabId } from '@/lib/documents/utils/active-tab'
+import type { EditorGroups } from '@/lib/documents/utils/group-types'
+import {
+  activeEditorTab,
+  allEditorTabs,
+  closeTabInGroups,
+  createEditorGroups,
+  filterGroupTabs,
+  groupForTab,
+  mapGroupTabs,
+  normalizeEditorGroups,
+  openTabInGroups,
+  selectEditorGroupTab,
+} from '@/lib/documents/utils/groups'
 import { createDefaultGitHistoryView, type GitHistoryView } from '@/lib/git-history-view'
 import {
   createEditorTabRecord,
@@ -6,12 +18,7 @@ import {
   sameTabContent,
   tabContentKey,
 } from '@/lib/documents/utils/tabs'
-import type {
-  EditorTabRecord,
-  FilesystemPath,
-  TabContent,
-  TabId,
-} from '@/lib/documents/utils/types'
+import type { FilesystemPath, TabContent, TabId } from '@/lib/documents/utils/types'
 import {
   createTerminalTabRecord,
   type TerminalTabRecord,
@@ -22,12 +29,11 @@ export type WorkbenchBottomTab = 'terminal' | 'problems'
 
 export type WorkbenchPanels = {
   readonly activeBottomTab: WorkbenchBottomTab
-  readonly activeEditorTabId: TabId | null
   readonly activeGitTab: 'changes' | 'graph'
   readonly activeSidebarTab: WorkbenchSidebarTab
   readonly activeTerminalTabId: string | null
   readonly bottomPanelOpen: boolean
-  readonly editorTabs: readonly EditorTabRecord[]
+  readonly editorGroups: EditorGroups
   readonly gitCommitDetailsOpen: boolean
   readonly gitHistory: GitHistoryView
   readonly gitChangesOpen: { readonly staged: boolean; readonly worktree: boolean }
@@ -48,12 +54,11 @@ export function createDefaultWorkbenchPanels(): WorkbenchPanels {
   const terminal = createTerminalTabRecord([], 1)
   return {
     activeBottomTab: 'terminal',
-    activeEditorTabId: null,
     activeGitTab: 'changes',
     activeSidebarTab: 'files',
     activeTerminalTabId: terminal.id,
     bottomPanelOpen: true,
-    editorTabs: [],
+    editorGroups: createEditorGroups(),
     gitCommitDetailsOpen: true,
     gitHistory: createDefaultGitHistoryView(),
     gitChangesOpen: { staged: true, worktree: true },
@@ -177,20 +182,20 @@ export function activeEditorContentForWorkbenchPanels(panels: WorkbenchPanels) {
 }
 
 export function activeEditorTabForWorkbenchPanels(panels: WorkbenchPanels) {
-  if (!panels.activeEditorTabId) return null
-
-  return editorTabById(panels, panels.activeEditorTabId) ?? panels.editorTabs[0] ?? null
+  return activeEditorTab(panels.editorGroups)
 }
 
 export function editorOpenContentsForWorkbenchPanels(panels: WorkbenchPanels) {
   return Array.from(
-    new Map(panels.editorTabs.map((tab) => [tabContentKey(tab.content), tab.content])).values(),
+    new Map(
+      allEditorTabs(panels.editorGroups).map((tab) => [tabContentKey(tab.content), tab.content]),
+    ).values(),
   )
 }
 
 export function editorContentCountsForWorkbenchPanels(panels: WorkbenchPanels) {
   const counts = new Map<string, number>()
-  for (const tab of panels.editorTabs) {
+  for (const tab of allEditorTabs(panels.editorGroups)) {
     const key = tabContentKey(tab.content)
     counts.set(key, (counts.get(key) ?? 0) + 1)
   }
@@ -199,42 +204,25 @@ export function editorContentCountsForWorkbenchPanels(panels: WorkbenchPanels) {
 }
 
 export function editorTabRecordsForWorkbenchPanels(panels: WorkbenchPanels) {
-  return panels.editorTabs
+  return allEditorTabs(panels.editorGroups)
 }
 
 export function openEditorContentInWorkbenchPanels(panels: WorkbenchPanels, content: TabContent) {
-  const existing = panels.editorTabs.find((tab) => sameTabContent(tab.content, content))
-  if (existing) return selectEditorTabInWorkbenchPanels(panels, existing.id)
-
-  const tab = createEditorTabRecord(content)
-  return {
-    ...panels,
-    activeEditorTabId: tab.id,
-    editorTabs: [...panels.editorTabs, tab],
-  }
+  return withEditorGroups(
+    panels,
+    openTabInGroups(panels.editorGroups, createEditorTabRecord(content)),
+  )
 }
 
 export function closeEditorTabInWorkbenchPanels(panels: WorkbenchPanels, tabId: TabId) {
-  const index = panels.editorTabs.findIndex((tab) => tab.id === tabId)
-  if (index < 0) return panels
-
-  const editorTabs = panels.editorTabs.filter((tab) => tab.id !== tabId)
-  return {
-    ...panels,
-    activeEditorTabId: activeEditorTabIdAfterClose(panels, editorTabs, index, tabId),
-    editorTabs,
-  }
+  return withEditorGroups(panels, closeTabInGroups(panels.editorGroups, tabId))
 }
 
 export function closeEditorContentInWorkbenchPanels(panels: WorkbenchPanels, content: TabContent) {
-  const editorTabs = panels.editorTabs.filter((tab) => !sameTabContent(tab.content, content))
-  if (editorTabs.length === panels.editorTabs.length) return panels
-
-  return {
-    ...panels,
-    activeEditorTabId: activeEditorTabIdAfterPathClose(panels, editorTabs),
-    editorTabs,
-  }
+  return withEditorGroups(
+    panels,
+    filterGroupTabs(panels.editorGroups, (tab) => !sameTabContent(tab.content, content)),
+  )
 }
 
 export function renameEditorFileInWorkbenchPanels(
@@ -242,35 +230,23 @@ export function renameEditorFileInWorkbenchPanels(
   from: FilesystemPath,
   to: FilesystemPath,
 ): WorkbenchPanels {
-  let renamed = false
-  const editorTabs = panels.editorTabs.map((tab) => {
+  const editorGroups = mapGroupTabs(panels.editorGroups, (tab) => {
     const content = rekeyTabFile(tab.content, from, to)
     if (content === tab.content) return tab
-
-    renamed = true
     return { ...tab, content }
   })
-  if (!renamed) return panels
-
-  return { ...panels, editorTabs }
-}
-
-export function reorderEditorTabInWorkbenchPanels(
-  panels: WorkbenchPanels,
-  tabId: TabId,
-  targetIndex: number,
-) {
-  const editorTabs = reorderedTabs(panels.editorTabs, tabId, targetIndex)
-  if (editorTabs === panels.editorTabs) return panels
-
-  return { ...panels, editorTabs }
+  return withEditorGroups(panels, editorGroups)
 }
 
 export function selectEditorTabInWorkbenchPanels(panels: WorkbenchPanels, tabId: TabId) {
-  if (!editorTabById(panels, tabId)) return panels
-  if (panels.activeEditorTabId === tabId) return panels
+  const group = groupForTab(panels.editorGroups, tabId)
+  if (!group) return panels
+  return withEditorGroups(panels, selectEditorGroupTab(panels.editorGroups, group.id, tabId))
+}
 
-  return { ...panels, activeEditorTabId: tabId }
+function withEditorGroups(panels: WorkbenchPanels, editorGroups: EditorGroups): WorkbenchPanels {
+  if (editorGroups === panels.editorGroups) return panels
+  return { ...panels, editorGroups }
 }
 
 export function setWorkbenchSidebarTab(
@@ -340,12 +316,11 @@ export function showWorkbenchBottomTab(
 export function normalizeWorkbenchPanels(value: WorkbenchPanels): WorkbenchPanels {
   return {
     activeBottomTab: value.activeBottomTab,
-    activeEditorTabId: normalizedActiveTabId(value),
     activeGitTab: value.activeGitTab,
     activeSidebarTab: value.activeSidebarTab,
     activeTerminalTabId: normalizedActiveTerminalTabId(value),
     bottomPanelOpen: value.bottomPanelOpen,
-    editorTabs: value.editorTabs,
+    editorGroups: normalizeEditorGroups(value.editorGroups),
     gitCommitDetailsOpen: value.gitCommitDetailsOpen,
     gitHistory: value.gitHistory,
     gitChangesOpen: value.gitChangesOpen,
@@ -353,10 +328,6 @@ export function normalizeWorkbenchPanels(value: WorkbenchPanels): WorkbenchPanel
     terminalTabSequence: value.terminalTabSequence,
     terminalTabs: value.terminalTabs,
   }
-}
-
-function editorTabById(panels: WorkbenchPanels, tabId: TabId) {
-  return panels.editorTabs.find((tab) => tab.id === tabId) ?? null
 }
 
 function terminalTabById(panels: WorkbenchPanels, tabId: string) {
@@ -380,35 +351,6 @@ function activeTerminalTabIdAfterClose(
   if (panels.activeTerminalTabId !== closedTabId) return panels.activeTerminalTabId
 
   return nextTabs[Math.min(closedIndex, nextTabs.length - 1)]?.id ?? null
-}
-
-function activeEditorTabIdAfterClose(
-  panels: WorkbenchPanels,
-  nextTabs: readonly EditorTabRecord[],
-  closedIndex: number,
-  closedTabId: TabId,
-) {
-  if (panels.activeEditorTabId !== closedTabId)
-    return activeEditorTabId(nextTabs, panels.activeEditorTabId, {
-      fallbackToFirstWhenUnset: false,
-    })
-
-  return nextTabs[Math.min(closedIndex, nextTabs.length - 1)]?.id ?? null
-}
-
-function activeEditorTabIdAfterPathClose(
-  panels: WorkbenchPanels,
-  nextTabs: readonly EditorTabRecord[],
-) {
-  return activeEditorTabId(nextTabs, panels.activeEditorTabId, {
-    fallbackToFirstWhenUnset: false,
-  })
-}
-
-function normalizedActiveTabId(panels: WorkbenchPanels) {
-  return activeEditorTabId(panels.editorTabs, panels.activeEditorTabId, {
-    fallbackToFirstWhenUnset: false,
-  })
 }
 
 /** Returns the same array for a no-op so callers can keep the panels object referentially stable. */

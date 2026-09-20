@@ -15,7 +15,6 @@ import {
   commandPaletteItems,
   editorPaletteItems,
   emptyLabelForMode,
-  fileUriForPath,
   focusTransitionAcknowledged,
   groupedCommandItems,
   isColorPreviewMode,
@@ -30,6 +29,7 @@ import {
   scopeLabelForMode,
   scopedPaletteFilter,
 } from '@/features/command-palette/command-palette-utils'
+import { fileUriForPath } from '@/lib/file-uri'
 import { ScopeChip } from '@/features/command-palette/scope-chip'
 import { useHighlightedPaletteValue } from '@/features/command-palette/hooks/use-highlighted-palette-value'
 import { useRecentCommandIds } from '@/features/command-palette/hooks/use-recent-command-ids'

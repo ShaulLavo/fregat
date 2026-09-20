@@ -1,4 +1,4 @@
-import { isRecord } from '../is-record'
+import { isRecord } from '@workspace/utils/objects'
 
 /**
  * Structural equality for JSON-shaped values.

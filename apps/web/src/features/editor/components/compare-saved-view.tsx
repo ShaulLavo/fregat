@@ -6,6 +6,7 @@ import { EmptyState } from '@workspace/ui/components/empty-state'
 import { useMemo } from 'react'
 
 import { DiffEditor } from '@/features/editor/components/diff-editor'
+import { EditorTabPlaceholder } from '@/features/editor/components/tab-placeholder'
 import { useDiffLanguageContext } from '@/features/editor/hooks/use-diff-language-context'
 import { useEditorDocumentState } from '@/features/editor/state/document-state'
 import type { DiffLanguageHost } from '@/features/editor/utils/diff-language-context'
@@ -60,7 +61,11 @@ export function CompareSavedView({
   }, [path, savedText, snapshot])
 
   if (fileState.status === 'error') {
-    return <EmptyState className='h-full' title='Could not read the saved file.' tone='error' />
+    return (
+      <EditorTabPlaceholder tabId={tabId}>
+        <EmptyState className='h-full' title='Could not read the saved file.' tone='error' />
+      </EditorTabPlaceholder>
+    )
   }
   if (fileState.status === 'loading') {
     return (
@@ -74,9 +79,18 @@ export function CompareSavedView({
   if (!file) {
     if (buffer) return <DiffEditor file={null} mode={mode} tabId={tabId} />
 
-    return <EmptyState className='h-full' title='Open the file to compare it with disk.' />
+    return (
+      <EditorTabPlaceholder tabId={tabId}>
+        <EmptyState className='h-full' title='Open the file to compare it with disk.' />
+      </EditorTabPlaceholder>
+    )
   }
-  if (file.hunks.length === 0) return <EmptyState className='h-full' title='No unsaved changes.' />
+  if (file.hunks.length === 0)
+    return (
+      <EditorTabPlaceholder tabId={tabId}>
+        <EmptyState className='h-full' title='No unsaved changes.' />
+      </EditorTabPlaceholder>
+    )
 
   return <DiffEditor file={file} languageServer={languageServer} mode={mode} tabId={tabId} />
 }

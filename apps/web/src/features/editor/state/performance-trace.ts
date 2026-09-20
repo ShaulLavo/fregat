@@ -1,3 +1,4 @@
+import { roundMs as round } from '@workspace/utils/timing'
 import { createClientInvariantError } from '@/lib/structured-errors'
 
 type EditorPerformanceDiagnostic = {
@@ -487,8 +488,4 @@ function editorPerformanceDisabledFeatures(): ReadonlySet<string> {
 
 function editorPerformanceTraceGlobal(): EditorPerformanceTraceGlobal {
   return globalThis as EditorPerformanceTraceGlobal
-}
-
-function round(value: number): number {
-  return Math.round(value * 100) / 100
 }

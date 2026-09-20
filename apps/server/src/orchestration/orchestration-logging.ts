@@ -1,9 +1,10 @@
+import { chatCommandSummary } from '@workspace/contracts'
+import { unique as uniqueValues } from '@workspace/utils/collections'
 import {
   type ClientOrchestrationCommand,
   type SessionId,
   type OrchestrationCommand,
   type OrchestrationEvent,
-  type OrchestrationReplayEventsInput,
 } from '@workspace/contracts'
 import { recordProcessInfo, recordProcessWarning, type OperationContext } from '../observability'
 
@@ -52,26 +53,7 @@ export function orchestrationCommandSummary(
   command: OrchestrationCommand | ClientOrchestrationCommand,
   attachmentIngest?: CommandAttachmentIngest,
 ) {
-  const summary: ChatPipelineContext = {
-    commandId: command.commandId,
-    commandType: command.type,
-  }
-
-  if ('sessionId' in command) summary.sessionId = command.sessionId
-  if ('projectId' in command) summary.projectId = command.projectId
-  if ('turnId' in command) summary.turnId = command.turnId
-
-  if (command.type === 'session.turn.start') {
-    summary.attachmentCount = command.message.attachments.length
-    summary.bootstrapCreateSession = Boolean(command.bootstrap?.createSession)
-    summary.interactionMode = command.interactionMode
-    summary.messageId = command.message.messageId
-    summary.model = command.modelSelection?.model
-    summary.providerInstanceId = command.modelSelection?.providerInstanceId
-    summary.worktreeId = command.bootstrap?.createSession?.worktreeTarget.worktreeId
-    summary.runtimeMode = command.runtimeMode
-    summary.textLength = command.message.text.length
-  }
+  const summary = chatCommandSummary(command)
 
   if (!attachmentIngest) return summary
 
@@ -106,15 +88,6 @@ export function orchestrationEventBatchSummary(events: readonly OrchestrationEve
     maxSequence: events.at(-1)?.sequence ?? null,
     sequences: events.map((event) => event.sequence),
     sessionIds: uniqueValues(sessionIdsFromEvents(events)),
-  }
-}
-
-export function orchestrationReplaySummary(input: OrchestrationReplayEventsInput) {
-  return {
-    afterSequence: input.afterSequence,
-    aggregateId: input.aggregateId,
-    aggregateKind: input.aggregateKind,
-    sessionId: input.sessionId,
   }
 }
 
@@ -271,10 +244,6 @@ function sessionIdFromEvent(event: OrchestrationEvent): SessionId | undefined {
   if (event.aggregateKind === 'session') return event.aggregateId as SessionId
 
   return undefined
-}
-
-function uniqueValues(values: string[]) {
-  return Array.from(new Set(values))
 }
 
 function sessionIdsFromEvents(events: readonly OrchestrationEvent[]) {

@@ -1,3 +1,4 @@
+import { timestampMs as stampMs } from './timestamp'
 import type { ProjectionSession } from '@workspace/client-core/chat/types'
 
 /** The completion stamp each session was last read at, keyed by session. */
@@ -25,10 +26,4 @@ export function isSessionUnread(completedAt: string | null, seenAt: string | und
   if (!seenAt) return true
 
   return stampMs(completedAt) > stampMs(seenAt)
-}
-
-function stampMs(value: string) {
-  const parsed = Date.parse(value)
-
-  return Number.isNaN(parsed) ? 0 : parsed
 }

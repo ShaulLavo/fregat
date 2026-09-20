@@ -1,3 +1,4 @@
+import { isContextMenuKey as isContextMenuOpenKey } from '@workspace/utils/keyboard'
 export interface FileTreeKeyboardEventLike {
   readonly altKey: boolean
   readonly code?: string
@@ -19,10 +20,6 @@ export function isSearchOpenSeedKey(event: FileTreeKeyboardEventLike): boolean {
 
 export function isSpaceSelectionKey(event: FileTreeKeyboardEventLike): boolean {
   return event.code === 'Space' || event.key === ' ' || event.key === 'Spacebar'
-}
-
-export function isContextMenuOpenKey(event: FileTreeKeyboardEventLike): boolean {
-  return (event.shiftKey && event.key === 'F10') || event.key === 'ContextMenu'
 }
 
 export function canKeyUseStickyKeyboardState(

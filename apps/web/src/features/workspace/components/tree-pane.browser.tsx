@@ -1,3 +1,4 @@
+import { allEditorTabs, activeEditorTab as selectedGroupTab } from '@/lib/documents/utils/groups'
 import { tabFileResource } from '@/lib/documents/utils/capabilities'
 import { fileDocumentKey } from '@/lib/documents/utils/identity'
 import { testDocumentRef } from '../../../../test/factories/document-targets'
@@ -134,7 +135,7 @@ test(
     const activationPublication = observePreparedSelectionPublication(PREPARED_FILE_PATH)
     const workspaceBeforeActivation = requiredTreeWorkspaceStore().getState()
     expect(
-      workspaceBeforeActivation.workbenchPanels.editorTabs.some(
+      allEditorTabs(workspaceBeforeActivation.workbenchPanels.editorGroups).some(
         (tab) => tabFileResource(tab.content)?.path === PREPARED_FILE_PATH,
       ),
     ).toBe(false)
@@ -360,7 +361,7 @@ function TreePaneHarness({
   const workbenchPanels = useEditorWorkspaceState((state) => state.workbenchPanels)
   const [gitStatus, setGitStatus] = useState<readonly GitStatusEntry[]>([])
   const [model] = useState(initialModel)
-  const deepTab = workbenchPanels.editorTabs.find(
+  const deepTab = allEditorTabs(workbenchPanels.editorGroups).find(
     (tab) => tabFileResource(tab.content)?.path === DEEP_FILE_PATH,
   )
   const activeTab = activeEditorTab(workbenchPanels)
@@ -391,7 +392,7 @@ function TreePaneHarness({
         onClick={() => {
           if (!deepTab) return
 
-          selectTab('main', deepTab.id)
+          selectTab({ groupId: workbenchPanels.editorGroups.activeGroupId, tabId: deepTab.id })
         }}
       >
         Select deep tab
@@ -678,9 +679,7 @@ function activeTabForPath(state: EditorWorkspaceStore, path: string) {
 }
 
 function activeEditorTab(panels: EditorWorkspaceStore['workbenchPanels']) {
-  const activeTabId = panels.activeEditorTabId
-  if (!activeTabId) return null
-  return panels.editorTabs.find((tab) => tab.id === activeTabId) ?? null
+  return selectedGroupTab(panels.editorGroups)
 }
 
 function dispatchPointerMove(clientX: number, clientY: number): void {

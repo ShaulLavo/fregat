@@ -11,13 +11,16 @@ import { iconForEntry } from '@/lib/file-icons'
 import { expect, test } from '../../../../../test/fixtures'
 
 test('the tab menu offers the close family, then the copy pair', () => {
-  expect(sectionIds(menuContext())).toEqual(['close', 'copy'])
+  expect(sectionIds(menuContext())).toEqual(['close', 'groups', 'copy'])
   expect(allLabels(menuContext())).toEqual([
     'Close',
     'Close Others',
     'Close to the Right',
     'Close Saved',
     'Close All',
+    'Split Right',
+    'Split Down',
+    'Move to Group…',
     'Copy Path',
     'Copy Relative Path',
   ])
@@ -30,7 +33,7 @@ test('a diff tab can jump to the file it is comparing', () => {
     tab: diffTabModel({ onDisk: true }),
   })
 
-  expect(sectionIds(context)).toEqual(['close', 'open', 'copy'])
+  expect(sectionIds(context)).toEqual(['close', 'groups', 'open', 'copy'])
 
   const openFile = byId(items(context), 'openFile')
   expect(openFile.disabled).toBe(false)
@@ -165,6 +168,11 @@ function tabModel(id: string): EditorTabModel {
 /** Three open tabs, the middle one dirty and the one being right-clicked. */
 function menuContext(overrides: Partial<EditorTabMenuContext> = {}): EditorTabMenuContext {
   return {
+    canSplitRight: false,
+    canSplitDown: false,
+    canMoveToGroup: false,
+    split: () => {},
+    moveToGroup: () => {},
     closeTabs: () => {},
     closeTargets: [target('a'), target('b', true), target('c')],
     copyPath: () => {},

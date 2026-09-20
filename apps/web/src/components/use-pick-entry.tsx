@@ -1,3 +1,4 @@
+import { elapsedMs } from '@workspace/utils/timing'
 import { useQueryClient } from '@tanstack/react-query'
 import type { Client } from '@/lib/client'
 import { clientForQueryClient } from '@/lib/environments/state/query-clients'
@@ -190,10 +191,6 @@ function assertEntryMatchesMode(entry: PickedFsEntry, mode: FilePickerMode) {
   throw createClientInvariantError(
     mode === 'folder' ? 'Picked path is not a folder.' : 'Picked path is not a file.',
   )
-}
-
-function elapsedMs(startedAt: number) {
-  return Math.round((performance.now() - startedAt) * 100) / 100
 }
 
 async function hydratePickedEntry(

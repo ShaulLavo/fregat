@@ -1,3 +1,4 @@
+import { activeEditorTab as selectedGroupTab } from '@/lib/documents/utils/groups'
 import { getClient } from '@/lib/client'
 import { testDocumentKey, testTabContent } from '../../../../test/factories/document-targets'
 import { filesystemPath } from '@/lib/documents/utils/identity'
@@ -74,7 +75,8 @@ for (const { isFolder, dirty } of [
       await hook.result.current.commands.openFileSurface(filesystemPath(unrelated))
       await hook.result.current.commands.openFileSurface(filesystemPath(from))
     })
-    const tabId = workspaceStore.getState().workbenchPanels.activeEditorTabId!
+    const tabId = (selectedGroupTab(workspaceStore.getState().workbenchPanels.editorGroups)?.id ??
+      null)!
     const view = documentStore.getState().ensureEditorView(tabId, file)
     if (dirty) act(() => createEditorBufferSession(view.buffer, view.view).applyText('unsaved\n'))
     const text = view.buffer.materializeFullText()
@@ -95,7 +97,9 @@ for (const { isFolder, dirty } of [
     )
     expect(workspaceStore.getState().editorHistory).toContainEqual(testTabContent(to))
     expect(workspaceStore.getState().editorHistory).not.toContainEqual(testTabContent(from))
-    expect(workspaceStore.getState().workbenchPanels.activeEditorTabId).toBe(tabId)
+    expect(
+      selectedGroupTab(workspaceStore.getState().workbenchPanels.editorGroups)?.id ?? null,
+    ).toBe(tabId)
     expect(documentStore.getState().getLiveEditorDocument(testDocumentKey(from))).toBeNull()
     expect(documentStore.getState().getLiveEditorDocument(testDocumentKey(to))?.buffer).toBe(
       view.buffer,
@@ -227,7 +231,8 @@ test('withdraws the projected rename when the authoritative mutation reservation
   setFileSnapshotQueryData(harness.queryClient, file)
   act(() => harness.result.current.commands.openFileSurface(file.path))
   const { documentStore, workspaceStore } = harness.result.current.runtime
-  const tabId = workspaceStore.getState().workbenchPanels.activeEditorTabId!
+  const tabId = (selectedGroupTab(workspaceStore.getState().workbenchPanels.editorGroups)?.id ??
+    null)!
   const view = documentStore.getState().ensureEditorView(tabId, file)
   harness.tree.move('old.ts', 'new.ts')
   const rootPath = filesystemPath('repo')

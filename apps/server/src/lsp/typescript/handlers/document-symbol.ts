@@ -1,4 +1,5 @@
-import { isRecord } from '@workspace/contracts'
+import { textDocumentIdentifier } from '../shared/boundary'
+
 import ts from 'typescript-language-service'
 import type * as lsp from 'vscode-languageserver-protocol'
 
@@ -49,12 +50,4 @@ function symbolKind(kind: string): lsp.SymbolKind {
   if (kind === ts.ScriptElementKind.constElement) return 13
   if (kind === ts.ScriptElementKind.letElement) return 13
   return 13
-}
-
-function textDocumentIdentifier(params: unknown): lsp.TextDocumentIdentifier | null {
-  if (!isRecord(params)) return null
-  if (!isRecord(params.textDocument)) return null
-  return typeof params.textDocument.uri === 'string'
-    ? ({ uri: params.textDocument.uri } satisfies lsp.TextDocumentIdentifier)
-    : null
 }

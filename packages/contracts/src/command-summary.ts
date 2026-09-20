@@ -1,9 +1,6 @@
-import type {
-  ClientOrchestrationCommand,
-  OrchestrationReplayEventsInput,
-} from '@workspace/contracts'
+import type { ClientOrchestrationCommand, OrchestrationCommand } from './orchestration-commands'
 
-export function chatCommandSummary(command: ClientOrchestrationCommand) {
+export function chatCommandSummary(command: ClientOrchestrationCommand | OrchestrationCommand) {
   const summary: Record<string, unknown> = {
     commandId: command.commandId,
     commandType: command.type,
@@ -26,13 +23,4 @@ export function chatCommandSummary(command: ClientOrchestrationCommand) {
   }
 
   return summary
-}
-
-export function chatReplaySummary(input: OrchestrationReplayEventsInput) {
-  return {
-    afterSequence: input.afterSequence,
-    aggregateId: input.aggregateId,
-    aggregateKind: input.aggregateKind,
-    sessionId: input.sessionId,
-  }
 }

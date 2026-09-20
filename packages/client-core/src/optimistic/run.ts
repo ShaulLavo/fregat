@@ -1,3 +1,4 @@
+import { nowMs, roundMs } from '@workspace/utils/timing'
 import type { Intent, IntentQueue, SubmitIntentOptions } from './queue'
 import { acknowledgementTimeoutError } from './structured-errors'
 
@@ -57,7 +58,7 @@ export async function runIntent<TPatch, TResult>(
 ): Promise<IntentOutcome<TResult>> {
   const { intent } = queue.submit(patch, options)
   const { intentId, resources } = intent
-  const startedAt = now()
+  const startedAt = nowMs()
   let attempts = 0
 
   const record = (
@@ -69,8 +70,8 @@ export async function runIntent<TPatch, TResult>(
       intentId,
       resources,
       outcome,
-      transportMs: round(transportEndedAt - startedAt),
-      acknowledgementMs: round(now() - transportEndedAt),
+      transportMs: roundMs(transportEndedAt - startedAt),
+      acknowledgementMs: roundMs(nowMs() - transportEndedAt),
       attempts,
       error,
     })
@@ -83,7 +84,7 @@ export async function runIntent<TPatch, TResult>(
     })
     result = performed
   } catch (error) {
-    const transportEndedAt = now()
+    const transportEndedAt = nowMs()
     if (options.signal?.aborted) {
       queue.discard(intentId)
       record('aborted', transportEndedAt, error)
@@ -96,7 +97,7 @@ export async function runIntent<TPatch, TResult>(
     return { ok: false, intentId, reason: 'transport', error }
   }
 
-  const transportEndedAt = now()
+  const transportEndedAt = nowMs()
   queue.settleTransport(intentId)
 
   if (options.until) {
@@ -194,12 +195,4 @@ function delay(ms: number, signal: AbortSignal) {
     }
     signal.addEventListener('abort', onAbort, { once: true })
   })
-}
-
-function round(value: number) {
-  return Math.round(value * 100) / 100
-}
-
-function now() {
-  return typeof performance === 'undefined' ? Date.now() : performance.now()
 }

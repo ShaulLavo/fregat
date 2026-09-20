@@ -1,3 +1,6 @@
+import { maxCheckpointTurnCount } from './checkpoint-turn-count'
+import { runtimeEventId } from '../provider/adapters/utils/runtime-ids'
+import { errorMessage as providerErrorMessage } from '@workspace/contracts'
 import { resolveSessionOwner } from './session-owner'
 import { internalCommandKey } from './utils/repository-ids'
 import { createInternalError } from '../observability/structured-errors'
@@ -872,16 +875,6 @@ function isProviderIntentEvent(event: OrchestrationEvent): event is ProviderInte
   }
 }
 
-function runtimeEventId(prefix: string) {
-  return `${prefix}:${crypto.randomUUID()}`
-}
-
-function providerErrorMessage(error: unknown) {
-  if (error instanceof Error) return error.message
-
-  return String(error)
-}
-
 function providerFailurePayload(detail: string, requestId: string | undefined) {
   if (!requestId) return { detail }
 
@@ -909,16 +902,6 @@ function runtimePayloadFromSessionContext(
     modelSelection: context.modelSelection,
     runtimeMode: context.runtimeMode,
   }
-}
-
-function maxCheckpointTurnCount(checkpoints: Array<{ checkpointTurnCount: number }>) {
-  let maxTurnCount = 0
-
-  for (const checkpoint of checkpoints) {
-    maxTurnCount = Math.max(maxTurnCount, checkpoint.checkpointTurnCount)
-  }
-
-  return maxTurnCount
 }
 
 function checkpointRefForTurnCount(

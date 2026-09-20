@@ -1,3 +1,4 @@
+import { emptySubscription } from '@workspace/utils/subscriptions'
 import type { DocumentKey, FilesystemPath, TabId } from '@/lib/documents/utils/types'
 import { ArrowCounterClockwiseIcon } from '@phosphor-icons/react'
 import type {
@@ -19,6 +20,7 @@ import { DiffEditor } from '@/features/editor/components/diff-editor'
 import { HistoryClearDialog } from '@/features/editor/components/history-clear-dialog'
 import { HistoryGraphStrip } from '@/features/editor/components/history-graph-strip'
 import { useHistoryViewer } from '@/features/editor/hooks/use-history-viewer'
+import { useTabPresentation } from '@/features/editor/hooks/use-tab-presentation'
 import { useOptionalWorkspaceEditService } from '@/features/editor/providers/workspace-edit-context'
 import type { HistoryBarrierGroup } from '@/features/editor/state/workspace-edit-service'
 import { basename } from '@/lib/path-formatters'
@@ -39,11 +41,10 @@ import {
 } from '@/features/editor/utils/history-state-label'
 import { editorMutationKeys } from '@/features/editor/utils/mutation-keys'
 import { useSettingValue } from '@/features/settings/hooks/use-setting-value'
+import { useFocusTarget } from '@/lib/focus/hooks/use-target'
 
 const CLOCK_TICK_MS = 30_000
 const MAX_LISTED_FILES = 6
-
-const noSubscription = () => () => undefined
 
 export function HistoryPane({
   buffer,
@@ -60,7 +61,8 @@ export function HistoryPane({
   onLeave?: () => void
 }) {
   const mode = useSettingValue('editor.diff.viewMode')
-  const snapshot = useHistoryViewer(buffer, path)
+  const snapshot = useHistoryViewer(buffer, path, tabId)
+  const presentation = useTabPresentation(tabId)
   const viewer = snapshot?.viewer ?? null
   const state = snapshot?.state ?? null
   const restore = useMutation(historyRestoreMutationOptions(documentKey, buffer))
@@ -68,15 +70,15 @@ export function HistoryPane({
   const restoring =
     useIsMutating({ mutationKey: editorMutationKeys.historyRestore(documentKey) }) > 0
   const [clearOpen, setClearOpen] = useState(false)
-  const [barrierFocused, setBarrierFocused] = useState(false)
+  const [barrierFocused, setBarrierFocusedState] = useState(presentation.history.barrierFocused)
   const now = useClock()
   const workspaceEdits = useOptionalWorkspaceEditService()
   const barrierGroup = useSyncExternalStore(
-    workspaceEdits ? workspaceEdits.subscribe : noSubscription,
+    workspaceEdits ? workspaceEdits.subscribe : emptySubscription,
     () => workspaceEdits?.historyBarrierGroup(buffer) ?? null,
   )
   const undoingWorkspaceEdit = useSyncExternalStore(
-    workspaceEdits ? workspaceEdits.subscribe : noSubscription,
+    workspaceEdits ? workspaceEdits.subscribe : emptySubscription,
     () => workspaceEdits?.getSnapshot().phase === 'undoing',
   )
 
@@ -93,6 +95,28 @@ export function HistoryPane({
     // eslint-disable-next-line react-hooks/exhaustive-deps
     [focused?.id, focused?.revision, graph?.revision, path],
   )
+  const selectedComparison = state?.comparison?.status === 'ready' ? state.comparison.result : null
+  const focusedComparison = state?.lostIds.length ? null : focusedDiff
+  const displayedDiff = state?.selectedIds.length === 2 ? selectedComparison : focusedComparison
+  const hasDiffEditor =
+    !(barrierFocused && graph?.barrier) &&
+    displayedDiff !== null &&
+    displayedDiff !== 'too-large' &&
+    displayedDiff.hunks.length > 0
+  const { ref: focusRef } = useFocusTarget<HTMLDivElement>(
+    {
+      area: 'editor',
+      id: { kind: 'editor', key: path, surface: 'history', tabId },
+      onIntent: (intent, element) => {
+        if (intent !== 'focus') return false
+        const graph = element.querySelector<SVGSVGElement>('[role="listbox"]')
+        if (!graph) return false
+        graph.focus()
+        return true
+      },
+    },
+    !hasDiffEditor,
+  )
 
   if (!viewer || !state || !graph) return null
 
@@ -101,6 +125,11 @@ export function HistoryPane({
   const barrierLabel = barrierAriaLabel(barrierGroup)
   const canRestore = focused !== null && !focused.isCurrent && !restoring && !barrierActive
   const twoSelected = state.selectedIds.length === 2
+
+  function setBarrierFocused(value: boolean) {
+    presentation.setBarrierFocused(value)
+    setBarrierFocusedState(value)
+  }
 
   function focusNode(id: HistoryNodeId) {
     setBarrierFocused(false)
@@ -137,7 +166,7 @@ export function HistoryPane({
   }
 
   return (
-    <div className='flex h-full min-h-0 flex-col' data-history-pane={documentKey}>
+    <div className='flex h-full min-h-0 flex-col' data-history-pane={documentKey} ref={focusRef}>
       <div className='border-border overflow-x-auto border-b px-(--bar-padding-x) py-1'>
         <HistoryGraphStrip
           barrierFocused={barrierActive}

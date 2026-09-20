@@ -1,9 +1,11 @@
+import { isString } from '@workspace/utils/objects'
+import { elapsedMs } from '@workspace/utils/timing'
 import { realpath, stat, writeFile } from 'node:fs/promises'
 import path from 'node:path'
 import { FsError } from '../fs/errors'
 import type { WorkspacePath, WorkspacePaths } from '../fs/path'
 import { toPosix } from '../fs/path'
-import { elapsedMs, limitText, recordGitCommand, recordRequestContext } from '../observability'
+import { limitText, recordGitCommand, recordRequestContext } from '../observability'
 import type {
   GitBranchRemoteState,
   GitCommitProgressEvent,
@@ -1361,10 +1363,6 @@ function isBinaryDiff(diff: GitFileDiff) {
 
 function isTooLarge(size: number | null, maxBytes: number) {
   return size !== null && size > maxBytes
-}
-
-function isString(value: string | null): value is string {
-  return typeof value === 'string'
 }
 
 function recordGitServiceOperation(

@@ -1,3 +1,4 @@
+import { sortedDirents } from './dirents'
 import { createReadStream } from 'node:fs'
 import { readdir } from 'node:fs/promises'
 import path from 'node:path'
@@ -52,10 +53,6 @@ async function* searchDirectory(
 
     yield* searchEntry(absoluteDirectory, relativeDirectory, dirent.name, context, signal, depth)
   }
-}
-
-function sortedDirents<T extends { name: string }>(dirents: T[]) {
-  return dirents.sort((left, right) => left.name.localeCompare(right.name))
 }
 
 async function* searchEntry(

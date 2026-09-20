@@ -1,3 +1,4 @@
+import { normalizeText as normalize } from '@workspace/utils/strings'
 export type FieldTokenCalibration = {
   readonly fieldPenaltyStep: number
   readonly offsets: {
@@ -43,10 +44,6 @@ export function rankFieldTokens<T>({
 
   ranked.sort((left, right) => left.score - right.score || left.order - right.order)
   return ranked.slice(0, boundedLimit).map((entry) => entry.item)
-}
-
-function normalize(value: string) {
-  return value.trim().toLowerCase()
 }
 
 function itemScore(

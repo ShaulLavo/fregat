@@ -1,3 +1,4 @@
+import { errorMessage } from '@workspace/contracts'
 import type {
   EnvironmentId,
   HealthDescriptor,
@@ -433,10 +434,6 @@ function failurePhase(step: SshErrorStep) {
   if (step === 'identity') return 'identity-drift'
   if (step === 'settings' || step === 'probe') return 'blocked'
   return 'offline'
-}
-
-function errorMessage(error: unknown) {
-  return error instanceof Error ? error.message : String(error)
 }
 
 function actionableError(error: unknown) {

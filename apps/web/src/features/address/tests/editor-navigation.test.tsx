@@ -1,3 +1,4 @@
+import { editorTabRecordsForWorkbenchPanels } from '@/features/workbench/utils/panels'
 import {
   testTabContent,
   testDocumentRef,
@@ -168,12 +169,12 @@ test('repeated reopen consumes the closed-editor stack', async ({ client, server
   })
   await waitForNavigation(navigation)
   const commands = navigation.editorCommands(harness.workspace)
-  const b = harness.workspace
-    .getState()
-    .workbenchPanels.editorTabs.find((tab) => testContentMatches(tab.content, 'repo/b.ts'))
-  const c = harness.workspace
-    .getState()
-    .workbenchPanels.editorTabs.find((tab) => testContentMatches(tab.content, 'repo/c.ts'))
+  const b = editorTabRecordsForWorkbenchPanels(harness.workspace.getState().workbenchPanels).find(
+    (tab) => testContentMatches(tab.content, 'repo/b.ts'),
+  )
+  const c = editorTabRecordsForWorkbenchPanels(harness.workspace.getState().workbenchPanels).find(
+    (tab) => testContentMatches(tab.content, 'repo/c.ts'),
+  )
   if (!b || !c) return expect.unreachable('Seeded editor tabs are missing')
   await commands.closeTab(testTabId(b.id))
   await commands.closeTab(testTabId(c.id))
@@ -206,7 +207,9 @@ test('outside-root definitions retain their target range', async ({ client, serv
   expect(harness.workspace.getState().selectedTabContent).toEqual(
     testNullableTabContent('external.ts'),
   )
-  expect(application.getSnapshot().editor.uiStore.getState().definitionTarget).toEqual(target)
+  expect(application.getSnapshot().editor.uiStore.getState().definitionTarget?.target).toEqual(
+    target,
+  )
 })
 
 test('opening a chat file reveals the previously hidden editor tool', async ({

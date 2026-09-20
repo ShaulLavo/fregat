@@ -214,7 +214,7 @@ function durationEndForMessage(
   return assistantCompletionBoundary(message)
 }
 
-function compareMessagesByCreatedAt(left: ChatTimelineMessage, right: ChatTimelineMessage) {
+export function compareMessagesByCreatedAt(left: ChatTimelineMessage, right: ChatTimelineMessage) {
   return left.createdAt.localeCompare(right.createdAt)
 }
 

@@ -1,3 +1,4 @@
+import { activeEditorTab as selectedGroupTab } from '@/lib/documents/utils/groups'
 import { filesystemPath, fileDocumentKey, tabId } from '@/lib/documents/utils/identity'
 import { testTabContent } from '../../../../test/factories/document-targets'
 import type { TabContent } from '@/lib/documents/utils/types'
@@ -238,7 +239,8 @@ test(
     const retained = harness.documentStore.getState().getLiveEditorDocument(fileDocumentKey(PATH))
     if (!retained) throw new RangeError('retained browser document unavailable')
     createEditorBufferSession(retained.buffer).applyText('retained dirty browser text')
-    const activeTabId = harness.workspaceStore.getState().workbenchPanels.activeEditorTabId
+    const activeTabId =
+      selectedGroupTab(harness.workspaceStore.getState().workbenchPanels.editorGroups)?.id ?? null
     if (!activeTabId) throw new RangeError('active browser tab unavailable')
     expect(await harness.commands.closeTab(activeTabId)).toEqual({ status: 'applied' })
     const queryKey = fileSnapshotQueryOptions(PATH).queryKey
@@ -470,9 +472,7 @@ function ThemeIdentity() {
 }
 
 function activeEditorTab(state: EditorWorkspaceStore) {
-  const activeTabId = state.workbenchPanels.activeEditorTabId
-  if (!activeTabId) return null
-  return state.workbenchPanels.editorTabs.find((tab) => tab.id === activeTabId) ?? null
+  return selectedGroupTab(state.workbenchPanels.editorGroups)
 }
 
 function activeThemeIdentity(): string | null {

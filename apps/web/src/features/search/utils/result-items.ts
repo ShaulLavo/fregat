@@ -258,7 +258,7 @@ function expandedGroup(group: WorkspaceSearchFileGroup) {
   }
 }
 
-function isContentSearchResultItem(
+export function isContentSearchResultItem(
   item: SearchResultItem,
 ): item is Extract<SearchResultItem, { type: 'match' }> {
   return item.type === 'match'
@@ -270,7 +270,7 @@ function searchResultIndex(items: readonly SearchResultItem[], id: SearchResultI
   return items.findIndex((item) => item.id === id)
 }
 
-function clampIndex(index: number, length: number) {
+export function clampIndex(index: number, length: number) {
   return Math.min(Math.max(index, 0), length - 1)
 }
 

@@ -1,3 +1,4 @@
+import { elapsedMs, roundMs } from '@workspace/utils/timing'
 import type {
   WorkspaceSearchMeasurement,
   WorkspaceSearchIndexMeasurement,
@@ -173,12 +174,4 @@ function compareStatPathCount(
   if (left.count !== right.count) return right.count - left.count
 
   return left.path.localeCompare(right.path)
-}
-
-function elapsedMs(startedAt: number) {
-  return roundMs(performance.now() - startedAt)
-}
-
-function roundMs(value: number) {
-  return Math.round(value * 100) / 100
 }

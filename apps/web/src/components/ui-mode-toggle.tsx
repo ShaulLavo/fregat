@@ -1,6 +1,6 @@
+import { ToggleIconButton } from '@/components/toggle-icon-button'
 import { useNavigation } from '@/hooks/use-navigation'
 import { ChatCircleIcon, SidebarSimpleIcon, SquaresFourIcon } from '@phosphor-icons/react'
-import type { ReactNode } from 'react'
 
 import { useEditorWorkspaceState } from '@/features/editor/state/workspace-state'
 import { setChatModeSessionRailOpen } from '@/features/chat-mode/utils/panels'
@@ -37,46 +37,19 @@ export function UiModeToggle() {
         </Button>
       ) : null}
       <div className='flex items-center gap-(--density-gap-tight)'>
-        {modeButton({
-          active: uiMode === 'workbench',
-          icon: <SquaresFourIcon className='size-3.5' />,
-          label: `${workspaceUiModeLabel('workbench')} mode`,
-          onClick: () => void navigation.setMode('workbench'),
-        })}
-        {modeButton({
-          active: uiMode === 'chat',
-          icon: <ChatCircleIcon className='size-3.5' />,
-          label: `${workspaceUiModeLabel('chat')} mode`,
-          onClick: () => void navigation.setMode('chat'),
-        })}
+        <ToggleIconButton
+          active={uiMode === 'workbench'}
+          icon={<SquaresFourIcon className='size-3.5' />}
+          label={`${workspaceUiModeLabel('workbench')} mode`}
+          onClick={() => void navigation.setMode('workbench')}
+        />
+        <ToggleIconButton
+          active={uiMode === 'chat'}
+          icon={<ChatCircleIcon className='size-3.5' />}
+          label={`${workspaceUiModeLabel('chat')} mode`}
+          onClick={() => void navigation.setMode('chat')}
+        />
       </div>
     </div>
-  )
-}
-
-function modeButton({
-  active,
-  icon,
-  label,
-  onClick,
-}: {
-  readonly active: boolean
-  readonly icon: ReactNode
-  readonly label: string
-  readonly onClick: () => void
-}) {
-  return (
-    <Button
-      aria-label={label}
-      aria-pressed={active}
-      className={cn('text-muted-foreground', active && 'bg-accent text-accent-foreground')}
-      size='icon-sm'
-      title={label}
-      type='button'
-      variant='ghost'
-      onClick={onClick}
-    >
-      {icon}
-    </Button>
   )
 }

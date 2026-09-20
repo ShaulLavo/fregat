@@ -1,7 +1,8 @@
 import type { Stats } from 'node:fs'
 import { lstat, realpath, rm, stat } from 'node:fs/promises'
 import path from 'node:path'
-import { FsError, mapNodeError, nodeErrorCode } from './errors'
+import { FsError, mapNodeError } from './errors'
+import { nodeErrorCode } from '@workspace/contracts'
 import { isOutsideRoot, type WorkspacePath, type WorkspacePaths } from './path'
 
 export type MutationTargetKind = 'content' | 'entry'

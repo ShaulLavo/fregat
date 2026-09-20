@@ -1,6 +1,6 @@
 import { wallpaperSelectionSchema, type WallpaperSelection } from '../themes/wallpaper'
 import * as v from 'valibot'
-import { isRecord } from '../is-record'
+import { isRecord } from '@workspace/utils/objects'
 import { providerInstanceConfigsSchema, type ProviderInstanceConfig } from '../settings'
 import { descriptorFor, type SettingId, type SettingValue } from './keys'
 

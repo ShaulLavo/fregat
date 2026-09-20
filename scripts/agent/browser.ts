@@ -101,7 +101,11 @@ async function main() {
   const options: Options = {
     ...captureSize(values),
     site: values.site || Boolean(values['static-dir']),
-    productCapture: name === 'editor-product' || Boolean(values['product-wallpaper']),
+    productCapture:
+      name === 'editor-product' ||
+      name === 'editor-external-edit' ||
+      Boolean(name?.startsWith('editor-split-')) ||
+      Boolean(values['product-wallpaper']),
     staticDir: values['static-dir'],
     productWallpaper: values['product-wallpaper'],
     compare: values.compare,

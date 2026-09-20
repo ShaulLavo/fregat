@@ -1,11 +1,13 @@
 import type { TabId } from '@/lib/documents/utils/types'
-import { createDiffRegionStore, type DiffFile, type DiffRegionStore } from '@singapore-editor/diff'
+import { type DiffFile, type DiffRegionStore } from '@singapore-editor/diff'
 import {
   ResizableHandle,
   ResizablePanel,
   ResizablePanelGroup,
 } from '@workspace/ui/components/resizable'
-import { useMemo, useState } from 'react'
+import { useLayoutEffect, useMemo } from 'react'
+import { useTabPresentation } from '@/features/editor/hooks/use-tab-presentation'
+import { LoadingState } from '@workspace/ui/components/loading-state'
 
 import { DiffPane } from '@/features/editor/components/diff-pane'
 import { useDiffPanes } from '@/features/editor/hooks/use-diff-panes'
@@ -44,9 +46,20 @@ export function DiffEditor({
   // Split is two plugin instances, and a separator row is one region shown twice. Without a shared
   // store a gutter click would expand one pane and leave the other where it was, misaligning every
   // row below — the one property split mode exists to hold.
-  const [privateRegions] = useState(createDiffRegionStore)
-  const regionStore = regions ?? privateRegions
+  const presentation = useTabPresentation(tabId)
+  const regionStore = regions ?? presentation.regions
   const panes = useDiffPanes()
+  useLayoutEffect(() => {
+    if (file) presentation.setDiffFile(file)
+  }, [file, presentation])
+
+  if (!file)
+    return (
+      <LoadingState className='flex h-full flex-col gap-3 p-4' label='Loading comparison'>
+        <div className='skeleton-sweep h-4 w-3/4 rounded-md' />
+        <div className='skeleton-sweep h-4 w-1/2 rounded-md' />
+      </LoadingState>
+    )
 
   if (mode === 'stacked') {
     return (
@@ -55,6 +68,7 @@ export function DiffEditor({
           file={file}
           languageServer={languageServer}
           regions={regionStore}
+          presentation={presentation.diffPanes.stacked}
           side='stacked'
           syntaxBackend={syntax.backend}
           syntaxHighlight={syntax.enabled}
@@ -67,12 +81,21 @@ export function DiffEditor({
 
   return (
     <div className='editor-diff-view flex h-full min-h-0 w-full min-w-0 overflow-hidden'>
-      <ResizablePanelGroup className='min-h-0 min-w-0' id='diff-panes'>
+      <ResizablePanelGroup
+        key={tabId}
+        className='min-h-0 min-w-0'
+        defaultLayout={presentation.diffLayout}
+        id={`diff-panes-${tabId ?? 'standalone'}`}
+        onLayoutChanged={(layout, meta) => {
+          if (meta.isUserInteraction) presentation.setDiffLayout(layout)
+        }}
+      >
         <ResizablePanel className='min-h-0 min-w-0 overflow-hidden' id='diff-old'>
           <DiffPane
             file={file}
             languageServer={languageServer}
             regions={regionStore}
+            presentation={presentation.diffPanes.old}
             side='old'
             syntaxBackend={syntax.backend}
             syntaxHighlight={syntax.enabled}
@@ -89,6 +112,7 @@ export function DiffEditor({
             file={file}
             languageServer={languageServer}
             regions={regionStore}
+            presentation={presentation.diffPanes.new}
             side='new'
             syntaxBackend={syntax.backend}
             syntaxHighlight={syntax.enabled}

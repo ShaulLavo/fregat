@@ -1,7 +1,8 @@
+import { elapsedMs } from '@workspace/utils/timing'
 import { realpathSync } from 'node:fs'
 import { realpath } from 'node:fs/promises'
 import path from 'node:path'
-import { isRecord } from '@workspace/contracts'
+import { isRecord } from '@workspace/utils/objects'
 
 type Waiter = {
   readonly ready: () => void
@@ -143,8 +144,4 @@ function releaseCoordinator(canonicalPath: string, coordinator: Coordinator) {
 
   coordinator.held = false
   if (coordinator.references === 0) coordinators.delete(canonicalPath)
-}
-
-function elapsedMs(startedAt: number) {
-  return Math.round((performance.now() - startedAt) * 100) / 100
 }

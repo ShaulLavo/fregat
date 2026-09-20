@@ -8,7 +8,7 @@ import {
 } from '@workspace/contracts'
 import type { SettingsOwner } from '@workspace/client-core/settings/owner'
 
-import { emptySettingsSubscription } from '@/settings/utils/subscription'
+import { emptySubscription } from '@workspace/utils/subscriptions'
 
 export function useSettingValue<K extends SettingId>(
   owner: SettingsOwner | null,
@@ -16,7 +16,7 @@ export function useSettingValue<K extends SettingId>(
 ): SettingsValues[K] {
   const systemMode = useSystemColorMode()
   const snapshot = useSyncExternalStore(
-    owner?.subscribe ?? emptySettingsSubscription,
+    owner?.subscribe ?? emptySubscription,
     () => owner?.getSnapshot().projection.values ?? DEFAULT_SETTING_VALUES,
   )
   return resolveThemeSettings(snapshot, systemMode, owner?.getSnapshot().projection.layers)[key]

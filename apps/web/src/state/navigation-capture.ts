@@ -1,10 +1,6 @@
-import type { TabContent } from '@/lib/documents/utils/types'
-import {
-  selectChatSessionsForProject,
-  selectWorktreeAtPath,
-} from '@workspace/client-core/chat/selectors'
-import { compareSessionsForRail } from '@workspace/client-core/chat/rail/session-order'
-import { activeSession } from '@/features/chat-mode/utils/active-session'
+import type { EditorTabRecord } from '@/lib/documents/utils/types'
+import { selectWorktreeAtPath } from '@workspace/client-core/chat/selectors'
+import { activeProjectSession } from '@/features/chat-mode/utils/active-session'
 import { confirmedEnvironmentId } from '@/lib/environments/state/domain'
 import {
   useChatProjectionStore,
@@ -31,6 +27,7 @@ import { createDefaultChatModePanels } from '@/features/chat-mode/utils/panels'
 import {
   createDefaultWorkbenchPanels,
   activeEditorTabForWorkbenchPanels,
+  editorOpenContentsForWorkbenchPanels,
 } from '@/features/workbench/utils/panels'
 import { readSettingsCategory } from '@/features/settings/state/category-store'
 import { settingsCategorySlug } from '@/features/address/utils/settings-category'
@@ -60,9 +57,9 @@ function snapshotFromStore(
     environmentId,
     sidebarSessionToken: sidebarSessionToken(rootPath),
     activeTabContent: activeEditorTabForWorkbenchPanels(panels)?.content ?? null,
-    focus: focusFor(uiStoreApi, activeEditorTabForWorkbenchPanels(panels)?.content ?? null),
+    focus: focusFor(uiStoreApi, activeEditorTabForWorkbenchPanels(panels)),
     bottomTab: orAbsent(panels.activeBottomTab, defaults.activeBottomTab),
-    editorTabContents: panels.editorTabs.map((tab) => tab.content),
+    editorTabContents: editorOpenContentsForWorkbenchPanels(panels),
     workspaceAddress: state.rootFolder?.workspaceAddress ?? null,
     passthrough,
     mode: state.uiMode === 'chat' ? ('chat' as const) : ('workbench' as const),
@@ -81,8 +78,11 @@ function snapshotFromStore(
   }
 }
 
-function focusFor(uiStoreApi: EditorUiStoreApi, activeContent: TabContent | null) {
-  const target = uiStoreApi.getState().definitionTarget
+function focusFor(uiStoreApi: EditorUiStoreApi, activeTab: EditorTabRecord | null) {
+  const owned = uiStoreApi.getState().definitionTarget
+  if (!owned || owned.tabId !== activeTab?.id) return null
+  const target = owned.target
+  const activeContent = activeTab.content
   if (!target || activeContent?.kind !== 'document' || activeContent.document.kind !== 'file')
     return null
   if (target.path !== activeContent.document.resource.path) return null
@@ -131,17 +131,13 @@ export function captureMainSession(application: ApplicationRuntime) {
   const slice = selectChatProjectionSlice(useChatProjectionStore.getState(), environmentId)
   const projectId = selectWorktreeAtPath(slice, rootPath)?.projectId ?? null
   if (!projectId) return null
-  const sessions = selectChatSessionsForProject(slice, projectId).toSorted(compareSessionsForRail)
   const { selection, restored } = useSessionSelectionStore.getState()
-  const resolved = activeSession({
+  const resolved = activeProjectSession({
+    slice,
     environmentId,
     projectId,
     selection,
     restored,
-    sessionIds: sessions.filter((session) => !session.archivedAt).map((session) => session.id),
-    archivedSessionIds: sessions
-      .filter((session) => session.archivedAt)
-      .map((session) => session.id),
   })
   return resolved.sessionId ? { environmentId, sessionId: resolved.sessionId } : null
 }

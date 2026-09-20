@@ -9,6 +9,9 @@
     "format:check": "oxfmt --check .",
     "typecheck": "tsgo --noEmit"
   },
+  "dependencies": {
+    "@workspace/utils": "workspace:*"
+  },
   "devDependencies": {
     "@jridgewell/trace-mapping": "0.3.31",
     "@types/bun": "1.3.14",

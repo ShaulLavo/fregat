@@ -1,3 +1,4 @@
+import { editorTabRecordsForWorkbenchPanels } from '@/features/workbench/utils/panels'
 import { filesystemPath } from '@/lib/documents/utils/identity'
 import {
   testNullableTabContent,
@@ -19,6 +20,13 @@ import {
 import { emptyWorkspaceSlice, emptyWorkspaceState } from '@/features/workspace/state/cache'
 
 import { expect, test } from '../../../../test/fixtures'
+import {
+  groupBranch,
+  groupLeaf,
+  groupTab,
+  groupTree,
+} from '../../../../test/factories/editor-groups'
+import { activeEditorTab, allEditorGroups } from '@/lib/documents/utils/groups'
 
 const ROOT = '/repo'
 const SESSION = 't/99dc0669-0262-4f92-a8d2-85ff6baea075'
@@ -62,7 +70,9 @@ test.each(PATHS)('chat restores %s before any effects regardless of the last tab
   expect(parsed.document).toBe(SESSION)
   expect(parsed.tabs).toEqual(['f/a.ts', 'settings', 's'])
   expect(activeEditorContentForWorkbenchPanels(restored)).toEqual(testNullableTabContent(path))
-  expect(restored.editorTabs.map((tab) => tab.content)).toEqual(testTabContents(PATHS))
+  expect(editorTabRecordsForWorkbenchPanels(restored).map((tab) => tab.content)).toEqual(
+    testTabContents(PATHS),
+  )
 })
 
 test.each(PATHS)('workbench restores %s through the same document pipeline', (path) => {
@@ -88,13 +98,42 @@ test('a tab collection without a selection preserves the cached active tab', () 
   )
   const restored = addressedWorkspaceCache(cachedWorkspace(), address).workspaces[ROOT]
     .workbenchPanels
-  expect(restored.editorTabs.map((tab) => tab.content)).toContainEqual(
+  expect(editorTabRecordsForWorkbenchPanels(restored).map((tab) => tab.content)).toContainEqual(
     testTabContent(`${ROOT}/new.ts`),
   )
   expect(activeEditorContentForWorkbenchPanels(restored)).toEqual(
     testNullableTabContent(`search-buffer:${encodeURIComponent(ROOT)}`),
   )
 })
+
+test.each(['a', 'b'])(
+  'boot selects %s without copying URL tab hints across cached groups',
+  (file) => {
+    const copy = groupTab('copy-a', `${ROOT}/a.ts`)
+    const original = groupTab('original-a', `${ROOT}/a.ts`)
+    const other = groupTab('original-b', `${ROOT}/b.ts`)
+    const panels = {
+      ...createDefaultWorkbenchPanels(),
+      editorGroups: groupTree(
+        groupBranch('split', 'horizontal', [
+          { node: groupLeaf('left', [copy]), size: 50 },
+          { node: groupLeaf('right', [other, original]), size: 50 },
+        ]),
+        'left',
+      ),
+    }
+    const address = parseAddress(
+      `/~${testWorkspaceToken(ROOT)}/workbench/f/${file}.ts?tabs=f/a.ts~f/b.ts`,
+    )
+    const restored = panelsForAddress(panels, ROOT, address)
+
+    expect(allEditorGroups(restored.editorGroups).map((group) => group.tabs)).toEqual([
+      [copy],
+      [other, original],
+    ])
+    expect(activeEditorTab(restored.editorGroups)?.id).toBe(file === 'a' ? copy.id : other.id)
+  },
+)
 
 test('a settings category does not select a background settings tab', () => {
   const address = parseAddress(
@@ -145,7 +184,9 @@ test('folderless settings retains its document, tab and category in the address'
 test('folderless settings is selected by the synchronous boot panel merge', () => {
   const address = parseAddress('/~-/workbench/settings?tabs=settings&settings=providers')
   const panels = panelsForAddress(createDefaultWorkbenchPanels(), null, address)
-  expect(panels.editorTabs.map((tab) => tab.content)).toEqual(testTabContents(['settings:']))
+  expect(editorTabRecordsForWorkbenchPanels(panels).map((tab) => tab.content)).toEqual(
+    testTabContents(['settings:']),
+  )
   expect(activeEditorContentForWorkbenchPanels(panels)).toEqual(testNullableTabContent('settings:'))
 })
 

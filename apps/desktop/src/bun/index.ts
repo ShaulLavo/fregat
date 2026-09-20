@@ -1,3 +1,5 @@
+import { isNonEmptyString as isString } from '@workspace/utils/objects'
+import { errorMessage } from '@workspace/contracts'
 import { createDesktopError } from './structured-errors'
 
 import { existsSync, readdirSync } from 'node:fs'
@@ -514,12 +516,6 @@ function pathWithPrefix(prefix: string, current: string | undefined) {
   return [prefix, ...entries].join(path.delimiter)
 }
 
-function errorMessage(error: unknown) {
-  if (error instanceof Error) return error.message
-
-  return String(error)
-}
-
 function resolvePlatformRoot() {
   const candidates = [
     Bun.env.PLATFORM_ROOT,
@@ -556,8 +552,4 @@ function isPlatformRoot(candidate: string) {
     existsSync(path.join(candidate, 'apps/server/src/index.ts')) &&
     existsSync(path.join(candidate, 'apps/web/package.json'))
   )
-}
-
-function isString(value: string | undefined): value is string {
-  return typeof value === 'string' && value.length > 0
 }

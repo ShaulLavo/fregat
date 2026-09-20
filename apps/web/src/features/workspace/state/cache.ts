@@ -1,4 +1,4 @@
-import { activeEditorTabId } from '@/lib/documents/utils/active-tab'
+import { entryTypeSchema, workspaceSearchMatchSchema } from '@workspace/contracts'
 import {
   workspaceLocation,
   workspaceLocationId,
@@ -47,7 +47,13 @@ import {
   storedTabContentSchema,
   type StoredTabContent,
 } from '@/lib/documents/utils/storage-codec'
-import type { ReopenScrollPosition, TabContent, WorkspaceRoot } from '@/lib/documents/utils/types'
+import type {
+  EditorViewScrollPosition,
+  ReopenScrollPosition,
+  TabContent,
+  TabId,
+  WorkspaceRoot,
+} from '@/lib/documents/utils/types'
 import {
   environmentIdSchema,
   workspaceAddressSchema,
@@ -60,6 +66,15 @@ import {
   type WorkspaceSearchWarningEvent,
 } from '@workspace/contracts'
 import * as v from 'valibot'
+import {
+  groupId,
+  splitId,
+  type GroupNode,
+  type GroupId,
+  type SplitId,
+  type GroupAxis,
+} from '@/lib/documents/utils/group-types'
+import { allEditorTabs, filterGroupTabs, validEditorGroups } from '@/lib/documents/utils/groups'
 
 const WORKSPACE_SLICE_KEY_PREFIX = workspaceCacheStorageKey('workspace:')
 const SEARCH_BUFFER_KEY_PREFIX = workspaceCacheStorageKey('search:')
@@ -116,26 +131,23 @@ export type CachedSearchBufferState = {
   wholeWord: boolean
 }
 
-const pickedDirectorySchema = v.object({
+const pickedEntryFields = {
   workspaceAddress: v.optional(workspaceAddressSchema),
   birthtimeMs: v.number(),
   mtimeMs: v.number(),
   name: v.string(),
   path: v.pipe(v.string(), v.transform(filesystemPath)),
   size: v.number(),
-  type: v.literal('directory'),
   version: v.optional(v.string(), ''),
+}
+const pickedDirectorySchema = v.object({
+  ...pickedEntryFields,
+  type: v.literal('directory'),
 })
 const pickedSymlinkDirectorySchema = v.object({
-  workspaceAddress: v.optional(workspaceAddressSchema),
-  birthtimeMs: v.number(),
-  mtimeMs: v.number(),
-  name: v.string(),
-  path: v.pipe(v.string(), v.transform(filesystemPath)),
-  size: v.number(),
+  ...pickedEntryFields,
   targetType: v.literal('directory'),
   type: v.literal('symlink'),
-  version: v.optional(v.string(), ''),
 })
 const rootFolderSchema = v.nullable(
   v.pipe(
@@ -156,33 +168,13 @@ const cachedRootSchema = v.pipe(
 )
 
 const nullableStringSchema = v.nullable(v.string())
-const entryTypeSchema = v.union([
-  v.literal('file'),
-  v.literal('directory'),
-  v.literal('symlink'),
-  v.literal('other'),
-])
-const workspaceSearchSourceSchema = v.union([v.literal('disk'), v.literal('open-buffer')])
+
 const workspaceSearchMatchModeSchema = v.union([
   v.literal('literal'),
   v.literal('regex'),
   v.literal('fuzzy'),
 ])
-const workspaceSearchMatchSchema = v.object({
-  birthtimeMs: v.optional(v.number()),
-  column: v.optional(v.number()),
-  endColumn: v.optional(v.number()),
-  kind: v.union([v.literal('name'), v.literal('content')]),
-  line: v.optional(v.number()),
-  mtimeMs: v.optional(v.number()),
-  path: v.string(),
-  preview: v.optional(v.string()),
-  previewStartColumn: v.optional(v.number()),
-  size: v.optional(v.number()),
-  source: workspaceSearchSourceSchema,
-  targetType: v.optional(entryTypeSchema),
-  type: entryTypeSchema,
-})
+
 const searchWarningSchema = v.object({
   code: v.union([
     v.literal('content-tool-partial-failure'),
@@ -262,14 +254,63 @@ const terminalTabRecordSchema = v.strictObject({
   name: v.nullable(v.pipe(v.string(), v.nonEmpty())),
   title: v.pipe(v.string(), v.nonEmpty()),
 })
+type StoredGroupNode =
+  | {
+      kind: 'group'
+      id: GroupId
+      tabs: { id: TabId; content: StoredTabContent }[]
+      selectedTabId: TabId | null
+    }
+  | {
+      kind: 'split'
+      id: SplitId
+      axis: GroupAxis
+      children: [
+        { node: StoredGroupNode; size: number },
+        { node: StoredGroupNode; size: number },
+        ...{ node: StoredGroupNode; size: number }[],
+      ]
+    }
+const groupIdSchema = v.pipe(v.string(), v.nonEmpty(), v.transform(groupId))
+const splitIdSchema = v.pipe(v.string(), v.nonEmpty(), v.transform(splitId))
+const storedGroupNodeSchema: v.GenericSchema<unknown, StoredGroupNode> = v.lazy(() =>
+  v.variant('kind', [
+    v.strictObject({
+      kind: v.literal('group'),
+      id: groupIdSchema,
+      tabs: v.array(editorTabRecordSchema),
+      selectedTabId: v.nullable(tabIdSchema),
+    }),
+    v.strictObject({
+      kind: v.literal('split'),
+      id: splitIdSchema,
+      axis: v.picklist(['horizontal', 'vertical']),
+      children: v.tupleWithRest(
+        [
+          v.strictObject({
+            node: storedGroupNodeSchema,
+            size: v.pipe(v.number(), v.finite(), v.minValue(Number.MIN_VALUE)),
+          }),
+          v.strictObject({
+            node: storedGroupNodeSchema,
+            size: v.pipe(v.number(), v.finite(), v.minValue(Number.MIN_VALUE)),
+          }),
+        ],
+        v.strictObject({
+          node: storedGroupNodeSchema,
+          size: v.pipe(v.number(), v.finite(), v.minValue(Number.MIN_VALUE)),
+        }),
+      ),
+    }),
+  ]),
+)
 const workbenchPanelsSchema = v.strictObject({
   activeBottomTab: bottomTabSchema,
-  activeEditorTabId: v.nullable(tabIdSchema),
   activeGitTab: v.optional(v.picklist(['changes', 'graph']), 'changes'),
   activeSidebarTab: sidebarTabSchema,
   activeTerminalTabId: v.nullable(v.string()),
   bottomPanelOpen: v.boolean(),
-  editorTabs: v.array(editorTabRecordSchema),
+  editorGroups: v.strictObject({ root: storedGroupNodeSchema, activeGroupId: groupIdSchema }),
   gitCommitDetailsOpen: v.optional(v.boolean(), true),
   gitHistory: v.optional(gitHistoryViewSchema, createDefaultGitHistoryView),
   gitChangesOpen: v.optional(v.object({ staged: v.boolean(), worktree: v.boolean() }), () => ({
@@ -292,6 +333,9 @@ const workspaceSliceSchema = v.strictObject({
       content: storedTabContentSchema,
       position: scrollPositionSchema,
     }),
+  ),
+  viewScrollPositions: v.array(
+    v.strictObject({ tabId: tabIdSchema, position: scrollPositionSchema }),
   ),
   workbenchPanels: workbenchPanelsSchema,
 })
@@ -325,6 +369,7 @@ export type CachedWorkspaceSlice = {
   editorHistory: readonly TabContent[]
   recentlyClosedTabs: readonly TabContent[]
   reopenScrollPositions: readonly ReopenScrollPosition[]
+  viewScrollPositions: readonly EditorViewScrollPosition[]
   workbenchPanels: WorkbenchPanels
 }
 
@@ -537,15 +582,17 @@ function readWorkspaceSlice(
   rootPath: string,
   worktreeId: WorktreeId | null,
 ): CachedWorkspaceSlice {
-  return restoredSliceForWorkspace(
-    rootPath,
-    readCacheEntry<StoredWorkspaceSlice>(
-      workspaceSliceStorageKey(rootPath, worktreeId),
-      workspaceSliceSchema,
-      storedSliceForWorkspace(rootPath, emptyWorkspaceSlice()),
-      { storage },
-    ),
+  const key = workspaceSliceStorageKey(rootPath, worktreeId)
+  const stored = readCacheEntry<StoredWorkspaceSlice>(
+    key,
+    workspaceSliceSchema,
+    storedSliceForWorkspace(rootPath, emptyWorkspaceSlice()),
+    { storage },
   )
+  const restored = restoredSliceForWorkspace(rootPath, stored)
+  if (restored) return restored
+  removeCacheEntry(key, storage)
+  return emptyWorkspaceSlice()
 }
 
 function readSearchBuffer(storage: ScopedStorage, rootPath: string, worktreeId: WorktreeId | null) {
@@ -566,11 +613,14 @@ function storedSliceForWorkspace(
   slice: CachedWorkspaceSlice,
 ): StoredWorkspaceSlice {
   const root = workspaceRoot(rootPath)
-  const editorTabs = slice.workbenchPanels.editorTabs.flatMap((tab) => {
-    const content = encodeTabContent(tab.content, root)
-    return content === null ? [] : [{ id: tab.id, content }]
-  })
+  const groups = filterGroupTabs(
+    slice.workbenchPanels.editorGroups,
+    (tab) => encodeTabContent(tab.content, root) !== null,
+  )
+  const ids = new Set(allEditorTabs(groups).map((tab) => tab.id))
+  const editorGroups = { ...groups, root: storedGroupNode(groups.root, root) }
   return {
+    viewScrollPositions: slice.viewScrollPositions.filter((entry) => ids.has(entry.tabId)),
     editorHistory: storedContents(root, slice.editorHistory),
     recentlyClosedTabs: storedContents(root, slice.recentlyClosedTabs),
     reopenScrollPositions: slice.reopenScrollPositions.flatMap((entry) => {
@@ -579,10 +629,7 @@ function storedSliceForWorkspace(
     }),
     workbenchPanels: {
       ...slice.workbenchPanels,
-      activeEditorTabId: activeEditorTabId(editorTabs, slice.workbenchPanels.activeEditorTabId, {
-        fallbackToFirstWhenUnset: true,
-      }),
-      editorTabs,
+      editorGroups,
       terminalTabs: slice.workbenchPanels.terminalTabs.map(({ id, name, title }) => ({
         id,
         name,
@@ -595,13 +642,16 @@ function storedSliceForWorkspace(
 function restoredSliceForWorkspace(
   rootPath: string,
   slice: StoredWorkspaceSlice,
-): CachedWorkspaceSlice {
+): CachedWorkspaceSlice | null {
   const root = workspaceRoot(rootPath)
-  const editorTabs = slice.workbenchPanels.editorTabs.flatMap((tab) => {
-    const content = decodeTabContent(tab.content, root)
-    return content === null ? [] : [{ id: tab.id, content }]
-  })
+  const editorGroups = {
+    ...slice.workbenchPanels.editorGroups,
+    root: restoredGroupNode(slice.workbenchPanels.editorGroups.root, root),
+  }
+  if (!validEditorGroups(editorGroups)) return null
+  const ids = new Set(allEditorTabs(editorGroups).map((tab) => tab.id))
   return {
+    viewScrollPositions: slice.viewScrollPositions.filter((entry) => ids.has(entry.tabId)),
     editorHistory: restoredContents(root, slice.editorHistory),
     recentlyClosedTabs: restoredContents(root, slice.recentlyClosedTabs),
     reopenScrollPositions: slice.reopenScrollPositions.flatMap((entry) => {
@@ -610,10 +660,7 @@ function restoredSliceForWorkspace(
     }),
     workbenchPanels: normalizeWorkbenchPanels({
       ...slice.workbenchPanels,
-      activeEditorTabId: activeEditorTabId(editorTabs, slice.workbenchPanels.activeEditorTabId, {
-        fallbackToFirstWhenUnset: true,
-      }),
-      editorTabs,
+      editorGroups,
       terminalTabs: slice.workbenchPanels.terminalTabs.map((tab) => ({
         ...tab,
         process: null,
@@ -621,6 +668,40 @@ function restoredSliceForWorkspace(
       })),
     }),
   }
+}
+
+function storedGroupNode(node: GroupNode, root: WorkspaceRoot): StoredGroupNode {
+  if (node.kind === 'group')
+    return {
+      ...node,
+      tabs: node.tabs.flatMap((tab) => {
+        const content = encodeTabContent(tab.content, root)
+        return content === null ? [] : [{ id: tab.id, content }]
+      }),
+    }
+  const convert = (child: (typeof node.children)[number]) => ({
+    size: child.size,
+    node: storedGroupNode(child.node, root),
+  })
+  const [first, second, ...rest] = node.children
+  return { ...node, children: [convert(first), convert(second), ...rest.map(convert)] }
+}
+
+function restoredGroupNode(node: StoredGroupNode, root: WorkspaceRoot): GroupNode {
+  if (node.kind === 'group')
+    return {
+      ...node,
+      tabs: node.tabs.flatMap((tab) => {
+        const content = decodeTabContent(tab.content, root)
+        return content === null ? [] : [{ id: tab.id, content }]
+      }),
+    }
+  const convert = (child: (typeof node.children)[number]) => ({
+    size: child.size,
+    node: restoredGroupNode(child.node, root),
+  })
+  const [first, second, ...rest] = node.children
+  return { ...node, children: [convert(first), convert(second), ...rest.map(convert)] }
 }
 
 function storedContents(root: WorkspaceRoot, contents: readonly TabContent[]): StoredTabContent[] {
@@ -690,6 +771,7 @@ export function emptyWorkspaceSlice(): CachedWorkspaceSlice {
     editorHistory: [],
     recentlyClosedTabs: [],
     reopenScrollPositions: [],
+    viewScrollPositions: [],
     workbenchPanels: createDefaultWorkbenchPanels(),
   }
 }

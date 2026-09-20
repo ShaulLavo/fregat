@@ -1,3 +1,4 @@
+import { allEditorTabs, activeEditorTab as selectedGroupTab } from '@/lib/documents/utils/groups'
 import {
   testContentMatches,
   testTabContents,
@@ -37,7 +38,7 @@ import { createFileOpenIntentServiceOwner } from '@/lib/file-open-intent/state/s
 import { fileSnapshotQueryOptions } from '@/lib/file-snapshot-query-cache'
 
 describe('editor workspace state', () => {
-  test('opens files as flat editor tabs and records history', () => {
+  test('opens files in the active editor group and records history', () => {
     const { commands, workspaceStore } = editorHarness()
     commands.openFileSurface(filesystemPath('/repo/src/app.ts'))
     expect(workspaceStore.getState()).toMatchObject({
@@ -45,7 +46,7 @@ describe('editor workspace state', () => {
       openTabContents: testTabContents(['/repo/src/app.ts']),
       selectedTabContent: testNullableTabContent('/repo/src/app.ts'),
     })
-    expect(workspaceStore.getState().workbenchPanels.editorTabs).toEqual([
+    expect(allEditorTabs(workspaceStore.getState().workbenchPanels.editorGroups)).toEqual([
       expect.objectContaining({ content: testTabContent('/repo/src/app.ts') }),
     ])
   })
@@ -80,7 +81,8 @@ describe('editor workspace state', () => {
     const searchStore = createSearchBufferStore()
     const uiStore = createEditorUiStore()
     const workspaceStore = createEditorWorkspaceStore(cachedWorkspace({ workbenchPanels: panels }))
-    const tabId = workspaceStore.getState().workbenchPanels.activeEditorTabId!
+    const tabId = (selectedGroupTab(workspaceStore.getState().workbenchPanels.editorGroups)?.id ??
+      null)!
     const document = documentStore.getState().ensureEditorView(testTabId(tabId), fileResult(path))
     createEditorBufferSession(document.buffer).applyText('dirty')
     const { owner } = fileOpenIntentService(documentStore)
@@ -99,7 +101,7 @@ describe('editor workspace state', () => {
     let viewAtPublication = null
     const unsubscribe = workspaceStore.subscribe((state) => {
       if (!testContentMatches(state.selectedTabContent, path)) return
-      const activeTabId = state.workbenchPanels.activeEditorTabId
+      const activeTabId = selectedGroupTab(state.workbenchPanels.editorGroups)?.id ?? null
       viewAtPublication = activeTabId
         ? documentStore.getState().getEditorView(testTabId(activeTabId))
         : null
@@ -144,7 +146,7 @@ describe('editor workspace state', () => {
       let preparedAtPublication: EditorPreparedDocument | null = null
       const unsubscribe = workspaceStore.subscribe((state) => {
         if (!testContentMatches(state.selectedTabContent, path)) return
-        const activeTabId = state.workbenchPanels.activeEditorTabId
+        const activeTabId = selectedGroupTab(state.workbenchPanels.editorGroups)?.id ?? null
         preparedAtPublication = activeTabId
           ? (documentStore.getState().getEditorView(testTabId(activeTabId))?.preparedDocument ??
             null)
@@ -161,7 +163,8 @@ describe('editor workspace state', () => {
       unsubscribe()
 
       expect(preparedAtPublication).toBe(preparedDocument)
-      if (source === 'definition') expect(uiStore.getState().definitionTarget).toEqual(definition)
+      if (source === 'definition')
+        expect(uiStore.getState().definitionTarget?.target).toEqual(definition)
       owner.disposeNow()
       queryClient.clear()
     },
@@ -175,21 +178,19 @@ describe('editor workspace state', () => {
       openTabContents: testTabContents([searchPath]),
       selectedTabContent: testNullableTabContent(searchPath),
     })
-    expect(workspaceStore.getState().workbenchPanels.editorTabs).toEqual([
+    expect(allEditorTabs(workspaceStore.getState().workbenchPanels.editorGroups)).toEqual([
       expect.objectContaining({ content: testTabContent(searchPath) }),
     ])
   })
   test('selects existing tabs without duplicating open paths', () => {
     const panels = workbenchPanelsForPaths(['/repo/src/a.ts', '/repo/src/b.ts'], '/repo/src/a.ts')
     const { commands, workspaceStore } = editorHarness({ workbenchPanels: panels })
-    const tab = workspaceStore
-      .getState()
-      .workbenchPanels.editorTabs.find((candidate) =>
-        testContentMatches(candidate.content, '/repo/src/b.ts'),
-      )
+    const tab = allEditorTabs(workspaceStore.getState().workbenchPanels.editorGroups).find(
+      (candidate) => testContentMatches(candidate.content, '/repo/src/b.ts'),
+    )
     expect(tab).toBeTruthy()
 
-    commands.selectTab('main', tab!.id)
+    commands.selectTab({ groupId: panels.editorGroups.activeGroupId, tabId: tab!.id })
 
     expect(workspaceStore.getState()).toMatchObject({
       editorHistory: testTabContents(['/repo/src/b.ts']),
@@ -203,7 +204,8 @@ describe('editor workspace state', () => {
       editorHistory: testTabContents(['/repo/src/b.ts', '/repo/src/a.ts']),
       workbenchPanels: panels,
     })
-    const activeTabId = workspaceStore.getState().workbenchPanels.activeEditorTabId
+    const activeTabId =
+      selectedGroupTab(workspaceStore.getState().workbenchPanels.editorGroups)?.id ?? null
     expect(activeTabId).toBeTruthy()
     commands.closeTab(testTabId(activeTabId!))
     expect(workspaceStore.getState()).toMatchObject({
@@ -226,14 +228,17 @@ describe('editor workspace state', () => {
       recentlyClosedTabs: testTabContents(['/repo/src/a.ts']),
       workbenchPanels: panels,
     })
-    uiStore.getState().setDefinitionTarget({
-      path: '/repo/src/a.ts',
-      range: {
-        end: { character: 1, line: 0 },
-        start: { character: 0, line: 0 },
+    uiStore.getState().setDefinitionTarget(
+      {
+        path: '/repo/src/a.ts',
+        range: {
+          end: { character: 1, line: 0 },
+          start: { character: 0, line: 0 },
+        },
+        uri: 'file:///repo/src/a.ts',
       },
-      uri: 'file:///repo/src/a.ts',
-    })
+      selectedGroupTab(panels.editorGroups)!.id,
+    )
     commands.renameLiveEditorDocument(
       filesystemPath('/repo/src/a.ts'),
       filesystemPath('/repo/src/renamed.ts'),
@@ -244,7 +249,7 @@ describe('editor workspace state', () => {
       recentlyClosedTabs: testTabContents(['/repo/src/renamed.ts']),
       selectedTabContent: testNullableTabContent('/repo/src/renamed.ts'),
     })
-    expect(uiStore.getState().definitionTarget?.path).toBe('/repo/src/renamed.ts')
+    expect(uiStore.getState().definitionTarget?.target.path).toBe('/repo/src/renamed.ts')
   })
   test.each([false, true])(
     'preserves encoded comparison targets when renaming a file, parked: %s',
@@ -283,25 +288,15 @@ describe('editor workspace state', () => {
           Object.fromEntries(expectedPaths.map((path) => [path, { left: 3, top: 120 }])),
         ),
       })
-      expect(workspaceStore.getState().workbenchPanels.editorTabs.map((tab) => tab.id)).toEqual(
-        panels.editorTabs.map((tab) => tab.id),
-      )
+      expect(
+        allEditorTabs(workspaceStore.getState().workbenchPanels.editorGroups).map((tab) => tab.id),
+      ).toEqual(allEditorTabs(panels.editorGroups).map((tab) => tab.id))
       expect(
         documentStore.getState().getLiveEditorDocument(testDocumentKey('/repo/src/renamed.ts'))
           ?.buffer,
       ).toBe(file.buffer)
     },
   )
-  test('keeps split and pane movement commands inert in the workbench', () => {
-    const panels = workbenchPanelsForPaths(['/repo/src/a.ts'], '/repo/src/a.ts')
-    const { commands, workspaceStore } = editorHarness({ workbenchPanels: panels })
-    const activeTabId = workspaceStore.getState().workbenchPanels.activeEditorTabId
-    expect(activeTabId).toBeTruthy()
-
-    expect(commands.splitTab(activeTabId!, 'horizontal')).toBe(false)
-    expect(commands.moveTabToPane(activeTabId!, 'secondary')).toBe(false)
-    expect(commands.moveTabToSplit(activeTabId!, 'main', 'right')).toBe(false)
-  })
   test('parks the open project on a switch and restores it on the way back', () => {
     const { commands, workspaceStore } = editorHarness({
       editorHistory: testTabContents(['/repo/src/a.ts']),
@@ -333,6 +328,7 @@ describe('editor workspace state', () => {
   test('parks and restores the empty filesystem root with its search tab and scroll', () => {
     const panels = workbenchPanelsForPaths(['src/a.ts', 'search-buffer:'], 'search-buffer:')
     const slice: CachedWorkspaceSlice = {
+      viewScrollPositions: [],
       editorHistory: testTabContents(['search-buffer:', 'src/a.ts']),
       recentlyClosedTabs: testTabContents(['src/closed.ts']),
       reopenScrollPositions: testScrollPositions({ 'search-buffer:': { left: 0, top: 240 } }),
@@ -380,9 +376,12 @@ describe('editor workspace state', () => {
       )
       for (const root of ['/repo', '/second']) {
         const parked = workspaceStore.getState().parkedWorkspaces.get(root)
-        expect(parked?.workbenchPanels.editorTabs.map((tab) => tab.content)).toEqual(
-          testTabContents(paths),
-        )
+        expect(
+          allEditorTabs(
+            (parked ?? expect.unreachable('Expected parked workspace')).workbenchPanels
+              .editorGroups,
+          ).map((tab) => tab.content),
+        ).toEqual(testTabContents(paths))
         expect(parked).toMatchObject({
           editorHistory: testTabContents(paths),
           recentlyClosedTabs: testTabContents(paths),
@@ -407,7 +406,8 @@ describe('editor workspace state', () => {
     const { commands, documentStore, workspaceStore } = editorHarness({
       workbenchPanels: workbenchPanelsForPaths(['/repo/src/a.ts'], '/repo/src/a.ts'),
     })
-    const tabId = workspaceStore.getState().workbenchPanels.activeEditorTabId
+    const tabId =
+      selectedGroupTab(workspaceStore.getState().workbenchPanels.editorGroups)?.id ?? null
     expect(tabId).toBeTruthy()
     documentStore.getState().ensureEditorView(testTabId(tabId!), fileResult('/repo/src/a.ts'))
     commands.switchRootFolder(pickedDirectory('/other'))
@@ -431,24 +431,6 @@ describe('editor workspace state', () => {
     commands.switchRootFolder(pickedDirectory('/repo'))
     expect(searchStore.getState().active).toMatchObject({ query: 'needle', rootPath: '/repo' })
   })
-  test('reorders editor tabs without changing the selected path', () => {
-    const panels = workbenchPanelsForPaths(
-      ['/repo/src/a.ts', '/repo/src/b.ts', '/repo/src/c.ts'],
-      '/repo/src/b.ts',
-    )
-    const { commands, workspaceStore } = editorHarness({ workbenchPanels: panels })
-    const tabId = workspaceStore.getState().workbenchPanels.editorTabs[0]?.id
-    expect(tabId).toBeTruthy()
-
-    expect(commands.reorderTab('main', tabId!, 2)).toBe(true)
-    expect(workspaceStore.getState().selectedTabContent).toEqual(
-      testNullableTabContent('/repo/src/b.ts'),
-    )
-    expect(workspaceStore.getState().workbenchPanels.editorTabs.map((tab) => tab.content)).toEqual(
-      testTabContents(['/repo/src/b.ts', '/repo/src/c.ts', '/repo/src/a.ts']),
-    )
-  })
-
   // A keep set built from the closing workspace's panels alone evicts every other
   // project's clean documents.
   test("closing a tab in one project keeps a parked project's clean documents", () => {
@@ -456,7 +438,8 @@ describe('editor workspace state', () => {
     const { commands, documentStore, workspaceStore } = editorHarness()
 
     commands.openFileSurface(filesystemPath(parkedPath))
-    const parkedTabId = workspaceStore.getState().workbenchPanels.activeEditorTabId!
+    const parkedTabId = (selectedGroupTab(workspaceStore.getState().workbenchPanels.editorGroups)
+      ?.id ?? null)!
     documentStore.getState().ensureEditorView(parkedTabId, fileResult(parkedPath))
 
     commands.switchRootFolder(pickedDirectory('/other'))
@@ -467,10 +450,12 @@ describe('editor workspace state', () => {
     const first = '/other/first.ts'
     const second = '/other/second.ts'
     commands.openFileSurface(filesystemPath(first))
-    const firstTabId = workspaceStore.getState().workbenchPanels.activeEditorTabId!
+    const firstTabId = (selectedGroupTab(workspaceStore.getState().workbenchPanels.editorGroups)
+      ?.id ?? null)!
     documentStore.getState().ensureEditorView(firstTabId, fileResult(first))
     commands.openFileSurface(filesystemPath(second))
-    const secondTabId = workspaceStore.getState().workbenchPanels.activeEditorTabId!
+    const secondTabId = (selectedGroupTab(workspaceStore.getState().workbenchPanels.editorGroups)
+      ?.id ?? null)!
     documentStore.getState().ensureEditorView(secondTabId, fileResult(second))
 
     commands.closeTab(secondTabId)
@@ -493,7 +478,8 @@ describe('editor workspace state', () => {
       const { commands, documentStore, workspaceStore } = editorHarness({}, () => budget)
 
       commands.openFileSurface(filesystemPath(parkedPath))
-      const parkedTabId = workspaceStore.getState().workbenchPanels.activeEditorTabId!
+      const parkedTabId = (selectedGroupTab(workspaceStore.getState().workbenchPanels.editorGroups)
+        ?.id ?? null)!
       documentStore
         .getState()
         .ensureEditorView(parkedTabId, fileResult(parkedPath, 'x'.repeat(1000)))
@@ -545,6 +531,7 @@ function cachedWorkspace(slice: Partial<CachedWorkspaceSlice>): CachedWorkspaceS
         recentlyClosedTabs: testTabContents([]),
         reopenScrollPositions: testScrollPositions({}),
         workbenchPanels: createDefaultWorkbenchPanels(),
+        viewScrollPositions: [],
         ...slice,
       },
     },

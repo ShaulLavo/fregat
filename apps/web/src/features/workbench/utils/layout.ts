@@ -1,3 +1,4 @@
+import { isPercentage as isLayoutSize } from '@workspace/utils/numbers'
 /**
  * Pane geometry is global, not per-project. Restored tabs are state the user put
  * there; a sidebar that changes width because they clicked a session in another
@@ -114,13 +115,6 @@ function normalizeSplitLayout(
     first: normalizedFirst,
     second: 100 - normalizedFirst,
   }
-}
-
-function isLayoutSize(value: number | undefined): value is number {
-  if (typeof value !== 'number') return false
-  if (!Number.isFinite(value)) return false
-
-  return value >= 0 && value <= 100
 }
 
 function outerLayoutsEqual(left: WorkbenchOuterLayout, right: WorkbenchOuterLayout) {

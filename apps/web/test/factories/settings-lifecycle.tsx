@@ -1,3 +1,4 @@
+import { allEditorTabs } from '@/lib/documents/utils/groups'
 import { Button } from '@workspace/ui/components/button'
 import { useDirtyTabCloseRequest } from '@/features/editor/hooks/use-dirty-tab-close'
 import { useEditorCommands } from '@/features/editor/hooks/use-editor-commands'
@@ -6,7 +7,8 @@ import { useEditorWorkspaceState } from '@/features/editor/state/workspace-state
 export function SettingsLifecycle() {
   const close = useDirtyTabCloseRequest()
   const commands = useEditorCommands()
-  const tabs = useEditorWorkspaceState((state) => state.workbenchPanels.editorTabs)
+  const groups = useEditorWorkspaceState((state) => state.workbenchPanels.editorGroups)
+  const tabs = allEditorTabs(groups)
 
   return (
     <div data-workbench=''>

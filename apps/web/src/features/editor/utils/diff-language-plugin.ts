@@ -1,3 +1,4 @@
+import { hasCommandModifier as isNavigationModifier } from '@workspace/utils/keyboard'
 import type {
   EditorPlugin,
   EditorTheme,
@@ -204,6 +205,3 @@ function cursorFor(target: DiffQueryTarget, navigationModifier: boolean): string
 }
 
 /** Cmd on a Mac, Ctrl everywhere else — the same split the editor's own navigation uses. */
-function isNavigationModifier(event: MouseEvent): boolean {
-  return event.metaKey || event.ctrlKey
-}

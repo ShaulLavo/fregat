@@ -1,3 +1,4 @@
+import { maxCheckpointTurnCount } from './checkpoint-turn-count'
 import { asc, eq } from 'drizzle-orm'
 import * as v from 'valibot'
 
@@ -117,16 +118,6 @@ function checkpointRefsForRange(
     fromRef: checkpointRefForTurnCount(context, input.fromTurnCount),
     toRef: checkpointRefForTurnCount(context, input.toTurnCount),
   }
-}
-
-function maxCheckpointTurnCount(checkpoints: readonly ProjectionSessionCheckpointRow[]) {
-  let maxTurnCount = 0
-
-  for (const checkpoint of checkpoints) {
-    maxTurnCount = Math.max(maxTurnCount, checkpoint.checkpointTurnCount)
-  }
-
-  return maxTurnCount
 }
 
 function checkpointRefForTurnCount(context: SessionCheckpointContext, turnCount: number) {

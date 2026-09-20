@@ -1,3 +1,4 @@
+import { captureEditorScrollPositions } from '@/features/editor/state/scroll-persistence'
 import {
   documentKey,
   fileDocument,
@@ -21,11 +22,8 @@ import type {
   TabContent,
   TabId,
 } from '@/lib/documents/utils/types'
-import type {
-  EditorSnapZone,
-  EditorSplitDirection,
-  EditorSplitScope,
-} from '@/features/workspace/utils/tab-model'
+import type { GroupId } from '@/lib/documents/utils/group-types'
+import { groupForTab, selectEditorGroupTab } from '@/lib/documents/utils/groups'
 import { type EditorDocumentStoreApi } from '@/features/editor/state/document-state'
 import {
   editorHistoryForClosedContent,
@@ -49,8 +47,7 @@ import {
   editorOpenContentsForWorkbenchPanels,
   editorContentCountsForWorkbenchPanels,
   openEditorContentInWorkbenchPanels,
-  reorderEditorTabInWorkbenchPanels,
-  selectEditorTabInWorkbenchPanels,
+  editorTabRecordsForWorkbenchPanels,
   activeEditorTabForWorkbenchPanels,
   type WorkbenchPanels,
 } from '@/features/workbench/utils/panels'
@@ -72,13 +69,6 @@ export type EditorApplyActions = {
   closeTab: (tabId: TabId) => void
   discardAndCloseTab: (tabId: TabId) => { wasDirty: boolean }
   discardLiveEditorDocument: (document: DocumentRef) => { wasDirty: boolean }
-  moveTabToPane: (tabId: TabId, paneId: string, targetIndex?: number) => boolean
-  moveTabToSplit: (
-    tabId: TabId,
-    paneId: string,
-    zone: Exclude<EditorSnapZone, 'center'>,
-    scope?: EditorSplitScope,
-  ) => boolean
   openDefinition: (target: LanguageServerDefinitionTarget) => boolean
   openFileSurface: (path: FilesystemPath) => void
   openTabContent: (content: TabContent) => void
@@ -87,12 +77,9 @@ export type EditorApplyActions = {
   openSettingsEditor: () => void
   reopenClosedEditor: () => boolean
   renameLiveEditorDocument: (from: FilesystemPath, to: FilesystemPath) => { wasDirty: boolean }
-  reorderTab: (paneId: string, tabId: TabId, targetIndex: number) => boolean
   selectFile: (path: FilesystemPath | null) => void
   selectPreviousEditor: () => boolean
-  selectTab: (paneId: string, tabId: TabId) => void
-  setActivePane: (paneId: string) => void
-  splitTab: (tabId: TabId, direction: EditorSplitDirection) => boolean
+  selectTab: (selection: { groupId: GroupId; tabId: TabId }) => void
   /** Parks the open project and restores the target's tabs, history and search results. */
   switchRootFolder: (rootFolder: PickedFsEntry) => void
 }
@@ -120,6 +107,7 @@ export function createEditorApplyActions({
 }): EditorApplyActions {
   return {
     clearRootFolder: () => {
+      captureEditorScrollPositions(workspaceStore, documentStore)
       uiStore.getState().resetEditorUiState()
       activation.setRoot(null)
       workspaceStore.getState().clearRootFolder()
@@ -133,8 +121,6 @@ export function createEditorApplyActions({
       }),
     discardLiveEditorDocument: (document) =>
       discardLiveEditorDocument(document, workspaceStore, documentStore, uiStore, activation),
-    moveTabToPane: () => false,
-    moveTabToSplit: () => false,
     openDefinition: (target) => openDefinition(target, workspaceStore, uiStore, activation),
     openFileSurface: (path) =>
       openTabContentSurface(
@@ -154,12 +140,9 @@ export function createEditorApplyActions({
     reopenClosedEditor: () => reopenClosedEditor(workspaceStore, activation),
     renameLiveEditorDocument: (from, to) =>
       renameLiveEditorDocument(from, to, workspaceStore, documentStore, uiStore, activation),
-    reorderTab: (_paneId, tabId, targetIndex) => reorderTab(tabId, targetIndex, workspaceStore),
     selectFile: (path) => selectFile(path, workspaceStore, activation),
     selectPreviousEditor: () => selectPreviousEditor(workspaceStore, activation),
-    selectTab: (_paneId, tabId) => selectTab(tabId, workspaceStore, activation),
-    setActivePane: () => undefined,
-    splitTab: () => false,
+    selectTab: ({ groupId, tabId }) => selectTab(groupId, tabId, workspaceStore, activation),
     switchRootFolder: (rootFolder) =>
       switchRootFolder(rootFolder, {
         activation,
@@ -228,14 +211,14 @@ function logSelectTabTransition({
     action: 'editor.command.select_file',
     area: 'editor',
     existingTabId: existingTab?.id ?? null,
-    nextActiveTabId: workbenchPanels.activeEditorTabId,
+    nextActiveTabId: activeEditorTabForWorkbenchPanels(workbenchPanels)?.id ?? null,
     nextOpenTabContents: nextSelection.openTabContents,
     nextSelectedTabContent: nextSelection.selectedTabContent,
-    previousActiveTabId: workspace.workbenchPanels.activeEditorTabId,
+    previousActiveTabId: activeEditorTabForWorkbenchPanels(workspace.workbenchPanels)?.id ?? null,
     previousOpenTabContents: workspace.openTabContents,
     previousSelectedTabContent: workspace.selectedTabContent,
     requestedContent,
-    requestedTabActive: requestedTab?.id === workbenchPanels.activeEditorTabId,
+    requestedTabActive: requestedTab?.id === activeEditorTabForWorkbenchPanels(workbenchPanels)?.id,
     requestedTabId: requestedTab?.id ?? null,
   })
 }
@@ -251,8 +234,10 @@ function openDefinition(
     workspaceStore,
     activation,
   )
+  const tab = activeEditorTabForWorkbenchPanels(workspaceStore.getState().workbenchPanels)
+  if (!tab) return false
   uiStore.setState({
-    definitionTarget,
+    definitionTarget: { tabId: tab.id, target: definitionTarget },
     statusBarSource: null,
   })
 
@@ -283,8 +268,9 @@ function switchRootFolder(
 
   uiStore.getState().resetEditorUiState()
   activation.setRoot(rootFolder.path)
-  activateRestoredWorkspace(rootFolder.path, workspaceStore.getState(), activation)
+  captureEditorScrollPositions(workspaceStore, documentStore)
   workspaceStore.getState().switchWorkspace(rootFolder)
+  activateWorkbenchSelection(workspaceStore.getState().workbenchPanels, activation)
   searchStore.getState().switchWorkspace(rootFolder.path)
   const workspace = workspaceStore.getState()
   const documentSizes = documentStore.getState().editorDocumentSizes()
@@ -301,6 +287,7 @@ function switchRootFolder(
       ),
     )
 
+  retainTabPresentation(workspace, workspace.workbenchPanels, documentStore, uiStore, byteBudget)
   log.info({
     action: 'workspace.root_switched',
     area: 'workspace',
@@ -311,7 +298,7 @@ function switchRootFolder(
     parkedCount: workspace.parkedWorkspaces.size,
     path: rootFolder.path,
     previousPath: previousRootPath,
-    restoredTabCount: workspace.workbenchPanels.editorTabs.length,
+    restoredTabCount: editorTabRecordsForWorkbenchPanels(workspace.workbenchPanels).length,
     // Read after the trim: `documentSizes` is the pre-eviction snapshot.
     retainedDocumentSize: totalRetainedSize(documentStore.getState().editorDocumentSizes()),
   })
@@ -352,6 +339,24 @@ function editorRetention(
   })
 }
 
+function retainTabPresentation(
+  workspace: EditorWorkspaceStore,
+  panels: WorkbenchPanels,
+  documentStore: EditorDocumentStoreApi,
+  uiStore: EditorUiStoreApi,
+  byteBudget: number,
+) {
+  const documents = documentStore.getState()
+  const retained = editorRetention(
+    workspace,
+    panels,
+    documents.editorDocumentSizes(),
+    byteBudget,
+    documents.unevictableEditorDocumentKeys(),
+  )
+  uiStore.getState().retainTabPresentation(retained.tabIds)
+}
+
 function retainedSlice(
   rootPath: FilesystemPath | null,
   panels: WorkbenchPanels,
@@ -363,7 +368,7 @@ function retainedSlice(
       .map(documentKey),
     lastActiveAt,
     rootPath,
-    tabIds: panels.editorTabs.map((tab) => tab.id),
+    tabIds: editorTabRecordsForWorkbenchPanels(panels).map((tab) => tab.id),
   }
 }
 
@@ -376,6 +381,7 @@ function closeTab(
   retainedTextBudget: () => number,
   options: { discard?: boolean } = {},
 ) {
+  captureEditorScrollPositions(workspaceStore, documentStore)
   const workspace = workspaceStore.getState()
   const tab = editorTabForId(workspace.workbenchPanels, tabId)
   if (!tab) return { wasDirty: false }
@@ -424,10 +430,12 @@ function closeTab(
       })
     }
   }
+  retainTabPresentation(workspace, nextPanels, documentStore, uiStore, retainedTextBudget())
   updateUiForClosedContent(content, nextSelection.selectedTabContent, remainingCount, uiStore)
   activateWorkbenchSelection(nextPanels, activation)
   workspaceStore.setState({
     ...nextSelection,
+    viewScrollPositions: workspace.viewScrollPositions.filter((entry) => entry.tabId !== tabId),
     editorHistory:
       remainingCount === 0
         ? editorHistoryForClosedContent(workspace.editorHistory, content)
@@ -521,28 +529,16 @@ function updateWorkspaceDocuments(
   return { ...updateWorkspaceDocument(workspace, change), parkedWorkspaces }
 }
 
-function reorderTab(tabId: TabId, targetIndex: number, workspaceStore: EditorWorkspaceStoreApi) {
-  const workspace = workspaceStore.getState()
-  const workbenchPanels = reorderEditorTabInWorkbenchPanels(
-    workspace.workbenchPanels,
-    tabId,
-    targetIndex,
-  )
-  if (workbenchPanels === workspace.workbenchPanels) return false
-
-  workspaceStore.setState(
-    editorWorkspaceSelectionForWorkbenchPanelsForState(workspace, workbenchPanels),
-  )
-  return true
-}
-
 function selectTab(
+  groupId: GroupId,
   tabId: TabId,
   workspaceStore: EditorWorkspaceStoreApi,
   activation: EditorActivation,
 ) {
   const workspace = workspaceStore.getState()
-  const workbenchPanels = selectEditorTabInWorkbenchPanels(workspace.workbenchPanels, tabId)
+  if (groupForTab(workspace.workbenchPanels.editorGroups, tabId)?.id !== groupId) return
+  const editorGroups = selectEditorGroupTab(workspace.workbenchPanels.editorGroups, groupId, tabId)
+  const workbenchPanels = { ...workspace.workbenchPanels, editorGroups }
   if (workbenchPanels === workspace.workbenchPanels) return
 
   const nextSelection = editorWorkspaceSelectionForWorkbenchPanelsForState(
@@ -568,11 +564,15 @@ function editorWorkspaceSelectionForWorkbenchPanelsForState(
 }
 
 function editorTabForId(panels: WorkbenchPanels, tabId: TabId) {
-  return panels.editorTabs.find((tab) => tab.id === tabId) ?? null
+  return editorTabRecordsForWorkbenchPanels(panels).find((tab) => tab.id === tabId) ?? null
 }
 
 function editorTabForContent(panels: WorkbenchPanels, content: TabContent) {
-  return panels.editorTabs.find((tab) => sameTabContent(tab.content, content)) ?? null
+  return (
+    editorTabRecordsForWorkbenchPanels(panels).find((tab) =>
+      sameTabContent(tab.content, content),
+    ) ?? null
+  )
 }
 
 export function createEditorActivation(
@@ -607,22 +607,14 @@ export function createEditorActivation(
   }
 }
 
-function activateWorkbenchSelection(panels: WorkbenchPanels, activation: EditorActivation): void {
+export function activateWorkbenchSelection(
+  panels: WorkbenchPanels,
+  activation: EditorActivation,
+): void {
   const tab = activeEditorTabForWorkbenchPanels(panels)
   if (!tab) return
 
   activation.activate(tab.content, tab.id)
-}
-
-function activateRestoredWorkspace(
-  rootPath: string,
-  workspace: EditorWorkspaceStore,
-  activation: EditorActivation,
-): void {
-  const restored = workspace.parkedWorkspaces.get(rootPath)
-  if (!restored) return
-
-  activateWorkbenchSelection(restored.workbenchPanels, activation)
 }
 
 function updateUiForClosedContent(

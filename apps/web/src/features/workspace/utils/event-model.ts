@@ -187,7 +187,8 @@ export function mayTrustCachedSnapshot(
   refresh: WorkspaceOpenFileRefresh,
   cachedVersion: string | undefined,
 ): boolean {
-  if (refresh.reason === 'ready') return true
+  // The disk may have changed between the initial read and watch registration.
+  if (refresh.reason === 'ready') return false
   if (refresh.version === undefined) return false
   return cachedVersion === refresh.version
 }

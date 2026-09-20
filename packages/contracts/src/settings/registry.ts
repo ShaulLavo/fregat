@@ -1,6 +1,6 @@
 import type { WallpaperSelection } from '../themes/wallpaper'
 import * as v from 'valibot'
-import { isRecord } from '../is-record'
+import { isRecord } from '@workspace/utils/objects'
 import type { ModelRef, ProviderInstanceConfig } from '../settings'
 import type { MachineDefinition } from '../machines'
 

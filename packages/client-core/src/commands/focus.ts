@@ -17,11 +17,18 @@ export type FocusTargetId =
   | { readonly kind: 'app-shell' }
   | { readonly kind: 'chat-composer'; readonly key: string }
   | { readonly kind: 'command-palette' }
+  | { readonly kind: 'editor-group-dialog' }
   | {
       readonly kind: 'editor'
       readonly key: string
       readonly side?: 'new' | 'old' | 'stacked'
-      readonly surface: 'diff' | 'document' | 'search-result' | 'settings'
+      readonly surface:
+        | 'diff'
+        | 'document'
+        | 'search-result'
+        | 'settings'
+        | 'history'
+        | 'placeholder'
       readonly tabId?: string
     }
   | { readonly kind: 'file-tree'; readonly rootPath: string }

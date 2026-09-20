@@ -1,3 +1,4 @@
+import { allEditorTabs } from '@/lib/documents/utils/groups'
 import { documentKey, settingsJsonDocument } from '@/lib/documents/utils/identity'
 import { act, fireEvent, screen, waitFor } from '@testing-library/react'
 import { afterEach, onTestFinished, vi } from 'vitest'
@@ -11,7 +12,6 @@ import { SettingsSyncService } from '@/features/settings/state/sync-service'
 import { selectSettingsScope } from '@/features/settings/state/scope-store'
 import { selectSettingsView } from '@/features/settings/state/view-store'
 import { fetchSettings, saveSettingsText } from '@/features/settings/utils/api'
-import { createEditorTabRecord, settingsTab } from '@/lib/documents/utils/tabs'
 import { FocusService } from '@/lib/focus/state/service'
 import { statPath } from '@/lib/file-server'
 import type { Client } from '@/lib/client'
@@ -138,32 +138,6 @@ for (const choice of ['Save', 'Discard', 'Cancel'] as const) {
     expect(settingsLayerFile(saved, 'workspace').text).toBe(WORKSPACE_TEXT)
   })
 }
-
-test('duplicate settings tabs share both members and only their final close saves each once', async ({
-  server,
-}) => {
-  const lifecycle = await mountLifecycle(server)
-  seedBothScopes(lifecycle)
-  const firstTabId = settingsTabId(lifecycle)
-  act(() => {
-    const state = lifecycle.editor.workspaceStore.getState()
-    const duplicate = createEditorTabRecord(settingsTab())
-    state.setWorkbenchPanels({
-      ...state.workbenchPanels,
-      editorTabs: [...state.workbenchPanels.editorTabs, duplicate],
-    })
-  })
-  fireEvent.click(screen.getByRole('button', { name: `Close ${firstTabId}`, exact: true }))
-  await waitFor(() => expect(screen.getByLabelText('Settings tab count')).toHaveTextContent('1'))
-  expect(screen.queryByRole('dialog')).toBeNull()
-  expectSettings(lifecycle, 'user', USER_TEXT, true)
-  expectSettings(lifecycle, 'workspace', WORKSPACE_TEXT, true)
-  expect(lifecycle.rawWrites).toEqual([])
-  fireEvent.click(screen.getByRole('button', { name: 'Close all settings' }))
-  fireEvent.click(await screen.findByRole('button', { name: 'Save', exact: true }))
-  await waitFor(() => expect(screen.getByLabelText('Settings tab count')).toHaveTextContent('0'))
-  expect(lifecycle.rawWrites.map((write) => write.target)).toEqual(['user', 'workspace'])
-})
 
 for (const conflict of ['already conflicted', 'newly stale'] as const) {
   test(`${conflict} user scope rejects save-close while workspace saves, then resolves and closes`, async ({
@@ -326,7 +300,9 @@ function expectSettings(
 }
 
 function settingsTabId(lifecycle: Lifecycle) {
-  const tab = lifecycle.editor.workspaceStore.getState().workbenchPanels.editorTabs[0]
+  const tab = allEditorTabs(
+    lifecycle.editor.workspaceStore.getState().workbenchPanels.editorGroups,
+  )[0]
   expect(tab).toBeDefined()
   return tab!.id
 }

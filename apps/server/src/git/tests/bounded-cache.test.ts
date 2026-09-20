@@ -98,3 +98,21 @@ function manualClock() {
     now: () => current,
   }
 }
+
+it('starts the git TTL after loading and leaves an in-flight value available', async () => {
+  const clock = manualClock()
+  const cache = new BoundedTtlCache<string>({ capacity: 2, ttlMs: 10, now: clock.now })
+  const pending = Promise.withResolvers<string>()
+  const loaded = cache.load('pending', () => pending.promise)
+
+  clock.advance(100)
+  expect(cache.size).toBe(1)
+  expect(cache.read('pending')).toBe(pending.promise)
+  pending.resolve('ready')
+  await loaded
+
+  clock.advance(9)
+  expect(await cache.read('pending')).toBe('ready')
+  clock.advance(1)
+  expect(cache.read('pending')).toBeUndefined()
+})

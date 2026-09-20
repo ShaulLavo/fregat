@@ -1,3 +1,4 @@
+import { isRecord } from '@workspace/utils/objects'
 import { createRequestLogger, type RequestLogger } from 'evlog'
 
 import { sanitizeRecord } from './sanitize'
@@ -131,8 +132,4 @@ function numberAtPath(context: Record<string, unknown> | undefined, path: string
   }
 
   return typeof current === 'number' && Number.isFinite(current) ? current : 0
-}
-
-function isRecord(value: unknown): value is Record<string, unknown> {
-  return typeof value === 'object' && value !== null && !Array.isArray(value)
 }

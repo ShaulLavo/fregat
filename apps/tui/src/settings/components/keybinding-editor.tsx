@@ -9,7 +9,7 @@ import { commandShortcut, effectiveTerminalBindings } from '@/commands/utils/bin
 import { Dialog } from '@/components/dialog'
 import { Prompt } from '@/components/prompt'
 import { Select } from '@/components/select'
-import { Spinner } from '@/components/spinner'
+import { SaveFeedback } from '@/settings/components/save-feedback'
 import {
   matchingCommands,
   recordedKeysLabel,
@@ -245,13 +245,7 @@ export function KeybindingEditor({
           }}
         />
       )}
-      {failure && <text fg={theme.destructive}>{failure}</text>}
-      {pending && (
-        <box flexDirection='row' gap={1}>
-          <Spinner theme={theme} />
-          <text fg={theme.mutedForeground}>Saving shortcut…</text>
-        </box>
-      )}
+      <SaveFeedback failure={failure} pending={pending} theme={theme} label='Saving shortcut…' />
     </Dialog>
   )
 }

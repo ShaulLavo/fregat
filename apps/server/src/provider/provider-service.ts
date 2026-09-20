@@ -1,3 +1,4 @@
+import { elapsedMs } from '@workspace/utils/timing'
 import path from 'node:path'
 import { tmpdir } from 'node:os'
 import type { AgentTerminalProcess } from '../terminal/agent-launch'
@@ -1154,8 +1155,4 @@ function textGenerationResult(task: ProviderTextGenerationTask): ProviderTextGen
   }
 
   return { text: outcome.text }
-}
-
-function elapsedMs(startedAt: number) {
-  return Math.round((performance.now() - startedAt) * 100) / 100
 }

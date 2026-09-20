@@ -4,11 +4,7 @@ import {
   type ScopedProjectRef,
   type ScopedWorktreeRef,
 } from '@workspace/contracts'
-import {
-  selectCurrentWorktree,
-  selectChatSessionsForProject,
-  selectWorktreeAtPath,
-} from '@workspace/client-core/chat/selectors'
+import { selectCurrentWorktree, selectWorktreeAtPath } from '@workspace/client-core/chat/selectors'
 import { activeChatProjection } from '@/features/chat/state/active-projection'
 import {
   useChatProjectionStore,
@@ -22,9 +18,8 @@ import { useSessionSearchStore } from '@/features/chat-mode/state/session-search
 import { useSessionSelectionStore } from '@/features/chat-mode/state/session-selection-store'
 import { currentRailEnvironments } from '@/features/chat-mode/state/rail-environments'
 import type { SessionClickIntent } from '@workspace/client-core/chat/rail/multi-select'
-import { activeSession } from '@/features/chat-mode/utils/active-session'
+import { activeProjectSession } from '@/features/chat-mode/utils/active-session'
 import { activeWorktree } from '@/features/chat-mode/utils/active-worktree'
-import { compareSessionsForRail } from '@workspace/client-core/chat/rail/session-order'
 import { sessionRailModel, type SessionRailItem } from '@workspace/client-core/chat/rail/model'
 import { useActiveProjectStore } from '@/features/workspace/state/active-project'
 import { activeEnvironmentId } from '@/lib/environments/state/domain'
@@ -72,16 +67,12 @@ export function startScopedSessionDraft() {
   const environmentId = activeEnvironmentId()
   const { selection, restored, draftWorktreeId } = useSessionSelectionStore.getState()
   const slice = selectChatProjectionSlice(useChatProjectionStore.getState(), environmentId)
-  const sessions = selectChatSessionsForProject(slice, projectId).toSorted(compareSessionsForRail)
-  const resolved = activeSession({
+  const resolved = activeProjectSession({
+    slice,
     environmentId,
     projectId,
     selection,
     restored,
-    sessionIds: sessions.filter((session) => !session.archivedAt).map((session) => session.id),
-    archivedSessionIds: sessions
-      .filter((session) => session.archivedAt)
-      .map((session) => session.id),
   })
   const selected = resolved.sessionId ? slice.sessionById[resolved.sessionId] : null
   const worktree = activeWorktree({

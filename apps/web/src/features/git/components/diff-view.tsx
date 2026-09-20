@@ -1,10 +1,11 @@
 import { filesystemPath } from '@/lib/documents/utils/identity'
 import { languageIdForFilePath } from '@/features/editor/utils/file-path'
-import { createDiffRegionStore } from '@singapore-editor/diff'
-import { useMemo, useRef, useState } from 'react'
+import { useMemo, useRef } from 'react'
 
 import { DiffEditor } from '@/features/editor/components/diff-editor'
+import { EditorTabPlaceholder } from '@/features/editor/components/tab-placeholder'
 import { useDiffLanguageContext } from '@/features/editor/hooks/use-diff-language-context'
+import { useTabPresentation } from '@/features/editor/hooks/use-tab-presentation'
 import type { DiffLanguageHost } from '@/features/editor/utils/diff-language-context'
 import type { FilesystemPath, GitComparison, TabId } from '@/lib/documents/utils/types'
 import { useDiffDocumentDiffs } from '../hooks/use-diff-document-diffs'
@@ -43,7 +44,7 @@ export function DiffView({
   // One store, read by both split panes and by the comment layer. The layer does
   // not keep a copy of which regions are open — the mirror it used to keep was
   // keyed by hunk ordinal, which a trailing-tail region does not have.
-  const [regions] = useState(createDiffRegionStore)
+  const { regions } = useTabPresentation(tabId)
   // Stable identity is required: this is pushed into the plugin, and a fresh
   // array each render would re-project the diff and throw away scroll position.
   const files = useMemo(() => editorDiffFiles(diffs, languageIdForFilePath), [diffs])
@@ -71,12 +72,25 @@ export function DiffView({
     languageHost,
   )
 
-  if (failure) return <DiffNotice message={failure} tone='error' />
+  if (failure)
+    return (
+      <EditorTabPlaceholder tabId={tabId}>
+        <DiffNotice message={failure} tone='error' />
+      </EditorTabPlaceholder>
+    )
   if (!pending && diffs.length === 0) {
-    return <DiffNotice message={emptyDiffNotice(comparison, rootPath)} />
+    return (
+      <EditorTabPlaceholder tabId={tabId}>
+        <DiffNotice message={emptyDiffNotice(comparison, rootPath)} />
+      </EditorTabPlaceholder>
+    )
   }
   if (!pending && !file) {
-    return <DiffNotice message={unrenderableDiffNotice(diffs, comparison, rootPath)} />
+    return (
+      <EditorTabPlaceholder tabId={tabId}>
+        <DiffNotice message={unrenderableDiffNotice(diffs, comparison, rootPath)} />
+      </EditorTabPlaceholder>
+    )
   }
 
   const unchanged = file ? unchangedFileNotice(file, rootPath) : null

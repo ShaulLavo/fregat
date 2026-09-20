@@ -1,4 +1,18 @@
+import { settingsFontInput } from './settings-font-input'
+import { terminalBackground } from './terminal-background'
+import { chatFollowUp } from './chat-follow-up'
+import { editorSplitDrag } from './editor-split-drag'
+import { editorSplitActions } from './editor-split-actions'
+import { editorSplitContent } from './editor-split-content'
+import { editorSplitState } from './editor-split-state'
+import { editorSplitFolds } from './editor-split-folds'
+import { editorSplitBlur } from './editor-split-blur'
+import { editorSplitOrder } from './editor-split-order'
+import { editorSplitTargets } from './editor-split-targets'
+import { editorSplitBreadcrumbs } from './editor-split-breadcrumbs'
+import { editorSplitHistoryState } from './editor-split-history-state'
 import { pageLifecycle } from './page-lifecycle'
+import { editorExternalEdit } from './editor-external-edit'
 import { editorThemePreview } from './editor-theme-preview'
 import { themeBundles } from './theme-bundles'
 import { themeGallery } from './theme-gallery'
@@ -49,6 +63,19 @@ import { demoThemeStartup } from './demo-theme-startup'
 import { demoWallpaperStartup } from './demo-wallpaper-startup'
 
 export const scenarios: readonly Scenario[] = [
+  chatFollowUp,
+  editorSplitDrag,
+  editorSplitActions,
+  editorSplitContent,
+  editorSplitState,
+  editorSplitFolds,
+  editorSplitBlur,
+  editorSplitOrder,
+  editorSplitTargets,
+  editorSplitBreadcrumbs,
+  editorSplitHistoryState,
+  editorExternalEdit,
+  terminalBackground,
   editorThemePreview,
   themeGallery,
   pageLifecycle,
@@ -66,6 +93,7 @@ export const scenarios: readonly Scenario[] = [
   wallpaperLibrary,
   wallpaperPalette,
   settingsDefaults,
+  settingsFontInput,
   demoWorkspace,
   demoAgentGit,
   demoReset,

@@ -14,7 +14,8 @@ import type { OrchestrationEngine } from './engine'
 import type { OrchestrationCheckpointDiffQuery } from './checkpoint-diff-query'
 import type { OrchestrationSessionSearchQuery } from './session-search-query'
 import { observeRequestOperation } from '../observability'
-import { chatOperationContext, orchestrationReplaySummary } from './orchestration-logging'
+import { chatOperationContext } from './orchestration-logging'
+import { orchestrationReplaySummary } from '@workspace/contracts'
 
 const sessionDetailQuerySchema = v.object({
   sessionId: sessionIdSchema,

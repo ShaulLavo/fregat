@@ -1,7 +1,7 @@
+import { errorSummary as serializeOrchestrationRpcError } from '@workspace/contracts'
+import { adaptWebSocket } from '../utils/websocket'
+import { elapsedMs } from '@workspace/utils/timing'
 import {
-  errorNumberField,
-  errorStringField,
-  isRecord,
   ORCHESTRATION_REPLAY_MAX_EVENTS,
   ORCHESTRATION_RESUME_MAX_GAP,
   ORCHESTRATION_WS_PROTOCOL_VERSION,
@@ -25,10 +25,10 @@ import { authenticateWebSocketData, type AuthConfig } from '../auth'
 import type { EnvironmentIdentity } from '../db/environment-identity'
 import {
   orchestrationCommandSummary,
-  orchestrationReplaySummary,
   recordChatPipelineInfo,
   recordChatPipelineWarning,
 } from './orchestration-logging'
+import { orchestrationReplaySummary } from '@workspace/contracts'
 import type { OrchestrationEngine } from './engine'
 
 /**
@@ -89,7 +89,7 @@ export function orchestrationWsRoutes(
   return new Elysia({ name: 'orchestration-ws-rpc' }).ws('/orchestration/rpc', {
     body: orchestrationWsClientMessageSchema,
     open(ws) {
-      const socket = orchestrationRpcWebSocket(ws)
+      const socket = adaptWebSocket(ws)
       if (!socket) return
 
       const authError = authenticateWebSocketData(socket.data, auth)
@@ -115,7 +115,7 @@ export function orchestrationWsRoutes(
       })
     },
     message(ws, message) {
-      const socket = orchestrationRpcWebSocket(ws)
+      const socket = adaptWebSocket(ws)
       if (!socket) return
 
       const state = states.get(socket.key)
@@ -124,7 +124,7 @@ export function orchestrationWsRoutes(
       handleOrchestrationRpcMessage(engine, socket, state, message, config)
     },
     close(ws) {
-      const socket = orchestrationRpcWebSocket(ws)
+      const socket = adaptWebSocket(ws)
       if (!socket) return
 
       const state = states.get(socket.key)
@@ -444,43 +444,4 @@ function orchestrationRpcSubscribeSummary(message: OrchestrationWsSubscribe) {
     method: message.method,
     subscriptionId: message.subscriptionId,
   }
-}
-
-function serializeOrchestrationRpcError(error: unknown) {
-  if (error instanceof Error) {
-    return {
-      code: errorStringField(error, 'code'),
-      message: error.message,
-      name: error.name,
-      status: errorNumberField(error, 'statusCode') ?? errorNumberField(error, 'status'),
-    }
-  }
-
-  return {
-    message: String(error),
-    name: typeof error,
-  }
-}
-
-function orchestrationRpcWebSocket(value: unknown): OrchestrationRpcWebSocket | null {
-  if (!isRecord(value)) return null
-  if (typeof value.send !== 'function') return null
-
-  const close = value.close
-  const send = value.send
-  return {
-    close: (code, reason) =>
-      typeof close === 'function' ? close.call(value, code, reason) : undefined,
-    data: value.data,
-    key: websocketKey(value),
-    send: (message) => send.call(value, message),
-  }
-}
-
-function websocketKey(value: Record<string, unknown>): object {
-  return isRecord(value.raw) ? value.raw : value
-}
-
-function elapsedMs(startedAt: number) {
-  return Math.round((performance.now() - startedAt) * 100) / 100
 }

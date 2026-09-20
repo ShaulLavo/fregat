@@ -1,4 +1,5 @@
-import { isRecord, orchestrationWsClientMessageSchema } from '@workspace/contracts'
+import { orchestrationWsClientMessageSchema } from '@workspace/contracts'
+import { isRecord } from '@workspace/utils/objects'
 import type { createApp } from 'server/testing'
 import * as v from 'valibot'
 import { createClientError } from '../src/errors'

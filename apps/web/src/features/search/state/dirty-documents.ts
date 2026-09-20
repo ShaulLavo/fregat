@@ -1,3 +1,4 @@
+import { matchesWorkspaceRoot as isPathInWorkspace } from '@/lib/path-formatters'
 import type { DocumentKey } from '@/lib/documents/utils/types'
 import type { LiveEditorDocument } from '@/features/editor/state/document-state'
 import type { OpenBufferSearchDocument } from '@/features/search/utils/providers'
@@ -66,11 +67,4 @@ function liveDocumentSnapshotRevision(document: LiveEditorDocument) {
   if (document.sync.kind === 'file') return document.sync.mtimeMs.toString()
 
   return document.localRevision.toString()
-}
-
-function isPathInWorkspace(path: string, rootPath: string) {
-  if (!rootPath) return true
-  if (path === rootPath) return true
-
-  return path.startsWith(`${rootPath}/`)
 }

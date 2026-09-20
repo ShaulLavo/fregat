@@ -1,3 +1,4 @@
+import { settleAnimations } from './browser-animations.mjs'
 import { createHash } from 'node:crypto'
 import { mkdirSync, writeFileSync } from 'node:fs'
 import { join } from 'node:path'
@@ -360,21 +361,6 @@ async function restoreSidebar(page, original) {
   if (!box) return
   const current = (await geometry(page.locator('#sidebar-handle'), true)).x
   await resizeSettingsPane(page, original - current)
-}
-
-async function settleAnimations(page) {
-  await page.evaluate(async () => {
-    await new Promise((resolve) => requestAnimationFrame(() => requestAnimationFrame(resolve)))
-    const animations = document
-      .getAnimations()
-      .filter(
-        (animation) =>
-          animation.playState === 'running' &&
-          Number.isFinite(animation.effect?.getComputedTiming().endTime),
-      )
-    await Promise.all(animations.map((animation) => animation.finished.catch(() => {})))
-    await new Promise((resolve) => requestAnimationFrame(resolve))
-  })
 }
 
 async function geometry(locator, documentCoordinates = false) {

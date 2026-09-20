@@ -1,3 +1,16 @@
+import {
+  groupLeaf,
+  groupTree,
+  groupBranch,
+  groupTab,
+} from '../../../../test/factories/editor-groups'
+import {
+  activeEditorGroup,
+  allEditorGroups,
+  allEditorTabs,
+  groupById,
+} from '@/lib/documents/utils/groups'
+import { editorTabRecordsForWorkbenchPanels } from '@/features/workbench/utils/panels'
 import { filesystemPath, tabId as testTabId } from '@/lib/documents/utils/identity'
 import { testDocumentKey, testTabContents } from '../../../../test/factories/document-targets'
 import { mkdir } from 'node:fs/promises'
@@ -33,7 +46,9 @@ test('boot adds tabs while explicit navigation orders addressed tabs and retains
     })
   expect((await apply('/f/a.ts?tabs=@~f/b.ts~f/c.ts', 'boot')).status).toBe('applied')
   commands.openFileSurface(filesystemPath('repo/dirty.ts'))
-  const dirtyTab = editor.workspaceStore.getState().workbenchPanels.editorTabs.at(-1)
+  const dirtyTab = editorTabRecordsForWorkbenchPanels(
+    editor.workspaceStore.getState().workbenchPanels,
+  ).at(-1)
   if (!dirtyTab) return expect.unreachable('dirty tab was not opened')
   editor.documentStore.getState().ensureEditorView(testTabId(dirtyTab.id), {
     content: 'unsaved',
@@ -212,4 +227,53 @@ test('superseding a root lookup prevents it from opening its workspace', async (
   expect((await pending).status).toBe('superseded')
   expect(editor.workspaceStore.getState().rootFolder).toBeNull()
   expect(editor.workspaceStore.getState().openTabContents).toEqual(testTabContents([]))
+})
+
+test('incoming addresses preserve duplicate views and clear only the active selection', async ({
+  client,
+  server,
+}) => {
+  await mkdir(path.join(server.root, 'repo'))
+  const workspace = await registerTestWorkspaceAddress(client, 'repo')
+  const { application, editor } = await createAddressTestRuntime(client)
+  const href = `/~${workspaceToken(workspace)}/workbench`
+  const apply = (suffix: string, reason: 'boot' | 'navigate' | 'traverse') =>
+    applyAddressView({
+      application,
+      address: parseAddressIntent(href + suffix),
+      reason,
+      isCurrent: () => true,
+    })
+  await apply('/f/a.ts', 'boot')
+  const leftTab = groupTab('left-a', 'repo/a.ts')
+  const rightTab = groupTab('right-a', 'repo/a.ts')
+  const other = groupTab('right-b', 'repo/b.ts')
+  const left = groupLeaf('left', [leftTab])
+  const right = groupLeaf('right', [rightTab, other])
+  const state = editor.workspaceStore.getState()
+  state.setWorkbenchPanels({
+    ...state.workbenchPanels,
+    editorGroups: groupTree(
+      groupBranch('root', 'horizontal', [
+        { node: left, size: 40 },
+        { node: right, size: 60 },
+      ]),
+      'right',
+    ),
+  })
+  await apply('/f/a.ts?tabs=f/b.ts~@', 'navigate')
+  let groups = editor.workspaceStore.getState().workbenchPanels.editorGroups
+  expect(allEditorGroups(groups)).toHaveLength(2)
+  expect(groupById(groups, left.id)?.tabs.map((tab) => tab.id)).toEqual([leftTab.id])
+  expect(activeEditorGroup(groups).tabs.map((tab) => tab.id)).toEqual([other.id, rightTab.id])
+  expect(activeEditorGroup(groups).selectedTabId).toBe(rightTab.id)
+  await apply('?tabs=f/a.ts~f/b.ts', 'navigate')
+  groups = editor.workspaceStore.getState().workbenchPanels.editorGroups
+  expect(activeEditorGroup(groups).selectedTabId).toBeNull()
+  expect(groupById(groups, left.id)?.selectedTabId).toBe(leftTab.id)
+  expect(editor.workspaceStore.getState().selectedTabContent).toBeNull()
+  await apply('/f/a.ts', 'traverse')
+  groups = editor.workspaceStore.getState().workbenchPanels.editorGroups
+  expect(activeEditorGroup(groups).selectedTabId).toBe(rightTab.id)
+  expect(allEditorTabs(groups)).toHaveLength(3)
 })

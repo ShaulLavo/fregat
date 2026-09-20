@@ -15,6 +15,8 @@ import {
   type WorkbenchPanels,
 } from '@/features/workbench/utils/panels'
 import type { CachedWorkspaceState } from '@/features/workspace/state/cache'
+import { activeEditorGroup, allEditorTabs } from '@/lib/documents/utils/groups'
+import { sameTabContent } from '@/lib/documents/utils/tabs'
 
 /**
  * The address, folded into the cache before the stores are built.
@@ -95,19 +97,31 @@ export function panelsForAddress(
   const active = activeEditorTabForWorkbenchPanels(panels)
   const withPanes = withBottomTab(withSidebarTab(panels, address), address)
   const withTabs = (applicableTabs(address.tabs) ?? []).reduce(
-    (next, token) => withDocumentToken(next, rootPath, token),
+    (next, token) => withDocumentToken(next, rootPath, token, 'preserve'),
     withPanes,
   )
   const selected = editorDocumentToken(address)
-  if (selected) return withDocumentToken(withTabs, rootPath, selected)
+  if (selected) return withDocumentToken(withTabs, rootPath, selected, 'select')
   if (active) return selectEditorTabInWorkbenchPanels(withTabs, active.id)
 
   return withTabs
 }
 
-function withDocumentToken(panels: WorkbenchPanels, rootPath: string | null, token: string) {
+function withDocumentToken(
+  panels: WorkbenchPanels,
+  rootPath: string | null,
+  token: string,
+  selection: 'preserve' | 'select',
+) {
   const parsed = contentForDocumentToken(rootPath, token)
   if (parsed.kind !== 'content') return panels
+
+  const groups = panels.editorGroups
+  const existing =
+    activeEditorGroup(groups).tabs.find((tab) => sameTabContent(tab.content, parsed.content)) ??
+    allEditorTabs(groups).find((tab) => sameTabContent(tab.content, parsed.content))
+  if (existing)
+    return selection === 'select' ? selectEditorTabInWorkbenchPanels(panels, existing.id) : panels
 
   return openEditorContentInWorkbenchPanels(panels, parsed.content)
 }

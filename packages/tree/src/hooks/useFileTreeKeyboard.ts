@@ -10,10 +10,10 @@ import { getActiveTreeElement, readMeasuredViewportHeight } from '../utils/rende
 import {
   BLOCKED_CONTEXT_MENU_NAV_KEYS,
   canKeyUseStickyKeyboardState,
-  isContextMenuOpenKey,
   isSearchOpenSeedKey,
   isSpaceSelectionKey,
 } from '../utils/render/keyboard'
+import { isContextMenuKey as isContextMenuOpenKey } from '@workspace/utils/keyboard'
 
 interface UseFileTreeKeyboardOptions {
   readonly closeContextMenu: () => void

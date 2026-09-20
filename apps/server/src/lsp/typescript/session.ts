@@ -1,3 +1,7 @@
+import { isTypeScriptFileName } from './shared/file-type'
+import { samePath } from '../../utils/path'
+import { normalizeNativePath } from '../../utils/path'
+import { isInsidePath } from '../../utils/path'
 import { existsSync } from 'node:fs'
 import path from 'node:path'
 
@@ -6,7 +10,7 @@ import {
   tsDiagnosticToLspDiagnostic,
 } from '@singapore-editor/typescript-lsp/ts-diagnostics'
 import type { PublishDiagnosticsNotificationParams } from '@singapore-editor/lsp/types'
-import { isRecord } from '@workspace/contracts'
+import { isRecord } from '@workspace/utils/objects'
 import ts from 'typescript-language-service'
 import type * as lsp from 'vscode-languageserver-protocol'
 
@@ -45,7 +49,6 @@ import type {
 const JSON_RPC_VERSION = '2.0'
 const METHOD_NOT_FOUND = -32601
 const DEFAULT_DIAGNOSTIC_DELAY_MS = 150
-const TYPE_SCRIPT_EXTENSIONS = new Set(['.cts', '.mts', '.ts', '.tsx'])
 
 export type TypeScriptLspSessionOptions = {
   root: string
@@ -539,27 +542,8 @@ function referencedConfigFileName(
   return normalizeNativePath(path.join(basePath, 'tsconfig.json'))
 }
 
-function normalizeNativePath(input: string): string {
-  return path.resolve(input).split(path.sep).join('/')
-}
-
-function samePath(left: string, right: string): boolean {
-  return normalizeNativePath(left) === normalizeNativePath(right)
-}
-
-function isInsidePath(root: string, candidate: string): boolean {
-  const relative = path.relative(root, candidate)
-  if (relative === '') return true
-  if (relative === '..' || relative.startsWith(`..${path.sep}`)) return false
-  return !path.isAbsolute(relative)
-}
-
 function typeScriptLibDirectory(): string {
   return normalizeNativePath(path.dirname(ts.getDefaultLibFilePath(defaultCompilerOptions())))
-}
-
-function isTypeScriptFileName(fileName: string): boolean {
-  return TYPE_SCRIPT_EXTENSIONS.has(path.extname(fileName).toLowerCase())
 }
 
 function parseIncomingMessage(data: string | ArrayBuffer | Uint8Array): unknown {

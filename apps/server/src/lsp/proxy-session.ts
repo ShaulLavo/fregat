@@ -1,25 +1,22 @@
+import { lineStartOffset } from '@workspace/utils/strings'
+import { errorMessage } from '@workspace/contracts'
+import { elapsedMs } from '@workspace/utils/timing'
 import { createInternalError } from '../observability/structured-errors'
 
 import {
   DEFAULT_SETTING_VALUES,
-  isRecord,
   LSP_DIAGNOSTIC_REFRESH,
   LSP_SEMANTIC_TOKENS_REFRESH,
   LSP_SERVER_EXITED,
   type LspNegotiatedSemanticTokens,
 } from '@workspace/contracts'
+import { isRecord } from '@workspace/utils/objects'
 import type { ChildProcessWithoutNullStreams } from 'node:child_process'
 
 import type { LspServerHandle, LspServerMatch } from './registry'
 import { fileUriForPath } from './language'
 import { LspStdioMessageReader, writeLspStdioMessage } from './stdio-rpc'
-import {
-  elapsedMs,
-  errorSummary,
-  limitText,
-  recordProcessInfo,
-  recordProcessWarning,
-} from '../observability'
+import { errorSummary, limitText, recordProcessInfo, recordProcessWarning } from '../observability'
 
 type JsonRpcId = number | string | null
 
@@ -979,7 +976,7 @@ class PooledLspProxySession {
     shared.owners.set(owner, synchronizedOwner(document, shared))
     this.documents.set(document.uri, shared)
     owner.addDocument(document.uri)
-    this.writeToServer(JSON.stringify(rewriteDidOpenVersion(message, shared.backendVersion)))
+    this.writeToServer(JSON.stringify(rewriteTextDocumentVersion(message, shared.backendVersion)))
   }
 
   private handleDidChange(connection: LspProxyConnection, message: JsonRpcNotification): void {
@@ -1014,7 +1011,7 @@ class PooledLspProxySession {
     }
 
     if (ownerIsSynchronized(owner, shared)) {
-      this.writeToServer(JSON.stringify(rewriteDidChangeVersion(message, backendVersion)))
+      this.writeToServer(JSON.stringify(rewriteTextDocumentVersion(message, backendVersion)))
     } else {
       this.sendFullDocumentChange(change.uri, text, backendVersion)
     }
@@ -2111,30 +2108,6 @@ function cancellationRequestId(params: unknown): JsonRpcId | null {
   return isJsonRpcId(params.id) ? params.id : null
 }
 
-function rewriteDidOpenVersion(message: JsonRpcNotification, version: number) {
-  const params = isRecord(message.params) ? message.params : {}
-  const textDocument = isRecord(params.textDocument) ? params.textDocument : {}
-  return {
-    ...message,
-    params: {
-      ...params,
-      textDocument: { ...textDocument, version },
-    },
-  }
-}
-
-function rewriteDidChangeVersion(message: JsonRpcNotification, version: number) {
-  const params = isRecord(message.params) ? message.params : {}
-  const textDocument = isRecord(params.textDocument) ? params.textDocument : {}
-  return {
-    ...message,
-    params: {
-      ...params,
-      textDocument: { ...textDocument, version },
-    },
-  }
-}
-
 function responseForClient(response: JsonRpcResponse, id: JsonRpcId): JsonRpcResponse {
   return { ...response, id }
 }
@@ -2194,17 +2167,8 @@ function strictOffsetForPosition(
   text: string,
   position: { readonly line: number; readonly character: number },
 ): number | null {
-  let line = 0
-  let lineStart = 0
-  for (let index = 0; index < text.length; index += 1) {
-    if (line >= position.line) break
-    if (text[index] !== '\n') continue
-
-    line += 1
-    lineStart = index + 1
-  }
-
-  if (line < position.line) return null
+  const lineStart = lineStartOffset(text, position.line)
+  if (lineStart === null) return null
 
   const newline = text.indexOf('\n', lineStart)
   const rawLineEnd = newline < 0 ? text.length : newline
@@ -2222,12 +2186,6 @@ function byteLength(value: string | ArrayBuffer | Uint8Array): number {
   return value.byteLength
 }
 
-function errorMessage(error: unknown): string {
-  if (error instanceof Error) return error.message
-
-  return String(error)
-}
-
 function isFailedLspSession(
   outcome: string,
   exitCode: number | null,
@@ -2238,4 +2196,16 @@ function isFailedLspSession(
   if (exitSignal) return true
 
   return exitCode !== 0
+}
+
+function rewriteTextDocumentVersion(message: JsonRpcNotification, version: number) {
+  const params = isRecord(message.params) ? message.params : {}
+  const textDocument = isRecord(params.textDocument) ? params.textDocument : {}
+  return {
+    ...message,
+    params: {
+      ...params,
+      textDocument: { ...textDocument, version },
+    },
+  }
 }

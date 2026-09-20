@@ -1,3 +1,4 @@
+import { errorMessage } from '@workspace/contracts'
 import { eq } from 'drizzle-orm'
 import * as v from 'valibot'
 import {
@@ -48,17 +49,10 @@ export class OrchestrationCommandReceipts {
     result: ProjectRegistrationResult | null,
     intentFingerprint = commandFingerprint(command),
   ) {
-    const aggregate = commandAggregate(command)
     const receipt = {
-      acceptedAt: new Date().toISOString(),
-      aggregateId: aggregate.id,
-      aggregateKind: aggregate.kind,
-      commandId: command.commandId,
-      commandJson: JSON.stringify(command),
-      commandType: command.type,
+      ...receiptIdentity(command, intentFingerprint),
       error: null,
       resultJson: result ? JSON.stringify(result) : null,
-      intentFingerprint,
       resultSequence: sequence,
       status: 'accepted' as const,
     }
@@ -91,17 +85,10 @@ export class OrchestrationCommandReceipts {
     error: unknown,
     intentFingerprint = commandFingerprint(command),
   ) {
-    const aggregate = commandAggregate(command)
     const receipt = {
-      acceptedAt: new Date().toISOString(),
-      aggregateId: aggregate.id,
-      aggregateKind: aggregate.kind,
-      commandId: command.commandId,
-      commandJson: JSON.stringify(command),
-      commandType: command.type,
+      ...receiptIdentity(command, intentFingerprint),
       error: errorMessage(error),
       resultJson: null,
-      intentFingerprint,
       resultSequence: null,
       status: 'rejected' as const,
     }
@@ -231,12 +218,6 @@ function rowToReceipt(row: OrchestrationCommandReceiptRow): OrchestrationCommand
   })
 }
 
-function errorMessage(error: unknown) {
-  if (error instanceof Error) return error.message
-
-  return String(error)
-}
-
 export function verifyReceiptIntent(
   receipt: OrchestrationCommandReceipt,
   commandType: string,
@@ -244,4 +225,17 @@ export function verifyReceiptIntent(
 ) {
   if (receipt.commandType === commandType && receipt.intentFingerprint === fingerprint) return
   throw sessionDomainErrors.COMMAND_ID_COLLISION({ commandId: receipt.commandId })
+}
+
+function receiptIdentity(command: ReceiptCommand, intentFingerprint: string) {
+  const aggregate = commandAggregate(command)
+  return {
+    acceptedAt: new Date().toISOString(),
+    aggregateId: aggregate.id,
+    aggregateKind: aggregate.kind,
+    commandId: command.commandId,
+    commandJson: JSON.stringify(command),
+    commandType: command.type,
+    intentFingerprint,
+  }
 }

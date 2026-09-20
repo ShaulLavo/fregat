@@ -1,3 +1,4 @@
+import { syncPath } from './sync-path'
 import { randomUUID } from 'node:crypto'
 import type { Dirent, Stats } from 'node:fs'
 import {
@@ -22,7 +23,8 @@ import type {
   WorkspaceEditResult,
   WorkspaceEditState,
 } from '@workspace/contracts'
-import { FsError, nodeErrorCode } from './errors'
+import { FsError } from './errors'
+import { nodeErrorCode } from '@workspace/contracts'
 
 export const MAX_WORKSPACE_EDIT_OPERATION_BYTES = 128 * 1024 * 1024
 export const MAX_WORKSPACE_EDIT_JOURNAL_BYTES = 512 * 1024 * 1024
@@ -237,8 +239,8 @@ export class WorkspaceEditJournal {
     await this.driver.mkdir(this.root, { mode: 0o700, recursive: true })
     await this.assertDirectory(this.root)
     await this.driver.chmod(this.root, 0o700)
-    await this.fsyncDirectory(this.root)
-    if (!existed) await this.fsyncDirectory(path.dirname(this.root))
+    await syncPath(this.driver, this.root)
+    if (!existed) await syncPath(this.driver, path.dirname(this.root))
   }
 
   async createOperation(operationId: string) {
@@ -246,12 +248,12 @@ export class WorkspaceEditJournal {
     await this.driver.mkdir(operationPath, { mode: 0o700, recursive: false })
     await this.assertDirectory(operationPath)
     await this.driver.chmod(operationPath, 0o700)
-    await this.fsyncDirectory(this.root)
+    await syncPath(this.driver, this.root)
     const stagePath = path.join(operationPath, STAGE_DIRECTORY)
     await this.driver.mkdir(stagePath, { mode: 0o700, recursive: false })
     await this.assertDirectory(stagePath)
     await this.driver.chmod(stagePath, 0o700)
-    await this.fsyncDirectory(operationPath)
+    await syncPath(this.driver, operationPath)
   }
 
   async writeStage(operationId: string, name: string, bytes: Uint8Array) {
@@ -260,8 +262,8 @@ export class WorkspaceEditJournal {
     await this.assertMissing(target)
     await this.driver.writeFile(target, bytes, { flag: 'wx', mode: 0o600 })
     await this.driver.chmod(target, 0o600)
-    await this.fsyncFile(target)
-    await this.fsyncDirectory(path.dirname(target))
+    await syncPath(this.driver, target)
+    await syncPath(this.driver, path.dirname(target))
     return relativePath
   }
 
@@ -293,10 +295,10 @@ export class WorkspaceEditJournal {
     await this.assertMissing(temporary)
     await this.driver.writeFile(temporary, serialized, { flag: 'wx', mode: 0o600 })
     await this.driver.chmod(temporary, 0o600)
-    await this.fsyncFile(temporary)
+    await syncPath(this.driver, temporary)
     await this.assertReplaceableManifest(destination)
     await this.driver.rename(temporary, destination)
-    await this.fsyncDirectory(operationPath)
+    await syncPath(this.driver, operationPath)
   }
 
   async append(operationId: string, record: WorkspaceEditJournalRecord) {
@@ -314,7 +316,7 @@ export class WorkspaceEditJournal {
     } finally {
       await handle.close()
     }
-    if (!existed) await this.fsyncDirectory(operationPath)
+    if (!existed) await syncPath(this.driver, operationPath)
   }
 
   async load(operationId: string) {
@@ -377,7 +379,7 @@ export class WorkspaceEditJournal {
     if (!stats.isDirectory() || stats.isSymbolicLink()) throw new FsError('WORKSPACE_EDIT_INVALID')
 
     await this.driver.rm(operationPath, { force: false, recursive: true })
-    await this.fsyncDirectory(this.root)
+    await syncPath(this.driver, this.root)
   }
 
   async clearStaging(operationId: string) {
@@ -387,7 +389,7 @@ export class WorkspaceEditJournal {
     const programPath = path.join(operationPath, PROGRAM_FILE)
     await this.removeJournalChild(stagePath)
     await this.removeJournalChild(programPath)
-    await this.fsyncDirectory(operationPath)
+    await syncPath(this.driver, operationPath)
   }
 
   async sizeBytes() {
@@ -453,24 +455,6 @@ export class WorkspaceEditJournal {
     } catch (error) {
       if (nodeErrorCode(error) === 'ENOENT') return null
       throw error
-    }
-  }
-
-  private async fsyncFile(target: string) {
-    const handle = await this.driver.open(target, 'r')
-    try {
-      await handle.sync()
-    } finally {
-      await handle.close()
-    }
-  }
-
-  private async fsyncDirectory(target: string) {
-    const handle = await this.driver.open(target, 'r')
-    try {
-      await handle.sync()
-    } finally {
-      await handle.close()
     }
   }
 

@@ -1,13 +1,7 @@
-import { TrashIcon, WarningCircleIcon } from '@phosphor-icons/react'
+import { TrashIcon } from '@phosphor-icons/react'
 import { Button } from '@workspace/ui/components/button'
-import {
-  Dialog,
-  DialogContent,
-  DialogDescription,
-  DialogFooter,
-  DialogHeader,
-  DialogTitle,
-} from '@workspace/ui/components/dialog'
+import { Dialog } from '@workspace/ui/components/dialog'
+import { ActionDialogContent } from '@/components/action-dialog-content'
 
 import type { DeleteTarget } from '@/features/workspace/hooks/use-fs-actions'
 import { Spinner } from '@workspace/ui/components/spinner'
@@ -33,50 +27,28 @@ export function DeleteEntryDialog({
 }) {
   return (
     <Dialog onOpenChange={(open) => open || onCancel()} open={target !== null}>
-      <DialogContent
-        className='w-[min(420px,calc(100vw-2rem))] max-w-none border text-sm sm:max-w-none'
-        showCloseButton={false}
+      <ActionDialogContent
+        title={<>Delete {target?.isDirectory ? 'folder' : 'file'}</>}
+        description={deleteDescription(target)}
+        path={target?.path}
+        error={error}
+        pending={deleting}
+        onCancel={onCancel}
       >
-        <DialogHeader>
-          <DialogTitle>Delete {target?.isDirectory ? 'folder' : 'file'}</DialogTitle>
-          <DialogDescription>{deleteDescription(target)}</DialogDescription>
-        </DialogHeader>
-        {target ? (
-          <div
-            className='bg-muted/30 text-muted-foreground truncate rounded-lg border px-(--density-control-padding-x) py-(--density-section-gap) text-xs'
-            title={target.path}
-          >
-            {target.path}
-          </div>
-        ) : null}
-        {error ? (
-          <div
-            className='border-destructive/25 bg-destructive/10 text-destructive flex items-start gap-(--density-control-gap) rounded-lg border px-(--density-control-padding-x) py-(--density-section-gap) text-xs'
-            role='alert'
-          >
-            <WarningCircleIcon className='mt-0.5 size-3.5 shrink-0' />
-            <span>{error}</span>
-          </div>
-        ) : null}
-        <DialogFooter>
-          <Button disabled={deleting} onClick={onCancel} type='button' variant='outline'>
-            Cancel
-          </Button>
-          <Button
-            disabled={deleting || !mutationsEnabled}
-            onClick={onConfirm}
-            type='button'
-            variant='destructive'
-          >
-            {deleting ? (
-              <Spinner aria-hidden='true' data-icon='inline-start' role='presentation' />
-            ) : (
-              <TrashIcon data-icon='inline-start' />
-            )}
-            Delete
-          </Button>
-        </DialogFooter>
-      </DialogContent>
+        <Button
+          disabled={deleting || !mutationsEnabled}
+          onClick={onConfirm}
+          type='button'
+          variant='destructive'
+        >
+          {deleting ? (
+            <Spinner aria-hidden='true' data-icon='inline-start' role='presentation' />
+          ) : (
+            <TrashIcon data-icon='inline-start' />
+          )}
+          Delete
+        </Button>
+      </ActionDialogContent>
     </Dialog>
   )
 }

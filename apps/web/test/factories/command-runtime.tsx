@@ -1,3 +1,5 @@
+import { allEditorTabs } from '@/lib/documents/utils/groups'
+import { createTestGroupCommands } from './editor-group-commands'
 import { workspaceRoot } from '@/lib/documents/utils/identity'
 import type { FilesystemPath, TabId } from '@/lib/documents/utils/types'
 import { FileSyncService } from '@/features/editor/state/file-sync-service'
@@ -306,7 +308,7 @@ function createRuntime(
   const editor =
     navigation && owner?.workspaceStore === workspace && owner.documentStore === store
       ? { ...navigation.editorCommands(workspace), ...overrides?.editor }
-      : createTestEditor(documents.store, workspace, overrides?.editor)
+      : createTestEditor(documents.store, workspace, queryClient, overrides?.editor)
   const files: WorkspaceCommandRuntime['files'] = {
     openFileAtRef: async () => false,
     ...overrides?.files,
@@ -353,20 +355,23 @@ function createRuntime(
 function createTestEditor(
   documentStore: EditorDocumentStoreApi,
   workspaceStore: EditorWorkspaceStoreApi,
+  queryClient: QueryClient,
   overrides?: Partial<EditorCommands>,
 ): EditorCommands {
+  const uiStore = createEditorUiStore()
   const apply = createEditorApplyActions({
     retainedTextBudget: () => Number.MAX_SAFE_INTEGER,
     activation: { activate: () => undefined, setRoot: () => undefined },
     documentStore,
     searchStore: createSearchBufferStore({ rootPath: workspaceStore.getState().rootFolder?.path }),
-    uiStore: createEditorUiStore(),
+    uiStore,
     workspaceStore,
   })
 
   const applied = () => Promise.resolve({ status: 'applied' } as const)
   const editor: EditorCommands = {
     ...apply,
+    ...createTestGroupCommands(queryClient, workspaceStore, documentStore, uiStore),
     openTabContent: (content) => {
       apply.openTabContent(content)
       return applied()
@@ -395,8 +400,8 @@ function createTestEditor(
       apply.openSettingsEditor()
       return applied()
     },
-    selectTab: (paneId, tabId) => {
-      apply.selectTab(paneId, tabId)
+    selectTab: (selection) => {
+      apply.selectTab(selection)
       return applied()
     },
     closeTab: (tabId) => {
@@ -413,10 +418,6 @@ function createTestEditor(
     },
     discardAndCloseTabs: (tabIds) => {
       tabIds.forEach(apply.discardAndCloseTab)
-      return applied()
-    },
-    reorderTab: (paneId, tabId, index) => {
-      apply.reorderTab(paneId, tabId, index)
       return applied()
     },
     selectPreviousEditor: () => {
@@ -496,7 +497,9 @@ function showTestSettings(
 }
 
 function closeTestTab(tabId: TabId, editor: EditorCommands, workspace: EditorWorkspaceStoreApi) {
-  const open = workspace.getState().workbenchPanels.editorTabs.some((tab) => tab.id === tabId)
+  const open = allEditorTabs(workspace.getState().workbenchPanels.editorGroups).some(
+    (tab) => tab.id === tabId,
+  )
   if (!open) return { reason: 'not-found', status: 'rejected' } as const
 
   const completion = editor.closeTab(tabId)

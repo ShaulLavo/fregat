@@ -76,6 +76,7 @@ function createTitlebarStore() {
         editorHistory: [],
         recentlyClosedTabs: [],
         reopenScrollPositions: [],
+        viewScrollPositions: [],
         workbenchPanels: panels,
       },
     },

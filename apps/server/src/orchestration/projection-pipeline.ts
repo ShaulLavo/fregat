@@ -1,3 +1,4 @@
+import { isProviderTurnFailureActivity } from '@workspace/contracts'
 import {
   applyWorktreeEvent,
   lifecycleFields,
@@ -718,8 +719,14 @@ export class OrchestrationProjectionPipeline {
     if (!event.payload.turnId) return
 
     const turn = this.selectTurn(event.payload.sessionId, event.payload.turnId)
-    const state = assistantTurnState(turn?.state, event.payload.streaming)
-    const completedAt = assistantTurnCompletedAt(turn?.completedAt, event)
+    // Commentary can finish between tool calls while the provider turn continues.
+    const settlesTurn =
+      !event.payload.streaming &&
+      !this.isSessionRunningTurn(event.payload.sessionId, event.payload.turnId)
+    const state = assistantTurnState(turn?.state, settlesTurn)
+    const completedAt = settlesTurn
+      ? (turn?.completedAt ?? event.payload.updatedAt)
+      : (turn?.completedAt ?? null)
     const startedAt = turn?.startedAt ?? event.payload.createdAt
     const requestedAt = turn?.requestedAt ?? event.payload.createdAt
 
@@ -953,38 +960,23 @@ export class OrchestrationProjectionPipeline {
 
   private upsertRuntime(event: Extract<OrchestrationEvent, { type: 'session.runtime-set' }>) {
     this.updateSession(event.payload.sessionId, { runtimeSequence: event.sequence })
+    const runtime = {
+      activeTurnId: event.payload.runtime.activeTurnId,
+      lastError: event.payload.runtime.lastError,
+      providerInstanceId: event.payload.runtime.providerInstanceId ?? 'codex',
+      providerName: event.payload.runtime.providerName,
+      providerBindingHandle: event.payload.runtime.providerBindingHandle,
+      providerConversationMarker: event.payload.runtime.providerConversationMarker,
+      providerResumeCursor: event.payload.runtime.providerResumeCursor,
+      runtimeEpoch: event.payload.runtime.runtimeEpoch,
+      runtimeMode: event.payload.runtime.runtimeMode ?? 'full-access',
+      status: event.payload.runtime.status,
+      updatedAt: event.payload.runtime.updatedAt,
+    }
     this.database
       .insert(projectionSessionRuntime)
-      .values({
-        activeTurnId: event.payload.runtime.activeTurnId,
-        lastError: event.payload.runtime.lastError,
-        providerInstanceId: event.payload.runtime.providerInstanceId ?? 'codex',
-        providerName: event.payload.runtime.providerName,
-        providerBindingHandle: event.payload.runtime.providerBindingHandle,
-        providerConversationMarker: event.payload.runtime.providerConversationMarker,
-        providerResumeCursor: event.payload.runtime.providerResumeCursor,
-        runtimeEpoch: event.payload.runtime.runtimeEpoch,
-        runtimeMode: event.payload.runtime.runtimeMode ?? 'full-access',
-        status: event.payload.runtime.status,
-        sessionId: event.payload.sessionId,
-        updatedAt: event.payload.runtime.updatedAt,
-      })
-      .onConflictDoUpdate({
-        target: projectionSessionRuntime.sessionId,
-        set: {
-          activeTurnId: event.payload.runtime.activeTurnId,
-          lastError: event.payload.runtime.lastError,
-          providerInstanceId: event.payload.runtime.providerInstanceId ?? 'codex',
-          providerName: event.payload.runtime.providerName,
-          providerBindingHandle: event.payload.runtime.providerBindingHandle,
-          providerConversationMarker: event.payload.runtime.providerConversationMarker,
-          providerResumeCursor: event.payload.runtime.providerResumeCursor,
-          runtimeEpoch: event.payload.runtime.runtimeEpoch,
-          runtimeMode: event.payload.runtime.runtimeMode ?? 'full-access',
-          status: event.payload.runtime.status,
-          updatedAt: event.payload.runtime.updatedAt,
-        },
-      })
+      .values({ ...runtime, sessionId: event.payload.sessionId })
+      .onConflictDoUpdate({ target: projectionSessionRuntime.sessionId, set: runtime })
       .run()
   }
 
@@ -1515,25 +1507,12 @@ function jsonOrUndefined(value: unknown) {
 
 function assistantTurnState(
   current: 'running' | 'completed' | 'interrupted' | 'error' | undefined,
-  streaming: boolean,
+  settlesTurn: boolean,
 ) {
-  if (streaming) return current ?? 'running'
+  if (!settlesTurn) return current ?? 'running'
   if (current === 'interrupted' || current === 'error') return current
 
   return 'completed'
-}
-
-function isProviderTurnFailureActivity(kind: string) {
-  return kind === 'provider.turn.start.failed' || kind === 'provider.turn.failed'
-}
-
-function assistantTurnCompletedAt(
-  current: string | null | undefined,
-  event: Extract<OrchestrationEvent, { type: 'session.message-sent' }>,
-) {
-  if (event.payload.streaming) return current ?? null
-
-  return current ?? event.payload.updatedAt
 }
 
 function shouldRetainAfterRevert(turnId: string | null, retainedTurnIds: Set<string>) {

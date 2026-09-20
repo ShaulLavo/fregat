@@ -8,7 +8,7 @@ import { afterEach, describe, expect, it } from 'vitest'
 import * as v from 'valibot'
 
 import * as schema from '../../db/schema'
-import { migrateOrchestrationDatabase } from '../../db/migrations'
+import { migratePlatformDatabase as migrateOrchestrationDatabase } from '../../db/migrations'
 import { OrchestrationEngine } from '../engine'
 import { orchestrationCommandSummary } from '../orchestration-logging'
 import { orchestrationCommandSchema, type OrchestrationCommand } from '@workspace/contracts'

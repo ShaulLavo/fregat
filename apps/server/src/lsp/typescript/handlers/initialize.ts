@@ -1,4 +1,4 @@
-import { isRecord } from '@workspace/contracts'
+import { isRecord } from '@workspace/utils/objects'
 import ts from 'typescript-language-service'
 import type * as lsp from 'vscode-languageserver-protocol'
 

@@ -1,3 +1,4 @@
+import { isObject } from '@workspace/utils/objects'
 export type ClientErrorMetadata = {
   readonly context: Readonly<Record<string, unknown>>
   readonly operation: string
@@ -24,8 +25,4 @@ export function clientErrorMetadata(error: unknown): ClientErrorMetadata | undef
   if (!isObject(error)) return undefined
 
   return metadataByError.get(error)
-}
-
-function isObject(value: unknown): value is object {
-  return typeof value === 'object' && value !== null
 }

@@ -8,7 +8,7 @@ import {
 
 import type { Client } from '../transport/client'
 import type { OrchestrationRpcClient } from '../transport/orchestration-rpc-client'
-import { chatCommandSummary } from '../transport/utils/logging'
+import { chatCommandSummary } from '@workspace/contracts'
 import { createOrchestrationRpcClosedError } from '../transport/structured-errors'
 import { readChatSession, readChatShell } from './snapshots'
 import { createClientError } from '../errors'

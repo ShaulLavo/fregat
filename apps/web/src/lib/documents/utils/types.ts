@@ -90,3 +90,8 @@ export type ReopenScrollPosition = {
   readonly content: TabContent
   readonly position: { readonly left: number; readonly top: number }
 }
+
+export type EditorViewScrollPosition = {
+  readonly tabId: TabId
+  readonly position: { readonly left: number; readonly top: number }
+}

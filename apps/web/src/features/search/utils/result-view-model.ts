@@ -1,3 +1,7 @@
+import { isContentSearchResultItem as isSearchResultMatchItem } from '@/features/search/utils/result-items'
+import { clampIndex } from '@/features/search/utils/result-items'
+import { queryRange as searchResultQueryRange } from '@/features/search/utils/match-display'
+import { searchMatchPreviewRange as searchResultContentPreviewRange } from '@/features/search/utils/match-display'
 import type { EditorSyntaxLanguageId } from '@singapore-editor/core'
 import type { WorkspaceSearchMatch } from '@workspace/contracts'
 
@@ -367,31 +371,6 @@ function searchResultEditorDisplay(match: WorkspaceSearchMatch, query: string): 
   return { range, text }
 }
 
-function searchResultContentPreviewRange(match: WorkspaceSearchMatch, preview: string) {
-  if (match.kind !== 'content') return null
-  if (match.column === undefined || match.endColumn === undefined) return null
-
-  const previewStart = match.previewStartColumn ?? 0
-  const start = match.column - 1 - previewStart
-  const end = match.endColumn - 1 - previewStart
-  if (start < 0 || end <= start) return null
-  if (start >= preview.length) return null
-
-  return { end: Math.min(end, preview.length), start }
-}
-
-function searchResultQueryRange(text: string, query: string) {
-  if (!query) return null
-
-  const start = text.toLocaleLowerCase().indexOf(query.toLocaleLowerCase())
-  if (start < 0) return null
-
-  return {
-    end: start + query.length,
-    start,
-  }
-}
-
 function searchResultExcerptDisplay(display: SearchMatchDisplay) {
   const text = searchResultExcerptText(display.text)
   const leadingIndentLength = searchResultLeadingIndentLength(text)
@@ -442,16 +421,8 @@ function isSearchResultGroupItem(item: SearchResultItem): item is SearchResultGr
   return item.type === 'group'
 }
 
-function isSearchResultMatchItem(item: SearchResultItem): item is SearchResultMatchItem {
-  return item.type === 'match'
-}
-
 function isSearchResultNameItem(item: SearchResultItem): item is SearchResultNameItem {
   return item.type === 'name'
-}
-
-function clampIndex(index: number, length: number) {
-  return Math.min(Math.max(index, 0), length - 1)
 }
 
 function searchResultSelectableIds(rows: readonly SearchResultVirtualRow[]) {

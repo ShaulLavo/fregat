@@ -1,12 +1,10 @@
-import path from 'node:path'
+import { isTypeScriptFileName } from '../shared/file-type'
 
-import { isRecord } from '@workspace/contracts'
+import { isRecord } from '@workspace/utils/objects'
 import type * as lsp from 'vscode-languageserver-protocol'
 
 import { fileNameForUri } from '../shared/boundary'
 import type { SessionContext } from '../shared/context'
-
-const TYPE_SCRIPT_EXTENSIONS = new Set(['.cts', '.mts', '.ts', '.tsx'])
 
 export function handleDidOpen(ctx: SessionContext, params: unknown): void {
   const textDocument = textDocumentItem(params)
@@ -38,8 +36,4 @@ function textDocumentItem(params: unknown): lsp.TextDocumentItem | null {
   if (typeof textDocument.version !== 'number') return null
   if (typeof textDocument.text !== 'string') return null
   return textDocument as unknown as lsp.TextDocumentItem
-}
-
-function isTypeScriptFileName(fileName: string): boolean {
-  return TYPE_SCRIPT_EXTENSIONS.has(path.extname(fileName).toLowerCase())
 }

@@ -1,3 +1,5 @@
+import { isJsonObject, type JsonObject, type JsonValue } from '@workspace/utils/json'
+import { targetArgument } from './target-argument'
 /** Generates the settings JSON Schema from the live descriptor registry. */
 import { mkdtemp, readFile, rm, writeFile } from 'node:fs/promises'
 import { tmpdir } from 'node:os'
@@ -31,10 +33,6 @@ const ORDER_INSENSITIVE_ARRAY_KEYS = new Set([
   'required',
   'type',
 ])
-
-type JsonPrimitive = boolean | number | string | null
-type JsonValue = JsonPrimitive | JsonValue[] | { [key: string]: JsonValue }
-type JsonObject = { [key: string]: JsonValue }
 
 export function generateSettingsSchema(): JsonObject {
   const properties = Object.fromEntries(
@@ -99,10 +97,6 @@ function stableJson(value: JsonValue): string {
   return JSON.stringify(value)
 }
 
-function isJsonObject(value: JsonValue): value is JsonObject {
-  return typeof value === 'object' && value !== null && !Array.isArray(value)
-}
-
 async function schemaText(): Promise<string> {
   const source = `${JSON.stringify(generateSettingsSchema(), null, 2)}\n`
   const result = await format('schema.json', source)
@@ -134,26 +128,8 @@ async function checkSchema(target: string): Promise<void> {
   }
 }
 
-function targetArgument(): string {
-  const inline = process.argv.find((argument) => argument.startsWith('--target='))
-  if (inline) return resolveTarget(inline.slice('--target='.length))
-
-  const index = process.argv.indexOf('--target')
-  if (index === -1) return DEFAULT_TARGET
-
-  return resolveTarget(process.argv[index + 1])
-}
-
 /** A valueless `--target` used to fall through to the default and overwrite it. */
-function resolveTarget(value: string | undefined): string {
-  if (!value || value.startsWith('--')) {
-    console.error('--target requires a path')
-    process.exit(1)
-  }
 
-  return path.resolve(value)
-}
-
-const target = targetArgument()
+const target = targetArgument(DEFAULT_TARGET)
 if (process.argv.includes('--check')) await checkSchema(target)
 else await writeSchema(target)

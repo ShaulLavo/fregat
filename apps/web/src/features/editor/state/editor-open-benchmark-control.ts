@@ -1,3 +1,9 @@
+import { sameItems as sameQueryKey } from '@workspace/utils/collections'
+import { groupForTab, openTabInGroups, selectEditorGroupTab } from '@/lib/documents/utils/groups'
+import {
+  activeEditorTabForWorkbenchPanels,
+  editorTabRecordsForWorkbenchPanels,
+} from '@/features/workbench/utils/panels'
 import type { ScopedStorage } from '@/lib/environments/state/scoped-storage'
 import { retainedTextBudgetFromSettings } from '@/features/editor/utils/retained-text-budget'
 import type { Query, QueryClient } from '@tanstack/react-query'
@@ -207,7 +213,7 @@ function activateInertAndCloseTarget(
   workspaceStore: EditorWorkspaceStoreApi,
 ): void {
   const workspace = workspaceStore.getState()
-  const targetTabs = workspace.workbenchPanels.editorTabs.filter((tab) =>
+  const targetTabs = editorTabRecordsForWorkbenchPanels(workspace.workbenchPanels).filter((tab) =>
     sameTabContent(tab.content, documentTab(fileDocument({ path }))),
   )
   if (targetTabs.length > 1) {
@@ -218,7 +224,7 @@ function activateInertAndCloseTarget(
     throw createClientInvariantError('Editor-open benchmark target tab is missing')
   }
 
-  const inertTab = workspace.workbenchPanels.editorTabs.find(
+  const inertTab = editorTabRecordsForWorkbenchPanels(workspace.workbenchPanels).find(
     (tab) =>
       tab.id !== targetTab.id &&
       (tab.content.kind !== 'document' || !filesystemResource(tab.content.document)),
@@ -227,8 +233,12 @@ function activateInertAndCloseTarget(
     throw createClientInvariantError('Editor-open benchmark requires a dedicated inert surface')
   }
 
-  commands.selectTab('', inertTab.id)
-  const selectedInert = workspaceStore.getState().workbenchPanels.activeEditorTabId
+  const group = groupForTab(workspace.workbenchPanels.editorGroups, inertTab.id)
+  if (!group) throw createClientInvariantError('Benchmark inert group is missing')
+  commands.selectTab({ groupId: group.id, tabId: inertTab.id })
+  const selectedInert = activeEditorTabForWorkbenchPanels(
+    workspaceStore.getState().workbenchPanels,
+  )?.id
   if (selectedInert !== inertTab.id) {
     throw createClientInvariantError('Editor-open benchmark could not activate its inert surface')
   }
@@ -239,7 +249,9 @@ function activateInertAndCloseTarget(
       closeEditorTabInWorkbenchPanels(workspaceStore.getState().workbenchPanels, targetTab.id),
     )
 
-  const activeTabId = workspaceStore.getState().workbenchPanels.activeEditorTabId
+  const activeTabId = activeEditorTabForWorkbenchPanels(
+    workspaceStore.getState().workbenchPanels,
+  )?.id
   if (activeTabId === inertTab.id) return
 
   throw createClientInvariantError('Editor-open benchmark requires an inert editor surface')
@@ -313,11 +325,6 @@ function targetQueries(request: EditorOpenSampleTarget, queryClient: QueryClient
   })
 }
 
-function sameQueryKey(left: readonly unknown[], right: readonly unknown[]): boolean {
-  if (left.length !== right.length) return false
-  return left.every((value, index) => value === right[index])
-}
-
 function assertTargetStateCleared(
   request: EditorOpenSampleTarget,
   documentStore: EditorDocumentStoreApi,
@@ -327,7 +334,7 @@ function assertTargetStateCleared(
 ): void {
   const workspace = workspaceStore.getState()
   if (
-    workspace.workbenchPanels.editorTabs.some((tab) =>
+    editorTabRecordsForWorkbenchPanels(workspace.workbenchPanels).some((tab) =>
       sameTabContent(tab.content, documentTab(fileDocument({ path: request.path }))),
     )
   ) {
@@ -360,22 +367,24 @@ function installInactiveTargetTab(
   const workspace = workspaceStore.getState()
   const panels = workspace.workbenchPanels
   if (
-    panels.editorTabs.some((tab) =>
+    editorTabRecordsForWorkbenchPanels(panels).some((tab) =>
       sameTabContent(tab.content, documentTab(fileDocument({ path }))),
     )
   )
     return
 
-  workspace.setWorkbenchPanels({
-    ...panels,
-    editorTabs: [
-      ...panels.editorTabs,
-      {
-        id: tabId(`${BENCHMARK_TARGET_TAB_PREFIX}${crypto.randomUUID()}`),
-        content: documentTab(fileDocument({ path })),
-      },
-    ],
-  })
+  const tab = {
+    id: tabId(`${BENCHMARK_TARGET_TAB_PREFIX}${crypto.randomUUID()}`),
+    content: documentTab(fileDocument({ path })),
+  }
+  const groupId = panels.editorGroups.activeGroupId
+  const selected = activeEditorTabForWorkbenchPanels(panels)?.id ?? null
+  const editorGroups = selectEditorGroupTab(
+    openTabInGroups(panels.editorGroups, tab),
+    groupId,
+    selected,
+  )
+  workspace.setWorkbenchPanels({ ...panels, editorGroups })
 }
 
 async function nextTaskAndFrame(): Promise<void> {

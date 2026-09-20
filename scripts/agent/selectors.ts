@@ -5,6 +5,76 @@ export const wallpaperLayerSelector = '[data-workbench] img[data-workbench-wallp
 
 // Stable handles the app already exposes. Add here, never inline a selector in a scenario.
 export const selectors = {
+  workspaceReplaceAll: (page: Page) => page.getByRole('button', { name: 'All', exact: true }),
+  editorGroupBreadcrumbs: (page: Page, index: number) =>
+    page
+      .locator('[data-editor-group-id]')
+      .nth(index)
+      .getByRole('navigation', { name: 'Breadcrumbs', exact: true }),
+  editorGroupTabStrip: (page: Page, index: number) =>
+    page
+      .locator('[data-editor-group-id]')
+      .nth(index)
+      .getByRole('tablist', { name: 'Editor tabs', exact: true }),
+  editorInsertionBeforeTab: (page: Page) =>
+    page.locator('[data-editor-tab-insertion]').locator('..').getByRole('tab'),
+  editorBlurProbeFrame: (page: Page) => page.locator('iframe[data-editor-blur-probe]'),
+  editorGroupStructuralFoldToggle: (page: Page, index: number, collapsed: boolean) =>
+    page
+      .locator('[data-editor-group-id]')
+      .nth(index)
+      .locator('[data-editor-fold-key]:not([data-editor-fold-key*="\u003aindent\u003a"])')
+      .and(
+        page.getByRole('button', {
+          name: collapsed ? 'Expand folded region' : 'Collapse foldable region',
+          exact: true,
+        }),
+      ),
+  editorGroupHistoryStates: (page: Page, index: number) =>
+    page
+      .locator('[data-editor-group-id]')
+      .nth(index)
+      .getByRole('listbox', { name: 'History states' }),
+  editorGroupDiffRows: (page: Page, index: number) =>
+    page
+      .locator('[data-editor-group-id]')
+      .nth(index)
+      .locator('.editor-diff-pane [data-editor-virtual-row]'),
+  editorGroupEmptyText: (page: Page, index: number, text: string) =>
+    page.locator('[data-editor-group-id]').nth(index).getByText(text, { exact: true }),
+  unsavedChangesDialog: (page: Page) =>
+    page.getByRole('dialog', { name: 'Unsaved changes', exact: true }),
+  editorGroupFind: (page: Page, index: number) =>
+    page
+      .locator('[data-editor-group-id]')
+      .nth(index)
+      .getByRole('textbox', { name: 'Find', exact: true }),
+  editorGroups: (page: Page) => page.locator('[data-editor-group-id]'),
+  editorGroupContent: (page: Page, index: number) =>
+    page.locator('[data-editor-group-id]').nth(index).locator('[data-editor-group-content]'),
+  editorGroupTabs: (page: Page, index: number) =>
+    page.locator('[data-editor-group-id]').nth(index).getByRole('tab'),
+  editorGroupInput: (page: Page, index: number) =>
+    page
+      .locator('[data-editor-group-id]')
+      .nth(index)
+      .getByRole('textbox', { name: 'Editor input' }),
+  editorGroupRows: (page: Page, index: number) =>
+    page.locator('[data-editor-group-id]').nth(index).locator('.editor-virtualized-row'),
+  editorGroupViewport: (page: Page, index: number) =>
+    page.locator('[data-editor-group-id]').nth(index).locator('.editor-virtualized-viewport'),
+  editorDropPreview: (page: Page) => page.locator('[data-editor-drop-preview]'),
+  editorTabInsertion: (page: Page) => page.locator('[data-editor-tab-insertion]'),
+  editorGroupDialog: (page: Page) => page.getByRole('dialog', { name: 'Move tab to group' }),
+  editorSplitHandles: (page: Page) => page.locator('[data-editor-groups]').getByRole('separator'),
+  treeItem: (page: Page, name: string) =>
+    page.getByLabel('Folder tree', { exact: true }).getByRole('treeitem', { name, exact: true }),
+  fileConflict: (page: Page, name: string) =>
+    page.getByRole('alertdialog', { name: `${name} changed on disk`, exact: true }),
+  terminalTool: (page: Page) =>
+    page
+      .getByRole('navigation', { name: 'Tool tabs' })
+      .getByRole('button', { name: 'Terminal', exact: true }),
   codeThemeOptions: (page: Page) => page.locator('[data-value^="color-theme:"]'),
   codeThemeOption: (page: Page, id: string) => page.locator(`[data-value="color-theme:${id}"]`),
   wallpaperAsset: (page: Page, id: string) =>
@@ -35,6 +105,8 @@ export const selectors = {
     page.locator('[data-editor-hidden-character="invisible"]'),
   fileIconElements: (page: Page) => page.locator(fileIconSelector),
   colorModeOption: (page: Page, mode: string) => page.locator(`[data-value="color-mode:${mode}"]`),
+  settingsFontFamily: (page: Page) =>
+    page.getByRole('textbox', { name: 'Font family', exact: true }),
   settingsSearch: (page: Page) => page.getByRole('textbox', { name: 'Search settings' }),
   settingsScopeTab: (page: Page, name: 'User' | 'Workspace' | 'Defaults') =>
     page.getByRole('tab', { name, exact: true }),
@@ -101,6 +173,10 @@ export const selectors = {
   replaceToggle: (page: Page) => page.getByRole('button', { name: 'Replace', exact: true }),
   searchResults: (page: Page) => page.getByRole('region', { name: 'Search results', exact: true }),
   chatMessage: (page: Page) => page.getByRole('textbox', { name: 'Message', exact: true }),
+  chatNewSession: (page: Page) => page.getByRole('button', { name: 'New session', exact: true }),
+  chatCorrection: (page: Page) =>
+    page.getByRole('button', { name: 'Send correction', exact: true }),
+  chatStop: (page: Page) => page.getByRole('button', { name: 'Stop current turn', exact: true }),
   chatSend: (page: Page) => page.getByRole('button', { name: 'Send message', exact: true }),
   chatMessages: (page: Page) => page.getByRole('log', { name: 'Messages', exact: true }),
   stageChanges: (page: Page) =>
@@ -198,4 +274,15 @@ export async function runPaletteCommand(page: Page, title: string) {
   await input.waitFor({ timeout: 5_000 })
   await input.fill(`>${title}`)
   await selectors.commandOption(page, title).first().click({ timeout: 5_000 })
+}
+
+export async function selectedEditorTabId(page: Page, group: number) {
+  return selectors
+    .editorGroupTabs(page, group)
+    .evaluateAll(
+      (elements) =>
+        elements
+          .find((element) => element.getAttribute('aria-selected') === 'true')
+          ?.getAttribute('data-editor-tab-id') ?? null,
+    )
 }

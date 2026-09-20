@@ -1,4 +1,4 @@
-import { isRecord } from '@workspace/contracts'
+import { isRecord } from '@workspace/utils/objects'
 
 import { errorPayload, FsError } from './fs/errors'
 import { recordRequestContext, recordRequestWarning } from './observability'

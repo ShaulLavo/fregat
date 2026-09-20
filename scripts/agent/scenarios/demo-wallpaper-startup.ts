@@ -1,3 +1,4 @@
+import { reloadDelayedDemo } from '../demo-startup'
 import type { Scenario } from './index'
 import { selectors, wallpaperLayerSelector } from '../selectors'
 import { createScriptError } from '../../structured-errors'
@@ -36,14 +37,7 @@ export const demoWallpaperStartup: Scenario = {
   },
   async run(page, { step }) {
     await page.addInitScript(captureWallpaper)
-    await page.context().route('**/*.ttf', async (route) => {
-      await new Promise((resolve) => setTimeout(resolve, 3000))
-      await route.continue()
-    })
-    await page.reload({ waitUntil: 'commit' })
-    await selectors.demoIframe(page).waitFor({ state: 'visible' })
-    const frame = await (await selectors.demoIframe(page).elementHandle())?.contentFrame()
-    if (!frame) throw createScriptError('The demo iframe did not mount.')
+    const frame = await reloadDelayedDemo(page, '**/*.ttf', 3000)
     await frame.waitForFunction('window.__wallpaperFrames?.length > 0')
     await step('first-wallpaper')
     await selectors.demoReady(page).waitFor({ timeout: 60_000 })

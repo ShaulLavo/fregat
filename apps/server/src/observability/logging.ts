@@ -1,6 +1,9 @@
+import { sanitizeErrorMessage } from './sanitize-message'
+import { elapsedMs, roundMs } from '@workspace/utils/timing'
 import { AsyncLocalStorage } from 'node:async_hooks'
 
-import { errorNumberField, errorStringField, isRecord } from '@workspace/contracts'
+import { errorNumberField, errorStringField } from '@workspace/contracts'
+import { isRecord } from '@workspace/utils/objects'
 import type { RequestLogger } from 'evlog'
 import { useLogger as getRequestLogger } from 'evlog/elysia'
 
@@ -65,7 +68,7 @@ export async function observeRequestOperation<T>(
     const result = await operation()
     recordOperationSummary({
       ...context,
-      ...summarizeResult(summarize, result),
+      ...summarize?.(result),
       durationMs: elapsedMs(startedAt),
       status: 'ok',
     })
@@ -151,10 +154,6 @@ export function recordStreamSummary(context: OperationSummary) {
   recordOperationSummary(context)
 }
 
-export function elapsedMs(startedAt: number) {
-  return roundMs(performance.now() - startedAt)
-}
-
 export function errorSummary(error: unknown) {
   if (error instanceof Error) {
     return {
@@ -223,13 +222,6 @@ function recordOperationSummary(summary: OperationSummary) {
       operations: [summary],
     },
   })
-}
-
-function summarizeResult<T>(
-  summarize: ((result: T) => Record<string, unknown>) | undefined,
-  result: T,
-) {
-  return summarize?.(result) ?? {}
 }
 
 function errorForLogger(error: unknown) {
@@ -302,10 +294,6 @@ function copySafeErrorFields(
   }
 }
 
-function sanitizeErrorMessage(message: string) {
-  return message.replaceAll(/'[^']*'/g, `'${redactedDiagnosticValue}'`)
-}
-
 function errorCause(error: Error) {
   return 'cause' in error ? error.cause : undefined
 }
@@ -372,8 +360,4 @@ function slowestCommand(
 
 function numberField(value: unknown) {
   return typeof value === 'number' && Number.isFinite(value) ? value : 0
-}
-
-function roundMs(value: number) {
-  return Math.round(value * 100) / 100
 }

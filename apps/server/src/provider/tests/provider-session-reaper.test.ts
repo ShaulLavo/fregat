@@ -9,7 +9,7 @@ import {
   sessionIdSchema,
   type SessionId,
 } from '@workspace/contracts'
-import { migrateOrchestrationDatabase } from '../../db/migrations'
+import { migratePlatformDatabase as migrateOrchestrationDatabase } from '../../db/migrations'
 import * as schema from '../../db/schema'
 import { OrchestrationProjectionPipeline } from '../../orchestration/projection-pipeline'
 import {

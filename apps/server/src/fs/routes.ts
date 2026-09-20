@@ -63,9 +63,16 @@ export function fsRoutes(fs: FileSystemService) {
         '/events',
         ({ query, request }) =>
           sseResponse(
-            toSse(fs.events(parseWatchInputs(query.path, query.paths), request.signal), {
-              event: (event) => event.type,
-            }),
+            toSse(
+              fs.events(
+                parseWatchInputs(query.path, query.paths),
+                request.signal,
+                typeof query.files === 'string' ? [query.files] : query.files,
+              ),
+              {
+                event: (event) => event.type,
+              },
+            ),
             request.signal,
           ),
         {

@@ -1,3 +1,4 @@
+import { isCanonicalDirectoryPath } from './pathHelpers'
 import type {
   FileTreeBatchOperation,
   FileTreeDropContext,
@@ -10,10 +11,6 @@ export interface FileTreeDragSession {
   draggedPaths: readonly FileTreePublicId[]
   primaryPath: FileTreePublicId
   target: FileTreeDropTarget | null
-}
-
-function isCanonicalDirectoryPath(path: string): boolean {
-  return path.endsWith('/')
 }
 
 function getPathBasename(path: string): string {

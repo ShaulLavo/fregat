@@ -129,10 +129,10 @@ export function FileEditorBody({
           onInitialPaint={recordInitialPaint}
           onScrollPositionChange={
             currentActions
-              ? (changedKey, scrollPosition) => {
+              ? (changedKey, scrollPosition, reopenScrollPosition) => {
                   if (changedKey !== key) return
 
-                  currentActions.setScrollPosition(scrollPosition)
+                  currentActions.setScrollPosition(scrollPosition, reopenScrollPosition)
                 }
               : undefined
           }

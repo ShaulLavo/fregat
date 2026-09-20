@@ -14,7 +14,11 @@ import type { CachedWorkspaceSlice, CachedWorkspaceState } from '@/features/work
 import { emptyWorkspaceSlice, emptyWorkspaceState } from '@/features/workspace/state/cache'
 import { clientErrors } from '@/lib/structured-errors'
 import { sameTabContent, tabContentKey } from '@/lib/documents/utils/tabs'
-import type { ReopenScrollPosition, TabContent } from '@/lib/documents/utils/types'
+import type {
+  EditorViewScrollPosition,
+  ReopenScrollPosition,
+  TabContent,
+} from '@/lib/documents/utils/types'
 import { createContext, use } from 'react'
 import { useStore } from 'zustand'
 import { subscribeWithSelector } from 'zustand/middleware'
@@ -47,6 +51,7 @@ type EditorWorkspaceStoreActions = {
   setEditorHistory: (contents: readonly TabContent[]) => void
   /** Merges latest scroll positions; positions for closed tabs are kept for reopen. */
   setEditorScrollPositions: (positions: readonly ReopenScrollPosition[]) => void
+  setViewScrollPositions: (positions: readonly EditorViewScrollPosition[]) => void
   setPickerOpen: (open: boolean) => void
   setRecentlyClosedTabs: (contents: readonly TabContent[]) => void
   setUiMode: (mode: WorkspaceUiMode) => void
@@ -114,6 +119,22 @@ export function createEditorWorkspaceStore(
 
         set({ reopenScrollPositions: merged })
       },
+      setViewScrollPositions: (viewScrollPositions) => {
+        const current = get().viewScrollPositions
+        if (
+          current.length === viewScrollPositions.length &&
+          current.every((entry, index) => {
+            const next = viewScrollPositions[index]
+            return (
+              next?.tabId === entry.tabId &&
+              next.position.left === entry.position.left &&
+              next.position.top === entry.position.top
+            )
+          })
+        )
+          return
+        set({ viewScrollPositions })
+      },
       setPickerOpen: (pickerOpen) => set({ pickerOpen }),
       setRecentlyClosedTabs: (recentlyClosedTabs) => set({ recentlyClosedTabs }),
       setUiMode: (uiMode) => set({ uiMode }),
@@ -166,6 +187,7 @@ function currentWorkspaceSlice(state: EditorWorkspaceStore): CachedWorkspaceSlic
     editorHistory: state.editorHistory,
     recentlyClosedTabs: state.recentlyClosedTabs,
     reopenScrollPositions: state.reopenScrollPositions,
+    viewScrollPositions: state.viewScrollPositions,
     workbenchPanels: state.workbenchPanels,
   }
 }
@@ -176,6 +198,7 @@ function activeWorkspaceState(slice: CachedWorkspaceSlice) {
     editorHistory: slice.editorHistory,
     recentlyClosedTabs: slice.recentlyClosedTabs,
     reopenScrollPositions: slice.reopenScrollPositions,
+    viewScrollPositions: slice.viewScrollPositions,
   }
 }
 

@@ -20,6 +20,8 @@
     "test:browser": "vitest run --project browser"
   },
   "dependencies": {
+    "@workspace/observability": "workspace:*",
+    "@workspace/utils": "workspace:*",
     "evlog": "catalog:",
     "zustand": "^5.0.15"
   },

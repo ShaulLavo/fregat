@@ -1,3 +1,5 @@
+import { installSignalHandlers } from './process-signals'
+import { errorMessage } from '../packages/contracts/src/error-fields'
 import path from 'node:path'
 import { observabilityEnvFromFile } from '../packages/observability/src/env-file'
 import {
@@ -54,19 +56,4 @@ function configureRuntime(webHost: string, webPort: number) {
     webHost,
     webPort,
   )
-}
-
-function installSignalHandlers(child: ReturnType<typeof Bun.spawn>) {
-  const stop = (signal: NodeJS.Signals) => {
-    child.kill(signal)
-  }
-
-  process.once('SIGINT', stop)
-  process.once('SIGTERM', stop)
-}
-
-function errorMessage(error: unknown) {
-  if (error instanceof Error) return error.message
-
-  return String(error)
 }

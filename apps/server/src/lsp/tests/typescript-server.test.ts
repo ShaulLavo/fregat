@@ -4,7 +4,7 @@ import {
   mergeClientCapabilities,
   semanticTokensClientCapability,
 } from '@singapore-editor/lsp'
-import { isRecord } from '@workspace/contracts'
+import { isRecord } from '@workspace/utils/objects'
 import { afterEach, describe, expect, it } from 'vitest'
 
 import { installedTypeScriptRuntimeFixture } from '../../../test/factories/typescript-runtime'

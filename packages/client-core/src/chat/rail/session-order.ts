@@ -1,3 +1,4 @@
+import { timestampMs as orderTimestampMs } from './timestamp'
 import type { ProjectionSession } from '@workspace/client-core/chat/types'
 import { compareOrderKeys } from '@workspace/client-core/chat/rail/reorder'
 
@@ -23,8 +24,3 @@ export function compareSessionsForRail(left: SessionOrderSource, right: SessionO
 }
 
 /** A malformed stamp must not poison the whole ordering, so it sinks to the epoch. */
-function orderTimestampMs(value: string) {
-  const parsed = Date.parse(value)
-
-  return Number.isNaN(parsed) ? 0 : parsed
-}

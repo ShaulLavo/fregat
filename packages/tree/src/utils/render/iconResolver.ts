@@ -1,3 +1,4 @@
+import { normalizeText as normalizeIconRuleKey } from '@workspace/utils/strings'
 import { getBuiltInFileIconName, resolveBuiltInFileIconToken } from '../builtInIcons'
 import { type FileTreeIcons, normalizeFileTreeIcons, type RemappedIcon } from '../iconConfig'
 import type { SVGSpriteNames } from '../sprite'
@@ -10,8 +11,6 @@ export interface FileTreeResolvedIcon {
   viewBox?: string
   width?: number
 }
-
-const normalizeIconRuleKey = (value: string): string => value.trim().toLowerCase()
 
 const getBaseFileName = (path: string): string => {
   const parts = path.split('/')

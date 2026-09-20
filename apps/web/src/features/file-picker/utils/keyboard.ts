@@ -1,3 +1,4 @@
+import { hasCommandModifier } from '@workspace/utils/keyboard'
 export type PickerKeyboardEvent = {
   altKey: boolean
   code?: string
@@ -25,8 +26,4 @@ export function isToggleHiddenShortcut(event: PickerKeyboardEvent) {
 
 export function isGoUpShortcut(event: PickerKeyboardEvent) {
   return hasCommandModifier(event) && !event.shiftKey && event.key === 'ArrowUp'
-}
-
-function hasCommandModifier(event: PickerKeyboardEvent) {
-  return event.metaKey || event.ctrlKey
 }

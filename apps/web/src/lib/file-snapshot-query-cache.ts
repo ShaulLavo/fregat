@@ -1,3 +1,4 @@
+import { markEditorOpenBenchmark } from '@/lib/editor-open-benchmark-mark'
 import { filesystemPath } from '@/lib/documents/utils/identity'
 import type { FilesystemPath } from '@/lib/documents/utils/types'
 import type { Query, QueryClient, QueryKey } from '@tanstack/react-query'
@@ -35,13 +36,6 @@ export function fileSnapshotQueryOptions(
     queryKey: fileSystemKeys.fileSnapshot(path),
     staleTime: FILE_SNAPSHOT_STALE_MS,
   }
-}
-
-function markEditorOpenBenchmark(name: string, path: FilesystemPath): void {
-  const traceGlobal = globalThis as typeof globalThis & { readonly __editorPerfTrace?: unknown }
-  if (!traceGlobal.__editorPerfTrace) return
-
-  globalThis.performance?.mark(name, { detail: { path } })
 }
 
 export function setFileSnapshotQueryData(

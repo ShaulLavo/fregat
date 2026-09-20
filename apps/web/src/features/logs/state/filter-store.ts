@@ -1,3 +1,4 @@
+import { createSubscriptions } from '@workspace/utils/subscriptions'
 /**
  * The log dashboard's filters, lifted out of the panel so an address can name them.
  *
@@ -25,7 +26,8 @@ let filters: LogsFilterState | null = null
  * call is an infinite render loop.
  */
 let defaultsSnapshot = defaultLogsFilterState()
-const listeners = new Set<() => void>()
+const subscriptions = createSubscriptions()
+const subscribeLogsFilters = subscriptions.subscribe
 
 function currentFilters() {
   if (filters) return filters
@@ -53,7 +55,7 @@ export function readLogsFilters() {
 
 export function setLogsFilters(next: LogsFilterState) {
   filters = next
-  for (const listener of listeners) listener()
+  subscriptions.notify()
 }
 
 /**
@@ -64,15 +66,7 @@ export function setLogsFilters(next: LogsFilterState) {
  */
 export function resetLogsFilters() {
   filters = null
-  for (const listener of listeners) listener()
-}
-
-function subscribeLogsFilters(listener: () => void) {
-  listeners.add(listener)
-
-  return () => {
-    listeners.delete(listener)
-  }
+  subscriptions.notify()
 }
 
 export function useLogsFilters() {

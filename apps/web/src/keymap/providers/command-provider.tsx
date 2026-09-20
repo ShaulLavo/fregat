@@ -1,3 +1,4 @@
+import { activeEditorTabForWorkbenchPanels } from '@/features/workbench/utils/panels'
 import { wallpaperLibraryOptions } from '@/lib/wallpapers/state/queries'
 import { selectSettingsSearch } from '@/features/settings/state/search-store'
 import { selectSettingsView } from '@/features/settings/state/view-store'
@@ -209,8 +210,9 @@ export function CommandProvider({ children }: { readonly children: ReactNode }) 
       discardAndCloseTab: (...args) => adaptersRef.current.editor.discardAndCloseTab(...args),
       discardLiveEditorDocument: (...args) =>
         adaptersRef.current.editor.discardLiveEditorDocument(...args),
-      moveTabToPane: (...args) => adaptersRef.current.editor.moveTabToPane(...args),
-      moveTabToSplit: (...args) => adaptersRef.current.editor.moveTabToSplit(...args),
+      placeTab: (...args) => adaptersRef.current.editor.placeTab(...args),
+      resizeEditorSplit: (...args) => adaptersRef.current.editor.resizeEditorSplit(...args),
+      requestMoveTab: (...args) => adaptersRef.current.editor.requestMoveTab(...args),
       openDefinition: (...args) => adaptersRef.current.editor.openDefinition(...args),
       openTabContent: (...args) => adaptersRef.current.editor.openTabContent(...args),
       selectContent: (...args) => adaptersRef.current.editor.selectContent(...args),
@@ -220,12 +222,10 @@ export function CommandProvider({ children }: { readonly children: ReactNode }) 
       reopenClosedEditor: (...args) => adaptersRef.current.editor.reopenClosedEditor(...args),
       renameLiveEditorDocument: (...args) =>
         adaptersRef.current.editor.renameLiveEditorDocument(...args),
-      reorderTab: (...args) => adaptersRef.current.editor.reorderTab(...args),
       selectFile: (...args) => adaptersRef.current.editor.selectFile(...args),
       selectPreviousEditor: (...args) => adaptersRef.current.editor.selectPreviousEditor(...args),
       selectTab: (...args) => adaptersRef.current.editor.selectTab(...args),
-      setActivePane: (...args) => adaptersRef.current.editor.setActivePane(...args),
-      splitTab: (...args) => adaptersRef.current.editor.splitTab(...args),
+      setActiveGroup: (...args) => adaptersRef.current.editor.setActiveGroup(...args),
     },
     files: {
       openFileAtRef: (path, ref) => adaptersRef.current.openFileAtRef(path, ref),
@@ -348,7 +348,7 @@ export function CommandProvider({ children }: { readonly children: ReactNode }) 
   }
   const handleSettingsOpenChange = (open: boolean) => {
     if (open) return
-    const tabId = workspace.getState().workbenchPanels.activeEditorTabId
+    const tabId = activeEditorTabForWorkbenchPanels(workspace.getState().workbenchPanels)?.id
     if (tabId) void adaptersRef.current.editor.closeTab(tabId)
     settingsRestoreRef.current = settingsOrigin
     setSettingsOrigin(null)

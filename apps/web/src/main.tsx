@@ -16,6 +16,7 @@ import { browserAddressHref } from '@/features/address/utils/browser-url'
 import { createBrowserHistory } from '@tanstack/react-router'
 import { createApplicationRouter } from '@/state/router'
 import { createNavigation } from '@/state/navigation'
+import { canPlaceEditorTab } from '@/lib/documents/state/group-geometry'
 import { NavigationProvider } from '@/providers/navigation-provider'
 import { LoggingErrorBoundary } from '@/components/logging-error-boundary.tsx'
 import {} from '@/features/settings/providers/appearance-provider.tsx'
@@ -73,7 +74,7 @@ const initialBrowserHref = browserAddressHref(initialHref)
 if (routerHistory.location.href !== initialBrowserHref) routerHistory.replace(initialBrowserHref)
 routerHistory.flush()
 const router = createApplicationRouter({ history: routerHistory })
-const navigation = createNavigation(router, initialIntent)
+const navigation = createNavigation(router, initialIntent, { canPlaceTab: canPlaceEditorTab })
 
 createRoot(document.getElementById('root')!, {
   onCaughtError: (error, errorInfo) => {

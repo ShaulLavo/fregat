@@ -1,3 +1,4 @@
+import { clamp } from '@workspace/utils/numbers'
 export type FileListVirtualItem = {
   index: number
   key: string
@@ -144,8 +145,4 @@ function findFirstItemStartingAtOrAfter(items: readonly FileListVirtualItem[], o
 
 function encodeIdPart(value: string) {
   return Array.from(value, (character) => character.codePointAt(0)?.toString(16) ?? '').join('-')
-}
-
-function clamp(value: number, minimum: number, maximum: number) {
-  return Math.min(Math.max(value, minimum), maximum)
 }

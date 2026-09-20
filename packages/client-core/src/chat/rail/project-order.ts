@@ -1,3 +1,4 @@
+import { timestampMs as orderTimestampMs } from './timestamp'
 import type { OrchestrationProjectShell, ProjectId } from '@workspace/contracts'
 
 import { compareOrderKeys } from '@workspace/client-core/chat/rail/reorder'
@@ -34,10 +35,4 @@ export function withProjectOrderKey(
   if (orderKey === project.orderKey) return project
 
   return { ...project, orderKey }
-}
-
-function orderTimestampMs(value: string) {
-  const parsed = Date.parse(value)
-
-  return Number.isNaN(parsed) ? 0 : parsed
 }

@@ -1,4 +1,6 @@
-import { isRecord } from '@workspace/contracts'
+import { nodeErrorCode } from '@workspace/contracts'
+import { sanitizeErrorMessage as sanitizeCauseMessage } from '../observability/sanitize-message'
+import { isRecord } from '@workspace/utils/objects'
 import { EvlogError } from 'evlog'
 
 export type FsErrorCode =
@@ -128,14 +130,6 @@ export function errorPayload(error: FsError) {
   }
 }
 
-export function nodeErrorCode(error: unknown) {
-  if (!error || typeof error !== 'object') return null
-  if (!('code' in error)) return null
-
-  const code = error.code
-  return typeof code === 'string' ? code : null
-}
-
 function sanitizeCause(cause: unknown, seen = new WeakSet<object>()): unknown {
   if (cause === undefined) return undefined
   if (cause instanceof Error) return sanitizeCauseError(cause, seen)
@@ -176,8 +170,4 @@ function copyCauseFields(source: Error, target: Record<string, unknown>, seen: W
       ? redactedDiagnosticValue
       : sanitizeCause(value, seen)
   }
-}
-
-function sanitizeCauseMessage(message: string) {
-  return message.replaceAll(/'[^']*'/g, `'${redactedDiagnosticValue}'`)
 }

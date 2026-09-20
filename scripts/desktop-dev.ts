@@ -1,3 +1,4 @@
+import { installSignalHandlers } from './process-signals'
 import path from 'node:path'
 import { observabilityEnabledFromEnv } from '../packages/observability/src/env'
 import { observabilityEnvFromFile } from '../packages/observability/src/env-file'
@@ -15,12 +16,3 @@ const child = Bun.spawn({
 
 installSignalHandlers(child)
 process.exit(await child.exited)
-
-function installSignalHandlers(child: ReturnType<typeof Bun.spawn>) {
-  const stop = (signal: NodeJS.Signals) => {
-    child.kill(signal)
-  }
-
-  process.once('SIGINT', stop)
-  process.once('SIGTERM', stop)
-}

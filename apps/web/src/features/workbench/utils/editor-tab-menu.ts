@@ -8,6 +8,7 @@ import {
 } from '@/features/workspace/utils/tab-close-targets'
 import type { EditorTabModel } from '@/features/workspace/utils/tab-types'
 import type { FilesystemPath, TabId } from '@/lib/documents/utils/types'
+import type { GroupEdge } from '@/lib/documents/utils/group-types'
 import { actionItem, section, type Menu } from '@/keymap/menus/utils/model'
 
 export type EditorTabMenuContext = {
@@ -16,6 +17,11 @@ export type EditorTabMenuContext = {
   readonly closeTabs: (tabIds: readonly TabId[]) => void
   readonly openFile: (path: FilesystemPath) => void
   readonly tab: EditorTabModel
+  readonly canSplitRight: boolean
+  readonly canSplitDown: boolean
+  readonly canMoveToGroup: boolean
+  readonly split: (edge: GroupEdge) => void
+  readonly moveToGroup: () => void
 }
 
 export function editorTabMenu(context: EditorTabMenuContext): Menu {
@@ -28,6 +34,29 @@ export function editorTabMenu(context: EditorTabMenuContext): Menu {
       closeAction(context, 'closeToRight', 'Close to the Right', ArrowRightIcon),
       closeAction(context, 'closeSaved', 'Close Saved', FloppyDiskIcon),
       closeAction(context, 'closeAll', 'Close All', XIcon),
+    ]),
+    section('groups', [
+      actionItem({
+        id: 'splitRight',
+        label: 'Split Right',
+        icon: FilesIcon,
+        disabled: !context.canSplitRight,
+        run: () => context.split('right'),
+      }),
+      actionItem({
+        id: 'splitDown',
+        label: 'Split Down',
+        icon: FilesIcon,
+        disabled: !context.canSplitDown,
+        run: () => context.split('bottom'),
+      }),
+      actionItem({
+        id: 'moveToGroup',
+        label: 'Move to Group…',
+        icon: ArrowRightIcon,
+        disabled: !context.canMoveToGroup,
+        run: context.moveToGroup,
+      }),
     ]),
     section('open', [
       // Only a diff tab has a file behind it worth jumping to; a file tab is

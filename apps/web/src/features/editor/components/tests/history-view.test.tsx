@@ -1,11 +1,6 @@
 import { filesystemPath, tabId } from '@/lib/documents/utils/identity'
-import {
-  commitPreparedDocumentTransaction,
-  createEditorBufferSession,
-  prepareDocumentTransaction,
-  type EditorTextBuffer,
-} from '@singapore-editor/core'
-import { screen, waitFor } from '@testing-library/react'
+import type { EditorTextBuffer } from '@singapore-editor/core'
+import { screen, waitFor, within } from '@testing-library/react'
 import userEvent from '@testing-library/user-event'
 
 import { HistoryView } from '@/features/editor/components/history-view'
@@ -13,10 +8,16 @@ import {
   EditorDocumentStateContext,
   createEditorDocumentStore,
 } from '@/features/editor/state/document-state'
+import { createEditorUiStore, EditorUiStateContext } from '@/features/editor/state/ui-state'
+import { FocusService } from '@/lib/focus/state/service'
 import { stubEditorViewport } from '../../../../../test/env/editor-viewport'
 import { stubHighlightApi } from '../../../../../test/env/highlight-api'
 import { expect, test } from '../../../../../test/fixtures'
 import { renderWithProviders } from '../../../../../test/render'
+import {
+  commitHistoryBarrier,
+  historyDocument,
+} from '../../../../../test/factories/history-document'
 
 const FILE = filesystemPath('repo/a.ts')
 const SAVED = 'alpha\nbeta\n'
@@ -62,16 +63,55 @@ test('clears history after confirmation and leaves the text alone', async () => 
   expect(buffer.canUndo()).toBe(false)
 })
 
+test('keeps the focused history state when its tab moves into another group', async () => {
+  stubEditorViewport()
+  const user = userEvent.setup()
+  const rendered = await renderHistory({ edits: ['one', 'two'] })
+  const options = await screen.findAllByRole('option')
+  await user.click(options[1]!)
+  await waitFor(() => expect(diffRowTexts()).toContain('alphaone'))
+
+  rendered.remount()
+
+  await waitFor(() => {
+    expect(screen.getByRole('listbox', { name: 'History states' })).toHaveAttribute(
+      'aria-activedescendant',
+      screen.getAllByRole('option')[1]!.id,
+    )
+    expect(diffRowTexts()).toContain('alphaone')
+  })
+})
+
+test('focuses the history graph or its diff without registering competing tab targets', async () => {
+  stubEditorViewport()
+  const user = userEvent.setup()
+  const { focus } = await renderHistory({ edits: ['one'] })
+  await screen.findByText('This is the current state.')
+  const destination = {
+    kind: 'match' as const,
+    matches: (target: { id: { kind: string; tabId?: string; side?: string } }) =>
+      target.id.kind === 'editor' && target.id.tabId === 'tab-history' && target.id.side !== 'old',
+  }
+
+  await expect(focus.request(destination).completion).resolves.toMatchObject({
+    status: 'acknowledged',
+    targetId: { surface: 'history', tabId: 'tab-history' },
+  })
+  const options = await screen.findAllByRole('option')
+  await user.click(options[0]!)
+  await waitFor(() => expect(diffRowTexts()).toContain('alpha'))
+  await expect(focus.request(destination).completion).resolves.toMatchObject({
+    status: 'acknowledged',
+    targetId: { surface: 'diff', tabId: 'tab-history' },
+  })
+})
+
 test('the barrier before a workspace edit is a state of its own', async () => {
   stubEditorViewport()
   const user = userEvent.setup()
   const rendered = await renderHistory({ edits: ['one'] })
   const buffer = requireBuffer(rendered.buffer)
-  const committed = commitPreparedDocumentTransaction(
-    { buffer, sourceView: null },
-    prepareDocumentTransaction(buffer, [{ from: 0, to: 1, text: 'A' }], 2, null),
-    { history: { groupId: 'rename', kind: 'external-barrier' } },
-  )
+  const committed = commitHistoryBarrier(buffer, [{ from: 0, to: 1, text: 'A' }])
   expect(committed.status).toBe('committed')
 
   const barrier = await screen.findByRole('option', { name: /Workspace edit/ })
@@ -81,36 +121,87 @@ test('the barrier before a workspace edit is a state of its own', async () => {
   expect(screen.queryByRole('button', { name: 'Undo workspace edit' })).not.toBeInTheDocument()
 })
 
+test('moving into a group with another history tab preserves the selected barrier', async () => {
+  stubEditorViewport()
+  stubHighlightApi()
+  const store = createEditorDocumentStore()
+  const uiStore = createEditorUiStore()
+  const otherFile = filesystemPath('repo/b.ts')
+  for (const path of [FILE, otherFile]) {
+    const { buffer } = historyDocument({ store, path, content: SAVED })
+    expect(commitHistoryBarrier(buffer, [{ from: 0, to: 1, text: 'A' }]).status).toBe('committed')
+  }
+
+  function body(moved: boolean) {
+    return (
+      <EditorDocumentStateContext value={store}>
+        <EditorUiStateContext value={uiStore}>
+          <section aria-label='Source group'>
+            {moved ? (
+              <div>Another selected tab</div>
+            ) : (
+              <HistoryView path={FILE} tabId={tabId('a')} />
+            )}
+          </section>
+          <section aria-label='Destination group'>
+            <HistoryView path={moved ? FILE : otherFile} tabId={tabId(moved ? 'a' : 'b')} />
+          </section>
+        </EditorUiStateContext>
+      </EditorDocumentStateContext>
+    )
+  }
+
+  const rendered = renderWithProviders(body(false))
+  const user = userEvent.setup()
+  const source = within(await screen.findByRole('region', { name: 'Source group' }))
+  const destination = within(screen.getByRole('region', { name: 'Destination group' }))
+  await user.click(await source.findByRole('option', { name: /Workspace edit/ }))
+  expect(source.getByText('Earlier history is behind a workspace edit.')).toBeInTheDocument()
+
+  rendered.rerender(body(true))
+
+  expect(
+    await destination.findByText('Earlier history is behind a workspace edit.'),
+  ).toBeInTheDocument()
+  rendered.rerender(body(false))
+  expect(await destination.findByText('This is the current state.')).toBeInTheDocument()
+  expect(await source.findByText('Earlier history is behind a workspace edit.')).toBeInTheDocument()
+})
+
 async function renderHistory({ edits }: { edits: readonly string[] | null }) {
   stubHighlightApi()
   const store = createEditorDocumentStore()
+  const uiStore = createEditorUiStore()
+  const focus = new FocusService()
   const document =
     edits === null
       ? null
-      : store.getState().ensureLiveEditorDocument({
+      : historyDocument({
+          store,
           content: SAVED,
-          mtimeMs: 1,
           path: FILE,
-          size: SAVED.length,
-          version: 'v1',
+          cursorOffset: 5,
+          insertions: edits,
         })
-  if (document && edits) {
-    const session = createEditorBufferSession(document.buffer)
-    session.setSelection(5)
-    for (const text of edits) {
-      session.applyText(text)
-      session.breakTypingRun()
-    }
-  }
 
   // renderWithProviders mounts under StrictMode, as the app does: the viewer must survive the
   // mount, unmount, mount rehearsal.
-  const rendered = renderWithProviders(
-    <EditorDocumentStateContext.Provider value={store}>
-      <HistoryView path={FILE} tabId={tabId('tab-history')} />
-    </EditorDocumentStateContext.Provider>,
-  )
-  return { ...rendered, buffer: document?.buffer ?? null }
+  function body(key: string) {
+    return (
+      <EditorDocumentStateContext.Provider value={store}>
+        <EditorUiStateContext value={uiStore}>
+          <HistoryView key={key} path={FILE} tabId={tabId('tab-history')} />
+        </EditorUiStateContext>
+      </EditorDocumentStateContext.Provider>
+    )
+  }
+  const rendered = renderWithProviders(body('before-move'), { focusService: focus })
+  return {
+    ...rendered,
+    buffer: document?.buffer ?? null,
+    focus,
+    remount: () => rendered.rerender(body('after-move')),
+  }
 }
 
 function requireBuffer(buffer: EditorTextBuffer | null): EditorTextBuffer {

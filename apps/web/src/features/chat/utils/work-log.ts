@@ -1,3 +1,5 @@
+import { sameItems as stringListsEqual } from '@workspace/utils/collections'
+import { compactActivityLabel } from '@/features/chat/utils/activity-label'
 import type { OrchestrationLatestTurn, OrchestrationSessionActivity } from '@workspace/contracts'
 
 import {
@@ -159,12 +161,6 @@ function chatWorkLogPlanEquals(left: ChatWorkLogPlan | null, right: ChatWorkLogP
 
 function planStepEquals(left: ChatActivityPlanStep, right: ChatActivityPlanStep | undefined) {
   return left.status === right?.status && left.step === right.step
-}
-
-function stringListsEqual(left: readonly string[], right: readonly string[]) {
-  if (left.length !== right.length) return false
-
-  return left.every((value, index) => value === right[index])
 }
 
 function isActivityForWorkLog(activity: OrchestrationSessionActivity) {
@@ -488,8 +484,4 @@ function stringPayloadValue(payload: unknown, key: string) {
 
   const value = (payload as Record<string, unknown>)[key]
   return typeof value === 'string' && value.trim().length > 0 ? value : null
-}
-
-function compactActivityLabel(value: string) {
-  return value.replace(/\s+(?:started|updated|complete|completed)\s*$/i, '').trim()
 }

@@ -32,7 +32,7 @@ function searchMatchPreview(match: WorkspaceSearchMatch) {
   return match.preview || 'Matched line'
 }
 
-function searchMatchPreviewRange(match: WorkspaceSearchMatch, preview: string) {
+export function searchMatchPreviewRange(match: WorkspaceSearchMatch, preview: string) {
   if (match.kind !== 'content') return null
   if (match.column === undefined || match.endColumn === undefined) return null
 
@@ -52,7 +52,7 @@ function searchQueryDisplay(text: string, query: string, options: SearchMatchDis
   return searchRangeDisplay(text, range, options)
 }
 
-function queryRange(text: string, query: string) {
+export function queryRange(text: string, query: string) {
   if (!query) return null
 
   const start = text.toLocaleLowerCase().indexOf(query.toLocaleLowerCase())

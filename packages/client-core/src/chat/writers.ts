@@ -1,3 +1,4 @@
+import { isProviderTurnFailureActivity } from '@workspace/contracts'
 import { shellItemKey } from './shell-item-key'
 import { projectWorktreeEvent } from './worktree-event'
 import {
@@ -1251,10 +1252,6 @@ function writeTurnFailureState(
     },
     pendingSourceProposedPlan: session.pendingSourceProposedPlan,
   })
-}
-
-function isProviderTurnFailureActivity(kind: string) {
-  return kind === 'provider.turn.start.failed' || kind === 'provider.turn.failed'
 }
 
 function writeAssistantMessageTurnState(

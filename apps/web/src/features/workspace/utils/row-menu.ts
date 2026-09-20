@@ -13,7 +13,8 @@ import {
 
 import type { GitFileStatus } from '@workspace/contracts'
 
-import { isStagedStatus, isWorktreeStatus } from '@/features/git/utils/change-rows'
+import { isWorktreeStatus } from '@/lib/git-status'
+import { isStagedStatus } from '@/lib/git-status'
 import { actionItem, section, type Menu } from '@/keymap/menus/utils/model'
 
 export type RowGitActions = {

@@ -1,3 +1,4 @@
+import { elapsedMs } from '@workspace/utils/timing'
 import {
   ORCHESTRATION_WS_RESULTS,
   orchestrationShellStreamItemSchema,
@@ -22,7 +23,8 @@ import { AsyncSubscriptionQueue, drainSubscriptionQueue } from './subscription-q
 import type { createEnvironmentsStore } from '../environments/state/store'
 import { createClientError } from '../errors'
 import { createOrchestrationRpcClosedError } from './structured-errors'
-import { chatCommandSummary, chatReplaySummary } from './utils/logging'
+import { chatCommandSummary } from '@workspace/contracts'
+import { orchestrationReplaySummary as chatReplaySummary } from '@workspace/contracts'
 import { guardOrchestrationStreamSequence } from './utils/sequence'
 import type { OrchestrationStreamInput } from './streams'
 import type {
@@ -788,10 +790,6 @@ function createOrchestrationRpcHeartbeatTimeoutError() {
     why: 'The socket stayed open but the server never answered a ping, so it is half-open.',
     fix: 'Let the chat supervisors reconnect; inspect the server if heartbeats keep timing out.',
   })
-}
-
-function elapsedMs(startedAt: number) {
-  return Math.round((performance.now() - startedAt) * 100) / 100
 }
 
 function settleParsedResult<TSchema extends v.GenericSchema>({

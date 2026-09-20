@@ -1,3 +1,4 @@
+import { nonEmptyText as normalizeCustomAnswer } from '@workspace/utils/strings'
 import {
   approvalRequestIdSchema,
   userInputQuestionSchema,
@@ -193,12 +194,6 @@ function otherAnswer(question: UserInputQuestion, draft: UserInputAnswerDraft | 
   if (!question.allowOther) return null
 
   return normalizeCustomAnswer(draft?.customAnswer)
-}
-
-function normalizeCustomAnswer(value: string | undefined) {
-  const text = value?.trim()
-
-  return text ? text : null
 }
 
 function normalizeSelectedValues(value: readonly string[] | undefined): string[] {

@@ -1,3 +1,4 @@
+import { reloadDelayedDemo } from '../demo-startup'
 import type { Scenario } from './index'
 import { selectors } from '../selectors'
 import { createScriptError } from '../../structured-errors'
@@ -35,14 +36,7 @@ export const demoThemeStartup: Scenario = {
   async run(page, { step }) {
     await page.emulateMedia({ colorScheme: 'light' })
     await page.addInitScript(captureTheme)
-    await page.context().route('**/demo/assets/demo-*.js', async (route) => {
-      await new Promise((resolve) => setTimeout(resolve, 1500))
-      await route.continue()
-    })
-    await page.reload({ waitUntil: 'commit' })
-    await selectors.demoIframe(page).waitFor({ state: 'visible' })
-    const frame = await (await selectors.demoIframe(page).elementHandle())?.contentFrame()
-    if (!frame) throw createScriptError('The demo iframe did not mount.')
+    const frame = await reloadDelayedDemo(page, '**/demo/assets/demo-*.js', 1500)
     await frame.waitForFunction('window.__themeFrames?.length > 0')
     await step('first-paint')
     await selectors.demoReady(page).waitFor({ timeout: 60_000 })

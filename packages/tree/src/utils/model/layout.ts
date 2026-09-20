@@ -1,3 +1,4 @@
+import { clamp } from '@workspace/utils/numbers'
 export type FileTreeLayoutRow = {
   ancestorPaths: readonly string[]
   isExpanded: boolean
@@ -65,10 +66,6 @@ export type FileTreeLayoutSnapshot<Row extends FileTreeLayoutRow = FileTreeLayou
     offsetTop: number
     startIndex: number
   }
-}
-
-function clamp(value: number, minimum: number, maximum: number): number {
-  return Math.min(Math.max(value, minimum), maximum)
 }
 
 function createRange(startIndex: number, endIndex: number): FileTreeLayoutRange {

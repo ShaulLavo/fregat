@@ -1,5 +1,5 @@
 import { prefersReducedMotion } from '@/features/workbench/utils/wallpaper'
-import { useLayoutEffect, useRef } from 'react'
+import { useCallback, useLayoutEffect, useRef } from 'react'
 
 import {
   createTabStripMetrics,
@@ -15,7 +15,10 @@ const TAB_STRIP_GUTTER = 8
  * quick access, a git diff, go-to-definition, a chat checkpoint — selects a tab
  * that may sit outside the scroll window, and nothing else brings it back.
  */
-export function useActiveTabStripScroll(activeTabId: string | null) {
+export function useActiveTabStripScroll(
+  activeTabId: string | null,
+  onNode?: (node: HTMLDivElement | null) => void,
+) {
   const stripRef = useRef<HTMLDivElement>(null)
   const metricsRef = useRef<TabStripMetrics | null>(null)
   const hasRevealedRef = useRef(false)
@@ -53,7 +56,14 @@ export function useActiveTabStripScroll(activeTabId: string | null) {
     strip.scrollTo({ behavior, left })
   }, [activeTabId])
 
-  return stripRef
+  // The strip metrics and a drag target can share one stable callback ref.
+  return useCallback(
+    (node: HTMLDivElement | null) => {
+      stripRef.current = node
+      onNode?.(node)
+    },
+    [onNode],
+  )
 }
 
 /** Motion is the point, but not against the wishes of someone who asked the OS for less of it. */

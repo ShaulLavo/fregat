@@ -9,26 +9,13 @@ import { Select } from '@/components/select'
 import { LoadingState } from '@/components/loading-state'
 import { EmptyState } from '@/components/empty-state'
 import { OrbitLoader } from '@/components/orbit-loader'
-import type { SettingsSession } from '@/connection/state/session'
+import type { WorkbenchPaneProps } from '@/workbench/utils/pane-props'
 import { createGitWorkbench } from '@/git/state/workbench'
 import { actionLabels, actionTitles, type GitDialog } from '@/git/utils/actions'
 import { gitRows } from '@/git/utils/rows'
 import { DiffView } from '@/git/components/diff'
-import type { Theme } from '@/theme/utils/theme'
 
-export function GitPane({
-  session,
-  rootPath,
-  theme,
-  enabled,
-  onOpenFile,
-}: {
-  session: SettingsSession
-  rootPath: string
-  theme: Theme
-  enabled: boolean
-  onOpenFile: (path: string, line?: number) => void
-}) {
+export function GitPane({ session, rootPath, theme, enabled, onOpenFile }: WorkbenchPaneProps) {
   const commands = useCommands()
   const [store] = useState(() => createGitWorkbench(session.client, rootPath))
   const state = useSyncExternalStore(store.subscribe, store.getSnapshot)

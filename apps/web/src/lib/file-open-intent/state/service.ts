@@ -1,3 +1,5 @@
+import { isRecord } from '@workspace/utils/objects'
+import { markEditorOpenBenchmark } from '@/lib/editor-open-benchmark-mark'
 import { fileDocumentKey, filesystemPath } from '@/lib/documents/utils/identity'
 import type { DocumentKey, FilesystemPath, TabId } from '@/lib/documents/utils/types'
 import type { QueryClient } from '@tanstack/react-query'
@@ -1945,10 +1947,6 @@ function diagnosticCount(
   ).length
 }
 
-function isRecord(value: unknown): value is Record<string, unknown> {
-  return typeof value === 'object' && value !== null && !Array.isArray(value)
-}
-
 function createCleanBuffer(
   file: FileResult,
   createBuffer: (text: string) => EditorTextBuffer,
@@ -1984,13 +1982,6 @@ function fileResultIdentity(value: unknown): FileResultIdentity | null {
   if (typeof value.path !== 'string') return null
   if (typeof value.version !== 'string') return null
   return { path: filesystemPath(value.path), version: value.version }
-}
-
-function markEditorOpenBenchmark(name: string, path: FilesystemPath): void {
-  const traceGlobal = globalThis as typeof globalThis & { readonly __editorPerfTrace?: unknown }
-  if (!traceGlobal.__editorPerfTrace) return
-
-  globalThis.performance?.mark(name, { detail: { path } })
 }
 
 function canonicalPath(path: FilesystemPath): FilesystemPath {

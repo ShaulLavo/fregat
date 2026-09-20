@@ -1,13 +1,12 @@
-import { expect, onTestFinished } from 'vitest'
 import { createInternalError } from '../../src/observability/structured-errors'
 import { MockProviderAdapter } from '../../src/provider/adapters/mock'
 import type { ProviderAdapter, ProviderTurnSteerInput } from '../../src/provider/types'
-import { createOrchestrationFixture, FIXTURE_SESSION_ID, mockRuntime } from './orchestration'
+import { FIXTURE_SESSION_ID } from './orchestration'
+import { startPendingProviderTurn } from './pending-provider'
 
 export async function pendingSteerableTurn(
   options: { supported?: boolean; failure?: string } = {},
 ) {
-  const fixture = await createOrchestrationFixture()
   const started = Promise.withResolvers<void>()
   const release = Promise.withResolvers<void>()
   const adapter: MockProviderAdapter & Pick<ProviderAdapter, 'steerTurn'> = new MockProviderAdapter(
@@ -24,18 +23,12 @@ export async function pendingSteerableTurn(
       corrections.push(input)
       if (options.failure) throw createInternalError(options.failure)
     }
-  onTestFinished(async () => {
-    release.resolve()
-    await fixture.engine.providerRuntimeIdle()
-    await fixture.close()
+  const pending = await startPendingProviderTurn({
+    adapter,
+    started: started.promise,
+    release: () => release.resolve(),
   })
-  const registration = await fixture.register()
-  expect(registration.result).not.toBeNull()
-  await fixture.createSession(registration.result!.worktreeId)
-  await fixture.restart(mockRuntime(adapter))
-  await fixture.startTurn()
-  await started.promise
-  return { fixture, adapter, corrections, release: () => release.resolve() }
+  return { ...pending, corrections }
 }
 
 export function correctionCommand(overrides: { commandId?: string; turnId?: string } = {}) {

@@ -1,7 +1,7 @@
 import type { GitFileStatus } from '@workspace/contracts'
 import { EmptyState } from '@workspace/ui/components/empty-state'
 import { cn } from '@workspace/ui/lib/utils'
-import { Activity, useCallback, useMemo, useRef, type ComponentProps, type ReactNode } from 'react'
+import { Activity, useMemo, type ComponentProps, type ReactNode } from 'react'
 import { useIsFetching } from '@tanstack/react-query'
 import { Button } from '@workspace/ui/components/button'
 import { PaneBar } from '@workspace/ui/components/pane-bar'
@@ -18,7 +18,7 @@ import { ChangeGroup } from '@/features/git/components/change-group'
 import { CommitControls } from '@/features/git/components/commit-controls'
 import { PanelLoading } from '@/features/git/components/panel-loading'
 import { diffDocumentQueryKey } from '@/features/git/utils/diff-document-query'
-import { useFocusTarget } from '@/lib/focus/hooks/use-target'
+import { FocusablePanel } from '@/components/focusable-panel'
 import { queryHasNoData } from '@/lib/query-state'
 import { StaleNotice } from '@/lib/environments/components/stale-notice'
 
@@ -39,26 +39,7 @@ export function Panel({ className, rootPath }: ComponentProps<'section'> & { roo
   const repository = status.data?.repository ?? null
   const rows = useMemo(() => changeRows(files), [files])
   const hasLocalChanges = rows.staged.length > 0 || rows.worktree.length > 0
-  const rootRef = useRef<HTMLElement | null>(null)
-  const { ref: focusTargetRef } = useFocusTarget<HTMLElement>({
-    area: 'git',
-    id: { kind: 'git', rootPath },
-    onIntent: (intent) => {
-      if (intent !== 'focus') return false
-      if (!rootRef.current) return false
 
-      rootRef.current.focus()
-      return true
-    },
-  })
-  // Stable identity keeps the target registration mounted across query updates.
-  const setRootRef = useCallback(
-    (element: HTMLElement | null) => {
-      rootRef.current = element
-      focusTargetRef(element)
-    },
-    [focusTargetRef],
-  )
   const selectedContent = useEditorWorkspaceState((state) => state.selectedTabContent)
   const selectedDiff =
     selectedContent?.kind === 'document' && selectedContent.document.kind === 'git-diff'
@@ -77,15 +58,15 @@ export function Panel({ className, rootPath }: ComponentProps<'section'> & { roo
 
   function renderRoot(children: ReactNode) {
     return (
-      <section
+      <FocusablePanel
+        area='git'
+        target={{ kind: 'git', rootPath }}
         aria-label='Git panel'
         className={cn('flex h-full min-h-0 flex-col text-foreground', className)}
-        ref={setRootRef}
-        tabIndex={-1}
       >
         <StaleNotice />
         {children}
-      </section>
+      </FocusablePanel>
     )
   }
 

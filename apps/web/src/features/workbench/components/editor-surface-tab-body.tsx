@@ -74,6 +74,7 @@ export function EditorSurfaceTabBody({
   const selectedDocumentEditability = useEditorDocumentState((state) => {
     if (!selectedViewDocumentKey) return 'editable'
     const document = state.liveDocumentsByKey[selectedViewDocumentKey]
+    if (document?.target.kind === 'git-ref') return 'readonly'
     if (document?.sync.kind === 'recovery-conflict') return 'readonly'
     // The defaults document is generated from the registry; nothing could receive an edit.
     if (document?.target.kind === 'settings-json' && document.target.target === 'default') {
@@ -108,8 +109,12 @@ export function EditorSurfaceTabBody({
   const setEditorViewScrollPosition = useEditorDocumentState(
     (state) => state.setEditorViewScrollPosition,
   )
-  const uiDefinitionTarget = useEditorUiState((state) => state.definitionTarget)
-  const languageServerReferences = useEditorUiState((state) => state.languageServerReferences)
+  const uiDefinitionTarget = useEditorUiState((state) =>
+    state.definitionTarget?.tabId === tabId ? state.definitionTarget.target : null,
+  )
+  const languageServerReferences = useEditorUiState((state) =>
+    state.languageServerReferences?.tabId === tabId ? state.languageServerReferences.result : null,
+  )
   const setLanguageServerReferences = useEditorUiState((state) => state.setLanguageServerReferences)
   const clearStatusBarSource = useEditorUiState((state) => state.clearStatusBarSource)
   const setStatusBarSource = useEditorUiState((state) => state.setStatusBarSource)
@@ -148,11 +153,15 @@ export function EditorSurfaceTabBody({
 
   useEffect(() => {
     if (!active) return
+    if (content.kind === 'settings') {
+      clearStatusBarSource()
+      return
+    }
     if (selectedLiveDocument) return
     if (fileState.status === 'ready') return
 
     clearStatusBarSource()
-  }, [active, clearStatusBarSource, fileState.status, selectedLiveDocument])
+  }, [active, clearStatusBarSource, content.kind, fileState.status, selectedLiveDocument])
 
   const handleEditorTextChange = useCallback(
     (_sourceTabId: TabId, changedKey: DocumentKey, change: DocumentSessionChange) => {
@@ -163,20 +172,20 @@ export function EditorSurfaceTabBody({
   )
   const handleOpenReferences = useCallback(
     (result: LanguageServerReferencesResult) => {
-      setLanguageServerReferences(result)
+      setLanguageServerReferences(result, tabId)
       return true
     },
-    [setLanguageServerReferences],
+    [setLanguageServerReferences, tabId],
   )
   const handlePreviewDefinition = useCallback(
     (target: LanguageServerDefinitionTarget) => {
-      uiStore.getState().setDefinitionTarget(target)
+      uiStore.getState().setDefinitionTarget(target, tabId)
     },
-    [uiStore],
+    [uiStore, tabId],
   )
   const handleCloseReferences = useCallback(
-    () => setLanguageServerReferences(null),
-    [setLanguageServerReferences],
+    () => setLanguageServerReferences(null, tabId),
+    [setLanguageServerReferences, tabId],
   )
   // This is a bound workbench action surface; Editor still receives explicit plugin callbacks.
   const editorSurfaceActions = useMemo<EditorSurfaceActions>(
@@ -197,13 +206,15 @@ export function EditorSurfaceTabBody({
       },
       openReferences: handleOpenReferences,
       previewReference: handlePreviewDefinition,
-      handleTextChange: handleEditorTextChange,
-      setScrollPosition: (scrollPosition) => setEditorViewScrollPosition(tabId, scrollPosition),
+      handleTextChange: active ? handleEditorTextChange : () => undefined,
+      setScrollPosition: (scrollPosition, reopenScrollPosition) =>
+        setEditorViewScrollPosition(tabId, scrollPosition, reopenScrollPosition),
       setStatusSource: setStatusBarSource,
       showFile: (path) => selectContent(documentTab(fileDocument(fileResource(path)))),
     }),
     [
       applyWorkspaceEdit,
+      active,
       comparableConflictPath,
       handleCloseReferences,
       handleEditorTextChange,
@@ -221,7 +232,14 @@ export function EditorSurfaceTabBody({
   // and nothing to save, so falling through to the editor machinery would only
   // give it a spinner for a file that does not exist.
   if (content.kind === 'settings') {
-    return <SettingsPage liveDocument={selectedLiveDocument} rootPath={rootPath} tabId={tabId} />
+    return (
+      <SettingsPage
+        active={active}
+        liveDocument={selectedLiveDocument}
+        rootPath={rootPath}
+        tabId={tabId}
+      />
+    )
   }
 
   if (target?.kind === 'search') {
@@ -233,10 +251,10 @@ export function EditorSurfaceTabBody({
       <FileEditorBody
         active={active}
         liveDocument={selectedLiveDocument}
-        definitionTarget={definitionTarget ?? (active ? uiDefinitionTarget : null)}
+        definitionTarget={definitionTarget ?? uiDefinitionTarget}
         fileState={fileState}
         fileVersion={fileVersion}
-        languageServerReferences={active ? languageServerReferences : null}
+        languageServerReferences={languageServerReferences}
         target={content.document}
         rootPath={rootPath}
         tabId={tabId}

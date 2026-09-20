@@ -4,10 +4,10 @@ import type * as lsp from 'vscode-languageserver-protocol'
 import {
   documentTextSnapshot,
   documentUriForFileName,
-  isInsidePath,
-  normalizeNativePath,
   strictRangeFromTextSpan,
 } from '../shared/boundary'
+import { normalizeNativePath } from '../../../utils/path'
+import { isInsidePath } from '../../../utils/path'
 import type { SessionContext } from '../shared/context'
 
 type PreparedFileChange = {

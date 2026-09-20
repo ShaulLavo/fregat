@@ -12,7 +12,7 @@ The bottom panel's Terminal tab. `address` parameter `bottom=terminal` opens it.
 
 ## Driving it with agent:browser
 
-No scenario yet. A proof types `echo verify-$RANDOM` and reads it back from the terminal DOM, then closes the tab and confirms the PTY is gone via `bun run logs --area terminal`.
+`scenario terminal-background` opens the terminal in code mode, switches to chat mode, and checks that both terminals have the same computed ancestor background layers. Screenshots capture both modes. It does not type into either shell.
 
 ## Gotchas
 

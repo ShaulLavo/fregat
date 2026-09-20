@@ -12,7 +12,6 @@ export {
   recordProcessWarning,
 } from './runtime'
 export {
-  elapsedMs,
   errorSummary,
   limitText,
   observeRequestOperation,

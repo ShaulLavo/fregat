@@ -1,6 +1,6 @@
 import path from 'node:path'
 import { expect, it } from 'vitest'
-import { isInsidePath } from '../shared/boundary'
+import { isInsidePath } from '../../../utils/path'
 
 it('accepts a double-dot prefix while rejecting parents and sibling paths', () => {
   const root = path.resolve('/workspace/project')

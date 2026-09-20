@@ -1,3 +1,4 @@
+import { compareValues as compareRawStrings } from '@workspace/utils/compare'
 const fileNameCollator = new Intl.Collator(undefined, {
   numeric: true,
   sensitivity: 'base',
@@ -235,12 +236,6 @@ function cacheFileNameComparison(left: string, right: string, comparison: number
 
 function fileNameCompareCacheKey(left: string, right: string) {
   return `${left}\u0000${right}`
-}
-
-function compareRawStrings(left: string, right: string) {
-  if (left === right) return 0
-
-  return left < right ? -1 : 1
 }
 
 function asciiLowerCode(code: number) {

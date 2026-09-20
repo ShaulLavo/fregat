@@ -1,3 +1,4 @@
+import { activeEditorTab as selectedGroupTab, allEditorTabs } from '@/lib/documents/utils/groups'
 import { getClient } from '@/lib/client'
 import { documentKey, filesystemPath } from '@/lib/documents/utils/identity'
 import { documentSourcePath } from '@/lib/documents/utils/capabilities'
@@ -46,7 +47,8 @@ test('Compare on the conflict toast opens the conflict editor in its own tab', a
   await act(async () => {
     await hook.result.current.commands.openFileSurface(path)
   })
-  const fileTabId = workspaceStore.getState().workbenchPanels.activeEditorTabId!
+  const fileTabId = (selectedGroupTab(workspaceStore.getState().workbenchPanels.editorGroups)?.id ??
+    null)!
   const view = documentStore.getState().ensureEditorView(fileTabId, file)
   act(() => createEditorBufferSession(view.buffer, view.view).applyText('const b = 2\n'))
 
@@ -82,12 +84,15 @@ test('Compare on the conflict toast opens the conflict editor in its own tab', a
   }
 
   const panels = workspaceStore.getState().workbenchPanels
-  const conflictTab = panels.editorTabs.find(
+  const conflictTab = allEditorTabs(panels.editorGroups).find(
     (tab) => tab.content.kind === 'document' && tab.content.document.kind === 'conflict',
   )
   expect(conflictTab).toBeDefined()
-  expect(panels.activeEditorTabId).toBe(conflictTab!.id)
-  expect(panels.editorTabs.map((tab) => tab.id)).toEqual([fileTabId, conflictTab!.id])
+  expect(selectedGroupTab(panels.editorGroups)?.id ?? null).toBe(conflictTab!.id)
+  expect(allEditorTabs(panels.editorGroups).map((tab) => tab.id)).toEqual([
+    fileTabId,
+    conflictTab!.id,
+  ])
   const document = conflictTab!.content.kind === 'document' ? conflictTab!.content.document : null
   expect(documentSourcePath(document!)).toBe(path)
   expect(languageIdForFilePath(documentSourcePath(document!)!)).toBe('typescript')

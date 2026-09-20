@@ -1,3 +1,5 @@
+import { isAbortError } from '@/lib/abort-error'
+import { elapsedMs } from '@workspace/utils/timing'
 import { limitDiagnosticString, sanitizeRecord } from '@workspace/observability/sanitize'
 import { initLogger, log as evlog, type LogLevel } from 'evlog'
 import { createHttpLogDrain } from 'evlog/http'
@@ -78,7 +80,7 @@ export async function observeClientOperation<T>(
       ...baseEvent,
       durationMs: elapsedMs(startedAt),
       outcome: 'ok',
-      ...summarizeResult(summarize, result),
+      ...summarize?.(result),
     })
     return result
   } catch (error) {
@@ -168,13 +170,6 @@ function clientErrorContext(event: ClientLogEvent): Record<string, unknown> {
   return context
 }
 
-function summarizeResult<T>(
-  summarize: ((result: T) => Record<string, unknown>) | undefined,
-  result: T,
-) {
-  return summarize?.(result) ?? {}
-}
-
 function errorSummary(error: unknown) {
   const code = errorStringField(error, 'code')
   const status = errorNumberField(error, 'status') ?? errorNumberField(error, 'statusCode')
@@ -204,13 +199,3 @@ function failedOperationLevel(level: ClientLogLevel | undefined): ClientLogLevel
 // Catches only direct, unwrapped aborts. Wrapped aborts and mid-stream
 // cancellations are unrecognizable by shape — operations that can be aborted
 // must pass their AbortSignal to observeClientOperation instead.
-function isAbortError(error: unknown) {
-  if (error instanceof DOMException) return error.name === 'AbortError'
-  if (error instanceof Error) return error.name === 'AbortError'
-
-  return false
-}
-
-function elapsedMs(startedAt: number) {
-  return Math.round((performance.now() - startedAt) * 100) / 100
-}

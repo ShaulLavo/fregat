@@ -1,3 +1,4 @@
+import { matchNoun } from '@/features/search/utils/match-noun'
 import { filesystemPath } from '@/lib/documents/utils/identity'
 import type { TextChangeTarget, WorkspaceTextChanges } from '@/lib/workspace-edits/utils/types'
 import { workspaceSearchReplacePlan } from '@/features/search/utils/replace'
@@ -89,8 +90,4 @@ function contentMatchesByPath(matches: readonly WorkspaceSearchMatch[]) {
 
 function replaceLabel(count: number) {
   return `Replace ${count.toLocaleString()} ${matchNoun(count)}`
-}
-
-function matchNoun(count: number) {
-  return count === 1 ? 'match' : 'matches'
 }

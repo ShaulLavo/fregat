@@ -1,3 +1,4 @@
+import type { WorkspaceIndex } from './workspace-index'
 import path from 'node:path'
 
 import type {
@@ -203,4 +204,13 @@ export function globMatchPath(context: FindContext, relativePath: string) {
 
 function searchContentLineText(line: string) {
   return line.replace(/(?:\r\n|\r|\n)$/u, '')
+}
+
+export function workspaceIndexForSearch(
+  options: Pick<FindOptions, 'useWorkspaceIndex'>,
+  index: WorkspaceIndex | undefined,
+) {
+  if (options.useWorkspaceIndex === false) return undefined
+
+  return index
 }

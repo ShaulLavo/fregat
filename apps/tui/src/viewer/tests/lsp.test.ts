@@ -1,6 +1,6 @@
 import { writeFile } from 'node:fs/promises'
 import { pathToFileURL } from 'node:url'
-import { isRecord } from '@workspace/contracts'
+import { isRecord } from '@workspace/utils/objects'
 import { createViewerLsp } from '@/viewer/state/lsp'
 import type { ViewerDiagnostics } from '@/viewer/utils/lsp'
 import { test, expect } from '../../../test/socket-fixtures'

@@ -111,13 +111,13 @@ export function compareSegmentSortKeys(leftKey: SegmentSortKey, rightKey: Segmen
   return 0
 }
 
-function compareSegmentValuesWithSortKeyLookup(
+function compareSegmentValues(
   left: string,
   right: string,
-  getSortKey: (value: string) => SegmentSortKey,
+  cache?: Map<string, SegmentSortKey>,
 ): number {
-  const leftKey = getSortKey(left)
-  const rightKey = getSortKey(right)
+  const leftKey = getCachedSortKey(left, cache)
+  const rightKey = getCachedSortKey(right, cache)
   const comparison = compareSegmentSortKeys(leftKey, rightKey)
   if (comparison !== 0) {
     return comparison
@@ -130,8 +130,12 @@ function compareSegmentValuesWithSortKeyLookup(
   return left < right ? -1 : 1
 }
 
-function compareSegmentValues(left: string, right: string): number {
-  return compareSegmentValuesWithSortKeyLookup(left, right, createSegmentSortKey)
+function getCachedSortKey(value: string, cache?: Map<string, SegmentSortKey>): SegmentSortKey {
+  const existingKey = cache?.get(value)
+  if (existingKey != null) return existingKey
+  const nextKey = createSegmentSortKey(value)
+  cache?.set(value, nextKey)
+  return nextKey
 }
 
 function getKindAtDepth(entry: PreparedPath | PathStoreCompareEntry, depth: number): number {
@@ -146,6 +150,7 @@ function getKindAtDepth(entry: PreparedPath | PathStoreCompareEntry, depth: numb
 function comparePreparedEntries(
   left: PreparedPath | PathStoreCompareEntry,
   right: PreparedPath | PathStoreCompareEntry,
+  cache?: Map<string, SegmentSortKey>,
 ): number {
   const sharedDepth = Math.min(left.segments.length, right.segments.length)
 
@@ -163,7 +168,7 @@ function comparePreparedEntries(
       return leftKind === PATH_STORE_NODE_KIND_DIRECTORY ? -1 : 1
     }
 
-    return compareSegmentValues(leftSegment, rightSegment)
+    return compareSegmentValues(leftSegment, rightSegment, cache)
   }
 
   if (left.segments.length !== right.segments.length) {
@@ -186,44 +191,7 @@ export function comparePreparedPathsWithCachedSortKeys(
   right: PreparedPath,
   cache: Map<string, SegmentSortKey>,
 ): number {
-  const getCachedSortKey = (value: string): SegmentSortKey => {
-    const existingKey = cache.get(value)
-    if (existingKey != null) {
-      return existingKey
-    }
-
-    const nextKey = createSegmentSortKey(value)
-    cache.set(value, nextKey)
-    return nextKey
-  }
-  const sharedDepth = Math.min(left.segments.length, right.segments.length)
-
-  for (let depth = 0; depth < sharedDepth; depth++) {
-    const leftSegment = left.segments[depth]
-    const rightSegment = right.segments[depth]
-
-    if (leftSegment === rightSegment) {
-      continue
-    }
-
-    const leftKind = getKindAtDepth(left, depth)
-    const rightKind = getKindAtDepth(right, depth)
-    if (leftKind !== rightKind) {
-      return leftKind === PATH_STORE_NODE_KIND_DIRECTORY ? -1 : 1
-    }
-
-    return compareSegmentValuesWithSortKeyLookup(leftSegment, rightSegment, getCachedSortKey)
-  }
-
-  if (left.segments.length !== right.segments.length) {
-    return left.segments.length < right.segments.length ? -1 : 1
-  }
-
-  if (left.isDirectory === right.isDirectory) {
-    return 0
-  }
-
-  return left.isDirectory ? -1 : 1
+  return comparePreparedEntries(left, right, cache)
 }
 
 export function getSegmentSortKey(segmentTable: SegmentTable, segmentId: number): SegmentSortKey {

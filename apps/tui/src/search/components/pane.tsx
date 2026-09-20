@@ -7,24 +7,11 @@ import { Prompt } from '@/components/prompt'
 import { Select } from '@/components/select'
 import { LoadingState } from '@/components/loading-state'
 import { EmptyState } from '@/components/empty-state'
-import type { SettingsSession } from '@/connection/state/session'
+import type { WorkbenchPaneProps } from '@/workbench/utils/pane-props'
 import { createSearchWorkbench } from '@/search/state/workbench'
 import { resultOptions, searchQuery, type SearchOptions } from '@/search/utils/results'
-import type { Theme } from '@/theme/utils/theme'
 
-export function SearchPane({
-  session,
-  rootPath,
-  theme,
-  enabled,
-  onOpenFile,
-}: {
-  session: SettingsSession
-  rootPath: string
-  theme: Theme
-  enabled: boolean
-  onOpenFile: (path: string, line?: number) => void
-}) {
+export function SearchPane({ session, rootPath, theme, enabled, onOpenFile }: WorkbenchPaneProps) {
   const commands = useCommands()
   const [store] = useState(() => createSearchWorkbench(session.client))
   const state = useSyncExternalStore(store.subscribe, store.getSnapshot)

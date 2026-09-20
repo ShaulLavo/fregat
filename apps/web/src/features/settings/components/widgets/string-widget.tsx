@@ -1,5 +1,6 @@
 import { Input } from '@workspace/ui/components/input'
 import { useRef, useState } from 'react'
+import { cn } from '@workspace/ui/lib/utils'
 
 /**
  * A text field with the same focus contract as the number one: commit on blur or
@@ -10,12 +11,16 @@ import { useRef, useState } from 'react'
  * naming fonts that do not exist.
  */
 export function StringWidget({
+  'aria-label': ariaLabel,
+  className,
   disabled,
   id,
   onCommit,
   value,
   verbatim = false,
 }: {
+  'aria-label'?: string
+  className?: string
   disabled?: boolean
   id: string
   onCommit: (next: string) => void
@@ -39,10 +44,11 @@ export function StringWidget({
 
   return (
     <Input
+      aria-label={ariaLabel}
       autoCapitalize='off'
       autoComplete='off'
       autoCorrect='off'
-      className='w-64 @max-3xl/settings:w-full'
+      className={cn('w-64 @max-3xl/settings:w-full', className)}
       disabled={disabled}
       id={id}
       onBlur={() => {

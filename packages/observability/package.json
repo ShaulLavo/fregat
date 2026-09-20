@@ -9,7 +9,8 @@
     "./env": "./src/env.ts",
     "./env-file": "./src/env-file.ts",
     "./scope": "./src/scope.ts",
-    "./sanitize": "./src/sanitize.ts"
+    "./sanitize": "./src/sanitize.ts",
+    "./errors": "./src/errors.ts"
   },
   "scripts": {
     "build": "tsgo --noEmit",
@@ -20,6 +21,7 @@
     "test": "vitest run"
   },
   "dependencies": {
+    "@workspace/utils": "workspace:*",
     "evlog": "catalog:"
   },
   "devDependencies": {

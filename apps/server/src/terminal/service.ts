@@ -1,3 +1,6 @@
+import { isNonEmptyString as isString } from '@workspace/utils/objects'
+import { adaptWebSocket } from '../utils/websocket'
+import { elapsedMs } from '@workspace/utils/timing'
 import { terminalAgentLease, type AgentTerminalResolver } from './agent-launch'
 import { sessionIdentityErrors } from '../provider/structured-errors'
 import type { TerminalExecutionLease, TerminalLeaseBoundary } from './lease'
@@ -12,16 +15,16 @@ import {
 import { realpathSync } from 'node:fs'
 import { spawnPty, type Pty } from '@workspace/pty'
 import {
-  isRecord,
   parseTerminalClientMessage,
   type TerminalClientMessage,
   type TerminalServerMessage,
 } from '@workspace/contracts'
+import { isRecord } from '@workspace/utils/objects'
 
 import { authenticateWebSocketData, type AuthConfig } from '../auth'
 import { FsError, isFsError } from '../fs/errors'
 import type { WorkspacePaths } from '../fs/path'
-import { elapsedMs, limitText, recordProcessInfo, recordProcessWarning } from '../observability'
+import { limitText, recordProcessInfo, recordProcessWarning } from '../observability'
 import { readForegroundProcessName, type ForegroundProcessReader } from './foreground'
 
 export type TerminalPtyFactory = typeof spawnPty
@@ -852,23 +855,12 @@ type TerminalWebSocket = {
 }
 
 function terminalWebSocketObject(value: unknown): TerminalWebSocket | null {
-  if (!isRecord(value)) return null
-  if (typeof value.send !== 'function') return null
-
-  const close = value.close
-  const send = value.send
+  const socket = adaptWebSocket(value)
+  if (!socket) return null
   return {
-    close: (code, reason) =>
-      typeof close === 'function' ? close.call(value, code, reason) : undefined,
-    data: value.data,
-    key: websocketKey(value),
-    input: openInputFromWebSocketData(value.data),
-    send: (message) => send.call(value, message),
+    ...socket,
+    input: openInputFromWebSocketData(socket.data),
   }
-}
-
-function websocketKey(value: Record<string, unknown>): object {
-  return isRecord(value.raw) ? value.raw : value
 }
 
 function openInputFromWebSocketData(data: unknown): TerminalOpenInput | null {
@@ -952,10 +944,6 @@ function terminalOutcome(exitCode: number | null, errorMessage: string | null) {
   if (typeof exitCode === 'number') return 'failed'
 
   return 'closed'
-}
-
-function isString(value: string | undefined): value is string {
-  return typeof value === 'string' && value.length > 0
 }
 
 function partialCharacterBytes(bytes: Uint8Array, limit: number) {

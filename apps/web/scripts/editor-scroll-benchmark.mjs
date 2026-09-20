@@ -1,14 +1,16 @@
+import { gateFailures } from './bench-workspace.mjs'
+import { runBrowserTrial as runTrial } from './bench-workspace.mjs'
+import { diagnostic } from './bench-workspace.mjs'
+import { defaultBrowsers } from './bench-workspace.mjs'
 import { resolve } from 'node:path'
 import { createBenchmarkError } from './structured-errors.mjs'
 import {
   applyCpuThrottle,
   average,
   browserList,
-  browserTypes,
   createWorkspaceContext,
   fractionOption,
   jumpToScrollFraction,
-  launchOptions,
   measureCpuCalibration,
   median,
   minimum,
@@ -61,7 +63,7 @@ for (const browserName of browserNames) {
 console.log(`EDITOR_SCROLL_BENCHMARK_SUMMARY ${JSON.stringify(results, null, 2)}`)
 
 if (options.gate) {
-  const failures = gateFailures(results)
+  const failures = gateFailures(results, gateThresholds, thresholdFailures)
   if (failures.length > 0) {
     console.error(`EDITOR_SCROLL_BENCHMARK_GATE_FAILED ${JSON.stringify(failures, null, 2)}`)
     process.exit(1)
@@ -122,30 +124,15 @@ function applyOption(parsed, arg) {
   if (name === '--workspace-root') parsed.workspaceRoot = value ?? parsed.workspaceRoot
 }
 
-function defaultBrowsers(gate) {
-  if (gate) return ['chromium']
-
-  return ['chromium', 'webkit', 'firefox']
-}
-
 async function runBrowserSamples(browserName, workspace) {
   const samples = []
   for (let trial = 1; trial <= options.trials; trial += 1) {
-    const sample = await runTrial(browserName, trial, workspace)
+    const sample = await runTrial(browserName, trial, workspace, runTrialInBrowser)
     samples.push(sample)
     console.log(JSON.stringify({ type: 'editor-scroll-benchmark-trial', ...sample }))
   }
 
   return summarizeSamples(samples)
-}
-
-async function runTrial(browserName, trial, workspace) {
-  const browser = await browserTypes[browserName].launch(launchOptions(browserName))
-  try {
-    return await runTrialInBrowser(browser, browserName, trial, workspace)
-  } finally {
-    await browser.close().catch(() => {})
-  }
 }
 
 async function runTrialInBrowser(browser, browserName, trial, workspace) {
@@ -210,17 +197,6 @@ function trialSample(browserName, trial, report, cpuCalibrationMs) {
   }
 }
 
-function diagnostic(report, name) {
-  return (
-    report.topDiagnostics.find((item) => item.name === name) ?? {
-      count: 0,
-      maxMs: 0,
-      meanMs: 0,
-      totalMs: 0,
-    }
-  )
-}
-
 function summarizeSamples(samples) {
   return {
     trials: samples.length,
@@ -239,15 +215,6 @@ function summarizeSamples(samples) {
     medianFrameMeanMs: median(samples.map((sample) => sample.frameMeanMs)),
     samples,
   }
-}
-
-function gateFailures(results) {
-  return Object.entries(results).flatMap(([browserName, summary]) => {
-    const thresholds = gateThresholds[browserName]
-    if (!thresholds) return []
-
-    return thresholdFailures(browserName, summary, thresholds)
-  })
 }
 
 function thresholdFailures(browserName, summary, thresholds) {

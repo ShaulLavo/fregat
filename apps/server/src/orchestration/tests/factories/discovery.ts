@@ -1,3 +1,4 @@
+import { executeGit } from '../../../../test/factories/orchestration'
 import { mkdtemp, mkdir, realpath, rm, writeFile } from 'node:fs/promises'
 import { tmpdir } from 'node:os'
 import path from 'node:path'
@@ -128,16 +129,7 @@ export async function discoveryFixture() {
         title: 'Discovery fixture',
         workspaceRoot,
       }),
-    git: async (...args: string[]) => {
-      const child = Bun.spawn(['git', ...args], { cwd: main, stdout: 'pipe', stderr: 'pipe' })
-      const [stdout, stderr, code] = await Promise.all([
-        new Response(child.stdout).text(),
-        new Response(child.stderr).text(),
-        child.exited,
-      ])
-      if (code !== 0) throw new TypeError(`Git fixture failed: ${stderr}`)
-      return stdout.trim()
-    },
+    git: (...args: string[]) => executeGit(main, ...args),
     initializeGit: async () => {
       await writeFile(path.join(main, 'README.md'), '# Fixture\n')
       for (const args of [

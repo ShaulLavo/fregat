@@ -9,7 +9,7 @@ import * as v from 'valibot'
 
 import { providerInstanceIdSchema, type ProviderInstanceId } from '../chat-ids'
 import { trimmedNonEmptyStringSchema } from '../chat-model'
-import { isRecord } from '../is-record'
+import { isRecord } from '@workspace/utils/objects'
 import { machineNameSchema, machineSchema, type MachineDefinition } from '../machines'
 import { providerDriverKindSchema, type ProviderDriverKind } from '../orchestration-runtime'
 import {

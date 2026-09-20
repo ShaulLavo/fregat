@@ -9,7 +9,7 @@ import {
   DEFAULT_RUNTIME_MODE,
   sessionIdSchema,
 } from '@workspace/contracts'
-import { migrateOrchestrationDatabase } from '../../db/migrations'
+import { migratePlatformDatabase as migrateOrchestrationDatabase } from '../../db/migrations'
 import * as schema from '../../db/schema'
 import { ProviderSessionDirectory } from '../provider-session-directory'
 

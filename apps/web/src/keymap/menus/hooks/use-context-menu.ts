@@ -1,3 +1,5 @@
+import { stopPropagation as stopEvent } from '@workspace/utils/events'
+import { isContextMenuKey } from '@workspace/utils/keyboard'
 import { useState } from 'react'
 
 import { pointAnchor, rectAnchor, type MenuAnchor } from '@/keymap/menus/utils/virtual-anchor'
@@ -64,10 +66,6 @@ export function useContextMenu() {
   }
 }
 
-function isContextMenuKey(event: ContextMenuKeyEvent) {
-  return (event.shiftKey && event.key === 'F10') || event.key === 'ContextMenu'
-}
-
 /**
  * Base UI only guards against this when its own Trigger recorded the opening
  * cursor point. Opening from our own handler leaves the guard disarmed, so on
@@ -79,8 +77,4 @@ function swallowTerminatingMouseUp() {
   if (typeof document === 'undefined') return
 
   document.addEventListener('mouseup', stopEvent, { capture: true, once: true })
-}
-
-function stopEvent(event: Event) {
-  event.stopPropagation()
 }

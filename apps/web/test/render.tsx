@@ -169,55 +169,32 @@ type HappyDomDeviceApi = { settings: { device: { prefersColorScheme: string } } 
 // Returns the QueryClient for cache assertions.
 export function renderWithProviders(
   ui: ReactElement,
-  {
-    application,
-    navigation,
-    connections,
-    settingsOwner,
-    command,
-    focusService,
-    queryClient = createTestQueryClient(),
-    theme = 'dark',
-    ...options
-  }: RenderWithProvidersOptions = {},
+  options: RenderWithProvidersOptions = {},
 ): RenderWithProvidersResult {
-  seedBootMirrorTheme(theme)
-
-  function Wrapper({ children }: { children: ReactNode }) {
-    return (
-      <AppProviders
-        application={application}
-        navigation={navigation}
-        connections={connections}
-        settingsOwner={settingsOwner}
-        command={command}
-        focusService={focusService}
-        queryClient={queryClient}
-      >
-        {children}
-      </AppProviders>
-    )
-  }
-
-  return { queryClient, ...render(ui, { wrapper: Wrapper, ...options }) }
+  const { queryClient, renderOptions } = providerRenderOptions(options)
+  return { queryClient, ...render(ui, renderOptions) }
 }
 
 export function renderHookWithProviders<Result, Props>(
   callback: (props: Props) => Result,
-  {
-    application,
-    navigation,
-    connections,
-    settingsOwner,
-    command,
-    focusService,
-    queryClient = createTestQueryClient(),
-    theme = 'dark',
-    ...options
-  }: Omit<RenderHookOptions<Props>, 'wrapper'> & RenderWithProvidersOptions = {},
+  options: Omit<RenderHookOptions<Props>, 'wrapper'> & RenderWithProvidersOptions = {},
 ) {
-  seedBootMirrorTheme(theme)
+  const { queryClient, renderOptions } = providerRenderOptions(options)
+  return { queryClient, ...renderHook(callback, renderOptions) }
+}
 
+function providerRenderOptions<Options extends RenderWithProvidersOptions>({
+  application,
+  navigation,
+  connections,
+  settingsOwner,
+  command,
+  focusService,
+  queryClient = createTestQueryClient(),
+  theme = 'dark',
+  ...options
+}: Options) {
+  seedBootMirrorTheme(theme)
   function Wrapper({ children }: { children: ReactNode }) {
     return (
       <AppProviders
@@ -233,8 +210,7 @@ export function renderHookWithProviders<Result, Props>(
       </AppProviders>
     )
   }
-
-  return { queryClient, ...renderHook(callback, { wrapper: Wrapper, ...options }) }
+  return { queryClient, renderOptions: { wrapper: Wrapper, ...options } }
 }
 
 export function renderApplication(

@@ -4,7 +4,7 @@ import path from 'node:path'
 import type { ProviderLoginAttempt, ProviderSignInMethod } from '@workspace/contracts'
 import * as v from 'valibot'
 import { createInternalError } from '../../../observability/structured-errors'
-import { providerErrorMessage } from './adapters'
+import { errorMessage as providerErrorMessage } from '@workspace/contracts'
 
 /**
  * `claude auth login` opens a browser and blocks until the user finishes there,

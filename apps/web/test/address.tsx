@@ -1,3 +1,4 @@
+import { allEditorTabs } from '@/lib/documents/utils/groups'
 import { filesystemPath } from '@/lib/documents/utils/identity'
 import { testTabContents } from './factories/document-targets'
 import { testScopedStorage } from './factories/scoped-storage'
@@ -77,6 +78,7 @@ export function seedWorkspaceCache({
     editorHistory: [],
     recentlyClosedTabs: [],
     reopenScrollPositions: [],
+    viewScrollPositions: [],
     workbenchPanels: panels,
   })
   writeUiModeCache('workbench')
@@ -200,5 +202,5 @@ export async function pressBack(navigation: Navigation) {
 }
 
 export function editorTabContents(workspace: EditorWorkspaceStoreApi) {
-  return workspace.getState().workbenchPanels.editorTabs.map((tab) => tab.content)
+  return allEditorTabs(workspace.getState().workbenchPanels.editorGroups).map((tab) => tab.content)
 }

@@ -1,3 +1,4 @@
+import { createSubscriptions } from '@workspace/utils/subscriptions'
 import type { PlatformCommandId } from '@/keymap/types'
 import { globalChromeStorage } from '@/lib/environments/state/scoped-storage'
 
@@ -10,7 +11,8 @@ const RECENT_COMMANDS_STORAGE_VERSION = 1
  */
 const RECENT_COMMANDS_LIMIT = 30
 
-const listeners = new Set<() => void>()
+const subscriptions = createSubscriptions()
+export const subscribeRecentCommands = subscriptions.subscribe
 
 // Cached so repeat reads return the same reference: `useSyncExternalStore` treats
 // a fresh array each call as a fresh value and re-renders forever.
@@ -32,21 +34,13 @@ export function recordCommandUse(commandId: PlatformCommandId) {
     RECENT_COMMANDS_LIMIT,
   )
   persistRecentCommandIds(recentIds)
-  for (const listener of listeners) listener()
-}
-
-export function subscribeRecentCommands(listener: () => void): () => void {
-  listeners.add(listener)
-
-  return () => {
-    listeners.delete(listener)
-  }
+  subscriptions.notify()
 }
 
 /** Test hook: drops in-memory state so the next read hits localStorage again. */
 export function resetRecentCommandsStore() {
   recentIds = null
-  listeners.clear()
+  subscriptions.clear()
 }
 
 function readPersistedRecentCommandIds(): readonly PlatformCommandId[] {

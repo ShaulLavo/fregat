@@ -1,3 +1,5 @@
+import { planStepStatus } from '@workspace/contracts'
+import { compactActivityLabel } from '@/features/chat/utils/activity-label'
 import type { OrchestrationSessionActivity } from '@workspace/contracts'
 import { commandIsSingleSearch } from '@/features/chat/utils/command-label'
 
@@ -149,13 +151,6 @@ function toolTextLooksLikeFailure(text: string) {
   if (TOOL_FAILURE_PHRASES.some((phrase) => lowered.includes(phrase))) return true
 
   return TOOL_FAILURE_PATTERNS.some((pattern) => pattern.test(text))
-}
-
-function planStepStatus(value: unknown): ChatActivityPlanStepStatus {
-  if (value === 'completed') return 'completed'
-  if (value === 'inProgress') return 'inProgress'
-
-  return 'pending'
 }
 
 function activityTitle(activity: OrchestrationSessionActivity, payload: Record<string, unknown>) {
@@ -580,8 +575,4 @@ function formatStatus(status: string) {
   if (status === 'inProgress') return 'In progress'
 
   return `${status.slice(0, 1).toUpperCase()}${status.slice(1)}`
-}
-
-function compactActivityLabel(value: string) {
-  return value.replace(/\s+(?:started|updated|complete|completed)\s*$/i, '').trim()
 }

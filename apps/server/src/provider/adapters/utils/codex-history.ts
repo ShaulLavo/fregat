@@ -1,14 +1,14 @@
 import * as v from 'valibot'
 import { sessionIdSchema } from '@workspace/contracts'
 import type { ProviderDiscoveredSession, ProviderHistoryMessage } from '../../types'
-import type { V2ThreadListResponse__Thread } from '../codex-protocol'
-import { V2ThreadReadResponse__UserInputSchema } from '../codex-protocol'
+import type { CodexThread } from '../codex-protocol'
+import { CodexUserInputSchema } from '../codex-protocol'
 
 const historyItemSchema = v.variant('type', [
   v.object({
     type: v.literal('userMessage'),
     id: v.string(),
-    content: v.array(V2ThreadReadResponse__UserInputSchema),
+    content: v.array(CodexUserInputSchema),
   }),
   v.object({ type: v.literal('agentMessage'), id: v.string(), text: v.string() }),
 ])
@@ -37,9 +37,7 @@ function isConversationItem(item: unknown) {
   return type === 'userMessage' || type === 'agentMessage'
 }
 
-export function codexDiscoveredSession(
-  thread: V2ThreadListResponse__Thread,
-): ProviderDiscoveredSession {
+export function codexDiscoveredSession(thread: CodexThread): ProviderDiscoveredSession {
   return {
     sessionId: v.parse(sessionIdSchema, thread.id),
     cwd: thread.cwd,

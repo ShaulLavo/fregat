@@ -1,5 +1,5 @@
 import type { ServerWebSocket } from 'bun'
-import { isRecord } from '@workspace/contracts'
+import { isRecord } from '@workspace/utils/objects'
 
 import { recordProcessWarning } from '../observability'
 

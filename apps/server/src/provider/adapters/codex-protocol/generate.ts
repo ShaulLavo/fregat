@@ -1,3 +1,5 @@
+import { isString } from '@workspace/utils/objects'
+import { isJsonObject, type JsonObject, type JsonValue } from '@workspace/utils/json'
 import { createInternalError } from '../../../observability/structured-errors'
 
 import { spawn } from 'node:child_process'
@@ -105,8 +107,6 @@ const SERVER_NOTIFICATION_METHODS = [
 type ClientRequestMethod = (typeof CLIENT_REQUEST_METHODS)[number]
 type ServerNotificationMethod = (typeof SERVER_NOTIFICATION_METHODS)[number]
 type ProtocolNamespace = 'v1' | 'v2'
-type JsonValue = boolean | null | number | string | JsonObject | JsonValue[]
-type JsonObject = { readonly [key: string]: JsonValue }
 
 type MethodEntry = {
   readonly method: string
@@ -126,6 +126,7 @@ export type GeneratedFile = {
 
 type RenderContext = {
   readonly definitionNames: ReadonlyMap<string, string>
+  readonly shared?: SchemaRegistry
 }
 
 export async function generateCodexProtocolFiles(): Promise<GeneratedFile[]> {
@@ -138,14 +139,15 @@ export async function generateCodexProtocolFiles(): Promise<GeneratedFile[]> {
     })),
   )
 
+  const schemas = renderSchemaModule(documents)
   return formatGeneratedFiles([
     {
       path: path.join(GENERATED_DIR, 'schema.gen.ts'),
-      text: renderSchemaModule(documents),
+      text: schemas.text,
     },
     {
       path: path.join(GENERATED_DIR, 'meta.gen.ts'),
-      text: renderMetaModule(methodMaps),
+      text: renderMetaModule(methodMaps, schemas.schemaNames),
     },
   ])
 }
@@ -330,11 +332,19 @@ function isServerNotificationMethod(method: string): method is ServerNotificatio
   return (SERVER_NOTIFICATION_METHODS as readonly string[]).includes(method)
 }
 
-function renderSchemaModule(
+export function renderSchemaModule(
   documents: readonly { readonly document: JsonObject; readonly file: ProtocolSchemaFile }[],
 ) {
-  const sections = documents.flatMap(({ document, file }) => renderSchemaFile(file, document))
-  return [
+  const registry = new Map<string, string>()
+  const sections: string[] = []
+  const names = new Set<string>()
+  const objects: SharedObject[] = []
+  const schemaNames = new Map<string, string>()
+  for (const { document, file } of documents) {
+    const canonical = renderSchemaFile(file, document, { registry, sections, names, objects })
+    schemaNames.set(file.typeName, canonical)
+  }
+  const text = [
     ...generatedPrelude(),
     "import * as v from 'valibot'",
     '',
@@ -343,30 +353,56 @@ function renderSchemaModule(
     ...sections,
     '',
   ].join('\n')
+  return { text, schemaNames }
 }
 
-function renderSchemaFile(file: ProtocolSchemaFile, document: JsonObject) {
+type SchemaRegistry = {
+  readonly registry: Map<string, string>
+  readonly sections: string[]
+  readonly names: Set<string>
+  readonly objects: SharedObject[]
+}
+
+function renderSchemaFile(file: ProtocolSchemaFile, document: JsonObject, shared: SchemaRegistry) {
   const definitions = objectField(document, 'definitions')
-  const definitionNames = new Map(
-    Object.keys(definitions).map((name) => [name, `${file.typeName}__${sanitizeIdentifier(name)}`]),
-  )
-  const context = { definitionNames }
-  const sections: string[] = []
+  const definitionNames = new Map<string, string>()
+  const context = { definitionNames, shared }
 
   for (const name of orderedDefinitionNames(definitions)) {
-    sections.push(
-      renderNamedSchema(definitionNames.get(name) ?? name, objectField(definitions, name), context),
-    )
+    const expression = renderSchemaExpression(objectField(definitions, name), context, name)
+    const canonical = internSchema(name, expression, shared)
+    definitionNames.set(name, canonical)
   }
-  sections.push(renderNamedSchema(file.typeName, document, context))
-
-  return sections
+  const expression = renderSchemaExpression(document, context, file.schemaName)
+  const canonical = internSchema(file.schemaName, expression, shared)
+  shared.sections.push(
+    `export type ${file.typeName} = v.InferOutput<typeof ${schemaConstName(canonical)}>`,
+    '',
+  )
+  return canonical
 }
 
-function renderNamedSchema(typeName: string, schema: JsonObject, context: RenderContext) {
+function internSchema(name: string, expression: string, shared: SchemaRegistry) {
+  const existing = shared.registry.get(expression)
+  if (existing) return existing
+
+  const baseName = name.startsWith('Codex')
+    ? sanitizeIdentifier(name)
+    : `Codex${sanitizeIdentifier(name)}`
+  let typeName = baseName
+  let suffix = 2
+  while (shared.names.has(typeName)) typeName = `${baseName}${suffix++}`
+  shared.names.add(typeName)
+  shared.registry.set(expression, typeName)
+  shared.registry.set(schemaConstName(typeName), typeName)
+  shared.sections.push(renderNamedExpression(typeName, expression))
+  return typeName
+}
+
+function renderNamedExpression(typeName: string, expression: string) {
   const schemaConst = schemaConstName(typeName)
   return [
-    `export const ${schemaConst} = ${renderSchemaExpression(schema, context)}`,
+    `export const ${schemaConst} = ${expression}`,
     `export type ${typeName} = v.InferOutput<typeof ${schemaConst}>`,
     '',
   ].join('\n')
@@ -429,7 +465,7 @@ function collectLocalReferences(schema: JsonValue, references: string[]) {
   for (const value of Object.values(schema)) collectLocalReferences(value, references)
 }
 
-function renderSchemaExpression(schema: JsonObject, context: RenderContext): string {
+function renderSchemaExpression(schema: JsonObject, context: RenderContext, name?: string): string {
   const ref = stringField(schema, '$ref')
   if (ref) return renderRef(ref, context)
 
@@ -448,17 +484,17 @@ function renderSchemaExpression(schema: JsonObject, context: RenderContext): str
   const anyOf = arrayField(schema, 'anyOf')
   if (anyOf.length > 0) return renderUnion(anyOf, context)
 
-  return renderSchemaByType(schema, context)
+  return renderSchemaByType(schema, context, name)
 }
 
-function renderSchemaByType(schema: JsonObject, context: RenderContext): string {
+function renderSchemaByType(schema: JsonObject, context: RenderContext, name?: string): string {
   const rawType = schema.type
   if (Array.isArray(rawType))
     return renderUnion(
       rawType.map((type) => ({ ...schema, type })),
       context,
     )
-  if (rawType === 'object') return renderObjectSchema(schema, context)
+  if (rawType === 'object') return renderObjectSchema(schema, context, name)
   if (rawType === 'array') return `v.array(${renderArrayItemSchema(schema, context)})`
   if (rawType === 'string') return 'v.string()'
   if (rawType === 'integer') return renderNumberSchema(schema, true)
@@ -466,7 +502,7 @@ function renderSchemaByType(schema: JsonObject, context: RenderContext): string 
   if (rawType === 'boolean') return 'v.boolean()'
   if (rawType === 'null') return 'v.null()'
   if ('properties' in schema || 'additionalProperties' in schema) {
-    return renderObjectSchema(schema, context)
+    return renderObjectSchema(schema, context, name)
   }
 
   return 'v.unknown()'
@@ -502,23 +538,76 @@ function renderOpenEnum(values: readonly string[]) {
   return `openEnum(${JSON.stringify(values)})`
 }
 
-function renderObjectSchema(schema: JsonObject, context: RenderContext): string {
+type SharedObject = {
+  readonly typeName: string
+  readonly entries: ReadonlyMap<string, string>
+}
+
+function renderObjectSchema(schema: JsonObject, context: RenderContext, name?: string): string {
   const properties = objectField(schema, 'properties')
   const required = new Set(stringArrayField(schema, 'required'))
-  const entries = Object.entries(properties).map(([key, value]) =>
-    renderObjectEntry(key, value, required.has(key), context),
+  const entries = new Map(
+    Object.entries(properties).map(([key, value]) => [
+      key,
+      renderObjectEntry(key, value, required.has(key), context),
+    ]),
   )
-  const entriesSource = `{${entries.join(', ')}}`
   const additionalProperties = schema.additionalProperties
+  const entriesSource = `{${[...entries.values()].join(', ')}}`
 
   if (isJsonObject(additionalProperties)) {
     const rest = renderSchemaExpression(additionalProperties, context)
-    if (entries.length > 0) return `v.objectWithRest(${entriesSource}, ${rest})`
+    if (entries.size > 0) return `v.objectWithRest(${entriesSource}, ${rest})`
 
     return `v.record(v.string(), ${rest})`
   }
 
-  return `v.looseObject(${entriesSource})`
+  const expression = `v.looseObject(${entriesSource})`
+  if (!context.shared || entries.size === 0) return expression
+
+  const existing = context.shared.registry.get(expression)
+  if (existing) return schemaConstName(existing)
+
+  const sharedSource = renderSharedObjectEntries(entries, context.shared.objects)
+  const typeName = internSchema(
+    name ?? objectSchemaName(schema),
+    `v.looseObject(${sharedSource})`,
+    context.shared,
+  )
+  context.shared.registry.set(expression, typeName)
+  context.shared.objects.push({ typeName, entries })
+  return schemaConstName(typeName)
+}
+
+function objectSchemaName(schema: JsonObject) {
+  const title = stringField(schema, 'title')
+  if (title) return title
+
+  const properties = objectField(schema, 'properties')
+  const discriminator = objectField(properties, 'type')
+  const kind = stringField(discriminator, 'const') ?? stringArrayField(discriminator, 'enum')[0]
+  if (kind) return `${toPascalCaseMethod(kind)}Object`
+
+  return `${Object.keys(properties).map(toPascalCaseMethod).join('')}Object`
+}
+
+function renderSharedObjectEntries(
+  entries: ReadonlyMap<string, string>,
+  objects: readonly SharedObject[],
+) {
+  const candidates = objects
+    .map((object) => ({
+      object,
+      keys: [...entries.keys()].filter((key) => object.entries.get(key) === entries.get(key)),
+    }))
+    .sort((left, right) => right.keys.length - left.keys.length)
+  const best = candidates[0]
+  if (!best || best.keys.length < 3) return `{${[...entries.values()].join(', ')}}`
+
+  const shared = new Set(best.keys)
+  const remaining = [...entries].filter(([key]) => !shared.has(key)).map(([, entry]) => entry)
+  const picked = `...v.pick(${schemaConstName(best.object.typeName)}, ${JSON.stringify(best.keys)}).entries`
+  return `{${[picked, ...remaining].join(', ')}}`
 }
 
 function renderObjectEntry(
@@ -574,10 +663,13 @@ function renderRef(ref: string, context: RenderContext) {
   return schemaConstName(typeName)
 }
 
-function renderMetaModule(methodMaps: {
-  readonly clientRequests: readonly MethodEntry[]
-  readonly serverNotifications: readonly MethodEntry[]
-}) {
+function renderMetaModule(
+  methodMaps: {
+    readonly clientRequests: readonly MethodEntry[]
+    readonly serverNotifications: readonly MethodEntry[]
+  },
+  schemaNames: ReadonlyMap<string, string>,
+) {
   return [
     ...generatedPrelude(),
     "import * as CodexSchema from './schema.gen'",
@@ -606,16 +698,19 @@ function renderMetaModule(methodMaps: {
       'CODEX_CLIENT_REQUEST_PARAMS',
       methodMaps.clientRequests,
       (entry) => schemaFileForMethodType(entry.method, requiredType(entry)).typeName,
+      schemaNames,
     ),
     renderSchemaMap(
       'CODEX_CLIENT_REQUEST_RESULTS',
       methodMaps.clientRequests,
       (entry) => schemaFileForMethodType(entry.method, responseTypeName(entry)).typeName,
+      schemaNames,
     ),
     renderSchemaMap(
       'CODEX_SERVER_NOTIFICATION_PARAMS',
       methodMaps.serverNotifications,
       (entry) => schemaFileForMethodType(entry.method, requiredType(entry)).typeName,
+      schemaNames,
     ),
   ].join('\n')
 }
@@ -650,16 +745,24 @@ function renderSchemaMap(
   constantName: string,
   entries: readonly MethodEntry[],
   typeName: (entry: MethodEntry) => string,
+  schemaNames: ReadonlyMap<string, string>,
 ) {
   return [
     `export const ${constantName} = {`,
     ...entries.map(
       (entry) =>
-        `  ${JSON.stringify(entry.method)}: CodexSchema.${schemaConstName(typeName(entry))},`,
+        `  ${JSON.stringify(entry.method)}: CodexSchema.${schemaConstName(requiredSchemaName(typeName(entry), schemaNames))},`,
     ),
     '} as const',
     '',
   ].join('\n')
+}
+
+function requiredSchemaName(typeName: string, schemaNames: ReadonlyMap<string, string>) {
+  const name = schemaNames.get(typeName)
+  if (name) return name
+
+  throw createInternalError(`Missing canonical Codex schema: ${typeName}`)
 }
 
 function generatedPrelude() {
@@ -710,19 +813,11 @@ function stringField(value: JsonObject, key: string) {
   return typeof child === 'string' ? child : null
 }
 
-function isJsonObject(value: JsonValue | unknown): value is JsonObject {
-  return typeof value === 'object' && value !== null && !Array.isArray(value)
-}
-
-function isString(value: unknown): value is string {
-  return typeof value === 'string'
-}
-
 function isPicklistValue(value: JsonValue): value is boolean | number | string {
   return typeof value === 'string' || typeof value === 'number' || typeof value === 'boolean'
 }
 
-function asJsonObject(value: unknown, source: string): JsonObject {
+function asJsonObject(value: JsonValue, source: string): JsonObject {
   if (isJsonObject(value)) return value
 
   throw createInternalError(`Expected JSON object from ${source}`)

@@ -2,7 +2,7 @@ import { screen, waitFor } from '@testing-library/react'
 import { useEffect, useRef, useState } from 'react'
 import { afterEach, beforeEach, vi } from 'vitest'
 
-import { useElementWidth } from '@/features/search/components/results-view'
+import { useElementWidth } from '@/hooks/use-element-width'
 import { expect, test } from '../../../../test/fixtures'
 import { renderWithProviders } from '../../../../test/render'
 

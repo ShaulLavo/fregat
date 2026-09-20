@@ -1,3 +1,5 @@
+import { unique } from '@workspace/utils/collections'
+import { errorMessage } from '@workspace/contracts'
 import { homedir } from 'node:os'
 import path from 'node:path'
 import { closeApp, createApp } from './app'
@@ -151,10 +153,6 @@ function loopbackOrigins(host: string, port: number) {
   return hosts.map((name) => `http://${name}:${port}`)
 }
 
-function unique(values: readonly string[]) {
-  return Array.from(new Set(values))
-}
-
 function numberFromEnv(value: string | undefined) {
   if (!value) return undefined
 
@@ -166,12 +164,6 @@ function assertLoopbackHost(host: string) {
   if (host === 'localhost' || host === '127.0.0.1' || host === '::1') return
 
   throw serverErrors.LOOPBACK_HOST_REQUIRED()
-}
-
-function errorMessage(error: unknown) {
-  if (error instanceof Error) return error.message
-
-  return String(error)
 }
 
 function exitCodeForSignal(signal: NodeJS.Signals) {

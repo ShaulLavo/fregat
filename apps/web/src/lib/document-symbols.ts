@@ -1,3 +1,4 @@
+import { fileUriForPath } from '@/lib/file-uri'
 import {
   LspClient,
   composeWorkspaceEditClientCapabilities,
@@ -292,11 +293,6 @@ function isPosition(value: unknown) {
   if (!value || typeof value !== 'object') return false
   if (!('line' in value) || typeof value.line !== 'number') return false
   return 'character' in value && typeof value.character === 'number'
-}
-
-export function fileUriForPath(path: string) {
-  const normalized = path.replace(/^\/+/, '')
-  return `file:///${normalized.split('/').map(encodeURIComponent).join('/')}`
 }
 
 function languageIdForPath(path: string) {

@@ -1,3 +1,4 @@
+import { errorMessage } from '@workspace/contracts'
 import { LspConnectionPool, type LspConnectionPoolEvent } from '@singapore-editor/lsp-plugin'
 
 import { log } from '@/lib/client-logging'
@@ -79,10 +80,4 @@ function actionSuffix(kind: LspConnectionPoolEvent['kind']): string {
   if (kind === 'created' || kind === 'reused') return 'acquired'
 
   return kind
-}
-
-function errorMessage(error: unknown): string {
-  if (error instanceof Error) return error.message
-
-  return String(error)
 }

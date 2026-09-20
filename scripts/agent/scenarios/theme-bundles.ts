@@ -9,7 +9,7 @@ import {
 } from '../../../packages/contracts/src/index'
 import { wallpaperPng, secondWallpaperPng } from '../../../apps/web/test/factories/wallpaper'
 import { preserveAppearance } from '../preserve-settings'
-import { chords, selectors } from '../selectors'
+import { chords, selectors, runPaletteCommand } from '../selectors'
 import type { Scenario } from './index'
 
 async function mode(page: Page, value: 'light' | 'dark' | 'system') {
@@ -94,13 +94,7 @@ export const themeBundles: Scenario = {
       await mode(page, 'light')
       await wallpaper(page, assets[0]!.id)
       await step('light-wallpaper')
-      await page.keyboard.press(chords.commandPalette)
-      await selectors.paletteInput(page).fill('>Toggle wallpaper')
-      await selectors.commandOption(page, 'Toggle wallpaper').click()
-      await selectors.paletteInput(page).waitFor({ state: 'hidden' })
-      await selectors.wallpaperStill(page).waitFor({ state: 'detached' })
-      await mode(page, 'dark')
-      await wallpaper(page, assets[1]!.id)
+      await hideLightWallpaper(page, assets[1]!.id)
       await step('dark-unaffected-by-light-customization')
       await mode(page, 'light')
       await selectors.wallpaperStill(page).waitFor({ state: 'detached' })
@@ -115,19 +109,11 @@ export const themeBundles: Scenario = {
       await page.emulateMedia({ colorScheme: 'light' })
       await selectors.wallpaperStill(page).waitFor({ state: 'detached' })
       await step('system-light')
-      await page.keyboard.press(chords.commandPalette)
-      await selectors.paletteInput(page).fill('>Toggle wallpaper')
-      await selectors.commandOption(page, 'Toggle wallpaper').click()
+      await runPaletteCommand(page, 'Toggle wallpaper')
       await selectors.paletteInput(page).waitFor({ state: 'hidden' })
       await wallpaper(page, assets[0]!.id)
       await step('reenabled-light-restores-image')
-      await page.keyboard.press(chords.commandPalette)
-      await selectors.paletteInput(page).fill('>Toggle wallpaper')
-      await selectors.commandOption(page, 'Toggle wallpaper').click()
-      await selectors.paletteInput(page).waitFor({ state: 'hidden' })
-      await selectors.wallpaperStill(page).waitFor({ state: 'detached' })
-      await mode(page, 'dark')
-      await wallpaper(page, assets[1]!.id)
+      await hideLightWallpaper(page, assets[1]!.id)
       await selectors.settingsSearch(page).fill('Theme bundles')
       await page.keyboard.press('Tab')
       await selectors.themeCard(page, 'sage').focus()
@@ -217,4 +203,12 @@ export const themeBundles: Scenario = {
         )
     }
   },
+}
+
+async function hideLightWallpaper(page: Page, darkAsset: string) {
+  await runPaletteCommand(page, 'Toggle wallpaper')
+  await selectors.paletteInput(page).waitFor({ state: 'hidden' })
+  await selectors.wallpaperStill(page).waitFor({ state: 'detached' })
+  await mode(page, 'dark')
+  await wallpaper(page, darkAsset)
 }

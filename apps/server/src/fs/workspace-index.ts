@@ -1,3 +1,7 @@
+import { sortedDirents } from './dirents'
+import { joinRelative } from './search-shared'
+import { errorMessage } from '@workspace/contracts'
+import { elapsedMs } from '@workspace/utils/timing'
 import type { Stats } from 'node:fs'
 import { open, readdir } from 'node:fs/promises'
 import path from 'node:path'
@@ -763,10 +767,6 @@ function recordSkippedScanEntry(context: ScanContext) {
   context.skippedEntryCount += 1
 }
 
-function sortedDirents<T extends { name: string }>(dirents: T[]) {
-  return dirents.sort((left, right) => left.name.localeCompare(right.name))
-}
-
 async function indexEntry(
   context: ScanContext,
   relativePath: string,
@@ -902,34 +902,29 @@ async function sniffFileKnownTextContentKind(
   }
 }
 
-async function sniffReadableFileContentKind(
-  absolutePath: string,
-  size: number,
-): Promise<WorkspaceIndexContentKind> {
+async function readSniffBytes(absolutePath: string, size: number) {
   const handle = await open(absolutePath, 'r')
   try {
     const buffer = new Uint8Array(Math.min(size, SNIFF_BYTES))
     const { bytesRead } = await handle.read(buffer, 0, buffer.length, 0)
-    return sniffBytes(buffer.subarray(0, bytesRead))
+    return buffer.subarray(0, bytesRead)
   } finally {
     await handle.close()
   }
+}
+
+async function sniffReadableFileContentKind(
+  absolutePath: string,
+  size: number,
+): Promise<WorkspaceIndexContentKind> {
+  return sniffBytes(await readSniffBytes(absolutePath, size))
 }
 
 async function sniffReadableKnownTextContentKind(
   absolutePath: string,
   size: number,
 ): Promise<WorkspaceIndexContentKind> {
-  const handle = await open(absolutePath, 'r')
-  try {
-    const buffer = new Uint8Array(Math.min(size, SNIFF_BYTES))
-    const { bytesRead } = await handle.read(buffer, 0, buffer.length, 0)
-    if (buffer.subarray(0, bytesRead).includes(0)) return 'binary'
-
-    return 'text'
-  } finally {
-    await handle.close()
-  }
+  return (await readSniffBytes(absolutePath, size)).includes(0) ? 'binary' : 'text'
 }
 
 function sniffBytes(bytes: Uint8Array): WorkspaceIndexContentKind {
@@ -1212,12 +1207,6 @@ function pathCharBag(relativePath: string) {
   return Array.from(characters).sort().join('')
 }
 
-function joinRelative(parent: string, child: string) {
-  if (!parent) return child
-
-  return toPosix(path.join(parent, child))
-}
-
 function emptyStatus(scanRoot: string): WorkspaceIndexStatus {
   return {
     entryCount: 0,
@@ -1347,16 +1336,6 @@ function statusWithPendingCreatedPathCount(
     ...previous,
     pendingCreatedPathCount: pendingCreatedPaths.size,
   }
-}
-
-function elapsedMs(startedAt: number) {
-  return Math.round((performance.now() - startedAt) * 100) / 100
-}
-
-function errorMessage(error: unknown) {
-  if (error instanceof Error) return error.message
-
-  return String(error)
 }
 
 function cloneEntry(entry: WorkspaceIndexEntry): WorkspaceIndexEntry {

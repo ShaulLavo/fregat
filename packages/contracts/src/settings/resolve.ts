@@ -1,5 +1,5 @@
 import * as v from 'valibot'
-import { isRecord } from '../is-record'
+import { isRecord } from '@workspace/utils/objects'
 import { jsonEqual } from './json-equal'
 import { SETTINGS_REGISTRY, type SettingId, type SettingsValues } from './keys'
 import { migrateSetting } from './migrations'

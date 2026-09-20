@@ -248,7 +248,7 @@ function wordBoundaryBefore(text: string, index: number) {
   return /[./_\-\s]/u.test(text[index - 1] ?? '')
 }
 
-function queryPieces(query: string) {
+export function queryPieces(query: string) {
   return query.toLocaleLowerCase().trim().split(/\s+/u).filter(Boolean)
 }
 

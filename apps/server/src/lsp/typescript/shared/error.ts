@@ -1,4 +1,4 @@
-import { isRecord } from '@workspace/contracts'
+import { isRecord } from '@workspace/utils/objects'
 
 export const JSON_RPC_INTERNAL_ERROR = -32603
 

@@ -53,7 +53,7 @@ test('an inline file reference opens the referenced file at its line', async ({
       testTabContent('repo/src/foo.ts'),
     ),
   )
-  expect(editor.uiStore.getState().definitionTarget).toMatchObject({
+  expect(editor.uiStore.getState().definitionTarget?.target).toMatchObject({
     path: 'repo/src/foo.ts',
     uri: 'file:///repo/src/foo.ts',
     range: { start: { character: 0, line: 41 } },
@@ -127,7 +127,7 @@ test('a managed chat resolves citations and images in its worktree while the edi
   expect(editor.workspaceStore.getState().rootFolder?.path).toBe('repo')
   await userEvent.click(file)
   await waitFor(() =>
-    expect(editor.uiStore.getState().definitionTarget).toMatchObject({
+    expect(editor.uiStore.getState().definitionTarget?.target).toMatchObject({
       path: `${worktreePath}/src/foo.ts`,
       range: { start: { line: 1, character: 0 } },
     }),

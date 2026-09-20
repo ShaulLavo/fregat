@@ -1,3 +1,4 @@
+import { processExists } from './process-exists'
 import { existsSync } from 'node:fs'
 import { chmod, mkdir, mkdtemp, readFile, rm, writeFile } from 'node:fs/promises'
 import { arch, cpus, platform, release, tmpdir, totalmem } from 'node:os'
@@ -228,15 +229,6 @@ async function cleanupProcess(pidFile: string) {
       throw benchmarkError(`PTY cleanup exceeded ${SAMPLE_TIMEOUT_MS} ms for PID ${pid}`)
     }
     await Bun.sleep(1)
-  }
-}
-
-function processExists(pid: number) {
-  try {
-    process.kill(pid, 0)
-    return true
-  } catch {
-    return false
   }
 }
 

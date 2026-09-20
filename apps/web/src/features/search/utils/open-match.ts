@@ -1,3 +1,4 @@
+import { fileUriForPath } from '@/lib/file-uri'
 import type { LanguageServerDefinitionTarget } from '@singapore-editor/lsp-plugin'
 import type { WorkspaceSearchMatch } from '@workspace/contracts'
 
@@ -54,9 +55,4 @@ function searchEndCharacter(
   }
 
   return character + Math.max(1, query.length)
-}
-
-function fileUriForPath(path: string) {
-  const normalized = path.replace(/^\/+/, '')
-  return `file:///${normalized.split('/').map(encodeURIComponent).join('/')}`
 }

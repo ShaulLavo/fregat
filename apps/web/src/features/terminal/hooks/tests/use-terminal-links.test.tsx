@@ -245,7 +245,7 @@ function EditorSelectionProbe({ opened }: { opened: OpenedPaths }) {
   const selectedFilePath = useEditorWorkspaceState((state) =>
     state.selectedTabContent ? (tabFileResource(state.selectedTabContent)?.path ?? null) : null,
   )
-  const definitionTarget = useEditorUiState((state) => state.definitionTarget)
+  const definitionTarget = useEditorUiState((state) => state.definitionTarget?.target ?? null)
 
   useEffect(() => {
     if (!selectedFilePath) return

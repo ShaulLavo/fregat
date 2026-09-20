@@ -1,4 +1,5 @@
-import { errorStringField, isRecord, TUI_CLIENT_ORIGIN } from '@workspace/contracts'
+import { errorStringField, TUI_CLIENT_ORIGIN } from '@workspace/contracts'
+import { isRecord } from '@workspace/utils/objects'
 
 export type ConnectionFailure = ReturnType<typeof connectionFailure>
 

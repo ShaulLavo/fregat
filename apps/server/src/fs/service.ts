@@ -1,3 +1,5 @@
+import { workspaceIndexForSearch } from './search-shared'
+import { elapsedMs } from '@workspace/utils/timing'
 import { homedir } from 'node:os'
 import path from 'node:path'
 import { effectiveEntryType, type WorkspaceAddressId } from '@workspace/contracts'
@@ -22,7 +24,6 @@ import {
   type MutationTargetKind,
 } from './mutation-target'
 import {
-  elapsedMs,
   errorSummary,
   observeRequestOperation,
   recordProcessWarning,
@@ -39,7 +40,6 @@ import {
   WorkspaceIndex,
   inactiveWorkspaceIndexStatus,
   watchWorkspaceIndex,
-  type WorkspaceIndex as WorkspaceIndexInstance,
   type WorkspaceIndexWatchSubscription,
 } from './workspace-index'
 import type {
@@ -549,9 +549,13 @@ export class FileSystemService {
     return entry
   }
 
-  async *events(paths: string[], signal?: AbortSignal): AsyncGenerator<WatchServerMessage> {
+  async *events(
+    paths: string[],
+    signal?: AbortSignal,
+    files: readonly string[] = [],
+  ): AsyncGenerator<WatchServerMessage> {
     await this.workspaceEditReady
-    yield* observedWatchEvents(this.changes.stream(paths, signal), paths)
+    yield* observedWatchEvents(this.changes.stream(paths, signal, { files }), paths)
   }
 
   workspaceEditPrepare(body: WorkspaceEditPrepareBody) {
@@ -708,15 +712,6 @@ function matchesRecentQuery(entry: TreeEntry, query: RecentsQuery) {
 
 function hasHiddenPathSegment(input: string) {
   return input.split('/').some((segment) => segment.startsWith('.'))
-}
-
-function workspaceIndexForSearch(
-  options: FileSystemSearchOptions,
-  index: WorkspaceIndexInstance | undefined,
-) {
-  if (options.useWorkspaceIndex === false) return undefined
-
-  return index
 }
 
 async function startWorkspaceIndex(

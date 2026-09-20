@@ -8,7 +8,7 @@ import {
 } from '@workspace/contracts'
 import * as v from 'valibot'
 import { describe, expect, it } from 'vitest'
-import { migrateOrchestrationDatabase } from '../../db/migrations'
+import { migratePlatformDatabase as migrateOrchestrationDatabase } from '../../db/migrations'
 import * as schema from '../../db/schema'
 import { MOCK_ADAPTER_CAPABILITIES, MockProviderAdapter } from '../adapters/mock'
 import type { ProviderDriver } from '../driver'

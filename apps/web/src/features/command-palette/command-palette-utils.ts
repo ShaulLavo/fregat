@@ -359,11 +359,6 @@ export function symbolKindLabel(kind: number) {
   return 'Symbol'
 }
 
-export function fileUriForPath(path: string) {
-  const normalized = path.replace(/^\/+/, '')
-  return `file:///${normalized.split('/').map(encodeURIComponent).join('/')}`
-}
-
 function platformCommandPaletteItem(
   spec: CommandSpec,
   bindings: readonly PlatformKeyBinding[],

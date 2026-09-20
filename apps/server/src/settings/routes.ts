@@ -1,7 +1,6 @@
 import {
   errorNumberField,
   errorStringField,
-  isRecord,
   isSettingId,
   settingsMutationRequestSchema,
   settingsMutationResultSchema,
@@ -10,6 +9,7 @@ import {
   settingsSnapshotSchema,
   type SettingId,
 } from '@workspace/contracts'
+import { isRecord } from '@workspace/utils/objects'
 import { Elysia } from 'elysia'
 import * as v from 'valibot'
 import { recordRequestContext } from '../observability'

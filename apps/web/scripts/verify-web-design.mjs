@@ -1,3 +1,5 @@
+import { writeReport } from './write-report.mjs'
+import { settleAnimations } from './browser-animations.mjs'
 import { randomUUID } from 'node:crypto'
 import { mkdirSync, readFileSync, writeFileSync } from 'node:fs'
 import { basename, join, resolve } from 'node:path'
@@ -80,7 +82,7 @@ try {
     report.variants.some((entry) => entry.status === 'failed')
       ? 'failed'
       : 'passed'
-  writeReport()
+  writeReport(report, options.outputDir)
   writeGallery()
   process.stdout.write(`${report.status}: ${join(options.outputDir, 'results.json')}\n`)
   if (report.status === 'failed') process.exitCode = 1
@@ -166,7 +168,7 @@ async function setAppearance(density, colorScheme) {
   }
   const values = { 'workbench.density': density, 'workbench.colorTheme': colorScheme }
   appearance.pending = values
-  writeReport()
+  writeReport(report, options.outputDir)
   await api('settings/write', {
     mutationId: randomUUID(),
     target: appearance.target,
@@ -174,7 +176,7 @@ async function setAppearance(density, colorScheme) {
   })
   appearance.last = values
   appearance.pending = null
-  writeReport()
+  writeReport(report, options.outputDir)
 }
 
 async function restoreAppearance() {
@@ -289,7 +291,7 @@ async function verifyVariant(density, colorScheme) {
       entry.closeError = error.message
     })
     classifyNetworkFailures(entry)
-    writeReport()
+    writeReport(report, options.outputDir)
   }
 }
 
@@ -618,21 +620,6 @@ function validateMetrics(record, density) {
   }
 }
 
-async function settleAnimations(page) {
-  await page.evaluate(async () => {
-    await new Promise((resolve) => requestAnimationFrame(() => requestAnimationFrame(resolve)))
-    const animations = document
-      .getAnimations()
-      .filter(
-        (animation) =>
-          animation.playState === 'running' &&
-          Number.isFinite(animation.effect?.getComputedTiming().endTime),
-      )
-    await Promise.all(animations.map((animation) => animation.finished.catch(() => {})))
-    await new Promise((resolve) => requestAnimationFrame(resolve))
-  })
-}
-
 async function imageVariation(dataUrl) {
   const img = new Image()
   img.src = dataUrl
@@ -671,10 +658,6 @@ function drawRulers(bars) {
     root.append(ruler)
   }
   document.body.append(root)
-}
-
-function writeReport() {
-  writeFileSync(join(options.outputDir, 'results.json'), JSON.stringify(report, null, 2))
 }
 
 function writeGallery() {

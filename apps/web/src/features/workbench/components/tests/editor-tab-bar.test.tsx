@@ -1,5 +1,6 @@
 import { testTabContent } from '../../../../../test/factories/document-targets'
 import { tabId } from '@/lib/documents/utils/identity'
+import { groupId } from '@/lib/documents/utils/group-types'
 import { fireEvent, screen } from '@testing-library/react'
 import { vi } from 'vitest'
 
@@ -111,11 +112,14 @@ function TestEditorTabs({
         value={{
           requestCloseTab: onCloseTab,
           requestCloseTabs: onCloseTabs,
-          reorderTab: async () => ({ status: 'superseded' }),
           selectTab: onSelectTab,
         }}
       >
-        <EditorTabBar loadingTabId={loadingTabId ? tabId(loadingTabId) : null} tabs={tabs} />
+        <EditorTabBar
+          groupId={groupId('test-group')}
+          loadingTabId={loadingTabId ? tabId(loadingTabId) : null}
+          tabs={tabs}
+        />
       </EditorTabActionsContext>
     </EditorStateProvider>
   )

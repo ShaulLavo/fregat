@@ -23,6 +23,7 @@
     "@workspace/contracts": "workspace:*",
     "@workspace/observability": "workspace:*",
     "@workspace/tree": "workspace:*",
+    "@workspace/utils": "workspace:*",
     "evlog": "catalog:",
     "react": "^19.3.0",
     "shiki": "4.4.3",

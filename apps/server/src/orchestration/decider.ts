@@ -25,15 +25,15 @@ import {
   liveProjectSessions,
   requireFutureWakeTime,
   requirePinned,
-  requireProject,
   requireSettleable,
   requireSnoozable,
   requireSessionAbsent,
   requireSessionArchived,
   requireSessionNotArchived,
-  requireSessionNotDeleted,
   requireValidOrderKey,
 } from './command-invariants'
+import { requireSession as requireSessionNotDeleted } from './read-model'
+import { requireProject } from './read-model'
 import type { PendingOrchestrationEvent } from './event-store'
 import type { OrchestrationProjectedSession, OrchestrationReadModel } from './read-model'
 

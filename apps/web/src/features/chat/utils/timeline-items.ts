@@ -1,3 +1,4 @@
+import { compareMessagesByCreatedAt } from '@/features/chat/utils/message-metadata'
 import type {
   OrchestrationLatestTurn,
   OrchestrationMessage,
@@ -827,10 +828,6 @@ function revertTurnCountAfterUserMessage(
   }
 
   return null
-}
-
-function compareMessagesByCreatedAt(left: ChatTimelineMessage, right: ChatTimelineMessage) {
-  return left.createdAt.localeCompare(right.createdAt)
 }
 
 function appendActivityGroup(items: ChatTimelineItem[], activities: readonly ChatWorkLogEntry[]) {

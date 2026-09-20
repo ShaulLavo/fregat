@@ -1,3 +1,4 @@
+import { nodeErrorCode as structuredErrorCode } from '@workspace/contracts'
 import type { GitFileDiff, GitFileStatus } from '@workspace/contracts'
 import { clientLogContext } from '@/lib/environments/state/log-context'
 import type { SessionId } from '@workspace/contracts'
@@ -220,14 +221,6 @@ export function checkpointDiffRetry(failureCount: number, error: unknown) {
   if (failureCount >= 2) return false
 
   return structuredErrorCode(error) !== 'checkpoint.RANGE_INVALID'
-}
-
-function structuredErrorCode(error: unknown) {
-  if (!error || typeof error !== 'object') return null
-  if (!('code' in error)) return null
-
-  const code = error.code
-  return typeof code === 'string' ? code : null
 }
 
 export function checkpointDiffRetryDelay(attemptIndex: number) {

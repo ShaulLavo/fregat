@@ -67,6 +67,11 @@ type OperationPayload =
       readonly owner: WorkspaceAddressOwner
       readonly passthrough: Address['passthrough']
     }
+type EditorOperationOwner = {
+  readonly workspace: EditorWorkspaceStoreApi
+  readonly rootPath: string | null
+}
+
 type Operation = {
   readonly generation: number
   readonly abort: AbortController
@@ -77,6 +82,8 @@ type Operation = {
   href: string | null
   complete: OperationPayload | null
   beforeApply?: () => void
+  commitEditorState?: (owner: EditorWorkspaceStoreApi) => boolean
+  editorOwner?: EditorOperationOwner
   draftWorktreeId?: WorktreeId
   preserveTransient: boolean
   applying: boolean
@@ -98,6 +105,8 @@ type Destination = {
   readonly historyTarget?: NavigationHistoryTarget | null
   readonly preserveTransient?: boolean
   readonly beforeApply?: () => void
+  readonly commitEditorState?: (owner: EditorWorkspaceStoreApi) => boolean
+  readonly editorOwner?: EditorOperationOwner
   readonly draftWorktreeId?: WorktreeId
 }
 
@@ -322,15 +331,20 @@ export function createNavigationCoordinator(router: ApplicationRouter, initial: 
       application: owner,
       address: intent,
       reason: op.reason,
-      isCurrent: () => isCurrent(op, owner) && op.complete === payload,
+      isCurrent: () =>
+        isCurrent(op, owner) && op.complete === payload && editorOwnerIsCurrent(op, owner),
       signal: op.abort.signal,
       preserveTransient: op.preserveTransient,
+      commitEditorState: op.commitEditorState,
       draftWorktreeId: op.draftWorktreeId,
       reconcileResources: (workspace, rootPath) =>
         reconcileResolvedAddress(op, workspace, rootPath),
     })
     if (!isCurrent(op, owner) || op.complete !== payload) return
     if (result.status !== 'applied') {
+      if (op.commitEditorState && result.status === 'superseded')
+        await restoreEditorAddress(op, owner)
+      if (!isCurrent(op, owner)) return
       finish(op, result.status === 'superseded' ? { status: 'superseded' } : result)
       return
     }
@@ -355,10 +369,34 @@ export function createNavigationCoordinator(router: ApplicationRouter, initial: 
     finish(op, { status: 'applied' })
   }
 
+  function editorOwnerIsCurrent(op: Operation, owner: ApplicationRuntime) {
+    if (!op.editorOwner) return true
+    const workspace = owner.getSnapshot().editor.workspaceStore
+    return (
+      workspace === op.editorOwner.workspace &&
+      (workspace.getState().rootFolder?.path ?? null) === op.editorOwner.rootPath
+    )
+  }
+
+  async function restoreEditorAddress(op: Operation, owner: ApplicationRuntime) {
+    const canonical = budgetAddress(captureAddress(owner, accepted)).address
+    const href = buildAddressLocation(router, canonical).publicHref
+    op.href = href
+    op.historyIdentity = null
+    op.writing = true
+    await navigateAddress(router, canonical, { replace: true })
+    if (!isCurrent(op, owner)) return
+    accepted = canonical
+    writeAddressCache(formatAddress(canonical))
+    publish({ status: 'applied', href })
+  }
+
   async function commit(op: Operation, destination: Destination) {
     if (!isCurrent(op)) return
     const address = destination.address
     op.complete = payloadForAddress(address)
+    op.editorOwner = destination.editorOwner
+    op.commitEditorState = destination.commitEditorState
     op.beforeApply = destination.beforeApply
     op.draftWorktreeId = destination.draftWorktreeId
     op.preserveTransient = destination.preserveTransient ?? false

@@ -1,3 +1,4 @@
+import { pathLeaf as basename } from '@/lib/path-formatters'
 /**
  * Turns the file references agents write in prose — `src/foo.ts:42`,
  * `[foo](src/foo.ts)`, `/abs/path.ts#L12` — into editor-openable targets.
@@ -255,10 +256,6 @@ function stripQuery(value: string) {
   if (index < 0) return value
 
   return value.slice(0, index)
-}
-
-function basename(path: string) {
-  return path.slice(path.lastIndexOf('/') + 1)
 }
 
 function positiveInteger(value: string | undefined) {

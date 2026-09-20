@@ -1,3 +1,4 @@
+import { requireSession as requireSessionNotDeleted } from './read-model'
 import { defineErrorCatalog } from 'evlog'
 import { isValidOrderKey } from '@workspace/contracts'
 import { orchestrationErrors } from '../observability'
@@ -60,12 +61,6 @@ const sessionLifecycleErrors = defineErrorCatalog('orchestration', {
   },
 })
 
-export function requireSessionNotDeleted(model: OrchestrationReadModel, sessionId: string) {
-  const session = model.sessions.get(sessionId)
-  if (!session || session.deletedAt) throw orchestrationErrors.SESSION_NOT_FOUND({ sessionId })
-  return session
-}
-
 export function requireSessionNotArchived(
   model: OrchestrationReadModel,
   sessionId: string,
@@ -84,12 +79,6 @@ export function requireSessionArchived(model: OrchestrationReadModel, sessionId:
 
 export function requireSessionAbsent(model: OrchestrationReadModel, sessionId: string) {
   if (model.sessions.has(sessionId)) throw orchestrationErrors.SESSION_ALREADY_EXISTS({ sessionId })
-}
-
-export function requireProject(model: OrchestrationReadModel, projectId: string) {
-  const project = model.projects.get(projectId)
-  if (!project || project.deletedAt) throw orchestrationErrors.PROJECT_NOT_FOUND({ projectId })
-  return project
 }
 
 export function requireActionableSourcePlan(

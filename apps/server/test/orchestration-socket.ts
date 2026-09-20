@@ -1,9 +1,9 @@
 import {
-  isRecord,
   orchestrationWsServerMessageSchema,
   type OrchestrationWsClientMessage,
   type OrchestrationWsServerMessage,
 } from '@workspace/contracts'
+import { isRecord } from '@workspace/utils/objects'
 import * as v from 'valibot'
 import { expect } from 'vitest'
 import type { App } from '../src/app'

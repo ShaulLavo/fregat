@@ -1,3 +1,4 @@
+import { targetArgument } from './target-argument'
 /**
  * Regenerates `docs/settings-reference.md` from the registry.
  *
@@ -105,25 +106,7 @@ ${sections.join('\n\n')}
 
 const DEFAULT_TARGET = path.join(import.meta.dirname, '..', 'docs', 'settings-reference.md')
 
-function targetArgument(): string {
-  const inline = process.argv.find((argument) => argument.startsWith('--target='))
-  if (inline) return resolveTarget(inline.slice('--target='.length))
-
-  const index = process.argv.indexOf('--target')
-  if (index === -1) return DEFAULT_TARGET
-
-  return resolveTarget(process.argv[index + 1])
-}
-
 /** A valueless `--target` used to fall through to the default and overwrite it. */
-function resolveTarget(value: string | undefined): string {
-  if (!value || value.startsWith('--')) {
-    console.error('--target requires a path')
-    process.exit(1)
-  }
-
-  return path.resolve(value)
-}
 
 function writeReference(target: string): void {
   writeFileSync(target, body, 'utf8')
@@ -144,6 +127,6 @@ function checkReference(target: string): void {
   process.exitCode = 1
 }
 
-const target = targetArgument()
+const target = targetArgument(DEFAULT_TARGET)
 if (process.argv.includes('--check')) checkReference(target)
 else writeReference(target)

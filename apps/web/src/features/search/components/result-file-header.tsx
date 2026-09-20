@@ -6,7 +6,8 @@ import { useSearchResultActions } from '@/features/search/hooks/use-result-actio
 import { Button } from '@workspace/ui/components/button'
 import { cn } from '@workspace/ui/lib/utils'
 
-import { fileName, matchNoun } from '@/features/search/utils/result-editor'
+import { fileName } from '@/features/search/utils/result-editor'
+import { matchNoun } from '@/features/search/utils/match-noun'
 import type { SearchResultFileBlock } from '@/features/search/utils/result-view-model'
 import { iconForEntry } from '@/lib/file-icons'
 

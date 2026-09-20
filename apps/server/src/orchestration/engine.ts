@@ -1,3 +1,5 @@
+import { errorMessage } from '@workspace/contracts'
+import { elapsedMs } from '@workspace/utils/timing'
 import { terminalHistoryMessages } from './utils/terminal-history'
 import { TerminalHandoffs, type TerminalHandoff } from './terminal-handoffs'
 import type { AgentTerminalResolver, AgentTerminalProcess } from '../terminal/agent-launch'
@@ -31,7 +33,7 @@ import {
 import * as v from 'valibot'
 
 import { defaultAttachmentsDir, writeAttachmentFromDataUrl } from '../attachments/store'
-import { migrateOrchestrationDatabase } from '../db/migrations'
+import { migratePlatformDatabase as migrateOrchestrationDatabase } from '../db/migrations'
 import { orchestrationErrors } from '../observability'
 import { requireActionableSourcePlan } from './command-invariants'
 
@@ -1144,17 +1146,7 @@ function attachmentMetadata(attachment: ChatAttachmentUpload): ChatAttachment {
   }
 }
 
-function errorMessage(error: unknown) {
-  if (error instanceof Error) return error.message
-
-  return String(error)
-}
-
 function noop() {}
-
-function elapsedMs(startedAt: number) {
-  return Math.round((performance.now() - startedAt) * 100) / 100
-}
 
 function previouslyRejectedCommandError(
   receipt: NonNullable<ReturnType<OrchestrationCommandReceipts['find']>>,

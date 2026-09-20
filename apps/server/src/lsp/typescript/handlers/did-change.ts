@@ -1,6 +1,6 @@
 import path from 'node:path'
 
-import { isRecord } from '@workspace/contracts'
+import { isRecord } from '@workspace/utils/objects'
 import type * as lsp from 'vscode-languageserver-protocol'
 
 import { lspPositionToOffset } from '../shared/boundary'

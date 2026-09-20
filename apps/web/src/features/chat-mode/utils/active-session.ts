@@ -1,3 +1,5 @@
+import { selectChatSessionsForProject } from '@workspace/client-core/chat/selectors'
+import { compareSessionsForRail } from '@workspace/client-core/chat/rail/session-order'
 import type { EnvironmentId, ProjectId, SessionId } from '@workspace/contracts'
 
 export type SessionSelection =
@@ -84,4 +86,23 @@ export function activeSessionShowsComposer(session: ActiveSession) {
   if (session.status === 'draft') return true
 
   return session.status === 'auto' && session.sessionId === null
+}
+
+export function activeProjectSession({
+  slice,
+  ...options
+}: Omit<Parameters<typeof activeSession>[0], 'sessionIds' | 'archivedSessionIds' | 'projectId'> & {
+  readonly slice: Parameters<typeof selectChatSessionsForProject>[0]
+  readonly projectId: ProjectId
+}): ActiveSession {
+  const sessions = selectChatSessionsForProject(slice, options.projectId).toSorted(
+    compareSessionsForRail,
+  )
+  return activeSession({
+    ...options,
+    sessionIds: sessions.filter((session) => !session.archivedAt).map((session) => session.id),
+    archivedSessionIds: sessions
+      .filter((session) => session.archivedAt)
+      .map((session) => session.id),
+  })
 }

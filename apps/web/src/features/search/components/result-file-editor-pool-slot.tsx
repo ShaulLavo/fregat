@@ -5,12 +5,12 @@ import { SEARCH_RESULT_FILE_EDITOR_POOL_HIDDEN_STYLE } from '@/features/search/u
 import type { SearchResultFileEditorPoolEntry } from '@/features/search/utils/result-editor-types'
 import {
   equalSearchResultFileEditorLineWindow,
-  searchResultDomId,
   searchResultFileContainsId,
   searchResultFileEditorLineWindow,
   searchResultVirtualRowStyle,
   type SearchResultFileEditorLineWindow,
 } from '@/features/search/utils/result-editor'
+import { searchResultDomId } from '@/features/search/utils/result-dom-id'
 import { SearchResultFileEditor } from '@/features/search/components/result-file-editor'
 import type { SearchResultId } from '@/features/search/utils/result-items'
 import { searchResultVirtualRowId } from '@/features/search/utils/result-view-model'

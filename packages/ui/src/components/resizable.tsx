@@ -1,3 +1,4 @@
+import { isPercentage as isResizableLayoutSize } from '@workspace/utils/numbers'
 import * as ResizablePrimitive from 'react-resizable-panels'
 import { useMemo } from 'react'
 
@@ -155,13 +156,6 @@ function isResizableLayout(value: unknown): value is ResizablePrimitive.Layout {
   if (!isRecord(value)) return false
 
   return Object.values(value).every(isResizableLayoutSize)
-}
-
-function isResizableLayoutSize(value: unknown) {
-  if (typeof value !== 'number') return false
-  if (!Number.isFinite(value)) return false
-
-  return value >= 0 && value <= 100
 }
 
 function isRecord(value: unknown): value is Record<string, unknown> {

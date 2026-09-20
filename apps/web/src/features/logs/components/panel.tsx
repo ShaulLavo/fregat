@@ -2,10 +2,10 @@ import { useNavigation } from '@/hooks/use-navigation'
 import { ArrowClockwiseIcon } from '@phosphor-icons/react'
 import { useQueryClient } from '@tanstack/react-query'
 import { Button } from '@workspace/ui/components/button'
-import { memo, useCallback, useEffect, useMemo, useRef, useState } from 'react'
+import { memo, useCallback, useEffect, useMemo, useState } from 'react'
 
 import { logsKeys } from '@/features/logs/utils/query-keys'
-import { useFocusTarget } from '@/lib/focus/hooks/use-target'
+import { FocusablePanel } from '@/components/focusable-panel'
 import { logDashboardFilters } from '@/features/logs/utils/filter-params'
 import { logFilterQuery, logToolbarOptionFilters } from '@/features/logs/utils/filter-params'
 import { useLogEvents } from '@/features/logs/hooks/use-events'
@@ -23,26 +23,7 @@ type LogsPanelProps = {
 export const LogsPanel = memo(({ active }: LogsPanelProps) => {
   const navigation = useNavigation()
   const queryClient = useQueryClient()
-  const rootRef = useRef<HTMLElement | null>(null)
-  const { ref: focusTargetRef } = useFocusTarget<HTMLElement>({
-    area: 'logs',
-    id: { kind: 'logs' },
-    onIntent: (intent) => {
-      if (intent !== 'focus') return false
-      if (!rootRef.current) return false
 
-      rootRef.current.focus()
-      return true
-    },
-  })
-  // Stable identity keeps the target registration mounted across renders.
-  const setRootRef = useCallback(
-    (element: HTMLElement | null) => {
-      rootRef.current = element
-      focusTargetRef(element)
-    },
-    [focusTargetRef],
-  )
   const filtersState = useLogsFilters()
   const [inspectedEventId, setInspectedEventId] = useState<string | null>(null)
   const [now, setNow] = useState(Date.now)
@@ -70,10 +51,10 @@ export const LogsPanel = memo(({ active }: LogsPanelProps) => {
   }, [])
 
   return (
-    <section
+    <FocusablePanel
+      area='logs'
+      target={{ kind: 'logs' }}
       className='text-foreground flex h-full min-h-0 flex-col'
-      ref={setRootRef}
-      tabIndex={-1}
     >
       <ToolPaneHeader
         actions={
@@ -113,6 +94,6 @@ export const LogsPanel = memo(({ active }: LogsPanelProps) => {
         pending={events.isPending}
         onInspectEvent={handleInspectEvent}
       />
-    </section>
+    </FocusablePanel>
   )
 })

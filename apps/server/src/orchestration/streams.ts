@@ -1,3 +1,4 @@
+import { errorMessage as reactorErrorMessage } from '@workspace/contracts'
 import { referencingSessionIds, worktreesAffectedByEvent } from './worktree-projection'
 import {
   ORCHESTRATION_RESUME_MAX_GAP,
@@ -553,12 +554,6 @@ function runReactor(
       reactor: reactor.name,
     }
   }
-}
-
-function reactorErrorMessage(error: unknown) {
-  if (error instanceof Error) return error.message
-
-  return String(error)
 }
 
 function reactorErrorCode(error: unknown) {

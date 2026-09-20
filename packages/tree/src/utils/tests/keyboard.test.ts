@@ -3,11 +3,11 @@ import { describe, expect, it } from 'vitest'
 import {
   BLOCKED_CONTEXT_MENU_NAV_KEYS,
   canKeyUseStickyKeyboardState,
-  isContextMenuOpenKey,
   isSearchOpenSeedKey,
   isSpaceSelectionKey,
   type FileTreeKeyboardEventLike,
 } from '../render/keyboard'
+import { isContextMenuKey as isContextMenuOpenKey } from '@workspace/utils/keyboard'
 
 describe('file tree keyboard classification', () => {
   it.each([

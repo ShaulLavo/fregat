@@ -116,6 +116,7 @@
     "@tanstack/hotkeys": "^0.8.0",
     "@tanstack/query-core": "^5.102.8",
     "@workspace/contracts": "workspace:*",
+    "@workspace/utils": "workspace:*",
     "evlog": "catalog:",
     "server": "workspace:*",
     "valibot": "^1.5.0",

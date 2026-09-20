@@ -72,6 +72,7 @@
     "@workspace/observability": "workspace:*",
     "@workspace/tree": "workspace:*",
     "@workspace/ui": "workspace:*",
+    "@workspace/utils": "workspace:*",
     "evlog": "catalog:",
     "ghostty-webgpu": "0.1.2",
     "js.foresight": "^4.2.1",

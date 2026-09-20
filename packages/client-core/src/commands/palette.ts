@@ -1,3 +1,5 @@
+import { compareValues as compareNumbers } from '@workspace/utils/compare'
+import { queryPieces } from '@workspace/contracts'
 import { fuzzyRankScore } from '@workspace/contracts'
 
 export type PaletteRankItem = {
@@ -195,13 +197,4 @@ function quickAccessRankTarget(value: string, keywords: readonly string[] | unde
   const extraKeywords = [value].concat(keywords?.slice(2) ?? [])
 
   return { label, keywords: extraKeywords, path }
-}
-
-function queryPieces(query: string) {
-  return query.toLocaleLowerCase().trim().split(/\s+/u).filter(Boolean)
-}
-
-function compareNumbers(left: number, right: number) {
-  if (left === right) return 0
-  return left < right ? -1 : 1
 }

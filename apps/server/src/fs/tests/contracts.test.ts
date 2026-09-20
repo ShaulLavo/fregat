@@ -1,3 +1,4 @@
+import { workspaceSearchMatchSchema as cachedSearchMatchSchema } from '@workspace/contracts'
 import { describe, expect, it } from 'vitest'
 import * as v from 'valibot'
 
@@ -338,3 +339,10 @@ function workspaceEditResult(state: string) {
     unrecoveredPaths: [],
   }
 }
+
+it('keeps request path limits separate from persisted search matches', () => {
+  const match = { kind: 'name', path: 'x'.repeat(4097), source: 'disk', type: 'file' }
+  expect(v.safeParse(workspaceSearchMatchSchema, match).success).toBe(false)
+  expect(v.parse(cachedSearchMatchSchema, match)).toEqual(match)
+  expect(v.safeParse(cachedSearchMatchSchema, { ...match, source: 'unknown' }).success).toBe(false)
+})

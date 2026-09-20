@@ -1,6 +1,6 @@
 import * as v from 'valibot'
 import { worktreeIdSchema, sessionIdSchema } from './chat-ids'
-import { isRecord } from './is-record'
+import { isRecord } from '@workspace/utils/objects'
 
 export const TERMINAL_MIN_COLS = 2
 export const TERMINAL_MAX_COLS = 500

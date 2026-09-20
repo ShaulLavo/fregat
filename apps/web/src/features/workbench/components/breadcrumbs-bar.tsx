@@ -12,7 +12,8 @@ import { SymbolKindIcon } from '@/features/workbench/components/symbol-kind-icon
 import { breadcrumbPathItems, symbolRowKey } from '@/features/workbench/utils/breadcrumbs'
 import { filesystemPath } from '@/lib/documents/utils/identity'
 import type { FilesystemPath } from '@/lib/documents/utils/types'
-import { fileUriForPath, type DocumentSymbol } from '@/lib/document-symbols'
+import { type DocumentSymbol } from '@/lib/document-symbols'
+import { fileUriForPath } from '@/lib/file-uri'
 import { iconForEntry } from '@/lib/file-icons'
 
 // Cursor and document revisions leave this row unchanged until its symbol path or tree changes.

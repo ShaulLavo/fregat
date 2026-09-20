@@ -1,8 +1,6 @@
 {
   "extends": "../tsconfig.json",
   "compilerOptions": {
-    // Dev/prod launchers and generators run under Bun in Node-land, never the browser.
-    "lib": ["ES2023"],
     "types": ["bun", "node"],
 
     /* Bundler mode */

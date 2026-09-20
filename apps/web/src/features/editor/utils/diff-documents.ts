@@ -1,3 +1,4 @@
+import { fileUriForPath as fileUri } from '@/lib/file-uri'
 import type { DiffFile } from '@singapore-editor/diff'
 import { fnv1a32 } from '@workspace/client-core/address/path-hash'
 
@@ -121,10 +122,4 @@ function phantomUri(documentPath: string, side: string, text: string): string {
 /** FNV-1a. Not a checksum — just enough to keep two different texts from sharing a name. */
 function textKey(text: string): string {
   return (fnv1a32(text) >>> 0).toString(36)
-}
-
-function fileUri(path: string): string {
-  const normalized = path.replace(/^\/+/, '')
-
-  return `file:///${normalized.split('/').map(encodeURIComponent).join('/')}`
 }

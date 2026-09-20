@@ -1,3 +1,4 @@
+import { elapsedMs, nowMs } from '@workspace/utils/timing'
 import { errorNumberField, errorStringField, settingsEventSchema } from '@workspace/contracts'
 import { type QueryClient } from '@tanstack/query-core'
 
@@ -83,7 +84,7 @@ async function runStreamAttempt(
   const abortAttempt = () => attemptController.abort()
   if (signal.aborted) abortAttempt()
   signal.addEventListener('abort', abortAttempt, { once: true })
-  const startedAt = now()
+  const startedAt = nowMs()
   let admittedEventCount = 0
   let invalidEventCount = 0
   let receivedEventCount = 0
@@ -154,7 +155,7 @@ function streamAttemptResult(
 ) {
   return {
     admittedEventCount,
-    durationMs: Math.round((now() - startedAt) * 100) / 100,
+    durationMs: elapsedMs(startedAt),
     errorCode: errorStringField(error, 'code'),
     errorStatus: errorNumberField(error, 'status') ?? errorNumberField(error, 'statusCode'),
     invalidEventCount,
@@ -210,8 +211,4 @@ function waitForReconnect(delayMs: number, signal: AbortSignal): Promise<boolean
 
     signal.addEventListener('abort', onAbort, { once: true })
   })
-}
-
-function now() {
-  return typeof performance === 'undefined' ? Date.now() : performance.now()
 }

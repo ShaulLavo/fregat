@@ -13,7 +13,7 @@ import {
   type MetadataDatabaseHandle,
   type PlatformDatabase,
 } from '../db/client'
-import { migrateMetadataDatabase } from '../db/migrations'
+import { migratePlatformDatabase as migrateMetadataDatabase } from '../db/migrations'
 import { fsMetadata, workspaceAddresses } from '../db/schema'
 
 export type FsMetadataEntry = {

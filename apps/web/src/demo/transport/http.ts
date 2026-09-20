@@ -1,3 +1,4 @@
+import { jsonResponse as json } from '@/demo/utils/response'
 import { bypass, http } from 'msw'
 import * as v from 'valibot'
 import {
@@ -305,12 +306,7 @@ function indexStatus(workspace: DemoWorkspace) {
     staleEntryCount: 0,
   }
 }
-function json(body: unknown, status = 200) {
-  return new Response(JSON.stringify(body), {
-    status,
-    headers: { 'content-type': 'application/json' },
-  })
-}
+
 function required<T>(value: T | undefined): T {
   if (value === undefined) throw demoError('File not found.', 'NOT_FOUND', 404)
   return value

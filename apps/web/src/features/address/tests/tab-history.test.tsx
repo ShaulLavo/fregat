@@ -1,3 +1,5 @@
+import { activeEditorGroup } from '@/lib/documents/utils/groups'
+import { editorTabRecordsForWorkbenchPanels } from '@/features/workbench/utils/panels'
 import {
   testTabContents,
   testNullableTabContent,
@@ -45,9 +47,16 @@ test('Back and Forward preserve reordered tabs and the current dirty buffer', as
     .ensureLiveEditorDocument(fileResultFromResponse(file))
   createEditorBufferSession(document.buffer).applyText('unsaved ')
   const unsaved = document.buffer.materializeFullText()
-  const tab = harness.workspace.getState().workbenchPanels.editorTabs.at(-1)
+  const tab = editorTabRecordsForWorkbenchPanels(harness.workspace.getState().workbenchPanels).at(
+    -1,
+  )
   if (!tab) return expect.unreachable('the current editor tab is missing')
-  await navigation.editorCommands(harness.workspace).reorderTab('', tab.id, 0)
+  const group = activeEditorGroup(harness.workspace.getState().workbenchPanels.editorGroups)
+  await navigation.editorCommands(harness.workspace).placeTab({
+    tabId: tab.id,
+    mode: 'move',
+    target: { kind: 'strip', groupId: group.id, beforeTabId: group.tabs[0]!.id },
+  })
   expect(editorTabContents(harness.workspace)).toEqual(
     testTabContents(['repo/c.ts', 'repo/a.ts', 'repo/b.ts']),
   )
@@ -86,9 +95,8 @@ test('Back reopens only its destination after explicit tab closes', async ({ cli
   await waitForNavigation(navigation)
   await navigation.openFile({ owner: harness.workspace, path: filesystemPath('repo/b.ts') })
   await navigation.openFile({ owner: harness.workspace, path: filesystemPath('repo/c.ts') })
-  const closedIds = harness.workspace
-    .getState()
-    .workbenchPanels.editorTabs.filter((tab) => !testContentMatches(tab.content, 'repo/c.ts'))
+  const closedIds = editorTabRecordsForWorkbenchPanels(harness.workspace.getState().workbenchPanels)
+    .filter((tab) => !testContentMatches(tab.content, 'repo/c.ts'))
     .map((tab) => tab.id)
   expect(await navigation.editorCommands(harness.workspace).closeTabs(closedIds)).toEqual({
     status: 'applied',

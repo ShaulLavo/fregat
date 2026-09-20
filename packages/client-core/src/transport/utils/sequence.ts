@@ -1,3 +1,4 @@
+import { shellItemKey } from '../../chat/shell-item-key'
 import type {
   OrchestrationShellStreamItem,
   OrchestrationSessionStreamItem,
@@ -40,21 +41,7 @@ function streamItemKey(item: OrchestrationStreamItem) {
       return 'snapshot'
     case 'event':
       return `event:${item.event.eventId}`
-    case 'project-upserted':
-      return `project:${item.project.id}`
-    case 'project-removed':
-      return `project:${item.projectId}`
-    case 'worktree-upserted':
-      return `worktree:${item.worktree.id}`
-    case 'worktree-removed':
-      return `worktree:${item.worktreeId}`
-    case 'session-upserted':
-      return `session:${item.session.id}`
-    case 'session-removed':
-      return `session:${item.sessionId}`
-    default: {
-      const exhaustive: never = item
-      return exhaustive
-    }
+    default:
+      return shellItemKey(item)
   }
 }

@@ -1,3 +1,7 @@
+import { virtualEnvironmentPaths } from './environment'
+import { exists } from './environment'
+import { firstExistingPath } from './environment'
+import { isInsidePath as isInsideOrEqual } from '../utils/path'
 import type {
   LspFeatureId,
   LspFeatureRanks,
@@ -5,7 +9,7 @@ import type {
   LspServerOverride,
   LspServerOverrides,
 } from '@workspace/contracts'
-import { access, readdir } from 'node:fs/promises'
+import { readdir } from 'node:fs/promises'
 import path from 'node:path'
 import type { ChildProcessWithoutNullStreams } from 'node:child_process'
 
@@ -958,39 +962,6 @@ function compareFeatureRank(left: LspServerMatch, right: LspServerMatch, feature
 function serverPriorityIndex(id: string) {
   const index = serverPriority.indexOf(id as (typeof serverPriority)[number])
   return index === -1 ? serverPriority.length : index
-}
-
-async function firstExistingPath(candidates: readonly string[]) {
-  for (const candidate of candidates) {
-    if (!(await exists(candidate))) continue
-
-    return candidate
-  }
-
-  return null
-}
-
-async function exists(candidate: string) {
-  try {
-    await access(candidate)
-    return true
-  } catch {
-    return false
-  }
-}
-
-function virtualEnvironmentPaths(root: string) {
-  return [process.env.VIRTUAL_ENV, path.join(root, '.venv'), path.join(root, 'venv')].filter(
-    (item): item is string => Boolean(item),
-  )
-}
-
-function isInsideOrEqual(root: string, candidate: string) {
-  const relative = path.relative(root, candidate)
-  if (relative === '') return true
-  if (relative === '..' || relative.startsWith(`..${path.sep}`)) return false
-
-  return !path.isAbsolute(relative)
 }
 
 function globMarkerRegex(marker: string) {

@@ -18,7 +18,10 @@ export type EditorSurfaceActions = {
   readonly openReferences: (result: LanguageServerReferencesResult) => void | boolean
   readonly previewReference: (target: LanguageServerDefinitionTarget) => void
   readonly handleTextChange: (tabId: TabId, key: DocumentKey, change: DocumentSessionChange) => void
-  readonly setScrollPosition: (scrollPosition: EditorScrollPosition) => void
+  readonly setScrollPosition: (
+    scrollPosition: EditorScrollPosition,
+    reopenScrollPosition?: EditorScrollPosition,
+  ) => void
   readonly setStatusSource: (source: EditorStatusBarSource | null) => void
   /** Selects the file's own editor tab, opening it if needed. */
   readonly showFile: (path: FilesystemPath) => void
