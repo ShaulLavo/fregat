@@ -553,9 +553,10 @@ export class FileSystemService {
     paths: string[],
     signal?: AbortSignal,
     files: readonly string[] = [],
+    onlyFiles = false,
   ): AsyncGenerator<WatchServerMessage> {
     await this.workspaceEditReady
-    yield* observedWatchEvents(this.changes.stream(paths, signal, { files }), paths)
+    yield* observedWatchEvents(this.changes.stream(paths, signal, { files, onlyFiles }), paths)
   }
 
   workspaceEditPrepare(body: WorkspaceEditPrepareBody) {

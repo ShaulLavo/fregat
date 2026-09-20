@@ -163,6 +163,7 @@ export const workspaceSearchEventSchema = v.variant('type', [
 ])
 
 export const eventsQuerySchema = v.object({
+  scope: v.optional(v.picklist(['project', 'files']), 'project'),
   files: v.optional(v.union([pathSchema, v.pipe(v.array(pathSchema), v.readonly())])),
   path: v.optional(pathSchema),
   paths: v.optional(v.union([v.string(), v.array(pathSchema)])),

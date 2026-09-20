@@ -68,6 +68,7 @@ export function fsRoutes(fs: FileSystemService) {
                 parseWatchInputs(query.path, query.paths),
                 request.signal,
                 typeof query.files === 'string' ? [query.files] : query.files,
+                query.scope === 'files',
               ),
               {
                 event: (event) => event.type,

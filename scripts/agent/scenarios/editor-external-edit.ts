@@ -10,7 +10,11 @@ import type { Scenario } from './index'
 const filename = 'linked-edit-probe.txt'
 const before = 'keep this line\nREMOVE_THIS_LINE\nkeep this too\n'
 const after = 'keep this line\nkeep this too\n'
-const inspections = new WeakMap<Page, { disk: string; phases: string[] }>()
+const otherFile = 'watch-tab-probe.txt'
+const inspections = new WeakMap<
+  Page,
+  { disk: string; phases: string[]; subscriptions: { before: number; after: number } }
+>()
 
 export const editorExternalEdit: Scenario = {
   name: 'editor-external-edit',
@@ -21,8 +25,20 @@ export const editorExternalEdit: Scenario = {
     const project = path.join(fixture, 'project')
     const target = path.join(fixture, 'target')
     let disk = path.join(target, filename)
-    const inspection: { disk: string; phases: string[] } = { disk: before, phases: [] }
+    const inspection = {
+      disk: before,
+      phases: new Array<string>(),
+      subscriptions: { before: 0, after: 0 },
+    }
     inspections.set(page, inspection)
+    let projectSubscriptions = 0
+    page.on('request', (request) => {
+      const url = new URL(request.url())
+      if (!url.pathname.endsWith('/fs/events')) return
+      if (url.searchParams.get('scope') === 'files') return
+      if (!url.searchParams.get('path')?.endsWith(project.slice(1))) return
+      projectSubscriptions += 1
+    })
     try {
       await mkdir(project)
       const git = Bun.spawn(['git', 'init', '--quiet', project], {
@@ -52,6 +68,7 @@ export const editorExternalEdit: Scenario = {
       await mkdir(target)
       await symlink('../target', path.join(project, 'linked'))
       await writeFile(disk, before)
+      await writeFile(path.join(project, otherFile), 'ANOTHER_OPEN_TAB\n')
       await openFixtureWorkspace(page, project)
       await selectors.treeItem(page, 'linked').click()
       await openFileFromTree(page, filename)
@@ -113,7 +130,21 @@ export const editorExternalEdit: Scenario = {
       await focusEditor(page)
       await page.keyboard.press('Control+End')
       await page.keyboard.type('UNSAVED_LOCAL_EDIT')
-      await writeFile(disk, 'EXTERNAL_CONFLICT\n')
+      const subscriptionsBeforeTabChange = projectSubscriptions
+      await Promise.all([writeFile(disk, 'EXTERNAL_CONFLICT\n'), openFileFromTree(page, otherFile)])
+      await selectors.editorRows(page).filter({ hasText: 'ANOTHER_OPEN_TAB' }).waitFor()
+      if (projectSubscriptions !== subscriptionsBeforeTabChange)
+        throw createScriptError('Opening a tab restarted the project filesystem subscription')
+      await selectors.editorTabNamed(page, /watch-tab-probe\.txt/).click({ button: 'right' })
+      await selectors.menuItem(page, 'Close').click()
+      await selectors.editorRows(page).filter({ hasText: 'UNSAVED_LOCAL_EDIT' }).waitFor()
+      if (projectSubscriptions !== subscriptionsBeforeTabChange)
+        throw createScriptError('Closing a tab restarted the project filesystem subscription')
+      inspection.subscriptions = {
+        before: subscriptionsBeforeTabChange,
+        after: projectSubscriptions,
+      }
+      inspection.phases.push('project-watch-preserved')
       inspection.disk = await readFile(disk, 'utf8')
       await selectors.fileConflict(page, filename).waitFor({ timeout: 5000 })
       await selectors.editorRows(page).filter({ hasText: 'UNSAVED_LOCAL_EDIT' }).waitFor()

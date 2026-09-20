@@ -81,6 +81,7 @@ export type WatchOptions = {
 }
 
 export type WatchStreamOptions = {
+  onlyFiles?: boolean
   includeIgnored?: boolean
   files?: readonly string[]
 }
@@ -154,7 +155,7 @@ export class FileChangeHub {
       (options.files ?? []).map((input) => this.paths.resolve(input).relativePath),
     )
     const listeners = options.includeIgnored || files.size > 0 ? this.rawListeners : this.listeners
-    return this.createStream(subscribed, signal, listeners, files, options.includeIgnored ?? false)
+    return this.createStream(subscribed, signal, listeners, files, options)
   }
 
   info() {
@@ -461,14 +462,14 @@ export class FileChangeHub {
     signal: AbortSignal | undefined,
     listeners: Set<Listener>,
     files: Set<string>,
-    includeIgnored: boolean,
+    options: WatchStreamOptions,
   ) {
     const queue: WatchServerMessage[] = [{ type: 'ready', root: '' }]
     const wake: WakeSlot = { current: null }
 
     const listener = (event: WatchServerMessage) => {
-      const visible = streamEvent(event, files, includeIgnored)
-      if (!visible || !deliverWatchEvent(visible, subscribed, files)) return
+      const visible = streamEvent(event, files, options.includeIgnored ?? false)
+      if (!visible || !deliverWatchEvent(visible, subscribed, files, options.onlyFiles)) return
 
       queue.push(visible)
       wake.current?.()
@@ -484,7 +485,13 @@ export class FileChangeHub {
       if (this.watchEnabled) {
         for (const file of files) releases.push(await this.retainOpenFile(file, subscribed))
       }
-      recordRequestContext({ watch: { openFiles: [...files], ...this.info() } })
+      recordRequestContext({
+        watch: {
+          scope: options.onlyFiles ? 'files' : 'project',
+          openFiles: [...files],
+          ...this.info(),
+        },
+      })
 
       yield* drainWatchQueue(queue, signal, wake)
     } finally {
@@ -675,11 +682,16 @@ function shouldDeliver(event: WatchServerMessage, subscribed: Set<string>) {
   return false
 }
 
-function deliverWatchEvent(event: WatchServerMessage, roots: Set<string>, files: Set<string>) {
+function deliverWatchEvent(
+  event: WatchServerMessage,
+  roots: Set<string>,
+  files: Set<string>,
+  onlyFiles = false,
+) {
   if (!isFilesystemEvent(event)) return true
   if (files.has(event.path)) return true
   if (event.type === 'renamed' && files.has(event.oldPath)) return true
-  return shouldDeliver(event, roots)
+  return !onlyFiles && shouldDeliver(event, roots)
 }
 
 function streamEvent(event: WatchServerMessage, files: Set<string>, includeIgnored: boolean) {

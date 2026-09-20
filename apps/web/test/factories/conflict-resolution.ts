@@ -1,14 +1,11 @@
+import { streamWorkspaceEvents } from '@/features/workspace/state/event-stream'
 import { mkdir, writeFile } from 'node:fs/promises'
 import { dirname, join } from 'node:path'
 import { createEditorBufferSession } from '@singapore-editor/core'
 import { createEditorConflictStore } from '@/features/editor/state/conflict-state'
 import { createEditorDocumentStore } from '@/features/editor/state/document-state'
 import { FileSyncService } from '@/features/editor/state/file-sync-service'
-import {
-  applyWorkspaceEvents,
-  streamWorkspaceEvents,
-  type FilesystemEvent,
-} from '@/features/workspace/hooks/use-events'
+import { applyWorkspaceEvents, type FilesystemEvent } from '@/features/workspace/hooks/use-events'
 import { createWideEventScope } from '@/lib/wide-event-scope'
 import { ConflictEditorResolutionCoordinator } from '@/features/workspace/state/conflict-editor-resolution'
 import {

@@ -1,8 +1,6 @@
 import type { Client } from '@/lib/client'
-import {
-  streamWorkspaceEvents,
-  type WatchServerMessage,
-} from '@/features/workspace/hooks/use-events'
+import type { WatchServerMessage } from '@workspace/contracts'
+import { streamWorkspaceEvents } from '@/features/workspace/state/event-stream'
 
 export function watchFilesystem(client: Client, root: string, files: readonly string[]) {
   const abort = new AbortController()

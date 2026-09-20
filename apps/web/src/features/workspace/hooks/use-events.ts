@@ -1,3 +1,4 @@
+import { startWorkspaceEventStreams } from '@/features/workspace/state/event-streams'
 import { startPageSubscription } from '@/lib/state/page-subscription'
 import { entryFromResponse } from '@/lib/file-system-types'
 import type { PickedFsEntry } from '@/lib/file-system-types'
@@ -23,11 +24,7 @@ import {
   useEditorDocumentStoreApi,
   type LiveEditorDocument,
 } from '@/features/editor/state/document-state'
-import {
-  useEditorWorkspaceState,
-  useEditorWorkspaceStoreApi,
-} from '@/features/editor/state/workspace-state'
-import { useShallow } from 'zustand/react/shallow'
+import { useEditorWorkspaceStoreApi } from '@/features/editor/state/workspace-state'
 import { reportError, toClientError } from '@/lib/client-error-taxonomy'
 import { fileSnapshotQueryOptions, setFileSnapshotQueryData } from '@/lib/file-snapshot-query-cache'
 import { fetchFile, fetchTree } from '@/lib/file-server'
@@ -40,9 +37,7 @@ import {
 } from '@/features/workspace/utils/directory-churn'
 import { fileSystemKeys, gitKeys } from '@/lib/query-keys'
 import { Throttler } from '@tanstack/react-pacer/throttler'
-import { parseEdenSseStream } from '@workspace/client-core/transport/eden'
 import { toTreePath } from '@/lib/path-formatters'
-import { clientErrors } from '@/lib/structured-errors'
 import { createWideEventScope } from '@/lib/wide-event-scope'
 import { editorMutationKeys } from '@/features/editor/utils/mutation-keys'
 import type { WideEventScope } from '@workspace/observability/scope'
@@ -98,9 +93,6 @@ export function useWorkspaceEvents(rootFolder: PickedFsEntry | null) {
   const conflictStore = useEditorConflictStoreApi()
   const documentStore = useEditorDocumentStoreApi()
   const workspaceStore = useEditorWorkspaceStoreApi()
-  const watchedFiles = useEditorWorkspaceState(
-    useShallow((state) => filePathsForTabs(state.openTabContents)),
-  )
   const { discardLiveEditorDocument, renameLiveEditorDocument, selectContent } = useEditorCommands()
   const isOwnWorkspaceEditEvent = useWorkspaceEditEventClassifier()
   const rootPath = rootFolder?.path ?? null
@@ -146,6 +138,7 @@ export function useWorkspaceEvents(rootFolder: PickedFsEntry | null) {
       currentRootPath: string,
       eventsScope: WideEventScope,
       scheduleGitInvalidation: () => void,
+      readyFiles?: readonly string[],
     ) => {
       const documentState = documentStore.getState()
       const workspaceState = workspaceStore.getState()
@@ -157,7 +150,7 @@ export function useWorkspaceEvents(rootFolder: PickedFsEntry | null) {
         ensureUnsyncedEditorDocument: documentState.ensureUnsyncedEditorDocument,
         forceReplaceLiveEditorDocument: documentState.forceReplaceLiveEditorDocument,
         getLiveEditorDocument: documentState.getLiveEditorDocument,
-        openFilePaths: filePathsForTabs(workspaceState.openTabContents),
+        openFilePaths: readyFiles ?? filePathsForTabs(workspaceState.openTabContents),
         queryClient,
         renameLiveEditorDocument,
         rootPath: currentRootPath,
@@ -194,11 +187,10 @@ export function useWorkspaceEvents(rootFolder: PickedFsEntry | null) {
       })
       eventsScope.increment('subscription.subscribeCount')
 
-      void streamWorkspaceEvents(
-        clientForQueryClient(queryClient),
+      const streams = startWorkspaceEventStreams({
+        client: clientForQueryClient(queryClient),
         rootPath,
-        controller.signal,
-        (message) => {
+        onMessage: (message) => {
           if (message.type === 'ready') {
             eventsScope.increment('subscription.readyCount')
             applyReady(controller.signal, rootPath, eventsScope, gitInvalidation.maybeExecute)
@@ -222,15 +214,26 @@ export function useWorkspaceEvents(rootFolder: PickedFsEntry | null) {
 
           queue.push(message)
         },
-        watchedFiles,
-      ).catch((error: unknown) => {
-        if (controller.signal.aborted) return
+        onFilesReady: (files) => {
+          eventsScope.increment('subscription.filesReadyCount')
+          applyReady(controller.signal, rootPath, eventsScope, gitInvalidation.maybeExecute, files)
+        },
+        onError: (error: unknown) => {
+          if (controller.signal.aborted) return
 
-        eventsScope.warn('Workspace event stream failed.', { error })
-        reportError(toClientError(error))
+          eventsScope.warn('Workspace event stream failed.', { error })
+          reportError(toClientError(error))
+        },
       })
+      const unsubscribeFiles = workspaceStore.subscribe(
+        (state) => state.openTabContents,
+        (contents) => streams.setFiles(filePathsForTabs(contents)),
+        { fireImmediately: true },
+      )
 
       return () => {
+        unsubscribeFiles()
+        streams.close()
         controller.abort()
         gitInvalidation.cancel()
         queue.clear()
@@ -239,7 +242,7 @@ export function useWorkspaceEvents(rootFolder: PickedFsEntry | null) {
         endWorkspaceEventsScope(eventsScope)
       }
     })
-  }, [queryClient, rootPath, watchedFiles])
+  }, [queryClient, rootPath, workspaceStore])
 
   useEffect(() => {
     return () => dismissFilesystemConflicts(conflictStore)
@@ -794,79 +797,30 @@ function shouldRefreshDirectory(model: TreeModel, rootPath: string, path: string
   return model.loadedDirectoryPaths.has(treePath)
 }
 
-export async function streamWorkspaceEvents(
-  client: Client,
-  rootPath: string,
-  signal: AbortSignal,
-  onMessage: (message: WatchServerMessage) => void,
-  files: readonly string[] = [],
-) {
-  const response = await client.fs.events.get({
-    // JSON preserves commas in filenames that query-array decoding would split.
-    query: { path: rootPath, files: JSON.stringify(files) },
-    fetch: { signal },
-  })
-  signal.throwIfAborted()
-  if (response.error) throw clientErrors.WATCH_FAILED({ status: response.status })
-  if (!response.data) throw clientErrors.EDEN_STREAM_MISSING({ label: 'File watcher' })
-
-  for await (const event of parseEdenSseStream(response.data)) {
-    const message = watchServerMessage(event.data)
-    if (!message) continue
-
-    onMessage(message)
-  }
-}
-
-function watchServerMessage(data: unknown): WatchServerMessage | null {
-  if (!data || typeof data !== 'object') return null
-  if (!('type' in data) || typeof data.type !== 'string') return null
-  if (data.type === 'ready' && hasString(data, 'root')) {
-    return data as WatchServerMessage
-  }
-  if (data.type === 'error' && hasString(data, 'code') && hasString(data, 'message')) {
-    return data as WatchServerMessage
-  }
-  if (isBasicFilesystemMessage(data)) return data
-  if (data.type === 'renamed' && hasString(data, 'path') && hasString(data, 'oldPath')) {
-    return data as WatchServerMessage
-  }
-
-  return null
-}
-
-function isBasicFilesystemMessage(
-  data: object,
-): data is Extract<FilesystemEvent, { type: 'created' | 'changed' | 'deleted' }> {
-  if (!('type' in data) || !('path' in data)) return false
-  if (typeof data.path !== 'string') return false
-
-  return data.type === 'created' || data.type === 'changed' || data.type === 'deleted'
-}
-
-function hasString<T extends string>(value: object, key: T): value is object & Record<T, string> {
-  return typeof (value as Record<string, unknown>)[key] === 'string'
-}
-
 function createEventQueue(onFlush: (events: FilesystemEvent[]) => void) {
   let queued: FilesystemEvent[] = []
+  const sequences = new Set<number>()
   let timeout: number | null = null
 
   return {
     clear: () => {
       queued = []
+      sequences.clear()
       if (timeout === null) return
 
       window.clearTimeout(timeout)
       timeout = null
     },
     push: (event: FilesystemEvent) => {
+      if (event.sequence !== undefined && sequences.has(event.sequence)) return
+      if (event.sequence !== undefined) sequences.add(event.sequence)
       queued.push(event)
       if (timeout !== null) return
 
       timeout = window.setTimeout(() => {
         const events = queued
         queued = []
+        sequences.clear()
         timeout = null
         onFlush(events)
       }, EVENT_BATCH_DELAY_MS)
