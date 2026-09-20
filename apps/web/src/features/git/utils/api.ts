@@ -190,9 +190,15 @@ export async function discardPaths(paths: readonly string[], client: Client) {
  * hook talking; the resolved value is the same commit result the one-shot route
  * returns.
  */
+/** `message-file` commits what was written in COMMIT_EDITMSG; `message` is then unused. */
+export type CommitRequest = {
+  readonly message: string
+  readonly source: 'input' | 'message-file'
+}
+
 export async function commitChangesStreaming(
   path: string,
-  message: string,
+  { message, source }: CommitRequest,
   onProgress: (line: { stream: 'stderr' | 'stdout'; text: string }) => void,
   client: Client,
 ): Promise<GitCommitResult> {
@@ -200,11 +206,12 @@ export async function commitChangesStreaming(
     {
       ...clientLogContext(client),
       action: 'git.commit_stream',
+      commitSource: source,
       messageBytes: new Blob([message]).size,
       path,
     },
     async () => {
-      const response = await client.git['commit-stream'].post({ message, path })
+      const response = await client.git['commit-stream'].post({ message, path, source })
       const stream = unwrapEdenResponse(response, {
         requireData: true,
         emptyMessage: 'git server returned an empty response',
@@ -228,6 +235,9 @@ async function readCommitProgress(
   let result: GitCommitResult | null = null
 
   for await (const event of parseEdenSseStream(stream)) {
+    // Sent through a hook's silences, such as a typecheck that prints nothing for a minute.
+    if (event.event === 'heartbeat') continue
+
     const data = event.data as GitCommitProgressEvent
     if (data.kind === 'progress') {
       onProgress({ stream: data.stream, text: data.text })

@@ -4,15 +4,17 @@ import { useMutation } from '@tanstack/react-query'
 import { unstagePath } from '@/features/git/utils/api'
 import { mutationKeys } from '@/features/git/utils/mutation-keys'
 import { notifyMutationError } from '@/features/git/utils/notify-mutation-error'
-import { useWorkspaceInvalidation } from './use-workspace-invalidation'
+import { settleGitStatus } from '@/features/git/utils/settle-status'
 
-export function useUnstagePathMutation(path: string) {
-  const invalidate = useWorkspaceInvalidation()
-
+export function useUnstagePathMutation(path: string, rootPath: string) {
   return useMutation({
     mutationFn: (_variables, { client }) => unstagePath(path, clientForQueryClient(client)),
     mutationKey: mutationKeys.unstage(path),
     onError: notifyMutationError,
-    onSuccess: invalidate,
+    onSuccess: (status, _variables, _onMutateResult, { client }) =>
+      settleGitStatus(client, rootPath, status),
+    // One write per repository at a time: a settled cache has no self-healing
+    // refetch, so two responses must not land out of order.
+    scope: { id: `git-index:${rootPath}` },
   })
 }

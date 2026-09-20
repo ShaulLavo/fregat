@@ -38,9 +38,8 @@ export function RawConflictBanner({ documentKey }: { readonly documentKey: Docum
       await new SettingsSyncService(documentStore, queryClient).overwrite(current)
     } catch (cause) {
       setError(toClientError(cause).message)
-    } finally {
-      setOverwriting(false)
     }
+    setOverwriting(false)
   }
 
   function reload() {

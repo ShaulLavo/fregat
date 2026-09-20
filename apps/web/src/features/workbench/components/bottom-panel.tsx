@@ -21,9 +21,12 @@ import { cn } from '@workspace/ui/lib/utils'
 export function BottomPanel({
   panels,
   rootPath,
+  visible,
 }: {
   readonly panels: WorkbenchPanels
   readonly rootPath: FilesystemPath
+  /** False while the panel is collapsed and only kept mounted for its terminals. */
+  readonly visible: boolean
 }) {
   const navigation = useNavigation()
   const terminalActive = panels.activeBottomTab === 'terminal'
@@ -63,16 +66,15 @@ export function BottomPanel({
         </PaneBar>
       }
     >
-      {/* The strip stays mounted behind Problems: unmounting a terminal detaches
-          its PTY, and the server kills a detached session once its TTL expires.
-          Hidden with `visibility`, not `display` — a display:none host measures
-          0x0 and the grid comes back reflowed. */}
+      {/* The strip stays mounted behind Problems: a remount reconnects and replays
+          scrollback, losing scroll position. Hidden with `visibility`, not
+          `display` — a display:none host measures 0x0. */}
       <div
         className={cn('absolute inset-0', !terminalActive && 'invisible')}
         inert={!terminalActive}
       >
         <RenderErrorBoundary label='Terminal'>
-          <TerminalTabs panels={panels} rootPath={rootPath} visible={terminalActive} />
+          <TerminalTabs panels={panels} rootPath={rootPath} visible={visible && terminalActive} />
         </RenderErrorBoundary>
       </div>
       {terminalActive ? null : (

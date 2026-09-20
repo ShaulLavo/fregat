@@ -6,13 +6,13 @@ import { useOpenDiffDocument } from './use-open-diff-document'
 import { useStagePathsMutation } from './use-stage-paths-mutation'
 import { useUnstagePathsMutation } from './use-unstage-paths-mutation'
 
-export function useGroupMenu(rows: readonly ChangeRow[], section: PanelSection) {
+export function useGroupMenu(rows: readonly ChangeRow[], section: PanelSection, rootPath: string) {
   const paths = rows.map((row) => row.file.path)
   const staged = section === 'staged'
-  const discard = useDiscardPathsMutation(paths)
-  const discardStaged = useDiscardStagedPathsMutation(paths)
-  const stage = useStagePathsMutation(paths)
-  const unstage = useUnstagePathsMutation(paths)
+  const discard = useDiscardPathsMutation(paths, rootPath)
+  const discardStaged = useDiscardStagedPathsMutation(paths, rootPath)
+  const stage = useStagePathsMutation(paths, rootPath)
+  const unstage = useUnstagePathsMutation(paths, rootPath)
   const { openDiffs } = useOpenDiffDocument()
 
   function runDiscardAll() {

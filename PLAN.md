@@ -387,8 +387,8 @@ Replacing React with a smaller reimplementation was considered and rejected: Rea
 ## React compiler and pane lifetime lane
 
 Requested 2026-09-20. [Plan 127](plans/127-compiler-and-lifetime-repairs.md) precedes
-[Plan 128](plans/128-react-19-patterns.md). Both are proposed; implementation has not started, except
-that Plan 127's Phase 3 terminal repair is applied in the working tree and unverified in a browser.
+[Plan 128](plans/128-react-19-patterns.md). Plan 127's Phases 1–4 are implemented and deployed
+(2026-09-20); its Phase 5, the palette capture, is open. Plan 128 is proposed and not started.
 
 Plan 127 is the repair pass. It turns the React Compiler's diagnostics on, pins them with a census
 beside the design census, clears the `ref={focusTarget.ref}` bailouts, stops the bottom panel and its

@@ -107,9 +107,13 @@ export function ChatPlanFollowUpProvider({
 
       setSubmitting(true)
       try {
-        return await dispatch({ draftTarget, transport, onSessionCreated, plan, session })
-      } finally {
+        const sent = await dispatch({ draftTarget, transport, onSessionCreated, plan, session })
         setSubmitting(false)
+        return sent
+      } catch (error) {
+        // Not `finally`: the compiler refuses the whole provider over one.
+        setSubmitting(false)
+        throw error
       }
     }
 

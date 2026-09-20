@@ -104,6 +104,9 @@ const ASYNC_COMMAND_IDS = [
   'workspace.jumpToSession8',
   'workspace.jumpToSession9',
   'workspace.closeCurrentTab',
+  'workspace.newChat',
+  'workspace.acceptCommitMessage',
+  'workspace.discardCommitMessage',
   'workspace.toggleDiffViewMode',
   'workspace.toggleUiMode',
   'workspace.showChatMode',
@@ -179,6 +182,7 @@ const WORKSPACE_OPERATION_COMMAND_IDS = [
   'workspace.undoWorkspaceEdit',
   'workspace.redoWorkspaceEdit',
   'workspace.copyAddress',
+  'workspace.acceptCommitMessage',
   'workspace.toggleDiffViewMode',
   'workspace.setDarkTheme',
   'workspace.setLightTheme',
@@ -198,6 +202,8 @@ const FILE_BACKED_COMMAND_IDS = [
   'workspace.openFileAtHead',
   'workspace.revertFile',
   'workspace.revealActiveFileInTree',
+  'workspace.acceptCommitMessage',
+  'workspace.discardCommitMessage',
 ] as const satisfies readonly PlatformCommandId[]
 
 const TAB_OPEN_COMMAND_IDS = [

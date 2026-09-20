@@ -1,6 +1,6 @@
 import { isString } from '@workspace/utils/objects'
 import { elapsedMs } from '@workspace/utils/timing'
-import { realpath, stat, writeFile } from 'node:fs/promises'
+import { readFile, realpath, stat, writeFile } from 'node:fs/promises'
 import path from 'node:path'
 import { FsError } from '../fs/errors'
 import type { WorkspacePath, WorkspacePaths } from '../fs/path'
@@ -16,7 +16,7 @@ import type {
 import { withGitRepositoryLane, withGitRepositoryLaneStream } from './repository-lane'
 import { parseBranches } from './branches'
 import { commandOutput, gitErrorMessage } from './command'
-import { commitMessageTemplate } from './commit-message'
+import { commitMessageTemplate, hasCommitMessageText } from './commit-message'
 import type {
   GitApplyPatchBody,
   GitBlobDiffQuery,
@@ -147,6 +147,10 @@ const READ_ONLY_GIT_ACTIONS = new Set([
   'show',
   'status',
 ])
+
+type CommitPlan =
+  | { readonly kind: 'run'; readonly args: readonly string[] }
+  | { readonly kind: 'settled'; readonly result: GitCommitResult }
 
 export class GitService {
   private readonly mutationListeners = new Set<(path: string) => Promise<void>>()
@@ -476,10 +480,10 @@ export class GitService {
       messageBytes: Buffer.byteLength(body.message, 'utf8'),
     })
     const repository = await this.requiredRepository(body.path)
-    const message = body.message.trim()
-    if (!message) return this.openCommitMessage(repository)
+    const plan = await this.commitPlan(repository, body)
+    if (plan.kind === 'settled') return plan.result
 
-    const result = await this.git(repository.rootAbsolutePath, ['commit', '-m', message])
+    const result = await this.git(repository.rootAbsolutePath, plan.args)
     return {
       kind: 'committed' as const,
       output: result.stdout.trim(),
@@ -509,15 +513,15 @@ export class GitService {
       messageBytes: Buffer.byteLength(body.message, 'utf8'),
     })
     const repository = await this.requiredRepository(body.path)
-    const message = body.message.trim()
-    if (!message) {
-      yield { kind: 'result', result: await this.openCommitMessage(repository) }
+    const plan = await this.commitPlan(repository, body)
+    if (plan.kind === 'settled') {
+      yield { kind: 'result', result: plan.result }
       return
     }
 
     let lineCount = 0
     for await (const event of streamProcess({
-      args: ['commit', '-m', message],
+      args: plan.args,
       cwd: repository.rootAbsolutePath,
     })) {
       if (event.kind === 'line') {
@@ -1230,6 +1234,26 @@ export class GitService {
       relativePath,
     ])
     return result.stdout.trim() || null
+  }
+
+  /** Either the `git commit` to run, or the result when there is nothing to run. */
+  private async commitPlan(repository: GitRepository, body: GitCommitBody): Promise<CommitPlan> {
+    if (body.source === 'message-file') return this.messageFileCommitPlan(repository)
+
+    const message = body.message.trim()
+    if (!message) return { kind: 'settled', result: await this.openCommitMessage(repository) }
+
+    return { args: ['commit', '-m', message], kind: 'run' }
+  }
+
+  private async messageFileCommitPlan(repository: GitRepository): Promise<CommitPlan> {
+    const target = await this.commitMessageTarget(repository)
+    const written = await readFile(target.absolutePath, 'utf8').catch(() => '')
+    if (!hasCommitMessageText(written))
+      return { kind: 'settled', result: { kind: 'aborted', repository: repository.info } }
+
+    // `strip` is git's editor default; `-F` alone would keep the `#` lines.
+    return { args: ['commit', '-F', target.absolutePath, '--cleanup=strip'], kind: 'run' }
   }
 
   private async openCommitMessage(repository: GitRepository): Promise<GitCommitResult> {

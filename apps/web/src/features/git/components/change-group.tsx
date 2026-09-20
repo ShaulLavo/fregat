@@ -97,7 +97,7 @@ export function ChangeGroup({
           />
           <span className='min-w-0 flex-1 truncate'>{label}</span>
         </CollapsibleTrigger>
-        <GroupActions rows={rows} section={section} />
+        <GroupActions rootPath={rootPath} rows={rows} section={section} />
         <span className='ml-1 tabular-nums'>{rows.length}</span>
       </div>
       <CollapsibleContent className='pl-(--density-row-padding-x)'>
@@ -114,6 +114,7 @@ export function ChangeGroup({
         <GroupMenu
           anchor={contextMenu.anchor}
           onOpenChange={contextMenu.onOpenChange}
+          rootPath={rootPath}
           rows={rows}
           section={section}
         />

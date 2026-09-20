@@ -7,25 +7,33 @@ import { useUnstagePathMutation } from '@/features/git/hooks/use-unstage-path-mu
 import type { PanelSection } from '@/features/git/utils/types'
 import { RowActionButton } from './row-action-button'
 
-export function FileActions({ path, section }: { path: string; section: PanelSection }) {
+export function FileActions({
+  path,
+  rootPath,
+  section,
+}: {
+  path: string
+  rootPath: string
+  section: PanelSection
+}) {
   if (section === 'staged') {
     return (
       <ActionCluster hoverGroup='row'>
-        <UnstageFileButton path={path} />
+        <UnstageFileButton path={path} rootPath={rootPath} />
       </ActionCluster>
     )
   }
 
   return (
     <ActionCluster hoverGroup='row'>
-      <DiscardFileButton path={path} />
-      <StageFileButton path={path} />
+      <DiscardFileButton path={path} rootPath={rootPath} />
+      <StageFileButton path={path} rootPath={rootPath} />
     </ActionCluster>
   )
 }
 
-function StageFileButton({ path }: { path: string }) {
-  const stage = useStagePathMutation(path)
+function StageFileButton({ path, rootPath }: { path: string; rootPath: string }) {
+  const stage = useStagePathMutation(path, rootPath)
 
   return (
     <RowActionButton disabled={stage.isPending} label='Stage file' onClick={() => stage.mutate()}>
@@ -34,8 +42,8 @@ function StageFileButton({ path }: { path: string }) {
   )
 }
 
-function UnstageFileButton({ path }: { path: string }) {
-  const unstage = useUnstagePathMutation(path)
+function UnstageFileButton({ path, rootPath }: { path: string; rootPath: string }) {
+  const unstage = useUnstagePathMutation(path, rootPath)
 
   return (
     <RowActionButton
@@ -48,8 +56,8 @@ function UnstageFileButton({ path }: { path: string }) {
   )
 }
 
-function DiscardFileButton({ path }: { path: string }) {
-  const discard = useDiscardPathMutation(path)
+function DiscardFileButton({ path, rootPath }: { path: string; rootPath: string }) {
+  const discard = useDiscardPathMutation(path, rootPath)
 
   return (
     <RowActionButton

@@ -94,8 +94,11 @@ export function PendingUserInputCard({ pending }: { readonly pending: PendingUse
     try {
       const accepted = await respondToUserInput(pending.requestId, answers, attachments.uploads())
       if (accepted) attachments.clearSent()
-    } finally {
       submitting.current = false
+    } catch (error) {
+      // Not `finally`: the compiler refuses the whole component over one.
+      submitting.current = false
+      throw error
     }
   }
 

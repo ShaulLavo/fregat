@@ -91,6 +91,8 @@ export const gitApplyPatchBodySchema = v.object({
 export const gitCommitBodySchema = v.object({
   path: v.optional(pathSchema, ''),
   message: v.string(),
+  /** `message-file` commits what the user wrote in COMMIT_EDITMSG and ignores `message`. */
+  source: v.optional(v.picklist(['input', 'message-file']), 'input'),
 })
 
 const gitCommitMessageSourceSchema = v.picklist(['staged', 'working'])
@@ -160,7 +162,10 @@ export const gitBranchDiffQuerySchema = v.object({
 export type GitBlobDiffQuery = v.InferOutput<typeof gitBlobDiffQuerySchema>
 export type GitPathsBody = v.InferOutput<typeof gitPathsBodySchema>
 export type GitApplyPatchBody = v.InferOutput<typeof gitApplyPatchBodySchema>
-export type GitCommitBody = v.InferOutput<typeof gitCommitBodySchema>
+type ParsedGitCommitBody = v.InferOutput<typeof gitCommitBodySchema>
+/** `source` stays optional for in-process callers; the route's parse fills the default. */
+export type GitCommitBody = Omit<ParsedGitCommitBody, 'source'> &
+  Partial<Pick<ParsedGitCommitBody, 'source'>>
 export type GitCommitMessageResult = v.InferOutput<typeof gitCommitMessageResultSchema>
 export type GitCommitMessageSource = v.InferOutput<typeof gitCommitMessageSourceSchema>
 export type GitCheckoutBody = v.InferOutput<typeof gitCheckoutBodySchema>

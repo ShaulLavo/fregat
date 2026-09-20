@@ -140,7 +140,7 @@ export function ChatInput({
   // State as well as the ref: the inbox only splices text once a caret exists,
   // and a ref cannot wake the effect that is waiting for one.
   const [editorReady, setEditorReady] = useState(false)
-  const focusTarget = useFocusTarget<HTMLDivElement>(
+  const { ref: focusTargetRef } = useFocusTarget<HTMLDivElement>(
     {
       area: 'chat',
       id: { kind: 'chat-composer', key: rootPath },
@@ -289,10 +289,13 @@ export function ChatInput({
         imagePreparation.clearSent()
         clearDraft()
       }
+      setSubmitting(false)
 
       return sent
-    } finally {
+    } catch (error) {
+      // Not `finally`: the compiler refuses the whole component over one.
       setSubmitting(false)
+      throw error
     }
   }
 
@@ -435,7 +438,7 @@ export function ChatInput({
                 // :focus-within, so a bare border-primary would lose to it mid-drag.
                 dropTargetActive && 'border-primary [--focus-ring-color:var(--primary)]',
               )}
-              ref={focusTarget.ref}
+              ref={focusTargetRef}
               onDragLeave={handleComposerDragLeave}
               onDragOver={handleComposerDragOver}
               onDrop={handleComposerDrop}

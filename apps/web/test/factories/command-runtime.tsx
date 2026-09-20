@@ -349,7 +349,9 @@ function createRuntime(
     undo: async () => false,
   }
 
-  return { documents, editor, files, focus, settings, shell, tabs, workspace, workspaceEdits }
+  const git = { setPendingMessageFile: () => undefined }
+
+  return { documents, editor, files, focus, git, settings, shell, tabs, workspace, workspaceEdits }
 }
 
 function createTestEditor(

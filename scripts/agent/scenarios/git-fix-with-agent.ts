@@ -9,10 +9,12 @@ import { createScriptError } from '../../structured-errors'
 // Rejects, so the run never lands a commit and can be repeated on one fixture.
 const HOOK = ['#!/bin/sh', 'echo "lint failed on src/app.ts" >&2', 'exit 1', ''].join('\n')
 
+const EXISTING_DRAFT = 'a question I was already writing'
+
 export const gitFixWithAgent: Scenario = {
   name: 'git-fix-with-agent',
   description:
-    'Fail a commit on a rejecting hook, press Fix with agent, and find the failure in the composer.',
+    'Fail a commit on a rejecting hook, press Fix with agent, and find the failure alone in a new chat.',
   async run(page, { step }) {
     const fixture = await mkdtemp('/work/tmp/fregat-fix-with-agent-')
     try {
@@ -30,6 +32,11 @@ export const gitFixWithAgent: Scenario = {
       await chmod(hook, 0o755)
 
       await openFixtureWorkspace(page, fixture)
+      // Something already in the open chat: the hand-off must not land beside it.
+      await selectors.sidebarTab(page, 'Chat').click()
+      await selectors.chatMessage(page).waitFor({ timeout: 20_000 })
+      await selectors.chatMessage(page).click()
+      await page.keyboard.type(EXISTING_DRAFT)
       await openGitPanel(page)
       await selectors.commitMessage(page).fill('rejected by the hook')
       await selectors.commitButton(page).click()
@@ -49,6 +56,8 @@ export const gitFixWithAgent: Scenario = {
       const text = (await composer.textContent()) ?? ''
       if (!text.includes('Git commit failed'))
         throw createScriptError('The composer did not name the failed step')
+      if (text.includes(EXISTING_DRAFT))
+        throw createScriptError('Fix with agent reused the open chat instead of starting a new one')
       await composer.fill('')
     } finally {
       await rm(fixture, { force: true, recursive: true })

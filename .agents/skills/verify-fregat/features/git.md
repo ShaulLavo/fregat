@@ -28,4 +28,10 @@ Graph roots exclude `refs/platform/*`. A browsing session pins tips and ref labe
 
 `git-commit-message-persists` types a commit message in a fixture repository, reloads the window and requires the same text back. The draft is stored per repository location and cleared by a successful commit.
 
-`git-fix-with-agent` fails a commit on a rejecting hook, presses Fix with agent on the failure notice and requires the failed step and the hook's output in the chat composer. The notice reads the newest git mutation from the mutation cache, so any failing step (stage, push, pull, sync) raises it and a retry clears it.
+`git-fix-with-agent` types something into the open chat, fails a commit on a rejecting hook, presses Fix with agent and requires the failed step and the hook's output in the composer of a new chat, without the text typed earlier. The notice reads the newest git mutation from the mutation cache, so any failing step (stage, push, pull, sync) raises it and a retry clears it.
+
+`git-commit-message-file` opens `COMMIT_EDITMSG` from an empty-message commit twice: Discard commit message in the editor title must close it with HEAD unchanged, and Accept commit message must save, close and leave HEAD carrying the typed subject. Closing the tab by hand commits the same way; a file left with only comment lines aborts.
+
+`scenario git-stage-settles` builds a throwaway repository under `/work/tmp`, stages and unstages one file through the row buttons, and counts `/git/status` requests between the Stage click and the row appearing under Staged. The count must be zero: stage, unstage and discard settle the status query from the write's own response. A rapid Stage → Unstage burst must leave the panel matching `git status --porcelain`. It never drives the dev workspace, where Stage would stage real work.
+
+`git-commit-slow-hook` commits through a `pre-commit` hook that prints once and then stays silent for 35 seconds. It takes about 45 seconds and proves two things: hook-running git commands get the 15 minute limit rather than the 30 second local one, and the commit stream's reader skips the server's 15 second heartbeats.

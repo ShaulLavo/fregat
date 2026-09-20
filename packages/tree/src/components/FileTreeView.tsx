@@ -799,10 +799,10 @@ export function FileTreeView({
     // position for a frame while the rows themselves have already scrolled.
     const markScrolling = (): void => {
       if (listElement != null) {
-        listElement.dataset.isScrolling ??= ''
+        if (listElement.dataset.isScrolling == null) listElement.dataset.isScrolling = ''
       }
       if (rootElement != null) {
-        rootElement.dataset.isScrolling ??= ''
+        if (rootElement.dataset.isScrolling == null) rootElement.dataset.isScrolling = ''
       }
       isScrollingRef.current = true
       if (scrollTimer != null) {

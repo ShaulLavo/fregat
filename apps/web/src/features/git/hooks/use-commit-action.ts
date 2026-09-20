@@ -15,14 +15,16 @@ export function useCommitAction(rootPath: string) {
   function submit() {
     if (isPending) return
 
-    commit.mutate(trimmedMessage, {
-      onSuccess: (result) => {
-        if (result.kind !== 'message-file') return
-        discardLiveEditorDocument(fileDocument(fileResource(filesystemPath(result.path))))
-        // TODO: when save is implemented, saving COMMIT_EDITMSG should complete or abort the git commit.
-        selectFile(filesystemPath(result.path))
+    commit.mutate(
+      { message: trimmedMessage, source: 'input' },
+      {
+        onSuccess: (result) => {
+          if (result.kind !== 'message-file') return
+          discardLiveEditorDocument(fileDocument(fileResource(filesystemPath(result.path))))
+          selectFile(filesystemPath(result.path))
+        },
       },
-    })
+    )
   }
 
   return {

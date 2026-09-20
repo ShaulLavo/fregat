@@ -25,13 +25,22 @@ export const LOCAL_TIMEOUT_MS = 30_000
  */
 export const NETWORK_TIMEOUT_MS = 120_000
 
-const NETWORK_ACTIONS = new Set(['clone', 'fetch', 'ls-remote', 'pull', 'push', 'remote'])
+/**
+ * Commands that run the repository's hooks run arbitrary user code: a pre-commit
+ * that typechecks a monorepo takes minutes and is healthy the whole time. Their
+ * output streams to the user, so a slow hook is visible rather than silent; this
+ * only bounds one that never returns.
+ */
+export const HOOK_TIMEOUT_MS = 15 * 60_000
+
+const NETWORK_ACTIONS = new Set(['clone', 'fetch', 'ls-remote', 'pull', 'remote'])
+const HOOK_ACTIONS = new Set(['am', 'cherry-pick', 'commit', 'merge', 'push', 'rebase', 'revert'])
 
 export const gitProcessErrors = defineErrorCatalog('git', {
   COMMAND_TIMED_OUT: {
     status: 504,
     message: ({ action, timeoutMs }: { action: string; timeoutMs: number }) =>
-      `git ${action} did not finish within ${timeoutMs}ms and was killed`,
+      `git ${action} did not finish within ${formatTimeout(timeoutMs)} and was killed`,
     why: 'The git subprocess exceeded its time budget: network commands wait on an unreachable or unauthenticated remote, local ones usually block on a stale index lock or a hook.',
     fix: 'Check the remote (or clear the stale git lock) and retry. Raise timeoutMs for that call only when the command is legitimately slower than the budget.',
   },
@@ -149,7 +158,11 @@ export function processLimitError(limit: GitProcessLimit, action: string) {
 }
 
 export function defaultTimeoutMs(args: readonly string[]) {
-  return NETWORK_ACTIONS.has(args[0] ?? '') ? NETWORK_TIMEOUT_MS : LOCAL_TIMEOUT_MS
+  const action = args[0] ?? ''
+  if (HOOK_ACTIONS.has(action)) return HOOK_TIMEOUT_MS
+  if (NETWORK_ACTIONS.has(action)) return NETWORK_TIMEOUT_MS
+
+  return LOCAL_TIMEOUT_MS
 }
 
 type StreamRead = { bytes: number; text: string; truncated: boolean }
@@ -353,4 +366,10 @@ async function* mergeProcessLines(sources: AsyncGenerator<GitProcessLine>[]) {
       source.next().then((next) => ({ index, result: next })),
     )
   }
+}
+
+function formatTimeout(timeoutMs: number) {
+  if (timeoutMs >= 60_000) return `${Math.round(timeoutMs / 60_000)} min`
+
+  return `${Math.round(timeoutMs / 1000)}s`
 }

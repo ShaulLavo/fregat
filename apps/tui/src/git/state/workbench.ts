@@ -96,7 +96,7 @@ export function createGitWorkbench(client: Client, rootPath: string) {
     return mutate(async () => {
       const stream = requireEdenData(
         await client.git['commit-stream'].post(
-          { path: rootPath, message },
+          { path: rootPath, message, source: 'input' },
           { fetch: { signal: lifetime.signal } },
         ),
       )

@@ -57,9 +57,8 @@ export function useMachineForm({
       await connections.cancelMachine(machineName)
     } catch (cause) {
       event.error(cause)
-    } finally {
-      event.end()
     }
+    event.end()
   }
 
   function beginSave(machineName: string) {

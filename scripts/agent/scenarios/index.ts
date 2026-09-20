@@ -43,6 +43,8 @@ import { chatIconHints } from './chat-icon-hints'
 import { chatModelPicker } from './chat-model-picker'
 import { wallpaperIconHints } from './wallpaper-icon-hints'
 import { terminalBackground } from './terminal-background'
+import { bottomPanelPersistence } from './bottom-panel-persistence'
+import { gitStageSettles } from './git-stage-settles'
 import { chatFollowUp } from './chat-follow-up'
 import { chatDiffSyntax } from './chat-diff-syntax'
 import { editorSplitDrag } from './editor-split-drag'
@@ -109,9 +111,12 @@ import { editorLargePaste } from './editor-large-paste'
 import { editorTypeBurst } from './editor-type-burst'
 import { editorUndoBarrier } from './editor-undo-barrier'
 import { editorUndoBranch } from './editor-undo-branch'
+import { editorTitleDiffToggle } from './editor-title-diff-toggle'
 import { editorUndoReopen } from './editor-undo-reopen'
 import { gitCommitHookColors } from './git-commit-hook-colors'
+import { gitCommitMessageFile } from './git-commit-message-file'
 import { gitCommitMessagePersists } from './git-commit-message-persists'
+import { gitCommitSlowHook } from './git-commit-slow-hook'
 import { gitFixWithAgent } from './git-fix-with-agent'
 import { gitHistory } from './git-history'
 import { editorCaretBurst } from './editor-caret-burst'
@@ -183,6 +188,8 @@ export const scenarios: readonly Scenario[] = [
   editorSplitHistoryState,
   editorExternalEdit,
   terminalBackground,
+  bottomPanelPersistence,
+  gitStageSettles,
   editorThemePreview,
   editorSyntaxBenchmark('native'),
   editorNativeCoverage('light'),
@@ -232,8 +239,11 @@ export const scenarios: readonly Scenario[] = [
   editorTypeBurst,
   editorUndoBarrier,
   editorUndoBranch,
+  editorTitleDiffToggle,
   editorUndoReopen,
   gitCommitHookColors,
+  gitCommitMessageFile,
+  gitCommitSlowHook,
   gitCommitMessagePersists,
   gitFixWithAgent,
   editorCaretBurst,

@@ -1,6 +1,7 @@
 import { ToolPane as PaneShell } from '@workspace/ui/patterns/tool-pane'
 import type { GitFileStatus } from '@workspace/contracts'
 import { filesystemPath } from '@/lib/documents/utils/identity'
+import { cn } from '@workspace/ui/lib/utils'
 import { Button } from '@workspace/ui/components/button'
 import { PaneBar } from '@workspace/ui/components/pane-bar'
 
@@ -8,20 +9,22 @@ import { SearchPane } from '@/features/workspace/components/search-pane'
 import type { EditorTabConflictMap } from '@/features/workspace/utils/tab-types'
 import { TurnFiles } from '@/features/chat-mode/components/turn-files'
 import { CheckpointLoading } from '@/features/chat-mode/components/checkpoint-loading'
+import { SessionTerminals } from '@/features/chat-mode/components/session-terminals'
+import { useOpenedTerminals } from '@/features/chat-mode/hooks/use-opened-terminals'
 import { useSessionTerminalId } from '@/features/chat-mode/hooks/use-session-terminal-id'
 import { useSessionToolRoot } from '@/features/chat-mode/hooks/use-session-tool-root'
 import { useSessionDiffScope } from '@/features/chat/hooks/use-session-diff-scope'
 import { Panel as GitPanel } from '@/features/git/components/panel'
 
 import { LogsPanel } from '@/features/logs/components/panel'
-import { TerminalPanel } from '@/features/terminal/components/panel'
 import { CodePanel } from '@/features/workbench/components/code-panel'
 import { DiagnosticsPanel } from '@/features/workbench/components/diagnostics-panel'
 import { FileNavigatorPanel } from '@/features/workbench/components/file-navigator-panel'
 import { GitPaneHeader } from '@/features/workbench/components/git-pane-header'
 import { ToolPaneHeader } from '@/components/tool-pane-header'
 import type { WorkbenchPanels } from '@/features/workbench/utils/panels'
-import type { ChatModeToolTab } from '@/features/chat-mode/utils/panels'
+import { chatModeToolTabLabel, type ChatModeToolTab } from '@/features/chat-mode/utils/panels'
+import { RenderErrorBoundary } from '@workspace/ui/patterns/render-error-boundary'
 
 type SessionDiffScopeState = ReturnType<typeof useSessionDiffScope>
 
@@ -31,6 +34,7 @@ export function ToolPane({
   gitFiles,
   rootPath,
   tab,
+  visible,
   workbenchPanels,
 }: {
   readonly conflicts: EditorTabConflictMap
@@ -39,6 +43,8 @@ export function ToolPane({
   /** The project root. Individual tools act on the session's checkout below. */
   readonly rootPath: string
   readonly tab: ChatModeToolTab
+  /** False while the pane is collapsed and only kept mounted for its terminals. */
+  readonly visible: boolean
   readonly workbenchPanels: WorkbenchPanels
 }) {
   // Read for every tab, not just the git one: the hook is what moves a pick off a
@@ -50,7 +56,55 @@ export function ToolPane({
   // worktree; the difference only appears once one has its own.
   const toolRoot = useSessionToolRoot()
   const terminalSessionId = useSessionTerminalId()
+  const terminalShowing = tab === 'terminal'
+  const terminals = useOpenedTerminals(
+    { id: terminalSessionId, rootPath: toolRoot },
+    visible && terminalShowing,
+  )
 
+  return (
+    <div className='relative h-full min-w-0'>
+      {terminals.length > 0 ? (
+        <div
+          className={cn('absolute inset-0', !terminalShowing && 'invisible')}
+          inert={!terminalShowing}
+        >
+          <SessionTerminals
+            activeId={terminalSessionId}
+            terminals={terminals}
+            visible={visible && terminalShowing}
+          />
+        </div>
+      ) : null}
+      {terminalShowing ? null : (
+        <div className='absolute inset-0'>
+          {/* Below the terminals, so a crashing tool cannot detach them. */}
+          <RenderErrorBoundary label={chatModeToolTabLabel(tab)} resetKeys={[tab]}>
+            {toolBody({ conflicts, diffScope, gitFiles, rootPath, tab, toolRoot, workbenchPanels })}
+          </RenderErrorBoundary>
+        </div>
+      )}
+    </div>
+  )
+}
+
+function toolBody({
+  conflicts,
+  diffScope,
+  gitFiles,
+  rootPath,
+  tab,
+  toolRoot,
+  workbenchPanels,
+}: {
+  readonly conflicts: EditorTabConflictMap
+  readonly diffScope: SessionDiffScopeState
+  readonly gitFiles: readonly GitFileStatus[]
+  readonly rootPath: string
+  readonly tab: Exclude<ChatModeToolTab, 'terminal'>
+  readonly toolRoot: string
+  readonly workbenchPanels: WorkbenchPanels
+}) {
   if (tab === 'editor') {
     return (
       <CodePanel
@@ -64,28 +118,15 @@ export function ToolPane({
   if (tab === 'files') return <FileNavigatorPanel rootPath={filesystemPath(toolRoot)} />
   if (tab === 'git') return gitToolPane(toolRoot, diffScope)
   if (tab === 'logs') return <LogsPanel active />
-  if (tab === 'problems') {
-    return (
-      <PaneShell
-        className='h-full min-w-0 overflow-hidden'
-        bodyClassName='overflow-hidden'
-        header={<ToolPaneHeader tab='problems' />}
-      >
-        <DiagnosticsPanel />
-      </PaneShell>
-    )
-  }
-  if (tab === 'search') {
-    return <SearchPane rootPath={toolRoot} />
-  }
+  if (tab === 'search') return <SearchPane rootPath={toolRoot} />
 
   return (
     <PaneShell
       className='h-full min-w-0 overflow-hidden'
-      bodyClassName='bg-content-well overflow-hidden'
-      header={<ToolPaneHeader tab='terminal' />}
+      bodyClassName='overflow-hidden'
+      header={<ToolPaneHeader tab='problems' />}
     >
-      <TerminalPanel active className='h-full' rootPath={toolRoot} sessionId={terminalSessionId} />
+      <DiagnosticsPanel />
     </PaneShell>
   )
 }

@@ -114,7 +114,7 @@ export const SearchResultFileEditor = memo(
       textMetrics: SEARCH_RESULT_FILE_EDITOR_TEXT_METRICS,
       theme: editorTheme,
     })
-    const focusTarget = useEditorFocusTarget({
+    const { ref: focusTargetRef } = useEditorFocusTarget({
       controller,
       writable: false,
       id: {
@@ -228,7 +228,7 @@ export const SearchResultFileEditor = memo(
     return (
       <div
         className='ml-5 min-w-0 border-l border-transparent px-2 py-0.5'
-        ref={focusTarget.ref}
+        ref={focusTargetRef}
         onBeforeInputCapture={preventReadonlyInput}
         onDropCapture={preventReadonlyInput}
         onKeyDownCapture={handleKeyDownCapture}

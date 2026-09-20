@@ -32,9 +32,9 @@ export function useRowMenu({
   const treePath = canonicalTreePath(item.path)
   const path = entryForTreePath(model, treePath)?.path ?? null
   const paths = path ? [path] : []
-  const discard = useDiscardPathsMutation(paths)
-  const stage = useStagePathsMutation(paths)
-  const unstage = useUnstagePathsMutation(paths)
+  const discard = useDiscardPathsMutation(paths, rootPath)
+  const stage = useStagePathsMutation(paths, rootPath)
+  const unstage = useUnstagePathsMutation(paths, rootPath)
   const { selectFile } = useEditorCommands()
   // Same query key the git panel uses, so this is a cache read, not a refetch.
   const status = useStatus(rootPath)

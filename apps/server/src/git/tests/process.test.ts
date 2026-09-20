@@ -7,6 +7,7 @@ import { createWorkspacePaths } from '../../fs/path'
 import { GitService } from '../service'
 import {
   defaultTimeoutMs,
+  HOOK_TIMEOUT_MS,
   gitProcessErrors,
   LOCAL_TIMEOUT_MS,
   NETWORK_TIMEOUT_MS,
@@ -69,7 +70,10 @@ describe('git process limits', () => {
 
   it('gives network commands the longer default bound', () => {
     expect(defaultTimeoutMs(['fetch'])).toBe(NETWORK_TIMEOUT_MS)
-    expect(defaultTimeoutMs(['push'])).toBe(NETWORK_TIMEOUT_MS)
+    expect(defaultTimeoutMs(['pull'])).toBe(NETWORK_TIMEOUT_MS)
+    // Hooks are user code: a monorepo typecheck in pre-commit outlasts any local limit.
+    expect(defaultTimeoutMs(['commit'])).toBe(HOOK_TIMEOUT_MS)
+    expect(defaultTimeoutMs(['push'])).toBe(HOOK_TIMEOUT_MS)
     expect(defaultTimeoutMs(['status'])).toBe(LOCAL_TIMEOUT_MS)
     expect(defaultTimeoutMs(['diff'])).toBe(LOCAL_TIMEOUT_MS)
   })

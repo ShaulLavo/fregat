@@ -45,9 +45,8 @@ export function MachineConnectionNotice({
       await retry()
     } catch (error) {
       setRetryError(errorMessage(error, `Could not reconnect ${label}.`))
-    } finally {
-      setRetrying(false)
     }
+    setRetrying(false)
   }
 
   return (

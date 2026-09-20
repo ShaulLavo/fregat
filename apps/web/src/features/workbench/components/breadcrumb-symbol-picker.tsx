@@ -41,10 +41,10 @@ export function BreadcrumbSymbolPicker({
     onCollapse: toggle,
     onExpand: toggle,
   })
-  const ref = list.containerProps.ref
+  const focusList = list.focus
   useEffect(() => {
-    ref.current?.focus({ preventScroll: true })
-  }, [ref])
+    focusList()
+  }, [focusList])
   if (symbols.length === 0) return <EmptyState align='start' title='No symbols' />
   return (
     <div

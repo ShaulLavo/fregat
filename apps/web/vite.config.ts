@@ -20,6 +20,8 @@ const devServerPort = portFromEnv(process.env, 'WEB_PORT', 5173)
 
 export default defineConfig(({ command, isPreview, mode }) => {
   const packages = command === 'serve' && !isPreview ? readDevSources(__dirname) : []
+  // A build compiles the linked checkouts' pre-built `dist`; none of it is ours to memoize.
+  const linkedDist = command === 'build' ? readDevSources(__dirname) : []
   return {
     build:
       mode === 'demo'
@@ -41,9 +43,11 @@ export default defineConfig(({ command, isPreview, mode }) => {
       devSourcePlugin(packages),
       platformSelfSaveHmrPlugin(),
       react({
-        compiler: true,
+        // Vitest configs keep `compiler: true`: the flag would reprint every diagnostic per run.
+        compiler: { logDiagnostics: true },
         exclude: [
           /\/node_modules\//,
+          ...linkedDist.map((pkg) => new RegExp(`^${escapeRegExp(pkg.root)}/`)),
           ...packages
             .filter((pkg) => pkg.name !== '@singapore-editor/react')
             .map((pkg) => new RegExp(`^${escapeRegExp(pkg.root)}/`)),

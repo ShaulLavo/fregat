@@ -119,8 +119,10 @@ function sessionDiffScopeParam(rootPath: string | null) {
 function sidebarSessionToken(rootPath: string | null) {
   const selection = useSidebarSelectionStore.getState().selection
   if (selection.kind === 'auto' || !selectionBelongsToWorkspace(selection, rootPath)) return null
-  if (selection.kind === 'draft') return 't/new'
-  return `t/${selection.sessionId}`
+
+  // With its id: a bare `t/new` is re-minted when the address is applied, so any
+  // navigation made beside an open draft would swap it for an empty one.
+  return sessionTokenFor(selection)
 }
 
 export function captureMainSession(application: ApplicationRuntime) {

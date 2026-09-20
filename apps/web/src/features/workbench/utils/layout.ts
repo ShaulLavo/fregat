@@ -55,6 +55,11 @@ export function setWorkbenchMainLayout(
   return { ...layout, mainLayout }
 }
 
+/** A collapsed bottom panel reports zero; persisting it would lose the chosen height. */
+export function isBottomCollapsed(layout: Partial<Record<keyof WorkbenchMainLayout, number>>) {
+  return (layout.bottom ?? 0) === 0
+}
+
 export function normalizeWorkbenchLayout(value: WorkbenchLayout): WorkbenchLayout {
   return {
     mainLayout: normalizeMainLayout(value.mainLayout),

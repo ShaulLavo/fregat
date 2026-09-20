@@ -219,7 +219,8 @@ export function useFileTreeDrag(options: UseFileTreeDragOptions): FileTreeDragHa
 
   const updateDragPoint = (clientX: number, clientY: number): void => {
     dragPointRef.current = { clientX, clientY }
-    dragAutoScrollFrameRef.current ??= requestDragAnimationFrame(runDragAutoScroll)
+    if (dragAutoScrollFrameRef.current == null)
+      dragAutoScrollFrameRef.current = requestDragAnimationFrame(runDragAutoScroll)
   }
 
   const handleRowDragStart = (

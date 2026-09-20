@@ -71,7 +71,7 @@ export function useFileTreeIntentPrefetch({
     })
     let observer: MutationObserver | null = null
     const schedule = createIdleScheduler(() => {
-      observer ??= observeTreeRows(tree, schedule.request)
+      if (observer === null) observer = observeTreeRows(tree, schedule.request)
       syncRegistrations(registry)
     })
     const unsubscribe = tree.subscribe(schedule.request)

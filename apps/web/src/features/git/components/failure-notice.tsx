@@ -1,9 +1,10 @@
 import { ChatCircleIcon, XIcon } from '@phosphor-icons/react'
 import { useQueryClient } from '@tanstack/react-query'
 import { Button } from '@workspace/ui/components/button'
-import { useState } from 'react'
+import { useEffect, useState } from 'react'
 
 import { ToolbarButton } from '@/components/toolbar-button'
+import { log } from '@/lib/client-logging'
 
 import { useAttachToComposer } from '@/features/chat/hooks/use-attach-to-composer'
 import { useLatestFailure } from '@/features/git/hooks/use-latest-failure'
@@ -17,10 +18,19 @@ import { gitFailureLabel, gitFailurePrompt } from '@/features/git/utils/failure-
 export function FailureNotice({ rootPath }: { readonly rootPath: string }) {
   const failure = useLatestFailure()
   const queryClient = useQueryClient()
-  const { attachText } = useAttachToComposer()
+  const { attachTextToNewChat } = useAttachToComposer()
   const [dismissedId, setDismissedId] = useState<number | null>(null)
 
-  if (!failure || failure.mutationId === dismissedId) return null
+  const shownId = failure && failure.mutationId !== dismissedId ? failure.mutationId : null
+  const operation = failure?.operation
+  // One event per failure shown, so a report of a missing notice can be checked.
+  useEffect(() => {
+    if (shownId === null) return
+
+    log.info({ action: 'git.failure_notice', area: 'git', mutationId: shownId, operation })
+  }, [operation, shownId])
+
+  if (!failure || shownId === null) return null
 
   const current = failure
   const title = `${gitFailureLabel(current.operation)} failed`
@@ -34,7 +44,9 @@ export function FailureNotice({ rootPath }: { readonly rootPath: string }) {
       rootPath,
       lines.map((line) => line.text),
     )
-    if (attachText('git-failure', prompt)) setDismissedId(current.mutationId)
+    void attachTextToNewChat('git-failure', prompt, rootPath).then((attached) => {
+      if (attached) setDismissedId(current.mutationId)
+    })
   }
 
   return (

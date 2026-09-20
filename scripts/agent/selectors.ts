@@ -299,6 +299,12 @@ export const selectors = {
     page.getByLabel('Folder tree', { exact: true }).getByRole('treeitem', { name, exact: true }),
   fileConflict: (page: Page, name: string) =>
     page.getByRole('alertdialog', { name: `${name} changed on disk`, exact: true }),
+  resizablePanel: (page: Page, id: string) =>
+    page.locator(`[data-slot="resizable-panel"][id="${id}"]`),
+  bottomTab: (page: Page, name: 'Terminal' | 'Problems') =>
+    page.getByRole('tablist', { name: 'Bottom panel tabs' }).getByRole('tab', { name }),
+  toolTab: (page: Page, name: string) =>
+    page.getByRole('navigation', { name: 'Tool tabs' }).getByRole('button', { name, exact: true }),
   terminalTool: (page: Page) =>
     page
       .getByRole('navigation', { name: 'Tool tabs' })
@@ -493,6 +499,8 @@ export const selectors = {
   commitMessage: (page: Page) => page.getByRole('textbox', { name: 'Commit message', exact: true }),
   commitButton: (page: Page) => page.getByRole('button', { name: /^Commit\b/ }),
   commitOutput: (page: Page) => page.getByRole('log', { name: 'Commit output', exact: true }),
+  editorTitleAction: (page: Page, label: string) =>
+    page.locator('[data-editor-tab-strip]').getByRole('button', { name: label, exact: true }),
   gitFixWithAgent: (page: Page) =>
     page.getByRole('button', { name: 'Fix with agent', exact: true }),
   folderTree: (page: Page) => page.getByLabel('Folder tree', { exact: true }),
@@ -509,6 +517,12 @@ export const selectors = {
   windowToolbar: (page: Page) => page.getByLabel('Window toolbar', { exact: true }),
   editorTab: (page: Page, path: string) => page.locator(`[data-editor-tab-path="${path}"]`),
   gitPanel: (page: Page) => page.getByRole('region', { name: 'Git panel' }),
+  gitChangeRow: (page: Page, name: string) =>
+    page.getByRole('region', { name: 'Git panel' }).getByText(name, { exact: true }),
+  gitRowAction: (page: Page, label: 'Stage file' | 'Unstage file' | 'Discard file') =>
+    page
+      .getByRole('region', { name: 'Git panel' })
+      .getByRole('button', { name: label, exact: true }),
   focusGitCommand: (page: Page) => page.getByRole('option', { name: /Focus Git/ }),
   graphButton: (page: Page) => page.getByRole('button', { name: 'Graph', exact: true }),
   changesToggle: (page: Page) => page.getByRole('button', { name: 'Changes', exact: true }),
@@ -549,6 +563,7 @@ export const selectors = {
 
 export const chords = {
   commandPalette: 'Control+Shift+P',
+  togglePanel: 'Control+J',
 }
 
 export async function waitForApp(page: Page, timeoutMs = 45_000) {

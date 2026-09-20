@@ -7,6 +7,9 @@ import {
 import { cn } from '@workspace/ui/lib/utils'
 import { RenderErrorBoundary } from '@workspace/ui/patterns/render-error-boundary'
 
+import { useState } from 'react'
+
+import { useCollapsiblePanel } from '@/hooks/use-collapsible-panel'
 import type { EditorTabConflictMap } from '@/features/workspace/utils/tab-types'
 import { ChatStage } from '@/features/chat-mode/components/chat-stage'
 import { SessionRail } from '@/features/chat-mode/components/session-rail'
@@ -45,6 +48,17 @@ export function ChatModeLayout({
   readonly workbenchPanels: WorkbenchPanels
   readonly onPanelsChange: (panels: ChatModePanels) => void
 }) {
+  const toolsOpen = panels.toolPaneOpen
+  const toolsRef = useCollapsiblePanel(toolsOpen)
+  // A session terminal spawns on mount, so the pane joins the group on its first open.
+  const [toolsOpened, setToolsOpened] = useState(toolsOpen)
+  if (toolsOpen && !toolsOpened) setToolsOpened(true)
+
+  function handleLayoutChanged(next: Record<string, number>) {
+    // Dragged shut rather than toggled: the open flag has to follow.
+    if (toolsOpen && next.tools === 0) onPanelsChange({ ...panels, toolPaneOpen: false })
+  }
+
   function handleSelectToolTab(tab: ChatModeToolTab) {
     onPanelsChange(toggleChatModeToolTab(panels, tab))
   }
@@ -61,6 +75,7 @@ export function ChatModeLayout({
         className='relative z-10 min-h-0 min-w-0 flex-1'
         id='chat-mode'
         storageKey='chat-mode'
+        onLayoutChanged={handleLayoutChanged}
       >
         {panels.sessionRailOpen ? (
           <>
@@ -81,36 +96,40 @@ export function ChatModeLayout({
         <ResizablePanel className='min-h-0 min-w-0 overflow-hidden' id='stage' minSize={360}>
           <ChatStage />
         </ResizablePanel>
-        {panels.toolPaneOpen ? (
-          <>
-            <ResizableHandle id='tools-handle' withHandle />
-            <ResizablePanel
-              className={cn(
-                'min-h-0 min-w-0 overflow-hidden',
-                // Editor and terminal paint their own content wells.
-                panels.activeToolTab !== 'editor' &&
-                  panels.activeToolTab !== 'terminal' &&
-                  'bg-card backdrop-material',
-              )}
-              defaultSize={TOOL_PANE_DEFAULT_SIZE}
-              id='tools'
-              maxSize={TOOL_PANE_MAX_SIZE}
-              minSize={TOOL_PANE_MIN_SIZE}
+        {toolsOpen ? <ResizableHandle id='tools-handle' withHandle /> : null}
+        {toolsOpened ? (
+          // Closing collapses instead of unmounting, which would reconnect the terminals.
+          <ResizablePanel
+            collapsible
+            className={cn(
+              'min-h-0 min-w-0 overflow-hidden',
+              // Editor and terminal paint their own content wells.
+              panels.activeToolTab !== 'editor' &&
+                panels.activeToolTab !== 'terminal' &&
+                'bg-card backdrop-material',
+            )}
+            collapsedSize={0}
+            defaultSize={TOOL_PANE_DEFAULT_SIZE}
+            id='tools'
+            inert={!toolsOpen}
+            maxSize={TOOL_PANE_MAX_SIZE}
+            minSize={TOOL_PANE_MIN_SIZE}
+            panelRef={toolsRef}
+          >
+            <RenderErrorBoundary
+              label={chatModeToolTabLabel(panels.activeToolTab)}
+              resetKeys={[panels.activeToolTab]}
             >
-              <RenderErrorBoundary
-                label={chatModeToolTabLabel(panels.activeToolTab)}
-                resetKeys={[panels.activeToolTab]}
-              >
-                <ToolPane
-                  conflicts={conflicts}
-                  gitFiles={gitFiles}
-                  rootPath={rootPath}
-                  tab={panels.activeToolTab}
-                  workbenchPanels={workbenchPanels}
-                />
-              </RenderErrorBoundary>
-            </ResizablePanel>
-          </>
+              <ToolPane
+                conflicts={conflicts}
+                gitFiles={gitFiles}
+                rootPath={rootPath}
+                tab={panels.activeToolTab}
+                visible={toolsOpen}
+                workbenchPanels={workbenchPanels}
+              />
+            </RenderErrorBoundary>
+          </ResizablePanel>
         ) : null}
       </PersistedResizablePanelGroup>
       <ToolRail panels={panels} onSelectTab={handleSelectToolTab} />

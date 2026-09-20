@@ -21,7 +21,7 @@ a bare root `bun run verify`.
 | ------------------------------------------------------------------------------- | ---------------------------------------------------- |
 | [129 — dependency shape](129-dependency-shape.md)                               | **PHASE 1 DEPLOYED 2026-09-20; PHASES 2–3 PROPOSED** |
 | [128 — React 19 patterns](128-react-19-patterns.md)                             | **PROPOSED — IMPLEMENTATION NOT STARTED**            |
-| [127 — compiler and lifetime repairs](127-compiler-and-lifetime-repairs.md)     | **PROPOSED — PHASE 3 RANK 1 APPLIED, UNVERIFIED**    |
+| [127 — compiler and lifetime repairs](127-compiler-and-lifetime-repairs.md)     | **PHASES 1–4 DEPLOYED 2026-09-20; PHASE 5 OPEN**     |
 | [126 — T3 Code behavioral alignment](126-t3code-alignment.md)                   | **IN PROGRESS — ARCHIVE DELIVERY DEPLOYED**          |
 | [125 — observability overhead](125-observability-overhead.md)                   | **IMPLEMENTED — DEV/STREAMING EVIDENCE PENDING**     |
 | [071 — syntax highlight retry](071-syntax-highlight-retry.md)                   | **PROPOSED — ROOT GO/NO-GO SCHEDULING**              |

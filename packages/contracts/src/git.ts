@@ -119,6 +119,11 @@ export type GitCommitResult =
       path: string
       repository: GitRepositoryInfo
     }
+  /** The message file held nothing but comments, which is how a commit is called off. */
+  | {
+      kind: 'aborted'
+      repository: GitRepositoryInfo
+    }
 
 /**
  * A commit reported as it happens, because a commit runs the repository's

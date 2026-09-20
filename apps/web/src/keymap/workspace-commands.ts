@@ -10,6 +10,7 @@ import {
   BracketsCurlyIcon,
   CardsIcon,
   ChatCircleIcon,
+  CheckIcon,
   FilePlusIcon,
   FilesIcon,
   FolderPlusIcon,
@@ -43,6 +44,7 @@ import {
   jumpToSession,
   selectAdjacentSession,
   startScopedSessionDraft,
+  startSidebarSessionDraft,
   type SessionTraversalDirection,
 } from '@/features/chat-mode/state/session-commands'
 import { setChatModeSessionRailOpen, showChatModeToolTab } from '@/features/chat-mode/utils/panels'
@@ -56,9 +58,10 @@ import {
   saveCapability,
 } from '@/lib/documents/utils/capabilities'
 import { documentTab, sameTabContent } from '@/lib/documents/utils/tabs'
-import type { DocumentRef } from '@/lib/documents/utils/types'
+import type { DocumentRef, TabId } from '@/lib/documents/utils/types'
 import type { EditorDocumentStoreApi } from '@/features/editor/state/document-state'
 import { nextEditorDiffViewMode } from '@/features/editor/utils/diff-view-mode'
+import { commitMessageFilePath } from '@/keymap/utils/commit-message-file'
 import {
   activeEditorTabForWorkbenchPanels,
   openTerminalTabInWorkbenchPanels,
@@ -972,6 +975,42 @@ export const workspaceCommands = [
     },
   }),
   defineCommand({
+    ...workspaceCommandMetadata['workspace.newChat'],
+    icon: ChatCircleIcon,
+    run: ({ snapshot }) => {
+      const start = snapshot.uiMode === 'chat' ? startScopedSessionDraft : startSidebarSessionDraft
+      const started = start()
+      return operationStart(started instanceof Promise ? started : Promise.resolve(started))
+    },
+  }),
+  defineCommand({
+    ...workspaceCommandMetadata['workspace.acceptCommitMessage'],
+    icon: CheckIcon,
+    run: ({ runtime, snapshot }) => {
+      const path = commitMessageFilePath(snapshot.activeDocument)
+      const tabId = snapshot.activeTabId
+      if (!path || !tabId || !snapshot.rootPath || !snapshot.activeDocument) return declined
+
+      // Armed before the save: closing the tab is what commits, and a reload
+      // since the file opened would have forgotten that a commit was waiting.
+      runtime.git.setPendingMessageFile(snapshot.rootPath, path)
+      const saved = runtime.documents.save.save(documentKey(snapshot.activeDocument))
+      return operationStart(saved.then((ok) => ok && closeSavedTab(runtime, tabId)))
+    },
+  }),
+  defineCommand({
+    ...workspaceCommandMetadata['workspace.discardCommitMessage'],
+    icon: XIcon,
+    run: ({ runtime, snapshot }) => {
+      const path = commitMessageFilePath(snapshot.activeDocument)
+      if (!path || !snapshot.activeTabId || !snapshot.rootPath) return declined
+
+      runtime.git.setPendingMessageFile(snapshot.rootPath, null)
+      runtime.editor.discardAndCloseTab(snapshot.activeTabId)
+      return resolvedOperationStart(Promise.resolve())
+    },
+  }),
+  defineCommand({
     ...workspaceCommandMetadata['workspace.toggleDiffViewMode'],
     icon: GitDiffIcon,
     run: ({ runtime, snapshot }) => {
@@ -1097,3 +1136,8 @@ export const workspaceCommands = [
 ]
 
 export type WorkspaceCommandId = (typeof workspaceCommands)[number]['id']
+
+function closeSavedTab(runtime: WorkspaceCommandRuntime, tabId: TabId) {
+  runtime.editor.closeTab(tabId)
+  return true
+}

@@ -4,10 +4,18 @@ import { createStore, type StoreApi as ZustandStoreApi } from 'zustand/vanilla'
 
 import { clientErrors } from '@/lib/structured-errors'
 
+export type PendingMessageFile = {
+  readonly path: string
+  /** False until the tab exists: the path is recorded a moment before it opens. */
+  readonly seenOpen: boolean
+}
+
 type StoreState = {
   activeChangeId: string | null
   commitMessage: string
   commitMessageRevision: number
+  /** COMMIT_EDITMSG awaiting its commit; closing its tab, once seen open, commits. */
+  pendingMessageFile: PendingMessageFile | null
 }
 
 type StoreActions = {
@@ -15,6 +23,7 @@ type StoreActions = {
   applyGeneratedCommitMessage: (message: string, expectedRevision: number) => boolean
   resetCommitMessage: () => void
   setCommitMessage: (message: string) => void
+  setPendingMessageFile: (pending: PendingMessageFile | null) => void
 }
 
 export type GitStore = StoreState & StoreActions
@@ -59,6 +68,8 @@ export function createGitStore(draft?: CommitMessageDraft) {
     selectChange: (activeChangeId) => set({ activeChangeId }),
     commitMessage: draft?.read() ?? '',
     commitMessageRevision: 0,
+    pendingMessageFile: null,
+    setPendingMessageFile: (pendingMessageFile) => set({ pendingMessageFile }),
     resetCommitMessage: () => set(nextCommitMessageState(get(), '')),
     setCommitMessage: (commitMessage) => set(nextCommitMessageState(get(), commitMessage)),
   }))

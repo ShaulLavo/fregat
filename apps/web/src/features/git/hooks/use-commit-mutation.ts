@@ -3,7 +3,7 @@ import { useMutation, useQueryClient } from '@tanstack/react-query'
 import { toast } from 'sonner'
 
 import { fileSystemKeys } from '@/lib/query-keys'
-import { commitChangesStreaming } from '@/features/git/utils/api'
+import { commitChangesStreaming, type CommitRequest } from '@/features/git/utils/api'
 import { mutationKeys } from '@/features/git/utils/mutation-keys'
 import { notifyMutationError } from '@/features/git/utils/notify-mutation-error'
 import { commitProgressStoreFor } from '@/features/git/state/commit-progress-store'
@@ -19,13 +19,13 @@ export function useCommitMutation(rootPath: string) {
     // Streaming, so the repository's hooks can be seen working. A commit is the
     // one git command that runs arbitrary user code, and the previous one-shot
     // call left a slow hook looking exactly like a hung button.
-    mutationFn: (message: string, { client }) => {
+    mutationFn: (request: CommitRequest, { client }) => {
       const progress = commitProgressStoreFor(client).getState()
       progress.clearCommitProgress(rootPath)
 
       return commitChangesStreaming(
         rootPath,
-        message,
+        request,
         (line) => progress.appendCommitProgress(rootPath, line),
         clientForQueryClient(client),
       )
@@ -33,12 +33,17 @@ export function useCommitMutation(rootPath: string) {
     mutationKey: mutationKeys.commit(rootPath),
     onMutate: () => ({ store, revision: store.getState().commitMessageRevision }),
     onError: notifyMutationError,
-    onSuccess: (result, _message, draft) => {
+    onSuccess: (result, _request, draft) => {
       if (result.kind === 'message-file') {
-        void queryClient.invalidateQueries({
-          queryKey: fileSystemKeys.fileSnapshot(result.path),
-        })
-        toast.info('Opened commit message')
+        // Closing that tab is what commits; see useMessageFileCommit.
+        store.getState().setPendingMessageFile({ path: result.path, seenOpen: false })
+        toast.info('Write the commit message, then close the tab to commit')
+        // Awaited, so the tab opens on the file the server just rewrote: a cached
+        // snapshot from an earlier commit would make the first save a conflict.
+        return queryClient.refetchQueries({ queryKey: fileSystemKeys.fileSnapshot(result.path) })
+      }
+      if (result.kind === 'aborted') {
+        toast.info('Commit aborted: the message was empty')
         return
       }
 

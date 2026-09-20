@@ -11,15 +11,17 @@ import type { ChangeRow, PanelSection } from '@/features/git/utils/types'
 export function GroupMenu({
   anchor,
   onOpenChange,
+  rootPath,
   rows,
   section,
 }: {
   readonly anchor: MenuAnchor
   readonly onOpenChange: (open: boolean) => void
+  readonly rootPath: string
   readonly rows: readonly ChangeRow[]
   readonly section: PanelSection
 }) {
-  const menu = useGroupMenu(rows, section)
+  const menu = useGroupMenu(rows, section, rootPath)
 
   return (
     <MenuSurface

@@ -58,6 +58,10 @@ export type WorkspaceCommandRuntime = {
   readonly files: {
     readonly openFileAtRef: (path: FilesystemPath, ref: string) => Promise<boolean>
   }
+  readonly git: {
+    /** Arms or clears the commit that closing COMMIT_EDITMSG completes. */
+    readonly setPendingMessageFile: (rootPath: WorkspaceRoot, path: FilesystemPath | null) => void
+  }
   readonly focus: FocusService
   readonly settings: {
     readonly nextWallpaper: () => Promise<boolean>

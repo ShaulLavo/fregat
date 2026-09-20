@@ -6,11 +6,13 @@ import { mkdir, writeFile } from 'node:fs/promises'
 import { join } from 'node:path'
 
 import { onlineManager, useQueryClient } from '@tanstack/react-query'
+import type { GitStatusResult } from '@workspace/contracts'
 import { act, fireEvent, screen, waitFor } from '@testing-library/react'
 import { Button } from '@workspace/ui/components/button'
 
 import { useStagePathsMutation } from '@/features/git/hooks/use-stage-paths-mutation'
 import { useStatus } from '@/features/git/hooks/use-status'
+import { mutationKeys } from '@/features/git/utils/mutation-keys'
 import { readWorkspaceCache } from '@/features/workspace/state/cache'
 import { useActiveProjectStore } from '@/features/workspace/state/active-project'
 import { activeServerOrigin, getClient, setActiveServerOrigin, setClient } from '@/lib/client'
@@ -71,7 +73,10 @@ test('an offline Git mutation resumes on A while its provider is unmounted and B
     act(() => onlineManager.setOnline(false))
     fireEvent.click(screen.getByRole('button', { name: 'Stage changes' }))
     await waitFor(() => expect(queryClientA.isMutating()).toBe(1))
-    const mutation = queryClientA.getMutationCache().getAll()[0]
+    // By key: other features park their own mutations in the same cache.
+    const mutation = queryClientA
+      .getMutationCache()
+      .find({ mutationKey: mutationKeys.stageMany(['repo/shared.txt']) })
     await waitFor(() => expect(mutation?.state.isPaused).toBe(true))
 
     act(() => application.activateEnvironment(originB))
@@ -91,6 +96,13 @@ test('an offline Git mutation resumes on A while its provider is unmounted and B
 
     act(() => onlineManager.setOnline(true))
     await waitFor(() => expect(mutation?.state.status).toBe('success'))
+
+    // The response seeded A's status under the caller's key, with no refetch behind it.
+    const settled = queryClientA.getQueryData<GitStatusResult>(gitKeys.status('repo'))
+    expect(settled?.files.map((file) => [file.path, file.index])).toEqual([
+      ['repo/shared.txt', 'added'],
+    ])
+    expect(queryClientA.getQueryState(gitKeys.status('repo'))?.fetchStatus).toBe('idle')
 
     expect(application.getSnapshot().origin).toBe(originB)
     expect(
@@ -125,7 +137,7 @@ test('an offline Git mutation resumes on A while its provider is unmounted and B
 function StageChanges() {
   const queryClient = useQueryClient()
   useStatus('repo')
-  const mutation = useStagePathsMutation(['repo/shared.txt'])
+  const mutation = useStagePathsMutation(['repo/shared.txt'], 'repo')
   return (
     <>
       <output data-testid='active-origin'>{originForQueryClient(queryClient)}</output>

@@ -11,9 +11,13 @@ export function useOpenDiffDocument() {
   async function openDiff(row: ChangeRow) {
     setOpeningCount((count) => count + 1)
     try {
-      return await navigation.openDiff({ owner, row })
-    } finally {
+      const result = await navigation.openDiff({ owner, row })
       setOpeningCount((count) => count - 1)
+      return result
+    } catch (error) {
+      // Not `finally`: the compiler refuses the whole hook over one.
+      setOpeningCount((count) => count - 1)
+      throw error
     }
   }
 

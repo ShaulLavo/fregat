@@ -4,6 +4,7 @@ import { selectSettingsSearch } from '@/features/settings/state/search-store'
 import { selectSettingsView } from '@/features/settings/state/view-store'
 import { selectSettingsScope } from '@/features/settings/state/scope-store'
 import { useEditorRuntime } from '@/features/editor/hooks/use-runtime'
+import { filesystemPath } from '@/lib/documents/utils/identity'
 import { PickerDialog } from '@/features/environments/components/picker-dialog'
 import { useEffect, useLayoutEffect, useMemo, useRef, useState, type ReactNode } from 'react'
 import { useQueryClient } from '@tanstack/react-query'
@@ -299,6 +300,14 @@ export function CommandProvider({ children }: { readonly children: ReactNode }) 
           search === undefined ? undefined : null,
         )
       },
+    },
+    git: {
+      setPendingMessageFile: (rootPath, path) =>
+        editorRuntime
+          .gitStoreForRoot(filesystemPath(rootPath))
+          .getState()
+          // The command runs on the open tab, so it has already been seen open.
+          .setPendingMessageFile(path ? { path, seenOpen: true } : null),
     },
     tabs: {
       requestCloseTab: (tabId) => adaptersRef.current.requestCloseTab(tabId),

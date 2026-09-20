@@ -144,3 +144,8 @@ function commitSectionLines(title: string, files: readonly string[]) {
 function commitCount(count: number) {
   return `${count} ${count === 1 ? 'commit' : 'commits'}`
 }
+
+/** Whether anything survives git's `strip` cleanup: a line that is neither blank nor a comment. */
+export function hasCommitMessageText(contents: string) {
+  return contents.split(/\r?\n/).some((line) => line.trim().length > 0 && !line.startsWith('#'))
+}

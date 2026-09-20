@@ -56,7 +56,7 @@ export function ApplicationBootstrap({
     )
       .then((descriptor) => {
         if (abort.signal.aborted) return
-        runtime ??= attach(createBootRuntime(descriptor, navigation.initial))
+        if (runtime === null) runtime = attach(createBootRuntime(descriptor, navigation.initial))
         setApplication(runtime)
         setError(null)
       })

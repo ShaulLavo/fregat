@@ -10,30 +10,34 @@ import type { ChangeRow, PanelSection } from '@/features/git/utils/types'
 import { RowActionButton } from './row-action-button'
 
 export function GroupActions({
+  rootPath,
   rows,
   section,
 }: {
+  rootPath: string
   rows: readonly ChangeRow[]
   section: PanelSection
 }) {
   const paths = rows.map((row) => row.file.path)
 
   if (section === 'staged') {
-    return <StagedGroupActions paths={paths} rows={rows} />
+    return <StagedGroupActions paths={paths} rootPath={rootPath} rows={rows} />
   }
 
-  return <WorktreeGroupActions paths={paths} rows={rows} />
+  return <WorktreeGroupActions paths={paths} rootPath={rootPath} rows={rows} />
 }
 
 function WorktreeGroupActions({
   paths,
+  rootPath,
   rows,
 }: {
   paths: readonly string[]
+  rootPath: string
   rows: readonly ChangeRow[]
 }) {
-  const discard = useDiscardPathsMutation(paths)
-  const stage = useStagePathsMutation(paths)
+  const discard = useDiscardPathsMutation(paths, rootPath)
+  const stage = useStagePathsMutation(paths, rootPath)
 
   return (
     <ActionCluster hoverGroup='group'>
@@ -58,13 +62,15 @@ function WorktreeGroupActions({
 
 function StagedGroupActions({
   paths,
+  rootPath,
   rows,
 }: {
   paths: readonly string[]
+  rootPath: string
   rows: readonly ChangeRow[]
 }) {
-  const discard = useDiscardStagedPathsMutation(paths)
-  const unstage = useUnstagePathsMutation(paths)
+  const discard = useDiscardStagedPathsMutation(paths, rootPath)
+  const unstage = useUnstagePathsMutation(paths, rootPath)
 
   return (
     <ActionCluster hoverGroup='group'>

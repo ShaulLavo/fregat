@@ -70,10 +70,10 @@ export function BreadcrumbFolderPicker({
     onCollapse: toggle,
   })
   const pending = queries[0]?.isPending ?? true
-  const ref = list.containerProps.ref
+  const focusList = list.focus
   useEffect(() => {
-    if (!pending) ref.current?.focus({ preventScroll: true })
-  }, [pending, ref])
+    if (!pending) focusList()
+  }, [pending, focusList])
 
   if (pending)
     return (

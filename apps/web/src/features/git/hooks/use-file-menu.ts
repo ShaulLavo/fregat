@@ -14,10 +14,10 @@ import { useUnstagePathMutation } from './use-unstage-path-mutation'
 export function useFileMenu(row: ChangeRow, rootPath: string) {
   const path = filesystemPath(row.file.path)
   const staged = row.section === 'staged'
-  const discard = useDiscardPathMutation(path)
-  const discardStaged = useDiscardStagedPathsMutation([path])
-  const stage = useStagePathMutation(path)
-  const unstage = useUnstagePathMutation(path)
+  const discard = useDiscardPathMutation(path, rootPath)
+  const discardStaged = useDiscardStagedPathsMutation([path], rootPath)
+  const stage = useStagePathMutation(path, rootPath)
+  const unstage = useUnstagePathMutation(path, rootPath)
   const { openDiff } = useOpenDiffDocument()
   const { selectFile } = useEditorCommands()
 

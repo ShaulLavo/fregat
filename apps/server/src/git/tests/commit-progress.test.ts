@@ -1,4 +1,4 @@
-import { chmod, mkdir, mkdtemp, rm, writeFile } from 'node:fs/promises'
+import { chmod, mkdir, mkdtemp, readFile, rm, writeFile } from 'node:fs/promises'
 import { tmpdir } from 'node:os'
 import path from 'node:path'
 import { afterEach, describe, expect, it } from 'vitest'
@@ -108,6 +108,38 @@ describe('streaming commit', () => {
       stream: 'stderr',
       text: '\x1b[38;2;0;0;0m╭─\x1b[m \x1b[1mpre-commit\x1b[m',
     })
+  })
+
+  it('commits what was written in the message file, without its comment lines', async () => {
+    const root = await fixtureRepo()
+    await stageChange(root, 'two\n')
+    const service = gitService(root)
+    const opened = (await collect(service.commitProgress({ message: '', path: root }))).at(-1)
+    if (opened?.kind !== 'result' || opened.result.kind !== 'message-file')
+      throw new Error('an empty message must open the message file')
+    const messageFile = path.join(root, '.git', 'COMMIT_EDITMSG')
+    await writeFile(messageFile, `feat: from the file\n${await readFile(messageFile, 'utf8')}`)
+
+    const events = await collect(
+      service.commitProgress({ message: '', path: root, source: 'message-file' }),
+    )
+
+    expect(events.at(-1)).toMatchObject({ kind: 'result', result: { kind: 'committed' } })
+    expect(await runGit(root, ['log', '-1', '--pretty=%B'])).toBe('feat: from the file\n\n')
+  })
+
+  it('aborts when the message file holds only comments', async () => {
+    const root = await fixtureRepo()
+    await stageChange(root, 'two\n')
+    const service = gitService(root)
+    await collect(service.commitProgress({ message: '', path: root }))
+
+    const events = await collect(
+      service.commitProgress({ message: '', path: root, source: 'message-file' }),
+    )
+
+    expect(events.at(-1)).toMatchObject({ kind: 'result', result: { kind: 'aborted' } })
+    expect(await headSubject(root)).toBe('initial')
   })
 
   it('reaches the client as an SSE stream, not one buffered body', async () => {

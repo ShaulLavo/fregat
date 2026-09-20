@@ -108,6 +108,8 @@ async function main() {
     productCapture:
       name === 'editor-product' ||
       name === 'terminal-tabs' ||
+      name === 'bottom-panel-persistence' ||
+      name === 'git-stage-settles' ||
       name === 'workbench-list-focus' ||
       name === 'editor-external-edit' ||
       Boolean(name?.startsWith('editor-syntax-')) ||

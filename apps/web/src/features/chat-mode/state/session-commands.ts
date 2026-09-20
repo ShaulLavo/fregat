@@ -95,6 +95,20 @@ export function startScopedSessionDraft() {
     { baseWorktree: { environmentId, worktreeId: worktree.id } },
   )
 }
+/** A fresh draft in the workbench's Chat panel, which holds one project's sessions. */
+export async function startSidebarSessionDraft() {
+  const projectId = activeProjectId()
+  if (!projectId) return false
+
+  const result = await getNavigation().openChat({
+    environmentId: activeEnvironmentId(),
+    newDraft: true,
+    projectId,
+    sessionId: null,
+    surface: 'sidebar',
+  })
+  return result.status === 'applied'
+}
 export function selectAdjacentSession(direction: SessionTraversalDirection) {
   const sessions = visibleSessions()
   if (!sessions.length) return false
