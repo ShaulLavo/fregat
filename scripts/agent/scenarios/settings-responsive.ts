@@ -19,40 +19,45 @@ export const settingsResponsive: Scenario = {
   description:
     'Check narrow Settings touch controls, scope/search order and the wide header layout.',
   async run(page, { step }) {
-    const viewport = page.viewportSize()
-    try {
-      await page.setViewportSize({ width: 700, height: 1000 })
-      await page.keyboard.press('Control+,')
-      await selectors.settingsSearch(page).waitFor()
-      const narrow = await headerGeometry(page)
-      ok(narrow.header.width < 768, 'The narrow check must exercise the Settings container query')
-      ok(
-        narrow.search.fontSize >= 16,
-        'Narrow Settings search must retain readable 16px input text',
-      )
-      ok(narrow.search.height >= 40, 'Narrow Settings search must retain its 40px touch target')
-      ok(
-        narrow.scope.height >= 40,
-        'Narrow Settings scope tabs must retain their 40px touch target',
-      )
-      ok(
-        narrow.search.y >= narrow.scope.y + narrow.scope.height,
-        'Narrow Settings search must occupy its own row after the scope tabs',
-      )
-      await step('narrow-settings-header')
+    const home = new URL(page.url())
+    home.pathname = `${home.pathname.split('/~')[0]}/`
+    home.search = ''
+    home.hash = ''
+    // The capture initially opens a workspace; this modal belongs to a fresh window.
+    await page.addInitScript(() => {
+      localStorage.clear()
+      sessionStorage.clear()
+    })
+    await page.goto(home.href, { waitUntil: 'domcontentloaded' })
+    await selectors.chooseFolder(page).waitFor()
+    await page.setViewportSize({ width: 700, height: 1000 })
+    await page.keyboard.press('Control+,')
+    await selectors.settingsDialog(page).waitFor()
+    await selectors.settingsSearch(page).waitFor()
+    await step('narrow-settings-header')
+    const narrow = await headerGeometry(page)
+    ok(narrow.header.width < 768, 'The narrow check must exercise the Settings container query')
+    ok(narrow.search.fontSize >= 16, 'Narrow Settings search must retain readable 16px input text')
+    ok(narrow.search.height >= 40, 'Narrow Settings search must retain its 40px touch target')
+    ok(narrow.scope.height >= 40, 'Narrow Settings scope tabs must retain their 40px touch target')
+    ok(
+      narrow.search.y >= narrow.scope.y + narrow.scope.height,
+      'Narrow Settings search must occupy its own row after the scope tabs',
+    )
+    await selectors.settingsSearch(page).fill('interface density')
+    await selectors.settingsDensity(page).waitFor()
+    await step('narrow-settings-search')
+    await selectors.settingsSearch(page).clear()
 
-      await page.setViewportSize({ width: 1960, height: 1100 })
-      const wide = await headerGeometry(page)
-      ok(wide.header.width >= 768, 'The wide check must leave the Settings container query')
-      ok(wide.search.x > wide.scope.x, 'Wide Settings search must follow the scope tabs')
-      ok(
-        Math.abs(wide.search.y + wide.search.height / 2 - wide.scope.y - wide.scope.height / 2) < 1,
-        'Wide Settings search and scope tabs must share a bar',
-      )
-      await step('wide-settings-header')
-    } finally {
-      if (viewport) await page.setViewportSize(viewport)
-    }
+    await page.setViewportSize({ width: 1960, height: 1100 })
+    await step('wide-settings-header')
+    const wide = await headerGeometry(page)
+    ok(wide.header.width >= 768, 'The wide check must leave the Settings container query')
+    ok(wide.search.x > wide.scope.x, 'Wide Settings search must follow the scope tabs')
+    ok(
+      Math.abs(wide.search.y + wide.search.height / 2 - wide.scope.y - wide.scope.height / 2) < 1,
+      'Wide Settings search and scope tabs must share a bar',
+    )
   },
   inspect: headerGeometry,
 }

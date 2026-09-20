@@ -78,6 +78,8 @@ const SHIKI_LANGUAGE_LOADERS: Readonly<Record<string, ShikiLanguageLoader>> = {
 
 export const EDITOR_SHIKI_LANGUAGE_MAP: ShikiLanguageMap = {
   markdown: 'markdown',
+  typescript: 'typescript',
+  tsx: 'tsx',
   ...Object.fromEntries(SHIKI_NATIVE_LANGUAGE_IDS.map(([id]) => [id, id])),
 }
 

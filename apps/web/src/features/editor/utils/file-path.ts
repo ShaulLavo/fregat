@@ -1,11 +1,6 @@
+import { TREE_SITTER_LANGUAGE_METADATA } from '@singapore-editor/tree-sitter-languages/metadata'
 import type { EditorSyntaxLanguageId } from '@singapore-editor/core'
 
-/**
- * Language ids the app can hand to the editor. The js/ts/html/css/json/markdown
- * ids double as tree-sitter language ids (folds/brackets); the rest are shiki's
- * own ids — they feed the shiki highlighter's `languages` map as identity
- * entries, so every value here must be a real shiki language name.
- */
 const LANGUAGE_BY_EXTENSION: Record<string, EditorSyntaxLanguageId> = {
   '.astro': 'astro',
   '.babelrc': 'json',
@@ -99,7 +94,7 @@ const LANGUAGE_BY_EXTENSION: Record<string, EditorSyntaxLanguageId> = {
   '.tfvars': 'terraform',
   '.toml': 'toml',
   '.ts': 'typescript',
-  '.tsx': 'typescript',
+  '.tsx': 'tsx',
   '.typ': 'typst',
   '.typc': 'typst',
   '.vue': 'vue',
@@ -117,22 +112,52 @@ const LANGUAGE_BY_BASENAME: Record<string, EditorSyntaxLanguageId> = {
   makefile: 'makefile',
 }
 
-export function languageIdForFilePath(filePath: string): EditorSyntaxLanguageId | null {
-  return (
-    LANGUAGE_BY_BASENAME[basenameForFilePath(filePath)] ??
-    LANGUAGE_BY_EXTENSION[extensionForFilePath(filePath)] ??
-    null
-  )
+const nativeAliases = new Map<string, string>(
+  TREE_SITTER_LANGUAGE_METADATA.flatMap((language) =>
+    [language.id, ...language.aliases].map((alias) => [alias, language.id] as const),
+  ),
+)
+const nativeFilenames = new Map<string, string>(
+  TREE_SITTER_LANGUAGE_METADATA.flatMap((language) =>
+    language.filenames.map((filename) => [filename.toLowerCase(), language.id] as const),
+  ),
+)
+const extensions = Object.entries({
+  ...LANGUAGE_BY_EXTENSION,
+  ...Object.fromEntries(
+    TREE_SITTER_LANGUAGE_METADATA.flatMap((language) =>
+      language.extensions.map((extension) => [extension, language.id]),
+    ),
+  ),
+}).sort(([left], [right]) => right.length - left.length)
+
+export function languageIdForFilePath(
+  filePath: string,
+  hints: { readonly languageId?: string; readonly firstLine?: string } = {},
+): EditorSyntaxLanguageId | null {
+  const explicit = hints.languageId?.trim().toLowerCase()
+  if (explicit) return nativeAliases.get(explicit) ?? explicit
+  const basename = filePath
+    .slice(Math.max(filePath.lastIndexOf('/'), filePath.lastIndexOf('\\')) + 1)
+    .toLowerCase()
+  const filenameLanguage = nativeFilenames.get(basename) ?? LANGUAGE_BY_BASENAME[basename]
+  if (filenameLanguage) return filenameLanguage
+  const extension = extensions.find(([extension]) => basename.endsWith(extension))
+  if (extension) return extension[1]
+  return languageForShebang(hints.firstLine)
 }
 
-function basenameForFilePath(filePath: string) {
-  const slashIndex = filePath.lastIndexOf('/')
-  return filePath.slice(slashIndex + 1).toLowerCase()
-}
-
-function extensionForFilePath(filePath: string) {
-  const dotIndex = filePath.lastIndexOf('.')
-  if (dotIndex === -1) return ''
-
-  return filePath.slice(dotIndex).toLowerCase()
+function languageForShebang(line: string | undefined): EditorSyntaxLanguageId | null {
+  if (!line?.startsWith('#!')) return null
+  const words = line.slice(2).trim().split(/\s+/)
+  const command = words[0]?.split('/').at(-1)
+  const interpreter =
+    command === 'env'
+      ? words.slice(1).find((word) => !word.startsWith('-') && !word.includes('='))
+      : command
+  if (!interpreter) return null
+  if (/^python[\d.]*$/.test(interpreter)) return 'python'
+  if (['sh', 'bash', 'zsh', 'ksh'].includes(interpreter)) return 'shellscript'
+  if (['node', 'nodejs'].includes(interpreter)) return 'javascript'
+  return null
 }

@@ -1,0 +1,2889 @@
+{
+  "shikiVersion": "4.4.3",
+  "canonicalCount": 242,
+  "counts": {
+    "verified": 0,
+    "partial": 22,
+    "candidate": 212,
+    "blocked": 8
+  },
+  "specialModes": [
+    {
+      "id": "text",
+      "state": "not-a-parser",
+      "aliases": ["txt", "plain", "plaintext"]
+    },
+    {
+      "id": "ansi",
+      "state": "not-a-parser",
+      "aliases": []
+    }
+  ],
+  "rows": [
+    {
+      "id": "abap",
+      "aliases": [],
+      "state": "candidate",
+      "source": null,
+      "evidence": "Helix 079a789e8cb08ead67f19e1971a1b7438b37354b languages.toml",
+      "gap": "No direct canonical match in the pinned Helix grammar inventory.",
+      "nextAction": "Check the Tree-sitter parser registry and verify a matching grammar repository.",
+      "capabilities": null
+    },
+    {
+      "id": "actionscript-3",
+      "aliases": ["actionscript", "as3"],
+      "state": "candidate",
+      "source": null,
+      "evidence": "Helix 079a789e8cb08ead67f19e1971a1b7438b37354b languages.toml",
+      "gap": "No direct canonical match in the pinned Helix grammar inventory.",
+      "nextAction": "Check the Tree-sitter parser registry and verify a matching grammar repository.",
+      "capabilities": null
+    },
+    {
+      "id": "ada",
+      "aliases": [],
+      "state": "candidate",
+      "source": {
+        "git": "https://github.com/briot/tree-sitter-ada",
+        "rev": "ba0894efa03beb70780156b91e28c716b7a4764d"
+      },
+      "evidence": "Helix 079a789e8cb08ead67f19e1971a1b7438b37354b languages.toml",
+      "gap": "Parser and query bundle have not passed runtime admission.",
+      "nextAction": "Pin sources, build WASM, check predicates and captures, and add language fixtures.",
+      "capabilities": null
+    },
+    {
+      "id": "ahk",
+      "aliases": ["ahk1"],
+      "state": "candidate",
+      "source": null,
+      "evidence": "Helix 079a789e8cb08ead67f19e1971a1b7438b37354b languages.toml",
+      "gap": "No direct canonical match in the pinned Helix grammar inventory.",
+      "nextAction": "Check the Tree-sitter parser registry and verify a matching grammar repository.",
+      "capabilities": null
+    },
+    {
+      "id": "ahk2",
+      "aliases": [],
+      "state": "candidate",
+      "source": null,
+      "evidence": "Helix 079a789e8cb08ead67f19e1971a1b7438b37354b languages.toml",
+      "gap": "No direct canonical match in the pinned Helix grammar inventory.",
+      "nextAction": "Check the Tree-sitter parser registry and verify a matching grammar repository.",
+      "capabilities": null
+    },
+    {
+      "id": "angular-html",
+      "aliases": [],
+      "state": "candidate",
+      "source": null,
+      "evidence": "Helix 079a789e8cb08ead67f19e1971a1b7438b37354b languages.toml",
+      "gap": "No direct canonical match in the pinned Helix grammar inventory.",
+      "nextAction": "Check the Tree-sitter parser registry and verify a matching grammar repository.",
+      "capabilities": null
+    },
+    {
+      "id": "angular-ts",
+      "aliases": [],
+      "state": "candidate",
+      "source": null,
+      "evidence": "Helix 079a789e8cb08ead67f19e1971a1b7438b37354b languages.toml",
+      "gap": "No direct canonical match in the pinned Helix grammar inventory.",
+      "nextAction": "Check the Tree-sitter parser registry and verify a matching grammar repository.",
+      "capabilities": null
+    },
+    {
+      "id": "apache",
+      "aliases": [],
+      "state": "candidate",
+      "source": null,
+      "evidence": "Helix 079a789e8cb08ead67f19e1971a1b7438b37354b languages.toml",
+      "gap": "No direct canonical match in the pinned Helix grammar inventory.",
+      "nextAction": "Check the Tree-sitter parser registry and verify a matching grammar repository.",
+      "capabilities": null
+    },
+    {
+      "id": "apex",
+      "aliases": [],
+      "state": "candidate",
+      "source": null,
+      "evidence": "Helix 079a789e8cb08ead67f19e1971a1b7438b37354b languages.toml",
+      "gap": "No direct canonical match in the pinned Helix grammar inventory.",
+      "nextAction": "Check the Tree-sitter parser registry and verify a matching grammar repository.",
+      "capabilities": null
+    },
+    {
+      "id": "apl",
+      "aliases": [],
+      "state": "candidate",
+      "source": null,
+      "evidence": "Helix 079a789e8cb08ead67f19e1971a1b7438b37354b languages.toml",
+      "gap": "No direct canonical match in the pinned Helix grammar inventory.",
+      "nextAction": "Check the Tree-sitter parser registry and verify a matching grammar repository.",
+      "capabilities": null
+    },
+    {
+      "id": "applescript",
+      "aliases": [],
+      "state": "candidate",
+      "source": null,
+      "evidence": "Helix 079a789e8cb08ead67f19e1971a1b7438b37354b languages.toml",
+      "gap": "No direct canonical match in the pinned Helix grammar inventory.",
+      "nextAction": "Check the Tree-sitter parser registry and verify a matching grammar repository.",
+      "capabilities": null
+    },
+    {
+      "id": "ara",
+      "aliases": [],
+      "state": "candidate",
+      "source": null,
+      "evidence": "Helix 079a789e8cb08ead67f19e1971a1b7438b37354b languages.toml",
+      "gap": "No direct canonical match in the pinned Helix grammar inventory.",
+      "nextAction": "Check the Tree-sitter parser registry and verify a matching grammar repository.",
+      "capabilities": null
+    },
+    {
+      "id": "asciidoc",
+      "aliases": ["adoc"],
+      "state": "candidate",
+      "source": null,
+      "evidence": "Helix 079a789e8cb08ead67f19e1971a1b7438b37354b languages.toml",
+      "gap": "No direct canonical match in the pinned Helix grammar inventory.",
+      "nextAction": "Check the Tree-sitter parser registry and verify a matching grammar repository.",
+      "capabilities": null
+    },
+    {
+      "id": "asm",
+      "aliases": [],
+      "state": "candidate",
+      "source": null,
+      "evidence": "Helix 079a789e8cb08ead67f19e1971a1b7438b37354b languages.toml",
+      "gap": "No direct canonical match in the pinned Helix grammar inventory.",
+      "nextAction": "Check the Tree-sitter parser registry and verify a matching grammar repository.",
+      "capabilities": null
+    },
+    {
+      "id": "astro",
+      "aliases": [],
+      "nativeId": "astro",
+      "state": "partial",
+      "capabilities": {
+        "highlighting": "partial",
+        "injections": "partial",
+        "detection": "verified",
+        "folds": "partial"
+      },
+      "evidence": "Editor: test/admission.test.ts; test/native-coverage.browser.test.ts",
+      "gap": "CSS and TypeScript injections work; SCSS and full Astro expression coverage remain unverified.",
+      "nextAction": "Broaden expected-category and edit fixtures; verify remaining embedded languages and structural capabilities."
+    },
+    {
+      "id": "awk",
+      "aliases": [],
+      "state": "candidate",
+      "source": {
+        "git": "https://github.com/Beaglefoot/tree-sitter-awk",
+        "rev": "34bbdc7cce8e803096f47b625979e34c1be38127"
+      },
+      "evidence": "Helix 079a789e8cb08ead67f19e1971a1b7438b37354b languages.toml",
+      "gap": "Parser and query bundle have not passed runtime admission.",
+      "nextAction": "Pin sources, build WASM, check predicates and captures, and add language fixtures.",
+      "capabilities": null
+    },
+    {
+      "id": "ballerina",
+      "aliases": [],
+      "state": "candidate",
+      "source": null,
+      "evidence": "Helix 079a789e8cb08ead67f19e1971a1b7438b37354b languages.toml",
+      "gap": "No direct canonical match in the pinned Helix grammar inventory.",
+      "nextAction": "Check the Tree-sitter parser registry and verify a matching grammar repository.",
+      "capabilities": null
+    },
+    {
+      "id": "bat",
+      "aliases": ["batch", "cmd"],
+      "state": "candidate",
+      "source": null,
+      "evidence": "Helix 079a789e8cb08ead67f19e1971a1b7438b37354b languages.toml",
+      "gap": "No direct canonical match in the pinned Helix grammar inventory.",
+      "nextAction": "Check the Tree-sitter parser registry and verify a matching grammar repository.",
+      "capabilities": null
+    },
+    {
+      "id": "beancount",
+      "aliases": [],
+      "state": "candidate",
+      "source": {
+        "git": "https://github.com/polarmutex/tree-sitter-beancount",
+        "rev": "429cff869513cf9e34a2cf604fbfaaedc467e809"
+      },
+      "evidence": "Helix 079a789e8cb08ead67f19e1971a1b7438b37354b languages.toml",
+      "gap": "Parser and query bundle have not passed runtime admission.",
+      "nextAction": "Pin sources, build WASM, check predicates and captures, and add language fixtures.",
+      "capabilities": null
+    },
+    {
+      "id": "berry",
+      "aliases": ["be"],
+      "state": "candidate",
+      "source": null,
+      "evidence": "Helix 079a789e8cb08ead67f19e1971a1b7438b37354b languages.toml",
+      "gap": "No direct canonical match in the pinned Helix grammar inventory.",
+      "nextAction": "Check the Tree-sitter parser registry and verify a matching grammar repository.",
+      "capabilities": null
+    },
+    {
+      "id": "bibtex",
+      "aliases": [],
+      "state": "candidate",
+      "source": {
+        "git": "https://github.com/latex-lsp/tree-sitter-bibtex",
+        "rev": "8d04ed27b3bc7929f14b7df9236797dab9f3fa66"
+      },
+      "evidence": "Helix 079a789e8cb08ead67f19e1971a1b7438b37354b languages.toml",
+      "gap": "Parser and query bundle have not passed runtime admission.",
+      "nextAction": "Pin sources, build WASM, check predicates and captures, and add language fixtures.",
+      "capabilities": null
+    },
+    {
+      "id": "bicep",
+      "aliases": [],
+      "state": "candidate",
+      "source": {
+        "git": "https://github.com/tree-sitter-grammars/tree-sitter-bicep",
+        "rev": "bff59884307c0ab009bd5e81afd9324b46a6c0f9"
+      },
+      "evidence": "Helix 079a789e8cb08ead67f19e1971a1b7438b37354b languages.toml",
+      "gap": "Parser and query bundle have not passed runtime admission.",
+      "nextAction": "Pin sources, build WASM, check predicates and captures, and add language fixtures.",
+      "capabilities": null
+    },
+    {
+      "id": "bird2",
+      "aliases": ["bird"],
+      "state": "candidate",
+      "source": null,
+      "evidence": "Helix 079a789e8cb08ead67f19e1971a1b7438b37354b languages.toml",
+      "gap": "No direct canonical match in the pinned Helix grammar inventory.",
+      "nextAction": "Check the Tree-sitter parser registry and verify a matching grammar repository.",
+      "capabilities": null
+    },
+    {
+      "id": "blade",
+      "aliases": [],
+      "state": "candidate",
+      "source": {
+        "git": "https://github.com/EmranMR/tree-sitter-blade",
+        "rev": "5dbdcb0ccbe91e64b038b41545d3acc26c74907a"
+      },
+      "evidence": "Helix 079a789e8cb08ead67f19e1971a1b7438b37354b languages.toml",
+      "gap": "Parser and query bundle have not passed runtime admission.",
+      "nextAction": "Pin sources, build WASM, check predicates and captures, and add language fixtures.",
+      "capabilities": null
+    },
+    {
+      "id": "bsl",
+      "aliases": ["1c"],
+      "state": "candidate",
+      "source": null,
+      "evidence": "Helix 079a789e8cb08ead67f19e1971a1b7438b37354b languages.toml",
+      "gap": "No direct canonical match in the pinned Helix grammar inventory.",
+      "nextAction": "Check the Tree-sitter parser registry and verify a matching grammar repository.",
+      "capabilities": null
+    },
+    {
+      "id": "c",
+      "aliases": [],
+      "nativeId": "c",
+      "state": "partial",
+      "capabilities": {
+        "highlighting": "partial",
+        "injections": "none",
+        "detection": "verified",
+        "folds": "none"
+      },
+      "evidence": "Editor: test/admission.test.ts; test/native-coverage.browser.test.ts",
+      "gap": "Curated captures and worker edits pass; full language coverage and folds are not established.",
+      "nextAction": "Broaden expected-category and edit fixtures; verify remaining embedded languages and structural capabilities."
+    },
+    {
+      "id": "c3",
+      "aliases": [],
+      "state": "candidate",
+      "source": {
+        "git": "https://github.com/c3lang/tree-sitter-c3",
+        "rev": "15d3502510af0a6c888c663ec8d6aca8791216ce"
+      },
+      "evidence": "Helix 079a789e8cb08ead67f19e1971a1b7438b37354b languages.toml",
+      "gap": "Parser and query bundle have not passed runtime admission.",
+      "nextAction": "Pin sources, build WASM, check predicates and captures, and add language fixtures.",
+      "capabilities": null
+    },
+    {
+      "id": "cadence",
+      "aliases": ["cdc"],
+      "state": "candidate",
+      "source": null,
+      "evidence": "Helix 079a789e8cb08ead67f19e1971a1b7438b37354b languages.toml",
+      "gap": "No direct canonical match in the pinned Helix grammar inventory.",
+      "nextAction": "Check the Tree-sitter parser registry and verify a matching grammar repository.",
+      "capabilities": null
+    },
+    {
+      "id": "cairo",
+      "aliases": [],
+      "state": "candidate",
+      "source": {
+        "git": "https://github.com/starkware-libs/tree-sitter-cairo",
+        "rev": "4c6a25680546761b80a710ead1dd34e76c203125"
+      },
+      "evidence": "Helix 079a789e8cb08ead67f19e1971a1b7438b37354b languages.toml",
+      "gap": "Parser and query bundle have not passed runtime admission.",
+      "nextAction": "Pin sources, build WASM, check predicates and captures, and add language fixtures.",
+      "capabilities": null
+    },
+    {
+      "id": "chapel",
+      "aliases": ["chpl"],
+      "state": "candidate",
+      "source": null,
+      "evidence": "Helix 079a789e8cb08ead67f19e1971a1b7438b37354b languages.toml",
+      "gap": "No direct canonical match in the pinned Helix grammar inventory.",
+      "nextAction": "Check the Tree-sitter parser registry and verify a matching grammar repository.",
+      "capabilities": null
+    },
+    {
+      "id": "clarity",
+      "aliases": [],
+      "state": "candidate",
+      "source": {
+        "git": "https://github.com/xlittlerag/tree-sitter-clarity",
+        "rev": "1436da3946359fcd7ac2d81917aaa78ef1e01755"
+      },
+      "evidence": "Helix 079a789e8cb08ead67f19e1971a1b7438b37354b languages.toml",
+      "gap": "Parser and query bundle have not passed runtime admission.",
+      "nextAction": "Pin sources, build WASM, check predicates and captures, and add language fixtures.",
+      "capabilities": null
+    },
+    {
+      "id": "clojure",
+      "aliases": ["clj"],
+      "state": "candidate",
+      "source": {
+        "git": "https://github.com/sogaiu/tree-sitter-clojure",
+        "rev": "e43eff80d17cf34852dcd92ca5e6986d23a7040f"
+      },
+      "evidence": "Helix 079a789e8cb08ead67f19e1971a1b7438b37354b languages.toml",
+      "gap": "Parser and query bundle have not passed runtime admission.",
+      "nextAction": "Pin sources, build WASM, check predicates and captures, and add language fixtures.",
+      "capabilities": null
+    },
+    {
+      "id": "cmake",
+      "aliases": [],
+      "state": "candidate",
+      "source": {
+        "git": "https://github.com/uyha/tree-sitter-cmake",
+        "rev": "c7b2a71e7f8ecb167fad4c97227c838439280175"
+      },
+      "evidence": "Helix 079a789e8cb08ead67f19e1971a1b7438b37354b languages.toml",
+      "gap": "Parser and query bundle have not passed runtime admission.",
+      "nextAction": "Pin sources, build WASM, check predicates and captures, and add language fixtures.",
+      "capabilities": null
+    },
+    {
+      "id": "cobol",
+      "aliases": [],
+      "state": "candidate",
+      "source": null,
+      "evidence": "Helix 079a789e8cb08ead67f19e1971a1b7438b37354b languages.toml",
+      "gap": "No direct canonical match in the pinned Helix grammar inventory.",
+      "nextAction": "Check the Tree-sitter parser registry and verify a matching grammar repository.",
+      "capabilities": null
+    },
+    {
+      "id": "codeowners",
+      "aliases": [],
+      "state": "candidate",
+      "source": null,
+      "evidence": "Helix 079a789e8cb08ead67f19e1971a1b7438b37354b languages.toml",
+      "gap": "No direct canonical match in the pinned Helix grammar inventory.",
+      "nextAction": "Check the Tree-sitter parser registry and verify a matching grammar repository.",
+      "capabilities": null
+    },
+    {
+      "id": "codeql",
+      "aliases": ["ql"],
+      "state": "candidate",
+      "source": {
+        "git": "https://github.com/tree-sitter/tree-sitter-ql",
+        "rev": "1fd627a4e8bff8c24c11987474bd33112bead857"
+      },
+      "evidence": "Helix 079a789e8cb08ead67f19e1971a1b7438b37354b languages.toml",
+      "gap": "Parser and query bundle have not passed runtime admission.",
+      "nextAction": "Pin sources, build WASM, check predicates and captures, and add language fixtures.",
+      "capabilities": null
+    },
+    {
+      "id": "coffee",
+      "aliases": ["coffeescript"],
+      "state": "candidate",
+      "source": null,
+      "evidence": "Helix 079a789e8cb08ead67f19e1971a1b7438b37354b languages.toml",
+      "gap": "No direct canonical match in the pinned Helix grammar inventory.",
+      "nextAction": "Check the Tree-sitter parser registry and verify a matching grammar repository.",
+      "capabilities": null
+    },
+    {
+      "id": "common-lisp",
+      "aliases": ["lisp"],
+      "state": "candidate",
+      "source": {
+        "git": "https://github.com/tree-sitter-grammars/tree-sitter-commonlisp",
+        "rev": "32323509b3d9fe96607d151c2da2c9009eb13a2f"
+      },
+      "evidence": "Helix 079a789e8cb08ead67f19e1971a1b7438b37354b languages.toml",
+      "gap": "Parser and query bundle have not passed runtime admission.",
+      "nextAction": "Pin sources, build WASM, check predicates and captures, and add language fixtures.",
+      "capabilities": null
+    },
+    {
+      "id": "coq",
+      "aliases": [],
+      "state": "candidate",
+      "source": null,
+      "evidence": "Helix 079a789e8cb08ead67f19e1971a1b7438b37354b languages.toml",
+      "gap": "No direct canonical match in the pinned Helix grammar inventory.",
+      "nextAction": "Check the Tree-sitter parser registry and verify a matching grammar repository.",
+      "capabilities": null
+    },
+    {
+      "id": "cpp",
+      "aliases": ["c++"],
+      "nativeId": "cpp",
+      "state": "partial",
+      "capabilities": {
+        "highlighting": "partial",
+        "injections": "none",
+        "detection": "verified",
+        "folds": "none"
+      },
+      "evidence": "Editor: test/admission.test.ts; test/native-coverage.browser.test.ts",
+      "gap": "Curated captures and worker edits pass; full language coverage and folds are not established.",
+      "nextAction": "Broaden expected-category and edit fixtures; verify remaining embedded languages and structural capabilities."
+    },
+    {
+      "id": "crystal",
+      "aliases": [],
+      "state": "candidate",
+      "source": {
+        "git": "https://github.com/crystal-lang-tools/tree-sitter-crystal",
+        "rev": "50ca9e6fcfb16a2cbcad59203cfd8ad650e25c49"
+      },
+      "evidence": "Helix 079a789e8cb08ead67f19e1971a1b7438b37354b languages.toml",
+      "gap": "Parser and query bundle have not passed runtime admission.",
+      "nextAction": "Pin sources, build WASM, check predicates and captures, and add language fixtures.",
+      "capabilities": null
+    },
+    {
+      "id": "csharp",
+      "aliases": ["c#", "cs"],
+      "nativeId": "csharp",
+      "state": "partial",
+      "capabilities": {
+        "highlighting": "partial",
+        "injections": "none",
+        "detection": "verified",
+        "folds": "none"
+      },
+      "evidence": "Editor: test/admission.test.ts; test/native-coverage.browser.test.ts",
+      "gap": "Curated captures and worker edits pass; full language coverage and folds are not established.",
+      "nextAction": "Broaden expected-category and edit fixtures; verify remaining embedded languages and structural capabilities."
+    },
+    {
+      "id": "css",
+      "aliases": [],
+      "nativeId": "css",
+      "state": "partial",
+      "capabilities": {
+        "highlighting": "partial",
+        "injections": "none",
+        "detection": "verified",
+        "folds": "partial"
+      },
+      "evidence": "Editor: test/admission.test.ts; test/native-coverage.browser.test.ts",
+      "gap": "Curated captures and worker edits pass; full language coverage and folds are not established.",
+      "nextAction": "Broaden expected-category and edit fixtures; verify remaining embedded languages and structural capabilities."
+    },
+    {
+      "id": "csv",
+      "aliases": [],
+      "state": "candidate",
+      "source": {
+        "git": "https://github.com/weartist/rainbow-csv-tree-sitter",
+        "rev": "d3dbf916446131417e4c2ea9eb8591b23b466d27"
+      },
+      "evidence": "Helix 079a789e8cb08ead67f19e1971a1b7438b37354b languages.toml",
+      "gap": "Parser and query bundle have not passed runtime admission.",
+      "nextAction": "Pin sources, build WASM, check predicates and captures, and add language fixtures.",
+      "capabilities": null
+    },
+    {
+      "id": "cue",
+      "aliases": [],
+      "state": "candidate",
+      "source": {
+        "git": "https://github.com/eonpatapon/tree-sitter-cue",
+        "rev": "8a5f273bfa281c66354da562f2307c2d394b6c81"
+      },
+      "evidence": "Helix 079a789e8cb08ead67f19e1971a1b7438b37354b languages.toml",
+      "gap": "Parser and query bundle have not passed runtime admission.",
+      "nextAction": "Pin sources, build WASM, check predicates and captures, and add language fixtures.",
+      "capabilities": null
+    },
+    {
+      "id": "cypher",
+      "aliases": ["cql"],
+      "state": "candidate",
+      "source": null,
+      "evidence": "Helix 079a789e8cb08ead67f19e1971a1b7438b37354b languages.toml",
+      "gap": "No direct canonical match in the pinned Helix grammar inventory.",
+      "nextAction": "Check the Tree-sitter parser registry and verify a matching grammar repository.",
+      "capabilities": null
+    },
+    {
+      "id": "d",
+      "aliases": [],
+      "state": "candidate",
+      "source": {
+        "git": "https://github.com/gdamore/tree-sitter-d",
+        "rev": "8bcb13dbddf16ca44a42f8e98e8cf3d86b2b2e48"
+      },
+      "evidence": "Helix 079a789e8cb08ead67f19e1971a1b7438b37354b languages.toml",
+      "gap": "Parser and query bundle have not passed runtime admission.",
+      "nextAction": "Pin sources, build WASM, check predicates and captures, and add language fixtures.",
+      "capabilities": null
+    },
+    {
+      "id": "dart",
+      "aliases": [],
+      "state": "candidate",
+      "source": {
+        "git": "https://github.com/UserNobody14/tree-sitter-dart",
+        "rev": "a9bdfa3db2fbc9b9f12c93450d04a671f33a5102"
+      },
+      "evidence": "Helix 079a789e8cb08ead67f19e1971a1b7438b37354b languages.toml",
+      "gap": "Parser and query bundle have not passed runtime admission.",
+      "nextAction": "Pin sources, build WASM, check predicates and captures, and add language fixtures.",
+      "capabilities": null
+    },
+    {
+      "id": "dax",
+      "aliases": [],
+      "state": "candidate",
+      "source": null,
+      "evidence": "Helix 079a789e8cb08ead67f19e1971a1b7438b37354b languages.toml",
+      "gap": "No direct canonical match in the pinned Helix grammar inventory.",
+      "nextAction": "Check the Tree-sitter parser registry and verify a matching grammar repository.",
+      "capabilities": null
+    },
+    {
+      "id": "desktop",
+      "aliases": [],
+      "state": "candidate",
+      "source": null,
+      "evidence": "Helix 079a789e8cb08ead67f19e1971a1b7438b37354b languages.toml",
+      "gap": "No direct canonical match in the pinned Helix grammar inventory.",
+      "nextAction": "Check the Tree-sitter parser registry and verify a matching grammar repository.",
+      "capabilities": null
+    },
+    {
+      "id": "diff",
+      "aliases": [],
+      "state": "candidate",
+      "source": {
+        "git": "https://github.com/the-mikedavis/tree-sitter-diff",
+        "rev": "2520c3f934b3179bb540d23e0ef45f75304b5fed"
+      },
+      "evidence": "Helix 079a789e8cb08ead67f19e1971a1b7438b37354b languages.toml",
+      "gap": "Parser and query bundle have not passed runtime admission.",
+      "nextAction": "Pin sources, build WASM, check predicates and captures, and add language fixtures.",
+      "capabilities": null
+    },
+    {
+      "id": "docker",
+      "aliases": ["dockerfile"],
+      "state": "candidate",
+      "source": null,
+      "evidence": "Helix 079a789e8cb08ead67f19e1971a1b7438b37354b languages.toml",
+      "gap": "No direct canonical match in the pinned Helix grammar inventory.",
+      "nextAction": "Check the Tree-sitter parser registry and verify a matching grammar repository.",
+      "capabilities": null
+    },
+    {
+      "id": "dotenv",
+      "aliases": [],
+      "state": "candidate",
+      "source": null,
+      "evidence": "Helix 079a789e8cb08ead67f19e1971a1b7438b37354b languages.toml",
+      "gap": "No direct canonical match in the pinned Helix grammar inventory.",
+      "nextAction": "Check the Tree-sitter parser registry and verify a matching grammar repository.",
+      "capabilities": null
+    },
+    {
+      "id": "dream-maker",
+      "aliases": [],
+      "state": "candidate",
+      "source": null,
+      "evidence": "Helix 079a789e8cb08ead67f19e1971a1b7438b37354b languages.toml",
+      "gap": "No direct canonical match in the pinned Helix grammar inventory.",
+      "nextAction": "Check the Tree-sitter parser registry and verify a matching grammar repository.",
+      "capabilities": null
+    },
+    {
+      "id": "edge",
+      "aliases": [],
+      "state": "candidate",
+      "source": null,
+      "evidence": "Helix 079a789e8cb08ead67f19e1971a1b7438b37354b languages.toml",
+      "gap": "No direct canonical match in the pinned Helix grammar inventory.",
+      "nextAction": "Check the Tree-sitter parser registry and verify a matching grammar repository.",
+      "capabilities": null
+    },
+    {
+      "id": "elixir",
+      "aliases": [],
+      "state": "candidate",
+      "source": {
+        "git": "https://github.com/elixir-lang/tree-sitter-elixir",
+        "rev": "7937d3b4d65fa574163cfa59394515d3c1cf16f4"
+      },
+      "evidence": "Helix 079a789e8cb08ead67f19e1971a1b7438b37354b languages.toml",
+      "gap": "Parser and query bundle have not passed runtime admission.",
+      "nextAction": "Pin sources, build WASM, check predicates and captures, and add language fixtures.",
+      "capabilities": null
+    },
+    {
+      "id": "elm",
+      "aliases": [],
+      "state": "candidate",
+      "source": {
+        "git": "https://github.com/elm-tooling/tree-sitter-elm",
+        "rev": "6d9511c28181db66daee4e883f811f6251220943"
+      },
+      "evidence": "Helix 079a789e8cb08ead67f19e1971a1b7438b37354b languages.toml",
+      "gap": "Parser and query bundle have not passed runtime admission.",
+      "nextAction": "Pin sources, build WASM, check predicates and captures, and add language fixtures.",
+      "capabilities": null
+    },
+    {
+      "id": "emacs-lisp",
+      "aliases": ["elisp"],
+      "state": "candidate",
+      "source": null,
+      "evidence": "Helix 079a789e8cb08ead67f19e1971a1b7438b37354b languages.toml",
+      "gap": "No direct canonical match in the pinned Helix grammar inventory.",
+      "nextAction": "Check the Tree-sitter parser registry and verify a matching grammar repository.",
+      "capabilities": null
+    },
+    {
+      "id": "erb",
+      "aliases": [],
+      "state": "candidate",
+      "source": {
+        "git": "https://github.com/tree-sitter/tree-sitter-embedded-template",
+        "rev": "5bce9d580d3b78f48e13e331f69dfa0abd4ff68b"
+      },
+      "evidence": "Helix 079a789e8cb08ead67f19e1971a1b7438b37354b languages.toml",
+      "gap": "Parser and query bundle have not passed runtime admission.",
+      "nextAction": "Pin sources, build WASM, check predicates and captures, and add language fixtures.",
+      "capabilities": null
+    },
+    {
+      "id": "erlang",
+      "aliases": ["erl"],
+      "state": "candidate",
+      "source": {
+        "git": "https://github.com/the-mikedavis/tree-sitter-erlang",
+        "rev": "d85b18e76962d6a3ba131bc5b514d77558e82762"
+      },
+      "evidence": "Helix 079a789e8cb08ead67f19e1971a1b7438b37354b languages.toml",
+      "gap": "Parser and query bundle have not passed runtime admission.",
+      "nextAction": "Pin sources, build WASM, check predicates and captures, and add language fixtures.",
+      "capabilities": null
+    },
+    {
+      "id": "fennel",
+      "aliases": [],
+      "state": "candidate",
+      "source": {
+        "git": "https://github.com/alexmozaidze/tree-sitter-fennel",
+        "rev": "3f0f6b24d599e92460b969aabc4f4c5a914d15a0"
+      },
+      "evidence": "Helix 079a789e8cb08ead67f19e1971a1b7438b37354b languages.toml",
+      "gap": "Parser and query bundle have not passed runtime admission.",
+      "nextAction": "Pin sources, build WASM, check predicates and captures, and add language fixtures.",
+      "capabilities": null
+    },
+    {
+      "id": "fish",
+      "aliases": [],
+      "state": "candidate",
+      "source": {
+        "git": "https://github.com/ram02z/tree-sitter-fish",
+        "rev": "f435b0bd772578c70e5d158b85267bb886316f88"
+      },
+      "evidence": "Helix 079a789e8cb08ead67f19e1971a1b7438b37354b languages.toml",
+      "gap": "Parser and query bundle have not passed runtime admission.",
+      "nextAction": "Pin sources, build WASM, check predicates and captures, and add language fixtures.",
+      "capabilities": null
+    },
+    {
+      "id": "fluent",
+      "aliases": ["ftl"],
+      "state": "candidate",
+      "source": null,
+      "evidence": "Helix 079a789e8cb08ead67f19e1971a1b7438b37354b languages.toml",
+      "gap": "No direct canonical match in the pinned Helix grammar inventory.",
+      "nextAction": "Check the Tree-sitter parser registry and verify a matching grammar repository.",
+      "capabilities": null
+    },
+    {
+      "id": "fortran-fixed-form",
+      "aliases": ["f", "for", "f77"],
+      "state": "candidate",
+      "source": null,
+      "evidence": "Helix 079a789e8cb08ead67f19e1971a1b7438b37354b languages.toml",
+      "gap": "No direct canonical match in the pinned Helix grammar inventory.",
+      "nextAction": "Check the Tree-sitter parser registry and verify a matching grammar repository.",
+      "capabilities": null
+    },
+    {
+      "id": "fortran-free-form",
+      "aliases": ["f90", "f95", "f03", "f08", "f18"],
+      "state": "candidate",
+      "source": null,
+      "evidence": "Helix 079a789e8cb08ead67f19e1971a1b7438b37354b languages.toml",
+      "gap": "No direct canonical match in the pinned Helix grammar inventory.",
+      "nextAction": "Check the Tree-sitter parser registry and verify a matching grammar repository.",
+      "capabilities": null
+    },
+    {
+      "id": "fsharp",
+      "aliases": ["f#", "fs"],
+      "state": "candidate",
+      "source": {
+        "git": "https://github.com/ionide/tree-sitter-fsharp",
+        "rev": "cfc12456941da47b64b7a3994f8dccdc9fe7d2c9",
+        "subpath": "fsharp"
+      },
+      "evidence": "Helix 079a789e8cb08ead67f19e1971a1b7438b37354b languages.toml",
+      "gap": "Parser and query bundle have not passed runtime admission.",
+      "nextAction": "Pin sources, build WASM, check predicates and captures, and add language fixtures.",
+      "capabilities": null
+    },
+    {
+      "id": "gdresource",
+      "aliases": ["tscn", "tres"],
+      "state": "candidate",
+      "source": null,
+      "evidence": "Helix 079a789e8cb08ead67f19e1971a1b7438b37354b languages.toml",
+      "gap": "No direct canonical match in the pinned Helix grammar inventory.",
+      "nextAction": "Check the Tree-sitter parser registry and verify a matching grammar repository.",
+      "capabilities": null
+    },
+    {
+      "id": "gdscript",
+      "aliases": ["gd"],
+      "state": "candidate",
+      "source": {
+        "git": "https://github.com/PrestonKnopp/tree-sitter-gdscript",
+        "rev": "1f1e782fe2600f50ae57b53876505b8282388d77"
+      },
+      "evidence": "Helix 079a789e8cb08ead67f19e1971a1b7438b37354b languages.toml",
+      "gap": "Parser and query bundle have not passed runtime admission.",
+      "nextAction": "Pin sources, build WASM, check predicates and captures, and add language fixtures.",
+      "capabilities": null
+    },
+    {
+      "id": "gdshader",
+      "aliases": [],
+      "state": "candidate",
+      "source": null,
+      "evidence": "Helix 079a789e8cb08ead67f19e1971a1b7438b37354b languages.toml",
+      "gap": "No direct canonical match in the pinned Helix grammar inventory.",
+      "nextAction": "Check the Tree-sitter parser registry and verify a matching grammar repository.",
+      "capabilities": null
+    },
+    {
+      "id": "genie",
+      "aliases": [],
+      "state": "candidate",
+      "source": null,
+      "evidence": "Helix 079a789e8cb08ead67f19e1971a1b7438b37354b languages.toml",
+      "gap": "No direct canonical match in the pinned Helix grammar inventory.",
+      "nextAction": "Check the Tree-sitter parser registry and verify a matching grammar repository.",
+      "capabilities": null
+    },
+    {
+      "id": "gherkin",
+      "aliases": [],
+      "state": "candidate",
+      "source": {
+        "git": "https://github.com/SamyAB/tree-sitter-gherkin",
+        "rev": "43873ee8de16476635b48d52c46f5b6407cb5c09"
+      },
+      "evidence": "Helix 079a789e8cb08ead67f19e1971a1b7438b37354b languages.toml",
+      "gap": "Parser and query bundle have not passed runtime admission.",
+      "nextAction": "Pin sources, build WASM, check predicates and captures, and add language fixtures.",
+      "capabilities": null
+    },
+    {
+      "id": "git-commit",
+      "aliases": [],
+      "state": "candidate",
+      "source": {
+        "git": "https://github.com/gbprod/tree-sitter-gitcommit",
+        "rev": "49715a9e6f19ce3d33b875aacdd6ad8ddaee0ffe"
+      },
+      "evidence": "Helix 079a789e8cb08ead67f19e1971a1b7438b37354b languages.toml",
+      "gap": "Parser and query bundle have not passed runtime admission.",
+      "nextAction": "Pin sources, build WASM, check predicates and captures, and add language fixtures.",
+      "capabilities": null
+    },
+    {
+      "id": "git-rebase",
+      "aliases": [],
+      "state": "candidate",
+      "source": {
+        "git": "https://github.com/the-mikedavis/tree-sitter-git-rebase",
+        "rev": "32686d6b72980b36f876ae2d07719c9c3ed154e2"
+      },
+      "evidence": "Helix 079a789e8cb08ead67f19e1971a1b7438b37354b languages.toml",
+      "gap": "Parser and query bundle have not passed runtime admission.",
+      "nextAction": "Pin sources, build WASM, check predicates and captures, and add language fixtures.",
+      "capabilities": null
+    },
+    {
+      "id": "gleam",
+      "aliases": [],
+      "state": "candidate",
+      "source": {
+        "git": "https://github.com/gleam-lang/tree-sitter-gleam",
+        "rev": "c610c282ef73f830d80c1f0999dce8e83f024ef5"
+      },
+      "evidence": "Helix 079a789e8cb08ead67f19e1971a1b7438b37354b languages.toml",
+      "gap": "Parser and query bundle have not passed runtime admission.",
+      "nextAction": "Pin sources, build WASM, check predicates and captures, and add language fixtures.",
+      "capabilities": null
+    },
+    {
+      "id": "glimmer-js",
+      "aliases": ["gjs"],
+      "state": "candidate",
+      "source": null,
+      "evidence": "Helix 079a789e8cb08ead67f19e1971a1b7438b37354b languages.toml",
+      "gap": "No direct canonical match in the pinned Helix grammar inventory.",
+      "nextAction": "Check the Tree-sitter parser registry and verify a matching grammar repository.",
+      "capabilities": null
+    },
+    {
+      "id": "glimmer-ts",
+      "aliases": ["gts"],
+      "state": "candidate",
+      "source": null,
+      "evidence": "Helix 079a789e8cb08ead67f19e1971a1b7438b37354b languages.toml",
+      "gap": "No direct canonical match in the pinned Helix grammar inventory.",
+      "nextAction": "Check the Tree-sitter parser registry and verify a matching grammar repository.",
+      "capabilities": null
+    },
+    {
+      "id": "glsl",
+      "aliases": [],
+      "state": "candidate",
+      "source": {
+        "git": "https://github.com/theHamsta/tree-sitter-glsl",
+        "rev": "24a6c8ef698e4480fecf8340d771fbcb5de8fbb4"
+      },
+      "evidence": "Helix 079a789e8cb08ead67f19e1971a1b7438b37354b languages.toml",
+      "gap": "Parser and query bundle have not passed runtime admission.",
+      "nextAction": "Pin sources, build WASM, check predicates and captures, and add language fixtures.",
+      "capabilities": null
+    },
+    {
+      "id": "gn",
+      "aliases": [],
+      "state": "candidate",
+      "source": {
+        "git": "https://github.com/willcassella/tree-sitter-gn",
+        "rev": "fbaa7b3d52b958e3ac06e15416e1785138bde063"
+      },
+      "evidence": "Helix 079a789e8cb08ead67f19e1971a1b7438b37354b languages.toml",
+      "gap": "Parser and query bundle have not passed runtime admission.",
+      "nextAction": "Pin sources, build WASM, check predicates and captures, and add language fixtures.",
+      "capabilities": null
+    },
+    {
+      "id": "gnuplot",
+      "aliases": [],
+      "state": "candidate",
+      "source": {
+        "git": "https://codeberg.org/maribu/tree-sitter-gnuplot",
+        "rev": "21a3a3929facb964b3592daeb69119294ff84cf2"
+      },
+      "evidence": "Helix 079a789e8cb08ead67f19e1971a1b7438b37354b languages.toml",
+      "gap": "Parser and query bundle have not passed runtime admission.",
+      "nextAction": "Pin sources, build WASM, check predicates and captures, and add language fixtures.",
+      "capabilities": null
+    },
+    {
+      "id": "go",
+      "aliases": [],
+      "nativeId": "go",
+      "state": "partial",
+      "capabilities": {
+        "highlighting": "partial",
+        "injections": "none",
+        "detection": "verified",
+        "folds": "none"
+      },
+      "evidence": "Editor: test/admission.test.ts; test/native-coverage.browser.test.ts",
+      "gap": "Curated captures and worker edits pass; full language coverage and folds are not established.",
+      "nextAction": "Broaden expected-category and edit fixtures; verify remaining embedded languages and structural capabilities."
+    },
+    {
+      "id": "graphql",
+      "aliases": ["gql"],
+      "state": "blocked",
+      "source": {
+        "git": "https://github.com/bkegley/tree-sitter-graphql",
+        "rev": "5e66e961eee421786bdda8495ed1db045e06b5fe"
+      },
+      "evidence": "tree-sitter-graphql@1.0.0",
+      "gap": "No WASM artifact or highlight query in the package.",
+      "nextAction": "Build pinned grammar and source a compatible query bundle.",
+      "capabilities": null
+    },
+    {
+      "id": "groovy",
+      "aliases": [],
+      "state": "candidate",
+      "source": {
+        "git": "https://github.com/murtaza64/tree-sitter-groovy",
+        "rev": "235009aad0f580211fc12014bb0846c3910130c1"
+      },
+      "evidence": "Helix 079a789e8cb08ead67f19e1971a1b7438b37354b languages.toml",
+      "gap": "Parser and query bundle have not passed runtime admission.",
+      "nextAction": "Pin sources, build WASM, check predicates and captures, and add language fixtures.",
+      "capabilities": null
+    },
+    {
+      "id": "hack",
+      "aliases": [],
+      "state": "candidate",
+      "source": null,
+      "evidence": "Helix 079a789e8cb08ead67f19e1971a1b7438b37354b languages.toml",
+      "gap": "No direct canonical match in the pinned Helix grammar inventory.",
+      "nextAction": "Check the Tree-sitter parser registry and verify a matching grammar repository.",
+      "capabilities": null
+    },
+    {
+      "id": "haml",
+      "aliases": [],
+      "state": "candidate",
+      "source": null,
+      "evidence": "Helix 079a789e8cb08ead67f19e1971a1b7438b37354b languages.toml",
+      "gap": "No direct canonical match in the pinned Helix grammar inventory.",
+      "nextAction": "Check the Tree-sitter parser registry and verify a matching grammar repository.",
+      "capabilities": null
+    },
+    {
+      "id": "handlebars",
+      "aliases": ["hbs"],
+      "state": "candidate",
+      "source": null,
+      "evidence": "Helix 079a789e8cb08ead67f19e1971a1b7438b37354b languages.toml",
+      "gap": "No direct canonical match in the pinned Helix grammar inventory.",
+      "nextAction": "Check the Tree-sitter parser registry and verify a matching grammar repository.",
+      "capabilities": null
+    },
+    {
+      "id": "haskell",
+      "aliases": ["hs"],
+      "state": "candidate",
+      "source": {
+        "git": "https://github.com/tree-sitter/tree-sitter-haskell",
+        "rev": "0975ef72fc3c47b530309ca93937d7d143523628"
+      },
+      "evidence": "Helix 079a789e8cb08ead67f19e1971a1b7438b37354b languages.toml",
+      "gap": "Parser and query bundle have not passed runtime admission.",
+      "nextAction": "Pin sources, build WASM, check predicates and captures, and add language fixtures.",
+      "capabilities": null
+    },
+    {
+      "id": "haxe",
+      "aliases": [],
+      "state": "candidate",
+      "source": {
+        "git": "https://github.com/vantreeseba/tree-sitter-haxe",
+        "rev": "f2a2394d9ca7a6099f78d8b0d178530e7c9a8e26"
+      },
+      "evidence": "Helix 079a789e8cb08ead67f19e1971a1b7438b37354b languages.toml",
+      "gap": "Parser and query bundle have not passed runtime admission.",
+      "nextAction": "Pin sources, build WASM, check predicates and captures, and add language fixtures.",
+      "capabilities": null
+    },
+    {
+      "id": "hcl",
+      "aliases": [],
+      "state": "candidate",
+      "source": {
+        "git": "https://github.com/tree-sitter-grammars/tree-sitter-hcl",
+        "rev": "64ad62785d442eb4d45df3a1764962dafd5bc98b"
+      },
+      "evidence": "Helix 079a789e8cb08ead67f19e1971a1b7438b37354b languages.toml",
+      "gap": "Parser and query bundle have not passed runtime admission.",
+      "nextAction": "Pin sources, build WASM, check predicates and captures, and add language fixtures.",
+      "capabilities": null
+    },
+    {
+      "id": "hjson",
+      "aliases": [],
+      "state": "candidate",
+      "source": null,
+      "evidence": "Helix 079a789e8cb08ead67f19e1971a1b7438b37354b languages.toml",
+      "gap": "No direct canonical match in the pinned Helix grammar inventory.",
+      "nextAction": "Check the Tree-sitter parser registry and verify a matching grammar repository.",
+      "capabilities": null
+    },
+    {
+      "id": "hlsl",
+      "aliases": [],
+      "state": "candidate",
+      "source": null,
+      "evidence": "Helix 079a789e8cb08ead67f19e1971a1b7438b37354b languages.toml",
+      "gap": "No direct canonical match in the pinned Helix grammar inventory.",
+      "nextAction": "Check the Tree-sitter parser registry and verify a matching grammar repository.",
+      "capabilities": null
+    },
+    {
+      "id": "html",
+      "aliases": [],
+      "nativeId": "html",
+      "state": "partial",
+      "capabilities": {
+        "highlighting": "partial",
+        "injections": "partial",
+        "detection": "verified",
+        "folds": "partial"
+      },
+      "evidence": "Editor: test/admission.test.ts; test/native-coverage.browser.test.ts",
+      "gap": "Curated captures and worker edits pass; full language coverage and folds are not established.",
+      "nextAction": "Broaden expected-category and edit fixtures; verify remaining embedded languages and structural capabilities."
+    },
+    {
+      "id": "html-derivative",
+      "aliases": [],
+      "state": "candidate",
+      "source": null,
+      "evidence": "Helix 079a789e8cb08ead67f19e1971a1b7438b37354b languages.toml",
+      "gap": "No direct canonical match in the pinned Helix grammar inventory.",
+      "nextAction": "Check the Tree-sitter parser registry and verify a matching grammar repository.",
+      "capabilities": null
+    },
+    {
+      "id": "http",
+      "aliases": [],
+      "state": "candidate",
+      "source": null,
+      "evidence": "Helix 079a789e8cb08ead67f19e1971a1b7438b37354b languages.toml",
+      "gap": "No direct canonical match in the pinned Helix grammar inventory.",
+      "nextAction": "Check the Tree-sitter parser registry and verify a matching grammar repository.",
+      "capabilities": null
+    },
+    {
+      "id": "hurl",
+      "aliases": [],
+      "state": "candidate",
+      "source": {
+        "git": "https://github.com/pfeiferj/tree-sitter-hurl",
+        "rev": "597efbd7ce9a814bb058f48eabd055b1d1e12145"
+      },
+      "evidence": "Helix 079a789e8cb08ead67f19e1971a1b7438b37354b languages.toml",
+      "gap": "Parser and query bundle have not passed runtime admission.",
+      "nextAction": "Pin sources, build WASM, check predicates and captures, and add language fixtures.",
+      "capabilities": null
+    },
+    {
+      "id": "hxml",
+      "aliases": [],
+      "state": "candidate",
+      "source": null,
+      "evidence": "Helix 079a789e8cb08ead67f19e1971a1b7438b37354b languages.toml",
+      "gap": "No direct canonical match in the pinned Helix grammar inventory.",
+      "nextAction": "Check the Tree-sitter parser registry and verify a matching grammar repository.",
+      "capabilities": null
+    },
+    {
+      "id": "hy",
+      "aliases": [],
+      "state": "candidate",
+      "source": {
+        "git": "https://github.com/6cdh/tree-sitter-scheme",
+        "rev": "c6cb7c7d7a04b3f5d999c28e2e9c0c31b2d50ece"
+      },
+      "evidence": "Helix 079a789e8cb08ead67f19e1971a1b7438b37354b languages.toml",
+      "gap": "Parser and query bundle have not passed runtime admission.",
+      "nextAction": "Pin sources, build WASM, check predicates and captures, and add language fixtures.",
+      "capabilities": null
+    },
+    {
+      "id": "imba",
+      "aliases": [],
+      "state": "candidate",
+      "source": null,
+      "evidence": "Helix 079a789e8cb08ead67f19e1971a1b7438b37354b languages.toml",
+      "gap": "No direct canonical match in the pinned Helix grammar inventory.",
+      "nextAction": "Check the Tree-sitter parser registry and verify a matching grammar repository.",
+      "capabilities": null
+    },
+    {
+      "id": "ini",
+      "aliases": ["properties"],
+      "state": "candidate",
+      "source": {
+        "git": "https://github.com/justinmk/tree-sitter-ini",
+        "rev": "e4018b5176132b4f3c5d6e61cea383f42288d0f5"
+      },
+      "evidence": "Helix 079a789e8cb08ead67f19e1971a1b7438b37354b languages.toml",
+      "gap": "Parser and query bundle have not passed runtime admission.",
+      "nextAction": "Pin sources, build WASM, check predicates and captures, and add language fixtures.",
+      "capabilities": null
+    },
+    {
+      "id": "java",
+      "aliases": [],
+      "nativeId": "java",
+      "state": "partial",
+      "capabilities": {
+        "highlighting": "partial",
+        "injections": "none",
+        "detection": "verified",
+        "folds": "none"
+      },
+      "evidence": "Editor: test/admission.test.ts; test/native-coverage.browser.test.ts",
+      "gap": "Curated captures and worker edits pass; full language coverage and folds are not established.",
+      "nextAction": "Broaden expected-category and edit fixtures; verify remaining embedded languages and structural capabilities."
+    },
+    {
+      "id": "javascript",
+      "aliases": ["js", "cjs", "mjs"],
+      "nativeId": "javascript",
+      "state": "partial",
+      "capabilities": {
+        "highlighting": "partial",
+        "injections": "partial",
+        "detection": "verified",
+        "folds": "partial"
+      },
+      "evidence": "Editor: test/admission.test.ts; test/native-coverage.browser.test.ts",
+      "gap": "Builtin shadowing needs local-scope predicates; regex and jsdoc injections are unavailable.",
+      "nextAction": "Broaden expected-category and edit fixtures; verify remaining embedded languages and structural capabilities."
+    },
+    {
+      "id": "jinja",
+      "aliases": [],
+      "state": "candidate",
+      "source": {
+        "git": "https://github.com/varpeti/tree-sitter-jinja2",
+        "rev": "a533cd3c33aea6acb0f9bf9a56f35dcfe6a8eb53"
+      },
+      "evidence": "Helix 079a789e8cb08ead67f19e1971a1b7438b37354b languages.toml",
+      "gap": "Parser and query bundle have not passed runtime admission.",
+      "nextAction": "Pin sources, build WASM, check predicates and captures, and add language fixtures.",
+      "capabilities": null
+    },
+    {
+      "id": "jison",
+      "aliases": [],
+      "state": "candidate",
+      "source": null,
+      "evidence": "Helix 079a789e8cb08ead67f19e1971a1b7438b37354b languages.toml",
+      "gap": "No direct canonical match in the pinned Helix grammar inventory.",
+      "nextAction": "Check the Tree-sitter parser registry and verify a matching grammar repository.",
+      "capabilities": null
+    },
+    {
+      "id": "json",
+      "aliases": [],
+      "nativeId": "json",
+      "state": "partial",
+      "capabilities": {
+        "highlighting": "partial",
+        "injections": "none",
+        "detection": "verified",
+        "folds": "partial"
+      },
+      "evidence": "Editor: test/admission.test.ts; test/native-coverage.browser.test.ts",
+      "gap": "Curated captures and worker edits pass; full language coverage and folds are not established.",
+      "nextAction": "Broaden expected-category and edit fixtures; verify remaining embedded languages and structural capabilities."
+    },
+    {
+      "id": "json5",
+      "aliases": [],
+      "state": "candidate",
+      "source": {
+        "git": "https://github.com/Joakker/tree-sitter-json5",
+        "rev": "248b8564567087d7866be76569b182f6dd7e14e9"
+      },
+      "evidence": "Helix 079a789e8cb08ead67f19e1971a1b7438b37354b languages.toml",
+      "gap": "Parser and query bundle have not passed runtime admission.",
+      "nextAction": "Pin sources, build WASM, check predicates and captures, and add language fixtures.",
+      "capabilities": null
+    },
+    {
+      "id": "jsonc",
+      "aliases": [],
+      "state": "candidate",
+      "source": {
+        "git": "https://github.com/tree-sitter/tree-sitter-json",
+        "rev": "001c28d7a29832b06b0e831ec77845553c89b56d"
+      },
+      "evidence": "Helix 079a789e8cb08ead67f19e1971a1b7438b37354b languages.toml",
+      "gap": "Parser and query bundle have not passed runtime admission.",
+      "nextAction": "Pin sources, build WASM, check predicates and captures, and add language fixtures.",
+      "capabilities": null
+    },
+    {
+      "id": "jsonl",
+      "aliases": [],
+      "state": "candidate",
+      "source": null,
+      "evidence": "Helix 079a789e8cb08ead67f19e1971a1b7438b37354b languages.toml",
+      "gap": "No direct canonical match in the pinned Helix grammar inventory.",
+      "nextAction": "Check the Tree-sitter parser registry and verify a matching grammar repository.",
+      "capabilities": null
+    },
+    {
+      "id": "jsonnet",
+      "aliases": [],
+      "state": "candidate",
+      "source": {
+        "git": "https://github.com/sourcegraph/tree-sitter-jsonnet",
+        "rev": "ddd075f1939aed8147b7aa67f042eda3fce22790"
+      },
+      "evidence": "Helix 079a789e8cb08ead67f19e1971a1b7438b37354b languages.toml",
+      "gap": "Parser and query bundle have not passed runtime admission.",
+      "nextAction": "Pin sources, build WASM, check predicates and captures, and add language fixtures.",
+      "capabilities": null
+    },
+    {
+      "id": "jssm",
+      "aliases": ["fsl"],
+      "state": "candidate",
+      "source": null,
+      "evidence": "Helix 079a789e8cb08ead67f19e1971a1b7438b37354b languages.toml",
+      "gap": "No direct canonical match in the pinned Helix grammar inventory.",
+      "nextAction": "Check the Tree-sitter parser registry and verify a matching grammar repository.",
+      "capabilities": null
+    },
+    {
+      "id": "jsx",
+      "aliases": [],
+      "nativeId": "javascript",
+      "state": "partial",
+      "capabilities": {
+        "highlighting": "partial",
+        "injections": "partial",
+        "detection": "verified",
+        "folds": "partial"
+      },
+      "evidence": "Editor: test/admission.test.ts; test/native-coverage.browser.test.ts",
+      "gap": "Builtin shadowing needs local-scope predicates; regex and jsdoc injections are unavailable.",
+      "nextAction": "Broaden expected-category and edit fixtures; verify remaining embedded languages and structural capabilities."
+    },
+    {
+      "id": "julia",
+      "aliases": ["jl"],
+      "state": "candidate",
+      "source": {
+        "git": "https://github.com/tree-sitter/tree-sitter-julia",
+        "rev": "e0f9dcd180fdcfcfa8d79a3531e11d99e79321d3"
+      },
+      "evidence": "Helix 079a789e8cb08ead67f19e1971a1b7438b37354b languages.toml",
+      "gap": "Parser and query bundle have not passed runtime admission.",
+      "nextAction": "Pin sources, build WASM, check predicates and captures, and add language fixtures.",
+      "capabilities": null
+    },
+    {
+      "id": "just",
+      "aliases": ["justfile"],
+      "state": "candidate",
+      "source": {
+        "git": "https://github.com/poliorcetics/tree-sitter-just",
+        "rev": "00859eebfb774d371af174ea1e582d46e697b469"
+      },
+      "evidence": "Helix 079a789e8cb08ead67f19e1971a1b7438b37354b languages.toml",
+      "gap": "Parser and query bundle have not passed runtime admission.",
+      "nextAction": "Pin sources, build WASM, check predicates and captures, and add language fixtures.",
+      "capabilities": null
+    },
+    {
+      "id": "kdl",
+      "aliases": [],
+      "state": "candidate",
+      "source": {
+        "git": "https://github.com/amaanq/tree-sitter-kdl",
+        "rev": "b37e3d58e5c5cf8d739b315d6114e02d42e66664"
+      },
+      "evidence": "Helix 079a789e8cb08ead67f19e1971a1b7438b37354b languages.toml",
+      "gap": "Parser and query bundle have not passed runtime admission.",
+      "nextAction": "Pin sources, build WASM, check predicates and captures, and add language fixtures.",
+      "capabilities": null
+    },
+    {
+      "id": "kotlin",
+      "aliases": ["kt", "kts"],
+      "state": "blocked",
+      "source": {
+        "git": "https://github.com/fwcd/tree-sitter-kotlin",
+        "rev": "f66d2908542e93c0204c6c241f794afe4e9cd5d1"
+      },
+      "evidence": "tree-sitter-kotlin@0.3.8/queries/highlights.scm",
+      "gap": "Uses lua-match? predicates; runtime has no Lua pattern evaluator.",
+      "nextAction": "Adapt Lua patterns with equivalence fixtures before admission.",
+      "capabilities": null
+    },
+    {
+      "id": "kusto",
+      "aliases": ["kql"],
+      "state": "candidate",
+      "source": null,
+      "evidence": "Helix 079a789e8cb08ead67f19e1971a1b7438b37354b languages.toml",
+      "gap": "No direct canonical match in the pinned Helix grammar inventory.",
+      "nextAction": "Check the Tree-sitter parser registry and verify a matching grammar repository.",
+      "capabilities": null
+    },
+    {
+      "id": "latex",
+      "aliases": [],
+      "state": "candidate",
+      "source": {
+        "git": "https://github.com/latex-lsp/tree-sitter-latex",
+        "rev": "8c75e93cd08ccb7ce1ccab22c1fbd6360e3bcea6"
+      },
+      "evidence": "Helix 079a789e8cb08ead67f19e1971a1b7438b37354b languages.toml",
+      "gap": "Parser and query bundle have not passed runtime admission.",
+      "nextAction": "Pin sources, build WASM, check predicates and captures, and add language fixtures.",
+      "capabilities": null
+    },
+    {
+      "id": "lean",
+      "aliases": ["lean4"],
+      "state": "candidate",
+      "source": {
+        "git": "https://github.com/Julian/tree-sitter-lean",
+        "rev": "d98426109258b266e1e92358c5f11716d2e8f638"
+      },
+      "evidence": "Helix 079a789e8cb08ead67f19e1971a1b7438b37354b languages.toml",
+      "gap": "Parser and query bundle have not passed runtime admission.",
+      "nextAction": "Pin sources, build WASM, check predicates and captures, and add language fixtures.",
+      "capabilities": null
+    },
+    {
+      "id": "less",
+      "aliases": [],
+      "state": "candidate",
+      "source": {
+        "git": "https://github.com/jimliang/tree-sitter-less",
+        "rev": "e5ae6245f841b5778c79ac93b28fa4f56b679c5d"
+      },
+      "evidence": "Helix 079a789e8cb08ead67f19e1971a1b7438b37354b languages.toml",
+      "gap": "Parser and query bundle have not passed runtime admission.",
+      "nextAction": "Pin sources, build WASM, check predicates and captures, and add language fixtures.",
+      "capabilities": null
+    },
+    {
+      "id": "liquid",
+      "aliases": [],
+      "state": "candidate",
+      "source": null,
+      "evidence": "Helix 079a789e8cb08ead67f19e1971a1b7438b37354b languages.toml",
+      "gap": "No direct canonical match in the pinned Helix grammar inventory.",
+      "nextAction": "Check the Tree-sitter parser registry and verify a matching grammar repository.",
+      "capabilities": null
+    },
+    {
+      "id": "llvm",
+      "aliases": [],
+      "state": "candidate",
+      "source": {
+        "git": "https://github.com/benwilliamgraham/tree-sitter-llvm",
+        "rev": "c14cb839003348692158b845db9edda201374548"
+      },
+      "evidence": "Helix 079a789e8cb08ead67f19e1971a1b7438b37354b languages.toml",
+      "gap": "Parser and query bundle have not passed runtime admission.",
+      "nextAction": "Pin sources, build WASM, check predicates and captures, and add language fixtures.",
+      "capabilities": null
+    },
+    {
+      "id": "log",
+      "aliases": [],
+      "state": "candidate",
+      "source": {
+        "git": "https://github.com/Tudyx/tree-sitter-log",
+        "rev": "62cfe307e942af3417171243b599cc7deac5eab9"
+      },
+      "evidence": "Helix 079a789e8cb08ead67f19e1971a1b7438b37354b languages.toml",
+      "gap": "Parser and query bundle have not passed runtime admission.",
+      "nextAction": "Pin sources, build WASM, check predicates and captures, and add language fixtures.",
+      "capabilities": null
+    },
+    {
+      "id": "logo",
+      "aliases": [],
+      "state": "candidate",
+      "source": null,
+      "evidence": "Helix 079a789e8cb08ead67f19e1971a1b7438b37354b languages.toml",
+      "gap": "No direct canonical match in the pinned Helix grammar inventory.",
+      "nextAction": "Check the Tree-sitter parser registry and verify a matching grammar repository.",
+      "capabilities": null
+    },
+    {
+      "id": "lua",
+      "aliases": [],
+      "nativeId": "lua",
+      "state": "partial",
+      "capabilities": {
+        "highlighting": "partial",
+        "injections": "partial",
+        "detection": "verified",
+        "folds": "none"
+      },
+      "evidence": "Editor: test/admission.test.ts; test/native-coverage.browser.test.ts",
+      "gap": "Curated captures and worker edits pass; full language coverage and folds are not established.",
+      "nextAction": "Broaden expected-category and edit fixtures; verify remaining embedded languages and structural capabilities."
+    },
+    {
+      "id": "luau",
+      "aliases": [],
+      "state": "candidate",
+      "source": {
+        "git": "https://github.com/polychromatist/tree-sitter-luau",
+        "rev": "ec187cafba510cddac265329ca7831ec6f3b9955"
+      },
+      "evidence": "Helix 079a789e8cb08ead67f19e1971a1b7438b37354b languages.toml",
+      "gap": "Parser and query bundle have not passed runtime admission.",
+      "nextAction": "Pin sources, build WASM, check predicates and captures, and add language fixtures.",
+      "capabilities": null
+    },
+    {
+      "id": "make",
+      "aliases": ["makefile"],
+      "state": "candidate",
+      "source": {
+        "git": "https://github.com/alemuller/tree-sitter-make",
+        "rev": "a4b9187417d6be349ee5fd4b6e77b4172c6827dd"
+      },
+      "evidence": "Helix 079a789e8cb08ead67f19e1971a1b7438b37354b languages.toml",
+      "gap": "Parser and query bundle have not passed runtime admission.",
+      "nextAction": "Pin sources, build WASM, check predicates and captures, and add language fixtures.",
+      "capabilities": null
+    },
+    {
+      "id": "markdown",
+      "aliases": ["md"],
+      "nativeId": "markdown",
+      "state": "partial",
+      "capabilities": {
+        "highlighting": "partial",
+        "injections": "partial",
+        "detection": "verified",
+        "folds": "partial"
+      },
+      "evidence": "Editor: test/admission.test.ts; test/native-coverage.browser.test.ts",
+      "gap": "Fences load admitted grammars lazily; unsupported fence languages remain unavailable.",
+      "nextAction": "Broaden expected-category and edit fixtures; verify remaining embedded languages and structural capabilities."
+    },
+    {
+      "id": "marko",
+      "aliases": [],
+      "state": "candidate",
+      "source": null,
+      "evidence": "Helix 079a789e8cb08ead67f19e1971a1b7438b37354b languages.toml",
+      "gap": "No direct canonical match in the pinned Helix grammar inventory.",
+      "nextAction": "Check the Tree-sitter parser registry and verify a matching grammar repository.",
+      "capabilities": null
+    },
+    {
+      "id": "matlab",
+      "aliases": [],
+      "state": "candidate",
+      "source": {
+        "git": "https://github.com/acristoffers/tree-sitter-matlab",
+        "rev": "c2390a59016f74e7d5f75ef09510768b4f30217e"
+      },
+      "evidence": "Helix 079a789e8cb08ead67f19e1971a1b7438b37354b languages.toml",
+      "gap": "Parser and query bundle have not passed runtime admission.",
+      "nextAction": "Pin sources, build WASM, check predicates and captures, and add language fixtures.",
+      "capabilities": null
+    },
+    {
+      "id": "mdc",
+      "aliases": [],
+      "state": "candidate",
+      "source": null,
+      "evidence": "Helix 079a789e8cb08ead67f19e1971a1b7438b37354b languages.toml",
+      "gap": "No direct canonical match in the pinned Helix grammar inventory.",
+      "nextAction": "Check the Tree-sitter parser registry and verify a matching grammar repository.",
+      "capabilities": null
+    },
+    {
+      "id": "mdx",
+      "aliases": [],
+      "state": "blocked",
+      "source": {
+        "git": "https://github.com/tree-sitter-grammars/tree-sitter-markdown",
+        "rev": "f969cd3ae3f9fbd4e43205431d0ae286014c05b5",
+        "subpath": "tree-sitter-markdown"
+      },
+      "evidence": "helix markdown grammar mapping",
+      "gap": "Markdown cannot parse MDX JSX and ESM as equivalent syntax.",
+      "nextAction": "Find and admit a dedicated MDX grammar and injections.",
+      "capabilities": null
+    },
+    {
+      "id": "mermaid",
+      "aliases": ["mmd"],
+      "state": "candidate",
+      "source": {
+        "git": "https://github.com/monaqa/tree-sitter-mermaid",
+        "rev": "d787c66276e7e95899230539f556e8b83ee16f6d"
+      },
+      "evidence": "Helix 079a789e8cb08ead67f19e1971a1b7438b37354b languages.toml",
+      "gap": "Parser and query bundle have not passed runtime admission.",
+      "nextAction": "Pin sources, build WASM, check predicates and captures, and add language fixtures.",
+      "capabilities": null
+    },
+    {
+      "id": "mipsasm",
+      "aliases": ["mips"],
+      "state": "candidate",
+      "source": null,
+      "evidence": "Helix 079a789e8cb08ead67f19e1971a1b7438b37354b languages.toml",
+      "gap": "No direct canonical match in the pinned Helix grammar inventory.",
+      "nextAction": "Check the Tree-sitter parser registry and verify a matching grammar repository.",
+      "capabilities": null
+    },
+    {
+      "id": "mojo",
+      "aliases": [],
+      "state": "candidate",
+      "source": {
+        "git": "https://github.com/lsh/tree-sitter-mojo",
+        "rev": "3d7c53b8038f9ebbb57cd2e61296180aa5c1cf64"
+      },
+      "evidence": "Helix 079a789e8cb08ead67f19e1971a1b7438b37354b languages.toml",
+      "gap": "Parser and query bundle have not passed runtime admission.",
+      "nextAction": "Pin sources, build WASM, check predicates and captures, and add language fixtures.",
+      "capabilities": null
+    },
+    {
+      "id": "moonbit",
+      "aliases": ["mbt", "mbti"],
+      "state": "candidate",
+      "source": {
+        "git": "https://github.com/moonbitlang/tree-sitter-moonbit",
+        "rev": "36191d7fe4ec4298c8c1f251af6a82939f8e9a67"
+      },
+      "evidence": "Helix 079a789e8cb08ead67f19e1971a1b7438b37354b languages.toml",
+      "gap": "Parser and query bundle have not passed runtime admission.",
+      "nextAction": "Pin sources, build WASM, check predicates and captures, and add language fixtures.",
+      "capabilities": null
+    },
+    {
+      "id": "move",
+      "aliases": [],
+      "state": "candidate",
+      "source": {
+        "git": "https://github.com/tzakian/tree-sitter-move",
+        "rev": "8bc0d1692caa8763fef54d48068238d9bf3c0264"
+      },
+      "evidence": "Helix 079a789e8cb08ead67f19e1971a1b7438b37354b languages.toml",
+      "gap": "Parser and query bundle have not passed runtime admission.",
+      "nextAction": "Pin sources, build WASM, check predicates and captures, and add language fixtures.",
+      "capabilities": null
+    },
+    {
+      "id": "narrat",
+      "aliases": ["nar"],
+      "state": "candidate",
+      "source": null,
+      "evidence": "Helix 079a789e8cb08ead67f19e1971a1b7438b37354b languages.toml",
+      "gap": "No direct canonical match in the pinned Helix grammar inventory.",
+      "nextAction": "Check the Tree-sitter parser registry and verify a matching grammar repository.",
+      "capabilities": null
+    },
+    {
+      "id": "nextflow",
+      "aliases": ["nf"],
+      "state": "candidate",
+      "source": null,
+      "evidence": "Helix 079a789e8cb08ead67f19e1971a1b7438b37354b languages.toml",
+      "gap": "No direct canonical match in the pinned Helix grammar inventory.",
+      "nextAction": "Check the Tree-sitter parser registry and verify a matching grammar repository.",
+      "capabilities": null
+    },
+    {
+      "id": "nextflow-groovy",
+      "aliases": [],
+      "state": "candidate",
+      "source": null,
+      "evidence": "Helix 079a789e8cb08ead67f19e1971a1b7438b37354b languages.toml",
+      "gap": "No direct canonical match in the pinned Helix grammar inventory.",
+      "nextAction": "Check the Tree-sitter parser registry and verify a matching grammar repository.",
+      "capabilities": null
+    },
+    {
+      "id": "nginx",
+      "aliases": [],
+      "state": "candidate",
+      "source": {
+        "git": "https://gitlab.com/joncoole/tree-sitter-nginx",
+        "rev": "f6d13cf6281b25f2ce342a49a41a10a0381e00f0"
+      },
+      "evidence": "Helix 079a789e8cb08ead67f19e1971a1b7438b37354b languages.toml",
+      "gap": "Parser and query bundle have not passed runtime admission.",
+      "nextAction": "Pin sources, build WASM, check predicates and captures, and add language fixtures.",
+      "capabilities": null
+    },
+    {
+      "id": "nim",
+      "aliases": [],
+      "state": "candidate",
+      "source": {
+        "git": "https://github.com/alaviss/tree-sitter-nim",
+        "rev": "c5f0ce3b65222f5dbb1a12f9fe894524881ad590"
+      },
+      "evidence": "Helix 079a789e8cb08ead67f19e1971a1b7438b37354b languages.toml",
+      "gap": "Parser and query bundle have not passed runtime admission.",
+      "nextAction": "Pin sources, build WASM, check predicates and captures, and add language fixtures.",
+      "capabilities": null
+    },
+    {
+      "id": "nix",
+      "aliases": [],
+      "state": "candidate",
+      "source": {
+        "git": "https://github.com/numtide/tree-sitter-nix",
+        "rev": "70f34e95e30b7ebcc40815d4385d68576c4a15cd"
+      },
+      "evidence": "Helix 079a789e8cb08ead67f19e1971a1b7438b37354b languages.toml",
+      "gap": "Parser and query bundle have not passed runtime admission.",
+      "nextAction": "Pin sources, build WASM, check predicates and captures, and add language fixtures.",
+      "capabilities": null
+    },
+    {
+      "id": "nsis",
+      "aliases": [],
+      "state": "candidate",
+      "source": null,
+      "evidence": "Helix 079a789e8cb08ead67f19e1971a1b7438b37354b languages.toml",
+      "gap": "No direct canonical match in the pinned Helix grammar inventory.",
+      "nextAction": "Check the Tree-sitter parser registry and verify a matching grammar repository.",
+      "capabilities": null
+    },
+    {
+      "id": "nushell",
+      "aliases": ["nu"],
+      "state": "candidate",
+      "source": null,
+      "evidence": "Helix 079a789e8cb08ead67f19e1971a1b7438b37354b languages.toml",
+      "gap": "No direct canonical match in the pinned Helix grammar inventory.",
+      "nextAction": "Check the Tree-sitter parser registry and verify a matching grammar repository.",
+      "capabilities": null
+    },
+    {
+      "id": "objective-c",
+      "aliases": ["objc"],
+      "state": "candidate",
+      "source": null,
+      "evidence": "Helix 079a789e8cb08ead67f19e1971a1b7438b37354b languages.toml",
+      "gap": "No direct canonical match in the pinned Helix grammar inventory.",
+      "nextAction": "Check the Tree-sitter parser registry and verify a matching grammar repository.",
+      "capabilities": null
+    },
+    {
+      "id": "objective-cpp",
+      "aliases": [],
+      "state": "candidate",
+      "source": null,
+      "evidence": "Helix 079a789e8cb08ead67f19e1971a1b7438b37354b languages.toml",
+      "gap": "No direct canonical match in the pinned Helix grammar inventory.",
+      "nextAction": "Check the Tree-sitter parser registry and verify a matching grammar repository.",
+      "capabilities": null
+    },
+    {
+      "id": "ocaml",
+      "aliases": [],
+      "state": "candidate",
+      "source": {
+        "git": "https://github.com/tree-sitter/tree-sitter-ocaml",
+        "rev": "59e2b9f63526db8b95cf59dde6b2402ec2e48b52",
+        "subpath": "grammars/ocaml"
+      },
+      "evidence": "Helix 079a789e8cb08ead67f19e1971a1b7438b37354b languages.toml",
+      "gap": "Parser and query bundle have not passed runtime admission.",
+      "nextAction": "Pin sources, build WASM, check predicates and captures, and add language fixtures.",
+      "capabilities": null
+    },
+    {
+      "id": "odin",
+      "aliases": [],
+      "state": "candidate",
+      "source": {
+        "git": "https://github.com/tree-sitter-grammars/tree-sitter-odin",
+        "rev": "6c6b07e354a52f8f2a9bc776cbc262a74e74fd26"
+      },
+      "evidence": "Helix 079a789e8cb08ead67f19e1971a1b7438b37354b languages.toml",
+      "gap": "Parser and query bundle have not passed runtime admission.",
+      "nextAction": "Pin sources, build WASM, check predicates and captures, and add language fixtures.",
+      "capabilities": null
+    },
+    {
+      "id": "openscad",
+      "aliases": ["scad"],
+      "state": "candidate",
+      "source": {
+        "git": "https://github.com/openscad/tree-sitter-openscad",
+        "rev": "4c36a4fb569688c97cfa28090031e039a6079244"
+      },
+      "evidence": "Helix 079a789e8cb08ead67f19e1971a1b7438b37354b languages.toml",
+      "gap": "Parser and query bundle have not passed runtime admission.",
+      "nextAction": "Pin sources, build WASM, check predicates and captures, and add language fixtures.",
+      "capabilities": null
+    },
+    {
+      "id": "org",
+      "aliases": [],
+      "state": "candidate",
+      "source": {
+        "git": "https://github.com/milisims/tree-sitter-org",
+        "rev": "698bb1a34331e68f83fc24bdd1b6f97016bb30de"
+      },
+      "evidence": "Helix 079a789e8cb08ead67f19e1971a1b7438b37354b languages.toml",
+      "gap": "Parser and query bundle have not passed runtime admission.",
+      "nextAction": "Pin sources, build WASM, check predicates and captures, and add language fixtures.",
+      "capabilities": null
+    },
+    {
+      "id": "pascal",
+      "aliases": [],
+      "state": "candidate",
+      "source": {
+        "git": "https://github.com/Isopod/tree-sitter-pascal",
+        "rev": "042119eca2e18a60e56317fb06ee3ba5c32cb447"
+      },
+      "evidence": "Helix 079a789e8cb08ead67f19e1971a1b7438b37354b languages.toml",
+      "gap": "Parser and query bundle have not passed runtime admission.",
+      "nextAction": "Pin sources, build WASM, check predicates and captures, and add language fixtures.",
+      "capabilities": null
+    },
+    {
+      "id": "perl",
+      "aliases": [],
+      "state": "candidate",
+      "source": {
+        "git": "https://github.com/tree-sitter-perl/tree-sitter-perl",
+        "rev": "72a08a496a23212f23802490ef6f4700d68cfd0e"
+      },
+      "evidence": "Helix 079a789e8cb08ead67f19e1971a1b7438b37354b languages.toml",
+      "gap": "Parser and query bundle have not passed runtime admission.",
+      "nextAction": "Pin sources, build WASM, check predicates and captures, and add language fixtures.",
+      "capabilities": null
+    },
+    {
+      "id": "php",
+      "aliases": [],
+      "nativeId": "php",
+      "state": "partial",
+      "capabilities": {
+        "highlighting": "partial",
+        "injections": "partial",
+        "detection": "verified",
+        "folds": "none"
+      },
+      "evidence": "Editor: test/admission.test.ts; test/native-coverage.browser.test.ts",
+      "gap": "phpdoc and unadmitted heredoc languages remain unavailable.",
+      "nextAction": "Broaden expected-category and edit fixtures; verify remaining embedded languages and structural capabilities."
+    },
+    {
+      "id": "pkl",
+      "aliases": [],
+      "state": "candidate",
+      "source": {
+        "git": "https://github.com/apple/tree-sitter-pkl",
+        "rev": "c03f04a313b712f8ab00a2d862c10b37318699ae"
+      },
+      "evidence": "Helix 079a789e8cb08ead67f19e1971a1b7438b37354b languages.toml",
+      "gap": "Parser and query bundle have not passed runtime admission.",
+      "nextAction": "Pin sources, build WASM, check predicates and captures, and add language fixtures.",
+      "capabilities": null
+    },
+    {
+      "id": "plsql",
+      "aliases": [],
+      "state": "candidate",
+      "source": null,
+      "evidence": "Helix 079a789e8cb08ead67f19e1971a1b7438b37354b languages.toml",
+      "gap": "No direct canonical match in the pinned Helix grammar inventory.",
+      "nextAction": "Check the Tree-sitter parser registry and verify a matching grammar repository.",
+      "capabilities": null
+    },
+    {
+      "id": "po",
+      "aliases": ["pot", "potx"],
+      "state": "candidate",
+      "source": {
+        "git": "https://github.com/erasin/tree-sitter-po",
+        "rev": "417cee9abb2053ed26b19e7de972398f2da9b29e"
+      },
+      "evidence": "Helix 079a789e8cb08ead67f19e1971a1b7438b37354b languages.toml",
+      "gap": "Parser and query bundle have not passed runtime admission.",
+      "nextAction": "Pin sources, build WASM, check predicates and captures, and add language fixtures.",
+      "capabilities": null
+    },
+    {
+      "id": "polar",
+      "aliases": [],
+      "state": "candidate",
+      "source": null,
+      "evidence": "Helix 079a789e8cb08ead67f19e1971a1b7438b37354b languages.toml",
+      "gap": "No direct canonical match in the pinned Helix grammar inventory.",
+      "nextAction": "Check the Tree-sitter parser registry and verify a matching grammar repository.",
+      "capabilities": null
+    },
+    {
+      "id": "postcss",
+      "aliases": [],
+      "state": "candidate",
+      "source": null,
+      "evidence": "Helix 079a789e8cb08ead67f19e1971a1b7438b37354b languages.toml",
+      "gap": "No direct canonical match in the pinned Helix grammar inventory.",
+      "nextAction": "Check the Tree-sitter parser registry and verify a matching grammar repository.",
+      "capabilities": null
+    },
+    {
+      "id": "powerquery",
+      "aliases": [],
+      "state": "candidate",
+      "source": null,
+      "evidence": "Helix 079a789e8cb08ead67f19e1971a1b7438b37354b languages.toml",
+      "gap": "No direct canonical match in the pinned Helix grammar inventory.",
+      "nextAction": "Check the Tree-sitter parser registry and verify a matching grammar repository.",
+      "capabilities": null
+    },
+    {
+      "id": "powershell",
+      "aliases": ["ps", "ps1", "pwsh"],
+      "state": "candidate",
+      "source": {
+        "git": "https://github.com/airbus-cert/tree-sitter-powershell",
+        "rev": "c9316be0faca5d5b9fd3b57350de650755f42dc0"
+      },
+      "evidence": "Helix 079a789e8cb08ead67f19e1971a1b7438b37354b languages.toml",
+      "gap": "Parser and query bundle have not passed runtime admission.",
+      "nextAction": "Pin sources, build WASM, check predicates and captures, and add language fixtures.",
+      "capabilities": null
+    },
+    {
+      "id": "prisma",
+      "aliases": [],
+      "state": "candidate",
+      "source": {
+        "git": "https://github.com/victorhqc/tree-sitter-prisma",
+        "rev": "eca2596a355b1a9952b4f80f8f9caed300a272b5"
+      },
+      "evidence": "Helix 079a789e8cb08ead67f19e1971a1b7438b37354b languages.toml",
+      "gap": "Parser and query bundle have not passed runtime admission.",
+      "nextAction": "Pin sources, build WASM, check predicates and captures, and add language fixtures.",
+      "capabilities": null
+    },
+    {
+      "id": "prolog",
+      "aliases": [],
+      "state": "candidate",
+      "source": {
+        "git": "https://codeberg.org/foxy/tree-sitter-prolog",
+        "subpath": "grammars/prolog",
+        "rev": "d8d415f6a1cf80ca138524bcc395810b176d40fa"
+      },
+      "evidence": "Helix 079a789e8cb08ead67f19e1971a1b7438b37354b languages.toml",
+      "gap": "Parser and query bundle have not passed runtime admission.",
+      "nextAction": "Pin sources, build WASM, check predicates and captures, and add language fixtures.",
+      "capabilities": null
+    },
+    {
+      "id": "proto",
+      "aliases": ["protobuf"],
+      "state": "candidate",
+      "source": {
+        "git": "https://github.com/sdoerner/tree-sitter-proto",
+        "rev": "35a6a3b543e418b7037328261f40e912c767c598"
+      },
+      "evidence": "Helix 079a789e8cb08ead67f19e1971a1b7438b37354b languages.toml",
+      "gap": "Parser and query bundle have not passed runtime admission.",
+      "nextAction": "Pin sources, build WASM, check predicates and captures, and add language fixtures.",
+      "capabilities": null
+    },
+    {
+      "id": "pug",
+      "aliases": ["jade"],
+      "state": "candidate",
+      "source": {
+        "git": "https://github.com/zealot128/tree-sitter-pug",
+        "rev": "13e9195370172c86a8b88184cc358b23b677cc46"
+      },
+      "evidence": "Helix 079a789e8cb08ead67f19e1971a1b7438b37354b languages.toml",
+      "gap": "Parser and query bundle have not passed runtime admission.",
+      "nextAction": "Pin sources, build WASM, check predicates and captures, and add language fixtures.",
+      "capabilities": null
+    },
+    {
+      "id": "puppet",
+      "aliases": [],
+      "state": "candidate",
+      "source": {
+        "git": "https://github.com/tree-sitter-grammars/tree-sitter-puppet",
+        "rev": "15f192929b7d317f5914de2b4accd37b349182a6"
+      },
+      "evidence": "Helix 079a789e8cb08ead67f19e1971a1b7438b37354b languages.toml",
+      "gap": "Parser and query bundle have not passed runtime admission.",
+      "nextAction": "Pin sources, build WASM, check predicates and captures, and add language fixtures.",
+      "capabilities": null
+    },
+    {
+      "id": "purescript",
+      "aliases": [],
+      "state": "candidate",
+      "source": {
+        "git": "https://github.com/postsolar/tree-sitter-purescript",
+        "rev": "f541f95ffd6852fbbe88636317c613285bc105af"
+      },
+      "evidence": "Helix 079a789e8cb08ead67f19e1971a1b7438b37354b languages.toml",
+      "gap": "Parser and query bundle have not passed runtime admission.",
+      "nextAction": "Pin sources, build WASM, check predicates and captures, and add language fixtures.",
+      "capabilities": null
+    },
+    {
+      "id": "python",
+      "aliases": ["py"],
+      "nativeId": "python",
+      "state": "partial",
+      "capabilities": {
+        "highlighting": "partial",
+        "injections": "none",
+        "detection": "verified",
+        "folds": "none"
+      },
+      "evidence": "Editor: test/admission.test.ts; test/native-coverage.browser.test.ts",
+      "gap": "Curated captures and worker edits pass; full language coverage and folds are not established.",
+      "nextAction": "Broaden expected-category and edit fixtures; verify remaining embedded languages and structural capabilities."
+    },
+    {
+      "id": "qml",
+      "aliases": [],
+      "state": "candidate",
+      "source": {
+        "git": "https://github.com/yuja/tree-sitter-qmljs",
+        "rev": "0b2b25bcaa7d4925d5f0dda16f6a99c588a437f1"
+      },
+      "evidence": "Helix 079a789e8cb08ead67f19e1971a1b7438b37354b languages.toml",
+      "gap": "Parser and query bundle have not passed runtime admission.",
+      "nextAction": "Pin sources, build WASM, check predicates and captures, and add language fixtures.",
+      "capabilities": null
+    },
+    {
+      "id": "qmldir",
+      "aliases": [],
+      "state": "candidate",
+      "source": null,
+      "evidence": "Helix 079a789e8cb08ead67f19e1971a1b7438b37354b languages.toml",
+      "gap": "No direct canonical match in the pinned Helix grammar inventory.",
+      "nextAction": "Check the Tree-sitter parser registry and verify a matching grammar repository.",
+      "capabilities": null
+    },
+    {
+      "id": "qss",
+      "aliases": [],
+      "state": "candidate",
+      "source": null,
+      "evidence": "Helix 079a789e8cb08ead67f19e1971a1b7438b37354b languages.toml",
+      "gap": "No direct canonical match in the pinned Helix grammar inventory.",
+      "nextAction": "Check the Tree-sitter parser registry and verify a matching grammar repository.",
+      "capabilities": null
+    },
+    {
+      "id": "r",
+      "aliases": [],
+      "state": "candidate",
+      "source": {
+        "git": "https://github.com/r-lib/tree-sitter-r",
+        "rev": "0e6ef7741712c09dc3ee6e81c42e919820cc65ef"
+      },
+      "evidence": "Helix 079a789e8cb08ead67f19e1971a1b7438b37354b languages.toml",
+      "gap": "Parser and query bundle have not passed runtime admission.",
+      "nextAction": "Pin sources, build WASM, check predicates and captures, and add language fixtures.",
+      "capabilities": null
+    },
+    {
+      "id": "racket",
+      "aliases": [],
+      "state": "candidate",
+      "source": {
+        "git": "https://github.com/6cdh/tree-sitter-scheme",
+        "rev": "c6cb7c7d7a04b3f5d999c28e2e9c0c31b2d50ece"
+      },
+      "evidence": "Helix 079a789e8cb08ead67f19e1971a1b7438b37354b languages.toml",
+      "gap": "Parser and query bundle have not passed runtime admission.",
+      "nextAction": "Pin sources, build WASM, check predicates and captures, and add language fixtures.",
+      "capabilities": null
+    },
+    {
+      "id": "raku",
+      "aliases": ["perl6"],
+      "state": "candidate",
+      "source": null,
+      "evidence": "Helix 079a789e8cb08ead67f19e1971a1b7438b37354b languages.toml",
+      "gap": "No direct canonical match in the pinned Helix grammar inventory.",
+      "nextAction": "Check the Tree-sitter parser registry and verify a matching grammar repository.",
+      "capabilities": null
+    },
+    {
+      "id": "razor",
+      "aliases": [],
+      "state": "candidate",
+      "source": null,
+      "evidence": "Helix 079a789e8cb08ead67f19e1971a1b7438b37354b languages.toml",
+      "gap": "No direct canonical match in the pinned Helix grammar inventory.",
+      "nextAction": "Check the Tree-sitter parser registry and verify a matching grammar repository.",
+      "capabilities": null
+    },
+    {
+      "id": "rbs",
+      "aliases": ["ruby-signature"],
+      "state": "candidate",
+      "source": null,
+      "evidence": "Helix 079a789e8cb08ead67f19e1971a1b7438b37354b languages.toml",
+      "gap": "No direct canonical match in the pinned Helix grammar inventory.",
+      "nextAction": "Check the Tree-sitter parser registry and verify a matching grammar repository.",
+      "capabilities": null
+    },
+    {
+      "id": "reg",
+      "aliases": [],
+      "state": "candidate",
+      "source": null,
+      "evidence": "Helix 079a789e8cb08ead67f19e1971a1b7438b37354b languages.toml",
+      "gap": "No direct canonical match in the pinned Helix grammar inventory.",
+      "nextAction": "Check the Tree-sitter parser registry and verify a matching grammar repository.",
+      "capabilities": null
+    },
+    {
+      "id": "regexp",
+      "aliases": ["regex"],
+      "state": "candidate",
+      "source": null,
+      "evidence": "Helix 079a789e8cb08ead67f19e1971a1b7438b37354b languages.toml",
+      "gap": "No direct canonical match in the pinned Helix grammar inventory.",
+      "nextAction": "Check the Tree-sitter parser registry and verify a matching grammar repository.",
+      "capabilities": null
+    },
+    {
+      "id": "rel",
+      "aliases": [],
+      "state": "candidate",
+      "source": null,
+      "evidence": "Helix 079a789e8cb08ead67f19e1971a1b7438b37354b languages.toml",
+      "gap": "No direct canonical match in the pinned Helix grammar inventory.",
+      "nextAction": "Check the Tree-sitter parser registry and verify a matching grammar repository.",
+      "capabilities": null
+    },
+    {
+      "id": "riscv",
+      "aliases": [],
+      "state": "candidate",
+      "source": null,
+      "evidence": "Helix 079a789e8cb08ead67f19e1971a1b7438b37354b languages.toml",
+      "gap": "No direct canonical match in the pinned Helix grammar inventory.",
+      "nextAction": "Check the Tree-sitter parser registry and verify a matching grammar repository.",
+      "capabilities": null
+    },
+    {
+      "id": "ron",
+      "aliases": [],
+      "state": "candidate",
+      "source": {
+        "git": "https://github.com/tree-sitter-grammars/tree-sitter-ron",
+        "rev": "78938553b93075e638035f624973083451b29055"
+      },
+      "evidence": "Helix 079a789e8cb08ead67f19e1971a1b7438b37354b languages.toml",
+      "gap": "Parser and query bundle have not passed runtime admission.",
+      "nextAction": "Pin sources, build WASM, check predicates and captures, and add language fixtures.",
+      "capabilities": null
+    },
+    {
+      "id": "rosmsg",
+      "aliases": [],
+      "state": "candidate",
+      "source": null,
+      "evidence": "Helix 079a789e8cb08ead67f19e1971a1b7438b37354b languages.toml",
+      "gap": "No direct canonical match in the pinned Helix grammar inventory.",
+      "nextAction": "Check the Tree-sitter parser registry and verify a matching grammar repository.",
+      "capabilities": null
+    },
+    {
+      "id": "rst",
+      "aliases": [],
+      "state": "candidate",
+      "source": {
+        "git": "https://github.com/stsewd/tree-sitter-rst",
+        "rev": "6322f2629f29d8b442f4ca897904d407672ebb78"
+      },
+      "evidence": "Helix 079a789e8cb08ead67f19e1971a1b7438b37354b languages.toml",
+      "gap": "Parser and query bundle have not passed runtime admission.",
+      "nextAction": "Pin sources, build WASM, check predicates and captures, and add language fixtures.",
+      "capabilities": null
+    },
+    {
+      "id": "ruby",
+      "aliases": ["rb"],
+      "state": "blocked",
+      "source": {
+        "git": "https://github.com/tree-sitter/tree-sitter-ruby",
+        "rev": "ad907a69da0c8a4f7a943a7fe012712208da6dee"
+      },
+      "evidence": "tree-sitter-ruby@0.23.1/queries/highlights.scm",
+      "gap": "Uses is-not? local; runtime does not evaluate lexical locals.",
+      "nextAction": "Implement scoped locals before admitting these queries.",
+      "capabilities": null
+    },
+    {
+      "id": "rust",
+      "aliases": ["rs"],
+      "nativeId": "rust",
+      "state": "partial",
+      "capabilities": {
+        "highlighting": "partial",
+        "injections": "none",
+        "detection": "verified",
+        "folds": "none"
+      },
+      "evidence": "Editor: test/admission.test.ts; test/native-coverage.browser.test.ts",
+      "gap": "Curated captures and worker edits pass; full language coverage and folds are not established.",
+      "nextAction": "Broaden expected-category and edit fixtures; verify remaining embedded languages and structural capabilities."
+    },
+    {
+      "id": "sas",
+      "aliases": [],
+      "state": "candidate",
+      "source": null,
+      "evidence": "Helix 079a789e8cb08ead67f19e1971a1b7438b37354b languages.toml",
+      "gap": "No direct canonical match in the pinned Helix grammar inventory.",
+      "nextAction": "Check the Tree-sitter parser registry and verify a matching grammar repository.",
+      "capabilities": null
+    },
+    {
+      "id": "sass",
+      "aliases": [],
+      "state": "candidate",
+      "source": null,
+      "evidence": "Helix 079a789e8cb08ead67f19e1971a1b7438b37354b languages.toml",
+      "gap": "No direct canonical match in the pinned Helix grammar inventory.",
+      "nextAction": "Check the Tree-sitter parser registry and verify a matching grammar repository.",
+      "capabilities": null
+    },
+    {
+      "id": "scala",
+      "aliases": [],
+      "state": "candidate",
+      "source": {
+        "git": "https://github.com/tree-sitter/tree-sitter-scala",
+        "rev": "4d081d98670ff6e98ca42c085294fc75eec15e1d"
+      },
+      "evidence": "Helix 079a789e8cb08ead67f19e1971a1b7438b37354b languages.toml",
+      "gap": "Parser and query bundle have not passed runtime admission.",
+      "nextAction": "Pin sources, build WASM, check predicates and captures, and add language fixtures.",
+      "capabilities": null
+    },
+    {
+      "id": "scheme",
+      "aliases": [],
+      "state": "candidate",
+      "source": {
+        "git": "https://github.com/6cdh/tree-sitter-scheme",
+        "rev": "c6cb7c7d7a04b3f5d999c28e2e9c0c31b2d50ece"
+      },
+      "evidence": "Helix 079a789e8cb08ead67f19e1971a1b7438b37354b languages.toml",
+      "gap": "Parser and query bundle have not passed runtime admission.",
+      "nextAction": "Pin sources, build WASM, check predicates and captures, and add language fixtures.",
+      "capabilities": null
+    },
+    {
+      "id": "scss",
+      "aliases": [],
+      "state": "blocked",
+      "source": {
+        "git": "https://github.com/serenadeai/tree-sitter-scss",
+        "rev": "c478c6868648eff49eb04a4df90d703dc45b312a"
+      },
+      "evidence": "tree-sitter-scss@1.0.0",
+      "gap": "No WASM artifact; query requires CSS inheritance and capture adaptation.",
+      "nextAction": "Build pinned source and compose CSS queries with SCSS fixtures.",
+      "capabilities": null
+    },
+    {
+      "id": "sdbl",
+      "aliases": ["1c-query"],
+      "state": "candidate",
+      "source": null,
+      "evidence": "Helix 079a789e8cb08ead67f19e1971a1b7438b37354b languages.toml",
+      "gap": "No direct canonical match in the pinned Helix grammar inventory.",
+      "nextAction": "Check the Tree-sitter parser registry and verify a matching grammar repository.",
+      "capabilities": null
+    },
+    {
+      "id": "shaderlab",
+      "aliases": ["shader"],
+      "state": "candidate",
+      "source": null,
+      "evidence": "Helix 079a789e8cb08ead67f19e1971a1b7438b37354b languages.toml",
+      "gap": "No direct canonical match in the pinned Helix grammar inventory.",
+      "nextAction": "Check the Tree-sitter parser registry and verify a matching grammar repository.",
+      "capabilities": null
+    },
+    {
+      "id": "shellscript",
+      "aliases": ["bash", "sh", "shell", "zsh"],
+      "nativeId": "shellscript",
+      "state": "partial",
+      "capabilities": {
+        "highlighting": "partial",
+        "injections": "none",
+        "detection": "verified",
+        "folds": "none"
+      },
+      "evidence": "Editor: test/admission.test.ts; test/native-coverage.browser.test.ts",
+      "gap": "Curated captures and worker edits pass; full language coverage and folds are not established.",
+      "nextAction": "Broaden expected-category and edit fixtures; verify remaining embedded languages and structural capabilities."
+    },
+    {
+      "id": "shellsession",
+      "aliases": ["console"],
+      "state": "candidate",
+      "source": null,
+      "evidence": "Helix 079a789e8cb08ead67f19e1971a1b7438b37354b languages.toml",
+      "gap": "No direct canonical match in the pinned Helix grammar inventory.",
+      "nextAction": "Check the Tree-sitter parser registry and verify a matching grammar repository.",
+      "capabilities": null
+    },
+    {
+      "id": "smalltalk",
+      "aliases": [],
+      "state": "candidate",
+      "source": null,
+      "evidence": "Helix 079a789e8cb08ead67f19e1971a1b7438b37354b languages.toml",
+      "gap": "No direct canonical match in the pinned Helix grammar inventory.",
+      "nextAction": "Check the Tree-sitter parser registry and verify a matching grammar repository.",
+      "capabilities": null
+    },
+    {
+      "id": "smithy",
+      "aliases": [],
+      "state": "candidate",
+      "source": {
+        "git": "https://github.com/indoorvivants/tree-sitter-smithy",
+        "rev": "ec4fe14586f2b0a1bc65d6db17f8d8acd8a90433"
+      },
+      "evidence": "Helix 079a789e8cb08ead67f19e1971a1b7438b37354b languages.toml",
+      "gap": "Parser and query bundle have not passed runtime admission.",
+      "nextAction": "Pin sources, build WASM, check predicates and captures, and add language fixtures.",
+      "capabilities": null
+    },
+    {
+      "id": "solidity",
+      "aliases": [],
+      "state": "candidate",
+      "source": {
+        "git": "https://github.com/JoranHonig/tree-sitter-solidity",
+        "rev": "048fe686cb1fde267243739b8bdbec8fc3a55272"
+      },
+      "evidence": "Helix 079a789e8cb08ead67f19e1971a1b7438b37354b languages.toml",
+      "gap": "Parser and query bundle have not passed runtime admission.",
+      "nextAction": "Pin sources, build WASM, check predicates and captures, and add language fixtures.",
+      "capabilities": null
+    },
+    {
+      "id": "soy",
+      "aliases": ["closure-templates"],
+      "state": "candidate",
+      "source": null,
+      "evidence": "Helix 079a789e8cb08ead67f19e1971a1b7438b37354b languages.toml",
+      "gap": "No direct canonical match in the pinned Helix grammar inventory.",
+      "nextAction": "Check the Tree-sitter parser registry and verify a matching grammar repository.",
+      "capabilities": null
+    },
+    {
+      "id": "sparql",
+      "aliases": [],
+      "state": "candidate",
+      "source": null,
+      "evidence": "Helix 079a789e8cb08ead67f19e1971a1b7438b37354b languages.toml",
+      "gap": "No direct canonical match in the pinned Helix grammar inventory.",
+      "nextAction": "Check the Tree-sitter parser registry and verify a matching grammar repository.",
+      "capabilities": null
+    },
+    {
+      "id": "splunk",
+      "aliases": ["spl"],
+      "state": "candidate",
+      "source": null,
+      "evidence": "Helix 079a789e8cb08ead67f19e1971a1b7438b37354b languages.toml",
+      "gap": "No direct canonical match in the pinned Helix grammar inventory.",
+      "nextAction": "Check the Tree-sitter parser registry and verify a matching grammar repository.",
+      "capabilities": null
+    },
+    {
+      "id": "sql",
+      "aliases": [],
+      "state": "blocked",
+      "source": {
+        "git": "https://github.com/DerekStride/tree-sitter-sql",
+        "rev": "851e9cb257ba7c66cc8c14214a31c44d2f1e954e"
+      },
+      "evidence": "tree-sitter-sql@0.1.0",
+      "gap": "Dialect parity is not established by this generic SQL grammar.",
+      "nextAction": "Select dialect-specific grammars and validate each canonical Shiki SQL language.",
+      "capabilities": null
+    },
+    {
+      "id": "ssh-config",
+      "aliases": [],
+      "state": "candidate",
+      "source": null,
+      "evidence": "Helix 079a789e8cb08ead67f19e1971a1b7438b37354b languages.toml",
+      "gap": "No direct canonical match in the pinned Helix grammar inventory.",
+      "nextAction": "Check the Tree-sitter parser registry and verify a matching grammar repository.",
+      "capabilities": null
+    },
+    {
+      "id": "stata",
+      "aliases": [],
+      "state": "candidate",
+      "source": null,
+      "evidence": "Helix 079a789e8cb08ead67f19e1971a1b7438b37354b languages.toml",
+      "gap": "No direct canonical match in the pinned Helix grammar inventory.",
+      "nextAction": "Check the Tree-sitter parser registry and verify a matching grammar repository.",
+      "capabilities": null
+    },
+    {
+      "id": "stylus",
+      "aliases": ["styl"],
+      "state": "candidate",
+      "source": null,
+      "evidence": "Helix 079a789e8cb08ead67f19e1971a1b7438b37354b languages.toml",
+      "gap": "No direct canonical match in the pinned Helix grammar inventory.",
+      "nextAction": "Check the Tree-sitter parser registry and verify a matching grammar repository.",
+      "capabilities": null
+    },
+    {
+      "id": "surrealql",
+      "aliases": ["surql"],
+      "state": "candidate",
+      "source": null,
+      "evidence": "Helix 079a789e8cb08ead67f19e1971a1b7438b37354b languages.toml",
+      "gap": "No direct canonical match in the pinned Helix grammar inventory.",
+      "nextAction": "Check the Tree-sitter parser registry and verify a matching grammar repository.",
+      "capabilities": null
+    },
+    {
+      "id": "svelte",
+      "aliases": [],
+      "nativeId": "svelte",
+      "state": "partial",
+      "capabilities": {
+        "highlighting": "partial",
+        "injections": "partial",
+        "detection": "verified",
+        "folds": "partial"
+      },
+      "evidence": "Editor: test/admission.test.ts; test/native-coverage.browser.test.ts",
+      "gap": "JavaScript/TypeScript and CSS injections work; preprocessors and Svelte-version parity remain unverified.",
+      "nextAction": "Broaden expected-category and edit fixtures; verify remaining embedded languages and structural capabilities."
+    },
+    {
+      "id": "swift",
+      "aliases": [],
+      "state": "blocked",
+      "source": {
+        "git": "https://github.com/alex-pinkus/tree-sitter-swift",
+        "rev": "7b7909f2f6b9414be0958275f4c8e5d69c3bca43"
+      },
+      "evidence": "tree-sitter-swift@0.7.1",
+      "gap": "Package does not ship WASM; parser build and query adaptation remain untested.",
+      "nextAction": "Compile the pinned parser and test Swift interpolation and raw strings.",
+      "capabilities": null
+    },
+    {
+      "id": "system-verilog",
+      "aliases": [],
+      "state": "candidate",
+      "source": null,
+      "evidence": "Helix 079a789e8cb08ead67f19e1971a1b7438b37354b languages.toml",
+      "gap": "No direct canonical match in the pinned Helix grammar inventory.",
+      "nextAction": "Check the Tree-sitter parser registry and verify a matching grammar repository.",
+      "capabilities": null
+    },
+    {
+      "id": "systemd",
+      "aliases": [],
+      "state": "candidate",
+      "source": {
+        "git": "https://github.com/justinmk/tree-sitter-ini",
+        "rev": "e4018b5176132b4f3c5d6e61cea383f42288d0f5"
+      },
+      "evidence": "Helix 079a789e8cb08ead67f19e1971a1b7438b37354b languages.toml",
+      "gap": "Parser and query bundle have not passed runtime admission.",
+      "nextAction": "Pin sources, build WASM, check predicates and captures, and add language fixtures.",
+      "capabilities": null
+    },
+    {
+      "id": "talonscript",
+      "aliases": ["talon"],
+      "state": "candidate",
+      "source": null,
+      "evidence": "Helix 079a789e8cb08ead67f19e1971a1b7438b37354b languages.toml",
+      "gap": "No direct canonical match in the pinned Helix grammar inventory.",
+      "nextAction": "Check the Tree-sitter parser registry and verify a matching grammar repository.",
+      "capabilities": null
+    },
+    {
+      "id": "tasl",
+      "aliases": [],
+      "state": "candidate",
+      "source": null,
+      "evidence": "Helix 079a789e8cb08ead67f19e1971a1b7438b37354b languages.toml",
+      "gap": "No direct canonical match in the pinned Helix grammar inventory.",
+      "nextAction": "Check the Tree-sitter parser registry and verify a matching grammar repository.",
+      "capabilities": null
+    },
+    {
+      "id": "tcl",
+      "aliases": [],
+      "state": "candidate",
+      "source": {
+        "git": "https://github.com/tree-sitter-grammars/tree-sitter-tcl",
+        "rev": "56ad1fa6a34ba800e5495d1025a9b0fda338d5b8"
+      },
+      "evidence": "Helix 079a789e8cb08ead67f19e1971a1b7438b37354b languages.toml",
+      "gap": "Parser and query bundle have not passed runtime admission.",
+      "nextAction": "Pin sources, build WASM, check predicates and captures, and add language fixtures.",
+      "capabilities": null
+    },
+    {
+      "id": "templ",
+      "aliases": [],
+      "state": "candidate",
+      "source": {
+        "git": "https://github.com/vrischmann/tree-sitter-templ",
+        "rev": "68d6707ed20159ae7525241b8161c126dc1c620c"
+      },
+      "evidence": "Helix 079a789e8cb08ead67f19e1971a1b7438b37354b languages.toml",
+      "gap": "Parser and query bundle have not passed runtime admission.",
+      "nextAction": "Pin sources, build WASM, check predicates and captures, and add language fixtures.",
+      "capabilities": null
+    },
+    {
+      "id": "terraform",
+      "aliases": ["tf", "tfvars"],
+      "state": "candidate",
+      "source": null,
+      "evidence": "Helix 079a789e8cb08ead67f19e1971a1b7438b37354b languages.toml",
+      "gap": "No direct canonical match in the pinned Helix grammar inventory.",
+      "nextAction": "Check the Tree-sitter parser registry and verify a matching grammar repository.",
+      "capabilities": null
+    },
+    {
+      "id": "tex",
+      "aliases": [],
+      "state": "candidate",
+      "source": null,
+      "evidence": "Helix 079a789e8cb08ead67f19e1971a1b7438b37354b languages.toml",
+      "gap": "No direct canonical match in the pinned Helix grammar inventory.",
+      "nextAction": "Check the Tree-sitter parser registry and verify a matching grammar repository.",
+      "capabilities": null
+    },
+    {
+      "id": "toml",
+      "aliases": [],
+      "nativeId": "toml",
+      "state": "partial",
+      "capabilities": {
+        "highlighting": "partial",
+        "injections": "none",
+        "detection": "verified",
+        "folds": "none"
+      },
+      "evidence": "Editor: test/admission.test.ts; test/native-coverage.browser.test.ts",
+      "gap": "Curated captures and worker edits pass; full language coverage and folds are not established.",
+      "nextAction": "Broaden expected-category and edit fixtures; verify remaining embedded languages and structural capabilities."
+    },
+    {
+      "id": "ts-tags",
+      "aliases": ["lit"],
+      "state": "candidate",
+      "source": null,
+      "evidence": "Helix 079a789e8cb08ead67f19e1971a1b7438b37354b languages.toml",
+      "gap": "No direct canonical match in the pinned Helix grammar inventory.",
+      "nextAction": "Check the Tree-sitter parser registry and verify a matching grammar repository.",
+      "capabilities": null
+    },
+    {
+      "id": "tsv",
+      "aliases": [],
+      "state": "candidate",
+      "source": null,
+      "evidence": "Helix 079a789e8cb08ead67f19e1971a1b7438b37354b languages.toml",
+      "gap": "No direct canonical match in the pinned Helix grammar inventory.",
+      "nextAction": "Check the Tree-sitter parser registry and verify a matching grammar repository.",
+      "capabilities": null
+    },
+    {
+      "id": "tsx",
+      "aliases": [],
+      "nativeId": "tsx",
+      "state": "partial",
+      "capabilities": {
+        "highlighting": "partial",
+        "injections": "partial",
+        "detection": "verified",
+        "folds": "partial"
+      },
+      "evidence": "Editor: test/admission.test.ts; test/native-coverage.browser.test.ts",
+      "gap": "Builtin shadowing needs local-scope predicates; regex and jsdoc injections are unavailable.",
+      "nextAction": "Broaden expected-category and edit fixtures; verify remaining embedded languages and structural capabilities."
+    },
+    {
+      "id": "turtle",
+      "aliases": [],
+      "state": "candidate",
+      "source": null,
+      "evidence": "Helix 079a789e8cb08ead67f19e1971a1b7438b37354b languages.toml",
+      "gap": "No direct canonical match in the pinned Helix grammar inventory.",
+      "nextAction": "Check the Tree-sitter parser registry and verify a matching grammar repository.",
+      "capabilities": null
+    },
+    {
+      "id": "twig",
+      "aliases": [],
+      "state": "candidate",
+      "source": {
+        "git": "https://github.com/gbprod/tree-sitter-twig",
+        "rev": "0afd9a6d808944e65a7be393e31868b85345735f"
+      },
+      "evidence": "Helix 079a789e8cb08ead67f19e1971a1b7438b37354b languages.toml",
+      "gap": "Parser and query bundle have not passed runtime admission.",
+      "nextAction": "Pin sources, build WASM, check predicates and captures, and add language fixtures.",
+      "capabilities": null
+    },
+    {
+      "id": "typescript",
+      "aliases": ["ts", "cts", "mts"],
+      "nativeId": "typescript",
+      "state": "partial",
+      "capabilities": {
+        "highlighting": "partial",
+        "injections": "partial",
+        "detection": "verified",
+        "folds": "partial"
+      },
+      "evidence": "Editor: test/admission.test.ts; test/native-coverage.browser.test.ts",
+      "gap": "Builtin shadowing needs local-scope predicates; regex and jsdoc injections are unavailable.",
+      "nextAction": "Broaden expected-category and edit fixtures; verify remaining embedded languages and structural capabilities."
+    },
+    {
+      "id": "typespec",
+      "aliases": ["tsp"],
+      "state": "candidate",
+      "source": {
+        "git": "https://github.com/happenslol/tree-sitter-typespec",
+        "rev": "0ee05546d73d8eb64635ed8125de6f35c77759fe"
+      },
+      "evidence": "Helix 079a789e8cb08ead67f19e1971a1b7438b37354b languages.toml",
+      "gap": "Parser and query bundle have not passed runtime admission.",
+      "nextAction": "Pin sources, build WASM, check predicates and captures, and add language fixtures.",
+      "capabilities": null
+    },
+    {
+      "id": "typst",
+      "aliases": ["typ"],
+      "state": "candidate",
+      "source": {
+        "git": "https://github.com/uben0/tree-sitter-typst",
+        "rev": "13863ddcbaa7b68ee6221cea2e3143415e64aea4"
+      },
+      "evidence": "Helix 079a789e8cb08ead67f19e1971a1b7438b37354b languages.toml",
+      "gap": "Parser and query bundle have not passed runtime admission.",
+      "nextAction": "Pin sources, build WASM, check predicates and captures, and add language fixtures.",
+      "capabilities": null
+    },
+    {
+      "id": "v",
+      "aliases": [],
+      "state": "candidate",
+      "source": {
+        "git": "https://github.com/vlang/v-analyzer",
+        "subpath": "tree_sitter_v",
+        "rev": "59a8889d84a293d7c0366d14c8dbb0eec24fe889"
+      },
+      "evidence": "Helix 079a789e8cb08ead67f19e1971a1b7438b37354b languages.toml",
+      "gap": "Parser and query bundle have not passed runtime admission.",
+      "nextAction": "Pin sources, build WASM, check predicates and captures, and add language fixtures.",
+      "capabilities": null
+    },
+    {
+      "id": "vala",
+      "aliases": [],
+      "state": "candidate",
+      "source": {
+        "git": "https://github.com/vala-lang/tree-sitter-vala",
+        "rev": "97e6db3c8c73b15a9541a458d8e797a07f588ef4"
+      },
+      "evidence": "Helix 079a789e8cb08ead67f19e1971a1b7438b37354b languages.toml",
+      "gap": "Parser and query bundle have not passed runtime admission.",
+      "nextAction": "Pin sources, build WASM, check predicates and captures, and add language fixtures.",
+      "capabilities": null
+    },
+    {
+      "id": "vb",
+      "aliases": [],
+      "state": "candidate",
+      "source": null,
+      "evidence": "Helix 079a789e8cb08ead67f19e1971a1b7438b37354b languages.toml",
+      "gap": "No direct canonical match in the pinned Helix grammar inventory.",
+      "nextAction": "Check the Tree-sitter parser registry and verify a matching grammar repository.",
+      "capabilities": null
+    },
+    {
+      "id": "verilog",
+      "aliases": [],
+      "state": "candidate",
+      "source": {
+        "git": "https://github.com/tree-sitter/tree-sitter-verilog",
+        "rev": "4457145e795b363f072463e697dfe2f6973c9a52"
+      },
+      "evidence": "Helix 079a789e8cb08ead67f19e1971a1b7438b37354b languages.toml",
+      "gap": "Parser and query bundle have not passed runtime admission.",
+      "nextAction": "Pin sources, build WASM, check predicates and captures, and add language fixtures.",
+      "capabilities": null
+    },
+    {
+      "id": "vhdl",
+      "aliases": [],
+      "state": "candidate",
+      "source": {
+        "git": "https://github.com/jpt13653903/tree-sitter-vhdl",
+        "rev": "b8e31d110c6b039899d0f307792bdb0ff50ece2c"
+      },
+      "evidence": "Helix 079a789e8cb08ead67f19e1971a1b7438b37354b languages.toml",
+      "gap": "Parser and query bundle have not passed runtime admission.",
+      "nextAction": "Pin sources, build WASM, check predicates and captures, and add language fixtures.",
+      "capabilities": null
+    },
+    {
+      "id": "viml",
+      "aliases": ["vim", "vimscript"],
+      "state": "candidate",
+      "source": null,
+      "evidence": "Helix 079a789e8cb08ead67f19e1971a1b7438b37354b languages.toml",
+      "gap": "No direct canonical match in the pinned Helix grammar inventory.",
+      "nextAction": "Check the Tree-sitter parser registry and verify a matching grammar repository.",
+      "capabilities": null
+    },
+    {
+      "id": "vue",
+      "aliases": [],
+      "state": "blocked",
+      "source": {
+        "git": "https://github.com/ikatyang/tree-sitter-vue",
+        "rev": "91fe2754796cd8fba5f229505a23fa08f3546c06"
+      },
+      "evidence": "tree-sitter-vue@0.2.1",
+      "gap": "Package has neither WASM nor queries.",
+      "nextAction": "Build a pinned parser and admit a maintained query bundle.",
+      "capabilities": null
+    },
+    {
+      "id": "vue-html",
+      "aliases": [],
+      "state": "candidate",
+      "source": null,
+      "evidence": "Helix 079a789e8cb08ead67f19e1971a1b7438b37354b languages.toml",
+      "gap": "No direct canonical match in the pinned Helix grammar inventory.",
+      "nextAction": "Check the Tree-sitter parser registry and verify a matching grammar repository.",
+      "capabilities": null
+    },
+    {
+      "id": "vue-vine",
+      "aliases": [],
+      "state": "candidate",
+      "source": null,
+      "evidence": "Helix 079a789e8cb08ead67f19e1971a1b7438b37354b languages.toml",
+      "gap": "No direct canonical match in the pinned Helix grammar inventory.",
+      "nextAction": "Check the Tree-sitter parser registry and verify a matching grammar repository.",
+      "capabilities": null
+    },
+    {
+      "id": "vyper",
+      "aliases": ["vy"],
+      "state": "candidate",
+      "source": null,
+      "evidence": "Helix 079a789e8cb08ead67f19e1971a1b7438b37354b languages.toml",
+      "gap": "No direct canonical match in the pinned Helix grammar inventory.",
+      "nextAction": "Check the Tree-sitter parser registry and verify a matching grammar repository.",
+      "capabilities": null
+    },
+    {
+      "id": "wasm",
+      "aliases": [],
+      "state": "candidate",
+      "source": null,
+      "evidence": "Helix 079a789e8cb08ead67f19e1971a1b7438b37354b languages.toml",
+      "gap": "No direct canonical match in the pinned Helix grammar inventory.",
+      "nextAction": "Check the Tree-sitter parser registry and verify a matching grammar repository.",
+      "capabilities": null
+    },
+    {
+      "id": "wenyan",
+      "aliases": ["文言"],
+      "state": "candidate",
+      "source": null,
+      "evidence": "Helix 079a789e8cb08ead67f19e1971a1b7438b37354b languages.toml",
+      "gap": "No direct canonical match in the pinned Helix grammar inventory.",
+      "nextAction": "Check the Tree-sitter parser registry and verify a matching grammar repository.",
+      "capabilities": null
+    },
+    {
+      "id": "wgsl",
+      "aliases": [],
+      "state": "candidate",
+      "source": {
+        "git": "https://github.com/szebniok/tree-sitter-wgsl",
+        "rev": "272e89ef2aeac74178edb9db4a83c1ffef80a463"
+      },
+      "evidence": "Helix 079a789e8cb08ead67f19e1971a1b7438b37354b languages.toml",
+      "gap": "Parser and query bundle have not passed runtime admission.",
+      "nextAction": "Pin sources, build WASM, check predicates and captures, and add language fixtures.",
+      "capabilities": null
+    },
+    {
+      "id": "wikitext",
+      "aliases": ["mediawiki", "wiki"],
+      "state": "candidate",
+      "source": {
+        "git": "https://github.com/santhoshtr/tree-sitter-wikitext",
+        "rev": "444214b31695e9dd4d32fb06247397fb8778a9d2"
+      },
+      "evidence": "Helix 079a789e8cb08ead67f19e1971a1b7438b37354b languages.toml",
+      "gap": "Parser and query bundle have not passed runtime admission.",
+      "nextAction": "Pin sources, build WASM, check predicates and captures, and add language fixtures.",
+      "capabilities": null
+    },
+    {
+      "id": "wit",
+      "aliases": [],
+      "state": "candidate",
+      "source": {
+        "git": "https://github.com/hh9527/tree-sitter-wit",
+        "rev": "c917790ab9aec50c5fd664cbfad8dd45110cfff3"
+      },
+      "evidence": "Helix 079a789e8cb08ead67f19e1971a1b7438b37354b languages.toml",
+      "gap": "Parser and query bundle have not passed runtime admission.",
+      "nextAction": "Pin sources, build WASM, check predicates and captures, and add language fixtures.",
+      "capabilities": null
+    },
+    {
+      "id": "wolfram",
+      "aliases": ["wl"],
+      "state": "candidate",
+      "source": null,
+      "evidence": "Helix 079a789e8cb08ead67f19e1971a1b7438b37354b languages.toml",
+      "gap": "No direct canonical match in the pinned Helix grammar inventory.",
+      "nextAction": "Check the Tree-sitter parser registry and verify a matching grammar repository.",
+      "capabilities": null
+    },
+    {
+      "id": "xml",
+      "aliases": [],
+      "state": "candidate",
+      "source": {
+        "git": "https://github.com/RenjiSann/tree-sitter-xml",
+        "rev": "48a7c2b6fb9d515577e115e6788937e837815651"
+      },
+      "evidence": "Helix 079a789e8cb08ead67f19e1971a1b7438b37354b languages.toml",
+      "gap": "Parser and query bundle have not passed runtime admission.",
+      "nextAction": "Pin sources, build WASM, check predicates and captures, and add language fixtures.",
+      "capabilities": null
+    },
+    {
+      "id": "xsl",
+      "aliases": [],
+      "state": "candidate",
+      "source": null,
+      "evidence": "Helix 079a789e8cb08ead67f19e1971a1b7438b37354b languages.toml",
+      "gap": "No direct canonical match in the pinned Helix grammar inventory.",
+      "nextAction": "Check the Tree-sitter parser registry and verify a matching grammar repository.",
+      "capabilities": null
+    },
+    {
+      "id": "yaml",
+      "aliases": ["yml"],
+      "nativeId": "yaml",
+      "state": "partial",
+      "capabilities": {
+        "highlighting": "partial",
+        "injections": "none",
+        "detection": "verified",
+        "folds": "none"
+      },
+      "evidence": "Editor: test/admission.test.ts; test/native-coverage.browser.test.ts",
+      "gap": "Curated captures and worker edits pass; full language coverage and folds are not established.",
+      "nextAction": "Broaden expected-category and edit fixtures; verify remaining embedded languages and structural capabilities."
+    },
+    {
+      "id": "zenscript",
+      "aliases": [],
+      "state": "candidate",
+      "source": null,
+      "evidence": "Helix 079a789e8cb08ead67f19e1971a1b7438b37354b languages.toml",
+      "gap": "No direct canonical match in the pinned Helix grammar inventory.",
+      "nextAction": "Check the Tree-sitter parser registry and verify a matching grammar repository.",
+      "capabilities": null
+    },
+    {
+      "id": "zig",
+      "aliases": [],
+      "state": "candidate",
+      "source": {
+        "git": "https://github.com/tree-sitter-grammars/tree-sitter-zig",
+        "rev": "6479aa13f32f701c383083d8b28360ebd682fb7d"
+      },
+      "evidence": "Helix 079a789e8cb08ead67f19e1971a1b7438b37354b languages.toml",
+      "gap": "Parser and query bundle have not passed runtime admission.",
+      "nextAction": "Pin sources, build WASM, check predicates and captures, and add language fixtures.",
+      "capabilities": null
+    }
+  ]
+}

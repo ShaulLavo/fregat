@@ -216,6 +216,8 @@ export const selectors = {
   colorModeOption: (page: Page, mode: string) => page.locator(`[data-value="color-mode:${mode}"]`),
   settingsFontFamily: (page: Page) =>
     page.getByRole('textbox', { name: 'Font family', exact: true }),
+  chooseFolder: (page: Page) => page.getByRole('button', { name: 'Choose folder', exact: true }),
+  settingsDialog: (page: Page) => page.getByRole('dialog', { name: 'Settings', exact: true }),
   settingsSearch: (page: Page) => page.getByRole('textbox', { name: 'Search settings' }),
   settingsHeader: (page: Page) => page.locator('[data-settings-header]'),
   settingsDensity: (page: Page) =>

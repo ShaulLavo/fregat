@@ -57,3 +57,5 @@ The click scenario waits 750ms between clicks so debounced document highlights, 
 `scenario editor-undo-branch --file a.ts --workspace work/tmp/plan121-undo` types A, undoes, types B, undoes, types C and CC, opens the file's History tab through the palette, checks five retained states, previews B against the current text, compares B with C by shift-clicking, restores B and checks the pane returns to the current state. `Show history` is also in the palette for any file tab; the tab's address is `h/<path>`.
 
 `scenario editor-markdown-punctuation --file README.md` hovers en dashes and invisible characters in the editor and a saved-file diff, checks their explanations, opens Unicode settings, and undoes its sample.
+
+Native grammar coverage: `editor-native-coverage-light` and `editor-native-coverage-dark` open an Astro file or Markdown fence fixture, check native worker use, edit syntax, undo and redo. Use `--workspace work/tmp/fregat-evidence/syntax-benchmark-fixtures --file Component.astro` or `--file injections.md`. `editor-syntax-native` retains the whitespace control for timing comparisons.

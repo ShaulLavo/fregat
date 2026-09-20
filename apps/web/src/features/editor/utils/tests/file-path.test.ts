@@ -8,7 +8,7 @@ import {
 
 test('keeps the tree-sitter-backed language ids stable', () => {
   expect(languageIdForFilePath('/repo/src/app.ts')).toBe('typescript')
-  expect(languageIdForFilePath('/repo/src/app.tsx')).toBe('typescript')
+  expect(languageIdForFilePath('/repo/src/app.tsx')).toBe('tsx')
   expect(languageIdForFilePath('/repo/src/app.js')).toBe('javascript')
   expect(languageIdForFilePath('/repo/src/app.jsx')).toBe('javascript')
   expect(languageIdForFilePath('/repo/src/app.css')).toBe('css')
@@ -171,4 +171,19 @@ test('maps extensionless dockerfile and makefile basenames', () => {
 test('returns null for unknown ids so they never reach shiki', () => {
   expect(languageIdForFilePath('/repo/notes.txt')).toBeNull()
   expect(languageIdForFilePath('/repo/README')).toBeNull()
+})
+
+test('detects explicit ids, exact filenames, extensions and content hints in order', () => {
+  expect(languageIdForFilePath('Cargo.lock')).toBe('toml')
+  expect(languageIdForFilePath('other.lock')).toBe('json')
+  expect(languageIdForFilePath('script.ts', { languageId: 'tsx', firstLine: '#!/bin/bash' })).toBe(
+    'tsx',
+  )
+  expect(languageIdForFilePath('script.ts', { firstLine: '#!/bin/bash' })).toBe('typescript')
+  expect(languageIdForFilePath('script', { firstLine: '#!/usr/bin/env -S python3 -u' })).toBe(
+    'python',
+  )
+  expect(languageIdForFilePath('/folder.ts/unknown')).toBeNull()
+  expect(languageIdForFilePath('types.d.ts')).toBe('typescript')
+  expect(languageIdForFilePath('script', { firstLine: '#!/bin/bash' })).toBe('shellscript')
 })

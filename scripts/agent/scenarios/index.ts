@@ -39,6 +39,7 @@ import { editorSplitHistoryState } from './editor-split-history-state'
 import { pageLifecycle } from './page-lifecycle'
 import { editorExternalEdit } from './editor-external-edit'
 import { editorThemePreview } from './editor-theme-preview'
+import { editorNativeCoverage } from './editor-native-coverage'
 import { editorSyntaxBenchmark } from './editor-syntax-benchmark'
 import { themeBundles } from './theme-bundles'
 import { bundleWallpapers } from './bundle-wallpapers'
@@ -134,6 +135,8 @@ export const scenarios: readonly Scenario[] = [
   terminalBackground,
   editorThemePreview,
   editorSyntaxBenchmark('native'),
+  editorNativeCoverage('light'),
+  editorNativeCoverage('dark'),
   editorSyntaxBenchmark('shiki'),
   editorSyntaxBenchmark('shiki', true),
   themeGallery,

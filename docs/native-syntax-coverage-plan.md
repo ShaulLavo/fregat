@@ -1,6 +1,6 @@
 # Expand native syntax coverage and improve queries
 
-Status: proposed implementation plan. Grounded in source and measurements on 2026-09-20. Implementation has not started.
+Status: implementation in progress, 2026-09-20. The generated catalog, TS/TSX split, Astro, dynamic injection loading and initial language batches are implemented. The complete Shiki inventory is in [native-syntax-coverage.md](native-syntax-coverage.md). Full-catalog admission and the remaining verification work are not complete. See [implementation notes](native-syntax-implementation.md).
 
 Keep built-in palettes on Tree-sitter. Extend the existing native provider to as many Shiki languages as available grammars and verified queries allow. Improve both query accuracy and the cost of producing highlights from trees we already maintain.
 

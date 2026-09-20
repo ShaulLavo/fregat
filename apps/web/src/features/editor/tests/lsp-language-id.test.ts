@@ -5,7 +5,7 @@ import { lspLanguageIdForPath } from '@/features/editor/utils/lsp-language-id'
 
 describe('lspLanguageIdForPath', () => {
   it('renames the JSX-bearing extensions the grammar table calls plain ts/js', () => {
-    expect(languageIdForFilePath('/a/b/Row.tsx')).toBe('typescript')
+    expect(languageIdForFilePath('/a/b/Row.tsx')).toBe('tsx')
     expect(lspLanguageIdForPath('/a/b/Row.tsx')).toBe('typescriptreact')
     expect(lspLanguageIdForPath('/a/b/Row.jsx')).toBe('javascriptreact')
   })

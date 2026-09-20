@@ -13,6 +13,8 @@ type WorkerSample = {
   includeHighlights: unknown
   includeCaptures: unknown
   timings?: unknown
+  statistics?: unknown
+  languages?: unknown
   error?: unknown
 }
 
@@ -29,6 +31,7 @@ declare global {
 export function editorSyntaxBenchmark(
   engine: 'native' | 'shiki',
   settleBackground = false,
+  palette: 'light' | 'dark' = 'dark',
 ): Scenario {
   return {
     name: `editor-syntax-${engine}${settleBackground ? '-settled' : ''}`,
@@ -36,16 +39,20 @@ export function editorSyntaxBenchmark(
       'Compare native and Shiki highlighting on identical files with browser-only settings; capture worker requests, edits, and scrolling.',
     async run(page, { file, step }) {
       const url = new URL(page.url())
-      const theme = engine === 'native' ? 'tree-sitter-dark' : 'github-dark'
+      const theme = engine === 'native' ? `tree-sitter-${palette}` : `github-${palette}`
       const settings = {
-        'workbench.colorTheme': 'dark',
+        'workbench.theme': null,
+        'workbench.theme.customizations': {},
+        'workbench.colorTheme': palette,
         'editor.codeTheme.dark': theme,
         'editor.codeTheme.light': theme,
         'files.autoSave': 'off',
       }
       await page.route(/\/settings(?:\?.*)?$/, async (route) => {
         if (route.request().method() !== 'GET') return route.continue()
-        const response = await route.fetch()
+        const response = await route.fetch({
+          headers: { ...route.request().headers(), Origin: url.origin },
+        })
         const snapshot: unknown = await response.json()
         ok(snapshot && typeof snapshot === 'object' && 'values' in snapshot)
         ok(snapshot.values && typeof snapshot.values === 'object')
@@ -63,10 +70,13 @@ export function editorSyntaxBenchmark(
       await waitForApp(page)
       await mark(page, 'open-start')
       await openFileByName(page, file)
-      await page.waitForFunction(() =>
-        window.syntaxBenchmark.requests.some(
-          (request) => request.type === 'parse' && request.end !== undefined,
-        ),
+      await page.waitForFunction(
+        () =>
+          window.syntaxBenchmark.requests.some(
+            (request) => request.type === 'parse' && request.end !== undefined,
+          ),
+        undefined,
+        { timeout: 30_000 },
       )
       await waitForWorkers(page)
       await assertHighlighting(page, engine)
@@ -180,7 +190,7 @@ function observeWorkers() {
 
   window.Worker = class extends NativeWorker {
     private readonly pending = new Map<unknown, WorkerSample>()
-    private readonly family: string
+    private family: string
 
     constructor(url: string | URL, options?: WorkerOptions) {
       super(url, options)
@@ -195,18 +205,23 @@ function observeWorkers() {
         sample.end = performance.now()
         sample.durationMs = sample.end - sample.start
         sample.timings = record(data.result).timings
+        sample.statistics = record(data.result).statistics
         sample.error = data.error
         this.pending.delete(data.id)
       })
     }
 
     override postMessage(message: unknown, options?: Transferable[] | StructuredSerializeOptions) {
+      const data = record(message)
+      const payload = record(data.payload)
+      if (['registerLanguages', 'parse', 'queryRange'].includes(String(payload.type)))
+        this.family = 'tree-sitter'
+      if (['open', 'preload', 'recolor', 'theme'].includes(String(payload.type)))
+        this.family = 'shiki'
       if (this.family === 'other') {
         if (Array.isArray(options)) return super.postMessage(message, options)
         return super.postMessage(message, options)
       }
-      const data = record(message)
-      const payload = record(data.payload)
       const sample: WorkerSample = {
         family: this.family,
         type: payload.type,
@@ -214,6 +229,9 @@ function observeWorkers() {
         start: performance.now(),
         includeHighlights: payload.includeHighlights,
         includeCaptures: payload.includeCaptures,
+        languages: Array.isArray(payload.languages)
+          ? payload.languages.map((language) => record(language).id)
+          : undefined,
       }
       this.pending.set(data.id, sample)
       window.syntaxBenchmark.requests.push(sample)
