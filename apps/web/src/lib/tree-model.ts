@@ -107,7 +107,9 @@ export function replaceDirectoryLoad(
   const directoryTreePath = directoryTreePathForResult(result.path, rootPath)
   const next = cloneTreeModel(model)
 
-  removeDirectoryChildren(next, directoryTreePath)
+  const retainedDirectories = new Set<string>()
+  collectUnlistedDirectories(model, result.entries, rootPath, retainedDirectories)
+  removeDirectoryChildren(next, directoryTreePath, retainedDirectories)
   addEntriesToModel(next, result.entries, rootPath)
   next.loadingDirectoryPaths.delete(directoryTreePath)
   next.errorByDirectoryPath.delete(directoryTreePath)
@@ -204,26 +206,55 @@ function applyDirectoryLoad(
   model.loadedDirectoryPaths.add(directoryTreePath)
 }
 
-function removeDirectoryChildren(model: TreeModel, directoryTreePath: string) {
-  for (const treePath of Array.from(model.entriesByTreePath.keys())) {
-    if (!isDirectoryChildPath(treePath, directoryTreePath)) continue
-
-    model.entriesByTreePath.delete(treePath)
+// A shallow listing says nothing about the contents of directories that still exist.
+function collectUnlistedDirectories(
+  model: TreeModel,
+  entries: readonly TreeEntry[],
+  rootPath: string,
+  retained: Set<string>,
+) {
+  for (const entry of entries) {
+    if (!isDirectoryEntry(entry)) continue
+    if (entry.children) {
+      collectUnlistedDirectories(model, entry.children, rootPath, retained)
+      continue
+    }
+    const treePath = canonicalTreePath(toTreePath(entry.path, rootPath))
+    const previous = model.entriesByTreePath.get(treePath)
+    if (previous && isDirectoryEntry(previous)) retained.add(treePath)
   }
+}
 
-  removeDirectoryState(model.loadedDirectoryPaths, directoryTreePath)
-  removeDirectoryState(model.loadingDirectoryPaths, directoryTreePath)
-  removeDirectoryState(model.errorByDirectoryPath, directoryTreePath)
+function hasRetainedDirectory(treePath: string, retained: ReadonlySet<string>) {
+  let path = treePath
+  while (path) {
+    if (retained.has(path)) return true
+    const separator = path.lastIndexOf('/')
+    if (separator < 0) return false
+    path = path.slice(0, separator)
+  }
+  return false
+}
+
+function removeDirectoryChildren(
+  model: TreeModel,
+  directoryTreePath: string,
+  retained: ReadonlySet<string>,
+) {
+  const shouldRemove = (treePath: string) =>
+    isDirectoryChildPath(treePath, directoryTreePath) && !hasRetainedDirectory(treePath, retained)
+  removeDirectoryState(model.entriesByTreePath, shouldRemove)
+  removeDirectoryState(model.loadedDirectoryPaths, shouldRemove)
+  removeDirectoryState(model.loadingDirectoryPaths, shouldRemove)
+  removeDirectoryState(model.errorByDirectoryPath, shouldRemove)
 }
 
 function removeDirectoryState(
   state: Map<string, unknown> | Set<string>,
-  directoryTreePath: string,
+  shouldRemove: (treePath: string) => boolean,
 ) {
-  for (const treePath of Array.from(state.keys())) {
-    if (!isDirectoryChildPath(treePath, directoryTreePath)) continue
-
-    state.delete(treePath)
+  for (const treePath of state.keys()) {
+    if (shouldRemove(treePath)) state.delete(treePath)
   }
 }
 

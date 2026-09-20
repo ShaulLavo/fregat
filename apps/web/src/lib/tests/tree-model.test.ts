@@ -44,6 +44,63 @@ describe('treeModelWithDirectoryLoads', () => {
 })
 
 describe('replaceDirectoryLoad', () => {
+  it.each(['repo', 'repo/src'])(
+    'preserves loaded descendants when refreshing %s',
+    (refreshedPath) => {
+      const model = treeModelWithDirectoryLoads(tree('repo', [directory('repo/src')]), 'repo', [
+        tree('repo/src', [directory('repo/src/nested'), file('repo/src/sibling.txt')]),
+        tree('repo/src/nested', [file('repo/src/nested/a.txt')]),
+      ])
+      model.loadingDirectoryPaths.add('src/nested/pending')
+      model.errorByDirectoryPath.set('src/nested/failed', 'Unavailable')
+      const entries =
+        refreshedPath === 'repo'
+          ? [directory('repo/src'), file('repo/new.txt')]
+          : [directory('repo/src/nested'), file('repo/src/new.txt')]
+      const next = replaceDirectoryLoad(model, 'repo', tree(refreshedPath, entries))
+
+      expect(next.entriesByTreePath.get('src/nested/a.txt')).toEqual(file('repo/src/nested/a.txt'))
+      expect(next.loadedDirectoryPaths).toEqual(new Set(['src', 'src/nested']))
+      expect(next.loadingDirectoryPaths.has('src/nested/pending')).toBe(true)
+      expect(next.errorByDirectoryPath.get('src/nested/failed')).toBe('Unavailable')
+      expect(model.entriesByTreePath.has('new.txt')).toBe(false)
+    },
+  )
+
+  it('refreshes explicit child listings while preserving unlisted grandchildren', () => {
+    const model = treeModelWithDirectoryLoads(tree('repo', [directory('repo/src')]), 'repo', [
+      tree('repo/src', [directory('repo/src/nested'), file('repo/src/old.txt')]),
+      tree('repo/src/nested', [file('repo/src/nested/a.txt')]),
+    ])
+    const next = replaceDirectoryLoad(
+      model,
+      'repo',
+      tree('repo', [
+        directory('repo/src', [directory('repo/src/nested'), file('repo/src/new.txt')]),
+      ]),
+    )
+
+    expect(next.entriesByTreePath.has('src/old.txt')).toBe(false)
+    expect(next.entriesByTreePath.has('src/new.txt')).toBe(true)
+    expect(next.entriesByTreePath.has('src/nested/a.txt')).toBe(true)
+    expect(next.loadedDirectoryPaths).toEqual(new Set(['src', 'src/nested']))
+  })
+
+  it('removes descendant entries and load state when a directory becomes a file', () => {
+    const model = treeModelWithDirectoryLoads(tree('repo', [directory('repo/src')]), 'repo', [
+      tree('repo/src', [directory('repo/src/nested')]),
+      tree('repo/src/nested', [file('repo/src/nested/a.txt')]),
+    ])
+    model.loadingDirectoryPaths.add('src/pending')
+    model.errorByDirectoryPath.set('src/failed', 'Unavailable')
+    const next = replaceDirectoryLoad(model, 'repo', tree('repo', [file('repo/src')]))
+
+    expect(next.paths).toEqual(['src'])
+    expect(next.loadedDirectoryPaths.size).toBe(0)
+    expect(next.loadingDirectoryPaths.size).toBe(0)
+    expect(next.errorByDirectoryPath.size).toBe(0)
+  })
+
   it('replaces root children and removes stale entries', () => {
     const model = treeModel(tree('', [directory('src'), file('src/old.ts'), file('README.md')]), '')
     const next = replaceDirectoryLoad(model, '', tree('', [file('package.json')]))

@@ -19,6 +19,7 @@ a bare root `bun run verify`.
 
 | Plan                                                                            | State                                                |
 | ------------------------------------------------------------------------------- | ---------------------------------------------------- |
+| [125 — observability overhead](125-observability-overhead.md)                   | **PROPOSED — BASELINE AND CENSUS FIRST**             |
 | [071 — syntax highlight retry](071-syntax-highlight-retry.md)                   | **PROPOSED — ROOT GO/NO-GO SCHEDULING**              |
 | [080 — Platform and VS Code keybinding modes](080-platform-keybinding-modes.md) | **PROPOSED — INTERACTION RULES CONFIRMED**           |
 | [085 — instant workspace reload](085-instant-workspace-reload.md)               | **PROPOSED — IMPLEMENTATION NOT STARTED**            |
@@ -56,6 +57,12 @@ a bare root `bun run verify`.
 | [076 — watch-reload child reaping](076-watch-reload-child-reaping.md)           | **PROPOSED — ROOT GO/NO-GO SCHEDULING**              |
 
 ## Dependency notes
+
+- Plan 125 reduces logging and measurement overhead while preserving failure evidence. It covers
+  producer admission, client/server delivery, bounded measurement lifetime and the log viewer.
+  Reconcile shared helper edits with Plan 091 and verification tooling with Plan 119; its internal
+  sequence is census/baseline → admission → producer reductions → delivery/viewer → proof/deploy.
+  It does not reorder the root roadmap or authorize a general logging-framework rewrite.
 
 - Plan 122 records the single `createPlugin` entrypoint, composable third-party extension points,
   full-power isomorphic execution, and selective notification requirements. CodeMirror/Monaco

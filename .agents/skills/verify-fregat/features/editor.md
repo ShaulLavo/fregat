@@ -14,6 +14,8 @@ Open the command palette (`Control+Shift+P`), type a file name, press Enter. Or 
 
 `scenario editor-type-burst`, `scenario editor-large-paste`, `scenario editor-fast-scroll`, `scenario editor-caret-burst`. These open `--file` (default `use-events.ts`) through the palette. For a save, press `Control+s` in a scenario and check the file on disk plus `bun run logs --action fs.write`.
 
+`trace editor-fast-scroll --file keys.ts` waits for startup before the `ready` marker, then runs repeated 1,200px sweeps and alternating 6,000px jumps through the settings registry. Compare scrolling after `ready` separately from file opening. The editor holds its complete previous paint until the next scroll paint is ready; its browser regression checks this with zero overscan, including horizontal jumps.
+
 Split views: `scenario editor-split-drag` checks edge previews, modifier changes, shared editing/undo, nested layouts, resize/reload, cancellation and duplicate collapse. `scenario editor-split-actions` checks keyboard reorder, moves, tab-strip insertion, menu size limits, numbered focus and independent scroll restore. `scenario editor-split-state` uses a disposable committed workspace to check Find and Save in the focused pane, closing one dirty copy, and the final-view save prompt. Split scenarios isolate their terminal sessions and clean them up.
 
 `scenario editor-split-content` creates and removes its own committed scratch workspace. It moves Settings and Search between groups, checks their split commands stay disabled, and copies HEAD references, history, and saved comparisons in empty and populated states. It checks read-only editing and focus in the destination group without writing repository files.

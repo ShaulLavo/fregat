@@ -54,6 +54,7 @@ import { gitHistory } from './git-history'
 import { editorCaretBurst } from './editor-caret-burst'
 import { editorFocusClicks } from './editor-focus-clicks'
 import { editorProduct } from './editor-product'
+import { treeFileClicks } from './tree-file-clicks'
 import { treeStickyScroll } from './tree-sticky-scroll'
 import { demoWorkspace } from './demo-workspace'
 import { demoAgentGit } from './demo-agent-git'
@@ -111,6 +112,7 @@ export const scenarios: readonly Scenario[] = [
   editorFocusClicks,
   editorProduct,
   treeStickyScroll,
+  treeFileClicks,
 ]
 
 export function scenarioNamed(name: string): Scenario {
