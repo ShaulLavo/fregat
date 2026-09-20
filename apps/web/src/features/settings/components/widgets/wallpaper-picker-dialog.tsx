@@ -15,7 +15,7 @@ import { EmptyState } from '@workspace/ui/components/empty-state'
 import { InputGroup, InputGroupAddon, InputGroupInput } from '@workspace/ui/components/input-group'
 import { LoadingState } from '@workspace/ui/components/loading-state'
 import { PaneBar } from '@workspace/ui/components/pane-bar'
-import { Spinner } from '@workspace/ui/components/spinner'
+import { OrbitLoader } from '@workspace/ui/components/orbit-loader'
 import { useState, type ClipboardEvent, type DragEvent } from 'react'
 import { toast } from 'sonner'
 import { WallpaperCard } from '@/features/settings/components/widgets/wallpaper-card'
@@ -161,7 +161,7 @@ export function WallpaperPickerDialog({
               disabled={disabled || actions.importDirectory.isPending}
               onClick={importOmarchy}
             >
-              {actions.importDirectory.isPending ? <Spinner /> : null}
+              {actions.importDirectory.isPending ? <OrbitLoader /> : null}
               Import Omarchy
             </Button>
           ) : null}

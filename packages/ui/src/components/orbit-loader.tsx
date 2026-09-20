@@ -15,14 +15,15 @@ const ORBIT_RINGS = [
 ] as const
 
 /**
- * A process running with no known end — an agent turn, a tool call. Three
- * dashed rings counter-rotating at unrelated speeds, so the mark never settles
- * into looking like one rigid object.
+ * The app's busy mark: a control mid-action, or a process running with no known
+ * end. Three dashed rings counter-rotating at unrelated speeds, so the mark
+ * never settles into looking like one rigid object.
  *
- * Sized for a line of text and up. Draws in currentColor.
+ * Defaults to --icon-size so it lands where an icon would in a control, and
+ * follows density with one. Draws in currentColor.
  *
- * Not the default: a region with no content yet gets LoadingState, and a button
- * mid-action gets Spinner.
+ * A region with no content yet gets LoadingState instead, and RingLoader is the
+ * quieter sibling for a whole-surface wait.
  */
 function OrbitLoader({
   className,
@@ -32,7 +33,7 @@ function OrbitLoader({
   return (
     <span
       aria-label={label}
-      className={cn('inline-block size-4', className)}
+      className={cn('inline-block size-(--icon-size)', className)}
       data-slot='orbit-loader'
       role='status'
       {...props}

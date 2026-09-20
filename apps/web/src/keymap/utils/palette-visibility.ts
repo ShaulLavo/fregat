@@ -5,7 +5,7 @@ import type { FocusTargetSnapshot } from '@/lib/focus/state/service'
 
 export function isCommandVisibleInPalette(
   command: PlatformCommandId,
-  inspection: ReturnType<PlatformCommandBus['inspect']>,
+  inspection: ReturnType<ReturnType<PlatformCommandBus['capture']>['inspect']>,
   origin: FocusTargetSnapshot | null,
 ): boolean {
   const entry = platformCommand(command)

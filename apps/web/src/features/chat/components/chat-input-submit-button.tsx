@@ -1,7 +1,7 @@
 import { ArrowUpIcon, StopIcon } from '@phosphor-icons/react'
 import { Button } from '@workspace/ui/components/button'
 import { Tooltip, TooltipContent, TooltipTrigger } from '@workspace/ui/components/tooltip'
-import { Spinner } from '@workspace/ui/components/spinner'
+import { OrbitLoader } from '@workspace/ui/components/orbit-loader'
 import {
   selectChatInputDraftHasContent,
   useChatInputDraftStore,
@@ -78,7 +78,7 @@ export function ChatInputSubmitButton({
             />
           }
         >
-          {action.kind === 'pending' ? <Spinner aria-hidden='true' className='size-4' /> : null}
+          {action.kind === 'pending' ? <OrbitLoader aria-hidden='true' /> : null}
           {action.kind === 'stop' ? (
             <StopIcon aria-hidden='true' className='size-(--icon-size)' weight='fill' />
           ) : null}

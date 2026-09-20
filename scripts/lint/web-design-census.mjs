@@ -483,7 +483,7 @@ function isIconChild(child) {
     const name = jsxName(child.openingElement.name)
     if (isHiddenElement(child.openingElement)) return true
     if (name?.endsWith('Icon')) return true
-    if (['svg', 'img', 'Spinner', 'OrbitLoader', 'RingLoader'].includes(name)) return true
+    if (['svg', 'img', 'OrbitLoader', 'RingLoader'].includes(name)) return true
     if (name !== 'span' && name !== 'div') return false
     const children = child.children.filter(isVisibleChild)
     return children.length > 0 && children.every(isIconChild)

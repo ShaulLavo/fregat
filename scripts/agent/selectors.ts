@@ -512,6 +512,7 @@ export const selectors = {
     page.locator('[data-slot="tool-pane"][aria-label="Terminal"]:visible'),
   paletteRowSelector: '[data-slot="command-list"] [role="option"]',
   paletteInput: (page: Page) => page.locator('[data-slot="command-input"]').first(),
+  paletteOptions: (page: Page) => page.locator('[data-slot="command-list"]').getByRole('option'),
   selectedPaletteOption: (page: Page) => page.locator('[cmdk-item][data-selected="true"]'),
   paletteDialog: (page: Page) => page.getByRole('dialog', { name: 'Command Palette', exact: true }),
   windowToolbar: (page: Page) => page.getByLabel('Window toolbar', { exact: true }),

@@ -10,7 +10,6 @@ import { jsonEqual, themeVariants, type ThemeDocument } from '@workspace/contrac
 import { Button } from '@workspace/ui/components/button'
 import { Input } from '@workspace/ui/components/input'
 import { OrbitLoader } from '@workspace/ui/components/orbit-loader'
-import { Spinner } from '@workspace/ui/components/spinner'
 import { toast } from 'sonner'
 import { ThemeCard } from '@/features/settings/components/widgets/theme-card'
 import { ThemeEditor } from '@/features/settings/components/widgets/theme-editor'
@@ -112,7 +111,7 @@ export function ThemeWidget({ disabled }: { disabled: boolean }) {
           disabled={disabled || actions.importArchive.isPending}
           onClick={() => input.current?.click()}
         >
-          {actions.importArchive.isPending ? <Spinner /> : null}Import theme
+          {actions.importArchive.isPending ? <OrbitLoader /> : null}Import theme
         </Button>
         {selected?.source === 'user' ? (
           <Button
@@ -121,7 +120,7 @@ export function ThemeWidget({ disabled }: { disabled: boolean }) {
             disabled={disabled || actions.remove.isPending}
             onClick={() => actions.remove.mutate(selected.id, { onError: fail })}
           >
-            {actions.remove.isPending ? <Spinner /> : null}Delete theme
+            {actions.remove.isPending ? <OrbitLoader /> : null}Delete theme
           </Button>
         ) : null}
         <Select
@@ -137,7 +136,7 @@ export function ThemeWidget({ disabled }: { disabled: boolean }) {
         >
           <SelectTrigger aria-label='Import Omarchy theme'>
             <SelectValue>
-              {actions.importOmarchy.isPending ? <Spinner /> : 'Import from Omarchy'}
+              {actions.importOmarchy.isPending ? <OrbitLoader /> : 'Import from Omarchy'}
             </SelectValue>
           </SelectTrigger>
           <SelectContent>

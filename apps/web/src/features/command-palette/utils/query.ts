@@ -54,6 +54,25 @@ export function commandPaletteItems(
     .map((spec) => platformCommandPaletteItem(spec, bindings))
 }
 
+type Inspected = { readonly status: string; readonly reason?: string }
+
+export function disabledReasonOf(inspection: Inspected) {
+  return inspection.status === 'disabled' ? (inspection.reason ?? null) : null
+}
+
+/** One inspection per command: it decides visibility and carries the disabled reason as data. */
+export function inspectedCommandItems<Inspection extends Inspected>(
+  items: readonly CommandPaletteItem[],
+  inspect: (item: CommandPaletteItem) => Inspection,
+  visible: (item: CommandPaletteItem, inspection: Inspection) => boolean,
+): readonly CommandPaletteItem[] {
+  return items.flatMap((item) => {
+    const inspection = inspect(item)
+    if (!visible(item, inspection)) return []
+    return [{ ...item, disabledReason: disabledReasonOf(inspection) }]
+  })
+}
+
 export function filePaletteItems(state: LoadState<TreeModel>): readonly FilePaletteItem[] {
   if (state.status !== 'ready') return []
 

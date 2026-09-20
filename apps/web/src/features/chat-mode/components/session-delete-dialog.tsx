@@ -1,5 +1,5 @@
 import { useIsMutating } from '@tanstack/react-query'
-import { Spinner } from '@workspace/ui/components/spinner'
+import { OrbitLoader } from '@workspace/ui/components/orbit-loader'
 import { chatModeMutationKeys } from '@/features/chat-mode/utils/mutation-keys'
 import { TrashIcon } from '@phosphor-icons/react'
 import { Button } from '@workspace/ui/components/button'
@@ -80,7 +80,7 @@ export function SessionDeleteDialog() {
             type='button'
             variant='destructive'
           >
-            {pending ? <Spinner /> : <TrashIcon data-icon='inline-start' />}
+            {pending ? <OrbitLoader /> : <TrashIcon data-icon='inline-start' />}
             Delete
           </Button>
         </DialogFooter>

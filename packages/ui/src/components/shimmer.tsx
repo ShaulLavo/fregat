@@ -7,8 +7,8 @@ import { cn } from '@workspace/ui/lib/utils'
  * detail, a summary line, a tool status. The sweep is what separates it from
  * the same sentence sitting still.
  *
- * Not a third loader: a region with nothing in it yet gets LoadingState, and a
- * control mid-action gets Spinner. This is only for text that was already
+ * Not another loader: a region with nothing in it yet gets LoadingState, and a
+ * control mid-action gets OrbitLoader. This is only for text that was already
  * earning its place.
  */
 function Shimmer({ children, className, ...props }: ComponentProps<'span'>) {

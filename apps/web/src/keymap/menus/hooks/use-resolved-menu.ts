@@ -21,9 +21,12 @@ export function useResolvedMenu(
     source: { kind: 'menu', surface },
   } satisfies CommandInvocation
 
+  // One capture for the whole menu: every item reads the same snapshot.
+  const captured = bus.capture(invocation)
+
   return resolveMenu(menu, {
     bindings,
     dispatch: (command) => bus.dispatch(command, invocation),
-    inspect: (command) => bus.inspect(command, invocation),
+    inspect: captured.inspect,
   })
 }

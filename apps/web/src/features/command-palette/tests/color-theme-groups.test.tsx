@@ -116,7 +116,6 @@ function CommandPaletteActionsProvider({
 
 function commandPaletteActions(): CommandPaletteActions {
   return {
-    disabledReasonForCommand: vi.fn(() => null),
     previewColorTheme: vi.fn(),
     selectColorTheme: vi.fn(),
     selectContent: () => Promise.resolve(),

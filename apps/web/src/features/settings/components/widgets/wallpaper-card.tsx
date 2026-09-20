@@ -7,7 +7,7 @@ import {
   DropdownMenuItem,
   DropdownMenuTrigger,
 } from '@workspace/ui/components/dropdown-menu'
-import { Spinner } from '@workspace/ui/components/spinner'
+import { OrbitLoader } from '@workspace/ui/components/orbit-loader'
 import { Tooltip, TooltipContent, TooltipTrigger } from '@workspace/ui/components/tooltip'
 import { WallpaperChoice } from '@/features/settings/components/widgets/wallpaper-choice'
 import { libraryImageUrl } from '@/lib/wallpapers/state/queries'
@@ -67,7 +67,7 @@ export function WallpaperCard({
                 />
               }
             >
-              {deleting ? <Spinner /> : <DotsThreeIcon weight='bold' />}
+              {deleting ? <OrbitLoader /> : <DotsThreeIcon weight='bold' />}
             </TooltipTrigger>
             <TooltipContent>Actions for {asset.name}</TooltipContent>
           </Tooltip>

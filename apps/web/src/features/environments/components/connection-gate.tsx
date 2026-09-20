@@ -3,7 +3,7 @@ import { useQuery } from '@tanstack/react-query'
 import type { ReactNode } from 'react'
 import { Button } from '@workspace/ui/components/button'
 import { RingLoader } from '@workspace/ui/components/ring-loader'
-import { Spinner } from '@workspace/ui/components/spinner'
+import { OrbitLoader } from '@workspace/ui/components/orbit-loader'
 
 import { clientForQueryClient, originForQueryClient } from '@/lib/environments/state/query-clients'
 import { selectServerConnection } from '@workspace/client-core/environments/state/store'
@@ -41,7 +41,7 @@ export function ConnectionGate({
             : toClientError(query.error).message}
         </p>
         <Button onClick={() => void query.refetch()} disabled={query.isFetching}>
-          {query.isFetching ? <Spinner /> : null} Retry connection
+          {query.isFetching ? <OrbitLoader /> : null} Retry connection
         </Button>
       </div>
     )

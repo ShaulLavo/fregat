@@ -12,7 +12,7 @@ import { cn } from '@workspace/ui/lib/utils'
  * this one when the wait should stay quiet.
  *
  * Still not the default: a region with no content yet gets LoadingState, and a
- * button mid-action gets Spinner. This is for a wait worth looking at.
+ * control mid-action gets OrbitLoader. This is for a wait worth looking at.
  */
 function RingLoader({
   className,

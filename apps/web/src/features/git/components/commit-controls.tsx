@@ -8,7 +8,7 @@ import {
   InputGroupInput,
 } from '@workspace/ui/components/input-group'
 import { PaneBar } from '@workspace/ui/components/pane-bar'
-import { Spinner } from '@workspace/ui/components/spinner'
+import { OrbitLoader } from '@workspace/ui/components/orbit-loader'
 import { Tooltip, TooltipContent, TooltipTrigger } from '@workspace/ui/components/tooltip'
 import { useId, type ChangeEvent, type KeyboardEvent } from 'react'
 
@@ -88,7 +88,7 @@ export function CommitControls({
                     size='icon-xs'
                   >
                     {generation.isPending ? (
-                      <Spinner aria-hidden='true' role='presentation' />
+                      <OrbitLoader aria-hidden='true' role='presentation' />
                     ) : (
                       <SparkleIcon aria-hidden='true' />
                     )}
@@ -109,7 +109,7 @@ export function CommitControls({
             variant='default'
           >
             {syncChanges.isPending ? (
-              <Spinner aria-hidden='true' role='presentation' />
+              <OrbitLoader aria-hidden='true' role='presentation' />
             ) : (
               <ArrowsClockwiseIcon className='size-(--icon-size-sm)' />
             )}
@@ -125,7 +125,11 @@ export function CommitControls({
             type='button'
             variant='default'
           >
-            <CheckIcon className='size-(--icon-size-sm)' />
+            {commit.isPending ? (
+              <OrbitLoader aria-hidden='true' className='size-(--icon-size-sm)' />
+            ) : (
+              <CheckIcon className='size-(--icon-size-sm)' />
+            )}
             Commit
             <span className='text-primary-foreground/65 text-3xs'>⌘↵</span>
           </Button>

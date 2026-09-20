@@ -14,8 +14,8 @@ export function PlatformCommandItem({
   icon: Icon
   active?: boolean
 }) {
-  const { disabledReasonForCommand, selectPlatformCommand } = useActions()
-  const disabledReason = disabledReasonForCommand(item.command)
+  const { selectPlatformCommand } = useActions()
+  const disabledReason = item.disabledReason ?? null
 
   return (
     <CommandItem

@@ -238,13 +238,6 @@ export class CommandBus<
     this.#options = options
   }
 
-  inspect(
-    id: Id,
-    invocation: Invocation,
-  ): CommandInspection<Id, Runtime, Snapshot, Target, Invocation> {
-    return this.capture(invocation).inspect(id)
-  }
-
   capture(invocation: Invocation) {
     const runtime = this.#options.captureRuntime()
     const snapshot = runtime ? this.#options.captureSnapshot(runtime, invocation) : null
@@ -298,7 +291,7 @@ export class CommandBus<
     invocation: Invocation,
     captured?: CommandInspection<Id, Runtime, Snapshot, Target, Invocation>,
   ): CommandDispatchTicket {
-    return this.#dispatch(id, invocation, () => captured ?? this.inspect(id, invocation))
+    return this.#dispatch(id, invocation, () => captured ?? this.capture(invocation).inspect(id))
   }
 
   #dispatch(

@@ -62,7 +62,7 @@ test('disabled inspection does not execute and dispatch remains unclaimed', asyn
     snapshot: { ...enabledSnapshot, workspaceOpen: false },
   })
 
-  expect(harness.bus.inspect('test.command', invocation)).toMatchObject({
+  expect(harness.bus.capture(invocation).inspect('test.command')).toMatchObject({
     reason: 'No workspace open.',
     status: 'disabled',
   })
@@ -83,7 +83,7 @@ test('a missing target is disabled and a target lost after inspection is unavail
   const definition = syncWorkspaceDefinition(run)
   const missing = commandBusHarness(definition, { resolveTarget: () => null })
 
-  expect(missing.bus.inspect('test.command', invocation)).toMatchObject({
+  expect(missing.bus.capture(invocation).inspect('test.command')).toMatchObject({
     reason: 'No compatible command target is available.',
     status: 'disabled',
   })
@@ -95,7 +95,7 @@ test('a missing target is disabled and a target lost after inspection is unavail
   const lost = commandBusHarness(definition, {
     targetIsAvailable: () => targetLive,
   })
-  expect(lost.bus.inspect('test.command', invocation).status).toBe('ready')
+  expect(lost.bus.capture(invocation).inspect('test.command').status).toBe('ready')
   targetLive = false
 
   const lostTicket = lost.bus.dispatch('test.command', invocation)

@@ -3,7 +3,7 @@ import { useListbox } from '@workspace/ui/patterns/use-listbox'
 import { Button } from '@workspace/ui/components/button'
 import { EmptyState } from '@workspace/ui/components/empty-state'
 import { LoadingState } from '@workspace/ui/components/loading-state'
-import { Spinner } from '@workspace/ui/components/spinner'
+import { OrbitLoader } from '@workspace/ui/components/orbit-loader'
 import { useSshHosts } from '@/features/environments/hooks/use-ssh-hosts'
 import { SshHostOption } from '@/features/environments/components/ssh-host-option'
 
@@ -48,7 +48,7 @@ export function SshHostList({
             disabled={query.isFetching}
             onClick={() => void query.refetch()}
           >
-            {query.isFetching ? <Spinner /> : null}Retry
+            {query.isFetching ? <OrbitLoader /> : null}Retry
           </Button>
         }
       />

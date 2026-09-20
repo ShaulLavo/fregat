@@ -66,7 +66,7 @@ function reportSilentHold(area: string, intentId: string, summary: string | unde
     summary,
     heldMs: SILENT_HOLD_MS,
     why: 'A change has been pending with no loader or busy marker anywhere on the page.',
-    fix: 'Show a pending affordance for this action: Spinner on the control, OrbitLoader beside the row, or a projected value the user can see.',
+    fix: 'Show a pending affordance for this action: OrbitLoader on the control or beside the row, or a projected value the user can see.',
   })
 }
 

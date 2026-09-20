@@ -29,6 +29,7 @@ export type FilePaletteItem = {
 export type ViewPaletteItem = {
   readonly command: PlatformCommandId
   readonly description: string
+  readonly disabledReason?: string | null
   readonly title: string
   readonly value: string
 }
@@ -36,6 +37,7 @@ export type ViewPaletteItem = {
 export type ColorModePaletteItem = {
   readonly command: PlatformCommandId
   readonly description: string
+  readonly disabledReason?: string | null
   readonly mode: Theme
   readonly title: string
   readonly value: string

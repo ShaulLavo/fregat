@@ -18,7 +18,7 @@ import {
 import { EmptyState } from '@workspace/ui/components/empty-state'
 import { LoadingState } from '@workspace/ui/components/loading-state'
 import { RingLoader } from '@workspace/ui/components/ring-loader'
-import { Spinner } from '@workspace/ui/components/spinner'
+import { OrbitLoader } from '@workspace/ui/components/orbit-loader'
 import { useLayoutEffect, useRef } from 'react'
 
 import { useWorkspaceEditState } from '@/features/editor/hooks/use-workspace-edit-state'
@@ -191,7 +191,7 @@ export function WorkspaceEditPreviewDialog() {
             type='button'
           >
             {processing ? (
-              <Spinner aria-hidden='true' data-icon='inline-start' role='presentation' />
+              <OrbitLoader aria-hidden='true' data-icon='inline-start' role='presentation' />
             ) : (
               <ArrowsClockwiseIcon data-icon='inline-start' />
             )}

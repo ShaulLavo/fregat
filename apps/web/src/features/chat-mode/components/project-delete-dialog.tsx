@@ -3,7 +3,7 @@ import {
   useChatProjectionStore,
 } from '@/features/chat/state/chat-projection-store'
 import { useWorktreeManagerStore } from '@/features/chat-mode/state/worktree-manager-store'
-import { Spinner } from '@workspace/ui/components/spinner'
+import { OrbitLoader } from '@workspace/ui/components/orbit-loader'
 import { TrashIcon } from '@phosphor-icons/react'
 import { Button } from '@workspace/ui/components/button'
 import {
@@ -117,7 +117,7 @@ export function ProjectDeleteDialog() {
             type='button'
             variant='destructive'
           >
-            {pending ? <Spinner /> : <TrashIcon data-icon='inline-start' />}
+            {pending ? <OrbitLoader /> : <TrashIcon data-icon='inline-start' />}
             Delete
           </Button>
         </DialogFooter>

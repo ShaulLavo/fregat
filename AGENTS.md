@@ -142,12 +142,11 @@ Interaction treatments are utilities, not strings to copy:
 
 ## Loading And Empty States
 
-- Never hand-roll a loader. There are five, they live in `@workspace/ui`, and every waiting state in the app is one of them. No `animate-spin` on a borrowed icon, no `animate-pulse` dots, no bare "Loading…" paragraph.
+- Never hand-roll a loader. There are four, they live in `@workspace/ui`, and every waiting state in the app is one of them. No `animate-spin` on a borrowed icon, no `animate-pulse` dots, no bare "Loading…" paragraph.
 - Pick by **where the wait is**, not by which feature you are in:
   - `LoadingState` — a region with no content yet (a pane, a list, a popover menu). Skeleton rows.
-  - `OrbitLoader` — a process running with no known end, in a slot beside a label: a header cell, a list row, a status line. This is the default small loader.
+  - `OrbitLoader` — the default. A control mid-action (a button that was clicked and is now working), or a process with no known end in a slot beside a label: a header cell, a list row, a status line. It defaults to `--icon-size`, so in a control it lands exactly where the icon it replaces did.
   - `RingLoader` — the same, when the wait should stay quiet. Also the one to scale up for a whole-surface wait.
-  - `Spinner` — a control mid-action: a button that was clicked and is now working.
   - `Shimmer` — text already on screen, transiently in progress, _inline inside a running sentence_ where a mark would break the flow. Never a substitute for a loader in a slot that can hold one.
 - A loading state and an empty state must never look alike. "Loading X" and "No X" set in the same type is a bug — the user cannot tell a slow panel from an empty one. Pending gets a loader; `EmptyState` is only for a verdict the app can actually deliver.
 - Check the fall-through. A list that only branches on `error` and `length === 0` will show "Nothing here" while it is still fetching. Branch on pending **before** empty.
@@ -185,7 +184,7 @@ Interaction treatments are utilities, not strings to copy:
 ## Async Effects Go Through TanStack
 
 - Every effect that reaches the server or writes state another consumer reads is a TanStack mutation: `useMutation` in React, the same `mutationOptions` executed through `runMutation` in `lib/mutations/run.ts` outside it, which is a `MutationObserver` over the same client. Command handlers, services in `state/`, toast buttons and dialogs are not exempt. A bare `await client.x.y.post()` or `await writeFileContent()` behind a `useState` flag is the thing this rule bans.
-- Every mutation carries a `mutationKey` from the feature's `mutation-keys.ts`. That key is how the rest of the app sees the effect: in-flight state is `useIsMutating` / `useMutationState`, never a local `pending` or `saving` boolean, and a `Button` shows `Spinner` from that.
+- Every mutation carries a `mutationKey` from the feature's `mutation-keys.ts`. That key is how the rest of the app sees the effect: in-flight state is `useIsMutating` / `useMutationState`, never a local `pending` or `saving` boolean, and a `Button` shows `OrbitLoader` from that.
 - A mutation settles the cache before it resolves. `setQueryData` with the response when the server returned the new state, `invalidateQueries` on the keys it could have changed otherwise. "It will arrive over the socket" is not settlement; taint the query anyway. The cost of a redundant refetch is nothing, the cost of a stale snapshot is a phantom conflict.
 - Two calls of the same mutation while one is in flight never throw "busy". Give them a `scope: { id }` so TanStack runs them serially, and let the second observe the first's result before it decides whether it still has work. VS Code's save sequentializer is the model: join an identical request, queue at most one follow-up.
 - A read is a query even when the transport is a POST. Session search and root validation are reads; they get `queryOptions`, a `queryKey` and a `staleTime`, not an ad-hoc abort controller.

@@ -7,7 +7,7 @@ import { RingLoader } from '@workspace/ui/components/ring-loader'
 import { CheckIcon, QuestionIcon } from '@phosphor-icons/react'
 import { Button } from '@workspace/ui/components/button'
 import { Input } from '@workspace/ui/components/input'
-import { Spinner } from '@workspace/ui/components/spinner'
+import { OrbitLoader } from '@workspace/ui/components/orbit-loader'
 import { Textarea } from '@workspace/ui/components/textarea'
 import { useId, useState, useRef } from 'react'
 
@@ -268,7 +268,7 @@ export function PendingUserInputCard({ pending }: { readonly pending: PendingUse
             type='button'
           >
             {response.kind === 'submitting' ? (
-              <Spinner aria-hidden='true' className='size-3.5' />
+              <OrbitLoader aria-hidden='true' className='size-3.5' />
             ) : null}
             {response.kind === 'submitting' ? 'Submitting…' : 'Submit'}
           </Button>

@@ -8,15 +8,18 @@ import {
 import { useEffect, useMemo, type KeyboardEvent } from 'react'
 
 import { GroupsFactory } from '@/features/command-palette/components/groups-factory'
+import { colorModePaletteItems, viewPaletteItems } from '@/features/command-palette/utils/data'
 import {
   activeEditorFocusDestination,
   colorThemeIdFromItemValue,
   commandKeepsPaletteOpen,
   commandPaletteItems,
+  disabledReasonOf,
   editorPaletteItems,
   emptyLabelForMode,
   focusTransitionAcknowledged,
   groupedCommandItems,
+  inspectedCommandItems,
   isColorPreviewMode,
   paletteCommandInvocation,
   paletteCommandSucceeded,
@@ -126,15 +129,36 @@ export function CommandPaletteContent() {
     enabled: open && mode === 'scripts',
     rootPath: rootFolder?.path ?? null,
   })
-  const commandContext = bus.capture(paletteCommandInvocation(paletteOrigin))
+  // One capture per render, and only in the modes that list commands: a capture reads the
+  // whole workspace, and quick open would pay for it on every keystroke and discard it.
+  const commandContext =
+    mode === 'commands' || mode === 'views' || mode === 'colorMode'
+      ? bus.capture(paletteCommandInvocation(paletteOrigin))
+      : null
   const commandOrigin = paletteOrigin ? focus.getTarget(paletteOrigin) : null
-  const commandItems = commandPaletteItems(platformCommandSpecs, bindings).filter((item) =>
-    isCommandVisibleInPalette(
-      item.command.command,
-      commandContext.inspect(item.command.command),
-      commandOrigin,
-    ),
-  )
+  const commandItems =
+    commandContext && mode === 'commands'
+      ? inspectedCommandItems(
+          commandPaletteItems(platformCommandSpecs, bindings),
+          (item) => commandContext.inspect(item.command.command),
+          (item, inspection) =>
+            isCommandVisibleInPalette(item.command.command, inspection, commandOrigin),
+        )
+      : []
+  const viewItems =
+    commandContext && mode === 'views'
+      ? viewPaletteItems.map((item) => ({
+          ...item,
+          disabledReason: disabledReasonOf(commandContext.inspect(item.command)),
+        }))
+      : []
+  const colorModeItems =
+    commandContext && mode === 'colorMode'
+      ? colorModePaletteItems.map((item) => ({
+          ...item,
+          disabledReason: disabledReasonOf(commandContext.inspect(item.command)),
+        }))
+      : []
   const recentCommandIds = useRecentCommandIds()
   const groups = groupedCommandItems(commandItems, search, recentCommandIds)
   const { ref: paletteTargetRef } = useFocusTarget<HTMLDivElement>({
@@ -253,10 +277,6 @@ export function CommandPaletteContent() {
     }
 
     return {
-      disabledReasonForCommand: (command) => {
-        const inspection = bus.inspect(command, paletteCommandInvocation(paletteOrigin))
-        return inspection.status === 'disabled' ? inspection.reason : null
-      },
       previewColorTheme: (themeId) => {
         previewEditorTheme(resolvedTheme, themeId)
       },
@@ -388,6 +408,7 @@ export function CommandPaletteContent() {
         {!fileSearchUnsettled && <CommandEmpty>{emptyLabelForMode(mode)}</CommandEmpty>}
         <CommandPaletteActionsContext value={actions}>
           <GroupsFactory
+            colorModeItems={colorModeItems}
             commandGroups={groups}
             currentTheme={theme}
             editorItems={editorItems}
@@ -401,6 +422,7 @@ export function CommandPaletteContent() {
             sessionProjects={sessionProjects}
             symbolItems={symbolQuery.data ?? []}
             symbolsPending={symbolsEnabled && symbolQuery.isPending}
+            viewItems={viewItems}
           />
         </CommandPaletteActionsContext>
       </CommandList>

@@ -1,3 +1,4 @@
+import { colorModePaletteItems } from '@/features/command-palette/utils/data'
 import { render, screen } from '@testing-library/react'
 import { vi } from 'vitest'
 
@@ -17,7 +18,7 @@ test('rows carry the value the preview path reads back', () => {
   render(
     <CommandPaletteActionsProvider actions={actions}>
       <Command>
-        <ColorModeGroups currentTheme='light' />
+        <ColorModeGroups currentTheme='light' items={colorModePaletteItems} />
       </Command>
     </CommandPaletteActionsProvider>,
   )
@@ -43,7 +44,6 @@ function CommandPaletteActionsProvider({
 
 function commandPaletteActions(): CommandPaletteActions {
   return {
-    disabledReasonForCommand: vi.fn(() => null),
     previewColorTheme: vi.fn(),
     selectColorTheme: vi.fn(),
     selectContent: () => Promise.resolve(),

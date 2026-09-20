@@ -14,7 +14,7 @@ import { Button } from '@workspace/ui/components/button'
 import { EmptyState } from '@workspace/ui/components/empty-state'
 import { LoadingState } from '@workspace/ui/components/loading-state'
 import { PaneBar } from '@workspace/ui/components/pane-bar'
-import { Spinner } from '@workspace/ui/components/spinner'
+import { OrbitLoader } from '@workspace/ui/components/orbit-loader'
 import { useEffect, useMemo, useState, useSyncExternalStore, type KeyboardEvent } from 'react'
 
 import { DiffEditor } from '@/features/editor/components/diff-editor'
@@ -213,7 +213,11 @@ export function HistoryPane({
                 variant='outline'
                 onClick={() => focused && restore.mutate(focused.id)}
               >
-                {restoring ? <Spinner /> : <ArrowCounterClockwiseIcon data-icon='inline-start' />}
+                {restoring ? (
+                  <OrbitLoader />
+                ) : (
+                  <ArrowCounterClockwiseIcon data-icon='inline-start' />
+                )}
                 Restore
               </Button>
               <Button
@@ -291,7 +295,7 @@ function BarrierBody({
   const action =
     onUndo && group ? (
       <Button disabled={!group.undoable || undoing} size='sm' type='button' onClick={onUndo}>
-        {undoing ? <Spinner /> : <ArrowCounterClockwiseIcon data-icon='inline-start' />}
+        {undoing ? <OrbitLoader /> : <ArrowCounterClockwiseIcon data-icon='inline-start' />}
         Undo workspace edit
       </Button>
     ) : null

@@ -19,7 +19,6 @@ import { defaultPlatformKeyBindings } from '@/keymap/default-bindings'
 
 const RECENTS = ['workspace.showSettings', 'workspace.showChatMode'] as const
 const COMMAND_PALETTE_ACTIONS: CommandPaletteActions = {
-  disabledReasonForCommand: () => null,
   previewColorTheme: () => undefined,
   selectColorTheme: () => undefined,
   selectContent: () => Promise.resolve(),

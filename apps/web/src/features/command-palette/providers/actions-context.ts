@@ -8,7 +8,6 @@ import type { FlatDocumentSymbol } from '@/lib/document-symbols'
 import type { PlatformCommandId } from '@/keymap/types'
 
 export type CommandPaletteActions = {
-  readonly disabledReasonForCommand: (command: PlatformCommandId) => string | null
   readonly previewColorTheme: (themeId: string) => void
   readonly selectColorTheme: (themeId: string) => void
   readonly selectContent: (content: TabContent) => Promise<void>

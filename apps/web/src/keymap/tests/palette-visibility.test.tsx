@@ -35,7 +35,7 @@ test('offers useful editing actions once while keyboard-only commands still disp
   const items = commandPaletteItems(platformCommandSpecs, bindings).filter((item) =>
     isCommandVisibleInPalette(
       item.command.command,
-      bus.inspect(item.command.command, invocation),
+      bus.capture(invocation).inspect(item.command.command),
       origin,
     ),
   )
@@ -72,7 +72,7 @@ test('hides unrelated editor actions but keeps read-only editing actions visibly
   const invocation = { source: { kind: 'palette' } } as const
   const editorCommand = 'editor.editor.action.formatDocument'
   expect(
-    isCommandVisibleInPalette(editorCommand, bus.inspect(editorCommand, invocation), null),
+    isCommandVisibleInPalette(editorCommand, bus.capture(invocation).inspect(editorCommand), null),
   ).toBe(false)
 
   const registration = focus.register({
@@ -83,7 +83,7 @@ test('hides unrelated editor actions but keeps read-only editing actions visibly
     onIntent: () => true,
   })
   const editorInvocation = { ...invocation, origin: registration.token }
-  const inspection = bus.inspect(editorCommand, editorInvocation)
+  const inspection = bus.capture(editorInvocation).inspect(editorCommand)
   expect(inspection.status).toBe('disabled')
   expect(
     isCommandVisibleInPalette(editorCommand, inspection, focus.getTarget(registration.token)),
@@ -115,7 +115,7 @@ test('keeps global preferences and relevant disabled commands while hiding other
   const visible = () =>
     platformCommands
       .filter((command) =>
-        isCommandVisibleInPalette(command.id, bus.inspect(command.id, invocation), null),
+        isCommandVisibleInPalette(command.id, bus.capture(invocation).inspect(command.id), null),
       )
       .map((command) => command.id)
 
@@ -125,7 +125,7 @@ test('keeps global preferences and relevant disabled commands while hiding other
   expect(visible()).not.toContain('workspace.openSearchEditor')
   expect(visible()).not.toContain('workspace.nextSession')
   expect(visible()).toContain('workspace.saveFile')
-  expect(bus.inspect('workspace.saveFile', invocation).status).toBe('disabled')
+  expect(bus.capture(invocation).inspect('workspace.saveFile').status).toBe('disabled')
 
   runtime.workspace.getState().switchWorkspace(rootFolder)
   runtime.workspace.getState().setUiMode('workbench')

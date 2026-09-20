@@ -2,7 +2,7 @@ import { useId, useState, type FormEvent } from 'react'
 import type { MachineAuthPrompt } from '@workspace/contracts'
 import { Button } from '@workspace/ui/components/button'
 import { Input } from '@workspace/ui/components/input'
-import { Spinner } from '@workspace/ui/components/spinner'
+import { OrbitLoader } from '@workspace/ui/components/orbit-loader'
 import {
   Dialog,
   DialogContent,
@@ -78,7 +78,7 @@ export function AuthForm({ prompt }: { readonly prompt: MachineAuthPrompt }) {
               Cancel
             </Button>
             <Button type='submit' disabled={pending || (!confirmation && secret.length === 0)}>
-              {pending ? <Spinner /> : null}
+              {pending ? <OrbitLoader /> : null}
               {confirmation ? 'Trust and connect' : 'Continue'}
             </Button>
           </DialogFooter>

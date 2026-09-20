@@ -4,7 +4,7 @@ import { Dialog } from '@workspace/ui/components/dialog'
 import { ActionDialogContent } from '@/components/action-dialog-content'
 
 import type { DeleteTarget } from '@/features/workspace/hooks/use-fs-actions'
-import { Spinner } from '@workspace/ui/components/spinner'
+import { OrbitLoader } from '@workspace/ui/components/orbit-loader'
 
 /**
  * Deleting is the one tree action with nothing to undo — no trash, no revert —
@@ -42,7 +42,7 @@ export function DeleteEntryDialog({
           variant='destructive'
         >
           {deleting ? (
-            <Spinner aria-hidden='true' data-icon='inline-start' role='presentation' />
+            <OrbitLoader aria-hidden='true' data-icon='inline-start' role='presentation' />
           ) : (
             <TrashIcon data-icon='inline-start' />
           )}

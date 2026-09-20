@@ -12,7 +12,7 @@ import {
 } from '@phosphor-icons/react'
 import { Button } from '@workspace/ui/components/button'
 import { PaneBar } from '@workspace/ui/components/pane-bar'
-import { Spinner } from '@workspace/ui/components/spinner'
+import { OrbitLoader } from '@workspace/ui/components/orbit-loader'
 import { Tooltip, TooltipContent, TooltipTrigger } from '@workspace/ui/components/tooltip'
 import {
   DropdownMenu,
@@ -42,7 +42,7 @@ export function SessionBulkBar() {
         <DropdownMenuTrigger
           render={
             <Button size='sm' variant='ghost' disabled={pending}>
-              {pending ? <Spinner /> : null}Actions
+              {pending ? <OrbitLoader /> : null}Actions
             </Button>
           }
         />

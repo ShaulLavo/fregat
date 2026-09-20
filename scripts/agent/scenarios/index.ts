@@ -45,6 +45,8 @@ import { wallpaperIconHints } from './wallpaper-icon-hints'
 import { terminalBackground } from './terminal-background'
 import { bottomPanelPersistence } from './bottom-panel-persistence'
 import { gitStageSettles } from './git-stage-settles'
+import { commandPaletteTypeBurst } from './command-palette-type-burst'
+import { zzDebugStash } from './zz-debug-stash'
 import { chatFollowUp } from './chat-follow-up'
 import { chatDiffSyntax } from './chat-diff-syntax'
 import { editorSplitDrag } from './editor-split-drag'
@@ -190,6 +192,8 @@ export const scenarios: readonly Scenario[] = [
   terminalBackground,
   bottomPanelPersistence,
   gitStageSettles,
+  commandPaletteTypeBurst,
+  zzDebugStash,
   editorThemePreview,
   editorSyntaxBenchmark('native'),
   editorNativeCoverage('light'),

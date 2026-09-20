@@ -21,7 +21,7 @@ import {
   DialogTitle,
 } from '@workspace/ui/components/dialog'
 import { Input } from '@workspace/ui/components/input'
-import { Spinner } from '@workspace/ui/components/spinner'
+import { OrbitLoader } from '@workspace/ui/components/orbit-loader'
 import { useEffect, useState } from 'react'
 import { toast } from 'sonner'
 
@@ -188,7 +188,7 @@ function PaletteEditorBody({
           onClick={() => void apply()}
           type='button'
         >
-          {saving ? <Spinner /> : null}
+          {saving ? <OrbitLoader /> : null}
           Apply
         </Button>
       </DialogFooter>

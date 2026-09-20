@@ -9,10 +9,12 @@ import { ColorModeGroups } from '@/features/command-palette/components/color-mod
 import { ColorThemeGroups } from '@/features/command-palette/components/color-theme-groups'
 import { CommandGroups } from '@/features/command-palette/components/command-groups'
 import type {
+  ColorModePaletteItem,
   CommandPaletteItem,
   EditorPaletteItem,
   FilePaletteItem,
   QuickAccessMode,
+  ViewPaletteItem,
 } from '@/features/command-palette/utils/types'
 import { EditorGroups } from '@/features/command-palette/components/editor-groups'
 import { QuickOpenGroups } from '@/features/command-palette/components/quick-open-groups'
@@ -24,6 +26,7 @@ import type { ProjectScriptSuggestion } from '@/features/chat-mode/utils/project
 import type { SessionRailItem, SessionRailProject } from '@workspace/client-core/chat/rail/model'
 
 type GroupsFactoryProps = {
+  readonly colorModeItems: readonly ColorModePaletteItem[]
   readonly commandGroups: readonly (readonly [string, readonly CommandPaletteItem[]])[]
   readonly currentTheme: Theme
   readonly editorItems: readonly EditorPaletteItem[]
@@ -37,9 +40,11 @@ type GroupsFactoryProps = {
   readonly sessionProjects: readonly SessionRailProject[]
   readonly symbolItems: readonly FlatDocumentSymbol[]
   readonly symbolsPending: boolean
+  readonly viewItems: readonly ViewPaletteItem[]
 }
 
 export function GroupsFactory({
+  colorModeItems,
   commandGroups,
   currentTheme,
   editorItems,
@@ -53,17 +58,18 @@ export function GroupsFactory({
   sessionProjects,
   symbolItems,
   symbolsPending,
+  viewItems,
 }: GroupsFactoryProps) {
   if (mode === 'commands') {
     return <CommandGroups groups={commandGroups} />
   }
 
   if (mode === 'views') {
-    return <ViewGroups />
+    return <ViewGroups items={viewItems} />
   }
 
   if (mode === 'colorMode') {
-    return <ColorModeGroups currentTheme={currentTheme} />
+    return <ColorModeGroups currentTheme={currentTheme} items={colorModeItems} />
   }
 
   if (mode === 'appColors') {

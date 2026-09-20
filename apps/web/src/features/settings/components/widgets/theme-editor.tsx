@@ -2,7 +2,7 @@ import { useContext, useEffect, useState } from 'react'
 import type { ColorMode, ThemeDocument } from '@workspace/contracts'
 import { Button } from '@workspace/ui/components/button'
 import { Input } from '@workspace/ui/components/input'
-import { Spinner } from '@workspace/ui/components/spinner'
+import { OrbitLoader } from '@workspace/ui/components/orbit-loader'
 import {
   Dialog,
   DialogContent,
@@ -86,7 +86,7 @@ export function ThemeEditor({
             Cancel
           </Button>
           <Button disabled={pending || !document.name.trim()} onClick={() => onSave(document)}>
-            {pending ? <Spinner /> : null}Save and apply
+            {pending ? <OrbitLoader /> : null}Save and apply
           </Button>
         </DialogFooter>
       </DialogContent>
