@@ -161,6 +161,7 @@ Interaction treatments are utilities, not strings to copy:
 - A local boundary does not log. The root's `onCaughtError` reports every caught error once; `onError` is only for fields the root cannot know, such as a fence language.
 - Boundaries are for render bugs. Query and mutation failures stay state rendered through `ToolPane`; do not adopt `throwOnError`.
 - Keep a boundary below anything that must stay mounted. A terminal unmounted by a sibling's crash detaches its PTY.
+- Content that must outlive its layout goes through `lib/keep-alive`: `KeepAliveProvider` above every layout it must survive, a `KeepAliveSlot` where it shows, `useKeptIds` as the only thing that ends it. Terminals use it, so a mode switch, a collapsed panel or another tab parks a terminal instead of unmounting it. Do not re-solve this with `invisible` + `inert` wrappers or collapsed panels. Kept content renders under the provider, so it sees the provider's context, not its slot's; take the `attached` argument to stand down while parked.
 - `LoggingErrorBoundary` at the root is the last resort for providers, router and bootstrap.
 
 ## Truncation And Recovery

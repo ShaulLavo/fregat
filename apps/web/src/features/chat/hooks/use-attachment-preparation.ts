@@ -68,10 +68,15 @@ export function useAttachmentPreparation(target: ChatInputDraftTarget) {
       useChatInputDraftStore.getState().removeAttachment(target, input.remove.id)
     },
     onError: (error) => setError(errorMessage(error, 'Attachment operation failed.')),
-    onSettled: () => useChatInputDraftStore.getState().changeAttachmentPreparation(target, -1),
+    onSettled: (_data, _error, input) => {
+      if (!('remove' in input))
+        useChatInputDraftStore.getState().changeAttachmentPreparation(target, -1)
+    },
   })
   const start = (input: Parameters<typeof mutation.mutate>[0]) => {
-    useChatInputDraftStore.getState().changeAttachmentPreparation(target, 1)
+    // A removal has already left the draft, so its server delete must not hold up send or stash.
+    if (!('remove' in input))
+      useChatInputDraftStore.getState().changeAttachmentPreparation(target, 1)
     mutation.mutate(input)
   }
   return {

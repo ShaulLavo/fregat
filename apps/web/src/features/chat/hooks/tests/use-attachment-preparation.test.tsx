@@ -54,3 +54,39 @@ test('queued attachment batches block every composer and storage failure preserv
     vi.unstubAllGlobals()
   }
 })
+
+test('removing an attachment never counts as preparing, so send and stash stay available', async () => {
+  vi.stubGlobal('indexedDB', {
+    open: () => {
+      throw new DOMException('Storage unavailable')
+    },
+  })
+  resetChatInputDraftStore()
+  const target = {
+    environmentId: TEST_ENVIRONMENT_ID,
+    draftKey: TEST_SESSION_ID,
+    rootPath: '/repo/platform',
+  }
+  const composer = renderHookWithProviders(() => useAttachmentPreparation(target))
+  const attachments = () => useChatInputDraftStore.getState().getDraft(target).attachments
+  try {
+    act(() =>
+      composer.result.current.prepare([new File(['one'], 'one.png', { type: 'image/png' })]),
+    )
+    await waitFor(() => expect(attachments()).toHaveLength(1))
+    await waitFor(() =>
+      expect(useChatInputDraftStore.getState().preparingAttachmentsByKey).toEqual({}),
+    )
+
+    act(() => composer.result.current.remove(attachments()[0]!.id))
+
+    // Read before the delete settles: the draft is already empty and nothing is pending.
+    expect(attachments()).toEqual([])
+    expect(useChatInputDraftStore.getState().preparingAttachmentsByKey).toEqual({})
+    expect(composer.result.current.isPreparing()).toBe(false)
+  } finally {
+    composer.unmount()
+    resetChatInputDraftStore()
+    vi.unstubAllGlobals()
+  }
+})

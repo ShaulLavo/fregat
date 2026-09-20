@@ -43,10 +43,7 @@ function PersistedResizablePanelGroup({
     layout: ResizablePrimitive.Layout,
     meta: ResizablePrimitive.LayoutChangedMeta,
   ) {
-    // A collapsed panel reports zero; storing it would lose the size it reopens to.
-    if (!Object.values(layout).includes(0)) {
-      writePersistedResizableLayout(storageKey, layout, storage)
-    }
+    writePersistedResizableLayout(storageKey, layout, storage)
     onLayoutChanged?.(layout, meta)
   }
 

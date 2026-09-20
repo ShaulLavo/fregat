@@ -4,6 +4,7 @@ import { ChatModeSurfaceView } from '@/features/chat-mode/components/surface-vie
 import { useEditorWorkspaceState } from '@/features/editor/state/workspace-state'
 import { EditorSurfaceLayoutView } from '@/features/workbench/components/editor-surface-layout-view'
 import type { PickedFsEntry } from '@/lib/file-system-types'
+import { KeepAliveProvider } from '@/lib/keep-alive/providers/keep-alive-provider'
 
 type WorkspaceViewProps = {
   rootFolder: PickedFsEntry
@@ -19,11 +20,14 @@ export function WorkspaceView({ rootFolder }: WorkspaceViewProps) {
       <div className='h-full min-h-0 flex-1 overflow-auto'>
         <div className='flex h-full min-w-[1024px] flex-col'>
           <div className='relative min-h-0 flex-1 overflow-hidden' data-terminal-overlay-bounds>
-            {uiMode === 'chat' ? (
-              <ChatModeSurfaceView rootPath={rootPath} />
-            ) : (
-              <EditorSurfaceLayoutView rootPath={rootPath} />
-            )}
+            {/* Above the mode switch: a terminal outlives the surface that shows it. */}
+            <KeepAliveProvider>
+              {uiMode === 'chat' ? (
+                <ChatModeSurfaceView rootPath={rootPath} />
+              ) : (
+                <EditorSurfaceLayoutView rootPath={rootPath} />
+              )}
+            </KeepAliveProvider>
           </div>
         </div>
       </div>

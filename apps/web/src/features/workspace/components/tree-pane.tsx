@@ -682,7 +682,6 @@ const treeUnsafeCss = `
     height: var(--bar-height);
     margin: 0;
     padding-inline: var(--bar-padding-x);
-    border-bottom: 1px solid var(--border);
   }
 
   [data-file-tree-search-input] {

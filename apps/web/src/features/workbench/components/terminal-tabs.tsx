@@ -11,9 +11,12 @@ import {
 } from '@workspace/ui/components/resizable'
 import { EmptyState } from '@workspace/ui/components/empty-state'
 import { cn } from '@workspace/ui/lib/utils'
+import { KeepAliveSlot } from '@/lib/keep-alive/components/keep-alive-slot'
+import { useKeptIds } from '@/lib/keep-alive/hooks/use-kept-ids'
 
 // Hidden with `visibility`, not `display` or an unmount: a remount replays
 // scrollback, and a display:none host measures 0×0 so the grid comes back wrong.
+const TERMINAL_SCOPE = 'workbench-terminals'
 const TERMINAL_LIST_DEFAULT_SIZE = 176
 const TERMINAL_LIST_MIN_SIZE = 120
 const TERMINAL_LIST_MAX_SIZE = 400
@@ -21,14 +24,17 @@ const TERMINAL_LIST_MAX_SIZE = 400
 export function TerminalTabs({
   panels,
   rootPath,
-  visible,
 }: {
   readonly panels: WorkbenchPanels
   readonly rootPath: string
-  /** False while the whole strip is hidden behind another bottom tab. */
-  readonly visible: boolean
 }) {
   const { closeTab, openTab, setProcess, setShellTitle } = useTerminalTabActions(rootPath)
+  const keptId = (tabId: string) => `${TERMINAL_SCOPE}:${rootPath}:${tabId}`
+  // Closing a tab is the only thing that ends its terminal; hiding one never does.
+  useKeptIds(
+    TERMINAL_SCOPE,
+    panels.terminalTabs.map((tab) => keptId(tab.id)),
+  )
   if (panels.terminalTabs.length === 0)
     return (
       <EmptyState
@@ -57,20 +63,24 @@ export function TerminalTabs({
               inert={!active}
               key={tab.id}
             >
-              <RenderErrorBoundary label='Terminal'>
-                <TerminalPanel
-                  active={visible && active}
-                  className='h-full'
-                  rootPath={rootPath}
-                  sessionId={tab.id}
-                  // A failing shell keeps its tab so the exit message stays readable.
-                  onExit={(exitCode) => {
-                    if (exitCode === 0) closeTab(tab.id)
-                  }}
-                  onProcessChange={(process) => setProcess(tab.id, process)}
-                  onTitleChange={(title) => setShellTitle(tab.id, title)}
-                />
-              </RenderErrorBoundary>
+              <KeepAliveSlot id={keptId(tab.id)} scope={TERMINAL_SCOPE}>
+                {(attached) => (
+                  <RenderErrorBoundary label='Terminal'>
+                    <TerminalPanel
+                      active={attached && active}
+                      className='h-full'
+                      rootPath={rootPath}
+                      sessionId={tab.id}
+                      // A failing shell keeps its tab so the exit message stays readable.
+                      onExit={(exitCode) => {
+                        if (exitCode === 0) closeTab(tab.id)
+                      }}
+                      onProcessChange={(process) => setProcess(tab.id, process)}
+                      onTitleChange={(title) => setShellTitle(tab.id, title)}
+                    />
+                  </RenderErrorBoundary>
+                )}
+              </KeepAliveSlot>
             </div>
           )
         })}

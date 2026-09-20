@@ -19,8 +19,12 @@ const ORBIT_RINGS = [
  * end. Three dashed rings counter-rotating at unrelated speeds, so the mark
  * never settles into looking like one rigid object.
  *
- * Defaults to --icon-size so it lands where an icon would in a control, and
- * follows density with one. Draws in currentColor.
+ * A bare svg with no size class, because that is what lets a control size it:
+ * Button and InputGroup carry `[&_svg:not([class*='size-'])]:size-(--icon-size…)`,
+ * so a loader in a small button lands at --icon-size-sm like the icon it
+ * replaced. A wrapper element would be invisible to that rule and always render
+ * at full size. `:where(.loader-orbit)` in globals.css supplies the standalone
+ * fallback at zero specificity, so a call site's own size- class still wins.
  *
  * A region with no content yet gets LoadingState instead, and RingLoader is the
  * quieter sibling for a whole-surface wait.
@@ -29,31 +33,31 @@ function OrbitLoader({
   className,
   label = 'Working',
   ...props
-}: ComponentProps<'span'> & { label?: string }) {
+}: ComponentProps<'svg'> & { label?: string }) {
   return (
-    <span
+    <svg
       aria-label={label}
-      className={cn('inline-block size-(--icon-size)', className)}
+      className={cn('loader-orbit', className)}
       data-slot='orbit-loader'
+      fill='none'
       role='status'
+      viewBox='0 0 16 16'
       {...props}
     >
-      <svg aria-hidden='true' className='loader-orbit size-full' fill='none' viewBox='0 0 16 16'>
-        {ORBIT_RINGS.map((ring) => (
-          <circle
-            cx='8'
-            cy='8'
-            key={ring.radius}
-            opacity={ring.opacity}
-            r={ring.radius}
-            stroke='currentColor'
-            strokeDasharray={ring.dash}
-            strokeLinecap='round'
-            strokeWidth='1'
-          />
-        ))}
-      </svg>
-    </span>
+      {ORBIT_RINGS.map((ring) => (
+        <circle
+          cx='8'
+          cy='8'
+          key={ring.radius}
+          opacity={ring.opacity}
+          r={ring.radius}
+          stroke='currentColor'
+          strokeDasharray={ring.dash}
+          strokeLinecap='round'
+          strokeWidth='1'
+        />
+      ))}
+    </svg>
   )
 }
 

@@ -126,7 +126,7 @@ export function CommitControls({
             variant='default'
           >
             {commit.isPending ? (
-              <OrbitLoader aria-hidden='true' className='size-(--icon-size-sm)' />
+              <OrbitLoader aria-hidden='true' />
             ) : (
               <CheckIcon className='size-(--icon-size-sm)' />
             )}

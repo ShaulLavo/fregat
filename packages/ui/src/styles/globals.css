@@ -687,6 +687,15 @@
   }
 }
 
+/* The standalone size, at zero specificity: a control that sizes its own icons
+   wins, and so does a size- class at the call site. Without this a loader
+   outside both would fall back to the svg default box. */
+:where(.loader-orbit) {
+  width: var(--icon-size);
+  height: var(--icon-size);
+  flex-shrink: 0;
+}
+
 /* Both loaders slow down rather than stop. A frozen ring reads as a hung
    process, which is the opposite of what it is there to say. */
 @media (prefers-reduced-motion: reduce) {

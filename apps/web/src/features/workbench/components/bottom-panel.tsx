@@ -21,12 +21,9 @@ import { cn } from '@workspace/ui/lib/utils'
 export function BottomPanel({
   panels,
   rootPath,
-  visible,
 }: {
   readonly panels: WorkbenchPanels
   readonly rootPath: FilesystemPath
-  /** False while the panel is collapsed and only kept mounted for its terminals. */
-  readonly visible: boolean
 }) {
   const navigation = useNavigation()
   const terminalActive = panels.activeBottomTab === 'terminal'
@@ -39,7 +36,7 @@ export function BottomPanel({
     <ToolPane
       className='h-full min-w-0 overflow-hidden'
       header={null}
-      bodyClassName='relative flex overflow-hidden bg-content-well'
+      bodyClassName='flex overflow-hidden bg-content-well'
       subheader={
         <PaneBar className={cn(BAR_TAB_STRIP_CLASS, 'bg-background px-0')}>
           <div
@@ -66,23 +63,14 @@ export function BottomPanel({
         </PaneBar>
       }
     >
-      {/* The strip stays mounted behind Problems: a remount reconnects and replays
-          scrollback, losing scroll position. Hidden with `visibility`, not
-          `display` — a display:none host measures 0x0. */}
-      <div
-        className={cn('absolute inset-0', !terminalActive && 'invisible')}
-        inert={!terminalActive}
-      >
+      {terminalActive ? (
         <RenderErrorBoundary label='Terminal'>
-          <TerminalTabs panels={panels} rootPath={rootPath} visible={visible && terminalActive} />
+          <TerminalTabs panels={panels} rootPath={rootPath} />
         </RenderErrorBoundary>
-      </div>
-      {terminalActive ? null : (
-        <div className='absolute inset-0'>
-          <RenderErrorBoundary label='Problems'>
-            <DiagnosticsPanel />
-          </RenderErrorBoundary>
-        </div>
+      ) : (
+        <RenderErrorBoundary label='Problems'>
+          <DiagnosticsPanel />
+        </RenderErrorBoundary>
       )}
     </ToolPane>
   )

@@ -7,8 +7,11 @@ async function backgrounds(page: Page) {
   return selectors
     .terminalSurface(page)
     .first()
-    .evaluate((terminal) => {
+    .evaluate(async (terminal) => {
       const layers: string[] = []
+      // The pane body is reused between tools, so its fill animates in; read it once that ends.
+      for (let element = terminal.parentElement; element; element = element.parentElement)
+        await Promise.all(element.getAnimations().map((animation) => animation.finished))
       for (let element = terminal.parentElement; element; element = element.parentElement) {
         const color = getComputedStyle(element).backgroundColor
         if (color !== 'rgba(0, 0, 0, 0)') layers.push(color)
