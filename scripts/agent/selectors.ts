@@ -493,6 +493,8 @@ export const selectors = {
   commitMessage: (page: Page) => page.getByRole('textbox', { name: 'Commit message', exact: true }),
   commitButton: (page: Page) => page.getByRole('button', { name: /^Commit\b/ }),
   commitOutput: (page: Page) => page.getByRole('log', { name: 'Commit output', exact: true }),
+  gitFixWithAgent: (page: Page) =>
+    page.getByRole('button', { name: 'Fix with agent', exact: true }),
   folderTree: (page: Page) => page.getByLabel('Folder tree', { exact: true }),
   focusedTreeRow: (page: Page) =>
     page.getByLabel('Folder tree', { exact: true }).locator('[role="treeitem"][tabindex="0"]'),

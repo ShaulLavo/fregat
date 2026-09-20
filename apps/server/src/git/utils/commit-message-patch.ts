@@ -32,7 +32,7 @@ function patchAllowances(patches: readonly string[], budget: number) {
   const order = patches.map((_, position) => position)
   order.sort((left, right) => (patches[left]?.length ?? 0) - (patches[right]?.length ?? 0))
 
-  const allowances = new Array<number>(patches.length).fill(0)
+  const allowances = Array.from(patches, () => 0)
   let remaining = budget
   for (const [rank, position] of order.entries()) {
     const share = Math.floor(remaining / (order.length - rank))

@@ -16,6 +16,7 @@ import { useCommitAction } from '@/features/git/hooks/use-commit-action'
 import { useGenerateCommitMessage } from '@/features/git/hooks/use-generate-commit-message'
 import { useSyncChangesMutation } from '@/features/git/hooks/use-sync-changes-mutation'
 import { CommitProgress } from './commit-progress'
+import { FailureNotice } from './failure-notice'
 
 import { canSyncChanges, syncChangesLabel } from '../utils/repository'
 
@@ -140,6 +141,7 @@ export function CommitControls({
         </p>
       ) : null}
       <CommitProgress rootPath={rootPath} />
+      <FailureNotice rootPath={rootPath} />
     </>
   )
 }

@@ -27,3 +27,5 @@ Graph roots exclude `refs/platform/*`. A browsing session pins tips and ref labe
 `git-commit-hook-colors` commits in a fixture repository whose rejecting `pre-commit` hook prints truecolor, 16-color and 256-table SGR. The Commit output log must show no escape text and the colored spans must carry a computed color. The hook exits 1, so nothing is committed.
 
 `git-commit-message-persists` types a commit message in a fixture repository, reloads the window and requires the same text back. The draft is stored per repository location and cleared by a successful commit.
+
+`git-fix-with-agent` fails a commit on a rejecting hook, presses Fix with agent on the failure notice and requires the failed step and the hook's output in the chat composer. The notice reads the newest git mutation from the mutation cache, so any failing step (stage, push, pull, sync) raises it and a retry clears it.

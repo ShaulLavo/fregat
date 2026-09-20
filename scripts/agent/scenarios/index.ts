@@ -112,6 +112,7 @@ import { editorUndoBranch } from './editor-undo-branch'
 import { editorUndoReopen } from './editor-undo-reopen'
 import { gitCommitHookColors } from './git-commit-hook-colors'
 import { gitCommitMessagePersists } from './git-commit-message-persists'
+import { gitFixWithAgent } from './git-fix-with-agent'
 import { gitHistory } from './git-history'
 import { editorCaretBurst } from './editor-caret-burst'
 import { editorFocusClicks } from './editor-focus-clicks'
@@ -234,6 +235,7 @@ export const scenarios: readonly Scenario[] = [
   editorUndoReopen,
   gitCommitHookColors,
   gitCommitMessagePersists,
+  gitFixWithAgent,
   editorCaretBurst,
   editorFocusClicks,
   editorProduct,

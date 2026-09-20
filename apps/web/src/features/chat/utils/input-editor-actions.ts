@@ -53,6 +53,9 @@ export function insertChatInputText(editor: LexicalEditor, text: string) {
   let inserted = false
 
   editor.update(() => {
+    // A composer that was never focused has no caret; the end of the prompt is
+    // where handed-over text belongs, and without this it was dropped silently.
+    if (!$isRangeSelection($getSelection())) $getRoot().selectEnd()
     inserted = $insertChatInputPrompt(text)
   })
 
