@@ -94,7 +94,7 @@ test('groups and confirms needsConfirmation annotations', () => {
 
   const safe = screen.getByText('Format imports')
   const guarded = screen.getByText('Security-sensitive edit')
-  const annotationGroup = guarded.closest('div[class*="border-warning"]')
+  const annotationGroup = guarded.closest('div[class*="bg-warning"]')
 
   expect(annotationGroup).not.toBeNull()
   expect(annotationGroup).toContainElement(safe)

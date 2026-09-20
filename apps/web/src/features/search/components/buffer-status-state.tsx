@@ -19,6 +19,7 @@ export function SearchBufferStatusState({
   if (status === 'idle') {
     return <SearchIdleState />
   }
+  // No retry button: editing or resubmitting the query in the header re-runs the search.
   if (status === 'error') {
     return (
       <EmptyState

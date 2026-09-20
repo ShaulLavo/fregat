@@ -35,7 +35,7 @@ a bare root `bun run verify`.
 | [099 — document contribution runtime](099-document-contributions.md)            | **PROPOSED — BASELINE AND PUBLICATION FIRST**        |
 | [101 — truncation and value recovery](101-truncation-recovery.md)               | **PROPOSED — DECISIONS D5 AND D7 NEED CONFIRMATION** |
 | [102 — scroll and keyboard affordance](102-scroll-and-keyboard-affordance.md)   | **PROPOSED — DECISIONS D2 AND D7 NEED CONFIRMATION** |
-| [103 — loading, empty and error states](103-loading-empty-error-states.md)      | **PROPOSED — DECISIONS D4 AND D6 NEED CONFIRMATION** |
+| [103 — loading, empty and error states](103-loading-empty-error-states.md)      | **CLOSED 2026-09-20**                                |
 | [115 — palettes as data](115-palettes-as-data.md)                               | **IMPLEMENTED 2026-09-14**                           |
 | [116 — wallpaper library and picker](116-wallpaper-library.md)                  | **IMPLEMENTED 2026-09-14**                           |
 | [117 — themes as bundles](../docs/theme-bundles.md)                             | **IMPLEMENTED — 2026-09-19**                         |

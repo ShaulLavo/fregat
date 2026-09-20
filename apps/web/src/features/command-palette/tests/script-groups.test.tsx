@@ -47,14 +47,27 @@ test('says a project has no scripts instead of showing an empty list', () => {
   expect(screen.getByText('No scripts in this project.')).toBeInTheDocument()
 })
 
-function renderScripts(scripts: readonly ProjectScriptSuggestion[]) {
+test('holds the verdict while the manifest is still being read', () => {
+  renderScripts([], true)
+
+  expect(screen.queryByText('No scripts in this project.')).not.toBeInTheDocument()
+  expect(screen.getByRole('status', { name: 'Loading scripts' })).toBeInTheDocument()
+})
+
+test('shows saved scripts at once instead of waiting for the manifest', () => {
+  renderScripts([{ command: 'bun run dev', name: 'Start the app', saved: true }], true)
+
+  expect(screen.getByText('Start the app')).toBeInTheDocument()
+})
+
+function renderScripts(scripts: readonly ProjectScriptSuggestion[], isPending = false) {
   const actions = commandPaletteActions()
 
   render(
     <CommandPaletteActionsProvider actions={actions}>
       <Command>
         <CommandList>
-          <ScriptGroups scripts={scripts} />
+          <ScriptGroups isPending={isPending} scripts={scripts} />
         </CommandList>
       </Command>
     </CommandPaletteActionsProvider>,

@@ -1,6 +1,7 @@
 import { PlayIcon } from '@phosphor-icons/react'
 import { CommandEmpty, CommandGroup, CommandItem } from '@workspace/ui/components/command'
 
+import { ScriptsLoading } from '@/features/command-palette/components/scripts-loading'
 import { useActions } from '@/features/command-palette/hooks/use-actions'
 import type { ProjectScriptSuggestion } from '@/features/chat-mode/utils/project-scripts'
 
@@ -10,13 +11,26 @@ import type { ProjectScriptSuggestion } from '@/features/chat-mode/utils/project
  * a command you still have to press Enter on is not a shortcut.
  */
 export function ScriptGroups({
+  isPending,
   scripts,
 }: {
+  readonly isPending: boolean
   readonly scripts: readonly ProjectScriptSuggestion[]
 }) {
   const { selectScript } = useActions()
   const saved = scripts.filter((script) => script.saved)
   const discovered = scripts.filter((script) => !script.saved)
+
+  if (isPending && scripts.length === 0) {
+    // Still a CommandItem: an empty list would let CommandEmpty deliver a verdict mid-fetch.
+    return (
+      <CommandGroup heading='From package.json'>
+        <CommandItem disabled value='scripts:loading'>
+          <ScriptsLoading />
+        </CommandItem>
+      </CommandGroup>
+    )
+  }
 
   if (scripts.length === 0) {
     return <CommandEmpty>No scripts in this project.</CommandEmpty>

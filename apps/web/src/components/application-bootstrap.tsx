@@ -6,7 +6,8 @@ import { useEffect, useState, type ReactNode } from 'react'
 import { QueryClientProvider } from '@tanstack/react-query'
 import { HotkeysProvider } from '@tanstack/react-hotkeys'
 import { ActiveEnvironmentApplication } from '@/components/active-environment-application'
-import { LoadingState } from '@workspace/ui/components/loading-state'
+import { EmptyState } from '@workspace/ui/components/empty-state'
+import { RingLoader } from '@workspace/ui/components/ring-loader'
 import { Button } from '@workspace/ui/components/button'
 import { SettingsOwnerProvider } from '@/features/settings/providers/owner-provider'
 import { SimulatedLatencyBridge } from '@/features/settings/components/simulated-latency-bridge'
@@ -75,16 +76,27 @@ export function ApplicationBootstrap({
   }, [attempt, navigation])
   if (error)
     return (
-      <div role='alert' className='text-destructive p-4'>
-        {error}
-        <Button onClick={() => setAttempt(attempt + 1)}>Retry connection</Button>
-      </div>
+      <EmptyState
+        action={
+          <Button onClick={() => setAttempt(attempt + 1)} size='sm' variant='outline'>
+            Retry connection
+          </Button>
+        }
+        className='min-h-svh'
+        description={error}
+        title='Cannot connect to the local machine'
+        tone='error'
+      />
     )
   if (!application)
     return (
-      <LoadingState label='Connecting to local machine'>
-        <div className='skeleton-sweep h-4 w-48' />
-      </LoadingState>
+      <div
+        className='bg-background text-foreground grid min-h-svh place-content-center gap-3'
+        role='status'
+      >
+        <RingLoader aria-hidden='true' className='mx-auto size-8' />
+        <p className='text-sm'>Connecting to local machine…</p>
+      </div>
     )
   return (
     <QueryClientProvider client={primaryQueryClient()}>

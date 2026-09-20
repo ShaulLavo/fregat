@@ -35,6 +35,7 @@ import {
 
 type SearchResultEditorSurfaceProps = {
   activeResultId: SearchResultId | null
+  activeResultPicked: boolean
   canReplace?: boolean
   displayedResultsQuery: string | null
   groups: readonly WorkspaceSearchFileGroup[]
@@ -51,6 +52,7 @@ const noopScrollToOffset = () => {}
 export const SearchResultEditorSurface = memo(
   ({
     activeResultId,
+    activeResultPicked,
     canReplace,
     displayedResultsQuery,
     groups,
@@ -113,7 +115,8 @@ export const SearchResultEditorSurface = memo(
     useLayoutEffect(() => {
       if (previousActiveResultIdRef.current === activeResultId) return
       previousActiveResultIdRef.current = activeResultId
-      if (!activeResultId) return
+      // The default cursor follows streaming results and must not drag the view with it.
+      if (!activeResultId || !activeResultPicked) return
       if (suppressNextActiveRevealRef.current) {
         suppressNextActiveRevealRef.current = false
         return
@@ -124,7 +127,7 @@ export const SearchResultEditorSurface = memo(
         activeScrollTargetRef,
         scrollToIndexRef,
       })
-    }, [activeResultId])
+    }, [activeResultId, activeResultPicked])
 
     const initialViewport = useSearchResultScrollPosition({
       displayedResultsQuery,

@@ -36,6 +36,7 @@ type GroupsFactoryProps = {
   readonly hasWorkspace: boolean
   readonly mode: QuickAccessMode
   readonly scriptItems: readonly ProjectScriptSuggestion[]
+  readonly scriptsPending: boolean
   readonly sessionItems: readonly SessionRailItem[]
   readonly sessionProjects: readonly SessionRailProject[]
   readonly symbolItems: readonly FlatDocumentSymbol[]
@@ -54,6 +55,7 @@ export function GroupsFactory({
   hasWorkspace,
   mode,
   scriptItems,
+  scriptsPending,
   sessionItems,
   sessionProjects,
   symbolItems,
@@ -93,7 +95,7 @@ export function GroupsFactory({
   }
 
   if (mode === 'scripts') {
-    return <ScriptGroups scripts={scriptItems} />
+    return <ScriptGroups isPending={scriptsPending} scripts={scriptItems} />
   }
 
   if (mode === 'sessions') {

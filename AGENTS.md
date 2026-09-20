@@ -149,6 +149,7 @@ Interaction treatments are utilities, not strings to copy:
   - `RingLoader` — the same, when the wait should stay quiet. Also the one to scale up for a whole-surface wait.
   - `Shimmer` — text already on screen, transiently in progress, _inline inside a running sentence_ where a mark would break the flow. Never a substitute for a loader in a slot that can hold one.
 - A loading state and an empty state must never look alike. "Loading X" and "No X" set in the same type is a bug — the user cannot tell a slow panel from an empty one. Pending gets a loader; `EmptyState` is only for a verdict the app can actually deliver.
+- A skeleton mounts the same primitive and the same density variables as the loaded view, and draws one placeholder per real element. `LoadingState` never wraps a loader.
 - Check the fall-through. A list that only branches on `error` and `length === 0` will show "Nothing here" while it is still fetching. Branch on pending **before** empty.
 - `LoadingState` holds its bars back for 120ms (`delayMs`) so a fast query does not flash a skeleton. The `role="status"` container mounts immediately either way, so assistive tech is told at once. Do not defeat this with your own conditional.
 - Reduced motion is handled inside the primitives — they slow down rather than freeze, because a stopped spinner reads as a hung process. Do not add `motion-reduce:` classes at the call site.

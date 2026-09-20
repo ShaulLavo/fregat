@@ -1,7 +1,7 @@
+import { CompareSavedLoading } from '@/features/editor/components/compare-saved-loading'
 import { fileDocumentKey } from '@/lib/documents/utils/identity'
 import type { FilesystemPath, TabId } from '@/lib/documents/utils/types'
 import { createTextDiff } from '@singapore-editor/diff'
-import { LoadingState } from '@workspace/ui/components/loading-state'
 import { EmptyState } from '@workspace/ui/components/empty-state'
 import { useMemo } from 'react'
 
@@ -60,6 +60,7 @@ export function CompareSavedView({
     })
   }, [path, savedText, snapshot])
 
+  // No retry: closing and reopening the compare tab re-reads the saved file.
   if (fileState.status === 'error') {
     return (
       <EditorTabPlaceholder tabId={tabId}>
@@ -68,13 +69,7 @@ export function CompareSavedView({
     )
   }
   if (fileState.status === 'loading') {
-    return (
-      <LoadingState className='flex h-full flex-col gap-3 p-4' label='Loading saved file'>
-        <div className='skeleton-sweep h-4 w-3/4 rounded-md' />
-        <div className='skeleton-sweep h-4 w-1/2 rounded-md' />
-        <div className='skeleton-sweep h-4 w-2/3 rounded-md' />
-      </LoadingState>
-    )
+    return <CompareSavedLoading />
   }
   if (!file) {
     if (buffer) return <DiffEditor file={null} mode={mode} tabId={tabId} />

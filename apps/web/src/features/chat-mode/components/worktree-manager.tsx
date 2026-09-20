@@ -15,7 +15,6 @@ import {
 } from '@workspace/ui/components/dropdown-menu'
 import { EmptyState } from '@workspace/ui/components/empty-state'
 import { OrbitLoader } from '@workspace/ui/components/orbit-loader'
-import { LoadingState } from '@workspace/ui/components/loading-state'
 import { WorktreeManagerRow } from '@/features/chat-mode/components/worktree-manager-row'
 import { useRailEnvironments } from '@/features/chat-mode/hooks/use-rail-environments'
 import { useWorktreeManagerStore } from '@/features/chat-mode/state/worktree-manager-store'
@@ -72,11 +71,7 @@ export function WorktreeManager() {
             )}
           </DropdownMenuContent>
         </DropdownMenu>
-        {!projection?.bootstrapComplete ? (
-          <LoadingState label='Loading worktrees'>
-            <OrbitLoader label='Loading worktrees' />
-          </LoadingState>
-        ) : null}
+        {!projection?.bootstrapComplete ? <OrbitLoader label='Loading worktrees' /> : null}
         {projection?.bootstrapComplete && worktrees.length === 0 ? (
           <EmptyState
             title='No worktrees'

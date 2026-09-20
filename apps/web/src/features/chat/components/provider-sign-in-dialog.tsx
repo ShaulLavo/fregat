@@ -1,3 +1,4 @@
+import { Alert, AlertDescription } from '@workspace/ui/components/alert'
 import { Tooltip, TooltipContent, TooltipTrigger } from '@workspace/ui/components/tooltip'
 import {
   CheckCircleIcon,
@@ -91,15 +92,12 @@ export function ProviderSignInDialog({
         </DialogHeader>
 
         {signIn.isAuthenticated ? (
-          <div
-            className='bg-success/10 text-success flex items-center gap-(--density-control-gap) px-(--density-control-padding-x) py-(--density-section-gap) text-xs'
-            title={accountLabel ?? undefined}
-          >
-            <CheckCircleIcon className='size-(--icon-size-sm) shrink-0' />
-            <span className='min-w-0 flex-1 truncate'>
+          <Alert role='status' title={accountLabel ?? undefined} variant='success'>
+            <CheckCircleIcon />
+            <AlertDescription className='truncate'>
               {accountLabel ?? `${providerLabel} is signed in.`}
-            </span>
-          </div>
+            </AlertDescription>
+          </Alert>
         ) : null}
 
         {busy ? (
@@ -144,23 +142,17 @@ export function ProviderSignInDialog({
         )}
 
         {signIn.statusError ? (
-          <div
-            className='bg-warning/10 text-warning flex items-start gap-(--density-control-gap) px-(--density-control-padding-x) py-(--density-section-gap) text-xs'
-            role='status'
-          >
-            <WarningCircleIcon className='mt-0.5 size-(--icon-size-sm) shrink-0' />
-            <span className='min-w-0 flex-1 break-words'>{signIn.statusError}</span>
-          </div>
+          <Alert role='status' variant='warning'>
+            <WarningCircleIcon />
+            <AlertDescription className='break-words'>{signIn.statusError}</AlertDescription>
+          </Alert>
         ) : null}
 
         {signIn.attemptError ? (
-          <div
-            className='bg-destructive/10 text-destructive flex items-start gap-(--density-control-gap) px-(--density-control-padding-x) py-(--density-section-gap) text-xs'
-            role='alert'
-          >
-            <WarningCircleIcon className='mt-0.5 size-(--icon-size-sm) shrink-0' />
-            <span className='min-w-0 flex-1 break-words'>{signIn.attemptError}</span>
-          </div>
+          <Alert variant='destructive'>
+            <WarningCircleIcon />
+            <AlertDescription className='break-words'>{signIn.attemptError}</AlertDescription>
+          </Alert>
         ) : null}
 
         <div className='bg-muted flex flex-col gap-(--density-control-gap) px-(--density-control-padding-x) py-(--density-section-gap)'>

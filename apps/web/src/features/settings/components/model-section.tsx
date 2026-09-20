@@ -6,6 +6,7 @@ import { providerListQueryOptions } from '@/features/chat/utils/provider-query'
 
 import { useSettingValue } from '@/hooks/use-setting-value'
 import { EmptyRow } from './empty-row'
+import { ModelLoading } from './model-loading'
 import { ModelRow } from './model-row'
 import { useSettingsOwner } from '@/features/settings/hooks/use-settings-owner'
 
@@ -25,11 +26,12 @@ import { useSettingsOwner } from '@/features/settings/hooks/use-settings-owner'
  * instead, which is what this screen exists to toggle.
  */
 export function ModelSection() {
-  const { data } = useQuery(providerListQueryOptions(), useSettingsOwner())
+  const { data, isPending } = useQuery(providerListQueryOptions(), useSettingsOwner())
   const hidden = useSettingValue('models.hidden')
   const order = useSettingValue('models.order')
   const rows = modelPreferenceRows(providerModelOptions(data?.providers), { hidden, order })
 
+  if (isPending) return <ModelLoading />
   if (rows.length === 0) return <EmptyRow>No models are available yet.</EmptyRow>
 
   // A move is one place in *this* sequence, so the rows are what it is computed

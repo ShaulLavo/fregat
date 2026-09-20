@@ -129,6 +129,7 @@ function renderDiagnosticsState(status: LanguageServerStatus) {
   if (status === 'loading') {
     return <DiagnosticsLoading />
   }
+  // No retry: no restart handle is exposed here; reopening the file restarts its language server.
   if (status === 'error') {
     return <EmptyState className='min-h-0 flex-1' title='Diagnostics unavailable' tone='error' />
   }

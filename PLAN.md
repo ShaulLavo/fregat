@@ -296,7 +296,7 @@ Three independent follow-ups remain proposed:
 [Plan 102](plans/102-scroll-and-keyboard-affordance.md) settles scrollbars, nested-scroll
 containment and keyboard chips, and
 [Plan 103](plans/103-loading-empty-error-states.md) finishes the loading, empty and error states
-`CLAUDE.md` already decided. Each names the decisions that need confirmation before implementation.
+`CLAUDE.md` already decided (closed 2026-09-20, implemented and deployed). Each names the decisions that need confirmation before implementation.
 They preserve the implemented design tokens and extend the existing census and browser verifier.
 
 The [shared pattern layer](docs/pattern-layer.md) now supplies rows, list focus, virtualization

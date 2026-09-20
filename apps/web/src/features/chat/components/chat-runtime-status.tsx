@@ -5,11 +5,7 @@ import { Button } from '@workspace/ui/components/button'
 import { WarningCircleIcon, XIcon } from '@phosphor-icons/react'
 import { useState } from 'react'
 
-import {
-  chatRuntimeAlerts,
-  type ChatRuntimeAlert,
-  type ChatRuntimeAlertTone,
-} from '@/features/chat/utils/runtime-state'
+import { chatRuntimeAlerts, type ChatRuntimeAlert } from '@/features/chat/utils/runtime-state'
 import { errorMessage } from '@/lib/error-message'
 import { useProviderSignInDialog } from '../hooks/use-provider-sign-in-dialog'
 import { providerListQueryOptions } from '@/features/chat/utils/provider-query'
@@ -98,10 +94,7 @@ function RuntimeAlert({
   const signIn = alert.signIn
 
   return (
-    <Alert
-      className={runtimeAlertClass(alert.tone)}
-      variant={alert.tone === 'error' ? 'destructive' : 'default'}
-    >
+    <Alert variant={alert.tone === 'error' ? 'destructive' : 'warning'}>
       <WarningCircleIcon className='size-(--icon-size)' />
       <AlertTitle>{alert.title}</AlertTitle>
       {alert.detail ? (
@@ -138,12 +131,4 @@ function RuntimeAlert({
       ) : null}
     </Alert>
   )
-}
-
-function runtimeAlertClass(tone: ChatRuntimeAlertTone) {
-  if (tone === 'warning') {
-    return 'border-warning/30 bg-warning/10 text-warning'
-  }
-
-  return undefined
 }

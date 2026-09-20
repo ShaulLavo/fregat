@@ -74,6 +74,7 @@ export const TreePane = memo(
     state: LoadState<TreeModel>
   }) => {
     if (state.status === 'loading') return <TreeLoading />
+    // No retry: LoadState exposes no refetch; reloading the workspace is the way out.
     if (state.status === 'error') {
       return (
         <EmptyState

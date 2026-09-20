@@ -1,4 +1,5 @@
 import { useSyncExternalStore } from 'react'
+import { Alert, AlertDescription } from '@workspace/ui/components/alert'
 import { LoadingState } from '@workspace/ui/components/loading-state'
 import { useNavigation } from '@/hooks/use-navigation'
 
@@ -8,9 +9,9 @@ export function NavigationStatus() {
   if (status.status === 'applied') return null
   if (status.status === 'unavailable')
     return (
-      <div role='alert' className='bg-background text-destructive p-3'>
-        {status.reason}
-      </div>
+      <Alert variant='destructive'>
+        <AlertDescription>{status.reason}</AlertDescription>
+      </Alert>
     )
   return (
     <LoadingState label='Opening destination'>

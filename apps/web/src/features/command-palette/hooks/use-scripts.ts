@@ -39,7 +39,8 @@ export function useScripts({
   const saved = worktree
     ? (slice.projectById[worktree.projectId]?.scripts ?? NO_SCRIPTS)
     : NO_SCRIPTS
-  const { data: discovered } = useQuery({
+  // isLoading, not isPending: a disabled query stays pending forever and would hold saved scripts behind a loader.
+  const { data: discovered, isLoading } = useQuery({
     enabled: enabled && rootPath !== null,
     queryFn: ({ signal, client }) =>
       discoverPackageScripts(rootPath ?? '', signal, clientForQueryClient(client)),
@@ -50,7 +51,10 @@ export function useScripts({
     staleTime: 30_000,
   })
 
-  return projectScriptSuggestions({ discovered: discovered ?? NO_SCRIPTS, saved })
+  return {
+    isPending: isLoading,
+    scripts: projectScriptSuggestions({ discovered: discovered ?? NO_SCRIPTS, saved }),
+  }
 }
 
 async function discoverPackageScripts(rootPath: string, signal: AbortSignal, client: Client) {

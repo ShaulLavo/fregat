@@ -8,15 +8,15 @@ export function DiagnosticsLoading() {
         <div className='grid grid-cols-4 gap-2'>
           <div className='bg-destructive/10 space-y-1 rounded-lg px-2 py-1.5'>
             <div className='skeleton-sweep h-2 w-10 rounded-md' />
-            <div className='bg-destructive/20 h-3 w-5 rounded-md' />
+            <div className='skeleton-sweep h-3 w-5 rounded-md' />
           </div>
           <div className='bg-warning/10 space-y-1 rounded-lg px-2 py-1.5'>
             <div className='skeleton-sweep h-2 w-12 rounded-md' />
-            <div className='bg-warning/20 h-3 w-5 rounded-md' />
+            <div className='skeleton-sweep h-3 w-5 rounded-md' />
           </div>
           <div className='bg-info/10 space-y-1 rounded-lg px-2 py-1.5'>
             <div className='skeleton-sweep h-2 w-8 rounded-md' />
-            <div className='bg-info/20 h-3 w-5 rounded-md' />
+            <div className='skeleton-sweep h-3 w-5 rounded-md' />
           </div>
           <div className='bg-muted space-y-1 rounded-lg px-2 py-1.5'>
             <div className='skeleton-sweep h-2 w-9 rounded-md' />

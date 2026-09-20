@@ -1,6 +1,12 @@
 # Finish the loading, empty and error states
 
-Status: proposed, implementation not started. Requested 2026-09-12.
+Status: **closed 2026-09-20** — implemented and deployed, uncommitted; the leftovers below are accepted as is. Requested 2026-09-12. Drift from the text below:
+Quick Open (2b) was already fixed by `fileSearchUnsettled`; the no-hairlines rule landed first, so D6's
+`Alert` tones are `bg-<tone>/10 text-<tone>` with no border; `malformed-banner`, `raw-conflict-banner` and
+the preview dialog's annotation list keep their own markup because their button rows and icon lists do not
+fit `Alert`'s title/description grid; `NavigationStatus`'s pending sliver is unchanged and still needs the
+D4 call (ring, or nothing under a threshold); `AppWorkspace`'s restore skeleton and Phase 7's five-loader
+audit are not done. Scenarios: `palette-scripts-pending`, `settings-models-pending`.
 
 `CLAUDE.md` already decided this area. It names five loaders, assigns each one a job, bans
 hand-rolling a sixth, and states the failure mode in one line:

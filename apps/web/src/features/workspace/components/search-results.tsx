@@ -28,8 +28,15 @@ export function SearchResults({
 
   readonly rootPath: string
 }) {
-  const { activeResultId, groups, replaceText, replaceVisible, resultsQuery, resultsSearchQuery } =
-    useSearchBufferResults(rootPath)
+  const {
+    activeResultId,
+    activeResultPicked,
+    groups,
+    replaceText,
+    replaceVisible,
+    resultsQuery,
+    resultsSearchQuery,
+  } = useSearchBufferResults(rootPath)
   const { canReplace, replaceGroup, replaceMatch } = useWorkspaceSearchReplace(
     rootPath,
     replaceVisible,
@@ -94,6 +101,7 @@ export function SearchResults({
       <SearchResultActionsContext value={actions}>
         <SearchResultEditorSurface
           activeResultId={activeResultId}
+          activeResultPicked={activeResultPicked}
           canReplace={replaceVisible ? canReplace : false}
           displayedResultsQuery={resultsSearchQuery?.query ?? null}
           groups={groups}
@@ -109,6 +117,7 @@ export function SearchResults({
     <SearchResultActionsContext value={actions}>
       <SearchResultsView
         activeResultId={activeResultId}
+        activeResultPicked={activeResultPicked}
         canReplace={replaceVisible ? canReplace : false}
         compact={compact}
         error={null}

@@ -22,6 +22,7 @@ import { SearchResultRow } from '@/features/search/components/result-row'
 
 export function SearchResultsView({
   activeResultId,
+  activeResultPicked,
   className,
   compact,
   groups,
@@ -34,6 +35,7 @@ export function SearchResultsView({
   status,
 }: {
   activeResultId: SearchResultId | null
+  activeResultPicked: boolean
   className?: string
   compact?: boolean
   groups: readonly WorkspaceSearchFileGroup[]
@@ -89,7 +91,10 @@ export function SearchResultsView({
       event.preventDefault()
       action.focus()
     },
-    scrollToIndex: (index) => virtualRef.current?.scrollToIndex(index, { align: 'auto' }),
+    // The default cursor moves as results stream in; only a picked one may scroll the list.
+    scrollToIndex(index) {
+      if (activeResultPicked) virtualRef.current?.scrollToIndex(index, { align: 'auto' })
+    },
   })
   function handleKeyDown(event: KeyboardEvent<HTMLDivElement>) {
     if (event.key === 'Escape' && event.target !== event.currentTarget) {
@@ -106,6 +111,7 @@ export function SearchResultsView({
   if (status === 'idle') {
     return <SearchIdleState className={className} />
   }
+  // No retry button: editing or resubmitting the query in the header re-runs the search.
   if (status === 'error' && groups.length === 0) {
     return (
       <EmptyState
@@ -125,7 +131,7 @@ export function SearchResultsView({
     <VirtualList
       {...list.containerProps}
       onKeyDown={handleKeyDown}
-      activeIndex={list.activeIndex}
+      activeIndex={activeResultPicked ? list.activeIndex : undefined}
       scrollRef={parentRef}
       handleRef={virtualRef}
       aria-label='Search results'

@@ -49,9 +49,9 @@ export function StageBody({
   if (!ready) return <StageEmptyState />
   if (activeSession.status === 'resolving') {
     return (
-      <LoadingState label='Opening session' className='p-4'>
+      <div className='p-4'>
         <OrbitLoader label='Opening session' />
-      </LoadingState>
+      </div>
     )
   }
   if (activeSession.status === 'missing') return <SessionMissingState />

@@ -125,7 +125,7 @@ export function CommandPaletteContent() {
   const { projects: sessionProjects, sessions: sessionItems } = useSessions()
   const queueTerminalCommand = useTerminalCommandInboxStore((state) => state.queueCommand)
   const saveProjectScript = useSaveProjectScript()
-  const scriptItems = useScripts({
+  const { isPending: scriptsPending, scripts: scriptItems } = useScripts({
     enabled: open && mode === 'scripts',
     rootPath: rootFolder?.path ?? null,
   })
@@ -418,6 +418,7 @@ export function CommandPaletteContent() {
             hasWorkspace={hasWorkspace}
             mode={mode}
             scriptItems={scriptItems}
+            scriptsPending={scriptsPending}
             sessionItems={sessionItems}
             sessionProjects={sessionProjects}
             symbolItems={symbolQuery.data ?? []}

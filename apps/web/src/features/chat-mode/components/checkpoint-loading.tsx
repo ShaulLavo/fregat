@@ -13,18 +13,18 @@ export function CheckpointLoading() {
         </div>
         <div className='flex h-(--density-control-height-sm) items-center gap-2'>
           <div className='skeleton-sweep h-3 min-w-0 flex-1 rounded-md' />
-          <div className='bg-diff-added/20 h-2.5 w-6 rounded-md' />
-          <div className='bg-diff-removed/20 h-2.5 w-5 rounded-md' />
+          <div className='skeleton-sweep h-2.5 w-6 rounded-md' />
+          <div className='skeleton-sweep h-2.5 w-5 rounded-md' />
         </div>
         <div className='flex h-(--density-control-height-sm) items-center gap-2'>
           <div className='skeleton-sweep h-3 w-3/4 rounded-md' />
-          <div className='bg-diff-added/20 ml-auto h-2.5 w-5 rounded-md' />
-          <div className='bg-diff-removed/20 h-2.5 w-4 rounded-md' />
+          <div className='skeleton-sweep ml-auto h-2.5 w-5 rounded-md' />
+          <div className='skeleton-sweep h-2.5 w-4 rounded-md' />
         </div>
         <div className='flex h-(--density-control-height-sm) items-center gap-2'>
           <div className='skeleton-sweep h-3 w-1/2 rounded-md' />
-          <div className='bg-diff-added/20 ml-auto h-2.5 w-6 rounded-md' />
-          <div className='bg-diff-removed/20 h-2.5 w-5 rounded-md' />
+          <div className='skeleton-sweep ml-auto h-2.5 w-6 rounded-md' />
+          <div className='skeleton-sweep h-2.5 w-5 rounded-md' />
         </div>
       </div>
     </LoadingState>

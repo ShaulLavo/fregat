@@ -143,7 +143,7 @@ export function searchResultItemById(
   return items.find((item) => item.id === id) ?? null
 }
 
-function firstSelectableSearchResultId(groups: readonly WorkspaceSearchFileGroup[]) {
+export function firstSelectableSearchResultId(groups: readonly WorkspaceSearchFileGroup[]) {
   let firstVisibleId: SearchResultId | null = null
 
   for (const group of groups) {
@@ -156,18 +156,15 @@ function firstSelectableSearchResultId(groups: readonly WorkspaceSearchFileGroup
   return firstVisibleId
 }
 
-export function visibleSearchResultId(
+/** The picked result while it is still on screen, its file row once collapsed, otherwise null. */
+export function pickedSearchResultId(
   groups: readonly WorkspaceSearchFileGroup[],
   id: SearchResultId | null,
 ) {
-  if (!id) return firstSelectableSearchResultId(groups)
-
+  if (!id) return null
   if (searchResultIdIsVisible(groups, id)) return id
 
-  const parentId = hiddenSearchResultParentId(groups, id)
-  if (parentId) return parentId
-
-  return firstSelectableSearchResultId(groups)
+  return hiddenSearchResultParentId(groups, id)
 }
 
 export function searchResultContentItems(items: readonly SearchResultItem[]) {

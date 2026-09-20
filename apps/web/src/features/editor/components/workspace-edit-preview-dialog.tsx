@@ -1,3 +1,5 @@
+import { WorkspaceEditPreviewLoading } from '@/features/editor/components/workspace-edit-preview-loading'
+import { Alert, AlertDescription } from '@workspace/ui/components/alert'
 import {
   ArrowsClockwiseIcon,
   FileDashedIcon,
@@ -16,7 +18,6 @@ import {
   DialogTitle,
 } from '@workspace/ui/components/dialog'
 import { EmptyState } from '@workspace/ui/components/empty-state'
-import { LoadingState } from '@workspace/ui/components/loading-state'
 import { RingLoader } from '@workspace/ui/components/ring-loader'
 import { OrbitLoader } from '@workspace/ui/components/orbit-loader'
 import { useLayoutEffect, useRef } from 'react'
@@ -85,13 +86,7 @@ export function WorkspaceEditPreviewDialog() {
           </DialogDescription>
         </DialogHeader>
 
-        {preparing ? (
-          <LoadingState className='grid gap-2 py-2' label='Preparing workspace edit preview'>
-            <div className='skeleton-sweep h-10 rounded-md' />
-            <div className='skeleton-sweep h-16 rounded-md' />
-            <div className='skeleton-sweep h-12 rounded-md' />
-          </LoadingState>
-        ) : null}
+        {preparing ? <WorkspaceEditPreviewLoading /> : null}
 
         {preview ? (
           <div className='min-h-0 overflow-y-auto pr-1'>
@@ -168,10 +163,12 @@ export function WorkspaceEditPreviewDialog() {
         ) : null}
 
         {stale ? (
-          <div className='bg-warning/10 text-warning flex items-start gap-2 rounded-lg p-3 text-xs'>
-            <WarningCircleIcon className='mt-0.5 size-(--icon-size-sm) shrink-0' />
-            <span>{state.message ?? 'This preview is stale. Request the edit again.'}</span>
-          </div>
+          <Alert variant='warning'>
+            <WarningCircleIcon />
+            <AlertDescription>
+              {state.message ?? 'This preview is stale. Request the edit again.'}
+            </AlertDescription>
+          </Alert>
         ) : null}
 
         {processing ? (

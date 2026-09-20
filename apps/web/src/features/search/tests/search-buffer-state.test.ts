@@ -1151,6 +1151,39 @@ describe('search buffer store', () => {
     ])
   })
 
+  it('keeps the default cursor on the first result while files stream in above it', () => {
+    const store = createSearchBufferStore()
+    const runId = store.getState().startSearch(searchQuery('needle'))
+    store
+      .getState()
+      .appendEvent(runId, { match: contentMatch('repo/src/zeta.ts', 1, 1), type: 'match' })
+    store
+      .getState()
+      .appendEvent(runId, { match: contentMatch('repo/src/alpha.ts', 1, 1), type: 'match' })
+
+    const items = searchResultItems(searchGroupsForSnapshot(store.getState().active))
+    const firstMatch = items.find((item) => item.type === 'match')
+
+    expect(store.getState().active?.activeResultPicked).toBe(false)
+    expect(store.getState().active?.activeResultId).toBe(firstMatch?.id)
+  })
+
+  it('keeps a picked result while files stream in above it', () => {
+    const store = createSearchBufferStore()
+    const runId = store.getState().startSearch(searchQuery('needle'))
+    store
+      .getState()
+      .appendEvent(runId, { match: contentMatch('repo/src/zeta.ts', 1, 1), type: 'match' })
+    const picked = store.getState().active?.activeResultId ?? null
+    store.getState().selectResult(picked)
+    store
+      .getState()
+      .appendEvent(runId, { match: contentMatch('repo/src/alpha.ts', 1, 1), type: 'match' })
+
+    expect(store.getState().active?.activeResultPicked).toBe(true)
+    expect(store.getState().active?.activeResultId).toBe(picked)
+  })
+
   it('maps the active match to its parent when a group collapses', () => {
     const store = createSearchBufferStore()
     const runId = store.getState().startSearch(searchQuery('needle'))

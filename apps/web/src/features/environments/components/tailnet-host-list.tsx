@@ -1,8 +1,8 @@
+import { HostListLoading } from '@/features/environments/components/host-list-loading'
 import { useState } from 'react'
 import { useListbox } from '@workspace/ui/patterns/use-listbox'
 import { Button } from '@workspace/ui/components/button'
 import { EmptyState } from '@workspace/ui/components/empty-state'
-import { LoadingState } from '@workspace/ui/components/loading-state'
 import { OrbitLoader } from '@workspace/ui/components/orbit-loader'
 import { useTailnetHosts } from '@/features/environments/hooks/use-tailnet-hosts'
 import { SshHostOption } from '@/features/environments/components/ssh-host-option'
@@ -30,13 +30,7 @@ export function TailnetHostList({
     onActiveChange: setActiveId,
     onCommit: onSelect,
   })
-  if (query.isPending)
-    return (
-      <LoadingState label='Loading tailnet machines' className='space-y-2 p-3'>
-        <div className='skeleton-sweep h-7 rounded-md' />
-        <div className='skeleton-sweep h-7 rounded-md' />
-      </LoadingState>
-    )
+  if (query.isPending) return <HostListLoading label='Loading tailnet machines' />
   if (query.isError)
     return (
       <EmptyState

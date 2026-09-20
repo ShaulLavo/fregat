@@ -12,6 +12,9 @@ import type { ReactNode } from 'react'
  * The busy container mounts immediately so assistive tech is told right away;
  * only the visual preview waits out `delayMs`, which keeps a fast query from
  * flashing placeholder content.
+ *
+ * Never wrap a loader: `OrbitLoader` and `RingLoader` are their own `role="status"`,
+ * so nesting one announces the wait twice and delays the mark itself.
  */
 function LoadingState({
   children,

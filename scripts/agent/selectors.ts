@@ -436,6 +436,8 @@ export const selectors = {
   demoIframe: (page: Page) => page.locator('#workbench-demo'),
   workspaceSearch: (page: Page) =>
     page.getByRole('searchbox', { name: 'Search workspace', exact: true }),
+  searchEditorInput: (page: Page) =>
+    page.getByTestId('editor').getByRole('searchbox', { name: 'Search workspace', exact: true }),
   openSearchEditor: (page: Page) =>
     page.getByRole('button', { name: 'Open search editor', exact: true }),
   searchEditor: (page: Page) => page.locator(searchEditorSelector),
@@ -514,6 +516,10 @@ export const selectors = {
   paletteInput: (page: Page) => page.locator('[data-slot="command-input"]').first(),
   paletteOptions: (page: Page) => page.locator('[data-slot="command-list"]').getByRole('option'),
   selectedPaletteOption: (page: Page) => page.locator('[cmdk-item][data-selected="true"]'),
+  settingsModelsLoading: (page: Page) => page.getByRole('status', { name: 'Loading models' }),
+  settingsNoModels: (page: Page) => page.getByText('No models are available yet.'),
+  paletteScriptsLoading: (page: Page) => page.getByRole('status', { name: 'Loading scripts' }),
+  paletteNoScripts: (page: Page) => page.getByText('No scripts in this project.'),
   paletteDialog: (page: Page) => page.getByRole('dialog', { name: 'Command Palette', exact: true }),
   windowToolbar: (page: Page) => page.getByLabel('Window toolbar', { exact: true }),
   editorTab: (page: Page, path: string) => page.locator(`[data-editor-tab-path="${path}"]`),

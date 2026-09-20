@@ -1,3 +1,4 @@
+import { Alert, AlertDescription } from '@workspace/ui/components/alert'
 import { WarningCircleIcon } from '@phosphor-icons/react'
 import { Button } from '@workspace/ui/components/button'
 import {
@@ -49,13 +50,10 @@ export function ActionDialogContent({
         </div>
       ) : null}
       {error ? (
-        <div
-          className='bg-destructive/10 text-destructive flex items-start gap-(--density-control-gap) rounded-lg px-(--density-control-padding-x) py-(--density-section-gap) text-xs'
-          role='alert'
-        >
-          <WarningCircleIcon className='mt-0.5 size-(--icon-size-sm) shrink-0' />
-          <span>{error}</span>
-        </div>
+        <Alert variant='destructive'>
+          <WarningCircleIcon />
+          <AlertDescription>{error}</AlertDescription>
+        </Alert>
       ) : null}
       <DialogFooter>
         <Button disabled={pending} onClick={onCancel} type='button' variant='outline'>

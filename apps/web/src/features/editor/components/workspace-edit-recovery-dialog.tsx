@@ -1,3 +1,4 @@
+import { Alert, AlertDescription, AlertTitle } from '@workspace/ui/components/alert'
 import {
   ArrowCounterClockwiseIcon,
   FloppyDiskIcon,
@@ -66,36 +67,36 @@ export function WorkspaceEditRecoveryDialog() {
           </DialogHeader>
 
           {conflict ? (
-            <div className='bg-warning/10 rounded-lg p-3'>
-              <div className='text-warning mb-2 flex items-center gap-2 text-xs font-medium'>
-                <WarningOctagonIcon className='size-(--icon-size)' />
-                Workspace state is unknown
-              </div>
-              <p className='text-muted-foreground mb-2 text-xs'>
-                Save and resource operations are disabled for affected live buffers. Close and
-                reopen them from disk before editing again.
-              </p>
-              <ul className='text-2xs grid gap-1 font-mono'>
-                {recovery.unrecoveredPaths.map((path) => (
-                  <li key={path}>{path}</li>
-                ))}
-              </ul>
-            </div>
+            <Alert variant='warning'>
+              <WarningOctagonIcon />
+              <AlertTitle>Workspace state is unknown</AlertTitle>
+              <AlertDescription>
+                <p>
+                  Save and resource operations are disabled for affected live buffers. Close and
+                  reopen them from disk before editing again.
+                </p>
+                <ul className='text-2xs grid gap-1 font-mono'>
+                  {recovery.unrecoveredPaths.map((path) => (
+                    <li key={path}>{path}</li>
+                  ))}
+                </ul>
+              </AlertDescription>
+            </Alert>
           ) : (
-            <div className='bg-destructive/10 rounded-lg p-3'>
-              <div className='text-destructive mb-2 flex items-center gap-2 text-xs font-medium'>
-                <WarningOctagonIcon className='size-(--icon-size)' />
-                <span className='tabular-nums'>
-                  {recovery?.unrecoveredPaths.length ?? 0} unrecovered{' '}
-                  {recovery?.unrecoveredPaths.length === 1 ? 'path' : 'paths'}
-                </span>
-              </div>
-              <ul className='text-2xs grid gap-1 font-mono'>
-                {recovery?.unrecoveredPaths.map((path) => (
-                  <li key={path}>{path}</li>
-                ))}
-              </ul>
-            </div>
+            <Alert variant='destructive'>
+              <WarningOctagonIcon />
+              <AlertTitle className='tabular-nums'>
+                {recovery?.unrecoveredPaths.length ?? 0} unrecovered{' '}
+                {recovery?.unrecoveredPaths.length === 1 ? 'path' : 'paths'}
+              </AlertTitle>
+              <AlertDescription>
+                <ul className='text-2xs grid gap-1 font-mono'>
+                  {recovery?.unrecoveredPaths.map((path) => (
+                    <li key={path}>{path}</li>
+                  ))}
+                </ul>
+              </AlertDescription>
+            </Alert>
           )}
 
           {busy ? (

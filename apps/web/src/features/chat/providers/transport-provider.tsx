@@ -1,5 +1,5 @@
 import { useSyncExternalStore, type ReactNode } from 'react'
-import { LoadingState } from '@workspace/ui/components/loading-state'
+import { RingLoader } from '@workspace/ui/components/ring-loader'
 import { useEnvironmentId } from '@/lib/environments/hooks/use-environment-id'
 import { transportFor, subscribeTransports } from '@/features/chat/state/active-transports'
 import { ChatTransportContext } from '@/features/chat/providers/transport-context'
@@ -9,9 +9,9 @@ export function ChatTransportProvider({ children }: { readonly children: ReactNo
   const transport = useSyncExternalStore(subscribeTransports, () => transportFor(environmentId))
   if (!transport)
     return (
-      <LoadingState label='Connecting chat'>
-        <div className='skeleton-sweep h-4 w-48' />
-      </LoadingState>
+      <div className='grid h-full min-h-0 place-content-center'>
+        <RingLoader className='size-8' label='Connecting chat' />
+      </div>
     )
   return <ChatTransportContext value={transport}>{children}</ChatTransportContext>
 }

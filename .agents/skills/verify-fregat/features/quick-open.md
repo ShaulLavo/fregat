@@ -23,3 +23,5 @@ The index never scans a symlinked directory and the watcher cannot see into one,
 `quick-open-no-flicker` types a file name one key at a time and samples every frame. The step label must read `blank-frames-0`; any other count means the list blanked or flashed "No matching files" between keystrokes.
 
 `scenario command-palette-type-burst` opens the palette from an editor origin, which lists the most commands, types `>toggle sidebar` at 70 ms per key, then types a file query in the same palette. Use it with `trace --compare` and `renders` for palette cost. Commands, views and color mode share one command capture per render; files mode takes none.
+
+`scenario palette-scripts-pending` holds filesystem reads for 1.5 s and opens script mode (`run `). The pending step must show one skeleton row under "From package.json" and never "No scripts in this project."

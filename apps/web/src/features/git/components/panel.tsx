@@ -1,3 +1,4 @@
+import { OrbitLoader } from '@workspace/ui/components/orbit-loader'
 import { disabledDiffQueryKey } from '@/features/git/utils/query-keys'
 import type { GitFileStatus } from '@workspace/contracts'
 import { EmptyState } from '@workspace/ui/components/empty-state'
@@ -76,6 +77,16 @@ export function Panel({ className, rootPath }: ComponentProps<'section'> & { roo
           <EmptyState
             align='start'
             className='min-h-0 flex-1'
+            action={
+              <Button
+                disabled={status.isFetching}
+                onClick={() => void status.refetch()}
+                size='sm'
+                variant='outline'
+              >
+                {status.isFetching ? <OrbitLoader /> : null}Retry
+              </Button>
+            }
             description={errorMessage(status.error)}
             title='Git is unavailable'
             tone='error'

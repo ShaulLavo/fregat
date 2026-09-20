@@ -22,7 +22,8 @@ import {
   searchResultContentItems,
   searchResultIdIsName,
   searchResultItemById,
-  visibleSearchResultId,
+  firstSelectableSearchResultId,
+  pickedSearchResultId,
   type SearchResultId,
 } from '@/features/search/utils/result-items'
 
@@ -64,6 +65,8 @@ export type SearchBufferSnapshot = {
   readonly incarnation: object
   replaceRequest: SearchReplaceToken | null
   activeResultId: SearchResultId | null
+  // False while the cursor is only the default first result: it follows the list and never scrolls it.
+  activeResultPicked: boolean
   caseSensitive: boolean
   collapsedPaths: readonly string[]
   error: string | null
@@ -380,6 +383,7 @@ function searchBufferSnapshotFromCache(
     incarnation: Object.freeze({}),
     replaceRequest: null,
     activeResultId: cached.activeResultId,
+    activeResultPicked: cached.activeResultId !== null,
     caseSensitive: cached.caseSensitive,
     collapsedPaths,
     error: null,
@@ -479,6 +483,7 @@ function clearedSearchBuffer(current: SearchBufferSnapshot) {
   return {
     ...current,
     activeResultId: null,
+    activeResultPicked: false,
     error: null,
     groups: EMPTY_SEARCH_GROUPS,
     matches: [],
@@ -788,6 +793,7 @@ export function emptySearchBuffer(rootPath: string): SearchBufferSnapshot {
     incarnation: Object.freeze({}),
     replaceRequest: null,
     activeResultId: null,
+    activeResultPicked: false,
     caseSensitive: settings['search.caseSensitive'],
     collapsedPaths: [],
     error: null,
@@ -840,6 +846,7 @@ function loadingSearchBuffer(
     incarnation: previous?.incarnation ?? Object.freeze({}),
     replaceRequest: previous?.replaceRequest ?? null,
     activeResultId: previous?.activeResultId ?? null,
+    activeResultPicked: previous?.activeResultPicked ?? false,
     caseSensitive: query.caseSensitive ?? previous?.caseSensitive ?? false,
     collapsedPaths: previous?.collapsedPaths ?? [],
     error: null,
@@ -1370,6 +1377,7 @@ function selectSearchResult(snapshot: SearchBufferSnapshot | null, id: SearchRes
   return resolveActiveSearchResult({
     ...snapshot,
     activeResultId: selected.id,
+    activeResultPicked: true,
     collapsedPaths,
     groups: searchGroupsWithCollapsedPaths(groups, collapsedPaths),
   })
@@ -1391,18 +1399,26 @@ function selectSearchMatch(snapshot: SearchBufferSnapshot | null, direction: 1 |
   return resolveActiveSearchResult({
     ...snapshot,
     activeResultId: selected.id,
+    activeResultPicked: true,
     collapsedPaths,
     groups: searchGroupsWithCollapsedPaths(groups, collapsedPaths),
   })
 }
 
 function resolveActiveSearchResult(snapshot: SearchBufferSnapshot) {
-  const activeResultId = visibleSearchResultId(snapshot.groups, snapshot.activeResultId)
-  if (activeResultId === snapshot.activeResultId) return snapshot
+  const picked = snapshot.activeResultPicked
+    ? pickedSearchResultId(snapshot.groups, snapshot.activeResultId)
+    : null
+  const activeResultId = picked ?? firstSelectableSearchResultId(snapshot.groups)
+  const activeResultPicked = picked !== null
+  const unchanged =
+    activeResultId === snapshot.activeResultId && activeResultPicked === snapshot.activeResultPicked
+  if (unchanged) return snapshot
 
   return {
     ...snapshot,
     activeResultId,
+    activeResultPicked,
   }
 }
 
@@ -1428,7 +1444,7 @@ function canKeepActiveResult(
     incomingMatches: readonly WorkspaceSearchMatch[]
   },
 ) {
-  if (!previous.activeResultId) return false
+  if (!previous.activeResultId || !previous.activeResultPicked) return false
   if (!options.appendingToResults) return false
   if (!searchResultIdIsName(previous.activeResultId)) return true
 

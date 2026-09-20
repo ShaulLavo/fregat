@@ -112,7 +112,10 @@ export function WorkspaceProjectMenu({ workspaceTitle }: { readonly workspaceTit
           <DropdownMenuLabel>Recent</DropdownMenuLabel>
           {isPending ? (
             <LoadingState label='Loading projects' className='px-2 py-1'>
-              <div aria-hidden='true' className='skeleton-sweep h-4 w-full rounded-md' />
+              <div aria-hidden='true' className='flex items-baseline gap-1.5'>
+                <div className='skeleton-sweep h-3 w-28 rounded-md' />
+                <div className='skeleton-sweep h-2.5 w-16 rounded-md' />
+              </div>
             </LoadingState>
           ) : null}
           {entries.map((entry) => (

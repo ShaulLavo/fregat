@@ -1,3 +1,4 @@
+import { Alert, AlertDescription, AlertTitle } from '@workspace/ui/components/alert'
 import type { SettingsDiagnostic } from '@workspace/contracts'
 
 const LABELS: Record<SettingsDiagnostic['kind'], string> = {
@@ -66,31 +67,19 @@ function DiagnosticGroup({
   readonly tone: 'warning' | 'info'
 }) {
   return (
-    <div
-      className={
-        tone === 'warning'
-          ? 'bg-warning/10 rounded-lg p-(--density-section-padding)'
-          : 'bg-info/10 rounded-lg p-(--density-section-padding)'
-      }
-    >
-      <p
-        className={
-          tone === 'warning' ? 'text-warning text-xs font-medium' : 'text-info text-xs font-medium'
-        }
-      >
-        {summary}
-      </p>
-      <ul className='mt-1 flex flex-col gap-0.5'>
-        {diagnostics.map((diagnostic) => (
-          <li
-            className='text-muted-foreground text-xs'
-            key={`${diagnostic.layer}:${diagnostic.id}`}
-          >
-            <code>{diagnostic.id}</code> in {diagnostic.layer} settings — {LABELS[diagnostic.kind]}
-            {diagnostic.detail ? `: ${diagnostic.detail}` : ''}
-          </li>
-        ))}
-      </ul>
-    </div>
+    <Alert role='status' variant={tone}>
+      <AlertTitle>{summary}</AlertTitle>
+      <AlertDescription>
+        <ul className='flex flex-col gap-0.5'>
+          {diagnostics.map((diagnostic) => (
+            <li key={`${diagnostic.layer}:${diagnostic.id}`}>
+              <code>{diagnostic.id}</code> in {diagnostic.layer} settings —{' '}
+              {LABELS[diagnostic.kind]}
+              {diagnostic.detail ? `: ${diagnostic.detail}` : ''}
+            </li>
+          ))}
+        </ul>
+      </AlertDescription>
+    </Alert>
   )
 }

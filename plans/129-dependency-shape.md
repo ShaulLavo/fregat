@@ -1,6 +1,6 @@
 # Dependency shape: the bytes no loading boundary reaches
 
-Status: Phase 1 implemented and deployed 2026-09-20, uncommitted in both checkouts; Phases 2 and 3
+Status: Phases 1 and 2 implemented and deployed 2026-09-20, uncommitted in both checkouts; Phase 3
 not started. Requested 2026-09-20. Planned against Platform
 `b915d3e0` and Editor `21c17e8`, both with unrelated working changes present.
 
@@ -139,6 +139,46 @@ worker 404 across a no-restart deploy, is still open and still shared with 109 P
 Verification: `bundle:report` shows `@phosphor-icons/react` down by about 128,873 rendered bytes;
 `look` on a surface with each of the four kept weights (duotone has 18 call sites, bold 9, fill 6)
 and read the screenshot for an empty icon slot.
+
+### Outcome
+
+Landed 2026-09-20 as
+[`phosphor-weight-plugin.ts`](../apps/web/scripts/phosphor-weight-plugin.ts), wired into
+[`vite.config.ts`](../apps/web/vite.config.ts) after `tailwindcss()`. `collectKeptWeights` walks
+`apps/web/src` and `packages/ui/src` at `buildStart` and reads every `weight=` literal; `regular` is
+kept unconditionally because `IconBase` falls back to it when the prop is unset. The 34 call sites
+draw `bold`, `duotone` and `fill`, so `thin` and `light` are the whole prune. `pruneWeights` rewrites
+each `dist/defs/*.es.js` `new Map([…])` with a string-and-comment-aware scanner and throws on a
+definition it cannot read — an unpruned module is a build failure, not a silent pass.
+
+Measured with `bundle:report` on the same working tree, the plugin out and then in. Entry chunk only;
+nothing else in the build moved.
+
+|                    |                 Raw |             Gzip-9 |
+| ------------------ | ------------------: | -----------------: |
+| Entry chunk before |           5,979,441 |          1,752,756 |
+| Entry chunk after  |           5,860,567 |          1,721,696 |
+| **Delta**          | **118,874 (1.99%)** | **31,060 (1.77%)** |
+
+`@phosphor-icons/react`'s first-load share falls 75,575 → 53,967 gz, 28.6%. The raw delta lands
+within 8,000 bytes of the 128,873 the plan modelled. First-load JavaScript is now 1722 KB gz.
+
+The prune is exact rather than approximate: the shipped entry holds 139 icon definitions and each
+one has precisely the four kept weights — `regular`, `bold`, `fill` and `duotone` all appear as 139
+map keys, `thin` and `light` as none.
+
+Verified on release `20260920T201321Z-46edcf82-phosphor-weights`. `duotone` paints in the
+empty-workspace folder and the command-palette category icons
+(`/work/tmp/fregat-evidence/20260920T201349Z-look-platform-1600x1000`,
+`…/20260920T201404Z-scenario-command-palette-type-burst`), `fill` in the contained render-error
+badge (`…/20260920T201418Z-scenario-pane-render-crash`), `bold` in the session rail's New session
+plus (`…/20260920T201431Z-scenario-chat-timeline`), `regular` throughout. No empty icon slot in any
+of them.
+
+D5's guards are covered by [`phosphor-weight-plugin.test.ts`](../apps/web/scripts/phosphor-weight-plugin.test.ts),
+which is in `test:scripts`: a fixture definition with exact pruned output, an untouched definition
+when every weight survives, and a failing build for `weight={w}`, for `IconContext` and for a
+misspelled weight.
 
 ## Phase 3 — what is left, costed
 

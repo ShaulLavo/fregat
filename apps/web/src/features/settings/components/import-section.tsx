@@ -1,6 +1,6 @@
+import { ImportLoading } from './import-loading'
 import { Button } from '@workspace/ui/components/button'
 import { EmptyState } from '@workspace/ui/components/empty-state'
-import { LoadingState } from '@workspace/ui/components/loading-state'
 import { ImportSourceRow } from '@/features/settings/components/import-source-row'
 import { useImportSources } from '@/features/settings/hooks/use-import-sources'
 
@@ -21,12 +21,7 @@ export function ImportSection() {
           local app sessions stored in the same Codex home, not cloud-only sessions.
         </p>
       </div>
-      {sources.isPending ? (
-        <LoadingState className='space-y-2' label='Loading import sources'>
-          <div aria-hidden='true' className='skeleton-sweep h-8 rounded-md' />
-          <div aria-hidden='true' className='skeleton-sweep h-8 rounded-md' />
-        </LoadingState>
-      ) : null}
+      {sources.isPending ? <ImportLoading /> : null}
       {sources.isError ? (
         <EmptyState
           action={

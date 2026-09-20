@@ -47,6 +47,8 @@ import { bottomPanelPersistence } from './bottom-panel-persistence'
 import { gitOpenAllDiffsSpam } from './git-open-all-diffs-spam'
 import { gitStageSettles } from './git-stage-settles'
 import { commandPaletteTypeBurst } from './command-palette-type-burst'
+import { paletteScriptsPending } from './palette-scripts-pending'
+import { settingsModelsPending } from './settings-models-pending'
 import { chatFollowUp } from './chat-follow-up'
 import { chatDiffSyntax } from './chat-diff-syntax'
 import { editorSplitDrag } from './editor-split-drag'
@@ -90,6 +92,7 @@ import { quickOpenLinkedFile } from './quick-open-linked-file'
 import { quickOpenNoFlicker } from './quick-open-no-flicker'
 import { gitHistorySearchNoFlicker } from './git-history-search-no-flicker'
 import { logsSearchNoFlicker } from './logs-search-no-flicker'
+import { searchTypeDelete } from './search-type-delete'
 import { paneRenderCrash } from './pane-render-crash'
 import type { Page } from 'playwright'
 
@@ -194,6 +197,8 @@ export const scenarios: readonly Scenario[] = [
   gitOpenAllDiffsSpam,
   gitStageSettles,
   commandPaletteTypeBurst,
+  paletteScriptsPending,
+  settingsModelsPending,
   editorThemePreview,
   editorSyntaxBenchmark('native'),
   editorNativeCoverage('light'),
@@ -220,6 +225,7 @@ export const scenarios: readonly Scenario[] = [
   quickOpenNoFlicker,
   gitHistorySearchNoFlicker,
   logsSearchNoFlicker,
+  searchTypeDelete,
   paneRenderCrash,
   wallpaperModeToggle,
   wallpaperLibrary,
