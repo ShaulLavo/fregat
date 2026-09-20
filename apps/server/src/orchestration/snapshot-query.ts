@@ -1,6 +1,7 @@
+import { pendingMessageQuestions, retainMessageQuestions } from './message-questions'
 import { terminalLeaseSchema } from '@workspace/contracts'
 import { worktreesAffectedByEvent, referencingSessionIds } from './worktree-projection'
-import { and, asc, desc, eq, isNull, lt, or, type SQL } from 'drizzle-orm'
+import { and, asc, desc, eq, inArray, isNull, lt, or, type SQL } from 'drizzle-orm'
 import type { SQLiteColumn } from 'drizzle-orm/sqlite-core'
 import * as v from 'valibot'
 import {
@@ -60,9 +61,14 @@ import {
 
 export class OrchestrationSnapshotQuery {
   private readonly database: OrchestrationDatabase
+  private readonly backgroundLiveness: (sessionId: string) => 'working' | 'monitoring' | null
 
-  constructor(database: OrchestrationDatabase = getDefaultPlatformDatabase()) {
+  constructor(
+    database: OrchestrationDatabase = getDefaultPlatformDatabase(),
+    backgroundLiveness: (sessionId: string) => 'working' | 'monitoring' | null = () => null,
+  ) {
     this.database = database
+    this.backgroundLiveness = backgroundLiveness
   }
 
   latestProposedPlan(sessionId: string) {
@@ -115,6 +121,8 @@ export class OrchestrationSnapshotQuery {
         checkpointByTurnId: boundCheckpoints(this.sessionCheckpointIndex(row.sessionId)),
         hasActionableProposedPlan: row.hasActionableProposedPlan,
         latestUserMessageAt: row.latestUserMessageAt,
+        pendingRewindCommandId: row.pendingRewindCommandId,
+        pendingRewindRestoreFiles: row.pendingRewindRestoreFiles,
         pendingApprovalCount: row.pendingApprovalCount,
         pendingUserInputCount: row.pendingUserInputCount,
       })
@@ -212,7 +220,10 @@ export class OrchestrationSnapshotQuery {
       .where(isNull(projectionSessions.deletedAt))
       .orderBy(asc(projectionSessions.createdAt))
       .all()
-      .map((session) => sessionShellFromRow(session, this.sessionRuntime(session.sessionId)))
+      .map((session) => ({
+        ...sessionShellFromRow(session, this.sessionRuntime(session.sessionId)),
+        backgroundLiveness: this.backgroundLiveness(session.sessionId),
+      }))
 
     return v.parse(orchestrationShellSnapshotSchema, {
       projects,
@@ -241,12 +252,17 @@ export class OrchestrationSnapshotQuery {
       checkpoints: this.sessionCheckpointRows(sessionId).map(checkpointFromRow),
       proposedPlans: this.sessionProposedPlans(sessionId).map(proposedPlanFromRow),
       snapshotSequence: this.currentSequence(),
-      session: sessionFromRow(
-        row,
-        this.messagesBefore(sessionId, null, ORCHESTRATION_SESSION_DETAIL_PAGE_SIZE).rows,
-        this.activitiesBefore(sessionId, null, ORCHESTRATION_SESSION_DETAIL_PAGE_SIZE).rows,
-        this.sessionRuntime(sessionId),
-      ),
+      session: {
+        ...sessionFromRow(
+          row,
+          this.messagesBefore(sessionId, null, ORCHESTRATION_SESSION_DETAIL_PAGE_SIZE).rows,
+          this.activitiesBefore(sessionId, null, ORCHESTRATION_SESSION_DETAIL_PAGE_SIZE).rows,
+          this.sessionRuntime(sessionId),
+        ),
+        pendingMessageQuestions: pendingMessageQuestions(
+          this.recentSessionActivities(sessionId).map(activityFromRow),
+        ),
+      },
     })
   }
 
@@ -334,7 +350,32 @@ export class OrchestrationSnapshotQuery {
   }
 
   private recentSessionActivities(sessionId: string) {
-    return this.activitiesBefore(sessionId, null, MAX_SESSION_ACTIVITIES).rows
+    const recent = this.activitiesBefore(sessionId, null, MAX_SESSION_ACTIVITIES).rows
+    const requests = this.database
+      .select()
+      .from(projectionSessionActivities)
+      .where(
+        and(
+          eq(projectionSessionActivities.sessionId, sessionId),
+          inArray(projectionSessionActivities.kind, [
+            'user-input.requested',
+            'user-input.resolved',
+          ]),
+        ),
+      )
+      .orderBy(
+        asc(projectionSessionActivities.sequence),
+        asc(projectionSessionActivities.createdAt),
+      )
+      .all()
+    const pendingIds = new Set<string>(
+      pendingMessageQuestions(requests.map(activityFromRow)).map((activity) => activity.id),
+    )
+    const recentIds = new Set(recent.map((row) => row.activityId))
+    const retained = requests.filter(
+      (row) => pendingIds.has(row.activityId) && !recentIds.has(row.activityId),
+    )
+    return [...retained, ...recent]
   }
 
   private sessionRuntime(sessionId: string) {
@@ -415,6 +456,8 @@ export class OrchestrationSnapshotQuery {
       hasActionableProposedPlan: row.hasActionableProposedPlan,
       latestUserMessageAt: row.latestUserMessageAt,
       messages: held?.messages ?? this.recentSessionMessages(sessionId).map(messageFromRow),
+      pendingRewindCommandId: row.pendingRewindCommandId,
+      pendingRewindRestoreFiles: row.pendingRewindRestoreFiles,
       pendingApprovalCount: row.pendingApprovalCount,
       pendingUserInputCount: row.pendingUserInputCount,
     })
@@ -465,7 +508,8 @@ export class OrchestrationSnapshotQuery {
       .get()
     if (!row) return
 
-    upsertById(session.activities, activityFromRow(row), MAX_SESSION_ACTIVITIES)
+    upsertById(session.activities, activityFromRow(row), Number.POSITIVE_INFINITY)
+    session.activities = retainMessageQuestions(session.activities, MAX_SESSION_ACTIVITIES)
   }
 
   /**

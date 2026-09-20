@@ -1,11 +1,12 @@
 import { createClientInvariantError } from '@/lib/structured-errors'
 
-import { MAX_CHAT_ATTACHMENTS, type ChatAttachmentUpload } from '@workspace/contracts'
+import {
+  MAX_CHAT_ATTACHMENTS,
+  MAX_CHAT_FILE_ATTACHMENT_BYTES,
+  type ChatAttachmentUpload,
+} from '@workspace/contracts'
 
-import type {
-  ChatInputDraftTarget,
-  ChatInputImageAttachment,
-} from '@/features/chat/state/chat-input-draft-store'
+import type { ChatInputAttachment } from '@/features/chat/state/chat-input-draft-store'
 
 import {
   classifyChatImageFile,
@@ -18,16 +19,16 @@ import {
 
 const IMAGE_ATTACHMENT_ID_PREFIX = 'image'
 
-export function imageFilesFromTransfer(dataTransfer: DataTransfer | null) {
+export function filesFromTransfer(dataTransfer: DataTransfer | null) {
   if (!dataTransfer) return []
 
-  return imageFilesFromFileList(dataTransfer.files)
+  return filesFromFileList(dataTransfer.files)
 }
 
-export function imageFilesFromClipboard(clipboardData: DataTransfer | null) {
+export function filesFromClipboard(clipboardData: DataTransfer | null) {
   if (!clipboardData) return []
 
-  return imageFilesFromFileList(clipboardData.files)
+  return filesFromFileList(clipboardData.files)
 }
 
 /**
@@ -36,59 +37,42 @@ export function imageFilesFromClipboard(clipboardData: DataTransfer | null) {
  * no-op. `previewUrl` is dropped: it exists purely to paint the local preview.
  */
 export function chatInputUploadAttachments(
-  attachments: readonly ChatInputImageAttachment[],
+  attachments: readonly ChatInputAttachment[],
 ): ChatAttachmentUpload[] {
-  return attachments.map(({ previewUrl: _previewUrl, ...attachment }) => attachment)
-}
-
-/**
- * Classifies, compresses and stages a batch of dropped/pasted/picked files.
- * Every file goes through the same gate, so the count cap and the media-type
- * allowlist hold no matter which capture path produced them.
- */
-export async function stageChatInputImageFiles({
-  addImages,
-  draftTarget,
-  existingImageCount,
-  files,
-  onError,
-}: {
-  addImages: (target: ChatInputDraftTarget, images: readonly ChatInputImageAttachment[]) => number
-  draftTarget: ChatInputDraftTarget
-  existingImageCount: number
-  files: readonly File[]
-  onError: (error: string | null) => void
-}) {
-  if (files.length === 0) return
-
-  const staged: ChatInputImageAttachment[] = []
-  let rejection: string | null = null
-
-  for (const file of files) {
-    const prepared = await prepareChatInputImage(file, existingImageCount + staged.length)
-    if (prepared.status === 'reject') {
-      // First refusal wins: the composer shows one sentence, and the first
-      // cause is the one the user is most likely to be able to act on.
-      rejection ??= prepared.message
-      continue
-    }
-
-    staged.push(prepared.attachment)
-  }
-
-  const accepted = staged.length > 0 ? addImages(draftTarget, staged) : 0
-  if (accepted < staged.length) rejection ??= `Up to ${MAX_CHAT_ATTACHMENTS} images per message.`
-  onError(rejection)
+  return attachments.map(({ previewUrl: _previewUrl, upload, ...attachment }) => {
+    if (!upload) return attachment
+    if (upload.status !== 'ready')
+      throw createClientInvariantError('Wait for attachments to upload, or retry failed files.')
+    return upload.attachment
+  })
 }
 
 type PreparedChatInputImage =
-  | { status: 'accept'; attachment: ChatInputImageAttachment }
+  | { status: 'accept'; attachment: ChatInputAttachment; blob: Blob }
   | { status: 'reject'; message: string }
 
-async function prepareChatInputImage(
+export async function prepareChatInputFile(
   file: File,
   currentCount: number,
 ): Promise<PreparedChatInputImage> {
+  if (!file.type.toLowerCase().startsWith('image/')) {
+    if (currentCount >= MAX_CHAT_ATTACHMENTS)
+      return { status: 'reject', message: `Up to ${MAX_CHAT_ATTACHMENTS} files per message.` }
+    if (file.size === 0 || file.size > MAX_CHAT_FILE_ATTACHMENT_BYTES)
+      return { status: 'reject', message: 'Files must contain between 1 byte and 50 MB.' }
+    return {
+      status: 'accept',
+      blob: file,
+      attachment: {
+        type: 'file',
+        id: `file-${crypto.randomUUID()}`,
+        name: file.name,
+        mimeType: file.type || 'application/octet-stream',
+        sizeBytes: file.size,
+        previewUrl: '',
+      },
+    }
+  }
   const classification = classifyChatImageFile(file, currentCount)
   if (classification.status === 'reject') {
     return { status: 'reject', message: classification.message }
@@ -106,6 +90,7 @@ async function prepareChatInputImage(
 
   return {
     status: 'accept',
+    blob: compressed.file,
     attachment: {
       dataUrl,
       id: `${IMAGE_ATTACHMENT_ID_PREFIX}-${crypto.randomUUID()}`,
@@ -126,15 +111,8 @@ function compressionFailureMessage(reason: ImageCompressionFailureReason) {
   return 'That image is too large to send.'
 }
 
-function imageFilesFromFileList(fileList: FileList) {
-  return Array.from(fileList).filter(isImageFile)
-}
-
-// Deliberately wider than the allowlist: anything the OS calls an image reaches
-// the classifier, so a HEIC paste gets a sentence explaining itself instead of
-// being silently swallowed like a dropped folder or text selection.
-function isImageFile(file: File) {
-  return file.type.toLowerCase().startsWith('image/')
+function filesFromFileList(fileList: FileList) {
+  return Array.from(fileList)
 }
 
 function readFileAsDataUrl(file: File) {

@@ -1,3 +1,4 @@
+import { sessionTitleEntries } from './session-titles'
 import { worktreeLifecycleEntries } from './worktree-lifecycle'
 import * as v from 'valibot'
 import {
@@ -48,7 +49,9 @@ export const MAX_CHAT_ATTACHMENT_BYTES = 10 * 1024 * 1024
  */
 export const MAX_CHAT_ATTACHMENT_DATA_URL_LENGTH = 64 + 4 * Math.ceil(MAX_CHAT_ATTACHMENT_BYTES / 3)
 
-export const chatAttachmentSchema = v.object({
+export const MAX_CHAT_FILE_ATTACHMENT_BYTES = 50 * 1024 * 1024
+
+export const chatImageAttachmentSchema = v.object({
   type: v.literal('image'),
   id: trimmedNonEmptyStringSchema,
   name: trimmedNonEmptyStringSchema,
@@ -56,26 +59,46 @@ export const chatAttachmentSchema = v.object({
   sizeBytes: v.pipe(nonNegativeIntegerSchema, v.maxValue(MAX_CHAT_ATTACHMENT_BYTES)),
 })
 
+export const chatFileAttachmentSchema = v.object({
+  type: v.literal('file'),
+  id: trimmedNonEmptyStringSchema,
+  name: v.pipe(trimmedNonEmptyStringSchema, v.maxLength(255)),
+  mimeType: v.pipe(trimmedNonEmptyStringSchema, v.maxLength(100)),
+  sizeBytes: v.pipe(
+    nonNegativeIntegerSchema,
+    v.minValue(1),
+    v.maxValue(MAX_CHAT_FILE_ATTACHMENT_BYTES),
+  ),
+})
+
+export const chatAttachmentSchema = v.variant('type', [
+  chatImageAttachmentSchema,
+  chatFileAttachmentSchema,
+])
+
 /**
  * Wire-only attachment shape: carries the bytes on their way in from the client.
  * The bytes are written to the blob store at ingest and never reach the event
  * log or the projection, which keep the metadata-only `chatAttachmentSchema`.
  */
-export const chatAttachmentUploadSchema = v.object({
-  ...chatAttachmentSchema.entries,
-  dataUrl: v.optional(
-    v.pipe(
-      v.string(),
-      // The length ceiling, not just the shape. `sizeBytes` is a number the
-      // client declares and the bytes need not match it, so validating only
-      // that leaves the actual payload unbounded: a client can say `1` and
-      // send half a gigabyte, which the server would decode whole into memory
-      // before anything noticed.
-      v.maxLength(MAX_CHAT_ATTACHMENT_DATA_URL_LENGTH),
-      v.regex(/^data:image\/[a-z+]+;base64,/i),
+export const chatAttachmentUploadSchema = v.variant('type', [
+  v.object({
+    ...chatImageAttachmentSchema.entries,
+    dataUrl: v.optional(
+      v.pipe(
+        v.string(),
+        // The length ceiling, not just the shape. `sizeBytes` is a number the
+        // client declares and the bytes need not match it, so validating only
+        // that leaves the actual payload unbounded: a client can say `1` and
+        // send half a gigabyte, which the server would decode whole into memory
+        // before anything noticed.
+        v.maxLength(MAX_CHAT_ATTACHMENT_DATA_URL_LENGTH),
+        v.regex(/^data:image\/[a-z+]+;base64,/i),
+      ),
     ),
-  ),
-})
+  }),
+  chatFileAttachmentSchema,
+])
 
 /**
  * The count cap lives on the array, so every place a message declares its
@@ -127,9 +150,10 @@ export function chatAttachmentExtension(mimeType: string): string | null {
  * Null for a type outside the allowlist — which is exactly when no blob exists.
  */
 export function chatAttachmentUrlPath(
-  attachment: Pick<ChatAttachment, 'id' | 'mimeType'>,
+  attachment: Pick<ChatAttachment, 'id' | 'mimeType' | 'type'>,
 ): string | null {
-  const extension = chatAttachmentExtension(attachment.mimeType)
+  const extension =
+    attachment.type === 'file' ? '.bin' : chatAttachmentExtension(attachment.mimeType)
   if (!extension) return null
 
   return `${CHAT_ATTACHMENT_URL_PREFIX}/${encodeURIComponent(attachment.id)}${extension}`
@@ -405,6 +429,8 @@ export const orchestrationSessionLifecycleEntries = {
   // renders in the pinned block and never classifies into a shelf.
   pinnedAt: v.optional(v.nullable(isoDateTimeSchema)),
   pinOrderKey: v.optional(v.nullable(orderKeySchema)),
+  activeOrderKey: v.optional(v.nullable(orderKeySchema)),
+  unsettledAt: v.optional(v.nullable(isoDateTimeSchema)),
 } as const
 
 export const sessionOriginSchema = v.picklist(['platform', 'discovered'])
@@ -437,6 +463,7 @@ export const sessionAttentionEntries = {
 } as const
 
 export const orchestrationSessionSchema = v.object({
+  ...sessionTitleEntries,
   id: sessionIdSchema,
   worktreeId: worktreeIdSchema,
   origin: sessionOriginSchema,
@@ -452,6 +479,9 @@ export const orchestrationSessionSchema = v.object({
   deletedAt: v.nullable(isoDateTimeSchema),
   messages: v.array(orchestrationMessageSchema),
   activities: v.array(orchestrationSessionActivitySchema),
+  pendingMessageQuestions: v.optional(
+    v.pipe(v.array(orchestrationSessionActivitySchema), v.readonly()),
+  ),
   runtime: v.nullable(sessionRuntimeStateSchema),
   deletion: v.nullable(sessionDeletionStateSchema),
   ...orchestrationSessionLifecycleEntries,
@@ -491,3 +521,24 @@ export type OrchestrationCheckpointSummary = v.InferOutput<
 export type SessionSettledOverride = v.InferOutput<typeof sessionSettledOverrideSchema>
 export type SessionLifecycleReason = v.InferOutput<typeof sessionLifecycleReasonSchema>
 export type OrchestrationSession = v.InferOutput<typeof orchestrationSessionSchema>
+
+export const userInputAttachmentsSchema = v.pipe(
+  v.record(v.string(), chatAttachmentsSchema),
+  v.check(
+    (entries) =>
+      Object.values(entries).reduce((count, entries) => count + entries.length, 0) <=
+      MAX_CHAT_ATTACHMENTS,
+    'Too many question attachments.',
+  ),
+)
+export const userInputAttachmentUploadsSchema = v.pipe(
+  v.record(v.string(), chatAttachmentUploadsSchema),
+  v.check(
+    (entries) =>
+      Object.values(entries).reduce((count, entries) => count + entries.length, 0) <=
+      MAX_CHAT_ATTACHMENTS,
+    'Too many question attachments.',
+  ),
+)
+export type UserInputAttachments = v.InferOutput<typeof userInputAttachmentsSchema>
+export type UserInputAttachmentUploads = v.InferOutput<typeof userInputAttachmentUploadsSchema>

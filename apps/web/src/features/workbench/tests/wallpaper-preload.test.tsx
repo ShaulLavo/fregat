@@ -2,7 +2,7 @@ import { readFileSync } from 'node:fs'
 import { join } from 'node:path'
 import { afterEach, vi } from 'vitest'
 import { DEFAULT_SETTING_VALUES } from '@workspace/contracts'
-import { writeBootMirror } from '@/features/settings/utils/boot-mirror'
+import { writeBootMirror } from '@/lib/settings-boot-mirror'
 
 import { expect, test } from '../../../../test/fixtures'
 

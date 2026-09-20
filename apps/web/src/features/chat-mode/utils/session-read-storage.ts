@@ -6,11 +6,7 @@ import type { SessionSeenStamps } from '@workspace/client-core/chat/rail/unread'
 
 const SESSION_READ_STORAGE_KEY = 'platform.chat-session-reads.v1'
 const SESSION_READ_STORAGE_VERSION = 1
-/**
- * Nothing prunes stamps for sessions that were deleted elsewhere, so the record is
- * bounded here instead. Newest completions win: the oldest stamps belong to sessions
- * nobody has touched in weeks, and losing one only makes that row read as unread once.
- */
+// Keep browser-owned visits bounded; absent history is read by default.
 const MAX_SESSION_READ_ENTRIES = 300
 
 const persistedSessionReadsSchema = v.object({

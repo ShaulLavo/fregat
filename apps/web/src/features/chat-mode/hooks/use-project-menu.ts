@@ -1,9 +1,4 @@
 import { useWorktreeManagerStore } from '@/features/chat-mode/state/worktree-manager-store'
-import {
-  useChatProjectionStore,
-  selectChatProjectionSlice,
-} from '@/features/chat/state/chat-projection-store'
-import { selectChatSidebarSessionsForProject } from '@workspace/client-core/chat/selectors'
 import { useProjectActions } from '@/features/chat-mode/hooks/use-project-actions'
 import { startSessionDraft } from '@/features/chat-mode/state/session-commands'
 import { useProjectRenameRequestStore } from '@/features/chat-mode/state/project-rename-request-store'
@@ -23,19 +18,13 @@ export function useProjectMenu(group: SessionRailGroup) {
   const setScope = useSessionRailStore((state) => state.setScope)
   const toggleProjectCollapsed = useSessionRailStore((state) => state.toggleProjectCollapsed)
   const { project } = group
-  // Counted across the whole project, not the group: in the archive view the band
-  // lists filed sessions, but the ones "Archive All" would act on live in the inbox.
-  const archivableCount = useChatProjectionStore(
-    (state) =>
-      selectChatSidebarSessionsForProject(
-        selectChatProjectionSlice(state, project.ref.environmentId),
-        project.id,
-      ).length,
-  )
-
   return projectMenu({
-    archiveAllSessions: () => actions.archiveAllSessions(project.ref),
-    canArchiveSessions: archivableCount > 0,
+    ownerLabel:
+      project.members.length > 1
+        ? project.members.find((member) => member.physicalKey === project.key)?.label
+        : undefined,
+    archiveAllSessions: () => actions.archiveAllSessions(project),
+    canArchiveSessions: project.sessionRefs.length > 0,
     collapsed: group.collapsed,
     copyPath: () => void copyTextToClipboard(project.workspaceRoot, 'path'),
     deleteProject: () => actions.deleteProject(project),
@@ -45,8 +34,9 @@ export function useProjectMenu(group: SessionRailGroup) {
       useProjectRenameRequestStore
         .getState()
         .requestRename({ ref: project.ref, title: project.title }),
-    scopedToProject: scope === project.id,
-    scopeToProject: () => setScope(project.id),
-    toggleCollapsed: () => toggleProjectCollapsed(project.id),
+    scopedToProject: scope === project.groupKey,
+    scopeToProject: () => setScope(project.groupKey),
+    toggleCollapsed: () =>
+      toggleProjectCollapsed(project.members.map((member) => member.physicalKey)),
   })
 }

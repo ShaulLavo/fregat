@@ -1,8 +1,16 @@
-import type { ModelSelection, ProviderInstanceId, SessionId, TurnId } from '@workspace/contracts'
+import type {
+  ChatAttachment,
+  ModelSelection,
+  ProviderInstanceId,
+  SessionId,
+  TurnId,
+} from '@workspace/contracts'
 
 import type { ProviderRuntimeEvent } from './types'
 
 export type ProviderTextGenerationInput = {
+  attachments?: readonly ChatAttachment[]
+  attachmentsDir?: string
   messageText: string
   modelSelection: ModelSelection
   signal?: AbortSignal

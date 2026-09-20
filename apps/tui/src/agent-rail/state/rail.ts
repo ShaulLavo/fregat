@@ -3,14 +3,12 @@ import { recordObservabilityWarning } from '@workspace/observability'
 import * as v from 'valibot'
 import {
   commandIdSchema,
-  projectIdSchema,
   projectRegistrationResultSchema,
   orchestrationSearchSessionsResultSchema,
   ORCHESTRATION_SESSION_SEARCH_MIN_QUERY_LENGTH,
   ORCHESTRATION_SESSION_SEARCH_MAX_QUERY_LENGTH,
   scopedSessionKey,
   type ClientOrchestrationCommand,
-  type ProjectId,
   type SessionId,
 } from '@workspace/contracts'
 import { sessionIdRange, toggledSessionIds } from '@workspace/client-core/chat/rail/multi-select'
@@ -27,8 +25,8 @@ import type { FileStorage } from '@/storage/files'
 type State = {
   readonly query: string
   readonly view: SessionRailView
-  readonly scope: ProjectId | null
-  readonly collapsed: readonly ProjectId[]
+  readonly scope: string | null
+  readonly collapsed: readonly string[]
   readonly marked: readonly SessionId[]
   readonly anchor: SessionId | null
   readonly search: SessionSearchMatches
@@ -132,13 +130,13 @@ export function createAgentRailState(
       }
     },
     setQuery,
-    setScope: (scope: ProjectId | null) => publish({ scope, marked: [], anchor: null }),
+    setScope: (scope: string | null) => publish({ scope, marked: [], anchor: null }),
     toggleArchived: () =>
       publish({ view: state.view === 'active' ? 'archived' : 'active', marked: [], anchor: null }),
-    toggleCollapsed(projectId: ProjectId) {
-      const collapsed = state.collapsed.includes(projectId)
-        ? state.collapsed.filter((id) => id !== projectId)
-        : [...state.collapsed, projectId]
+    toggleCollapsed(keys: readonly string[]) {
+      const allCollapsed = keys.every((key) => state.collapsed.includes(key))
+      const collapsed = state.collapsed.filter((key) => !keys.includes(key))
+      if (!allCollapsed) collapsed.push(...new Set(keys))
       ready.storage.setItem('agent:rail:collapsed', JSON.stringify(collapsed))
       publish({ collapsed })
     },
@@ -193,7 +191,7 @@ export function createAgentRailState(
 
 function readCollapsed(
   storage: Pick<FileStorage, 'getItem' | 'removeItemIfValue'>,
-): readonly ProjectId[] {
+): readonly string[] {
   const key = 'agent:rail:collapsed'
   let raw = storage.getItem(key)
   while (raw !== null) {
@@ -210,7 +208,7 @@ function readCollapsedValue(
   raw: string,
 ) {
   try {
-    return v.parse(v.array(projectIdSchema), JSON.parse(raw))
+    return v.parse(v.array(v.string()), JSON.parse(raw))
   } catch {
     if (!storage.removeItemIfValue(key, raw)) return null
     recordObservabilityWarning('tui.storage.read', {

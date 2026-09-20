@@ -3,7 +3,7 @@ import { act, screen, waitFor } from '@testing-library/react'
 import userEvent from '@testing-library/user-event'
 
 import { MachinesSection } from '@/features/settings/components/machines-section'
-import { useSettingValue } from '@/features/settings/hooks/use-setting-value'
+import { useSettingValue } from '@/hooks/use-setting-value'
 import { useSettingsActions } from '@/features/settings/hooks/use-settings-actions'
 import { fetchSettings, saveSettings } from '@/features/settings/utils/api'
 import { settingsKeys } from '@workspace/client-core/settings/query-keys'

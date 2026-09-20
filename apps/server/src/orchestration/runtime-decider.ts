@@ -1,7 +1,6 @@
 import { requireReadyWorktree } from './worktree-decider'
 import type { OrchestrationCommand } from '@workspace/contracts'
 import { event, one } from './event-factory'
-import { lifecycleResetEvents } from './lifecycle-events'
 import { requireSession, type OrchestrationReadModel } from './read-model'
 import { sessionDomainErrors } from './structured-errors'
 
@@ -89,7 +88,6 @@ export function decideRuntimeRecovery(
     throw sessionDomainErrors.START_STATE_CONFLICT(command)
   }
   return [
-    ...lifecycleResetEvents(command, session, at),
     event(command, at, 'session.runtime-recovered', {
       sessionId: command.sessionId,
       turnId: command.turnId,

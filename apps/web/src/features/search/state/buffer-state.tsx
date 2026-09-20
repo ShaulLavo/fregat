@@ -16,7 +16,7 @@ import { clientErrors } from '@/lib/structured-errors'
 import { documentKey, filesystemPath } from '@/lib/documents/utils/identity'
 import type { DocumentKey } from '@/lib/documents/utils/types'
 import { compareSearchPaths } from '@/features/search/utils/sort'
-import { readSettingsMirror } from '@/features/settings/utils/boot-mirror'
+import { readSettingsMirror } from '@/lib/settings-boot-mirror'
 import {
   expandedSearchResultItems,
   searchResultContentItems,

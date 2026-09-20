@@ -41,7 +41,7 @@ import {
   relativeTimeLabel,
 } from '@/features/editor/utils/history-state-label'
 import { editorMutationKeys } from '@/features/editor/utils/mutation-keys'
-import { useSettingValue } from '@/features/settings/hooks/use-setting-value'
+import { useSettingValue } from '@/hooks/use-setting-value'
 import { useFocusTarget } from '@/lib/focus/hooks/use-target'
 
 const CLOCK_TICK_MS = 30_000

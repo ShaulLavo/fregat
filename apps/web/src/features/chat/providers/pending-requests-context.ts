@@ -1,7 +1,9 @@
 import type {
   ApprovalRequestId,
+  SessionId,
   ProviderApprovalDecision,
   ProviderUserInputAnswers,
+  UserInputAttachmentUploads,
 } from '@workspace/contracts'
 import { createContext } from 'react'
 
@@ -10,6 +12,8 @@ import type { PendingUserInput } from '@workspace/client-core/chat/pending-user-
 
 /** Requests holding the turn open, plus the actions and state of their responses. */
 export type ChatPendingRequests = {
+  readonly sessionId: SessionId
+  readonly dismissUserInput: (requestId: ApprovalRequestId) => Promise<boolean>
   readonly disabledReason: string | null
   readonly responseState: (requestId: ApprovalRequestId) => PendingRequestResponse
   readonly pendingApprovals: readonly PendingApproval[]
@@ -23,6 +27,7 @@ export type ChatPendingRequests = {
   readonly respondToUserInput: (
     requestId: ApprovalRequestId,
     answers: ProviderUserInputAnswers,
+    attachmentsByQuestionId?: UserInputAttachmentUploads,
   ) => Promise<boolean>
 }
 

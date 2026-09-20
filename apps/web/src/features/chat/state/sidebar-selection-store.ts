@@ -3,7 +3,12 @@ import { create } from 'zustand'
 
 export type SidebarSelection =
   | { readonly kind: 'auto' }
-  | { readonly kind: 'draft'; readonly environmentId: EnvironmentId; readonly projectId: ProjectId }
+  | {
+      readonly kind: 'draft'
+      readonly draftId?: string
+      readonly environmentId: EnvironmentId
+      readonly projectId: ProjectId
+    }
   | {
       readonly kind: 'session'
       readonly environmentId: EnvironmentId

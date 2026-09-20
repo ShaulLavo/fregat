@@ -34,8 +34,10 @@ import { ScopeChip } from '@/features/command-palette/components/scope-chip'
 import { useHighlightedPaletteValue } from '@/features/command-palette/hooks/use-highlighted-palette-value'
 import { useRecentCommandIds } from '@/features/command-palette/hooks/use-recent-command-ids'
 import { paletteIdFromItemValue } from '@/features/command-palette/utils/app-colors'
+import { themeBundleFromItemValue } from '@/features/command-palette/utils/theme-bundles'
 import { wallpaperSourceFromItemValue } from '@/features/command-palette/utils/wallpapers'
 import { useWallpaperPreviewStore } from '@/lib/wallpapers/state/preview-store'
+import { useBundles } from '@/lib/appearance/hooks/use-bundles'
 import { usePalette } from '@/lib/appearance/hooks/use-palette'
 import { isCommandVisibleInPalette } from '@/keymap/utils/palette-visibility'
 import {
@@ -85,6 +87,7 @@ export function CommandPaletteContent() {
   const { selectTheme } = useEditorColorTheme()
   const { clearThemePreview, previewTheme, resolvedTheme, theme } = useTheme()
   const { catalog, clearPalettePreview, previewPalette } = usePalette()
+  const { catalog: bundles, clear: clearBundlePreview, preview: previewBundle } = useBundles()
   const previewWallpaper = useWallpaperPreviewStore((state) => state.preview)
   const clearWallpaperPreview = useWallpaperPreviewStore((state) => state.clear)
   const hasWorkspace = useEditorWorkspaceState((state) => Boolean(state.rootFolder))
@@ -153,17 +156,19 @@ export function CommandPaletteContent() {
     if (mode !== 'colorTheme') clearEditorThemePreview()
     if (mode !== 'colorMode') clearThemePreview()
     if (mode !== 'appColors') clearPalettePreview()
+    if (mode !== 'themeBundle') clearBundlePreview()
     if (mode !== 'wallpaper') clearWallpaperPreview()
-  }, [clearWallpaperPreview, clearPalettePreview, clearThemePreview, mode])
+  }, [clearBundlePreview, clearWallpaperPreview, clearPalettePreview, clearThemePreview, mode])
 
   useEffect(
     () => () => {
       clearEditorThemePreview()
       clearThemePreview()
       clearPalettePreview()
+      clearBundlePreview()
       clearWallpaperPreview()
     },
-    [clearWallpaperPreview, clearPalettePreview, clearThemePreview],
+    [clearBundlePreview, clearWallpaperPreview, clearPalettePreview, clearThemePreview],
   )
 
   function previewHighlightedColorTheme(value: string) {
@@ -183,6 +188,11 @@ export function CommandPaletteContent() {
       if (mode === 'wallpaper') {
         const source = wallpaperSourceFromItemValue(value)
         if (source) previewWallpaper(source)
+        return
+      }
+      if (mode === 'themeBundle') {
+        const bundle = themeBundleFromItemValue(bundles, value)
+        if (bundle) previewBundle(bundle)
         return
       }
       if (mode === 'appColors') {

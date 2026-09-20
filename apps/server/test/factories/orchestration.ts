@@ -17,7 +17,9 @@ import { ProviderAdapterRegistry } from '../../src/provider/provider-adapter-reg
 export const FIXTURE_SESSION_ID = '974a8f3c-3bc1-44d1-bc82-da59e3dc6cde'
 export const FIXTURE_MODEL = { providerInstanceId: 'codex', model: 'mock-model' }
 
-export async function createOrchestrationFixture(options: { repositoryCacheTtlMs?: number } = {}) {
+export async function createOrchestrationFixture(
+  options: { repositoryCacheTtlMs?: number; engineOptions?: OrchestrationEngineOptions } = {},
+) {
   const root = await mkdtemp(path.join(tmpdir(), 'platform-domain-'))
   const checkout = path.join(root, 'checkout')
   await mkdir(checkout)
@@ -32,6 +34,7 @@ export async function createOrchestrationFixture(options: { repositoryCacheTtlMs
   const registration = { paths, git }
   let nextCommand = 0
   let engine = new OrchestrationEngine(database, {
+    ...options.engineOptions,
     registration,
     attachmentsDir: path.join(root, 'attachments'),
   })
@@ -75,8 +78,9 @@ export async function createOrchestrationFixture(options: { repositoryCacheTtlMs
     restart: async (providerRuntime?: OrchestrationEngineOptions['providerRuntime']) => {
       await engine.close()
       engine = new OrchestrationEngine(database, {
+        ...options.engineOptions,
         registration,
-        providerRuntime,
+        providerRuntime: providerRuntime ?? options.engineOptions?.providerRuntime,
         attachmentsDir: path.join(root, 'attachments'),
       })
       return engine

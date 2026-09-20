@@ -1,3 +1,4 @@
+import { readSettingsMirror } from '@/lib/settings-boot-mirror'
 import {
   scopedSessionKey,
   type ProjectId,
@@ -62,7 +63,12 @@ export async function startSessionDraft(ref: ScopedProjectRef, options: SessionO
   return result.status === 'applied'
 }
 export function startScopedSessionDraft() {
-  const projectId = useSessionRailStore.getState().scope ?? activeProjectId()
+  const scope = useSessionRailStore.getState().scope
+  if (scope) {
+    const project = currentRailModel().projects.find((candidate) => candidate.groupKey === scope)
+    return project ? startSessionDraft(project.ref) : false
+  }
+  const projectId = activeProjectId()
   if (!projectId) return false
   const environmentId = activeEnvironmentId()
   const { selection, restored, draftWorktreeId } = useSessionSelectionStore.getState()
@@ -107,17 +113,28 @@ function openSessionAt(sessions: readonly SessionRailItem[], index: number) {
   return openSessionRow(session)
 }
 function visibleSessions() {
+  return currentRailModel().sessions
+}
+function currentRailModel() {
   const rail = useSessionRailStore.getState()
+  const settings = readSettingsMirror()
   return sessionRailModel({
+    grouping: {
+      mode: settings['chat.projectGrouping'],
+      overrides: settings['chat.projectGroupingOverrides'],
+    },
     environments: currentRailEnvironments(),
     orderOverrides: railOrderOverrides(),
     query: rail.query,
     scope: rail.scope,
     machineFilter: rail.machineFilter,
-    searchMatches: useSessionSearchStore.getState().matchBySessionKey,
+    searchMatches:
+      useSessionSearchStore.getState().matchedQuery === rail.query.trim()
+        ? useSessionSearchStore.getState().matchBySessionKey
+        : {},
     seenBySessionKey: useSessionReadStore.getState().seenBySessionKey,
     view: rail.view,
-  }).sessions
+  })
 }
 function selectedSessionKey() {
   const { selection } = useSessionSelectionStore.getState()

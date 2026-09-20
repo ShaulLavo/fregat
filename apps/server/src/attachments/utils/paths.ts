@@ -61,7 +61,8 @@ export function resolveAttachmentRelativePath(input: {
  * single safe path segment.
  */
 export function attachmentFileName(attachment: ChatAttachment): string | null {
-  const extension = chatAttachmentExtension(attachment.mimeType)
+  const extension =
+    attachment.type === 'file' ? '.bin' : chatAttachmentExtension(attachment.mimeType)
   if (!extension) return null
 
   const fileName = normalizeAttachmentRelativePath(`${attachment.id}${extension}`)

@@ -15,7 +15,7 @@ import {
   previewEditorTheme,
 } from '@/features/editor/state/color-theme-store'
 import { fetchSettings } from '@/features/settings/utils/api'
-import { readSettingsMirror } from '@/features/settings/utils/boot-mirror'
+import { readSettingsMirror } from '@/lib/settings-boot-mirror'
 import { dismissSaveError } from '@/features/settings/utils/notify-save-error'
 
 test('settings saves native code themes per mode and reset restores the editor default', async ({

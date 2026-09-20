@@ -1,3 +1,4 @@
+import { compareSessionsByActivity } from '@workspace/client-core/chat/rail/session-order'
 import { useEffect, useLayoutEffect, useRef, useState, useSyncExternalStore } from 'react'
 import { useTerminalDimensions } from '@opentui/react'
 import {
@@ -12,7 +13,7 @@ import {
   selectChatWorktrees,
 } from '@workspace/client-core/chat/selectors'
 import { sessionRailModel, type SessionRailItem } from '@workspace/client-core/chat/rail/model'
-import { railReorderIntent } from '@workspace/client-core/chat/rail/reorder'
+import { railReorderIntent, planRailReorder } from '@workspace/client-core/chat/rail/reorder'
 import {
   createProjectMetaCommand,
   createProjectDeleteCommand,
@@ -21,8 +22,8 @@ import {
   createSessionArchiveCommand,
   createSessionUnarchiveCommand,
   createSessionDeleteCommand,
-  createSessionPlaceCommand,
   createSessionReorderCommand,
+  createSessionActiveReorderCommand,
   createSessionRuntimeStopCommand,
 } from '@workspace/client-core/chat/commands'
 import { createAgentRailState } from '@/agent-rail/state/rail'
@@ -33,6 +34,7 @@ import { RailMenu } from '@/agent-rail/components/menu'
 import { currentWorktree } from '@/agent/utils/selection'
 import { draftsForStorage, draftKey } from '@/agent-stage/state/drafts'
 import { WorktreeManager } from '@/worktrees/components/manager'
+import { useSettingValue } from '@/settings/hooks/use-setting-value'
 import { useCommands } from '@/commands/hooks/use-commands'
 import type { CommandContext } from '@/commands/state/bus'
 import type { FocusToken } from '@/commands/state/focus'
@@ -92,6 +94,10 @@ export function AgentRail({
     key: null,
   })
   const latestSelection = useRef(0)
+  const currentSession = useRef(sessionId)
+  useLayoutEffect(() => {
+    currentSession.current = sessionId
+  }, [sessionId])
   const [filtering, setFiltering] = useState(false)
   const [modal, setModal] = useState<Modal>({ kind: 'closed' })
   const projection = chat.projection
@@ -102,6 +108,10 @@ export function AgentRail({
     setModal({ kind: 'closed' })
     commands.focus.request({ kind: 'match', matches: (target) => target.widgetId === 'agent-rail' })
   }, [modal, managedProject, chat.status, commands.focus])
+  const groupingMode = useSettingValue(ready.owner, 'chat.projectGrouping')
+  const sessionSortOrder = useSettingValue(ready.owner, 'chat.sessionSortOrder')
+  const confirmSessionDelete = useSettingValue(ready.owner, 'chat.confirmSessionDelete')
+  const groupingOverrides = useSettingValue(ready.owner, 'chat.projectGroupingOverrides')
   const sessions = selectChatSessions(projection)
   const model = sessionRailModel({
     environments: [
@@ -113,9 +123,12 @@ export function AgentRail({
         projects: selectChatProjects(projection),
         worktrees: selectChatWorktrees(projection),
         sessions,
+        capabilities: ready.descriptor.capabilities,
       },
     ],
-    activeProjectId: projectId,
+    activeProjectRef: projectId
+      ? { environmentId: ready.descriptor.environmentId, projectId }
+      : null,
     activeSessionKey: sessionId
       ? scopedSessionKey({ environmentId: ready.descriptor.environmentId, sessionId })
       : null,
@@ -125,6 +138,7 @@ export function AgentRail({
     searchMatches: state.search,
     seenBySessionKey: state.seen,
     view: state.view,
+    grouping: { mode: groupingMode, overrides: groupingOverrides },
   })
   const rows = railRows(model, state.marked, state.scope, state.query, state.search)
   const keyedIndex = rows.findIndex((row) => row.key === selection.key)
@@ -180,7 +194,12 @@ export function AgentRail({
     setSelection(Math.max(0, Math.min(rows.length - 1, latestSelection.current + amount)))
   }
   function rowProject(row = current) {
-    return row?.kind === 'project' ? row.project.id : (row?.session.projectId ?? projectId)
+    if (row?.kind === 'project') return row.project
+    const id = row?.session.projectId ?? projectId
+    return (
+      model.projects.find((group) => group.members.some((member) => member.ref.projectId === id)) ??
+      null
+    )
   }
   function newSession(context: CommandContext) {
     const fromRail = context.target?.widgetId.startsWith('agent-rail') === true
@@ -234,39 +253,42 @@ export function AgentRail({
     if (state.marked.length) return model.sessions.filter((item) => state.marked.includes(item.id))
     if (row?.kind === 'session') return [row.session]
     if (row?.kind === 'project')
-      return model.sessions.filter((item) => item.projectId === row.project.id)
+      return model.sessions.filter((item) =>
+        row.project.sessionRefs.some((ref) => ref.sessionId === item.id),
+      )
     return []
   }
   async function archive(row = current) {
     const items = targets(row)
     const unarchive = items.length > 0 && items.every((item) => item.archived)
-    const running = items.find((item) => {
-      const session = projection.sessionById[item.id]
-      return (
+    let failures = 0
+    let completed = 0
+    for (const item of items) {
+      if (item.archived !== unarchive) continue
+      const session = ready.chat.getSnapshot().projection.sessionById[item.id]
+      const running =
         session?.latestTurn?.state === 'running' ||
         (session?.runtime?.activeTurnId != null &&
           ['running', 'waiting'].includes(session.runtime.status))
+      if (running && !unarchive) {
+        failures++
+        continue
+      }
+      const command = unarchive
+        ? createSessionUnarchiveCommand({ sessionId: item.id })
+        : createSessionArchiveCommand({ sessionId: item.id })
+      if (!(await store.execute([command], true))) {
+        failures++
+        continue
+      }
+      completed++
+      if (!unarchive && currentSession.current === item.id) onSelectWorktree(item.worktree.id)
+    }
+    close()
+    if (failures)
+      store.setError(
+        `${completed} ${unarchive ? 'restored' : 'archived'}, ${failures} skipped or failed.`,
       )
-    })
-    if (running && !unarchive) {
-      store.setError(`Stop ${running.title} before archiving it.`)
-      close()
-      return
-    }
-    const accepted = await store.execute(
-      items
-        .filter((item) => item.archived === unarchive)
-        .map((item) =>
-          unarchive
-            ? createSessionUnarchiveCommand({ sessionId: item.id })
-            : createSessionArchiveCommand({ sessionId: item.id }),
-        ),
-      true,
-    )
-    if (accepted) {
-      store.clearMarks()
-      close()
-    }
   }
   function remove(row = current) {
     if (row?.kind === 'project' && !state.marked.length) {
@@ -274,12 +296,18 @@ export function AgentRail({
       return
     }
     const items = targets(row)
-    if (items.length) setModal({ kind: 'delete-sessions', sessions: items })
+    if (!items.length) return
+    if (confirmSessionDelete) {
+      setModal({ kind: 'delete-sessions', sessions: items })
+      return
+    }
+    void deleteSessions(items)
   }
   async function reorder(amount: number) {
     if (!current) return
     if (current.kind === 'project') {
-      const items = model.projects
+      if (current.project.members.length !== 1) return
+      const items = model.projects.filter((project) => project.members.length === 1)
       const index = items.findIndex((item) => item.id === current.project.id)
       const intent = railReorderIntent({
         activeId: current.project.id,
@@ -293,22 +321,44 @@ export function AgentRail({
       return
     }
     const selected = current.session
-    if (selected.archived) return
+    if (!selected.canReorder) return
     const items = model.sessions.filter(
       (item) =>
-        item.projectId === selected.projectId && item.status === selected.status && !item.archived,
+        item.projectGroupKey === selected.projectGroupKey && item.placement === selected.placement,
     )
-    const index = items.findIndex((item) => item.id === selected.id)
-    const intent = railReorderIntent({
-      activeId: selected.id,
-      overId: items[index + amount]?.id ?? null,
-      rows: items.map((item) => ({ id: item.id, orderKey: item.pinOrderKey })),
-    })
-    if (!intent) return
-    const command = selected.pinOrderKey
-      ? createSessionReorderCommand({ sessionId: selected.id, orderKey: intent.orderKey })
-      : createSessionPlaceCommand({ sessionId: selected.id, orderKey: intent.orderKey })
-    await store.execute([command])
+    const index = items.findIndex((item) => item.key === selected.key)
+    const destination = index + amount
+    if (destination < 0 || destination >= items.length) return
+    const orderedIds = items.map((item) => item.key)
+    orderedIds.splice(index, 1)
+    orderedIds.splice(destination, 0, selected.key)
+    const keysById = new Map(
+      Object.values(projection.sessionById)
+        .filter((session) => !session.archivedAt)
+        .map(
+          (session) =>
+            [
+              scopedSessionKey({
+                environmentId: ready.descriptor.environmentId,
+                sessionId: session.id,
+              }),
+              selected.placement === 'pinned' ? session.pinOrderKey : session.activeOrderKey,
+            ] as const,
+        ),
+    )
+    const assignments = planRailReorder({ orderedIds, keysById, movedId: selected.key })
+    const targets = new Map(items.map((item) => [item.key, item]))
+    if (assignments.some((assignment) => !targets.get(assignment.id)?.canReorder)) return
+    await store.execute(
+      assignments.map((assignment) => {
+        const sessionId = targets.get(assignment.id)!.id
+        const command =
+          selected.placement === 'pinned'
+            ? createSessionReorderCommand
+            : createSessionActiveReorderCommand
+        return command({ sessionId, orderKey: assignment.orderKey })
+      }),
+    )
   }
   async function workbench(row = current) {
     if (!row) return
@@ -431,7 +481,7 @@ export function AgentRail({
       'agent.archive': { run: () => archive() },
       'agent.delete': { run: () => remove() },
       'agent.toggleArchived': { run: store.toggleArchived },
-      'agent.scopeProject': { run: () => store.setScope(rowProject()) },
+      'agent.scopeProject': { run: () => store.setScope(rowProject()?.groupKey ?? null) },
       'agent.clearScope': { run: () => store.setScope(null) },
       'agent.mark': { disabledReason: railKeyTarget, run: () => mark() },
       'agent.markRange': { disabledReason: railKeyTarget, run: () => mark(true) },
@@ -442,7 +492,7 @@ export function AgentRail({
       'agent.collapseProject': {
         run: () => {
           const id = rowProject()
-          if (id) store.toggleCollapsed(id)
+          if (id) store.toggleCollapsed(id.members.map((member) => member.physicalKey))
         },
       },
       'agent.openWorkbench': { run: () => workbench() },
@@ -467,33 +517,61 @@ export function AgentRail({
     }
     if (modal.kind === 'rename') {
       const row = modal.row
-      const command =
+      const commands =
         row.kind === 'project'
-          ? createProjectMetaCommand({ projectId: row.project.id, title: text })
-          : createSessionRenameCommand({ sessionId: row.session.id, title: text })
-      if (await store.execute([command])) close()
+          ? row.project.members.map((member) =>
+              createProjectMetaCommand({ projectId: member.ref.projectId, title: text }),
+            )
+          : [createSessionRenameCommand({ sessionId: row.session.id, title: text })]
+      if (await store.execute(commands)) close()
       return
     }
     if (modal.kind === 'delete-project') {
-      if (await store.execute([createProjectDeleteCommand({ projectId: modal.row.project.id })])) {
+      if (
+        await store.execute(
+          modal.row.project.members.map((member) =>
+            createProjectDeleteCommand({ projectId: member.ref.projectId }),
+          ),
+        )
+      ) {
         close()
-        if (modal.row.project.id === projectId) onSelectProject(null)
+        if (modal.row.project.members.some((member) => member.ref.projectId === projectId))
+          onSelectProject(null)
       }
       return
     }
     if (modal.kind !== 'delete-sessions') return
-    if (
-      await store.execute(
-        modal.sessions
-          .filter((item) => projection.sessionById[item.id])
-          .map((item) => createSessionDeleteCommand({ sessionId: item.id })),
+    await deleteSessions(modal.sessions)
+  }
+  async function deleteSessions(items: readonly SessionRailItem[]) {
+    let failures = 0
+    let deleted = 0
+    for (const item of items) {
+      const accepted = await store.execute(
+        [createSessionDeleteCommand({ sessionId: item.id })],
         true,
       )
-    ) {
-      store.clearMarks()
-      if (modal.sessions.some((item) => item.id === sessionId)) onSelectProject(projectId)
-      close()
+      if (!accepted) {
+        failures++
+        continue
+      }
+      deleted++
+      if (currentSession.current !== item.id) continue
+      const snapshot = ready.chat.getSnapshot().projection
+      const survivor = Object.values(snapshot.sessionById)
+        .filter(
+          (candidate) =>
+            candidate.id !== item.id &&
+            !candidate.archivedAt &&
+            snapshot.worktreeById[candidate.worktreeId]?.projectId === item.projectId,
+        )
+        .toSorted((left, right) => compareSessionsByActivity(left, right, sessionSortOrder))[0]
+      if (survivor) onSelectSession(survivor.id)
+      else onSelectWorktree(item.worktree.id)
     }
+    close()
+    if (failures)
+      store.setError(`${deleted} deleted, ${failures} failed. Failed sessions remain selected.`)
   }
   const prompt =
     modal.kind === 'add' ||
@@ -511,7 +589,7 @@ export function AgentRail({
   }
   if (modal.kind === 'delete-project') {
     title = 'Delete project'
-    description = `Delete ${modal.row.project.title} and all ${sessions.filter((item) => item.project.id === modal.row.project.id).length} sessions.`
+    description = `Delete ${modal.row.project.title} and all ${modal.row.project.sessionRefs.length} sessions.`
     confirmation = 'delete'
   }
   if (modal.kind === 'delete-sessions') {
@@ -658,7 +736,7 @@ export function AgentRail({
             {
               label: 'Show this project',
               run: () => {
-                store.setScope(rowProject(menuRow))
+                store.setScope(rowProject(menuRow)?.groupKey ?? null)
                 close()
               },
             },
@@ -672,7 +750,7 @@ export function AgentRail({
               label: 'Collapse / expand project',
               run: () => {
                 const id = rowProject(menuRow)
-                if (id) store.toggleCollapsed(id)
+                if (id) store.toggleCollapsed(id.members.map((member) => member.physicalKey))
                 close()
               },
             },

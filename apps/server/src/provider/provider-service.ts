@@ -1,3 +1,4 @@
+import { BackgroundTaskRegistry } from './background-liveness'
 import { elapsedMs } from '@workspace/utils/timing'
 import path from 'node:path'
 import { tmpdir } from 'node:os'
@@ -113,6 +114,8 @@ export class ProviderService {
   private readonly adapterRegistry: ProviderAdapterRegistry
   private readonly externalSessions = new Map<SessionId, 'terminal' | 'history' | 'unknown'>()
   private readonly pendingLaunches = new Map<SessionId, PendingProviderLaunch>()
+  private readonly backgroundTasks = new BackgroundTaskRegistry()
+  private readonly reaperTimer: ReturnType<typeof setInterval>
   private readonly reaper: ProviderSessionReaper
   private readonly runtimeEventListeners = new Set<ProviderRuntimeEventListener>()
   private readonly runtimeEvents = new SerialWorker<ProviderRuntimeEventTask>((task) =>
@@ -140,8 +143,20 @@ export class ProviderService {
       deadlineMs: options.idleSessionDeadlineMs,
       directory: this.sessionDirectory,
       isLaunching: (sessionId) => this.pendingLaunches.has(sessionId),
+      hasBackgroundWork: (sessionId) => this.backgroundTasks.get(sessionId) !== null,
       stopRuntime: (input) => this.stopRuntime(input),
     })
+    this.reaperTimer = setInterval(
+      () => {
+        void this.reaper.sweep().catch((error) =>
+          recordChatPipelineWarning('chat.pipeline.provider_session_reaper.sweep_failed', {
+            error,
+          }),
+        )
+      },
+      5 * 60 * 1000,
+    )
+    this.reaperTimer.unref()
     this.startAdapterEventStreams()
   }
 
@@ -149,6 +164,10 @@ export class ProviderService {
    * Liveness, called for every runtime event the ingestion pipeline accepts.
    * The reaper's deadline is only safe to act on because this is fed.
    */
+  backgroundLiveness(sessionId: string) {
+    return this.backgroundTasks.get(sessionId)
+  }
+
   markRuntimeSeen(sessionId: SessionId) {
     this.sessionDirectory.markSeen(sessionId)
   }
@@ -160,6 +179,8 @@ export class ProviderService {
    */
   async shutdown() {
     this.shuttingDown = true
+    clearInterval(this.reaperTimer)
+    await this.reaper.waitForIdle()
     this.unsubscribeRegistry?.()
     this.unsubscribeRegistry = null
     this.runtimeEventListeners.clear()
@@ -388,7 +409,8 @@ export class ProviderService {
       throwIfTextGenerationAborted(input.signal)
       turnStarted = true
       await adapter.sendTurn({
-        attachments: [],
+        attachments: input.attachments ?? [],
+        attachmentsDir: input.attachmentsDir,
         cwd: isolatedCwd,
         ephemeral: true,
         interactionMode: DEFAULT_INTERACTION_MODE,
@@ -467,9 +489,17 @@ export class ProviderService {
     return binding
   }
 
-  async stopRuntime(input: { sessionId: SessionId }) {
+  async stopRuntime(input: { sessionId: SessionId; idleBefore?: string }) {
     recordChatPipelineInfo('chat.pipeline.provider_service.stop.start', input)
     await this.awaitPendingLaunch(input.sessionId)
+    if (
+      input.idleBefore &&
+      (this.backgroundTasks.get(input.sessionId) !== null ||
+        !this.sessionDirectory
+          .listIdleSince(input.idleBefore, 'ready')
+          .some((binding) => binding.sessionId === input.sessionId))
+    )
+      return null
     const routed = this.routeSession(input.sessionId)
     if (!routed) {
       recordChatPipelineWarning('chat.pipeline.provider_service.stop.missing_binding', input)
@@ -616,15 +646,21 @@ export class ProviderService {
     return this.adapterRegistry.getInstanceRoutingInfo(providerInstanceId)
   }
 
-  async rollbackConversation(input: { numTurns: number; sessionId: SessionId }) {
-    if (input.numTurns === 0) return Promise.resolve()
-    const routed = this.routeSession(input.sessionId)
-    if (!routed)
-      throw createInternalError(
-        `No active provider session is bound to session ${input.sessionId}.`,
-      )
+  private async assertConversationRollbackSupported(sessionId: SessionId) {
+    this.requireSdkOwnership(sessionId)
+    const routed = this.routeSession(sessionId)
+    if (!routed) throw sessionIdentityErrors.ROLLBACK_RUNTIME_UNAVAILABLE()
+    if (!routed.adapter.capabilities.conversationRollback)
+      throw sessionIdentityErrors.ROLLBACK_UNSUPPORTED()
+    if (!(await boundedProviderOperation(routed.adapter, routed.adapter.hasRuntime({ sessionId }))))
+      throw sessionIdentityErrors.ROLLBACK_RUNTIME_UNAVAILABLE()
+    return routed
+  }
 
-    await routed.adapter.rollbackSession(input)
+  async prepareConversationRollback(input: { numTurns: number; sessionId: SessionId }) {
+    const routed = await this.assertConversationRollbackSupported(input.sessionId)
+    if (input.numTurns === 0) return async () => {}
+    return routed.adapter.prepareRollbackSession(input)
   }
 
   subscribeRuntimeEvents(listener: ProviderRuntimeEventListener) {
@@ -804,6 +840,7 @@ export class ProviderService {
     if (await boundedProviderOperation(adapter, adapter.hasRuntime({ sessionId }))) {
       throw createInternalError('The provider still owns its runtime after stopping.')
     }
+    this.backgroundTasks.clear(sessionId)
     this.releaseWorktree(sessionId)
   }
 
@@ -927,6 +964,7 @@ export class ProviderService {
     const binding = this.sessionDirectory.getBinding(task.event.sessionId)
     if (binding && binding.runtimeEpoch !== task.event.runtimeEpoch) return
 
+    this.backgroundTasks.accept(task.event)
     this.recordRuntimeEvent(task.event, task.adapter)
     await this.emitRuntimeEvent(task.event)
   }

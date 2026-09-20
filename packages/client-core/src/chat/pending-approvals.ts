@@ -1,15 +1,19 @@
 import { nonEmptyText } from '@workspace/utils/strings'
 import {
   approvalRequestIdSchema,
+  providerApprovalOptionSchema,
+  DEFAULT_APPROVAL_OPTIONS,
+  type ProviderApprovalOption,
   type ApprovalRequestId,
   type OrchestrationSessionActivity,
   type TurnId,
 } from '@workspace/contracts'
 import * as v from 'valibot'
 
-export type PendingApprovalKind = 'command' | 'file-change' | 'file-read'
+export type PendingApprovalKind = 'command' | 'file-change' | 'file-read' | 'app-access'
 
 export type PendingApproval = {
+  readonly options: readonly ProviderApprovalOption[]
   readonly createdAt: string
   readonly detail: string | null
   readonly requestId: ApprovalRequestId
@@ -24,6 +28,7 @@ export type PendingApproval = {
  * rather than rendering an unlabelled approval.
  */
 const APPROVAL_KIND_BY_REQUEST_TYPE: Record<string, PendingApprovalKind> = {
+  mcp_elicitation_approval: 'app-access',
   apply_patch_approval: 'file-change',
   command_execution_approval: 'command',
   dynamic_tool_call: 'command',
@@ -38,6 +43,7 @@ const APPROVAL_KIND_BY_REQUEST_TYPE: Record<string, PendingApprovalKind> = {
  * parsed and a failed parse drops the activity.
  */
 const approvalPayloadSchema = v.object({
+  options: v.optional(v.array(providerApprovalOptionSchema)),
   detail: v.nullish(v.string()),
   requestId: approvalRequestIdSchema,
   requestKind: v.nullish(v.string()),
@@ -111,6 +117,7 @@ function pendingApproval(
   payload: ApprovalPayload,
 ): PendingApproval {
   return {
+    options: payload.options ?? DEFAULT_APPROVAL_OPTIONS,
     createdAt: activity.createdAt,
     detail: nonEmptyText(payload.detail),
     requestId: payload.requestId,
@@ -131,5 +138,10 @@ function approvalKind(
 }
 
 function isApprovalKind(value: string | null | undefined): value is PendingApprovalKind {
-  return value === 'command' || value === 'file-change' || value === 'file-read'
+  return (
+    value === 'command' ||
+    value === 'file-change' ||
+    value === 'file-read' ||
+    value === 'app-access'
+  )
 }

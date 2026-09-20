@@ -1,0 +1,61 @@
+{
+  "upstreamCommit": "7445aa733ada33e45289e5aa5055f79142556513",
+  "evidence": "source-derived; no live upstream comparison",
+  "sources": {
+    "archive": "apps/server/src/orchestration/decider.ts:435-477",
+    "runtime": "apps/server/src/orchestration/decider.ts:1864-1912",
+    "activity": "apps/server/src/orchestration/decider.ts:2143-2194",
+    "userSend": "apps/server/src/orchestration/decider.ts:1459-1500",
+    "uiArchive": "apps/web/src/hooks/useThreadActions.ts:258"
+  },
+  "runtimeTransitions": [
+    {
+      "status": "starting",
+      "resetsSettlement": true
+    },
+    {
+      "status": "running",
+      "resetsSettlement": true
+    },
+    {
+      "status": "waiting",
+      "resetsSettlement": false
+    },
+    {
+      "status": "ready",
+      "resetsSettlement": false
+    },
+    {
+      "status": "stopped",
+      "resetsSettlement": false
+    },
+    {
+      "status": "error",
+      "resetsSettlement": false
+    },
+    {
+      "status": "interrupted",
+      "resetsSettlement": false
+    }
+  ],
+  "activityTransitions": [
+    {
+      "kind": "approval.requested",
+      "resetsSettlement": true
+    },
+    {
+      "kind": "user-input.requested",
+      "resetsSettlement": true
+    },
+    {
+      "kind": "provider.error",
+      "resetsSettlement": false
+    }
+  ],
+  "invariants": {
+    "archiveRequiresOnlyExistingNonarchivedSession": true,
+    "onlyExplicitRestoreUnarchives": true,
+    "providerActivityPreservesSnooze": true,
+    "userSendClearsSettlementAndSnooze": true
+  }
+}

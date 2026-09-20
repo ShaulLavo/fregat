@@ -1,6 +1,18 @@
 import { defineErrorCatalog } from 'evlog'
 
 export const sessionIdentityErrors = defineErrorCatalog('provider', {
+  ROLLBACK_UNSUPPORTED: {
+    status: 409,
+    message: 'This provider cannot rewind its conversation.',
+    why: 'The selected adapter does not support native conversation rollback.',
+    fix: 'Continue this conversation or start a new session. No files were restored.',
+  },
+  ROLLBACK_RUNTIME_UNAVAILABLE: {
+    status: 409,
+    message: 'The provider runtime is unavailable for rewind.',
+    why: 'Rewind requires an active binding to the same native conversation.',
+    fix: 'Resume the provider session before rewinding. No files were restored.',
+  },
   STEERING_UNAVAILABLE: {
     status: 409,
     message: 'This provider cannot accept a correction while running.',

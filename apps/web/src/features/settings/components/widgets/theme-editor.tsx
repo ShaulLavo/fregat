@@ -12,7 +12,7 @@ import {
   DialogTitle,
 } from '@workspace/ui/components/dialog'
 import { ThemeVariantEditor } from '@/features/settings/components/widgets/theme-variant-editor'
-import { BundlePreviewContext } from '@/features/settings/providers/appearance-preview-context'
+import { BundleContext } from '@/lib/appearance/providers/bundle-context'
 import { previewBundle } from '@/features/settings/utils/bundle-editing'
 
 export function ThemeEditor({
@@ -30,7 +30,7 @@ export function ThemeEditor({
 }) {
   const [document, setDocument] = useState(initial)
   const [mode, setMode] = useState<ColorMode>('light')
-  const preview = useContext(BundlePreviewContext)
+  const preview = useContext(BundleContext)
   const clear = preview?.clear
   useEffect(() => () => clear?.(), [clear])
   return (

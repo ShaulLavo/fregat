@@ -61,6 +61,13 @@ describe('fuzzy ranking', () => {
     ])
   })
 
+  it('ranks a word-start hit behind a mid-word hit as a word match', () => {
+    const wordStart = fuzzyRankScore(rankTarget('src/research-search.ts'), 'search')
+    const midWord = fuzzyRankScore(rankTarget('src/research-results.ts'), 'search')
+
+    expect(wordStart).toBeGreaterThan(midWord)
+  })
+
   it('still supports contiguous slash path queries', () => {
     expect(fuzzyRankScore(rankTarget('src/app.ts'), 'src/app')).toBeGreaterThan(0)
   })

@@ -13,11 +13,18 @@ test('a session actively producing a turn is running', () => {
   expect(hasRunningTurn(session('running'))).toBe(true)
 })
 
-test('a session parked mid-work still holds its turn open', () => {
-  // Compaction, or an approval nobody has answered. The turn has not ended, so
-  // the archive guard must still refuse — before the status enum was unified
-  // this state arrived here spelled `running`.
-  expect(hasRunningTurn(session('waiting'))).toBe(true)
+test.each(['starting', 'waiting', 'ready', 'stopped', 'error', 'interrupted'] as const)(
+  '%s does not block archive even with an active turn ID',
+  (status) => expect(hasRunningTurn(session(status))).toBe(false),
+)
+test('running without an active turn does not block archive', () => {
+  const value = session('running')
+  expect(
+    hasRunningTurn({
+      ...value,
+      runtime: value.runtime && { ...value.runtime, activeTurnId: null },
+    }),
+  ).toBe(false)
 })
 
 test('a settled session does not become running because the predicate loosened', () => {
@@ -44,3 +51,14 @@ function session(status: SessionRuntimeStatus): ProjectionSession {
     },
   })
 }
+
+test('a stale running latest turn does not override a ready runtime', () => {
+  const latestTurn = projectionSession().latestTurn
+  expect(latestTurn).not.toBeNull()
+  expect(
+    hasRunningTurn({
+      ...session('ready'),
+      latestTurn: latestTurn && { ...latestTurn, state: 'running' },
+    }),
+  ).toBe(false)
+})

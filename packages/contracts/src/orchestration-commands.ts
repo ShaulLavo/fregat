@@ -21,6 +21,7 @@ import {
 } from './chat-ids'
 import {
   chatAttachmentUploadsSchema,
+  userInputAttachmentUploadsSchema,
   importedSessionMessageSchema,
   isoDateTimeSchema,
   nonNegativeIntegerSchema,
@@ -129,6 +130,7 @@ export const sessionTurnBootstrapSchema = v.object({
 })
 
 export const sessionMetaUpdateCommandSchema = v.object({
+  regenerateTitle: v.optional(v.boolean()),
   ...commandBaseSchema,
   type: v.literal('session.meta.update'),
   sessionId: sessionIdSchema,
@@ -213,6 +215,13 @@ export const sessionPinReorderCommandSchema = v.object({
   orderKey: orderKeySchema,
 })
 
+export const sessionActiveReorderCommandSchema = v.object({
+  ...commandBaseSchema,
+  type: v.literal('session.active.reorder'),
+  sessionId: sessionIdSchema,
+  orderKey: orderKeySchema,
+})
+
 export const sessionRuntimeModeSetCommandSchema = v.object({
   ...commandBaseSchema,
   type: v.literal('session.runtime-mode.set'),
@@ -274,6 +283,7 @@ export const sessionRuntimeStopCommandSchema = v.object({
   ...commandBaseSchema,
   type: v.literal('session.runtime.stop'),
   sessionId: sessionIdSchema,
+  onlyIfSettled: v.optional(v.boolean()),
 })
 
 export const sessionApprovalRespondCommandSchema = v.object({
@@ -290,6 +300,14 @@ export const sessionUserInputRespondCommandSchema = v.object({
   sessionId: sessionIdSchema,
   requestId: approvalRequestIdSchema,
   answers: providerUserInputAnswersSchema,
+  attachmentsByQuestionId: v.optional(userInputAttachmentUploadsSchema),
+})
+
+export const sessionUserInputDismissCommandSchema = v.object({
+  ...commandBaseSchema,
+  type: v.literal('session.user-input.dismiss'),
+  sessionId: sessionIdSchema,
+  requestId: approvalRequestIdSchema,
 })
 
 export const sessionCheckpointRevertCommandSchema = v.object({
@@ -297,6 +315,7 @@ export const sessionCheckpointRevertCommandSchema = v.object({
   type: v.literal('session.checkpoint.revert'),
   sessionId: sessionIdSchema,
   turnCount: nonNegativeIntegerSchema,
+  restoreFiles: v.boolean(),
 })
 
 export const clientOrchestrationCommandSchema = v.variant('type', [
@@ -316,6 +335,7 @@ export const clientOrchestrationCommandSchema = v.variant('type', [
   sessionPinCommandSchema,
   sessionUnpinCommandSchema,
   sessionPinReorderCommandSchema,
+  sessionActiveReorderCommandSchema,
   sessionRuntimeModeSetCommandSchema,
   sessionInteractionModeSetCommandSchema,
   sessionTurnStartCommandSchema,
@@ -324,6 +344,7 @@ export const clientOrchestrationCommandSchema = v.variant('type', [
   sessionRuntimeStopCommandSchema,
   sessionApprovalRespondCommandSchema,
   sessionUserInputRespondCommandSchema,
+  sessionUserInputDismissCommandSchema,
   sessionCheckpointRevertCommandSchema,
   ...worktreeClientCommandSchemas,
 ])
@@ -388,6 +409,7 @@ export const sessionTurnDiffCompleteCommandSchema = v.object({
 export const sessionRevertCompleteCommandSchema = v.object({
   ...commandBaseSchema,
   type: v.literal('session.revert.complete'),
+  revertCommandId: commandIdSchema,
   sessionId: sessionIdSchema,
   turnCount: nonNegativeIntegerSchema,
   createdAt: isoDateTimeSchema,
@@ -491,7 +513,34 @@ const preparedSessionTurnStartCommandSchema = v.object({
   intentFingerprint: v.optional(trimmedNonEmptyStringSchema),
 })
 
+const sessionTitleCommands = [
+  v.object({
+    ...commandBaseSchema,
+    type: v.literal('session.title.generate.complete'),
+    sessionId: sessionIdSchema,
+    title: trimmedNonEmptyStringSchema,
+    expectedTitle: v.string(),
+    expectedVersion: v.nullable(v.string()),
+    needsRefinement: v.boolean(),
+  }),
+  v.object({
+    ...commandBaseSchema,
+    type: v.literal('session.title.refine'),
+    sessionId: sessionIdSchema,
+    expectedVersion: v.string(),
+  }),
+  v.object({
+    ...commandBaseSchema,
+    type: v.literal('session.title.regeneration.complete'),
+    sessionId: sessionIdSchema,
+    requestId: v.string(),
+    title: v.optional(trimmedNonEmptyStringSchema),
+    error: v.optional(v.string()),
+  }),
+] as const
+
 export const internalOrchestrationCommandSchema = v.variant('type', [
+  ...sessionTitleCommands,
   v.object({
     ...commandBaseSchema,
     type: v.literal('session.terminal-history.append'),
@@ -545,6 +594,7 @@ export const orchestrationCommandSchema = v.variant('type', [
   sessionPinCommandSchema,
   sessionUnpinCommandSchema,
   sessionPinReorderCommandSchema,
+  sessionActiveReorderCommandSchema,
   sessionRuntimeModeSetCommandSchema,
   sessionInteractionModeSetCommandSchema,
   sessionTurnInterruptCommandSchema,
@@ -552,6 +602,7 @@ export const orchestrationCommandSchema = v.variant('type', [
   sessionRuntimeStopCommandSchema,
   sessionApprovalRespondCommandSchema,
   sessionUserInputRespondCommandSchema,
+  sessionUserInputDismissCommandSchema,
   sessionCheckpointRevertCommandSchema,
   worktreeRetryCommandSchema,
   worktreeCleanupCommandSchema,
@@ -598,6 +649,7 @@ export type SessionSnoozeCommand = v.InferOutput<typeof sessionSnoozeCommandSche
 export type SessionUnsnoozeCommand = v.InferOutput<typeof sessionUnsnoozeCommandSchema>
 export type SessionPinCommand = v.InferOutput<typeof sessionPinCommandSchema>
 export type SessionUnpinCommand = v.InferOutput<typeof sessionUnpinCommandSchema>
+export type SessionActiveReorderCommand = v.InferOutput<typeof sessionActiveReorderCommandSchema>
 export type SessionPinReorderCommand = v.InferOutput<typeof sessionPinReorderCommandSchema>
 export type SessionRuntimeModeSetCommand = v.InferOutput<typeof sessionRuntimeModeSetCommandSchema>
 export type SessionInteractionModeSetCommand = v.InferOutput<
@@ -619,3 +671,7 @@ export type SessionCheckpointRevertCommand = v.InferOutput<
 export type ClientOrchestrationCommand = v.InferOutput<typeof clientOrchestrationCommandSchema>
 export type InternalOrchestrationCommand = v.InferOutput<typeof internalOrchestrationCommandSchema>
 export type OrchestrationCommand = v.InferOutput<typeof orchestrationCommandSchema>
+
+export type SessionUserInputDismissCommand = v.InferOutput<
+  typeof sessionUserInputDismissCommandSchema
+>

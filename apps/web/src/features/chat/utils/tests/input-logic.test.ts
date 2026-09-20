@@ -230,7 +230,7 @@ describe('provider-backed composer menus', () => {
   })
 
   it('offers the provider’s skills, never the disabled ones', () => {
-    const items = chatInputCommandItems(detectChatInputTrigger('$', 1), [], catalog)
+    const items = chatInputCommandItems(detectChatInputTrigger('$', 1), [], catalog, true)
 
     // A disabled skill committed into the prompt is a name the provider will
     // not resolve, so it is dropped rather than ranked last.
@@ -239,7 +239,7 @@ describe('provider-backed composer menus', () => {
   })
 
   it('lists built-in modes ahead of the provider’s commands', () => {
-    const items = chatInputCommandItems(detectChatInputTrigger('/', 1), [], catalog)
+    const items = chatInputCommandItems(detectChatInputTrigger('/', 1), [], catalog, true)
 
     expect(items.map((item) => item.label)).toEqual(['/default', '/plan', '/review', '/summarize'])
     expect(groupChatInputCommandItems(items, 'slash-command').map((group) => group.label)).toEqual([
@@ -249,8 +249,8 @@ describe('provider-backed composer menus', () => {
   })
 
   it('ranks both menus by what has been typed', () => {
-    const commands = chatInputCommandItems(detectChatInputTrigger('/rev', 4), [], catalog)
-    const skills = chatInputCommandItems(detectChatInputTrigger('$slop', 5), [], catalog)
+    const commands = chatInputCommandItems(detectChatInputTrigger('/rev', 4), [], catalog, true)
+    const skills = chatInputCommandItems(detectChatInputTrigger('$slop', 5), [], catalog, true)
 
     // Ranked, not filtered: the search is fuzzy, so a weaker match stays on the
     // list behind the one the user is plainly typing.
@@ -258,11 +258,21 @@ describe('provider-backed composer menus', () => {
     expect(skills.map((item) => item.label)).toEqual(['$desloppify'])
   })
 
+  it('hides built-in mode commands without suppressing provider commands', () => {
+    expect(
+      chatInputCommandItems(detectChatInputTrigger('/', 1), [], catalog, false).map(
+        (item) => item.label,
+      ),
+    ).toEqual(['/review', '/summarize'])
+  })
+
   it('offers only the built-ins when the provider cannot answer', () => {
     const unsupported = { ...catalog, supported: false }
 
-    expect(chatInputCommandItems(detectChatInputTrigger('/', 1), [], unsupported)).toHaveLength(2)
-    expect(chatInputCommandItems(detectChatInputTrigger('$', 1), [], unsupported)).toEqual([])
-    expect(chatInputCommandItems(detectChatInputTrigger('$', 1), [], null)).toEqual([])
+    expect(
+      chatInputCommandItems(detectChatInputTrigger('/', 1), [], unsupported, true),
+    ).toHaveLength(2)
+    expect(chatInputCommandItems(detectChatInputTrigger('$', 1), [], unsupported, true)).toEqual([])
+    expect(chatInputCommandItems(detectChatInputTrigger('$', 1), [], null, true)).toEqual([])
   })
 })

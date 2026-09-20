@@ -20,7 +20,7 @@ import type { EditorStatusBarSource } from '@/features/editor/state/status-bar-s
 import type { EditorRenderDocument } from '@/features/editor/utils/render-document'
 import { useCommitMessageEditorFocus } from '@/features/editor/hooks/use-commit-message-editor-focus'
 import { useEditorColorTheme } from '@/features/editor/hooks/use-editor-color-theme'
-import { useSettingValue } from '@/features/settings/hooks/use-setting-value'
+import { useSettingValue } from '@/hooks/use-setting-value'
 import { useScrollPersistencePlugin } from '@/features/editor/hooks/use-scroll-persistence-plugin'
 import { useRowHeightAudit } from '@/features/editor/hooks/use-row-height-audit'
 import {

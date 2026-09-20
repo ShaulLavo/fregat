@@ -2,6 +2,7 @@ import { sessionRuntimeStatusSchema, type WorkspaceAddressId } from '@workspace/
 import { sql } from 'drizzle-orm'
 import {
   check,
+  blob,
   index,
   integer,
   primaryKey,
@@ -20,6 +21,26 @@ export const schemaMigrations = sqliteTable('schema_migrations', {
   name: text('name').notNull(),
   appliedAt: text('applied_at').notNull(),
 })
+
+export const terminalHistoryChunks = sqliteTable(
+  'terminal_history_chunks',
+  {
+    owner: text('owner').notNull(),
+    sequence: integer('sequence').notNull(),
+    data: blob('data', { mode: 'buffer' }).notNull(),
+  },
+  (table) => [primaryKey({ columns: [table.owner, table.sequence] })],
+)
+
+export const attachmentUploadOwners = sqliteTable(
+  'attachment_upload_owners',
+  {
+    attachmentId: text('attachment_id').primaryKey(),
+    sessionId: text('session_id').notNull(),
+    attachmentJson: text('attachment_json').notNull(),
+  },
+  (table) => [index('attachment_upload_owners_session_idx').on(table.sessionId)],
+)
 
 export const environmentIdentity = sqliteTable('environment_identity', {
   id: text('id').primaryKey(),
@@ -291,6 +312,10 @@ export const projectionSessions = sqliteTable(
     latestTurnId: text('latest_turn_id'),
     latestTurnJson: text('latest_turn_json'),
     latestUserMessageAt: text('latest_user_message_at'),
+    pendingRewindCommandId: text('pending_rewind_command_id'),
+    pendingRewindRestoreFiles: integer('pending_rewind_restore_files', { mode: 'boolean' })
+      .notNull()
+      .default(false),
     pendingApprovalCount: integer('pending_approval_count').notNull().default(0),
     pendingUserInputCount: integer('pending_user_input_count').notNull().default(0),
     hasActionableProposedPlan: integer('has_actionable_proposed_plan', {
@@ -316,6 +341,11 @@ export const projectionSessions = sqliteTable(
     pinnedAt: text('pinned_at'),
     /** Fractional index; the pinned block sorts on plain string comparison. */
     pinOrderKey: text('pin_order_key'),
+    activeOrderKey: text('active_order_key'),
+    titleStateJson: text('title_state_json'),
+    titleRegenerationJson: text('title_regeneration_json'),
+    titleGenerationError: text('title_generation_error'),
+    unsettledAt: text('unsettled_at'),
   },
   (table) => [
     index('projection_sessions_worktree_deleted_created_idx').on(

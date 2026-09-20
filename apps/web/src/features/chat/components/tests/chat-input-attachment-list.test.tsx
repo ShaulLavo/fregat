@@ -2,13 +2,13 @@ import { screen } from '@testing-library/react'
 import userEvent from '@testing-library/user-event'
 
 import { ChatInputAttachmentList } from '@/features/chat/components/chat-input-attachment-list'
-import type { ChatInputImageAttachment } from '@/features/chat/state/chat-input-draft-store'
+import type { ChatInputAttachment } from '@/features/chat/state/chat-input-draft-store'
 import { expect, test } from '../../../../../test/fixtures'
 import { renderWithProviders } from '../../../../../test/render'
 
 const PNG_DATA_URL = 'data:image/png;base64,iVBORw0KGgo='
 
-function stagedImage(id: string, name: string): ChatInputImageAttachment {
+function stagedImage(id: string, name: string): ChatInputAttachment {
   return {
     dataUrl: PNG_DATA_URL,
     id,

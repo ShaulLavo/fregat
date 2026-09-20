@@ -32,6 +32,30 @@ test('an open approval renders its command and offers every decision', () => {
   }
 })
 
+test('app access renders only advertised decisions and dispatches permanent approval', async () => {
+  const { dispatched } = renderPanel([
+    sessionActivity({
+      payload: {
+        requestId: REQUEST_ID,
+        requestType: 'mcp_elicitation_approval',
+        detail: 'Safari access',
+        options: [
+          { decision: 'decline', label: 'Decline' },
+          { decision: 'acceptAlways', label: 'Always allow Safari' },
+          { decision: 'accept', label: 'Allow once' },
+        ],
+      },
+    }),
+  ])
+  expect(screen.getByRole('region', { name: 'App access' })).toBeVisible()
+  expect(screen.queryByRole('button', { name: 'Allow for this session' })).not.toBeInTheDocument()
+  expect(screen.queryByRole('button', { name: 'Cancel' })).not.toBeInTheDocument()
+  await userEvent.click(screen.getByRole('button', { name: 'Always allow Safari' }))
+  expect(dispatched).toMatchObject([
+    { requestId: REQUEST_ID, decision: 'acceptAlways', type: 'session.approval.respond' },
+  ])
+})
+
 test('allowing dispatches the respond command for that request', async () => {
   const { dispatched } = renderPanel([requestedActivity()])
 

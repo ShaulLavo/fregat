@@ -25,7 +25,7 @@ export function SessionScopeMenu({
   readonly scopeTitle: string
   readonly onSelectScope: (scope: SessionRailScope) => void
 }) {
-  const scoped = projects.find((project) => project.id === scope)
+  const scoped = projects.find((project) => project.groupKey === scope)
   const scopeDetail = scoped ? sessionProjectRowTitle(scoped) : scopeTitle
 
   return (
@@ -53,10 +53,10 @@ export function SessionScopeMenu({
           </DropdownMenuRadioItem>
           {projects.map((project) => (
             <DropdownMenuRadioItem
-              key={project.id}
+              key={project.groupKey}
               title={sessionProjectRowTitle(project)}
-              value={project.id}
-              onClick={() => onSelectScope(project.id)}
+              value={project.groupKey}
+              onClick={() => onSelectScope(project.groupKey)}
             >
               <span className='flex min-w-0 flex-1 items-baseline gap-1.5'>
                 <span className='truncate'>{project.title}</span>

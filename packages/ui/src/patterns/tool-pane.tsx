@@ -4,6 +4,7 @@ import { EmptyState } from '@workspace/ui/components/empty-state'
 import { LoadingState } from '@workspace/ui/components/loading-state'
 import { RingLoader } from '@workspace/ui/components/ring-loader'
 import { cn } from '@workspace/ui/lib/utils'
+import { RenderErrorBoundary } from '@workspace/ui/patterns/render-error-boundary'
 import { ToolPaneHeader } from '@workspace/ui/patterns/tool-pane-header'
 
 export type ToolPaneProps = Omit<ComponentProps<'div'>, 'title'> & {
@@ -73,7 +74,7 @@ export function ToolPane({
           bodyProps?.className,
         )}
       >
-        {content}
+        <RenderErrorBoundary label={title ?? 'This pane'}>{content}</RenderErrorBoundary>
       </div>
     </div>
   )

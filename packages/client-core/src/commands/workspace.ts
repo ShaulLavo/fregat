@@ -710,6 +710,18 @@ export const workspaceCommandMetadata = {
     when: [],
     title: 'Follow system light / dark mode',
   }),
+  'workspace.selectThemeBundle': defineMetadata({
+    aliases: ['Theme bundle'],
+    category: 'Appearance',
+    description: 'Switch the whole look at once: palette, code theme and wallpaper.',
+    id: 'workspace.selectThemeBundle',
+    execution: 'async',
+    target: 'workspace',
+    undoCategory: 'view-only',
+    when: [],
+    title: 'Choose theme',
+    keepsPaletteOpen: true,
+  }),
   'workspace.selectWallpaper': defineMetadata({
     category: 'Appearance',
     description: 'Choose the wallpaper, previewing as you go.',

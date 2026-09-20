@@ -93,6 +93,7 @@ test('selecting a cached session keeps its transcript readable and resumes detai
     act(() =>
       socket.deliver({
         kind: 'subscription.next',
+        deliveryId: 1,
         subscriptionId: subscription.subscriptionId,
         item: {
           kind: 'snapshot',

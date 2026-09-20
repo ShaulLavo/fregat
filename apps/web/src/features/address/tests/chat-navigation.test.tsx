@@ -1,3 +1,4 @@
+import { useChatInputDraftStore } from '@/features/chat/state/chat-input-draft-store'
 import { filesystemPath } from '@/lib/documents/utils/identity'
 import { testNullableTabContent } from '../../../../test/factories/document-targets'
 import { mkdirSync, writeFileSync } from 'node:fs'
@@ -137,12 +138,15 @@ test('starting a draft in another worktree of the same project updates its execu
   expect(await navigation.startDraft(project, registration.worktreeId)).toEqual({
     status: 'applied',
   })
+  const firstDraftAddress = navigation.currentAddress().document
   expect(useSessionSelectionStore.getState().draftWorktreeId).toBe(registration.worktreeId)
   expect(linked.projectId).toBe(registration.projectId)
   expect(await navigation.startDraft(project, linked.worktreeId)).toEqual({ status: 'applied' })
   expect(editor.workspaceStore.getState().rootFolder?.path).toBe('linked')
   expect(useSessionSelectionStore.getState().draftWorktreeId).toBe(linked.worktreeId)
+  expect(navigation.currentAddress().document).not.toBe(firstDraftAddress)
   await pressBack(navigation)
+  expect(navigation.currentAddress().document).toBe(firstDraftAddress)
   expect(editor.workspaceStore.getState().rootFolder?.path).toBe('main')
   expect(useSessionSelectionStore.getState().draftWorktreeId).toBe(registration.worktreeId)
   const generation = useSessionSelectionStore.getState().draftGeneration
@@ -314,5 +318,32 @@ test('a superseded ownership read aborts without publishing its session or repla
       DOMAIN_SESSION
     ],
   ).toBeUndefined()
-  expect(navigation.currentAddress().document).toBe('t/new')
+  expect(navigation.currentAddress().document).toMatch(/^t\/draft-/)
+})
+
+test('recovering a draft refuses a missing exact worktree without changing the active address', async () => {
+  const { environmentId, navigation, registration } = await createChatNavigationFixture()
+  const id = crypto.randomUUID()
+  const missing = v.parse(worktreeIdSchema, crypto.randomUUID())
+  useChatInputDraftStore.getState().setIdentity(
+    { environmentId, rootPath: 'main', draftKey: id },
+    {
+      id,
+      projectId: registration.projectId,
+      rootPath: 'main',
+      baseWorktreeId: missing,
+      worktreeTarget: { kind: 'current', worktreeId: missing },
+      createdAt: new Date().toISOString(),
+    },
+  )
+  const before = navigation.currentAddress()
+  const result = await navigation.openChat({
+    environmentId,
+    projectId: registration.projectId,
+    draftId: id,
+    sessionId: null,
+    surface: 'main',
+  })
+  expect(result).toMatchObject({ status: 'unavailable' })
+  expect(navigation.currentAddress()).toEqual(before)
 })

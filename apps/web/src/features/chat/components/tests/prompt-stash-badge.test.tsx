@@ -5,7 +5,7 @@ import { useLexicalComposerContext } from '@lexical/react/LexicalComposerContext
 import { ContentEditable } from '@lexical/react/LexicalContentEditable'
 import { LexicalErrorBoundary } from '@lexical/react/LexicalErrorBoundary'
 import { PlainTextPlugin } from '@lexical/react/LexicalPlainTextPlugin'
-import { screen } from '@testing-library/react'
+import { screen, waitFor, act } from '@testing-library/react'
 import userEvent from '@testing-library/user-event'
 import type { LexicalEditor } from 'lexical'
 import { useEffect } from 'react'
@@ -85,6 +85,39 @@ test('a stashed prompt can be thrown away without going back to the composer', a
   expect(composer.text).toBe('')
 })
 
+test('a queued restore keeps its captured draft and cannot focus the composer navigated to', async () => {
+  const composer = renderComposer()
+  composer.type('same prompt')
+  await composer.pressStashShortcut()
+  let release!: () => void
+  const hold = new Promise<void>((resolve) => {
+    release = resolve
+  })
+  const blocker = composer.queryClient
+    .getMutationCache()
+    .build(composer.queryClient, {
+      mutationKey: ['test', 'hold-stash-preparation'],
+      scope: { id: `stash:${draftTarget.environmentId}` },
+      mutationFn: () => hold,
+    })
+    .execute(undefined)
+  await userEvent.click(screen.getByRole('button', { name: 'Stashed prompts: 1' }))
+  await userEvent.click(await screen.findByRole('button', { name: /^same prompt/ }))
+  const other = { ...draftTarget, draftKey: 'other-composer' }
+  useChatInputDraftStore.getState().setPrompt(other, 'same prompt')
+  composer.navigate(other)
+  if (document.activeElement instanceof HTMLElement) document.activeElement.blur()
+  const focused = document.activeElement
+  await act(async () => {
+    release()
+    await blocker
+  })
+  await waitFor(() => expect(stashedPrompts()).toEqual([]))
+  expect(useChatInputDraftStore.getState().getDraft(draftTarget).prompt).toBe('same prompt')
+  expect(useChatInputDraftStore.getState().getDraft(other).prompt).toBe('same prompt')
+  expect(document.activeElement).toBe(focused)
+})
+
 function stashedPrompts() {
   return promptStashStoreFor(testScopedStorage.environmentId)
     .getState()
@@ -97,7 +130,7 @@ function renderComposer() {
   resetChatInputDraftStore()
   const state = { editor: null as LexicalEditor | null }
 
-  renderWithProviders(
+  const element = (target: ChatInputDraftTarget) => (
     <LexicalComposer
       initialConfig={{
         namespace: 'prompt-stash-badge-test',
@@ -115,11 +148,14 @@ function renderComposer() {
         ErrorBoundary={LexicalErrorBoundary}
         contentEditable={<ContentEditable data-testid='composer' />}
       />
-      <PromptStashBadge disabled={false} draftTarget={draftTarget} />
-    </LexicalComposer>,
+      <PromptStashBadge disabled={false} draftTarget={target} />
+    </LexicalComposer>
   )
+  const rendered = renderWithProviders(element(draftTarget))
 
   return {
+    queryClient: rendered.queryClient,
+    navigate: (target: ChatInputDraftTarget) => rendered.rerender(element(target)),
     async pressStashShortcut() {
       // The listener only fires for the composer the keystroke came from, so the
       // editor has to hold focus exactly as it does in the app.

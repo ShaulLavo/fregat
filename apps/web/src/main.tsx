@@ -1,5 +1,5 @@
 import { systemColorMode } from '@/features/settings/state/system-color-mode'
-import { readSettingsMirror } from '@/features/settings/utils/boot-mirror'
+import { readSettingsMirror } from '@/lib/settings-boot-mirror'
 import { ApplicationBootstrap } from '@/components/application-bootstrap'
 import { StrictMode } from 'react'
 import { createRoot } from 'react-dom/client'

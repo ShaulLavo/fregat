@@ -1,3 +1,9 @@
+import {
+  settledSessionTimestamp,
+  sessionSortTimestamp,
+} from '@workspace/client-core/chat/rail/session-order'
+import { useSettingValue } from '@/hooks/use-setting-value'
+import { deriveProjectGroupKey } from '@workspace/client-core/chat/rail/project-grouping'
 import { EMPTY_ACTIVITIES } from '@/lib/empty-activities'
 import { useApplicationRuntime } from '@/hooks/use-application-runtime'
 import { confirmedEnvironmentOrigin } from '@/lib/environments/state/domain'
@@ -5,6 +11,7 @@ import { useNavigation } from '@/hooks/use-navigation'
 import { scopedSessionKey } from '@workspace/contracts'
 import { useActiveChatProjection } from '@/features/chat/hooks/use-active-projection'
 import type { SessionId } from '@workspace/contracts'
+import { RenderErrorBoundary } from '@workspace/ui/patterns/render-error-boundary'
 
 import { contextUsageForActivities } from '@workspace/client-core/chat/context-usage'
 import { selectChatSessionById } from '@workspace/client-core/chat/selectors'
@@ -16,9 +23,11 @@ import { useSessionReadStore } from '@/features/chat-mode/state/session-read-sto
 import { useSessionSelectionStore } from '@/features/chat-mode/state/session-selection-store'
 import { isDraftFor } from '@/features/chat-mode/utils/active-session'
 import { sessionRailItem } from '@workspace/client-core/chat/rail/model'
-import { sessionCompletedAt } from '@workspace/client-core/chat/rail/unread'
+import { sessionVisitAt } from '@workspace/client-core/chat/rail/unread'
 
 export function ChatStage() {
+  const groupingMode = useSettingValue('chat.projectGrouping')
+  const groupingOverrides = useSettingValue('chat.projectGroupingOverrides')
   const navigation = useNavigation()
   const application = useApplicationRuntime()
   const draftGeneration = useSessionSelectionStore((state) => state.draftGeneration)
@@ -36,9 +45,15 @@ export function ChatStage() {
     (state) =>
       selectChatSessionById(state, activeSession.sessionId)?.activities ?? EMPTY_ACTIVITIES,
   )
-  const session = summary
+  const row = summary
     ? sessionRailItem(
-        { ...summary, activityAt: summary.updatedAt },
+        {
+          ...summary,
+          activityAt: summary.updatedAt,
+          settledOrderAt: settledSessionTimestamp(summary),
+          createdSortAt: sessionSortTimestamp(summary, 'created_at'),
+          updatedSortAt: sessionSortTimestamp(summary, 'updated_at'),
+        },
         transport.environmentId,
         null,
         seenBySessionKey[
@@ -47,7 +62,19 @@ export function ChatStage() {
       )
     : null
 
-  useMarkSessionSeen(summary?.id ?? null, summary ? sessionCompletedAt(summary) : null)
+  const session =
+    row && summary
+      ? {
+          ...row,
+          projectGroupKey: deriveProjectGroupKey(
+            { environmentId: transport.environmentId, projectId: summary.project.id },
+            summary.project.repositoryIdentity,
+            { mode: groupingMode, overrides: groupingOverrides },
+          ),
+        }
+      : null
+
+  useMarkSessionSeen(summary?.id ?? null, summary ? sessionVisitAt(summary) : null)
 
   function handleSessionCreated(sessionId: SessionId) {
     if (!project) return
@@ -80,15 +107,20 @@ export function ChatStage() {
         session={session}
       />
       <div className='mx-auto flex min-h-0 w-full max-w-3xl flex-1 flex-col overflow-hidden'>
-        <StageBody
-          activeSession={activeSession}
-          transport={transport}
-          project={project}
-          worktree={worktree}
-          ready={ready}
-          rootPath={rootPath}
-          onSessionCreated={handleSessionCreated}
-        />
+        <RenderErrorBoundary
+          label='This session'
+          resetKeys={[activeSession.status, activeSession.sessionId]}
+        >
+          <StageBody
+            activeSession={activeSession}
+            transport={transport}
+            project={project}
+            worktree={worktree}
+            ready={ready}
+            rootPath={rootPath}
+            onSessionCreated={handleSessionCreated}
+          />
+        </RenderErrorBoundary>
       </div>
       {error ? (
         <p className='text-destructive text-2xs shrink-0 px-(--density-section-padding) py-(--density-section-gap)'>

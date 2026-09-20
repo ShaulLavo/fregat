@@ -18,6 +18,7 @@ import {
 } from '@workspace/contracts'
 
 export type ProjectionSession = OrchestrationSessionShell & {
+  pendingMessageQuestions?: readonly OrchestrationSessionActivity[]
   pinOrderKey: string | null
   detailSynced: boolean
   liveTurn: OrchestrationLatestTurn | null

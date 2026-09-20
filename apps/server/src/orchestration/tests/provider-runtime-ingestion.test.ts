@@ -25,6 +25,153 @@ const turnId = v.parse(turnIdSchema, 'turn-1')
 const messageId = v.parse(messageIdSchema, 'assistant:turn-1')
 
 describe('provider runtime ingestion', () => {
+  it('defaults to paragraph delivery and paces on server time, not provider timestamps', async () => {
+    let clock = 0
+    const { dispatched, ingestion } = fixture({
+      responseStreamingMode: undefined,
+      now: () => clock,
+    })
+    await ingestion.ingest(assistantDelta('p1', 'First.\n\n'))
+    clock = 399
+    await ingestion.ingest(assistantDelta('p2', 'Second.\n\n'))
+    expect(dispatched).toMatchObject([{ delta: 'First.\n\n' }])
+    clock = 400
+    await ingestion.ingest(assistantDelta('p3', 'Tail'))
+    expect(dispatched).toMatchObject([{ delta: 'First.\n\n' }, { delta: 'Second.\n\n' }])
+    await ingestion.ingest(assistantComplete('done'))
+    expect(dispatched).toMatchObject([
+      { delta: 'First.\n\n' },
+      { delta: 'Second.\n\n' },
+      { delta: 'Tail' },
+      { type: 'session.message.assistant.complete' },
+    ])
+  })
+
+  it.each(['token', 'paragraph', 'turn'] as const)(
+    'retains full reasoning content and suppresses final snapshot duplication in %s mode',
+    async (mode) => {
+      const { dispatched, ingestion } = fixture({ responseStreamingMode: () => mode })
+      const base = {
+        createdAt: now,
+        runtimeEpoch: 'epoch-ingestion',
+        sessionId,
+        turnId,
+        itemId: 'reasoning',
+      }
+      const first = 'a'.repeat(500) + '\n\n'
+      const tail = 'b'.repeat(600)
+      await ingestion.ingest({
+        ...base,
+        eventId: 'r1',
+        type: 'content.delta',
+        payload: { streamKind: 'reasoning_text', delta: first },
+      })
+      expect(dispatched.length).toBe(mode === 'turn' ? 0 : 1)
+      await ingestion.ingest({
+        ...base,
+        eventId: 'r2',
+        type: 'content.delta',
+        payload: { streamKind: 'reasoning_text', delta: tail },
+      })
+      await ingestion.ingest({
+        ...base,
+        eventId: 'r3',
+        type: 'item.completed',
+        payload: { itemType: 'reasoning', detail: first + tail },
+      })
+      await ingestion.ingest({
+        ...base,
+        eventId: 'r4',
+        type: 'item.completed',
+        payload: { itemType: 'reasoning', detail: first + tail },
+      })
+      const chunks = dispatched.filter((command) => command.type === 'session.activity.append')
+      expect(
+        chunks
+          .map(
+            (command) =>
+              v.parse(v.object({ summary: v.string() }), command.activity.payload).summary,
+          )
+          .join(''),
+      ).toBe(first + tail)
+      expect(
+        new Set(
+          chunks.map(
+            (command) => v.parse(v.object({ taskId: v.string() }), command.activity.payload).taskId,
+          ),
+        ).size,
+      ).toBe(1)
+      expect(new Set(chunks.map((command) => command.activity.id)).size).toBe(chunks.length)
+    },
+  )
+
+  it('retains final-only reasoning and creates separate segments around tool work', async () => {
+    const { dispatched, ingestion } = fixture({ responseStreamingMode: () => 'turn' })
+    const base = { createdAt: now, runtimeEpoch: 'epoch-ingestion', sessionId, turnId }
+    await ingestion.ingest({
+      ...base,
+      itemId: 'one',
+      eventId: 'r1',
+      type: 'item.completed',
+      payload: { itemType: 'reasoning', detail: 'first'.repeat(100) },
+    })
+    await ingestion.ingest({
+      ...base,
+      itemId: 'tool',
+      eventId: 'tool',
+      type: 'item.started',
+      payload: { itemType: 'command_execution' },
+    })
+    await ingestion.ingest({
+      ...base,
+      itemId: 'two',
+      eventId: 'r2',
+      type: 'content.delta',
+      payload: { streamKind: 'reasoning_text', delta: 'second'.repeat(100) },
+    })
+    await ingestion.ingest(assistantDelta('visible', 'answer'))
+    const chunks = dispatched
+      .filter((command) => command.type === 'session.activity.append')
+      .filter((command) => command.activity.tone === 'thinking')
+    expect(
+      chunks.map(
+        (command) => v.parse(v.object({ summary: v.string() }), command.activity.payload).summary,
+      ),
+    ).toEqual(['first'.repeat(100), 'second'.repeat(100)])
+    expect(
+      new Set(
+        chunks.map(
+          (command) => v.parse(v.object({ taskId: v.string() }), command.activity.payload).taskId,
+        ),
+      ).size,
+    ).toBe(2)
+  })
+
+  it('gives final-only paragraph reasoning spill and remainder distinct durable commands', async () => {
+    const { dispatched, ingestion } = fixture({ responseStreamingMode: () => 'paragraph' })
+    await ingestion.ingest({
+      createdAt: now,
+      runtimeEpoch: 'epoch-ingestion',
+      sessionId,
+      turnId,
+      itemId: 'final-only',
+      eventId: 'final-only',
+      type: 'item.completed',
+      payload: { itemType: 'reasoning', detail: 'First paragraph.\n\nLast paragraph.' },
+    })
+    const chunks = dispatched.filter((command) => command.type === 'session.activity.append')
+    expect(chunks).toHaveLength(2)
+    expect(new Set(chunks.map((command) => command.commandId)).size).toBe(2)
+    expect(new Set(chunks.map((command) => command.activity.id)).size).toBe(2)
+    expect(
+      chunks
+        .map(
+          (command) => v.parse(v.object({ summary: v.string() }), command.activity.payload).summary,
+        )
+        .join(''),
+    ).toBe('First paragraph.\n\nLast paragraph.')
+  })
+
   it('keeps hook lifecycle events out of chat activities, matching T3 Code', async () => {
     const { dispatched, ingestion } = fixture()
     const base = { createdAt: now, runtimeEpoch: 'epoch-ingestion', sessionId, turnId }
@@ -250,7 +397,7 @@ describe('provider runtime ingestion', () => {
   })
 
   it('can buffer assistant deltas and flush them at completion', async () => {
-    const { dispatched, ingestion } = fixture({ assistantDeliveryMode: 'buffered' })
+    const { dispatched, ingestion } = fixture({ responseStreamingMode: () => 'turn' })
 
     await ingestion.ingest(assistantDelta('delta-1', 'Hello '))
     await ingestion.ingest(assistantDelta('delta-2', 'world'))
@@ -266,7 +413,7 @@ describe('provider runtime ingestion', () => {
   })
 
   it('flushes buffered assistant text before the cap is exceeded', async () => {
-    const { dispatched, ingestion } = fixture({ assistantDeliveryMode: 'buffered' })
+    const { dispatched, ingestion } = fixture({ responseStreamingMode: () => 'turn' })
     const oversized = 'x'.repeat(MAX_BUFFERED_ASSISTANT_CHARS + 1)
 
     await ingestion.ingest(assistantDelta('delta-1', oversized))
@@ -276,6 +423,56 @@ describe('provider runtime ingestion', () => {
       { delta: oversized, type: 'session.message.assistant.delta' },
       { type: 'session.message.assistant.complete' },
     ])
+  })
+
+  it('keeps async questions in the current assistant segment and advertises message response mode', async () => {
+    const { dispatched, ingestion } = fixture()
+    await ingestion.ingest(contentDelta('async-content-1', 'async-assistant', 'Before'))
+    await ingestion.ingest({
+      createdAt: later,
+      eventId: 'async-question',
+      requestId: 'codex-async:session:question',
+      sessionId,
+      runtimeEpoch: 'epoch-ingestion',
+      turnId,
+      type: 'user-input.requested',
+      payload: {
+        responseMode: 'message',
+        questions: [
+          {
+            id: '0',
+            prompt: 'Language?',
+            answerKind: 'text',
+            options: [],
+            allowOther: true,
+            secret: false,
+          },
+        ],
+      },
+    })
+    await ingestion.ingest(contentDelta('async-content-2', 'async-assistant', 'After'))
+    await ingestion.ingest(assistantComplete('async-complete'))
+    expect(
+      dispatched.filter((command) => command.type === 'session.message.assistant.delta'),
+    ).toEqual(
+      expect.arrayContaining([
+        expect.objectContaining({ messageId: `assistant:${sessionId}:${turnId}:async-assistant` }),
+      ]),
+    )
+    expect(
+      dispatched
+        .filter((command) => command.type === 'session.message.assistant.delta')
+        .every(
+          (command) => command.messageId === `assistant:${sessionId}:${turnId}:async-assistant`,
+        ),
+    ).toBe(true)
+    expect(
+      dispatched.find(
+        (command) =>
+          command.type === 'session.activity.append' &&
+          command.activity.kind === 'user-input.requested',
+      ),
+    ).toMatchObject({ activity: { payload: { responseMode: 'message' } } })
   })
 
   it('rolls over assistant segment message IDs after a pause event', async () => {
@@ -309,20 +506,20 @@ describe('provider runtime ingestion', () => {
     expect(messageCommands).toMatchObject([
       {
         delta: 'First',
-        messageId: 'assistant:assistant-item',
+        messageId: `assistant:${sessionId}:${turnId}:assistant-item`,
         type: 'session.message.assistant.delta',
       },
       {
-        messageId: 'assistant:assistant-item',
+        messageId: `assistant:${sessionId}:${turnId}:assistant-item`,
         type: 'session.message.assistant.complete',
       },
       {
         delta: 'Second',
-        messageId: 'assistant:assistant-item:segment:1',
+        messageId: `assistant:${sessionId}:${turnId}:assistant-item:segment:1`,
         type: 'session.message.assistant.delta',
       },
       {
-        messageId: 'assistant:assistant-item:segment:1',
+        messageId: `assistant:${sessionId}:${turnId}:assistant-item:segment:1`,
         type: 'session.message.assistant.complete',
       },
     ])
@@ -343,20 +540,20 @@ describe('provider runtime ingestion', () => {
     expect(messageCommands).toMatchObject([
       {
         delta: 'First',
-        messageId: 'assistant:assistant-item-1',
+        messageId: `assistant:${sessionId}:${turnId}:assistant-item-1`,
         type: 'session.message.assistant.delta',
       },
       {
-        messageId: 'assistant:assistant-item-1',
+        messageId: `assistant:${sessionId}:${turnId}:assistant-item-1`,
         type: 'session.message.assistant.complete',
       },
       {
         delta: 'Second',
-        messageId: 'assistant:assistant-item-2',
+        messageId: `assistant:${sessionId}:${turnId}:assistant-item-2`,
         type: 'session.message.assistant.delta',
       },
       {
-        messageId: 'assistant:assistant-item-2',
+        messageId: `assistant:${sessionId}:${turnId}:assistant-item-2`,
         type: 'session.message.assistant.complete',
       },
     ])
@@ -375,11 +572,11 @@ describe('provider runtime ingestion', () => {
     expect(messageCommands).toMatchObject([
       {
         delta: 'First',
-        messageId: 'assistant:assistant-item-1',
+        messageId: `assistant:${sessionId}:${turnId}:assistant-item-1`,
         type: 'session.message.assistant.delta',
       },
       {
-        messageId: 'assistant:assistant-item-1',
+        messageId: `assistant:${sessionId}:${turnId}:assistant-item-1`,
         type: 'session.message.assistant.complete',
       },
     ])
@@ -666,6 +863,17 @@ describe('provider runtime ingestion', () => {
       type: 'content.delta',
     })
 
+    expect(dispatched).toEqual([])
+    await ingestion.ingest({
+      createdAt: later,
+      eventId: 'reasoning-end',
+      runtimeEpoch: 'epoch-ingestion',
+      sessionId,
+      turnId,
+      itemId: 'reasoning-1',
+      type: 'item.completed',
+      payload: { itemType: 'reasoning' },
+    })
     expect(dispatched).toMatchObject([
       {
         activity: {
@@ -674,8 +882,7 @@ describe('provider runtime ingestion', () => {
             detail: 'Inspecting the repo.',
             streamKind: 'reasoning_summary_text',
             summary: 'Inspecting the repo.',
-            summaryIndex: 0,
-            taskId: 'reasoning-1',
+            taskId: expect.stringContaining('reasoning:'),
           },
           summary: 'Thinking',
           tone: 'thinking',
@@ -721,12 +928,13 @@ describe('provider runtime ingestion', () => {
 
   it('preserves the full app access request the user must approve', async () => {
     const { dispatched, ingestion } = fixture()
+    const options = [{ decision: 'acceptAlways', label: 'Always allow' }] as const
     const detail = `Authorize access to ${'repository '.repeat(30)}and its issues`
 
     await ingestion.ingest({
       createdAt: now,
       eventId: 'app-approval',
-      payload: { detail, requestType: 'mcp_elicitation_approval' },
+      payload: { detail, options, requestType: 'mcp_elicitation_approval' },
       requestId: 'app-request-1',
       sessionId,
       runtimeEpoch: 'epoch-ingestion',
@@ -740,7 +948,7 @@ describe('provider runtime ingestion', () => {
         activity: {
           kind: 'approval.requested',
           summary: 'App access approval requested',
-          payload: { detail, requestKind: 'tool', requestId: 'app-request-1' },
+          payload: { detail, options, requestKind: 'tool', requestId: 'app-request-1' },
         },
       },
     ])
@@ -914,9 +1122,12 @@ function userInputRequested(eventId: string, questions: readonly unknown[]) {
 
 function fixture(options: ConstructorParameters<typeof ProviderRuntimeIngestion>[1] = {}) {
   const dispatched: OrchestrationCommand[] = []
-  const ingestion = new ProviderRuntimeIngestion(async (command) => {
-    dispatched.push(command)
-  }, options)
+  const ingestion = new ProviderRuntimeIngestion(
+    async (command) => {
+      dispatched.push(command)
+    },
+    { responseStreamingMode: () => 'token', ...options },
+  )
 
   return { dispatched, ingestion }
 }

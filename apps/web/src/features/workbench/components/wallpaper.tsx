@@ -1,4 +1,4 @@
-import { useSettingValue } from '@/features/settings/hooks/use-setting-value'
+import { useSettingValue } from '@/hooks/use-setting-value'
 import { visibleWallpaper } from '@/lib/wallpapers/utils/selection'
 import { LibraryWallpaper } from '@/features/workbench/components/library-wallpaper'
 import { WebWallpaper } from '@/features/workbench/components/web-wallpaper'

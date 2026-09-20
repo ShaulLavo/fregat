@@ -321,7 +321,8 @@ function chatInputSkillItems(
 export function chatInputCommandItems(
   trigger: ChatInputTrigger | null,
   entries: Parameters<typeof chatInputMentionCommandItems>[0],
-  catalog: ProviderCommandCatalog | null = null,
+  catalog: ProviderCommandCatalog | null,
+  planModeEnabled: boolean,
 ) {
   if (!trigger) return []
   if (trigger.kind === 'skill') return chatInputSkillItems(catalog, trigger.query)
@@ -329,7 +330,7 @@ export function chatInputCommandItems(
   // provider with forty commands would otherwise bury them.
   if (trigger.kind === 'slash-command') {
     return [
-      ...searchChatInputSlashCommands(trigger.query),
+      ...(planModeEnabled ? searchChatInputSlashCommands(trigger.query) : []),
       ...chatInputProviderCommandItems(catalog, trigger.query),
     ]
   }

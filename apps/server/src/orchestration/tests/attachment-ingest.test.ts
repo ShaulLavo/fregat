@@ -57,59 +57,126 @@ describe('client command attachment ingest', () => {
     expect(message?.attachments).toEqual([pngMetadata()])
   })
 
-  it('drops an unwritable attachment instead of failing the turn', async () => {
+  it('persists per-question images before dispatch and rejects missing uploads without resolving', async () => {
+    const fixture = await createFixture()
+    await fixture.engine.dispatch(v.parse(orchestrationCommandSchema, projectCreateCommand()))
+    await fixture.engine.dispatchClientCommand(sessionCreateCommand())
+    const sessionId = '00000000-0000-4000-8000-000000000001'
+    const requestId = 'codex-async:question-images'
+    await fixture.engine.dispatch(
+      v.parse(orchestrationCommandSchema, {
+        type: 'session.activity.append',
+        commandId: 'question-arrival',
+        sessionId,
+        createdAt: now,
+        activity: {
+          id: 'question-arrival',
+          sessionId,
+          createdAt: now,
+          kind: 'user-input.requested',
+          tone: 'info',
+          turnId: null,
+          summary: 'Question',
+          payload: {
+            requestId,
+            responseMode: 'message',
+            questions: [
+              {
+                id: '0',
+                prompt: 'Show the screenshot',
+                answerKind: 'text',
+                options: [],
+                allowOther: true,
+                secret: false,
+              },
+            ],
+          },
+        },
+      }),
+    )
+    const command = {
+      type: 'session.user-input.respond',
+      commandId: 'image-answer',
+      sessionId,
+      requestId,
+      answers: { '0': '' },
+      attachmentsByQuestionId: { '0': [pngAttachment()] },
+    }
+    await expect(
+      fixture.engine.dispatchClientCommand({
+        ...command,
+        commandId: 'missing-image-answer',
+        attachmentsByQuestionId: { '0': [{ ...pngMetadata(), id: 'absent-image' }] },
+      }),
+    ).rejects.toThrow('unavailable')
+    await fixture.engine.dispatchClientCommand(command)
+    expect(await readFile(path.join(fixture.attachmentsDir, 'attachment-1.png'))).toEqual(
+      Buffer.from(pngBytes),
+    )
+    const detail = await fixture.engine.sessionDetailSnapshot(sessionId)
+    expect(detail.session.messages[0]).toMatchObject({
+      text: 'Show the screenshot\n',
+      attachments: [pngMetadata()],
+    })
+    expect(detail.session.pendingMessageQuestions).toEqual([])
+    expect(persistedJson(fixture.database)).not.toContain('dataUrl')
+  })
+
+  it('rejects an unwritable attachment without sending an incomplete turn', async () => {
     const fixture = await createFixture()
 
     await fixture.engine.dispatch(v.parse(orchestrationCommandSchema, projectCreateCommand()))
     await fixture.engine.dispatchClientCommand(sessionCreateCommand())
-    const result = await fixture.engine.dispatchClientCommand(
-      turnStartCommand([
-        {
-          type: 'image',
-          id: 'attachment-svg',
-          name: 'diagram.svg',
-          mimeType: 'image/svg+xml',
-          sizeBytes: 12,
-          dataUrl: 'data:image/svg+xml;base64,PHN2Zz48L3N2Zz4=',
-        },
-      ]),
-    )
+    await expect(
+      fixture.engine.dispatchClientCommand(
+        turnStartCommand([
+          {
+            type: 'image',
+            id: 'attachment-svg',
+            name: 'diagram.svg',
+            mimeType: 'image/svg+xml',
+            sizeBytes: 12,
+            dataUrl: 'data:image/svg+xml;base64,PHN2Zz48L3N2Zz4=',
+          },
+        ]),
+      ),
+    ).rejects.toThrow('unsupported image type')
 
-    expect(result.deduped).toBe(false)
     expect(existsSync(fixture.attachmentsDir)).toBe(false)
 
     const message = (
       await fixture.engine.sessionDetailSnapshot('00000000-0000-4000-8000-000000000001')
     ).session.messages[0]
-    expect(message?.text).toBe('What is in this screenshot?')
-    expect(message?.attachments).toEqual([])
+    expect(message).toBeUndefined()
   })
 
-  it('keeps the writable attachments of a partially broken batch', async () => {
+  it('rejects a partially broken batch without silently losing a file', async () => {
     const fixture = await createFixture()
 
     await fixture.engine.dispatch(v.parse(orchestrationCommandSchema, projectCreateCommand()))
     await fixture.engine.dispatchClientCommand(sessionCreateCommand())
-    await fixture.engine.dispatchClientCommand(
-      turnStartCommand([
-        {
-          type: 'image',
-          id: 'attachment-heic',
-          name: 'photo.heic',
-          mimeType: 'image/heic',
-          sizeBytes: 4,
-          dataUrl: 'data:image/heic;base64,AAAA',
-        },
-        pngAttachment(),
-      ]),
-    )
+    await expect(
+      fixture.engine.dispatchClientCommand(
+        turnStartCommand([
+          {
+            type: 'image',
+            id: 'attachment-heic',
+            name: 'photo.heic',
+            mimeType: 'image/heic',
+            sizeBytes: 4,
+            dataUrl: 'data:image/heic;base64,AAAA',
+          },
+          pngAttachment(),
+        ]),
+      ),
+    ).rejects.toThrow('unsupported image type')
 
     const message = (
       await fixture.engine.sessionDetailSnapshot('00000000-0000-4000-8000-000000000001')
     ).session.messages[0]
-    expect(message?.attachments).toEqual([pngMetadata()])
+    expect(message).toBeUndefined()
     expect(existsSync(path.join(fixture.attachmentsDir, 'attachment-heic.heic'))).toBe(false)
-    expect(existsSync(path.join(fixture.attachmentsDir, 'attachment-1.png'))).toBe(true)
+    expect(existsSync(path.join(fixture.attachmentsDir, 'attachment-1.png'))).toBe(false)
   })
 })
 

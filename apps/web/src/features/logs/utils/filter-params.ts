@@ -1,5 +1,5 @@
 import type { LogDashboardFilters, LogDashboardLevel } from '@workspace/contracts'
-import { readSettingsMirror } from '@/features/settings/utils/boot-mirror'
+import { readSettingsMirror } from '@/lib/settings-boot-mirror'
 
 export type LogTimeRange = '15m' | '1h' | '6h' | '24h' | 'all'
 

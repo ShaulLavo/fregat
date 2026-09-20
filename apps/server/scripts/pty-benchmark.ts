@@ -1,3 +1,5 @@
+import { createMetadataDatabase } from '../src/db/client'
+import { migratePlatformDatabase } from '../src/db/migrations'
 import { processExists } from './process-exists'
 import { existsSync } from 'node:fs'
 import { chmod, mkdir, mkdtemp, readFile, rm, writeFile } from 'node:fs/promises'
@@ -100,7 +102,10 @@ class OutputCapture {
 async function openSession(root: string, id: string) {
   const capture = new OutputCapture()
   const pidFile = path.join(root, `${id}.pid`)
+  const historyDatabase = createMetadataDatabase({ databasePath: path.join(root, `${id}.sqlite`) })
+  migratePlatformDatabase(historyDatabase.db)
   const options = {
+    database: historyDatabase.db,
     lifecycle,
     paths: createWorkspacePaths(root),
     resolveWorktree: async () => root,
@@ -128,12 +133,14 @@ async function openSession(root: string, id: string) {
     await Promise.all([routes.open(socket), ready])
   } catch (error) {
     await service.dispose()
+    historyDatabase.close()
     await cleanupProcess(pidFile)
     throw error
   }
   const firstOutputAt = capture.firstOutputAt
   if (firstOutputAt === null || !capture.output.startsWith(STARTED)) {
     await service.dispose()
+    historyDatabase.close()
     await cleanupProcess(pidFile)
     throw benchmarkError('The controlled shell did not produce the first output marker')
   }
@@ -155,6 +162,7 @@ async function openSession(root: string, id: string) {
     },
     async close() {
       await service.dispose()
+      historyDatabase.close()
       await cleanupProcess(pidFile)
     },
   }

@@ -1,3 +1,4 @@
+import { Spinner } from '@workspace/ui/components/spinner'
 import { BookmarkSimpleIcon } from '@phosphor-icons/react'
 import { Button } from '@workspace/ui/components/button'
 import { Popover, PopoverContent, PopoverTrigger } from '@workspace/ui/components/popover'
@@ -19,8 +20,9 @@ export function PromptStashBadge({
   readonly disabled: boolean
   readonly draftTarget: ChatInputDraftTarget
 }) {
-  const { entries, menuOpen, removeEntry, restoreEntry, setMenuOpen } = usePromptStash(draftTarget)
-  if (entries.length === 0) return null
+  const { entries, pending, menuOpen, removeEntry, restoreEntry, setMenuOpen } =
+    usePromptStash(draftTarget)
+  if (entries.length === 0 && !pending) return null
 
   return (
     <Popover open={menuOpen} onOpenChange={setMenuOpen}>
@@ -38,7 +40,11 @@ export function PromptStashBadge({
                   type='button'
                   variant='ghost'
                 >
-                  <BookmarkSimpleIcon className='size-(--icon-size-sm) shrink-0' />
+                  {pending ? (
+                    <Spinner />
+                  ) : (
+                    <BookmarkSimpleIcon className='size-(--icon-size-sm) shrink-0' />
+                  )}
                   <span className='tabular-nums'>{entries.length}</span>
                 </Button>
               }

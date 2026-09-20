@@ -74,6 +74,8 @@ export type IntentQueueOptions = {
 
 type MutableIntent<TPatch> = Intent<TPatch> & {
   readonly resolveSettlement: (settlement: IntentSettlement) => void
+  /** Set at submit time: the newer write may be gone from `active` by the time this one fails. */
+  readonly overtaken: boolean
 }
 
 type InternalState<TPatch> = {
@@ -120,6 +122,7 @@ export function createIntentQueue<TPatch>(options: IntentQueueOptions = {}): Int
       transportSettled: false,
       settled,
       resolveSettlement,
+      overtaken: false,
     }
   }
 
@@ -140,7 +143,12 @@ export function createIntentQueue<TPatch>(options: IntentQueueOptions = {}): Int
         .map((entry) => entry.intentId)
 
       store.setState((state) => ({
-        active: [...state.active, intent],
+        active: [
+          ...state.active.map((entry) =>
+            resourcesCollide(entry.resources, resources) ? { ...entry, overtaken: true } : entry,
+          ),
+          intent,
+        ],
         failed: state.failed.map((entry) =>
           supersededIntentIds.includes(entry.intentId) ? { ...entry, superseded: true } : entry,
         ),
@@ -184,13 +192,7 @@ export function createIntentQueue<TPatch>(options: IntentQueueOptions = {}): Int
         patch: entry.patch,
         resources: entry.resources,
         error,
-        superseded: store
-          .getState()
-          .active.some(
-            (candidate) =>
-              candidate.sequence > entry.sequence &&
-              resourcesCollide(candidate.resources, entry.resources),
-          ),
+        superseded: entry.overtaken,
       }
       store.setState((state) => ({
         active: state.active.filter((candidate) => candidate.intentId !== intentId),

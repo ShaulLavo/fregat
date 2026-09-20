@@ -1,3 +1,5 @@
+import { createAttachmentOwnership } from './attachments/ownership'
+import { selectTitleModel } from './orchestration/title-generation'
 import { errorMessage } from '@workspace/contracts'
 import { BundleLibrary } from './themes/bundle-library'
 import { bundleRoutes } from './themes/bundle-routes'
@@ -5,7 +7,12 @@ import { WallpaperLibrary } from './themes/wallpapers/library'
 import { wallpaperLibraryRoutes } from './themes/wallpapers/routes'
 import { createInternalError } from './observability/structured-errors'
 import { cors } from '@elysiajs/cors'
-import { terminalKillInputSchema, type HealthDescriptor } from '@workspace/contracts'
+import {
+  terminalClearInputSchema,
+  terminalRestartInputSchema,
+  terminalKillInputSchema,
+  type HealthDescriptor,
+} from '@workspace/contracts'
 import { homedir, hostname } from 'node:os'
 import path from 'node:path'
 import { Elysia } from 'elysia'
@@ -73,7 +80,6 @@ export type AppOptions = FileSystemServiceOptions & {
   terminal?: {
     env?: NodeJS.ProcessEnv
     ptyFactory?: TerminalPtyFactory
-    detachTtlMs?: number
   }
   fonts?: FontService
   themes?: {
@@ -128,7 +134,13 @@ export function createApp(options: AppOptions) {
   const git = new GitService(fs.paths, {
     maxTextFileBytes: fs.info().maxTextFileBytes,
   })
+  const database = options.orchestration?.database ?? getDefaultPlatformDatabase()
+  // The schema has to exist before anything below reads this handle: the
+  // identity row, the settings store, and the engine all query it while
+  // `createApp` is still running. Idempotent — applied versions are skipped.
+  migratePlatformDatabase(database)
   const terminal: TerminalService = new TerminalService({
+    database,
     ...options.terminal,
     paths: fs.paths,
     resolveWorktree: async (worktreeId) => {
@@ -141,11 +153,7 @@ export function createApp(options: AppOptions) {
     resolveAgentSession: (input) => orchestration.beginAgentTerminal(input),
   })
   const fonts = options.fonts ?? new NerdFontService()
-  const database = options.orchestration?.database ?? getDefaultPlatformDatabase()
-  // The schema has to exist before anything below reads this handle: the
-  // identity row, the settings store, and the engine all query it while
-  // `createApp` is still running. Idempotent — applied versions are skipped.
-  migratePlatformDatabase(database)
+
   // Before the registry, because the registry is built *from* it. One SQLite
   // file backs the whole platform, so settings ride on whichever handle this
   // app was given — in tests that is the in-memory database, which is what
@@ -220,6 +228,20 @@ export function createApp(options: AppOptions) {
     sessionDirectory: new ProviderSessionDirectory(database),
   })
   const orchestration = new OrchestrationEngine(database, {
+    responseStreamingMode: (projectId) => {
+      const values = settings.snapshot().values
+      return (
+        values['chat.projectResponseStreamingModes'][projectId] ??
+        values['chat.responseStreamingMode']
+      )
+    },
+    titleModel: async (projectId) => {
+      const values = settings.snapshot().values
+      const configured =
+        values['chat.projectTextGenerationModels'][projectId] ?? values['chat.textGenerationModel']
+      const { providers } = await providerAdapterRegistry.listProviders()
+      return selectTitleModel(configured, providers)
+    },
     keepImportedSessionsUpdated: () =>
       settings.snapshot().values['chat.keepImportedSessionsUpdated'],
     providerService,
@@ -330,6 +352,14 @@ export function createApp(options: AppOptions) {
           label: hostname(),
           protocolVersion: serverConfig.protocolVersion,
           serverVersion: serverConfig.serverVersion,
+          capabilities: {
+            sessionSettlement: true,
+            sessionSnooze: true,
+            sessionPinning: true,
+            sessionPinReorder: true,
+            sessionActiveReorder: true,
+            sessionTitleRegeneration: true,
+          },
           platform: { os: process.platform, arch: process.arch },
           ...fs.info(),
         }) satisfies HealthDescriptor,
@@ -344,10 +374,19 @@ export function createApp(options: AppOptions) {
     )
     .ws('/lsp', lspRoutes(fs, auth, { pool: lspPool, settings: lspSettings }))
     .ws('/terminal', terminal.routes(auth))
+    .post('/terminal/restart', ({ body }) => terminal.restart(body), {
+      body: terminalRestartInputSchema,
+    })
+    .post('/terminal/clear', ({ body }) => terminal.clear(body), { body: terminalClearInputSchema })
     .post('/terminal/kill', ({ body }) => terminal.kill(body), { body: terminalKillInputSchema })
     .use(providerRoutes(providerAdapterRegistry))
     .use(orchestrationRoutes(orchestration, checkpointDiff, sessionSearch))
-    .use(attachmentRoutes({ attachmentsDir: options.orchestration?.attachmentsDir }))
+    .use(
+      attachmentRoutes({
+        attachmentsDir: options.orchestration?.attachmentsDir,
+        ownership: createAttachmentOwnership(database),
+      }),
+    )
     .use(fontRoutes(fonts))
     .use(wallpaperRoutes())
     .use(settingsRoutes(settings))

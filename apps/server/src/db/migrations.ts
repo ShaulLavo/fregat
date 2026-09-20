@@ -20,7 +20,45 @@ export const platformMigrations: readonly Migration[] = [
   { version: 13, name: 'workspace_addresses', up: applyWorkspaceAddresses },
   { version: 14, name: 'agent_terminal_handoffs', up: applyAgentTerminalHandoffs },
   { version: 15, name: 'message_pagination_order', up: applyMessagePaginationOrder },
+  { version: 16, name: 'pending_rewind', up: applyPendingRewind },
+  { version: 17, name: 'active_session_order', up: applyActiveSessionOrder },
+  { version: 18, name: 'session_titles', up: applySessionTitles },
+  { version: 19, name: 'attachment_upload_owners', up: applyAttachmentUploadOwners },
+  { version: 20, name: 'terminal_history', up: applyTerminalHistory },
 ]
+
+function applyTerminalHistory(database: PlatformDatabase) {
+  database.run(
+    sql`CREATE TABLE terminal_history_chunks (owner TEXT NOT NULL, sequence INTEGER NOT NULL, data BLOB NOT NULL, PRIMARY KEY (owner, sequence))`,
+  )
+}
+
+function applyAttachmentUploadOwners(database: PlatformDatabase) {
+  database.run(
+    sql`CREATE TABLE attachment_upload_owners (attachment_id TEXT PRIMARY KEY NOT NULL, session_id TEXT NOT NULL, attachment_json TEXT NOT NULL)`,
+  )
+  database.run(
+    sql`CREATE INDEX attachment_upload_owners_session_idx ON attachment_upload_owners (session_id)`,
+  )
+}
+
+function applySessionTitles(database: PlatformDatabase) {
+  database.run(sql`ALTER TABLE projection_sessions ADD COLUMN title_state_json TEXT`)
+  database.run(sql`ALTER TABLE projection_sessions ADD COLUMN title_regeneration_json TEXT`)
+  database.run(sql`ALTER TABLE projection_sessions ADD COLUMN title_generation_error TEXT`)
+}
+
+function applyActiveSessionOrder(database: PlatformDatabase) {
+  database.run(sql`ALTER TABLE projection_sessions ADD COLUMN active_order_key TEXT`)
+  database.run(sql`ALTER TABLE projection_sessions ADD COLUMN unsettled_at TEXT`)
+}
+
+function applyPendingRewind(database: PlatformDatabase) {
+  database.run(sql`ALTER TABLE projection_sessions ADD COLUMN pending_rewind_command_id TEXT`)
+  database.run(
+    sql`ALTER TABLE projection_sessions ADD COLUMN pending_rewind_restore_files INTEGER NOT NULL DEFAULT 0`,
+  )
+}
 
 function applyMessagePaginationOrder(database: PlatformDatabase) {
   database.run(sql`DROP INDEX projection_session_messages_session_created_idx`)

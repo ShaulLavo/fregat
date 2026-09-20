@@ -144,6 +144,7 @@ test('stops external updates at the first Platform message even when source read
 
     await fixture.engine.dispatch({
       type: 'session.revert.complete',
+      revertCommandId: v.parse(commandIdSchema, 'cmd-revert'),
       commandId: v.parse(commandIdSchema, 'revert-imported-turn'),
       sessionId,
       turnCount: 0,

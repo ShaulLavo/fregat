@@ -1,3 +1,4 @@
+import { scopedProjectKey } from '@workspace/contracts'
 import { screen, waitFor } from '@testing-library/react'
 import userEvent from '@testing-library/user-event'
 import { useSessionRailStore } from '@/features/chat-mode/state/session-rail-store'
@@ -16,9 +17,13 @@ test('project menu scopes and collapses the repository group', async ({ client, 
       .find((element) => element.getAttribute('aria-expanded') === 'true')!
   await userEvent.pointer({ keys: '[MouseRight]', target: groupHeader() })
   await userEvent.click(await screen.findByRole('menuitem', { name: 'Show Only This Project' }))
-  expect(useSessionRailStore.getState().scope).toBe(h.projectId)
+  expect(useSessionRailStore.getState().scope).toBe(
+    `physical:${scopedProjectKey({ environmentId: h.environmentId, projectId: h.projectId })}`,
+  )
   await userEvent.click(groupHeader())
-  expect(useSessionRailStore.getState().collapsedProjectIds).toEqual([h.projectId])
+  expect(useSessionRailStore.getState().collapsedProjectIds).toEqual([
+    scopedProjectKey({ environmentId: h.environmentId, projectId: h.projectId }),
+  ])
   expect(screen.getByTitle('First')).toBeVisible()
   expect(screen.queryByTitle('Second')).toBeNull()
 })

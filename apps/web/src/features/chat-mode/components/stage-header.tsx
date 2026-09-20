@@ -1,3 +1,5 @@
+import { useSettingValue } from '@/hooks/use-setting-value'
+import { SessionTitleStatus } from '@/features/chat-mode/components/session-title-status'
 import { WorktreeChip } from '@/features/chat-mode/components/worktree-chip'
 import { SessionAttentionIndicator } from '@/features/chat-mode/components/session-attention-indicator'
 import { scopedSessionKey } from '@workspace/contracts'
@@ -29,6 +31,7 @@ export function StageHeader({
   /** Null while the stage is on the composer — there is no session to name or act on. */
   readonly session: SessionRailItem | null
 }) {
+  const contextMeterEnabled = useSettingValue('chat.contextWindowMeterEnabled')
   const { rootPath } = useChatModeSession()
   const renaming = useSessionRailStore((state) => state.renaming)
   const editing =
@@ -48,7 +51,7 @@ export function StageHeader({
               rootPath={session.worktreePath ?? rootPath}
             />
           ) : null}
-          {session && session.status !== 'settled' ? (
+          {session && session.status !== 'ready' ? (
             <span
               className={cn(
                 'flex shrink-0 items-center gap-1.5 text-2xs',
@@ -59,7 +62,8 @@ export function StageHeader({
               {sessionStatusLabel(session.status)}
             </span>
           ) : null}
-          {contextUsage ? <ContextUsageRing usage={contextUsage} /> : null}
+          {session ? <SessionTitleStatus sessionRef={session.ref} /> : null}
+          {contextMeterEnabled && contextUsage ? <ContextUsageRing usage={contextUsage} /> : null}
           {session ? <StageSessionMenu session={session} /> : null}
         </>
       }

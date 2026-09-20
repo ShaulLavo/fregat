@@ -49,6 +49,7 @@ export type MockProviderAdapterOptions = {
 }
 
 export const MOCK_ADAPTER_CAPABILITIES = {
+  conversationRollback: true,
   listCommands: true,
   sessionModelSwitch: 'in-session',
 } satisfies ProviderAdapter['capabilities']
@@ -75,7 +76,7 @@ const MOCK_COMMAND_CATALOG: ProviderCommandCatalogResult = {
 export class MockProviderAdapter implements ProviderAdapter {
   readonly operationTimeoutMs: number
   readonly adapterKey: ProviderInstanceId
-  readonly capabilities = MOCK_ADAPTER_CAPABILITIES
+  readonly capabilities: ProviderAdapter['capabilities'] = MOCK_ADAPTER_CAPABILITIES
   readonly driverKind: ProviderDriverKind
   readonly approvalResponses: Array<{
     decision: ProviderApprovalDecision
@@ -278,12 +279,20 @@ export class MockProviderAdapter implements ProviderAdapter {
     return this.sessions.has(sessionId)
   }
 
-  async rollbackSession({ numTurns, sessionId }: { numTurns: number; sessionId: SessionId }) {
+  async prepareRollbackSession({
+    numTurns,
+    sessionId,
+  }: {
+    numTurns: number
+    sessionId: SessionId
+  }) {
     if (!Number.isInteger(numTurns) || numTurns < 1) {
       throw createInternalError('Mock provider rollback requires numTurns >= 1.')
     }
 
-    this.rollbacks.push({ numTurns, sessionId })
+    return async () => {
+      this.rollbacks.push({ numTurns, sessionId })
+    }
   }
 
   async interruptTurn({ sessionId }: { sessionId: SessionId }) {

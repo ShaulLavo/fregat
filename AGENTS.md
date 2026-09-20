@@ -155,6 +155,15 @@ Interaction treatments are utilities, not strings to copy:
 - Reduced motion is handled inside the primitives — they slow down rather than freeze, because a stopped spinner reads as a hung process. Do not add `motion-reduce:` classes at the call site.
 - Ellipsis is `…`, never `...`.
 
+## Render Errors
+
+- Render failures are contained by `RenderErrorBoundary` (`@workspace/ui/patterns/render-error-boundary`, over `react-error-boundary`). Never hand-write a boundary class. `ToolPane` wraps its body in one; the composition layer wraps each seam a `ToolPane` body cannot cover: sidebar panel, editor tab body, each terminal, chat stage, tool pane, timeline row.
+- Pass `resetKeys` with the identity of what is shown (tab id, session id, row id) so navigating away heals the region. Retry covers the rest.
+- A local boundary does not log. The root's `onCaughtError` reports every caught error once; `onError` is only for fields the root cannot know, such as a fence language.
+- Boundaries are for render bugs. Query and mutation failures stay state rendered through `ToolPane`; do not adopt `throwOnError`.
+- Keep a boundary below anything that must stay mounted. A terminal unmounted by a sibling's crash detaches its PTY.
+- `LoggingErrorBoundary` at the root is the last resort for providers, router and bootstrap.
+
 ## Truncation And Recovery
 
 - Truncation is correct in a one-line row, but the cut part must be recoverable. Any element carrying `truncate` or `line-clamp-N` whose content is a value the app did not author (a path, a branch, a session title, a model name, a machine label, a host, a code excerpt) carries a native `title` with the complete value. `scripts/lint/web-design-census.mjs` measures this as `truncationRecovery`.

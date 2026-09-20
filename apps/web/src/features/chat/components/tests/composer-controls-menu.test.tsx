@@ -1,3 +1,8 @@
+import { getClient } from '@/lib/client'
+import { DEFAULT_PROVIDER_INSTANCE_ID } from '@workspace/contracts'
+import { providerSnapshot } from '../../../../../test/factories/chat'
+import { ChatModelPickerProvider } from '@/features/chat/providers/model-picker-provider'
+import { providerListQueryOptions } from '@/features/chat/utils/provider-query'
 import { TEST_ENVIRONMENT_ID as FIXTURE_ENVIRONMENT_ID } from '../../../../../test/factories/chat'
 import {
   sessionIdSchema,
@@ -17,7 +22,7 @@ import {
   type ChatInputDraftTarget,
 } from '@/features/chat/state/chat-input-draft-store'
 import { expect, test } from '../../../../../test/fixtures'
-import { renderWithProviders } from '../../../../../test/render'
+import { createTestQueryClient, renderWithProviders } from '../../../../../test/render'
 
 const sessionId = v.parse(sessionIdSchema, '0b1cf4bb-c595-5929-9994-7174e9f096ef')
 const draftTarget: ChatInputDraftTarget = {
@@ -26,15 +31,15 @@ const draftTarget: ChatInputDraftTarget = {
   rootPath: '/repo/platform',
 }
 
-test('the trigger reports the session values while the draft has no override', () => {
-  renderMenu()
+test('the trigger reports the session values while the draft has no override', async () => {
+  await renderMenu()
 
   expect(trigger()).toHaveTextContent('Full access')
   expect(trigger()).not.toHaveTextContent('Plan')
 })
 
 test('choosing an access level writes it to the draft and back onto the trigger', async () => {
-  renderMenu()
+  await renderMenu()
 
   await openMenu()
   await userEvent.click(await screen.findByRole('menuitemradio', { name: /Ask first/ }))
@@ -44,7 +49,7 @@ test('choosing an access level writes it to the draft and back onto the trigger'
 })
 
 test('choosing an access level also sets it on the session itself', async () => {
-  const { dispatched } = renderMenu()
+  const { dispatched } = await renderMenu()
 
   await openMenu()
   await userEvent.click(await screen.findByRole('menuitemradio', { name: /Ask first/ }))
@@ -58,7 +63,7 @@ test('choosing an access level also sets it on the session itself', async () => 
 })
 
 test('plan mode lands in the draft and shows on the composer', async () => {
-  renderMenu()
+  await renderMenu()
 
   await openMenu()
   await userEvent.click(await screen.findByRole('menuitemradio', { name: /Plan/ }))
@@ -68,7 +73,7 @@ test('plan mode lands in the draft and shows on the composer', async () => {
 })
 
 test('plan mode is set on the session, not only on the next turn', async () => {
-  const { dispatched } = renderMenu()
+  const { dispatched } = await renderMenu()
 
   await openMenu()
   await userEvent.click(await screen.findByRole('menuitemradio', { name: /Plan/ }))
@@ -81,7 +86,7 @@ test('plan mode is set on the session, not only on the next turn', async () => {
 })
 
 test('a rejected session sync leaves the pick on the composer so the turn still carries it', async () => {
-  renderMenu({}, () => Promise.reject(new Error('offline')))
+  await renderMenu({}, () => Promise.reject(new Error('offline')))
 
   await openMenu()
   await userEvent.click(await screen.findByRole('menuitemradio', { name: /Ask first/ }))
@@ -93,7 +98,7 @@ test('a rejected session sync leaves the pick on the composer so the turn still 
 })
 
 test('an override survives a reopen as the checked option', async () => {
-  renderMenu({ interactionMode: 'plan', runtimeMode: 'approval-required' })
+  await renderMenu({ interactionMode: 'plan', runtimeMode: 'approval-required' })
 
   await openMenu()
   await userEvent.click(await screen.findByRole('menuitemradio', { name: /Auto-accept edits/ }))
@@ -107,10 +112,26 @@ test('an override survives a reopen as the checked option', async () => {
   ])
 })
 
-function renderMenu(
-  session: { interactionMode?: InteractionMode; runtimeMode?: RuntimeMode } = {},
+async function renderMenu(
+  session: {
+    interactionMode?: InteractionMode
+    runtimeMode?: RuntimeMode
+    planModeEnabled?: boolean
+    supported?: boolean
+  } = {},
   dispatch?: () => Promise<{ result: null; deduped: boolean; sequence: number }>,
 ) {
+  await getClient().settings.write.post({
+    target: 'user',
+    mutationId: crypto.randomUUID(),
+    operations: [
+      { kind: 'set', key: 'chat.planModeEnabled', value: session.planModeEnabled ?? true },
+    ],
+  })
+  const queryClient = createTestQueryClient()
+  queryClient.setQueryData(providerListQueryOptions().queryKey, {
+    providers: [providerSnapshot({ showInteractionModeToggle: session.supported ?? true })],
+  })
   resetChatInputDraftStore()
 
   const dispatched: ClientOrchestrationCommand[] = []
@@ -127,13 +148,21 @@ function renderMenu(
       draftTarget={draftTarget}
       sessionId={sessionId}
     >
-      <ComposerControlsMenu
-        disabled={false}
+      <ChatModelPickerProvider
         draftTarget={draftTarget}
-        interactionMode={session.interactionMode ?? 'default'}
-        runtimeMode={session.runtimeMode ?? 'full-access'}
-      />
+        sessionProviderInstanceId={DEFAULT_PROVIDER_INSTANCE_ID}
+        modelSelection={{ providerInstanceId: DEFAULT_PROVIDER_INSTANCE_ID, model: 'mock' }}
+        persistModelSelection={() => {}}
+      >
+        <ComposerControlsMenu
+          disabled={false}
+          draftTarget={draftTarget}
+          interactionMode={session.interactionMode ?? 'default'}
+          runtimeMode={session.runtimeMode ?? 'full-access'}
+        />
+      </ChatModelPickerProvider>
     </ChatComposerModesProvider>,
+    { queryClient },
   )
 
   return { dispatched }
@@ -150,3 +179,10 @@ async function openMenu() {
 function draft() {
   return useChatInputDraftStore.getState().getDraft(draftTarget)
 }
+
+test('default-hidden and unsupported Plan controls retain stored preference without exposing the action', async () => {
+  await renderMenu({ interactionMode: 'plan', planModeEnabled: false })
+  await openMenu()
+  expect(screen.queryByRole('menuitemradio', { name: /Plan/ })).toBeNull()
+  expect(trigger()).not.toHaveTextContent('Plan')
+})

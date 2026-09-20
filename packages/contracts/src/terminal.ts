@@ -26,6 +26,17 @@ export const terminalKillInputSchema = v.object({
   terminalId: v.pipe(v.string(), v.trim(), v.minLength(1)),
 })
 
+export const terminalClearInputSchema = v.pick(terminalOpenInputSchema, [
+  'worktreeId',
+  'terminalId',
+])
+export const terminalRestartInputSchema = v.pick(terminalOpenInputSchema, [
+  'worktreeId',
+  'terminalId',
+])
+export type TerminalRestartInput = v.InferOutput<typeof terminalRestartInputSchema>
+export type TerminalClearInput = v.InferOutput<typeof terminalClearInputSchema>
+
 export type TerminalKillInput = v.InferOutput<typeof terminalKillInputSchema>
 
 export type TerminalClientMessage =
@@ -34,7 +45,8 @@ export type TerminalClientMessage =
   | { type: 'dispose' }
 
 export type TerminalServerMessage =
-  | { type: 'ready'; shell: string; cwd: string }
+  | { type: 'ready'; shell: string; cwd: string; restoredHistory: boolean }
+  | { type: 'cleared' }
   | { type: 'output'; data: Uint8Array }
   | { type: 'exit'; exitCode: number | null }
   | { type: 'error'; message: string }
@@ -56,6 +68,7 @@ export function parseTerminalServerMessage(value: unknown): TerminalServerMessag
   if (bytes) return { type: 'output', data: bytes }
   const parsed = parseJsonValue(value)
   if (!isRecord(parsed)) return null
+  if (parsed.type === 'cleared') return { type: 'cleared' }
   if (parsed.type === 'ready') return terminalReadyMessage(parsed)
   if (parsed.type === 'exit') return terminalExitMessage(parsed)
   if (parsed.type === 'error') return terminalErrorMessage(parsed)
@@ -90,7 +103,13 @@ function terminalReadyMessage(value: Record<string, unknown>): TerminalServerMes
   if (typeof value.shell !== 'string') return null
   if (typeof value.cwd !== 'string') return null
 
-  return { type: 'ready', shell: value.shell, cwd: value.cwd }
+  if (typeof value.restoredHistory !== 'boolean') return null
+  return {
+    type: 'ready',
+    shell: value.shell,
+    cwd: value.cwd,
+    restoredHistory: value.restoredHistory,
+  }
 }
 
 function terminalExitMessage(value: Record<string, unknown>): TerminalServerMessage | null {

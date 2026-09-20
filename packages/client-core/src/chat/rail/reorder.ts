@@ -82,3 +82,60 @@ function movedRows<TRow>(rows: readonly TRow[], from: number, to: number): TRow[
 
   return next
 }
+
+const ORDER_DIGITS = 'abcdefghijklmnopqrstuvwxyz'
+
+function spreadOrderKeys(count: number): string[] {
+  let width = 2
+  let space = ORDER_DIGITS.length ** width
+  while (space <= (count + 1) * 2) {
+    width += 1
+    space *= ORDER_DIGITS.length
+  }
+  const step = space / (count + 1)
+  const keys: string[] = []
+  for (let i = 0; i < count; i += 1) {
+    let value = Math.round(step * (i + 1))
+    if (value % ORDER_DIGITS.length === 0) value += 1
+    let key = ''
+    for (let digit = 0; digit < width; digit += 1) {
+      key = ORDER_DIGITS.charAt(value % ORDER_DIGITS.length) + key
+      value = Math.floor(value / ORDER_DIGITS.length)
+    }
+    keys.push(key)
+  }
+  return keys
+}
+
+export function planRailReorder(input: {
+  readonly orderedIds: readonly string[]
+
+  readonly keysById: ReadonlyMap<string, string | null | undefined>
+  readonly movedId: string
+}): ReadonlyArray<{ readonly id: string; readonly orderKey: string }> {
+  const { orderedIds, keysById, movedId } = input
+  const visibleIds = new Set(orderedIds)
+  const reservedKeys = new Set(
+    [...keysById].flatMap(([id, key]) => (!visibleIds.has(id) && key != null ? [key] : [])),
+  )
+  const movedIndex = orderedIds.indexOf(movedId)
+  if (movedIndex === -1) return []
+  const beforeId = movedIndex > 0 ? orderedIds[movedIndex - 1] : null
+  const afterId = movedIndex < orderedIds.length - 1 ? orderedIds[movedIndex + 1] : null
+  const beforeKey = beforeId != null ? (keysById.get(beforeId) ?? null) : null
+  const afterKey = afterId != null ? (keysById.get(afterId) ?? null) : null
+  const beforeUsable = beforeId === null || beforeKey != null
+  const afterUsable = afterId === null || afterKey != null
+  if (beforeUsable && afterUsable) {
+    let key = orderKeyBetween(beforeKey, afterKey)
+    while (key !== null && reservedKeys.has(key)) key = orderKeyBetween(key, afterKey)
+    if (key !== null) return [{ id: movedId, orderKey: key }]
+  }
+  const keys = spreadOrderKeys(orderedIds.length + reservedKeys.size)
+    .filter((key) => !reservedKeys.has(key))
+    .slice(0, orderedIds.length)
+  return orderedIds.flatMap((id, index) => {
+    const key = keys[index]!
+    return keysById.get(id) === key ? [] : [{ id, orderKey: key }]
+  })
+}

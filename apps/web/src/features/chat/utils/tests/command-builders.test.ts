@@ -174,6 +174,7 @@ describe('chat command builders', () => {
   it('builds checkpoint revert commands for user-row rollback affordances', () => {
     const sessionId = v.parse(sessionIdSchema, 'ad686244-5b2e-59be-805f-ef86eac80feb')
     const command = createCheckpointRevertCommand({
+      restoreFiles: false,
       sessionId,
       turnCount: 2,
     })
@@ -182,6 +183,7 @@ describe('chat command builders', () => {
       sessionId,
       turnCount: 2,
       type: 'session.checkpoint.revert',
+      restoreFiles: false,
     })
   })
 

@@ -312,7 +312,7 @@ function settingsErrorResponse({ code, message, status }: InjectedSettingsError)
   return Response.json({ error: { code, message } }, { status })
 }
 
-function directInProcessFetcher(server: TestServer): typeof fetch {
+export function directInProcessFetcher(server: TestServer): typeof fetch {
   return (async (input, init) => {
     const response = await server.app.handle(withOrigin(new Request(input, init), server.origin))
     normalizeInProcessSseHeaders(response)

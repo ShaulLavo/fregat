@@ -1,8 +1,12 @@
+import { persistedAttachmentDraftSchema } from './attachment-draft'
 import { readWorkspaceCacheEntry, writeWorkspaceCacheEntry } from '@/lib/workspace-cache-storage'
 import type { ScopedStorage } from '@/lib/environments/state/scoped-storage'
 import type { EnvironmentId } from '@workspace/contracts'
 import {
   interactionModeSchema,
+  projectIdSchema,
+  worktreeIdSchema,
+  sessionWorktreeTargetSchema,
   modelSelectionSchema,
   runtimeModeSchema,
   trimmedNonEmptyStringSchema,
@@ -17,7 +21,7 @@ const CHAT_INPUT_DRAFT_STORAGE_VERSION = 2
  * rebuild both the composer chip and the `<terminal_context>` block it sends.
  */
 const lineNumberSchema = v.pipe(v.number(), v.integer(), v.minValue(1))
-const persistedTerminalContextSchema = v.object({
+export const persistedTerminalContextSchema = v.object({
   id: trimmedNonEmptyStringSchema,
   lineEnd: lineNumberSchema,
   lineStart: lineNumberSchema,
@@ -25,13 +29,31 @@ const persistedTerminalContextSchema = v.object({
   text: trimmedNonEmptyStringSchema,
 })
 
-// Image attachments are deliberately absent: a draft is text-sized state, and a
-// couple of pasted screenshots serialize to megabytes of base64 that blow the
-// ~5 MB localStorage quota. The failed write took the whole text draft with it,
-// so image bytes stay in memory only and stored attachments are not restored.
-// `v.object` ignores unknown entries, so drafts written by the old schema still
-// parse — their `images` array is stripped instead of rehydrated.
+export const composedMessageSchema = v.object({
+  prompt: v.string(),
+  attachments: v.array(persistedAttachmentDraftSchema),
+  terminalContexts: v.array(persistedTerminalContextSchema),
+})
+export const promptStashEntrySchema = v.object({
+  ...composedMessageSchema.entries,
+  createdAt: v.string(),
+  id: trimmedNonEmptyStringSchema,
+})
+export type PromptStashEntry = v.InferOutput<typeof promptStashEntrySchema>
+
+export const draftIdentitySchema = v.object({
+  id: v.pipe(v.string(), v.uuid()),
+  projectId: projectIdSchema,
+  rootPath: v.string(),
+  baseWorktreeId: worktreeIdSchema,
+  worktreeTarget: sessionWorktreeTargetSchema,
+  createdAt: v.string(),
+})
+export type DraftIdentity = v.InferOutput<typeof draftIdentitySchema>
+
 const persistedChatInputDraftSchema = v.object({
+  identity: v.optional(v.nullable(draftIdentitySchema), null),
+  attachments: v.optional(v.array(persistedAttachmentDraftSchema), []),
   interactionMode: v.optional(v.nullable(interactionModeSchema), null),
   modelSelection: v.optional(v.nullable(modelSelectionSchema), null),
   prompt: v.optional(v.string(), ''),
@@ -41,6 +63,7 @@ const persistedChatInputDraftSchema = v.object({
 })
 
 const persistedChatInputDraftStorageSchema = v.object({
+  stashEntries: v.optional(v.array(promptStashEntrySchema), []),
   draftsByKey: v.record(v.string(), persistedChatInputDraftSchema),
   version: v.literal(CHAT_INPUT_DRAFT_STORAGE_VERSION),
 })
@@ -80,6 +103,7 @@ export function writePersistedChatInputDrafts(
 
 export function emptyPersistedChatInputDrafts(): PersistedChatInputDraftStorage {
   return {
+    stashEntries: [],
     draftsByKey: {},
     version: CHAT_INPUT_DRAFT_STORAGE_VERSION,
   }

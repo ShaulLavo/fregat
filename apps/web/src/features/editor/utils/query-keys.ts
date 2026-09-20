@@ -11,6 +11,7 @@ export type LanguageServerMatchConfigurationSnapshot = {
 }
 
 export const editorQueryKeys = {
+  storedHistory: (id: string) => ['editor', 'stored-history', id] as const,
   languageServerMatches: (
     rootPath: string,
     matchPath: string,

@@ -1,3 +1,5 @@
+import { FileIcon } from '@phosphor-icons/react'
+import { ChatFilePreview } from './chat-file-preview'
 import { useQueryClient } from '@tanstack/react-query'
 import { originForQueryClient } from '@/lib/environments/state/query-clients'
 import { serverEndpoint } from '@/lib/client'
@@ -27,6 +29,7 @@ export function ChatAttachmentThumbnails({
   const environment = useEnvironmentsStore((state) => state.entries[owner])
   const origin = serverEndpoint(environment?.origin ?? owner)
   const [openIndex, setOpenIndex] = useState<number | null>(null)
+  const [openFile, setOpenFile] = useState<Extract<ChatAttachment, { type: 'file' }> | null>(null)
   if (attachments.length === 0) return null
 
   const images = chatAttachmentImages(attachments, origin)
@@ -60,6 +63,23 @@ export function ChatAttachmentThumbnails({
           <TooltipContent>Open {image.name}</TooltipContent>
         </Tooltip>
       ))}
+      {attachments
+        .filter((attachment) => attachment.type === 'file')
+        .map((attachment) => (
+          <Button
+            key={attachment.id}
+            size='sm'
+            variant='outline'
+            title={attachment.name}
+            onClick={() => setOpenFile(attachment)}
+          >
+            <FileIcon className='size-(--icon-size-sm)' />
+            <span className='max-w-56 truncate'>{attachment.name}</span>
+          </Button>
+        ))}
+      {openFile && (
+        <ChatFilePreview attachment={openFile} origin={origin} onClose={() => setOpenFile(null)} />
+      )}
       {unrenderable.map((attachment) => (
         <span
           className='bg-muted text-muted-foreground text-3xs rounded-md px-1.5 py-0.5'

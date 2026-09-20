@@ -7,11 +7,13 @@ export function SessionRailEmpty({
   query,
   ready,
   searching,
+  incompleteSearch,
   view,
 }: {
   readonly query: string
   readonly ready: boolean
   readonly searching: boolean
+  readonly incompleteSearch: boolean
   readonly view: SessionRailView
 }) {
   if (searching || !ready) {
@@ -22,6 +24,8 @@ export function SessionRailEmpty({
       </LoadingState>
     )
   }
+  if (query.trim() && incompleteSearch)
+    return <EmptyState align='start' title='Search is incomplete.' />
   if (query.trim())
     return <EmptyState align='start' title={`No sessions match “${query.trim()}”.`} />
   return (

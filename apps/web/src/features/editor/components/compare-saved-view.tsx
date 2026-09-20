@@ -12,7 +12,7 @@ import { useEditorDocumentState } from '@/features/editor/state/document-state'
 import type { DiffLanguageHost } from '@/features/editor/utils/diff-language-context'
 import { useSelectedFile } from '@/features/workspace/hooks/use-selected-file'
 import { languageIdForFilePath } from '@/features/editor/utils/file-path'
-import { useSettingValue } from '@/features/settings/hooks/use-setting-value'
+import { useSettingValue } from '@/hooks/use-setting-value'
 
 /**
  * Diffs the active buffer against the file on disk — VS Code's "Compare Active File with Saved".

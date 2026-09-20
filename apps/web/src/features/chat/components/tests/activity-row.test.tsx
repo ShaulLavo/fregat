@@ -209,3 +209,45 @@ test('historical commands show their actual invocation and an expandable process
   expect(screen.getByLabelText('Result')).toHaveTextContent('Exit code 0')
   expect(screen.getByLabelText('Result')).toHaveTextContent('No such file or directory')
 })
+
+test('native answer history preserves question order, nested choices and file references', async () => {
+  resetExpansion()
+  const activity = sessionActivity({
+    kind: 'user-input.answer-submitted',
+    summary: 'Answers submitted',
+    payload: {
+      requestId: 'native-question',
+      answers: { scope: { answers: ['Repository', 'Tests'] }, details: 'Use the attached spec.' },
+      questionTextById: {
+        scope: 'Which scope?',
+        details: 'Any constraints?',
+        file: 'Provide a spec',
+      },
+      attachmentsByQuestionId: {
+        file: [
+          {
+            type: 'file',
+            id: 'history-file',
+            name: 'spec.pdf',
+            mimeType: 'application/pdf',
+            sizeBytes: 40,
+          },
+        ],
+      },
+      detail: 'Answers recorded',
+    },
+  })
+  const row = chatWorkLogEntries({ activities: [activity] })[0]!
+  renderWithProviders(<ActivityRow activity={row} />)
+  expect(screen.queryByText('Which scope?')).toBeNull()
+  await userEvent.click(screen.getByRole('button', { name: 'Answers submitted' }))
+  expect(screen.getByText('Repository, Tests')).toBeVisible()
+  expect(screen.getByText('Use the attached spec.')).toBeVisible()
+  expect(screen.getByText('Provide a spec')).toBeVisible()
+  await userEvent.click(screen.getByRole('button', { name: 'spec.pdf' }))
+  expect(screen.getByRole('dialog', { name: 'spec.pdf' })).toBeVisible()
+  expect(screen.getByRole('link', { name: 'Download spec.pdf' })).toHaveAttribute(
+    'download',
+    'spec.pdf',
+  )
+})

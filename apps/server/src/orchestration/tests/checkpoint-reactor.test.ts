@@ -1,3 +1,4 @@
+import { createInternalError } from '../../observability/structured-errors'
 import { OrchestrationSnapshotQuery } from '../snapshot-query'
 import { mkdir, mkdtemp, readFile, rm, writeFile } from 'node:fs/promises'
 import { tmpdir } from 'node:os'
@@ -20,7 +21,7 @@ import { migratePlatformDatabase as migrateOrchestrationDatabase } from '../../d
 import { DEFAULT_MAX_TEXT_FILE_BYTES } from '../../fs/limits'
 import { createWorkspacePaths } from '../../fs/path'
 import { GitService } from '../../git/service'
-import { MockProviderAdapter } from '../../provider/adapters/mock'
+import { MockProviderAdapter, MOCK_ADAPTER_CAPABILITIES } from '../../provider/adapters/mock'
 import { ProviderAdapterRegistry } from '../../provider/provider-adapter-registry'
 import type { ProviderRuntimeEvent } from '../../provider/types'
 import { CheckpointReactor } from '../checkpoint-reactor'
@@ -202,10 +203,247 @@ describe('checkpoint reactor', () => {
     fixture.close()
   })
 
-  it('reverts the worktree to a captured turn and leaves the git index clean', async () => {
+  it('rewinds conversation only without changing shared checkout bytes or index', async () => {
     const fixture = createFixture()
     const root = await gitFixtureRoot()
     await commitFile(root, 'app.txt', 'base\n')
+    const adapter = new MockProviderAdapter({
+      beforeComplete: () => writeFile(path.join(root, 'app.txt'), 'agent\n'),
+    })
+    const engine = checkpointEngine(fixture, root, adapter)
+    await runTurn(engine, root)
+    await writeFile(path.join(root, 'app.txt'), 'staged\n')
+    await runGit(root, ['add', 'app.txt'])
+    await writeFile(path.join(root, 'app.txt'), 'unstaged\n')
+    await writeFile(path.join(root, 'untracked.txt'), 'preserve\n')
+    const beforeIndex = await gitShow(root, ':app.txt')
+    await engine.dispatch(
+      command({
+        type: 'session.checkpoint.revert',
+        commandId: 'conversation-only',
+        sessionId,
+        turnCount: 0,
+        restoreFiles: false,
+      }),
+    )
+    await engine.providerRuntimeIdle()
+    expect(await readFile(path.join(root, 'app.txt'), 'utf8')).toBe('unstaged\n')
+    expect(await readFile(path.join(root, 'untracked.txt'), 'utf8')).toBe('preserve\n')
+    expect(await gitShow(root, ':app.txt')).toBe(beforeIndex)
+    expect(adapter.rollbacks).toEqual([{ sessionId, numTurns: 1 }])
+    expect((await engine.readModelSnapshot()).sessions.get(sessionId)?.messages).toEqual([])
+    fixture.close()
+  })
+
+  it('refuses shared-checkout file restore before changing files or provider history', async () => {
+    const fixture = createFixture()
+    const root = await gitFixtureRoot()
+    await commitFile(root, 'app.txt', 'base\n')
+    const adapter = new MockProviderAdapter({
+      beforeComplete: () => writeFile(path.join(root, 'app.txt'), 'agent\n'),
+    })
+    const engine = checkpointEngine(fixture, root, adapter)
+    await runTurn(engine, root)
+    const before = (await engine.readModelSnapshot()).sessions.get(sessionId)?.messages
+    await engine.dispatch(
+      command({
+        type: 'session.checkpoint.revert',
+        commandId: 'shared-restore',
+        sessionId,
+        turnCount: 0,
+        restoreFiles: true,
+      }),
+    )
+    await engine.providerRuntimeIdle()
+    expect(await readFile(path.join(root, 'app.txt'), 'utf8')).toBe('agent\n')
+    expect(adapter.rollbacks).toEqual([])
+    expect((await engine.readModelSnapshot()).sessions.get(sessionId)?.messages).toEqual(before)
+    expect(await gitRefExists(root, checkpointRefForSessionTurn(sessionId, 1))).toBe(true)
+    fixture.close()
+  })
+
+  it.each(['unsupported', 'missing-runtime'] as const)(
+    'rejects %s rollback before changing files or history',
+    async (failure) => {
+      const fixture = createFixture()
+      const root = await gitFixtureRoot()
+      await commitFile(root, 'app.txt', 'base\n')
+      class UnsupportedRollbackAdapter extends MockProviderAdapter {
+        override readonly capabilities = {
+          ...MOCK_ADAPTER_CAPABILITIES,
+          conversationRollback: false,
+        }
+      }
+      const adapter =
+        failure === 'unsupported' ? new UnsupportedRollbackAdapter() : new MockProviderAdapter()
+      const engine = checkpointEngine(fixture, root, adapter)
+      await runTurn(engine, root)
+      if (failure === 'missing-runtime') await adapter.stopRuntime({ sessionId })
+      await writeFile(path.join(root, 'app.txt'), 'local edit\n')
+      await runGit(root, ['add', 'app.txt'])
+      const before = await engine.sessionDetailSnapshot(sessionId)
+      await engine.dispatch(
+        command({
+          type: 'session.checkpoint.revert',
+          commandId: 'revert-rejected',
+          createdAt: later,
+          sessionId,
+          turnCount: 0,
+          restoreFiles: true,
+        }),
+      )
+      await engine.providerRuntimeIdle()
+      expect(await readFile(path.join(root, 'app.txt'), 'utf8')).toBe('local edit\n')
+      expect(await gitShow(root, ':app.txt')).toBe('local edit\n')
+      expect(adapter.rollbacks).toEqual([])
+      const after = await engine.sessionDetailSnapshot(sessionId)
+      expect(after.session.messages).toEqual(before.session.messages)
+      expect(after.session.activities).toContainEqual(
+        expect.objectContaining({
+          kind: 'checkpoint.revert.failed',
+          payload: expect.objectContaining({
+            detail: expect.stringMatching(
+              failure === 'unsupported' ? /cannot rewind/i : /runtime/i,
+            ),
+          }),
+        }),
+      )
+      fixture.close()
+    },
+  )
+
+  it.each([false, true])(
+    'rejects file restore when another session shares a linked checkout, archived=%s',
+    async (archived) => {
+      const fixture = createFixture()
+      const root = await linkedGitFixtureRoot()
+      const adapter = new MockProviderAdapter()
+      const engine = checkpointEngine(fixture, root, adapter)
+      await runTurn(engine, root, undefined, 'linked')
+      const other = '00000000-0000-4000-8000-000000000002'
+      await engine.dispatch(
+        command({
+          type: 'session.create',
+          commandId: 'create-other',
+          createdAt: now,
+          sessionId: other,
+          title: 'Other session',
+          modelSelection,
+          worktreeTarget: { kind: 'current', worktreeId: '20000000-0000-4000-8000-000000000001' },
+        }),
+      )
+      if (archived)
+        await engine.dispatch(
+          command({
+            type: 'session.archive',
+            commandId: 'archive-other',
+            createdAt: later,
+            sessionId: other,
+          }),
+        )
+      await writeFile(path.join(root, 'app.txt'), 'other session edit\n')
+      await engine.dispatch(
+        command({
+          type: 'session.checkpoint.revert',
+          commandId: 'reject-shared-linked',
+          createdAt: later,
+          sessionId,
+          turnCount: 0,
+          restoreFiles: true,
+        }),
+      )
+      await engine.providerRuntimeIdle()
+      expect(await readFile(path.join(root, 'app.txt'), 'utf8')).toBe('other session edit\n')
+      expect(adapter.rollbacks).toEqual([])
+      expect((await engine.readModelSnapshot()).sessions.get(sessionId)?.activities).toContainEqual(
+        expect.objectContaining({ kind: 'checkpoint.revert.failed' }),
+      )
+      fixture.close()
+    },
+  )
+
+  it('preserves files and index when native rewind preparation cannot find the boundary', async () => {
+    const fixture = createFixture()
+    const root = await linkedGitFixtureRoot()
+    class MissingBoundaryAdapter extends MockProviderAdapter {
+      override async prepareRollbackSession(): Promise<() => Promise<void>> {
+        throw createInternalError('Native rewind boundary is unavailable.')
+      }
+    }
+    const adapter = new MissingBoundaryAdapter()
+    const engine = checkpointEngine(fixture, root, adapter)
+    await runTurn(engine, root, undefined, 'linked')
+    await writeFile(path.join(root, 'app.txt'), 'staged edit\n')
+    await runGit(root, ['add', 'app.txt'])
+    await writeFile(path.join(root, 'app.txt'), 'unstaged edit\n')
+    const before = await engine.sessionDetailSnapshot(sessionId)
+    await engine.dispatch(
+      command({
+        type: 'session.checkpoint.revert',
+        commandId: 'missing-boundary',
+        createdAt: later,
+        sessionId,
+        turnCount: 0,
+        restoreFiles: true,
+      }),
+    )
+    await engine.providerRuntimeIdle()
+    expect(await readFile(path.join(root, 'app.txt'), 'utf8')).toBe('unstaged edit\n')
+    expect(await gitShow(root, ':app.txt')).toBe('staged edit\n')
+    expect(adapter.rollbacks).toEqual([])
+    const after = await engine.sessionDetailSnapshot(sessionId)
+    expect(after.session.messages).toEqual(before.session.messages)
+    expect(after.session.activities).toContainEqual(
+      expect.objectContaining({ kind: 'checkpoint.revert.failed' }),
+    )
+    expect(await gitRefExists(root, checkpointRefForSessionTurn(sessionId, 1))).toBe(true)
+    fixture.close()
+  })
+
+  it.each([false, true])(
+    'reports provider rejection after preflight without pruning history, restoreFiles=%s',
+    async (restoreFiles) => {
+      const fixture = createFixture()
+      const root = await linkedGitFixtureRoot()
+      class RejectingRollbackAdapter extends MockProviderAdapter {
+        override async prepareRollbackSession() {
+          return async () => {
+            throw createInternalError('Native rewind rejected after preflight.')
+          }
+        }
+      }
+      const engine = checkpointEngine(fixture, root, new RejectingRollbackAdapter())
+      await runTurn(engine, root, undefined, 'linked')
+      await writeFile(path.join(root, 'app.txt'), 'developer edit\n')
+      const before = await engine.sessionDetailSnapshot(sessionId)
+      await engine.dispatch(
+        command({
+          type: 'session.checkpoint.revert',
+          commandId: 'native-reject',
+          createdAt: later,
+          sessionId,
+          turnCount: 0,
+          restoreFiles,
+        }),
+      )
+      await engine.providerRuntimeIdle()
+      expect((await engine.sessionDetailSnapshot(sessionId)).session.messages).toEqual(
+        before.session.messages,
+      )
+      expect(await readFile(path.join(root, 'app.txt'), 'utf8')).toBe(
+        restoreFiles ? 'base\n' : 'developer edit\n',
+      )
+      expect(await gitRefExists(root, checkpointRefForSessionTurn(sessionId, 1))).toBe(true)
+      expect((await engine.readModelSnapshot()).sessions.get(sessionId)?.activities).toContainEqual(
+        expect.objectContaining({ kind: 'checkpoint.revert.failed' }),
+      )
+      fixture.close()
+    },
+  )
+
+  it('reverts the worktree to a captured turn and leaves the git index clean', async () => {
+    const fixture = createFixture()
+    const root = await linkedGitFixtureRoot()
     let turnContent = 'one\n'
     const adapter = new MockProviderAdapter({
       beforeComplete: async () => {
@@ -215,7 +453,7 @@ describe('checkpoint reactor', () => {
     })
     const engine = checkpointEngine(fixture, root, adapter)
 
-    await runTurn(engine, root)
+    await runTurn(engine, root, undefined, 'linked')
     turnContent = 'two\n'
     await runTurn(engine, root, {
       commandId: 'cmd-turn-2-start',
@@ -229,10 +467,16 @@ describe('checkpoint reactor', () => {
         sessionId,
         turnCount: 1,
         type: 'session.checkpoint.revert',
+        restoreFiles: true,
       }),
     )
     await engine.providerRuntimeIdle()
 
+    expect(
+      (await engine.readModelSnapshot()).sessions
+        .get(sessionId)
+        ?.activities.filter((activity) => activity.kind === 'checkpoint.revert.failed'),
+    ).toEqual([])
     expect(await readFile(path.join(root, 'app.txt'), 'utf8')).toBe('one\n')
     expect(await gitRefExists(root, checkpointRefForSessionTurn(sessionId, 2))).toBe(false)
     expect(await stagedStatusEntries(root)).toEqual([])
@@ -278,8 +522,9 @@ async function runTurn(
     messageId: 'message-1',
     turnId: 'turn-1',
   },
+  worktreeKind: 'current' | 'linked' = 'current',
 ) {
-  if (turn.turnId === 'turn-1') await dispatchSession(engine, workspaceRoot)
+  if (turn.turnId === 'turn-1') await dispatchSession(engine, workspaceRoot, worktreeKind)
 
   await engine.dispatch(turnStartCommand(turn))
   await engine.providerRuntimeIdle()
@@ -292,18 +537,26 @@ async function dispatchSessionWithTurn(engine: OrchestrationEngine, workspaceRoo
   )
 }
 
-async function dispatchSession(engine: OrchestrationEngine, workspaceRoot: string) {
+async function dispatchSession(
+  engine: OrchestrationEngine,
+  workspaceRoot: string,
+  kind: 'current' | 'linked' = 'current',
+) {
+  const currentId =
+    kind === 'linked'
+      ? '20000000-0000-4000-8000-000000000002'
+      : '20000000-0000-4000-8000-000000000001'
   await engine.dispatch(
     command({
-      worktreeId: '20000000-0000-4000-8000-000000000001',
+      worktreeId: currentId,
       repositoryKey: 'fixture-repository',
       repositoryKind: 'directory',
       repositoryIdentity: { source: 'path', canonical: workspaceRoot },
-      canonicalPath: workspaceRoot,
+      canonicalPath: kind === 'linked' ? path.dirname(workspaceRoot) : workspaceRoot,
       path: workspaceRoot,
       branch: null,
       registrationGeneration: 0,
-      kind: 'current',
+      kind,
       ownership: 'protected',
       updatedAt: '2026-05-24T00:00:00.000Z',
       intentFingerprint: 'fixture-intent',
@@ -316,6 +569,23 @@ async function dispatchSession(engine: OrchestrationEngine, workspaceRoot: strin
       workspaceRoot,
     }),
   )
+  if (kind === 'linked')
+    await engine.dispatch(
+      command({
+        type: 'worktree.register',
+        commandId: 'cmd-linked-register',
+        createdAt: now,
+        worktreeId: '20000000-0000-4000-8000-000000000001',
+        projectId: '10000000-0000-4000-8000-000000000001',
+        canonicalPath: workspaceRoot,
+        path: workspaceRoot,
+        branch: null,
+        kind: 'linked',
+        ownership: 'external',
+        registrationGeneration: 0,
+        updatedAt: now,
+      }),
+    )
   await engine.dispatch(
     command({
       worktreeTarget: { kind: 'current', worktreeId: '20000000-0000-4000-8000-000000000001' },
@@ -438,6 +708,14 @@ async function gitFixtureRoot() {
   await runGit(root, ['config', 'user.name', 'Test User'])
 
   return root
+}
+
+async function linkedGitFixtureRoot() {
+  const root = await gitFixtureRoot()
+  await commitFile(root, 'app.txt', 'base\n')
+  const linked = path.join(await fixtureRoot(), 'isolated')
+  await runGit(root, ['worktree', 'add', '--detach', linked])
+  return linked
 }
 
 async function commitFile(root: string, file: string, content: string) {

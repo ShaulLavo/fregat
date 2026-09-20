@@ -32,6 +32,7 @@ async function main() {
     origin: options.origin,
     headers: () => ({ origin: TUI_CLIENT_ORIGIN, 'x-client-instance': instanceId }),
   })
+
   const session = createSettingsSession({
     origin: options.origin,
     client,

@@ -1,0 +1,13 @@
+# Recoverable meaningful drafts
+
+Drafts now have distinct IDs, owner-scoped persisted content and identity metadata, including project, original root, base worktree, requested worktree target and creation time. Explicit New session creates a new ID; opening a recoverable row uses its existing ID. The address retains that identity across reload and history navigation. Main and sidebar composers use the same stored identity. The empty automatic composer initializes one named draft when its project becomes available.
+
+The rail lists drafts with text, attachments (including unfinished uploads), or terminal context. Empty drafts remain hidden. Rows follow project, machine and search filters and creation order. A current draft's row keeps its entry snapshot; new content does not appear in the rail until leaving that draft. Stash entries remain separate.
+
+Opening a row checks the exact owner, project, base worktree and root. Missing worktrees produce an unavailable result, not a fallback checkout. Discard writes the composition document before removing the row and releases only uploads unused by remaining drafts or stash entries. Successful submission clears the draft identity after admission.
+
+Focused checks cover distinct address identities and back navigation, missing-worktree refusal, persisted new-worktree target, meaningful pending attachments, reload/discard and preservation of stash transfers. The live `draft-recovery` scenario passed on release `20260920T161132Z-b915d3e0-plan126-draft-recovery`. This closes the draft-recovery part of LIFE-12, not orphaned-worktree cleanup or session-owned terminal deletion.
+
+Live evidence: `/work/tmp/fregat-evidence/20260920T161205Z-scenario-draft-recovery/`. All three screenshots were inspected: the initial meaningful draft stays out of the rail until leaving; reload preserves distinct drafts; opening restores the first prompt, uploaded text file and requested new-worktree target; discarding it preserves the second draft. The scenario removed its drafts and issued upload DELETE in finally. Upload `upload-c8ea8e30-8a82-4ebd-871c-502415dec8c2` has no remaining blob or manifest files. No sessions, worktrees, providers or settings were created or changed. The structured log window has no warnings or errors; browser warnings were adapter availability and GPU readback.
+
+Earlier live runs exposed missing option semantics and missing pointer activation on draft rows. Both were fixed before this passing release. The focused rail regression verifies pointer opening, keyboard Enter opening and discard without changing the surviving selection.

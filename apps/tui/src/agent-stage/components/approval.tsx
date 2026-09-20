@@ -6,12 +6,6 @@ import { Select } from '@/components/select'
 import { OrbitLoader } from '@/components/orbit-loader'
 import type { Theme } from '@/theme/utils/theme'
 
-const choices: readonly { label: string; value: ProviderApprovalDecision }[] = [
-  { label: '1 Allow once', value: 'accept' },
-  { label: '2 Allow for this session', value: 'acceptForSession' },
-  { label: '3 Decline', value: 'decline' },
-  { label: '4 Cancel turn', value: 'cancel' },
-]
 export function Approval({
   request,
   theme,
@@ -25,6 +19,10 @@ export function Approval({
   readonly busy: boolean
   readonly onRespond: (decision: ProviderApprovalDecision) => void
 }) {
+  const choices = request.options.map((option, index) => ({
+    label: `${index + 1} ${option.label}`,
+    value: option.decision,
+  }))
   const focused = usePaneFocus({ id: 'agent-approval', area: 'chat', enabled: enabled && !busy })
   useKeyboard((event) => {
     if (!focused || event.defaultPrevented || event.ctrl || event.meta) return
@@ -50,7 +48,8 @@ export function Approval({
         <Select
           id='agent-approval'
           focused={focused}
-          height={4}
+          height={choices.length}
+          showDescription={false}
           textColor={theme.foreground}
           selectedTextColor={theme.primaryForeground}
           selectedBackgroundColor={theme.primary}

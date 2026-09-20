@@ -121,6 +121,8 @@ export class OrchestrationCommandReceipts {
  */
 export function isDurableCommandRejection(error: unknown) {
   if (!isEvlogError(error)) return false
+  // Rewind admission is transient; its rejected command identity remains retryable.
+  if (error.code === 'orchestration.SESSION_REWIND_PENDING') return false
 
   return error.status >= 400 && error.status < 500
 }
@@ -173,7 +175,11 @@ export function commandAggregate(command: ReceiptCommand) {
     case 'session.message.assistant.complete':
     case 'session.message.assistant.delta':
     case 'session.meta.update':
+    case 'session.title.generate.complete':
+    case 'session.title.refine':
+    case 'session.title.regeneration.complete':
     case 'session.pin':
+    case 'session.active.reorder':
     case 'session.pin.reorder':
     case 'session.proposed-plan.upsert':
     case 'session.provider-start.adopt':
@@ -195,6 +201,7 @@ export function commandAggregate(command: ReceiptCommand) {
     case 'session.unsettle':
     case 'session.unsnooze':
     case 'session.user-input.respond':
+    case 'session.user-input.dismiss':
       return { id: command.sessionId, kind: 'session' as const }
     default: {
       const exhaustive: never = command

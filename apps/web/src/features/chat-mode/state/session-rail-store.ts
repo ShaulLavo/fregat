@@ -1,6 +1,6 @@
 import { useChatProjectionStore } from '@/features/chat/state/chat-projection-store'
 import type { ScopedStorage } from '@/lib/environments/state/scoped-storage'
-import type { EnvironmentId, ProjectId, ScopedSessionRef } from '@workspace/contracts'
+import type { EnvironmentId, ScopedSessionRef } from '@workspace/contracts'
 import { create } from 'zustand'
 
 import {
@@ -17,7 +17,7 @@ type SessionRenameTarget = {
   readonly ref: ScopedSessionRef
 }
 
-const NO_PROJECT_IDS: readonly ProjectId[] = []
+const NO_PROJECT_IDS: readonly string[] = []
 
 /**
  * How the session list is currently being looked at: which projects, which text, the
@@ -29,7 +29,7 @@ const NO_PROJECT_IDS: readonly ProjectId[] = []
  * chat mode, with no React context of the rail's to read.
  */
 type SessionRailStore = {
-  readonly collapsedProjectIds: readonly ProjectId[]
+  readonly collapsedProjectIds: readonly string[]
   readonly query: string
   readonly renaming: SessionRenameTarget | null
   readonly scope: SessionRailScope
@@ -41,7 +41,7 @@ type SessionRailStore = {
   readonly setMachineFilter: (machineFilter: EnvironmentId | null) => void
   readonly setView: (view: SessionRailView) => void
   readonly startRename: (target: SessionRenameTarget) => void
-  readonly toggleProjectCollapsed: (projectId: ProjectId) => void
+  readonly toggleProjectCollapsed: (projectKeys: readonly string[]) => void
 }
 
 const collapseStorage = new Map<EnvironmentId, ScopedStorage>()
@@ -54,13 +54,15 @@ export function hydrateSessionRailCollapse(storage: ScopedStorage) {
   }))
 }
 
-function persistRailCollapse(collapsedProjectIds: readonly ProjectId[]) {
+function persistRailCollapse(collapsedProjectIds: readonly string[]) {
   const slices = useChatProjectionStore.getState().slices
   for (const storage of collapseStorage.values()) {
     const projects = slices[storage.environmentId]?.projectById ?? {}
     writePersistedRailCollapse(
       storage,
-      collapsedProjectIds.filter((id) => projects[id] !== undefined),
+      collapsedProjectIds.filter((key) =>
+        Object.keys(projects).some((id) => key === `${storage.environmentId}:${id}`),
+      ),
     )
   }
 }
@@ -81,9 +83,9 @@ export const useSessionRailStore = create<SessionRailStore>()((set) => ({
   setMachineFilter: (machineFilter) => set({ machineFilter }),
   setView: (view) => set({ view }),
   startRename: (renaming) => set({ renaming }),
-  toggleProjectCollapsed: (projectId) =>
+  toggleProjectCollapsed: (projectKeys) =>
     set((state) => {
-      const collapsedProjectIds = toggledProjectIds(state.collapsedProjectIds, projectId)
+      const collapsedProjectIds = toggledProjectIds(state.collapsedProjectIds, projectKeys)
       // Written on the click rather than debounced: a collapse is one rare
       // deliberate act, not a keystroke stream, and a reload right after it is
       // exactly when the user notices it did not stick.
@@ -94,8 +96,8 @@ export const useSessionRailStore = create<SessionRailStore>()((set) => ({
   view: 'active',
 }))
 
-function toggledProjectIds(projectIds: readonly ProjectId[], projectId: ProjectId) {
-  if (!projectIds.includes(projectId)) return [...projectIds, projectId]
-
-  return projectIds.filter((candidate) => candidate !== projectId)
+function toggledProjectIds(projectIds: readonly string[], projectKeys: readonly string[]) {
+  if (projectKeys.every((key) => projectIds.includes(key)))
+    return projectIds.filter((candidate) => !projectKeys.includes(candidate))
+  return [...new Set([...projectIds, ...projectKeys])]
 }

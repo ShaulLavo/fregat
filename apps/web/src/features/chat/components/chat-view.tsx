@@ -14,7 +14,6 @@ import { useCallback, useEffect, useMemo, useState } from 'react'
 import { notifyChatCommandError } from '@/features/chat/notify-command-error'
 import type { ChatTransport } from '@/features/chat/transport/chat-transport'
 import {
-  createCheckpointRevertCommand,
   createProjectDefaultModelCommand,
   createSessionInterruptCommand,
   createTurnSubmission,
@@ -41,6 +40,8 @@ import { ChatPendingRequestsProvider } from '../providers/pending-requests-provi
 import { ChatPlanFollowUpProvider } from '../providers/plan-follow-up-provider'
 import { ChatTimelineActionsProvider } from '../providers/timeline-actions-provider'
 import type { ChatInputDraftTarget } from '../state/chat-input-draft-store'
+import { useCheckpointRewind } from '@/features/chat/hooks/use-checkpoint-rewind'
+import { errorMessage } from '@/lib/error-message'
 
 export function ChatView({
   activeSessionId,
@@ -72,8 +73,12 @@ export function ChatView({
   const optimisticMessages = useOptimisticMessages(transport.environmentId, activeSessionId)
   const [sendError, setSendError] = useState<string | null>(null)
   const [interruptCommand, setInterruptCommand] = useState<SessionTurnInterruptCommand | null>(null)
-  const [revertingCheckpoint, setRevertingCheckpoint] = useState(false)
-  const [pendingCheckpoint, setPendingCheckpoint] = useState<number | null>(null)
+  const rewind = useCheckpointRewind(transport, activeSessionId)
+  const revertingCheckpoint = rewind.isPending
+  const [pendingCheckpoint, setPendingCheckpoint] = useState<{
+    turnCount: number
+    messageId: string
+  } | null>(null)
   const [sending, setSending] = useState(false)
   const busy = isChatSessionBusy(session)
   const interruptFailure = sessionStopFailure(session, interruptCommand)
@@ -87,13 +92,13 @@ export function ChatView({
   const disabledReason = connection.kind === 'live' ? null : connection.label
   // Stable identity is required because this is part of the timeline action context value.
   const handleRevertToCheckpoint = useCallback(
-    (turnCount: number) => {
+    (turnCount: number, messageId: string) => {
       if (!session || revertingCheckpoint) return
       if (busy) {
         setSendError('Interrupt the current turn before reverting checkpoints.')
         return
       }
-      setPendingCheckpoint(turnCount)
+      setPendingCheckpoint({ turnCount, messageId })
     },
     [busy, revertingCheckpoint, session],
   )
@@ -154,27 +159,35 @@ export function ChatView({
     })
   }
 
-  async function handleConfirmRevert() {
+  function handleConfirmRevert(restoreFiles: boolean) {
     if (!session || pendingCheckpoint === null || busy || sending || revertingCheckpoint) return
-
-    const turnCount = pendingCheckpoint
-    setPendingCheckpoint(null)
-    await revertSessionToCheckpoint({
-      transport,
-      setRevertingCheckpoint,
-      setSendError,
-      session,
-      turnCount,
-    })
+    const message = session.messages.find((entry) => entry.id === pendingCheckpoint.messageId)
+    if (!message || message.role !== 'user') return
+    setSendError(null)
+    rewind.mutate(
+      {
+        message,
+        turnCount: pendingCheckpoint.turnCount,
+        restoreFiles,
+        target: { ...draftTarget, draftKey: session.id },
+      },
+      {
+        onSuccess: () => setPendingCheckpoint(null),
+        onError: (error) => setSendError(errorMessage(error, 'Could not rewind this session.')),
+      },
+    )
   }
 
   return (
     <section className='flex min-h-0 flex-1 flex-col'>
       <CheckpointRevertDialog
-        turnCount={pendingCheckpoint}
+        turnCount={pendingCheckpoint?.turnCount ?? null}
         disabled={busy || sending || revertingCheckpoint}
+        pending={revertingCheckpoint}
         onCancel={() => setPendingCheckpoint(null)}
-        onConfirm={() => void handleConfirmRevert()}
+        onConfirm={handleConfirmRevert}
+        canRestoreFiles={session.worktree.kind === 'linked'}
+        error={rewind.isError ? errorMessage(rewind.error, 'Could not rewind this session.') : null}
       />
       <ChatWorkspaceRootContext value={session.worktree}>
         <ChatTransportContext value={transport}>
@@ -359,38 +372,4 @@ async function dispatchSessionStop({
 
   setSendError(outcome.message)
   setInterruptCommand(null)
-}
-
-async function revertSessionToCheckpoint({
-  transport,
-  setRevertingCheckpoint,
-  setSendError,
-  session,
-  turnCount,
-}: {
-  transport: ChatTransport
-  setRevertingCheckpoint: (value: boolean) => void
-  setSendError: (value: string | null) => void
-  session: ChatSession
-  turnCount: number
-}) {
-  setRevertingCheckpoint(true)
-  setSendError(null)
-  const command = createCheckpointRevertCommand({ sessionId: session.id, turnCount })
-  try {
-    const outcome = await dispatchChatCommand({
-      action: 'chat.checkpoint_revert.dispatch.summary',
-      command,
-      dispatchCommand: transport.dispatchCommand,
-      onAccepted: (result) =>
-        scheduleSessionProjectionSyncAfterDispatch({
-          transport,
-          replayAfterSequence: replayAfterDispatch(command, result),
-          sessionId: session.id,
-        }),
-    })
-    if (!outcome.ok) setSendError(outcome.message)
-  } finally {
-    setRevertingCheckpoint(false)
-  }
 }

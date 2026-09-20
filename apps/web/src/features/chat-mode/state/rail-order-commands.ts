@@ -1,10 +1,22 @@
-import type { ClientOrchestrationCommand, SessionId } from '@workspace/contracts'
-import { dispatchCommandForEnvironment } from '@/features/chat/state/active-transports'
+import { scopedSessionKey } from '@workspace/contracts'
+import { planRailDrop, resolveRailDropTarget } from '@workspace/client-core/chat/rail/drop'
 import {
-  createProjectReorderCommand,
-  createSessionPlaceCommand,
-  createSessionReorderCommand,
-} from '@workspace/client-core/chat/commands'
+  railDropItems,
+  sessionDropPatch,
+  type SessionDropPatch,
+} from '@/features/chat-mode/utils/rail-drop'
+import {
+  canonicalShelf,
+  dropEntryAcknowledged,
+  dropEntryConflicts,
+} from '@/features/chat-mode/utils/rail-drop-state'
+import { railOrderErrors } from '@/features/chat-mode/utils/rail-order-errors'
+import { currentSessionLifecyclePolicy } from '@/features/chat-mode/state/session-lifecycle'
+import { useSessionSearchStore } from '@/features/chat-mode/state/session-search-store'
+import { readSettingsMirror } from '@/lib/settings-boot-mirror'
+import type { ClientOrchestrationCommand } from '@workspace/contracts'
+import { dispatchCommandForEnvironment } from '@/features/chat/state/active-transports'
+import { createProjectReorderCommand } from '@workspace/client-core/chat/commands'
 import { runIntent, type AcknowledgementSource } from '@workspace/client-core/optimistic/run'
 import { dispatchChatCommand } from '@/features/chat/utils/command-dispatch'
 import {
@@ -33,7 +45,7 @@ export function reorderRailProject({ activeId, overId }: Drop) {
   const model = railOrderModel()
   const active = model.groups.find((group) => group.key === activeId)?.project
   const over = model.groups.find((group) => group.key === overId)?.project
-  if (!active || !over) return
+  if (!active || !over || active.members.length !== 1 || over.members.length !== 1) return
   const intent = railReorderIntent({
     activeId: active.key,
     overId: over.key,
@@ -52,45 +64,121 @@ export function reorderRailProject({ activeId, overId }: Drop) {
 }
 
 export function reorderRailSession({ activeId, overId }: Drop) {
-  const sessions = railOrderModel().sessions
-  const active = sessions.find((session) => session.key === activeId)
-  const over = sessions.find((session) => session.key === overId)
-  if (
-    !active ||
-    !over ||
-    active.archived ||
-    active.environmentId !== over.environmentId ||
-    active.projectId !== over.projectId ||
-    active.status !== over.status
+  if (!overId) return
+  const environments = currentRailEnvironments()
+  const model = railOrderModel()
+  const active = model.sessions.find((session) => session.key === activeId)
+  if (!active || !active.canDrag || active.archived) return
+  const over = model.sessions.find((session) => session.key === overId)
+  if (over && over.projectGroupKey !== active.projectGroupKey) return
+  const visible = model.groups
+    .flatMap((group) => group.sessions)
+    .filter((session) => session.projectGroupKey === active.projectGroupKey)
+  const target = resolveRailDropTarget(railDropItems(visible), activeId, overId)
+  if (!target) return
+  const owner = environments.find(
+    (environment) => environment.environmentId === active.environmentId,
   )
-    return
-  const owned = sessions.filter(
-    (session) =>
-      session.environmentId === active.environmentId &&
-      session.projectId === active.projectId &&
-      session.status === active.status,
+  const policy = currentSessionLifecyclePolicy(active.ref)
+  if (target.section === 'settled' && (!policy.settlement || policy.settleBlocked)) return
+  if (target.section === 'pinned' && !policy.pinning) return
+  if (target.section === 'active' && !owner?.capabilities?.sessionActiveReorder) return
+  if (target.section === 'active' && active.pinnedAt && !policy.pinning) return
+  if (active.placement === 'snoozed' && !policy.snooze) return
+  const retained = environments.flatMap((environment) =>
+    environment.sessions.map((session) => ({
+      key: scopedSessionKey({ environmentId: environment.environmentId, sessionId: session.id }),
+      pinOrderKey: session.pinOrderKey,
+      activeOrderKey: session.activeOrderKey,
+    })),
   )
-  const intent = railReorderIntent({
-    activeId,
-    overId,
-    rows: owned.map((session) => ({ id: session.key, orderKey: session.pinOrderKey })),
+  const capable = (capability: 'sessionPinReorder' | 'sessionActiveReorder') =>
+    new Set(
+      visible
+        .filter((row) => {
+          const environment = environments.find(
+            (candidate) => candidate.environmentId === row.environmentId,
+          )
+          if (environment?.phase !== 'live' || !environment.capabilities?.[capability]) return false
+          return capability !== 'sessionPinReorder' || environment.capabilities.sessionPinning
+        })
+        .map((row) => row.key),
+    )
+  const plan = planRailDrop({
+    activeKey: activeId,
+    activeSection: active.placement,
+    activePinned: Boolean(active.pinnedAt),
+    activeSettled: active.settledOverride === 'settled',
+    supportsSettlement: policy.settlement,
+    target,
+    pinnedOrder: visible.filter((row) => row.placement === 'pinned').map((row) => row.key),
+    activeOrder: visible.filter((row) => row.placement === 'active').map((row) => row.key),
+    pinnedKeysById: new Map(retained.map((row) => [row.key, row.pinOrderKey])),
+    activeKeysById: new Map(retained.map((row) => [row.key, row.activeOrderKey])),
+    reorderableKeys: capable('sessionPinReorder'),
+    activeReorderableKeys: capable('sessionActiveReorder'),
   })
-  if (!intent) return
-
-  const ref = active.ref
-  void placeRailRow(
-    { kind: 'session', ref, orderKey: intent.orderKey },
-    sessionOrderCommand(ref.sessionId, intent.orderKey, active.pinOrderKey),
-    (state) =>
-      selectChatProjectionSlice(state, ref.environmentId).sessionById[ref.sessionId]?.pinOrderKey ??
-      null,
+  const patch = sessionDropPatch(
+    active,
+    plan,
+    new Map(model.sessions.map((row) => [row.key, row])),
+    new Date().toISOString(),
   )
+  if (!patch || !patch.commands.length) return
+  return performSessionDrop(patch)
 }
 
-function sessionOrderCommand(sessionId: SessionId, orderKey: string, current: string | null) {
-  return current
-    ? createSessionReorderCommand({ sessionId, orderKey })
-    : createSessionPlaceCommand({ sessionId, orderKey })
+function performSessionDrop(patch: SessionDropPatch) {
+  return runMutation(
+    queryClientFor(confirmedEnvironmentOrigin(patch.ref.environmentId)),
+    {
+      mutationKey: chatModeMutationKeys.railOrder(patch.ref.environmentId),
+      scope: { id: 'chat.rail.drop' },
+      mutationFn: async () => {
+        const abort = new AbortController()
+        const read = (ref: SessionDropPatch['ref']) =>
+          selectChatProjectionSlice(useChatProjectionStore.getState(), ref.environmentId)
+            .sessionById[ref.sessionId]
+        const unsubscribe = useChatProjectionStore.subscribe(() => {
+          if (patch.entries.some((entry) => dropEntryConflicts(patch, entry, read(entry.ref))))
+            abort.abort(railOrderErrors.DROP_CHANGED())
+        })
+        try {
+          return await runIntent(railOrderIntents, patch, {
+            resources: patch.entries.map((entry) => `session:${entry.key}`),
+            signal: abort.signal,
+            perform: async () => {
+              for (const step of patch.commands) {
+                abort.signal.throwIfAborted()
+                const outcome = await dispatchChatCommand({
+                  action: 'chat.rail.drop',
+                  command: step.command,
+                  dispatchCommand: (command) =>
+                    dispatchCommandForEnvironment(step.ref.environmentId, command),
+                })
+                if (!outcome.ok) throw outcome.error
+              }
+            },
+            until: {
+              subscribe: useChatProjectionStore.subscribe,
+              satisfied: () =>
+                patch.entries.every((entry) => dropEntryAcknowledged(entry, read(entry.ref))) &&
+                canonicalShelf(read(patch.ref)!) === patch.destination,
+            },
+            record: (event) =>
+              log[event.outcome === 'acknowledged' ? 'debug' : 'warn']({
+                action: 'chat.rail.drop.intent',
+                area: 'chat-rail',
+                ...event,
+              }),
+          })
+        } finally {
+          unsubscribe()
+        }
+      },
+    },
+    undefined,
+  )
 }
 
 type ProjectedOrderKey = (
@@ -104,7 +192,7 @@ type ProjectedOrderKey = (
  * catches up withdraws the placement.
  */
 function placeRailRow(
-  placement: RailPlacement,
+  placement: Extract<RailPlacement, { kind: 'project' }>,
   command: ClientOrchestrationCommand,
   projectedOrderKey: ProjectedOrderKey,
 ) {
@@ -145,7 +233,18 @@ function placeRailRow(
 }
 
 function railOrderModel() {
+  const settings = readSettingsMirror()
+  const rail = useSessionRailStore.getState()
+  const search = useSessionSearchStore.getState()
   return sessionRailModel({
+    query: rail.query,
+    scope: rail.scope,
+    collapsedProjectIds: rail.collapsedProjectIds,
+    searchMatches: search.matchedQuery === rail.query.trim() ? search.matchBySessionKey : {},
+    grouping: {
+      mode: settings['chat.projectGrouping'],
+      overrides: settings['chat.projectGroupingOverrides'],
+    },
     environments: currentRailEnvironments(),
     orderOverrides: railOrderOverrides(),
     machineFilter: useSessionRailStore.getState().machineFilter,

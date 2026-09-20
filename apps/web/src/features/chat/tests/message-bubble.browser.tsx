@@ -293,7 +293,7 @@ describe('MessageBubble browser rendering', () => {
     await vi.waitFor(() => expect(revertButton()).toBeVisible())
     revertButton().click()
     await vi.waitFor(() => {
-      expect(revertToCheckpoint).toHaveBeenCalledWith(2)
+      expect(revertToCheckpoint).toHaveBeenCalledWith(2, expect.any(String))
     })
   })
 })

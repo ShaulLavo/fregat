@@ -1,3 +1,5 @@
+import { createMetadataDatabase } from '../src/db/client'
+import { migratePlatformDatabase } from '../src/db/migrations'
 import { processExists } from './process-exists'
 import { shellQuote } from '../src/utils/shell'
 import { strict as assert } from 'node:assert'
@@ -180,8 +182,13 @@ async function main() {
   const base = existsSync('/work') ? '/work/tmp' : tmpdir()
   await mkdir(base, { recursive: true })
   const root = await mkdtemp(path.join(base, 'terminal-service-smoke-'))
+  const historyDatabase = createMetadataDatabase({
+    databasePath: path.join(root, 'history.sqlite'),
+  })
+  migratePlatformDatabase(historyDatabase.db)
   let endedLeases = 0
   const service = new TerminalService({
+    database: historyDatabase.db,
     paths: createWorkspacePaths(root),
     resolveWorktree: async () => root,
     env: { HOME: root, PATH: process.env.PATH, SHELL: '/bin/sh', TERM: 'xterm-256color' },
@@ -226,6 +233,7 @@ async function main() {
     )
   } finally {
     await service.dispose()
+    historyDatabase.close()
     await rm(root, { recursive: true, force: true })
   }
 }

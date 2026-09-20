@@ -1,3 +1,4 @@
+import { LiveStreamBudget, type RetainedLiveItem } from './live-stream-budget'
 import { errorMessage as reactorErrorMessage } from '@workspace/contracts'
 import { referencingSessionIds, worktreesAffectedByEvent } from './worktree-projection'
 import {
@@ -20,6 +21,7 @@ import { createShellRowReader, type OrchestrationShellRowReader } from './shell-
 
 export type OrchestrationStreamOptions = {
   afterSequence?: number
+  budget?: LiveStreamBudget
   signal?: AbortSignal
 }
 
@@ -108,6 +110,10 @@ export class OrchestrationStreamHub {
   private readonly subscribers = new Set<EventSubscriber>()
   private headSequence = 0
 
+  get subscriberCount() {
+    return this.subscribers.size
+  }
+
   publish(events: OrchestrationEvent[]) {
     if (events.length === 0) return
 
@@ -155,42 +161,42 @@ export class OrchestrationStreamHub {
     return { events, gap, kind: 'replay' }
   }
 
-  subscribe(signal?: AbortSignal): AsyncGenerator<OrchestrationEvent[]> {
-    const queue: OrchestrationEvent[][] = []
-    const waiters: Array<(value: IteratorResult<OrchestrationEvent[]>) => void> = []
+  subscribe(
+    budget: LiveStreamBudget,
+    signal?: AbortSignal,
+  ): AsyncGenerator<RetainedLiveItem<OrchestrationEvent>[]> {
+    const queue: RetainedLiveItem<OrchestrationEvent>[][] = []
+    const waiters: Array<(value: IteratorResult<RetainedLiveItem<OrchestrationEvent>[]>) => void> =
+      []
     let closed = false
-
+    const close = () => subscriber.close()
     const subscriber: EventSubscriber = {
       close: () => {
+        if (closed) return
         closed = true
         this.subscribers.delete(subscriber)
         recordChatPipelineInfo('chat.pipeline.stream_hub.unsubscribe', {
           subscriberCount: this.subscribers.size,
         })
-        while (waiters.length > 0) {
-          waiters.shift()?.({ done: true, value: undefined })
-        }
+        signal?.removeEventListener('abort', close)
+        budget.signal.removeEventListener('abort', close)
+        for (const items of queue) budget.release(items)
+        queue.length = 0
+        while (waiters.length > 0) waiters.shift()?.({ done: true, value: undefined })
       },
       publish: (events) => {
         if (closed) return
-
-        const waiter = waiters.shift()
-        if (waiter) {
-          waiter({ done: false, value: events })
-          return
-        }
-
-        queue.push(events)
+        publishRetainedEvents(events, budget, queue, waiters)
       },
     }
-
     this.subscribers.add(subscriber)
     recordChatPipelineInfo('chat.pipeline.stream_hub.subscribe', {
       subscriberCount: this.subscribers.size,
     })
-    signal?.addEventListener('abort', subscriber.close, { once: true })
-
-    return eventBatchGenerator(subscriber, queue, waiters, signal)
+    signal?.addEventListener('abort', close, { once: true })
+    budget.signal.addEventListener('abort', close, { once: true })
+    if (signal?.aborted || budget.signal.aborted) close()
+    return eventBatchGenerator(subscriber, queue, waiters, budget, signal)
   }
 
   private retain(events: OrchestrationEvent[]) {
@@ -288,29 +294,45 @@ export class OrchestrationStreams {
   async *shell(
     options: OrchestrationStreamOptions = {},
   ): AsyncGenerator<OrchestrationShellStreamFrame> {
-    const eventBatches = this.hub.subscribe(options.signal)
-    const start = this.startShell(options.afterSequence ?? 0)
-    let sequence = start.sequence
-
-    yield* start.items
-    yield { kind: 'synchronized', sequence }
-
-    const windows = coalesceEventBatches(
-      eventBatches,
-      this.coalesceWindowMs,
-      SHELL_COALESCE_MAX_EVENTS,
-    )
-    for await (const events of windows) {
-      const result = this.shellItemsAfter(events, sequence)
-      sequence = result.sequence
-      recordChatPipelineInfo('chat.pipeline.shell_stream.batch', {
-        coalescedEventCount: result.coalescedFrom,
-        emittedItemCount: result.items.length,
-        rowReaderKind: this.rowReaderKind,
-        sequence,
-        ...orchestrationEventBatchSummary(events),
-      })
-      yield* result.items
+    const budget = createStreamBudget(options)
+    const eventBatches = this.hub.subscribe(budget, options.signal)
+    try {
+      if (options.signal?.aborted) return
+      const start = this.startShell(options.afterSequence ?? 0)
+      let sequence = start.sequence
+      // Snapshot and catch-up are ACK-gated separately; this budget owns the live tail.
+      yield* start.items
+      start.items.length = 0
+      budget.signal.throwIfAborted()
+      yield { kind: 'synchronized', sequence }
+      const windows = coalesceEventBatches(
+        eventBatches,
+        this.coalesceWindowMs,
+        SHELL_COALESCE_MAX_EVENTS,
+        budget,
+      )
+      for await (const retained of windows) {
+        const result = this.shellItemsAfter(
+          retained.map((item) => item.value),
+          sequence,
+        )
+        sequence = result.sequence
+        recordChatPipelineInfo('chat.pipeline.shell_stream.batch', {
+          coalescedEventCount: result.coalescedFrom,
+          emittedItemCount: result.items.length,
+          rowReaderKind: this.rowReaderKind,
+          sequence,
+          ...orchestrationEventBatchSummary(retained.map((item) => item.value)),
+        })
+        const delivery = budget.replace(retained, result.items)
+        retained.length = 0
+        result.items.length = 0
+        yield* deliverRetained(delivery, budget)
+      }
+      if (!options.signal?.aborted) budget.signal.throwIfAborted()
+    } finally {
+      budget.dispose()
+      await eventBatches.return(undefined)
     }
   }
 
@@ -318,23 +340,38 @@ export class OrchestrationStreams {
     sessionId: string,
     options: OrchestrationStreamOptions = {},
   ): AsyncGenerator<OrchestrationSessionStreamFrame> {
-    const eventBatches = this.hub.subscribe(options.signal)
-    const start = this.startSessionDetail(sessionId, options.afterSequence ?? 0)
-    let sequence = start.sequence
-
-    yield* start.items
-    yield { kind: 'synchronized', sequence }
-
-    for await (const events of eventBatches) {
-      const result = this.sessionItemsAfter(events, sessionId, sequence)
-      sequence = result.sequence
-      recordChatPipelineInfo('chat.pipeline.session_stream.batch', {
-        emittedItemCount: result.items.length,
-        sequence,
-        sessionId,
-        ...orchestrationEventBatchSummary(events),
-      })
-      yield* result.items
+    const budget = createStreamBudget(options)
+    const eventBatches = this.hub.subscribe(budget, options.signal)
+    try {
+      if (options.signal?.aborted) return
+      const start = this.startSessionDetail(sessionId, options.afterSequence ?? 0)
+      let sequence = start.sequence
+      yield* start.items
+      start.items.length = 0
+      budget.signal.throwIfAborted()
+      yield { kind: 'synchronized', sequence }
+      for await (const retained of eventBatches) {
+        const result = this.sessionItemsAfter(
+          retained.map((item) => item.value),
+          sessionId,
+          sequence,
+        )
+        sequence = result.sequence
+        recordChatPipelineInfo('chat.pipeline.session_stream.batch', {
+          emittedItemCount: result.items.length,
+          sequence,
+          sessionId,
+          ...orchestrationEventBatchSummary(retained.map((item) => item.value)),
+        })
+        const delivery = budget.replace(retained, result.items)
+        retained.length = 0
+        result.items.length = 0
+        yield* deliverRetained(delivery, budget)
+      }
+      if (!options.signal?.aborted) budget.signal.throwIfAborted()
+    } finally {
+      budget.dispose()
+      await eventBatches.return(undefined)
     }
   }
 
@@ -615,12 +652,18 @@ const COALESCE_WINDOW_ELAPSED = Symbol('coalesce-window-elapsed')
  * interleave two reads of the same subscription.
  */
 async function* coalesceEventBatches(
-  batches: AsyncGenerator<OrchestrationEvent[]>,
+  batches: AsyncGenerator<RetainedLiveItem<OrchestrationEvent>[]>,
   windowMs: number,
   maxEvents: number,
-): AsyncGenerator<OrchestrationEvent[]> {
-  const pending: OrchestrationEvent[] = []
-  let inflight: Promise<IteratorResult<OrchestrationEvent[]>> | null = null
+  budget: LiveStreamBudget,
+): AsyncGenerator<RetainedLiveItem<OrchestrationEvent>[]> {
+  const pending: RetainedLiveItem<OrchestrationEvent>[] = []
+  const clear = () => {
+    budget.release(pending)
+    pending.length = 0
+  }
+  budget.signal.addEventListener('abort', clear, { once: true })
+  let inflight: Promise<IteratorResult<RetainedLiveItem<OrchestrationEvent>[]>> | null = null
   let closesAt = 0
 
   try {
@@ -637,6 +680,7 @@ async function* coalesceEventBatches(
 
       if (pending.length === 0) closesAt = Date.now() + windowMs
       pending.push(...result.value)
+      result.value.length = 0
       if (pending.length < maxEvents) continue
 
       yield pending.splice(0)
@@ -644,12 +688,14 @@ async function* coalesceEventBatches(
 
     if (pending.length > 0) yield pending.splice(0)
   } finally {
+    budget.signal.removeEventListener('abort', clear)
+    clear()
     void batches.return(undefined)
   }
 }
 
 async function raceCoalesceWindow(
-  inflight: Promise<IteratorResult<OrchestrationEvent[]>>,
+  inflight: Promise<IteratorResult<RetainedLiveItem<OrchestrationEvent>[]>>,
   closesAt: number | null,
 ) {
   if (closesAt === null) return await inflight
@@ -673,21 +719,24 @@ function coalesceDeadline(delayMs: number) {
 
 async function* eventBatchGenerator(
   subscriber: EventSubscriber,
-  queue: OrchestrationEvent[][],
-  waiters: Array<(value: IteratorResult<OrchestrationEvent[]>) => void>,
+  queue: RetainedLiveItem<OrchestrationEvent>[][],
+  waiters: Array<(value: IteratorResult<RetainedLiveItem<OrchestrationEvent>[]>) => void>,
+  budget: LiveStreamBudget,
   signal?: AbortSignal,
-): AsyncGenerator<OrchestrationEvent[]> {
+): AsyncGenerator<RetainedLiveItem<OrchestrationEvent>[]> {
   try {
-    while (!signal?.aborted) {
+    while (!signal?.aborted && !budget.signal.aborted) {
       const next = queue.shift()
       if (next) {
         yield next
         continue
       }
 
-      const result = await new Promise<IteratorResult<OrchestrationEvent[]>>((resolve) => {
-        waiters.push(resolve)
-      })
+      const result = await new Promise<IteratorResult<RetainedLiveItem<OrchestrationEvent>[]>>(
+        (resolve) => {
+          waiters.push(resolve)
+        },
+      )
       if (result.done) return
 
       yield result.value
@@ -702,4 +751,50 @@ function isDetailEventForSession(event: OrchestrationEvent, sessionId: string) {
   if (event.aggregateId !== sessionId) return false
 
   return DETAIL_EVENT_TYPES.has(event.type)
+}
+
+function publishRetainedEvents(
+  events: OrchestrationEvent[],
+  budget: LiveStreamBudget,
+  queue: RetainedLiveItem<OrchestrationEvent>[][],
+  waiters: Array<(value: IteratorResult<RetainedLiveItem<OrchestrationEvent>[]>) => void>,
+) {
+  try {
+    const retained = budget.replace([], events)
+    const waiter = waiters.shift()
+    if (waiter) {
+      waiter({ done: false, value: retained })
+      return
+    }
+    queue.push(retained)
+  } catch (error) {
+    if (!budget.signal.aborted) throw error
+  }
+}
+
+async function* deliverRetained<T>(items: RetainedLiveItem<T>[], budget: LiveStreamBudget) {
+  try {
+    while (items.length > 0) {
+      const item = items.shift()!
+      budget.signal.throwIfAborted()
+      yield item.value
+      budget.release([item])
+    }
+  } finally {
+    budget.release(items)
+    items.length = 0
+  }
+}
+
+function createStreamBudget(options: OrchestrationStreamOptions) {
+  const budget = options.budget ?? new LiveStreamBudget()
+  const dispose = () => budget.dispose()
+  options.signal?.addEventListener('abort', dispose, { once: true })
+  budget.signal.addEventListener(
+    'abort',
+    () => options.signal?.removeEventListener('abort', dispose),
+    { once: true },
+  )
+  if (options.signal?.aborted) dispose()
+  return budget
 }

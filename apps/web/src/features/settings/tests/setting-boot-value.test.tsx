@@ -1,7 +1,7 @@
 import { DEFAULT_SETTING_VALUES } from '@workspace/contracts'
 import { renderHook, waitFor } from '@testing-library/react'
-import { useSettingValue } from '@/features/settings/hooks/use-setting-value'
-import { readSettingBootValue, writeBootMirror } from '@/features/settings/utils/boot-mirror'
+import { useSettingValue } from '@/hooks/use-setting-value'
+import { readSettingBootValue, writeBootMirror } from '@/lib/settings-boot-mirror'
 import { settingsKeys } from '@workspace/client-core/settings/query-keys'
 import { afterEach } from 'vitest'
 

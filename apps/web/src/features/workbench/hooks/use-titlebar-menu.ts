@@ -4,7 +4,7 @@ import { useQuery } from '@tanstack/react-query'
 import { useTheme } from '@/features/settings/hooks/use-theme'
 import { selectChatProjects, selectCurrentWorktree } from '@workspace/client-core/chat/selectors'
 import { useEditorWorkspaceState } from '@/features/editor/state/workspace-state'
-import { projectMenuModel } from '@/features/workbench/utils/project-menu-model'
+import { useProjectMenuEntries } from '@/features/workbench/hooks/use-project-menu-entries'
 import { titlebarMenu } from '@/features/workbench/utils/titlebar-menu'
 import { useOpenWorkspaceRoot } from '@/features/workspace/hooks/use-open-root'
 import { copyTextToClipboard } from '@/lib/clipboard'
@@ -30,6 +30,14 @@ export function useTitlebarMenu(open: boolean) {
   const { theme } = useTheme()
   const recentFolders = useQuery(recentFoldersQueryOptions({ enabled: open }))
   const workspacePath = rootFolder?.path ?? null
+  const { entries } = useProjectMenuEntries({
+    enabled: open,
+    sourcesPending: recentFolders.isPending,
+    activeRootPath: workspacePath,
+    activeTitle: rootFolder?.name ?? '',
+    projects,
+    recentFolders: recentFolders.data ?? EMPTY_FOLDERS,
+  })
 
   function selectProject(rootPath: string) {
     if (rootPath === workspacePath) return
@@ -40,12 +48,7 @@ export function useTitlebarMenu(open: boolean) {
   return titlebarMenu({
     colorMode: theme,
     copyWorkspacePath: () => void copyTextToClipboard(workspacePath ?? '', 'workspace path'),
-    projects: projectMenuModel({
-      activeRootPath: workspacePath,
-      activeTitle: rootFolder?.name ?? '',
-      projects,
-      recentFolders: recentFolders.data ?? EMPTY_FOLDERS,
-    }),
+    projects: entries,
     selectProject,
     uiMode,
     workspacePath,

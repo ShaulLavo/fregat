@@ -5,7 +5,7 @@ import {
   useChatProjectionStore,
 } from '@/features/chat/state/chat-projection-store'
 import { createWideEventScope } from '@/lib/wide-event-scope'
-import { readSettingsMirror } from '@/features/settings/utils/boot-mirror'
+import { readSettingsMirror } from '@/lib/settings-boot-mirror'
 import {
   readCachedEnvironmentBindings,
   recordEnvironmentCacheBinding,

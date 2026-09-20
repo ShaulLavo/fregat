@@ -1,3 +1,6 @@
+import { Toaster } from '@workspace/ui/components/sonner'
+import { toast } from 'sonner'
+import { SessionSnoozeDialog } from '@/features/chat-mode/components/session-snooze-dialog'
 import { WorktreeManager } from '@/features/chat-mode/components/worktree-manager'
 import { useWorktreeManagerStore } from '@/features/chat-mode/state/worktree-manager-store'
 import { createEnvironmentEntry } from '@workspace/client-core/environments/utils/connection'
@@ -83,6 +86,7 @@ export async function createRailHarness(
         ...createEnvironmentEntry(origin, origin),
         origin,
         kind: 'primary',
+        phase: 'live',
         label: descriptor.label,
         descriptor,
         environmentId: descriptor.environmentId,
@@ -173,6 +177,7 @@ export async function createRailHarness(
     rootPath: server.root,
   }
   onTestFinished(() => {
+    toast.dismiss()
     transport.close()
     application.dispose()
     useEnvironmentsStore.setState(previousEnvironments, true)
@@ -213,6 +218,8 @@ export function renderRailHarness(
             </Profiler>
           )}
           <SessionDeleteDialog />
+          <SessionSnoozeDialog />
+          <Toaster />
           <ProjectDeleteDialog />
           <ProjectRenameDialog />
           <WorktreeManager />

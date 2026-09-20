@@ -128,9 +128,16 @@ function projectSubmenu(context: TitlebarMenuContext) {
  * without it two projects named `web` are indistinguishable.
  */
 function projectOption(entry: ProjectMenuEntry): MenuRadioItem {
+  if (entry.worktree) return { label: worktreeLabel(entry), value: entry.rootPath }
   if (!entry.qualifier) return { label: entry.title, value: entry.rootPath }
 
   return { label: `${entry.title} — ${entry.qualifier}`, value: entry.rootPath }
+}
+
+/** A radio row has no leading slot either, so the nesting is a glyph in the label. */
+function worktreeLabel(entry: ProjectMenuEntry) {
+  const branch = entry.worktree?.branch
+  return branch ? `↳ ${entry.title} — ${branch}` : `↳ ${entry.title}`
 }
 
 /**

@@ -1,4 +1,5 @@
 import { ToolPane } from '@workspace/ui/patterns/tool-pane'
+import { RenderErrorBoundary } from '@workspace/ui/patterns/render-error-boundary'
 import { PaneBar } from '@workspace/ui/components/pane-bar'
 import type { FilesystemPath } from '@/lib/documents/utils/types'
 import { useNavigation } from '@/hooks/use-navigation'
@@ -35,7 +36,7 @@ export function BottomPanel({
     <ToolPane
       className='h-full min-w-0 overflow-hidden'
       header={null}
-      bodyClassName='flex overflow-hidden bg-content-well'
+      bodyClassName='relative flex overflow-hidden bg-content-well'
       subheader={
         <PaneBar className={cn(BAR_TAB_STRIP_CLASS, 'bg-background px-0')}>
           <div
@@ -62,7 +63,25 @@ export function BottomPanel({
         </PaneBar>
       }
     >
-      {terminalActive ? <TerminalTabs panels={panels} rootPath={rootPath} /> : <DiagnosticsPanel />}
+      {/* The strip stays mounted behind Problems: unmounting a terminal detaches
+          its PTY, and the server kills a detached session once its TTL expires.
+          Hidden with `visibility`, not `display` — a display:none host measures
+          0x0 and the grid comes back reflowed. */}
+      <div
+        className={cn('absolute inset-0', !terminalActive && 'invisible')}
+        inert={!terminalActive}
+      >
+        <RenderErrorBoundary label='Terminal'>
+          <TerminalTabs panels={panels} rootPath={rootPath} visible={terminalActive} />
+        </RenderErrorBoundary>
+      </div>
+      {terminalActive ? null : (
+        <div className='absolute inset-0'>
+          <RenderErrorBoundary label='Problems'>
+            <DiagnosticsPanel />
+          </RenderErrorBoundary>
+        </div>
+      )}
     </ToolPane>
   )
 }

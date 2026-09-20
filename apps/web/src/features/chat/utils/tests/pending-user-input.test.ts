@@ -3,6 +3,7 @@ import type { OrchestrationSessionActivity, UserInputQuestion } from '@workspace
 import {
   buildUserInputAnswers,
   derivePendingUserInputs,
+  retainPendingMessageQuestions,
   firstUnansweredUserInputIndex,
   isUserInputDraftComplete,
   resolveUserInputAnswer,
@@ -301,3 +302,30 @@ function activity({
     turnId,
   } as OrchestrationSessionActivity
 }
+
+test('retained optional questions survive timeline trimming and clear permanently on resolution', () => {
+  const requested = userInputActivity({
+    kind: 'user-input.requested',
+    requestId: 'req-retained',
+    sequence: 1,
+  })
+  const retained = retainPendingMessageQuestions(
+    [],
+    [
+      {
+        ...requested,
+        payload: { requestId: 'req-retained', responseMode: 'message', questions: [scope] },
+      },
+    ],
+  )
+  expect(derivePendingUserInputs([], retained)).toMatchObject([
+    { requestId: 'req-retained', responseMode: 'message' },
+  ])
+  const resolved = userInputActivity({
+    kind: 'user-input.resolved',
+    requestId: 'req-retained',
+    sequence: 2,
+  })
+  expect(derivePendingUserInputs([resolved], retained)).toEqual([])
+  expect(retainPendingMessageQuestions(retained, [resolved])).toEqual([])
+})

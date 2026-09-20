@@ -1,29 +1,81 @@
-import { timestampMs as stampMs } from './timestamp'
 import type { ProjectionSession } from '@workspace/client-core/chat/types'
 
-/** The completion stamp each session was last read at, keyed by session. */
+/** Visit stamps belong to the scoped session, not the server's session identity alone. */
 export type SessionSeenStamps = Readonly<Record<string, string>>
 
 type SessionCompletionSource = Pick<ProjectionSession, 'latestTurn'>
+type SessionWakeSource = Pick<
+  ProjectionSession,
+  | 'snoozedUntil'
+  | 'snoozedAt'
+  | 'latestTurn'
+  | 'runtime'
+  | 'pendingApprovalCount'
+  | 'pendingUserInputCount'
+  | 'settledOverride'
+  | 'archivedAt'
+>
 
-/** When the agent last stopped working on this session; null while it never has. */
 export function sessionCompletedAt(session: SessionCompletionSource) {
   return session.latestTurn?.completedAt ?? null
 }
 
-/**
- * Unread means "finished while you were looking somewhere else" — the one thing the
- * four live statuses cannot say, because a session that finished an hour ago and one
- * you just read both read as idle.
- *
- * What gets stored is the completion the user actually saw, not the clock at the
- * moment they saw it: the completion comes from the server, and comparing it against
- * a client `now` turns clock skew into rows that are either permanently unread or
- * never unread at all.
- */
-export function isSessionUnread(completedAt: string | null, seenAt: string | undefined) {
-  if (!completedAt) return false
-  if (!seenAt) return true
+export function sessionVisitAt(
+  session: SessionCompletionSource & Pick<ProjectionSession, 'createdAt'>,
+) {
+  return sessionCompletedAt(session) ?? session.latestTurn?.requestedAt ?? session.createdAt
+}
 
-  return stampMs(completedAt) > stampMs(seenAt)
+export function isSessionUnread(completedAt: string | null, seenAt: string | undefined) {
+  if (!completedAt || !seenAt) return false
+  const completed = Date.parse(completedAt)
+  if (!Number.isFinite(completed)) return false
+  const visited = Date.parse(seenAt)
+  return !Number.isFinite(visited) || completed > visited
+}
+
+export function advanceSessionVisit(previous: string | undefined, visitedAt: string) {
+  const visited = Date.parse(visitedAt)
+  if (!Number.isFinite(visited)) return previous
+  if (previous && Date.parse(previous) >= visited) return previous
+  return visitedAt
+}
+
+export function unreadSessionVisit(completedAt: string | null) {
+  if (!completedAt) return null
+  const completed = Date.parse(completedAt)
+  if (!Number.isFinite(completed) || completed <= -8_640_000_000_000_000) return null
+  return new Date(completed - 1).toISOString()
+}
+
+export function sessionWokeAt(session: SessionWakeSource, nowMs: number): string | null {
+  if (!session.snoozedUntil || !Number.isFinite(Date.parse(session.snoozedUntil))) return null
+  const completedAt = sessionCompletedAt(session)
+  const completedWhileSnoozed =
+    session.snoozedAt != null &&
+    session.latestTurn?.state === 'completed' &&
+    completedAt != null &&
+    Date.parse(completedAt) > Date.parse(session.snoozedAt)
+  // Preserve the early trigger after the deadline so an acknowledged wake stays acknowledged.
+  if (completedWhileSnoozed) return completedAt
+  const failedWhileSnoozed =
+    session.runtime?.status === 'error' &&
+    (session.snoozedAt == null ||
+      Date.parse(session.runtime.updatedAt) > Date.parse(session.snoozedAt))
+  if (failedWhileSnoozed || session.pendingApprovalCount > 0 || session.pendingUserInputCount > 0) {
+    return session.runtime?.updatedAt ?? session.snoozedAt ?? null
+  }
+  return Date.parse(session.snoozedUntil) <= nowMs ? session.snoozedUntil : null
+}
+
+export function unseenSessionWake(
+  session: SessionWakeSource,
+  seenAt: string | undefined,
+  nowMs: number,
+) {
+  if (session.archivedAt || session.settledOverride === 'settled') return null
+  const wokeAt = sessionWokeAt(session, nowMs)
+  if (!wokeAt || !Number.isFinite(Date.parse(wokeAt))) return null
+  if (seenAt && Date.parse(seenAt) >= Date.parse(wokeAt)) return null
+  return wokeAt
 }

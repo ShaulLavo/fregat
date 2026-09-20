@@ -6,6 +6,7 @@ import type {
   InteractionMode,
   ModelSelection,
   ProviderApprovalDecision,
+  ProviderApprovalOption,
   ProviderAuth,
   ProviderDriverKind,
   ProviderInstanceId,
@@ -23,7 +24,8 @@ import type {
 } from '@workspace/contracts'
 
 export type ProviderTurnInput = {
-  attachments: ChatAttachment[]
+  attachments: readonly ChatAttachment[]
+  attachmentsDir?: string
   cwd: string
   ephemeral?: boolean
   resumeExisting?: boolean
@@ -59,7 +61,7 @@ export type ProviderRuntimeStartInput = {
 
 export type ProviderTurnSteerInput = Pick<
   ProviderTurnInput,
-  'sessionId' | 'turnId' | 'messageText' | 'attachments'
+  'sessionId' | 'turnId' | 'messageText' | 'attachments' | 'attachmentsDir'
 >
 
 export type ProviderTurnControlInput = {
@@ -223,6 +225,7 @@ export type ProviderRuntimeEventPayload =
   | (ProviderRuntimeBaseEvent & {
       type: 'request.opened'
       payload: {
+        options?: readonly ProviderApprovalOption[]
         args?: unknown
         detail?: string
         requestType: string
@@ -243,7 +246,7 @@ export type ProviderRuntimeEventPayload =
        * states the target shape rather than a guarantee: ingestion re-parses
        * every question and drops the ones that miss it.
        */
-      payload: { questions: UserInputQuestions }
+      payload: { questions: UserInputQuestions; responseMode?: 'message' }
     })
   | (ProviderRuntimeBaseEvent & {
       type: 'user-input.resolved'
@@ -252,14 +255,17 @@ export type ProviderRuntimeEventPayload =
   | (ProviderRuntimeBaseEvent & {
       type: 'task.started'
       payload: {
+        taskType?: string
+        status?: string
         description?: string
         taskId: string
-        taskType?: string
       }
     })
   | (ProviderRuntimeBaseEvent & {
       type: 'task.progress'
       payload: {
+        taskType?: string
+        status?: string
         tool?: ChatAgentTool
         description: string
         lastToolName?: string
@@ -271,6 +277,7 @@ export type ProviderRuntimeEventPayload =
   | (ProviderRuntimeBaseEvent & {
       type: 'task.completed'
       payload: {
+        taskType?: string
         status: 'completed' | 'failed' | 'stopped'
         summary?: string
         taskId: string
@@ -434,6 +441,7 @@ export type ProviderRuntimeEventPayload =
     })
 
 type ProviderAdapterCapabilities = {
+  conversationRollback: boolean
   /**
    * Whether the adapter implements `listCommands`. Optional so adapters whose
    * protocol has no listing request (codex, today) stay untouched.
@@ -528,7 +536,10 @@ export type ProviderAdapter = {
   listCommands?: (input: ProviderCommandCatalogInput) => Promise<ProviderCommandCatalogResult>
   respondApproval: (input: ProviderApprovalResponseInput) => Promise<void>
   respondUserInput: (input: ProviderUserInputResponseInput) => Promise<void>
-  rollbackSession: (input: { numTurns: number; sessionId: SessionId }) => Promise<void>
+  prepareRollbackSession: (input: {
+    numTurns: number
+    sessionId: SessionId
+  }) => Promise<() => Promise<void>>
   /**
    * Starts an interactive sign-in. Returns as soon as the flow is running — the
    * user still has a browser round trip to finish — so callers poll

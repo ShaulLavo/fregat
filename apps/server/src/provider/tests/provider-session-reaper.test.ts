@@ -26,6 +26,50 @@ const DEADLINE_MS = 30 * 60 * 1000
 const START_MS = Date.parse('2026-06-01T12:00:00.000Z')
 
 describe('ProviderSessionReaper', () => {
+  it('preserves quiet background work and reclaims it only after completion', async () => {
+    let background = true
+    const fixture = createFixture({ hasBackgroundWork: () => background })
+    try {
+      fixture.bind('93ff7ec0-5902-5ddf-b36e-b6b705a8bc41', 'ready')
+      fixture.advanceTo(START_MS + DEADLINE_MS * 3)
+      expect(await fixture.reaper.sweep()).toEqual([])
+      background = false
+      expect(await fixture.reaper.sweep()).toEqual(['93ff7ec0-5902-5ddf-b36e-b6b705a8bc41'])
+    } finally {
+      fixture.close()
+    }
+  })
+
+  it('joins overlapping sweeps and rechecks later candidates after awaiting a stop', async () => {
+    const entered = Promise.withResolvers<void>()
+    const release = Promise.withResolvers<void>()
+    let background = false
+    const protectedId = '9b1e820c-d996-548c-8a05-cef70f5bec06'
+    const fixture = createFixture({
+      hasBackgroundWork: (id) => id === protectedId && background,
+      stopRuntime: async () => {
+        entered.resolve()
+        await release.promise
+      },
+    })
+    try {
+      fixture.bind('7e156e14-152f-57e3-a391-567aac7ae6ab', 'ready')
+      fixture.bind(protectedId, 'ready')
+      fixture.advanceTo(START_MS + DEADLINE_MS * 3)
+      const first = fixture.reaper.sweep()
+      await entered.promise
+      const second = fixture.reaper.sweep()
+      expect(second).toBe(first)
+      background = true
+      release.resolve()
+      expect(await first).toEqual(['7e156e14-152f-57e3-a391-567aac7ae6ab'])
+    } finally {
+      release.resolve()
+      await fixture.reaper.waitForIdle()
+      fixture.close()
+    }
+  })
+
   it('reclaims a session nobody has touched past the deadline', async () => {
     const fixture = createFixture()
     try {
@@ -115,7 +159,10 @@ function sessionId(id: string) {
 }
 
 function createFixture(
-  options: { stopRuntime?: (input: { sessionId: SessionId }) => Promise<unknown> } = {},
+  options: {
+    stopRuntime?: (input: { sessionId: SessionId }) => Promise<unknown>
+    hasBackgroundWork?: (sessionId: SessionId) => boolean
+  } = {},
 ) {
   const sqlite = new Database(':memory:', { create: true })
   const database = drizzle({ client: sqlite, schema })
@@ -130,6 +177,7 @@ function createFixture(
   const directory = new ProviderSessionDirectory(database, { now })
   const reaper = new ProviderSessionReaper({
     deadlineMs: DEADLINE_MS,
+    hasBackgroundWork: options.hasBackgroundWork,
     directory,
     now,
     stopRuntime: async (input) => {

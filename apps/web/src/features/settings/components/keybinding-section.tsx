@@ -6,7 +6,7 @@ import { useState } from 'react'
 import { commandKeyBindings, keyBindingResolution } from '@/keymap/active-bindings'
 import { presetPlatformKeyBindings } from '@/keymap/default-bindings'
 
-import { useSettingValue } from '../hooks/use-setting-value'
+import { useSettingValue } from '@/hooks/use-setting-value'
 import { commandsShadowedBy, matchingKeybindingRows } from '../utils/keybinding-rows'
 import { EmptyRow } from './empty-row'
 import { KeybindingRow } from './keybinding-row'

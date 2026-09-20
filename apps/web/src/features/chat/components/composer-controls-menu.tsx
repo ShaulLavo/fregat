@@ -1,3 +1,6 @@
+import { useSettingValue } from '@/hooks/use-setting-value'
+import { useModelPicker } from '@/features/chat/hooks/use-model-picker'
+import { resolveComposerInteractionMode } from '@workspace/client-core/chat/composer-interaction'
 import { CaretUpDownIcon, SlidersHorizontalIcon } from '@phosphor-icons/react'
 import type { InteractionMode, RuntimeMode } from '@workspace/contracts'
 import { Button } from '@workspace/ui/components/button'
@@ -85,7 +88,14 @@ export function ComposerControlsMenu({
     selectChatInputDraftRuntimeMode(state, draftTarget),
   )
   const { selectInteractionMode, selectRuntimeMode } = useComposerModes()
-  const activeInteractionMode = draftInteractionMode ?? interactionMode
+  const planModeEnabled = useSettingValue('chat.planModeEnabled')
+  const { provider } = useModelPicker()
+  const planMode = resolveComposerInteractionMode({
+    planModeEnabled,
+    provider,
+    interactionMode: draftInteractionMode ?? interactionMode,
+  })
+  const activeInteractionMode = planMode.interactionMode
   const activeRuntimeMode = draftRuntimeMode ?? runtimeMode
   const planActive = activeInteractionMode === 'plan'
 
@@ -98,7 +108,11 @@ export function ComposerControlsMenu({
             className='text-muted-foreground hover:text-foreground min-w-0 text-xs font-normal'
             disabled={disabled}
             size='sm'
-            title={triggerTitle(activeRuntimeMode, activeInteractionMode)}
+            title={
+              planMode.enabled
+                ? triggerTitle(activeRuntimeMode, activeInteractionMode)
+                : optionLabel(RUNTIME_MODE_OPTIONS, activeRuntimeMode)
+            }
             type='button'
             variant='ghost'
           >
@@ -130,20 +144,24 @@ export function ComposerControlsMenu({
             </DropdownMenuRadioItem>
           ))}
         </DropdownMenuRadioGroup>
-        <DropdownMenuSeparator />
-        <DropdownMenuRadioGroup value={activeInteractionMode}>
-          <DropdownMenuLabel>Mode</DropdownMenuLabel>
-          {INTERACTION_MODE_OPTIONS.map((option) => (
-            <DropdownMenuRadioItem
-              className='items-start'
-              key={option.value}
-              value={option.value}
-              onClick={() => void selectInteractionMode(option.value)}
-            >
-              <OptionText description={option.description} label={option.label} />
-            </DropdownMenuRadioItem>
-          ))}
-        </DropdownMenuRadioGroup>
+        {planMode.enabled && (
+          <>
+            <DropdownMenuSeparator />
+            <DropdownMenuRadioGroup value={activeInteractionMode}>
+              <DropdownMenuLabel>Mode</DropdownMenuLabel>
+              {INTERACTION_MODE_OPTIONS.map((option) => (
+                <DropdownMenuRadioItem
+                  className='items-start'
+                  key={option.value}
+                  value={option.value}
+                  onClick={() => void selectInteractionMode(option.value)}
+                >
+                  <OptionText description={option.description} label={option.label} />
+                </DropdownMenuRadioItem>
+              ))}
+            </DropdownMenuRadioGroup>
+          </>
+        )}
       </DropdownMenuContent>
     </DropdownMenu>
   )

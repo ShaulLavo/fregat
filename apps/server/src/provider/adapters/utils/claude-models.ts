@@ -94,6 +94,14 @@ const CLAUDE_MODELS: ProviderModel[] = [
     shortName: 'Fable 5',
     slug: 'claude-fable-5',
   },
+  {
+    // No effort ladder advertised: Haiku 4.5 predates it, and null sends no `effort` at all.
+    capabilities: null,
+    isCustom: false,
+    name: 'Claude Haiku 4.5',
+    shortName: 'Haiku 4.5',
+    slug: 'claude-haiku-4-5-20251001',
+  },
 ]
 
 export function claudeModelCatalog(): ProviderModel[] {

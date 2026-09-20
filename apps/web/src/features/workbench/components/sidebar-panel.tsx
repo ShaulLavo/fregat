@@ -2,6 +2,7 @@ import { ToggleIconButton } from '@/components/toggle-icon-button'
 import { WorkspaceRail } from '@/components/workspace-rail'
 import type { FilesystemPath } from '@/lib/documents/utils/types'
 import { useNavigation } from '@/hooks/use-navigation'
+import { RenderErrorBoundary } from '@workspace/ui/patterns/render-error-boundary'
 import {
   ChatCircleIcon,
   FilesIcon,
@@ -15,7 +16,11 @@ import { ChatSidePanel } from '@/features/chat/components/chat-side-panel'
 import { LogsPanel } from '@/features/logs/components/panel'
 import { FileNavigatorPanel } from '@/features/workbench/components/file-navigator-panel'
 import { GitChangesPanel } from '@/features/workbench/components/git-changes-panel'
-import { type WorkbenchPanels, type WorkbenchSidebarTab } from '@/features/workbench/utils/panels'
+import {
+  workbenchSidebarTabLabel,
+  type WorkbenchPanels,
+  type WorkbenchSidebarTab,
+} from '@/features/workbench/utils/panels'
 
 export function SidebarPanel({
   panels,
@@ -70,10 +75,15 @@ export function SidebarPanel({
         />
       </WorkspaceRail>
       <div className='min-h-0 min-w-0 flex-1 overflow-hidden'>
-        {renderSidebarPanel({
-          rootPath,
-          tab: panels.activeSidebarTab,
-        })}
+        <RenderErrorBoundary
+          label={workbenchSidebarTabLabel(panels.activeSidebarTab)}
+          resetKeys={[panels.activeSidebarTab]}
+        >
+          {renderSidebarPanel({
+            rootPath,
+            tab: panels.activeSidebarTab,
+          })}
+        </RenderErrorBoundary>
       </div>
     </aside>
   )

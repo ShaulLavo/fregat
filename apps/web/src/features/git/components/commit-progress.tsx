@@ -1,8 +1,8 @@
 import { useQueryClient } from '@tanstack/react-query'
 import { useStore } from 'zustand'
-import { cn } from '@workspace/ui/lib/utils'
 import { useLayoutEffect, useRef } from 'react'
 
+import { CommitOutputLine } from '@/features/git/components/commit-output-line'
 import {
   selectCommitProgress,
   commitProgressStoreFor,
@@ -38,17 +38,13 @@ export function CommitProgress({ rootPath }: { readonly rootPath: string }) {
       role='log'
     >
       {lines.map((line, index) => (
-        <p
-          className={cn(
-            'break-all whitespace-pre-wrap',
-            line.stream === 'stderr' && 'text-warning',
-          )}
+        <CommitOutputLine
           // Output lines have no identity of their own and the list only ever
           // grows at the end, so the index is the position and nothing moves.
           key={index}
-        >
-          {line.text}
-        </p>
+          stream={line.stream}
+          text={line.text}
+        />
       ))}
       <div ref={endRef} />
     </div>

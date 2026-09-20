@@ -351,6 +351,7 @@ const chatModeSelectionSchema = v.union([
   v.strictObject({ kind: v.literal('auto') }),
   v.strictObject({
     kind: v.literal('draft'),
+    draftId: v.optional(v.pipe(v.string(), v.uuid())),
     environmentId: environmentIdSchema,
     projectId: projectIdSchema,
   }),

@@ -58,12 +58,16 @@ export function ChangedFiles({
         value: file.path,
       }))
   async function confirm(value: string) {
-    if (value !== 'revert' || selectedTurn === null || busy) return
+    if ((value !== 'revert' && value !== 'restore files') || selectedTurn === null || busy) return
     setBusy(true)
     try {
       if (
         await run(
-          createCheckpointRevertCommand({ sessionId: conversation.id, turnCount: selectedTurn }),
+          createCheckpointRevertCommand({
+            sessionId: conversation.id,
+            turnCount: selectedTurn,
+            restoreFiles: value === 'restore files',
+          }),
         )
       )
         onClose()
@@ -128,8 +132,8 @@ export function ChangedFiles({
       {selectedTurn !== null && (
         <box flexDirection='column'>
           <text fg={theme.warning}>
-            This restores tracked files and removes later conversation turns. Type revert to
-            continue.
+            Type revert to remove later conversation turns and keep your files. Type restore files
+            to also restore files in an isolated worktree.
           </text>
           <Prompt
             id={id}

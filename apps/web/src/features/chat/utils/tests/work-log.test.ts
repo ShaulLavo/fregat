@@ -8,9 +8,34 @@ import {
 } from '@workspace/contracts'
 import * as v from 'valibot'
 
+import { workRowSections } from '@/features/chat/utils/work-row'
 import { chatActiveWorkLogPlan, chatWorkLogEntries } from '@/features/chat/utils/work-log'
 
 describe('chat work log entries', () => {
+  it('retains every buffered reasoning chunk in both the label and expanded detail', () => {
+    const chunks = ['a'.repeat(500) + '\n\n', 'b'.repeat(600), '\n\nc'.repeat(100)]
+    const entries = chatWorkLogEntries({
+      activities: chunks.map((text, index) =>
+        activity(`reasoning-${index}`, {
+          kind: 'task.progress',
+          tone: 'thinking',
+          summary: 'Thinking',
+          payload: {
+            taskId: 'reasoning-segment',
+            streamKind: 'reasoning_text',
+            summary: text,
+            detail: text,
+          },
+        }),
+      ),
+    })
+    expect(entries).toHaveLength(1)
+    expect(entries[0]?.title).toBe(chunks.join(''))
+    expect(
+      workRowSections(entries[0]!).find((section) => section.label === 'Reasoning')?.value,
+    ).toBe(chunks.join(''))
+  })
+
   it('hides persisted Rust stderr diagnostics while preserving protocol retries and failures', () => {
     const diagnostic =
       '2026-09-07T05:01:30.819533Z ERROR codex_models_manager::manager: failed to refresh available models: timeout waiting for child process to exit'

@@ -11,7 +11,7 @@ export function ChatTimelineActionsProvider({
   revertToCheckpoint,
 }: {
   readonly children: ReactNode
-  readonly revertToCheckpoint: (turnCount: number) => void
+  readonly revertToCheckpoint: (turnCount: number, messageId: string) => void
 }) {
   const { openCheckpointDiff, openFullSessionCheckpointDiff } = useOpenCheckpointDiffDocument()
   // Context value stability keeps message rows from repainting on unrelated chat chrome changes.

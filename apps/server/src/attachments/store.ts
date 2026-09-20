@@ -1,3 +1,5 @@
+import type { AttachmentOwnership } from './ownership'
+import { withAttachmentLane } from './lanes'
 import { mkdir, readFile, stat, unlink, writeFile } from 'node:fs/promises'
 import path from 'node:path'
 import {
@@ -42,7 +44,7 @@ export async function writeAttachmentFromDataUrl(input: {
 }): Promise<AttachmentWriteResult> {
   const { attachment, attachmentsDir } = input
 
-  if (!attachment.dataUrl) {
+  if (attachment.type !== 'image' || !attachment.dataUrl) {
     throw createInternalError(`Attachment ${attachment.id} carries no dataUrl to persist.`)
   }
   if (!chatAttachmentExtension(attachment.mimeType)) {
@@ -129,48 +131,44 @@ export async function resolveAttachmentFile(input: {
   return { byteLength: stats.size, contentType, filePath }
 }
 
+async function removeAttachmentFile(filePath: string): Promise<boolean> {
+  try {
+    await unlink(filePath)
+    return true
+  } catch (error) {
+    if (typeof error === 'object' && error !== null && 'code' in error && error.code === 'ENOENT')
+      return false
+    throw error
+  }
+}
+
 // Missing blobs are already reclaimed; other failures remain retryable deletion work.
 export async function deleteAttachmentBlobs(input: {
   readonly attachmentsDir: string
   readonly attachments: readonly ChatAttachment[]
+  readonly ownership?: AttachmentOwnership
 }): Promise<number> {
   let reclaimed = 0
 
-  for (const filePath of attachmentFilePaths(input)) {
-    const unlinked = await unlink(filePath).then(
-      () => true,
-      (error: unknown) => {
-        if (
-          typeof error === 'object' &&
-          error !== null &&
-          'code' in error &&
-          error.code === 'ENOENT'
-        )
-          return false
-        throw error
-      },
-    )
-    if (unlinked) reclaimed += 1
+  for (const attachment of input.attachments) {
+    if (attachment.id.startsWith('upload-') && !input.ownership)
+      throw createInternalError('Upload cleanup requires ownership storage.')
+    const filePath = attachmentFilePath({ attachmentsDir: input.attachmentsDir, attachment })
+    if (!filePath) continue
+    reclaimed += await withAttachmentLane(input.attachmentsDir, attachment.id, async () => {
+      const removed = await removeAttachmentFile(filePath)
+      if (attachment.id.startsWith('upload-')) {
+        await removeAttachmentFile(path.join(input.attachmentsDir, `${attachment.id}.json`))
+        input.ownership!.release(attachment.id)
+      }
+      return removed ? 1 : 0
+    })
   }
 
   return reclaimed
 }
 
-function attachmentFilePaths(input: {
-  readonly attachmentsDir: string
-  readonly attachments: readonly ChatAttachment[]
-}) {
-  const filePaths = new Set<string>()
-
-  for (const attachment of input.attachments) {
-    const filePath = attachmentFilePath({ attachment, attachmentsDir: input.attachmentsDir })
-    if (filePath) filePaths.add(filePath)
-  }
-
-  return filePaths
-}
-
-function attachmentFilePath(input: {
+export function attachmentFilePath(input: {
   readonly attachmentsDir: string
   readonly attachment: ChatAttachment
 }): string | null {

@@ -23,11 +23,13 @@ export function Question({
   enabled,
   busy,
   onRespond,
+  onDismiss,
 }: {
   readonly request: PendingUserInput
   readonly theme: Theme
   readonly enabled: boolean
   readonly busy: boolean
+  readonly onDismiss?: () => void
   readonly onRespond: (answers: UserInputAnswers) => void
 }) {
   const [drafts, setDrafts] = useState<UserInputAnswerDrafts>({})
@@ -70,6 +72,11 @@ export function Question({
   }
   useKeyboard((event) => {
     if (!focused || event.defaultPrevented) return
+    if (event.ctrl && event.name === 'x' && request.responseMode === 'message' && onDismiss) {
+      event.preventDefault()
+      onDismiss()
+      return
+    }
     if (event.ctrl && event.name === 'd') {
       event.preventDefault()
       next()
@@ -142,6 +149,16 @@ export function Question({
           selectedBackgroundColor={theme.primary}
           onSelect={choose}
         />
+      )}
+      {request.responseMode === 'message' && onDismiss && !busy && (
+        <text
+          fg={theme.mutedForeground}
+          onMouseDown={() => {
+            if (enabled) onDismiss()
+          }}
+        >
+          Ctrl+X dismiss question
+        </text>
       )}
       <text
         fg={theme.mutedForeground}

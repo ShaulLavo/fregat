@@ -8,7 +8,11 @@ import { fileDocument } from '@/lib/documents/utils/identity'
 import type { FilesystemPath } from '@/lib/documents/utils/types'
 import type { ScopedWorktreeRef } from '@workspace/contracts'
 import { useChatProjectionStore } from '@/features/chat/state/chat-projection-store'
-import { createGitStore, type GitStoreApi } from '@/features/git/state/store'
+import {
+  createGitStore,
+  type CommitMessageDraft,
+  type GitStoreApi,
+} from '@/features/git/state/store'
 import { workspaceLocationId } from '@/features/workspace/utils/location'
 import type { ScopedStorage } from '@/lib/environments/state/scoped-storage'
 import { LanguageServerDocumentSyncController } from '@singapore-editor/lsp-plugin'
@@ -34,6 +38,7 @@ import { SettingsSyncService } from '@/features/settings/state/sync-service'
 import type { CachedWorkspaceState } from '@/features/workspace/state/cache'
 import { log } from '@/lib/client-logging'
 import { createHistoryBuffer } from '@/features/editor/state/history-buffer'
+import { HistoryPersistenceService } from '@/features/editor/state/history-persistence'
 import { createFileOpenIntentServiceOwner } from '@/lib/file-open-intent/state/service'
 
 export type EditorRuntime = ReturnType<typeof createEditorRuntime>
@@ -96,6 +101,11 @@ export function createEditorRuntime({
   )
   const documentSyncController = new LanguageServerDocumentSyncController()
   const fileSync = new FileSyncService(documentStore, queryClient)
+  const historyPersistence = new HistoryPersistenceService(
+    documentStore,
+    queryClient,
+    storage.environmentId,
+  )
   let rootGeneration = 1
   let active = false
   let disposed = false
@@ -190,7 +200,7 @@ export function createEditorRuntime({
     gitStoreForRoot(rootPath: FilesystemPath) {
       const worktreeId = workspaceStore.getState().worktreeIdByRootPath[rootPath] ?? null
       const key = workspaceLocationId(rootPath, worktreeId)
-      const store = gitStores.get(key) ?? createGitStore()
+      const store = gitStores.get(key) ?? createGitStore(commitMessageDraft(storage, key))
       gitStores.set(key, store)
       return store
     },
@@ -220,6 +230,7 @@ export function createEditorRuntime({
       suspend()
       disposed = true
       for (const unsubscribe of subscriptions) unsubscribe()
+      historyPersistence.dispose()
       fileOpenIntentOwner.disposeNow()
       workspaceEditService.dispose()
     },
@@ -284,4 +295,15 @@ function workspaceRoot(store: ReturnType<typeof createEditorWorkspaceStore>, gen
 
 function reportRecoveryFailure(error: unknown): void {
   log.warn({ action: 'workspace_edit.recovery_discovery_failed', area: 'workspace-edit', error })
+}
+
+function commitMessageDraft(storage: ScopedStorage, locationId: string): CommitMessageDraft {
+  const key = `git-commit-message:${locationId}`
+  return {
+    read: () => storage.getItem(key) ?? '',
+    write(message) {
+      if (message) storage.setItem(key, message)
+      else storage.removeItem(key)
+    },
+  }
 }

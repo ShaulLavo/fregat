@@ -1,9 +1,10 @@
+import { draftAddressTokenSchema } from '@workspace/client-core/address/references'
 import { createRoute } from '@tanstack/react-router'
 import { sessionIdSchema } from '@workspace/contracts'
 import * as v from 'valibot'
 import { localWorkspaceRoute, remoteWorkspaceRoute } from '@/state/routes/workspace'
 
-const sessionParams = v.object({ sessionId: sessionIdSchema })
+const sessionParams = v.object({ sessionId: v.union([sessionIdSchema, draftAddressTokenSchema]) })
 export const localChatRoute = createRoute({
   getParentRoute: () => localWorkspaceRoute,
   path: 'chat',

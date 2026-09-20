@@ -32,13 +32,18 @@ export function ProjectDeleteDialog() {
   const actions = useProjectActions()
   const managedCount = useChatProjectionStore((state) => {
     if (!request) return 0
-    const slice = selectChatProjectionSlice(state, request.ref.environmentId)
-    return Object.values(slice.worktreeById).filter(
-      (worktree) =>
-        worktree.projectId === request.ref.projectId &&
-        worktree.ownership === 'platform' &&
-        worktree.lifecycle.state !== 'removed',
-    ).length
+    return request.members.reduce((count, member) => {
+      const slice = selectChatProjectionSlice(state, member.ref.environmentId)
+      return (
+        count +
+        Object.values(slice.worktreeById).filter(
+          (worktree) =>
+            worktree.projectId === member.ref.projectId &&
+            worktree.ownership === 'platform' &&
+            worktree.lifecycle.state !== 'removed',
+        ).length
+      )
+    }, 0)
   })
 
   return (
@@ -61,6 +66,14 @@ export function ProjectDeleteDialog() {
             })}
           </DialogDescription>
         </DialogHeader>
+        <ul className='space-y-1 text-xs'>
+          {request?.members.map((member) => (
+            <li key={member.physicalKey} title={`${member.label}: ${member.workspaceRoot}`}>
+              {member.label} · {member.workspaceRoot} · {member.sessionCount} sessions
+              {member.available ? '' : ' · Unavailable'}
+            </li>
+          ))}
+        </ul>
         {managedCount > 0 ? (
           <p className='text-warning text-sm tabular-nums'>
             Clean up or release the {managedCount} Platform worktrees before deleting this project.
@@ -72,18 +85,22 @@ export function ProjectDeleteDialog() {
           </p>
         ) : null}
         <DialogFooter>
-          {managedCount > 0 ? (
-            <Button
-              variant='outline'
-              onClick={() => {
-                if (!request) return
-                useWorktreeManagerStore.getState().openManager(request.ref)
-                actions.cancelDelete()
-              }}
-            >
-              Manage worktrees
-            </Button>
-          ) : null}
+          {managedCount > 0
+            ? request?.members.map((member) => (
+                <Button
+                  key={member.physicalKey}
+                  variant='outline'
+                  onClick={() => {
+                    useWorktreeManagerStore.getState().openManager(member.ref)
+                    actions.cancelDelete()
+                  }}
+                >
+                  {request.members.length > 1
+                    ? `Manage worktrees (${member.label})`
+                    : 'Manage worktrees'}
+                </Button>
+              ))
+            : null}
           <Button
             disabled={pending}
             onClick={() => actions.cancelDelete()}
@@ -93,7 +110,9 @@ export function ProjectDeleteDialog() {
             Cancel
           </Button>
           <Button
-            disabled={managedCount > 0 || pending}
+            disabled={
+              managedCount > 0 || pending || request?.members.some((member) => !member.available)
+            }
             onClick={() => request && actions.confirmDelete(request)}
             type='button'
             variant='destructive'

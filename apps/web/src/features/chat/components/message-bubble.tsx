@@ -83,7 +83,7 @@ export function MessageBubble({
   function handleRevertClick() {
     if (typeof revertTurnCount !== 'number') return
 
-    revertToCheckpoint(revertTurnCount)
+    revertToCheckpoint(revertTurnCount, message.id)
   }
 
   // Opened by hand rather than through MenuSurface's trigger: the trigger

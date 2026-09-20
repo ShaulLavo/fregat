@@ -76,11 +76,13 @@ describe('terminal protocol', () => {
         cwd: '/workspace',
         shell: '/bin/zsh',
         type: 'ready',
+        restoredHistory: false,
       }),
     ).toEqual({
       cwd: '/workspace',
       shell: '/bin/zsh',
       type: 'ready',
+      restoredHistory: false,
     })
     expect(parseTerminalServerMessage({ type: 'process', name: 'nvim' })).toEqual({
       name: 'nvim',

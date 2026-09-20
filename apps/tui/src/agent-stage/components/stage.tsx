@@ -6,6 +6,7 @@ import {
   createApprovalRespondCommand,
   createSessionInterruptCommand,
   createUserInputRespondCommand,
+  createUserInputDismissCommand,
 } from '@workspace/client-core/chat/commands'
 import {
   contextUsageForActivities,
@@ -91,7 +92,10 @@ export function AgentStage({
   const activeModal = modal?.key === state.key ? modal : null
   const active = enabled && activeModal === null && target.kind !== 'terminal'
   const approvals = derivePendingApprovals(state.conversation?.activities ?? [])
-  const questions = derivePendingUserInputs(state.conversation?.activities ?? [])
+  const questions = derivePendingUserInputs(
+    state.conversation?.activities ?? [],
+    state.conversation?.pendingMessageQuestions,
+  )
   const approval = approvals[0]
   const question = approval ? undefined : questions[0]
   const pendingId = approval?.requestId ?? question?.requestId
@@ -464,6 +468,15 @@ export function AgentStage({
           theme={theme}
           enabled={inputAvailable}
           busy={responding === question.requestId}
+          onDismiss={() => {
+            void respond(
+              createUserInputDismissCommand({
+                sessionId: conversation.id,
+                requestId: question.requestId,
+              }),
+              question.requestId,
+            )
+          }}
           onRespond={(answers) => {
             void respond(
               createUserInputRespondCommand({

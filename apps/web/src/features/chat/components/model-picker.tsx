@@ -1,7 +1,7 @@
 import { useQuery } from '@tanstack/react-query'
 import type { ProviderInstanceId } from '@workspace/contracts'
 
-import { useSettingValue } from '@/features/settings/hooks/use-setting-value'
+import { useSettingValue } from '@/hooks/use-setting-value'
 import { Command, CommandEmpty, CommandInput, CommandList } from '@workspace/ui/components/command'
 import { Popover, PopoverContent } from '@workspace/ui/components/popover'
 import { cn } from '@workspace/ui/lib/utils'

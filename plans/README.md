@@ -19,7 +19,10 @@ a bare root `bun run verify`.
 
 | Plan                                                                            | State                                                |
 | ------------------------------------------------------------------------------- | ---------------------------------------------------- |
-| [126 — T3 Code behavioral alignment](126-t3code-alignment.md)                   | **PLANNED — TWO AUDIT PASSES; IMPLEMENTATION OPEN**  |
+| [129 — dependency shape](129-dependency-shape.md)                               | **PHASE 1 DEPLOYED 2026-09-20; PHASES 2–3 PROPOSED** |
+| [128 — React 19 patterns](128-react-19-patterns.md)                             | **PROPOSED — IMPLEMENTATION NOT STARTED**            |
+| [127 — compiler and lifetime repairs](127-compiler-and-lifetime-repairs.md)     | **PROPOSED — PHASE 3 RANK 1 APPLIED, UNVERIFIED**    |
+| [126 — T3 Code behavioral alignment](126-t3code-alignment.md)                   | **IN PROGRESS — ARCHIVE DELIVERY DEPLOYED**          |
 | [125 — observability overhead](125-observability-overhead.md)                   | **IMPLEMENTED — DEV/STREAMING EVIDENCE PENDING**     |
 | [071 — syntax highlight retry](071-syntax-highlight-retry.md)                   | **PROPOSED — ROOT GO/NO-GO SCHEDULING**              |
 | [080 — Platform and VS Code keybinding modes](080-platform-keybinding-modes.md) | **PROPOSED — INTERACTION RULES CONFIRMED**           |
@@ -46,7 +49,7 @@ a bare root `bun run verify`.
 | [106 — first-load weight](106-boot-weight.md)                                   | **IMPLEMENTED 2026-09-13**                           |
 | [107 — a markdown package we own](107-workspace-markdown.md)                    | **IMPLEMENTED 2026-09-13**                           |
 | [108 — two markdown modes](108-markdown-modes.md)                               | **PROPOSED — PHASE 1 READY; PHASE 2 NEEDS 111**      |
-| [109 — boot boundaries and gate](109-boot-boundaries.md)                        | **PROPOSED — DEPENDS ON 106; SCHEDULED AFTER 108**   |
+| [109 — boot boundaries and gate](109-boot-boundaries.md)                        | **PROPOSED — REVISED; PHASES 2 AND 3 UNBLOCKED**     |
 | [110 — workspace indexing](110-workspace-indexing.md)                           | **RESEARCH — NO IMPLEMENTATION SCOPE YET**           |
 | [111 — editor decorations](111-editor-decorations.md)                           | **RESEARCH — NO IMPLEMENTATION SCOPE YET**           |
 | [112 — the large-file ceiling](112-large-file-ceiling.md)                       | **RESEARCH — NO IMPLEMENTATION SCOPE YET**           |
@@ -59,13 +62,38 @@ a bare root `bun run verify`.
 
 ## Dependency notes
 
+- Plans 127 and 128 and the 2026-09-20 revision of Plan 109 come from one review of React behaviour
+  at Platform `b915d3e0`. Plan 127 is separable and small because each of its five repairs is one
+  call site carrying its own proof: `compiler: true` in `apps/web/vite.config.ts` discards every
+  compiler diagnostic, four files lose all memoization to `ref={focusTarget.ref}`, two ternaries
+  unmount every terminal and let the server kill the shells ten minutes later, seven git write hooks
+  invalidate the whole `['git']` subtree when the response already carried the new status, and the
+  command palette takes one command-bus capture per rendered row. Its only new gate is
+  `scripts/lint/react-compiler-census.mjs`, which Phase 2 cannot be proven without. The first of its
+  six terminal sites is applied in the working tree and unverified in a browser; the two panel-collapse
+  sites turned out to be a layout-engine change, and the chat-mode site was reverted because mounting
+  the terminal unconditionally spawns a shell per session. Plan 128 is
+  rules rather than a migration: 46 classifications were re-checked adversarially and 34 were
+  overturned, most of them because `<Activity mode="hidden">` applies `display: none !important` and
+  nearly every pane here measures itself — Base UI's collapsible reads `scrollHeight`,
+  `use-listbox.ts` reads `offsetHeight`, `VirtualList` calls `measureElement` per row. Safety under
+  `display: none` is a property of the children, so no `packages/ui` primitive can own the boundary
+  and the deliverable is three `AGENTS.md` sections, each naming an exemplar already in the
+  repository. The bundle work stayed in 109 because the first per-owner attribution answered the
+  question that plan was waiting on rather than opening a new one: every non-entry chunk is vendor
+  or data, no first-party byte sits outside the entry chunk, and the two surviving boundaries are
+  worth 6.25% of it against 59.5% in `node_modules` and the linked Editor packages. A new plan would
+  have restated 109's Phases 2–4 against a different number. Nothing in this group has been measured
+  in a browser: the dev server is down, and every `agent:browser` line in all three plans is a
+  prescription.
+
 - Plan 126 pins T3 Code and records 48 alignment groups after two source-audit passes and
   independent cross-review. Its first delivery units cover archive semantics, safe rewind,
   native approval replies, bounded delivery and PR lookup failures. The reports, acceptance
   cases, contract census and open finding ledger live beside the master plan. Reconcile shared
   client-core work with 094, keyboard behavior with 080, native capabilities with 087/088,
   verification tooling with 119 and background telemetry with 125. This is an execution plan;
-  application implementation has not started. Root `PLAN.md` remains the roadmap owner.
+  LIFE-01/02 are implemented and deployed; the remaining groups are open. Root `PLAN.md` remains the roadmap owner.
 
 - Plan 125 reduces logging and measurement overhead while preserving failure evidence. It covers
   producer admission, client/server delivery, bounded measurement lifetime and the log viewer.
@@ -177,15 +205,18 @@ a bare root `bun run verify`.
   the one-record visual-only snapshot cache, and the exact `editor-open-benchmark.mjs` gate. Cached
   rows are never document truth, and the typed bus and local UI share one activation transaction.
 
-- Plans 106 through 109 come from the first-load weight review at Platform base `00513340`. The
-  production build sends 2421 KB gzip of JavaScript before the first frame, 2311 KB of it in one
-  chunk, because the application declares almost no loading boundaries — not because of bundler
-  configuration. Plan 106 builds the measurement instrument and lands the two removals that depend
-  on nothing else. Plan 107 replaces streamdown with `@workspace/markdown`, which is what removes
-  the duplicate `shiki@3.23.0` installation that `@streamdown/code` drags in. Plan 108 gives
+- Plans 106 through 109 come from the first-load weight review at Platform base `00513340`. That
+  build sent 2421 KB gzip of JavaScript before the first frame, 2311 KB of it in one chunk, because
+  the application declares almost no loading boundaries — not because of bundler configuration.
+  Plan 106 builds the measurement instrument and lands the two removals that depend on nothing else.
+  Plan 107 replaces streamdown with `@workspace/markdown`, which is what removes the duplicate
+  `shiki@3.23.0` installation that `@streamdown/code` drags in. Plan 108 gives
   markdown a split view and finishes the live-preview experiment rather than deleting it. Plan 109
-  runs last, because 107 and 108 both move the number a gate would otherwise pin twice. Rolldown is
-  already in use; there is no bundler migration in any of them.
+  still runs last; its 2026-09-20 revision measures 2217 KB gz of first-load JavaScript, withdraws
+  the clause that made the gate wait for a final number, and pins after its own Phase 3 with a
+  re-pin after 108. Rolldown is already in use; there is no bundler migration in any of them.
+  Plan 129 owns the two items 109 measured and handed off: the Editor's three inline workers, 25.5%
+  of first-load JavaScript, and the `@phosphor-icons/react` weights no call site draws.
 
 - Plans 110 and 111 are research, not executable work. They sit in this inventory rather than under
   `docs/` so they stay visible, and each ends in a decision record plus the executable plans it

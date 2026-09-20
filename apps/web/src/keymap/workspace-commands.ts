@@ -27,6 +27,7 @@ import {
   ImageIcon,
   MoonIcon,
   PaletteIcon,
+  SwatchesIcon,
   SidebarSimpleIcon,
   SquareHalfBottomIcon,
   SquaresFourIcon,
@@ -491,6 +492,14 @@ export const workspaceCommands = [
     run: ({ invocation, runtime }) =>
       transitionStart(
         runtime.shell.showCommandPalette('colors ', invocation.origin as FocusTargetToken | null),
+      ),
+  }),
+  defineCommand({
+    ...workspaceCommandMetadata['workspace.selectThemeBundle'],
+    icon: SwatchesIcon,
+    run: ({ invocation, runtime }) =>
+      transitionStart(
+        runtime.shell.showCommandPalette('bundle ', invocation.origin as FocusTargetToken | null),
       ),
   }),
   defineCommand({

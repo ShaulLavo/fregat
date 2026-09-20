@@ -11,7 +11,7 @@ import { StrictMode, useEffect, useState, type ReactElement, type ReactNode } fr
 
 import { EditorColorThemeProvider } from '@/features/editor/providers/color-theme-provider'
 import { AppearanceProvider } from '@/features/settings/providers/appearance-provider'
-import { readSettingsMirror } from '@/features/settings/utils/boot-mirror'
+import { readSettingsMirror } from '@/lib/settings-boot-mirror'
 import { FocusProvider } from '@/lib/focus/providers/provider'
 import type { FocusService } from '@/lib/focus/state/service'
 import { TestCommandProvider, type TestCommandRuntimeOptions } from './factories/command-runtime'

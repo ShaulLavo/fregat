@@ -23,5 +23,5 @@ export function isWorkLogFailure(entry: ChatWorkLogEntry) {
 }
 
 export function workRowExpandable(entry: ChatWorkLogEntry) {
-  return workRowSections(entry).length > 0
+  return Boolean(entry.questionAnswers?.length) || workRowSections(entry).length > 0
 }

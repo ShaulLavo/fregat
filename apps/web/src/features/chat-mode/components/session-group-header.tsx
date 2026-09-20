@@ -29,11 +29,12 @@ export function SessionGroupHeader({
       trigger={
         <ListRow
           as='button'
-          {...dragAttributes}
+          {...(!dragAttributes?.['aria-disabled'] ? dragAttributes : {})}
           {...dragListeners}
           {...rowProps}
           role='option'
           selected={active}
+          data-project-group={project.groupKey}
           data-active={active || undefined}
           data-dragging={dragging || undefined}
           aria-expanded={!group.collapsed}
@@ -42,7 +43,7 @@ export function SessionGroupHeader({
           type='button'
           onClick={(event) => {
             rowProps?.onClick(event)
-            toggleProjectCollapsed(project.id)
+            toggleProjectCollapsed(project.members.map((member) => member.physicalKey))
           }}
         >
           {group.collapsed ? (

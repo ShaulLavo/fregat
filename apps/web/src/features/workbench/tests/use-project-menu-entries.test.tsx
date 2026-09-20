@@ -40,3 +40,58 @@ test('merges chat-only aliases with recent folders using their canonical roots',
     { title: 'another', rootPath: 'projects/another', qualifier: null },
   ])
 })
+
+test('drops roots that no longer exist and lands the rest together', async ({ client }) => {
+  void client
+  await ensureFolderPath(filesystemPath('projects/platform'), getClient())
+  await ensureFolderPath(filesystemPath('projects/another'), getClient())
+  const seen: number[] = []
+
+  const { result } = renderHookWithProviders(() => {
+    const menu = useProjectMenuEntries({
+      enabled: true,
+      activeRootPath: 'projects/platform',
+      activeTitle: 'platform',
+      recentFolders: [{ name: 'another', path: 'projects/another' }],
+      projects: [
+        { title: 'removed', updatedAt: '2026-09-08T00:00:00Z', workspaceRoot: 'worktrees/removed' },
+      ],
+    })
+    seen.push(menu.entries.length)
+    return menu
+  })
+
+  await waitFor(() => expect(result.current.isPending).toBe(false))
+  expect(result.current.entries.map((entry) => entry.rootPath)).toEqual([
+    'projects/platform',
+    'projects/another',
+  ])
+  expect(new Set(seen)).toEqual(new Set([1, 2]))
+})
+
+test('nests a linked worktree under its repository with its branch', async ({ client, server }) => {
+  void client
+  await ensureFolderPath(filesystemPath('projects/platform'), getClient())
+  const repo = path.join(server.root, 'projects/platform')
+  const git = (...args: string[]) =>
+    Bun.spawn(['git', '-c', 'user.name=t', '-c', 'user.email=t@t', ...args], { cwd: repo }).exited
+  await git('init', '-b', 'main')
+  await git('commit', '--allow-empty', '-m', 'init')
+  await git('worktree', 'add', path.join(server.root, 'worktrees/t07'), '-b', 'task/t07')
+
+  const { result } = renderHookWithProviders(() =>
+    useProjectMenuEntries({
+      enabled: true,
+      activeRootPath: 'worktrees/t07',
+      activeTitle: 't07',
+      recentFolders: [],
+      projects: [],
+    }),
+  )
+
+  await waitFor(() => expect(result.current.isPending).toBe(false))
+  expect(result.current.entries).toEqual([
+    { title: 'platform', rootPath: 'projects/platform', qualifier: null },
+    { title: 't07', rootPath: 'worktrees/t07', qualifier: null, worktree: { branch: 'task/t07' } },
+  ])
+})

@@ -522,7 +522,9 @@ export class GitService {
     })) {
       if (event.kind === 'line') {
         lineCount += 1
-        yield { kind: 'progress', stream: event.line.stream, text: event.line.text }
+        // SGR colors pass through for the panel to paint; a CRLF's `\r` is only noise.
+        const text = event.line.text.replace(/\r$/, '')
+        yield { kind: 'progress', stream: event.line.stream, text }
         continue
       }
 

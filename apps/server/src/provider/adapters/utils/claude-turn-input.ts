@@ -16,10 +16,12 @@ type ClaudeContentBlock = Extract<SDKUserMessage['message']['content'], readonly
 /** The four image types the Anthropic API accepts. Anything else hard-fails the turn. */
 export type ClaudeImageMediaType = 'image/gif' | 'image/jpeg' | 'image/png' | 'image/webp'
 
-export type ResolvedAttachment = {
-  attachment: ChatAttachment
-  bytes: Uint8Array
-}
+export type ResolvedAttachment =
+  | {
+      attachment: ChatAttachment
+      bytes: Uint8Array
+    }
+  | { attachment: ChatAttachment; path: string }
 
 /**
  * The allowlist guard. `chatAttachmentSchema` only enforces `/^image\//i`, so
@@ -68,6 +70,13 @@ export function claudeUserMessage(input: {
   }
 
   for (const entry of input.resolved) {
+    if ('path' in entry) {
+      content.push({
+        type: 'text',
+        text: `Attached file ${JSON.stringify(entry.attachment.name)}: ${JSON.stringify(entry.path)}`,
+      })
+      continue
+    }
     if (entry.attachment.type !== 'image') continue
 
     const mediaType = claudeImageMediaType(entry.attachment.mimeType)

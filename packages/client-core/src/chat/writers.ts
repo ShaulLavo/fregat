@@ -1,3 +1,4 @@
+import { retainPendingMessageQuestions } from './pending-user-input'
 import { isProviderTurnFailureActivity } from '@workspace/contracts'
 import { shellItemKey } from './shell-item-key'
 import { projectWorktreeEvent } from './worktree-event'
@@ -490,8 +491,6 @@ function applyFreshSessionEvent(
     case 'session.approval-response-requested':
     case 'session.user-input-response-requested':
       return state
-    // The arranged slot is the one piece of pin state the rail draws, and the
-    // shell snapshot does not carry it — these events are the only producer.
     case 'session.pinned':
       return writeSessionPinOrderKey(
         state,
@@ -502,11 +501,8 @@ function applyFreshSessionEvent(
       return writeSessionPinOrderKey(state, event.payload.sessionId, null)
     case 'session.pin-reordered':
       return writeSessionPinOrderKey(state, event.payload.sessionId, event.payload.orderKey)
-    // Settle and snooze live on the server session row; the shell snapshot the
-    // client projects does not carry those fields, so there is nothing here to
-    // patch. `updatedAt` deliberately stays untouched — bumping it from an
-    // event whose state the client cannot see would reorder the rail for a
-    // change nothing renders.
+    // Lifecycle snapshots are authoritative across the separate shell/detail streams.
+    case 'session.active-reordered':
     case 'session.settled':
     case 'session.unsettled':
     case 'session.snoozed':
@@ -517,10 +513,6 @@ function applyFreshSessionEvent(
   }
 }
 
-/**
- * The arranged slot has no shell producer, so it is written here and carried across
- * resnapshots by `sessionFromShell`.
- */
 function writeSessionPinOrderKey(
   state: ChatProjectionSlice,
   sessionId: SessionId,
@@ -611,6 +603,7 @@ function sessionFromShell(
     archivedAt: session.archivedAt,
     createdAt: session.createdAt,
     detailSynced: previous?.detailSynced ?? false,
+    pendingMessageQuestions: previous?.pendingMessageQuestions,
     hasActionableProposedPlan: session.hasActionableProposedPlan,
     id: session.id,
     interactionMode: session.interactionMode,
@@ -781,6 +774,9 @@ function applySessionMetaUpdatedEvent(
   return patchSession(state, event.payload.sessionId, {
     modelSelection: event.payload.modelSelection,
     title: event.payload.title,
+    titleState: event.payload.titleState,
+    titleRegeneration: event.payload.titleRegeneration,
+    titleGenerationError: event.payload.titleGenerationError,
     updatedAt: event.payload.updatedAt,
   })
 }
@@ -964,7 +960,13 @@ function applySessionActivityAppendedEvent(
   return writeTurnFailureState(
     markTrimmedFront(
       {
-        ...patchSession(state, sessionId, { updatedAt: activity.createdAt }),
+        ...patchSession(state, sessionId, {
+          updatedAt: activity.createdAt,
+          pendingMessageQuestions: retainPendingMessageQuestions(
+            state.sessionById[sessionId]?.pendingMessageQuestions ?? [],
+            [activity],
+          ),
+        }),
         activityBySessionId: {
           ...state.activityBySessionId,
           [sessionId]: nextById,
@@ -1356,6 +1358,7 @@ function sessionFromDetail(
   if (previous?.metaSource === 'shell') {
     return {
       ...previous,
+      pendingMessageQuestions: session.pendingMessageQuestions,
       detailSynced: true,
       liveTurn: session.latestTurn,
       pendingSourceProposedPlan: carriedPendingSourcePlan(previous, session.latestTurn),

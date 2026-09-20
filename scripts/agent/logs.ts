@@ -19,7 +19,9 @@ export type LogFilter = {
 }
 
 const LEVELS = ['debug', 'info', 'warn', 'error'] as const
-const LOGS_DIR = resolve(import.meta.dirname, '../../logs')
+const LOGS_DIR = process.env.OBSERVABILITY_DIR
+  ? resolve(process.env.OBSERVABILITY_DIR)
+  : resolve(import.meta.dirname, '../../logs')
 
 export async function readLogs(filter: LogFilter): Promise<LogEvent[]> {
   const until = filter.until ?? new Date()

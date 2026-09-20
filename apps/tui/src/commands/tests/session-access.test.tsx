@@ -1,7 +1,12 @@
+import { sessionAccessRows } from '@/commands/utils/session-access'
+import { openTestChat } from '../../../test/factories/chat'
 import assert from 'node:assert/strict'
 import { act } from 'react'
 import type { SessionId } from '@workspace/contracts'
-import { createSessionArchiveCommand } from '@workspace/client-core/chat/commands'
+import {
+  createSessionArchiveCommand,
+  createSessionPlaceCommand,
+} from '@workspace/client-core/chat/commands'
 import { test, expect } from '../../../test/fixtures'
 import { renderAgentNavigation } from '../../../test/factories/agent-navigation'
 import { createRailSession } from '../../../test/factories/agent-rail'
@@ -61,5 +66,26 @@ test('sess quick access gives a real empty result and keeps keyboard focus in th
     expect(frame.renderer.currentFocusedRenderable?.id).toBe('command-palette')
   } finally {
     await harness.cleanup()
+  }
+})
+
+test('sess ranking follows configured activity or creation timestamps independently of pins', async ({
+  server,
+}) => {
+  const { session, chat } = await openTestChat(server)
+  try {
+    const worktree = await session.ensureWorktree('')
+    const first = await createRailSession(chat, worktree, 'First')
+    const second = await createRailSession(chat, worktree, 'Second')
+    await createRailSession(chat, worktree, 'Newest unpinned')
+    await chat.dispatch(createSessionPlaceCommand({ sessionId: first, orderKey: 'b' }))
+    await chat.dispatch(createSessionPlaceCommand({ sessionId: second, orderKey: 'b' }))
+    const rows = sessionAccessRows(chat.getSnapshot().projection, '', 'created_at')
+    expect(rows[0]?.name).toBe('Newest unpinned')
+    expect(sessionAccessRows(chat.getSnapshot().projection, '', 'updated_at')[0]?.name).toBe(
+      'Second',
+    )
+  } finally {
+    session.dispose()
   }
 })

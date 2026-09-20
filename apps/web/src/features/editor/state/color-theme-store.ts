@@ -15,7 +15,7 @@ import {
 } from '@/lib/code-theme/utils/catalog'
 import { shikiThemeContentHash } from '@/features/editor/utils/theme-content-hash'
 import { loadVscodeThemeRegistration } from '@workspace/client-core/themes/registration'
-import { readSettingsMirror } from '@/features/settings/utils/boot-mirror'
+import { readSettingsMirror } from '@/lib/settings-boot-mirror'
 import { log } from '@/lib/client-logging'
 import { clientErrors, createClientInvariantError } from '@/lib/structured-errors'
 

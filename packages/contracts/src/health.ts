@@ -8,6 +8,16 @@ export const healthDescriptorSchema = v.looseObject({
   label: trimmedNonEmptyStringSchema,
   protocolVersion: nonNegativeIntegerSchema,
   serverVersion: trimmedNonEmptyStringSchema,
+  capabilities: v.optional(
+    v.object({
+      sessionSettlement: v.boolean(),
+      sessionSnooze: v.boolean(),
+      sessionPinning: v.boolean(),
+      sessionPinReorder: v.boolean(),
+      sessionActiveReorder: v.boolean(),
+      sessionTitleRegeneration: v.optional(v.boolean(), false),
+    }),
+  ),
   platform: v.object({
     os: trimmedNonEmptyStringSchema,
     arch: trimmedNonEmptyStringSchema,

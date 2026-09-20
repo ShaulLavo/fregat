@@ -1,9 +1,13 @@
 import { selectChatSessions } from '@workspace/client-core/chat/selectors'
-import { compareSessionsForRail } from '@workspace/client-core/chat/rail/session-order'
+import { compareSessionsByActivity } from '@workspace/client-core/chat/rail/session-order'
 import { scopedPaletteFilter } from '@workspace/client-core/commands/palette'
 import type { ChatProjectionSlice } from '@workspace/client-core/chat/types'
 
-export function sessionAccessRows(projection: ChatProjectionSlice, query: string) {
+export function sessionAccessRows(
+  projection: ChatProjectionSlice,
+  query: string,
+  sortOrder: 'updated_at' | 'created_at',
+) {
   return selectChatSessions(projection)
     .map((session) => ({
       session,
@@ -17,7 +21,12 @@ export function sessionAccessRows(projection: ChatProjectionSlice, query: string
     .filter((row) => row.score > 0)
     .toSorted(
       (left, right) =>
-        right.score - left.score || compareSessionsForRail(left.session, right.session),
+        right.score - left.score ||
+        compareSessionsByActivity(
+          projection.sessionById[left.session.id]!,
+          projection.sessionById[right.session.id]!,
+          sortOrder,
+        ),
     )
     .map(({ session }) => ({
       name: session.title,

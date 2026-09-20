@@ -56,6 +56,8 @@ export function sessionShellFromRow(
     ...row,
     id: row.sessionId,
     modelSelection: parseJson(row.modelSelectionJson),
+    titleState: parseJson(row.titleStateJson),
+    titleRegeneration: parseJson(row.titleRegenerationJson),
     latestTurn: parseJson(row.latestTurnJson),
     planProgress: parseJson(row.planProgressJson),
     runtime: runtime ? runtimeFromRow(runtime) : null,

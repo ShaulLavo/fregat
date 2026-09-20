@@ -1,3 +1,4 @@
+import { sessionTitleEntries } from './session-titles'
 import { WORKTREE_EVENT_PAYLOADS } from './worktree-lifecycle'
 import * as v from 'valibot'
 import {
@@ -13,6 +14,7 @@ import {
 } from './chat-ids'
 import {
   chatAttachmentsSchema,
+  userInputAttachmentsSchema,
   importedSessionMessageSchema,
   isoDateTimeSchema,
   nonNegativeIntegerSchema,
@@ -107,6 +109,9 @@ export const sessionCreatedPayloadSchema = v.object({
 })
 
 export const sessionMetaUpdatedPayloadSchema = v.object({
+  regenerateTitle: v.optional(v.boolean()),
+  previousTitle: v.optional(v.string()),
+  ...sessionTitleEntries,
   sessionId: sessionIdSchema,
   title: v.optional(trimmedNonEmptyStringSchema),
   modelSelection: v.optional(modelSelectionSchema),
@@ -175,6 +180,12 @@ export const sessionPinReorderedPayloadSchema = v.object({
   updatedAt: isoDateTimeSchema,
 })
 
+export const sessionActiveReorderedPayloadSchema = v.object({
+  sessionId: sessionIdSchema,
+  orderKey: orderKeySchema,
+  updatedAt: isoDateTimeSchema,
+})
+
 export const sessionRuntimeModeSetPayloadSchema = v.object({
   sessionId: sessionIdSchema,
   runtimeMode: runtimeModeSchema,
@@ -225,6 +236,7 @@ export const sessionTurnSteerRequestedPayloadSchema = v.object({
 })
 
 export const sessionRuntimeStopRequestedPayloadSchema = v.object({
+  onlyIfSettled: v.optional(v.boolean()),
   sessionId: sessionIdSchema,
   createdAt: isoDateTimeSchema,
 })
@@ -267,6 +279,7 @@ export const sessionCheckpointRevertRequestedPayloadSchema = v.object({
   sessionId: sessionIdSchema,
   turnCount: nonNegativeIntegerSchema,
   createdAt: isoDateTimeSchema,
+  restoreFiles: v.boolean(),
 })
 
 export const sessionRevertedPayloadSchema = v.object({
@@ -286,6 +299,7 @@ export const sessionUserInputResponseRequestedPayloadSchema = v.object({
   sessionId: sessionIdSchema,
   requestId: approvalRequestIdSchema,
   answers: providerUserInputAnswersSchema,
+  attachmentsByQuestionId: v.optional(userInputAttachmentsSchema),
   createdAt: isoDateTimeSchema,
 })
 
@@ -378,6 +392,7 @@ export const ORCHESTRATION_EVENT_PAYLOADS = {
   'session.pinned': sessionPinnedPayloadSchema,
   'session.unpinned': sessionUnpinnedPayloadSchema,
   'session.pin-reordered': sessionPinReorderedPayloadSchema,
+  'session.active-reordered': sessionActiveReorderedPayloadSchema,
   'session.runtime-mode-set': sessionRuntimeModeSetPayloadSchema,
   'session.interaction-mode-set': sessionInteractionModeSetPayloadSchema,
   'session.message-sent': sessionMessageSentPayloadSchema,

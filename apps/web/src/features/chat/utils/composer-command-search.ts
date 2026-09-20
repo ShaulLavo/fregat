@@ -9,7 +9,7 @@ import {
 const CALIBRATION: FieldTokenCalibration = {
   fieldPenaltyStep: 200,
   offsets: { exact: 0, prefix: 20, boundary: 40, includes: 60, fuzzy: 120 },
-  boundaryMarkers: [' ', '-', '_', '/', ':', '.'],
+  boundaryMarkers: ' -_/:.',
   maxPositionPenalty: 8,
   positionPenaltyFactor: 1,
   maxLengthPenalty: 16,

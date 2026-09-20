@@ -1,3 +1,5 @@
+import { useSettingValue } from '@/hooks/use-setting-value'
+import { resolveComposerInteractionMode } from '@workspace/client-core/chat/composer-interaction'
 import { useEnvironmentId } from '@/lib/environments/hooks/use-environment-id'
 import { LexicalComposer, type InitialConfigType } from '@lexical/react/LexicalComposer'
 import { useQuery } from '@tanstack/react-query'
@@ -22,7 +24,7 @@ import {
 import { composerDropCarriesFiles, composerDropMentionPath } from '../utils/composer-drop'
 import {
   chatInputUploadAttachments,
-  imageFilesFromTransfer,
+  filesFromTransfer,
 } from '@/features/chat/utils/input-attachments'
 import {
   activeChatInputCommandItem,
@@ -35,7 +37,7 @@ import {
 import { useProjectEntrySearch } from '../hooks/use-project-entry-search'
 import { providerCommandCatalogQueryOptions } from '@/features/chat/utils/composer-skills'
 import { useComposerInbox } from '../hooks/use-composer-inbox'
-import { useImagePreparation } from '@/features/chat/hooks/use-image-preparation'
+import { useAttachmentPreparation } from '@/features/chat/hooks/use-attachment-preparation'
 import { useProviderDisplay } from '@/features/chat/hooks/use-provider-display'
 import { chatSubmissionValidation } from '@/features/chat/utils/submission-validation'
 import { OrbitLoader } from '@workspace/ui/components/orbit-loader'
@@ -43,7 +45,7 @@ import { ChatModelPickerProvider } from '../providers/model-picker-provider'
 import type { TerminalContextSelection } from '@workspace/client-core/chat/terminal-context'
 import {
   readChatInputDraftPrompt,
-  selectChatInputDraftImages,
+  selectChatInputDraftAttachments,
   selectChatInputDraftTerminalContexts,
   useChatInputDraftStore,
   type ChatInputDraftStore,
@@ -108,19 +110,30 @@ export function ChatInput({
     [environmentId, draftKey, rootPath],
   )
   const imagesSelector = useMemo(
-    () => (state: ChatInputDraftStore) => selectChatInputDraftImages(state, draftTarget),
+    () => (state: ChatInputDraftStore) => selectChatInputDraftAttachments(state, draftTarget),
     [draftTarget],
   )
   const terminalContextsSelector = useMemo(
     () => (state: ChatInputDraftStore) => selectChatInputDraftTerminalContexts(state, draftTarget),
     [draftTarget],
   )
+  const planModeEnabled = useSettingValue('chat.planModeEnabled')
+  const draftProviderId = useChatInputDraftStore(
+    (state) => state.getDraft(draftTarget).modelSelection?.providerInstanceId,
+  )
+  const { provider: modeProvider } = useProviderDisplay(
+    draftProviderId ?? modelSelection?.providerInstanceId,
+  )
+  const planMode = resolveComposerInteractionMode({
+    planModeEnabled,
+    provider: modeProvider,
+    interactionMode,
+  })
   const images = useChatInputDraftStore(imagesSelector)
   const terminalContexts = useChatInputDraftStore(terminalContextsSelector)
   const persistenceError = useChatInputDraftStore((store) => store.persistenceError)
   const clearStoredDraft = useChatInputDraftStore((store) => store.clearDraft)
   const clearStoredDraftContent = useChatInputDraftStore((store) => store.clearDraftContent)
-  const removeImage = useChatInputDraftStore((store) => store.removeImage)
   const removeTerminalContext = useChatInputDraftStore((store) => store.removeTerminalContext)
   const setInteractionMode = useChatInputDraftStore((store) => store.setInteractionMode)
   const editorRef = useRef<LexicalEditor | null>(null)
@@ -145,7 +158,7 @@ export function ChatInput({
   )
   const initialDraft = useMemo(() => readChatInputDraftPrompt(draftTarget), [draftTarget])
   const [activeCommandItemId, setActiveCommandItemId] = useState<string | null>(null)
-  const imagePreparation = useImagePreparation(draftTarget)
+  const imagePreparation = useAttachmentPreparation(draftTarget)
   const { display: sessionProvider } = useProviderDisplay(sessionProviderInstanceId ?? undefined)
   const busySendDisabledReason = busy
     ? (correctionDisabledReason ??
@@ -180,8 +193,14 @@ export function ChatInput({
     }),
   )
   const commandMenuItems = useMemo(
-    () => chatInputCommandItems(trigger, projectEntries.entries, commandCatalog.data ?? null),
-    [commandCatalog.data, projectEntries.entries, trigger],
+    () =>
+      chatInputCommandItems(
+        trigger,
+        projectEntries.entries,
+        commandCatalog.data ?? null,
+        planMode.enabled,
+      ),
+    [commandCatalog.data, projectEntries.entries, trigger, planMode.enabled],
   )
   const commandMenuEmptyLabel = chatInputCommandMenuEmptyLabel(trigger)
   // Built-in slash commands answer instantly, so the menu is only "loading"
@@ -242,7 +261,7 @@ export function ChatInput({
     const validation = chatSubmissionValidation(text, draft.terminalContexts)
     setValidationError(validation)
     if (validation) return false
-    const attachments = chatInputUploadAttachments(draft.images)
+    const attachments = chatInputUploadAttachments(draft.attachments)
     if (!text && attachments.length === 0 && draft.terminalContexts.length === 0) return false
 
     // No ready provider offers a model, so there is nothing legitimate to send.
@@ -253,13 +272,23 @@ export function ChatInput({
     try {
       const sent = await onSubmit({
         attachments,
-        interactionMode: draft.interactionMode ?? interactionMode,
+        interactionMode: resolveComposerInteractionMode({
+          planModeEnabled,
+          provider:
+            modeProvider?.providerInstanceId === selected.providerInstanceId
+              ? modeProvider
+              : undefined,
+          interactionMode: draft.interactionMode ?? interactionMode,
+        }).interactionMode,
         modelSelection: selected,
         runtimeMode: draft.runtimeMode ?? runtimeMode,
         terminalContexts: draft.terminalContexts,
         text,
       })
-      if (sent) clearDraft()
+      if (sent) {
+        imagePreparation.clearSent()
+        clearDraft()
+      }
 
       return sent
     } finally {
@@ -268,12 +297,7 @@ export function ChatInput({
   }
 
   const handleImageFiles = imagePreparation.prepare
-  const handleRemoveImage = useCallback(
-    (imageId: string) => {
-      removeImage(draftTarget, imageId)
-    },
-    [draftTarget, removeImage],
-  )
+  const handleRemoveImage = imagePreparation.remove
   const handleRemoveTerminalContext = useCallback(
     (contextId: string) => {
       removeTerminalContext(draftTarget, contextId)
@@ -284,6 +308,7 @@ export function ChatInput({
     (item: ChatInputCommandItem) => {
       const editor = editorRef.current
       if (!editor || !trigger) return
+      if (item.type === 'slash-command' && !planMode.enabled) return
 
       // The trigger is React state, so it can already describe a prompt that has
       // moved on — a stale or repeated commit is refused rather than spliced in.
@@ -301,7 +326,7 @@ export function ChatInput({
 
       editor.focus()
     },
-    [draftTarget, setInteractionMode, trigger],
+    [draftTarget, setInteractionMode, trigger, planMode.enabled],
   )
   const handleCommandMenuCommit = useCallback(() => {
     const item = activeChatInputCommandItem(commandMenuItems, activeCommandItemId)
@@ -355,7 +380,7 @@ export function ChatInput({
       return
     }
 
-    const files = imageFilesFromTransfer(event.dataTransfer)
+    const files = filesFromTransfer(event.dataTransfer)
     if (files.length === 0) return
 
     event.preventDefault()
@@ -446,6 +471,7 @@ export function ChatInput({
                 attachments={images}
                 disabled={composerDisabled}
                 onRemove={handleRemoveImage}
+                onRetry={imagePreparation.retry}
               />
               <ChatInputActions
                 correctionDisabledReason={busySendDisabledReason}

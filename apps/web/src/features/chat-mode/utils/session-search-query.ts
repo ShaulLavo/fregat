@@ -22,7 +22,6 @@ import { unwrapEdenResponse } from '@/lib/eden-events'
 export const SESSION_SEARCH_DEBOUNCE_MS = 220
 
 const SESSION_SEARCH_STALE_TIME_MS = 30_000
-const EMPTY_SESSION_SEARCH: OrchestrationSearchSessionsResult = { matches: [] }
 
 type SessionSearchQueryKey = ReturnType<typeof sessionSearchQueryKeys.search>
 
@@ -42,9 +41,6 @@ export function sessionSearchQueryOptions(input: { limit?: number; query: string
     SessionSearchQueryKey
   >({
     enabled: isSessionSearchQuery(query),
-    // Keep the last answer on screen while the next one is in flight: the rail
-    // is a list the user is reading, and blanking it mid-word reads as "gone".
-    placeholderData: (previous) => previous ?? EMPTY_SESSION_SEARCH,
     queryFn: ({ signal, client }) =>
       searchSessions({ limit, query, signal, client: clientForQueryClient(client) }),
     queryKey: sessionSearchQueryKeys.search(query, limit),

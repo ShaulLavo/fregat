@@ -1,4 +1,5 @@
 import { TerminalPanel } from '@/features/terminal/components/panel'
+import { RenderErrorBoundary } from '@workspace/ui/patterns/render-error-boundary'
 import { TerminalList } from '@/features/workbench/components/terminal-list'
 import { useTerminalTabActions } from '@/features/workbench/hooks/use-terminal-tab-actions'
 import type { WorkbenchPanels } from '@/features/workbench/utils/panels'
@@ -20,9 +21,12 @@ const TERMINAL_LIST_MAX_SIZE = 400
 export function TerminalTabs({
   panels,
   rootPath,
+  visible,
 }: {
   readonly panels: WorkbenchPanels
   readonly rootPath: string
+  /** False while the whole strip is hidden behind another bottom tab. */
+  readonly visible: boolean
 }) {
   const { closeTab, openTab, setProcess, setShellTitle } = useTerminalTabActions(rootPath)
   if (panels.terminalTabs.length === 0)
@@ -53,18 +57,20 @@ export function TerminalTabs({
               inert={!active}
               key={tab.id}
             >
-              <TerminalPanel
-                active={active}
-                className='h-full'
-                rootPath={rootPath}
-                sessionId={tab.id}
-                // A failing shell keeps its tab so the exit message stays readable.
-                onExit={(exitCode) => {
-                  if (exitCode === 0) closeTab(tab.id)
-                }}
-                onProcessChange={(process) => setProcess(tab.id, process)}
-                onTitleChange={(title) => setShellTitle(tab.id, title)}
-              />
+              <RenderErrorBoundary label='Terminal'>
+                <TerminalPanel
+                  active={visible && active}
+                  className='h-full'
+                  rootPath={rootPath}
+                  sessionId={tab.id}
+                  // A failing shell keeps its tab so the exit message stays readable.
+                  onExit={(exitCode) => {
+                    if (exitCode === 0) closeTab(tab.id)
+                  }}
+                  onProcessChange={(process) => setProcess(tab.id, process)}
+                  onTitleChange={(title) => setShellTitle(tab.id, title)}
+                />
+              </RenderErrorBoundary>
             </div>
           )
         })}
@@ -79,11 +85,13 @@ export function TerminalTabs({
             maxSize={TERMINAL_LIST_MAX_SIZE}
             minSize={TERMINAL_LIST_MIN_SIZE}
           >
-            <TerminalList
-              activeTabId={panels.activeTerminalTabId}
-              rootPath={rootPath}
-              tabs={panels.terminalTabs}
-            />
+            <RenderErrorBoundary label='Terminal list'>
+              <TerminalList
+                activeTabId={panels.activeTerminalTabId}
+                rootPath={rootPath}
+                tabs={panels.terminalTabs}
+              />
+            </RenderErrorBoundary>
           </ResizablePanel>
         </>
       ) : null}

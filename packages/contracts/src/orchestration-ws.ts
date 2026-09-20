@@ -30,7 +30,7 @@ import {
  *     subscriptions still push snapshot *frames*; only the requests are gone.
  * 4 — added the durable environment identity to the handshake.
  */
-export const ORCHESTRATION_WS_PROTOCOL_VERSION = 6
+export const ORCHESTRATION_WS_PROTOCOL_VERSION = 7
 
 /**
  * Hard ceiling on one `replayEvents` page. `replayEvents` is client-reachable,
@@ -188,7 +188,14 @@ export const orchestrationWsPingSchema = v.object({
   requestId: orchestrationWsRequestIdSchema,
 })
 
+export const orchestrationWsSubscriptionAckSchema = v.object({
+  kind: v.literal('subscription.ack'),
+  subscriptionId: orchestrationWsSubscriptionIdSchema,
+  deliveryId: nonNegativeIntegerSchema,
+})
+
 export const orchestrationWsClientMessageSchema = v.union([
+  orchestrationWsSubscriptionAckSchema,
   orchestrationWsRequestSchema,
   orchestrationWsSubscribeSchema,
   orchestrationWsUnsubscribeSchema,
@@ -295,6 +302,7 @@ export const orchestrationWsSubscriptionItemSchema = v.union([
 
 export const orchestrationWsSubscriptionNextMessageSchema = v.object({
   kind: v.literal('subscription.next'),
+  deliveryId: nonNegativeIntegerSchema,
   subscriptionId: orchestrationWsSubscriptionIdSchema,
   item: orchestrationWsSubscriptionItemSchema,
 })

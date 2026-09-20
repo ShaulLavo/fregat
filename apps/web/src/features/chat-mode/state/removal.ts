@@ -8,26 +8,50 @@ import {
   useChatProjectionStore,
   selectChatProjectionSlice,
 } from '@/features/chat/state/chat-projection-store'
-import { compareSessionsForRail } from '@workspace/client-core/chat/rail/session-order'
-import { neighbourSessionId } from '@/features/chat-mode/utils/session-neighbour'
+import { compareSessionsByActivity } from '@workspace/client-core/chat/rail/session-order'
+import { readSettingsMirror } from '@/lib/settings-boot-mirror'
+import { scopedSessionKey } from '@workspace/contracts'
 
 export function sessionSummary(ref: ScopedSessionRef) {
   return selectChatProjectionSlice(useChatProjectionStore.getState(), ref.environmentId)
     .sessionById[ref.sessionId]
 }
-export function sessionRemoval(ref: ScopedSessionRef) {
+export function sessionArchive(ref: ScopedSessionRef) {
   const slice = selectChatProjectionSlice(useChatProjectionStore.getState(), ref.environmentId)
   const owner = selectSessionOwnership(slice, ref.sessionId)
   if (!owner) return null
-  const ids = selectChatSessionsForProject(slice, owner.project.id)
-    .filter((session) => !session.archivedAt)
-    .toSorted(compareSessionsForRail)
-    .map((session) => session.id)
   return {
     environmentId: ref.environmentId,
     projectId: owner.project.id,
     removedSessionIds: [ref.sessionId],
-    successorSessionId: neighbourSessionId(ids, ref.sessionId),
+    successorSessionId: null,
+  }
+}
+export function sessionDeletion(ref: ScopedSessionRef, deleted: readonly ScopedSessionRef[] = []) {
+  const slice = selectChatProjectionSlice(useChatProjectionStore.getState(), ref.environmentId)
+  const owner = selectSessionOwnership(slice, ref.sessionId)
+  if (!owner) return null
+  const removed = new Set(deleted.map(scopedSessionKey))
+  const sortOrder = readSettingsMirror()['chat.sessionSortOrder']
+  const candidates = selectChatSessionsForProject(slice, owner.project.id)
+    .filter(
+      (session) =>
+        !session.archivedAt &&
+        session.id !== ref.sessionId &&
+        !removed.has(scopedSessionKey({ environmentId: ref.environmentId, sessionId: session.id })),
+    )
+    .toSorted((left, right) =>
+      compareSessionsByActivity(
+        slice.sessionById[left.id]!,
+        slice.sessionById[right.id]!,
+        sortOrder,
+      ),
+    )
+  return {
+    environmentId: ref.environmentId,
+    projectId: owner.project.id,
+    removedSessionIds: [ref.sessionId],
+    successorSessionId: candidates[0]?.id ?? null,
   }
 }
 

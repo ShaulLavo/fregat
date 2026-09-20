@@ -80,6 +80,11 @@ export function openTerminalConnection(
       return
     }
     clearTimeout(timeout)
+    if (message.type === 'cleared') {
+      const clear = new TextEncoder().encode('\x1b[2J\x1b[3J\x1b[H')
+      for (const output of outputs) output(clear)
+      return
+    }
     if (message.type === 'ready') {
       publish({ kind: 'ready', cwd: message.cwd, shell: message.shell })
       resize(dimensions.cols, dimensions.rows)

@@ -34,7 +34,7 @@ export function useMessageMenu({
   function handleRevertToCheckpoint() {
     if (typeof revertTurnCount !== 'number') return
 
-    revertToCheckpoint(revertTurnCount)
+    revertToCheckpoint(revertTurnCount, message.id)
   }
 
   async function handleViewChangedFiles() {

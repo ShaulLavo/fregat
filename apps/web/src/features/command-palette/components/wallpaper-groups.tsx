@@ -6,7 +6,7 @@ import { LoadingState } from '@workspace/ui/components/loading-state'
 
 import { RowLabel } from '@/features/command-palette/components/row-label'
 import { wallpaperItemValue } from '@/features/command-palette/utils/wallpapers'
-import { useSettingValue } from '@/features/settings/hooks/use-setting-value'
+import { useSettingValue } from '@/hooks/use-setting-value'
 import { useSettingsActions } from '@/features/settings/hooks/use-settings-actions'
 import { useSettingsOwner } from '@/features/settings/hooks/use-settings-owner'
 import { selectWallpaper, visibleWallpaper } from '@/lib/wallpapers/utils/selection'

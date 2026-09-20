@@ -4,15 +4,16 @@ import { HighlightedCode } from '@workspace/markdown/components/highlighted-code
 import type { MarkdownCodeBlockProps } from '@workspace/markdown/providers/render-context'
 import { Button } from '@workspace/ui/components/button'
 import { Tooltip, TooltipContent, TooltipTrigger } from '@workspace/ui/components/tooltip'
-import { use, useState } from 'react'
+import { use, useState, type ErrorInfo } from 'react'
+import { ErrorBoundary } from 'react-error-boundary'
 
+import { log } from '@/lib/client-logging'
 import { iconForEntry } from '@/lib/file-icons'
 
 import { MarkdownDiagramContext } from '@/features/chat/providers/markdown-diagram-context'
 import { fenceIconFileName, fenceTitle } from '@/features/chat/utils/markdown-fence'
 import { AssistantMarkdownMermaid } from './assistant-markdown-mermaid'
 import { MarkdownCopyButton } from './markdown-copy-button'
-import { MarkdownRenderErrorBoundary } from './markdown-render-error-boundary'
 
 const BODY_CLASS_NAME = 'overflow-x-auto bg-transparent p-2 text-xs leading-5'
 
@@ -80,13 +81,14 @@ export function AssistantMarkdownCodeBlock({
           <MarkdownCopyButton label='Copy code' text={text} />
         </span>
       </div>
-      <MarkdownRenderErrorBoundary
+      {/* A grammar or theme that trips the highlighter falls back to plain text. */}
+      <ErrorBoundary
         fallback={
           <pre className={BODY_CLASS_NAME} data-markdown='code-block-body'>
             <code className='font-mono'>{text}</code>
           </pre>
         }
-        language={language}
+        onError={(error, errorInfo) => logMarkdownRenderFailure(error, errorInfo, language)}
       >
         <HighlightedCode
           className={BODY_CLASS_NAME}
@@ -95,11 +97,21 @@ export function AssistantMarkdownCodeBlock({
           incomplete={incomplete}
           language={language}
         />
-      </MarkdownRenderErrorBoundary>
+      </ErrorBoundary>
     </div>
   )
 }
 
 function trimTrailingNewlines(value: string) {
   return value.replace(/\n+$/u, '')
+}
+
+function logMarkdownRenderFailure(error: unknown, errorInfo: ErrorInfo, language: string) {
+  log.error({
+    action: 'chat.markdown.render_failed',
+    area: 'chat',
+    componentStack: errorInfo.componentStack ?? null,
+    error: error instanceof Error ? error.message : String(error),
+    language,
+  })
 }

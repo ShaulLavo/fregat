@@ -18,6 +18,7 @@ export type QuickAccessMode =
   | 'scripts'
   | 'sessions'
   | 'symbols'
+  | 'themeBundle'
   | 'views'
   | 'wallpaper'
 const SCRIPT_PREFIX = 'run '
@@ -140,7 +141,7 @@ function commandItemStrongMatch<Item extends PaletteRankItem>(item: Item, query:
 }
 
 function commandItemMatchesPiece<Item extends PaletteRankItem>(item: Item, piece: string) {
-  return item.keywords.some((keyword) => keyword.toLocaleLowerCase().includes(piece))
+  return item.keywords.some((keyword) => keyword.toLowerCase().includes(piece))
 }
 
 // Recency is applied a level up, by splitting these into recent and not, so the only
@@ -154,6 +155,7 @@ function compareRankedCommandItems<Item extends PaletteRankItem>(
 
 export function quickAccessMode(search: string): QuickAccessMode {
   if (search.startsWith('colors ')) return 'appColors'
+  if (search.startsWith('bundle ')) return 'themeBundle'
   if (search.startsWith('view ')) return 'views'
   if (search.startsWith('wallpaper ')) return 'wallpaper'
   if (search.startsWith('color ')) return 'colorMode'
@@ -168,6 +170,7 @@ export function quickAccessMode(search: string): QuickAccessMode {
 
 export function quickAccessQuery(search: string) {
   if (search.startsWith('colors ')) return search.slice(7).trimStart()
+  if (search.startsWith('bundle ')) return search.slice(7).trimStart()
   if (search.startsWith('view ')) return search.slice(5).trimStart()
   if (search.startsWith('color ')) return search.slice(6).trimStart()
   if (search.startsWith('theme ')) return search.slice(6).trimStart()

@@ -1,8 +1,9 @@
+import { useChatInputDraftStore } from '@/features/chat/state/chat-input-draft-store'
 import {
   shellSnapshot,
   TEST_ENVIRONMENT_ID as FIXTURE_ENVIRONMENT_ID,
 } from '../../../../../test/factories/chat'
-import { screen, within } from '@testing-library/react'
+import { act, screen, within } from '@testing-library/react'
 import userEvent from '@testing-library/user-event'
 import { eventIdSchema, type ClientOrchestrationCommand } from '@workspace/contracts'
 import * as v from 'valibot'
@@ -67,7 +68,9 @@ test('a multi-select keeps collecting values instead of advancing', async () => 
   await userEvent.click(screen.getByRole('button', { name: /Web/ }))
   await userEvent.click(screen.getByRole('button', { name: 'Submit' }))
 
-  expect(dispatched[0]).toMatchObject({ answers: { targets: ['server', 'web'] } })
+  expect(dispatched[0]).toMatchObject({
+    answers: { targets: ['server', 'web'] },
+  })
 })
 
 test('a resolved prompt leaves nothing to answer', () => {
@@ -120,7 +123,11 @@ function targets() {
 }
 
 function notes() {
-  return { answerKind: 'text', id: 'notes', prompt: 'Anything else the agent should know?' }
+  return {
+    answerKind: 'text',
+    id: 'notes',
+    prompt: 'Anything else the agent should know?',
+  }
 }
 
 function requestedActivity(questions: readonly unknown[]) {
@@ -145,7 +152,11 @@ function resolvedActivity() {
 
 function renderPanel(
   activities: ReturnType<typeof sessionActivity>[],
-  dispatch?: () => Promise<{ result: null; deduped: boolean; sequence: number }>,
+  dispatch?: () => Promise<{
+    result: null
+    deduped: boolean
+    sequence: number
+  }>,
 ) {
   const seeded = sessionFactory({ activities })
   useChatProjectionStore.getState().resetChatProjection()
@@ -185,5 +196,121 @@ function renderPanel(
     </ChatPendingRequestsProvider>,
   )
 
-  return { dispatched }
+  return { dispatched, sessionId: seeded.id }
 }
+
+test('only message-mode questions offer dismissal and dispatch without an answer', async () => {
+  const activity = requestedActivity([framework()])
+  const { dispatched } = renderPanel([
+    {
+      ...activity,
+      payload: {
+        questions: [framework()],
+        requestId: REQUEST_ID,
+        responseMode: 'message',
+      },
+    },
+  ])
+  await userEvent.click(screen.getByRole('button', { name: 'Dismiss' }))
+  expect(dispatched[0]).toMatchObject({
+    type: 'session.user-input.dismiss',
+    requestId: REQUEST_ID,
+  })
+  expect(dispatched[0]).not.toHaveProperty('answers')
+})
+
+test('native callback questions do not offer dismissal', () => {
+  renderPanel([requestedActivity([framework()])])
+  expect(screen.queryByRole('button', { name: 'Dismiss' })).not.toBeInTheDocument()
+})
+
+test('number shortcuts select visible choices but ignore editable fields and modifiers', async () => {
+  renderPanel([requestedActivity([{ ...framework(), allowOther: true }])])
+  await userEvent.keyboard('2')
+  expect(screen.getByRole('button', { name: 'Bun test' })).toHaveAttribute('aria-pressed', 'true')
+  await userEvent.click(screen.getByLabelText('Other'))
+  await userEvent.keyboard('1')
+  expect(screen.getByLabelText('Other')).toHaveValue('1')
+  await userEvent.click(screen.getByRole('status'))
+  await userEvent.keyboard('{Control>}1{/Control}')
+  expect(screen.getByRole('button', { name: 'Vitest' })).toHaveAttribute('aria-pressed', 'false')
+})
+
+test('number shortcuts answer only the visible request when two requests are pending', async () => {
+  const secondQuestion = {
+    ...framework(),
+    id: 'second',
+    prompt: 'Second pending question?',
+  }
+  const second = requestedActivity([secondQuestion])
+  const { dispatched } = renderPanel([
+    requestedActivity([framework()]),
+    {
+      ...second,
+      id: v.parse(eventIdSchema, 'second-pending-question'),
+      sequence: 2,
+      payload: { questions: [secondQuestion], requestId: 'user-input-2' },
+    },
+  ])
+
+  expect(screen.getAllByRole('region', { name: 'Agent question' })).toHaveLength(1)
+  expect(screen.queryByText('Second pending question?')).not.toBeInTheDocument()
+  await userEvent.keyboard('2')
+  await userEvent.click(screen.getByRole('button', { name: 'Submit' }))
+  expect(dispatched).toHaveLength(1)
+  expect(dispatched[0]).toMatchObject({
+    requestId: REQUEST_ID,
+    answers: { framework: 'bun-test' },
+  })
+})
+
+test('independent question attachments can answer without text and survive failed response', async () => {
+  const { dispatched, sessionId } = renderPanel(
+    [requestedActivity([notes(), { ...notes(), id: 'second', prompt: 'Second question?' }])],
+    async () => {
+      throw new TypeError('Response rejected')
+    },
+  )
+  function stage(questionId: string, name: string) {
+    const attachment = {
+      type: 'image' as const,
+      id: `test-${questionId}`,
+      name,
+      mimeType: 'image/png',
+      sizeBytes: 5,
+    }
+    act(() =>
+      useChatInputDraftStore.getState().addAttachments(
+        {
+          environmentId: FIXTURE_ENVIRONMENT_ID,
+          rootPath: '',
+          draftKey: `${sessionId}:question:${REQUEST_ID}:${questionId}`,
+        },
+        [
+          {
+            ...attachment,
+            previewUrl: 'data:image/png;base64,AA==',
+            upload: { status: 'ready', attachment, expiresAt: '2099-01-01T00:00:00Z' },
+          },
+        ],
+      ),
+    )
+  }
+  stage('notes', 'first.png')
+  await screen.findByRole('button', { name: 'Remove first.png' })
+  await userEvent.click(screen.getByRole('button', { name: 'Next' }))
+  expect(screen.queryByRole('button', { name: 'Remove first.png' })).not.toBeInTheDocument()
+  stage('second', 'second.png')
+  await screen.findByRole('button', { name: 'Remove second.png' })
+  await userEvent.click(screen.getByRole('button', { name: 'Submit' }))
+  expect(dispatched[0]).toMatchObject({
+    answers: { notes: '', second: '' },
+    attachmentsByQuestionId: {
+      notes: [expect.objectContaining({ name: 'first.png' })],
+      second: [expect.objectContaining({ name: 'second.png' })],
+    },
+  })
+  expect(screen.getByRole('button', { name: 'Remove second.png' })).toBeInTheDocument()
+  await userEvent.click(screen.getByRole('button', { name: 'Back' }))
+  expect(screen.getByRole('button', { name: 'Remove first.png' })).toBeInTheDocument()
+})

@@ -7,10 +7,7 @@ import {
   type ThemeBundle,
   type ColorMode,
 } from '@workspace/contracts'
-import {
-  AppearancePreviewContext,
-  BundlePreviewContext,
-} from '@/features/settings/providers/appearance-preview-context'
+import { AppearancePreviewContext } from '@/features/settings/providers/appearance-preview-context'
 import {
   ViewTransition,
   useCallback,
@@ -29,9 +26,11 @@ import {
 import { paletteStylesheet, resolvePalette } from '@workspace/client-core/themes/palette'
 
 import { loadNerdFont } from '@/lib/default-nerd-font'
+import { BundleContext } from '@/lib/appearance/providers/bundle-context'
 import { PaletteContext } from '@/lib/appearance/providers/palette-context'
 import { applyPaletteStylesheet, writePaletteBootCache } from '@/lib/appearance/utils/palette-style'
 
+import { useBundleLibrary } from '@/features/settings/hooks/use-bundle-library'
 import { usePaletteCatalog } from '@/features/settings/hooks/use-palette-catalog'
 import { useSettingsActions } from '@/features/settings/hooks/use-settings-actions'
 import { useSettingsDocument } from '@/features/settings/hooks/use-settings-document'
@@ -44,7 +43,7 @@ import {
   resolveColorTheme,
   type AppearanceValues,
 } from '@/features/settings/utils/apply-appearance'
-import { readSettingsMirror, writeBootMirror } from '@/features/settings/utils/boot-mirror'
+import { readSettingsMirror, writeBootMirror } from '@/lib/settings-boot-mirror'
 
 type Preview<T> = {
   readonly value: T
@@ -65,19 +64,22 @@ export function AppearanceProvider({
 }) {
   const confirmedQuery = useSettingsDocument()
   const projection = useSettingsProjection()
-  const { setColorTheme, setSetting } = useSettingsActions()
+  const { selectBundle, setColorTheme, setSetting } = useSettingsActions()
   const catalog = usePaletteCatalog()
+  const bundles = useBundleLibrary().catalog
   const [bootValues] = useState(readSettingsMirror)
   const prefersDark = useSystemColorMode() === 'dark'
-  const [bundlePreview, setBundlePreview] = useState<{
+  const [bundleState, setBundlePreview] = useState<Preview<{
     theme: ThemeBundle
     mode?: ColorMode
-  } | null>(null)
+  }> | null>(null)
   const [modePreview, setModePreview] = useState<Preview<Theme> | null>(null)
   const [palettePreview, setPalettePreview] = useState<Preview<Palette> | null>(null)
   const projectedValues = projection?.values
   const baseValues = projectedValues ?? { ...DEFAULT_SETTING_VALUES, ...bootValues }
   const committedTheme = baseValues['workbench.colorTheme']
+  const bundleHandoffObserved = projectionObservesHandoff(projection, bundleState?.handingOffTo)
+  const bundlePreview = bundleState && !bundleHandoffObserved ? bundleState.value : null
   const modeHandoffObserved = projectionObservesHandoff(projection, modePreview?.handingOffTo)
   const requestedMode =
     bundlePreview?.mode ??
@@ -105,6 +107,12 @@ export function AppearanceProvider({
 
     clearMatchingHandoff(setModePreview, modePreview.handingOffTo)
   }, [modeHandoffObserved, modePreview?.handingOffTo])
+
+  useEffect(() => {
+    if (!bundleHandoffObserved || !bundleState?.handingOffTo) return
+
+    clearMatchingHandoff(setBundlePreview, bundleState.handingOffTo)
+  }, [bundleHandoffObserved, bundleState?.handingOffTo])
 
   useEffect(() => {
     if (!paletteHandoffObserved || !palettePreview?.handingOffTo) return
@@ -228,14 +236,36 @@ export function AppearanceProvider({
   }
 
   // Cleanup uses stable identities so moving focus between cards cannot clear a newer preview.
-  const previewBundle = useCallback(
-    (bundle: ThemeBundle, mode?: ColorMode) => setBundlePreview({ theme: bundle, mode }),
-    [],
-  )
-  const clearBundlePreview = useCallback(() => setBundlePreview(null), [])
+  const previewBundle = useCallback((bundle: ThemeBundle, mode?: ColorMode) => {
+    setBundlePreview((current) =>
+      current?.handingOffTo ? current : { handingOffTo: null, value: { theme: bundle, mode } },
+    )
+  }, [])
+  const clearBundlePreview = useCallback(() => {
+    setBundlePreview((current) => (current && !current.handingOffTo ? null : current))
+  }, [])
+
+  const chooseBundle = (bundle: ThemeBundle, initiator?: string): SettingsSubmission => {
+    const submission = selectBundle(bundle, initiator)
+    if (submission.kind === 'noop') return submission
+
+    setBundlePreview({ handingOffTo: submission.mutationId, value: { theme: bundle } })
+    void submission.settled.then(() =>
+      clearMatchingHandoff(setBundlePreview, submission.mutationId),
+    )
+    return submission
+  }
 
   return (
-    <BundlePreviewContext value={{ preview: previewBundle, clear: clearBundlePreview }}>
+    <BundleContext
+      value={{
+        bundleId: baseValues['workbench.theme']?.id ?? null,
+        catalog: bundles,
+        preview: previewBundle,
+        clear: clearBundlePreview,
+        select: chooseBundle,
+      }}
+    >
       <AppearancePreviewContext value={renderedValues}>
         <WorkbenchDensityBootContext value={bootDensity}>
           <ThemeContext
@@ -269,7 +299,7 @@ export function AppearanceProvider({
           </ThemeContext>
         </WorkbenchDensityBootContext>
       </AppearancePreviewContext>
-    </BundlePreviewContext>
+    </BundleContext>
   )
 }
 

@@ -65,6 +65,7 @@ type SessionSelectionStore = {
     environmentId: EnvironmentId,
     projectId: ProjectId,
     worktreeId?: WorktreeId,
+    draftId?: string,
   ) => void
 }
 
@@ -87,12 +88,12 @@ function selectionStore(remembered: SessionSelection) {
     selection: remembered,
     selectSession: (environmentId, projectId, sessionId) =>
       set({ restored: false, selection: { kind: 'session', environmentId, projectId, sessionId } }),
-    startDraft: (environmentId, projectId, worktreeId) =>
+    startDraft: (environmentId, projectId, worktreeId, draftId = crypto.randomUUID()) =>
       set((state) => ({
         draftGeneration: state.draftGeneration + 1,
         draftWorktreeId: worktreeId ?? null,
         restored: false,
-        selection: { kind: 'draft', environmentId, projectId },
+        selection: { kind: 'draft', environmentId, projectId, draftId },
       })),
   }))
 }

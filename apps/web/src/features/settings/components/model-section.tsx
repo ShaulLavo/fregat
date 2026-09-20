@@ -4,7 +4,7 @@ import { modelPreferenceRows } from '@workspace/client-core/chat/providers/prefe
 import { providerModelOptions } from '@workspace/client-core/chat/providers/models'
 import { providerListQueryOptions } from '@/features/chat/utils/provider-query'
 
-import { useSettingValue } from '../hooks/use-setting-value'
+import { useSettingValue } from '@/hooks/use-setting-value'
 import { EmptyRow } from './empty-row'
 import { ModelRow } from './model-row'
 import { useSettingsOwner } from '@/features/settings/hooks/use-settings-owner'

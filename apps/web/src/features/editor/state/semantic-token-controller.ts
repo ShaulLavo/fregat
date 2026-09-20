@@ -13,7 +13,7 @@ import type { LspClient, LspDocument, lsp } from '@singapore-editor/lsp'
 import { LspRequestCancelledError, offsetToLspPositionInSnapshot } from '@singapore-editor/lsp'
 
 import { log } from '@/lib/client-logging'
-import { readSettingsMirror } from '@/features/settings/utils/boot-mirror'
+import { readSettingsMirror } from '@/lib/settings-boot-mirror'
 import {
   semanticTokenProfileFor,
   type SemanticTokenServerProfile,

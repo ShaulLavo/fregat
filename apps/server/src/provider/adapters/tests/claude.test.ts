@@ -1,3 +1,4 @@
+import { BackgroundTaskRegistry } from '../../background-liveness'
 import { mkdtemp, rm } from 'node:fs/promises'
 import { tmpdir } from 'node:os'
 import path from 'node:path'
@@ -321,6 +322,13 @@ describe('ClaudeProviderAdapter', () => {
 
     const requestId = opened.requestId
     assert(requestId, 'request.opened carried no requestId')
+    await expect(
+      harness.adapter.respondApproval({
+        decision: 'acceptAlways',
+        requestId: v.parse(approvalRequestIdSchema, requestId),
+        sessionId,
+      }),
+    ).rejects.toThrow('does not offer permanent access')
     await harness.adapter.respondApproval({
       decision: 'accept',
       requestId: v.parse(approvalRequestIdSchema, requestId),
@@ -638,6 +646,70 @@ describe('ClaudeProviderAdapter', () => {
     })
     expect(runtimeWarnings(harness)).toEqual([])
     await harness.adapter.stopAll()
+  })
+
+  it('preserves monitor classification across progress and ignores metadata after completion', async () => {
+    const harness = claudeHarness()
+    const liveness = new BackgroundTaskRegistry()
+    const unsubscribe = harness.adapter.subscribeEvents((event) => liveness.accept(event))
+    try {
+      await harness.adapter.startRuntime(sessionStartInput({}))
+      const query = latestQuery(harness)
+      await waitForEvent(harness, 'conversation.started')
+      query.emit(
+        systemMessage({
+          subtype: 'task_started',
+          task_id: 'watch',
+          task_type: 'shell',
+          description: 'Watch logs',
+        }),
+      )
+      await waitFor(
+        () => liveness.get(SESSION_ID) === 'monitoring',
+        'watch never became monitoring',
+      )
+      query.emit(
+        systemMessage({
+          subtype: 'task_progress',
+          task_id: 'watch',
+          description: 'Still watching',
+          usage: { duration_ms: 1, tool_uses: 0, total_tokens: 0 },
+        }),
+      )
+      await waitFor(
+        () => harness.events.some((event) => event.type === 'task.progress'),
+        'progress missing',
+      )
+      expect(liveness.get(SESSION_ID)).toBe('monitoring')
+      query.emit(
+        systemMessage({
+          subtype: 'task_updated',
+          task_id: 'watch',
+          patch: { status: 'completed' },
+        }),
+      )
+      await waitFor(() => liveness.get(SESSION_ID) === null, 'completed task remained live')
+      query.emit(
+        systemMessage({
+          subtype: 'task_progress',
+          task_id: 'watch',
+          description: 'Late metadata',
+          usage: { duration_ms: 1, tool_uses: 0, total_tokens: 0 },
+        }),
+      )
+      await waitFor(
+        () =>
+          harness.events.some(
+            (event) =>
+              event.type === 'task.progress' && event.payload.description === 'Late metadata',
+          ),
+        'late metadata missing',
+      )
+      expect(liveness.get(SESSION_ID)).toBeNull()
+    } finally {
+      unsubscribe()
+      await harness.adapter.stopAll()
+    }
   })
 
   it('maps every SDK message onto its intended runtime event', async () => {
@@ -966,7 +1038,9 @@ function askUserQuestionInput() {
   }
 }
 
-function imageAttachment(overrides: Partial<ChatAttachment> = {}): ChatAttachment {
+function imageAttachment(
+  overrides: Partial<Extract<ChatAttachment, { type: 'image' }>> = {},
+): Extract<ChatAttachment, { type: 'image' }> {
   return {
     id: 'attachment-1',
     mimeType: 'image/png',

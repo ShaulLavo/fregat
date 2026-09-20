@@ -4,7 +4,7 @@ import type {
   SessionRailProject,
   SessionSearchMatches,
 } from '@workspace/client-core/chat/rail/model'
-import type { ProjectId, SessionId } from '@workspace/contracts'
+import type { SessionId } from '@workspace/contracts'
 import { worktreeSummary } from '@/worktrees/utils/summary'
 
 export type RailRow =
@@ -14,16 +14,16 @@ export type RailRow =
 export function railRows(
   model: SessionRailModel,
   marked: readonly SessionId[],
-  scope: ProjectId | null,
+  scope: string | null,
   query: string,
   search: SessionSearchMatches = {},
 ) {
   const rows: { key: string; name: string; description: string; value: RailRow }[] = []
-  const listed = new Set<ProjectId>()
+  const listed = new Set<string>()
   for (const section of model.sections) {
     for (const group of section.groups) {
       const project = group.project
-      listed.add(project.id)
+      listed.add(project.groupKey)
       rows.push({
         key: group.key,
         name: `${group.collapsed ? '▸' : '▾'} ${project.title}`,
@@ -40,7 +40,7 @@ export function railRows(
     }
   }
   for (const project of model.projects) {
-    if (listed.has(project.id) || (scope !== null && project.id !== scope)) continue
+    if (listed.has(project.groupKey) || (scope !== null && project.groupKey !== scope)) continue
     if (query && !project.title.toLowerCase().includes(query.toLowerCase())) continue
     rows.push({
       key: project.key,

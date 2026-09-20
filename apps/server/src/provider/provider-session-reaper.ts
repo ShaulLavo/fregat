@@ -20,42 +20,30 @@ const IDLE_PROVIDER_SESSION_DEADLINE_MS = 30 * 60 * 1000
  */
 const REAPABLE_STATUS: SessionRuntimeStatus = 'ready'
 
-type StopRuntime = (input: { sessionId: SessionId }) => Promise<unknown>
+type StopRuntime = (input: { sessionId: SessionId; idleBefore: string }) => Promise<unknown>
 
-/**
- * Reclaims the child processes of sessions nobody is using.
- *
- * Deliberately demand-triggered rather than on a timer: it sweeps when a new
- * session is about to be started, which is the moment the cost of holding idle
- * ones is about to be paid. An interval would also have to reason about
- * shutdown ordering and would fire inside every test in the suite, for a
- * reclaim nobody is waiting on — an idle machine has nothing to lose by holding
- * a process until it is next asked to start one.
- *
- * Safety rests entirely on the liveness stamp: `lastSeenAt` moves with the
- * provider's own event stream, not just with status transitions, so a session
- * doing long background work reads as recently seen even though its status has
- * not changed in an hour. Without that feed this class would kill live work,
- * which is why it must never be pointed at a directory that is not being fed.
- */
 export class ProviderSessionReaper {
   private readonly deadlineMs: number
   private readonly directory: ProviderSessionDirectory
   private readonly now: () => number
   private readonly isLaunching: (sessionId: SessionId) => boolean
+  private readonly hasBackgroundWork: (sessionId: SessionId) => boolean
   private readonly stopRuntime: StopRuntime
+  private pendingSweep: Promise<SessionId[]> | null = null
 
   constructor(options: {
     deadlineMs?: number
     directory: ProviderSessionDirectory
     now?: () => number
     isLaunching?: (sessionId: SessionId) => boolean
+    hasBackgroundWork?: (sessionId: SessionId) => boolean
     stopRuntime: StopRuntime
   }) {
     this.deadlineMs = options.deadlineMs ?? IDLE_PROVIDER_SESSION_DEADLINE_MS
     this.directory = options.directory
     this.now = options.now ?? Date.now
     this.isLaunching = options.isLaunching ?? (() => false)
+    this.hasBackgroundWork = options.hasBackgroundWork ?? (() => false)
     this.stopRuntime = options.stopRuntime
   }
 
@@ -64,7 +52,19 @@ export class ProviderSessionReaper {
    * the user actually asked for, and one adapter that cannot stop must not fail
    * the turn that triggered the sweep.
    */
-  async sweep(options: { exceptSessionId?: SessionId } = {}) {
+  sweep(options: { exceptSessionId?: SessionId } = {}) {
+    if (this.pendingSweep) return this.pendingSweep
+    this.pendingSweep = this.runSweep(options).finally(() => {
+      this.pendingSweep = null
+    })
+    return this.pendingSweep
+  }
+
+  async waitForIdle() {
+    await this.pendingSweep
+  }
+
+  private async runSweep(options: { exceptSessionId?: SessionId }) {
     const idle = this.idleBindings(options.exceptSessionId)
     if (idle.length === 0) return []
 
@@ -93,12 +93,23 @@ export class ProviderSessionReaper {
       .listIdleSince(cutoff, REAPABLE_STATUS)
       .filter((binding) => binding.sessionId !== exceptSessionId)
       .filter((binding) => !this.isLaunching(binding.sessionId))
+      .filter((binding) => !this.hasBackgroundWork(binding.sessionId))
   }
 
   private async reap(binding: ProviderRuntimeBindingWithMetadata) {
+    if (
+      !this.idleBindings(undefined).some(
+        (current) =>
+          current.sessionId === binding.sessionId && current.runtimeEpoch === binding.runtimeEpoch,
+      )
+    )
+      return false
     try {
-      await this.stopRuntime({ sessionId: binding.sessionId })
-      return true
+      const result = await this.stopRuntime({
+        sessionId: binding.sessionId,
+        idleBefore: new Date(this.now() - this.deadlineMs).toISOString(),
+      })
+      return result !== null
     } catch (error) {
       recordChatPipelineWarning('chat.pipeline.provider_session_reaper.stop_failed', {
         error,

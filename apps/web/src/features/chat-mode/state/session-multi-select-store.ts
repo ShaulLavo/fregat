@@ -38,3 +38,11 @@ export const useSessionMultiSelectStore = create<SessionMultiSelectStore>()((set
 export function isSessionBulkSelection(refs: readonly ScopedSessionRef[]) {
   return refs.length > 1
 }
+
+export function removeSuccessfulSelection(refs: readonly ScopedSessionRef[]) {
+  const removed = new Set(refs.map(scopedSessionKey))
+  useSessionMultiSelectStore.setState((state) => {
+    const remaining = state.refs.filter((ref) => !removed.has(scopedSessionKey(ref)))
+    return { refs: remaining, anchor: remaining[0] ?? null }
+  })
+}

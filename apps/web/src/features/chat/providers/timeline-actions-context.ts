@@ -8,7 +8,7 @@ export type ChatTimelineActions = {
     path?: string,
   ) => Promise<unknown> | unknown
   readonly openSessionCheckpointDiff: (summary: ChatTurnDiffSummary) => Promise<unknown> | unknown
-  readonly revertToCheckpoint: (turnCount: number) => void
+  readonly revertToCheckpoint: (turnCount: number, messageId: string) => void
 }
 
 export const ChatTimelineActionsContext = createContext<ChatTimelineActions | null>(null)

@@ -113,53 +113,19 @@ function fakeModelWithoutReasoningEfforts() {
 }
 
 function sendReasoningEvents() {
-  send({
-    method: 'item/started',
-    params: {
-      threadId: 'provider-thread-1',
-      turnId: fakeTurn().id,
-      startedAtMs: 1770000000000,
-      item: {
-        id: 'reasoning-1',
-        type: 'reasoning',
-        summary: [],
-        content: [],
-      },
-    },
-  });
-  send({
-    method: 'item/reasoning/summaryPartAdded',
-    params: {
-      threadId: 'provider-thread-1',
-      turnId: fakeTurn().id,
-      itemId: 'reasoning-1',
-      summaryIndex: 0,
-    },
-  });
-  send({
-    method: 'item/reasoning/summaryTextDelta',
-    params: {
-      threadId: 'provider-thread-1',
-      turnId: fakeTurn().id,
-      itemId: 'reasoning-1',
-      delta: 'Inspecting the repo.',
-      summaryIndex: 0,
-    },
-  });
-  send({
-    method: 'item/completed',
-    params: {
-      threadId: 'provider-thread-1',
-      turnId: fakeTurn().id,
-      completedAtMs: 1770000001000,
-      item: {
-        id: 'reasoning-1',
-        type: 'reasoning',
-        summary: ['Inspecting the repo.'],
-        content: [],
-      },
-    },
-  });
+  const long = process.env.PLATFORM_FAKE_CODEX_MODE?.startsWith('reasoning-long');
+  const parts = long ? ['A'.repeat(640), 'B'.repeat(640)] : ['Inspecting the repo.'];
+  const params = { threadId: 'provider-thread-1', turnId: fakeTurn().id, itemId: 'reasoning-1' };
+  if (!process.env.PLATFORM_FAKE_CODEX_MODE?.endsWith('final-only')) {
+    for (const [index, delta] of parts.entries()) {
+      const raw = process.env.PLATFORM_FAKE_CODEX_MODE === 'reasoning-long-mixed' && index === 1;
+      send({ method: raw ? 'item/reasoning/textDelta' : 'item/reasoning/summaryTextDelta', params: { ...params, ...(raw ? { contentIndex: index } : { summaryIndex: index }), delta } });
+    }
+  }
+  const contentOnly = process.env.PLATFORM_FAKE_CODEX_MODE === 'reasoning-long-content-final-only';
+  const item = { id: 'reasoning-1', type: 'reasoning', summary: contentOnly ? [] : parts, content: contentOnly ? parts : ['unused full reasoning'] };
+  send({ method: 'item/completed', params: { ...params, item } });
+  send({ method: 'item/completed', params: { ...params, item } });
 }
 
 function sendAgentMessageItemCompleted(itemId, text) {
@@ -203,6 +169,13 @@ function assertStartParams(message) {
 }
 
 function assertTurnParams(message) {
+  if (process.env.PLATFORM_FAKE_CODEX_MODE === 'local-image') {
+    const image = message.params.input.find((item) => item.type === 'localImage');
+    if (!image || require('node:fs').readFileSync(image.path, 'utf8') !== 'synthetic-image') {
+      fail(message.id, 'Stored image was not passed by native localImage path');
+      return false;
+    }
+  }
   if (message.params.model !== 'codex') {
     fail(message.id, 'turn model mismatch');
     return false;
@@ -237,6 +210,22 @@ function assertTurnParams(message) {
     return false;
   }
   return true;
+}
+
+function sendMcpRequests(mode) {
+  const parent = { threadId: 'provider-thread-1', turnId: fakeTurn().id };
+  const child = { threadId: 'mcp-child', turnId: 'mcp-child-turn' };
+  send({ method: 'item/started', params: { ...parent, item: { id: 'mcp-spawn', type: 'subAgentActivity', agentThreadId: child.threadId, agentPath: '/root/mcp', kind: 'started' } } });
+  send({ method: 'thread/started', params: { thread: { ...fakeSession(), id: child.threadId, source: { subAgent: { thread_spawn: { parent_thread_id: parent.threadId, agent_nickname: 'MCP', agent_role: 'explorer' } } } } } });
+  send({ method: 'turn/started', params: { threadId: child.threadId, turn: { id: child.turnId, status: 'inProgress', items: [] } } });
+  const fields = mode === 'mcp-once-only' ? ['once'] : ['once', 'session', 'always'];
+  let requestedSchema = { properties: { approval: { enum: fields } }, required: ['approval'] };
+  if (mode === 'mcp-required') requestedSchema = { properties: { email: { type: 'string' } }, required: ['email'] };
+  if (mode === 'mcp-unknown') requestedSchema = { properties: 123 };
+  const params = { mode: 'form', serverName: 'computer-use', message: 'Allow ChatGPT to use Safari?', _meta: { persist: ['session', 'always'] }, requestedSchema };
+  if (mode === 'mcp-url') params.mode = 'url';
+  send({ id: 911, method: 'mcpServer/elicitation/request', params: { ...params, ...parent } });
+  send({ id: 'child-mcp', method: 'mcpServer/elicitation/request', params: { ...params, ...child } });
 }
 
 function sendChildEvents() {
@@ -302,7 +291,7 @@ function handle(message) {
   const mode = process.env.PLATFORM_FAKE_CODEX_MODE;
   const nativeProjection = mode === 'native-projection' || mode === 'native-projection-final-only';
   if (mode === 'steer-stop-late-completion' && handleSteerStopSequence(message)) return;
-  if (!message.method && (message.id === 801 || message.id === 802)) {
+  if (!message.method && message.id !== undefined) {
     record({ event: 'server-response', ...message });
     return;
   }
@@ -392,6 +381,30 @@ function handle(message) {
       params: { threadId: 'provider-thread-1', turn: fakeTurn('inProgress') },
     });
     if (mode === 'child-agents' || mode === 'child-input-response' || nativeProjection) sendChildEvents();
+    if (mode === 'permission-invalid') {
+      send({ id: 901, method: 'item/permissions/requestApproval', params: { threadId: 'provider-thread-1', turnId: fakeTurn().id, itemId: 'permission-invalid', permissions: null } });
+    }
+    if (mode?.startsWith('mcp-')) sendMcpRequests(mode);
+    if (mode === 'async-questions') {
+      const parent = { threadId: 'provider-thread-1', turnId: fakeTurn().id };
+      const child = { threadId: 'async-child', turnId: 'async-child-turn' };
+      send({ method: 'item/started', params: { ...parent, item: { id: 'async-spawn', type: 'subAgentActivity', agentThreadId: child.threadId, agentPath: '/root/async', kind: 'started' } } });
+      send({ method: 'thread/started', params: { thread: { ...fakeSession(), id: child.threadId, source: { subAgent: { thread_spawn: { parent_thread_id: parent.threadId } } } } } });
+      send({ method: 'turn/started', params: { threadId: child.threadId, turn: { id: child.turnId, status: 'inProgress', items: [] } } });
+      for (const owner of [parent, child]) {
+        const notification = { method: 'item/completed', params: { ...owner, item: { id: 'question-' + owner.threadId, type: 'agentMessage', delivery: 'async', text: '', questions: [{ title: 'Pick a language', options: ['Rust', 'Go'] }] } } };
+        send(notification);
+        send(notification);
+      }
+    }
+    if (mode === 'permission-response') {
+      send({ method: 'item/started', params: { threadId: 'provider-thread-1', turnId: fakeTurn().id, item: { id: 'permission-spawn', type: 'subAgentActivity', agentThreadId: 'permission-child', agentPath: '/root/permissions', kind: 'started' } } });
+      send({ method: 'thread/started', params: { thread: { ...fakeSession(), id: 'permission-child', source: { subAgent: { thread_spawn: { parent_thread_id: 'provider-thread-1', agent_nickname: 'Permissions', agent_role: 'explorer' } } } } } });
+      send({ method: 'turn/started', params: { threadId: 'permission-child', turn: { id: 'permission-child-turn', status: 'inProgress', items: [] } } });
+      send({ id: 901, method: 'item/permissions/requestApproval', params: { threadId: 'provider-thread-1', turnId: fakeTurn().id, itemId: 'permission-parent', permissions: { network: { enabled: true } } } });
+      send({ id: 'child-permission', method: 'item/permissions/requestApproval', params: { threadId: 'permission-child', turnId: 'permission-child-turn', itemId: 'permission-child-item', permissions: { fileSystem: { read: ['/work/example'], write: [] } } } });
+    }
+
     if (nativeProjection) {
       send({ method: 'turn/completed', params: { threadId: 'child-thread-1', turn: { id: 'child-turn-1', status: 'completed', items: [] } } });
     }
@@ -443,7 +456,7 @@ function handle(message) {
       send({ method: 'thread/status/changed', params: { threadId: 'provider-thread-1', status: { type: 'idle' } } });
       send({ method: 'item/completed', params: { threadId: 'provider-thread-1', turnId: fakeTurn().id, item: { id: 'root-failed-command', type: 'commandExecution', command: 'rg missing', status: 'failed', exitCode: 2 } } });
     }
-    if (mode === 'reasoning-events') {
+    if (mode === 'reasoning-events' || mode?.startsWith('reasoning-long')) {
       sendReasoningEvents();
     }
     if (mode === 'retryable-error') {
@@ -682,17 +695,16 @@ function handle(message) {
     send({ id: message.id, result: { data, nextCursor: next < all.length ? String(next) : null } });
     return;
   }
-  if (message.method === 'thread/rollback') {
-    if (message.params.numTurns !== 1) {
-      fail(message.id, 'rollback numTurns mismatch');
-      return;
-    }
-    send({
-      id: message.id,
-      result: {
-        thread: fakeSession(),
-      },
-    });
+  if (message.method === 'thread/turns/list') {
+    record({ event: 'thread/turns/list', params: message.params });
+    const older = message.params.cursor === 'older';
+    const ids = older ? ['rollback-turn-2', 'rollback-turn-1'] : ['rollback-turn-3'];
+    send({ id: message.id, result: { data: ids.map((id) => ({ ...fakeTurn('completed'), id })), nextCursor: older ? null : 'older' } });
+    return;
+  }
+  if (message.method === 'thread/revert') {
+    record({ event: 'thread/revert', params: message.params });
+    send({ id: message.id, result: { thread: fakeSession() } });
     return;
   }
   fail(message.id, 'unsupported method: ' + message.method);
@@ -725,6 +737,8 @@ type FakeCodexLogEntry = {
     | 'thread/list'
     | 'thread/read'
     | 'thread/resume'
+    | 'thread/turns/list'
+    | 'thread/revert'
 }
 
 type EchoedModeParams = {
@@ -858,6 +872,7 @@ describe('CodexProviderAdapter', () => {
       const hasRuntimeAfterStop = await adapter.hasRuntime({ sessionId: input.sessionId })
 
       expect(adapter.capabilities).toEqual({
+        conversationRollback: true,
         listCommands: true,
         sessionModelSwitch: 'in-session',
       })
@@ -983,6 +998,25 @@ describe('CodexProviderAdapter', () => {
 
       expect(await adapter.hasRuntime({ sessionId: input.sessionId })).toBe(false)
     })
+  })
+
+  it('resolves persisted image metadata to a readable native localImage path', async () => {
+    await withFakeCodex(
+      async ({ projectPath }) => {
+        await writeFile(path.join(projectPath, 'stored.png'), 'synthetic-image')
+        const adapter = new CodexProviderAdapter({ attachmentsDir: projectPath })
+        const input = providerTurnInput()
+        input.attachments = [
+          { type: 'image', id: 'stored', name: 'stored.png', mimeType: 'image/png', sizeBytes: 15 },
+        ]
+        try {
+          await adapter.sendTurn(input)
+        } finally {
+          await adapter.stopAll()
+        }
+      },
+      { mode: 'local-image' },
+    )
   })
 
   it('relays the selected reasoning effort to turn/start verbatim', async () => {
@@ -1257,9 +1291,11 @@ describe('CodexProviderAdapter', () => {
   })
 
   it.for([
-    { delivery: 'streaming', mode: 'native-projection' },
-    { delivery: 'buffered', mode: 'native-projection' },
-    { delivery: 'streaming', mode: 'native-projection-final-only' },
+    { delivery: 'token', mode: 'native-projection' },
+    { delivery: 'turn', mode: 'native-projection' },
+    { delivery: 'paragraph', mode: 'native-projection' },
+    { delivery: 'token', mode: 'native-projection-final-only' },
+    { delivery: 'paragraph', mode: 'native-projection-final-only' },
   ] as const)(
     'projects a native Codex child session for browser handoff ($delivery, $mode)',
     async ({ delivery, mode }, { onTestFinished }) => {
@@ -1328,7 +1364,7 @@ describe('CodexProviderAdapter', () => {
             streaming: false,
           })
           const snapshotPath = process.env.PLATFORM_CHAT_PARITY_SNAPSHOT
-          if (!snapshotPath || delivery !== 'streaming' || mode !== 'native-projection') return
+          if (!snapshotPath || delivery !== 'token' || mode !== 'native-projection') return
           await mkdir(path.dirname(snapshotPath), { recursive: true })
           await writeFile(
             snapshotPath,
@@ -1441,6 +1477,37 @@ describe('CodexProviderAdapter', () => {
     )
   })
 
+  it('projects parent and child async questions with stable message-mode request IDs', async () => {
+    await withFakeCodex(
+      async () => {
+        const adapter = new CodexProviderAdapter()
+        const input = providerTurnInput()
+        const events: ProviderRuntimeEvent[] = []
+        collectAdapterEvents(adapter, events)
+        await adapter.sendTurn(input)
+        await settleRuntimeEvents()
+        await adapter.stopAll()
+        const questions = events.filter((event) => event.type === 'user-input.requested')
+        expect(questions.length).toBeGreaterThanOrEqual(2)
+        expect(new Set(questions.map((event) => event.eventId)).size).toBe(2)
+        expect(questions).toEqual(
+          expect.arrayContaining([
+            expect.objectContaining({
+              requestId: `codex-async:${input.sessionId}:question-provider-thread-1`,
+              payload: expect.objectContaining({ responseMode: 'message' }),
+            }),
+            expect.objectContaining({
+              requestId: `codex-async:${input.sessionId}:question-async-child`,
+              agent: expect.objectContaining({ threadId: 'async-child' }),
+              payload: expect.objectContaining({ responseMode: 'message' }),
+            }),
+          ]),
+        )
+      },
+      { mode: 'async-questions' },
+    )
+  })
+
   it('preserves native root idle status and failed tool verdicts', async () => {
     await withFakeCodex(
       async () => {
@@ -1510,6 +1577,229 @@ describe('CodexProviderAdapter', () => {
         ])
       },
       { mode: 'child-input-response' },
+    )
+  })
+
+  it.for(['accept', 'acceptForSession', 'decline', 'cancel'] as const)(
+    'answers native permission requests with the requested profile for %s',
+    async (decision, { onTestFinished }) => {
+      await withFakeCodex(
+        async ({ spawnLogPath }) => {
+          const adapter = new CodexProviderAdapter()
+          onTestFinished(() => adapter.stopAll())
+          const input = { ...providerTurnInput(), sessionId: v.parse(sessionIdSchema, SESSION_ID) }
+          const projection = createNativeSessionProjection(input)
+          onTestFinished(projection.close)
+          const events: ProviderRuntimeEvent[] = []
+          const ingestion: Promise<void>[] = []
+          adapter.subscribeEvents((event) => {
+            events.push(event)
+            ingestion.push(projection.ingestion.ingest(event))
+          })
+          await adapter.sendTurn(input)
+          const opened = events.filter((event) => event.type === 'request.opened')
+          expect(opened).toHaveLength(2)
+          expect(opened[1]).toMatchObject({
+            agent: { threadId: 'permission-child' },
+            providerRefs: {
+              providerThreadId: 'permission-child',
+              providerTurnId: 'permission-child-turn',
+            },
+            turnId: input.turnId,
+          })
+          for (const event of opened) {
+            const requestId = v.parse(approvalRequestIdSchema, event.requestId)
+            await adapter.respondApproval({ sessionId: input.sessionId, requestId, decision })
+            await expect(
+              adapter.respondApproval({ sessionId: input.sessionId, requestId, decision }),
+            ).rejects.toThrow('Unknown pending approval')
+          }
+          await waitForFakeCodexEvent(spawnLogPath, 'server-response')
+          await adapter.stopAll()
+          await Promise.all(ingestion)
+          await projection.ingestion.drain()
+          const granted = decision === 'accept' || decision === 'acceptForSession'
+          const scope = decision === 'acceptForSession' ? { scope: 'session' } : {}
+          const entries = await readFakeCodexLog(spawnLogPath)
+          expect(entries.filter((entry) => entry.event === 'server-response')).toEqual([
+            {
+              event: 'server-response',
+              id: 901,
+              result: { permissions: granted ? { network: { enabled: true } } : {}, ...scope },
+            },
+            {
+              event: 'server-response',
+              id: 'child-permission',
+              result: {
+                permissions: granted ? { fileSystem: { read: ['/work/example'], write: [] } } : {},
+                ...scope,
+              },
+            },
+          ])
+          expect(events.filter((event) => event.type === 'request.resolved')).toHaveLength(2)
+          const activities = projection.snapshot().session.activities
+          expect(
+            activities.filter((activity) => activity.kind === 'approval.requested'),
+          ).toHaveLength(2)
+          expect(
+            activities.filter((activity) => activity.kind === 'approval.resolved'),
+          ).toHaveLength(2)
+        },
+        { mode: 'permission-response' },
+      )
+    },
+  )
+
+  it('rejects malformed native permission profiles without opening an approval', async () => {
+    await withFakeCodex(
+      async ({ spawnLogPath }) => {
+        const adapter = new CodexProviderAdapter()
+        const events: ProviderRuntimeEvent[] = []
+        collectAdapterEvents(adapter, events)
+        await adapter.sendTurn(providerTurnInput())
+        await waitForFakeCodexEvent(spawnLogPath, 'server-response')
+        await adapter.stopAll()
+        expect(events.filter((event) => event.type === 'request.opened')).toEqual([])
+        const entries = await readFakeCodexLog(spawnLogPath)
+        expect(entries.filter((entry) => entry.event === 'server-response')).toMatchObject([
+          { id: 901, error: { code: -32000 } },
+        ])
+      },
+      { mode: 'permission-invalid' },
+    )
+  })
+
+  it.for([
+    { decision: 'accept', result: { action: 'accept', content: { approval: 'once' } } },
+    {
+      decision: 'acceptForSession',
+      result: { action: 'accept', content: { approval: 'session' }, _meta: { persist: 'session' } },
+    },
+    {
+      decision: 'acceptAlways',
+      result: { action: 'accept', content: { approval: 'always' }, _meta: { persist: 'always' } },
+    },
+    { decision: 'decline', result: { action: 'decline' } },
+    { decision: 'cancel', result: { action: 'cancel' } },
+  ] as const)(
+    'answers parent and child MCP approvals exactly once for %s',
+    async ({ decision, result }, { onTestFinished }) => {
+      await withFakeCodex(
+        async ({ spawnLogPath }) => {
+          const adapter = new CodexProviderAdapter()
+          onTestFinished(() => adapter.stopAll())
+          const input = { ...providerTurnInput(), sessionId: v.parse(sessionIdSchema, SESSION_ID) }
+          const projection = createNativeSessionProjection(input)
+          onTestFinished(projection.close)
+          const events: ProviderRuntimeEvent[] = []
+          const ingestion: Promise<void>[] = []
+          adapter.subscribeEvents((event) => {
+            events.push(event)
+            ingestion.push(projection.ingestion.ingest(event))
+          })
+          await adapter.sendTurn(input)
+          const opened = events.filter((event) => event.type === 'request.opened')
+          expect(opened).toHaveLength(2)
+          expect(opened[1]).toMatchObject({
+            agent: { threadId: 'mcp-child' },
+            providerRefs: { providerThreadId: 'mcp-child', providerTurnId: 'mcp-child-turn' },
+            turnId: input.turnId,
+          })
+          for (const event of opened) {
+            const requestId = v.parse(approvalRequestIdSchema, event.requestId)
+            await adapter.respondApproval({ sessionId: input.sessionId, requestId, decision })
+            await expect(
+              adapter.respondApproval({ sessionId: input.sessionId, requestId, decision }),
+            ).rejects.toThrow('Unknown pending approval')
+          }
+          await waitForFakeCodexEvent(spawnLogPath, 'server-response')
+          await adapter.stopAll()
+          await Promise.all(ingestion)
+          await projection.ingestion.drain()
+          const entries = await readFakeCodexLog(spawnLogPath)
+          expect(entries.filter((entry) => entry.event === 'server-response')).toEqual([
+            { event: 'server-response', id: 911, result },
+            { event: 'server-response', id: 'child-mcp', result },
+          ])
+          const activities = projection.snapshot().session.activities
+          expect(
+            activities.filter((activity) => activity.kind === 'approval.requested'),
+          ).toHaveLength(2)
+          for (const activity of activities.filter(
+            (activity) => activity.kind === 'approval.requested',
+          ))
+            expect(activity.payload).toMatchObject({
+              options: [
+                { decision: 'cancel' },
+                { decision: 'decline' },
+                { decision: 'acceptForSession' },
+                { decision: 'acceptAlways' },
+                { decision: 'accept' },
+              ],
+            })
+          expect(
+            activities.filter((activity) => activity.kind === 'approval.resolved'),
+          ).toHaveLength(2)
+        },
+        { mode: 'mcp-response' },
+      )
+    },
+  )
+
+  it.for(['mcp-url', 'mcp-required'] as const)(
+    'declines unsupported native MCP form %s without opening an approval',
+    async (mode) => {
+      await withFakeCodex(
+        async ({ spawnLogPath }) => {
+          const adapter = new CodexProviderAdapter()
+          const events: ProviderRuntimeEvent[] = []
+          collectAdapterEvents(adapter, events)
+          await adapter.sendTurn(providerTurnInput())
+          await waitForFakeCodexEvent(spawnLogPath, 'server-response')
+          await adapter.stopAll()
+          expect(events.filter((event) => event.type === 'request.opened')).toEqual([])
+          const entries = await readFakeCodexLog(spawnLogPath)
+          expect(entries.filter((entry) => entry.event === 'server-response')).toEqual([
+            { event: 'server-response', id: 911, result: { action: 'decline' } },
+            { event: 'server-response', id: 'child-mcp', result: { action: 'decline' } },
+          ])
+        },
+        { mode },
+      )
+    },
+  )
+
+  it('keeps an MCP request pending when a response selects an unavailable persistence option', async () => {
+    await withFakeCodex(
+      async ({ spawnLogPath }) => {
+        const adapter = new CodexProviderAdapter()
+        const events: ProviderRuntimeEvent[] = []
+        collectAdapterEvents(adapter, events)
+        const input = providerTurnInput()
+        await adapter.sendTurn(input)
+        const opened = events.find((event) => event.type === 'request.opened')
+        const requestId = v.parse(approvalRequestIdSchema, opened?.requestId)
+        await expect(
+          adapter.respondApproval({
+            sessionId: input.sessionId,
+            requestId,
+            decision: 'acceptAlways',
+          }),
+        ).rejects.toThrow('does not offer')
+        expect(events.filter((event) => event.type === 'request.resolved')).toHaveLength(0)
+        await adapter.respondApproval({ sessionId: input.sessionId, requestId, decision: 'accept' })
+        await waitForFakeCodexEvent(spawnLogPath, 'server-response')
+        await adapter.stopAll()
+        const entries = await readFakeCodexLog(spawnLogPath)
+        expect(entries.filter((entry) => entry.event === 'server-response')).toEqual([
+          {
+            event: 'server-response',
+            id: 911,
+            result: { action: 'accept', content: { approval: 'once' } },
+          },
+        ])
+      },
+      { mode: 'mcp-once-only' },
     )
   })
 
@@ -1642,45 +1932,75 @@ describe('CodexProviderAdapter', () => {
     )
   })
 
-  it('streams Codex reasoning notifications as thinking progress', async () => {
+  it('normalizes Codex reasoning into shared content events rather than summary activities', async () => {
     await withFakeCodex(
       async () => {
         const adapter = new CodexProviderAdapter()
         const events: ProviderRuntimeEvent[] = []
         const input = providerTurnInput()
         collectAdapterEvents(adapter, events)
-
         await adapter.sendTurn(input)
         await settleRuntimeEvents()
         await adapter.stopAll()
-
-        const progressEvents = events.filter((event) => event.type === 'task.progress')
-        expect(progressEvents).toEqual([
-          expect.objectContaining({
-            payload: expect.objectContaining({
-              description: 'Thinking',
-              summary: 'Thinking',
-              taskId: 'reasoning:reasoning-1',
-            }),
+        expect(events.filter((event) => event.type === 'task.progress')).toEqual([])
+        expect(
+          events.filter(
+            (event) =>
+              event.type === 'content.delta' &&
+              event.payload.streamKind === 'reasoning_summary_text',
+          ),
+        ).toMatchObject([
+          {
+            itemId: 'reasoning-1',
+            payload: { delta: 'Inspecting the repo.', summaryIndex: 0 },
             sessionId: input.sessionId,
             turnId: input.turnId,
-            type: 'task.progress',
-          }),
-          expect.objectContaining({
-            payload: expect.objectContaining({
-              description: 'Inspecting the repo.',
-              summary: 'Inspecting the repo.',
-              taskId: 'reasoning:reasoning-1',
-            }),
-            sessionId: input.sessionId,
-            turnId: input.turnId,
-            type: 'task.progress',
-          }),
+          },
         ])
       },
       { mode: 'reasoning-events' },
     )
   })
+
+  it.for([
+    { delivery: 'paragraph', mode: 'reasoning-long' },
+    { delivery: 'turn', mode: 'reasoning-long' },
+    { delivery: 'token', mode: 'reasoning-long' },
+    { delivery: 'paragraph', mode: 'reasoning-long-final-only' },
+    { delivery: 'paragraph', mode: 'reasoning-long-content-final-only' },
+    { delivery: 'paragraph', mode: 'reasoning-long-mixed' },
+  ] as const)(
+    'retains complete native reasoning through real ingestion ($delivery, $mode)',
+    async ({ delivery, mode }, { onTestFinished }) => {
+      await withFakeCodex(
+        async () => {
+          const adapter = new CodexProviderAdapter()
+          onTestFinished(() => adapter.stopAll())
+          const input = { ...providerTurnInput(), sessionId: v.parse(sessionIdSchema, SESSION_ID) }
+          const projection = createNativeSessionProjection(input, delivery)
+          onTestFinished(projection.close)
+          const failures: unknown[] = []
+          adapter.subscribeEvents((event) => {
+            void projection.ingestion.ingest(event).catch((error) => failures.push(error))
+          })
+          await adapter.sendTurn(input)
+          await projection.ingestion.drain()
+          expect(failures).toEqual([])
+          const reasoning = projection
+            .snapshot()
+            .session.activities.filter((activity) => activity.kind === 'task.progress')
+            .map((activity) =>
+              v.parse(v.object({ summary: v.string(), taskId: v.string() }), activity.payload),
+            )
+          expect(reasoning.map((chunk) => chunk.summary).join('')).toBe(
+            'A'.repeat(640) + '\n\n' + 'B'.repeat(640),
+          )
+          expect(new Set(reasoning.map((chunk) => chunk.taskId)).size).toBe(1)
+        },
+        { mode },
+      )
+    },
+  )
 
   it('shows retryable Codex errors as warnings while the turn continues to completion', async () => {
     await withFakeCodex(
@@ -1845,15 +2165,62 @@ describe('CodexProviderAdapter', () => {
     )
   })
 
+  it('rewinds a paginated native thread by selecting the oldest removed turn before reverting', async () => {
+    await withFakeCodex(async ({ spawnLogPath }) => {
+      const adapter = new CodexProviderAdapter()
+      const input = providerTurnInput()
+      await adapter.sendTurn(input)
+      const commit = await adapter.prepareRollbackSession({
+        sessionId: input.sessionId,
+        numTurns: 3,
+      })
+      expect(
+        (await readFakeCodexLog(spawnLogPath)).some((entry) => entry.event === 'thread/revert'),
+      ).toBe(false)
+      await commit()
+      await adapter.stopAll()
+      const entries = await readFakeCodexLog(spawnLogPath)
+      expect(
+        entries.filter(
+          (entry) => entry.event === 'thread/turns/list' || entry.event === 'thread/revert',
+        ),
+      ).toEqual([
+        {
+          event: 'thread/turns/list',
+          params: {
+            threadId: 'provider-thread-1',
+            sortDirection: 'desc',
+            itemsView: 'notLoaded',
+            limit: 3,
+          },
+        },
+        {
+          event: 'thread/turns/list',
+          params: {
+            threadId: 'provider-thread-1',
+            sortDirection: 'desc',
+            itemsView: 'notLoaded',
+            limit: 2,
+            cursor: 'older',
+          },
+        },
+        {
+          event: 'thread/revert',
+          params: { threadId: 'provider-thread-1', beforeTurnId: 'rollback-turn-1' },
+        },
+      ])
+    })
+  })
+
   it('fails rollback requests without an active session', async () => {
     const adapter = new CodexProviderAdapter()
     const input = providerTurnInput()
 
     await expect(
-      adapter.rollbackSession({ numTurns: 1, sessionId: input.sessionId }),
-    ).rejects.toThrow('Codex thread/rollback requires an active session')
+      adapter.prepareRollbackSession({ numTurns: 1, sessionId: input.sessionId }),
+    ).rejects.toThrow('Codex thread/revert requires an active session')
     await expect(
-      adapter.rollbackSession({ numTurns: 0, sessionId: input.sessionId }),
+      adapter.prepareRollbackSession({ numTurns: 0, sessionId: input.sessionId }),
     ).rejects.toThrow('Codex thread rollback requires numTurns')
   })
 

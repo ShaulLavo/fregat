@@ -705,6 +705,7 @@ describe('orchestration engine', () => {
         sessionId: '00000000-0000-4000-8000-000000000001',
         turnCount: 1,
         type: 'session.checkpoint.revert',
+        restoreFiles: false,
       }),
     )
     await engine.providerRuntimeIdle()

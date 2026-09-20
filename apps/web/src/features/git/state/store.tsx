@@ -40,8 +40,14 @@ export function useGitStoreApi(): GitStoreApi {
   return store
 }
 
-export function createGitStore() {
-  return createStore<GitStore>()((set, get) => ({
+export type CommitMessageDraft = {
+  readonly read: () => string
+  readonly write: (message: string) => void
+}
+
+/** `draft` keeps the unsent commit message across reloads; omit it for a throwaway store. */
+export function createGitStore(draft?: CommitMessageDraft) {
+  const store = createStore<GitStore>()((set, get) => ({
     applyGeneratedCommitMessage: (commitMessage, expectedRevision) => {
       const state = get()
       if (state.commitMessageRevision !== expectedRevision) return false
@@ -51,11 +57,17 @@ export function createGitStore() {
     },
     activeChangeId: null,
     selectChange: (activeChangeId) => set({ activeChangeId }),
-    commitMessage: '',
+    commitMessage: draft?.read() ?? '',
     commitMessageRevision: 0,
     resetCommitMessage: () => set(nextCommitMessageState(get(), '')),
     setCommitMessage: (commitMessage) => set(nextCommitMessageState(get(), commitMessage)),
   }))
+  if (!draft) return store
+
+  store.subscribe((state, previous) => {
+    if (state.commitMessage !== previous.commitMessage) draft.write(state.commitMessage)
+  })
+  return store
 }
 
 function nextCommitMessageState(state: StoreState, commitMessage: string) {

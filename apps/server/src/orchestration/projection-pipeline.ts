@@ -212,6 +212,9 @@ export class OrchestrationProjectionPipeline {
         return
       case 'session.meta-updated':
         this.updateSession(event.payload.sessionId, {
+          titleStateJson: jsonOrUndefined(event.payload.titleState),
+          titleRegenerationJson: jsonOrUndefined(event.payload.titleRegeneration),
+          titleGenerationError: event.payload.titleGenerationError,
           modelSelectionJson: jsonOrUndefined(event.payload.modelSelection),
           title: event.payload.title,
           updatedAt: event.payload.updatedAt,
@@ -233,6 +236,7 @@ export class OrchestrationProjectionPipeline {
         return
       case 'session.activity-appended':
         this.upsertActivity(event)
+        this.clearFailedRewind(event)
         this.updateTurnForActivity(event)
         this.refreshPendingRequestCountsForActivity(event)
         this.refreshPlanProgressForActivity(event)
@@ -266,6 +270,8 @@ export class OrchestrationProjectionPipeline {
       case 'session.settled':
         this.updateSession(event.payload.sessionId, {
           settledAt: event.payload.settledAt,
+          activeOrderKey: null,
+          unsettledAt: null,
           settledOverride: 'settled',
           acknowledgedFailureThroughSequence: event.payload.acknowledgedFailureThroughSequence,
           updatedAt: event.payload.updatedAt,
@@ -274,11 +280,16 @@ export class OrchestrationProjectionPipeline {
       case 'session.unsettled':
         // "user" is an explicit keep-active override; "activity" resets to
         // neutral so the session can settle on its own again.
-        this.updateSession(event.payload.sessionId, {
-          settledAt: null,
-          settledOverride: event.payload.reason === 'user' ? 'active' : null,
-          updatedAt: event.payload.updatedAt,
-        })
+        this.database
+          .update(projectionSessions)
+          .set({
+            settledAt: null,
+            unsettledAt: sql`CASE WHEN ${projectionSessions.settledOverride} = 'active' THEN ${projectionSessions.unsettledAt} ELSE ${event.payload.updatedAt} END`,
+            settledOverride: event.payload.reason === 'user' ? 'active' : null,
+            updatedAt: event.payload.updatedAt,
+          })
+          .where(eq(projectionSessions.sessionId, event.payload.sessionId))
+          .run()
         return
       case 'session.snoozed':
         this.updateSession(event.payload.sessionId, {
@@ -307,6 +318,12 @@ export class OrchestrationProjectionPipeline {
         this.updateSession(event.payload.sessionId, {
           pinOrderKey: null,
           pinnedAt: null,
+          updatedAt: event.payload.updatedAt,
+        })
+        return
+      case 'session.active-reordered':
+        this.updateSession(event.payload.sessionId, {
+          activeOrderKey: event.payload.orderKey,
           updatedAt: event.payload.updatedAt,
         })
         return
@@ -350,8 +367,13 @@ export class OrchestrationProjectionPipeline {
         this.upsertProposedPlan(event)
         return
       case 'session.checkpoint-revert-requested':
+        this.updateSession(event.payload.sessionId, {
+          pendingRewindCommandId: event.commandId,
+          pendingRewindRestoreFiles: event.payload.restoreFiles,
+        })
         return
       case 'session.reverted':
+        this.clearPendingRewind(event.payload.sessionId, event.correlationId)
         this.pruneSessionAfterRevert(event)
         return
       case 'session.approval-response-requested':
@@ -596,6 +618,8 @@ export class OrchestrationProjectionPipeline {
         hasError: false,
         runtimeMode: event.payload.runtimeMode,
         settledAt: null,
+        activeOrderKey: null,
+        unsettledAt: null,
         settledOverride: null,
         snoozedAt: null,
         snoozedUntil: null,
@@ -987,6 +1011,31 @@ export class OrchestrationProjectionPipeline {
    * and `sequence` are where the activity sits in the stream, not content — a
    * revision must correct the entry, never reorder the timeline around it.
    */
+  private clearFailedRewind(
+    event: Extract<OrchestrationEvent, { type: 'session.activity-appended' }>,
+  ) {
+    const activity = event.payload.activity
+    if (activity.kind !== 'checkpoint.revert.failed') return
+    const payload = activity.payload
+    if (!payload || typeof payload !== 'object' || !('commandId' in payload)) return
+    if (typeof payload.commandId !== 'string') return
+    this.clearPendingRewind(event.payload.sessionId, payload.commandId)
+  }
+
+  private clearPendingRewind(sessionId: string, commandId: string | null) {
+    if (!commandId) return
+    this.database
+      .update(projectionSessions)
+      .set({ pendingRewindCommandId: null, pendingRewindRestoreFiles: false })
+      .where(
+        and(
+          eq(projectionSessions.sessionId, sessionId),
+          eq(projectionSessions.pendingRewindCommandId, commandId),
+        ),
+      )
+      .run()
+  }
+
   private upsertActivity(
     event: Extract<OrchestrationEvent, { type: 'session.activity-appended' }>,
   ) {

@@ -1,10 +1,15 @@
 import { selectChatSessionsForProject } from '@workspace/client-core/chat/selectors'
-import { compareSessionsForRail } from '@workspace/client-core/chat/rail/session-order'
+import { comparePinnedSessions } from '@workspace/client-core/chat/rail/session-order'
 import type { EnvironmentId, ProjectId, SessionId } from '@workspace/contracts'
 
 export type SessionSelection =
   | { readonly kind: 'auto' }
-  | { readonly kind: 'draft'; readonly environmentId: EnvironmentId; readonly projectId: ProjectId }
+  | {
+      readonly kind: 'draft'
+      readonly draftId?: string
+      readonly environmentId: EnvironmentId
+      readonly projectId: ProjectId
+    }
   | {
       readonly kind: 'session'
       readonly environmentId: EnvironmentId
@@ -96,7 +101,7 @@ export function activeProjectSession({
   readonly projectId: ProjectId
 }): ActiveSession {
   const sessions = selectChatSessionsForProject(slice, options.projectId).toSorted(
-    compareSessionsForRail,
+    comparePinnedSessions,
   )
   return activeSession({
     ...options,

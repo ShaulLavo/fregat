@@ -10,7 +10,7 @@ export function sessionTokenFor(selection: SessionSelection) {
 }
 
 export type ParsedSessionToken =
-  | { readonly kind: 'draft' }
+  | { readonly kind: 'draft'; readonly draftId?: string }
   | { readonly kind: 'session'; readonly sessionId: SessionId }
   | { readonly kind: 'rejected' }
 
@@ -24,7 +24,13 @@ export function sessionSelectionFor(
   environmentId: EnvironmentId,
   projectId: ProjectId,
 ): SessionSelection | null {
-  if (parsed.kind === 'draft') return { kind: 'draft', environmentId, projectId }
+  if (parsed.kind === 'draft')
+    return {
+      kind: 'draft',
+      environmentId,
+      projectId,
+      ...(parsed.draftId ? { draftId: parsed.draftId } : {}),
+    }
   if (parsed.kind === 'session')
     return { kind: 'session', environmentId, projectId, sessionId: parsed.sessionId }
 

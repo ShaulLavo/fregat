@@ -7,7 +7,7 @@ import { collectComposerMentions } from '@workspace/contracts'
 import type { LexicalEditor } from 'lexical'
 import { useCallback, type ClipboardEvent } from 'react'
 
-import { imageFilesFromClipboard } from '@/features/chat/utils/input-attachments'
+import { filesFromClipboard } from '@/features/chat/utils/input-attachments'
 import { insertChatInputText } from '@/features/chat/utils/input-editor-actions'
 import type { ChatInputTrigger } from '@/features/chat/utils/input-logic'
 import { ChatInputDraftPlugin } from './chat-input-draft-plugin'
@@ -48,7 +48,7 @@ export function ChatInputEditor({
   // caret.
   const handlePaste = useCallback(
     (event: ClipboardEvent<HTMLElement>) => {
-      const files = imageFilesFromClipboard(event.clipboardData)
+      const files = filesFromClipboard(event.clipboardData)
       if (files.length > 0) {
         event.preventDefault()
         onImageFiles(files)

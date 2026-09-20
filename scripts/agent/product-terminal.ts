@@ -50,7 +50,7 @@ export async function isolateProductTerminals(page: Page, evidence: Evidence) {
   }
 }
 
-function installCaptureSocketPrefix(prefix: string) {
+export function installCaptureSocketPrefix(prefix: string) {
   const NativeWebSocket = globalThis.WebSocket
   // Browser storage is fresh, but the server's terminal-1 session may belong to the user.
   globalThis.WebSocket = new Proxy(NativeWebSocket, {

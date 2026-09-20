@@ -1,105 +1,80 @@
+import { SKIP_DOM_SELECTION_TAG } from 'lexical'
 import { useStore } from 'zustand'
 import { useLexicalComposerContext } from '@lexical/react/LexicalComposerContext'
-import type { LexicalEditor } from 'lexical'
-import { useEffect, useState } from 'react'
+import { useEffect, useLayoutEffect, useRef, useState } from 'react'
+import { useMutation } from '@tanstack/react-query'
+import { toast } from 'sonner'
+import { errorMessage } from '@/lib/error-message'
+import { $setChatInputText } from '../utils/input-editor-actions'
+import { useChatInputDraftStore, type ChatInputDraftTarget } from '../state/chat-input-draft-store'
+import { promptStashStoreFor, type PromptStashEntry } from '../state/prompt-stash-store'
+import { transferStash } from '../state/stash-transfer'
+import { chatMutationKeys } from '../utils/mutation-keys'
 
-import { $setChatInputText } from '@/features/chat/utils/input-editor-actions'
-import {
-  readChatInputDraftPrompt,
-  useChatInputDraftStore,
-  type ChatInputDraftTarget,
-} from '@/features/chat/state/chat-input-draft-store'
-import {
-  promptStashStoreFor,
-  type PromptStashEntry,
-} from '@/features/chat/state/prompt-stash-store'
-
-/**
- * ⌘S on the composer: park the prompt, or — on an empty composer — open the
- * queue to pull one back. The listener is capture-phase on `window` so it beats
- * the editor's own key handling and the browser's save dialog, but it acts only
- * when the keystroke came from *this* composer's editor: chat mode can have a
- * second composer mounted on another surface.
- */
 export function usePromptStash(draftTarget: ChatInputDraftTarget) {
   const [editor] = useLexicalComposerContext()
+  const activeTarget = useRef<ChatInputDraftTarget | null>(draftTarget)
+  useLayoutEffect(() => {
+    activeTarget.current = draftTarget
+    return () => {
+      activeTarget.current = null
+    }
+  }, [draftTarget])
   const stashStore = promptStashStoreFor(draftTarget.environmentId)
   const entries = useStore(stashStore, (state) => state.entries)
   const [menuOpen, setMenuOpen] = useState(false)
-
+  const mutation = useMutation({
+    mutationKey: chatMutationKeys.stash(draftTarget.environmentId, draftTarget.draftKey),
+    scope: { id: `stash:${draftTarget.environmentId}` },
+    mutationFn: (input: {
+      target: ChatInputDraftTarget
+      action: Parameters<typeof transferStash>[1]
+    }) => transferStash(input.target, input.action),
+    onSuccess: (content, { target, action }) => {
+      const current = activeTarget.current
+      if (
+        !current ||
+        target.environmentId !== current.environmentId ||
+        target.rootPath !== current.rootPath ||
+        target.draftKey !== current.draftKey
+      )
+        return
+      if (!content) {
+        if (action.kind === 'stash') setMenuOpen(true)
+        return
+      }
+      if (useChatInputDraftStore.getState().getDraft(draftTarget).prompt !== content.prompt) return
+      editor.update(() => $setChatInputText(content.prompt), { tag: SKIP_DOM_SELECTION_TAG })
+      if (action.kind === 'restore') editor.focus()
+      setMenuOpen(false)
+    },
+    onError: (error) => toast.error(errorMessage(error, 'Could not transfer the message stash.')),
+  })
+  const { mutate } = mutation
   useEffect(() => {
     function handleKeyDown(event: KeyboardEvent) {
-      if (!isStashShortcut(event)) return
-
-      const root = editor.getRootElement()
-      if (!root?.contains(document.activeElement)) return
-
+      if (
+        !['s', 'S'].includes(event.key) ||
+        event.altKey ||
+        event.shiftKey ||
+        !(event.metaKey || event.ctrlKey)
+      )
+        return
+      if (!editor.getRootElement()?.contains(document.activeElement)) return
       event.preventDefault()
-      const stashed = stashComposerPrompt(draftTarget, editor)
-      if (stashed) return
-
-      setMenuOpen(true)
+      mutate({ target: draftTarget, action: { kind: 'stash' } })
     }
-
     window.addEventListener('keydown', handleKeyDown, true)
-
     return () => window.removeEventListener('keydown', handleKeyDown, true)
-  }, [draftTarget, editor])
-
-  function removeEntry(entry: PromptStashEntry) {
-    promptStashStoreFor(draftTarget.environmentId).getState().removeEntry(entry.id)
+  }, [draftTarget, editor, mutate])
+  return {
+    entries,
+    pending: mutation.isPending,
+    menuOpen,
+    setMenuOpen,
+    removeEntry: (entry: PromptStashEntry) =>
+      mutation.mutate({ target: draftTarget, action: { kind: 'remove', entry } }),
+    restoreEntry: (entry: PromptStashEntry) =>
+      mutation.mutate({ target: draftTarget, action: { kind: 'restore', entry } }),
   }
-
-  function restoreEntry(entry: PromptStashEntry) {
-    const stash = promptStashStoreFor(draftTarget.environmentId).getState()
-    const current = readChatInputDraftPrompt(draftTarget)
-    // Restoring on top of a prompt in progress would destroy it, so the
-    // composer's own text swaps into the queue instead of being overwritten. A
-    // failed stash aborts the restore rather than trading one prompt for another.
-    if (current.trim() && !stash.stashPrompt(current)) return
-
-    const taken = stash.takeEntry(entry.id)
-    if (!taken) return
-
-    writeComposerPrompt(draftTarget, editor, taken.prompt)
-    editor.focus()
-    setMenuOpen(false)
-  }
-
-  return { entries, menuOpen, removeEntry, restoreEntry, setMenuOpen }
-}
-
-/** True once the prompt is parked and the composer emptied. */
-function stashComposerPrompt(draftTarget: ChatInputDraftTarget, editor: LexicalEditor) {
-  const prompt = readChatInputDraftPrompt(draftTarget)
-  if (!prompt.trim()) return false
-  // The composer is only emptied on the strength of the write landing.
-  if (!promptStashStoreFor(draftTarget.environmentId).getState().stashPrompt(prompt)) return false
-
-  writeComposerPrompt(draftTarget, editor, '')
-
-  return true
-}
-
-/**
- * The editor and the stored draft are moved together. The draft plugin would
- * catch up on its own, but a second ⌘S or a restore that lands before it does
- * reads the stale prompt and stashes the same text twice.
- */
-function writeComposerPrompt(
-  draftTarget: ChatInputDraftTarget,
-  editor: LexicalEditor,
-  prompt: string,
-) {
-  editor.update(() => {
-    $setChatInputText(prompt)
-  })
-  useChatInputDraftStore.getState().setPrompt(draftTarget, prompt)
-}
-
-function isStashShortcut(event: KeyboardEvent) {
-  if (event.key !== 's' && event.key !== 'S') return false
-  if (event.altKey || event.shiftKey) return false
-
-  return event.metaKey || event.ctrlKey
 }

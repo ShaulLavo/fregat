@@ -125,6 +125,7 @@ export const providerSnapshotSchema = v.object({
    * says only whether `/providers/:id/auth/login` exists for this provider.
    */
   supportsSignIn: v.optional(v.boolean()),
+  showInteractionModeToggle: v.optional(v.boolean()),
 })
 
 export const providerListResultSchema = v.object({

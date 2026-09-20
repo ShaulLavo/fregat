@@ -38,9 +38,23 @@ export const providerUserInputAnswersSchema = v.record(v.string(), v.unknown())
 export const providerApprovalDecisionSchema = v.picklist([
   'accept',
   'acceptForSession',
+  'acceptAlways',
   'decline',
   'cancel',
 ])
+
+export const providerApprovalOptionSchema = v.object({
+  decision: providerApprovalDecisionSchema,
+  label: v.pipe(v.string(), v.minLength(1)),
+})
+export type ProviderApprovalOption = v.InferOutput<typeof providerApprovalOptionSchema>
+
+export const DEFAULT_APPROVAL_OPTIONS: readonly ProviderApprovalOption[] = [
+  { decision: 'cancel', label: 'Cancel' },
+  { decision: 'decline', label: 'Deny' },
+  { decision: 'acceptForSession', label: 'Allow for this session' },
+  { decision: 'accept', label: 'Allow' },
+]
 
 const trimmedText = v.pipe(v.string(), v.trim(), v.minLength(1))
 

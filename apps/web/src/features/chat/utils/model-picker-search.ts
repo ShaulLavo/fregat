@@ -15,7 +15,7 @@ export type ModelPickerSearchable = {
 const CALIBRATION: FieldTokenCalibration = {
   fieldPenaltyStep: 10,
   offsets: { exact: 0, prefix: 2, boundary: 4, includes: 6, fuzzy: 100 },
-  boundaryMarkers: [' ', '-', '_', '/'],
+  boundaryMarkers: ' -_/',
   maxPositionPenalty: Number.POSITIVE_INFINITY,
   positionPenaltyFactor: 2,
   maxLengthPenalty: 64,

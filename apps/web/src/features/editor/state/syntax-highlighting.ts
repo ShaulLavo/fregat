@@ -27,7 +27,7 @@ import {
   resolveShikiLanguageRegistrations,
 } from '@/features/editor/utils/shiki-languages'
 import { isBuiltinEditorThemeId } from '@/lib/code-theme/utils/catalog'
-import { readSettingsMirror } from '@/features/settings/utils/boot-mirror'
+import { readSettingsMirror } from '@/lib/settings-boot-mirror'
 import { log } from '@/lib/client-logging'
 
 let treeSitterSyntaxProvider: TreeSitterSyntaxProvider | null = null

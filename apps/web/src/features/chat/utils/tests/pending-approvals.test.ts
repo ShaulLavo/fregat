@@ -1,3 +1,4 @@
+import { DEFAULT_APPROVAL_OPTIONS } from '@workspace/contracts'
 import type { OrchestrationSessionActivity } from '@workspace/contracts'
 
 import { derivePendingApprovals } from '@workspace/client-core/chat/pending-approvals'
@@ -97,6 +98,7 @@ test('the derived approval carries the fields the panel renders', () => {
   ])
 
   expect(approval).toEqual({
+    options: DEFAULT_APPROVAL_OPTIONS,
     createdAt: at(1),
     detail: 'rm -rf build',
     requestId: 'req-1',
@@ -104,6 +106,29 @@ test('the derived approval carries the fields the panel renders', () => {
     requestType: 'exec_command_approval',
     turnId: 'turn-1',
   })
+})
+
+test('MCP activities retain their advertised choices and app identity across derivation', () => {
+  const options = [
+    { decision: 'acceptAlways', label: 'Always allow Safari' },
+    { decision: 'accept', label: 'Allow once' },
+  ]
+  const activities = [
+    activity({
+      createdAt: at(1),
+      kind: 'approval.requested',
+      payload: {
+        requestId: 'mcp-1',
+        requestType: 'mcp_elicitation_approval',
+        requestKind: 'tool',
+        detail: 'Safari',
+        options,
+      },
+    }),
+  ]
+  const [pending] = derivePendingApprovals(activities)
+  expect(pending).toMatchObject({ requestKind: 'app-access', options, detail: 'Safari' })
+  expect(derivePendingApprovals(activities)).toEqual([pending])
 })
 
 test('requestKind is recovered from requestType when the provider omits it', () => {

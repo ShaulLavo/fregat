@@ -1,3 +1,14 @@
+import { questionAnswerHistory } from './question-answer-history'
+import { decideSessionTitle, titleMetadata } from './title-decider'
+import { createInternalError } from '../observability/structured-errors'
+import {
+  pendingMessageQuestions,
+  messageQuestionDismissalEvents,
+  messageQuestionAnswer,
+  messageQuestionResolutionEvent,
+} from './message-questions'
+import { requireSettled } from './command-invariants'
+import { requireNoRewindConflict } from './rewind-admission'
 import {
   decideWorktreeLifecycle,
   creationTargetEvents,
@@ -9,6 +20,8 @@ import {
   DEFAULT_RUNTIME_MODE,
   type OrchestrationCommand,
   approvalRequestIdSchema,
+  messageIdSchema,
+  turnIdSchema,
   type OrchestrationEventMetadata,
 } from '@workspace/contracts'
 import * as v from 'valibot'
@@ -16,7 +29,7 @@ import * as v from 'valibot'
 import { orchestrationErrors } from '../observability'
 import { activityRequestId } from './pending-requests'
 import { event, one } from './event-factory'
-import { lifecycleResetEvents } from './lifecycle-events'
+import { settlementActivityEvents, userEngagementEvents } from './lifecycle-events'
 import { decideRegistration, decideWorktreeCommand } from './registration-decider'
 import { decideProviderStart, decideRuntimeRecovery, decideDeletionUpdate } from './runtime-decider'
 import { requireWorktree } from './read-model'
@@ -25,6 +38,7 @@ import {
   liveProjectSessions,
   requireFutureWakeTime,
   requirePinned,
+  requireActiveOrderable,
   requireSettleable,
   requireSnoozable,
   requireSessionAbsent,
@@ -46,9 +60,14 @@ export function decideOrchestrationCommand(
   command: OrchestrationCommand,
   model: OrchestrationReadModel,
 ): PendingOrchestrationEvent[] {
+  requireNoRewindConflict(command, model)
   const at = new Date().toISOString()
 
   switch (command.type) {
+    case 'session.title.generate.complete':
+    case 'session.title.refine':
+    case 'session.title.regeneration.complete':
+      return decideSessionTitle(command, model, at)
     case 'worktree.retry':
     case 'worktree.cleanup':
     case 'worktree.force-cleanup':
@@ -107,11 +126,7 @@ export function decideOrchestrationCommand(
         sessionId: command.sessionId,
       })
     case 'session.archive':
-      requireSettleable(
-        requireSessionNotArchived(model, command.sessionId, command.type),
-        command.type,
-        at,
-      )
+      requireSessionNotArchived(model, command.sessionId, command.type)
 
       return one(command, at, 'session.archived', {
         archivedAt: at,
@@ -137,6 +152,8 @@ export function decideOrchestrationCommand(
       return sessionPinned(command, model, at)
     case 'session.unpin':
       return sessionUnpinned(command, model, at)
+    case 'session.active.reorder':
+      return sessionActiveReordered(command, model, at)
     case 'session.pin.reorder':
       return sessionPinReordered(command, model, at)
     case 'session.runtime-mode.set':
@@ -168,9 +185,13 @@ export function decideOrchestrationCommand(
         turnId: command.turnId ?? model.sessions.get(command.sessionId)?.latestTurn?.turnId,
       })
     case 'session.runtime.stop':
-      requireSessionNotDeleted(model, command.sessionId)
-
+      const stoppedSession = requireSessionNotDeleted(model, command.sessionId)
+      if (command.onlyIfSettled) {
+        requireSettled(stoppedSession)
+        requireSettleable(stoppedSession, command.type, at)
+      }
       return one(command, at, 'session.runtime-stop-requested', {
+        onlyIfSettled: command.onlyIfSettled,
         createdAt: at,
         sessionId: command.sessionId,
       })
@@ -192,27 +213,28 @@ export function decideOrchestrationCommand(
         { metadata: { requestId: command.requestId } },
       )
     case 'session.user-input.respond':
-      requireSessionNotDeleted(model, command.sessionId)
-
-      return one(
-        command,
-        at,
-        'session.user-input-response-requested',
-        {
-          answers: command.answers,
-          createdAt: at,
-          requestId: command.requestId,
-          sessionId: command.sessionId,
-        },
-        { metadata: { requestId: command.requestId } },
+      return userInputResponse(command, model, at)
+    case 'session.user-input.dismiss': {
+      const session = requireSessionNotDeleted(model, command.sessionId)
+      const request = pendingMessageQuestions(session.activities).find(
+        (entry) => entry.payload.requestId === command.requestId,
       )
+      if (!request)
+        throw createInternalError('This question cannot be dismissed. Answer it or stop the turn.')
+      return messageQuestionDismissalEvents(command, command.sessionId, [request], at)
+    }
     case 'session.checkpoint.revert':
-      requireSessionNotArchived(model, command.sessionId, command.type)
+      requireSettleable(
+        requireSessionNotArchived(model, command.sessionId, command.type),
+        command.type,
+        at,
+      )
 
       return one(command, at, 'session.checkpoint-revert-requested', {
         createdAt: at,
         sessionId: command.sessionId,
         turnCount: command.turnCount,
+        restoreFiles: command.restoreFiles,
       })
     case 'session.runtime.set':
       return sessionSet(command, model, at)
@@ -294,11 +316,17 @@ export function decideOrchestrationCommand(
     case 'session.revert.complete':
       requireSessionNotDeleted(model, command.sessionId)
 
-      return one(command, at, 'session.reverted', {
-        revertedAt: command.createdAt,
-        sessionId: command.sessionId,
-        turnCount: command.turnCount,
-      })
+      return one(
+        command,
+        at,
+        'session.reverted',
+        {
+          revertedAt: command.createdAt,
+          sessionId: command.sessionId,
+          turnCount: command.turnCount,
+        },
+        { correlationId: command.revertCommandId },
+      )
   }
 }
 
@@ -438,6 +466,7 @@ function sessionMetaUpdated(
   requireProviderInstance(session, command.modelSelection)
 
   return one(command, at, 'session.meta-updated', {
+    ...titleMetadata(command, session, at),
     modelSelection: command.modelSelection,
     sessionId: command.sessionId,
     title: command.title,
@@ -495,7 +524,7 @@ function sessionSettled(
   at: string,
 ) {
   const session = requireSessionNotArchived(model, command.sessionId, command.type)
-  requireSettleable(session, command.type, at)
+  requireSettleable(session, command.type, at, true)
 
   const settledAt = session.settledOverride === 'settled' ? session.settledAt : null
   const settled = event(command, at, 'session.settled', {
@@ -507,15 +536,26 @@ function sessionSettled(
     sessionId: command.sessionId,
     updatedAt: settledAt ? session.updatedAt : at,
   })
-  // Settling is "I am done with this", so it clears a pin the same way it parks
-  // the session. Without this the pin would hold the card in place and the
-  // settle would only stamp invisible state.
-  if (!session.pinnedAt) return [settled]
-
-  return [
+  const events = [
+    ...messageQuestionDismissalEvents(
+      command,
+      session.id,
+      pendingMessageQuestions(session.activities),
+      at,
+    ),
     settled,
-    event(command, at, 'session.unpinned', { sessionId: command.sessionId, updatedAt: at }),
   ]
+  if (session.pinnedAt)
+    events.push(event(command, at, 'session.unpinned', { sessionId: session.id, updatedAt: at }))
+  if (session.snoozedUntil != null)
+    events.push(
+      event(command, at, 'session.unsnoozed', {
+        sessionId: session.id,
+        updatedAt: at,
+        reason: 'user',
+      }),
+    )
+  return events
 }
 
 function sessionUnsettled(
@@ -644,6 +684,20 @@ function sessionUnpinned(
  * silently pinning it) keeps a reorder that raced an unpin from resurrecting
  * the pin the user just cleared.
  */
+function sessionActiveReordered(
+  command: Extract<OrchestrationCommand, { type: 'session.active.reorder' }>,
+  model: OrchestrationReadModel,
+  at: string,
+) {
+  const session = requireSessionNotArchived(model, command.sessionId, command.type)
+  requireActiveOrderable(session)
+  return one(command, at, 'session.active-reordered', {
+    sessionId: command.sessionId,
+    orderKey: command.orderKey,
+    updatedAt: session.activeOrderKey === command.orderKey ? session.updatedAt : at,
+  })
+}
+
 function sessionPinReordered(
   command: Extract<OrchestrationCommand, { type: 'session.pin.reorder' }>,
   model: OrchestrationReadModel,
@@ -671,10 +725,9 @@ function sessionSet(
     sessionId: command.sessionId,
   })
   const status = command.runtime.status
-  const wakes =
-    status === 'starting' || status === 'running' || status === 'waiting' || status === 'error'
+  const wakes = status === 'starting' || status === 'running'
   if (!wakes) return [sessionSetEvent]
-  return [...lifecycleResetEvents(command, session, at), sessionSetEvent]
+  return [...settlementActivityEvents(command, session, at), sessionSetEvent]
 }
 
 /**
@@ -699,10 +752,9 @@ function activityAppended(
   )
   const wakes =
     command.activity.kind === 'approval.requested' ||
-    command.activity.kind === 'user-input.requested' ||
-    command.activity.tone === 'error'
+    command.activity.kind === 'user-input.requested'
   if (!wakes) return [appended]
-  return [...lifecycleResetEvents(command, session, at), appended]
+  return [...settlementActivityEvents(command, session, at), appended]
 }
 
 /**
@@ -750,7 +802,7 @@ function turnStartRequested(
     updatedAt: at,
   })
   const turnEvents = [
-    ...lifecycleResetEvents(command, model.sessions.get(command.sessionId), at),
+    ...userEngagementEvents(command, model.sessions.get(command.sessionId), at),
     messageEvent,
     // The turn exists because the message asked for it; without the link the
     // message→turn causal chain is unreconstructible from the log.
@@ -799,7 +851,7 @@ function turnSteerRequested(
     session.latestTurn.state !== 'running' ||
     session.latestTurn.providerStartState !== 'adopted' ||
     session.pendingApprovalCount > 0 ||
-    session.pendingUserInputCount > 0
+    session.pendingUserInputCount > pendingMessageQuestions(session.activities).length
   ) {
     throw sessionDomainErrors.STEER_TURN_NOT_ACTIVE()
   }
@@ -862,13 +914,86 @@ function proposedPlanUpserted(
   model: OrchestrationReadModel,
   at: string,
 ) {
-  const session = requireSessionNotDeleted(model, command.sessionId)
-  const reset = command.proposedPlan.implementedAt ? [] : lifecycleResetEvents(command, session, at)
+  requireSessionNotDeleted(model, command.sessionId)
   return [
-    ...reset,
     event(command, at, 'session.proposed-plan-upserted', {
       proposedPlan: command.proposedPlan,
       sessionId: command.sessionId,
     }),
+  ]
+}
+
+function userInputResponse(
+  command: Extract<OrchestrationCommand, { type: 'session.user-input.respond' }>,
+  model: OrchestrationReadModel,
+  at: string,
+): PendingOrchestrationEvent[] {
+  const session = requireSessionNotDeleted(model, command.sessionId)
+  const request = pendingMessageQuestions(session.activities).find(
+    (entry) => entry.payload.requestId === command.requestId,
+  )
+  if (!request) {
+    if (command.requestId.startsWith('codex-async:'))
+      throw createInternalError('This question has already been answered or dismissed.')
+    return [
+      ...questionAnswerHistory(command, session.activities, at),
+      ...one(
+        command,
+        at,
+        'session.user-input-response-requested',
+        {
+          answers: command.answers,
+          attachmentsByQuestionId: command.attachmentsByQuestionId,
+          createdAt: at,
+          requestId: command.requestId,
+          sessionId: command.sessionId,
+        },
+        { metadata: { requestId: command.requestId } },
+      ),
+    ]
+  }
+  const message = {
+    messageId: v.parse(messageIdSchema, `async-answer:${command.requestId}`),
+    role: 'user' as const,
+    text: messageQuestionAnswer(request, command.answers, command.attachmentsByQuestionId),
+    attachments: Object.values(command.attachmentsByQuestionId ?? {}).flat(),
+  }
+  const resolution = messageQuestionResolutionEvent(
+    command,
+    command.sessionId,
+    request,
+    at,
+    command.answers,
+    command.attachmentsByQuestionId,
+  )
+  if (session.latestTurn?.state === 'running') {
+    return [
+      resolution,
+      ...turnSteerRequested(
+        {
+          ...command,
+          type: 'session.turn.steer',
+          turnId: session.latestTurn.turnId,
+          message,
+        },
+        model,
+        at,
+      ),
+    ]
+  }
+  return [
+    resolution,
+    ...turnStartRequested(
+      {
+        ...command,
+        type: 'session.turn.start',
+        turnId: v.parse(turnIdSchema, `async-answer:${command.requestId}`),
+        message,
+        runtimeMode: session.runtimeMode,
+        interactionMode: session.interactionMode,
+      },
+      model,
+      at,
+    ),
   ]
 }

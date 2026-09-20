@@ -20,9 +20,8 @@ export function activeWorktree({
   if (
     selection.kind === 'draft' &&
     selection.environmentId === environmentId &&
-    selection.projectId === projectId &&
-    draftWorktree?.projectId === projectId
+    selection.projectId === projectId
   )
-    return draftWorktree
+    return draftWorktree?.projectId === projectId ? draftWorktree : null
   return currentWorktree ?? null
 }

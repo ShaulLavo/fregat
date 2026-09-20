@@ -1,3 +1,4 @@
+import { LiveStreamBudget } from './live-stream-budget'
 import { errorSummary as serializeOrchestrationRpcError } from '@workspace/contracts'
 import { adaptWebSocket } from '../utils/websocket'
 import { elapsedMs } from '@workspace/utils/timing'
@@ -67,11 +68,14 @@ type OrchestrationRpcWebSocket = {
 }
 
 type OrchestrationRpcConnectionState = {
+  nextDeliveryId: number
   subscriptions: Map<OrchestrationWsSubscriptionId, OrchestrationRpcSubscription>
 }
 
 type OrchestrationRpcSubscription = {
   abortController: AbortController
+  budget: LiveStreamBudget
+  pendingAck: { deliveryId: number; resolve: () => void } | null
   method: OrchestrationWsSubscribe['method']
   sessionId?: string
 }
@@ -102,7 +106,7 @@ export function orchestrationWsRoutes(
         return
       }
 
-      states.set(socket.key, { subscriptions: new Map() })
+      states.set(socket.key, { nextDeliveryId: 1, subscriptions: new Map() })
       // The handshake is pushed rather than requested so the client reaches an
       // honest `connected` phase — and can compare protocol versions — without
       // paying a round trip before it may subscribe.
@@ -146,6 +150,12 @@ function handleOrchestrationRpcMessage(
   message: OrchestrationWsClientMessage,
   config: OrchestrationWsServerConfig,
 ) {
+  if (message.kind === 'subscription.ack') {
+    const pending = state.subscriptions.get(message.subscriptionId)?.pendingAck
+    if (pending?.deliveryId === message.deliveryId) pending.resolve()
+    return
+  }
+
   if (message.kind === 'request') {
     void handleOrchestrationRpcRequest(engine, socket, message, config)
     return
@@ -253,6 +263,8 @@ function handleOrchestrationRpcSubscribe(
   const abortController = new AbortController()
   const subscription: OrchestrationRpcSubscription = {
     abortController,
+    budget: new LiveStreamBudget(),
+    pendingAck: null,
     method: message.method,
     sessionId: message.method === 'subscribeSession' ? message.sessionId : undefined,
   }
@@ -262,7 +274,12 @@ function handleOrchestrationRpcSubscribe(
     orchestrationRpcSubscribeSummary(message),
   )
 
-  const stream = orchestrationRpcStream(engine, message, abortController.signal)
+  const stream = orchestrationRpcStream(
+    engine,
+    message,
+    abortController.signal,
+    subscription.budget,
+  )
   void pumpOrchestrationRpcSubscription(socket, state, message.subscriptionId, stream, subscription)
 }
 
@@ -277,15 +294,21 @@ async function pumpOrchestrationRpcSubscription(
     for await (const item of stream) {
       if (subscription.abortController.signal.aborted) break
 
-      sendOrchestrationRpcMessage(socket, {
+      const deliveryId = state.nextDeliveryId++
+      const acknowledgement = awaitSubscriptionAck(subscription, deliveryId)
+      const sent = sendOrchestrationRpcMessage(socket, {
         item,
         kind: 'subscription.next',
         subscriptionId,
+        deliveryId,
       })
+      if (!sent) subscription.abortController.abort()
+      await acknowledgement
     }
   } catch (error) {
     handleOrchestrationRpcSubscriptionError(socket, subscriptionId, subscription, error)
   } finally {
+    subscription.budget.dispose()
     completeOrchestrationRpcSubscription(socket, state, subscriptionId, subscription)
   }
 }
@@ -339,14 +362,16 @@ function orchestrationRpcStream(
   engine: OrchestrationEngine,
   message: OrchestrationWsSubscribe,
   signal: AbortSignal,
+  budget: LiveStreamBudget,
 ) {
   if (message.method === 'subscribeShell') {
-    return engine.shellStream({ afterSequence: message.afterSequence, signal })
+    return engine.shellStream({ afterSequence: message.afterSequence, signal, budget })
   }
 
   return engine.sessionDetailStream(message.sessionId, {
     afterSequence: message.afterSequence,
     signal,
+    budget,
   })
 }
 
@@ -359,6 +384,7 @@ function unsubscribeOrchestrationRpcState(
 
   state.subscriptions.delete(subscriptionId)
   subscription.abortController.abort()
+  subscription.budget.dispose()
   recordChatPipelineInfo('chat.pipeline.ws.subscription.unsubscribe', {
     method: subscription.method,
     subscriptionId,
@@ -380,12 +406,14 @@ function sendOrchestrationRpcMessage(
 ) {
   try {
     socket.send(JSON.stringify(message))
+    return true
   } catch (error) {
     recordChatPipelineWarning('chat.pipeline.ws.send_failed', {
       error,
       messageKind: message.kind,
     })
     socket.close()
+    return false
   }
 }
 
@@ -444,4 +472,21 @@ function orchestrationRpcSubscribeSummary(message: OrchestrationWsSubscribe) {
     method: message.method,
     subscriptionId: message.subscriptionId,
   }
+}
+
+function awaitSubscriptionAck(subscription: OrchestrationRpcSubscription, deliveryId: number) {
+  const signal = AbortSignal.any([subscription.abortController.signal, subscription.budget.signal])
+  return new Promise<void>((resolve, reject) => {
+    const finish = (error?: unknown) => {
+      clearTimeout(timer)
+      signal.removeEventListener('abort', abort)
+      subscription.pendingAck = null
+      error === undefined ? resolve() : reject(error)
+    }
+    const abort = () => finish(signal.reason)
+    const timer = setTimeout(() => subscription.budget.overflow(), 30_000)
+    subscription.pendingAck = { deliveryId, resolve: () => finish() }
+    signal.addEventListener('abort', abort, { once: true })
+    if (signal.aborted) abort()
+  })
 }

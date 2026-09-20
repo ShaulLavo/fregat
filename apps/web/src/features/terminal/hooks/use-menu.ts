@@ -3,7 +3,6 @@ import { useEffect, useState } from 'react'
 import { useAttachToComposer } from '@/features/chat/hooks/use-attach-to-composer'
 import { isClipboardReadBlocked } from '@/features/terminal/utils/clipboard'
 import {
-  clearTerminal,
   pasteFromClipboard,
   resetTerminal,
   selectAllInTerminal,
@@ -39,7 +38,8 @@ export function useTerminalMenu(target: TerminalMenuTarget) {
     // the portalled item is pressed, so a run-time read is always empty.
     askAgent: () => attachTerminalContext(target.contextSelection),
     canAskAgent: target.contextSelection !== null,
-    clear: () => clearTerminal(target.terminal),
+    clear: target.clearHistory,
+    restart: target.restart,
     copySelection: () => void copyTextToClipboard(target.selection, 'selection'),
     hasScrollback: target.hasScrollback,
     hasSelection: target.selection.length > 0,

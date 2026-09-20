@@ -1,3 +1,4 @@
+import { draftAddressTokenSchema } from '@workspace/client-core/address/references'
 import type { LocationRewrite } from '@tanstack/react-router'
 import { createError } from 'evlog'
 import * as v from 'valibot'
@@ -324,10 +325,17 @@ function chatOptions<K extends keyof RouteOwner>(
   const prefix = PREFIX[kind]
   const chat = chatReferenceForToken(address.document)
   if (!chat) return { to: `${prefix}/chat` as const, params, ...common }
-  if (chat.kind === 'draft') return { to: `${prefix}/chat/t/new` as const, params, ...common }
+  if (chat.kind === 'draft' && !chat.draftId)
+    return { to: `${prefix}/chat/t/new` as const, params, ...common }
   return {
     to: `${prefix}/chat/t/$sessionId` as const,
-    params: { ...params, sessionId: chat.sessionId },
+    params: {
+      ...params,
+      sessionId:
+        chat.kind === 'draft'
+          ? v.parse(draftAddressTokenSchema, `draft-${chat.draftId}`)
+          : chat.sessionId,
+    },
     ...common,
   }
 }

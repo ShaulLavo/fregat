@@ -1,4 +1,4 @@
-import { readSettingsMirror } from '@/features/settings/utils/boot-mirror'
+import { readSettingsMirror } from '@/lib/settings-boot-mirror'
 import { createEditorTextBuffer, type EditorTextBuffer } from '@singapore-editor/core'
 
 // The retention budget is a setting; every buffer that can become a live document carries it.

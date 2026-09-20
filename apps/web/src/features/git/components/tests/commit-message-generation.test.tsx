@@ -5,6 +5,7 @@ import path from 'node:path'
 import { cleanup, screen, waitFor } from '@testing-library/react'
 import userEvent from '@testing-library/user-event'
 import { MockProviderAdapter } from 'server/testing'
+import { afterEach } from 'vitest'
 
 import { TestEditorStateProvider as EditorStateProvider } from '../../../../../test/factories/editor-state-provider'
 import { CommitControls } from '@/features/git/components/commit-controls'
@@ -16,6 +17,9 @@ import { renderWithProviders } from '../../../../../test/render'
 import { makeTestServer, type TestServer } from '../../../../../test/server'
 
 const GENERATED_MESSAGE = 'feat: add generated feature'
+
+// The commit draft persists per repository, and every case here shares a root path.
+afterEach(() => localStorage.clear())
 const LUNA_MODELS = [
   {
     capabilities: { reasoningEfforts: [{ effort: 'low' }] },
@@ -139,7 +143,7 @@ test('shows provider failure and preserves the existing commit input', async () 
     await userEvent.click(screen.getByRole('button', { name: 'Generate commit message' }))
 
     expect(await screen.findByRole('alert')).toHaveTextContent(
-      'Could not generate a commit message with codex.',
+      'Could not generate a commit message with codex: Mock provider failed',
     )
     expect(screen.getByRole('textbox', { name: 'Commit message' })).toHaveValue(
       'fix: keep this draft',

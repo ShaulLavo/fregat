@@ -76,6 +76,7 @@ test('supported session commands update snapshots; unsupported commands do not r
   expect(() =>
     dispatch({
       type: 'session.checkpoint.revert',
+      restoreFiles: false,
       commandId: 'unsupported',
       sessionId,
       turnCount: 0,

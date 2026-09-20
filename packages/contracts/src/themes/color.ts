@@ -1,3 +1,16 @@
+import {
+  convertHslToRgb,
+  parse,
+  parseHex,
+  parseHsl,
+  parseHslLegacy,
+  parseOklch,
+  parseRgb,
+  parseRgbLegacy,
+  parseTransparent,
+  useParser as registerParser,
+} from 'culori/fn'
+
 /**
  * OKLCH is the palette's canonical color. Everything the app authors is OKLCH
  * already, and it is the space where "lift every surface 3%" is one axis. Hex,
@@ -17,9 +30,23 @@ export type Rgb = Readonly<{
   alpha: number
 }>
 
-const HEX_PATTERN = /^#(?:[0-9a-f]{3,4}|[0-9a-f]{6}|[0-9a-f]{8})$/iu
-const FUNCTION_PATTERN = /^(rgba?|hsla?|oklch)\((.*)\)$/iu
+const LITERAL_PATTERN = /^(?:transparent|#[0-9a-f]+|(?:rgba?|hsla?|oklch)\(.*\))$/u
 const GAMUT_EPSILON = 0.0001
+
+// Culori's parser registry is process-wide, so `parseAnyColor` gates on the
+// literal pattern too: another consumer may register named colors.
+for (const parser of [
+  parseHex,
+  parseRgb,
+  parseRgbLegacy,
+  parseHsl,
+  parseHslLegacy,
+  parseOklch,
+  parseTransparent,
+]) {
+  // @types/culori types a parser as never returning undefined, which every parser does.
+  registerParser(parser as Parameters<typeof registerParser>[0])
+}
 
 /**
  * Parses hex, `rgb()`, `hsl()`, `oklch()` and `transparent` into OKLCH, clipped
@@ -33,22 +60,23 @@ export function parseColor(input: string): Oklch | null {
   return parsed && stabilize(parsed)
 }
 
+// Culori owns the CSS syntax; the conversion below stays ours so a stored
+// `oklch()` value never shifts with a library upgrade.
 function parseAnyColor(value: string): Oklch | null {
-  if (value === 'transparent') return { l: 0, c: 0, h: 0, alpha: 0 }
-  if (HEX_PATTERN.test(value)) return clipToSrgb(rgbToOklch(parseHex(value)))
+  if (!LITERAL_PATTERN.test(value)) return null
 
-  const match = FUNCTION_PATTERN.exec(value)
-  if (!match) return null
+  const parsed = parse(value)
+  if (!parsed) return null
 
-  const [, name, body] = match
-  const [channels, alphaText] = splitAlpha(body ?? '')
-  const alpha = alphaText === undefined ? 1 : parseAlpha(alphaText)
-  if (alpha === null || channels.length !== 3) return null
+  const alpha = parsed.alpha ?? 1
+  if (parsed.mode === 'oklch') {
+    return clipToSrgb({ l: parsed.l ?? 0, c: parsed.c ?? 0, h: normalizeHue(parsed.h ?? 0), alpha })
+  }
 
-  if (name === 'oklch') return parseOklchChannels(channels, alpha)
-  if (name === 'rgb' || name === 'rgba') return parseRgbChannels(channels, alpha)
+  const rgb = parsed.mode === 'hsl' ? convertHslToRgb(parsed) : parsed
+  if (rgb.mode !== 'rgb') return null
 
-  return parseHslChannels(channels, alpha)
+  return clipToSrgb({ ...linearSrgbToOklch(decodeChannels(rgb.r, rgb.g, rgb.b)), alpha })
 }
 
 // Rounding to the precision `toCss` writes can nudge a boundary color a hair
@@ -147,109 +175,15 @@ export function normalizeColor(color: Oklch): Oklch {
   return stabilize({ ...color, h: normalizeHue(color.h), c: Math.max(0, color.c) })
 }
 
-function parseHex(value: string): Rgb {
-  const digits = value.slice(1)
-  const expanded =
-    digits.length <= 4
-      ? digits
-          .split('')
-          .map((digit) => digit + digit)
-          .join('')
-      : digits
-  const channel = (offset: number) => Number.parseInt(expanded.slice(offset, offset + 2), 16)
-
-  return {
-    r: channel(0),
-    g: channel(2),
-    b: channel(4),
-    alpha: expanded.length === 8 ? channel(6) / 255 : 1,
-  }
-}
-
-function splitAlpha(body: string): [readonly string[], string | undefined] {
-  const slash = body.indexOf('/')
-  const channelText = slash === -1 ? body : body.slice(0, slash)
-  const alphaText = slash === -1 ? undefined : body.slice(slash + 1).trim()
-  const channels = channelText
-    .replace(/,/gu, ' ')
-    .split(/\s+/u)
-    .filter((part) => part.length > 0)
-  // Legacy `rgba(r, g, b, a)`: the fourth comma channel is the alpha.
-  if (channels.length === 4 && alphaText === undefined) {
-    return [channels.slice(0, 3), channels[3]]
-  }
-
-  return [channels, alphaText]
-}
-
-function parseAlpha(text: string): number | null {
-  const value = parseNumber(text, 1)
-  if (value === null) return null
-
-  return clamp(value, 0, 1)
-}
-
-/** A number, or a percentage of `full`. */
-function parseNumber(text: string, full: number): number | null {
-  const isPercent = text.endsWith('%')
-  const numeric = Number(isPercent ? text.slice(0, -1) : text)
-  if (!Number.isFinite(numeric)) return null
-
-  return isPercent ? (numeric / 100) * full : numeric
-}
-
-function parseOklchChannels(channels: readonly string[], alpha: number): Oklch | null {
-  const l = parseNumber(channels[0] ?? '', 1)
-  const c = parseNumber(channels[1] ?? '', 0.4)
-  const h = channels[2] === 'none' ? 0 : parseNumber(channels[2] ?? '', 360)
-  if (l === null || c === null || h === null) return null
-
-  return clipToSrgb({ l: clamp(l, 0, 1), c: Math.max(0, c), h: normalizeHue(h), alpha })
-}
-
-function parseRgbChannels(channels: readonly string[], alpha: number): Oklch | null {
-  const [r, g, b] = channels.map((channel) => parseNumber(channel, 255))
-  if (r == null || g == null || b == null) return null
-
-  return clipToSrgb(
-    rgbToOklch({ r: clamp(r, 0, 255), g: clamp(g, 0, 255), b: clamp(b, 0, 255), alpha }),
-  )
-}
-
-function parseHslChannels(channels: readonly string[], alpha: number): Oklch | null {
-  const h = parseNumber(channels[0]?.replace(/deg$/u, '') ?? '', 360)
-  const s = parseNumber(channels[1] ?? '', 1)
-  const l = parseNumber(channels[2] ?? '', 1)
-  if (h === null || s === null || l === null) return null
-
-  const saturation = clamp(s, 0, 1)
-  const lightness = clamp(l, 0, 1)
-  const chroma = (1 - Math.abs(2 * lightness - 1)) * saturation
-  const hue = normalizeHue(h) / 60
-  const x = chroma * (1 - Math.abs((hue % 2) - 1))
-  const m = lightness - chroma / 2
-  const sector = Math.floor(hue)
-  const rgb1: readonly (readonly [number, number, number])[] = [
-    [chroma, x, 0],
-    [x, chroma, 0],
-    [0, chroma, x],
-    [0, x, chroma],
-    [x, 0, chroma],
-    [chroma, 0, x],
-  ]
-  const [r, g, b] = rgb1[sector] ?? rgb1[0]!
-
-  return clipToSrgb(rgbToOklch({ r: (r + m) * 255, g: (g + m) * 255, b: (b + m) * 255, alpha }))
-}
-
 function rgbToOklch(rgb: Rgb): Oklch {
-  const linear: [number, number, number] = [
-    gammaDecode(rgb.r),
-    gammaDecode(rgb.g),
-    gammaDecode(rgb.b),
-  ]
+  const linear = decodeChannels(rgb.r / 255, rgb.g / 255, rgb.b / 255)
 
   return { ...linearSrgbToOklch(linear), alpha: rgb.alpha }
+}
+
+/** Unit-range sRGB channels; a missing (`none`) or out-of-range one is clamped. */
+function decodeChannels(r = 0, g = 0, b = 0): [number, number, number] {
+  return [gammaDecode(r), gammaDecode(g), gammaDecode(b)]
 }
 
 function linearSrgbToOklch([r, g, b]: readonly [number, number, number]): Omit<Oklch, 'alpha'> {
@@ -308,7 +242,7 @@ function relativeLuminance(color: Oklch): number {
 }
 
 function gammaDecode(channel: number): number {
-  const value = channel / 255
+  const value = clamp(channel, 0, 1)
 
   return value <= 0.04045 ? value / 12.92 : ((value + 0.055) / 1.055) ** 2.4
 }

@@ -32,6 +32,7 @@ export type TerminalMenuContext = {
   /** The browser refuses programmatic clipboard reads for this origin. */
   readonly pasteBlocked: boolean
   readonly reset: () => void
+  readonly restart: () => void
   readonly scrollToBottom: () => void
   readonly scrollToTop: () => void
   readonly selectAll: () => void
@@ -84,16 +85,21 @@ export function terminalMenu(context: TerminalMenuContext): Menu {
         id: 'clear',
         label: 'Clear',
         run: context.clear,
-        // Clear is Ctrl+L sent to the shell, so the hint names the real key.
-        shortcut: formatChord('ctrl+l'),
       }),
       actionItem({
-        // Reset rebuilds the emulator and drops the scrollback for good.
+        // Reset rebuilds this viewer without clearing shared history.
         destructive: true,
         icon: ArrowClockwiseIcon,
         id: 'reset',
         label: 'Reset',
         run: context.reset,
+      }),
+      actionItem({
+        icon: ArrowClockwiseIcon,
+        id: 'restart',
+        label: 'Restart shell',
+        destructive: true,
+        run: context.restart,
       }),
     ]),
     section('scroll', [

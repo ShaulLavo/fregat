@@ -5,6 +5,8 @@ export type ProjectMenuEntry = {
   readonly qualifier: string | null
   readonly rootPath: string
   readonly title: string
+  /** Set when the root is a linked worktree, which the menu nests under its repository. */
+  readonly worktree?: { readonly branch: string | null }
 }
 
 /**

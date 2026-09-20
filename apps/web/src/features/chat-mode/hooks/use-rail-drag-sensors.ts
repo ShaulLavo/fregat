@@ -5,7 +5,7 @@ import {
   useSensors,
   type KeyboardCodes,
 } from '@dnd-kit/core'
-import { sortableKeyboardCoordinates } from '@dnd-kit/sortable'
+import { railKeyboardCoordinates } from '@/features/chat-mode/utils/rail-keyboard-coordinates'
 
 /**
  * How a rail row is picked up. The rail is navigation first and a sortable list
@@ -26,7 +26,7 @@ export function useRailDragSensors() {
   return useSensors(
     useSensor(PointerSensor, { activationConstraint: { distance: 6 } }),
     useSensor(KeyboardSensor, {
-      coordinateGetter: sortableKeyboardCoordinates,
+      coordinateGetter: railKeyboardCoordinates,
       keyboardCodes: RAIL_DRAG_KEYS,
     }),
   )

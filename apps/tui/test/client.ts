@@ -1,3 +1,9 @@
+import * as v from 'valibot'
+import {
+  orchestrationWsClientMessageSchema,
+  type ClientOrchestrationCommand,
+} from '@workspace/contracts'
+import { createClientError } from '@workspace/client-core/errors'
 import { createEnvironmentClient } from '@workspace/client-core/transport/client'
 import { inProcessOrchestrationSocketFactory } from '@workspace/client-core/test/in-process-orchestration-socket'
 import type { FakeOrchestrationSocket } from '@workspace/client-core/test/orchestration-socket'
@@ -92,5 +98,37 @@ export function createControlledInProcessTransport(server: TestServer) {
       gates.set(pathname, { reached, released })
       return { reached: reached.promise, release: released.resolve }
     },
+  }
+}
+
+export function failingCommandSocket(
+  server: TestServer,
+  shouldFail: (command: ClientOrchestrationCommand) => boolean,
+) {
+  const createSocket = inProcessOrchestrationSocketFactory({
+    app: server.app,
+    clientOrigin: server.clientOrigin,
+  })
+  return (url: string) => {
+    const socket = createSocket(url)
+    const send = socket.send.bind(socket)
+    socket.send = (raw) => {
+      const message = v.parse(orchestrationWsClientMessageSchema, JSON.parse(raw))
+      if (
+        message.kind === 'request' &&
+        message.method === 'dispatchCommand' &&
+        shouldFail(message.command)
+      ) {
+        throw createClientError({
+          code: 'TEST_NETWORK_FAILURE',
+          message: 'Injected command transport failure',
+          status: 503,
+          why: 'A single test transport request is interrupted.',
+          fix: 'Retry the failed selection.',
+        })
+      }
+      send(raw)
+    }
+    return socket
   }
 }

@@ -1,99 +1,93 @@
+import { afterEach, beforeEach, vi } from 'vitest'
+import { expect, test } from '../../../../../test/fixtures'
 import { testScopedStorage } from '../../../../../test/factories/scoped-storage'
 import { memoryLocalStorage } from '../../../../../test/factories/local-storage'
-import { afterEach, beforeEach, vi } from 'vitest'
 import {
-  MAX_PROMPT_STASH_ENTRIES,
-  resetPromptStashStore,
-  promptStashStoreFor,
   initializePromptStashStore,
+  promptStashStoreFor,
+  resetPromptStashStore,
   createPromptStashStore,
-} from '@/features/chat/state/prompt-stash-store'
-import { expect, test } from '../../../../../test/fixtures'
+} from '../prompt-stash-store'
+import {
+  hydrateChatInputDraftStoreFromStorage,
+  resetChatInputDraftStore,
+  useChatInputDraftStore,
+} from '../chat-input-draft-store'
+import { transferStash } from '../stash-transfer'
+import { readPersistedChatInputDrafts } from '../../utils/draft-storage'
 
-beforeEach(() => vi.stubGlobal('localStorage', memoryLocalStorage()))
+const target = {
+  environmentId: testScopedStorage.environmentId,
+  rootPath: '/repo',
+  draftKey: 'stash-test',
+}
+const drafts = () => useChatInputDraftStore.getState()
+const stash = () => promptStashStoreFor(target.environmentId).getState()
+beforeEach(() => {
+  vi.stubGlobal('localStorage', memoryLocalStorage())
+  resetChatInputDraftStore()
+  hydrateChatInputDraftStoreFromStorage(testScopedStorage)
+  initializePromptStashStore(testScopedStorage)
+  resetPromptStashStore()
+})
 afterEach(() => {
   vi.restoreAllMocks()
   vi.unstubAllGlobals()
 })
 
-function stash() {
-  return promptStashStoreFor(testScopedStorage.environmentId).getState()
-}
-
-test('a stashed prompt comes back exactly as it was typed, and only once', () => {
-  initializePromptStashStore(testScopedStorage)
-  resetPromptStashStore()
-
-  const entry = stash().stashPrompt('  rewrite the ingestion reactor  ')
-  expect(entry?.prompt).toBe('rewrite the ingestion reactor')
-  expect(stash().entries).toHaveLength(1)
-
-  const restored = stash().takeEntry(entry?.id ?? '')
-  expect(restored?.prompt).toBe('rewrite the ingestion reactor')
-  // Restoring is spending it: the prompt now lives in the composer, and a queue
-  // that kept its own copy would hand back a duplicate on the next restore.
-  expect(stash().entries).toEqual([])
-  expect(stash().takeEntry(entry?.id ?? '')).toBeNull()
+test('one persisted transaction moves exact prompt and terminal context, then swaps them back', async () => {
+  drafts().setPrompt(target, '  explain output  ')
+  drafts().addTerminalContexts(target, [
+    { id: 'capture', source: 'shell', lineStart: 1, lineEnd: 2, text: 'two lines' },
+  ])
+  const write = vi.spyOn(localStorage, 'setItem')
+  await transferStash(target, { kind: 'stash' })
+  expect(write).toHaveBeenCalledTimes(1)
+  expect(drafts().getDraft(target).terminalContexts).toEqual([])
+  const entry = stash().entries[0]!
+  expect(entry.prompt).toBe('  explain output  ')
+  expect(entry.terminalContexts[0]?.text).toBe('two lines')
+  drafts().setPrompt(target, 'other work')
+  await transferStash(target, { kind: 'restore', entry })
+  expect(drafts().getDraft(target).prompt).toBe(entry.prompt)
+  expect(drafts().getDraft(target).terminalContexts).toEqual(entry.terminalContexts)
+  expect(stash().entries.map((item) => item.prompt)).toEqual(['other work'])
+  expect(readPersistedChatInputDrafts(testScopedStorage).stashEntries).toEqual(stash().entries)
 })
 
-test('the newest stash is first in the queue', () => {
-  initializePromptStashStore(testScopedStorage)
-  resetPromptStashStore()
-
-  stash().stashPrompt('first')
-  stash().stashPrompt('second')
-
-  expect(stash().entries.map((entry) => entry.prompt)).toEqual(['second', 'first'])
-})
-
-test('an empty composer stashes nothing', () => {
-  initializePromptStashStore(testScopedStorage)
-  resetPromptStashStore()
-
-  expect(stash().stashPrompt('   \n  ')).toBeNull()
-  expect(stash().entries).toEqual([])
-})
-
-test('the queue evicts the oldest prompt rather than growing without bound', () => {
-  initializePromptStashStore(testScopedStorage)
-  resetPromptStashStore()
-
-  for (let index = 0; index <= MAX_PROMPT_STASH_ENTRIES; index += 1) {
-    stash().stashPrompt(`prompt ${index}`)
-  }
-
-  const entries = stash().entries
-  expect(entries).toHaveLength(MAX_PROMPT_STASH_ENTRIES)
-  expect(entries[0]?.prompt).toBe(`prompt ${MAX_PROMPT_STASH_ENTRIES}`)
-  expect(entries.some((entry) => entry.prompt === 'prompt 0')).toBe(false)
-})
-
-test('deleting a stashed prompt drops it without handing it back', () => {
-  initializePromptStashStore(testScopedStorage)
-  resetPromptStashStore()
-
-  const entry = stash().stashPrompt('abandoned idea')
-  stash().removeEntry(entry?.id ?? '')
-
-  expect(stash().entries).toEqual([])
-})
-
-test('a quota failure leaves the prompt in the composer and the stash unchanged', () => {
-  const store = createPromptStashStore(testScopedStorage)
-  const previous = store.getState().stashPrompt('already saved')
+test('quota failure preserves both draft and stash during restore and removal', async () => {
+  drafts().setPrompt(target, 'saved')
+  await transferStash(target, { kind: 'stash' })
+  const entry = stash().entries[0]!
+  drafts().setPrompt(target, 'keep')
   vi.spyOn(localStorage, 'setItem').mockImplementation(() => {
-    throw new DOMException('Storage quota exceeded', 'QuotaExceededError')
+    throw new DOMException('quota', 'QuotaExceededError')
   })
-
-  expect(store.getState().stashPrompt('keep in composer')).toBeNull()
-  expect(store.getState().entries).toEqual([previous])
-  expect(createPromptStashStore(testScopedStorage).getState().entries).toEqual([previous])
+  await expect(transferStash(target, { kind: 'restore', entry })).rejects.toThrow()
+  await expect(transferStash(target, { kind: 'remove', entry })).rejects.toThrow()
+  expect(drafts().getDraft(target).prompt).toBe('keep')
+  expect(stash().entries).toEqual([entry])
+  expect(createPromptStashStore(testScopedStorage).getState().entries).toEqual([entry])
 })
 
-test('an unavailable store cannot report a prompt as saved', () => {
-  vi.stubGlobal('localStorage', undefined)
-  const store = createPromptStashStore(testScopedStorage)
+test('preparation blocks repeated shortcuts and context-only drafts can be stashed', async () => {
+  drafts().addTerminalContexts(target, [
+    { id: 'capture', source: 'shell', lineStart: 1, lineEnd: 1, text: 'output' },
+  ])
+  drafts().changeAttachmentPreparation(target, 1)
+  await expect(transferStash(target, { kind: 'stash' })).rejects.toThrow()
+  expect(stash().entries).toEqual([])
+  drafts().changeAttachmentPreparation(target, -1)
+  await transferStash(target, { kind: 'stash' })
+  await transferStash(target, { kind: 'stash' })
+  expect(stash().entries).toHaveLength(1)
+})
 
-  expect(store.getState().stashPrompt('keep in composer')).toBeNull()
-  expect(store.getState().entries).toEqual([])
+test('stash writes preserve unrelated composed drafts', async () => {
+  const other = { ...target, draftKey: 'other' }
+  drafts().setPrompt(other, 'untouched')
+  drafts().setPrompt(target, 'moving')
+  await transferStash(target, { kind: 'stash' })
+  const stored = readPersistedChatInputDrafts(testScopedStorage)
+  expect(Object.values(stored.draftsByKey).map((item) => item.prompt)).toEqual(['untouched'])
 })

@@ -10,7 +10,7 @@ import {
 import type { SettingsSubmission } from '@workspace/client-core/settings/intent-store'
 
 import { useTheme } from '@/features/settings/hooks/use-theme'
-import { useSettingValue } from '@/features/settings/hooks/use-setting-value'
+import { useSettingValue } from '@/hooks/use-setting-value'
 import { useSettingsActions } from '@/features/settings/hooks/use-settings-actions'
 import {
   EditorColorThemeContext,

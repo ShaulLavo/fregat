@@ -6,6 +6,12 @@ import { defineErrorCatalog } from 'evlog'
  * message — a rewording silently turned a permanent failure into a retry loop.
  */
 export const checkpointErrors = defineErrorCatalog('checkpoint', {
+  WORKSPACE_NOT_ISOLATED: {
+    status: 409,
+    message: 'File restore requires an isolated worktree.',
+    why: 'Restoring this checkout could overwrite another session or the main workspace.',
+    fix: 'Rewind the conversation without restoring files.',
+  },
   RANGE_INVALID: {
     status: 400,
     message: ({ fromTurnCount, toTurnCount }: { fromTurnCount: number; toTurnCount: number }) =>

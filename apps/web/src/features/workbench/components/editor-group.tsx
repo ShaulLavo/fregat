@@ -1,6 +1,7 @@
 import type { GitFileStatus } from '@workspace/contracts'
 import { FileDashedIcon } from '@phosphor-icons/react'
 import { EmptyState } from '@workspace/ui/components/empty-state'
+import { RenderErrorBoundary } from '@workspace/ui/patterns/render-error-boundary'
 import { useEditorCommands } from '@/features/editor/hooks/use-editor-commands'
 import { EditorBreadcrumbs } from '@/features/workbench/components/editor-breadcrumbs'
 import { EditorGroupDropOverlay } from '@/features/workbench/components/editor-group-drop-overlay'
@@ -65,12 +66,14 @@ export function EditorGroup({
         ) : null}
         {selectedTab ? (
           <div className='min-h-0 min-w-0 flex-1 overflow-hidden'>
-            <EditorSurfaceTabBody
-              active={active}
-              content={selectedTab.content}
-              rootPath={rootPath}
-              tabId={selectedTab.id}
-            />
+            <RenderErrorBoundary label='This tab' resetKeys={[selectedTab.id]}>
+              <EditorSurfaceTabBody
+                active={active}
+                content={selectedTab.content}
+                rootPath={rootPath}
+                tabId={selectedTab.id}
+              />
+            </RenderErrorBoundary>
           </div>
         ) : (
           <EmptyState

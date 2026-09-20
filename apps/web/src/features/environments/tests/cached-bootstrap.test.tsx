@@ -19,7 +19,7 @@ import { assertEnvironmentWritable } from '@/lib/environments/state/availability
 import { environmentScopedStorage } from '@/lib/environments/state/scoped-storage'
 import { primaryQueryClient } from '@/lib/environments/state/query-clients'
 import { transportFor, closeChatTransports } from '@/features/chat/state/active-transports'
-import { writeBootMirror } from '@/features/settings/utils/boot-mirror'
+import { writeBootMirror } from '@/lib/settings-boot-mirror'
 import { createBootRuntime } from '@/state/bootstrap-runtime'
 import { currentRailEnvironments } from '@/features/chat-mode/state/rail-environments'
 import { sessionRailModel } from '@workspace/client-core/chat/rail/model'

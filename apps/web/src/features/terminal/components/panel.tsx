@@ -1,3 +1,4 @@
+import { useTerminalActions } from '@/features/terminal/hooks/use-terminal-actions'
 import { ToolPane } from '@workspace/ui/patterns/tool-pane'
 import { RingLoader } from '@workspace/ui/components/ring-loader'
 import { errorMessage } from '@/lib/error-message'
@@ -51,7 +52,7 @@ import { readTerminalMenuTarget, type TerminalMenuTarget } from '@/features/term
 import { terminalThemeFor } from '@/features/terminal/utils/theme'
 import type { TerminalColors } from '@workspace/client-core/themes/palette'
 import { isFocusOutsideElement } from '@/features/terminal/utils/focus-target'
-import { useSettingValue } from '@/features/settings/hooks/use-setting-value'
+import { useSettingValue } from '@/hooks/use-setting-value'
 import { useUnavailableEnvironment } from '@/lib/environments/hooks/use-unavailable-environment'
 
 /** Writes to the terminal's socket. False when the connection is not up yet. */
@@ -119,6 +120,7 @@ export function TerminalPanel({
   const fontSize = useSettingValue('terminal.integrated.fontSize')
   const scrollback = useSettingValue('terminal.integrated.scrollback')
   const contextMenu = useContextMenu()
+  const terminalActions = useTerminalActions({ rootPath, terminalId: sessionId })
   const [menuTarget, setMenuTarget] = useState<TerminalMenuTarget | null>(null)
   const [socketConnected, setSocketConnected] = useState(false)
   const focusIdentity = terminalSessionKey(rootPath, sessionId)
@@ -210,7 +212,12 @@ export function TerminalPanel({
     event.stopPropagation()
     // Snapshotted here because ghostty drops the selection from a document
     // `click` handler the moment a portalled menu item is pressed.
-    setMenuTarget(readTerminalMenuTarget(terminal, sessionId, scrollbackLengthRef.current > 0))
+    setMenuTarget(
+      readTerminalMenuTarget(terminal, sessionId, scrollbackLengthRef.current > 0, {
+        clearHistory: () => terminalActions.mutate('clear'),
+        restart: () => terminalActions.mutate('restart'),
+      }),
+    )
     contextMenu.openAtEvent(event, event.currentTarget)
   }
   const handleTerminalMenuOpenChange = (open: boolean) => {
@@ -518,6 +525,8 @@ function openTerminalSocket({
     const message = parseTerminalServerMessage((event as MessageEvent).data)
     if (!message) return
     if (message.type === 'ready') {
+      if (message.restoredHistory)
+        terminal.writeln('\r\n[Previous output restored. A new terminal process has started.]')
       sendTerminalResize(socket, getTerminalDimensions())
       return
     }
@@ -539,6 +548,10 @@ function handleTerminalServerMessage({
   onProcessChange: (process: string | null) => void
   terminal: Terminal
 }) {
+  if (message.type === 'cleared') {
+    terminal.reset()
+    return
+  }
   if (message.type === 'output') {
     terminal.write(message.data)
     return

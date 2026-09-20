@@ -19,6 +19,24 @@
       "description": "Imported chats receive one-way updates from local history until you send their first message in Platform. New chats are only imported when you click Import.",
       "type": "boolean"
     },
+    "chat.projectGrouping": {
+      "default": "repository",
+      "description": "Group projects by repository, repository-relative path, or owning machine. Git projects currently register at the repository root, so both repository modes are equivalent.",
+      "enum": ["repository_path", "repository", "separate"],
+      "type": "string"
+    },
+    "chat.projectGroupingOverrides": {
+      "additionalProperties": {
+        "enum": ["repository_path", "repository", "separate"],
+        "type": "string"
+      },
+      "default": {},
+      "description": "Grouping mode per scoped project key (environment UUID:project UUID).",
+      "propertyNames": {
+        "type": "string"
+      },
+      "type": "object"
+    },
     "developer.simulatedLatencyMs": {
       "default": 0,
       "description": "Milliseconds added before every request to the server, to see how the app behaves on a slow link. Zero disables it.",

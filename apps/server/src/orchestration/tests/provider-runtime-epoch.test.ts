@@ -1,3 +1,5 @@
+import { startPendingProviderTurn } from '../../../test/factories/pending-provider'
+import { MockProviderAdapter } from '../../provider/adapters/mock'
 import { pendingProviderTurnFailure } from '../../../test/factories/provider-launch'
 import { expect, onTestFinished, test } from 'vitest'
 import * as v from 'valibot'
@@ -182,4 +184,62 @@ test('a delayed failure from an interrupted send cannot stamp the next runtime w
     hasError: false,
     attentionState: 'settled',
   })
+})
+
+test('archiving an adopted turn preserves archive through a late provider failure', async () => {
+  const { fixture, failOldTurn } = await pendingProviderTurnFailure()
+  await fixture.command({
+    type: 'session.archive',
+    commandId: 'archive-adopted',
+    sessionId: FIXTURE_SESSION_ID,
+  })
+  const before = await sessionFrom(fixture)
+  expect(before.archivedAt).toEqual(expect.any(String))
+  expect(before.latestTurn?.providerStartState).toBe('adopted')
+  failOldTurn()
+  await fixture.engine.providerRuntimeIdle()
+  const after = await sessionFrom(fixture)
+  expect(after.archivedAt).toBe(before.archivedAt)
+  expect(after.runtime?.status).toBe('error')
+  expect(after.messages).toEqual(before.messages)
+  expect(after.activities.some((activity) => activity.kind === 'provider.turn.start.failed')).toBe(
+    true,
+  )
+})
+
+test('archiving an adopted turn retains the completed answer and archive after restart', async () => {
+  const started = Promise.withResolvers<void>()
+  const finish = Promise.withResolvers<void>()
+  const adapter = new MockProviderAdapter({
+    beforeComplete: () => {
+      started.resolve()
+      return finish.promise
+    },
+  })
+  const { fixture } = await startPendingProviderTurn({
+    adapter,
+    started: started.promise,
+    release: () => finish.resolve(),
+  })
+  await fixture.command({
+    type: 'session.archive',
+    commandId: 'archive-before-completion',
+    sessionId: FIXTURE_SESSION_ID,
+  })
+  const archivedAt = (await sessionFrom(fixture)).archivedAt
+  expect(archivedAt).toEqual(expect.any(String))
+  finish.resolve()
+  await fixture.engine.providerRuntimeIdle()
+  const completed = await sessionFrom(fixture)
+  expect(completed.archivedAt).toBe(archivedAt)
+  expect(completed.latestTurn?.state).toBe('completed')
+  expect(
+    completed.messages.some(
+      (message) => message.role === 'assistant' && message.text === 'Mock response',
+    ),
+  ).toBe(true)
+  await fixture.restart()
+  const reloaded = await sessionFrom(fixture)
+  expect(reloaded.archivedAt).toBe(archivedAt)
+  expect(reloaded.messages).toEqual(completed.messages)
 })

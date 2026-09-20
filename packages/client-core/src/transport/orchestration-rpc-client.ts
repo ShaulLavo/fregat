@@ -1,6 +1,7 @@
 import { elapsedMs } from '@workspace/utils/timing'
 import {
   ORCHESTRATION_WS_RESULTS,
+  errorStringField,
   orchestrationShellStreamItemSchema,
   orchestrationSessionStreamItemSchema,
   orchestrationWsServerMessageSchema,
@@ -25,7 +26,11 @@ import { createClientError } from '../errors'
 import { createOrchestrationRpcClosedError } from './structured-errors'
 import { chatCommandSummary } from '@workspace/contracts'
 import { orchestrationReplaySummary as chatReplaySummary } from '@workspace/contracts'
-import { guardOrchestrationStreamSequence } from './utils/sequence'
+import {
+  guardOrchestrationStreamSequence,
+  orchestrationStreamItemSequence,
+  type OrchestrationStreamItem,
+} from './utils/sequence'
 import type { OrchestrationStreamInput } from './streams'
 import type {
   OrchestrationSocket,
@@ -59,8 +64,8 @@ type PendingRequest = {
 type RpcSubscription = {
   method: OrchestrationWsSubscribe['method']
   queue: Pick<AsyncSubscriptionQueue<unknown>, 'close' | 'fail'>
-  accept: (item: unknown) => void
-  synchronize: (sequence: number) => void
+  accept: (item: unknown, deliveryId: number) => void
+  synchronize: (sequence: number, deliveryId: number) => void
   scope: RpcEventScope
   sessionId?: SessionId
 }
@@ -222,7 +227,7 @@ export class OrchestrationRpcClient {
       method: 'subscribeShell',
       subscriptionId: this.nextSubscriptionId('shell'),
     }
-    const stream = this.subscribe(subscription, input, orchestrationShellStreamItemSchema)
+    const stream = this.subscribeRecovering(subscription, input, orchestrationShellStreamItemSchema)
 
     yield* guardOrchestrationStreamSequence(stream, streamGuardSequence(input.afterSequence))
   }
@@ -236,7 +241,11 @@ export class OrchestrationRpcClient {
       subscriptionId: this.nextSubscriptionId('session'),
       sessionId,
     }
-    const stream = this.subscribe(subscription, input, orchestrationSessionStreamItemSchema)
+    const stream = this.subscribeRecovering(
+      subscription,
+      input,
+      orchestrationSessionStreamItemSchema,
+    )
 
     yield* guardOrchestrationStreamSequence(stream, streamGuardSequence(input.afterSequence))
   }
@@ -292,6 +301,47 @@ export class OrchestrationRpcClient {
     return pending
   }
 
+  private async *subscribeRecovering<
+    TSchema extends v.GenericSchema<unknown, OrchestrationStreamItem>,
+  >(message: OrchestrationWsSubscribe, input: OrchestrationStreamInput, schema: TSchema) {
+    const recovery: SubscriptionRecovery = {
+      afterSequence: message.afterSequence,
+      attempt: 0,
+      failedCursor: undefined,
+    }
+    while (!input.signal?.aborted) {
+      const current = {
+        ...message,
+        afterSequence: recovery.afterSequence,
+        subscriptionId: this.nextSubscriptionId(message.method),
+      }
+      const failure = yield* this.consumeSubscription(current, input, schema, recovery)
+      if (!failure || input.signal?.aborted) return
+      if (errorStringField(failure.error, 'code') !== 'orchestration.LIVE_STREAM_OVERFLOW')
+        throw failure.error
+      await waitForSubscriptionRetry(advanceSubscriptionRetry(recovery), input.signal)
+    }
+  }
+
+  private async *consumeSubscription<
+    TSchema extends v.GenericSchema<unknown, OrchestrationStreamItem>,
+  >(
+    message: OrchestrationWsSubscribe,
+    input: OrchestrationStreamInput,
+    schema: TSchema,
+    recovery: SubscriptionRecovery,
+  ) {
+    try {
+      for await (const item of this.subscribe(message, input, schema)) {
+        yield item
+        recordSubscriptionConsumption(recovery, item)
+      }
+      return null
+    } catch (error) {
+      return { error }
+    }
+  }
+
   private async *subscribe<TSchema extends v.GenericSchema>(
     message: OrchestrationWsSubscribe,
     { signal, onSynchronized }: OrchestrationStreamInput,
@@ -299,7 +349,21 @@ export class OrchestrationRpcClient {
   ) {
     if (signal?.aborted) return
 
-    const queue = new AsyncSubscriptionQueue<SubscriptionItem<v.InferOutput<TSchema>>>()
+    const acknowledge = (deliveryId: number) =>
+      this.sendClientMessageIfOpen({
+        kind: 'subscription.ack',
+        subscriptionId: message.subscriptionId,
+        deliveryId,
+      })
+    const queue = new AsyncSubscriptionQueue<SubscriptionItem<v.InferOutput<TSchema>>>({
+      // Snapshot recovery is one ACK-gated frame, outside the live-event byte budget.
+      isSnapshot: (frame) => frame.kind === 'data' && isSnapshotFrame(frame.item),
+      onOverflow: () =>
+        this.sendClientMessageIfOpen({
+          kind: 'unsubscribe',
+          subscriptionId: message.subscriptionId,
+        }),
+    })
     const sessionId = message.method === 'subscribeSession' ? message.sessionId : undefined
     const scope = this.options.observation.createScope({
       action: 'orchestration.ws.subscription.summary',
@@ -312,25 +376,30 @@ export class OrchestrationRpcClient {
     const subscription: RpcSubscription = {
       method: message.method,
       queue,
-      accept: (value) =>
+      accept: (value, deliveryId) =>
         settleParsedResult({
           value,
           schema,
-          resolve: (item) => queue.push({ kind: 'data', item }),
+          resolve: (item) => queue.push({ kind: 'data', item, deliveryId }),
           reject: (error) => queue.fail(error),
         }),
-      synchronize: (sequence) => queue.push({ kind: 'synchronized', sequence }),
+      synchronize: (sequence, deliveryId) =>
+        queue.push({ kind: 'synchronized', sequence, deliveryId }),
       scope,
       sessionId,
     }
     this.subscriptions.set(message.subscriptionId, subscription)
-    const abort = () => queue.close()
+    const abort = () => {
+      queue.close()
+      this.subscriptions.delete(message.subscriptionId)
+      this.sendClientMessageIfOpen({ kind: 'unsubscribe', subscriptionId: message.subscriptionId })
+    }
 
     try {
       signal?.addEventListener('abort', abort, { once: true })
       await this.sendClientMessage(message)
       scope.increment('subscription.openCount')
-      yield* drainSubscriptionItems(queue, onSynchronized)
+      yield* drainSubscriptionItems(queue, onSynchronized, acknowledge)
     } catch (error) {
       if (error !== this.closedError) scope.error(error)
       if (!signal?.aborted) throw error
@@ -536,10 +605,10 @@ export class OrchestrationRpcClient {
     subscription.scope.increment('subscription.nextCount')
     if (message.item.kind === 'synchronized') {
       subscription.scope.set({ synchronizedSequence: message.item.sequence })
-      subscription.synchronize(message.item.sequence)
+      subscription.synchronize(message.item.sequence, message.deliveryId)
       return
     }
-    subscription.accept(message.item)
+    subscription.accept(message.item, message.deliveryId)
   }
 
   private handleSubscriptionError(
@@ -821,18 +890,63 @@ function settleParsedResult<TSchema extends v.GenericSchema>({
 }
 
 type SubscriptionItem<T> =
-  | { readonly kind: 'data'; readonly item: T }
-  | { readonly kind: 'synchronized'; readonly sequence: number }
+  | { readonly kind: 'data'; readonly item: T; readonly deliveryId: number }
+  | { readonly kind: 'synchronized'; readonly sequence: number; readonly deliveryId: number }
 
 async function* drainSubscriptionItems<T>(
   queue: AsyncSubscriptionQueue<SubscriptionItem<T>>,
   onSynchronized: (() => void) | undefined,
+  acknowledge: (deliveryId: number) => void,
 ) {
   for await (const frame of drainSubscriptionQueue(queue)) {
     if (frame.kind === 'synchronized') {
       onSynchronized?.()
+      acknowledge(frame.deliveryId)
       continue
     }
     yield frame.item
+    acknowledge(frame.deliveryId)
   }
+}
+
+function isSnapshotFrame(value: unknown) {
+  return value !== null && typeof value === 'object' && 'kind' in value && value.kind === 'snapshot'
+}
+
+function waitForSubscriptionRetry(delay: number, signal?: AbortSignal) {
+  return new Promise<void>((resolve) => {
+    const done = () => {
+      clearTimeout(timer)
+      signal?.removeEventListener('abort', done)
+      resolve()
+    }
+    const timer = setTimeout(done, delay)
+    signal?.addEventListener('abort', done, { once: true })
+    if (signal?.aborted) done()
+  })
+}
+
+type SubscriptionRecovery = {
+  afterSequence: number
+  attempt: number
+  failedCursor: number | undefined
+}
+
+function recordSubscriptionConsumption(
+  recovery: SubscriptionRecovery,
+  item: OrchestrationStreamItem,
+) {
+  const sequence = orchestrationStreamItemSequence(item)
+  if (sequence > recovery.afterSequence) recovery.failedCursor = undefined
+  recovery.afterSequence = sequence
+  recovery.attempt = 0
+}
+
+function advanceSubscriptionRetry(recovery: SubscriptionRecovery) {
+  // An oversized replay cannot pass the live client budget; recover it as a snapshot.
+  const cursor = recovery.afterSequence
+  if (recovery.failedCursor === cursor) recovery.afterSequence = 0
+  recovery.failedCursor = cursor
+  recovery.attempt += 1
+  return Math.min(100 * 2 ** Math.min(recovery.attempt - 1, 5), 2_000)
 }

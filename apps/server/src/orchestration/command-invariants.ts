@@ -1,3 +1,4 @@
+import { pendingMessageQuestions } from './message-questions'
 import { requireSession as requireSessionNotDeleted } from './read-model'
 import { defineErrorCatalog } from 'evlog'
 import { isValidOrderKey } from '@workspace/contracts'
@@ -25,12 +26,24 @@ const orderKeyErrors = defineErrorCatalog('orchestration', {
  * one namespace to branch on.
  */
 const sessionLifecycleErrors = defineErrorCatalog('orchestration', {
+  SESSION_NOT_SETTLED: {
+    status: 409,
+    message: 'The session is no longer settled.',
+    why: 'New activity superseded the provider release requested by settlement.',
+    fix: 'Keep the active provider attached; a later settlement can release it.',
+  },
   SESSION_BLOCKING_REQUEST: {
     status: 409,
     message: ({ commandType, sessionId }: { commandType: string; sessionId: string }) =>
       `Session ${sessionId} has an open approval or user-input request and cannot handle ${commandType}`,
     why: 'An open request is the agent waiting on the user; parking the session would hide the very question it is asking.',
     fix: 'Answer or dismiss the pending request, then retry.',
+  },
+  SESSION_NOT_ACTIVE: {
+    status: 409,
+    message: 'Only unpinned, unsettled sessions can be reordered in the active shelf.',
+    why: 'The session moved to another shelf before this reorder was accepted.',
+    fix: 'Refresh the session list and reorder it on its current shelf.',
   },
   SESSION_NOT_PINNED: {
     status: 409,
@@ -112,9 +125,11 @@ export function requireSettleable(
   session: OrchestrationProjectedSession,
   commandType: string,
   _at: string,
+  dismissMessageQuestions = false,
 ) {
   const sessionId = session.id
-  if (hasOpenBlockingRequest(session))
+  const optional = dismissMessageQuestions ? pendingMessageQuestions(session.activities).length : 0
+  if (session.pendingApprovalCount > 0 || session.pendingUserInputCount > optional)
     throw sessionLifecycleErrors.SESSION_BLOCKING_REQUEST({ commandType, sessionId })
   if (hasQueuedTurnStart(session))
     throw sessionLifecycleErrors.SESSION_QUEUED_TURN_START({ commandType, sessionId })
@@ -126,14 +141,27 @@ export function requireSettleable(
 export function requireSnoozable(
   session: OrchestrationProjectedSession,
   commandType: string,
-  at: string,
+  _at: string,
 ) {
-  requireSettleable(session, commandType, at)
+  const sessionId = session.id
+  if (hasOpenBlockingRequest(session))
+    throw sessionLifecycleErrors.SESSION_BLOCKING_REQUEST({ commandType, sessionId })
+  if (hasQueuedTurnStart(session))
+    throw sessionLifecycleErrors.SESSION_QUEUED_TURN_START({ commandType, sessionId })
+}
+
+export function requireSettled(session: OrchestrationProjectedSession) {
+  if (session.settledOverride !== 'settled') throw sessionLifecycleErrors.SESSION_NOT_SETTLED()
 }
 
 export function requireFutureWakeTime(sessionId: string, snoozedUntil: string, at: string) {
   if (Date.parse(snoozedUntil) > Date.parse(at)) return
   throw sessionLifecycleErrors.SESSION_SNOOZE_NOT_FUTURE({ snoozedUntil, sessionId })
+}
+
+export function requireActiveOrderable(session: OrchestrationProjectedSession) {
+  if (!session.pinnedAt && session.settledOverride !== 'settled') return
+  throw sessionLifecycleErrors.SESSION_NOT_ACTIVE()
 }
 
 export function requirePinned(session: OrchestrationProjectedSession) {
@@ -147,7 +175,13 @@ function hasOpenBlockingRequest(session: OrchestrationProjectedSession) {
 
 function hasQueuedTurnStart(session: OrchestrationProjectedSession) {
   const state = session.latestTurn?.providerStartState
-  return state === 'queued' || state === 'claimed' || state === 'adopted'
+  return (
+    state === 'queued' ||
+    state === 'claimed' ||
+    (state === 'adopted' &&
+      (session.runtime?.status !== 'running' ||
+        session.runtime.activeTurnId !== session.latestTurn?.turnId))
+  )
 }
 
 function isSessionAlive(session: OrchestrationProjectedSession) {

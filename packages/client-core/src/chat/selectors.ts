@@ -1,3 +1,4 @@
+import { settledSessionTimestamp, sessionSortTimestamp } from './rail/session-order'
 import type {
   OrchestrationLatestTurn,
   OrchestrationSessionActivity,
@@ -40,6 +41,7 @@ const sessionCache = new WeakMap<
  */
 export type ChatSessionListProjection = Pick<
   ProjectionSession,
+  | 'backgroundLiveness'
   | 'archivedAt'
   | 'createdAt'
   | 'hasActionableProposedPlan'
@@ -49,17 +51,28 @@ export type ChatSessionListProjection = Pick<
   | 'pendingApprovalCount'
   | 'pendingUserInputCount'
   | 'pinOrderKey'
+  | 'activeOrderKey'
+  | 'unsettledAt'
   | 'planProgress'
   | 'runtime'
   | 'title'
+  | 'titleState'
+  | 'titleRegeneration'
+  | 'titleGenerationError'
   | 'worktreeId'
   | 'origin'
   | 'attentionState'
   | 'attentionReason'
   | 'hasError'
   | 'settledOverride'
+  | 'settledAt'
+  | 'pinnedAt'
+  | 'snoozedAt'
   | 'snoozedUntil'
 > & {
+  readonly createdSortAt: number
+  readonly updatedSortAt: number
+  readonly settledOrderAt: string | null
   readonly activityAt: string
   readonly project: OrchestrationProjectShell
   readonly worktree: OrchestrationWorktreeShell
@@ -142,8 +155,7 @@ export function createChatSessionListSelector({
     const next = (sessionIds ?? []).flatMap((sessionId) => {
       const session = state.sessionById[sessionId]
       if (!session) return []
-      if (!includeArchived && session.archivedAt && session.attentionState !== 'needs-input')
-        return []
+      if (!includeArchived && session.archivedAt) return []
       const worktree = state.worktreeById[session.worktreeId]
       const project = worktree && state.projectById[worktree.projectId]
       if (!worktree || !project) return []
@@ -192,6 +204,9 @@ function sessionListProjection(
 
   return {
     activityAt,
+    settledOrderAt: settledSessionTimestamp(session),
+    createdSortAt: sessionSortTimestamp(session, 'created_at'),
+    updatedSortAt: sessionSortTimestamp(session, 'updated_at'),
     project,
     worktree,
     worktreeId: session.worktreeId,
@@ -200,7 +215,13 @@ function sessionListProjection(
     attentionReason: session.attentionReason,
     hasError: session.hasError,
     settledOverride: session.settledOverride,
+    settledAt: session.settledAt,
+    pinnedAt: session.pinnedAt,
+    activeOrderKey: session.activeOrderKey,
+    unsettledAt: session.unsettledAt,
+    snoozedAt: session.snoozedAt,
     snoozedUntil: session.snoozedUntil,
+    backgroundLiveness: session.backgroundLiveness ?? null,
     archivedAt: session.archivedAt,
     createdAt: session.createdAt,
     hasActionableProposedPlan: session.hasActionableProposedPlan,
@@ -213,6 +234,9 @@ function sessionListProjection(
     planProgress: session.planProgress,
     runtime: session.runtime,
     title: session.title,
+    titleState: session.titleState,
+    titleRegeneration: session.titleRegeneration,
+    titleGenerationError: session.titleGenerationError,
   }
 }
 
@@ -223,6 +247,10 @@ function listProjectionMatches(
 ) {
   return (
     previous.activityAt === activityAt &&
+    previous.settledOrderAt === settledSessionTimestamp(session) &&
+    previous.createdSortAt === sessionSortTimestamp(session, 'created_at') &&
+    previous.updatedSortAt === sessionSortTimestamp(session, 'updated_at') &&
+    previous.backgroundLiveness === (session.backgroundLiveness ?? null) &&
     previous.archivedAt === session.archivedAt &&
     previous.createdAt === session.createdAt &&
     previous.hasActionableProposedPlan === session.hasActionableProposedPlan &&
@@ -235,11 +263,19 @@ function listProjectionMatches(
     previous.planProgress === session.planProgress &&
     previous.runtime === session.runtime &&
     previous.title === session.title &&
+    previous.titleState === session.titleState &&
+    previous.titleRegeneration === session.titleRegeneration &&
+    previous.titleGenerationError === session.titleGenerationError &&
     previous.worktreeId === session.worktreeId &&
     previous.origin === session.origin &&
     previous.attentionState === session.attentionState &&
     previous.attentionReason === session.attentionReason &&
     previous.hasError === session.hasError &&
+    previous.settledAt === session.settledAt &&
+    previous.pinnedAt === session.pinnedAt &&
+    previous.activeOrderKey === session.activeOrderKey &&
+    previous.unsettledAt === session.unsettledAt &&
+    previous.snoozedAt === session.snoozedAt &&
     previous.settledOverride === session.settledOverride &&
     previous.snoozedUntil === session.snoozedUntil
   )

@@ -20,7 +20,7 @@ const packs = [
     lightPalette: 'sage',
     darkPalette: 'sage',
     lightCode: 'light-plus',
-    darkCode: 'dark-plus',
+    darkCode: 'poimandres',
     lightWallpaper: BUNDLED_WALLPAPERS.sageLight,
     darkWallpaper: BUNDLED_WALLPAPERS.sageDark,
   },

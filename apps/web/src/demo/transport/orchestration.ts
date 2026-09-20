@@ -1,4 +1,5 @@
 import { ws } from 'msw'
+import { isRecord } from '@workspace/utils/objects'
 import * as v from 'valibot'
 import {
   ORCHESTRATION_WS_PROTOCOL_VERSION,
@@ -33,7 +34,12 @@ export function demoOrchestrationHandler(
   const socket = ws.link(`${apiOrigin.replace(/^http/u, 'ws')}/orchestration/rpc`)
   return socket.addEventListener('connection', ({ client }) => {
     const subscriptions = new Map<string, string | null>()
-    const send: Send = (message) => {
+    let deliveryId = 0
+    const send: Send = (input) => {
+      const message =
+        isRecord(input) && input.kind === 'subscription.next'
+          ? { ...input, deliveryId: ++deliveryId }
+          : input
       record({ direction: 'server', message })
       client.send(JSON.stringify(message))
     }
@@ -58,6 +64,7 @@ function receive(
   const parsed = v.safeParse(orchestrationWsClientMessageSchema, JSON.parse(data))
   if (!parsed.success) return
   const message = parsed.output
+  if (message.kind === 'subscription.ack') return
   if (message.kind === 'ping') {
     send({ kind: 'pong', requestId: message.requestId })
     return

@@ -1,7 +1,11 @@
+import { useChatInputDraftStore } from '../state/chat-input-draft-store'
+import { useSidebarSelectionStore } from '../state/sidebar-selection-store'
+import { useNavigation } from '@/hooks/use-navigation'
+import { LoadingState } from '@workspace/ui/components/loading-state'
 import type { SessionId, WorktreeId } from '@workspace/contracts'
 import { selectCurrentWorktree } from '@workspace/client-core/chat/selectors'
 import { useActiveChatProjection } from '@/features/chat/hooks/use-active-projection'
-import { memo, useCallback, useMemo, useRef, useState } from 'react'
+import { memo, useCallback, useEffect, useMemo, useRef, useState } from 'react'
 
 import { useActiveChatSessionId } from '../hooks/use-active-chat-session-id'
 import { useChatShellSubscription } from '../hooks/use-chat-shell-subscription'
@@ -29,15 +33,44 @@ export const ChatSidePanelContent = memo(({ rootPath }: { rootPath: string }) =>
   const sessionIds = useMemo(() => sessions.map((session) => session.id), [sessions])
   const { activeSessionId, selectDraftSession, setActiveSessionId, promoteDraftSession } =
     useActiveChatSessionId({ sessionIds, environmentId: transport.environmentId, projectId })
+  const selection = useSidebarSelectionStore((state) => state.selection)
+  const restoredDraft = useChatInputDraftStore((state) =>
+    selection.kind === 'draft' && selection.draftId
+      ? Object.entries(state.draftsByKey).find(
+          ([key, draft]) =>
+            key.startsWith(`${transport.environmentId}:`) &&
+            draft.identity?.id === selection.draftId,
+        )?.[1]
+      : undefined,
+  )
   const [draftBaseId, setDraftBaseId] = useState<WorktreeId | null>(null)
   const [draftGeneration, setDraftGeneration] = useState(0)
   const currentDraftGeneration = useRef(0)
   const draftBase = useActiveChatProjection((state) => {
     if (!projectId) return undefined
-    const source = draftBaseId ? state.worktreeById[draftBaseId] : undefined
-    if (source?.projectId === projectId) return source
+    const baseId = restoredDraft?.identity?.baseWorktreeId ?? draftBaseId
+    const source = baseId ? state.worktreeById[baseId] : undefined
+    if (baseId) return source?.projectId === projectId ? source : undefined
     return selectCurrentWorktree(state, projectId)
   })
+  const navigation = useNavigation()
+  const draftId =
+    selection.kind === 'draft' &&
+    selection.environmentId === transport.environmentId &&
+    selection.projectId === projectId
+      ? selection.draftId
+      : null
+  useEffect(() => {
+    if (activeSessionId || draftId || !projectId || !draftBase) return
+    void navigation.openChat({
+      environmentId: transport.environmentId,
+      projectId,
+      sessionId: null,
+      surface: 'sidebar',
+      newDraft: true,
+      replace: true,
+    })
+  }, [activeSessionId, draftId, projectId, draftBase, navigation, transport.environmentId])
   const disabled = !projectState.project || projectState.status !== 'ready'
 
   const handleNewChat = useCallback(() => {
@@ -71,16 +104,19 @@ export const ChatSidePanelContent = memo(({ rootPath }: { rootPath: string }) =>
           rootPath={rootPath}
           onSessionCreated={handleSessionCreated}
         />
-      ) : (
+      ) : draftId ? (
         <ChatDraftView
           disabled={disabled}
+          draftId={draftId}
           transport={transport}
           project={projectState.project}
-          key={`${transport.environmentId}:${draftBase?.id}:${draftGeneration}`}
+          key={`${transport.environmentId}:${draftId}`}
           worktree={draftBase ?? null}
-          rootPath={draftBase?.path ?? rootPath}
+          rootPath={restoredDraft?.identity?.rootPath ?? draftBase?.path ?? rootPath}
           onSessionCreated={handleSessionCreated}
         />
+      ) : (
+        <LoadingState label='Opening draft'>{null}</LoadingState>
       )}
       <ChatPanelStatus
         createError={null}

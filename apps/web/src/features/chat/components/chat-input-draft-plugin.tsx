@@ -1,11 +1,15 @@
 import { useEnvironmentId } from '@/lib/environments/hooks/use-environment-id'
 import { useLexicalComposerContext } from '@lexical/react/LexicalComposerContext'
 import { OnChangePlugin } from '@lexical/react/LexicalOnChangePlugin'
-import type { EditorState, LexicalEditor } from 'lexical'
+import { SKIP_DOM_SELECTION_TAG, type EditorState, type LexicalEditor } from 'lexical'
 import { useCallback, useEffect } from 'react'
 
 import { detectChatInputTrigger, type ChatInputTrigger } from '@/features/chat/utils/input-logic'
-import { $readChatInputTextSnapshot } from '@/features/chat/utils/input-editor-actions'
+import {
+  $readChatInputTextSnapshot,
+  $setChatInputText,
+  readChatInputText,
+} from '@/features/chat/utils/input-editor-actions'
 import { useChatInputDraftStore } from '../state/chat-input-draft-store'
 
 export function ChatInputDraftPlugin({
@@ -32,6 +36,17 @@ export function ChatInputDraftPlugin({
   useEffect(() => {
     editor.setEditable(!disabled)
   }, [disabled, editor])
+
+  useEffect(() => {
+    const target = { environmentId, draftKey, rootPath }
+    const syncPrompt = () => {
+      const prompt = useChatInputDraftStore.getState().getDraft(target).prompt
+      if (readChatInputText(editor) === prompt) return
+      editor.update(() => $setChatInputText(prompt), { tag: SKIP_DOM_SELECTION_TAG })
+    }
+    syncPrompt()
+    return useChatInputDraftStore.subscribe(syncPrompt)
+  }, [editor, environmentId, draftKey, rootPath])
 
   const handleChange = useCallback(
     (editorState: EditorState) => {

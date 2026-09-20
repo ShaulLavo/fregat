@@ -31,7 +31,11 @@ import {
   type UserInputQuestions,
 } from '@workspace/contracts'
 import * as v from 'valibot'
-import { defaultAttachmentsDir, readAttachmentBytes } from '../../attachments/store'
+import {
+  attachmentFilePath,
+  defaultAttachmentsDir,
+  readAttachmentBytes,
+} from '../../attachments/store'
 import {
   providerTurnSummary,
   recordChatPipelineInfo,
@@ -101,6 +105,7 @@ const CLAUDE_INIT_TIMEOUT_MS = 25_000
 const EMPTY_ATTACHMENT_BYTES = new Uint8Array(0)
 
 export const CLAUDE_ADAPTER_CAPABILITIES = {
+  conversationRollback: false,
   listCommands: true,
   // Honest: `Query.setModel()` exists, and our prompt is a streaming
   // AsyncIterable, which is the only mode where that method works.
@@ -329,8 +334,8 @@ export class ClaudeProviderAdapter
     return this.sessions.get(sessionId)?.hasProcess() ?? false
   }
 
-  async rollbackSession(): Promise<never> {
-    throw createInternalError('Claude rollbackSession is not supported.')
+  async prepareRollbackSession(): Promise<never> {
+    throw createInternalError('Claude prepareRollbackSession is not supported.')
   }
 
   async sendTurn(input: ProviderTurnInput) {
@@ -466,6 +471,7 @@ export class ClaudeProviderAdapter
 class ClaudeAgentSession extends SessionContext {
   private readonly abortController = new AbortController()
   private readonly attachmentsDir: string
+  private readonly taskTypes = new Map<string, string>()
   private readonly inFlightTools = new Map<string, InFlightClaudeTool>()
   private readonly interactionMode: InteractionMode
   private readonly pendingApprovals = new Map<ApprovalRequestId, PendingClaudeApproval>()
@@ -708,6 +714,8 @@ class ClaudeAgentSession extends SessionContext {
     const pending = this.pendingApprovals.get(input.requestId)
     if (!pending) throw createInternalError(`Unknown pending approval request: ${input.requestId}`)
 
+    if (input.decision === 'acceptAlways')
+      throw createInternalError('This approval does not offer permanent access.')
     this.pendingApprovals.delete(input.requestId)
     pending.resolve(claudePermissionResult(input.decision, pending.toolInput))
     this.emit({
@@ -956,6 +964,7 @@ class ClaudeAgentSession extends SessionContext {
         )
         return
       case 'task_started':
+        this.rememberTaskType(message.task_id, message.task_type ?? message.subagent_type)
         this.emitRuntimeNotification(
           'task.started',
           {
@@ -974,6 +983,7 @@ class ClaudeAgentSession extends SessionContext {
             lastToolName: message.last_tool_name,
             summary: message.summary,
             taskId: message.task_id,
+            taskType: this.taskTypes.get(message.task_id),
             usage: message.usage,
           },
           message,
@@ -989,10 +999,12 @@ class ClaudeAgentSession extends SessionContext {
             status: message.status,
             summary: message.summary,
             taskId: message.task_id,
+            taskType: this.taskTypes.get(message.task_id),
             usage: message.usage,
           },
           message,
         )
+        this.taskTypes.delete(message.task_id)
         return
       case 'files_persisted':
         this.emitRuntimeNotification(
@@ -1080,15 +1092,25 @@ class ClaudeAgentSession extends SessionContext {
    * other patch (pending/running/paused/backgrounded, a description or error
    * edit) is progress, which is the only other task event our union carries.
    */
+  private rememberTaskType(taskId: string, taskType: string | undefined) {
+    if (taskType) this.taskTypes.set(taskId, taskType)
+  }
+
   private handleTaskUpdated(message: ClaudeSystemMessageOf<'task_updated'>) {
     const patch = message.patch
     const terminal = claudeTerminalTaskStatus(patch.status)
     if (terminal) {
       this.emitRuntimeNotification(
         'task.completed',
-        { status: terminal, summary: patch.error ?? patch.description, taskId: message.task_id },
+        {
+          status: terminal,
+          summary: patch.error ?? patch.description,
+          taskId: message.task_id,
+          taskType: this.taskTypes.get(message.task_id),
+        },
         message,
       )
+      this.taskTypes.delete(message.task_id)
       return
     }
 
@@ -1097,6 +1119,8 @@ class ClaudeAgentSession extends SessionContext {
       {
         description: patch.description ?? `Task ${patch.status ?? 'updated'}`,
         taskId: message.task_id,
+        taskType: this.taskTypes.get(message.task_id),
+        status: patch.status,
       },
       message,
     )
@@ -1112,6 +1136,7 @@ class ClaudeAgentSession extends SessionContext {
     const itemType = claudeItemType(message.tool_name)
     const tool = this.inFlightTools.get(message.tool_use_id)
     this.inFlightTools.delete(message.tool_use_id)
+    this.taskTypes.delete(message.tool_use_id)
     this.emitRuntimeNotification(
       'item.completed',
       {
@@ -1326,6 +1351,7 @@ class ClaudeAgentSession extends SessionContext {
       { itemId: toolUseId },
     )
     if (!isClaudeTaskTool(toolName)) return
+    this.rememberTaskType(toolUseId, toolName)
 
     this.emitRuntimeNotification(
       'task.started',
@@ -1357,6 +1383,7 @@ class ClaudeAgentSession extends SessionContext {
 
     const tool = this.inFlightTools.get(toolUseId)
     this.inFlightTools.delete(toolUseId)
+    this.taskTypes.delete(toolUseId)
     this.emitRuntimeNotification(
       'item.completed',
       {
@@ -1477,7 +1504,15 @@ class ClaudeAgentSession extends SessionContext {
   private async resolveAttachments(input: ProviderTurnInput): Promise<ResolvedAttachment[]> {
     const resolved: ResolvedAttachment[] = []
     for (const attachment of input.attachments) {
-      const bytes = await readAttachmentBytes({ attachment, attachmentsDir: this.attachmentsDir })
+      const attachmentsDir = input.attachmentsDir ?? this.attachmentsDir
+      if (attachment.type === 'file') {
+        const filePath = attachmentFilePath({ attachment, attachmentsDir })
+        if (!filePath || !(await Bun.file(filePath).exists()))
+          throw createInternalError('Attached file is unavailable.')
+        resolved.push({ attachment, path: filePath })
+        continue
+      }
+      const bytes = await readAttachmentBytes({ attachment, attachmentsDir })
       if (bytes) {
         resolved.push({ attachment, bytes })
         continue

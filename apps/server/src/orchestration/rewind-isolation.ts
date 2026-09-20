@@ -1,0 +1,68 @@
+import { realpath } from 'node:fs/promises'
+import path from 'node:path'
+import type { SessionId } from '@workspace/contracts'
+import type { GitService } from '../git/service'
+import type { ProviderRuntimeBindingWithMetadata } from '../provider/provider-session-directory'
+import type { OrchestrationReadModel } from './read-model'
+import { resolveSessionOwner } from './session-owner'
+import { checkpointErrors } from './structured-errors'
+
+export async function assertRewindIsolation({
+  sessionId,
+  model,
+  git,
+  activeRuntimes,
+}: {
+  readonly sessionId: SessionId
+  readonly model: OrchestrationReadModel
+  readonly git: GitService
+  readonly activeRuntimes: readonly ProviderRuntimeBindingWithMetadata[]
+}) {
+  const { worktree } = resolveSessionOwner(model, sessionId)
+  if (worktree.kind !== 'linked' || worktree.lifecycle.state !== 'ready')
+    throw checkpointErrors.WORKSPACE_NOT_ISOLATED()
+  const cwd = await realpath(worktree.canonicalPath)
+  const repository = await git.repositoryRunner(cwd)
+  if ((await realpath(repository.rootAbsolutePath)) !== cwd)
+    throw checkpointErrors.WORKSPACE_NOT_ISOLATED()
+  const gitDir = await repository.run(['rev-parse', '--absolute-git-dir'])
+  const commonDir = await repository.run(['rev-parse', '--git-common-dir'])
+  if (
+    (await realpath(gitDir.stdout.trim())) ===
+    (await realpath(path.resolve(cwd, commonDir.stdout.trim())))
+  )
+    throw checkpointErrors.WORKSPACE_NOT_ISOLATED()
+  const candidates = new Set<string>()
+  for (const other of model.sessions.values()) {
+    if (other.id === sessionId || other.deletedAt) continue
+    const owner = model.worktrees.get(other.worktreeId)
+    if (owner) candidates.add(owner.canonicalPath)
+  }
+  for (const runtime of activeRuntimes) {
+    if (runtime.sessionId === sessionId || !runtime.runtimePayload?.cwd) continue
+    candidates.add(runtime.runtimePayload.cwd)
+  }
+  for (const candidate of candidates) {
+    const other = await existingRealPath(candidate)
+    if (other && (isWithin(cwd, other) || isWithin(other, cwd)))
+      throw checkpointErrors.WORKSPACE_NOT_ISOLATED()
+  }
+}
+
+async function existingRealPath(candidate: string) {
+  try {
+    return await realpath(candidate)
+  } catch (error) {
+    if (error && typeof error === 'object' && 'code' in error && error.code === 'ENOENT')
+      return null
+    throw error
+  }
+}
+
+function isWithin(parent: string, child: string) {
+  const relative = path.relative(parent, child)
+  return (
+    relative === '' ||
+    (!path.isAbsolute(relative) && relative !== '..' && !relative.startsWith(`..${path.sep}`))
+  )
+}

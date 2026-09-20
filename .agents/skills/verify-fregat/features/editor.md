@@ -54,9 +54,15 @@ The click scenario waits 750ms between clicks so debounced document highlights, 
 
 `scenario editor-lsp-hover --file main.tsx` inserts a `const`, hovers its name, checks the language server tooltip names it, then inserts a name with a Cyrillic letter and checks that its diagnostic and its character warning share one tooltip. Undoes both edits.
 
+`scenario editor-lsp-completion --file main.tsx` reaches `console.l` by typing straight through, pausing after `c`, and accepting `console` with Enter, each at three key delays, and checks the list offers `log` and no globals. Also worth running with an `.astro` or `.mjs` file.
+
+`scenario editor-format-chord --file arguments.ts` appends a badly spaced line, presses Alt+Shift+F and then Mod+Shift+F, and checks each one reformats it. Pick a short file: the line has to be on screen. Undoes both.
+
 `scenario editor-undo-barrier --file a.ts --workspace work/tmp/plan121-undo` types a note, renames `renameMe` across `a.ts` and `b.ts` through F2 and the preview dialog, presses Ctrl+Z past the note into the workspace-edit barrier, checks the "Undo stopped at a workspace edit" toast, then opens the History tab, picks the barrier state and undoes the rename from the pane's own "Undo workspace edit" action; it waits for the barrier to leave the graph before switching tabs, because the file's path stays reserved until the undo finalizes. The workspace must hold those two files; create them if the folder is gone.
 
 `scenario editor-undo-branch --file a.ts --workspace work/tmp/plan121-undo` types A, undoes, types B, undoes, types C and CC, opens the file's History tab through the palette, checks five retained states, previews B against the current text, compares B with C by shift-clicking, restores B and checks the pane returns to the current state. `Show history` is also in the palette for any file tab; the tab's address is `h/<path>`.
+
+`scenario editor-undo-reopen` builds a disposable workspace, types and saves, closes the tab, reopens the file and undoes back to the text from before the save, then redoes, reloads the window and undoes again. Both undos can only come from the history stored in IndexedDB (`platform-editor-history`), so a failure means persistence or the content-hash match broke. Typing lands as several states, so the scenario repeats the chord until the row matches.
 
 `scenario editor-markdown-punctuation --file README.md` hovers en dashes and invisible characters in the editor and a saved-file diff, checks their explanations, opens Unicode settings, and undoes its sample.
 

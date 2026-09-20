@@ -10,7 +10,7 @@ import {
   type SettingsSubmission,
 } from '@workspace/client-core/settings/intent-store'
 import { resetSettingsSnapshotAdmission } from '@/features/settings/state/snapshot-admission'
-import { readSettingsMirror } from '@/features/settings/utils/boot-mirror'
+import { readSettingsMirror } from '@/lib/settings-boot-mirror'
 import { dismissSaveError } from '@/features/settings/utils/notify-save-error'
 import { settingsKeys } from '@workspace/client-core/settings/query-keys'
 

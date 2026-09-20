@@ -14,7 +14,7 @@ import { EditorWorkspaceStateContext } from '@/features/editor/state/workspace-s
 import { languageServerMatchQueryOptions } from '@/features/editor/utils/language-server-match-query'
 import { createPlatformFileOpenPreparer } from '@/features/editor/utils/prepared-document'
 import { SearchBufferStateContext } from '@/features/search/state/buffer-state'
-import { useSettingValue } from '@/features/settings/hooks/use-setting-value'
+import { useSettingValue } from '@/hooks/use-setting-value'
 import { FileOpenIntentProvider } from '@/lib/file-open-intent/providers/context'
 
 export function EditorStateProvider({

@@ -1,5 +1,11 @@
 import type { ProviderInstanceId } from '@workspace/contracts'
 
+export const attachmentQueryKeys = {
+  text: (url: string) => ['chat-attachment-text', url] as const,
+  capabilities: (environmentId: string) =>
+    ['chat', 'attachment-capabilities', environmentId] as const,
+}
+
 export const providerAuthKeys = {
   all: ['providers', 'auth'] as const,
   attempt: (providerInstanceId: ProviderInstanceId, attemptId: string) =>

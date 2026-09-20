@@ -1,3 +1,6 @@
+import { appendUserInputAttachmentPaths } from '../provider/user-input-attachments'
+import { defaultAttachmentsDir } from '../attachments/store'
+import { assertRewindIsolation } from './rewind-isolation'
 import { maxCheckpointTurnCount } from './checkpoint-turn-count'
 import { runtimeEventId } from '../provider/adapters/utils/runtime-ids'
 import { errorMessage as providerErrorMessage } from '@workspace/contracts'
@@ -49,6 +52,7 @@ type ProviderIntentEvent = Extract<
       | 'session.turn-steer-requested'
       | 'session.turn-interrupt-requested'
       | 'session.runtime-stop-requested'
+      | 'session.settled'
       | 'session.checkpoint-revert-requested'
       | 'session.approval-response-requested'
       | 'session.user-input-response-requested'
@@ -67,6 +71,7 @@ export class ProviderCommandReactor {
    * turn one then diffs against its own output.
    */
   private readonly beforeTurnStart: ((sessionId: SessionId) => Promise<void>) | null
+  private readonly attachmentsDir: string
   private readonly checkpointGit: GitService | null
   private readonly dispatch: ((command: OrchestrationCommand) => Promise<unknown> | unknown) | null
   private readonly getReadModel: () => OrchestrationReadModel
@@ -77,6 +82,7 @@ export class ProviderCommandReactor {
   private readonly worker: SerialWorker<ProviderIntentEvent>
 
   constructor({
+    attachmentsDir,
     beforeTurnStart,
     checkpointGit,
     dispatch,
@@ -86,6 +92,7 @@ export class ProviderCommandReactor {
     providerService,
     turnStartKeyTtlMs,
   }: {
+    attachmentsDir?: string
     beforeTurnStart?: (sessionId: SessionId) => Promise<void>
     checkpointGit?: GitService | null
     dispatch?: (command: OrchestrationCommand) => Promise<unknown> | unknown
@@ -95,6 +102,7 @@ export class ProviderCommandReactor {
     providerService: ProviderService
     turnStartKeyTtlMs?: number
   }) {
+    this.attachmentsDir = attachmentsDir ?? defaultAttachmentsDir()
     this.beforeTurnStart = beforeTurnStart ?? null
     this.checkpointGit = checkpointGit ?? null
     this.dispatch = dispatch ?? null
@@ -183,6 +191,9 @@ export class ProviderCommandReactor {
         return
       case 'session.turn-interrupt-requested':
         await this.interruptTurn(event)
+        return
+      case 'session.settled':
+        await this.releaseSettledRuntime(event)
         return
       case 'session.runtime-stop-requested':
         await this.stopRuntime(event)
@@ -472,9 +483,33 @@ export class ProviderCommandReactor {
     }
   }
 
+  private async releaseSettledRuntime(
+    event: Extract<ProviderIntentEvent, { type: 'session.settled' }>,
+  ) {
+    const session = this.getReadModel().sessions.get(event.payload.sessionId)
+    if (!this.dispatch || !session?.runtime || session.settledOverride !== 'settled') return
+    if (session.runtime.status === 'stopped') return
+    await this.dispatch({
+      type: 'session.runtime.stop',
+      commandId: v.parse(commandIdSchema, internalCommandKey('settled-release', event.eventId)),
+      sessionId: event.payload.sessionId,
+      onlyIfSettled: true,
+    })
+  }
+
   private async stopRuntime(
     event: Extract<ProviderIntentEvent, { type: 'session.runtime-stop-requested' }>,
   ) {
+    if (
+      event.payload.onlyIfSettled &&
+      this.getReadModel().sessions.get(event.payload.sessionId)?.settledOverride !== 'settled'
+    ) {
+      recordChatPipelineInfo('chat.pipeline.provider_reactor.stop.skipped', {
+        ...orchestrationEventSummary(event),
+        reason: 'session-active',
+      })
+      return
+    }
     const runtimeEpoch = this.runtimeEpochFor(event.payload.sessionId)
     recordChatPipelineInfo('chat.pipeline.provider_reactor.stop.start', {
       ...orchestrationEventSummary(event),
@@ -520,24 +555,32 @@ export class ProviderCommandReactor {
         return
       }
 
-      const restored = await context.git.restoreRef({
-        fallbackToHead: event.payload.turnCount === 0,
-        path: context.workspacePath,
-        ref: context.targetRef,
+      if (!event.commandId)
+        throw createInternalError('Checkpoint revert is missing its command identity.')
+      const rollbackTurns = context.currentTurnCount - event.payload.turnCount
+      const commitRollback = await this.providerService.prepareConversationRollback({
+        numTurns: rollbackTurns,
+        sessionId: event.payload.sessionId,
       })
-      if (!restored) {
-        throw createInternalError(
-          `Checkpoint ref is unavailable for turn ${event.payload.turnCount}.`,
-        )
+      if (event.payload.restoreFiles) {
+        await assertRewindIsolation({
+          sessionId: event.payload.sessionId,
+          model: this.getReadModel(),
+          git: context.git,
+          activeRuntimes: await this.providerService.listActiveRuntimes(),
+        })
+        const restored = await context.git.restoreRef({
+          fallbackToHead: event.payload.turnCount === 0,
+          path: context.workspacePath,
+          ref: context.targetRef,
+        })
+        if (!restored)
+          throw createInternalError(
+            `Checkpoint ref is unavailable for turn ${event.payload.turnCount}.`,
+          )
       }
 
-      const rollbackTurns = context.currentTurnCount - event.payload.turnCount
-      if (rollbackTurns > 0) {
-        await this.providerService.rollbackConversation({
-          numTurns: rollbackTurns,
-          sessionId: event.payload.sessionId,
-        })
-      }
+      await commitRollback()
 
       // The projection prune comes first: `session.reverted` is what tells every
       // client which checkpoints still exist, and a ref deleted ahead of it
@@ -549,6 +592,7 @@ export class ProviderCommandReactor {
           sessionId: event.payload.sessionId,
           turnCount: event.payload.turnCount,
           type: 'session.revert.complete',
+          revertCommandId: event.commandId,
         }),
       )
       await context.git.deleteRefs({
@@ -562,9 +606,18 @@ export class ProviderCommandReactor {
         turnCount: event.payload.turnCount,
         // A revert must read as an edit, not as a commit someone prepared. This
         // is the observable for that: anything staged here is the bug.
-        ...(await revertedIndexSummary(context.git, context.workspacePath)),
+        ...(event.payload.restoreFiles
+          ? await revertedIndexSummary(context.git, context.workspacePath)
+          : {}),
       })
     } catch (error) {
+      recordChatPipelineWarning('chat.pipeline.provider_reactor.checkpoint_revert.failed', {
+        sessionId: event.payload.sessionId,
+        commandId: event.commandId,
+        restoreFiles: event.payload.restoreFiles,
+        turnCount: event.payload.turnCount,
+        error,
+      })
       await this.appendProviderFailureActivity({
         runtimeEpoch,
         detail: providerErrorMessage(error),
@@ -613,7 +666,11 @@ export class ProviderCommandReactor {
     const runtimeEpoch = this.runtimeEpochFor(event.payload.sessionId)
     try {
       const handled = await this.providerService.respondUserInput({
-        answers: event.payload.answers,
+        answers: await appendUserInputAttachmentPaths(
+          event.payload.answers,
+          event.payload.attachmentsByQuestionId,
+          this.attachmentsDir,
+        ),
         requestId: event.payload.requestId,
         sessionId: event.payload.sessionId,
       })
@@ -866,6 +923,7 @@ function isProviderIntentEvent(event: OrchestrationEvent): event is ProviderInte
     case 'session.turn-steer-requested':
     case 'session.turn-interrupt-requested':
     case 'session.runtime-stop-requested':
+    case 'session.settled':
     case 'session.checkpoint-revert-requested':
     case 'session.approval-response-requested':
     case 'session.user-input-response-requested':

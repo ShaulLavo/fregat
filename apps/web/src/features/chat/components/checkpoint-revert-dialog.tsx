@@ -1,3 +1,4 @@
+import { Spinner } from '@workspace/ui/components/spinner'
 import { Button } from '@workspace/ui/components/button'
 import {
   Dialog,
@@ -11,32 +12,54 @@ import {
 export function CheckpointRevertDialog({
   turnCount,
   disabled,
+  pending = false,
   onCancel,
   onConfirm,
+  canRestoreFiles = false,
+  error = null,
 }: {
   readonly turnCount: number | null
   readonly disabled: boolean
+  readonly pending?: boolean
   readonly onCancel: () => void
-  readonly onConfirm: () => void
+  readonly onConfirm: (restoreFiles: boolean) => void
+  readonly canRestoreFiles?: boolean
+  readonly error?: string | null
 }) {
   return (
-    <Dialog open={turnCount !== null} onOpenChange={(open) => open || onCancel()}>
+    <Dialog open={turnCount !== null} onOpenChange={(open) => open || disabled || onCancel()}>
       <DialogContent role='alertdialog' showCloseButton={false}>
         <DialogHeader>
           <DialogTitle className='tabular-nums'>
             Revert this session to checkpoint {turnCount}?
           </DialogTitle>
           <DialogDescription>
-            This will discard newer messages and turn diffs in this session. This action cannot be
-            undone.
+            Newer messages will be removed and the original prompt restored to the composer. Keep
+            your current files, or restore files in an isolated worktree. This cannot be undone.
           </DialogDescription>
         </DialogHeader>
+        {error ? (
+          <p className='text-destructive text-xs' role='alert'>
+            {error}
+          </p>
+        ) : null}
         <DialogFooter>
-          <Button type='button' variant='outline' onClick={onCancel}>
+          <Button type='button' variant='outline' disabled={disabled} onClick={onCancel}>
             Cancel
           </Button>
-          <Button type='button' variant='destructive' disabled={disabled} onClick={onConfirm}>
-            Revert
+          {canRestoreFiles ? (
+            <Button
+              type='button'
+              variant='destructive'
+              disabled={disabled}
+              onClick={() => onConfirm(true)}
+            >
+              Rewind and restore files
+            </Button>
+          ) : null}
+          <Button type='button' disabled={disabled} onClick={() => onConfirm(false)}>
+            {pending ? <Spinner aria-hidden /> : null}
+            Rewind conversation only
           </Button>
         </DialogFooter>
       </DialogContent>

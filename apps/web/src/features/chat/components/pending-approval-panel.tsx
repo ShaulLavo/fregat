@@ -2,7 +2,7 @@ import { WarningCircleIcon } from '@phosphor-icons/react'
 
 import { PendingApprovalActions } from '@/features/chat/components/pending-approval-actions'
 import { usePendingRequests } from '@/features/chat/hooks/use-pending-requests'
-import type { PendingApprovalKind } from '@workspace/client-core/chat/pending-approvals'
+import { approvalTitle, detailLabel } from '@/features/chat/utils/approval-presentation'
 
 export function PendingApprovalPanel() {
   const { pendingApprovals } = usePendingRequests()
@@ -40,24 +40,8 @@ export function PendingApprovalPanel() {
         >
           {approval.detail || approvalTitle(approval.requestKind)}
         </pre>
-        <PendingApprovalActions requestId={approval.requestId} />
+        <PendingApprovalActions requestId={approval.requestId} options={approval.options} />
       </section>
     </div>
   )
-}
-
-function approvalTitle(requestKind: PendingApprovalKind | null) {
-  if (requestKind === 'command') return 'Run a command'
-  if (requestKind === 'file-change') return 'Apply a file change'
-  if (requestKind === 'file-read') return 'Read a file'
-
-  return 'Approval requested'
-}
-
-function detailLabel(requestKind: PendingApprovalKind | null) {
-  if (requestKind === 'command') return 'Command'
-  if (requestKind === 'file-change') return 'File change'
-  if (requestKind === 'file-read') return 'File to read'
-
-  return 'Details'
 }

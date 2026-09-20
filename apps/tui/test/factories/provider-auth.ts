@@ -5,6 +5,7 @@ import type { ProviderAuth, ProviderLoginAttempt, ProviderSignInMethod } from '@
 
 export class AccountProviderAdapter extends MockProviderAdapter {
   override readonly capabilities = {
+    conversationRollback: true,
     listCommands: true as const,
     sessionModelSwitch: 'in-session' as const,
     signIn: true,

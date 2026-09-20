@@ -1,3 +1,8 @@
+import {
+  questionAnswerHistory,
+  questionAnswerHistoryEqual,
+  type QuestionAnswerRow,
+} from './question-answer-history'
 import { sameItems as stringListsEqual } from '@workspace/utils/collections'
 import { compactActivityLabel } from '@/features/chat/utils/activity-label'
 import type { OrchestrationLatestTurn, OrchestrationSessionActivity } from '@workspace/contracts'
@@ -26,6 +31,7 @@ export type ChatWorkLogPlan = {
 }
 
 export type ChatWorkLogEntry = {
+  questionAnswers?: readonly QuestionAnswerRow[]
   changedFiles: readonly string[]
   command: string | null
   createdAt: string
@@ -143,6 +149,7 @@ export function chatWorkLogEntryEquals(left: ChatWorkLogEntry, right: ChatWorkLo
 
   const scalarsMatch = WORK_LOG_SCALAR_FIELDS.every((field) => left[field] === right[field])
   if (!scalarsMatch) return false
+  if (!questionAnswerHistoryEqual(left.questionAnswers, right.questionAnswers)) return false
   if (!stringListsEqual(left.changedFiles, right.changedFiles)) return false
   if (left.tool?.kind !== right.tool?.kind || left.tool?.target !== right.tool?.target) return false
 
@@ -294,6 +301,9 @@ function derivedWorkLogEntry(activity: OrchestrationSessionActivity): DerivedCha
   const presentation = chatActivityPresentation(activity)
   const entry = {
     activityKind: activity.kind,
+    ...(activity.kind === 'user-input.answer-submitted'
+      ? { questionAnswers: questionAnswerHistory(activity.payload) }
+      : {}),
     changedFiles: presentation.changedFiles,
     collapseKey: null,
     command: presentation.command,

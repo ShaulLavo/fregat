@@ -18,7 +18,7 @@ import { editorDiffFiles, renderableDiffFile } from '@workspace/client-core/git/
 import { DiffLineCommentAction } from './diff-line-comment-action'
 import { DiffNotice } from './diff-notice'
 import { UnchangedDiffBanner } from './unchanged-diff-banner'
-import { useSettingValue } from '@/features/settings/hooks/use-setting-value'
+import { useSettingValue } from '@/hooks/use-setting-value'
 
 /**
  * Renders a `git-diff:` document as real editors carrying the diff plugin, so a

@@ -1,3 +1,7 @@
+import { InputRenderable, SelectRenderable } from '@opentui/core'
+import { act } from 'react'
+import { expect } from '../fixtures'
+import { runPaletteCommand } from '../actions'
 import assert from 'node:assert/strict'
 import { mkdir } from 'node:fs/promises'
 import { join } from 'node:path'
@@ -46,4 +50,27 @@ export async function createRailProjects({
   const projectId = chat.getSnapshot().projection.worktreeById[beta]?.projectId
   assert(projectId)
   return { alpha, beta, sessionId, projectId }
+}
+
+export async function focusRailSession(
+  frame: Awaited<ReturnType<typeof import('../render').renderTui>>,
+  title: string,
+) {
+  await runPaletteCommand(frame, 'Filter sessions')
+  const input = frame.renderer.currentFocusedRenderable
+  if (!(input instanceof InputRenderable)) return expect.unreachable('Expected session filter')
+  const length = input.value.length
+  await act(async () => {
+    frame.mockInput.pressKey('END')
+    for (let index = 0; index < length; index++) frame.mockInput.pressKey('BACKSPACE')
+    await frame.mockInput.typeText(title)
+    frame.mockInput.pressEnter()
+  })
+  await expect.poll(() => frame.renderer.currentFocusedRenderable?.id).toBe('agent-rail')
+  await act(async () => {
+    frame.mockInput.pressArrow('down')
+  })
+  expect(
+    (frame.renderer.currentFocusedRenderable as SelectRenderable).getSelectedOption()?.name,
+  ).toContain(title)
 }

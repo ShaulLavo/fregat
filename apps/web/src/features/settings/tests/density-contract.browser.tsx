@@ -30,7 +30,7 @@ import { ModelPickerRail } from '@/features/chat/components/model-picker-rail'
 import { TimelineLoadEarlier } from '@/features/chat/components/timeline-load-earlier'
 import {
   resetChatInputDraftStore,
-  type ChatInputImageAttachment,
+  type ChatInputAttachment,
 } from '@/features/chat/state/chat-input-draft-store'
 import { chatInputMentionCommandItems } from '@/features/chat/utils/input-logic'
 import { LanguageServerReferencesPane } from '@/features/editor/components/language-server-references-pane'
@@ -282,7 +282,7 @@ test('custom composer, picker, search, and references chrome follows density', a
   const commandItems = chatInputMentionCommandItems([
     { id: 'path:app.tsx', label: 'app.tsx', path: 'src/app.tsx', type: 'file' },
   ])
-  const attachment: ChatInputImageAttachment = {
+  const attachment: ChatInputAttachment = {
     dataUrl: 'data:image/png;base64,iVBORw0KGgo=',
     id: 'density-attachment',
     mimeType: 'image/png',
@@ -365,9 +365,7 @@ test('custom composer, picker, search, and references chrome follows density', a
   const editorShell = requiredElement<HTMLElement>(
     '[data-testid="chat-input-editor"]',
   ).parentElement!
-  const attachmentStrip = requiredElement<HTMLElement>(
-    '[role="group"][aria-label="Image attachments"]',
-  )
+  const attachmentStrip = requiredElement<HTMLElement>('[role="group"][aria-label="Attachments"]')
   const commandItem = requiredElement<HTMLElement>('[data-chat-input-command-item-id]')
   const modelRail = requiredElement<HTMLElement>('[data-testid="model-rail"] > div')
   // The sidebar search is a tool row: one bar, the query field inside it.

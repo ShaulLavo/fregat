@@ -1,0 +1,1631 @@
+{
+  "upstreamCommit": "7445aa733ada33e45289e5aa5055f79142556513",
+  "evidence": "source-derived; operation identity only, no behavioral comparison",
+  "sources": {
+    "rpc": "packages/contracts/src/rpc.ts",
+    "commands": "packages/contracts/src/orchestration.ts"
+  },
+  "upstream": {
+    "rpc": [
+      "agentSessions.import",
+      "agentSessions.scan",
+      "assets.createUrl",
+      "attachments.createUploadUrl",
+      "attachments.delete",
+      "cloud.getRelayClientStatus",
+      "cloud.installRelayClient",
+      "device.action",
+      "device.close",
+      "device.configure",
+      "device.detail",
+      "device.list",
+      "device.open",
+      "device.shutdown",
+      "device.testHost",
+      "filesystem.browse",
+      "git.preparePullRequestThread",
+      "git.resolvePullRequest",
+      "git.runStackedAction",
+      "orchestration.dispatchCommand",
+      "orchestration.getArchivedShellSnapshot",
+      "orchestration.getFullThreadDiff",
+      "orchestration.getTurnDiff",
+      "orchestration.getWorkflowScript",
+      "orchestration.searchThreads",
+      "orchestration.subscribeShell",
+      "orchestration.subscribeThread",
+      "preview.close",
+      "preview.list",
+      "preview.navigate",
+      "preview.open",
+      "preview.refresh",
+      "preview.reportStatus",
+      "preview.resize",
+      "previewAutomation.connect",
+      "previewAutomation.focusHost",
+      "previewAutomation.respond",
+      "projectClone.cancel",
+      "projectClone.retry",
+      "projectClone.start",
+      "projects.add",
+      "projects.list",
+      "projects.listEntries",
+      "projects.readFile",
+      "projects.remove",
+      "projects.searchContents",
+      "projects.searchEntries",
+      "projects.writeFile",
+      "provider.auth.cancel",
+      "provider.auth.complete",
+      "provider.auth.logout",
+      "provider.auth.start",
+      "provider.auth.subscribe",
+      "provider.consumeResetCredit",
+      "provider.install.cancel",
+      "provider.install.remove",
+      "provider.install.start",
+      "provider.install.subscribe",
+      "provider.uploadFeedback",
+      "pullRequests.activity",
+      "pullRequests.comment",
+      "pullRequests.detail",
+      "pullRequests.diffFileContents",
+      "pullRequests.filesViewed",
+      "pullRequests.invalidate",
+      "pullRequests.labelCandidates",
+      "pullRequests.linkedThreads",
+      "pullRequests.list",
+      "pullRequests.listStats",
+      "pullRequests.preview",
+      "pullRequests.replyToThread",
+      "pullRequests.requestReviewers",
+      "pullRequests.reviewerCandidates",
+      "pullRequests.routing",
+      "pullRequests.routingIdentity",
+      "pullRequests.runAction",
+      "pullRequests.setFilesViewed",
+      "pullRequests.setLabels",
+      "pullRequests.setReaction",
+      "pullRequests.setThreadResolution",
+      "pullRequests.stack",
+      "pullRequests.submitReview",
+      "pullRequests.subscribeRefreshes",
+      "pullRequests.summary",
+      "pullRequests.threadComments",
+      "pullRequests.update",
+      "pullRequests.updateComment",
+      "review.getDiffFileContents",
+      "review.getDiffPreview",
+      "server.commitDesktopUpdate",
+      "server.discoverSourceControl",
+      "server.getBackgroundPolicy",
+      "server.getConfig",
+      "server.getHostResources",
+      "server.getProcessDiagnostics",
+      "server.getProcessResourceHistory",
+      "server.getResourceTelemetryHistory",
+      "server.getSettings",
+      "server.getTraceDiagnostics",
+      "server.getUsageSummary",
+      "server.probe",
+      "server.refreshProviders",
+      "server.refreshUsageRates",
+      "server.removeKeybinding",
+      "server.reportClientActivity",
+      "server.reportHostPowerState",
+      "server.retryResourceTelemetry",
+      "server.signalProcess",
+      "server.updateProvider",
+      "server.updateServer",
+      "server.updateServerWithProgress",
+      "server.updateSettings",
+      "server.upsertKeybinding",
+      "shell.openInEditor",
+      "sourceControl.cloneRepository",
+      "sourceControl.lookupRepository",
+      "sourceControl.publishRepository",
+      "subscribeAuthAccess",
+      "subscribeBackgroundPolicy",
+      "subscribeDeviceState",
+      "subscribeDiscoveredLocalServers",
+      "subscribePreviewEvents",
+      "subscribeProjectClones",
+      "subscribeResourceTelemetry",
+      "subscribeServerConfig",
+      "subscribeServerLifecycle",
+      "subscribeTerminalEvents",
+      "subscribeTerminalMetadata",
+      "subscribeVcsStatus",
+      "subscribeWorktreeSetup",
+      "terminal.attach",
+      "terminal.clear",
+      "terminal.close",
+      "terminal.open",
+      "terminal.resize",
+      "terminal.restart",
+      "terminal.write",
+      "vcs.createRef",
+      "vcs.createWorktree",
+      "vcs.init",
+      "vcs.listRefs",
+      "vcs.pull",
+      "vcs.refreshStatus",
+      "vcs.removeWorktree",
+      "vcs.switchRef",
+      "worktreeSetup.cancel"
+    ],
+    "commands": {
+      "client": {
+        "ClientThreadTurnStartCommand": "thread.turn.start",
+        "ProjectCreateCommand": "project.create",
+        "ProjectDeleteCommand": "project.delete",
+        "ProjectMetaUpdateCommand": "project.meta.update",
+        "ThreadActiveReorderCommand": "thread.active.reorder",
+        "ThreadApprovalRespondCommand": "thread.approval.respond",
+        "ThreadArchiveCommand": "thread.archive",
+        "ThreadCheckpointRevertCommand": "thread.checkpoint.revert",
+        "ThreadConversationRevertCommand": "thread.conversation.revert",
+        "ThreadCreateCommand": "thread.create",
+        "ThreadDeleteCommand": "thread.delete",
+        "ThreadInteractionModeSetCommand": "thread.interaction-mode.set",
+        "ThreadMetaUpdateCommand": "thread.meta.update",
+        "ThreadPinCommand": "thread.pin",
+        "ThreadPinReorderCommand": "thread.pin.reorder",
+        "ThreadPullRequestLinkCommand": "thread.pull-request.link",
+        "ThreadPullRequestUnlinkCommand": "thread.pull-request.unlink",
+        "ThreadRuntimeModeSetCommand": "thread.runtime-mode.set",
+        "ThreadSessionStopCommand": "thread.session.stop",
+        "ThreadSettleCommand": "thread.settle",
+        "ThreadSnoozeCommand": "thread.snooze",
+        "ThreadTurnInterruptCommand": "thread.turn.interrupt",
+        "ThreadUnarchiveCommand": "thread.unarchive",
+        "ThreadUnpinCommand": "thread.unpin",
+        "ThreadUnsettleCommand": "thread.unsettle",
+        "ThreadUnsnoozeCommand": "thread.unsnooze",
+        "ThreadUserInputDismissCommand": "thread.user-input.dismiss",
+        "ThreadUserInputRespondCommand": "thread.user-input.respond"
+      },
+      "internal": {
+        "ThreadActivityAppendCommand": "thread.activity.append",
+        "ThreadAutoSettleCommand": "thread.auto-settle",
+        "ThreadHistoryImportCommand": "thread.history.import",
+        "ThreadMessageAssistantCompleteCommand": "thread.message.assistant.complete",
+        "ThreadMessageAssistantDeltaCommand": "thread.message.assistant.delta",
+        "ThreadMessageReasoningCompleteCommand": "thread.message.reasoning.complete",
+        "ThreadMessageReasoningDeltaCommand": "thread.message.reasoning.delta",
+        "ThreadMessageUserAppendCommand": "thread.message.user.append",
+        "ThreadProposedPlanUpsertCommand": "thread.proposed-plan.upsert",
+        "ThreadPullRequestLinkSyncCommand": "thread.pull-request-link.sync",
+        "ThreadPullRequestSyncCommand": "thread.pull-request.sync",
+        "ThreadRevertCompleteCommand": "thread.revert.complete",
+        "ThreadSessionSetCommand": "thread.session.set",
+        "ThreadTitleGenerateCompleteCommand": "thread.title.generate.complete",
+        "ThreadTitleRefineCommand": "thread.title.refine",
+        "ThreadTitleRegenerationCompleteCommand": "thread.title.regeneration.complete",
+        "ThreadTurnDiffCompleteCommand": "thread.turn.diff.complete"
+      }
+    }
+  },
+  "localCommands": {
+    "client": [
+      "project.create",
+      "project.delete",
+      "project.meta.update",
+      "project.reorder",
+      "session.active.reorder",
+      "session.approval.respond",
+      "session.archive",
+      "session.checkpoint.revert",
+      "session.create",
+      "session.delete",
+      "session.interaction-mode.set",
+      "session.meta.update",
+      "session.pin",
+      "session.pin.reorder",
+      "session.runtime-mode.set",
+      "session.runtime.stop",
+      "session.settle",
+      "session.snooze",
+      "session.turn.interrupt",
+      "session.turn.start",
+      "session.turn.steer",
+      "session.unarchive",
+      "session.unpin",
+      "session.unsettle",
+      "session.unsnooze",
+      "session.user-input.dismiss",
+      "session.user-input.respond",
+      "worktree.adopt",
+      "worktree.cleanup",
+      "worktree.force-cleanup",
+      "worktree.release",
+      "worktree.resolve-missing",
+      "worktree.retain",
+      "worktree.retry"
+    ],
+    "internal": [
+      "project.create",
+      "project.revive",
+      "session.activity.append",
+      "session.create",
+      "session.deletion.update",
+      "session.discover",
+      "session.discovery-metadata.update",
+      "session.history.import",
+      "session.message.assistant.complete",
+      "session.message.assistant.delta",
+      "session.proposed-plan.upsert",
+      "session.provider-start.adopt",
+      "session.provider-start.claim",
+      "session.provider-start.settle",
+      "session.revert.complete",
+      "session.runtime.recover",
+      "session.runtime.set",
+      "session.terminal-history.append",
+      "session.title.generate.complete",
+      "session.title.refine",
+      "session.title.regeneration.complete",
+      "session.turn.diff.complete",
+      "session.turn.start",
+      "session.worktree.release",
+      "terminal.lease.activate",
+      "terminal.lease.claim",
+      "terminal.lease.end",
+      "terminal.lease.mark-unknown",
+      "terminal.lease.request",
+      "terminal.lease.terminate",
+      "worktree.adopt",
+      "worktree.cleanup.blocked",
+      "worktree.cleanup.complete",
+      "worktree.cleanup.fail",
+      "worktree.create.complete",
+      "worktree.create.fail",
+      "worktree.mark-missing",
+      "worktree.metadata.refresh",
+      "worktree.orphan.register",
+      "worktree.register",
+      "worktree.resolve-missing",
+      "worktree.retain",
+      "worktree.revive"
+    ]
+  },
+  "operations": [
+    {
+      "id": "client-command:project.create",
+      "review": "unverified",
+      "reason": "Behavior, capability, local entry point, defaults and negative paths need review.",
+      "localMapping": null,
+      "scenarios": []
+    },
+    {
+      "id": "client-command:project.delete",
+      "review": "unverified",
+      "reason": "Behavior, capability, local entry point, defaults and negative paths need review.",
+      "localMapping": null,
+      "scenarios": []
+    },
+    {
+      "id": "client-command:project.meta.update",
+      "review": "unverified",
+      "reason": "Behavior, capability, local entry point, defaults and negative paths need review.",
+      "localMapping": null,
+      "scenarios": []
+    },
+    {
+      "id": "client-command:thread.active.reorder",
+      "review": "unverified",
+      "reason": "Behavior, capability, local entry point, defaults and negative paths need review.",
+      "localMapping": null,
+      "scenarios": []
+    },
+    {
+      "id": "client-command:thread.approval.respond",
+      "review": "unverified",
+      "reason": "Behavior, capability, local entry point, defaults and negative paths need review.",
+      "localMapping": null,
+      "scenarios": []
+    },
+    {
+      "id": "client-command:thread.archive",
+      "review": "unverified",
+      "reason": "Behavior, capability, local entry point, defaults and negative paths need review.",
+      "localMapping": null,
+      "scenarios": []
+    },
+    {
+      "id": "client-command:thread.checkpoint.revert",
+      "review": "unverified",
+      "reason": "Behavior, capability, local entry point, defaults and negative paths need review.",
+      "localMapping": null,
+      "scenarios": []
+    },
+    {
+      "id": "client-command:thread.conversation.revert",
+      "review": "unverified",
+      "reason": "Behavior, capability, local entry point, defaults and negative paths need review.",
+      "localMapping": null,
+      "scenarios": []
+    },
+    {
+      "id": "client-command:thread.create",
+      "review": "unverified",
+      "reason": "Behavior, capability, local entry point, defaults and negative paths need review.",
+      "localMapping": null,
+      "scenarios": []
+    },
+    {
+      "id": "client-command:thread.delete",
+      "review": "unverified",
+      "reason": "Behavior, capability, local entry point, defaults and negative paths need review.",
+      "localMapping": null,
+      "scenarios": []
+    },
+    {
+      "id": "client-command:thread.interaction-mode.set",
+      "review": "unverified",
+      "reason": "Behavior, capability, local entry point, defaults and negative paths need review.",
+      "localMapping": null,
+      "scenarios": []
+    },
+    {
+      "id": "client-command:thread.meta.update",
+      "review": "unverified",
+      "reason": "Behavior, capability, local entry point, defaults and negative paths need review.",
+      "localMapping": null,
+      "scenarios": []
+    },
+    {
+      "id": "client-command:thread.pin",
+      "review": "unverified",
+      "reason": "Behavior, capability, local entry point, defaults and negative paths need review.",
+      "localMapping": null,
+      "scenarios": []
+    },
+    {
+      "id": "client-command:thread.pin.reorder",
+      "review": "unverified",
+      "reason": "Behavior, capability, local entry point, defaults and negative paths need review.",
+      "localMapping": null,
+      "scenarios": []
+    },
+    {
+      "id": "client-command:thread.pull-request.link",
+      "review": "unverified",
+      "reason": "Behavior, capability, local entry point, defaults and negative paths need review.",
+      "localMapping": null,
+      "scenarios": []
+    },
+    {
+      "id": "client-command:thread.pull-request.unlink",
+      "review": "unverified",
+      "reason": "Behavior, capability, local entry point, defaults and negative paths need review.",
+      "localMapping": null,
+      "scenarios": []
+    },
+    {
+      "id": "client-command:thread.runtime-mode.set",
+      "review": "unverified",
+      "reason": "Behavior, capability, local entry point, defaults and negative paths need review.",
+      "localMapping": null,
+      "scenarios": []
+    },
+    {
+      "id": "client-command:thread.session.stop",
+      "review": "unverified",
+      "reason": "Behavior, capability, local entry point, defaults and negative paths need review.",
+      "localMapping": null,
+      "scenarios": []
+    },
+    {
+      "id": "client-command:thread.settle",
+      "review": "unverified",
+      "reason": "Behavior, capability, local entry point, defaults and negative paths need review.",
+      "localMapping": null,
+      "scenarios": []
+    },
+    {
+      "id": "client-command:thread.snooze",
+      "review": "unverified",
+      "reason": "Behavior, capability, local entry point, defaults and negative paths need review.",
+      "localMapping": null,
+      "scenarios": []
+    },
+    {
+      "id": "client-command:thread.turn.interrupt",
+      "review": "unverified",
+      "reason": "Behavior, capability, local entry point, defaults and negative paths need review.",
+      "localMapping": null,
+      "scenarios": []
+    },
+    {
+      "id": "client-command:thread.turn.start",
+      "review": "unverified",
+      "reason": "Behavior, capability, local entry point, defaults and negative paths need review.",
+      "localMapping": null,
+      "scenarios": []
+    },
+    {
+      "id": "client-command:thread.unarchive",
+      "review": "unverified",
+      "reason": "Behavior, capability, local entry point, defaults and negative paths need review.",
+      "localMapping": null,
+      "scenarios": []
+    },
+    {
+      "id": "client-command:thread.unpin",
+      "review": "unverified",
+      "reason": "Behavior, capability, local entry point, defaults and negative paths need review.",
+      "localMapping": null,
+      "scenarios": []
+    },
+    {
+      "id": "client-command:thread.unsettle",
+      "review": "unverified",
+      "reason": "Behavior, capability, local entry point, defaults and negative paths need review.",
+      "localMapping": null,
+      "scenarios": []
+    },
+    {
+      "id": "client-command:thread.unsnooze",
+      "review": "unverified",
+      "reason": "Behavior, capability, local entry point, defaults and negative paths need review.",
+      "localMapping": null,
+      "scenarios": []
+    },
+    {
+      "id": "client-command:thread.user-input.dismiss",
+      "review": "unverified",
+      "reason": "Behavior, capability, local entry point, defaults and negative paths need review.",
+      "localMapping": null,
+      "scenarios": []
+    },
+    {
+      "id": "client-command:thread.user-input.respond",
+      "review": "unverified",
+      "reason": "Behavior, capability, local entry point, defaults and negative paths need review.",
+      "localMapping": null,
+      "scenarios": []
+    },
+    {
+      "id": "internal-command:thread.activity.append",
+      "review": "unverified",
+      "reason": "Behavior, capability, local entry point, defaults and negative paths need review.",
+      "localMapping": null,
+      "scenarios": []
+    },
+    {
+      "id": "internal-command:thread.auto-settle",
+      "review": "unverified",
+      "reason": "Behavior, capability, local entry point, defaults and negative paths need review.",
+      "localMapping": null,
+      "scenarios": []
+    },
+    {
+      "id": "internal-command:thread.history.import",
+      "review": "unverified",
+      "reason": "Behavior, capability, local entry point, defaults and negative paths need review.",
+      "localMapping": null,
+      "scenarios": []
+    },
+    {
+      "id": "internal-command:thread.message.assistant.complete",
+      "review": "unverified",
+      "reason": "Behavior, capability, local entry point, defaults and negative paths need review.",
+      "localMapping": null,
+      "scenarios": []
+    },
+    {
+      "id": "internal-command:thread.message.assistant.delta",
+      "review": "unverified",
+      "reason": "Behavior, capability, local entry point, defaults and negative paths need review.",
+      "localMapping": null,
+      "scenarios": []
+    },
+    {
+      "id": "internal-command:thread.message.reasoning.complete",
+      "review": "unverified",
+      "reason": "Behavior, capability, local entry point, defaults and negative paths need review.",
+      "localMapping": null,
+      "scenarios": []
+    },
+    {
+      "id": "internal-command:thread.message.reasoning.delta",
+      "review": "unverified",
+      "reason": "Behavior, capability, local entry point, defaults and negative paths need review.",
+      "localMapping": null,
+      "scenarios": []
+    },
+    {
+      "id": "internal-command:thread.message.user.append",
+      "review": "unverified",
+      "reason": "Behavior, capability, local entry point, defaults and negative paths need review.",
+      "localMapping": null,
+      "scenarios": []
+    },
+    {
+      "id": "internal-command:thread.proposed-plan.upsert",
+      "review": "unverified",
+      "reason": "Behavior, capability, local entry point, defaults and negative paths need review.",
+      "localMapping": null,
+      "scenarios": []
+    },
+    {
+      "id": "internal-command:thread.pull-request-link.sync",
+      "review": "unverified",
+      "reason": "Behavior, capability, local entry point, defaults and negative paths need review.",
+      "localMapping": null,
+      "scenarios": []
+    },
+    {
+      "id": "internal-command:thread.pull-request.sync",
+      "review": "unverified",
+      "reason": "Behavior, capability, local entry point, defaults and negative paths need review.",
+      "localMapping": null,
+      "scenarios": []
+    },
+    {
+      "id": "internal-command:thread.revert.complete",
+      "review": "unverified",
+      "reason": "Behavior, capability, local entry point, defaults and negative paths need review.",
+      "localMapping": null,
+      "scenarios": []
+    },
+    {
+      "id": "internal-command:thread.session.set",
+      "review": "unverified",
+      "reason": "Behavior, capability, local entry point, defaults and negative paths need review.",
+      "localMapping": null,
+      "scenarios": []
+    },
+    {
+      "id": "internal-command:thread.title.generate.complete",
+      "review": "unverified",
+      "reason": "Behavior, capability, local entry point, defaults and negative paths need review.",
+      "localMapping": null,
+      "scenarios": []
+    },
+    {
+      "id": "internal-command:thread.title.refine",
+      "review": "unverified",
+      "reason": "Behavior, capability, local entry point, defaults and negative paths need review.",
+      "localMapping": null,
+      "scenarios": []
+    },
+    {
+      "id": "internal-command:thread.title.regeneration.complete",
+      "review": "unverified",
+      "reason": "Behavior, capability, local entry point, defaults and negative paths need review.",
+      "localMapping": null,
+      "scenarios": []
+    },
+    {
+      "id": "internal-command:thread.turn.diff.complete",
+      "review": "unverified",
+      "reason": "Behavior, capability, local entry point, defaults and negative paths need review.",
+      "localMapping": null,
+      "scenarios": []
+    },
+    {
+      "id": "rpc:agentSessions.import",
+      "review": "unverified",
+      "reason": "Behavior, capability, local entry point, defaults and negative paths need review.",
+      "localMapping": null,
+      "scenarios": []
+    },
+    {
+      "id": "rpc:agentSessions.scan",
+      "review": "unverified",
+      "reason": "Behavior, capability, local entry point, defaults and negative paths need review.",
+      "localMapping": null,
+      "scenarios": []
+    },
+    {
+      "id": "rpc:assets.createUrl",
+      "review": "unverified",
+      "reason": "Behavior, capability, local entry point, defaults and negative paths need review.",
+      "localMapping": null,
+      "scenarios": []
+    },
+    {
+      "id": "rpc:attachments.createUploadUrl",
+      "review": "unverified",
+      "reason": "Behavior, capability, local entry point, defaults and negative paths need review.",
+      "localMapping": null,
+      "scenarios": []
+    },
+    {
+      "id": "rpc:attachments.delete",
+      "review": "unverified",
+      "reason": "Behavior, capability, local entry point, defaults and negative paths need review.",
+      "localMapping": null,
+      "scenarios": []
+    },
+    {
+      "id": "rpc:cloud.getRelayClientStatus",
+      "review": "unverified",
+      "reason": "Behavior, capability, local entry point, defaults and negative paths need review.",
+      "localMapping": null,
+      "scenarios": []
+    },
+    {
+      "id": "rpc:cloud.installRelayClient",
+      "review": "unverified",
+      "reason": "Behavior, capability, local entry point, defaults and negative paths need review.",
+      "localMapping": null,
+      "scenarios": []
+    },
+    {
+      "id": "rpc:device.action",
+      "review": "unverified",
+      "reason": "Behavior, capability, local entry point, defaults and negative paths need review.",
+      "localMapping": null,
+      "scenarios": []
+    },
+    {
+      "id": "rpc:device.close",
+      "review": "unverified",
+      "reason": "Behavior, capability, local entry point, defaults and negative paths need review.",
+      "localMapping": null,
+      "scenarios": []
+    },
+    {
+      "id": "rpc:device.configure",
+      "review": "unverified",
+      "reason": "Behavior, capability, local entry point, defaults and negative paths need review.",
+      "localMapping": null,
+      "scenarios": []
+    },
+    {
+      "id": "rpc:device.detail",
+      "review": "unverified",
+      "reason": "Behavior, capability, local entry point, defaults and negative paths need review.",
+      "localMapping": null,
+      "scenarios": []
+    },
+    {
+      "id": "rpc:device.list",
+      "review": "unverified",
+      "reason": "Behavior, capability, local entry point, defaults and negative paths need review.",
+      "localMapping": null,
+      "scenarios": []
+    },
+    {
+      "id": "rpc:device.open",
+      "review": "unverified",
+      "reason": "Behavior, capability, local entry point, defaults and negative paths need review.",
+      "localMapping": null,
+      "scenarios": []
+    },
+    {
+      "id": "rpc:device.shutdown",
+      "review": "unverified",
+      "reason": "Behavior, capability, local entry point, defaults and negative paths need review.",
+      "localMapping": null,
+      "scenarios": []
+    },
+    {
+      "id": "rpc:device.testHost",
+      "review": "unverified",
+      "reason": "Behavior, capability, local entry point, defaults and negative paths need review.",
+      "localMapping": null,
+      "scenarios": []
+    },
+    {
+      "id": "rpc:filesystem.browse",
+      "review": "unverified",
+      "reason": "Behavior, capability, local entry point, defaults and negative paths need review.",
+      "localMapping": null,
+      "scenarios": []
+    },
+    {
+      "id": "rpc:git.preparePullRequestThread",
+      "review": "unverified",
+      "reason": "Behavior, capability, local entry point, defaults and negative paths need review.",
+      "localMapping": null,
+      "scenarios": []
+    },
+    {
+      "id": "rpc:git.resolvePullRequest",
+      "review": "unverified",
+      "reason": "Behavior, capability, local entry point, defaults and negative paths need review.",
+      "localMapping": null,
+      "scenarios": []
+    },
+    {
+      "id": "rpc:git.runStackedAction",
+      "review": "unverified",
+      "reason": "Behavior, capability, local entry point, defaults and negative paths need review.",
+      "localMapping": null,
+      "scenarios": []
+    },
+    {
+      "id": "rpc:orchestration.dispatchCommand",
+      "review": "unverified",
+      "reason": "Behavior, capability, local entry point, defaults and negative paths need review.",
+      "localMapping": null,
+      "scenarios": []
+    },
+    {
+      "id": "rpc:orchestration.getArchivedShellSnapshot",
+      "review": "unverified",
+      "reason": "Behavior, capability, local entry point, defaults and negative paths need review.",
+      "localMapping": null,
+      "scenarios": []
+    },
+    {
+      "id": "rpc:orchestration.getFullThreadDiff",
+      "review": "unverified",
+      "reason": "Behavior, capability, local entry point, defaults and negative paths need review.",
+      "localMapping": null,
+      "scenarios": []
+    },
+    {
+      "id": "rpc:orchestration.getTurnDiff",
+      "review": "unverified",
+      "reason": "Behavior, capability, local entry point, defaults and negative paths need review.",
+      "localMapping": null,
+      "scenarios": []
+    },
+    {
+      "id": "rpc:orchestration.getWorkflowScript",
+      "review": "unverified",
+      "reason": "Behavior, capability, local entry point, defaults and negative paths need review.",
+      "localMapping": null,
+      "scenarios": []
+    },
+    {
+      "id": "rpc:orchestration.searchThreads",
+      "review": "unverified",
+      "reason": "Behavior, capability, local entry point, defaults and negative paths need review.",
+      "localMapping": null,
+      "scenarios": []
+    },
+    {
+      "id": "rpc:orchestration.subscribeShell",
+      "review": "unverified",
+      "reason": "Behavior, capability, local entry point, defaults and negative paths need review.",
+      "localMapping": null,
+      "scenarios": []
+    },
+    {
+      "id": "rpc:orchestration.subscribeThread",
+      "review": "unverified",
+      "reason": "Behavior, capability, local entry point, defaults and negative paths need review.",
+      "localMapping": null,
+      "scenarios": []
+    },
+    {
+      "id": "rpc:preview.close",
+      "review": "unverified",
+      "reason": "Behavior, capability, local entry point, defaults and negative paths need review.",
+      "localMapping": null,
+      "scenarios": []
+    },
+    {
+      "id": "rpc:preview.list",
+      "review": "unverified",
+      "reason": "Behavior, capability, local entry point, defaults and negative paths need review.",
+      "localMapping": null,
+      "scenarios": []
+    },
+    {
+      "id": "rpc:preview.navigate",
+      "review": "unverified",
+      "reason": "Behavior, capability, local entry point, defaults and negative paths need review.",
+      "localMapping": null,
+      "scenarios": []
+    },
+    {
+      "id": "rpc:preview.open",
+      "review": "unverified",
+      "reason": "Behavior, capability, local entry point, defaults and negative paths need review.",
+      "localMapping": null,
+      "scenarios": []
+    },
+    {
+      "id": "rpc:preview.refresh",
+      "review": "unverified",
+      "reason": "Behavior, capability, local entry point, defaults and negative paths need review.",
+      "localMapping": null,
+      "scenarios": []
+    },
+    {
+      "id": "rpc:preview.reportStatus",
+      "review": "unverified",
+      "reason": "Behavior, capability, local entry point, defaults and negative paths need review.",
+      "localMapping": null,
+      "scenarios": []
+    },
+    {
+      "id": "rpc:preview.resize",
+      "review": "unverified",
+      "reason": "Behavior, capability, local entry point, defaults and negative paths need review.",
+      "localMapping": null,
+      "scenarios": []
+    },
+    {
+      "id": "rpc:previewAutomation.connect",
+      "review": "unverified",
+      "reason": "Behavior, capability, local entry point, defaults and negative paths need review.",
+      "localMapping": null,
+      "scenarios": []
+    },
+    {
+      "id": "rpc:previewAutomation.focusHost",
+      "review": "unverified",
+      "reason": "Behavior, capability, local entry point, defaults and negative paths need review.",
+      "localMapping": null,
+      "scenarios": []
+    },
+    {
+      "id": "rpc:previewAutomation.respond",
+      "review": "unverified",
+      "reason": "Behavior, capability, local entry point, defaults and negative paths need review.",
+      "localMapping": null,
+      "scenarios": []
+    },
+    {
+      "id": "rpc:projectClone.cancel",
+      "review": "unverified",
+      "reason": "Behavior, capability, local entry point, defaults and negative paths need review.",
+      "localMapping": null,
+      "scenarios": []
+    },
+    {
+      "id": "rpc:projectClone.retry",
+      "review": "unverified",
+      "reason": "Behavior, capability, local entry point, defaults and negative paths need review.",
+      "localMapping": null,
+      "scenarios": []
+    },
+    {
+      "id": "rpc:projectClone.start",
+      "review": "unverified",
+      "reason": "Behavior, capability, local entry point, defaults and negative paths need review.",
+      "localMapping": null,
+      "scenarios": []
+    },
+    {
+      "id": "rpc:projects.add",
+      "review": "unverified",
+      "reason": "Behavior, capability, local entry point, defaults and negative paths need review.",
+      "localMapping": null,
+      "scenarios": []
+    },
+    {
+      "id": "rpc:projects.list",
+      "review": "unverified",
+      "reason": "Behavior, capability, local entry point, defaults and negative paths need review.",
+      "localMapping": null,
+      "scenarios": []
+    },
+    {
+      "id": "rpc:projects.listEntries",
+      "review": "unverified",
+      "reason": "Behavior, capability, local entry point, defaults and negative paths need review.",
+      "localMapping": null,
+      "scenarios": []
+    },
+    {
+      "id": "rpc:projects.readFile",
+      "review": "unverified",
+      "reason": "Behavior, capability, local entry point, defaults and negative paths need review.",
+      "localMapping": null,
+      "scenarios": []
+    },
+    {
+      "id": "rpc:projects.remove",
+      "review": "unverified",
+      "reason": "Behavior, capability, local entry point, defaults and negative paths need review.",
+      "localMapping": null,
+      "scenarios": []
+    },
+    {
+      "id": "rpc:projects.searchContents",
+      "review": "unverified",
+      "reason": "Behavior, capability, local entry point, defaults and negative paths need review.",
+      "localMapping": null,
+      "scenarios": []
+    },
+    {
+      "id": "rpc:projects.searchEntries",
+      "review": "unverified",
+      "reason": "Behavior, capability, local entry point, defaults and negative paths need review.",
+      "localMapping": null,
+      "scenarios": []
+    },
+    {
+      "id": "rpc:projects.writeFile",
+      "review": "unverified",
+      "reason": "Behavior, capability, local entry point, defaults and negative paths need review.",
+      "localMapping": null,
+      "scenarios": []
+    },
+    {
+      "id": "rpc:provider.auth.cancel",
+      "review": "unverified",
+      "reason": "Behavior, capability, local entry point, defaults and negative paths need review.",
+      "localMapping": null,
+      "scenarios": []
+    },
+    {
+      "id": "rpc:provider.auth.complete",
+      "review": "unverified",
+      "reason": "Behavior, capability, local entry point, defaults and negative paths need review.",
+      "localMapping": null,
+      "scenarios": []
+    },
+    {
+      "id": "rpc:provider.auth.logout",
+      "review": "unverified",
+      "reason": "Behavior, capability, local entry point, defaults and negative paths need review.",
+      "localMapping": null,
+      "scenarios": []
+    },
+    {
+      "id": "rpc:provider.auth.start",
+      "review": "unverified",
+      "reason": "Behavior, capability, local entry point, defaults and negative paths need review.",
+      "localMapping": null,
+      "scenarios": []
+    },
+    {
+      "id": "rpc:provider.auth.subscribe",
+      "review": "unverified",
+      "reason": "Behavior, capability, local entry point, defaults and negative paths need review.",
+      "localMapping": null,
+      "scenarios": []
+    },
+    {
+      "id": "rpc:provider.consumeResetCredit",
+      "review": "unverified",
+      "reason": "Behavior, capability, local entry point, defaults and negative paths need review.",
+      "localMapping": null,
+      "scenarios": []
+    },
+    {
+      "id": "rpc:provider.install.cancel",
+      "review": "unverified",
+      "reason": "Behavior, capability, local entry point, defaults and negative paths need review.",
+      "localMapping": null,
+      "scenarios": []
+    },
+    {
+      "id": "rpc:provider.install.remove",
+      "review": "unverified",
+      "reason": "Behavior, capability, local entry point, defaults and negative paths need review.",
+      "localMapping": null,
+      "scenarios": []
+    },
+    {
+      "id": "rpc:provider.install.start",
+      "review": "unverified",
+      "reason": "Behavior, capability, local entry point, defaults and negative paths need review.",
+      "localMapping": null,
+      "scenarios": []
+    },
+    {
+      "id": "rpc:provider.install.subscribe",
+      "review": "unverified",
+      "reason": "Behavior, capability, local entry point, defaults and negative paths need review.",
+      "localMapping": null,
+      "scenarios": []
+    },
+    {
+      "id": "rpc:provider.uploadFeedback",
+      "review": "unverified",
+      "reason": "Behavior, capability, local entry point, defaults and negative paths need review.",
+      "localMapping": null,
+      "scenarios": []
+    },
+    {
+      "id": "rpc:pullRequests.activity",
+      "review": "unverified",
+      "reason": "Behavior, capability, local entry point, defaults and negative paths need review.",
+      "localMapping": null,
+      "scenarios": []
+    },
+    {
+      "id": "rpc:pullRequests.comment",
+      "review": "unverified",
+      "reason": "Behavior, capability, local entry point, defaults and negative paths need review.",
+      "localMapping": null,
+      "scenarios": []
+    },
+    {
+      "id": "rpc:pullRequests.detail",
+      "review": "unverified",
+      "reason": "Behavior, capability, local entry point, defaults and negative paths need review.",
+      "localMapping": null,
+      "scenarios": []
+    },
+    {
+      "id": "rpc:pullRequests.diffFileContents",
+      "review": "unverified",
+      "reason": "Behavior, capability, local entry point, defaults and negative paths need review.",
+      "localMapping": null,
+      "scenarios": []
+    },
+    {
+      "id": "rpc:pullRequests.filesViewed",
+      "review": "unverified",
+      "reason": "Behavior, capability, local entry point, defaults and negative paths need review.",
+      "localMapping": null,
+      "scenarios": []
+    },
+    {
+      "id": "rpc:pullRequests.invalidate",
+      "review": "unverified",
+      "reason": "Behavior, capability, local entry point, defaults and negative paths need review.",
+      "localMapping": null,
+      "scenarios": []
+    },
+    {
+      "id": "rpc:pullRequests.labelCandidates",
+      "review": "unverified",
+      "reason": "Behavior, capability, local entry point, defaults and negative paths need review.",
+      "localMapping": null,
+      "scenarios": []
+    },
+    {
+      "id": "rpc:pullRequests.linkedThreads",
+      "review": "unverified",
+      "reason": "Behavior, capability, local entry point, defaults and negative paths need review.",
+      "localMapping": null,
+      "scenarios": []
+    },
+    {
+      "id": "rpc:pullRequests.list",
+      "review": "unverified",
+      "reason": "Behavior, capability, local entry point, defaults and negative paths need review.",
+      "localMapping": null,
+      "scenarios": []
+    },
+    {
+      "id": "rpc:pullRequests.listStats",
+      "review": "unverified",
+      "reason": "Behavior, capability, local entry point, defaults and negative paths need review.",
+      "localMapping": null,
+      "scenarios": []
+    },
+    {
+      "id": "rpc:pullRequests.preview",
+      "review": "unverified",
+      "reason": "Behavior, capability, local entry point, defaults and negative paths need review.",
+      "localMapping": null,
+      "scenarios": []
+    },
+    {
+      "id": "rpc:pullRequests.replyToThread",
+      "review": "unverified",
+      "reason": "Behavior, capability, local entry point, defaults and negative paths need review.",
+      "localMapping": null,
+      "scenarios": []
+    },
+    {
+      "id": "rpc:pullRequests.requestReviewers",
+      "review": "unverified",
+      "reason": "Behavior, capability, local entry point, defaults and negative paths need review.",
+      "localMapping": null,
+      "scenarios": []
+    },
+    {
+      "id": "rpc:pullRequests.reviewerCandidates",
+      "review": "unverified",
+      "reason": "Behavior, capability, local entry point, defaults and negative paths need review.",
+      "localMapping": null,
+      "scenarios": []
+    },
+    {
+      "id": "rpc:pullRequests.routing",
+      "review": "unverified",
+      "reason": "Behavior, capability, local entry point, defaults and negative paths need review.",
+      "localMapping": null,
+      "scenarios": []
+    },
+    {
+      "id": "rpc:pullRequests.routingIdentity",
+      "review": "unverified",
+      "reason": "Behavior, capability, local entry point, defaults and negative paths need review.",
+      "localMapping": null,
+      "scenarios": []
+    },
+    {
+      "id": "rpc:pullRequests.runAction",
+      "review": "unverified",
+      "reason": "Behavior, capability, local entry point, defaults and negative paths need review.",
+      "localMapping": null,
+      "scenarios": []
+    },
+    {
+      "id": "rpc:pullRequests.setFilesViewed",
+      "review": "unverified",
+      "reason": "Behavior, capability, local entry point, defaults and negative paths need review.",
+      "localMapping": null,
+      "scenarios": []
+    },
+    {
+      "id": "rpc:pullRequests.setLabels",
+      "review": "unverified",
+      "reason": "Behavior, capability, local entry point, defaults and negative paths need review.",
+      "localMapping": null,
+      "scenarios": []
+    },
+    {
+      "id": "rpc:pullRequests.setReaction",
+      "review": "unverified",
+      "reason": "Behavior, capability, local entry point, defaults and negative paths need review.",
+      "localMapping": null,
+      "scenarios": []
+    },
+    {
+      "id": "rpc:pullRequests.setThreadResolution",
+      "review": "unverified",
+      "reason": "Behavior, capability, local entry point, defaults and negative paths need review.",
+      "localMapping": null,
+      "scenarios": []
+    },
+    {
+      "id": "rpc:pullRequests.stack",
+      "review": "unverified",
+      "reason": "Behavior, capability, local entry point, defaults and negative paths need review.",
+      "localMapping": null,
+      "scenarios": []
+    },
+    {
+      "id": "rpc:pullRequests.submitReview",
+      "review": "unverified",
+      "reason": "Behavior, capability, local entry point, defaults and negative paths need review.",
+      "localMapping": null,
+      "scenarios": []
+    },
+    {
+      "id": "rpc:pullRequests.subscribeRefreshes",
+      "review": "unverified",
+      "reason": "Behavior, capability, local entry point, defaults and negative paths need review.",
+      "localMapping": null,
+      "scenarios": []
+    },
+    {
+      "id": "rpc:pullRequests.summary",
+      "review": "unverified",
+      "reason": "Behavior, capability, local entry point, defaults and negative paths need review.",
+      "localMapping": null,
+      "scenarios": []
+    },
+    {
+      "id": "rpc:pullRequests.threadComments",
+      "review": "unverified",
+      "reason": "Behavior, capability, local entry point, defaults and negative paths need review.",
+      "localMapping": null,
+      "scenarios": []
+    },
+    {
+      "id": "rpc:pullRequests.update",
+      "review": "unverified",
+      "reason": "Behavior, capability, local entry point, defaults and negative paths need review.",
+      "localMapping": null,
+      "scenarios": []
+    },
+    {
+      "id": "rpc:pullRequests.updateComment",
+      "review": "unverified",
+      "reason": "Behavior, capability, local entry point, defaults and negative paths need review.",
+      "localMapping": null,
+      "scenarios": []
+    },
+    {
+      "id": "rpc:review.getDiffFileContents",
+      "review": "unverified",
+      "reason": "Behavior, capability, local entry point, defaults and negative paths need review.",
+      "localMapping": null,
+      "scenarios": []
+    },
+    {
+      "id": "rpc:review.getDiffPreview",
+      "review": "unverified",
+      "reason": "Behavior, capability, local entry point, defaults and negative paths need review.",
+      "localMapping": null,
+      "scenarios": []
+    },
+    {
+      "id": "rpc:server.commitDesktopUpdate",
+      "review": "unverified",
+      "reason": "Behavior, capability, local entry point, defaults and negative paths need review.",
+      "localMapping": null,
+      "scenarios": []
+    },
+    {
+      "id": "rpc:server.discoverSourceControl",
+      "review": "unverified",
+      "reason": "Behavior, capability, local entry point, defaults and negative paths need review.",
+      "localMapping": null,
+      "scenarios": []
+    },
+    {
+      "id": "rpc:server.getBackgroundPolicy",
+      "review": "unverified",
+      "reason": "Behavior, capability, local entry point, defaults and negative paths need review.",
+      "localMapping": null,
+      "scenarios": []
+    },
+    {
+      "id": "rpc:server.getConfig",
+      "review": "unverified",
+      "reason": "Behavior, capability, local entry point, defaults and negative paths need review.",
+      "localMapping": null,
+      "scenarios": []
+    },
+    {
+      "id": "rpc:server.getHostResources",
+      "review": "unverified",
+      "reason": "Behavior, capability, local entry point, defaults and negative paths need review.",
+      "localMapping": null,
+      "scenarios": []
+    },
+    {
+      "id": "rpc:server.getProcessDiagnostics",
+      "review": "unverified",
+      "reason": "Behavior, capability, local entry point, defaults and negative paths need review.",
+      "localMapping": null,
+      "scenarios": []
+    },
+    {
+      "id": "rpc:server.getProcessResourceHistory",
+      "review": "unverified",
+      "reason": "Behavior, capability, local entry point, defaults and negative paths need review.",
+      "localMapping": null,
+      "scenarios": []
+    },
+    {
+      "id": "rpc:server.getResourceTelemetryHistory",
+      "review": "unverified",
+      "reason": "Behavior, capability, local entry point, defaults and negative paths need review.",
+      "localMapping": null,
+      "scenarios": []
+    },
+    {
+      "id": "rpc:server.getSettings",
+      "review": "unverified",
+      "reason": "Behavior, capability, local entry point, defaults and negative paths need review.",
+      "localMapping": null,
+      "scenarios": []
+    },
+    {
+      "id": "rpc:server.getTraceDiagnostics",
+      "review": "unverified",
+      "reason": "Behavior, capability, local entry point, defaults and negative paths need review.",
+      "localMapping": null,
+      "scenarios": []
+    },
+    {
+      "id": "rpc:server.getUsageSummary",
+      "review": "unverified",
+      "reason": "Behavior, capability, local entry point, defaults and negative paths need review.",
+      "localMapping": null,
+      "scenarios": []
+    },
+    {
+      "id": "rpc:server.probe",
+      "review": "unverified",
+      "reason": "Behavior, capability, local entry point, defaults and negative paths need review.",
+      "localMapping": null,
+      "scenarios": []
+    },
+    {
+      "id": "rpc:server.refreshProviders",
+      "review": "unverified",
+      "reason": "Behavior, capability, local entry point, defaults and negative paths need review.",
+      "localMapping": null,
+      "scenarios": []
+    },
+    {
+      "id": "rpc:server.refreshUsageRates",
+      "review": "unverified",
+      "reason": "Behavior, capability, local entry point, defaults and negative paths need review.",
+      "localMapping": null,
+      "scenarios": []
+    },
+    {
+      "id": "rpc:server.removeKeybinding",
+      "review": "unverified",
+      "reason": "Behavior, capability, local entry point, defaults and negative paths need review.",
+      "localMapping": null,
+      "scenarios": []
+    },
+    {
+      "id": "rpc:server.reportClientActivity",
+      "review": "unverified",
+      "reason": "Behavior, capability, local entry point, defaults and negative paths need review.",
+      "localMapping": null,
+      "scenarios": []
+    },
+    {
+      "id": "rpc:server.reportHostPowerState",
+      "review": "unverified",
+      "reason": "Behavior, capability, local entry point, defaults and negative paths need review.",
+      "localMapping": null,
+      "scenarios": []
+    },
+    {
+      "id": "rpc:server.retryResourceTelemetry",
+      "review": "unverified",
+      "reason": "Behavior, capability, local entry point, defaults and negative paths need review.",
+      "localMapping": null,
+      "scenarios": []
+    },
+    {
+      "id": "rpc:server.signalProcess",
+      "review": "unverified",
+      "reason": "Behavior, capability, local entry point, defaults and negative paths need review.",
+      "localMapping": null,
+      "scenarios": []
+    },
+    {
+      "id": "rpc:server.updateProvider",
+      "review": "unverified",
+      "reason": "Behavior, capability, local entry point, defaults and negative paths need review.",
+      "localMapping": null,
+      "scenarios": []
+    },
+    {
+      "id": "rpc:server.updateServer",
+      "review": "unverified",
+      "reason": "Behavior, capability, local entry point, defaults and negative paths need review.",
+      "localMapping": null,
+      "scenarios": []
+    },
+    {
+      "id": "rpc:server.updateServerWithProgress",
+      "review": "unverified",
+      "reason": "Behavior, capability, local entry point, defaults and negative paths need review.",
+      "localMapping": null,
+      "scenarios": []
+    },
+    {
+      "id": "rpc:server.updateSettings",
+      "review": "unverified",
+      "reason": "Behavior, capability, local entry point, defaults and negative paths need review.",
+      "localMapping": null,
+      "scenarios": []
+    },
+    {
+      "id": "rpc:server.upsertKeybinding",
+      "review": "unverified",
+      "reason": "Behavior, capability, local entry point, defaults and negative paths need review.",
+      "localMapping": null,
+      "scenarios": []
+    },
+    {
+      "id": "rpc:shell.openInEditor",
+      "review": "unverified",
+      "reason": "Behavior, capability, local entry point, defaults and negative paths need review.",
+      "localMapping": null,
+      "scenarios": []
+    },
+    {
+      "id": "rpc:sourceControl.cloneRepository",
+      "review": "unverified",
+      "reason": "Behavior, capability, local entry point, defaults and negative paths need review.",
+      "localMapping": null,
+      "scenarios": []
+    },
+    {
+      "id": "rpc:sourceControl.lookupRepository",
+      "review": "unverified",
+      "reason": "Behavior, capability, local entry point, defaults and negative paths need review.",
+      "localMapping": null,
+      "scenarios": []
+    },
+    {
+      "id": "rpc:sourceControl.publishRepository",
+      "review": "unverified",
+      "reason": "Behavior, capability, local entry point, defaults and negative paths need review.",
+      "localMapping": null,
+      "scenarios": []
+    },
+    {
+      "id": "rpc:subscribeAuthAccess",
+      "review": "unverified",
+      "reason": "Behavior, capability, local entry point, defaults and negative paths need review.",
+      "localMapping": null,
+      "scenarios": []
+    },
+    {
+      "id": "rpc:subscribeBackgroundPolicy",
+      "review": "unverified",
+      "reason": "Behavior, capability, local entry point, defaults and negative paths need review.",
+      "localMapping": null,
+      "scenarios": []
+    },
+    {
+      "id": "rpc:subscribeDeviceState",
+      "review": "unverified",
+      "reason": "Behavior, capability, local entry point, defaults and negative paths need review.",
+      "localMapping": null,
+      "scenarios": []
+    },
+    {
+      "id": "rpc:subscribeDiscoveredLocalServers",
+      "review": "unverified",
+      "reason": "Behavior, capability, local entry point, defaults and negative paths need review.",
+      "localMapping": null,
+      "scenarios": []
+    },
+    {
+      "id": "rpc:subscribePreviewEvents",
+      "review": "unverified",
+      "reason": "Behavior, capability, local entry point, defaults and negative paths need review.",
+      "localMapping": null,
+      "scenarios": []
+    },
+    {
+      "id": "rpc:subscribeProjectClones",
+      "review": "unverified",
+      "reason": "Behavior, capability, local entry point, defaults and negative paths need review.",
+      "localMapping": null,
+      "scenarios": []
+    },
+    {
+      "id": "rpc:subscribeResourceTelemetry",
+      "review": "unverified",
+      "reason": "Behavior, capability, local entry point, defaults and negative paths need review.",
+      "localMapping": null,
+      "scenarios": []
+    },
+    {
+      "id": "rpc:subscribeServerConfig",
+      "review": "unverified",
+      "reason": "Behavior, capability, local entry point, defaults and negative paths need review.",
+      "localMapping": null,
+      "scenarios": []
+    },
+    {
+      "id": "rpc:subscribeServerLifecycle",
+      "review": "unverified",
+      "reason": "Behavior, capability, local entry point, defaults and negative paths need review.",
+      "localMapping": null,
+      "scenarios": []
+    },
+    {
+      "id": "rpc:subscribeTerminalEvents",
+      "review": "unverified",
+      "reason": "Behavior, capability, local entry point, defaults and negative paths need review.",
+      "localMapping": null,
+      "scenarios": []
+    },
+    {
+      "id": "rpc:subscribeTerminalMetadata",
+      "review": "unverified",
+      "reason": "Behavior, capability, local entry point, defaults and negative paths need review.",
+      "localMapping": null,
+      "scenarios": []
+    },
+    {
+      "id": "rpc:subscribeVcsStatus",
+      "review": "unverified",
+      "reason": "Behavior, capability, local entry point, defaults and negative paths need review.",
+      "localMapping": null,
+      "scenarios": []
+    },
+    {
+      "id": "rpc:subscribeWorktreeSetup",
+      "review": "unverified",
+      "reason": "Behavior, capability, local entry point, defaults and negative paths need review.",
+      "localMapping": null,
+      "scenarios": []
+    },
+    {
+      "id": "rpc:terminal.attach",
+      "review": "unverified",
+      "reason": "Behavior, capability, local entry point, defaults and negative paths need review.",
+      "localMapping": null,
+      "scenarios": []
+    },
+    {
+      "id": "rpc:terminal.clear",
+      "review": "unverified",
+      "reason": "Behavior, capability, local entry point, defaults and negative paths need review.",
+      "localMapping": null,
+      "scenarios": []
+    },
+    {
+      "id": "rpc:terminal.close",
+      "review": "unverified",
+      "reason": "Behavior, capability, local entry point, defaults and negative paths need review.",
+      "localMapping": null,
+      "scenarios": []
+    },
+    {
+      "id": "rpc:terminal.open",
+      "review": "unverified",
+      "reason": "Behavior, capability, local entry point, defaults and negative paths need review.",
+      "localMapping": null,
+      "scenarios": []
+    },
+    {
+      "id": "rpc:terminal.resize",
+      "review": "unverified",
+      "reason": "Behavior, capability, local entry point, defaults and negative paths need review.",
+      "localMapping": null,
+      "scenarios": []
+    },
+    {
+      "id": "rpc:terminal.restart",
+      "review": "unverified",
+      "reason": "Behavior, capability, local entry point, defaults and negative paths need review.",
+      "localMapping": null,
+      "scenarios": []
+    },
+    {
+      "id": "rpc:terminal.write",
+      "review": "unverified",
+      "reason": "Behavior, capability, local entry point, defaults and negative paths need review.",
+      "localMapping": null,
+      "scenarios": []
+    },
+    {
+      "id": "rpc:vcs.createRef",
+      "review": "unverified",
+      "reason": "Behavior, capability, local entry point, defaults and negative paths need review.",
+      "localMapping": null,
+      "scenarios": []
+    },
+    {
+      "id": "rpc:vcs.createWorktree",
+      "review": "unverified",
+      "reason": "Behavior, capability, local entry point, defaults and negative paths need review.",
+      "localMapping": null,
+      "scenarios": []
+    },
+    {
+      "id": "rpc:vcs.init",
+      "review": "unverified",
+      "reason": "Behavior, capability, local entry point, defaults and negative paths need review.",
+      "localMapping": null,
+      "scenarios": []
+    },
+    {
+      "id": "rpc:vcs.listRefs",
+      "review": "unverified",
+      "reason": "Behavior, capability, local entry point, defaults and negative paths need review.",
+      "localMapping": null,
+      "scenarios": []
+    },
+    {
+      "id": "rpc:vcs.pull",
+      "review": "unverified",
+      "reason": "Behavior, capability, local entry point, defaults and negative paths need review.",
+      "localMapping": null,
+      "scenarios": []
+    },
+    {
+      "id": "rpc:vcs.refreshStatus",
+      "review": "unverified",
+      "reason": "Behavior, capability, local entry point, defaults and negative paths need review.",
+      "localMapping": null,
+      "scenarios": []
+    },
+    {
+      "id": "rpc:vcs.removeWorktree",
+      "review": "unverified",
+      "reason": "Behavior, capability, local entry point, defaults and negative paths need review.",
+      "localMapping": null,
+      "scenarios": []
+    },
+    {
+      "id": "rpc:vcs.switchRef",
+      "review": "unverified",
+      "reason": "Behavior, capability, local entry point, defaults and negative paths need review.",
+      "localMapping": null,
+      "scenarios": []
+    },
+    {
+      "id": "rpc:worktreeSetup.cancel",
+      "review": "unverified",
+      "reason": "Behavior, capability, local entry point, defaults and negative paths need review.",
+      "localMapping": null,
+      "scenarios": []
+    }
+  ]
+}

@@ -109,13 +109,13 @@ test('an unavailable configured agent binary never falls back to a shell and rel
   }
 })
 
-test('a detached agent keeps ownership until the terminal expiry confirms its exit', async () => {
-  const fixture = await createAgentTerminalFixture({ detachTtlMs: 1, pty: { holdUntilExit: true } })
+test('a detached agent keeps running and retains ownership until its process exits', async () => {
+  const fixture = await createAgentTerminalFixture({ pty: { holdUntilExit: true } })
   try {
     const socket = fixture.socket()
     await socket.open()
     socket.detach()
-    await expect.poll(() => fixture.pty.ptys[0]?.killed).toBe(true)
+    expect(fixture.pty.ptys[0]?.killed).toBe(false)
     await expect(fixture.turn()).rejects.toMatchObject({ code: 'provider.SESSION_IN_TERMINAL' })
     fixture.pty.ptys[0]?.exit(0)
     await expect

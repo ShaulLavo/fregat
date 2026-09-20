@@ -1,12 +1,16 @@
 # Plan 126: Align Platform behavior with pinned T3 Code
 
-Status: **PLANNED; IMPLEMENTATION NOT STARTED**. Two source-audit passes and independent
+Status: **IN PROGRESS; FINAL AUTHORIZED BATCH DEPLOYED AND VERIFIED**. Two source-audit passes and independent
 cross-review completed on 2026-09-20. The audit found **48 implementation groups**, including
 paired client/server work. This is not a count of independently reproduced bugs.
+
+LIFE-01/02 shipped on 2026-09-20. Rewind/native permissions/PR lookup have an initial deployment and follow-up validation in [delivery evidence](126-t3code-alignment/rewind-permissions-delivery.md); bounded delivery and MCP approval implementation are recorded in [their delivery evidence](126-t3code-alignment/live-delivery-approvals-delivery.md). The active-list exceptions and automatic unarchive are removed; archive eligibility is separate from settlement. See [archive delivery evidence](126-t3code-alignment/archive-delivery.md). The source-derived archive fixture is the first focused conformance case, not completion of Wave 0 or proof of full upstream parity.
 
 Priority: P0 for the archive defect and conformance foundation; execute the remaining work in
 the dependency order below. Overall effort is large and spans multiple deliveries. No honest
 date estimate is possible before provider/platform prerequisites and live comparison are measured.
+
+The user ended this run after the active batch on 2026-09-20. See [the wrap-up record](126-t3code-alignment/wrap-up.md) for the four bounded deliveries, browser evidence and remaining limits. This stopping boundary does not mark the broader plan complete.
 
 ## Authority and completion rule
 
@@ -105,8 +109,7 @@ python plans/126-t3code-alignment/inventory.py
 Expected: the pinned census and ledger validate. Source changes since the baseline require
 re-reading the affected finding and updating its evidence, not resetting someone else's work.
 Unrelated source changes and scratch files were present/concurrently changing during the audit;
-this task edited only `plans/`. No branches, commits, pushes, application deployments or installs
-were performed. Use the current worktree and preserve that other work.
+the initial audit edited only `plans/`. That audit made no branches, commits, pushes, deployments or installs. Subsequent implementation and deployment are recorded in the linked delivery evidence. Use the current worktree and preserve unrelated work.
 
 Application write scope during execution: the specific feature, shared contract/client-core,
 server owner, test, settings registry and browser scenario files named by the selected finding.
@@ -143,20 +146,20 @@ Wave 1; do not wait for every provider/platform case to exist before fixing the 
 
 Done: the first critical cases fail on current behavior and pass only when the corresponding
 fix lands; operation/default coverage is explicit; CI can detect drift without claiming that
-the static census proves parity. Audit-census validation below already works; runtime adapters
-and CI wiring are planned, not shipped.
+the static census proves parity. The durable census and CI checks are implemented. Most operation mappings and paired runtime
+comparisons remain unverified; these checks do not establish behavioral parity.
 
 ## Wave 1: Correct existing unsafe or misleading behavior
 
-| Delivery unit    | Finding IDs                | Exact implementation and proof                                                                                                                                                                                                                                                                                                               |
-| ---------------- | -------------------------- | -------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
-| Archive          | LIFE-01, LIFE-02           | Remove both active-list exceptions; replace blanket lifecycle reset with event-specific settle/snooze resets; only explicit unarchive clears archive. Match UI versus API eligibility separately. Replace contrary tests. Prove late approval/error/plan/completion/recovery never reopens an archive and restore retains history.           |
-| Safe rewind      | RUNTIME-01, INTERACTION-05 | Add explicit restore-files choice; preflight native rollback and true workspace isolation before Git mutation; offer conversation-only rewind. Prepare attachments/capacity first, await canonical history change, restore prompt/payload to captured draft. Unsupported provider/shared checkout leaves bytes, index and history unchanged. |
-| Native approvals | RUNTIME-11, RUNTIME-03     | Discriminate pending request kinds and retain native IDs/permission profiles/child ownership. Send exact grant/schema responses and supported app-access form decisions. Unsupported forms decline. Exercise accept/deny/session acceptance, replay and duplicate response through real adapter ingestion.                                   |
-| Bounded delivery | RUNTIME-04                 | Cap queued/coalesced/in-flight subscription items and serialized bytes, release on completion/cancel, force cursor resync on overflow. Bound the client queue too. Slow shell/detail subscribers must recover the same text without unbounded retained memory.                                                                               |
-| PR read failures | EXT-13                     | Distinguish successful absence from auth/rate/timeout/malformed failures; forbid create after indeterminate lookup. Reuse feature structured errors and show actionable retry. Prove failed read performs no remote mutation.                                                                                                                |
+| Delivery unit    | Finding IDs                | Exact implementation and proof                                                                                                                                                                                                                                                                                                                                        |
+| ---------------- | -------------------------- | --------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| Archive          | LIFE-01, LIFE-02           | Remove both active-list exceptions; replace blanket lifecycle reset with event-specific settle/snooze resets; only explicit unarchive clears archive. Match UI versus API eligibility separately. Replace contrary tests. Prove late approval/error/plan/completion/recovery never reopens an archive and restore retains history.                                    |
+| Safe rewind      | RUNTIME-01, INTERACTION-05 | Add explicit restore-files choice; preflight native rollback and true workspace isolation before Git mutation; offer conversation-only rewind. Prepare attachments/capacity first, await canonical history change, restore prompt/payload to captured draft. Unsupported provider/shared checkout leaves bytes, index and history unchanged.                          |
+| Native approvals | RUNTIME-11, RUNTIME-03     | Discriminate pending request kinds and retain native IDs/permission profiles/child ownership. Send exact grant/schema responses and supported app-access form decisions. Unknown schemas accept without content; URL and unpopulatable required forms decline. Exercise accept/deny/session acceptance, replay and duplicate response through real adapter ingestion. |
+| Bounded delivery | RUNTIME-04                 | Cap queued/coalesced/in-flight subscription items and serialized bytes, release on completion/cancel, force cursor resync on overflow. Bound the client queue too. Slow shell/detail subscribers must recover the same text without unbounded retained memory.                                                                                                        |
+| PR read failures | EXT-13                     | Distinguish successful absence from auth/rate/timeout/malformed failures; forbid create after indeterminate lookup. Reuse feature structured errors and show actionable retry. Prove failed read performs no remote mutation.                                                                                                                                         |
 
-Archive current-state excerpts for the executor:
+Archive pre-fix excerpts retained as the regression target:
 
 ```ts
 // packages/client-core/src/chat/rail/model.ts:155
@@ -169,7 +172,7 @@ if (session.archivedAt) {
 }
 ```
 
-All three behaviors must change. Keep explicitly opened archived details usable. Archive does
+All three behaviors were changed in the archive delivery. Keep explicitly opened archived details usable. Archive does
 not imply provider Stop or dropping outstanding requests. The upstream server allows archive
 after existence/nonarchive checks, while UI blocks running plus active-turn-ID; compare starting,
 waiting, running-without-turn-ID, stopped, pending-request and duplicate command-receipt cases.
@@ -388,12 +391,12 @@ screenshots and wide logs and record the evidence directory. Performance/resourc
 The dev server at `localhost:5173` was unavailable in the preceding investigation; never start
 or restart one just to make proof convenient. Mesh homepage health was checked at
 `/work/tmp/fregat-evidence/20260920T105844Z-look-platform-1440x1000/`. That evidence proves only
-homepage availability. Browser/provider/platform cases in this plan have **not** run.
+homepage availability. At audit time, browser/provider/platform cases had not run. The delivery notes now record completed cases; unverified host/provider paths remain open.
 
 After each implemented, verified unit deploy through `bun run deploy --slug=t3code-<unit>`;
 server changes require `--server` per repository policy. Record the release response and live
 check evidence. Coordinate shared file work before a restart; no restart for web-only changes.
-This documentation-only task does not build or deploy an unchanged application.
+Completed implementation deliveries deploy through this procedure.
 
 ## Completion criteria and unresolved coverage
 

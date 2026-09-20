@@ -13,6 +13,7 @@ import {
 import { actionItem, section, type Menu } from '@/keymap/menus/utils/model'
 
 export type ProjectMenuContext = {
+  readonly ownerLabel?: string
   /** False once every session is already filed away — archiving nothing is not an action. */
   readonly canArchiveSessions: boolean
   /** What the header is showing right now, so the item offers the flip, not a state. */
@@ -35,7 +36,9 @@ export function projectMenu(context: ProjectMenuContext): Menu {
       actionItem({
         icon: PlusIcon,
         id: 'newSession',
-        label: 'New Session in This Project',
+        label: context.ownerLabel
+          ? `New Session in This Project (${context.ownerLabel})`
+          : 'New Session in This Project',
         run: context.newSession,
       }),
     ]),
@@ -43,13 +46,13 @@ export function projectMenu(context: ProjectMenuContext): Menu {
       actionItem({
         icon: GitForkIcon,
         id: 'manageWorktrees',
-        label: 'Manage Worktrees',
+        label: context.ownerLabel ? `Manage Worktrees (${context.ownerLabel})` : 'Manage Worktrees',
         run: context.manageWorktrees,
       }),
       actionItem({
         icon: PencilSimpleIcon,
         id: 'renameProject',
-        label: 'Rename Project',
+        label: context.ownerLabel ? `Rename Project (${context.ownerLabel})` : 'Rename Project',
         run: context.renameProject,
       }),
       context.canArchiveSessions &&
@@ -88,7 +91,7 @@ export function projectMenu(context: ProjectMenuContext): Menu {
       actionItem({
         icon: CopyIcon,
         id: 'copyPath',
-        label: 'Copy Path',
+        label: context.ownerLabel ? `Copy Path (${context.ownerLabel})` : 'Copy Path',
         run: context.copyPath,
       }),
     ]),

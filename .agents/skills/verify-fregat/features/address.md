@@ -17,3 +17,5 @@ Copy the URL from the browser. Paste it to an agent to put it in the same state.
 ## Gotchas
 
 Workspace ids are server-assigned; a path is not an address. Requests to the API need an `Origin` of the web app or they are refused as untrusted.
+
+`scenario project-menu` opens the titlebar project switcher and samples its row count on every frame: rows must land in one step, a root that no longer resolves must be absent, and a linked worktree sits under its repository row with its branch. Pass `--workspace` with a worktree path to see the nesting.

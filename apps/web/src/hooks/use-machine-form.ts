@@ -1,6 +1,6 @@
 import { useEffect, useRef, useState, type FormEvent } from 'react'
 import type { MachineDefinition } from '@workspace/contracts'
-import { useSettingValue } from '@/features/settings/hooks/use-setting-value'
+import { useSettingValue } from '@/hooks/use-setting-value'
 import { useSettingsActions } from '@/features/settings/hooks/use-settings-actions'
 import { useEnvironmentConnections } from '@/hooks/use-environment-connections'
 import { errorMessage } from '@/lib/error-message'

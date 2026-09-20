@@ -261,7 +261,7 @@ test('restart catches up before readiness, imports terminal history, and converg
     ).toEqual(['Desktop', 'Laptop'])
     expect(
       rail.sections
-        .find((section) => section.state === 'needs-input')
+        .find((section) => section.state === 'active')
         ?.groups[0]?.sessions.map((session) => session.id),
     ).toContain(AMBIGUOUS_SESSION)
     expect(rail.sessions.find((session) => session.id === TERMINAL_SESSION)?.worktreePath).toBe(

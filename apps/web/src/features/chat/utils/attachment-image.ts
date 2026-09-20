@@ -36,6 +36,7 @@ export function chatAttachmentImages(
   const images: ChatAttachmentImage[] = []
 
   for (const attachment of attachments) {
+    if (attachment.type !== 'image') continue
     const src = chatAttachmentImageSrc(attachment, origin)
     if (!src) continue
 
@@ -54,7 +55,9 @@ export function chatAttachmentImages(
 export function unrenderableChatAttachments(
   attachments: readonly ChatAttachment[],
 ): ChatAttachment[] {
-  return attachments.filter((attachment) => !chatAttachmentUrlPath(attachment))
+  return attachments.filter(
+    (attachment) => attachment.type === 'image' && !chatAttachmentUrlPath(attachment),
+  )
 }
 
 export function stagedAttachmentImages(

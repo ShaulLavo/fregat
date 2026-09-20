@@ -19,6 +19,8 @@ const FORM_FEED = '\f'
  */
 export type TerminalMenuTarget = {
   /** The same selection typed for the agent, line numbers and all. */
+  readonly clearHistory: () => void
+  readonly restart: () => void
   readonly contextSelection: TerminalContextSelection | null
   readonly hasScrollback: boolean
   readonly selection: string
@@ -29,17 +31,15 @@ export function readTerminalMenuTarget(
   terminal: Terminal,
   sessionId: string,
   hasScrollback: boolean,
+  actions: Pick<TerminalMenuTarget, 'clearHistory' | 'restart'>,
 ): TerminalMenuTarget {
   return {
+    ...actions,
     contextSelection: captureTerminalSelection(terminal, sessionId),
     hasScrollback,
     selection: terminal.getSelection() ?? '',
     terminal,
   }
-}
-
-export function clearTerminal(terminal: Terminal) {
-  terminal.sendInput(FORM_FEED)
 }
 
 /**

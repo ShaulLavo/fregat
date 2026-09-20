@@ -5,7 +5,7 @@ import { useEffect } from 'react'
 import type { DocumentKey } from '@/lib/documents/utils/types'
 import { isDirtyLiveEditorDocument } from '@/features/editor/utils/save'
 import { useEditorDocumentStoreApi } from '@/features/editor/state/document-state'
-import { useSettingValue } from '@/features/settings/hooks/use-setting-value'
+import { useSettingValue } from '@/hooks/use-setting-value'
 
 /**
  * Saves edited files without being asked.

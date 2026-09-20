@@ -8,23 +8,18 @@ import {
   readPersistedSessionReads,
   writePersistedSessionReads,
 } from '@/features/chat-mode/utils/session-read-storage'
-import type { SessionSeenStamps } from '@workspace/client-core/chat/rail/unread'
+import {
+  advanceSessionVisit,
+  unreadSessionVisit,
+  type SessionSeenStamps,
+} from '@workspace/client-core/chat/rail/unread'
 
 const SESSION_READ_PERSIST_DEBOUNCE_MS = 300
 
-/**
- * Which sessions the user has already seen finish. Purely client-side: "have I read
- * this" is a property of this browser, not of the session, and the server has no
- * opinion to sync.
- *
- * Writes are debounced and flushed on unload, the same shape the chat draft store
- * uses — a stamp lost to a crash costs one spurious unread dot, and that is not worth
- * a localStorage write per turn completion across every open session.
- */
 type SessionReadStore = {
   readonly seenBySessionKey: SessionSeenStamps
-  /** `completedAt` is the turn stamp that was read, never the local clock. */
-  readonly markSeen: (ref: ScopedSessionRef, completedAt: string) => void
+  readonly markSeen: (ref: ScopedSessionRef, visitedAt: string) => void
+  readonly markUnread: (ref: ScopedSessionRef, completedAt: string | null) => void
 }
 
 const readPersist = new Debouncer(() => flushSessionReadStorage(), {
@@ -37,13 +32,22 @@ const sessionReadPersistence = createEnvironmentRecordPersistence<string>({
 })
 
 export const useSessionReadStore = create<SessionReadStore>()((set, get) => ({
-  markSeen: (ref, completedAt) => {
+  markSeen: (ref, visitedAt) => {
     const sessionId = scopedSessionKey(ref)
-    if (get().seenBySessionKey[sessionId] === completedAt) return
+    const previous = get().seenBySessionKey[sessionId]
+    const next = advanceSessionVisit(previous, visitedAt)
+    if (!next || next === previous) return
 
     set((state) => ({
-      seenBySessionKey: { ...state.seenBySessionKey, [sessionId]: completedAt },
+      seenBySessionKey: { ...state.seenBySessionKey, [sessionId]: next },
     }))
+    readPersist.maybeExecute()
+  },
+  markUnread: (ref, completedAt) => {
+    const key = scopedSessionKey(ref)
+    const stamp = unreadSessionVisit(completedAt)
+    if (!stamp || stamp === get().seenBySessionKey[key]) return
+    set((state) => ({ seenBySessionKey: { ...state.seenBySessionKey, [key]: stamp } }))
     readPersist.maybeExecute()
   },
   seenBySessionKey: {},

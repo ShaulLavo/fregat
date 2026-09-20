@@ -8,7 +8,7 @@ import {
   compareSearchEntries,
   type FilePickerMode,
 } from '@/features/file-picker/utils/model'
-import { readSettingsMirror } from '@/features/settings/utils/boot-mirror'
+import { readSettingsMirror } from '@/lib/settings-boot-mirror'
 
 const SEARCH_SCOPE_TIMEOUT_MS = 6000
 export const PICKER_HIDDEN_SEARCH_EXCLUDE_GLOBS = ['**/.*', '**/.*/**'] as const

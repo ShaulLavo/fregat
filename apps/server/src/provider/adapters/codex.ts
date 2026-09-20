@@ -1,3 +1,7 @@
+import { defaultAttachmentsDir } from '../../attachments/store'
+import { resolveCodexAttachments } from './utils/codex-attachments'
+import { codexAsyncQuestions } from './utils/codex-async-questions'
+import { parseCodexElicitation, type CodexElicitation } from './utils/codex-elicitation'
 import { ProviderProcessLifetime } from './process-lifetime'
 import { createInternalError } from '../../observability/structured-errors'
 
@@ -6,6 +10,7 @@ import {
   DEFAULT_CODEX_PROVIDER_SETTINGS,
   DEFAULT_INTERACTION_MODE,
   approvalRequestIdSchema,
+  providerApprovalDecisionSchema,
   messageIdSchema,
   type ApprovalRequestId,
   type ChatAgent,
@@ -56,6 +61,7 @@ import {
   type CodexSkillMetadata,
 } from './codex-protocol'
 import { errorMessage as providerErrorMessage } from '@workspace/contracts'
+import { prepareCodexRewind } from './utils/codex-rewind'
 import { activeProviderTurn, type ActiveProviderTurn } from './utils/active-turn'
 import { codexDeveloperInstructions } from './utils/codex-instructions'
 import { modelOptionValue, type ModelOptions } from './utils/model-options'
@@ -93,6 +99,7 @@ const BENIGN_CODEX_STDERR_ERROR_SNIPPETS = [
   'state db record_discrepancy: find_thread_path_by_id_str_in_subdir, falling_back',
 ]
 export const CODEX_ADAPTER_CAPABILITIES = {
+  conversationRollback: true,
   listCommands: true,
   sessionModelSwitch: 'in-session',
 } satisfies ProviderAdapter['capabilities']
@@ -106,28 +113,36 @@ type JsonRpcMessage = {
   result?: unknown
 }
 
-type CodexReasoningState = {
-  contentParts: Map<number, string>
-  itemId: string
-  lastEmittedSummary: string | null
-  providerTurnId: string
-  summaryParts: Map<number, string>
-  sessionId: SessionId
-  turnId: TurnId
-}
-
 type PendingCodexApproval = {
   agent?: ChatAgent
   providerThreadId?: string
   providerTurnId?: string
   id: JsonRpcId
-  requestType:
-    | 'apply_patch_approval'
-    | 'command_execution_approval'
-    | 'exec_command_approval'
-    | 'file_change_approval'
   turnId?: TurnId
-}
+} & (
+  | {
+      method: 'mcpServer/elicitation/request'
+      requestType: 'mcp_elicitation_approval'
+      elicitation: CodexElicitation
+    }
+  | {
+      method: 'item/permissions/requestApproval'
+      requestType: 'permissions_approval'
+      permissions: Record<string, unknown>
+    }
+  | {
+      method:
+        | 'item/commandExecution/requestApproval'
+        | 'item/fileChange/requestApproval'
+        | 'applyPatchApproval'
+        | 'execCommandApproval'
+      requestType:
+        | 'apply_patch_approval'
+        | 'command_execution_approval'
+        | 'exec_command_approval'
+        | 'file_change_approval'
+    }
+)
 
 type PendingCodexUserInput = {
   agent?: ChatAgent
@@ -181,6 +196,7 @@ type CodexTurnInputItem = CodexClientRequestParamsByMethod['turn/start']['input'
  * env for every configured account.
  */
 export type CodexAdapterOptions = {
+  attachmentsDir?: string
   displayLabel?: string
   enabled?: boolean
   env?: NodeJS.ProcessEnv
@@ -195,12 +211,14 @@ export class CodexProviderAdapter
   readonly adapterKey: ProviderInstanceId
   readonly capabilities = CODEX_ADAPTER_CAPABILITIES
   readonly driverKind = DEFAULT_CODEX_PROVIDER_SETTINGS.driverKind
+  private readonly attachmentsDir: string
   private readonly env: NodeJS.ProcessEnv
   private readonly clients = new Map<SessionId, CodexAppServerRpcClient>()
   private readonly settings: ProviderInstanceSettings
 
   constructor(options: CodexAdapterOptions = {}) {
     super('Codex', 'thread')
+    this.attachmentsDir = options.attachmentsDir ?? defaultAttachmentsDir()
     this.adapterKey =
       options.providerInstanceId ?? DEFAULT_CODEX_PROVIDER_SETTINGS.providerInstanceId
     this.env = options.env ?? process.env
@@ -313,12 +331,18 @@ export class CodexProviderAdapter
     return this.clients.get(sessionId)?.hasProcess() ?? false
   }
 
-  async rollbackSession({ numTurns, sessionId }: { numTurns: number; sessionId: SessionId }) {
+  async prepareRollbackSession({
+    numTurns,
+    sessionId,
+  }: {
+    numTurns: number
+    sessionId: SessionId
+  }) {
     if (!Number.isInteger(numTurns) || numTurns < 1) {
       throw createInternalError('Codex thread rollback requires numTurns to be an integer >= 1.')
     }
 
-    return this.requireSession(sessionId, 'thread/rollback').rollbackSession(numTurns)
+    return this.requireSession(sessionId, 'thread/revert').prepareRollbackSession(numTurns)
   }
 
   async sendTurn(input: ProviderTurnInput) {
@@ -327,7 +351,13 @@ export class CodexProviderAdapter
     })
     const session = await this.ensureRuntimeSession(sessionInputFromTurn(input))
     await session.sendTurn({
-      input,
+      input: {
+        ...input,
+        attachments: await resolveCodexAttachments(
+          input.attachments,
+          input.attachmentsDir ?? this.attachmentsDir,
+        ),
+      },
       messageId: v.parse(messageIdSchema, `assistant:${input.turnId}`),
     })
     recordChatPipelineInfo('chat.pipeline.codex_adapter.start_turn.complete', {
@@ -336,7 +366,13 @@ export class CodexProviderAdapter
   }
 
   async steerTurn(input: ProviderTurnSteerInput) {
-    await this.requireSession(input.sessionId, 'turn/steer').steerTurn(input)
+    await this.requireSession(input.sessionId, 'turn/steer').steerTurn({
+      ...input,
+      attachments: await resolveCodexAttachments(
+        input.attachments,
+        input.attachmentsDir ?? this.attachmentsDir,
+      ),
+    })
   }
 
   async interruptTurn({ sessionId, turnId }: { sessionId: SessionId; turnId?: TurnId }) {
@@ -446,7 +482,6 @@ class CodexAppServerSession extends SessionContext {
   private readonly providerBindingHandle: string
   private readonly providerConversationMarker: string
   private readonly providerResumeCursor: unknown | null
-  private readonly reasoningItems = new Map<string, CodexReasoningState>()
   private readonly turns = new Map<string, ActiveProviderTurn>()
   private activeProviderTurnId: string | null = null
   private interactionMode: InteractionMode
@@ -482,6 +517,7 @@ class CodexAppServerSession extends SessionContext {
         canonicalTurnId(this.canonicalTurnByProviderTurnId, this.activeProviderTurnId ?? undefined),
       emit: (event) => {
         const { method, params, ...task } = event
+        if (method === 'item/completed') this.handleAsyncQuestions(params)
         this.emit({
           ...task,
           createdAt: new Date().toISOString(),
@@ -614,12 +650,17 @@ class CodexAppServerSession extends SessionContext {
     }
   }
 
-  async rollbackSession(numTurns: number): Promise<void> {
-    await this.client.request('thread/rollback', {
+  async prepareRollbackSession(numTurns: number) {
+    const commit = await prepareCodexRewind({
       numTurns,
       threadId: this.providerConversationMarker,
+      request: (method, params) =>
+        this.client.requestRaw(method, params, REQUEST_TIMEOUT_MS, (response) => response),
     })
-    this.status = 'ready'
+    return async () => {
+      await commit()
+      this.status = 'ready'
+    }
   }
 
   async sendTurn({ input, messageId }: { input: ProviderTurnInput; messageId: string }) {
@@ -779,8 +820,10 @@ class CodexAppServerSession extends SessionContext {
     const pending = this.pendingApprovals.get(input.requestId)
     if (!pending) throw createInternalError(`Unknown pending approval request: ${input.requestId}`)
 
+    const decision = v.parse(providerApprovalDecisionSchema, input.decision)
+    const response = codexApprovalResponse(pending, decision)
     this.pendingApprovals.delete(input.requestId)
-    this.client.respondSuccess(pending.id, { decision: input.decision })
+    this.client.respondSuccess(pending.id, response)
     this.emit({
       createdAt: new Date().toISOString(),
       eventId: runtimeEventId('codex-request-resolved'),
@@ -875,8 +918,13 @@ class CodexAppServerSession extends SessionContext {
     const method = message.method
     if (!method) return false
 
-    const requestType = approvalRequestType(method)
-    if (!requestType) return false
+    const approval = pendingApprovalKind(method, message.params)
+    if (!approval && method === 'mcpServer/elicitation/request' && message.id !== undefined) {
+      this.client.respondSuccess(message.id, { action: 'decline' })
+      return true
+    }
+    if (!approval) return false
+    const { requestType } = approval
 
     const requestId = v.parse(approvalRequestIdSchema, `codex:${crypto.randomUUID()}`)
     const params = asRecord(message.params)
@@ -884,7 +932,7 @@ class CodexAppServerSession extends SessionContext {
     const itemId = stringField(params, 'itemId') ?? stringField(params, 'approvalId') ?? undefined
     this.pendingApprovals.set(requestId, {
       id: message.id as JsonRpcId,
-      requestType,
+      ...approval,
       turnId,
       agent,
       providerThreadId: notificationThreadId(params),
@@ -897,7 +945,14 @@ class CodexAppServerSession extends SessionContext {
       itemId,
       payload: {
         args: message.params,
-        detail: approvalRequestDetail(requestType, params),
+        detail:
+          approval.method === 'mcpServer/elicitation/request'
+            ? approval.elicitation.detail
+            : approvalRequestDetail(requestType, params),
+        options:
+          approval.method === 'mcpServer/elicitation/request'
+            ? approval.elicitation.options
+            : undefined,
         requestType,
       },
       provider: DEFAULT_CODEX_PROVIDER_SETTINGS.driverKind,
@@ -977,6 +1032,7 @@ class CodexAppServerSession extends SessionContext {
     if (!message.method) return
 
     if (this.childAgents.handle(message.method, message.params)) return
+    if (message.method === 'item/completed' && this.handleAsyncQuestions(message.params)) return
 
     // Awaiting the fallback first lets completed items overtake their preceding text deltas.
     switch (message.method) {
@@ -1079,13 +1135,12 @@ class CodexAppServerSession extends SessionContext {
       case 'item/completed':
         return this.handleItemCompletedNotification(params)
       case 'item/reasoning/summaryPartAdded':
-        this.handleReasoningSummaryPartAddedNotification(params)
         return true
       case 'item/reasoning/summaryTextDelta':
-        await this.handleReasoningSummaryTextDeltaNotification(params)
+        await this.handleReasoningDeltaNotification(params, 'reasoning_summary_text')
         return true
       case 'item/reasoning/textDelta':
-        await this.handleReasoningTextDeltaNotification(params)
+        await this.handleReasoningDeltaNotification(params, 'reasoning_text')
         return true
       default:
         return false
@@ -1464,6 +1519,34 @@ class CodexAppServerSession extends SessionContext {
     } as ProviderRuntimeEvent)
   }
 
+  private handleAsyncQuestions(params: unknown) {
+    const request = codexAsyncQuestions(asRecord(params).item)
+    if (!request) return false
+    const owner = this.childAgents.owner(params)
+    const requestId = `codex-async:${this.sessionId}:${request.itemId}`
+    this.emit({
+      createdAt: new Date().toISOString(),
+      eventId: requestId,
+      requestId,
+      itemId: request.itemId,
+      agent: owner.agent,
+      turnId: owner.turnId,
+      providerRefs: {
+        providerThreadId: notificationThreadId(params),
+        providerTurnId: notificationTurnId(params),
+        providerItemId: request.itemId,
+      },
+      payload: { responseMode: 'message', questions: request.questions },
+      provider: DEFAULT_CODEX_PROVIDER_SETTINGS.driverKind,
+      providerInstanceId: this.providerInstanceId,
+      providerBindingHandle: this.providerBindingHandle,
+      runtimeMode: this.runtimeMode,
+      sessionId: this.sessionId,
+      type: 'user-input.requested',
+    })
+    return true
+  }
+
   private async handleItemStartedNotification(params: unknown) {
     const item = notificationItem(params)
     if (!isReasoningItem(item)) return this.handleGenericItemLifecycle('item.started', params, item)
@@ -1477,14 +1560,6 @@ class CodexAppServerSession extends SessionContext {
       return true
     }
 
-    const state = this.getOrCreateReasoningState(context.providerTurnId, item.id, turn)
-    await this.emitReasoningProgress({
-      createdAt: context.createdAt,
-      eventId: reasoningRuntimeEventId('start', context.providerTurnId, item.id),
-      state,
-      summary: 'Thinking',
-      updateLastEmitted: false,
-    })
     return true
   }
 
@@ -1588,50 +1663,40 @@ class CodexAppServerSession extends SessionContext {
     return true
   }
 
-  private handleReasoningSummaryPartAddedNotification(params: unknown) {
-    const context = codexReasoningPartContext(params)
+  private async handleReasoningDeltaNotification(
+    params: unknown,
+    streamKind: 'reasoning_summary_text' | 'reasoning_text',
+  ) {
+    const context = codexReasoningDeltaContext(
+      params,
+      streamKind === 'reasoning_text' ? 'contentIndex' : 'summaryIndex',
+    )
     if (!context) return
-
-    const turn = this.turnForProviderTurnId(context.providerTurnId)
-    if (!turn) {
-      this.recordMissingReasoningTurn(context.providerTurnId, 'summary_part_added')
-      return
-    }
-
-    const state = this.getOrCreateReasoningState(context.providerTurnId, context.itemId, turn)
-    if (!state.summaryParts.has(context.summaryIndex)) {
-      state.summaryParts.set(context.summaryIndex, '')
-    }
-  }
-
-  private async handleReasoningSummaryTextDeltaNotification(params: unknown) {
-    const context = codexReasoningDeltaContext(params)
-    if (!context) return
-
-    const turn = this.turnForProviderTurnId(context.providerTurnId)
-    if (!turn) {
-      this.recordMissingReasoningTurn(context.providerTurnId, 'summary_text_delta')
-      return
-    }
-
-    const state = this.getOrCreateReasoningState(context.providerTurnId, context.itemId, turn)
-    appendReasoningPart(state.summaryParts, context.summaryIndex, context.delta)
-    await this.emitBufferedReasoningProgress(state, context.createdAt)
-  }
-
-  private async handleReasoningTextDeltaNotification(params: unknown) {
-    const context = codexReasoningDeltaContext(params, 'contentIndex')
-    if (!context) return
-
     const turn = this.turnForProviderTurnId(context.providerTurnId)
     if (!turn) {
       this.recordMissingReasoningTurn(context.providerTurnId, 'text_delta')
       return
     }
-
-    const state = this.getOrCreateReasoningState(context.providerTurnId, context.itemId, turn)
-    appendReasoningPart(state.contentParts, context.contentIndex, context.delta)
-    await this.emitBufferedReasoningProgress(state, context.createdAt)
+    this.emit({
+      createdAt: context.createdAt,
+      eventId: runtimeEventId('codex-reasoning-delta'),
+      itemId: context.itemId,
+      payload: {
+        delta: context.delta,
+        streamKind,
+        ...(streamKind === 'reasoning_text'
+          ? { contentIndex: context.contentIndex }
+          : { summaryIndex: context.summaryIndex }),
+      },
+      provider: DEFAULT_CODEX_PROVIDER_SETTINGS.driverKind,
+      providerInstanceId: this.providerInstanceId,
+      providerRefs: { providerItemId: context.itemId, providerTurnId: context.providerTurnId },
+      providerBindingHandle: this.providerBindingHandle,
+      runtimeMode: this.runtimeMode,
+      sessionId: this.sessionId,
+      turnId: turn.canonicalTurnId,
+      type: 'content.delta',
+    })
   }
 
   private async handleAgentMessageDelta(
@@ -1948,7 +2013,6 @@ class CodexAppServerSession extends SessionContext {
   private rejectTurn(providerTurnId: string, turn: ActiveProviderTurn, message: string) {
     this.turns.delete(providerTurnId)
     // Late tools and child registration still need the completed turn's canonical identity.
-    this.clearReasoningForProviderTurn(providerTurnId)
     if (this.activeProviderTurnId === providerTurnId) this.activeProviderTurnId = null
     this.failTurn(turn, message, providerTurnId)
   }
@@ -1991,46 +2055,8 @@ class CodexAppServerSession extends SessionContext {
 
   private resolveTurn(providerTurnId: string, turn: ActiveProviderTurn) {
     this.turns.delete(providerTurnId)
-    this.clearReasoningForProviderTurn(providerTurnId)
     if (this.activeProviderTurnId === providerTurnId) this.activeProviderTurnId = null
     turn.resolve()
-  }
-
-  private getOrCreateReasoningState(
-    providerTurnId: string,
-    itemId: string,
-    turn: ActiveProviderTurn,
-  ) {
-    const key = reasoningStateKey(providerTurnId, itemId)
-    const existing = this.reasoningItems.get(key)
-    if (existing) return existing
-
-    const state: CodexReasoningState = {
-      contentParts: new Map(),
-      itemId,
-      lastEmittedSummary: null,
-      providerTurnId,
-      summaryParts: new Map(),
-      sessionId: this.sessionId,
-      turnId: turn.canonicalTurnId,
-    }
-    this.reasoningItems.set(key, state)
-
-    return state
-  }
-
-  private async emitBufferedReasoningProgress(state: CodexReasoningState, createdAt: string) {
-    const summary = reasoningStateSummary(state)
-    if (!summary) return
-    if (!shouldEmitReasoningSummary(state.lastEmittedSummary, summary)) return
-
-    await this.emitReasoningProgress({
-      createdAt,
-      eventId: runtimeEventId('codex-reasoning-progress'),
-      state,
-      summary,
-      updateLastEmitted: true,
-    })
   }
 
   private async emitCompletedReasoningItem(
@@ -2039,17 +2065,19 @@ class CodexAppServerSession extends SessionContext {
     turn: ActiveProviderTurn,
     createdAt: string,
   ) {
-    const state = this.getOrCreateReasoningState(providerTurnId, item.id, turn)
-    const summary = reasoningItemSummary(item) ?? reasoningStateSummary(state)
-    if (!summary) return
-    if (summary === state.lastEmittedSummary) return
-
-    await this.emitReasoningProgress({
+    this.emit({
       createdAt,
       eventId: reasoningRuntimeEventId('complete', providerTurnId, item.id),
-      state,
-      summary,
-      updateLastEmitted: true,
+      itemId: item.id,
+      payload: { itemType: 'reasoning', detail: reasoningItemSummary(item) ?? undefined },
+      provider: DEFAULT_CODEX_PROVIDER_SETTINGS.driverKind,
+      providerInstanceId: this.providerInstanceId,
+      providerRefs: { providerItemId: item.id, providerTurnId },
+      providerBindingHandle: this.providerBindingHandle,
+      runtimeMode: this.runtimeMode,
+      sessionId: this.sessionId,
+      turnId: turn.canonicalTurnId,
+      type: 'item.completed',
     })
   }
 
@@ -2068,49 +2096,12 @@ class CodexAppServerSession extends SessionContext {
     }
   }
 
-  private async emitReasoningProgress(input: {
-    createdAt: string
-    eventId: string
-    state: CodexReasoningState
-    summary: string
-    updateLastEmitted: boolean
-  }) {
-    if (input.updateLastEmitted) input.state.lastEmittedSummary = input.summary
-    this.emit({
-      createdAt: input.createdAt,
-      eventId: input.eventId,
-      payload: {
-        description: input.summary,
-        summary: input.summary,
-        taskId: `reasoning:${input.state.itemId}`,
-      },
-      provider: DEFAULT_CODEX_PROVIDER_SETTINGS.driverKind,
-      providerInstanceId: this.providerInstanceId,
-      providerRefs: {
-        providerItemId: input.state.itemId,
-        providerTurnId: input.state.providerTurnId,
-      },
-      providerBindingHandle: this.providerBindingHandle,
-      runtimeMode: this.runtimeMode,
-      sessionId: input.state.sessionId,
-      turnId: input.state.turnId,
-      type: 'task.progress',
-    })
-  }
-
   private recordMissingReasoningTurn(providerTurnId: string, stage: string) {
     recordChatPipelineWarning('chat.pipeline.codex_session.reasoning.missing_turn', {
       providerTurnId,
       stage,
       sessionId: this.sessionId,
     })
-  }
-
-  private clearReasoningForProviderTurn(providerTurnId: string) {
-    for (const key of this.reasoningItems.keys()) {
-      if (!key.startsWith(`${providerTurnId}:`)) continue
-      this.reasoningItems.delete(key)
-    }
   }
 }
 
@@ -2713,10 +2704,22 @@ function codexTextInput(
 
 function codexImageInput(value: unknown): CodexTurnInputItem | null {
   const attachment = asRecord(value)
+  if (stringField(attachment, 'type') === 'file') {
+    const localPath = stringField(attachment, 'localPath')
+    return localPath
+      ? {
+          type: 'text',
+          text: `Attached file ${JSON.stringify(stringField(attachment, 'name'))}: ${JSON.stringify(localPath)}`,
+          text_elements: [],
+        }
+      : null
+  }
   if (stringField(attachment, 'type') !== 'image') return null
 
   const url = stringField(attachment, 'dataUrl') ?? stringField(attachment, 'url')
-  return url ? { type: 'image', url } : null
+  if (url) return { type: 'image', url }
+  const localPath = stringField(attachment, 'localPath')
+  return localPath ? { type: 'localImage', path: localPath } : null
 }
 
 function codexModelOptions(
@@ -3032,25 +3035,6 @@ function codexReasoningDeltaContext(
   }
 }
 
-function appendReasoningPart(parts: Map<number, string>, index: number, delta: string) {
-  parts.set(index, `${parts.get(index) ?? ''}${delta}`)
-}
-
-function reasoningStateSummary(state: CodexReasoningState) {
-  return reasoningPartsText(state.summaryParts) ?? reasoningPartsText(state.contentParts)
-}
-
-function reasoningPartsText(parts: Map<number, string>) {
-  const text = Array.from(parts.entries())
-    .toSorted(([left], [right]) => left - right)
-    .map(([, part]) => part.trim())
-    .filter(Boolean)
-    .join('\n\n')
-    .trim()
-
-  return text.length > 0 ? text : null
-}
-
 function reasoningItemSummary(item: CodexReasoningItem) {
   return (
     normalizeReasoningText(stringArrayValue(item.summary)) ??
@@ -3074,27 +3058,12 @@ function stringArrayValue(value: unknown) {
   return value.filter((item): item is string => typeof item === 'string')
 }
 
-function shouldEmitReasoningSummary(lastSummary: string | null, nextSummary: string) {
-  if (nextSummary === lastSummary) return false
-  if (!lastSummary) return nextSummary.length >= 48 || hasReasoningBoundary(nextSummary)
-
-  return nextSummary.length - lastSummary.length >= 80 || hasReasoningBoundary(nextSummary)
-}
-
-function hasReasoningBoundary(value: string) {
-  return /[.!?:\n]$/.test(value.trim())
-}
-
 function reasoningRuntimeEventId(
   kind: 'complete' | 'start',
   providerTurnId: string,
   itemId: string,
 ) {
   return `codex-reasoning-${kind}:${providerTurnId}:${itemId}`
-}
-
-function reasoningStateKey(providerTurnId: string, itemId: string) {
-  return `${providerTurnId}:${itemId}`
 }
 
 function isoFromUnixMs(value: number | null | undefined) {
@@ -3120,25 +3089,49 @@ function rawRequest(method: string, payload: unknown) {
   }
 }
 
-function approvalRequestType(method: string) {
+function pendingApprovalKind(method: string, params: unknown) {
+  if (method === 'mcpServer/elicitation/request') {
+    const elicitation = parseCodexElicitation(params)
+    if (!elicitation) return null
+    return { method, requestType: 'mcp_elicitation_approval', elicitation } as const
+  }
+  if (method === 'item/permissions/requestApproval') {
+    const parsed = v.parse(v.object({ permissions: v.record(v.string(), v.unknown()) }), params)
+    return { method, requestType: 'permissions_approval', permissions: parsed.permissions } as const
+  }
   switch (method) {
     case 'item/commandExecution/requestApproval':
-      return 'command_execution_approval'
+      return { method, requestType: 'command_execution_approval' } as const
     case 'item/fileChange/requestApproval':
-      return 'file_change_approval'
-    case 'item/permissions/requestApproval':
-      return 'command_execution_approval'
+      return { method, requestType: 'file_change_approval' } as const
     case 'applyPatchApproval':
-      return 'apply_patch_approval'
+      return { method, requestType: 'apply_patch_approval' } as const
     case 'execCommandApproval':
-      return 'exec_command_approval'
+      return { method, requestType: 'exec_command_approval' } as const
     default:
       return null
   }
 }
 
+function codexApprovalResponse(
+  pending: PendingCodexApproval,
+  decision: ProviderApprovalResponseInput['decision'],
+) {
+  if (pending.method === 'mcpServer/elicitation/request') {
+    const response = pending.elicitation.responses.get(decision)
+    if (!response) throw createInternalError('This approval does not offer the selected decision.')
+    return response
+  }
+  if (decision === 'acceptAlways')
+    throw createInternalError('This approval does not offer permanent access.')
+  if (pending.method !== 'item/permissions/requestApproval') return { decision }
+  const permissions =
+    decision === 'accept' || decision === 'acceptForSession' ? pending.permissions : {}
+  return { permissions, ...(decision === 'acceptForSession' ? { scope: 'session' } : {}) }
+}
+
 function approvalRequestDetail(
-  requestType: NonNullable<ReturnType<typeof approvalRequestType>>,
+  requestType: PendingCodexApproval['requestType'],
   params: Record<string, unknown>,
 ) {
   return (

@@ -1,0 +1,183 @@
+import { queryOptions, type QueryClient } from '@tanstack/react-query'
+import type { EnvironmentId, ScopedSessionRef } from '@workspace/contracts'
+import { scopedSessionKey } from '@workspace/contracts'
+import {
+  hasNativeNotifications,
+  hasNotificationSound,
+  type NotificationMode,
+  type SessionNotice,
+} from '@workspace/client-core/chat/notifications'
+import { toast } from 'sonner'
+import { readSettingsMirror } from '@/lib/settings-boot-mirror'
+import { chatNotificationQueryKeys } from '@/features/chat-mode/utils/query-keys'
+
+export function createNotificationHost({
+  queryClient,
+  open,
+  active,
+}: {
+  queryClient: QueryClient
+  open: (ref: ScopedSessionRef) => void
+  active: () => ScopedSessionRef | null
+}) {
+  const pending = new Map<string, { environmentId: EnvironmentId; notification: Notification }>()
+  const badge = createNotificationBadge()
+  let audio: AudioContext | null = null
+  let disposed = false
+  const unlock = () => {
+    if (typeof AudioContext === 'undefined') return
+    audio ??= new AudioContext()
+    void audio.resume().catch(() => undefined)
+  }
+  const clear = () => {
+    for (const entry of pending.values()) entry.notification.close()
+    pending.clear()
+    badge.set(0)
+  }
+  const play = async (kind: SessionNotice['kind']) => {
+    const context = audio
+    if (!context || context.state !== 'running') return
+    try {
+      const buffer = await queryClient.fetchQuery(
+        queryOptions({
+          queryKey: chatNotificationQueryKeys.sound(kind),
+          staleTime: Infinity,
+          queryFn: async ({ signal }) => {
+            const url = new URL(
+              `${import.meta.env.BASE_URL}notifications/${kind}.mp3`,
+              window.location.href,
+            )
+            const response = await fetch(url, { signal })
+            return context.decodeAudioData(await response.arrayBuffer())
+          },
+        }),
+      )
+      if (
+        disposed ||
+        !hasNotificationSound(readSettingsMirror()['chat.notificationMode']) ||
+        context.state !== 'running'
+      )
+        return
+      const source = context.createBufferSource()
+      source.buffer = buffer
+      source.connect(context.destination)
+      source.start()
+    } catch {
+      // Audio availability and autoplay permission differ between browsers.
+    }
+  }
+  const native = (notice: SessionNotice) => {
+    if (typeof Notification === 'undefined' || Notification.permission !== 'granted') return
+    try {
+      const tag = scopedSessionKey(notice.ref)
+      const notification = new Notification(notice.title, { body: notice.body, tag, silent: true })
+      pending.get(tag)?.notification.close()
+      pending.set(tag, { environmentId: notice.ref.environmentId, notification })
+      badge.set(pending.size)
+      notification.addEventListener('click', () => {
+        notification.close()
+        window.focus()
+        open(notice.ref)
+      })
+    } catch {
+      // Some hosts expose Notification but reject desktop presentation.
+    }
+  }
+  return {
+    configure(mode: NotificationMode) {
+      clear()
+      window.removeEventListener('focus', clear)
+      document.removeEventListener('pointerdown', unlock)
+      document.removeEventListener('keydown', unlock)
+      if (hasNativeNotifications(mode)) window.addEventListener('focus', clear)
+      if (!hasNotificationSound(mode)) return
+      document.addEventListener('pointerdown', unlock)
+      document.addEventListener('keydown', unlock)
+    },
+    retain(owners: ReadonlySet<EnvironmentId>) {
+      for (const [tag, entry] of pending) {
+        if (owners.has(entry.environmentId)) continue
+        entry.notification.close()
+        pending.delete(tag)
+      }
+      badge.set(pending.size)
+    },
+    deliver(notice: SessionNotice, mode: NotificationMode, inApp: boolean) {
+      if (hasNotificationSound(mode)) void play(notice.kind)
+      const focused = document.visibilityState === 'visible' && document.hasFocus()
+      const selected = active()
+      const sameSession =
+        selected?.environmentId === notice.ref.environmentId &&
+        selected.sessionId === notice.ref.sessionId
+      if (inApp && focused && !sameSession) {
+        const show = noticeToast(notice)
+        show(notice.title, {
+          description: notice.body,
+          action: { label: 'Open session', onClick: () => open(notice.ref) },
+        })
+        return
+      }
+      if (!focused && hasNativeNotifications(mode)) native(notice)
+    },
+    dispose() {
+      disposed = true
+      clear()
+      window.removeEventListener('focus', clear)
+      document.removeEventListener('pointerdown', unlock)
+      document.removeEventListener('keydown', unlock)
+      void audio?.close().catch(() => undefined)
+    },
+  }
+}
+
+function noticeToast(notice: SessionNotice) {
+  if (notice.kind === 'completion') return toast.success
+  if (notice.failed) return toast.error
+  return toast.warning
+}
+
+function createNotificationBadge() {
+  let original: HTMLLinkElement | null = null
+  let badge: HTMLLinkElement | null = null
+  let count = 0
+  return {
+    set(next: number) {
+      if (next === count) return
+      count = next
+      if (!next) {
+        badge?.remove()
+        badge = null
+        if (original) document.head.append(original)
+        original = null
+        return
+      }
+      const canvas = document.createElement('canvas')
+      canvas.width = canvas.height = 64
+      const context = canvas.getContext('2d')
+      if (!context) return
+      const theme = getComputedStyle(document.documentElement)
+      context.fillStyle = theme.getPropertyValue('--destructive').trim()
+      context.beginPath()
+      context.arc(32, 32, 28, 0, Math.PI * 2)
+      context.fill()
+      context.fillStyle =
+        theme.getPropertyValue('--destructive-foreground').trim() ||
+        theme.getPropertyValue('--foreground').trim()
+      context.font = `600 ${next > 9 ? 30 : 40}px sans-serif`
+      context.textAlign = 'center'
+      context.textBaseline = 'middle'
+      context.fillText(next > 9 ? '9+' : String(next), 32, 34)
+      if (!badge) {
+        original = document.querySelector<HTMLLinkElement>('link[rel="icon"]')
+        badge = document.createElement('link')
+        badge.rel = 'icon'
+        badge.type = 'image/png'
+        badge.sizes.value = '64x64'
+        badge.dataset.sessionNotifications = 'true'
+        original?.remove()
+        document.head.append(badge)
+      }
+      badge.href = canvas.toDataURL('image/png')
+    },
+  }
+}

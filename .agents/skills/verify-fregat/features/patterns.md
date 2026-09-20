@@ -33,3 +33,7 @@ Expand a session's **Changed files** section. `scenario chat-changed-files` insp
 `scenario pattern-hints` hovers the workbench chat actions, opens conversation history and palette-card actions, and closes the wallpaper picker through its hinted close button. It does not create a session, change a palette, or select a wallpaper. The menu screenshots prove that composing TooltipTrigger with a second Base UI trigger preserves both actions.
 
 `scenario icon-hints` checks shared Git toolbar actions, history search clearing, dialog closing, and Search actions. It checks native titles do not duplicate tooltips, opens and closes the history dialog, and verifies disabled Search actions retain their appearance and expose hints through hover and keyboard focus.
+
+## Render error boundaries
+
+`pane-render-crash` opens Logs, makes the log time formatters throw from outside the app, and checks that only the pane body shows "hit a render error" while the toolbar, rail, editor and terminal stay. It then restores the formatter and clicks Retry; the rows must come back. The crash must appear once in the log as `react.caught_error`.

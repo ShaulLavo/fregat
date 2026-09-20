@@ -12,6 +12,7 @@ import * as v from 'valibot'
 import { orderedSessionActivities } from './pending-approvals'
 
 export type PendingUserInput = {
+  readonly responseMode?: 'native' | 'message'
   readonly createdAt: string
   readonly questions: readonly UserInputQuestion[]
   readonly requestId: ApprovalRequestId
@@ -23,6 +24,8 @@ export type PendingUserInput = {
  * what goes back to the provider — never the display labels.
  */
 export type UserInputAnswerDraft = {
+  readonly attachmentCount?: number
+  readonly attachmentsBlocked?: boolean
   readonly customAnswer?: string
   readonly selectedValues?: readonly string[]
 }
@@ -35,6 +38,7 @@ export type UserInputAnswers = Record<string, string | string[]>
 const userInputPayloadSchema = v.object({
   questions: v.optional(v.array(v.unknown())),
   requestId: approvalRequestIdSchema,
+  responseMode: v.optional(v.picklist(['native', 'message']), 'native'),
 })
 
 /**
@@ -43,10 +47,11 @@ const userInputPayloadSchema = v.object({
  */
 export function derivePendingUserInputs(
   activities: readonly OrchestrationSessionActivity[],
+  retained: readonly OrchestrationSessionActivity[] = [],
 ): PendingUserInput[] {
   const open = new Map<ApprovalRequestId, PendingUserInput>()
 
-  for (const activity of orderedSessionActivities(activities)) {
+  for (const activity of orderedSessionActivities([...retained, ...activities])) {
     if (!isUserInputActivity(activity.kind)) continue
 
     const parsed = v.safeParse(userInputPayloadSchema, activity.payload)
@@ -57,7 +62,13 @@ export function derivePendingUserInputs(
       continue
     }
 
-    openPendingUserInput(open, activity, parsed.output.requestId, parsed.output.questions)
+    openPendingUserInput(
+      open,
+      activity,
+      parsed.output.requestId,
+      parsed.output.questions,
+      parsed.output.responseMode,
+    )
   }
 
   return [...open.values()]
@@ -72,15 +83,20 @@ export function resolveUserInputAnswer(
   question: UserInputQuestion,
   draft: UserInputAnswerDraft | undefined,
 ): string | string[] | null {
-  if (question.answerKind === 'text') return normalizeCustomAnswer(draft?.customAnswer)
+  if (draft?.attachmentsBlocked) return null
+  const attachmentAnswer =
+    draft?.attachmentCount && (question.allowOther || question.answerKind === 'text') ? '' : null
+  if (question.answerKind === 'text')
+    return normalizeCustomAnswer(draft?.customAnswer) ?? attachmentAnswer
 
   const customAnswer = otherAnswer(question, draft)
   const selected = normalizeSelectedValues(draft?.selectedValues)
-  if (question.answerKind === 'single-select') return customAnswer ?? selected[0] ?? null
+  if (question.answerKind === 'single-select')
+    return customAnswer ?? selected[0] ?? attachmentAnswer
 
   const values = customAnswer ? [...selected, customAnswer] : selected
 
-  return values.length > 0 ? values : null
+  return values.length > 0 ? values : attachmentAnswer
 }
 
 /**
@@ -117,7 +133,7 @@ export function firstUnansweredUserInputIndex(
   drafts: UserInputAnswerDrafts,
 ): number {
   const index = questions.findIndex(
-    (question) => !resolveUserInputAnswer(question, drafts[question.id]),
+    (question) => resolveUserInputAnswer(question, drafts[question.id]) === null,
   )
   if (index !== -1) return index
 
@@ -144,7 +160,7 @@ export function buildUserInputAnswers(
 
   for (const question of questions) {
     const answer = resolveUserInputAnswer(question, drafts[question.id])
-    if (!answer) return null
+    if (answer === null) return null
 
     answers[question.id] = answer
   }
@@ -157,11 +173,13 @@ function openPendingUserInput(
   activity: OrchestrationSessionActivity,
   requestId: ApprovalRequestId,
   rawQuestions: readonly unknown[] | undefined,
+  responseMode: 'native' | 'message',
 ) {
   const questions = parseUserInputQuestions(rawQuestions)
   if (questions.length === 0) return
 
   open.set(requestId, {
+    responseMode,
     createdAt: activity.createdAt,
     questions,
     requestId,
@@ -207,4 +225,22 @@ function normalizeSelectedValues(value: readonly string[] | undefined): string[]
   }
 
   return [...values]
+}
+
+export function retainPendingMessageQuestions(
+  retained: readonly OrchestrationSessionActivity[],
+  activities: readonly OrchestrationSessionActivity[],
+): readonly OrchestrationSessionActivity[] {
+  const pending = new Map<string, OrchestrationSessionActivity>()
+  for (const activity of orderedSessionActivities([...retained, ...activities])) {
+    if (!isUserInputActivity(activity.kind)) continue
+    const parsed = v.safeParse(userInputPayloadSchema, activity.payload)
+    if (!parsed.success) continue
+    if (activity.kind === 'user-input.resolved') {
+      pending.delete(parsed.output.requestId)
+      continue
+    }
+    if (parsed.output.responseMode === 'message') pending.set(parsed.output.requestId, activity)
+  }
+  return [...pending.values()]
 }

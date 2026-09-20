@@ -1,3 +1,5 @@
+import { orchestrationForApp } from 'server/testing'
+import { orchestrationCommandSchema } from '@workspace/contracts'
 import { screen, waitFor, within } from '@testing-library/react'
 import userEvent from '@testing-library/user-event'
 import { commandIdSchema, scopedSessionKey } from '@workspace/contracts'
@@ -7,15 +9,12 @@ import { expect, test } from '../../../../../test/fixtures'
 import { useSessionSelectionStore } from '@/features/chat-mode/state/session-selection-store'
 import { useSessionMultiSelectStore } from '@/features/chat-mode/state/session-multi-select-store'
 
-test('renders the three projected attention sections and each session once', async ({
-  client,
-  server,
-}) => {
+test('renders four lifecycle sections and each session once', async ({ client, server }) => {
   const harness = await createRailHarness(client, server)
   renderRailHarness(harness)
-  for (const name of ['Needs input', 'Working', 'Settled'])
+  for (const name of ['Pinned', 'Active', 'Snoozed', 'Settled'])
     expect(screen.getByRole('region', { name })).toBeVisible()
-  expect(within(screen.getByRole('region', { name: 'Settled' })).getByTitle('First')).toBeVisible()
+  expect(within(screen.getByRole('region', { name: 'Active' })).getByTitle('First')).toBeVisible()
   expect(screen.getAllByTitle('First')).toHaveLength(1)
 })
 test('opens the owning worktree before publishing the scoped session selection', async ({
@@ -142,7 +141,7 @@ test('an empty archive reports its own empty state and toggles back to active se
   await userEvent.click(screen.getByRole('button', { name: 'Archived sessions' }))
   expect(screen.getByText('No archived sessions.')).toBeVisible()
   expect(screen.queryByText('No sessions yet.')).toBeNull()
-  for (const name of ['Needs input', 'Working', 'Settled'])
+  for (const name of ['Pinned', 'Active', 'Snoozed', 'Settled'])
     expect(screen.getByRole('region', { name })).toBeVisible()
   await userEvent.click(screen.getByRole('button', { name: 'Archived sessions' }))
   expect(screen.queryByText('No archived sessions.')).toBeNull()
@@ -210,9 +209,10 @@ test('shift selection includes intervening scoped rows and archives the whole se
   )
   await user.click(
     within(screen.getByRole('toolbar', { name: 'Selected sessions' })).getByRole('button', {
-      name: /^Archive$/,
+      name: 'Actions',
     }),
   )
+  await user.click(await screen.findByRole('menuitem', { name: /^Archive$/ }))
   await waitFor(async () =>
     expect((await harness.refresh()).sessions.every((session) => session.archivedAt !== null)).toBe(
       true,
@@ -239,5 +239,57 @@ test('New session opens the scoped project before selecting its draft', async ({
   )
   expect(harness.application.getSnapshot().editor.workspaceStore.getState().rootFolder?.path).toBe(
     harness.context.worktree!.path,
+  )
+})
+
+test('archiving pending input hides the row and late activity cannot restore it', async ({
+  client,
+  server,
+}) => {
+  const harness = await createRailHarness(client, server)
+  const sessionId = harness.sessionIds[0]!
+  const engine = orchestrationForApp(server.app)
+  const deliver = (kind: string) =>
+    engine.dispatch(
+      v.parse(orchestrationCommandSchema, {
+        type: 'session.activity.append',
+        commandId: `archive-attention-${kind}`,
+        sessionId,
+        createdAt: '2026-09-20T00:00:00.000Z',
+        activity: {
+          id: `activity-${kind}`,
+          sessionId,
+          kind,
+          tone: 'error',
+          summary: kind,
+          payload: { requestId: 'archive-approval' },
+          turnId: null,
+          createdAt: '2026-09-20T00:00:00.000Z',
+        },
+      }),
+    )
+  await deliver('approval.requested')
+  await harness.refresh()
+  renderRailHarness(harness)
+  await userEvent.pointer({ keys: '[MouseRight]', target: screen.getByTitle('First') })
+  await userEvent.click(await screen.findByRole('menuitem', { name: /^Archive$/ }))
+  await waitFor(() => expect(screen.queryByTitle('First')).toBeNull())
+  await deliver('provider.error')
+  await harness.refresh()
+  expect(screen.queryByTitle('First')).toBeNull()
+  const before = await engine.sessionDetailSnapshot(sessionId)
+  await userEvent.click(screen.getByRole('button', { name: 'Archived sessions' }))
+  expect(screen.getByTitle('First')).toBeVisible()
+  await userEvent.pointer({ keys: '[MouseRight]', target: screen.getByTitle('First') })
+  await userEvent.click(await screen.findByRole('menuitem', { name: /^Unarchive$/ }))
+  await waitFor(async () =>
+    expect(
+      (await harness.refresh()).sessions.find((item) => item.id === sessionId)?.archivedAt,
+    ).toBeNull(),
+  )
+  await userEvent.click(screen.getByRole('button', { name: 'Archived sessions' }))
+  expect(within(screen.getByRole('region', { name: 'Active' })).getByTitle('First')).toBeVisible()
+  expect((await engine.sessionDetailSnapshot(sessionId)).session.activities).toEqual(
+    before.session.activities,
   )
 })

@@ -117,7 +117,8 @@ function scopedSelection(
   projectId: Extract<SidebarSelection, { kind: 'draft' }>['projectId'],
 ): SidebarSelection | null {
   if (!ref) return null
-  if (ref.kind === 'draft') return { kind: 'draft', environmentId, projectId }
+  if (ref.kind === 'draft')
+    return { kind: 'draft', environmentId, projectId, draftId: ref.draftId ?? crypto.randomUUID() }
   return { kind: 'session', environmentId, projectId, sessionId: ref.sessionId }
 }
 
@@ -156,8 +157,14 @@ function applyMainSelection(selection: SidebarSelection, worktreeId: WorktreeId 
     current.kind === 'draft' &&
     current.environmentId === selection.environmentId &&
     current.projectId === selection.projectId &&
+    current.draftId === selection.draftId &&
     state.draftWorktreeId === worktreeId
   )
     return
-  state.startDraft(selection.environmentId, selection.projectId, worktreeId ?? undefined)
+  state.startDraft(
+    selection.environmentId,
+    selection.projectId,
+    worktreeId ?? undefined,
+    selection.draftId,
+  )
 }

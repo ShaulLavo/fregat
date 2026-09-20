@@ -15,7 +15,7 @@ test('offers open and a new session in the same project first', () => {
 })
 
 test('groups rename, archive, and delete after the open section', () => {
-  expect(sectionIds(menuContext())).toEqual(['open', 'edit', 'project', 'agent'])
+  expect(sectionIds(menuContext())).toEqual(['open', 'edit', 'copy', 'project', 'agent'])
   expect(itemLabels(menuContext(), 'edit')).toEqual(['Rename', 'Archive', 'Delete'])
 })
 
@@ -50,7 +50,11 @@ test('offers to stop the agent only while a session is live', () => {
 
 test('every item runs its own callback', () => {
   const calls: string[] = []
-  const context = menuContext({ archived: true, canStopAgent: true, record: calls })
+  const context = menuContext({
+    archived: true,
+    canStopAgent: true,
+    record: calls,
+  })
   for (const item of actionsIn(context)) {
     item.run()
   }
@@ -61,6 +65,8 @@ test('every item runs its own callback', () => {
     'rename',
     'unarchive',
     'deleteSession',
+    'copyPath',
+    'copySessionId',
     'scopeToProject',
     'stopAgent',
   ])
@@ -122,13 +128,22 @@ function menuContext({
   canStopAgent = false,
   record = [],
   scopedToProject = false,
+  titleGeneration,
 }: {
   archived?: boolean
   canStopAgent?: boolean
   record?: string[]
   scopedToProject?: boolean
+  titleGeneration?: SessionMenuContext['titleGeneration']
 } = {}): SessionMenuContext {
   return {
+    copyPath: () => record.push('copyPath'),
+    copyBranch: null,
+    copySessionId: () => record.push('copySessionId'),
+    canMarkUnread: false,
+    woke: false,
+    markUnread: () => record.push('markUnread'),
+    acknowledgeWake: () => record.push('acknowledgeWake'),
     archive: () => record.push('archive'),
     archived,
     canStopAgent,
@@ -137,6 +152,7 @@ function menuContext({
     open: () => record.push('open'),
     rename: () => record.push('rename'),
     scopedToProject,
+    titleGeneration,
     scopeToProject: () => record.push('scopeToProject'),
     stopAgent: () => record.push('stopAgent'),
     unarchive: () => record.push('unarchive'),
@@ -158,3 +174,57 @@ function session(status: SessionRuntimeStatus): SessionRuntimeState {
     updatedAt: '2026-05-09T00:00:00.000Z',
   }
 }
+
+test('completed read sessions can be marked unread and wakes explicitly acknowledged', () => {
+  const calls: string[] = []
+  const context = {
+    ...menuContext({ record: calls }),
+    canMarkUnread: true,
+    woke: true,
+  }
+  const actions = actionsIn(context, 'edit')
+  expect(actions.map((item) => item.label)).toContain('Mark as unread')
+  expect(actions.map((item) => item.label)).toContain('Acknowledge wake')
+  actions.find((item) => item.id === 'markUnread')?.run()
+  actions.find((item) => item.id === 'acknowledgeWake')?.run()
+  expect(calls).toEqual(['markUnread', 'acknowledgeWake'])
+})
+
+test('copy branch exists only for a known owner branch', () => {
+  expect(itemLabels(menuContext(), 'copy')).toEqual(['Copy Path', 'Copy Session ID'])
+  expect(itemLabels({ ...menuContext(), copyBranch: () => {} }, 'copy')).toEqual([
+    'Copy Path',
+    'Copy Branch',
+    'Copy Session ID',
+  ])
+})
+
+test('title regeneration remains available in archives and exposes pending and retry states', () => {
+  const generation = {
+    supported: true,
+    pending: false,
+    requesting: false,
+    error: null,
+    regenerate() {},
+  }
+  expect(
+    itemLabels(menuContext({ archived: true, titleGeneration: generation }), 'edit'),
+  ).toContain('Regenerate title')
+  const pending = actionsIn(
+    menuContext({ titleGeneration: { ...generation, pending: true } }),
+  ).find((item) => item.id === 'regenerateTitle')
+  expect(pending).toMatchObject({ label: 'Regenerating…', disabled: true })
+  expect(
+    itemLabels(
+      menuContext({
+        titleGeneration: { ...generation, error: 'Provider unavailable' },
+      }),
+      'edit',
+    ),
+  ).toContain('Retry title generation')
+  expect(
+    actionsIn(menuContext({ titleGeneration: { ...generation, supported: false } })).some(
+      (item) => item.id === 'regenerateTitle',
+    ),
+  ).toBe(false)
+})

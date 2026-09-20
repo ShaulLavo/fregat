@@ -1,6 +1,5 @@
 import { useApplicationRuntime } from '@/hooks/use-application-runtime'
 import { projectSessions, removedProjectRoot } from '@/features/chat-mode/state/removal'
-import type { ScopedProjectRef } from '@workspace/contracts'
 import { useMutation } from '@tanstack/react-query'
 import { createProjectDeleteCommand } from '@workspace/client-core/chat/commands'
 import { dispatchChatCommand } from '@/features/chat/utils/command-dispatch'
@@ -23,46 +22,70 @@ export function useProjectActions() {
   const failDelete = useProjectDeleteRequestStore((state) => state.failDelete)
   const remove = useMutation({
     mutationFn: async (request: ProjectDeleteRequest) => {
-      const outcome = await dispatchChatCommand({
-        action: 'chat.project.delete',
-        command: createProjectDeleteCommand({ projectId: request.ref.projectId }),
-        dispatchCommand: (command) =>
-          dispatchCommandForEnvironment(request.ref.environmentId, command),
-      })
-      if (!outcome.ok) throw outcome.error
-      return outcome.result
+      for (const member of request.members) {
+        const rootPath = removedProjectRoot(
+          member.ref,
+          application.getSnapshot().editor.workspaceStore.getState().rootFolder?.path,
+        )
+        const outcome = await dispatchChatCommand({
+          action: 'chat.project.delete',
+          command: createProjectDeleteCommand({ projectId: member.ref.projectId }),
+          dispatchCommand: (command) =>
+            dispatchCommandForEnvironment(member.ref.environmentId, command),
+        })
+        if (!outcome.ok) throw outcome.error
+        await navigation.removeProject({ ...member.ref, rootPath })
+        useProjectDeleteRequestStore.setState((state) => {
+          if (!state.request) return {}
+          const members = state.request.members.filter(
+            (pending) => pending.physicalKey !== member.physicalKey,
+          )
+          return {
+            request: {
+              ...state.request,
+              members,
+              sessionCount: members.reduce((sum, pending) => sum + pending.sessionCount, 0),
+            },
+          }
+        })
+      }
     },
     mutationKey: chatModeMutationKeys.projectDelete(),
+    scope: { id: 'chat-project-delete' },
     onError: (error) => failDelete(error instanceof Error ? error.message : String(error)),
-    onSuccess: async (_result, request) => {
-      const rootPath = removedProjectRoot(
-        request.ref,
-        application.getSnapshot().editor.workspaceStore.getState().rootFolder?.path,
-      )
+    onSuccess: () => {
       dismissDelete()
-      await navigation.removeProject({ ...request.ref, rootPath })
       clearSessionMultiSelect()
     },
   })
   return {
-    archiveAllSessions(ref: ScopedProjectRef) {
-      sessionActions.archiveSessions(
-        projectSessions(ref)
-          .filter((session) => !session.archivedAt)
-          .map((session) => ({ environmentId: ref.environmentId, sessionId: session.id })),
-      )
+    archiveAllSessions(project: SessionRailProject) {
+      sessionActions.archiveSessions(project.sessionRefs)
     },
     cancelDelete() {
       dismissDelete()
     },
     confirmDelete(request: ProjectDeleteRequest) {
       if (remove.isPending) return
+      const unavailable = request.members.filter((member) => !member.available)
+      if (unavailable.length) {
+        failDelete(
+          `Unavailable machines: ${unavailable.map((member) => member.label).join(', ')}. Reconnect and reopen this confirmation.`,
+        )
+        return
+      }
       void remove.mutateAsync(request).catch(() => undefined)
     },
     deleteProject(project: SessionRailProject) {
       requestDelete({
-        ref: project.ref,
-        sessionCount: projectSessions(project.ref).length,
+        members: project.members.map((member) => ({
+          ...member,
+          sessionCount: projectSessions(member.ref).length,
+        })),
+        sessionCount: project.members.reduce(
+          (sum, member) => sum + projectSessions(member.ref).length,
+          0,
+        ),
         title: project.title,
       })
     },

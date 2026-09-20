@@ -3,12 +3,9 @@ import { Button } from '@workspace/ui/components/button'
 import { Tooltip, TooltipContent, TooltipTrigger } from '@workspace/ui/components/tooltip'
 import { useRef, type ChangeEvent } from 'react'
 
-import { CHAT_IMAGE_MIME_ALLOWLIST } from '@/features/chat/utils/input-attachment-limits'
-
 // Filters the OS picker to what the composer can actually stage. It is a hint,
 // not a gate: every picked file still goes through the same classifier as a
 // paste or a drop.
-const FILE_INPUT_ACCEPT = CHAT_IMAGE_MIME_ALLOWLIST.join(',')
 
 /**
  * Opens the OS file picker for image attachments. No primitive wraps a native
@@ -37,7 +34,6 @@ export function ChatInputAttachButton({
   return (
     <>
       <input
-        accept={FILE_INPUT_ACCEPT}
         // Hidden from assistive tech as well: the button below is the labelled
         // control, and it is the only thing that ever focuses or clicks this.
         aria-hidden='true'
@@ -53,7 +49,7 @@ export function ChatInputAttachButton({
         <TooltipTrigger
           render={
             <Button
-              aria-label='Attach images'
+              aria-label='Attach files'
               className='text-muted-foreground'
               disabled={disabled}
               focusableWhenDisabled
@@ -66,7 +62,7 @@ export function ChatInputAttachButton({
         >
           <PaperclipIcon className='size-(--icon-size-sm)' />
         </TooltipTrigger>
-        <TooltipContent>Attach images</TooltipContent>
+        <TooltipContent>Attach files</TooltipContent>
       </Tooltip>
     </>
   )

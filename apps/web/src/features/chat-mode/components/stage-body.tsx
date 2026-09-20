@@ -1,3 +1,5 @@
+import { useEffect } from 'react'
+import { useNavigation } from '@/hooks/use-navigation'
 import { useSessionSelectionStore } from '@/features/chat-mode/state/session-selection-store'
 import type { SessionId } from '@workspace/contracts'
 import { LoadingState } from '@workspace/ui/components/loading-state'
@@ -21,7 +23,27 @@ export function StageBody({
   readonly rootPath: string
   readonly onSessionCreated: (sessionId: SessionId) => void
 }) {
-  const draftGeneration = useSessionSelectionStore((state) => state.draftGeneration)
+  const selection = useSessionSelectionStore((state) => state.selection)
+  const navigation = useNavigation()
+  const draftId =
+    selection.kind === 'draft' &&
+    selection.environmentId === transport.environmentId &&
+    selection.projectId === project?.id
+      ? selection.draftId
+      : null
+  useEffect(() => {
+    if (draftId || !ready || !project || !worktree || !activeSessionShowsComposer(activeSession))
+      return
+    void navigation.openChat({
+      environmentId: transport.environmentId,
+      projectId: project.id,
+      worktreeId: worktree.id,
+      sessionId: null,
+      surface: 'main',
+      newDraft: true,
+      replace: true,
+    })
+  }, [draftId, ready, project, worktree, activeSession, navigation, transport.environmentId])
   // Before anything else: with no project there is no session to resolve, and a
   // composer that cannot send is the state this screen exists to replace.
   if (!ready) return <StageEmptyState />
@@ -34,14 +56,16 @@ export function StageBody({
   }
   if (activeSession.status === 'missing') return <SessionMissingState />
   if (activeSessionShowsComposer(activeSession)) {
+    if (!draftId) return <LoadingState label='Opening draft'>{null}</LoadingState>
     return (
       <ChatDraftView
         // Never disabled here: reaching this line means the project is ready, and the
         // states that are not get their own screen above.
         disabled={false}
+        draftId={draftId}
         transport={transport}
         project={project}
-        key={`${transport.environmentId}:${worktree?.id ?? 'preparing'}:${draftGeneration}`}
+        key={`${transport.environmentId}:${draftId}`}
         worktree={worktree}
         rootPath={rootPath}
         onSessionCreated={onSessionCreated}

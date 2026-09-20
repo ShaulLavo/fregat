@@ -1,3 +1,22 @@
+import { responseDelivery } from './response-delivery'
+import { draftRecovery } from './draft-recovery'
+import { composerDefaults } from './composer-defaults'
+import { sessionNotifications } from './session-notifications'
+import { terminalHistory } from './terminal-history'
+import { chatStashContext } from './chat-stash-context'
+import { fileAttachments } from './file-attachments'
+import { sessionTitles } from './session-titles'
+import { sessionNavigation } from './session-navigation'
+import { sessionOrdering } from './session-ordering'
+import { backgroundLiveness } from './background-liveness'
+import { sessionLifecycle } from './session-lifecycle'
+import { asyncQuestions } from './async-questions'
+import { projectGrouping } from './project-grouping'
+import { sessionSearch, sessionSearchEnvironments } from './session-search'
+import { sessionUnread } from './session-unread'
+import { mcpApproval } from './mcp-approval'
+import { checkpointRewind } from './checkpoint-rewind'
+import { archiveLifecycle } from './archive-lifecycle'
 import {
   breadcrumbPicker,
   lspReferences,
@@ -46,11 +65,16 @@ import { bundleWallpapers } from './bundle-wallpapers'
 import { themeGallery } from './theme-gallery'
 import { colorModePreview } from './color-mode-preview'
 import { wallpaperModeToggle } from './wallpaper-mode-toggle'
+import { editorAutoClose } from './editor-auto-close'
+import { editorFormatChord } from './editor-format-chord'
+import { editorLspCompletion } from './editor-lsp-completion'
 import { editorLspHover } from './editor-lsp-hover'
 import { editorMarkdownPunctuation } from './editor-markdown-punctuation'
 import { wallpaperLibrary } from './wallpaper-library'
 import { wallpaperPalette } from './wallpaper-palette'
+import { themeBundlePalette } from './theme-bundle-palette'
 import { settingsDefaults } from './settings-defaults'
+import { projectMenu } from './project-menu'
 import { sidebarSettingsButton } from './sidebar-settings-button'
 import { fileIcons } from './file-icons'
 import { searchInputUndo } from './search-input-undo'
@@ -62,6 +86,7 @@ import { quickOpenLinkedFile } from './quick-open-linked-file'
 import { quickOpenNoFlicker } from './quick-open-no-flicker'
 import { gitHistorySearchNoFlicker } from './git-history-search-no-flicker'
 import { logsSearchNoFlicker } from './logs-search-no-flicker'
+import { paneRenderCrash } from './pane-render-crash'
 import type { Page } from 'playwright'
 
 type ScenarioContext = {
@@ -84,6 +109,9 @@ import { editorLargePaste } from './editor-large-paste'
 import { editorTypeBurst } from './editor-type-burst'
 import { editorUndoBarrier } from './editor-undo-barrier'
 import { editorUndoBranch } from './editor-undo-branch'
+import { editorUndoReopen } from './editor-undo-reopen'
+import { gitCommitHookColors } from './git-commit-hook-colors'
+import { gitCommitMessagePersists } from './git-commit-message-persists'
 import { gitHistory } from './git-history'
 import { editorCaretBurst } from './editor-caret-burst'
 import { editorFocusClicks } from './editor-focus-clicks'
@@ -98,6 +126,26 @@ import { demoThemeStartup } from './demo-theme-startup'
 import { demoWallpaperStartup } from './demo-wallpaper-startup'
 
 export const scenarios: readonly Scenario[] = [
+  terminalHistory,
+  responseDelivery,
+  archiveLifecycle,
+  sessionUnread,
+  sessionSearch,
+  sessionSearchEnvironments,
+  projectGrouping,
+  sessionLifecycle,
+  sessionNavigation,
+  sessionOrdering,
+  sessionTitles,
+  sessionNotifications,
+  composerDefaults,
+  mcpApproval,
+  fileAttachments,
+  chatStashContext,
+  draftRecovery,
+  asyncQuestions,
+  backgroundLiveness,
+  checkpointRewind,
   workbenchListFocus,
   breadcrumbPicker,
   lspReferences,
@@ -145,6 +193,9 @@ export const scenarios: readonly Scenario[] = [
   pageLifecycle,
   themeBundles,
   bundleWallpapers,
+  editorAutoClose,
+  editorFormatChord,
+  editorLspCompletion,
   editorLspHover,
   editorMarkdownPunctuation,
   fileIcons,
@@ -157,10 +208,13 @@ export const scenarios: readonly Scenario[] = [
   quickOpenNoFlicker,
   gitHistorySearchNoFlicker,
   logsSearchNoFlicker,
+  paneRenderCrash,
   wallpaperModeToggle,
   wallpaperLibrary,
   wallpaperPalette,
+  themeBundlePalette,
   settingsDefaults,
+  projectMenu,
   sidebarSettingsButton,
   settingsFontInput,
   demoWorkspace,
@@ -177,6 +231,9 @@ export const scenarios: readonly Scenario[] = [
   editorTypeBurst,
   editorUndoBarrier,
   editorUndoBranch,
+  editorUndoReopen,
+  gitCommitHookColors,
+  gitCommitMessagePersists,
   editorCaretBurst,
   editorFocusClicks,
   editorProduct,

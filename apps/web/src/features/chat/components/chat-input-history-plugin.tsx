@@ -53,7 +53,7 @@ export function ChatInputHistoryPlugin({
         return false
       const target = { environmentId, rootPath, draftKey }
       const draft = useChatInputDraftStore.getState().getDraft(target)
-      if (draft.images.length || draft.terminalContexts.length) return false
+      if (draft.attachments.length || draft.terminalContexts.length) return false
       const selection = $getSelection()
       if (!$isRangeSelection(selection) || !selection.isCollapsed()) return false
       const { text, cursor } = $readChatInputTextSnapshot()

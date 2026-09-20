@@ -190,6 +190,7 @@ function draftCommand(): ClientOrchestrationCommand {
 
 function checkpointRevertCommand(): ClientOrchestrationCommand {
   return createCheckpointRevertCommand({
+    restoreFiles: false,
     sessionId: v.parse(sessionIdSchema, 'ad686244-5b2e-59be-805f-ef86eac80feb'),
     turnCount: 2,
   })

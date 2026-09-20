@@ -1,6 +1,6 @@
 import type { WorkspaceSearchMatchMode, WorkspaceSearchQuery } from '@workspace/contracts'
 import { workspaceSearchGlobPatterns } from '@workspace/contracts'
-import { readSettingsMirror } from '@/features/settings/utils/boot-mirror'
+import { readSettingsMirror } from '@/lib/settings-boot-mirror'
 
 export type WorkspaceSearchQueryOptions = {
   caseSensitive: boolean

@@ -1,6 +1,11 @@
 import { purgeExpiredEntries, readFreshEntry, trimEntriesToCapacity } from '../utils/cache-entries'
 import { messageIdSchema, type MessageId, type SessionId, type TurnId } from '@workspace/contracts'
 import * as v from 'valibot'
+import {
+  splitBufferedAssistantText,
+  MIN_ASSISTANT_DELIVERY_INTERVAL_MS,
+  type ResponseStreamingMode,
+} from './response-delivery'
 
 const ASSISTANT_MESSAGE_IDS_BY_TURN_CAPACITY = 10_000
 const BUFFERED_ASSISTANT_TEXT_BY_MESSAGE_ID_CAPACITY = 20_000
@@ -65,6 +70,7 @@ export class ProviderRuntimeBuffers {
   private readonly assistantMessageIdsByTurn: BoundedTtlCache<string, Set<MessageId>>
   private readonly assistantSegmentStateByTurn: BoundedTtlCache<string, AssistantSegmentState>
   private readonly bufferedAssistantTextByMessageId: BoundedTtlCache<MessageId, string>
+  private readonly lastDeliveryAt: BoundedTtlCache<MessageId, number>
   private readonly bufferedProposedPlanById: BoundedTtlCache<string, ProposedPlanBuffer>
 
   constructor(options: { now?: () => number } = {}) {
@@ -78,6 +84,10 @@ export class ProviderRuntimeBuffers {
       capacity: ASSISTANT_MESSAGE_IDS_BY_TURN_CAPACITY,
     })
     this.bufferedAssistantTextByMessageId = new BoundedTtlCache({
+      ...cacheOptions,
+      capacity: BUFFERED_ASSISTANT_TEXT_BY_MESSAGE_ID_CAPACITY,
+    })
+    this.lastDeliveryAt = new BoundedTtlCache({
       ...cacheOptions,
       capacity: BUFFERED_ASSISTANT_TEXT_BY_MESSAGE_ID_CAPACITY,
     })
@@ -125,12 +135,15 @@ export class ProviderRuntimeBuffers {
     sessionId: SessionId
     turnId: TurnId | undefined
   }) {
-    if (!input.turnId) return assistantSegmentMessageId(input.baseKey, 0)
+    const baseKey = [input.sessionId, input.turnId ?? '', input.baseKey]
+      .map(encodeURIComponent)
+      .join(':')
+    if (!input.turnId) return assistantSegmentMessageId(baseKey, 0)
 
     const activeMessageId = this.activeAssistantMessageIdForTurn(input.sessionId, input.turnId)
     if (activeMessageId) return activeMessageId
 
-    return this.startAssistantSegmentForTurn(input.sessionId, input.turnId, input.baseKey)
+    return this.startAssistantSegmentForTurn(input.sessionId, input.turnId, baseKey)
   }
 
   markActiveAssistantSegmentComplete(sessionId: SessionId, turnId: TurnId) {
@@ -145,8 +158,23 @@ export class ProviderRuntimeBuffers {
     this.assistantSegmentStateByTurn.delete(turnCacheKey(sessionId, turnId))
   }
 
-  appendBufferedAssistantText(messageId: MessageId, delta: string) {
+  appendBufferedAssistantText(
+    messageId: MessageId,
+    delta: string,
+    mode: Exclude<ResponseStreamingMode, 'token'> = 'turn',
+    atMillis = Date.now(),
+  ) {
     const nextText = `${this.bufferedAssistantTextByMessageId.get(messageId) ?? ''}${delta}`
+    const { ready, rest } =
+      mode === 'paragraph' ? splitBufferedAssistantText(nextText) : { ready: '', rest: nextText }
+    const last = this.lastDeliveryAt.get(messageId)
+    const paced = last === undefined || atMillis - last >= MIN_ASSISTANT_DELIVERY_INTERVAL_MS
+    if (paced && ready.trim().length > 0 && rest.length <= MAX_BUFFERED_ASSISTANT_CHARS) {
+      if (rest.length) this.bufferedAssistantTextByMessageId.set(messageId, rest)
+      else this.bufferedAssistantTextByMessageId.delete(messageId)
+      this.lastDeliveryAt.set(messageId, atMillis)
+      return ready
+    }
     if (nextText.length <= MAX_BUFFERED_ASSISTANT_CHARS) {
       this.bufferedAssistantTextByMessageId.set(messageId, nextText)
       return ''
@@ -163,6 +191,7 @@ export class ProviderRuntimeBuffers {
   }
 
   clearBufferedAssistantText(messageId: MessageId) {
+    this.lastDeliveryAt.delete(messageId)
     this.bufferedAssistantTextByMessageId.delete(messageId)
   }
 

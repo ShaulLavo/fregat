@@ -75,7 +75,7 @@ import {
   type FileListSort,
   type FileListSortKey,
 } from '@/features/file-picker/utils/sort-entries'
-import { useSettingValue } from '@/features/settings/hooks/use-setting-value'
+import { useSettingValue } from '@/hooks/use-setting-value'
 import { useSettingsProjection } from '@/features/settings/hooks/use-settings-projection'
 import { useSettingsActions } from '@/features/settings/hooks/use-settings-actions'
 

@@ -31,7 +31,7 @@ import {
 } from '@/features/chat/providers/plan-follow-up-context'
 import {
   useChatInputDraftStore,
-  chatInputImagesPreparing,
+  chatInputAttachmentsPreparing,
   type ChatInputDraftTarget,
 } from '@/features/chat/state/chat-input-draft-store'
 import { placeChatMessage } from '@/features/chat/state/place-chat-message'
@@ -89,7 +89,7 @@ export function ChatPlanFollowUpProvider({
   const session = useActiveChatProjection((state) => selectChatSessionById(state, sessionId))
   const [submitting, setSubmitting] = useState(false)
   const preparingImages = useChatInputDraftStore((state) =>
-    chatInputImagesPreparing(state, draftTarget),
+    chatInputAttachmentsPreparing(state, draftTarget),
   )
   const unavailableReason = planUnavailableReason(disabledReason, session, preparingImages)
   // A running turn already owns the composer: the plan has been answered, and a
@@ -146,7 +146,7 @@ async function dispatchPlanFollowUpTurn({
     return false
   }
   const submission = createTurnSubmission({
-    attachments: chatInputUploadAttachments(draft.images),
+    attachments: chatInputUploadAttachments(draft.attachments),
     createdAt: new Date().toISOString(),
     interactionMode: followUp.interactionMode,
     modelSelection: draft.modelSelection ?? session.modelSelection,

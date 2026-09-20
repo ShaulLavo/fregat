@@ -3,7 +3,7 @@ import { useState } from 'react'
 
 import { MachineForm } from '@/components/machine-form'
 import { MachineRow } from '@/features/settings/components/machine-row'
-import { useSettingValue } from '@/features/settings/hooks/use-setting-value'
+import { useSettingValue } from '@/hooks/use-setting-value'
 
 export function MachinesSection({ disabled }: { readonly disabled: boolean }) {
   const machines = useSettingValue('environments.machines')

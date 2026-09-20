@@ -1,3 +1,4 @@
+import { stashMessageLabel } from '../utils/stash-message'
 import { Tooltip, TooltipContent, TooltipTrigger } from '@workspace/ui/components/tooltip'
 import { BookmarkSimpleIcon, XIcon } from '@phosphor-icons/react'
 import { Button } from '@workspace/ui/components/button'
@@ -27,13 +28,15 @@ export function PromptStashMenu({
           <li className='group/stash flex min-w-0 items-center gap-1' key={entry.id}>
             <Button
               className='h-auto min-w-0 flex-1 justify-start gap-(--density-control-gap) py-(--density-gap-tight) text-left text-xs font-normal'
-              title={entry.prompt}
+              title={stashMessageLabel(entry)}
               type='button'
               variant='ghost'
               onClick={() => onRestore(entry)}
             >
               <BookmarkSimpleIcon className='text-muted-foreground size-(--icon-size-sm) shrink-0' />
-              <span className='min-w-0 flex-1 truncate'>{promptSnippet(entry.prompt)}</span>
+              <span className='min-w-0 flex-1 truncate'>
+                {promptSnippet(stashMessageLabel(entry))}
+              </span>
               <span className='text-muted-foreground text-3xs shrink-0 tabular-nums'>
                 {formatChatTimestamp(entry.createdAt)}
               </span>
@@ -42,7 +45,7 @@ export function PromptStashMenu({
               <TooltipTrigger
                 render={
                   <Button
-                    aria-label={`Delete stashed prompt: ${promptSnippet(entry.prompt)}`}
+                    aria-label={`Delete stashed prompt: ${promptSnippet(stashMessageLabel(entry))}`}
                     className='shrink-0 opacity-0 group-hover/stash:opacity-100 focus-visible:opacity-100'
                     size='icon-sm'
                     type='button'
@@ -53,7 +56,7 @@ export function PromptStashMenu({
                   </Button>
                 }
               />
-              <TooltipContent>{`Delete stashed prompt: ${promptSnippet(entry.prompt)}`}</TooltipContent>
+              <TooltipContent>{`Delete stashed prompt: ${promptSnippet(stashMessageLabel(entry))}`}</TooltipContent>
             </Tooltip>
           </li>
         ))}

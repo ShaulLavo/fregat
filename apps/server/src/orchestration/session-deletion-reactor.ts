@@ -1,8 +1,7 @@
+import { createAttachmentOwnership } from '../attachments/ownership'
 import { errorMessage } from '@workspace/contracts'
-import { eq } from 'drizzle-orm'
 import * as v from 'valibot'
 import {
-  chatAttachmentsSchema,
   commandIdSchema,
   type SessionId,
   type SessionDeletionState,
@@ -10,7 +9,7 @@ import {
   type OrchestrationEvent,
 } from '@workspace/contracts'
 import { deleteAttachmentBlobs } from '../attachments/store'
-import { projectionSessionMessages } from '../db/schema'
+import { sessionAttachments } from './session-attachments'
 import type { OrchestrationDatabase } from './event-store'
 import type { ProviderService } from '../provider/provider-service'
 import type { OrchestrationReadModel } from './read-model'
@@ -142,15 +141,20 @@ export class SessionDeletionReactor implements OrchestrationDomainEventReactor {
     if (previous.blobCleanup === 'completed')
       return { blobCleanup: 'completed', blobCleanupError: null }
     try {
-      const rows = this.options.database
-        .select({ attachments: projectionSessionMessages.attachmentsJson })
-        .from(projectionSessionMessages)
-        .where(eq(projectionSessionMessages.sessionId, sessionId))
-        .all()
-      const attachments = rows.flatMap((row) =>
-        v.parse(chatAttachmentsSchema, JSON.parse(row.attachments)),
-      )
-      await deleteAttachmentBlobs({ attachments, attachmentsDir: this.options.attachmentsDir })
+      const ownership = createAttachmentOwnership(this.options.database)
+      const attachments = [
+        ...new Map(
+          [
+            ...sessionAttachments(this.options.database, sessionId),
+            ...ownership.attachmentsForSession(sessionId),
+          ].map((attachment) => [attachment.id, attachment]),
+        ).values(),
+      ]
+      await deleteAttachmentBlobs({
+        attachments,
+        attachmentsDir: this.options.attachmentsDir,
+        ownership,
+      })
       return { blobCleanup: 'completed', blobCleanupError: null }
     } catch (error) {
       return { blobCleanup: 'failed', blobCleanupError: errorMessage(error) }

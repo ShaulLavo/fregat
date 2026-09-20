@@ -1,12 +1,22 @@
+import type { SessionId } from '@workspace/contracts'
+import { failingCommandSocket } from '../../../test/client'
+import { submitPaletteSearch } from '../../../test/palette'
 import { Application } from '@/components/application'
 import { renderTui } from '../../../test/render'
 import { openTestChat } from '../../../test/factories/chat'
 import { act } from 'react'
 import { SelectRenderable } from '@opentui/core'
-import { createSessionArchiveCommand } from '@workspace/client-core/chat/commands'
+import {
+  createSessionArchiveCommand,
+  createSessionPlaceCommand,
+} from '@workspace/client-core/chat/commands'
 import { test, expect } from '../../../test/fixtures'
 import { renderAgentStage } from '../../../test/factories/agent-stage'
-import { createRailSession, createRailProjects } from '../../../test/factories/agent-rail'
+import {
+  createRailSession,
+  createRailProjects,
+  focusRailSession,
+} from '../../../test/factories/agent-rail'
 import { runPaletteCommand } from '../../../test/actions'
 
 test('native session rail filters, marks, renames, archives, restores and deletes real sessions', async ({
@@ -109,6 +119,8 @@ test('reordering keeps the moved session selected so the next action targets the
   try {
     const alpha = await createRailSession(chat, worktreeId, 'Alpha')
     const beta = await createRailSession(chat, worktreeId, 'Beta')
+    await chat.dispatch(createSessionPlaceCommand({ sessionId: beta, orderKey: 'b' }))
+    await chat.dispatch(createSessionPlaceCommand({ sessionId: alpha, orderKey: 'c' }))
     await runPaletteCommand(frame, 'Filter sessions')
     await act(async () => {
       frame.mockInput.pressEnter()
@@ -124,7 +136,7 @@ test('reordering keeps the moved session selected so the next action targets the
     await runPaletteCommand(frame, 'Move selected item up')
     await expect
       .poll(() => chat.getSnapshot().projection.sessionById[alpha]?.pinOrderKey)
-      .not.toBeNull()
+      .not.toBe('c')
     await act(async () => {
       await frame.renderOnce()
     })
@@ -197,3 +209,114 @@ test.for(['composer palette', 'composer shortcut', 'rail palette', 'rail shortcu
     }
   },
 )
+
+test('native current archive opens an owning draft while background archive preserves selection', async ({
+  server,
+}) => {
+  const h = await renderAgentStage(server)
+  try {
+    const current = await createRailSession(h.chat, h.worktreeId, 'Current archive')
+    const background = await createRailSession(h.chat, h.worktreeId, 'Background archive')
+    await submitPaletteSearch(h.frame, 'sess Current archive')
+    await expect.poll(() => h.chat.getSnapshot().selectedSessionId).toBe(current)
+    await focusRailSession(h.frame, 'Background archive')
+    await runPaletteCommand(h.frame, 'Archive selected sessions')
+    await expect
+      .poll(() => h.chat.getSnapshot().projection.sessionById[background]?.archivedAt)
+      .not.toBeNull()
+    expect(h.chat.getSnapshot().selectedSessionId).toBe(current)
+    await focusRailSession(h.frame, 'Current archive')
+    await runPaletteCommand(h.frame, 'Archive selected sessions')
+    await expect
+      .poll(() => h.chat.getSnapshot().projection.sessionById[current]?.archivedAt)
+      .not.toBeNull()
+    await expect.poll(() => h.chat.getSnapshot().selectedSessionId).toBeNull()
+  } finally {
+    await h.cleanup()
+  }
+})
+
+test('native delete skips confirmation when configured and selects the first configured survivor', async ({
+  server,
+  client,
+}) => {
+  expect(
+    (
+      await client.settings.write.post({
+        mutationId: crypto.randomUUID(),
+        target: 'user',
+        operations: [
+          { kind: 'set', key: 'chat.confirmSessionDelete', value: false },
+          { kind: 'set', key: 'chat.sessionSortOrder', value: 'created_at' },
+        ],
+      })
+    ).error,
+  ).toBeNull()
+  const h = await renderAgentStage(server)
+  try {
+    const first = await createRailSession(h.chat, h.worktreeId, 'First survivor')
+    const middle = await createRailSession(h.chat, h.worktreeId, 'Delete middle')
+    const newest = await createRailSession(h.chat, h.worktreeId, 'Newest survivor')
+    await submitPaletteSearch(h.frame, 'sess Delete middle')
+    await expect.poll(() => h.chat.getSnapshot().selectedSessionId).toBe(middle)
+    await focusRailSession(h.frame, 'Delete middle')
+    await runPaletteCommand(h.frame, 'Delete selected item')
+    await expect.poll(() => h.chat.getSnapshot().projection.sessionById[middle]).toBeUndefined()
+    await expect.poll(() => h.chat.getSnapshot().selectedSessionId).toBe(newest)
+    expect(h.chat.getSnapshot().projection.sessionById[first]).toBeDefined()
+  } finally {
+    await h.cleanup()
+  }
+})
+
+test('native bulk deletion continues after a failed middle request and retains only its selection', async ({
+  server,
+}) => {
+  let failed: SessionId | undefined
+  const h = await renderAgentStage(server, {
+    connection: {
+      createSocket: failingCommandSocket(
+        server,
+        (command) => command.type === 'session.delete' && command.sessionId === failed,
+      ),
+    },
+  })
+  try {
+    await createRailSession(h.chat, h.worktreeId, 'Bulk deletion first')
+    failed = await createRailSession(h.chat, h.worktreeId, 'Bulk deletion middle')
+    await createRailSession(h.chat, h.worktreeId, 'Bulk deletion last')
+    await focusRailSession(h.frame, 'Bulk deletion')
+    await runPaletteCommand(h.frame, 'agent.selectAll')
+    await runPaletteCommand(h.frame, 'Delete selected item')
+    await act(async () => {
+      await h.frame.mockInput.typeText('delete')
+      h.frame.mockInput.pressEnter()
+    })
+    await expect.poll(() => h.chat.getSnapshot().projection.sessionIds).toEqual([failed])
+    await h.frame.renderOnce()
+    expect(h.frame.captureCharFrame()).toContain('1 marked')
+    expect(h.frame.captureCharFrame()).toContain('2 deleted, 1 failed')
+  } finally {
+    await h.cleanup()
+  }
+})
+
+test('native active reorder materializes visible keyless neighbors without pinning', async ({
+  server,
+}) => {
+  const h = await renderAgentStage(server)
+  try {
+    const first = await createRailSession(h.chat, h.worktreeId, 'Active first')
+    const second = await createRailSession(h.chat, h.worktreeId, 'Active second')
+    await focusRailSession(h.frame, 'Active')
+    await runPaletteCommand(h.frame, 'Move selected item down')
+    await expect
+      .poll(() => h.chat.getSnapshot().projection.sessionById[first]?.activeOrderKey)
+      .toBeTruthy()
+    expect(h.chat.getSnapshot().projection.sessionById[second]?.activeOrderKey).toBeTruthy()
+    expect(h.chat.getSnapshot().projection.sessionById[first]?.pinOrderKey).toBeNull()
+    expect(h.chat.getSnapshot().projection.sessionById[second]?.pinOrderKey).toBeNull()
+  } finally {
+    await h.cleanup()
+  }
+})

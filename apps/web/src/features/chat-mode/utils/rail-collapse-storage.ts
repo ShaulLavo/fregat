@@ -1,6 +1,5 @@
 import { readWorkspaceCacheEntry, writeWorkspaceCacheEntry } from '@/lib/workspace-cache-storage'
 import type { ScopedStorage } from '@/lib/environments/state/scoped-storage'
-import { projectIdSchema, type ProjectId } from '@workspace/contracts'
 import * as v from 'valibot'
 
 const RAIL_COLLAPSE_STORAGE_KEY = 'platform.chat-rail-collapse.v1'
@@ -13,13 +12,13 @@ const RAIL_COLLAPSE_STORAGE_VERSION = 1
 const MAX_COLLAPSED_PROJECTS = 200
 
 const persistedRailCollapseSchema = v.object({
-  collapsedProjectIds: v.array(projectIdSchema),
+  collapsedProjectIds: v.array(v.string()),
   version: v.literal(RAIL_COLLAPSE_STORAGE_VERSION),
 })
 
-const NO_PROJECT_IDS: readonly ProjectId[] = []
+const NO_PROJECT_IDS: readonly string[] = []
 
-export function readPersistedRailCollapse(storage: ScopedStorage): readonly ProjectId[] {
+export function readPersistedRailCollapse(storage: ScopedStorage): readonly string[] {
   const stored = readWorkspaceCacheEntry<v.InferOutput<typeof persistedRailCollapseSchema> | null>(
     RAIL_COLLAPSE_STORAGE_KEY,
     persistedRailCollapseSchema,
@@ -31,7 +30,7 @@ export function readPersistedRailCollapse(storage: ScopedStorage): readonly Proj
 
 export function writePersistedRailCollapse(
   storage: ScopedStorage,
-  collapsedProjectIds: readonly ProjectId[],
+  collapsedProjectIds: readonly string[],
 ) {
   return writeWorkspaceCacheEntry(
     RAIL_COLLAPSE_STORAGE_KEY,

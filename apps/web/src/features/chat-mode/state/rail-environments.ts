@@ -26,6 +26,7 @@ export function railEnvironments(
       label: entry.label ?? entry.name,
       isPrimary: entry.kind === 'primary',
       phase: entry.phase,
+      capabilities: entry.descriptor?.capabilities,
       projects: selectChatProjects(slice),
       worktrees: selectChatWorktrees(slice),
       sessions: selectChatSessions(slice),
@@ -41,6 +42,7 @@ export function createRailEnvironmentsSelector(entries: EnvironmentsState['entri
       const held = previous.find((entry) => entry.environmentId === environment.environmentId)
       if (
         held?.phase === environment.phase &&
+        held.capabilities === environment.capabilities &&
         held.label === environment.label &&
         held.projects === environment.projects &&
         held.worktrees === environment.worktrees &&

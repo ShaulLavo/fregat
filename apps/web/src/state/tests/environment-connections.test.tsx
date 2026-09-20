@@ -7,7 +7,7 @@ import {
   useChatProjectionStore,
 } from '@/features/chat/state/chat-projection-store'
 import { readChatProjectionCache } from '@/features/chat/state/chat-projection-cache'
-import { writeBootMirror } from '@/features/settings/utils/boot-mirror'
+import { writeBootMirror } from '@/lib/settings-boot-mirror'
 import { currentRailEnvironments } from '@/features/chat-mode/state/rail-environments'
 import { environmentScopedStorage } from '@/lib/environments/state/scoped-storage'
 import { createEnvironmentConnections } from '@/state/environment-connections'

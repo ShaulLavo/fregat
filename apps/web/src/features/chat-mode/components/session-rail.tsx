@@ -1,3 +1,10 @@
+import { ChatDraftRail } from '@/components/chat-draft-rail'
+import { SessionDragPreview } from '@/features/chat-mode/components/session-drag-preview'
+import { SessionShelf } from '@/features/chat-mode/components/session-shelf'
+import { railCollisions } from '@/features/chat-mode/utils/rail-collisions'
+import { useRailNow } from '@/features/chat-mode/hooks/use-rail-now'
+import { SessionSearchStatus } from '@/features/chat-mode/components/session-search-status'
+import { useSettingValue } from '@/hooks/use-setting-value'
 import { Tooltip, TooltipContent, TooltipTrigger } from '@workspace/ui/components/tooltip'
 import { forwardActiveRowKey } from '@/lib/list-keyboard'
 import { useListbox } from '@workspace/ui/patterns/use-listbox'
@@ -7,13 +14,7 @@ import { useNavigation } from '@/hooks/use-navigation'
 import { useWorktreeManagerStore } from '@/features/chat-mode/state/worktree-manager-store'
 import { scopedSessionKey } from '@workspace/contracts'
 import { useRailEnvironments } from '@/features/chat-mode/hooks/use-rail-environments'
-import {
-  closestCenter,
-  DndContext,
-  DragOverlay,
-  type DragEndEvent,
-  type DragStartEvent,
-} from '@dnd-kit/core'
+import { DndContext, DragOverlay, type DragEndEvent, type DragStartEvent } from '@dnd-kit/core'
 import { restrictToVerticalAxis } from '@dnd-kit/modifiers'
 import { SortableContext, verticalListSortingStrategy } from '@dnd-kit/sortable'
 import {
@@ -61,14 +62,18 @@ import {
 } from '@workspace/ui/components/input-group'
 import { cn } from '@workspace/ui/lib/utils'
 
+const EMPTY_SEARCH_MATCHES = {}
 const RAIL_DND_MODIFIERS = [restrictToVerticalAxis]
 
 export function SessionRail() {
   const { activeSession, addProject, project, ready, transport } = useChatModeSession()
-  const { reorderProject } = useChatRailOrder()
+  const { reorderProject, reorderSession } = useChatRailOrder()
   const sensors = useRailDragSensors()
   const orderOverrides = useRailOrderOverrides()
+  const groupingMode = useSettingValue('chat.projectGrouping')
+  const groupingOverrides = useSettingValue('chat.projectGroupingOverrides')
   const environments = useRailEnvironments()
+  const now = useRailNow(environments)
   const seenBySessionKey = useSessionReadStore((state) => state.seenBySessionKey)
   const collapsedProjectIds = useSessionRailStore((state) => state.collapsedProjectIds)
   const query = useSessionRailStore((state) => state.query)
@@ -81,8 +86,13 @@ export function SessionRail() {
   const markedSessionIds = useSessionMultiSelectStore((state) => state.refs)
   const [draggingProjectId, setDraggingProjectId] = useState<string | null>(null)
   useSessionSearch()
-  const searchMatches = useSessionSearchStore((state) => state.matchBySessionKey)
+  const searchMatches = useSessionSearchStore((state) =>
+    state.matchedQuery === query.trim() ? state.matchBySessionKey : EMPTY_SEARCH_MATCHES,
+  )
   const searching = useSessionSearchStore((state) => state.searching)
+  const incompleteSearch = useSessionSearchStore(
+    (state) => state.matchedQuery === query.trim() && state.unavailable.length > 0,
+  )
   const activeSessionKey = activeSession.sessionId
     ? scopedSessionKey({
         environmentId: transport.environmentId,
@@ -94,11 +104,15 @@ export function SessionRail() {
   const model = useMemo(
     () =>
       sessionRailModel({
-        activeProjectId,
+        grouping: { mode: groupingMode, overrides: groupingOverrides },
+        activeProjectRef: activeProjectId
+          ? { environmentId: transport.environmentId, projectId: activeProjectId }
+          : null,
         activeSessionKey,
         collapsedProjectIds,
         orderOverrides,
         environments,
+        now,
         query,
         scope,
         machineFilter,
@@ -107,11 +121,15 @@ export function SessionRail() {
         view,
       }),
     [
+      groupingMode,
+      groupingOverrides,
       activeProjectId,
+      transport.environmentId,
       activeSessionKey,
       collapsedProjectIds,
       orderOverrides,
       environments,
+      now,
       query,
       scope,
       machineFilter,
@@ -131,7 +149,9 @@ export function SessionRail() {
   function commitRow(id: string) {
     const group = model.groups.find((item) => item.key === id)
     if (!group) return selectSession(id)
-    useSessionRailStore.getState().toggleProjectCollapsed(group.project.id)
+    useSessionRailStore
+      .getState()
+      .toggleProjectCollapsed(group.project.members.map((member) => member.physicalKey))
   }
   const list = useListbox({
     role: 'listbox',
@@ -177,10 +197,15 @@ export function SessionRail() {
 
   function handleProjectDragEnd(event: DragEndEvent) {
     handleProjectDragCancel(event)
-    reorderProject(String(event.active.id), event.over ? String(event.over.id) : null)
+    const activeId = String(event.active.id)
+    const overId = event.over ? String(event.over.id) : null
+    if (model.groups.some((group) => group.key === activeId)) reorderProject(activeId, overId)
+    else reorderSession(activeId, overId)
   }
 
   const draggingGroup = model.groups.find((group) => group.key === draggingProjectId) ?? null
+  const draggingSession =
+    model.sessions.find((session) => session.key === draggingProjectId) ?? null
 
   // Escape is the universal "never mind" for a marked set, and the rail is the only
   // place it means that — the app keymap has no business knowing about this list.
@@ -321,16 +346,26 @@ export function SessionRail() {
         </InputGroup>
       </div>
       <MachineConnectionRows />
+      <ChatDraftRail
+        projects={model.projects}
+        scope={scope}
+        machineFilter={machineFilter}
+        query={query}
+        archived={view === 'archived'}
+      />
       <SessionListContext value={listContext}>
         <div
           {...list.containerProps}
+          onKeyDown={(event) => {
+            if (!draggingProjectId) list.containerProps.onKeyDown(event)
+          }}
           aria-label='Sessions'
           className='focus-ring-inset min-h-0 flex-1 overflow-y-auto'
         >
           <div className='flex flex-col gap-(--density-control-gap) px-1 pb-(--density-section-padding)'>
             <DndContext
               accessibility={{ restoreFocus: false }}
-              collisionDetection={closestCenter}
+              collisionDetection={railCollisions}
               modifiers={RAIL_DND_MODIFIERS}
               sensors={sensors}
               onDragCancel={handleProjectDragCancel}
@@ -342,14 +377,11 @@ export function SessionRail() {
                 strategy={verticalListSortingStrategy}
               >
                 {model.sections.map((section) => (
-                  <section key={section.state} aria-label={section.title}>
-                    <h2 className='text-muted-foreground text-2xs flex h-(--density-control-height-sm) items-center px-(--density-row-padding-x) font-medium tracking-wider uppercase'>
-                      {section.title}
-                    </h2>
+                  <SessionShelf key={section.state} shelf={section.state} title={section.title}>
                     {section.groups.map((group) => (
                       <SessionGroup group={group} key={group.key} />
                     ))}
-                  </section>
+                  </SessionShelf>
                 ))}
               </SortableContext>
               {/* Only the header travels. Lifting the whole band — header plus every
@@ -360,14 +392,22 @@ export function SessionRail() {
                     <SessionGroupHeader group={draggingGroup} />
                   </div>
                 ) : null}
+                {draggingSession ? <SessionDragPreview session={draggingSession} /> : null}
               </DragOverlay>
             </DndContext>
             {model.sessions.length === 0 ? (
-              <SessionRailEmpty query={query} ready={ready} searching={searching} view={view} />
+              <SessionRailEmpty
+                query={query}
+                ready={ready}
+                searching={searching}
+                incompleteSearch={incompleteSearch}
+                view={view}
+              />
             ) : null}
           </div>
         </div>
       </SessionListContext>
+      <SessionSearchStatus />
       {isSessionBulkSelection(markedSessionIds) ? <SessionBulkBar /> : null}
     </aside>
   )

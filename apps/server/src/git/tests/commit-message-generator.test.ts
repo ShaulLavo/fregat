@@ -1,7 +1,7 @@
 import { describe, expect, it } from 'vitest'
 
 import { MockProviderAdapter } from '../../provider/adapters/mock'
-import { selectCommitMessageModel } from '../commit-message-generator'
+import { commitMessageCandidates, selectCommitMessageModel } from '../commit-message-generator'
 
 describe('commit message model selection', () => {
   it('uses only advertised cheap fallbacks instead of an arbitrary expensive model', async () => {
@@ -25,6 +25,31 @@ describe('commit message model selection', () => {
     expect(selectCommitMessageModel([cheap])?.modelSelection).toMatchObject({
       model: 'claude-haiku-5',
     })
+  })
+
+  it('offers one cheap model per ready provider, so a failing provider has a successor', async () => {
+    const claude = await providerSnapshot([
+      { name: 'Claude Opus 5', shortName: 'Opus', slug: 'claude-opus-5' },
+      { name: 'Claude Haiku 5', shortName: 'Haiku', slug: 'claude-haiku-5' },
+    ])
+    const gemini = await providerSnapshot([
+      { name: 'Gemini Flash', shortName: 'Flash', slug: 'gemini-flash' },
+    ])
+
+    const models = commitMessageCandidates([claude, gemini]).map(
+      (candidate) => candidate.modelSelection.model,
+    )
+
+    expect(models).toEqual(['claude-haiku-5', 'gemini-flash'])
+  })
+
+  it('settles for Sonnet when a provider advertises nothing cheaper, and never for Opus', async () => {
+    const claude = await providerSnapshot([
+      { name: 'Claude Opus 5', shortName: 'Opus 5', slug: 'claude-opus-5' },
+      { name: 'Claude Sonnet 5', shortName: 'Sonnet 5', slug: 'claude-sonnet-5' },
+    ])
+
+    expect(selectCommitMessageModel([claude])?.modelSelection.model).toBe('claude-sonnet-5')
   })
 })
 

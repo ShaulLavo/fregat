@@ -2,6 +2,7 @@ import type { Theme } from '@/features/settings/providers/theme-context'
 import type { FlatDocumentSymbol } from '@/lib/document-symbols'
 import { GotoLineGroups } from '@/features/command-palette/components/goto-line-groups'
 import { AppColorsGroups } from '@/features/command-palette/components/app-colors-groups'
+import { ThemeBundleGroups } from '@/features/command-palette/components/theme-bundle-groups'
 import { WallpaperGroups } from '@/features/command-palette/components/wallpaper-groups'
 
 import { ColorModeGroups } from '@/features/command-palette/components/color-mode-groups'
@@ -67,6 +68,10 @@ export function GroupsFactory({
 
   if (mode === 'appColors') {
     return <AppColorsGroups />
+  }
+
+  if (mode === 'themeBundle') {
+    return <ThemeBundleGroups />
   }
 
   if (mode === 'wallpaper') {

@@ -6,7 +6,7 @@ import { selectChatSidebarSessionsForProject } from '@workspace/client-core/chat
 import { createInitialChatProjectionSlice } from '@workspace/client-core/chat/types'
 import { syncChatProjectionShellSnapshot } from '@workspace/client-core/chat/writers'
 import { activeSession } from '@/features/chat-mode/utils/active-session'
-import { compareSessionsForRail } from '@workspace/client-core/chat/rail/session-order'
+import { comparePinnedSessions } from '@workspace/client-core/chat/rail/session-order'
 import { sessionRailModel } from '@workspace/client-core/chat/rail/model'
 import { chatProject, sessionShell } from '../../../../../test/factories/chat'
 import { railEnvironment } from '../../../../../test/factories/chat-mode'
@@ -19,10 +19,10 @@ const liveId = v.parse(sessionIdSchema, '1cb66ded-870c-5359-8e74-f911ce864e73')
 test('the stage never opens a session the rail refuses to draw', () => {
   const state = projection()
   const stageSessionIds = selectChatSidebarSessionsForProject(state, projectId)
-    .toSorted(compareSessionsForRail)
+    .toSorted(comparePinnedSessions)
     .map((session) => session.id)
   const rail = sessionRailModel({
-    activeProjectId: projectId,
+    activeProjectRef: { environmentId: TEST_ENVIRONMENT_ID, projectId },
     environments: [
       railEnvironment({
         environmentId: TEST_ENVIRONMENT_ID,

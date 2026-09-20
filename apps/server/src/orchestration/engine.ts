@@ -1,3 +1,11 @@
+import { commandUploadClaim } from './command-attachments'
+import { withAttachmentLanes } from '../attachments/lanes'
+import { createAttachmentOwnership, type AttachmentOwnership } from '../attachments/ownership'
+import { sessionTitleMessages } from './title-messages'
+import { SessionTitleReactor } from './title-reactor'
+import type { ModelSelection } from '@workspace/contracts'
+import { validateAttachmentUpload } from '../attachments/uploads'
+import { createInternalError } from '../observability/structured-errors'
 import { errorMessage } from '@workspace/contracts'
 import { elapsedMs } from '@workspace/utils/timing'
 import { terminalHistoryMessages } from './utils/terminal-history'
@@ -32,7 +40,11 @@ import {
 } from '@workspace/contracts'
 import * as v from 'valibot'
 
-import { defaultAttachmentsDir, writeAttachmentFromDataUrl } from '../attachments/store'
+import {
+  defaultAttachmentsDir,
+  writeAttachmentFromDataUrl,
+  attachmentFilePath,
+} from '../attachments/store'
 import { migratePlatformDatabase as migrateOrchestrationDatabase } from '../db/migrations'
 import { orchestrationErrors } from '../observability'
 import { requireActionableSourcePlan } from './command-invariants'
@@ -84,6 +96,13 @@ import {
 } from './streams'
 
 export type OrchestrationEngineOptions = {
+  responseStreamingMode?: (
+    projectId: string,
+  ) =>
+    | import('./response-delivery').ResponseStreamingMode
+    | Promise<import('./response-delivery').ResponseStreamingMode>
+  titleModel?: (projectId: string) => Promise<ModelSelection>
+
   keepImportedSessionsUpdated?: () => boolean
   providerService?: ProviderService
   terminalService?: TerminalService
@@ -110,10 +129,12 @@ export class OrchestrationEngine {
   private unsubscribeGitMutations: (() => void) | null = null
   private reactorsStarted = false
   private queue = Promise.resolve()
+  private readonly attachmentOwnership: AttachmentOwnership
   private readonly attachmentsDir: string
   private checkpointReactor: CheckpointReactor | null = null
   private deletionReactor: SessionDeletionReactor | null = null
   private discovery: SessionDiscoveryReconciler | null = null
+  private titleReactor: SessionTitleReactor | null = null
   private readonly keepImportedSessionsUpdated: () => boolean
   private providerService: ProviderService | null = null
   private readonly registration: RegistrationBoundary | undefined
@@ -134,6 +155,7 @@ export class OrchestrationEngine {
     this.keepImportedSessionsUpdated = options.keepImportedSessionsUpdated ?? (() => false)
     this.attachmentsDir = options.attachmentsDir ?? defaultAttachmentsDir()
     this.database = database
+    this.attachmentOwnership = createAttachmentOwnership(database)
     this.registration = options.registration
     this.providerService = options.providerService ?? null
     this.terminalHandoffs = new TerminalHandoffs(database)
@@ -145,7 +167,10 @@ export class OrchestrationEngine {
     this.eventStore = new OrchestrationEventStore(database)
     this.receipts = new OrchestrationCommandReceipts(database)
     this.projectionPipeline = new OrchestrationProjectionPipeline(database, this.eventStore)
-    this.snapshotQuery = new OrchestrationSnapshotQuery(database)
+    this.snapshotQuery = new OrchestrationSnapshotQuery(
+      database,
+      (sessionId) => this.providerService?.backgroundLiveness(sessionId) ?? null,
+    )
     this.streams = new OrchestrationStreams(this.snapshotQuery, { database })
     this.ready = bootstrapOrchestration({
       migrate: () => {
@@ -218,7 +243,11 @@ export class OrchestrationEngine {
     if (existing) return this.dispatchFromReceipt(existing, command.type, fingerprint)
     this.requireSourceProposedPlan(command)
     const prepared = await this.prepare(command, fingerprint)
-    const ingested = await ingestCommandAttachments(prepared, this.attachmentsDir)
+    const ingested = await ingestCommandAttachments(
+      prepared,
+      this.attachmentsDir,
+      this.attachmentOwnership,
+    )
     const result = await this.enqueue(ingested.command, ingested.attachmentIngest, fingerprint)
     return result
   }
@@ -269,7 +298,23 @@ export class OrchestrationEngine {
   ) {
     const intent =
       'intentFingerprint' in command ? (command.intentFingerprint ?? fingerprint) : fingerprint
-    return this.schedule(() => this.dispatchNow(command, attachmentIngest, intent))
+    const claim = commandUploadClaim(command)
+    if (!claim?.attachments.length)
+      return this.schedule(() => this.dispatchNow(command, attachmentIngest, intent))
+    return withAttachmentLanes(
+      this.attachmentsDir,
+      claim.attachments.map((attachment) => attachment.id),
+      async () => {
+        for (const attachment of claim.attachments)
+          await validateAttachmentUpload(
+            this.attachmentsDir,
+            attachment,
+            claim.sessionId,
+            this.attachmentOwnership,
+          )
+        return this.schedule(() => this.dispatchNow(command, attachmentIngest, intent))
+      },
+    )
   }
 
   private enqueueProviderCommand(command: OrchestrationCommand, source: ProviderRuntimeSource) {
@@ -375,6 +420,7 @@ export class OrchestrationEngine {
   }
   async close() {
     await this.ready
+    await this.titleReactor?.close()
     await this.discovery?.close()
     this.unsubscribeGitMutations?.()
     await this.worktreeReactor?.drain()
@@ -555,6 +601,10 @@ export class OrchestrationEngine {
       const eventStore = new OrchestrationEventStore(database)
       const projectionPipeline = new OrchestrationProjectionPipeline(database, eventStore)
       const receipts = new OrchestrationCommandReceipts(database)
+      const ownership = createAttachmentOwnership(database)
+      const claim = commandUploadClaim(command)
+      for (const attachment of claim?.attachments ?? [])
+        ownership.claim(attachment, claim!.sessionId)
       const events = eventStore.append(pendingEvents)
       projectionPipeline.applyEvents(events)
       const result =
@@ -620,14 +670,48 @@ export class OrchestrationEngine {
   }
 
   private async recover() {
+    await this.titleReactor?.recover()
     await this.recoverTerminalHistory()
     for (const session of this.readModel.sessions.values()) {
       if (session.deletedAt) continue
+      await this.recoverRewind(session)
       await this.recoverRuntime(session)
     }
     await this.deletionReactor?.recover()
     await this.terminalLeases.recover()
     await this.worktreeReactor?.recover()
+  }
+
+  private async recoverRewind(session: OrchestrationProjectedSession) {
+    const rewindCommandId = session.pendingRewindCommandId
+    if (!rewindCommandId) return
+    const createdAt = new Date().toISOString()
+    await this.enqueue({
+      type: 'session.activity.append',
+      sessionId: session.id,
+      commandId: v.parse(
+        commandIdSchema,
+        internalCommandKey('rewind-recovery', session.id, rewindCommandId),
+      ),
+      createdAt,
+      activity: {
+        id: v.parse(
+          eventIdSchema,
+          internalCommandKey('rewind-recovery-activity', session.id, rewindCommandId),
+        ),
+        sessionId: session.id,
+        createdAt,
+        turnId: null,
+        tone: 'error',
+        kind: 'checkpoint.revert.failed',
+        summary: 'Rewind interrupted by server restart',
+        payload: {
+          commandId: rewindCommandId,
+          detail:
+            'The server restarted during rewind. Check conversation history and files before retrying; rewind was not replayed.',
+        },
+      },
+    })
   }
 
   private async recoverRuntime(session: OrchestrationProjectedSession) {
@@ -1041,14 +1125,33 @@ export class OrchestrationEngine {
       (command, source) => this.enqueueProviderCommand(command, source),
       {
         getReadModel: () => this.readModel,
+        responseStreamingMode: options.responseStreamingMode,
         onLiveness: (sessionId) => providerService.markRuntimeSeen(sessionId),
       },
     )
 
     this.providerService = providerService
+    if (options.titleModel) {
+      const titleReactor = new SessionTitleReactor({
+        attachmentsDir: this.attachmentsDir,
+        messages: (sessionId) => sessionTitleMessages(this.database, sessionId),
+        service: providerService,
+        model: () => this.readModel,
+        selection: options.titleModel,
+        dispatch: (command) => this.enqueue(command),
+      })
+      this.titleReactor = titleReactor
+      this.domainEvents.subscribe(titleReactor)
+      this.reactors.register({
+        name: 'session-title-reactor',
+        drain: () => titleReactor.drain(),
+        isIdle: () => titleReactor.isIdle(),
+      })
+    }
     this.subscribeCheckpointReactor(providerRuntimeOptions?.checkpointGit, providerService)
 
     const providerCommandReactor = new ProviderCommandReactor({
+      attachmentsDir: this.attachmentsDir,
       beforeTurnStart: (sessionId) => this.turnPrerequisitesSettled(sessionId),
       checkpointGit: providerRuntimeOptions?.checkpointGit ?? null,
       dispatch: (command) => this.dispatch(command),
@@ -1073,12 +1176,27 @@ export class OrchestrationEngine {
 async function ingestCommandAttachments(
   command: OrchestrationCommand,
   attachmentsDir: string,
+  ownership: AttachmentOwnership,
 ): Promise<{ attachmentIngest?: CommandAttachmentIngest; command: OrchestrationCommand }> {
+  if (command.type === 'session.user-input.respond' && command.attachmentsByQuestionId) {
+    const kept: Record<string, ChatAttachment[]> = {}
+    for (const [questionId, attachments] of Object.entries(command.attachmentsByQuestionId)) {
+      kept[questionId] = (
+        await persistTurnAttachments(attachments, attachmentsDir, command.sessionId, ownership)
+      ).attachments
+    }
+    return { command: { ...command, attachmentsByQuestionId: kept } }
+  }
   if (command.type !== 'session.turn.start' && command.type !== 'session.turn.steer')
     return { command }
   if (command.message.attachments.length === 0) return { command }
 
-  const ingested = await persistTurnAttachments(command.message.attachments, attachmentsDir)
+  const ingested = await persistTurnAttachments(
+    command.message.attachments,
+    attachmentsDir,
+    command.sessionId,
+    ownership,
+  )
 
   return {
     attachmentIngest: ingested.attachmentIngest,
@@ -1092,47 +1210,35 @@ async function ingestCommandAttachments(
 async function persistTurnAttachments(
   attachments: readonly ChatAttachmentUpload[],
   attachmentsDir: string,
+  sessionId: string,
+  ownership: AttachmentOwnership,
 ) {
   const kept: ChatAttachment[] = []
-  const dropReasons: string[] = []
+  const ids = new Set<string>()
   let bytesPersisted = 0
-  let persisted = 0
-
   for (const attachment of attachments) {
-    if (!attachment.dataUrl) {
-      kept.push(attachmentMetadata(attachment))
+    if (ids.has(attachment.id))
+      throw createInternalError('The same attachment cannot be sent twice.')
+    ids.add(attachment.id)
+    if (attachment.id.startsWith('upload-')) {
+      kept.push(await validateAttachmentUpload(attachmentsDir, attachment, sessionId, ownership))
       continue
     }
-
-    const written = await writeAttachment(attachment, attachmentsDir)
-    // A broken paste drops its image, never the user's message.
-    if ('dropReason' in written) {
-      dropReasons.push(written.dropReason)
+    if (attachment.type === 'file') throw createInternalError('Upload this file before sending it.')
+    if (attachment.dataUrl) {
+      const written = await writeAttachmentFromDataUrl({ attachment, attachmentsDir })
+      bytesPersisted += written.bytesWritten
+      kept.push({ ...attachmentMetadata(attachment), sizeBytes: written.bytesWritten })
       continue
     }
-
-    bytesPersisted += written.bytesWritten
-    persisted += 1
-    // The measured length wins over the declared one. Storing what the client
-    // said would leave the timeline reporting a size the blob on disk does not
-    // have, and every reader downstream trusting it.
-    kept.push({ ...attachmentMetadata(attachment), sizeBytes: written.bytesWritten })
+    const filePath = attachmentFilePath({ attachment, attachmentsDir })
+    if (!filePath || !(await Bun.file(filePath).exists()))
+      throw createInternalError('Attachment is unavailable. Attach it again.')
+    kept.push(attachmentMetadata(attachment))
   }
-
   return {
-    attachmentIngest: { bytesPersisted, dropReasons, dropped: dropReasons.length, persisted },
+    attachmentIngest: { bytesPersisted, dropReasons: [], dropped: 0, persisted: kept.length },
     attachments: kept,
-  }
-}
-
-async function writeAttachment(
-  attachment: ChatAttachmentUpload,
-  attachmentsDir: string,
-): Promise<{ bytesWritten: number } | { dropReason: string }> {
-  try {
-    return await writeAttachmentFromDataUrl({ attachment, attachmentsDir })
-  } catch (error) {
-    return { dropReason: `${attachment.id}: ${errorMessage(error)}` }
   }
 }
 

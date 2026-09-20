@@ -1,3 +1,4 @@
+import { unwrapEdenResponse } from '@/lib/eden-events'
 import { environmentActivitySignal } from '@/lib/environments/state/activity'
 import { clientForQueryClient, queryClientFor } from '@/lib/environments/state/query-clients'
 import { runMutation } from '@/lib/mutations/run'
@@ -5,7 +6,7 @@ import { fetchTerminalCheckout } from '@/features/terminal/state/register-checko
 import { terminalKillScope, terminalMutationKeys } from '@/features/terminal/utils/mutation-keys'
 import { notifyMutationError } from '@/features/terminal/utils/notify-mutation-error'
 
-// For a tab with no mounted panel: the shell would otherwise run until the detach timeout.
+// Closing an unmounted tab must still terminate its server-owned shell.
 export function killTerminalSession({
   origin,
   rootPath,
@@ -21,10 +22,14 @@ export function killTerminalSession({
     {
       mutationFn: async (_variables: void, { client }) => {
         const worktreeId = await fetchTerminalCheckout(client, rootPath)
-        await clientForQueryClient(client).terminal.kill.post(
+        const response = await clientForQueryClient(client).terminal.kill.post(
           { terminalId, worktreeId },
           { fetch: { signal } },
         )
+        unwrapEdenResponse(response, {
+          requireData: true,
+          emptyMessage: 'Terminal close returned no result.',
+        })
       },
       mutationKey: terminalMutationKeys.kill(terminalId),
       onError: (error) => {

@@ -30,7 +30,6 @@ export async function createAgentTerminalFixture(
       MockProviderAdapterOptions,
       'beforeComplete' | 'stopError' | 'operationTimeoutMs'
     >
-    detachTtlMs?: number
   } = {},
 ) {
   const root = await mkdtemp(path.join(tmpdir(), 'platform-agent-terminal-'))
@@ -74,7 +73,7 @@ export async function createAgentTerminalFixture(
       metadataDatabase: handle,
       settings: testSettingsOptions(root),
       workspaceEditJournalRoot: path.join(root, 'journals'),
-      terminal: { ptyFactory: pty.factory, detachTtlMs: options.detachTtlMs },
+      terminal: { ptyFactory: pty.factory },
       orchestration: {
         database: handle.db,
         providerAdapterRegistry: registry,

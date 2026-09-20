@@ -1,3 +1,6 @@
+import { useIsMutating } from '@tanstack/react-query'
+import { Spinner } from '@workspace/ui/components/spinner'
+import { chatModeMutationKeys } from '@/features/chat-mode/utils/mutation-keys'
 import { TrashIcon } from '@phosphor-icons/react'
 import { Button } from '@workspace/ui/components/button'
 import {
@@ -28,6 +31,7 @@ import {
 export function SessionDeleteDialog() {
   const request = useSessionDeleteRequestStore((state) => state.request)
   const actions = useSessionActions()
+  const pending = useIsMutating({ mutationKey: chatModeMutationKeys.session() }) > 0
   const count = request?.refs.length ?? 1
   const ref = count === 1 ? request?.refs[0] : undefined
   const projection = useChatProjectionStore((state) =>
@@ -71,11 +75,12 @@ export function SessionDeleteDialog() {
             Cancel
           </Button>
           <Button
+            disabled={pending}
             onClick={() => request && actions.confirmDelete(request)}
             type='button'
             variant='destructive'
           >
-            <TrashIcon data-icon='inline-start' />
+            {pending ? <Spinner /> : <TrashIcon data-icon='inline-start' />}
             Delete
           </Button>
         </DialogFooter>

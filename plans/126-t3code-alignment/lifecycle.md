@@ -19,6 +19,8 @@ Compared Platform `3c9b88c35784e571e706600b0cee8e95a2656f77` with T3 Code `7445a
 
 Priority meanings: P0 blocks the reported archive fix; P1 is a substantial behavioral mismatch; P2 is a smaller but confirmed parity gap. Effort includes tests: S hours, M roughly a day, L multiple days. Estimates overlap and must not be summed blindly.
 
+LIFE-01/02 implementation shipped on 2026-09-20; [delivery evidence](archive-delivery.md) records local checks, deployment, and remaining live-comparison limits. Their source excerpts below describe the pre-fix baseline.
+
 ## Findings and execution plans
 
 ### LIFE-01 — P0: Enforce archive before every active-list classification

@@ -1,4 +1,9 @@
 import { normalizeText as normalize } from '@workspace/utils/strings'
+import { matchToken, type TokenMatch } from '@workspace/utils/token-match'
+
+// Short subsequences match almost everything; one- and two-character tokens must be literal.
+const MIN_FUZZY_LENGTH = 3
+
 export type FieldTokenCalibration = {
   readonly fieldPenaltyStep: number
   readonly offsets: {
@@ -8,7 +13,7 @@ export type FieldTokenCalibration = {
     readonly includes: number
     readonly fuzzy: number
   }
-  readonly boundaryMarkers: readonly string[]
+  readonly boundaryMarkers: string
   readonly maxPositionPenalty: number
   readonly positionPenaltyFactor: number
   readonly maxLengthPenalty: number
@@ -81,79 +86,36 @@ function fieldTokenScore(
   token: string,
   calibration: FieldTokenCalibration,
 ): number | null {
-  const { offsets } = calibration
-  if (!field) return null
-  if (field === token) return offsets.exact
-  if (field.startsWith(token)) return offsets.prefix + lengthPenalty(field, token, calibration)
+  const match = matchToken(field, token, {
+    boundaryMarkers: calibration.boundaryMarkers,
+    minFuzzyLength: MIN_FUZZY_LENGTH,
+  })
+  if (!match) return null
+  if (match.kind === 'fuzzy')
+    return calibration.offsets.fuzzy + fuzzyPenalty(field, token, match, calibration)
 
-  const boundaryIndex = boundaryMatchIndex(field, token, calibration.boundaryMarkers)
-  if (boundaryIndex !== null) {
-    return (
-      offsets.boundary +
-      positionPenalty(boundaryIndex, calibration) +
-      lengthPenalty(field, token, calibration)
-    )
-  }
-
-  const includesIndex = field.indexOf(token)
-  if (includesIndex !== -1) {
-    return (
-      offsets.includes +
-      positionPenalty(includesIndex, calibration) +
-      lengthPenalty(field, token, calibration)
-    )
-  }
-  // Short subsequences match almost everything; one- and two-character tokens must be literal.
-  if (token.length < 3) return null
-
-  const fuzzy = subsequenceScore(field, token, calibration)
-  return fuzzy === null ? null : offsets.fuzzy + fuzzy
+  return (
+    calibration.offsets[match.kind] +
+    positionPenalty(match.index, calibration) +
+    lengthPenalty(field, token, calibration)
+  )
 }
 
-function boundaryMatchIndex(
+function fuzzyPenalty(
   field: string,
   token: string,
-  markers: readonly string[],
-): number | null {
-  let best: number | null = null
-  for (const marker of markers) {
-    const index = field.indexOf(`${marker}${token}`)
-    if (index === -1) continue
-    const matchIndex = index + marker.length
-    if (best !== null && matchIndex >= best) continue
-    best = matchIndex
-  }
-  return best
-}
-
-function subsequenceScore(
-  field: string,
-  token: string,
+  match: TokenMatch,
   calibration: FieldTokenCalibration,
-): number | null {
-  let tokenIndex = 0
-  let firstMatchIndex = -1
-  let previousMatchIndex = -1
-  let gapPenalty = 0
+) {
+  const gaps = match.span - token.length
+  const length = calibration.fuzzyIncludesLengthPenalty
+    ? lengthPenalty(field, token, calibration)
+    : 0
 
-  for (let index = 0; index < field.length; index += 1) {
-    if (field[index] !== token[tokenIndex]) continue
-    if (firstMatchIndex === -1) firstMatchIndex = index
-    if (previousMatchIndex !== -1) gapPenalty += index - previousMatchIndex - 1
-    previousMatchIndex = index
-    tokenIndex += 1
-    if (tokenIndex < token.length) continue
-
-    const spanPenalty = index - firstMatchIndex + 1 - token.length
-    const length = calibration.fuzzyIncludesLengthPenalty
-      ? lengthPenalty(field, token, calibration)
-      : 0
-    return Math.min(
-      calibration.maxFuzzyPenalty,
-      positionPenalty(firstMatchIndex, calibration) + gapPenalty * 3 + spanPenalty + length,
-    )
-  }
-  return null
+  return Math.min(
+    calibration.maxFuzzyPenalty,
+    positionPenalty(match.index, calibration) + gaps * 4 + length,
+  )
 }
 
 function positionPenalty(index: number, calibration: FieldTokenCalibration) {

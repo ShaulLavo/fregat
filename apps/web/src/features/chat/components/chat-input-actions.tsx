@@ -1,3 +1,4 @@
+import { useSettingValue } from '@/hooks/use-setting-value'
 import { EMPTY_ACTIVITIES } from '@/lib/empty-activities'
 import { useActiveChatProjection } from '@/features/chat/hooks/use-active-projection'
 import type { InteractionMode, RuntimeMode, SessionId } from '@workspace/contracts'
@@ -52,6 +53,7 @@ export function ChatInputActions({
   sendDisabled: boolean
   statusLabel: string | null
 }) {
+  const contextMeterEnabled = useSettingValue('chat.contextWindowMeterEnabled')
   const actionsRef = useRef<HTMLDivElement | null>(null)
   const width = useElementWidth(actionsRef)
   // Only once measured: assuming compact before the first layout would flash the
@@ -85,7 +87,9 @@ export function ChatInputActions({
           />
           <ModelOptionsMenu compact={compact} disabled={disabled} draftTarget={draftTarget} />
           <ChatInputAttachButton disabled={disabled} onSelectFiles={onSelectImageFiles} />
-          {contextUsage ? <ContextUsageRing compact={compact} usage={contextUsage} /> : null}
+          {contextMeterEnabled && contextUsage ? (
+            <ContextUsageRing compact={compact} usage={contextUsage} />
+          ) : null}
           {statusLabel && !compact ? (
             <span
               className='text-muted-foreground text-2xs min-w-0 flex-1 truncate pl-1'

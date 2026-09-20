@@ -38,6 +38,8 @@ export type OrchestrationProjectedSession = OrchestrationSession & {
   checkpointByTurnId: Record<TurnId, OrchestrationProjectedCheckpoint>
   hasActionableProposedPlan: boolean
   latestUserMessageAt: string | null
+  pendingRewindCommandId: string | null
+  pendingRewindRestoreFiles: boolean
   pendingApprovalCount: number
   pendingUserInputCount: number
 }

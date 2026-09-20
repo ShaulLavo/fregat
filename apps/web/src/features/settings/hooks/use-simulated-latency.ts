@@ -1,6 +1,6 @@
 import { useEffect } from 'react'
 
-import { useSettingValue } from '@/features/settings/hooks/use-setting-value'
+import { useSettingValue } from '@/hooks/use-setting-value'
 import { setSimulatedLatencyMs } from '@/lib/simulated-latency'
 
 /** Pushes the developer latency setting into the transports, which cannot read settings themselves. */

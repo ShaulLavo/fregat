@@ -1,7 +1,7 @@
 import * as v from 'valibot'
 import { mkdir, realpath, rm, symlink } from 'node:fs/promises'
 import path from 'node:path'
-import { afterEach, describe, expect, it } from 'vitest'
+import { afterEach, describe, expect, it, vi } from 'vitest'
 import { ElysiaWS } from 'elysia/ws'
 import {
   TERMINAL_MAX_COLS,
@@ -72,6 +72,7 @@ describe('terminal service', () => {
       cwd: path.join(root, 'project'),
       shell: '/bin/zsh',
       type: 'ready',
+      restoredHistory: false,
     })
   })
 
@@ -251,14 +252,14 @@ describe('terminal service', () => {
     expect(frames[1]).toEqual(Buffer.from([0xff, 0x00, 0x80]))
   })
 
-  it('keeps exactly the latest 256 KiB for replay even after one oversized chunk', async () => {
+  it('keeps exactly the latest 8 MiB for replay even after one oversized chunk', async () => {
     const root = await fixtureRoot()
     const pty = createFakePtyFactory()
     const service = testService(root, { ptyFactory: pty.factory })
     const routes = service.routes(auth())
     const first = fakeSocket(root, '')
     await routes.open(first)
-    const oversized = Uint8Array.from({ length: 256 * 1024 + 31 }, (_, index) => index % 251)
+    const oversized = Uint8Array.from({ length: 8 * 1024 * 1024 + 31 }, () => 97)
     const tail = new Uint8Array([0xff, 0x80, 0x00])
 
     pty.ptys[0]?.emit(oversized)
@@ -269,8 +270,10 @@ describe('terminal service', () => {
 
     expect(terminalOutputBytes(first.messages).length).toBe(oversized.length + tail.length)
     const replay = terminalOutputBytes(second.messages)
-    expect(replay.length).toBe(256 * 1024)
-    expect(replay.subarray(0, -tail.length)).toEqual(oversized.subarray(31 + tail.length))
+    expect(replay.length).toBe(8 * 1024 * 1024)
+    expect(
+      Buffer.compare(replay.subarray(0, -tail.length), oversized.subarray(31 + tail.length)),
+    ).toBe(0)
     expect(replay.subarray(-tail.length)).toEqual(tail)
   })
 
@@ -298,7 +301,7 @@ describe('terminal service', () => {
   it('fans out live output without replaying history to existing viewers', async () => {
     const root = await fixtureRoot()
     const pty = createFakePtyFactory()
-    const service = testService(root, { ptyFactory: pty.factory, detachTtlMs: 0 })
+    const service = testService(root, { ptyFactory: pty.factory })
     const routes = service.routes(auth())
     const first = fakeSocket(root, '')
     await routes.open(first)
@@ -324,7 +327,9 @@ describe('terminal service', () => {
     routes.message(second, new TextEncoder().encode('input'))
     expect(pty.ptys[0]?.writes).toEqual([new TextEncoder().encode('input')])
     routes.close(second)
-    await expect.poll(() => pty.ptys[0]?.killed).toBe(true)
+    expect(pty.ptys[0]?.killed).toBe(false)
+    await service.dispose()
+    expect(pty.ptys[0]?.killed).toBe(true)
   })
 
   it('reports shared dimensions in band only while mode 2048 is enabled', async () => {
@@ -353,14 +358,14 @@ describe('terminal service', () => {
     const routes = service.routes(auth())
     const first = fakeSocket(root, '')
     await routes.open(first)
-    const bytes = new TextEncoder().encode('😀' + 'x'.repeat(256 * 1024 - 2))
+    const bytes = new TextEncoder().encode('😀' + 'x'.repeat(8 * 1024 * 1024 - 2))
     pty.ptys[0]?.emit(bytes.subarray(0, 3))
     pty.ptys[0]?.emit(bytes.subarray(3))
     const second = fakeSocket(root, '')
     await routes.open(second)
 
-    expect(terminalOutputText(first.messages)).toBe('😀' + 'x'.repeat(256 * 1024 - 2))
-    expect(terminalOutputText(second.messages)).toBe('x'.repeat(256 * 1024 - 2))
+    expect(terminalOutputText(first.messages)).toBe('😀' + 'x'.repeat(8 * 1024 * 1024 - 2))
+    expect(terminalOutputText(second.messages)).toBe('x'.repeat(8 * 1024 * 1024 - 2))
   })
 
   it('keeps terminal tab sessions isolated within the same workspace', async () => {
@@ -401,17 +406,27 @@ describe('terminal service', () => {
     await service.dispose()
   })
 
-  it('kills the PTY when a detached session exceeds its idle TTL', async () => {
+  it('keeps detached jobs past the former timeout and replays output on reconnect', async () => {
     const root = await fixtureRoot()
     const pty = createFakePtyFactory()
-    const service = testService(root, { detachTtlMs: 0, ptyFactory: pty.factory })
+    const service = testService(root, { ptyFactory: pty.factory })
     const routes = service.routes(auth())
-    const ws = fakeSocket(root, '')
-
-    await routes.open(ws)
-    routes.close(ws)
-    await Bun.sleep(10)
-
+    const first = fakeSocket(root, '', 'retained-job')
+    await routes.open(first)
+    vi.useFakeTimers({ toFake: ['setTimeout', 'clearTimeout'] })
+    try {
+      routes.close(first)
+      await vi.advanceTimersByTimeAsync(11 * 60 * 1000)
+      expect(pty.ptys[0]?.killed).toBe(false)
+    } finally {
+      vi.useRealTimers()
+    }
+    pty.ptys[0]?.emit(new TextEncoder().encode('output while detached'))
+    const second = fakeSocket(root, '', 'retained-job')
+    await routes.open(second)
+    expect(pty.ptys).toHaveLength(1)
+    expect(terminalOutputText(second.messages)).toBe('output while detached')
+    await service.dispose()
     expect(pty.ptys[0]?.killed).toBe(true)
   })
 
@@ -691,6 +706,214 @@ describe('terminal service', () => {
     ).toBe(0)
   })
 
+  it('reconnects to the same native shell after eleven detached minutes', async () => {
+    const root = await fixtureRoot()
+    const service = testService(root, {
+      env: { HOME: root, PATH: process.env.PATH, SHELL: '/bin/sh' },
+    })
+    const routes = service.routes(auth())
+    const first = fakeSocket(root, '', 'native-retained-job')
+    await routes.open(first)
+    routes.message(first, new TextEncoder().encode('RETAINED_JOB=survived; echo READY_TO_DETACH\n'))
+    await waitForTerminalOutput(first.messages, 'READY_TO_DETACH\r\n')
+    vi.useFakeTimers({ toFake: ['setTimeout', 'clearTimeout'] })
+    try {
+      routes.close(first)
+      await vi.advanceTimersByTimeAsync(11 * 60 * 1000)
+    } finally {
+      vi.useRealTimers()
+    }
+    const second = fakeSocket(root, '', 'native-retained-job')
+    await routes.open(second)
+    routes.message(second, new TextEncoder().encode('printf "retained:%s\\n" "$RETAINED_JOB"\n'))
+    await waitForTerminalOutput(second.messages, 'retained:survived')
+    await service.dispose()
+  })
+
+  it('restores raw history after service restart without retaining the old process', async () => {
+    const root = await fixtureRoot()
+    const pty = createFakePtyFactory()
+    const firstService = testService(root, { ptyFactory: pty.factory })
+    const first = fakeSocket(root, '', 'restart-history')
+    await firstService.routes(auth()).open(first)
+    const bytes = new Uint8Array([0xff, 0, 0xf0, 0x9f, 0x98, 0x80])
+    pty.ptys[0]?.emit(bytes)
+    await firstService.dispose()
+    expect(pty.ptys[0]?.killed).toBe(true)
+    const secondService = testService(root, { ptyFactory: pty.factory })
+    const second = fakeSocket(root, '', 'restart-history')
+    await secondService.routes(auth()).open(second)
+    expect(pty.ptys).toHaveLength(2)
+    expect(terminalOutputBytes(second.messages)).toEqual(bytes)
+    expect(second.messages).toContainEqual(
+      expect.objectContaining({ type: 'ready', restoredHistory: true }),
+    )
+  })
+
+  it('clears all viewers and persisted replay without ending the process', async () => {
+    const root = await fixtureRoot()
+    const pty = createFakePtyFactory()
+    const service = testService(root, { ptyFactory: pty.factory })
+    const routes = service.routes(auth())
+    const first = fakeSocket(root, '', 'shared-clear')
+    const second = fakeSocket(root, '', 'shared-clear')
+    await routes.open(first)
+    await routes.open(second)
+    pty.ptys[0]?.emit(Buffer.from('private output'))
+    const worktreeId = v.parse(worktreeIdSchema, registrations.get(root))
+    await service.clear({ worktreeId, terminalId: 'shared-clear' })
+    expect(first.messages.at(-1)).toEqual({ type: 'cleared' })
+    expect(second.messages.at(-1)).toEqual({ type: 'cleared' })
+    expect(pty.ptys[0]?.killed).toBe(false)
+    expect(pty.ptys[0]?.writes).toContain('\f')
+    const third = fakeSocket(root, '', 'shared-clear')
+    await routes.open(third)
+    expect(terminalOutputBytes(third.messages)).toHaveLength(0)
+    pty.ptys[0]?.emit(Buffer.from('new output'))
+    await service.kill({ worktreeId, terminalId: 'shared-clear' })
+    const reopened = fakeSocket(root, '', 'shared-clear')
+    await routes.open(reopened)
+    expect(terminalOutputBytes(reopened.messages)).toHaveLength(0)
+    expect(reopened.messages[0]).toMatchObject({ type: 'ready', restoredHistory: false })
+  })
+
+  it('serializes clear behind an opening terminal so stale history cannot return', async () => {
+    const root = await fixtureRoot()
+    const pty = createFakePtyFactory()
+    const firstService = testService(root, { ptyFactory: pty.factory })
+    await firstService.routes(auth()).open(fakeSocket(root, '', 'opening-clear'))
+    pty.ptys[0]?.emit(Buffer.from('old output'))
+    await firstService.dispose()
+    const entered = Promise.withResolvers<void>()
+    const release = Promise.withResolvers<void>()
+    const fixture = requiredFixture(root)
+    const service = testService(root, {
+      ptyFactory: pty.factory,
+      lifecycle: {
+        begin: async (id) => {
+          entered.resolve()
+          await release.promise
+          return fixture.engine.beginTerminalLease(id)
+        },
+      },
+    })
+    const routes = service.routes(auth())
+    const socket = fakeSocket(root, '', 'opening-clear')
+    const opening = routes.open(socket)
+    await entered.promise
+    const worktreeId = v.parse(worktreeIdSchema, registrations.get(root))
+    const clearing = service.clear({ worktreeId, terminalId: 'opening-clear' })
+    release.resolve()
+    await Promise.all([opening, clearing])
+    expect(socket.messages.at(-1)).toEqual({ type: 'cleared' })
+    pty.ptys[1]?.emit(Buffer.from('after clear'))
+    const next = fakeSocket(root, '', 'opening-clear')
+    await routes.open(next)
+    expect(terminalOutputText(next.messages)).toBe('after clear')
+  })
+
+  it('reports failed history cleanup instead of claiming kill succeeded', async () => {
+    const root = await fixtureRoot()
+    const fixture = requiredFixture(root)
+    const pty = createFakePtyFactory()
+    const service = testService(root, { ptyFactory: pty.factory })
+    const routes = service.routes(auth())
+    await routes.open(fakeSocket(root, '', 'failed-delete'))
+    pty.ptys[0]?.emit(Buffer.from('retained until cleanup'))
+    fixture.sqlite.run(
+      "CREATE TRIGGER refuse_history_delete BEFORE DELETE ON terminal_history_chunks BEGIN SELECT RAISE(ABORT, 'history cleanup failed'); END",
+    )
+    const worktreeId = v.parse(worktreeIdSchema, registrations.get(root))
+    try {
+      await expect(service.kill({ worktreeId, terminalId: 'failed-delete' })).rejects.toMatchObject(
+        { code: 'terminal.CLEANUP_UNCONFIRMED' },
+      )
+    } finally {
+      fixture.sqlite.run('DROP TRIGGER refuse_history_delete')
+    }
+    await routes.open(fakeSocket(root, '', 'failed-delete'))
+    await expect.poll(() => service.hasWorktreeRuntime(worktreeId)).toBe(false)
+    const reopened = fakeSocket(root, '', 'failed-delete')
+    await routes.open(reopened)
+    expect(terminalOutputBytes(reopened.messages)).toHaveLength(0)
+  })
+
+  it('restarts only the selected shell, preserves viewers and dimensions, and removes old replay', async () => {
+    const root = await fixtureRoot()
+    const pty = createFakePtyFactory()
+    const service = testService(root, { ptyFactory: pty.factory })
+    const routes = service.routes(auth())
+    const first = fakeSocket(root, '', 'restart-target')
+    const second = fakeSocket(root, '', 'restart-target')
+    const other = fakeSocket(root, '', 'other-target')
+    await routes.open(first)
+    await routes.open(second)
+    await routes.open(other)
+    pty.ptys[0]?.emit(Buffer.from('before restart'))
+    routes.message(first, { type: 'resize', cols: 100, rows: 35 })
+    const worktreeId = v.parse(worktreeIdSchema, registrations.get(root))
+    await expect(service.restart({ worktreeId, terminalId: 'restart-target' })).resolves.toEqual({
+      restarted: true,
+    })
+    expect(pty.ptys).toHaveLength(3)
+    expect(pty.ptys[0]?.killed).toBe(true)
+    expect(pty.ptys[1]?.killed).toBe(false)
+    expect(pty.spawns[2]).toMatchObject({ cols: 100, rows: 35 })
+    expect(first.closed).toBe(false)
+    expect(second.closed).toBe(false)
+    expect(first.messages.filter((message) => message.type === 'cleared')).toHaveLength(1)
+    expect(second.messages.filter((message) => message.type === 'cleared')).toHaveLength(1)
+    expect(first.messages.some((message) => message.type === 'exit')).toBe(false)
+    routes.message(second, Buffer.from('replacement input'))
+    expect(pty.ptys[2]?.writes).toContainEqual(Buffer.from('replacement input'))
+    pty.ptys[2]?.emit(Buffer.from('replacement output'))
+    const third = fakeSocket(root, '', 'restart-target')
+    await routes.open(third)
+    expect(terminalOutputText(third.messages)).toBe('replacement output')
+    expect(
+      requireWorktree(await requiredFixture(root).engine.readModelSnapshot(), worktreeId)
+        .activeTerminalCount,
+    ).toBe(2)
+  })
+
+  it('restarts an exited detached terminal immediately without requiring a viewer', async () => {
+    const root = await fixtureRoot()
+    const pty = createFakePtyFactory()
+    const service = testService(root, { ptyFactory: pty.factory })
+    const routes = service.routes(auth())
+    const first = fakeSocket(root, '', 'detached-restart')
+    await routes.open(first)
+    routes.close(first)
+    const worktreeId = v.parse(worktreeIdSchema, registrations.get(root))
+    await service.restart({ worktreeId, terminalId: 'detached-restart' })
+    expect(pty.ptys).toHaveLength(2)
+    expect(pty.ptys[0]?.killed).toBe(true)
+    expect(pty.ptys[1]?.killed).toBe(false)
+    expect(service.hasWorktreeRuntime(worktreeId)).toBe(true)
+  })
+
+  it('replaces a real native shell without disconnecting its viewer', async () => {
+    const root = await fixtureRoot()
+    const service = testService(root, {
+      env: { HOME: root, PATH: process.env.PATH, SHELL: '/bin/sh' },
+    })
+    const routes = service.routes(auth())
+    const socket = fakeSocket(root, '', 'native-restart')
+    await routes.open(socket)
+    routes.message(
+      socket,
+      Buffer.from('RESTART_TOKEN=old; printf "before:%s\\n" "$RESTART_TOKEN"\n'),
+    )
+    await waitForTerminalOutput(socket.messages, 'before:old')
+    const worktreeId = v.parse(worktreeIdSchema, registrations.get(root))
+    await service.restart({ worktreeId, terminalId: 'native-restart' })
+    expect(socket.closed).toBe(false)
+    expect(socket.messages.filter((message) => message.type === 'ready')).toHaveLength(2)
+    routes.message(socket, Buffer.from('printf "after:%s\\n" "${RESTART_TOKEN-unset}"\n'))
+    await waitForTerminalOutput(socket.messages, 'after:unset')
+    await service.dispose()
+  })
+
   it('spawns a native shell directly beneath the server and streams its output', async () => {
     const root = await fixtureRoot()
     const service = testService(root, {
@@ -721,7 +944,6 @@ function testService(
   root: string,
   options: {
     beforeWorktreeResolution?: Promise<void>
-    detachTtlMs?: number
     env?: NodeJS.ProcessEnv
     foregroundProcess?: (pid: number) => Promise<string | null>
     paths?: WorkspacePaths
@@ -734,6 +956,7 @@ function testService(
   if (!fixture) throw new TypeError('Missing fixture')
   const { beforeWorktreeResolution, ...serviceOptions } = options
   const service = new TerminalService({
+    database: fixture.database,
     paths: createWorkspacePaths(root),
     resolveWorktree: async (id) => {
       await beforeWorktreeResolution

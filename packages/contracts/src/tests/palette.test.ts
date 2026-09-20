@@ -40,6 +40,14 @@ describe('parseColor', () => {
     expect(parseColor('transparent')?.alpha).toBe(0)
   })
 
+  it('reads the css hue units and unitless hsl()', () => {
+    expect(toHex(parseColor('hsl(0.5turn 100% 20%)')!)).toBe('#006666')
+    expect(toHex(parseColor('hsl(200grad 100% 20%)')!)).toBe('#006666')
+    expect(toHex(parseColor('hsl(120 100 25)')!)).toBe('#008000')
+    expect(toHex(parseColor('oklch(1 0 none)')!)).toBe('#ffffff')
+    expect(toHex(parseColor('rgb(300 0 0)')!)).toBe('#ff0000')
+  })
+
   it('rejects anything that is not a literal color', () => {
     expect(parseColor('var(--foreground)')).toBeNull()
     expect(parseColor('color-mix(in oklch, red, blue)')).toBeNull()

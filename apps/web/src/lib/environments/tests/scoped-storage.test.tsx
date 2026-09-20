@@ -1,3 +1,4 @@
+import { stashMessage } from '@/features/chat/utils/stash-message'
 import { filesystemPath } from '@/lib/documents/utils/identity'
 import { testTabContents } from '../../../../test/factories/document-targets'
 import { healthDescriptorSchema, environmentIdSchema } from '@workspace/contracts'
@@ -123,8 +124,12 @@ test('draft writes keep identical paths and session keys on their captured machi
 })
 
 test('prompt queues reload independently', () => {
-  createPromptStashStore(a).getState().stashPrompt('A prompt')
-  createPromptStashStore(b).getState().stashPrompt('B prompt')
+  createPromptStashStore(a)
+    .getState()
+    .commit([stashMessage({ prompt: 'A prompt', attachments: [], terminalContexts: [] })])
+  createPromptStashStore(b)
+    .getState()
+    .commit([stashMessage({ prompt: 'B prompt', attachments: [], terminalContexts: [] })])
   expect(
     createPromptStashStore(a)
       .getState()

@@ -188,12 +188,8 @@ export function useSettingsActions() {
 
   return {
     isSaving: pendingTransports.length > 0,
-    selectBundle: (theme: ThemeBundle) =>
-      submit(
-        'user',
-        [{ kind: 'set', key: 'workbench.theme', value: theme }],
-        'settings.theme.select',
-      ),
+    selectBundle: (theme: ThemeBundle, initiator = 'settings.theme.select') =>
+      submit('user', [{ kind: 'set', key: 'workbench.theme', value: theme }], initiator),
     resetBundle: (id: ThemeId) =>
       submit('user', [{ kind: 'theme.reset', id }], 'settings.theme.defaults'),
     setMachine: (name: string, machine: MachineDefinition) =>

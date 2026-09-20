@@ -1,3 +1,4 @@
+import { sessionTitleEntries } from './session-titles'
 import * as v from 'valibot'
 import {
   commandIdSchema,
@@ -51,6 +52,8 @@ export const orchestrationSessionPlanProgressSchema = v.object({
 })
 
 export const orchestrationSessionShellSchema = v.object({
+  ...sessionTitleEntries,
+  backgroundLiveness: v.optional(v.nullable(v.picklist(['working', 'monitoring']))),
   id: sessionIdSchema,
   worktreeId: worktreeIdSchema,
   origin: sessionOriginSchema,

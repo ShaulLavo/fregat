@@ -60,7 +60,7 @@ test('plan actions cannot bypass a disconnected composer', async () => {
 
 test('plan actions wait for staged image preparation', async () => {
   const { dispatched } = renderBanner()
-  useChatInputDraftStore.getState().changeImagePreparation(draftTarget, 1)
+  useChatInputDraftStore.getState().changeAttachmentPreparation(draftTarget, 1)
   expect(await screen.findByRole('button', { name: 'Implement' })).toBeDisabled()
   expect(dispatched).toHaveLength(0)
 })

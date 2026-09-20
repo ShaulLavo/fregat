@@ -1,8 +1,27 @@
-import { CHAT_ATTACHMENT_URL_PREFIX } from '@workspace/contracts'
+import type { AttachmentOwnership } from './ownership'
+import {
+  CHAT_ATTACHMENT_URL_PREFIX,
+  MAX_CHAT_ATTACHMENTS,
+  MAX_CHAT_ATTACHMENT_BYTES,
+  MAX_CHAT_FILE_ATTACHMENT_BYTES,
+  attachmentUploadInputSchema,
+} from '@workspace/contracts'
+import * as v from 'valibot'
 import { Elysia } from 'elysia'
 
 import { observeRequestOperation } from '../observability'
-import { defaultAttachmentsDir, resolveAttachmentFile, type AttachmentFile } from './store'
+import {
+  attachmentFilePath,
+  defaultAttachmentsDir,
+  resolveAttachmentFile,
+  type AttachmentFile,
+} from './store'
+import {
+  createAttachmentUpload,
+  storeAttachmentUpload,
+  uploadedAttachmentMetadata,
+  deletePendingAttachmentUpload,
+} from './uploads'
 
 /**
  * Blob names carry a random id and their bytes are written exactly once, so a
@@ -20,13 +39,38 @@ const ATTACHMENT_CACHE_CONTROL = 'private, max-age=31536000, immutable'
  */
 export function attachmentRoutes({
   attachmentsDir = defaultAttachmentsDir(),
-}: { attachmentsDir?: string } = {}) {
-  return new Elysia({ name: 'attachment-routes' }).get(
-    `${CHAT_ATTACHMENT_URL_PREFIX}/:fileName`,
-    async ({ params, set }) => {
+  ownership,
+}: {
+  attachmentsDir?: string
+  ownership: AttachmentOwnership
+}) {
+  return new Elysia({ name: 'attachment-routes' })
+    .get('/attachments/capabilities', () => ({
+      files: true,
+      maxCount: MAX_CHAT_ATTACHMENTS,
+      maxImageBytes: MAX_CHAT_ATTACHMENT_BYTES,
+      maxFileBytes: MAX_CHAT_FILE_ATTACHMENT_BYTES,
+    }))
+    .post('/attachments/uploads', ({ body }) =>
+      createAttachmentUpload(attachmentsDir, v.parse(attachmentUploadInputSchema, body), ownership),
+    )
+    .put(
+      '/attachments/uploads/:id',
+      ({ params, request }) =>
+        storeAttachmentUpload(attachmentsDir, params.id, request.body, ownership),
+      { parse: 'none' },
+    )
+    .get('/attachments/uploads/:id', ({ params }) =>
+      uploadedAttachmentMetadata(attachmentsDir, params.id, ownership),
+    )
+    .delete('/attachments/uploads/:id', async ({ params }) => {
+      await deletePendingAttachmentUpload(attachmentsDir, params.id, ownership)
+      return { removed: true }
+    })
+    .get(`${CHAT_ATTACHMENT_URL_PREFIX}/:fileName`, async ({ params, set }) => {
       const file = await observeRequestOperation(
         { area: 'attachments', operation: 'read' },
-        () => resolveAttachmentFile({ attachmentsDir, fileName: params.fileName }),
+        () => resolveServedAttachment(attachmentsDir, params.fileName, ownership),
         (result) => summarizeAttachmentFile(params.fileName, result),
       )
       if (!file) {
@@ -39,10 +83,37 @@ export function attachmentRoutes({
           'cache-control': ATTACHMENT_CACHE_CONTROL,
           'content-length': String(file.byteLength),
           'content-type': file.contentType,
+          'x-content-type-options': 'nosniff',
+          ...(file.downloadName
+            ? {
+                'content-disposition': `attachment; filename*=UTF-8''${encodeURIComponent(file.downloadName)}`,
+              }
+            : {}),
         },
       })
-    },
-  )
+    })
+}
+
+async function resolveServedAttachment(
+  attachmentsDir: string,
+  fileName: string,
+  ownership: AttachmentOwnership,
+): Promise<(AttachmentFile & { downloadName?: string }) | null> {
+  if (!fileName.endsWith('.bin')) return resolveAttachmentFile({ attachmentsDir, fileName })
+  const metadata = await uploadedAttachmentMetadata(
+    attachmentsDir,
+    fileName.slice(0, -4),
+    ownership,
+  ).catch(() => null)
+  if (!metadata?.ready || metadata.attachment.type !== 'file') return null
+  const filePath = attachmentFilePath({ attachmentsDir, attachment: metadata.attachment })
+  if (!filePath) return null
+  return {
+    filePath,
+    byteLength: metadata.attachment.sizeBytes,
+    contentType: metadata.attachment.mimeType,
+    downloadName: metadata.attachment.name,
+  }
 }
 
 function summarizeAttachmentFile(

@@ -3,6 +3,7 @@ import {
   CaretDownIcon,
   FolderOpenIcon,
   FolderPlusIcon,
+  GitBranchIcon,
   PlugsConnectedIcon,
 } from '@phosphor-icons/react'
 import { useQuery, useQueryClient } from '@tanstack/react-query'
@@ -39,6 +40,9 @@ export function WorkspaceProjectMenu({ workspaceTitle }: { readonly workspaceTit
   const origin = originForQueryClient(useQueryClient())
   const machine = useEnvironmentsStore((state) => state.entries[origin])
   const [open, setOpen] = useState(false)
+  // Lookups start when the pointer or focus reaches the trigger, so the rows are ready by the click.
+  const [armed, setArmed] = useState(false)
+  const wanted = open || armed
   const rootPath = useEditorWorkspaceState((state) => state.rootFolder?.path ?? null)
   const openPicker = useEditorWorkspaceState((state) => state.openPicker)
   const slice = useActiveChatProjection((state) => state)
@@ -49,10 +53,11 @@ export function WorkspaceProjectMenu({ workspaceTitle }: { readonly workspaceTit
       : []
   })
   const openWorkspaceRoot = useOpenWorkspaceRoot()
-  // Only fetched while the menu is open: recents are a menu concern, not app state.
-  const recentFolders = useQuery(recentFoldersQueryOptions({ enabled: open }))
+  // Only fetched around the menu: recents are a menu concern, not app state.
+  const recentFolders = useQuery(recentFoldersQueryOptions({ enabled: wanted }))
   const { entries, isPending } = useProjectMenuEntries({
-    enabled: open,
+    enabled: wanted,
+    sourcesPending: recentFolders.isPending,
     activeRootPath: rootPath,
     activeTitle: workspaceTitle,
     projects,
@@ -83,6 +88,10 @@ export function WorkspaceProjectMenu({ workspaceTitle }: { readonly workspaceTit
           />
         }
         title={menuTitle}
+        onPointerEnter={() => setArmed(true)}
+        onPointerLeave={() => setArmed(false)}
+        onFocus={() => setArmed(true)}
+        onBlur={() => setArmed(false)}
       >
         <FolderOpenIcon
           className='text-muted-foreground size-(--icon-size) shrink-0'
@@ -101,7 +110,7 @@ export function WorkspaceProjectMenu({ workspaceTitle }: { readonly workspaceTit
         <DropdownMenuRadioGroup value={rootPath ?? ''}>
           {/* Inside the group: base-ui resolves the label against its group context. */}
           <DropdownMenuLabel>Recent</DropdownMenuLabel>
-          {recentFolders.isPending || isPending ? (
+          {isPending ? (
             <LoadingState label='Loading projects' className='px-2 py-1'>
               <div aria-hidden='true' className='skeleton-sweep h-4 w-full rounded-md' />
             </LoadingState>
@@ -109,15 +118,18 @@ export function WorkspaceProjectMenu({ workspaceTitle }: { readonly workspaceTit
           {entries.map((entry) => (
             <DropdownMenuRadioItem
               key={entry.rootPath}
-              title={entry.rootPath}
+              title={entry.worktree ? `Worktree · ${entry.rootPath}` : entry.rootPath}
               value={entry.rootPath}
               onClick={() => handleSelect(entry.rootPath)}
             >
+              {entry.worktree ? (
+                <GitBranchIcon className='text-muted-foreground ml-3 size-(--icon-size-sm) shrink-0' />
+              ) : null}
               <span className='flex min-w-0 flex-1 items-baseline gap-1.5'>
                 <span className='truncate'>{entry.title}</span>
-                {entry.qualifier ? (
+                {(entry.worktree?.branch ?? entry.qualifier) ? (
                   <span className='text-muted-foreground text-2xs shrink-0 truncate'>
-                    {entry.qualifier}
+                    {entry.worktree?.branch ?? entry.qualifier}
                   </span>
                 ) : null}
               </span>

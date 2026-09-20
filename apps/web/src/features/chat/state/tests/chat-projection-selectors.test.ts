@@ -67,6 +67,31 @@ test('an archived session is not a sidebar session, project-scoped or not', () =
   ).toEqual(['1cb66ded-870c-5359-8e74-f911ce864e73'])
 })
 
+test.each(['approval', 'user-input', 'plan', 'failure', 'interruption'] as const)(
+  'archived %s attention is excluded from normal selectors but available explicitly',
+  (attentionReason) => {
+    const archived = sessionShell({
+      archivedAt: timestamp(1),
+      attentionState: 'needs-input',
+      attentionReason,
+    })
+    const state = syncChatProjectionShellSnapshot(createInitialChatProjectionSlice(), {
+      projects: [chatProject()],
+      worktrees: [fixtureWorktree()],
+      sessions: [archived],
+      snapshotSequence: 1,
+      updatedAt: timestamp(1),
+    })
+    expect(createChatSessionListSelector({ includeArchived: false })(state)).toEqual([])
+    expect(selectChatSidebarSessions(state)).toEqual([])
+    expect(selectChatSidebarSessionsForProject(state, chatProject().id)).toEqual([])
+    expect(
+      createChatSessionListSelector({ includeArchived: true })(state).map((session) => session.id),
+    ).toEqual([archived.id])
+    expect(selectChatSessionById(state, archived.id)?.attentionReason).toBe(attentionReason)
+  },
+)
+
 // These feed zustand selectors: a fresh array per read is a render loop, not a detail.
 test('sidebar session lists keep their identity across reads', () => {
   const state = sidebarState()

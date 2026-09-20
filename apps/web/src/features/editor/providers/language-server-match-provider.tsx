@@ -2,7 +2,7 @@ import { useLayoutEffect, useState, type ReactNode } from 'react'
 import { useQueryClient, type QueryClient } from '@tanstack/react-query'
 
 import { LanguageServerMatchConfigurationContext } from '@/features/editor/providers/language-server-match-context'
-import { useSettingValue } from '@/features/settings/hooks/use-setting-value'
+import { useSettingValue } from '@/hooks/use-setting-value'
 import type { LanguageServerMatchConfigurationSnapshot } from '@/features/editor/utils/query-keys'
 
 const configurationStateByQueryClient = new WeakMap<QueryClient, LanguageServerMatchProviderState>()

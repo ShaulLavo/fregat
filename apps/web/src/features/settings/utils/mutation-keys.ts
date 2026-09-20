@@ -2,6 +2,7 @@ import type { ProviderInstanceId } from '@workspace/contracts'
 import type { DocumentKey } from '@/lib/documents/utils/types'
 
 export const settingsMutationKeys = {
+  notificationPermission: () => ['settings', 'notification-permission'] as const,
   importSessions: (providerInstanceId: ProviderInstanceId) =>
     ['settings', 'session-import', providerInstanceId] as const,
   palettes: {

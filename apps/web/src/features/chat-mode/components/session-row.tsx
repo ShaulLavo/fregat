@@ -1,3 +1,5 @@
+import { SessionTitleStatus } from '@/features/chat-mode/components/session-title-status'
+import { useSessionWake } from '@/features/chat-mode/hooks/use-session-wake'
 import { ListRow } from '@workspace/ui/patterns/list-row'
 import { useSessionListRow } from '@/features/chat-mode/hooks/use-session-list-row'
 import { SessionAttentionIndicator } from '@/features/chat-mode/components/session-attention-indicator'
@@ -25,6 +27,7 @@ export function SessionRow({ session }: { readonly session: SessionRailItem }) {
   // label stuck at whatever it said when the row mounted.
   const { rowProps, active } = useSessionListRow(session.key)
   const nowMs = useCoarseNow()
+  const wokeAt = useSessionWake(session.ref)
   const renaming = useSessionRailStore((state) => state.renaming)
   const marked = useSessionMultiSelectStore((state) =>
     state.refs.some((ref) => scopedSessionKey(ref) === session.key),
@@ -34,6 +37,8 @@ export function SessionRow({ session }: { readonly session: SessionRailItem }) {
       roleDescription: 'sortable session row',
     },
     id: session.key,
+    disabled: !session.canDrag,
+    data: { kind: 'session', groupKey: session.projectGroupKey, shelf: session.placement },
   })
 
   if (renaming?.surface === 'rail' && scopedSessionKey(renaming.ref) === session.key) {
@@ -51,7 +56,7 @@ export function SessionRow({ session }: { readonly session: SessionRailItem }) {
       trigger={
         <ListRow
           as='button'
-          {...attributes}
+          {...(session.canDrag ? attributes : {})}
           {...listeners}
           {...rowProps}
           role='option'
@@ -112,7 +117,9 @@ export function SessionRow({ session }: { readonly session: SessionRailItem }) {
           {session.hasError ? (
             <span className='text-destructive text-2xs pl-[14px]'>Error</span>
           ) : null}
+          {wokeAt ? <span className='text-info text-2xs'>Woke</span> : null}
           <SessionRowSnippet sessionKey={session.key} />
+          <SessionTitleStatus sessionRef={session.ref} />
         </ListRow>
       }
     />

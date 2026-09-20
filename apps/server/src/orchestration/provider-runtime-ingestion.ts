@@ -35,7 +35,14 @@ export type ProviderRuntimeDispatch = (
   source: ProviderRuntimeSource,
 ) => Promise<unknown>
 export type ProviderRuntimeSource = Pick<ProviderRuntimeEvent, 'sessionId' | 'runtimeEpoch'>
-export type AssistantDeliveryMode = 'streaming' | 'buffered'
+type ReasoningState = {
+  messageId: MessageId
+  event: Extract<ProviderRuntimeEvent, { type: 'content.delta' }>
+  partIndex?: number
+  closed: boolean
+  nextChunkIndex: number
+}
+import type { ResponseStreamingMode } from './response-delivery'
 
 const SEEN_RUNTIME_EVENT_ID_MAX = 20_000
 const TOOL_LIFECYCLE_ITEM_TYPES = new Set([
@@ -49,7 +56,11 @@ const TOOL_LIFECYCLE_ITEM_TYPES = new Set([
 ])
 
 export class ProviderRuntimeIngestion {
-  private readonly assistantDeliveryMode: AssistantDeliveryMode
+  private readonly responseStreamingMode: (
+    projectId: string,
+  ) => ResponseStreamingMode | Promise<ResponseStreamingMode>
+  private readonly now: () => number
+  private readonly reasoning: BoundedTtlCache<string, ReasoningState>
   private readonly buffers: ProviderRuntimeBuffers
   private readonly dispatchCommand: ProviderRuntimeDispatch
   private readonly getReadModel: (() => OrchestrationReadModel) | null
@@ -60,7 +71,9 @@ export class ProviderRuntimeIngestion {
   constructor(
     dispatch: ProviderRuntimeDispatch,
     options: {
-      assistantDeliveryMode?: AssistantDeliveryMode
+      responseStreamingMode?: (
+        projectId: string,
+      ) => ResponseStreamingMode | Promise<ResponseStreamingMode>
       buffers?: ProviderRuntimeBuffers
       getReadModel?: () => OrchestrationReadModel
       now?: () => number
@@ -73,7 +86,13 @@ export class ProviderRuntimeIngestion {
       onLiveness?: (sessionId: SessionId) => void
     } = {},
   ) {
-    this.assistantDeliveryMode = options.assistantDeliveryMode ?? 'streaming'
+    this.responseStreamingMode = options.responseStreamingMode ?? (() => 'paragraph')
+    this.now = options.now ?? Date.now
+    this.reasoning = new BoundedTtlCache({
+      capacity: 10_000,
+      now: this.now,
+      ttlMs: PROVIDER_RUNTIME_BUFFER_TTL_MS,
+    })
     this.buffers = options.buffers ?? new ProviderRuntimeBuffers({ now: options.now })
     this.dispatchCommand = dispatch
     this.getReadModel = options.getReadModel ?? null
@@ -118,6 +137,7 @@ export class ProviderRuntimeIngestion {
     this.onLiveness?.(event.sessionId)
     await this.dispatchSessionCommand(event)
     await this.dispatchMetadataCommands(event)
+    await this.dispatchReasoning(event)
     await this.dispatchContentCommands(event)
     await this.dispatchCheckpointPlaceholder(event)
     await this.dispatchActivityCommands(event)
@@ -255,6 +275,8 @@ export class ProviderRuntimeIngestion {
         return
       case 'request.opened':
       case 'user-input.requested':
+        if (event.type === 'user-input.requested' && event.payload.responseMode === 'message')
+          return
         await this.pauseAssistantSegment(event)
         return
       case 'proposed-plan.upsert':
@@ -289,12 +311,18 @@ export class ProviderRuntimeIngestion {
     if (input.turnId)
       this.buffers.rememberAssistantMessageId(input.sessionId, input.turnId, input.messageId)
 
-    if (this.assistantDeliveryMode === 'streaming') {
+    const mode = await this.deliveryMode(input.sessionId)
+    if (mode === 'token') {
       await this.dispatch(assistantDeltaCommand(input, input.delta, 'assistant-delta'), input.event)
       return
     }
 
-    const spill = this.buffers.appendBufferedAssistantText(input.messageId, input.delta)
+    const spill = this.buffers.appendBufferedAssistantText(
+      input.messageId,
+      input.delta,
+      mode,
+      this.now(),
+    )
     if (spill.length === 0) return
 
     await this.dispatch(
@@ -398,13 +426,11 @@ export class ProviderRuntimeIngestion {
     if (event.payload.itemType !== 'assistant_message') return
 
     const turnId = event.turnId
-    const fallbackMessageId = v.parse(
-      messageIdSchema,
-      `assistant:${event.itemId ?? event.turnId ?? event.eventId}`,
-    )
-    const messageId = turnId
-      ? (this.buffers.activeAssistantMessageIdForTurn(event.sessionId, turnId) ?? fallbackMessageId)
-      : fallbackMessageId
+    const messageId = this.buffers.getOrCreateAssistantMessageId({
+      baseKey: event.itemId ?? event.turnId ?? event.eventId,
+      sessionId: event.sessionId,
+      turnId,
+    })
     await this.completeAssistantMessage({
       completedAt: event.createdAt,
       event,
@@ -508,6 +534,130 @@ export class ProviderRuntimeIngestion {
         type: 'session.proposed-plan.upsert',
       },
       input.event,
+    )
+  }
+
+  private deliveryMode(sessionId: SessionId) {
+    const model = this.getReadModel?.()
+    const session = model?.sessions.get(sessionId)
+    const projectId = session ? model?.worktrees.get(session.worktreeId)?.projectId : undefined
+    return this.responseStreamingMode(projectId ?? '')
+  }
+
+  private async dispatchReasoning(event: ProviderRuntimeEvent) {
+    const key = `${event.sessionId}:${event.turnId ?? ''}`
+    if (event.type === 'runtime.exited') {
+      for (const owned of this.reasoning.keys()) {
+        if (!owned.startsWith(`${event.sessionId}:`)) continue
+        const state = this.reasoning.get(owned)
+        if (state) this.buffers.clearBufferedAssistantText(state.messageId)
+        this.reasoning.delete(owned)
+      }
+      return
+    }
+    if (event.type === 'content.delta' && isReasoningStreamKind(event.payload.streamKind)) {
+      await this.appendReasoning(key, event)
+      return
+    }
+    if (event.type === 'item.completed' && event.payload.itemType === 'reasoning') {
+      const state = this.reasoning.get(key)
+      if (!state && event.payload.detail?.trim()) {
+        await this.appendReasoning(key, {
+          ...event,
+          type: 'content.delta',
+          payload: { streamKind: 'reasoning_text', delta: event.payload.detail },
+        })
+      }
+      await this.finalizeReasoning(key, event)
+      return
+    }
+    const boundary =
+      event.type === 'assistant.delta' ||
+      (event.type === 'content.delta' && event.payload.streamKind === 'assistant_text') ||
+      (event.type === 'item.started' && TOOL_LIFECYCLE_ITEM_TYPES.has(event.payload.itemType)) ||
+      event.type === 'request.opened' ||
+      (event.type === 'user-input.requested' && event.payload.responseMode !== 'message') ||
+      event.type === 'turn.completed'
+    if (!boundary) return
+    await this.finalizeReasoning(key, event)
+    if (event.type === 'turn.completed') this.reasoning.delete(key)
+  }
+
+  private async appendReasoning(
+    key: string,
+    event: Extract<ProviderRuntimeEvent, { type: 'content.delta' }>,
+  ) {
+    if (!event.payload.delta) return
+    let state = this.reasoning.get(key)
+    if (state && !state.closed && state.event.itemId !== event.itemId) {
+      await this.finalizeReasoning(key, event)
+      state = undefined
+    }
+    if (!state || state.closed) {
+      state = {
+        messageId: v.parse(
+          messageIdSchema,
+          `reasoning:${event.sessionId}:${event.turnId ?? ''}:${event.eventId}`,
+        ),
+        event,
+        closed: false,
+        nextChunkIndex: 0,
+      }
+    }
+    const partIndex = event.payload.summaryIndex ?? event.payload.contentIndex
+    const separator =
+      state.partIndex !== undefined && partIndex !== undefined && state.partIndex !== partIndex
+        ? '\n\n'
+        : ''
+    state.partIndex = partIndex
+    this.reasoning.set(key, state)
+    const mode = await this.deliveryMode(event.sessionId)
+    const text = this.buffers.appendBufferedAssistantText(
+      state.messageId,
+      separator + event.payload.delta,
+      mode === 'token' ? 'paragraph' : mode,
+      this.now(),
+    )
+    await this.emitReasoning(state, event, text)
+  }
+
+  private async finalizeReasoning(key: string, event: ProviderRuntimeEvent) {
+    const state = this.reasoning.get(key)
+    if (!state || state.closed) return
+    await this.emitReasoning(state, event, this.buffers.takeBufferedAssistantText(state.messageId))
+    this.buffers.clearBufferedAssistantText(state.messageId)
+    this.reasoning.set(key, { ...state, closed: true })
+  }
+
+  private async emitReasoning(state: ReasoningState, event: ProviderRuntimeEvent, text: string) {
+    if (!text) return
+    // Snapshot cursors order equal timestamps by activity ID.
+    const chunkId = `${state.messageId}:${String(state.nextChunkIndex++).padStart(12, '0')}`
+    const activity = baseActivity(
+      {
+        ...state.event,
+        eventId: chunkId,
+        createdAt: state.event.createdAt,
+      },
+      'thinking',
+      'task.progress',
+      'Thinking',
+      {
+        detail: text,
+        summary: text,
+        streamKind: state.event.payload.streamKind,
+        taskId: state.messageId,
+      },
+    )
+    await this.dispatch(
+      {
+        activity,
+        commandId: providerCommandId(event.eventId, `reasoning:${chunkId}`),
+        createdAt: activity.createdAt,
+        sessionId: event.sessionId,
+        type: 'session.activity.append',
+      },
+      event,
     )
   }
 
@@ -701,7 +851,7 @@ function activitiesForRuntimeEvent(
     case 'activity.append':
       return [activityFromLegacyEvent(event)]
     case 'content.delta':
-      return reasoningContentDeltaActivity(event)
+      return []
     case 'item.started':
       return toolActivity(event, 'tool.started', `${event.payload.title ?? 'Tool'} started`)
     case 'item.completed':
@@ -795,6 +945,7 @@ function requestOpenedActivity(event: Extract<ProviderRuntimeEvent, { type: 'req
       : approvalRequestSummary(requestKind)
   return [
     baseActivity(event, 'approval', 'approval.requested', summary, {
+      options: event.payload.options,
       detail: event.payload.detail,
       requestId: event.requestId,
       requestKind,
@@ -824,6 +975,7 @@ function userInputRequestedActivity(
   const { droppedQuestionCount, questions } = normalizeUserInputQuestions(event.payload.questions)
 
   return baseActivity(event, 'info', 'user-input.requested', 'User input requested', {
+    responseMode: event.payload.responseMode,
     // Widening the activity rather than logging a second line: whoever reads
     // the request also sees how much of it we could not read.
     droppedQuestionCount: droppedQuestionCount === 0 ? undefined : droppedQuestionCount,
@@ -962,26 +1114,6 @@ function taskProgressActivity(event: Extract<ProviderRuntimeEvent, { type: 'task
       `task-progress:${event.sessionId}:${event.turnId ?? 'session'}:${event.payload.taskId}${event.payload.tool ? `:tool:${event.payload.tool.itemId}` : ''}`,
     ),
   }
-}
-
-function reasoningContentDeltaActivity(
-  event: Extract<ProviderRuntimeEvent, { type: 'content.delta' }>,
-) {
-  if (!isReasoningStreamKind(event.payload.streamKind)) return []
-
-  const summary = truncateDetail(event.payload.delta)
-  if (!summary) return []
-
-  return [
-    baseActivity(event, 'thinking', 'task.progress', 'Thinking', {
-      contentIndex: event.payload.contentIndex,
-      detail: summary,
-      streamKind: event.payload.streamKind,
-      summary,
-      summaryIndex: event.payload.summaryIndex,
-      taskId: event.itemId ?? event.eventId,
-    }),
-  ]
 }
 
 function taskCompletedActivity(

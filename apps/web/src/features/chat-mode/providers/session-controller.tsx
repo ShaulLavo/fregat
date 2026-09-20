@@ -1,3 +1,4 @@
+import { SessionSnoozeDialog } from '@/features/chat-mode/components/session-snooze-dialog'
 import { WorktreeManager } from '@/features/chat-mode/components/worktree-manager'
 import { useActiveChatProjection } from '@/features/chat/hooks/use-active-projection'
 import type { ReactNode } from 'react'
@@ -21,7 +22,7 @@ import {
 import { useSessionSelectionStore } from '@/features/chat-mode/state/session-selection-store'
 import { activeSession } from '@/features/chat-mode/utils/active-session'
 import { activeWorktree } from '@/features/chat-mode/utils/active-worktree'
-import { compareSessionsForRail } from '@workspace/client-core/chat/rail/session-order'
+import { comparePinnedSessions } from '@workspace/client-core/chat/rail/session-order'
 import { useActiveProjectStore } from '@/features/workspace/state/active-project'
 
 export function ChatModeSessionController({
@@ -44,7 +45,7 @@ export function ChatModeSessionController({
   )
   const sessions = projectSessions
     .filter((session) => !session.archivedAt)
-    .toSorted(compareSessionsForRail)
+    .toSorted(comparePinnedSessions)
   const sessionIds = sessions.map((session) => session.id)
   const archivedSessionIds = projectSessions
     .filter((session) => Boolean(session.archivedAt))
@@ -105,6 +106,7 @@ export function ChatModeSessionController({
       {/* Mounted here, not in the rail: the row that asks for the delete is the first
           thing to unmount once the answer is yes. */}
       <SessionDeleteDialog />
+      <SessionSnoozeDialog />
       <ProjectDeleteDialog />
       <ProjectRenameDialog />
       <WorktreeManager />

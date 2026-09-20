@@ -93,6 +93,23 @@ describe('streaming commit', () => {
     expect(await headSubject(root)).toBe('initial')
   })
 
+  it('relays a colored hook line with its escapes and without its carriage return', async () => {
+    const root = await fixtureRepo()
+    await writeHook(root, 'pre-commit', [
+      'printf "\\033[38;2;0;0;0m╭─\\033[m \\033[1mpre-commit\\033[m\\r\\n"',
+      'exit 0',
+    ])
+    await stageChange(root, 'two\n')
+
+    const events = await collect(gitService(root).commitProgress({ message: 'plain', path: root }))
+
+    expect(events).toContainEqual({
+      kind: 'progress',
+      stream: 'stderr',
+      text: '\x1b[38;2;0;0;0m╭─\x1b[m \x1b[1mpre-commit\x1b[m',
+    })
+  })
+
   it('reaches the client as an SSE stream, not one buffered body', async () => {
     const root = await fixtureRepo()
     await writeHook(root, 'pre-commit', ['echo "hook ran"', 'exit 0'])

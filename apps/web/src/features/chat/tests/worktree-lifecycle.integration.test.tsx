@@ -27,7 +27,7 @@ test('draft choices, shared chips and dirty worktree cleanup survive deletion an
   )!
   const draftTarget = {
     environmentId: harness.environmentId,
-    draftKey: 'draft',
+    draftKey: '1be91a27-21da-4f7c-b345-6f6f09814671',
     rootPath: base.path,
   }
   const drafts = useChatInputDraftStore.getState()
@@ -38,6 +38,7 @@ test('draft choices, shared chips and dirty worktree cleanup survive deletion an
   })
   let created: SessionId | null = null
   const draft = renderChatDraft({
+    draftId: draftTarget.draftKey,
     disabled: false,
     transport: harness.context.transport,
     project,
@@ -65,6 +66,7 @@ test('draft choices, shared chips and dirty worktree cleanup survive deletion an
     providerInstanceId: server.providerAdapter.adapterKey,
   })
   const isolatedDraft = renderChatDraft({
+    draftId: draftTarget.draftKey,
     disabled: false,
     transport: harness.context.transport,
     project,

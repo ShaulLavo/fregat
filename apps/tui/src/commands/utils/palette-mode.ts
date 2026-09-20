@@ -54,6 +54,7 @@ export function paletteModeRows({
   palette,
   writable,
   chat,
+  sessionSortOrder,
 }: {
   readonly captured: ReturnType<CommandBus['capture']>
   readonly bindings: readonly TerminalBinding[]
@@ -62,6 +63,7 @@ export function paletteModeRows({
   readonly colorMode: keyof typeof colorCommands
   readonly palette: PaletteId
   readonly writable: boolean
+  readonly sessionSortOrder: 'updated_at' | 'created_at'
   readonly chat: ChatOwnerSnapshot
 }): { readonly title: string; readonly empty: string; readonly options: PaletteOption[] } {
   const mode = quickAccessMode(search)
@@ -124,7 +126,7 @@ export function paletteModeRows({
       return {
         title: 'Sessions',
         empty: chat.error ?? 'No matching sessions.',
-        options: sessionAccessRows(chat.projection, query),
+        options: sessionAccessRows(chat.projection, query, sessionSortOrder),
       }
     case 'symbols':
       return unavailable('Symbols')
@@ -132,6 +134,8 @@ export function paletteModeRows({
       return unavailable('Go to line')
     case 'wallpaper':
       return unavailable('Wallpapers')
+    case 'themeBundle':
+      return unavailable('Themes')
   }
 }
 

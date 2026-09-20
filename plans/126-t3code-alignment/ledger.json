@@ -6,18 +6,27 @@
       "title": "Install a conformance gate that catches a deliberate wrong test",
       "report": "adjacent.md",
       "wave": "0",
-      "status": "open",
+      "status": "in-progress",
       "evidence_level": "source-reviewed",
       "acceptance": "adjacent.md, EXT-11, Acceptance / verification",
-      "execution_evidence": []
+      "execution_evidence": [
+        "scripts/parity/README.md",
+        "scripts/parity/check.py and source.py pass; 25 negative record/census tests pass",
+        "test/parity/t3code/operations.json records 191 explicit unknown mappings; CI checks pinned reference 7445aa733ada33e45289e5aa5055f79142556513",
+        "Behavioral mapping, fixtures and wrong-behavior controls remain incomplete"
+      ]
     },
     {
       "id": "EXT-13",
       "wave": "1",
-      "status": "open",
+      "status": "in-progress",
       "evidence_level": "source-reviewed",
       "acceptance": "adjacent.md, EXT-13, Acceptance / verification",
-      "execution_evidence": [],
+      "execution_evidence": [
+        "rewind-permissions-delivery.md",
+        "Server release 20260920T125500Z-02885149-plan126-rewind-permissions; web release 20260920T125946Z-b915d3e0-rewind-draft-identity",
+        "Focused real-engine/native-process tests pass; live rewind and paired upstream runtime evidence pending"
+      ],
       "report": "adjacent.md",
       "title": "Preserve failed pull-request lookup as failure"
     },
@@ -26,70 +35,95 @@
       "title": "Restore the rewound user message into the composer",
       "report": "interaction.md",
       "wave": "1",
-      "status": "open",
-      "evidence_level": "source-reviewed",
+      "status": "in-progress",
+      "evidence_level": "implementation-deployed; local-regressions-and-browser-verified; live-upstream-comparison-pending",
       "acceptance": "interaction.md, INTERACTION-05, Acceptance / verification",
-      "execution_evidence": []
+      "execution_evidence": [
+        "rewind-permissions-delivery.md",
+        "/work/tmp/fregat-evidence/20260920T133321Z-scenario-checkpoint-rewind; real Codex native conversation rewind and draft restoration verified"
+      ]
     },
     {
       "id": "LIFE-01",
       "title": "P0: Enforce archive before every active-list classification",
       "report": "lifecycle.md",
       "wave": "1",
-      "status": "open",
-      "evidence_level": "source-reviewed",
+      "status": "in-progress",
+      "evidence_level": "implementation-deployed; local-regressions-and-browser-verified; live-upstream-comparison-pending",
       "acceptance": "lifecycle.md, LIFE-01, Acceptance / verification",
-      "execution_evidence": []
+      "execution_evidence": [
+        "archive-delivery.md",
+        "test/parity/t3code/archive.json",
+        "/work/tmp/fregat-evidence/20260920T122707Z-scenario-archive-lifecycle/"
+      ]
     },
     {
       "id": "LIFE-02",
       "title": "P0: Align archive eligibility and remove automatic unarchive",
       "report": "lifecycle.md",
       "wave": "1",
-      "status": "open",
-      "evidence_level": "source-reviewed",
+      "status": "in-progress",
+      "evidence_level": "implementation-deployed; local-regressions-and-browser-verified; live-upstream-comparison-pending",
       "acceptance": "lifecycle.md, LIFE-02, Acceptance / verification",
-      "execution_evidence": []
+      "execution_evidence": [
+        "archive-delivery.md",
+        "test/parity/t3code/archive.json",
+        "/work/tmp/fregat-evidence/20260920T122707Z-scenario-archive-lifecycle/"
+      ]
     },
     {
       "id": "RUNTIME-01",
       "title": "Validate rewind before touching files, and separate conversation rewind",
       "report": "runtime.md",
       "wave": "1",
-      "status": "open",
+      "status": "in-progress",
       "evidence_level": "source-reviewed",
       "acceptance": "runtime.md, RUNTIME-01, Acceptance / verification",
-      "execution_evidence": []
+      "execution_evidence": [
+        "rewind-permissions-delivery.md",
+        "Server release 20260920T125500Z-02885149-plan126-rewind-permissions; web release 20260920T125946Z-b915d3e0-rewind-draft-identity",
+        "Focused real-engine/native-process tests pass; live rewind and paired upstream runtime evidence pending"
+      ]
     },
     {
       "id": "RUNTIME-03",
       "title": "Route the supported MCP app-access elicitation forms",
       "report": "runtime.md",
       "wave": "1",
-      "status": "open",
+      "status": "in-progress",
       "evidence_level": "source-reviewed",
       "acceptance": "runtime.md, RUNTIME-03, Acceptance / verification",
-      "execution_evidence": []
+      "execution_evidence": [
+        "live-delivery-approvals-delivery.md",
+        "Focused local integration tests pass; next deployment and browser checks pending; no paired upstream execution"
+      ]
     },
     {
       "id": "RUNTIME-04",
       "title": "Bound retained live delivery and recover from overflow",
       "report": "runtime.md",
       "wave": "1",
-      "status": "open",
+      "status": "in-progress",
       "evidence_level": "source-reviewed",
       "acceptance": "runtime.md, RUNTIME-04, Acceptance / verification",
-      "execution_evidence": []
+      "execution_evidence": [
+        "live-delivery-approvals-delivery.md",
+        "Focused local integration tests pass; next deployment and browser checks pending; no paired upstream execution"
+      ]
     },
     {
       "id": "RUNTIME-11",
       "title": "Return the native permission-approval response shape",
       "report": "runtime.md",
       "wave": "1",
-      "status": "open",
+      "status": "in-progress",
       "evidence_level": "source-reviewed",
       "acceptance": "runtime.md, RUNTIME-11, Acceptance / verification",
-      "execution_evidence": []
+      "execution_evidence": [
+        "rewind-permissions-delivery.md",
+        "Server release 20260920T125500Z-02885149-plan126-rewind-permissions; web release 20260920T125946Z-b915d3e0-rewind-draft-identity",
+        "Focused real-engine/native-process tests pass; live rewind and paired upstream runtime evidence pending"
+      ]
     },
     {
       "id": "EXT-06",
@@ -106,30 +140,41 @@
       "title": "P1: Restore lifecycle shelves and separate attention from placement",
       "report": "lifecycle.md",
       "wave": "2",
-      "status": "open",
+      "status": "in-progress",
       "evidence_level": "source-reviewed",
       "acceptance": "lifecycle.md, LIFE-03, Acceptance / verification",
-      "execution_evidence": []
+      "execution_evidence": [
+        "lifecycle-grouping-delivery.md",
+        "Live lifecycle evidence /work/tmp/fregat-evidence/20260920T140116Z-scenario-session-lifecycle; screenshots reviewed; multi-owner grouping live prerequisite unavailable; repository_path subproject registration remains open"
+      ]
     },
     {
       "id": "LIFE-04",
       "title": "P1: Align settle and snooze transitions, including provider release",
       "report": "lifecycle.md",
       "wave": "2",
-      "status": "open",
+      "status": "in-progress",
       "evidence_level": "source-reviewed",
       "acceptance": "lifecycle.md, LIFE-04, Acceptance / verification",
-      "execution_evidence": []
+      "execution_evidence": [
+        "lifecycle-grouping-delivery.md",
+        "Live lifecycle evidence /work/tmp/fregat-evidence/20260920T140116Z-scenario-session-lifecycle; screenshots reviewed; multi-owner grouping live prerequisite unavailable; repository_path subproject registration remains open"
+      ]
     },
     {
       "id": "LIFE-05",
       "title": "P1: Separate active ordering from pinning and implement shelf drag transitions",
       "report": "lifecycle.md",
       "wave": "2",
-      "status": "open",
+      "status": "in-progress",
       "evidence_level": "source-reviewed",
       "acceptance": "lifecycle.md, LIFE-05, Acceptance / verification",
-      "execution_evidence": []
+      "execution_evidence": [
+        "ordering-delivery.md",
+        "Pinned ordering oracle1621cases; source-derived negative controls; server active lifecycle and UI drag tests pass",
+        "Release143358; live pointer empty shelves, canonical reload order, keyboard pin proof: /work/tmp/fregat-evidence/20260920T144130Z-scenario-session-ordering",
+        "Cross-owner live ordering remains unproven; full group not runtime-compared"
+      ]
     },
     {
       "id": "LIFE-07",
@@ -146,40 +191,52 @@
       "title": "P1: Search messages on every connected environment represented in the rail",
       "report": "lifecycle.md",
       "wave": "2",
-      "status": "open",
-      "evidence_level": "source-reviewed",
+      "status": "in-progress",
+      "evidence_level": "implementation-deployed; local-regressions-and-browser-verified; live-upstream-comparison-pending",
       "acceptance": "lifecycle.md, LIFE-08, Acceptance / verification",
-      "execution_evidence": []
+      "execution_evidence": [
+        "search-delivery.md",
+        "/work/tmp/fregat-evidence/20260920T140044Z-scenario-session-search; single-owner browser passed, distinct two-owner server tests passed; two-owner live unavailable"
+      ]
     },
     {
       "id": "LIFE-09",
       "title": "P1: Preserve project group membership and configurable grouping",
       "report": "lifecycle.md",
       "wave": "2",
-      "status": "open",
+      "status": "in-progress",
       "evidence_level": "source-reviewed",
       "acceptance": "lifecycle.md, LIFE-09, Acceptance / verification",
-      "execution_evidence": []
+      "execution_evidence": [
+        "lifecycle-grouping-delivery.md",
+        "Live lifecycle evidence /work/tmp/fregat-evidence/20260920T140116Z-scenario-session-lifecycle; screenshots reviewed; multi-owner grouping live prerequisite unavailable; repository_path subproject registration remains open"
+      ]
     },
     {
       "id": "LIFE-10",
       "title": "P1: Match navigation after archive/delete and retain failed bulk-delete selections",
       "report": "lifecycle.md",
       "wave": "2",
-      "status": "open",
+      "status": "in-progress",
       "evidence_level": "source-reviewed",
       "acceptance": "lifecycle.md, LIFE-10, Acceptance / verification",
-      "execution_evidence": []
+      "execution_evidence": [
+        "lifecycle-grouping-delivery.md",
+        "Live lifecycle evidence /work/tmp/fregat-evidence/20260920T140116Z-scenario-session-lifecycle; screenshots reviewed; multi-owner grouping live prerequisite unavailable; repository_path subproject registration remains open"
+      ]
     },
     {
       "id": "LIFE-11",
       "title": "P2: Implement generated title lifecycle and regeneration actions",
       "report": "lifecycle.md",
       "wave": "2",
-      "status": "open",
+      "status": "in-progress",
       "evidence_level": "source-reviewed",
       "acceptance": "lifecycle.md, LIFE-11, Acceptance / verification",
-      "execution_evidence": []
+      "execution_evidence": [
+        "Title lifecycle/reactor/model settings implemented; server38focusedtests include migrations and pinnedcontext144cases",
+        "UI and native browser verification in progress; source not yet deployed"
+      ]
     },
     {
       "id": "LIFE-12",
@@ -189,7 +246,12 @@
       "status": "open",
       "evidence_level": "source-reviewed",
       "acceptance": "lifecycle.md, LIFE-12, Acceptance / verification",
-      "execution_evidence": []
+      "execution_evidence": [
+        "Bounded draft recovery delivered; plans/126-t3code-alignment/draft-recovery-delivery.md",
+        "Live draft-recovery PASS on 20260920T161132Z-b915d3e0-plan126-draft-recovery; /work/tmp/fregat-evidence/20260920T161205Z-scenario-draft-recovery/; all three screenshots inspected and owned upload cleanup confirmed",
+        "Focused regression verifies pointer open, keyboard Enter open and discard preserving surviving selection",
+        "Group remains open: orphaned-worktree cleanup and session-owned terminal deletion are not delivered by this unit"
+      ]
     },
     {
       "id": "INTERACTION-01",
@@ -226,10 +288,13 @@
       "title": "Complete pending-question interactions",
       "report": "interaction.md",
       "wave": "3",
-      "status": "open",
-      "evidence_level": "source-reviewed",
+      "status": "in-progress",
+      "evidence_level": "implementation-deployed; local-regressions-and-browser-verified; live-upstream-comparison-pending",
       "acceptance": "interaction.md, INTERACTION-04, Acceptance / verification",
-      "execution_evidence": []
+      "execution_evidence": [
+        "async-questions-delivery.md",
+        "Server135727/web135934; running answer steers, idle answer starts, dismissal and pending reload verified in /work/tmp/fregat-evidence/20260920T140014Z-scenario-async-questions; attachments and digit shortcuts in progress"
+      ]
     },
     {
       "id": "INTERACTION-09",
@@ -336,10 +401,15 @@
       "title": "Make idle cleanup aware of background work and periodic",
       "report": "runtime.md",
       "wave": "4",
-      "status": "open",
+      "status": "in-progress",
       "evidence_level": "source-reviewed",
       "acceptance": "runtime.md, RUNTIME-07, Acceptance / verification",
-      "execution_evidence": []
+      "execution_evidence": [
+        "background-delivery.md",
+        "Actual pinned liveness720transitions, three negative controls; periodic reaper tests pass",
+        "Native child live142923: completed parent working, child idle and late metadata/reload remains ready; screenshots inspected",
+        "Monitor-only native Codex wire and automatic settlement are not claimed"
+      ]
     },
     {
       "id": "RUNTIME-08",
@@ -356,10 +426,16 @@
       "title": "Match response delivery modes and paragraph default",
       "report": "runtime.md",
       "wave": "4",
-      "status": "open",
+      "status": "in-progress",
       "evidence_level": "source-reviewed",
       "acceptance": "runtime.md, RUNTIME-09, Acceptance / verification",
-      "execution_evidence": []
+      "execution_evidence": [
+        "response-delivery.md",
+        "/work/tmp/plan126-response-delivery-90-tests.log: 61 native adapter + 29 ingestion tests pass; six adapter-to-database full reasoning cases",
+        "Pinned splitter248 and buffering190 cases match; two negative controls rejected; 19 work-log cases pass",
+        "Live response-delivery161535 on web/server161447: full expanded reasoning and reload exact text pass, both screenshots inspected, owned session/provider/processes cleaned",
+        "Reasoning remains activity-domain mapping; full upstream reasoning-message UI and cross-provider live matrix are not claimed"
+      ]
     },
     {
       "id": "RUNTIME-10",
@@ -416,10 +492,12 @@
       "title": "Match terminal history, restart and attachment semantics",
       "report": "adjacent.md",
       "wave": "5",
-      "status": "open",
+      "status": "in-progress",
       "evidence_level": "source-reviewed",
       "acceptance": "adjacent.md, EXT-05, Acceptance / verification",
-      "execution_evidence": []
+      "execution_evidence": [
+        "terminal-delivery.md: detached lifetime, durable raw history, shared clear and shell restart delivered. Live evidence 20260920T160608Z-scenario-terminal-history; 38 service,16 agent terminal/history,4 TUI attach tests; full attach/host equivalence remains open."
+      ]
     },
     {
       "id": "EXT-10",

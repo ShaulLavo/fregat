@@ -378,3 +378,12 @@ function clampedInsertionIndex(index: number, length: number) {
 function clamp(value: number, min: number, max: number) {
   return Math.min(Math.max(value, min), max)
 }
+
+export function workbenchSidebarTabLabel(tab: WorkbenchSidebarTab) {
+  if (tab === 'chat') return 'Chat'
+  if (tab === 'git') return 'Git'
+  if (tab === 'logs') return 'Logs'
+  if (tab === 'search') return 'Search'
+
+  return 'Files'
+}

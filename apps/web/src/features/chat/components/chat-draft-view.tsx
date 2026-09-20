@@ -6,7 +6,7 @@ import {
   type SessionWorktreeTarget,
 } from '@workspace/contracts'
 import { useQuery } from '@tanstack/react-query'
-import { useCallback, useMemo, useState } from 'react'
+import { useCallback, useEffect, useMemo, useState } from 'react'
 
 import { notifyChatCommandError } from '@/features/chat/notify-command-error'
 import type { ChatTransport } from '@/features/chat/transport/chat-transport'
@@ -20,18 +20,17 @@ import { dispatchChatCommand, replayAfterDispatch } from '@/features/chat/utils/
 import { scheduleSessionProjectionSyncAfterDispatch } from '@/features/chat/utils/command-sync'
 import { placeChatMessage } from '@/features/chat/state/place-chat-message'
 import { ChatComposerModesProvider } from '../providers/composer-modes-provider'
-import type { ChatInputDraftTarget } from '../state/chat-input-draft-store'
+import { useChatInputDraftStore, type ChatInputDraftTarget } from '../state/chat-input-draft-store'
 import { ChatInput, type ChatInputSubmitPayload } from './chat-input'
 import { ChatWelcomeView } from './chat-welcome-view'
 import { WorktreePicker } from '@/features/chat/components/worktree-picker'
 import { newWorktreeTarget } from '@/features/chat/utils/worktree-target'
-import { useSettingValue } from '@/features/settings/hooks/use-setting-value'
+import { useSettingValue } from '@/hooks/use-setting-value'
 import { useNavigation } from '@/hooks/use-navigation'
-
-const DRAFT_CHAT_KEY = 'draft'
 
 export function ChatDraftView({
   disabled,
+  draftId,
   transport,
   onSessionCreated,
   project,
@@ -39,6 +38,7 @@ export function ChatDraftView({
   rootPath,
 }: {
   disabled: boolean
+  draftId: string
   transport: ChatTransport
   onSessionCreated: (sessionId: SessionId) => void
   project: OrchestrationProjectShell | null
@@ -46,12 +46,6 @@ export function ChatDraftView({
   rootPath: string
 }) {
   const navigation = useNavigation()
-  const [chosenTarget, setChosenTarget] = useState<SessionWorktreeTarget | null>(null)
-  const target =
-    chosenTarget ?? (worktree ? { kind: 'current' as const, worktreeId: worktree.id } : null)
-  const targetReady =
-    worktree?.lifecycle.state === 'ready' &&
-    (target?.kind !== 'new' || worktree.worktreeCreationCapability.allowed)
   const [sendError, setSendError] = useState<string | null>(null)
   // The same target ChatInput builds for itself, so a mode pick lands on the
   // draft the send path reads. Stable identity: it feeds the modes context value.
@@ -61,9 +55,34 @@ export function ChatDraftView({
   const defaultRuntimeMode = useSettingValue('chat.defaultRuntimeMode')
   const defaultInteractionMode = useSettingValue('chat.defaultInteractionMode')
   const draftTarget = useMemo<ChatInputDraftTarget>(
-    () => ({ environmentId: transport.environmentId, draftKey: DRAFT_CHAT_KEY, rootPath }),
-    [transport.environmentId, rootPath],
+    () => ({ environmentId: transport.environmentId, draftKey: draftId, rootPath }),
+    [transport.environmentId, rootPath, draftId],
   )
+  const draft = useChatInputDraftStore((state) => state.getDraft(draftTarget))
+  const identity = draft.identity
+  useEffect(() => {
+    if (identity || !project || !worktree) return
+    useChatInputDraftStore.getState().setIdentity(draftTarget, {
+      id: draftId,
+      projectId: project.id,
+      rootPath,
+      baseWorktreeId: worktree.id,
+      worktreeTarget: { kind: 'current', worktreeId: worktree.id },
+      createdAt: new Date().toISOString(),
+    })
+  }, [identity, project, worktree, draftTarget, draftId, rootPath])
+  const target = identity?.worktreeTarget ?? null
+  const targetReady =
+    identity?.projectId === project?.id &&
+    identity?.baseWorktreeId === worktree?.id &&
+    identity?.rootPath === rootPath &&
+    worktree?.path === rootPath &&
+    worktree?.lifecycle.state === 'ready' &&
+    (target?.kind !== 'new' || worktree.worktreeCreationCapability.allowed)
+  function chooseTarget(worktreeTarget: SessionWorktreeTarget) {
+    if (identity)
+      useChatInputDraftStore.getState().setIdentity(draftTarget, { ...identity, worktreeTarget })
+  }
   const providersQuery = useQuery(providerListQueryOptions())
   const modelSelection = resolveChatModelSelection(
     providersQuery.data?.providers,
@@ -144,6 +163,7 @@ export function ChatDraftView({
       return false
     }
 
+    useChatInputDraftStore.getState().setIdentity(draftTarget, null)
     setSendError(null)
     if (navigation.getSnapshot() === operation) onSessionCreated(submission.command.sessionId)
 
@@ -157,8 +177,8 @@ export function ChatDraftView({
         <WorktreePicker
           base={worktree}
           target={target}
-          onCurrent={() => setChosenTarget({ kind: 'current', worktreeId: worktree.id })}
-          onNew={() => setChosenTarget(newWorktreeTarget(worktree.id))}
+          onCurrent={() => chooseTarget({ kind: 'current', worktreeId: worktree.id })}
+          onNew={() => chooseTarget(newWorktreeTarget(worktree.id))}
         />
       ) : null}
       {/* No session exists yet, so a mode pick only lands in the draft — the turn
@@ -171,8 +191,16 @@ export function ChatDraftView({
         <ChatInput
           busy={false}
           disabled={disabled || !project || !targetReady}
-          draftKey={DRAFT_CHAT_KEY}
-          error={sendError}
+          draftKey={draftId}
+          error={
+            sendError ??
+            (identity &&
+            (!worktree ||
+              identity.baseWorktreeId !== worktree.id ||
+              identity.rootPath !== worktree.path)
+              ? 'The draft worktree is unavailable. Restore it before sending.'
+              : null)
+          }
           interactionMode={defaultInteractionMode}
           modelSelection={modelSelection}
           rootPath={rootPath}

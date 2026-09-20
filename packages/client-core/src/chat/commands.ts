@@ -40,6 +40,8 @@ import {
   type SessionTurnSteerCommand,
   type SessionUnarchiveCommand,
   type SessionUserInputRespondCommand,
+  type UserInputAttachmentUploads,
+  type SessionUserInputDismissCommand,
   type TurnId,
 } from '@workspace/contracts'
 import * as v from 'valibot'
@@ -286,6 +288,17 @@ export function createSessionRenameCommand({
   }
 }
 
+export function createSessionRegenerateTitleCommand(
+  sessionId: SessionId,
+): SessionMetaUpdateCommand {
+  return {
+    type: 'session.meta.update',
+    commandId: createCommandId(),
+    sessionId,
+    regenerateTitle: true,
+  }
+}
+
 export function createSessionArchiveCommand({
   sessionId,
 }: {
@@ -342,15 +355,18 @@ export function createApprovalRespondCommand({
 
 export function createUserInputRespondCommand({
   answers,
+  attachmentsByQuestionId,
   requestId,
   sessionId,
 }: {
+  attachmentsByQuestionId?: UserInputAttachmentUploads
   answers: ProviderUserInputAnswers
   requestId: ApprovalRequestId
   sessionId: SessionId
 }): SessionUserInputRespondCommand {
   return {
     answers,
+    attachmentsByQuestionId,
     commandId: createCommandId(),
     requestId,
     sessionId,
@@ -391,14 +407,17 @@ export function createInteractionModeSetCommand({
 export function createCheckpointRevertCommand({
   sessionId,
   turnCount,
+  restoreFiles,
 }: {
   sessionId: SessionId
   turnCount: number
+  restoreFiles: boolean
 }): SessionCheckpointRevertCommand {
   return {
     commandId: createCommandId(),
     sessionId,
     turnCount,
+    restoreFiles,
     type: 'session.checkpoint.revert',
   }
 }
@@ -590,4 +609,51 @@ function hasSensitiveSessionTitleWord(title: string) {
 
   const compact = words.join('')
   return SENSITIVE_SESSION_TITLE_COMPOUNDS.some((word) => compact.includes(word))
+}
+
+export function createUserInputDismissCommand(input: {
+  sessionId: SessionId
+  requestId: ApprovalRequestId
+}): SessionUserInputDismissCommand {
+  return { ...input, type: 'session.user-input.dismiss', commandId: createCommandId() }
+}
+
+export type SessionLifecycleChange =
+  | { readonly type: 'settle' | 'unsettle' | 'unsnooze' | 'pin' | 'unpin' }
+  | { readonly type: 'snooze'; readonly snoozedUntil: string }
+
+export function createSessionActiveReorderCommand({
+  sessionId,
+  orderKey,
+}: {
+  readonly sessionId: SessionId
+  readonly orderKey: string
+}) {
+  return {
+    type: 'session.active.reorder' as const,
+    commandId: createCommandId(),
+    sessionId,
+    orderKey,
+  }
+}
+
+export function createSessionLifecycleCommand(
+  sessionId: SessionId,
+  change: SessionLifecycleChange,
+): import('@workspace/contracts').ClientOrchestrationCommand {
+  const commandId = createCommandId()
+  switch (change.type) {
+    case 'settle':
+      return { type: 'session.settle', commandId, sessionId }
+    case 'unsettle':
+      return { type: 'session.unsettle', commandId, sessionId, reason: 'user' }
+    case 'snooze':
+      return { type: 'session.snooze', commandId, sessionId, snoozedUntil: change.snoozedUntil }
+    case 'unsnooze':
+      return { type: 'session.unsnooze', commandId, sessionId, reason: 'user' }
+    case 'pin':
+      return { type: 'session.pin', commandId, sessionId }
+    case 'unpin':
+      return { type: 'session.unpin', commandId, sessionId }
+  }
 }

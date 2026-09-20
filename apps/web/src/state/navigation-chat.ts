@@ -1,6 +1,10 @@
+import { recoverableDraft } from '@/features/chat/state/chat-input-draft-store'
 import { supersededNavigation } from '@/state/navigation-result'
 import { editorDocumentToken } from '@workspace/client-core/address/grammar'
-import type { ChatReference } from '@workspace/client-core/address/references'
+import {
+  chatReferenceForToken,
+  type ChatReference,
+} from '@workspace/client-core/address/references'
 import {
   selectCurrentWorktree,
   selectSessionOwnership,
@@ -18,7 +22,6 @@ import type {
   SessionId,
   WorktreeId,
 } from '@workspace/contracts'
-import { useSessionSelectionStore } from '@/features/chat-mode/state/session-selection-store'
 import {
   useChatProjectionStore,
   selectChatProjectionSlice,
@@ -40,6 +43,7 @@ export function createChatNavigation(coordinator: ReturnType<typeof createNaviga
     surface,
     replace = false,
     newDraft = false,
+    draftId,
   }: {
     readonly environmentId: EnvironmentId
     readonly sessionId: SessionId | null
@@ -48,6 +52,7 @@ export function createChatNavigation(coordinator: ReturnType<typeof createNaviga
     readonly surface: 'main' | 'sidebar'
     readonly replace?: boolean
     readonly newDraft?: boolean
+    readonly draftId?: string
   }) {
     if (
       surface === 'sidebar' &&
@@ -55,7 +60,14 @@ export function createChatNavigation(coordinator: ReturnType<typeof createNaviga
     )
       return supersededNavigation()
     return coordinator.request(async ({ application, address, signal, isCurrent }) => {
-      const token = sessionId ? `t/${sessionId}` : 't/new'
+      const previous = chatReferenceForToken(
+        surface === 'sidebar' ? (address.chat ?? null) : address.document,
+      )
+      const identity =
+        draftId ??
+        (!newDraft && previous?.kind === 'draft' ? previous.draftId : undefined) ??
+        crypto.randomUUID()
+      const token = sessionId ? `t/${sessionId}` : `t/draft-${identity}`
       const origin = confirmedEnvironmentOrigin(environmentId)
       if (surface === 'sidebar') {
         if (confirmedEnvironmentId(application.getSnapshot().origin) !== environmentId)
@@ -64,7 +76,7 @@ export function createChatNavigation(coordinator: ReturnType<typeof createNaviga
           )
         const sidebarChat: ChatReference = sessionId
           ? { kind: 'session', sessionId }
-          : { kind: 'draft' }
+          : { kind: 'draft', draftId: identity }
         return {
           address: { ...address, chat: token, side: 'chat' },
           replace,
@@ -77,13 +89,29 @@ export function createChatNavigation(coordinator: ReturnType<typeof createNaviga
         signal,
       )
       if (!isCurrent()) return { address, replace }
+      const recovered = draftId ? recoverableDraft(environmentId, draftId)?.identity : null
+      if (draftId && !recovered)
+        throw createClientInvariantError('This draft is unavailable on this machine.')
+      if (recovered && projectId && recovered.projectId !== projectId)
+        throw createClientInvariantError('This draft belongs to another project.')
       const ownership = sessionId ? selectSessionOwnership(slice, sessionId) : null
       if (sessionId && !ownership)
         throw createClientInvariantError('The conversation is unavailable.')
       const worktree =
         ownership?.worktree ??
+        (recovered ? slice.worktreeById[recovered.baseWorktreeId] : null) ??
         (worktreeId ? slice.worktreeById[worktreeId] : null) ??
         (projectId ? selectCurrentWorktree(slice, projectId) : null)
+      if (
+        recovered &&
+        (!worktree ||
+          worktree.id !== recovered.baseWorktreeId ||
+          worktree.path !== recovered.rootPath ||
+          worktree.lifecycle.state !== 'ready')
+      )
+        throw createClientInvariantError(
+          'The draft worktree is unavailable. Restore that worktree before opening this draft.',
+        )
       if (!worktree) throw createClientInvariantError('The conversation workspace is unavailable.')
       if (projectId && worktree.projectId !== projectId)
         throw createClientInvariantError('The conversation does not belong to this project.')
@@ -118,8 +146,6 @@ export function createChatNavigation(coordinator: ReturnType<typeof createNaviga
           applyPreparedChat({
             snapshot,
             environmentId,
-            worktree,
-            restartDraft: newDraft && sameRoot,
           }),
       }
     })
@@ -131,17 +157,11 @@ export function createChatNavigation(coordinator: ReturnType<typeof createNaviga
 function applyPreparedChat({
   snapshot,
   environmentId,
-  worktree,
-  restartDraft,
 }: {
   readonly snapshot: OrchestrationShellSnapshot | null
   readonly environmentId: EnvironmentId
-  readonly worktree: OrchestrationWorktreeShell
-  readonly restartDraft: boolean
 }) {
   if (snapshot) useChatProjectionStore.getState().syncShellSnapshot(environmentId, snapshot)
-  if (!restartDraft || !sameDraft(environmentId, worktree.projectId)) return
-  useSessionSelectionStore.getState().startDraft(environmentId, worktree.projectId, worktree.id)
 }
 
 async function chatProjectionForNavigation(
@@ -175,13 +195,4 @@ function sidebarOwnerMatches(
   if (root === undefined) return false
   const slice = selectChatProjectionSlice(useChatProjectionStore.getState(), environmentId)
   return selectWorktreeAtPath(slice, root)?.projectId === projectId
-}
-
-function sameDraft(environmentId: EnvironmentId, projectId: ProjectId) {
-  const selection = useSessionSelectionStore.getState().selection
-  return (
-    selection.kind === 'draft' &&
-    selection.environmentId === environmentId &&
-    selection.projectId === projectId
-  )
 }

@@ -38,7 +38,7 @@ test.each([
   [SESSION_DIFF_SCOPE_STORAGE_KEY, readPersistedSessionDiffScopes],
   ['platform.chat-session-reads.v1', readPersistedSessionReads],
   ['platform.chat-rail-collapse.v1', readPersistedRailCollapse],
-  ['platform.prompt-stash.v1', createPromptStashStore],
+  ['platform.chat-input-drafts.v1', createPromptStashStore],
 ] as const)('discards malformed JSON and invalid schema for %s', (key, read) => {
   testScopedStorage.setItem('unrelated', 'kept')
   for (const invalid of ['broken JSON', '{"version":999}']) {

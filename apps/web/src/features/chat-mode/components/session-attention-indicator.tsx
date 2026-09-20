@@ -1,4 +1,4 @@
-import type { SessionAttentionState } from '@workspace/contracts'
+import type { SessionRailStatus } from '@workspace/client-core/chat/rail/status'
 import { OrbitLoader } from '@workspace/ui/components/orbit-loader'
 import { cn } from '@workspace/ui/lib/utils'
 import {
@@ -6,7 +6,7 @@ import {
   sessionStatusLabel,
 } from '@/features/chat-mode/utils/attention-state'
 
-export function SessionAttentionIndicator({ status }: { readonly status: SessionAttentionState }) {
+export function SessionAttentionIndicator({ status }: { readonly status: SessionRailStatus }) {
   const label = sessionStatusLabel(status)
   if (status === 'working')
     return <OrbitLoader className='text-info size-3 shrink-0' label={label} />

@@ -1,8 +1,8 @@
-import type { ScopedProjectRef } from '@workspace/contracts'
+import type { ProjectGroupMember } from '@workspace/client-core/chat/rail/project-grouping'
 import { create } from 'zustand'
 
 export type ProjectDeleteRequest = {
-  readonly ref: ScopedProjectRef
+  readonly members: readonly (ProjectGroupMember & { readonly sessionCount: number })[]
   /** Sessions the cascade will take with it, archived ones included. */
   readonly sessionCount: number
   readonly title: string

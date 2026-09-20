@@ -1,4 +1,4 @@
-import { useSettingValue } from '@/features/settings/hooks/use-setting-value'
+import { useSettingValue } from '@/hooks/use-setting-value'
 import { useTheme } from '@/features/settings/hooks/use-theme'
 import { PlusIcon, UploadSimpleIcon } from '@phosphor-icons/react'
 import { paletteSupportsMode, type Palette } from '@workspace/contracts'

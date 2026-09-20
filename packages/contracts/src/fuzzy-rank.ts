@@ -1,3 +1,12 @@
+import {
+  contiguousMatch,
+  matchToken,
+  startsWord,
+  subsequenceMatch,
+  type TokenMatch,
+  type TokenMatchKind,
+} from '@workspace/utils/token-match'
+
 export type FuzzyRankTarget = {
   label: string
   keywords?: readonly string[]
@@ -26,11 +35,16 @@ type FieldRank = {
 const LABEL_FIELD_BONUS = 3_000
 const PATH_FIELD_BONUS = 1_000
 const KEYWORD_FIELD_BONUS = 500
-const EXACT_BASE_SCORE = 10_000
-const PREFIX_BASE_SCORE = 8_000
-const WORD_BASE_SCORE = 7_000
-const SUBSTRING_BASE_SCORE = 6_000
-const FUZZY_BASE_SCORE = 1_000
+const BASE_SCORE: Record<TokenMatchKind, number> = {
+  exact: 10_000,
+  prefix: 8_000,
+  boundary: 7_000,
+  includes: 6_000,
+  fuzzy: 1_000,
+}
+const BOUNDARY_MARKERS = './_- '
+// File and command queries stay fuzzy from the first character.
+const MATCH_OPTIONS = { boundaryMarkers: BOUNDARY_MARKERS, minFuzzyLength: 1 }
 
 export function fuzzyRank(target: FuzzyRankTarget, query: string): FuzzyRank | null {
   const pieces = queryPieces(query)
@@ -122,70 +136,29 @@ function bestKeywordRank(keywords: readonly string[] | undefined, piece: string)
 }
 
 function textFieldRank(text: string, piece: string, field: FieldRank['field']): FieldRank | null {
-  const normalized = text.toLocaleLowerCase()
-  if (!normalized) return null
+  const normalized = text.toLowerCase()
+  if (field === 'path') return pathFieldRank(normalized, piece)
 
-  const contiguous = contiguousRank(text, normalized, piece, field)
-  if (contiguous) return contiguous
-
-  return fuzzyFieldRank(text, normalized, piece, field)
+  const match = matchToken(normalized, piece, MATCH_OPTIONS)
+  return match ? fieldRank(normalized, piece, field, match) : null
 }
 
-function contiguousRank(
-  text: string,
-  normalized: string,
-  piece: string,
-  field: FieldRank['field'],
-): FieldRank | null {
-  const index = normalized.indexOf(piece)
-  if (index < 0) return null
-
-  const exact = normalized === piece
-  const base = contiguousBaseScore(normalized, piece, index, exact)
-  const coverage = piece.length / Math.max(1, text.length)
-  const score = fieldBonus(field) + base + coverage * 500 - index
-
-  return {
-    exact,
-    field,
-    firstIndex: index,
-    score,
-    span: piece.length,
-  }
-}
-
-function contiguousBaseScore(text: string, piece: string, index: number, exact: boolean) {
-  if (exact) return EXACT_BASE_SCORE
-  if (index === 0) return PREFIX_BASE_SCORE
-  if (wordBoundaryBefore(text, index)) return WORD_BASE_SCORE
-
-  return SUBSTRING_BASE_SCORE + piece.length / Math.max(1, text.length)
-}
-
-function fuzzyFieldRank(
-  text: string,
-  normalized: string,
-  piece: string,
-  field: FieldRank['field'],
-): FieldRank | null {
-  if (field === 'path') return fuzzyPathFieldRank(text, normalized, piece)
-
-  const positions = fuzzyPositions(normalized, piece)
-  if (!positions) return null
-
-  return fuzzyRankFromPositions(text, piece, field, positions)
-}
-
-function fuzzyPathFieldRank(text: string, normalized: string, piece: string): FieldRank | null {
+function pathFieldRank(normalized: string, piece: string): FieldRank | null {
+  const contiguous = contiguousMatch(normalized, piece, BOUNDARY_MARKERS)
+  if (contiguous) return fieldRank(normalized, piece, 'path', contiguous)
   if (piece.includes('/')) return null
 
+  return bestSegmentRank(normalized, piece)
+}
+
+// One fuzzy piece never spans two path segments.
+function bestSegmentRank(normalized: string, piece: string): FieldRank | null {
   const ranks: FieldRank[] = []
   let offset = 0
 
   for (const segment of normalized.split('/')) {
-    const positions = fuzzyPositions(segment, piece)
-    if (positions)
-      ranks.push(fuzzyRankFromPositions(text, piece, 'path', offsetPositions(positions, offset)))
+    const match = subsequenceMatch(segment, piece)
+    if (match) ranks.push(fieldRank(normalized, piece, 'path', offsetMatch(match, offset)))
 
     offset += segment.length + 1
   }
@@ -193,46 +166,39 @@ function fuzzyPathFieldRank(text: string, normalized: string, piece: string): Fi
   return ranks.sort(compareFieldRanks)[0] ?? null
 }
 
-function fuzzyRankFromPositions(
+function offsetMatch(match: TokenMatch, offset: number): TokenMatch {
+  return { kind: match.kind, index: match.index + offset, span: match.span }
+}
+
+function fieldRank(
   text: string,
   piece: string,
   field: FieldRank['field'],
-  positions: readonly number[],
+  match: TokenMatch,
 ): FieldRank {
-  const firstIndex = positions[0] ?? 0
-  const lastIndex = positions.at(-1) ?? firstIndex
-  const span = lastIndex - firstIndex + 1
-  const compactness = piece.length / Math.max(1, span)
-  const boundaryBoost = wordBoundaryBefore(text, firstIndex) ? 150 : 0
-  const score =
-    fieldBonus(field) + FUZZY_BASE_SCORE + compactness * 350 + boundaryBoost - firstIndex
-
   return {
-    exact: false,
+    exact: match.kind === 'exact',
     field,
-    firstIndex,
-    score,
-    span,
+    firstIndex: match.index,
+    score: fieldBonus(field) + matchScore(text, piece, match),
+    span: match.span,
   }
 }
 
-function offsetPositions(positions: readonly number[], offset: number) {
-  return positions.map((position) => position + offset)
+function matchScore(text: string, piece: string, match: TokenMatch) {
+  if (match.kind === 'fuzzy') return fuzzyScore(text, piece, match)
+
+  const coverage = piece.length / text.length
+  const base = BASE_SCORE[match.kind] + (match.kind === 'includes' ? coverage : 0)
+
+  return base + coverage * 500 - match.index
 }
 
-function fuzzyPositions(text: string, piece: string) {
-  const positions: number[] = []
-  let fromIndex = 0
+function fuzzyScore(text: string, piece: string, match: TokenMatch) {
+  const compactness = piece.length / match.span
+  const boundaryBoost = startsWord(text, match.index, BOUNDARY_MARKERS) ? 150 : 0
 
-  for (const character of piece) {
-    const index = text.indexOf(character, fromIndex)
-    if (index < 0) return null
-
-    positions.push(index)
-    fromIndex = index + character.length
-  }
-
-  return positions
+  return BASE_SCORE.fuzzy + compactness * 350 + boundaryBoost - match.index
 }
 
 function fieldBonus(field: FieldRank['field']) {
@@ -242,14 +208,8 @@ function fieldBonus(field: FieldRank['field']) {
   return KEYWORD_FIELD_BONUS
 }
 
-function wordBoundaryBefore(text: string, index: number) {
-  if (index <= 0) return true
-
-  return /[./_\-\s]/u.test(text[index - 1] ?? '')
-}
-
 export function queryPieces(query: string) {
-  return query.toLocaleLowerCase().trim().split(/\s+/u).filter(Boolean)
+  return query.toLowerCase().trim().split(/\s+/u).filter(Boolean)
 }
 
 function emptyRank(target: FuzzyRankTarget): FuzzyRank {

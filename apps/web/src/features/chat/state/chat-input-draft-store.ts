@@ -2,7 +2,6 @@ import { createEnvironmentRecordPersistence } from '@/lib/environments/state/rec
 import { MAX_CHAT_ATTACHMENTS } from '@workspace/contracts'
 import type { ScopedStorage } from '@/lib/environments/state/scoped-storage'
 import type {
-  ChatAttachment,
   EnvironmentId,
   InteractionMode,
   ModelSelection,
@@ -17,6 +16,7 @@ import {
   readPersistedChatInputDrafts,
   writePersistedChatInputDrafts,
   type PersistedChatInputDraft,
+  type DraftIdentity,
   type PersistedChatInputDraftStorage,
 } from '@/features/chat/utils/draft-storage'
 import type { TerminalContextSelection } from '@workspace/client-core/chat/terminal-context'
@@ -30,10 +30,8 @@ export type ChatInputDraftTarget = {
   rootPath: string
 }
 
-export type ChatInputImageAttachment = ChatAttachment & {
-  dataUrl: string
-  previewUrl: string
-}
+export type { ChatInputAttachment } from '../utils/attachment-draft'
+import type { ChatInputAttachment } from '../utils/attachment-draft'
 
 /**
  * A captured terminal slice waiting to be sent. It carries the whole selection
@@ -46,7 +44,8 @@ export type ChatInputTerminalContext = TerminalContextSelection & {
 }
 
 export type ChatInputDraft = {
-  images: ChatInputImageAttachment[]
+  identity: DraftIdentity | null
+  attachments: ChatInputAttachment[]
   interactionMode: InteractionMode | null
   modelSelection: ModelSelection | null
   prompt: string
@@ -57,22 +56,35 @@ export type ChatInputDraft = {
 
 type ChatInputDraftState = {
   draftsByKey: Record<string, ChatInputDraft>
-  preparingImagesByKey: Record<string, number>
+  preparingAttachmentsByKey: Record<string, number>
   persistenceError: string | null
 }
 
 type ChatInputDraftActions = {
-  changeImagePreparation: (target: ChatInputDraftTarget, delta: 1 | -1) => void
-  addImages: (target: ChatInputDraftTarget, images: readonly ChatInputImageAttachment[]) => number
+  setIdentity: (target: ChatInputDraftTarget, identity: DraftIdentity | null) => void
+  restoreContent: (
+    target: ChatInputDraftTarget,
+    content: Pick<ChatInputDraft, 'prompt' | 'attachments' | 'terminalContexts'>,
+  ) => void
+  changeAttachmentPreparation: (target: ChatInputDraftTarget, delta: 1 | -1) => void
+  addAttachments: (
+    target: ChatInputDraftTarget,
+    attachments: readonly ChatInputAttachment[],
+  ) => number
   addTerminalContexts: (
     target: ChatInputDraftTarget,
     contexts: readonly ChatInputTerminalContext[],
   ) => void
+  updateAttachment: (
+    target: ChatInputDraftTarget,
+    id: string,
+    update: Partial<ChatInputAttachment>,
+  ) => boolean
   clearDraft: (target: ChatInputDraftTarget) => void
   clearDraftContent: (target: ChatInputDraftTarget) => void
   flush: () => boolean
   getDraft: (target: ChatInputDraftTarget) => ChatInputDraft
-  removeImage: (target: ChatInputDraftTarget, imageId: string) => void
+  removeAttachment: (target: ChatInputDraftTarget, imageId: string) => void
   removeTerminalContext: (target: ChatInputDraftTarget, contextId: string) => void
   setInteractionMode: (
     target: ChatInputDraftTarget,
@@ -85,10 +97,11 @@ type ChatInputDraftActions = {
 
 export type ChatInputDraftStore = ChatInputDraftState & ChatInputDraftActions
 
-const EMPTY_IMAGES: ChatInputImageAttachment[] = []
+const EMPTY_ATTACHMENTS: ChatInputAttachment[] = []
 const EMPTY_TERMINAL_CONTEXTS: ChatInputTerminalContext[] = []
 const EMPTY_CHAT_INPUT_DRAFT: ChatInputDraft = {
-  images: EMPTY_IMAGES,
+  identity: null,
+  attachments: EMPTY_ATTACHMENTS,
   interactionMode: null,
   modelSelection: null,
   prompt: '',
@@ -97,11 +110,13 @@ const EMPTY_CHAT_INPUT_DRAFT: ChatInputDraft = {
   updatedAt: null,
 }
 
+const draftAdapters = new Map<EnvironmentId, ScopedStorage>()
+
 const draftPersistence = createEnvironmentRecordPersistence<PersistedChatInputDraft>({
   read: (storage) => readPersistedChatInputDrafts(storage).draftsByKey,
   write: (storage, draftsByKey) =>
     writePersistedChatInputDrafts(storage, {
-      ...emptyPersistedChatInputDrafts(),
+      ...readPersistedChatInputDrafts(storage),
       draftsByKey: { ...draftsByKey },
     }),
 })
@@ -112,24 +127,57 @@ const draftPersist = new Debouncer(() => flushChatInputDraftStorage(), {
 
 export const useChatInputDraftStore = create<ChatInputDraftStore>((set, get) => ({
   ...createInitialChatInputDraftState(),
-  changeImagePreparation: (target, delta) => {
+  setIdentity: (target, identity) => {
+    set((state) =>
+      updateDraftForTarget(state, target, (draft) => withDraftPatch(draft, { identity })),
+    )
+    draftPersist.maybeExecute()
+  },
+  restoreContent: (target, content) => {
+    set((state) =>
+      updateDraftForTarget(state, target, (draft) =>
+        withDraftPatch(draft, {
+          prompt: [content.prompt, draft.prompt].filter(Boolean).join('\n\n'),
+          // Capacity was checked before rewind; preserve both if another editor changed the draft.
+          attachments: content.attachments.concat(draft.attachments),
+          terminalContexts: content.terminalContexts.concat(draft.terminalContexts),
+        }),
+      ),
+    )
+    draftPersist.maybeExecute()
+  },
+  changeAttachmentPreparation: (target, delta) => {
     const key = chatInputDraftStorageId(target.environmentId, target.rootPath, target.draftKey)
     if (!key) return
     set((state) => {
-      const preparingImagesByKey = { ...state.preparingImagesByKey }
-      const count = Math.max(0, (preparingImagesByKey[key] ?? 0) + delta)
-      if (count === 0) delete preparingImagesByKey[key]
-      else preparingImagesByKey[key] = count
-      return { preparingImagesByKey }
+      const preparingAttachmentsByKey = { ...state.preparingAttachmentsByKey }
+      const count = Math.max(0, (preparingAttachmentsByKey[key] ?? 0) + delta)
+      if (count === 0) delete preparingAttachmentsByKey[key]
+      else preparingAttachmentsByKey[key] = count
+      return { preparingAttachmentsByKey }
     })
   },
-  addImages: (target, images) => {
-    const accepted = images.slice(
+  updateAttachment: (target, id, update) => {
+    const draft = get().getDraft(target)
+    if (!draft.attachments.some((image) => image.id === id)) return false
+    set((state) =>
+      updateDraftForTarget(state, target, (current) =>
+        withDraftPatch(current, {
+          attachments: current.attachments.map((image) =>
+            image.id === id ? ({ ...image, ...update } as ChatInputAttachment) : image,
+          ),
+        }),
+      ),
+    )
+    return true
+  },
+  addAttachments: (target, attachments) => {
+    const accepted = attachments.slice(
       0,
-      Math.max(0, MAX_CHAT_ATTACHMENTS - get().getDraft(target).images.length),
+      Math.max(0, MAX_CHAT_ATTACHMENTS - get().getDraft(target).attachments.length),
     )
     set((state) =>
-      updateDraftForTarget(state, target, (draft) => addImagesToDraft(draft, accepted)),
+      updateDraftForTarget(state, target, (draft) => addAttachmentsToDraft(draft, accepted)),
     )
     draftPersist.maybeExecute()
     return accepted.length
@@ -149,7 +197,7 @@ export const useChatInputDraftStore = create<ChatInputDraftStore>((set, get) => 
       updateDraftForTarget(state, target, (draft) =>
         withDraftPatch(draft, {
           prompt: '',
-          images: EMPTY_IMAGES,
+          attachments: EMPTY_ATTACHMENTS,
           terminalContexts: EMPTY_TERMINAL_CONTEXTS,
         }),
       ),
@@ -158,9 +206,9 @@ export const useChatInputDraftStore = create<ChatInputDraftStore>((set, get) => 
   },
   flush: () => flushChatInputDraftStorage(),
   getDraft: (target) => chatInputDraftForTarget(get(), target),
-  removeImage: (target, imageId) => {
+  removeAttachment: (target, imageId) => {
     set((state) =>
-      updateDraftForTarget(state, target, (draft) => removeImageFromDraft(draft, imageId)),
+      updateDraftForTarget(state, target, (draft) => removeAttachmentFromDraft(draft, imageId)),
     )
     draftPersist.maybeExecute()
   },
@@ -204,15 +252,17 @@ export function selectChatInputDraftHasContent(
 ) {
   const draft = chatInputDraftForTarget(state, target)
   return (
-    draft.prompt.trim().length > 0 || draft.images.length > 0 || draft.terminalContexts.length > 0
+    draft.prompt.trim().length > 0 ||
+    draft.attachments.length > 0 ||
+    draft.terminalContexts.length > 0
   )
 }
 
-export function selectChatInputDraftImages(
+export function selectChatInputDraftAttachments(
   state: ChatInputDraftStore,
   target: ChatInputDraftTarget,
 ) {
-  return chatInputDraftForTarget(state, target).images
+  return chatInputDraftForTarget(state, target).attachments
 }
 
 export function selectChatInputDraftTerminalContexts(
@@ -255,6 +305,7 @@ export function flushChatInputDraftStorage() {
 }
 
 export function hydrateChatInputDraftStoreFromStorage(storage: ScopedStorage) {
+  draftAdapters.set(storage.environmentId, storage)
   const draftsByKey = hydrateDrafts({
     ...emptyPersistedChatInputDrafts(),
     draftsByKey: draftPersistence.hydrate(storage),
@@ -264,11 +315,65 @@ export function hydrateChatInputDraftStoreFromStorage(storage: ScopedStorage) {
   }))
 }
 
+export function recoverableDraft(environmentId: EnvironmentId, id: string) {
+  return (
+    Object.entries(useChatInputDraftStore.getState().draftsByKey).find(
+      ([key, draft]) => key.startsWith(`${environmentId}:`) && draft.identity?.id === id,
+    )?.[1] ?? null
+  )
+}
+
+export function discardRecoverableDraft(target: ChatInputDraftTarget) {
+  const storage = draftAdapters.get(target.environmentId)
+  if (!storage) return null
+  const state = useChatInputDraftStore.getState()
+  const draft = state.getDraft(target)
+  const next = removeDraftForTarget(state, target)
+  const document = persistedStorageFromState(next)
+  document.stashEntries = readPersistedChatInputDrafts(storage).stashEntries
+  document.draftsByKey = Object.fromEntries(
+    Object.entries(document.draftsByKey).filter(([key]) =>
+      key.startsWith(`${target.environmentId}:`),
+    ),
+  )
+  if (writePersistedChatInputDrafts(storage, document).status !== 'written') return null
+  useChatInputDraftStore.setState(next)
+  return draft.attachments
+}
+
+export function commitComposerTransfer(
+  storage: ScopedStorage,
+  stashEntries: import('../utils/draft-storage').PromptStashEntry[],
+  transfer?: {
+    target: ChatInputDraftTarget
+    expected: ChatInputDraft
+    content: Pick<ChatInputDraft, 'prompt' | 'attachments' | 'terminalContexts'>
+  },
+) {
+  const state = useChatInputDraftStore.getState()
+  if (transfer && state.getDraft(transfer.target) !== transfer.expected) return false
+  const next = transfer
+    ? updateDraftForTarget(state, transfer.target, (draft) =>
+        withDraftPatch(draft, transfer.content),
+      )
+    : state
+  const document = persistedStorageFromState({ ...state, ...next })
+  document.draftsByKey = Object.fromEntries(
+    Object.entries(document.draftsByKey).filter(([key]) =>
+      key.startsWith(`${storage.environmentId}:`),
+    ),
+  )
+  document.stashEntries = stashEntries
+  if (writePersistedChatInputDrafts(storage, document).status !== 'written') return false
+  if (transfer) useChatInputDraftStore.setState(next)
+  return true
+}
+
 export function resetChatInputDraftStore() {
   draftPersist.cancel()
   useChatInputDraftStore.setState({
     draftsByKey: {},
-    preparingImagesByKey: {},
+    preparingAttachmentsByKey: {},
     persistenceError: null,
   })
 }
@@ -276,14 +381,17 @@ export function resetChatInputDraftStore() {
 function createInitialChatInputDraftState(): ChatInputDraftState {
   return {
     draftsByKey: {},
-    preparingImagesByKey: {},
+    preparingAttachmentsByKey: {},
     persistenceError: null,
   }
 }
 
-export function chatInputImagesPreparing(state: ChatInputDraftState, target: ChatInputDraftTarget) {
+export function chatInputAttachmentsPreparing(
+  state: ChatInputDraftState,
+  target: ChatInputDraftTarget,
+) {
   const key = chatInputDraftStorageId(target.environmentId, target.rootPath, target.draftKey)
-  return key !== null && (state.preparingImagesByKey[key] ?? 0) > 0
+  return key !== null && (state.preparingAttachmentsByKey[key] ?? 0) > 0
 }
 
 function chatInputDraftForTarget(
@@ -348,22 +456,22 @@ function withDraftPatch(draft: ChatInputDraft, patch: Partial<ChatInputDraft>): 
   return draftsEqual(draft, nextDraft) ? draft : nextDraft
 }
 
-function addImagesToDraft(
+function addAttachmentsToDraft(
   draft: ChatInputDraft,
-  images: readonly ChatInputImageAttachment[],
+  attachments: readonly ChatInputAttachment[],
 ): ChatInputDraft {
-  if (images.length === 0) return draft
+  if (attachments.length === 0) return draft
 
   return withDraftPatch(draft, {
-    images: draft.images.concat(images),
+    attachments: draft.attachments.concat(attachments),
   })
 }
 
-function removeImageFromDraft(draft: ChatInputDraft, imageId: string): ChatInputDraft {
-  const images = draft.images.filter((image) => image.id !== imageId)
-  if (images.length === draft.images.length) return draft
+function removeAttachmentFromDraft(draft: ChatInputDraft, imageId: string): ChatInputDraft {
+  const attachments = draft.attachments.filter((image) => image.id !== imageId)
+  if (attachments.length === draft.attachments.length) return draft
 
-  return withDraftPatch(draft, { images })
+  return withDraftPatch(draft, { attachments })
 }
 
 /**
@@ -391,8 +499,9 @@ function removeTerminalContextFromDraft(draft: ChatInputDraft, contextId: string
 }
 
 function isEmptyChatInputDraft(draft: ChatInputDraft) {
+  if (draft.identity) return false
   if (draft.prompt.trim()) return false
-  if (draft.images.length > 0) return false
+  if (draft.attachments.length > 0) return false
   if (draft.terminalContexts.length > 0) return false
   if (draft.modelSelection) return false
   if (draft.runtimeMode) return false
@@ -403,9 +512,10 @@ function isEmptyChatInputDraft(draft: ChatInputDraft) {
 function draftsEqual(left: ChatInputDraft, right: ChatInputDraft) {
   return (
     left.prompt === right.prompt &&
-    left.images === right.images &&
+    left.attachments === right.attachments &&
     left.terminalContexts === right.terminalContexts &&
     left.modelSelection === right.modelSelection &&
+    left.identity === right.identity &&
     left.runtimeMode === right.runtimeMode &&
     left.interactionMode === right.interactionMode
   )
@@ -425,9 +535,20 @@ function hydrateDrafts(storage: PersistedChatInputDraftStorage) {
 
 function hydrateDraft(draft: PersistedChatInputDraft): ChatInputDraft {
   return {
+    identity: draft.identity,
     // Image bytes never reach storage, so a stored draft has no preview source:
     // restoring its attachments would only render broken thumbnails.
-    images: EMPTY_IMAGES,
+    attachments: draft.attachments.map((entry) => ({
+      ...entry,
+      upload:
+        entry.upload.status === 'uploading' ||
+        (entry.upload.status === 'ready' && Date.parse(entry.upload.expiresAt) <= Date.now())
+          ? {
+              status: 'failed' as const,
+              message: 'Upload interrupted or expired. Retry to restore the saved file.',
+            }
+          : entry.upload,
+    })),
     interactionMode: draft.interactionMode,
     modelSelection: draft.modelSelection,
     prompt: draft.prompt,
@@ -451,6 +572,18 @@ function persistedStorageFromState(state: ChatInputDraftState): PersistedChatInp
 
 function persistedDraft(draft: ChatInputDraft): PersistedChatInputDraft {
   return {
+    identity: draft.identity,
+    attachments: draft.attachments.flatMap(({ dataUrl: _bytes, ...entry }) =>
+      entry.upload
+        ? [
+            {
+              ...entry,
+              previewUrl: /^(data|blob):/.test(entry.previewUrl) ? '' : entry.previewUrl,
+              upload: entry.upload,
+            },
+          ]
+        : [],
+    ),
     interactionMode: draft.interactionMode,
     modelSelection: draft.modelSelection,
     prompt: draft.prompt,

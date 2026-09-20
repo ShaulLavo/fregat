@@ -340,7 +340,7 @@ readers migrate with each shared-settings cutover. Native Swift theme UI is outs
 
 ## First-load weight and markdown lane
 
-Requested 2026-09-13. Six plans from one review of the production web build. The deployed release
+Requested 2026-09-13. Six plans from one review, and a seventh added 2026-09-20 of the production web build. The deployed release
 sends **2421 KB gzip of JavaScript before the first frame**, 2311 KB of it in a single chunk. The
 cause is not bundler configuration — Rolldown is already in use and `apps/web/vite.config.ts` has no
 chunking options because the application declares almost no loading boundaries. Chunk boundaries
@@ -360,7 +360,16 @@ Execution order is strict:
    blocked on 111.
 4. [Plan 109](plans/109-boot-boundaries.md) defines boot, decides where loading boundaries belong
    from 106's attribution data, and pins a first-load gate. It runs last because 107 and 108 both
-   move the number.
+   move the number. Revised 2026-09-20: the per-owner attribution now exists, which unblocks its
+   Phases 2 and 3 and refuted two of the three boundaries anyone had proposed. Two survive, worth
+   6.25% of the entry chunk. Phase 4 pins after Phase 3 and re-pins after 108 rather than waiting
+   for a final number, and it owns correcting the stale first-load figure quoted below.
+
+5. [Plan 129](plans/129-dependency-shape.md) owns the bytes 109 measured and handed off because no
+   loading boundary reaches them: the Editor's three inline worker blobs, 579 KB gz and 25.5% of
+   first-load JavaScript, and the `thin` and `light` Phosphor weights no call site draws. It does
+   not depend on 108 or 109 and is the largest available cut, so it may run first; 109's gate
+   re-pins downward when it lands.
 
 Two research plans feed the lane and are not executable as written:
 [Plan 110](plans/110-workspace-indexing.md) asks what belongs in a workspace index beyond the file
@@ -374,6 +383,27 @@ Coordinate shared editor and chat surfaces with Plans 101–103 and 115; do not 
 files. Plan 085 owns first paint and restoration, which this lane measures but does not change.
 Replacing React with a smaller reimplementation was considered and rejected: React is 60 KB of a
 2421 KB first load, so it is revisited only once it is the largest remaining line item.
+
+## React compiler and pane lifetime lane
+
+Requested 2026-09-20. [Plan 127](plans/127-compiler-and-lifetime-repairs.md) precedes
+[Plan 128](plans/128-react-19-patterns.md). Both are proposed; implementation has not started, except
+that Plan 127's Phase 3 terminal repair is applied in the working tree and unverified in a browser.
+
+Plan 127 is the repair pass. It turns the React Compiler's diagnostics on, pins them with a census
+beside the design census, clears the `ref={focusTarget.ref}` bailouts, stops the bottom panel and its
+collapse from unmounting every terminal and arming the server's ten-minute kill, settles git stage,
+unstage and discard from the response the server already computed, and takes one command-bus capture
+per palette keystroke instead of one per row. Plan 128 follows with the written rules and the two
+prerequisites the remaining pane work waits behind: `packages/tree` lifetime, and a `VirtualList`
+contract for hiding and revealing a populated list. Its `AGENTS.md` sections are the deliverable,
+because none of its three patterns can be gated by tooling.
+
+Neither plan reorders another lane. The scoped error boundary and the `<Activity>` counter-example
+are shared with [Plan 109](plans/109-boot-boundaries.md); whichever lands first owns the
+implementation and the others consume it. Verification tooling reconciles with Plan 119 and mutation
+shape with Plan 118. No measurement has been taken for either plan: the dev server is down, only the
+mesh answers, and every `agent:browser` line in both is a prescription for the implementer.
 
 ## Verification boundaries
 

@@ -3,6 +3,7 @@ import {
   eventIdSchema,
   orchestrationEventSchema,
   type EventId,
+  type CommandId,
   type OrchestrationCommand,
   type OrchestrationEvent,
   type OrchestrationEventMetadata,
@@ -14,6 +15,7 @@ type EventPayloads = {
 }
 
 type EnvelopeOptions = {
+  readonly correlationId?: CommandId
   readonly causationEventId?: EventId
   readonly metadata?: OrchestrationEventMetadata
 }
@@ -31,7 +33,7 @@ export function event<Type extends OrchestrationEvent['type']>(
     ...aggregate(payload),
     causationEventId: options?.causationEventId ?? null,
     commandId: command.commandId,
-    correlationId: command.commandId,
+    correlationId: options?.correlationId ?? command.commandId,
     eventId: v.parse(eventIdSchema, `event-${crypto.randomUUID()}`),
     metadata: options?.metadata ?? {},
     occurredAt: at,

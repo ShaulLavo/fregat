@@ -1,38 +1,45 @@
-import { useEnvironmentId } from '@/lib/environments/hooks/use-environment-id'
-import { useQuery } from '@tanstack/react-query'
-import { useDebouncedValue } from '@tanstack/react-pacer/debouncer'
-import { useEffect } from 'react'
-
+import { Debouncer } from '@tanstack/react-pacer/debouncer'
+import { useEffect, useMemo } from 'react'
+import { useShallow } from 'zustand/react/shallow'
+import { useEnvironmentsStore } from '@/lib/environments/state/store'
+import { queryClientFor } from '@/lib/environments/state/query-clients'
+import { useChatProjectionStore } from '@/features/chat/state/chat-projection-store'
 import { useSessionRailStore } from '@/features/chat-mode/state/session-rail-store'
 import { useSessionSearchStore } from '@/features/chat-mode/state/session-search-store'
+import { observeSessionSearch } from '@/features/chat-mode/state/observe-session-search'
+import { sessionSearchOwners } from '@/features/chat-mode/utils/session-search-owners'
 import {
   SESSION_SEARCH_DEBOUNCE_MS,
   isSessionSearchQuery,
-  sessionSearchQueryOptions,
 } from '@/features/chat-mode/utils/session-search-query'
 
-const NO_MATCHES: readonly [] = []
-
-/**
- * Runs the rail's text through server-side message search and publishes the
- * result for the rail and the keyboard commands to read.
- *
- * The rail's own title/branch filter is unaffected and stays instant — this only
- * widens what counts as a match, so "where did I discuss X" stops being a
- * question the rail cannot answer.
- */
 export function useSessionSearch() {
-  const environmentId = useEnvironmentId()
-  const query = useSessionRailStore((state) => state.query)
-  const [settledQuery] = useDebouncedValue(query, { wait: SESSION_SEARCH_DEBOUNCE_MS })
-  const result = useQuery(sessionSearchQueryOptions({ query: settledQuery }))
-  const sync = useSessionSearchStore((state) => state.sync)
-  const matches = result.data?.matches ?? NO_MATCHES
-  // Keystrokes ahead of the settled query still count as searching, or the rail
-  // announces "no matches" between characters.
-  const searching = isSessionSearchQuery(query) && (result.isFetching || settledQuery !== query)
-
+  const query = useSessionRailStore((state) => state.query).trim()
+  const entries = useEnvironmentsStore((state) => state.entries)
+  const represented = useChatProjectionStore(useShallow((state) => Object.keys(state.slices)))
+  // Keep query observers attached across unrelated transcript updates.
+  const owners = useMemo(() => sessionSearchOwners(entries, represented), [entries, represented])
   useEffect(() => {
-    sync({ environmentId, matches, query: settledQuery.trim(), searching })
-  }, [environmentId, matches, searching, settledQuery, sync])
+    const store = useSessionSearchStore.getState()
+    const enabled = isSessionSearchQuery(query)
+    const generation = store.begin(query, enabled)
+    if (!enabled) return
+    let stopSearch = () => {}
+    const debouncer = new Debouncer(
+      () => {
+        stopSearch = observeSessionSearch({
+          query,
+          owners,
+          queryClientForOrigin: queryClientFor,
+          publish: store.publish.bind(null, generation),
+        })
+      },
+      { wait: SESSION_SEARCH_DEBOUNCE_MS },
+    )
+    debouncer.maybeExecute()
+    return () => {
+      debouncer.cancel()
+      stopSearch()
+    }
+  }, [query, owners])
 }

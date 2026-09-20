@@ -136,7 +136,6 @@ async function runShellStream(supervisor: ShellSupervisor): Promise<ShellStreamO
       useChatProjectionStore
         .getState()
         .applyShellStreamItem(supervisor.transport.environmentId, item)
-      markLive()
     }
 
     return { blocked: false, error: null, established: live }

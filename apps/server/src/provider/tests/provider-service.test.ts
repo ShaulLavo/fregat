@@ -2,7 +2,13 @@ import { mkdtemp, rm, stat } from 'node:fs/promises'
 import { tmpdir } from 'node:os'
 import path from 'node:path'
 import { Database } from 'bun:sqlite'
-import { describe, expect, it } from 'vitest'
+import { describe, expect, it, vi } from 'vitest'
+import { OrchestrationProjectionPipeline } from '../../orchestration/projection-pipeline'
+import {
+  domainBootstrap,
+  domainEvent,
+  DOMAIN_IDS,
+} from '../../orchestration/tests/factories/session-domain'
 import { drizzle } from 'drizzle-orm/bun-sqlite'
 import * as v from 'valibot'
 import {
@@ -25,6 +31,66 @@ import { ProviderSessionDirectory } from '../provider-session-directory'
 import type { ProviderRuntimeEvent, ProviderTurnInput } from '../types'
 
 describe('ProviderService', () => {
+  it('reclaims an idle runtime periodically without another launch and clears its timer on shutdown', async () => {
+    vi.useFakeTimers()
+    const fixture = createFixture()
+    const adapter = new MockProviderAdapter()
+    const service = new ProviderService({
+      adapterRegistry: new ProviderAdapterRegistry([adapter]),
+      sessionDirectory: new ProviderSessionDirectory(fixture.database),
+    })
+    const input = {
+      ...providerTurnInput(),
+      sessionId: v.parse(sessionIdSchema, DOMAIN_IDS.session),
+    }
+    try {
+      const pipeline = new OrchestrationProjectionPipeline(fixture.database)
+      pipeline.applyEvents(domainBootstrap())
+      await service.ensureRuntime({
+        providerInstanceId: input.providerInstanceId,
+        runtimeMode: input.runtimeMode,
+        runtimePayload: providerSessionPayload(input),
+        runtimeEpoch: input.runtimeEpoch,
+        sessionId: input.sessionId,
+      })
+      await service.drainRuntimeEvents()
+      pipeline.applyEvents([
+        domainEvent(
+          'session.runtime-set',
+          {
+            sessionId: input.sessionId,
+            runtime: {
+              sessionId: input.sessionId,
+              status: 'ready',
+              providerName: 'codex',
+              providerInstanceId: input.providerInstanceId,
+              runtimeMode: input.runtimeMode,
+              runtimeEpoch: input.runtimeEpoch,
+              providerBindingHandle: null,
+              providerConversationMarker: null,
+              providerResumeCursor: null,
+              activeTurnId: null,
+              lastError: null,
+              updatedAt: new Date().toISOString(),
+            },
+            updatedAt: new Date().toISOString(),
+          },
+          4,
+        ),
+      ])
+      await vi.advanceTimersByTimeAsync(30 * 60 * 1000)
+      expect(await adapter.hasRuntime({ sessionId: input.sessionId })).toBe(true)
+      await vi.advanceTimersByTimeAsync(5 * 60 * 1000)
+      expect(await adapter.hasRuntime({ sessionId: input.sessionId })).toBe(false)
+      await service.shutdown()
+      expect(vi.getTimerCount()).toBe(0)
+    } finally {
+      await service.shutdown()
+      fixture.close()
+      vi.useRealTimers()
+    }
+  })
+
   it('closes a launch that resolves after the shutdown wait times out', async () => {
     const fixture = createFixture()
     const adapter = new MockProviderAdapter({ operationTimeoutMs: 5 })

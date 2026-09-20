@@ -1,61 +1,112 @@
+import { useSessionTitleActions } from '@/features/chat-mode/hooks/use-session-title-actions'
+import { useSessionTitleSelection } from '@/features/chat-mode/hooks/use-session-title-selection'
+import { useIsMutating } from '@tanstack/react-query'
+import {
+  ArchiveIcon,
+  ArrowsClockwiseIcon,
+  CheckIcon,
+  ClockIcon,
+  EnvelopeSimpleIcon,
+  TrashIcon,
+  XIcon,
+} from '@phosphor-icons/react'
+import { Button } from '@workspace/ui/components/button'
+import { PaneBar } from '@workspace/ui/components/pane-bar'
+import { Spinner } from '@workspace/ui/components/spinner'
 import { Tooltip, TooltipContent, TooltipTrigger } from '@workspace/ui/components/tooltip'
-import { ArchiveIcon, TrashIcon, XIcon } from '@phosphor-icons/react'
-
+import {
+  DropdownMenu,
+  DropdownMenuContent,
+  DropdownMenuItem,
+  DropdownMenuTrigger,
+} from '@workspace/ui/components/dropdown-menu'
+import { useSessionBulkLifecycle } from '@/features/chat-mode/hooks/use-session-bulk-lifecycle'
 import { useSessionActions } from '@/features/chat-mode/hooks/use-session-actions'
 import { clearSessionMultiSelect } from '@/features/chat-mode/state/session-commands'
 import { useSessionMultiSelectStore } from '@/features/chat-mode/state/session-multi-select-store'
-import { Button } from '@workspace/ui/components/button'
-import { PaneBar } from '@workspace/ui/components/pane-bar'
+import { chatModeMutationKeys } from '@/features/chat-mode/utils/mutation-keys'
 
-/**
- * What a marked set is for. Without it, multi-select is a highlight — the reason to pick
- * ten finished sessions is to file or drop all ten in one gesture.
- */
 export function SessionBulkBar() {
   const refs = useSessionMultiSelectStore((state) => state.refs)
   const actions = useSessionActions()
-
+  const titles = useSessionTitleSelection(refs)
+  const titleActions = useSessionTitleActions()
+  const lifecycle = useSessionBulkLifecycle(refs)
+  const pending = useIsMutating({ mutationKey: chatModeMutationKeys.session() }) > 0
   return (
     <PaneBar aria-label='Selected sessions' role='toolbar'>
       <span className='text-muted-foreground text-2xs min-w-0 flex-1 truncate tabular-nums'>
         {refs.length} selected
       </span>
-      <Button
-        className='text-muted-foreground hover:text-foreground text-2xs'
-        size='sm'
-        type='button'
-        variant='ghost'
-        onClick={() => actions.archiveSessions(refs)}
-      >
-        <ArchiveIcon className='size-(--icon-size-sm)' />
-        Archive
-      </Button>
-      <Button
-        className='text-destructive hover:text-destructive text-2xs'
-        size='sm'
-        type='button'
-        variant='ghost'
-        onClick={() => actions.deleteSessions(refs)}
-      >
-        <TrashIcon className='size-(--icon-size-sm)' />
-        Delete
-      </Button>
+      <DropdownMenu>
+        <DropdownMenuTrigger
+          render={
+            <Button size='sm' variant='ghost' disabled={pending}>
+              {pending ? <Spinner /> : null}Actions
+            </Button>
+          }
+        />
+        <DropdownMenuContent align='end'>
+          {lifecycle.settlement ? (
+            <DropdownMenuItem
+              disabled={!lifecycle.settleEnabled}
+              onClick={() => void actions.applyLifecycleToSessions(refs, { type: 'settle' })}
+            >
+              <CheckIcon />
+              Settle
+            </DropdownMenuItem>
+          ) : null}
+          {lifecycle.snooze ? (
+            <DropdownMenuItem
+              disabled={!lifecycle.snoozeEnabled}
+              onClick={() => actions.requestSnooze(refs, 'Selected sessions')}
+            >
+              <ClockIcon />
+              Snooze…
+            </DropdownMenuItem>
+          ) : null}
+          {titles.supported > 0 ? (
+            <DropdownMenuItem
+              disabled={titles.eligible === 0}
+              onClick={() => titleActions.mutate(refs)}
+            >
+              <ArrowsClockwiseIcon />
+              {titles.eligible ? `Regenerate titles (${titles.eligible})` : 'Regenerating titles…'}
+            </DropdownMenuItem>
+          ) : null}
+          <DropdownMenuItem onClick={() => actions.markSessionsUnread(refs)}>
+            <EnvelopeSimpleIcon />
+            Mark as unread
+          </DropdownMenuItem>
+          <DropdownMenuItem onClick={() => void actions.archiveSessions(refs)}>
+            <ArchiveIcon />
+            Archive
+          </DropdownMenuItem>
+          <DropdownMenuItem
+            className='text-destructive'
+            onClick={() => actions.deleteSessions(refs)}
+          >
+            <TrashIcon />
+            Delete
+          </DropdownMenuItem>
+        </DropdownMenuContent>
+      </DropdownMenu>
       <Tooltip>
         <TooltipTrigger
           render={
             <Button
               aria-label='Clear selection'
-              className='text-muted-foreground hover:text-foreground shrink-0'
+              focusableWhenDisabled
               size='icon-sm'
-              type='button'
               variant='ghost'
+              disabled={pending}
               onClick={clearSessionMultiSelect}
             >
               <XIcon className='size-(--icon-size-sm)' />
             </Button>
           }
-        />{' '}
-        <TooltipContent>{'Clear selection'}</TooltipContent>
+        />
+        <TooltipContent>Clear selection</TooltipContent>
       </Tooltip>
     </PaneBar>
   )

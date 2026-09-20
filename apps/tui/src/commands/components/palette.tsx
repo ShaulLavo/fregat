@@ -64,6 +64,7 @@ export function CommandPalette({
   }, [])
   const colorMode = useSettingValue(owner, 'workbench.colorTheme')
   const palette = useSettingValue(owner, 'workbench.palette')
+  const sessionSortOrder = useSettingValue(owner, 'chat.sessionSortOrder')
   const { height } = useTerminalDimensions()
   const paletteInput = {
     captured,
@@ -73,6 +74,7 @@ export function CommandPalette({
     palette,
     writable,
     chat: snapshot,
+    sessionSortOrder,
   }
   const { title, empty, options } = paletteModeRows({ ...paletteInput, search: query })
   useCommandFocus(

@@ -5,6 +5,7 @@ import {
   ResizablePanel,
 } from '@workspace/ui/components/resizable'
 import { cn } from '@workspace/ui/lib/utils'
+import { RenderErrorBoundary } from '@workspace/ui/patterns/render-error-boundary'
 
 import type { EditorTabConflictMap } from '@/features/workspace/utils/tab-types'
 import { ChatStage } from '@/features/chat-mode/components/chat-stage'
@@ -18,6 +19,7 @@ import {
   TOOL_PANE_DEFAULT_SIZE,
   TOOL_PANE_MAX_SIZE,
   TOOL_PANE_MIN_SIZE,
+  chatModeToolTabLabel,
   toggleChatModeToolTab,
   type ChatModePanels,
   type ChatModeToolTab,
@@ -69,7 +71,9 @@ export function ChatModeLayout({
               maxSize={SESSION_RAIL_MAX_SIZE}
               minSize={SESSION_RAIL_MIN_SIZE}
             >
-              <SessionRail />
+              <RenderErrorBoundary label='Sessions'>
+                <SessionRail />
+              </RenderErrorBoundary>
             </ResizablePanel>
             <ResizableHandle id='sessions-handle' withHandle />
           </>
@@ -93,13 +97,18 @@ export function ChatModeLayout({
               maxSize={TOOL_PANE_MAX_SIZE}
               minSize={TOOL_PANE_MIN_SIZE}
             >
-              <ToolPane
-                conflicts={conflicts}
-                gitFiles={gitFiles}
-                rootPath={rootPath}
-                tab={panels.activeToolTab}
-                workbenchPanels={workbenchPanels}
-              />
+              <RenderErrorBoundary
+                label={chatModeToolTabLabel(panels.activeToolTab)}
+                resetKeys={[panels.activeToolTab]}
+              >
+                <ToolPane
+                  conflicts={conflicts}
+                  gitFiles={gitFiles}
+                  rootPath={rootPath}
+                  tab={panels.activeToolTab}
+                  workbenchPanels={workbenchPanels}
+                />
+              </RenderErrorBoundary>
             </ResizablePanel>
           </>
         ) : null}

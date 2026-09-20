@@ -1,3 +1,4 @@
+import archivePolicy from '../../../../../test/parity/t3code/archive.json'
 import { Database } from 'bun:sqlite'
 import { eq } from 'drizzle-orm'
 import { drizzle } from 'drizzle-orm/bun-sqlite'
@@ -24,7 +25,7 @@ afterEach(() => {
 
 describe('settle guards', () => {
   it.each(['queued', 'claimed', 'runtime-live'] as const)(
-    'refuses to archive a session with %s work',
+    'archives a session with %s work without stopping it',
     async (state) => {
       const { database, engine } = await createEngineWithSession()
       const sessionId = '00000000-0000-4000-8000-000000000001'
@@ -47,18 +48,11 @@ describe('settle guards', () => {
       }
       const before = await engine.shellSnapshot()
 
-      await expect(
-        engine.dispatch(command({ sessionId, type: 'session.archive' })),
-      ).rejects.toMatchObject({
-        code:
-          state === 'runtime-live'
-            ? 'orchestration.SESSION_RUNTIME_ACTIVE'
-            : 'orchestration.SESSION_QUEUED_TURN_START',
-        status: 409,
-      })
-
-      expect(sessionRow(database).archivedAt).toBeNull()
-      expect(await engine.shellSnapshot()).toEqual(before)
+      await engine.dispatch(command({ sessionId, type: 'session.archive' }))
+      expect(sessionRow(database).archivedAt).toEqual(expect.any(String))
+      const after = await engine.shellSnapshot()
+      expect(after.sessions[0]?.runtime).toEqual(before.sessions[0]?.runtime)
+      expect(after.sessions[0]?.latestTurn).toEqual(before.sessions[0]?.latestTurn)
     },
   )
 
@@ -160,6 +154,80 @@ describe('settle guards', () => {
     expect(sessionRow(database).snoozedUntil).toBeNull()
   })
 
+  it.each(['claimed', 'adopted', 'started'] as const)(
+    'snooze distinguishes durable provider start stage %s',
+    async (stage) => {
+      const { database, engine } = await createEngineWithSession()
+      const sessionId = '00000000-0000-4000-8000-000000000001'
+      await engine.dispatch(turnStartCommand())
+      const turn = (await engine.readModelSnapshot()).sessions.get(sessionId)!.latestTurn!
+      const claim = await engine.dispatch(
+        command({
+          type: 'session.provider-start.claim',
+          sessionId,
+          turnId: turn.turnId,
+          observedSequence: turn.providerStartSequence,
+          generation: 1,
+          runtimeEpoch: 'epoch-fixture',
+          createdAt: '2026-09-05T12:00:00.000Z',
+        }),
+      )
+      if (stage !== 'claimed')
+        await engine.dispatch(
+          command({
+            type: 'session.provider-start.adopt',
+            sessionId,
+            turnId: turn.turnId,
+            observedSequence: claim.sequence,
+            generation: 1,
+            runtimeEpoch: 'epoch-fixture',
+            createdAt: '2026-09-05T12:00:01.000Z',
+          }),
+        )
+      if (stage !== 'started') {
+        await expect(engine.dispatch(snoozeCommand())).rejects.toMatchObject({
+          code: 'orchestration.SESSION_QUEUED_TURN_START',
+        })
+        return
+      }
+      await engine.dispatch(sessionSetCommand('running', sessionId, turn.turnId))
+      await engine.dispatch(snoozeCommand())
+      expect(sessionRow(database).snoozedUntil).toBe(futureWakeTime())
+      expect((await engine.readModelSnapshot()).sessions.get(sessionId)?.latestTurn?.state).toBe(
+        'running',
+      )
+    },
+  )
+
+  it('allows a running session to be snoozed without interrupting it', async () => {
+    const { database, engine } = await createEngineWithSession()
+    await engine.dispatch(sessionSetCommand('running'))
+    await engine.dispatch(snoozeCommand())
+    expect(sessionRow(database).snoozedUntil).toBe(futureWakeTime())
+    expect((await engine.shellSnapshot()).sessions[0]?.runtime?.status).toBe('running')
+  })
+
+  it('refuses a conditional provider stop after settlement was superseded', async () => {
+    const { engine } = await createEngineWithSession()
+    await engine.dispatch(settleCommand())
+    await engine.dispatch(
+      command({
+        type: 'session.unsettle',
+        sessionId: '00000000-0000-4000-8000-000000000001',
+        reason: 'user',
+      }),
+    )
+    await expect(
+      engine.dispatch(
+        command({
+          type: 'session.runtime.stop',
+          sessionId: '00000000-0000-4000-8000-000000000001',
+          onlyIfSettled: true,
+        }),
+      ),
+    ).rejects.toMatchObject({ code: 'orchestration.SESSION_NOT_SETTLED' })
+  })
+
   it('refuses a snooze whose wake time is not in the future', async () => {
     const { engine } = await createEngineWithSession()
 
@@ -219,6 +287,32 @@ describe('settle and snooze projection', () => {
 
     expect(unsettled.settledOverride).toBe('active')
     expect(unsettled.settledAt).toBeNull()
+  })
+
+  it('settlement clears pin and snooze and dismisses only optional message questions', async () => {
+    const { database, engine } = await createEngineWithSession()
+    await engine.dispatch(pinCommand())
+    await engine.dispatch(snoozeCommand())
+    await engine.dispatch(
+      activityCommand('user-input.requested', 'info', {
+        requestId: 'optional-question',
+        responseMode: 'message',
+        questions: [],
+      }),
+    )
+    await engine.dispatch(settleCommand())
+    const row = sessionRow(database)
+    expect(row.settledOverride).toBe('settled')
+    expect(row.pinnedAt).toBeNull()
+    expect(row.snoozedUntil).toBeNull()
+    const session = (await engine.readModelSnapshot()).sessions.get(row.sessionId)!
+    expect(session.pendingUserInputCount).toBe(0)
+    expect(session.activities).toContainEqual(
+      expect.objectContaining({
+        kind: 'user-input.resolved',
+        payload: { requestId: 'optional-question', responseMode: 'message' },
+      }),
+    )
   })
 
   it('projects a duplicate settle as a no-op', async () => {
@@ -302,13 +396,13 @@ describe('activity auto-unsettles', () => {
     expect(await unsettledReasons(engine)).toEqual([])
   })
 
-  it('clears snooze when a runtime starts new work', async () => {
+  it('retains snooze when a runtime starts new work', async () => {
     const { database, engine } = await createEngineWithSession()
     await engine.dispatch(snoozeCommand())
 
     await engine.dispatch(sessionSetCommand('starting'))
 
-    expect(sessionRow(database).snoozedUntil).toBeNull()
+    expect(sessionRow(database).snoozedUntil).toBe(futureWakeTime())
   })
 
   it('wakes a settled session when an approval request arrives', async () => {
@@ -492,30 +586,126 @@ describe('pinning', () => {
   })
 })
 
-describe('actionable work clears lifecycle overlays', () => {
-  it.each(['settle', 'snooze', 'archive'] as const)(
-    'an approval clears %s in the same committed batch',
-    async (overlay) => {
+describe('archive and activity policy', () => {
+  it.each(archivePolicy.activityTransitions)(
+    'keeps archive and snooze through $kind, duplicate delivery and explicit restore',
+    async ({ kind, resetsSettlement }) => {
       const { database, engine } = await createEngineWithSession()
-      const parked = {
-        type: `session.${overlay}`,
-        sessionId: '00000000-0000-4000-8000-000000000001',
-        snoozedUntil: futureWakeTime(),
-      }
-      await engine.dispatch(command(parked))
-      const before = (await engine.replay({ afterSequence: 0 })).events.at(-1)?.sequence ?? 0
-      await engine.dispatch(activityCommand('approval.requested', 'approval'))
+      const sessionId = '00000000-0000-4000-8000-000000000001'
+      await engine.dispatch(settleCommand())
+      await engine.dispatch(snoozeCommand())
+      await engine.dispatch(command({ type: 'session.archive', sessionId }))
+      const archivedAt = sessionRow(database).archivedAt
+      const activity = activityCommand(kind, kind === 'provider.error' ? 'error' : 'info')
+      await engine.dispatch(activity)
+      await engine.dispatch(activity)
       expect(sessionRow(database)).toMatchObject({
-        archivedAt: null,
-        settledOverride: null,
-        snoozedUntil: null,
-        attentionState: 'needs-input',
-        attentionReason: 'approval',
+        archivedAt,
+        snoozedUntil: futureWakeTime(),
+        settledOverride: resetsSettlement ? null : 'settled',
       })
-      const events = (await engine.replay({ afterSequence: before })).events
-      expect(new Set(events.map((event) => event.commandId)).size).toBe(1)
+      expect((await engine.shellSnapshot()).sessions[0]?.archivedAt).toBe(archivedAt)
+      expect(
+        (await engine.replay({ afterSequence: 0 })).events.filter(
+          (event) => event.type === 'session.unarchived',
+        ),
+      ).toEqual([])
+      const before = await engine.sessionDetailSnapshot(sessionId)
+      await engine.dispatch(command({ type: 'session.unarchive', sessionId }))
+      const after = await engine.sessionDetailSnapshot(sessionId)
+      expect(after.session.archivedAt).toBeNull()
+      expect(after.session.activities).toEqual(before.session.activities)
+      expect(after.session.messages).toEqual(before.session.messages)
+      expect(sessionRow(database).snoozedUntil).toBe(futureWakeTime())
     },
   )
+
+  it.each(archivePolicy.runtimeTransitions)(
+    'keeps archive and snooze when runtime becomes $status',
+    async ({ status, resetsSettlement }) => {
+      const { database, engine } = await createEngineWithSession()
+      await engine.dispatch(settleCommand())
+      await engine.dispatch(snoozeCommand())
+      await engine.dispatch(
+        command({ type: 'session.archive', sessionId: '00000000-0000-4000-8000-000000000001' }),
+      )
+      const archivedAt = sessionRow(database).archivedAt
+      await engine.dispatch(sessionSetCommand(status))
+      expect(sessionRow(database)).toMatchObject({
+        archivedAt,
+        snoozedUntil: futureWakeTime(),
+        settledOverride: resetsSettlement ? null : 'settled',
+      })
+    },
+  )
+
+  it.each(['approval.requested', 'user-input.requested'])(
+    'archives a pending %s request without discarding it',
+    async (kind) => {
+      const { engine } = await createEngineWithSession()
+      const sessionId = '00000000-0000-4000-8000-000000000001'
+      await engine.dispatch(activityCommand(kind, 'info'))
+      const before = await engine.sessionDetailSnapshot(sessionId)
+      const archive = command({ type: 'session.archive', sessionId })
+      await engine.dispatch(archive)
+      expect((await engine.dispatch(archive)).deduped).toBe(true)
+      await expect(
+        engine.dispatch(command({ type: 'session.archive', sessionId })),
+      ).rejects.toMatchObject({ code: 'orchestration.SESSION_ARCHIVED' })
+      const after = await engine.sessionDetailSnapshot(sessionId)
+      expect(after.session.activities).toEqual(before.session.activities)
+      expect(after.session.archivedAt).toEqual(expect.any(String))
+    },
+  )
+
+  it('retains archive, settlement and snooze through plan arrival and runtime recovery', async () => {
+    const { database, engine } = await createEngineWithSession()
+    const sessionId = '00000000-0000-4000-8000-000000000001'
+    await engine.dispatch(settleCommand())
+    await engine.dispatch(snoozeCommand())
+    await engine.dispatch(sessionSetCommand('stopped'))
+    await engine.dispatch(command({ type: 'session.archive', sessionId }))
+    const archivedAt = sessionRow(database).archivedAt
+    await engine.dispatch(
+      command({
+        type: 'session.proposed-plan.upsert',
+        sessionId,
+        createdAt: '2026-06-01T00:00:00.000Z',
+        proposedPlan: {
+          id: 'late-plan',
+          sessionId,
+          turnId: null,
+          planMarkdown: '# Retained plan',
+          createdAt: '2026-06-01T00:00:00.000Z',
+          updatedAt: '2026-06-01T00:00:00.000Z',
+        },
+      }),
+    )
+    const observedSequence = (await engine.readModelSnapshot()).sessions.get(
+      sessionId,
+    )?.runtimeSequence
+    await engine.dispatch(
+      command({
+        type: 'session.runtime.recover',
+        sessionId,
+        observedSequence,
+        runtimeEpoch: 'epoch-fixture',
+        message: 'Recover interrupted runtime',
+        createdAt: '2026-06-01T00:01:00.000Z',
+      }),
+    )
+    expect(sessionRow(database)).toMatchObject({
+      archivedAt,
+      settledOverride: 'settled',
+      snoozedUntil: futureWakeTime(),
+    })
+    const before = await engine.sessionDetailSnapshot(sessionId)
+    expect(before.proposedPlans[0]?.planMarkdown).toBe('# Retained plan')
+    await engine.dispatch(command({ type: 'session.unarchive', sessionId }))
+    expect((await engine.sessionDetailSnapshot(sessionId)).proposedPlans).toEqual(
+      before.proposedPlans,
+    )
+  })
 
   it('settling acknowledges one failure while a later failure raises attention again', async () => {
     const { database, engine } = await createEngineWithSession()
@@ -530,10 +720,74 @@ describe('actionable work clears lifecycle overlays', () => {
       attentionState: 'needs-input',
       attentionReason: 'failure',
       hasError: true,
-      settledOverride: null,
+      settledOverride: 'settled',
       acknowledgedFailureThroughSequence: acknowledged,
     })
   })
+})
+
+describe('active ordering', () => {
+  it('retains active keys during snooze, preserves duplicate timestamps, and clears them on settlement', async () => {
+    const { database, engine } = await createEngineWithSession()
+    const sessionId = '00000000-0000-4000-8000-000000000001'
+    await engine.dispatch(command({ type: 'session.active.reorder', sessionId, orderKey: 'm' }))
+    const ordered = sessionRow(database)
+    await tick()
+    await engine.dispatch(command({ type: 'session.active.reorder', sessionId, orderKey: 'm' }))
+    expect(sessionRow(database).updatedAt).toBe(ordered.updatedAt)
+    await engine.dispatch(
+      command({ type: 'session.snooze', sessionId, snoozedUntil: futureWakeTime() }),
+    )
+    await engine.dispatch(command({ type: 'session.active.reorder', sessionId, orderKey: 'n' }))
+    expect(sessionRow(database)).toMatchObject({
+      activeOrderKey: 'n',
+      snoozedUntil: futureWakeTime(),
+    })
+    expect((await engine.shellSnapshot()).sessions[0]?.activeOrderKey).toBe('n')
+    await engine.dispatch(settleCommand())
+    expect(sessionRow(database)).toMatchObject({ activeOrderKey: null, unsettledAt: null })
+    await engine.dispatch(command({ type: 'session.unsettle', sessionId, reason: 'user' }))
+    const active = sessionRow(database)
+    expect(active.unsettledAt).toBe(active.updatedAt)
+    await tick()
+    await engine.dispatch(command({ type: 'session.unsettle', sessionId, reason: 'user' }))
+    expect(sessionRow(database).unsettledAt).toBe(active.unsettledAt)
+    await engine.dispatch(turnStartCommand())
+    expect(sessionRow(database)).toMatchObject({
+      unsettledAt: active.unsettledAt,
+      settledOverride: null,
+    })
+  })
+
+  it('loads active order and re-entry anchors after restarting the engine', async () => {
+    const { database, engine } = await createEngineWithSession()
+    const sessionId = '00000000-0000-4000-8000-000000000001'
+    await engine.dispatch(command({ type: 'session.unsettle', sessionId, reason: 'user' }))
+    await engine.dispatch(command({ type: 'session.active.reorder', sessionId, orderKey: 'k' }))
+    const before = (await engine.shellSnapshot()).sessions[0]!
+    const restarted = new OrchestrationEngine(database)
+    const after = (await restarted.shellSnapshot()).sessions[0]!
+    expect(after).toMatchObject({
+      activeOrderKey: 'k',
+      unsettledAt: before.unsettledAt,
+      updatedAt: before.updatedAt,
+    })
+    await restarted.dispatch(command({ type: 'session.active.reorder', sessionId, orderKey: 'k' }))
+    expect((await restarted.shellSnapshot()).sessions[0]?.updatedAt).toBe(before.updatedAt)
+  })
+
+  it.each(['session.pin', 'session.settle', 'session.archive'] as const)(
+    'refuses active reorder after %s',
+    async (type) => {
+      const { database, engine } = await createEngineWithSession()
+      const sessionId = '00000000-0000-4000-8000-000000000001'
+      await engine.dispatch(command({ type, sessionId }))
+      await expect(
+        engine.dispatch(command({ type: 'session.active.reorder', sessionId, orderKey: 'm' })),
+      ).rejects.toThrow()
+      expect(sessionRow(database).activeOrderKey).toBeNull()
+    },
+  )
 })
 
 async function unsettledReasons(engine: OrchestrationEngine) {
@@ -609,11 +863,15 @@ function pinReorderCommand(orderKey: string, sessionId = '00000000-0000-4000-800
   return command({ orderKey, sessionId, type: 'session.pin.reorder' })
 }
 
-function sessionSetCommand(status: string, sessionId = '00000000-0000-4000-8000-000000000001') {
+function sessionSetCommand(
+  status: string,
+  sessionId = '00000000-0000-4000-8000-000000000001',
+  activeTurnId: string | null = null,
+) {
   return command({
     createdAt: '2026-06-01T00:00:00.000Z',
     runtime: {
-      activeTurnId: null,
+      activeTurnId,
       lastError: null,
       providerInstanceId: 'codex',
       providerName: 'codex',

@@ -15,8 +15,10 @@ export const gitCommitMessageErrors = defineErrorCatalog('git', {
   },
   COMMIT_MESSAGE_PROVIDER_FAILED: {
     status: 502,
-    message: ({ providerInstanceId }: { providerInstanceId: string }) =>
-      `Could not generate a commit message with ${providerInstanceId}.`,
+    message: ({ providerInstanceId, reason }: { providerInstanceId: string; reason?: string }) =>
+      reason
+        ? `Could not generate a commit message with ${providerInstanceId}: ${reason}`
+        : `Could not generate a commit message with ${providerInstanceId}.`,
     why: 'The selected provider failed, stopped, or requested interaction during the isolated generation turn.',
     fix: 'Check the provider account and retry, or enable another provider in settings.',
   },

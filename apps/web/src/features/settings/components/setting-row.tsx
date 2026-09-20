@@ -1,3 +1,4 @@
+import { NotificationModeWidget } from '@/features/settings/components/widgets/notification-mode-widget'
 import { ThemeWidget } from '@/features/settings/components/widgets/theme-widget'
 import { WallpaperWidget } from '@/features/settings/components/widgets/wallpaper-widget'
 import {
@@ -194,6 +195,16 @@ function SettingControl({
       />
     )
   }
+
+  if (control.widget === 'enum' && id === 'chat.notificationMode')
+    return (
+      <NotificationModeWidget
+        disabled={disabled}
+        onChange={onChange}
+        options={control.options}
+        value={control.value}
+      />
+    )
 
   if (control.widget === 'enum') {
     return (

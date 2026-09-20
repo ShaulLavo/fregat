@@ -20,8 +20,14 @@ export type EditorReference =
     }
 
 export type ChatReference =
-  | { readonly kind: 'draft' }
+  | { readonly kind: 'draft'; readonly draftId?: string }
   | { readonly kind: 'session'; readonly sessionId: SessionId }
+
+export const draftAddressTokenSchema = v.pipe(
+  v.string(),
+  v.regex(/^draft-[a-f0-9]{8}(?:-[a-f0-9]{4}){3}-[a-f0-9]{12}$/i),
+  v.brand('DraftAddressToken'),
+)
 
 const OBJECT_ID = /^[0-9a-f]{40,64}$/i
 const STATUS = v.picklist([
@@ -37,13 +43,19 @@ const STATUS = v.picklist([
 
 export function chatReferenceForToken(token: string | null): ChatReference | null {
   if (token === 't/new') return { kind: 'draft' }
+  if (token?.startsWith('t/draft-')) {
+    const id = v.safeParse(v.pipe(v.string(), v.uuid()), token.slice(8))
+    return id.success ? { kind: 'draft', draftId: id.output } : null
+  }
   if (!token?.startsWith('t/') || token.split('/').length !== 2) return null
   const parsed = v.safeParse(sessionIdSchema, decodeSegment(token.slice(2)))
   return parsed.success ? { kind: 'session', sessionId: parsed.output } : null
 }
 
 export function tokenForChatReference(reference: ChatReference) {
-  return reference.kind === 'draft' ? 't/new' : `t/${encodeSegment(reference.sessionId)}`
+  if (reference.kind === 'draft')
+    return reference.draftId ? `t/draft-${reference.draftId}` : 't/new'
+  return `t/${encodeSegment(reference.sessionId)}`
 }
 
 export function editorReferenceForToken(token: string | null): EditorReference | null {
@@ -194,6 +206,6 @@ export const editorReferenceSchema = v.pipe(
 )
 
 export const chatReferenceSchema = v.variant('kind', [
-  v.object({ kind: v.literal('draft') }),
+  v.object({ kind: v.literal('draft'), draftId: v.optional(v.pipe(v.string(), v.uuid())) }),
   v.object({ kind: v.literal('session'), sessionId: sessionIdSchema }),
 ])

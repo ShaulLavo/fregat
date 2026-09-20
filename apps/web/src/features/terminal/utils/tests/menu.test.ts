@@ -48,8 +48,8 @@ test('a blocked Paste is unavailable, and says which key still works', () => {
   expect(paste.unavailable).toBeTruthy()
 })
 
-test('the screen section reads Clear, then Reset', () => {
-  expect(labels(menuContext(), 'screen')).toEqual(['Clear', 'Reset'])
+test('the screen section separates clear, viewer reset and process restart', () => {
+  expect(labels(menuContext(), 'screen')).toEqual(['Clear', 'Reset', 'Restart shell'])
 })
 
 test('Reset is destructive and Clear is not', () => {
@@ -57,8 +57,8 @@ test('Reset is destructive and Clear is not', () => {
   expect(item(menuContext(), 'clear').destructive).toBeFalsy()
 })
 
-test('Clear advertises a shortcut because it sends a real key to the shell', () => {
-  expect(item(menuContext(), 'clear').shortcut).toBeTruthy()
+test('shared history Clear does not advertise the shell repaint shortcut', () => {
+  expect(item(menuContext(), 'clear').shortcut).toBeUndefined()
 })
 
 test('a terminal with no scrollback offers no scroll items', () => {
@@ -98,6 +98,7 @@ test('every item runs the callback it was built from', () => {
     'selectAll',
     'clear',
     'reset',
+    'restart',
     'scrollToTop',
     'scrollToBottom',
   ])
@@ -139,6 +140,7 @@ function menuContext({
     askAgent: () => {},
     canAskAgent,
     clear: () => {},
+    restart: () => {},
     copySelection: () => {},
     hasScrollback,
     hasSelection,

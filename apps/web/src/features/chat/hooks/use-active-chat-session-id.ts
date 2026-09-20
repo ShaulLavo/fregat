@@ -83,7 +83,13 @@ export function useActiveChatSessionId({
     promoteDraftSession,
     selectDraftSession: () => {
       if (!projectId) return
-      void navigation.openChat({ environmentId, projectId, sessionId: null, surface: 'sidebar' })
+      void navigation.openChat({
+        environmentId,
+        projectId,
+        sessionId: null,
+        surface: 'sidebar',
+        newDraft: true,
+      })
     },
     setActiveSessionId: (sessionId: SessionId) => selectSession(sessionId),
   }

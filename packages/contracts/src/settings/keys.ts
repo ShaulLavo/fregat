@@ -1,3 +1,5 @@
+import { modelSelectionSchema } from '../orchestration-runtime'
+import { DEFAULT_CODEX_PROVIDER_SETTINGS } from '../provider'
 import { themeBundleSchema, themeCustomizationsSchema } from '../themes/bundle'
 import { wallpaperSelectionSchema } from '../themes/wallpaper'
 import * as v from 'valibot'
@@ -34,6 +36,128 @@ import { defineSetting, type SettingDescriptor } from './registry'
 const percentSchema = v.pipe(v.number(), v.integer(), v.minValue(0), v.maxValue(100))
 
 export const SETTINGS_REGISTRY = {
+  'chat.planModeEnabled': defineSetting({
+    schema: v.boolean(),
+    default: false,
+    scope: 'application',
+    widget: 'boolean',
+    category: 'Chat',
+    title: 'Plan mode controls',
+    description:
+      'Show the Plan mode picker and /plan and /default commands for providers that support them. Stored draft preferences are retained while hidden.',
+  }),
+  'chat.contextWindowMeterEnabled': defineSetting({
+    schema: v.boolean(),
+    default: false,
+    scope: 'application',
+    widget: 'boolean',
+    category: 'Chat',
+    title: 'Context window meter',
+    description:
+      'Show conversation context occupancy in the composer and session header. Provider quota information is independent.',
+  }),
+  'chat.responseStreamingMode': defineSetting({
+    schema: v.picklist(['paragraph', 'turn', 'token']),
+    default: 'paragraph',
+    scope: 'application',
+    widget: 'enum',
+    category: 'Chat',
+    title: 'Response streaming',
+    description: 'Publish assistant responses by paragraph, complete turn, or individual token.',
+  }),
+  'chat.projectResponseStreamingModes': defineSetting({
+    schema: v.record(v.string(), v.picklist(['paragraph', 'turn', 'token'])),
+    default: {},
+    merge: 'record',
+    scope: 'application',
+    widget: 'complex',
+    category: 'Chat',
+    title: 'Project response streaming',
+    description: 'Response streaming mode overrides keyed by project UUID on this machine.',
+  }),
+  'chat.notificationMode': defineSetting({
+    schema: v.picklist(['off', 'notifications', 'sound', 'notifications-and-sound']),
+    default: 'off',
+    scope: 'application',
+    widget: 'enum',
+    category: 'Chat',
+    title: 'Session notifications',
+    description:
+      'Notify when a session needs attention or completes. Native notifications require browser permission; sound starts after a pointer or keyboard gesture.',
+  }),
+  'chat.inAppNotificationsEnabled': defineSetting({
+    schema: v.boolean(),
+    default: false,
+    scope: 'application',
+    widget: 'boolean',
+    category: 'Chat',
+    title: 'In-app session notifications',
+    description:
+      'Show an Open session action when another session needs attention or completes while this window is focused.',
+  }),
+  'chat.textGenerationModel': defineSetting({
+    schema: modelSelectionSchema,
+    default: {
+      providerInstanceId: DEFAULT_CODEX_PROVIDER_SETTINGS.providerInstanceId,
+      model: 'gpt-5.6-luna',
+      options: { reasoningEffort: 'low' },
+    },
+    scope: 'application',
+    widget: 'complex',
+    category: 'Chat',
+    title: 'Title generation model',
+    description:
+      'Provider and model used to generate session titles, independently of the conversation model.',
+  }),
+  'chat.projectTextGenerationModels': defineSetting({
+    schema: v.record(v.string(), modelSelectionSchema),
+    default: {},
+    scope: 'application',
+    widget: 'complex',
+    merge: 'record',
+    category: 'Chat',
+    title: 'Project title generation models',
+    description: 'Title generation model overrides keyed by project UUID on this machine.',
+  }),
+  'chat.sessionSortOrder': defineSetting({
+    schema: v.picklist(['updated_at', 'created_at']),
+    default: 'updated_at',
+    scope: 'application',
+    widget: 'enum',
+    category: 'Chat',
+    title: 'Session navigation order',
+    description:
+      'Order palette sessions and choose the surviving project session after deletion by latest user activity or creation time. Shelf ordering remains independent.',
+  }),
+  'chat.confirmSessionDelete': defineSetting({
+    schema: v.boolean(),
+    default: true,
+    scope: 'application',
+    widget: 'boolean',
+    category: 'Chat',
+    title: 'Confirm session deletion',
+    description: 'Ask before permanently deleting one or more conversations.',
+  }),
+  'chat.projectGrouping': defineSetting({
+    schema: v.picklist(['repository', 'repository_path', 'separate']),
+    default: 'repository',
+    scope: 'application',
+    widget: 'enum',
+    category: 'Chat',
+    title: 'Project grouping',
+    description:
+      'Group projects by repository, repository-relative path, or owning machine. Git projects currently register at the repository root, so both repository modes are equivalent.',
+  }),
+  'chat.projectGroupingOverrides': defineSetting({
+    schema: v.record(v.string(), v.picklist(['repository', 'repository_path', 'separate'])),
+    default: {},
+    scope: 'application',
+    widget: 'complex',
+    merge: 'record',
+    category: 'Chat',
+    title: 'Project grouping overrides',
+    description: 'Grouping mode per scoped project key (environment UUID:project UUID).',
+  }),
   'environments.machines': defineSetting({
     schema: machinesSchema,
     default: {},
@@ -263,6 +387,37 @@ export const SETTINGS_REGISTRY = {
     description:
       'Earlier states kept per open file, across every undo branch. The least recently visited go first when the budget is exceeded.',
     keywords: ['undo', 'history', 'branches', 'retained', 'memory'],
+  }),
+  'editor.history.persist': defineSetting({
+    schema: v.boolean(),
+    default: true,
+    scope: 'application',
+    widget: 'boolean',
+    category: 'Editor',
+    description:
+      'Keep undo history for closed files in this browser, so reopening a file or reloading the window brings it back. A file that changed on disk in the meantime starts fresh.',
+    keywords: ['undo', 'history', 'restore', 'reopen', 'reload', 'persist'],
+  }),
+  'editor.history.persistDays': defineSetting({
+    schema: v.pipe(v.number(), v.integer(), v.minValue(1), v.maxValue(365)),
+    default: 30,
+    scope: 'application',
+    widget: 'number',
+    category: 'Editor',
+    description: 'Days a closed file keeps its stored undo history before it is dropped.',
+    keywords: ['undo', 'history', 'ttl', 'expire', 'persist'],
+  }),
+  'editor.history.persistBudget': defineSetting({
+    // Clamped at 1 GiB, like the retained text budget: browser storage is shared.
+    schema: v.pipe(v.number(), v.integer(), v.minValue(0), v.maxValue(1_073_741_824)),
+    default: 67_108_864,
+    scope: 'application',
+    widget: 'number',
+    category: 'Editor',
+    description:
+      'Total stored undo history across closed files, in UTF-16 code units. The least recently saved files go first when it is exceeded.',
+    visibility: 'advanced',
+    keywords: ['undo', 'history', 'storage', 'budget', 'persist'],
   }),
   'editor.diff.viewMode': defineSetting({
     schema: v.picklist(['split', 'stacked'] as const),

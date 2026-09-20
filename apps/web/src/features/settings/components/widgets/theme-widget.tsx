@@ -20,7 +20,7 @@ import { useBundleExport } from '@/features/settings/hooks/use-bundle-export'
 import { usePaletteCatalog } from '@/features/settings/hooks/use-palette-catalog'
 import { useSettingsProjection } from '@/features/settings/hooks/use-settings-projection'
 import { useSettingsActions } from '@/features/settings/hooks/use-settings-actions'
-import { BundlePreviewContext } from '@/features/settings/providers/appearance-preview-context'
+import { BundleContext } from '@/lib/appearance/providers/bundle-context'
 import { newThemeDocument } from '@/features/settings/utils/bundle-editing'
 import { errorMessage } from '@/lib/error-message'
 
@@ -31,7 +31,7 @@ export function ThemeWidget({ disabled }: { disabled: boolean }) {
   const exportBundle = useBundleExport()
   const { selectBundle, resetBundle } = useSettingsActions()
   const projection = useSettingsProjection()
-  const preview = useContext(BundlePreviewContext)
+  const preview = useContext(BundleContext)
   const clear = preview?.clear
   const [editing, setEditing] = useState<ThemeDocument | null>(null)
   const input = useRef<HTMLInputElement>(null)

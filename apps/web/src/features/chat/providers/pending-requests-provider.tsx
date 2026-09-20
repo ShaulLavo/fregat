@@ -6,6 +6,7 @@ import type {
   SessionApprovalRespondCommand,
   SessionId,
   SessionUserInputRespondCommand,
+  SessionUserInputDismissCommand,
 } from '@workspace/contracts'
 import { useMemo, useState, type ReactNode } from 'react'
 
@@ -13,6 +14,7 @@ import type { ChatTransport } from '@/features/chat/transport/chat-transport'
 import {
   createApprovalRespondCommand,
   createUserInputRespondCommand,
+  createUserInputDismissCommand,
 } from '@workspace/client-core/chat/commands'
 import { dispatchChatCommand, replayAfterDispatch } from '@/features/chat/utils/command-dispatch'
 import { scheduleSessionProjectionSyncAfterDispatch } from '@/features/chat/utils/command-sync'
@@ -51,11 +53,15 @@ export function ChatPendingRequestsProvider({
   const activities = useActiveChatProjection(
     (state) => selectChatSessionById(state, sessionId)?.activities ?? NO_ACTIVITIES,
   )
+  const retainedQuestions = useActiveChatProjection(
+    (state) => selectChatSessionById(state, sessionId)?.pendingMessageQuestions ?? NO_ACTIVITIES,
+  )
   const [responses, setResponses] = useState<RequestResponses>(NO_RESPONSES)
   // Context value identity: these panels sit beside the composer, so a fresh
   // object on every composer render would repaint them for nothing.
   const value = useMemo<ChatPendingRequests>(
     () => ({
+      sessionId,
       disabledReason,
       responseState: (requestId) => {
         const pending = responses.get(requestId)
@@ -64,7 +70,15 @@ export function ChatPendingRequestsProvider({
         return failure ? { kind: 'failed', message: failure } : pending.response
       },
       pendingApprovals: derivePendingApprovals(activities),
-      pendingUserInputs: derivePendingUserInputs(activities),
+      pendingUserInputs: derivePendingUserInputs(activities, retainedQuestions),
+      dismissUserInput: (requestId) =>
+        dispatchPendingRequestResponse({
+          command: createUserInputDismissCommand({ requestId, sessionId }),
+          context: {},
+          requestId,
+          setResponses,
+          transport,
+        }),
       respondToApproval: (requestId, decision) =>
         dispatchPendingRequestResponse({
           command: createApprovalRespondCommand({
@@ -77,10 +91,11 @@ export function ChatPendingRequestsProvider({
           setResponses,
           transport,
         }),
-      respondToUserInput: (requestId, answers) =>
+      respondToUserInput: (requestId, answers, attachmentsByQuestionId) =>
         dispatchPendingRequestResponse({
           command: createUserInputRespondCommand({
             answers,
+            attachmentsByQuestionId,
             requestId,
             sessionId,
           }),
@@ -91,7 +106,7 @@ export function ChatPendingRequestsProvider({
           transport,
         }),
     }),
-    [activities, disabledReason, responses, sessionId, transport],
+    [activities, retainedQuestions, disabledReason, responses, sessionId, transport],
   )
 
   return <ChatPendingRequestsContext value={value}>{children}</ChatPendingRequestsContext>
@@ -104,7 +119,10 @@ async function dispatchPendingRequestResponse({
   setResponses,
   transport,
 }: {
-  command: SessionApprovalRespondCommand | SessionUserInputRespondCommand
+  command:
+    | SessionApprovalRespondCommand
+    | SessionUserInputRespondCommand
+    | SessionUserInputDismissCommand
   context: Record<string, unknown>
   requestId: ApprovalRequestId
   setResponses: SetResponses

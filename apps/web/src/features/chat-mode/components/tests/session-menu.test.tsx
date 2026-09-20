@@ -1,3 +1,5 @@
+import { commandIdSchema } from '@workspace/contracts'
+import * as v from 'valibot'
 import { screen, waitFor } from '@testing-library/react'
 import userEvent from '@testing-library/user-event'
 import { useSessionSelectionStore } from '@/features/chat-mode/state/session-selection-store'
@@ -46,7 +48,8 @@ test('archive persists and releases only the selected scoped session', async ({
   )
   expect(useSessionSelectionStore.getState().selection).toMatchObject({
     environmentId: h.environmentId,
-    sessionId: h.sessionIds[1],
+    kind: 'draft',
+    projectId: h.projectId,
   })
 })
 test('delete requires confirmation and cancellation leaves the real session intact', async ({
@@ -72,4 +75,28 @@ test('confirmed delete removes the session through its owner', async ({ client, 
       false,
     ),
   )
+})
+
+test('timer wake appears at its deadline and acknowledgment retains server snooze', async ({
+  client,
+  server,
+}) => {
+  const h = await createRailHarness(client, server)
+  const sessionId = h.sessionIds[0]!
+  const deadline = new Date(Date.now() + 200).toISOString()
+  await h.dispatch({
+    type: 'session.snooze',
+    sessionId,
+    snoozedUntil: deadline,
+    commandId: v.parse(commandIdSchema, 'snooze-wake-ui'),
+  })
+  await h.refresh()
+  renderRailHarness(h)
+  await screen.findByText('Woke')
+  await userEvent.pointer({ keys: '[MouseRight]', target: screen.getByTitle('First') })
+  await userEvent.click(await screen.findByRole('menuitem', { name: 'Acknowledge wake' }))
+  await waitFor(() => expect(screen.queryByText('Woke')).toBeNull())
+  expect(
+    (await h.refresh()).sessions.find((session) => session.id === sessionId)?.snoozedUntil,
+  ).toBe(deadline)
 })

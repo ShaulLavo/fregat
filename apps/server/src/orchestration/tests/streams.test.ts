@@ -1,3 +1,4 @@
+import { LiveStreamBudget } from '../live-stream-budget'
 import { describe, expect, it } from 'vitest'
 import * as v from 'valibot'
 import {
@@ -336,3 +337,121 @@ async function openShellStream(workspace: ShellWorkspace, options: { targeted: b
 
   return reader
 }
+
+// A suspended generator models the RPC pump waiting for its delivery ACK.
+it.each(['shell', 'detail'] as const)(
+  'bounds the %s live tail while initial delivery is stalled',
+  async (kind) => {
+    const workspace = createShellWorkspace(1)
+    const hub = new OrchestrationStreamHub()
+    const budget = new LiveStreamBudget({ maxItems: 2, maxBytes: 8 * 1024 * 1024 })
+    const streams = shellStreams(workspace, hub, true)
+    const sessionId = workspace.sessionIds[0]!
+    const stream =
+      kind === 'shell' ? streams.shell({ budget }) : streams.sessionDetail(sessionId, { budget })
+    try {
+      expect((await stream.next()).value).toMatchObject({ kind: 'snapshot' })
+      for (const text of ['one', 'two', 'three'])
+        streams.publish(workspace.commit([assistantDeltaEvent(sessionId, text)]))
+      expect(budget.signal.aborted).toBe(true)
+      expect(hub.subscriberCount).toBe(0)
+      expect(budget.usage).toEqual({ items: 0, bytes: 0 })
+    } finally {
+      await stream.return(undefined)
+      workspace.close()
+    }
+  },
+)
+
+it('keeps delivered detail data charged until the next pull and resumes overflow without losing text', async () => {
+  const workspace = createShellWorkspace(1)
+  const hub = new OrchestrationStreamHub()
+  const budget = new LiveStreamBudget({ maxItems: 2, maxBytes: 8 * 1024 * 1024 })
+  const streams = shellStreams(workspace, hub, true)
+  const sessionId = workspace.sessionIds[0]!
+  const stream = streams.sessionDetail(sessionId, { budget })
+  try {
+    await stream.next()
+    await stream.next()
+    const next = stream.next()
+    const first = workspace.commit([assistantDeltaEvent(sessionId, 'first')])
+    streams.publish(first)
+    const delivered = await next
+    expect(delivered.value).toMatchObject({
+      kind: 'event',
+      event: { sequence: first[0]!.sequence },
+    })
+    expect(budget.usage.items).toBe(1)
+    streams.publish(workspace.commit([assistantDeltaEvent(sessionId, 'second')]))
+    streams.publish(workspace.commit([assistantDeltaEvent(sessionId, 'third')]))
+    expect(hub.subscriberCount).toBe(0)
+    await expect(stream.next()).rejects.toThrow('subscription buffer')
+    const resumed = streams.sessionDetail(sessionId, { afterSequence: first[0]!.sequence })
+    expect((await resumed.next()).value).toMatchObject({
+      kind: 'event',
+      event: { payload: { text: 'second' } },
+    })
+    expect((await resumed.next()).value).toMatchObject({
+      kind: 'event',
+      event: { payload: { text: 'third' } },
+    })
+    await resumed.return(undefined)
+    expect(hub.subscriberCount).toBe(0)
+  } finally {
+    await stream.return(undefined)
+    workspace.close()
+  }
+})
+
+it('releases retained delivery immediately on abort without another consumer pull', async () => {
+  const workspace = createShellWorkspace(1)
+  const hub = new OrchestrationStreamHub()
+  const streams = shellStreams(workspace, hub, true)
+  const budget = new LiveStreamBudget()
+  const controller = new AbortController()
+  const stream = streams.sessionDetail(workspace.sessionIds[0]!, {
+    budget,
+    signal: controller.signal,
+  })
+  try {
+    await stream.next()
+    streams.publish(workspace.commit([assistantDeltaEvent(workspace.sessionIds[0]!, 'queued')]))
+    expect(budget.usage.items).toBe(1)
+    controller.abort()
+    expect(hub.subscriberCount).toBe(0)
+    expect(budget.usage).toEqual({ items: 0, bytes: 0 })
+  } finally {
+    await stream.return(undefined)
+    workspace.close()
+  }
+})
+
+it('keeps publication during snapshot delivery and falls back after losing the live epoch', async () => {
+  const workspace = createShellWorkspace(1)
+  const streams = shellStreams(workspace, new OrchestrationStreamHub(), true)
+  const sessionId = workspace.sessionIds[0]!
+  const stream = streams.sessionDetail(sessionId)
+  try {
+    const initial = (await stream.next()).value
+    if (!initial || initial.kind !== 'snapshot') return expect.unreachable('expected snapshot')
+    const events = workspace.commit([assistantDeltaEvent(sessionId, 'during snapshot')])
+    streams.publish(events)
+    await stream.next()
+    expect((await stream.next()).value).toMatchObject({
+      kind: 'event',
+      event: { sequence: events[0]!.sequence },
+    })
+    const restarted = shellStreams(workspace, new OrchestrationStreamHub(), true)
+    const resumed = restarted.sessionDetail(sessionId, {
+      afterSequence: initial.snapshot.snapshotSequence,
+    })
+    expect((await resumed.next()).value).toMatchObject({
+      kind: 'snapshot',
+      snapshot: { session: { messages: [{ text: 'during snapshot' }] } },
+    })
+    await resumed.return(undefined)
+  } finally {
+    await stream.return(undefined)
+    workspace.close()
+  }
+})

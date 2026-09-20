@@ -1,6 +1,6 @@
 import assert from 'node:assert/strict'
 import * as v from 'valibot'
-import { sessionIdSchema, scopedSessionKey } from '@workspace/contracts'
+import { sessionIdSchema, scopedSessionKey, scopedProjectKey } from '@workspace/contracts'
 import {
   createSessionArchiveCommand,
   createSessionRenameCommand,
@@ -70,10 +70,22 @@ test('project registration, durable collapse and read stamps, and partial bulk f
     assert(project)
     const first = await createRailSession(chat, project.worktreeId, 'First session')
     const second = await createRailSession(chat, project.worktreeId, 'Second session')
-    store.toggleCollapsed(project.projectId)
+    const projectKey = scopedProjectKey({
+      environmentId: ready.descriptor.environmentId,
+      projectId: project.projectId,
+    })
+    store.toggleCollapsed([projectKey])
+    const otherKey = 'second-member-key'
+    store.toggleCollapsed([projectKey, otherKey])
+    expect(store.getSnapshot().collapsed).toEqual([projectKey, otherKey])
+    store.toggleCollapsed([projectKey, otherKey])
+    expect(store.getSnapshot().collapsed).toEqual([])
+    store.toggleCollapsed([projectKey])
+    store.setScope('repository:shared')
+    expect(store.getSnapshot().scope).toBe('repository:shared')
     store.markSeen(first, '2026-07-01T12:00:00.000Z')
     const reopened = createAgentRailState(session, ready)
-    expect(reopened.getSnapshot().collapsed).toEqual([project.projectId])
+    expect(reopened.getSnapshot().collapsed).toEqual([projectKey])
     expect(
       reopened.getSnapshot().seen[
         scopedSessionKey({ environmentId: ready.descriptor.environmentId, sessionId: first })

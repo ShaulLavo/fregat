@@ -129,6 +129,7 @@ export async function registerFederatedProject(
   server: TestServer,
   client: ReturnType<typeof createInProcessClient>,
   suffix: string,
+  requestedSessionId?: import('@workspace/contracts').SessionId,
 ) {
   const path = join(server.root, 'repo')
   await mkdir(path)
@@ -142,7 +143,7 @@ export async function registerFederatedProject(
     createProjectRegistrationCommand({ workspaceRoot: 'repo', title: 'Shared project' }),
   )
   const result = response.data!.result!
-  const sessionId = v.parse(sessionIdSchema, crypto.randomUUID())
+  const sessionId = requestedSessionId ?? v.parse(sessionIdSchema, crypto.randomUUID())
   await client.orchestration.commands.post({
     type: 'session.create',
     commandId: v.parse(commandIdSchema, `federation-session-${suffix}`),

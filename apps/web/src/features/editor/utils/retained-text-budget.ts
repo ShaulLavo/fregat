@@ -1,4 +1,4 @@
-import { readSettingBootValue } from '@/features/settings/utils/boot-mirror'
+import { readSettingBootValue } from '@/lib/settings-boot-mirror'
 
 /**
  * Read at call time, so a change applies at the next switch or close rather than

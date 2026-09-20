@@ -17,6 +17,96 @@ export const searchEditorGeometrySelectors = {
 
 // Stable handles the app already exposes. Add here, never inline a selector in a scenario.
 export const selectors = {
+  completedWorkGroup: (page: Page) => page.getByRole('button', { name: /^Worked for / }),
+  reasoningDeliveryRow: (page: Page) => page.getByRole('button', { name: /^REASONING_BEGIN / }),
+  reasoningDeliveryDetail: (page: Page, text: string) => page.getByText(text, { exact: true }),
+  recoverableDraft: (page: Page, label: string) =>
+    page
+      .getByRole('listbox', { name: 'Drafts', exact: true })
+      .getByRole('option')
+      .filter({ hasText: label }),
+  discardDraft: (page: Page, label: string) =>
+    page.getByRole('button', { name: `Discard draft: ${label}`, exact: true }),
+  newWorktreeChoice: (page: Page) =>
+    page.getByRole('button', { name: 'New worktree', exact: true }),
+  composerAccess: (page: Page) => page.getByRole('menuitemradio', { name: /^Full access/ }),
+  chatExactText: (page: Page, text: string) => page.getByText(text, { exact: true }),
+  composerModes: (page: Page) =>
+    page.getByRole('button', { name: 'Agent access and mode', exact: true }),
+  composerPlan: (page: Page) => page.getByRole('menuitemradio', { name: /^Plan/ }),
+  contextMeter: (page: Page) => page.getByRole('button', { name: /^Context / }),
+  notificationToast: (page: Page) =>
+    page
+      .locator('[data-sonner-toast]')
+      .filter({ has: page.getByRole('button', { name: 'Open session', exact: true }) }),
+  notificationOpenSession: (page: Page) =>
+    page.getByRole('button', { name: 'Open session', exact: true }),
+  notificationBadge: (page: Page) => page.locator('link[data-session-notifications]'),
+  chatStash: (page: Page, count: number) =>
+    page.getByRole('button', { name: `Stashed prompts: ${count}`, exact: true }),
+  chatStashEntry: (page: Page, label: string) =>
+    page.getByRole('button', { name: new RegExp(`^${label}`) }),
+  sessionTitleInput: (page: Page) =>
+    page.getByRole('textbox', { name: 'Session title', exact: true }),
+  titleGenerationStatus: (page: Page) =>
+    page.getByRole('status', { name: 'Generating title' }).first(),
+  titleGenerationFailure: (page: Page) =>
+    page.getByText('Title generation failed', { exact: true }).first(),
+  sessionLifecycleAction: (page: Page, name: string) =>
+    page.getByRole('menuitem', { name, exact: true }),
+  sessionInShelf: (page: Page, title: string, shelf: string) =>
+    page.getByRole('region', { name: shelf, exact: true }).getByTitle(title, { exact: true }),
+  snoozePreset: (page: Page) => page.getByRole('button', { name: /In 1 hour/ }),
+  snoozeDurationMode: (page: Page) => page.getByRole('button', { name: 'Duration', exact: true }),
+  snoozeAmount: (page: Page) => page.getByRole('spinbutton', { name: 'Duration', exact: true }),
+  snoozeCustomSubmit: (page: Page) =>
+    page.getByRole('button', { name: 'Snooze until chosen time', exact: true }),
+  snoozeDialog: (page: Page) => page.getByRole('dialog', { name: 'Snooze sessions', exact: true }),
+  sessionBulkActions: (page: Page) =>
+    page
+      .getByRole('toolbar', { name: 'Selected sessions' })
+      .getByRole('button', { name: 'Actions', exact: true }),
+  toastUndo: (page: Page) =>
+    page.locator('[data-sonner-toast]').getByRole('button', { name: 'Undo', exact: true }).last(),
+
+  projectGroups: (page: Page) => page.locator('[data-project-group]'),
+  projectDeleteMenu: (page: Page) =>
+    page.getByRole('menuitem', { name: 'Delete Project', exact: true }),
+  projectDeleteDialog: (page: Page) =>
+    page.getByRole('dialog', { name: 'Delete project', exact: true }),
+  projectDeleteOwners: (page: Page) =>
+    page.getByRole('dialog', { name: 'Delete project', exact: true }).getByRole('listitem'),
+  projectDeleteCancel: (page: Page) =>
+    page
+      .getByRole('dialog', { name: 'Delete project', exact: true })
+      .getByRole('button', { name: 'Cancel', exact: true }),
+
+  asyncQuestion: (page: Page, prompt: string) =>
+    page.getByRole('region', { name: 'Agent question', exact: true }).filter({ hasText: prompt }),
+  questionFileInput: (page: Page, prompt: string) =>
+    page
+      .getByRole('region', { name: 'Agent question', exact: true })
+      .filter({ hasText: prompt })
+      .locator('input[type="file"]'),
+  questionPrompt: (page: Page, prompt: string) =>
+    page
+      .getByRole('region', { name: 'Agent question', exact: true })
+      .filter({ hasText: prompt })
+      .getByRole('status'),
+  questionAttachment: (page: Page, name: string) =>
+    page.getByRole('button', { name: `Remove ${name}`, exact: true }),
+  asyncQuestionAction: (page: Page, prompt: string, action: string) =>
+    page
+      .getByRole('region', { name: 'Agent question', exact: true })
+      .filter({ hasText: prompt })
+      .getByRole('button', { name: action, exact: true }),
+  sessionStatus: (page: Page, title: string, status: string) =>
+    page.getByTitle(title, { exact: true }).getByRole('status', { name: status, exact: true }),
+  appApproval: (page: Page) => page.getByRole('region', { name: 'App access', exact: true }),
+  appApprovalDecision: (page: Page, label: string) =>
+    page
+      .getByRole('region', { name: 'App access', exact: true })
+      .getByRole('button', { name: label, exact: true }),
   imageLightbox: (page: Page, name: string) => page.getByRole('dialog', { name, exact: true }),
   iconHintControl: (scope: Page | Locator, name: string) =>
     scope.getByRole('button', { name, exact: true }),
@@ -76,6 +166,9 @@ export const selectors = {
   patternRows: (list: Locator) => list.locator('[data-slot="list-row"]'),
   selectedPatternRows: (list: Locator) =>
     list.locator('[data-slot="list-row"][aria-selected="true"]'),
+  clearTerminalHistory: (page: Page) => page.getByRole('menuitem', { name: 'Clear', exact: true }),
+  restartTerminalShell: (page: Page) =>
+    page.getByRole('menuitem', { name: 'Restart shell', exact: true }),
   terminalName: (page: Page) => page.getByRole('textbox', { name: 'Terminal name', exact: true }),
   commitFilesTree: (page: Page) => page.getByRole('tree', { name: 'Commit files', exact: true }),
   newTerminal: (page: Page) => page.getByRole('button', { name: 'New terminal', exact: true }),
@@ -108,6 +201,32 @@ export const selectors = {
       .locator('[data-dragging="true"]'),
   connectMachineMenu: (page: Page) =>
     page.getByRole('menuitem', { name: 'Connect machine…', exact: true }),
+  sessionByTitle: (page: Page, title: string) => page.getByTitle(title, { exact: true }),
+  draggingSession: (page: Page) =>
+    page.locator('[data-dragging="true"][aria-roledescription="sortable session row"]'),
+  sessionShelfTarget: (page: Page, shelf: 'pinned' | 'active' | 'settled') =>
+    page.locator(`[data-rail-shelf-target="${shelf}"]`),
+  sessionSearch: (page: Page) => page.getByRole('searchbox', { name: 'Search sessions' }),
+  archivedSessions: (page: Page) =>
+    page.getByRole('button', { name: 'Archived sessions', exact: true }),
+  markSessionUnread: (page: Page) =>
+    page.getByRole('menuitem', { name: 'Mark as unread', exact: true }),
+  acknowledgeSessionWake: (page: Page) =>
+    page.getByRole('menuitem', { name: 'Acknowledge wake', exact: true }),
+  sessionUnread: (page: Page, title: string) =>
+    page.getByTitle(title, { exact: true }).getByLabel('Unread', { exact: true }),
+  sessionWoke: (page: Page, title: string) =>
+    page.getByTitle(title, { exact: true }).getByText('Woke', { exact: true }),
+  deleteSession: (page: Page) => page.getByRole('menuitem', { name: 'Delete', exact: true }),
+  confirmSessionDelete: (page: Page) =>
+    page.getByRole('dialog').getByRole('button', { name: 'Delete', exact: true }),
+  copySessionPath: (page: Page) => page.getByRole('menuitem', { name: 'Copy Path', exact: true }),
+  copySessionBranch: (page: Page) =>
+    page.getByRole('menuitem', { name: 'Copy Branch', exact: true }),
+  copySessionId: (page: Page) =>
+    page.getByRole('menuitem', { name: 'Copy Session ID', exact: true }),
+  archiveSession: (page: Page) => page.getByRole('menuitem', { name: 'Archive', exact: true }),
+  restoreSession: (page: Page) => page.getByRole('menuitem', { name: 'Unarchive', exact: true }),
   sessionRows: (page: Page) => page.locator('aside [aria-roledescription="sortable session row"]'),
   sessionDraggingRow: (page: Page) =>
     page.locator('aside [aria-roledescription="sortable session row"][data-dragging="true"]'),
@@ -202,6 +321,10 @@ export const selectors = {
   themeRoot: (page: Page) => page.locator('html'),
 
   editorHover: (page: Page) => page.locator('.editor-plugin-hover:not([hidden])'),
+  editorCompletionLabels: (page: Page) =>
+    page
+      .locator('[class$="-completion"]:not([hidden]) [class$="-completion-item"]')
+      .evaluateAll((rows) => rows.map((row) => row.children[1]?.textContent ?? '')),
   unicodeAdjustSettings: (page: Page) =>
     page.getByRole('button', { name: 'Adjust settings', exact: true }),
   diffAmbiguousCharacters: (page: Page) =>
@@ -242,6 +365,8 @@ export const selectors = {
   wallpaperUploadInput: (page: Page) => page.getByLabel('Upload wallpapers', { exact: true }),
   wallpaperActions: (page: Page, name: string) =>
     page.getByRole('button', { name: `Actions for ${name}`, exact: true }),
+  themeBundlePaletteOption: (page: Page) =>
+    page.locator('[cmdk-item][data-value^="theme-bundle:"]'),
   wallpaperPaletteOption: (page: Page, name: string) =>
     page.locator('[cmdk-item][data-value^="wallpaper:"]').filter({ hasText: name }),
   menuItem: (page: Page, name: string) => page.getByRole('menuitem', { name, exact: true }),
@@ -289,6 +414,9 @@ export const selectors = {
       .getByRole('button'),
   chatToolTab: (page: Page, name: string) =>
     page.getByRole('navigation', { name: 'Tool tabs' }).getByRole('button', { name, exact: true }),
+  projectMenuTrigger: (page: Page) => page.getByRole('button', { name: 'Switch project' }),
+  projectMenuRows: (page: Page) => page.getByRole('menuitemradio'),
+  projectMenuLoader: (page: Page) => page.getByRole('status', { name: 'Loading projects' }),
   sidebarSettingsButton: (page: Page, mode: 'Workbench' | 'Chat' = 'Workbench') =>
     page
       .getByRole('navigation', { name: mode === 'Workbench' ? 'Sidebar tabs' : 'Tool tabs' })
@@ -331,6 +459,27 @@ export const selectors = {
     page.getByRole('textbox', { name: 'Replace in workspace', exact: true }),
   replaceToggle: (page: Page) => page.getByRole('button', { name: 'Replace', exact: true }),
   searchResults: (page: Page) => page.getByRole('region', { name: 'Search results', exact: true }),
+  chatRewind: (page: Page) =>
+    page.getByRole('button', { name: 'Revert to checkpoint before this turn', exact: true }),
+  rewindConversation: (page: Page) =>
+    page.getByRole('button', { name: 'Rewind conversation only', exact: true }),
+  rewindFiles: (page: Page) =>
+    page.getByRole('button', { name: 'Rewind and restore files', exact: true }),
+  rewindDialog: (page: Page) => page.getByRole('alertdialog'),
+  chatComposerFileInput: (page: Page) =>
+    page
+      .getByRole('button', { name: 'Attach files', exact: true })
+      .locator('..')
+      .locator('input[type=file]'),
+  chatStagedFile: (page: Page, name: string) =>
+    page.getByLabel('Attachments', { exact: true }).getByText(name, { exact: true }),
+  chatTranscriptFile: (page: Page, name: string) =>
+    page
+      .getByRole('log', { name: 'Messages', exact: true })
+      .getByRole('button', { name, exact: true }),
+  chatFilePreview: (page: Page) => page.locator('[data-chat-file-preview]'),
+  chatFileDownload: (page: Page, name: string) =>
+    page.getByRole('link', { name: `Download ${name}`, exact: true }),
   chatMessage: (page: Page) => page.getByRole('textbox', { name: 'Message', exact: true }),
   chatNewSession: (page: Page) => page.getByRole('button', { name: 'New session', exact: true }),
   chatCorrection: (page: Page) =>
@@ -342,6 +491,8 @@ export const selectors = {
     page.getByRole('button', { name: 'Stage all changes', exact: true }),
   changesHeader: (page: Page) => page.getByRole('button', { name: 'Changes', exact: true }),
   commitMessage: (page: Page) => page.getByRole('textbox', { name: 'Commit message', exact: true }),
+  commitButton: (page: Page) => page.getByRole('button', { name: /^Commit\b/ }),
+  commitOutput: (page: Page) => page.getByRole('log', { name: 'Commit output', exact: true }),
   folderTree: (page: Page) => page.getByLabel('Folder tree', { exact: true }),
   focusedTreeRow: (page: Page) =>
     page.getByLabel('Folder tree', { exact: true }).locator('[role="treeitem"][tabindex="0"]'),
@@ -366,6 +517,13 @@ export const selectors = {
   logRows: (page: Page) => page.locator('[data-log-row-summary]'),
   logsSearch: (page: Page) => page.getByRole('textbox', { name: 'Search logs' }),
   logsTab: (page: Page) => page.getByRole('button', { name: 'Logs', exact: true }),
+  renderErrorState: (page: Page) =>
+    page.locator('[data-slot="empty-state"]').filter({ hasText: 'hit a render error' }),
+  renderErrorRetry: (page: Page) =>
+    page
+      .locator('[data-slot="empty-state"]')
+      .filter({ hasText: 'hit a render error' })
+      .getByRole('button', { name: 'Retry' }),
   historyRows: (page: Page) => page.locator('[data-history-commit]'),
   historyCircles: (page: Page) => page.locator('[data-history-commit] svg circle'),
   historyFiles: (page: Page) => page.locator('[data-history-file]'),

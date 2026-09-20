@@ -140,10 +140,17 @@ export {
   CHAT_ATTACHMENT_URL_PREFIX,
   chatAttachmentExtension,
   chatAttachmentSchema,
+  chatImageAttachmentSchema,
+  chatFileAttachmentSchema,
   chatAttachmentsSchema,
+  userInputAttachmentsSchema,
+  userInputAttachmentUploadsSchema,
+  type UserInputAttachments,
+  type UserInputAttachmentUploads,
   chatAttachmentUploadsSchema,
   chatAttachmentUrlPath,
   MAX_CHAT_ATTACHMENT_BYTES,
+  MAX_CHAT_FILE_ATTACHMENT_BYTES,
   MAX_CHAT_ATTACHMENT_DATA_URL_LENGTH,
   MAX_CHAT_ATTACHMENTS,
   nonNegativeIntegerSchema,
@@ -180,6 +187,8 @@ export {
   interactionModeSchema,
   modelSelectionSchema,
   providerApprovalDecisionSchema,
+  providerApprovalOptionSchema,
+  DEFAULT_APPROVAL_OPTIONS,
   providerDriverKindSchema,
   runtimeModeSchema,
   userInputQuestionOptionSchema,
@@ -189,6 +198,7 @@ export {
   type ModelSelection,
   type ModelSelectionOptions,
   type ProviderApprovalDecision,
+  type ProviderApprovalOption,
   type ProviderDriverKind,
   type ProviderUserInputAnswers,
   type RuntimeMode,
@@ -246,6 +256,7 @@ export {
   type SessionMetaUpdateCommand,
   type SessionPinCommand,
   type SessionPinReorderCommand,
+  type SessionActiveReorderCommand,
   type SessionRuntimeModeSetCommand,
   type SessionRuntimeStopCommand,
   type SessionTurnInterruptCommand,
@@ -253,6 +264,7 @@ export {
   type SessionTurnSteerCommand,
   type SessionUnarchiveCommand,
   type SessionUserInputRespondCommand,
+  type SessionUserInputDismissCommand,
 } from './orchestration-commands'
 export {
   orchestrationEventSchema,
@@ -564,6 +576,7 @@ export {
   sessionPinCommandSchema,
   sessionUnpinCommandSchema,
   sessionPinReorderCommandSchema,
+  sessionActiveReorderCommandSchema,
   sessionRuntimeModeSetCommandSchema,
   sessionInteractionModeSetCommandSchema,
   MAX_TURN_MESSAGE_CHARS,
@@ -571,6 +584,7 @@ export {
   sessionRuntimeStopCommandSchema,
   sessionApprovalRespondCommandSchema,
   sessionUserInputRespondCommandSchema,
+  sessionUserInputDismissCommandSchema,
   sessionCheckpointRevertCommandSchema,
   sessionRuntimeSetCommandSchema,
   sessionMessageAssistantDeltaCommandSchema,
@@ -634,6 +648,7 @@ export {
   sessionPinnedPayloadSchema,
   sessionUnpinnedPayloadSchema,
   sessionPinReorderedPayloadSchema,
+  sessionActiveReorderedPayloadSchema,
   sessionRuntimeModeSetPayloadSchema,
   sessionInteractionModeSetPayloadSchema,
   sessionMessageSentPayloadSchema,
@@ -707,6 +722,10 @@ export {
 } from './orchestration-ws'
 
 export {
+  terminalRestartInputSchema,
+  type TerminalRestartInput,
+  terminalClearInputSchema,
+  type TerminalClearInput,
   terminalKillInputSchema,
   terminalOpenInputSchema,
   type TerminalKillInput,
@@ -816,3 +835,10 @@ export { nodeErrorCode } from './error-fields'
 export { chatCommandSummary } from './command-summary'
 
 export { entryTypeSchema, workspaceSearchMatchSchema } from './workspace-search'
+
+export {
+  attachmentUploadInputSchema,
+  attachmentUploadTicketSchema,
+  type AttachmentUploadInput,
+  type AttachmentUploadTicket,
+} from './attachment-upload'

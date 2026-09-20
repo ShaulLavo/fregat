@@ -9,6 +9,7 @@ import { WorkingRow } from './working-row'
 import { LiveActivityRow } from '@/features/chat/components/live-activity-row'
 import { timelineRowSpacing } from '@/features/chat/utils/timeline-items'
 import { cn } from '@workspace/ui/lib/utils'
+import { RenderErrorBoundary } from '@workspace/ui/patterns/render-error-boundary'
 import { AgentsRow } from '@/features/chat/components/agents-row'
 
 export function TimelineRow({
@@ -32,12 +33,15 @@ export function TimelineRow({
       data-timeline-row-id={item.id}
       data-timeline-row-type={item.type}
     >
-      {timelineRowContent({
-        checkpointRevertPending,
-        foldExpanded,
-        item,
-        toggleFold: () => toggleGroupExpanded(foldId),
-      })}
+      {/* One bad row must not blank the transcript around it. */}
+      <RenderErrorBoundary align='start' label='This row' resetKeys={[item.id]}>
+        {timelineRowContent({
+          checkpointRevertPending,
+          foldExpanded,
+          item,
+          toggleFold: () => toggleGroupExpanded(foldId),
+        })}
+      </RenderErrorBoundary>
     </div>
   )
 }

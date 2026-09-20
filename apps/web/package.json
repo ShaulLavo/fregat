@@ -81,6 +81,7 @@
     "react": "^19.3.0",
     "react-animated-counter": "^1.9.0",
     "react-dom": "^19.3.0",
+    "react-error-boundary": "^6.1.5",
     "server": "workspace:*",
     "shiki": "4.4.3",
     "sonner": "^2.0.8",

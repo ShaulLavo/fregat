@@ -73,7 +73,9 @@ describe('platform migration ledger', () => {
     const plan = () => messagePaginationPlan(handle)
     expect(plan()).toEqual(expect.arrayContaining([expect.stringContaining('TEMP B-TREE')]))
 
-    expect(migratePlatformDatabase(handle.db).map((migration) => migration.version)).toEqual([15])
+    expect(migratePlatformDatabase(handle.db).map((migration) => migration.version)).toEqual([
+      15, 16, 17, 18, 19, 20,
+    ])
 
     expect(plan()).toEqual(
       expect.arrayContaining([
@@ -110,7 +112,7 @@ describe('platform migration ledger', () => {
     )
     seedVersion11Worktrees(handle.db)
     expect(migratePlatformDatabase(handle.db).map((migration) => migration.version)).toEqual([
-      12, 13, 14, 15,
+      12, 13, 14, 15, 16, 17, 18, 19, 20,
     ])
     const query = new OrchestrationSnapshotQuery(handle.db)
     const migrated = query.shellSnapshot()

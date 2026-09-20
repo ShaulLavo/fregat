@@ -22,7 +22,7 @@ test('checkpoint zero opens an in-app confirmation with Cancel focused', async (
     'Revert this session to checkpoint 0?',
   )
   expect(screen.getByRole('alertdialog')).toHaveAccessibleDescription(
-    'This will discard newer messages and turn diffs in this session. This action cannot be undone.',
+    'Newer messages will be removed and the original prompt restored to the composer. Keep your current files, or restore files in an isolated worktree. This cannot be undone.',
   )
   await waitFor(() => expect(screen.getByRole('button', { name: 'Cancel' })).toHaveFocus())
   await userEvent.click(screen.getByRole('button', { name: 'Cancel' }))
@@ -54,7 +54,7 @@ test('Revert waits while the session is busy and requires an explicit click', as
     <CheckpointRevertDialog turnCount={2} disabled onCancel={onCancel} onConfirm={onConfirm} />,
   )
 
-  const revert = screen.getByRole('button', { name: 'Revert' })
+  const revert = screen.getByRole('button', { name: 'Rewind conversation only' })
   expect(revert).toBeDisabled()
   await userEvent.click(revert)
   expect(onConfirm).not.toHaveBeenCalled()
@@ -66,7 +66,7 @@ test('Revert waits while the session is busy and requires an explicit click', as
       onConfirm={onConfirm}
     />,
   )
-  await userEvent.click(screen.getByRole('button', { name: 'Revert' }))
-  expect(onConfirm).toHaveBeenCalledOnce()
+  await userEvent.click(screen.getByRole('button', { name: 'Rewind conversation only' }))
+  expect(onConfirm).toHaveBeenCalledWith(false)
   expect(onCancel).not.toHaveBeenCalled()
 })
