@@ -16,6 +16,13 @@ const DEFAULT_ROOTS = [
   'packages/ui/src',
 ]
 const MANUAL_MEMO_HOOKS = new Set(['useMemo', 'useCallback'])
+const DEPENDENCY_HOOKS = new Set([
+  'useEffect',
+  'useLayoutEffect',
+  'useMemo',
+  'useCallback',
+  'useImperativeHandle',
+])
 const SUMMARY_WIDTH = 96
 
 // The build's own compiler, for the reason the census gives: another version memoizes differently.
@@ -188,6 +195,51 @@ export function explainSource(file, source) {
   return { file, functions, diagnostics: errors.map((error) => error.message) }
 }
 
+function rootIdentifier(node) {
+  let cursor = node
+  while (cursor && (cursor.type === 'MemberExpression' || cursor.type === 'ChainExpression'))
+    cursor = cursor.expression ?? cursor.object
+  return cursor?.type === 'Identifier' ? cursor.name : null
+}
+
+/**
+ * Every identifier a hook keys on: named in a dependency array, or handed to a hook as an argument
+ * the way a store selector is. Such a value must keep its identity, and the compiler's cache is a
+ * cache rather than a guarantee — when it recomputes, the effect re-runs or the store re-subscribes.
+ * A manual memo is load-bearing there however well the inferred keys match.
+ */
+function dependencyNames(tree) {
+  const names = new Set()
+  walk(tree, (node) => {
+    if (node.type !== 'CallExpression' || !node.callee?.name?.startsWith('use')) return
+    if (DEPENDENCY_HOOKS.has(node.callee.name)) {
+      const deps = node.arguments[1]
+      for (const element of deps?.type === 'ArrayExpression' ? (deps.elements ?? []) : []) {
+        const name = rootIdentifier(element)
+        if (name) names.add(name)
+      }
+    }
+    // An identifier argument is the store shape: `useStore(select)`, `useStore(source.subscribe)`.
+    for (const argument of node.arguments) {
+      const name = rootIdentifier(argument)
+      if (name) names.add(name)
+    }
+  })
+  // React keys on a ref callback's identity too: it calls the old one with null on every change.
+  walk(tree, (node) => {
+    const attribute =
+      node.type === 'JSXAttribute' && node.name?.name === 'ref' && node.value?.expression
+    if (attribute) {
+      const name = rootIdentifier(node.value.expression)
+      if (name) names.add(name)
+    }
+    if (node.type !== 'Property' || node.key?.name !== 'ref') return
+    const name = rootIdentifier(node.value)
+    if (name) names.add(name)
+  })
+  return names
+}
+
 function manualMemoSites(tree) {
   const sites = []
   walk(tree, (node) => {
@@ -230,7 +282,9 @@ function sameSet(left, right) {
   return left.length === right.length && left.every((value) => right.includes(value))
 }
 
-function verdict(manual, inferred, refusedWithout) {
+function verdict(manual, inferred, refusedWithout, isDependency) {
+  if (isDependency)
+    return 'needed: a hook depends on this value, and compiler memoization is a cache, not identity'
   if (refusedWithout) return 'needed: the compiler refuses the component without it'
   if (inferred === null) return 'needed: the compiler does not memoize this value on its own'
   if (manual !== null && sameSet(manual, inferred))
@@ -245,7 +299,9 @@ function lineOf(source, offset) {
 /** Compiles the file once per manual memo with that memo removed, and compares the keys. */
 export function auditManualMemos(file, source) {
   const baseline = compile(file, source).errors.length
-  return manualMemoSites(parse(file, source)).flatMap((site) => {
+  const tree = parse(file, source)
+  const dependencies = dependencyNames(tree)
+  return manualMemoSites(tree).flatMap((site) => {
     const replacement = withoutManualMemo(site, source)
     if (replacement === null) return []
     const variant = source.slice(0, site.call.start) + replacement + source.slice(site.call.end)
@@ -260,7 +316,12 @@ export function auditManualMemos(file, source) {
         hook: site.call.callee.name,
         manual,
         inferred,
-        verdict: verdict(manual, inferred, explained.diagnostics.length > baseline),
+        verdict: verdict(
+          manual,
+          inferred,
+          explained.diagnostics.length > baseline,
+          dependencies.has(site.name),
+        ),
       },
     ]
   })

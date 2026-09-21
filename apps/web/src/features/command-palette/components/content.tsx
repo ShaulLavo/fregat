@@ -5,7 +5,7 @@ import {
   CommandInput,
   CommandList,
 } from '@workspace/ui/components/command'
-import { useEffect, type KeyboardEvent } from 'react'
+import { useEffect, useMemo, type KeyboardEvent } from 'react'
 
 import { GroupsFactory } from '@/features/command-palette/components/groups-factory'
 import { colorModePaletteItems, viewPaletteItems } from '@/features/command-palette/utils/data'
@@ -255,94 +255,113 @@ export function CommandPaletteContent() {
     popPaletteScope()
   }
 
-  async function focusSelectedEditor() {
-    const destination = activeEditorFocusDestination(workspace)
-    if (!destination) return false
+  // Context identity must stay stable while cmdk updates its controlled input.
+  const actions = useMemo<CommandPaletteActions>(() => {
+    async function focusSelectedEditor() {
+      const destination = activeEditorFocusDestination(workspace)
+      if (!destination) return false
 
-    const outcome = await focus.request(destination).completion
-    return focusTransitionAcknowledged(outcome)
-  }
+      const outcome = await focus.request(destination).completion
+      return focusTransitionAcknowledged(outcome)
+    }
 
-  async function revealDestination(command: 'workspace.revealTerminal' | 'workspace.showChatMode') {
-    const ticket = bus.dispatch(command, paletteCommandInvocation(paletteOrigin))
-    const outcome = await ticket.completion
-    if (!paletteCommandSucceeded(outcome)) return false
-
-    closePalette(false)
-    return true
-  }
-
-  const actions: CommandPaletteActions = {
-    previewColorTheme: (themeId) => {
-      previewEditorTheme(resolvedTheme, themeId)
-    },
-    selectColorTheme: (themeId) => {
-      selectTheme(themeId, 'workspace.selectColorTheme')
-      closePalette(true)
-    },
-    selectContent: async (content) => {
-      if ((await selectContent(content)).status !== 'applied') return
-      if (!(await focusSelectedEditor())) return
-
-      closePalette(false)
-    },
-    selectFile: async (path) => {
-      if ((await selectFile(path)).status !== 'applied') return
-      if (!(await focusSelectedEditor())) return
-
-      closePalette(false)
-    },
-    selectGotoLine: async (target) => {
-      if (!selectedFileBackedPath) return
-
-      const position = { character: target.column - 1, line: target.line - 1 }
-      const handled = await openDefinition({
-        path: selectedFileBackedPath,
-        range: { end: position, start: position },
-        uri: fileUriForPath(selectedFileBackedPath),
-      })
-      if (handled.status !== 'applied') return
-      if (!(await focusSelectedEditor())) return
-
-      closePalette(false)
-    },
-    selectPlatformCommand: async (command) => {
+    async function revealDestination(
+      command: 'workspace.revealTerminal' | 'workspace.showChatMode',
+    ) {
       const ticket = bus.dispatch(command, paletteCommandInvocation(paletteOrigin))
       const outcome = await ticket.completion
-      if (!paletteCommandSucceeded(outcome)) return
-
-      recordCommandUse(command)
-      if (commandKeepsPaletteOpen(command)) return
-
-      closePalette(true)
-    },
-    selectScript: async (script) => {
-      saveProjectScript(script)
-      queueTerminalCommand(script.command)
-      await revealDestination('workspace.revealTerminal')
-    },
-    selectSession: async (session) => {
-      if (!(await openSessionRow(session))) return
-      await revealDestination('workspace.showChatMode')
-    },
-    selectSymbol: async (symbol) => {
-      if (!selectedFileBackedPath) return
-
-      const handled = await openDefinition({
-        path: selectedFileBackedPath,
-        range: symbol.selectionRange,
-        uri: fileUriForPath(selectedFileBackedPath),
-      })
-      if (handled.status !== 'applied') return
-      if (!(await focusSelectedEditor())) return
+      if (!paletteCommandSucceeded(outcome)) return false
 
       closePalette(false)
-    },
-    startSessionDraft: async (ref) => {
-      if (!(await startSessionDraft(ref))) return
-      await revealDestination('workspace.showChatMode')
-    },
-  }
+      return true
+    }
+
+    return {
+      previewColorTheme: (themeId) => {
+        previewEditorTheme(resolvedTheme, themeId)
+      },
+      selectColorTheme: (themeId) => {
+        selectTheme(themeId, 'workspace.selectColorTheme')
+        closePalette(true)
+      },
+      selectContent: async (content) => {
+        if ((await selectContent(content)).status !== 'applied') return
+        if (!(await focusSelectedEditor())) return
+
+        closePalette(false)
+      },
+      selectFile: async (path) => {
+        if ((await selectFile(path)).status !== 'applied') return
+        if (!(await focusSelectedEditor())) return
+
+        closePalette(false)
+      },
+      selectGotoLine: async (target) => {
+        if (!selectedFileBackedPath) return
+
+        const position = { character: target.column - 1, line: target.line - 1 }
+        const handled = await openDefinition({
+          path: selectedFileBackedPath,
+          range: { end: position, start: position },
+          uri: fileUriForPath(selectedFileBackedPath),
+        })
+        if (handled.status !== 'applied') return
+        if (!(await focusSelectedEditor())) return
+
+        closePalette(false)
+      },
+      selectPlatformCommand: async (command) => {
+        const ticket = bus.dispatch(command, paletteCommandInvocation(paletteOrigin))
+        const outcome = await ticket.completion
+        if (!paletteCommandSucceeded(outcome)) return
+
+        recordCommandUse(command)
+        if (commandKeepsPaletteOpen(command)) return
+
+        closePalette(true)
+      },
+      selectScript: async (script) => {
+        saveProjectScript(script)
+        queueTerminalCommand(script.command)
+        await revealDestination('workspace.revealTerminal')
+      },
+      selectSession: async (session) => {
+        if (!(await openSessionRow(session))) return
+        await revealDestination('workspace.showChatMode')
+      },
+      selectSymbol: async (symbol) => {
+        if (!selectedFileBackedPath) return
+
+        const handled = await openDefinition({
+          path: selectedFileBackedPath,
+          range: symbol.selectionRange,
+          uri: fileUriForPath(selectedFileBackedPath),
+        })
+        if (handled.status !== 'applied') return
+        if (!(await focusSelectedEditor())) return
+
+        closePalette(false)
+      },
+      startSessionDraft: async (ref) => {
+        if (!(await startSessionDraft(ref))) return
+        await revealDestination('workspace.showChatMode')
+      },
+    }
+  }, [
+    bus,
+    closePalette,
+    focus,
+    openDefinition,
+    paletteOrigin,
+    queueTerminalCommand,
+    resolvedTheme,
+    saveProjectScript,
+    selectFile,
+    selectContent,
+    selectTheme,
+    selectedFileBackedPath,
+    workspace,
+  ])
 
   return (
     <CommandDialog

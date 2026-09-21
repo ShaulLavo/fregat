@@ -1,6 +1,14 @@
-import { useEffect, useState } from 'react'
+import { useEffect, useRef, useState } from 'react'
 
+import { TOOLTIP_DELAY } from '@workspace/ui/components/tooltip'
 import { tooltipTargetFor, type TooltipTarget } from '@workspace/ui/patterns/tooltip-target'
+
+/**
+ * Moving straight from one row to the next should not re-wait: the user has
+ * already asked for hover text. This is the window Base UI calls its grace
+ * period, which a controlled tooltip has to keep itself.
+ */
+const INSTANT_AFTER_CLOSE_MS = 300
 
 /**
  * Tracks what the pointer or keyboard is on, for the one shared tooltip.
@@ -8,28 +16,57 @@ import { tooltipTargetFor, type TooltipTarget } from '@workspace/ui/patterns/too
  * Delegation is what makes a single instance possible: rows carry an
  * attribute, so a virtualized list can recycle them without any tooltip
  * bookkeeping, and nothing is mounted per control.
+ *
+ * The delay lives here because a controlled `open` bypasses the provider's.
  */
 export function useTooltipLayer(describedById: string) {
   const [target, setTarget] = useState<TooltipTarget | null>(null)
+  const timer = useRef<number | undefined>(undefined)
+  const closedAt = useRef(0)
 
   useEffect(() => {
+    function clearTimer() {
+      if (timer.current === undefined) return
+
+      window.clearTimeout(timer.current)
+      timer.current = undefined
+    }
+
+    function hide() {
+      clearTimer()
+      setTarget((current) => {
+        if (current) closedAt.current = Date.now()
+        return null
+      })
+    }
+
+    function open(next: TooltipTarget | null) {
+      clearTimer()
+      if (!next) {
+        hide()
+        return
+      }
+      if (Date.now() - closedAt.current < INSTANT_AFTER_CLOSE_MS) {
+        setTarget(next)
+        return
+      }
+
+      timer.current = window.setTimeout(() => setTarget(next), TOOLTIP_DELAY)
+    }
+
     function show(event: Event) {
-      setTarget(tooltipTargetFor(event.target))
+      open(tooltipTargetFor(event.target))
     }
 
     function showOnFocus(event: FocusEvent) {
       const next = tooltipTargetFor(event.target)
-      setTarget(next?.element.matches(':focus-visible') ? next : null)
-    }
-
-    function hide() {
-      setTarget(null)
+      open(next?.element.matches(':focus-visible') ? next : null)
     }
 
     function hideOnEscape(event: KeyboardEvent) {
       if (event.key !== 'Escape') return
 
-      setTarget(null)
+      hide()
     }
 
     // Capture: a row that stops propagation must not strand the tooltip open.
@@ -39,6 +76,7 @@ export function useTooltipLayer(describedById: string) {
     document.addEventListener('focusout', hide, true)
     document.addEventListener('keydown', hideOnEscape, true)
     return () => {
+      clearTimer()
       document.removeEventListener('pointerover', show, true)
       document.removeEventListener('pointerdown', hide, true)
       document.removeEventListener('focusin', showOnFocus, true)

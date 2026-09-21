@@ -34,7 +34,11 @@ export const surfaceStacking: Scenario = {
   },
 }
 
-const findings: { readonly where: string; readonly stacked: readonly Stack[] }[] = []
+const findings: {
+  readonly where: string
+  readonly stacked: readonly Stack[]
+  readonly regions: readonly string[]
+}[] = []
 
 type Stack = {
   readonly color: string
@@ -45,7 +49,37 @@ type Stack = {
 
 async function record(page: Page, where: string) {
   const stacked = await page.evaluate(scan)
-  findings.push({ where, stacked })
+  const regions = await page.evaluate(paints)
+  findings.push({ where, stacked, regions })
+}
+
+/** Runs in the page: what each layout region actually paints, ancestors included. */
+function paints() {
+  const out: string[] = []
+  const seen = new Set<Element>()
+  const selectors = [
+    '[data-chat-mode]',
+    '[data-workbench]',
+    '[data-slot="resizable-panel-group"]',
+    '[data-slot="resizable-panel"]',
+    '[data-slot="resizable-handle"]',
+    'aside',
+    'nav[aria-label="Tool tabs"]',
+    'nav[aria-label="Sidebar tabs"]',
+  ]
+  for (const selector of selectors) {
+    for (const node of Array.from(document.querySelectorAll(selector))) {
+      if (seen.has(node)) continue
+      seen.add(node)
+      const style = getComputedStyle(node)
+      const box = node.getBoundingClientRect()
+      if (box.width < 8) continue
+      out.push(
+        `${selector} x=${Math.round(box.x)} w=${Math.round(box.width)} bg=${style.backgroundColor} filter=${style.backdropFilter}`,
+      )
+    }
+  }
+  return out
 }
 
 /** Runs in the page: no imports, no closure over anything above. */

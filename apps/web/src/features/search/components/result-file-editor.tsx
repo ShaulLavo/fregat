@@ -69,7 +69,9 @@ export const SearchResultFileEditor = memo(
     replaceVisible,
   }: SearchResultFileEditorProps) => {
     const { openTarget, replaceMatch, selectResultWithoutReveal } = useSearchResultActions()
-    const fileDocument = searchResultFileDocument(file)
+    // Manual memo: `fileDocument` is a useMemo dependency, and the compiler's cache is a
+    // cache, not an identity guarantee — when it recomputes, the useMemo re-runs.
+    const fileDocument = useMemo(() => searchResultFileDocument(file), [file])
     // Manual keys: the compiler would also key this on `activeResultId`, so moving the selection
     // would rebuild the windowed document under the editor.
     const visibleDocument = useMemo(

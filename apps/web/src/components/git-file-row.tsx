@@ -7,6 +7,7 @@ import { cn } from '@workspace/ui/lib/utils'
 import { iconForEntry } from '@/lib/file-icons'
 import { basename, parentPath, toTreePath } from '@/lib/path-formatters'
 import type { GitLineStat } from '@workspace/contracts'
+import { encodeTooltipParts } from '@workspace/ui/patterns/tooltip-parts'
 import { DiffStatLabel } from '@/components/diff-stat-label'
 import type { StatusPresentation } from '@/lib/git-status-symbols'
 
@@ -46,14 +47,13 @@ export function GitFileRow({
   const directory = parentPath(relativePath)
   const icon = iconForEntry({ name, type: 'file' })
   const changed = stat && stat.additions + stat.deletions > 0 ? stat : undefined
-  const title = [
-    `${oldPath ? `${toTreePath(oldPath, rootPath)} → ` : ''}${relativePath}`,
-    status.title,
-    changed ? `+${changed.additions} -${changed.deletions}` : undefined,
-    disabledReason,
-  ]
-    .filter(Boolean)
-    .join(' · ')
+  const tooltip = encodeTooltipParts([
+    { text: oldPath ? `${toTreePath(oldPath, rootPath)} → ` : '' },
+    { text: relativePath },
+    { text: ` · ${status.title}`, tone: 'muted' },
+    ...(changed ? diffParts(changed) : []),
+    { text: disabledReason ? ` · ${disabledReason}` : '', tone: 'muted' },
+  ])
   const label = (
     <>
       <span className={cn('font-medium', !loading && 'text-foreground')}>{name}</span>
@@ -88,7 +88,7 @@ export function GitFileRow({
       data-git-file={path}
       data-git-file-loading={loading || undefined}
       data-history-file={historical ? path : undefined}
-      data-tooltip={title}
+      data-tooltip={tooltip}
       onClick={(event) => {
         rowProps?.onClick(event)
         handleOpen()
@@ -122,4 +122,13 @@ function treeLevel(role: 'treeitem' | 'option', historical: boolean) {
   if (role === 'option') return undefined
 
   return historical ? 1 : 2
+}
+
+function diffParts(stat: GitLineStat) {
+  return [
+    { text: ' · ' as const, tone: 'muted' as const },
+    { text: `+${stat.additions}`, tone: 'added' as const },
+    { text: ' ', tone: 'muted' as const },
+    { text: `-${stat.deletions}`, tone: 'removed' as const },
+  ]
 }

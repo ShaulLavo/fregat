@@ -49,10 +49,17 @@ export function useLanguageServerPlugin({
   const documentUri = document?.uri ?? null
   const origin = originForQueryClient(useQueryClient())
   const { service: fileOpenIntent } = useFileOpenIntent()
-  const languageServerStatusSource = createEditorLanguageServerStatusSource()
+  // Manual memo: `languageServerStatusSource` is a useMemo dependency, and the compiler's cache is a
+  // cache, not an identity guarantee — when it recomputes, the useMemo re-runs.
+  const languageServerStatusSource = useMemo(() => createEditorLanguageServerStatusSource(), [])
   const onApplyWorkspaceEdit = useWorkspaceEditHost()
   const documentSyncController = useWorkspaceDocumentSyncController()
-  const target = languageServerTarget ?? { matchPath: filePath }
+  // Manual memo: `target` is a useMemo dependency, and the compiler's cache is a
+  // cache, not an identity guarantee — when it recomputes, the useMemo re-runs.
+  const target = useMemo(
+    () => languageServerTarget ?? { matchPath: filePath },
+    [filePath, languageServerTarget],
+  )
   const matches = useLanguageServerMatches(rootPath, target.matchPath, enabled && document !== null)
 
   const languageServer = useMemo(() => {

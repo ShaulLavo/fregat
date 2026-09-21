@@ -1,4 +1,4 @@
-import { useLayoutEffect, useState } from 'react'
+import { useLayoutEffect, useMemo, useState } from 'react'
 
 import type { PlatformCommandBus } from '@/keymap/providers/command-context'
 import { createPlatformKeymapSession } from '@/keymap/state/keymap-session'
@@ -22,7 +22,12 @@ export function useAppKeymap({
 }) {
   const [pendingChord, setPendingChord] = useState<PendingChordLabel | null>(null)
   // Table identity must remain stable while the pending label renders.
-  const activeBindings = appKeyBindingsForPane(bindings, focusedPane)
+  // Manual, because the effects below depend on it and the compiler's cache is a cache, not an
+  // identity guarantee: a recompute would rebind every shortcut.
+  const activeBindings = useMemo(
+    () => appKeyBindingsForPane(bindings, focusedPane),
+    [bindings, focusedPane],
+  )
   // Key ownership must survive focus/table changes until the corresponding keyup.
   const [session] = useState(() =>
     createPlatformKeymapSession({

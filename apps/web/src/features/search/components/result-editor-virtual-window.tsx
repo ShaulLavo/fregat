@@ -63,7 +63,12 @@ export const SearchResultEditorVirtualWindow = memo(
       () => searchResultRenderedVirtualItems(virtualItems, rows),
       [rows, virtualItems],
     )
-    const fileResultItems = renderedVirtualItems.filter(isSearchResultRenderedFileResultItem)
+    // Manual memo: a hook keys on this value, and the compiler's cache is a cache, not an identity
+    // guarantee — a recompute hands it a cold value every render.
+    const fileResultItems = useMemo(
+      () => renderedVirtualItems.filter(isSearchResultRenderedFileResultItem),
+      [renderedVirtualItems],
+    )
     const fileEditorPoolEntries = useSearchResultFileEditorPoolEntries(
       fileResultItems,
       prewarmEditorPool,

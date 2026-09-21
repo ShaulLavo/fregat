@@ -1,4 +1,3 @@
-import {} from 'react'
 import { useCommandBus } from '@/keymap/hooks/use-command-bus'
 import { useSettingValue } from '@/hooks/use-setting-value'
 import { createUnicodeHoverPlugin } from '@/features/editor/state/unicode-hover-plugin'

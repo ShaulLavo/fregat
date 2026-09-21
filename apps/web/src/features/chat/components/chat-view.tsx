@@ -9,7 +9,7 @@ import {
 } from '@/features/chat/utils/composer-state'
 import { sessionStopFailure } from '@/features/chat/utils/session-stop'
 import type { ModelSelection, SessionId, SessionTurnInterruptCommand } from '@workspace/contracts'
-import { useEffect, useState } from 'react'
+import { useEffect, useMemo, useState } from 'react'
 
 import { notifyChatCommandError } from '@/features/chat/notify-command-error'
 import type { ChatTransport } from '@/features/chat/transport/chat-transport'
@@ -58,7 +58,12 @@ export function ChatView({
   onSessionCreated: (sessionId: SessionId) => void
   rootPath: string
 }) {
-  const sessionSelector = createChatSessionSelector(activeSessionId)
+  // Manual memo: the store keys on this selector's identity, and the compiler's cache is a cache, not an identity
+  // guarantee — a recompute hands it a cold value every render.
+  const sessionSelector = useMemo(
+    () => createChatSessionSelector(activeSessionId),
+    [activeSessionId],
+  )
   // The same target ChatInput builds for itself, so a mode pick lands on the
   // draft the send path reads. Stable identity is required: it feeds the
   // composer modes context value.

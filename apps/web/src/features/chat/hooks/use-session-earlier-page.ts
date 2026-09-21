@@ -1,6 +1,5 @@
 import { useActiveChatProjection } from '@/features/chat/hooks/use-active-projection'
 import type { SessionId } from '@workspace/contracts'
-import {} from 'react'
 
 import { selectChatSessionHasEarlier } from '@workspace/client-core/chat/selectors'
 import { useChatTransport } from '@/features/chat/hooks/use-chat-transport'

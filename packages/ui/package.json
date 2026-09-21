@@ -17,6 +17,7 @@
     "./patterns/render-error-boundary": "./src/patterns/render-error-boundary.tsx",
     "./patterns/render-error-state": "./src/patterns/render-error-state.tsx",
     "./patterns/tooltip-layer": "./src/patterns/tooltip-layer.tsx",
+    "./patterns/tooltip-parts": "./src/patterns/tooltip-parts.ts",
     "./patterns/tooltip-target": "./src/patterns/tooltip-target.ts",
     "./patterns/use-tooltip-layer": "./src/patterns/use-tooltip-layer.ts",
     "./patterns/tool-pane": "./src/patterns/tool-pane.tsx",

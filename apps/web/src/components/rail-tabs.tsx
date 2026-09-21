@@ -9,6 +9,7 @@ import { WorkspaceRail } from '@/components/workspace-rail'
  */
 export function RailTabs<Tab extends PanelTab>({
   activeTab,
+  className,
   label,
   side,
   tabLabel,
@@ -16,6 +17,7 @@ export function RailTabs<Tab extends PanelTab>({
   onSelectTab,
 }: {
   readonly activeTab: Tab | null
+  readonly className?: string
   readonly label: string
   readonly side: 'left' | 'right'
   readonly tabLabel: (tab: Tab) => string
@@ -23,7 +25,7 @@ export function RailTabs<Tab extends PanelTab>({
   readonly onSelectTab: (tab: Tab) => void
 }) {
   return (
-    <WorkspaceRail label={label} side={side}>
+    <WorkspaceRail className={className} label={label} side={side}>
       {tabs.map((tab) => (
         <ToggleIconButton
           active={activeTab === tab}

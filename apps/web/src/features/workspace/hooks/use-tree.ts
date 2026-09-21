@@ -27,7 +27,6 @@ import {
   type TreeModel,
 } from '@/lib/tree-model'
 import { useQuery, useQueryClient } from '@tanstack/react-query'
-import {} from 'react'
 
 const DIRECTORY_LOAD_SKIPPED_LOG_DELAY_MS = 250
 const directoryLoadSkippedLogs = createCoalescedLogQueue({

@@ -58,13 +58,25 @@ export const SearchResultEditorSurface = memo(
     const treeId = useId()
     const parentRef = useRef<HTMLDivElement | null>(null)
     const blocks = searchResultFileBlocks(groups, resultsQuery)
-    const rows = searchResultVirtualRows(blocks)
+    // Manual memo: `rows` is a useMemo dependency, and the compiler's cache is a
+    // cache, not an identity guarantee — when it recomputes, the useMemo re-runs.
+    const rows = useMemo(() => searchResultVirtualRows(blocks), [groups, resultsQuery])
     const activeRow = useMemo(
       () => searchResultVirtualRowById(rows, activeResultId),
       [activeResultId, rows],
     )
-    const activeIndex = searchResultVirtualRowIndex(rows, activeResultId)
-    const activeScrollTarget = searchResultVirtualRowScrollTarget(activeRow, activeResultId)
+    // Manual memo: `activeIndex` is a useLayoutEffect dependency, and the compiler's cache is a
+    // cache, not an identity guarantee — when it recomputes, the useLayoutEffect re-runs.
+    const activeIndex = useMemo(
+      () => searchResultVirtualRowIndex(rows, activeResultId),
+      [activeResultId, rows],
+    )
+    // Manual memo: `activeScrollTarget` is a useLayoutEffect dependency, and the compiler's cache is a
+    // cache, not an identity guarantee — when it recomputes, the useLayoutEffect re-runs.
+    const activeScrollTarget = useMemo(
+      () => searchResultVirtualRowScrollTarget(activeRow, activeResultId),
+      [activeResultId, activeRow],
+    )
     const suppressNextActiveRevealRef = useRef(false)
     const previousActiveResultIdRef = useRef(activeResultId)
     const activeIndexRef = useRef(activeIndex)

@@ -3,7 +3,6 @@ import { fileDocumentKey } from '@/lib/documents/utils/identity'
 import type { FilesystemPath, TabId } from '@/lib/documents/utils/types'
 import { createTextDiff } from '@singapore-editor/diff'
 import { EmptyState } from '@workspace/ui/components/empty-state'
-import {} from 'react'
 
 import { DiffEditor } from '@/features/editor/components/diff-editor'
 import { EditorTabPlaceholder } from '@/features/editor/components/tab-placeholder'

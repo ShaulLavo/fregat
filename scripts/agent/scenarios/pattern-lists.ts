@@ -290,9 +290,21 @@ async function expectSharedTooltip(page: Page) {
   ok(expected, 'A change row must carry its hover text')
   await row.hover()
   const popup = selectors.tooltipPopup(page)
+  // A controlled tooltip bypasses the provider's delay, so the layer owns it.
+  strictEqual(await popup.count(), 0, 'Hover text must wait, not appear on contact')
   await popup.waitFor({ timeout: 5_000 })
   strictEqual(await popup.count(), 1, 'Exactly one tooltip may be mounted')
-  strictEqual((await popup.textContent())?.trim(), expected.trim())
+  strictEqual((await popup.textContent())?.trim(), tooltipText(expected).trim())
+}
+
+/** `data-tooltip` carries either plain text or tone-tagged parts. */
+function tooltipText(value: string) {
+  if (!value.startsWith('[')) return value
+
+  const parts: unknown = JSON.parse(value)
+  if (!Array.isArray(parts)) return value
+
+  return parts.map((part) => String((part as { text?: string }).text ?? '')).join('')
 }
 
 /**

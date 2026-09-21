@@ -6,7 +6,7 @@ import {
   type SessionWorktreeTarget,
 } from '@workspace/contracts'
 import { useQuery } from '@tanstack/react-query'
-import { useCallback, useEffect, useState } from 'react'
+import { useCallback, useEffect, useMemo, useState } from 'react'
 
 import { notifyChatCommandError } from '@/features/chat/notify-command-error'
 import type { ChatTransport } from '@/features/chat/transport/chat-transport'
@@ -54,11 +54,16 @@ export function ChatDraftView({
   // only the seed the composer starts from.
   const defaultRuntimeMode = useSettingValue('chat.defaultRuntimeMode')
   const defaultInteractionMode = useSettingValue('chat.defaultInteractionMode')
-  const draftTarget: ChatInputDraftTarget = {
-    environmentId: transport.environmentId,
-    draftKey: draftId,
-    rootPath,
-  }
+  // Manual memo: `draftTarget` is a useEffect dependency, and the compiler's cache is a
+  // cache, not an identity guarantee — when it recomputes, the useEffect re-runs.
+  const draftTarget: ChatInputDraftTarget = useMemo(
+    () => ({
+      environmentId: transport.environmentId,
+      draftKey: draftId,
+      rootPath,
+    }),
+    [draftId, rootPath, transport.environmentId],
+  )
   const draft = useChatInputDraftStore((state) => state.getDraft(draftTarget))
   const identity = draft.identity
   useEffect(() => {

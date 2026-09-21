@@ -34,6 +34,7 @@ import {
   terminalTabs,
   gitGraphKeyboard,
 } from './pattern-lists'
+import { panelSeams } from './panel-seams'
 import { surfaceStacking } from './surface-stacking'
 import { chatTimelinePattern } from './chat-timeline-pattern'
 import { settingsFontInput } from './settings-font-input'
@@ -184,6 +185,7 @@ export const scenarios: readonly Scenario[] = [
   searchResults,
   terminalTabs,
   gitGraphKeyboard,
+  panelSeams,
   surfaceStacking,
   chatTimelinePattern,
   chatFollowUp,

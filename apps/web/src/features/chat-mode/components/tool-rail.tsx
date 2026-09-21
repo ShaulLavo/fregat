@@ -7,15 +7,18 @@ import {
 } from '@/features/chat-mode/utils/panels'
 
 export function ToolRail({
+  className,
   panels,
   onSelectTab,
 }: {
+  readonly className?: string
   readonly panels: ChatModePanels
   readonly onSelectTab: (tab: ChatModeToolTab) => void
 }) {
   return (
     <RailTabs
       activeTab={panels.toolPaneOpen ? panels.activeToolTab : null}
+      className={className}
       label='Tool tabs'
       side='right'
       tabLabel={chatModeToolTabLabel}

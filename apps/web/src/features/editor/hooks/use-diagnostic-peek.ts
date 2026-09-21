@@ -1,5 +1,5 @@
 import type { LanguageServerDiagnosticMarkerEvent } from '@singapore-editor/lsp-plugin'
-import { useEffect, useRef, useSyncExternalStore } from 'react'
+import { useEffect, useMemo, useRef, useSyncExternalStore } from 'react'
 
 import { createDiagnosticPeekSource } from '@/features/editor/state/diagnostic-peek-source'
 import { fileUriForPath } from '@/lib/diagnostic'
@@ -9,7 +9,9 @@ import { registeredFocusTarget, type FocusTargetToken } from '@/lib/focus/state/
 export function useDiagnosticPeek({ active, filePath }: { active: boolean; filePath: string }) {
   const focus = useFocusService()
   // The external store and its Editor plugin must share one identity for the document lifecycle.
-  const source = createDiagnosticPeekSource(fileUriForPath(filePath))
+  // Manual, because the effect below depends on it and the compiler's cache is a cache, not an
+  // identity guarantee: a recompute would hand the plugin a second store.
+  const source = useMemo(() => createDiagnosticPeekSource(fileUriForPath(filePath)), [filePath])
   const origin = useRef<FocusTargetToken | null>(null)
   const snapshot = useSyncExternalStore(source.subscribe, source.getSnapshot, source.getSnapshot)
 

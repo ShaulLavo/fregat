@@ -1,5 +1,4 @@
 import { filesystemPath } from '@/lib/documents/utils/identity'
-import {} from 'react'
 import type { WorkspaceSearchMatch } from '@workspace/contracts'
 
 import { useEditorCommands } from '@/features/editor/hooks/use-editor-commands'

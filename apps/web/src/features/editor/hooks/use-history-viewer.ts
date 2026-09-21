@@ -11,7 +11,7 @@ import {
   type HistoryViewer,
   type HistoryViewerState,
 } from '@singapore-editor/core/document'
-import { useSyncExternalStore } from 'react'
+import { useMemo, useSyncExternalStore } from 'react'
 
 type Viewer = HistoryViewer<HistoryComparisonResult>
 
@@ -37,7 +37,12 @@ export function useHistoryViewer(
 ): HistoryViewerSnapshot | null {
   const { history } = useTabPresentation(tabId)
   // Stable identity: the source owns the viewer and its buffer subscription.
-  const source = buffer ? viewerSource(buffer, path, history) : EMPTY_SOURCE
+  // Manual memo: useSyncExternalStore resubscribes when `source.subscribe` changes, and the
+  // compiler's cache is a cache, not an identity guarantee — a recompute drops the viewer.
+  const source = useMemo(
+    () => (buffer ? viewerSource(buffer, path, history) : EMPTY_SOURCE),
+    [buffer, history, path],
+  )
   return useSyncExternalStore(source.subscribe, source.getSnapshot)
 }
 

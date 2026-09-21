@@ -105,11 +105,24 @@ export function ChatInput({
 }) {
   const environmentId = useEnvironmentId()
   const inputKey = `${environmentId}:${rootPath}:${draftKey}`
-  const draftTarget: ChatInputDraftTarget = { environmentId, draftKey, rootPath }
-  const imagesSelector = (state: ChatInputDraftStore) =>
-    selectChatInputDraftAttachments(state, draftTarget)
-  const terminalContextsSelector = (state: ChatInputDraftStore) =>
-    selectChatInputDraftTerminalContexts(state, draftTarget)
+  // Manual memo: the store keys on this value, and the compiler's cache is a cache, not an identity
+  // guarantee — a recompute hands it a cold value every render.
+  const draftTarget: ChatInputDraftTarget = useMemo(
+    () => ({ environmentId, draftKey, rootPath }),
+    [draftKey, environmentId, rootPath],
+  )
+  // Manual memo: the store keys on this selector's identity, and the compiler's cache is a cache,
+  // not an identity guarantee — a recompute resubscribes the draft store every render.
+  const imagesSelector = useMemo(
+    () => (state: ChatInputDraftStore) => selectChatInputDraftAttachments(state, draftTarget),
+    [draftTarget],
+  )
+  // Manual memo: the store keys on this selector's identity, and the compiler's cache is a cache,
+  // not an identity guarantee — a recompute resubscribes the draft store every render.
+  const terminalContextsSelector = useMemo(
+    () => (state: ChatInputDraftStore) => selectChatInputDraftTerminalContexts(state, draftTarget),
+    [draftTarget],
+  )
   const planModeEnabled = useSettingValue('chat.planModeEnabled')
   const draftProviderId = useChatInputDraftStore(
     (state) => state.getDraft(draftTarget).modelSelection?.providerInstanceId,

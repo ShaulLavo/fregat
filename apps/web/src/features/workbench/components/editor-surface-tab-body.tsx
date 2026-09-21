@@ -2,7 +2,7 @@ import { documentKey, fileDocument, fileResource } from '@/lib/documents/utils/i
 import { filesystemResource } from '@/lib/documents/utils/capabilities'
 import { documentTab } from '@/lib/documents/utils/tabs'
 import type { DocumentKey, FilesystemPath, TabContent, TabId } from '@/lib/documents/utils/types'
-import { useEffect, useLayoutEffect } from 'react'
+import { useEffect, useLayoutEffect, useMemo } from 'react'
 
 import {
   joinedEditorRenderDocument,
@@ -80,14 +80,27 @@ export function EditorSurfaceTabBody({
     }
     return 'editable'
   })
-  const selectedLiveDocument = joinedEditorRenderDocument({
-    buffer: selectedDocumentBuffer,
-    documentKey: selectedViewDocumentKey,
-    editability: selectedDocumentEditability,
-    target: selectedDocumentTarget,
-    preparedDocument: selectedPreparedDocument,
-    view: selectedViewSession,
-  })
+  // Manual memo: `selectedLiveDocument` is a useEffect dependency, and the compiler's cache is a
+  // cache, not an identity guarantee — when it recomputes, the useEffect re-runs.
+  const selectedLiveDocument = useMemo(
+    () =>
+      joinedEditorRenderDocument({
+        buffer: selectedDocumentBuffer,
+        documentKey: selectedViewDocumentKey,
+        editability: selectedDocumentEditability,
+        target: selectedDocumentTarget,
+        preparedDocument: selectedPreparedDocument,
+        view: selectedViewSession,
+      }),
+    [
+      selectedDocumentBuffer,
+      selectedDocumentEditability,
+      selectedDocumentTarget,
+      selectedPreparedDocument,
+      selectedViewDocumentKey,
+      selectedViewSession,
+    ],
+  )
   const ensureEditorView = useEditorDocumentState((state) => state.ensureEditorView)
   const ensureEditorViewForDocument = useEditorDocumentState(
     (state) => state.ensureEditorViewForDocument,

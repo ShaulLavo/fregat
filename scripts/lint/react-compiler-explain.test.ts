@@ -103,3 +103,41 @@ test('flags a manual memo whose keys the compiler would not choose', () => {
 
   expect(rows[0]?.verdict.split(':')[0]).toBe('differs')
 })
+
+test('never calls a memo redundant when a hook depends on the value', () => {
+  const rows: readonly AuditRow[] = auditManualMemos(
+    'probe.tsx',
+    source([
+      "import { useEffect, useMemo } from 'react'",
+      "import { expensive, observe } from './expensive'",
+      '',
+      'export function Probe({ left, right }: { left: string; right: string }) {',
+      '  const joined = useMemo(() => expensive(left, right), [left, right])',
+      '  useEffect(() => observe(joined), [joined])',
+      '  return <div />',
+      '}',
+    ]),
+  )
+
+  // The compiler picks the same keys here, so key matching alone would call it redundant.
+  expect(rows[0]?.name).toBe('joined')
+  expect(rows[0]?.verdict).toContain('a hook depends on this value')
+})
+
+test('never calls a memo redundant when the value is a ref callback', () => {
+  const rows: readonly AuditRow[] = auditManualMemos(
+    'probe.tsx',
+    source([
+      "import { useCallback, useState } from 'react'",
+      '',
+      'export function useProbe() {',
+      '  const [, setNode] = useState<HTMLElement | null>(null)',
+      '  const ref = useCallback((node: HTMLElement | null) => setNode(node), [])',
+      '  return { ref }',
+      '}',
+    ]),
+  )
+
+  expect(rows[0]?.name).toBe('ref')
+  expect(rows[0]?.verdict).toContain('a hook depends on this value')
+})

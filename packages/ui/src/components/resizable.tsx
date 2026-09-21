@@ -1,6 +1,5 @@
 import { isPercentage as isResizableLayoutSize } from '@workspace/utils/numbers'
 import * as ResizablePrimitive from 'react-resizable-panels'
-import {} from 'react'
 
 import { cn } from '@workspace/ui/lib/utils'
 

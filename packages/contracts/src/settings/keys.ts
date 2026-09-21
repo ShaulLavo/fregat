@@ -315,6 +315,20 @@ export const SETTINGS_REGISTRY = {
     visibility: 'advanced',
     keywords: ['saturation', 'glass', 'material', 'vibrancy'],
   }),
+  'workbench.surface.continuousSeams': defineSetting({
+    schema: v.boolean(),
+    default: false,
+    scope: 'window',
+    widget: 'boolean',
+    category: 'Appearance',
+    title: 'Continuous panel background',
+    // Which element paints the surface. Off, each panel paints its own and the
+    // resize handles between them show the wallpaper. On, the region around them
+    // paints once, so the handles carry the same surface and the panels merge.
+    description:
+      'Carry one background across panels and their resize handles, instead of showing the wallpaper in the gap between them.',
+    keywords: ['seam', 'handle', 'divider', 'wallpaper', 'surface', 'glass'],
+  }),
   'workbench.wallpaper': defineSetting({
     schema: wallpaperSelectionSchema,
     default: { enabled: true, source: { kind: 'desktop' } },

@@ -836,6 +836,11 @@
       "minimum": 0,
       "type": "integer"
     },
+    "workbench.surface.continuousSeams": {
+      "default": false,
+      "description": "Carry one background across panels and their resize handles, instead of showing the wallpaper in the gap between them.",
+      "type": "boolean"
+    },
     "workbench.surface.opacity": {
       "default": 80,
       "description": "How opaque panels and sidebars are over the wallpaper. 100 turns the glass material off.",

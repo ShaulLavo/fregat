@@ -243,10 +243,15 @@ export function Editor({
       tabId,
     },
   })
-  const selection =
-    definitionTarget && liveDocument
-      ? selectionForDefinition(filePath, liveDocument.buffer.getTextSnapshot(), definitionTarget)
-      : null
+  // Manual memo: `selection` is a useEffect dependency, and the compiler's cache is a
+  // cache, not an identity guarantee — when it recomputes, the useEffect re-runs.
+  const selection = useMemo(
+    () =>
+      definitionTarget && liveDocument
+        ? selectionForDefinition(filePath, liveDocument.buffer.getTextSnapshot(), definitionTarget)
+        : null,
+    [definitionTarget, filePath, liveDocument],
+  )
 
   useEffect(() => {
     if (!active || !liveDocument) return

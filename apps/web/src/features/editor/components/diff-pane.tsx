@@ -10,7 +10,7 @@ import {
 } from '@singapore-editor/diff'
 import { EditorHost, useEditor } from '@singapore-editor/react'
 import type { Editor } from '@singapore-editor/core/editor'
-import { useLayoutEffect } from 'react'
+import { useLayoutEffect, useMemo } from 'react'
 
 import { useDiffLanguage } from '@/features/editor/hooks/use-diff-language'
 import { useDiffRows } from '@/features/editor/hooks/use-diff-rows'
@@ -66,18 +66,29 @@ export function DiffPane({
   onRegisterEditor?: (side: DiffGutterSide, editor: Editor | null) => void
   onScroll?: (side: DiffGutterSide, position: DiffScrollPosition) => void
 }) {
-  const plugin = createDiffPlugin({
-    mode: 'document',
-    regions,
-    side,
-    syntaxBackend,
-    syntaxHighlight,
-  })
+  // Manual memo: `plugin` is a useLayoutEffect dependency, and the compiler's cache is a
+  // cache, not an identity guarantee — when it recomputes, the useLayoutEffect re-runs.
+  const plugin = useMemo(
+    () =>
+      createDiffPlugin({
+        mode: 'document',
+        regions,
+        side,
+        syntaxBackend,
+        syntaxHighlight,
+      }),
+    [regions, side, syntaxBackend, syntaxHighlight],
+  )
   const { rows, text, tokensRevision } = useDiffRows(plugin, file)
   const diffLanguagePlugin = useDiffLanguage(file, rows, theme, languageServer)
   const unicodeHighlights = useUnicodeHighlights()
   // A plugin instance owns its registered view context for the lifetime of this pane.
-  const persistence = presentation ? createDiffPresentationBinding(presentation) : null
+  // Manual, because the layout effect below depends on it and the compiler's cache is a cache,
+  // not an identity guarantee: a recompute would re-register the context.
+  const persistence = useMemo(
+    () => (presentation ? createDiffPresentationBinding(presentation) : null),
+    [presentation],
+  )
   const plugins = [
     plugin,
     unicodeHighlights.plugin,

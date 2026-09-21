@@ -370,6 +370,8 @@ export const selectors = {
   settingsDialog: (page: Page) => page.getByRole('dialog', { name: 'Settings', exact: true }),
   settingsSearch: (page: Page) => page.getByRole('textbox', { name: 'Search settings' }),
   settingsHeader: (page: Page) => page.locator('[data-settings-header]'),
+  settingsContinuousSeams: (page: Page) =>
+    page.getByRole('switch', { name: 'Continuous panel background', exact: true }),
   settingsDensity: (page: Page) =>
     page.getByRole('combobox', { name: 'Interface density', exact: true }),
   settingsDensityOption: (page: Page, density: 'compact' | 'cozy') =>

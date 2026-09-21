@@ -1,7 +1,14 @@
 /** @jsxImportSource react */
 
 import type { CSSProperties, HTMLAttributes, ReactNode } from 'react'
-import { createElement, useEffect, useLayoutEffect, useState, useSyncExternalStore } from 'react'
+import {
+  createElement,
+  useCallback,
+  useEffect,
+  useLayoutEffect,
+  useState,
+  useSyncExternalStore,
+} from 'react'
 
 import { CONTEXT_MENU_SLOT_NAME, FILE_TREE_TAG_NAME, HEADER_SLOT_NAME } from '../utils/constants'
 import type {
@@ -130,8 +137,15 @@ export function FileTree({
   }))
   if (baseline.model !== model) setBaseline({ composition: model.getComposition(), model })
   // Stable callbacks prevent useSyncExternalStore from resubscribing every render.
-  const subscribeToDensity = (listener: () => void) => model.subscribeDensity(listener)
-  const getDensitySnapshot = () => model.getDensityVersion()
+  // Manual memo: useSyncExternalStore resubscribes when this changes, and the compiler's cache is a cache, not an identity
+  // guarantee — a recompute hands it a cold value every render.
+  const subscribeToDensity = useCallback(
+    (listener: () => void) => model.subscribeDensity(listener),
+    [model],
+  )
+  // Manual memo: useSyncExternalStore re-reads when this changes, and the compiler's cache is a cache, not an identity
+  // guarantee — a recompute hands it a cold value every render.
+  const getDensitySnapshot = useCallback(() => model.getDensityVersion(), [model])
   const densityVersion = useSyncExternalStore(
     subscribeToDensity,
     getDensitySnapshot,

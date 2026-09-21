@@ -1,7 +1,7 @@
 import type { DocumentKey, FilesystemPath } from '@/lib/documents/utils/types'
 import type { EditorTextBuffer } from '@singapore-editor/core/document'
 import type { EditorPlugin } from '@singapore-editor/core/extensions'
-import { useEffect, useLayoutEffect, useState } from 'react'
+import { useEffect, useLayoutEffect, useMemo, useState } from 'react'
 
 import { createSnapshotCapture } from '@/features/workbench/state/snapshot-capture'
 import type { ScopedStorage } from '@/lib/environments/state/scoped-storage'
@@ -69,7 +69,9 @@ export function useEditorVisibleSnapshot({
   }
 
   // The plugin and capture source survive ordinary document changes in this host.
-  const capture = createSnapshotCapture(storage)
+  // Manual, because the memo below depends on it and the compiler's cache is a cache, not an
+  // identity guarantee: a recompute would rebuild the plugin mid-document.
+  const capture = useMemo(() => createSnapshotCapture(storage), [storage])
   const additionalPlugins: readonly EditorPlugin[] = [
     {
       name: 'platform-snapshot-capture',

@@ -84,6 +84,7 @@
     "workbench.reduceMotion",
     "workbench.surface.blur",
     "workbench.surface.contentOpacity",
+    "workbench.surface.continuousSeams",
     "workbench.surface.opacity",
     "workbench.surface.saturation",
     "workbench.theme",

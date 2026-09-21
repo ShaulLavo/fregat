@@ -1,6 +1,6 @@
 import { useQueryClient } from '@tanstack/react-query'
 import type { LogDashboardFilters, LogEventsResult, LogLiveStreamItem } from '@workspace/contracts'
-import { useEffect } from 'react'
+import { useEffect, useMemo } from 'react'
 
 import { logsKeys } from '@/features/logs/utils/query-keys'
 import { subscribeLogEvents } from '@/features/logs/utils/api'
@@ -12,7 +12,9 @@ import { clientForQueryClient } from '@/lib/environments/state/query-clients'
 
 export function useLogLive(filters: LogDashboardFilters, enabled: boolean) {
   const queryClient = useQueryClient()
-  const queryFilters = logFilterQuery(filters)
+  // Manual memo: `queryFilters` is a useEffect dependency, and the compiler's cache is a
+  // cache, not an identity guarantee — when it recomputes, the useEffect re-runs.
+  const queryFilters = useMemo(() => logFilterQuery(filters), [filters])
 
   useEffect(() => {
     if (!enabled) return

@@ -10,6 +10,7 @@ import {
 import { AppearancePreviewContext } from '@/features/settings/providers/appearance-preview-context'
 import {
   ViewTransition,
+  useCallback,
   useEffect,
   useInsertionEffect,
   useRef,
@@ -185,25 +186,25 @@ export function AppearanceProvider({
   }, [catalog, confirmedPaletteId, confirmedValues, confirmedQuery.data?.layers])
 
   // Stable identity lets palette unmount cleanup clear hover exactly once.
-  const clearThemePreview = () => {
+  const clearThemePreview = useCallback(() => {
     setModePreview((current) => (current && !current.handingOffTo ? null : current))
-  }
+  }, [])
 
-  const previewTheme = (theme: Theme) => {
+  const previewTheme = useCallback((theme: Theme) => {
     setModePreview((current) =>
       current?.handingOffTo ? current : { handingOffTo: null, value: theme },
     )
-  }
+  }, [])
 
-  const clearPalettePreview = () => {
+  const clearPalettePreview = useCallback(() => {
     setPalettePreview((current) => (current && !current.handingOffTo ? null : current))
-  }
+  }, [])
 
-  const previewPalette = (palette: Palette) => {
+  const previewPalette = useCallback((palette: Palette) => {
     setPalettePreview((current) =>
       current?.handingOffTo ? current : { handingOffTo: null, value: palette },
     )
-  }
+  }, [])
 
   const setTheme = (theme: Theme, initiator?: string): SettingsSubmission => {
     const submission = setColorTheme(theme, committedTheme, initiator)
@@ -235,14 +236,14 @@ export function AppearanceProvider({
   }
 
   // Cleanup uses stable identities so moving focus between cards cannot clear a newer preview.
-  const previewBundle = (bundle: ThemeBundle, mode?: ColorMode) => {
+  const previewBundle = useCallback((bundle: ThemeBundle, mode?: ColorMode) => {
     setBundlePreview((current) =>
       current?.handingOffTo ? current : { handingOffTo: null, value: { theme: bundle, mode } },
     )
-  }
-  const clearBundlePreview = () => {
+  }, [])
+  const clearBundlePreview = useCallback(() => {
     setBundlePreview((current) => (current && !current.handingOffTo ? null : current))
-  }
+  }, [])
 
   const chooseBundle = (bundle: ThemeBundle, initiator?: string): SettingsSubmission => {
     const submission = selectBundle(bundle, initiator)

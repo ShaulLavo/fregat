@@ -1,4 +1,4 @@
-import { PANEL_SURFACE } from '@workspace/ui/patterns/panel-surface'
+import { usePanelSurface } from '@/hooks/use-panel-surface'
 import type { GitFileStatus } from '@workspace/contracts'
 import {
   PersistedResizablePanelGroup,
@@ -46,6 +46,8 @@ export function ChatModeLayout({
   readonly workbenchPanels: WorkbenchPanels
   readonly onPanelsChange: (panels: ChatModePanels) => void
 }) {
+  const surface = usePanelSurface()
+
   function handleSelectToolTab(tab: ChatModeToolTab) {
     onPanelsChange(toggleChatModeToolTab(panels, tab))
   }
@@ -58,63 +60,63 @@ export function ChatModeLayout({
       role='application'
     >
       <Wallpaper />
-      <PersistedResizablePanelGroup
-        className='relative z-10 min-h-0 min-w-0 flex-1'
-        id='chat-mode'
-        storageKey='chat-mode'
-      >
-        {panels.sessionRailOpen ? (
-          <>
-            <ResizablePanel
-              className='h-full min-h-0 overflow-hidden'
-              defaultSize={SESSION_RAIL_DEFAULT_SIZE}
-              id='sessions'
-              maxSize={SESSION_RAIL_MAX_SIZE}
-              minSize={SESSION_RAIL_MIN_SIZE}
-            >
-              <RenderErrorBoundary label='Sessions'>
-                <SessionRail />
-              </RenderErrorBoundary>
-            </ResizablePanel>
-            <ResizableHandle id='sessions-handle' withHandle />
-          </>
-        ) : null}
-        <ResizablePanel className='min-h-0 min-w-0 overflow-hidden' id='stage' minSize={360}>
-          <ChatStage />
-        </ResizablePanel>
-        {panels.toolPaneOpen ? (
-          <>
-            <ResizableHandle id='tools-handle' withHandle />
-            <ResizablePanel
-              className={cn(
-                'min-h-0 min-w-0 overflow-hidden',
-                // Editor and terminal paint their own content wells.
-                panels.activeToolTab !== 'editor' &&
-                  panels.activeToolTab !== 'terminal' &&
-                  PANEL_SURFACE,
-              )}
-              defaultSize={TOOL_PANE_DEFAULT_SIZE}
-              id='tools'
-              maxSize={TOOL_PANE_MAX_SIZE}
-              minSize={TOOL_PANE_MIN_SIZE}
-            >
-              <RenderErrorBoundary
-                label={chatModeToolTabLabel(panels.activeToolTab)}
-                resetKeys={[panels.activeToolTab]}
+      <div className={cn(surface.region, 'relative z-10 flex min-h-0 min-w-0 flex-1')}>
+        <PersistedResizablePanelGroup
+          className='min-h-0 min-w-0 flex-1'
+          id='chat-mode'
+          storageKey='chat-mode'
+        >
+          {panels.sessionRailOpen ? (
+            <>
+              <ResizablePanel
+                className={cn('h-full min-h-0 overflow-hidden', surface.panel)}
+                defaultSize={SESSION_RAIL_DEFAULT_SIZE}
+                id='sessions'
+                maxSize={SESSION_RAIL_MAX_SIZE}
+                minSize={SESSION_RAIL_MIN_SIZE}
               >
-                <ToolPane
-                  conflicts={conflicts}
-                  gitFiles={gitFiles}
-                  rootPath={rootPath}
-                  tab={panels.activeToolTab}
-                  workbenchPanels={workbenchPanels}
-                />
-              </RenderErrorBoundary>
-            </ResizablePanel>
-          </>
-        ) : null}
-      </PersistedResizablePanelGroup>
-      <ToolRail panels={panels} onSelectTab={handleSelectToolTab} />
+                <RenderErrorBoundary label='Sessions'>
+                  <SessionRail />
+                </RenderErrorBoundary>
+              </ResizablePanel>
+              <ResizableHandle id='sessions-handle' withHandle />
+            </>
+          ) : null}
+          <ResizablePanel
+            className={cn('min-h-0 min-w-0 overflow-hidden', surface.panel)}
+            id='stage'
+            minSize={360}
+          >
+            <ChatStage />
+          </ResizablePanel>
+          {panels.toolPaneOpen ? (
+            <>
+              <ResizableHandle id='tools-handle' withHandle />
+              <ResizablePanel
+                className={cn('min-h-0 min-w-0 overflow-hidden', surface.panel)}
+                defaultSize={TOOL_PANE_DEFAULT_SIZE}
+                id='tools'
+                maxSize={TOOL_PANE_MAX_SIZE}
+                minSize={TOOL_PANE_MIN_SIZE}
+              >
+                <RenderErrorBoundary
+                  label={chatModeToolTabLabel(panels.activeToolTab)}
+                  resetKeys={[panels.activeToolTab]}
+                >
+                  <ToolPane
+                    conflicts={conflicts}
+                    gitFiles={gitFiles}
+                    rootPath={rootPath}
+                    tab={panels.activeToolTab}
+                    workbenchPanels={workbenchPanels}
+                  />
+                </RenderErrorBoundary>
+              </ResizablePanel>
+            </>
+          ) : null}
+        </PersistedResizablePanelGroup>
+        <ToolRail className={surface.panel} panels={panels} onSelectTab={handleSelectToolTab} />
+      </div>
     </div>
   )
 }

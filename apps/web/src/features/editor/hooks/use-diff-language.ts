@@ -78,7 +78,9 @@ export function useDiffLanguage(
     documentPath ?? '',
     documentPath !== null,
   )
-  const routedMatches = diffLanguageServerMatches(matches)
+  // Manual memo: `routedMatches` is a useEffect dependency, and the compiler's cache is a
+  // cache, not an identity guarantee — when it recomputes, the useEffect re-runs.
+  const routedMatches = useMemo(() => diffLanguageServerMatches(matches), [matches])
 
   // A plain holder the plugin reads from, so its identity stays stable across renders — a fresh
   // plugin per render would tear the view contribution down and rebuild its tooltip on every mouse

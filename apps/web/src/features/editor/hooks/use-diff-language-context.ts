@@ -1,7 +1,6 @@
 import { fileDocumentKey } from '@/lib/documents/utils/identity'
 import type { FilesystemPath } from '@/lib/documents/utils/types'
 import { workspaceDocumentPath } from '@/features/editor/utils/diff-language-context'
-import {} from 'react'
 
 import { useEditorDocumentState } from '@/features/editor/state/document-state'
 import type {

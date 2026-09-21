@@ -1,5 +1,3 @@
-import {} from 'react'
-
 import { useCommand } from '@/keymap/hooks/use-command'
 import { log } from '@/lib/client-logging'
 

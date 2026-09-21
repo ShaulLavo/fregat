@@ -1,4 +1,3 @@
-import { PANEL_SURFACE } from '@workspace/ui/patterns/panel-surface'
 import type { ReactNode } from 'react'
 import { GearSixIcon } from '@phosphor-icons/react'
 import { Button } from '@workspace/ui/components/button'
@@ -8,10 +7,12 @@ import { useCommandBus } from '@/keymap/hooks/use-command-bus'
 
 export function WorkspaceRail({
   children,
+  className,
   label,
   side,
 }: {
   readonly children: ReactNode
+  readonly className?: string
   readonly label: string
   readonly side: 'left' | 'right'
 }) {
@@ -20,12 +21,7 @@ export function WorkspaceRail({
   return (
     <nav
       aria-label={label}
-      className={cn(
-        'flex w-(--rail-width) shrink-0 flex-col items-center gap-1 p-1',
-        // The left rail sits inside its panel and inherits it; the right rail stands
-        // outside the tool panel, so it carries the surface itself.
-        side === 'right' && PANEL_SURFACE,
-      )}
+      className={cn('flex w-(--rail-width) shrink-0 flex-col items-center gap-1 p-1', className)}
     >
       {children}
       <Tooltip>

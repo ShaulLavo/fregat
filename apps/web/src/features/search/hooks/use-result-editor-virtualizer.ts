@@ -1,4 +1,4 @@
-import { useEffect, useLayoutEffect, useState, type RefObject } from 'react'
+import { useEffect, useLayoutEffect, useMemo, useState, type RefObject } from 'react'
 import { flushSync } from 'react-dom'
 import { useRowHeight } from '@workspace/ui/patterns/use-row-height'
 
@@ -30,7 +30,12 @@ export function useSearchResultEditorVirtualizer(
 ): SearchResultEditorVirtualizer {
   const headerHeight = useRowHeight(parentRef)
   const itemInputs = searchResultVirtualRowInputs(rows, headerHeight)
-  const metrics = createSearchResultVirtualListMetrics(itemInputs)
+  // Manual memo: `metrics` is a useLayoutEffect dependency, and the compiler's cache is a
+  // cache, not an identity guarantee — when it recomputes, the useLayoutEffect re-runs.
+  const metrics = useMemo(
+    () => createSearchResultVirtualListMetrics(itemInputs),
+    [headerHeight, rows],
+  )
   const [store] = useState(() => new SearchResultVirtualWindowStore({ metrics, initialViewport }))
   const [windowState, setWindowState] = useState<SearchResultVirtualWindow>(() => store.getWindow())
 

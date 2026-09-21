@@ -100,7 +100,7 @@ export function ChatStage() {
   }
 
   return (
-    <section className='bg-background backdrop-material flex h-full min-h-0 min-w-0 flex-col overflow-hidden'>
+    <section className='flex h-full min-h-0 min-w-0 flex-col overflow-hidden'>
       <StageHeader
         contextUsage={contextUsageForActivities(activities)}
         projectTitle={project?.title ?? null}

@@ -1,3 +1,5 @@
+import { cn } from '@workspace/ui/lib/utils'
+import { usePanelSurface } from '@/hooks/use-panel-surface'
 import type { GitFileStatus } from '@workspace/contracts'
 import type { FilesystemPath } from '@/lib/documents/utils/types'
 import {
@@ -42,6 +44,8 @@ export function WorkbenchLayout({
   readonly rootPath: FilesystemPath
   readonly onLayoutChange: (layout: WorkbenchLayout) => void
 }) {
+  const surface = usePanelSurface()
+
   function handleOuterLayoutChanged(next: Record<string, number>) {
     onLayoutChange(setWorkbenchOuterLayout(layout, next))
   }
@@ -59,7 +63,7 @@ export function WorkbenchLayout({
     >
       <Wallpaper />
       <ResizablePanelGroup
-        className='relative z-10 min-h-0 min-w-0 flex-1'
+        className={cn(surface.region, 'relative z-10 min-h-0 min-w-0 flex-1')}
         defaultLayout={layout.outerLayout}
         id='workbench-outer'
         onLayoutChanged={handleOuterLayoutChanged}
