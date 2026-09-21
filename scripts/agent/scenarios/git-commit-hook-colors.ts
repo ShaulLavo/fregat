@@ -1,8 +1,7 @@
-import { chmod, mkdtemp, rm, writeFile } from 'node:fs/promises'
-import path from 'node:path'
+import { rm } from 'node:fs/promises'
 
 import type { Scenario } from './index'
-import { fixtureGit, openFixtureWorkspace } from '../fixture-workspace'
+import { createGitFixture, installPreCommitHook, openFixtureWorkspace } from '../fixture-workspace'
 import { openGitPanel, selectors } from '../selectors'
 import { createScriptError } from '../../structured-errors'
 
@@ -22,14 +21,9 @@ export const gitCommitHookColors: Scenario = {
   name: 'git-commit-hook-colors',
   description: 'Commit against a rejecting hook that prints SGR colors; the panel paints them.',
   async run(page, { step }) {
-    const fixture = await mkdtemp('/work/tmp/fregat-commit-colors-')
+    const fixture = await createGitFixture('commit-colors')
     try {
-      await fixtureGit(fixture, ['init', '--quiet'])
-      await writeFile(path.join(fixture, 'a.txt'), 'one\n')
-      await fixtureGit(fixture, ['add', 'a.txt'])
-      const hook = path.join(fixture, '.git', 'hooks', 'pre-commit')
-      await writeFile(hook, HOOK)
-      await chmod(hook, 0o755)
+      await installPreCommitHook(fixture, HOOK)
 
       await openFixtureWorkspace(page, fixture)
       await openGitPanel(page)

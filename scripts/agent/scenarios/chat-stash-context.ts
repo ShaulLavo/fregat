@@ -1,3 +1,4 @@
+import type { Page } from 'playwright'
 import { strictEqual } from 'node:assert/strict'
 import { selectors } from '../selectors'
 import { isolatedNativeScenario } from './native-provider-verification'
@@ -8,7 +9,7 @@ export const chatStashContext = isolatedNativeScenario({
     'Stash an image-only message, then swap a complete image/file draft and recover it after reload before native delivery.',
   fixture: new URL('../fixtures/native-codex.mjs', import.meta.url),
   async drive(page, { step }) {
-    await selectors.chatComposerFileInput(page).setInputFiles({
+    await attachFile(page, {
       name: 'stash.png',
       mimeType: 'image/png',
       buffer: Buffer.from(
@@ -16,25 +17,17 @@ export const chatStashContext = isolatedNativeScenario({
         'base64',
       ),
     })
-    await selectors.chatSend(page).click({ trial: true })
-    await selectors.chatMessage(page).click()
-    await page.keyboard.press('Control+s')
-    await selectors.chatStash(page, 1).waitFor()
-    await selectors.chatStagedFile(page, 'stash.png').waitFor({ state: 'hidden' })
+    await stashDraft(page, 'stash.png')
     await selectors.chatStash(page, 1).click()
     await selectors.chatStashEntry(page, 'stash.png').click()
     await selectors.chatStagedFile(page, 'stash.png').waitFor()
     await selectors.chatMessage(page).fill('Read this complete stashed message.')
-    await selectors.chatComposerFileInput(page).setInputFiles({
+    await attachFile(page, {
       name: 'notes.txt',
       mimeType: 'text/plain',
       buffer: Buffer.from('General file verification.\n'),
     })
-    await selectors.chatSend(page).click({ trial: true })
-    await selectors.chatMessage(page).click()
-    await page.keyboard.press('Control+s')
-    await selectors.chatStash(page, 1).waitFor()
-    await selectors.chatStagedFile(page, 'notes.txt').waitFor({ state: 'hidden' })
+    await stashDraft(page, 'notes.txt')
     await selectors.chatMessage(page).fill('Keep this separate idea.')
     await page.reload()
     await selectors.chatStash(page, 1).click()
@@ -59,3 +52,16 @@ export const chatStashContext = isolatedNativeScenario({
     await selectors.chatMessage(page).fill('')
   },
 })
+
+function attachFile(page: Page, file: { name: string; mimeType: string; buffer: Buffer }) {
+  return selectors.chatComposerFileInput(page).setInputFiles(file)
+}
+
+/** Ctrl+S from the composer, then wait for the stash to hold it and the staged row to go. */
+async function stashDraft(page: Page, fileName: string) {
+  await selectors.chatSend(page).click({ trial: true })
+  await selectors.chatMessage(page).click()
+  await page.keyboard.press('Control+s')
+  await selectors.chatStash(page, 1).waitFor()
+  await selectors.chatStagedFile(page, fileName).waitFor({ state: 'hidden' })
+}

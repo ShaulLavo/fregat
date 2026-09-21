@@ -1,4 +1,4 @@
-import { useCallback, useEffect, useRef, useState } from 'react'
+import { useEffect, useEffectEvent, useRef, useState } from 'react'
 import { useEditorRuntime } from '@/features/editor/hooks/use-runtime'
 import type { EditorSaveService } from '@/features/editor/state/save-service'
 
@@ -93,35 +93,32 @@ export function useDirtyTabCloseRequest() {
       const document = pendingDocumentState.getLiveEditorDocument(id)
       return document ? isSavableEditorDocument(document) : false
     })
-  const publishPendingCloses = useCallback((next: readonly PendingClose[]) => {
+  const publishPendingCloses = (next: readonly PendingClose[]) => {
     pendingClosesRef.current = next
     setPendingCloses(next)
-  }, [])
+  }
 
-  const finishPendingFocus = useCallback(
-    (cancelled: boolean) => {
-      const origin = closeOriginRef.current
-      closeOriginRef.current = null
-      if (cancelled && restoreRegisteredOrigin(focus, origin)) return
+  const settlePendingFocus = useEffectEvent((cancelled: boolean) => {
+    const origin = closeOriginRef.current
+    closeOriginRef.current = null
+    if (cancelled && restoreRegisteredOrigin(focus, origin)) return
 
-      const destination = activeCloseSuccessorDestination(workspaceStore)
-      if (destination) {
-        focus.request(destination)
-        return
-      }
+    const destination = activeCloseSuccessorDestination(workspaceStore)
+    if (destination) {
+      focus.request(destination)
+      return
+    }
 
-      focus.request(focusTargetById({ kind: 'app-shell' }))
-    },
-    [focus, workspaceStore],
-  )
+    focus.request(focusTargetById({ kind: 'app-shell' }))
+  })
 
-  const clearPendingClose = useCallback(() => {
+  const clearPendingClose = () => {
     pendingFocusRef.current = { cancelled: true, kind: 'finish' }
     publishPendingCloses(EMPTY_PENDING_CLOSES)
     setSaveError(null)
-  }, [publishPendingCloses])
+  }
 
-  const advancePendingClose = useCallback(() => {
+  const advancePendingClose = () => {
     const current = pendingClosesRef.current
     const remaining = current.length <= 1 ? EMPTY_PENDING_CLOSES : current.slice(1)
     const next = remaining[0]
@@ -130,7 +127,7 @@ export function useDirtyTabCloseRequest() {
       : { cancelled: false, kind: 'finish' }
     publishPendingCloses(remaining)
     setSaveError(null)
-  }, [publishPendingCloses])
+  }
 
   useEffect(() => {
     const pendingFocus = pendingFocusRef.current
@@ -150,85 +147,76 @@ export function useDirtyTabCloseRequest() {
     if (pendingClose) return
 
     pendingFocusRef.current = null
-    finishPendingFocus(pendingFocus.cancelled)
-  }, [finishPendingFocus, focus, pendingClose])
+    settlePendingFocus(pendingFocus.cancelled)
+  }, [focus, pendingClose])
 
-  const requestCloseTabs = useCallback<RequestCloseTabs>(
-    (tabIds) => {
-      if (pendingClosesRef.current.length > 0) {
-        return { status: 'rejected', reason: 'busy' }
+  const requestCloseTabs: RequestCloseTabs = (tabIds) => {
+    if (pendingClosesRef.current.length > 0) {
+      return { status: 'rejected', reason: 'busy' }
+    }
+
+    const origin = captureDirtyCloseOrigin(focus)
+
+    const workspace = workspaceStore.getState()
+    const openTabs = openTabCloseTargets(tabIds, workspace.workbenchPanels)
+    if (openTabs.length === 0) return { status: 'rejected', reason: 'not-found' }
+    const state = documentStore.getState()
+    const pending: PendingClose[] = []
+    const cleanTabIds: TabId[] = []
+    const closingContentCounts = tabCloseContentCounts(openTabs)
+    const openContentCounts = editorContentCountsForWorkbenchPanels(workspace.workbenchPanels)
+
+    for (const tab of openTabs) {
+      const dirty = tabDocuments(tab.content)
+        .map(documentKey)
+        .some((id) => isDirtyLiveEditorDocument(state, id))
+      const closingLastContentTab =
+        closingContentCounts.get(tabContentKey(tab.content)) ===
+        openContentCounts.get(tabContentKey(tab.content))
+      if (dirty && closingLastContentTab) {
+        appendPendingClose(pending, tab.content, tab.id)
+        continue
       }
 
-      const origin = captureDirtyCloseOrigin(focus)
+      cleanTabIds.push(tab.id)
+    }
 
-      const workspace = workspaceStore.getState()
-      const openTabs = openTabCloseTargets(tabIds, workspace.workbenchPanels)
-      if (openTabs.length === 0) return { status: 'rejected', reason: 'not-found' }
-      const state = documentStore.getState()
-      const pending: PendingClose[] = []
-      const cleanTabIds: TabId[] = []
-      const closingContentCounts = tabCloseContentCounts(openTabs)
-      const openContentCounts = editorContentCountsForWorkbenchPanels(workspace.workbenchPanels)
+    const completion = closeTabs(cleanTabIds)
+    publishPendingCloses(pendingClosesForRequest(pendingClosesRef.current, pending))
+    setSaveError(null)
 
-      for (const tab of openTabs) {
-        const dirty = tabDocuments(tab.content)
-          .map(documentKey)
-          .some((id) => isDirtyLiveEditorDocument(state, id))
-        const closingLastContentTab =
-          closingContentCounts.get(tabContentKey(tab.content)) ===
-          openContentCounts.get(tabContentKey(tab.content))
-        if (dirty && closingLastContentTab) {
-          appendPendingClose(pending, tab.content, tab.id)
-          continue
-        }
+    const requestedTabIds = openTabs.map((tab) => tab.id)
+    const firstPending = pending[0]
+    if (!firstPending) {
+      closeOriginRef.current = null
+      return { status: 'closed', tabIds: requestedTabIds, completion }
+    }
 
-        cleanTabIds.push(tab.id)
-      }
+    closeOriginRef.current = origin
 
-      const completion = closeTabs(cleanTabIds)
-      publishPendingCloses(pendingClosesForRequest(pendingClosesRef.current, pending))
-      setSaveError(null)
+    return {
+      status: 'deferred',
+      dialogTarget: firstPending.dialogTarget,
+      tabIds: requestedTabIds,
+    }
+  }
 
-      const requestedTabIds = openTabs.map((tab) => tab.id)
-      const firstPending = pending[0]
-      if (!firstPending) {
-        closeOriginRef.current = null
-        return { status: 'closed', tabIds: requestedTabIds, completion }
-      }
+  const requestCloseTab: RequestCloseTab = (tabId) => requestCloseTabs([tabId])
 
-      closeOriginRef.current = origin
-
-      return {
-        status: 'deferred',
-        dialogTarget: firstPending.dialogTarget,
-        tabIds: requestedTabIds,
-      }
-    },
-    [closeTabs, documentStore, focus, publishPendingCloses, workspaceStore],
-  )
-
-  const requestCloseTab = useCallback<RequestCloseTab>(
-    (tabId) => requestCloseTabs([tabId]),
-    [requestCloseTabs],
-  )
-
-  const handleOpenChange = useCallback(
-    (open: boolean) => {
-      if (open) return
-      if (saving) return
-
-      clearPendingClose()
-    },
-    [clearPendingClose, saving],
-  )
-
-  const handleCancel = useCallback(() => {
+  const handleOpenChange = (open: boolean) => {
+    if (open) return
     if (saving) return
 
     clearPendingClose()
-  }, [clearPendingClose, saving])
+  }
 
-  const handleDiscard = useCallback(async () => {
+  const handleCancel = () => {
+    if (saving) return
+
+    clearPendingClose()
+  }
+
+  const handleDiscard = async () => {
     if (!pendingClose) return
     if (saving) return
     if (!pendingCloseIsOpen(pendingClose, workspaceStore.getState())) {
@@ -238,9 +226,9 @@ export function useDirtyTabCloseRequest() {
 
     await discardAndCloseTabs(pendingClose.tabIds)
     advancePendingClose()
-  }, [advancePendingClose, discardAndCloseTabs, pendingClose, saving, workspaceStore])
+  }
 
-  const handleSave = useCallback(() => {
+  const handleSave = () => {
     if (!pendingClose) return
     if (saving) return
     if (!mutationsEnabled) return
@@ -254,16 +242,7 @@ export function useDirtyTabCloseRequest() {
       setSaving,
       workspaceStore,
     })
-  }, [
-    advancePendingClose,
-    closeTabs,
-    documentStore,
-    pendingClose,
-    saveService,
-    saving,
-    mutationsEnabled,
-    workspaceStore,
-  ])
+  }
 
   return {
     dirtyTabCloseDialog: (

@@ -9,6 +9,24 @@ import { useQueryClient } from '@tanstack/react-query'
 
 import { absolutePickerPath, parsePickerPathInput } from '@workspace/client-core/files/path-input'
 
+type FolderProbe = { kind: 'folder' } | { kind: 'rejected'; message: string }
+
+// Outside the hook: React Compiler cannot lower a `try`/`finally`, and the caller needs one
+// settlement path whether the stat resolved, rejected or named something that is not a folder.
+async function probeFolder(
+  path: string,
+  signal: AbortSignal,
+  client: ReturnType<typeof clientForQueryClient>,
+): Promise<FolderProbe> {
+  try {
+    const entry = await statPath(filesystemPath(path), signal, client)
+    if (isDirectoryEntry(entry)) return { kind: 'folder' }
+    return { kind: 'rejected', message: 'That path is not a folder.' }
+  } catch (cause) {
+    return { kind: 'rejected', message: errorMessage(cause, 'Could not open that folder.') }
+  }
+}
+
 export function useFilePickerPathInput({
   currentPath,
   onIntentStart,
@@ -77,26 +95,20 @@ export function useFilePickerPathInput({
     setIsPending(true)
     setError(null)
 
-    try {
-      const entry = await statPath(filesystemPath(parsed.path), controller.signal, client)
-      if (controller.signal.aborted || requestRef.current !== controller) return
-      if (!isDirectoryEntry(entry)) {
-        setError('That path is not a folder.')
-        return
-      }
-
-      navigate(parsed.path, intentId)
-      setIsEditing(false)
-    } catch (cause) {
-      if (controller.signal.aborted || requestRef.current !== controller) return
-
-      setError(errorMessage(cause, 'Could not open that folder.'))
-    } finally {
-      if (requestRef.current === controller) {
-        requestRef.current = null
-        setIsPending(false)
-      }
+    const probe = await probeFolder(parsed.path, controller.signal, client)
+    const current = requestRef.current === controller
+    if (current) {
+      requestRef.current = null
+      setIsPending(false)
     }
+    if (controller.signal.aborted || !current) return
+    if (probe.kind !== 'folder') {
+      setError(probe.message)
+      return
+    }
+
+    navigate(parsed.path, intentId)
+    setIsEditing(false)
   }
 
   return {

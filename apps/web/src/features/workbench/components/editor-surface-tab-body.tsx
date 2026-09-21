@@ -2,7 +2,7 @@ import { documentKey, fileDocument, fileResource } from '@/lib/documents/utils/i
 import { filesystemResource } from '@/lib/documents/utils/capabilities'
 import { documentTab } from '@/lib/documents/utils/tabs'
 import type { DocumentKey, FilesystemPath, TabContent, TabId } from '@/lib/documents/utils/types'
-import { useCallback, useEffect, useLayoutEffect, useMemo } from 'react'
+import { useEffect, useLayoutEffect } from 'react'
 
 import {
   joinedEditorRenderDocument,
@@ -80,25 +80,14 @@ export function EditorSurfaceTabBody({
     }
     return 'editable'
   })
-  const selectedLiveDocument = useMemo(
-    () =>
-      joinedEditorRenderDocument({
-        buffer: selectedDocumentBuffer,
-        documentKey: selectedViewDocumentKey,
-        editability: selectedDocumentEditability,
-        target: selectedDocumentTarget,
-        preparedDocument: selectedPreparedDocument,
-        view: selectedViewSession,
-      }),
-    [
-      selectedDocumentBuffer,
-      selectedDocumentEditability,
-      selectedDocumentTarget,
-      selectedPreparedDocument,
-      selectedViewDocumentKey,
-      selectedViewSession,
-    ],
-  )
+  const selectedLiveDocument = joinedEditorRenderDocument({
+    buffer: selectedDocumentBuffer,
+    documentKey: selectedViewDocumentKey,
+    editability: selectedDocumentEditability,
+    target: selectedDocumentTarget,
+    preparedDocument: selectedPreparedDocument,
+    view: selectedViewSession,
+  })
   const ensureEditorView = useEditorDocumentState((state) => state.ensureEditorView)
   const ensureEditorViewForDocument = useEditorDocumentState(
     (state) => state.ensureEditorViewForDocument,
@@ -161,70 +150,46 @@ export function EditorSurfaceTabBody({
     clearStatusBarSource()
   }, [active, clearStatusBarSource, content.kind, fileState.status, selectedLiveDocument])
 
-  const handleEditorTextChange = useCallback(
-    (_sourceTabId: TabId, changedKey: DocumentKey, change: DocumentSessionChange) => {
-      if (!selectedConflict || changedKey !== documentKey(selectedConflict)) return
-      resolveConflictEditorDocument(selectedConflict, change.textSnapshot)
-    },
-    [resolveConflictEditorDocument, selectedConflict],
-  )
-  const handleOpenReferences = useCallback(
-    (result: LanguageServerReferencesResult) => {
-      setLanguageServerReferences(result, tabId)
-      return true
-    },
-    [setLanguageServerReferences, tabId],
-  )
-  const handlePreviewDefinition = useCallback(
-    (target: LanguageServerDefinitionTarget) => {
-      uiStore.getState().setDefinitionTarget(target, tabId)
-    },
-    [uiStore, tabId],
-  )
-  const handleCloseReferences = useCallback(
-    () => setLanguageServerReferences(null, tabId),
-    [setLanguageServerReferences, tabId],
-  )
+  const handleEditorTextChange = (
+    _sourceTabId: TabId,
+    changedKey: DocumentKey,
+    change: DocumentSessionChange,
+  ) => {
+    if (!selectedConflict || changedKey !== documentKey(selectedConflict)) return
+    resolveConflictEditorDocument(selectedConflict, change.textSnapshot)
+  }
+  const handleOpenReferences = (result: LanguageServerReferencesResult) => {
+    setLanguageServerReferences(result, tabId)
+    return true
+  }
+  const handlePreviewDefinition = (target: LanguageServerDefinitionTarget) => {
+    uiStore.getState().setDefinitionTarget(target, tabId)
+  }
+  const handleCloseReferences = () => setLanguageServerReferences(null, tabId)
   // This is a bound workbench action surface; Editor still receives explicit plugin callbacks.
-  const editorSurfaceActions = useMemo<EditorSurfaceActions>(
-    () => ({
-      applyWorkspaceEdit,
-      closeReferences: handleCloseReferences,
-      compareMergeConflict: comparableConflictPath
-        ? () =>
-            selectContent(
-              documentTab({
-                kind: 'compare-saved',
-                file: fileResource(comparableConflictPath),
-              }),
-            )
-        : null,
-      openDefinition: (target) => {
-        void openDefinition(target)
-      },
-      openReferences: handleOpenReferences,
-      previewReference: handlePreviewDefinition,
-      handleTextChange: active ? handleEditorTextChange : () => undefined,
-      setScrollPosition: (scrollPosition, reopenScrollPosition) =>
-        setEditorViewScrollPosition(tabId, scrollPosition, reopenScrollPosition),
-      setStatusSource: setStatusBarSource,
-      showFile: (path) => selectContent(documentTab(fileDocument(fileResource(path)))),
-    }),
-    [
-      applyWorkspaceEdit,
-      active,
-      comparableConflictPath,
-      handleCloseReferences,
-      handleEditorTextChange,
-      handleOpenReferences,
-      handlePreviewDefinition,
-      openDefinition,
-      selectContent,
-      setEditorViewScrollPosition,
-      setStatusBarSource,
-      tabId,
-    ],
-  )
+  const editorSurfaceActions: EditorSurfaceActions = {
+    applyWorkspaceEdit,
+    closeReferences: handleCloseReferences,
+    compareMergeConflict: comparableConflictPath
+      ? () =>
+          selectContent(
+            documentTab({
+              kind: 'compare-saved',
+              file: fileResource(comparableConflictPath),
+            }),
+          )
+      : null,
+    openDefinition: (target) => {
+      void openDefinition(target)
+    },
+    openReferences: handleOpenReferences,
+    previewReference: handlePreviewDefinition,
+    handleTextChange: active ? handleEditorTextChange : () => undefined,
+    setScrollPosition: (scrollPosition, reopenScrollPosition) =>
+      setEditorViewScrollPosition(tabId, scrollPosition, reopenScrollPosition),
+    setStatusSource: setStatusBarSource,
+    showFile: (path) => selectContent(documentTab(fileDocument(fileResource(path)))),
+  }
 
   // Before the file paths: a settings tab has no document, no language server
   // and nothing to save, so falling through to the editor machinery would only

@@ -6,6 +6,7 @@ import { parseSync } from 'oxc-parser'
 
 const ROOT = fileURLToPath(new URL('../../', import.meta.url))
 const TIMING = 'packages/utils/src/timing.ts'
+const DEFAULT_ALLOW = 'scripts/lint/duplicate-functions-allow.json'
 const EXCLUDED = /(?:\/tests?\/|\.(?:test|spec|browser|test-d)\.|\/generated\/|\/protocol\/)/
 
 function structure(key, value) {
@@ -121,7 +122,61 @@ export function inspectFunctions(sources) {
         fallbacks.push(location(file, source, node, 'clock fallback'))
     })
   }
-  return { duplicates: [...groups.values()].filter((group) => group.length > 1), fallbacks, errors }
+  const duplicates = [...groups.values()].filter((group) => group.length > 1)
+  return { duplicates, fallbacks, errors }
+}
+
+function allowKey(name, files) {
+  return `${name} :: ${[...files].sort().join(', ')}`
+}
+
+function entryProblems(entry, index) {
+  const label = `allow[${index}]`
+  if (!entry || typeof entry !== 'object') return [`${label}: entry must be an object`]
+  const problems = []
+  if (typeof entry.name !== 'string' || entry.name === '') problems.push(`${label}: missing "name"`)
+  if (!Array.isArray(entry.files) || entry.files.length < 2)
+    problems.push(`${label}: "files" must list the two or more copies`)
+  if (typeof entry.reason !== 'string' || entry.reason.trim() === '')
+    problems.push(
+      `${label} (${entry.name ?? '?'}): an exception without a reason is itself a violation`,
+    )
+  return problems
+}
+
+/**
+ * Splits the groups an allow-list excuses from the ones it does not, and reports entries that
+ * match nothing: an exception matching nothing is a claim about code that no longer exists.
+ */
+export function applyAllowList(duplicates, entries) {
+  const problems = Array.isArray(entries)
+    ? entries.flatMap(entryProblems)
+    : ['the allow-list must be a JSON array of { name, files, reason } entries']
+  const valid = Array.isArray(entries)
+    ? entries.filter((e) => entryProblems(e, 0).length === 0)
+    : []
+  const seen = new Set(
+    duplicates.map((group) =>
+      allowKey(
+        group[0].name,
+        group.map((item) => item.file),
+      ),
+    ),
+  )
+  for (const entry of valid)
+    if (!seen.has(allowKey(entry.name, entry.files)))
+      problems.push(`${entry.name}: stale, those copies no longer match`)
+  const allowed = new Set(valid.map((entry) => allowKey(entry.name, entry.files)))
+  const offenders = duplicates.filter(
+    (group) =>
+      !allowed.has(
+        allowKey(
+          group[0].name,
+          group.map((item) => item.file),
+        ),
+      ),
+  )
+  return { offenders, problems }
 }
 
 function sourceFiles(root) {
@@ -151,10 +206,15 @@ function sourceFiles(root) {
     .map((file) => ({ file, source: readFileSync(path.join(root, file), 'utf8') }))
 }
 
+function readAllowList(file) {
+  return existsSync(file) ? JSON.parse(readFileSync(file, 'utf8')) : []
+}
+
 function main() {
   const sources = sourceFiles(ROOT)
   const result = inspectFunctions(sources)
-  for (const group of result.duplicates) {
+  const allow = applyAllowList(result.duplicates, readAllowList(path.join(ROOT, DEFAULT_ALLOW)))
+  for (const group of allow.offenders) {
     console.error(
       'Copied function:\n' +
         group.map((item) => `  ${item.file}:${item.line} ${item.name}`).join('\n'),
@@ -162,11 +222,17 @@ function main() {
   }
   for (const item of result.fallbacks)
     console.error(`${item.file}:${item.line}: import nowMs from @workspace/utils/timing`)
+  for (const problem of allow.problems) console.error(`allow-list  ${problem}`)
   for (const error of result.errors) console.error(error)
   console.log(
-    `${sources.length} files; ${result.duplicates.length} duplicate function groups; ${result.fallbacks.length} inline clock fallbacks; ${result.errors.length} parse errors`,
+    `${sources.length} files; ${allow.offenders.length} duplicate function groups; ${result.fallbacks.length} inline clock fallbacks; ${result.errors.length} parse errors`,
   )
-  if (result.duplicates.length || result.fallbacks.length || result.errors.length)
+  if (
+    allow.offenders.length ||
+    allow.problems.length ||
+    result.fallbacks.length ||
+    result.errors.length
+  )
     process.exitCode = 1
 }
 

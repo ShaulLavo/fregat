@@ -1,5 +1,5 @@
-import { wakeCases } from './wake-cases'
-import { deepStrictEqual, notDeepStrictEqual, strictEqual } from 'node:assert/strict'
+import { upstreamSnoozeInput, wakeCases } from './wake-cases'
+import { deepStrictEqual, notDeepStrictEqual } from 'node:assert/strict'
 import { execFileSync } from 'node:child_process'
 import {
   customSnooze,
@@ -8,12 +8,10 @@ import {
   type CustomSnoozeInput,
 } from '../../packages/client-core/src/chat/rail/snooze'
 import { sessionWokeAt } from '../../packages/client-core/src/chat/rail/unread'
-import inventory from '../../plans/126-t3code-alignment/inventory.json'
+import { pin, readPinned } from './pinned'
 
 const zones = ['UTC', 'America/New_York', 'Europe/Berlin', 'Asia/Jerusalem', 'Australia/Sydney']
-const pin = '7445aa733ada33e45289e5aa5055f79142556513'
 const sourcePath = 'packages/client-runtime/src/state/threadSettled.ts'
-strictEqual(pin, inventory.upstream_commit)
 
 if (process.argv[2] !== '--zone') {
   const results = zones.map((zone) =>
@@ -38,9 +36,7 @@ if (process.argv[2] !== '--zone') {
 }
 
 async function compareZone() {
-  const source = execFileSync('git', ['-C', 'references/t3code', 'show', `${pin}:${sourcePath}`], {
-    encoding: 'utf8',
-  })
+  const source = readPinned(`${sourcePath}`)
   const javascript = new Bun.Transpiler({ loader: 'ts' }).transformSync(source)
   const upstream = await import(
     `data:text/javascript;base64,${Buffer.from(javascript).toString('base64')}`
@@ -148,17 +144,7 @@ async function compareZone() {
 
   const effectiveCases = [...makeEffectiveCases(), ...wakeCases]
   const effectiveExpected = effectiveCases.map(({ session, now }) =>
-    upstream.effectiveSnoozed(
-      {
-        snoozedAt: session.snoozedAt,
-        snoozedUntil: session.snoozedUntil,
-        latestTurn: session.latestTurn,
-        session: session.runtime,
-        hasPendingApprovals: session.pendingApprovalCount > 0,
-        hasPendingUserInput: session.pendingUserInputCount > 0,
-      },
-      { now: new Date(now).toISOString() },
-    ),
+    upstream.effectiveSnoozed(upstreamSnoozeInput(session), { now: new Date(now).toISOString() }),
   )
   deepStrictEqual(
     effectiveCases.map(({ session, now }) => effectiveSnoozed(session, now)),

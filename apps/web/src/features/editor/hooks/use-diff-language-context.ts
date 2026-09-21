@@ -1,7 +1,7 @@
 import { fileDocumentKey } from '@/lib/documents/utils/identity'
 import type { FilesystemPath } from '@/lib/documents/utils/types'
 import { workspaceDocumentPath } from '@/features/editor/utils/diff-language-context'
-import { useMemo } from 'react'
+import {} from 'react'
 
 import { useEditorDocumentState } from '@/features/editor/state/document-state'
 import type {
@@ -25,10 +25,7 @@ export function useDiffLanguageContext(
   const revision = useEditorDocumentState((state) =>
     key ? (state.documentContentRevisions[key] ?? '') : '',
   )
-  const snapshot = useMemo(
-    () => ({ revision, text: buffer?.materializeFullText() ?? null }),
-    [buffer, revision],
-  )
+  const snapshot = { revision, text: buffer?.materializeFullText() ?? null }
 
   if (!path) return null
 

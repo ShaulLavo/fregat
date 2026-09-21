@@ -49,6 +49,18 @@
 - Keep leaf callbacks as props only when they are local UI behavior owned by the direct parent. Context/provider APIs should expose small domain actions such as `selectTab` or `requestCloseTab`, not broad state blobs.
 - Avoid manual React memoization. Do not add `memo`, `useMemo`, or `useCallback` for ordinary render values or callbacks. Use them only for measured performance issues, required stable identity, or correctness. Add a short reason when you do.
 
+## React Compiler: Read The Output, Do Not Guess
+
+- The compiler memoizes this app, and what it chose is a fact you can read. Never reason about it from the source. `bun run compiler:explain <file> [--component Name]` prints every component and hook in the file: whether it compiled, and each memo block as `[keys] → value`, with temporaries resolved to named values.
+- `bun run compiler:memos [paths…]` audits every `useMemo` and `useCallback`. It recompiles the file with that one memo removed and compares keys. `redundant` means the compiler picks the same keys, so delete the memo. `needed` means the compiler refuses the component or leaves the value unmemoized without it. `differs` means read both key lists: a coarser compiler key justifies the memo, and a manual list missing a key the compiler found is a stale-value bug. `--undecided` hides the `needed` rows.
+- A manual memo that survives carries its verdict as the reason: `history-pane.tsx` keeps one because the compiler keys the diff on the whole viewer `state`.
+- Run `compiler:memos` on a file before adding a memo to it and after touching one. Run it on the feature when chasing a render or performance problem, before `renders` or `trace`.
+- Each row is measured with that one memo removed and the rest still in place, so a file's rows are not independent. Removing several at once can shift a downstream key that each row on its own said was safe. Remove them one at a time and re-read the file's keys after each.
+- `exhaustive-deps` and the compiler disagree by design. The rule reads the source, so it calls a compiler-memoized value "changes every render". When the dep is the action rather than the trigger, `useEffectEvent` is the fix; when the effect genuinely keys on the value, the warning is wrong and the memo does not come back. Silence that last case with `// oxlint-disable-next-line react/exhaustive-deps` and a comment naming the keys the compiler chose. Spelling matters: the compiler's suppression detector watches the `react-hooks/…` alias and will refuse the component over it, while `react/…`, the name this repo actually configures, it does not see. That makes the `react/` spelling an unguarded escape — use it only for a claim you have checked against `compiler:explain` output, never to quiet a rule you have not read.
+- Removing a memo drops the contextual type its type argument supplied. Carry `useMemo<T>(…)` over as `const value: T = …`, or the parameters inside it silently become `any`.
+- `bun run compiler:census` gates refusals in `verify` and CI: any refused component fails unless `scripts/lint/react-compiler-allow.json` excuses it with a reason. Lint cannot stand in for it, because its compiler rules miss components wrapped in `memo()`.
+- Refusals have known repairs. A lazily filled ref or an equal-value ref cache becomes lazy `useState`. A `try`/`finally` moves to a module-scope function or returns a result the caller settles. A suppressed `exhaustive-deps` becomes `useEffectEvent`, with the trigger passed in as an argument so the dependency is still read. Handlers are declared after the handlers they call. JSX, not `createElement`, carries a `ref`.
+
 ## Styling
 
 - Rows are `ListRow`: token height, square corners, `aria-selected` selection, `data-marked` inset ring, and immediate hover/press paint. Disabled rows keep title recovery and are skipped by navigation.
@@ -73,6 +85,7 @@
 - Need a color with no token? Add it to `packages/ui/src/styles/globals.css` (light `:root`, `.dark`, and the `@theme inline` map) instead of inlining a palette class.
 - Compose the shared primitives; do not restyle them ad-hoc or reach for a raw `<button>`/`<input>` when a primitive exists.
 - Pane surfaces (`bg-background`, `bg-card`, `bg-muted`, `bg-accent`) follow `--surface-opacity`. Use `backdrop-material` for panes over wallpaper or content.
+- A surface is painted once. Because it is translucent, a second `bg-background` inside a `bg-background` region reads as an extra layer against the wallpaper. `ToolPane` therefore paints nothing; the region that owns the surface does — the sidebar `aside`, the chat-mode tool panel, a dialog. A `ToolPane` that is itself the whole region (a settings or search editor tab, the bottom panel) carries `bg-background` at the call site.
 - Floating UI is always opaque: dialogs, menus, popovers, toasts, tooltips, and editor hover/completion panels. Use `bg-popover-solid` or another solid theme token. Do not add backdrop blur, wallpaper layers, or transparency derived from pane settings.
 - `bg-popover` also resolves to the solid popover token. The `-solid` utilities deliberately ignore the user's transparency setting.
 
@@ -97,8 +110,11 @@ entry without a real reason is itself a violation.
   that changes height when data arrives is the bug this rule exists to prevent.
 - **One density system.** The `--density-*` custom properties. Never hand-write a
   `compact:`-prefixed pair; the variant no longer exists.
-- **No dividers.** Surfaces separate by tone, never by a line: a sidebar is `bg-card` beside a
-  `bg-background` well, a chip is a `bg-muted` fill, a callout is a status tint. `border-border`,
+- **No dividers.** Surfaces separate by tone, never by a line: a panel is `bg-background` beside a
+  `bg-content-well`, a chip is a `bg-muted` fill, a callout is a status tint. Panels take the
+  darker neutral, not `bg-card`: it scrims the wallpaper where a lighter surface veils it, and
+  an Omarchy palette derives `card` and `muted` from one color, so a chip only steps on
+  `bg-background`. `border-border`,
   `border-subtle`, `divide-*` and any edge border are banned (`hairlines` in the census); a bare
   `border` survives only as `border border-transparent`, the sizing base for a state color such as
   `aria-invalid:border-destructive`. Floating surfaces keep their `ring-1 ring-foreground/10`.
@@ -240,6 +256,13 @@ Interaction treatments are utilities, not strings to copy:
 ## Dev Server
 
 - A dev server is always running. Never spin up your own server to test or verify changes — reuse the running one.
+
+## Gates
+
+- `bun run gates` is the whole-tree set a commit must not break: `dupes:functions`, `dupes`, `design:census`, `compiler:census`. It runs in `pre-commit` through lefthook, in `verify`, and in CI, and a test pins all three so a gate cannot exist without being run. Under two seconds together.
+- A staged-file lint cannot see a clone, a duplicated helper or a refused component, which is why these run over the tree rather than over `{staged_files}`.
+- `bun run hooks:pre-commit` is **not** a dry run. Its fix jobs carry `stage_fixed: true`, so invoking it by hand stages every file they touch. Run the individual gate you want instead.
+- `packages/ui` and `packages/tree` run their tests through the React Compiler, because the app that ships them compiles them. Without it a test exercises unmemoized source: manual memoization the compiler makes redundant looks load-bearing, and a value the compiler over-caches never shows up.
 
 ## Verification
 

@@ -26,6 +26,8 @@ export function useSelectedFile(filePath: FilesystemPath | null) {
     queryKey: fileSystemKeys.fileMetadata(filePath ?? filesystemPath('')),
     refetchOnMount: 'always',
   })
+  // Manual keys: the compiler would also key this on the metadata query, which refetches on every
+  // mount, so consumers would see a new `fileState` for a stat that changed nothing.
   const fileState = useMemo(
     () => (filePath ? fileLoadState({ data, error, isError, isPending }, filePath) : idleState),
     [data, error, filePath, isError, isPending],

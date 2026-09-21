@@ -481,7 +481,12 @@ function awaitSubscriptionAck(subscription: OrchestrationRpcSubscription, delive
       clearTimeout(timer)
       signal.removeEventListener('abort', abort)
       subscription.pendingAck = null
-      error === undefined ? resolve() : reject(error)
+      if (error === undefined) {
+        resolve()
+        return
+      }
+
+      reject(error)
     }
     const abort = () => finish(signal.reason)
     const timer = setTimeout(() => subscription.budget.overflow(), 30_000)

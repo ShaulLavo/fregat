@@ -1,4 +1,4 @@
-import { useMemo, type ReactNode } from 'react'
+import { type ReactNode } from 'react'
 
 import { useOpenCheckpointDiffDocument } from '@/features/chat/hooks/use-open-checkpoint-diff-document'
 import {
@@ -15,14 +15,11 @@ export function ChatTimelineActionsProvider({
 }) {
   const { openCheckpointDiff, openFullSessionCheckpointDiff } = useOpenCheckpointDiffDocument()
   // Context value stability keeps message rows from repainting on unrelated chat chrome changes.
-  const value = useMemo<ChatTimelineActions>(
-    () => ({
-      openCheckpointDiff,
-      openSessionCheckpointDiff: openFullSessionCheckpointDiff,
-      revertToCheckpoint,
-    }),
-    [openCheckpointDiff, openFullSessionCheckpointDiff, revertToCheckpoint],
-  )
+  const value: ChatTimelineActions = {
+    openCheckpointDiff,
+    openSessionCheckpointDiff: openFullSessionCheckpointDiff,
+    revertToCheckpoint,
+  }
 
   return <ChatTimelineActionsContext value={value}>{children}</ChatTimelineActionsContext>
 }

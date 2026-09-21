@@ -1,26 +1,14 @@
 import { ok, strictEqual } from 'node:assert/strict'
 import type { Scenario } from './index'
 import { selectors } from '../selectors'
-import { dispatch, readShell } from './chat-verification'
+import { dispatch, openChatShell, readShell } from './chat-verification'
 
 export const sessionNavigation: Scenario = {
   name: 'session-navigation',
   description:
     'Archive the current session into its project draft, preserve a background archive route, and delete into the first surviving session. Uses three disposable sessions on one connected owner.',
   async run(page, { step }) {
-    const connected = page.waitForEvent('websocket', {
-      predicate: (socket) => socket.url().endsWith('/orchestration/rpc'),
-    })
-    await page.goto(page.url().replace(/\/workbench(?:\?.*)?$/, '/chat'))
-    const base = (await connected)
-      .url()
-      .replace(/^ws/, 'http')
-      .replace(/\/rpc$/, '')
-    const snapshot = await readShell(page, base)
-    const worktree = snapshot.worktrees.find((item) => item.path.endsWith('/projects/platform'))
-    ok(worktree, 'Platform worktree must be registered')
-    const project = snapshot.projects.find((item) => item.id === worktree.projectId)
-    ok(project?.defaultModelSelection, 'Project needs a default model')
+    const { base, project, worktree } = await openChatShell(page)
     const ids = [crypto.randomUUID(), crypto.randomUUID(), crypto.randomUUID()]
     const prefix = `Navigation verification ${ids[0]!.slice(0, 8)}`
     const titles = ids.map((_, index) => `${prefix} ${index + 1}`)

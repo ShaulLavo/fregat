@@ -1,26 +1,14 @@
-import { ok, strictEqual } from 'node:assert/strict'
+import { strictEqual } from 'node:assert/strict'
 import type { Scenario } from './index'
 import { selectors } from '../selectors'
-import { readShell, dispatch } from './chat-verification'
+import { dispatch, openChatShell, readShell } from './chat-verification'
 
 export const sessionUnread: Scenario = {
   name: 'session-unread',
   description:
     'Visit, leave, complete, mark unread, reload and acknowledge a timer wake in disposable sessions. Uses one short provider turn.',
   async run(page, { step }) {
-    const connected = page.waitForEvent('websocket', {
-      predicate: (socket) => socket.url().endsWith('/orchestration/rpc'),
-    })
-    await page.goto(page.url().replace(/\/workbench(?:\?.*)?$/, '/chat'))
-    const base = (await connected)
-      .url()
-      .replace(/^ws/, 'http')
-      .replace(/\/rpc$/, '')
-    const snapshot = await readShell(page, base)
-    const worktree = snapshot.worktrees.find((item) => item.path.endsWith('/projects/platform'))
-    ok(worktree, 'Platform worktree must be registered')
-    const project = snapshot.projects.find((item) => item.id === worktree.projectId)
-    ok(project?.defaultModelSelection, 'Project must have a default model')
+    const { base, project, worktree } = await openChatShell(page)
     const first = crypto.randomUUID()
     const second = crypto.randomUUID()
     const prefix = `Unread verification ${first.slice(0, 8)}`

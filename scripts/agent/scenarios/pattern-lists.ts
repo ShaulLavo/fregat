@@ -1,5 +1,5 @@
 import { strictEqual, ok } from 'node:assert/strict'
-import type { Page } from 'playwright'
+import type { Locator, Page } from 'playwright'
 import type { Scenario } from './index'
 import { openGitPanel, runPaletteCommand, selectors } from '../selectors'
 
@@ -19,17 +19,14 @@ export const gitChanges: Scenario = {
       0,
       'Only the tree container is a Tab stop',
     )
+    await expectVirtualizedRows(page)
+    await expectSingleTooltip(page)
+    await expectSharedTooltip(page)
     await step('changes-list')
     await selectors.worktreeFiles(page).first().click()
     await step('selected-file')
     await tree.focus()
-    const first = await tree.getAttribute('aria-activedescendant')
-    await page.keyboard.press('ArrowDown')
-    ok((await tree.getAttribute('aria-activedescendant')) !== first)
-    strictEqual(
-      await tree.evaluate((element) => element === element.ownerDocument.activeElement),
-      true,
-    )
+    await expectActiveDescendantMoves(page, tree)
     await step('next-file')
     await page.keyboard.press('Shift+F10')
     await selectors.menuSurface(page, 'git.file').waitFor()
@@ -68,13 +65,7 @@ export const logsPanel: Scenario = {
     await step('log-events')
     await selectors.logRows(page).first().click()
     await step('inspected-event')
-    const first = await list.getAttribute('aria-activedescendant')
-    await page.keyboard.press('ArrowDown')
-    ok((await list.getAttribute('aria-activedescendant')) !== first)
-    strictEqual(
-      await list.evaluate((element) => element === element.ownerDocument.activeElement),
-      true,
-    )
+    await expectActiveDescendantMoves(page, list)
     await step('next-event')
     await page.keyboard.press('Enter')
     await step('keyboard-inspected-event')
@@ -205,13 +196,7 @@ export const searchResults: Scenario = {
     await tree.focus()
     await page.keyboard.press('Home')
     await step('search-first-result')
-    const first = await tree.getAttribute('aria-activedescendant')
-    await page.keyboard.press('ArrowDown')
-    ok((await tree.getAttribute('aria-activedescendant')) !== first)
-    strictEqual(
-      await tree.evaluate((element) => element === element.ownerDocument.activeElement),
-      true,
-    )
+    await expectActiveDescendantMoves(page, tree)
     await step('search-next-result')
     await page.keyboard.press('Home')
     await page.keyboard.press('ArrowLeft')
@@ -298,6 +283,54 @@ export const terminalTabs: Scenario = {
   },
 }
 
+/** One layer draws every row's hover text, so the popup is in the page, not the OS. */
+async function expectSharedTooltip(page: Page) {
+  const row = selectors.worktreeFiles(page).first()
+  const expected = await row.getAttribute('data-tooltip')
+  ok(expected, 'A change row must carry its hover text')
+  await row.hover()
+  const popup = selectors.tooltipPopup(page)
+  await popup.waitFor({ timeout: 5_000 })
+  strictEqual(await popup.count(), 1, 'Exactly one tooltip may be mounted')
+  strictEqual((await popup.textContent())?.trim(), expected.trim())
+}
+
+/**
+ * A native `title` applies to every descendant, so a tooltip trigger inside a
+ * titled row shows the styled popup and the browser's own at the same time.
+ * An empty `title` on the control (or a wrapper) is what suppresses the second.
+ */
+async function expectSingleTooltip(page: Page) {
+  const doubled = await page.evaluate(() => {
+    const triggers = [...document.querySelectorAll('[data-slot="tooltip-trigger"]')]
+    return triggers
+      .filter((trigger) => {
+        if (trigger.hasAttribute('title')) return false
+        let node = trigger.parentElement
+        while (node) {
+          const own = node.getAttribute('title')
+          if (own !== null) return own !== ''
+          node = node.parentElement
+        }
+        return false
+      })
+      .map((trigger) => trigger.getAttribute('aria-label') ?? trigger.textContent?.slice(0, 30))
+  })
+  strictEqual(doubled.length, 0, `Controls showing two tooltips: ${JSON.stringify(doubled)}`)
+}
+
+/** A tree that mounts every changed file is the regression this guards. */
+const VIRTUALIZATION_MIN_FILES = 40
+
+async function expectVirtualizedRows(page: Page) {
+  const label = (await selectors.gitChangesTab(page).textContent()) ?? ''
+  const total = Number(label.replace(/\D+/gu, ''))
+  if (!Number.isFinite(total) || total < VIRTUALIZATION_MIN_FILES) return
+
+  const mounted = await selectors.worktreeFiles(page).count()
+  ok(mounted < total, `The changes tree mounted all ${total} rows`)
+}
+
 async function expectTerminalFocus(page: Page) {
   await page.waitForFunction(
     (element) => element?.contains(element.ownerDocument.activeElement),
@@ -316,13 +349,7 @@ export const gitGraphKeyboard: Scenario = {
     const list = selectors.historyList(page)
     await list.focus()
     await page.keyboard.press('Home')
-    const first = await list.getAttribute('aria-activedescendant')
-    await page.keyboard.press('ArrowDown')
-    ok((await list.getAttribute('aria-activedescendant')) !== first)
-    strictEqual(
-      await list.evaluate((element) => element === element.ownerDocument.activeElement),
-      true,
-    )
+    await expectActiveDescendantMoves(page, list)
     await step('graph-keyboard-next')
     await page.keyboard.press('PageDown')
     await step('graph-keyboard-page')
@@ -335,4 +362,15 @@ export const gitGraphKeyboard: Scenario = {
     await page.waitForURL(/historical/, { timeout: 15_000 })
     await step('historical-diff')
   },
+}
+
+/** ArrowDown moves the roving cursor while the container keeps DOM focus. */
+async function expectActiveDescendantMoves(page: Page, container: Locator) {
+  const first = await container.getAttribute('aria-activedescendant')
+  await page.keyboard.press('ArrowDown')
+  ok((await container.getAttribute('aria-activedescendant')) !== first)
+  strictEqual(
+    await container.evaluate((element) => element === element.ownerDocument.activeElement),
+    true,
+  )
 }

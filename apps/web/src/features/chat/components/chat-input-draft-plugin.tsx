@@ -2,7 +2,7 @@ import { useEnvironmentId } from '@/lib/environments/hooks/use-environment-id'
 import { useLexicalComposerContext } from '@lexical/react/LexicalComposerContext'
 import { OnChangePlugin } from '@lexical/react/LexicalOnChangePlugin'
 import { SKIP_DOM_SELECTION_TAG, type EditorState, type LexicalEditor } from 'lexical'
-import { useCallback, useEffect } from 'react'
+import { useEffect } from 'react'
 
 import { detectChatInputTrigger, type ChatInputTrigger } from '@/features/chat/utils/input-logic'
 import {
@@ -48,16 +48,13 @@ export function ChatInputDraftPlugin({
     return useChatInputDraftStore.subscribe(syncPrompt)
   }, [editor, environmentId, draftKey, rootPath])
 
-  const handleChange = useCallback(
-    (editorState: EditorState) => {
-      editorState.read(() => {
-        const { cursor, text } = $readChatInputTextSnapshot()
-        setPrompt({ environmentId, draftKey, rootPath }, text)
-        onTriggerChange(detectChatInputTrigger(text, cursor))
-      })
-    },
-    [environmentId, draftKey, onTriggerChange, rootPath, setPrompt],
-  )
+  const handleChange = (editorState: EditorState) => {
+    editorState.read(() => {
+      const { cursor, text } = $readChatInputTextSnapshot()
+      setPrompt({ environmentId, draftKey, rootPath }, text)
+      onTriggerChange(detectChatInputTrigger(text, cursor))
+    })
+  }
 
   return <OnChangePlugin ignoreSelectionChange onChange={handleChange} />
 }

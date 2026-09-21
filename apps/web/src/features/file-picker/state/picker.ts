@@ -5,7 +5,7 @@ import {
   type ServerInfo,
 } from '@/lib/file-system-types'
 import { useDebouncedValue } from '@tanstack/react-pacer/debouncer'
-import { useCallback, useState } from 'react'
+import { useState } from 'react'
 
 import { ROOT_PATH, initialPathForOpen, pickerParentPath } from '@/features/file-picker/utils/model'
 
@@ -29,69 +29,60 @@ export function useFilePickerSession(value: PickedFsEntry | null) {
   const effectiveQuery = query.trim() ? debouncedQuery : ''
   const [selectedEntry, setSelectedEntry] = useState<FsEntry | null>(value)
 
-  const initializeOpenSession = useCallback(
-    (info: ServerInfo) => {
-      if (isInitialized) return
+  const initializeOpenSession = (info: ServerInfo) => {
+    if (isInitialized) return
 
-      setIsInitialized(true)
-      setNavigation({
-        backHistory: [],
-        currentPath: initialPathForOpen(value, info.defaultPath ?? info.homePath),
-        forwardHistory: [],
-      })
-      setQuery('')
-      setSelectedEntry(value)
-    },
-    [isInitialized, value],
-  )
+    setIsInitialized(true)
+    setNavigation({
+      backHistory: [],
+      currentPath: initialPathForOpen(value, info.defaultPath ?? info.homePath),
+      forwardHistory: [],
+    })
+    setQuery('')
+    setSelectedEntry(value)
+  }
 
-  const resetOpenSession = useCallback(() => {
+  const resetOpenSession = () => {
     setIsInitialized(false)
     setNavigation(initialNavigationState)
     setQuery('')
     setSelectedEntry(null)
-  }, [])
+  }
 
-  const moveToPath = useCallback(
-    (path: string) => {
-      if (path === navigation.currentPath) return
+  const moveToPath = (path: string) => {
+    if (path === navigation.currentPath) return
 
-      setNavigation((current) => navigate(current, path))
-      setSelectedEntry(null)
-      setQuery('')
-    },
-    [navigation.currentPath],
-  )
+    setNavigation((current) => navigate(current, path))
+    setSelectedEntry(null)
+    setQuery('')
+  }
 
-  const goBack = useCallback(() => {
+  const goBack = () => {
     if (navigation.backHistory.length === 0) return
 
     setNavigation(back)
     setSelectedEntry(null)
     setQuery('')
-  }, [navigation.backHistory.length])
+  }
 
-  const goForward = useCallback(() => {
+  const goForward = () => {
     if (navigation.forwardHistory.length === 0) return
 
     setNavigation(forward)
     setSelectedEntry(null)
     setQuery('')
-  }, [navigation.forwardHistory.length])
+  }
 
-  const revealEntry = useCallback(
-    (entry: FsEntry) => {
-      const directory = isDirectoryEntry(entry)
-      const path = directory ? entry.path : pickerParentPath(entry.path)
-      if (path !== navigation.currentPath) {
-        setNavigation((current) => navigate(current, path))
-      }
+  const revealEntry = (entry: FsEntry) => {
+    const directory = isDirectoryEntry(entry)
+    const path = directory ? entry.path : pickerParentPath(entry.path)
+    if (path !== navigation.currentPath) {
+      setNavigation((current) => navigate(current, path))
+    }
 
-      setSelectedEntry(directory ? null : entry)
-      setQuery('')
-    },
-    [navigation.currentPath],
-  )
+    setSelectedEntry(directory ? null : entry)
+    setQuery('')
+  }
 
   return {
     backPath: navigation.backHistory.at(-1) ?? null,

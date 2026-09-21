@@ -1,7 +1,11 @@
 import type { GitFileStatus } from '@workspace/contracts'
-import type { PanelSection, StatusPresentation } from '@/features/git/utils/types'
+export type GitSymbolSource = 'staged' | 'worktree' | 'historical'
 
-export type GitSymbolSource = PanelSection | 'historical'
+export type StatusPresentation = {
+  className: string
+  label: string
+  title: string
+}
 
 // TODO(git): Add VS Code-style incoming/outgoing decorations such as "↓M"
 // TODO(git): Support the full VS Code status alphabet: copied (C),

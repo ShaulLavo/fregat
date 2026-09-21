@@ -5,6 +5,7 @@ import { selectors } from '../selectors'
 import {
   isolatedNativeScenario,
   nativeLog,
+  restoreUserSettings,
   settingsSnapshot,
   writeSettings,
 } from './native-provider-verification'
@@ -75,16 +76,7 @@ export const composerDefaults = isolatedNativeScenario({
       }
       await step('retained-preference-and-hidden-mode-sends-default')
     } finally {
-      const raw = before.layers.find((layer) => layer.id === 'user')?.raw
-      await writeSettings(
-        page,
-        base,
-        keys.map((key) =>
-          raw?.[key] === undefined
-            ? { kind: 'reset', keys: [key] }
-            : { kind: 'set', key, value: raw[key] },
-        ),
-      )
+      await restoreUserSettings(page, base, before, keys)
     }
   },
 })

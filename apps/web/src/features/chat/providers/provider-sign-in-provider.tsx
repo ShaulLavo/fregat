@@ -1,4 +1,4 @@
-import { useMemo, useState, type ReactNode } from 'react'
+import { useState, type ReactNode } from 'react'
 
 import { ProviderSignInDialog } from '@/features/chat/components/provider-sign-in-dialog'
 import type { ProviderSignInTarget } from '@workspace/client-core/chat/providers/auth'
@@ -17,10 +17,9 @@ export function ChatProviderSignInProvider({ children }: { readonly children: Re
   const [target, setTarget] = useState<ProviderSignInTarget | null>(null)
   // Context value identity: a fresh object every render would rerender every
   // consumer, including the model picker list while its popover is open.
-  const value = useMemo<ProviderSignInDialogControl>(
-    () => ({ openSignIn: (next: ProviderSignInTarget) => setTarget(next) }),
-    [],
-  )
+  const value: ProviderSignInDialogControl = {
+    openSignIn: (next: ProviderSignInTarget) => setTarget(next),
+  }
 
   return (
     <ProviderSignInDialogContext value={value}>

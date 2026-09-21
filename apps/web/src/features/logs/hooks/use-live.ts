@@ -1,6 +1,6 @@
 import { useQueryClient } from '@tanstack/react-query'
 import type { LogDashboardFilters, LogEventsResult, LogLiveStreamItem } from '@workspace/contracts'
-import { useEffect, useMemo } from 'react'
+import { useEffect } from 'react'
 
 import { logsKeys } from '@/features/logs/utils/query-keys'
 import { subscribeLogEvents } from '@/features/logs/utils/api'
@@ -12,7 +12,7 @@ import { clientForQueryClient } from '@/lib/environments/state/query-clients'
 
 export function useLogLive(filters: LogDashboardFilters, enabled: boolean) {
   const queryClient = useQueryClient()
-  const queryFilters = useMemo(() => logFilterQuery(filters), [filters])
+  const queryFilters = logFilterQuery(filters)
 
   useEffect(() => {
     if (!enabled) return

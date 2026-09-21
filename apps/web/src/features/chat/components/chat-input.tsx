@@ -11,7 +11,7 @@ import type {
   RuntimeMode,
 } from '@workspace/contracts'
 import { $setSelection, type LexicalEditor } from 'lexical'
-import { useCallback, useEffect, useMemo, useRef, useState, type DragEvent } from 'react'
+import { useEffect, useMemo, useRef, useState, type DragEvent } from 'react'
 import { cn } from '@workspace/ui/lib/utils'
 
 import {
@@ -105,18 +105,11 @@ export function ChatInput({
 }) {
   const environmentId = useEnvironmentId()
   const inputKey = `${environmentId}:${rootPath}:${draftKey}`
-  const draftTarget = useMemo<ChatInputDraftTarget>(
-    () => ({ environmentId, draftKey, rootPath }),
-    [environmentId, draftKey, rootPath],
-  )
-  const imagesSelector = useMemo(
-    () => (state: ChatInputDraftStore) => selectChatInputDraftAttachments(state, draftTarget),
-    [draftTarget],
-  )
-  const terminalContextsSelector = useMemo(
-    () => (state: ChatInputDraftStore) => selectChatInputDraftTerminalContexts(state, draftTarget),
-    [draftTarget],
-  )
+  const draftTarget: ChatInputDraftTarget = { environmentId, draftKey, rootPath }
+  const imagesSelector = (state: ChatInputDraftStore) =>
+    selectChatInputDraftAttachments(state, draftTarget)
+  const terminalContextsSelector = (state: ChatInputDraftStore) =>
+    selectChatInputDraftTerminalContexts(state, draftTarget)
   const planModeEnabled = useSettingValue('chat.planModeEnabled')
   const draftProviderId = useChatInputDraftStore(
     (state) => state.getDraft(draftTarget).modelSelection?.providerInstanceId,
@@ -156,7 +149,7 @@ export function ChatInput({
     },
     editorReady,
   )
-  const initialDraft = useMemo(() => readChatInputDraftPrompt(draftTarget), [draftTarget])
+  const initialDraft = readChatInputDraftPrompt(draftTarget)
   const [activeCommandItemId, setActiveCommandItemId] = useState<string | null>(null)
   const imagePreparation = useAttachmentPreparation(draftTarget)
   const { display: sessionProvider } = useProviderDisplay(sessionProviderInstanceId ?? undefined)
@@ -208,21 +201,18 @@ export function ChatInput({
   // a spinner over rows that are already usable.
   const commandMenuLoading =
     trigger?.kind === 'mention' ? projectEntries.isSearching : commandCatalog.isFetching
-  const initialConfig = useMemo<InitialConfigType>(
-    () => ({
-      editorState: () => {
-        // Restoring a draft must not take focus from the session list.
-        $setChatInputText(initialDraft)
-        $setSelection(null)
-      },
-      namespace: `platform-chat-input:${inputKey}`,
-      nodes: CHAT_INPUT_EDITOR_NODES,
-      onError: (error) => {
-        throw error
-      },
-    }),
-    [inputKey, initialDraft],
-  )
+  const initialConfig: InitialConfigType = {
+    editorState: () => {
+      // Restoring a draft must not take focus from the session list.
+      $setChatInputText(initialDraft)
+      $setSelection(null)
+    },
+    namespace: `platform-chat-input:${inputKey}`,
+    nodes: CHAT_INPUT_EDITOR_NODES,
+    onError: (error) => {
+      throw error
+    },
+  }
 
   // Captures made outside chat wait in the inbox until a composer exists to
   // hold them — the terminal is often right-clicked while the sidebar is on
@@ -236,10 +226,10 @@ export function ChatInput({
     setActiveCommandItemId(commandMenuItems[0]?.id ?? null)
   }, [activeCommandItemId, commandMenuItems])
 
-  const handleEditorReady = useCallback((editor: LexicalEditor | null) => {
+  const handleEditorReady = (editor: LexicalEditor | null) => {
     editorRef.current = editor
     setEditorReady(editor !== null)
-  }, [])
+  }
   function clearDraft() {
     const editor = editorRef.current
     if (editor) clearChatInputEditor(editor)
@@ -301,53 +291,44 @@ export function ChatInput({
 
   const handleImageFiles = imagePreparation.prepare
   const handleRemoveImage = imagePreparation.remove
-  const handleRemoveTerminalContext = useCallback(
-    (contextId: string) => {
-      removeTerminalContext(draftTarget, contextId)
-    },
-    [draftTarget, removeTerminalContext],
-  )
-  const handleCommandItemSelect = useCallback(
-    (item: ChatInputCommandItem) => {
-      const editor = editorRef.current
-      if (!editor || !trigger) return
-      if (item.type === 'slash-command' && !planMode.enabled) return
+  const handleRemoveTerminalContext = (contextId: string) => {
+    removeTerminalContext(draftTarget, contextId)
+  }
+  const handleCommandItemSelect = (item: ChatInputCommandItem) => {
+    const editor = editorRef.current
+    if (!editor || !trigger) return
+    if (item.type === 'slash-command' && !planMode.enabled) return
 
-      // The trigger is React state, so it can already describe a prompt that has
-      // moved on — a stale or repeated commit is refused rather than spliced in.
-      const applied = replaceChatInputEditorRange(editor, {
-        expectedText: trigger.text,
-        rangeEnd: trigger.rangeEnd,
-        rangeStart: trigger.rangeStart,
-        replacement: item.replacement,
-      })
-      setTrigger(null)
-      if (!applied) return
+    // The trigger is React state, so it can already describe a prompt that has
+    // moved on — a stale or repeated commit is refused rather than spliced in.
+    const applied = replaceChatInputEditorRange(editor, {
+      expectedText: trigger.text,
+      rangeEnd: trigger.rangeEnd,
+      rangeStart: trigger.rangeStart,
+      replacement: item.replacement,
+    })
+    setTrigger(null)
+    if (!applied) return
 
-      useChatInputDraftStore.getState().setPrompt(draftTarget, applied.text)
-      if (item.type === 'slash-command') setInteractionMode(draftTarget, item.value)
+    useChatInputDraftStore.getState().setPrompt(draftTarget, applied.text)
+    if (item.type === 'slash-command') setInteractionMode(draftTarget, item.value)
 
-      editor.focus()
-    },
-    [draftTarget, setInteractionMode, trigger, planMode.enabled],
-  )
-  const handleCommandMenuCommit = useCallback(() => {
+    editor.focus()
+  }
+  const handleCommandMenuCommit = () => {
     const item = activeChatInputCommandItem(commandMenuItems, activeCommandItemId)
     if (!item) return false
 
     handleCommandItemSelect(item)
     return true
-  }, [activeCommandItemId, commandMenuItems, handleCommandItemSelect])
-  const handleCommandMenuMove = useCallback(
-    (offset: number) => {
-      const nextItem = chatInputCommandItemByOffset(commandMenuItems, activeCommandItemId, offset)
-      if (!nextItem) return false
+  }
+  const handleCommandMenuMove = (offset: number) => {
+    const nextItem = chatInputCommandItemByOffset(commandMenuItems, activeCommandItemId, offset)
+    if (!nextItem) return false
 
-      setActiveCommandItemId(nextItem.id)
-      return true
-    },
-    [activeCommandItemId, commandMenuItems],
-  )
+    setActiveCommandItemId(nextItem.id)
+    return true
+  }
 
   /** The popover dismissed itself — a press outside it, most of the time. */
   function handleCommandMenuDismiss() {
@@ -433,7 +414,7 @@ export function ChatInput({
                 nothing at all. */}
             <div
               className={cn(
-                'focus-ring-within border-transparent bg-background relative overflow-hidden rounded-lg border',
+                'focus-ring-within border-transparent bg-input/30 relative overflow-hidden rounded-lg border',
                 // Tint rather than restate: the utility owns the border colour under
                 // :focus-within, so a bare border-primary would lose to it mid-drag.
                 dropTargetActive && 'border-primary [--focus-ring-color:var(--primary)]',

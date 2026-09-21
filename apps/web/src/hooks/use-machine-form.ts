@@ -71,40 +71,6 @@ export function useMachineForm({
     return abort
   }
 
-  async function save(event: FormEvent) {
-    event.preventDefault()
-    if (pending.current) return
-    const parsed = parseMachineDraft(draft)
-    if (parsed.kind === 'invalid') return setError(parsed.message)
-    if (!name && savedName !== parsed.name && Object.hasOwn(machines, parsed.name)) {
-      setOptionsOpen(true)
-      return setError('That machine name is already in use. Choose another name under Options.')
-    }
-    const abort = beginSave(parsed.name)
-    setError(null)
-    setSaving(true)
-    try {
-      const submission = setMachine(parsed.name, parsed.machine)
-      const result = submission.kind === 'noop' ? 'acknowledged' : await submission.settled
-      if (abort.signal.aborted) return
-      if (result !== 'acknowledged')
-        return setError('The machine could not be saved. Retry after resolving the settings error.')
-      setSavedName(parsed.name)
-      setDraft((current) => ({ ...current, name: parsed.name }))
-      const connected =
-        intent !== 'connect' || (await connect(parsed.name, parsed.machine, abort.signal))
-      if (abort.signal.aborted || !connected) return
-      pending.current = null
-      onSaved(parsed.name)
-    } catch (cause) {
-      if (!abort.signal.aborted)
-        setError(errorMessage(cause, 'The machine could not be saved or connected.'))
-    } finally {
-      if (pending.current === abort) pending.current = null
-      if (!abort.signal.aborted) setSaving(false)
-    }
-  }
-
   async function connect(machineName: string, definition: MachineDefinition, signal: AbortSignal) {
     connections.configureMachines({ ...machines, [machineName]: definition })
     const result = await connections.connectMachine(machineName)
@@ -121,6 +87,47 @@ export function useMachineForm({
       connected?.lastError || `Cannot connect to ${machineName}. Check the address and try again.`,
     )
     return false
+  }
+
+  /** Returns the message to show, or null when it succeeded or the caller aborted. */
+  async function runSave(machineName: string, definition: MachineDefinition, signal: AbortSignal) {
+    try {
+      const submission = setMachine(machineName, definition)
+      const result = submission.kind === 'noop' ? 'acknowledged' : await submission.settled
+      if (signal.aborted) return null
+      if (result !== 'acknowledged')
+        return 'The machine could not be saved. Retry after resolving the settings error.'
+      setSavedName(machineName)
+      setDraft((current) => ({ ...current, name: machineName }))
+      const connected = intent !== 'connect' || (await connect(machineName, definition, signal))
+      if (signal.aborted || !connected) return null
+      pending.current = null
+      onSaved(machineName)
+      return null
+    } catch (cause) {
+      if (signal.aborted) return null
+      return errorMessage(cause, 'The machine could not be saved or connected.')
+    }
+  }
+
+  async function save(event: FormEvent) {
+    event.preventDefault()
+    if (pending.current) return
+    const parsed = parseMachineDraft(draft)
+    if (parsed.kind === 'invalid') return setError(parsed.message)
+    if (!name && savedName !== parsed.name && Object.hasOwn(machines, parsed.name)) {
+      setOptionsOpen(true)
+      return setError('That machine name is already in use. Choose another name under Options.')
+    }
+    const abort = beginSave(parsed.name)
+    setError(null)
+    setSaving(true)
+    const failure = await runSave(parsed.name, parsed.machine, abort.signal)
+    if (pending.current === abort) pending.current = null
+    if (abort.signal.aborted) return
+
+    setSaving(false)
+    if (failure) setError(failure)
   }
 
   return { draft, error, saving, optionsOpen, setOptionsOpen, update, save, cancel, submitLabel }

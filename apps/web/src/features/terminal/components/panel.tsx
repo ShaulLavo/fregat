@@ -231,12 +231,15 @@ export function TerminalPanel({
     applyTerminalAppearance(terminalRef.current, { cursorBlink, fontSize })
   }, [cursorBlink, fontSize])
 
-  // Keyed on the content hash, not the mode: a dark-to-dark palette change
-  // repaints the ANSI table without a remount.
+  // Keyed on the content hash, not the mode: a dark-to-dark palette change repaints the ANSI
+  // table without a remount, and the same colors arriving as a fresh object repaint nothing.
+  const appliedPaletteRef = useRef<string | null>(null)
   useEffect(() => {
+    if (appliedPaletteRef.current === paletteHash) return
+
+    appliedPaletteRef.current = paletteHash
     applyTerminalTheme(terminalRef.current, terminalColors)
-    // eslint-disable-next-line react-hooks/exhaustive-deps -- the hash is the colors' identity
-  }, [paletteHash])
+  }, [paletteHash, terminalColors])
 
   useEffect(() => {
     if (machineUnavailable) return

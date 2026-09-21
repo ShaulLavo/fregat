@@ -12,7 +12,9 @@ export function LogsTimelineBar({ bucket, maxTotal }: LogsTimelineBarProps) {
   const tone = bucketTone(bucket)
 
   return (
-    <div className='flex min-w-[3px] flex-1 items-end' title={timelineTitle(bucket)}>
+    // h-full gives the bar's percentage height a definite basis; the strip's
+    // items-end otherwise leaves this column content-sized, so every bar is 0px.
+    <div className='flex h-full min-w-[3px] flex-1 items-end' title={timelineTitle(bucket)}>
       <div
         className={cn(
           'w-full transition-colors',

@@ -3,7 +3,7 @@ import type {
   SessionInteractionModeSetCommand,
   SessionRuntimeModeSetCommand,
 } from '@workspace/contracts'
-import { useMemo, type ReactNode } from 'react'
+import { type ReactNode } from 'react'
 
 import type { ChatTransport } from '@/features/chat/transport/chat-transport'
 import {
@@ -52,39 +52,36 @@ export function ChatComposerModesProvider({
   const setRuntimeMode = useChatInputDraftStore((state) => state.setRuntimeMode)
   // Context value identity: this wraps the whole composer subtree, so a fresh
   // object every render would repaint the panels and the input beside the menu.
-  const value = useMemo<ChatComposerModes>(
-    () => ({
-      selectInteractionMode: async (interactionMode) => {
-        // Local first: the pick has to survive an offline or rejected dispatch,
-        // because the turn command is what actually carries it to the provider.
-        setInteractionMode(draftTarget, interactionMode)
-        if (!sessionId) return true
+  const value: ChatComposerModes = {
+    selectInteractionMode: async (interactionMode) => {
+      // Local first: the pick has to survive an offline or rejected dispatch,
+      // because the turn command is what actually carries it to the provider.
+      setInteractionMode(draftTarget, interactionMode)
+      if (!sessionId) return true
 
-        return dispatchModeSet({
-          command: createInteractionModeSetCommand({
-            interactionMode,
-            sessionId,
-          }),
-          context: { interactionMode },
-          dispatchCommand,
-        })
-      },
-      selectRuntimeMode: async (runtimeMode) => {
-        setRuntimeMode(draftTarget, runtimeMode)
-        if (!sessionId) return true
+      return dispatchModeSet({
+        command: createInteractionModeSetCommand({
+          interactionMode,
+          sessionId,
+        }),
+        context: { interactionMode },
+        dispatchCommand,
+      })
+    },
+    selectRuntimeMode: async (runtimeMode) => {
+      setRuntimeMode(draftTarget, runtimeMode)
+      if (!sessionId) return true
 
-        return dispatchModeSet({
-          command: createRuntimeModeSetCommand({
-            runtimeMode,
-            sessionId,
-          }),
-          context: { runtimeMode },
-          dispatchCommand,
-        })
-      },
-    }),
-    [dispatchCommand, draftTarget, setInteractionMode, setRuntimeMode, sessionId],
-  )
+      return dispatchModeSet({
+        command: createRuntimeModeSetCommand({
+          runtimeMode,
+          sessionId,
+        }),
+        context: { runtimeMode },
+        dispatchCommand,
+      })
+    },
+  }
 
   return <ChatComposerModesContext value={value}>{children}</ChatComposerModesContext>
 }

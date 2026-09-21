@@ -4,7 +4,7 @@ import { WarningCircleIcon } from '@phosphor-icons/react'
 import type { WorkspaceSearchWarningEvent } from '@workspace/contracts'
 import { Shimmer } from '@workspace/ui/components/shimmer'
 
-import { SearchNumber } from '@/features/search/components/number'
+import { TickerNumber } from '@/components/ticker-number'
 import { useSearchBufferValue } from '@/features/search/hooks/use-buffer-value'
 import {
   searchGroupsForSnapshot,
@@ -113,9 +113,9 @@ function summaryWithControls(
   const activeContent = active ? (
     <>
       {' '}
-      <span aria-hidden='true'>·</span> <SearchNumber value={active.index} />
+      <span aria-hidden='true'>·</span> <TickerNumber value={active.index} />
       /
-      <SearchNumber value={active.total} />
+      <TickerNumber value={active.total} />
     </>
   ) : null
   const activeTitle = active ? ` · ${active.index}/${active.total}` : ''
@@ -156,11 +156,11 @@ function searchResultCount(snapshot: SearchBufferSnapshot) {
   const fileTitle = fileCount.toLocaleString()
   const matchSummary = snapshot.truncated ? (
     <>
-      <SearchNumber value={snapshot.totalCount} /> shown, limit reached
+      <TickerNumber value={snapshot.totalCount} /> shown, limit reached
     </>
   ) : (
     <>
-      <SearchNumber value={snapshot.totalCount} /> {matchNoun(snapshot.totalCount)}
+      <TickerNumber value={snapshot.totalCount} /> {matchNoun(snapshot.totalCount)}
     </>
   )
   const titleMatches = snapshot.truncated
@@ -170,7 +170,7 @@ function searchResultCount(snapshot: SearchBufferSnapshot) {
   return {
     content: (
       <>
-        {matchSummary} in <SearchNumber value={fileCount} /> {fileNoun(fileCount)}
+        {matchSummary} in <TickerNumber value={fileCount} /> {fileNoun(fileCount)}
       </>
     ),
     title: `${titleMatches} in ${fileTitle} ${fileNoun(fileCount)}`,

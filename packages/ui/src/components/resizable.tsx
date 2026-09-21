@@ -1,6 +1,6 @@
 import { isPercentage as isResizableLayoutSize } from '@workspace/utils/numbers'
 import * as ResizablePrimitive from 'react-resizable-panels'
-import { useMemo } from 'react'
+import {} from 'react'
 
 import { cn } from '@workspace/ui/lib/utils'
 
@@ -34,10 +34,7 @@ function PersistedResizablePanelGroup({
   storageKey,
   ...props
 }: PersistedResizablePanelGroupProps) {
-  const persistedLayout = useMemo(
-    () => readPersistedResizableLayout(storageKey, storage),
-    [storage, storageKey],
-  )
+  const persistedLayout = readPersistedResizableLayout(storageKey, storage)
 
   function handleLayoutChanged(
     layout: ResizablePrimitive.Layout,

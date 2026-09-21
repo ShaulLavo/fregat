@@ -1,16 +1,7 @@
 /** @jsxImportSource react */
 
 import type { CSSProperties, HTMLAttributes, ReactNode } from 'react'
-import {
-  createElement,
-  useCallback,
-  useEffect,
-  useLayoutEffect,
-  useMemo,
-  useRef,
-  useState,
-  useSyncExternalStore,
-} from 'react'
+import { createElement, useEffect, useLayoutEffect, useState, useSyncExternalStore } from 'react'
 
 import { CONTEXT_MENU_SLOT_NAME, FILE_TREE_TAG_NAME, HEADER_SLOT_NAME } from '../utils/constants'
 import type {
@@ -103,6 +94,25 @@ export interface FileTreeProps extends Omit<HTMLAttributes<HTMLElement>, 'childr
   ) => ReactNode
 }
 
+/**
+ * Paints the model's resolved density onto the host so callers don't have to set
+ * `--trees-item-height` and `--trees-density-override` themselves; caller `style` keys still win.
+ *
+ * `version` is the cache key, and it is why this is a function: the model changes its density in
+ * place, so its identity cannot report the change and a memo keyed on it would serve stale sizes.
+ */
+function densityStyle(
+  model: FileTreeModel,
+  _version: number,
+  style: CSSProperties | undefined,
+): CSSProperties {
+  return {
+    ['--trees-item-height' as string]: `${String(model.getItemHeight())}px`,
+    ['--trees-density-override' as string]: model.getDensityFactor(),
+    ...style,
+  }
+}
+
 export function FileTree({
   header,
   id,
@@ -112,56 +122,48 @@ export function FileTree({
 }: FileTreeProps): React.JSX.Element {
   const [activeContextMenu, setActiveContextMenu] = useState<ActiveContextMenuState | null>(null)
   const [hostElement, setHostElement] = useState<HTMLElement | null>(null)
-  const baselineCompositionRef = useRef<FileTreeCompositionOptions | undefined>(
-    model.getComposition(),
-  )
-  const baselineModelRef = useRef(model)
-  if (baselineModelRef.current !== model) {
-    baselineModelRef.current = model
-    baselineCompositionRef.current = model.getComposition()
-  }
+  // The composition the model arrived with, re-read only when the model itself is replaced.
+  // State, not a ref: React re-runs this render with the new baseline before it commits.
+  const [baseline, setBaseline] = useState(() => ({
+    composition: model.getComposition(),
+    model,
+  }))
+  if (baseline.model !== model) setBaseline({ composition: model.getComposition(), model })
   // Stable callbacks prevent useSyncExternalStore from resubscribing every render.
-  const subscribeToDensity = useCallback(
-    (listener: () => void) => model.subscribeDensity(listener),
-    [model],
+  const subscribeToDensity = (listener: () => void) => model.subscribeDensity(listener)
+  const getDensitySnapshot = () => model.getDensityVersion()
+  const densityVersion = useSyncExternalStore(
+    subscribeToDensity,
+    getDensitySnapshot,
+    getDensitySnapshot,
   )
-  const getDensitySnapshot = useCallback(() => model.getDensityVersion(), [model])
-  useSyncExternalStore(subscribeToDensity, getDensitySnapshot, getDensitySnapshot)
 
   const hasContextMenu = renderContextMenu != null
-  const handleContextMenuClose = useCallback(() => {
+  const handleContextMenuClose = () => {
     setActiveContextMenu(null)
-  }, [])
-  const handleContextMenuOpen = useCallback(
-    (item: FileTreeContextMenuItem, context: FileTreeContextMenuOpenContext) => {
-      setActiveContextMenu({ context, item })
-    },
-    [],
-  )
-  const baselineComposition = baselineCompositionRef.current
-  const composition = useMemo<FileTreeCompositionOptions | undefined>(
-    () =>
-      resolveComposition(
-        baselineComposition,
-        header,
-        hasContextMenu,
-        handleContextMenuClose,
-        handleContextMenuOpen,
-      ),
-    [baselineComposition, handleContextMenuClose, handleContextMenuOpen, hasContextMenu, header],
+  }
+  const handleContextMenuOpen = (
+    item: FileTreeContextMenuItem,
+    context: FileTreeContextMenuOpenContext,
+  ) => {
+    setActiveContextMenu({ context, item })
+  }
+  const baselineComposition = baseline.composition
+  const composition: FileTreeCompositionOptions | undefined = resolveComposition(
+    baselineComposition,
+    header,
+    hasContextMenu,
+    handleContextMenuClose,
+    handleContextMenuOpen,
   )
 
-  const handleHostRef = useCallback((node: HTMLElement | null) => {
+  const handleHostRef = (node: HTMLElement | null) => {
     setHostElement(node)
-  }, [])
+  }
 
-  useEffect(() => {
-    if (hasContextMenu) {
-      return
-    }
-
-    setActiveContextMenu(null)
-  }, [hasContextMenu])
+  // Dropped during render, not in an effect: a menu whose renderer just went away must not
+  // survive into the commit that removes it.
+  if (!hasContextMenu && activeContextMenu !== null) setActiveContextMenu(null)
 
   useClientLayoutEffect(() => {
     model.setComposition(composition)
@@ -182,14 +184,7 @@ export function FileTree({
 
   const children = renderFileTreeChildren(header, renderContextMenu, activeContextMenu)
 
-  // Paint the model's resolved density onto the host so callers don't have to
-  // set `--trees-item-height` and `--trees-density-override` themselves.
-  // Caller-provided `style` keys still win via spread order.
-  const mergedStyle: CSSProperties = {
-    ['--trees-item-height' as string]: `${String(model.getItemHeight())}px`,
-    ['--trees-density-override' as string]: model.getDensityFactor(),
-    ...hostProps.style,
-  }
+  const mergedStyle = densityStyle(model, densityVersion, hostProps.style)
 
   return createElement(
     FILE_TREE_TAG_NAME,

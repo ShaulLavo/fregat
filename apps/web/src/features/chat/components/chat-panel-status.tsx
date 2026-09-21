@@ -1,3 +1,4 @@
+import { TickerNumber } from '@/components/ticker-number'
 import { HourglassMediumIcon, WarningCircleIcon } from '@phosphor-icons/react'
 import type { ReactNode } from 'react'
 
@@ -36,7 +37,7 @@ export function ChatPanelStatus({
     <StatusLine tone='warning'>
       <HourglassMediumIcon className='size-(--icon-size-sm) shrink-0' />
       <span className='truncate'>
-        Waiting on the server (<span className='tabular-nums'>{slowRequestCount}</span>{' '}
+        Waiting on the server (<TickerNumber value={slowRequestCount} />{' '}
         {slowRequestCount === 1 ? 'request' : 'requests'})
       </span>
     </StatusLine>

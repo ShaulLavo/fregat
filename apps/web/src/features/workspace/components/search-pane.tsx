@@ -3,7 +3,8 @@ import { ToolPane } from '@workspace/ui/patterns/tool-pane'
 import { filesystemPath } from '@/lib/documents/utils/identity'
 import { ArrowSquareOutIcon } from '@phosphor-icons/react'
 import { Button } from '@workspace/ui/components/button'
-import { memo, useCallback, useRef } from 'react'
+import { cn } from '@workspace/ui/lib/utils'
+import { memo, useRef } from 'react'
 
 import { useEditorCommands } from '@/features/editor/hooks/use-editor-commands'
 import { SearchSummaryActions } from '@/features/search/components/summary-actions'
@@ -41,17 +42,14 @@ export const SearchPane = memo(
       },
     })
     // Stable identity keeps the parent target mounted while nested editors register deeper.
-    const setRootRef = useCallback(
-      (element: HTMLElement | null) => {
-        rootRef.current = element
-        focusTargetRef(element)
-      },
-      [focusTargetRef],
-    )
+    const setRootRef = (element: HTMLElement | null) => {
+      rootRef.current = element
+      focusTargetRef(element)
+    }
 
     return (
       <ToolPane
-        className='h-full min-w-0 overflow-hidden'
+        className={cn('h-full min-w-0 overflow-hidden', !compact && 'bg-background')}
         bodyClassName='flex flex-col overflow-hidden'
         ref={setRootRef}
         header={

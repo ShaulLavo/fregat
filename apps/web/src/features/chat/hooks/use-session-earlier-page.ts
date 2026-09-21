@@ -1,6 +1,6 @@
 import { useActiveChatProjection } from '@/features/chat/hooks/use-active-projection'
 import type { SessionId } from '@workspace/contracts'
-import { useCallback } from 'react'
+import {} from 'react'
 
 import { selectChatSessionHasEarlier } from '@workspace/client-core/chat/selectors'
 import { useChatTransport } from '@/features/chat/hooks/use-chat-transport'
@@ -21,11 +21,11 @@ export function useSessionEarlierPage(sessionId: SessionId | null | undefined) {
       sessionId ? { environmentId: transport.environmentId, sessionId } : null,
     ),
   )
-  const loadEarlier = useCallback(() => {
+  const loadEarlier = () => {
     if (!sessionId) return
 
     void transport.loadEarlierPage(sessionId)
-  }, [sessionId, transport])
+  }
 
   return { error, hasEarlier, loadEarlier, pending }
 }

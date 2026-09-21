@@ -2,7 +2,7 @@ import { Tooltip, TooltipContent, TooltipTrigger } from '@workspace/ui/component
 import { ListRow } from '@workspace/ui/patterns/list-row'
 import { FileTypeIcon } from '@/components/file-type-icon'
 import { CaretRightIcon } from '@phosphor-icons/react'
-import { memo, useCallback, useMemo } from 'react'
+import { memo } from 'react'
 
 import { useSearchResultActions } from '@/features/search/hooks/use-result-actions'
 import { Button } from '@workspace/ui/components/button'
@@ -24,9 +24,9 @@ export const SearchResultFileHeader = memo(
   ({ active, canReplace, file, replaceVisible }: SearchResultFileHeaderProps) => {
     const { replacePath, toggleGroup } = useSearchResultActions()
     const name = fileName(file.path)
-    const icon = useMemo(() => iconForEntry({ name, type: 'file' }), [name])
-    const handleReplace = useCallback(() => replacePath(file.path), [file.path, replacePath])
-    const handleToggle = useCallback(() => toggleGroup(file.path), [file.path, toggleGroup])
+    const icon = iconForEntry({ name, type: 'file' })
+    const handleReplace = () => replacePath(file.path)
+    const handleToggle = () => toggleGroup(file.path)
 
     return (
       <ListRow

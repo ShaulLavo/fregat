@@ -1,4 +1,5 @@
 import path from 'node:path'
+import react from '@vitejs/plugin-react'
 import { playwright } from '@vitest/browser-playwright'
 import { defineConfig } from 'vitest/config'
 
@@ -6,6 +7,8 @@ const alias = {
   '@workspace/tree': path.resolve(__dirname, './src'),
 }
 
+// The compiler runs here because it runs in the app that mounts this fork: without it a test
+// exercises unmemoized source, and manual memoization the compiler makes redundant looks load-bearing.
 export default defineConfig({
   test: {
     projects: [
@@ -18,6 +21,7 @@ export default defineConfig({
         },
       },
       {
+        plugins: [react({ compiler: true })],
         resolve: { alias, dedupe: ['react', 'react-dom'] },
         test: {
           name: 'dom',
@@ -27,6 +31,7 @@ export default defineConfig({
         },
       },
       {
+        plugins: [react({ compiler: true })],
         resolve: { alias, dedupe: ['react', 'react-dom'] },
         test: {
           name: 'browser',

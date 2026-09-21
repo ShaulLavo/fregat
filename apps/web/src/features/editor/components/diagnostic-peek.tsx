@@ -2,7 +2,7 @@ import { Tooltip, TooltipContent, TooltipTrigger } from '@workspace/ui/component
 import { Button } from '@workspace/ui/components/button'
 import { cn } from '@workspace/ui/lib/utils'
 import { XIcon } from '@phosphor-icons/react'
-import { useCallback, useLayoutEffect, useRef, useState } from 'react'
+import { useLayoutEffect, useRef, useState } from 'react'
 
 import type { DiagnosticPeekModel } from '@/features/editor/state/diagnostic-peek-source'
 import {
@@ -36,13 +36,10 @@ export function DiagnosticPeek({ model, onClose, onOpenTarget, tabId }: Diagnost
     },
   })
   // Keep the FocusService registration attached while placement updates rerender the surface.
-  const setSurfaceRef = useCallback(
-    (element: HTMLDivElement | null) => {
-      surfaceRef.current = element
-      focusTargetRef(element)
-    },
-    [focusTargetRef],
-  )
+  const setSurfaceRef = (element: HTMLDivElement | null) => {
+    surfaceRef.current = element
+    focusTargetRef(element)
+  }
 
   useLayoutEffect(() => {
     const layer = layerRef.current

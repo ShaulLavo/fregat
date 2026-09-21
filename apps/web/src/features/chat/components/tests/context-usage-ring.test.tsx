@@ -20,7 +20,9 @@ function usage(overrides: Partial<ContextUsage> = {}): ContextUsage {
 test('a reported window shows the share of it that is gone', () => {
   renderWithProviders(<ContextUsageRing usage={usage()} />)
 
-  expect(screen.getByRole('button', { name: 'Context 25% full' })).toHaveTextContent('25%')
+  // The rolling digits leave no readable text node, so the label is the readout.
+  expect(screen.getByRole('button', { name: 'Context 25% full' })).toBeVisible()
+  expect(screen.getByRole('img', { name: '25' })).toBeVisible()
 })
 
 test('a provider that reports no window size still gets a gauge', async () => {

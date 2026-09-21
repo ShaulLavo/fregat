@@ -1,8 +1,8 @@
-import { mkdtemp, readFile, rm, writeFile } from 'node:fs/promises'
+import { mkdtemp, rm, writeFile } from 'node:fs/promises'
 import { strictEqual } from 'node:assert'
 import path from 'node:path'
 import type { Page } from 'playwright'
-import { fixtureGit, openFixtureWorkspace } from '../fixture-workspace'
+import { fixtureGit, openFixtureWorkspace, waitForFileContent } from '../fixture-workspace'
 import { focusEditor, openFileFromTree, selectors } from '../selectors'
 import type { Scenario } from './index'
 
@@ -25,7 +25,7 @@ export const editorUndoReopen: Scenario = {
       await page.keyboard.press('End')
       await page.keyboard.type(' // kept')
       await page.keyboard.press('Control+s')
-      await waitForDisk(diskPath, EDITED)
+      await waitForFileContent(diskPath, EDITED)
       await step('saved')
 
       await closeTab(page)
@@ -67,13 +67,4 @@ async function firstRowText(page: Page) {
 async function closeTab(page: Page) {
   await selectors.editorGroupTabs(page, 0).first().click({ button: 'right' })
   await selectors.menuItem(page, 'Close').click()
-}
-
-async function waitForDisk(file: string, expected: string) {
-  const deadline = Date.now() + 8000
-  while (Date.now() < deadline) {
-    if ((await readFile(file, 'utf8')) === expected) return
-    await Bun.sleep(50)
-  }
-  strictEqual(await readFile(file, 'utf8'), expected)
 }

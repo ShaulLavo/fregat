@@ -1,4 +1,4 @@
-import { useMemo, useReducer } from 'react'
+import { useReducer } from 'react'
 import { VirtualList } from '@workspace/ui/patterns/virtual-list'
 import type { ChatSession } from '@workspace/client-core/chat/types'
 
@@ -25,25 +25,14 @@ export function MessagesTimeline({
   const [scrollState, dispatch] = useReducer(timelineScrollReducer, initialTimelineScrollState)
   // Stable identity is required: the items array feeds the virtualizer's option
   // closures and every scroll effect's dependency list.
-  const items = useMemo(
-    () =>
-      chatTimelineItems({
-        activities: session.activities,
-        latestTurn: session.latestTurn,
-        messages: session.messages,
-        optimisticMessages,
-        proposedPlans: session.proposedPlans,
-        turnDiffSummaries: session.turnDiffSummaries,
-      }),
-    [
-      optimisticMessages,
-      session.activities,
-      session.latestTurn,
-      session.messages,
-      session.proposedPlans,
-      session.turnDiffSummaries,
-    ],
-  )
+  const items = chatTimelineItems({
+    activities: session.activities,
+    latestTurn: session.latestTurn,
+    messages: session.messages,
+    optimisticMessages,
+    proposedPlans: session.proposedPlans,
+    turnDiffSummaries: session.turnDiffSummaries,
+  })
 
   return (
     <VirtualList

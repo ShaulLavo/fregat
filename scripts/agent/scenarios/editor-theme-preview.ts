@@ -1,7 +1,7 @@
 import { notEqual, ok, strictEqual } from 'node:assert/strict'
 import type { Page } from 'playwright'
 import type { Scenario } from './index'
-import { chords, openFileByName, selectors, waitForApp } from '../selectors'
+import { chords, openFileByName, paintedTokenColors, selectors, waitForApp } from '../selectors'
 
 export const editorThemePreview: Scenario = {
   name: 'editor-theme-preview',
@@ -77,17 +77,7 @@ export const editorThemePreview: Scenario = {
   inspect: (page) => page.evaluate('window.__editorPerfTrace.report()'),
 }
 
-function syntaxColors(page: Page): Promise<string> {
-  return selectors
-    .editorSurface(page)
-    .first()
-    .evaluate((element) =>
-      Array.from(CSS.highlights.entries())
-        .filter(
-          ([name, highlight]) => name.startsWith('editor-shared-token-') && highlight.size > 0,
-        )
-        .map(([name]) => getComputedStyle(element, `::highlight(${name})`).color)
-        .sort()
-        .join('|'),
-    )
+async function syntaxColors(page: Page): Promise<string> {
+  const colors = await paintedTokenColors(selectors.editorSurface(page).first())
+  return colors.sort().join('|')
 }

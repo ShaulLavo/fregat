@@ -67,3 +67,15 @@ export const wakeCases = sources.flatMap((session) =>
     Date.parse('2026-09-20T13:00:00Z'),
   ].map((now) => ({ session, now })),
 )
+
+/** The shape upstream's snooze predicates take, mapped from one of our rail sessions. */
+export function upstreamSnoozeInput(session: (typeof wakeCases)[number]['session']) {
+  return {
+    snoozedAt: session.snoozedAt,
+    snoozedUntil: session.snoozedUntil,
+    latestTurn: session.latestTurn,
+    session: session.runtime,
+    hasPendingApprovals: session.pendingApprovalCount > 0,
+    hasPendingUserInput: session.pendingUserInputCount > 0,
+  }
+}

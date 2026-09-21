@@ -1,7 +1,13 @@
 import { ok } from 'node:assert/strict'
 import type { Page } from 'playwright'
 import type { Scenario } from './index'
-import { focusEditor, openFileByName, selectors, waitForApp } from '../selectors'
+import {
+  focusEditor,
+  openFileByName,
+  paintedTokenColors,
+  selectors,
+  waitForApp,
+} from '../selectors'
 
 type WorkerSample = {
   family: string
@@ -168,16 +174,7 @@ async function assertHighlighting(page: Page, engine: string) {
     requests.some((request) => request.family === 'shiki') === (engine === 'shiki'),
     'Expected highlighting engine runs',
   )
-  const colors = await selectors
-    .editorGroupRows(page, 0)
-    .first()
-    .evaluate((element) =>
-      Array.from(CSS.highlights.entries())
-        .filter(
-          ([name, highlight]) => name.startsWith('editor-shared-token-') && highlight.size > 0,
-        )
-        .map(([name]) => getComputedStyle(element, `::highlight(${name})`).color),
-    )
+  const colors = await paintedTokenColors(selectors.editorGroupRows(page, 0).first())
   ok(new Set(colors).size > 1, 'Syntax colors are actually painted')
 }
 

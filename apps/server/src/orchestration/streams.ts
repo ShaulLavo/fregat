@@ -317,17 +317,12 @@ export class OrchestrationStreams {
           sequence,
         )
         sequence = result.sequence
-        recordChatPipelineInfo('chat.pipeline.shell_stream.batch', {
+        this.recordStreamBatch('chat.pipeline.shell_stream.batch', retained, result.items, {
           coalescedEventCount: result.coalescedFrom,
-          emittedItemCount: result.items.length,
           rowReaderKind: this.rowReaderKind,
           sequence,
-          ...orchestrationEventBatchSummary(retained.map((item) => item.value)),
         })
-        const delivery = budget.replace(retained, result.items)
-        retained.length = 0
-        result.items.length = 0
-        yield* deliverRetained(delivery, budget)
+        yield* handOff(budget, retained, result.items)
       }
       if (!options.signal?.aborted) budget.signal.throwIfAborted()
     } finally {
@@ -357,22 +352,31 @@ export class OrchestrationStreams {
           sequence,
         )
         sequence = result.sequence
-        recordChatPipelineInfo('chat.pipeline.session_stream.batch', {
-          emittedItemCount: result.items.length,
+        this.recordStreamBatch('chat.pipeline.session_stream.batch', retained, result.items, {
           sequence,
           sessionId,
-          ...orchestrationEventBatchSummary(retained.map((item) => item.value)),
         })
-        const delivery = budget.replace(retained, result.items)
-        retained.length = 0
-        result.items.length = 0
-        yield* deliverRetained(delivery, budget)
+        yield* handOff(budget, retained, result.items)
       }
       if (!options.signal?.aborted) budget.signal.throwIfAborted()
     } finally {
       budget.dispose()
       await eventBatches.return(undefined)
     }
+  }
+
+  /** One wide event per delivered batch; `fields` carries what only that stream knows. */
+  private recordStreamBatch(
+    action: string,
+    retained: readonly RetainedLiveItem<OrchestrationEvent>[],
+    items: readonly unknown[],
+    fields: Record<string, unknown>,
+  ) {
+    recordChatPipelineInfo(action, {
+      emittedItemCount: items.length,
+      ...fields,
+      ...orchestrationEventBatchSummary(retained.map((item) => item.value)),
+    })
   }
 
   private startShell(afterSequence: number) {
@@ -770,6 +774,21 @@ function publishRetainedEvents(
   } catch (error) {
     if (!budget.signal.aborted) throw error
   }
+}
+
+/**
+ * Moves a window's retained events onto the frames they produced and delivers those, emptying both
+ * arrays so the budget holds only what is still in flight.
+ */
+async function* handOff<TEvent, TFrame extends object>(
+  budget: LiveStreamBudget,
+  retained: RetainedLiveItem<TEvent>[],
+  frames: TFrame[],
+): AsyncGenerator<TFrame> {
+  const delivery = budget.replace(retained, frames)
+  retained.length = 0
+  frames.length = 0
+  yield* deliverRetained(delivery, budget)
 }
 
 async function* deliverRetained<T>(items: RetainedLiveItem<T>[], budget: LiveStreamBudget) {

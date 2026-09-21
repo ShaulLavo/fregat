@@ -123,6 +123,21 @@ export function useSessionActions() {
       () => false,
     )
   }
+  async function reconcileRemoval(
+    removal: Parameters<typeof navigation.reconcileSessions>[0],
+    action: 'archived' | 'deleted',
+  ) {
+    try {
+      const result = await navigation.reconcileSessions(removal)
+      if (result.status !== 'unavailable') return true
+      toast.error(`Session ${action}, but navigation failed`, { description: result.reason })
+    } catch (error) {
+      toast.error(`Session ${action}, but navigation failed`, {
+        description: errorMessage(error, 'The destination could not be opened.'),
+      })
+    }
+    return false
+  }
   async function archive(ref: ScopedSessionRef) {
     const session = sessionSummary(ref)
     if (hasRunningTurn(session)) {
@@ -139,21 +154,6 @@ export function useSessionActions() {
     )
     const navigated = !accepted || !removal || (await reconcileRemoval(removal, 'archived'))
     return { accepted, navigationFailed: !navigated }
-  }
-  async function reconcileRemoval(
-    removal: Parameters<typeof navigation.reconcileSessions>[0],
-    action: 'archived' | 'deleted',
-  ) {
-    try {
-      const result = await navigation.reconcileSessions(removal)
-      if (result.status !== 'unavailable') return true
-      toast.error(`Session ${action}, but navigation failed`, { description: result.reason })
-    } catch (error) {
-      toast.error(`Session ${action}, but navigation failed`, {
-        description: errorMessage(error, 'The destination could not be opened.'),
-      })
-    }
-    return false
   }
   async function confirmDelete(request: SessionDeleteRequest) {
     dismissDelete()

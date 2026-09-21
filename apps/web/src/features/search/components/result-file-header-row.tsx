@@ -36,6 +36,8 @@ export const SearchResultFileHeaderRow = memo(
     const { selectResult } = useSearchResultActions()
     const id = searchResultVirtualRowId(row)
     const active = searchResultFileContainsId(row.file, activeResultId)
+    // Manual keys: the compiler would key this on the whole row and its virtual item, so every
+    // scroll frame would hand a virtualized row a new handler.
     const handleMouseDown = useCallback(() => selectResult(id), [id, selectResult])
 
     return (

@@ -265,7 +265,11 @@ export function createNavigation(
     focus: Address['focus'] = null,
   ) {
     const selected = activeEditorTabForWorkbenchPanels(panels)
-    if (selected) return addressWithContent(address, selected.content, rootPath, focus) ?? address
+    if (selected) {
+      const next = addressWithContent(address, selected.content, rootPath, focus)
+      // A panel change records the selected document; only opening one reveals the editor tool.
+      return next ? { ...next, tool: address.tool } : address
+    }
     return {
       ...address,
       document: address.mode === 'chat' ? address.document : null,

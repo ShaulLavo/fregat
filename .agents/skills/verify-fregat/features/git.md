@@ -37,3 +37,7 @@ Graph roots exclude `refs/platform/*`. A browsing session pins tips and ref labe
 `git-commit-slow-hook` commits through a `pre-commit` hook that prints once and then stays silent for 35 seconds. It takes about 45 seconds and proves two things: hook-running git commands get the 15 minute limit rather than the 30 second local one, and the commit stream's reader skips the server's 15 second heartbeats.
 
 `scenario git-open-all-diffs-spam` clicks Open all diffs eight times in a row on a six-file fixture. No error banner may appear and all six diff tabs must open: a superseded navigation must not abort the diff fetch the next one joined.
+
+`scenario chat-git-tab-switch` opens a file, enters chat mode and clicks Graph then Changes in the Git tool. The Git panel must stay: a panel change records the selected document in the address but must not set `tool: editor`, which only opening a document does.
+
+`scenario chat-git-turn-rows` opens the chat Git tool and screenshots the Working tree and Turn scopes. Both draw `GitFileRow`: icon, name, directory, `+/-` counts and the status letter. It needs a selected session with a checkpointed turn.

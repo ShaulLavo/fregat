@@ -1,5 +1,5 @@
 import type { LogEventDetailsById, LogEventSummary } from '@workspace/contracts'
-import { useCallback, useRef, useState } from 'react'
+import { useRef, useState } from 'react'
 import { VirtualList, type VirtualListHandle } from '@workspace/ui/patterns/virtual-list'
 import { useListbox } from '@workspace/ui/patterns/use-listbox'
 
@@ -20,9 +20,9 @@ export function LogsEventList({
   const virtualList = useRef<VirtualListHandle>(null)
   const [activeId, setActiveId] = useState<string | null>(null)
   // Expanding a detail must not restart the cursor's scroll effect.
-  const scrollToIndex = useCallback((index: number) => {
+  const scrollToIndex = (index: number) => {
     virtualList.current?.scrollToIndex(index, { align: 'auto' })
-  }, [])
+  }
   const listbox = useListbox({
     role: 'listbox',
     items: events.map((event) => ({ id: event.id })),

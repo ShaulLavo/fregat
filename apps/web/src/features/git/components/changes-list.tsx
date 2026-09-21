@@ -1,16 +1,26 @@
-import { useMemo, type KeyboardEvent as ReactKeyboardEvent } from 'react'
+import { useRef, type KeyboardEvent as ReactKeyboardEvent } from 'react'
 import { isContextMenuKey } from '@workspace/utils/keyboard'
-import { useNavigation } from '@/hooks/use-navigation'
-import { useListbox } from '@workspace/ui/patterns/use-listbox'
 import { EmptyState } from '@workspace/ui/components/empty-state'
+import { useListbox } from '@workspace/ui/patterns/use-listbox'
+import { VirtualList, type VirtualListHandle } from '@workspace/ui/patterns/virtual-list'
 
-import { ChangeGroup } from '@/features/git/components/change-group'
+import { useNavigation } from '@/hooks/use-navigation'
+import { ChangeFileRow } from '@/features/git/components/change-file-row'
+import { ChangeGroupHeader } from '@/features/git/components/change-group-header'
 import { useOpenDiffDocument } from '@/features/git/hooks/use-open-diff-document'
 import { ChangesContext } from '@/features/git/providers/changes-context'
 import { useGitState } from '@/features/git/state/store'
 import { useEditorWorkspaceState } from '@/features/editor/state/workspace-state'
+import {
+  changeEntries,
+  changeListboxItems,
+  type ChangesEntry,
+} from '@/features/git/utils/change-entries'
 import type { ChangeRow } from '@/features/git/utils/types'
 import { changeRowId } from '@/features/git/utils/change-row-id'
+
+const CONTAINER_CLASS =
+  'app-scrollbar-thin focus-ring-inset min-h-0 flex-1 overflow-auto py-(--density-gap-tight)'
 
 export function ChangesList({
   rootPath,
@@ -31,7 +41,14 @@ export function ChangesList({
   const activeId = useGitState((state) => state.activeChangeId)
   const select = useGitState((state) => state.selectChange)
   const { openDiff } = useOpenDiffDocument()
+  const scrollRef = useRef<HTMLDivElement>(null)
+  const virtualList = useRef<VirtualListHandle>(null)
+  const entries = changeEntries([
+    { expanded: open.staged, label: 'Staged', rows: staged, section: 'staged' },
+    { expanded: open.worktree, label: 'Changes', rows: worktree, section: 'worktree' },
+  ])
   const rows = [...(open.staged ? staged : []), ...(open.worktree ? worktree : [])]
+
   function setGroupExpanded(id: string, expanded: boolean) {
     if (id !== 'staged' && id !== 'worktree') return
     void navigation.setWorkbenchPanels({ ...panels, gitChangesOpen: { ...open, [id]: expanded } })
@@ -52,28 +69,16 @@ export function ChangesList({
     )
   }
 
-  const items = [
-    ...(staged.length
-      ? [{ id: 'staged', label: 'Staged', expanded: open.staged, hasChildren: true }]
-      : []),
-    ...(open.staged
-      ? staged.map((row) => ({ id: changeRowId(row), label: row.file.path, parentId: 'staged' }))
-      : []),
-    ...(worktree.length
-      ? [{ id: 'worktree', label: 'Changes', expanded: open.worktree, hasChildren: true }]
-      : []),
-    ...(open.worktree
-      ? worktree.map((row) => ({
-          id: changeRowId(row),
-          label: row.file.path,
-          parentId: 'worktree',
-        }))
-      : []),
-  ]
+  // A row the cursor reaches may be unmounted, so the virtualizer scrolls it in.
+  const scrollToIndex = (index: number) => {
+    virtualList.current?.scrollToIndex(index, { align: 'auto' })
+  }
   const listbox = useListbox({
     role: 'tree',
-    items,
+    items: changeListboxItems(entries),
     activeId,
+    containerRef: scrollRef,
+    scrollToIndex,
     onActiveChange: select,
     onSelect: select,
     onExpand: (id) => setGroupExpanded(id, true),
@@ -90,40 +95,63 @@ export function ChangesList({
   })
 
   // Keep hundreds of rows independent of the list cursor's changing render state.
-  const bindings = useMemo(
-    () => ({ rowBindings: listbox.rowBindings, focus: listbox.focus }),
-    [listbox.rowBindings, listbox.focus],
-  )
+  const bindings = { rowBindings: listbox.rowBindings, focus: listbox.focus }
 
-  return (
-    <ChangesContext value={bindings}>
-      <div
-        {...listbox.containerProps}
-        aria-label='Git changes'
-        className='app-scrollbar-thin focus-ring-inset min-h-0 flex-1 overflow-auto py-(--density-gap-tight)'
-      >
-        <ChangeGroup
-          label='Staged'
-          loadingPath={loadingSection === 'staged' ? loadingPath : null}
+  function renderEntry(entry: ChangesEntry) {
+    if (entry.kind === 'group') {
+      return (
+        <ChangeGroupHeader
+          group={entry.group}
           rootPath={rootPath}
-          rows={staged}
-          section='staged'
+          onToggle={() => setGroupExpanded(entry.group.section, !entry.group.expanded)}
         />
-        <ChangeGroup
-          label='Changes'
-          loadingPath={loadingSection === 'worktree' ? loadingPath : null}
+      )
+    }
+
+    return (
+      <div className='pl-(--density-row-padding-x)'>
+        <ChangeFileRow
+          loading={entry.row.file.path === loadingPath && entry.row.section === loadingSection}
           rootPath={rootPath}
-          rows={worktree}
-          section='worktree'
+          row={entry.row}
         />
-        {staged.length + worktree.length === 0 ? (
+      </div>
+    )
+  }
+
+  if (entries.length === 0) {
+    return (
+      <ChangesContext value={bindings}>
+        <div {...listbox.containerProps} aria-label='Git changes' className={CONTAINER_CLASS}>
           <EmptyState
             align='start'
             className='px-(--density-row-padding-x) py-4'
             title='Working tree clean'
           />
-        ) : null}
-      </div>
+        </div>
+      </ChangesContext>
+    )
+  }
+
+  return (
+    <ChangesContext value={bindings}>
+      <VirtualList
+        {...listbox.containerProps}
+        activeIndex={listbox.activeIndex}
+        aria-label='Git changes'
+        className={CONTAINER_CLASS}
+        getKey={(entry) => entry.id}
+        handleRef={virtualList}
+        items={entries}
+        layout='flow'
+        measureItems
+        renderRow={(entry) => (
+          <div className={entry.endsGroup ? 'pb-(--density-gap-tight)' : undefined}>
+            {renderEntry(entry)}
+          </div>
+        )}
+        scrollRef={scrollRef}
+      />
     </ChangesContext>
   )
 }

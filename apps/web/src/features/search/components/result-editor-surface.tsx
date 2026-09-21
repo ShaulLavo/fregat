@@ -1,12 +1,4 @@
-import {
-  memo,
-  useCallback,
-  useId,
-  useLayoutEffect,
-  useMemo,
-  useRef,
-  type KeyboardEvent,
-} from 'react'
+import { memo, useId, useLayoutEffect, useMemo, useRef, type KeyboardEvent } from 'react'
 
 import { useEditorColorTheme } from '@/features/editor/hooks/use-editor-color-theme'
 import type { WorkspaceSearchFileGroup } from '@/features/search/state/buffer-state'
@@ -65,23 +57,14 @@ export const SearchResultEditorSurface = memo(
     const actions = useSearchResultActions()
     const treeId = useId()
     const parentRef = useRef<HTMLDivElement | null>(null)
-    const blocks = useMemo(
-      () => searchResultFileBlocks(groups, resultsQuery),
-      [groups, resultsQuery],
-    )
-    const rows = useMemo(() => searchResultVirtualRows(blocks), [blocks])
+    const blocks = searchResultFileBlocks(groups, resultsQuery)
+    const rows = searchResultVirtualRows(blocks)
     const activeRow = useMemo(
       () => searchResultVirtualRowById(rows, activeResultId),
       [activeResultId, rows],
     )
-    const activeIndex = useMemo(
-      () => searchResultVirtualRowIndex(rows, activeResultId),
-      [activeResultId, rows],
-    )
-    const activeScrollTarget = useMemo(
-      () => searchResultVirtualRowScrollTarget(activeRow, activeResultId),
-      [activeResultId, activeRow],
-    )
+    const activeIndex = searchResultVirtualRowIndex(rows, activeResultId)
+    const activeScrollTarget = searchResultVirtualRowScrollTarget(activeRow, activeResultId)
     const suppressNextActiveRevealRef = useRef(false)
     const previousActiveResultIdRef = useRef(activeResultId)
     const activeIndexRef = useRef(activeIndex)
@@ -89,23 +72,17 @@ export const SearchResultEditorSurface = memo(
     const scrollToIndexRef = useRef<SearchResultEditorScrollToIndex>(noopScrollToIndex)
     const scrollToOffsetRef = useRef<(offset: number) => void>(noopScrollToOffset)
     const { editorTheme } = useEditorColorTheme()
-    const selectResultWithoutReveal = useCallback(
-      (id: SearchResultId | null) => {
-        if (id === activeResultId) return
+    const selectResultWithoutReveal = (id: SearchResultId | null) => {
+      if (id === activeResultId) return
 
-        suppressNextActiveRevealRef.current = true
-        actions.selectResult(id)
-      },
-      [actions, activeResultId],
-    )
+      suppressNextActiveRevealRef.current = true
+      actions.selectResult(id)
+    }
     // The editor surface changes selection reveal semantics for editor-pool interactions.
-    const editorActions = useMemo<SearchResultActions>(
-      () => ({
-        ...actions,
-        selectResultWithoutReveal,
-      }),
-      [actions, selectResultWithoutReveal],
-    )
+    const editorActions: SearchResultActions = {
+      ...actions,
+      selectResultWithoutReveal,
+    }
 
     useLayoutEffect(() => {
       activeIndexRef.current = activeIndex

@@ -1,5 +1,5 @@
 import type { GitHistoryRef } from '@workspace/contracts'
-import { useCallback, useEffect, useRef } from 'react'
+import { useEffect, useEffectEvent, useRef } from 'react'
 import { VirtualList, type VirtualListHandle } from '@workspace/ui/patterns/virtual-list'
 import { useListbox } from '@workspace/ui/patterns/use-listbox'
 import { HistoryRow } from '@/features/git/components/history-row'
@@ -30,9 +30,9 @@ export function HistoryList({
   const laneCount = rows.reduce((width, row) => Math.max(width, row.width), 1)
   const graphWidth = laneCount * 14 + 10
   // The cursor effect must not re-scroll merely because commit details rendered.
-  const scrollToIndex = useCallback((index: number) => {
+  const scrollToIndex = (index: number) => {
     virtualList.current?.scrollToIndex(index, { align: 'auto' })
-  }, [])
+  }
   const listbox = useListbox({
     role: 'listbox',
     items: rows.map((row) => ({ id: row.commit.id, label: row.commit.subject })),
@@ -44,9 +44,10 @@ export function HistoryList({
     revealOnMount: false,
   })
 
+  const revealIndex = useEffectEvent((index: number) => scrollToIndex(index))
   useEffect(() => {
-    if (revealRevision > 0 && selectedIndex >= 0) scrollToIndex(selectedIndex)
-  }, [selectedIndex, revealRevision, scrollToIndex])
+    if (revealRevision > 0 && selectedIndex >= 0) revealIndex(selectedIndex)
+  }, [selectedIndex, revealRevision])
 
   return (
     <VirtualList

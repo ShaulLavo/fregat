@@ -261,9 +261,12 @@ export function FileTreeView({
   }, [])
   const hasSeenInitialControllerSnapshotRef = useRef(false)
   const [activeItemPath, setActiveItemPath] = useState<string | null>(null)
-  const markContextMenuActiveItem = useCallback((path: string): void => {
-    setActiveItemPath((previousPath) => (previousPath === path ? previousPath : path))
-  }, [])
+  const markContextMenuActiveItem = useCallback(
+    (path: string): void => {
+      setActiveItemPath((previousPath) => (previousPath === path ? previousPath : path))
+    },
+    [setActiveItemPath],
+  )
   const [, setScrollSettledRevision] = useState(0)
 
   // Trees that mount with an already-open search session (because a caller
@@ -449,15 +452,18 @@ export function FileTreeView({
       }
 
       if (controller.isSearchOpen()) {
+        // Read at call time: a render-time copy in the deps is a value React Compiler cannot
+        // prove unmodified, and it then refuses the whole component.
+        const currentFocusedIndex = controller.getFocusedIndex()
         const scrollElement = getScroll()
         const viewportHeight = readMeasuredViewportHeight(scrollElement, resolvedViewportHeight)
         const restoreViewportOffset =
-          focusedIndex < 0 || scrollElement == null
+          currentFocusedIndex < 0 || scrollElement == null
             ? null
             : Math.max(
                 0,
                 Math.min(
-                  focusedIndex * itemHeight - scrollElement.scrollTop,
+                  currentFocusedIndex * itemHeight - scrollElement.scrollTop,
                   Math.max(0, viewportHeight - itemHeight),
                 ),
               )
@@ -474,7 +480,6 @@ export function FileTreeView({
     [
       controller,
       getScroll,
-      focusedIndex,
       invalidateControllerView,
       itemHeight,
       noteContextMenuInteraction,
@@ -1206,6 +1211,7 @@ export function FileTreeView({
       noteContextMenuInteraction,
       revealCanonicalRowAtStickyOffset,
       searchBlurBehavior,
+      setActiveItemPath,
       suppressNextPointerFocusScroll,
     ],
   )

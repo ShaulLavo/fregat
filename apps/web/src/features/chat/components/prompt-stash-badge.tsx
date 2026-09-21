@@ -1,3 +1,4 @@
+import { TickerNumber } from '@/components/ticker-number'
 import { OrbitLoader } from '@workspace/ui/components/orbit-loader'
 import { BookmarkSimpleIcon } from '@phosphor-icons/react'
 import { Button } from '@workspace/ui/components/button'
@@ -45,7 +46,7 @@ export function PromptStashBadge({
                   ) : (
                     <BookmarkSimpleIcon className='size-(--icon-size-sm) shrink-0' />
                   )}
-                  <span className='tabular-nums'>{entries.length}</span>
+                  <TickerNumber value={entries.length} />
                 </Button>
               }
             />

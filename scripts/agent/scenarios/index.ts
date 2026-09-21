@@ -34,12 +34,16 @@ import {
   terminalTabs,
   gitGraphKeyboard,
 } from './pattern-lists'
+import { surfaceStacking } from './surface-stacking'
 import { chatTimelinePattern } from './chat-timeline-pattern'
 import { settingsFontInput } from './settings-font-input'
 import { settingsResponsive } from './settings-responsive'
 import { filePickerNavigation, gitHistoryScroll } from './list-regressions'
 import { iconHints } from './icon-hints'
 import { chatIconHints } from './chat-icon-hints'
+import { chatCardNarrow } from './chat-card-narrow'
+import { chatGitTabSwitch } from './chat-git-tab-switch'
+import { chatGitTurnRows } from './chat-git-turn-rows'
 import { chatModelPicker } from './chat-model-picker'
 import { wallpaperIconHints } from './wallpaper-icon-hints'
 import { terminalBackground } from './terminal-background'
@@ -180,6 +184,7 @@ export const scenarios: readonly Scenario[] = [
   searchResults,
   terminalTabs,
   gitGraphKeyboard,
+  surfaceStacking,
   chatTimelinePattern,
   chatFollowUp,
   chatDiffSyntax,
@@ -254,6 +259,9 @@ export const scenarios: readonly Scenario[] = [
   editorUndoBarrier,
   editorUndoBranch,
   editorTitleDiffToggle,
+  chatCardNarrow,
+  chatGitTabSwitch,
+  chatGitTurnRows,
   editorUndoReopen,
   gitCommitHookColors,
   gitCommitMessageFile,

@@ -7,7 +7,7 @@ import type {
   SessionId,
   SessionTurnStartCommand,
 } from '@workspace/contracts'
-import { useMemo, useState, type ReactNode } from 'react'
+import { useState, type ReactNode } from 'react'
 
 import type { ChatTransport } from '@/features/chat/transport/chat-transport'
 import {
@@ -97,34 +97,30 @@ export function ChatPlanFollowUpProvider({
   const plan = isChatSessionBusy(session)
     ? null
     : actionableProposedPlan(session?.proposedPlans ?? NO_PLANS)
-  // Context value identity: this wraps the composer, so a fresh object on every
-  // keystroke would repaint the panels beside it for nothing.
-  const value = useMemo<ChatPlanFollowUp>(() => {
-    // One follow-up in flight at a time whichever button started it: both end in
-    // a turn against the same plan, and only one of them can be its implementation.
-    const once = (dispatch: (context: PlanDispatchContext) => Promise<boolean>) => async () => {
-      if (!plan || !session || submitting || unavailableReason) return false
+  // One follow-up in flight at a time whichever button started it: both end in
+  // a turn against the same plan, and only one of them can be its implementation.
+  const once = (dispatch: (context: PlanDispatchContext) => Promise<boolean>) => async () => {
+    if (!plan || !session || submitting || unavailableReason) return false
 
-      setSubmitting(true)
-      try {
-        const sent = await dispatch({ draftTarget, transport, onSessionCreated, plan, session })
-        setSubmitting(false)
-        return sent
-      } catch (error) {
-        // Not `finally`: the compiler refuses the whole provider over one.
-        setSubmitting(false)
-        throw error
-      }
+    setSubmitting(true)
+    try {
+      const sent = await dispatch({ draftTarget, transport, onSessionCreated, plan, session })
+      setSubmitting(false)
+      return sent
+    } catch (error) {
+      // Not `finally`: the compiler refuses the whole provider over one.
+      setSubmitting(false)
+      throw error
     }
+  }
 
-    return {
-      disabledReason: unavailableReason,
-      implementInNewSession: once(dispatchPlanImplementationSession),
-      plan,
-      submitFollowUp: once(dispatchPlanFollowUpTurn),
-      submitting,
-    }
-  }, [draftTarget, transport, onSessionCreated, plan, submitting, session, unavailableReason])
+  const value: ChatPlanFollowUp = {
+    disabledReason: unavailableReason,
+    implementInNewSession: once(dispatchPlanImplementationSession),
+    plan,
+    submitFollowUp: once(dispatchPlanFollowUpTurn),
+    submitting,
+  }
 
   return <ChatPlanFollowUpContext value={value}>{children}</ChatPlanFollowUpContext>
 }

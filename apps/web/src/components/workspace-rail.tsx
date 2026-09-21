@@ -1,3 +1,4 @@
+import { PANEL_SURFACE } from '@workspace/ui/patterns/panel-surface'
 import type { ReactNode } from 'react'
 import { GearSixIcon } from '@phosphor-icons/react'
 import { Button } from '@workspace/ui/components/button'
@@ -21,7 +22,9 @@ export function WorkspaceRail({
       aria-label={label}
       className={cn(
         'flex w-(--rail-width) shrink-0 flex-col items-center gap-1 p-1',
-        side === 'right' && 'bg-card backdrop-material',
+        // The left rail sits inside its panel and inherits it; the right rail stands
+        // outside the tool panel, so it carries the surface itself.
+        side === 'right' && PANEL_SURFACE,
       )}
     >
       {children}

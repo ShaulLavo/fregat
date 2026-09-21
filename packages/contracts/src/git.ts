@@ -7,12 +7,19 @@ import type { WorktreeId } from './chat-ids'
 
 export type GitTreeStatus = 'added' | 'deleted' | 'ignored' | 'modified' | 'renamed' | 'untracked'
 
+export type GitLineStat = {
+  additions: number
+  deletions: number
+}
+
 export type GitFileStatus = {
   path: string
   oldPath?: string
   index: GitTreeStatus | 'unmodified' | 'conflicted'
   worktree: GitTreeStatus | 'unmodified' | 'conflicted'
   status: GitTreeStatus | 'conflicted'
+  /** Absent for a binary file, or a side with no change. */
+  lines?: { staged?: GitLineStat; worktree?: GitLineStat }
 }
 
 export type GitRepositoryInfo = {

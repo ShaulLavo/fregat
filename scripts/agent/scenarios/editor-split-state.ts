@@ -1,5 +1,5 @@
-import { openFixtureWorkspace } from '../fixture-workspace'
-import { mkdtemp, readFile, rm, writeFile } from 'node:fs/promises'
+import { openFixtureWorkspace, waitForFileContent } from '../fixture-workspace'
+import { mkdtemp, rm, writeFile } from 'node:fs/promises'
 import { strictEqual, ok } from 'node:assert'
 import path from 'node:path'
 import type { Page } from 'playwright'
@@ -72,7 +72,7 @@ export const editorSplitState: Scenario = {
       await page.keyboard.press('Control+End')
       await page.keyboard.type(saved)
       await page.keyboard.press('Control+s')
-      await waitForDisk(diskPath, initial + saved)
+      await waitForFileContent(diskPath, initial + saved)
       result.savedFromRight = true
       await step('saved-from-right')
 
@@ -115,7 +115,7 @@ export const editorSplitState: Scenario = {
         .getByRole('button', { name: 'Save', exact: true })
         .click()
       await selectors.unsavedChangesDialog(page).waitFor({ state: 'hidden' })
-      await waitForDisk(diskPath, initial + saved + dirty)
+      await waitForFileContent(diskPath, initial + saved + dirty)
       result.savedLastView = true
       strictEqual(await selectors.editorGroupTabs(page, 0).count(), 0)
       strictEqual(
@@ -137,13 +137,4 @@ export const editorSplitState: Scenario = {
 async function closeTab(page: Page, group: number) {
   await selectors.editorGroupTabs(page, group).first().click({ button: 'right' })
   await selectors.menuItem(page, 'Close').click()
-}
-
-async function waitForDisk(file: string, expected: string) {
-  const deadline = Date.now() + 8000
-  while (Date.now() < deadline) {
-    if ((await readFile(file, 'utf8')) === expected) return
-    await Bun.sleep(50)
-  }
-  strictEqual(await readFile(file, 'utf8'), expected)
 }

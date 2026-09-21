@@ -86,15 +86,14 @@ export function HistoryPane({
   const graph = state?.graph ?? null
   const focused = state && viewer && state.focusedId !== null ? viewer.node(state.focusedId) : null
   const current = graph && viewer ? viewer.node(graph.currentId) : null
-  // A full-text diff of two states is real work; only the focused state, its revision and the
-  // graph revision can change its answer.
+  // Manual memo: the compiler keys this full-text diff on the whole viewer `state`, so a selection
+  // change would redo it. Nodes are immutable and rebuilt per graph revision, so identity is exact.
   const focusedDiff = useMemo(
     () =>
       focused && current && !focused.isCurrent
         ? compareHistoryStates(current, focused, path)
         : null,
-    // eslint-disable-next-line react-hooks/exhaustive-deps
-    [focused?.id, focused?.revision, graph?.revision, path],
+    [current, focused, path],
   )
   const selectedComparison = state?.comparison?.status === 'ready' ? state.comparison.result : null
   const focusedComparison = state?.lostIds.length ? null : focusedDiff
@@ -168,7 +167,7 @@ export function HistoryPane({
 
   return (
     <ToolPane
-      className='h-full'
+      className='bg-background h-full'
       header={null}
       bodyClassName='flex flex-col overflow-hidden'
       data-history-pane={documentKey}

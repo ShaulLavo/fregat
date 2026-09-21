@@ -6,7 +6,7 @@ import {
   type SessionWorktreeTarget,
 } from '@workspace/contracts'
 import { useQuery } from '@tanstack/react-query'
-import { useCallback, useEffect, useMemo, useState } from 'react'
+import { useCallback, useEffect, useState } from 'react'
 
 import { notifyChatCommandError } from '@/features/chat/notify-command-error'
 import type { ChatTransport } from '@/features/chat/transport/chat-transport'
@@ -54,10 +54,11 @@ export function ChatDraftView({
   // only the seed the composer starts from.
   const defaultRuntimeMode = useSettingValue('chat.defaultRuntimeMode')
   const defaultInteractionMode = useSettingValue('chat.defaultInteractionMode')
-  const draftTarget = useMemo<ChatInputDraftTarget>(
-    () => ({ environmentId: transport.environmentId, draftKey: draftId, rootPath }),
-    [transport.environmentId, rootPath, draftId],
-  )
+  const draftTarget: ChatInputDraftTarget = {
+    environmentId: transport.environmentId,
+    draftKey: draftId,
+    rootPath,
+  }
   const draft = useChatInputDraftStore((state) => state.getDraft(draftTarget))
   const identity = draft.identity
   useEffect(() => {
@@ -70,6 +71,9 @@ export function ChatDraftView({
       worktreeTarget: { kind: 'current', worktreeId: worktree.id },
       createdAt: new Date().toISOString(),
     })
+    // `draftTarget` is not rebuilt every render: the compiler keys it on draftId, rootPath and
+    // transport.environmentId. Verified with `bun run compiler:explain` on this file.
+    // oxlint-disable-next-line react/exhaustive-deps
   }, [identity, project, worktree, draftTarget, draftId, rootPath])
   const target = identity?.worktreeTarget ?? null
   const targetReady =
@@ -89,22 +93,19 @@ export function ChatDraftView({
     project?.defaultModelSelection ?? null,
   )
   const handleStop = useCallback(() => undefined, [])
-  const handlePersistModelSelection = useCallback(
-    (next: ModelSelection) => {
-      if (!project) return
+  const handlePersistModelSelection = (next: ModelSelection) => {
+    if (!project) return
 
-      void dispatchChatCommand({
-        action: 'chat.project.default_model.set',
-        command: createProjectDefaultModelCommand({
-          defaultModelSelection: next,
-          projectId: project.id,
-        }),
-        dispatchCommand: transport.dispatchCommand,
-        onFailed: (error) => notifyChatCommandError(error, 'Could not save the default model'),
-      })
-    },
-    [transport, project],
-  )
+    void dispatchChatCommand({
+      action: 'chat.project.default_model.set',
+      command: createProjectDefaultModelCommand({
+        defaultModelSelection: next,
+        projectId: project.id,
+      }),
+      dispatchCommand: transport.dispatchCommand,
+      onFailed: (error) => notifyChatCommandError(error, 'Could not save the default model'),
+    })
+  }
   async function handleSend({
     attachments,
     interactionMode,

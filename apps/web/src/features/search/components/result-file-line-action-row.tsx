@@ -1,6 +1,6 @@
 import { Tooltip, TooltipContent, TooltipTrigger } from '@workspace/ui/components/tooltip'
 import { ArrowSquareOutIcon } from '@phosphor-icons/react'
-import { memo, useCallback, useEffect, useRef, type MouseEvent, type RefObject } from 'react'
+import { memo, useEffect, useRef, type MouseEvent, type RefObject } from 'react'
 
 import {
   searchResultLineActionClassName,
@@ -46,21 +46,15 @@ export const SearchResultFileLineActionRow = memo(
       }
     }, [line.id, lineActionRowsRef])
 
-    const handleOpenClick = useCallback(
-      (event: MouseEvent<HTMLButtonElement>) => {
-        event.stopPropagation()
-        onOpenLine(line)
-      },
-      [line, onOpenLine],
-    )
+    const handleOpenClick = (event: MouseEvent<HTMLButtonElement>) => {
+      event.stopPropagation()
+      onOpenLine(line)
+    }
 
-    const handleReplaceClick = useCallback(
-      (event: MouseEvent<HTMLButtonElement>) => {
-        event.stopPropagation()
-        onReplaceLine(line)
-      },
-      [line, onReplaceLine],
-    )
+    const handleReplaceClick = (event: MouseEvent<HTMLButtonElement>) => {
+      event.stopPropagation()
+      onReplaceLine(line)
+    }
 
     return (
       <div

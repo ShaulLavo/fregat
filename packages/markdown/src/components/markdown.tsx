@@ -1,5 +1,5 @@
 import type { Components } from 'hast-util-to-jsx-runtime'
-import { Fragment, useMemo, type ComponentType } from 'react'
+import { Fragment, type ComponentType } from 'react'
 import type { PluggableList } from 'unified'
 
 import { useMarkdownBlocks } from '../hooks/use-markdown-blocks'
@@ -45,15 +45,12 @@ export function Markdown({
   const extensions = useMarkdownExtensions(blocks)
   // Identity is the block render cache key: rebuilt only when a stage loads or
   // the consumer's overrides change.
-  const options = useMemo<MarkdownRenderOptions>(
-    () => ({
-      components: { ...components, pre: MarkdownPre },
-      processor: createHastProcessor(extensions),
-    }),
-    [components, extensions],
-  )
+  const options: MarkdownRenderOptions = {
+    components: { ...components, pre: MarkdownPre },
+    processor: createHastProcessor(extensions),
+  }
   const elements = useMarkdownElements(blocks, options)
-  const renderState = useMemo(() => ({ codeBlock: codeBlock ?? null }), [codeBlock])
+  const renderState = { codeBlock: codeBlock ?? null }
   const showCaret = caret && streaming && caretFits(blocks.at(-1))
 
   return (

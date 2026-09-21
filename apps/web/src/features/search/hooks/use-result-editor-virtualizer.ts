@@ -1,4 +1,4 @@
-import { useCallback, useEffect, useLayoutEffect, useMemo, useState, type RefObject } from 'react'
+import { useEffect, useLayoutEffect, useState, type RefObject } from 'react'
 import { flushSync } from 'react-dom'
 import { useRowHeight } from '@workspace/ui/patterns/use-row-height'
 
@@ -29,11 +29,8 @@ export function useSearchResultEditorVirtualizer(
   initialViewport?: SearchResultVirtualListViewport,
 ): SearchResultEditorVirtualizer {
   const headerHeight = useRowHeight(parentRef)
-  const itemInputs = useMemo(
-    () => searchResultVirtualRowInputs(rows, headerHeight),
-    [headerHeight, rows],
-  )
-  const metrics = useMemo(() => createSearchResultVirtualListMetrics(itemInputs), [itemInputs])
+  const itemInputs = searchResultVirtualRowInputs(rows, headerHeight)
+  const metrics = createSearchResultVirtualListMetrics(itemInputs)
   const [store] = useState(() => new SearchResultVirtualWindowStore({ metrics, initialViewport }))
   const [windowState, setWindowState] = useState<SearchResultVirtualWindow>(() => store.getWindow())
 
@@ -89,37 +86,31 @@ export function useSearchResultEditorVirtualizer(
     return () => observer.disconnect()
   }, [parentRef, store])
 
-  const scrollToOffset = useCallback(
-    (offset: number) => {
-      const element = parentRef.current
-      if (!element) return
+  const scrollToOffset = (offset: number) => {
+    const element = parentRef.current
+    if (!element) return
 
-      store.setViewportHeight(element.clientHeight)
-      const top = store.scrollTopForOffset(offset)
-      element.scrollTop = top
-      store.setScrollTop(top, {
-        publish: 'sync',
-        updateVelocity: false,
-      })
-    },
-    [parentRef, store],
-  )
-  const scrollToIndex = useCallback<SearchResultEditorScrollToIndex>(
-    (index, target) => {
-      const element = parentRef.current
-      if (!element) return
+    store.setViewportHeight(element.clientHeight)
+    const top = store.scrollTopForOffset(offset)
+    element.scrollTop = top
+    store.setScrollTop(top, {
+      publish: 'sync',
+      updateVelocity: false,
+    })
+  }
+  const scrollToIndex: SearchResultEditorScrollToIndex = (index, target) => {
+    const element = parentRef.current
+    if (!element) return
 
-      const nextTop = store.scrollTopForIndex(index, target)
-      if (nextTop === null) return
+    const nextTop = store.scrollTopForIndex(index, target)
+    if (nextTop === null) return
 
-      element.scrollTop = nextTop
-      store.setScrollTop(nextTop, {
-        publish: 'sync',
-        updateVelocity: false,
-      })
-    },
-    [parentRef, store],
-  )
+    element.scrollTop = nextTop
+    store.setScrollTop(nextTop, {
+      publish: 'sync',
+      updateVelocity: false,
+    })
+  }
 
   return {
     items: windowState.items,

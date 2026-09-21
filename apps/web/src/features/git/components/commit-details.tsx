@@ -17,8 +17,8 @@ import { EmptyState } from '@workspace/ui/components/empty-state'
 import { LoadingState } from '@workspace/ui/components/loading-state'
 import { ToolbarButton } from '@/components/toolbar-button'
 import { useCommitDetails } from '@/features/git/hooks/use-commit-details'
-import { FileRow } from '@/features/git/components/file-row'
-import { gitStatusSymbol } from '@/features/git/utils/status-symbols'
+import { GitFileRow } from '@/components/git-file-row'
+import { gitStatusSymbol } from '@/lib/git-status-symbols'
 import { copyTextToClipboard } from '@/lib/clipboard'
 import { errorMessage } from '@/lib/file-server'
 import { historyMessageBody } from '@/features/git/utils/history-presentation'
@@ -169,7 +169,7 @@ export function CommitDetails({
           </PaneBar>
           <div {...fileList.containerProps} aria-label='Commit files'>
             {details.data.files.map((file) => (
-              <FileRow
+              <GitFileRow
                 key={file.path}
                 rowProps={fileList.rowProps(file.path)}
                 path={file.path}

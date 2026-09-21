@@ -1,5 +1,5 @@
 import type { LexicalEditor } from 'lexical'
-import { useEffect, type RefObject } from 'react'
+import { useEffect, useEffectEvent, type RefObject } from 'react'
 
 import { insertChatInputText, readChatInputText } from '@/features/chat/utils/input-editor-actions'
 import { useChatInputDraftStore, type ChatInputDraftTarget } from '../state/chat-input-draft-store'
@@ -22,21 +22,21 @@ export function useComposerInbox(
 ) {
   const pending = useComposerInboxStore((store) => store.pending)
 
-  useEffect(() => {
-    if (pending.length === 0) return
-
+  // `draftTarget` and the editor ref are read, not depended on: re-running on a session switch
+  // would take from an already-empty inbox at best, and re-home someone else's capture at worst.
+  const drain = useEffectEvent((ready: boolean) => {
     // Chips need only the draft; text needs somewhere to splice. Taking just
     // what can be honoured leaves the rest queued for the render that can.
-    const entries = useComposerInboxStore
-      .getState()
-      .take((entry) => entry.kind !== 'text' || editorReady)
+    const entries = useComposerInboxStore.getState().take((entry) => entry.kind !== 'text' || ready)
     if (entries.length === 0) return
 
     applyComposerInboxEntries(entries, draftTarget, editorRef.current)
-    // `draftTarget` and the editor ref are read, not depended on: re-running on
-    // a session switch would take from an already-empty inbox at best, and
-    // re-home someone else's capture at worst.
-    // oxlint-disable-next-line react-hooks/exhaustive-deps
+  })
+
+  useEffect(() => {
+    if (pending.length === 0) return
+
+    drain(editorReady)
   }, [editorReady, pending])
 }
 

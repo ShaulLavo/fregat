@@ -1,3 +1,4 @@
+import { TickerText } from '@/components/ticker-text'
 import { useNavigation } from '@/hooks/use-navigation'
 import { ArrowClockwiseIcon } from '@phosphor-icons/react'
 import { useQueryClient } from '@tanstack/react-query'
@@ -92,7 +93,7 @@ export function LogsPanel({ active }: LogsPanelProps) {
                   <TooltipContent side='bottom'>Refresh logs</TooltipContent>
                 </Tooltip>
               }
-              detail={summary.data ? `${summary.data.total} events` : null}
+              detail={summary.data ? <TickerText text={`${summary.data.total} events`} /> : null}
               tab='logs'
             />
             <LogsToolbar

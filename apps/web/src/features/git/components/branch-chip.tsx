@@ -1,3 +1,4 @@
+import { TickerText } from '@/components/ticker-text'
 import { useStatus } from '@/features/git/hooks/use-status'
 import { aheadBehindLabel } from '@/features/git/utils/repository'
 
@@ -16,7 +17,11 @@ export function BranchChip({ rootPath }: { readonly rootPath: string }) {
       title={`${branch}${commit}`}
     >
       <span className='text-foreground min-w-0 truncate'>{branch}</span>
-      {label ? <span className='shrink-0 tabular-nums'>{label}</span> : null}
+      {label ? (
+        <span className='shrink-0'>
+          <TickerText text={label} />
+        </span>
+      ) : null}
     </span>
   )
 }

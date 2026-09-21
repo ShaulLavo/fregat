@@ -5,7 +5,7 @@ import { PageHeader } from '@/features/settings/components/page-header'
 export function PageLoading({ showJson }: { showJson: boolean }) {
   return (
     <ToolPane
-      className='@container/settings h-full'
+      className='bg-background @container/settings h-full'
       bodyClassName='overflow-hidden'
       header={
         <PageHeader

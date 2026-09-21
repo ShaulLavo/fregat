@@ -1,6 +1,4 @@
-import { WorkspaceRail } from '@/components/workspace-rail'
-import { ToggleIconButton } from '@/components/toggle-icon-button'
-import { ToolTabIcon } from '@/features/chat-mode/components/tool-tab-icon'
+import { RailTabs } from '@/components/rail-tabs'
 import {
   CHAT_MODE_TOOL_TABS,
   chatModeToolTabLabel,
@@ -16,17 +14,13 @@ export function ToolRail({
   readonly onSelectTab: (tab: ChatModeToolTab) => void
 }) {
   return (
-    <WorkspaceRail label='Tool tabs' side='right'>
-      {CHAT_MODE_TOOL_TABS.map((tab) => (
-        <ToggleIconButton
-          active={panels.toolPaneOpen && panels.activeToolTab === tab}
-          icon={<ToolTabIcon tab={tab} />}
-          key={tab}
-          label={chatModeToolTabLabel(tab)}
-          tooltipSide='left'
-          onClick={() => onSelectTab(tab)}
-        />
-      ))}
-    </WorkspaceRail>
+    <RailTabs
+      activeTab={panels.toolPaneOpen ? panels.activeToolTab : null}
+      label='Tool tabs'
+      side='right'
+      tabLabel={chatModeToolTabLabel}
+      tabs={CHAT_MODE_TOOL_TABS}
+      onSelectTab={onSelectTab}
+    />
   )
 }

@@ -6,7 +6,7 @@ import { selectSettingsScope } from '@/features/settings/state/scope-store'
 import { useEditorRuntime } from '@/features/editor/hooks/use-runtime'
 import { filesystemPath } from '@/lib/documents/utils/identity'
 import { PickerDialog } from '@/features/environments/components/picker-dialog'
-import { useEffect, useLayoutEffect, useMemo, useRef, useState, type ReactNode } from 'react'
+import { useEffect, useLayoutEffect, useRef, useState, type ReactNode } from 'react'
 import { useQueryClient } from '@tanstack/react-query'
 import { DEFAULT_SETTING_VALUES, type SettingsSnapshot } from '@workspace/contracts'
 
@@ -317,12 +317,9 @@ export function CommandProvider({ children }: { readonly children: ReactNode }) 
   }))
   const { binding, bus } = useBusBinding()
   useLayoutEffect(() => binding.bind(runtime), [binding, runtime])
-  const defaults = useMemo(() => defaultPlatformKeyBindings(undefined, preset), [preset])
+  const defaults = defaultPlatformKeyBindings(undefined, preset)
   // Stable identity is required by the document listener and every shortcut-hint consumer.
-  const bindings = useMemo(
-    () => resolvedPlatformKeyBindings(defaults, overrides),
-    [defaults, overrides],
-  )
+  const bindings = resolvedPlatformKeyBindings(defaults, overrides)
   const { claimKeybinding, pendingChord } = useAppKeymap({
     bindings,
     bus,

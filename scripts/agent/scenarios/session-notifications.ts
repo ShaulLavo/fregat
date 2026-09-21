@@ -1,10 +1,11 @@
 import { ok, strictEqual } from 'node:assert/strict'
 import { writeFile } from 'node:fs/promises'
 import { join } from 'node:path'
-import { selectors } from '../selectors'
+import { selectors, settleAnimations } from '../selectors'
 import { dispatch, readShell } from './chat-verification'
 import {
   isolatedNativeScenario,
+  restoreUserSettings,
   settingsSnapshot,
   writeSettings,
 } from './native-provider-verification'
@@ -73,16 +74,7 @@ export const sessionNotifications = isolatedNativeScenario({
       await page.waitForURL((url) => url.href.includes(otherId))
       await control('success')
       await selectors.notificationOpenSession(page).waitFor()
-      await selectors.notificationToast(page).evaluate(async (element) => {
-        await new Promise<void>((resolve) =>
-          requestAnimationFrame(() => requestAnimationFrame(() => resolve())),
-        )
-        await Promise.all(
-          element
-            .getAnimations({ subtree: true })
-            .map((animation) => animation.finished.catch(() => undefined)),
-        )
-      })
+      await settleAnimations(selectors.notificationToast(page))
       await step('focused-other-session-toast')
       await selectors.notificationOpenSession(page).click()
       await page.waitForURL((url) => url.href.includes(sessionId))
@@ -150,16 +142,7 @@ export const sessionNotifications = isolatedNativeScenario({
     } finally {
       if (created)
         await dispatch(page, orchestration, { type: 'session.delete', sessionId: otherId })
-      const raw = before.layers.find((layer) => layer.id === 'user')?.raw
-      await writeSettings(
-        page,
-        base,
-        keys.map((key) =>
-          raw?.[key] === undefined
-            ? { kind: 'reset', keys: [key] }
-            : { kind: 'set', key, value: raw[key] },
-        ),
-      )
+      await restoreUserSettings(page, base, before, keys)
     }
   },
 })

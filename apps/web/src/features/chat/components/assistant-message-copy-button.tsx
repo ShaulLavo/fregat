@@ -2,7 +2,7 @@ import { Button } from '@workspace/ui/components/button'
 import { Tooltip, TooltipContent, TooltipTrigger } from '@workspace/ui/components/tooltip'
 import { cn } from '@workspace/ui/lib/utils'
 import { CheckIcon, CopyIcon } from '@phosphor-icons/react'
-import { useCallback, useEffect, useRef, useState } from 'react'
+import { useEffect, useRef, useState } from 'react'
 import { toast } from 'sonner'
 import { codexFileCitationsMarkdown } from '@/features/chat/utils/codex-file-citations'
 
@@ -16,7 +16,7 @@ export function AssistantMessageCopyButton({
   const [copied, setCopied] = useState(false)
   const resetTimerRef = useRef<number | null>(null)
 
-  const handleCopy = useCallback(() => {
+  const handleCopy = () => {
     void copyAssistantMessageText(text, () => {
       setCopied(true)
       if (resetTimerRef.current !== null) {
@@ -24,7 +24,7 @@ export function AssistantMessageCopyButton({
       }
       resetTimerRef.current = window.setTimeout(() => setCopied(false), 1200)
     })
-  }, [text])
+  }
 
   useEffect(() => {
     return () => {

@@ -8,7 +8,8 @@ import { clientForQueryClient } from '@/lib/environments/state/query-clients'
 export function useConflictEditorResolution() {
   const runtime = useEditorRuntime()
   const commands = useEditorCommands()
-  // The coordinator owns debounce and in-flight writes across editor renders.
+  // Required stable identity: the coordinator owns debounce state and in-flight writes across
+  // editor renders, so rebuilding it would drop them.
   const coordinator = useMemo(
     () =>
       new ConflictEditorResolutionCoordinator({
@@ -21,7 +22,7 @@ export function useConflictEditorResolution() {
         discardLiveEditorDocument: commands.discardLiveEditorDocument,
         renameLiveEditorDocument: commands.renameLiveEditorDocument,
       }),
-    [runtime, commands],
+    [commands, runtime],
   )
   useEffect(() => coordinator.connect(), [coordinator])
   return coordinator.schedule

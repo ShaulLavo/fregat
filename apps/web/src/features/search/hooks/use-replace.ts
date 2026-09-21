@@ -1,4 +1,4 @@
-import { useCallback, useRef } from 'react'
+import { useRef } from 'react'
 
 import { useWorkspaceTextChanges } from '@/lib/workspace-edits/hooks/use-text-changes'
 import type {
@@ -24,45 +24,36 @@ export function useWorkspaceSearchReplace(rootPath: string, enabled = true) {
   const workspaceEdits = useWorkspaceTextChanges()
   const controllerRef = useRef<AbortController | null>(null)
 
-  const replaceMatches = useCallback(
-    (matches: readonly WorkspaceSearchMatch[]) => {
-      const controller = new AbortController()
-      controllerRef.current?.abort()
-      controllerRef.current = controller
+  const replaceMatches = (matches: readonly WorkspaceSearchMatch[]) => {
+    const controller = new AbortController()
+    controllerRef.current?.abort()
+    controllerRef.current = controller
 
-      void runReplace({
-        controller,
-        matches,
-        rootPath,
-        store,
-        workspaceEdits,
-      }).finally(() => {
-        if (controllerRef.current === controller) controllerRef.current = null
-      })
-    },
-    [rootPath, store, workspaceEdits],
-  )
-  const replaceAll = useCallback(() => {
+    void runReplace({
+      controller,
+      matches,
+      rootPath,
+      store,
+      workspaceEdits,
+    }).finally(() => {
+      if (controllerRef.current === controller) controllerRef.current = null
+    })
+  }
+  const replaceAll = () => {
     const snapshot = store.getState().active
     if (snapshot?.rootPath !== rootPath) return
 
     replaceMatches(snapshot.matches)
-  }, [replaceMatches, rootPath, store])
-  const replaceGroup = useCallback(
-    (group: WorkspaceSearchFileGroup) => replaceMatches(group.matches),
-    [replaceMatches],
-  )
-  const replaceMatch = useCallback(
-    (match: WorkspaceSearchMatch) => replaceMatches([match]),
-    [replaceMatches],
-  )
-  const replaceNext = useCallback(() => {
+  }
+  const replaceGroup = (group: WorkspaceSearchFileGroup) => replaceMatches(group.matches)
+  const replaceMatch = (match: WorkspaceSearchMatch) => replaceMatches([match])
+  const replaceNext = () => {
     const snapshot = store.getState().active
     if (snapshot?.rootPath !== rootPath) return
 
     const match = firstContentMatch(snapshot.matches)
     if (match) replaceMatches([match])
-  }, [replaceMatches, rootPath, store])
+  }
 
   return {
     canReplace: canReplaceValue,

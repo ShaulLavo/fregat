@@ -23,7 +23,7 @@ import {
 } from '../state/chat-changed-files-expansion-store'
 import type { ChatTurnDiffSummary } from '@workspace/client-core/chat/types'
 import { AssistantChangedFilesTree } from './assistant-changed-files-tree'
-import { ChatDiffStatLabel } from './chat-diff-stat-label'
+import { DiffStatLabel } from '@/components/diff-stat-label'
 
 export function AssistantChangedFilesSection({ summary }: { summary: ChatTurnDiffSummary }) {
   const { openCheckpointDiff, openSessionCheckpointDiff } = useChatTimelineActions()
@@ -67,13 +67,14 @@ export function AssistantChangedFilesSection({ summary }: { summary: ChatTurnDif
 
   return (
     <section
-      className='bg-card/45 mt-2 rounded-lg p-2.5'
+      className='bg-card/45 @container/changed-files mt-2 rounded-lg p-2.5'
       data-changed-files-state={expanded ? 'expanded' : 'preview'}
     >
-      <div className='flex items-center justify-between gap-2'>
+      {/* Wraps rather than letting the counts overlap the actions when the stage is narrow. */}
+      <div className='flex flex-wrap items-center justify-between gap-2'>
         <Button
           aria-expanded={expanded}
-          className='h-auto min-w-0 flex-1 justify-start gap-1.5 py-1 pr-1 pl-0 text-left font-normal'
+          className='h-auto flex-1 justify-start gap-1.5 py-1 pr-1 pl-0 text-left font-normal @max-2xs/changed-files:min-w-0'
           data-scroll-anchor-ignore
           size='sm'
           type='button'
@@ -92,15 +93,16 @@ export function AssistantChangedFilesSection({ summary }: { summary: ChatTurnDif
             {files.length === 1 ? ' changed file' : ' changed files'}
           </span>
           {hasNonZeroChatTurnDiffStat(summaryStat) ? (
-            <span className='text-3xs shrink-0 font-mono tabular-nums'>
-              <ChatDiffStatLabel
+            <span className='text-3xs shrink-0 font-mono tabular-nums @max-2xs/changed-files:hidden'>
+              <DiffStatLabel
+                size='3xs'
                 additions={summaryStat.additions}
                 deletions={summaryStat.deletions}
               />
             </span>
           ) : null}
         </Button>
-        <div className='flex shrink-0 items-center gap-1.5'>
+        <div className='flex flex-wrap items-center gap-1.5'>
           {diffAvailable ? (
             <Button
               data-scroll-anchor-ignore

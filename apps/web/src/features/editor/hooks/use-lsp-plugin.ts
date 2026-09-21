@@ -49,13 +49,10 @@ export function useLanguageServerPlugin({
   const documentUri = document?.uri ?? null
   const origin = originForQueryClient(useQueryClient())
   const { service: fileOpenIntent } = useFileOpenIntent()
-  const languageServerStatusSource = useMemo(() => createEditorLanguageServerStatusSource(), [])
+  const languageServerStatusSource = createEditorLanguageServerStatusSource()
   const onApplyWorkspaceEdit = useWorkspaceEditHost()
   const documentSyncController = useWorkspaceDocumentSyncController()
-  const target = useMemo(
-    () => languageServerTarget ?? { matchPath: filePath },
-    [filePath, languageServerTarget],
-  )
+  const target = languageServerTarget ?? { matchPath: filePath }
   const matches = useLanguageServerMatches(rootPath, target.matchPath, enabled && document !== null)
 
   const languageServer = useMemo(() => {
@@ -97,6 +94,9 @@ export function useLanguageServerPlugin({
     onOpenReferences,
     onDidNavigateDiagnostic,
     rootPath,
+    // `target` is not rebuilt every render: the compiler keys it on filePath and
+    // languageServerTarget. Verified with `bun run compiler:explain` on this file.
+    // oxlint-disable-next-line react/exhaustive-deps
     target,
   ])
 

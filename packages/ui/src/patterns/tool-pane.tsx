@@ -54,11 +54,7 @@ export function ToolPane({
   else if (state?.empty) content = emptyState ?? <EmptyState title='Nothing here yet' />
 
   return (
-    <div
-      {...props}
-      data-slot='tool-pane'
-      className={cn('flex min-h-0 flex-1 flex-col bg-background', className)}
-    >
+    <div {...props} data-slot='tool-pane' className={cn('flex min-h-0 flex-1 flex-col', className)}>
       {header === undefined ? (
         <ToolPaneHeader title={title} detail={detail} actions={actions} />
       ) : (

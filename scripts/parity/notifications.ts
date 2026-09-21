@@ -1,5 +1,4 @@
 import { deepStrictEqual, strictEqual } from 'node:assert/strict'
-import { execFileSync } from 'node:child_process'
 import * as v from 'valibot'
 import { sessionIdSchema, turnIdSchema } from '../../packages/contracts/src/index'
 import {
@@ -7,14 +6,10 @@ import {
   type NotificationCursor,
   type NotificationSession,
 } from '../../packages/client-core/src/chat/notifications'
-import inventory from '../../plans/126-t3code-alignment/inventory.json'
+import { pin, readPinned } from './pinned'
 
-const pin = '7445aa733ada33e45289e5aa5055f79142556513'
-strictEqual(pin, inventory.upstream_commit)
 const path = 'apps/web/src/components/ThreadNotificationCoordinator.tsx'
-const source = execFileSync('git', ['-C', 'references/t3code', 'show', `${pin}:${path}`], {
-  encoding: 'utf8',
-})
+const source = readPinned(`${path}`)
 const start = source.indexOf('      let status = resolveSidebarThreadStatus(thread);')
 const end = source.indexOf('      const title =', start)
 strictEqual(start >= 0 && end > start, true)

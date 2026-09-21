@@ -5,7 +5,7 @@ import {
   ResizablePanel,
   ResizablePanelGroup,
 } from '@workspace/ui/components/resizable'
-import { useLayoutEffect, useMemo } from 'react'
+import { useLayoutEffect } from 'react'
 import { useTabPresentation } from '@/features/editor/hooks/use-tab-presentation'
 import { LoadingState } from '@workspace/ui/components/loading-state'
 
@@ -42,7 +42,7 @@ export function DiffEditor({
   const { editorTheme, shikiTheme } = useEditorColorTheme()
   const source = editorSyntaxHighlightingSource(shikiTheme)
   // Stable backend identity preserves diff sessions when only their colors change.
-  const syntax = useMemo(() => editorDiffSyntaxConfiguration(source), [source])
+  const syntax = editorDiffSyntaxConfiguration(source)
   // Split is two plugin instances, and a separator row is one region shown twice. Without a shared
   // store a gutter click would expand one pane and leave the other where it was, misaligning every
   // row below — the one property split mode exists to hold.

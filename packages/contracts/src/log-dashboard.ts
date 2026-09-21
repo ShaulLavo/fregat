@@ -88,6 +88,9 @@ export const logLiveStreamItemSchema = v.variant('kind', [
   }),
 ])
 
+// The server always fills this many buckets, so the client can size its skeleton.
+export const logDashboardTimelineBucketCount = 48
+
 export type LogDashboardLevel = v.InferOutput<typeof logDashboardLevelSchema>
 export type LogDashboardFilters = v.InferOutput<typeof logDashboardFiltersSchema>
 export type LogEventSummary = v.InferOutput<typeof logEventSummarySchema>

@@ -41,6 +41,7 @@ export type {
   GitCommitFile,
   GitCommitDetails,
   GitFileStatus,
+  GitLineStat,
   GitLineChange,
   GitPullRequest,
   GitPullRequestCreateResult,
@@ -347,6 +348,7 @@ export {
 export {
   logDashboardLevelSchema,
   logDashboardSummarySchema,
+  logDashboardTimelineBucketCount,
   logEventsResultSchema,
   logLiveStreamItemSchema,
   type LogDashboardBreakdownItem,

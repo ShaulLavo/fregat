@@ -18,3 +18,60 @@ export async function dispatch(page: Page, base: string, command: Record<string,
   })
   ok(response.ok(), `Verification command failed: ${await response.text()}`)
 }
+
+/**
+ * Opens chat mode on the connected owner and returns the shell every session scenario drives:
+ * the orchestration base URL, the platform worktree and the project that owns it.
+ */
+export async function openChatShell(page: Page) {
+  const connected = page.waitForEvent('websocket', {
+    predicate: (socket) => socket.url().endsWith('/orchestration/rpc'),
+  })
+  await page.goto(page.url().replace(/\/workbench(?:\?.*)?$/, '/chat'))
+  const base = (await connected)
+    .url()
+    .replace(/^ws/, 'http')
+    .replace(/\/rpc$/, '')
+  const snapshot = await readShell(page, base)
+  const worktree = snapshot.worktrees.find((item) => item.path.endsWith('/projects/platform'))
+  ok(worktree, 'Platform worktree must be registered')
+  const project = snapshot.projects.find((item) => item.id === worktree.projectId)
+  ok(project?.defaultModelSelection, 'Project must have a default model')
+  return { base, project, snapshot, worktree }
+}
+
+export type ChatShell = Awaited<ReturnType<typeof openChatShell>>
+
+/** Creates one disposable session on the shell's worktree with the project's default model. */
+export async function createSession(
+  page: Page,
+  shell: Pick<ChatShell, 'base' | 'project' | 'worktree'>,
+  sessionId: string,
+  title: string,
+) {
+  await dispatch(page, shell.base, {
+    type: 'session.create',
+    sessionId,
+    title,
+    worktreeTarget: { kind: 'current', worktreeId: shell.worktree.id },
+    modelSelection: shell.project.defaultModelSelection,
+  })
+}
+
+/**
+ * Every orchestration owner the page connects to while the scenario runs, as HTTP bases.
+ * Registered before the navigation that opens the sockets.
+ */
+export function collectOrchestrationBases(page: Page) {
+  const bases = new Set<string>()
+  page.on('websocket', (socket) => {
+    if (socket.url().endsWith('/orchestration/rpc'))
+      bases.add(
+        socket
+          .url()
+          .replace(/^ws/, 'http')
+          .replace(/\/rpc$/, ''),
+      )
+  })
+  return bases
+}

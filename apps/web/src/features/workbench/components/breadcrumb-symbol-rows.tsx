@@ -1,5 +1,5 @@
 import type { useListbox } from '@workspace/ui/patterns/use-listbox'
-import { BreadcrumbPickerRow } from '@/features/workbench/components/breadcrumb-picker-row'
+import { BreadcrumbPickerRowList } from '@/features/workbench/components/breadcrumb-picker-row-list'
 import { SymbolKindIcon } from '@/features/workbench/components/symbol-kind-icon'
 import type { SymbolPickerRow } from '@/features/workbench/utils/breadcrumb-picker-rows'
 
@@ -15,28 +15,19 @@ export function BreadcrumbSymbolRows({
   onToggle: (id: string) => void
 }) {
   return (
-    <>
-      {rows.map((row) => (
-        <BreadcrumbPickerRow
-          key={row.id}
-          depth={row.depth}
-          expandable={row.hasChildren}
-          expanded={row.expanded}
-          icon={
-            <SymbolKindIcon className='size-(--icon-size-sm) shrink-0' kind={row.symbol.kind} />
-          }
-          label={row.label}
-          path={row.id}
-          rowProps={rowProps(row.id)}
-          trailing={
-            <span className='text-muted-foreground text-2xs tabular-nums'>
-              {row.symbol.selectionRange.start.line + 1}
-            </span>
-          }
-          onActivate={() => onPick(row.id)}
-          onToggle={() => onToggle(row.id)}
-        />
-      ))}
-    </>
+    <BreadcrumbPickerRowList
+      rows={rows}
+      rowProps={rowProps}
+      renderIcon={(row) => (
+        <SymbolKindIcon className='size-(--icon-size-sm) shrink-0' kind={row.symbol.kind} />
+      )}
+      renderTrailing={(row) => (
+        <span className='text-muted-foreground text-2xs tabular-nums'>
+          {row.symbol.selectionRange.start.line + 1}
+        </span>
+      )}
+      onActivate={onPick}
+      onToggle={onToggle}
+    />
   )
 }

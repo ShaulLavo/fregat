@@ -35,6 +35,7 @@ import {
   repositoryRelativePath,
 } from './path-utils'
 import { gitCwdForPath, lexicalRepositoryRoot } from './repository'
+import { parseNumstat, untrackedLineStats, withLineStats } from './numstat'
 import { parseRepositoryInfo, parseStatus, statusMatchesPathspec } from './status'
 import { UpstreamFetchScheduler } from './upstream-fetch'
 import { BoundedTtlCache } from './utils/bounded-cache'
@@ -51,6 +52,8 @@ import type {
   GitCommandResult,
   GitCommitResult,
   GitFileDiff,
+  GitFileStatus,
+  GitLineStat,
   GitRepository,
   GitRepositoryInfo,
   GitStatusResult,
@@ -766,11 +769,37 @@ export class GitService {
       ...pathspecArgs(repository.pathspec),
     ])
     void this.upstreamFetch.schedule(repository.rootAbsolutePath, result.stdout)
+    const files = parseStatus(result.stdout, repository.rootPath)
 
     return {
       repository: parseRepositoryInfo(result.stdout, repository.rootPath),
-      files: parseStatus(result.stdout, repository.rootPath),
+      files: files.length > 0 ? await this.withLineStats(repository, files) : files,
     }
+  }
+
+  private async withLineStats(repository: GitRepositoryLocation, files: GitFileStatus[]) {
+    const [staged, worktree, untracked] = await Promise.all([
+      this.numstat(repository, true),
+      this.numstat(repository, false),
+      untrackedLineStats(files, repository.rootPath, repository.rootAbsolutePath),
+    ])
+    for (const [filePath, stat] of untracked) worktree.set(filePath, stat)
+
+    return withLineStats(files, staged, worktree)
+  }
+
+  // Counts decorate the rows; a failed or oversized numstat must not fail status.
+  private async numstat(repository: GitRepositoryLocation, staged: boolean) {
+    const args = ['diff', '--numstat', '-z', '--no-ext-diff']
+    if (staged) args.push('--cached')
+    const result = await this.git(
+      repository.rootAbsolutePath,
+      args.concat(pathspecArgs(repository.pathspec)),
+      { allowFailure: true },
+    ).catch(() => null)
+    if (!result || result.exitCode !== 0) return new Map<string, GitLineStat>()
+
+    return parseNumstat(result.stdout, repository.rootPath)
   }
 
   /**

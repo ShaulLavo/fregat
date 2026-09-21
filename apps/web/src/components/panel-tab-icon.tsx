@@ -1,4 +1,5 @@
 import {
+  ChatCircleIcon,
   CodeIcon,
   FilesIcon,
   GitBranchIcon,
@@ -7,9 +8,10 @@ import {
   TerminalIcon,
   WarningCircleIcon,
 } from '@phosphor-icons/react'
-import type { ChatModeToolTab } from '@/features/chat-mode/utils/panels'
+import type { PanelTab } from '@/components/utils/panel-tabs'
 
-export function ToolTabIcon({ tab }: { readonly tab: ChatModeToolTab }) {
+export function PanelTabIcon({ tab }: { readonly tab: PanelTab }) {
+  if (tab === 'chat') return <ChatCircleIcon className='size-(--icon-size)' />
   if (tab === 'editor') return <CodeIcon className='size-(--icon-size)' />
   if (tab === 'files') return <FilesIcon className='size-(--icon-size)' />
   if (tab === 'git') return <GitBranchIcon className='size-(--icon-size)' />

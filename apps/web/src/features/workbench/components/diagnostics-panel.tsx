@@ -1,3 +1,4 @@
+import { TickerNumber } from '@/components/ticker-number'
 import type {
   LanguageServerDefinitionTarget,
   LanguageServerStatus,
@@ -119,7 +120,7 @@ function renderDiagnosticCount({
     <div className={cn('rounded-lg px-2 py-1', diagnosticTileClass(severity, value))} key={label}>
       <div className='text-muted-foreground'>{label}</div>
       <div className={cn('font-medium tabular-nums', diagnosticValueClass(severity, value))}>
-        {value}
+        <TickerNumber size='xs' value={value} />
       </div>
     </div>
   )

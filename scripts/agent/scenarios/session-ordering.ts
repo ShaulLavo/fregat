@@ -1,26 +1,14 @@
 import { ok } from 'node:assert/strict'
 import type { Scenario } from './index'
 import { selectors } from '../selectors'
-import { dispatch, readShell } from './chat-verification'
+import { dispatch, openChatShell, readShell } from './chat-verification'
 
 export const sessionOrdering: Scenario = {
   name: 'session-ordering',
   description:
     'Move disposable sessions between empty shelves by pointer and keyboard, then verify persisted active ordering after reload.',
   async run(page, { step }) {
-    const connected = page.waitForEvent('websocket', {
-      predicate: (socket) => socket.url().endsWith('/orchestration/rpc'),
-    })
-    await page.goto(page.url().replace(/\/workbench(?:\?.*)?$/, '/chat'))
-    const base = (await connected)
-      .url()
-      .replace(/^ws/, 'http')
-      .replace(/\/rpc$/, '')
-    const snapshot = await readShell(page, base)
-    const worktree = snapshot.worktrees.find((item) => item.path.endsWith('/projects/platform'))
-    ok(worktree)
-    const project = snapshot.projects.find((item) => item.id === worktree.projectId)
-    ok(project?.defaultModelSelection)
+    const { base, project, worktree } = await openChatShell(page)
     const first = crypto.randomUUID()
     const second = crypto.randomUUID()
     const prefix = `Ordering verification ${first.slice(0, 8)}`

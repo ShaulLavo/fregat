@@ -1,3 +1,4 @@
+import { TickerNumber } from '@/components/ticker-number'
 import { OrbitLoader } from '@workspace/ui/components/orbit-loader'
 import type { LoadState } from '@/lib/load-state'
 import type { TreeModel } from '@/lib/tree-model'
@@ -18,5 +19,7 @@ export function TreeHeaderDetail({
       </span>
     )
   if (treeState.status === 'error') return 'Unable to load files'
-  return visibleTreeItemCount
+  if (visibleTreeItemCount === null) return null
+
+  return <TickerNumber value={visibleTreeItemCount} />
 }

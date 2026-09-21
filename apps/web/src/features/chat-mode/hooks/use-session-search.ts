@@ -1,5 +1,5 @@
 import { Debouncer } from '@tanstack/react-pacer/debouncer'
-import { useEffect, useMemo } from 'react'
+import { useEffect } from 'react'
 import { useShallow } from 'zustand/react/shallow'
 import { useEnvironmentsStore } from '@/lib/environments/state/store'
 import { queryClientFor } from '@/lib/environments/state/query-clients'
@@ -18,7 +18,7 @@ export function useSessionSearch() {
   const entries = useEnvironmentsStore((state) => state.entries)
   const represented = useChatProjectionStore(useShallow((state) => Object.keys(state.slices)))
   // Keep query observers attached across unrelated transcript updates.
-  const owners = useMemo(() => sessionSearchOwners(entries, represented), [entries, represented])
+  const owners = sessionSearchOwners(entries, represented)
   useEffect(() => {
     const store = useSessionSearchStore.getState()
     const enabled = isSessionSearchQuery(query)

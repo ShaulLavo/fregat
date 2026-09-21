@@ -1,6 +1,6 @@
 import { expect, test } from 'vitest'
 
-import { inspectFunctions } from './duplicate-functions.mjs'
+import { applyAllowList, inspectFunctions } from './duplicate-functions.mjs'
 
 test('finds renamed short helpers and assigned function expressions despite formatting', () => {
   const result = inspectFunctions([
@@ -60,4 +60,38 @@ test('ignores annotation differences but retains branded constructors and distin
     { file: 'four.ts', source: 'function id(value: string) { return parse(value) as ProjectId }' },
   ])
   expect(different.duplicates).toEqual([])
+})
+
+test('excuses an allow-listed pair, and only with a reason naming every copy', () => {
+  const { duplicates } = inspectFunctions([
+    { file: 'one.ts', source: 'function send(value) { return write(value + 1) }' },
+    { file: 'two.ts', source: 'function send(value) { return write(value + 1) }' },
+  ])
+  const entry = { name: 'send', files: ['one.ts', 'two.ts'] }
+
+  const excused = applyAllowList(duplicates, [{ ...entry, reason: 'Copied binaries.' }])
+  expect(excused.offenders).toEqual([])
+  expect(excused.problems).toEqual([])
+
+  const unexplained = applyAllowList(duplicates, [{ ...entry, reason: ' ' }])
+  expect(unexplained.offenders).toHaveLength(1)
+  expect(unexplained.problems[0]).toContain('an exception without a reason is itself a violation')
+})
+
+test('fails a stale allow-list entry and one that names only part of the group', () => {
+  const { duplicates } = inspectFunctions([
+    { file: 'one.ts', source: 'function send(value) { return write(value + 1) }' },
+    { file: 'two.ts', source: 'function send(value) { return write(value + 1) }' },
+  ])
+
+  const stale = applyAllowList(duplicates, [
+    { name: 'gone', files: ['a.ts', 'b.ts'], reason: 'Once true.' },
+  ])
+  expect(stale.problems[0]).toContain('stale')
+  expect(stale.offenders).toHaveLength(1)
+
+  const partial = applyAllowList(duplicates, [
+    { name: 'send', files: ['one.ts', 'three.ts'], reason: 'Names the wrong copy.' },
+  ])
+  expect(partial.offenders).toHaveLength(1)
 })

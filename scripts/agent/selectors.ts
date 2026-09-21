@@ -157,6 +157,25 @@ export const selectors = {
     page.getByRole('tree', { name: 'Reference results', exact: true }),
   changedFilesTree: (page: Page) => page.getByRole('tree', { name: 'Changed files', exact: true }),
   changedFilesSections: (page: Page) => page.locator('[data-changed-files-state]'),
+  chatToolsHandle: (page: Page) => page.locator('[data-slot="resizable-handle"]').last(),
+  tooltipPopup: (page: Page) => page.locator('[data-slot="tooltip-content"]'),
+  sidebarHandle: (page: Page) => page.locator('[data-slot="resizable-handle"]').first(),
+  changedFilesCard: (page: Page) => page.locator('[data-changed-files-state]').first(),
+  changedFileName: (page: Page) =>
+    page.locator('[data-changed-files-state] [data-changed-file-name]').first(),
+  changedFilesActions: (page: Page) =>
+    page.locator('[data-changed-files-state]').first().getByRole('button'),
+  changedFilesStat: (page: Page) =>
+    page
+      .locator('[data-changed-files-state]')
+      .first()
+      .getByRole('group', { name: /additions/u })
+      .first(),
+  changedFilesViewDiff: (page: Page) =>
+    page
+      .locator('[data-changed-files-state]')
+      .first()
+      .getByRole('button', { name: 'View diff', exact: true }),
   expandChangedFiles: (page: Page) => page.getByRole('button', { name: /^Show all \d+ files$/ }),
   machineDialog: (page: Page) => page.getByRole('dialog', { name: 'Connect machine', exact: true }),
   machineAdd: (page: Page) => page.getByRole('button', { name: 'Add machine', exact: true }),
@@ -541,7 +560,15 @@ export const selectors = {
   unexpectedError: (page: Page) => page.getByText('Something unexpected went wrong.'),
   focusGitCommand: (page: Page) => page.getByRole('option', { name: /Focus Git/ }),
   graphButton: (page: Page) => page.getByRole('button', { name: 'Graph', exact: true }),
+  // The Changes tab's accessible name carries its live file count.
+  gitChangesTab: (page: Page) =>
+    page.getByRole('region', { name: 'Git panel' }).getByRole('button', { name: /^Changes\b/ }),
   changesToggle: (page: Page) => page.getByRole('button', { name: 'Changes', exact: true }),
+  gitDiffScope: (page: Page, scope: 'Working tree' | 'Turn') =>
+    page
+      .getByRole('group', { name: 'Diff scope' })
+      .getByRole('button', { name: scope, exact: true }),
+  turnFiles: (page: Page) => page.getByRole('listbox', { name: 'Turn changed files' }),
   worktreeFiles: (page: Page) => page.locator('[data-git-file]:not([data-history-file])'),
   historyList: (page: Page) => page.getByRole('listbox', { name: 'Commit history' }),
   historyRowSelector: '[data-history-commit]',
@@ -629,6 +656,38 @@ export async function runPaletteCommand(page: Page, title: string) {
   await input.waitFor({ timeout: 5_000 })
   await input.fill(`>${title}`)
   await selectors.commandOption(page, title).first().click({ timeout: 5_000 })
+}
+
+export async function chooseColorMode(page: Page, value: 'light' | 'dark' | 'system') {
+  await page.keyboard.press(chords.commandPalette)
+  await selectors.paletteInput(page).fill('>Choose light / dark mode')
+  await selectors.commandOption(page, 'Choose light / dark mode').click()
+  await selectors.colorModeOption(page, value).click()
+  await selectors.paletteInput(page).waitFor({ state: 'hidden' })
+}
+
+/** Two frames, then every running animation under the target. Collapsed panels animate open. */
+export async function settleAnimations(target: Locator) {
+  await target.evaluate(async (element) => {
+    await new Promise<void>((resolve) =>
+      requestAnimationFrame(() => requestAnimationFrame(() => resolve())),
+    )
+    await Promise.all(
+      element
+        .getAnimations({ subtree: true })
+        // A toast can be dismissed mid-animation; a cancelled one is settled, not a failure.
+        .map((animation) => animation.finished.catch(() => undefined)),
+    )
+  })
+}
+
+/** The colors the shared-token CSS highlights actually paint on an element. */
+export function paintedTokenColors(target: Locator): Promise<string[]> {
+  return target.evaluate((element) =>
+    Array.from(CSS.highlights.entries())
+      .filter(([name, highlight]) => name.startsWith('editor-shared-token-') && highlight.size > 0)
+      .map(([name]) => getComputedStyle(element, `::highlight(${name})`).color),
+  )
 }
 
 export async function selectedEditorTabId(page: Page, group: number) {

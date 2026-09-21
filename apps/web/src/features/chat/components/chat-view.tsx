@@ -9,7 +9,7 @@ import {
 } from '@/features/chat/utils/composer-state'
 import { sessionStopFailure } from '@/features/chat/utils/session-stop'
 import type { ModelSelection, SessionId, SessionTurnInterruptCommand } from '@workspace/contracts'
-import { useCallback, useEffect, useMemo, useState } from 'react'
+import { useEffect, useState } from 'react'
 
 import { notifyChatCommandError } from '@/features/chat/notify-command-error'
 import type { ChatTransport } from '@/features/chat/transport/chat-transport'
@@ -58,17 +58,15 @@ export function ChatView({
   onSessionCreated: (sessionId: SessionId) => void
   rootPath: string
 }) {
-  const sessionSelector = useMemo(
-    () => createChatSessionSelector(activeSessionId),
-    [activeSessionId],
-  )
+  const sessionSelector = createChatSessionSelector(activeSessionId)
   // The same target ChatInput builds for itself, so a mode pick lands on the
   // draft the send path reads. Stable identity is required: it feeds the
   // composer modes context value.
-  const draftTarget = useMemo<ChatInputDraftTarget>(
-    () => ({ environmentId: transport.environmentId, draftKey: activeSessionId, rootPath }),
-    [transport.environmentId, activeSessionId, rootPath],
-  )
+  const draftTarget: ChatInputDraftTarget = {
+    environmentId: transport.environmentId,
+    draftKey: activeSessionId,
+    rootPath,
+  }
   const session = useActiveChatProjection(sessionSelector)
   const optimisticMessages = useOptimisticMessages(transport.environmentId, activeSessionId)
   const [sendError, setSendError] = useState<string | null>(null)
@@ -91,36 +89,30 @@ export function ChatView({
   const connection = useComposerConnection(transport, activeSessionId)
   const disabledReason = connection.kind === 'live' ? null : connection.label
   // Stable identity is required because this is part of the timeline action context value.
-  const handleRevertToCheckpoint = useCallback(
-    (turnCount: number, messageId: string) => {
-      if (!session || revertingCheckpoint) return
-      if (busy) {
-        setSendError('Interrupt the current turn before reverting checkpoints.')
-        return
-      }
-      setPendingCheckpoint({ turnCount, messageId })
-    },
-    [busy, revertingCheckpoint, session],
-  )
+  const handleRevertToCheckpoint = (turnCount: number, messageId: string) => {
+    if (!session || revertingCheckpoint) return
+    if (busy) {
+      setSendError('Interrupt the current turn before reverting checkpoints.')
+      return
+    }
+    setPendingCheckpoint({ turnCount, messageId })
+  }
 
   const projectId = session?.project.id
   // Stable identity is required because this is part of the model picker context value.
-  const handlePersistModelSelection = useCallback(
-    (next: ModelSelection) => {
-      if (!projectId) return
+  const handlePersistModelSelection = (next: ModelSelection) => {
+    if (!projectId) return
 
-      void dispatchChatCommand({
-        action: 'chat.project.default_model.set',
-        command: createProjectDefaultModelCommand({
-          defaultModelSelection: next,
-          projectId,
-        }),
-        dispatchCommand: transport.dispatchCommand,
-        onFailed: (error) => notifyChatCommandError(error, 'Could not save the default model'),
-      })
-    },
-    [transport, projectId],
-  )
+    void dispatchChatCommand({
+      action: 'chat.project.default_model.set',
+      command: createProjectDefaultModelCommand({
+        defaultModelSelection: next,
+        projectId,
+      }),
+      dispatchCommand: transport.dispatchCommand,
+      onFailed: (error) => notifyChatCommandError(error, 'Could not save the default model'),
+    })
+  }
 
   useEffect(() => {
     if (!activeSessionId || transport.closed) return

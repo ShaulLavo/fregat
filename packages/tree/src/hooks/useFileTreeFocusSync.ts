@@ -142,7 +142,8 @@ export function useFileTreeFocusSync(
   }, [])
 
   const applyScrollRequest = useEffectEvent(
-    (request: NonNullable<typeof scrollRequest>, behavior = request.behavior) => {
+    (request: NonNullable<typeof scrollRequest>, override?: typeof request.behavior) => {
+      const behavior = override ?? request.behavior
       const scrollElement = getScroll()
       const row = controller.getVisibleRows(request.visibleIndex, request.visibleIndex)[0]
       if (!scrollElement || !row) return null

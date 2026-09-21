@@ -23,15 +23,7 @@ import { InputGroup, InputGroupAddon, InputGroupInput } from '@workspace/ui/comp
 import { PaneBar } from '@workspace/ui/components/pane-bar'
 import { Separator } from '@workspace/ui/components/separator'
 import { deriveWriteTarget, policyControlledIds } from '@workspace/contracts'
-import {
-  useCallback,
-  useEffect,
-  useMemo,
-  useRef,
-  useState,
-  type ChangeEvent,
-  type KeyboardEvent,
-} from 'react'
+import { useEffect, useMemo, useRef, useState, type ChangeEvent, type KeyboardEvent } from 'react'
 
 import { useDirectoryTransition } from '@/features/file-picker/hooks/use-directory-transition'
 import { useFilePickerPathInput } from '@/features/file-picker/hooks/use-path-input'
@@ -143,33 +135,24 @@ export function FilePickerDialog({
   })
   const navigateSessionTo = session.navigateTo
   const selectSessionEntry = session.setSelectedEntry
-  const loadAndNavigate = useCallback(
-    (path: string, intentId: number) => {
-      void loadDirectory(path, intentId).then((loaded) => {
-        if (loaded) navigateSessionTo(path)
-      })
-    },
-    [loadDirectory, navigateSessionTo],
-  )
-  const navigateTo = useCallback(
-    (path: string) => {
-      loadAndNavigate(path, beginDirectoryIntent())
-    },
-    [beginDirectoryIntent, loadAndNavigate],
-  )
-  const revealEntry = useCallback(
-    (entry: FsEntry) => {
-      const path = isDirectoryEntry(entry) ? entry.path : pickerParentPath(entry.path)
-      const intentId = beginDirectoryIntent()
-      void loadDirectory(path, intentId).then((loaded) => {
-        if (!loaded) return
+  const loadAndNavigate = (path: string, intentId: number) => {
+    void loadDirectory(path, intentId).then((loaded) => {
+      if (loaded) navigateSessionTo(path)
+    })
+  }
+  const navigateTo = (path: string) => {
+    loadAndNavigate(path, beginDirectoryIntent())
+  }
+  const revealEntry = (entry: FsEntry) => {
+    const path = isDirectoryEntry(entry) ? entry.path : pickerParentPath(entry.path)
+    const intentId = beginDirectoryIntent()
+    void loadDirectory(path, intentId).then((loaded) => {
+      if (!loaded) return
 
-        navigateSessionTo(path)
-        if (!isDirectoryEntry(entry)) selectSessionEntry(entry)
-      })
-    },
-    [beginDirectoryIntent, loadDirectory, navigateSessionTo, selectSessionEntry],
-  )
+      navigateSessionTo(path)
+      if (!isDirectoryEntry(entry)) selectSessionEntry(entry)
+    })
+  }
   const pathInput = useFilePickerPathInput({
     currentPath: session.currentPath,
     onIntentStart: beginDirectoryIntent,
@@ -185,8 +168,8 @@ export function FilePickerDialog({
   const loadedEntries = loadStateEntries(loadState)
   const isSearching = session.query.trim().length > 0
   const effectiveSort = sort ?? (isSearching ? null : INITIAL_SORT)
-  // Selection changes frequently; keep them from re-sorting and rebuilding
-  // every virtual row when the loaded data and requested order are unchanged.
+  // Manual keys: the compiler would key this on nine values including the selection and the
+  // query, re-sorting every virtual row for changes the sorted list cannot see.
   const entries = useMemo(
     () => (effectiveSort ? sortFilePickerEntries(loadedEntries, effectiveSort) : loadedEntries),
     [effectiveSort, loadedEntries],
@@ -207,15 +190,12 @@ export function FilePickerDialog({
   const displayedIconMode = iconMode ?? (mode === 'file' ? 'vscode' : 'default')
   // The list rows consume these actions through context, so identity must stay
   // stable while typing or scrolling to avoid rerendering every visible row.
-  const sessionActions = useMemo<FilePickerSessionActions>(
-    () => ({
-      jumpTo: navigateTo,
-      navigateTo,
-      revealEntry,
-      selectEntry: session.setSelectedEntry,
-    }),
-    [navigateTo, revealEntry, session.setSelectedEntry],
-  )
+  const sessionActions: FilePickerSessionActions = {
+    jumpTo: navigateTo,
+    navigateTo,
+    revealEntry,
+    selectEntry: session.setSelectedEntry,
+  }
 
   useEffect(() => {
     if (open) commitStartedRef.current = false
@@ -249,6 +229,85 @@ export function FilePickerDialog({
     void loadDirectory(path, intentId).then((loaded) => {
       if (loaded) session.goForward()
     })
+  }
+
+  // Declaration order is a constraint, not a preference: React Compiler cannot rewrite a
+  // hoisted reference, so every handler below is declared after the handlers it calls.
+  function commitPick(entry: PickedFsEntry) {
+    if (commitStartedRef.current) return
+
+    commitStartedRef.current = true
+    recordRecentMutation.mutate(entry)
+    onPick(entry)
+    onOpenChange(false)
+  }
+
+  function selectByOffset(event: KeyboardEvent<HTMLElement>, offset: number) {
+    event.preventDefault()
+    const nextEntry = entryByOffset(entries, selectedEntry, offset)
+    if (!nextEntry) return
+
+    session.setSelectedEntry(nextEntry)
+  }
+
+  function toggleHiddenFiles() {
+    if (hiddenSettingDisabled) return
+
+    settingsActions.setSetting('files.showHidden', !showHidden, hiddenWriteTarget)
+  }
+
+  function leaveDirectory(event: KeyboardEvent<HTMLElement>) {
+    if (!session.canGoUp) return
+
+    event.preventDefault()
+    navigateTo(pickerParentPath(session.currentPath))
+  }
+
+  function chooseSelected() {
+    if (!selectedPickable) return
+
+    commitPick(selectedPickable)
+  }
+
+  function commitFromKeyboard(event: KeyboardEvent<HTMLElement>) {
+    if (listInteractionPending) {
+      event.preventDefault()
+      return
+    }
+
+    const candidate = selectedEntry ?? entries[0] ?? null
+    if (candidate && isDirectoryEntry(candidate) && mode === 'file') {
+      event.preventDefault()
+      navigateTo(candidate.path)
+      return
+    }
+
+    const candidatePickable = candidate ? toPickedEntry(candidate, mode, accept) : selectedPickable
+    if (!candidatePickable) return
+
+    event.preventDefault()
+    commitPick(candidatePickable)
+  }
+
+  function focusListFromSearch(event: KeyboardEvent<HTMLInputElement>, offset: number) {
+    event.preventDefault()
+    listRef.current?.focus()
+    if (listInteractionPending) return
+
+    selectByOffset(event, offset)
+  }
+
+  function handleEntryDoubleClick(entry: FsEntry) {
+    if (listInteractionPending) return
+    if (isDirectoryEntry(entry)) {
+      navigateTo(entry.path)
+      return
+    }
+
+    const picked = toPickedEntry(entry, mode, accept)
+    if (!picked) return
+
+    commitPick(picked)
   }
 
   function handleSearchChange(event: ChangeEvent<HTMLInputElement>) {
@@ -297,62 +356,6 @@ export function FilePickerDialog({
     searchInputRef.current?.focus()
   }
 
-  function focusListFromSearch(event: KeyboardEvent<HTMLInputElement>, offset: number) {
-    event.preventDefault()
-    listRef.current?.focus()
-    if (listInteractionPending) return
-
-    selectByOffset(event, offset)
-  }
-
-  function selectByOffset(event: KeyboardEvent<HTMLElement>, offset: number) {
-    event.preventDefault()
-    const nextEntry = entryByOffset(entries, selectedEntry, offset)
-    if (!nextEntry) return
-
-    session.setSelectedEntry(nextEntry)
-  }
-
-  function commitFromKeyboard(event: KeyboardEvent<HTMLElement>) {
-    if (listInteractionPending) {
-      event.preventDefault()
-      return
-    }
-
-    const candidate = selectedEntry ?? entries[0] ?? null
-    if (candidate && isDirectoryEntry(candidate) && mode === 'file') {
-      event.preventDefault()
-      navigateTo(candidate.path)
-      return
-    }
-
-    const candidatePickable = candidate ? toPickedEntry(candidate, mode, accept) : selectedPickable
-    if (!candidatePickable) return
-
-    event.preventDefault()
-    commitPick(candidatePickable)
-  }
-
-  function leaveDirectory(event: KeyboardEvent<HTMLElement>) {
-    if (!session.canGoUp) return
-
-    event.preventDefault()
-    navigateTo(pickerParentPath(session.currentPath))
-  }
-
-  function handleEntryDoubleClick(entry: FsEntry) {
-    if (listInteractionPending) return
-    if (isDirectoryEntry(entry)) {
-      navigateTo(entry.path)
-      return
-    }
-
-    const picked = toPickedEntry(entry, mode, accept)
-    if (!picked) return
-
-    commitPick(picked)
-  }
-
   function handleSort(key: FileListSortKey) {
     setSort((current) => {
       const activeSort = current ?? (isSearching ? null : INITIAL_SORT)
@@ -370,27 +373,6 @@ export function FilePickerDialog({
   function handleFolderCreated(entry: FsEntry) {
     session.setQuery('')
     session.setSelectedEntry(entry)
-  }
-
-  function toggleHiddenFiles() {
-    if (hiddenSettingDisabled) return
-
-    settingsActions.setSetting('files.showHidden', !showHidden, hiddenWriteTarget)
-  }
-
-  function chooseSelected() {
-    if (!selectedPickable) return
-
-    commitPick(selectedPickable)
-  }
-
-  function commitPick(entry: PickedFsEntry) {
-    if (commitStartedRef.current) return
-
-    commitStartedRef.current = true
-    recordRecentMutation.mutate(entry)
-    onPick(entry)
-    onOpenChange(false)
   }
 
   return (

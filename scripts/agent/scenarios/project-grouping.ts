@@ -3,23 +3,14 @@ import * as v from 'valibot'
 import { settingsSnapshotSchema } from '../../../packages/contracts/src/index'
 import type { Scenario } from './index'
 import { selectors } from '../selectors'
-import { dispatch, readShell } from './chat-verification'
+import { collectOrchestrationBases, dispatch, readShell } from './chat-verification'
 
 export const projectGrouping: Scenario = {
   name: 'project-grouping',
   description:
     'Verify repository/separate grouping and scoped delete previews with two already-connected owners sharing a repository. Never confirms deletion.',
   async run(page, { step }) {
-    const bases = new Set<string>()
-    page.on('websocket', (socket) => {
-      if (socket.url().endsWith('/orchestration/rpc'))
-        bases.add(
-          socket
-            .url()
-            .replace(/^ws/, 'http')
-            .replace(/\/rpc$/, ''),
-        )
-    })
+    const bases = collectOrchestrationBases(page)
     await page.goto(page.url().replace(/\/workbench(?:\?.*)?$/, '/chat'))
     await selectors.sessionSearch(page).waitFor()
     await page.waitForTimeout(2_000)

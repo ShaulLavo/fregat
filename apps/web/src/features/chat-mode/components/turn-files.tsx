@@ -1,10 +1,10 @@
 import { useState } from 'react'
-import { ListRow } from '@workspace/ui/patterns/list-row'
 import { useListbox } from '@workspace/ui/patterns/use-listbox'
 
-import { ChatDiffStatLabel } from '@/features/chat/components/chat-diff-stat-label'
+import { GitFileRow } from '@/components/git-file-row'
 import type { useSessionDiffScope } from '@/features/chat/hooks/use-session-diff-scope'
-import { basename, parentPath } from '@/lib/path-formatters'
+import { turnFileStatus } from '@/features/chat-mode/utils/turn-file-status'
+import { gitStatusSymbol } from '@/lib/git-status-symbols'
 
 export function TurnFiles({
   summary,
@@ -31,30 +31,18 @@ export function TurnFiles({
         aria-label='Turn changed files'
         className='app-scrollbar-thin focus-ring-inset min-h-0 flex-1 overflow-auto'
       >
-        {summary.files.map((file) => {
-          const rowProps = list.rowProps(file.path)
-          const directory = parentPath(file.path)
-          return (
-            <ListRow
-              {...rowProps}
-              as='button'
-              role='option'
-              key={file.path}
-              className='w-full justify-between text-left'
-              title={file.path}
-              onClick={(event) => {
-                rowProps.onClick(event)
-                onOpenFile(file.path)
-              }}
-            >
-              <span className='min-w-0 truncate'>
-                <span>{basename(file.path)}</span>
-                {directory ? <span className='text-muted-foreground ml-2'>{directory}</span> : null}
-              </span>
-              <ChatDiffStatLabel additions={file.additions} deletions={file.deletions} />
-            </ListRow>
-          )
-        })}
+        {summary.files.map((file) => (
+          <GitFileRow
+            key={file.path}
+            role='option'
+            rowProps={list.rowProps(file.path)}
+            path={file.path}
+            rootPath=''
+            status={gitStatusSymbol(turnFileStatus(file.kind), 'historical')}
+            stat={file}
+            onOpen={() => onOpenFile(file.path)}
+          />
+        ))}
       </div>
     </div>
   )

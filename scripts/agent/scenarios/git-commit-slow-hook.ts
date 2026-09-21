@@ -1,8 +1,12 @@
-import { chmod, mkdtemp, rm, writeFile } from 'node:fs/promises'
-import path from 'node:path'
+import { rm } from 'node:fs/promises'
 
 import type { Scenario } from './index'
-import { fixtureGit, openFixtureWorkspace } from '../fixture-workspace'
+import {
+  createGitFixture,
+  fixtureHeadSubject,
+  installPreCommitHook,
+  openFixtureWorkspace,
+} from '../fixture-workspace'
 import { openGitPanel, selectors } from '../selectors'
 import { createScriptError } from '../../structured-errors'
 
@@ -18,16 +22,9 @@ export const gitCommitSlowHook: Scenario = {
   description:
     'Commit through a pre-commit hook that is silent for 35 seconds, and find the commit.',
   async run(page, { step }) {
-    const fixture = await mkdtemp('/work/tmp/fregat-slow-hook-')
+    const fixture = await createGitFixture('slow-hook')
     try {
-      await fixtureGit(fixture, ['init', '--quiet'])
-      await fixtureGit(fixture, ['config', 'user.email', 'fregat@example.com'])
-      await fixtureGit(fixture, ['config', 'user.name', 'Fregat'])
-      await writeFile(path.join(fixture, 'a.txt'), 'one\n')
-      await fixtureGit(fixture, ['add', 'a.txt'])
-      const hook = path.join(fixture, '.git', 'hooks', 'pre-commit')
-      await writeFile(hook, HOOK)
-      await chmod(hook, 0o755)
+      await installPreCommitHook(fixture, HOOK)
 
       await openFixtureWorkspace(page, fixture)
       await openGitPanel(page)
@@ -49,18 +46,10 @@ export const gitCommitSlowHook: Scenario = {
 async function waitForHeadSubject(fixture: string) {
   const deadline = Date.now() + 60_000
   while (Date.now() < deadline) {
-    if ((await headSubject(fixture)) === SUBJECT) return
+    if ((await fixtureHeadSubject(fixture)) === SUBJECT) return
     await Bun.sleep(500)
   }
   throw createScriptError(
-    `The slow hook's commit never landed: HEAD is "${await headSubject(fixture)}"`,
+    `The slow hook's commit never landed: HEAD is "${await fixtureHeadSubject(fixture)}"`,
   )
-}
-
-async function headSubject(fixture: string) {
-  const child = Bun.spawn(['git', '-C', fixture, 'log', '-1', '--pretty=%s'], {
-    stderr: 'ignore',
-    stdout: 'pipe',
-  })
-  return (await new Response(child.stdout).text()).trim()
 }

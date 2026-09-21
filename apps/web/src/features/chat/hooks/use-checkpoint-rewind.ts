@@ -20,69 +20,72 @@ import { createChatPipelineScope } from '@/features/chat/utils/pipeline-logging'
 import { serverEndpoint } from '@/lib/client'
 import { createClientInvariantError } from '@/lib/structured-errors'
 
+type CheckpointRewindVariables = {
+  target: ChatInputDraftTarget & { draftKey: SessionId }
+  message: OrchestrationMessage
+  turnCount: number
+  restoreFiles: boolean
+}
+
 export function useCheckpointRewind(transport: ChatTransport, sessionId: SessionId | null) {
   return useMutation({
     mutationKey: chatMutationKeys.rewind(transport.environmentId, sessionId),
     scope: { id: `chat-rewind:${transport.environmentId}:${sessionId}` },
-    mutationFn: async ({
-      target,
+    mutationFn: (variables: CheckpointRewindVariables) => rewind(transport, variables),
+  })
+}
+
+// Outside the hook: React Compiler cannot lower the `try`/`finally` that closes the wide event.
+async function rewind(
+  transport: ChatTransport,
+  { target, message, turnCount, restoreFiles }: CheckpointRewindVariables,
+) {
+  const scope = createChatPipelineScope('chat.checkpoint_rewind.summary', {
+    sessionId: target.draftKey,
+    environmentId: target.environmentId,
+    turnCount,
+    restoreFiles,
+  })
+  try {
+    const drafts = useChatInputDraftStore.getState()
+    const origin = confirmedEnvironmentOrigin(target.environmentId)
+    const images = await prepareRewindAttachments(
       message,
+      serverEndpoint(origin),
+      drafts.getDraft(target).attachments.length,
+    )
+    if (drafts.getDraft(target).attachments.length + images.length > MAX_CHAT_ATTACHMENTS)
+      throw createClientInvariantError(
+        'The draft changed while preparing rewind. Remove images and retry.',
+      )
+    const command = createCheckpointRevertCommand({
+      sessionId: target.draftKey,
       turnCount,
       restoreFiles,
-    }: {
-      target: ChatInputDraftTarget & { draftKey: SessionId }
-      message: OrchestrationMessage
-      turnCount: number
-      restoreFiles: boolean
-    }) => {
-      const scope = createChatPipelineScope('chat.checkpoint_rewind.summary', {
-        sessionId: target.draftKey,
-        environmentId: target.environmentId,
-        turnCount,
-        restoreFiles,
-      })
-      try {
-        const drafts = useChatInputDraftStore.getState()
-        const origin = confirmedEnvironmentOrigin(target.environmentId)
-        const images = await prepareRewindAttachments(
-          message,
-          serverEndpoint(origin),
-          drafts.getDraft(target).attachments.length,
-        )
-        if (drafts.getDraft(target).attachments.length + images.length > MAX_CHAT_ATTACHMENTS)
-          throw createClientInvariantError(
-            'The draft changed while preparing rewind. Remove images and retry.',
-          )
-        const command = createCheckpointRevertCommand({
-          sessionId: target.draftKey,
-          turnCount,
-          restoreFiles,
-        })
-        const outcome = await dispatchChatCommand({
-          action: 'chat.checkpoint_revert.dispatch.summary',
-          command,
-          dispatchCommand: transport.dispatchCommand,
-        })
-        if (!outcome.ok) throw outcome.error
-        const event = await awaitRewind(transport, command, outcome.result.sequence)
-        useChatProjectionStore.getState().applyOrchestrationEvents(target.environmentId, [event])
-        const original = extractTerminalContexts(message.text)
-        drafts.restoreContent(target, {
-          prompt: original.text,
-          attachments: images,
-          terminalContexts: original.contexts.map((context) => ({
-            ...context,
-            id: crypto.randomUUID(),
-          })),
-        })
-        scope.set({ outcome: 'ok', restoredImageCount: images.length })
-      } catch (error) {
-        scope.warn('Checkpoint rewind failed.', { error })
-        scope.set({ outcome: 'error' })
-        throw error
-      } finally {
-        scope.end()
-      }
-    },
-  })
+    })
+    const outcome = await dispatchChatCommand({
+      action: 'chat.checkpoint_revert.dispatch.summary',
+      command,
+      dispatchCommand: transport.dispatchCommand,
+    })
+    if (!outcome.ok) throw outcome.error
+    const event = await awaitRewind(transport, command, outcome.result.sequence)
+    useChatProjectionStore.getState().applyOrchestrationEvents(target.environmentId, [event])
+    const original = extractTerminalContexts(message.text)
+    drafts.restoreContent(target, {
+      prompt: original.text,
+      attachments: images,
+      terminalContexts: original.contexts.map((context) => ({
+        ...context,
+        id: crypto.randomUUID(),
+      })),
+    })
+    scope.set({ outcome: 'ok', restoredImageCount: images.length })
+  } catch (error) {
+    scope.warn('Checkpoint rewind failed.', { error })
+    scope.set({ outcome: 'error' })
+    throw error
+  } finally {
+    scope.end()
+  }
 }

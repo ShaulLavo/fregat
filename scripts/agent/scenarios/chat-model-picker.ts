@@ -1,19 +1,8 @@
-import type { Locator } from 'playwright'
 import type { Scenario } from './index'
-import { selectors } from '../selectors'
+import { selectors, settleAnimations } from '../selectors'
 
 // The panel fades and scales in. A frame captured mid-enter reads as a
 // transparent, collapsed panel, so every step waits the animation out.
-async function settle(target: Locator) {
-  await target.evaluate(async (element) => {
-    await new Promise<void>((resolve) =>
-      requestAnimationFrame(() => requestAnimationFrame(() => resolve())),
-    )
-    await Promise.all(
-      element.getAnimations({ subtree: true }).map((animation) => animation.finished),
-    )
-  })
-}
 
 /**
  * Opens the composer's provider/model panel, searches it, and closes it.
@@ -36,11 +25,11 @@ export const chatModelPicker: Scenario = {
     await trigger.click()
     const panel = selectors.modelPickerPanel(page)
     await panel.waitFor({ timeout: 10_000 })
-    await settle(panel)
+    await settleAnimations(panel)
     await step('panel-open')
 
     await selectors.modelPickerSearch(page).fill('opus')
-    await settle(panel)
+    await settleAnimations(panel)
     await step('panel-search')
 
     await page.keyboard.press('Escape')

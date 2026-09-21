@@ -1,5 +1,4 @@
 import {
-  useCallback,
   useEffect,
   useEffectEvent,
   useId,
@@ -147,37 +146,31 @@ export function useListbox<Id extends string>({
   }
 
   // Stable bindings keep context consumers from rerendering on unrelated parent updates.
-  const rowBindings = useCallback(
-    (id: Id) => ({
-      id: `${prefix}-${id}`,
-      tabIndex: -1,
-      onClick: (event: MouseEvent<HTMLElement>) => {
-        if (isRowControl(event.target, event.currentTarget)) return
-        const current = interactions.current
-        const item = current.items.find((candidate) => candidate.id === id)
-        if (item && !item.disabled) current.onActiveChange(id)
-        ref.current?.focus({ preventScroll: true })
-      },
-      onMouseDown: (event: MouseEvent<HTMLElement>) => {
-        if (isRowControl(event.target, event.currentTarget)) return
-        event.preventDefault()
-        ref.current?.focus({ preventScroll: true })
-      },
-    }),
-    [prefix, ref],
-  )
+  const rowBindings = (id: Id) => ({
+    id: `${prefix}-${id}`,
+    tabIndex: -1,
+    onClick: (event: MouseEvent<HTMLElement>) => {
+      if (isRowControl(event.target, event.currentTarget)) return
+      const current = interactions.current
+      const item = current.items.find((candidate) => candidate.id === id)
+      if (item && !item.disabled) current.onActiveChange(id)
+      ref.current?.focus({ preventScroll: true })
+    },
+    onMouseDown: (event: MouseEvent<HTMLElement>) => {
+      if (isRowControl(event.target, event.currentTarget)) return
+      event.preventDefault()
+      ref.current?.focus({ preventScroll: true })
+    },
+  })
 
-  const focus = useCallback(() => ref.current?.focus({ preventScroll: true }), [ref])
+  const focus = () => ref.current?.focus({ preventScroll: true })
 
   const cursorId = cursor?.id
-  const rowProps = useCallback(
-    (id: Id) => ({
-      ...rowBindings(id),
-      'aria-selected': cursorId === id,
-      'data-active': cursorId === id || undefined,
-    }),
-    [cursorId, rowBindings],
-  )
+  const rowProps = (id: Id) => ({
+    ...rowBindings(id),
+    'aria-selected': cursorId === id,
+    'data-active': cursorId === id || undefined,
+  })
 
   return {
     activeIndex: cursorIndex,

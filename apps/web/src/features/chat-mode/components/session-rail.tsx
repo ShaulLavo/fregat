@@ -1,3 +1,4 @@
+import { PANEL_SURFACE } from '@workspace/ui/patterns/panel-surface'
 import { ChatDraftRail } from '@/components/chat-draft-rail'
 import { SessionDragPreview } from '@/features/chat-mode/components/session-drag-preview'
 import { SessionShelf } from '@/features/chat-mode/components/session-shelf'
@@ -219,7 +220,7 @@ export function SessionRail() {
 
   return (
     <aside
-      className='bg-card backdrop-material flex h-full min-h-0 min-w-0 flex-col overflow-hidden'
+      className={cn(PANEL_SURFACE, 'flex h-full min-h-0 min-w-0 flex-col overflow-hidden')}
       onKeyDown={handleKeyDown}
     >
       <div className='flex shrink-0 items-center gap-1 px-2 pt-(--density-section-gap)'>

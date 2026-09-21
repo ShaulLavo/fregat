@@ -1,6 +1,5 @@
 import {
   createElement,
-  useCallback,
   useEffect,
   useLayoutEffect,
   useState,
@@ -70,7 +69,7 @@ export function EditorColorThemeProvider({ children }: { readonly children: Reac
     return themeId ? getResolvedShikiThemeContentHash(themeId) : null
   })
   // The highlighter uses this callback identity to decide whether to rebuild.
-  const shikiThemeResolver = useCallback(() => shikiTheme, [shikiTheme])
+  const shikiThemeResolver = () => shikiTheme
 
   // The shiki plugin's non-React theme resolver reads the active mode from the
   // store; mirror the app's resolved mode there.

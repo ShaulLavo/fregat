@@ -1,8 +1,7 @@
-import { mkdtemp, rm, writeFile } from 'node:fs/promises'
-import path from 'node:path'
+import { rm } from 'node:fs/promises'
 
 import type { Scenario } from './index'
-import { fixtureGit, openFixtureWorkspace } from '../fixture-workspace'
+import { createGitFixture, openFixtureWorkspace } from '../fixture-workspace'
 import { openGitPanel, selectors } from '../selectors'
 import { createScriptError } from '../../structured-errors'
 
@@ -12,12 +11,8 @@ export const gitCommitMessagePersists: Scenario = {
   name: 'git-commit-message-persists',
   description: 'Type a commit message, reload the window, and find the message still there.',
   async run(page, { step }) {
-    const fixture = await mkdtemp('/work/tmp/fregat-commit-draft-')
+    const fixture = await createGitFixture('commit-draft')
     try {
-      await fixtureGit(fixture, ['init', '--quiet'])
-      await writeFile(path.join(fixture, 'a.txt'), 'one\n')
-      await fixtureGit(fixture, ['add', 'a.txt'])
-
       await openFixtureWorkspace(page, fixture)
       await openGitPanel(page)
       await selectors.commitMessage(page).fill(DRAFT)

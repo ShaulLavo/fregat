@@ -1,23 +1,11 @@
 import { deepStrictEqual, notDeepStrictEqual, strictEqual } from 'node:assert/strict'
-import { execFileSync } from 'node:child_process'
 import * as v from 'valibot'
 import { messageIdSchema } from '../../packages/contracts/src/chat-ids'
 import { ProviderRuntimeBuffers } from '../../apps/server/src/orchestration/provider-runtime-buffers'
 import { splitBufferedAssistantText } from '../../apps/server/src/orchestration/response-delivery'
-import inventory from '../../plans/126-t3code-alignment/inventory.json'
+import { pin, readPinned } from './pinned'
 
-const pin = '7445aa733ada33e45289e5aa5055f79142556513'
-strictEqual(inventory.upstream_commit, pin)
-const source = execFileSync(
-  'git',
-  [
-    '-C',
-    'references/t3code',
-    'show',
-    `${pin}:apps/server/src/orchestration/Layers/ProviderRuntimeIngestion.ts`,
-  ],
-  { encoding: 'utf8' },
-)
+const source = readPinned(`apps/server/src/orchestration/Layers/ProviderRuntimeIngestion.ts`)
 const splitter = source.slice(
   source.indexOf('const MARKDOWN_FENCE_PATTERN'),
   source.indexOf('\nfunction proposedPlanIdForTurn'),

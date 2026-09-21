@@ -60,3 +60,5 @@ Commands dispatch over the orchestration socket when it is live and over HTTP ot
 - `response-delivery`: native paragraph delivery preserves full reasoning in an expanded activity and after reload; owned fixture cleanup.
 
 - `draft-recovery`: two distinct unsent identities, image/file-capable draft recovery after reload, retained new-worktree choice, and discard without clearing the other draft. Does not send provider turns or create worktrees.
+
+`scenario chat-card-narrow` drags the stage/tool split to its narrowest and checks the assistant changed-files card. The `+/-` counts are a ticker, which cannot shrink or ellipsize, so the header wraps its buttons to a second row rather than letting the counts paint over View diff.

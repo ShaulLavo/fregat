@@ -1,5 +1,4 @@
 import { deepStrictEqual, notDeepStrictEqual, strictEqual } from 'node:assert/strict'
-import { execFileSync } from 'node:child_process'
 import {
   compareActiveSessions,
   comparePinnedSessions,
@@ -15,16 +14,12 @@ import {
   type RailListItem,
   type RailShelf,
 } from '../../packages/client-core/src/chat/rail/drop'
-import inventory from '../../plans/126-t3code-alignment/inventory.json'
+import { pin, readPinned } from './pinned'
 
-const pin = '7445aa733ada33e45289e5aa5055f79142556513'
-strictEqual(pin, inventory.upstream_commit)
 const sortPath = 'packages/client-runtime/src/state/threadSort.ts'
 const sidebarPath = 'apps/web/src/components/Sidebar.logic.ts'
-const read = (path: string) =>
-  execFileSync('git', ['-C', 'references/t3code', 'show', `${pin}:${path}`], { encoding: 'utf8' })
-const sortSource = read(sortPath)
-const sidebarSource = read(sidebarPath)
+const sortSource = readPinned(sortPath)
+const sidebarSource = readPinned(sidebarPath)
 const start = sidebarSource.indexOf('export type SidebarSection =')
 const end = sidebarSource.indexOf("/** Project a drop's lifecycle fields", start)
 strictEqual(start >= 0 && end > start, true, 'Pinned pure sidebar section must exist')

@@ -1,6 +1,7 @@
 import type { GitFileStatus } from '@workspace/contracts'
 import { FileDashedIcon } from '@phosphor-icons/react'
 import { EmptyState } from '@workspace/ui/components/empty-state'
+import { cn } from '@workspace/ui/lib/utils'
 import { RenderErrorBoundary } from '@workspace/ui/patterns/render-error-boundary'
 import { useEditorCommands } from '@/features/editor/hooks/use-editor-commands'
 import { EditorBreadcrumbs } from '@/features/workbench/components/editor-breadcrumbs'
@@ -53,7 +54,12 @@ export function EditorGroup({
         tabs={tabs}
       />
       <div
-        className='bg-content-well relative flex min-h-0 min-w-0 flex-1 flex-col overflow-hidden'
+        className={cn(
+          'relative flex min-h-0 min-w-0 flex-1 flex-col overflow-hidden',
+          // The well is nearly opaque so text has a stable ground. With no tab
+          // there is no text, so the same ground thins out to the pane opacity.
+          selectedTab ? 'bg-content-well' : 'bg-card',
+        )}
         data-editor-group-content=''
       >
         {filePath && selectedTab ? (

@@ -1,3 +1,4 @@
+import { TickerNumber } from '@/components/ticker-number'
 import { useSessionTitleActions } from '@/features/chat-mode/hooks/use-session-title-actions'
 import { useSessionTitleSelection } from '@/features/chat-mode/hooks/use-session-title-selection'
 import { useIsMutating } from '@tanstack/react-query'
@@ -36,7 +37,7 @@ export function SessionBulkBar() {
   return (
     <PaneBar aria-label='Selected sessions' role='toolbar'>
       <span className='text-muted-foreground text-2xs min-w-0 flex-1 truncate tabular-nums'>
-        {refs.length} selected
+        <TickerNumber value={refs.length} /> selected
       </span>
       <DropdownMenu>
         <DropdownMenuTrigger

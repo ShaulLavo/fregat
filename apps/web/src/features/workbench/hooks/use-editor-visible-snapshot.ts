@@ -1,7 +1,7 @@
 import type { DocumentKey, FilesystemPath } from '@/lib/documents/utils/types'
 import type { EditorTextBuffer } from '@singapore-editor/core/document'
 import type { EditorPlugin } from '@singapore-editor/core/extensions'
-import { useEffect, useLayoutEffect, useMemo, useState } from 'react'
+import { useEffect, useLayoutEffect, useState } from 'react'
 
 import { createSnapshotCapture } from '@/features/workbench/state/snapshot-capture'
 import type { ScopedStorage } from '@/lib/environments/state/scoped-storage'
@@ -69,19 +69,16 @@ export function useEditorVisibleSnapshot({
   }
 
   // The plugin and capture source survive ordinary document changes in this host.
-  const capture = useMemo(() => createSnapshotCapture(storage), [storage])
-  const additionalPlugins = useMemo<readonly EditorPlugin[]>(
-    () => [
-      {
-        name: 'platform-snapshot-capture',
-        activate: (context) =>
-          context.registerViewContribution({
-            createContribution: () => ({ update: capture.schedule, dispose: capture.flush }),
-          }),
-      },
-    ],
-    [capture],
-  )
+  const capture = createSnapshotCapture(storage)
+  const additionalPlugins: readonly EditorPlugin[] = [
+    {
+      name: 'platform-snapshot-capture',
+      activate: (context) =>
+        context.registerViewContribution({
+          createContribution: () => ({ update: capture.schedule, dispose: capture.flush }),
+        }),
+    },
+  ]
   const buffer = renderedDocument?.buffer ?? null
   const key = renderedDocument?.documentKey ?? null
   const matchesTarget =

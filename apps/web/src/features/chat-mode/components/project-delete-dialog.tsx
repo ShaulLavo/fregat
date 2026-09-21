@@ -3,14 +3,11 @@ import {
   useChatProjectionStore,
 } from '@/features/chat/state/chat-projection-store'
 import { useWorktreeManagerStore } from '@/features/chat-mode/state/worktree-manager-store'
-import { OrbitLoader } from '@workspace/ui/components/orbit-loader'
-import { TrashIcon } from '@phosphor-icons/react'
 import { Button } from '@workspace/ui/components/button'
 import {
   Dialog,
   DialogContent,
   DialogDescription,
-  DialogFooter,
   DialogHeader,
   DialogTitle,
 } from '@workspace/ui/components/dialog'
@@ -20,6 +17,7 @@ import { useProjectActions } from '@/features/chat-mode/hooks/use-project-action
 import { useProjectDeleteRequestStore } from '@/features/chat-mode/state/project-delete-request-store'
 import { chatModeMutationKeys } from '@/features/chat-mode/utils/mutation-keys'
 import { projectDeletePrompt } from '@/features/chat-mode/utils/project-delete-prompt'
+import { DeleteDialogFooter } from '@workspace/ui/patterns/delete-dialog-footer'
 
 /**
  * Deleting a project cascades onto every session it owns and there is no undo,
@@ -84,7 +82,13 @@ export function ProjectDeleteDialog() {
             {error}
           </p>
         ) : null}
-        <DialogFooter>
+        <DeleteDialogFooter
+          cancelDisabled={pending}
+          confirmDisabled={managedCount > 0 || request?.members.some((member) => !member.available)}
+          onCancel={() => actions.cancelDelete()}
+          onConfirm={() => request && actions.confirmDelete(request)}
+          pending={pending}
+        >
           {managedCount > 0
             ? request?.members.map((member) => (
                 <Button
@@ -101,26 +105,7 @@ export function ProjectDeleteDialog() {
                 </Button>
               ))
             : null}
-          <Button
-            disabled={pending}
-            onClick={() => actions.cancelDelete()}
-            type='button'
-            variant='outline'
-          >
-            Cancel
-          </Button>
-          <Button
-            disabled={
-              managedCount > 0 || pending || request?.members.some((member) => !member.available)
-            }
-            onClick={() => request && actions.confirmDelete(request)}
-            type='button'
-            variant='destructive'
-          >
-            {pending ? <OrbitLoader /> : <TrashIcon data-icon='inline-start' />}
-            Delete
-          </Button>
-        </DialogFooter>
+        </DeleteDialogFooter>
       </DialogContent>
     </Dialog>
   )

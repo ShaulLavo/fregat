@@ -8,6 +8,7 @@
     "./lib/*": "./src/lib/*.ts",
     "./components/*": "./src/components/*.tsx",
     "./hooks/*": "./src/hooks/*.ts",
+    "./patterns/delete-dialog-footer": "./src/patterns/delete-dialog-footer.tsx",
     "./patterns/list-row": "./src/patterns/list-row.tsx",
     "./patterns/list-row-classes": "./src/patterns/list-row-classes.ts",
     "./patterns/listbox-keys": "./src/patterns/listbox-keys.ts",
@@ -15,10 +16,14 @@
     "./patterns/virtual-list": "./src/patterns/virtual-list.tsx",
     "./patterns/render-error-boundary": "./src/patterns/render-error-boundary.tsx",
     "./patterns/render-error-state": "./src/patterns/render-error-state.tsx",
+    "./patterns/tooltip-layer": "./src/patterns/tooltip-layer.tsx",
+    "./patterns/tooltip-target": "./src/patterns/tooltip-target.ts",
+    "./patterns/use-tooltip-layer": "./src/patterns/use-tooltip-layer.ts",
     "./patterns/tool-pane": "./src/patterns/tool-pane.tsx",
     "./patterns/tool-pane-header": "./src/patterns/tool-pane-header.tsx",
     "./patterns/use-row-height": "./src/patterns/use-row-height.ts",
-    "./patterns/bar-tabs": "./src/patterns/bar-tabs.ts"
+    "./patterns/bar-tabs": "./src/patterns/bar-tabs.ts",
+    "./patterns/panel-surface": "./src/patterns/panel-surface.ts"
   },
   "scripts": {
     "lint": "oxlint .",
@@ -50,6 +55,7 @@
     "@types/react": "^19.3.0",
     "@types/react-dom": "^19.3.0",
     "@typescript/native-preview": "7.0.0-dev.20260707.2",
+    "@vitejs/plugin-react": "^6.1.1",
     "@vitest/browser-playwright": "^4.1.11",
     "happy-dom": "^20.14.5",
     "oxfmt": "0.64.0",

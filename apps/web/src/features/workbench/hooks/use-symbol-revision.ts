@@ -27,6 +27,9 @@ export function useSymbolRevision(documentStore: EditorDocumentStoreApi, key: Do
       (revision) => pending.maybeExecute(revision),
     )
     const revision = documentStore.getState().documentContentRevisions[key] ?? null
+    // Closes the gap between render and subscribe. It returns `current` unchanged unless the
+    // revision moved in that window, so the usual path bails out without a second render.
+    // oxlint-disable-next-line oxc-react-compiler/set-state-in-effect
     setSnapshot((current) =>
       current.documentStore === documentStore &&
       current.key === key &&

@@ -1,7 +1,7 @@
 import { directoryQueryOptions } from '@/features/file-picker/utils/directory-query'
 import { errorMessage } from '@/lib/error-message'
 import { useQueryClient } from '@tanstack/react-query'
-import { useCallback, useEffect, useLayoutEffect, useRef } from 'react'
+import { useEffect, useLayoutEffect, useRef } from 'react'
 import { toast } from 'sonner'
 
 import type { FilePickerMode } from '@/features/file-picker/utils/model'
@@ -31,45 +31,39 @@ export function useDirectoryTransition({
     [],
   )
 
-  const beginDirectoryIntent = useCallback(() => {
+  const beginDirectoryIntent = () => {
     requestIdRef.current += 1
     return requestIdRef.current
-  }, [])
+  }
 
-  const preloadDirectory = useCallback(
-    (path: string) => {
-      if (!enabled || path === currentPath) return
+  const preloadDirectory = (path: string) => {
+    if (!enabled || path === currentPath) return
 
-      return queryClient.prefetchQuery(directoryQueryOptions({ mode, path, query: '', showHidden }))
-    },
-    [currentPath, enabled, mode, queryClient, showHidden],
-  )
+    return queryClient.prefetchQuery(directoryQueryOptions({ mode, path, query: '', showHidden }))
+  }
 
-  const loadDirectory = useCallback(
-    async (path: string, intentId?: number) => {
-      if (!enabled) return false
+  const loadDirectory = async (path: string, intentId?: number) => {
+    if (!enabled) return false
 
-      const requestId = intentId ?? beginDirectoryIntent()
+    const requestId = intentId ?? beginDirectoryIntent()
+    if (requestId !== requestIdRef.current) return false
+    if (path === currentPath) {
+      return true
+    }
+
+    try {
+      await queryClient.fetchQuery(directoryQueryOptions({ mode, path, query: '', showHidden }))
+    } catch (cause) {
       if (requestId !== requestIdRef.current) return false
-      if (path === currentPath) {
-        return true
-      }
 
-      try {
-        await queryClient.fetchQuery(directoryQueryOptions({ mode, path, query: '', showHidden }))
-      } catch (cause) {
-        if (requestId !== requestIdRef.current) return false
+      toast.error('Could not open folder', {
+        description: errorMessage(cause, 'The folder could not be loaded.'),
+      })
+      return false
+    }
 
-        toast.error('Could not open folder', {
-          description: errorMessage(cause, 'The folder could not be loaded.'),
-        })
-        return false
-      }
-
-      return requestId === requestIdRef.current
-    },
-    [beginDirectoryIntent, currentPath, enabled, mode, queryClient, showHidden],
-  )
+    return requestId === requestIdRef.current
+  }
 
   return { beginDirectoryIntent, loadDirectory, preloadDirectory }
 }

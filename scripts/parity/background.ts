@@ -1,15 +1,10 @@
 import { deepStrictEqual, notStrictEqual, strictEqual } from 'node:assert/strict'
-import { execFileSync } from 'node:child_process'
 import { BackgroundTaskRegistry } from '../../apps/server/src/provider/background-liveness'
-import inventory from '../../plans/126-t3code-alignment/inventory.json'
+import { pin, readPinned } from './pinned'
 
-const pin = '7445aa733ada33e45289e5aa5055f79142556513'
-strictEqual(pin, inventory.upstream_commit)
-const read = (path: string) =>
-  execFileSync('git', ['-C', 'references/t3code', 'show', `${pin}:${path}`], { encoding: 'utf8' })
 const sourcePath = 'apps/server/src/orchestration/ThreadBackgroundLiveness.ts'
-const source = read(sourcePath)
-const contracts = read('packages/contracts/src/providerRuntime.ts')
+const source = readPinned(sourcePath)
+const contracts = readPinned('packages/contracts/src/providerRuntime.ts')
 const constantsStart = contracts.indexOf('export const MONITOR_TASK_TYPES:')
 const constantsEnd = contracts.indexOf('/**', constantsStart)
 const terminalStart = source.indexOf('const TERMINAL_STATUSES:')

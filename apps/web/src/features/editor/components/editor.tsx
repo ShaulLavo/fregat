@@ -171,41 +171,26 @@ export function Editor({
   )
   const decodePlugin = useMemo(() => createDecodePluginLoader(decodeMode), [decodeMode])
   const unicodeHighlights = useUnicodeHighlights()
-  const plugins = useMemo(
-    () => [
-      ...criticalEditorCorePlugins,
-      unicodeHighlights.plugin,
-      diagnosticPeek.plugin,
-      languageServer,
-      decodePlugin,
-      scrollPersistencePlugin,
-      ...additionalPlugins,
-    ],
-    [
-      additionalPlugins,
-      unicodeHighlights.plugin,
-      criticalEditorCorePlugins,
-      diagnosticPeek.plugin,
-      languageServer,
-      decodePlugin,
-      scrollPersistencePlugin,
-    ],
-  )
-  const document = useMemo(
-    () =>
-      liveDocument
-        ? {
-            documentId: liveDocument.key,
-            buffer: liveDocument.buffer,
-            ...preparedTags,
-            languageId: documentLanguageId,
-            preparedDocument: liveDocument.preparedDocument,
-            text: '',
-            view: liveDocument.view,
-          }
-        : null,
-    [documentLanguageId, liveDocument, preparedTags],
-  )
+  const plugins = [
+    ...criticalEditorCorePlugins,
+    unicodeHighlights.plugin,
+    diagnosticPeek.plugin,
+    languageServer,
+    decodePlugin,
+    scrollPersistencePlugin,
+    ...additionalPlugins,
+  ]
+  const document = liveDocument
+    ? {
+        documentId: liveDocument.key,
+        buffer: liveDocument.buffer,
+        ...preparedTags,
+        languageId: documentLanguageId,
+        preparedDocument: liveDocument.preparedDocument,
+        text: '',
+        view: liveDocument.view,
+      }
+    : null
   const scheduleRowHeightAudit = useRowHeightAudit(filePath)
   const rowPositioning = editorPerformanceLayoutVariant() === 'absolute-rows' ? 'top' : 'transform'
   const controller = useEditor({
@@ -258,13 +243,10 @@ export function Editor({
       tabId,
     },
   })
-  const selection = useMemo(
-    () =>
-      definitionTarget && liveDocument
-        ? selectionForDefinition(filePath, liveDocument.buffer.getTextSnapshot(), definitionTarget)
-        : null,
-    [definitionTarget, liveDocument, filePath],
-  )
+  const selection =
+    definitionTarget && liveDocument
+      ? selectionForDefinition(filePath, liveDocument.buffer.getTextSnapshot(), definitionTarget)
+      : null
 
   useEffect(() => {
     if (!active || !liveDocument) return

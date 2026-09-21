@@ -1,3 +1,4 @@
+import { TickerNumber } from '@/components/ticker-number'
 import { cn } from '@workspace/ui/lib/utils'
 
 type LogsTimelineMetricProps = {
@@ -17,7 +18,7 @@ export function LogsTimelineMetric({ label, tone, value }: LogsTimelineMetricPro
           tone === 'slow' && 'text-info',
         )}
       >
-        {value.toLocaleString()}
+        <TickerNumber size='xs' value={value} />
       </div>
       <div className='text-muted-foreground truncate'>{label}</div>
     </div>

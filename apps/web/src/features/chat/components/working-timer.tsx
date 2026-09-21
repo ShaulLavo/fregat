@@ -1,5 +1,6 @@
 import { useEffect, useState } from 'react'
 
+import { TickerText } from '@/components/ticker-text'
 import { formatWorkingTimer } from '@/features/chat/utils/formatters'
 
 export function WorkingTimer({ startedAt }: { startedAt: string }) {
@@ -10,9 +11,5 @@ export function WorkingTimer({ startedAt }: { startedAt: string }) {
     return () => window.clearInterval(intervalId)
   }, [startedAt])
 
-  return (
-    <span className='tabular-nums'>
-      {formatWorkingTimer(startedAt, new Date(nowMs).toISOString()) ?? '0s'}
-    </span>
-  )
+  return <TickerText text={formatWorkingTimer(startedAt, new Date(nowMs).toISOString()) ?? '0s'} />
 }

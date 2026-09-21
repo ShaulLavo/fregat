@@ -25,6 +25,14 @@ import {
 } from '@/features/workbench/utils/terminal-tabs'
 
 export type WorkbenchSidebarTab = 'chat' | 'files' | 'git' | 'logs' | 'search'
+
+export const WORKBENCH_SIDEBAR_TABS: readonly WorkbenchSidebarTab[] = [
+  'files',
+  'git',
+  'search',
+  'logs',
+  'chat',
+]
 export type WorkbenchBottomTab = 'terminal' | 'problems'
 
 export type WorkbenchPanels = {

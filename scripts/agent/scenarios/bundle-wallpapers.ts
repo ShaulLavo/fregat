@@ -1,18 +1,10 @@
 import { ok } from 'node:assert/strict'
-import type { Page } from 'playwright'
 import * as v from 'valibot'
 import { themeBundleSchema, type ThemeBundle } from '../../../packages/contracts/src/index'
 import { preserveAppearance } from '../preserve-settings'
-import { chords, selectors } from '../selectors'
+import { chooseColorMode, selectors } from '../selectors'
 import type { Scenario } from './index'
-
-async function mode(page: Page, value: 'light' | 'dark') {
-  await page.keyboard.press(chords.commandPalette)
-  await selectors.paletteInput(page).fill('>Choose light / dark mode')
-  await selectors.commandOption(page, 'Choose light / dark mode').click()
-  await selectors.colorModeOption(page, value).click()
-  await selectors.paletteInput(page).waitFor({ state: 'hidden' })
-}
+import { serverApi } from '../server-api'
 
 function pairedAsset(theme: ThemeBundle, variant: 'light' | 'dark') {
   const selection = theme.variants[variant].wallpaper
@@ -25,11 +17,7 @@ export const bundleWallpapers: Scenario = {
   description:
     'Select every bundled theme from the gallery in dark and light and wait for its paired wallpaper to paint. Restores the original settings.',
   async run(page, { step }) {
-    const url = new URL(page.url())
-    const base = url.pathname.startsWith('/platform/')
-      ? `${url.origin}/platform`
-      : 'http://localhost:3001'
-    const headers = { origin: url.origin }
+    const { base, headers } = serverApi(page)
     const restore = await preserveAppearance(page)
     try {
       const library = v.parse(
@@ -41,7 +29,7 @@ export const bundleWallpapers: Scenario = {
       await page.keyboard.press('Control+,')
       await selectors.settingsSearch(page).fill('Theme bundles')
       for (const variant of ['dark', 'light'] as const) {
-        await mode(page, variant)
+        await chooseColorMode(page, variant)
         for (const theme of bundled) {
           await selectors.themeCard(page, theme.id).click()
           const image = selectors.wallpaperAsset(page, pairedAsset(theme, variant))

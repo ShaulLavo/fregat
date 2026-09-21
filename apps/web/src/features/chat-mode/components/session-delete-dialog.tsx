@@ -1,13 +1,10 @@
 import { useIsMutating } from '@tanstack/react-query'
-import { OrbitLoader } from '@workspace/ui/components/orbit-loader'
 import { chatModeMutationKeys } from '@/features/chat-mode/utils/mutation-keys'
-import { TrashIcon } from '@phosphor-icons/react'
 import { Button } from '@workspace/ui/components/button'
 import {
   Dialog,
   DialogContent,
   DialogDescription,
-  DialogFooter,
   DialogHeader,
   DialogTitle,
 } from '@workspace/ui/components/dialog'
@@ -23,6 +20,7 @@ import {
   sessionDeletePrompt,
   sessionDeleteTitle,
 } from '@/features/chat-mode/utils/session-delete-prompt'
+import { DeleteDialogFooter } from '@workspace/ui/patterns/delete-dialog-footer'
 
 /**
  * Deleting a session takes its whole event history with it and there is no undo, so it
@@ -70,20 +68,11 @@ export function SessionDeleteDialog() {
             Manage worktrees
           </Button>
         ) : null}
-        <DialogFooter>
-          <Button onClick={() => actions.cancelDelete()} type='button' variant='outline'>
-            Cancel
-          </Button>
-          <Button
-            disabled={pending}
-            onClick={() => request && actions.confirmDelete(request)}
-            type='button'
-            variant='destructive'
-          >
-            {pending ? <OrbitLoader /> : <TrashIcon data-icon='inline-start' />}
-            Delete
-          </Button>
-        </DialogFooter>
+        <DeleteDialogFooter
+          onCancel={() => actions.cancelDelete()}
+          onConfirm={() => request && actions.confirmDelete(request)}
+          pending={pending}
+        />
       </DialogContent>
     </Dialog>
   )

@@ -37,3 +37,7 @@ Expand a session's **Changed files** section. `scenario chat-changed-files` insp
 ## Render error boundaries
 
 `pane-render-crash` opens Logs, makes the log time formatters throw from outside the app, and checks that only the pane body shows "hit a render error" while the toolbar, rail, editor and terminal stay. It then restores the formatter and clicks Retry; the rows must come back. The crash must appear once in the log as `react.caught_error`.
+
+## Surface stacking
+
+Surface tokens are translucent, so painting one inside a region that already paints it doubles the alpha instead of changing the tone — an extra layer over the wallpaper, invisible over a flat background. `scenario surface-stacking` walks the four sidebar tabs and chat mode, and records in `inspection.json` every element whose painted background matches a painted ancestor, with its box so you can find it on the screenshot. Pairs whose ancestor is the root shell or `body` sit behind the wallpaper and do not paint; everything else is a real double. Run it after touching any pane, bar, field or chip background.

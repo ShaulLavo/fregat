@@ -2,25 +2,16 @@ import { ok } from 'node:assert/strict'
 import type { Page } from 'playwright'
 import type { Scenario } from './index'
 import { selectors } from '../selectors'
-import { readShell, dispatch } from './chat-verification'
+import { collectOrchestrationBases, dispatch, readShell } from './chat-verification'
 
 async function searchConversation(
   page: Page,
   step: (name: string) => Promise<void>,
   crossOwner: boolean,
 ) {
-  const bases = new Set<string>()
+  const bases = collectOrchestrationBases(page)
   const connected = page.waitForEvent('websocket', {
     predicate: (socket) => socket.url().endsWith('/orchestration/rpc'),
-  })
-  page.on('websocket', (socket) => {
-    if (socket.url().endsWith('/orchestration/rpc'))
-      bases.add(
-        socket
-          .url()
-          .replace(/^ws/, 'http')
-          .replace(/\/rpc$/, ''),
-      )
   })
   await page.goto(page.url().replace(/\/workbench(?:\?.*)?$/, '/chat'))
   const primary = (await connected)

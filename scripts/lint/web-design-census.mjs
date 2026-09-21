@@ -3,6 +3,7 @@ import path from 'node:path'
 import { pathToFileURL } from 'node:url'
 import { parseArgs } from 'node:util'
 import { parseSync } from 'oxc-parser'
+import { formatGate, formatHistogram, formatList, histogram } from './census-report.mjs'
 
 const REPOSITORY = path.resolve(import.meta.dirname, '../..')
 // The app and the primitives it composes are one design surface; measuring only the app leaves
@@ -10,9 +11,8 @@ const REPOSITORY = path.resolve(import.meta.dirname, '../..')
 const DEFAULT_ROOTS = ['apps/web/src', 'packages/markdown/src', 'packages/ui/src'].map((root) =>
   path.join(REPOSITORY, root),
 )
-const UI_PACKAGE = 'packages/ui/src/'
 const DEFAULT_ALLOW = path.join(REPOSITORY, 'scripts/lint/web-design-allow.json')
-const LIST_CAP = 40
+const UI_PACKAGE = 'packages/ui/src/'
 const BAR_HEIGHT = 'h-(--bar-height)'
 
 /**
@@ -220,12 +220,6 @@ function mergeCensus(censuses) {
   return merged
 }
 
-function histogram(hits) {
-  const counts = new Map()
-  for (const hit of hits) counts.set(hit.value, (counts.get(hit.value) ?? 0) + 1)
-  return counts
-}
-
 export function censusSource(file, source) {
   const census = emptyCensus()
   census.files = 1
@@ -329,7 +323,9 @@ function hasAttribute(opening, name) {
 }
 
 function hasTitle(opening) {
-  return hasAttribute(opening, 'title')
+  // `data-tooltip` recovers the same value through the shared tooltip layer,
+  // which rows use instead of a native title.
+  return hasAttribute(opening, 'title') || hasAttribute(opening, 'data-tooltip')
 }
 
 function attributeValue(opening, name) {
@@ -757,18 +753,6 @@ function toJson(census, result, roots) {
   }
 }
 
-function formatHistogram(title, hits) {
-  const rows = [...histogram(hits)].sort(
-    (left, right) => right[1] - left[1] || left[0].localeCompare(right[0]),
-  )
-  if (rows.length === 0) return `${title}\n  (none)`
-  const width = Math.max(...rows.map(([value]) => value.length), 'total'.length)
-  const body = rows.map(
-    ([value, count]) => `  ${value.padEnd(width)}  ${String(count).padStart(6)}`,
-  )
-  return `${title}\n${body.join('\n')}\n  ${'total'.padEnd(width)}  ${String(hits.length).padStart(6)}`
-}
-
 function formatCounts(census) {
   const rows = ALL_MEASURES.map((measure) => [
     TARGETS[measure].title,
@@ -779,21 +763,6 @@ function formatCounts(census) {
     'totals',
     ...rows.map(([title, count]) => `  ${title.padEnd(width)}  ${String(count).padStart(6)}`),
   ].join('\n')
-}
-
-function formatList(title, hits) {
-  if (hits.length === 0) return `${title}: none`
-  const shown = hits.slice(0, LIST_CAP).map((hit) => `  ${hit.file}:${hit.line}  ${hit.value}`)
-  if (hits.length > LIST_CAP) shown.push(`  … and ${hits.length - LIST_CAP} more`)
-  return `${title}: ${hits.length}\n${shown.join('\n')}`
-}
-
-function formatGate(result) {
-  const lines = result.allowProblems.map((problem) => `  allow-list  ${problem}`)
-  for (const failure of result.failures)
-    lines.push(`  ${failure.title}: ${failure.count} over target`)
-  if (lines.length === 0) return 'gate: every measure is on target'
-  return `gate: ${lines.length} measure(s) off target\n${lines.join('\n')}`
 }
 
 function formatRoots(roots) {

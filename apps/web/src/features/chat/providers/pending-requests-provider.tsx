@@ -8,7 +8,7 @@ import type {
   SessionUserInputRespondCommand,
   SessionUserInputDismissCommand,
 } from '@workspace/contracts'
-import { useMemo, useState, type ReactNode } from 'react'
+import { useState, type ReactNode } from 'react'
 
 import type { ChatTransport } from '@/features/chat/transport/chat-transport'
 import {
@@ -59,55 +59,52 @@ export function ChatPendingRequestsProvider({
   const [responses, setResponses] = useState<RequestResponses>(NO_RESPONSES)
   // Context value identity: these panels sit beside the composer, so a fresh
   // object on every composer render would repaint them for nothing.
-  const value = useMemo<ChatPendingRequests>(
-    () => ({
-      sessionId,
-      disabledReason,
-      responseState: (requestId) => {
-        const pending = responses.get(requestId)
-        if (!pending) return IDLE_RESPONSE
-        const failure = pendingRequestError(activities, pending.commandId)
-        return failure ? { kind: 'failed', message: failure } : pending.response
-      },
-      pendingApprovals: derivePendingApprovals(activities),
-      pendingUserInputs: derivePendingUserInputs(activities, retainedQuestions),
-      dismissUserInput: (requestId) =>
-        dispatchPendingRequestResponse({
-          command: createUserInputDismissCommand({ requestId, sessionId }),
-          context: {},
+  const value: ChatPendingRequests = {
+    sessionId,
+    disabledReason,
+    responseState: (requestId) => {
+      const pending = responses.get(requestId)
+      if (!pending) return IDLE_RESPONSE
+      const failure = pendingRequestError(activities, pending.commandId)
+      return failure ? { kind: 'failed', message: failure } : pending.response
+    },
+    pendingApprovals: derivePendingApprovals(activities),
+    pendingUserInputs: derivePendingUserInputs(activities, retainedQuestions),
+    dismissUserInput: (requestId) =>
+      dispatchPendingRequestResponse({
+        command: createUserInputDismissCommand({ requestId, sessionId }),
+        context: {},
+        requestId,
+        setResponses,
+        transport,
+      }),
+    respondToApproval: (requestId, decision) =>
+      dispatchPendingRequestResponse({
+        command: createApprovalRespondCommand({
+          decision,
           requestId,
-          setResponses,
-          transport,
+          sessionId,
         }),
-      respondToApproval: (requestId, decision) =>
-        dispatchPendingRequestResponse({
-          command: createApprovalRespondCommand({
-            decision,
-            requestId,
-            sessionId,
-          }),
-          context: { decision },
+        context: { decision },
+        requestId,
+        setResponses,
+        transport,
+      }),
+    respondToUserInput: (requestId, answers, attachmentsByQuestionId) =>
+      dispatchPendingRequestResponse({
+        command: createUserInputRespondCommand({
+          answers,
+          attachmentsByQuestionId,
           requestId,
-          setResponses,
-          transport,
+          sessionId,
         }),
-      respondToUserInput: (requestId, answers, attachmentsByQuestionId) =>
-        dispatchPendingRequestResponse({
-          command: createUserInputRespondCommand({
-            answers,
-            attachmentsByQuestionId,
-            requestId,
-            sessionId,
-          }),
-          // Count only: an answer can be a credential the provider asked for.
-          context: { answerCount: Object.keys(answers).length },
-          requestId,
-          setResponses,
-          transport,
-        }),
-    }),
-    [activities, retainedQuestions, disabledReason, responses, sessionId, transport],
-  )
+        // Count only: an answer can be a credential the provider asked for.
+        context: { answerCount: Object.keys(answers).length },
+        requestId,
+        setResponses,
+        transport,
+      }),
+  }
 
   return <ChatPendingRequestsContext value={value}>{children}</ChatPendingRequestsContext>
 }

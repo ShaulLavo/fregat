@@ -6,7 +6,7 @@ import {
 import { CodeHighlighterContext } from '@workspace/markdown/providers/code-highlighter-context'
 import { cn } from '@workspace/ui/lib/utils'
 import { useQueryClient } from '@tanstack/react-query'
-import { useMemo, type ClipboardEvent } from 'react'
+import { type ClipboardEvent } from 'react'
 import type { ThemeRegistrationAny } from 'shiki/core'
 
 import { useEditorColorTheme } from '@/features/editor/hooks/use-editor-color-theme'
@@ -63,20 +63,14 @@ export function AssistantMarkdown({
     : null
   const renderedText = normalizeAgentMarkdown(text)
   const mermaid = useMermaid(renderedText, streaming)
-  const fileLinkActions = useMemo(
-    () => ({ openFileReference, rootPath }),
-    [openFileReference, rootPath],
-  )
+  const fileLinkActions = { openFileReference, rootPath }
   // The plugin list is the parser's identity: a new list is a new parser and
   // an empty incremental cache, so it changes only with the workspace.
-  const remarkPlugins = useMemo<MarkdownProps['remarkPlugins']>(
-    () => [
-      remarkNormalizeListItemIndentation,
-      [remarkFileLinkChips, { rootPath }],
-      [remarkWorkspaceImages, { rootPath, workspacePath, origin }],
-    ],
-    [rootPath, workspacePath, origin],
-  )
+  const remarkPlugins: MarkdownProps['remarkPlugins'] = [
+    remarkNormalizeListItemIndentation,
+    [remarkFileLinkChips, { rootPath }],
+    [remarkWorkspaceImages, { rootPath, workspacePath, origin }],
+  ]
 
   // Re-emit the rendered view as markdown so copying a selection keeps links,
   // emphasis, lists and fences instead of flattening to text.

@@ -1,4 +1,6 @@
 import { Button } from '@workspace/ui/components/button'
+
+import { TickerNumber } from '@/components/ticker-number'
 import { Popover, PopoverContent, PopoverTrigger } from '@workspace/ui/components/popover'
 import { Tooltip, TooltipContent, TooltipTrigger } from '@workspace/ui/components/tooltip'
 import { cn } from '@workspace/ui/lib/utils'
@@ -29,7 +31,6 @@ export function ContextUsageRing({
   readonly usage: ContextUsage
 }) {
   const percent = usage.ratio === null ? null : Math.round(usage.ratio * 100)
-  const readout = percent === null ? formatContextTokens(usage.usedTokens) : `${percent}%`
 
   return (
     <Popover>
@@ -75,7 +76,16 @@ export function ContextUsageRing({
                       />
                     )}
                   </svg>
-                  {compact ? null : <span className='text-2xs tabular-nums'>{readout}</span>}
+                  {compact ? null : (
+                    <span className='text-2xs tabular-nums'>
+                      {percent === null ? (
+                        formatContextTokens(usage.usedTokens)
+                      ) : (
+                        <TickerNumber value={percent} />
+                      )}
+                      {percent === null ? null : '%'}
+                    </span>
+                  )}
                 </Button>
               }
             />

@@ -4,8 +4,8 @@ import type { EditorPlugin } from '@singapore-editor/core/extensions'
 import { EditorHost, useEditor } from '@singapore-editor/react'
 import {
   memo,
-  useCallback,
   useEffect,
+  useEffectEvent,
   useMemo,
   useRef,
   type KeyboardEvent,
@@ -69,36 +69,28 @@ export const SearchResultFileEditor = memo(
     replaceVisible,
   }: SearchResultFileEditorProps) => {
     const { openTarget, replaceMatch, selectResultWithoutReveal } = useSearchResultActions()
-    const fileDocument = useMemo(() => searchResultFileDocument(file), [file])
+    const fileDocument = searchResultFileDocument(file)
+    // Manual keys: the compiler would also key this on `activeResultId`, so moving the selection
+    // would rebuild the windowed document under the editor.
     const visibleDocument = useMemo(
       () => searchResultFileDocumentWindow(fileDocument, lineWindow),
       [fileDocument, lineWindow],
     )
     const sourceLineDigits = fileBlockLineDigits(file)
-    const document = useMemo(
-      () => ({
-        documentId: searchResultFileDocumentId(file),
-        documentMode: 'static' as const,
-        languageId: visibleDocument.languageId,
-        revision: searchResultFileDocumentRevision(visibleDocument, lineWindow),
-        text: visibleDocument.text,
-        textSyncMode: 'open' as const,
-      }),
-      [file, lineWindow, visibleDocument],
-    )
-    const rangeDecorations = useMemo(
-      () => searchResultFileRangeDecorations(visibleDocument, activeResultId),
-      [activeResultId, visibleDocument],
-    )
-    const syntaxPlugins = useMemo(
-      () => [createSearchResultSyntaxHighlightingPlugin(editorTreeSitterSyntaxProvider())],
-      [],
-    )
-    const plugins = useMemo(() => createFileResultEditorPlugins(syntaxPlugins), [syntaxPlugins])
-    const editorStyle = useMemo(
-      () => searchResultFileEditorStyle(visibleDocument),
-      [visibleDocument],
-    )
+    const document = {
+      documentId: searchResultFileDocumentId(file),
+      documentMode: 'static' as const,
+      languageId: visibleDocument.languageId,
+      revision: searchResultFileDocumentRevision(visibleDocument, lineWindow),
+      text: visibleDocument.text,
+      textSyncMode: 'open' as const,
+    }
+    const rangeDecorations = searchResultFileRangeDecorations(visibleDocument, activeResultId)
+    const syntaxPlugins = [
+      createSearchResultSyntaxHighlightingPlugin(editorTreeSitterSyntaxProvider()),
+    ]
+    const plugins = createFileResultEditorPlugins(syntaxPlugins)
+    const editorStyle = searchResultFileEditorStyle(visibleDocument)
     const editorScrollMode = searchResultFileEditorScrollMode(visibleDocument.lines.length)
     const controller = useEditor({
       cursorLineHighlight: SEARCH_RESULT_CURSOR_LINE_HIGHLIGHT,
@@ -127,14 +119,14 @@ export const SearchResultFileEditor = memo(
     const pendingActivationFrameRef = useRef<number | null>(null)
     const lineActionRowsRef = useRef(new Map<SearchResultId, HTMLDivElement>())
     const hoveredLineActionRowRef = useRef<HTMLDivElement | null>(null)
-    const setHoveredLineActionRow = useCallback((lineId: SearchResultId | null) => {
+    const setHoveredLineActionRow = (lineId: SearchResultId | null) => {
       const nextRow = lineId ? (lineActionRowsRef.current.get(lineId) ?? null) : null
       if (hoveredLineActionRowRef.current === nextRow) return
 
       hoveredLineActionRowRef.current?.removeAttribute('data-hovered')
       hoveredLineActionRowRef.current = nextRow
       nextRow?.setAttribute('data-hovered', 'true')
-    }, [])
+    }
 
     useEffect(
       () => () => {
@@ -145,48 +137,39 @@ export const SearchResultFileEditor = memo(
       [],
     )
 
-    useEffect(
-      () => () => {
-        setHoveredLineActionRow(null)
-      },
-      [setHoveredLineActionRow],
-    )
-
-    const handlePointerUp = useCallback(
-      (event: PointerEvent<HTMLDivElement>) => {
-        if (isSearchResultEditorActionTarget(event.target)) return
-
-        const nextResultId =
-          searchResultFileLineIdAtClientY(fileDocument, event.currentTarget, event.clientY) ??
-          file.id
-        if (pendingActivationFrameRef.current !== null) {
-          window.cancelAnimationFrame(pendingActivationFrameRef.current)
-        }
-        pendingActivationFrameRef.current = window.requestAnimationFrame(() => {
-          pendingActivationFrameRef.current = null
-          selectResultWithoutReveal(nextResultId)
-        })
-      },
-      [file.id, fileDocument, selectResultWithoutReveal],
-    )
-
-    const handlePointerMove = useCallback(
-      (event: PointerEvent<HTMLDivElement>) => {
-        const lineId = searchResultFileLineIdAtClientY(
-          fileDocument,
-          event.currentTarget,
-          event.clientY,
-        )
-        setHoveredLineActionRow(lineId)
-      },
-      [fileDocument, setHoveredLineActionRow],
-    )
-
-    const handlePointerLeave = useCallback(() => {
+    const clearHoveredLineAction = useEffectEvent(() => {
       setHoveredLineActionRow(null)
-    }, [setHoveredLineActionRow])
+    })
+    useEffect(() => () => clearHoveredLineAction(), [])
 
-    const handleOpen = useCallback(() => {
+    const handlePointerUp = (event: PointerEvent<HTMLDivElement>) => {
+      if (isSearchResultEditorActionTarget(event.target)) return
+
+      const nextResultId =
+        searchResultFileLineIdAtClientY(fileDocument, event.currentTarget, event.clientY) ?? file.id
+      if (pendingActivationFrameRef.current !== null) {
+        window.cancelAnimationFrame(pendingActivationFrameRef.current)
+      }
+      pendingActivationFrameRef.current = window.requestAnimationFrame(() => {
+        pendingActivationFrameRef.current = null
+        selectResultWithoutReveal(nextResultId)
+      })
+    }
+
+    const handlePointerMove = (event: PointerEvent<HTMLDivElement>) => {
+      const lineId = searchResultFileLineIdAtClientY(
+        fileDocument,
+        event.currentTarget,
+        event.clientY,
+      )
+      setHoveredLineActionRow(lineId)
+    }
+
+    const handlePointerLeave = () => {
+      setHoveredLineActionRow(null)
+    }
+
+    const handleOpen = () => {
       const line = currentSearchResultFileLine(visibleDocument, controller)
       if (!line) return
 
@@ -194,37 +177,28 @@ export const SearchResultFileEditor = memo(
         match: line.sourceMatch,
         path: file.path,
       })
-    }, [controller, file.path, openTarget, visibleDocument])
+    }
 
-    const handleOpenLine = useCallback(
-      (line: SearchResultFileDocumentLine) => {
-        selectResultWithoutReveal(line.id)
-        openTarget({
-          match: line.sourceMatch,
-          path: file.path,
-        })
-      },
-      [file.path, openTarget, selectResultWithoutReveal],
-    )
+    const handleOpenLine = (line: SearchResultFileDocumentLine) => {
+      selectResultWithoutReveal(line.id)
+      openTarget({
+        match: line.sourceMatch,
+        path: file.path,
+      })
+    }
 
-    const handleReplaceLine = useCallback(
-      (line: SearchResultFileDocumentLine) => {
-        selectResultWithoutReveal(line.id)
-        replaceMatch(line.sourceMatch)
-      },
-      [replaceMatch, selectResultWithoutReveal],
-    )
+    const handleReplaceLine = (line: SearchResultFileDocumentLine) => {
+      selectResultWithoutReveal(line.id)
+      replaceMatch(line.sourceMatch)
+    }
 
-    const handleKeyDownCapture = useCallback(
-      (event: KeyboardEvent<HTMLDivElement>) => {
-        if (openFileResultOnEnter(event, handleOpen)) return
-        if (!readonlyEditingKey(event)) return
+    const handleKeyDownCapture = (event: KeyboardEvent<HTMLDivElement>) => {
+      if (openFileResultOnEnter(event, handleOpen)) return
+      if (!readonlyEditingKey(event)) return
 
-        event.preventDefault()
-        event.stopPropagation()
-      },
-      [handleOpen],
-    )
+      event.preventDefault()
+      event.stopPropagation()
+    }
 
     return (
       <div

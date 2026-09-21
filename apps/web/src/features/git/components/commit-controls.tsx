@@ -1,3 +1,4 @@
+import { TickerText } from '@/components/ticker-text'
 import type { GitRepositoryInfo } from '@workspace/contracts'
 import { ArrowsClockwiseIcon, CheckIcon, SparkleIcon } from '@phosphor-icons/react'
 import { Button } from '@workspace/ui/components/button'
@@ -58,7 +59,7 @@ export function CommitControls({
   return (
     <>
       <PaneBar>
-        <InputGroup className='bg-background h-(--density-control-height-sm) min-w-0 flex-1'>
+        <InputGroup className='h-(--density-control-height-sm) min-w-0 flex-1'>
           <InputGroupInput
             aria-label='Commit message'
             aria-describedby={generation.error ? generationErrorId : undefined}
@@ -113,7 +114,7 @@ export function CommitControls({
             ) : (
               <ArrowsClockwiseIcon className='size-(--icon-size-sm)' />
             )}
-            {syncChangesLabel(repository)}
+            <TickerText text={syncChangesLabel(repository)} />
           </Button>
         ) : (
           <Button

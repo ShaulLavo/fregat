@@ -2,6 +2,16 @@
   "$schema": "http://json-schema.org/draft-07/schema#",
   "additionalProperties": false,
   "properties": {
+    "chat.confirmSessionDelete": {
+      "default": true,
+      "description": "Ask before permanently deleting one or more conversations.",
+      "type": "boolean"
+    },
+    "chat.contextWindowMeterEnabled": {
+      "default": false,
+      "description": "Show conversation context occupancy in the composer and session header. Provider quota information is independent.",
+      "type": "boolean"
+    },
     "chat.defaultInteractionMode": {
       "default": "default",
       "description": "Whether a new session starts in plan mode.",
@@ -14,9 +24,25 @@
       "enum": ["approval-required", "auto-accept-edits", "full-access"],
       "type": "string"
     },
+    "chat.inAppNotificationsEnabled": {
+      "default": false,
+      "description": "Show an Open session action when another session needs attention or completes while this window is focused.",
+      "type": "boolean"
+    },
     "chat.keepImportedSessionsUpdated": {
       "default": true,
       "description": "Imported chats receive one-way updates from local history until you send their first message in Platform. New chats are only imported when you click Import.",
+      "type": "boolean"
+    },
+    "chat.notificationMode": {
+      "default": "off",
+      "description": "Notify when a session needs attention or completes. Native notifications require browser permission; sound starts after a pointer or keyboard gesture.",
+      "enum": ["notifications-and-sound", "notifications", "off", "sound"],
+      "type": "string"
+    },
+    "chat.planModeEnabled": {
+      "default": false,
+      "description": "Show the Plan mode picker and /plan and /default commands for providers that support them. Stored draft preferences are retained while hidden.",
       "type": "boolean"
     },
     "chat.projectGrouping": {
@@ -35,6 +61,98 @@
       "propertyNames": {
         "type": "string"
       },
+      "type": "object"
+    },
+    "chat.projectResponseStreamingModes": {
+      "additionalProperties": {
+        "enum": ["paragraph", "token", "turn"],
+        "type": "string"
+      },
+      "default": {},
+      "description": "Response streaming mode overrides keyed by project UUID on this machine.",
+      "propertyNames": {
+        "type": "string"
+      },
+      "type": "object"
+    },
+    "chat.projectTextGenerationModels": {
+      "additionalProperties": {
+        "properties": {
+          "model": {
+            "minLength": 1,
+            "type": "string"
+          },
+          "options": {
+            "properties": {
+              "reasoningEffort": {
+                "minLength": 1,
+                "type": "string"
+              }
+            },
+            "required": [],
+            "type": "object"
+          },
+          "providerInstanceId": {
+            "maxLength": 64,
+            "minLength": 1,
+            "pattern": "^[a-zA-Z][a-zA-Z0-9_-]*$",
+            "type": "string"
+          }
+        },
+        "required": ["model", "providerInstanceId"],
+        "type": "object"
+      },
+      "default": {},
+      "description": "Title generation model overrides keyed by project UUID on this machine.",
+      "propertyNames": {
+        "type": "string"
+      },
+      "type": "object"
+    },
+    "chat.responseStreamingMode": {
+      "default": "paragraph",
+      "description": "Publish assistant responses by paragraph, complete turn, or individual token.",
+      "enum": ["paragraph", "token", "turn"],
+      "type": "string"
+    },
+    "chat.sessionSortOrder": {
+      "default": "updated_at",
+      "description": "Order palette sessions and choose the surviving project session after deletion by latest user activity or creation time. Shelf ordering remains independent.",
+      "enum": ["created_at", "updated_at"],
+      "type": "string"
+    },
+    "chat.textGenerationModel": {
+      "default": {
+        "model": "gpt-5.6-luna",
+        "options": {
+          "reasoningEffort": "low"
+        },
+        "providerInstanceId": "codex"
+      },
+      "description": "Provider and model used to generate session titles, independently of the conversation model.",
+      "properties": {
+        "model": {
+          "minLength": 1,
+          "type": "string"
+        },
+        "options": {
+          "properties": {
+            "reasoningEffort": {
+              "minLength": 1,
+              "type": "string"
+            }
+          },
+          "required": [],
+          "type": "object"
+        },
+        "providerInstanceId": {
+          "maxLength": 64,
+          "minLength": 1,
+          "pattern": "^[a-zA-Z][a-zA-Z0-9_-]*$",
+          "type": "string"
+        }
+      },
+      "required": ["model", "providerInstanceId"],
       "type": "object"
     },
     "developer.simulatedLatencyMs": {
@@ -86,6 +204,25 @@
       "default": true,
       "description": "Draw indentation guides (scope lines).",
       "type": "boolean"
+    },
+    "editor.history.persist": {
+      "default": true,
+      "description": "Keep undo history for closed files in this browser, so reopening a file or reloading the window brings it back. A file that changed on disk in the meantime starts fresh.",
+      "type": "boolean"
+    },
+    "editor.history.persistBudget": {
+      "default": 67108864,
+      "description": "Total stored undo history across closed files, in UTF-16 code units. The least recently saved files go first when it is exceeded.",
+      "maximum": 1073741824,
+      "minimum": 0,
+      "type": "integer"
+    },
+    "editor.history.persistDays": {
+      "default": 30,
+      "description": "Days a closed file keeps its stored undo history before it is dropped.",
+      "maximum": 365,
+      "minimum": 1,
+      "type": "integer"
     },
     "editor.history.retainedStates": {
       "default": 200,

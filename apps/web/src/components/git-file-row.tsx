@@ -6,13 +6,17 @@ import { Shimmer } from '@workspace/ui/components/shimmer'
 import { cn } from '@workspace/ui/lib/utils'
 import { iconForEntry } from '@/lib/file-icons'
 import { basename, parentPath, toTreePath } from '@/lib/path-formatters'
-import type { StatusPresentation } from '@/features/git/utils/types'
+import type { GitLineStat } from '@workspace/contracts'
+import { DiffStatLabel } from '@/components/diff-stat-label'
+import type { StatusPresentation } from '@/lib/git-status-symbols'
 
-export function FileRow({
+export function GitFileRow({
   path,
   oldPath,
   rootPath,
   status,
+  stat,
+  role = 'treeitem',
   loading = false,
   disabledReason,
   historical = false,
@@ -26,6 +30,8 @@ export function FileRow({
   oldPath?: string
   rootPath: string
   status: StatusPresentation
+  stat?: GitLineStat
+  role?: 'treeitem' | 'option'
   loading?: boolean
   disabledReason?: string
   historical?: boolean
@@ -39,7 +45,15 @@ export function FileRow({
   const name = basename(relativePath)
   const directory = parentPath(relativePath)
   const icon = iconForEntry({ name, type: 'file' })
-  const title = `${oldPath ? `${toTreePath(oldPath, rootPath)} → ` : ''}${relativePath} · ${status.title}${disabledReason ? ` · ${disabledReason}` : ''}`
+  const changed = stat && stat.additions + stat.deletions > 0 ? stat : undefined
+  const title = [
+    `${oldPath ? `${toTreePath(oldPath, rootPath)} → ` : ''}${relativePath}`,
+    status.title,
+    changed ? `+${changed.additions} -${changed.deletions}` : undefined,
+    disabledReason,
+  ]
+    .filter(Boolean)
+    .join(' · ')
   const label = (
     <>
       <span className={cn('font-medium', !loading && 'text-foreground')}>{name}</span>
@@ -66,15 +80,15 @@ export function FileRow({
   return (
     <ListRow
       {...rowProps}
-      role='treeitem'
-      aria-level={historical ? 1 : 2}
+      role={role}
+      aria-level={treeLevel(role, historical)}
       aria-busy={loading || undefined}
       aria-disabled={Boolean(disabledReason) || undefined}
-      className='grid cursor-pointer grid-cols-[22px_minmax(0,1fr)_auto_28px] gap-0 leading-4'
+      className='grid cursor-pointer grid-cols-[22px_minmax(0,1fr)_auto_auto_28px] gap-0 leading-4'
       data-git-file={path}
       data-git-file-loading={loading || undefined}
       data-history-file={historical ? path : undefined}
-      title={title}
+      data-tooltip={title}
       onClick={(event) => {
         rowProps?.onClick(event)
         handleOpen()
@@ -87,6 +101,11 @@ export function FileRow({
         {loading ? <Shimmer>{label}</Shimmer> : label}
       </div>
       <div>{actions}</div>
+      <span className='text-2xs pl-1.5 tabular-nums'>
+        {changed ? (
+          <DiffStatLabel additions={changed.additions} deletions={changed.deletions} />
+        ) : null}
+      </span>
       <span
         className={cn(
           'flex h-(--density-row-height) items-center justify-self-end pb-px text-xs font-semibold leading-none',
@@ -97,4 +116,10 @@ export function FileRow({
       </span>
     </ListRow>
   )
+}
+
+function treeLevel(role: 'treeitem' | 'option', historical: boolean) {
+  if (role === 'option') return undefined
+
+  return historical ? 1 : 2
 }

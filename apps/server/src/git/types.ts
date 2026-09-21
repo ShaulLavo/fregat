@@ -10,6 +10,7 @@ export type {
   GitFileDiff,
   GitFileStatus,
   GitLineChange,
+  GitLineStat,
   GitRepositoryInfo,
   GitStatusResult,
   GitWorktree,

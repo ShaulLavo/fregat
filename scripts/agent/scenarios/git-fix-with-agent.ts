@@ -1,8 +1,13 @@
-import { chmod, mkdtemp, rm, writeFile } from 'node:fs/promises'
+import { rm, writeFile } from 'node:fs/promises'
 import path from 'node:path'
 
 import type { Scenario } from './index'
-import { fixtureGit, openFixtureWorkspace } from '../fixture-workspace'
+import {
+  createGitFixture,
+  fixtureGit,
+  installPreCommitHook,
+  openFixtureWorkspace,
+} from '../fixture-workspace'
 import { openGitPanel, selectors } from '../selectors'
 import { createScriptError } from '../../structured-errors'
 
@@ -16,20 +21,13 @@ export const gitFixWithAgent: Scenario = {
   description:
     'Fail a commit on a rejecting hook, press Fix with agent, and find the failure alone in a new chat.',
   async run(page, { step }) {
-    const fixture = await mkdtemp('/work/tmp/fregat-fix-with-agent-')
+    const fixture = await createGitFixture('fix-with-agent')
     try {
-      await fixtureGit(fixture, ['init', '--quiet'])
-      await fixtureGit(fixture, ['config', 'user.email', 'fregat@example.com'])
-      await fixtureGit(fixture, ['config', 'user.name', 'Fregat'])
       // Chat needs a root commit to identify the repository.
-      await writeFile(path.join(fixture, 'a.txt'), 'one\n')
-      await fixtureGit(fixture, ['add', 'a.txt'])
       await fixtureGit(fixture, ['commit', '--quiet', '-m', 'initial'])
       await writeFile(path.join(fixture, 'a.txt'), 'two\n')
       await fixtureGit(fixture, ['add', 'a.txt'])
-      const hook = path.join(fixture, '.git', 'hooks', 'pre-commit')
-      await writeFile(hook, HOOK)
-      await chmod(hook, 0o755)
+      await installPreCommitHook(fixture, HOOK)
 
       await openFixtureWorkspace(page, fixture)
       // Something already in the open chat: the hand-off must not land beside it.

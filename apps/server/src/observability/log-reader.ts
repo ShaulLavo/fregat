@@ -11,7 +11,7 @@ import type {
   LogEventSummary,
   LogLiveStreamItem,
 } from '@workspace/contracts'
-import { errorStringField } from '@workspace/contracts'
+import { errorStringField, logDashboardTimelineBucketCount } from '@workspace/contracts'
 import { isRecord } from '@workspace/utils/objects'
 import type { LogLevel, WideEvent } from 'evlog'
 import { readFsLogs, tailFsLogs } from 'evlog/fs'
@@ -42,7 +42,6 @@ type TimelineRange = {
 const defaultEventLimit = 200
 const maxEventLimit = 1_000
 const defaultSlowMs = 500
-const timelineBucketCount = 48
 const maxBreakdownItems = 12
 const maxDetailCacheEvents = 5_000
 const validLevels: ReadonlySet<string> = new Set(['debug', 'error', 'info', 'warn'])
@@ -303,7 +302,10 @@ function timeline(
   range: TimelineRange,
   filters: LogDashboardFilters,
 ): LogDashboardTimelineBucket[] {
-  const bucketMs = Math.max(1, Math.ceil((range.endMs - range.startMs) / timelineBucketCount))
+  const bucketMs = Math.max(
+    1,
+    Math.ceil((range.endMs - range.startMs) / logDashboardTimelineBucketCount),
+  )
   const buckets = createTimelineBuckets(range.startMs, bucketMs)
 
   for (const event of events) {
@@ -314,7 +316,7 @@ function timeline(
 }
 
 function createTimelineBuckets(startMs: number, bucketMs: number) {
-  return Array.from({ length: timelineBucketCount }, (_, index) => ({
+  return Array.from({ length: logDashboardTimelineBucketCount }, (_, index) => ({
     end: new Date(startMs + bucketMs * (index + 1)).toISOString(),
     error: 0,
     slow: 0,

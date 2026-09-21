@@ -25,6 +25,25 @@ export async function settingsSnapshot(page: Page, base: string) {
   return v.parse(settingsSnapshotSchema, await response.json())
 }
 
+/** Puts the user layer back exactly as `preserveAppearance` found it, key by key. */
+export async function restoreUserSettings(
+  page: Page,
+  base: string,
+  before: { layers: readonly { id: string; raw?: Record<string, unknown> }[] },
+  keys: readonly string[],
+) {
+  const raw = before.layers.find((layer) => layer.id === 'user')?.raw
+  await writeSettings(
+    page,
+    base,
+    keys.map((key) =>
+      raw?.[key] === undefined
+        ? { kind: 'reset', keys: [key] }
+        : { kind: 'set', key, value: raw[key] },
+    ),
+  )
+}
+
 export async function writeSettings(page: Page, base: string, operations: readonly unknown[]) {
   const response = await page.request.post(`${base}/settings/write`, {
     headers: { Origin: new URL(page.url()).origin },

@@ -4,7 +4,7 @@ import type { useListbox } from '@workspace/ui/patterns/use-listbox'
 import { cn } from '@workspace/ui/lib/utils'
 
 import { FileTypeIcon } from '@/components/file-type-icon'
-import { ChatDiffStatLabel } from '@/features/chat/components/chat-diff-stat-label'
+import { DiffStatLabel } from '@/components/diff-stat-label'
 import { hasNonZeroChatTurnDiffStat } from '@/features/chat/utils/turn-diff-tree'
 import type { TurnDiffRow } from '@/features/chat/utils/turn-diff-view'
 import { iconForEntry } from '@/lib/file-icons'
@@ -55,10 +55,12 @@ export function AssistantChangedFileRow({
       ) : (
         <FolderGlyph className='text-muted-foreground size-(--icon-size-sm) shrink-0' />
       )}
-      <span className='min-w-0 truncate font-mono'>{node.name}</span>
+      <span className='min-w-0 truncate font-mono' data-changed-file-name>
+        {node.name}
+      </span>
       {node.stat && hasNonZeroChatTurnDiffStat(node.stat) ? (
-        <span className='text-muted-foreground text-2xs ml-auto shrink-0 font-mono tabular-nums'>
-          <ChatDiffStatLabel additions={node.stat.additions} deletions={node.stat.deletions} />
+        <span className='text-muted-foreground text-2xs ml-auto shrink-0 font-mono tabular-nums @max-2xs/changed-files:hidden'>
+          <DiffStatLabel additions={node.stat.additions} deletions={node.stat.deletions} />
         </span>
       ) : null}
     </ListRow>

@@ -5,6 +5,7 @@ import { pathToFileURL } from 'node:url'
 import { parseArgs } from 'node:util'
 
 import { isTestFile } from './web-design-census.mjs'
+import { formatGate, formatHistogram, formatList, histogram } from './census-report.mjs'
 
 const REPOSITORY = path.resolve(import.meta.dirname, '../..')
 // The design census's roots plus the tree fork, which holds React the design census does not read.
@@ -15,7 +16,6 @@ const DEFAULT_ROOTS = [
   'packages/ui/src',
 ].map((root) => path.join(REPOSITORY, root))
 const DEFAULT_ALLOW = path.join(REPOSITORY, 'scripts/lint/react-compiler-allow.json')
-const LIST_CAP = 40
 
 // Loaded from apps/web, where it is installed unhoisted: the census must run the exact compiler
 // the build runs, because another version reports a different set of bailouts.
@@ -28,7 +28,9 @@ const { transformSync } = createRequire(path.join(REPOSITORY, 'apps/web/package.
  * allow-list excuses it. `histogramOnly` reports and never fails.
  */
 export const TARGETS = {
-  bailouts: { title: 'whole-file bailouts', limit: 0, listed: true },
+  // Every refusal gates, not only a file with no memoized sibling: a component that depends on
+  // the compiler for a memo loses it silently when it shares a file with one that compiles.
+  bailouts: { title: 'refused components', limit: 0, listed: true },
   unclassified: { title: 'unclassified diagnostics', limit: 0, listed: true },
   causes: { title: 'diagnostic causes', histogram: true, histogramOnly: true },
   // Never gated: most files that emit no `_c()` are correct, and a ratio would fire on a
@@ -93,11 +95,11 @@ export function censusSource(file, source) {
     value: causeOf(error.message),
   }))
   census.hits.coverage.push({ file, line: 1, value: outcome(memoized, diagnostics.length > 0) })
-  for (const hit of diagnostics) record(census, hit, memoized)
+  for (const hit of diagnostics) record(census, hit)
   return census
 }
 
-function record(census, hit, memoized) {
+function record(census, hit) {
   if (isTestFile(hit.file)) {
     census.hits.testBailouts.push({ ...hit, value: hit.value ?? 'unclassified' })
     return
@@ -107,7 +109,7 @@ function record(census, hit, memoized) {
     return
   }
   census.hits.causes.push(hit)
-  if (!memoized) census.hits.bailouts.push(hit)
+  census.hits.bailouts.push(hit)
 }
 
 function outcome(memoized, diagnosed) {
@@ -147,12 +149,6 @@ function censusTree(root) {
 
 function posix(value) {
   return value.split(path.sep).join('/')
-}
-
-function histogram(hits) {
-  const counts = new Map()
-  for (const hit of hits) counts.set(hit.value, (counts.get(hit.value) ?? 0) + 1)
-  return counts
 }
 
 function readAllowList(file) {
@@ -230,33 +226,6 @@ function toJson(census, result, roots) {
     allowProblems: result.allowProblems,
     passed: result.passed,
   }
-}
-
-function formatHistogram(title, hits) {
-  const rows = [...histogram(hits)].sort(
-    (left, right) => right[1] - left[1] || left[0].localeCompare(right[0]),
-  )
-  if (rows.length === 0) return `${title}\n  (none)`
-  const width = Math.max(...rows.map(([value]) => value.length), 'total'.length)
-  const body = rows.map(
-    ([value, count]) => `  ${value.padEnd(width)}  ${String(count).padStart(6)}`,
-  )
-  return `${title}\n${body.join('\n')}\n  ${'total'.padEnd(width)}  ${String(hits.length).padStart(6)}`
-}
-
-function formatList(title, hits) {
-  if (hits.length === 0) return `${title}: none`
-  const shown = hits.slice(0, LIST_CAP).map((hit) => `  ${hit.file}:${hit.line}  ${hit.value}`)
-  if (hits.length > LIST_CAP) shown.push(`  … and ${hits.length - LIST_CAP} more`)
-  return `${title}: ${hits.length}\n${shown.join('\n')}`
-}
-
-function formatGate(result) {
-  const lines = result.allowProblems.map((problem) => `  allow-list  ${problem}`)
-  for (const failure of result.failures)
-    lines.push(`  ${failure.title}: ${failure.count} over target`)
-  if (lines.length === 0) return 'gate: every measure is on target'
-  return `gate: ${lines.length} measure(s) off target\n${lines.join('\n')}`
 }
 
 function formatReport(census, result, roots) {

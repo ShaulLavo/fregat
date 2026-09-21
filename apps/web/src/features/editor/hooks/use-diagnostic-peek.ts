@@ -1,5 +1,5 @@
 import type { LanguageServerDiagnosticMarkerEvent } from '@singapore-editor/lsp-plugin'
-import { useCallback, useEffect, useMemo, useRef, useSyncExternalStore } from 'react'
+import { useEffect, useRef, useSyncExternalStore } from 'react'
 
 import { createDiagnosticPeekSource } from '@/features/editor/state/diagnostic-peek-source'
 import { fileUriForPath } from '@/lib/diagnostic'
@@ -9,30 +9,24 @@ import { registeredFocusTarget, type FocusTargetToken } from '@/lib/focus/state/
 export function useDiagnosticPeek({ active, filePath }: { active: boolean; filePath: string }) {
   const focus = useFocusService()
   // The external store and its Editor plugin must share one identity for the document lifecycle.
-  const source = useMemo(() => createDiagnosticPeekSource(fileUriForPath(filePath)), [filePath])
+  const source = createDiagnosticPeekSource(fileUriForPath(filePath))
   const origin = useRef<FocusTargetToken | null>(null)
   const snapshot = useSyncExternalStore(source.subscribe, source.getSnapshot, source.getSnapshot)
 
   // Stable identity keeps the LSP plugin alive across peek geometry updates.
-  const onDidNavigateDiagnostic = useCallback(
-    (event: LanguageServerDiagnosticMarkerEvent) => {
-      const claim = source.claim(event)
-      if (claim.kind === 'claimed') origin.current = focus.captureOrigin()
-      return claim
-    },
-    [focus, source],
-  )
+  const onDidNavigateDiagnostic = (event: LanguageServerDiagnosticMarkerEvent) => {
+    const claim = source.claim(event)
+    if (claim.kind === 'claimed') origin.current = focus.captureOrigin()
+    return claim
+  }
 
-  const close = useCallback(
-    (restoreOrigin: boolean) => {
-      const captured = origin.current
-      origin.current = null
-      source.close()
-      if (!restoreOrigin || !captured || !focus.isRegistered(captured)) return
-      void focus.request(registeredFocusTarget(captured)).completion
-    },
-    [focus, source],
-  )
+  const close = (restoreOrigin: boolean) => {
+    const captured = origin.current
+    origin.current = null
+    source.close()
+    if (!restoreOrigin || !captured || !focus.isRegistered(captured)) return
+    void focus.request(registeredFocusTarget(captured)).completion
+  }
 
   useEffect(() => {
     if (active) return

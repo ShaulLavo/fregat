@@ -37,11 +37,24 @@ test('counts a component the compiler accepted as memoized and not as a bailout'
   expect(subject.hits.bailouts).toEqual([])
 })
 
-test('reports a ref read during render as a whole-file bailout with its line', () => {
+test('reports a ref read during render as a refusal with its line', () => {
   const subject = census('probe.tsx', REFUSED)
 
   expect(subject.hits.coverage.map((hit) => hit.value)).toEqual(['refused'])
   expect(locations(subject, 'bailouts')[0]).toBe('probe.tsx:5 refs-during-render')
+  expect(evaluate(subject).passed).toBe(false)
+})
+
+test('gates a refused component even when a sibling in the file compiles', () => {
+  const subject = census('probe.tsx', [
+    ...REFUSED,
+    '',
+    'export function Sibling({ items }: { readonly items: readonly string[] }) {',
+    '  return <ul>{items.map((item) => <li key={item}>{item}</li>)}</ul>',
+    '}',
+  ])
+
+  expect(subject.hits.coverage.map((hit) => hit.value)).toEqual(['memoized, partly refused'])
   expect(evaluate(subject).passed).toBe(false)
 })
 
@@ -80,7 +93,7 @@ test('an unrecognised compiler message has no cause, which is what gates it', ()
   expect(causeOf('A message a future compiler invents')).toBeNull()
 })
 
-test('is wired into the repository: a script entry and a place in the verify chain', () => {
+test('is wired into the repository: a script entry, the verify chain and CI', () => {
   const manifest = JSON.parse(
     readFileSync(new URL('../../package.json', import.meta.url), 'utf8'),
   ) as { scripts: Record<string, string> }
@@ -90,4 +103,34 @@ test('is wired into the repository: a script entry and a place in the verify cha
   )
   expect(manifest.scripts.verify).toContain('bun run design:census && bun run compiler:census')
   expect(manifest.scripts['test:scripts']).toContain('scripts/lint/react-compiler-census.test.ts')
+  const workflow = readFileSync(new URL('../../.github/workflows/ci.yml', import.meta.url), 'utf8')
+  expect(workflow).toContain('run: bun run compiler:census')
+})
+
+/**
+ * A gate nobody runs is a gate that goes red unnoticed, which is how `dupes` sat broken on main.
+ * Every whole-tree gate has to reach all three: the commit hook, `verify`, and CI.
+ */
+test('every whole-tree gate runs in the commit hook, in verify and in CI', () => {
+  const root = new URL('../../', import.meta.url)
+  const manifest = JSON.parse(readFileSync(new URL('package.json', root), 'utf8')) as {
+    scripts: Record<string, string>
+  }
+  const hook = readFileSync(new URL('lefthook.yml', root), 'utf8')
+  const workflow = readFileSync(new URL('.github/workflows/ci.yml', root), 'utf8')
+
+  const gates = manifest.scripts.gates.split('&&').map((part) => part.trim())
+  expect(gates).toEqual([
+    'bun run dupes:functions',
+    'bun run dupes',
+    'bun run design:census',
+    'bun run compiler:census',
+  ])
+  expect(hook).toContain('bun run gates')
+  for (const gate of gates) {
+    const name = gate.replace('bun run ', '')
+    expect(manifest.scripts[name]).toBeDefined()
+    expect(`${manifest.scripts.verify} ${manifest.scripts.lint}`).toContain(gate)
+    expect(workflow).toContain('run: bun run')
+  }
 })

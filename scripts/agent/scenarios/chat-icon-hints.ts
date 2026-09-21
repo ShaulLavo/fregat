@@ -1,7 +1,7 @@
 import { strictEqual } from 'node:assert/strict'
 import type { Locator, Page } from 'playwright'
 import type { Scenario } from './index'
-import { selectors } from '../selectors'
+import { selectors, settleAnimations } from '../selectors'
 
 type Step = Parameters<Scenario['run']>[1]['step']
 const PROMPT = 'Verify the stashed prompt hint'
@@ -42,14 +42,7 @@ async function driveComposer(
   await attachment.click()
   const lightbox = selectors.imageLightbox(page, image.name)
   await lightbox.waitFor()
-  await lightbox.evaluate(async (element) => {
-    await new Promise<void>((resolve) =>
-      requestAnimationFrame(() => requestAnimationFrame(() => resolve())),
-    )
-    await Promise.all(
-      element.getAnimations({ subtree: true }).map((animation) => animation.finished),
-    )
-  })
+  await settleAnimations(lightbox)
   await step('attachment-lightbox')
   await page.keyboard.press('Escape')
   await selectors.iconHintControl(page, `Remove ${image.name}`).click()

@@ -6,7 +6,7 @@ import type {
   EditorTabDiffSource,
   EditorTabModel,
 } from '@/features/workspace/utils/tab-types'
-import { gitStatusSymbol, type GitSymbolSource } from '@/features/git/utils/status-symbols'
+import { gitStatusSymbol, type GitSymbolSource } from '@/lib/git-status-symbols'
 
 import { iconForEntry } from '@/lib/file-icons'
 import { basename } from '@/lib/path-formatters'

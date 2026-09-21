@@ -1,6 +1,6 @@
 import type { FilesystemPath } from '@/lib/documents/utils/types'
 import { filesystemPath } from '@/lib/documents/utils/identity'
-import { useCallback, useMemo, useState } from 'react'
+import { useState } from 'react'
 
 import { FilesPane } from '@/features/workspace/components/files-pane'
 import {
@@ -18,20 +18,15 @@ export function FileNavigatorPanel({ rootPath }: { readonly rootPath: Filesystem
   const [visibleTreeItemCountStore] = useState(() => createVisibleTreeItemCountStore())
   const [treeToolbarStore] = useState(() => createTreeToolbarStore())
   // Measured: visible-count publication should update the header, not repaint FilesPane.
-  const handleVisibleTreeItemCountChange = useCallback(
-    (count: number) => visibleTreeItemCountStore.setCount(rootPath, count),
-    [rootPath, visibleTreeItemCountStore],
-  )
+  const handleVisibleTreeItemCountChange = (count: number) =>
+    visibleTreeItemCountStore.setCount(rootPath, count)
   // Keep tree action identity stable so header count updates do not repaint the tree.
-  const fileTreeActions = useMemo<FileTreeActions>(
-    () => ({
-      loadDirectory: loadTreeDirectory,
-      prefetchDirectory: prefetchTreeDirectory,
-      publishToolbar: treeToolbarStore.publish,
-      publishVisibleItemCount: handleVisibleTreeItemCountChange,
-    }),
-    [handleVisibleTreeItemCountChange, loadTreeDirectory, prefetchTreeDirectory, treeToolbarStore],
-  )
+  const fileTreeActions: FileTreeActions = {
+    loadDirectory: loadTreeDirectory,
+    prefetchDirectory: prefetchTreeDirectory,
+    publishToolbar: treeToolbarStore.publish,
+    publishVisibleItemCount: handleVisibleTreeItemCountChange,
+  }
 
   return (
     <section className='flex h-full min-h-0 min-w-0 flex-col overflow-hidden'>

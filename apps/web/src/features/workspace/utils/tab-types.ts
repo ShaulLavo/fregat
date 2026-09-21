@@ -1,4 +1,4 @@
-import type { StatusPresentation } from '@/features/git/utils/types'
+import type { StatusPresentation } from '@/lib/git-status-symbols'
 import type { FilesystemPath, TabContent, TabId } from '@/lib/documents/utils/types'
 import type { ResolvedFileIcon } from '@/lib/file-icons'
 

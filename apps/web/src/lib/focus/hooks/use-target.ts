@@ -1,4 +1,4 @@
-import { useCallback, useEffectEvent, useLayoutEffect, useState } from 'react'
+import { useEffectEvent, useLayoutEffect, useState } from 'react'
 
 import { useFocusService } from '@/lib/focus/hooks/use-service'
 import { useFocusSnapshot } from '@/lib/focus/hooks/use-snapshot'
@@ -30,10 +30,10 @@ export function useFocusTarget<E extends HTMLElement>(
   })
 
   // A stable ref callback prevents detach/register churn on ordinary renders.
-  const ref = useCallback((nextElement: E | null) => {
+  const ref = (nextElement: E | null) => {
     setElement(nextElement)
     if (!nextElement) setRegistration(null)
-  }, [])
+  }
 
   useLayoutEffect(() => {
     if (!element || !enabled) return

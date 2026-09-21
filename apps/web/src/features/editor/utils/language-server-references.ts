@@ -89,19 +89,26 @@ function referenceDocumentSnapshotRevision(document: LiveEditorDocument | undefi
   return document.localRevision.toString()
 }
 
+export type ReferenceDocumentsSnapshot = {
+  /** Revision key the map was read at. Documents mutate in place, so only this tells two reads apart. */
+  readonly revision: string
+  readonly byPath: Readonly<Record<string, LiveEditorDocument | undefined>>
+}
+
 export function referenceDocumentsByPath(
   documents: Readonly<Record<DocumentKey, LiveEditorDocument>>,
   targets: readonly { readonly path: string; readonly key: DocumentKey }[],
-) {
-  const result: Record<string, LiveEditorDocument | undefined> = {}
+  revision: string,
+): ReferenceDocumentsSnapshot {
+  const byPath: Record<string, LiveEditorDocument | undefined> = {}
 
   for (const target of targets) {
-    if (target.path in result) continue
+    if (target.path in byPath) continue
 
-    result[target.path] = documents[target.key]
+    byPath[target.path] = documents[target.key]
   }
 
-  return result
+  return { revision, byPath }
 }
 
 export function toggledPathSet(paths: ReadonlySet<string>, path: string) {

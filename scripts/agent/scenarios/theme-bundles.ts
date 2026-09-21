@@ -10,16 +10,9 @@ import {
 } from '../../../packages/contracts/src/index'
 import { wallpaperPng, secondWallpaperPng } from '../../../apps/web/test/factories/wallpaper'
 import { preserveAppearance } from '../preserve-settings'
-import { chords, selectors, runPaletteCommand } from '../selectors'
+import { chooseColorMode, runPaletteCommand, selectors } from '../selectors'
 import type { Scenario } from './index'
-
-async function mode(page: Page, value: 'light' | 'dark' | 'system') {
-  await page.keyboard.press(chords.commandPalette)
-  await selectors.paletteInput(page).fill('>Choose light / dark mode')
-  await selectors.commandOption(page, 'Choose light / dark mode').click()
-  await selectors.colorModeOption(page, value).click()
-  await selectors.paletteInput(page).waitFor({ state: 'hidden' })
-}
+import { serverApi } from '../server-api'
 async function wallpaper(page: Page, selection: string | WallpaperSelection) {
   const id = typeof selection === 'string' ? selection : libraryAsset(selection)
   await selectors.wallpaperAsset(page, id).waitFor()
@@ -34,11 +27,7 @@ export const themeBundles: Scenario = {
   description:
     'Select paired wallpapers, customize one mode, reload, follow system mode, cancel a preview, create a bundle and restore the original settings.',
   async run(page, { step }) {
-    const url = new URL(page.url())
-    const base = url.pathname.startsWith('/platform/')
-      ? `${url.origin}/platform`
-      : 'http://localhost:3001'
-    const headers = { origin: url.origin }
+    const { base, headers } = serverApi(page)
     const restore = await preserveAppearance(page)
     const existing = await (await page.request.get(`${base}/themes/wallpapers`, { headers })).json()
     const initialIds = new Set(
@@ -94,21 +83,21 @@ export const themeBundles: Scenario = {
       await page.keyboard.press('Control+,')
       await selectors.settingsSearch(page).fill('Theme bundles')
       await selectors.themeCard(page, createId).click()
-      await mode(page, 'dark')
+      await chooseColorMode(page, 'dark')
       await wallpaper(page, assets[1]!.id)
       await step('dark-wallpaper')
-      await mode(page, 'light')
+      await chooseColorMode(page, 'light')
       await wallpaper(page, assets[0]!.id)
       await step('light-wallpaper')
       await hideLightWallpaper(page, assets[1]!.id)
       await step('dark-unaffected-by-light-customization')
-      await mode(page, 'light')
+      await chooseColorMode(page, 'light')
       await selectors.wallpaperStill(page).waitFor({ state: 'detached' })
       await page.reload()
       await selectors.windowToolbar(page).waitFor()
       strictEqual(await selectors.wallpaperStill(page).count(), 0)
       await step('reload-customized-light')
-      await mode(page, 'system')
+      await chooseColorMode(page, 'system')
       await page.emulateMedia({ colorScheme: 'dark' })
       await wallpaper(page, assets[1]!.id)
       await step('system-dark')
@@ -215,6 +204,6 @@ async function hideLightWallpaper(page: Page, darkAsset: string) {
   await runPaletteCommand(page, 'Toggle wallpaper')
   await selectors.paletteInput(page).waitFor({ state: 'hidden' })
   await selectors.wallpaperStill(page).waitFor({ state: 'detached' })
-  await mode(page, 'dark')
+  await chooseColorMode(page, 'dark')
   await wallpaper(page, darkAsset)
 }

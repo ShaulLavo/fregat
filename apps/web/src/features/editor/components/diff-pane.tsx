@@ -10,7 +10,7 @@ import {
 } from '@singapore-editor/diff'
 import { EditorHost, useEditor } from '@singapore-editor/react'
 import type { Editor } from '@singapore-editor/core/editor'
-import { useLayoutEffect, useMemo } from 'react'
+import { useLayoutEffect } from 'react'
 
 import { useDiffLanguage } from '@/features/editor/hooks/use-diff-language'
 import { useDiffRows } from '@/features/editor/hooks/use-diff-rows'
@@ -66,36 +66,25 @@ export function DiffPane({
   onRegisterEditor?: (side: DiffGutterSide, editor: Editor | null) => void
   onScroll?: (side: DiffGutterSide, position: DiffScrollPosition) => void
 }) {
-  const plugin = useMemo(
-    () =>
-      createDiffPlugin({
-        mode: 'document',
-        regions,
-        side,
-        syntaxBackend,
-        syntaxHighlight,
-      }),
-    [regions, side, syntaxBackend, syntaxHighlight],
-  )
+  const plugin = createDiffPlugin({
+    mode: 'document',
+    regions,
+    side,
+    syntaxBackend,
+    syntaxHighlight,
+  })
   const { rows, text, tokensRevision } = useDiffRows(plugin, file)
   const diffLanguagePlugin = useDiffLanguage(file, rows, theme, languageServer)
   const unicodeHighlights = useUnicodeHighlights()
   // A plugin instance owns its registered view context for the lifetime of this pane.
-  const persistence = useMemo(
-    () => (presentation ? createDiffPresentationBinding(presentation) : null),
-    [presentation],
-  )
-  const plugins = useMemo(
-    () =>
-      [
-        plugin,
-        unicodeHighlights.plugin,
-        onScroll ? createDiffScrollBridgePlugin((position) => onScroll(side, position)) : null,
-        diffLanguagePlugin,
-        persistence?.plugin,
-      ].filter((entry) => entry !== null && entry !== undefined),
-    [diffLanguagePlugin, onScroll, persistence, plugin, side, unicodeHighlights.plugin],
-  )
+  const persistence = presentation ? createDiffPresentationBinding(presentation) : null
+  const plugins = [
+    plugin,
+    unicodeHighlights.plugin,
+    onScroll ? createDiffScrollBridgePlugin((position) => onScroll(side, position)) : null,
+    diffLanguagePlugin,
+    persistence?.plugin,
+  ].filter((entry) => entry !== null && entry !== undefined)
   const controller = useEditor({
     suspiciousCharacters: unicodeHighlights.options,
     cursorLineHighlight: DIFF_CURSOR_LINE_HIGHLIGHT,

@@ -1,14 +1,7 @@
 import { deepStrictEqual, strictEqual } from 'node:assert/strict'
-import { execFileSync } from 'node:child_process'
 import { resolveComposerInteractionMode } from '../../packages/client-core/src/chat/composer-interaction'
-import inventory from '../../plans/126-t3code-alignment/inventory.json'
-const pin = '7445aa733ada33e45289e5aa5055f79142556513'
-strictEqual(pin, inventory.upstream_commit)
-const source = execFileSync(
-  'git',
-  ['-C', 'references/t3code', 'show', `${pin}:apps/web/src/components/ChatView.logic.ts`],
-  { encoding: 'utf8' },
-)
+import { pin, readPinned } from './pinned'
+const source = readPinned(`apps/web/src/components/ChatView.logic.ts`)
 const start = source.indexOf('export function resolveComposerInteractionMode(')
 const end = source.indexOf('export function getAntigravitySendBlockReason(', start)
 strictEqual(start >= 0 && end > start, true)

@@ -1,4 +1,4 @@
-import { type RefObject, useCallback, useRef } from 'react'
+import { type RefObject, useRef } from 'react'
 
 export interface FileTreeRowDom {
   readonly getList: () => HTMLDivElement | null
@@ -42,28 +42,22 @@ export function useFileTreeRowDom(): FileTreeRowDomBinding {
   const searchInputRef = useRef<HTMLInputElement | null>(null)
   const rowButtonsRef = useRef(new Map<string, HTMLElement>())
   const stickyRowButtonsRef = useRef(new Map<string, HTMLElement>())
-  const getList = useCallback((): HTMLDivElement | null => listRef.current, [])
-  const getRenameInput = useCallback((): HTMLInputElement | null => renameInputRef.current, [])
-  const getRoot = useCallback((): HTMLDivElement | null => rootRef.current, [])
-  const getRowButtons = useCallback(
-    (): ReadonlyMap<string, HTMLElement> => rowButtonsRef.current,
-    [],
-  )
-  const getScroll = useCallback((): HTMLDivElement | null => scrollRef.current, [])
-  const getSearchInput = useCallback((): HTMLInputElement | null => searchInputRef.current, [])
-  const getStickyRowButtons = useCallback(
-    (): ReadonlyMap<string, HTMLElement> => stickyRowButtonsRef.current,
-    [],
-  )
-  const registerRenameInput = useCallback((element: HTMLInputElement | null): void => {
+  const getList = (): HTMLDivElement | null => listRef.current
+  const getRenameInput = (): HTMLInputElement | null => renameInputRef.current
+  const getRoot = (): HTMLDivElement | null => rootRef.current
+  const getRowButtons = (): ReadonlyMap<string, HTMLElement> => rowButtonsRef.current
+  const getScroll = (): HTMLDivElement | null => scrollRef.current
+  const getSearchInput = (): HTMLInputElement | null => searchInputRef.current
+  const getStickyRowButtons = (): ReadonlyMap<string, HTMLElement> => stickyRowButtonsRef.current
+  const registerRenameInput = (element: HTMLInputElement | null): void => {
     renameInputRef.current = element
-  }, [])
-  const registerRowButton = useCallback((path: string, element: HTMLElement | null): void => {
+  }
+  const registerRowButton = (path: string, element: HTMLElement | null): void => {
     updateButtonRegistry(rowButtonsRef.current, path, element)
-  }, [])
-  const registerStickyRowButton = useCallback((path: string, element: HTMLElement | null): void => {
+  }
+  const registerStickyRowButton = (path: string, element: HTMLElement | null): void => {
     updateButtonRegistry(stickyRowButtonsRef.current, path, element)
-  }, [])
+  }
 
   return {
     getList,

@@ -58,7 +58,7 @@ export function ToolPane({
 
   return (
     <PaneShell
-      className='h-full min-w-0 overflow-hidden'
+      className='bg-background h-full min-w-0 overflow-hidden'
       bodyClassName='bg-content-well overflow-hidden'
       header={<ToolPaneHeader tab='terminal' />}
     >

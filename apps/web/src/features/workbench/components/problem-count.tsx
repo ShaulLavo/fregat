@@ -1,3 +1,4 @@
+import { TickerNumber } from '@/components/ticker-number'
 import { useSyncExternalStore } from 'react'
 
 import { createEditorLanguageServerStatusSource } from '@/features/editor/state/language-server-status-source'
@@ -16,7 +17,7 @@ export function ProblemCount() {
 
   return (
     <span className='bg-muted text-muted-foreground text-3xs flex h-4 min-w-4 items-center justify-center rounded-full px-1 tabular-nums'>
-      {count}
+      <TickerNumber size='3xs' value={count} />
     </span>
   )
 }

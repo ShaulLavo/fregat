@@ -5,7 +5,7 @@ import { LoadingState } from '@workspace/ui/components/loading-state'
 import type { SessionId, WorktreeId } from '@workspace/contracts'
 import { selectCurrentWorktree } from '@workspace/client-core/chat/selectors'
 import { useActiveChatProjection } from '@/features/chat/hooks/use-active-projection'
-import { memo, useCallback, useEffect, useMemo, useRef, useState } from 'react'
+import { memo, useEffect, useRef, useState } from 'react'
 
 import { useActiveChatSessionId } from '../hooks/use-active-chat-session-id'
 import { useChatShellSubscription } from '../hooks/use-chat-shell-subscription'
@@ -26,11 +26,8 @@ export const ChatSidePanelContent = memo(({ rootPath }: { rootPath: string }) =>
   const sidebarSessions = useActiveChatProjection((state) =>
     selectChatSidebarSessionsForProject(state, projectId),
   )
-  const sessions = useMemo(
-    () => sidebarSessions.toSorted(compareChatSidebarSessions),
-    [sidebarSessions],
-  )
-  const sessionIds = useMemo(() => sessions.map((session) => session.id), [sessions])
+  const sessions = sidebarSessions.toSorted(compareChatSidebarSessions)
+  const sessionIds = sessions.map((session) => session.id)
   const { activeSessionId, selectDraftSession, setActiveSessionId, promoteDraftSession } =
     useActiveChatSessionId({ sessionIds, environmentId: transport.environmentId, projectId })
   const selection = useSidebarSelectionStore((state) => state.selection)
@@ -73,13 +70,13 @@ export const ChatSidePanelContent = memo(({ rootPath }: { rootPath: string }) =>
   }, [activeSessionId, draftId, projectId, draftBase, navigation, transport.environmentId])
   const disabled = !projectState.project || projectState.status !== 'ready'
 
-  const handleNewChat = useCallback(() => {
+  const handleNewChat = () => {
     const source = sessions.find((session) => session.id === activeSessionId)
     setDraftBaseId(source?.worktreeId ?? null)
     currentDraftGeneration.current += 1
     setDraftGeneration(currentDraftGeneration.current)
     selectDraftSession()
-  }, [selectDraftSession, activeSessionId, sessions])
+  }
 
   function handleSessionCreated(sessionId: SessionId) {
     if (draftGeneration !== currentDraftGeneration.current) return

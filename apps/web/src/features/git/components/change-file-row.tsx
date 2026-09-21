@@ -4,9 +4,9 @@ import { ChangesContext } from '@/features/git/providers/changes-context'
 import { changeRowId } from '@/features/git/utils/change-row-id'
 import { useContextMenu } from '@/keymap/menus/hooks/use-context-menu'
 import { useOpenDiffDocument } from '@/features/git/hooks/use-open-diff-document'
-import { gitStatusSymbol } from '@/features/git/utils/status-symbols'
+import { gitStatusSymbol } from '@/lib/git-status-symbols'
 import type { ChangeRow } from '@/features/git/utils/types'
-import { FileRow } from '@/features/git/components/file-row'
+import { GitFileRow } from '@/components/git-file-row'
 import { FileActions } from '@/features/git/components/file-actions'
 import { FileMenu } from '@/features/git/components/file-menu'
 
@@ -34,12 +34,13 @@ export function ChangeFileRow({
 
   return (
     <>
-      <FileRow
+      <GitFileRow
         rowProps={rowProps}
         path={row.file.path}
         oldPath={row.file.oldPath}
         rootPath={rootPath}
         status={gitStatusSymbol(row.status, row.section)}
+        stat={row.file.lines?.[row.section]}
         loading={loading || opening}
         actions={<FileActions path={row.file.path} rootPath={rootPath} section={row.section} />}
         onOpen={() => {

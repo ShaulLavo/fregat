@@ -1,5 +1,5 @@
 import type { EditorTheme } from '@singapore-editor/core/rendering'
-import { memo, useRef } from 'react'
+import { memo, useState } from 'react'
 
 import { SEARCH_RESULT_FILE_EDITOR_POOL_HIDDEN_STYLE } from '@/features/search/utils/result-editor-constants'
 import type { SearchResultFileEditorPoolEntry } from '@/features/search/utils/result-editor-types'
@@ -8,7 +8,6 @@ import {
   searchResultFileContainsId,
   searchResultFileEditorLineWindow,
   searchResultVirtualRowStyle,
-  type SearchResultFileEditorLineWindow,
 } from '@/features/search/utils/result-editor'
 import { searchResultDomId } from '@/features/search/utils/result-dom-id'
 import { SearchResultFileEditor } from '@/features/search/components/result-file-editor'
@@ -43,19 +42,16 @@ export const SearchResultFileEditorPoolSlot = memo(
     const file = row.file
     const id = searchResultVirtualRowId(row)
     const active = visible && searchResultFileContainsId(file, activeResultId)
-    const lineWindowRef = useRef<SearchResultFileEditorLineWindow | null>(null)
     const nextLineWindow = searchResultFileEditorLineWindow({
       lineCount: file.excerpts.length,
       virtualItem: item.virtualItem,
       viewport,
     })
-    if (
-      lineWindowRef.current === null ||
-      !equalSearchResultFileEditorLineWindow(lineWindowRef.current, nextLineWindow)
-    ) {
-      lineWindowRef.current = nextLineWindow
-    }
-    const lineWindow = lineWindowRef.current
+    // An equal window must keep its identity, or the editor below re-renders on every scroll
+    // frame. React re-runs this render with the new state before it commits anything.
+    const [lineWindow, setLineWindow] = useState(nextLineWindow)
+    if (!equalSearchResultFileEditorLineWindow(lineWindow, nextLineWindow))
+      setLineWindow(nextLineWindow)
     const renderEditor = lineWindow.end > lineWindow.start
 
     return (

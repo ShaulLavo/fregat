@@ -1,5 +1,5 @@
 import { filesystemPath } from '@/lib/documents/utils/identity'
-import { useCallback, useMemo } from 'react'
+import {} from 'react'
 import type { WorkspaceSearchMatch } from '@workspace/contracts'
 
 import { useEditorCommands } from '@/features/editor/hooks/use-editor-commands'
@@ -44,53 +44,34 @@ export function SearchResults({
   const commands = useEditorCommands()
   const selectResult = useSearchBufferState((state) => state.selectResult)
   const toggleGroup = useSearchBufferState((state) => state.toggleGroup)
-  const groupByPath = useMemo(() => searchResultGroupByPath(groups), [groups])
-  const handleOpenMatch = useCallback(
-    (match: WorkspaceSearchMatch) => openWorkspaceSearchMatch(match, resultsQuery, commands),
-    [commands, resultsQuery],
-  )
-  const handleOpenTarget = useCallback(
-    (target: SearchResultOpenTarget) => {
-      if (!target.match) {
-        commands.openFileSurface(filesystemPath(target.path))
-        return
-      }
+  const groupByPath = searchResultGroupByPath(groups)
+  const handleOpenMatch = (match: WorkspaceSearchMatch) =>
+    openWorkspaceSearchMatch(match, resultsQuery, commands)
+  const handleOpenTarget = (target: SearchResultOpenTarget) => {
+    if (!target.match) {
+      commands.openFileSurface(filesystemPath(target.path))
+      return
+    }
 
-      openWorkspaceSearchMatch(target.match, resultsQuery, commands)
-    },
-    [commands, resultsQuery],
-  )
-  const replacePath = useCallback(
-    (path: string) => {
-      const group = groupByPath.get(path)
-      if (!group) return
+    openWorkspaceSearchMatch(target.match, resultsQuery, commands)
+  }
+  const replacePath = (path: string) => {
+    const group = groupByPath.get(path)
+    if (!group) return
 
-      replaceGroup(group)
-    },
-    [groupByPath, replaceGroup],
-  )
+    replaceGroup(group)
+  }
   // Search renderers are memoized; keep domain actions stable across unrelated result renders.
-  const actions = useMemo<SearchResultActions>(
-    () => ({
-      openMatch: handleOpenMatch,
-      openTarget: handleOpenTarget,
-      replaceGroup,
-      replaceMatch,
-      replacePath,
-      selectResult,
-      selectResultWithoutReveal: selectResult,
-      toggleGroup,
-    }),
-    [
-      handleOpenMatch,
-      handleOpenTarget,
-      replaceGroup,
-      replaceMatch,
-      replacePath,
-      selectResult,
-      toggleGroup,
-    ],
-  )
+  const actions: SearchResultActions = {
+    openMatch: handleOpenMatch,
+    openTarget: handleOpenTarget,
+    replaceGroup,
+    replaceMatch,
+    replacePath,
+    selectResult,
+    selectResultWithoutReveal: selectResult,
+    toggleGroup,
+  }
 
   if (groups.length === 0) {
     return <SearchBufferStatus rootPath={rootPath} />

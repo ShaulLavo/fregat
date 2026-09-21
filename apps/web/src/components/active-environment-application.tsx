@@ -1,6 +1,7 @@
 import { useSyncExternalStore, type ReactNode } from 'react'
 import { QueryClientProvider } from '@tanstack/react-query'
 import { TooltipProvider } from '@workspace/ui/components/tooltip'
+import { TooltipLayer } from '@workspace/ui/patterns/tooltip-layer'
 import type { SettingsValues } from '@workspace/contracts'
 
 import { ThemeAwareToaster } from '@/components/theme-aware-toaster'
@@ -30,6 +31,7 @@ export function ActiveEnvironmentApplication({
               <TooltipProvider>
                 <EditorStateProvider runtime={active.editor}>{children}</EditorStateProvider>
                 <ThemeAwareToaster />
+                <TooltipLayer />
               </TooltipProvider>
             </EditorColorThemeProvider>
           </AppearanceProvider>

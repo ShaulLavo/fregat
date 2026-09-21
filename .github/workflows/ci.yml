@@ -74,6 +74,10 @@ jobs:
       - name: Design language census
         run: bun run design:census
 
+      # Lint cannot stand in for this: its compiler rules miss components wrapped in `memo()`.
+      - name: React Compiler census
+        run: bun run compiler:census
+
       - name: Unused code
         run: bun run unused:check
 

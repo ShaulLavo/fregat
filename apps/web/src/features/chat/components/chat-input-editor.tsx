@@ -5,7 +5,7 @@ import { HistoryPlugin } from '@lexical/react/LexicalHistoryPlugin'
 import { PlainTextPlugin } from '@lexical/react/LexicalPlainTextPlugin'
 import { collectComposerMentions } from '@workspace/contracts'
 import type { LexicalEditor } from 'lexical'
-import { useCallback, type ClipboardEvent } from 'react'
+import { type ClipboardEvent } from 'react'
 
 import { filesFromClipboard } from '@/features/chat/utils/input-attachments'
 import { insertChatInputText } from '@/features/chat/utils/input-editor-actions'
@@ -46,26 +46,23 @@ export function ChatInputEditor({
   // Drops are handled by the composer container so the attachment strip and the
   // action row are droppable too; paste stays here, on the element that owns the
   // caret.
-  const handlePaste = useCallback(
-    (event: ClipboardEvent<HTMLElement>) => {
-      const files = filesFromClipboard(event.clipboardData)
-      if (files.length > 0) {
-        event.preventDefault()
-        onImageFiles(files)
-
-        return
-      }
-
-      // A pasted prompt carries mentions in their serialized form; letting the
-      // browser drop them in as plain text is how a chip would decay into text.
-      const text = event.clipboardData?.getData('text/plain') ?? ''
-      if (collectComposerMentions(text).length === 0) return
-
+  const handlePaste = (event: ClipboardEvent<HTMLElement>) => {
+    const files = filesFromClipboard(event.clipboardData)
+    if (files.length > 0) {
       event.preventDefault()
-      insertChatInputText(editor, text)
-    },
-    [editor, onImageFiles],
-  )
+      onImageFiles(files)
+
+      return
+    }
+
+    // A pasted prompt carries mentions in their serialized form; letting the
+    // browser drop them in as plain text is how a chip would decay into text.
+    const text = event.clipboardData?.getData('text/plain') ?? ''
+    if (collectComposerMentions(text).length === 0) return
+
+    event.preventDefault()
+    insertChatInputText(editor, text)
+  }
 
   return (
     <div className='relative px-(--density-section-padding) pt-(--density-section-padding) pb-(--density-section-gap)'>

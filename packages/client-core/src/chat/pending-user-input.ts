@@ -45,30 +45,34 @@ const userInputPayloadSchema = v.object({
  * Requested minus resolved, oldest first — the user-input twin of
  * `derivePendingApprovals`, derived client-side for the same reason.
  */
-export function derivePendingUserInputs(
+/** Ordered user-input activities whose payload parses; the rest are not ours to interpret. */
+function* parsedUserInputActivities(
+  retained: readonly OrchestrationSessionActivity[],
   activities: readonly OrchestrationSessionActivity[],
-  retained: readonly OrchestrationSessionActivity[] = [],
-): PendingUserInput[] {
-  const open = new Map<ApprovalRequestId, PendingUserInput>()
-
+) {
   for (const activity of orderedSessionActivities([...retained, ...activities])) {
     if (!isUserInputActivity(activity.kind)) continue
 
     const parsed = v.safeParse(userInputPayloadSchema, activity.payload)
     if (!parsed.success) continue
 
+    yield { activity, payload: parsed.output }
+  }
+}
+
+export function derivePendingUserInputs(
+  activities: readonly OrchestrationSessionActivity[],
+  retained: readonly OrchestrationSessionActivity[] = [],
+): PendingUserInput[] {
+  const open = new Map<ApprovalRequestId, PendingUserInput>()
+
+  for (const { activity, payload } of parsedUserInputActivities(retained, activities)) {
     if (activity.kind === 'user-input.resolved') {
-      open.delete(parsed.output.requestId)
+      open.delete(payload.requestId)
       continue
     }
 
-    openPendingUserInput(
-      open,
-      activity,
-      parsed.output.requestId,
-      parsed.output.questions,
-      parsed.output.responseMode,
-    )
+    openPendingUserInput(open, activity, payload.requestId, payload.questions, payload.responseMode)
   }
 
   return [...open.values()]
@@ -232,15 +236,12 @@ export function retainPendingMessageQuestions(
   activities: readonly OrchestrationSessionActivity[],
 ): readonly OrchestrationSessionActivity[] {
   const pending = new Map<string, OrchestrationSessionActivity>()
-  for (const activity of orderedSessionActivities([...retained, ...activities])) {
-    if (!isUserInputActivity(activity.kind)) continue
-    const parsed = v.safeParse(userInputPayloadSchema, activity.payload)
-    if (!parsed.success) continue
+  for (const { activity, payload } of parsedUserInputActivities(retained, activities)) {
     if (activity.kind === 'user-input.resolved') {
-      pending.delete(parsed.output.requestId)
+      pending.delete(payload.requestId)
       continue
     }
-    if (parsed.output.responseMode === 'message') pending.set(parsed.output.requestId, activity)
+    if (payload.responseMode === 'message') pending.set(payload.requestId, activity)
   }
   return [...pending.values()]
 }

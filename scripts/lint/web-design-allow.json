@@ -92,7 +92,7 @@
   {
     "file": "apps/web/src/features/chat/components/message-completion-divider.tsx",
     "class": "truncate",
-    "reason": "D3: \"Worked for …\" is app-authored."
+    "reason": "D3: \"Worked for \u2026\" is app-authored."
   },
   {
     "file": "apps/web/src/features/chat/components/model-options-menu.tsx",
@@ -135,7 +135,7 @@
     "reason": "Column headers are app-authored labels; file option values carry their complete path on the row."
   },
   {
-    "file": "apps/web/src/features/git/components/change-group.tsx",
+    "file": "apps/web/src/features/git/components/change-group-header.tsx",
     "class": "truncate",
     "reason": "D3: a section label (\"Staged Changes\")."
   },
@@ -143,6 +143,11 @@
     "file": "apps/web/src/features/git/components/unchanged-diff-banner.tsx",
     "class": "truncate",
     "reason": "D3: an app-authored notice."
+  },
+  {
+    "file": "apps/web/src/features/logs/components/timeline-loading.tsx",
+    "class": "truncate",
+    "reason": "D3: the app-authored labels of timeline-metric.tsx, mirrored so the skeleton keeps its height."
   },
   {
     "file": "apps/web/src/features/logs/components/timeline-metric.tsx",

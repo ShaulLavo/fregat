@@ -4,7 +4,7 @@ import {
   type DiffPlugin,
   type DiffRenderRow,
 } from '@singapore-editor/diff'
-import { useLayoutEffect, useMemo, useState } from 'react'
+import { useLayoutEffect, useState } from 'react'
 
 export type DiffRowsState = {
   readonly rows: readonly DiffRenderRow[]
@@ -46,7 +46,7 @@ export function useDiffRows(plugin: DiffPlugin, file: DiffFile | null): DiffRows
     }
   }, [plugin])
 
-  const text = useMemo(() => joinRenderLines(rows), [rows])
+  const text = joinRenderLines(rows)
 
   return { rows, text, tokensRevision }
 }

@@ -19,5 +19,10 @@ pre-commit:
       glob: '*.{ts,tsx,js,jsx,mjs,cjs,json,jsonc,css,md,mdx,yml,yaml}'
       run: PATH="$HOME/.bun/bin:/opt/homebrew/bin:/usr/local/bin:$PATH" bun x oxfmt --check {staged_files}
 
+    # Whole-tree gates: a clone or a compiler refusal is invisible to a staged-file lint, and
+    # these are the ones that went red on main unnoticed. Together they cost under two seconds.
+    - name: whole-tree gates
+      run: PATH="$HOME/.bun/bin:/opt/homebrew/bin:/usr/local/bin:$PATH" bun run gates
+
     - name: typecheck repo
       run: PATH="$HOME/.bun/bin:/opt/homebrew/bin:/usr/local/bin:$PATH" bun run typecheck

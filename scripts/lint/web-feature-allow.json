@@ -134,12 +134,6 @@
   {
     "from": "chat-mode",
     "to": "chat",
-    "module": "features/chat/components/chat-diff-stat-label.tsx",
-    "reason": "couple: Chat mode and chat share one session lifecycle through ChatDiffStatLabel; merge their ownership in a later pass."
-  },
-  {
-    "from": "chat-mode",
-    "to": "chat",
     "module": "features/chat/components/chat-draft-view.tsx",
     "reason": "couple: Chat mode and chat share one session lifecycle through ChatDraftView; merge their ownership in a later pass."
   },
@@ -1222,18 +1216,6 @@
     "to": "git",
     "module": "features/git/utils/status-entries-for-tree.ts",
     "reason": "shared \u2192 lib: statusEntriesForTree is reused by workspace outside git; move this shared behavior with its consumers."
-  },
-  {
-    "from": "workspace",
-    "to": "git",
-    "module": "features/git/utils/status-symbols.ts",
-    "reason": "shared \u2192 lib: gitStatusSymbol, type GitSymbolSource is reused by workspace outside git; move this shared behavior with its consumers."
-  },
-  {
-    "from": "workspace",
-    "to": "git",
-    "module": "features/git/utils/types.ts",
-    "reason": "shared \u2192 lib: StatusPresentation is reused by workspace outside git; move this shared behavior with its consumers."
   },
   {
     "from": "workspace",

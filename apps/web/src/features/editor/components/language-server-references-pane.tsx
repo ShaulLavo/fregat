@@ -1,3 +1,4 @@
+import { TickerNumber } from '@/components/ticker-number'
 import { useListbox } from '@workspace/ui/patterns/use-listbox'
 import { ReferenceGroupRow } from '@/features/editor/components/reference-group-row'
 import { ReferenceRow } from '@/features/editor/components/reference-row'
@@ -40,24 +41,20 @@ export function LanguageServerReferencesPane({
 }: LanguageServerReferencesPaneProps) {
   const documentStore = useEditorDocumentStoreApi()
   // Stable bindings keep live-store selectors free of descriptor construction.
-  const referenceTargets = useMemo(
-    () =>
-      references.targets.map((target) => ({
-        path: target.path,
-        key: fileDocumentKey(filesystemPath(target.path)),
-      })),
-    [references.targets],
-  )
+  const referenceTargets = references.targets.map((target) => ({
+    path: target.path,
+    key: fileDocumentKey(filesystemPath(target.path)),
+  }))
   const documentRevisionKey = useEditorDocumentState((state) =>
     referenceDocumentsRevisionKey(state.liveDocumentsByKey, referenceTargets),
   )
-  const documents = useMemo(
-    () => referenceDocumentsByPath(documentStore.getState().liveDocumentsByKey, referenceTargets),
-    // documentRevisionKey is the intentional invalidation token: the memo reads liveDocumentsByKey
-    // imperatively via getState() instead of subscribing (to avoid a re-render storm), so the key
-    // must stay in deps to rebuild when document content revisions change in place.
-    // eslint-disable-next-line react-hooks/exhaustive-deps
-    [documentRevisionKey, documentStore, referenceTargets],
+  // The live map is read imperatively: subscribing to it would re-render this pane on every
+  // keystroke in any open file. Content revisions mutate the documents in place, so the
+  // subscribed revision key is both the reason to re-read and the snapshot's identity.
+  const documents = referenceDocumentsByPath(
+    documentStore.getState().liveDocumentsByKey,
+    referenceTargets,
+    documentRevisionKey,
   )
   const [collapsedPaths, setCollapsedPaths] = useState<ReadonlySet<string>>(() => new Set())
   const groups = useMemo(
@@ -94,9 +91,9 @@ export function LanguageServerReferencesPane({
   return (
     <ToolPane
       title='References'
-      detail={references.targets.length.toLocaleString()}
+      detail={<TickerNumber value={references.targets.length} />}
       aria-label='References'
-      className='h-full'
+      className='bg-background h-full'
       bodyClassName='py-1'
       bodyProps={
         groups.length > 0
@@ -144,7 +141,7 @@ export function LanguageServerReferencesPane({
               <ReferenceRow
                 key={row.id}
                 rowProps={list.rowProps(row.id)}
-                document={documents[row.target.path]}
+                document={documents.byPath[row.target.path]}
                 target={row.target}
                 onOpenReference={onOpenReference}
                 onPreviewReference={onPreviewReference}

@@ -8,7 +8,7 @@ import { Button } from '@workspace/ui/components/button'
 import { InputGroup, InputGroupAddon, InputGroupInput } from '@workspace/ui/components/input-group'
 import { OrbitLoader } from '@workspace/ui/components/orbit-loader'
 import { MagnifyingGlassIcon, XIcon } from '@phosphor-icons/react'
-import { useCallback, useRef } from 'react'
+import { useRef } from 'react'
 import { useQueryClient } from '@tanstack/react-query'
 
 import { DiagnosticsBanner } from '@/features/settings/components/diagnostics-banner'
@@ -92,13 +92,10 @@ export function SettingsPage({
     tabId !== undefined && !showJson,
   )
   // JSON has a nested Editor target. Its parent must not become an ambiguous peer.
-  const setRootRef = useCallback(
-    (element: HTMLDivElement | null) => {
-      rootRef.current = element
-      focusTargetRef(element)
-    },
-    [focusTargetRef],
-  )
+  const setRootRef = (element: HTMLDivElement | null) => {
+    rootRef.current = element
+    focusTargetRef(element)
+  }
 
   if (document.isError) return <Status tone='destructive'>Settings could not be loaded.</Status>
   if (document.isPending || !projection) return <PageLoading showJson={showJson} />
@@ -121,7 +118,7 @@ export function SettingsPage({
 
   return (
     <ToolPane
-      className='@container/settings h-full min-w-0'
+      className='bg-background @container/settings h-full min-w-0'
       bodyClassName='flex flex-col overflow-hidden'
       ref={setRootRef}
       tabIndex={-1}

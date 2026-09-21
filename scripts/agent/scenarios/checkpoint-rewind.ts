@@ -1,37 +1,19 @@
-import { ok, strictEqual } from 'node:assert/strict'
+import { strictEqual } from 'node:assert/strict'
 import type { Scenario } from './index'
 import { selectors } from '../selectors'
-import { readShell, dispatch } from './chat-verification'
+import { createSession, dispatch, openChatShell } from './chat-verification'
 
 export const checkpointRewind: Scenario = {
   name: 'checkpoint-rewind',
   description:
     'Rewind one disposable real-provider conversation, preserving and restoring composer text. Uses provider tokens and removes its own session.',
   async run(page, { step }) {
-    const connected = page.waitForEvent('websocket', {
-      predicate: (socket) => socket.url().endsWith('/orchestration/rpc'),
-    })
-    await page.goto(page.url().replace(/\/workbench(?:\?.*)?$/, '/chat'))
-    const base = (await connected)
-      .url()
-      .replace(/^ws/, 'http')
-      .replace(/\/rpc$/, '')
-    const snapshot = await readShell(page, base)
-    const worktree = snapshot.worktrees.find((item) => item.path.endsWith('/projects/platform'))
-    ok(worktree, 'Platform worktree must be registered')
-    const project = snapshot.projects.find((item) => item.id === worktree.projectId)
-    ok(project?.defaultModelSelection, 'Project must have a default model')
+    const shell = await openChatShell(page)
     const sessionId = crypto.randomUUID()
     const title = `Rewind verification ${sessionId.slice(0, 8)}`
     const prompt =
       'Reply with exactly REWIND_VERIFIED. Do not use tools, inspect files or change files.'
-    await dispatch(page, base, {
-      type: 'session.create',
-      sessionId,
-      title,
-      worktreeTarget: { kind: 'current', worktreeId: worktree.id },
-      modelSelection: project.defaultModelSelection,
-    })
+    await createSession(page, shell, sessionId, title)
     try {
       await selectors.sessionSearch(page).fill(title)
       await selectors.sessionByTitle(page, title).click()
@@ -65,7 +47,7 @@ export const checkpointRewind: Scenario = {
       await step('rewind-failed-before-cleanup')
       throw error
     } finally {
-      await dispatch(page, base, { type: 'session.delete', sessionId })
+      await dispatch(page, shell.base, { type: 'session.delete', sessionId })
     }
   },
 }

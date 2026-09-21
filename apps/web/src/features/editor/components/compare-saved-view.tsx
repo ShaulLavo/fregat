@@ -3,7 +3,7 @@ import { fileDocumentKey } from '@/lib/documents/utils/identity'
 import type { FilesystemPath, TabId } from '@/lib/documents/utils/types'
 import { createTextDiff } from '@singapore-editor/diff'
 import { EmptyState } from '@workspace/ui/components/empty-state'
-import { useMemo } from 'react'
+import {} from 'react'
 
 import { DiffEditor } from '@/features/editor/components/diff-editor'
 import { EditorTabPlaceholder } from '@/features/editor/components/tab-placeholder'
@@ -46,19 +46,8 @@ export function CompareSavedView({
   const savedText = fileState.status === 'ready' ? fileState.data.content : null
   // Keep the text tied to the revision that materialized it. The mutable buffer object does not
   // change identity as edits arrive.
-  const snapshot = useMemo(
-    () => ({ revision, text: buffer?.materializeFullText() ?? null }),
-    [buffer, revision],
-  )
-  const file = useMemo(() => {
-    if (savedText === null || snapshot.text === null) return null
-
-    const languageId = languageIdForFilePath(path)
-    return createTextDiff({
-      newFile: { languageId, path, text: snapshot.text },
-      oldFile: { languageId, path, text: savedText },
-    })
-  }, [path, savedText, snapshot])
+  const snapshot = { revision, text: buffer?.materializeFullText() ?? null }
+  const file = savedTextDiff(path, savedText, snapshot.text)
 
   // No retry: closing and reopening the compare tab re-reads the saved file.
   if (fileState.status === 'error') {
@@ -88,4 +77,14 @@ export function CompareSavedView({
     )
 
   return <DiffEditor file={file} languageServer={languageServer} mode={mode} tabId={tabId} />
+}
+
+function savedTextDiff(path: FilesystemPath, savedText: string | null, text: string | null) {
+  if (savedText === null || text === null) return null
+
+  const languageId = languageIdForFilePath(path)
+  return createTextDiff({
+    newFile: { languageId, path, text },
+    oldFile: { languageId, path, text: savedText },
+  })
 }

@@ -6,7 +6,7 @@ import {
   DialogHeader,
   DialogTitle,
 } from '@workspace/ui/components/dialog'
-import { useCallback, useRef } from 'react'
+import { useRef } from 'react'
 
 import { DeferredSettingsPage } from '@/features/settings/components/deferred-page'
 import { useFocusTarget } from '@/lib/focus/hooks/use-target'
@@ -45,13 +45,10 @@ export function SettingsDialog({
     },
   })
   // The closed dialog must not remain a live overlay target.
-  const setRootRef = useCallback(
-    (element: HTMLDivElement | null) => {
-      rootRef.current = element
-      focusTargetRef(open ? element : null)
-    },
-    [focusTargetRef, open],
-  )
+  const setRootRef = (element: HTMLDivElement | null) => {
+    rootRef.current = element
+    focusTargetRef(open ? element : null)
+  }
 
   return (
     <Dialog open={open} onOpenChange={onOpenChange}>

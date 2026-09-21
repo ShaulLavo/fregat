@@ -1,6 +1,6 @@
 import type { Editor } from '@singapore-editor/core/editor'
 import type { DiffGutterSide } from '@singapore-editor/diff'
-import { useCallback, useRef } from 'react'
+import { useRef } from 'react'
 
 import type { DiffScrollPosition } from '@/features/editor/utils/diff-scroll-bridge'
 
@@ -34,7 +34,7 @@ export function useDiffPanes(): DiffPanesController {
   // stay armed and swallow the reader's next scroll of that pane instead.
   const echo = useRef<{ side: DiffGutterSide; top: number; left: number } | null>(null)
 
-  const registerEditor = useCallback((side: DiffGutterSide, editor: Editor | null) => {
+  const registerEditor = (side: DiffGutterSide, editor: Editor | null) => {
     if (editor) {
       editors.current.set(side, editor)
       return
@@ -43,9 +43,9 @@ export function useDiffPanes(): DiffPanesController {
     editors.current.delete(side)
     lastSeen.current.delete(side)
     if (echo.current?.side === side) echo.current = null
-  }, [])
+  }
 
-  const handleScroll = useCallback((side: DiffGutterSide, from: DiffScrollPosition) => {
+  const handleScroll = (side: DiffGutterSide, from: DiffScrollPosition) => {
     const pending = echo.current
     // Spent by the FIRST update from that side, whether or not it is the one we were waiting for.
     // Clearing it only on an exact match leaves it armed whenever the update we get instead exits
@@ -86,16 +86,16 @@ export function useDiffPanes(): DiffPanesController {
     // axis they moved. Without this the first event from a pane has no previous to compare against
     // and carries both axes — which is the yank above, just one gesture later.
     lastSeen.current.set(target, landed)
-  }, [])
+  }
 
-  const handleFocus = useCallback((side: DiffGutterSide) => {
+  const handleFocus = (side: DiffGutterSide) => {
     const target = otherSide(side)
     if (!target) return
 
     // `reveal: false`, or collapsing the idle pane's selection scrolls it to the top and takes the
     // pane the reader is looking at with it on the next sync.
     editors.current.get(target)?.setSelection(0, 0, { reveal: false })
-  }, [])
+  }
 
   return { handleFocus, handleScroll, registerEditor }
 }

@@ -1,7 +1,7 @@
 import { assignRef } from '@workspace/ui/lib/assign-ref'
 import { FileTypeIcon } from '@/components/file-type-icon'
 import type { DraggableAttributes, DraggableSyntheticListeners } from '@dnd-kit/core'
-import { useCallback, type CSSProperties, type Ref } from 'react'
+import { type CSSProperties, type Ref } from 'react'
 
 import { useEditorTabIntentPrefetch } from '@/features/workspace/hooks/use-tab-intent-prefetch'
 import type { EditorTabCloseTarget } from '@/features/workspace/utils/tab-close-targets'
@@ -42,13 +42,10 @@ export function EditorTabButton({
   const intentPrefetchRef = useEditorTabIntentPrefetch(tab)
   const { requestCloseTab, selectTab } = useEditorTabActions()
   // Stable ref composition keeps Foresight and DnD from re-registering on every render.
-  const buttonRef = useCallback(
-    (node: HTMLButtonElement | null) => {
-      intentPrefetchRef(node)
-      assignRef(dragNodeRef, node)
-    },
-    [dragNodeRef, intentPrefetchRef],
-  )
+  const buttonRef = (node: HTMLButtonElement | null) => {
+    intentPrefetchRef(node)
+    assignRef(dragNodeRef, node)
+  }
 
   function handleSelectTab() {
     selectTab(tab.id)

@@ -57,7 +57,6 @@ import {
   useEffect,
   useLayoutEffect,
   memo,
-  useMemo,
   useRef,
   useState,
   type CSSProperties,
@@ -142,7 +141,7 @@ function ReadyTreePane({
   const [initialGitStatus] = useState(() => gitStatus ?? EMPTY_GIT_STATUS)
   const previousGitStatusRef = useRef(initialGitStatus)
   const [initialPreparedInput] = useState(() => preparedTreeInputForPaths(model.paths))
-  const icons = useMemo(() => fileTreeIconsForPaths(model.paths), [model.paths])
+  const icons = fileTreeIconsForPaths(model.paths)
   function moveDroppedPaths(moves: readonly TreePathMove[]) {
     void runTreeIntent({
       patch: { kind: 'move', rootPath, moves },

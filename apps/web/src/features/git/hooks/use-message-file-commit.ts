@@ -1,4 +1,4 @@
-import { useEffect } from 'react'
+import { useEffect, useEffectEvent } from 'react'
 
 import { useEditorWorkspaceState } from '@/features/editor/state/workspace-state'
 import { useGitState } from '@/features/git/state/store'
@@ -25,6 +25,11 @@ export function useMessageFileCommit(rootPath: string) {
     )
   })
 
+  // `commit` is a fresh object each render; the close is the only trigger.
+  const commitMessageFile = useEffectEvent(() => {
+    commit.mutate({ message: '', source: 'message-file' })
+  })
+
   useEffect(() => {
     if (!pending) return
     if (isOpen) {
@@ -34,8 +39,6 @@ export function useMessageFileCommit(rootPath: string) {
     if (!pending.seenOpen) return
 
     setPendingMessageFile(null)
-    commit.mutate({ message: '', source: 'message-file' })
-    // `commit` is a fresh object each render; the close is the only trigger.
-    // oxlint-disable-next-line react-hooks/exhaustive-deps
+    commitMessageFile()
   }, [isOpen, pending, setPendingMessageFile])
 }

@@ -1,9 +1,10 @@
+import { TickerNumber } from '@/components/ticker-number'
 import { OrbitLoader } from '@workspace/ui/components/orbit-loader'
 import { disabledDiffQueryKey } from '@/features/git/utils/query-keys'
 import type { GitFileStatus } from '@workspace/contracts'
 import { EmptyState } from '@workspace/ui/components/empty-state'
 import { cn } from '@workspace/ui/lib/utils'
-import { Activity, useMemo, type ComponentProps } from 'react'
+import { Activity, type ComponentProps } from 'react'
 import { useIsFetching } from '@tanstack/react-query'
 import { Button } from '@workspace/ui/components/button'
 import { PaneBar } from '@workspace/ui/components/pane-bar'
@@ -38,7 +39,7 @@ export function Panel({ className, rootPath }: ComponentProps<'section'> & { roo
   const status = useStatus(rootPath)
   const files = status.data?.files ?? EMPTY_FILES
   const repository = status.data?.repository ?? null
-  const rows = useMemo(() => changeRows(files), [files])
+  const rows = changeRows(files)
   const hasLocalChanges = rows.staged.length > 0 || rows.worktree.length > 0
 
   const selectedContent = useEditorWorkspaceState((state) => state.selectedTabContent)
@@ -106,7 +107,9 @@ export function Panel({ className, rootPath }: ComponentProps<'section'> & { roo
             >
               <GitDiffIcon />
               Changes
-              <span className='text-muted-foreground text-2xs tabular-nums'>{files.length}</span>
+              <span className='text-muted-foreground text-2xs tabular-nums'>
+                <TickerNumber value={files.length} />
+              </span>
             </Button>
             <Button
               size='sm'

@@ -1,3 +1,4 @@
+import { PANEL_SURFACE } from '@workspace/ui/patterns/panel-surface'
 import type { GitFileStatus } from '@workspace/contracts'
 import {
   PersistedResizablePanelGroup,
@@ -90,7 +91,7 @@ export function ChatModeLayout({
                 // Editor and terminal paint their own content wells.
                 panels.activeToolTab !== 'editor' &&
                   panels.activeToolTab !== 'terminal' &&
-                  'bg-card backdrop-material',
+                  PANEL_SURFACE,
               )}
               defaultSize={TOOL_PANE_DEFAULT_SIZE}
               id='tools'

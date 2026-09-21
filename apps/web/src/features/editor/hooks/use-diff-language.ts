@@ -64,10 +64,7 @@ export function useDiffLanguage(
   const origin = originForQueryClient(useQueryClient())
   const newLines = file?.newLines ?? EMPTY_DIFF_LINES
   const oldLines = file?.oldLines ?? EMPTY_DIFF_LINES
-  const map = useMemo(
-    () => createDiffPositionMap(rows, newLines, oldLines),
-    [newLines, oldLines, rows],
-  )
+  const map = createDiffPositionMap(rows, newLines, oldLines)
   const host = languageServer?.host ?? null
   const onApplyWorkspaceEdit = host?.applyWorkspaceEdit ?? null
   const openDefinition = host?.openDefinition ?? null
@@ -81,7 +78,7 @@ export function useDiffLanguage(
     documentPath ?? '',
     documentPath !== null,
   )
-  const routedMatches = useMemo(() => diffLanguageServerMatches(matches), [matches])
+  const routedMatches = diffLanguageServerMatches(matches)
 
   // A plain holder the plugin reads from, so its identity stays stable across renders — a fresh
   // plugin per render would tear the view contribution down and rebuild its tooltip on every mouse

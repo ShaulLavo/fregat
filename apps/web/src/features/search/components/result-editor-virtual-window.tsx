@@ -1,5 +1,5 @@
 import type { EditorTheme } from '@singapore-editor/core/rendering'
-import { memo, useMemo, type RefObject } from 'react'
+import { memo, useLayoutEffect, useMemo, type RefObject } from 'react'
 
 import { SEARCH_RESULT_VIRTUAL_PADDING } from '@/features/search/utils/result-editor-constants'
 import type { SearchResultEditorScrollToIndex } from '@/features/search/utils/result-editor-types'
@@ -52,25 +52,23 @@ export const SearchResultEditorVirtualWindow = memo(
       totalSize: virtualTotalSize,
       viewport,
     } = useSearchResultEditorVirtualizer(rows, parentRef, 'raf', initialViewport)
-    scrollToIndexRef.current = scrollToIndex
-    scrollToOffsetRef.current = scrollToOffset
+    // Published from a layout effect, not during render: the surface above reads these from its
+    // own layout effects, which React runs after every child's.
+    useLayoutEffect(() => {
+      scrollToIndexRef.current = scrollToIndex
+      scrollToOffsetRef.current = scrollToOffset
+    }, [scrollToIndex, scrollToIndexRef, scrollToOffset, scrollToOffsetRef])
 
     const renderedVirtualItems = useMemo(
       () => searchResultRenderedVirtualItems(virtualItems, rows),
       [rows, virtualItems],
     )
-    const fileResultItems = useMemo(
-      () => renderedVirtualItems.filter(isSearchResultRenderedFileResultItem),
-      [renderedVirtualItems],
-    )
+    const fileResultItems = renderedVirtualItems.filter(isSearchResultRenderedFileResultItem)
     const fileEditorPoolEntries = useSearchResultFileEditorPoolEntries(
       fileResultItems,
       prewarmEditorPool,
     )
-    const windowStyle = useMemo(
-      () => ({ height: virtualTotalSize + SEARCH_RESULT_VIRTUAL_PADDING }),
-      [virtualTotalSize],
-    )
+    const windowStyle = { height: virtualTotalSize + SEARCH_RESULT_VIRTUAL_PADDING }
 
     return (
       <div className='relative' style={windowStyle}>
