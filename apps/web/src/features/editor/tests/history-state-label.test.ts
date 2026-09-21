@@ -1,4 +1,4 @@
-import { createEditorBufferSession, createEditorTextBuffer } from '@singapore-editor/core'
+import { createEditorBufferSession, createEditorTextBuffer } from '@singapore-editor/core/document'
 import { describe, expect, it } from 'vitest'
 
 import { adjacentHistoryState } from '@/features/editor/utils/history-navigation'

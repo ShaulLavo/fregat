@@ -1,4 +1,4 @@
-import type { EditorViewSnapshot } from '@singapore-editor/core'
+import type { EditorViewSnapshot } from '@singapore-editor/core/extensions'
 import { describe, expect, it } from 'vitest'
 
 import { capOverscrollTop } from '@/features/editor/utils/scroll-position'

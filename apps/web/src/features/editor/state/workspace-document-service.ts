@@ -29,13 +29,15 @@ import {
   acquireDocumentMutationLease,
   releaseDocumentMutationLease,
   type DocumentMutationLease,
-  type EditorScrollPosition,
   type EditorTextBuffer,
   type EditorTextBufferChange,
   type EditorViewSession,
   type PieceTableSnapshot,
+} from '@singapore-editor/core/document'
+import {
+  type EditorScrollPosition,
   type EditorPreparedDocument,
-} from '@singapore-editor/core'
+} from '@singapore-editor/core/editor'
 
 type LiveDocumentSyncState = 'idle' | 'saving' | 'conflict'
 

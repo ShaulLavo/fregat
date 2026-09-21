@@ -1,6 +1,6 @@
 import { waitFor } from '@testing-library/react'
 import { StrictMode } from 'react'
-import type { Editor } from '@singapore-editor/core'
+import type { Editor } from '@singapore-editor/core/editor'
 import {
   createDiffRegionStore,
   createStackedProjection,

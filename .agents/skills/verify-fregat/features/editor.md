@@ -14,6 +14,8 @@ Open the command palette (`Control+Shift+P`), type a file name, press Enter. Or 
 
 `scenario editor-type-burst`, `scenario editor-large-paste`, `scenario editor-fast-scroll`, `scenario editor-caret-burst`. These open `--file` (default `use-events.ts`) through the palette. For a save, press `Control+s` in a scenario and check the file on disk plus `bun run logs --action fs.write`.
 
+`scenario editor-find` opens the find widget with `Control+f`, types a dense query, a sparse one and one that matches nothing, and steps through matches. It fails unless the count reads `N of M` with no floor marker and the position moves; the count is exact past the 19,999-highlight cap.
+
 `trace editor-fast-scroll --file keys.ts` waits for startup before the `ready` marker, then runs repeated 1,200px sweeps and alternating 6,000px jumps through the settings registry. Compare scrolling after `ready` separately from file opening. The editor holds its complete previous paint until the next scroll paint is ready; its browser regression checks this with zero overscan, including horizontal jumps.
 
 Split views: `scenario editor-split-drag` checks edge previews, modifier changes, shared editing/undo, nested layouts, resize/reload, cancellation and duplicate collapse. `scenario editor-split-actions` checks keyboard reorder, moves, tab-strip insertion, menu size limits, numbered focus and independent scroll restore. `scenario editor-split-state` uses a disposable committed workspace to check Find and Save in the focused pane, closing one dirty copy, and the final-view save prompt. Split scenarios isolate their terminal sessions and clean them up.
@@ -53,6 +55,8 @@ The click scenario waits 750ms between clicks so debounced document highlights, 
 `scenario editor-row-height-audit` opens `--file`, then forces `--editor-row-height: 0px` on the editor and opens `README.md`. Every initial text paint logs `editor.layout.rows_audited` (debug) with the row pitch, painted height, line-height and the CSS vars on the editor and the root; a disagreement logs `editor.layout.row_height_mismatch` (warn) with the same fields. The client batches logs about once a minute, so the run's `logs.txt` is usually empty: read `bun run logs --action editor.layout.row_height_mismatch` a minute after the run. A rows-stacked or text-clipped editor without that warn is a gap in the audit itself.
 
 `scenario editor-lsp-hover --file main.tsx` inserts a `const`, hovers its name, checks the language server tooltip names it, then inserts a name with a Cyrillic letter and checks that its diagnostic and its character warning share one tooltip. Undoes both edits.
+
+`scenario editor-lsp-signature-help` types `console.log(`, checks the signature surface names the call, then types `)` and checks it goes away. Both characters are read as keystrokes, not as edits: auto-close writes a typed `(` as `()`, and typing over the closer it inserted changes no text at all, so neither is visible in the document change. The surface and its Markdown renderer load on that first `(`, so this also covers the lazy chunk. Undoes the edit.
 
 `scenario editor-lsp-completion --file main.tsx` reaches `console.l` by typing straight through, pausing after `c`, and accepting `console` with Enter, each at three key delays, and checks the list offers `log` and no globals. Also worth running with an `.astro` or `.mjs` file.
 

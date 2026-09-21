@@ -1,4 +1,4 @@
-import { createEditorBufferSession } from '@singapore-editor/core'
+import { createEditorBufferSession } from '@singapore-editor/core/document'
 import { act, waitFor } from '@testing-library/react'
 import { vi } from 'vitest'
 

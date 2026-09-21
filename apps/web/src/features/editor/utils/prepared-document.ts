@@ -1,12 +1,14 @@
+import { type EditorTextBuffer } from '@singapore-editor/core/document'
 import {
-  createEditorPreparedDocument,
-  type EditorHighlighterProvider,
-  type EditorPreparedDocument,
-  type EditorPreparedTagValue,
   type EditorSyntaxProvider,
   type EditorSyntaxLanguageId,
-  type EditorTextBuffer,
-} from '@singapore-editor/core'
+} from '@singapore-editor/core/syntax'
+import { type EditorHighlighterProvider } from '@singapore-editor/core/extensions'
+import {
+  createEditorPreparedDocument,
+  type EditorPreparedDocument,
+  type EditorPreparedTagValue,
+} from '@singapore-editor/core/editor'
 
 import { languageIdForFilePath } from '@/features/editor/utils/file-path'
 import {

@@ -1,4 +1,7 @@
-import type { EditorPlugin, EditorViewContributionUpdateKind } from '@singapore-editor/core'
+import type {
+  EditorPlugin,
+  EditorViewContributionUpdateKind,
+} from '@singapore-editor/core/extensions'
 
 export type DiffScrollPosition = {
   readonly top: number

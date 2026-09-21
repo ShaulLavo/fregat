@@ -290,8 +290,8 @@
   {
     "from": "chat-mode",
     "to": "terminal",
-    "module": "features/terminal/components/panel.tsx",
-    "reason": "owner: The chat mode tool area composes this pane through TerminalPanel."
+    "module": "features/terminal/components/deferred-panel.tsx",
+    "reason": "owner: The chat mode tool area composes this pane through DeferredTerminalPanel."
   },
   {
     "from": "chat-mode",
@@ -956,8 +956,8 @@
   {
     "from": "workbench",
     "to": "settings",
-    "module": "features/settings/components/page.tsx",
-    "reason": "owner: The workbench composes feature panes and their commands; this module supplies SettingsPage."
+    "module": "features/settings/components/deferred-page.tsx",
+    "reason": "owner: The workbench composes feature panes and their commands; this module supplies DeferredSettingsPage."
   },
   {
     "from": "workbench",
@@ -980,8 +980,8 @@
   {
     "from": "workbench",
     "to": "terminal",
-    "module": "features/terminal/components/panel.tsx",
-    "reason": "owner: The workbench composes feature panes and their commands; this module supplies TerminalPanel."
+    "module": "features/terminal/components/deferred-panel.tsx",
+    "reason": "owner: The workbench composes feature panes and their commands; this module supplies DeferredTerminalPanel."
   },
   {
     "from": "workbench",

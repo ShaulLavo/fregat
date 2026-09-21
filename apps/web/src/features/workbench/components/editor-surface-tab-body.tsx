@@ -20,14 +20,12 @@ import {
   EditorSurfaceActionsContext,
   type EditorSurfaceActions,
 } from '@/features/workbench/providers/editor-surface-actions-context'
-import { SettingsPage } from '@/features/settings/components/page'
+import { DeferredSettingsPage } from '@/features/settings/components/deferred-page'
 import { useSettingsJsonDocument } from '@/features/settings/hooks/use-settings-json-document'
 import { useSelectedFile } from '@/features/workspace/hooks/use-selected-file'
-import type { DocumentSessionChange } from '@singapore-editor/core'
-import type {
-  LanguageServerDefinitionTarget,
-  LanguageServerReferencesResult,
-} from '@singapore-editor/lsp-plugin'
+import type { DocumentSessionChange } from '@singapore-editor/core/document'
+import type { LanguageServerDefinitionTarget } from '@singapore-editor/lsp-plugin/websocket'
+import type { LanguageServerReferencesResult } from '@singapore-editor/lsp-plugin'
 import { useFileOpenIntent } from '@/lib/file-open-intent/providers/context'
 
 export function EditorSurfaceTabBody({
@@ -233,7 +231,7 @@ export function EditorSurfaceTabBody({
   // give it a spinner for a file that does not exist.
   if (content.kind === 'settings') {
     return (
-      <SettingsPage
+      <DeferredSettingsPage
         active={active}
         liveDocument={selectedLiveDocument}
         rootPath={rootPath}

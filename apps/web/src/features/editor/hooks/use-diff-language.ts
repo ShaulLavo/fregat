@@ -1,6 +1,7 @@
 import { useQueryClient } from '@tanstack/react-query'
 import { originForQueryClient } from '@/lib/environments/state/query-clients'
-import type { EditorPlugin, EditorTheme } from '@singapore-editor/core'
+import type { EditorTheme } from '@singapore-editor/core/rendering'
+import type { EditorPlugin } from '@singapore-editor/core/extensions'
 import type { DiffFile, DiffRenderRow } from '@singapore-editor/diff'
 import { useEffect, useLayoutEffect, useMemo, useState } from 'react'
 

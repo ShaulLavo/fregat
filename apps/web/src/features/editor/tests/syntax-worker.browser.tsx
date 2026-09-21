@@ -1,11 +1,8 @@
 import chatModelSource from '../../../../../../packages/contracts/src/chat-model.ts?raw'
 import { expect, test } from 'vitest'
-import {
-  createEditorLoggingPlugin,
-  createEditorRuntimeSessionId,
-  Editor,
-  type EditorLogEvent,
-} from '@singapore-editor/core'
+import { createEditorRuntimeSessionId } from '@singapore-editor/core/syntax'
+import { createEditorLoggingPlugin, type EditorLogEvent } from '@singapore-editor/core/logging'
+import { Editor } from '@singapore-editor/core/editor'
 import { createPieceTableSnapshot } from '@singapore-editor/core/document'
 import { createShikiHighlighterPlugin, createShikiWorkerOwner } from '@singapore-editor/core/shiki'
 import {

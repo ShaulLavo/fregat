@@ -364,6 +364,9 @@ Execution order is strict:
    Phases 2 and 3 and refuted two of the three boundaries anyone had proposed. Two survive, worth
    6.25% of the entry chunk. Phase 4 pins after Phase 3 and re-pins after 108 rather than waiting
    for a final number, and it owns correcting the stale first-load figure quoted below.
+   Phases 2 and 3 are implemented and deployed (2026-09-21): the report prints per-owner rows, and
+   the terminal and settings load behind boundaries, first-load JS 1,722,976 → 1,610,904 gz. The
+   written boot definition and the Phase 4 gate remain.
 
 5. [Plan 129](plans/129-dependency-shape.md) owns the bytes 109 measured and handed off because no
    loading boundary reaches them: the Editor's three inline worker blobs, 579 KB gz and 25.5% of

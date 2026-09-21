@@ -1,9 +1,6 @@
 import type { LspClient, LspWorkspace } from '@singapore-editor/lsp'
-import type {
-  LspConnectionCallbacks,
-  LspConnectionProvider,
-  LanguageServerLaneOptions,
-} from '@singapore-editor/lsp-plugin'
+import type { LanguageServerLaneOptions } from '@singapore-editor/lsp-plugin/websocket'
+import type { LspConnectionCallbacks, LspConnectionProvider } from '@singapore-editor/lsp-plugin'
 import { vi } from 'vitest'
 
 import { createDiffLanguageSession } from '@/features/editor/state/diff-language-session'

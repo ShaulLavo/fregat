@@ -1,17 +1,16 @@
+import { type EditorSyntaxLanguageId } from '@singapore-editor/core/syntax'
+import { createEditorLoggingPlugin, type EditorLogEvent } from '@singapore-editor/core/logging'
+import { type EditorDisposable, type EditorPlugin } from '@singapore-editor/core/extensions'
 import {
   createBracketMatchPlugin,
   createDocumentLinkPlugin,
-  createEditorLoggingPlugin,
   createMergeConflictPlugin,
   createOccurrenceHighlightPlugin,
-  type EditorDisposable,
-  type EditorLogEvent,
-  type EditorPlugin,
   type EditorScrollPosition,
-  type EditorSyntaxLanguageId,
-} from '@singapore-editor/core'
+} from '@singapore-editor/core/editor'
 import { createEditorFindPlugin } from '@singapore-editor/find'
-import { createFoldGutterPlugin, createLineGutterPlugin } from '@singapore-editor/gutters'
+import { createFoldGutterPlugin } from '@singapore-editor/gutters/fold-gutter'
+import { createLineGutterPlugin } from '@singapore-editor/gutters/line-gutter'
 import { createMinimapPlugin } from '@singapore-editor/minimap'
 import { createMarkdownPreviewPlugin } from '@singapore-editor/markdown'
 import { createScopeLinesPlugin } from '@singapore-editor/scope-lines'

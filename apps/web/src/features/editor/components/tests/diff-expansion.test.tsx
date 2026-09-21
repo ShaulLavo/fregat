@@ -1,7 +1,7 @@
 import { waitFor } from '@testing-library/react'
 import { StrictMode } from 'react'
 import userEvent from '@testing-library/user-event'
-import type { Editor } from '@singapore-editor/core'
+import type { Editor } from '@singapore-editor/core/editor'
 import {
   createDiffRegionStore,
   createStackedProjection,

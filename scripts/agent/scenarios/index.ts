@@ -75,6 +75,7 @@ import { editorAutoClose } from './editor-auto-close'
 import { editorFormatChord } from './editor-format-chord'
 import { editorLspCompletion } from './editor-lsp-completion'
 import { editorLspHover } from './editor-lsp-hover'
+import { editorLspSignatureHelp } from './editor-lsp-signature-help'
 import { editorMarkdownPunctuation } from './editor-markdown-punctuation'
 import { wallpaperLibrary } from './wallpaper-library'
 import { wallpaperPalette } from './wallpaper-palette'
@@ -113,6 +114,7 @@ import { editorDiagnosticsLifecycle } from './editor-diagnostics-lifecycle'
 import { editorFastScroll } from './editor-fast-scroll'
 import { editorRowHeightAudit } from './editor-row-height-audit'
 import { editorLargePaste } from './editor-large-paste'
+import { editorFind } from './editor-find'
 import { editorTypeBurst } from './editor-type-burst'
 import { editorUndoBarrier } from './editor-undo-barrier'
 import { editorUndoBranch } from './editor-undo-branch'
@@ -214,6 +216,7 @@ export const scenarios: readonly Scenario[] = [
   editorFormatChord,
   editorLspCompletion,
   editorLspHover,
+  editorLspSignatureHelp,
   editorMarkdownPunctuation,
   fileIcons,
   searchInputUndo,
@@ -246,6 +249,7 @@ export const scenarios: readonly Scenario[] = [
   editorFastScroll,
   editorDiagnosticsLifecycle,
   editorRowHeightAudit,
+  editorFind,
   editorTypeBurst,
   editorUndoBarrier,
   editorUndoBranch,

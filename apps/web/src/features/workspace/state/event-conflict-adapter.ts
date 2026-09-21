@@ -31,7 +31,7 @@ import { createFileContent, ensureFolderPath, writeFileContent } from '@/lib/fil
 import type { FileResult } from '@/lib/file-system-types'
 import { fileSystemKeys } from '@/lib/query-keys'
 import type { Client } from '@/lib/client'
-import { createMergeConflictDocumentText } from '@singapore-editor/core'
+import { createMergeConflictDocumentText } from '@singapore-editor/core/editor'
 import type { QueryClient } from '@tanstack/react-query'
 import { createElement } from 'react'
 import { toast } from 'sonner'

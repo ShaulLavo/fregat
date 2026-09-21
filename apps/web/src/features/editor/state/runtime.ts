@@ -15,7 +15,7 @@ import {
 } from '@/features/git/state/store'
 import { workspaceLocationId } from '@/features/workspace/utils/location'
 import type { ScopedStorage } from '@/lib/environments/state/scoped-storage'
-import { LanguageServerDocumentSyncController } from '@singapore-editor/lsp-plugin'
+import { LanguageServerDocumentSyncController } from '@singapore-editor/lsp-plugin/document-sync-controller'
 import type { QueryClient } from '@tanstack/react-query'
 
 import type { WorkspaceEditHost } from '@/features/editor/providers/workspace-edit-context'

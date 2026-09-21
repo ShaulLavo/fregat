@@ -1,14 +1,16 @@
 import {
   createDocumentTextSnapshot,
-  createEmptySyntaxResult,
   createPieceTableSnapshot,
+  type PieceTableSnapshot,
+} from '@singapore-editor/core/document'
+import {
+  createEmptySyntaxResult,
   type EditorSyntaxProvider,
   type EditorSyntaxResult,
   type EditorSyntaxSession,
   type EditorSyntaxSessionOptions,
   type EditorToken,
-  type PieceTableSnapshot,
-} from '@singapore-editor/core'
+} from '@singapore-editor/core/syntax'
 import { describe } from 'vitest'
 
 import { expect, test as it } from '../../../../test/fixtures'

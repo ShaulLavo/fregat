@@ -12,6 +12,7 @@
 import fs from 'node:fs'
 import path from 'node:path'
 import { gzipSync } from 'node:zlib'
+import { attributeOwners, type OwnerRow } from './bundle-owners'
 import {
   bundleStatsFile,
   GZIP_LEVEL,
@@ -56,6 +57,7 @@ type Report = {
     readonly chunkBytes: number
     readonly chunkGzip: number
   } | null
+  readonly owners: readonly OwnerRow[]
   readonly packages: readonly PackageRow[]
   readonly duplicatePackages: readonly {
     readonly name: string
@@ -68,6 +70,7 @@ type Report = {
 }
 
 const webRoot = path.resolve(import.meta.dirname, '..')
+const repoRoot = path.resolve(webRoot, '..', '..')
 const NODE_MODULES_PACKAGE = /\/node_modules\/((?:@[^/]+\/)?[^/]+)\//gu
 
 main()
@@ -118,6 +121,7 @@ function buildReport(dir: string): Report {
       dir,
       firstLoad: { scriptGzip, stylesheetGzip, files },
       build: null,
+      owners: [],
       packages: [],
       duplicatePackages: [],
       duplicateChunkNames: [],
@@ -134,6 +138,7 @@ function buildReport(dir: string): Report {
       chunkBytes: sum(stats.chunks.map((chunk) => chunk.size)),
       chunkGzip: sum(stats.chunks.map((chunk) => chunk.gzipSize)),
     },
+    owners: attributeOwners(stats.chunks, firstLoadNames, repoRoot),
     packages,
     duplicatePackages: packages
       .filter((row) => row.versions.length > 1)
@@ -320,6 +325,7 @@ function printReport(report: Report): void {
   console.log(
     `Whole build: ${build.chunkCount} chunks, ${mb(build.chunkBytes)} raw, ${kb(build.chunkGzip)} gz`,
   )
+  printOwners(report.owners)
   console.log('\nPackage                                  First-load gz    Total gz  Versions')
   for (const row of report.packages.slice(0, 40)) {
     console.log(
@@ -327,6 +333,19 @@ function printReport(report: Report): void {
     )
   }
   printDuplicates(report)
+}
+
+function printOwners(owners: readonly OwnerRow[]): void {
+  const firstLoadRendered = sum(owners.map((row) => row.firstLoadRendered))
+  console.log(
+    '\nOwner                                    First-load rendered       %   Gz (model)  Modules  Lazy rendered',
+  )
+  for (const row of owners) {
+    const percent = ((row.firstLoadRendered / firstLoadRendered) * 100).toFixed(2)
+    console.log(
+      `${row.owner.padEnd(40)} ${grouped(row.firstLoadRendered).padStart(19)} ${percent.padStart(6)}% ${grouped(row.firstLoadGzip).padStart(12)} ${String(row.firstLoadModules).padStart(8)} ${grouped(row.lazyRendered).padStart(14)}`,
+    )
+  }
 }
 
 function printDuplicates(report: Report): void {
@@ -344,6 +363,10 @@ function printDuplicates(report: Report): void {
 
 function countOf(files: readonly FirstLoadFile[], kind: FirstLoadFile['kind']): number {
   return files.filter((file) => file.kind === kind).length
+}
+
+function grouped(value: number): string {
+  return value.toLocaleString('en-US')
 }
 
 function kb(bytes: number): string {

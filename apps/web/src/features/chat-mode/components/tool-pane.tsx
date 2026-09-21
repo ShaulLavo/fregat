@@ -14,7 +14,7 @@ import { useSessionDiffScope } from '@/features/chat/hooks/use-session-diff-scop
 import { Panel as GitPanel } from '@/features/git/components/panel'
 
 import { LogsPanel } from '@/features/logs/components/panel'
-import { TerminalPanel } from '@/features/terminal/components/panel'
+import { DeferredTerminalPanel } from '@/features/terminal/components/deferred-panel'
 import { KeepAliveSlot } from '@/lib/keep-alive/components/keep-alive-slot'
 import { CodePanel } from '@/features/workbench/components/code-panel'
 import { DiagnosticsPanel } from '@/features/workbench/components/diagnostics-panel'
@@ -66,7 +66,7 @@ export function ToolPane({
       <KeepAliveSlot id={`chat-terminals:${terminalSessionId}`} scope='chat-terminals'>
         {(attached) => (
           <RenderErrorBoundary label='Terminal'>
-            <TerminalPanel
+            <DeferredTerminalPanel
               active={attached}
               className='h-full'
               rootPath={toolRoot}

@@ -1,8 +1,6 @@
-import {
-  LanguageServerDocumentSyncController,
-  summarizeDiagnostics,
-  type LanguageServerSetPluginOptions,
-} from '@singapore-editor/lsp-plugin'
+import { summarizeDiagnostics } from '@singapore-editor/lsp-plugin/diagnostics'
+import { LanguageServerDocumentSyncController } from '@singapore-editor/lsp-plugin/document-sync-controller'
+import { type LanguageServerSetPluginOptions } from '@singapore-editor/lsp-plugin/websocket'
 import { beforeEach, describe, vi } from 'vitest'
 import { activeDocumentForSnapshot } from '@singapore-editor/lsp-plugin/document-sync'
 

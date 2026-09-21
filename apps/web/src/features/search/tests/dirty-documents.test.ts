@@ -1,4 +1,4 @@
-import { createEditorBufferSession } from '@singapore-editor/core'
+import { createEditorBufferSession } from '@singapore-editor/core/document'
 
 import { createEditorDocumentStore } from '@/features/editor/state/document-state'
 import {

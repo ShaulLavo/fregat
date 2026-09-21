@@ -1,5 +1,6 @@
 import { parentFilesystemPath } from '@/lib/path-formatters'
-import { parseMergeConflicts, type TextSnapshot } from '@singapore-editor/core'
+import { type TextSnapshot } from '@singapore-editor/core/document'
+import { parseMergeConflicts } from '@singapore-editor/core/editor'
 import { decodedAsText } from '@workspace/contracts'
 import { Debouncer } from '@tanstack/react-pacer/debouncer'
 import type { QueryClient } from '@tanstack/react-query'

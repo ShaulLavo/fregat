@@ -1,4 +1,5 @@
-import type { Editor, EditorPlugin, EditorViewContributionContext } from '@singapore-editor/core'
+import type { EditorPlugin, EditorViewContributionContext } from '@singapore-editor/core/extensions'
+import type { Editor } from '@singapore-editor/core/editor'
 import type { DiffPanePresentation } from '@/features/editor/state/tab-presentation'
 
 export function createDiffPresentationBinding(presentation: DiffPanePresentation) {

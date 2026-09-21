@@ -1,9 +1,6 @@
 import type { DocumentKey, FilesystemPath } from '@/lib/documents/utils/types'
-import type {
-  EditorPreparedDocument,
-  EditorTextBuffer,
-  PieceTableSnapshot,
-} from '@singapore-editor/core'
+import type { EditorTextBuffer, PieceTableSnapshot } from '@singapore-editor/core/document'
+import type { EditorPreparedDocument } from '@singapore-editor/core/editor'
 import type { FileResult } from '@/lib/file-system-types'
 
 type PreparedOpenClaimBase = {

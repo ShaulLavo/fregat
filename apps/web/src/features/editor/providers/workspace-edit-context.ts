@@ -1,5 +1,5 @@
+import { LanguageServerDocumentSyncController } from '@singapore-editor/lsp-plugin/document-sync-controller'
 import {
-  LanguageServerDocumentSyncController,
   type ApplyWorkspaceEditResult,
   type OnApplyWorkspaceEdit,
 } from '@singapore-editor/lsp-plugin'

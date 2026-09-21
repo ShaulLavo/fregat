@@ -12,7 +12,7 @@ import { log } from '@/lib/client-logging'
 import type { DocumentKey } from '@/lib/documents/utils/types'
 import { runMutation } from '@/lib/mutations/run'
 import { readSettingBootValue } from '@/lib/settings-boot-mirror'
-import type { EditorTextBuffer, SerializedEditorHistory } from '@singapore-editor/core'
+import type { EditorTextBuffer, SerializedEditorHistory } from '@singapore-editor/core/document'
 import {
   mutationOptions,
   queryOptions,

@@ -1,4 +1,4 @@
-import type { EditorHistoryGraph } from '@singapore-editor/core'
+import type { EditorHistoryGraph } from '@singapore-editor/core/document'
 
 // The state next to the current one in sequence order, for the chronological
 // history commands that step across branches.

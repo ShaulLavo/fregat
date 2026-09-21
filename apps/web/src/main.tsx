@@ -1,3 +1,5 @@
+import { loadSettingsPage } from '@/features/settings/state/load-page'
+import { loadTerminalPanel } from '@/features/terminal/state/load-panel'
 import { systemColorMode } from '@/features/settings/state/system-color-mode'
 import { readSettingsMirror } from '@/lib/settings-boot-mirror'
 import { ApplicationBootstrap } from '@/components/application-bootstrap'
@@ -97,3 +99,12 @@ createRoot(document.getElementById('root')!, {
     </LoggingErrorBoundary>
   </StrictMode>,
 )
+
+// After the first frame, so opening a terminal or settings never waits on the
+// network. A failed prefetch is silent: the boundary retries when the pane opens.
+const prefetchDeferredChunks = () => {
+  loadTerminalPanel().catch(() => {})
+  loadSettingsPage().catch(() => {})
+}
+if ('requestIdleCallback' in window) window.requestIdleCallback(prefetchDeferredChunks)
+else setTimeout(prefetchDeferredChunks, 2000)

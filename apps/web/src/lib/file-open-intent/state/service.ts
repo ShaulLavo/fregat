@@ -3,14 +3,13 @@ import { markEditorOpenBenchmark } from '@/lib/editor-open-benchmark-mark'
 import { fileDocumentKey, filesystemPath } from '@/lib/documents/utils/identity'
 import type { DocumentKey, FilesystemPath, TabId } from '@/lib/documents/utils/types'
 import type { QueryClient } from '@tanstack/react-query'
+import { createEditorTextBuffer, type EditorTextBuffer } from '@singapore-editor/core/document'
+import { type EditorInitialPaintEvent } from '@singapore-editor/core/extensions'
 import {
-  createEditorTextBuffer,
-  type EditorInitialPaintEvent,
   type EditorPreparedDocument,
   type EditorPreparedTagValue,
   type EditorScrollPosition,
-  type EditorTextBuffer,
-} from '@singapore-editor/core'
+} from '@singapore-editor/core/editor'
 
 import type { FileResult } from '@/lib/file-system-types'
 import {

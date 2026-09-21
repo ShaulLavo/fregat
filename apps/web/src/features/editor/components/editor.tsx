@@ -1,10 +1,8 @@
 import { useUnicodeHighlights } from '@/features/editor/hooks/use-unicode-highlights'
 import { HOSTED_EDITOR_KEYMAP } from '@/keymap/editor-keymap'
 import { useEditor } from '@singapore-editor/react'
-import type {
-  LanguageServerDefinitionTarget,
-  LanguageServerReferencesResult,
-} from '@singapore-editor/lsp-plugin'
+import type { LanguageServerDefinitionTarget } from '@singapore-editor/lsp-plugin/websocket'
+import type { LanguageServerReferencesResult } from '@singapore-editor/lsp-plugin'
 import { useEffect, useLayoutEffect, useMemo, useState } from 'react'
 import { OrbitLoader } from '@workspace/ui/components/orbit-loader'
 
@@ -36,12 +34,9 @@ import { languageServerDocument } from '@/lib/language-server-document'
 import { documentSourcePath, filesystemResource } from '@/lib/documents/utils/capabilities'
 import type { DocumentKey, DocumentRef, FilesystemPath, TabId } from '@/lib/documents/utils/types'
 import { useEditorFocusTarget } from '@/lib/focus/hooks/use-editor-target'
-import type {
-  DocumentSessionChange,
-  EditorInitialPaintEvent,
-  EditorPlugin,
-  EditorScrollPosition,
-} from '@singapore-editor/core'
+import type { DocumentSessionChange } from '@singapore-editor/core/document'
+import type { EditorInitialPaintEvent, EditorPlugin } from '@singapore-editor/core/extensions'
+import type { EditorScrollPosition } from '@singapore-editor/core/editor'
 import { editorPreparedDocumentTags } from '@/features/editor/utils/prepared-document'
 import { useMountedEditorRegistry } from '@/features/editor/hooks/use-mounted-editor-registry'
 import { useRegisterEditorController } from '@/features/editor/hooks/use-register-editor-controller'

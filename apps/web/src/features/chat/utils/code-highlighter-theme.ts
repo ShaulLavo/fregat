@@ -1,4 +1,4 @@
-import type { EditorTheme } from '@singapore-editor/core'
+import type { EditorTheme } from '@singapore-editor/core/rendering'
 import { editorThemeToShikiTheme } from '@singapore-editor/core/shiki'
 import type { CodeHighlighter } from '@workspace/markdown/providers/code-highlighter-context'
 import { createShikiHighlighter } from '@workspace/markdown/utils/shiki-highlighter'

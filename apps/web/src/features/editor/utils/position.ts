@@ -1,5 +1,5 @@
-import type { TextSnapshot } from '@singapore-editor/core'
-import type { LanguageServerDefinitionTarget } from '@singapore-editor/lsp-plugin'
+import type { TextSnapshot } from '@singapore-editor/core/document'
+import type { LanguageServerDefinitionTarget } from '@singapore-editor/lsp-plugin/websocket'
 
 export function selectionForDefinition(
   filePath: string,

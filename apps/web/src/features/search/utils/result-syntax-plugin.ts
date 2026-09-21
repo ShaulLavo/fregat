@@ -1,8 +1,10 @@
 import {
   createDocumentTextSnapshot,
-  createEmptySyntaxResult,
   type DocumentSessionChange,
-  type EditorPlugin,
+  type PieceTableSnapshot,
+} from '@singapore-editor/core/document'
+import {
+  createEmptySyntaxResult,
   type EditorSyntaxLanguageId,
   type EditorSyntaxProvider,
   type EditorSyntaxResult,
@@ -10,8 +12,8 @@ import {
   type EditorSyntaxSessionOptions,
   type EditorToken,
   type EditorTokenInput,
-  type PieceTableSnapshot,
-} from '@singapore-editor/core'
+} from '@singapore-editor/core/syntax'
+import { type EditorPlugin } from '@singapore-editor/core/extensions'
 
 import { SEARCH_RESULT_FILE_DOCUMENT_ID_PREFIX } from '@/features/search/utils/result-editor'
 import {

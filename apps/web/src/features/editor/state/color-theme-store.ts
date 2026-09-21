@@ -1,4 +1,4 @@
-import type { EditorTheme } from '@singapore-editor/core'
+import type { EditorTheme } from '@singapore-editor/core/rendering'
 import {
   editorThemeFromVscodeTheme,
   VSCODE_THEMES,

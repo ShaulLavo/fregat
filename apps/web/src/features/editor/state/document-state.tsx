@@ -1,6 +1,6 @@
 import { clientErrors } from '@/lib/structured-errors'
 import type { FileResult } from '@/lib/file-system-types'
-import { type EditorScrollPosition } from '@singapore-editor/core'
+import { type EditorScrollPosition } from '@singapore-editor/core/editor'
 import { createContext, use } from 'react'
 import { useStore } from 'zustand'
 import { subscribeWithSelector } from 'zustand/middleware'

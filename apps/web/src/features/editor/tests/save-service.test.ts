@@ -1,6 +1,6 @@
 import { decodedAsText } from '@workspace/contracts'
 import { QueryClient } from '@tanstack/react-query'
-import { createEditorBufferSession } from '@singapore-editor/core'
+import { createEditorBufferSession } from '@singapore-editor/core/document'
 import { describe } from 'vitest'
 
 import { createEditorDocumentStore } from '@/features/editor/state/document-state'

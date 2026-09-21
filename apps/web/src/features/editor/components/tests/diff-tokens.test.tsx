@@ -1,7 +1,7 @@
 import { waitFor } from '@testing-library/react'
 import { StrictMode } from 'react'
 import { vi } from 'vitest'
-import { Editor } from '@singapore-editor/core'
+import { Editor } from '@singapore-editor/core/editor'
 import {
   createEmptySyntaxResult,
   type EditorSyntaxSessionOptions,

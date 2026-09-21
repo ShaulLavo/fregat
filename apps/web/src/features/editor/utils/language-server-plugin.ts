@@ -1,12 +1,14 @@
 import { fileUriForPath } from '@/lib/file-uri'
+import type { LanguageServerDocumentSyncController } from '@singapore-editor/lsp-plugin/document-sync-controller'
 import type {
   LanguageServerDefinitionTarget,
-  LanguageServerDiagnosticMarkerClaim,
-  LanguageServerDiagnosticMarkerEvent,
-  LanguageServerDocumentSyncController,
-  LanguageServerFeatureRanks,
   LanguageServerLaneOptions,
   LanguageServerPlugin,
+} from '@singapore-editor/lsp-plugin/websocket'
+import type {
+  LanguageServerDiagnosticMarkerClaim,
+  LanguageServerDiagnosticMarkerEvent,
+  LanguageServerFeatureRanks,
   LanguageServerReferencesResult,
   LanguageServerSemanticTokensFactory,
   LspConnectionProvider,

@@ -2,10 +2,8 @@ import {
   editorStatusBarSourcesEqual,
   type EditorStatusBarSource,
 } from '@/features/editor/state/status-bar-source'
-import type {
-  LanguageServerDefinitionTarget,
-  LanguageServerReferencesResult,
-} from '@singapore-editor/lsp-plugin'
+import type { LanguageServerDefinitionTarget } from '@singapore-editor/lsp-plugin/websocket'
+import type { LanguageServerReferencesResult } from '@singapore-editor/lsp-plugin'
 import type { ReactEditorController } from '@singapore-editor/react'
 import { createContext, use } from 'react'
 import { useStore } from 'zustand'

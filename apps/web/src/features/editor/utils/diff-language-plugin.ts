@@ -1,10 +1,10 @@
 import { hasCommandModifier as isNavigationModifier } from '@workspace/utils/keyboard'
-import type {
-  EditorPlugin,
-  EditorTheme,
-  EditorViewContributionContext,
-} from '@singapore-editor/core'
-import { EDITOR_HOVER_PARTICIPANT, type HoverRequest } from '@singapore-editor/plugin-ui'
+import type { EditorTheme } from '@singapore-editor/core/rendering'
+import type { EditorPlugin, EditorViewContributionContext } from '@singapore-editor/core/extensions'
+import {
+  EDITOR_HOVER_PARTICIPANT,
+  type HoverRequest,
+} from '@singapore-editor/plugin-ui/hover-participant'
 
 import type { DiffQueryTarget } from '@/features/editor/utils/diff-language-query'
 import type { DiffFilePosition, DiffFileSide } from '@/features/editor/utils/diff-position-map'

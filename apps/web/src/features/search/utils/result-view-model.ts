@@ -2,7 +2,7 @@ import { isContentSearchResultItem as isSearchResultMatchItem } from '@/features
 import { clampIndex } from '@/features/search/utils/result-items'
 import { queryRange as searchResultQueryRange } from '@/features/search/utils/match-display'
 import { searchMatchPreviewRange as searchResultContentPreviewRange } from '@/features/search/utils/match-display'
-import type { EditorSyntaxLanguageId } from '@singapore-editor/core'
+import type { EditorSyntaxLanguageId } from '@singapore-editor/core/syntax'
 import type { WorkspaceSearchMatch } from '@workspace/contracts'
 
 import { languageIdForFilePath } from '@/features/editor/utils/file-path'

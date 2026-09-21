@@ -2,7 +2,7 @@ import { documentUriToFileName, fileNameToDocumentUri } from '@singapore-editor/
 import type {
   LanguageServerDefinitionTarget,
   LanguageServerDiagnosticSummary,
-} from '@singapore-editor/lsp-plugin'
+} from '@singapore-editor/lsp-plugin/websocket'
 
 type Diagnostic = LanguageServerDiagnosticSummary['diagnostics'][number]
 

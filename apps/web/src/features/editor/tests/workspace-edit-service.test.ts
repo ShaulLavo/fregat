@@ -6,18 +6,16 @@ import { createWorkspaceTextChanges } from '../../../../test/factories/workspace
 import { fetchFile } from '@/lib/file-server'
 import { testDocumentKey } from '../../../../test/factories/document-targets'
 import type {
-  ApplyWorkspaceEditRequest,
-  LanguageServerDocumentSyncController,
-  WorkspaceTextDocumentProvenance,
-} from '@singapore-editor/lsp-plugin'
-import type {
   ParsedWorkspaceEdit,
   WorkspaceEditOperation,
+  WorkspaceTextDocumentProvenance,
 } from '@singapore-editor/lsp-plugin/workspace-edit'
+import type { LanguageServerDocumentSyncController } from '@singapore-editor/lsp-plugin/document-sync-controller'
+import type { ApplyWorkspaceEditRequest } from '@singapore-editor/lsp-plugin'
 import {
   createDocumentLogicalRevisionScope,
   createEditorBufferSession,
-} from '@singapore-editor/core'
+} from '@singapore-editor/core/document'
 import { QueryClient } from '@tanstack/react-query'
 import type {
   WorkspaceEditPrepareRequest,

@@ -1,6 +1,6 @@
 import { languageIdForFilePath } from '@/features/editor/utils/file-path'
 import type { FilesystemPath } from '@/lib/documents/utils/types'
-import type { HistoryComparisonSide } from '@singapore-editor/core'
+import type { HistoryComparisonSide } from '@singapore-editor/core/document'
 import { createTextDiff, type DiffFile } from '@singapore-editor/diff'
 import { materializePieceTableFullText } from '@singapore-editor/textbuffer'
 

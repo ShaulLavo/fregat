@@ -1,4 +1,4 @@
-import type { EditorHighlighterProvider } from '@singapore-editor/core'
+import type { EditorHighlighterProvider } from '@singapore-editor/core/extensions'
 import {
   createShikiHighlighterProvider,
   createShikiWorkerOwner,

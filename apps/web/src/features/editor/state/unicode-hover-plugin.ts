@@ -1,9 +1,9 @@
-import type { EditorPlugin, EditorViewContributionContext } from '@singapore-editor/core'
+import type { EditorPlugin, EditorViewContributionContext } from '@singapore-editor/core/extensions'
 import {
   EDITOR_HOVER_PARTICIPANT,
   type HoverAnchor,
   type HoverPart,
-} from '@singapore-editor/plugin-ui'
+} from '@singapore-editor/plugin-ui/hover-participant'
 import { unicodeCharacterMessage } from '@/features/editor/utils/unicode-character-message'
 
 /** After the language server's prose and its diagnostics, as VS Code orders it. */

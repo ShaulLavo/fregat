@@ -8,7 +8,7 @@ import {
 } from '@/lib/documents/utils/identity'
 import { screen, waitFor } from '@testing-library/react'
 import userEvent from '@testing-library/user-event'
-import { createEditorTextBuffer, createEditorViewSession } from '@singapore-editor/core'
+import { createEditorTextBuffer, createEditorViewSession } from '@singapore-editor/core/document'
 
 import { getClient } from '@/lib/client'
 

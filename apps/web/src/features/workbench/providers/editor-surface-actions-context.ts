@@ -2,9 +2,10 @@ import type { DocumentKey, FilesystemPath, TabId } from '@/lib/documents/utils/t
 import { createContext } from 'react'
 
 import type { EditorStatusBarSource } from '@/features/editor/state/status-bar-source'
-import type { DocumentSessionChange, EditorScrollPosition } from '@singapore-editor/core'
+import type { DocumentSessionChange } from '@singapore-editor/core/document'
+import type { EditorScrollPosition } from '@singapore-editor/core/editor'
+import type { LanguageServerDefinitionTarget } from '@singapore-editor/lsp-plugin/websocket'
 import type {
-  LanguageServerDefinitionTarget,
   LanguageServerReferencesResult,
   OnApplyWorkspaceEdit,
 } from '@singapore-editor/lsp-plugin'

@@ -17,11 +17,9 @@ import { useEditorVisibleSnapshot } from '@/features/workbench/hooks/use-editor-
 import { useFileOpenIntent } from '@/lib/file-open-intent/providers/context'
 import type { FileResult } from '@/lib/file-system-types'
 import type { LoadState } from '@/lib/load-state'
-import type { EditorInitialPaintEvent } from '@singapore-editor/core'
-import type {
-  LanguageServerDefinitionTarget,
-  LanguageServerReferencesResult,
-} from '@singapore-editor/lsp-plugin'
+import type { EditorInitialPaintEvent } from '@singapore-editor/core/extensions'
+import type { LanguageServerDefinitionTarget } from '@singapore-editor/lsp-plugin/websocket'
+import type { LanguageServerReferencesResult } from '@singapore-editor/lsp-plugin'
 
 export function FileEditorBody({
   active,

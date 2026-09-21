@@ -4,7 +4,7 @@ import {
   layoutHistoryGraph,
   type EditorHistoryGraph,
   type HistoryNodeId,
-} from '@singapore-editor/core'
+} from '@singapore-editor/core/document'
 import { useId, type KeyboardEvent } from 'react'
 
 const COLUMN_WIDTH = 14

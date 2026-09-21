@@ -4,7 +4,8 @@ import {
   type LanguageServerLaneOptions,
 } from '@singapore-editor/lsp-plugin/websocket'
 import { LanguageServerSet } from '@singapore-editor/lsp-plugin'
-import { arrayLspLineStarts, type LspWorkspaceDocumentAttachment } from '@singapore-editor/lsp'
+import { type LspWorkspaceDocumentAttachment } from '@singapore-editor/lsp/types'
+import { arrayLspLineStarts } from '@singapore-editor/lsp'
 import { createStringTextSnapshot } from '@singapore-editor/core/document'
 
 import type { DiffFileSide } from '@/features/editor/utils/diff-position-map'

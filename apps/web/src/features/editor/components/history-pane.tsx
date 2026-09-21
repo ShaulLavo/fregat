@@ -8,7 +8,7 @@ import type {
   HistoryComparison,
   HistoryNodeId,
   HistoryViewer,
-} from '@singapore-editor/core'
+} from '@singapore-editor/core/document'
 import { useIsMutating, useMutation } from '@tanstack/react-query'
 import { Button } from '@workspace/ui/components/button'
 import { EmptyState } from '@workspace/ui/components/empty-state'

@@ -1,4 +1,4 @@
-import { Editor } from '@singapore-editor/core'
+import { Editor } from '@singapore-editor/core/editor'
 import { createDiffPresentationBinding } from '@/features/editor/state/diff-presentation'
 import { TabPresentations } from '@/features/editor/state/tab-presentation'
 import { tabId } from '@/lib/documents/utils/identity'

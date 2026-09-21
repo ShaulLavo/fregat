@@ -1,6 +1,6 @@
 import { ListRow } from '@workspace/ui/patterns/list-row'
 import type { useListbox } from '@workspace/ui/patterns/use-listbox'
-import type { LanguageServerDefinitionTarget } from '@singapore-editor/lsp-plugin'
+import type { LanguageServerDefinitionTarget } from '@singapore-editor/lsp-plugin/websocket'
 import type { LiveEditorDocument } from '@/features/editor/state/document-state'
 import { referencePreview } from '@/features/editor/utils/language-server-references'
 

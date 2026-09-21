@@ -1,4 +1,4 @@
-import type { EditorScrollPosition } from '@singapore-editor/core'
+import type { EditorScrollPosition } from '@singapore-editor/core/editor'
 
 export function scrollPositionsEqual(
   current: EditorScrollPosition | undefined,

@@ -1,4 +1,5 @@
-import type { HistoryNodeId, EditorResolvedSelection } from '@singapore-editor/core'
+import type { HistoryNodeId } from '@singapore-editor/core/document'
+import type { EditorResolvedSelection } from '@singapore-editor/core/extensions'
 import {
   createDiffRegionStore,
   type DiffFile,

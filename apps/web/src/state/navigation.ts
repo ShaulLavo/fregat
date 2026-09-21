@@ -44,7 +44,7 @@ import {
 } from '@workspace/client-core/address/grammar'
 import { workspaceToken } from '@workspace/client-core/address/workspace'
 import { registerWorkspaceAddress } from '@workspace/client-core/files/workspace-address'
-import type { LanguageServerDefinitionTarget } from '@singapore-editor/lsp-plugin'
+import type { LanguageServerDefinitionTarget } from '@singapore-editor/lsp-plugin/websocket'
 import { createNavigationCoordinator, type NavigationResult } from '@/state/navigation-coordinator'
 import type { ApplicationRouter } from '@/state/router'
 import type { AddressIntent } from '@/features/address/utils/intent'

@@ -11,10 +11,8 @@ import {
 import { Tooltip, TooltipContent, TooltipTrigger } from '@workspace/ui/components/tooltip'
 import { fileDocumentKey, filesystemPath } from '@/lib/documents/utils/identity'
 import { XIcon } from '@phosphor-icons/react'
-import type {
-  LanguageServerDefinitionTarget,
-  LanguageServerReferencesResult,
-} from '@singapore-editor/lsp-plugin'
+import type { LanguageServerDefinitionTarget } from '@singapore-editor/lsp-plugin/websocket'
+import type { LanguageServerReferencesResult } from '@singapore-editor/lsp-plugin'
 import { useMemo, useState } from 'react'
 
 import {

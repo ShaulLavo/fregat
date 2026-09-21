@@ -1,9 +1,5 @@
-import type {
-  EditorPreparedDocument,
-  EditorScrollPosition,
-  EditorTextBuffer,
-  EditorViewSession,
-} from '@singapore-editor/core'
+import type { EditorTextBuffer, EditorViewSession } from '@singapore-editor/core/document'
+import type { EditorPreparedDocument, EditorScrollPosition } from '@singapore-editor/core/editor'
 import type { DocumentKey, DocumentRef } from '@/lib/documents/utils/types'
 
 export type EditorRenderDocument = {

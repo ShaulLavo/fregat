@@ -1,5 +1,6 @@
 import type { DocumentKey, FilesystemPath } from '@/lib/documents/utils/types'
-import type { EditorPlugin, EditorTextBuffer } from '@singapore-editor/core'
+import type { EditorTextBuffer } from '@singapore-editor/core/document'
+import type { EditorPlugin } from '@singapore-editor/core/extensions'
 import { useEffect, useLayoutEffect, useMemo, useState } from 'react'
 
 import { createSnapshotCapture } from '@/features/workbench/state/snapshot-capture'

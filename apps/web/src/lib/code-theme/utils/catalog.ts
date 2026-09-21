@@ -1,4 +1,4 @@
-import type { EditorTheme } from '@singapore-editor/core'
+import type { EditorTheme } from '@singapore-editor/core/rendering'
 import { VSCODE_THEMES, type VscodeThemeDefinition } from '@singapore-editor/core/shiki'
 
 export type EditorColorModeType = 'dark' | 'light'

@@ -23,7 +23,7 @@ export type {
   FocusTargetToken,
 } from '@workspace/client-core/commands/focus'
 import type { EditorKeymapContext } from '@singapore-editor/core/keymap'
-import type { EditorCommandContext, EditorCommandId } from '@singapore-editor/core'
+import type { EditorCommandContext, EditorCommandId } from '@singapore-editor/core/editor'
 
 import type { FocusArea } from '@workspace/client-core/commands/focus'
 export type { FocusArea } from '@workspace/client-core/commands/focus'

@@ -13,12 +13,12 @@ import {
   createEditorTextBuffer,
   getDocumentMutationLeaseState,
   type EditorTextBuffer,
-  type EditorPreparedDocument,
   prepareDocumentTransaction,
   releaseDocumentMutationLease,
   reverseDocumentTransaction,
   subscribeDocumentMutationLeaseState,
-} from '@singapore-editor/core'
+} from '@singapore-editor/core/document'
+import { type EditorPreparedDocument } from '@singapore-editor/core/editor'
 
 describe('editor document store state identity', () => {
   it('keeps unrelated slices referentially stable across scroll updates', () => {

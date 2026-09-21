@@ -327,6 +327,8 @@ export const selectors = {
   themeRoot: (page: Page) => page.locator('html'),
 
   editorHover: (page: Page) => page.locator('.editor-plugin-hover:not([hidden])'),
+  // Signature help keeps its own namespace, so it is distinguishable from the shared hover.
+  editorSignatureHelp: (page: Page) => page.locator('.editor-lsp-plugin-hover:not([hidden])'),
   editorCompletionLabels: (page: Page) =>
     page
       .locator('[class$="-completion"]:not([hidden]) [class$="-completion-item"]')
@@ -510,6 +512,8 @@ export const selectors = {
     page.getByLabel('Folder tree', { exact: true }).locator('[role="treeitem"][tabindex="0"]'),
   editorInput: (page: Page) => page.getByRole('textbox', { name: 'Editor input' }),
   editorSurface: (page: Page) => page.locator('.editor-virtualized-viewport'),
+  editorFindInput: (page: Page) => page.getByRole('textbox', { name: 'Find', exact: true }),
+  editorFindCount: (page: Page) => page.locator('.editor-find-count'),
   terminalSurface: (page: Page) =>
     page.locator('[data-slot="tool-pane"][aria-label="Terminal"]:visible'),
   paletteRowSelector: '[data-slot="command-list"] [role="option"]',

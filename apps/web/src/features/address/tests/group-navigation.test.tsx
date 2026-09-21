@@ -1,4 +1,4 @@
-import { createEditorBufferSession } from '@singapore-editor/core'
+import { createEditorBufferSession } from '@singapore-editor/core/document'
 import { mkdir } from 'node:fs/promises'
 import path from 'node:path'
 import { readFilePreview } from '@workspace/client-core/files/read'

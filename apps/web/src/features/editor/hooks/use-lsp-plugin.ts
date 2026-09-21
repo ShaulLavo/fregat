@@ -2,8 +2,8 @@ import { filesystemPath } from '@/lib/documents/utils/identity'
 import type { LanguageServerDocument } from '@/lib/language-server-document'
 import { useQueryClient } from '@tanstack/react-query'
 import { originForQueryClient } from '@/lib/environments/state/query-clients'
+import type { LanguageServerDefinitionTarget } from '@singapore-editor/lsp-plugin/websocket'
 import type {
-  LanguageServerDefinitionTarget,
   LanguageServerDiagnosticMarkerClaim,
   LanguageServerDiagnosticMarkerEvent,
   LanguageServerReferencesResult,

@@ -1,7 +1,7 @@
 import type {
   LanguageServerDefinitionTarget,
   LanguageServerStatus,
-} from '@singapore-editor/lsp-plugin'
+} from '@singapore-editor/lsp-plugin/websocket'
 import { EmptyState } from '@workspace/ui/components/empty-state'
 import { cn } from '@workspace/ui/lib/utils'
 

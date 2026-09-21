@@ -4,12 +4,9 @@ import { QueryClient } from '@tanstack/react-query'
 import { describe, vi } from 'vitest'
 import { expect, test as it } from '../../../test/fixtures'
 
-import {
-  createEditorBufferSession,
-  createEditorTextBuffer,
-  type EditorInitialPaintEvent,
-  type EditorPreparedDocument,
-} from '@singapore-editor/core'
+import { createEditorBufferSession, createEditorTextBuffer } from '@singapore-editor/core/document'
+import { type EditorInitialPaintEvent } from '@singapore-editor/core/extensions'
+import { type EditorPreparedDocument } from '@singapore-editor/core/editor'
 import type { FileResult } from '@/lib/file-system-types'
 import { fileSnapshotQueryOptions } from '@/lib/file-snapshot-query-cache'
 import {

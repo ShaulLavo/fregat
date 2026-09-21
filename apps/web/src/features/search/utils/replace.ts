@@ -1,7 +1,6 @@
 import { isWholeWordMatch } from '@workspace/contracts'
 import { textSnapshotLineRange } from '@/features/editor/utils/text-snapshot'
-import type { TextEdit } from '@singapore-editor/core'
-import type { TextSnapshot } from '@singapore-editor/core'
+import type { TextEdit, TextSnapshot } from '@singapore-editor/core/document'
 import type { WorkspaceSearchMatch, WorkspaceSearchQuery } from '@workspace/contracts'
 
 export type WorkspaceSearchReplacePlan = {

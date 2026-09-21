@@ -1,8 +1,8 @@
+import { summarizeDiagnostics } from '@singapore-editor/lsp-plugin/diagnostics'
 import {
-  summarizeDiagnostics,
   type LanguageServerDiagnosticSummary,
   type LanguageServerStatus,
-} from '@singapore-editor/lsp-plugin'
+} from '@singapore-editor/lsp-plugin/websocket'
 
 export type EditorLanguageServerStatusSnapshot = {
   diagnostics: LanguageServerDiagnosticSummary | null

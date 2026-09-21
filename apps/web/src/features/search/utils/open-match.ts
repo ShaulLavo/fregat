@@ -1,5 +1,5 @@
 import { fileUriForPath } from '@/lib/file-uri'
-import type { LanguageServerDefinitionTarget } from '@singapore-editor/lsp-plugin'
+import type { LanguageServerDefinitionTarget } from '@singapore-editor/lsp-plugin/websocket'
 import type { WorkspaceSearchMatch } from '@workspace/contracts'
 
 export function openWorkspaceSearchMatch(

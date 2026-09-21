@@ -2,7 +2,7 @@ import { useState } from 'react'
 import type {
   LanguageServerDefinitionTarget,
   LanguageServerDiagnosticSummary,
-} from '@singapore-editor/lsp-plugin'
+} from '@singapore-editor/lsp-plugin/websocket'
 import { ListRow } from '@workspace/ui/patterns/list-row'
 import { useListbox } from '@workspace/ui/patterns/use-listbox'
 import { cn } from '@workspace/ui/lib/utils'

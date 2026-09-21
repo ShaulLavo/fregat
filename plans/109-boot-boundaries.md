@@ -1,11 +1,9 @@
 # Boot boundaries and a first-load gate
 
-Status: proposed, implementation not started. Requested 2026-09-13, revised 2026-09-20 against the
-first per-owner attribution of the entry chunk. Planned against Platform `b915d3e0`, with
-substantial unrelated working changes present. [Plan 106](106-boot-weight.md) and
-[Plan 107](107-workspace-markdown.md) are implemented; [Plan 108](108-markdown-modes.md) is not
-started. The attribution this plan said it was waiting for now exists, it unblocks Phases 2 and 3,
-and it refutes most of what the plan expected to land.
+Status: Phases 2 and 3 implemented and deployed 2026-09-21 (release
+`20260920T210650Z-f9a0815e-boot-boundaries`), uncommitted; Phase 1's written definition and Phase 4's
+gate are not started. See [Landed](#landed-2026-09-21) for the measured result. Requested
+2026-09-13, revised 2026-09-20 against the first per-owner attribution of the entry chunk.
 
 This plan covers where loading boundaries belong in `apps/web` and the gate that pins the result.
 It does not cover the instrument that measures first load ([Plan 106](106-boot-weight.md) owns it),
@@ -27,6 +25,54 @@ application declares almost no loading boundaries**. Rolldown emits one chunk be
 graph is one graph. The 2026-09-20 build confirms it exactly — 484 chunks, and all 483 non-entry
 chunks are vendor or data. Not one byte of `apps/web/src`, `packages/ui`, `packages/tree` or
 `ghostty-webgpu` lives outside the entry chunk.
+
+## Landed 2026-09-21
+
+`bun run --cwd apps/web bundle:report`, [disk] gzip-9 over what `index.html` names, before and after
+on the same tree (after Plan 129 Phases 1 and 2):
+
+|                     |    Before |     After |                 Delta |
+| ------------------- | --------: | --------: | --------------------: |
+| First-load JS, gzip | 1,722,976 | 1,610,904 | **−112,072 (−6.50%)** |
+| Chunks              |       484 |       488 |                       |
+
+- **The instrument prints owners.** [`bundle-owners.ts`](../apps/web/scripts/bundle-owners.ts) folds a
+  module to its feature directory, source directory, workspace package or linked checkout, with
+  `node_modules` whole, and the report gains first-load rendered, modelled gzip, modules and a
+  `Lazy rendered` column — the D9 proof. `ghostty-webgpu` reproduces this document's 443,345 exactly.
+  `--json` carries the rows for Phase 4.
+- **Terminal.** `assets/panel-*.js`, 310,504 raw / 80,759 gz, 72 modules. All 443,345 rendered bytes
+  of `ghostty-webgpu` and 30,793 of `features/terminal` left first load. Both composition sites —
+  the workbench's `terminal-tabs.tsx` and chat mode's `tool-pane.tsx` — render
+  `DeferredTerminalPanel`; the plan had only named the first.
+- **Settings.** `assets/page-*.js`, 159,924 raw / 49,001 gz, 97 modules. 257,336 rendered bytes of
+  `features/settings` left first load, plus 28,104 of `packages/contracts`. The audit's prediction
+  of roughly 131,000 raw exclusive bytes was low by about a fifth against the 159,924-byte chunk:
+  it counted the feature directory and missed the contracts modules only the page reaches.
+- **The boundary is `use()` over a cached `import()`, not `React.lazy`.**
+  [`lib/retryable-import.ts`](../apps/web/src/lib/retryable-import.ts) clears its cache on rejection.
+  `React.lazy` keeps a rejected payload for good, so `RenderErrorBoundary`'s Retry would replay the
+  failure; this way Retry asks the network again. Both terminal sites already sat inside a
+  `RenderErrorBoundary` from Plan 127, so D7 consumed it and wrote nothing new.
+- **D4 changed: idle prefetch, not hover.** `main.tsx` loads both chunks on `requestIdleCallback`
+  after the first frame. Settings opens from a chord, which has no hover to listen to, and one idle
+  prefetch covers every entry point of both boundaries. The bytes leave the path to first frame,
+  which is what the gate measures; they are still downloaded in every session.
+- Rolldown also split a shared chunk, `use-palette-*.js` (227,441 gz), that `index.html`
+  modulepreloads. It is first load and is counted above; the name is an accident of its first module.
+- No new `[INEFFECTIVE_DYNAMIC_IMPORT]`; the one in the log is still the Editor's `hoverPlugin.js`.
+
+Browser evidence, against the mesh because the dev server is down:
+`/work/tmp/fregat-evidence/20260920T210711Z-scenario-terminal-tabs`,
+`…210715Z-scenario-settings-defaults` and `…210719Z-scenario-bottom-panel-persistence` (workbench
+and chat-mode terminals, two sockets opened, none closed). Reports: `/work/tmp/plan109/`.
+
+**Not proven:** the release-swap retry. The idle prefetch means a held page already owns both chunks
+before a second deploy can remove them, so the swap no longer reaches these boundaries in the
+ordinary case; the retry path itself was not exercised against a real 404. The stale-asset exposure
+that remains is the 480-odd grammar, theme and worker chunks, which predate this plan. Carrying
+hashed assets forward between releases in `scripts/deploy/mesh.ts` would close it for all of them
+and is the better fix than any per-boundary retry. No `trace --compare` was taken.
 
 ## The boundaries are a rounding error
 

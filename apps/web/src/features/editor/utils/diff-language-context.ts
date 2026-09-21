@@ -1,10 +1,8 @@
 import { filesystemPath } from '@/lib/documents/utils/identity'
 import type { FilesystemPath } from '@/lib/documents/utils/types'
 import { isPathInWorkspace, toWorkspaceAbsolute } from '@workspace/client-core/files/path'
-import type {
-  LanguageServerDefinitionTarget,
-  OnApplyWorkspaceEdit,
-} from '@singapore-editor/lsp-plugin'
+import type { LanguageServerDefinitionTarget } from '@singapore-editor/lsp-plugin/websocket'
+import type { OnApplyWorkspaceEdit } from '@singapore-editor/lsp-plugin'
 
 export type DiffLanguageHost = {
   readonly applyWorkspaceEdit: OnApplyWorkspaceEdit

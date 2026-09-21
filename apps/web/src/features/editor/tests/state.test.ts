@@ -13,11 +13,8 @@ import { filesystemPath, tabId as testTabId } from '@/lib/documents/utils/identi
 import { createDefaultWorkbenchLayout } from '@/features/workbench/utils/layout'
 import { createDefaultChatModePanels } from '@/features/chat-mode/utils/panels'
 import { QueryClient } from '@tanstack/react-query'
-import {
-  createEditorBufferSession,
-  type EditorPreparedDocument,
-  type EditorTextBuffer,
-} from '@singapore-editor/core'
+import { createEditorBufferSession, type EditorTextBuffer } from '@singapore-editor/core/document'
+import { type EditorPreparedDocument } from '@singapore-editor/core/editor'
 import { describe, vi } from 'vitest'
 import { expect, test } from '../../../../test/fixtures'
 import {

@@ -10,7 +10,7 @@ import {
   type EditorTextBuffer,
   type HistoryViewer,
   type HistoryViewerState,
-} from '@singapore-editor/core'
+} from '@singapore-editor/core/document'
 import { useMemo, useSyncExternalStore } from 'react'
 
 type Viewer = HistoryViewer<HistoryComparisonResult>

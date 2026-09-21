@@ -1,4 +1,4 @@
-import type { EditorHistoryGraphNode } from '@singapore-editor/core'
+import type { EditorHistoryGraphNode } from '@singapore-editor/core/document'
 
 const INTENT_LABELS: Record<string, string> = {
   'insert-text': 'Typed',

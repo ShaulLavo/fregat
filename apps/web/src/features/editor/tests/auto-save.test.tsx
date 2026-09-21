@@ -10,7 +10,7 @@ import { renderHook, waitFor } from '@testing-library/react'
 import { QueryClient, QueryClientProvider } from '@tanstack/react-query'
 import { createElement, type ReactNode } from 'react'
 import { vi } from 'vitest'
-import { createEditorBufferSession } from '@singapore-editor/core'
+import { createEditorBufferSession } from '@singapore-editor/core/document'
 import { readFile, writeFile } from 'node:fs/promises'
 import { join } from 'node:path'
 

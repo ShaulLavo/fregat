@@ -1,5 +1,5 @@
 import { filesystemPath, tabId } from '@/lib/documents/utils/identity'
-import type { EditorTextBuffer } from '@singapore-editor/core'
+import type { EditorTextBuffer } from '@singapore-editor/core/document'
 import { screen, waitFor, within } from '@testing-library/react'
 import userEvent from '@testing-library/user-event'
 

@@ -1,4 +1,4 @@
-import type { EditorRangeDecoration, EditorScrollMode } from '@singapore-editor/core'
+import type { EditorRangeDecoration, EditorScrollMode } from '@singapore-editor/core/editor'
 import type { CSSProperties, KeyboardEvent, RefObject } from 'react'
 
 import type { SearchResultId } from '@/features/search/utils/result-items'

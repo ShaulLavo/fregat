@@ -9,7 +9,7 @@ import { testDocumentKey } from '../../../../test/factories/document-targets'
 import { WorkspaceDocumentService } from '@/features/editor/state/workspace-document-service'
 import { isSavableEditorDocument } from '@/features/editor/utils/save'
 import { retentionForProjects } from '@/features/editor/utils/document-retention'
-import { createEditorBufferSession } from '@singapore-editor/core'
+import { createEditorBufferSession } from '@singapore-editor/core/document'
 import { expect, test } from '../../../../test/fixtures'
 
 function fileResult(path: string, content = 'hello') {

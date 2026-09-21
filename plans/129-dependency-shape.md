@@ -195,6 +195,189 @@ dropped or promoted to its own plan (D7).
 
 Verification: each row ends with a measured exclusive-byte figure and a verdict in this document.
 
+### Q1 — the Editor's main-thread half: measured, and the question was wrong
+
+Answered 2026-09-20 against the build with Phases 1 and 2 in. Method: a throwaway Rollup plugin
+dumped `getModuleInfo` for every module in the client build, giving the real static import graph
+including which edges are dynamic; reachability was then recomputed from `main.tsx` with chosen
+edges removed, and the byte ceiling was measured for real by rebuilding with
+`external: [/^@singapore-editor\//]`. Both the plugin and the switch were removed afterwards.
+
+**The premise does not hold.** The two modules the question names are not the route, and neither is
+the provider stack alone:
+
+| Cut                                                               | Modules released | Rendered bytes released |
+| ----------------------------------------------------------------- | ---------------: | ----------------------: |
+| `lib/code-theme/utils/catalog.ts` stops importing the Editor      |                0 |                       0 |
+| `state/syntax-highlighting.ts` stops importing the Editor         |                3 |                  21,448 |
+| `features/editor/utils/plugins.ts` stops importing the Editor     |                — |                 175,864 |
+| Every static edge from the app into `@singapore-editor/*` removed |              516 |               2,362,077 |
+
+`catalog.ts` releases nothing: it imports `VSCODE_THEMES` for metadata only, and every byte behind
+it is held by something else. `syntax-highlighting.ts` releases 21,448 — and not the Shiki cone, but
+`tree-sitter-languages/dist/catalog.generated.js`. The Editor's own Shiki subtree is 35,962 rendered
+in the entry, not 2 MB; the weight is the editor proper (`Editor.js`, the virtualizers,
+`documentSession`, `inputSelectionController`).
+
+**Of 50 boot-reachable modules that statically import an Editor package, 48 have a marginal of
+exactly zero.** Everything funnels through the same package barrels, so cutting any one edge frees
+nothing. The real anchors are `features/editor/{utils,state,hooks,components,providers}`,
+`features/search`, `features/settings`, `features/workspace`, `features/git`, `features/chat`,
+`features/workbench`, `keymap/{default-bindings,state,utils}`, `lib/{diagnostic,document-symbols,
+language-server-capabilities,language-server-document,file-open-intent}`, `main.tsx` (three
+stylesheets) and `packages/client-core/src/{commands/metadata,git/diff-files}` — across twelve
+Editor packages. `keymap/utils/when.ts` and `client-core`'s command metadata reaching
+`editor/dist/public/keymap.js` is the shape of the problem: the command registry cannot boot without
+the editor's keymap types' runtime module.
+
+**The ceiling, measured not modelled.** Externalizing `@singapore-editor/*` entirely:
+
+|                                  |                   Raw |              Gzip-9 |
+| -------------------------------- | --------------------: | ------------------: |
+| Entry chunk, as built            |             5,860,567 |           1,721,696 |
+| Entry chunk, Editor external     |             4,619,470 |           1,375,182 |
+| **Exclusive to the Editor cone** | **1,241,097 (21.2%)** | **346,514 (20.1%)** |
+
+The gz figure covers the twelve Editor packages plus what only they pull — `micromark` and the
+`mdast` stack behind `@singapore-editor/markdown` (about 190,000 rendered together) and `diff`
+(31,624). First load would go 1722 KB → about 1384 KB gz.
+
+**Verdict: promoted, but not as this question asked it.** 346 KB gz clears D7 by more than twenty
+times and is the largest cut left in the repository, second only to Phase 1. It is not a dynamic
+import in two modules; it is an all-or-nothing boundary across 50 call sites and twelve packages,
+where no intermediate step pays anything. That makes it a plan of its own, not a Phase 3 item, and
+its first question is not bundling but whether the command registry, the keymap and `client-core`
+can describe the editor without importing it. The two modules the question named are dropped with
+their numbers recorded: 0 and 21,448 rendered, both under D7's threshold.
+
+### The duplicated markdown stack
+
+Found while checking Q1's numbers, fixed in part 2026-09-21. The `markdown stack` the table above
+attributes to the Editor is not the Editor's own parser: it is a **second copy of the platform's**,
+at identical versions, resolved out of `/work/projects/Editor/node_modules` because of the `link:`
+setup. Fifty-five npm packages ship twice in the entry chunk, 265,995 rendered bytes from the Editor
+side. `bundle:report` never flagged it because its duplicate detector keys on version, and the
+versions match — an instrument gap, not a build one.
+
+The route is `features/editor/providers/workspace-edit-context.ts` → `@singapore-editor/lsp-plugin`
+→ `@singapore-editor/plugin-ui` → `markdownTooltip.js` → `remark-gfm` → micromark.
+
+Two things were wrong and one was fixed. `plugin-ui` already ships granular subpath exports
+(`./hover-participant`, `./anchored-surface`, `./offset-range`, `./tooltip`, `./markdown-tooltip`),
+so the package is shaped correctly for standalone use — but `lsp-plugin` imported the root barrel in
+eleven places and the platform in two, and the barrel statically re-exports `markdownTooltip`. All
+thirteen now import subpaths, and `markdownTooltip` builds its two `unified()` pipelines on first
+use instead of at import.
+
+Measured back-to-back on the same tree: entry 4,585,845 → 4,578,074 raw, 1,377,519 → 1,375,816 gz-9.
+**1,703 gz, 0.12%** — far less than the duplicate is worth, because the barrel was not the only
+route. `plugin-ui/tooltip.ts` imports `renderTooltipMarkdown` directly, and `lsp-plugin` needs
+`createTooltipController`: a tooltip renders markdown, so that edge is real. The duplicate's bytes
+leave only when `lsp-plugin` leaves the boot path, which is the same structural item as Q1 — or if
+the tooltip's markdown renderer becomes injectable, which is an API change to the library.
+
+**The hover surface now splits.** `plugin-ui/hoverToken.ts` already registers the hover as an
+ambient plugin loaded by `import('./hoverPlugin')` on the first participant, with a comment saying
+the Markdown renderer is part of what that defers. One static import defeated it, and the Editor's
+own build had been warning about it: `INEFFECTIVE_DYNAMIC_IMPORT — hoverPlugin.js is dynamically
+imported by hoverToken.js but also statically imported by lsp-plugin/dist/plugin.js`. `lsp-plugin`
+wanted two trivial symbols from it — a `WeakMap.get` and a `closest('[data-editor-popup]')`.
+
+`isInsideEditorPopup` moved to `anchoredSurface.ts`, beside the code that writes the attribute, and
+the controller registry to a new leaf `hoverRegistry.ts` with a `./hover-registry` subpath.
+`hoverPlugin.ts` writes into the registry instead of owning it. Nothing statically imports
+`hoverPlugin` any more, the warning is gone, and `hoverPlugin` + `hoverController` now ship as a
+4,333-byte dynamic chunk fetched on first hover. Entry 4,578,387 → 4,574,164 raw, 1,375,919 →
+1,374,646 gz-9: **1,273 gz**.
+
+**And the parser still did not leave, for a third reason.** `plugin-ui/tooltip.ts` statically
+imports `renderTooltipMarkdown`, and `lsp-plugin/src/signatureHelpController.ts:21` statically
+imports `createTooltipController` — constructed eagerly at `plugin.ts:501`, and it renders real
+markdown (`hoverText: display.markdown`). So `tooltip.js` (26,604) and `markdownTooltip.js`
+(12,826) stay in the entry with the 282,392 rendered bytes of duplicated npm behind them.
+
+That was the last anchor, and it came out by demand-loading signature help rather than by any
+bundling trick. `signatureHelp.ts` holds `signatureHelpTriggerFromChange`, a pure function over a
+single-character edit with only type imports — the perfect demand signal. `LanguageServerContribution`
+now keeps the controller's options instead of the controller, and `updateSignatureHelp` returns early
+until an opening `(` or a `,` arrives, then `import('./signatureHelpController')` once and forwards
+every update after. `)` on a signature that was never shown loads nothing. Disposal settles into a
+load still in flight; the controller's own `dispose` is idempotent, so the race is safe.
+
+Measured in isolation — the platform tree held constant, the Editor change stashed and restored,
+rebuilt and re-measured back-to-back:
+
+|                             |                 Raw |             Gzip-9 |
+| --------------------------- | ------------------: | -----------------: |
+| Entry, signature help eager |           4,574,164 |          1,374,656 |
+| Entry, signature help lazy  |           4,441,041 |          1,338,319 |
+| **Delta**                   | **133,123 (2.91%)** | **36,337 (2.64%)** |
+
+`markdownTooltip`, `plugin-ui/tooltip`, `signatureHelpController` and `hoverPlugin` are all absent
+from the entry chunk. The duplicated npm from the Editor checkout falls from 282,392 to 37,913
+rendered. Both now live in an `assets/tooltip-*.js` chunk of 129,975 bytes, fetched on the first
+hover or the first `(` — never at boot.
+
+Two `anchoredSurface` tests typed `(` and answered the request synchronously; the first signature
+help of a session is now async. They wait on a new `awaitRequest(method)` helper that polls the
+transport rather than on a fixed flush — a fixed delay passed the second test and failed the first,
+because the very first dynamic import of a process resolves over more turns than a later one.
+
+### The trigger read the wrong signal, and had since before this plan
+
+Writing the browser scenario for the change above found that **typing `(` never opened signature
+help at all**, on the lazy build or the eager one — the control run on the previous release failed
+the same way, with the surface present but hidden. `signatureHelpTriggerFromChange` required
+`edits.length === 1 && edit.text.length === 1`, and auto-close writes a typed `(` as the
+two-character `()` in one edit, deliberately: `inputSelectionController.ts` carries the comment
+_"One edit, not two: the renderer only takes its incremental path for a single-edit change."_
+Worse, typing over the closer it inserted calls `typeOverCloser`, which is a `setSelection` with no
+text edit at all, so `)` could never dismiss either. No reshaping of the edits fixes that half.
+
+VS Code does not have this bug despite the same auto-close behavior, because its `ParameterHintsModel`
+triggers on `editor.onDidType(text)` — the keystroke — and uses the content change only to retrigger
+or dismiss a hint already on screen. Aligned with that:
+
+- `EditorViewContributionContext.onDidType?(listener)` is new and optional, fed from `applyTypedText`
+  (the single funnel for `beforeinput`, the keydown fallback and deduced/composition input) and
+  delivered from `applyChange` after the edit lands, so a listener that reads the document sees the
+  character in it. Type-over emits it too, having no edit of its own.
+- `signatureHelpTriggerFromChange(change)` became `signatureHelpTriggerFromTypedText(text)`, which
+  also removes the `edits.length` fragility. The controller keeps `update` for hide and re-anchor
+  and gains `handleTypedText`; `LanguageServerContribution` subscribes in its constructor and
+  disposes the registration.
+- The demand gate for the lazy load is the same function, so the byte result is unchanged:
+  `markdownTooltip`, `plugin-ui/tooltip` and `signatureHelpController` all stay out of the entry.
+
+The scenario now types `(` and then `)` like a person, and asserts both the surface and its
+dismissal. Verified on release `20260921T052025Z-f9a0815e-vscode-typed-trigger`
+(`/work/tmp/fregat-evidence/20260921T052040Z-scenario-editor-lsp-signature-help`). `lsp-plugin`'s
+382 tests pass; the harness context now carries `onDidType`, because a contribution that reads the
+keystroke cannot be tested by a harness that only replays edits. The five failures in
+`packages/editor` are pre-existing — verified by re-running `autoClose.test.ts` with these changes
+stashed.
+
+Injecting a markdown renderer into `createTooltipController` would not have worked: signature help
+renders real markdown (`hoverText: display.markdown`), so it would have had to pass the real
+renderer at boot and put every byte straight back. Laziness at the feature boundary is what pays.
+
+A dedupe experiment bounds the other half: collapsing the two copies with `resolve.dedupe` recovers
+16,185 gz and only 56,250 of the roughly 130,000 minified duplicate bytes, so it is a partial
+mitigation, not the fix. Not adopted; recorded here.
+
+Verified on release `20260921T033620Z-f9a0815e-plugin-ui-subpaths`: the shared LSP tooltip still
+renders its markdown parts, links and actions
+(`/work/tmp/fregat-evidence/20260921T033638Z-scenario-editor-lsp-hover`). `lsp-plugin`'s 382 tests
+and `plugin-ui`'s 10 pass.
+
+Two leads fell out of the same graph and belong to Q2. `@shikijs/vscode-textmate` is reached from
+boot through `state/bootstrap-runtime.ts` → `features/editor/state/color-theme-store.ts` →
+`editor/dist/shiki/index.js` → `tokenizer.js` → `scopedTokens.js`: the main thread pulls the
+tokenizer through the Shiki barrel even though tokenizing runs in a worker, which is the "import
+wider than it needs to be" Q2 guessed at. It is not exclusive to that route, so Q2 still owes a
+second path. `oniguruma-to-es` arrives somewhere else entirely, through
+`features/command-palette/components/content.tsx`, and has nothing to do with the editor.
+
 ## What this plan does not do
 
 - No Lexical removal. [Plan 111](111-editor-decorations.md) question 7 decides whether the composer

@@ -1,6 +1,6 @@
 import { useUnicodeHighlights } from '@/features/editor/hooks/use-unicode-highlights'
 import type { TabId } from '@/lib/documents/utils/types'
-import type { EditorTheme } from '@singapore-editor/core'
+import type { EditorTheme } from '@singapore-editor/core/rendering'
 import {
   createDiffPlugin,
   type DiffFile,
@@ -9,7 +9,7 @@ import {
   type DiffSyntaxBackend,
 } from '@singapore-editor/diff'
 import { EditorHost, useEditor } from '@singapore-editor/react'
-import type { Editor } from '@singapore-editor/core'
+import type { Editor } from '@singapore-editor/core/editor'
 import { useLayoutEffect, useMemo } from 'react'
 
 import { useDiffLanguage } from '@/features/editor/hooks/use-diff-language'

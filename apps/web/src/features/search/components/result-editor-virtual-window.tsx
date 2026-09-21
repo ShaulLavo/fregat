@@ -1,4 +1,4 @@
-import type { EditorTheme } from '@singapore-editor/core'
+import type { EditorTheme } from '@singapore-editor/core/rendering'
 import { memo, useMemo, type RefObject } from 'react'
 
 import { SEARCH_RESULT_VIRTUAL_PADDING } from '@/features/search/utils/result-editor-constants'

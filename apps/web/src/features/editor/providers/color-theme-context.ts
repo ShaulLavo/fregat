@@ -1,5 +1,5 @@
 import { createContext } from 'react'
-import type { EditorTheme } from '@singapore-editor/core'
+import type { EditorTheme } from '@singapore-editor/core/rendering'
 import type { VscodeThemeDefinition, VscodeThemeRegistration } from '@singapore-editor/core/shiki'
 import type { SettingsSubmission } from '@workspace/client-core/settings/intent-store'
 import type { EditorColorMode } from '@/features/editor/state/color-theme-store'

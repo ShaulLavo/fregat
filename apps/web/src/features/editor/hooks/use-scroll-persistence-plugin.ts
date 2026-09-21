@@ -1,4 +1,5 @@
-import type { EditorPlugin, EditorScrollPosition, EditorViewSnapshot } from '@singapore-editor/core'
+import type { EditorPlugin, EditorViewSnapshot } from '@singapore-editor/core/extensions'
+import type { EditorScrollPosition } from '@singapore-editor/core/editor'
 import { useLayoutEffect, useMemo, useRef, type RefObject } from 'react'
 
 import type { DocumentKey } from '@/lib/documents/utils/types'

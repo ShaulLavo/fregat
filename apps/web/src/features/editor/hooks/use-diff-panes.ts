@@ -1,4 +1,4 @@
-import type { Editor } from '@singapore-editor/core'
+import type { Editor } from '@singapore-editor/core/editor'
 import type { DiffGutterSide } from '@singapore-editor/diff'
 import { useCallback, useRef } from 'react'
 

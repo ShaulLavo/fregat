@@ -9,8 +9,10 @@ import type {
   SemanticTokenLayer,
   SemanticTokenRangeRequest,
 } from '@singapore-editor/core/extensions'
-import type { LspClient, LspDocument, lsp } from '@singapore-editor/lsp'
-import { LspRequestCancelledError, offsetToLspPositionInSnapshot } from '@singapore-editor/lsp'
+import type { LspDocument } from '@singapore-editor/lsp/types'
+import type { LspClient, lsp } from '@singapore-editor/lsp'
+import { offsetToLspPositionInSnapshot } from '@singapore-editor/lsp/positions'
+import { LspRequestCancelledError } from '@singapore-editor/lsp'
 
 import { log } from '@/lib/client-logging'
 import { readSettingsMirror } from '@/lib/settings-boot-mirror'

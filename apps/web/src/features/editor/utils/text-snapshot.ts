@@ -1,4 +1,4 @@
-import type { TextSnapshot } from '@singapore-editor/core'
+import type { TextSnapshot } from '@singapore-editor/core/document'
 import { updateStableHashCode } from '@workspace/client-core/address/path-hash'
 
 export type TextSnapshotLineRange = {

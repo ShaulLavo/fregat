@@ -1,7 +1,7 @@
 import { editorMutationKeys } from '@/features/editor/utils/mutation-keys'
 import { notifyHistoryError } from '@/features/editor/utils/notify-history-error'
 import type { DocumentKey } from '@/lib/documents/utils/types'
-import type { EditorTextBuffer, HistoryNodeId } from '@singapore-editor/core'
+import type { EditorTextBuffer, HistoryNodeId } from '@singapore-editor/core/document'
 import { mutationOptions } from '@tanstack/react-query'
 
 // The buffer change these publish flows into the document store on its own, which is

@@ -1,4 +1,4 @@
-import { summarizeDiagnostics } from '@singapore-editor/lsp-plugin'
+import { summarizeDiagnostics } from '@singapore-editor/lsp-plugin/diagnostics'
 
 import { createEditorLanguageServerStatusSource } from '@/features/editor/state/language-server-status-source'
 import { expect, test } from '../../../../../test/fixtures'

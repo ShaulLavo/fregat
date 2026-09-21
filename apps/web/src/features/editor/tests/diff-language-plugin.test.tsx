@@ -1,4 +1,4 @@
-import type { EditorPlugin, EditorViewContribution } from '@singapore-editor/core'
+import type { EditorPlugin, EditorViewContribution } from '@singapore-editor/core/extensions'
 
 import {
   createDiffLanguagePlugin,

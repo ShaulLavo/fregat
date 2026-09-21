@@ -54,7 +54,7 @@ import {
 import { type SearchBufferStoreApi } from '@/features/search/state/buffer-state'
 import { log } from '@/lib/client-logging'
 import type { PickedFsEntry } from '@/lib/file-system-types'
-import type { LanguageServerDefinitionTarget } from '@singapore-editor/lsp-plugin'
+import type { LanguageServerDefinitionTarget } from '@singapore-editor/lsp-plugin/websocket'
 import type {
   FileOpenIntentActivation,
   FileOpenIntentServiceOwner,

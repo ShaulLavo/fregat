@@ -1,12 +1,14 @@
 import {
   createDocumentTextSnapshot,
   createPieceTableSnapshot,
+} from '@singapore-editor/core/document'
+import {
   toEditorTokenStore,
   type EditorSyntaxProvider,
   type EditorSyntaxSession,
   type EditorSyntaxSessionOptions,
   type EditorToken,
-} from '@singapore-editor/core'
+} from '@singapore-editor/core/syntax'
 
 type ExcerptOptions = Pick<
   EditorSyntaxSessionOptions,

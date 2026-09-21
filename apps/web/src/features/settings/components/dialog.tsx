@@ -8,7 +8,7 @@ import {
 } from '@workspace/ui/components/dialog'
 import { useCallback, useRef } from 'react'
 
-import { SettingsPage } from '@/features/settings/components/page'
+import { DeferredSettingsPage } from '@/features/settings/components/deferred-page'
 import { useFocusTarget } from '@/lib/focus/hooks/use-target'
 
 /**
@@ -74,7 +74,7 @@ export function SettingsDialog({
         </DialogHeader>
         {/* Mounted only while open so the settings query is not held warm — and
             so closing the dialog discards any half-typed provider config. */}
-        {open ? <SettingsPage /> : null}
+        {open ? <DeferredSettingsPage /> : null}
       </DialogContent>
     </Dialog>
   )

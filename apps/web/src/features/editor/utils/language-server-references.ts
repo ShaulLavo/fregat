@@ -1,4 +1,4 @@
-import type { LanguageServerDefinitionTarget } from '@singapore-editor/lsp-plugin'
+import type { LanguageServerDefinitionTarget } from '@singapore-editor/lsp-plugin/websocket'
 import type { DocumentKey } from '@/lib/documents/utils/types'
 import type { LiveEditorDocument } from '@/features/editor/state/document-state'
 import { textLineAt } from '@/features/editor/utils/position'

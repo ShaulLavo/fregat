@@ -4,7 +4,7 @@ import type {
   EditorViewContributionContext,
   EditorViewContributionUpdateKind,
   EditorViewSnapshot,
-} from '@singapore-editor/core'
+} from '@singapore-editor/core/extensions'
 import {
   DiagnosticsPresenter,
   viewDocumentSnapshot,

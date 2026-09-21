@@ -1,4 +1,4 @@
-import { TerminalPanel } from '@/features/terminal/components/panel'
+import { DeferredTerminalPanel } from '@/features/terminal/components/deferred-panel'
 import { RenderErrorBoundary } from '@workspace/ui/patterns/render-error-boundary'
 import { TerminalList } from '@/features/workbench/components/terminal-list'
 import { useTerminalTabActions } from '@/features/workbench/hooks/use-terminal-tab-actions'
@@ -66,7 +66,7 @@ export function TerminalTabs({
               <KeepAliveSlot id={keptId(tab.id)} scope={TERMINAL_SCOPE}>
                 {(attached) => (
                   <RenderErrorBoundary label='Terminal'>
-                    <TerminalPanel
+                    <DeferredTerminalPanel
                       active={attached && active}
                       className='h-full'
                       rootPath={rootPath}

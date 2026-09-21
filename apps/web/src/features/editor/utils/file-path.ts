@@ -1,5 +1,5 @@
 import { TREE_SITTER_LANGUAGE_METADATA } from '@singapore-editor/tree-sitter-languages/metadata'
-import type { EditorSyntaxLanguageId } from '@singapore-editor/core'
+import type { EditorSyntaxLanguageId } from '@singapore-editor/core/syntax'
 
 const LANGUAGE_BY_EXTENSION: Record<string, EditorSyntaxLanguageId> = {
   '.astro': 'astro',

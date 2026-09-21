@@ -1,16 +1,13 @@
 import { filesystemPath } from '@/lib/documents/utils/identity'
 import { createTextDiff } from '@singapore-editor/diff'
+import type { LspTransportHandler } from '@singapore-editor/lsp/types'
 import type {
   LspManagedTransport,
-  LspTransportHandler,
   LspWebSocketConstructor,
   LspWebSocketLike,
 } from '@singapore-editor/lsp'
-import type {
-  LanguageServerLaneOptions,
-  LspConnectionCallbacks,
-  LspConnectionOptions,
-} from '@singapore-editor/lsp-plugin'
+import type { LanguageServerLaneOptions } from '@singapore-editor/lsp-plugin/websocket'
+import type { LspConnectionCallbacks, LspConnectionOptions } from '@singapore-editor/lsp-plugin'
 import {
   acquireLanguageServerLane,
   type AcquiredLanguageServerLane,

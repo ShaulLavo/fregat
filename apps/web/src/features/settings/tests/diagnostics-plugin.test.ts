@@ -1,12 +1,12 @@
 import { documentKey, settingsJsonDocument } from '@/lib/documents/utils/identity'
+import type { VirtualizedTextHighlightStyle } from '@singapore-editor/core/rendering'
 import type {
   EditorPluginContext,
   EditorViewContribution,
   EditorViewContributionContext,
   EditorViewContributionProvider,
   EditorViewSnapshot,
-  VirtualizedTextHighlightStyle,
-} from '@singapore-editor/core'
+} from '@singapore-editor/core/extensions'
 import type { SettingsLayerFile } from '@workspace/contracts'
 
 import { createSettingsDiagnosticsPlugin } from '@/features/settings/state/diagnostics-plugin'
