@@ -9,7 +9,9 @@ The app is a Vite web client (`apps/web`) over a Bun server (`apps/server`). One
 
 ## Launch
 
-None. A dev server is always running: web on `http://localhost:5173/`, API on `http://localhost:3001/`. Never start your own. If the dev server is down, tell the user; do not spawn one, and do not restart theirs, because a restart drops their live terminal and agent sessions.
+Use the existing dev server: web on `http://localhost:5173/`, API on `http://localhost:3001/`. Do not start a duplicate. This project, including the mesh deployment called production, is under development. Restart the existing service when needed to complete an authorized fix. Persisted sessions survive restarts; active processes and connections may be interrupted.
+
+When web changes depend on a server protocol change, deploy both with `bun run deploy --server`. A web-only deployment reuses the old server. Verify `/release` and exercise the changed protocol in the browser before calling the deployment done.
 
 Any verb also accepts `--url` for a different target, including the mesh build at `https://omarchy.mesh.shaulavo.dev/platform/` and any address URL the user pastes. An address URL puts you in the user's exact state (workspace, tabs, selection).
 
@@ -69,7 +71,7 @@ Trace tables use `ProfileChunk` samples to name the deepest application function
 
 `renders` counts completed component renders, including scenario setup. Its timing is React `actualDuration` (subtree render duration), not exclusive self time. A component absent from `renders.json` rendered zero times in that measured window. `render-steps.json` holds cumulative counts at each scenario checkpoint, so subtract consecutive snapshots to isolate the action from setup. The screenshot is taken after measurement; use `scenario` when you need screenshots at each action.
 
-A `/themes/palettes` 404 can mean the dev process predates the route. Confirm the route and process start time, then report that a restart is needed; never restart it yourself. WebGL "GPU stall" warnings can come from screenshot capture. TypeScript language-server exits are failures to investigate, not expected noise: inspect the exact log window printed by the command. CLI summaries can omit stderr fields; read the structured event or capture a standalone process replay when the retained tail omits the cause.
+A `/themes/palettes` 404 can mean the dev process predates the route. Confirm the route and process start time, then restart the existing service if needed for the fix. WebGL "GPU stall" warnings can come from screenshot capture. TypeScript language-server exits are failures to investigate, not expected noise: inspect the exact log window printed by the command. CLI summaries can omit stderr fields; read the structured event or capture a standalone process replay when the retained tail omits the cause.
 
 ## Cleanup
 

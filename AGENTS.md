@@ -202,6 +202,8 @@ Interaction treatments are utilities, not strings to copy:
 
 ## Async Effects Go Through TanStack
 
+- TanStack owns async operation state, caching, deduplication, and retries, including code imports and local work. Use queries for reads and mutations for effects. Outside React, use QueryClient and MutationObserver APIs; do not build parallel promise caches or pending/error state machines. The streaming and intent-queue exceptions below still apply.
+
 - Every effect that reaches the server or writes state another consumer reads is a TanStack mutation: `useMutation` in React, the same `mutationOptions` executed through `runMutation` in `lib/mutations/run.ts` outside it, which is a `MutationObserver` over the same client. Command handlers, services in `state/`, toast buttons and dialogs are not exempt. A bare `await client.x.y.post()` or `await writeFileContent()` behind a `useState` flag is the thing this rule bans.
 - Every mutation carries a `mutationKey` from the feature's `mutation-keys.ts`. That key is how the rest of the app sees the effect: in-flight state is `useIsMutating` / `useMutationState`, never a local `pending` or `saving` boolean, and a `Button` shows `OrbitLoader` from that.
 - A mutation settles the cache before it resolves. `setQueryData` with the response when the server returned the new state, `invalidateQueries` on the keys it could have changed otherwise. "It will arrive over the socket" is not settlement; taint the query anyway. The cost of a redundant refetch is nothing, the cost of a stale snapshot is a phantom conflict.

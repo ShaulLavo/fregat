@@ -11,7 +11,7 @@ import { QueryClient, QueryClientProvider } from '@tanstack/react-query'
 import { createElement, type ReactNode } from 'react'
 import { vi } from 'vitest'
 import { createEditorBufferSession } from '@singapore-editor/core/document'
-import { readFile, writeFile } from 'node:fs/promises'
+import { readFile, rm, writeFile } from 'node:fs/promises'
 import { join } from 'node:path'
 
 import { DEFAULT_SETTING_VALUES, type SettingId, type SettingsValues } from '@workspace/contracts'
@@ -119,6 +119,30 @@ test('skips a focus-change save when the workspace mutation gate is closed', asy
   await waitFor(() => expect(runWorkspaceMutation).toHaveBeenCalledOnce())
   expect(runWorkspaceMutation.mock.calls[0]?.[0]).toEqual(['src/dirty.ts'])
   expect(documentStore.getState().dirtyDocumentKeys).toContain(testDocumentKey('src/dirty.ts'))
+})
+
+test('deletion alone does not trigger autosave; edited deleted buffers save normally', async ({
+  client,
+  server,
+}) => {
+  const path = filesystemPath('deleted.txt')
+  await writeFile(join(server.root, path), 'saved')
+  const { documentStore, runtime, wrapper } = harness({ 'files.autoSave': 'onWindowChange' })
+  const document = documentStore
+    .getState()
+    .ensureLiveEditorDocument(await fetchFile(path, new AbortController().signal, client))
+  await rm(join(server.root, path))
+  documentStore.getState().setFileOrphaned(document.key, true)
+  const saveMany = vi.spyOn(runtime.saveService, 'saveMany')
+  const hook = renderHook(() => useAutoSave(), { wrapper })
+  window.dispatchEvent(new Event('blur'))
+  expect(saveMany).not.toHaveBeenCalled()
+  await expect(readFile(join(server.root, path), 'utf8')).rejects.toMatchObject({ code: 'ENOENT' })
+  createEditorBufferSession(document.buffer).applyText(' edited')
+  window.dispatchEvent(new Event('blur'))
+  await waitFor(() => expect(document.buffer.isDirty()).toBe(false))
+  expect(await readFile(join(server.root, path), 'utf8')).toBe('saved edited')
+  hook.unmount()
 })
 
 test('the setting exists with an off default, so nothing changes until asked', ({ client }) => {

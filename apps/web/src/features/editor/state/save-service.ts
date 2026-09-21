@@ -64,7 +64,8 @@ export class EditorSaveService {
     const state = this.documentStore.getState()
     const document = state.getLiveEditorDocument(key)
     if (!document || !isSavableEditorDocument(document)) return false
-    if (!isDirtyLiveEditorDocument(state, key)) return true
+    const orphaned = document.sync.kind === 'file' && document.sync.orphaned
+    if (!orphaned && !isDirtyLiveEditorDocument(state, key)) return true
 
     if (document.sync.kind === 'settings') {
       return this.settingsSync.save(document)

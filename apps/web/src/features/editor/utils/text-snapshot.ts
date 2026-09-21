@@ -33,12 +33,9 @@ export function textSnapshotLineRange(
   textSnapshot: TextSnapshot,
   row: number,
 ): TextSnapshotLineRange | null {
-  if (row < 0) return null
+  if (row < 0 || row >= textSnapshot.lineCount) return null
 
-  const start = textSnapshotRowStartOffset(textSnapshot, row)
-  if (start > textSnapshot.length) return null
-
-  const rawEnd = nextTextSnapshotLineBreak(textSnapshot, start) ?? textSnapshot.length
+  const { start, end: rawEnd } = textSnapshot.lineRange(row)
   const end =
     rawEnd > start && textSnapshot.readRange(rawEnd - 1, rawEnd) === '\r' ? rawEnd - 1 : rawEnd
 
@@ -60,76 +57,4 @@ function textHash(initialHash: number, text: string) {
 
 function contentRevision(length: number, hash: number) {
   return `h:${length.toString(36)}:${(hash >>> 0).toString(36)}`
-}
-
-function textSnapshotRowStartOffset(textSnapshot: TextSnapshot, row: number) {
-  let remainingRows = row
-  let result: number | null = null
-
-  textSnapshot.forEachTextChunk((text, start) => {
-    if (result !== null) return
-
-    const offset = rowStartOffsetInChunk(text, remainingRows)
-    if (offset === null) {
-      remainingRows -= lineBreakCount(text)
-      return
-    }
-
-    result = start + offset
-  })
-
-  if (result !== null) return result
-  if (remainingRows === 0) return textSnapshot.length
-
-  return textSnapshot.length + 1
-}
-
-function rowStartOffsetInChunk(text: string, row: number) {
-  if (row === 0) return 0
-
-  let remainingRows = row
-  let offset = 0
-  while (offset < text.length) {
-    const nextLine = text.indexOf('\n', offset)
-    if (nextLine === -1) return null
-
-    remainingRows -= 1
-    if (remainingRows === 0) return nextLine + 1
-
-    offset = nextLine + 1
-  }
-
-  return null
-}
-
-function nextTextSnapshotLineBreak(textSnapshot: TextSnapshot, startOffset: number) {
-  let result: number | null = null
-
-  textSnapshot.forEachTextChunk((text, chunkStart) => {
-    if (result !== null) return
-
-    const localStart = Math.max(0, startOffset - chunkStart)
-    if (localStart >= text.length) return
-
-    const nextLine = text.indexOf('\n', localStart)
-    if (nextLine === -1) return
-
-    result = chunkStart + nextLine
-  })
-
-  return result
-}
-
-function lineBreakCount(text: string) {
-  let count = 0
-  let offset = 0
-  while (offset < text.length) {
-    const nextLine = text.indexOf('\n', offset)
-    if (nextLine === -1) return count
-
-    count += 1
-    offset = nextLine + 1
-  }
-
-  return count
 }

@@ -1380,6 +1380,7 @@ function createHarness(options: HarnessOptions = {}) {
   let onUriTransition: () => void = () => undefined
   const queryClient = new QueryClient()
   const fileSync = new FileSyncService(store, queryClient, {
+    recreateFileContent: () => Promise.reject('Unexpected file recreation'),
     readFileContent: async (path, signal) => {
       await options.beforeRead?.()
       signal.throwIfAborted()

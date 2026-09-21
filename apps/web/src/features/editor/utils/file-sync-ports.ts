@@ -1,6 +1,9 @@
 import type { FileSyncPorts } from '@/features/editor/state/file-sync-service'
+import { parentFilesystemPath } from '@/lib/path-formatters'
 import type { Client } from '@/lib/client'
 import {
+  createFileContent,
+  ensureFolderPath,
   fetchFile,
   fetchWorkspaceEditRecovery,
   fetchWorkspaceEditStatus,
@@ -14,6 +17,10 @@ import {
 
 export function createFileSyncPorts(client: Client): FileSyncPorts {
   return {
+    recreateFileContent: async (path, content, identity) => {
+      await ensureFolderPath(parentFilesystemPath(path), client)
+      return createFileContent(path, content, client, identity)
+    },
     inspectPath: (path, signal) => statPath(path, signal, client),
     readFileContent: (path, signal) => fetchFile(path, signal, client),
     writeFileContent: (path, content, options) => writeFileContent(path, content, options, client),

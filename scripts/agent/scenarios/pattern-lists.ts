@@ -285,7 +285,18 @@ export const terminalTabs: Scenario = {
 
 /** One layer draws every row's hover text, so the popup is in the page, not the OS. */
 async function expectSharedTooltip(page: Page) {
-  const row = selectors.worktreeFiles(page).first()
+  const rows = selectors.worktreeFiles(page)
+  const longest = await rows.evaluateAll((elements) =>
+    elements.reduce(
+      (best, element, index) =>
+        (element.getAttribute('data-git-file')?.length ?? 0) >
+        (elements[best]?.getAttribute('data-git-file')?.length ?? 0)
+          ? index
+          : best,
+      0,
+    ),
+  )
+  const row = rows.nth(longest)
   const expected = await row.getAttribute('data-tooltip')
   ok(expected, 'A change row must carry its hover text')
   await row.hover()
@@ -295,6 +306,19 @@ async function expectSharedTooltip(page: Page) {
   await popup.waitFor({ timeout: 5_000 })
   strictEqual(await popup.count(), 1, 'Exactly one tooltip may be mounted')
   strictEqual((await popup.textContent())?.trim(), tooltipText(expected).trim())
+  const contained = await popup.evaluate((element) => {
+    const bounds = element.getBoundingClientRect()
+    const range = document.createRange()
+    range.selectNodeContents(element)
+    return [...range.getClientRects()].every(
+      (rect) =>
+        rect.left >= bounds.left &&
+        rect.right <= bounds.right &&
+        rect.top >= bounds.top &&
+        rect.bottom <= bounds.bottom,
+    )
+  })
+  ok(contained, 'Every line of hover text must stay inside the tooltip')
 }
 
 /** `data-tooltip` carries either plain text or tone-tagged parts. */

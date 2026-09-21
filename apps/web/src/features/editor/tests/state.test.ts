@@ -71,6 +71,28 @@ describe('editor workspace state', () => {
     commands.openFileSurface(filesystemPath('/repo/src/app.ts'))
     expect(events).toEqual(['activated:/repo/src/app.ts', 'published'])
   })
+  test('closing the last clean deleted-file tab releases its retained buffer', () => {
+    const path = '/repo/src/app.ts'
+    const documentStore = createEditorDocumentStore()
+    const workspaceStore = createEditorWorkspaceStore(
+      cachedWorkspace({
+        workbenchPanels: workbenchPanelsForPaths([path], path),
+      }),
+    )
+    const tabId = selectedGroupTab(workspaceStore.getState().workbenchPanels.editorGroups)!.id
+    const document = documentStore.getState().ensureEditorView(tabId, fileResult(path))
+    documentStore.getState().setFileOrphaned(document.key, true)
+    const commands = createEditorApplyActions({
+      retainedTextBudget: () => Number.MAX_SAFE_INTEGER,
+      activation: { activate: () => undefined, setRoot: () => undefined },
+      documentStore,
+      searchStore: createSearchBufferStore(),
+      uiStore: createEditorUiStore(),
+      workspaceStore,
+    })
+    commands.closeTab(tabId)
+    expect(documentStore.getState().getLiveEditorDocument(document.key)).toBeNull()
+  })
   test('reopens a tabless dirty buffer before publishing its new selection', () => {
     const path = '/repo/src/app.ts'
     const panels = workbenchPanelsForPaths([path], path)

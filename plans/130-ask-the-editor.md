@@ -1,6 +1,6 @@
 # Ask the editor; do not model it
 
-Status: **PROPOSED — PHASE 1 NEEDS EDITOR E047; PHASES 2 AND 4 ARE READY NOW.** Requested
+Status: **PHASE 2 IMPLEMENTED — REMAINING PHASES NEED EDITOR APIs.** Requested
 2026-09-21, after the diff line-comment fix. Inspected at Platform `d1ca6472` and Editor
 `aeba6783`.
 
@@ -50,11 +50,27 @@ Unicode hover uses `markerAtPoint`; delete the marker scan.
 Scenarios: add `search-result-line-pick` (click a result line in a multi-line excerpt, assert the
 selected line) and run the existing unicode hover surface with `look`.
 
-## Phase 2 — delete the duplicate line index (ready now)
+## Phase 2 — delete the duplicate line index (implemented)
 
 Replace `rowStartOffset`, `textLineAt` and `textSnapshotRowStartOffset` with `TextSnapshot.lineStart`
 and `lineRange`. Diff behaviour first, per the repository rule on same-sounding helpers: the host
 copies carry their own `\r` handling, so add a call-site test for a CRLF file before deleting.
+
+Implemented 2026-09-21. Definition and commit-message offsets now use `lineStart`;
+reference previews and search replacement use `lineRange`, retaining CR trimming and explicit
+out-of-range handling. Deleted the host line-index scans and their obsolete helper tests.
+
+Verification: 15 focused tests pass, including raw CRLF definition offsets, CRLF replacement
+edits, and normalized document reference previews. Web and script typechecks, focused lint,
+and repository gates pass. `editor-definition-crlf` follows a definition into a CRLF fixture
+and proves the caret offset by inserting and checking the saved file. The editor normalizes
+saved line endings to LF. Screenshot inspected; evidence:
+`/work/tmp/fregat-evidence/20260921T174304Z-scenario-editor-definition-crlf/`.
+The capture also records a `LoadedTerminalPanel` React `use()` error outside the changed code.
+
+E047 and E050 remain proposed in the linked Editor checkout; `rowAtPoint`, `markerAtPoint`,
+`getStackedRows` and `onDidScroll` are absent. Phases 1, 3, 4 and 5 remain pending their
+Editor implementations. No compatibility layer was added.
 
 ## Phase 3 — stacked rows from the plugin (small Editor change)
 

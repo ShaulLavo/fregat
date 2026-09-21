@@ -18,7 +18,8 @@ function observeResolution() {
   const observer = vi.spyOn(log, 'info')
   const recorded = () =>
     observer.mock.calls.flatMap(([event]) => {
-      const value: unknown = event
+      const input: unknown = event
+      const value: unknown = typeof input === 'function' ? input() : input
       if (
         !value ||
         typeof value !== 'object' ||

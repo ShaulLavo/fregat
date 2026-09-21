@@ -1,7 +1,7 @@
 import type { LanguageServerDefinitionTarget } from '@singapore-editor/lsp-plugin/websocket'
 import type { DocumentKey } from '@/lib/documents/utils/types'
 import type { LiveEditorDocument } from '@/features/editor/state/document-state'
-import { textLineAt } from '@/features/editor/utils/position'
+import { textSnapshotLineRange } from '@/features/editor/utils/text-snapshot'
 import { compareSearchPaths } from '@/features/search/utils/sort'
 import { basename, parentPath, toTreePath } from '@/lib/path-formatters'
 
@@ -55,7 +55,8 @@ export function referencePreview(
   target: LanguageServerDefinitionTarget,
 ) {
   const line = document
-    ? textLineAt(document.buffer.getTextSnapshot(), target.range.start.line)
+    ? (textSnapshotLineRange(document.buffer.getTextSnapshot(), target.range.start.line)?.text ??
+      null)
     : null
   const trimmed = line?.trim()
   if (trimmed) return trimmed

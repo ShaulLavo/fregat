@@ -1,158 +1,29 @@
-# ssr-dehydration: Use Dehydrate/Hydrate Pattern for SSR
+# Server rendering and hydration
 
-## Priority: MEDIUM
+Use this rule only for an SSR application. Platform's client-only workbench does not need
+SSR machinery to use route loaders.
 
-## Explanation
-
-For server-side rendering, prefetch queries on the server, dehydrate the cache to a serializable format, send it to the client, and hydrate on the client. This prevents content flash and duplicate requests.
-
-## Bad Example
+Create a QueryClient per server request. A module-global server client can share one user's
+data with another request. The browser owns a stable client for its application lifetime.
 
 ```tsx
-// No SSR data passing - client refetches everything
-// server-side
-export async function getServerSideProps() {
-  const data = await fetchPosts()
-  return { props: { posts: data } }  // Bypasses React Query cache
-}
-
-// client-side
-function PostsPage({ posts }: { posts: Post[] }) {
-  // This doesn't benefit from the server fetch
-  const { data } = useQuery({
-    queryKey: ['posts'],
-    queryFn: fetchPosts,
-    // Will refetch on client, causing flash
-  })
-
-  return <PostList posts={data ?? posts} />  // Awkward fallback pattern
-}
-```
-
-## Good Example: Next.js App Router
-
-```tsx
-// app/posts/page.tsx
-import {
-  dehydrate,
-  HydrationBoundary,
-  QueryClient,
-} from '@tanstack/react-query'
-import { postQueries } from '@/lib/queries'
-
-export default async function PostsPage() {
-  const queryClient = new QueryClient()
-
-  await queryClient.prefetchQuery(postQueries.list())
-
-  return (
-    <HydrationBoundary state={dehydrate(queryClient)}>
-      <PostList />
-    </HydrationBoundary>
-  )
-}
-
-// components/PostList.tsx
-'use client'
-
-import { useSuspenseQuery } from '@tanstack/react-query'
-import { postQueries } from '@/lib/queries'
-
-export function PostList() {
-  const { data: posts } = useSuspenseQuery(postQueries.list())
-
-  return (
-    <ul>
-      {posts.map(post => (
-        <li key={post.id}>{post.title}</li>
-      ))}
-    </ul>
-  )
-}
-```
-
-## Good Example: TanStack Start/Router
-
-```tsx
-// routes/posts.tsx
-import { createFileRoute } from '@tanstack/react-router'
-import { postQueries } from '@/lib/queries'
-
-export const Route = createFileRoute('/posts')({
-  loader: async ({ context: { queryClient } }) => {
-    // Prefetch in route loader
-    await queryClient.ensureQueryData(postQueries.list())
-  },
-  component: PostsPage,
-})
-
-function PostsPage() {
-  const { data: posts } = useSuspenseQuery(postQueries.list())
-  return <PostList posts={posts} />
-}
-```
-
-## Good Example: Manual SSR Setup
-
-```tsx
-// server.tsx
-import { dehydrate, QueryClient } from '@tanstack/react-query'
-import { renderToString } from 'react-dom/server'
-
-export async function render(url: string) {
-  const queryClient = new QueryClient({
-    defaultOptions: {
-      queries: {
-        staleTime: 60 * 1000,  // Prevent immediate client refetch
-      },
-    },
-  })
-
-  // Prefetch required data
-  await queryClient.prefetchQuery({
-    queryKey: ['posts'],
-    queryFn: fetchPosts,
-  })
-
-  const dehydratedState = dehydrate(queryClient)
-
-  const html = renderToString(
-    <QueryClientProvider client={queryClient}>
-      <App />
-    </QueryClientProvider>
-  )
-
-  // Serialize safely - JSON.stringify is XSS vulnerable
-  const serializedState = serialize(dehydratedState)
-
-  return `
-    <html>
-      <body>
-        <div id="app">${html}</div>
-        <script>window.__DEHYDRATED_STATE__ = ${serializedState}</script>
-      </body>
-    </html>
-  `
-}
-
-// client.tsx
-import { hydrate, QueryClient, QueryClientProvider } from '@tanstack/react-query'
-
 const queryClient = new QueryClient()
-hydrate(queryClient, window.__DEHYDRATED_STATE__)
-
-hydrateRoot(
-  document.getElementById('app'),
-  <QueryClientProvider client={queryClient}>
-    <App />
-  </QueryClientProvider>
-)
+await queryClient.query(postQueries.list())
+const state = dehydrate(queryClient)
 ```
 
-## Context
+This is a required read: rejection propagates to the request owner. For an optional warmup,
+handle rejection explicitly before dehydration; do not accidentally turn all server failures
+into success. See [imperative queries](imperative-queries.md).
 
-- Create new QueryClient per request to prevent data sharing between users
-- Set `staleTime > 0` on server to prevent immediate client refetch
-- Use a safe serializer (not JSON.stringify) to prevent XSS
-- Failed queries aren't dehydrated by default; use `shouldDehydrateQuery` to override
-- `HydrationBoundary` can be nested for route-level prefetching
+Use the framework's supported Query hydration integration or `HydrationBoundary`. Share
+query options with browser consumers, including a deliberate freshness window. Use the
+framework's safe serialization path for inline payloads. Failed queries are excluded by
+default; changing that requires an explicit error/serialization policy. Never dehydrate
+opaque browser resources, native handles, or secrets.
+
+For TanStack Start/Router, verify the installed integration and current official docs before
+adding hydration callbacks. A route loader that fills the cache is only the loading part;
+it does not itself implement request scoping, serialization, hydration, or streaming.
+
+[Server rendering guide](https://tanstack.com/query/latest/docs/framework/react/guides/ssr)

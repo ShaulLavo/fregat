@@ -73,3 +73,7 @@ The click scenario waits 750ms between clicks so debounced document highlights, 
 Native grammar coverage: `editor-native-coverage-light` and `editor-native-coverage-dark` open an MDX, SQL or Astro file or a Markdown fence fixture, check native worker use, edit syntax, undo and redo. Use `--workspace work/tmp/fregat-evidence/syntax-benchmark-fixtures --file Component.astro`, `--file Component.mdx`, `--file mdx-injections.md`, `--file queries.sql`, `--file sql-injections.md` or `--file injections.md`. Fenced MDX must retain its heading and emphasis markers in Markdown preview; injected code is displayed as source. `editor-syntax-native` retains the whitespace control for timing comparisons.
 
 Editor title actions are the active tab's controls at the end of its tab strip, declared in `apps/web/src/keymap/editor-title-actions.ts` as a command plus a `when` over the tab. `editor-title-diff-toggle` opens a diff tab, switches stacked/split from the title and switches back, because the toggle writes the real `editor.diff.viewMode` setting. `git-commit-message-file` covers the accept and discard pair.
+
+`scenario editor-definition-crlf` opens a disposable TypeScript workspace, follows Go to definition into a CRLF file, inserts at the definition caret and checks the saved bytes. It removes the fixture afterward.
+
+`scenario editor-external-deletion` verifies that externally deleted clean and dirty files stay open, retain their text across tab switches, can be recreated with Save, and refresh when another process restores them.

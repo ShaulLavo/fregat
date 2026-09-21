@@ -1,35 +1,13 @@
-import { describe, expect, it } from 'vitest'
+import { describe } from 'vitest'
+import { expect, test as it } from '../../../../../test/fixtures'
 
-import { createDocumentSession } from '@singapore-editor/core/document'
+import { createStringTextSnapshot } from '@singapore-editor/core/document'
 
-import {
-  rowStartOffset,
-  selectionForDefinition,
-  textLineAt,
-} from '@/features/editor/utils/position'
+import { selectionForDefinition } from '@/features/editor/utils/position'
 
 describe('editor position utilities', () => {
-  it('computes row starts from text snapshots', () => {
-    const text = textSnapshot('alpha\nbeta\ngamma')
-
-    expect(rowStartOffset(text, 0)).toBe(0)
-    expect(rowStartOffset(text, 1)).toBe(6)
-    expect(rowStartOffset(text, 2)).toBe(11)
-    expect(rowStartOffset(text, 3)).toBe(text.length)
-  })
-
-  it('reads one line from a text snapshot', () => {
-    const text = textSnapshot('alpha\r\n\r\ngamma\n')
-
-    expect(textLineAt(text, 0)).toBe('alpha')
-    expect(textLineAt(text, 1)).toBe('')
-    expect(textLineAt(text, 2)).toBe('gamma')
-    expect(textLineAt(text, 3)).toBe('')
-    expect(textLineAt(text, 4)).toBeNull()
-  })
-
   it('computes definition selections without full text', () => {
-    const text = textSnapshot('alpha\nbeta\ngamma')
+    const text = createStringTextSnapshot('alpha\r\nbeta\r\ngamma')
 
     expect(
       selectionForDefinition('src/file.ts', text, {
@@ -41,12 +19,8 @@ describe('editor position utilities', () => {
         uri: 'file:///src/file.ts',
       }),
     ).toEqual({
-      anchor: 7,
-      head: 15,
+      anchor: 8,
+      head: 17,
     })
   })
 })
-
-function textSnapshot(text: string) {
-  return createDocumentSession(text).getTextSnapshot()
-}

@@ -37,3 +37,5 @@ Scope is a security boundary: a window-scoped value never reaches execution. Sec
 `scenario page-lifecycle` drives retained-page lifecycle events, cancels and accepts native reload confirmation, and reloads three times. Each restore/reload must start settings, machine and filesystem subscriptions. Inspect the run’s structured logs for unexpected stream failures. The retained-page events are simulated; this does not prove browser BFCache eligibility.
 
 `scenario settings-models-pending` holds the provider read, reloads and opens the Models setting. The pending step must show the row skeleton and never "No models are available yet."
+
+`scenario settings-cold-load` delays the settings module in the Vite dev server, verifies the loading state, then releases the import and checks that rendering resumes without console errors.

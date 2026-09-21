@@ -1,3 +1,5 @@
+import { useEditorDocumentState } from '@/features/editor/state/document-state'
+import { documentKey } from '@/lib/documents/utils/identity'
 import { assignRef } from '@workspace/ui/lib/assign-ref'
 import { FileTypeIcon } from '@/components/file-type-icon'
 import type { DraggableAttributes, DraggableSyntheticListeners } from '@dnd-kit/core'
@@ -38,6 +40,14 @@ export function EditorTabButton({
   readonly loading: boolean
   readonly tab: EditorTabModel
 }) {
+  const deleted = useEditorDocumentState((state) => {
+    if (tab.content.kind !== 'document') return false
+    const sync = state.liveDocumentsByKey[documentKey(tab.content.document)]?.sync
+    return sync?.kind === 'file' && sync.orphaned
+  })
+  const displayTab = deleted
+    ? { ...tab, name: `${tab.name} (deleted)`, title: `${tab.title} (deleted on disk)` }
+    : tab
   const unavailable = useUnavailableEnvironment()
   const intentPrefetchRef = useEditorTabIntentPrefetch(tab)
   const { requestCloseTab, selectTab } = useEditorTabActions()
@@ -80,14 +90,14 @@ export function EditorTabButton({
       style={dragStyle}
       title={
         unavailable
-          ? `${tab.title} (read only; ${unavailable.label ?? unavailable.name} is unreachable)`
-          : tab.title
+          ? `${displayTab.title} (read only; ${unavailable.label ?? unavailable.name} is unreachable)`
+          : displayTab.title
       }
       type='button'
       onClick={handleSelectTab}
     >
       <FileTypeIcon className='size-(--icon-size-sm) shrink-0 object-contain' icon={tab.icon} />
-      {editorTabTitle(tab, loading)}
+      {editorTabTitle(displayTab, loading)}
       {unavailable ? (
         <LockSimpleIcon
           aria-label='Read only'
@@ -98,7 +108,7 @@ export function EditorTabButton({
         active={tab.active}
         dirty={dirty}
         orientation='horizontal'
-        title={tab.title}
+        title={displayTab.title}
         onClose={closeTab}
       />
     </button>

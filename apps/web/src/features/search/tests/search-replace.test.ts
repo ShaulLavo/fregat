@@ -1,4 +1,6 @@
-import { describe, expect, it } from 'vitest'
+import { describe } from 'vitest'
+import { expect, test as it } from '../../../../test/fixtures'
+import { createStringTextSnapshot } from '@singapore-editor/core/document'
 import type { WorkspaceSearchMatch, WorkspaceSearchQuery } from '@workspace/contracts'
 
 import {
@@ -15,6 +17,23 @@ const QUERY: WorkspaceSearchQuery = {
 }
 
 describe('workspace search replacement planner', () => {
+  it('replaces snapshot matches after CRLF without consuming line endings', () => {
+    const source = 'alpha\r\nneedle\r\n\r\nneedle\r'
+    const plan = workspaceSearchReplacePlan({
+      matches: [
+        match({ column: 1, endColumn: 7, line: 2 }),
+        match({ column: 1, endColumn: 7, line: 4 }),
+        match({ column: 1, endColumn: 7, line: 5 }),
+      ],
+      query: QUERY,
+      replaceText: 'pin',
+      text: createStringTextSnapshot(source),
+    })
+    expect(plan.appliedCount).toBe(2)
+    expect(plan.skippedCount).toBe(1)
+    expect(applyWorkspaceSearchReplaceEdits(source, plan.edits)).toBe('alpha\r\npin\r\n\r\npin\r')
+  })
+
   it('previews literal replacements against the match preview', () => {
     expect(
       workspaceSearchReplacementPreview({

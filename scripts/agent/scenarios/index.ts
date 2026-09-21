@@ -81,12 +81,15 @@ import { wallpaperModeToggle } from './wallpaper-mode-toggle'
 import { editorAutoClose } from './editor-auto-close'
 import { editorFormatChord } from './editor-format-chord'
 import { editorLspCompletion } from './editor-lsp-completion'
+import { editorExternalDeletion } from './editor-external-deletion'
+import { editorDefinitionCrlf } from './editor-definition-crlf'
 import { editorLspHover } from './editor-lsp-hover'
 import { editorLspSignatureHelp } from './editor-lsp-signature-help'
 import { editorMarkdownPunctuation } from './editor-markdown-punctuation'
 import { wallpaperLibrary } from './wallpaper-library'
 import { wallpaperPalette } from './wallpaper-palette'
 import { themeBundlePalette } from './theme-bundle-palette'
+import { settingsColdLoad } from './settings-cold-load'
 import { settingsDefaults } from './settings-defaults'
 import { projectMenu } from './project-menu'
 import { sidebarSettingsButton } from './sidebar-settings-button'
@@ -230,6 +233,8 @@ export const scenarios: readonly Scenario[] = [
   editorFormatChord,
   editorLspCompletion,
   editorLspHover,
+  editorDefinitionCrlf,
+  editorExternalDeletion,
   editorLspSignatureHelp,
   editorMarkdownPunctuation,
   fileIcons,
@@ -249,6 +254,7 @@ export const scenarios: readonly Scenario[] = [
   wallpaperPalette,
   themeBundlePalette,
   settingsDefaults,
+  settingsColdLoad,
   projectMenu,
   sidebarSettingsButton,
   settingsFontInput,

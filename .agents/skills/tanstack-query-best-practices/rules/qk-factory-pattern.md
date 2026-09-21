@@ -18,18 +18,18 @@ const { data } = useQuery({
 
 // file: components/TodoDetail.tsx
 const { data } = useQuery({
-  queryKey: ['todo', id],  // Inconsistent: 'todo' vs 'todos'
+  queryKey: ['todo', id], // Inconsistent: 'todo' vs 'todos'
   queryFn: () => fetchTodo(id),
 })
 
 // file: components/TodoComments.tsx
 const { data } = useQuery({
-  queryKey: ['todoComments', todoId],  // Different naming convention
+  queryKey: ['todoComments', todoId], // Different naming convention
   queryFn: () => fetchComments(todoId),
 })
 
 // Invalidation is error-prone
-queryClient.invalidateQueries({ queryKey: ['todos'] })  // Misses 'todo' and 'todoComments'
+queryClient.invalidateQueries({ queryKey: ['todos'] }) // Misses 'todo' and 'todoComments'
 ```
 
 ## Good Example
@@ -66,8 +66,8 @@ const { data } = useQuery({
 })
 
 // Invalidation is type-safe and predictable
-queryClient.invalidateQueries({ queryKey: todoKeys.all })  // Invalidates everything
-queryClient.invalidateQueries({ queryKey: todoKeys.detail(5) })  // Specific todo + comments
+queryClient.invalidateQueries({ queryKey: todoKeys.all }) // Invalidates everything
+queryClient.invalidateQueries({ queryKey: todoKeys.detail(5) }) // Specific todo + comments
 ```
 
 ## Query Options Factory Pattern
@@ -77,20 +77,22 @@ queryClient.invalidateQueries({ queryKey: todoKeys.detail(5) })  // Specific tod
 import { queryOptions } from '@tanstack/react-query'
 
 export const todoQueries = {
-  all: () => queryOptions({
-    queryKey: todoKeys.all,
-    queryFn: fetchAllTodos,
-  }),
-  detail: (id: number) => queryOptions({
-    queryKey: todoKeys.detail(id),
-    queryFn: () => fetchTodo(id),
-    staleTime: 5 * 60 * 1000,
-  }),
+  all: () =>
+    queryOptions({
+      queryKey: todoKeys.all,
+      queryFn: fetchAllTodos,
+    }),
+  detail: (id: number) =>
+    queryOptions({
+      queryKey: todoKeys.detail(id),
+      queryFn: () => fetchTodo(id),
+      staleTime: 5 * 60 * 1000,
+    }),
 }
 
 // Usage
 const { data } = useQuery(todoQueries.detail(5))
-await queryClient.prefetchQuery(todoQueries.detail(5))
+void queryClient.query(todoQueries.detail(5)).catch(() => undefined)
 ```
 
 ## Context

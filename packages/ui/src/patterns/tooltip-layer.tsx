@@ -33,6 +33,7 @@ export function TooltipLayer() {
       <TooltipContent
         anchor={target?.element ?? null}
         aria-label={tooltipPartsText(parts)}
+        className='block max-w-[min(var(--container-sm),var(--available-width))] wrap-anywhere whitespace-pre-wrap'
         id={id}
         side='bottom'
       >

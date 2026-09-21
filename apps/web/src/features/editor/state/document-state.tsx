@@ -78,6 +78,7 @@ type EditorDocumentStoreActions = {
   getEditorView: (tabId: TabId) => EditorDocumentView | null
   getLiveEditorDocument: (documentKey: DocumentKey) => LiveEditorDocument | null
   hasLiveEditorDocument: (documentKey: DocumentKey) => boolean
+  setFileOrphaned: (documentKey: DocumentKey, orphaned: boolean) => boolean
   markLiveEditorDocumentSaved: (input: {
     documentKey: DocumentKey
     fileVersion: string
@@ -250,6 +251,11 @@ export function createEditorDocumentStore(options: CreateEditorDocumentStoreOpti
         unevictableEditorDocumentKeys: () => service.unevictableDocumentKeys(),
         getLiveEditorDocument: (documentKey) => service.getLiveDocument(documentKey),
         hasLiveEditorDocument: (documentKey) => service.hasLiveDocument(documentKey),
+        setFileOrphaned: (documentKey, orphaned) => {
+          const changed = service.setFileOrphaned(documentKey, orphaned)
+          if (changed) publish()
+          return changed
+        },
         markLiveEditorDocumentSaved: (input) => {
           const marked = service.markSaved(input)
           publish()

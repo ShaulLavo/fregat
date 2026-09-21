@@ -1,3 +1,5 @@
+import { mkdir, readFile, rm, writeFile } from 'node:fs/promises'
+import { join } from 'node:path'
 import { decodedAsText } from '@workspace/contracts'
 import { filesystemPath } from '@/lib/documents/utils/identity'
 import { testDocumentKey } from '../../../../test/factories/document-targets'
@@ -18,6 +20,55 @@ import { expect, test as it } from '../../../../test/fixtures'
 import type { WorkspaceEditResult, WorkspaceEditTransitionRequest } from '@workspace/contracts'
 
 describe('FileSyncService', () => {
+  it('retains an orphaned buffer and recreates its deleted parent on save', async ({
+    client,
+    server,
+  }) => {
+    const path = filesystemPath('nested/note.txt')
+    await mkdir(join(server.root, 'nested'))
+    await writeFile(join(server.root, path), 'original')
+    const ports = createFileSyncPorts(client)
+    const store = createEditorDocumentStore()
+    const queryClient = new QueryClient()
+    const fileSync = new FileSyncService(store, queryClient, ports)
+    const document = store
+      .getState()
+      .ensureLiveEditorDocument(await ports.readFileContent(path, new AbortController().signal))
+    await rm(join(server.root, 'nested'), { recursive: true })
+    store.getState().setFileOrphaned(document.key, true)
+    store.getState().retainEditorDocuments({ documentKeys: new Set(), tabIds: new Set() })
+    const orphan = store.getState().getLiveEditorDocument(document.key)!
+    expect(orphan.buffer).toBe(document.buffer)
+    expect(orphan.buffer.isDirty()).toBe(false)
+    expect(orphan.buffer.materializeFullText()).toBe('original')
+    await fileSync.save(orphan)
+    expect(await readFile(join(server.root, path), 'utf8')).toBe('original')
+    expect(store.getState().getLiveEditorDocument(document.key)?.sync).toMatchObject({
+      orphaned: false,
+    })
+    expect(queryClient.getQueryData(fileSystemKeys.fileSnapshot(path))).toMatchObject({
+      content: 'original',
+    })
+  })
+
+  it('refuses to recreate over a file another process has restored', async ({ client, server }) => {
+    const path = filesystemPath('note.txt')
+    await writeFile(join(server.root, path), 'original')
+    const ports = createFileSyncPorts(client)
+    const store = createEditorDocumentStore()
+    const service = new FileSyncService(store, new QueryClient(), ports)
+    const document = store
+      .getState()
+      .ensureLiveEditorDocument(await ports.readFileContent(path, new AbortController().signal))
+    store.getState().setFileOrphaned(document.key, true)
+    await writeFile(join(server.root, path), 'restored by agent')
+    await expect(
+      service.save(store.getState().getLiveEditorDocument(document.key)!),
+    ).rejects.toBeDefined()
+    expect(await readFile(join(server.root, path), 'utf8')).toBe('restored by agent')
+    expect(document.buffer.materializeFullText()).toBe('original')
+  })
+
   it('saves with a base file version and marks unchanged saved buffers clean', async () => {
     const store = createEditorDocumentStore()
     const queryClient = new QueryClient()
@@ -26,6 +77,7 @@ describe('FileSyncService', () => {
     const writes: Array<{ content: string; options: Parameters<FileSyncWriteFileContent>[2] }> = []
 
     const service = new FileSyncService(store, queryClient, {
+      recreateFileContent: () => Promise.reject('Unexpected file recreation'),
       readFileContent: async () => file('unused', '', 0),
       writeFileContent: async (path, content, options) => {
         writes.push({ content, options })
@@ -66,6 +118,7 @@ describe('FileSyncService', () => {
     const savingDocument = store.getState().getLiveEditorDocument(document.key)!
 
     await new FileSyncService(store, queryClient, {
+      recreateFileContent: () => Promise.reject('Unexpected file recreation'),
       readFileContent: async () => file('unused', '', 0),
       writeFileContent: async (path, content) => {
         const latest = store.getState().getLiveEditorDocument(testDocumentKey(path))!
@@ -92,6 +145,7 @@ describe('FileSyncService', () => {
     const queryClient = new QueryClient()
     const controller = new AbortController()
     const service = new FileSyncService(store, queryClient, {
+      recreateFileContent: () => Promise.reject('Unexpected file recreation'),
       readFileContent: async (path, signal) => {
         expect(signal).toBe(controller.signal)
         return file(path, '\uFEFFhello', 123)
@@ -121,6 +175,7 @@ describe('FileSyncService', () => {
         inspectedPaths.push(path)
         return entry(path, 'content', 123)
       },
+      recreateFileContent: () => Promise.reject('Unexpected file recreation'),
       readFileContent: async (path) => file(path, '', 0),
       writeFileContent: async (path, content) => entry(path, content, 0),
     })
@@ -143,6 +198,7 @@ describe('FileSyncService', () => {
     const controller = new AbortController()
     let settle!: (file: FileResult) => void
     const service = new FileSyncService(store, queryClient, {
+      recreateFileContent: () => Promise.reject('Unexpected file recreation'),
       readFileContent: () =>
         new Promise((resolve) => {
           settle = resolve
@@ -257,6 +313,7 @@ describe('FileSyncService', () => {
       treeModel({ entries: [entry(path, 'old', 10)], path: filesystemPath('/repo') }, '/repo'),
     )
     const service = new FileSyncService(store, queryClient, {
+      recreateFileContent: () => Promise.reject('Unexpected file recreation'),
       readFileContent: async () => oldFile,
       writeFileContent: async (nextPath, content) => entry(nextPath, content, 20),
     })
@@ -305,6 +362,7 @@ describe('FileSyncService', () => {
     const path = '/repo/a.ts'
     queryClient.setQueryData(fileSystemKeys.fileSnapshot(path), file(path, 'before', 10))
     const service = new FileSyncService(createEditorDocumentStore(), queryClient, {
+      recreateFileContent: () => Promise.reject('Unexpected file recreation'),
       readFileContent: async () => file(path, 'before', 10),
       writeFileContent: async (nextPath, content) => entry(nextPath, content, 20),
     })
@@ -359,6 +417,7 @@ describe('FileSyncService', () => {
     queryClient.setQueryData(gitKeys.status('/repo'), { stale: 'git' })
     const reads: string[] = []
     const service = new FileSyncService(createEditorDocumentStore(), queryClient, {
+      recreateFileContent: () => Promise.reject('Unexpected file recreation'),
       readFileContent: async (nextPath) => {
         reads.push(nextPath)
         return file(nextPath, 'recovered', 30)
@@ -394,6 +453,7 @@ function workspaceService(overrides: Partial<WorkspaceMutationTransport>): FileS
   }
   const store = createEditorDocumentStore()
   return new FileSyncService(store, new QueryClient(), {
+    recreateFileContent: () => Promise.reject('Unexpected file recreation'),
     readFileContent: async () => file('unused', '', 0),
     writeFileContent: async (path, content) => entry(path, content, 0),
     workspaceMutations: { ...base, ...overrides },

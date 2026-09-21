@@ -1,3 +1,4 @@
+import { isDirtyLiveEditorDocument } from '@/features/editor/utils/save'
 import { captureEditorScrollPositions } from '@/features/editor/state/scroll-persistence'
 import {
   documentKey,
@@ -390,8 +391,18 @@ function closeTab(
   const nextSelection = editorWorkspaceSelectionForWorkbenchPanelsForState(workspace, nextPanels)
   const remainingCount =
     editorContentCountsForWorkbenchPanels(nextPanels).get(tabContentKey(content)) ?? 0
+  const discard =
+    options.discard ||
+    tabDocuments(content).some((target) => {
+      const document = documentStore.getState().getLiveEditorDocument(documentKey(target))
+      return (
+        document?.sync.kind === 'file' &&
+        document.sync.orphaned &&
+        !isDirtyLiveEditorDocument(documentStore.getState(), document.key)
+      )
+    })
   const result =
-    options.discard && remainingCount === 0
+    discard && remainingCount === 0
       ? tabDocuments(content)
           .map((document) =>
             documentStore.getState().deleteLiveEditorDocument(documentKey(document)),
@@ -399,7 +410,7 @@ function closeTab(
           .reduce((all, one) => ({ wasDirty: all.wasDirty || one.wasDirty }), { wasDirty: false })
       : { wasDirty: false }
 
-  if (!options.discard || remainingCount > 0) {
+  if (!discard || remainingCount > 0) {
     documentStore.getState().removeEditorView(tabId)
     if (remainingCount === 0) {
       const documentSizes = documentStore.getState().editorDocumentSizes()

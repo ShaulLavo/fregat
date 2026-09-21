@@ -218,6 +218,7 @@ function createHarness(options: { readonly failFinalize?: boolean } = {}) {
   const store = createEditorDocumentStore()
   const transport = new SearchWorkspaceMutationTransport(ROOT, files, options)
   const fileSync = new FileSyncService(store, new QueryClient(), {
+    recreateFileContent: () => Promise.reject('Unexpected file recreation'),
     readFileContent: async (path, signal) => {
       signal.throwIfAborted()
       return requiredFile({ files }, path)

@@ -5,6 +5,7 @@ export const bundleQueryKey = ['themes', 'bundles'] as const
 export const importSourcesQueryKey = ['settings', 'session-import', 'sources'] as const
 
 export const settingsQueryKeys = {
+  pageModule: ['settings', 'page-module'] as const,
   bundleExport: (id: string) => ['themes', 'bundles', id, 'export'] as const,
   nerdFonts: ['fonts', 'nerd-fonts'],
 } as const

@@ -20,8 +20,6 @@ export type WorkspaceTreeOperation =
   | { type: 'refresh-tree-directory'; path: string }
 
 export type WorkspaceOpenFileOperation =
-  | { type: 'deleted-conflict'; path: string }
-  | { type: 'discard-open-file'; path: string }
   | WorkspaceOpenFileRefresh
   | { type: 'rename-open-file'; from: string; to: string }
   | { type: 'renamed-conflict'; localPath: string; remotePath: string }
@@ -29,7 +27,7 @@ export type WorkspaceOpenFileOperation =
 export type WorkspaceOpenFileRefresh = {
   type: 'refresh-open-file'
   path: string
-  reason: 'changed' | 'ready'
+  reason: 'changed' | 'ready' | 'deleted'
   version?: string
 }
 
@@ -202,12 +200,7 @@ function planDeletedOpenFileOperations(
 
   for (const openFile of openFiles) {
     if (!isSameOrChildPath(openFile.path, deletedPath)) continue
-    if (openFile.isDirty) {
-      operations.push({ type: 'deleted-conflict', path: openFile.path })
-      continue
-    }
-
-    operations.push({ type: 'discard-open-file', path: openFile.path })
+    operations.push({ type: 'refresh-open-file', reason: 'deleted', path: openFile.path })
   }
 
   return operations

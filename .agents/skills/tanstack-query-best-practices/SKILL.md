@@ -1,114 +1,56 @@
 ---
 name: tanstack-query-best-practices
-description: TanStack Query (React Query) best practices for data fetching, caching, mutations, and server state management. Activate when building data-driven React applications with server state.
+description: Use TanStack Query for async reads, resource loading, caching, and mutations in React or non-React code. Apply when adding or migrating query ownership, retries, preloading, or operation state.
 ---
 
-# TanStack Query Best Practices
+# TanStack Query
 
-Comprehensive guidelines for implementing TanStack Query (React Query) patterns in React applications. These rules optimize data fetching, caching, mutations, and server state synchronization.
+## Check the API before choosing a pattern
 
-## When to Apply
+Resolve the installed `@tanstack/query-core` version through the consuming package, then
+read its declarations/source and current official docs. Do not assume all v5 releases
+have the same APIs or that an old Router example is current Query guidance.
 
-- Creating new data fetching logic
-- Setting up query configurations
-- Implementing mutations and optimistic updates
-- Configuring caching strategies
-- Integrating with SSR/SSG
-- Refactoring existing data fetching code
+Verified on 2026-09-21 with query-core/react-query 5.102.8: use `queryClient.query()`
+and `queryClient.infiniteQuery()` for imperative execution. The old fetch, prefetch,
+and ensure methods are deprecated. Read [imperative queries](rules/imperative-queries.md)
+when migrating them; error propagation, freshness, and `select` behavior differ.
+If another project lacks the replacement, report the version constraint rather than
+inventing a compatibility wrapper or silently upgrading dependencies.
 
-## Rule Categories by Priority
+## Choose ownership first
 
-| Priority | Category | Rules | Impact |
-|----------|----------|-------|--------|
-| CRITICAL | Query Keys | 5 rules | Prevents cache bugs and data inconsistencies |
-| CRITICAL | Caching | 5 rules | Optimizes performance and data freshness |
-| HIGH | Mutations | 6 rules | Ensures data integrity and UI consistency |
-| HIGH | Error Handling | 3 rules | Prevents poor user experiences |
-| MEDIUM | Prefetching | 4 rules | Improves perceived performance |
-| MEDIUM | Parallel Queries | 2 rules | Enables dynamic parallel fetching |
-| MEDIUM | Infinite Queries | 3 rules | Prevents pagination bugs |
-| MEDIUM | SSR Integration | 4 rules | Enables proper hydration |
-| LOW | Performance | 4 rules | Reduces unnecessary re-renders |
-| LOW | Offline Support | 2 rules | Enables offline-first patterns |
+- React uses Query hooks; non-React code uses query-core clients and observers. Keep
+  async pending/error state and retry policy there instead of in promise maps or stores.
+- Use queries for reads, including local resource acquisition. Use mutations for effects
+  and settle affected queries before success resolves. Follow the repository's intent
+  queues and domain transaction rules rather than wrapping them in another mutation.
+- Match cache scope to resource identity: environment, browser, or owned instance.
+  Query GC does not dispose sockets, database handles, or highlighters.
+- Include every result-changing input in keys. Share options between consumers and
+  preloaders. Feature keys belong with the feature under this repository's AGENTS.md.
+- Query functions resolve a defined value. For opaque runtime objects, choose
+  `structuralSharing: false`, explicit disposal, and no persistence/dehydration.
+- Local acquisition may need `networkMode: 'always'`; remote reads need their actual
+  connectivity policy. Do not make all queries static or disable retries globally.
+- Preserve stream projections, edit state, locks, and operation ordering. They are
+  domain behavior, not redundant query caches.
 
-## Quick Reference
+## Read the relevant rules
 
-### Query Keys (Prefix: `qk-`)
+- Imperative execution/migration: [imperative-queries](rules/imperative-queries.md).
+- Key identity: [dependencies](rules/qk-include-dependencies.md),
+  [serializability](rules/qk-serializable.md), [factories](rules/qk-factory-pattern.md).
+- Cache policy: [freshness](rules/cache-stale-time.md), [retention](rules/cache-gc-time.md),
+  [invalidation](rules/cache-invalidation.md), [placeholder data](rules/cache-placeholder-vs-initial.md).
+- Operations: [mutation settlement](rules/mut-invalidate-queries.md),
+  [mutation state](rules/mut-mutation-state.md), [optimism](rules/mut-optimistic-updates.md).
+- Loading: [intent preloading](rules/pf-intent-prefetch.md),
+  [error handling](rules/err-error-boundaries.md), [cancellation](rules/query-cancellation.md),
+  [network mode](rules/network-mode.md), [page parameters](rules/inf-page-params.md).
+- Only for SSR/persistence work: [dehydration](rules/ssr-dehydration.md),
+  [persistence](rules/persist-queries.md).
 
-- `qk-array-structure` — Always use arrays for query keys
-- `qk-include-dependencies` — Include all variables the query depends on
-- `qk-hierarchical-organization` — Organize keys hierarchically (entity → id → filters)
-- `qk-factory-pattern` — Use query key factories for complex applications
-- `qk-serializable` — Ensure all key parts are JSON-serializable
-
-### Caching (Prefix: `cache-`)
-
-- `cache-stale-time` — Set appropriate staleTime based on data volatility
-- `cache-gc-time` — Configure gcTime for inactive query retention
-- `cache-defaults` — Set sensible defaults at QueryClient level
-- `cache-invalidation` — Use targeted invalidation over broad patterns
-- `cache-placeholder-vs-initial` — Understand placeholder vs initial data differences
-
-### Mutations (Prefix: `mut-`)
-
-- `mut-invalidate-queries` — Always invalidate related queries after mutations
-- `mut-optimistic-updates` — Implement optimistic updates for responsive UI
-- `mut-rollback-context` — Provide rollback context from onMutate
-- `mut-error-handling` — Handle mutation errors gracefully
-- `mut-loading-states` — Use isPending for mutation loading states
-- `mut-mutation-state` — Use useMutationState for cross-component tracking
-
-### Error Handling (Prefix: `err-`)
-
-- `err-error-boundaries` — Use error boundaries with useQueryErrorResetBoundary
-- `err-retry-config` — Configure retry logic appropriately
-- `err-fallback-data` — Provide fallback data when appropriate
-
-### Prefetching (Prefix: `pf-`)
-
-- `pf-intent-prefetch` — Prefetch on user intent (hover, focus)
-- `pf-route-prefetch` — Prefetch data during route transitions
-- `pf-stale-time-config` — Set staleTime when prefetching
-- `pf-ensure-query-data` — Use ensureQueryData for conditional prefetching
-
-### Infinite Queries (Prefix: `inf-`)
-
-- `inf-page-params` — Always provide getNextPageParam
-- `inf-loading-guards` — Check isFetchingNextPage before fetching more
-- `inf-max-pages` — Consider maxPages for large datasets
-
-### SSR Integration (Prefix: `ssr-`)
-
-- `ssr-dehydration` — Use dehydrate/hydrate pattern for SSR
-- `ssr-client-per-request` — Create QueryClient per request
-- `ssr-stale-time-server` — Set higher staleTime on server
-- `ssr-hydration-boundary` — Wrap with HydrationBoundary
-
-### Parallel Queries (Prefix: `parallel-`)
-
-- `parallel-use-queries` — Use useQueries for dynamic parallel queries
-- `query-cancellation` — Implement query cancellation properly
-
-### Performance (Prefix: `perf-`)
-
-- `perf-select-transform` — Use select to transform/filter data
-- `perf-structural-sharing` — Leverage structural sharing
-- `perf-notify-change-props` — Limit re-renders with notifyOnChangeProps
-- `perf-placeholder-data` — Use placeholderData for instant UI
-
-### Offline Support (Prefix: `offline-`)
-
-- `network-mode` — Configure network mode for offline support
-- `persist-queries` — Configure query persistence for offline support
-
-## How to Use
-
-Each rule file in the `rules/` directory contains:
-1. **Explanation** — Why this pattern matters
-2. **Bad Example** — Anti-pattern to avoid
-3. **Good Example** — Recommended implementation
-4. **Context** — When to apply or skip this rule
-
-## Full Reference
-
-See individual rule files in `rules/` directory for detailed guidance and code examples.
+Project instructions take precedence over generic examples, especially feature ownership,
+render boundaries, loaders, and mutation settlement. Verify real cache behavior with the
+installed client; a typecheck alone cannot prove freshness or deduplication.

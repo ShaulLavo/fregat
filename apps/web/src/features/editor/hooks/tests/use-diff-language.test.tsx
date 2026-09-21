@@ -234,6 +234,7 @@ function createHostPolicyHarness() {
   const readFileContent = vi.fn(rejectUnexpectedFileAccess)
   const fileSync = new FileSyncService(store, queryClient, {
     readFileContent,
+    recreateFileContent: rejectUnexpectedFileAccess,
     writeFileContent: rejectUnexpectedFileAccess,
   })
   const service = new WorkspaceEditService({

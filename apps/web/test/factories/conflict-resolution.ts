@@ -151,6 +151,7 @@ export async function watchConflictResolutionEvents(
         ensureUnsyncedEditorDocument: documents.ensureUnsyncedEditorDocument,
         events: events.splice(0),
         forceReplaceLiveEditorDocument: documents.forceReplaceLiveEditorDocument,
+        setFileOrphaned: documents.setFileOrphaned,
         getLiveEditorDocument: documents.getLiveEditorDocument,
         isOwnWorkspaceEditEvent: fixture.isOwnEvent,
         openFilePaths: [fixture.path],

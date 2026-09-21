@@ -1,13 +1,18 @@
-import { Suspense, type ComponentProps } from 'react'
+import { useQuery } from '@tanstack/react-query'
+import type { ComponentProps } from 'react'
 
-import { LoadedSettingsPage } from '@/features/settings/components/loaded-page'
+import { ModuleLoadError } from '@/components/module-load-error'
+import type { SettingsPage } from '@/features/settings/components/page'
 import { PageLoading } from '@/features/settings/components/page-loading'
+import { settingsPageQueryOptions } from '@/features/settings/utils/page-query'
+import { primaryQueryClient } from '@/lib/environments/state/query-clients'
 
-/** The settings page behind its loading boundary, shared by the dialog and the settings tab. */
-export function DeferredSettingsPage(props: ComponentProps<typeof LoadedSettingsPage>) {
-  return (
-    <Suspense fallback={<PageLoading showJson={false} />}>
-      <LoadedSettingsPage {...props} />
-    </Suspense>
-  )
+export function DeferredSettingsPage(props: ComponentProps<typeof SettingsPage>) {
+  const query = useQuery(settingsPageQueryOptions, primaryQueryClient())
+  if (query.isPending) return <PageLoading showJson={false} />
+  if (query.isError)
+    return <ModuleLoadError label='settings' onRetry={() => void query.refetch()} />
+
+  const { SettingsPage: View } = query.data
+  return <View {...props} />
 }

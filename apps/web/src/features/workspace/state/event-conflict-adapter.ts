@@ -46,6 +46,7 @@ export type WorkspaceConflictContext = {
   getLiveEditorDocument: (key: DocumentKey) => LiveEditorDocument | null
   queryClient: QueryClient
   renameLiveEditorDocument: (from: FilesystemPath, to: FilesystemPath) => { wasDirty: boolean }
+  setFileOrphaned: (key: DocumentKey, orphaned: boolean) => boolean
   selectContent: (content: TabContent) => void
 }
 
@@ -59,11 +60,27 @@ export function notifyChangedFilesystemConflict(
   notifyFilesystemConflict(changedConflict(path, remoteFile, context), context)
 }
 
-export function notifyDeletedFilesystemConflict(
+export function markDeletedFilesystemDocument(
   path: FilesystemPath,
   context: WorkspaceConflictContext,
 ) {
-  notifyFilesystemConflict(deletedConflict(path, context), context)
+  context.setFileOrphaned(fileDocumentKey(path), true)
+  const conflict = Object.values(context.conflictStore.getState().conflicts).find(
+    (entry) => entry.remotePath === path,
+  )
+  if (!conflict) return
+  notifyFilesystemConflict(
+    {
+      ...conflict,
+      eventType: 'deleted',
+      localText: localConflictText(conflict.localPath, context),
+      remoteMtimeMs: null,
+      remoteSize: null,
+      remoteText: null,
+      remoteVersion: null,
+    },
+    context,
+  )
 }
 
 export async function notifyRenamedFilesystemConflict(
@@ -114,28 +131,10 @@ function changedConflict(
   }
 }
 
-function deletedConflict(
-  path: FilesystemPath,
-  context: WorkspaceConflictContext,
-): FilesystemConflict {
-  return {
-    eventType: 'deleted',
-    id: createConflictId(),
-    localPath: path,
-    localText: localConflictText(path, context),
-    remoteMtimeMs: null,
-    remotePath: path,
-    remoteSize: null,
-    remoteText: null,
-    remoteVersion: null,
-  }
-}
-
 function notifyFilesystemConflict(conflict: FilesystemConflict, context: WorkspaceConflictContext) {
   const current = matchingConflict(conflict, context)
   const next = current ? refreshedConflict(current, conflict) : conflict
   context.conflictStore.getState().addConflict(next)
-  if (current?.toastId) return
 
   const toastId = toast.custom(
     () =>
@@ -146,7 +145,7 @@ function notifyFilesystemConflict(conflict: FilesystemConflict, context: Workspa
         onOverrideRemote: () => void resolveConflict(next.id, 'remote', context),
         queryClient: context.queryClient,
       }),
-    { dismissible: false, duration: Infinity },
+    { id: current?.toastId, dismissible: false, duration: Infinity },
   )
   context.conflictStore.getState().updateConflict(next.id, { toastId })
 }

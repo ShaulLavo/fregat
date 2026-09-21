@@ -648,6 +648,7 @@ function liveDocument(
     sync: {
       fileVersion: `test:${mtimeMs}`,
       kind: 'file',
+      orphaned: false,
       mtimeMs,
       state: 'idle',
     },

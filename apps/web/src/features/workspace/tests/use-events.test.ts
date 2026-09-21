@@ -110,7 +110,7 @@ describe('planWorkspaceFilesystemEvents', () => {
     })
   })
 
-  it('plans discard and conflict operations for deleted open files', () => {
+  it('retains clean and dirty editors when files are deleted externally', () => {
     const plan = planWorkspaceFilesystemEvents({
       events: [{ path: 'repo/src', type: 'deleted' }],
       openFiles: [
@@ -121,8 +121,8 @@ describe('planWorkspaceFilesystemEvents', () => {
     })
 
     expect(plan.openFileOperations).toEqual([
-      { path: 'repo/src/a.ts', type: 'discard-open-file' },
-      { path: 'repo/src/b.ts', type: 'deleted-conflict' },
+      { path: 'repo/src/a.ts', reason: 'deleted', type: 'refresh-open-file' },
+      { path: 'repo/src/b.ts', reason: 'deleted', type: 'refresh-open-file' },
     ])
   })
 
@@ -463,6 +463,8 @@ describe('conflict resolution event reconciliation', () => {
       'repo',
       isOwnEvent,
     )
-    expect(plan.openFileOperations).toEqual([{ type: 'deleted-conflict', path: 'repo/a.ts' }])
+    expect(plan.openFileOperations).toEqual([
+      { type: 'refresh-open-file', reason: 'deleted', path: 'repo/a.ts' },
+    ])
   })
 })

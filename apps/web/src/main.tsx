@@ -1,8 +1,9 @@
 import { beginReloadBudget, prepareWithinReloadBudget } from '@/lib/reload-budget'
 import { loadEditorThemeForSelection } from '@/features/editor/state/color-theme-store'
 import { createBootstrap } from '@/state/bootstrap'
-import { loadSettingsPage } from '@/features/settings/state/load-page'
-import { loadTerminalPanel } from '@/features/terminal/state/load-panel'
+import { settingsPageQueryOptions } from '@/features/settings/utils/page-query'
+import { terminalPanelQueryOptions } from '@/features/terminal/utils/panel-query'
+import { primaryQueryClient } from '@/lib/environments/state/query-clients'
 import { systemColorMode } from '@/features/settings/state/system-color-mode'
 import { readSettingsMirror } from '@/lib/settings-boot-mirror'
 import { ApplicationBootstrap } from '@/components/application-bootstrap'
@@ -89,12 +90,12 @@ const restoredWorkspace = bootstrap
   .editor.workspaceStore.getState()
 const warmViews: Promise<unknown>[] = []
 if (restoredWorkspace?.selectedTabContent?.kind === 'settings')
-  warmViews.push(loadSettingsPage().catch(() => null))
+  warmViews.push(primaryQueryClient().prefetchQuery(settingsPageQueryOptions))
 if (
   restoredWorkspace?.workbenchPanels.bottomPanelOpen &&
   restoredWorkspace.workbenchPanels.activeBottomTab === 'terminal'
 )
-  warmViews.push(loadTerminalPanel().catch(() => null))
+  warmViews.push(primaryQueryClient().prefetchQuery(terminalPanelQueryOptions))
 if (restoredWorkspace)
   warmViews.push(
     loadEditorThemeForSelection(
@@ -127,10 +128,10 @@ createRoot(document.getElementById('root')!, {
 )
 
 // After the first frame, so opening a terminal or settings never waits on the
-// network. A failed prefetch is silent: the boundary retries when the pane opens.
+// network. A failed prefetch is silent: the query retries when the pane opens.
 const prefetchDeferredChunks = () => {
-  loadTerminalPanel().catch(() => {})
-  loadSettingsPage().catch(() => {})
+  void primaryQueryClient().prefetchQuery(terminalPanelQueryOptions)
+  void primaryQueryClient().prefetchQuery(settingsPageQueryOptions)
 }
 if ('requestIdleCallback' in window) window.requestIdleCallback(prefetchDeferredChunks)
 else setTimeout(prefetchDeferredChunks, 2000)

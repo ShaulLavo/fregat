@@ -1,6 +1,6 @@
 # Processes, leases and dev plumbing each get an owner
 
-Status: **PROPOSED — PHASE 1 FIRST; D4 NEEDS THE OWNER'S ANSWER.** Requested 2026-09-21. Inspected
+Status: **PROPOSED — PHASE 1 FIRST; D4 DECIDED 2026-09-21: DELETE THE MIGRATIONS.** Requested 2026-09-21. Inspected
 at Platform `d1ca6472`. Covers `apps/desktop`, `apps/tui`, `apps/server` outside the provider
 adapters ([plan 131](131-provider-codes-not-prose.md)), `apps/web/vite.config.ts` and `scripts/`.
 
@@ -41,11 +41,10 @@ document at import and is kept alive by a sentinel export.
 - D3: item 3 stops crossing the app boundary through a file. The dev server learns about
   app-originated saves over the server's existing channel, and `vite.config.ts` stops importing
   `apps/server/src/**`.
-- D4 (**owner**): `apps/server/src/db/migrations.ts` holds ten migrations and squashes history below
-  version 11. `CLAUDE.md` says no migration or healing code. Either session and chat data is worth
-  preserving, in which case the rule gets a stated exception, or the database is recreated on a
-  schema change and the ledger is deleted. The migration code itself is careful; this is a policy
-  question, not a defect.
+- D4 (decided by the owner, 2026-09-21): delete the migrations and start from scratch.
+  `apps/server/src/db/migrations.ts` holds ten migrations (versions 11 to 20) and squashes history
+  below 11, against the rule in `CLAUDE.md` that this project carries no migration or healing code.
+  Nothing in the database is worth a ledger. Phase 4 does it.
 
 ## Phase 1 — stop killing and stop hiding (items 1, 2, 4)
 
@@ -66,6 +65,24 @@ Ancestry through the ppid chain instead of executable names. A window handle fro
 into the FFI call. Terminal state restored by query or a documented reset, with each surviving mode
 commented. Name the repaint constants, or replay stored scrollback instead of poking the app. A
 supported terminal namespace parameter so the harness asks instead of intercepting.
+
+## Phase 4 — one schema, no ledger (D4)
+
+`migrations.ts` (511 lines) becomes one function that creates the current schema, which is what
+versions 11 to 20 add up to. Delete the `Migration` type, the `platformMigrations` list, the
+`schema_migrations` table and its Drizzle definition in `db/schema.ts`, and the
+`DELETE … WHERE version < 11` squash. The three callers (`app.ts`, `fs/metadata.ts`,
+`orchestration/engine.ts`) call the schema function instead. Delete the migration tests that pin
+upgrade behaviour; keep or add one that a fresh database has every table the code reads.
+
+A database written by an older schema is not repaired. The server stamps the schema with a single
+number (`PRAGMA user_version`), and on a mismatch fails at boot with a structured error whose `fix`
+names the file to delete. That is detection, not healing, and it is the rule's own instruction:
+"delete the bad state, or tell the user what to delete". A schema change from then on bumps the
+number.
+
+Landing this means deleting the dev and mesh databases once. Sessions, chat history and terminal
+history in them are lost; say so in the deploy reason.
 
 ## Verification
 

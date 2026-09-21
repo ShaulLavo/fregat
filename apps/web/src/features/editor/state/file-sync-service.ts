@@ -64,6 +64,11 @@ export type FileSyncPorts = {
   readonly assertWritable?: () => void
   readonly inspectPath?: (path: FilesystemPath, signal: AbortSignal) => Promise<StatResult>
   readonly readFileContent: (path: FilesystemPath, signal: AbortSignal) => Promise<FileResult>
+  readonly recreateFileContent: (
+    path: FilesystemPath,
+    content: string,
+    identity: { origin: string; writeId: string },
+  ) => Promise<StatResult>
   readonly writeFileContent: FileSyncWriteFileContent
   readonly workspaceMutations?: WorkspaceMutationTransport
 }
@@ -213,12 +218,14 @@ export class FileSyncService {
     const savedContentRevision = document.contentRevision
     // Issued, not random, so the watcher echo of this write classifies as ours.
     const writeId = this.issueWriteId()
-    const entry = await this.ports.writeFileContent(path, text, {
-      baseVersion: sync.fileVersion,
-      expectedMtimeMs: sync.mtimeMs,
-      origin: 'editor',
-      writeId,
-    })
+    const identity = { origin: 'editor', writeId }
+    const entry = sync.orphaned
+      ? await this.ports.recreateFileContent(path, text, identity)
+      : await this.ports.writeFileContent(path, text, {
+          baseVersion: sync.fileVersion,
+          expectedMtimeMs: sync.mtimeMs,
+          ...identity,
+        })
     const file = fileResultForSavedDocument(path, text, entry)
 
     this.documentStore.getState().markLiveEditorDocumentSaved({

@@ -21,6 +21,7 @@ describe('EditorSaveService', () => {
     createEditorBufferSession(document.buffer).applyText('!')
     const writes: string[] = []
     const fileSync = new FileSyncService(store, queryClient, {
+      recreateFileContent: () => Promise.reject('Unexpected file recreation'),
       readFileContent: async () => file('unused', '', 0),
       writeFileContent: async (path, content) => {
         writes.push(content)
@@ -62,6 +63,7 @@ describe('EditorSaveService', () => {
     const writes: string[] = []
     let mtime = 100
     const fileSync = new FileSyncService(store, queryClient, {
+      recreateFileContent: () => Promise.reject('Unexpected file recreation'),
       readFileContent: async () => file('unused', '', 0),
       writeFileContent: async (path, content) => {
         writes.push(content)

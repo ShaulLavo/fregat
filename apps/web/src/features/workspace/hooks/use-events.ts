@@ -3,12 +3,7 @@ import { startWorkspaceEventStreams } from '@/features/workspace/state/event-str
 import { startPageSubscription } from '@/lib/state/page-subscription'
 import { entryFromResponse } from '@/lib/file-system-types'
 import type { PickedFsEntry } from '@/lib/file-system-types'
-import {
-  fileDocument,
-  fileDocumentKey,
-  fileResource,
-  filesystemPath,
-} from '@/lib/documents/utils/identity'
+import { fileDocumentKey, filesystemPath } from '@/lib/documents/utils/identity'
 import { filePathsForTabs } from '@/lib/documents/utils/capabilities'
 import type {
   DocumentKey,
@@ -55,8 +50,8 @@ import {
 } from '@/features/workspace/utils/event-model'
 import {
   dismissFilesystemConflicts,
+  markDeletedFilesystemDocument,
   notifyChangedFilesystemConflict,
-  notifyDeletedFilesystemConflict,
   notifyRenamedFilesystemConflict,
   type WorkspaceConflictContext,
 } from '@/features/workspace/state/event-conflict-adapter'
@@ -113,6 +108,7 @@ export function useWorkspaceEvents(rootFolder: PickedFsEntry | null) {
         events,
         forceReplaceLiveEditorDocument: documentState.forceReplaceLiveEditorDocument,
         getLiveEditorDocument: documentState.getLiveEditorDocument,
+        setFileOrphaned: documentState.setFileOrphaned,
         isOwnWorkspaceEditEvent,
         openFilePaths: filePathsForTabs(workspaceState.openTabContents),
         queryClient,
@@ -148,6 +144,7 @@ export function useWorkspaceEvents(rootFolder: PickedFsEntry | null) {
         ensureUnsyncedEditorDocument: documentState.ensureUnsyncedEditorDocument,
         forceReplaceLiveEditorDocument: documentState.forceReplaceLiveEditorDocument,
         getLiveEditorDocument: documentState.getLiveEditorDocument,
+        setFileOrphaned: documentState.setFileOrphaned,
         openFilePaths: readyFiles ?? filePathsForTabs(workspaceState.openTabContents),
         queryClient,
         renameLiveEditorDocument,
@@ -375,6 +372,7 @@ async function applyWorkspaceEventPlan({
   ensureUnsyncedEditorDocument,
   forceReplaceLiveEditorDocument,
   getLiveEditorDocument,
+  setFileOrphaned,
   ignoreOpenFileRefreshErrors = false,
   plan,
   queryClient,
@@ -390,6 +388,7 @@ async function applyWorkspaceEventPlan({
   ensureUnsyncedEditorDocument: WorkspaceConflictContext['ensureUnsyncedEditorDocument']
   forceReplaceLiveEditorDocument: (file: FileResult) => { wasDirty: boolean }
   getLiveEditorDocument: (key: DocumentKey) => LiveEditorDocument | null
+  setFileOrphaned: WorkspaceConflictContext['setFileOrphaned']
   ignoreOpenFileRefreshErrors?: boolean
   plan: WorkspaceEventPlan
   queryClient: ReturnType<typeof useQueryClient>
@@ -408,6 +407,7 @@ async function applyWorkspaceEventPlan({
     fetchFile: (path, signal) => fetchFileWithRetry(path, signal, client),
     forceReplaceLiveEditorDocument,
     getLiveEditorDocument,
+    setFileOrphaned,
     queryClient,
     renameLiveEditorDocument,
     selectContent,
@@ -598,16 +598,8 @@ async function applyOpenFileOperation({
   queryClient: ReturnType<typeof useQueryClient>
   signal: AbortSignal
 }) {
-  if (operation.type === 'discard-open-file') {
-    applyDiscardOpenFileOperation(operation.path, conflictContext)
-    return
-  }
   if (operation.type === 'rename-open-file') {
     applyRenameOpenFileOperation(operation.from, operation.to, conflictContext)
-    return
-  }
-  if (operation.type === 'deleted-conflict') {
-    applyDeletedConflictOperation(operation.path, conflictContext)
     return
   }
   if (operation.type === 'renamed-conflict') {
@@ -648,16 +640,27 @@ async function applyRefreshOpenFileOperation({
   if (signal.aborted) return
 
   const cached = queryClient.getQueryData<FileResult>(fileSystemKeys.fileSnapshot(path))
-  const file = await queryClient.fetchQuery({
-    ...fileSnapshotQueryOptions(filesystemPath(path), {
-      fetcher: (path, signal) =>
-        fetchFileWithRetry(path, signal, clientForQueryClient(queryClient)),
-    }),
-    // fetchFileWithRetry retries internally; query-level retry would stack.
-    retry: false,
-    ...(mayTrustCachedSnapshot(refresh, cached?.version) ? {} : { staleTime: 0 }),
-  })
-  if (signal.aborted) return
+  const file = await queryClient
+    .fetchQuery({
+      ...fileSnapshotQueryOptions(filesystemPath(path), {
+        fetcher: (path, signal) => {
+          const client = clientForQueryClient(queryClient)
+          if (refresh.reason === 'deleted') return fetchFile(path, signal, client)
+          return fetchFileWithRetry(path, signal, client)
+        },
+      }),
+      // fetchFileWithRetry retries internally; query-level retry would stack.
+      retry: false,
+      ...(mayTrustCachedSnapshot(refresh, cached?.version) ? {} : { staleTime: 0 }),
+    })
+    .catch((error: unknown) => {
+      if (signal.aborted) return null
+      if (toClientError(error).category !== 'not_found') throw error
+      markDeletedFilesystemDocument(filesystemPath(path), conflictContext)
+      return null
+    })
+  if (signal.aborted || !file) return
+  conflictContext.setFileOrphaned(fileDocumentKey(filesystemPath(path)), false)
 
   setFileSnapshotQueryData(queryClient, file)
   const operation = planFetchedOpenFileRefresh({
@@ -685,23 +688,10 @@ function applyFetchedOpenFileOperation(
   if (result.wasDirty && operation.notifyDirtyOverwrite) notifyDirtyOverwrite(operation.path)
 }
 
-function applyDiscardOpenFileOperation(path: string, context: WorkspaceConflictContext) {
-  const result = context.discardLiveEditorDocument(fileDocument(fileResource(filesystemPath(path))))
-  context.queryClient.removeQueries({
-    exact: true,
-    queryKey: fileSystemKeys.fileSnapshot(path),
-  })
-  if (result.wasDirty) notifyDirtyOverwrite(path)
-}
-
 function applyRenameOpenFileOperation(from: string, to: string, context: WorkspaceConflictContext) {
   const result = context.renameLiveEditorDocument(filesystemPath(from), filesystemPath(to))
   moveFileQueryData(context.queryClient, from, to)
   if (result.wasDirty) notifyDirtyOverwrite(from)
-}
-
-function applyDeletedConflictOperation(path: string, context: WorkspaceConflictContext) {
-  notifyDeletedFilesystemConflict(filesystemPath(path), context)
 }
 
 async function applyRenamedConflictOperation(

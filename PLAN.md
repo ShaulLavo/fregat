@@ -424,7 +424,7 @@ Suggested order:
 2. [E047](../Editor/plans/e047-point-and-row-queries.md), then
    [Plan 130](plans/130-ask-the-editor.md) Phases 1 and 4. One point query in the Editor removes the
    search-result row arithmetic, the unicode hover's marker scan and the residue in `diffRowAtEvent`.
-   Plan 130 Phase 2 needs nothing and can go at any time.
+   Plan 130 Phase 2 is implemented and verified; the remaining phases need Editor APIs.
 3. [E048](../Editor/plans/e048-minimap-document-space.md) and
    [E051](../Editor/plans/e051-fast-path-equivalence.md). The minimap repeats the display-row bug,
    and the row-layout fast path has no equivalence test.
@@ -432,9 +432,22 @@ Suggested order:
 5. [E050](../Editor/plans/e050-host-obligations-into-api.md) row by row, each unlocking its Plan 130
    Phase 5 item.
 
-Two questions are the owner's: whether the server's migration ledger is a stated exception to the
-no-migration rule (Plan 132 D4), and whether overwriting unsaved edits on a disk change is fixed
-inside Plan 133 or gets its own conflict plan (Plan 133 D1). No lane is reordered by this one.
+The owner decided Plan 132 D4 on 2026-09-21: the server's migrations are deleted and the schema
+starts from scratch (Plan 132 Phase 4). External-change
+and dirty-buffer safety from Plan 133 D1 are now owned by Plan 134 below. No lane is reordered
+by this one.
+
+## External edits and language-server freshness
+
+[Plan 134](plans/134-external-edit-and-lsp-freshness.md) owns the investigation and repair of
+external file synchronization, language-server filesystem watches, and recovery after event gaps.
+It starts from measured failures in native TypeScript dependency refresh and symlinked-file updates.
+Run its reproduction and tracing phase first, then document synchronization, backend watcher support,
+and reconnect recovery, followed by verification against the running deployment.
+
+Plan 134 also owns the dirty-buffer safety verification raised by Plan 133 D1. Reconcile the audit
+with the existing conflict implementation before adding any new conflict machinery. Coordinate
+backend lifetime changes with Plan 132. This work is independent of the AI diagnostic action plan.
 
 ## Verification boundaries
 

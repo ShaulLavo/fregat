@@ -58,6 +58,7 @@ type LiveDocumentSync =
   | {
       fileVersion: string
       kind: 'file'
+      orphaned: boolean
       mtimeMs: number
       state: LiveDocumentSyncState
     }
@@ -268,7 +269,7 @@ export class WorkspaceDocumentService {
     const document = this.liveDocumentsByKey.get(documentKey)
     if (!document) return false
     if (this.isDirtyDocument(documentKey)) return true
-    if (document.sync.kind !== 'file') return true
+    if (document.sync.kind !== 'file' || document.sync.orphaned) return true
 
     const resource = filesystemResource(document.target)
     return !resource || !this.pathsAvailable([resource.path], null)
@@ -840,6 +841,14 @@ export class WorkspaceDocumentService {
     return this.liveDocumentsByKey.has(documentKey)
   }
 
+  setFileOrphaned(documentKey: DocumentKey, orphaned: boolean): boolean {
+    const document = this.liveDocumentsByKey.get(documentKey)
+    if (!document || document.sync.kind !== 'file') return false
+    if (document.sync.orphaned === orphaned) return false
+    this.setLiveDocument({ ...document, sync: { ...document.sync, orphaned } })
+    return true
+  }
+
   markSaved({
     fileVersion,
     documentKey,
@@ -859,7 +868,7 @@ export class WorkspaceDocumentService {
 
     return this.applySaved(
       document,
-      { ...document.sync, fileVersion, mtimeMs, state: 'idle' },
+      { ...document.sync, fileVersion, mtimeMs, orphaned: false, state: 'idle' },
       savedContentRevision,
       savedText,
     )
@@ -1180,6 +1189,7 @@ export class WorkspaceDocumentService {
       sync: {
         fileVersion: file.version,
         kind: 'file',
+        orphaned: false,
         mtimeMs: file.mtimeMs,
         state: 'idle',
       },
@@ -1218,6 +1228,7 @@ export class WorkspaceDocumentService {
       sync: {
         fileVersion: file.version,
         kind: 'file',
+        orphaned: false,
         mtimeMs: file.mtimeMs,
         state: 'idle',
       },

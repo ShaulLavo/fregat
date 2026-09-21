@@ -545,6 +545,8 @@ export const selectors = {
   paletteInput: (page: Page) => page.locator('[data-slot="command-input"]').first(),
   paletteOptions: (page: Page) => page.locator('[data-slot="command-list"]').getByRole('option'),
   selectedPaletteOption: (page: Page) => page.locator('[cmdk-item][data-selected="true"]'),
+  settingsLoading: (page: Page) =>
+    page.getByRole('status', { name: 'Loading settings', exact: true }),
   settingsModelsLoading: (page: Page) => page.getByRole('status', { name: 'Loading models' }),
   settingsNoModels: (page: Page) => page.getByText('No models are available yet.'),
   paletteScriptsLoading: (page: Page) => page.getByRole('status', { name: 'Loading scripts' }),

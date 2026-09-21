@@ -3,7 +3,6 @@ import type { ReactEditorController } from '@singapore-editor/react'
 import { useEffect, useRef } from 'react'
 
 import type { EditorRenderDocument } from '@/features/editor/utils/render-document'
-import { rowStartOffset } from '@/features/editor/utils/position'
 
 type UseCommitMessageEditorFocusOptions = {
   controller: ReactEditorController
@@ -27,7 +26,7 @@ export function useCommitMessageEditorFocus({
     if (preparedPathRef.current === path) return
 
     preparedPathRef.current = path
-    const offset = rowStartOffset(document.buffer.getTextSnapshot(), 1)
+    const offset = document.buffer.getTextSnapshot().lineStart(1)
     editor.setSelection(offset, offset, offset)
     editor.focus()
   }, [controller, document])

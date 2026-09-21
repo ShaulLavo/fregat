@@ -70,6 +70,7 @@ test('Compare on the conflict toast opens the conflict editor in its own tab', a
           getLiveEditorDocument: documentState.getLiveEditorDocument,
           queryClient,
           renameLiveEditorDocument: commands.renameLiveEditorDocument,
+          setFileOrphaned: documentState.setFileOrphaned,
           selectContent: commands.selectContent,
         },
       ),
