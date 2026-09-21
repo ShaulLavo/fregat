@@ -14,6 +14,9 @@ const toastThemeStyle = {
   // The lg step (D1: a toast is a floating surface). Spelled `--radius` because
   // the radius scale is `@theme inline`, which emits no custom properties.
   '--border-radius': 'var(--radius)',
+  // A description carries a server message and its fix; the 356px default
+  // leaves ~190px of text beside the action buttons, which shreds a setting key.
+  '--width': '440px',
   // Oklab tints toward each status color without rotating the popover's hue.
   '--error-bg': 'color-mix(in oklab, var(--destructive) 12%, var(--popover-solid))',
   '--error-border': 'color-mix(in oklab, var(--destructive) 45%, transparent)',
@@ -33,6 +36,10 @@ const toastThemeStyle = {
 // to its built-in toast shadow; `!` is what makes the D6 step stick.
 const TOAST_SURFACE_CLASS = 'shadow-md!'
 
+// Descriptions carry values the app did not author — a setting key, a path, a
+// branch. Sonner only sets `word-break`, which splits those mid-token.
+const TOAST_DESCRIPTION_CLASS = '[overflow-wrap:anywhere]'
+
 export function Toaster({
   className,
   closeButton = true,
@@ -51,7 +58,11 @@ export function Toaster({
       theme={theme}
       toastOptions={{
         ...toastOptions,
-        classNames: { toast: TOAST_SURFACE_CLASS, ...toastOptions?.classNames },
+        classNames: {
+          description: TOAST_DESCRIPTION_CLASS,
+          toast: TOAST_SURFACE_CLASS,
+          ...toastOptions?.classNames,
+        },
       }}
       {...props}
     />

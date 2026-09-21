@@ -81,7 +81,10 @@ export function decideWorktreeCommand(
   if (existing && !existing.retiredAt) return []
   if (existing) requireWorktreeRevival(command, model, existing.retirementSequence)
   if (!existing && command.type === 'worktree.revive')
-    throw sessionDomainErrors.WORKTREE_NOT_FOUND(command)
+    throw sessionDomainErrors.WORKTREE_NOT_FOUND({
+      worktreeId: command.worktreeId,
+      internal: { commandType: command.type, projectId: command.projectId },
+    })
   requireCurrentWorktreeAvailable(command, model)
   return one(command, at, existing ? 'worktree.revived' : 'worktree.registered', {
     worktreeId: command.worktreeId,
@@ -107,7 +110,15 @@ function requireProviderOwnershipReleased(
     if (model.worktrees.get(session.worktreeId)?.projectId !== projectId) continue
     const stop = session.deletion?.providerStop
     if (session.deletedAt && (stop === 'completed' || stop === 'no-binding')) continue
-    throw sessionDomainErrors.REGISTRATION_BUSY({ projectId })
+    throw sessionDomainErrors.REGISTRATION_BUSY({
+      projectId,
+      internal: {
+        worktreeId: worktreeId ?? null,
+        busySessionId: session.id,
+        deletedAt: session.deletedAt,
+        providerStop: stop ?? null,
+      },
+    })
   }
 }
 
@@ -120,12 +131,28 @@ function requireRegistrationIdentity(command: Registration, model: Orchestration
       existing.repositoryIdentity.source !== command.repositoryIdentity.source ||
       existing.repositoryIdentity.canonical !== command.repositoryIdentity.canonical)
   ) {
-    throw sessionDomainErrors.IDENTITY_COLLISION({ id: command.projectId })
+    throw sessionDomainErrors.IDENTITY_COLLISION({
+      id: command.projectId,
+      internal: {
+        collision: 'project-identity',
+        observed: {
+          repositoryKind: existing?.repositoryKind,
+          source: existing?.repositoryIdentity.source,
+        },
+        expected: {
+          repositoryKind: command.repositoryKind,
+          source: command.repositoryIdentity.source,
+        },
+      },
+    })
   }
   for (const project of model.projects.values()) {
     if (project.deletedAt || project.id === command.projectId) continue
     if (project.repositoryKey !== command.repositoryKey) continue
-    throw sessionDomainErrors.IDENTITY_COLLISION({ id: command.projectId })
+    throw sessionDomainErrors.IDENTITY_COLLISION({
+      id: command.projectId,
+      internal: { collision: 'repository-key', heldBy: project.id },
+    })
   }
   requireCheckoutIdentity(command, model)
 }
@@ -139,12 +166,22 @@ function requireCheckoutIdentity(
     existing &&
     (existing.canonicalPath !== command.canonicalPath || existing.projectId !== command.projectId)
   ) {
-    throw sessionDomainErrors.IDENTITY_COLLISION({ id: command.worktreeId })
+    throw sessionDomainErrors.IDENTITY_COLLISION({
+      id: command.worktreeId,
+      internal: {
+        collision: 'checkout-identity',
+        observedProjectId: existing?.projectId,
+        expectedProjectId: command.projectId,
+      },
+    })
   }
   for (const worktree of model.worktrees.values()) {
     if (worktree.retiredAt || worktree.id === command.worktreeId) continue
     if (worktree.canonicalPath !== command.canonicalPath) continue
-    throw sessionDomainErrors.WORKTREE_PATH_TAKEN({ worktreeId: worktree.id })
+    throw sessionDomainErrors.WORKTREE_PATH_TAKEN({
+      worktreeId: worktree.id,
+      internal: { requestedWorktreeId: command.worktreeId, projectId: worktree.projectId },
+    })
   }
 }
 
@@ -154,7 +191,16 @@ function requireWorktreeRevival(
   sequence: number | null,
 ) {
   if (command.type !== 'worktree.revive' || command.retirementSequence !== sequence) {
-    throw sessionDomainErrors.IDENTITY_COLLISION({ id: command.worktreeId })
+    throw sessionDomainErrors.IDENTITY_COLLISION({
+      id: command.worktreeId,
+      internal: {
+        collision: 'revival',
+        commandType: command.type,
+        retirementSequence: sequence,
+        confirmedSequence:
+          command.type === 'worktree.revive' ? command.retirementSequence : undefined,
+      },
+    })
   }
   requireProviderOwnershipReleased(model, command.projectId, command.worktreeId)
 }
@@ -171,6 +217,9 @@ function requireCurrentWorktreeAvailable(
       worktree.kind !== 'current'
     )
       continue
-    throw sessionDomainErrors.IDENTITY_COLLISION({ id: command.worktreeId })
+    throw sessionDomainErrors.IDENTITY_COLLISION({
+      id: command.worktreeId,
+      internal: { collision: 'current-worktree', heldBy: worktree.id, kind: worktree.kind },
+    })
   }
 }

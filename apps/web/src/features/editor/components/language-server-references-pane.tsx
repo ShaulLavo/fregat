@@ -93,7 +93,7 @@ export function LanguageServerReferencesPane({
       title='References'
       detail={<TickerNumber value={references.targets.length} />}
       aria-label='References'
-      className='bg-background h-full'
+      className='h-full'
       bodyClassName='py-1'
       bodyProps={
         groups.length > 0

@@ -1,7 +1,7 @@
 import { toast } from 'sonner'
 
 import { clientErrorMetadata } from '@/lib/client-error-context'
-import { toClientError } from '@/lib/client-error-taxonomy'
+import { clientErrorDescription, toClientError } from '@/lib/client-error-taxonomy'
 import { reportClientError } from '@/lib/client-error-reporting'
 
 export function createMutationErrorNotifier({ area, title }: { area: string; title: string }) {
@@ -20,6 +20,6 @@ export function createMutationErrorNotifier({ area, title }: { area: string; tit
 
     if (clientError.category === 'unknown') return
 
-    toast.error(title, { description: clientError.message })
+    toast.error(title, { description: clientErrorDescription(clientError) })
   }
 }

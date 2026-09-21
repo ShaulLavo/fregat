@@ -53,7 +53,11 @@ export async function collectWorkspaceSearch(
 
   // No terminal field is defaulted: a defaulted `truncated: false` reads as a
   // finished run. Belt-and-braces — the producer already throws without `done`.
-  if (!done) throw clientErrors.SEARCH_INCOMPLETE({ matchCount: matches.length })
+  if (!done)
+    throw clientErrors.SEARCH_INCOMPLETE({
+      matchCount: matches.length,
+      internal: { at: 'collect' },
+    })
 
   return {
     count: done.count,
@@ -76,7 +80,11 @@ export async function* streamWorkspaceSearch(
     query: workspaceSearchRequestQuery(query),
     fetch: { signal },
   })
-  if (response.error) throw clientErrors.SEARCH_FAILED({ status: response.status })
+  if (response.error)
+    throw clientErrors.SEARCH_FAILED({
+      status: response.status,
+      internal: { matchMode: query.matchMode, caseSensitive: query.caseSensitive === true },
+    })
   if (!response.data) throw clientErrors.EDEN_STREAM_MISSING({ label: 'Search' })
 
   let matchCount = 0
@@ -93,7 +101,7 @@ export async function* streamWorkspaceSearch(
 
   // Throwing, not returning: `for await` discards a generator's return value with
   // no diagnostic, so a consumer's catch is the only enforceable handoff.
-  if (!terminated) throw clientErrors.SEARCH_INCOMPLETE({ matchCount })
+  if (!terminated) throw clientErrors.SEARCH_INCOMPLETE({ matchCount, internal: { at: 'stream' } })
 }
 
 function workspaceSearchRequestQuery(query: WorkspaceSearchQuery) {
@@ -121,15 +129,24 @@ function workspaceSearchEventFromSse(event: EdenSseEvent): WorkspaceSearchEvent 
   if (event.event === 'warning') return warningEventFromData(event.data)
   if (event.event === 'done') return doneEventFromData(event.data)
   if (event.event === 'error') {
-    throw clientErrors.SEARCH_EVENT_ERROR({ message: searchEventError(event.data) })
+    throw clientErrors.SEARCH_EVENT_ERROR({
+      message: searchEventError(event.data),
+      internal: { at: 'sse-error-event' },
+    })
   }
 
-  throw clientErrors.UNEXPECTED_SEARCH_EVENT({ event: event.event })
+  throw clientErrors.UNEXPECTED_SEARCH_EVENT({
+    event: event.event,
+    internal: { known: ['match', 'warning', 'done', 'error'] },
+  })
 }
 
 function matchEvent(data: unknown): WorkspaceSearchEvent {
   const match = searchEventMatch(data)
-  if (!match) throw clientErrors.SEARCH_MATCH_INVALID()
+  if (!match)
+    throw clientErrors.SEARCH_MATCH_INVALID({
+      internal: { fields: isRecord(data) ? Object.keys(data) : typeof data },
+    })
 
   return { match, type: 'match' }
 }
@@ -169,11 +186,19 @@ function warningCode(value: unknown): WorkspaceSearchWarningCode {
 // default a missing one to 0/''/false, so `{}` would otherwise read as a
 // complete, untruncated, empty run — the fabrication this exists to reject.
 function doneEventFromData(data: unknown): WorkspaceSearchDoneEvent {
-  if (!isRecord(data)) throw clientErrors.SEARCH_DONE_INVALID()
-  if (typeof data.count !== 'number') throw clientErrors.SEARCH_DONE_INVALID()
-  if (typeof data.path !== 'string') throw clientErrors.SEARCH_DONE_INVALID()
-  if (typeof data.query !== 'string') throw clientErrors.SEARCH_DONE_INVALID()
-  if (typeof data.truncated !== 'boolean') throw clientErrors.SEARCH_DONE_INVALID()
+  // Naming the field is the whole point: a `done` event that fabricates an empty
+  // finished run is indistinguishable from a real one without it.
+  if (!isRecord(data))
+    throw clientErrors.SEARCH_DONE_INVALID({ internal: { missing: 'object', saw: typeof data } })
+  const fields = Object.keys(data)
+  if (typeof data.count !== 'number')
+    throw clientErrors.SEARCH_DONE_INVALID({ internal: { missing: 'count', fields } })
+  if (typeof data.path !== 'string')
+    throw clientErrors.SEARCH_DONE_INVALID({ internal: { missing: 'path', fields } })
+  if (typeof data.query !== 'string')
+    throw clientErrors.SEARCH_DONE_INVALID({ internal: { missing: 'query', fields } })
+  if (typeof data.truncated !== 'boolean')
+    throw clientErrors.SEARCH_DONE_INVALID({ internal: { missing: 'truncated', fields } })
 
   return {
     count: data.count,

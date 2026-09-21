@@ -1,19 +1,31 @@
+/**
+ * Every git mutation carries its repository root right after the prefix, so a
+ * panel can watch only its own repository. A chat session's worktree is its own
+ * root: its failures must not surface in the project's git panel.
+ */
+export const gitMutationScope = (rootPath: string) => ['git', 'mutation', rootPath] as const
+
 export const mutationKeys = {
-  checkout: (rootPath: string) => ['git', 'mutation', 'checkout', rootPath] as const,
-  commit: (rootPath: string) => ['git', 'mutation', 'commit', rootPath] as const,
-  createBranch: (rootPath: string) => ['git', 'mutation', 'create-branch', rootPath] as const,
-  discard: (path: string) => ['git', 'mutation', 'discard', path] as const,
-  discardMany: (paths: readonly string[]) => ['git', 'mutation', 'discard-many', ...paths] as const,
-  discardStagedMany: (paths: readonly string[]) =>
-    ['git', 'mutation', 'discard-staged-many', ...paths] as const,
-  fetch: (rootPath: string) => ['git', 'mutation', 'fetch', rootPath] as const,
-  pull: (rootPath: string) => ['git', 'mutation', 'pull', rootPath] as const,
+  checkout: (rootPath: string) => ['git', 'mutation', rootPath, 'checkout'] as const,
+  commit: (rootPath: string) => ['git', 'mutation', rootPath, 'commit'] as const,
+  createBranch: (rootPath: string) => ['git', 'mutation', rootPath, 'create-branch'] as const,
   createPullRequest: (rootPath: string) =>
-    ['git', 'mutation', 'create-pull-request', rootPath] as const,
-  push: (rootPath: string) => ['git', 'mutation', 'push', rootPath] as const,
-  sync: (rootPath: string) => ['git', 'mutation', 'sync', rootPath] as const,
-  stage: (path: string) => ['git', 'mutation', 'stage', path] as const,
-  stageMany: (paths: readonly string[]) => ['git', 'mutation', 'stage-many', ...paths] as const,
-  unstage: (path: string) => ['git', 'mutation', 'unstage', path] as const,
-  unstageMany: (paths: readonly string[]) => ['git', 'mutation', 'unstage-many', ...paths] as const,
+    ['git', 'mutation', rootPath, 'create-pull-request'] as const,
+  discard: (rootPath: string, path: string) =>
+    ['git', 'mutation', rootPath, 'discard', path] as const,
+  discardMany: (rootPath: string, paths: readonly string[]) =>
+    ['git', 'mutation', rootPath, 'discard-many', ...paths] as const,
+  discardStagedMany: (rootPath: string, paths: readonly string[]) =>
+    ['git', 'mutation', rootPath, 'discard-staged-many', ...paths] as const,
+  fetch: (rootPath: string) => ['git', 'mutation', rootPath, 'fetch'] as const,
+  pull: (rootPath: string) => ['git', 'mutation', rootPath, 'pull'] as const,
+  push: (rootPath: string) => ['git', 'mutation', rootPath, 'push'] as const,
+  stage: (rootPath: string, path: string) => ['git', 'mutation', rootPath, 'stage', path] as const,
+  stageMany: (rootPath: string, paths: readonly string[]) =>
+    ['git', 'mutation', rootPath, 'stage-many', ...paths] as const,
+  sync: (rootPath: string) => ['git', 'mutation', rootPath, 'sync'] as const,
+  unstage: (rootPath: string, path: string) =>
+    ['git', 'mutation', rootPath, 'unstage', path] as const,
+  unstageMany: (rootPath: string, paths: readonly string[]) =>
+    ['git', 'mutation', rootPath, 'unstage-many', ...paths] as const,
 }

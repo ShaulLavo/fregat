@@ -9,7 +9,10 @@ export function parseHistoryCommits(output: string): Omit<GitCommitDetails, 'fil
   if (!output) return []
   const fields = output.split('\0')
   if (fields.at(-1) === '') fields.pop()
-  if (fields.length % 7 !== 0) throw historyErrors.HISTORY_OUTPUT_INVALID()
+  if (fields.length % 7 !== 0)
+    throw historyErrors.HISTORY_OUTPUT_INVALID({
+      internal: { at: 'commit-fields', fieldCount: fields.length, perCommit: 7 },
+    })
   const commits: Omit<GitCommitDetails, 'files'>[] = []
   for (let index = 0; index < fields.length; index += 7) {
     const [
@@ -27,7 +30,15 @@ export function parseHistoryCommits(output: string): Omit<GitCommitDetails, 'fil
       parents.some((parent) => !objectId.test(parent)) ||
       !Number.isFinite(Number(timestamp))
     )
-      throw historyErrors.HISTORY_OUTPUT_INVALID()
+      throw historyErrors.HISTORY_OUTPUT_INVALID({
+        internal: {
+          at: 'commit-record',
+          index,
+          idValid: objectId.test(id),
+          parentCount: parents.length,
+          timestampValid: Number.isFinite(Number(timestamp)),
+        },
+      })
     commits.push({
       id,
       parents,
@@ -48,7 +59,10 @@ export function parseHistoryRefs(output: string): GitHistoryRef[] {
     const [name = '', type, id = '', peeledType, peeledId = ''] = line.split('\0')
     const commitId = type === 'commit' ? id : peeledId
     if (type !== 'commit' && peeledType !== 'commit') continue
-    if (!objectId.test(commitId)) throw historyErrors.HISTORY_OUTPUT_INVALID()
+    if (!objectId.test(commitId))
+      throw historyErrors.HISTORY_OUTPUT_INVALID({
+        internal: { at: 'ref', refName: name, type, peeledType },
+      })
     refs.push({ name, kind: refKind(name), commitId })
   }
   return refs
@@ -73,7 +87,10 @@ export function parsePeeledHistoryTags(names: readonly string[], output: string)
   return names.flatMap((name, index) => {
     const [commitId = '', type] = (lines[index] ?? '').split(' ')
     if (type !== 'commit') return []
-    if (!objectId.test(commitId)) throw historyErrors.HISTORY_OUTPUT_INVALID()
+    if (!objectId.test(commitId))
+      throw historyErrors.HISTORY_OUTPUT_INVALID({
+        internal: { at: 'tag', refName: name, index, type },
+      })
     return [{ name, kind: 'tag', commitId }]
   })
 }
@@ -84,12 +101,24 @@ export function parseHistoryFiles(output: string): GitCommitFile[] {
   for (let index = 0; index < tokens.length - 1; index += 1) {
     const header = tokens[index] ?? ''
     const match = /^:(\d{6}) (\d{6}) ([0-9a-f]+) ([0-9a-f]+) ([AMDRT])\d*$/.exec(header)
-    if (!match) throw historyErrors.HISTORY_OUTPUT_INVALID()
+    if (!match)
+      throw historyErrors.HISTORY_OUTPUT_INVALID({
+        internal: { at: 'numstat-header', index, headerLength: header.length },
+      })
     const [, oldMode, newMode, oldId = '', newId = '', code] = match
     const firstPath = tokens[++index]
     const nextPath = code === 'R' ? tokens[++index] : firstPath
     if (!nextPath || !objectId.test(oldId) || !objectId.test(newId))
-      throw historyErrors.HISTORY_OUTPUT_INVALID()
+      throw historyErrors.HISTORY_OUTPUT_INVALID({
+        internal: {
+          at: 'numstat-record',
+          index,
+          code,
+          hasPath: Boolean(nextPath),
+          oldIdValid: objectId.test(oldId),
+          newIdValid: objectId.test(newId),
+        },
+      })
     files.push({
       path: nextPath,
       oldPath: code === 'R' ? firstPath : undefined,

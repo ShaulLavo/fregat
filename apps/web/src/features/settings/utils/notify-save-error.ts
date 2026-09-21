@@ -2,7 +2,7 @@ import { toast } from 'sonner'
 
 import { clientErrorMetadata } from '@/lib/client-error-context'
 import { reportClientError } from '@/lib/client-error-reporting'
-import { toClientError } from '@/lib/client-error-taxonomy'
+import { clientErrorDescription, toClientError } from '@/lib/client-error-taxonomy'
 
 export function notifySaveError({
   discard,
@@ -34,7 +34,7 @@ export function notifySaveError({
   toast.error('Could not save settings', {
     action: { label: 'Retry', onClick: retry },
     cancel: { label: 'Discard', onClick: discard },
-    description: clientError.message,
+    description: clientErrorDescription(clientError),
     id: settingsSaveToastId(mutationId),
   })
 }

@@ -4,6 +4,7 @@ import { useEditorWorkspaceState } from '@/features/editor/state/workspace-state
 import { TitlebarMenu } from '@/features/workbench/components/titlebar-menu'
 import { titlebarModel } from '@/features/workbench/utils/titlebar-model'
 import { isMacDesktop } from '@/lib/platform/bridge'
+import { usePanelSurface } from '@/hooks/use-panel-surface'
 import { NATIVE_WINDOW_DRAG_CLASS } from '@/lib/platform/window-drag'
 import { cn } from '@workspace/ui/lib/utils'
 
@@ -12,6 +13,7 @@ export function AppTitlebar() {
   const layout = useEditorWorkspaceState((state) => state.workbenchLayout)
   const uiMode = useEditorWorkspaceState((state) => state.uiMode)
   const model = titlebarModel(rootFolder, layout, uiMode)
+  const surface = usePanelSurface()
 
   // Built as an element rather than returned so the whole bar — including the
   // gaps between its controls — is the context menu's trigger.
@@ -20,7 +22,8 @@ export function AppTitlebar() {
       aria-label='Window toolbar'
       className={cn(
         NATIVE_WINDOW_DRAG_CLASS,
-        'bg-card backdrop-material grid h-(--bar-height) shrink-0 select-none',
+        surface.panel,
+        'grid h-(--bar-height) shrink-0 select-none',
       )}
       data-native-window-drag-region=''
       style={{ gridTemplateColumns: model.gridTemplateColumns }}

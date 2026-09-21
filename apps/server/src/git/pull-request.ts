@@ -1,7 +1,8 @@
-import type {
-  GitPullRequest,
-  GitPullRequestCreateResult,
-  GitPullRequestSupport,
+import {
+  errorStringField,
+  type GitPullRequest,
+  type GitPullRequestCreateResult,
+  type GitPullRequestSupport,
 } from '@workspace/contracts'
 
 import * as v from 'valibot'
@@ -169,6 +170,7 @@ async function runGh(cwd: string, args: readonly string[], runProcess: RunProces
     }
     throw gitPullRequestErrors.PULL_REQUEST_LOOKUP_FAILED({
       cause: cause instanceof Error ? cause : undefined,
+      internal: { at: 'gh-spawn', command: args[0], errorCode: errorStringField(cause, 'code') },
     })
   }
 }
@@ -180,10 +182,18 @@ function parsePullRequest(stdout: string): GitPullRequest | null {
   } catch (cause) {
     throw gitPullRequestErrors.PULL_REQUEST_RESPONSE_INVALID({
       cause: cause instanceof Error ? cause : undefined,
+      internal: { at: 'json-parse', outputLength: stdout.length },
     })
   }
   const parsed = v.safeParse(v.array(pullRequestSchema), json)
-  if (!parsed.success) throw gitPullRequestErrors.PULL_REQUEST_RESPONSE_INVALID()
+  if (!parsed.success)
+    throw gitPullRequestErrors.PULL_REQUEST_RESPONSE_INVALID({
+      internal: {
+        at: 'schema',
+        issueCount: parsed.issues.length,
+        summary: v.summarize(parsed.issues),
+      },
+    })
   const pullRequest = parsed.output[0]
   if (!pullRequest) return null
 

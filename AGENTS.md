@@ -246,6 +246,10 @@ Interaction treatments are utilities, not strings to copy:
 - If the logs do not explain the failure, that is itself the bug to fix first: add the missing log events or fields, then debug with the better logs. Do not debug blind.
 - Logging is wide-event style (evlog). Always prefer wide logs: enrich the one event per operation/request with more fields instead of emitting extra narrow log lines.
 - Never throw `new Error`. Create errors with `createError` from `evlog` — in practice through the feature's `structured-errors.ts` wrapper (`createStructuredError` or a `defineErrorCatalog` entry) so the error carries `code`, `status`, `why`, and `fix`.
+- `why` and `fix` reach the client. `responseErrorPayload` puts them on the wire, `createRpcError` carries them through, and `clientErrorDescription` renders message + fix in the toast. A catalog entry's `fix` is the sentence the user acts on, so write it for them, not for the person editing the registry.
+- Runtime facts go in `internal`, which evlog keeps out of every HTTP response and our logger writes to the wide event. Attach what the message cannot say: the observed value against the expected one, an exit code, a lifecycle state, which of several identical checks failed. `bun run errors:census` gates this — an error whose catalog `message` is a constant string carries nothing but a code, so throwing one bare is a failure. An entry with a templated message is exempt: it already names its own facts.
+- Never put a setting value, a file's contents or a secret in a message or in `internal`. Name the type and the constraint instead (`Expected number, received string`). `apps/server/src/observability/tests/runtime.test.ts` pins it, and the sanitizer redacts a known-sensitive key wherever it is nested.
+- Every log line carries `version` and `commitHash` from the running release, so a web build newer than the server is visible in the log rather than only in `GET /release`.
 
 ## TypeScript Fixes
 

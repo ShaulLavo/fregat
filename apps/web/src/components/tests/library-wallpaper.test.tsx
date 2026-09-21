@@ -1,8 +1,8 @@
 import { act, fireEvent, waitFor } from '@testing-library/react'
-import { test, expect } from '../../../../test/fixtures'
-import { wallpaperPng } from '../../../../test/factories/wallpaper'
-import { createTestQueryClient, renderWithProviders } from '../../../../test/render'
-import { Wallpaper } from '@/features/workbench/components/wallpaper'
+import { test, expect } from '../../../test/fixtures'
+import { wallpaperPng } from '../../../test/factories/wallpaper'
+import { createTestQueryClient, renderWithProviders } from '../../../test/render'
+import { Wallpaper } from '@/components/wallpaper'
 import { refreshConfirmedSettings } from '@/features/settings/state/snapshot-admission'
 
 test.afterEach(() => document.documentElement.removeAttribute('data-backdrop'))

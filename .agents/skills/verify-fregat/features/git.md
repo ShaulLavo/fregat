@@ -38,6 +38,10 @@ Graph roots exclude `refs/platform/*`. A browsing session pins tips and ref labe
 
 `scenario git-open-all-diffs-spam` clicks Open all diffs eight times in a row on a six-file fixture. No error banner may appear and all six diff tabs must open: a superseded navigation must not abort the diff fetch the next one joined.
 
+`scenario git-diff-inline-tint` opens a diff where one line becomes several and reads `CSS.highlights`: the word tint must be present on open, unchanged after a hide/unhide of unmodified lines, and never cover a whole added line.
+
+`scenario git-diff-hover-tokens` hovers an identifier inside a diff pane and checks the hover's fenced code is painted with token colours: a diff lends its private syntax backend to the editor's snippet tokens, because the diff editor itself has no language.
+
 `scenario chat-git-tab-switch` opens a file, enters chat mode and clicks Graph then Changes in the Git tool. The Git panel must stay: a panel change records the selected document in the address but must not set `tool: editor`, which only opening a document does.
 
 `scenario chat-git-turn-rows` opens the chat Git tool and screenshots the Working tree and Turn scopes. Both draw `GitFileRow`: icon, name, directory, `+/-` counts and the status letter. It needs a selected session with a checkpointed turn.

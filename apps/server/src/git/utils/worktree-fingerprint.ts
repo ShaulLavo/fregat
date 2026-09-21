@@ -25,8 +25,11 @@ export async function removalPreview(runner: GitRepositoryRunner, checkout: stri
   addField(hash, index.stdout)
   try {
     addField(hash, await fingerprintEntry(Buffer.from(checkout), Buffer.alloc(0)))
-  } catch {
-    throw gitWorktreeErrors.WORKTREE_UNSAFE_ENTRY()
+  } catch (cause) {
+    throw gitWorktreeErrors.WORKTREE_UNSAFE_ENTRY({
+      cause: cause instanceof Error ? cause : undefined,
+      internal: { check: 'root-entry' },
+    })
   }
   return {
     expectedHead: head.stdout.trim(),
@@ -47,7 +50,14 @@ async function fingerprintEntry(absolutePath: Buffer, relativePath: Buffer): Pro
   } else if (before.isFile()) {
     await fingerprintFile(hash, absolutePath, before)
   } else {
-    throw gitWorktreeErrors.WORKTREE_UNSAFE_ENTRY()
+    throw gitWorktreeErrors.WORKTREE_UNSAFE_ENTRY({
+      internal: {
+        check: 'entry-kind',
+        isDirectory: before.isDirectory(),
+        isFile: before.isFile(),
+        isSymbolicLink: before.isSymbolicLink(),
+      },
+    })
   }
   assertUnchanged(before, await lstat(absolutePath, { bigint: true }))
   return hash.digest()
@@ -60,7 +70,9 @@ async function fingerprintDirectory(
   before: BigIntStats,
 ) {
   if ((before.mode & 0o444n) === 0n || (before.mode & 0o111n) === 0n) {
-    throw gitWorktreeErrors.WORKTREE_UNSAFE_ENTRY()
+    throw gitWorktreeErrors.WORKTREE_UNSAFE_ENTRY({
+      internal: { check: 'directory-mode', mode: (before.mode & 0o7777n).toString(8) },
+    })
   }
   const entries = (await readdir(absolutePath, { encoding: 'buffer' })).sort(Buffer.compare)
   for (const name of entries) {
@@ -71,7 +83,10 @@ async function fingerprintDirectory(
 }
 
 async function fingerprintFile(hash: Hash, absolutePath: Buffer, before: BigIntStats) {
-  if ((before.mode & 0o444n) === 0n) throw gitWorktreeErrors.WORKTREE_UNSAFE_ENTRY()
+  if ((before.mode & 0o444n) === 0n)
+    throw gitWorktreeErrors.WORKTREE_UNSAFE_ENTRY({
+      internal: { check: 'file-mode', mode: (before.mode & 0o7777n).toString(8) },
+    })
   const file = await open(absolutePath, constants.O_RDONLY | constants.O_NOFOLLOW)
   try {
     assertUnchanged(before, await file.stat({ bigint: true }))
@@ -92,7 +107,14 @@ function assertUnchanged(before: BigIntStats, after: BigIntStats) {
     before.mtimeNs !== after.mtimeNs ||
     before.ctimeNs !== after.ctimeNs
   ) {
-    throw gitWorktreeErrors.WORKTREE_UNSAFE_ENTRY()
+    throw gitWorktreeErrors.WORKTREE_UNSAFE_ENTRY({
+      internal: {
+        check: 'changed-during-scan',
+        changed: ['dev', 'ino', 'mode', 'size', 'mtimeNs', 'ctimeNs'].filter(
+          (field) => before[field as 'ino'] !== after[field as 'ino'],
+        ),
+      },
+    })
   }
 }
 

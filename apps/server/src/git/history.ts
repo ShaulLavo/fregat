@@ -91,7 +91,10 @@ export class GitHistory {
       '--',
     ])
     const commit = parseHistoryCommits(result.stdout)[0]
-    if (!commit) throw historyErrors.HISTORY_REF_MISSING()
+    if (!commit)
+      throw historyErrors.HISTORY_REF_MISSING({
+        internal: { at: 'commit-detail', ref: query.commit, outputLength: result.stdout.length },
+      })
 
     const parent = commit.parents[0]
     const diff = await runner.run([
@@ -144,6 +147,8 @@ async function readRefs(runner: GitRepositoryRunner): Promise<GitHistoryRef[]> {
 function historyTips(refs: readonly GitHistoryRef[], selected: string): string[] {
   const chosen = selected === 'all' ? refs : refs.filter((ref) => ref.name === selected)
   if (selected !== 'all' && selected !== 'HEAD' && chosen.length === 0)
-    throw historyErrors.HISTORY_REF_MISSING()
+    throw historyErrors.HISTORY_REF_MISSING({
+      internal: { at: 'tips', selected, knownRefs: refs.map((ref) => ref.name).slice(0, 50) },
+    })
   return [...new Set(chosen.map((ref) => ref.commitId))].sort()
 }

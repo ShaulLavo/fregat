@@ -9,7 +9,7 @@ import { settleGitStatus } from '@/features/git/utils/settle-status'
 export function useUnstagePathsMutation(paths: readonly string[], rootPath: string) {
   return useMutation({
     mutationFn: (_variables, { client }) => unstagePaths(paths, clientForQueryClient(client)),
-    mutationKey: mutationKeys.unstageMany(paths),
+    mutationKey: mutationKeys.unstageMany(rootPath, paths),
     onError: notifyMutationError,
     onSuccess: (status, _variables, _onMutateResult, { client }) =>
       settleGitStatus(client, rootPath, status),

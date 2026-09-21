@@ -9,7 +9,7 @@ import { settleDiscardedGitStatus } from '@/features/git/utils/settle-status'
 export function useDiscardPathsMutation(paths: readonly string[], rootPath: string) {
   return useMutation({
     mutationFn: (_variables, { client }) => discardPaths(paths, clientForQueryClient(client)),
-    mutationKey: mutationKeys.discardMany(paths),
+    mutationKey: mutationKeys.discardMany(rootPath, paths),
     onError: notifyMutationError,
     onSuccess: (status, _variables, _onMutateResult, { client }) =>
       settleDiscardedGitStatus(client, rootPath, status),

@@ -73,7 +73,7 @@ export function TerminalList({
           {...list.containerProps}
           aria-label='Open terminals'
           aria-orientation='vertical'
-          className='focus-ring-inset bg-background flex h-full flex-col overflow-y-auto py-(--density-section-gap)'
+          className='focus-ring-inset flex h-full flex-col overflow-y-auto py-(--density-section-gap)'
         >
           {tabs.map((tab) => (
             <TerminalListRow

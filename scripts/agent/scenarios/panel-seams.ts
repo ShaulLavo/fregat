@@ -59,10 +59,10 @@ function seamPaints(page: Page) {
     }
     const panels = Array.from(document.querySelectorAll('[data-slot="resizable-panel"]'))
     const sidebar = document.querySelector('[data-workbench] aside, [data-chat-mode] aside')
-    const group = document.querySelector('[data-slot="resizable-panel-group"]')
+    const region = document.querySelector('[data-surface-region]')
     return {
       panels: [...panels, sidebar].filter(painted).length,
-      region: [group?.parentElement ?? null, group].filter(painted).length,
+      region: [region].filter(painted).length,
     }
   })
 }

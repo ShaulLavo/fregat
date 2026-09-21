@@ -391,7 +391,10 @@ export class TerminalService {
     const lease = await this.lifecycle.begin(worktreeId)
     if (!sessionId) return { lease, env: this.env }
     try {
-      if (!this.resolveAgentSession) throw sessionIdentityErrors.TERMINAL_UNSUPPORTED()
+      if (!this.resolveAgentSession)
+        throw sessionIdentityErrors.TERMINAL_UNSUPPORTED({
+          internal: { at: 'terminal-service', sessionId, worktreeId, reason: 'no-resolver' },
+        })
       const launch = await this.resolveAgentSession({
         sessionId,
         worktreeId,

@@ -80,18 +80,31 @@ export function requireSessionNotArchived(
   commandType: string,
 ) {
   const session = requireSessionNotDeleted(model, sessionId)
-  if (session.archivedAt) throw orchestrationErrors.SESSION_ARCHIVED({ commandType, sessionId })
+  if (session.archivedAt)
+    throw orchestrationErrors.SESSION_ARCHIVED({
+      commandType,
+      sessionId,
+      internal: { archivedAt: session.archivedAt },
+    })
   return session
 }
 
 export function requireSessionArchived(model: OrchestrationReadModel, sessionId: string) {
   const session = requireSessionNotDeleted(model, sessionId)
-  if (!session.archivedAt) throw orchestrationErrors.SESSION_NOT_ARCHIVED({ sessionId })
+  if (!session.archivedAt)
+    throw orchestrationErrors.SESSION_NOT_ARCHIVED({
+      sessionId,
+      internal: { settledOverride: session.settledOverride, pinnedAt: session.pinnedAt },
+    })
   return session
 }
 
 export function requireSessionAbsent(model: OrchestrationReadModel, sessionId: string) {
-  if (model.sessions.has(sessionId)) throw orchestrationErrors.SESSION_ALREADY_EXISTS({ sessionId })
+  if (model.sessions.has(sessionId))
+    throw orchestrationErrors.SESSION_ALREADY_EXISTS({
+      sessionId,
+      internal: { deletedAt: model.sessions.get(sessionId)?.deletedAt ?? null },
+    })
 }
 
 export function requireActionableSourcePlan(
@@ -107,18 +120,31 @@ export function requireActionableSourcePlan(
     plan.implementedAt !== null ||
     !session.hasActionableProposedPlan
   ) {
-    throw orchestrationErrors.SOURCE_PLAN_NOT_ACTIONABLE({ planSessionId: source.sessionId })
+    throw orchestrationErrors.SOURCE_PLAN_NOT_ACTIONABLE({
+      planSessionId: source.sessionId,
+      internal: {
+        implementedAt: plan?.implementedAt ?? null,
+        hasActionableProposedPlan: session.hasActionableProposedPlan,
+        planFound: Boolean(plan),
+      },
+    })
   }
   const sourceWorktree = model.worktrees.get(session.worktreeId)
   const targetWorktree = targetWorktreeId ? model.worktrees.get(targetWorktreeId) : undefined
   if (!sourceWorktree || !targetWorktree || sourceWorktree.projectId !== targetWorktree.projectId) {
-    throw sessionDomainErrors.SOURCE_PLAN_PROJECT_MISMATCH()
+    throw sessionDomainErrors.SOURCE_PLAN_PROJECT_MISMATCH({
+      internal: {
+        sourceProjectId: sourceWorktree?.projectId ?? null,
+        targetProjectId: targetWorktree?.projectId ?? null,
+        targetWorktreeId: targetWorktreeId ?? null,
+      },
+    })
   }
 }
 
 export function requireValidOrderKey(orderKey: string) {
   if (isValidOrderKey(orderKey)) return
-  throw orderKeyErrors.ORDER_KEY_INVALID({ orderKey })
+  throw orderKeyErrors.ORDER_KEY_INVALID({ orderKey, internal: { length: orderKey.length } })
 }
 
 export function requireSettleable(
@@ -130,11 +156,31 @@ export function requireSettleable(
   const sessionId = session.id
   const optional = dismissMessageQuestions ? pendingMessageQuestions(session.activities).length : 0
   if (session.pendingApprovalCount > 0 || session.pendingUserInputCount > optional)
-    throw sessionLifecycleErrors.SESSION_BLOCKING_REQUEST({ commandType, sessionId })
+    throw sessionLifecycleErrors.SESSION_BLOCKING_REQUEST({
+      commandType,
+      sessionId,
+      internal: {
+        pendingApprovalCount: session.pendingApprovalCount,
+        pendingUserInputCount: session.pendingUserInputCount,
+        dismissibleQuestions: optional,
+      },
+    })
   if (hasQueuedTurnStart(session))
-    throw sessionLifecycleErrors.SESSION_QUEUED_TURN_START({ commandType, sessionId })
+    throw sessionLifecycleErrors.SESSION_QUEUED_TURN_START({
+      commandType,
+      sessionId,
+      internal: { latestTurnState: session.latestTurn?.state ?? null },
+    })
   if (isSessionAlive(session) || session.latestTurn?.state === 'running') {
-    throw sessionLifecycleErrors.SESSION_RUNTIME_ACTIVE({ commandType, sessionId })
+    throw sessionLifecycleErrors.SESSION_RUNTIME_ACTIVE({
+      commandType,
+      sessionId,
+      internal: {
+        alive: isSessionAlive(session),
+        latestTurnState: session.latestTurn?.state ?? null,
+        runtimeStatus: session.runtime?.status ?? null,
+      },
+    })
   }
 }
 
@@ -145,28 +191,55 @@ export function requireSnoozable(
 ) {
   const sessionId = session.id
   if (hasOpenBlockingRequest(session))
-    throw sessionLifecycleErrors.SESSION_BLOCKING_REQUEST({ commandType, sessionId })
+    throw sessionLifecycleErrors.SESSION_BLOCKING_REQUEST({
+      commandType,
+      sessionId,
+      internal: {
+        pendingApprovalCount: session.pendingApprovalCount,
+        pendingUserInputCount: session.pendingUserInputCount,
+      },
+    })
   if (hasQueuedTurnStart(session))
-    throw sessionLifecycleErrors.SESSION_QUEUED_TURN_START({ commandType, sessionId })
+    throw sessionLifecycleErrors.SESSION_QUEUED_TURN_START({
+      commandType,
+      sessionId,
+      internal: { latestTurnState: session.latestTurn?.state ?? null },
+    })
 }
 
 export function requireSettled(session: OrchestrationProjectedSession) {
-  if (session.settledOverride !== 'settled') throw sessionLifecycleErrors.SESSION_NOT_SETTLED()
+  if (session.settledOverride !== 'settled')
+    throw sessionLifecycleErrors.SESSION_NOT_SETTLED({
+      internal: { sessionId: session.id, settledOverride: session.settledOverride },
+    })
 }
 
 export function requireFutureWakeTime(sessionId: string, snoozedUntil: string, at: string) {
   if (Date.parse(snoozedUntil) > Date.parse(at)) return
-  throw sessionLifecycleErrors.SESSION_SNOOZE_NOT_FUTURE({ snoozedUntil, sessionId })
+  throw sessionLifecycleErrors.SESSION_SNOOZE_NOT_FUTURE({
+    snoozedUntil,
+    sessionId,
+    internal: { at, behindByMs: Date.parse(at) - Date.parse(snoozedUntil) },
+  })
 }
 
 export function requireActiveOrderable(session: OrchestrationProjectedSession) {
   if (!session.pinnedAt && session.settledOverride !== 'settled') return
-  throw sessionLifecycleErrors.SESSION_NOT_ACTIVE()
+  throw sessionLifecycleErrors.SESSION_NOT_ACTIVE({
+    internal: {
+      sessionId: session.id,
+      pinnedAt: session.pinnedAt,
+      settledOverride: session.settledOverride,
+    },
+  })
 }
 
 export function requirePinned(session: OrchestrationProjectedSession) {
   if (session.pinnedAt) return
-  throw sessionLifecycleErrors.SESSION_NOT_PINNED({ sessionId: session.id })
+  throw sessionLifecycleErrors.SESSION_NOT_PINNED({
+    sessionId: session.id,
+    internal: { settledOverride: session.settledOverride },
+  })
 }
 
 function hasOpenBlockingRequest(session: OrchestrationProjectedSession) {

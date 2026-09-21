@@ -349,6 +349,7 @@ function requireVscodeThemeDefinition(themeId: string): VscodeThemeDefinition {
   if (!definition) {
     throw clientErrors.CLIENT_INVARIANT_ERROR({
       message: `Bundled VSCode themes are missing the default theme: ${themeId}`,
+      internal: { themeId, bundled: VSCODE_THEMES.map((theme) => theme.id) },
     })
   }
 

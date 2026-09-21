@@ -702,3 +702,33 @@ export async function selectedEditorTabId(page: Page, group: number) {
           ?.getAttribute('data-editor-tab-id') ?? null,
     )
 }
+
+/** Whether the hover's fenced code wraps the word in a span that carries a token colour. */
+export async function hoverTokenColor(page: Page, word: string): Promise<boolean> {
+  const spans = selectors.editorHover(page).locator('pre > code > span')
+  await spans.first().waitFor({ state: 'attached', timeout: 8000 })
+  const style = await spans.getByText(word, { exact: true }).first().getAttribute('style')
+  return /(^|;)\s*color:/.test(style ?? '')
+}
+
+/** Rests the pointer on the first on-screen occurrence of the word, under `within`, until the hover shows. */
+export async function hoverWord(page: Page, word: string, within = 'body') {
+  // A string: this package types without the DOM, and the callback runs in the page.
+  const point = (await page.evaluate(`((needle, root) => {
+    const walker = document.createTreeWalker(document.querySelector(root) ?? document.body, NodeFilter.SHOW_TEXT)
+    for (let node = walker.nextNode(); node; node = walker.nextNode()) {
+      const index = node.textContent?.indexOf(needle) ?? -1
+      if (index < 0) continue
+      const range = document.createRange()
+      range.setStart(node, index)
+      range.setEnd(node, index + needle.length)
+      const rect = range.getBoundingClientRect()
+      if (rect.width === 0) continue
+      return { x: rect.left + rect.width / 2, y: rect.top + rect.height / 2 }
+    }
+    throw new Error(needle + ' is not on screen')
+  })(${JSON.stringify(word)}, ${JSON.stringify(within)})`)) as { x: number; y: number }
+  await page.mouse.move(point.x, point.y)
+  await selectors.editorHover(page).waitFor({ state: 'visible', timeout: 8000 })
+  await page.waitForTimeout(400)
+}

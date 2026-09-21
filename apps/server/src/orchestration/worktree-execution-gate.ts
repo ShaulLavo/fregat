@@ -19,7 +19,10 @@ export class WorktreeExecutionGate {
   private readonly exclusive = new Map<WorktreeId, symbol>()
 
   acquireShared(worktreeId: WorktreeId, kind: Holder): Lease {
-    if (this.exclusive.has(worktreeId)) throw worktreeExecutionErrors.EXECUTION_BUSY()
+    if (this.exclusive.has(worktreeId))
+      throw worktreeExecutionErrors.EXECUTION_BUSY({
+        internal: { worktreeId, kind, holder: 'exclusive' },
+      })
     const holders = this.shared.get(worktreeId) ?? new Map<symbol, Holder>()
     const token = Symbol(kind)
     holders.set(token, kind)

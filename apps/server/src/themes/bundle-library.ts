@@ -78,13 +78,17 @@ export class BundleLibrary {
     if (used)
       throw themeErrors.BUNDLE_INVALID({
         detail: `This ${kind} belongs to a theme. Change that theme’s parts before deleting it.`,
+        internal: { kind, assetId: id },
       })
   }
 
   async remove(input: string) {
     const id = v.parse(themeIdSchema, input)
     if (BUNDLED_THEMES.some((theme) => theme.id === id))
-      throw themeErrors.BUNDLE_INVALID({ detail: 'Bundled themes cannot be deleted' })
+      throw themeErrors.BUNDLE_INVALID({
+        detail: 'Bundled themes cannot be deleted',
+        internal: { themeId: id },
+      })
     const selected = this.options.settings.snapshot().values['workbench.theme']
     const operations: import('@workspace/contracts').SettingsOperation[] = [
       { kind: 'theme.reset', id },
@@ -114,6 +118,11 @@ export class BundleLibrary {
     if (references.some((part) => usesOwnedPart(part, ownedPalettes, ownedWallpapers)))
       throw themeErrors.BUNDLE_INVALID({
         detail: 'Another theme or setting uses parts from this imported bundle',
+        internal: {
+          ownedPalettes: [...ownedPalettes],
+          ownedWallpapers: [...ownedWallpapers],
+          referenceCount: references.length,
+        },
       })
     await this.options.settings.write({
       mutationId: `theme-delete:${randomUUID()}`,
@@ -132,10 +141,21 @@ export class BundleLibrary {
 
   async importArchive(input: unknown): Promise<ThemeBundle> {
     const parsed = v.safeParse(themeArchiveSchema, input)
-    if (!parsed.success) throw themeErrors.BUNDLE_INVALID({ detail: v.summarize(parsed.issues) })
+    if (!parsed.success)
+      throw themeErrors.BUNDLE_INVALID({
+        detail: v.summarize(parsed.issues),
+        internal: { issueCount: parsed.issues.length, at: 'archive-schema' },
+      })
     const archive = parsed.output
     if (Buffer.byteLength(JSON.stringify(archive)) > THEME_ARCHIVE_LIMIT)
-      throw themeErrors.BUNDLE_INVALID({ detail: 'Archive exceeds 60 MiB' })
+      throw themeErrors.BUNDLE_INVALID({
+        detail: 'Archive exceeds 60 MiB',
+        internal: {
+          bytes: Buffer.byteLength(JSON.stringify(archive)),
+          limit: THEME_ARCHIVE_LIMIT,
+          themeId: archive.theme.id,
+        },
+      })
     const originals = archive.palettes.map(normalizePalette)
     const palettes = originals.map((palette) => ({
       ...palette,
@@ -166,7 +186,11 @@ export class BundleLibrary {
   async exportArchive(input: string): Promise<ThemeArchive> {
     const id = v.safeParse(themeIdSchema, input)
     const theme = (await this.list()).find((entry) => entry.id === id.output)
-    if (!id.success || !theme) throw themeErrors.BUNDLE_INVALID({ detail: 'Theme does not exist' })
+    if (!id.success || !theme)
+      throw themeErrors.BUNDLE_INVALID({
+        detail: 'Theme does not exist',
+        internal: { requested: input, idValid: id.success },
+      })
     const variants = themeVariants(
       theme,
       this.options.settings.snapshot().values['workbench.theme.customizations'],
@@ -226,25 +250,35 @@ export class BundleLibrary {
       const bundled = bundledPalette(variant.palette)
       const candidate = palettes.find((palette) => palette.id === variant.palette)
       if (assets && !bundled && !candidate)
-        throw themeErrors.BUNDLE_INVALID({ detail: 'Archive is missing a referenced palette' })
+        throw themeErrors.BUNDLE_INVALID({
+          detail: 'Archive is missing a referenced palette',
+          internal: { mode, palette: variant.palette, archivePalettes: palettes.map((p) => p.id) },
+        })
       const parsed = bundled
         ? null
         : parsePalette(candidate ?? (await this.options.palettes.read(variant.palette)), 'user')
       const palette = bundled ?? (parsed?.success ? parsed.palette : null)
       if (!palette || !paletteSupportsMode(palette, mode))
-        throw themeErrors.BUNDLE_INVALID({ detail: `${variant.palette} does not support ${mode}` })
+        throw themeErrors.BUNDLE_INVALID({
+          detail: `${variant.palette} does not support ${mode}`,
+          internal: { mode, palette: variant.palette, bundled: Boolean(bundled) },
+        })
       const syntaxModes: Readonly<Record<string, string>> = SYNTAX_THEME_MODES
       const syntaxMode =
         syntaxModes[variant.codeTheme] ?? variant.codeTheme.replace('tree-sitter-', '')
       if (syntaxMode !== mode)
         throw themeErrors.BUNDLE_INVALID({
           detail: `Syntax theme ${variant.codeTheme} does not support ${mode}`,
+          internal: { mode, codeTheme: variant.codeTheme, resolvedMode: syntaxMode },
         })
       const source = variant.wallpaper.source
       if (source.kind !== 'library') continue
       if (assets?.includes(source.asset)) continue
       if (assets)
-        throw themeErrors.BUNDLE_INVALID({ detail: 'Archive is missing a referenced wallpaper' })
+        throw themeErrors.BUNDLE_INVALID({
+          detail: 'Archive is missing a referenced wallpaper',
+          internal: { mode, asset: source.asset, archiveAssets: assets },
+        })
       await this.options.wallpapers.read(source.asset)
     }
   }
@@ -255,7 +289,10 @@ export class BundleLibrary {
     archive: ThemeArchive | null,
   ) {
     if (BUNDLED_THEMES.some((theme) => theme.id === document.id))
-      throw themeErrors.BUNDLE_INVALID({ detail: 'Use a new id for a bundled theme copy' })
+      throw themeErrors.BUNDLE_INVALID({
+        detail: 'Use a new id for a bundled theme copy',
+        internal: { themeId: document.id },
+      })
     await mkdir(this.options.directory, { recursive: true })
     const stage = path.join(this.options.directory, `.import-${randomUUID()}`)
     await mkdir(stage)
@@ -277,7 +314,9 @@ export class BundleLibrary {
     } catch (cause) {
       await rm(stage, { recursive: true, force: true })
       throw themeErrors.BUNDLE_INVALID({
+        cause: cause instanceof Error ? cause : undefined,
         detail: cause instanceof Error ? cause.message : 'Import failed',
+        internal: { at: 'stage-import', themeId: document.id, hasArchive: Boolean(archive) },
       })
     }
   }
@@ -286,7 +325,14 @@ export class BundleLibrary {
 async function stageWallpaper(stage: string, asset: ThemeArchive['wallpapers'][number]) {
   const bytes = Buffer.from(asset.base64, 'base64')
   if (createHash('sha256').update(bytes).digest('hex') !== asset.id)
-    throw themeErrors.BUNDLE_INVALID({ detail: 'Wallpaper hash does not match' })
+    throw themeErrors.BUNDLE_INVALID({
+      detail: 'Wallpaper hash does not match',
+      internal: {
+        asset: asset.id,
+        computed: createHash('sha256').update(bytes).digest('hex'),
+        bytes: bytes.byteLength,
+      },
+    })
   const { thumbnail, display, ...metadata } = await decodeWallpaper(bytes)
   const directory = path.join(stage, 'wallpapers')
   await writeFile(path.join(directory, `${asset.id}.${metadata.extension}`), bytes)
@@ -307,12 +353,20 @@ async function stageWallpaper(stage: string, asset: ThemeArchive['wallpapers'][n
 
 function parseDocument(input: unknown): ThemeDocument {
   const result = v.safeParse(themeDocumentSchema, input)
-  if (!result.success) throw themeErrors.BUNDLE_INVALID({ detail: v.summarize(result.issues) })
+  if (!result.success)
+    throw themeErrors.BUNDLE_INVALID({
+      detail: v.summarize(result.issues),
+      internal: { at: 'theme-document', issueCount: result.issues.length },
+    })
   return result.output
 }
 function normalizePalette(input: unknown): PaletteDocument {
   const result = parsePalette(input, 'user')
-  if (!result.success) throw themeErrors.BUNDLE_INVALID({ detail: 'Invalid palette in archive' })
+  if (!result.success)
+    throw themeErrors.BUNDLE_INVALID({
+      detail: 'Invalid palette in archive',
+      internal: { at: 'archive-palette' },
+    })
   if (bundledPalette(result.palette.id))
     throw themeErrors.BUNDLE_INVALID({ detail: 'Archive may not replace bundled palettes' })
   return serializePalette(result.palette)

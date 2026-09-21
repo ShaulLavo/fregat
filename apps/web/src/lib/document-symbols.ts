@@ -70,6 +70,7 @@ export async function fetchDocumentSymbolTree(
       serverId: request.serverId,
       error: clientErrors.DOCUMENT_SYMBOL_FAILED({
         cause: error instanceof Error ? error : undefined,
+        internal: { serverId: request.serverId, rootPath: request.rootPath },
       }),
     })
     return []
@@ -90,7 +91,7 @@ function requestDocumentSymbols(
 ) {
   return new Promise<readonly DocumentSymbol[]>((resolve, reject) => {
     if (signal?.aborted) {
-      reject(clientErrors.DOCUMENT_SYMBOL_ABORTED())
+      reject(clientErrors.DOCUMENT_SYMBOL_ABORTED({ internal: { at: 'before-connect', serverId } }))
       return
     }
 
@@ -116,7 +117,10 @@ function requestDocumentSymbols(
       socket.close()
       callback()
     }
-    const abort = () => finish(() => reject(clientErrors.DOCUMENT_SYMBOL_ABORTED()))
+    const abort = () =>
+      finish(() =>
+        reject(clientErrors.DOCUMENT_SYMBOL_ABORTED({ internal: { at: 'in-flight', serverId } })),
+      )
 
     signal?.addEventListener('abort', abort, { once: true })
     const succeed = (result: unknown) => finish(() => resolve(documentSymbolsFromResult(result)))
@@ -129,10 +133,14 @@ function requestDocumentSymbols(
     })
     socket.addEventListener('message', (event) => dispatchSocketMessage(handlers, event))
     socket.addEventListener('error', () =>
-      finish(() => reject(clientErrors.DOCUMENT_SYMBOL_SOCKET_FAILED())),
+      finish(() =>
+        reject(clientErrors.DOCUMENT_SYMBOL_SOCKET_FAILED({ internal: { serverId, rootPath } })),
+      ),
     )
     socket.addEventListener('close', () =>
-      finish(() => reject(clientErrors.DOCUMENT_SYMBOL_SOCKET_CLOSED())),
+      finish(() =>
+        reject(clientErrors.DOCUMENT_SYMBOL_SOCKET_CLOSED({ internal: { serverId, rootPath } })),
+      ),
     )
   })
 }

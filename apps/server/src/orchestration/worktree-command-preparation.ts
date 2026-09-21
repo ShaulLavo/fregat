@@ -40,7 +40,10 @@ export class WorktreeCommandPreparation {
       async () => {
         if (command.type !== 'worktree.resolve-missing') return operation()
         const lease = this.options.gate.tryAcquireExclusive(worktree.id)
-        if (!lease.acquired) throw worktreeRuntimeErrors.ACTIVE()
+        if (!lease.acquired)
+          throw worktreeRuntimeErrors.ACTIVE({
+            internal: { at: 'resolve-missing', worktreeId: worktree.id, commandType: command.type },
+          })
         try {
           return await operation()
         } finally {
@@ -61,7 +64,14 @@ export class WorktreeCommandPreparation {
     ) {
       const base = requireReady(this.options.getReadModel(), target.baseWorktreeId)
       const project = requireProject(this.options.getReadModel(), base.projectId)
-      if (project.repositoryKind !== 'git') throw worktreeRuntimeErrors.NOT_GIT()
+      if (project.repositoryKind !== 'git')
+        throw worktreeRuntimeErrors.NOT_GIT({
+          internal: {
+            projectId: base.projectId,
+            repositoryKind: project.repositoryKind,
+            baseWorktreeId: base.id,
+          },
+        })
       const prepared = await this.options.git.prepareCreate({
         path: base.canonicalPath,
         worktreeId: target.worktreeId,
@@ -80,9 +90,25 @@ export class WorktreeCommandPreparation {
     if (command.type === 'worktree.retain' || command.type === 'worktree.adopt') {
       const worktree = requireWorktree(this.options.getReadModel(), command.worktreeId)
       const observed = await this.options.git.inspect(await this.target(worktree))
-      if (!observed.pathExists || !observed.worktree) throw worktreeRuntimeErrors.UNAVAILABLE()
+      if (!observed.pathExists || !observed.worktree)
+        throw worktreeRuntimeErrors.UNAVAILABLE({
+          internal: {
+            at: command.type,
+            worktreeId: command.worktreeId,
+            pathExists: observed.pathExists,
+            adminExists: observed.adminExists,
+          },
+        })
       if (command.type === 'worktree.adopt') {
-        if (!observed.worktree.commit) throw worktreeRuntimeErrors.UNAVAILABLE()
+        if (!observed.worktree.commit)
+          throw worktreeRuntimeErrors.UNAVAILABLE({
+            internal: {
+              at: 'adopt',
+              worktreeId: command.worktreeId,
+              reason: 'no-commit',
+              branch: observed.worktree.branch,
+            },
+          })
         return {
           ...command,
           verified: true,
@@ -95,7 +121,13 @@ export class WorktreeCommandPreparation {
     if (command.type === 'worktree.resolve-missing') {
       const preview = await this.missingPreview(command.worktreeId)
       if (JSON.stringify(preview.authorization) !== JSON.stringify(command.authorization))
-        throw worktreeRuntimeErrors.RECONFIRM()
+        throw worktreeRuntimeErrors.RECONFIRM({
+          internal: {
+            worktreeId: command.worktreeId,
+            observed: preview.authorization,
+            confirmed: command.authorization,
+          },
+        })
       return { ...command, verified: true }
     }
     return command
@@ -103,7 +135,10 @@ export class WorktreeCommandPreparation {
 
   async cleanupPreview(worktreeId: WorktreeId) {
     const worktree = requireWorktree(this.options.getReadModel(), worktreeId)
-    if (worktree.ownership !== 'platform') throw worktreeRuntimeErrors.UNAVAILABLE()
+    if (worktree.ownership !== 'platform')
+      throw worktreeRuntimeErrors.UNAVAILABLE({
+        internal: { at: 'cleanup-preview', worktreeId, ownership: worktree.ownership },
+      })
     const preview = await this.options.git.previewRemoval(await this.target(worktree))
     return {
       worktreeId,
@@ -117,10 +152,24 @@ export class WorktreeCommandPreparation {
 
   async missingPreview(worktreeId: WorktreeId) {
     const worktree = requireWorktree(this.options.getReadModel(), worktreeId)
-    if (worktree.ownership !== 'platform') throw worktreeRuntimeErrors.UNAVAILABLE()
-    if (await this.options.reactor.runtimeBlocker(worktree)) throw worktreeRuntimeErrors.ACTIVE()
+    if (worktree.ownership !== 'platform')
+      throw worktreeRuntimeErrors.UNAVAILABLE({
+        internal: { at: 'missing-preview', worktreeId, ownership: worktree.ownership },
+      })
+    if (await this.options.reactor.runtimeBlocker(worktree))
+      throw worktreeRuntimeErrors.ACTIVE({
+        internal: { at: 'missing-preview', worktreeId, reason: 'runtime-blocker' },
+      })
     const observed = await this.options.git.inspect(await this.target(worktree))
-    if (observed.pathExists || observed.adminExists) throw worktreeRuntimeErrors.UNAVAILABLE()
+    if (observed.pathExists || observed.adminExists)
+      throw worktreeRuntimeErrors.UNAVAILABLE({
+        internal: {
+          at: 'missing-preview',
+          worktreeId,
+          pathExists: observed.pathExists,
+          adminExists: observed.adminExists,
+        },
+      })
     return {
       worktreeId,
       authorization: {
@@ -155,6 +204,9 @@ function worktreeCommandId(command: ClientOrchestrationCommand) {
 
 function requireReady(model: OrchestrationReadModel, worktreeId: WorktreeId) {
   const worktree = requireWorktree(model, worktreeId)
-  if (worktree.lifecycle.state !== 'ready') throw worktreeRuntimeErrors.UNAVAILABLE()
+  if (worktree.lifecycle.state !== 'ready')
+    throw worktreeRuntimeErrors.UNAVAILABLE({
+      internal: { at: 'require-ready', worktreeId, lifecycleState: worktree.lifecycle.state },
+    })
   return worktree
 }

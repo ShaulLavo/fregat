@@ -146,7 +146,7 @@ async function loadEntries(
 async function fetchCurrentEntry(path: string, signal: AbortSignal, client: Client) {
   const entry = await statPath(filesystemPath(path), signal, client)
   if (!isDirectoryEntry(entry)) {
-    throw clientErrors.CURRENT_PATH_NOT_FOLDER()
+    throw clientErrors.CURRENT_PATH_NOT_FOLDER({ internal: { entryType: entry.type } })
   }
 
   return {

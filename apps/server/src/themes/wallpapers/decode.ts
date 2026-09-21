@@ -1,11 +1,16 @@
 import sharp, { type Sharp } from 'sharp'
+import { isEvlogError } from '../../observability/structured-errors'
 import { wallpaperErrors } from './structured-errors'
 
 export const MAX_WALLPAPER_BYTES = 20 * 1024 * 1024
 
 export async function decodeWallpaper(bytes: Uint8Array) {
-  if (bytes.byteLength > MAX_WALLPAPER_BYTES) throw wallpaperErrors.TOO_LARGE()
-  if (isAnimatedPng(bytes)) throw wallpaperErrors.INVALID()
+  if (bytes.byteLength > MAX_WALLPAPER_BYTES)
+    throw wallpaperErrors.TOO_LARGE({
+      internal: { bytes: bytes.byteLength, limit: MAX_WALLPAPER_BYTES },
+    })
+  if (isAnimatedPng(bytes))
+    throw wallpaperErrors.INVALID({ internal: { reason: 'animated-png', bytes: bytes.byteLength } })
   try {
     const image = sharp(bytes, { limitInputPixels: 40_000_000, failOn: 'warning' }).timeout({
       seconds: 10,
@@ -13,8 +18,11 @@ export async function decodeWallpaper(bytes: Uint8Array) {
     const metadata = await image.metadata()
     const { width, height, format } = metadata
     if (!width || !height || width > 16384 || height > 16384 || (metadata.pages ?? 1) > 1)
-      throw wallpaperErrors.INVALID()
-    if (format !== 'jpeg' && format !== 'png' && format !== 'webp') throw wallpaperErrors.INVALID()
+      throw wallpaperErrors.INVALID({
+        internal: { reason: 'dimensions', width, height, pages: metadata.pages ?? 1 },
+      })
+    if (format !== 'jpeg' && format !== 'png' && format !== 'webp')
+      throw wallpaperErrors.INVALID({ internal: { reason: 'format', format: format ?? null } })
     // Decode the full image before committing even when a thumbnail could skip corrupt rows.
     await image.clone().raw().toBuffer()
     const derived = await deriveWallpaper(image)
@@ -22,8 +30,14 @@ export async function decodeWallpaper(bytes: Uint8Array) {
     const contentType: 'image/jpeg' | 'image/png' | 'image/webp' =
       format === 'jpeg' ? 'image/jpeg' : (`image/${format}` as const)
     return { width, height, extension, contentType, ...derived }
-  } catch {
-    throw wallpaperErrors.INVALID()
+  } catch (cause) {
+    // `sharp` is the only thing that knows why a decode failed; without its
+    // message a corrupt file and an unsupported one are the same error.
+    if (isEvlogError(cause)) throw cause
+    throw wallpaperErrors.INVALID({
+      cause: cause instanceof Error ? cause : undefined,
+      internal: { reason: 'decode', bytes: bytes.byteLength },
+    })
   }
 }
 

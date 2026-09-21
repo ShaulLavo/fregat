@@ -89,7 +89,9 @@ export async function resolveRepositoryIdentity(
   const rootCommit = await git.rootCommit(canonicalPath)
   if (rootCommit) return { source: 'root-commit', canonical: rootCommit }
 
-  throw sessionDomainErrors.REPOSITORY_IDENTITY_UNAVAILABLE()
+  throw sessionDomainErrors.REPOSITORY_IDENTITY_UNAVAILABLE({
+    internal: { tried: ['remote', 'root-commit'], hasRootCommit: Boolean(rootCommit) },
+  })
 }
 
 async function canonicalRegistrationPath(input: ProjectCreateCommand, paths: WorkspacePaths) {

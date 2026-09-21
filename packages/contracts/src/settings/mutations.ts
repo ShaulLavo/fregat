@@ -206,41 +206,59 @@ export const nonSecretProviderSeedSchema: v.GenericSchema<unknown, NonSecretProv
     config: v.optional(v.record(v.string(), v.unknown())),
   })
 
-export const settingsOperationSchema = v.union([
-  ...scalarSettingOperationSchemas,
-  themeCustomizeOperationSchema,
-  themeResetOperationSchema,
-  v.strictObject({ kind: v.literal('reset'), keys: uniqueSettingIdsSchema }),
-  v.strictObject({
+/**
+ * The non-`set` branches, keyed by `kind`. The union below is built from these,
+ * so a rejected request can re-check one branch on its own instead of reporting
+ * the union's "Expected Object but received Object".
+ */
+export const settingsOperationSchemasByKind = {
+  'theme.customize': themeCustomizeOperationSchema,
+  'theme.reset': themeResetOperationSchema,
+  reset: v.strictObject({ kind: v.literal('reset'), keys: uniqueSettingIdsSchema }),
+  'machine.set': v.strictObject({
     kind: v.literal('machine.set'),
     name: machineNameSchema,
     machine: machineSchema,
   }),
-  v.strictObject({ kind: v.literal('machine.remove'), name: machineNameSchema }),
-  v.strictObject({
+  'machine.remove': v.strictObject({
+    kind: v.literal('machine.remove'),
+    name: machineNameSchema,
+  }),
+  'keybinding.set': v.strictObject({
     kind: v.literal('keybinding.set'),
     command: keybindingCommandIdSchema,
     keys: v.nullable(trimmedNonEmptyStringSchema),
   }),
-  v.strictObject({
+  'keybinding.remove': v.strictObject({
     kind: v.literal('keybinding.remove'),
     command: keybindingCommandIdSchema,
   }),
-  v.strictObject({
+  'model.setHidden': v.strictObject({
     kind: v.literal('model.setHidden'),
     ref: modelRefSchema,
     hidden: v.boolean(),
   }),
-  v.strictObject({
+  'model.setOrder': v.strictObject({
     kind: v.literal('model.setOrder'),
     order: modelRefListSchema,
   }),
-  v.strictObject({
+  'provider.setEnabled': v.strictObject({
     kind: v.literal('provider.setEnabled'),
     providerInstanceId: providerInstanceIdSchema,
     enabled: v.boolean(),
     createIfMissing: v.optional(nonSecretProviderSeedSchema),
   }),
+} satisfies Record<Exclude<SettingsOperation['kind'], 'set'>, v.GenericSchema>
+
+/** Every `kind` the operation union accepts, so a rejection can name a bad one. */
+export const SETTINGS_OPERATION_KINDS: readonly SettingsOperation['kind'][] = Object.freeze([
+  'set',
+  ...(Object.keys(settingsOperationSchemasByKind) as Exclude<SettingsOperation['kind'], 'set'>[]),
+])
+
+export const settingsOperationSchema = v.union([
+  ...scalarSettingOperationSchemas,
+  ...Object.values(settingsOperationSchemasByKind),
 ] as unknown as [
   v.GenericSchema<unknown, SettingsOperation>,
   v.GenericSchema<unknown, SettingsOperation>,

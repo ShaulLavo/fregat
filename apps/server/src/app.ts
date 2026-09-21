@@ -499,13 +499,25 @@ function errorForResponse(code: unknown, error: unknown) {
   return new FsError('OPERATION_FAILED', undefined, error)
 }
 
+/**
+ * `why` and `fix` are static catalog prose — no request data, nothing to
+ * redact. Dropping them here is why a toast could say what failed but never
+ * what to do about it, while the server log held the answer all along.
+ */
 function responseErrorPayload(error: { code?: string; message: string; statusCode: number }) {
   if (isFsError(error)) return errorPayload(error)
+
+  const guidance = isEvlogError(error) ? { fix: error.fix, link: error.link, why: error.why } : {}
 
   return {
     error: {
       code: error.code ?? 'OPERATION_FAILED',
       message: error.message,
+      ...definedOnly(guidance),
     },
   }
+}
+
+function definedOnly(values: Record<string, string | undefined>) {
+  return Object.fromEntries(Object.entries(values).filter(([, value]) => value !== undefined))
 }

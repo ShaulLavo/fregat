@@ -26,7 +26,6 @@ import {
   type ChatModeToolTab,
 } from '@/features/chat-mode/utils/panels'
 
-import { Wallpaper } from '@/features/workbench/components/wallpaper'
 import type { WorkbenchPanels } from '@/features/workbench/utils/panels'
 
 export function ChatModeLayout({
@@ -59,8 +58,7 @@ export function ChatModeLayout({
       data-chat-mode=''
       role='application'
     >
-      <Wallpaper />
-      <div className={cn(surface.region, 'relative z-10 flex min-h-0 min-w-0 flex-1')}>
+      <div className='relative z-10 flex min-h-0 min-w-0 flex-1'>
         <PersistedResizablePanelGroup
           className='min-h-0 min-w-0 flex-1'
           id='chat-mode'

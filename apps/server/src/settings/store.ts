@@ -341,7 +341,9 @@ export class SettingsStore {
   private assertOperational() {
     if (!this.recoveryBlocked) return
 
-    throw settingsErrors.TRANSACTION_RECOVERY_REQUIRED({})
+    throw settingsErrors.TRANSACTION_RECOVERY_REQUIRED({
+      internal: { journal: settingsTransactionJournalPath(this.secretsPath) },
+    })
   }
 
   private blockIfRecoveryPending() {
@@ -789,7 +791,10 @@ export class SettingsStore {
   private prepareRawDocument(target: SettingsWriteTarget, text: string): PreparedRawDocument {
     const parsed = parseSettingsDocument(text)
     if (parsed.parseErrors.length > 0) {
-      throw settingsErrors.FILE_MALFORMED({ detail: parsed.parseErrors[0].message })
+      throw settingsErrors.FILE_MALFORMED({
+        detail: parsed.parseErrors[0].message,
+        internal: { at: 'raw-write', target, parseErrorCount: parsed.parseErrors.length },
+      })
     }
 
     const registeredSettingIds = Object.keys(parsed.values).filter(isSettingId)
@@ -806,6 +811,7 @@ export class SettingsStore {
         key: PROVIDER_INSTANCES,
         scope: 'application',
         target,
+        internal: { at: 'raw-write', secretCount: split.secrets.size },
       })
     }
 
@@ -823,7 +829,10 @@ export class SettingsStore {
   private assertCurrentDocumentValid(current: LayerContents) {
     if (current.parseErrors.length === 0) return
 
-    throw settingsErrors.FILE_MALFORMED({ detail: current.parseErrors[0].message })
+    throw settingsErrors.FILE_MALFORMED({
+      detail: current.parseErrors[0].message,
+      internal: { at: 'current-document', parseErrorCount: current.parseErrors.length },
+    })
   }
 
   private assertReductionValid(raw: Readonly<Record<string, unknown>>) {
@@ -835,6 +844,7 @@ export class SettingsStore {
       throw settingsErrors.WRITE_INVALID({
         key: id,
         reason: validationReason(parsed.issues),
+        internal: { at: 'reduction', issueCount: parsed.issues.length },
       })
     }
   }
@@ -845,13 +855,26 @@ export class SettingsStore {
   }
 
   private assertWritable(key: SettingId, target: SettingsWriteTarget) {
-    if (!isSettingId(key)) throw settingsErrors.UNKNOWN_KEY({ key })
-    if (Object.hasOwn(this.policy, key)) throw settingsErrors.POLICY_CONTROLLED({ key })
+    if (!isSettingId(key))
+      throw settingsErrors.UNKNOWN_KEY({
+        key,
+        internal: { at: 'assert-writable', registeredCount: SETTING_IDS.length },
+      })
+    if (Object.hasOwn(this.policy, key))
+      throw settingsErrors.POLICY_CONTROLLED({
+        key,
+        internal: { policyKeys: Object.keys(this.policy) },
+      })
 
     const { scope } = descriptorFor(key)
     if (layerAllowsScope(target, scope)) return
 
-    throw settingsErrors.SCOPE_NOT_ALLOWED({ key, scope, target })
+    throw settingsErrors.SCOPE_NOT_ALLOWED({
+      key,
+      scope,
+      target,
+      internal: { at: 'assert-writable' },
+    })
   }
 
   private async runIdempotentWrite(
@@ -912,7 +935,13 @@ export class SettingsStore {
   ) {
     if (retained.kind === kind && retained.fingerprint === fingerprint) return
 
-    throw settingsErrors.ID_COLLISION({})
+    throw settingsErrors.ID_COLLISION({
+      internal: {
+        retainedKind: retained.kind,
+        requestedKind: kind,
+        fingerprintMatches: retained.fingerprint === fingerprint,
+      },
+    })
   }
 
   private rememberReceipt(id: string, receipt: WriteReceipt) {
@@ -972,6 +1001,7 @@ export class SettingsStore {
         file: filePath,
         detail: error instanceof Error ? error.message : String(error),
         cause: error instanceof Error ? error : undefined,
+        internal: { at: 'startup', errorCode: errorStringField(error, 'code') },
       })
     }
   }
@@ -1003,6 +1033,7 @@ export class SettingsStore {
       key: 'workspace settings',
       scope: 'window',
       target: 'workspace (no folder open)',
+      internal: { at: 'layer-for', requested: target },
     })
   }
 

@@ -59,7 +59,10 @@ export class CommitMessageGenerator {
     const context = await this.diffContext(path)
     throwIfCancelled(signal)
     const candidates = await this.candidateModels()
-    if (candidates.length === 0) throw gitCommitMessageErrors.COMMIT_MESSAGE_PROVIDER_UNAVAILABLE()
+    if (candidates.length === 0)
+      throw gitCommitMessageErrors.COMMIT_MESSAGE_PROVIDER_UNAVAILABLE({
+        internal: { reason: 'no-candidates', source: context.source },
+      })
 
     return this.firstMessage(candidates, context, signal)
   }
@@ -75,7 +78,13 @@ export class CommitMessageGenerator {
       throwIfCancelled(signal)
       try {
         const message = (await this.requestText(selected, context, signal)).trim()
-        if (!message) throw gitCommitMessageErrors.COMMIT_MESSAGE_RESPONSE_EMPTY()
+        if (!message)
+          throw gitCommitMessageErrors.COMMIT_MESSAGE_RESPONSE_EMPTY({
+            internal: {
+              model: selected.modelSelection.model,
+              providerInstanceId: selected.modelSelection.providerInstanceId,
+            },
+          })
 
         return { message, modelSelection: selected.modelSelection, source: context.source }
       } catch (error) {
@@ -94,7 +103,9 @@ export class CommitMessageGenerator {
     const working = await this.git.diff(path, false)
     if (working.length > 0) return { patch: budgetCommitMessagePatch(working), source: 'working' }
 
-    throw gitCommitMessageErrors.COMMIT_MESSAGE_DIFF_EMPTY()
+    throw gitCommitMessageErrors.COMMIT_MESSAGE_DIFF_EMPTY({
+      internal: { checked: ['staged', 'working'] },
+    })
   }
 
   private async candidateModels(): Promise<readonly CommitMessageModel[]> {
@@ -103,7 +114,10 @@ export class CommitMessageGenerator {
       return commitMessageCandidates(providers)
     } catch (error) {
       recordRequestWarning('git.commit_message.providers_read_failed', { error })
-      throw gitCommitMessageErrors.COMMIT_MESSAGE_PROVIDER_UNAVAILABLE()
+      throw gitCommitMessageErrors.COMMIT_MESSAGE_PROVIDER_UNAVAILABLE({
+        cause: error instanceof Error ? error : undefined,
+        internal: { reason: 'providers-read-failed' },
+      })
     }
   }
 
@@ -120,7 +134,10 @@ export class CommitMessageGenerator {
       })
       return result.text
     } catch (error) {
-      if (signal?.aborted) throw gitCommitMessageErrors.COMMIT_MESSAGE_CANCELLED()
+      if (signal?.aborted)
+        throw gitCommitMessageErrors.COMMIT_MESSAGE_CANCELLED({
+          internal: { at: 'request-text', model: selected.modelSelection.model },
+        })
 
       recordRequestWarning('git.commit_message.provider_failed', {
         patchLength: context.patch.length,
@@ -131,6 +148,12 @@ export class CommitMessageGenerator {
       throw gitCommitMessageErrors.COMMIT_MESSAGE_PROVIDER_FAILED({
         providerInstanceId: selected.modelSelection.providerInstanceId,
         reason: errorSummary(error).message,
+        cause: error instanceof Error ? error : undefined,
+        internal: {
+          model: selected.modelSelection.model,
+          patchLength: context.patch.length,
+          source: context.source,
+        },
       })
     }
   }
@@ -240,5 +263,6 @@ function commitMessagePrompt(context: DiffContext) {
 }
 
 function throwIfCancelled(signal: AbortSignal | undefined) {
-  if (signal?.aborted) throw gitCommitMessageErrors.COMMIT_MESSAGE_CANCELLED()
+  if (signal?.aborted)
+    throw gitCommitMessageErrors.COMMIT_MESSAGE_CANCELLED({ internal: { at: 'checkpoint' } })
 }

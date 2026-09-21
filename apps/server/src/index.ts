@@ -17,7 +17,7 @@ import {
 } from './observability'
 import { defaultSecretsFilePath, defaultSettingsFilePath } from './settings/paths'
 import { settingsPolicyFromEnv } from './settings/policy'
-import { releaseFileFor } from './web/release'
+import { readReleaseInfoSync, releaseFileFor } from './web/release'
 
 const port = Number(Bun.env.PORT ?? 3001)
 const hostname = Bun.env.FS_HOST ?? Bun.env.HOST ?? '127.0.0.1'
@@ -38,7 +38,7 @@ const treeConcurrency = numberFromEnv(Bun.env.FS_TREE_CONCURRENCY)
 let serverShutdown: Promise<void> | null = null
 
 assertLoopbackHost(hostname)
-initializeObservability(Bun.env)
+initializeObservability(Bun.env, readReleaseInfoSync(webRoot ? releaseFileFor(webRoot) : undefined))
 installCrashHandlers()
 
 export const app = createApp({
@@ -164,7 +164,7 @@ function numberFromEnv(value: string | undefined) {
 function assertLoopbackHost(host: string) {
   if (host === 'localhost' || host === '127.0.0.1' || host === '::1') return
 
-  throw serverErrors.LOOPBACK_HOST_REQUIRED()
+  throw serverErrors.LOOPBACK_HOST_REQUIRED({ internal: { host, port } })
 }
 
 function exitCodeForSignal(signal: NodeJS.Signals) {

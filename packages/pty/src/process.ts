@@ -4,13 +4,19 @@ import type { Pty, PtyExit, SpawnPtyOptions } from './utils/types'
 
 export function spawnPty(options: SpawnPtyOptions): Pty {
   if (typeof Bun === 'undefined' || typeof Bun.Terminal !== 'function') {
-    throw ptyErrors.UNSUPPORTED_RUNTIME()
+    throw ptyErrors.UNSUPPORTED_RUNTIME({
+      internal: { reason: 'no-bun-terminal', runtime: typeof Bun === 'undefined' ? 'node' : 'bun' },
+    })
   }
   if (!Bun.semver.satisfies(Bun.version, '>=1.3.14')) {
-    throw ptyErrors.UNSUPPORTED_RUNTIME()
+    throw ptyErrors.UNSUPPORTED_RUNTIME({
+      internal: { reason: 'bun-version', version: Bun.version, required: '>=1.3.14' },
+    })
   }
   if (process.platform !== 'linux' && process.platform !== 'darwin') {
-    throw ptyErrors.UNSUPPORTED_RUNTIME()
+    throw ptyErrors.UNSUPPORTED_RUNTIME({
+      internal: { reason: 'platform', platform: process.platform },
+    })
   }
   validateOptions(options)
   return new NativePty(options)
@@ -42,13 +48,23 @@ class NativePty implements Pty {
         },
       })
     } catch (cause) {
-      throw ptyErrors.SPAWN_FAILED(cause instanceof Error ? { cause } : { internal: { cause } })
+      throw ptyErrors.SPAWN_FAILED({
+        ...(cause instanceof Error ? { cause } : {}),
+        internal: {
+          ...(cause instanceof Error ? {} : { cause }),
+          command: options.command,
+          cols: options.cols ?? 80,
+          rows: options.rows ?? 24,
+        },
+      })
     }
 
     const terminal = this.#child.terminal
     if (!terminal) {
       this.#child.kill('SIGKILL')
-      throw ptyErrors.UNSUPPORTED_RUNTIME()
+      throw ptyErrors.UNSUPPORTED_RUNTIME({
+        internal: { reason: 'no-terminal-on-child', bunVersion: Bun.version },
+      })
     }
     this.#terminal = terminal
     void this.#child.exited.then(

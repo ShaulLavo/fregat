@@ -13,7 +13,7 @@ export function useDiscardStagedPathsMutation(paths: readonly string[], rootPath
       await unstagePaths(paths, owner)
       return discardPaths(paths, owner)
     },
-    mutationKey: mutationKeys.discardStagedMany(paths),
+    mutationKey: mutationKeys.discardStagedMany(rootPath, paths),
     onError: notifyMutationError,
     onSuccess: (status, _variables, _onMutateResult, { client }) =>
       settleDiscardedGitStatus(client, rootPath, status),

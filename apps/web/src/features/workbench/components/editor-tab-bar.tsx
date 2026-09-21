@@ -33,7 +33,7 @@ export function EditorTabBar({
     <SortableContext items={tabs.map((tab) => tab.id)} strategy={horizontalListSortingStrategy}>
       <div
         aria-label='Editor tabs'
-        className={cn(BAR_TAB_STRIP_CLASS, 'bg-background')}
+        className={BAR_TAB_STRIP_CLASS}
         data-editor-tab-strip={groupId}
         ref={setStripRef}
         role='tablist'

@@ -285,13 +285,14 @@ export const SETTINGS_REGISTRY = {
   }),
   'workbench.surface.contentOpacity': defineSetting({
     schema: percentSchema,
-    default: 95,
+    default: 50,
     scope: 'window',
     widget: 'number',
     category: 'Appearance',
-    // Drives --content-opacity, the opacity of the single content well
-    // (--content-well) that panes paint under the editor and terminal.
-    description: 'How opaque the editor and terminal background is.',
+    // Drives --content-opacity: the well is a second layer over a panel that
+    // already painted one, so 50 over 80 composites to 90.
+    description:
+      'How opaque the extra layer under the editor, terminal and settings is. It sits on top of the panel, so 0 leaves them as see-through as a sidebar.',
     keywords: ['transparency', 'opacity', 'editor', 'terminal', 'content'],
   }),
   'workbench.surface.blur': defineSetting({

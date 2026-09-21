@@ -118,7 +118,7 @@ export function SettingsPage({
 
   return (
     <ToolPane
-      className='bg-background @container/settings h-full min-w-0'
+      className='@container/settings h-full min-w-0'
       bodyClassName='flex flex-col overflow-hidden'
       ref={setRootRef}
       tabIndex={-1}

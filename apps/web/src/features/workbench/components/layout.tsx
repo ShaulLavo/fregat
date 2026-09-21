@@ -13,7 +13,6 @@ import type { EditorTabConflictMap } from '@/features/workspace/utils/tab-types'
 import { BottomPanel } from '@/features/workbench/components/bottom-panel'
 import { CodePanel } from '@/features/workbench/components/code-panel'
 import { SidebarPanel } from '@/features/workbench/components/sidebar-panel'
-import { Wallpaper } from '@/features/workbench/components/wallpaper'
 import {
   setWorkbenchMainLayout,
   setWorkbenchOuterLayout,
@@ -61,9 +60,8 @@ export function WorkbenchLayout({
       data-workbench=''
       role='application'
     >
-      <Wallpaper />
       <ResizablePanelGroup
-        className={cn(surface.region, 'relative z-10 min-h-0 min-w-0 flex-1')}
+        className='relative z-10 min-h-0 min-w-0 flex-1'
         defaultLayout={layout.outerLayout}
         id='workbench-outer'
         onLayoutChanged={handleOuterLayoutChanged}
@@ -89,7 +87,11 @@ export function WorkbenchLayout({
             orientation='vertical'
             onLayoutChanged={handleMainLayoutChanged}
           >
-            <ResizablePanel className='min-h-0 min-w-0 overflow-hidden' id='editor' minSize={160}>
+            <ResizablePanel
+              className={cn('min-h-0 min-w-0 overflow-hidden', surface.panel)}
+              id='editor'
+              minSize={160}
+            >
               <CodePanel
                 conflicts={conflicts}
                 gitFiles={gitFiles}
@@ -101,7 +103,7 @@ export function WorkbenchLayout({
               <>
                 <ResizableHandle id='bottom-handle' withHandle />
                 <ResizablePanel
-                  className='min-h-0 min-w-0 overflow-hidden'
+                  className={cn('min-h-0 min-w-0 overflow-hidden', surface.panel)}
                   id='bottom'
                   maxSize={BOTTOM_MAX_SIZE}
                   minSize={BOTTOM_MIN_SIZE}

@@ -2,7 +2,7 @@ import { themeBundleSchema, type ThemeBundle } from './bundle'
 import * as v from 'valibot'
 import { BUNDLED_WALLPAPERS, bundledWallpaperSelection } from './bundle-wallpapers'
 
-const material = { opacity: 80, contentOpacity: 95, blur: 9, saturation: 160 }
+const material = { opacity: 80, contentOpacity: 50, blur: 9, saturation: 160 }
 const packs = [
   {
     id: 'graphite',

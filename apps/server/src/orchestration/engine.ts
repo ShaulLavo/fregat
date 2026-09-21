@@ -353,7 +353,13 @@ export class OrchestrationEngine {
       !this.discovery ||
       !sources.some((source) => source.providerInstanceId === providerInstanceId)
     ) {
-      throw sessionImportErrors.UNAVAILABLE()
+      throw sessionImportErrors.UNAVAILABLE({
+        internal: {
+          providerInstanceId,
+          hasDiscovery: Boolean(this.discovery),
+          sourceIds: sources.map((source) => source.providerInstanceId),
+        },
+      })
     }
     return this.discovery.scan(providerInstanceId)
   }
@@ -470,7 +476,10 @@ export class OrchestrationEngine {
   private requireCommandRuntimeOwnership(command: OrchestrationCommand) {
     switch (command.type) {
       case 'session.terminal-history.append':
-        if (!this.providerService) throw sessionIdentityErrors.TERMINAL_SESSION_INVALID()
+        if (!this.providerService)
+          throw sessionIdentityErrors.TERMINAL_SESSION_INVALID({
+            internal: { at: 'terminal-history-append', reason: 'no-provider-service' },
+          })
         this.providerService.requireTerminalOwnership(command.sessionId)
         return
       case 'session.turn.start':
@@ -501,7 +510,7 @@ export class OrchestrationEngine {
         command.type === 'session.history.import' &&
         this.eventStore.hasPlatformTurn(command.sessionId)
       ) {
-        throw sessionImportErrors.CONTINUED()
+        throw sessionImportErrors.CONTINUED({ internal: { sessionId: command.sessionId } })
       }
       this.requireCommandRuntimeOwnership(command)
       if (command.type === 'session.turn.steer')
@@ -787,7 +796,14 @@ export class OrchestrationEngine {
               (row) => row.canonicalPath === cwd && !row.retiredAt,
             )
         if (!worktree) return null
-        if (worktree.lifecycle.state !== 'ready') throw worktreeRuntimeErrors.UNAVAILABLE()
+        if (worktree.lifecycle.state !== 'ready')
+          throw worktreeRuntimeErrors.UNAVAILABLE({
+            internal: {
+              at: 'acquire-shared',
+              worktreeId: worktree.id,
+              lifecycleState: worktree.lifecycle.state,
+            },
+          })
         return {
           worktreeId: worktree.id,
           ...this.worktreeExecutionGate.acquireShared(worktree.id, 'provider'),
@@ -840,7 +856,17 @@ export class OrchestrationEngine {
     const { sessionId, worktreeId } = input
     const session = this.readModel.sessions.get(sessionId)
     if (!session || session.deletedAt || session.worktreeId !== worktreeId || !this.providerService)
-      throw sessionIdentityErrors.TERMINAL_SESSION_INVALID()
+      throw sessionIdentityErrors.TERMINAL_SESSION_INVALID({
+        internal: {
+          at: 'terminal-handoff',
+          sessionId,
+          worktreeId,
+          sessionFound: Boolean(session),
+          deleted: Boolean(session?.deletedAt),
+          sessionWorktreeId: session?.worktreeId ?? null,
+          hasProviderService: Boolean(this.providerService),
+        },
+      })
     const status = session.runtime?.status
     if (
       session.latestTurn?.state === 'running' ||
@@ -848,7 +874,14 @@ export class OrchestrationEngine {
       status === 'starting' ||
       status === 'waiting'
     )
-      throw sessionIdentityErrors.TERMINAL_SESSION_INVALID()
+      throw sessionIdentityErrors.TERMINAL_SESSION_INVALID({
+        internal: {
+          at: 'terminal-handoff-busy',
+          sessionId,
+          runtimeStatus: status ?? null,
+          latestTurnState: session.latestTurn?.state ?? null,
+        },
+      })
     const provider = this.providerService
     const pending = this.terminalHandoffs.get(sessionId)
     if (pending) await this.retryTerminalHistory(pending, provider)
@@ -873,7 +906,14 @@ export class OrchestrationEngine {
     const worktree = this.readModel.worktrees.get(session.worktreeId)
     if (!worktree) {
       launch.release()
-      throw sessionIdentityErrors.TERMINAL_SESSION_INVALID()
+      throw sessionIdentityErrors.TERMINAL_SESSION_INVALID({
+        internal: {
+          at: 'terminal-launch',
+          sessionId: session.id,
+          worktreeId: session.worktreeId,
+          reason: 'worktree-absent',
+        },
+      })
     }
     const startedAt = new Date().toISOString()
     const input = {
@@ -1028,7 +1068,10 @@ export class OrchestrationEngine {
   }
 
   private async finishTerminalHistoryRecovery(handoff: TerminalHandoff, provider: ProviderService) {
-    if (handoff.phase === 'active') throw sessionIdentityErrors.TERMINAL_OWNERSHIP_UNKNOWN()
+    if (handoff.phase === 'active')
+      throw sessionIdentityErrors.TERMINAL_OWNERSHIP_UNKNOWN({
+        internal: { at: 'history-recovery', sessionId: handoff.sessionId, phase: handoff.phase },
+      })
     await this.terminalLeases.endRecovered(handoff.terminalLeaseId)
     await this.appendTerminalHistory(provider, handoff)
     this.terminalHandoffs.complete(handoff.sessionId)
@@ -1057,13 +1100,19 @@ export class OrchestrationEngine {
 
   async worktreeCleanupPreview(worktreeId: WorktreeId) {
     await this.ready
-    if (!this.worktreePreparation) throw worktreeRuntimeErrors.UNAVAILABLE()
+    if (!this.worktreePreparation)
+      throw worktreeRuntimeErrors.UNAVAILABLE({
+        internal: { at: 'cleanup-preview', worktreeId, reason: 'no-preparation' },
+      })
     return this.worktreePreparation.cleanupPreview(worktreeId)
   }
 
   async worktreeMissingPreview(worktreeId: WorktreeId) {
     await this.ready
-    if (!this.worktreePreparation) throw worktreeRuntimeErrors.UNAVAILABLE()
+    if (!this.worktreePreparation)
+      throw worktreeRuntimeErrors.UNAVAILABLE({
+        internal: { at: 'missing-preview', worktreeId, reason: 'no-preparation' },
+      })
     return this.worktreePreparation.missingPreview(worktreeId)
   }
 
@@ -1075,13 +1124,23 @@ export class OrchestrationEngine {
       if (!project?.deletedAt && session.worktreeId !== worktreeId) continue
       if (this.readModel.worktrees.get(session.worktreeId)?.projectId !== projectId) continue
       if (!(await this.providerService?.hasRuntime({ sessionId: session.id }))) continue
-      throw sessionDomainErrors.REGISTRATION_BUSY({ projectId })
+      throw sessionDomainErrors.REGISTRATION_BUSY({
+        projectId,
+        internal: { worktreeId, liveSessionId: session.id },
+      })
     }
   }
 
   private async turnPrerequisitesSettled(sessionId: Parameters<typeof resolveSessionOwner>[1]) {
     const { worktree } = resolveSessionOwner(this.readModel, sessionId)
-    if (worktree.lifecycle.state !== 'ready') throw worktreeRuntimeErrors.UNAVAILABLE()
+    if (worktree.lifecycle.state !== 'ready')
+      throw worktreeRuntimeErrors.UNAVAILABLE({
+        internal: {
+          at: 'turn-prerequisites',
+          worktreeId: worktree.id,
+          lifecycleState: worktree.lifecycle.state,
+        },
+      })
     await this.worktreeReactor?.refresh(worktree.id)
     if (this.readModel.worktrees.get(worktree.id)?.lifecycle.state !== 'ready') return
     await this.checkpointReactor?.drain()

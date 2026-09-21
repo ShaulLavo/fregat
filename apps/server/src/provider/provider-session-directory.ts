@@ -158,7 +158,13 @@ function resolveBindingForWrite(
   const providerInstanceId = binding.providerInstanceId ?? existing?.providerInstanceId
   const runtimeEpoch = binding.runtimeEpoch ?? existing?.runtimeEpoch
   if (existing && providerInstanceId !== existing.providerInstanceId)
-    throw sessionIdentityErrors.SESSION_PROVIDER_CONFLICT()
+    throw sessionIdentityErrors.SESSION_PROVIDER_CONFLICT({
+      internal: {
+        at: 'directory-merge',
+        boundTo: existing.providerInstanceId,
+        requested: providerInstanceId ?? null,
+      },
+    })
   if (!providerInstanceId || !runtimeEpoch)
     throw createInternalError('A provider binding requires its instance and runtime epoch.')
   const previous = existing ? rowToBinding(existing) : null

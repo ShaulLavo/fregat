@@ -26,7 +26,15 @@ export function decideProviderStart(
     turn.turnId !== command.turnId ||
     turn.providerStartSequence !== command.observedSequence
   ) {
-    throw sessionDomainErrors.START_STATE_CONFLICT(command)
+    throw sessionDomainErrors.START_STATE_CONFLICT({
+      sessionId: command.sessionId,
+      internal: {
+        at: 'turn-identity',
+        commandType: command.type,
+        observed: { turnId: turn?.turnId, providerStartSequence: turn?.providerStartSequence },
+        expected: { turnId: command.turnId, observedSequence: command.observedSequence },
+      },
+    })
   }
   if (command.type === 'session.provider-start.claim') {
     requireReadyWorktree(model, session.worktreeId)
@@ -36,10 +44,30 @@ export function decideProviderStart(
     turn.runtimeEpoch !== command.runtimeEpoch ||
     turn.providerStartGeneration !== command.generation
   ) {
-    throw sessionDomainErrors.START_STATE_CONFLICT(command)
+    throw sessionDomainErrors.START_STATE_CONFLICT({
+      sessionId: command.sessionId,
+      internal: {
+        at: 'epoch-generation',
+        commandType: command.type,
+        observed: {
+          runtimeEpoch: turn.runtimeEpoch,
+          providerStartGeneration: turn.providerStartGeneration,
+        },
+        expected: { runtimeEpoch: command.runtimeEpoch, generation: command.generation },
+      },
+    })
   }
   const expected = command.type === 'session.provider-start.adopt' ? 'claimed' : 'adopted'
-  if (turn.providerStartState !== expected) throw sessionDomainErrors.START_STATE_CONFLICT(command)
+  if (turn.providerStartState !== expected)
+    throw sessionDomainErrors.START_STATE_CONFLICT({
+      sessionId: command.sessionId,
+      internal: {
+        at: 'start-state',
+        commandType: command.type,
+        observed: turn.providerStartState,
+        expected,
+      },
+    })
   const type =
     command.type === 'session.provider-start.adopt'
       ? 'session.provider-start-adopted'
@@ -56,7 +84,17 @@ function claimStart(
     turn.providerStartState !== 'queued' ||
     command.generation !== turn.providerStartGeneration + 1
   ) {
-    throw sessionDomainErrors.START_STATE_CONFLICT(command)
+    throw sessionDomainErrors.START_STATE_CONFLICT({
+      sessionId: command.sessionId,
+      internal: {
+        at: 'claim',
+        observed: {
+          providerStartState: turn.providerStartState,
+          providerStartGeneration: turn.providerStartGeneration,
+        },
+        expected: { providerStartState: 'queued', generation: command.generation },
+      },
+    })
   }
   return one(command, at, 'session.provider-start-claimed', startPayload(command))
 }
@@ -85,7 +123,16 @@ export function decideRuntimeRecovery(
   const observedRuntime = session.runtimeSequence === command.observedSequence
   const epoch = command.turnId ? turn?.runtimeEpoch : session.runtime?.runtimeEpoch
   if ((!observedTurn && !observedRuntime) || epoch !== command.runtimeEpoch) {
-    throw sessionDomainErrors.START_STATE_CONFLICT(command)
+    throw sessionDomainErrors.START_STATE_CONFLICT({
+      sessionId: command.sessionId,
+      internal: {
+        at: 'runtime-recovery',
+        observedTurn,
+        observedRuntime,
+        observedEpoch: epoch ?? null,
+        expectedEpoch: command.runtimeEpoch,
+      },
+    })
   }
   return [
     event(command, at, 'session.runtime-recovered', {
@@ -109,7 +156,15 @@ export function decideDeletionUpdate(
     !session?.deletedAt ||
     session.deletion?.deletionSequence !== command.deletion.deletionSequence
   ) {
-    throw sessionDomainErrors.START_STATE_CONFLICT(command)
+    throw sessionDomainErrors.START_STATE_CONFLICT({
+      sessionId: command.sessionId,
+      internal: {
+        at: 'deletion-update',
+        deleted: Boolean(session?.deletedAt),
+        observedSequence: session?.deletion?.deletionSequence ?? null,
+        expectedSequence: command.deletion.deletionSequence,
+      },
+    })
   }
   return one(command, at, 'session.deletion-updated', {
     sessionId: command.sessionId,

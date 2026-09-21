@@ -35,9 +35,11 @@ import {
   gitGraphKeyboard,
 } from './pattern-lists'
 import { panelSeams } from './panel-seams'
+import { surfaceAudit } from './surface-audit'
 import { surfaceStacking } from './surface-stacking'
 import { chatTimelinePattern } from './chat-timeline-pattern'
 import { settingsFontInput } from './settings-font-input'
+import { settingsSaveRejected } from './settings-save-rejected'
 import { settingsResponsive } from './settings-responsive'
 import { filePickerNavigation, gitHistoryScroll } from './list-regressions'
 import { iconHints } from './icon-hints'
@@ -126,6 +128,8 @@ import { editorUndoBranch } from './editor-undo-branch'
 import { editorTitleDiffToggle } from './editor-title-diff-toggle'
 import { editorUndoReopen } from './editor-undo-reopen'
 import { gitCommitHookColors } from './git-commit-hook-colors'
+import { gitDiffHoverTokens } from './git-diff-hover-tokens'
+import { gitDiffInlineTint } from './git-diff-inline-tint'
 import { gitCommitMessageFile } from './git-commit-message-file'
 import { gitCommitMessagePersists } from './git-commit-message-persists'
 import { gitCommitSlowHook } from './git-commit-slow-hook'
@@ -182,10 +186,12 @@ export const scenarios: readonly Scenario[] = [
   filePickerNavigation,
   gitHistoryScroll,
   settingsResponsive,
+  settingsSaveRejected,
   searchResults,
   terminalTabs,
   gitGraphKeyboard,
   panelSeams,
+  surfaceAudit,
   surfaceStacking,
   chatTimelinePattern,
   chatFollowUp,
@@ -261,6 +267,8 @@ export const scenarios: readonly Scenario[] = [
   editorUndoBarrier,
   editorUndoBranch,
   editorTitleDiffToggle,
+  gitDiffHoverTokens,
+  gitDiffInlineTint,
   chatCardNarrow,
   chatGitTabSwitch,
   chatGitTurnRows,

@@ -36,9 +36,9 @@ export function BottomPanel({
     <ToolPane
       className='h-full min-w-0 overflow-hidden'
       header={null}
-      bodyClassName='flex overflow-hidden bg-content-well'
+      bodyClassName='flex overflow-hidden'
       subheader={
-        <PaneBar className={cn(BAR_TAB_STRIP_CLASS, 'bg-background px-0')}>
+        <PaneBar className={cn(BAR_TAB_STRIP_CLASS, 'px-0')}>
           <div
             aria-label='Bottom panel tabs'
             className='flex shrink-0 items-stretch'

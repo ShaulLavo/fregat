@@ -49,8 +49,8 @@ export const TARGETS = {
     allowed: ['shadow-md', 'shadow-xl', 'shadow-none'],
     histogram: true,
   },
-  rawButtons: {
-    title: 'raw <button> elements',
+  rawControls: {
+    title: 'raw form controls',
     allowListed: true,
     listed: true,
     // A primitive is the button, so the raw element has to be written somewhere in packages/ui.
@@ -415,9 +415,13 @@ function newlinesBefore(value, index) {
   return count
 }
 
+// Every element `@workspace/ui` ships a primitive for. Reaching for the raw tag skips the
+// primitive's radius, height, focus ring and density, which is the whole point of having one.
+const RAW_CONTROL_ELEMENTS = new Set(['button', 'input', 'select', 'textarea'])
+
 function recordElement(census, file, element, lineAt) {
   const hit = { file, line: lineAt(element.start), value: `<${element.name}>` }
-  if (element.name === 'button') census.hits.rawButtons.push(hit)
+  if (RAW_CONTROL_ELEMENTS.has(element.name)) census.hits.rawControls.push(hit)
   if (!isControl(element)) return
   const ownChildren = element.children.filter(isVisibleChild)
   const children =
@@ -699,8 +703,21 @@ function offTarget(hits, allowed) {
   return hits.filter((hit) => !allowed.includes(hit.value))
 }
 
-export function evaluate(census, allowEntries = []) {
+/** An exception matching nothing is a claim about code that no longer exists. */
+function staleEntries(entries, census) {
+  if (!Array.isArray(entries)) return []
+  const seen = new Set()
+  for (const hits of Object.values(census.hits))
+    for (const hit of hits) seen.add(allowKey(hit.file, hit.value))
+  return entries
+    .filter((entry) => entryProblems(entry, 0).length === 0)
+    .filter((entry) => !seen.has(allowKey(entry.file, entry.class)))
+    .map((entry) => `${entry.file} :: ${entry.class}: stale, no such hit remains`)
+}
+
+export function evaluate(census, allowEntries = [], { checkStale = true } = {}) {
   const allowProblems = validateAllowEntries(allowEntries)
+  if (checkStale) allowProblems.push(...staleEntries(allowEntries, census))
   const allow = allowIndex(allowEntries)
   const gate = (measure, hits) => unallowed(scoped(measure, hits), allow)
   const offenders = {
@@ -713,7 +730,7 @@ export function evaluate(census, allowEntries = []) {
     hairlines: gate('hairlines', census.hits.hairlines),
     arbitraryText: gate('arbitraryText', census.hits.arbitraryText),
     shadow: gate('shadow', offTarget(census.hits.shadow, TARGETS.shadow.allowed)),
-    rawButtons: gate('rawButtons', census.hits.rawButtons),
+    rawControls: gate('rawControls', census.hits.rawControls),
     hoverFills: gate('hoverFills', rowFillOpacityHits(census)),
     iconSize: gate('iconSize', offTarget(census.hits.iconSize, TARGETS.iconSize.allowed)),
     textAlpha: gate('textAlpha', census.hits.textAlpha),

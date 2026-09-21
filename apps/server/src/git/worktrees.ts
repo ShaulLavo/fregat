@@ -79,14 +79,18 @@ export class GitWorktreeService {
       const branch = `worktree/${body.worktreeId}`
       await runner.run(['check-ref-format', '--branch', branch])
       if (await this.refExists(runner, `refs/heads/${branch}`))
-        throw gitWorktreeErrors.WORKTREE_BRANCH_EXISTS()
+        throw gitWorktreeErrors.WORKTREE_BRANCH_EXISTS({
+          internal: { at: 'prepare', branch, worktreeId: body.worktreeId },
+        })
       const head = await runner.run(['rev-parse', '--verify', 'HEAD'])
       const absolutePath = await managedWorktreePath(runner, body.worktreeId)
       if (
         (await maybeStat(absolutePath)) ||
         (await hasWorktreeAdministration(runner, absolutePath))
       ) {
-        throw gitWorktreeErrors.WORKTREE_IDENTITY_MISMATCH()
+        throw gitWorktreeErrors.WORKTREE_IDENTITY_MISMATCH({
+          internal: { at: 'prepare', reason: 'path-occupied', worktreeId: body.worktreeId },
+        })
       }
       return { worktreeId: body.worktreeId, absolutePath, branch, baseCommit: head.stdout.trim() }
     })
@@ -168,7 +172,14 @@ export class GitWorktreeService {
     recordWorktreeOperation('worktree_create', body.path, { worktreeId: body.worktreeId })
     const runner = await this.git.repositoryRunner(body.path)
     if (body.branch !== `worktree/${body.worktreeId}`)
-      throw gitWorktreeErrors.WORKTREE_IDENTITY_MISMATCH()
+      throw gitWorktreeErrors.WORKTREE_IDENTITY_MISMATCH({
+        internal: {
+          at: 'create',
+          reason: 'branch-name',
+          observed: body.branch,
+          expected: `worktree/${body.worktreeId}`,
+        },
+      })
     const absolutePath = await managedWorktreePath(runner, body.worktreeId)
     await assertManagedPath(runner, absolutePath)
     await this.assertRefExists(runner, body.baseCommit)
@@ -183,14 +194,20 @@ export class GitWorktreeService {
       (await maybeStat(absolutePath)) ||
       (await hasWorktreeAdministration(runner, absolutePath))
     ) {
-      throw gitWorktreeErrors.WORKTREE_IDENTITY_MISMATCH()
+      throw gitWorktreeErrors.WORKTREE_IDENTITY_MISMATCH({
+        internal: { at: 'create', reason: 'path-occupied', worktreeId: body.worktreeId },
+      })
     }
     await this.createBranch(runner, body)
     await runner.run(['worktree', 'add', '--', absolutePath, body.branch])
     const worktree = (await this.worktrees(runner)).find(
       (entry) => entry.absolutePath === absolutePath,
     )
-    if (!worktree) throw gitWorktreeErrors.WORKTREE_NOT_FOUND({ path: absolutePath })
+    if (!worktree)
+      throw gitWorktreeErrors.WORKTREE_NOT_FOUND({
+        path: absolutePath,
+        internal: { at: 'create', reason: 'absent-after-add', worktreeId: body.worktreeId },
+      })
     await this.verifyCreated(runner, worktree, body)
     return { created: true, worktree }
   }
@@ -205,7 +222,15 @@ export class GitWorktreeService {
     if (created.exitCode === 0) return
     const current = await runner.run(['rev-parse', '--verify', ref], { allowFailure: true })
     if (current.exitCode !== 0 || current.stdout.trim() !== body.baseCommit) {
-      throw gitWorktreeErrors.WORKTREE_BRANCH_EXISTS()
+      throw gitWorktreeErrors.WORKTREE_BRANCH_EXISTS({
+        internal: {
+          at: 'create-branch',
+          ref,
+          exitCode: current.exitCode,
+          observedCommit: current.stdout.trim(),
+          expectedCommit: body.baseCommit,
+        },
+      })
     }
   }
 
@@ -220,7 +245,18 @@ export class GitWorktreeService {
       worktree.commit !== body.baseCommit ||
       worktree.prunable
     ) {
-      throw gitWorktreeErrors.WORKTREE_IDENTITY_MISMATCH()
+      throw gitWorktreeErrors.WORKTREE_IDENTITY_MISMATCH({
+        internal: {
+          at: 'verify-created',
+          observed: {
+            branch: worktree.branch,
+            commit: worktree.commit,
+            prunable: worktree.prunable,
+            worktreeId: worktree.worktreeId,
+          },
+          expected: { branch: body.branch, commit: body.baseCommit, prunable: false },
+        },
+      })
     }
     await verifyWorktreeAdministration(runner, worktree.absolutePath)
   }
@@ -239,6 +275,7 @@ export class GitWorktreeService {
       throw gitWorktreeErrors.WORKTREE_DIRTY({
         fileCount: preview.changedFileCount,
         path: target.absolutePath,
+        internal: { mode: body.mode, expectedHead: preview.expectedHead },
       })
     }
     if (
@@ -246,7 +283,14 @@ export class GitWorktreeService {
       (body.expectedHead !== preview.expectedHead ||
         body.expectedStatusFingerprint !== preview.expectedStatusFingerprint)
     ) {
-      throw gitWorktreeErrors.WORKTREE_NEEDS_RECONFIRMATION()
+      throw gitWorktreeErrors.WORKTREE_NEEDS_RECONFIRMATION({
+        internal: {
+          headMoved: body.expectedHead !== preview.expectedHead,
+          statusMoved: body.expectedStatusFingerprint !== preview.expectedStatusFingerprint,
+          observedHead: preview.expectedHead,
+          confirmedHead: body.expectedHead,
+        },
+      })
     }
     const force = body.mode === 'discard-changes' ? ['--force'] : []
     await runner.run(['worktree', 'remove', ...force, '--', target.absolutePath])
@@ -263,7 +307,9 @@ export class GitWorktreeService {
         continue
       return this.git.repositoryRunner(candidate.absolutePath)
     }
-    throw gitWorktreeErrors.WORKTREE_IDENTITY_MISMATCH()
+    throw gitWorktreeErrors.WORKTREE_IDENTITY_MISMATCH({
+      internal: { at: 'surviving-removal-runner', reason: 'no-surviving-checkout' },
+    })
   }
 
   private async removableWorktree(runner: GitRepositoryRunner, body: GitWorktreeTarget) {
@@ -271,19 +317,37 @@ export class GitWorktreeService {
     const target = (await this.worktrees(runner)).find(
       (entry) => entry.absolutePath === absolutePath,
     )
-    if (!target) throw gitWorktreeErrors.WORKTREE_NOT_FOUND({ path: absolutePath })
-    if (target.main) throw gitWorktreeErrors.WORKTREE_MAIN_PROTECTED({ path: absolutePath })
+    if (!target)
+      throw gitWorktreeErrors.WORKTREE_NOT_FOUND({
+        path: absolutePath,
+        internal: { at: 'removable', worktreeId: body.worktreeId, pathKind: body.pathKind },
+      })
+    if (target.main)
+      throw gitWorktreeErrors.WORKTREE_MAIN_PROTECTED({
+        path: absolutePath,
+        internal: { at: 'removable', worktreeId: body.worktreeId },
+      })
     await assertManagedPath(runner, absolutePath)
     this.verifyTargetIdentity(body, target)
     if (!(await maybeStat(absolutePath)) || target.prunable)
-      throw gitWorktreeErrors.WORKTREE_ADMIN_STALE()
+      throw gitWorktreeErrors.WORKTREE_ADMIN_STALE({
+        internal: { at: 'removable', prunable: target.prunable, worktreeId: body.worktreeId },
+      })
     await verifyWorktreeAdministration(runner, absolutePath)
     return target
   }
 
   private verifyTargetIdentity(body: GitWorktreeTarget, target: GitWorktree | null) {
     if (!target || body.pathKind === 'legacy') return
-    if (target.worktreeId !== body.worktreeId) throw gitWorktreeErrors.WORKTREE_IDENTITY_MISMATCH()
+    if (target.worktreeId !== body.worktreeId)
+      throw gitWorktreeErrors.WORKTREE_IDENTITY_MISMATCH({
+        internal: {
+          at: 'verify-target',
+          reason: 'worktree-id',
+          observed: target.worktreeId,
+          expected: body.worktreeId,
+        },
+      })
   }
 
   private targetPath(runner: GitRepositoryRunner, input: string) {
@@ -320,7 +384,10 @@ export class GitWorktreeService {
     const resolved = await this.findBaseRef(runner, headBranch)
     if (resolved) return resolved
 
-    throw gitWorktreeErrors.WORKTREE_BASE_UNRESOLVED({ headBranch: headBranch ?? 'HEAD' })
+    throw gitWorktreeErrors.WORKTREE_BASE_UNRESOLVED({
+      headBranch: headBranch ?? 'HEAD',
+      internal: { remotes: await this.remoteNames(runner) },
+    })
   }
 
   private async findBaseRef(runner: GitRepositoryRunner, headBranch: string | null) {
@@ -384,7 +451,7 @@ export class GitWorktreeService {
   private async assertRefExists(runner: GitRepositoryRunner, ref: string) {
     if (await this.refExists(runner, ref)) return
 
-    throw gitWorktreeErrors.WORKTREE_BASE_NOT_FOUND({ base: ref })
+    throw gitWorktreeErrors.WORKTREE_BASE_NOT_FOUND({ base: ref, internal: { ref } })
   }
 
   private async refExists(runner: GitRepositoryRunner, ref: string) {

@@ -89,7 +89,7 @@ export class OrchestrationCheckpointDiffQuery {
   ) {
     if (await this.git.hasRef({ path: context.workspacePath, ref })) return
 
-    throw checkpointErrors.REF_UNAVAILABLE({ turnCount })
+    throw checkpointErrors.REF_UNAVAILABLE({ turnCount, internal: { ref } })
   }
 }
 

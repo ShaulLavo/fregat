@@ -54,7 +54,11 @@ export function TerminalTabs({
       id='workbench-terminals'
       storageKey='workbench-terminals'
     >
-      <ResizablePanel className='relative min-h-0 min-w-0' id='terminals' minSize={240}>
+      <ResizablePanel
+        className='bg-content-well relative min-h-0 min-w-0'
+        id='terminals'
+        minSize={240}
+      >
         {panels.terminalTabs.map((tab) => {
           const active = tab.id === panels.activeTerminalTabId
           return (

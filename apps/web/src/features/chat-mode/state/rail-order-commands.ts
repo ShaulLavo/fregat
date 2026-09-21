@@ -141,7 +141,9 @@ function performSessionDrop(patch: SessionDropPatch) {
             .sessionById[ref.sessionId]
         const unsubscribe = useChatProjectionStore.subscribe(() => {
           if (patch.entries.some((entry) => dropEntryConflicts(patch, entry, read(entry.ref))))
-            abort.abort(railOrderErrors.DROP_CHANGED())
+            abort.abort(
+              railOrderErrors.DROP_CHANGED({ internal: { entryCount: patch.entries.length } }),
+            )
         })
         try {
           return await runIntent(railOrderIntents, patch, {

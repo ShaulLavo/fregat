@@ -19,7 +19,7 @@ export const settingsErrors = defineErrorCatalog('settings', {
     status: 400,
     message: ({ key }: { key: string }) => `Unknown setting: ${key}`,
     why: 'The write named a setting this build does not register. Reads keep unknown keys so another build’s settings survive, but a write has to name something real.',
-    fix: 'Check the key against the settings registry. A renamed setting keeps its old value in the file until it is removed explicitly.',
+    fix: 'Check the key against the settings registry. A web build newer than the server offers settings the server cannot store — compare GET /platform/release. A renamed setting keeps its old value in the file until it is removed explicitly.',
   },
   SCOPE_NOT_ALLOWED: {
     status: 400,

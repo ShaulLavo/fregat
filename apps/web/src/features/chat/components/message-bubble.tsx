@@ -110,7 +110,7 @@ export function MessageBubble({
           className={cn(
             'min-w-0 text-sm leading-5',
             user
-              ? 'max-w-[80%] rounded-lg bg-secondary px-4 py-3 text-secondary-foreground'
+              ? 'max-w-[80%] rounded-lg bg-muted px-4 py-3 text-foreground'
               : 'w-full max-w-full px-1 py-0.5 text-foreground',
           )}
           onContextMenu={handleContextMenu}

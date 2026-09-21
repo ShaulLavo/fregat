@@ -20,18 +20,29 @@ export async function assertRewindIsolation({
 }) {
   const { worktree } = resolveSessionOwner(model, sessionId)
   if (worktree.kind !== 'linked' || worktree.lifecycle.state !== 'ready')
-    throw checkpointErrors.WORKSPACE_NOT_ISOLATED()
+    throw checkpointErrors.WORKSPACE_NOT_ISOLATED({
+      internal: {
+        check: 'worktree-kind',
+        worktreeId: worktree.id,
+        kind: worktree.kind,
+        lifecycleState: worktree.lifecycle.state,
+      },
+    })
   const cwd = await realpath(worktree.canonicalPath)
   const repository = await git.repositoryRunner(cwd)
   if ((await realpath(repository.rootAbsolutePath)) !== cwd)
-    throw checkpointErrors.WORKSPACE_NOT_ISOLATED()
+    throw checkpointErrors.WORKSPACE_NOT_ISOLATED({
+      internal: { check: 'repository-root', worktreeId: worktree.id },
+    })
   const gitDir = await repository.run(['rev-parse', '--absolute-git-dir'])
   const commonDir = await repository.run(['rev-parse', '--git-common-dir'])
   if (
     (await realpath(gitDir.stdout.trim())) ===
     (await realpath(path.resolve(cwd, commonDir.stdout.trim())))
   )
-    throw checkpointErrors.WORKSPACE_NOT_ISOLATED()
+    throw checkpointErrors.WORKSPACE_NOT_ISOLATED({
+      internal: { check: 'shared-git-dir', worktreeId: worktree.id },
+    })
   const candidates = new Set<string>()
   for (const other of model.sessions.values()) {
     if (other.id === sessionId || other.deletedAt) continue
@@ -45,7 +56,9 @@ export async function assertRewindIsolation({
   for (const candidate of candidates) {
     const other = await existingRealPath(candidate)
     if (other && (isWithin(cwd, other) || isWithin(other, cwd)))
-      throw checkpointErrors.WORKSPACE_NOT_ISOLATED()
+      throw checkpointErrors.WORKSPACE_NOT_ISOLATED({
+        internal: { check: 'overlapping-runtime', candidateCount: candidates.size },
+      })
   }
 }
 

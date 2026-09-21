@@ -1533,6 +1533,7 @@ function searchFileGroup(
   if (!firstMatch) {
     throw clientErrors.INVALID_OPTION({
       message: 'Cannot create a search file group without matches.',
+      internal: { rootPath, collapsedCount: collapsedPaths.size },
     })
   }
 

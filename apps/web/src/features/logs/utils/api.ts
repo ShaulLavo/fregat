@@ -54,7 +54,11 @@ export async function* subscribeLogEvents(
     query: logFilterQuery(filters),
   })
   if (response.error) throw createRpcError(response.error)
-  if (!response.data) throw clientErrors.EDEN_STREAM_MISSING({ label: 'Logs stream' })
+  if (!response.data)
+    throw clientErrors.EDEN_STREAM_MISSING({
+      label: 'Logs stream',
+      internal: { filterKeys: Object.keys(logFilterQuery(filters)) },
+    })
 
   for await (const event of parseEdenSseStream(response.data)) {
     if (event.event === 'heartbeat') continue

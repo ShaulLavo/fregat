@@ -12,7 +12,14 @@ export async function managedWorktreesRoot(runner: GitRepositoryRunner) {
   const entry = await maybeStat(root)
   if (!entry) return root
   if (!entry.isDirectory() || entry.isSymbolicLink() || (await realpath(root)) !== root) {
-    throw gitWorktreeErrors.WORKTREE_IDENTITY_MISMATCH()
+    throw gitWorktreeErrors.WORKTREE_IDENTITY_MISMATCH({
+      internal: {
+        check: 'managed-root',
+        isDirectory: entry.isDirectory(),
+        isSymbolicLink: entry.isSymbolicLink(),
+        realpathMatches: (await realpath(root)) === root,
+      },
+    })
   }
   return root
 }
@@ -32,7 +39,10 @@ export async function assertManagedPath(runner: GitRepositoryRunner, absolutePat
   const root = await managedWorktreesRoot(runner)
   const relative = relativeInsideRoot(root, absolutePath)
   if (!relative || relative.includes('/')) {
-    throw gitWorktreeErrors.WORKTREE_OUTSIDE_REPOSITORY({ path: absolutePath })
+    throw gitWorktreeErrors.WORKTREE_OUTSIDE_REPOSITORY({
+      path: absolutePath,
+      internal: { check: 'managed-path', relative: relative ?? null },
+    })
   }
   const entry = await maybeStat(absolutePath)
   if (!entry) return
@@ -41,7 +51,14 @@ export async function assertManagedPath(runner: GitRepositoryRunner, absolutePat
     entry.isSymbolicLink() ||
     (await realpath(absolutePath)) !== absolutePath
   ) {
-    throw gitWorktreeErrors.WORKTREE_IDENTITY_MISMATCH()
+    throw gitWorktreeErrors.WORKTREE_IDENTITY_MISMATCH({
+      internal: {
+        check: 'managed-path-entry',
+        isDirectory: entry.isDirectory(),
+        isSymbolicLink: entry.isSymbolicLink(),
+        realpathMatches: (await realpath(absolutePath)) === absolutePath,
+      },
+    })
   }
 }
 
@@ -50,25 +67,45 @@ export async function verifyWorktreeAdministration(runner: GitRepositoryRunner, 
   const pointer = path.join(checkout, '.git')
   const pointerStat = await lstat(pointer)
   if (!pointerStat.isFile() || pointerStat.isSymbolicLink()) {
-    throw gitWorktreeErrors.WORKTREE_IDENTITY_MISMATCH()
+    throw gitWorktreeErrors.WORKTREE_IDENTITY_MISMATCH({
+      internal: {
+        check: 'git-pointer',
+        isFile: pointerStat.isFile(),
+        isSymbolicLink: pointerStat.isSymbolicLink(),
+      },
+    })
   }
   const contents = await readFile(pointer, 'utf8')
   const match = /^gitdir: ([^\n]+)\n?$/.exec(contents)
-  if (!match?.[1]) throw gitWorktreeErrors.WORKTREE_IDENTITY_MISMATCH()
+  if (!match?.[1])
+    throw gitWorktreeErrors.WORKTREE_IDENTITY_MISMATCH({
+      internal: { check: 'gitdir-line', contentLength: contents.length },
+    })
   const admin = await realpath(path.resolve(checkout, match[1]))
   const relative = relativeInsideRoot(path.join(common, 'worktrees'), admin)
-  if (!relative || relative.includes('/')) throw gitWorktreeErrors.WORKTREE_IDENTITY_MISMATCH()
+  if (!relative || relative.includes('/'))
+    throw gitWorktreeErrors.WORKTREE_IDENTITY_MISMATCH({
+      internal: { check: 'admin-inside-common', relative: relative ?? null },
+    })
   const backlink = await readFile(path.join(admin, 'gitdir'), 'utf8')
   const adminCommon = await readFile(path.join(admin, 'commondir'), 'utf8')
   if (
     path.resolve(admin, backlink.trimEnd()) !== pointer ||
     (await realpath(path.resolve(admin, adminCommon.trim()))) !== common
   ) {
-    throw gitWorktreeErrors.WORKTREE_IDENTITY_MISMATCH()
+    throw gitWorktreeErrors.WORKTREE_IDENTITY_MISMATCH({
+      internal: {
+        check: 'admin-backlink',
+        backlinkMatches: path.resolve(admin, backlink.trimEnd()) === pointer,
+        commonMatches: (await realpath(path.resolve(admin, adminCommon.trim()))) === common,
+      },
+    })
   }
   const observed = await runner.run(['-C', checkout, 'rev-parse', '--git-common-dir'])
   if ((await realpath(path.resolve(checkout, observed.stdout.trim()))) !== common) {
-    throw gitWorktreeErrors.WORKTREE_IDENTITY_MISMATCH()
+    throw gitWorktreeErrors.WORKTREE_IDENTITY_MISMATCH({
+      internal: { check: 'observed-common-dir', exitCode: observed.exitCode },
+    })
   }
 }
 
@@ -81,11 +118,21 @@ export async function hasWorktreeAdministration(runner: GitRepositoryRunner, che
     administration.isSymbolicLink() ||
     (await realpath(root)) !== root
   ) {
-    throw gitWorktreeErrors.WORKTREE_IDENTITY_MISMATCH()
+    throw gitWorktreeErrors.WORKTREE_IDENTITY_MISMATCH({
+      internal: {
+        check: 'admin-root',
+        isDirectory: administration.isDirectory(),
+        isSymbolicLink: administration.isSymbolicLink(),
+        realpathMatches: (await realpath(root)) === root,
+      },
+    })
   }
   const entries = await readdir(root, { withFileTypes: true })
   for (const entry of entries) {
-    if (!entry.isDirectory()) throw gitWorktreeErrors.WORKTREE_IDENTITY_MISMATCH()
+    if (!entry.isDirectory())
+      throw gitWorktreeErrors.WORKTREE_IDENTITY_MISMATCH({
+        internal: { check: 'admin-entry', entryName: entry.name },
+      })
     const admin = path.join(root, entry.name)
     const pointer = await readFile(path.join(admin, 'gitdir'), 'utf8')
     if (path.resolve(admin, pointer.trimEnd()) === path.join(checkout, '.git')) return true

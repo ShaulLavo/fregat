@@ -75,7 +75,8 @@ function media(library: WallpaperLibrary, input: string, kind: MediaKind) {
         thumbnail: asset.thumbnail,
       }
       const file = Bun.file(path.join(await library.assetDirectory(id), names[kind]))
-      if (!(await file.exists())) throw wallpaperErrors.NOT_FOUND()
+      if (!(await file.exists()))
+        throw wallpaperErrors.NOT_FOUND({ internal: { at: 'serve', asset: id, kind } })
       return new Response(file, {
         headers: {
           'content-type': kind === 'asset' ? asset.contentType : 'image/webp',

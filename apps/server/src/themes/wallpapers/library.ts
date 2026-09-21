@@ -4,6 +4,7 @@ import { mkdir, readdir, readFile, rename, rm, stat, writeFile } from 'node:fs/p
 import path from 'node:path'
 import {
   assetIdSchema,
+  errorStringField,
   BUNDLED_WALLPAPERS,
   bundledWallpaperFor,
   wallpaperAssetSchema,
@@ -36,7 +37,7 @@ export class WallpaperLibrary {
       await this.read(id)
       return this.directory
     }
-    throw wallpaperErrors.NOT_FOUND()
+    throw wallpaperErrors.NOT_FOUND({ internal: { at: 'directory-for', asset: id } })
   }
 
   readonly directory: string
@@ -90,11 +91,16 @@ export class WallpaperLibrary {
     if (imported) return v.parse(wallpaperAssetSchema, imported)
     const bundled = bundledWallpaperFor(id)
     if (bundled) return this.#serialize(() => this.#installBundled(bundled))
-    throw wallpaperErrors.NOT_FOUND()
+    throw wallpaperErrors.NOT_FOUND({
+      internal: { at: 'read', asset: id, searched: ['user', 'archives', 'bundled'] },
+    })
   }
 
   upload(file: File) {
-    if (file.size > MAX_WALLPAPER_BYTES) throw wallpaperErrors.TOO_LARGE()
+    if (file.size > MAX_WALLPAPER_BYTES)
+      throw wallpaperErrors.TOO_LARGE({
+        internal: { at: 'upload', bytes: file.size, limit: MAX_WALLPAPER_BYTES },
+      })
     return this.#serialize(async () =>
       this.#install(new Uint8Array(await file.arrayBuffer()), file.name, { kind: 'upload' }),
     )
@@ -126,7 +132,8 @@ export class WallpaperLibrary {
 
   delete(id: AssetId) {
     return this.#serialize(async () => {
-      if (bundledWallpaperFor(id)) throw wallpaperErrors.BUNDLED()
+      if (bundledWallpaperFor(id))
+        throw wallpaperErrors.BUNDLED({ internal: { at: 'delete', asset: id } })
       await this.assertUnused(id)
       const asset = await this.read(id)
       const selection = this.#settings.snapshot().values['workbench.wallpaper']
@@ -179,7 +186,16 @@ export class WallpaperLibrary {
   // One bad file in a seed directory must not cost the rest of the import.
   async #importFile(source: string, name: string, theme: string, skipped: SkippedFile[]) {
     try {
-      if ((await stat(source)).size > MAX_WALLPAPER_BYTES) throw wallpaperErrors.TOO_LARGE()
+      if ((await stat(source)).size > MAX_WALLPAPER_BYTES)
+        throw wallpaperErrors.TOO_LARGE({
+          internal: {
+            at: 'import',
+            theme,
+            name,
+            bytes: (await stat(source)).size,
+            limit: MAX_WALLPAPER_BYTES,
+          },
+        })
       return await this.#install(await readFile(source), name, {
         kind: 'omarchy',
         theme,
@@ -276,7 +292,10 @@ function errorCode(error: unknown): string | null {
 
 export function parseAssetId(input: string): AssetId {
   const result = v.safeParse(assetIdSchema, input)
-  if (!result.success) throw wallpaperErrors.NOT_FOUND()
+  if (!result.success)
+    throw wallpaperErrors.NOT_FOUND({
+      internal: { at: 'parse-asset-id', reason: 'malformed', length: input.length },
+    })
   return result.output
 }
 
@@ -287,6 +306,9 @@ async function directoryEntries(directory: string, optional = false) {
     )
   } catch (error) {
     if (optional && error instanceof Error && 'code' in error && error.code === 'ENOENT') return []
-    throw wallpaperErrors.DIRECTORY()
+    throw wallpaperErrors.DIRECTORY({
+      cause: error instanceof Error ? error : undefined,
+      internal: { optional, errorCode: errorStringField(error, 'code') },
+    })
   }
 }

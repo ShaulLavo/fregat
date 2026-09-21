@@ -122,7 +122,14 @@ export class WorktreeLifecycleReactor {
     for (const candidate of candidates) {
       if (await this.matchesRepository(candidate, managedRoot)) return candidate
     }
-    throw worktreeRuntimeErrors.UNAVAILABLE()
+    throw worktreeRuntimeErrors.UNAVAILABLE({
+      internal: {
+        at: 'repository-path',
+        worktreeId: worktree.id,
+        ownership: worktree.ownership,
+        candidateCount: candidates.size,
+      },
+    })
   }
 
   private async matchesRepository(candidate: string, managedRoot: string | null) {

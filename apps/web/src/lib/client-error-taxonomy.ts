@@ -1,6 +1,8 @@
 import { isConnectivityError } from '@workspace/client-core/transport/connectivity-error'
+import { isObject } from '@workspace/utils/objects'
 import { toast } from 'sonner'
 import type { ErrorCategory } from '@workspace/contracts'
+import { agentErrorReport } from './agent-error-report'
 import { clientErrorMetadata } from './client-error-context'
 import { reportClientError } from './client-error-reporting'
 
@@ -12,6 +14,10 @@ export type ClientError = {
   readonly cause?: unknown
   readonly context?: Readonly<Record<string, unknown>>
   readonly operation?: string
+  /** The catalog's own guidance, when the failure came from a structured error. */
+  readonly fix?: string
+  readonly why?: string
+  readonly code?: string
 }
 
 const messagesByCategory: Record<ErrorCategory, string> = {
@@ -79,14 +85,38 @@ export function toClientError(input: unknown): ClientError {
   // their own message, `why` and `fix`. Falling through to `unknown` here is
   // what made every rejected settings save silent: `notifySaveError` returns
   // before its toast on `unknown`, so the user saw nothing at all.
-  const structured = structuredErrorMessage(input)
-  if (structured) return categorizedClientError('io_error', input, structured)
+  const structured = structuredError(input)
+  if (structured) {
+    return { ...categorizedClientError('io_error', input, structured.message), ...structured }
+  }
 
   return categorizedClientError('unknown', input)
 }
 
 export function clientErrorMessage(input: unknown): string {
   return toClientError(input).message
+}
+
+/**
+ * What a toast should say: the failure, then the catalog's `fix`. The message
+ * alone names what broke; `fix` is the half that tells the reader what to do,
+ * and it reaches the client only because the error envelope carries it.
+ */
+export function clientErrorDescription(error: ClientError): string {
+  if (!error.fix) return error.message
+
+  // Catalog messages end without punctuation; a dash joiner collides with the
+  // dashes the `fix` sentences use themselves.
+  const message = /[.!?]$/.test(error.message) ? error.message : `${error.message}.`
+  return `${message} ${error.fix}`
+}
+
+/** Hands the failure to an agent: the catalog's answer plus how to find the log. */
+function copyAgentReport(error: ClientError) {
+  void navigator.clipboard
+    ?.writeText(agentErrorReport(error))
+    .then(() => toast.success('Copied for an agent'))
+    .catch(() => toast.error('Clipboard is unavailable'))
 }
 
 export function reportError(error: ClientError): void {
@@ -106,7 +136,8 @@ export function reportError(error: ClientError): void {
   if (!shouldToastCategory(error.category)) return
 
   toast.error(titleByCategory[error.category], {
-    description: error.message,
+    action: { label: 'Copy', onClick: () => copyAgentReport(error) },
+    description: clientErrorDescription(error),
   })
 }
 
@@ -195,23 +226,29 @@ function isFsErrorCode(value: unknown): value is FsErrorCode {
 }
 
 /**
- * Pulls the server's own message out of a structured error envelope.
+ * Pulls the server's own message, `why` and `fix` out of a structured error
+ * envelope.
  *
  * Deliberately message-first rather than code-mapped: a catalog entry already
  * phrases the failure for a person, and re-deriving a generic sentence from its
  * code would throw away the `fix` the server took care to write.
  */
-function structuredErrorMessage(input: unknown): string | null {
+function structuredError(input: unknown) {
   if (!input || typeof input !== 'object') return null
 
   const container = 'value' in input ? (input as { value: unknown }).value : input
   if (!container || typeof container !== 'object') return null
 
   const error = 'error' in container ? (container as { error: unknown }).error : container
-  if (!error || typeof error !== 'object') return null
-  if (!('code' in error) || typeof (error as { code: unknown }).code !== 'string') return null
+  if (!isObject(error)) return null
 
-  const message = 'message' in error ? (error as { message: unknown }).message : null
+  const code = text(error.code)
+  const message = text(error.message)
+  if (!code || !message) return null
 
-  return typeof message === 'string' && message.length > 0 ? message : null
+  return { code, fix: text(error.fix), message, why: text(error.why) }
+}
+
+function text(value: unknown) {
+  return typeof value === 'string' && value.length > 0 ? value : undefined
 }

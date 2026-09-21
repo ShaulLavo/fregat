@@ -11,8 +11,12 @@ export {
   resetObservabilityForTests,
 } from '@workspace/observability'
 
-export function initializeObservability(env: ObservabilityEnv = process.env) {
+export function initializeObservability(
+  env: ObservabilityEnv = process.env,
+  build?: { commit?: string | null; release?: string | null },
+) {
   return initializeObservabilityRuntime({
+    ...(build ? { build } : {}),
     env,
     shouldPersistEvent: shouldPersistServerEvent,
     source: 'be',

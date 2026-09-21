@@ -167,7 +167,7 @@ export function HistoryPane({
 
   return (
     <ToolPane
-      className='bg-background h-full'
+      className='h-full'
       header={null}
       bodyClassName='flex flex-col overflow-hidden'
       data-history-pane={documentKey}

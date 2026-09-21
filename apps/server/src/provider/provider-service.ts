@@ -244,7 +244,15 @@ export class ProviderService {
     await this.reaper.sweep({ exceptSessionId: input.sessionId })
     const existing = this.sessionDirectory.getBinding(input.sessionId)
     if (existing && existing.providerInstanceId !== input.providerInstanceId)
-      throw sessionIdentityErrors.SESSION_PROVIDER_CONFLICT()
+      throw sessionIdentityErrors.SESSION_PROVIDER_CONFLICT({
+        internal: {
+          sessionId: input.sessionId,
+          boundTo: existing.providerInstanceId,
+          requested: input.providerInstanceId,
+          boundEpoch: existing.runtimeEpoch,
+          requestedEpoch: input.runtimeEpoch,
+        },
+      })
     const reusableBinding =
       existing?.runtimeEpoch === input.runtimeEpoch &&
       canReuseProviderBinding(existing, input, adapter)
@@ -337,14 +345,20 @@ export class ProviderService {
     this.requireSdkOwnership(sessionId)
     this.requireRunning()
     const routed = this.routeSession(sessionId)
-    if (!routed?.adapter.steerTurn) throw sessionIdentityErrors.STEERING_UNAVAILABLE()
+    if (!routed?.adapter.steerTurn)
+      throw sessionIdentityErrors.STEERING_UNAVAILABLE({
+        internal: { sessionId, routed: Boolean(routed), at: 'require-steering' },
+      })
     return routed
   }
 
   async steerTurn(input: ProviderTurnSteerInput) {
     const routed = this.requireSteeringAvailable(input.sessionId)
     const steer = routed.adapter.steerTurn
-    if (!steer) throw sessionIdentityErrors.STEERING_UNAVAILABLE()
+    if (!steer)
+      throw sessionIdentityErrors.STEERING_UNAVAILABLE({
+        internal: { sessionId: input.sessionId, at: 'steer-turn' },
+      })
     await steer.call(routed.adapter, input)
   }
 
@@ -606,7 +620,10 @@ export class ProviderService {
     input: ProviderSessionHistoryInput & { providerInstanceId: ProviderInstanceId },
   ) {
     const adapter = this.adapterRegistry.getByInstance(input.providerInstanceId)
-    if (!adapter.readSessionHistory) throw sessionIdentityErrors.HISTORY_UNSUPPORTED()
+    if (!adapter.readSessionHistory)
+      throw sessionIdentityErrors.HISTORY_UNSUPPORTED({
+        internal: { providerInstanceId: input.providerInstanceId },
+      })
     return boundedProviderOperation(adapter, adapter.readSessionHistory(input))
   }
 
@@ -649,11 +666,22 @@ export class ProviderService {
   private async assertConversationRollbackSupported(sessionId: SessionId) {
     this.requireSdkOwnership(sessionId)
     const routed = this.routeSession(sessionId)
-    if (!routed) throw sessionIdentityErrors.ROLLBACK_RUNTIME_UNAVAILABLE()
+    if (!routed)
+      throw sessionIdentityErrors.ROLLBACK_RUNTIME_UNAVAILABLE({
+        internal: { sessionId, reason: 'unrouted' },
+      })
     if (!routed.adapter.capabilities.conversationRollback)
-      throw sessionIdentityErrors.ROLLBACK_UNSUPPORTED()
+      throw sessionIdentityErrors.ROLLBACK_UNSUPPORTED({
+        internal: { sessionId, providerInstanceId: routed.binding.providerInstanceId },
+      })
     if (!(await boundedProviderOperation(routed.adapter, routed.adapter.hasRuntime({ sessionId }))))
-      throw sessionIdentityErrors.ROLLBACK_RUNTIME_UNAVAILABLE()
+      throw sessionIdentityErrors.ROLLBACK_RUNTIME_UNAVAILABLE({
+        internal: {
+          sessionId,
+          reason: 'no-runtime',
+          providerInstanceId: routed.binding.providerInstanceId,
+        },
+      })
     return routed
   }
 
@@ -680,10 +708,13 @@ export class ProviderService {
 
   requireSdkOwnership(sessionId: SessionId) {
     if (this.externalSessions.get(sessionId) === 'unknown')
-      throw sessionIdentityErrors.TERMINAL_OWNERSHIP_UNKNOWN()
+      throw sessionIdentityErrors.TERMINAL_OWNERSHIP_UNKNOWN({ internal: { sessionId } })
     if (this.externalSessions.get(sessionId) === 'history')
-      throw sessionIdentityErrors.TERMINAL_HISTORY_PENDING()
-    if (this.externalSessions.has(sessionId)) throw sessionIdentityErrors.SESSION_IN_TERMINAL()
+      throw sessionIdentityErrors.TERMINAL_HISTORY_PENDING({ internal: { sessionId } })
+    if (this.externalSessions.has(sessionId))
+      throw sessionIdentityErrors.SESSION_IN_TERMINAL({
+        internal: { sessionId, ownership: this.externalSessions.get(sessionId) ?? null },
+      })
   }
 
   restoreTerminalOwnership(sessionId: SessionId, state: 'history' | 'unknown') {
@@ -701,7 +732,9 @@ export class ProviderService {
 
   requireTerminalOwnership(sessionId: SessionId) {
     if (!this.externalSessions.has(sessionId))
-      throw sessionIdentityErrors.TERMINAL_SESSION_INVALID()
+      throw sessionIdentityErrors.TERMINAL_SESSION_INVALID({
+        internal: { sessionId, trackedTerminalSessions: this.externalSessions.size },
+      })
   }
 
   async reserveTerminalRuntime(input: {
@@ -795,7 +828,8 @@ export class ProviderService {
   }
 
   private requireRunning() {
-    if (this.shuttingDown) throw sessionIdentityErrors.SERVICE_CLOSED()
+    if (this.shuttingDown)
+      throw sessionIdentityErrors.SERVICE_CLOSED({ internal: { at: 'require-running' } })
   }
 
   private async stopShutdownLaunch(
@@ -818,7 +852,14 @@ export class ProviderService {
   ) {
     const existing = this.sessionDirectory.getBinding(input.sessionId)
     if (existing && existing.providerInstanceId !== input.providerInstanceId) {
-      throw sessionIdentityErrors.SESSION_PROVIDER_CONFLICT()
+      throw sessionIdentityErrors.SESSION_PROVIDER_CONFLICT({
+        internal: {
+          at: 'shutdown-launch',
+          sessionId: input.sessionId,
+          boundTo: existing.providerInstanceId,
+          requested: input.providerInstanceId,
+        },
+      })
     }
 
     this.sessionDirectory.upsert({
@@ -1150,7 +1191,12 @@ async function boundedProviderOperation<T>(
   let timer: ReturnType<typeof setTimeout> | undefined
   const timeout = new Promise<never>((_, reject) => {
     timer = setTimeout(
-      () => reject(sessionIdentityErrors.OPERATION_TIMED_OUT()),
+      () =>
+        reject(
+          sessionIdentityErrors.OPERATION_TIMED_OUT({
+            internal: { timeoutMs: adapter.operationTimeoutMs },
+          }),
+        ),
       adapter.operationTimeoutMs,
     )
   })

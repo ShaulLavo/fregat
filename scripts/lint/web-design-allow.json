@@ -20,11 +20,6 @@
     "reason": "The inner input and textarea have to stay square inside the group, which draws the one corner the whole control shows. Their own radius would print a second rounded edge a few pixels inside it."
   },
   {
-    "file": "packages/ui/src/components/tooltip.tsx",
-    "class": "rounded-none",
-    "reason": "The arrow is a square rotated 45 degrees, so the corner pointing at the trigger is a tip. Any radius would blunt it and leave a gap against the tooltip body."
-  },
-  {
     "file": "apps/web/src/features/chat/components/assistant-markdown-file-link.tsx",
     "class": "text-[0.9em]",
     "reason": "An inline chip set in a run of markdown prose that renders at several sizes. It must track the text around it, which a fixed step cannot do; 0.9em also offsets the larger x-height of the mono face."
@@ -168,5 +163,10 @@
     "file": "apps/web/src/features/workbench/components/editor-tab-button.tsx",
     "class": "truncate",
     "reason": "Already recovered: editorTabTitle renders inside the tab <button>, which carries the enriched title (the plan's reference implementation)."
+  },
+  {
+    "file": "apps/web/src/features/chat/components/chat-input-attach-button.tsx",
+    "class": "<input>",
+    "reason": "A visually hidden type='file' input that only the Button beside it ever focuses or clicks. There is no primitive for a file picker, and the Input primitive would give a sr-only element a radius, a height and a focus ring."
   }
 ]

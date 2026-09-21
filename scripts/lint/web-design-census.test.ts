@@ -126,7 +126,7 @@ test('counts a raw button and attributes a radius override to the Button primiti
     '}',
   )
 
-  expect(locations(subject, 'rawButtons')).toEqual(['probe.tsx:4 <button>'])
+  expect(locations(subject, 'rawControls')).toEqual(['probe.tsx:4 <button>'])
   expect(locations(subject, 'buttonRadius')).toEqual(['probe.tsx:5 rounded-md'])
 })
 
@@ -141,7 +141,7 @@ test('ignores a button that only appears inside a JSX comment', () => {
     '}',
   )
 
-  expect(subject.hits.rawButtons).toEqual([])
+  expect(subject.hits.rawControls).toEqual([])
 })
 
 test('catches a raw palette class and a hex literal but not a token', () => {
@@ -292,9 +292,9 @@ test('walks the primitives package but drops the two measures a primitive cannot
   const app = gate(censusFile('apps/web/src/components/control.tsx', ...source))
   const ui = gate(censusFile('packages/ui/src/components/button.tsx', ...source))
 
-  expect(app.offenders.rawButtons).toHaveLength(1)
+  expect(app.offenders.rawControls).toHaveLength(1)
   expect(app.offenders.buttonRadius).toHaveLength(1)
-  expect(ui.offenders.rawButtons).toEqual([])
+  expect(ui.offenders.rawControls).toEqual([])
   expect(ui.offenders.buttonRadius).toEqual([])
   // The measures that do judge a primitive keep judging it.
   expect(ui.offenders.bareRadius).toHaveLength(1)
@@ -569,4 +569,34 @@ test('disabled icon tooltip controls remain hoverable and keyboard focusable', (
     'disabled Tooltip trigger needs focusableWhenDisabled',
     'disabled Tooltip trigger needs focusableWhenDisabled',
   ])
+})
+
+test('records every element a primitive exists for, not only <button>', () => {
+  const subject = census(
+    'export function Probe() {',
+    '  return (',
+    '    <form>',
+    '      <input />',
+    '      <textarea />',
+    '      <select />',
+    '    </form>',
+    '  )',
+    '}',
+  )
+
+  expect(locations(subject, 'rawControls')).toEqual([
+    'probe.tsx:4 <input>',
+    'probe.tsx:5 <textarea>',
+    'probe.tsx:6 <select>',
+  ])
+})
+
+test('fails an allow-list entry that matches nothing in the census', () => {
+  const subject = census('export const value = 1')
+  const result: Result = evaluate(subject, [
+    { file: 'gone.tsx', class: '<button>', reason: 'Once true.' },
+  ])
+
+  expect(result.passed).toBe(false)
+  expect(result.allowProblems[0]).toContain('stale')
 })

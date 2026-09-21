@@ -20,6 +20,8 @@ export type ObservabilityRuntime = {
 }
 
 export type InitializeObservabilityOptions = {
+  /** Which build is running. Stamped on every line so deploy skew is visible. */
+  build?: { commit?: string | null; release?: string | null }
   env?: ObservabilityEnv
   shouldPersistEvent?: ShouldPersistObservabilityEvent
   source: string
@@ -52,6 +54,8 @@ export function initializeObservabilityRuntime(options: InitializeObservabilityO
     env: {
       environment: config.environment,
       service: config.service,
+      ...(options.build?.commit ? { commitHash: options.build.commit } : {}),
+      ...(options.build?.release ? { version: options.build.release } : {}),
     },
     ...(drain ? { drain } : {}),
     pretty: config.consoleEnabled && config.environment !== 'production',

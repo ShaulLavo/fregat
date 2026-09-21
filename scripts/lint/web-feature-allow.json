@@ -314,12 +314,6 @@
   {
     "from": "chat-mode",
     "to": "workbench",
-    "module": "features/workbench/components/wallpaper.tsx",
-    "reason": "owner: The chat mode tool area composes this pane through Wallpaper."
-  },
-  {
-    "from": "chat-mode",
-    "to": "workbench",
     "module": "features/workbench/utils/panels.ts",
     "reason": "shared \u2192 lib: WorkbenchPanels is reused by chat-mode outside workbench; move this shared behavior with its consumers."
   },

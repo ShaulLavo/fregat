@@ -1236,7 +1236,9 @@ class ClaudeAgentSession extends SessionContext {
   private confirmSessionId(sessionId: string) {
     if (sessionId === this.sessionId) return
 
-    const error = sessionIdentityErrors.SESSION_IDENTITY_MISMATCH()
+    const error = sessionIdentityErrors.SESSION_IDENTITY_MISMATCH({
+      internal: { observed: sessionId, expected: this.sessionId },
+    })
     this.abortController.abort(error)
     this.prompt.close()
     this.rejectAllTurns(error)

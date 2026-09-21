@@ -64,17 +64,24 @@ export class PaletteLibrary {
     if (document) return document
     const imported = await readArchivePart(await this.archiveDirectories(), 'palettes', id)
     if (imported) return normalize(imported)
-    throw themeErrors.PALETTE_NOT_FOUND({ id })
+    throw themeErrors.PALETTE_NOT_FOUND({
+      id,
+      internal: { searched: ['user-directory', 'archives'], bundled: isBundledPaletteId(id) },
+    })
   }
 
   async create(input: unknown): Promise<PaletteDocument> {
     const document = normalize(input)
-    if (isBundledPaletteId(document.id)) throw themeErrors.PALETTE_BUNDLED({ id: document.id })
+    if (isBundledPaletteId(document.id))
+      throw themeErrors.PALETTE_BUNDLED({ id: document.id, internal: { at: 'create' } })
     if (
       (await this.#readFile(this.#fileName(document.id))) ||
       (await readArchivePart(await this.archiveDirectories(), 'palettes', document.id))
     ) {
-      throw themeErrors.PALETTE_EXISTS({ id: document.id })
+      throw themeErrors.PALETTE_EXISTS({
+        id: document.id,
+        internal: { at: 'create', fileName: this.#fileName(document.id) },
+      })
     }
 
     await this.#writeFile(document)
@@ -84,8 +91,10 @@ export class PaletteLibrary {
   async update(id: PaletteId, input: unknown): Promise<PaletteDocument> {
     const document = normalize(input)
     if (document.id !== id) throw themeErrors.PALETTE_ID_MISMATCH({ id, bodyId: document.id })
-    if (isBundledPaletteId(id)) throw themeErrors.PALETTE_BUNDLED({ id })
-    if (!(await this.#readFile(this.#fileName(id)))) throw themeErrors.PALETTE_NOT_FOUND({ id })
+    if (isBundledPaletteId(id))
+      throw themeErrors.PALETTE_BUNDLED({ id, internal: { at: 'update' } })
+    if (!(await this.#readFile(this.#fileName(id))))
+      throw themeErrors.PALETTE_NOT_FOUND({ id, internal: { at: 'update', searched: ['user'] } })
 
     await this.#writeFile(document)
     return document
@@ -98,8 +107,10 @@ export class PaletteLibrary {
    */
   async delete(id: PaletteId): Promise<void> {
     await this.assertUnused(id)
-    if (isBundledPaletteId(id)) throw themeErrors.PALETTE_BUNDLED({ id })
-    if (!(await this.#readFile(this.#fileName(id)))) throw themeErrors.PALETTE_NOT_FOUND({ id })
+    if (isBundledPaletteId(id))
+      throw themeErrors.PALETTE_BUNDLED({ id, internal: { at: 'delete' } })
+    if (!(await this.#readFile(this.#fileName(id))))
+      throw themeErrors.PALETTE_NOT_FOUND({ id, internal: { at: 'delete', searched: ['user'] } })
 
     await this.#releaseSelection(id)
     await rm(path.join(this.#directory, this.#fileName(id)), { force: true })
@@ -165,14 +176,22 @@ export class PaletteLibrary {
 /** Validates a request body and writes every color back as exact `oklch()`. */
 function normalize(input: unknown): PaletteDocument {
   const result = parsePalette(input, 'user')
-  if (!result.success) throw themeErrors.PALETTE_INVALID({ detail: v.summarize(result.issues) })
+  if (!result.success)
+    throw themeErrors.PALETTE_INVALID({
+      detail: v.summarize(result.issues),
+      internal: { at: 'normalize', issueCount: result.issues.length },
+    })
 
   return serializePalette(result.palette)
 }
 
 export function parsePaletteId(id: string): PaletteId {
   const result = v.safeParse(paletteIdSchema, id)
-  if (!result.success) throw themeErrors.PALETTE_INVALID({ detail: `id ${JSON.stringify(id)}` })
+  if (!result.success)
+    throw themeErrors.PALETTE_INVALID({
+      detail: `id ${JSON.stringify(id)}`,
+      internal: { at: 'parse-id', length: id.length },
+    })
 
   return result.output
 }

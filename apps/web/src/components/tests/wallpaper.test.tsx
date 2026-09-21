@@ -1,14 +1,14 @@
 import { fireEvent } from '@testing-library/react'
 import { QueryClient } from '@tanstack/react-query'
 import { afterEach, vi } from 'vitest'
-import { WebWallpaper } from '@/features/workbench/components/web-wallpaper'
+import { WebWallpaper } from '@/components/web-wallpaper'
 import { wallpaperStillUrl } from '@/features/workbench/state/wallpaper-query'
 import { WALLPAPER_URL } from '@/features/workbench/utils/wallpaper'
 import { primaryServerOrigin } from '@/lib/client'
 import { registerEnvironmentQueryClient } from '@/lib/environments/state/query-clients'
 
-import { expect, test } from '../../../../test/fixtures'
-import { renderWithProviders } from '../../../../test/render'
+import { expect, test } from '../../../test/fixtures'
+import { renderWithProviders } from '../../../test/render'
 
 function disableMotion() {
   const matchMedia = window.matchMedia.bind(window)

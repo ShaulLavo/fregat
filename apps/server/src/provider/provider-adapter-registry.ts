@@ -290,7 +290,15 @@ export class ProviderAdapterRegistry {
   ): AgentTerminalProcess {
     const instance = this.instances.get(providerInstanceId)
     if (!instance || instance.config.driverKind !== 'claude' || instance.config.enabled === false)
-      throw sessionIdentityErrors.TERMINAL_UNSUPPORTED()
+      throw sessionIdentityErrors.TERMINAL_UNSUPPORTED({
+        internal: {
+          providerInstanceId,
+          sessionId,
+          registered: Boolean(instance),
+          driverKind: instance?.config.driverKind ?? null,
+          enabled: instance?.config.enabled ?? null,
+        },
+      })
     const lease = this.acquireInstanceLease(providerInstanceId)
     const [, ...args] = claudeTerminalResumeArgv(sessionId)
     return {

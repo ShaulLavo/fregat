@@ -235,19 +235,17 @@
 
   /* Pane material follows the transparency setting; floating UI stays opaque. */
   --surface-opacity: 80%;
-  /* Content wells (editor, terminal) get their own, much higher opacity:
-     text needs a stable ground, but a 5% wallpaper ghost keeps the material. */
-  --content-opacity: 95%;
+  /* The content well (editor, terminal, settings) is a second layer of the pane
+     material over the panel that already painted one: 50% over 80% is 90%. */
+  --content-opacity: 50%;
   --surface-blur: 9px;
   --surface-saturation: 160%;
   /* Palette colors (--background-solid, --foreground, --primary, …) come from
-     palette.generated.css and the selected palette's <style>. The pane ground
-     sits BELOW the card ground on purpose: the titlebar and the editor well are
-     --card, the sidebar and the shell are --background. Tone separates the
-     panes; the workbench hairline only edges them. */
+     palette.generated.css and the selected palette's <style>. Every panel and
+     bar is --background, painted once; the well lifts text one layer above it. */
   --background: color-mix(in oklch, var(--background-solid) var(--surface-opacity), transparent);
   --card: color-mix(in oklch, var(--card-solid) var(--surface-opacity), transparent);
-  --content-well: color-mix(in oklch, var(--card-solid) var(--content-opacity), transparent);
+  --content-well: color-mix(in oklch, var(--background-solid) var(--content-opacity), transparent);
   --popover: var(--popover-solid);
   --muted: color-mix(in oklch, var(--muted-solid) var(--surface-opacity), transparent);
   --accent: color-mix(in oklch, var(--accent-solid) var(--surface-opacity), transparent);

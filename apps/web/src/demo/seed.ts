@@ -172,7 +172,7 @@ export function seedSettings(): SettingsSnapshot {
     'workbench.density': 'compact' as const,
     'workbench.wallpaper': { enabled: true, source: { kind: 'desktop' } } as const,
     'workbench.surface.opacity': 80,
-    'workbench.surface.contentOpacity': 95,
+    'workbench.surface.contentOpacity': 50,
     'workbench.surface.blur': 0,
     'workbench.surface.saturation': 80,
   }

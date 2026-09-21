@@ -2,6 +2,7 @@ import {
   errorNumberField,
   errorStringField,
   isSettingId,
+  SETTINGS_OPERATION_KINDS,
   settingsMutationRequestSchema,
   settingsMutationResultSchema,
   settingsRawWriteRequestSchema,
@@ -14,12 +15,14 @@ import { Elysia } from 'elysia'
 import * as v from 'valibot'
 import { recordRequestContext } from '../observability'
 import { sseResponse, toSse } from '../sse'
+import { requestRejection } from './request-rejection'
 import type { SettingsStore } from './store'
-import { settingsErrors } from './structured-errors'
 
 const targetSchema = v.optional(v.picklist(['user', 'workspace'] as const), 'user')
 
 const rawQuerySchema = v.object({ target: targetSchema })
+
+const OPERATION_KINDS = new Set<string>(SETTINGS_OPERATION_KINDS)
 
 /**
  * Five routes, all GET or POST — the CORS layer allows exactly GET/POST/OPTIONS,
@@ -74,8 +77,31 @@ function unparsedMutationContext(body: unknown) {
       operationKinds: unique(operations.flatMap(operationKind)),
       settingIds: unique(operations.flatMap(operationSettingIds)),
       target: safeTarget(isRecord(body) ? body.target : undefined),
+      ...unknownSettingIdsContext(operations),
     },
   }
+}
+
+/**
+ * `operationSettingIds` filters through `isSettingId`, so a key this build does
+ * not register vanishes from the one event that should name it. A client ahead
+ * of the server reads as an empty `settingIds` on a rejected write.
+ */
+function unknownSettingIdsContext(operations: readonly unknown[]) {
+  const unknown = unique(operations.flatMap(operationUnknownSettingIds))
+  return unknown.length > 0 ? { unknownSettingIds: unknown } : {}
+}
+
+function operationUnknownSettingIds(value: unknown): string[] {
+  if (!isRecord(value)) return []
+  if (value.kind === 'set' && typeof value.key === 'string' && !isSettingId(value.key)) {
+    return [safeDomainPart(value.key)]
+  }
+  if (value.kind !== 'reset' || !Array.isArray(value.keys)) return []
+
+  return value.keys
+    .filter((key): key is string => typeof key === 'string' && !isSettingId(key))
+    .map(safeDomainPart)
 }
 
 function unparsedRawContext(body: unknown) {
@@ -93,16 +119,7 @@ function unparsedRawContext(body: unknown) {
 function operationKind(value: unknown): string[] {
   if (!isRecord(value)) return []
 
-  const allowed = new Set([
-    'set',
-    'reset',
-    'keybinding.set',
-    'keybinding.remove',
-    'model.setHidden',
-    'model.setOrder',
-    'provider.setEnabled',
-  ])
-  return typeof value.kind === 'string' && allowed.has(value.kind) ? [value.kind] : []
+  return typeof value.kind === 'string' && OPERATION_KINDS.has(value.kind) ? [value.kind] : []
 }
 
 function operationSettingIds(value: unknown): SettingId[] {
@@ -169,13 +186,7 @@ function parse<TSchema extends v.GenericSchema>(
   const parsed = v.safeParse(schema, input)
   if (parsed.success) return parsed.output
 
-  throw settingsErrors.WRITE_INVALID({
-    key: 'request',
-    reason: parsed.issues
-      .slice(0, 3)
-      .map((issue) => issue.message.split(' but received ')[0])
-      .join('; '),
-  })
+  throw requestRejection(input, parsed.issues)
 }
 
 function parseRequest<TSchema extends v.GenericSchema>(

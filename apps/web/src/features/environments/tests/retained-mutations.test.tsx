@@ -76,7 +76,7 @@ test('an offline Git mutation resumes on A while its provider is unmounted and B
     // By key: other features park their own mutations in the same cache.
     const mutation = queryClientA
       .getMutationCache()
-      .find({ mutationKey: mutationKeys.stageMany(['repo/shared.txt']) })
+      .find({ mutationKey: mutationKeys.stageMany('repo', ['repo/shared.txt']) })
     await waitFor(() => expect(mutation?.state.isPaused).toBe(true))
 
     act(() => application.activateEnvironment(originB))

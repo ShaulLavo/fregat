@@ -20,6 +20,8 @@ The settings command, the gear button at the bottom of the sidebar rail, or an a
 
 `scenario settings-font-input` types a font draft and cancels with Escape, checking that the shared string editor restores the saved font family.
 
+`scenario settings-save-rejected` fulfils the settings write with a 400 structured envelope and checks the toast shows the server's own message _and_ its `fix`. The envelope carries `why` and `fix` (`responseErrorPayload` in `apps/server/src/app.ts`); `createRpcError` and `clientErrorDescription` are the two places that used to drop them.
+
 `scenario settings-responsive` checks 40px touch controls and 16px search text in narrow Settings, with search below the scope tabs, then verifies both return to a shared bar in a wide pane.
 
 `scenario wallpaper-icon-hints` creates an unselected wallpaper fixture through the API, hovers its action control and opens its menu. Cleanup deletes that fixture and asserts user settings are unchanged. It requires a server with the wallpaper-library routes; use the mesh URL if the running development API predates them.

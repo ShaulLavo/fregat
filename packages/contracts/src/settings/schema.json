@@ -830,8 +830,8 @@
       "type": "integer"
     },
     "workbench.surface.contentOpacity": {
-      "default": 95,
-      "description": "How opaque the editor and terminal background is.",
+      "default": 50,
+      "description": "How opaque the extra layer under the editor, terminal and settings is. It sits on top of the panel, so 0 leaves them as see-through as a sidebar.",
       "maximum": 100,
       "minimum": 0,
       "type": "integer"

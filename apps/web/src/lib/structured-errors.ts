@@ -111,6 +111,11 @@ export function createClientInvariantError(message: string, cause?: unknown) {
   })
 }
 
+/**
+ * The server catalog already answered "why" and "what do I do"; overwriting
+ * them with the generic RPC pair is how a precise rejection reached the user as
+ * "inspect the structured RPC payload". Keep the server's when it sent them.
+ */
 export function createRpcError(error: unknown) {
   const clientError = toClientError(error)
   const code = rpcErrorCode(error) ?? clientErrors.RPC_FAILED.code
@@ -120,8 +125,8 @@ export function createRpcError(error: unknown) {
     code,
     message: clientError.message,
     status: statusFromRpcError(error),
-    why: clientErrors.RPC_FAILED.why,
-    fix: clientErrors.RPC_FAILED.fix,
+    why: clientError.why ?? clientErrors.RPC_FAILED.why,
+    fix: clientError.fix ?? clientErrors.RPC_FAILED.fix,
   })
 }
 

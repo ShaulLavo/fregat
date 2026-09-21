@@ -386,12 +386,25 @@ function projectDeleted(
         worktree.lifecycle.state !== 'removed',
     )
   )
-    throw worktreeLifecycleErrors.PROJECT_HAS_WORKTREES(command)
+    throw worktreeLifecycleErrors.PROJECT_HAS_WORKTREES({
+      projectId: command.projectId,
+      internal: {
+        liveWorktreeIds: [...model.worktrees.values()]
+          .filter(
+            (worktree) =>
+              worktree.projectId === command.projectId &&
+              !worktree.retiredAt &&
+              worktree.lifecycle.state !== 'removed',
+          )
+          .map((worktree) => worktree.id),
+      },
+    })
   const sessions = liveProjectSessions(model, command.projectId)
   if (sessions.length > 0 && !command.force) {
     throw orchestrationErrors.PROJECT_NOT_EMPTY({
       projectId: command.projectId,
       sessionCount: sessions.length,
+      internal: { force: command.force, sessionIds: sessions.map((session) => session.id) },
     })
   }
 
@@ -480,7 +493,13 @@ function requireProviderInstance(
 ) {
   if (!selection || selection.providerInstanceId === session.modelSelection.providerInstanceId)
     return
-  throw sessionDomainErrors.PROVIDER_INSTANCE_IMMUTABLE({ sessionId: session.id })
+  throw sessionDomainErrors.PROVIDER_INSTANCE_IMMUTABLE({
+    sessionId: session.id,
+    internal: {
+      bound: session.modelSelection.providerInstanceId,
+      requested: selection.providerInstanceId,
+    },
+  })
 }
 
 function requireDiscoveryOwner(
@@ -492,7 +511,10 @@ function requireDiscoveryOwner(
 ) {
   requireProviderInstance(session, command.modelSelection)
   if (session.worktreeId === command.worktreeId) return
-  throw sessionDomainErrors.SESSION_REPARENT_CONFLICT({ sessionId: session.id })
+  throw sessionDomainErrors.SESSION_REPARENT_CONFLICT({
+    sessionId: session.id,
+    internal: { bound: session.worktreeId, requested: command.worktreeId },
+  })
 }
 
 function discoveryMetadataUpdated(
@@ -787,7 +809,14 @@ function turnStartRequested(
         session.latestTurn.providerStartState,
       )
     ) {
-      throw sessionDomainErrors.START_STATE_CONFLICT({ sessionId: command.sessionId })
+      throw sessionDomainErrors.START_STATE_CONFLICT({
+        sessionId: command.sessionId,
+        internal: {
+          at: 'message-send',
+          providerStartState: session.latestTurn.providerStartState,
+          turnState: session.latestTurn.state,
+        },
+      })
     }
   }
   const messageEvent = event(command, at, 'session.message-sent', {
@@ -853,7 +882,14 @@ function turnSteerRequested(
     session.pendingApprovalCount > 0 ||
     session.pendingUserInputCount > pendingMessageQuestions(session.activities).length
   ) {
-    throw sessionDomainErrors.STEER_TURN_NOT_ACTIVE()
+    throw sessionDomainErrors.STEER_TURN_NOT_ACTIVE({
+      internal: {
+        sessionId: session.id,
+        latestTurnState: session.latestTurn?.state ?? null,
+        pendingApprovalCount: session.pendingApprovalCount,
+        pendingUserInputCount: session.pendingUserInputCount,
+      },
+    })
   }
   return [
     event(command, at, 'session.message-sent', {

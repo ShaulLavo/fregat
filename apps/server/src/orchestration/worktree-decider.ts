@@ -12,6 +12,7 @@ import {
   type OrchestrationReadModel,
 } from './read-model'
 import { worktreeLifecycleErrors } from './worktree-errors'
+import { worktreeFacts } from './utils/decider-facts'
 import { worktreeCleanupEligibility } from './utils/worktree-policy'
 
 type Command = Extract<
@@ -22,7 +23,11 @@ type LifecycleCommand = Exclude<Command, { type: 'worktree.register' | 'worktree
 
 export function requireReadyWorktree(model: OrchestrationReadModel, worktreeId: string) {
   const worktree = requireWorktree(model, worktreeId)
-  if (worktree.lifecycle.state !== 'ready') throw worktreeLifecycleErrors.NOT_READY({ worktreeId })
+  if (worktree.lifecycle.state !== 'ready')
+    throw worktreeLifecycleErrors.NOT_READY({
+      worktreeId,
+      internal: worktreeFacts({ type: 'worktree.require-ready' }, worktree),
+    })
   return worktree
 }
 
@@ -40,21 +45,57 @@ export function creationTargetEvents(
   const base = requireReadyWorktree(model, target.baseWorktreeId)
   const project = requireProject(model, base.projectId)
   if (project.repositoryKind !== 'git')
-    throw worktreeLifecycleErrors.UNSUPPORTED_REPOSITORY({ worktreeId: base.id })
+    throw worktreeLifecycleErrors.UNSUPPORTED_REPOSITORY({
+      worktreeId: base.id,
+      internal: { projectId: base.projectId, repositoryKind: project.repositoryKind },
+    })
   if (model.worktrees.has(target.worktreeId))
-    throw worktreeLifecycleErrors.DUPLICATE_ID({ worktreeId: target.worktreeId })
+    throw worktreeLifecycleErrors.DUPLICATE_ID({
+      worktreeId: target.worktreeId,
+      internal: {
+        collision: 'id',
+        ...worktreeFacts(command, model.worktrees.get(target.worktreeId)),
+      },
+    })
   if (
     !provisioning ||
     provisioning.worktreeId !== target.worktreeId ||
     provisioning.baseWorktreeId !== target.baseWorktreeId ||
     provisioning.projectId !== base.projectId
   )
-    throw worktreeLifecycleErrors.INVALID_PREPARATION({ worktreeId: target.worktreeId })
+    throw worktreeLifecycleErrors.INVALID_PREPARATION({
+      worktreeId: target.worktreeId,
+      internal: {
+        mismatch: 'target',
+        observed: provisioning
+          ? {
+              worktreeId: provisioning.worktreeId,
+              baseWorktreeId: provisioning.baseWorktreeId,
+              projectId: provisioning.projectId,
+            }
+          : 'absent',
+        expected: {
+          worktreeId: target.worktreeId,
+          baseWorktreeId: target.baseWorktreeId,
+          projectId: base.projectId,
+        },
+      },
+    })
   if (provisioning.branch !== `worktree/${target.worktreeId}`)
-    throw worktreeLifecycleErrors.INVALID_PREPARATION({ worktreeId: target.worktreeId })
+    throw worktreeLifecycleErrors.INVALID_PREPARATION({
+      worktreeId: target.worktreeId,
+      internal: {
+        mismatch: 'branch',
+        observed: provisioning.branch,
+        expected: `worktree/${target.worktreeId}`,
+      },
+    })
   for (const existing of model.worktrees.values()) {
     if (existing.retiredAt || existing.canonicalPath !== provisioning.canonicalPath) continue
-    throw worktreeLifecycleErrors.DUPLICATE_ID({ worktreeId: target.worktreeId })
+    throw worktreeLifecycleErrors.DUPLICATE_ID({
+      worktreeId: target.worktreeId,
+      internal: { collision: 'canonicalPath', ...worktreeFacts(command, existing) },
+    })
   }
   return one(command, at, 'worktree.create-requested', {
     ...provisioning,
@@ -100,7 +141,11 @@ export function decideWorktreeLifecycle(
       return ownershipCommand(command, model, at)
     case 'worktree.mark-missing': {
       const worktree = requireWorktree(model, command.worktreeId)
-      if (worktree.lifecycle.state !== 'ready') throw worktreeLifecycleErrors.STALE_RESULT(command)
+      if (worktree.lifecycle.state !== 'ready')
+        throw worktreeLifecycleErrors.STALE_RESULT({
+          worktreeId: command.worktreeId,
+          internal: { expected: 'ready', ...worktreeFacts(command, worktree) },
+        })
       return withBlockedReferences(
         command,
         model,
@@ -111,7 +156,13 @@ export function decideWorktreeLifecycle(
     case 'worktree.metadata.refresh': {
       const worktree = requireWorktree(model, command.worktreeId)
       if (worktree.metadataVersion !== command.expectedMetadataVersion)
-        throw worktreeLifecycleErrors.STALE_RESULT(command)
+        throw worktreeLifecycleErrors.STALE_RESULT({
+          worktreeId: command.worktreeId,
+          internal: {
+            expectedMetadataVersion: command.expectedMetadataVersion,
+            ...worktreeFacts(command, worktree),
+          },
+        })
       if (worktree.branch === command.branch && worktree.headCommit === command.headCommit)
         return []
       return one(command, at, 'worktree.metadata-refreshed', {
@@ -136,9 +187,23 @@ function retryCreation(
 ) {
   const worktree = requireWorktree(model, command.worktreeId)
   if (worktree.ownership !== 'platform' || worktree.lifecycle.state !== 'creation-failed')
-    throw worktreeLifecycleErrors.NOT_RETRYABLE(command)
+    throw worktreeLifecycleErrors.NOT_RETRYABLE({
+      worktreeId: command.worktreeId,
+      internal: {
+        expected: { ownership: 'platform', lifecycleState: 'creation-failed' },
+        ...worktreeFacts(command, worktree),
+      },
+    })
   if (!worktree.baseWorktreeId || !worktree.baseCommit || !worktree.branch)
-    throw worktreeLifecycleErrors.INVALID_PREPARATION(command)
+    throw worktreeLifecycleErrors.INVALID_PREPARATION({
+      worktreeId: command.worktreeId,
+      internal: {
+        missing: ['baseWorktreeId', 'baseCommit', 'branch'].filter(
+          (field) => !worktree[field as 'baseWorktreeId' | 'baseCommit' | 'branch'],
+        ),
+        ...worktreeFacts(command, worktree),
+      },
+    })
   return one(command, at, 'worktree.create-requested', {
     worktreeId: worktree.id,
     projectId: worktree.projectId,
@@ -188,7 +253,11 @@ function requestCleanup(
   const worktree = requireWorktree(model, command.worktreeId)
   const eligibility = worktreeCleanupEligibility(worktree, references(model, worktree.id))
   if (eligibility.reason !== 'eligible')
-    throw worktreeLifecycleErrors.CLEANUP_INELIGIBLE({ ...command, reason: eligibility.reason })
+    throw worktreeLifecycleErrors.CLEANUP_INELIGIBLE({
+      worktreeId: command.worktreeId,
+      reason: eligibility.reason,
+      internal: { eligibility, ...worktreeFacts(command, worktree) },
+    })
   const common = { worktreeId: command.worktreeId, operationId: command.commandId, updatedAt: at }
   if (command.type === 'worktree.force-cleanup')
     return one(command, at, 'worktree.cleanup-requested', {
@@ -208,10 +277,20 @@ function cleanupResult(
   at: string,
 ) {
   const worktree = model.worktrees.get(command.worktreeId)
-  if (!worktree) throw worktreeLifecycleErrors.STALE_RESULT(command)
+  if (!worktree)
+    throw worktreeLifecycleErrors.STALE_RESULT({
+      worktreeId: command.worktreeId,
+      internal: { missing: 'worktree', ...worktreeFacts(command) },
+    })
   requireOperation(worktree.lifecycle, command, 'cleanup-requested')
   if (worktree.lifecycle.state !== 'cleanup-requested' || worktree.lifecycle.mode !== command.mode)
-    throw worktreeLifecycleErrors.STALE_RESULT(command)
+    throw worktreeLifecycleErrors.STALE_RESULT({
+      worktreeId: command.worktreeId,
+      internal: {
+        expected: { lifecycleState: 'cleanup-requested', mode: command.mode },
+        ...worktreeFacts(command, worktree),
+      },
+    })
   const common = { worktreeId: command.worktreeId, operationId: command.operationId, updatedAt: at }
   if (command.type === 'worktree.cleanup.complete')
     return one(command, at, 'worktree.removed', { ...common, removedAt: at })
@@ -241,20 +320,44 @@ function ownershipCommand(
   const common = { worktreeId: worktree.id, updatedAt: at }
   if (command.type === 'worktree.release') {
     if (worktree.ownership !== 'platform' && worktree.ownership !== 'unclaimed')
-      throw worktreeLifecycleErrors.CLEANUP_INELIGIBLE({ ...command, reason: worktree.ownership })
+      throw worktreeLifecycleErrors.CLEANUP_INELIGIBLE({
+        worktreeId: command.worktreeId,
+        reason: worktree.ownership,
+        internal: worktreeFacts(command, worktree),
+      })
     if (references(model, worktree.id).some((session) => !session.deletedAt))
-      throw worktreeLifecycleErrors.CLEANUP_INELIGIBLE({ ...command, reason: 'referenced' })
+      throw worktreeLifecycleErrors.CLEANUP_INELIGIBLE({
+        worktreeId: command.worktreeId,
+        reason: 'referenced',
+        internal: {
+          referenceCount: references(model, worktree.id).filter((one) => !one.deletedAt).length,
+          ...worktreeFacts(command, worktree),
+        },
+      })
     if (
       worktree.lifecycle.state === 'provisioning' ||
       worktree.lifecycle.state === 'cleanup-requested'
     )
-      throw worktreeLifecycleErrors.NOT_RETRYABLE(command)
+      throw worktreeLifecycleErrors.NOT_RETRYABLE({
+        worktreeId: command.worktreeId,
+        internal: { refused: 'release-while-in-flight', ...worktreeFacts(command, worktree) },
+      })
     return one(command, at, 'worktree.released', common)
   }
-  if (!command.verified) throw worktreeLifecycleErrors.INVALID_PREPARATION(command)
+  if (!command.verified)
+    throw worktreeLifecycleErrors.INVALID_PREPARATION({
+      worktreeId: command.worktreeId,
+      internal: { missing: 'verified-observation', ...worktreeFacts(command, worktree) },
+    })
   if (command.type === 'worktree.adopt') {
     if (worktree.ownership !== 'unclaimed' || worktree.lifecycle.state !== 'orphaned')
-      throw worktreeLifecycleErrors.NOT_RETRYABLE(command)
+      throw worktreeLifecycleErrors.NOT_RETRYABLE({
+        worktreeId: command.worktreeId,
+        internal: {
+          expected: { ownership: 'unclaimed', lifecycleState: 'orphaned' },
+          ...worktreeFacts(command, worktree),
+        },
+      })
     return one(command, at, 'worktree.adopted', {
       ...common,
       branch: command.branch,
@@ -266,17 +369,36 @@ function ownershipCommand(
       worktree.ownership !== 'platform' ||
       !['cleanup-blocked', 'cleanup-failed'].includes(worktree.lifecycle.state)
     )
-      throw worktreeLifecycleErrors.NOT_RETRYABLE(command)
+      throw worktreeLifecycleErrors.NOT_RETRYABLE({
+        worktreeId: command.worktreeId,
+        internal: {
+          expected: {
+            ownership: 'platform',
+            lifecycleState: ['cleanup-blocked', 'cleanup-failed'],
+          },
+          ...worktreeFacts(command, worktree),
+        },
+      })
     return one(command, at, 'worktree.retained', common)
   }
   const eligibility = worktreeCleanupEligibility(worktree, references(model, worktree.id))
   if (!eligibility.canResolveMissing)
-    throw worktreeLifecycleErrors.CLEANUP_INELIGIBLE({ ...command, reason: eligibility.reason })
+    throw worktreeLifecycleErrors.CLEANUP_INELIGIBLE({
+      worktreeId: command.worktreeId,
+      reason: eligibility.reason,
+      internal: { eligibility, ...worktreeFacts(command, worktree) },
+    })
   if (
     command.authorization.canonicalPath !== worktree.canonicalPath ||
     command.authorization.registrationGeneration !== worktree.registrationGeneration
   )
-    throw worktreeLifecycleErrors.STALE_RESULT(command)
+    throw worktreeLifecycleErrors.STALE_RESULT({
+      worktreeId: command.worktreeId,
+      internal: {
+        authorizedGeneration: command.authorization.registrationGeneration,
+        ...worktreeFacts(command, worktree),
+      },
+    })
   return one(command, at, 'worktree.removed', {
     ...common,
     operationId: command.commandId,
@@ -290,10 +412,20 @@ function registerOrphan(
   at: string,
 ) {
   requireProject(model, command.projectId)
-  if (model.worktrees.has(command.worktreeId)) throw worktreeLifecycleErrors.DUPLICATE_ID(command)
+  if (model.worktrees.has(command.worktreeId))
+    throw worktreeLifecycleErrors.DUPLICATE_ID({
+      worktreeId: command.worktreeId,
+      internal: {
+        collision: 'id',
+        ...worktreeFacts(command, model.worktrees.get(command.worktreeId)),
+      },
+    })
   for (const worktree of model.worktrees.values()) {
     if (worktree.retiredAt || worktree.canonicalPath !== command.canonicalPath) continue
-    throw worktreeLifecycleErrors.DUPLICATE_ID(command)
+    throw worktreeLifecycleErrors.DUPLICATE_ID({
+      worktreeId: command.worktreeId,
+      internal: { collision: 'canonicalPath', ...worktreeFacts(command, worktree) },
+    })
   }
   return one(command, at, 'worktree.orphan-registered', {
     worktreeId: command.worktreeId,
@@ -363,7 +495,13 @@ function requireOperation(
   state: 'provisioning' | 'cleanup-requested',
 ) {
   if (lifecycle.state !== state || lifecycle.operationId !== command.operationId)
-    throw worktreeLifecycleErrors.STALE_RESULT(command)
+    throw worktreeLifecycleErrors.STALE_RESULT({
+      worktreeId: command.worktreeId,
+      internal: {
+        expected: { lifecycleState: state, operationId: command.operationId },
+        observed: { lifecycleState: lifecycle.state, operationId: operationIdOf(lifecycle) },
+      },
+    })
 }
 
 function terminalLeaseChanged(
@@ -381,7 +519,11 @@ function terminalLeaseChanged(
   }
   if (command.type === 'terminal.lease.request') {
     requireReadyWorktree(model, command.worktreeId)
-    if (previous) throw worktreeLifecycleErrors.STALE_RESULT(command)
+    if (previous)
+      throw worktreeLifecycleErrors.STALE_RESULT({
+        worktreeId: command.worktreeId,
+        internal: { refused: 'lease-exists', leaseState: previous.state, ...leaseFacts(command) },
+      })
     return one(command, at, 'terminal.lease-updated', { ...common, state: 'requested' })
   }
   if (
@@ -389,9 +531,21 @@ function terminalLeaseChanged(
     previous.worktreeId !== command.worktreeId ||
     previous.runtimeEpoch !== command.runtimeEpoch
   )
-    throw worktreeLifecycleErrors.STALE_RESULT(command)
+    throw worktreeLifecycleErrors.STALE_RESULT({
+      worktreeId: command.worktreeId,
+      internal: {
+        observed: previous
+          ? { worktreeId: previous.worktreeId, runtimeEpoch: previous.runtimeEpoch }
+          : 'absent',
+        ...leaseFacts(command),
+      },
+    })
   const state = terminalLeaseTransition(command.type, previous.state)
-  if (!state) throw worktreeLifecycleErrors.STALE_RESULT(command)
+  if (!state)
+    throw worktreeLifecycleErrors.STALE_RESULT({
+      worktreeId: command.worktreeId,
+      internal: { refused: 'transition', leaseState: previous.state, ...leaseFacts(command) },
+    })
   return one(command, at, 'terminal.lease-updated', { ...common, state })
 }
 
@@ -414,4 +568,16 @@ function terminalLeaseTransition(
   )
     return 'ownership-unknown'
   return null
+}
+
+function operationIdOf(lifecycle: WorktreeLifecycle) {
+  return 'operationId' in lifecycle ? lifecycle.operationId : undefined
+}
+
+function leaseFacts(command: { type: string; terminalLeaseId: string; runtimeEpoch: string }) {
+  return {
+    commandType: command.type,
+    terminalLeaseId: command.terminalLeaseId,
+    runtimeEpoch: command.runtimeEpoch,
+  }
 }

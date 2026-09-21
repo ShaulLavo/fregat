@@ -56,9 +56,8 @@ export function EditorGroup({
       <div
         className={cn(
           'relative flex min-h-0 min-w-0 flex-1 flex-col overflow-hidden',
-          // The well is nearly opaque so text has a stable ground. With no tab
-          // there is no text, so the same ground thins out to the pane opacity.
-          selectedTab ? 'bg-content-well' : 'bg-card',
+          // The panel already paints one layer; text gets the lift on top of it.
+          selectedTab && 'bg-content-well',
         )}
         data-editor-group-content=''
       >

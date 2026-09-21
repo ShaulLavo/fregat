@@ -18,8 +18,16 @@ export async function streamWorkspaceEvents(
     fetch: { signal },
   })
   signal.throwIfAborted()
-  if (response.error) throw clientErrors.WATCH_FAILED({ status: response.status })
-  if (!response.data) throw clientErrors.EDEN_STREAM_MISSING({ label: 'File watcher' })
+  if (response.error)
+    throw clientErrors.WATCH_FAILED({
+      status: response.status,
+      internal: { scope, fileCount: files.length },
+    })
+  if (!response.data)
+    throw clientErrors.EDEN_STREAM_MISSING({
+      label: 'File watcher',
+      internal: { scope, fileCount: files.length },
+    })
 
   for await (const event of parseEdenSseStream(response.data)) {
     const message = watchServerMessage(event.data)

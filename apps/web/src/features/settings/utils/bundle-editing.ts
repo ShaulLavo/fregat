@@ -43,7 +43,7 @@ export const materialLimits = {
 
 export const materialLabels = {
   opacity: 'Pane opacity',
-  contentOpacity: 'Content opacity',
+  contentOpacity: 'Content layer opacity',
   blur: 'Blur',
   saturation: 'Saturation',
 } as const

@@ -16,7 +16,7 @@ import { gitFailureLabel, gitFailurePrompt } from '@/features/git/utils/failure-
 
 /** The last git step that failed, with a hand-off to the agent. A retry replaces it. */
 export function FailureNotice({ rootPath }: { readonly rootPath: string }) {
-  const failure = useLatestFailure()
+  const failure = useLatestFailure(rootPath)
   const queryClient = useQueryClient()
   const { attachTextToNewChat } = useAttachToComposer()
   const [dismissedId, setDismissedId] = useState<number | null>(null)
