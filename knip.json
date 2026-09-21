@@ -31,6 +31,7 @@
         "scripts/keymap-baseline.mjs",
         "scripts/verify-federated-environments.mjs",
         "scripts/verify-web-design.mjs",
+        "scripts/syntax-coverage.ts",
         "scripts/verify-workspace-navigation.mjs",
         "test/factories/chat-proof-workspace.tsx"
       ],
@@ -62,7 +63,15 @@
         "themes/import-omarchy-wallpapers.ts",
         "check-linked-sources.ts",
         "generate-unicode-confusables.mjs",
-        "themes/import-omarchy-theme.ts"
+        "themes/import-omarchy-theme.ts",
+        "parity/background.ts",
+        "parity/composer-defaults.ts",
+        "parity/local-commands.ts",
+        "parity/notifications.ts",
+        "parity/ordering.ts",
+        "parity/response-delivery.ts",
+        "parity/snooze.ts",
+        "parity/wake.ts"
       ]
     },
     ".": {

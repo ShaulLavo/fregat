@@ -9,9 +9,21 @@
     "is the record of what users may still have on disk."
   ],
   "ids": [
+    "chat.confirmSessionDelete",
+    "chat.contextWindowMeterEnabled",
     "chat.defaultInteractionMode",
     "chat.defaultRuntimeMode",
+    "chat.inAppNotificationsEnabled",
     "chat.keepImportedSessionsUpdated",
+    "chat.notificationMode",
+    "chat.planModeEnabled",
+    "chat.projectGrouping",
+    "chat.projectGroupingOverrides",
+    "chat.projectResponseStreamingModes",
+    "chat.projectTextGenerationModels",
+    "chat.responseStreamingMode",
+    "chat.sessionSortOrder",
+    "chat.textGenerationModel",
     "developer.simulatedLatencyMs",
     "editor.codeTheme.dark",
     "editor.codeTheme.light",
@@ -21,6 +33,10 @@
     "editor.fontFamily",
     "editor.fontSize",
     "editor.guides.indentation",
+    "editor.history.persist",
+    "editor.history.persistBudget",
+    "editor.history.persistDays",
+    "editor.history.retainedStates",
     "editor.lineHeight",
     "editor.minimap.enabled",
     "editor.retainedTextBudget",
@@ -57,6 +73,7 @@
     "terminal.integrated.cursorBlinking",
     "terminal.integrated.fontSize",
     "terminal.integrated.scrollback",
+    "tui.theme.colors",
     "window.defaultHeight",
     "window.defaultWidth",
     "window.nativeVibrancy",
@@ -69,9 +86,10 @@
     "workbench.surface.contentOpacity",
     "workbench.surface.opacity",
     "workbench.surface.saturation",
+    "workbench.theme",
+    "workbench.theme.customizations",
     "workbench.tree.indentGuides",
     "workbench.wallpaper",
-    "workbench.wallpaper.enabled",
-    "editor.history.retainedStates"
+    "workbench.wallpaper.enabled"
   ]
 }

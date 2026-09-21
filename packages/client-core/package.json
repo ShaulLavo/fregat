@@ -20,7 +20,6 @@
     "./transport/streams": "./src/transport/streams.ts",
     "./transport/structured-errors": "./src/transport/structured-errors.ts",
     "./transport/utils/sequence": "./src/transport/utils/sequence.ts",
-    "./transport/utils/logging": "./src/transport/utils/logging.ts",
     "./test/in-process-orchestration-socket": "./test/in-process-orchestration-socket.ts",
     "./test/orchestration-socket": "./test/orchestration-socket.ts",
     "./test/orchestration-server-config": "./test/orchestration-server-config.ts",

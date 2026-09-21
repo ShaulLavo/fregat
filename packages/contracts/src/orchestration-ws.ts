@@ -188,7 +188,7 @@ export const orchestrationWsPingSchema = v.object({
   requestId: orchestrationWsRequestIdSchema,
 })
 
-export const orchestrationWsSubscriptionAckSchema = v.object({
+const orchestrationWsSubscriptionAckSchema = v.object({
   kind: v.literal('subscription.ack'),
   subscriptionId: orchestrationWsSubscriptionIdSchema,
   deliveryId: nonNegativeIntegerSchema,

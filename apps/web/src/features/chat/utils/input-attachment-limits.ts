@@ -13,12 +13,7 @@ import { MAX_CHAT_ATTACHMENT_BYTES, MAX_CHAT_ATTACHMENTS } from '@workspace/cont
 const BYTES_PER_MEGABYTE = 1024 * 1024
 
 /** Exactly the media types the Claude SDK accepts. Do not widen. */
-export const CHAT_IMAGE_MIME_ALLOWLIST = [
-  'image/gif',
-  'image/jpeg',
-  'image/png',
-  'image/webp',
-] as const
+const CHAT_IMAGE_MIME_ALLOWLIST = ['image/gif', 'image/jpeg', 'image/png', 'image/webp'] as const
 
 export type ChatImageMimeType = (typeof CHAT_IMAGE_MIME_ALLOWLIST)[number]
 

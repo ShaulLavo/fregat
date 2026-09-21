@@ -4,7 +4,7 @@ type PatchFile = {
 }
 
 // Codex rejects input over 1,048,576 characters; a subject line needs far less.
-export const COMMIT_MESSAGE_PATCH_BUDGET = 200_000
+const COMMIT_MESSAGE_PATCH_BUDGET = 200_000
 
 const TRUNCATION_MARKER = '[patch truncated]'
 const SEPARATOR = '\n\n'

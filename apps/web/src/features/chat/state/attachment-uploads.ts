@@ -12,7 +12,7 @@ import { createClientInvariantError } from '@/lib/structured-errors'
 import { readAttachmentBlob, storeAttachmentBlob, deleteAttachmentBlob } from './attachment-blobs'
 
 const controllers = new Map<string, AbortController>()
-export function attachmentBlobKey(environmentId: EnvironmentId, id: string) {
+function attachmentBlobKey(environmentId: EnvironmentId, id: string) {
   return `${environmentId}:${id}`
 }
 export function cancelAttachmentUpload(environmentId: EnvironmentId, id: string) {

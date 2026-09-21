@@ -35,7 +35,7 @@ const requestSchema = v.object({
 })
 type Field = v.InferOutput<typeof fieldSchema>
 type PersistenceDecision = Extract<ProviderApprovalDecision, 'acceptForSession' | 'acceptAlways'>
-export type ElicitationResponse =
+type ElicitationResponse =
   | { action: 'decline' | 'cancel' }
   | {
       action: 'accept'

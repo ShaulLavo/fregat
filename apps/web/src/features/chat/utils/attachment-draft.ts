@@ -1,7 +1,7 @@
 import * as v from 'valibot'
 import { chatAttachmentSchema } from '@workspace/contracts'
 
-export const attachmentUploadStateSchema = v.variant('status', [
+const attachmentUploadStateSchema = v.variant('status', [
   v.object({ status: v.literal('uploading'), progress: v.number() }),
   v.object({ status: v.literal('failed'), message: v.string() }),
   v.object({ status: v.literal('ready'), attachment: chatAttachmentSchema, expiresAt: v.string() }),

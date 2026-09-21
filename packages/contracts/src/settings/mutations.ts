@@ -38,6 +38,11 @@ const NON_SCALAR_SETTING_IDS = [
   'models.hidden',
   'models.order',
   'keybindings.overrides',
+  'chat.projectResponseStreamingModes',
+  'chat.textGenerationModel',
+  'chat.projectTextGenerationModels',
+  'chat.projectGroupingOverrides',
+  'workbench.theme.customizations',
 ] as const satisfies readonly SettingId[]
 
 type NonScalarSettingId = (typeof NON_SCALAR_SETTING_IDS)[number]

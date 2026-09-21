@@ -5,7 +5,7 @@ import { fileURLToPath } from 'node:url'
 import type { BundledWallpaper } from '@workspace/contracts'
 import { wallpaperErrors } from './structured-errors'
 
-export const BUNDLED_WALLPAPER_DIRECTORY = fileURLToPath(new URL('./assets/', import.meta.url))
+const BUNDLED_WALLPAPER_DIRECTORY = fileURLToPath(new URL('./assets/', import.meta.url))
 
 export async function readBundledWallpaper(
   wallpaper: BundledWallpaper,

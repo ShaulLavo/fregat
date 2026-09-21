@@ -1,12 +1,12 @@
 import * as v from 'valibot'
 
-export const sessionTitleStateSchema = v.object({
+const sessionTitleStateSchema = v.object({
   source: v.picklist(['manual', 'generated']),
   version: v.string(),
   needsRefinement: v.boolean(),
 })
 
-export const sessionTitleRegenerationSchema = v.object({
+const sessionTitleRegenerationSchema = v.object({
   requestId: v.string(),
   startedAt: v.pipe(v.string(), v.isoTimestamp()),
 })

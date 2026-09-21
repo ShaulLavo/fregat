@@ -21,7 +21,7 @@ const CHAT_INPUT_DRAFT_STORAGE_VERSION = 2
  * rebuild both the composer chip and the `<terminal_context>` block it sends.
  */
 const lineNumberSchema = v.pipe(v.number(), v.integer(), v.minValue(1))
-export const persistedTerminalContextSchema = v.object({
+const persistedTerminalContextSchema = v.object({
   id: trimmedNonEmptyStringSchema,
   lineEnd: lineNumberSchema,
   lineStart: lineNumberSchema,
@@ -29,19 +29,19 @@ export const persistedTerminalContextSchema = v.object({
   text: trimmedNonEmptyStringSchema,
 })
 
-export const composedMessageSchema = v.object({
+const composedMessageSchema = v.object({
   prompt: v.string(),
   attachments: v.array(persistedAttachmentDraftSchema),
   terminalContexts: v.array(persistedTerminalContextSchema),
 })
-export const promptStashEntrySchema = v.object({
+const promptStashEntrySchema = v.object({
   ...composedMessageSchema.entries,
   createdAt: v.string(),
   id: trimmedNonEmptyStringSchema,
 })
 export type PromptStashEntry = v.InferOutput<typeof promptStashEntrySchema>
 
-export const draftIdentitySchema = v.object({
+const draftIdentitySchema = v.object({
   id: v.pipe(v.string(), v.uuid()),
   projectId: projectIdSchema,
   rootPath: v.string(),

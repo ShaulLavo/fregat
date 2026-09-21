@@ -4,7 +4,7 @@ import { createStore, type StoreApi as ZustandStoreApi } from 'zustand/vanilla'
 
 import { clientErrors } from '@/lib/structured-errors'
 
-export type PendingMessageFile = {
+type PendingMessageFile = {
   readonly path: string
   /** False until the tab exists: the path is recorded a moment before it opens. */
   readonly seenOpen: boolean

@@ -7,7 +7,7 @@ import {
 } from '@workspace/client-core/chat/providers/auth'
 import type { ChatSession } from '@workspace/client-core/chat/types'
 
-export type ChatRuntimeAlertTone = 'error' | 'warning'
+type ChatRuntimeAlertTone = 'error' | 'warning'
 
 const ALERT_PRIORITY = { error: 0, warning: 1 } as const
 
