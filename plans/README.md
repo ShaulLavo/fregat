@@ -19,6 +19,10 @@ a bare root `bun run verify`.
 
 | Plan                                                                            | State                                                   |
 | ------------------------------------------------------------------------------- | ------------------------------------------------------- |
+| [133 — one owner per fact](133-one-owner-per-fact.md)                           | **PROPOSED — PHASE 1 READY; D1 NEEDS AN ANSWER**        |
+| [132 — process and dev ownership](132-process-and-dev-ownership.md)             | **PROPOSED — PHASE 1 FIRST; D4 NEEDS AN ANSWER**        |
+| [131 — provider codes, not prose](131-provider-codes-not-prose.md)              | **PROPOSED — PHASE 1 IS A SECURITY FIX**                |
+| [130 — ask the editor](130-ask-the-editor.md)                                   | **PROPOSED — PHASE 1 NEEDS EDITOR E047**                |
 | [129 — dependency shape](129-dependency-shape.md)                               | **PHASE 1 DEPLOYED 2026-09-20; PHASES 2–3 PROPOSED**    |
 | [128 — React 19 patterns](128-react-19-patterns.md)                             | **PROPOSED — IMPLEMENTATION NOT STARTED**               |
 | [127 — compiler and lifetime repairs](127-compiler-and-lifetime-repairs.md)     | **IMPLEMENTED AND DEPLOYED 2026-09-20**                 |

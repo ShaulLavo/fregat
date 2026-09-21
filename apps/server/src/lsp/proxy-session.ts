@@ -93,6 +93,7 @@ type SemanticTokenBaseline = {
 
 type SharedDocument = {
   backendVersion: number
+  diagnostics: string | null
   languageId: string
   readonly owners: Map<LspProxyConnection, OwnerDocumentState>
   syncEpoch: number
@@ -318,6 +319,8 @@ class PooledLspProxySession {
   private clientBytes = 0
   private clientMessageCount = 0
   private connectionCount = 0
+  private diagnosticPublicationCount = 0
+  private diagnosticReplayCount = 0
   private disposed = false
   private exitCode: number | null = null
   private exitSignal: NodeJS.Signals | null = null
@@ -943,6 +946,10 @@ class PooledLspProxySession {
     if (shared.text === opened.text) {
       shared.owners.set(connection, synchronizedOwner(opened, shared))
       connection.addDocument(opened.uri)
+      if (shared.diagnostics !== null) {
+        connection.send(shared.diagnostics)
+        this.diagnosticReplayCount += 1
+      }
       return
     }
 
@@ -953,6 +960,7 @@ class PooledLspProxySession {
       return
     }
 
+    shared.diagnostics = null
     this.sendFullDocumentChange(opened.uri, opened.text, backendVersion)
     shared.backendVersion = backendVersion
     shared.syncEpoch = syncEpoch
@@ -968,6 +976,7 @@ class PooledLspProxySession {
   ): void {
     const shared = {
       backendVersion: document.version,
+      diagnostics: null,
       languageId: document.languageId,
       owners: new Map<LspProxyConnection, OwnerDocumentState>(),
       syncEpoch: 0,
@@ -1010,6 +1019,7 @@ class PooledLspProxySession {
       return
     }
 
+    shared.diagnostics = null
     if (ownerIsSynchronized(owner, shared)) {
       this.writeToServer(JSON.stringify(rewriteTextDocumentVersion(message, backendVersion)))
     } else {
@@ -1277,7 +1287,20 @@ class PooledLspProxySession {
   }
 
   private broadcastServerNotification(message: JsonRpcNotification, raw: string): void {
-    this.broadcastServerMessage(serverNotificationForClient(message, raw))
+    const notification = serverNotificationForClient(message, raw)
+    this.captureDiagnostics(message, notification)
+    this.broadcastServerMessage(notification)
+  }
+
+  private captureDiagnostics(message: JsonRpcNotification, notification: string): void {
+    if (message.method !== 'textDocument/publishDiagnostics') return
+    const params = message.params
+    if (!isRecord(params) || typeof params.uri !== 'string') return
+    this.diagnosticPublicationCount += 1
+    const document = this.documents.get(params.uri)
+    if (!document || !Array.isArray(params.diagnostics)) return
+    if (params.version !== undefined && params.version !== document.backendVersion) return
+    document.diagnostics = notification
   }
 
   private broadcastServerMessage(message: string): void {
@@ -1475,6 +1498,8 @@ class PooledLspProxySession {
       clientBytes: this.clientBytes,
       clientMessageCount: this.clientMessageCount,
       connectionCount: this.connectionCount,
+      diagnosticPublicationCount: this.diagnosticPublicationCount,
+      diagnosticReplayCount: this.diagnosticReplayCount,
       durationMs: elapsedMs(this.openedAt),
       exitCode: this.exitCode,
       exitSignal: this.exitSignal,

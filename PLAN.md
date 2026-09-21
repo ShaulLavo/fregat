@@ -407,6 +407,35 @@ implementation and the others consume it. Verification tooling reconciles with P
 shape with Plan 118. No measurement has been taken for either plan: the dev server is down, only the
 mesh answers, and every `agent:browser` line in both is a prescription for the implementer.
 
+## Workaround removal lane
+
+Requested 2026-09-21, after the diff line-comment fix replaced a DOM read, a duplicated projection
+and a runtime assumption guard with one Editor API (`diffRowAtEvent`). Five read-only audits the same
+day swept both repositories for the same shape and for workarounds generally. Their findings are
+grouped by owner into four Platform plans and five Editor backlog entries. Items marked verified in
+each plan were confirmed in source; the rest are audit findings an implementer re-checks first.
+
+Suggested order:
+
+1. [Plan 131](plans/131-provider-codes-not-prose.md) Phase 1 and
+   [Plan 132](plans/132-process-and-dev-ownership.md) Phase 1. A tool permission's lifetime is
+   decided by substring match, and the desktop app can kill a process it does not own. Both are
+   small and both need a `--server` or desktop restart, so batch them.
+2. [E047](../Editor/plans/e047-point-and-row-queries.md), then
+   [Plan 130](plans/130-ask-the-editor.md) Phases 1 and 4. One point query in the Editor removes the
+   search-result row arithmetic, the unicode hover's marker scan and the residue in `diffRowAtEvent`.
+   Plan 130 Phase 2 needs nothing and can go at any time.
+3. [E048](../Editor/plans/e048-minimap-document-space.md) and
+   [E051](../Editor/plans/e051-fast-path-equivalence.md). The minimap repeats the display-row bug,
+   and the row-layout fast path has no equivalence test.
+4. [E049](../Editor/plans/e049-no-silent-misses.md), [Plan 133](plans/133-one-owner-per-fact.md).
+5. [E050](../Editor/plans/e050-host-obligations-into-api.md) row by row, each unlocking its Plan 130
+   Phase 5 item.
+
+Two questions are the owner's: whether the server's migration ledger is a stated exception to the
+no-migration rule (Plan 132 D4), and whether overwriting unsaved edits on a disk change is fixed
+inside Plan 133 or gets its own conflict plan (Plan 133 D1). No lane is reordered by this one.
+
 ## Verification boundaries
 
 - **Platform-only:** verify the narrow Platform tests/typechecks named by the active plan.

@@ -44,6 +44,69 @@ afterEach(async () => {
 })
 
 describe('LspSessionPool pooling', () => {
+  it('replays diagnostics when another browser opens the same document', async () => {
+    const fixture = await initializedFixture()
+    const uri = 'file:///repo/a.ts'
+    const text = 'const value = missing'
+    await fixture.first.handleClientMessage(json(didOpen(uri, text, 40)))
+    const diagnostics = {
+      jsonrpc: '2.0',
+      method: 'textDocument/publishDiagnostics',
+      params: {
+        uri,
+        version: 40,
+        diagnostics: [{ message: 'Cannot find name missing', severity: 1 }],
+      },
+    }
+    fixture.respond(diagnostics)
+    fixture.secondSocket.sent.length = 0
+    await fixture.second.handleClientMessage(json(initializeRequest(2)))
+    await fixture.second.handleClientMessage(json(didOpen(uri, text, 0)))
+
+    expect(fixture.secondSocket.sent.at(-1)).toEqual({
+      ...diagnostics,
+      params: { uri, diagnostics: diagnostics.params.diagnostics },
+    })
+    expect(
+      fixture.serverMessages.filter((message) => message.method === 'textDocument/didOpen'),
+    ).toHaveLength(1)
+
+    fixture.respond({ ...diagnostics, params: { uri, version: 40, diagnostics: [] } })
+    await fixture.second.handleClientMessage(json(didClose(uri)))
+    await fixture.second.handleClientMessage(json(didOpen(uri, text, 1)))
+    expect(fixture.secondSocket.sent.at(-1)).toEqual({
+      ...diagnostics,
+      params: { uri, diagnostics: [] },
+    })
+  })
+
+  it.each(['change', 'open', 'close', 'old-version'])(
+    'does not replay diagnostics after %s invalidates their document',
+    async (invalidation) => {
+      const fixture = await initializedFixture()
+      const uri = 'file:///repo/a.ts'
+      await fixture.first.handleClientMessage(json(didOpen(uri, 'old', 40)))
+      const publication = {
+        jsonrpc: '2.0',
+        method: 'textDocument/publishDiagnostics',
+        params: { uri, version: 40, diagnostics: [{ message: 'Old error', severity: 1 }] },
+      }
+      fixture.respond(publication)
+      if (invalidation === 'change' || invalidation === 'old-version')
+        await fixture.first.handleClientMessage(json(didChange(uri, 41, [{ text: 'new' }])))
+      if (invalidation === 'old-version') fixture.respond(publication)
+      if (invalidation === 'close') await fixture.first.handleClientMessage(json(didClose(uri)))
+      fixture.secondSocket.sent.length = 0
+      await fixture.second.handleClientMessage(json(initializeRequest(2)))
+      await fixture.second.handleClientMessage(json(didOpen(uri, 'new', 0)))
+      expect(
+        fixture.secondSocket.sent.filter(
+          (message) => message.method === 'textDocument/publishDiagnostics',
+        ),
+      ).toEqual([])
+    },
+  )
+
   it('initializes the spawned runtime with machine settings taking precedence', async () => {
     const fixture = await lspFixture(
       { initializationOptions: async () => ({ preference: 'machine' }) },
