@@ -3,7 +3,7 @@ import { CommandGroup, CommandItem, CommandShortcut } from '@workspace/ui/compon
 import { useEffect } from 'react'
 
 import { useActions } from '@/features/command-palette/hooks/use-actions'
-import { useEditorColorTheme } from '@/features/editor/hooks/use-editor-color-theme'
+import { useEditorColorTheme } from '@/lib/editor-theme/hooks/use-editor-color-theme'
 import { preloadVscodeThemeRegistrations } from '@/features/editor/state/color-theme-store'
 import { editorThemeOptions } from '@/lib/code-theme/utils/catalog'
 import { colorThemeItemValue } from '@/features/command-palette/utils/query'

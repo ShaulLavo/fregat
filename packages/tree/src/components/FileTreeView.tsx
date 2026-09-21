@@ -202,6 +202,8 @@ export function FileTreeView({
   searchPlaceholder = 'Search…',
   slotHost,
   stickyFolders = false,
+  initialScrollTop,
+  onScrollTopChange,
   initialViewportHeight = FILE_TREE_DEFAULT_VIEWPORT_HEIGHT,
 }: FileTreeViewProps): JSX.Element {
   'use no memo'
@@ -304,7 +306,7 @@ export function FileTreeView({
       controller,
       itemHeight,
       overscan,
-      scrollTop: 0,
+      scrollTop: initialScrollTop ?? 0,
       stickyFolders,
       viewportHeight: initialViewportHeight,
     }),
@@ -758,8 +760,9 @@ export function FileTreeView({
     // inside the virtualized window instead of starting at the top of the tree.
     if (!initialFocusedScrollAppliedRef.current) {
       initialFocusedScrollAppliedRef.current = true
+      if (initialScrollTop !== undefined) scrollElement.scrollTop = initialScrollTop
       const initialFocusedIndex = controller.getFocusedIndex()
-      if (initialFocusedIndex >= 0) {
+      if (initialScrollTop === undefined && initialFocusedIndex >= 0) {
         const initialViewportHeightPx = getCachedViewportHeight(
           measuredViewportHeightRef.current,
           initialViewportHeight,
@@ -866,6 +869,7 @@ export function FileTreeView({
     }
 
     const onScroll = (): void => {
+      onScrollTopChange?.(scrollElement.scrollTop)
       update()
       if (scrollElement.scrollTop > 0) {
         clearOverlayReveal()
@@ -968,6 +972,8 @@ export function FileTreeView({
     getRoot,
     getScroll,
     initialViewportHeight,
+    onScrollTopChange,
+    initialScrollTop,
     invalidateControllerView,
     itemHeight,
     overscan,

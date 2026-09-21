@@ -1,3 +1,5 @@
+import { useDiffPaintOwner } from '@/features/editor/hooks/use-diff-paint-owner'
+import { hasSavedDiffPaint, savedDiffPaintView } from '@/features/editor/state/diff-paint'
 import type { TabId } from '@/lib/documents/utils/types'
 import { type DiffFile, type DiffRegionStore } from '@singapore-editor/diff'
 import {
@@ -11,7 +13,7 @@ import { LoadingState } from '@workspace/ui/components/loading-state'
 
 import { DiffPane } from '@/features/editor/components/diff-pane'
 import { useDiffPanes } from '@/features/editor/hooks/use-diff-panes'
-import { useEditorColorTheme } from '@/features/editor/hooks/use-editor-color-theme'
+import { useEditorColorTheme } from '@/lib/editor-theme/hooks/use-editor-color-theme'
 import {
   editorDiffSyntaxConfiguration,
   editorSyntaxHighlightingSource,
@@ -28,12 +30,16 @@ import type { EditorDiffViewMode } from '@/features/editor/utils/diff-view-mode'
  */
 export function DiffEditor({
   file,
+  paintIdentity,
+  failure,
   languageServer = null,
   mode,
   regions,
   tabId,
 }: {
   file: DiffFile | null
+  paintIdentity?: string
+  failure?: string | null
   languageServer?: DiffLanguageServerContext | null
   mode: EditorDiffViewMode
   regions?: DiffRegionStore
@@ -49,11 +55,18 @@ export function DiffEditor({
   const presentation = useTabPresentation(tabId)
   const regionStore = regions ?? presentation.regions
   const panes = useDiffPanes()
+  const paintOwner = useDiffPaintOwner()
+  const savedPaint = hasSavedDiffPaint(paintOwner, paintIdentity, mode)
+  const savedLayout = savedDiffPaintView(paintOwner, paintIdentity)?.layout
+  const layout = presentation.diffLayout ?? savedLayout
+  const getLayout = () => presentation.diffLayout ?? savedLayout
   useLayoutEffect(() => {
     if (file) presentation.setDiffFile(file)
   }, [file, presentation])
 
-  if (!file)
+  if (failure && !file && !savedPaint) return null
+
+  if (!file && !savedPaint)
     return (
       <LoadingState className='flex h-full flex-col gap-3 p-4' label='Loading comparison'>
         <div className='skeleton-sweep h-4 w-3/4 rounded-md' />
@@ -66,6 +79,8 @@ export function DiffEditor({
       <div className='editor-diff-view flex h-full min-h-0 w-full min-w-0 overflow-hidden'>
         <DiffPane
           file={file}
+          paintIdentity={paintIdentity}
+          getLayout={getLayout}
           languageServer={languageServer}
           regions={regionStore}
           presentation={presentation.diffPanes.stacked}
@@ -84,7 +99,7 @@ export function DiffEditor({
       <ResizablePanelGroup
         key={tabId}
         className='min-h-0 min-w-0'
-        defaultLayout={presentation.diffLayout}
+        defaultLayout={layout}
         id={`diff-panes-${tabId ?? 'standalone'}`}
         onLayoutChanged={(layout, meta) => {
           if (meta.isUserInteraction) presentation.setDiffLayout(layout)
@@ -93,6 +108,8 @@ export function DiffEditor({
         <ResizablePanel className='min-h-0 min-w-0 overflow-hidden' id='diff-old'>
           <DiffPane
             file={file}
+            paintIdentity={paintIdentity}
+            getLayout={getLayout}
             languageServer={languageServer}
             regions={regionStore}
             presentation={presentation.diffPanes.old}
@@ -110,6 +127,8 @@ export function DiffEditor({
         <ResizablePanel className='min-h-0 min-w-0 overflow-hidden' id='diff-new'>
           <DiffPane
             file={file}
+            paintIdentity={paintIdentity}
+            getLayout={getLayout}
             languageServer={languageServer}
             regions={regionStore}
             presentation={presentation.diffPanes.new}

@@ -6,6 +6,11 @@ export const gitPathQuerySchema = v.object({
   path: v.optional(pathSchema, ''),
 })
 
+export const gitStatusQuerySchema = v.object({
+  path: v.optional(pathSchema, ''),
+  fresh: v.optional(booleanQueryValueSchema),
+})
+
 export const gitPathBodySchema = v.object({
   path: v.optional(pathSchema, ''),
 })

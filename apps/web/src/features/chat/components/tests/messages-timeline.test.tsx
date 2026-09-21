@@ -1,3 +1,4 @@
+import { clearTimelineReload } from '@/features/chat/state/timeline-reload'
 import { TEST_ENVIRONMENT_ID as FIXTURE_ENVIRONMENT_ID } from '../../../../../test/factories/chat'
 import { fireEvent, screen, waitFor } from '@testing-library/react'
 import {
@@ -39,6 +40,7 @@ const originalScrollHeight = Object.getOwnPropertyDescriptor(Element.prototype, 
 const originalRect = Object.getOwnPropertyDescriptor(Element.prototype, 'getBoundingClientRect')
 
 beforeEach(() => {
+  clearTimelineReload(FIXTURE_ENVIRONMENT_ID)
   clientHeight = VIEWPORT_HEIGHT
   scrollHeightOverride = null
   Object.defineProperty(HTMLElement.prototype, 'clientHeight', {
@@ -392,3 +394,15 @@ function restoreLayoutProperty(
 
   Object.defineProperty(target, name, descriptor)
 }
+
+test('remounting a saved reader preserves the message anchor instead of jumping to the end', () => {
+  const messages = conversation(30)
+  const mounted = renderTimeline(messages)
+  fireEvent.wheel(transcript(), { deltaY: -300 })
+  transcript().scrollTop = 240
+  fireEvent.scroll(transcript())
+  mounted.unmount()
+  renderTimeline(messages)
+  expect(transcript().scrollTop).toBe(240)
+  expect(jumpToLatest()).not.toHaveClass('opacity-0')
+})

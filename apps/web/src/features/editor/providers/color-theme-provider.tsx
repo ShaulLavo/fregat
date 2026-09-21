@@ -14,7 +14,7 @@ import { useSettingsActions } from '@/features/settings/hooks/use-settings-actio
 import {
   EditorColorThemeContext,
   type EditorColorThemeState,
-} from '@/features/editor/providers/color-theme-context'
+} from '@/lib/editor-theme/providers/context'
 import { editorThemeColorMode } from '@/lib/code-theme/utils/catalog'
 import {
   clearEditorThemePreview,
@@ -22,6 +22,7 @@ import {
   getResolvedShikiThemeContentHash,
   getSelectedEditorThemeId,
   loadEditorThemeForSelection,
+  loadedEditorThemeForSelection,
   setActiveEditorColorMode,
   syncEditorThemeSelection,
   subscribeEditorColorTheme,
@@ -63,7 +64,9 @@ export function EditorColorThemeProvider({ children }: { readonly children: Reac
   const committedThemeId = useSyncExternalStore(subscribeEditorColorTheme, () =>
     getCommittedEditorThemeId(resolvedTheme),
   )
-  const [loadedTheme, setLoadedTheme] = useState<LoadedEditorColorTheme | null>(null)
+  const [loadedTheme, setLoadedTheme] = useState<LoadedEditorColorTheme | null>(() =>
+    loadedEditorThemeForSelection(resolvedTheme),
+  )
   const appliedThemeContentHash = useSyncExternalStore(subscribeEditorColorTheme, () => {
     const themeId = loadedTheme?.resolvedThemeId
     return themeId ? getResolvedShikiThemeContentHash(themeId) : null

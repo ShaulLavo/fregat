@@ -1,3 +1,4 @@
+import { useStatus } from '@/features/git/hooks/use-status'
 import type { ChangeRow, PanelSection } from '@/features/git/utils/types'
 import { groupMenu } from '../utils/group-menu'
 import { useDiscardPathsMutation } from './use-discard-paths-mutation'
@@ -7,6 +8,7 @@ import { useStagePathsMutation } from './use-stage-paths-mutation'
 import { useUnstagePathsMutation } from './use-unstage-paths-mutation'
 
 export function useGroupMenu(rows: readonly ChangeRow[], section: PanelSection, rootPath: string) {
+  const confirmed = Boolean(useStatus(rootPath).data)
   const paths = rows.map((row) => row.file.path)
   const staged = section === 'staged'
   const discard = useDiscardPathsMutation(paths, rootPath)
@@ -25,6 +27,7 @@ export function useGroupMenu(rows: readonly ChangeRow[], section: PanelSection, 
   }
 
   return groupMenu({
+    writable: confirmed,
     discardAll: runDiscardAll,
     openAllDiffs: () => void openDiffs(rows),
     section,

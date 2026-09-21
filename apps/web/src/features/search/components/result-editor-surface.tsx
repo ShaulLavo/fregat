@@ -1,6 +1,8 @@
+import { useRowHeight } from '@workspace/ui/patterns/use-row-height'
+import { createSearchResultVirtualListMetrics } from '@/features/search/utils/result-virtual-list'
 import { memo, useId, useLayoutEffect, useMemo, useRef, type KeyboardEvent } from 'react'
 
-import { useEditorColorTheme } from '@/features/editor/hooks/use-editor-color-theme'
+import { useEditorColorTheme } from '@/lib/editor-theme/hooks/use-editor-color-theme'
 import type { WorkspaceSearchFileGroup } from '@/features/search/state/buffer-state'
 import { useSearchResultActions } from '@/features/search/hooks/use-result-actions'
 import { useSearchResultScrollPosition } from '@/features/search/hooks/use-result-scroll-position'
@@ -11,6 +13,7 @@ import {
 import { handleSearchResultSurfaceKeyDown } from '@/features/search/utils/result-editor-keyboard'
 import type { SearchResultEditorScrollToIndex } from '@/features/search/utils/result-editor-types'
 import {
+  searchResultVirtualRowInputs,
   scrollActiveSearchResultIntoView,
   searchResultVirtualRowIndex,
   searchResultVirtualRowScrollTarget,
@@ -118,8 +121,13 @@ export const SearchResultEditorSurface = memo(
       })
     }, [activeResultId, activeResultPicked])
 
+    const rowHeight = useRowHeight(parentRef)
+    const geometry = createSearchResultVirtualListMetrics(
+      searchResultVirtualRowInputs(rows, rowHeight),
+    ).items
     const initialViewport = useSearchResultScrollPosition({
       displayedResultsQuery,
+      geometry,
       parentRef,
       rootPath,
       scrollToOffsetRef,

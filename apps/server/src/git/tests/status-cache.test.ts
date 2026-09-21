@@ -71,6 +71,37 @@ describe('git status cache', () => {
     ])
   })
 
+  it('fresh status replaces a cached missing repository for subsequent ordinary reads', async () => {
+    const root = await mkdtemp(path.join(tmpdir(), 'platform-git-cache-'))
+    roots.push(root)
+    const service = new GitService(createWorkspacePaths(root), {
+      maxTextFileBytes: DEFAULT_MAX_TEXT_FILE_BYTES,
+      repositoryCacheTtlMs: 60_000,
+    })
+    expect((await service.status('')).repository).toBeNull()
+    await runGit(root, ['init', '-b', 'main'])
+    await writeFile(path.join(root, 'new.txt'), 'new repository\n')
+    expect((await service.status('')).repository).toBeNull()
+    const fresh = await service.status('', true)
+    expect(fresh.repository).not.toBeNull()
+    expect(fresh.files.map((file) => file.path)).toEqual(['new.txt'])
+    expect(await service.status('')).toEqual(fresh)
+  })
+
+  it('fresh status replaces a cached repository after its metadata is removed', async () => {
+    const root = await fixtureRepo()
+    const service = new GitService(createWorkspacePaths(root), {
+      maxTextFileBytes: DEFAULT_MAX_TEXT_FILE_BYTES,
+      repositoryCacheTtlMs: 60_000,
+      statusCacheTtlMs: 60_000,
+    })
+    expect((await service.status('')).repository).not.toBeNull()
+    await rm(path.join(root, '.git'), { recursive: true, force: true })
+    expect((await service.status('')).repository).not.toBeNull()
+    expect(await service.status('', true)).toEqual({ repository: null, files: [] })
+    expect(await service.status('')).toEqual({ repository: null, files: [] })
+  })
+
   it('answers a non-repository path from the negative window without re-running git', async () => {
     const root = await mkdtemp(path.join(tmpdir(), 'platform-git-cache-'))
     roots.push(root)

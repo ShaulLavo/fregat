@@ -116,3 +116,16 @@ it('starts the git TTL after loading and leaves an in-flight value available', a
   clock.advance(1)
   expect(cache.read('pending')).toBeUndefined()
 })
+
+it('an exact invalidation replaces an in-flight value without letting its late result overwrite the refresh', async () => {
+  const cache = new BoundedTtlCache<string>({ capacity: 4, ttlMs: 60_000 })
+  const old = Promise.withResolvers<string>()
+  const oldLoad = cache.load('/repo', () => old.promise)
+  await cache.load('/repo-other', async () => 'other')
+  cache.invalidate('/repo')
+  expect(await cache.load('/repo', async () => 'fresh')).toBe('fresh')
+  old.resolve('stale')
+  expect(await oldLoad).toBe('stale')
+  expect(await cache.read('/repo')).toBe('fresh')
+  expect(await cache.read('/repo-other')).toBe('other')
+})

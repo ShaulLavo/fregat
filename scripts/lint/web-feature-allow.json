@@ -356,12 +356,6 @@
   {
     "from": "chat",
     "to": "editor",
-    "module": "features/editor/hooks/use-editor-color-theme.ts",
-    "reason": "shared \u2192 lib: useEditorColorTheme is reused by chat outside editor; move this shared behavior with its consumers."
-  },
-  {
-    "from": "chat",
-    "to": "editor",
     "module": "features/editor/hooks/use-editor-commands.ts",
     "reason": "shared \u2192 lib: useEditorCommands is reused by chat outside editor; move this shared behavior with its consumers."
   },
@@ -424,12 +418,6 @@
     "to": "chat",
     "module": "features/chat/utils/formatters.ts",
     "reason": "owner: The palette assembles commands and search results across features; this module supplies formatChatRelativeTime."
-  },
-  {
-    "from": "command-palette",
-    "to": "editor",
-    "module": "features/editor/hooks/use-editor-color-theme.ts",
-    "reason": "owner: The palette assembles commands and search results across features; this module supplies useEditorColorTheme."
   },
   {
     "from": "command-palette",
@@ -662,12 +650,6 @@
   {
     "from": "search",
     "to": "editor",
-    "module": "features/editor/hooks/use-editor-color-theme.ts",
-    "reason": "shared \u2192 lib: useEditorColorTheme is reused by search outside editor; move this shared behavior with its consumers."
-  },
-  {
-    "from": "search",
-    "to": "editor",
     "module": "features/editor/state/document-state.tsx",
     "reason": "couple: search and editor coordinate the same document or session state through useEditorDocumentStoreApi; separate that ownership before draining this edge."
   },
@@ -808,12 +790,6 @@
     "to": "editor",
     "module": "features/editor/components/language-server-references-pane.tsx",
     "reason": "owner: The workbench composes feature panes and their commands; this module supplies LanguageServerReferencesPane."
-  },
-  {
-    "from": "workbench",
-    "to": "editor",
-    "module": "features/editor/hooks/use-editor-color-theme.ts",
-    "reason": "owner: The workbench composes feature panes and their commands; this module supplies useEditorColorTheme."
   },
   {
     "from": "workbench",
@@ -1084,12 +1060,6 @@
     "to": "editor",
     "module": "features/editor/components/filesystem-conflict-toast.tsx",
     "reason": "shared \u2192 lib: FilesystemConflictToast is rendered by both workspace and editor; extract the shared presentation from its feature owner."
-  },
-  {
-    "from": "workspace",
-    "to": "editor",
-    "module": "features/editor/hooks/use-editor-color-theme.ts",
-    "reason": "shared \u2192 lib: useEditorColorTheme is reused by workspace outside editor; move this shared behavior with its consumers."
   },
   {
     "from": "workspace",

@@ -1,3 +1,7 @@
+import { savedSettings } from '@/features/settings/state/reload'
+import { settingsKeys } from '@workspace/client-core/settings/query-keys'
+import { assertEnvironmentWritable } from '@/lib/environments/state/availability'
+import { originForQueryClient } from '@/lib/environments/state/query-clients'
 import { SETTINGS_MUTATION_KEY } from '@/features/settings/utils/mutation-keys'
 import { nowMs } from '@workspace/utils/timing'
 import * as v from 'valibot'
@@ -135,6 +139,9 @@ export function useSettingsActions() {
     operations: readonly SettingsOperation[],
     initiator?: string,
   ): SettingsSubmission => {
+    if (savedSettings(queryClient) && !queryClient.getQueryData(settingsKeys.document()))
+      return { kind: 'noop' }
+    assertEnvironmentWritable(originForQueryClient(queryClient))
     const { entry, supersededMutationIds } = submitSettingsIntent(
       queryClient,
       target,

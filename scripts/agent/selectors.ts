@@ -415,6 +415,10 @@ export const selectors = {
   historyRestore: (page: Page) => page.getByRole('button', { name: 'Restore', exact: true }),
   diffRows: (page: Page) => page.locator('.editor-diff-pane [data-editor-virtual-row]'),
   diffExpandRows: (page: Page) => page.locator('.editor-diff-pane .editor-diff-row-expandable'),
+  diffLineSelectionLabel: (page: Page) =>
+    page
+      .getByRole('button', { name: 'Ask the agent about these lines', exact: true })
+      .locator('xpath=preceding-sibling::span'),
   editorRows: (page: Page) => page.locator('.editor-virtualized-row'),
   editorTabNamed: (page: Page, label: RegExp) =>
     page.locator('[data-editor-tab-path]').filter({ hasText: label }),
@@ -731,4 +735,20 @@ export async function hoverWord(page: Page, word: string, within = 'body') {
   await page.mouse.move(point.x, point.y)
   await selectors.editorHover(page).waitFor({ state: 'visible', timeout: 8000 })
   await page.waitForTimeout(400)
+}
+
+/** Starts recording whether any hover paints a fenced block before its token colours are in. */
+export async function watchHoverPlainCode(page: Page) {
+  await page.evaluate(`(() => {
+    window.__hoverPlainCode = false
+    new MutationObserver(() => {
+      for (const code of document.querySelectorAll('[data-editor-popup] pre > code[data-language]')) {
+        if (!code.querySelector('span')) window.__hoverPlainCode = true
+      }
+    }).observe(document.body, { childList: true, subtree: true })
+  })()`)
+}
+
+export async function hoverShowedPlainCode(page: Page): Promise<boolean> {
+  return (await page.evaluate('window.__hoverPlainCode')) as boolean
 }

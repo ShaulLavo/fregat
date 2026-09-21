@@ -1,4 +1,6 @@
-import { useReducer } from 'react'
+import { useChatTransport } from '@/features/chat/hooks/use-chat-transport'
+import { readTimelineReload, timelineInitialView } from '@/features/chat/state/timeline-reload'
+import { useReducer, useState } from 'react'
 import { VirtualList } from '@workspace/ui/patterns/virtual-list'
 import type { ChatSession } from '@workspace/client-core/chat/types'
 
@@ -22,7 +24,6 @@ export function MessagesTimeline({
   optimisticMessages: readonly OptimisticChatMessage[]
   session: ChatSession
 }) {
-  const [scrollState, dispatch] = useReducer(timelineScrollReducer, initialTimelineScrollState)
   // Stable identity is required: the items array feeds the virtualizer's option
   // closures and every scroll effect's dependency list.
   const items = chatTimelineItems({
@@ -34,8 +35,20 @@ export function MessagesTimeline({
     turnDiffSummaries: session.turnDiffSummaries,
   })
 
+  const { environmentId } = useChatTransport()
+  const [initialView] = useState(() =>
+    timelineInitialView(readTimelineReload(environmentId), session, items),
+  )
+  const [scrollState, dispatch] = useReducer(
+    timelineScrollReducer,
+    initialView?.scrollState ?? initialTimelineScrollState,
+  )
+
   return (
     <VirtualList
+      initialOffset={initialView?.offset}
+      initialRect={initialView?.rect}
+      initialMeasurementsCache={initialView?.measurements}
       items={items}
       getKey={(item) => item.id}
       estimateSize={(item) => chatTimelineItemEstimate(item)}

@@ -12,6 +12,7 @@ import {
   gitCreatePullRequestBodySchema,
   gitPathBodySchema,
   gitPathQuerySchema,
+  gitStatusQuerySchema,
   gitPathsBodySchema,
   gitHistoryBodySchema,
   gitHistoryCommitQuerySchema,
@@ -46,10 +47,10 @@ export function gitRoutes(
         '/status',
         async ({ query }) => {
           await options.refreshMetadata?.(query.path)
-          return git.status(query.path)
+          return git.status(query.path, query.fresh)
         },
         {
-          query: gitPathQuerySchema,
+          query: gitStatusQuerySchema,
         },
       )
       .get('/diff/blob', ({ query }) => git.diffBlob(query), {

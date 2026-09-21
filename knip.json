@@ -23,6 +23,8 @@
         "src/demo-entry.ts",
         "src/features/address/tests/navigation.types.ts",
         "scripts/chat-parity-proof.mjs",
+        "scripts/diff-reload-proof.mjs",
+        "scripts/terminal-reload-proof.mjs",
         "scripts/chat-review-proof.mjs",
         "scripts/chat-review-proof-entry.mjs",
         "scripts/chat-scroll-proof.mjs",

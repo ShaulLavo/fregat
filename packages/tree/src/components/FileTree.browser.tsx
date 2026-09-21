@@ -22,6 +22,16 @@ afterEach(() => {
 })
 
 describe('FileTree browser behavior', () => {
+  it('restores the initial virtual window and reports user scrolling', async () => {
+    const onScrollTopChange = vi.fn()
+    const { shadowRoot } = await mountBrowserTree({ initialScrollTop: 480, onScrollTopChange })
+    const scroll = virtualScroll(shadowRoot)
+    expect(scroll.scrollTop).toBe(480)
+    expect(rowButton(shadowRoot, 'src/features/a-20.ts')).toBeTruthy()
+    scroll.scrollTop = 360
+    scroll.dispatchEvent(new Event('scroll'))
+    await vi.waitFor(() => expect(onScrollTopChange).toHaveBeenLastCalledWith(360))
+  })
   it.each(['right-click', 'both'] as const)(
     'does not render rows on hover in %s mode',
     async (triggerMode) => {
@@ -714,7 +724,11 @@ async function settleBrowserFrames() {
 async function mountBrowserTree(
   options: Pick<
     ConstructorParameters<typeof FileTreeModel>[0],
-    'composition' | 'renderRowDecoration' | 'stickyFolders'
+    | 'composition'
+    | 'renderRowDecoration'
+    | 'stickyFolders'
+    | 'initialScrollTop'
+    | 'onScrollTopChange'
   > & { pathCount?: number } = {},
 ) {
   const mountedModel = new FileTreeModel({
@@ -723,6 +737,8 @@ async function mountBrowserTree(
     gitStatus: [{ path: 'src/features/a-3.ts', status: 'modified' }],
     initialExpansion: 'open',
     initialVisibleRowCount: 6,
+    initialScrollTop: options.initialScrollTop,
+    onScrollTopChange: options.onScrollTopChange,
     itemHeight: 24,
     paths: browserPaths(options.pathCount),
     renaming: true,

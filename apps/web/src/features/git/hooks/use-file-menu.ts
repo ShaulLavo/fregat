@@ -1,3 +1,4 @@
+import { useStatus } from '@/features/git/hooks/use-status'
 import { filesystemPath } from '@/lib/documents/utils/identity'
 import { useEditorCommands } from '@/features/editor/hooks/use-editor-commands'
 import { copyTextToClipboard } from '@/lib/clipboard'
@@ -12,6 +13,7 @@ import { useStagePathMutation } from './use-stage-path-mutation'
 import { useUnstagePathMutation } from './use-unstage-path-mutation'
 
 export function useFileMenu(row: ChangeRow, rootPath: string) {
+  const confirmed = Boolean(useStatus(rootPath).data)
   const path = filesystemPath(row.file.path)
   const staged = row.section === 'staged'
   const discard = useDiscardPathMutation(path, rootPath)
@@ -31,6 +33,7 @@ export function useFileMenu(row: ChangeRow, rootPath: string) {
   }
 
   return fileMenu({
+    writable: confirmed,
     copyPath: (value, label) => void copyTextToClipboard(value, label),
     discard: runDiscard,
     onDisk: row.status !== 'deleted',

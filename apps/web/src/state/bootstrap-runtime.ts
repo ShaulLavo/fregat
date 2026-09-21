@@ -1,3 +1,4 @@
+import { restoreSettingsView } from '@/features/settings/state/reload'
 import { environmentQueryKeys } from '@/features/environments/utils/query-keys'
 import type { HealthDescriptor } from '@workspace/contracts'
 import { addressedWorkspaceCache, panelsForAddress } from '@/features/address/utils/cache'
@@ -26,7 +27,7 @@ export function createBootRuntime(
       'The cached machine identity conflicts with the current connection.',
     )
   if (!cached) useEnvironmentsStore.getState().recordDescriptor(primaryServerOrigin(), descriptor)
-  if (cached) useEnvironmentsStore.getState().setPhase(primaryServerOrigin(), 'offline')
+  if (cached) useEnvironmentsStore.getState().setPhase(primaryServerOrigin(), 'connecting')
   primaryQueryClient().setQueryData(environmentQueryKeys.descriptor, descriptor)
   const address = intent.address
   const application = createApplicationRuntime({
@@ -41,6 +42,7 @@ export function createBootRuntime(
       syntaxHighlightingEnabled: readSettingsMirror()['editor.syntaxHighlighting.enabled'],
     },
   })
+  restoreSettingsView(primaryQueryClient())
   const workspace = application.getSnapshot().editor.workspaceStore
   if (workspace.getState().rootFolder === null && address.rejectedEnvironment === null) {
     workspace

@@ -68,6 +68,10 @@ export class BoundedTtlCache<Value> {
     )
   }
 
+  invalidate(key: string) {
+    this.entries.delete(key)
+  }
+
   /** Explicit invalidation for every entry a single repository owns. */
   invalidatePrefix(prefix: string) {
     for (const key of this.entries.keys()) {

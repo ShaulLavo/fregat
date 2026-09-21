@@ -1,6 +1,6 @@
 import { useEffect, useState } from 'react'
 
-import { useEditorColorTheme } from '@/features/editor/hooks/use-editor-color-theme'
+import { useEditorColorTheme } from '@/lib/editor-theme/hooks/use-editor-color-theme'
 import type { MermaidRenderer } from '@/features/chat/state/mermaid'
 import { log } from '@/lib/client-logging'
 import { MarkdownCopyButton } from './markdown-copy-button'

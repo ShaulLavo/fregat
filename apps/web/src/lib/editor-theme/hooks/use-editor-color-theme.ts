@@ -1,6 +1,6 @@
 import { use } from 'react'
 
-import { EditorColorThemeContext } from '@/features/editor/providers/color-theme-context'
+import { EditorColorThemeContext } from '@/lib/editor-theme/providers/context'
 import { clientErrors } from '@/lib/structured-errors'
 
 export function useEditorColorTheme() {

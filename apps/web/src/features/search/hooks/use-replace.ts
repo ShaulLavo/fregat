@@ -123,7 +123,7 @@ type ReplaceableSearchBufferSnapshot = SearchBufferSnapshot & {
 function canReplace(
   snapshot: SearchBufferSnapshot | null,
 ): snapshot is ReplaceableSearchBufferSnapshot {
-  if (!snapshot) return false
+  if (!snapshot || snapshot.runId === 0) return false
   if (!snapshot.resultsSearchQuery) return false
   if (snapshot.replaceStatus === 'running') return false
   // An allowlist: a run that fails mid-stream keeps its partial matches, so a

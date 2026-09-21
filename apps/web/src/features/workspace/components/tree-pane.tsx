@@ -1,3 +1,5 @@
+import { captureTree, savedTree } from '@/features/workspace/state/tree-reload'
+import { addLifecycleFlush } from '@/lib/lifecycle-flush'
 import { disabledFileQueryKey } from '@/features/workspace/utils/query-keys'
 import { clientForQueryClient } from '@/lib/environments/state/query-clients'
 import type {
@@ -25,7 +27,7 @@ import { DeleteEntryDialog } from '@/features/workspace/components/delete-entry-
 import { TreeLoading } from '@/features/workspace/components/tree-loading'
 import { useFileTreeActions } from '@/features/workspace/hooks/use-file-tree-actions'
 import { useFileTreeIntentPrefetch } from '@/features/workspace/hooks/use-file-tree-intent-prefetch'
-import { useEditorColorTheme } from '@/features/editor/hooks/use-editor-color-theme'
+import { useEditorColorTheme } from '@/lib/editor-theme/hooks/use-editor-color-theme'
 import { useRowHeight } from '@workspace/ui/patterns/use-row-height'
 import { useFileTreeMutationEvents } from '@/features/workspace/hooks/use-file-tree-mutation-events'
 import { useOptionalWorkspaceEditService } from '@/features/editor/providers/workspace-edit-context'
@@ -127,6 +129,12 @@ function ReadyTreePane({
     publishVisibleItemCount: publishVisibleItemCountAction,
   } = useFileTreeActions()
   const queryClient = useQueryClient()
+  const worktree = useEditorWorkspaceState((store) => store.worktreeIdByRootPath[rootPath] ?? null)
+  const [restored] = useState(() => {
+    const observation = savedTree(queryClient, rootPath, worktree)
+    return observation?.record.activeFile === selectedFilePath ? observation : null
+  })
+  const scrollTopRef = useRef(restored?.record.scrollTop ?? 0)
   const workspaceEdits = useOptionalWorkspaceEditService()
   const expandedDirectoryPathsRef = useRef<ReadonlySet<string> | undefined>(undefined)
   const modelRef = useRef(model)
@@ -134,11 +142,20 @@ function ReadyTreePane({
   const selectFileRef = useRef(selectFile)
   const pathsRef = useRef(model.paths)
   const selectionSyncRef = useRef<SelectionSyncState>({
-    rootPath: null,
-    selectedFilePath: undefined,
+    rootPath: restored ? rootPath : null,
+    selectedFilePath: restored ? selectedFilePath : undefined,
   })
   const treeRef = useRef<FileTreeModel | null>(null)
-  const [initialGitStatus] = useState(() => gitStatus ?? EMPTY_GIT_STATUS)
+  const observedGit = useRef(savedTree(queryClient, rootPath, worktree)?.record.git)
+  const [initialGitStatus] = useState(
+    () =>
+      gitStatus ??
+      savedTree(queryClient, rootPath, worktree)?.record.git?.entries ??
+      EMPTY_GIT_STATUS,
+  )
+  useLayoutEffect(() => {
+    if (gitStatus) observedGit.current = { entries: [...gitStatus], observedAt: Date.now() }
+  }, [gitStatus])
   const previousGitStatusRef = useRef(initialGitStatus)
   const [initialPreparedInput] = useState(() => preparedTreeInputForPaths(model.paths))
   const icons = fileTreeIconsForPaths(model.paths)
@@ -172,6 +189,7 @@ function ReadyTreePane({
     })
   }
   const fsActions = useFsActions({ modelRef, rootPath, treeRef })
+  const actionsRef = useRef(fsActions.actions)
   const completeRenameRef = useRef(fsActions.completeRename)
   const createEntryRef = useRef(fsActions.actions.createEntry)
   const revealActiveFileRef = useRef<() => boolean>(() => false)
@@ -198,7 +216,12 @@ function ReadyTreePane({
     gitStatus: initialGitStatus,
     icons,
     initialExpansion: 'closed',
-    initialSelectedPaths,
+    initialExpandedPaths: restored?.record.expanded,
+    initialScrollTop: restored?.record.scrollTop,
+    onScrollTopChange: (top) => {
+      scrollTopRef.current = top
+    },
+    initialSelectedPaths: restored?.record.selected ?? initialSelectedPaths,
     preparedInput: initialPreparedInput,
     search: true,
     searchBlurBehavior: 'retain',
@@ -206,12 +229,12 @@ function ReadyTreePane({
     stickyFolders: true,
     dragAndDrop: {
       canDrag: (paths) =>
-        fsActions.actions.mutationsEnabled &&
+        actionsRef.current.mutationsEnabled &&
         canDragTreePaths(modelRef.current, paths, hasPendingTreeMove(rootPath)),
       canDrop: (context) =>
-        fsActions.actions.mutationsEnabled && canDropTreePaths(modelRef.current, context),
+        actionsRef.current.mutationsEnabled && canDropTreePaths(modelRef.current, context),
       onDropComplete: (event) => {
-        if (!fsActions.actions.mutationsEnabled) return
+        if (!actionsRef.current.mutationsEnabled) return
         const moves = treePathMovesForDrop(event)
         if (moves.length === 0) return
 
@@ -272,7 +295,7 @@ function ReadyTreePane({
     id: { kind: 'file-tree', rootPath },
     onIntent: (intent) => {
       if (intent === 'create-file' || intent === 'create-folder') {
-        if (!fsActions.actions.mutationsEnabled) return false
+        if (!actionsRef.current.mutationsEnabled) return false
 
         const path = tree.getFocusedPath() ?? tree.getSelectedPaths()[0] ?? ''
         const entry = model.entriesByTreePath.get(canonicalTreePath(path))
@@ -295,6 +318,7 @@ function ReadyTreePane({
   // the body only mirrors the latest render into refs that captured-once tree
   // callbacks read at call time.
   useLayoutEffect(() => {
+    actionsRef.current = fsActions.actions
     completeRenameRef.current = fsActions.completeRename
     createEntryRef.current = fsActions.actions.createEntry
     modelRef.current = model
@@ -303,6 +327,38 @@ function ReadyTreePane({
     selectFileRef.current = selectFile
     treeRef.current = tree
   })
+
+  useEffect(() => {
+    const capture = () => {
+      const live = queryClient.getQueryData<TreeModel>(fileSystemKeys.tree(rootPath))
+      const saved = savedTree(queryClient, rootPath, worktree)
+      const displayed = live ?? saved?.model
+      if (!displayed) return
+      const expanded = displayed.paths.filter((path) => {
+        const item = tree.getItem(path)
+        return item !== null && 'isExpanded' in item && item.isExpanded()
+      })
+      captureTree(
+        queryClient,
+        displayed,
+        {
+          root: rootPath,
+          worktree,
+          activeFile: selectedFilePathRef.current,
+          git: observedGit.current,
+          expanded,
+          selected: [...tree.getSelectedPaths()],
+          scrollTop: scrollTopRef.current,
+        },
+        live ? Date.now() : saved?.record.observedAt,
+      )
+    }
+    const removeFlush = addLifecycleFlush(capture)
+    return () => {
+      capture()
+      removeFlush()
+    }
+  }, [queryClient, rootPath, tree, worktree])
 
   const mutationsEnabled = fsActions.actions.mutationsEnabled
   useLayoutEffect(() => {
@@ -342,13 +398,13 @@ function ReadyTreePane({
   }, [model, rootPath, selectedFilePath, tree])
 
   useEffect(() => {
-    const nextGitStatus = gitStatus ?? EMPTY_GIT_STATUS
+    const nextGitStatus = gitStatus ?? initialGitStatus
     const patch = treeGitStatusPatch(previousGitStatusRef.current, nextGitStatus)
     previousGitStatusRef.current = nextGitStatus
     if (!patch) return
 
     tree.applyGitStatusPatch(patch)
-  }, [gitStatus, tree])
+  }, [gitStatus, initialGitStatus, tree])
 
   useEffect(() => {
     return tree.subscribe(() => {

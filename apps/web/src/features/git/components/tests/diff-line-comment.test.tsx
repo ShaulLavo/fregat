@@ -22,9 +22,8 @@ import { renderWithProviders } from '../../../../../test/render'
 import { saveSettings } from '@/features/settings/utils/api'
 import { stubEditorViewport } from '../../../../../test/env/editor-viewport'
 
-// Real git, real routes, and the editor's real diff view: its rows are ordinary
-// elements carrying `data-editor-virtual-row`, which is the only thing the
-// annotation layer reads off it. Only the CSS Custom Highlight API is stubbed —
+// Real git, real routes, and the editor's real diff view, which answers where a
+// press landed through `diffRowAtEvent`. Only the CSS Custom Highlight API is stubbed —
 // happy-dom has none, and the diff view registers a selection highlight on mount.
 
 const FORTY_LINES = Array.from({ length: 40 }, (_, index) => `line ${index + 1}`).join('\n')

@@ -87,11 +87,18 @@ export function ChatPlanFollowUpProvider({
   readonly sessionId: SessionId
 }) {
   const session = useActiveChatProjection((state) => selectChatSessionById(state, sessionId))
+  const currentDetail = useActiveChatProjection(
+    (state) => state.sessionDetailSequenceById[sessionId] !== undefined,
+  )
   const [submitting, setSubmitting] = useState(false)
   const preparingImages = useChatInputDraftStore((state) =>
     chatInputAttachmentsPreparing(state, draftTarget),
   )
-  const unavailableReason = planUnavailableReason(disabledReason, session, preparingImages)
+  const unavailableReason = planUnavailableReason(
+    currentDetail ? disabledReason : 'Waiting for the current session.',
+    session,
+    preparingImages,
+  )
   // A running turn already owns the composer: the plan has been answered, and a
   // second Implement would start a duplicate build.
   const plan = isChatSessionBusy(session)

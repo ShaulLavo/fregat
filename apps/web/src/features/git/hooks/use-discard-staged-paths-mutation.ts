@@ -1,3 +1,4 @@
+import { admitGitMutation } from '@/features/git/utils/admit-mutation'
 import { clientForQueryClient } from '@/lib/environments/state/query-clients'
 import { useMutation } from '@tanstack/react-query'
 
@@ -9,6 +10,7 @@ import { settleDiscardedGitStatus } from '@/features/git/utils/settle-status'
 export function useDiscardStagedPathsMutation(paths: readonly string[], rootPath: string) {
   return useMutation({
     mutationFn: async (_variables, { client }) => {
+      await admitGitMutation(client, rootPath, paths)
       const owner = clientForQueryClient(client)
       await unstagePaths(paths, owner)
       return discardPaths(paths, owner)

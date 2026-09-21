@@ -26,7 +26,6 @@ a bare root `bun run verify`.
 | [125 — observability overhead](125-observability-overhead.md)                   | **IMPLEMENTED — DEV/STREAMING EVIDENCE PENDING**        |
 | [071 — syntax highlight retry](071-syntax-highlight-retry.md)                   | **PROPOSED — ROOT GO/NO-GO SCHEDULING**                 |
 | [080 — Platform and VS Code keybinding modes](080-platform-keybinding-modes.md) | **PROPOSED — INTERACTION RULES CONFIRMED**              |
-| [085 — instant workspace reload](085-instant-workspace-reload.md)               | **PROPOSED — IMPLEMENTATION NOT STARTED**               |
 | [087 — stateless MCP support](087-stateless-mcp.md)                             | **PROPOSED — IMPLEMENTATION NOT STARTED**               |
 | [088 — native code intelligence](088-native-code-intelligence.md)               | **PROPOSED — DEPENDS ON 087**                           |
 | [091 — error and timing helpers](091-error-and-timing-helpers.md)               | **PROPOSED — DEFECT FIXES IMPLEMENTED**                 |
@@ -155,10 +154,10 @@ a bare root `bun run verify`.
   machine and reload during continuous input. Plan 085's first-paint work remains separate. The
   [evaluation](../docs/router-evaluation.md) records the alternatives. No sharing backend is scheduled.
 
-- Plan 085 restores the visible workspace before live responses, starting with bootstrap, file tree,
-  and settings. It reuses feature renderers and keeps native paint separate from current-state
-  authority. Diff/search native paint and terminal replay may require package contracts; those
-  dependencies remain open until verified. Execution order is recorded in root `PLAN.md`.
+- Plan 085 is complete and its executable plan is deleted. The
+  [reload delivery record](../docs/instant-reload-implementation.md) covers all visible panes,
+  native Editor/Ghostty contracts, bounded saved presentation, authority checks, and the passing
+  desktop/narrow verification matrices. Paired native source changes remain unpublished.
 
 - Plans 081 and 082 are complete and their executable plans are deleted. The
   [workbench record](../docs/tui-workbench.md) and [Agent view record](../docs/tui-agent.md) preserve

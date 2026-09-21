@@ -1,3 +1,4 @@
+import { admitGitMutation } from '@/features/git/utils/admit-mutation'
 import { clientForQueryClient } from '@/lib/environments/state/query-clients'
 import { useMutation } from '@tanstack/react-query'
 
@@ -10,7 +11,10 @@ export function useSyncChangesMutation(rootPath: string) {
   const invalidate = useWorkspaceInvalidation()
 
   return useMutation({
-    mutationFn: (_variables, { client }) => syncRemote(rootPath, clientForQueryClient(client)),
+    mutationFn: async (_variables, { client }) => {
+      await admitGitMutation(client, rootPath, undefined)
+      return syncRemote(rootPath, clientForQueryClient(client))
+    },
     mutationKey: mutationKeys.sync(rootPath),
     onError: notifyMutationError,
     onSuccess: invalidate,

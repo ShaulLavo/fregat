@@ -1,5 +1,5 @@
 import { colorThemeItemValue, scopedPaletteFilter } from '@/features/command-palette/utils/query'
-import { useEditorColorTheme } from '@/features/editor/hooks/use-editor-color-theme'
+import { useEditorColorTheme } from '@/lib/editor-theme/hooks/use-editor-color-theme'
 import { CodeThemePreview } from '@/lib/code-theme/components/preview'
 import { editorThemeOptions } from '@/lib/code-theme/utils/catalog'
 

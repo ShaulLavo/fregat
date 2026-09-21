@@ -531,6 +531,29 @@ describe('workspace cache', () => {
     expect(readWorkspaceCache(testScopedStorage).searchBuffers['/repo']).toEqual(buffer)
   })
 
+  it('admits an ordinary large search by its actual JSON size and rejects oversized text', () => {
+    const buffer = cachedSearchBuffer('/repo')
+    const match = buffer.matches[0]!
+    const large = {
+      ...buffer,
+      matches: Array.from({ length: 750 }, (_, index) => ({
+        ...match,
+        line: index + 1,
+        preview: 'a'.repeat(240),
+      })),
+      totalCount: 750,
+    }
+    writeRootFolderCache(testScopedStorage, pickedDirectory('/repo'))
+    writeWorkspaceIndexCache(testScopedStorage, ['/repo'])
+    writeSearchBufferCache(testScopedStorage, '/repo', large)
+    expect(readWorkspaceCache(testScopedStorage).searchBuffers['/repo']?.matches).toHaveLength(750)
+    writeSearchBufferCache(testScopedStorage, '/repo', {
+      ...buffer,
+      matches: [{ ...match, preview: 'a'.repeat(800_000) }],
+    })
+    expect(readWorkspaceCache(testScopedStorage).searchBuffers['/repo']).toBeUndefined()
+  })
+
   it('refuses to file a search buffer under a workspace it does not belong to', () => {
     writeRootFolderCache(testScopedStorage, pickedDirectory('/repo'))
     writeSearchBufferCache(testScopedStorage, '/repo', emptySearchBuffer('/other'))

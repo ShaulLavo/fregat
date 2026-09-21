@@ -5,6 +5,7 @@ import { actionItem, section, type Menu } from '@/keymap/menus/utils/model'
 import type { PanelSection } from '@/features/git/utils/types'
 
 export type GroupMenuContext = {
+  readonly writable?: boolean
   /** Unstage-then-discard for the staged group, a plain discard for the worktree one. */
   readonly discardAll: () => void
   readonly openAllDiffs: () => void
@@ -35,6 +36,7 @@ export function groupMenu(context: GroupMenuContext): Menu {
     section('changes', [
       !staged &&
         actionItem({
+          disabled: context.writable === false,
           icon: PlusIcon,
           id: 'stageAll',
           label: 'Stage All Changes',
@@ -42,12 +44,14 @@ export function groupMenu(context: GroupMenuContext): Menu {
         }),
       staged &&
         actionItem({
+          disabled: context.writable === false,
           icon: MinusIcon,
           id: 'unstageAll',
           label: 'Unstage All Changes',
           run: context.unstageAll,
         }),
       actionItem({
+        disabled: context.writable === false,
         destructive: true,
         icon: ArrowBendUpLeftIcon,
         id: 'discardAll',

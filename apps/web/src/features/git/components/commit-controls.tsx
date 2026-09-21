@@ -1,3 +1,4 @@
+import { useStatus } from '@/features/git/hooks/use-status'
 import { TickerText } from '@/components/ticker-text'
 import type { GitRepositoryInfo } from '@workspace/contracts'
 import { ArrowsClockwiseIcon, CheckIcon, SparkleIcon } from '@phosphor-icons/react'
@@ -30,6 +31,7 @@ export function CommitControls({
   repository: GitRepositoryInfo
   rootPath: string
 }) {
+  const confirmed = Boolean(useStatus(rootPath).data)
   const commit = useCommitAction(rootPath)
   const generation = useGenerateCommitMessage(rootPath)
   const syncChanges = useSyncChangesMutation(rootPath)
@@ -43,7 +45,7 @@ export function CommitControls({
   if (generation.isCancelling) generationStatus = 'Cancelling commit message…'
 
   function handleCommitKeyDown(event: KeyboardEvent<HTMLInputElement>) {
-    if (showSyncChanges) return
+    if (!confirmed || showSyncChanges) return
     if (!event.metaKey && !event.ctrlKey) return
     if (event.key !== 'Enter') return
 
@@ -83,7 +85,11 @@ export function CommitControls({
                   <InputGroupButton
                     aria-busy={generation.isPending}
                     aria-label={generationLabel}
-                    disabled={generation.isCancelling || (inputDisabled && !generation.isPending)}
+                    disabled={
+                      !confirmed ||
+                      generation.isCancelling ||
+                      (inputDisabled && !generation.isPending)
+                    }
                     focusableWhenDisabled
                     onClick={generation.generateOrCancel}
                     size='icon-xs'
@@ -103,7 +109,7 @@ export function CommitControls({
         {showSyncChanges ? (
           <Button
             className='shrink-0 tabular-nums'
-            disabled={syncChanges.isPending}
+            disabled={!confirmed || syncChanges.isPending}
             onClick={() => syncChanges.mutate()}
             size='sm'
             type='button'
@@ -119,7 +125,7 @@ export function CommitControls({
         ) : (
           <Button
             className='shrink-0'
-            disabled={commit.isPending}
+            disabled={!confirmed || commit.isPending}
             onClick={commit.submit}
             size='sm'
             title={`Commit to ${repository.branch ?? 'HEAD'}`}

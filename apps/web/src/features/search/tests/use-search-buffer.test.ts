@@ -474,10 +474,10 @@ describe('workspace search event batching', () => {
   })
 
   it('drops scheduled match batches when a run is aborted', async () => {
+    const query = workspaceSearchQuery('repo', 'needle')
     const frames = installAnimationFrameQueue()
     const recorder = createRecordingSearchStore()
     const controller = new AbortController()
-    const query = workspaceSearchQuery('repo', 'needle')
     const match = matchEvent('disk', 'repo/src/app.ts')
     let releaseMatch!: () => void
     const matchReleased = new Promise<void>((resolve) => {

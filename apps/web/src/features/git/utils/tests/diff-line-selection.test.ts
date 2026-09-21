@@ -1,12 +1,12 @@
-import { createDiffPlugin } from '@singapore-editor/diff'
+import { createDiffPlugin, createSplitProjection } from '@singapore-editor/diff'
 
 import {
   diffLineAddress,
   diffLineAddressLabel,
   diffLineSelectionText,
-  diffPaneRows,
   diffRowsForAddress,
   selectedDiffRows,
+  stackedDiffRows,
 } from '@/features/git/utils/diff-line-selection'
 import { editorDiffFiles } from '@workspace/client-core/git/diff-files'
 import { gitFileDiff } from '../../../../../test/factories/git-diff'
@@ -20,8 +20,8 @@ const NEW_TEXT = 'alpha\nbeta changed\ngamma\ndelta\nepsilon\n'
 
 test('the same visual row addresses the old side in one pane and the new side in the other', () => {
   const file = textDiffFile(OLD_TEXT, NEW_TEXT)
-  const oldRows = diffPaneRows(file, 'old', new Set())
-  const newRows = diffPaneRows(file, 'new', new Set())
+  const oldRows = createSplitProjection(file).leftRows
+  const newRows = createSplitProjection(file).rightRows
   const changed = oldRows.findIndex((row) => row.type === 'deletion')
 
   const fromOldPane = diffLineAddress(selectedDiffRows(oldRows, changed, changed))
@@ -36,7 +36,7 @@ test('the same visual row addresses the old side in one pane and the new side in
 
 test('a stacked selection over a replacement names both sides', () => {
   const file = textDiffFile(OLD_TEXT, NEW_TEXT)
-  const rows = diffPaneRows(file, 'stacked', new Set())
+  const rows = stackedDiffRows(file, new Set())
 
   const address = diffLineAddress(selectedDiffRows(rows, 0, rows.length - 1))
 
@@ -46,8 +46,8 @@ test('a stacked selection over a replacement names both sides', () => {
 
 test('an address from one pane resolves to both sides and then holds still', () => {
   const file = textDiffFile(OLD_TEXT, NEW_TEXT)
-  const stackedRows = diffPaneRows(file, 'stacked', new Set())
-  const dragged = diffLineAddress(selectedDiffRows(diffPaneRows(file, 'new', new Set()), 0, 2))!
+  const stackedRows = stackedDiffRows(file, new Set())
+  const dragged = diffLineAddress(selectedDiffRows(createSplitProjection(file).rightRows, 0, 2))!
 
   // A drag through the new pane can only name new lines.
   expect(dragged).toEqual({ newRange: { end: 3, start: 1 }, oldRange: null })
@@ -64,11 +64,11 @@ test('an address from one pane resolves to both sides and then holds still', () 
 
 test('a deletion-only address never claims a new-side line', () => {
   const file = textDiffFile(OLD_TEXT, NEW_TEXT)
-  const oldRows = diffPaneRows(file, 'old', new Set())
+  const oldRows = createSplitProjection(file).leftRows
   const deletion = oldRows.findIndex((row) => row.type === 'deletion')
   const address = diffLineAddress(selectedDiffRows(oldRows, deletion, deletion))!
 
-  const resolved = diffRowsForAddress(diffPaneRows(file, 'stacked', new Set()), address)
+  const resolved = diffRowsForAddress(stackedDiffRows(file, new Set()), address)
 
   expect(resolved.map((row) => row.text)).toEqual(['beta'])
   expect(diffLineAddress(resolved)).toEqual(address)
@@ -76,7 +76,7 @@ test('a deletion-only address never claims a new-side line', () => {
 
 test('the attached text carries the path, both sides and the selected lines', () => {
   const file = textDiffFile(OLD_TEXT, NEW_TEXT)
-  const rows = diffPaneRows(file, 'stacked', new Set())
+  const rows = stackedDiffRows(file, new Set())
   const address = diffLineAddress(selectedDiffRows(rows, 0, rows.length - 1))!
 
   const text = diffLineSelectionText(file.path, address, diffRowsForAddress(rows, address))
@@ -100,7 +100,7 @@ test('the attached text carries the path, both sides and the selected lines', ()
 
 test('a selected line that contains a fence gets an outer fence that outruns it', () => {
   const file = textDiffFile('const md = ""\n', 'const md = "```ts"\n')
-  const rows = diffPaneRows(file, 'stacked', new Set())
+  const rows = stackedDiffRows(file, new Set())
   const address = diffLineAddress(selectedDiffRows(rows, 0, rows.length - 1))!
 
   const text = diffLineSelectionText(file.path, address, diffRowsForAddress(rows, address))
@@ -111,7 +111,7 @@ test('a selected line that contains a fence gets an outer fence that outruns it'
 
 test('the projection follows the expansion the plugin owns, and only that', () => {
   const file = textDiffFile(numberedText(), numberedText({ 2: 'two changed', 35: 'thirty five' }))
-  const plugin = createDiffPlugin({ mode: 'document', side: 'new', syntaxHighlight: false })
+  const plugin = createDiffPlugin({ mode: 'document', side: 'stacked', syntaxHighlight: false })
   plugin.setFile(file)
   const collapsed = plugin.getRows()
   const separator = collapsed.findIndex((row) => row.type === 'hunk' && row.expandable)
@@ -122,7 +122,7 @@ test('the projection follows the expansion the plugin owns, and only that', () =
 
   // The projection built here is the one the pane is showing, because it is
   // built from the plugin's own expansion set rather than a copy of it.
-  expect(diffPaneRows(file, 'new', plugin.getExpandedRegions())).toEqual(rows)
+  expect(stackedDiffRows(file, plugin.getExpandedRegions())).toEqual(rows)
   expect(rows.length).toBeGreaterThan(collapsed.length)
   // The row just past the separator is a different line once the skipped range
   // is spliced in. Reading it off the collapsed projection is the silent
@@ -134,12 +134,12 @@ test('the projection follows the expansion the plugin owns, and only that', () =
   // Toggling the same region back off returns the projection to where it was.
   plugin.toggleRegion(collapsed[separator]!.expandKey!)
   expect(plugin.getExpandedRegions().size).toBe(0)
-  expect(diffPaneRows(file, 'new', plugin.getExpandedRegions())).toEqual(collapsed)
+  expect(stackedDiffRows(file, plugin.getExpandedRegions())).toEqual(collapsed)
 })
 
 test('rows that stand for no line on either side never enter a selection', () => {
   const file = textDiffFile('alpha\n', 'alpha\nbeta\n')
-  const oldRows = diffPaneRows(file, 'old', new Set())
+  const oldRows = createSplitProjection(file).leftRows
 
   // The old pane pads an addition with a placeholder; it addresses nothing.
   expect(oldRows.some((row) => row.type === 'placeholder')).toBe(true)

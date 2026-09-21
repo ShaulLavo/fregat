@@ -248,6 +248,7 @@ export function createSearchBufferStore({
       startReplace: (rootPath) => {
         const snapshot = get().active
         if (!snapshot || snapshot.rootPath !== rootPath) return null
+        if (snapshot.runId === 0 || snapshot.status !== 'ready') return null
         const token = Object.freeze({
           rootPath,
           incarnation: snapshot.incarnation,

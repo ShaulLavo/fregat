@@ -1,3 +1,5 @@
+import { useDiagnosticsReload } from '@/features/workbench/hooks/use-diagnostics-reload'
+import type { RefObject } from 'react'
 import { TickerNumber } from '@/components/ticker-number'
 import type {
   LanguageServerDefinitionTarget,
@@ -9,7 +11,6 @@ import { cn } from '@workspace/ui/lib/utils'
 import { useEditorLanguageServerStatus } from '@/features/editor/hooks/use-editor-language-server-status'
 import { useEditorCommands } from '@/features/editor/hooks/use-editor-commands'
 import { createEditorLanguageServerStatusSource } from '@/features/editor/state/language-server-status-source'
-import type { EditorStatusBarSource } from '@/features/editor/state/status-bar-source'
 import { useEditorUiState, useEditorUiStoreApi } from '@/features/editor/state/ui-state'
 import { useEditorWorkspaceStoreApi } from '@/features/editor/state/workspace-state'
 import { activeEditorTab } from '@/lib/documents/utils/groups'
@@ -29,6 +30,8 @@ export function DiagnosticsPanel() {
     statusBarSource?.languageServerStatusSource ?? idleLanguageServerStatusSource,
   )
 
+  const reload = useDiagnosticsReload(statusBarSource?.filePath, languageServerStatus.diagnostics)
+
   function previewDiagnostic(target: LanguageServerDefinitionTarget) {
     const tab = activeEditorTab(workspaceStore.getState().workbenchPanels.editorGroups)
     if (tab) uiStore.getState().setDefinitionTarget(target, tab.id)
@@ -40,14 +43,19 @@ export function DiagnosticsPanel() {
       target={{ kind: 'problems' }}
       className='flex h-full min-h-0 min-w-0 flex-col overflow-hidden'
     >
-      {statusBarSource ? (
+      {reload.path ? (
         renderDiagnosticsStatus({
-          languageServerStatus,
+          languageServerStatus: {
+            status: statusBarSource ? languageServerStatus.status : 'loading',
+            diagnostics: reload.diagnostics,
+          },
           onOpenDiagnostic: (target) => {
             void commands.openDefinition(target)
           },
           onPreviewDiagnostic: previewDiagnostic,
-          source: statusBarSource,
+          filePath: reload.path,
+          scrollRef: reload.ref,
+          saved: reload.saved,
         })
       ) : (
         <EmptyState
@@ -62,25 +70,45 @@ export function DiagnosticsPanel() {
 
 function renderDiagnosticsStatus({
   languageServerStatus,
-  source,
+  filePath,
+  scrollRef,
+  saved,
   onOpenDiagnostic,
   onPreviewDiagnostic,
 }: {
   readonly languageServerStatus: ReturnType<typeof useEditorLanguageServerStatus>
-  readonly source: EditorStatusBarSource
+  readonly filePath: string
+  readonly scrollRef: RefObject<HTMLDivElement | null>
+  readonly saved: boolean
   onOpenDiagnostic(target: LanguageServerDefinitionTarget): void | boolean
   onPreviewDiagnostic(target: LanguageServerDefinitionTarget): void
 }) {
   const { diagnostics, status } = languageServerStatus
+  if (saved && diagnostics?.counts.total === 0) {
+    return (
+      <EmptyState
+        className='min-h-0 flex-1'
+        title='No problems in saved results'
+        description='Refreshing diagnostics…'
+      />
+    )
+  }
   if (!diagnostics || diagnostics.counts.total === 0) {
     return renderDiagnosticsState(status)
   }
-  const directory = parentPath(source.filePath)
+  const directory = parentPath(filePath)
 
   return (
-    <div className='min-h-0 flex-1 overflow-auto p-3 text-xs'>
-      <div className='text-muted-foreground mb-3 truncate' title={source.filePath}>
-        <span className='text-foreground'>{basename(source.filePath)}</span>
+    <div ref={scrollRef} className='min-h-0 flex-1 overflow-auto p-3 text-xs'>
+      {saved ? (
+        <p role='status' className='text-muted-foreground mb-2'>
+          {status === 'error'
+            ? 'Could not refresh diagnostics. Showing saved results.'
+            : 'Saved diagnostics. Refreshing…'}
+        </p>
+      ) : null}
+      <div className='text-muted-foreground mb-3 truncate' title={filePath}>
+        <span className='text-foreground'>{basename(filePath)}</span>
         {directory ? <span className='ml-2'>{directory}</span> : null}
       </div>
       <div className='grid grid-cols-4 gap-2'>
@@ -101,7 +129,7 @@ function renderDiagnosticsStatus({
         diagnostics={diagnostics}
         onOpenDiagnostic={onOpenDiagnostic}
         onPreviewDiagnostic={onPreviewDiagnostic}
-        path={source.filePath}
+        path={filePath}
       />
     </div>
   )

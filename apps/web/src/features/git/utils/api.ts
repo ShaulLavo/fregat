@@ -55,12 +55,17 @@ export async function fetchGitFile(
   )
 }
 
-export async function fetchStatus(path: string, signal: AbortSignal | undefined, client: Client) {
+export async function fetchStatus(
+  path: string,
+  signal: AbortSignal | undefined,
+  client: Client,
+  fresh = false,
+) {
   return observeGitOperation(
     { ...clientLogContext(client), action: 'git.status', path, signal },
     async () => {
       const response = await client.git.status.get({
-        query: { path },
+        query: { path, fresh },
         fetch: { signal },
       })
 

@@ -1,3 +1,4 @@
+import { readReloadCache } from '@/lib/reload-cache'
 import { entryTypeSchema, workspaceSearchMatchSchema } from '@workspace/contracts'
 import {
   workspaceLocation,
@@ -452,6 +453,8 @@ export function writeWorkspaceSliceCache(
   )
 }
 
+const SEARCH_RELOAD_MAX_BYTES = 786_432
+
 export function writeSearchBufferCache(
   storage: ScopedStorage,
   rootPath: string,
@@ -463,9 +466,16 @@ export function writeSearchBufferCache(
     return
   }
 
-  writeCacheEntry(searchBufferStorageKey(rootPath, worktreeId), searchBuffer, {
+  const key = searchBufferStorageKey(rootPath, worktreeId)
+  if (!searchBufferFits(searchBuffer)) {
+    removeCacheEntry(key, storage)
+    return
+  }
+  const result = writeCacheEntry(key, searchBuffer, {
     storage,
+    maxSerializedBytes: SEARCH_RELOAD_MAX_BYTES,
   })
+  if (result.status !== 'written') removeCacheEntry(key, storage)
 }
 
 /**
@@ -597,11 +607,11 @@ function readWorkspaceSlice(
 }
 
 function readSearchBuffer(storage: ScopedStorage, rootPath: string, worktreeId: WorktreeId | null) {
-  const searchBuffer = readCacheEntry<CachedSearchBufferState | null>(
+  const searchBuffer = readReloadCache<CachedSearchBufferState>(
     searchBufferStorageKey(rootPath, worktreeId),
-    v.nullable(cachedSearchBufferStateSchema),
-    null,
-    { storage },
+    cachedSearchBufferStateSchema,
+    storage,
+    SEARCH_RELOAD_MAX_BYTES,
   )
   if (!searchBuffer) return null
   if (searchBuffer.rootPath !== rootPath) return null
@@ -788,4 +798,22 @@ export function emptyWorkspaceState(): CachedWorkspaceState {
     workspaceOrder: [],
     workspaces: {},
   }
+}
+
+function searchBufferFits(buffer: CachedSearchBufferState): boolean {
+  let remaining = SEARCH_RELOAD_MAX_BYTES / 2
+  const pending: unknown[] = [buffer]
+  let nodes = 20_000
+  while (pending.length) {
+    if (--nodes < 0) return false
+    const value = pending.pop()
+    // Bound capture work here; the writer measures actual escaped JSON bytes.
+    if (typeof value === 'string') remaining -= value.length
+    if (remaining < 0) return false
+    if (!value || typeof value !== 'object') continue
+    const count = Array.isArray(value) ? value.length : Object.keys(value).length
+    if (count > nodes) return false
+    pending.push(...Object.values(value))
+  }
+  return true
 }

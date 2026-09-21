@@ -1,3 +1,4 @@
+import { admitGitMutation } from '@/features/git/utils/admit-mutation'
 import { clientForQueryClient } from '@/lib/environments/state/query-clients'
 import { useMutation } from '@tanstack/react-query'
 
@@ -8,7 +9,10 @@ import { settleDiscardedGitStatus } from '@/features/git/utils/settle-status'
 
 export function useDiscardPathMutation(path: string, rootPath: string) {
   return useMutation({
-    mutationFn: (_variables, { client }) => discardPath(path, clientForQueryClient(client)),
+    mutationFn: async (_variables, { client }) => {
+      await admitGitMutation(client, rootPath, [path])
+      return discardPath(path, clientForQueryClient(client))
+    },
     mutationKey: mutationKeys.discard(rootPath, path),
     onError: notifyMutationError,
     onSuccess: (status, _variables, _onMutateResult, { client }) =>

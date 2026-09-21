@@ -35,6 +35,8 @@ export type VirtualListProps<T> = Omit<ComponentProps<'div'>, 'children' | 'ref'
   estimateSize?: (item: T, index: number, rowHeight: number) => number
   measureItems?: boolean
   layout?: 'absolute' | 'flow'
+  initialRect?: { width: number; height: number }
+  initialMeasurementsCache?: Virtualizer<HTMLDivElement, HTMLDivElement>['measurementsCache']
   initialOffset?: number
   paddingStart?: number
   paddingEnd?: number
@@ -54,6 +56,8 @@ export function VirtualList<T>({
   estimateSize,
   measureItems = false,
   layout = 'absolute',
+  initialRect,
+  initialMeasurementsCache,
   initialOffset,
   paddingStart = 0,
   paddingEnd = 0,
@@ -82,6 +86,8 @@ export function VirtualList<T>({
       return item === undefined ? index : getKey(item, index)
     },
     overscan,
+    initialRect,
+    initialMeasurementsCache,
     initialOffset,
     paddingStart,
     paddingEnd,

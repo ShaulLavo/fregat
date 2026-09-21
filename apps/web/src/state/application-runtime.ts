@@ -1,3 +1,12 @@
+import { prepareDiffPaintReload } from '@/features/editor/state/diff-paint'
+import { prepareSearchReload } from '@/features/search/state/result-scroll-state'
+import { prepareLogsReload } from '@/features/logs/state/reload'
+import { prepareDiagnosticsReload } from '@/features/workbench/state/diagnostics-reload'
+import { prepareTerminalReload } from '@/features/terminal/state/reload'
+import { prepareGitReload } from '@/features/git/state/reload'
+import { prepareSettingsReload } from '@/features/settings/state/reload'
+import { environmentWindowStorage } from '@/lib/environments/state/window-storage'
+import { prepareTreeReload } from '@/features/workspace/state/tree-reload'
 import type { EnvironmentId } from '@workspace/contracts'
 import { retainedTextBudgetFromSettings } from '@/features/editor/utils/retained-text-budget'
 import { confirmedEnvironmentOrigin } from '@/lib/environments/state/domain'
@@ -5,7 +14,10 @@ import { openWorkspaceRootForOwner } from '@/features/workspace/state/open-root'
 import { createEditorApplyActions } from '@/features/editor/state/apply-actions'
 import { createEnvironmentConnections } from '@/state/environment-connections'
 import { confirmedEnvironmentId } from '@/lib/environments/state/domain'
-import { environmentScopedStorage } from '@/lib/environments/state/scoped-storage'
+import {
+  environmentScopedStorage,
+  type ScopedStorage,
+} from '@/lib/environments/state/scoped-storage'
 import { initializeEnvironmentPersistence } from '@/state/environment-persistence'
 import { restoreEnvironmentSessionSelection } from '@/features/chat-mode/state/session-selection-store'
 import { resetLanguageServerConnectionPool } from '@/features/editor/state/language-server-connection-pool'
@@ -29,7 +41,22 @@ type RetainedEnvironment = {
   readonly origin: string
   readonly queryClient: QueryClient
   readonly editor: EditorRuntime
+  readonly stopSearchReload: () => void
+  readonly stopSettingsReload: () => void
   readonly unsubscribeRoot: () => void
+}
+
+function prepareReloadOwners(
+  queryClient: QueryClient,
+  windowStorage: ScopedStorage,
+  root: string | null,
+) {
+  prepareGitReload(queryClient, windowStorage, root)
+  prepareDiffPaintReload(queryClient, windowStorage, root)
+  prepareTerminalReload(queryClient, windowStorage, root)
+  prepareLogsReload(queryClient, windowStorage, root)
+  prepareDiagnosticsReload(queryClient, windowStorage, root)
+  return prepareSettingsReload(queryClient, windowStorage, root)
 }
 
 export function createApplicationRuntime({
@@ -47,20 +74,32 @@ export function createApplicationRuntime({
     const storage = environmentScopedStorage(confirmedEnvironmentId(origin))
     initializeEnvironmentPersistence(storage)
     const queryClient = queryClientFor(origin)
+    const windowStorage = environmentWindowStorage(storage.environmentId)
+    prepareTreeReload(queryClient, windowStorage)
+    let stopSettingsReload = prepareReloadOwners(
+      queryClient,
+      windowStorage,
+      seed.rootFolder?.path ?? null,
+    )
     const editor = createEditorRuntime({
       queryClient,
       storage,
       workspaceCache: seed,
       preparation,
     })
+    const stopSearchReload = prepareSearchReload(editor.searchBufferStore, windowStorage)
     queryClient.mount()
     return {
       origin,
       queryClient,
       editor,
+      stopSearchReload,
+      stopSettingsReload: () => stopSettingsReload(),
       unsubscribeRoot: editor.workspaceStore.subscribe(
         (state) => state.rootFolder?.path ?? null,
         (root) => {
+          stopSettingsReload()
+          stopSettingsReload = prepareReloadOwners(queryClient, windowStorage, root)
           if (current.editor === editor) activateWorkspaceRoot(root)
         },
       ),
@@ -144,6 +183,8 @@ export function createApplicationRuntime({
       for (const environment of environments.values()) {
         suspendEnvironmentActivity(environment.origin)
         environment.unsubscribeRoot()
+        environment.stopSearchReload()
+        environment.stopSettingsReload()
         environment.editor.dispose()
         environment.queryClient.unmount()
       }

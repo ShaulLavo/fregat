@@ -1,3 +1,4 @@
+import { useUnavailableEnvironment } from '@/lib/environments/hooks/use-unavailable-environment'
 import { filePathsForTabs, filesystemResource } from '@/lib/documents/utils/capabilities'
 import { filesystemPath } from '@/lib/documents/utils/identity'
 import type { FilesystemPath } from '@/lib/documents/utils/types'
@@ -76,7 +77,12 @@ export function useFsActions({
   treeRef: RefObject<FileTreeModel | null>
 }) {
   const queryClient = useQueryClient()
-  const mutationsEnabled = useWorkspaceMutationAllowed()
+  const unavailable = useUnavailableEnvironment()
+  const workspaceMutationAllowed = useWorkspaceMutationAllowed()
+  const mutationsEnabled =
+    !unavailable &&
+    workspaceMutationAllowed &&
+    Boolean(queryClient.getQueryData(fileSystemKeys.tree(rootPath)))
   const workspaceEdits = useOptionalWorkspaceEditService()
   const documentStore = useEditorDocumentStoreApi()
   const workspaceStore = useEditorWorkspaceStoreApi()

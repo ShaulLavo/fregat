@@ -1,3 +1,4 @@
+import { admitGitMutation } from '@/features/git/utils/admit-mutation'
 import { clientForQueryClient } from '@/lib/environments/state/query-clients'
 import { useMutation, useQueryClient } from '@tanstack/react-query'
 import { toast } from 'sonner'
@@ -19,7 +20,8 @@ export function useCommitMutation(rootPath: string) {
     // Streaming, so the repository's hooks can be seen working. A commit is the
     // one git command that runs arbitrary user code, and the previous one-shot
     // call left a slow hook looking exactly like a hung button.
-    mutationFn: (request: CommitRequest, { client }) => {
+    mutationFn: async (request: CommitRequest, { client }) => {
+      await admitGitMutation(client, rootPath)
       const progress = commitProgressStoreFor(client).getState()
       progress.clearCommitProgress(rootPath)
 

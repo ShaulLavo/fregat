@@ -106,7 +106,12 @@ export class FileTree implements FileTreeMutationHandle, FileTreeSearchSessionHa
   #density: FileTreeDensityPreset
   readonly #viewOptions: Pick<
     FileTreeOptions,
-    'initialVisibleRowCount' | 'itemHeight' | 'overscan' | 'stickyFolders'
+    | 'initialVisibleRowCount'
+    | 'itemHeight'
+    | 'overscan'
+    | 'stickyFolders'
+    | 'initialScrollTop'
+    | 'onScrollTopChange'
   >
   #fileTreeContainer: HTMLElement | undefined
   #gitStatusState: FileTreeGitStatusState | null
@@ -150,6 +155,8 @@ export class FileTree implements FileTreeMutationHandle, FileTreeSearchSessionHa
       stickyFolders,
       unsafeCSS,
       initialVisibleRowCount,
+      initialScrollTop,
+      onScrollTopChange,
       ...controllerOptions
     } = options
     this.#composition = composition
@@ -170,6 +177,8 @@ export class FileTree implements FileTreeMutationHandle, FileTreeSearchSessionHa
       overscan,
       stickyFolders,
       initialVisibleRowCount,
+      initialScrollTop,
+      onScrollTopChange,
     }
     this.#controller = new FileTreeController({
       ...controllerOptions,
@@ -453,12 +462,16 @@ export class FileTree implements FileTreeMutationHandle, FileTreeSearchSessionHa
   }
 
   #getInitialViewOptions(): {
+    initialScrollTop?: number
+    onScrollTopChange?: (scrollTop: number) => void
     initialViewportHeight: number
     itemHeight?: number
     overscan?: number
     stickyFolders?: boolean
   } {
     return {
+      initialScrollTop: this.#viewOptions.initialScrollTop,
+      onScrollTopChange: this.#viewOptions.onScrollTopChange,
       initialViewportHeight: resolveInitialViewportHeight({
         initialVisibleRowCount: this.#viewOptions.initialVisibleRowCount,
         itemHeight: this.#viewOptions.itemHeight,

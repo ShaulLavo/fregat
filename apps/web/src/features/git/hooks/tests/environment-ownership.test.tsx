@@ -32,7 +32,7 @@ test('a queued Git mutation resumes on its owning server after the active server
   const origin = activeServerOrigin()
   const wasOnline = onlineManager.isOnline()
   const { result, queryClient, unmount } = renderHookWithProviders(() =>
-    useStagePathsMutation(['shared.txt'], 'repo'),
+    useStagePathsMutation(['shared.txt'], ''),
   )
   onlineManager.setOnline(false)
   const staged = result.current.mutateAsync()

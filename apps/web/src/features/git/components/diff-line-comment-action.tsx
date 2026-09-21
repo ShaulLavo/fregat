@@ -1,6 +1,12 @@
 import { Tooltip, TooltipContent, TooltipTrigger } from '@workspace/ui/components/tooltip'
 import { ChatCircleIcon, XIcon } from '@phosphor-icons/react'
-import type { DiffFile, DiffRegionStore, DiffRenderRow } from '@singapore-editor/diff'
+import {
+  diffRowAtEvent,
+  type DiffFile,
+  type DiffRegionStore,
+  type DiffRenderRow,
+  type DiffRowHit,
+} from '@singapore-editor/diff'
 import { Button } from '@workspace/ui/components/button'
 import { useEffect, useRef, useState, type RefObject } from 'react'
 
@@ -9,27 +15,18 @@ import {
   diffLineAddress,
   diffLineAddressLabel,
   diffLineSelectionText,
-  diffPaneRows,
   diffRowsForAddress,
   selectedDiffRows,
+  stackedDiffRows,
   type DiffLineAddress,
-  type DiffPaneSide,
 } from '../utils/diff-line-selection'
-
-type RowTarget = {
-  readonly rowIndex: number
-  readonly side: DiffPaneSide
-}
 
 /**
  * Turns a line range dragged out in the diff into something the agent can act
  * on, and hands it to the composer.
  *
- * What is read back from the panes is the one thing they publish: the row index
- * on each mounted row element. Everything after that — which side of the diff a
- * row is on, which lines it is — is derived from the same projection the panes
- * rendered, over the same expansion state, which the diff plugin owns and this
- * only reads.
+ * Where a press landed is the diff plugin's answer, not this layer's: it names
+ * the pane, the rows that pane is showing and the row under the pointer.
  */
 export function DiffLineCommentAction({
   file,
@@ -43,19 +40,17 @@ export function DiffLineCommentAction({
   const { attachText } = useAttachToComposer()
   const [address, setAddress] = useState<DiffLineAddress | null>(null)
   // Not state: re-rendering mid-drag on the anchor would only throw the drag away.
-  const anchor = useRef<RowTarget | null>(null)
+  const anchor = useRef<DiffRowHit | null>(null)
 
   useEffect(() => {
     const host = hostRef.current
     if (!host) return
 
-    const rowsFor = (side: DiffPaneSide) => diffPaneRows(file, side, regions.getExpandedRegions())
-
     const onMouseDown = (event: MouseEvent) => {
       if (event.button !== 0) return
 
       setAddress(null)
-      anchor.current = rowTargetAt(event, rowsFor)
+      anchor.current = diffRowAtEvent(event)
     }
 
     // On the document because a drag that runs past the last row releases
@@ -65,10 +60,11 @@ export function DiffLineCommentAction({
       anchor.current = null
       if (!start) return
 
-      const head = rowTargetAt(event, rowsFor)
+      const head = diffRowAtEvent(event)
       const headRow = head?.side === start.side ? head.rowIndex : start.rowIndex
-      const dragged = selectedDiffRows(rowsFor(start.side), start.rowIndex, headRow)
-      setAddress(canonicalAddress(diffLineAddress(dragged), rowsFor('stacked')))
+      const dragged = selectedDiffRows(start.rows, start.rowIndex, headRow)
+      const stackedRows = stackedDiffRows(file, regions.getExpandedRegions())
+      setAddress(canonicalAddress(diffLineAddress(dragged), stackedRows))
     }
 
     host.addEventListener('mousedown', onMouseDown, true)
@@ -85,10 +81,7 @@ export function DiffLineCommentAction({
   const ask = () => {
     // Resolved against the stacked projection so the agent gets both sides of
     // the change even when the range was dragged out in one split pane.
-    const rows = diffRowsForAddress(
-      diffPaneRows(file, 'stacked', regions.getExpandedRegions()),
-      address,
-    )
+    const rows = diffRowsForAddress(stackedDiffRows(file, regions.getExpandedRegions()), address)
     if (rows.length === 0) return
     if (!attachText('git-diff', diffLineSelectionText(file.path, address, rows))) return
 
@@ -137,28 +130,4 @@ function canonicalAddress(
   if (!address) return null
 
   return diffLineAddress(diffRowsForAddress(stackedRows, address))
-}
-
-function rowTargetAt(
-  event: MouseEvent,
-  rowsFor: (side: DiffPaneSide) => readonly DiffRenderRow[],
-): RowTarget | null {
-  const target = event.target
-  if (!(target instanceof Element)) return null
-
-  const element = target.closest<HTMLElement>('[data-editor-virtual-row]')
-  const side = paneSide(element?.closest('.editor-diff-pane'))
-  if (!element || !side) return null
-
-  const rowIndex = Number(element.dataset.editorVirtualRow)
-  return rowsFor(side)[rowIndex] ? { rowIndex, side } : null
-}
-
-function paneSide(pane: Element | null | undefined): DiffPaneSide | null {
-  if (!pane) return null
-  if (pane.classList.contains('editor-diff-pane-old')) return 'old'
-  if (pane.classList.contains('editor-diff-pane-new')) return 'new'
-  if (pane.classList.contains('editor-diff-pane-stacked')) return 'stacked'
-
-  return null
 }

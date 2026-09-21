@@ -805,7 +805,7 @@ describe('search buffer store', () => {
     store.getState().prepareBuffer('repo')
     store.getState().setReplaceVisible('repo', true)
     store.getState().setReplaceText('repo', 'pin')
-    store.getState().finishReplace(store.getState().startReplace('repo')!, '1 match replaced.')
+    store.getState().finishReplace(startReadyReplace(store, 'repo')!, '1 match replaced.')
     store.getState().startSearch({
       includeContent: true,
       limit: 20,
@@ -959,9 +959,9 @@ describe('search buffer store', () => {
     const store = createSearchBufferStore()
     store.getState().prepareBuffer('repo')
     store.getState().setReplaceText('repo', 'alpha')
-    store.getState().startReplace('repo')
+    startReadyReplace(store, 'repo')
     store.getState().setReplaceText('repo', 'beta')
-    store.getState().startReplace('repo')
+    startReadyReplace(store, 'repo')
     store.getState().setReplaceText('repo', 'draft')
 
     store.getState().selectPreviousReplaceText('repo')
@@ -1004,12 +1004,12 @@ describe('search buffer store', () => {
     const store = createSearchBufferStore()
     store.getState().prepareBuffer('repo')
     store.getState().setReplaceText('repo', 'alpha')
-    store.getState().startReplace('repo')
+    startReadyReplace(store, 'repo')
     store.getState().setReplaceText('repo', 'beta')
-    store.getState().startReplace('repo')
+    startReadyReplace(store, 'repo')
     store.getState().selectPreviousReplaceText('repo')
 
-    store.getState().startReplace('repo')
+    startReadyReplace(store, 'repo')
 
     expect(store.getState().active).toMatchObject({
       replaceHistory: ['alpha', 'beta'],
@@ -1030,7 +1030,7 @@ describe('search buffer store', () => {
     const store = createSearchBufferStore()
     store.getState().prepareBuffer('repo')
     store.getState().setReplaceText('repo', ' beta ')
-    store.getState().startReplace('repo')
+    startReadyReplace(store, 'repo')
     store.getState().setReplaceText('repo', 'draft')
 
     store.getState().selectPreviousReplaceText('repo')
@@ -1388,9 +1388,9 @@ function groupByPath(groups: ReturnType<typeof searchGroupsForSnapshot>, path: s
 it('ignores a completion after reset to the same root and leaves its new request running', () => {
   const store = createSearchBufferStore()
   store.getState().prepareBuffer('repo')
-  const old = store.getState().startReplace('repo')!
+  const old = startReadyReplace(store, 'repo')!
   store.getState().resetBuffer('repo')
-  const current = store.getState().startReplace('repo')!
+  const current = startReadyReplace(store, 'repo')!
   const before = store.getState().active
   store.getState().finishReplace(old, 'Old result', true)
   store.getState().failReplace(old, 'Old failure')
@@ -1402,7 +1402,7 @@ it('ignores a completion after reset to the same root and leaves its new request
 it('settles an owned parked buffer without altering the selected root', () => {
   const store = createSearchBufferStore()
   store.getState().prepareBuffer('repo')
-  const token = store.getState().startReplace('repo')!
+  const token = startReadyReplace(store, 'repo')!
   store.getState().switchWorkspace('other')
   const before = store.getState().active
   store.getState().finishReplace(token, 'Done')
@@ -1416,7 +1416,7 @@ it('settles an owned parked buffer without altering the selected root', () => {
 it('settles an earlier result generation without refreshing newer search inputs', () => {
   const store = createSearchBufferStore()
   store.getState().prepareBuffer('repo')
-  const token = store.getState().startReplace('repo')!
+  const token = startReadyReplace(store, 'repo')!
   store.getState().startSearch({ path: 'repo', query: 'new', includeContent: true, limit: 20 })
   const revision = store.getState().active?.searchRevision
   const runId = store.getState().active?.runId
@@ -1434,9 +1434,9 @@ it('settles an earlier result generation without refreshing newer search inputs'
 it('an old replacement cannot settle a newer request in the same incarnation', () => {
   const store = createSearchBufferStore()
   store.getState().prepareBuffer('repo')
-  const first = store.getState().startReplace('repo')!
+  const first = startReadyReplace(store, 'repo')!
   store.getState().setReplaceText('repo', 'new')
-  const second = store.getState().startReplace('repo')!
+  const second = startReadyReplace(store, 'repo')!
   store.getState().finishReplace(first, 'Old', true)
   expect(store.getState().active).toMatchObject({
     replaceRequest: second,
@@ -1450,4 +1450,34 @@ it('an old replacement cannot settle a newer request in the same incarnation', (
     replaceStatus: 'success',
     replaceMessage: 'New',
   })
+})
+
+function startReadyReplace(store: ReturnType<typeof createSearchBufferStore>, root: string) {
+  const active = store.getState().active
+  if (!active || active.runId === 0 || active.status !== 'ready') {
+    const query = active?.resultsSearchQuery ?? {
+      ...searchQuery(active?.query || 'needle'),
+      path: root,
+    }
+    const run = store.getState().startSearch(query)
+    store
+      .getState()
+      .appendEvent(run, { ...doneEvent(query.query, active?.matches.length ?? 0), path: root })
+  }
+  return store.getState().startReplace(root)
+}
+
+it('rejects replacement before a current completed generation', () => {
+  const store = createSearchBufferStore()
+  store.getState().prepareBuffer('repo')
+  expect(store.getState().startReplace('repo')).toBeNull()
+  const run = store.getState().startSearch(searchQuery('needle'))
+  expect(store.getState().startReplace('repo')).toBeNull()
+  store.getState().appendEvent(run, doneEvent('needle', 0))
+  expect(store.getState().startReplace('repo')).not.toBeNull()
+  const cached = cachedSearchBufferState(store.getState().active)
+  expect(cached).not.toBeNull()
+  if (!cached) return
+  const restored = createSearchBufferStore({ rootPath: 'repo', cachedByRootPath: { repo: cached } })
+  expect(restored.getState().startReplace('repo')).toBeNull()
 })

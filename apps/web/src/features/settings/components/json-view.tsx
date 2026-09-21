@@ -1,3 +1,4 @@
+import { useJsonPaint } from '@/features/settings/hooks/use-json-paint'
 import { Editor } from '@/features/editor/components/editor'
 import type { EditorRenderDocument } from '@/features/editor/utils/render-document'
 import type { SettingsDiagnostic, SettingsLayerFile } from '@workspace/contracts'
@@ -38,9 +39,12 @@ export function SettingsJsonView({
   tabId: TabId
 }) {
   const diagnosticsPlugins = useSettingsDiagnosticsPlugin({ diagnostics, file, target: scope })
+  const paint = useJsonPaint(scope, file, active)
+  const document =
+    liveDocument?.key === documentKey(settingsJsonDocument(scope)) ? liveDocument : null
   // The buffer is seeded and bound in effects, so the first render after opening
   // the view — or after a scope switch — still has the previous document or none.
-  if (!liveDocument || liveDocument.key !== documentKey(settingsJsonDocument(scope))) {
+  if (!document && !paint.snapshot) {
     return <JsonLoading />
   }
 
@@ -55,8 +59,11 @@ export function SettingsJsonView({
         <Editor
           active={active}
           additionalPlugins={diagnosticsPlugins}
-          document={liveDocument}
-          target={liveDocument.target}
+          document={document}
+          target={settingsJsonDocument(scope)}
+          paintKey={paint.paintKey}
+          snapshot={paint.snapshot}
+          onCaptureSourceChange={paint.onCaptureSourceChange}
           languageServerTarget={SETTINGS_LANGUAGE_SERVER_TARGET}
           rootPath={rootPath}
           tabId={tabId}

@@ -1,3 +1,11 @@
+import { LoadingState } from '@workspace/ui/components/loading-state'
+import { useChatTransport } from '@/features/chat/hooks/use-chat-transport'
+import {
+  captureTimelineReload,
+  flushTimelineReload,
+  readTimelineReload,
+} from '@/features/chat/state/timeline-reload'
+import { addLifecycleFlush } from '@/lib/lifecycle-flush'
 import { Tooltip, TooltipContent, TooltipTrigger } from '@workspace/ui/components/tooltip'
 import { Button } from '@workspace/ui/components/button'
 import { cn } from '@workspace/ui/lib/utils'
@@ -52,6 +60,7 @@ export function TimelineViewport({
   dispatch: Dispatch<TimelineScrollEvent>
 }) {
   'use no memo' // Minimap and follow state read the virtualizer's mutable geometry.
+  const { environmentId } = useChatTransport()
   const scrollElement = virtualizer.scrollElement
   // A disclosure keeps its row still until two animation frames have settled.
   const [disclosureSettleTick, setDisclosureSettleTick] = useState<number | null>(null)
@@ -77,8 +86,14 @@ export function TimelineViewport({
       latestUserItemId: resolveTimelineAnchorItemId(items),
       sessionId: session.id,
       type: 'items-changed',
+      preserveReadingPosition:
+        readTimelineReload(environmentId)?.sessionId === session.id &&
+        !items.some(
+          (item) =>
+            item.type === 'message' && 'optimistic' in item.message && item.message.role === 'user',
+        ),
     })
-  }, [dispatch, items, session.id])
+  }, [dispatch, environmentId, items, session.id])
 
   // Restore a prepended page's anchor before other effects measure the viewport.
   useLayoutEffect(() => {
@@ -149,8 +164,38 @@ export function TimelineViewport({
     }
   }, [disclosureSettleTick, dispatch, scrollElement])
 
+  useEffect(() => {
+    const capture = () =>
+      captureTimelineReload(
+        environmentId,
+        session,
+        items,
+        virtualizer,
+        scrollState.followMode === 'following-end',
+      )
+    const flush = () => {
+      capture()
+      flushTimelineReload(environmentId)
+    }
+    capture()
+    const remove = addLifecycleFlush(flush)
+    scrollElement?.addEventListener('scroll', capture, { passive: true })
+    return () => {
+      flushTimelineReload(environmentId)
+      remove()
+      scrollElement?.removeEventListener('scroll', capture)
+    }
+  }, [environmentId, items, session, scrollElement, scrollState.followMode, virtualizer])
+
   if (items.length === 0) {
-    return <ChatWelcomeView />
+    return session.detailSynced ? (
+      <ChatWelcomeView />
+    ) : (
+      <LoadingState label='Loading conversation'>
+        <div aria-hidden='true' className='skeleton-sweep h-16 w-full rounded-md' />
+        <div aria-hidden='true' className='skeleton-sweep h-16 w-3/4 rounded-md' />
+      </LoadingState>
+    )
   }
 
   function handleScroll() {

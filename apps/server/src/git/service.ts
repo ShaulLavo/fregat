@@ -235,11 +235,12 @@ export class GitService {
     return result.stdout.split(/\r?\n/, 1)[0]?.trim() || null
   }
 
-  async status(input = ''): Promise<GitStatusResult> {
+  async status(input = '', fresh = false): Promise<GitStatusResult> {
     recordGitServiceOperation('status', input)
-    const repository = await this.resolveRepositoryLocation(input)
+    const repository = await this.resolveRepositoryLocation(input, fresh)
     if (!repository) return { repository: null, files: [] }
 
+    if (fresh) this.invalidateStatus(repository.rootAbsolutePath)
     const cacheKey = statusCacheKey(repository)
     const cacheHit = this.statuses.read(cacheKey) !== undefined
     const status = await this.statuses.load(cacheKey, () => this.readStatus(repository))
@@ -726,9 +727,13 @@ export class GitService {
     return { ...location, info }
   }
 
-  private async resolveRepositoryLocation(input = ''): Promise<GitRepositoryLocation | null> {
+  private async resolveRepositoryLocation(
+    input = '',
+    fresh = false,
+  ): Promise<GitRepositoryLocation | null> {
     const resolved = this.resolveServicePath(input)
     const cwd = await gitCwdForPath(resolved.absolutePath)
+    if (fresh) this.repositoryRoots.invalidate(cwd)
     const root = await this.repositoryRoots.load(cwd, () => this.readRepositoryRoot(cwd))
     if (!root) return null
 

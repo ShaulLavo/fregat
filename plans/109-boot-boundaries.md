@@ -8,7 +8,7 @@ gate are not started. See [Landed](#landed-2026-09-21) for the measured result. 
 This plan covers where loading boundaries belong in `apps/web` and the gate that pins the result.
 It does not cover the instrument that measures first load ([Plan 106](106-boot-weight.md) owns it),
 the markdown stack that moves the number next ([Plan 108](108-markdown-modes.md)), first paint and
-restoration ([Plan 085](085-instant-workspace-reload.md)), the browser-driving CLI
+restoration ([workspace reload delivery](../docs/instant-reload-implementation.md)), the browser-driving CLI
 ([Plan 119](119-agent-verification-tooling.md)), or the scoped error boundary and the
 `<Activity>`/visibility rule it leans on
 ([Plan 127](127-compiler-and-lifetime-repairs.md), [Plan 128](128-react-19-patterns.md)).
@@ -485,7 +485,7 @@ No code. This phase produces the sentence everything else is measured against.
 
 1. Write down what is on screen at first usable frame: which panes, which of them can be empty
    shells, and which must hold real content. The
-   [instant workspace reload](085-instant-workspace-reload.md) plan already owns first-paint
+   [instant workspace reload](../docs/instant-reload-implementation.md) implementation owns first-paint
    restoration and its conclusions are inputs here, not competitors.
 2. Classify every top-level feature against that definition: required at boot, required on first
    interaction, or genuinely on demand. The per-feature table above supplies the cost column; this

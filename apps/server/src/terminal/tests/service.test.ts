@@ -208,6 +208,10 @@ describe('terminal service', () => {
     expect(pty.ptys[0]?.killed).toBe(false)
     expect(second.messages[0]).toMatchObject({ type: 'ready' })
     expect(terminalOutputText(second.messages)).toContain('streamed-output')
+    const marker = second.messages.findIndex((message) => message.type === 'replay-complete')
+    const output = second.messages.findIndex((message) => message.type === 'output')
+    expect(marker).toBeGreaterThan(output)
+    expect(output).toBeGreaterThan(0)
 
     await service.dispose()
   })
@@ -248,8 +252,9 @@ describe('terminal service', () => {
 
     expect(typeof frames[0]).toBe('string')
     expect(parseTerminalServerMessage(frames[0])).toMatchObject({ type: 'ready' })
-    expect(Buffer.isBuffer(frames[1])).toBe(true)
-    expect(frames[1]).toEqual(Buffer.from([0xff, 0x00, 0x80]))
+    expect(parseTerminalServerMessage(frames[1])).toEqual({ type: 'replay-complete' })
+    expect(Buffer.isBuffer(frames[2])).toBe(true)
+    expect(frames[2]).toEqual(Buffer.from([0xff, 0x00, 0x80]))
   })
 
   it('keeps exactly the latest 8 MiB for replay even after one oversized chunk', async () => {
@@ -864,6 +869,14 @@ describe('terminal service', () => {
     expect(first.messages.filter((message) => message.type === 'cleared')).toHaveLength(1)
     expect(second.messages.filter((message) => message.type === 'cleared')).toHaveLength(1)
     expect(first.messages.some((message) => message.type === 'exit')).toBe(false)
+    for (const viewer of [first, second]) {
+      const cleared = viewer.messages.findIndex((message) => message.type === 'cleared')
+      const replacement = viewer.messages.slice(cleared + 1)
+      expect(replacement.filter((message) => message.type === 'replay-complete')).toHaveLength(1)
+      expect(replacement.findIndex((message) => message.type === 'ready')).toBeLessThan(
+        replacement.findIndex((message) => message.type === 'replay-complete'),
+      )
+    }
     routes.message(second, Buffer.from('replacement input'))
     expect(pty.ptys[2]?.writes).toContainEqual(Buffer.from('replacement input'))
     pty.ptys[2]?.emit(Buffer.from('replacement output'))

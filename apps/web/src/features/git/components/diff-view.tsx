@@ -1,3 +1,6 @@
+import { Alert } from '@workspace/ui/components/alert'
+import { useDiffReloadView } from '@/features/git/hooks/use-diff-reload-view'
+import { diffDocumentQueryKey } from '@/features/git/utils/diff-document-query'
 import { filesystemPath } from '@/lib/documents/utils/identity'
 import { languageIdForFilePath } from '@/features/editor/utils/file-path'
 import { useMemo, useRef } from 'react'
@@ -44,7 +47,8 @@ export function DiffView({
   // One store, read by both split panes and by the comment layer. The layer does
   // not keep a copy of which regions are open — the mirror it used to keep was
   // keyed by hunk ordinal, which a trailing-tail region does not have.
-  const { regions } = useTabPresentation(tabId)
+  const presentation = useTabPresentation(tabId)
+  const { regions } = presentation
   // Stable identity is required: this is pushed into the plugin, and a fresh
   // array each render would re-project the diff and throw away scroll position.
   const files = useMemo(() => editorDiffFiles(diffs, languageIdForFilePath), [diffs])
@@ -57,6 +61,7 @@ export function DiffView({
   // that have to agree and nothing made them. The file list is off either way for a multi-file
   // diff, so a checkpoint diff touching several files deliberately shows one.
   const file = renderableDiffFile(files)
+  useDiffReloadView(JSON.stringify(diffDocumentQueryKey(comparison)), diffs, file, presentation)
   // What an editor tab currently holds for this path, if anything. That is the only text a
   // language server can be asked about, and comparing it to the diff's new side is what makes an
   // answer true — see `diffQueryTargetAt`. Called before the early returns below: hooks are not
@@ -72,20 +77,14 @@ export function DiffView({
     languageHost,
   )
 
-  if (failure)
-    return (
-      <EditorTabPlaceholder tabId={tabId}>
-        <DiffNotice message={failure} tone='error' />
-      </EditorTabPlaceholder>
-    )
-  if (!pending && diffs.length === 0) {
+  if (!pending && !failure && diffs.length === 0) {
     return (
       <EditorTabPlaceholder tabId={tabId}>
         <DiffNotice message={emptyDiffNotice(comparison, rootPath)} />
       </EditorTabPlaceholder>
     )
   }
-  if (!pending && !file) {
+  if (!pending && !failure && !file) {
     return (
       <EditorTabPlaceholder tabId={tabId}>
         <DiffNotice message={unrenderableDiffNotice(diffs, comparison, rootPath)} />
@@ -100,13 +99,20 @@ export function DiffView({
       aria-busy={pending || undefined}
       className='relative flex h-full min-h-0 w-full min-w-0 flex-col overflow-hidden'
     >
+      {failure ? (
+        <Alert className='bg-popover-solid text-destructive absolute right-2 bottom-2 z-10 max-w-sm'>
+          {failure}
+        </Alert>
+      ) : null}
       {unchanged ? <UnchangedDiffBanner message={unchanged} /> : null}
       {/* The ref is on the panes and not on the wrapper the toolbar shares: the
           comment layer listens for `mousedown` in capture, and a press on its own
           "Ask" button would otherwise clear the selection before the click landed. */}
       <div className='min-h-0 w-full min-w-0 flex-1' ref={containerRef}>
         <DiffEditor
+          paintIdentity={JSON.stringify(diffDocumentQueryKey(comparison))}
           file={file}
+          failure={failure}
           languageServer={file ? languageServer : null}
           mode={mode}
           regions={regions}

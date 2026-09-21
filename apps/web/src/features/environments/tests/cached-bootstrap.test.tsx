@@ -21,12 +21,49 @@ import { primaryQueryClient } from '@/lib/environments/state/query-clients'
 import { transportFor, closeChatTransports } from '@/features/chat/state/active-transports'
 import { writeBootMirror } from '@/lib/settings-boot-mirror'
 import { createBootRuntime } from '@/state/bootstrap-runtime'
+import { createBootstrap } from '@/state/bootstrap'
+import { createTestNavigation } from '../../../../test/factories/navigation'
 import { currentRailEnvironments } from '@/features/chat-mode/state/rail-environments'
 import { sessionRailModel } from '@workspace/client-core/chat/rail/model'
 import { createInProcessClient } from '../../../../test/client'
 import { registerFederatedProject } from '../../../../test/factories/federation'
 import { expect, test } from '../../../../test/fixtures'
 import { makeTestServer } from '../../../../test/server'
+
+test('warm bootstrap exists before mount and effect replay retains the same runtime', async ({
+  client,
+}) => {
+  const descriptor = v.parse(healthDescriptorSchema, (await client.health.get()).data)
+  const origin = primaryServerOrigin()
+  const previous = useEnvironmentsStore.getState()
+  recordEnvironmentCacheBinding(environmentScopedStorage(descriptor.environmentId), {
+    names: ['local'],
+    origin,
+    descriptor,
+  })
+  const navigation = createTestNavigation()
+  const boot = createBootstrap(navigation)
+  const application = boot.getState().application
+  try {
+    expect(application).not.toBeNull()
+    expect(() => assertEnvironmentWritable(origin)).toThrow()
+    boot.start()
+    boot.start()
+    boot.stop()
+    boot.start()
+    await Promise.resolve()
+    expect(boot.getState().application).toBe(application)
+    expect(application?.getEnvironment(descriptor.environmentId)).toBeDefined()
+    boot.stop()
+    await Promise.resolve()
+    expect(application?.getEnvironment(descriptor.environmentId)).toBeUndefined()
+  } finally {
+    boot.dispose()
+    navigation.dispose()
+    useEnvironmentsStore.setState(previous, true)
+    localStorage.clear()
+  }
+})
 
 test('cached primary and remote slices paint before sockets, and cached protocol versions cannot prevent startup', async ({
   client,

@@ -48,6 +48,12 @@ test('generates from an untracked working diff, fills the input, and never commi
     const headBefore = git(repo, 'rev-parse', 'HEAD')
 
     renderControls('repo', true)
+    await waitFor(() =>
+      expect(screen.getByRole('button', { name: 'Generate commit message' })).not.toHaveAttribute(
+        'aria-disabled',
+        'true',
+      ),
+    )
     await userEvent.click(screen.getByRole('button', { name: 'Generate commit message' }))
 
     await waitFor(() => {
@@ -76,6 +82,12 @@ test('prefers the staged diff instead of mixing in working changes', async () =>
     await writeFile(path.join(repo, 'working.ts'), 'export const working = true\n')
     renderControls('repo', true)
 
+    await waitFor(() =>
+      expect(screen.getByRole('button', { name: 'Generate commit message' })).not.toHaveAttribute(
+        'aria-disabled',
+        'true',
+      ),
+    )
     await userEvent.click(screen.getByRole('button', { name: 'Generate commit message' }))
     await waitForProviderTurn(adapter)
 
@@ -100,6 +112,12 @@ test('falls back to an advertised cheap model at low effort without ChatGPT', as
     await writeFile(path.join(repo, 'feature.ts'), 'export const feature = true\n')
     renderControls('repo', true)
 
+    await waitFor(() =>
+      expect(screen.getByRole('button', { name: 'Generate commit message' })).not.toHaveAttribute(
+        'aria-disabled',
+        'true',
+      ),
+    )
     await userEvent.click(screen.getByRole('button', { name: 'Generate commit message' }))
     await waitForProviderTurn(adapter)
 
@@ -118,6 +136,12 @@ test('shows the empty-diff error without starting a provider turn', async () => 
     await initRepo(server.root, 'repo')
     renderControls('repo', false)
 
+    await waitFor(() =>
+      expect(screen.getByRole('button', { name: 'Generate commit message' })).not.toHaveAttribute(
+        'aria-disabled',
+        'true',
+      ),
+    )
     await userEvent.click(screen.getByRole('button', { name: 'Generate commit message' }))
 
     expect(await screen.findByRole('alert')).toHaveTextContent(
@@ -140,6 +164,12 @@ test('shows provider failure and preserves the existing commit input', async () 
       screen.getByRole('textbox', { name: 'Commit message' }),
       'fix: keep this draft',
     )
+    await waitFor(() =>
+      expect(screen.getByRole('button', { name: 'Generate commit message' })).not.toHaveAttribute(
+        'aria-disabled',
+        'true',
+      ),
+    )
     await userEvent.click(screen.getByRole('button', { name: 'Generate commit message' }))
 
     expect(await screen.findByRole('alert')).toHaveTextContent(
@@ -148,7 +178,10 @@ test('shows provider failure and preserves the existing commit input', async () 
     expect(screen.getByRole('textbox', { name: 'Commit message' })).toHaveValue(
       'fix: keep this draft',
     )
-    expect(screen.getByRole('button', { name: 'Generate commit message' })).toBeEnabled()
+    expect(screen.getByRole('button', { name: 'Generate commit message' })).not.toHaveAttribute(
+      'aria-disabled',
+      'true',
+    )
   })
 })
 
@@ -164,6 +197,12 @@ test('cancels and ignores a stale result when the repository root changes', asyn
       await initRepo(server.root, 'repo-b')
       const view = renderControls('repo-a', true)
 
+      await waitFor(() =>
+        expect(screen.getByRole('button', { name: 'Generate commit message' })).not.toHaveAttribute(
+          'aria-disabled',
+          'true',
+        ),
+      )
       await userEvent.click(screen.getByRole('button', { name: 'Generate commit message' }))
       await waitForProviderTurn(adapter)
       expect(screen.getByRole('button', { name: 'Cancel commit message generation' })).toBeEnabled()
@@ -193,6 +232,12 @@ test('finishes cancellation before allowing a fresh generation request', async (
       await writeFile(path.join(repo, 'feature.ts'), 'export const feature = true\n')
       renderControls('repo', true)
 
+      await waitFor(() =>
+        expect(screen.getByRole('button', { name: 'Generate commit message' })).not.toHaveAttribute(
+          'aria-disabled',
+          'true',
+        ),
+      )
       await userEvent.click(screen.getByRole('button', { name: 'Generate commit message' }))
       await waitForProviderTurn(adapter)
       await userEvent.click(
@@ -233,6 +278,12 @@ test('does not overwrite commit text edited while generation is pending', async 
       await writeFile(path.join(repo, 'feature.ts'), 'export const feature = true\n')
       renderControls('repo', true)
 
+      await waitFor(() =>
+        expect(screen.getByRole('button', { name: 'Generate commit message' })).not.toHaveAttribute(
+          'aria-disabled',
+          'true',
+        ),
+      )
       await userEvent.click(screen.getByRole('button', { name: 'Generate commit message' }))
       await waitForProviderTurn(adapter)
       expect(screen.getByRole('button', { name: 'Cancel commit message generation' })).toBeEnabled()
@@ -242,7 +293,10 @@ test('does not overwrite commit text edited while generation is pending', async 
       gate.resolve()
 
       await waitFor(() => {
-        expect(screen.getByRole('button', { name: 'Generate commit message' })).toBeEnabled()
+        expect(screen.getByRole('button', { name: 'Generate commit message' })).not.toHaveAttribute(
+          'aria-disabled',
+          'true',
+        )
       })
       expect(input).toHaveValue('docs: keep my wording')
     },

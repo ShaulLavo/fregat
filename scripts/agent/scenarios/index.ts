@@ -130,6 +130,7 @@ import { editorUndoReopen } from './editor-undo-reopen'
 import { gitCommitHookColors } from './git-commit-hook-colors'
 import { gitDiffHoverTokens } from './git-diff-hover-tokens'
 import { gitDiffInlineTint } from './git-diff-inline-tint'
+import { gitDiffLineComment } from './git-diff-line-comment'
 import { gitCommitMessageFile } from './git-commit-message-file'
 import { gitCommitMessagePersists } from './git-commit-message-persists'
 import { gitCommitSlowHook } from './git-commit-slow-hook'
@@ -269,6 +270,7 @@ export const scenarios: readonly Scenario[] = [
   editorTitleDiffToggle,
   gitDiffHoverTokens,
   gitDiffInlineTint,
+  gitDiffLineComment,
   chatCardNarrow,
   chatGitTabSwitch,
   chatGitTurnRows,

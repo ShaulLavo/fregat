@@ -12,6 +12,7 @@ import { actionItem, section, type Menu } from '@/keymap/menus/utils/model'
 import type { PanelSection } from '@/features/git/utils/types'
 
 export type FileMenuContext = {
+  readonly writable?: boolean
   readonly copyPath: (value: string, label: string) => void
   /** Unstage-then-discard for a staged row, a plain discard for a worktree one. */
   readonly discard: () => void
@@ -54,6 +55,7 @@ export function fileMenu(context: FileMenuContext): Menu {
     section('stage', [
       !staged &&
         actionItem({
+          disabled: context.writable === false,
           icon: PlusIcon,
           id: 'stage',
           label: 'Stage Changes',
@@ -61,12 +63,14 @@ export function fileMenu(context: FileMenuContext): Menu {
         }),
       staged &&
         actionItem({
+          disabled: context.writable === false,
           icon: MinusIcon,
           id: 'unstage',
           label: 'Unstage Changes',
           run: context.unstage,
         }),
       actionItem({
+        disabled: context.writable === false,
         destructive: true,
         icon: ArrowBendUpLeftIcon,
         id: 'discard',

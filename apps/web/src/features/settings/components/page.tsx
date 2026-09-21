@@ -1,3 +1,4 @@
+import { useReloadView } from '@/features/settings/hooks/use-reload-view'
 import { ToolPane } from '@workspace/ui/patterns/tool-pane'
 import { workspaceRoot } from '@/lib/documents/utils/identity'
 import type { TabId, WorkspaceRoot } from '@/lib/documents/utils/types'
@@ -20,12 +21,11 @@ import { PageLoading } from '@/features/settings/components/page-loading'
 import { ScopeTabs } from '@/features/settings/components/scope-tabs'
 import { SettingsJsonView } from '@/features/settings/components/json-view'
 import { SettingRow } from '@/features/settings/components/setting-row'
-import { Status } from '@/features/settings/components/status'
+import { StatusMessage } from '@/components/status-message'
 import { ViewToggle } from '@/features/settings/components/view-toggle'
 import { useHasWorkspace } from '@/features/settings/hooks/use-has-workspace'
 import { useSettingsActions } from '@/features/settings/hooks/use-settings-actions'
-import { useSettingsDocument } from '@/features/settings/hooks/use-settings-document'
-import { useSettingsProjection } from '@/features/settings/hooks/use-settings-projection'
+import { useSettingsDisplay } from '@/features/settings/hooks/use-settings-display'
 import { useSettingsOwner } from '@/features/settings/hooks/use-settings-owner'
 import { SettingsOwnerProvider } from '@/features/settings/providers/owner-provider'
 import { useSettingsScope, writableSettingsScope } from '@/features/settings/state/scope-store'
@@ -62,8 +62,7 @@ export function SettingsPage({
   const showJson = (view === 'json' || scope === 'default') && tabId !== undefined
   const editorOwner = useQueryClient()
   const settingsOwner = useSettingsOwner()
-  const document = useSettingsDocument(showJson ? editorOwner : undefined)
-  const projection = useSettingsProjection(showJson ? editorOwner : undefined)
+  const { document, projection, saved } = useSettingsDisplay(showJson ? editorOwner : undefined)
   const { isSaving } = useSettingsActions()
   const editorHasWorkspace = useHasWorkspace()
   const hasWorkspace =
@@ -71,6 +70,7 @@ export function SettingsPage({
       ? editorHasWorkspace
       : Boolean(document.data?.layers.some((layer) => layer.id === 'workspace'))
   const query = useSettingsSearch()
+  const scrollRef = useReloadView(showJson ? editorOwner : settingsOwner, Boolean(document.data))
   const setQuery = selectSettingsSearch
   const searchRef = useRef<HTMLInputElement>(null)
   const rootRef = useRef<HTMLDivElement | null>(null)
@@ -97,8 +97,9 @@ export function SettingsPage({
     focusTargetRef(element)
   }
 
-  if (document.isError) return <Status tone='destructive'>Settings could not be loaded.</Status>
-  if (document.isPending || !projection) return <PageLoading showJson={showJson} />
+  if (document.isError && !document.data)
+    return <StatusMessage tone='destructive'>Settings could not be loaded.</StatusMessage>
+  if (!document.data || !projection) return <PageLoading showJson={showJson} />
 
   // `matchingSettingIds` already searches rows rather than keys, so a key edited
   // from another row is folded into its owner here rather than dropped.
@@ -122,6 +123,7 @@ export function SettingsPage({
       bodyClassName='flex flex-col overflow-hidden'
       ref={setRootRef}
       tabIndex={-1}
+      data-settings-display={saved ? 'saved' : 'live'}
       header={
         <PageHeader
           actions={
@@ -195,6 +197,11 @@ export function SettingsPage({
           on the container rather than per row — every control below would
           otherwise need its own handler, and a new widget would silently miss
           it. */}
+      {saved && document.isError ? (
+        <StatusMessage tone='destructive'>
+          Settings could not be refreshed. Showing saved settings.
+        </StatusMessage>
+      ) : null}
       {showJson ? (
         <div className='flex min-h-0 flex-1 flex-col'>
           <div className='px-(--density-section-padding) pt-(--density-section-padding)'>
@@ -214,7 +221,10 @@ export function SettingsPage({
         </div>
       ) : (
         <div
-          className='min-h-0 min-w-0 flex-1 overflow-y-auto p-(--density-section-padding) @max-3xl/settings:[&_[data-slot=button]]:min-h-10 @max-3xl/settings:[&_[data-slot=input-group]]:h-10 @max-3xl/settings:[&_[data-slot=select-trigger]]:min-h-10 @max-3xl/settings:[&_input]:h-10 @max-3xl/settings:[&_input]:text-base'
+          aria-label='Settings form'
+          role='region'
+          ref={scrollRef}
+          className='min-h-0 min-w-0 flex-1 overflow-y-auto p-(--density-section-padding) [overflow-anchor:none] @max-3xl/settings:[&_[data-slot=button]]:min-h-10 @max-3xl/settings:[&_[data-slot=input-group]]:h-10 @max-3xl/settings:[&_[data-slot=select-trigger]]:min-h-10 @max-3xl/settings:[&_input]:h-10 @max-3xl/settings:[&_input]:text-base'
           onKeyDown={(event) => {
             if (event.key !== 'Escape') return
             // Not while a control is mid-interaction: a recorder is capturing, and
@@ -225,19 +235,21 @@ export function SettingsPage({
         >
           <MalformedBanner layers={document.data.layers} />
           <DiagnosticsBanner diagnostics={projection.diagnostics} />
-          {shown.length === 0 ? (
-            <Status>{emptySettingsMessage(query, selectedCategory)}</Status>
-          ) : (
-            shown.map(([category, ids]) => (
-              <section className='mb-6' key={category}>
-                <h2 className='text-foreground mb-1 text-sm font-semibold'>{category}</h2>
-                {ids.includes('chat.keepImportedSessionsUpdated') ? <ImportSection /> : null}
-                {ids.map((id) => (
-                  <SettingRow id={id} key={id} snapshot={projection} />
-                ))}
-              </section>
-            ))
-          )}
+          <fieldset disabled={saved} className='min-w-0'>
+            {shown.length === 0 ? (
+              <StatusMessage>{emptySettingsMessage(query, selectedCategory)}</StatusMessage>
+            ) : (
+              shown.map(([category, ids]) => (
+                <section className='mb-6' key={category}>
+                  <h2 className='text-foreground mb-1 text-sm font-semibold'>{category}</h2>
+                  {ids.includes('chat.keepImportedSessionsUpdated') ? <ImportSection /> : null}
+                  {ids.map((id) => (
+                    <SettingRow id={id} key={id} snapshot={projection} />
+                  ))}
+                </section>
+              ))
+            )}
+          </fieldset>
         </div>
       )}
     </ToolPane>

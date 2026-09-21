@@ -101,6 +101,7 @@ export type TimelineScrollEvent =
       readonly latestUserItemId: string | null
       readonly sessionId: string
       readonly type: 'items-changed'
+      readonly preserveReadingPosition?: boolean
     }
 
 export const initialTimelineScrollState: TimelineScrollState = {
@@ -296,6 +297,7 @@ function reduceItemsChanged(
     firstItemId,
     latestUserItemId,
     sessionId,
+    preserveReadingPosition,
   }: Extract<TimelineScrollEvent, { type: 'items-changed' }>,
 ): TimelineScrollState {
   if (sessionId !== state.sessionId) {
@@ -311,6 +313,8 @@ function reduceItemsChanged(
   const withFront = reduceTimelineFront(state, firstItemId)
   if (latestUserItemId === state.latestUserItemId) return withFront
   if (latestUserItemId === null) return { ...withFront, latestUserItemId: null }
+  if (preserveReadingPosition && state.followMode === 'free-scrolling')
+    return { ...withFront, latestUserItemId }
 
   // A brand new user message means the user just sent something: park it near
   // the top instead of pinning to the bottom, even if they were reading history.

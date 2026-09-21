@@ -1,3 +1,4 @@
+import { admitGitMutation } from '@/features/git/utils/admit-mutation'
 import { clientForQueryClient } from '@/lib/environments/state/query-clients'
 import { useMutation } from '@tanstack/react-query'
 
@@ -8,7 +9,10 @@ import { settleGitStatus } from '@/features/git/utils/settle-status'
 
 export function useUnstagePathMutation(path: string, rootPath: string) {
   return useMutation({
-    mutationFn: (_variables, { client }) => unstagePath(path, clientForQueryClient(client)),
+    mutationFn: async (_variables, { client }) => {
+      await admitGitMutation(client, rootPath, [path])
+      return unstagePath(path, clientForQueryClient(client))
+    },
     mutationKey: mutationKeys.unstage(rootPath, path),
     onError: notifyMutationError,
     onSuccess: (status, _variables, _onMutateResult, { client }) =>

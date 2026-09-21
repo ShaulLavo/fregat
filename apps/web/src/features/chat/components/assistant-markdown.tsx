@@ -9,7 +9,7 @@ import { useQueryClient } from '@tanstack/react-query'
 import { type ClipboardEvent } from 'react'
 import type { ThemeRegistrationAny } from 'shiki/core'
 
-import { useEditorColorTheme } from '@/features/editor/hooks/use-editor-color-theme'
+import { useEditorColorTheme } from '@/lib/editor-theme/hooks/use-editor-color-theme'
 import { serverEndpoint } from '@/lib/client'
 import { originForQueryClient } from '@/lib/environments/state/query-clients'
 import { useEnvironmentsStore } from '@/lib/environments/state/store'

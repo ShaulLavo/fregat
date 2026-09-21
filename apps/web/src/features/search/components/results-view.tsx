@@ -1,3 +1,5 @@
+import { useRowHeight } from '@workspace/ui/patterns/use-row-height'
+import { useSearchResultScrollPosition } from '@/features/search/hooks/use-result-scroll-position'
 import { useLayoutEffect, useRef, type KeyboardEvent } from 'react'
 import type { WorkspaceSearchQuery } from '@workspace/contracts'
 import { VirtualList, type VirtualListHandle } from '@workspace/ui/patterns/virtual-list'
@@ -58,6 +60,7 @@ export function SearchResultsView({
   }
   const list = useListbox({
     role: 'tree',
+    revealOnMount: false,
     containerRef: parentRef,
     items: items.map((item) => ({
       id: item.id,
@@ -104,10 +107,24 @@ export function SearchResultsView({
     }
     list.containerProps.onKeyDown(event)
   }
+  const rowHeight = useRowHeight(parentRef)
+  const geometry = items.map((item, index) => ({
+    key: item.id,
+    start: index * rowHeight,
+    size: rowHeight,
+  }))
   const displayedQuery = resultsSearchQuery?.query
+  const scrollToOffsetRef = useRef<(offset: number) => void>(() => {})
   useLayoutEffect(() => {
-    virtualRef.current?.scrollToOffset(0)
-  }, [displayedQuery])
+    scrollToOffsetRef.current = (offset) => virtualRef.current?.scrollToOffset(offset)
+  })
+  const initialViewport = useSearchResultScrollPosition({
+    displayedResultsQuery: displayedQuery ?? null,
+    parentRef,
+    scrollToOffsetRef,
+    surface: 'compact',
+    geometry,
+  })
   if (status === 'idle') {
     return <SearchIdleState className={className} />
   }
@@ -139,6 +156,8 @@ export function SearchResultsView({
         'focus-ring-inset app-scrollbar-thin h-full min-h-0 overflow-x-hidden',
         className,
       )}
+      initialOffset={initialViewport.top}
+      initialRect={{ width: 0, height: initialViewport.height }}
       items={items}
       getKey={(item) => item.id}
       renderRow={(item) => (

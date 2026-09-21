@@ -7,7 +7,7 @@ import { settingsKeys } from '@workspace/client-core/settings/query-keys'
 import { expect, test } from '../../../../test/fixtures'
 import { createTestQueryClient, renderWithProviders } from '../../../../test/render'
 import { SettingsPage } from '@/features/settings/components/page'
-import { useEditorColorTheme } from '@/features/editor/hooks/use-editor-color-theme'
+import { useEditorColorTheme } from '@/lib/editor-theme/hooks/use-editor-color-theme'
 import {
   clearEditorThemePreview,
   getCommittedEditorThemeId,

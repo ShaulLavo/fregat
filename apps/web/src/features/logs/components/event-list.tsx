@@ -10,7 +10,11 @@ export function LogsEventList({
   events,
   inspectedEventId,
   onInspectEvent,
+  initialOffset,
+  onScroll,
 }: {
+  initialOffset?: number
+  onScroll?: (scrollTop: number) => void
   detailsById: LogEventDetailsById
   events: readonly LogEventSummary[]
   inspectedEventId: string | null
@@ -38,6 +42,8 @@ export function LogsEventList({
     <VirtualList
       {...listbox.containerProps}
       aria-label='Log events'
+      initialOffset={initialOffset}
+      onScroll={(event) => onScroll?.(event.currentTarget.scrollTop)}
       scrollRef={scrollRef}
       handleRef={virtualList}
       activeIndex={listbox.activeIndex}

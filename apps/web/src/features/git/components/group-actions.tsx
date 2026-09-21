@@ -1,3 +1,4 @@
+import { useStatus } from '@/features/git/hooks/use-status'
 import { ActionCluster } from '@/features/git/components/action-cluster'
 import { ArrowBendUpLeftIcon, FilePlusIcon, MinusIcon, PlusIcon } from '@phosphor-icons/react'
 
@@ -36,13 +37,14 @@ function WorktreeGroupActions({
   rootPath: string
   rows: readonly ChangeRow[]
 }) {
+  const confirmed = Boolean(useStatus(rootPath).data)
   const discard = useDiscardPathsMutation(paths, rootPath)
   const stage = useStagePathsMutation(paths, rootPath)
 
   return (
     <ActionCluster hoverGroup='group'>
       <RowActionButton
-        disabled={discard.isPending}
+        disabled={!confirmed || discard.isPending}
         label='Discard all changes'
         onClick={() => discard.mutate()}
       >
@@ -50,7 +52,7 @@ function WorktreeGroupActions({
       </RowActionButton>
       <OpenAllDiffsButton rows={rows} />
       <RowActionButton
-        disabled={stage.isPending}
+        disabled={!confirmed || stage.isPending}
         label='Stage all changes'
         onClick={() => stage.mutate()}
       >
@@ -69,13 +71,14 @@ function StagedGroupActions({
   rootPath: string
   rows: readonly ChangeRow[]
 }) {
+  const confirmed = Boolean(useStatus(rootPath).data)
   const discard = useDiscardStagedPathsMutation(paths, rootPath)
   const unstage = useUnstagePathsMutation(paths, rootPath)
 
   return (
     <ActionCluster hoverGroup='group'>
       <RowActionButton
-        disabled={discard.isPending}
+        disabled={!confirmed || discard.isPending}
         label='Discard all staged changes'
         onClick={() => discard.mutate()}
       >
@@ -83,7 +86,7 @@ function StagedGroupActions({
       </RowActionButton>
       <OpenAllDiffsButton rows={rows} />
       <RowActionButton
-        disabled={unstage.isPending}
+        disabled={!confirmed || unstage.isPending}
         label='Unstage all changes'
         onClick={() => unstage.mutate()}
       >

@@ -58,7 +58,7 @@ import {
   clearEditorThemePreview,
   previewEditorTheme,
 } from '@/features/editor/state/color-theme-store'
-import { useEditorColorTheme } from '@/features/editor/hooks/use-editor-color-theme'
+import { useEditorColorTheme } from '@/lib/editor-theme/hooks/use-editor-color-theme'
 import { useEditorCommands } from '@/features/editor/hooks/use-editor-commands'
 import {
   useEditorWorkspaceState,

@@ -1,12 +1,4 @@
-import {
-  createSplitProjection,
-  createStackedProjection,
-  type DiffFile,
-  type DiffRenderRow,
-} from '@singapore-editor/diff'
-
-/** Which pane a row was read from — the split view's two, or the stacked one. */
-export type DiffPaneSide = 'new' | 'old' | 'stacked'
+import { createStackedProjection, type DiffFile, type DiffRenderRow } from '@singapore-editor/diff'
 
 type DiffLineRange = { readonly start: number; readonly end: number }
 
@@ -24,29 +16,15 @@ export type DiffLineAddress = {
 }
 
 /**
- * The rows a pane renders, projected the same way the diff plugin projects them,
- * so a row index read off `data-editor-virtual-row` addresses the same row here.
- * The side comes from the pane element rather than from the view mode, so there
- * is no second copy of "which pane am I in" to fall out of step.
- *
- * `expandedRegions` comes from the plugin's own region store rather than a
- * mirror of it. Region keys are `"{oldStart}:{newStart}"`, which is why the
- * mirror this replaced could never work: it keyed off `hunkIndex`, and a
- * trailing-tail region carries none.
- *
- * The stacked projection is still built here even when the panes on screen are
- * split — an address is resolved against both sides of the change, and in split
- * mode no plugin instance is holding a stacked projection to ask.
+ * An address is resolved against both sides of the change, and in split mode no
+ * plugin instance is holding a stacked projection to ask, so it is built here
+ * over the plugin's own expansion state.
  */
-export function diffPaneRows(
+export function stackedDiffRows(
   file: DiffFile,
-  side: DiffPaneSide,
   expandedRegions: ReadonlySet<string>,
 ): readonly DiffRenderRow[] {
-  if (side === 'stacked') return createStackedProjection(file, { expandedRegions }).rows
-
-  const projection = createSplitProjection(file, { expandedRegions })
-  return side === 'old' ? projection.leftRows : projection.rightRows
+  return createStackedProjection(file, { expandedRegions }).rows
 }
 
 /**

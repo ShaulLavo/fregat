@@ -73,6 +73,10 @@ export function ChatView({
     rootPath,
   }
   const session = useActiveChatProjection(sessionSelector)
+  const currentDetail = useActiveChatProjection(
+    (state) =>
+      activeSessionId !== null && state.sessionDetailSequenceById[activeSessionId] !== undefined,
+  )
   const optimisticMessages = useOptimisticMessages(transport.environmentId, activeSessionId)
   const [sendError, setSendError] = useState<string | null>(null)
   const [interruptCommand, setInterruptCommand] = useState<SessionTurnInterruptCommand | null>(null)
@@ -95,7 +99,7 @@ export function ChatView({
   const disabledReason = connection.kind === 'live' ? null : connection.label
   // Stable identity is required because this is part of the timeline action context value.
   const handleRevertToCheckpoint = (turnCount: number, messageId: string) => {
-    if (!session || revertingCheckpoint) return
+    if (!currentDetail || !session || revertingCheckpoint) return
     if (busy) {
       setSendError('Interrupt the current turn before reverting checkpoints.')
       return
@@ -157,7 +161,15 @@ export function ChatView({
   }
 
   function handleConfirmRevert(restoreFiles: boolean) {
-    if (!session || pendingCheckpoint === null || busy || sending || revertingCheckpoint) return
+    if (
+      !currentDetail ||
+      !session ||
+      pendingCheckpoint === null ||
+      busy ||
+      sending ||
+      revertingCheckpoint
+    )
+      return
     const message = session.messages.find((entry) => entry.id === pendingCheckpoint.messageId)
     if (!message || message.role !== 'user') return
     setSendError(null)
@@ -190,7 +202,7 @@ export function ChatView({
         <ChatTransportContext value={transport}>
           <ChatTimelineActionsProvider revertToCheckpoint={handleRevertToCheckpoint}>
             <MessagesTimeline
-              checkpointRevertPending={revertingCheckpoint}
+              checkpointRevertPending={revertingCheckpoint || !currentDetail}
               optimisticMessages={optimisticMessages}
               session={session}
             />

@@ -1,6 +1,6 @@
 # Provisional editor display state
 
-Status: implemented and verified across Editor and Platform. See [implementation and verification results](editor-first-paint-verification.md). This replaces the separate preview-owner proposal and refines [Plan 085, milestone 5](../plans/085-instant-workspace-reload.md#milestone-5-make-native-preview-handoff-continuous).
+Status: implemented and verified across Editor and Platform. See [implementation and verification results](editor-first-paint-verification.md). This replaces the separate preview-owner proposal and refines [workspace reload delivery](instant-reload-implementation.md).
 
 A saved snapshot supplies provisional display state inside the editor's native view. The first authoritative paint replaces that state in one commit. There is one viewport, one painter, and one presented set of rows. Platform persists opaque paint and supplies authoritative file data.
 
@@ -197,3 +197,12 @@ Implement this design across `/work/projects/Editor` and `/work/projects/platfor
 Start by recording the immediate-document/delayed-highlights browser case and ordinary startup/typing baseline. Then establish the native presentation boundary and implement in the order above. Keep provisional data out of document/session/line-index state, preserve synchronous construction and incremental rendering, and replace paint in one commit based on render-data readiness. Do not use a separate preview owner, second editor text tree, or document arrival as the completion signal.
 
 Complete the paired package/adapter/Platform migration and delete the superseded renderer in the same delivery. Run only the focused native, adapter, and browser checks that prove the listed behavior. Report changed files, baseline-versus-result timings, frame/minimap evidence, and any unsupported contribution or unfinished acceptance check. A typecheck alone does not complete this work.
+
+## Workspace reload integration, 2026-09-21
+
+Native snapshot format 3 includes diff gutter/row paint and visible selection rectangles. It captures
+visible rows rather than overscan, and external presentation readiness keeps provisional paint until
+diff syntax is ready. Provisional scroll survives document installation; unchanged projections do
+not reinstall the native document and clear its selection. Platform retains saved paint through
+failed revalidation, with an overlaid alert that preserves pane geometry. The
+[delivery record](instant-reload-implementation.md) contains paired revisions and browser evidence.

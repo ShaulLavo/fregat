@@ -1,6 +1,6 @@
 import { useEffect, useLayoutEffect, type ReactNode } from 'react'
 
-import { useEditorColorTheme } from '@/features/editor/hooks/use-editor-color-theme'
+import { useEditorColorTheme } from '@/lib/editor-theme/hooks/use-editor-color-theme'
 import { useLanguageServerMatchConfiguration } from '@/features/editor/providers/language-server-match-context'
 import { MountedEditorProvider } from '@/features/editor/providers/mounted-editor-provider'
 import { EditorRuntimeContext } from '@/features/editor/providers/runtime-context'

@@ -1,3 +1,6 @@
+import { useLogsReloadOwner } from '@/features/logs/hooks/use-reload-owner'
+import { logsFilterIdentity, savedLogs } from '@/features/logs/state/reload'
+import { useLogsReload } from '@/features/logs/hooks/use-reload'
 import { TickerText } from '@/components/ticker-text'
 import { useNavigation } from '@/hooks/use-navigation'
 import { ArrowClockwiseIcon } from '@phosphor-icons/react'
@@ -31,11 +34,16 @@ export function LogsPanel({ active }: LogsPanelProps) {
   const queryClient = useQueryClient()
 
   const filtersState = useLogsFilters()
-  const [inspection, setInspection] = useState<{ filters: string; id: string | null } | null>(null)
-  const [now, setNow] = useState(Date.now)
+  const displayKey = logsFilterIdentity(filtersState)
+  const target = useLogsReloadOwner()
+  const saved = savedLogs(queryClient, displayKey, target)
+  const [inspection, setInspection] = useState<{ filters: string; id: string | null } | null>(() =>
+    saved ? { filters: displayKey, id: saved.inspectedId } : null,
+  )
+  const [now, setNow] = useState(() => saved?.windowTime ?? Date.now())
   const filters = logDashboardFilters(filtersState, now)
   const queryFilters = logFilterQuery(filters)
-  const filterKey = JSON.stringify(queryFilters)
+  const filterKey = displayKey
   const inspectedEventId = inspection?.filters === filterKey ? inspection.id : null
   const optionFilters = logToolbarOptionFilters(filters)
   const optionQueryFilters = logFilterQuery(optionFilters)
@@ -43,6 +51,18 @@ export function LogsPanel({ active }: LogsPanelProps) {
   const events = useLogEvents(filters, active)
   const summary = useLogSummary(filters, active)
   const optionSummary = useLogSummary(optionFilters, active)
+
+  const displayEvents = events.data ?? saved?.events
+  const displaySummary = summary.data ?? saved?.summary
+  const displayOptions = optionSummary.data ?? saved?.options
+  const reload = useLogsReload(
+    displayKey,
+    now,
+    events.isPlaceholderData ? undefined : events.data,
+    summary.isPlaceholderData ? undefined : summary.data,
+    optionSummary.isPlaceholderData ? undefined : optionSummary.data,
+    inspectedEventId,
+  )
 
   function handleRefresh() {
     setNow(Date.now())
@@ -54,15 +74,16 @@ export function LogsPanel({ active }: LogsPanelProps) {
   return (
     <FocusablePanel
       area='logs'
+      data-logs-saved={!events.data && Boolean(saved)}
       target={{ kind: 'logs' }}
       className='text-foreground flex h-full min-h-0 flex-col'
     >
       <ToolPane
         bodyClassName='flex flex-col overflow-hidden'
         state={{
-          pending: events.isPending,
-          error: events.isError || summary.isError,
-          empty: events.data?.events.length === 0,
+          pending: events.isPending && !saved,
+          error: (events.isError || summary.isError) && !saved,
+          empty: displayEvents?.events.length === 0,
         }}
         loading={<LogsListLoading />}
         errorState={<EmptyState title='Could not read local logs.' tone='error' />}
@@ -93,22 +114,31 @@ export function LogsPanel({ active }: LogsPanelProps) {
                   <TooltipContent side='bottom'>Refresh logs</TooltipContent>
                 </Tooltip>
               }
-              detail={summary.data ? <TickerText text={`${summary.data.total} events`} /> : null}
+              detail={
+                displaySummary ? <TickerText text={`${displaySummary.total} events`} /> : null
+              }
               tab='logs'
             />
             <LogsToolbar
-              areas={optionSummary.data?.areas ?? []}
+              areas={displayOptions?.areas ?? []}
               filters={filtersState}
-              sources={optionSummary.data?.sources ?? []}
+              sources={displayOptions?.sources ?? []}
               onFiltersChange={(filters) => void navigation.setLogsFilters(filters)}
             />
           </>
         }
       >
-        <LogsTimeline summary={summary.data} />
+        {saved && (events.isError || summary.isError) ? (
+          <p role='status' className='text-warning px-3 text-xs'>
+            Could not refresh logs. Showing saved events.
+          </p>
+        ) : null}
+        <LogsTimeline summary={displaySummary} />
         <LogsEventList
-          events={events.data?.events ?? []}
-          detailsById={events.data?.detailsById ?? {}}
+          events={displayEvents?.events ?? []}
+          detailsById={displayEvents?.detailsById ?? {}}
+          initialOffset={reload.initialOffset}
+          onScroll={reload.onScroll}
           inspectedEventId={inspectedEventId}
           onInspectEvent={(id) => setInspection({ filters: filterKey, id })}
         />

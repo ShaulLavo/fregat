@@ -47,6 +47,7 @@ export type TerminalClientMessage =
 export type TerminalServerMessage =
   | { type: 'ready'; shell: string; cwd: string; restoredHistory: boolean }
   | { type: 'cleared' }
+  | { type: 'replay-complete' }
   | { type: 'output'; data: Uint8Array }
   | { type: 'exit'; exitCode: number | null }
   | { type: 'error'; message: string }
@@ -68,6 +69,7 @@ export function parseTerminalServerMessage(value: unknown): TerminalServerMessag
   if (bytes) return { type: 'output', data: bytes }
   const parsed = parseJsonValue(value)
   if (!isRecord(parsed)) return null
+  if (parsed.type === 'replay-complete') return { type: 'replay-complete' }
   if (parsed.type === 'cleared') return { type: 'cleared' }
   if (parsed.type === 'ready') return terminalReadyMessage(parsed)
   if (parsed.type === 'exit') return terminalExitMessage(parsed)

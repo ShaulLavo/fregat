@@ -53,6 +53,7 @@ for (const { isFolder, dirty } of [
       current: new FileTreeModel({ paths: modelRef.current.paths, renaming: true }),
     }
     const queryClient = createTestQueryClient()
+    queryClient.setQueryData(fileSystemKeys.tree('repo'), modelRef.current)
     function Wrapper({ children }: { readonly children: ReactNode }) {
       return (
         <AppProviders queryClient={queryClient}>
@@ -229,7 +230,9 @@ test('withdraws the projected rename when the authoritative mutation reservation
   const harness = await renderFsActions('repo', service)
   const file = await fetchFile(filesystemPath('repo/old.ts'), signal(), getClient())
   setFileSnapshotQueryData(harness.queryClient, file)
-  act(() => harness.result.current.commands.openFileSurface(file.path))
+  await act(async () => {
+    await harness.result.current.commands.openFileSurface(file.path)
+  })
   const { documentStore, workspaceStore } = harness.result.current.runtime
   const tabId = (selectedGroupTab(workspaceStore.getState().workbenchPanels.editorGroups)?.id ??
     null)!
@@ -263,6 +266,21 @@ test('withdraws the projected rename when the authoritative mutation reservation
   harness.cleanUp()
 })
 
+test('saved rows cannot start mutations until the tree is confirmed', async ({ client }) => {
+  await ensureFolderPath(filesystemPath('repo'), client)
+  const harness = await renderFsActions('repo')
+  await waitFor(() => expect(harness.result.current).not.toBeNull())
+  harness.queryClient.removeQueries({ queryKey: fileSystemKeys.tree('repo') })
+  harness.rerender()
+  expect(harness.result.current.actions.mutationsEnabled).toBe(false)
+  act(() => harness.result.current.actions.createEntry('', false))
+  expect(harness.service.affectedPaths).toEqual([])
+  harness.queryClient.setQueryData(fileSystemKeys.tree('repo'), harness.model)
+  harness.rerender()
+  expect(harness.result.current.actions.mutationsEnabled).toBe(true)
+  harness.cleanUp()
+})
+
 async function renderFsActions(rootPath: string, service = new RecordingWorkspaceEditService()) {
   // The queue is global; an earlier test's unacknowledged intents must not leak in.
   resetTreeIntents()
@@ -272,6 +290,7 @@ async function renderFsActions(rootPath: string, service = new RecordingWorkspac
   )
   const tree = new FileTreeModel({ paths: model.paths, renaming: true })
   const queryClient = createTestQueryClient()
+  queryClient.setQueryData(fileSystemKeys.tree(rootPath), model)
 
   function Wrapper({ children }: { readonly children: ReactNode }) {
     return (

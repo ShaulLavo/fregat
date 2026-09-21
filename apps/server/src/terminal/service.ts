@@ -576,6 +576,7 @@ export class TerminalSession {
       (error: unknown) => this.handlePtyFailure(error),
     )
     this.emitReady(restoredHistory)
+    if (connection) this.send(connection, { type: 'replay-complete' })
     this.scheduleProcessPoll()
     return true
   }
@@ -601,6 +602,7 @@ export class TerminalSession {
         restoredHistory: false,
       })
     for (const data of this.history.values()) this.send(connection, { type: 'output', data })
+    this.send(connection, { type: 'replay-complete' })
     if (this.processName !== null)
       this.send(connection, { type: 'process', name: this.processName })
     this.repaint()

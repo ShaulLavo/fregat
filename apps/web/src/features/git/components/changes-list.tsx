@@ -1,4 +1,7 @@
-import { useRef, type KeyboardEvent as ReactKeyboardEvent } from 'react'
+import { useQueryClient } from '@tanstack/react-query'
+import { captureGitView, savedGit } from '@/features/git/state/reload'
+import { addLifecycleFlush } from '@/lib/lifecycle-flush'
+import { useEffect, useState, useRef, type KeyboardEvent as ReactKeyboardEvent } from 'react'
 import { isContextMenuKey } from '@workspace/utils/keyboard'
 import { EmptyState } from '@workspace/ui/components/empty-state'
 import { useListbox } from '@workspace/ui/patterns/use-listbox'
@@ -35,6 +38,9 @@ export function ChangesList({
   loadingPath?: string
   loadingSection?: string
 }) {
+  const owner = useQueryClient()
+  const [restored] = useState(() => savedGit(owner, rootPath)?.view)
+  const lastScroll = useRef(restored?.scrollTop ?? 0)
   const panels = useEditorWorkspaceState((state) => state.workbenchPanels)
   const open = panels.gitChangesOpen
   const navigation = useNavigation()
@@ -76,7 +82,7 @@ export function ChangesList({
   const listbox = useListbox({
     role: 'tree',
     items: changeListboxItems(entries),
-    activeId,
+    activeId: activeId ?? restored?.activeId ?? null,
     containerRef: scrollRef,
     scrollToIndex,
     onActiveChange: select,
@@ -93,6 +99,19 @@ export function ChangesList({
       if (row) void openDiff(row)
     },
   })
+
+  useEffect(() => {
+    const flush = () =>
+      captureGitView(owner, rootPath, {
+        activeId: activeId ?? restored?.activeId ?? null,
+        scrollTop: lastScroll.current,
+      })
+    const remove = addLifecycleFlush(flush)
+    return () => {
+      flush()
+      remove()
+    }
+  }, [owner, rootPath, activeId, restored])
 
   // Keep hundreds of rows independent of the list cursor's changing render state.
   const bindings = { rowBindings: listbox.rowBindings, focus: listbox.focus }
@@ -137,6 +156,10 @@ export function ChangesList({
     <ChangesContext value={bindings}>
       <VirtualList
         {...listbox.containerProps}
+        initialOffset={restored?.scrollTop}
+        onScroll={(event) => {
+          lastScroll.current = event.currentTarget.scrollTop
+        }}
         activeIndex={listbox.activeIndex}
         aria-label='Git changes'
         className={CONTAINER_CLASS}

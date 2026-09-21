@@ -126,18 +126,17 @@ This proposal does not reorder other lanes. Editor E009 supplies transport measu
 evidence for the strings decision. E014 parallel search must reuse this runtime if implemented.
 Shared text storage and worker consolidation are outside the refactor; E013 remains deferred research.
 
-## Instant workspace reload
+## Instant workspace reload (completed 2026-09-21)
 
-[Plan 085](plans/085-instant-workspace-reload.md) is proposed and implementation has not started.
-It follows the existing environment, [verified workspace navigation](docs/workspace-navigation.md),
-settings-admission, and Editor paint foundations. Its internal order is calibrated browser proof and budgets, synchronous bootstrap,
-tree/settings, Git/diff, search/chat, continuous native handoff, remaining visible tools, and
-complete reload verification. The first complete slice is bootstrap plus tree and settings.
+All Plan 085 slices are implemented. The [delivery record](docs/instant-reload-implementation.md)
+covers synchronous bootstrap, tree and settings, Git and native diffs, both search views, chat,
+logs, diagnostics, and native terminal output. Desktop and narrow held-response matrices each
+pass all 15 scenarios; targeted checks cover failed revalidation, accepted local input, window
+isolation, and owner/authority boundaries.
 
-Editor/diff paint and Ghostty terminal viewport replay stay with their package owners. If a required
-native contract is absent, record that package dependency before implementing its host integration.
-The plan remains incomplete until the visible terminal and all other scoped panes pass. This
-proposal does not reorder Plan 080 or the existing TUI and Ghostty lanes.
+Editor and Ghostty source changes are implemented and verified in their linked repositories;
+they must land with Platform or corresponding package releases. They are not yet published.
+The executable plan is retired. This does not reorder the keybinding, TUI, or Ghostty lanes.
 
 ## Environments lane (completed 2026-09-12)
 

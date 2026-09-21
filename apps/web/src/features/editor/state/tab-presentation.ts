@@ -35,6 +35,30 @@ export class TabPresentation {
   diffLayout: Record<string, number> | undefined
   diffFile: DiffFile | null = null
 
+  restoreDiffView(
+    file: DiffFile,
+    view: {
+      expanded: readonly string[]
+      layout?: Record<string, number>
+      oldSelections?: readonly EditorResolvedSelection[]
+      newSelections?: readonly EditorResolvedSelection[]
+      stackedSelections?: readonly EditorResolvedSelection[]
+      old: DiffScrollPosition | null
+      new: DiffScrollPosition | null
+      stacked: DiffScrollPosition | null
+    },
+  ): void {
+    this.regions.setFile(file)
+    for (const key of view.expanded) {
+      if (!this.regions.getExpandedRegions().has(key)) this.regions.toggleRegion(key)
+    }
+    this.diffLayout = view.layout
+    for (const side of ['old', 'new', 'stacked'] as const) {
+      this.diffPanes[side].scroll = view[side]
+      this.diffPanes[side].selections = view[`${side}Selections`] ?? []
+    }
+  }
+
   setDiffFile(file: DiffFile | null): void {
     this.diffFile = file
   }

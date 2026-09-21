@@ -15,7 +15,7 @@ import { ForesightManager } from 'js.foresight'
 import { createBrowserWorkspace } from '../../../../test/factories/browser-workspace'
 
 import { TestEditorStateProvider as EditorStateProvider } from '../../../../test/factories/editor-state-provider'
-import { useEditorColorTheme } from '@/features/editor/hooks/use-editor-color-theme'
+import { useEditorColorTheme } from '@/lib/editor-theme/hooks/use-editor-color-theme'
 import { useEditorCommands } from '@/features/editor/hooks/use-editor-commands'
 import { type EditorCommands } from '@/features/editor/state/commands'
 import {

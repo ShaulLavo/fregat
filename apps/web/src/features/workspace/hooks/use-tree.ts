@@ -1,3 +1,4 @@
+import { savedTree } from '@/features/workspace/state/tree-reload'
 import { matchesWorkspaceRoot as isPathInWorkspace } from '@/lib/path-formatters'
 import { tabFileResource } from '@/lib/documents/utils/capabilities'
 import { filesystemPath } from '@/lib/documents/utils/identity'
@@ -148,6 +149,12 @@ export function useWorkspaceTreeState(rootFolder: PickedFsEntry | null) {
 
 function useWorkspaceTreeQuery(rootPath: string | null) {
   const workspaceStore = useEditorWorkspaceStoreApi()
+  const owner = useQueryClient()
+  const saved = savedTree(
+    owner,
+    rootPath ?? '',
+    workspaceStore.getState().worktreeIdByRootPath[rootPath ?? ''] ?? null,
+  )
   const resolvedRootPath = rootPath ?? ''
   const rootTreeKey = fileSystemKeys.tree(resolvedRootPath)
   const query = useQuery({
@@ -160,17 +167,23 @@ function useWorkspaceTreeQuery(rootPath: string | null) {
         selectedFilePath,
         signal,
         clientForQueryClient(client),
+        saved?.record.loaded,
       )
       return treeModelWithDirectoryLoads(result.root, resolvedRootPath, result.directories)
     },
     queryKey: rootTreeKey,
   })
   const { data, error, isError, isPending } = query
-  const treeState = rootPath ? treeLoadState({ data, error, isError, isPending }) : idleState
+  const treeState = rootPath
+    ? treeLoadState({ data: data ?? saved?.model, error, isError, isPending })
+    : idleState
 
   return {
     rootTreeKey,
-    treeState,
+    treeState: {
+      ...treeState,
+      refreshError: saved && !data && isError ? errorMessage(error) : null,
+    },
   }
 }
 
@@ -209,8 +222,14 @@ async function fetchInitialTree(
   selectedFilePath: string | null,
   signal: AbortSignal,
   client: Client,
+  savedDirectories: readonly string[] = [],
 ) {
-  const directoryPaths = selectedFileAncestorDirectoryPaths(rootPath, selectedFilePath)
+  const directoryPaths = [
+    ...new Set([
+      ...selectedFileAncestorDirectoryPaths(rootPath, selectedFilePath),
+      ...savedDirectories.map((path) => `${rootPath}/${path}`),
+    ]),
+  ]
   const root = fetchTree(filesystemPath(rootPath), signal, client)
   const directories = Promise.all(
     directoryPaths.map((path) => fetchOptionalTree(path, signal, client)),

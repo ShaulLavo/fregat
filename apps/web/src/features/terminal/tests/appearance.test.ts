@@ -1,6 +1,6 @@
 import { describe, expect, it, vi } from 'vitest'
 
-import { applyTerminalAppearance } from '@/features/terminal/components/panel'
+import { applyTerminalAppearance } from '@/features/terminal/utils/appearance'
 
 function fakeTerminal() {
   return { setCursor: vi.fn(), setFont: vi.fn() }

@@ -1,3 +1,6 @@
+import { beginReloadBudget, prepareWithinReloadBudget } from '@/lib/reload-budget'
+import { loadEditorThemeForSelection } from '@/features/editor/state/color-theme-store'
+import { createBootstrap } from '@/state/bootstrap'
 import { loadSettingsPage } from '@/features/settings/state/load-page'
 import { loadTerminalPanel } from '@/features/terminal/state/load-panel'
 import { systemColorMode } from '@/features/settings/state/system-color-mode'
@@ -78,6 +81,29 @@ routerHistory.flush()
 const router = createApplicationRouter({ history: routerHistory })
 const navigation = createNavigation(router, initialIntent, { canPlaceTab: canPlaceEditorTab })
 
+beginReloadBudget()
+const bootstrap = prepareWithinReloadBudget(() => createBootstrap(navigation))
+const restoredWorkspace = bootstrap
+  .getState()
+  .application?.getSnapshot()
+  .editor.workspaceStore.getState()
+const warmViews: Promise<unknown>[] = []
+if (restoredWorkspace?.selectedTabContent?.kind === 'settings')
+  warmViews.push(loadSettingsPage().catch(() => null))
+if (
+  restoredWorkspace?.workbenchPanels.bottomPanelOpen &&
+  restoredWorkspace.workbenchPanels.activeBottomTab === 'terminal'
+)
+  warmViews.push(loadTerminalPanel().catch(() => null))
+if (restoredWorkspace)
+  warmViews.push(
+    loadEditorThemeForSelection(
+      document.documentElement.classList.contains('dark') ? 'dark' : 'light',
+    ).catch(() => null),
+  )
+await Promise.all(warmViews)
+if (import.meta.hot) import.meta.hot.dispose(() => bootstrap.dispose())
+
 createRoot(document.getElementById('root')!, {
   onCaughtError: (error, errorInfo) => {
     reportReactError({ error, errorInfo, kind: 'caught' })
@@ -92,7 +118,7 @@ createRoot(document.getElementById('root')!, {
   <StrictMode>
     <LoggingErrorBoundary>
       <NavigationProvider navigation={navigation}>
-        <ApplicationBootstrap boot={boot}>
+        <ApplicationBootstrap boot={boot} bootstrap={bootstrap}>
           <App />
         </ApplicationBootstrap>
       </NavigationProvider>

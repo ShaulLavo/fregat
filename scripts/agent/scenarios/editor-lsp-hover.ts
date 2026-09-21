@@ -1,7 +1,15 @@
 import type { Page } from 'playwright'
 import { match, strictEqual } from 'node:assert'
 import type { Scenario } from './index'
-import { focusEditor, hoverTokenColor, hoverWord, openFileByName, selectors } from '../selectors'
+import {
+  focusEditor,
+  hoverShowedPlainCode,
+  hoverTokenColor,
+  hoverWord,
+  openFileByName,
+  selectors,
+  watchHoverPlainCode,
+} from '../selectors'
 
 const SAMPLE = 'hoverSampleValue'
 /** Spelled with a Cyrillic а, so the same name carries a diagnostic and an ambiguous character. */
@@ -13,35 +21,11 @@ export const editorLspHover: Scenario = {
     'Hover a TypeScript identifier, then a confusable one, and check the one shared tooltip.',
   async run(page, { file, step }) {
     await openFileByName(page, file)
-    await page.evaluate(`(() => {
-      const seen = (window.__hoverPaint = { code: 0, span: 0 })
-      new MutationObserver(() => {
-        if (!seen.code && document.querySelector('pre > code')) seen.code = performance.now()
-        if (!seen.span && document.querySelector('pre > code > span')) seen.span = performance.now()
-      }).observe(document.body, { childList: true, subtree: true })
-    })()`)
-    for (let attempt = 0; attempt < 12; attempt += 1) {
-      const shown = await hoverWord(page, 'NavigationStatus', '.editor-virtualized-viewport').then(
-        () => true,
-        () => false,
-      )
-      if (shown) break
-      await page.mouse.move(5, 5)
-    }
-    await page.waitForTimeout(6000)
-    console.log(
-      'HOVER_FIRST',
-      JSON.stringify(
-        await page.evaluate(
-          '({d: window.__hoverPaint.span - window.__hoverPaint.code, ...window.__hoverPaint})',
-        ),
-      ),
-    )
-    await page.keyboard.press('Escape')
     await focusEditor(page)
     await page.keyboard.press('Control+Home')
     await page.keyboard.insertText(`const ${SAMPLE} = 1\n`)
     await page.waitForTimeout(2500)
+    await watchHoverPlainCode(page)
     await hoverWord(page, SAMPLE)
     match(await selectors.editorHover(page).innerText(), new RegExp(`${SAMPLE}.*1`, 's'))
     strictEqual(
@@ -49,6 +33,7 @@ export const editorLspHover: Scenario = {
       true,
       'the identifier is painted by the editor tokens, not left plain',
     )
+    strictEqual(await hoverShowedPlainCode(page), false, 'the hover opens coloured, never plain')
     await step('hover')
     await page.keyboard.press('Escape')
     await page.keyboard.insertText(`const ${CONFUSABLE} = 2\n`)

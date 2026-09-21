@@ -1,6 +1,6 @@
 # Restore the visible workspace on reload
 
-Design rationale, 2026-09-07. [Plan 085](../plans/085-instant-workspace-reload.md) owns the implementation sequence and completion checks. Implementation has not started.
+Design rationale, 2026-09-07; implemented 2026-09-21. The [delivery record](instant-reload-implementation.md) documents the shipped behavior, paired native contracts, cache budgets, and verification.
 
 Reloading a workspace should show the selected tabs, visible content, and scroll positions together on the first application-content paint. Live responses can update that view afterward. No pane should briefly show a different tab, default settings, an empty result, or incomplete text because its restoration ran later.
 
@@ -117,7 +117,7 @@ Data renderers reflow for the current pane size. Absolute editor paint requires 
 
 ## Implementation and verification
 
-[Plan 085](../plans/085-instant-workspace-reload.md) contains the ordered milestones, package dependencies, browser proof, and completion checklist. It starts with measured budgets and bootstrap, then proves file tree and settings before extending the design to the remaining views. Terminal replay is required for overall completion.
+The [delivery record](instant-reload-implementation.md) preserves the completed milestones, paired package dependencies, measured budgets, and browser proof. All visible panes, including native diff and terminal output, now restore saved presentation before live responses.
 
 The first acceptance gate is correct visible content before live responses complete, followed by stable handoff. Timing measurements separate initial content from live readiness so a cached preview cannot be counted as a finished connection or editor.
 

@@ -192,6 +192,30 @@ export function loadEditorThemeForSelection(
   return loadEditorTheme(definition, colorMode)
 }
 
+/** Reads a theme already loaded before the first React render. */
+export function loadedEditorThemeForSelection(
+  colorMode: EditorColorMode,
+): LoadedEditorColorTheme | null {
+  const themeId = getSelectedEditorThemeId(colorMode)
+  const builtin = builtinEditorTheme(themeId)
+  if (builtin)
+    return {
+      definition: null,
+      registration: null,
+      editorTheme: builtin.editorTheme,
+      resolvedThemeId: builtin.id,
+    }
+  const definition = vscodeThemeDefinitionById.get(themeId)
+  const registration = registrationByIdSync.get(themeId)
+  if (!definition || !registration) return null
+  return {
+    definition,
+    registration,
+    editorTheme: editorThemeFromVscodeTheme(registration),
+    resolvedThemeId: themeId,
+  }
+}
+
 /** Warms bundled theme registrations so hover preview never waits on a first import. */
 export function preloadVscodeThemeRegistrations(): Promise<void> {
   return Promise.all(

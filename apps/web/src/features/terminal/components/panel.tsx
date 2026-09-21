@@ -1,29 +1,26 @@
+import { mountTerminal, type TerminalInputSender } from '@/features/terminal/state/mount'
+import {
+  applyTerminalAppearance,
+  applyTerminalCursorOptions,
+  applyTerminalTheme,
+  terminalCursorOptions,
+} from '@/features/terminal/utils/appearance'
+import { SavedViewport } from '@/features/terminal/components/saved-viewport'
+import {
+  captureTerminal,
+  discardTerminal,
+  savedTerminal,
+  terminalReloadGeneration,
+} from '@/features/terminal/state/reload'
 import { useTerminalActions } from '@/features/terminal/hooks/use-terminal-actions'
 import { ToolPane } from '@workspace/ui/patterns/tool-pane'
 import { RingLoader } from '@workspace/ui/components/ring-loader'
-import { errorMessage } from '@/lib/error-message'
-import { fetchTerminalCheckout } from '@/features/terminal/state/register-checkout'
-import {
-  registerTerminalSession,
-  terminalSessionKey,
-} from '@/features/terminal/state/session-registry'
-import type { WorktreeId } from '@workspace/contracts'
+import { terminalSessionKey } from '@/features/terminal/state/session-registry'
 import { useQueryClient } from '@tanstack/react-query'
-import type { Client } from '@/lib/client'
-import {
-  clientForQueryClient,
-  originForQueryClient,
-  queryClientFor,
-} from '@/lib/environments/state/query-clients'
+import { clientForQueryClient, originForQueryClient } from '@/lib/environments/state/query-clients'
 import { environmentActivitySignal } from '@/lib/environments/state/activity'
-import { parseTerminalServerMessage, type TerminalServerMessage } from '@workspace/contracts'
 import { cn } from '@workspace/ui/lib/utils'
-import {
-  GhosttyRuntime,
-  Terminal,
-  type GhosttyWebGpuTerminalSubscription,
-  type TerminalCursorStyle,
-} from 'ghostty-webgpu'
+import type { Terminal, TerminalScrollbar } from 'ghostty-webgpu'
 import {
   useEffect,
   useEffectEvent,
@@ -36,59 +33,18 @@ import {
 
 import { usePalette } from '@/lib/appearance/hooks/use-palette'
 import { useContextMenu } from '@/keymap/menus/hooks/use-context-menu'
-import { reportError, toClientError } from '@/lib/client-error-taxonomy'
-import { DEFAULT_MONO_FONT_STACK } from '@/lib/default-nerd-font'
 import { useFocusService } from '@/lib/focus/hooks/use-service'
 import { useFocusTarget } from '@/lib/focus/hooks/use-target'
 import { registeredFocusTarget } from '@/lib/focus/state/service'
-import { connectTerminalSocket, type EdenServerSocket } from '@/lib/server-sockets'
 
 import { TerminalMenu } from '@/features/terminal/components/menu'
 import { useTerminalCommandInbox } from '@/features/terminal/hooks/use-command-inbox'
 import { useTerminalKeybindings } from '@/features/terminal/hooks/use-keybindings'
 import { useTerminalLinks } from '@/features/terminal/hooks/use-links'
-import { sendTerminalClientMessage } from '@/features/terminal/utils/socket'
 import { readTerminalMenuTarget, type TerminalMenuTarget } from '@/features/terminal/utils/commands'
-import { terminalThemeFor } from '@/features/terminal/utils/theme'
-import type { TerminalColors } from '@workspace/client-core/themes/palette'
 import { isFocusOutsideElement } from '@/features/terminal/utils/focus-target'
 import { useSettingValue } from '@/hooks/use-setting-value'
 import { useUnavailableEnvironment } from '@/lib/environments/hooks/use-unavailable-environment'
-
-/** Writes to the terminal's socket. False when the connection is not up yet. */
-type TerminalInputSender = (data: string) => boolean
-
-type TerminalDimensions = {
-  cols: number
-  rows: number
-}
-
-type TerminalCursorOptions = {
-  cursorBlink: boolean
-  cursorStyle: TerminalCursorStyle
-}
-
-/**
- * Focus owns the cursor's *shape*; `terminal.integrated.cursorBlinking` owns
- * whether it blinks.
- *
- * They used to be one constant carrying both, which meant every focus, blur and
- * click wrote a hardcoded blink over the setting — and the settings effect does
- * not re-run on focus, so the setting never won again.
- */
-const FOCUSED_TERMINAL_CURSOR_STYLE: TerminalCursorStyle = 'block'
-const UNFOCUSED_TERMINAL_CURSOR_STYLE: TerminalCursorStyle = 'outline'
-
-function terminalCursorOptions(focused: boolean, cursorBlink: boolean): TerminalCursorOptions {
-  return {
-    // Scoped to a focused terminal, per the setting's own description: an
-    // unfocused cursor is a static outline whatever the preference says.
-    cursorBlink: focused && cursorBlink,
-    cursorStyle: focused ? FOCUSED_TERMINAL_CURSOR_STYLE : UNFOCUSED_TERMINAL_CURSOR_STYLE,
-  }
-}
-
-let ghosttyRuntimePromise: Promise<GhosttyRuntime> | null = null
 
 export function TerminalPanel({
   active = true,
@@ -122,14 +78,34 @@ export function TerminalPanel({
   const contextMenu = useContextMenu()
   const terminalActions = useTerminalActions({ rootPath, terminalId: sessionId })
   const [menuTarget, setMenuTarget] = useState<TerminalMenuTarget | null>(null)
-  const [socketConnected, setSocketConnected] = useState(false)
+  const [connectedIdentity, setConnectedIdentity] = useState<string | null>(null)
+  const [paintedIdentity, setPaintedIdentity] = useState<string | null>(null)
+  const [disconnectedPaint, setDisconnectedPaint] = useState<{
+    key: string
+    paint: string | null
+  } | null>(null)
+  const displayKey = `${origin}\u0000${rootPath}\u0000${sessionId}\u0000${fontSize}\u0000${paletteHash}`
+  const [rejectedPaint, setRejectedPaint] = useState<{ key: string; paint: string } | null>(null)
+  const initialPaint = savedTerminal(queryClient, {
+    root: rootPath,
+    sessionId,
+    fontSize,
+    paletteHash,
+  })
+  const candidate = disconnectedPaint?.key === displayKey ? disconnectedPaint.paint : initialPaint
+  const savedPaint =
+    rejectedPaint?.key === displayKey && rejectedPaint.paint === candidate ? null : candidate
+  const savedScrollRef = useRef<{ paint: string; scrollbar: Readonly<TerminalScrollbar> } | null>(
+    null,
+  )
   const focusIdentity = terminalSessionKey(rootPath, sessionId)
   const terminalMountIdentity = `${origin}\u0000${focusIdentity}\u0000${scrollback}`
+  const hasLivePaint = paintedIdentity === terminalMountIdentity
+  const socketConnected = connectedIdentity === terminalMountIdentity && !machineUnavailable
   const [terminalFailure, setTerminalFailure] = useState<{
     identity: string
     message: string
   } | null>(null)
-  const [readyTerminalIdentity, setReadyTerminalIdentity] = useState<string | null>(null)
   const registerTerminalLinks = useTerminalLinks(rootPath)
   useTerminalKeybindings(hostRef)
   useTerminalCommandInbox({
@@ -145,7 +121,7 @@ export function TerminalPanel({
       area: 'terminal',
       id: { kind: 'terminal', rootPath, sessionId },
       onIntent: (intent) => {
-        if (intent !== 'focus' || !active || machineUnavailable) return false
+        if (intent !== 'focus' || !active || !socketConnected) return false
 
         const terminal = terminalRef.current
         if (!terminal) return false
@@ -154,7 +130,7 @@ export function TerminalPanel({
         return true
       },
     },
-    active && !machineUnavailable && readyTerminalIdentity === terminalMountIdentity,
+    active && socketConnected,
   )
   const captureTerminalRemountFocus = useEffectEvent(() => {
     restoreFocusAfterRemountRef.current = terminalFocused ? focusIdentity : null
@@ -163,10 +139,10 @@ export function TerminalPanel({
   // runs as an effect event and sees the current render rather than the one
   // that started the mount.
   const handleTerminalReady = useEffectEvent(
-    (terminal: Terminal, sendInput: TerminalInputSender) => {
+    (terminal: Terminal, sendInput: TerminalInputSender, identity: string) => {
+      if (identity !== terminalMountIdentity) return
       terminalRef.current = terminal
       sendInputRef.current = sendInput
-      setReadyTerminalIdentity(terminalMountIdentity)
       // At handover rather than at construction: ghostty resolves long after the
       // mount effect started, and this is an effect event, so it sees the
       // current settings rather than the ones the mount began with.
@@ -178,8 +154,37 @@ export function TerminalPanel({
   )
   // State, not just the ref: a script queued before the socket opened has to
   // wake the effect that runs it, and writing a ref never re-renders.
-  const handleTerminalConnectedChange = useEffectEvent((connected: boolean) => {
-    setSocketConnected(connected)
+  const handleTerminalConnectedChange = useEffectEvent((connected: boolean, identity: string) => {
+    if (identity !== terminalMountIdentity) return
+    setConnectedIdentity(connected ? identity : null)
+    if (connected) {
+      setPaintedIdentity(identity)
+      return
+    }
+    setDisconnectedPaint({
+      key: displayKey,
+      paint: savedTerminal(queryClient, { root: rootPath, sessionId, fontSize, paletteHash }),
+    })
+    setMenuTarget(null)
+  })
+  const handleTerminalCapture = useEffectEvent(
+    (
+      terminal: Terminal,
+      identity: string,
+      generation: ReturnType<typeof terminalReloadGeneration>,
+    ) => {
+      if (!active || identity !== terminalMountIdentity) return
+      captureTerminal(
+        queryClient,
+        { root: rootPath, sessionId, fontSize, paletteHash },
+        terminal.captureViewport(),
+        generation,
+      )
+    },
+  )
+  const readSavedScroll = useEffectEvent(() => {
+    const saved = savedScrollRef.current
+    return savedPaint && saved?.paint === savedPaint ? saved.scrollbar : null
   })
   const handleTerminalScrollbackLengthChange = useEffectEvent((length: number) => {
     scrollbackLengthRef.current = length
@@ -194,6 +199,7 @@ export function TerminalPanel({
     onTitleChange?.(title)
   })
   const handleTerminalFocus = () => {
+    if (!socketConnected) return
     applyTerminalCursorOptions(terminalRef.current, terminalCursorOptions(true, cursorBlink))
   }
   const handleTerminalBlur = (event: FocusEvent<HTMLElement>) => {
@@ -207,7 +213,7 @@ export function TerminalPanel({
   // only a capture-phase handler above the canvas can take the event first.
   const handleTerminalContextMenu = (event: ReactMouseEvent<HTMLElement>) => {
     const terminal = terminalRef.current
-    if (!terminal) return
+    if (!terminal || !socketConnected) return
 
     event.stopPropagation()
     // Snapshotted here because ghostty drops the selection from a document
@@ -246,6 +252,7 @@ export function TerminalPanel({
     const host = hostRef.current
     if (!host) return
 
+    const generation = terminalReloadGeneration(queryClient)
     const unmountTerminal = mountTerminal({
       origin,
       client: clientForQueryClient(queryClient),
@@ -254,18 +261,24 @@ export function TerminalPanel({
       rootPath,
       scrollback,
       sessionId,
-      onConnectedChange: handleTerminalConnectedChange,
+      onConnectedChange: (connected) =>
+        handleTerminalConnectedChange(connected, terminalMountIdentity),
+      getSavedScroll: readSavedScroll,
+      onCapture: (terminal) => handleTerminalCapture(terminal, terminalMountIdentity, generation),
       onExit: handleTerminalExit,
       onProcessChange: handleTerminalProcessChange,
       onTitleChange: handleTerminalTitleChange,
       onFailed: (message) => setTerminalFailure({ identity: terminalMountIdentity, message }),
-      onReady: handleTerminalReady,
+      onReady: (terminal, sendInput) =>
+        handleTerminalReady(terminal, sendInput, terminalMountIdentity),
       onScrollbackLengthChange: handleTerminalScrollbackLengthChange,
     })
 
     return () => {
       captureTerminalRemountFocus()
-      setReadyTerminalIdentity((current) => (current === terminalMountIdentity ? null : current))
+      setConnectedIdentity((current) => (current === terminalMountIdentity ? null : current))
+      setPaintedIdentity((current) => (current === terminalMountIdentity ? null : current))
+      sendInputRef.current = null
       scrollbackLengthRef.current = 0
       terminalRef.current = null
       // The open menu holds the terminal it was opened against. Dropping it
@@ -303,24 +316,6 @@ export function TerminalPanel({
     )
   }, [cursorBlink, terminalFocused])
 
-  if (unavailable)
-    return (
-      <section
-        {...sectionProps}
-        aria-label='Terminal'
-        className={cn(
-          'text-warning flex min-h-0 flex-col items-center justify-center gap-1 p-4 text-sm',
-          className,
-        )}
-        role='status'
-      >
-        <span>{unavailable.label ?? unavailable.name} is unreachable.</span>
-        <span className='text-muted-foreground text-xs'>
-          The terminal will reconnect when the machine is available.
-        </span>
-      </section>
-    )
-
   return (
     <ToolPane
       header={null}
@@ -334,9 +329,40 @@ export function TerminalPanel({
       ref={terminalFocusTargetRef}
     >
       <div
-        className='min-h-0 min-w-0 flex-1 overflow-hidden px-(--density-control-padding-x) py-(--density-section-gap) font-mono'
+        className={cn(
+          'min-h-0 min-w-0 flex-1 overflow-hidden px-(--density-control-padding-x) py-(--density-section-gap) font-mono',
+          savedPaint && !hasLivePaint && 'invisible',
+        )}
+        inert={!socketConnected}
         ref={hostRef}
       />
+      {savedPaint && !hasLivePaint && active ? (
+        <SavedViewport
+          key={`${terminalMountIdentity}:${paletteHash}:${fontSize}`}
+          paint={savedPaint}
+          fontSize={fontSize}
+          onAdmitted={(scrollbar) => {
+            savedScrollRef.current = { paint: savedPaint, scrollbar }
+          }}
+          onRejected={() => {
+            savedScrollRef.current = null
+            discardTerminal(
+              queryClient,
+              { root: rootPath, sessionId, fontSize, paletteHash },
+              savedPaint,
+            )
+            setRejectedPaint({ key: displayKey, paint: savedPaint })
+          }}
+        />
+      ) : null}
+      {!socketConnected && (savedPaint || hasLivePaint) ? (
+        <p
+          role='status'
+          className='text-warning bg-popover-solid absolute right-0 bottom-0 px-2 py-1 text-xs'
+        >
+          Terminal connection pending. Saved output is read-only.
+        </p>
+      ) : null}
       {terminalFailure?.identity === terminalMountIdentity ? (
         <p
           role='alert'
@@ -345,8 +371,7 @@ export function TerminalPanel({
           {terminalFailure.message}
         </p>
       ) : null}
-      {readyTerminalIdentity !== terminalMountIdentity &&
-      terminalFailure?.identity !== terminalMountIdentity ? (
+      {!savedPaint && !hasLivePaint && terminalFailure?.identity !== terminalMountIdentity ? (
         <div className='pointer-events-none absolute inset-0 flex items-center justify-center'>
           <RingLoader label='Opening terminal' className='text-muted-foreground size-6' />
         </div>
@@ -369,304 +394,4 @@ type TerminalPanelProps = ComponentPropsWithoutRef<'section'> & {
   onExit?: (exitCode: number | null) => void
   onProcessChange?: (process: string | null) => void
   onTitleChange?: (title: string) => void
-}
-
-function mountTerminal({
-  origin,
-  client,
-  signal,
-  host,
-  rootPath,
-  scrollback,
-  sessionId,
-  onConnectedChange,
-  onExit,
-  onFailed,
-  onProcessChange,
-  onReady,
-  onScrollbackLengthChange,
-  onTitleChange,
-}: {
-  origin: string
-  client: Client
-  signal: AbortSignal
-  host: HTMLDivElement
-  rootPath: string
-  scrollback: number
-  sessionId: string
-  onConnectedChange: (connected: boolean) => void
-  onExit: (exitCode: number | null) => void
-  onFailed: (message: string) => void
-  onProcessChange: (process: string | null) => void
-  onReady: (terminal: Terminal, sendInput: TerminalInputSender) => void
-  onScrollbackLengthChange: (length: number) => void
-  onTitleChange: (title: string) => void
-}) {
-  let cancelled = false
-  let dataDisposable: GhosttyWebGpuTerminalSubscription | null = null
-  let resizeDisposable: GhosttyWebGpuTerminalSubscription | null = null
-  let scrollDisposable: GhosttyWebGpuTerminalSubscription | null = null
-  let titleDisposable: GhosttyWebGpuTerminalSubscription | null = null
-  let socket: EdenServerSocket | null = null
-  let terminal: Terminal | null = null
-  let terminalDimensions: TerminalDimensions | null = null
-  let unregisterSession: (() => void) | null = null
-  const inputEncoder = new TextEncoder()
-
-  const open = async () => {
-    const [runtime, worktreeId] = await Promise.all([
-      initializeGhostty(),
-      fetchTerminalCheckout(queryClientFor(origin), rootPath),
-    ])
-    if (cancelled || signal.aborted) return
-
-    const nextTerminal = await createTerminal(runtime, scrollback)
-    if (cancelled || signal.aborted) {
-      nextTerminal.dispose()
-      return
-    }
-
-    terminal = nextTerminal
-    dataDisposable = terminal.onData((data) => {
-      if (data.byteLength === 0) return
-      sendTerminalClientMessage(socket, { data, type: 'input' })
-    })
-    resizeDisposable = terminal.onResize((dimensions) => {
-      terminalDimensions = dimensions
-      sendTerminalResize(socket, dimensions)
-    })
-    scrollDisposable = terminal.on('scroll', ({ scrollbackLength }) => {
-      onScrollbackLengthChange(scrollbackLength)
-    })
-    titleDisposable = terminal.on('title', (title) => onTitleChange(title))
-    await terminal.open(host)
-    if (cancelled || signal.aborted) return
-
-    // The theme lands in onReady, which sees the palette current at handover.
-    terminalDimensions = currentTerminalDimensions(terminal)
-    // The socket is opened below, so the sender is deliberately late-bound:
-    // a command queued before the connection lands must not be written into a
-    // null socket and silently dropped.
-    onReady(terminal, (data) =>
-      sendTerminalClientMessage(socket, { data: inputEncoder.encode(data), type: 'input' }),
-    )
-    socket = openTerminalSocket({
-      client,
-      signal,
-      getTerminalDimensions: () => terminalDimensions,
-      isCancelled: () => cancelled,
-      onConnectedChange,
-      onExit,
-      onProcessChange,
-      worktreeId,
-      sessionId,
-      terminal,
-    })
-    unregisterSession = registerTerminalSession(terminalSessionKey(rootPath, sessionId), {
-      dispose: () => sendTerminalClientMessage(socket, { type: 'dispose' }),
-    })
-  }
-
-  void open().catch((error: unknown) => {
-    if (cancelled || signal.aborted) return
-
-    onFailed(errorMessage(error, 'Could not open the terminal.'))
-    reportError(toClientError(error))
-  })
-
-  return () => {
-    cancelled = true
-    unregisterSession?.()
-    dataDisposable?.dispose()
-    resizeDisposable?.dispose()
-    scrollDisposable?.dispose()
-    titleDisposable?.dispose()
-    terminal?.dispose()
-    closeTerminalSocket(socket)
-    host.replaceChildren()
-  }
-}
-
-function openTerminalSocket({
-  client,
-  signal,
-  getTerminalDimensions,
-  isCancelled,
-  onConnectedChange,
-  onExit,
-  onProcessChange,
-  worktreeId,
-  sessionId,
-  terminal,
-}: {
-  client: Client
-  signal: AbortSignal
-  getTerminalDimensions: () => TerminalDimensions | null
-  isCancelled: () => boolean
-  onConnectedChange: (connected: boolean) => void
-  onExit: (exitCode: number | null) => void
-  onProcessChange: (process: string | null) => void
-  worktreeId: WorktreeId
-  sessionId: string
-  terminal: Terminal
-}) {
-  const socket = connectTerminalSocket({ worktreeId, terminalId: sessionId }, client, signal)
-
-  socket.addEventListener('open', () => {
-    if (isCancelled() || signal.aborted) return
-
-    onConnectedChange(true)
-  })
-  socket.addEventListener('close', () => {
-    if (isCancelled() || signal.aborted) return
-
-    onConnectedChange(false)
-  })
-  socket.addEventListener('message', (event) => {
-    if (isCancelled() || signal.aborted) return
-
-    const message = parseTerminalServerMessage((event as MessageEvent).data)
-    if (!message) return
-    if (message.type === 'ready') {
-      if (message.restoredHistory)
-        terminal.writeln('\r\n[Previous output restored. A new terminal process has started.]')
-      sendTerminalResize(socket, getTerminalDimensions())
-      return
-    }
-
-    handleTerminalServerMessage({ message, onExit, onProcessChange, terminal })
-  })
-
-  return socket
-}
-
-function handleTerminalServerMessage({
-  message,
-  onExit,
-  onProcessChange,
-  terminal,
-}: {
-  message: Exclude<TerminalServerMessage, { type: 'ready' }>
-  onExit: (exitCode: number | null) => void
-  onProcessChange: (process: string | null) => void
-  terminal: Terminal
-}) {
-  if (message.type === 'cleared') {
-    terminal.reset()
-    return
-  }
-  if (message.type === 'output') {
-    terminal.write(message.data)
-    return
-  }
-  if (message.type === 'exit') {
-    terminal.writeln('')
-    terminal.writeln(exitDetail(message.exitCode))
-    onExit(message.exitCode)
-    return
-  }
-  if (message.type === 'process') {
-    onProcessChange(message.name)
-    return
-  }
-
-  terminal.writeln('')
-  terminal.writeln(message.message)
-}
-
-function createTerminal(runtime: GhosttyRuntime, scrollback: number) {
-  return Terminal.create({
-    appearance: {
-      // Constructed unfocused; the real values arrive at handover, before paint.
-      cursor: { blink: false, style: UNFOCUSED_TERMINAL_CURSOR_STYLE },
-      font: {
-        boldWeight: 700,
-        family: DEFAULT_MONO_FONT_STACK,
-        letterSpacing: 0,
-        lineHeight: 1,
-        size: DEFAULT_TERMINAL_FONT_SIZE,
-        weight: 400,
-      },
-      scrollbackLimit: scrollback,
-    },
-    links: { activateUri: openTerminalUri },
-    runtime: { kind: 'borrowed', runtime },
-  })
-}
-
-/** Construction defaults; the real values arrive at handover, before first paint. */
-const DEFAULT_TERMINAL_FONT_SIZE = 12
-
-export type TerminalAppearance = {
-  readonly cursorBlink: boolean
-  readonly fontSize: number
-}
-
-/** Pushes live appearance settings without rebuilding the terminal. */
-export function applyTerminalAppearance(terminal: Terminal | null, appearance: TerminalAppearance) {
-  if (!terminal) return
-
-  terminal.setFont({ size: appearance.fontSize })
-  terminal.setCursor({ blink: appearance.cursorBlink })
-}
-
-function applyTerminalCursorOptions(terminal: Terminal | null, options: TerminalCursorOptions) {
-  if (!terminal) return
-
-  terminal.setCursor({ blink: options.cursorBlink, style: options.cursorStyle })
-}
-
-function applyTerminalTheme(terminal: Terminal | null, colors: TerminalColors) {
-  if (!terminal) return
-  terminal.setTheme(terminalThemeFor(colors, terminal.appearance.theme))
-}
-
-function currentTerminalDimensions(terminal: Terminal) {
-  const grid = terminal.appearance.grid
-  return {
-    cols: grid.columns,
-    rows: grid.rows,
-  }
-}
-
-function initializeGhostty() {
-  if (ghosttyRuntimePromise) return ghosttyRuntimePromise
-
-  const loading = GhosttyRuntime.create()
-  ghosttyRuntimePromise = loading
-  void loading.catch(() => {
-    if (ghosttyRuntimePromise === loading) ghosttyRuntimePromise = null
-  })
-  return loading
-}
-
-function openTerminalUri(uri: string) {
-  window.open(uri, '_blank', 'noopener,noreferrer')
-}
-
-function sendTerminalResize(
-  socket: EdenServerSocket | null,
-  dimensions: TerminalDimensions | null,
-) {
-  if (!dimensions) return false
-
-  return sendTerminalClientMessage(socket, {
-    cols: dimensions.cols,
-    rows: dimensions.rows,
-    type: 'resize',
-  })
-}
-
-function closeTerminalSocket(socket: EdenServerSocket | null) {
-  if (!socket) return
-  if (socket.readyState === 3) return
-  if (socket.readyState === 2) return
-
-  socket.close()
-}
-
-function exitDetail(exitCode: number | null) {
-  if (exitCode === null) return 'Process exited'
-
-  return `Process exited ${exitCode}`
 }

@@ -1,3 +1,5 @@
+import { useDiffPaint } from '@/features/editor/hooks/use-diff-paint'
+import { addLifecycleFlush } from '@/lib/lifecycle-flush'
 import { useUnicodeHighlights } from '@/features/editor/hooks/use-unicode-highlights'
 import type { TabId } from '@/lib/documents/utils/types'
 import type { EditorTheme } from '@singapore-editor/core/rendering'
@@ -10,7 +12,7 @@ import {
 } from '@singapore-editor/diff'
 import { EditorHost, useEditor } from '@singapore-editor/react'
 import type { Editor } from '@singapore-editor/core/editor'
-import { useLayoutEffect, useMemo } from 'react'
+import { useLayoutEffect, useMemo, useRef } from 'react'
 
 import { useDiffLanguage } from '@/features/editor/hooks/use-diff-language'
 import { useDiffRows } from '@/features/editor/hooks/use-diff-rows'
@@ -32,14 +34,11 @@ import type { DiffPanePresentation } from '@/features/editor/state/tab-presentat
 /**
  * One side of a diff: a real read-only `Editor` holding a synthetic buffer of the projected rows,
  * with the diff plugin supplying the rows, the gutter and the expansion clicks.
- *
- * `editor-diff-pane` and its `-${side}` suffix are stamped here rather than by the package. Both
- * are read: the bare class is how the git line-comment layer resolves which pane a row element
- * belongs to, and the suffix is how it names the side. Dropping either breaks side detection even
- * though nothing renders differently.
  */
 export function DiffPane({
   file,
+  paintIdentity,
+  getLayout,
   languageServer = null,
   presentation,
   regions,
@@ -53,6 +52,8 @@ export function DiffPane({
   onScroll,
 }: {
   file: DiffFile | null
+  paintIdentity?: string
+  getLayout?: () => Record<string, number> | undefined
   /** Present only where a language server may safely be asked about this diff; see `useDiffLanguage`. */
   languageServer?: DiffLanguageServerContext | null
   presentation?: DiffPanePresentation
@@ -79,6 +80,7 @@ export function DiffPane({
       }),
     [regions, side, syntaxBackend, syntaxHighlight],
   )
+  const { snapshot, capture } = useDiffPaint(paintIdentity, file, side, regions, getLayout)
   const { rows, text, tokensRevision } = useDiffRows(plugin, file)
   const diffLanguagePlugin = useDiffLanguage(file, rows, theme, languageServer)
   const unicodeHighlights = useUnicodeHighlights()
@@ -97,6 +99,9 @@ export function DiffPane({
     persistence?.plugin,
   ].filter((entry) => entry !== null && entry !== undefined)
   const controller = useEditor({
+    documentKey: paintIdentity ? `${paintIdentity}:${side}` : undefined,
+    snapshot,
+    presentationReady: false,
     suspiciousCharacters: unicodeHighlights.options,
     cursorLineHighlight: DIFF_CURSOR_LINE_HIGHLIGHT,
     // No `document`: the React wrapper pushes text through `openDocument`, which takes no scroll
@@ -130,6 +135,8 @@ export function DiffPane({
     },
   })
 
+  const installedProjection = useRef<{ editor: Editor; text: string } | null>(null)
+
   // `setText` clears tokens on its way through `setContent`, so they go back on in the same
   // statement pair — an expansion toggle would otherwise repaint uncoloured until the next parse.
   // The plugin re-projects its cached per-side token streams synchronously on a toggle, so what is
@@ -138,15 +145,27 @@ export function DiffPane({
     const editor = controller.getEditor()
     if (!editor) return
 
-    editor.setText(text, { documentMode: 'static', languageId: null })
+    if (!file || rows !== plugin.getRows()) return
+    persistence?.detach()
+    editor.setPresentationReady(false)
+    if (
+      installedProjection.current?.editor !== editor ||
+      installedProjection.current.text !== text
+    ) {
+      editor.setText(text, { documentMode: 'static', languageId: null })
+      installedProjection.current = { editor, text }
+    }
     editor.setTokens(plugin.getTokens())
-    if (file && rows === plugin.getRows()) persistence?.restore(editor)
+    persistence?.restore(editor)
+    editor.setPresentationReady(plugin.isSyntaxReady())
   }, [controller, file, persistence, plugin, rows, text])
 
   // A parse landing later changes the tokens without changing a row.
   useLayoutEffect(() => {
     const tokens = plugin.getTokens()
-    controller.getEditor()?.setTokens(tokens)
+    const editor = controller.getEditor()
+    editor?.setTokens(tokens)
+    if (file && rows === plugin.getRows()) editor?.setPresentationReady(plugin.isSyntaxReady())
     log.debug({
       action: 'editor.diff.syntax',
       area: 'editor',
@@ -160,7 +179,7 @@ export function DiffPane({
       newLineCount: file?.newLines.length,
       partial: file?.isPartial,
     })
-  }, [controller, file, plugin, side, syntaxBackend, syntaxHighlight, tokensRevision])
+  }, [controller, file, plugin, rows, side, syntaxBackend, syntaxHighlight, tokensRevision])
 
   useLayoutEffect(() => {
     if (!onRegisterEditor) return
@@ -169,28 +188,16 @@ export function DiffPane({
     return () => onRegisterEditor(side, null)
   }, [controller, onRegisterEditor, side])
 
-  // The whole design rests on projection row `i` being buffer row `i` being
-  // `data-editor-virtual-row="i"`. The plugin checks the identity on the rows actually mounted;
-  // anything that breaks it (word wrap, a fold map, block rows) would otherwise show up as line
-  // comments quietly addressing the wrong line.
   useLayoutEffect(() => {
-    if (!file) return
-
-    const { lineCount, rowCount, violations } = plugin.getDocumentModeStatus()
-    // The plugin can publish its next projection one layout pass before this host receives it.
-    if (rowCount !== rows.length) return
-    if (violations.length === 0) return
-
-    log.warn({
-      action: 'editor.diff.document_mode_violation',
-      area: 'editor',
-      documentId: `${file.cacheKey ?? file.path}:${side}`,
-      lineCount,
-      rowCount,
-      side,
-      violations,
-    })
-  }, [file, plugin, rows, side])
+    const flush = () => capture(controller)
+    const frame = requestAnimationFrame(flush)
+    const remove = addLifecycleFlush(flush)
+    return () => {
+      flush()
+      cancelAnimationFrame(frame)
+      remove()
+    }
+  }, [controller, capture, tokensRevision])
 
   return (
     <div

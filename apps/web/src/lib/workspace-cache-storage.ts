@@ -1,3 +1,5 @@
+import { recordLifecycleWrite } from '@/lib/lifecycle-flush'
+import { admitReloadRecord, rememberReloadRecord, measureReloadRead } from '@/lib/reload-budget'
 import {
   globalChromeStorage,
   type StorageAccess,
@@ -37,6 +39,20 @@ export function readWorkspaceCacheEntry<T>(
   fallback: T,
   options: WorkspaceCacheEntryOptions = {},
 ): T {
+  const startedAt = performance.now()
+  try {
+    return readCacheRecord(key, schema, fallback, options)
+  } finally {
+    measureReloadRead(startedAt)
+  }
+}
+
+function readCacheRecord<T>(
+  key: string,
+  schema: v.GenericSchema,
+  fallback: T,
+  options: WorkspaceCacheEntryOptions = {},
+): T {
   const storage = options.storage ?? globalChromeStorage
   let serialized: string | null
   try {
@@ -49,6 +65,10 @@ export function readWorkspaceCacheEntry<T>(
     return recoverCacheEntry({ key, reason: 'oversized', storage, fallback })
   }
 
+  const admission = admitReloadRecord(serialized, schema)
+  if (admission.kind === 'refused') return fallback
+  if (admission.kind === 'cached') return admission.value as T
+
   let input: unknown
   try {
     input = JSON.parse(serialized)
@@ -58,7 +78,10 @@ export function readWorkspaceCacheEntry<T>(
 
   try {
     const result = v.safeParse(schema, input)
-    if (result.success) return result.output as T
+    if (result.success) {
+      rememberReloadRecord(serialized, schema, result.output)
+      return result.output as T
+    }
   } catch {
     return recoverCacheEntry({ key, reason: 'schema', storage, fallback })
   }
@@ -69,6 +92,17 @@ export function writeWorkspaceCacheEntry(
   key: string,
   value: unknown,
   options: WorkspaceCacheEntryOptions = {},
+): WorkspaceCacheWriteResult {
+  const startedAt = performance.now()
+  const result = writeCacheRecord(key, value, options)
+  recordLifecycleWrite(startedAt, result.serializedBytes, result.status === 'written')
+  return result
+}
+
+function writeCacheRecord(
+  key: string,
+  value: unknown,
+  options: WorkspaceCacheEntryOptions,
 ): WorkspaceCacheWriteResult {
   let serialized: string | undefined
   try {

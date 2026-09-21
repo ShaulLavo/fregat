@@ -566,7 +566,7 @@ export function createEnvironmentConnections({
           label: binding.descriptor.label,
           localPort: null,
         })
-      useEnvironmentsStore.getState().setPhase(binding.origin, 'offline')
+      useEnvironmentsStore.getState().setPhase(binding.origin, 'connecting')
       const transport = createTransport(binding.origin)
       transport.close()
       registerChatTransport(transport)
