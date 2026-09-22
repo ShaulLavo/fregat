@@ -1,5 +1,5 @@
 import { createStore } from 'zustand/vanilla'
-import { readCachedEnvironmentBindings } from '@/features/chat/state/chat-projection-cache'
+import { readCachedEnvironmentBindings } from '@/lib/environments/state/binding-cache'
 import { createBootRuntime } from '@/state/bootstrap-runtime'
 import type { ApplicationRuntime } from '@/state/application-runtime'
 import type { createNavigation } from '@/state/navigation'

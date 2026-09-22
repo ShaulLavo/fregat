@@ -68,6 +68,10 @@ The click scenario waits 750ms between clicks so debounced document highlights, 
 
 `scenario editor-undo-reopen` builds a disposable workspace, types and saves, closes the tab, reopens the file and undoes back to the text from before the save, then redoes, reloads the window and undoes again. Both undos can only come from the history stored in IndexedDB (`platform-editor-history`), so a failure means persistence or the content-hash match broke. Typing lands as several states, so the scenario repeats the chord until the row matches.
 
+`scenario editor-reload-paint --file <long file>` opens a file, scrolls, reloads, and samples every frame after the reload; any frame with an editor viewport and no coloured text fails it. `inspection.json` holds the frame timeline, each `editor.snapshot.admission` reason, and the font fetch timings. `fontLoadedAt` must come before the admission: the editor measures its cell width at mount, so a face that lands later gets the snapshot rejected with reason `appearance`. Run it against the mesh with `--url` too, since a production boot mounts the editor ten times sooner than dev. Pick a file longer than the scroll, or the capture is one empty row.
+
+`scenario editor-reload-paint-slow-font` is the same reload with the font response held for a second. It is the case a fast device or a remote link hits: the editor mounts while `document.fonts` is still loading, and the cached paint must be shown anyway. A failure lists the admission as `appearance` with `differs: ["unavailable"]`.
+
 `scenario editor-markdown-punctuation --file README.md` hovers en dashes and invisible characters in the editor and a saved-file diff, checks their explanations, opens Unicode settings, and undoes its sample.
 
 Native grammar coverage: `editor-native-coverage-light` and `editor-native-coverage-dark` open an MDX, SQL or Astro file or a Markdown fence fixture, check native worker use, edit syntax, undo and redo. Use `--workspace work/tmp/fregat-evidence/syntax-benchmark-fixtures --file Component.astro`, `--file Component.mdx`, `--file mdx-injections.md`, `--file queries.sql`, `--file sql-injections.md` or `--file injections.md`. Fenced MDX must retain its heading and emphasis markers in Markdown preview; injected code is displayed as source. `editor-syntax-native` retains the whitespace control for timing comparisons.
@@ -77,3 +81,5 @@ Editor title actions are the active tab's controls at the end of its tab strip, 
 `scenario editor-definition-crlf` opens a disposable TypeScript workspace, follows Go to definition into a CRLF file, inserts at the definition caret and checks the saved bytes. It removes the fixture afterward.
 
 `scenario editor-external-deletion` verifies that externally deleted clean and dirty files stay open, retain their text across tab switches, can be recreated with Save, and refresh when another process restores them.
+
+`scenario editor-lsp-tab-switch` opens a TypeScript error in an isolated workspace, switches away and back, checks the diagnostic is already painted with no LSP close/reopen, then closes the tab and checks `didClose`.

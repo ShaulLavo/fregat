@@ -5,7 +5,7 @@ import { expect, test as it } from '../../../test/fixtures'
 
 import {
   FILE_SNAPSHOT_QUERY_GC_TIME_MS,
-  prefetchFileSnapshotQuery,
+  ensureFileSnapshotQuery,
   pruneFileSnapshotQueryCache,
   setFileSnapshotQueryData,
 } from '@/lib/file-snapshot-query-cache'
@@ -38,12 +38,12 @@ describe('file snapshot query cache policy', () => {
     expect(client.getQueryData(fileSystemKeys.quickOpenFiles('repo', 'a'))).toEqual(['repo/a.ts'])
   })
 
-  it('does not prefetch a file snapshot that is already cached', async () => {
+  it('does not re-read a file snapshot that is already fresh in the cache', async () => {
     const client = new QueryClient()
     let fetchCount = 0
 
     setFileSnapshotQueryData(client, file('repo/a.ts'))
-    await prefetchFileSnapshotQuery(client, filesystemPath('repo/a.ts'), {
+    await ensureFileSnapshotQuery(client, filesystemPath('repo/a.ts'), {
       fetcher: async (path) => {
         fetchCount += 1
         return file(path)
@@ -53,7 +53,7 @@ describe('file snapshot query cache policy', () => {
     expect(fetchCount).toBe(0)
   })
 
-  it('does not start a second prefetch while the same file snapshot is fetching', async () => {
+  it('joins an in-flight read instead of starting a second one', async () => {
     const client = new QueryClient()
     let fetchCount = 0
     let resolveFetch!: () => void
@@ -61,14 +61,14 @@ describe('file snapshot query cache policy', () => {
       resolveFetch = resolve
     })
 
-    const firstPrefetch = prefetchFileSnapshotQuery(client, filesystemPath('repo/a.ts'), {
+    const firstRead = ensureFileSnapshotQuery(client, filesystemPath('repo/a.ts'), {
       fetcher: async (path) => {
         fetchCount += 1
         await fetchWait
         return file(path)
       },
     })
-    const secondPrefetch = prefetchFileSnapshotQuery(client, filesystemPath('repo/a.ts'), {
+    const secondRead = ensureFileSnapshotQuery(client, filesystemPath('repo/a.ts'), {
       fetcher: async (path) => {
         fetchCount += 1
         return file(path)
@@ -77,7 +77,7 @@ describe('file snapshot query cache policy', () => {
 
     expect(fetchCount).toBe(1)
     resolveFetch()
-    await Promise.all([firstPrefetch, secondPrefetch])
+    await Promise.all([firstRead, secondRead])
   })
 })
 

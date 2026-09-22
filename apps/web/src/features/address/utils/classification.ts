@@ -71,15 +71,10 @@ export const STATE_CLASSIFICATIONS: Readonly<Record<string, ClassifiedState>> = 
     storageKey: 'platform.palette-boot.v1',
     why: 'the palette CSS cached for first paint, derived from the palette preference',
   },
-  chatProjection: {
-    classification: 'ephemeral',
-    storageKey: 'platform.chat-projection',
-    why: 'projected server truth, replayed from the server on connect',
-  },
-  providerDisplay: {
-    classification: 'ephemeral',
-    storageKey: 'platform.provider-display.v1',
-    why: 'provider logos, model labels and options for reload; live status is never persisted',
+  environmentBinding: {
+    classification: 'preference',
+    storageKey: 'platform.environments.binding.v1',
+    why: 'which machine an environment id belongs to, so a cold boot can resolve it before connecting',
   },
   chatRailCollapse: {
     classification: 'preference',
@@ -131,7 +126,12 @@ export const STATE_CLASSIFICATIONS: Readonly<Record<string, ClassifiedState>> = 
   },
   logsFilter: {
     classification: 'address',
-    why: 'log.* — persists nothing today, so the feature strictly gains',
+    why: 'log.* — the filter itself lives in the URL, never in storage',
+  },
+  logsView: {
+    classification: 'preference',
+    storageKey: 'logs.view.v1',
+    why: 'scroll offset, the viewed time window and the expanded row; no log events',
   },
   promptStash: {
     classification: 'ephemeral',

@@ -22,11 +22,11 @@ export function ModelPickerTrigger({
   readonly busy: boolean
   readonly disabled: boolean
 }) {
-  const { modelSelection, provider, display } = useModelPicker()
+  const { modelSelection, provider } = useModelPicker()
   // No ready provider offers a model yet. Stay openable — the rows carry the
   // sign-in and not-installed affordances the user needs to fix it.
   const modelLabel = modelSelection
-    ? providerModelDisplayLabel(display, modelSelection)
+    ? providerModelDisplayLabel(provider, modelSelection)
     : 'Select model'
   const statusLabel = triggerStatusLabel(provider)
 
@@ -47,11 +47,11 @@ export function ModelPickerTrigger({
               />
             }
           >
-            {display ? (
+            {provider ? (
               <ProviderGlyph
                 className='text-3xs size-3.5'
-                displayLabel={display.displayLabel}
-                driverKind={display.driverKind}
+                displayLabel={provider.displayLabel}
+                driverKind={provider.driverKind}
               />
             ) : null}
             <span className='min-w-0 truncate'>{modelLabel}</span>

@@ -5,7 +5,6 @@ import { assertEnvironmentWritable } from '@/lib/environments/state/availability
 import { clientForQueryClient, originForQueryClient } from '@/lib/environments/state/query-clients'
 import { gitKeys } from '@/lib/query-keys'
 import { fetchStatus } from '@/features/git/utils/api'
-import { savedGit } from '@/features/git/state/reload'
 
 export async function admitGitMutation(
   owner: QueryClient,
@@ -14,7 +13,6 @@ export async function admitGitMutation(
 ) {
   assertEnvironmentWritable(originForQueryClient(owner))
   const expected = owner.getQueryData<GitStatusResult>(gitKeys.status(rootPath))
-  if (!expected && savedGit(owner, rootPath)?.status) throw changedStatus('unconfirmed')
   await owner.cancelQueries({ queryKey: gitKeys.status(rootPath), exact: true })
   const status = await owner.fetchQuery({
     queryKey: gitKeys.status(rootPath),
@@ -22,7 +20,7 @@ export async function admitGitMutation(
     staleTime: 0,
   })
   if (expected && statusIdentity(expected, paths) !== statusIdentity(status, paths))
-    throw changedStatus('changed')
+    throw changedStatus()
   assertEnvironmentWritable(originForQueryClient(owner))
   return status
 }
@@ -37,13 +35,12 @@ function statusIdentity(status: GitStatusResult, paths?: readonly string[]) {
   })
 }
 
-function changedStatus(reason: 'unconfirmed' | 'changed') {
+function changedStatus() {
   return createClientError({
     code: 'git-status-changed',
     status: 409,
     message: 'The repository needs another review before this action.',
     why: 'The displayed changes are not the current confirmed repository state.',
     fix: 'Review the refreshed changes, then try the action again.',
-    internal: { reason },
   })
 }

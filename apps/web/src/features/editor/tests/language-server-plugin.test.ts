@@ -16,11 +16,12 @@ import { languageServerSnapshot } from '../../../../test/factories/language-serv
 import { expect, test } from '../../../../test/fixtures'
 
 const { createdServerSets } = vi.hoisted(() => ({
-  createdServerSets: [] as LanguageServerSetPluginOptions[],
+  createdServerSets: [] as Extract<LanguageServerSetPluginOptions, { readonly lanes: unknown }>[],
 }))
 
 vi.mock('@singapore-editor/lsp-plugin/websocket', () => ({
   createLanguageServerSetPlugin: (options: LanguageServerSetPluginOptions) => {
+    if (options.document) throw new TypeError('Expected connection options')
     createdServerSets.push(options)
     return { activate: () => [], name: 'editor.language-server' }
   },
@@ -84,7 +85,7 @@ describe('createMatchedLanguageServerPlugin', () => {
         statusSource: createEditorLanguageServerStatusSource(),
         target: { matchPath: 'src/app.tsx' },
         onApplyWorkspaceEdit,
-      })
+      }).activate({} as never)
       const snapshot = languageServerSnapshot(document.key, languageId)
       const options = createdServerSets[0]?.documentSync ?? {}
       const active = activeDocumentForSnapshot(snapshot, options)
@@ -197,7 +198,7 @@ describe('createMatchedLanguageServerPlugin', () => {
         },
       },
       onApplyWorkspaceEdit,
-    })
+    }).activate({} as never)
 
     const [typescript, eslint] = createdServerSets[0]?.lanes ?? []
     expect(typescript?.features.diagnostics).toBeUndefined()
@@ -296,7 +297,7 @@ describe('semantic token ownership', () => {
       statusSource: createEditorLanguageServerStatusSource(),
       target: { matchPath: 'src/a.rs' },
       onApplyWorkspaceEdit,
-    })
+    }).activate({} as never)
 
     const options = createdServerSets[0]
     const semanticTokens = options?.semanticTokens?.({
@@ -321,7 +322,7 @@ describe('semantic token ownership', () => {
         statusSource: createEditorLanguageServerStatusSource(),
         target: { matchPath: 'src/a.rs' },
         onApplyWorkspaceEdit,
-      })
+      }).activate({} as never)
     }
 
     const [first, second] = createdServerSets.map((set) => set.lanes[0]?.capabilities)

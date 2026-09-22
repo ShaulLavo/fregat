@@ -1,171 +1,100 @@
+import { QueryClient } from '@tanstack/react-query'
 import { describe, expect, it } from 'vitest'
 
-import {
-  DEFAULT_MONO_FONT_STACK,
-  DEFAULT_MONO_FONT_VARIABLE,
-  DEFAULT_NERD_FONT_FAMILY,
-  fontStack,
-  loadDefaultNerdFont,
-  loadNerdFont,
-} from '../default-nerd-font'
+import { DEFAULT_NERD_FONT_FAMILY, nerdFontQueryOptions } from '../default-nerd-font'
 
-describe('loadDefaultNerdFont', () => {
-  it('loads JetBrainsMono from the server and registers the FontFace', async () => {
-    const state = fontLoaderState()
-    const result = await loadDefaultNerdFont({
-      FontFace: state.FontFace,
-      fetcher: state.fetcher,
-      fonts: state.fonts,
-      root: state.root,
-      url: 'http://server.test/fonts/JetBrainsMono',
-    })
+const url = 'http://server.test/fonts/JetBrainsMono'
 
-    expect(result).toBe(true)
-    expect(state.variables.get(DEFAULT_MONO_FONT_VARIABLE)).toBe(DEFAULT_MONO_FONT_STACK)
-    expect(state.requests).toEqual(['http://server.test/fonts/JetBrainsMono'])
-    expect(state.added).toHaveLength(1)
-    expect(state.instances[0]?.family).toBe(DEFAULT_NERD_FONT_FAMILY)
-    expect(state.instances[0]?.loaded).toBe(true)
+describe('nerdFontQueryOptions', () => {
+  it('registers one URL-sourced face and loads it', async () => {
+    const state = fontState()
+    const family = await client().fetchQuery(nerdFontQueryOptions('JetBrainsMono', state))
+
+    expect(family).toBe(DEFAULT_NERD_FONT_FAMILY)
+    expect(state.faces).toHaveLength(1)
+    expect(state.faces[0]?.source).toBe(`url("${url}")`)
+    expect(state.faces[0]?.status).toBe('loaded')
   })
 
-  it('keeps the fallback stack when the server request fails', async () => {
-    const state = fontLoaderState({
-      fetcher: (async () => new Response('missing', { status: 404 })) as unknown as typeof fetch,
-    })
+  it('joins a second request for the same family instead of loading it again', async () => {
+    const state = fontState()
+    const queries = client()
+    await Promise.all([
+      queries.fetchQuery(nerdFontQueryOptions('JetBrainsMono', state)),
+      queries.fetchQuery(nerdFontQueryOptions('JetBrainsMono', state)),
+    ])
 
-    const result = await loadDefaultNerdFont({
-      FontFace: state.FontFace,
-      fetcher: state.fetcher,
-      fonts: state.fonts,
-      root: state.root,
-      url: 'http://server.test/fonts/JetBrainsMono',
-    })
-
-    expect(result).toBe(false)
-    expect(state.variables.get(DEFAULT_MONO_FONT_VARIABLE)).toBe(DEFAULT_MONO_FONT_STACK)
-    expect(state.added).toHaveLength(0)
+    expect(state.created).toBe(1)
   })
 
-  it('does not throw when font loading is unsupported', async () => {
-    const state = fontLoaderState()
-    const result = await loadDefaultNerdFont({
-      FontFace: null,
-      fetcher: state.fetcher,
-      fonts: null,
-      root: state.root,
-    })
+  it('adopts the face index.html already started', async () => {
+    const state = fontState()
+    const started = state.startFace(`"${DEFAULT_NERD_FONT_FAMILY}"`, `url("${url}")`)
+    state.faces.push(started)
+    await client().fetchQuery(nerdFontQueryOptions('JetBrainsMono', state))
 
-    expect(result).toBe(false)
-    expect(state.requests).toHaveLength(0)
-    expect(state.variables.get(DEFAULT_MONO_FONT_VARIABLE)).toBe(DEFAULT_MONO_FONT_STACK)
+    expect(state.created).toBe(1)
+    expect(started.status).toBe('loaded')
   })
 
-  it('does not let an older font request overwrite a newer stack', async () => {
-    const olderResponse = deferred<Response>()
-    const newerResponse = deferred<Response>()
-    const state = fontLoaderState({
-      fetcher: (async (input) => {
-        if (String(input).endsWith('/Older')) return olderResponse.promise
+  it('replaces a started face that failed', async () => {
+    const state = fontState()
+    const failed = state.startFace(DEFAULT_NERD_FONT_FAMILY, 'url("http://gone.test/font")')
+    failed.fail()
+    state.faces.push(failed)
+    await client().fetchQuery(nerdFontQueryOptions('JetBrainsMono', state))
 
-        return newerResponse.promise
-      }) as typeof fetch,
-    })
-    const older = loadNerdFont('Older', {
-      FontFace: state.FontFace,
-      fetcher: state.fetcher,
-      fonts: state.fonts,
-      root: state.root,
-      url: 'http://server.test/fonts/Older',
-    })
-    const newer = loadNerdFont('Newer', {
-      FontFace: state.FontFace,
-      fetcher: state.fetcher,
-      fonts: state.fonts,
-      root: state.root,
-      url: 'http://server.test/fonts/Newer',
-    })
+    expect(state.faces).toHaveLength(1)
+    expect(state.faces[0]).not.toBe(failed)
+  })
 
-    newerResponse.resolve(successfulResponse())
-    await newer
-    olderResponse.resolve(successfulResponse())
-    await older
+  it('resolves to null when font loading is unsupported', async () => {
+    const options = nerdFontQueryOptions('JetBrainsMono', { FontFace: null, fonts: null })
 
-    expect(state.variables.get(DEFAULT_MONO_FONT_VARIABLE)).toBe(fontStack('Newer'))
+    expect(await client().fetchQuery(options)).toBeNull()
   })
 })
 
-type FakeFontFace = {
-  family: string
-  loaded: boolean
-  load(): Promise<FontFace>
+function client() {
+  return new QueryClient({ defaultOptions: { queries: { retry: false } } })
 }
 
-function fontLoaderState(options: { fetcher?: typeof fetch } = {}) {
-  const variables = new Map<string, string>()
-  const requests: string[] = []
-  const added: FontFace[] = []
-  const instances: FakeFontFace[] = []
+function fontState() {
+  const faces: TestFontFace[] = []
+  const counter = { created: 0 }
 
-  class TestFontFace implements FakeFontFace {
-    loaded = false
+  class TestFontFace {
+    status: FontFaceLoadStatus = 'unloaded'
 
     constructor(
       readonly family: string,
-      readonly source: string | BufferSource,
-      readonly descriptors?: FontFaceDescriptors,
+      readonly source: string,
     ) {
-      void source
-      void descriptors
-      instances.push(this)
+      counter.created += 1
+    }
+
+    fail() {
+      this.status = 'error'
     }
 
     async load() {
-      this.loaded = true
-      return this as unknown as FontFace
+      this.status = 'loaded'
+      return this
     }
   }
 
   return {
+    get created() {
+      return counter.created
+    },
     FontFace: TestFontFace as unknown as typeof FontFace,
-    added,
-    fetcher: options.fetcher ?? successfulFontFetch(requests),
+    startFace: (family: string, source: string) => new TestFontFace(family, source),
+    faces,
     fonts: {
-      add(fontFace: FontFace) {
-        added.push(fontFace)
-      },
+      add: (face: FontFace) => faces.push(face as unknown as TestFontFace),
+      delete: (face: FontFace) => faces.splice(faces.indexOf(face as unknown as TestFontFace), 1),
+      [Symbol.iterator]: () => (faces as unknown as FontFace[])[Symbol.iterator](),
     },
-    instances,
-    requests,
-    root: {
-      style: {
-        getPropertyValue(name: string) {
-          return variables.get(name) ?? ''
-        },
-        setProperty(name: string, value: string) {
-          variables.set(name, value)
-        },
-      },
-    },
-    variables,
+    url,
   }
-}
-
-function successfulFontFetch(requests: string[]): typeof fetch {
-  return (async (input) => {
-    requests.push(String(input))
-    return new Response(new Uint8Array([1, 2, 3]).buffer)
-  }) as typeof fetch
-}
-
-function successfulResponse() {
-  return new Response(new Uint8Array([1, 2, 3]).buffer)
-}
-
-function deferred<T>() {
-  let resolve: (value: T) => void = () => undefined
-  const promise = new Promise<T>((settle) => {
-    resolve = settle
-  })
-
-  return { promise, resolve }
 }

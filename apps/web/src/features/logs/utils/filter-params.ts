@@ -86,3 +86,15 @@ function sinceForRange(range: LogTimeRange, now: number) {
 
   return new Date(now - rangeMinutes[range] * 60 * 1_000).toISOString()
 }
+
+/** Identity of the filter set, so a changed filter resets inspection and scroll. */
+export function logsFilterIdentity(filters: LogsFilterState) {
+  return JSON.stringify([
+    filters.area,
+    filters.level,
+    filters.search,
+    filters.slowMs,
+    filters.source,
+    filters.timeRange,
+  ])
+}

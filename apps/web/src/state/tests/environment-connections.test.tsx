@@ -2,14 +2,9 @@ import { beforeEach, onTestFinished } from 'vitest'
 import { DEFAULT_SETTING_VALUES } from '@workspace/contracts'
 import { inProcessOrchestrationSocketFactory } from '@workspace/client-core/test/in-process-orchestration-socket'
 import { createChatTransport } from '@/features/chat/transport/create-chat-transport'
-import {
-  flushChatProjectionCache,
-  useChatProjectionStore,
-} from '@/features/chat/state/chat-projection-store'
-import { readChatProjectionCache } from '@/features/chat/state/chat-projection-cache'
+import { useChatProjectionStore } from '@/features/chat/state/chat-projection-store'
 import { writeBootMirror } from '@/lib/settings-boot-mirror'
 import { currentRailEnvironments } from '@/features/chat-mode/state/rail-environments'
-import { environmentScopedStorage } from '@/lib/environments/state/scoped-storage'
 import { createEnvironmentConnections } from '@/state/environment-connections'
 import { readConnectedMachines } from '@/state/connected-machines'
 import { waitFor } from '@testing-library/react'
@@ -111,7 +106,7 @@ test('replacing a confirmed endpoint keeps its existing QueryClient and retained
   expect(previousTransport?.closed).toBe(true)
 })
 
-test('authoritative removal hides a mirrored cached machine, preserves its disk cache, and only an explicit re-add reconnects it', async ({
+test('authoritative removal drops a remembered machine, and only an explicit re-add reconnects it', async ({
   server,
 }) => {
   const h = await createFederationHarness(server)
@@ -121,7 +116,6 @@ test('authoritative removal hides a mirrored cached machine, preserves its disk 
       useChatProjectionStore.getState().slices[h.descriptorB.environmentId]?.projectIds,
     ).toContain(project.projectId),
   )
-  flushChatProjectionCache()
   h.connections.stop()
   useChatProjectionStore.getState().dropEnvironment(h.descriptorB.environmentId)
   const config = { remote: { kind: 'origin', url: h.originB } } as const
@@ -142,11 +136,13 @@ test('authoritative removal hides a mirrored cached machine, preserves its disk 
   })
   onTestFinished(() => restored.stop())
   expect(readConnectedMachines()).toEqual(['remote'])
+  // Remembered, but not yet answered: the rail lists a machine once its socket
+  // delivers a projection, never from anything restored off disk.
   expect(
     currentRailEnvironments().some(
       (environment) => environment.environmentId === h.descriptorB.environmentId,
     ),
-  ).toBe(true)
+  ).toBe(false)
   restored.configureMachines({})
   expect(readConnectedMachines()).toEqual([])
   expect(restored.store.getState().machines).toEqual([])
@@ -155,12 +151,6 @@ test('authoritative removal hides a mirrored cached machine, preserves its disk 
       (environment) => environment.environmentId === h.descriptorB.environmentId,
     ),
   ).toBe(false)
-  flushChatProjectionCache()
-  expect(
-    readChatProjectionCache(
-      environmentScopedStorage(h.descriptorB.environmentId),
-    )?.slices[0]?.projects.map((entry) => entry.id),
-  ).toContain(project.projectId)
   restored.start()
   window.dispatchEvent(new Event('focus'))
   await waitFor(() => expect(transportFor(h.descriptorA.environmentId)?.closed).toBe(false))
@@ -182,7 +172,7 @@ test('authoritative removal hides a mirrored cached machine, preserves its disk 
   ).toBe(true)
 })
 
-test('a missing boot mirror keeps desired names pending and hydrates only after a configured settings projection arrives', async ({
+test('a missing boot mirror keeps desired names pending until a configured settings projection arrives', async ({
   server,
 }) => {
   const h = await createFederationHarness(server)
@@ -192,7 +182,6 @@ test('a missing boot mirror keeps desired names pending and hydrates only after 
       useChatProjectionStore.getState().slices[h.descriptorB.environmentId]?.projectIds,
     ).toContain(project.projectId),
   )
-  flushChatProjectionCache()
   h.connections.stop()
   useChatProjectionStore.getState().dropEnvironment(h.descriptorB.environmentId)
   writeBootMirror(DEFAULT_SETTING_VALUES)
@@ -207,10 +196,11 @@ test('a missing boot mirror keeps desired names pending and hydrates only after 
   ).toBe(false)
   restored.configureMachines({ remote: { kind: 'origin', url: h.originB } })
   expect(readConnectedMachines()).toEqual(['remote'])
+  // Configured is not connected: the transport is still closed, so the rail stays empty of it.
   expect(
     currentRailEnvironments().some(
       (environment) => environment.environmentId === h.descriptorB.environmentId,
     ),
-  ).toBe(true)
+  ).toBe(false)
   expect(transportFor(h.descriptorB.environmentId)?.closed).toBe(true)
 })

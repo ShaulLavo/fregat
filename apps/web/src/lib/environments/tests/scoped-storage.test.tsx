@@ -5,12 +5,8 @@ import { healthDescriptorSchema, environmentIdSchema } from '@workspace/contract
 import {
   readCachedEnvironmentBindings,
   recordEnvironmentCacheBinding,
-  CHAT_PROJECTION_CACHE_STORAGE_KEY,
-  chatProjectionCacheFromState,
-  readChatProjectionCache,
-  writeChatProjectionCache,
-  hydrateChatProjectionState,
-} from '@/features/chat/state/chat-projection-cache'
+  ENVIRONMENT_BINDING_STORAGE_KEY,
+} from '@/lib/environments/state/binding-cache'
 import {
   initializeSessionSelectionStorage,
   restoreEnvironmentSessionSelection,
@@ -44,8 +40,6 @@ import {
   useChatInputDraftStore,
 } from '@/features/chat/state/chat-input-draft-store'
 import { readPersistedChatInputDrafts } from '@/features/chat/utils/draft-storage'
-import { createInitialChatProjectionSlice } from '@workspace/client-core/chat/types'
-import { createInitialChatProjectionState } from '@/features/chat/state/chat-projection-store'
 
 const a = environmentScopedStorage(
   v.parse(environmentIdSchema, 'acb59787-a2a8-4a00-9aee-aa242be93d01'),
@@ -142,31 +136,6 @@ test('prompt queues reload independently', () => {
   ).toEqual(['B prompt'])
 })
 
-test('each projection cache hydrates its own stale slice before sockets connect', () => {
-  const state = {
-    slices: {
-      [a.environmentId]: createInitialChatProjectionSlice(),
-      [b.environmentId]: createInitialChatProjectionSlice(),
-    },
-  }
-  const cached = chatProjectionCacheFromState(state)
-  writeChatProjectionCache(a, cached)
-  writeChatProjectionCache(b, cached)
-  expect(readChatProjectionCache(a)?.slices.map((slice) => slice.environmentId)).toEqual([
-    a.environmentId,
-  ])
-  expect(readChatProjectionCache(b)?.slices.map((slice) => slice.environmentId)).toEqual([
-    b.environmentId,
-  ])
-  const coldA = hydrateChatProjectionState(
-    createInitialChatProjectionState(),
-    readChatProjectionCache(a),
-  )
-  const coldBoth = hydrateChatProjectionState(coldA, readChatProjectionCache(b))
-  expect(Object.keys(coldBoth.slices)).toHaveLength(2)
-  expect(Object.values(coldBoth.slices).every((slice) => !slice.bootstrapComplete)).toBe(true)
-})
-
 test('switching into an empty machine preserves the outgoing remembered session', () => {
   initializeSessionSelectionStorage(a)
   initializeSessionSelectionStorage(b)
@@ -217,25 +186,17 @@ test('cold machine discovery keeps aliases with their confirmed identity and pre
     origin: 'http://localhost:39002',
     descriptor: descriptorB,
   })
-  const cached = chatProjectionCacheFromState({
-    slices: {
-      [a.environmentId]: createInitialChatProjectionSlice(),
-      [b.environmentId]: createInitialChatProjectionSlice(),
-    },
-  })
-  writeChatProjectionCache(a, cached)
-  writeChatProjectionCache(b, cached)
   const bindings = readCachedEnvironmentBindings(['local', 'remote'])
   expect(bindings).toHaveLength(2)
   expect(
     bindings.find((binding) => binding.descriptor.environmentId === a.environmentId),
   ).toMatchObject({ names: ['local', 'loopback-alias'], origin: 'http://localhost:3001' })
   expect(readCachedEnvironmentBindings(['not-connected'])).toEqual([])
+  // A binding naming another environment is a scope mix-up, and the read drops it.
   const invalid = {
-    ...readChatProjectionCache(b),
     binding: { names: ['remote'], origin: 'http://localhost:39002', descriptor: descriptorA },
   }
-  b.setItem(CHAT_PROJECTION_CACHE_STORAGE_KEY, JSON.stringify(invalid))
+  b.setItem(ENVIRONMENT_BINDING_STORAGE_KEY, JSON.stringify(invalid))
   expect(readCachedEnvironmentBindings(['remote'])).toEqual([])
 })
 

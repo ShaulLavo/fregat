@@ -7,11 +7,7 @@ import {
   createInitialChatProjectionState,
   useChatProjectionStore,
 } from '@/features/chat/state/chat-projection-store'
-import {
-  chatProjectionCacheFromState,
-  recordEnvironmentCacheBinding,
-  writeChatProjectionCache,
-} from '@/features/chat/state/chat-projection-cache'
+import { recordEnvironmentCacheBinding } from '@/lib/environments/state/binding-cache'
 import { fetchOrchestrationShellSnapshotHttp } from '@/features/chat/transport/orchestration-http-snapshots'
 import { primaryServerOrigin, activeServerOrigin, setActiveServerOrigin } from '@/lib/client'
 import { useEnvironmentsStore } from '@/lib/environments/state/store'
@@ -91,9 +87,6 @@ test('cached primary and remote slices paint before sockets, and cached protocol
       descriptorB.environmentId,
       await fetchOrchestrationShellSnapshotHttp(clientB),
     )
-  const cached = chatProjectionCacheFromState(useChatProjectionStore.getState())
-  writeChatProjectionCache(environmentScopedStorage(descriptorA.environmentId), cached)
-  writeChatProjectionCache(environmentScopedStorage(descriptorB.environmentId), cached)
   recordEnvironmentCacheBinding(environmentScopedStorage(descriptorA.environmentId), {
     names: ['local'],
     origin: primary,

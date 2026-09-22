@@ -25,7 +25,8 @@ import {
 } from '@workspace/contracts'
 import { paletteStylesheet, resolvePalette } from '@workspace/client-core/themes/palette'
 
-import { loadNerdFont } from '@/lib/default-nerd-font'
+import { useQuery } from '@tanstack/react-query'
+import { nerdFontQueryOptions } from '@/lib/default-nerd-font'
 import { BundleContext } from '@/lib/appearance/providers/bundle-context'
 import { PaletteContext } from '@/lib/appearance/providers/palette-context'
 import { applyPaletteStylesheet, writePaletteBootCache } from '@/lib/appearance/utils/palette-style'
@@ -144,11 +145,10 @@ export function AppearanceProvider({
 
   const confirmedValues = confirmedQuery.data?.values
   const confirmedFontFamily = confirmedValues?.['editor.fontFamily']
-  useEffect(() => {
-    if (!confirmedFontFamily) return
-
-    void loadNerdFont(confirmedFontFamily)
-  }, [confirmedFontFamily])
+  useQuery({
+    ...nerdFontQueryOptions(confirmedFontFamily ?? ''),
+    enabled: Boolean(confirmedFontFamily),
+  })
 
   useEffect(() => {
     if (!confirmedValues) return

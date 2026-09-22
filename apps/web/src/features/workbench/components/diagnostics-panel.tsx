@@ -1,12 +1,8 @@
-import { useDiagnosticsReload } from '@/features/workbench/hooks/use-diagnostics-reload'
-import type { RefObject } from 'react'
-import { TickerNumber } from '@/components/ticker-number'
 import type {
   LanguageServerDefinitionTarget,
   LanguageServerStatus,
 } from '@singapore-editor/lsp-plugin/websocket'
 import { EmptyState } from '@workspace/ui/components/empty-state'
-import { cn } from '@workspace/ui/lib/utils'
 
 import { useEditorLanguageServerStatus } from '@/features/editor/hooks/use-editor-language-server-status'
 import { useEditorCommands } from '@/features/editor/hooks/use-editor-commands'
@@ -14,6 +10,7 @@ import { createEditorLanguageServerStatusSource } from '@/features/editor/state/
 import { useEditorUiState, useEditorUiStoreApi } from '@/features/editor/state/ui-state'
 import { useEditorWorkspaceStoreApi } from '@/features/editor/state/workspace-state'
 import { activeEditorTab } from '@/lib/documents/utils/groups'
+import { useMarkerResources } from '@/hooks/use-markers'
 import { DiagnosticsLoading } from '@/features/workbench/components/diagnostics-loading'
 import { FocusablePanel } from '@/components/focusable-panel'
 import { basename, parentPath } from '@/lib/path-formatters'
@@ -26,15 +23,32 @@ export function DiagnosticsPanel() {
   const commands = useEditorCommands()
   const uiStore = useEditorUiStoreApi()
   const workspaceStore = useEditorWorkspaceStoreApi()
-  const languageServerStatus = useEditorLanguageServerStatus(
+  // Status still comes from the active tab's servers: it answers "is anything checking",
+  // which the marker store cannot — an empty store and a broken server look alike.
+  const { status } = useEditorLanguageServerStatus(
     statusBarSource?.languageServerStatusSource ?? idleLanguageServerStatusSource,
   )
-
-  const reload = useDiagnosticsReload(statusBarSource?.filePath, languageServerStatus.diagnostics)
+  const resources = useMarkerResources()
 
   function previewDiagnostic(target: LanguageServerDefinitionTarget) {
     const tab = activeEditorTab(workspaceStore.getState().workbenchPanels.editorGroups)
     if (tab) uiStore.getState().setDefinitionTarget(target, tab.id)
+  }
+
+  function openDiagnostic(target: LanguageServerDefinitionTarget) {
+    void commands.openDefinition(target)
+  }
+
+  if (resources.length === 0) {
+    return (
+      <FocusablePanel
+        area='problems'
+        target={{ kind: 'problems' }}
+        className='flex h-full min-h-0 min-w-0 flex-col overflow-hidden'
+      >
+        {renderDiagnosticsState(statusBarSource ? status : 'idle')}
+      </FocusablePanel>
+    )
   }
 
   return (
@@ -43,114 +57,25 @@ export function DiagnosticsPanel() {
       target={{ kind: 'problems' }}
       className='flex h-full min-h-0 min-w-0 flex-col overflow-hidden'
     >
-      {reload.path ? (
-        renderDiagnosticsStatus({
-          languageServerStatus: {
-            status: statusBarSource ? languageServerStatus.status : 'loading',
-            diagnostics: reload.diagnostics,
-          },
-          onOpenDiagnostic: (target) => {
-            void commands.openDefinition(target)
-          },
-          onPreviewDiagnostic: previewDiagnostic,
-          filePath: reload.path,
-          scrollRef: reload.ref,
-          saved: reload.saved,
-        })
-      ) : (
-        <EmptyState
-          className='min-h-0 flex-1'
-          description='Open a file to see its diagnostics.'
-          title='No active editor'
-        />
-      )}
+      <div className='min-h-0 flex-1 overflow-auto p-3 text-xs'>
+        {resources.map((resource) => (
+          <section className='mb-4 last:mb-0' key={resource.uri}>
+            <div className='text-muted-foreground mb-2 truncate' title={resource.path}>
+              <span className='text-foreground'>{basename(resource.path)}</span>
+              {parentPath(resource.path) ? (
+                <span className='ml-2'>{parentPath(resource.path)}</span>
+              ) : null}
+            </div>
+            <DiagnosticList
+              diagnostics={resource.summary}
+              onOpenDiagnostic={openDiagnostic}
+              onPreviewDiagnostic={previewDiagnostic}
+              path={resource.path}
+            />
+          </section>
+        ))}
+      </div>
     </FocusablePanel>
-  )
-}
-
-function renderDiagnosticsStatus({
-  languageServerStatus,
-  filePath,
-  scrollRef,
-  saved,
-  onOpenDiagnostic,
-  onPreviewDiagnostic,
-}: {
-  readonly languageServerStatus: ReturnType<typeof useEditorLanguageServerStatus>
-  readonly filePath: string
-  readonly scrollRef: RefObject<HTMLDivElement | null>
-  readonly saved: boolean
-  onOpenDiagnostic(target: LanguageServerDefinitionTarget): void | boolean
-  onPreviewDiagnostic(target: LanguageServerDefinitionTarget): void
-}) {
-  const { diagnostics, status } = languageServerStatus
-  if (saved && diagnostics?.counts.total === 0) {
-    return (
-      <EmptyState
-        className='min-h-0 flex-1'
-        title='No problems in saved results'
-        description='Refreshing diagnostics…'
-      />
-    )
-  }
-  if (!diagnostics || diagnostics.counts.total === 0) {
-    return renderDiagnosticsState(status)
-  }
-  const directory = parentPath(filePath)
-
-  return (
-    <div ref={scrollRef} className='min-h-0 flex-1 overflow-auto p-3 text-xs'>
-      {saved ? (
-        <p role='status' className='text-muted-foreground mb-2'>
-          {status === 'error'
-            ? 'Could not refresh diagnostics. Showing saved results.'
-            : 'Saved diagnostics. Refreshing…'}
-        </p>
-      ) : null}
-      <div className='text-muted-foreground mb-3 truncate' title={filePath}>
-        <span className='text-foreground'>{basename(filePath)}</span>
-        {directory ? <span className='ml-2'>{directory}</span> : null}
-      </div>
-      <div className='grid grid-cols-4 gap-2'>
-        {renderDiagnosticCount({ label: 'Errors', severity: 1, value: diagnostics.counts.error })}
-        {renderDiagnosticCount({
-          label: 'Warnings',
-          severity: 2,
-          value: diagnostics.counts.warning,
-        })}
-        {renderDiagnosticCount({
-          label: 'Info',
-          severity: 3,
-          value: diagnostics.counts.information,
-        })}
-        {renderDiagnosticCount({ label: 'Hints', severity: 4, value: diagnostics.counts.hint })}
-      </div>
-      <DiagnosticList
-        diagnostics={diagnostics}
-        onOpenDiagnostic={onOpenDiagnostic}
-        onPreviewDiagnostic={onPreviewDiagnostic}
-        path={filePath}
-      />
-    </div>
-  )
-}
-
-function renderDiagnosticCount({
-  label,
-  severity,
-  value,
-}: {
-  readonly label: string
-  readonly severity: number
-  readonly value: number
-}) {
-  return (
-    <div className={cn('rounded-lg px-2 py-1', diagnosticTileClass(severity, value))} key={label}>
-      <div className='text-muted-foreground'>{label}</div>
-      <div className={cn('font-medium tabular-nums', diagnosticValueClass(severity, value))}>
-        <TickerNumber size='xs' value={value} />
-      </div>
-    </div>
   )
 }
 
@@ -163,27 +88,11 @@ function renderDiagnosticsState(status: LanguageServerStatus) {
     return <EmptyState className='min-h-0 flex-1' title='Diagnostics unavailable' tone='error' />
   }
 
-  return <EmptyState className='min-h-0 flex-1' title='No problems reported' />
-}
-
-/**
- * LSP severities: 1 error, 2 warning, 3 information, 4 hint. Hints have no
- * status token by design — the lowest severity should recede, not compete.
- */
-function diagnosticValueClass(severity: number, value: number) {
-  if (value === 0) return 'text-muted-foreground'
-  if (severity === 1) return 'text-destructive'
-  if (severity === 2) return 'text-warning'
-  if (severity === 3) return 'text-info'
-
-  return 'text-foreground'
-}
-
-function diagnosticTileClass(severity: number, value: number) {
-  if (value === 0) return 'bg-muted'
-  if (severity === 1) return 'bg-destructive/10'
-  if (severity === 2) return 'bg-warning/10'
-  if (severity === 3) return 'bg-info/10'
-
-  return 'bg-muted'
+  return (
+    <EmptyState
+      className='min-h-0 flex-1'
+      description='A file is checked once it is opened.'
+      title='No problems reported'
+    />
+  )
 }

@@ -38,7 +38,7 @@ import { useProjectEntrySearch } from '../hooks/use-project-entry-search'
 import { providerCommandCatalogQueryOptions } from '@/features/chat/utils/composer-skills'
 import { useComposerInbox } from '../hooks/use-composer-inbox'
 import { useAttachmentPreparation } from '@/features/chat/hooks/use-attachment-preparation'
-import { useProviderDisplay } from '@/features/chat/hooks/use-provider-display'
+import { useProvider } from '@/features/chat/hooks/use-provider'
 import { chatSubmissionValidation } from '@/features/chat/utils/submission-validation'
 import { OrbitLoader } from '@workspace/ui/components/orbit-loader'
 import { ChatModelPickerProvider } from '../providers/model-picker-provider'
@@ -127,9 +127,7 @@ export function ChatInput({
   const draftProviderId = useChatInputDraftStore(
     (state) => state.getDraft(draftTarget).modelSelection?.providerInstanceId,
   )
-  const { provider: modeProvider } = useProviderDisplay(
-    draftProviderId ?? modelSelection?.providerInstanceId,
-  )
+  const modeProvider = useProvider(draftProviderId ?? modelSelection?.providerInstanceId)
   const planMode = resolveComposerInteractionMode({
     planModeEnabled,
     provider: modeProvider,
@@ -165,7 +163,7 @@ export function ChatInput({
   const initialDraft = readChatInputDraftPrompt(draftTarget)
   const [activeCommandItemId, setActiveCommandItemId] = useState<string | null>(null)
   const imagePreparation = useAttachmentPreparation(draftTarget)
-  const { display: sessionProvider } = useProviderDisplay(sessionProviderInstanceId ?? undefined)
+  const sessionProvider = useProvider(sessionProviderInstanceId ?? undefined)
   const busySendDisabledReason = busy
     ? (correctionDisabledReason ??
       (sessionProvider?.driverKind === 'codex'

@@ -110,7 +110,6 @@ export function DiffView({
           "Ask" button would otherwise clear the selection before the click landed. */}
       <div className='min-h-0 w-full min-w-0 flex-1' ref={containerRef}>
         <DiffEditor
-          paintIdentity={JSON.stringify(diffDocumentQueryKey(comparison))}
           file={file}
           failure={failure}
           languageServer={file ? languageServer : null}

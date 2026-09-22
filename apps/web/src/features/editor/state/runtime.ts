@@ -1,3 +1,5 @@
+import { LanguageServerDocuments } from '@/features/editor/state/language-server-documents'
+import { openLanguageServerBuffers } from '@/features/editor/utils/open-language-server-buffers'
 import { activeEditorTabForWorkbenchPanels } from '@/features/workbench/utils/panels'
 import { clientLogContext } from '@/lib/environments/state/log-context'
 import { clientForQueryClient } from '@/lib/environments/state/query-clients'
@@ -100,6 +102,11 @@ export function createEditorRuntime({
     fileOpenIntentOwner,
   )
   const documentSyncController = new LanguageServerDocumentSyncController()
+  const languageServerDocuments = new LanguageServerDocuments()
+  const retainLanguageServers = () =>
+    languageServerDocuments.retain(
+      openLanguageServerBuffers(workspaceStore.getState(), documentStore.getState()),
+    )
   const fileSync = new FileSyncService(documentStore, queryClient)
   const historyPersistence = new HistoryPersistenceService(
     documentStore,
@@ -154,6 +161,15 @@ export function createEditorRuntime({
     recoveryDiscovery = { generation, promise }
   }
   const subscriptions = [
+    documentStore.subscribe((state) => state.liveDocumentsByKey, retainLanguageServers),
+    workspaceStore.subscribe((state, previous) => {
+      if (
+        state.openTabContents === previous.openTabContents &&
+        state.parkedWorkspaces === previous.parkedWorkspaces
+      )
+        return
+      retainLanguageServers()
+    }),
     useChatProjectionStore.subscribe((state, previous) => {
       if (
         state.slices[storage.environmentId]?.worktreeById ===
@@ -215,6 +231,7 @@ export function createEditorRuntime({
     editorActivation,
     editorOpenBenchmarkControl,
     documentSyncController,
+    languageServerDocuments,
     workspaceEditService,
     workspaceEditHost,
     saveService,
@@ -230,6 +247,7 @@ export function createEditorRuntime({
       suspend()
       disposed = true
       for (const unsubscribe of subscriptions) unsubscribe()
+      languageServerDocuments.dispose()
       historyPersistence.dispose()
       fileOpenIntentOwner.disposeNow()
       workspaceEditService.dispose()

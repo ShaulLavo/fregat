@@ -665,7 +665,9 @@ function launch(headed: boolean): Promise<Browser> {
   if (!process.env.PLAYWRIGHT_BROWSERS_PATH && existsSync(cache)) {
     process.env.PLAYWRIGHT_BROWSERS_PATH = cache
   }
-  return chromium.launch({ headless: !headed })
+  // Playwright hides scrollbars by default. Users have them, and a scrollbar that appears with
+  // content changes every width the app measures.
+  return chromium.launch({ headless: !headed, ignoreDefaultArgs: ['--hide-scrollbars'] })
 }
 
 process.exitCode = await main()

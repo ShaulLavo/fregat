@@ -19,12 +19,14 @@
         let paletteCss = null
         let density = 'compact'
         let wallpaper = { enabled: true, source: { kind: 'desktop' } }
+        let fontId = 'JetBrainsMono'
         try {
           const raw = localStorage.getItem('platform.settings-boot-mirror.v1')
           const mirror = raw ? JSON.parse(raw) : {}
           const storedTheme = mirror['workbench.colorTheme']
           const storedDensity = mirror['workbench.density']
           if (storedTheme === 'dark' || storedTheme === 'light') theme = storedTheme
+          if (typeof mirror['editor.fontFamily'] === 'string') fontId = mirror['editor.fontFamily']
           if (typeof mirror['workbench.palette'] === 'string') palette = mirror['workbench.palette']
           let mode = theme
           if (mode === 'system')
@@ -60,6 +62,7 @@
         const source = wallpaper.enabled ? wallpaper.source : null
         if (!wallpaper.enabled) root.setAttribute('data-wallpaper-hidden', '')
         preloadWallpaper(source?.kind === 'desktop')
+        startEditorFont(fontId)
         if (paletteCss === null) return
 
         // Before globals.css loads, so the first frame already carries the
@@ -69,6 +72,33 @@
         style.textContent = paletteCss
         document.head.append(style)
       })()
+
+      // Mirrors defaultServerUrl in src/lib/client.ts: an explicit development
+      // override, else the page's own base URL, which is where one server serves both.
+      function serverBase() {
+        const configuredServer = '%VITE_SERVER_URL%'
+        const developmentServer = '%DEV%' === 'true' ? 'http://localhost:3001' : '%BASE_URL%'
+        const server = new URL(
+          configuredServer.startsWith('%') ? developmentServer : configuredServer,
+          location.href,
+        )
+        return `${server.origin}${server.pathname.replace(/\/+$/, '')}`
+      }
+
+      // The editor measures its cell width as it mounts, so the face has to be in flight before
+      // the bundle is. Family and URL mirror src/lib/default-nerd-font.ts, which adopts this face.
+      function startEditorFont(fontId) {
+        if (typeof FontFace === 'undefined') return
+        const url = `${serverBase()}/fonts/${encodeURIComponent(fontId)}`
+        const face = new FontFace(`${fontId} Nerd Font`, `url(${JSON.stringify(url)})`, {
+          display: 'swap',
+          style: 'normal',
+          weight: '400',
+        })
+        document.fonts.add(face)
+        // A family the user typed is not on the server; the stack falls through to the local one.
+        face.load().catch(() => {})
+      }
 
       function preloadWallpaper(enabled) {
         if (!enabled) return
@@ -80,15 +110,7 @@
           : !/android/i.test(navigator.userAgent) && /linux|bsd/i.test(navigator.userAgent)
         if (desktopLinux) return
 
-        // Mirrors defaultServerUrl in src/lib/client.ts: an explicit development
-        // override, else the page's own base URL, which is where one server serves both.
-        const configuredServer = '%VITE_SERVER_URL%'
-        const developmentServer = '%DEV%' === 'true' ? 'http://localhost:3001' : '%BASE_URL%'
-        const server = new URL(
-          configuredServer.startsWith('%') ? developmentServer : configuredServer,
-          location.href,
-        )
-        const desktopStill = `${server.origin}${server.pathname.replace(/\/+$/, '')}/wallpaper/still`
+        const desktopStill = `${serverBase()}/wallpaper/still`
         const preload = document.createElement('link')
         preload.rel = 'preload'
         preload.as = 'image'

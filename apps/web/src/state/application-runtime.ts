@@ -1,8 +1,6 @@
-import { prepareDiffPaintReload } from '@/features/editor/state/diff-paint'
 import { prepareSearchReload } from '@/features/search/state/result-scroll-state'
-import { prepareLogsReload } from '@/features/logs/state/reload'
-import { prepareDiagnosticsReload } from '@/features/workbench/state/diagnostics-reload'
 import { prepareTerminalReload } from '@/features/terminal/state/reload'
+import { prepareLogsViewReload } from '@/features/logs/state/view-reload'
 import { prepareGitReload } from '@/features/git/state/reload'
 import { prepareSettingsReload } from '@/features/settings/state/reload'
 import { environmentWindowStorage } from '@/lib/environments/state/window-storage'
@@ -21,6 +19,7 @@ import {
 import { initializeEnvironmentPersistence } from '@/state/environment-persistence'
 import { restoreEnvironmentSessionSelection } from '@/features/chat-mode/state/session-selection-store'
 import { resetLanguageServerConnectionPool } from '@/features/editor/state/language-server-connection-pool'
+import { markerStore } from '@/lib/markers/store'
 import { createEditorRuntime, type EditorRuntime } from '@/features/editor/state/runtime'
 import type { EditorWorkspaceStoreApi } from '@/features/editor/state/workspace-state'
 import type { QueryClient } from '@tanstack/react-query'
@@ -42,7 +41,6 @@ type RetainedEnvironment = {
   readonly queryClient: QueryClient
   readonly editor: EditorRuntime
   readonly stopSearchReload: () => void
-  readonly stopSettingsReload: () => void
   readonly unsubscribeRoot: () => void
 }
 
@@ -52,11 +50,9 @@ function prepareReloadOwners(
   root: string | null,
 ) {
   prepareGitReload(queryClient, windowStorage, root)
-  prepareDiffPaintReload(queryClient, windowStorage, root)
   prepareTerminalReload(queryClient, windowStorage, root)
-  prepareLogsReload(queryClient, windowStorage, root)
-  prepareDiagnosticsReload(queryClient, windowStorage, root)
-  return prepareSettingsReload(queryClient, windowStorage, root)
+  prepareLogsViewReload(queryClient, windowStorage, root)
+  prepareSettingsReload(queryClient, windowStorage, root)
 }
 
 export function createApplicationRuntime({
@@ -76,11 +72,7 @@ export function createApplicationRuntime({
     const queryClient = queryClientFor(origin)
     const windowStorage = environmentWindowStorage(storage.environmentId)
     prepareTreeReload(queryClient, windowStorage)
-    let stopSettingsReload = prepareReloadOwners(
-      queryClient,
-      windowStorage,
-      seed.rootFolder?.path ?? null,
-    )
+    prepareReloadOwners(queryClient, windowStorage, seed.rootFolder?.path ?? null)
     const editor = createEditorRuntime({
       queryClient,
       storage,
@@ -94,12 +86,10 @@ export function createApplicationRuntime({
       queryClient,
       editor,
       stopSearchReload,
-      stopSettingsReload: () => stopSettingsReload(),
       unsubscribeRoot: editor.workspaceStore.subscribe(
         (state) => state.rootFolder?.path ?? null,
         (root) => {
-          stopSettingsReload()
-          stopSettingsReload = prepareReloadOwners(queryClient, windowStorage, root)
+          prepareReloadOwners(queryClient, windowStorage, root)
           if (current.editor === editor) activateWorkspaceRoot(root)
         },
       ),
@@ -138,6 +128,7 @@ export function createApplicationRuntime({
       commandBinding.clear()
       suspendEnvironmentActivity(current.origin)
       resetLanguageServerConnectionPool()
+      markerStore.clear()
       current.editor.suspend()
       void current.queryClient.cancelQueries()
       resumeEnvironmentActivity(next.origin)
@@ -184,12 +175,12 @@ export function createApplicationRuntime({
         suspendEnvironmentActivity(environment.origin)
         environment.unsubscribeRoot()
         environment.stopSearchReload()
-        environment.stopSettingsReload()
         environment.editor.dispose()
         environment.queryClient.unmount()
       }
       environments.clear()
       resetLanguageServerConnectionPool()
+      markerStore.clear()
     },
   }
   return application

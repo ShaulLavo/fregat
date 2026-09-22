@@ -425,7 +425,7 @@ Suggested order:
    [Plan 130](plans/130-ask-the-editor.md) Phases 1 and 4. One point query in the Editor removes the
    search-result row arithmetic, the unicode hover's marker scan and the residue in `diffRowAtEvent`.
    Plan 130 Phase 2 is implemented and verified; the remaining phases need Editor APIs.
-3. [E048](../Editor/plans/e048-minimap-document-space.md) and
+3. [E048](../Editor/docs/display/e048-minimap-document-space.md) and
    [E051](../Editor/plans/e051-fast-path-equivalence.md). The minimap repeats the display-row bug,
    and the row-layout fast path has no equivalence test.
 4. [E049](../Editor/plans/e049-no-silent-misses.md), [Plan 133](plans/133-one-owner-per-fact.md).

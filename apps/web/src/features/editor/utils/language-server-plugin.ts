@@ -1,3 +1,8 @@
+import { languageIdForFilePath } from '@/features/editor/utils/file-path'
+import type { EditorTextBuffer } from '@singapore-editor/core/document'
+import { createLanguageServerDocument } from '@singapore-editor/lsp-plugin'
+import { createEditorLanguageServerStatusSource } from '@/features/editor/state/language-server-status-source'
+import type { LanguageServerDocuments } from '@/features/editor/state/language-server-documents'
 import { fileUriForPath } from '@/lib/file-uri'
 import type { LanguageServerDocumentSyncController } from '@singapore-editor/lsp-plugin/document-sync-controller'
 import type {
@@ -35,6 +40,7 @@ import {
 import { languageServerWebSocketConstructor } from '@/lib/server-sockets'
 import { environmentClientFor } from '@/lib/client'
 import { environmentActivitySignal } from '@/lib/environments/state/activity'
+import { markerStore } from '@/lib/markers/store'
 import { log } from '@/lib/client-logging'
 import type { LanguageServerDocument } from '@/lib/language-server-document'
 
@@ -50,6 +56,9 @@ export type LanguageServerDocumentTarget = {
 
 type MatchedLanguageServerPluginOptions = {
   document: LanguageServerDocument | null
+  configurationGeneration?: number
+  documents?: LanguageServerDocuments
+  buffer?: EditorTextBuffer | null
   origin: string
   documentSyncController: LanguageServerDocumentSyncController
   enabled: boolean
@@ -68,6 +77,9 @@ type MatchedLanguageServerPluginOptions = {
 
 export function createMatchedLanguageServerPlugin({
   document,
+  documents,
+  configurationGeneration = 0,
+  buffer,
   origin,
   documentSyncController,
   enabled,
@@ -83,42 +95,125 @@ export function createMatchedLanguageServerPlugin({
 }: MatchedLanguageServerPluginOptions): LanguageServerPlugin {
   const eligible = enabled ? (matches ?? []) : []
   if (eligible.length === 0 || document === null)
-    return createIdleLanguageServerPlugin(statusSource)
+    return createIdleLanguageServerPlugin(statusSource, () => {
+      documents?.configure(configurationGeneration)
+      if (document && matches !== null) documents?.delete(document.key)
+    })
 
   const descriptors = eligible.map((match) => ({
     ...match,
     features: withoutDisabledFeatures(match.features, target.disabledFeatures),
   }))
-  const semanticControllers = new Map<string, SemanticTokenController>()
-  const lanes = descriptors.map((match) =>
-    liveLanguageServerLane({
-      origin,
-      match,
-      onApplyWorkspaceEdit,
-      rootPath,
-      semanticControllers,
-      statusSource,
-      target,
-    }),
-  )
-  const plugin = createLanguageServerSetPlugin({
-    lanes,
-    documentSync: {
-      controller: documentSyncController,
-      uriForDocument: (snapshot) => (snapshot.documentId === document.key ? document.uri : null),
-      languageIdForDocument: (_languageId, uri) => lspLanguageIdForPath(uri),
+  return {
+    name: 'editor.language-server',
+    activate: (context) => {
+      documents?.configure(configurationGeneration)
+      const configuration = JSON.stringify([origin, rootPath, document.uri, descriptors, target])
+      const entry =
+        buffer && documents
+          ? documents.getOrCreate(document.key, buffer, configuration, () =>
+              createDocumentEntry({
+                document,
+                buffer,
+                origin,
+                descriptors,
+                onApplyWorkspaceEdit,
+                rootPath,
+                target,
+                documentSyncController,
+              }),
+            )
+          : null
+      const semanticControllers =
+        entry?.semanticControllers ?? new Map<string, Set<SemanticTokenController>>()
+      statusSource.setServers(statusOrderedMatches(descriptors).map((match) => match.serverId))
+      const unsubscribe = entry ? relayStatus(entry.status, statusSource) : () => undefined
+      const source = entry
+        ? { document: entry.document }
+        : {
+            onApplyWorkspaceEdit,
+            lanes: descriptors.map((match) =>
+              liveLanguageServerLane({
+                origin,
+                match,
+                onApplyWorkspaceEdit,
+                rootPath,
+                semanticControllers,
+                statusSource,
+                target,
+              }),
+            ),
+            documentSync: {
+              controller: documentSyncController,
+              uriForDocument: (snapshot: { readonly documentId: string | null }) =>
+                snapshot.documentId === document.key ? document.uri : null,
+              languageIdForDocument: (_languageId: string, uri: string) =>
+                lspLanguageIdForPath(uri),
+            },
+          }
+      const plugin = createLanguageServerSetPlugin({
+        ...source,
+        semanticTokens: descriptors.some((match) => match.features.semanticTokens !== undefined)
+          ? semanticTokenOwnerFactory(semanticControllers, document)
+          : undefined,
+        onDefinitionLinkHover,
+        onOpenDefinition,
+        onOpenReferences,
+        onDidNavigateDiagnostic,
+      })
+      return [...pluginDisposables(plugin.activate(context)), { dispose: unsubscribe }]
     },
-    semanticTokens: descriptors.some((match) => match.features.semanticTokens !== undefined)
-      ? semanticTokenOwnerFactory(semanticControllers, document)
-      : undefined,
-    onApplyWorkspaceEdit,
-    onDefinitionLinkHover,
-    onOpenDefinition,
-    onOpenReferences,
-    onDidNavigateDiagnostic,
-  })
+  }
+}
 
-  return initializeStatusOnActivation(plugin, statusSource, descriptors)
+function createDocumentEntry({
+  document,
+  buffer,
+  origin,
+  descriptors,
+  onApplyWorkspaceEdit,
+  rootPath,
+  target,
+  documentSyncController,
+}: {
+  document: LanguageServerDocument
+  buffer: EditorTextBuffer
+  origin: string
+  descriptors: readonly LanguageServerMatch[]
+  onApplyWorkspaceEdit: OnApplyWorkspaceEdit
+  rootPath: string
+  target: LanguageServerDocumentTarget
+  documentSyncController: LanguageServerDocumentSyncController
+}) {
+  const status = createEditorLanguageServerStatusSource()
+  status.setServers(statusOrderedMatches(descriptors).map((match) => match.serverId))
+  const semanticControllers = new Map<string, Set<SemanticTokenController>>()
+  return {
+    document: createLanguageServerDocument({
+      buffer,
+      documentId: document.key,
+      uri: document.uri,
+      languageId:
+        lspLanguageIdForPath(document.uri) ??
+        languageIdForFilePath(target.matchPath) ??
+        'plaintext',
+      controller: documentSyncController,
+      onApplyWorkspaceEdit,
+      lanes: descriptors.map((match) =>
+        liveLanguageServerLane({
+          origin,
+          match,
+          onApplyWorkspaceEdit,
+          rootPath,
+          semanticControllers,
+          statusSource: status,
+          target,
+        }),
+      ),
+    }),
+    status,
+    semanticControllers,
+  }
 }
 
 function liveLanguageServerLane({
@@ -134,7 +229,7 @@ function liveLanguageServerLane({
   onApplyWorkspaceEdit: OnApplyWorkspaceEdit
   rootPath: string
   origin: string
-  semanticControllers: Map<string, SemanticTokenController>
+  semanticControllers: Map<string, Set<SemanticTokenController>>
   statusSource: EditorLanguageServerStatusSource
   target: LanguageServerDocumentTarget
 }): LanguageServerLaneOptions {
@@ -156,8 +251,19 @@ function liveLanguageServerLane({
       semanticControllers,
       statusSource,
     ),
-    onStatusChange: (status) => statusSource.setServerStatus(match.serverId, status),
-    onDiagnostics: (diagnostics) => statusSource.setServerDiagnostics(match.serverId, diagnostics),
+    onStatusChange: (status) => {
+      // A server that stopped or failed keeps no claim on its markers.
+      if (status !== 'ready') markerStore.removeOwner(match.serverId)
+      statusSource.setServerStatus(match.serverId, status)
+    },
+    onDiagnostics: (diagnostics) => {
+      // The summary names its own resource, which is how one server's markers for a file
+      // it is not the active tab for still reach the panel.
+      if (diagnostics.uri) {
+        markerStore.changeOne(match.serverId, diagnostics.uri, diagnostics.diagnostics)
+      }
+      statusSource.setServerDiagnostics(match.serverId, diagnostics)
+    },
     onInteractiveReady: () => statusSource.setServerInteractiveReady(match.serverId),
     onRequestError: (method, error) => {
       log.error({
@@ -209,14 +315,14 @@ export function languageServerLaneOptions({
 
 function laneNotificationHandlers(
   serverId: string,
-  semanticControllers: ReadonlyMap<string, SemanticTokenController>,
+  semanticControllers: ReadonlyMap<string, Set<SemanticTokenController>>,
   statusSource: EditorLanguageServerStatusSource,
 ) {
   return {
     [LSP_SEMANTIC_TOKENS_REFRESH]: () => {
       const semanticTokens = semanticControllers.get(serverId) ?? null
-      semanticTokens?.handleRefresh()
-      return semanticTokens !== null
+      if (semanticTokens) for (const controller of semanticTokens) controller.handleRefresh()
+      return (semanticTokens?.size ?? 0) > 0
     },
     [LSP_SERVER_EXITED]: () => {
       statusSource.setServerStatus(serverId, 'error')
@@ -226,20 +332,22 @@ function laneNotificationHandlers(
 }
 
 function semanticTokenOwnerFactory(
-  controllers: Map<string, SemanticTokenController>,
+  controllers: Map<string, Set<SemanticTokenController>>,
   document: LanguageServerDocument,
 ): LanguageServerSemanticTokensFactory {
   return (owner) => {
-    controllers.get(owner.id)?.dispose()
+    const listeners = controllers.get(owner.id) ?? new Set<SemanticTokenController>()
     const controller = new SemanticTokenController({ serverId: owner.id })
-    controllers.set(owner.id, controller)
+    listeners.add(controller)
+    controllers.set(owner.id, listeners)
     controller.attachConnection(owner.connection)
     controller.handleConnected()
 
     return {
       ...semanticTokenLayerOptions(controller, document),
       dispose: () => {
-        if (controllers.get(owner.id) === controller) controllers.delete(owner.id)
+        listeners.delete(controller)
+        if (listeners.size === 0) controllers.delete(owner.id)
         controller.dispose()
       },
     }
@@ -265,26 +373,14 @@ function semanticTokenLayerOptions(
   }
 }
 
-function initializeStatusOnActivation(
-  plugin: LanguageServerPlugin,
-  statusSource: EditorLanguageServerStatusSource,
-  matches: readonly LanguageServerMatch[],
-): LanguageServerPlugin {
-  return {
-    name: plugin.name,
-    activate: (context) => {
-      statusSource.setServers(statusOrderedMatches(matches).map((match) => match.serverId))
-      return plugin.activate(context)
-    },
-  }
-}
-
 function createIdleLanguageServerPlugin(
   statusSource: EditorLanguageServerStatusSource,
+  onActivate: () => void,
 ): LanguageServerPlugin {
   return {
     name: 'editor.language-server.idle',
     activate: () => {
+      onActivate()
       statusSource.setServers([])
       return []
     },
@@ -363,4 +459,19 @@ function languageServerFeatures(value: unknown): LanguageServerMatch['features']
   }
 
   return features
+}
+
+function relayStatus(
+  source: EditorLanguageServerStatusSource,
+  target: EditorLanguageServerStatusSource,
+): () => void {
+  const relay = () => target.setSnapshot(source.getSnapshot())
+  relay()
+  return source.subscribe(relay)
+}
+
+function pluginDisposables(result: ReturnType<LanguageServerPlugin['activate']>) {
+  if (!result) return []
+  if ('dispose' in result) return [result]
+  return result
 }

@@ -32,9 +32,8 @@ export function AppShell({
       ref={shellRef}
       tabIndex={-1}
     >
-      {/* Behind the titlebar too, so every bar is the same glass. */}
       <Wallpaper />
-      {/* One region for the bar and the panels: two blurred elements sample the wallpaper apart. */}
+      {/* One blurred region for the bar and the panels, so they share a sample of the wallpaper. */}
       <div
         className={cn(surface.region, 'relative z-10 flex min-h-0 flex-1 flex-col')}
         data-surface-region=''

@@ -1,4 +1,6 @@
+import { queryOptions } from '@tanstack/react-query'
 import { activeServerOrigin } from '@/lib/client'
+import { appearanceKeys } from '@/lib/query-keys'
 
 const DEFAULT_NERD_FONT_ID = 'JetBrainsMono'
 
@@ -7,9 +9,8 @@ const DEFAULT_NERD_FONT_ID = 'JetBrainsMono'
  *
  * Derived from the id rather than the vendor's display name (`JetBrainsMono` the
  * id ships as `JetBrains Mono Nerd Font`), because nothing maps between the two
- * and the id is the only name the client and server share. Since this module
- * both registers the face and writes the stack, the derived name is what makes
- * them agree.
+ * and the id is the only name the client and server share. index.html registers
+ * the same name before the bundle loads, so the two must change together.
  */
 function nerdFontFamily(fontId: string): string {
   return `${fontId} Nerd Font`
@@ -37,83 +38,68 @@ export function fontStack(value: string): string {
 
 /** Derived, not written out again: one definition of what a font stack is. */
 export const DEFAULT_MONO_FONT_STACK = fontStack(DEFAULT_NERD_FONT_ID)
-export const DEFAULT_MONO_FONT_VARIABLE = '--font-mono'
 
-type CssVariableTarget = {
-  readonly style: {
-    getPropertyValue?(name: string): string
-    setProperty(name: string, value: string): void
-  }
+type FontSetTarget = Iterable<FontFace> & {
+  add(fontFace: FontFace): unknown
+  delete(fontFace: FontFace): unknown
 }
 
-type FontSetTarget = {
-  add(fontFace: FontFace): void
-}
-
-type FontFaceConstructor = new (
-  family: string,
-  source: string | BufferSource,
-  descriptors?: FontFaceDescriptors,
-) => FontFace
-
-type DefaultNerdFontOptions = {
-  FontFace?: FontFaceConstructor | null
-  fetcher?: typeof fetch
+type NerdFontEnvironment = {
+  FontFace?: typeof FontFace | null
   fonts?: FontSetTarget | null
-  root?: CssVariableTarget | null
   url?: string
 }
 
-export async function loadDefaultNerdFont(options: DefaultNerdFontOptions = {}) {
-  return loadNerdFont(DEFAULT_NERD_FONT_ID, options)
+/**
+ * The one owner of a Nerd Font download. Boot and the settings provider both ask for the
+ * confirmed family; the key is what makes the second ask join the first.
+ */
+export function nerdFontQueryOptions(fontId: string, environment: NerdFontEnvironment = {}) {
+  return queryOptions({
+    queryKey: appearanceKeys.nerdFont(fontId),
+    queryFn: () => registerNerdFont(fontId, environment),
+    staleTime: 'static',
+    gcTime: Infinity,
+    // The browser may already hold the immutable font while offline.
+    networkMode: 'always',
+  })
 }
 
 /**
- * Fetches one Nerd Font by id, registers it, and points `--font-mono` at it.
- *
- * The stack is applied before the fetch as well as after, so the editor renders
- * in a monospace face immediately instead of waiting on a download that may take
- * a while the first time — the server subsets and caches on demand.
+ * A URL source, not fetched bytes: the browser then owns the cache, a reload reuses the face
+ * instead of re-parsing it, and `document.fonts.status` reports the wait to anything measuring.
  */
-export async function loadNerdFont(fontId: string, options: DefaultNerdFontOptions = {}) {
-  const root = options.root ?? documentRoot()
+async function registerNerdFont(fontId: string, environment: NerdFontEnvironment) {
+  const FontFaceClass = environment.FontFace ?? globalThis.FontFace
+  const fonts = environment.fonts ?? documentFonts()
+  if (!FontFaceClass || !fonts) return null
+
   const family = nerdFontFamily(fontId)
-  applyMonoFontStack(root, fontStack(fontId))
-
-  const FontFaceClass = options.FontFace ?? globalThis.FontFace
-  const fonts = options.fonts ?? documentFonts()
-  if (!FontFaceClass || !fonts) return false
-
-  try {
-    const fontData = await fetchDefaultFontData({ ...options, url: options.url ?? fontUrl(fontId) })
-    if (!fontData) return false
-
-    const fontFace = new FontFaceClass(family, fontData, {
-      display: 'swap',
-      style: 'normal',
-      weight: '400',
-    })
-    await fontFace.load()
-    fonts.add(fontFace)
-    if (monoFontStackStillCurrent(root, fontStack(fontId))) {
-      applyMonoFontStack(root, fontStack(fontId))
-    }
-
-    return true
-  } catch {
-    return false
+  // index.html starts this face before the bundle arrives; a second one would load it again.
+  const started = registeredFace(fonts, family)
+  if (started && started.status !== 'error') {
+    await started.load()
+    return family
   }
+  if (started) fonts.delete(started)
+
+  const source = `url(${JSON.stringify(environment.url ?? fontUrl(fontId))})`
+  const face = new FontFaceClass(family, source, {
+    display: 'swap',
+    style: 'normal',
+    weight: '400',
+  })
+  fonts.add(face)
+  await face.load()
+  return family
 }
 
-function applyMonoFontStack(root: CssVariableTarget | null, stack: string) {
-  root?.style.setProperty(DEFAULT_MONO_FONT_VARIABLE, stack)
-}
-
-function monoFontStackStillCurrent(root: CssVariableTarget | null, stack: string) {
-  const current = root?.style.getPropertyValue?.(DEFAULT_MONO_FONT_VARIABLE)
-  if (current === undefined) return true
-
-  return current === stack
+function registeredFace(fonts: FontSetTarget, family: string) {
+  for (const face of fonts) {
+    // Chrome serializes a family with spaces back in quotes.
+    if (face.family.replaceAll('"', '') === family) return face
+  }
+  return null
 }
 
 function fontUrl(fontId: string) {
@@ -132,22 +118,6 @@ export function fontPreviewUrl(fontId: string, text: string) {
   url.searchParams.set('text', text)
 
   return url.href
-}
-
-async function fetchDefaultFontData(options: DefaultNerdFontOptions) {
-  const fetcher = options.fetcher ?? fetch
-  const response = await fetcher(options.url ?? fontUrl(DEFAULT_NERD_FONT_ID), {
-    credentials: 'omit',
-  })
-  if (!response.ok) return null
-
-  return response.arrayBuffer()
-}
-
-function documentRoot() {
-  if (typeof document === 'undefined') return null
-
-  return document.documentElement
 }
 
 function documentFonts() {

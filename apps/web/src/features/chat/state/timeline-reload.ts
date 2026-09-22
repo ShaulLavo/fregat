@@ -48,6 +48,27 @@ export function clearTimelineReload(environmentId: EnvironmentId) {
   environmentWindowStorage(environmentId).removeItem(KEY)
 }
 
+/**
+ * A remembered view names one session id. Server-confirmed deletion is the only
+ * thing that retires it: without this the record outlives what it points at, and
+ * the next unmount flush would write it back.
+ */
+export function discardTimelineReloadForSessions(
+  environmentId: EnvironmentId,
+  events: readonly { readonly type: string; readonly payload?: unknown }[],
+) {
+  const saved = readTimelineReload(environmentId)
+  if (!saved) return
+  for (const event of events) {
+    if (event.type !== 'session.deleted') continue
+    const payload = event.payload
+    if (!payload || typeof payload !== 'object') continue
+    if ((payload as { sessionId?: string }).sessionId !== saved.sessionId) continue
+    clearTimelineReload(environmentId)
+    return
+  }
+}
+
 export function readTimelineReload(environmentId: EnvironmentId) {
   if (savedByEnvironment.has(environmentId)) return savedByEnvironment.get(environmentId) ?? null
   const value = readReloadCache<TimelineReload>(

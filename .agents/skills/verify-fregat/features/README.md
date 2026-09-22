@@ -14,6 +14,7 @@ One file per user-facing surface. Each answers: what it is, how a user reaches i
 | Git                             | [git.md](git.md)               |
 | Pattern lists                   | [patterns.md](patterns.md)     |
 | Logs                            | [logs.md](logs.md)             |
+| Problems                        | [problems.md](problems.md)     |
 | Settings                        | [settings.md](settings.md)     |
 | Address URL                     | [address.md](address.md)       |
 | Landing page and product assets | [landing.md](landing.md)       |

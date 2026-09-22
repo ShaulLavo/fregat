@@ -10,6 +10,9 @@ import {
   removeEditorVisibleSnapshotCacheForPath,
 } from '@/lib/editor-visible-snapshot-cache'
 import { addLifecycleFlush } from '@/lib/lifecycle-flush'
+import { log } from '@/lib/client-logging'
+import { latestSnapshotAdmission } from '@/features/workbench/utils/snapshot-admission'
+import { snapshotWithheldReason } from '@/features/workbench/utils/snapshot-withheld-reason'
 
 type SnapshotTarget = {
   readonly contentVersion: string | null
@@ -140,12 +143,28 @@ export function useEditorVisibleSnapshot({
   )
 
   const record = cached.key === cacheKey ? cached.record : null
-  const eligible =
-    active &&
-    matchesTarget &&
-    themeReady &&
-    !buffer?.isDirty() &&
-    (contentVersion === null || record?.contentVersion === contentVersion)
+  const versionMatches = contentVersion === null || record?.contentVersion === contentVersion
+  const eligible = active && matchesTarget && themeReady && !buffer?.isDirty() && versionMatches
+  const withheld = snapshotWithheldReason({
+    active,
+    dirty: buffer?.isDirty() ?? false,
+    hasRecord: record !== null,
+    matchesTarget,
+    themeReady,
+    versionMatches,
+  })
+  // A paint that is never offered leaves no trace in the editor's own admission event.
+  useEffect(() => {
+    if (path === null) return
+    log.info({
+      area: 'editor',
+      action: 'editor.visible_snapshot.offer',
+      path,
+      outcome: withheld ?? 'offered',
+      documentLoaded: buffer !== null,
+      admission: withheld ? null : latestSnapshotAdmission(paintKey),
+    })
+  }, [buffer, paintKey, path, withheld])
   return {
     additionalPlugins,
     paintKey,

@@ -3,7 +3,6 @@ import type { ScopedStorage } from '@/lib/environments/state/scoped-storage'
 import { hydrateChatInputDraftStoreFromStorage } from '@/features/chat/state/chat-input-draft-store'
 import { hydrateChatChangedFilesExpansionStoreFromStorage } from '@/features/chat/state/chat-changed-files-expansion-store'
 import { hydrateSessionDiffScopeStoreFromStorage } from '@/features/chat/state/session-diff-scope-store'
-import { hydrateEnvironmentChatCache } from '@/features/chat/state/chat-projection-store'
 import { initializePromptStashStore } from '@/features/chat/state/prompt-stash-store'
 import { hydrateSessionReadStore } from '@/features/chat-mode/state/session-read-store'
 import { hydrateSessionRailCollapse } from '@/features/chat-mode/state/session-rail-store'
@@ -16,7 +15,6 @@ export function initializeEnvironmentPersistence(storage: ScopedStorage) {
   hydrateChatInputDraftStoreFromStorage(storage)
   hydrateChatChangedFilesExpansionStoreFromStorage(storage)
   hydrateSessionDiffScopeStoreFromStorage(storage)
-  hydrateEnvironmentChatCache(storage)
   initializePromptStashStore(storage)
   hydrateSessionReadStore(storage)
   hydrateSessionRailCollapse(storage)

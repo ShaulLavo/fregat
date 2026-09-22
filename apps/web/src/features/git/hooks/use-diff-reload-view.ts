@@ -5,7 +5,7 @@ import { useEffect, useState } from 'react'
 import { useQueryClient } from '@tanstack/react-query'
 import type { DiffFile, DiffRegionStore } from '@singapore-editor/diff'
 import type { GitFileDiff } from '@workspace/contracts'
-import { captureDiff, savedDiff } from '@/features/git/state/reload'
+import { captureDiffView, savedDiffView } from '@/features/git/state/reload'
 import { addLifecycleFlush } from '@/lib/lifecycle-flush'
 
 type Pane = {
@@ -29,14 +29,14 @@ export function useDiffReloadView(
   const generation = useGitReloadOwner(owner)
   const [restoredIdentity, setRestoredIdentity] = useState<string | null>(null)
   if (file && restoredIdentity !== identity) {
-    const view = savedDiff(owner, identity)?.view
+    const view = savedDiffView(owner, identity)
     if (view) presentation.restoreDiffView(file, view)
     setRestoredIdentity(identity)
   }
   useEffect(() => {
     if (!file || !diffs.length) return
     const flush = () =>
-      captureDiff(owner, generation, identity, diffs, {
+      captureDiffView(owner, generation, identity, {
         expanded: [...presentation.regions.getExpandedRegions()],
         old: presentation.diffPanes.old.scroll,
         new: presentation.diffPanes.new.scroll,

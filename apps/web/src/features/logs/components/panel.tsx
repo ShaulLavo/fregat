@@ -1,6 +1,3 @@
-import { useLogsReloadOwner } from '@/features/logs/hooks/use-reload-owner'
-import { logsFilterIdentity, savedLogs } from '@/features/logs/state/reload'
-import { useLogsReload } from '@/features/logs/hooks/use-reload'
 import { TickerText } from '@/components/ticker-text'
 import { useNavigation } from '@/hooks/use-navigation'
 import { ArrowClockwiseIcon } from '@phosphor-icons/react'
@@ -10,11 +7,13 @@ import { useState } from 'react'
 
 import { logsKeys } from '@/features/logs/utils/query-keys'
 import { FocusablePanel } from '@/components/focusable-panel'
-import { logDashboardFilters } from '@/features/logs/utils/filter-params'
+import { logDashboardFilters, logsFilterIdentity } from '@/features/logs/utils/filter-params'
 import { logFilterQuery, logToolbarOptionFilters } from '@/features/logs/utils/filter-params'
 import { useLogEvents } from '@/features/logs/hooks/use-events'
 import { useLogSummary } from '@/features/logs/hooks/use-summary'
 import { LogsEventList } from '@/features/logs/components/event-list'
+import { useLogsViewReload } from '@/features/logs/hooks/use-view-reload'
+import { savedLogsWindow, savedLogsView } from '@/features/logs/state/view-reload'
 import { LogsListLoading } from '@/features/logs/components/list-loading'
 import { useLogLive } from '@/features/logs/hooks/use-live'
 import { ToolPane } from '@workspace/ui/patterns/tool-pane'
@@ -35,12 +34,13 @@ export function LogsPanel({ active }: LogsPanelProps) {
 
   const filtersState = useLogsFilters()
   const displayKey = logsFilterIdentity(filtersState)
-  const target = useLogsReloadOwner()
-  const saved = savedLogs(queryClient, displayKey, target)
-  const [inspection, setInspection] = useState<{ filters: string; id: string | null } | null>(() =>
-    saved ? { filters: displayKey, id: saved.inspectedId } : null,
+  const [inspection, setInspection] = useState<{ filters: string; id: string | null } | null>(
+    () => {
+      const saved = savedLogsView(queryClient, displayKey)
+      return saved ? { filters: displayKey, id: saved.inspectedId } : null
+    },
   )
-  const [now, setNow] = useState(() => saved?.windowTime ?? Date.now())
+  const [now, setNow] = useState(() => savedLogsWindow(queryClient)?.windowTime ?? Date.now())
   const filters = logDashboardFilters(filtersState, now)
   const queryFilters = logFilterQuery(filters)
   const filterKey = displayKey
@@ -52,17 +52,10 @@ export function LogsPanel({ active }: LogsPanelProps) {
   const summary = useLogSummary(filters, active)
   const optionSummary = useLogSummary(optionFilters, active)
 
-  const displayEvents = events.data ?? saved?.events
-  const displaySummary = summary.data ?? saved?.summary
-  const displayOptions = optionSummary.data ?? saved?.options
-  const reload = useLogsReload(
-    displayKey,
-    now,
-    events.isPlaceholderData ? undefined : events.data,
-    summary.isPlaceholderData ? undefined : summary.data,
-    optionSummary.isPlaceholderData ? undefined : optionSummary.data,
-    inspectedEventId,
-  )
+  const displayEvents = events.data
+  const displaySummary = summary.data
+  const displayOptions = optionSummary.data
+  const reload = useLogsViewReload(displayKey, now, inspectedEventId)
 
   function handleRefresh() {
     setNow(Date.now())
@@ -74,15 +67,14 @@ export function LogsPanel({ active }: LogsPanelProps) {
   return (
     <FocusablePanel
       area='logs'
-      data-logs-saved={!events.data && Boolean(saved)}
       target={{ kind: 'logs' }}
       className='text-foreground flex h-full min-h-0 flex-col'
     >
       <ToolPane
         bodyClassName='flex flex-col overflow-hidden'
         state={{
-          pending: events.isPending && !saved,
-          error: (events.isError || summary.isError) && !saved,
+          pending: events.isPending,
+          error: events.isError || summary.isError,
           empty: displayEvents?.events.length === 0,
         }}
         loading={<LogsListLoading />}
@@ -128,17 +120,12 @@ export function LogsPanel({ active }: LogsPanelProps) {
           </>
         }
       >
-        {saved && (events.isError || summary.isError) ? (
-          <p role='status' className='text-warning px-3 text-xs'>
-            Could not refresh logs. Showing saved events.
-          </p>
-        ) : null}
         <LogsTimeline summary={displaySummary} />
         <LogsEventList
           events={displayEvents?.events ?? []}
-          detailsById={displayEvents?.detailsById ?? {}}
           initialOffset={reload.initialOffset}
           onScroll={reload.onScroll}
+          detailsById={displayEvents?.detailsById ?? {}}
           inspectedEventId={inspectedEventId}
           onInspectEvent={(id) => setInspection({ filters: filterKey, id })}
         />

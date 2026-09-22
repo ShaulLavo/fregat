@@ -46,7 +46,6 @@ a bare root `bun run verify`.
 | [117 — themes as bundles](../docs/theme-bundles.md)                                     | **IMPLEMENTED — 2026-09-19**                                 |
 | [118 — async effects through TanStack](118-async-effects-through-tanstack.md)           | **IMPLEMENTED 2026-09-14**                                   |
 | [119 — agent verification tooling](119-agent-verification-tooling.md)                   | **IMPLEMENTED 2026-09-14**                                   |
-| [121 — undo as a graph](121-undo-graph.md)                                              | **IMPLEMENTED 2026-09-16**                                   |
 | [123 — a wallpaper picker worth using](123-wallpaper-picker.md)                         | **IMPLEMENTED 2026-09-17**                                   |
 | [124 — the theme studio](124-theme-studio.md)                                           | **PROPOSED — REPLACES 117'S SURFACE; DATA STAYS**            |
 | [122 - composable full-power plugins](122-composable-plugins.md)                        | **PROPOSED - RESEARCH AND PERFORMANCE GATES FIRST**          |

@@ -54,18 +54,6 @@ export function setFileSnapshotQueryData(
   pruneFileSnapshotQueryCache(queryClient)
 }
 
-export function prefetchFileSnapshotQuery(
-  queryClient: QueryClient,
-  path: FilesystemPath,
-  config: FileSnapshotQueryConfig = {},
-) {
-  if (!shouldPrefetchFileSnapshotQuery(queryClient, path)) {
-    return Promise.resolve()
-  }
-
-  return queryClient.prefetchQuery(fileSnapshotQueryOptions(path, config))
-}
-
 export function ensureFileSnapshotQuery(
   queryClient: QueryClient,
   path: FilesystemPath,
@@ -110,14 +98,6 @@ export function pruneFileSnapshotQueryCache(
   }
 
   return removed
-}
-
-function shouldPrefetchFileSnapshotQuery(queryClient: QueryClient, path: FilesystemPath) {
-  const state = queryClient.getQueryState<FileResult>(fileSystemKeys.fileSnapshot(path))
-  if (!state) return true
-  if (state.fetchStatus === 'fetching') return false
-
-  return state.data === undefined
 }
 
 function fileSnapshotQueries(queryClient: QueryClient) {

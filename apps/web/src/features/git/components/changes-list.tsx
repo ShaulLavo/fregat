@@ -1,5 +1,5 @@
 import { useQueryClient } from '@tanstack/react-query'
-import { captureGitView, savedGit } from '@/features/git/state/reload'
+import { captureGitView, savedGitView } from '@/features/git/state/reload'
 import { addLifecycleFlush } from '@/lib/lifecycle-flush'
 import { useEffect, useState, useRef, type KeyboardEvent as ReactKeyboardEvent } from 'react'
 import { isContextMenuKey } from '@workspace/utils/keyboard'
@@ -39,7 +39,7 @@ export function ChangesList({
   loadingSection?: string
 }) {
   const owner = useQueryClient()
-  const [restored] = useState(() => savedGit(owner, rootPath)?.view)
+  const [restored] = useState(() => savedGitView(owner, rootPath))
   const lastScroll = useRef(restored?.scrollTop ?? 0)
   const panels = useEditorWorkspaceState((state) => state.workbenchPanels)
   const open = panels.gitChangesOpen

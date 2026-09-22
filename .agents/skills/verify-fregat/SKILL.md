@@ -55,7 +55,7 @@ Run `scenario demo-workspace` and `scenario demo-agent-git` against `/fregat/dem
 
 For mesh verification, set `OBSERVABILITY_DIR=/work/platform-production/logs` on the browser or logs command so the captured log window comes from the process being driven.
 
-Every run records its actual browser and GPU in `browser-renderer.json`. Use `--headed` for product assets and inspect that record; the headless shell can use software rendering.
+The CLI launches Chrome without Playwright's default `--hide-scrollbars`, so scrollbars take the space they take for a user. Every run records its actual browser and GPU in `browser-renderer.json`. Use `--headed` for product assets and inspect that record; the headless shell can use software rendering.
 
 For a real editor hero capture, see [landing.md](features/landing.md). The `editor-product` scenario opens four source tabs and runs the web typecheck in a capture-owned terminal. Its terminal IDs are isolated from existing sessions and cleaned up after the page closes; inspect `product-terminals.json` to confirm cleanup. Wallpaper overrides affect only the fresh browser context. Never type promotional commands into an existing user's terminal.
 

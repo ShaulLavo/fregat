@@ -1,7 +1,7 @@
 import type { ModelSelection, ProviderInstanceId } from '@workspace/contracts'
 import type { ReactNode } from 'react'
 
-import { useProviderDisplay } from '@/features/chat/hooks/use-provider-display'
+import { useProvider } from '@/features/chat/hooks/use-provider'
 import type { ProviderModelOption } from '@workspace/client-core/chat/providers/models'
 import { reconcileModelEffort } from '@workspace/client-core/chat/providers/effort'
 import {
@@ -33,7 +33,7 @@ export function ChatModelPickerProvider({
   )
   const setModelSelection = useChatInputDraftStore((state) => state.setModelSelection)
   const activeModelSelection = draftModelSelection ?? modelSelection
-  const { provider, display } = useProviderDisplay(activeModelSelection?.providerInstanceId)
+  const provider = useProvider(activeModelSelection?.providerInstanceId)
   function selectModel(option: ProviderModelOption) {
     if (
       sessionProviderInstanceId !== null &&
@@ -50,7 +50,6 @@ export function ChatModelPickerProvider({
     sessionProviderInstanceId,
     modelSelection: activeModelSelection,
     provider,
-    display,
     selectModel,
   }
 

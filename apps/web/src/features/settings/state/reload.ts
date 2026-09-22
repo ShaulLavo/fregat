@@ -1,8 +1,5 @@
 import { readReloadCache } from '@/lib/reload-cache'
-import type { SnapshotCaptureSource } from '@/lib/editor-visible-snapshot-cache'
-import { settingsSnapshotSchema, type SettingsSnapshot } from '@workspace/contracts'
-import { hashKey, type QueryClient } from '@tanstack/react-query'
-import { settingsKeys } from '@workspace/client-core/settings/query-keys'
+import type { QueryClient } from '@tanstack/react-query'
 import type { ScopedStorage } from '@/lib/environments/state/scoped-storage'
 import { writeWorkspaceCacheEntry } from '@/lib/workspace-cache-storage'
 import * as v from 'valibot'
@@ -11,9 +8,8 @@ import { selectSettingsView, type SettingsView } from '@/features/settings/state
 import { selectSettingsCategory } from '@/features/settings/state/category-store'
 import { selectSettingsSearch } from '@/features/settings/state/search-store'
 
-const KEY = 'settings.display.v1'
-const documentQueryHash = hashKey(settingsKeys.document())
-export const SETTINGS_RELOAD_MAX_BYTES = 524_288
+const KEY = 'settings.view.v1'
+const SETTINGS_VIEW_MAX_BYTES = 16_384
 const viewSchema = v.object({
   scope: v.picklist(['user', 'workspace', 'default']),
   view: v.picklist(['form', 'json']),
@@ -21,26 +17,15 @@ const viewSchema = v.object({
   category: v.nullable(v.pipe(v.string(), v.maxLength(200))),
   scrollTop: v.pipe(v.number(), v.minValue(0)),
 })
-const paintSchema = v.object({
-  scope: v.picklist(['user', 'workspace', 'default']),
-  revision: v.string(),
-  theme: v.string(),
-  paint: v.pipe(v.string(), v.maxLength(131_072)),
-})
-type SavedPaint = v.InferOutput<typeof paintSchema>
 const schema = v.object({
   root: v.nullable(v.string()),
-  snapshot: settingsSnapshotSchema,
   view: v.optional(viewSchema),
-  paint: v.optional(paintSchema),
 })
 type SavedView = v.InferOutput<typeof viewSchema>
 type DisplayOwner = {
   root: string | null
   generation: symbol
-  saved: SettingsSnapshot | undefined
   view: SavedView | undefined
-  paint: SavedPaint | undefined
   storage: ScopedStorage
 }
 const owners = new WeakMap<QueryClient, DisplayOwner>()
@@ -66,53 +51,15 @@ export function prepareSettingsReload(
     KEY,
     schema,
     storage,
-    SETTINGS_RELOAD_MAX_BYTES,
+    SETTINGS_VIEW_MAX_BYTES,
   )
-  const matches = record?.root === root
-  const state = {
+  owners.set(owner, {
     root,
     generation: Symbol('settings reload'),
-    saved: matches ? record.snapshot : undefined,
-    view: matches ? record.view : undefined,
-    paint: matches ? record.paint : undefined,
+    view: record?.root === root ? record.view : undefined,
     storage,
-  }
-  owners.set(owner, state)
-  for (const listener of listeners) listener()
-  return owner.getQueryCache().subscribe((event) => {
-    if (event.type !== 'updated' || event.action.type !== 'success') return
-    if (event.query.queryHash !== documentQueryHash) return
-    const snapshot = owner.getQueryData<SettingsSnapshot>(settingsKeys.document())
-    if (!snapshot) return
-    writeDisplay(state, snapshot)
   })
-}
-
-export function savedSettings(owner: QueryClient) {
-  return owners.get(owner)?.saved
-}
-
-export function settingsPaint(
-  owner: QueryClient,
-  scope: SettingsScope,
-  theme: string,
-  revision: string | undefined,
-) {
-  const paint = owners.get(owner)?.paint
-  if (paint?.scope !== scope || paint.theme !== theme || paint.revision !== revision) return null
-  return paint.paint
-}
-
-export function captureSettingsPaint(
-  owner: QueryClient,
-  paint: SavedPaint,
-  generation = settingsReloadGeneration(owner),
-) {
-  const state = owners.get(owner)
-  const snapshot = owner.getQueryData<SettingsSnapshot>(settingsKeys.document())
-  if (!state || state.generation !== generation || !snapshot || paint.paint.length > 131_072) return
-  state.paint = paint
-  writeDisplay(state, snapshot)
+  for (const listener of listeners) listener()
 }
 
 export function restoreSettingsView(owner: QueryClient) {
@@ -152,37 +99,10 @@ export function captureSettingsView(
   const state = owners.get(owner)
   if (!state || state.generation !== generation) return
   state.view = view
-  const snapshot = owner.getQueryData<SettingsSnapshot>(settingsKeys.document()) ?? state.saved
-  if (snapshot) writeDisplay(state, snapshot)
-}
-
-function writeDisplay(state: DisplayOwner, snapshot: SettingsSnapshot) {
-  if (
-    snapshot.layers.some((layer) => (layer.file?.text.length ?? 0) * 2 > SETTINGS_RELOAD_MAX_BYTES)
-  ) {
-    state.storage.removeItem(KEY)
-    state.saved = undefined
-    return
-  }
   const result = writeWorkspaceCacheEntry(
     KEY,
-    { root: state.root, snapshot, view: state.view, paint: state.paint },
-    { storage: state.storage, maxSerializedBytes: SETTINGS_RELOAD_MAX_BYTES },
+    { root: state.root, view },
+    { storage: state.storage, maxSerializedBytes: SETTINGS_VIEW_MAX_BYTES },
   )
-  if (result.status === 'oversized') {
-    state.storage.removeItem(KEY)
-    state.saved = undefined
-    return
-  }
-  state.saved = snapshot
-}
-
-export function createPaintCapture() {
-  let source: SnapshotCaptureSource | null = null
-  return {
-    read: () => source?.(),
-    setSource(next: SnapshotCaptureSource | null) {
-      source = next
-    },
-  }
+  if (result.status === 'oversized') state.storage.removeItem(KEY)
 }

@@ -32,7 +32,7 @@ import {
   bootPaletteStylesheet,
 } from '@/lib/appearance/utils/palette-style.ts'
 import { initializeClientLogging, log } from '@/lib/client-logging.ts'
-import { loadNerdFont } from '@/lib/default-nerd-font.ts'
+import { nerdFontQueryOptions } from '@/lib/default-nerd-font.ts'
 import { isDesktop } from '@/lib/platform/bridge.ts'
 import { applyBackdrop, resolveBackdrop } from '@/lib/platform/backdrop.ts'
 import { installEditorPerformanceTraceFromUrl } from '@/features/editor/state/performance-trace.ts'
@@ -65,12 +65,9 @@ log.info({
   visualViewportHeight: visualViewport?.height ?? null,
   visualViewportWidth: visualViewport?.width ?? null,
 })
-// The mirrored family, not the shipped default: `loadNerdFont` writes
-// `--font-mono` both before and after its fetch, so loading JetBrainsMono here
-// would overwrite the family `applyAppearance` just set — once immediately, and
-// again whenever the download resolved, which could land after
-// `AppearanceProvider` had already corrected it.
-void loadNerdFont(boot['editor.fontFamily'])
+// index.html already started this face from the boot mirror; the query adopts it, and is
+// the same one AppearanceProvider asks for once settings confirm.
+void primaryQueryClient().prefetchQuery(nerdFontQueryOptions(boot['editor.fontFamily']))
 
 // Preserve explicit fields before Router normalizes defaults; boot merges them with the cache.
 const initialHref = applicationHost()?.initialAddress ?? selectInitialAddress(window.location.href)

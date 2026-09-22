@@ -9,10 +9,6 @@ import {
 import * as v from 'valibot'
 import { useChatProjectionStore } from '@/features/chat/state/chat-projection-store'
 import {
-  chatProjectionCacheFromState,
-  hydrateChatProjectionState,
-} from '@/features/chat/state/chat-projection-cache'
-import {
   selectChatProjects,
   selectChatSessions,
   selectChatWorktrees,
@@ -148,14 +144,6 @@ test('restart catches up before readiness, imports terminal history, and converg
     expect(slice?.sessionIds.toSorted()).toEqual(
       snapshot.sessions.map((session) => session.id).toSorted(),
     )
-    const cache = chatProjectionCacheFromState(useChatProjectionStore.getState())
-    const hydrated = hydrateChatProjectionState({ slices: {} }, cache)
-    expect(hydrated.slices[fixture.descriptor.environmentId]?.worktreeById).toEqual(
-      slice?.worktreeById,
-    )
-    expect(
-      hydrated.slices[fixture.descriptor.environmentId]?.sessionById[TERMINAL_SESSION]?.origin,
-    ).toBe('discovered')
 
     await fixture.internal({
       type: 'session.runtime.set',

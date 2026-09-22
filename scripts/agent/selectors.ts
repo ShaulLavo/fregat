@@ -313,6 +313,7 @@ export const selectors = {
   editorDropPreview: (page: Page) => page.locator('[data-editor-drop-preview]'),
   editorTabInsertion: (page: Page) => page.locator('[data-editor-tab-insertion]'),
   editorGroupDialog: (page: Page) => page.getByRole('dialog', { name: 'Move tab to group' }),
+  panelHandles: (page: Page) => page.locator('[data-slot="resizable-handle"]'),
   editorSplitHandles: (page: Page) => page.locator('[data-editor-groups]').getByRole('separator'),
   treeItem: (page: Page, name: string) =>
     page.getByLabel('Folder tree', { exact: true }).getByRole('treeitem', { name, exact: true }),
@@ -536,6 +537,9 @@ export const selectors = {
   focusedTreeRow: (page: Page) =>
     page.getByLabel('Folder tree', { exact: true }).locator('[role="treeitem"][tabindex="0"]'),
   editorInput: (page: Page) => page.getByRole('textbox', { name: 'Editor input' }),
+  diagnosticsList: (page: Page) => page.getByRole('listbox', { name: 'Diagnostics' }),
+  diagnosticsRows: (page: Page) =>
+    page.getByRole('listbox', { name: 'Diagnostics' }).getByRole('option'),
   editorSurface: (page: Page) => page.locator('.editor-virtualized-viewport'),
   editorFindInput: (page: Page) => page.getByRole('textbox', { name: 'Find', exact: true }),
   editorFindCount: (page: Page) => page.locator('.editor-find-count'),

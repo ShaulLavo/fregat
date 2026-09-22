@@ -1,4 +1,3 @@
-import { StatusMessage } from '@/components/status-message'
 import { TickerNumber } from '@/components/ticker-number'
 import { OrbitLoader } from '@workspace/ui/components/orbit-loader'
 import { disabledDiffQueryKey } from '@/features/git/utils/query-keys'
@@ -67,11 +66,6 @@ export function Panel({ className, rootPath }: ComponentProps<'section'> & { roo
       className={cn('flex h-full min-h-0 flex-col text-foreground', className)}
     >
       <StaleNotice />
-      {status.saved && status.isError ? (
-        <StatusMessage tone='destructive'>
-          Git could not be refreshed. Showing saved changes.
-        </StatusMessage>
-      ) : null}
       <ToolPane
         bodyClassName='flex flex-col overflow-hidden'
         state={{

@@ -12,6 +12,11 @@ export const fileSystemKeys = {
     [...fileSystemKeys.tree(rootPath), 'directory', treePath, path] as const,
 }
 
+export const appearanceKeys = {
+  all: ['appearance'] as const,
+  nerdFont: (fontId: string) => [...appearanceKeys.all, 'nerd-font', fontId] as const,
+}
+
 export const filePickerKeys = {
   all: ['file-picker'] as const,
   serverInfo: () => [...filePickerKeys.all, 'server-info'] as const,

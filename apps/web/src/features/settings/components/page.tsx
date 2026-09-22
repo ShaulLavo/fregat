@@ -62,7 +62,7 @@ export function SettingsPage({
   const showJson = (view === 'json' || scope === 'default') && tabId !== undefined
   const editorOwner = useQueryClient()
   const settingsOwner = useSettingsOwner()
-  const { document, projection, saved } = useSettingsDisplay(showJson ? editorOwner : undefined)
+  const { document, projection } = useSettingsDisplay(showJson ? editorOwner : undefined)
   const { isSaving } = useSettingsActions()
   const editorHasWorkspace = useHasWorkspace()
   const hasWorkspace =
@@ -123,7 +123,6 @@ export function SettingsPage({
       bodyClassName='flex flex-col overflow-hidden'
       ref={setRootRef}
       tabIndex={-1}
-      data-settings-display={saved ? 'saved' : 'live'}
       header={
         <PageHeader
           actions={
@@ -197,11 +196,6 @@ export function SettingsPage({
           on the container rather than per row — every control below would
           otherwise need its own handler, and a new widget would silently miss
           it. */}
-      {saved && document.isError ? (
-        <StatusMessage tone='destructive'>
-          Settings could not be refreshed. Showing saved settings.
-        </StatusMessage>
-      ) : null}
       {showJson ? (
         <div className='flex min-h-0 flex-1 flex-col'>
           <div className='px-(--density-section-padding) pt-(--density-section-padding)'>
@@ -235,7 +229,7 @@ export function SettingsPage({
         >
           <MalformedBanner layers={document.data.layers} />
           <DiagnosticsBanner diagnostics={projection.diagnostics} />
-          <fieldset disabled={saved} className='min-w-0'>
+          <fieldset className='min-w-0'>
             {shown.length === 0 ? (
               <StatusMessage>{emptySettingsMessage(query, selectedCategory)}</StatusMessage>
             ) : (

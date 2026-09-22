@@ -1,3 +1,4 @@
+import { editorLspTabSwitch } from './editor-lsp-tab-switch'
 import { responseDelivery } from './response-delivery'
 import { draftRecovery } from './draft-recovery'
 import { composerDefaults } from './composer-defaults'
@@ -125,11 +126,13 @@ import { editorFastScroll } from './editor-fast-scroll'
 import { editorRowHeightAudit } from './editor-row-height-audit'
 import { editorLargePaste } from './editor-large-paste'
 import { editorFind } from './editor-find'
+import { problemsPanelRows } from './problems-panel-rows'
 import { editorTypeBurst } from './editor-type-burst'
 import { editorUndoBarrier } from './editor-undo-barrier'
 import { editorUndoBranch } from './editor-undo-branch'
 import { editorTitleDiffToggle } from './editor-title-diff-toggle'
 import { editorUndoReopen } from './editor-undo-reopen'
+import { editorReloadPaint, editorReloadPaintSlowFont } from './editor-reload-paint'
 import { gitCommitHookColors } from './git-commit-hook-colors'
 import { gitDiffHoverTokens } from './git-diff-hover-tokens'
 import { gitDiffInlineTint } from './git-diff-inline-tint'
@@ -233,6 +236,7 @@ export const scenarios: readonly Scenario[] = [
   editorFormatChord,
   editorLspCompletion,
   editorLspHover,
+  editorLspTabSwitch,
   editorDefinitionCrlf,
   editorExternalDeletion,
   editorLspSignatureHelp,
@@ -270,6 +274,7 @@ export const scenarios: readonly Scenario[] = [
   editorDiagnosticsLifecycle,
   editorRowHeightAudit,
   editorFind,
+  problemsPanelRows,
   editorTypeBurst,
   editorUndoBarrier,
   editorUndoBranch,
@@ -281,6 +286,8 @@ export const scenarios: readonly Scenario[] = [
   chatGitTabSwitch,
   chatGitTurnRows,
   editorUndoReopen,
+  editorReloadPaint,
+  editorReloadPaintSlowFont,
   gitCommitHookColors,
   gitCommitMessageFile,
   gitCommitSlowHook,

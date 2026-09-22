@@ -48,9 +48,9 @@ export function ModelOptionsMenu({
   readonly disabled: boolean
   readonly draftTarget: ChatInputDraftTarget
 }) {
-  const { modelSelection, display } = useModelPicker()
+  const { modelSelection, provider } = useModelPicker()
   const setModelSelection = useChatInputDraftStore((state) => state.setModelSelection)
-  const model = display?.models.find((candidate) => candidate.slug === modelSelection?.model)
+  const model = provider?.models.find((candidate) => candidate.slug === modelSelection?.model)
   const descriptors = model ? modelOptionDescriptors(model) : []
   if (!modelSelection || descriptors.length === 0) return null
 

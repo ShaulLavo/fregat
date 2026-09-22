@@ -2,7 +2,6 @@ import {
   createInitialChatProjectionSlice,
   type ChatProjectionSlice,
 } from '@workspace/client-core/chat/types'
-import type { ScopedStorage } from '@/lib/environments/state/scoped-storage'
 import {
   type EnvironmentId,
   type OrchestrationEvent,
@@ -23,13 +22,7 @@ import {
   createChatPipelineScope,
   type ChatPipelineScope,
 } from '@/features/chat/utils/pipeline-logging'
-import { CHAT_PROJECTION_CACHE_PERSIST_MS } from '@workspace/client-core/chat/cache-constants'
-import {
-  chatProjectionCacheFromState,
-  hydrateChatProjectionState,
-  readChatProjectionCache,
-  writeChatProjectionCache,
-} from './chat-projection-cache'
+import { discardTimelineReloadForSessions } from '@/features/chat/state/timeline-reload'
 import {
   applyChatProjectionEvents,
   applyChatProjectionShellStreamItem,
@@ -75,24 +68,6 @@ export function createInitialChatProjectionState(): ChatProjectionState {
   return { slices: {} }
 }
 
-const projectionStorage = new Map<EnvironmentId, ScopedStorage>()
-
-export function restoredChatProjectionState(storage: ScopedStorage): ChatProjectionState {
-  return hydrateChatProjectionState(
-    createInitialChatProjectionState(),
-    readChatProjectionCache(storage),
-  )
-}
-
-export function hydrateEnvironmentChatCache(storage: ScopedStorage) {
-  projectionStorage.set(storage.environmentId, storage)
-  const state = useChatProjectionStore.getState()
-  if (state.slices[storage.environmentId]) return
-  useChatProjectionStore.setState(
-    hydrateChatProjectionState(state, readChatProjectionCache(storage)),
-  )
-}
-
 const EMPTY_SLICE = createInitialChatProjectionSlice()
 
 export function selectChatProjectionSlice(
@@ -117,12 +92,14 @@ export const useChatProjectionStore = create<ChatProjectionStore>((set) => ({
   ...createInitialChatProjectionState(),
   applyOrchestrationEvent: (environmentId, event) => {
     recordProjectionMutation('applyEvent', () => ({ environmentId, ...chatEventSummary(event) }))
+    discardTimelineReloadForSessions(environmentId, [event])
     set((state) =>
       updateSlice(state, environmentId, (slice) => applyChatProjectionEvents(slice, [event])),
     )
   },
   applyOrchestrationEvents: (environmentId, events) => {
     recordProjectionMutation('applyEvents', () => ({ environmentId, eventCount: events.length }))
+    discardTimelineReloadForSessions(environmentId, events)
     set((state) =>
       updateSlice(state, environmentId, (slice) => applyChatProjectionEvents(slice, events)),
     )
@@ -215,43 +192,4 @@ function flushProjectionLogScope() {
   const scope = projectionLogScope
   projectionLogScope = null
   scope?.end()
-}
-
-/**
- * Throttled rather than debounced: a streaming turn mutates the projection
- * faster than any debounce window closes, so a debounce would never write until
- * the turn ended. Leading edge is off so the write costs one serialization per
- * window instead of one per burst start.
- */
-let projectionPersistTimer: ReturnType<typeof setTimeout> | null = null
-
-export function flushChatProjectionCache() {
-  const cached = chatProjectionCacheFromState(useChatProjectionStore.getState())
-  let written = true
-  for (const storage of projectionStorage.values()) {
-    if (!cached.slices.some((slice) => slice.environmentId === storage.environmentId)) continue
-    if (!writeChatProjectionCache(storage, cached)) written = false
-  }
-  return written
-}
-
-useChatProjectionStore.subscribe(() => {
-  scheduleChatProjectionCachePersist()
-})
-
-if (typeof window !== 'undefined' && typeof window.addEventListener === 'function') {
-  window.addEventListener('beforeunload', () => {
-    flushChatProjectionCache()
-  })
-}
-
-function scheduleChatProjectionCachePersist() {
-  if (projectionPersistTimer) return
-
-  projectionPersistTimer = setTimeout(persistChatProjectionCache, CHAT_PROJECTION_CACHE_PERSIST_MS)
-}
-
-function persistChatProjectionCache() {
-  projectionPersistTimer = null
-  flushChatProjectionCache()
 }

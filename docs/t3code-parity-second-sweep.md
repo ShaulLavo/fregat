@@ -8,6 +8,9 @@
 >
 > Effort scale: **S** ≤ 1 day · **M** 2–4 days · **L** 1–2 weeks · **XL** > 2 weeks.
 
+> **Client persistence is measured separately** in `docs/t3code-persistence-alignment.md`
+> (2026-09-22): what to persist is aligned, how stale records are retired is not.
+
 ---
 
 ## 1. Bottom line

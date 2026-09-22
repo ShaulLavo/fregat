@@ -1,15 +1,11 @@
 import { environmentQueryKeys } from '@/features/environments/utils/query-keys'
-import {
-  flushChatProjectionCache,
-  hydrateEnvironmentChatCache,
-  useChatProjectionStore,
-} from '@/features/chat/state/chat-projection-store'
+import { useChatProjectionStore } from '@/features/chat/state/chat-projection-store'
 import { createWideEventScope } from '@/lib/wide-event-scope'
 import { readSettingsMirror } from '@/lib/settings-boot-mirror'
 import {
   readCachedEnvironmentBindings,
   recordEnvironmentCacheBinding,
-} from '@/features/chat/state/chat-projection-cache'
+} from '@/lib/environments/state/binding-cache'
 import { createClientError } from '@workspace/client-core/errors'
 import type {
   EnvironmentId,
@@ -478,7 +474,6 @@ export function createEnvironmentConnections({
         .filter((binding) => binding.names.some((name) => obsoleteNames.includes(name)))
         .map((binding) => binding.descriptor.environmentId),
     ])
-    if (removedIdentities.size > 0) flushChatProjectionCache()
     for (const environmentId of removedIdentities) {
       if (serverHasPrimaryIdentity(environmentId)) continue
       if (store.getState().machines.some((machine) => machine.environmentId === environmentId))
@@ -556,7 +551,6 @@ export function createEnvironmentConnections({
       const storage = environmentScopedStorage(environmentId)
       if (!owners.has(environmentId)) owners.set(environmentId, binding.origin)
       initializeEnvironmentPersistence(storage)
-      hydrateEnvironmentChatCache(storage)
       const existing = transportFor(environmentId)
       if (existing) continue
       if (binding.origin !== primaryServerOrigin())

@@ -10,6 +10,7 @@ export type EditorLanguageServerStatusSnapshot = {
 }
 
 export type EditorLanguageServerStatusSource = {
+  setSnapshot: (snapshot: EditorLanguageServerStatusSnapshot) => void
   getSnapshot: () => EditorLanguageServerStatusSnapshot
   setServers: (serverIds: readonly string[]) => void
   setServerDiagnostics: (serverId: string, diagnostics: LanguageServerDiagnosticSummary) => void
@@ -46,6 +47,11 @@ export function createEditorLanguageServerStatusSource(): EditorLanguageServerSt
 
   return {
     getSnapshot: () => snapshot,
+    setSnapshot: (next) => {
+      if (snapshot === next) return
+      snapshot = next
+      for (const listener of listeners) listener()
+    },
     setServers: (nextServerIds) => {
       serverIds = nextServerIds
       servers.clear()

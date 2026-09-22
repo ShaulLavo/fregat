@@ -1,3 +1,5 @@
+import { useLanguageServerMatchConfiguration } from '@/features/editor/providers/language-server-match-context'
+import { useEditorRuntime } from '@/features/editor/hooks/use-runtime'
 import { filesystemPath } from '@/lib/documents/utils/identity'
 import type { LanguageServerDocument } from '@/lib/language-server-document'
 import { useQueryClient } from '@tanstack/react-query'
@@ -9,6 +11,7 @@ import type {
   LanguageServerReferencesResult,
 } from '@singapore-editor/lsp-plugin'
 import { useMemo } from 'react'
+import { useStore } from 'zustand'
 
 import { useFileOpenIntent } from '@/lib/file-open-intent/providers/context'
 import {
@@ -45,8 +48,13 @@ export function useLanguageServerPlugin({
   onOpenReferences,
   onDidNavigateDiagnostic,
 }: UseLanguageServerPluginOptions) {
+  const { generation: configurationGeneration } = useLanguageServerMatchConfiguration()
+  const { languageServerDocuments, documentStore } = useEditorRuntime()
   const documentKey = document?.key ?? null
   const documentUri = document?.uri ?? null
+  const buffer = useStore(documentStore, (state) =>
+    documentKey === null ? null : (state.liveDocumentsByKey[documentKey]?.buffer ?? null),
+  )
   const origin = originForQueryClient(useQueryClient())
   const { service: fileOpenIntent } = useFileOpenIntent()
   // Manual memo: `languageServerStatusSource` is a useMemo dependency, and the compiler's cache is a
@@ -71,6 +79,9 @@ export function useLanguageServerPlugin({
       origin,
       enabled,
       documentSyncController,
+      documents: languageServerDocuments,
+      configurationGeneration,
+      buffer,
       matches,
       rootPath,
       statusSource: languageServerStatusSource,
@@ -93,6 +104,9 @@ export function useLanguageServerPlugin({
     origin,
     enabled,
     documentSyncController,
+    languageServerDocuments,
+    configurationGeneration,
+    buffer,
     fileOpenIntent,
     languageServerStatusSource,
     matches,

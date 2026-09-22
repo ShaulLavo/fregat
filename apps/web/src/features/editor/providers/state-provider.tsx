@@ -52,12 +52,13 @@ export function EditorStateProvider({
   ])
 
   useLayoutEffect(() => {
+    runtime.languageServerDocuments.configure(languageServerMatchConfiguration.generation)
     fileOpenIntentOwner.setRelatedPrefetch((rootPath, path) =>
       queryClient.prefetchQuery(
         languageServerMatchQueryOptions(rootPath, path, languageServerMatchConfiguration),
       ),
     )
-  }, [fileOpenIntentOwner, languageServerMatchConfiguration, queryClient])
+  }, [fileOpenIntentOwner, languageServerMatchConfiguration, queryClient, runtime])
 
   useEffect(() => {
     runtime.resume()

@@ -1,5 +1,3 @@
-import { useDiffPaint } from '@/features/editor/hooks/use-diff-paint'
-import { addLifecycleFlush } from '@/lib/lifecycle-flush'
 import { useUnicodeHighlights } from '@/features/editor/hooks/use-unicode-highlights'
 import type { TabId } from '@/lib/documents/utils/types'
 import type { EditorTheme } from '@singapore-editor/core/rendering'
@@ -37,8 +35,6 @@ import type { DiffPanePresentation } from '@/features/editor/state/tab-presentat
  */
 export function DiffPane({
   file,
-  paintIdentity,
-  getLayout,
   languageServer = null,
   presentation,
   regions,
@@ -52,8 +48,6 @@ export function DiffPane({
   onScroll,
 }: {
   file: DiffFile | null
-  paintIdentity?: string
-  getLayout?: () => Record<string, number> | undefined
   /** Present only where a language server may safely be asked about this diff; see `useDiffLanguage`. */
   languageServer?: DiffLanguageServerContext | null
   presentation?: DiffPanePresentation
@@ -80,7 +74,6 @@ export function DiffPane({
       }),
     [regions, side, syntaxBackend, syntaxHighlight],
   )
-  const { snapshot, capture } = useDiffPaint(paintIdentity, file, side, regions, getLayout)
   const { rows, text, tokensRevision } = useDiffRows(plugin, file)
   const diffLanguagePlugin = useDiffLanguage(file, rows, theme, languageServer)
   const unicodeHighlights = useUnicodeHighlights()
@@ -99,8 +92,6 @@ export function DiffPane({
     persistence?.plugin,
   ].filter((entry) => entry !== null && entry !== undefined)
   const controller = useEditor({
-    documentKey: paintIdentity ? `${paintIdentity}:${side}` : undefined,
-    snapshot,
     presentationReady: false,
     suspiciousCharacters: unicodeHighlights.options,
     cursorLineHighlight: DIFF_CURSOR_LINE_HIGHLIGHT,
@@ -187,17 +178,6 @@ export function DiffPane({
     onRegisterEditor(side, controller.getEditor())
     return () => onRegisterEditor(side, null)
   }, [controller, onRegisterEditor, side])
-
-  useLayoutEffect(() => {
-    const flush = () => capture(controller)
-    const frame = requestAnimationFrame(flush)
-    const remove = addLifecycleFlush(flush)
-    return () => {
-      flush()
-      cancelAnimationFrame(frame)
-      remove()
-    }
-  }, [controller, capture, tokensRevision])
 
   return (
     <div
