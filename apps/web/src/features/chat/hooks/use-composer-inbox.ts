@@ -55,12 +55,9 @@ function applyComposerInboxEntries(
   if (textEntries.length === 0 || !editor) return
 
   const text = textEntries.map((entry) => entry.text).join('\n\n')
-  if (!insertChatInputText(editor, `${text} `)) return
+  if (!insertChatInputText(editor, `${text} `, { focus: true })) return
 
   // The editor is the source of truth for what was spliced, so the draft is
   // written from it rather than from what we asked for.
   drafts.setPrompt(draftTarget, readChatInputText(editor))
-  // Focused a frame later: focusing during the same commit makes the
-  // not-yet-reconciled editor sync its stale state back over the insert.
-  requestAnimationFrame(() => editor.focus())
 }

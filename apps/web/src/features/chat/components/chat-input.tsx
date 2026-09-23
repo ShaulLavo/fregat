@@ -381,17 +381,12 @@ export function ChatInput({
     handleImageFiles(files)
   }
 
-  /**
-   * Focused on the next frame, not here: focusing during the drop makes the
-   * not-yet-reconciled editor sync its stale state back over the mention.
-   */
   function insertMention(path: string) {
     const editor = editorRef.current
     if (!editor) return
-    if (!insertChatInputMention(editor, path)) return
+    if (!insertChatInputMention(editor, path, { focus: true })) return
 
     useChatInputDraftStore.getState().setPrompt(draftTarget, readChatInputText(editor))
-    requestAnimationFrame(() => editor.focus())
   }
 
   return (

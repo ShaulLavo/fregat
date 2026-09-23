@@ -24,7 +24,7 @@ export function attachTimelineNavigationListeners({
 }: {
   element: HTMLDivElement
   dispatch: (event: TimelineScrollEvent) => void
-  suspendForDisclosure: () => void
+  suspendForDisclosure: (disclosure: Element) => void
 }) {
   const contentScrollsUp = () => timelineContentScrollsUp(readTimelineViewport(element))
   const awayFromEnd = () =>
@@ -56,7 +56,7 @@ export function attachTimelineNavigationListeners({
     const disclosure = disclosureTarget(event.target)
     if (!disclosure) return
 
-    suspendForDisclosure()
+    suspendForDisclosure(disclosure)
     // Opening output is reading intent, including activation by Enter or Space.
     if (disclosure.hasAttribute('aria-expanded')) navigate()
   }

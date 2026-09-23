@@ -20,6 +20,7 @@ import { TIMELINE_ANCHOR_OFFSET_PX } from '@/features/chat/utils/timeline-scroll
 import { expect, test } from '../../../../../test/fixtures'
 import { chatMessage, session as sessionFactory } from '../../../../../test/factories/chat'
 import { renderWithProviders } from '../../../../../test/render'
+import { stubResizeObserver } from '../../../../../test/env/resize-observer'
 
 const VIEWPORT_HEIGHT = 600
 const ROW_HEIGHT = 80
@@ -37,9 +38,11 @@ let scrollHeightOverride: number | null = null
 const originalClientHeight = Object.getOwnPropertyDescriptor(HTMLElement.prototype, 'clientHeight')
 const originalOffsetHeight = Object.getOwnPropertyDescriptor(HTMLElement.prototype, 'offsetHeight')
 const originalScrollHeight = Object.getOwnPropertyDescriptor(Element.prototype, 'scrollHeight')
+const originalScrollTop = Object.getOwnPropertyDescriptor(Element.prototype, 'scrollTop')
 const originalRect = Object.getOwnPropertyDescriptor(Element.prototype, 'getBoundingClientRect')
 
 beforeEach(() => {
+  stubResizeObserver()
   clearTimelineReload(FIXTURE_ENVIRONMENT_ID)
   clientHeight = VIEWPORT_HEIGHT
   scrollHeightOverride = null
@@ -63,6 +66,18 @@ beforeEach(() => {
       return virtualContentHeight(this)
     },
   })
+  // A browser clamps scrollTop to the scrollable range; happy-dom keeps a
+  // negative scroll-to-end offset that no real transcript can have.
+  Object.defineProperty(Element.prototype, 'scrollTop', {
+    configurable: true,
+    get(this: Element) {
+      return originalScrollTop?.get?.call(this)
+    },
+    set(this: Element, value: number) {
+      const max = Math.max(0, this.scrollHeight - this.clientHeight)
+      originalScrollTop?.set?.call(this, Math.min(Math.max(value, 0), max))
+    },
+  })
   Object.defineProperty(Element.prototype, 'getBoundingClientRect', {
     configurable: true,
     value(this: Element) {
@@ -78,6 +93,7 @@ afterEach(() => {
   restoreLayoutProperty(HTMLElement.prototype, 'clientHeight', originalClientHeight)
   restoreLayoutProperty(HTMLElement.prototype, 'offsetHeight', originalOffsetHeight)
   restoreLayoutProperty(Element.prototype, 'scrollHeight', originalScrollHeight)
+  restoreLayoutProperty(Element.prototype, 'scrollTop', originalScrollTop)
   restoreLayoutProperty(Element.prototype, 'getBoundingClientRect', originalRect)
 })
 

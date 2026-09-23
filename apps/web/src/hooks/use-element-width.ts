@@ -1,40 +1,19 @@
-import { useLayoutEffect, useState, type RefObject } from 'react'
-export function useElementWidth<TElement extends HTMLElement>(ref: RefObject<TElement | null>) {
+import { useCallback, useState } from 'react'
+
+/** The width of the element the returned ref lands on; null until it attaches. */
+export function useElementWidth<TElement extends HTMLElement>() {
   const [width, setWidth] = useState<number | null>(null)
 
-  useLayoutEffect(() => {
-    let disposed = false
-    let observer: ResizeObserver | null = null
-    let retryFrame = 0
+  // Kept stable: React detaches the old ref callback on every identity change,
+  // which would disconnect and re-observe the element on each render.
+  const ref = useCallback((element: TElement | null) => {
+    if (!element) return
 
-    function updateWidth(element: TElement) {
-      setWidth(element.clientWidth)
-    }
+    setWidth(element.clientWidth)
+    const observer = new ResizeObserver(() => setWidth(element.clientWidth))
+    observer.observe(element)
+    return () => observer.disconnect()
+  }, [])
 
-    function attachObserver() {
-      if (disposed) return
-
-      const element = ref.current
-      if (!element) {
-        retryFrame = requestAnimationFrame(attachObserver)
-        return
-      }
-
-      updateWidth(element)
-      if (!('ResizeObserver' in window)) return
-
-      observer = new ResizeObserver(() => updateWidth(element))
-      observer.observe(element)
-    }
-
-    attachObserver()
-
-    return () => {
-      disposed = true
-      observer?.disconnect()
-      cancelAnimationFrame(retryFrame)
-    }
-  }, [ref])
-
-  return width
+  return [ref, width] as const
 }

@@ -2,7 +2,6 @@ import { useSettingValue } from '@/hooks/use-setting-value'
 import { EMPTY_ACTIVITIES } from '@/lib/empty-activities'
 import { useActiveChatProjection } from '@/features/chat/hooks/use-active-projection'
 import type { InteractionMode, RuntimeMode, SessionId } from '@workspace/contracts'
-import { useRef } from 'react'
 
 import { useElementWidth } from '@/hooks/use-element-width'
 import { contextUsageForActivities } from '@workspace/client-core/chat/context-usage'
@@ -54,8 +53,7 @@ export function ChatInputActions({
   statusLabel: string | null
 }) {
   const contextMeterEnabled = useSettingValue('chat.contextWindowMeterEnabled')
-  const actionsRef = useRef<HTMLDivElement | null>(null)
-  const width = useElementWidth(actionsRef)
+  const [actionsRef, width] = useElementWidth<HTMLDivElement>()
   // Only once measured: assuming compact before the first layout would flash the
   // whole row through its narrow arrangement on every mount.
   const compact = width !== null && width < COMPACT_ACTIONS_WIDTH

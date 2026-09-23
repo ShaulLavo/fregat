@@ -568,6 +568,19 @@ export const selectors = {
   stageChanges: (page: Page) =>
     page.getByRole('button', { name: 'Stage all changes', exact: true }),
   changesHeader: (page: Page) => page.getByRole('button', { name: 'Changes', exact: true }),
+  chatDisclosures: (page: Page) =>
+    page
+      .getByRole('log', { name: 'Messages', exact: true })
+      .locator('[data-scroll-anchor-ignore][aria-expanded="false"]'),
+  openDisclosure: (scope: Locator) =>
+    scope.locator('[data-scroll-anchor-ignore][aria-expanded="true"]').first(),
+  timelineRow: (page: Page, id: string) =>
+    page
+      .getByRole('log', { name: 'Messages', exact: true })
+      .locator(`[data-index] > [data-timeline-row-id="${id}"]`),
+  composerActions: (page: Page) => page.locator('[data-composer-actions]'),
+  askAgentAboutLines: (page: Page) =>
+    page.getByRole('button', { name: 'Ask the agent about these lines', exact: true }),
   commitMessage: (page: Page) => page.getByRole('textbox', { name: 'Commit message', exact: true }),
   commitButton: (page: Page) => page.getByRole('button', { name: /^Commit\b/ }),
   commitOutput: (page: Page) => page.getByRole('log', { name: 'Commit output', exact: true }),

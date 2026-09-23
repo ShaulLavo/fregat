@@ -438,7 +438,8 @@ Suggested order (steps 1–3 done 2026-09-23; step 4 is next):
    [E051](../Editor/plans/e051-fast-path-equivalence.md). The minimap repeats the display-row bug,
    and the row-layout fast path has no equivalence test.
 4. [E049](../Editor/plans/e049-no-silent-misses.md), [Plan 133](plans/133-one-owner-per-fact.md).
-   Plan 133 Phase 1 (group geometry registry) is done 2026-09-23. E049 waits on E033.
+   Plan 133 Phases 1 (group geometry registry), 2 (one source per constant) and 3
+   (notifications instead of timers) are done 2026-09-23. E049 waits on E033.
 5. [E050](../Editor/plans/e050-host-obligations-into-api.md) row by row, each unlocking its Plan 130
    Phase 5 item.
 

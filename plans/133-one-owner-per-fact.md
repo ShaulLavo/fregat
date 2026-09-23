@@ -1,6 +1,6 @@
 # One owner per fact in the web app
 
-Status: **PHASE 1 IMPLEMENTED 2026-09-23; PHASES 2–4 PROPOSED. D1 moved to Plan 134.** Requested 2026-09-21. Inspected
+Status: **PHASES 1–3 IMPLEMENTED 2026-09-23; PHASE 4 PROPOSED. D1 moved to Plan 134.** Requested 2026-09-21. Inspected
 at Platform `d1ca6472`. `apps/web/src` and the contracts it shares with the server.
 
 Inside Platform's own code the same shape recurs that [plan 130](130-ask-the-editor.md) removes at
@@ -88,10 +88,35 @@ The search cap is exported from `@workspace/contracts` and imported by the route
 schema and the client. The boot script is generated per D3. Preview length measures the box it
 already observes instead of assuming pixel widths.
 
+Done 2026-09-23. `WORKSPACE_SEARCH_LIMIT_MAX` in `@workspace/contracts` feeds the route, both
+settings schemas and the client. The inline script is `apps/web/src/boot-appearance.ts`, bundled
+by `scripts/boot-appearance-plugin.ts` into a 2.7 KB classic script. It reads its defaults from
+`settings/boot-defaults.ts`, which the registry also uses, and its storage keys from
+`lib/boot-keys.ts`. The desktop check is `resolveBackdrop`. Nothing read `data-density` back
+except `useWorkbenchDensity`, and that had no production caller. The hook, its boot context and the
+`bootDensity` prop chain are deleted. Search preview length comes from one `ResizeObserver` over
+the rows' preview cells, with the glyph width taken from the cell's font. The tab strip's 8 px gutter
+matched no `px-2`. It is now the strip's `scroll-px-2`, read back as `scroll-padding`.
+`visual-search-headers` failed (`-786 !== 2`) on the release before this phase as well. The scenario
+measured rows the editor had retired with `hidden`. The shared `excerpt` selector now skips them.
+
 ## Phase 3 — notifications instead of timers (items 14, 15, 16)
 
 `ResizeObserver` or `transitionend` for the disclosure. A callback ref in `use-element-width`. One
 `focusAfterInsert` helper, and a post-commit callback if the composer's editor offers one.
+
+Done 2026-09-23. Disclosures do not animate, so the wait is for a measurement. A `ResizeObserver`
+on the clicked row reports after the virtualizer's own observer, because observers report in
+creation order. The viewport is read in the layout effect of the next commit, since the
+virtualizer re-renders after its observer returns. The happy-dom timeline test only passed
+before because a virtualizer frame reset an unclamped `scrollTop` of −488 first. Its layout
+stubs now clamp `scrollTop` the way a browser does, and `test/env/resize-observer.ts` sends the
+initial report. `useElementWidth` returns a callback ref and measures in the commit that attaches
+the element. Lexical has the post-commit callback: `insertChatInputText(…, { focus: true })`
+focuses from the update's `onUpdate`, so both copies of the frame delay are gone.
+`scenario chat-disclosure-settle` and `scenario chat-composer-insert` cover the three surfaces.
+The drop is synthesized with the tree's payload, because Playwright's `dragTo` never completes a
+tree drag onto the composer.
 
 ## Phase 4 — the remaining DOM channels (items 4 to 10)
 

@@ -65,3 +65,5 @@ Commands dispatch over the orchestration socket when it is live and over HTTP ot
 - `draft-recovery`: two distinct unsent identities, image/file-capable draft recovery after reload, retained new-worktree choice, and discard without clearing the other draft. Does not send provider turns or create worktrees.
 
 `scenario chat-card-narrow` drags the stage/tool split to its narrowest and checks the assistant changed-files card. The `+/-` counts are a ticker, which cannot shrink or ellipsize, so the header wraps its buttons to a second row rather than letting the counts paint over View diff.
+
+`scenario chat-disclosure-settle` opens and closes the first collapsed disclosure it finds in an existing transcript. The row holding it must not move, and rows must not overlap. `scenario chat-composer-insert` uses a fixture repo. It sends a diff line through "Ask the agent about these lines" and drops a tree path onto the composer. Both must land in the composer with focus. It also checks that `data-compact` on the action row matches the measured width, in the side panel and in the chat stage. The drop is a synthesized `DragEvent` with the tree's `text/plain` payload.

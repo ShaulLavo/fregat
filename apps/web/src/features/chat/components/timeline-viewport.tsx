@@ -62,12 +62,18 @@ export function TimelineViewport({
   'use no memo' // Minimap and follow state read the virtualizer's mutable geometry.
   const { environmentId } = useChatTransport()
   const scrollElement = virtualizer.scrollElement
-  // A disclosure keeps its row still until two animation frames have settled.
-  const [disclosureSettleTick, setDisclosureSettleTick] = useState<number | null>(null)
+  // A disclosure keeps its row still until the row's new size has been measured.
+  const [disclosureSettle, setDisclosureSettle] = useState<{
+    disclosure: Element
+    measured: boolean
+  } | null>(null)
+  const unmeasuredDisclosure = disclosureSettle?.measured
+    ? null
+    : (disclosureSettle?.disclosure ?? null)
   const virtualItems = virtualizer.getVirtualItems()
   const contentHeight = virtualizer.getTotalSize()
   const viewportHeight = virtualizer.scrollRect?.height ?? 0
-  const disclosureSettling = disclosureSettleTick !== null
+  const disclosureSettling = disclosureSettle !== null
   const earlierPage = useSessionEarlierPage(session.id)
   // Earlier history is offered only after the reader reaches the oldest loaded row.
   const canLoadEarlier =
@@ -138,31 +144,36 @@ export function TimelineViewport({
     return attachTimelineNavigationListeners({
       element: scrollElement,
       dispatch,
-      suspendForDisclosure: () => setDisclosureSettleTick((current) => (current ?? 0) + 1),
+      suspendForDisclosure: (disclosure) => setDisclosureSettle({ disclosure, measured: false }),
     })
   }, [dispatch, scrollElement])
 
   useEffect(() => {
-    if (disclosureSettleTick === null) return
+    if (!unmeasuredDisclosure || !scrollElement) return
 
-    let second: number | null = null
-    const first = requestAnimationFrame(() => {
-      second = requestAnimationFrame(() => {
-        setDisclosureSettleTick(null)
-        if (!scrollElement) return
-
-        dispatch({
-          atContentEnd: isTimelineAtContentEnd(readTimelineViewport(scrollElement)),
-          type: 'scrolled',
-        })
-      })
+    // Observers report in creation order, so this first report of the row lands
+    // after the virtualizer's own observer has measured the toggle.
+    const observer = new ResizeObserver(() => {
+      observer.disconnect()
+      setDisclosureSettle({ disclosure: unmeasuredDisclosure, measured: true })
     })
+    observer.observe(unmeasuredDisclosure.closest('[data-index]') ?? scrollElement)
+    return () => observer.disconnect()
+  }, [scrollElement, unmeasuredDisclosure])
 
-    return () => {
-      cancelAnimationFrame(first)
-      if (second !== null) cancelAnimationFrame(second)
-    }
-  }, [disclosureSettleTick, dispatch, scrollElement])
+  // Read in the commit that carries the measured size: the virtualizer re-renders
+  // after its observer returns, so the observer itself still sees the old height.
+  useLayoutEffect(() => {
+    if (!disclosureSettle?.measured || !scrollElement) return
+
+    // Measure-then-update is what a layout effect is for; nothing paints in between.
+    // oxlint-disable-next-line oxc-react-compiler/set-state-in-effect
+    setDisclosureSettle(null)
+    dispatch({
+      atContentEnd: isTimelineAtContentEnd(readTimelineViewport(scrollElement)),
+      type: 'scrolled',
+    })
+  }, [disclosureSettle, dispatch, scrollElement])
 
   useEffect(() => {
     const capture = () =>

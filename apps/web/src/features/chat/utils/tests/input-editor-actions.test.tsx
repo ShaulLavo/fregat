@@ -5,6 +5,7 @@ import { LexicalErrorBoundary } from '@lexical/react/LexicalErrorBoundary'
 import { PlainTextPlugin } from '@lexical/react/LexicalPlainTextPlugin'
 import { $getSelection, KEY_DOWN_COMMAND, type LexicalEditor } from 'lexical'
 import { useEffect } from 'react'
+import { vi } from 'vitest'
 
 import { ChatInputLineBoundaryPlugin } from '@/features/chat/components/chat-input-line-boundary-plugin'
 import { CHAT_INPUT_EDITOR_NODES } from '@/features/chat/components/chat-input-mention-node'
@@ -77,6 +78,33 @@ test('inserting a mention writes it through the grammar and leaves the caret aft
   expect(insertChatInputMention(editor, 'src/my file.ts')).toBe(true)
 
   expect(snapshot(editor)).toEqual({ cursor: 23, text: 'read @"src/my file.ts" ' })
+})
+
+test('a focusing insert focuses only once the DOM holds the inserted text', async () => {
+  const editor = mountChatInputEditor('read ')
+  const root = editor.getRootElement()
+  const seenAtFocus: string[] = []
+  const focus = editor.focus.bind(editor)
+  vi.spyOn(editor, 'focus').mockImplementation((...args) => {
+    seenAtFocus.push(root?.textContent ?? '')
+    focus(...args)
+  })
+
+  insertChatInputMention(editor, 'src/app.ts', { focus: true })
+
+  // The chip renders the basename.
+  await vi.waitFor(() => expect(seenAtFocus).toEqual(['read app.ts ']))
+  await vi.waitFor(() => expect(document.activeElement).toBe(root))
+})
+
+test('an insert without focus leaves focus where it was', async () => {
+  const editor = mountChatInputEditor('read ')
+  const focus = vi.spyOn(editor, 'focus')
+
+  insertChatInputText(editor, 'more')
+  editor.read(() => undefined)
+
+  expect(focus).not.toHaveBeenCalled()
 })
 
 test('inserted prompt text keeps offsets right for the prose that follows a mention', () => {

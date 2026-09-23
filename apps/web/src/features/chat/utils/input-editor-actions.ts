@@ -49,22 +49,39 @@ export function $setChatInputText(text: string) {
  * characters it was written with. This is what a paste of a copied prompt runs
  * through.
  */
-export function insertChatInputText(editor: LexicalEditor, text: string) {
+export function insertChatInputText(
+  editor: LexicalEditor,
+  text: string,
+  { focus = false }: { focus?: boolean } = {},
+) {
   let inserted = false
 
-  editor.update(() => {
-    // A composer that was never focused has no caret; the end of the prompt is
-    // where handed-over text belongs, and without this it was dropped silently.
-    if (!$isRangeSelection($getSelection())) $getRoot().selectEnd()
-    inserted = $insertChatInputPrompt(text)
-  })
+  editor.update(
+    () => {
+      // A composer that was never focused has no caret; the end of the prompt is
+      // where handed-over text belongs, and without this it was dropped silently.
+      if (!$isRangeSelection($getSelection())) $getRoot().selectEnd()
+      inserted = $insertChatInputPrompt(text)
+    },
+    {
+      // After the commit: focusing an editor whose DOM still lacks the insert
+      // syncs that stale DOM back over it.
+      onUpdate: () => {
+        if (focus && inserted) editor.focus()
+      },
+    },
+  )
 
   return inserted
 }
 
 /** Inserts one mention, plus the blank that separates it from what follows. */
-export function insertChatInputMention(editor: LexicalEditor, path: string) {
-  return insertChatInputText(editor, `${serializeComposerMention(path)} `)
+export function insertChatInputMention(
+  editor: LexicalEditor,
+  path: string,
+  options?: { focus?: boolean },
+) {
+  return insertChatInputText(editor, `${serializeComposerMention(path)} `, options)
 }
 
 export function clearChatInputEditor(editor: LexicalEditor) {
