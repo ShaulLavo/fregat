@@ -85,10 +85,12 @@ The deleted plans remain in git history.
 
 Editor E006 is in progress as of 2026-09-23.
 [Automatic text reclamation](../Editor/docs/storage/e006-text-reclamation.md) now runs in live
-buffers with incremental scheduling, unchanged snapshot identity and retained undo history.
-Chunk-owned measurement caches release deleted strings too. Mounted multi-view browser checks
-and the linked Platform WorkspaceEdit service/event suites pass. Partial/original chunks and
-position metadata remain open. This does not reorder the other lanes.
+buffers, including unused portions of append chunks and original text, with unchanged snapshot
+identity and retained undo history. Measurement caches and worker descriptors follow physical
+text ownership. Mounted multi-view heap checks and linked Platform WorkspaceEdit tests cover
+the change. String-storage gates now pass; untouched spans keep their owners and small undo
+slices no longer pin whole strings. Position-metadata bounds remain open. This does not reorder
+the other lanes.
 
 Editor E002 is complete as of 2026-09-07. Correlated input diagnostics, bounded source-range
 indexing, and stale secondary-work guards are live. Three fresh controls calibrated the
