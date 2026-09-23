@@ -39,3 +39,5 @@ Scope is a security boundary: a window-scoped value never reaches execution. Sec
 `scenario settings-models-pending` holds the provider read, reloads and opens the Models setting. The pending step must show the row skeleton and never "No models are available yet."
 
 `scenario settings-cold-load` delays the settings module in the Vite dev server, verifies the loading state, then releases the import and checks that rendering resumes without console errors.
+
+`scenario wallpaper-boot-handoff` reloads as a macOS tab with a theme-less boot mirror whose wallpaper is the desktop. Linux composites over the real desktop, and a theme's own wallpaper wins, so neither preloads. The boot script's preload must report `ready` on `window.platformBootWallpaper`, the record the app reads instead of the link's attributes.

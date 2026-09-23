@@ -1,23 +1,20 @@
 import { useEffect, useEffectEvent, useLayoutEffect, useRef } from 'react'
 
-import {
-  fileTreeFileOpenIntent,
-  fileTreeRowElements,
-  fileTreeRowPath,
-} from '@/features/workspace/utils/file-tree-prefetch'
+import { fileTreeFileOpenIntent } from '@/features/workspace/utils/file-tree-prefetch'
 import { useFileTreeActions } from '@/features/workspace/hooks/use-file-tree-actions'
 import {
   createIntentPrefetchRegistry,
   type IntentPrefetchRegistry,
-  type IntentPrefetchRow,
+  type IntentPrefetchTarget,
 } from '@/features/workspace/utils/intent-prefetch-registry'
 import { createIdleScheduler } from '@/features/workspace/utils/intent-prefetch-scheduler'
 import { FILE_SNAPSHOT_STALE_MS } from '@/lib/file-snapshot-query-cache'
 import { useFileOpenIntent } from '@/lib/file-open-intent/providers/context'
 import { isDirectoryEntry } from '@/lib/file-system-types'
 import { INTENT_PREFETCH_HIT_SLOP_PX } from '@/lib/intent-prefetch-options'
+import { canonicalTreePath } from '@/lib/path-formatters'
 import { entryForTreePath, type TreeModel } from '@/lib/tree-model'
-import type { FileTreeModel } from '@workspace/tree'
+import type { FileTreeModel, FileTreeRowElement } from '@workspace/tree'
 
 type FileTreeIntentPrefetchOptions = {
   model: TreeModel
@@ -52,65 +49,39 @@ export function useFileTreeIntentPrefetch({
   })
 
   const syncRegistrations = useEffectEvent((registry: IntentPrefetchRegistry<string>) => {
-    const shadowRoot = tree.getFileTreeContainer()?.shadowRoot
-    if (!shadowRoot) {
-      registry.clear()
-      return
-    }
-
-    registry.sync(fileTreeRowElements(shadowRoot), prefetchTreePath)
+    registry.sync(tree.getRowElements().map(fileTreeRowTarget), prefetchTreePath)
   })
 
   useEffect(() => {
     if (typeof window === 'undefined') return
 
-    const registry = createIntentPrefetchRegistry({
+    const registry = createIntentPrefetchRegistry<string>({
       hitSlop: INTENT_PREFETCH_HIT_SLOP_PX,
       reactivateAfter: FILE_SNAPSHOT_STALE_MS,
-      resolveRow: resolveFileTreeRow,
     })
-    let observer: MutationObserver | null = null
-    const schedule = createIdleScheduler(() => {
-      if (observer === null) observer = observeTreeRows(tree, schedule.request)
-      syncRegistrations(registry)
-    })
-    const unsubscribe = tree.subscribe(schedule.request)
+    const schedule = createIdleScheduler(() => syncRegistrations(registry))
+    const unsubscribe = tree.subscribeRowElements(schedule.request)
 
     schedule.request()
 
     return () => {
       unsubscribe()
-      observer?.disconnect()
       schedule.cancel()
       registry.clear()
     }
   }, [rootPath, tree])
 }
 
-function resolveFileTreeRow(element: HTMLElement): IntentPrefetchRow<string> | null {
-  const treePath = fileTreeRowPath(element)
-  if (!treePath) return null
+function fileTreeRowTarget({ element, path }: FileTreeRowElement): IntentPrefetchTarget<string> {
+  const treePath = canonicalTreePath(path)
 
   return {
-    intent: treePath,
-    key: treePath,
-    meta: { treePath },
-    name: `file-tree:${treePath}`,
+    element,
+    row: {
+      intent: treePath,
+      key: treePath,
+      meta: { treePath },
+      name: `file-tree:${treePath}`,
+    },
   }
-}
-
-function observeTreeRows(tree: FileTreeModel, onChange: () => void): MutationObserver | null {
-  if (typeof MutationObserver === 'undefined') return null
-
-  const shadowRoot = tree.getFileTreeContainer()?.shadowRoot
-  if (!shadowRoot) return null
-
-  const observer = new MutationObserver(onChange)
-  observer.observe(shadowRoot, {
-    attributeFilter: ['data-item-path'],
-    attributes: true,
-    childList: true,
-    subtree: true,
-  })
-  return observer
 }

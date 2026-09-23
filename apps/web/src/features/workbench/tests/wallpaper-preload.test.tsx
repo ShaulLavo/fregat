@@ -1,5 +1,3 @@
-import { readFileSync } from 'node:fs'
-import { join } from 'node:path'
 import { afterEach, vi } from 'vitest'
 import { DEFAULT_SETTING_VALUES } from '@workspace/contracts'
 import { writeBootMirror } from '@/lib/settings-boot-mirror'
@@ -8,31 +6,38 @@ import { expect, test } from '../../../../test/fixtures'
 
 afterEach(() => {
   vi.unstubAllGlobals()
+  vi.unstubAllEnvs()
   delete window.platformBridge
+  delete window.platformBootWallpaper
   localStorage.clear()
   for (const link of document.querySelectorAll('link[rel="preload"][as="image"]')) link.remove()
 })
 
-test('HTML preloads the desktop wallpaper without fetching an unused fallback', () => {
+test('HTML preloads the desktop wallpaper without fetching an unused fallback', async () => {
   vi.stubGlobal('navigator', { userAgentData: { platform: 'macOS' }, userAgent: '' })
-  runBootScript({ serverUrl: 'https://example.test/platform-api/?ignored=yes' })
+  await runBootScript({ serverUrl: 'https://example.test/platform-api/?ignored=yes' })
 
   expect(preloadSources()).toEqual(['https://example.test/platform-api/wallpaper/still'])
+  // The app reads the preload's outcome from this record, not from the link.
+  expect(window.platformBootWallpaper).toEqual({
+    href: 'https://example.test/platform-api/wallpaper/still',
+    status: 'pending',
+  })
   for (const link of document.querySelectorAll('link[rel="preload"][as="image"]')) {
     expect(link).toHaveAttribute('crossorigin', 'anonymous')
   }
 })
 
-test('a production page without an override preloads from its own base URL', () => {
+test('a production page without an override preloads from its own base URL', async () => {
   vi.stubGlobal('navigator', { userAgentData: { platform: 'macOS' }, userAgent: '' })
-  runBootScript({ dev: false })
+  await runBootScript({ dev: false })
 
   expect(preloadSources()).toEqual([`${location.origin}/platform/wallpaper/still`])
 })
 
-test('a development page without an override preloads from the dev server port', () => {
+test('a development page without an override preloads from the dev server port', async () => {
   vi.stubGlobal('navigator', { userAgentData: { platform: 'macOS' }, userAgent: '' })
-  runBootScript({ dev: true })
+  await runBootScript({ dev: true })
 
   expect(preloadSources()).toEqual(['http://localhost:3001/wallpaper/still'])
 })
@@ -44,7 +49,7 @@ test.each([
   { platform: 'macOS', enabled: true, backdrop: 'compositor' },
 ])(
   'preload respects $platform, enabled=$enabled, backdrop=$backdrop',
-  ({ platform, enabled, backdrop }) => {
+  async ({ platform, enabled, backdrop }) => {
     vi.stubGlobal('navigator', { userAgentData: { platform }, userAgent: '' })
     Object.defineProperty(window, 'platformBridge', { configurable: true, value: { backdrop } })
     writeBootMirror({
@@ -54,24 +59,22 @@ test.each([
         source: { kind: 'desktop' },
       },
     })
-    runBootScript()
+    await runBootScript()
 
     expect(preloadSources()).toEqual([])
   },
 )
 
-// Vite leaves an unset %VITE_SERVER_URL% in place, which is the production case.
-function runBootScript({ serverUrl, dev = false }: { serverUrl?: string; dev?: boolean } = {}) {
-  const html = readFileSync(join(import.meta.dirname, '../../../../index.html'), 'utf8')
-  const script = html.match(/<script>([\s\S]*?)<\/script>/)?.[1]
-  expect(script).toBeDefined()
-  if (!script) return
-
-  const configured = script
-    .replaceAll('%BASE_URL%', '/platform/')
-    .replaceAll('%DEV%', String(dev))
-    .replaceAll('%VITE_SERVER_URL%', serverUrl ?? '%VITE_SERVER_URL%')
-  new Function(configured)()
+// The same module the Vite plugin bundles into index.html, with the three values it defines.
+async function runBootScript({
+  serverUrl,
+  dev = false,
+}: { serverUrl?: string; dev?: boolean } = {}) {
+  vi.stubEnv('DEV', dev)
+  vi.stubEnv('BASE_URL', '/platform/')
+  vi.stubEnv('VITE_SERVER_URL', serverUrl)
+  vi.resetModules()
+  await import('@/boot-appearance')
 }
 
 function preloadSources() {

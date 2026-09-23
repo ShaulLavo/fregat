@@ -1,5 +1,7 @@
 import { type RefObject, useRef } from 'react'
 
+import type { FileTreeRowElements } from '../utils/render/rowElements'
+
 export interface FileTreeRowDom {
   readonly getList: () => HTMLDivElement | null
   readonly getRenameInput: () => HTMLInputElement | null
@@ -34,7 +36,7 @@ function updateButtonRegistry(
   registry.set(path, element)
 }
 
-export function useFileTreeRowDom(): FileTreeRowDomBinding {
+export function useFileTreeRowDom(rowElements?: FileTreeRowElements): FileTreeRowDomBinding {
   const rootRef = useRef<HTMLDivElement | null>(null)
   const scrollRef = useRef<HTMLDivElement | null>(null)
   const listRef = useRef<HTMLDivElement | null>(null)
@@ -54,9 +56,11 @@ export function useFileTreeRowDom(): FileTreeRowDomBinding {
   }
   const registerRowButton = (path: string, element: HTMLElement | null): void => {
     updateButtonRegistry(rowButtonsRef.current, path, element)
+    rowElements?.register(path, element, false)
   }
   const registerStickyRowButton = (path: string, element: HTMLElement | null): void => {
     updateButtonRegistry(stickyRowButtonsRef.current, path, element)
+    rowElements?.register(path, element, true)
   }
 
   return {

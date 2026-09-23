@@ -16,21 +16,6 @@ export function treeDirectoryPrefetchKey(rootPath: string, treePath: string, ent
   return fileSystemKeys.treeDirectory(rootPath, canonicalTreePath(treePath), entry.path)
 }
 
-export function fileTreeRowElements(root: ParentNode) {
-  return Array.from(
-    root.querySelectorAll<HTMLButtonElement>('button[data-type="item"][data-item-path]'),
-  )
-}
-
-export function fileTreeRowPath(element: Element) {
-  if (!(element instanceof HTMLElement)) return null
-
-  const path = element.dataset.itemPath
-  if (!path) return null
-
-  return canonicalTreePath(path)
-}
-
 export function fileTreeFileOpenIntent(rootPath: string, entry: TreeEntry): FileOpenIntent | null {
   if (!canPrefetchFileEntry(entry)) return null
 

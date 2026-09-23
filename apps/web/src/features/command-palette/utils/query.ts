@@ -291,23 +291,6 @@ export function previewColorModeItem(
   return true
 }
 
-const HIGHLIGHT_NAVIGATION_KEYS: ReadonlySet<string> = new Set([
-  'ArrowDown',
-  'ArrowUp',
-  'End',
-  'Home',
-])
-
-export function isHighlightNavigationKey(event: {
-  readonly ctrlKey: boolean
-  readonly key: string
-}) {
-  if (HIGHLIGHT_NAVIGATION_KEYS.has(event.key)) return true
-  if (!event.ctrlKey) return false
-
-  return event.key === 'j' || event.key === 'k' || event.key === 'n' || event.key === 'p'
-}
-
 export function sessionProjectItemValue(projectId: string) {
   return `session-project:${projectId}`
 }

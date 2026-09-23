@@ -6,7 +6,7 @@ import { fetchQuickOpenFiles } from '@/lib/file-server'
 import { fileSystemKeys } from '@/lib/query-keys'
 import type { TreeModel } from '@/lib/tree-model'
 import { keepPreviousData, useQuery } from '@tanstack/react-query'
-import { useLayoutEffect, useState } from 'react'
+import { useLayoutEffect, useState, type RefObject } from 'react'
 
 import type { QuickAccessMode } from '@/features/command-palette/utils/types'
 import {
@@ -16,6 +16,7 @@ import {
 } from '@/features/command-palette/utils/query'
 
 type UseCommandPaletteFilesOptions = {
+  readonly listRef: RefObject<HTMLElement | null>
   readonly mode: QuickAccessMode
   readonly open: boolean
   readonly query: string
@@ -24,6 +25,7 @@ type UseCommandPaletteFilesOptions = {
 }
 
 export function useFiles({
+  listRef,
   mode,
   open,
   query,
@@ -61,11 +63,12 @@ export function useFiles({
   const selectedCommandValue =
     mode === 'files' ? selectedFileCommandValue(selectedFileItemValue, visibleFileItems) : undefined
 
+  // New rows start from the top; a list left scrolled would hide the best match.
   useLayoutEffect(() => {
     if (!open || mode !== 'files') return
-    //TODO this seems a bit hacky, do we even want to do this? if so use a ref at least
-    document.querySelector<HTMLElement>('[data-slot="command-list"]')?.scrollTo({ top: 0 })
-  }, [fileQuery, fileSearchQuery.data, mode, open])
+
+    listRef.current?.scrollTo({ top: 0 })
+  }, [fileQuery, fileSearchQuery.data, listRef, mode, open])
 
   return {
     fileQuery,

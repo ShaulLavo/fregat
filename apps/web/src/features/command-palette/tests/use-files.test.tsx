@@ -16,6 +16,7 @@ test('keeps the previous quick-open rows up until the new query answers', async 
   const { result, rerender, queryClient } = renderHookWithProviders(
     ({ query }: { query: string }) =>
       useFiles({
+        listRef: { current: null },
         mode: 'files',
         open: true,
         query,

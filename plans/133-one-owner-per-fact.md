@@ -1,6 +1,6 @@
 # One owner per fact in the web app
 
-Status: **PHASES 1–3 IMPLEMENTED 2026-09-23; PHASE 4 PROPOSED. D1 moved to Plan 134.** Requested 2026-09-21. Inspected
+Status: **PHASES 1–4 IMPLEMENTED 2026-09-23. D1 moved to Plan 134.** Requested 2026-09-21. Inspected
 at Platform `d1ca6472`. `apps/web/src` and the contracts it shares with the server.
 
 Inside Platform's own code the same shape recurs that [plan 130](130-ask-the-editor.md) removes at
@@ -122,6 +122,24 @@ tree drag onto the composer.
 
 Each is small and independent. Item 4 first checks whether an uncontrolled cmdk `Command` exposes
 `onValueChange`, which would remove the observer outright.
+
+Done 2026-09-23. cmdk 1.1.1 calls `onValueChange` only when `value` is controlled, but it exports
+`useCommandState`. A `HighlightReporter` rendered inside the palette's `Command` reads the store's
+`value`, so the MutationObserver, the microtask and the navigation-key list are gone (4). The quick
+open scroll reset takes a ref to its own `CommandList` (5). The code-block and mermaid headers carry
+`data-markdown-copy=''`, and the serializer no longer reads Tailwind classes (6). The boot script
+records its preload on `window.platformBootWallpaper` (typed in `lib/boot-keys.ts`), and the reader
+answers `unknown` for a missing or different record (7). The notification badge repaints the page's
+own icon link and restores its href and type (8). `packages/tree` publishes its mounted rows through
+`FileTreeModel.getRowElements()` and `subscribeRowElements()`, fed by the row ref registration the
+view already had. The prefetch registry takes `{ element, row }` targets, and the MutationObserver
+over the shadow root is gone (9). The editor frame handles the press on a `display: contents`
+wrapper around `EditorHost`, which takes no event props (10).
+
+`wallpaper-preload.test.tsx` had been failing since Phase 2 moved the boot script out of
+`index.html`. It now imports `@/boot-appearance` with the plugin's defines stubbed. Scenarios:
+`file-tree-hover-prefetch`, `wallpaper-boot-handoff`. `use-symbol-revision` and `diff-expansion`
+fail on HEAD before this phase too.
 
 ## Verification
 

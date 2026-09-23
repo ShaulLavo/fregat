@@ -363,18 +363,18 @@ test('delivers an imperative row prediction through the real Foresight manager',
   target.style.width = '180px'
   document.body.append(target)
   const intents: string[] = []
-  const registry = createIntentPrefetchRegistry({
+  const registry = createIntentPrefetchRegistry<string>({
     reactivateAfter: FILE_SNAPSHOT_STALE_MS,
-    resolveRow: () => ({
-      intent: '/repo/src/imperative.ts',
-      key: '/repo/src/imperative.ts',
-      meta: { treePath: 'src/imperative.ts' },
-      name: 'file-tree:src/imperative.ts',
-    }),
   })
+  const row = {
+    intent: '/repo/src/imperative.ts',
+    key: '/repo/src/imperative.ts',
+    meta: { treePath: 'src/imperative.ts' },
+    name: 'file-tree:src/imperative.ts',
+  }
 
   try {
-    registry.sync([target], (intent) => intents.push(intent))
+    registry.sync([{ element: target, row }], (intent) => intents.push(intent))
     expect(ForesightManager.instance.getManagerData.registeredElements.get(target)).toMatchObject({
       meta: { treePath: 'src/imperative.ts' },
       name: 'file-tree:src/imperative.ts',

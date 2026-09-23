@@ -41,6 +41,14 @@ test('interface chrome is left out of the copied markdown', () => {
   expect(markdown).toBe('kept')
 })
 
+test('an empty copy override drops a header; a class name decides nothing', () => {
+  const markdown = serialize(
+    '<div data-markdown-copy=""><span>ts</span></div><p class="select-none">kept</p>',
+  )
+
+  expect(markdown).toBe('kept')
+})
+
 function serialize(html: string) {
   const container = document.createElement('div')
   container.innerHTML = html

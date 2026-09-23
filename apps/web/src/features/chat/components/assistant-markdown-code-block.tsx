@@ -51,6 +51,7 @@ export function AssistantMarkdownCodeBlock({
         className='text-muted-foreground flex h-8 items-center justify-between gap-2 text-xs select-none'
         data-language={language}
         data-markdown='code-block-header'
+        data-markdown-copy=''
       >
         {/* Not on the header: the toolbar beside it holds Tooltip controls (D4). */}
         <span className='flex min-w-0 items-center gap-1.5 pl-1' title={title ?? undefined}>

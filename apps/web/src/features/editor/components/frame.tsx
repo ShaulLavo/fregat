@@ -4,7 +4,6 @@ import {
   type ComponentProps,
   type KeyboardEvent,
   type MouseEvent,
-  type PointerEvent,
   type ReactNode,
   type Ref,
 } from 'react'
@@ -41,12 +40,9 @@ export const EditorFrame = memo(
       contextMenu.openOnMenuKey(event)
     }
 
-    function handlePointerDown(event: PointerEvent<HTMLDivElement>) {
-      if (!onRequestCloseOverlay) return
-      if (!(event.target instanceof Element)) return
-      if (!event.target.closest('.app-editor-host')) return
-
-      onRequestCloseOverlay(false)
+    // On the host's own wrapper, so a press in an overlay rendered as `children` never closes it.
+    function handleHostPointerDown() {
+      onRequestCloseOverlay?.(false)
     }
 
     return (
@@ -56,9 +52,10 @@ export const EditorFrame = memo(
         ref={targetRef}
         onContextMenu={handleContextMenu}
         onKeyDown={handleKeyDown}
-        onPointerDownCapture={handlePointerDown}
       >
-        <EditorHost className='app-editor-host' controller={controller} />
+        <div className='contents' onPointerDownCapture={handleHostPointerDown}>
+          <EditorHost className='app-editor-host' controller={controller} />
+        </div>
         {children}
         {contextMenu.anchor ? (
           <EditorTextMenu anchor={contextMenu.anchor} onOpenChange={contextMenu.onOpenChange} />

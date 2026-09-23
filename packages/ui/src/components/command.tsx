@@ -196,6 +196,8 @@ function CommandShortcut({ className, ...props }: React.ComponentProps<'span'>) 
   )
 }
 
+export { useCommandState } from 'cmdk'
+
 export {
   Command,
   CommandDialog,

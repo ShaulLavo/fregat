@@ -7,45 +7,53 @@ export type IntentPrefetchRow<TIntent> = {
   name: string
 }
 
-export type IntentPrefetchRegistryConfig<TIntent> = {
+export type IntentPrefetchTarget<TIntent> = {
+  readonly element: HTMLElement
+  readonly row: IntentPrefetchRow<TIntent>
+}
+
+export type IntentPrefetchRegistryConfig = {
   hitSlop?: HitSlop
   reactivateAfter: number
-  resolveRow: (element: HTMLElement) => IntentPrefetchRow<TIntent> | null
 }
 
 export type IntentPrefetchRegistry<TIntent> = {
   clear: () => void
-  sync: (elements: Iterable<HTMLElement>, onIntent: (intent: TIntent) => void) => void
+  sync: (
+    targets: Iterable<IntentPrefetchTarget<TIntent>>,
+    onIntent: (intent: TIntent) => void,
+  ) => void
 }
 
 export function createIntentPrefetchRegistry<TIntent>({
   hitSlop,
   reactivateAfter,
-  resolveRow,
-}: IntentPrefetchRegistryConfig<TIntent>): IntentPrefetchRegistry<TIntent> {
+}: IntentPrefetchRegistryConfig): IntentPrefetchRegistry<TIntent> {
   const registrations = new Map<HTMLElement, string>()
 
-  function sync(elements: Iterable<HTMLElement>, onIntent: (intent: TIntent) => void) {
-    const currentElements = new Set(elements)
+  function sync(
+    targets: Iterable<IntentPrefetchTarget<TIntent>>,
+    onIntent: (intent: TIntent) => void,
+  ) {
+    const current = new Map<HTMLElement, IntentPrefetchRow<TIntent>>()
+    for (const { element, row } of targets) current.set(element, row)
 
     for (const element of registrations.keys()) {
-      if (currentElements.has(element)) continue
+      if (current.has(element)) continue
 
       unregister(element)
     }
 
-    for (const element of currentElements) {
-      register(element, onIntent)
+    for (const [element, row] of current) {
+      register(element, row, onIntent)
     }
   }
 
-  function register(element: HTMLElement, onIntent: (intent: TIntent) => void) {
-    const row = resolveRow(element)
-    if (!row) {
-      unregister(element)
-      return
-    }
-
+  function register(
+    element: HTMLElement,
+    row: IntentPrefetchRow<TIntent>,
+    onIntent: (intent: TIntent) => void,
+  ) {
     const currentKey = registrations.get(element)
     if (currentKey === row.key) return
     if (currentKey) unregister(element)

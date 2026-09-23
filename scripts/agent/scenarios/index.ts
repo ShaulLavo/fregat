@@ -51,6 +51,8 @@ import { chatIconHints } from './chat-icon-hints'
 import { chatCardNarrow } from './chat-card-narrow'
 import { chatComposerInsert } from './chat-composer-insert'
 import { chatDisclosureSettle } from './chat-disclosure-settle'
+import { fileTreeHoverPrefetch } from './file-tree-hover-prefetch'
+import { wallpaperBootHandoff } from './wallpaper-boot-handoff'
 import { chatGitTabSwitch } from './chat-git-tab-switch'
 import { chatGitTurnRows } from './chat-git-turn-rows'
 import { chatModelPicker } from './chat-model-picker'
@@ -307,6 +309,8 @@ export const scenarios: readonly Scenario[] = [
   chatCardNarrow,
   chatComposerInsert,
   chatDisclosureSettle,
+  fileTreeHoverPrefetch,
+  wallpaperBootHandoff,
   chatGitTabSwitch,
   chatGitTurnRows,
   editorUndoReopen,

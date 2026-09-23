@@ -196,6 +196,7 @@ export function FileTreeView({
   overscan = FILE_TREE_DEFAULT_OVERSCAN,
   renamingEnabled = false,
   renderRowDecoration,
+  rowElements,
   searchBlurBehavior = 'close',
   searchEnabled = false,
   searchFakeFocus = false,
@@ -231,7 +232,7 @@ export function FileTreeView({
     rootRef,
     scrollRef,
     searchInputRef,
-  } = useFileTreeRowDom()
+  } = useFileTreeRowDom(rowElements)
   const dom: FileTreeRowDom = {
     getList,
     getRenameInput,

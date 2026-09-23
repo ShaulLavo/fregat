@@ -10,7 +10,12 @@ import {
   type WallpaperSelection,
 } from '@workspace/contracts'
 
-import { BOOT_MIRROR_KEY, PALETTE_BOOT_KEY, PALETTE_STYLE_ID } from '@/lib/boot-keys'
+import {
+  BOOT_MIRROR_KEY,
+  PALETTE_BOOT_KEY,
+  PALETTE_STYLE_ID,
+  type BootWallpaperPreload,
+} from '@/lib/boot-keys'
 import { resolveBackdrop } from '@/lib/platform/backdrop'
 
 // The pre-paint boot script. scripts/boot-appearance-plugin.ts bundles this into a classic
@@ -121,13 +126,14 @@ function preloadDesktopWallpaper() {
   preload.crossOrigin = 'anonymous'
   preload.href = `${serverBase()}/wallpaper/still`
   preload.fetchPriority = 'high'
-  preload.dataset.workbenchWallpaperPreload = 'pending'
+  const record: BootWallpaperPreload = { href: preload.href, status: 'pending' }
   preload.onload = () => {
-    preload.dataset.workbenchWallpaperPreload = 'ready'
+    record.status = 'ready'
   }
   preload.onerror = () => {
-    preload.dataset.workbenchWallpaperPreload = 'error'
+    record.status = 'error'
   }
+  window.platformBootWallpaper = record
   document.head.append(preload)
 }
 

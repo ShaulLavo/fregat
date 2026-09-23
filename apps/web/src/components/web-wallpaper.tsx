@@ -33,7 +33,7 @@ export function WebWallpaper({ className }: { readonly className?: string }) {
   const [videoReady, setVideoReady] = useState(false)
   const videoRef = useRef<HTMLVideoElement | null>(null)
   const showVideo = !videoFailed && Boolean(videoMedia.data)
-  const preload = desktopSource ? wallpaperPreloadState(desktopSource) : 'pending'
+  const preload = desktopSource ? wallpaperPreloadState(desktopSource) : 'unknown'
   const desktopReady = loadedStillSource === desktopSource || preload === 'ready'
   const desktopFailed = failedStillSource === desktopSource || preload === 'error'
   const stillSources = desktopSource && desktopReady && !desktopFailed ? [] : [WALLPAPER_URL]

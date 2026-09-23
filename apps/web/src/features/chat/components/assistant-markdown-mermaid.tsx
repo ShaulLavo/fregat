@@ -51,7 +51,10 @@ export function AssistantMarkdownMermaid({
       data-language='mermaid'
       data-markdown='mermaid-block'
     >
-      <div className='text-muted-foreground flex h-8 items-center justify-between gap-2 text-xs select-none'>
+      <div
+        className='text-muted-foreground flex h-8 items-center justify-between gap-2 text-xs select-none'
+        data-markdown-copy=''
+      >
         <span className='truncate pl-1 font-mono'>mermaid</span>
         <span aria-label='Diagram actions' className='flex items-center gap-0.5' role='toolbar'>
           <MarkdownCopyButton label='Copy diagram source' text={chart} />

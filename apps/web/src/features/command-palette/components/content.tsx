@@ -5,7 +5,7 @@ import {
   CommandInput,
   CommandList,
 } from '@workspace/ui/components/command'
-import { useEffect, useMemo, type KeyboardEvent } from 'react'
+import { useEffect, useMemo, useRef, type KeyboardEvent } from 'react'
 
 import { GroupsFactory } from '@/features/command-palette/components/groups-factory'
 import { colorModePaletteItems, viewPaletteItems } from '@/features/command-palette/utils/data'
@@ -34,7 +34,7 @@ import {
 } from '@/features/command-palette/utils/query'
 import { fileUriForPath } from '@/lib/file-uri'
 import { ScopeChip } from '@/features/command-palette/components/scope-chip'
-import { useHighlightedPaletteValue } from '@/features/command-palette/hooks/use-highlighted-palette-value'
+import { HighlightReporter } from '@/features/command-palette/components/highlight-reporter'
 import { useRecentCommandIds } from '@/features/command-palette/hooks/use-recent-command-ids'
 import { paletteIdFromItemValue } from '@/features/command-palette/utils/app-colors'
 import { themeBundleFromItemValue } from '@/features/command-palette/utils/theme-bundles'
@@ -103,6 +103,7 @@ export function CommandPaletteContent() {
   const query = paletteScope ? search : quickAccessQuery(search)
   const treeState = useWorkspaceTreeState(rootFolder)
   const editorItems = editorPaletteItems(openTabContents, selectedTabContent)
+  const listRef = useRef<HTMLDivElement | null>(null)
   const {
     fileQuery,
     fileSearchQuery,
@@ -111,6 +112,7 @@ export function CommandPaletteContent() {
     setSelectedFileItemValue,
     visibleFileItems,
   } = useFiles({
+    listRef,
     mode,
     open,
     query,
@@ -206,33 +208,30 @@ export function CommandPaletteContent() {
     previewColorModeItem(value, previewTheme)
   }
 
-  const highlightedListRef = useHighlightedPaletteValue({
-    enabled: isColorPreviewMode(mode),
-    onHighlight: (value) => {
-      if (mode === 'wallpaper') {
-        const source = wallpaperSourceFromItemValue(value)
-        if (source) previewWallpaper(source)
-        return
-      }
-      if (mode === 'themeBundle') {
-        const bundle = themeBundleFromItemValue(bundles, value)
-        if (bundle) previewBundle(bundle)
-        return
-      }
-      if (mode === 'appColors') {
-        const id = paletteIdFromItemValue(value)
-        const palette = catalog.find((candidate) => candidate.id === id)
-        if (palette) previewPalette(palette)
-        return
-      }
-      if (mode === 'colorTheme') {
-        previewHighlightedColorTheme(value)
-        return
-      }
+  function previewHighlighted(value: string) {
+    if (mode === 'wallpaper') {
+      const source = wallpaperSourceFromItemValue(value)
+      if (source) previewWallpaper(source)
+      return
+    }
+    if (mode === 'themeBundle') {
+      const bundle = themeBundleFromItemValue(bundles, value)
+      if (bundle) previewBundle(bundle)
+      return
+    }
+    if (mode === 'appColors') {
+      const id = paletteIdFromItemValue(value)
+      const palette = catalog.find((candidate) => candidate.id === id)
+      if (palette) previewPalette(palette)
+      return
+    }
+    if (mode === 'colorTheme') {
+      previewHighlightedColorTheme(value)
+      return
+    }
 
-      previewHighlightedColorMode(value)
-    },
-  })
+    previewHighlightedColorMode(value)
+  }
 
   function handleCommandValueChange(value: string) {
     if (mode !== 'files') return
@@ -403,8 +402,9 @@ export function CommandPaletteContent() {
             ? 'max-h-60 min-h-0 shrink overflow-y-auto py-1'
             : 'max-h-[min(440px,calc(100vh-8rem))] py-1'
         }
-        ref={highlightedListRef}
+        ref={listRef}
       >
+        {isColorPreviewMode(mode) && <HighlightReporter onHighlight={previewHighlighted} />}
         {!fileSearchUnsettled && <CommandEmpty>{emptyLabelForMode(mode)}</CommandEmpty>}
         <CommandPaletteActionsContext value={actions}>
           <GroupsFactory

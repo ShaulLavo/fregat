@@ -20,17 +20,13 @@ function disableMotion() {
 }
 
 function markDesktopPreload(status: 'ready' | 'error') {
-  const link = document.createElement('link')
-  link.href = wallpaperStillUrl(primaryServerOrigin())!
-  link.dataset.workbenchWallpaperPreload = status
-  document.head.append(link)
+  const href = new URL(wallpaperStillUrl(primaryServerOrigin())!, document.baseURI).href
+  window.platformBootWallpaper = { href, status }
 }
 
 afterEach(() => {
   vi.restoreAllMocks()
-  document.head
-    .querySelectorAll('link[data-workbench-wallpaper-preload]')
-    .forEach((link) => link.remove())
+  delete window.platformBootWallpaper
 })
 
 test('a remote environment starts with the bundled image, never the primary desktop', ({

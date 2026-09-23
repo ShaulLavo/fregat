@@ -39,6 +39,7 @@ import {
 } from '../model/virtualization'
 import { wrapUnsafeCSS } from '../cssWrappers'
 import { renderFileTreeRoot, unmountFileTreeRoot } from '../../state/renderer'
+import { FileTreeRowElements, type FileTreeRowElement } from './rowElements'
 import { FileTreeManagedSlotHost } from './slotHost'
 
 let clientInstanceId = 0
@@ -103,6 +104,7 @@ export class FileTree implements FileTreeMutationHandle, FileTreeSearchSessionHa
   readonly #searchFakeFocus: boolean
   readonly #searchPlaceholder: string | undefined
   readonly #slotHost = new FileTreeManagedSlotHost()
+  readonly #rowElements = new FileTreeRowElements()
   #density: FileTreeDensityPreset
   readonly #viewOptions: Pick<
     FileTreeOptions,
@@ -218,6 +220,15 @@ export class FileTree implements FileTreeMutationHandle, FileTreeSearchSessionHa
     this.#selectionSubscription = null
     this.#densityListeners.clear()
     this.#controller.destroy()
+  }
+
+  /** The rows mounted right now, sticky ones included; changes arrive through `subscribeRowElements`. */
+  public getRowElements(): readonly FileTreeRowElement[] {
+    return this.#rowElements.rows()
+  }
+
+  public subscribeRowElements(listener: () => void): () => void {
+    return this.#rowElements.subscribe(listener)
   }
 
   public getFileTreeContainer(): HTMLElement | undefined {
@@ -494,6 +505,7 @@ export class FileTree implements FileTreeMutationHandle, FileTreeSearchSessionHa
       loadingPaths: this.#loadingPaths,
       renamingEnabled: this.#renamingEnabled,
       renderRowDecoration: this.#renderRowDecoration,
+      rowElements: this.#rowElements,
       searchBlurBehavior: this.#searchBlurBehavior,
       searchEnabled: this.#searchEnabled,
       searchFakeFocus: this.#searchFakeFocus,

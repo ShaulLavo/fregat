@@ -1,4 +1,4 @@
-import { onTestFinished } from 'vitest'
+import { onTestFinished, vi } from 'vitest'
 import { QueryClient } from '@tanstack/react-query'
 import { DEFAULT_SETTING_VALUES, environmentIdSchema, sessionIdSchema } from '@workspace/contracts'
 import {
@@ -58,6 +58,45 @@ test('native host scopes tags, replaces pending notices, handles refusal, focus 
   platform.Notification.permission = 'denied'
   host.deliver(notice, 'notifications', false)
   expect(platform.notifications).toHaveLength(3)
+})
+
+test('the badge repaints the page icon in place and gives it back on focus', () => {
+  installNotificationPlatform()
+  // happy-dom has no 2D canvas; the badge only needs one to draw into.
+  vi.spyOn(HTMLCanvasElement.prototype, 'getContext').mockReturnValue(
+    new Proxy({}, { get: () => () => {}, set: () => true }) as CanvasRenderingContext2D,
+  )
+  vi.spyOn(HTMLCanvasElement.prototype, 'toDataURL').mockReturnValue(
+    'data:image/png;base64,YmFkZ2U=',
+  )
+  const icon = document.createElement('link')
+  icon.rel = 'icon'
+  icon.type = 'image/svg+xml'
+  icon.href = '/platform/vscode-icons/code.svg'
+  document.head.append(icon)
+  const pageHref = icon.href
+  const queryClient = new QueryClient()
+  const host = createNotificationHost({ queryClient, open() {}, active: () => null })
+  onTestFinished(() => {
+    host.dispose()
+    queryClient.clear()
+    icon.remove()
+    vi.restoreAllMocks()
+  })
+  host.configure('notifications')
+
+  host.deliver(notice, 'notifications', false)
+
+  expect(document.head.querySelectorAll('link[rel="icon"]')).toHaveLength(1)
+  expect(icon.href).toBe('data:image/png;base64,YmFkZ2U=')
+  expect(icon.dataset.sessionNotifications).toBe('true')
+
+  window.dispatchEvent(new Event('focus'))
+
+  expect(icon.isConnected).toBe(true)
+  expect(icon.href).toBe(pageHref)
+  expect(icon.type).toBe('image/svg+xml')
+  expect(icon.dataset.sessionNotifications).toBeUndefined()
 })
 
 test('sound unlocks only on gestures, ignores focus and rechecks mode after async buffer retrieval', async () => {

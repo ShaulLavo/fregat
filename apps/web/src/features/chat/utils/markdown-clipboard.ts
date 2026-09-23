@@ -11,7 +11,7 @@ export type MarkdownClipboardPayload = {
 }
 
 const SKIPPED_TAGS = new Set(['BUTTON', 'INPUT', 'SCRIPT', 'STYLE', 'SVG', 'TEMPLATE'])
-const SKIPPED_CLASS_NAMES = ['select-none', 'sr-only']
+// `data-markdown-copy` is what an element copies as; an empty one copies as nothing.
 const SANITIZED_HTML_SELECTOR = [
   'button',
   'input',
@@ -19,7 +19,7 @@ const SANITIZED_HTML_SELECTOR = [
   'style',
   'svg',
   '[aria-hidden="true"]',
-  ...SKIPPED_CLASS_NAMES.map((className) => `.${className}`),
+  '[data-markdown-copy=""]',
 ].join(', ')
 
 export function chatMarkdownClipboardPayload(
@@ -146,9 +146,8 @@ const BLOCK_CONTAINER_TAGS = new Set(['ARTICLE', 'DIV', 'SECTION'])
 
 function isSkipped(element: Element) {
   if (SKIPPED_TAGS.has(element.tagName)) return true
-  if (element.getAttribute('aria-hidden') === 'true') return true
 
-  return SKIPPED_CLASS_NAMES.some((className) => element.classList.contains(className))
+  return element.getAttribute('aria-hidden') === 'true'
 }
 
 /** Hoists surrounding whitespace outside the markers: "` bold `" → " **bold** ". */

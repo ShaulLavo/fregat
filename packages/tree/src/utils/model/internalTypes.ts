@@ -45,6 +45,7 @@ export interface FileTreeViewProps extends Omit<FileTreeRenderOptions, 'initialV
   loadingPaths?: ReadonlySet<FileTreePublicId>
   renamingEnabled?: boolean
   renderRowDecoration?: FileTreeRowDecorationRenderer
+  rowElements?: import('../render/rowElements').FileTreeRowElements
   searchBlurBehavior?: FileTreeSearchBlurBehavior
   searchEnabled?: boolean
   searchFakeFocus?: boolean

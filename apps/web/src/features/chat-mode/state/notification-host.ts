@@ -136,48 +136,58 @@ function noticeToast(notice: SessionNotice) {
   return toast.warning
 }
 
+// Repaints the page's one icon link in place; a second link would leave two owners of the favicon.
 function createNotificationBadge() {
-  let original: HTMLLinkElement | null = null
-  let badge: HTMLLinkElement | null = null
+  let pageIcon: { readonly href: string; readonly type: string } | null = null
   let count = 0
   return {
     set(next: number) {
       if (next === count) return
       count = next
+      const icon = document.querySelector<HTMLLinkElement>('link[rel="icon"]')
+      if (!icon) return
       if (!next) {
-        badge?.remove()
-        badge = null
-        if (original) document.head.append(original)
-        original = null
+        restorePageIcon(icon, pageIcon)
+        pageIcon = null
         return
       }
-      const canvas = document.createElement('canvas')
-      canvas.width = canvas.height = 64
-      const context = canvas.getContext('2d')
-      if (!context) return
-      const theme = getComputedStyle(document.documentElement)
-      context.fillStyle = theme.getPropertyValue('--destructive').trim()
-      context.beginPath()
-      context.arc(32, 32, 28, 0, Math.PI * 2)
-      context.fill()
-      context.fillStyle =
-        theme.getPropertyValue('--destructive-foreground').trim() ||
-        theme.getPropertyValue('--foreground').trim()
-      context.font = `600 ${next > 9 ? 30 : 40}px sans-serif`
-      context.textAlign = 'center'
-      context.textBaseline = 'middle'
-      context.fillText(next > 9 ? '9+' : String(next), 32, 34)
-      if (!badge) {
-        original = document.querySelector<HTMLLinkElement>('link[rel="icon"]')
-        badge = document.createElement('link')
-        badge.rel = 'icon'
-        badge.type = 'image/png'
-        badge.sizes.value = '64x64'
-        badge.dataset.sessionNotifications = 'true'
-        original?.remove()
-        document.head.append(badge)
-      }
-      badge.href = canvas.toDataURL('image/png')
+      const badge = drawNotificationBadge(next)
+      if (!badge) return
+      pageIcon ??= { href: icon.href, type: icon.type }
+      icon.type = 'image/png'
+      icon.dataset.sessionNotifications = 'true'
+      icon.href = badge
     },
   }
+}
+
+function restorePageIcon(
+  icon: HTMLLinkElement,
+  pageIcon: { readonly href: string; readonly type: string } | null,
+) {
+  if (!pageIcon) return
+
+  icon.type = pageIcon.type
+  icon.href = pageIcon.href
+  delete icon.dataset.sessionNotifications
+}
+
+function drawNotificationBadge(count: number) {
+  const canvas = document.createElement('canvas')
+  canvas.width = canvas.height = 64
+  const context = canvas.getContext('2d')
+  if (!context) return null
+  const theme = getComputedStyle(document.documentElement)
+  context.fillStyle = theme.getPropertyValue('--destructive').trim()
+  context.beginPath()
+  context.arc(32, 32, 28, 0, Math.PI * 2)
+  context.fill()
+  context.fillStyle =
+    theme.getPropertyValue('--destructive-foreground').trim() ||
+    theme.getPropertyValue('--foreground').trim()
+  context.font = `600 ${count > 9 ? 30 : 40}px sans-serif`
+  context.textAlign = 'center'
+  context.textBaseline = 'middle'
+  context.fillText(count > 9 ? '9+' : String(count), 32, 34)
+  return canvas.toDataURL('image/png')
 }
