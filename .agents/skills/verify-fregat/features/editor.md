@@ -80,7 +80,7 @@ Editor title actions are the active tab's controls at the end of its tab strip, 
 
 `scenario editor-definition-crlf` opens a disposable TypeScript workspace, follows Go to definition into a CRLF file, inserts at the definition caret and checks the saved bytes. It removes the fixture afterward.
 
-`scenario editor-external-deletion` verifies that externally deleted clean and dirty files stay open, retain their text across tab switches, can be recreated with Save, and refresh when another process restores them.
+`scenario editor-external-deletion` verifies that externally deleted clean and dirty files stay open, retain their text across tab switches, can be recreated with Save, and refresh when another process restores them. Reload closes missing active and inactive tabs with no recoverable text, and a second reload keeps them closed. A file removed during its first explicit open stays open with Create File and Retry; clicking Create File must recreate it and dismiss the error.
 
 `scenario editor-lsp-tab-switch` opens a TypeScript error in an isolated workspace, switches away and back, checks the diagnostic is already painted with no LSP close/reopen, then closes the tab and checks `didClose`.
 

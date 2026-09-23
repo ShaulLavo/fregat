@@ -16,6 +16,7 @@ import { createPlatformFileOpenPreparer } from '@/features/editor/utils/prepared
 import { SearchBufferStateContext } from '@/features/search/state/buffer-state'
 import { useSettingValue } from '@/hooks/use-setting-value'
 import { FileOpenIntentProvider } from '@/lib/file-open-intent/providers/context'
+import { useFileAvailability } from '@/features/editor/hooks/use-file-availability'
 
 export function EditorStateProvider({
   children,
@@ -24,6 +25,7 @@ export function EditorStateProvider({
   readonly children: ReactNode
   readonly runtime: EditorRuntime
 }) {
+  useFileAvailability(runtime)
   const { appliedThemeContentHash, appliedThemeId, selectedThemeId } = useEditorColorTheme()
   const syntaxHighlightingEnabled = useSettingValue('editor.syntaxHighlighting.enabled')
   const languageServerMatchConfiguration = useLanguageServerMatchConfiguration()

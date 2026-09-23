@@ -558,6 +558,7 @@ export const selectors = {
   paletteDialog: (page: Page) => page.getByRole('dialog', { name: 'Command Palette', exact: true }),
   windowToolbar: (page: Page) => page.getByLabel('Window toolbar', { exact: true }),
   editorTab: (page: Page, path: string) => page.locator(`[data-editor-tab-path="${path}"]`),
+  createMissingFile: (page: Page) => page.getByRole('button', { name: 'Create File', exact: true }),
   editorTabs: (page: Page) => page.locator('[data-editor-tab-id]'),
   gitPanel: (page: Page) => page.getByRole('region', { name: 'Git panel' }),
   gitChangeRow: (page: Page, name: string) =>

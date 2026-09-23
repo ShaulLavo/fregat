@@ -33,8 +33,135 @@ import type { PickedFsEntry } from '@/lib/file-system-types'
 import type { CachedWorkspaceSlice, CachedWorkspaceState } from '@/features/workspace/state/cache'
 import { createFileOpenIntentServiceOwner } from '@/lib/file-open-intent/state/service'
 import { fileSnapshotQueryOptions } from '@/lib/file-snapshot-query-cache'
+import { watchFileAvailability } from '@/features/editor/state/file-availability'
+import { createRpcError } from '@/lib/structured-errors'
 
 describe('editor workspace state', () => {
+  test('retires a missing restored file from tabs and reopen history', async () => {
+    const path = '/repo/missing.ts'
+    const harness = editorHarness({
+      workbenchPanels: workbenchPanelsForPaths([path, '/repo/other.ts'], path),
+      recentlyClosedTabs: testTabContents([path]),
+    })
+    const queries = new QueryClient()
+    const stop = watchFileAvailability({
+      ...harness,
+      queryClient: queries,
+      forgetFile: harness.commands.discardLiveEditorDocument,
+    })
+    try {
+      await missingSnapshot(queries, path)
+      expect(harness.workspaceStore.getState().openTabContents).toEqual(
+        testTabContents(['/repo/other.ts']),
+      )
+      expect(harness.workspaceStore.getState().recentlyClosedTabs).toEqual([])
+      expect(harness.workspaceStore.getState().selectedTabContent).toEqual(
+        testTabContent('/repo/other.ts'),
+      )
+    } finally {
+      stop()
+      queries.clear()
+    }
+  })
+
+  test.for([false, true])(
+    'preserves a buffer arriving during a missing read, dirty=%s',
+    async (dirty) => {
+      const path = '/repo/missing.ts'
+      const harness = editorHarness({ workbenchPanels: workbenchPanelsForPaths([path], path) })
+      const queries = new QueryClient()
+      const stop = watchFileAvailability({
+        ...harness,
+        queryClient: queries,
+        forgetFile: harness.commands.discardLiveEditorDocument,
+      })
+      const deferred = Promise.withResolvers<never>()
+      try {
+        const pending = queries.query({
+          ...fileSnapshotQueryOptions(filesystemPath(path)),
+          queryFn: () => deferred.promise,
+          retry: false,
+        })
+        const document = harness.documentStore.getState().ensureLiveEditorDocument(fileResult(path))
+        if (dirty) createEditorBufferSession(document.buffer).applyText(' edited')
+        deferred.reject(createRpcError({ code: 'NOT_FOUND', message: 'file not found' }))
+        await expect(pending).rejects.toBeDefined()
+        expect(harness.workspaceStore.getState().openTabContents).toEqual(testTabContents([path]))
+        const retained = harness.documentStore.getState().getLiveEditorDocument(document.key)!
+        expect(retained.buffer).toBe(document.buffer)
+        expect(retained.buffer.isDirty()).toBe(dirty)
+        expect(retained.sync).toMatchObject({ orphaned: true })
+      } finally {
+        stop()
+        queries.clear()
+      }
+    },
+  )
+
+  test.for(['UNAUTHORIZED', 'OPERATION_FAILED'])('keeps restored tabs on %s', async (code) => {
+    const path = '/repo/missing.ts'
+    const harness = editorHarness({ workbenchPanels: workbenchPanelsForPaths([path], path) })
+    const queries = new QueryClient()
+    const stop = watchFileAvailability({
+      ...harness,
+      queryClient: queries,
+      forgetFile: harness.commands.discardLiveEditorDocument,
+    })
+    try {
+      await missingSnapshot(queries, path, code)
+      expect(harness.workspaceStore.getState().openTabContents).toEqual(testTabContents([path]))
+    } finally {
+      stop()
+      queries.clear()
+    }
+  })
+
+  test('retains recoverable cached text even without a live editor buffer', async () => {
+    const path = '/repo/missing.ts'
+    const harness = editorHarness({ workbenchPanels: workbenchPanelsForPaths([path], path) })
+    const queries = new QueryClient()
+    queries.setQueryData(
+      fileSnapshotQueryOptions(filesystemPath(path)).queryKey,
+      fileResult(path, 'recover me'),
+    )
+    const stop = watchFileAvailability({
+      ...harness,
+      queryClient: queries,
+      forgetFile: harness.commands.discardLiveEditorDocument,
+    })
+    try {
+      await missingSnapshot(queries, path)
+      const document = harness.documentStore
+        .getState()
+        .getLiveEditorDocument(testDocumentKey(path))!
+      expect(document.buffer.materializeFullText()).toBe('recover me')
+      expect(document.sync).toMatchObject({ orphaned: true })
+      expect(harness.workspaceStore.getState().openTabContents).toEqual(testTabContents([path]))
+    } finally {
+      stop()
+      queries.clear()
+    }
+  })
+
+  test('keeps an explicitly opened missing file for recovery actions', async () => {
+    const harness = editorHarness()
+    const queries = new QueryClient()
+    const stop = watchFileAvailability({
+      ...harness,
+      queryClient: queries,
+      forgetFile: harness.commands.discardLiveEditorDocument,
+    })
+    try {
+      const path = '/repo/missing.ts'
+      harness.commands.openFileSurface(filesystemPath(path))
+      await missingSnapshot(queries, path)
+      expect(harness.workspaceStore.getState().openTabContents).toEqual(testTabContents([path]))
+    } finally {
+      stop()
+      queries.clear()
+    }
+  })
+
   test('opens files in the active editor group and records history', () => {
     const { commands, workspaceStore } = editorHarness()
     commands.openFileSurface(filesystemPath('/repo/src/app.ts'))
@@ -510,6 +637,17 @@ describe('editor workspace state', () => {
     }
   })
 })
+
+async function missingSnapshot(queries: QueryClient, path: string, code = 'NOT_FOUND') {
+  await expect(
+    queries.query({
+      ...fileSnapshotQueryOptions(filesystemPath(path)),
+      queryFn: () => Promise.reject(createRpcError({ code, message: 'read failed' })),
+      retry: false,
+      staleTime: 0,
+    }),
+  ).rejects.toBeDefined()
+}
 
 function editorHarness(
   slice: Partial<CachedWorkspaceSlice> = {},

@@ -26,6 +26,7 @@ import type {
 import { createWideEventScope } from '@/lib/wide-event-scope'
 import type { WideEventScope } from '@workspace/observability/scope'
 import { createClientInvariantError } from '@/lib/structured-errors'
+import { toClientError } from '@/lib/client-error-taxonomy'
 
 const MAX_PREPARED_OPENS = 8
 const MAX_PREPARED_BYTES = 32 * 1024 * 1024
@@ -1039,9 +1040,16 @@ class FileOpenIntentServiceState {
       await this.runPreparationStages(path, record, lifecycleGeneration)
       event.set({ preparation: { status: 'ready-clean' } })
     } catch (error) {
-      event.error(error)
       const record = this.records.get(path)
       if (record) this.disposeRecord(path, record)
+      const snapshotError = this.queryClient.getQueryState(
+        fileSnapshotQueryOptions(path).queryKey,
+      )?.error
+      if (snapshotError === error && toClientError(error).category === 'not_found') {
+        this.finishIntent(path, 'rejected', { reason: 'file-missing' })
+        return
+      }
+      event.error(error)
       this.finishIntent(path, abortSignal.aborted ? 'aborted' : 'failed', {
         reason: abortSignal.aborted ? 'aborted' : 'preparation-error',
       })

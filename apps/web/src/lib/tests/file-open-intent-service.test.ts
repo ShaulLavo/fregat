@@ -9,6 +9,7 @@ import { type EditorInitialPaintEvent } from '@singapore-editor/core/extensions'
 import { type EditorPreparedDocument } from '@singapore-editor/core/editor'
 import type { FileResult } from '@/lib/file-system-types'
 import { fileSnapshotQueryOptions } from '@/lib/file-snapshot-query-cache'
+import { registerEnvironmentQueryClient } from '@/lib/environments/state/query-clients'
 import {
   createFileOpenIntentServiceOwner,
   type FileOpenIntentService,
@@ -21,6 +22,35 @@ import {
 } from '@/lib/file-open-intent/state/service'
 
 describe('file open intent service', () => {
+  it('records a missing file as an expected prefetch rejection without an error', async ({
+    client,
+  }) => {
+    const queryClient = new QueryClient({ defaultOptions: { queries: { retry: false } } })
+    registerEnvironmentQueryClient(queryClient, 'http://localhost:7077', client)
+    const events = recordingEvents()
+    const owner = createTestFileOpenIntentOwner(
+      queryClient,
+      testPreparer(vi.fn()),
+      () => null,
+      () => false,
+      () => false,
+      () => undefined,
+      undefined,
+      events.factory,
+    )
+    const path = filesystemPath('repo/missing.ts')
+    const rootPath = filesystemPath('repo')
+    try {
+      owner.setRoot(rootPath)
+      owner.prepare({ path, rootPath, source: 'tab', tabId: tabId('missing') })
+      await vi.waitFor(() => expect(events.emitted).toHaveLength(1))
+      expect(events.emitted[0]).toMatchObject({ outcome: 'rejected', reason: 'file-missing' })
+      expect(events.emitted[0]).not.toHaveProperty('error')
+    } finally {
+      owner.disposeNow()
+      queryClient.clear()
+    }
+  })
   it('prepares and claims one exact fetched revision once', async () => {
     const queryClient = new QueryClient()
     const file = fileResult('/repo/a.ts')

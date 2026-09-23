@@ -2,7 +2,7 @@ import { documentKey } from '@/lib/documents/utils/identity'
 import { filesystemResource } from '@/lib/documents/utils/capabilities'
 import type { FilesystemPath, StandaloneDocumentRef, TabId } from '@/lib/documents/utils/types'
 import { useEditorRuntime } from '@/features/editor/hooks/use-runtime'
-import { WarningCircleIcon } from '@phosphor-icons/react'
+import { FileLoadError } from '@/features/workbench/components/file-load-error'
 
 import { CompareSavedView } from '@/features/editor/components/compare-saved-view'
 import { HistoryView } from '@/features/editor/components/history-view'
@@ -112,7 +112,7 @@ export function FileEditorBody({
           : 'grid h-full min-h-0 min-w-0 grid-cols-1 grid-rows-[minmax(0,1fr)] overflow-hidden'
       }
     >
-      <div className='relative min-h-0 min-w-0 overflow-hidden'>
+      <div className='relative flex min-h-0 min-w-0 flex-col overflow-hidden'>
         <Editor
           active={active && currentActions !== null}
           additionalPlugins={visibleSnapshot.additionalPlugins}
@@ -139,14 +139,12 @@ export function FileEditorBody({
           onOpenReferences={currentActions?.openReferences}
           onCompareMergeConflict={currentActions?.compareMergeConflict ?? undefined}
         />
-        {fileState.status === 'error' ? (
-          <div
-            role='status'
-            className='bg-background text-muted-foreground absolute inset-x-0 bottom-0 flex items-center gap-2 px-3 py-2 text-xs'
-          >
-            <WarningCircleIcon className='size-(--icon-size) shrink-0' />
-            {fileState.message}
-          </div>
+        {fileState.status === 'error' && resource ? (
+          <FileLoadError
+            path={resource.path}
+            message={fileState.message}
+            hasContent={editorDocument !== null}
+          />
         ) : null}
         {!editorDocument && fileState.status !== 'error' ? (
           <div className='bg-background text-muted-foreground absolute inset-x-0 bottom-0 flex items-center gap-2 px-3 py-2 text-xs'>
