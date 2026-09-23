@@ -1,3 +1,8 @@
+import { CopyIcon } from '@phosphor-icons/react'
+import { Button } from '@workspace/ui/components/button'
+import { Tooltip, TooltipContent, TooltipTrigger } from '@workspace/ui/components/tooltip'
+import { copyTextToClipboard } from '@/lib/clipboard'
+import { logCopyValue } from '@/features/logs/utils/copy'
 import { memo, useRef, type PointerEvent } from 'react'
 import type { LogEventDetail, LogEventSummary } from '@workspace/contracts'
 import { ListRow } from '@workspace/ui/patterns/list-row'
@@ -43,7 +48,7 @@ export const LogsEventRow = memo(function LogsEventRow({
   }
 
   return (
-    <div className='w-full select-text'>
+    <div className='w-full select-text' data-log-event-id={event.id}>
       <ListRow
         {...rowProps}
         role='option'
@@ -82,6 +87,29 @@ export const LogsEventRow = memo(function LogsEventRow({
           >
             {event.level}
           </span>
+          <Tooltip>
+            <TooltipTrigger
+              render={
+                <Button
+                  aria-label='Copy log event'
+                  tabIndex={-1}
+                  size='icon-xs'
+                  variant='ghost'
+                  onPointerDown={(pointer) => pointer.stopPropagation()}
+                  onClick={(pointer) => {
+                    pointer.stopPropagation()
+                    void copyTextToClipboard(
+                      JSON.stringify(logCopyValue(event, detail), null, 2),
+                      'log event',
+                    )
+                  }}
+                >
+                  <CopyIcon className='size-(--icon-size-sm)' />
+                </Button>
+              }
+            />
+            <TooltipContent>Copy log event</TooltipContent>
+          </Tooltip>
           <LogsRowChevron expanded={expanded} />
         </span>
       </ListRow>

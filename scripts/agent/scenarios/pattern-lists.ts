@@ -62,6 +62,39 @@ export const logsPanel: Scenario = {
       0,
       'Only the log container is a Tab stop',
     )
+    await page.context().grantPermissions(['clipboard-read', 'clipboard-write'])
+    const firstRow = selectors.logRows(page).first()
+    const expandedBeforeCopy = await firstRow.getAttribute('aria-expanded')
+    await selectors.logCopyButtons(page).first().click()
+    strictEqual(await firstRow.getAttribute('aria-expanded'), expandedBeforeCopy)
+    const copied = await page.evaluate<string>('navigator.clipboard.readText()')
+    ok(JSON.parse(copied).timestamp, 'Copy button includes the structured event')
+    await firstRow.click({ button: 'right' })
+    await selectors.menuItem(page, 'Copy current log').waitFor()
+    await step('log-context-menu')
+    await selectors.menuItem(page, 'Copy current log').click()
+    strictEqual(await page.evaluate<string>('navigator.clipboard.readText()'), copied)
+    await firstRow.click({ button: 'right' })
+    await selectors.menuItem(page, 'Copy visible logs').click()
+    const visibleCopy = await page.evaluate<string>('navigator.clipboard.readText()')
+    ok(visibleCopy.split('\n').every((line) => JSON.parse(line).timestamp))
+    ok(
+      visibleCopy.split('\n').length >= (await selectors.logRows(page).count()),
+      'Copy includes every displayed row',
+    )
+    await firstRow.click({ button: 'right' })
+    const clearedId = await firstRow.getAttribute('id')
+    await selectors.menuItem(page, 'Clear current log').click()
+    ok((await selectors.logRows(page).first().getAttribute('id')) !== clearedId)
+    await selectors.logRows(page).first().click({ button: 'right' })
+    await selectors.menuItem(page, 'Clear visible logs').click()
+    await selectors.logCleared(page).waitFor()
+    strictEqual(await selectors.logRows(page).count(), 0)
+    await step('logs-cleared')
+    await selectors.logCleared(page).click({ button: 'right' })
+    await selectors.menuItem(page, 'Restore cleared logs').click()
+    await selectors.logRows(page).first().waitFor()
+    strictEqual(await selectors.logRows(page).first().getAttribute('id'), clearedId)
     await step('log-events')
     await selectors.logRows(page).first().click()
     await step('inspected-event')
@@ -69,6 +102,12 @@ export const logsPanel: Scenario = {
     await step('next-event')
     await page.keyboard.press('Enter')
     await step('keyboard-inspected-event')
+    await list.focus()
+    await page.keyboard.press('Shift+F10')
+    await selectors.menuItem(page, 'Copy current log').waitFor({ timeout: 3000 })
+    strictEqual(await selectors.menuItem(page, 'Copy current log').isEnabled(), true)
+    await step('keyboard-log-menu')
+    await page.keyboard.press('Escape')
   },
 }
 
